@@ -1,6 +1,7 @@
 import type { Bundle } from "../domain/template.ts";
 import type { Release } from "../domain/release.ts";
 import type { CheckOutcome } from "../domain/check_result.ts";
+import type { InstalledLock } from "../domain/installed_lock.ts";
 
 export interface FsWriter {
   detectConflicts(bundle: Bundle, targetDir: string): Promise<string[]>;
@@ -87,4 +88,14 @@ export interface EnvironmentProbe {
 
 export interface ProjectInspector {
   inspect(projectDir: string, templatesVersion: string): Promise<CheckOutcome[]>;
+}
+
+export interface LockStore {
+  read(projectDir: string): Promise<InstalledLock | null>;
+  write(projectDir: string, lock: InstalledLock): Promise<void>;
+  lockPath(projectDir: string): string;
+}
+
+export interface FsReader {
+  readText(projectDir: string, rel: string): Promise<string | null>;
 }
