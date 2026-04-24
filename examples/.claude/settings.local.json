@@ -1,0 +1,18 @@
+{
+  "env": {
+    "CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS": "1"
+  },
+  "permissions": {
+    "allow": [
+      "Bash(*)",
+      "Bash(grep -iE '\\(^tmp/|^temp/|\\\\.tmp\\\\.|test_scratch|debug_|scratch\\\\.|playground\\\\.|^test\\\\.[tj]s$|^try\\\\.|^check\\\\.|^verify\\\\.|spike\\\\.|^experiment\\)')",
+      "Skill(expose-tunnel)",
+      "Skill(expose-tunnel:*)",
+      "Skill(status-audit)",
+      "Skill(status-audit:*)",
+      "WebFetch(domain:www.pulumi.com)",
+      "WebFetch(domain:tkdodo.eu)",
+      "WebFetch(domain:react-photo-album.com)"
+    ]
+  }
+}

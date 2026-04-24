@@ -1,0 +1,57 @@
+{
+  "permissions": {
+    "allow": [
+      "WebFetch(domain:www.pulumi.com)",
+      "WebFetch(domain:github.com)",
+      "Edit(/.claude/skills/pulumi-infrastructure/**)"
+    ]
+  },
+  "hooks": {
+    "SubagentStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": ".claude/hooks/log-subagent-event.sh start",
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "SubagentStop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": ".claude/hooks/log-subagent-event.sh stop",
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": ".claude/hooks/protect-files.sh",
+            "timeout": 5
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": ".claude/hooks/auto-format.sh",
+            "timeout": 15
+          }
+        ]
+      }
+    ]
+  }
+}
