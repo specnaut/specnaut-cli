@@ -1,5 +1,6 @@
 import type { Downloader, ReleaseChecker } from "./ports.ts";
 import { SemVer } from "../domain/release.ts";
+import { sha256HexBytes } from "../domain/sha256.ts";
 
 export type SelfUpdateResult =
   | { status: "up-to-date"; currentVersion: string }
@@ -51,7 +52,7 @@ export class SelfUpdateUseCase {
     ]);
 
     const expectedSha = checksumText.trim().split(/\s+/)[0];
-    const actualSha = await sha256Hex(bytes);
+    const actualSha = await sha256HexBytes(bytes);
     if (expectedSha !== actualSha) {
       throw new Error(
         `Downloaded binary checksum mismatch: expected ${expectedSha}, got ${actualSha}`,
@@ -66,13 +67,4 @@ export class SelfUpdateUseCase {
       newVersion: release.version.toString(),
     };
   }
-}
-
-async function sha256Hex(bytes: Uint8Array): Promise<string> {
-  const buf = new ArrayBuffer(bytes.byteLength);
-  new Uint8Array(buf).set(bytes);
-  const digest = await crypto.subtle.digest("SHA-256", buf);
-  return Array.from(new Uint8Array(digest))
-    .map((b) => b.toString(16).padStart(2, "0"))
-    .join("");
 }
