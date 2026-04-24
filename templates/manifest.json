@@ -50,11 +50,6 @@
       "executable": true
     },
     {
-      "source": "specify/scripts/bash/update-agent-context.sh",
-      "destination": ".specify/scripts/bash/update-agent-context.sh",
-      "executable": true
-    },
-    {
       "source": "specify/scripts/powershell/check-prerequisites.ps1",
       "destination": ".specify/scripts/powershell/check-prerequisites.ps1"
     },

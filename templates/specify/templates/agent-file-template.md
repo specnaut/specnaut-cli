@@ -1,9 +1,28 @@
-# Agent File (Self-Test Preset)
+# [PROJECT NAME] Development Guidelines
 
-<!-- preset:self-test -->
+Auto-generated from all feature plans. Last updated: [DATE]
 
-> This template is provided by the self-test preset.
+## Active Technologies
 
-## Agent Instructions
+[EXTRACTED FROM ALL PLAN.MD FILES]
 
-Follow these guidelines when working on this project.
+## Project Structure
+
+```text
+[ACTUAL STRUCTURE FROM PLANS]
+```
+
+## Commands
+
+[ONLY COMMANDS FOR ACTIVE TECHNOLOGIES]
+
+## Code Style
+
+[LANGUAGE-SPECIFIC, ONLY FOR LANGUAGES IN USE]
+
+## Recent Changes
+
+[LAST 3 FEATURES AND WHAT THEY ADDED]
+
+<!-- MANUAL ADDITIONS START -->
+<!-- MANUAL ADDITIONS END -->
