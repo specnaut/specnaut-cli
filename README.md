@@ -25,6 +25,37 @@ pour la vision complète.
 Specflow ne parle à aucun LLM. Specflow n'orchestre aucun agent. Il faut un harnais IA compatible
 (comme avec l'amont).
 
+## Installation
+
+### curl | bash
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/kevinraimbaud/specflow/main/install.sh | bash
+```
+
+Pin a version: `VERSION=v0.1.0-alpha.1`. Change install dir: `PREFIX=$HOME/.local/bin`.
+
+### Homebrew
+
+```bash
+brew tap kevinraimbaud/tap
+brew install specflow
+```
+
+(The tap is updated manually at release time for v0.1.)
+
+### Manual
+
+Download the binary for your OS/arch from
+[GitHub Releases](https://github.com/kevinraimbaud/specflow/releases), run `chmod +x` and place it
+in your `$PATH`.
+
+On macOS, you may need to clear the quarantine attribute after download:
+
+```bash
+xattr -d com.apple.quarantine /path/to/specflow
+```
+
 ## Development setup
 
 ```bash
