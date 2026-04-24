@@ -10,13 +10,14 @@ export type Intent =
     noGit: boolean;
     ai: "claude";
   }
+  | { kind: "self-update"; checkOnly: boolean }
   | { kind: "unknown"; received: string };
 
 export function parseArgs(argv: string[]): Intent {
   if (argv.length === 0) return { kind: "help" };
 
   const parsed = stdParseArgs(argv, {
-    boolean: ["version", "help", "here", "no-git"],
+    boolean: ["version", "help", "here", "no-git", "check"],
     alias: { v: "version", h: "help" },
   });
 
@@ -32,6 +33,10 @@ export function parseArgs(argv: string[]): Intent {
       noGit: Boolean(parsed["no-git"]),
       ai: "claude",
     };
+  }
+
+  if (command === "self-update") {
+    return { kind: "self-update", checkOnly: Boolean(parsed.check) };
   }
 
   return { kind: "unknown", received: command ?? "" };

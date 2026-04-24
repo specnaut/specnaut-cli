@@ -16,6 +16,12 @@ export async function run(argv: string[]): Promise<number> {
       const { runInit } = await import("./cli/handlers/init_handler.ts");
       return await runInit(intent);
     }
+    case "self-update": {
+      const { handleSelfUpdate } = await import(
+        "./cli/handlers/self_update_handler.ts"
+      );
+      return await handleSelfUpdate(intent);
+    }
     case "unknown":
       console.error(red(`Unknown command: "${intent.received}"`));
       console.error(HELP);

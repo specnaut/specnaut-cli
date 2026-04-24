@@ -45,3 +45,17 @@ Deno.test("parseArgs returns init intent with --no-git", () => {
 Deno.test("parseArgs returns unknown intent for invalid commands", () => {
   assertEquals(parseArgs(["bogus"]), { kind: "unknown", received: "bogus" });
 });
+
+Deno.test("parseArgs returns self-update intent with --check", () => {
+  assertEquals(parseArgs(["self-update", "--check"]), {
+    kind: "self-update",
+    checkOnly: true,
+  });
+});
+
+Deno.test("parseArgs returns self-update intent without --check", () => {
+  assertEquals(parseArgs(["self-update"]), {
+    kind: "self-update",
+    checkOnly: false,
+  });
+});

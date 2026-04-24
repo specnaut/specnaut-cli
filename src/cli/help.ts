@@ -7,6 +7,7 @@ export const HELP = `${
 ${bold("Usage:")}
   specflow init <project-name>        Bootstrap a new project in ./<project-name>
   specflow init --here                Bootstrap in the current directory
+  specflow self-update [--check]      Update the specflow binary
   specflow --version                  Print version
   specflow --help                     Show this help
 
