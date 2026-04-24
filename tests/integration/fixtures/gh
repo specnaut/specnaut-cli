@@ -1,0 +1,23 @@
+#!/usr/bin/env bash
+# Records args to $GH_SHIM_LOG and prints canned responses.
+# Used by tests/integration/backlog_sync_test.ts.
+echo "$@" >> "${GH_SHIM_LOG:-/tmp/gh-shim.log}"
+
+case "$1 $2" in
+  "--version "*) echo "gh version 2.50.0"; exit 0 ;;
+  "auth status") exit 0 ;;
+  "issue list")
+    echo "[]"
+    exit 0
+    ;;
+  "issue create")
+    echo "https://github.com/kevin/specflow/issues/42"
+    exit 0
+    ;;
+  "issue edit"*|"issue close"*|"issue reopen"*)
+    exit 0
+    ;;
+  *)
+    exit 0
+    ;;
+esac
