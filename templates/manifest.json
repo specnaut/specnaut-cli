@@ -64,6 +64,42 @@
     {
       "source": "specify/scripts/powershell/setup-plan.ps1",
       "destination": ".specify/scripts/powershell/setup-plan.ps1"
+    },
+    {
+      "source": "claude/commands/speckit.specify.md",
+      "destination": ".claude/commands/speckit.specify.md"
+    },
+    {
+      "source": "claude/commands/speckit.clarify.md",
+      "destination": ".claude/commands/speckit.clarify.md"
+    },
+    {
+      "source": "claude/commands/speckit.plan.md",
+      "destination": ".claude/commands/speckit.plan.md"
+    },
+    {
+      "source": "claude/commands/speckit.tasks.md",
+      "destination": ".claude/commands/speckit.tasks.md"
+    },
+    {
+      "source": "claude/commands/speckit.analyze.md",
+      "destination": ".claude/commands/speckit.analyze.md"
+    },
+    {
+      "source": "claude/commands/speckit.implement.md",
+      "destination": ".claude/commands/speckit.implement.md"
+    },
+    {
+      "source": "claude/commands/speckit.constitution.md",
+      "destination": ".claude/commands/speckit.constitution.md"
+    },
+    {
+      "source": "claude/commands/speckit.checklist.md",
+      "destination": ".claude/commands/speckit.checklist.md"
+    },
+    {
+      "source": "claude/commands/speckit.merge.md",
+      "destination": ".claude/commands/speckit.merge.md"
     }
   ]
 }
