@@ -83,33 +83,48 @@ async function teardown(dir: string) {
   await Deno.remove(dir, { recursive: true });
 }
 
-Deno.test("specflow backlog sync --dry-run prints create plan", async () => {
-  const { dir, logFile } = await setupProject();
-  try {
-    const { code, stdout } = await run(["backlog", "sync", "--dry-run"], {
-      cwd: dir,
-      logFile,
-    });
-    assertEquals(code, 0);
-    assertStringIncludes(stdout, "+ 001 create");
-  } finally {
-    await teardown(dir);
-  }
+// The 3 tests below rely on a POSIX-shell shim named `gh` (no extension) on
+// PATH. Windows cannot execute Unix shebang scripts directly via `Deno.Command`
+// without a bash wrapper, so we skip there. The underlying logic is already
+// covered by tests/infrastructure/gh_cli_test.ts against a fake
+// SubprocessRunner on all platforms.
+const SKIP_ON_WINDOWS = Deno.build.os === "windows";
+
+Deno.test({
+  name: "specflow backlog sync --dry-run prints create plan",
+  ignore: SKIP_ON_WINDOWS,
+  fn: async () => {
+    const { dir, logFile } = await setupProject();
+    try {
+      const { code, stdout } = await run(["backlog", "sync", "--dry-run"], {
+        cwd: dir,
+        logFile,
+      });
+      assertEquals(code, 0);
+      assertStringIncludes(stdout, "+ 001 create");
+    } finally {
+      await teardown(dir);
+    }
+  },
 });
 
-Deno.test("specflow backlog sync calls gh with expected args", async () => {
-  const { dir, logFile } = await setupProject();
-  try {
-    const { code } = await run(["backlog", "sync"], { cwd: dir, logFile });
-    assertEquals(code, 0);
-    const log = await Deno.readTextFile(logFile);
-    assertStringIncludes(log, "issue list");
-    assertStringIncludes(log, "issue create");
-    assertStringIncludes(log, "backlog/001");
-    assertStringIncludes(log, "priority/high");
-  } finally {
-    await teardown(dir);
-  }
+Deno.test({
+  name: "specflow backlog sync calls gh with expected args",
+  ignore: SKIP_ON_WINDOWS,
+  fn: async () => {
+    const { dir, logFile } = await setupProject();
+    try {
+      const { code } = await run(["backlog", "sync"], { cwd: dir, logFile });
+      assertEquals(code, 0);
+      const log = await Deno.readTextFile(logFile);
+      assertStringIncludes(log, "issue list");
+      assertStringIncludes(log, "issue create");
+      assertStringIncludes(log, "backlog/001");
+      assertStringIncludes(log, "priority/high");
+    } finally {
+      await teardown(dir);
+    }
+  },
 });
 
 Deno.test("specflow backlog sync exits 2 when config missing", async () => {
@@ -127,12 +142,15 @@ Deno.test("specflow backlog sync exits 2 when config missing", async () => {
   }
 });
 
-Deno.test("specflow backlog sync --id filters to the specified task", async () => {
-  const { dir, logFile } = await setupProject();
-  try {
-    await Deno.writeTextFile(
-      join(dir, "tasks/backlog/002-second.md"),
-      `---
+Deno.test({
+  name: "specflow backlog sync --id filters to the specified task",
+  ignore: SKIP_ON_WINDOWS,
+  fn: async () => {
+    const { dir, logFile } = await setupProject();
+    try {
+      await Deno.writeTextFile(
+        join(dir, "tasks/backlog/002-second.md"),
+        `---
 id: "002"
 title: "Second"
 category: devex
@@ -147,17 +165,18 @@ created: 2026-04-24
 
 Second task.
 `,
-    );
-    const { code } = await run(["backlog", "sync", "--id", "002"], {
-      cwd: dir,
-      logFile,
-    });
-    assertEquals(code, 0);
-    const log = await Deno.readTextFile(logFile);
-    assertStringIncludes(log, "backlog/002");
-    const createCount = (log.match(/issue create/g) || []).length;
-    assertEquals(createCount, 1);
-  } finally {
-    await teardown(dir);
-  }
+      );
+      const { code } = await run(["backlog", "sync", "--id", "002"], {
+        cwd: dir,
+        logFile,
+      });
+      assertEquals(code, 0);
+      const log = await Deno.readTextFile(logFile);
+      assertStringIncludes(log, "backlog/002");
+      const createCount = (log.match(/issue create/g) || []).length;
+      assertEquals(createCount, 1);
+    } finally {
+      await teardown(dir);
+    }
+  },
 });
