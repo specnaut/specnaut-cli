@@ -106,6 +106,9 @@
     { "source": "claude/agents/review-coordinator.md",         "destination": ".claude/agents/review-coordinator.md" },
     { "source": "claude/agents/code-reviewer.md",              "destination": ".claude/agents/code-reviewer.md" },
     { "source": "claude/agents/security-auditor.md",           "destination": ".claude/agents/security-auditor.md" },
-    { "source": "claude/agents/test-reviewer.md",              "destination": ".claude/agents/test-reviewer.md" }
+    { "source": "claude/agents/test-reviewer.md",              "destination": ".claude/agents/test-reviewer.md" },
+    { "source": "claude/commands/backlog.md",        "destination": ".claude/commands/backlog.md" },
+    { "source": "claude/agents/product-owner.md",    "destination": ".claude/agents/product-owner.md" },
+    { "source": "root/tasks/backlog.md",             "destination": "tasks/backlog.md" }
   ]
 }
