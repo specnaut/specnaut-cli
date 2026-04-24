@@ -30,8 +30,8 @@ import type { ExistingIssue, SyncAction } from "../domain/backlog/sync_plan.ts";
 import type { SyncConfig } from "../domain/sync_config.ts";
 
 export interface BacklogReader {
-  readAll(tasksDir: string): Promise<BacklogTask[]>;
-  readOne(tasksDir: string, id: string): Promise<BacklogTask | null>;
+  readAll(projectDir: string): Promise<BacklogTask[]>;
+  readOne(projectDir: string, id: string): Promise<BacklogTask | null>;
 }
 
 export interface BacklogSyncTarget {

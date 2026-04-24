@@ -6,8 +6,8 @@ import type { BacklogReader } from "../application/ports.ts";
 const ENTRY_RE = /^(\d{3})-[\w.-]+\.md$/;
 
 export class FsBacklogReader implements BacklogReader {
-  async readAll(tasksDir: string): Promise<BacklogTask[]> {
-    const dir = join(tasksDir, "backlog");
+  async readAll(projectDir: string): Promise<BacklogTask[]> {
+    const dir = join(projectDir, "tasks", "backlog");
     const tasks: BacklogTask[] = [];
     try {
       for await (const entry of Deno.readDir(dir)) {
@@ -24,9 +24,9 @@ export class FsBacklogReader implements BacklogReader {
     return tasks;
   }
 
-  async readOne(tasksDir: string, id: string): Promise<BacklogTask | null> {
+  async readOne(projectDir: string, id: string): Promise<BacklogTask | null> {
     const padded = id.padStart(3, "0");
-    const dir = join(tasksDir, "backlog");
+    const dir = join(projectDir, "tasks", "backlog");
     try {
       for await (const entry of Deno.readDir(dir)) {
         if (!entry.isFile) continue;

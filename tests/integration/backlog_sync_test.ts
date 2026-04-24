@@ -56,9 +56,9 @@ sync:
 `,
   );
 
-  await Deno.mkdir(join(dir, "backlog"), { recursive: true });
+  await Deno.mkdir(join(dir, "tasks/backlog"), { recursive: true });
   await Deno.writeTextFile(
-    join(dir, "backlog/001-hello.md"),
+    join(dir, "tasks/backlog/001-hello.md"),
     `---
 id: "001"
 title: "Hello"
@@ -131,7 +131,7 @@ Deno.test("specflow backlog sync --id filters to the specified task", async () =
   const { dir, logFile } = await setupProject();
   try {
     await Deno.writeTextFile(
-      join(dir, "backlog/002-second.md"),
+      join(dir, "tasks/backlog/002-second.md"),
       `---
 id: "002"
 title: "Second"
