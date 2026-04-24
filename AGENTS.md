@@ -33,11 +33,23 @@ Si la question est "est-ce que Specflow peut tourner sans que l'utilisateur ait 
 - Pas de notion de **backlog produit** : une feature à la fois, sans vue d'ensemble
 - Sync avec un tracker distant (GitHub Issues…) à faire à la main
 
-## Choix techniques à trancher
+## Décisions figées
 
-- **Langage** : Rust | Go | Deno | Bun | Node — critère clé = binaire cross-platform facile à distribuer via Homebrew / `curl | sh` / GitHub Releases. Le binaire ne fait que copier des templates et piloter quelques scripts locaux (`git`, `gh`) — la charge CPU est nulle, donc le choix est un choix d'**ergonomie de distribution** et de **vélocité de développement**, pas de perf.
-- **Backlog storage** : en v1, fichiers Markdown locaux (index + un fichier par tâche) + push one-way vers GitHub Issues/Project via `gh`. Formats distants additionnels (GitLab, Bitbucket) = v2+.
-- **Harnais cibles pour le scaffolding** : upstream supporte Claude, Cursor, Copilot, Codex, Gemini, Windsurf, Qwen, etc. À décider lesquels on supporte en v0.1.
+- **Langage** : **Deno** (TypeScript, compile natif via `deno compile`, stdlib officielle zero-deps, skills IA officiels `denoland/skills` pour la vélocité de dev).
+- **Scope v0.1 — "Parity Claude Code + le delta"** :
+  - Un seul harnais cible : **Claude Code** (`.claude/` + `.specify/`)
+  - Comportement et surface CLI équivalents à `specify init` upstream
+  - Les **3 features différenciantes embarquées par défaut** : auto-chain, phase `review`, backlog + agent Product Owner
+- **Backlog storage v0.1** : fichiers Markdown locaux (index + un fichier par tâche) + script de sync one-way vers GitHub Issues/Project V2 via `gh`. GitLab/Bitbucket en v2+.
+- **Harnais additionnels** (Cursor, Copilot, Codex, Gemini, Windsurf, …) : v0.2+.
+
+## À explorer / décider au niveau design
+
+- Surface CLI exacte (commandes, flags)
+- Structure du dépôt Specflow
+- Quels templates amont on réutilise tels quels vs on réécrit
+- Stratégie de distribution (GitHub Releases + Homebrew + `curl | sh`)
+- Gestion des projets existants (merge vs overwrite sur un `.claude/` pré-existant)
 
 ## Méthodologie observée dans `examples/` (de référence, pas à recopier)
 
