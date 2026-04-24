@@ -12,6 +12,8 @@ ${bold("Usage:")}
                                      Sync tasks/backlog/ to GitHub Issues + Project V2
   specflow backlog configure         Interactive setup of .specflow/config.yml
   specflow check [--project]         Diagnose the environment (and optionally the project)
+  specflow upgrade [--dry-run] [--force]
+                                     Update project templates to the binary's version
   specflow --version                  Print version
   specflow --help                     Show this help
 

@@ -15,6 +15,7 @@ export type Intent =
   | { kind: "backlog-sync"; singleId: string | null; dryRun: boolean; allowSecrets: boolean }
   | { kind: "backlog-configure" }
   | { kind: "check"; projectMode: boolean }
+  | { kind: "upgrade"; dryRun: boolean; force: boolean }
   | { kind: "unknown"; received: string };
 
 export function parseArgs(argv: string[]): Intent {
@@ -73,6 +74,14 @@ export function parseArgs(argv: string[]): Intent {
 
   if (command === "check") {
     return { kind: "check", projectMode: Boolean(parsed.project) };
+  }
+
+  if (command === "upgrade") {
+    return {
+      kind: "upgrade",
+      dryRun: Boolean(parsed["dry-run"]),
+      force: Boolean(parsed.force),
+    };
   }
 
   return { kind: "unknown", received: command ?? "" };

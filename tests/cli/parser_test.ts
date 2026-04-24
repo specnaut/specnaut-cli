@@ -115,3 +115,19 @@ Deno.test("parseArgs init without --force defaults to false", () => {
   const result = parseArgs(["init", "demo"]);
   if (result.kind === "init") assertEquals(result.force, false);
 });
+
+Deno.test("parseArgs returns upgrade intent", () => {
+  assertEquals(parseArgs(["upgrade"]), {
+    kind: "upgrade",
+    dryRun: false,
+    force: false,
+  });
+});
+
+Deno.test("parseArgs returns upgrade intent with --dry-run --force", () => {
+  assertEquals(parseArgs(["upgrade", "--dry-run", "--force"]), {
+    kind: "upgrade",
+    dryRun: true,
+    force: true,
+  });
+});
