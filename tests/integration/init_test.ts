@@ -1,0 +1,99 @@
+import { assertEquals, assertStringIncludes } from "@std/assert";
+import { exists } from "@std/fs/exists";
+import { join } from "@std/path";
+
+const MAIN = new URL("../../src/main.ts", import.meta.url).pathname;
+
+async function runSpecflow(
+  args: string[],
+  opts: { cwd?: string } = {},
+): Promise<{ code: number; stdout: string; stderr: string }> {
+  const p = new Deno.Command("deno", {
+    args: [
+      "run",
+      "--allow-read",
+      "--allow-write",
+      "--allow-run",
+      "--allow-env",
+      MAIN,
+      ...args,
+    ],
+    cwd: opts.cwd,
+    stdout: "piped",
+    stderr: "piped",
+  });
+  const { code, stdout, stderr } = await p.output();
+  return {
+    code,
+    stdout: new TextDecoder().decode(stdout),
+    stderr: new TextDecoder().decode(stderr),
+  };
+}
+
+async function withTempDir(fn: (dir: string) => Promise<void>) {
+  const dir = await Deno.makeTempDir({ prefix: "specflow-integ-" });
+  try {
+    await fn(dir);
+  } finally {
+    await Deno.remove(dir, { recursive: true });
+  }
+}
+
+Deno.test("specflow init <name> writes a complete tree", async () => {
+  await withTempDir(async (dir) => {
+    const { code, stderr } = await runSpecflow(["init", "demo", "--no-git"], { cwd: dir });
+    assertEquals(code, 0, `init failed: ${stderr}`);
+
+    const root = join(dir, "demo");
+    assertEquals(await exists(join(root, "CLAUDE.md")), true);
+    assertEquals(await exists(join(root, "AGENTS.md")), true);
+    assertEquals(await exists(join(root, "tasks/backlog.md")), true);
+    assertEquals(await exists(join(root, ".specify/memory/constitution.md")), true);
+    assertEquals(await exists(join(root, ".specify/templates/spec-template.md")), true);
+    assertEquals(await exists(join(root, ".claude/commands/speckit.specify.md")), true);
+    assertEquals(await exists(join(root, ".claude/commands/speckit.review.md")), true);
+    assertEquals(await exists(join(root, ".claude/commands/backlog.md")), true);
+    assertEquals(await exists(join(root, ".claude/agents/product-owner.md")), true);
+    assertEquals(await exists(join(root, ".claude/skills/speckit/SKILL.md")), true);
+  });
+});
+
+Deno.test("specflow init --here writes into cwd", async () => {
+  await withTempDir(async (dir) => {
+    const { code, stderr } = await runSpecflow(["init", "--here", "--no-git"], { cwd: dir });
+    assertEquals(code, 0, `init --here failed: ${stderr}`);
+    assertEquals(await exists(join(dir, "CLAUDE.md")), true);
+  });
+});
+
+Deno.test("specflow init refuses to overwrite a pre-existing .claude/", async () => {
+  await withTempDir(async (dir) => {
+    await Deno.mkdir(join(dir, "demo/.claude/commands"), { recursive: true });
+    await Deno.writeTextFile(
+      join(dir, "demo/.claude/commands/speckit.specify.md"),
+      "custom",
+    );
+    const { code, stderr } = await runSpecflow(["init", "demo", "--no-git"], { cwd: dir });
+    assertEquals(code, 3);
+    assertStringIncludes(stderr, ".claude/commands/speckit.specify.md");
+  });
+});
+
+Deno.test("specflow --version prints semver line", async () => {
+  const { code, stdout } = await runSpecflow(["--version"]);
+  assertEquals(code, 0);
+  assertStringIncludes(stdout, "specflow ");
+  assertStringIncludes(stdout, "templates ");
+});
+
+Deno.test("specflow --help prints usage", async () => {
+  const { code, stdout } = await runSpecflow(["--help"]);
+  assertEquals(code, 0);
+  assertStringIncludes(stdout, "Usage:");
+  assertStringIncludes(stdout, "specflow init");
+});
+
+Deno.test("specflow bogus returns exit code 2", async () => {
+  const { code } = await runSpecflow(["bogus"]);
+  assertEquals(code, 2);
+});
