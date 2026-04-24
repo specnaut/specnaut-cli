@@ -17,9 +17,7 @@ export function parseArgs(argv: string[]): Intent {
 
   const parsed = stdParseArgs(argv, {
     boolean: ["version", "help", "here", "no-git"],
-    string: ["ai"],
     alias: { v: "version", h: "help" },
-    default: { ai: "claude" },
   });
 
   if (parsed.version) return { kind: "version" };
