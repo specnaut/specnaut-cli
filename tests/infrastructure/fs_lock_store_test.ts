@@ -52,5 +52,5 @@ Deno.test("FsLockStore.write creates .specflow dir if absent", async () => {
 
 Deno.test("FsLockStore.lockPath returns canonical location", () => {
   const store = new FsLockStore();
-  assertEquals(store.lockPath("/proj"), "/proj/.specflow/installed.lock");
+  assertEquals(store.lockPath("/proj"), join("/proj", ".specflow/installed.lock"));
 });

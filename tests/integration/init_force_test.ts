@@ -1,8 +1,8 @@
 import { assertEquals } from "@std/assert";
 import { exists } from "@std/fs/exists";
-import { join } from "@std/path";
+import { fromFileUrl, join } from "@std/path";
 
-const MAIN = new URL("../../src/main.ts", import.meta.url).pathname;
+const MAIN = fromFileUrl(new URL("../../src/main.ts", import.meta.url));
 
 async function runSpecflow(
   args: string[],

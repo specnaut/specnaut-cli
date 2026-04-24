@@ -54,5 +54,5 @@ Deno.test("FsConfigStore.write creates .specflow dir if absent", async () => {
 
 Deno.test("FsConfigStore.configPath returns canonical location", () => {
   const store = new FsConfigStore();
-  assertEquals(store.configPath("/proj"), "/proj/.specflow/config.yml");
+  assertEquals(store.configPath("/proj"), join("/proj", ".specflow/config.yml"));
 });

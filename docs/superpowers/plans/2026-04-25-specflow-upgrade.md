@@ -1002,7 +1002,7 @@ function fakeLockStore(): LockStore & { lastWritten: InstalledLock | null } {
 
 Then, in every `InitProjectUseCase` constructor call, add `lockStore: fakeLockStore()`.
 
-For a couple tests that need to assert the lock was written (test below), capture the lock store:
+For tests that need to assert the lock was written, capture the lock store:
 
 ```typescript
 const lockStore = fakeLockStore();
@@ -1059,7 +1059,7 @@ assertEquals(aEntry!.sha256.length, 64);
 assertEquals(typeof aEntry!.sha256, "string");
 ```
 
-That avoids the recompute. Use that form.
+Use this form to avoid recomputing the hash.
 
 - [ ] **Step 6: Run full suite — expect 178 green (177 + 1 new)**
 
@@ -1664,7 +1664,7 @@ git commit -m "feat(cli): specflow upgrade [--dry-run] [--force] command"
 
 - Create: `tests/integration/upgrade_test.ts`
 
-End-to-end: spawn real binary, init a project, modify a file, upgrade, assert behaviour.
+End-to-end: spawn the real binary, init a project, modify a file, run upgrade, assert behaviour.
 
 - [ ] **Step 1: Write the test**
 
@@ -1880,8 +1880,8 @@ upgrade_plan got 8 tests instead of 6 and diff got 5.)
 
 ### Deferred work
 
-- 3-way merge automatique (design rejected option B)
-- Migration lock format (v1 → v2 forward-compat) when templates layout changes dramatically
-- Windows `.ps1` upgrade flow (currently inherits from bash-ish flow; Deno runtime is cross-platform
-  so should work)
+- Automatic 3-way merge (design rejected option B)
+- Lock format migration (v1 → v2 forward-compat) when the templates layout changes significantly
+- Windows `.ps1` upgrade flow (currently inherits from the bash-ish flow; Deno runtime is
+  cross-platform so should work)
 - Auto-push Homebrew formula on release

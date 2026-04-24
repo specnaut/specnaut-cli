@@ -1,46 +1,46 @@
 # Specflow `upgrade` — Design
 
-**Date** : 2026-04-25 **Statut** : draft, en attente de revue **Brique** : template-upgrade
-(post-release-ready) **Prérequis** : v0.1 release-ready bundle mergé sur `main` (156 tests green)
+**Date**: 2026-04-25 **Status**: draft, awaiting review **Feature**: template-upgrade
+(post-release-ready) **Prerequisites**: v0.1 release-ready bundle merged on `main` (156 tests green)
 
 ---
 
-## 1. Objectifs et non-objectifs
+## 1. Objectives and non-objectives
 
-### Objectifs
+### Objectives
 
-1. Ajouter `specflow upgrade [--dry-run] [--force]` qui met à jour les templates d'un projet
-   existant vers la version embarquée dans le binaire courant.
-2. **Ne jamais écraser silencieusement** une customisation locale de l'utilisateur.
-3. Détecter automatiquement les fichiers non-modifiés et les mettre à jour sans question.
-4. Pour les fichiers customisés, afficher un **diff clair** entre le template actuel (dans le
-   binaire) et le contenu disque, puis laisser l'utilisateur décider (manuel).
-5. Persister un snapshot SHA256 des templates installés dans `.specflow/installed.lock` pour
-   permettre la détection fiable des modifications.
+1. Add `specflow upgrade [--dry-run] [--force]` which updates the templates of an existing project
+   to the version embedded in the current binary.
+2. **Never silently overwrite** a user's local customization.
+3. Automatically detect unchanged files and update them without prompting.
+4. For customized files, display a **clear diff** between the current template (in the binary) and
+   the disk content, then let the user decide (manual).
+5. Persist a SHA256 snapshot of the installed templates in `.specflow/installed.lock` to enable
+   reliable modification detection.
 
-### Non-objectifs
+### Non-objectives
 
-- **3-way merge automatique** — rejeté en brainstorm (option B).
-- **Backup à la `init --force`** généralisé — rejeté (option C).
-- **Rollback de l'upgrade** — si l'utilisateur veut annuler, `git restore` ou `git checkout` fait le
-  job.
-- **Sync incrémental** (diff entre 2 versions de templates) — simple full compare suffit en v0.1.
-- **Mise à jour du binaire** — c'est `self-update`, pas `upgrade`.
+- **3-way automatic merge** — rejected in brainstorm (option B).
+- **Generalized `init --force`-style backup** — rejected (option C).
+- **Rollback of the upgrade** — if the user wants to cancel, `git restore` or `git checkout` does
+  the job.
+- **Incremental sync** (diff between 2 template versions) — simple full compare is enough in v0.1.
+- **Binary update** — that's `self-update`, not `upgrade`.
 
 ---
 
-## 2. Surface CLI
+## 2. CLI surface
 
 ```
 specflow upgrade [--dry-run] [--force]
 ```
 
-- Sans flag : upgrade interactif. Affiche un résumé et demande confirmation avant d'écrire.
-- `--dry-run` : affiche ce qui serait fait, aucune écriture.
-- `--force` : pour les fichiers customisés, écrase quand même (avec backup `.specflow.bak` —
-  réutilise le mécanisme existant de Task 7 de la brique précédente).
+- No flag: interactive upgrade. Shows a summary and asks for confirmation before writing.
+- `--dry-run`: shows what would be done, no writing.
+- `--force`: for customized files, overwrite anyway (with backup `.specflow.bak` — reuses the
+  existing mechanism from Task 7 of the previous feature).
 
-### Sortie
+### Output
 
 ```
 specflow upgrade — templates 0.2.0 → 0.3.0
@@ -73,11 +73,11 @@ Re-run with --force to overwrite them (your edits will be backed up to .specflow
 ...
 ```
 
-Exit 0 si rien n'a raté ; exit 1 sinon.
+Exit 0 if nothing failed; exit 1 otherwise.
 
 ---
 
-## 3. Architecture DDD
+## 3. DDD architecture
 
 ```
 src/
@@ -188,7 +188,7 @@ All pure. Testable without IO.
 ### Edge case — file removed from new bundle
 
 If a path exists in the lock but NOT in the new bundle (we deleted a template in an upstream
-revision), the use case emits no action for that path : we leave the file on disk (it's the user's
+revision), the use case emits no action for that path: we leave the file on disk (it's the user's
 copy now) and **remove the entry from the updated lock**. Not a regular `UpgradeAction` variant —
 handled as a cleanup step during `applied`.
 
@@ -220,7 +220,7 @@ export type UpgradeProjectResult =
   };
 ```
 
-Orchestration :
+Orchestration:
 
 1. Load lock via `LockStore.read(projectDir)` → if missing, abort with message "this project was
    initialized before upgrade support; run `specflow init --force` to re-init with lock tracking".
@@ -295,8 +295,8 @@ use case simply assembles a partial bundle (only the files to update) and calls
 
 ### Upgrade-before-lock fallback
 
-For users who `init`'d before this brick lands : their `.specflow/installed.lock` is missing.
-`upgrade` prints a clear message :
+For users who `init`'d before this feature lands: their `.specflow/installed.lock` is missing.
+`upgrade` prints a clear message:
 
 ```
 error: no .specflow/installed.lock found.
@@ -312,7 +312,7 @@ Exit 2.
 
 ## 9. Diff rendering
 
-For each `preserve` action, the handler renders a unified diff using a tiny pure implementation :
+For each `preserve` action, the handler renders a unified diff using a tiny pure implementation:
 
 - Use `@std/fs` / roll our own minimal line-diff (we have two strings; split by `\n`; compute
   LCS-based diff; emit `---`/`+++` headers).
@@ -345,16 +345,16 @@ trying to match `git diff` pixel-for-pixel — a readable unified-ish diff is en
 
 ### Integration
 
-- `tests/integration/upgrade_test.ts` — 2 tests : init-then-upgrade no-op path,
+- `tests/integration/upgrade_test.ts` — 2 tests: init-then-upgrade no-op path,
   init-then-modify-then-upgrade with diff output on stdout
 
-Target : 23 new tests, 156 → 179.
+Target: 23 new tests, 156 → 179.
 
 ---
 
 ## 11. Dependencies between changes
 
-Order :
+Order:
 
 1. Extract shared `sha256Hex` to `src/domain/sha256.ts` (already live in self-update)
 2. Add `InstalledLock` domain + YAML parse/serialize
@@ -374,25 +374,25 @@ Order :
 
 ---
 
-## 12. Risques et points ouverts
+## 12. Risks and open questions
 
-1. **Pre-existing installs without lock** : resolved in §8 — clean error with upgrade path via
+1. **Pre-existing installs without lock**: resolved in section 8 — clean error with upgrade path via
    `init --force`.
-2. **Lock file drift vs disk** : if user deletes a file, the lock still contains it. Decision: on
+2. **Lock file drift vs disk**: if user deletes a file, the lock still contains it. Decision: on
    upgrade, if file missing on disk AND still in lock → emit `add-new` action to re-add (assumes
    user's deletion was accidental OR the re-add is harmless). User can always `--dry-run` first.
-3. **Diff rendering on binary files** : templates are all text. Not a concern.
-4. **Large diffs flooding the terminal** : if a `preserve` diff is huge (>200 lines), truncate
+3. **Diff rendering on binary files**: templates are all text. Not a concern.
+4. **Large diffs flooding the terminal**: if a `preserve` diff is huge (>200 lines), truncate
    display and hint at saving to a file. Edge case — acceptable in v1.
-5. **Concurrent lock corruption** : no locking mechanism. If user runs two `upgrade` in parallel,
+5. **Concurrent lock corruption**: no locking mechanism. If user runs two `upgrade` in parallel,
    last-writer wins. Acceptable (CLI, no multi-process workflow expected).
-6. **`.specflow/installed.lock` in git** : should be committed (like `package-lock.json`) so team
+6. **`.specflow/installed.lock` in git**: should be committed (like `package-lock.json`) so team
    upgrades stay consistent. Add to bundled `.gitignore` as a NEGATIVE (`!.specflow/installed.lock`)
    — but actually the current `.gitignore` doesn't ignore `.specflow/` so no change needed. The
    config.yml.local is already the only ignored thing.
 
 ---
 
-## 13. Prochaine étape
+## 13. Next step
 
-Après validation de ce design, passer en `writing-plans` pour un plan découpé selon l'ordre de §11.
+After validation of this design, move to `writing-plans` for a plan broken down per section 11.

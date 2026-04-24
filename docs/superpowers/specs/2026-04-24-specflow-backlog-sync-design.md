@@ -1,74 +1,72 @@
 # Specflow `backlog sync` — Design
 
-**Date** : 2026-04-24 **Statut** : draft, en attente de revue **Brique** : 4 de la v0.1 post-init
-(reportée depuis le plan v0.1-init) **Prérequis** : v0.1-init mergé sur `main` (commit `d890a9b`)
+**Date**: 2026-04-24 **Status**: draft, pending review **Component**: 4 of v0.1 post-init (deferred
+from v0.1-init plan) **Prerequisites**: v0.1-init merged on `main` (commit `d890a9b`)
 
 ---
 
-## 1. Objectifs et non-objectifs
+## 1. Goals and non-goals
 
-### Objectifs
+### Goals
 
-1. Compléter le **delta #3** (backlog produit) en permettant de synchroniser les fichiers
-   `tasks/backlog/NNN-*.md` vers un tracker distant (GitHub Issues + Project V2 en v1).
-2. Ajouter deux sous-commandes CLI au binaire Specflow :
+1. Complete **delta #3** (product backlog) by enabling synchronization of `tasks/backlog/NNN-*.md`
+   files to a remote tracker (GitHub Issues + Project V2 in v1).
+2. Add two CLI subcommands to the Specflow binary:
    - `specflow backlog sync [--id NNN] [--dry-run]`
-   - `specflow backlog configure` (onboarding interactif)
-3. Persister la configuration dans un fichier `.specflow/config.yml` versionné.
-4. Zéro gestion de token côté utilisateur — on délègue l'auth à **`gh` CLI** (prérequis connu, déjà
-   dans l'écosystème).
-5. Respect strict de la DDD hexagonale déjà en place (domain / application / infrastructure / cli).
+   - `specflow backlog configure` (interactive onboarding)
+3. Persist configuration in a versioned `.specflow/config.yml` file.
+4. Zero token management on the user side — delegate auth to **`gh` CLI** (known prerequisite,
+   already in the ecosystem).
+5. Strict adherence to hexagonal DDD already in place (domain / application / infrastructure / cli).
 
-### Non-objectifs
+### Non-goals
 
-- **Sync bidirectionnel** (reverse MD ← GitHub) — reporté en v0.2.
-- **Adapters GitLab / Bitbucket** — reportés en v0.3 (le port `BacklogSyncTarget` sera conçu pour
-  les accueillir).
-- **Gestion de token GitHub sans `gh`** — si `gh` n'est pas authentifié, on émet une erreur
-  explicite avec instruction.
-- **Détection de drift** (issue éditée manuellement dans l'UI GitHub) — on overwrite, MD gagne.
-- **Support multi-project** — un seul Project V2 par config.
-- **Création automatique du Project V2** — on assume que l'utilisateur l'a déjà créé dans l'UI
-  GitHub ou en crée un via `gh`.
+- **Bidirectional sync** (reverse MD ← GitHub) — deferred to v0.2.
+- **GitLab / Bitbucket adapters** — deferred to v0.3 (the `BacklogSyncTarget` port will be designed
+  to support them).
+- **GitHub token management without `gh`** — if `gh` is not authenticated, emit an explicit error
+  with instructions.
+- **Drift detection** (issue edited manually in GitHub UI) — we overwrite, MD wins.
+- **Multi-project support** — one Project V2 per config.
+- **Automatic Project V2 creation** — assume the user has already created it in GitHub UI or via
+  `gh`.
 
 ---
 
-## 2. Surface CLI
+## 2. CLI Surface
 
 ### `specflow backlog configure`
 
-Flux interactif :
+Interactive flow:
 
-1. Lit `tasks/backlog/` pour confirmer qu'on est dans un projet Specflow. Si absent → erreur claire.
-2. Détecte le repo GitHub via `git remote get-url origin`. Si pas un repo GitHub → erreur.
-3. Vérifie `gh auth status`. Si pas authentifié → instruction `gh auth login`.
-4. Liste les Projects V2 accessibles (personnels + du owner du repo) via `gh api graphql`.
-5. Prompt : `Which project?` (multiple choice) OU `[N] No project — issues only`.
-6. Pour le Project choisi, détecte les champs (SingleSelect `Status`, Number `Priority`, Number
-   `Complexity`) et propose un mapping.
-7. Écrit `.specflow/config.yml` + ajoute à `.gitignore` rien de plus (le fichier est public).
+1. Read `tasks/backlog/` to confirm we are in a Specflow project. If missing → clear error.
+2. Detect GitHub repo via `git remote get-url origin`. If not a GitHub repo → error.
+3. Verify `gh auth status`. If not authenticated → instruction `gh auth login`.
+4. List accessible Projects V2 (personal + owner's repo) via `gh api graphql`.
+5. Prompt: `Which project?` (multiple choice) OR `[N] No project — issues only`.
+6. For the chosen Project, detect fields (SingleSelect `Status`, Number `Priority`, Number
+   `Complexity`) and offer mapping.
+7. Write `.specflow/config.yml` + add to `.gitignore` nothing more (the file is public).
 
 ### `specflow backlog sync [--id NNN] [--dry-run]`
 
-1. Lit `.specflow/config.yml`. Si absent → `run 'specflow backlog configure' first`.
-2. Si `--id NNN` → sync une seule tâche. Sinon → sync toutes les tâches présentes dans
-   `tasks/backlog/`.
-3. Pour chaque tâche :
-   - Parse frontmatter + corps.
-   - Cherche l'issue existante via label `backlog/NNN`.
-   - Si absente → crée. Si présente → update.
-   - Attache au Project V2 configuré et renseigne les 3 champs mappés (Status, Priority,
+1. Read `.specflow/config.yml`. If missing → `run 'specflow backlog configure' first`.
+2. If `--id NNN` → sync a single task. Otherwise → sync all tasks present in `tasks/backlog/`.
+3. For each task:
+   - Parse frontmatter + body.
+   - Search for existing issue via label `backlog/NNN`.
+   - If absent → create. If present → update.
+   - Attach to configured Project V2 and populate the 3 mapped fields (Status, Priority,
      Complexity).
-   - Si status = `done` → close l'issue ; si `deferred` → close avec `not_planned` reason ; sinon
-     ouvrir.
-4. `--dry-run` : affiche le plan (CREATE / UPDATE / CLOSE / SKIP) sans appeler `gh`.
-5. Exit code 0 = tout OK (ou dry-run), 1 = une tâche au moins a échoué (les autres ont quand même
-   été tentées, log cumulatif en fin d'exécution), 2 = précondition manquante (pas de config, pas de
-   `gh`, etc.).
+   - If status = `done` → close the issue; if `deferred` → close with `not_planned` reason;
+     otherwise keep open.
+4. `--dry-run`: display the plan (CREATE / UPDATE / CLOSE / SKIP) without calling `gh`.
+5. Exit code 0 = all OK (or dry-run), 1 = at least one task failed (others were still attempted,
+   cumulative log at end of execution), 2 = missing precondition (no config, no `gh`, etc.).
 
 ---
 
-## 3. Architecture DDD
+## 3. DDD Architecture
 
 ```
 src/
@@ -76,7 +74,7 @@ src/
 │   ├── backlog/
 │   │   ├── task.ts             # BacklogTask entity, BacklogTaskId, Priority, Complexity, Status
 │   │   ├── frontmatter.ts      # pure parser MD frontmatter → BacklogTask
-│   │   └── sync_plan.ts        # value object: liste d'actions (Create|Update|Close|Skip)
+│   │   └── sync_plan.ts        # value object: list of actions (Create|Update|Close|Skip)
 │   └── sync_config.ts          # SyncConfig value object + loader/validator
 ├── application/
 │   ├── ports.ts                # ADD: BacklogReader, BacklogSyncTarget, ConfigStore, InteractivePrompt
@@ -84,8 +82,8 @@ src/
 │   └── configure_sync.ts       # ConfigureSyncUseCase (interactive setup, writes config)
 ├── infrastructure/
 │   ├── fs_backlog_reader.ts    # FsBacklogReader implementing BacklogReader via walk tasks/backlog/
-│   ├── fs_config_store.ts      # FsConfigStore via @std/yaml sur .specflow/config.yml
-│   ├── gh_cli.ts               # thin wrapper autour de `Deno.Command("gh", ...)`
+│   ├── fs_config_store.ts      # FsConfigStore via @std/yaml on .specflow/config.yml
+│   ├── gh_cli.ts               # thin wrapper around `Deno.Command("gh", ...)`
 │   ├── github_backlog_sync.ts  # GitHubBacklogSyncTarget (Issues REST + Project V2 GraphQL via gh)
 │   └── terminal_prompt.ts      # InteractivePrompt via @std/cli/unstable_prompt_select
 └── cli/
@@ -95,14 +93,14 @@ src/
         └── backlog_configure_handler.ts
 ```
 
-Tests mirrorés : `tests/domain/backlog/*_test.ts`, `tests/application/sync_backlog_test.ts`,
+Mirrored tests: `tests/domain/backlog/*_test.ts`, `tests/application/sync_backlog_test.ts`,
 `tests/application/configure_sync_test.ts`, `tests/infrastructure/fs_backlog_reader_test.ts`,
 `tests/infrastructure/fs_config_store_test.ts`, `tests/infrastructure/gh_cli_test.ts` (against
-mock), `tests/cli/parser_test.ts` (étendu).
+mock), `tests/cli/parser_test.ts` (extended).
 
 ---
 
-## 4. Modèle de données (domain)
+## 4. Data Model (domain)
 
 ### `BacklogTask`
 
@@ -128,7 +126,7 @@ class BacklogTask {
 }
 ```
 
-### `SyncConfig` (persisté dans `.specflow/config.yml`)
+### `SyncConfig` (persisted in `.specflow/config.yml`)
 
 ```yaml
 version: 1
@@ -182,23 +180,23 @@ type SyncPlan = ReadonlyArray<SyncAction>;
 
 ### Diff rule (deciding `update` vs `skip`)
 
-En v1, on reste simple : pour toute tâche existante (label `backlog/NNN` trouvé), on émet
-**toujours** une action `update` — PAS de comparaison de contenu. Raisons : (a) GitHub ne renvoie
-pas un hash qu'on pourrait comparer au body MD sans refaire la mise en forme, (b) les
-`gh issue edit` sont idempotents côté serveur (pas de notification si rien ne change). Test
-d'idempotence (§12.3) vérifiera que ces updates "vides" n'ont pas d'effet observable.
+In v1, we keep it simple: for any existing task (label `backlog/NNN` found), we always emit an
+`update` action — NO content comparison. Reasons: (a) GitHub does not return a hash we could compare
+against the formatted MD body, (b) `gh issue edit` operations are idempotent on the server (no
+notification if nothing changes). Idempotence test (§12.3) will verify that these "empty" updates
+have no observable effect.
 
-Exceptions qui émettent `skip` :
+Exceptions that emit `skip`:
 
-- Frontmatter invalide (on ne peut pas synchroniser une tâche qu'on ne peut pas parser).
-- Détection de secret dans le body (voir §9).
+- Invalid frontmatter (we cannot sync a task we cannot parse).
+- Secret detection in body (see §9).
 
-Exception qui émet `close` :
+Exception that emits `close`:
 
-- Status = `done` (raison `completed`).
-- Status = `deferred` (raison `not_planned`).
+- Status = `done` (reason `completed`).
+- Status = `deferred` (reason `not_planned`).
 
-### Interface `BacklogSyncTarget`
+### `BacklogSyncTarget` Interface
 
 ```typescript
 export interface BacklogSyncTarget {
@@ -210,17 +208,17 @@ type ExistingIssue = { id: string; number: number; state: "open" | "closed" };
 type ApplyResult = { ok: true; issueNumber: number } | { ok: false; error: string };
 ```
 
-L'implémentation `GitHubBacklogSyncTarget` shell-out à `gh`:
+The `GitHubBacklogSyncTarget` implementation shells out to `gh`:
 
-- `listExisting` → `gh issue list --label "backlog/*" --state all --json number,labels,state` puis
-  filtre les labels `backlog/\d{3}`.
+- `listExisting` → `gh issue list --label "backlog/*" --state all --json number,labels,state` then
+  filter labels `backlog/\d{3}`.
 - `apply(create)` →
-  `gh issue create --title ... --body ... --label backlog/NNN,priority/<x>,category/<y>` puis
-  GraphQL pour Project V2.
+  `gh issue create --title ... --body ... --label backlog/NNN,priority/<x>,category/<y>` then
+  GraphQL for Project V2.
 - `apply(update)` → `gh issue edit <num> --title ... --body ... --add-label ...`
 - `apply(close)` → `gh issue close <num> --reason completed|not_planned`
-- Project V2 : toujours via `gh api graphql` (pas de REST équivalent), avec mutations
-  `addProjectV2ItemById` et `updateProjectV2ItemFieldValue`.
+- Project V2: always via `gh api graphql` (no REST equivalent), with mutations
+  `addProjectV2ItemById` and `updateProjectV2ItemFieldValue`.
 
 ---
 
@@ -238,135 +236,133 @@ L'implémentation `GitHubBacklogSyncTarget` shell-out à `gh`:
 9. echo: "config written. run 'specflow backlog sync' to sync your current backlog."
 ```
 
-Non-interactive mode (for CI / scripts) : flags `--repo`, `--project-number`, `--project-owner`,
-`--skip-prompts`. Si fournis, pas de prompt.
+Non-interactive mode (for CI / scripts): flags `--repo`, `--project-number`, `--project-owner`,
+`--skip-prompts`. If provided, no prompts.
 
 ---
 
-## 7. Gestion d'erreurs
+## 7. Error Handling
 
-| Situation                                                         | Comportement                                                                                     |
-| ----------------------------------------------------------------- | ------------------------------------------------------------------------------------------------ |
-| Pas de `gh` dans PATH                                             | exit 2 avec message `gh CLI required. Install from https://cli.github.com then 'gh auth login'`. |
-| `gh auth status` fail                                             | exit 2 avec `Run 'gh auth login' first`.                                                         |
-| Pas de config file                                                | `sync` exit 2 avec `Run 'specflow backlog configure' first`.                                     |
-| Frontmatter invalide dans une tâche                               | Action `skip` avec reason, continue les autres, exit 1 en fin.                                   |
-| GitHub API rate-limited                                           | `gh` gère le retry ; on relaie son exit code. Pas de retry custom en v1.                         |
-| Project V2 inaccessible (token scope insuffisant)                 | Message explicite, exit 1 (les issues se créent quand même).                                     |
-| Fichier `tasks/backlog/NNN-slug.md` dont `id` ne matche pas `NNN` | Warning log, sync avec l'id du frontmatter (source de vérité).                                   |
+| Situation                                                        | Behavior                                                                                         |
+| ---------------------------------------------------------------- | ------------------------------------------------------------------------------------------------ |
+| No `gh` in PATH                                                  | exit 2 with message `gh CLI required. Install from https://cli.github.com then 'gh auth login'`. |
+| `gh auth status` fail                                            | exit 2 with `Run 'gh auth login' first`.                                                         |
+| No config file                                                   | `sync` exit 2 with `Run 'specflow backlog configure' first`.                                     |
+| Invalid frontmatter in a task                                    | Action `skip` with reason, continue others, exit 1 at end.                                       |
+| GitHub API rate-limited                                          | `gh` handles retry; we relay its exit code. No custom retry in v1.                               |
+| Project V2 inaccessible (token scope insufficient)               | Explicit message, exit 1 (issues are still created).                                             |
+| File `tasks/backlog/NNN-slug.md` where `id` does not match `NNN` | Warning log, sync with frontmatter id (source of truth).                                         |
 
 ---
 
-## 8. Tests par couche
+## 8. Tests by Layer
 
 ### Domain (pure)
 
-- `frontmatter_test.ts` : parse valid cases, reject missing fields, reject bad enum values,
+- `frontmatter_test.ts`: parse valid cases, reject missing fields, reject bad enum values,
   round-trip.
-- `task_test.ts` : invariants (priority enum, Fibonacci complexity, date format).
-- `sync_plan_test.ts` : diff algorithm (existing vs tasks → actions), status transitions.
-- `sync_config_test.ts` : YAML parse + validation, version-mismatch error.
+- `task_test.ts`: invariants (priority enum, Fibonacci complexity, date format).
+- `sync_plan_test.ts`: diff algorithm (existing vs tasks → actions), status transitions.
+- `sync_config_test.ts`: YAML parse + validation, version-mismatch error.
 
 ### Application (fake ports)
 
-- `sync_backlog_test.ts` : happy path, dry-run, skip invalid, close→done, close→deferred, mixed
+- `sync_backlog_test.ts`: happy path, dry-run, skip invalid, close→done, close→deferred, mixed
   outcomes.
-- `configure_sync_test.ts` : interactive flow with fake InteractivePrompt returning canned answers.
+- `configure_sync_test.ts`: interactive flow with fake InteractivePrompt returning canned answers.
 
 ### Infrastructure (real Deno APIs, mocked subprocess)
 
-- `fs_backlog_reader_test.ts` : walks a tmp `tasks/backlog/` tree, returns parsed tasks.
-- `fs_config_store_test.ts` : read/write round-trip to `.specflow/config.yml`.
-- `gh_cli_test.ts` : wraps a fake `Deno.Command` (via a port) so we can assert commands and
+- `fs_backlog_reader_test.ts`: walks a tmp `tasks/backlog/` tree, returns parsed tasks.
+- `fs_config_store_test.ts`: read/write round-trip to `.specflow/config.yml`.
+- `gh_cli_test.ts`: wraps a fake `Deno.Command` (via a port) so we can assert commands and
   responses.
-- `github_backlog_sync_test.ts` : depends on gh_cli fake, verifies the command shapes for
+- `github_backlog_sync_test.ts`: depends on gh_cli fake, verifies the command shapes for
   create/update/close/list.
 
 ### Integration
 
-- `backlog_sync_test.ts` : spawn real `specflow` binary in a tmp dir with a mock-gh shim on PATH (a
+- `backlog_sync_test.ts`: spawn real `specflow` binary in a tmp dir with a mock-gh shim on PATH (a
   bash script that records its args and prints canned JSON). Verifies exit codes, dry-run output,
   config gating.
 
-Target count : ~30 new tests, bringing total from 50 to ~80.
+Target count: ~30 new tests, bringing total from 50 to ~80.
 
 ---
 
-## 9. Considérations de sécurité
+## 9. Security Considerations
 
-- **Auth confinée à `gh`** : Specflow ne touche jamais un token GitHub directement, n'en lit aucun,
-  n'en persiste aucun.
-- **Network allowlist inchangée** — Specflow continue à n'avoir besoin que de
-  `api.github.com,github.com,…` (pour self-update). Pour le sync, il ne fait PAS de `fetch` direct
-  vers GitHub : tout passe par `gh` via subprocess, donc seul `--allow-run=gh` est nécessaire. Aucun
-  ajout à la liste `--allow-net` embarquée au compile.
-- **Injection** : titres/body sont passés à `gh` via `--title` / `--body-file` (fichier temp),
-  jamais concaténés dans une shell string. `--body-file` évite les problèmes de quoting.
-- **Secrets dans le MD** : on scanne les tâches pour des patterns évidents (`ghp_*`, `sk_*`, AWS
-  keys) avant d'uploader et on refuse le sync si détecté, avec une option `--allow-secrets` pour
-  override.
+- **Auth confined to `gh`**: Specflow never touches a GitHub token directly, never reads one, never
+  persists one.
+- **Network allowlist unchanged** — Specflow continues to need only `api.github.com,github.com,…`
+  (for self-update). For sync, it does NOT make direct `fetch` calls to GitHub: everything goes
+  through `gh` via subprocess, so only `--allow-run=gh` is needed. No additions to the embedded
+  `--allow-net` list at compile time.
+- **Injection**: titles/body are passed to `gh` via `--title` / `--body-file` (temp file), never
+  concatenated into a shell string. `--body-file` avoids quoting issues.
+- **Secrets in MD**: we scan tasks for obvious patterns (`ghp_*`, `sk_*`, AWS keys) before uploading
+  and refuse sync if detected, with an `--allow-secrets` option to override.
 
 ---
 
-## 10. Contracts avec l'agent `product-owner`
+## 10. Contracts with the `product-owner` Agent
 
-Le template `templates/claude/agents/product-owner.md` mentionne déjà :
+The `templates/claude/agents/product-owner.md` template already mentions:
 
 > ### `/backlog sync` and `/backlog sync <id>`
 >
 > Not yet available in this Specflow version. Tell the user: ...
 
-À la livraison de cette brique, on met à jour ce template pour remplacer par :
+On delivery of this component, update this template to replace with:
 
 > Runs `specflow backlog sync` (or `sync --id NNN`) as a shell command. After every mutation from
 > `add`/`update`/`groom`, the PO must emit the directive "run `specflow backlog sync --id NNN`" so
 > the orchestrator executes it.
 
-Update cohérent dans la commande `templates/claude/commands/backlog.md` également.
+Consistent update in the `templates/claude/commands/backlog.md` command as well.
 
-Note : le **bundle embarqué change**, donc `TEMPLATES_VERSION` dans `deno.json` et
-`src/domain/version.ts` passe de `0.1.0` à `0.2.0`. La version du binaire peut rester
-`0.1.0-alpha.N` ou passer en `0.2.0` selon stratégie de release — à trancher au moment du tag.
+Note: the **embedded bundle changes**, so `TEMPLATES_VERSION` in `deno.json` and
+`src/domain/version.ts` goes from `0.1.0` to `0.2.0`. The binary version can stay `0.1.0-alpha.N` or
+move to `0.2.0` depending on release strategy — to be decided at tag time.
 
 ---
 
-## 11. Plan de livraison (à transformer en implementation plan)
+## 11. Delivery Plan (to be transformed into implementation plan)
 
-Briques par ordre de dépendance :
+Components in dependency order:
 
-1. **Domain** — task, frontmatter parser, sync_plan, sync_config (+ tous les tests domain)
-2. **Application ports** — ajouter BacklogReader, BacklogSyncTarget, ConfigStore, InteractivePrompt
-3. **FsBacklogReader + FsConfigStore** — infrastructure bas niveau
-4. **SyncBacklogUseCase + tests application** avec fakes
-5. **gh_cli + GitHubBacklogSyncTarget + tests** avec subprocess fake
+1. **Domain** — task, frontmatter parser, sync_plan, sync_config (+ all domain tests)
+2. **Application ports** — add BacklogReader, BacklogSyncTarget, ConfigStore, InteractivePrompt
+3. **FsBacklogReader + FsConfigStore** — low-level infrastructure
+4. **SyncBacklogUseCase + application tests** with fakes
+5. **gh_cli + GitHubBacklogSyncTarget + tests** with subprocess fake
 6. **ConfigureSyncUseCase + TerminalPrompt + tests**
 7. **CLI parser extension + handlers** (sync + configure)
 8. **Main.ts routing**
-9. **Integration test** avec gh shim
+9. **Integration test** with gh shim
 10. **Template updates** (product-owner agent + backlog command refs)
 11. **Bump TEMPLATES_VERSION**
 
 ---
 
-## 12. Risques et points ouverts
+## 12. Risks and Open Questions
 
-1. **Project V2 GraphQL complexity** : les mutations `updateProjectV2ItemFieldValue` varient selon
-   le type de champ (`SingleSelect` nécessite `optionId`, `Number` nécessite `number`). L'adapter
-   doit détecter le type de champ et formuler la mutation correspondante. → Couvert par les tests
-   unitaires.
-2. **Rate limiting** : sur un backlog de 100 tâches, on fait ~300 appels API (liste + create +
-   project attach). `gh` a un rate-limit handling ; on ne fait rien de spécial en v1.
-3. **Idempotence** : la deuxième run du sync sur un backlog déjà synchronisé doit être un no-op
-   (aucune modification). Test dédié nécessaire.
-4. **Config file path** : `.specflow/config.yml` créé automatiquement. Faut-il l'ajouter à
-   `.gitignore` par défaut ? → Non, il doit être versionné (décidé §1).
-5. **Interactive prompt dans `configure`** : `@std/cli/unstable_prompt_select` est encore tagged
-   unstable. Alternative : prompter manuellement via `readLine`. → On part sur `@std/cli/unstable-*`
-   et on note la dépendance à l'évolution stdlib.
+1. **Project V2 GraphQL complexity**: the mutations `updateProjectV2ItemFieldValue` vary by field
+   type (`SingleSelect` requires `optionId`, `Number` requires `number`). The adapter must detect
+   field type and formulate the corresponding mutation. → Covered by unit tests.
+2. **Rate limiting**: on a backlog of 100 tasks, we make ~300 API calls (list + create + project
+   attach). `gh` has rate-limit handling; we do nothing special in v1.
+3. **Idempotence**: the second run of sync on an already-synced backlog must be a no-op (no
+   modifications). Dedicated test needed.
+4. **Config file path**: `.specflow/config.yml` created automatically. Should we add it to
+   `.gitignore` by default? → No, it must be versioned (decided §1).
+5. **Interactive prompt in `configure`**: `@std/cli/unstable_prompt_select` is still tagged
+   unstable. Alternative: prompt manually via `readLine`. → We go with `@std/cli/unstable-*` and
+   note the dependency on stdlib evolution.
 
 ---
 
-## 13. Prochaine étape
+## 13. Next Step
 
-Après validation de ce design, passer en `superpowers:writing-plans` pour produire le plan
-d'implémentation découpé en ~14 tâches (estimée) suivant l'ordre de §11.
+After validation of this design, move to `superpowers:writing-plans` to produce the implementation
+plan split into ~14 tasks (estimated) following the order in §11.

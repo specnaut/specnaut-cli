@@ -1,8 +1,8 @@
 import { assertEquals, assertStringIncludes } from "@std/assert";
-import { join } from "@std/path";
+import { fromFileUrl, join } from "@std/path";
 
-const MAIN = new URL("../../src/main.ts", import.meta.url).pathname;
-const SHIM_DIR = new URL("./fixtures/", import.meta.url).pathname;
+const MAIN = fromFileUrl(new URL("../../src/main.ts", import.meta.url));
+const SHIM_DIR = fromFileUrl(new URL("./fixtures/", import.meta.url));
 
 async function run(args: string[], opts: { cwd: string; logFile: string }) {
   const p = new Deno.Command("deno", {

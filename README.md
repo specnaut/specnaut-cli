@@ -1,29 +1,22 @@
 # Specflow
 
-Fork amélioré du CLI `specify` de [GitHub Spec Kit](https://github.com/github/spec-kit), distribué
-comme **binaire natif** (plus de pré-requis Python).
+An enhanced fork of the [GitHub Spec Kit](https://github.com/github/spec-kit) `specify` CLI,
+distributed as a **native binary** (no Python prerequisites).
 
-Specflow scaffolde dans ton projet les fichiers que ton harnais IA (Claude Code, Cursor, Copilot,
-Codex, Gemini CLI…) utilise pour piloter un workflow spec-driven. Il ajoute trois choses que l'amont
-n'a pas :
+Specflow scaffolds the files your AI harness (Claude Code, Cursor, Copilot, Codex, Gemini CLI…) uses
+to drive a spec-driven workflow inside your project. It adds three things upstream doesn't:
 
-- **Mode automatique** — enchaîne
-  `specify → clarify → plan → tasks → analyze → implement → review → merge` sans interruption, sauf
-  clarifications nécessaires et validation pré-merge
-- **Phase `review` structurée** — contrôles d'architecture + quality gates
-  (format/lint/typecheck/tests) avec boucle `implement → review → fix → re-review`
-- **Backlog produit** — index Markdown + fichier par tâche avec frontmatter, agent Product Owner
-  pour la gestion, sync one-way vers GitHub Issues/Project
+- **Auto mode** — chains `specify → clarify → plan → tasks → analyze → implement → review → merge`
+  uninterrupted, except for required clarifications and pre-merge validation
+- **Structured `review` phase** — architecture checks + quality gates (format/lint/typecheck/tests)
+  with an `implement → review → fix → re-review` loop
+- **Product backlog** — Markdown index + one file per task with structured frontmatter, a Product
+  Owner agent for management, one-way sync to GitHub Issues/Project V2
 
-## Statut
+## What Specflow is not
 
-Phase de brainstorming — langage et architecture pas encore figés. Voir [`AGENTS.md`](./AGENTS.md)
-pour la vision complète.
-
-## Ce que Specflow n'est pas
-
-Specflow ne parle à aucun LLM. Specflow n'orchestre aucun agent. Il faut un harnais IA compatible
-(comme avec l'amont).
+Specflow does not talk to any LLM. Specflow does not orchestrate any agent. You need a compatible AI
+harness (same as upstream).
 
 ## Installation
 
@@ -33,12 +26,12 @@ Specflow ne parle à aucun LLM. Specflow n'orchestre aucun agent. Il faut un har
 curl -fsSL https://raw.githubusercontent.com/mkrlabs/specflow/main/install.sh | bash
 ```
 
-Pin a version: `VERSION=v0.1.0-alpha.1`. Change install dir: `PREFIX=$HOME/.local/bin`.
+Pin a version: `VERSION=v0.1.0-alpha.1`. Change install directory: `PREFIX=$HOME/.local/bin`.
 
 ### Homebrew
 
 ```bash
-brew tap kevinraimbaud/tap
+brew tap mkrlabs/tap
 brew install specflow
 ```
 
@@ -62,13 +55,13 @@ When you update the `specflow` binary (via `specflow self-update` or Homebrew), 
 templates may have changed. To pull those changes into a project you previously `init`'d:
 
 ```bash
-specflow upgrade --dry-run    # see what would change
+specflow upgrade --dry-run    # preview what would change
 specflow upgrade              # apply safely — files you customized are preserved
 specflow upgrade --force      # overwrite customized files (backed up to .specflow.bak)
 ```
 
 Specflow tracks the SHA256 of each template in `.specflow/installed.lock` so it can detect your
-local edits and avoid overwriting them. Commit this lock file with your project.
+local edits and avoid overwriting them. Commit this lock file alongside your project.
 
 ## Development setup
 

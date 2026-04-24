@@ -1,167 +1,167 @@
 # AGENTS.md — Specflow
 
-> Document de contexte pour toute session future (Claude Code, Codex, etc.). Lire en premier.
+> Context document for every future session (Claude Code, Codex, etc.). Read this first.
 
 ## Vision
 
-Specflow est un **fork amélioré du CLI `specify`** de
-[GitHub Spec Kit](https://github.com/github/spec-kit), distribué comme **binaire natif** (plus de
-pré-requis Python côté utilisateur).
+Specflow is an **enhanced fork of the `specify` CLI** from
+[GitHub Spec Kit](https://github.com/github/spec-kit), distributed as a **native binary** (no Python
+prerequisites on the user side).
 
-Le rôle de Specflow est **exactement** celui de `specify init` upstream : scaffolder, dans un projet
-existant, les fichiers consommés par le harnais IA de l'utilisateur (Claude Code, Cursor, Copilot,
-Codex, Gemini CLI, …) — commandes SpecKit, templates de spec/plan/tasks, constitution, scripts
-utilitaires. **Specflow ne parle à aucun LLM. Specflow n'orchestre aucun agent. C'est le harnais de
-l'utilisateur qui consomme les fichiers générés.**
+Specflow's role is **exactly** that of upstream `specify init`: scaffold, inside an existing
+project, the files consumed by the user's AI harness (Claude Code, Cursor, Copilot, Codex, Gemini
+CLI, …) — SpecKit commands, spec/plan/tasks templates, constitution, utility scripts. **Specflow
+does not talk to any LLM. Specflow does not orchestrate any agent. It is the user's harness that
+consumes the generated files.**
 
-### Les 3 seules différences avec l'amont
+### The 3 differences from upstream
 
-1. **Mode automatique par défaut** — le skill/command `specify` généré enchaîne
-   `clarify → plan → tasks → analyze → implement → review → merge` dans la même session, en ne
-   s'arrêtant que sur (a) des clarifications nécessaires, (b) la validation pré-merge. Upstream est
-   100 % manuel étape par étape.
+1. **Auto mode by default** — the generated `specify` skill/command chains
+   `clarify → plan → tasks → analyze → implement → review → merge` in a single session, stopping
+   only for (a) required clarifications, (b) pre-merge validation. Upstream is 100 % manual step by
+   step.
 
-2. **Étape `review` post-implement** — une phase dédiée qui exécute des contrôles structurels
-   (architecture, silent catches, exposition d'IDs internes, cache, couverture de tests) puis les
-   quality gates (format / lint / typecheck / tests). La boucle
-   `implement → review → fix → re-review` est scriptée dans le skill généré. Upstream n'a pas cette
-   phase.
+2. **`review` phase post-implement** — a dedicated step that runs structural checks (architecture,
+   silent catches, internal-ID exposure, cache, test coverage) then the quality gates (format / lint
+   / typecheck / tests). The `implement → review → fix → re-review` loop is scripted in the
+   generated skill. Upstream has no such phase.
 
-3. **Commande `backlog` + agent Product Owner** — un système de backlog de tâches (index
-   `tasks/backlog.md` + fichiers `tasks/backlog/NNN-slug.md` avec frontmatter typé) géré par un
-   agent PO fourni dans les templates, avec un script de sync vers un backend distant (GitHub
-   Issues + Project V2 en v1 ; GitLab, Bitbucket envisagés plus tard). Upstream n'a aucune notion de
-   backlog produit.
+3. **`backlog` command + Product Owner agent** — a task backlog system (index `tasks/backlog.md` +
+   `tasks/backlog/NNN-slug.md` files with typed frontmatter) managed by a PO agent shipped in the
+   templates, with a sync script to a remote backend (GitHub Issues + Project V2 in v1; GitLab /
+   Bitbucket planned). Upstream has no notion of a product backlog.
 
-## Ce que Specflow n'est pas
+## What Specflow is not
 
-- Pas un harnais IA
-- Pas un orchestrateur multi-LLM
-- Pas un runtime d'agents
-- Pas un moteur de spécifications exécutable
-- Pas une réécriture de Claude Code
+- Not an AI harness
+- Not a multi-LLM orchestrator
+- Not an agent runtime
+- Not an executable specification engine
+- Not a Claude Code rewrite
 
-Si la question est "est-ce que Specflow peut tourner sans que l'utilisateur ait un harnais IA ?" →
-**non**. Specflow écrit des fichiers que Claude Code (ou Cursor, etc.) lit pour fonctionner. Le
-langage du binaire est une question d'installation et de distribution, pas d'exécution.
+If the question is "can Specflow run without the user having an AI harness?" → **no**. Specflow
+writes files that Claude Code (or Cursor, etc.) reads to operate. The binary's language is an
+installation/distribution concern, not a runtime one.
 
-## Frustrations avec Spec Kit upstream
+## Frustrations with upstream Spec Kit
 
-- Étapes manuelles imposées à chaque transition (pas d'auto-chain)
-- Pas de phase `review` structurée après l'implémentation
-- Pas de notion de **backlog produit** : une feature à la fois, sans vue d'ensemble
-- Sync avec un tracker distant (GitHub Issues…) à faire à la main
+- Manual steps at every transition (no auto-chain)
+- No structured `review` phase after implementation
+- No notion of a **product backlog**: one feature at a time, no broader view
+- Sync with a remote tracker (GitHub Issues…) must be done by hand
 
-## Décisions figées
+## Locked decisions
 
-- **Langage** : **Deno** (TypeScript, compile natif via `deno compile`, stdlib officielle zero-deps,
-  skills IA officiels `denoland/skills` pour la vélocité de dev).
-- **Scope v0.1 — "Parity Claude Code + le delta"** :
-  - Un seul harnais cible : **Claude Code** (`.claude/` + `.specify/`)
-  - Comportement et surface CLI équivalents à `specify init` upstream
-  - Les **3 features différenciantes embarquées par défaut** : auto-chain, phase `review`, backlog +
-    agent Product Owner
-- **Backlog storage v0.1** : fichiers Markdown locaux (index + un fichier par tâche) + script de
-  sync one-way vers GitHub Issues/Project V2 via `gh`. GitLab/Bitbucket en v2+.
-- **Harnais additionnels** (Cursor, Copilot, Codex, Gemini, Windsurf, …) : v0.2+.
+- **Language**: **Deno** (TypeScript, native compile via `deno compile`, zero-deps standard library,
+  official `denoland/skills` for dev velocity).
+- **v0.1 scope — "Claude Code parity + the delta"**:
+  - Single target harness: **Claude Code** (`.claude/` + `.specify/`)
+  - CLI surface and behaviour equivalent to upstream `specify init`
+  - The **3 differentiating features embedded by default**: auto-chain, `review` phase, backlog +
+    Product Owner agent
+- **v0.1 backlog storage**: local Markdown files (index + one file per task) + one-way sync script
+  to GitHub Issues/Project V2 via `gh`. GitLab/Bitbucket in v2+.
+- **Additional harnesses** (Cursor, Copilot, Codex, Gemini, Windsurf, …): v0.2+.
 
-## À explorer / décider au niveau design
+## Methodology observed in `examples/` (reference, not to copy verbatim)
 
-- Surface CLI exacte (commandes, flags)
-- Structure du dépôt Specflow
-- Quels templates amont on réutilise tels quels vs on réécrit
-- Stratégie de distribution (GitHub Releases + Homebrew + `curl | sh`)
-- Gestion des projets existants (merge vs overwrite sur un `.claude/` pré-existant)
+The `examples/` folder contains a real project where Kevin wired Spec Kit + agents + backlog by hand
+on top of Claude Code. The **agnostic** elements worth keeping:
 
-## Méthodologie observée dans `examples/` (de référence, pas à recopier)
-
-Le dossier `examples/` contient un projet réel où Kevin a déjà branché Spec Kit + agents + backlog à
-la main sur Claude Code. Les éléments **agnostiques** à retenir :
-
-### 1. Pipeline Spec Kit auto-chaîné
+### 1. Auto-chained Spec Kit pipeline
 
 ```
 specify → clarify → plan → tasks → analyze → implement → review → merge
            ▲                                                        ▲
            STOP #1                                                  STOP #2
-       (si questions)                                        (validation avant merge)
+       (if questions)                                       (validation before merge)
 ```
 
-- Mode **auto par défaut** ; `--manual` restaure le one-shot legacy.
-- `--copilot` : variante "cloud handoff" (push + draft PR + passe la main à un agent distant).
-- Seulement 2 interruptions utilisateur : clarifications nécessaires, et validation pre-merge.
+- **Auto by default**; `--manual` restores legacy one-shot behaviour.
+- `--copilot`: "cloud handoff" variant (push + draft PR + hand off to a remote agent).
+- Only 2 user interruptions: required clarifications, and pre-merge validation.
 
-### 2. Backlog comme source de vérité produit
+### 2. Backlog as product source of truth
 
-- Index `tasks/backlog.md` (checklist groupée par priorité).
-- Un fichier par tâche `tasks/backlog/NNN-slug.md` avec frontmatter structuré : `id`, `title`,
+- `tasks/backlog.md` index (checklist grouped by priority).
+- One file per task `tasks/backlog/NNN-slug.md` with structured frontmatter: `id`, `title`,
   `category`, `priority`, `complexity` (Fibonacci 1/2/3/5/8/13/21), `status`, `depends_on`, `spec`,
   `tags`, `created`.
-- Statuts : `todo | in_progress | done | deferred | blocked`.
-- **Toute mutation = sync obligatoire** vers le backend distant (GitHub Issues + Project V2 dans
-  l'exemple ; à généraliser GitLab/Bitbucket/local).
-- Un **agent Product Owner** possède le monopole des mutations — le commande `/backlog` le délègue
-  systématiquement, même pour un ajout trivial.
-- Le PO sait trancher **SpecKit-spec vs implémentation directe** selon complexité (≥ 8 pts /
-  nouvelle entité / multi-couche → spec ; sinon direct).
+- Statuses: `todo | in_progress | done | deferred | blocked`.
+- **Every mutation = mandatory sync** to the remote backend (GitHub Issues + Project V2 in the
+  example; to be generalized to GitLab / Bitbucket / local).
+- A **Product Owner agent** has exclusive ownership of mutations — the `/backlog` command always
+  delegates to it, even for trivial additions.
+- The PO decides **SpecKit spec vs direct implementation** based on complexity (≥ 8 pts / new entity
+  / multi-layer → spec; otherwise direct).
 
-### 3. Équipe d'agents spécialisés avec contrat d'interaction
+### 3. Specialist agent team with interaction contract
 
-Agents type observés : `product-owner`, `developer` (alias `implementer`), `workflow-manager`,
+Observed agent types: `product-owner`, `developer` (alias `implementer`), `workflow-manager`,
 `review-coordinator`, `qa-tester`, `security-auditor`, `devops-sre`, `accessibility-auditor`,
 `performance-analyst`, `api-contract-reviewer`, `design-system-enforcer`, `code-reviewer`,
-`test-reviewer`, experts domaine (typographie, paiement…).
+`test-reviewer`, domain experts (typography, payments…).
 
-Chaque agent déclare : `model`, `tools`, `skills`, `memory`, `maxTurns`, `permissionMode`, `color`,
-`description`. Les agents s'échangent le travail via des **"workflow status block"** + **"handoff
-block"** structurés (pas de prose libre).
+Every agent declares: `model`, `tools`, `skills`, `memory`, `maxTurns`, `permissionMode`, `color`,
+`description`. Agents hand work back and forth using structured **"workflow status blocks"** +
+**"handoff blocks"** (no free-form prose).
 
-### 4. Constitution + templates de spec
+### 4. Constitution + spec templates
 
-Un fichier `.specify/memory/constitution.md` codifie les invariants projet (architecture non
-négociable, conventions, politiques). Spec Kit charge
-`.specify/templates/{spec,plan,tasks,checklist,constitution,agent-file}-template.md` pour générer
-les artefacts. Le template d'agent-file est repeuplé à chaque feature pour donner le contexte aux
-agents IA.
+A `.specify/memory/constitution.md` file codifies project invariants (non-negotiable architecture,
+conventions, policies). Spec Kit loads
+`.specify/templates/{spec,plan,tasks,checklist,constitution,agent-file}-template.md` to generate the
+artefacts. The agent-file template is repopulated on every feature to give context to AI agents.
 
-### 5. Skills transversales
+### 5. Cross-cutting skills
 
-- Contrats inter-agents : `workflow-contract`, `handoff-protocol`, `review-findings-contract`,
+- Inter-agent contracts: `workflow-contract`, `handoff-protocol`, `review-findings-contract`,
   `qa-report-contract`, `status-audit`.
-- Intégrations : `github-pr`, `github-issue`, `github-release`, `git-tag`.
-- Un skill `speckit` fait office de dispatcher unique (résout une spec par numéro/nom, charge la
-  bonne commande).
+- Integrations: `github-pr`, `github-issue`, `github-release`, `git-tag`.
+- A `speckit` skill acts as a single dispatcher (resolves a spec by number/name, loads the right
+  command).
 
-### 6. Ce qui est **projet-spécifique** (à extraire et rendre configurable)
+### 6. What is **project-specific** (to extract and make configurable)
 
-- Les tech-stack hardcodés dans les agents `developer` / `implementer`.
-- Les skills métier (`adonisjs-v7`, `react`, `tailwind-v4-expert`, `configcat`, `ccbill`, `segpay`,
+- Tech stack hardcoded in `developer` / `implementer` agents.
+- Domain skills (`adonisjs-v7`, `react`, `tailwind-v4-expert`, `configcat`, `ccbill`, `segpay`,
   etc.).
-- Les hooks shell (`protect-files.sh`, `auto-format.sh`…).
-- Les scripts Python/Bash du sync GitHub.
-- La cible d'intégration unique (Claude Code `.claude/`).
+- Shell hooks (`protect-files.sh`, `auto-format.sh`…).
+- Python/Bash scripts for GitHub sync.
+- The single integration target (Claude Code `.claude/`).
 
-## Principes de conception pour Specflow
+## Design principles for Specflow
 
-- **Agnostique du langage** du projet utilisateur (Python / TS / Go / PHP / Rust…).
-- **Agnostique du LLM** (Claude / OpenAI / Gemini / local).
-- **Agnostique du harnais IA** côté utilisateur : Claude Code, Cursor, Codex, Aider, ou mode
-  standalone sans harnais.
-- **Agnostique de la source backlog** : Markdown local, GitHub, GitLab, Bitbucket, etc.
-- Pas de "mega-spec" : livrer par **roadmap incrémentale**, chaque brique a sa propre spec → plan →
-  implémentation.
+- **Agnostic of the user project's language** (Python / TS / Go / PHP / Rust…).
+- **Agnostic of the LLM** (Claude / OpenAI / Gemini / local).
+- **Agnostic of the AI harness** on the user side: Claude Code, Cursor, Codex, Aider, or standalone
+  without any harness.
+- **Agnostic of the backlog source**: local Markdown, GitHub, GitLab, Bitbucket, etc.
+- No "mega-spec": ship via an **incremental roadmap**, each brick has its own spec → plan →
+  implementation cycle.
 
-## À apporter par Kevin
+## Repository state (v0.1.0-alpha.1 shipped)
 
-- Éventuelles précisions futures au fil des brainstorms. Les exemples sont déjà dans `examples/`.
+First public alpha released as `v0.1.0-alpha.1` with the full CLI surface:
 
-## État du dépôt
+- `specflow init [<name>] [--here] [--no-git] [--force]` — scaffold a Claude Code project
+- `specflow check [--project]` — env + project diagnostic
+- `specflow upgrade [--dry-run] [--force]` — update templates in an existing project
+- `specflow self-update [--check]` — update the binary itself
+- `specflow backlog configure` + `specflow backlog sync [--id NNN] [--dry-run] [--allow-secrets]`
+- `specflow --version` / `--help`
 
-Initialisé vide (premier commit `b430fb4`). Pas encore de code. La phase de **brainstorming /
-design** est en cours — aucun langage ni architecture n'est figé.
+Five binaries published on GitHub Releases (macOS arm64/x64, Linux arm64/x64, Windows x64) +
+`.sha256` checksums. 196 tests green. Install via `curl -fsSL … | bash`, Homebrew tap, or manual
+download.
 
-## Convention pour les agents IA travaillant sur ce repo
+## Conventions for AI agents working on this repo
 
-- Tant que le langage n'est pas choisi, **ne pas scaffolder** de projet.
-- Le brainstorming vit dans `docs/superpowers/specs/` (skill superpowers standard).
-- Passer par des questions ciblées (une à la fois) avant toute proposition technique large.
+- Use the DDD/hexagonal layering under `src/`: `domain/` (pure), `application/` (use cases + ports),
+  `infrastructure/` (adapters), `cli/` (presentation). Tests mirror `src/`.
+- Every brick follows the same cycle: brainstorming spec (`docs/superpowers/specs/`) → plan
+  (`docs/superpowers/plans/`) → subagent-driven-development execution.
+- Templates live in `templates/` and are bundled into the binary at build time via
+  `scripts/bundle-templates.ts`. Never hand-edit `src/templates_bundle.ts`.
+- Pre-commit hook runs `deno fmt --check + lint + bundle + check` — must be green before every
+  commit.
