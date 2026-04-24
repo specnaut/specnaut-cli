@@ -56,6 +56,20 @@ On macOS, you may need to clear the quarantine attribute after download:
 xattr -d com.apple.quarantine /path/to/specflow
 ```
 
+## Upgrading an existing project
+
+When you update the `specflow` binary (via `specflow self-update` or Homebrew), the bundled
+templates may have changed. To pull those changes into a project you previously `init`'d:
+
+```bash
+specflow upgrade --dry-run    # see what would change
+specflow upgrade              # apply safely — files you customized are preserved
+specflow upgrade --force      # overwrite customized files (backed up to .specflow.bak)
+```
+
+Specflow tracks the SHA256 of each template in `.specflow/installed.lock` so it can detect your
+local edits and avoid overwriting them. Commit this lock file with your project.
+
 ## Development setup
 
 ```bash
