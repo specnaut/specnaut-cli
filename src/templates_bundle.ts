@@ -25,18 +25,18 @@ export const TEMPLATES: Record<string, TemplateFile> = {
   ".specify/templates/spec-template.md": {
     content: `# Feature Specification: [FEATURE NAME]
 
-**Feature Branch**: \`[###-feature-name]\`\\
-**Created**: [DATE]\\
-**Status**: Draft\\
+**Feature Branch**: \`[###-feature-name]\`  
+**Created**: [DATE]  
+**Status**: Draft  
 **Input**: User description: "\$ARGUMENTS"
 
-## User Scenarios & Testing _(mandatory)_
+## User Scenarios & Testing *(mandatory)*
 
 <!--
   IMPORTANT: User stories should be PRIORITIZED as user journeys ordered by importance.
   Each user story/journey must be INDEPENDENTLY TESTABLE - meaning if you implement just ONE of them,
   you should still have a viable MVP (Minimum Viable Product) that delivers value.
-
+  
   Assign priorities (P1, P2, P3, etc.) to each story, where P1 is the most critical.
   Think of each story as a standalone slice of functionality that can be:
   - Developed independently
@@ -51,8 +51,7 @@ export const TEMPLATES: Record<string, TemplateFile> = {
 
 **Why this priority**: [Explain the value and why it has this priority level]
 
-**Independent Test**: [Describe how this can be tested independently - e.g., "Can be fully tested by
-[specific action] and delivers [specific value]"]
+**Independent Test**: [Describe how this can be tested independently - e.g., "Can be fully tested by [specific action] and delivers [specific value]"]
 
 **Acceptance Scenarios**:
 
@@ -101,7 +100,7 @@ export const TEMPLATES: Record<string, TemplateFile> = {
 - What happens when [boundary condition]?
 - How does system handle [error scenario]?
 
-## Requirements _(mandatory)_
+## Requirements *(mandatory)*
 
 <!--
   ACTION REQUIRED: The content in this section represents placeholders.
@@ -111,23 +110,22 @@ export const TEMPLATES: Record<string, TemplateFile> = {
 ### Functional Requirements
 
 - **FR-001**: System MUST [specific capability, e.g., "allow users to create accounts"]
-- **FR-002**: System MUST [specific capability, e.g., "validate email addresses"]
+- **FR-002**: System MUST [specific capability, e.g., "validate email addresses"]  
 - **FR-003**: Users MUST be able to [key interaction, e.g., "reset their password"]
 - **FR-004**: System MUST [data requirement, e.g., "persist user preferences"]
 - **FR-005**: System MUST [behavior, e.g., "log all security events"]
 
-_Example of marking unclear requirements:_
+*Example of marking unclear requirements:*
 
-- **FR-006**: System MUST authenticate users via [NEEDS CLARIFICATION: auth method not specified -
-  email/password, SSO, OAuth?]
+- **FR-006**: System MUST authenticate users via [NEEDS CLARIFICATION: auth method not specified - email/password, SSO, OAuth?]
 - **FR-007**: System MUST retain user data for [NEEDS CLARIFICATION: retention period not specified]
 
-### Key Entities _(include if feature involves data)_
+### Key Entities *(include if feature involves data)*
 
 - **[Entity 1]**: [What it represents, key attributes without implementation]
 - **[Entity 2]**: [What it represents, relationships to other entities]
 
-## Success Criteria _(mandatory)_
+## Success Criteria *(mandatory)*
 
 <!--
   ACTION REQUIRED: Define measurable success criteria.
@@ -138,8 +136,7 @@ _Example of marking unclear requirements:_
 
 - **SC-001**: [Measurable metric, e.g., "Users can complete account creation in under 2 minutes"]
 - **SC-002**: [Measurable metric, e.g., "System handles 1000 concurrent users without degradation"]
-- **SC-003**: [User satisfaction metric, e.g., "90% of users successfully complete primary task on
-  first attempt"]
+- **SC-003**: [User satisfaction metric, e.g., "90% of users successfully complete primary task on first attempt"]
 - **SC-004**: [Business metric, e.g., "Reduce support tickets related to [X] by 50%"]
 
 ## Assumptions
@@ -160,11 +157,10 @@ _Example of marking unclear requirements:_
   ".specify/templates/plan-template.md": {
     content: `# Implementation Plan: [FEATURE]
 
-**Branch**: \`[###-feature-name]\` | **Date**: [DATE] | **Spec**: [link] **Input**: Feature
-specification from \`/specs/[###-feature-name]/spec.md\`
+**Branch**: \`[###-feature-name]\` | **Date**: [DATE] | **Spec**: [link]
+**Input**: Feature specification from \`/specs/[###-feature-name]/spec.md\`
 
-**Note**: This template is filled in by the \`__SPECKIT_COMMAND_PLAN__\` command. See
-\`.specify/templates/plan-template.md\` for the execution workflow.
+**Note**: This template is filled in by the \`__SPECKIT_COMMAND_PLAN__\` command. See \`.specify/templates/plan-template.md\` for the execution workflow.
 
 ## Summary
 
@@ -178,21 +174,19 @@ specification from \`/specs/[###-feature-name]/spec.md\`
   the iteration process.
 -->
 
-**Language/Version**: [e.g., Python 3.11, Swift 5.9, Rust 1.75 or NEEDS CLARIFICATION]\\
-**Primary Dependencies**: [e.g., FastAPI, UIKit, LLVM or NEEDS CLARIFICATION]\\
-**Storage**: [if applicable, e.g., PostgreSQL, CoreData, files or N/A]\\
-**Testing**: [e.g., pytest, XCTest, cargo test or NEEDS CLARIFICATION]\\
-**Target Platform**: [e.g., Linux server, iOS 15+, WASM or NEEDS CLARIFICATION] **Project Type**:
-[e.g., library/cli/web-service/mobile-app/compiler/desktop-app or NEEDS CLARIFICATION]\\
-**Performance Goals**: [domain-specific, e.g., 1000 req/s, 10k lines/sec, 60 fps or NEEDS
-CLARIFICATION]\\
-**Constraints**: [domain-specific, e.g., <200ms p95, <100MB memory, offline-capable or NEEDS
-CLARIFICATION]\\
+**Language/Version**: [e.g., Python 3.11, Swift 5.9, Rust 1.75 or NEEDS CLARIFICATION]  
+**Primary Dependencies**: [e.g., FastAPI, UIKit, LLVM or NEEDS CLARIFICATION]  
+**Storage**: [if applicable, e.g., PostgreSQL, CoreData, files or N/A]  
+**Testing**: [e.g., pytest, XCTest, cargo test or NEEDS CLARIFICATION]  
+**Target Platform**: [e.g., Linux server, iOS 15+, WASM or NEEDS CLARIFICATION]
+**Project Type**: [e.g., library/cli/web-service/mobile-app/compiler/desktop-app or NEEDS CLARIFICATION]  
+**Performance Goals**: [domain-specific, e.g., 1000 req/s, 10k lines/sec, 60 fps or NEEDS CLARIFICATION]  
+**Constraints**: [domain-specific, e.g., <200ms p95, <100MB memory, offline-capable or NEEDS CLARIFICATION]  
 **Scale/Scope**: [domain-specific, e.g., 10k users, 1M LOC, 50 screens or NEEDS CLARIFICATION]
 
 ## Constitution Check
 
-_GATE: Must pass before Phase 0 research. Re-check after Phase 1 design._
+*GATE: Must pass before Phase 0 research. Re-check after Phase 1 design.*
 
 [Gates determined based on constitution file]
 
@@ -211,7 +205,6 @@ specs/[###-feature]/
 \`\`\`
 
 ### Source Code (repository root)
-
 <!--
   ACTION REQUIRED: Replace the placeholder tree below with the concrete layout
   for this feature. Delete unused options and expand the chosen structure with
@@ -255,35 +248,34 @@ ios/ or android/
 └── [platform-specific structure: feature modules, UI flows, platform tests]
 \`\`\`
 
-**Structure Decision**: [Document the selected structure and reference the real directories captured
-above]
+**Structure Decision**: [Document the selected structure and reference the real
+directories captured above]
 
 ## Complexity Tracking
 
 > **Fill ONLY if Constitution Check has violations that must be justified**
 
-| Violation                  | Why Needed         | Simpler Alternative Rejected Because |
-| -------------------------- | ------------------ | ------------------------------------ |
-| [e.g., 4th project]        | [current need]     | [why 3 projects insufficient]        |
-| [e.g., Repository pattern] | [specific problem] | [why direct DB access insufficient]  |
+| Violation | Why Needed | Simpler Alternative Rejected Because |
+|-----------|------------|-------------------------------------|
+| [e.g., 4th project] | [current need] | [why 3 projects insufficient] |
+| [e.g., Repository pattern] | [specific problem] | [why direct DB access insufficient] |
 `,
     executable: false,
   },
   ".specify/templates/tasks-template.md": {
     content: `---
 
-## description: "Task list template for feature implementation"
+description: "Task list template for feature implementation"
+---
 
 # Tasks: [FEATURE NAME]
 
-**Input**: Design documents from \`/specs/[###-feature-name]/\` **Prerequisites**: plan.md (required),
-spec.md (required for user stories), research.md, data-model.md, contracts/
+**Input**: Design documents from \`/specs/[###-feature-name]/\`
+**Prerequisites**: plan.md (required), spec.md (required for user stories), research.md, data-model.md, contracts/
 
-**Tests**: The examples below include test tasks. Tests are OPTIONAL - only include them if
-explicitly requested in the feature specification.
+**Tests**: The examples below include test tasks. Tests are OPTIONAL - only include them if explicitly requested in the feature specification.
 
-**Organization**: Tasks are grouped by user story to enable independent implementation and testing
-of each story.
+**Organization**: Tasks are grouped by user story to enable independent implementation and testing of each story.
 
 ## Format: \`[ID] [P?] [Story] Description\`
 
@@ -298,21 +290,21 @@ of each story.
 - **Mobile**: \`api/src/\`, \`ios/src/\` or \`android/src/\`
 - Paths shown below assume single project - adjust based on plan.md structure
 
-<!--
+<!-- 
   ============================================================================
   IMPORTANT: The tasks below are SAMPLE TASKS for illustration purposes only.
-
+  
   The __SPECKIT_COMMAND_TASKS__ command MUST replace these with actual tasks based on:
   - User stories from spec.md (with their priorities P1, P2, P3...)
   - Feature requirements from plan.md
   - Entities from data-model.md
   - Endpoints from contracts/
-
+  
   Tasks MUST be organized by user story so each story can be:
   - Implemented independently
   - Tested independently
   - Delivered as an MVP increment
-
+  
   DO NOT keep these sample tasks in the generated tasks.md file.
   ============================================================================
 -->
@@ -446,10 +438,8 @@ Examples of foundational tasks (adjust based on your project):
 ### User Story Dependencies
 
 - **User Story 1 (P1)**: Can start after Foundational (Phase 2) - No dependencies on other stories
-- **User Story 2 (P2)**: Can start after Foundational (Phase 2) - May integrate with US1 but should
-  be independently testable
-- **User Story 3 (P3)**: Can start after Foundational (Phase 2) - May integrate with US1/US2 but
-  should be independently testable
+- **User Story 2 (P2)**: Can start after Foundational (Phase 2) - May integrate with US1 but should be independently testable
+- **User Story 3 (P3)**: Can start after Foundational (Phase 2) - May integrate with US1/US2 but should be independently testable
 
 ### Within Each User Story
 
@@ -463,8 +453,7 @@ Examples of foundational tasks (adjust based on your project):
 
 - All Setup tasks marked [P] can run in parallel
 - All Foundational tasks marked [P] can run in parallel (within Phase 2)
-- Once Foundational phase completes, all user stories can start in parallel (if team capacity
-  allows)
+- Once Foundational phase completes, all user stories can start in parallel (if team capacity allows)
 - All tests for a user story marked [P] can run in parallel
 - Models within a story marked [P] can run in parallel
 - Different user stories can be worked on in parallel by different team members
@@ -531,22 +520,22 @@ With multiple developers:
   ".specify/templates/checklist-template.md": {
     content: `# [CHECKLIST TYPE] Checklist: [FEATURE NAME]
 
-**Purpose**: [Brief description of what this checklist covers] **Created**: [DATE] **Feature**:
-[Link to spec.md or relevant documentation]
+**Purpose**: [Brief description of what this checklist covers]
+**Created**: [DATE]
+**Feature**: [Link to spec.md or relevant documentation]
 
-**Note**: This checklist is generated by the \`__SPECKIT_COMMAND_CHECKLIST__\` command based on
-feature context and requirements.
+**Note**: This checklist is generated by the \`__SPECKIT_COMMAND_CHECKLIST__\` command based on feature context and requirements.
 
-<!--
+<!-- 
   ============================================================================
   IMPORTANT: The checklist items below are SAMPLE ITEMS for illustration only.
-
+  
   The __SPECKIT_COMMAND_CHECKLIST__ command MUST replace these with actual items based on:
   - User's specific checklist request
   - Feature requirements from spec.md
   - Technical context from plan.md
   - Implementation details from tasks.md
-
+  
   DO NOT keep these sample items in the generated checklist file.
   ============================================================================
 -->
@@ -574,78 +563,54 @@ feature context and requirements.
   },
   ".specify/templates/constitution-template.md": {
     content: `# [PROJECT_NAME] Constitution
-
 <!-- Example: Spec Constitution, TaskFlow Constitution, etc. -->
 
 ## Core Principles
 
 ### [PRINCIPLE_1_NAME]
-
 <!-- Example: I. Library-First -->
-
 [PRINCIPLE_1_DESCRIPTION]
-
 <!-- Example: Every feature starts as a standalone library; Libraries must be self-contained, independently testable, documented; Clear purpose required - no organizational-only libraries -->
 
 ### [PRINCIPLE_2_NAME]
-
 <!-- Example: II. CLI Interface -->
-
 [PRINCIPLE_2_DESCRIPTION]
-
 <!-- Example: Every library exposes functionality via CLI; Text in/out protocol: stdin/args → stdout, errors → stderr; Support JSON + human-readable formats -->
 
 ### [PRINCIPLE_3_NAME]
-
 <!-- Example: III. Test-First (NON-NEGOTIABLE) -->
-
 [PRINCIPLE_3_DESCRIPTION]
-
 <!-- Example: TDD mandatory: Tests written → User approved → Tests fail → Then implement; Red-Green-Refactor cycle strictly enforced -->
 
 ### [PRINCIPLE_4_NAME]
-
 <!-- Example: IV. Integration Testing -->
-
 [PRINCIPLE_4_DESCRIPTION]
-
 <!-- Example: Focus areas requiring integration tests: New library contract tests, Contract changes, Inter-service communication, Shared schemas -->
 
 ### [PRINCIPLE_5_NAME]
-
 <!-- Example: V. Observability, VI. Versioning & Breaking Changes, VII. Simplicity -->
-
 [PRINCIPLE_5_DESCRIPTION]
-
 <!-- Example: Text I/O ensures debuggability; Structured logging required; Or: MAJOR.MINOR.BUILD format; Or: Start simple, YAGNI principles -->
 
 ## [SECTION_2_NAME]
-
 <!-- Example: Additional Constraints, Security Requirements, Performance Standards, etc. -->
 
 [SECTION_2_CONTENT]
-
 <!-- Example: Technology stack requirements, compliance standards, deployment policies, etc. -->
 
 ## [SECTION_3_NAME]
-
 <!-- Example: Development Workflow, Review Process, Quality Gates, etc. -->
 
 [SECTION_3_CONTENT]
-
 <!-- Example: Code review requirements, testing gates, deployment approval process, etc. -->
 
 ## Governance
-
 <!-- Example: Constitution supersedes all other practices; Amendments require documentation, approval, migration plan -->
 
 [GOVERNANCE_RULES]
-
 <!-- Example: All PRs/reviews must verify compliance; Complexity must be justified; Use [GUIDANCE_FILE] for runtime development guidance -->
 
-**Version**: [CONSTITUTION_VERSION] | **Ratified**: [RATIFICATION_DATE] | **Last Amended**:
-[LAST_AMENDED_DATE]
-
+**Version**: [CONSTITUTION_VERSION] | **Ratified**: [RATIFICATION_DATE] | **Last Amended**: [LAST_AMENDED_DATE]
 <!-- Example: Version: 2.1.1 | Ratified: 2025-06-13 | Last Amended: 2025-07-16 -->
 `,
     executable: false,
@@ -5098,22 +5063,27 @@ description: Merge the current feature branch into the base branch after pre-mer
 ## Preconditions
 
 - The feature branch must be checked out.
-- All Speckit phases must have completed successfully (clarify, plan, tasks, analyze, implement, review).
-- \`\$ARGUMENTS\` is optional. If empty, the base branch is \`main\`. Otherwise it is the first token of \`\$ARGUMENTS\`.
+- All Speckit phases must have completed successfully (clarify, plan, tasks, analyze, implement,
+  review).
+- \`\$ARGUMENTS\` is optional. If empty, the base branch is \`main\`. Otherwise it is the first token of
+  \`\$ARGUMENTS\`.
 
 ## Steps
 
 1. Determine the base branch from \`\$ARGUMENTS\` (default \`main\`).
 2. Run \`git status --porcelain\` — abort if the working tree is dirty.
-3. Run \`git fetch origin <base>\` and verify the current branch is up-to-date with \`origin/<base>\` (fast-forward or rebase first if behind).
+3. Run \`git fetch origin <base>\` and verify the current branch is up-to-date with \`origin/<base>\`
+   (fast-forward or rebase first if behind).
 4. Run \`git checkout <base>\`.
-5. Run \`git merge --ff-only <feature-branch>\`. If fast-forward is not possible, stop and ask the user whether to rebase.
+5. Run \`git merge --ff-only <feature-branch>\`. If fast-forward is not possible, stop and ask the
+   user whether to rebase.
 6. Print the merge summary (files changed, commits merged).
 7. Ask the user: "Push to origin <base>? (yes/no)". Do NOT auto-push.
 
 ## Output
 
-A structured report with: files merged, commits merged, whether the user chose to push, and the next suggested action (e.g. \`/backlog update <id> --status done\`).
+A structured report with: files merged, commits merged, whether the user chose to push, and the next
+suggested action (e.g. \`/backlog update <id> --status done\`).
 `,
     executable: false,
   },

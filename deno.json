@@ -29,5 +29,5 @@
   "lint": {
     "rules": { "tags": ["recommended"] }
   },
-  "exclude": ["dist/", "spec-kit/", "examples/"]
+  "exclude": ["dist/", "spec-kit/", "examples/", "templates/"]
 }
