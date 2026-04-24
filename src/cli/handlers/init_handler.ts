@@ -3,6 +3,7 @@ import { bold, dim, green, red, yellow } from "@std/fmt/colors";
 import { InitProjectUseCase } from "../../application/init_project.ts";
 import { DenoFsWriter } from "../../infrastructure/deno_fs_writer.ts";
 import { DenoGit } from "../../infrastructure/deno_git.ts";
+import { FsLockStore } from "../../infrastructure/fs_lock_store.ts";
 import { TEMPLATES } from "../../templates_bundle.ts";
 
 export type InitIntent = {
@@ -32,6 +33,7 @@ export async function runInit(intent: InitIntent): Promise<number> {
   const useCase = new InitProjectUseCase({
     writer: new DenoFsWriter(),
     git: new DenoGit(),
+    lockStore: new FsLockStore(),
     bundle: TEMPLATES,
     ensureDir: (path) => Deno.mkdir(path, { recursive: true }),
   });

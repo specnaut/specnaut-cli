@@ -1,7 +1,23 @@
 import { assert, assertEquals } from "@std/assert";
 import { InitProjectUseCase } from "../../src/application/init_project.ts";
-import type { FsWriter, GitAdapter } from "../../src/application/ports.ts";
+import type { FsWriter, GitAdapter, LockStore } from "../../src/application/ports.ts";
 import type { Bundle } from "../../src/domain/template.ts";
+import type { InstalledLock } from "../../src/domain/installed_lock.ts";
+
+function fakeLockStore(): LockStore & { lastWritten: InstalledLock | null } {
+  const state: { lastWritten: InstalledLock | null } = { lastWritten: null };
+  return {
+    get lastWritten() {
+      return state.lastWritten;
+    },
+    read: () => Promise.resolve(null),
+    write: (_d, lock) => {
+      state.lastWritten = lock;
+      return Promise.resolve();
+    },
+    lockPath: (d) => `${d}/.specflow/installed.lock`,
+  };
+}
 
 function fakeFsWriter(conflicts: string[] = []): FsWriter & { written: string[] } {
   const written: string[] = [];
@@ -37,6 +53,7 @@ Deno.test("InitProjectUseCase writes the bundle to the target dir (happy path)",
   const useCase = new InitProjectUseCase({
     writer,
     git: fakeGit(),
+    lockStore: fakeLockStore(),
     bundle,
     ensureDir: () => Promise.resolve(),
   });
@@ -57,6 +74,7 @@ Deno.test("InitProjectUseCase fails with 'conflicts' when target already has spe
   const useCase = new InitProjectUseCase({
     writer,
     git: fakeGit(),
+    lockStore: fakeLockStore(),
     bundle,
     ensureDir: () => Promise.resolve(),
   });
@@ -74,6 +92,7 @@ Deno.test("InitProjectUseCase calls git.init when repo not initialized and initG
   const useCase = new InitProjectUseCase({
     writer: fakeFsWriter(),
     git: fakeGit({ available: true, initialized: false, initCalled }),
+    lockStore: fakeLockStore(),
     bundle,
     ensureDir: () => Promise.resolve(),
   });
@@ -86,6 +105,7 @@ Deno.test("InitProjectUseCase skips git.init when initGit=false", async () => {
   const useCase = new InitProjectUseCase({
     writer: fakeFsWriter(),
     git: fakeGit({ available: true, initialized: false, initCalled }),
+    lockStore: fakeLockStore(),
     bundle,
     ensureDir: () => Promise.resolve(),
   });
@@ -98,6 +118,7 @@ Deno.test("InitProjectUseCase skips git.init when git not available", async () =
   const useCase = new InitProjectUseCase({
     writer: fakeFsWriter(),
     git: fakeGit({ available: false, initCalled }),
+    lockStore: fakeLockStore(),
     bundle,
     ensureDir: () => Promise.resolve(),
   });
@@ -115,6 +136,7 @@ Deno.test("InitProjectUseCase skips git.init when repo already initialized", asy
   const useCase = new InitProjectUseCase({
     writer: fakeFsWriter(),
     git: fakeGit({ available: true, initialized: true, initCalled }),
+    lockStore: fakeLockStore(),
     bundle,
     ensureDir: () => Promise.resolve(),
   });
@@ -136,6 +158,7 @@ Deno.test("InitProjectUseCase with force=true skips conflict detection and reque
   const useCase = new InitProjectUseCase({
     writer,
     git: fakeGit(),
+    lockStore: fakeLockStore(),
     bundle,
     ensureDir: () => Promise.resolve(),
   });
@@ -161,6 +184,7 @@ Deno.test("InitProjectUseCase returns backups array from writer report", async (
   const useCase = new InitProjectUseCase({
     writer,
     git: fakeGit(),
+    lockStore: fakeLockStore(),
     bundle,
     ensureDir: () => Promise.resolve(),
   });
@@ -172,4 +196,31 @@ Deno.test("InitProjectUseCase returns backups array from writer report", async (
   if (result.status === "initialized") {
     assertEquals(result.backups, [".claude/x.md"]);
   }
+});
+
+Deno.test("InitProjectUseCase persists an installed.lock with SHA256 of every file", async () => {
+  const lockStore = fakeLockStore();
+  const uc = new InitProjectUseCase({
+    writer: fakeFsWriter(),
+    git: fakeGit(),
+    lockStore,
+    bundle: {
+      "a.md": { content: "alpha", executable: false },
+      "b.md": { content: "beta", executable: false },
+    },
+    ensureDir: () => Promise.resolve(),
+    now: () => new Date("2026-04-25T10:00:00Z"),
+  });
+  await uc.execute({
+    targetDir: "/tmp/demo",
+    initGit: false,
+    force: false,
+  });
+  const written = lockStore.lastWritten;
+  assert(written !== null, "lock not written");
+  assertEquals(written!.entries.size, 2);
+  const aEntry = written!.entries.get("a.md");
+  assert(aEntry !== undefined);
+  assertEquals(aEntry!.installedAt, "2026-04-25T10:00:00.000Z");
+  assertEquals(aEntry!.sha256.length, 64);
 });

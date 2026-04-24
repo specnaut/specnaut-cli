@@ -1,16 +1,27 @@
 import type { Bundle } from "../domain/template.ts";
-import type { FsWriter, GitAdapter } from "./ports.ts";
+import type { FsWriter, GitAdapter, LockStore } from "./ports.ts";
+import { sha256Hex } from "../domain/sha256.ts";
+import type { InstalledLock, LockEntry } from "../domain/installed_lock.ts";
+import { TEMPLATES_VERSION } from "../templates_bundle.ts";
 
 export type InitResult =
-  | { status: "initialized"; filesWritten: number; warnings: string[]; backups: string[] }
+  | {
+    status: "initialized";
+    filesWritten: number;
+    warnings: string[];
+    backups: string[];
+    lockWritten: boolean;
+  }
   | { status: "conflicts"; conflicts: string[] };
 
 export type InitProjectDeps = {
   writer: FsWriter;
   git: GitAdapter;
+  lockStore: LockStore;
   bundle: Bundle;
   /** Creates the target directory if it does not exist (idempotent). */
   ensureDir(path: string): Promise<void>;
+  now?: () => Date; // test seam
 };
 
 export type InitProjectInput = {
@@ -23,7 +34,7 @@ export class InitProjectUseCase {
   constructor(private readonly deps: InitProjectDeps) {}
 
   async execute(input: InitProjectInput): Promise<InitResult> {
-    const { writer, git, bundle, ensureDir } = this.deps;
+    const { writer, git, lockStore, bundle, ensureDir } = this.deps;
     const warnings: string[] = [];
 
     await ensureDir(input.targetDir);
@@ -39,6 +50,23 @@ export class InitProjectUseCase {
       overwrite: input.force,
       backupExisting: input.force,
     });
+
+    // Persist the installed lock.
+    const now = (this.deps.now ?? (() => new Date()))().toISOString();
+    const lockEntries = new Map<string, LockEntry>();
+    for (const [dest, file] of Object.entries(bundle)) {
+      lockEntries.set(dest, {
+        sha256: await sha256Hex(file.content),
+        installedAt: now,
+        templatesVersion: TEMPLATES_VERSION,
+      });
+    }
+    const lock: InstalledLock = {
+      version: 1,
+      templatesVersion: TEMPLATES_VERSION,
+      entries: lockEntries,
+    };
+    await lockStore.write(input.targetDir, lock);
 
     if (input.initGit) {
       const available = await git.isAvailable();
@@ -62,6 +90,7 @@ export class InitProjectUseCase {
       filesWritten: Object.keys(bundle).length,
       warnings,
       backups: report.backups.map((b) => b.dest),
+      lockWritten: true,
     };
   }
 }
