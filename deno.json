@@ -9,7 +9,8 @@
     "lint": "deno lint",
     "fmt": "deno fmt",
     "fmt:check": "deno fmt --check",
-    "build": "deno task bundle && deno run --allow-read --allow-write --allow-run scripts/build.ts"
+    "build": "deno task bundle && deno run --allow-read --allow-write --allow-run scripts/build.ts",
+    "setup": "deno run --allow-read --allow-write --allow-run scripts/install-hooks.ts"
   },
   "imports": {
     "@std/cli": "jsr:@std/cli@^1.0.0",

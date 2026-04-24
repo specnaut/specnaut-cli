@@ -1,0 +1,20 @@
+#!/usr/bin/env bash
+# specflow pre-commit hook — format check, lint, type check.
+# Installed via `deno task setup`.
+set -euo pipefail
+
+cd "$(git rev-parse --show-toplevel)"
+
+echo "• deno fmt --check"
+deno fmt --check
+
+echo "• deno lint"
+deno lint
+
+echo "• deno task bundle"
+deno task bundle
+
+echo "• deno check src/main.ts"
+deno check src/main.ts
+
+echo "✓ pre-commit checks passed"

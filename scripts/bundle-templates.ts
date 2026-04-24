@@ -58,7 +58,7 @@ export type TemplateFile = {
 export const TEMPLATES_VERSION = ${JSON.stringify(manifest.version)};
 
 export const TEMPLATES: Record<string, TemplateFile> = {
-${entries.join(",\n")}
+${entries.join(",\n")},
 };
 `;
 }
