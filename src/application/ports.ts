@@ -8,3 +8,9 @@ export interface FsWriter {
     options: { overwrite?: boolean },
   ): Promise<void>;
 }
+
+export interface GitAdapter {
+  isAvailable(): Promise<boolean>;
+  isInitialized(dir: string): Promise<boolean>;
+  init(dir: string): Promise<void>;
+}

@@ -1,0 +1,62 @@
+import { resolve } from "@std/path";
+import { bold, green, red, yellow } from "@std/fmt/colors";
+import { InitProjectUseCase } from "../../application/init_project.ts";
+import { DenoFsWriter } from "../../infrastructure/deno_fs_writer.ts";
+import { DenoGit } from "../../infrastructure/deno_git.ts";
+import { TEMPLATES } from "../../templates_bundle.ts";
+
+export type InitIntent = {
+  kind: "init";
+  projectName: string | null;
+  here: boolean;
+  noGit: boolean;
+  ai: "claude";
+};
+
+export async function runInit(intent: InitIntent): Promise<number> {
+  const cwd = Deno.cwd();
+
+  let targetDir: string;
+  if (intent.here) {
+    targetDir = cwd;
+  } else if (intent.projectName) {
+    targetDir = resolve(cwd, intent.projectName);
+  } else {
+    console.error(red("error: `specflow init` requires a project name or --here"));
+    return 2;
+  }
+
+  console.log(`Initializing into ${bold(targetDir)}`);
+
+  const useCase = new InitProjectUseCase({
+    writer: new DenoFsWriter(),
+    git: new DenoGit(),
+    bundle: TEMPLATES,
+    ensureDir: (path) => Deno.mkdir(path, { recursive: true }),
+  });
+
+  const result = await useCase.execute({
+    targetDir,
+    initGit: !intent.noGit,
+  });
+
+  if (result.status === "conflicts") {
+    console.error(
+      red(`error: target already contains ${result.conflicts.length} specflow-managed file(s):`),
+    );
+    for (const c of result.conflicts) console.error(red(`  - ${c}`));
+    console.error(
+      "\nSpecflow v0.1 does not yet support upgrading an existing project. " +
+        "Remove these files or run init into a clean directory.",
+    );
+    return 3;
+  }
+
+  for (const w of result.warnings) console.error(yellow(`warn: ${w}`));
+  console.log(green(`✓ wrote ${result.filesWritten} files`));
+  console.log("\nNext steps:");
+  console.log(`  1. Edit ${bold("AGENTS.md")} and ${bold(".specify/memory/constitution.md")}`);
+  console.log(`  2. Open the project in Claude Code`);
+  console.log(`  3. Run ${bold('/backlog add "<first task title>"')}`);
+  return 0;
+}
