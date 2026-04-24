@@ -114,6 +114,7 @@
     { "source": "claude/agents/workflow-manager.md",  "destination": ".claude/agents/workflow-manager.md" },
     { "source": "claude/agents/qa-tester.md",         "destination": ".claude/agents/qa-tester.md" },
     { "source": "root/CLAUDE.md",                     "destination": "CLAUDE.md" },
-    { "source": "root/AGENTS.md",                     "destination": "AGENTS.md" }
+    { "source": "root/AGENTS.md",                     "destination": "AGENTS.md" },
+    { "source": "root/.gitignore",                    "destination": ".gitignore" }
   ]
 }
