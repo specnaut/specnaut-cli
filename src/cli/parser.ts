@@ -13,13 +13,14 @@ export type Intent =
   | { kind: "self-update"; checkOnly: boolean }
   | { kind: "backlog-sync"; singleId: string | null; dryRun: boolean; allowSecrets: boolean }
   | { kind: "backlog-configure" }
+  | { kind: "check"; projectMode: boolean }
   | { kind: "unknown"; received: string };
 
 export function parseArgs(argv: string[]): Intent {
   if (argv.length === 0) return { kind: "help" };
 
   const parsed = stdParseArgs(argv, {
-    boolean: ["version", "help", "here", "no-git", "check", "dry-run", "allow-secrets"],
+    boolean: ["version", "help", "here", "no-git", "check", "dry-run", "allow-secrets", "project"],
     string: ["id"],
     alias: { v: "version", h: "help" },
   });
@@ -56,6 +57,10 @@ export function parseArgs(argv: string[]): Intent {
       return { kind: "backlog-configure" };
     }
     return { kind: "unknown", received: "backlog (missing subcommand)" };
+  }
+
+  if (command === "check") {
+    return { kind: "check", projectMode: Boolean(parsed.project) };
   }
 
   return { kind: "unknown", received: command ?? "" };

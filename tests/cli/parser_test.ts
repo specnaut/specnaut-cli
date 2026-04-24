@@ -88,3 +88,11 @@ Deno.test("parseArgs rejects backlog without subcommand", () => {
     received: "backlog (missing subcommand)",
   });
 });
+
+Deno.test("parseArgs returns check intent without --project", () => {
+  assertEquals(parseArgs(["check"]), { kind: "check", projectMode: false });
+});
+
+Deno.test("parseArgs returns check intent with --project", () => {
+  assertEquals(parseArgs(["check", "--project"]), { kind: "check", projectMode: true });
+});

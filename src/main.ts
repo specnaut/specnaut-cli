@@ -30,6 +30,10 @@ export async function run(argv: string[]): Promise<number> {
       const { runBacklogConfigure } = await import("./cli/handlers/backlog_configure_handler.ts");
       return await runBacklogConfigure(intent);
     }
+    case "check": {
+      const { runCheck } = await import("./cli/handlers/check_handler.ts");
+      return await runCheck(intent);
+    }
     case "unknown":
       console.error(red(`Unknown command: "${intent.received}"`));
       console.error(HELP);

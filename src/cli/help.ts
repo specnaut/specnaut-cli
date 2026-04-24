@@ -11,6 +11,7 @@ ${bold("Usage:")}
   specflow backlog sync [--id NNN] [--dry-run] [--allow-secrets]
                                      Sync tasks/backlog/ to GitHub Issues + Project V2
   specflow backlog configure         Interactive setup of .specflow/config.yml
+  specflow check [--project]         Diagnose the environment (and optionally the project)
   specflow --version                  Print version
   specflow --help                     Show this help
 
