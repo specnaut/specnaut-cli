@@ -101,6 +101,11 @@
       "source": "claude/commands/speckit.merge.md",
       "destination": ".claude/commands/speckit.merge.md"
     },
-    { "source": "claude/skills/speckit/SKILL.md", "destination": ".claude/skills/speckit/SKILL.md" }
+    { "source": "claude/skills/speckit/SKILL.md", "destination": ".claude/skills/speckit/SKILL.md" },
+    { "source": "claude/commands/speckit.review.md",           "destination": ".claude/commands/speckit.review.md" },
+    { "source": "claude/agents/review-coordinator.md",         "destination": ".claude/agents/review-coordinator.md" },
+    { "source": "claude/agents/code-reviewer.md",              "destination": ".claude/agents/code-reviewer.md" },
+    { "source": "claude/agents/security-auditor.md",           "destination": ".claude/agents/security-auditor.md" },
+    { "source": "claude/agents/test-reviewer.md",              "destination": ".claude/agents/test-reviewer.md" }
   ]
 }
