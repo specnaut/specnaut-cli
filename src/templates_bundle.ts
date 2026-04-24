@@ -6,4 +6,3120 @@ export type TemplateFile = {
 
 export const TEMPLATES_VERSION = "0.1.0";
 
-export const TEMPLATES: Record<string, TemplateFile> = {};
+export const TEMPLATES: Record<string, TemplateFile> = {
+  ".specify/memory/constitution.md": {
+    content: `# Project Constitution
+
+> This file holds the invariants of your project: architecture rules,
+> conventions, and non-negotiable policies. Specflow, Spec Kit commands,
+> and review agents read it at every step.
+>
+> Replace this placeholder with your own constitution. Use
+> \`.specify/templates/constitution-template.md\` as a starting point.
+
+## Principles
+
+(none defined yet)
+`,
+    executable: false,
+  },
+  ".specify/templates/spec-template.md": {
+    content: `# Feature Specification: [FEATURE NAME]
+
+**Feature Branch**: \`[###-feature-name]\`  
+**Created**: [DATE]  
+**Status**: Draft  
+**Input**: User description: "\$ARGUMENTS"
+
+## User Scenarios & Testing *(mandatory)*
+
+<!--
+  IMPORTANT: User stories should be PRIORITIZED as user journeys ordered by importance.
+  Each user story/journey must be INDEPENDENTLY TESTABLE - meaning if you implement just ONE of them,
+  you should still have a viable MVP (Minimum Viable Product) that delivers value.
+  
+  Assign priorities (P1, P2, P3, etc.) to each story, where P1 is the most critical.
+  Think of each story as a standalone slice of functionality that can be:
+  - Developed independently
+  - Tested independently
+  - Deployed independently
+  - Demonstrated to users independently
+-->
+
+### User Story 1 - [Brief Title] (Priority: P1)
+
+[Describe this user journey in plain language]
+
+**Why this priority**: [Explain the value and why it has this priority level]
+
+**Independent Test**: [Describe how this can be tested independently - e.g., "Can be fully tested by [specific action] and delivers [specific value]"]
+
+**Acceptance Scenarios**:
+
+1. **Given** [initial state], **When** [action], **Then** [expected outcome]
+2. **Given** [initial state], **When** [action], **Then** [expected outcome]
+
+---
+
+### User Story 2 - [Brief Title] (Priority: P2)
+
+[Describe this user journey in plain language]
+
+**Why this priority**: [Explain the value and why it has this priority level]
+
+**Independent Test**: [Describe how this can be tested independently]
+
+**Acceptance Scenarios**:
+
+1. **Given** [initial state], **When** [action], **Then** [expected outcome]
+
+---
+
+### User Story 3 - [Brief Title] (Priority: P3)
+
+[Describe this user journey in plain language]
+
+**Why this priority**: [Explain the value and why it has this priority level]
+
+**Independent Test**: [Describe how this can be tested independently]
+
+**Acceptance Scenarios**:
+
+1. **Given** [initial state], **When** [action], **Then** [expected outcome]
+
+---
+
+[Add more user stories as needed, each with an assigned priority]
+
+### Edge Cases
+
+<!--
+  ACTION REQUIRED: The content in this section represents placeholders.
+  Fill them out with the right edge cases.
+-->
+
+- What happens when [boundary condition]?
+- How does system handle [error scenario]?
+
+## Requirements *(mandatory)*
+
+<!--
+  ACTION REQUIRED: The content in this section represents placeholders.
+  Fill them out with the right functional requirements.
+-->
+
+### Functional Requirements
+
+- **FR-001**: System MUST [specific capability, e.g., "allow users to create accounts"]
+- **FR-002**: System MUST [specific capability, e.g., "validate email addresses"]  
+- **FR-003**: Users MUST be able to [key interaction, e.g., "reset their password"]
+- **FR-004**: System MUST [data requirement, e.g., "persist user preferences"]
+- **FR-005**: System MUST [behavior, e.g., "log all security events"]
+
+*Example of marking unclear requirements:*
+
+- **FR-006**: System MUST authenticate users via [NEEDS CLARIFICATION: auth method not specified - email/password, SSO, OAuth?]
+- **FR-007**: System MUST retain user data for [NEEDS CLARIFICATION: retention period not specified]
+
+### Key Entities *(include if feature involves data)*
+
+- **[Entity 1]**: [What it represents, key attributes without implementation]
+- **[Entity 2]**: [What it represents, relationships to other entities]
+
+## Success Criteria *(mandatory)*
+
+<!--
+  ACTION REQUIRED: Define measurable success criteria.
+  These must be technology-agnostic and measurable.
+-->
+
+### Measurable Outcomes
+
+- **SC-001**: [Measurable metric, e.g., "Users can complete account creation in under 2 minutes"]
+- **SC-002**: [Measurable metric, e.g., "System handles 1000 concurrent users without degradation"]
+- **SC-003**: [User satisfaction metric, e.g., "90% of users successfully complete primary task on first attempt"]
+- **SC-004**: [Business metric, e.g., "Reduce support tickets related to [X] by 50%"]
+
+## Assumptions
+
+<!--
+  ACTION REQUIRED: The content in this section represents placeholders.
+  Fill them out with the right assumptions based on reasonable defaults
+  chosen when the feature description did not specify certain details.
+-->
+
+- [Assumption about target users, e.g., "Users have stable internet connectivity"]
+- [Assumption about scope boundaries, e.g., "Mobile support is out of scope for v1"]
+- [Assumption about data/environment, e.g., "Existing authentication system will be reused"]
+- [Dependency on existing system/service, e.g., "Requires access to the existing user profile API"]
+`,
+    executable: false,
+  },
+  ".specify/templates/plan-template.md": {
+    content: `# Implementation Plan: [FEATURE]
+
+**Branch**: \`[###-feature-name]\` | **Date**: [DATE] | **Spec**: [link]
+**Input**: Feature specification from \`/specs/[###-feature-name]/spec.md\`
+
+**Note**: This template is filled in by the \`__SPECKIT_COMMAND_PLAN__\` command. See \`.specify/templates/plan-template.md\` for the execution workflow.
+
+## Summary
+
+[Extract from feature spec: primary requirement + technical approach from research]
+
+## Technical Context
+
+<!--
+  ACTION REQUIRED: Replace the content in this section with the technical details
+  for the project. The structure here is presented in advisory capacity to guide
+  the iteration process.
+-->
+
+**Language/Version**: [e.g., Python 3.11, Swift 5.9, Rust 1.75 or NEEDS CLARIFICATION]  
+**Primary Dependencies**: [e.g., FastAPI, UIKit, LLVM or NEEDS CLARIFICATION]  
+**Storage**: [if applicable, e.g., PostgreSQL, CoreData, files or N/A]  
+**Testing**: [e.g., pytest, XCTest, cargo test or NEEDS CLARIFICATION]  
+**Target Platform**: [e.g., Linux server, iOS 15+, WASM or NEEDS CLARIFICATION]
+**Project Type**: [e.g., library/cli/web-service/mobile-app/compiler/desktop-app or NEEDS CLARIFICATION]  
+**Performance Goals**: [domain-specific, e.g., 1000 req/s, 10k lines/sec, 60 fps or NEEDS CLARIFICATION]  
+**Constraints**: [domain-specific, e.g., <200ms p95, <100MB memory, offline-capable or NEEDS CLARIFICATION]  
+**Scale/Scope**: [domain-specific, e.g., 10k users, 1M LOC, 50 screens or NEEDS CLARIFICATION]
+
+## Constitution Check
+
+*GATE: Must pass before Phase 0 research. Re-check after Phase 1 design.*
+
+[Gates determined based on constitution file]
+
+## Project Structure
+
+### Documentation (this feature)
+
+\`\`\`text
+specs/[###-feature]/
+├── plan.md              # This file (__SPECKIT_COMMAND_PLAN__ command output)
+├── research.md          # Phase 0 output (__SPECKIT_COMMAND_PLAN__ command)
+├── data-model.md        # Phase 1 output (__SPECKIT_COMMAND_PLAN__ command)
+├── quickstart.md        # Phase 1 output (__SPECKIT_COMMAND_PLAN__ command)
+├── contracts/           # Phase 1 output (__SPECKIT_COMMAND_PLAN__ command)
+└── tasks.md             # Phase 2 output (__SPECKIT_COMMAND_TASKS__ command - NOT created by __SPECKIT_COMMAND_PLAN__)
+\`\`\`
+
+### Source Code (repository root)
+<!--
+  ACTION REQUIRED: Replace the placeholder tree below with the concrete layout
+  for this feature. Delete unused options and expand the chosen structure with
+  real paths (e.g., apps/admin, packages/something). The delivered plan must
+  not include Option labels.
+-->
+
+\`\`\`text
+# [REMOVE IF UNUSED] Option 1: Single project (DEFAULT)
+src/
+├── models/
+├── services/
+├── cli/
+└── lib/
+
+tests/
+├── contract/
+├── integration/
+└── unit/
+
+# [REMOVE IF UNUSED] Option 2: Web application (when "frontend" + "backend" detected)
+backend/
+├── src/
+│   ├── models/
+│   ├── services/
+│   └── api/
+└── tests/
+
+frontend/
+├── src/
+│   ├── components/
+│   ├── pages/
+│   └── services/
+└── tests/
+
+# [REMOVE IF UNUSED] Option 3: Mobile + API (when "iOS/Android" detected)
+api/
+└── [same as backend above]
+
+ios/ or android/
+└── [platform-specific structure: feature modules, UI flows, platform tests]
+\`\`\`
+
+**Structure Decision**: [Document the selected structure and reference the real
+directories captured above]
+
+## Complexity Tracking
+
+> **Fill ONLY if Constitution Check has violations that must be justified**
+
+| Violation | Why Needed | Simpler Alternative Rejected Because |
+|-----------|------------|-------------------------------------|
+| [e.g., 4th project] | [current need] | [why 3 projects insufficient] |
+| [e.g., Repository pattern] | [specific problem] | [why direct DB access insufficient] |
+`,
+    executable: false,
+  },
+  ".specify/templates/tasks-template.md": {
+    content: `---
+
+description: "Task list template for feature implementation"
+---
+
+# Tasks: [FEATURE NAME]
+
+**Input**: Design documents from \`/specs/[###-feature-name]/\`
+**Prerequisites**: plan.md (required), spec.md (required for user stories), research.md, data-model.md, contracts/
+
+**Tests**: The examples below include test tasks. Tests are OPTIONAL - only include them if explicitly requested in the feature specification.
+
+**Organization**: Tasks are grouped by user story to enable independent implementation and testing of each story.
+
+## Format: \`[ID] [P?] [Story] Description\`
+
+- **[P]**: Can run in parallel (different files, no dependencies)
+- **[Story]**: Which user story this task belongs to (e.g., US1, US2, US3)
+- Include exact file paths in descriptions
+
+## Path Conventions
+
+- **Single project**: \`src/\`, \`tests/\` at repository root
+- **Web app**: \`backend/src/\`, \`frontend/src/\`
+- **Mobile**: \`api/src/\`, \`ios/src/\` or \`android/src/\`
+- Paths shown below assume single project - adjust based on plan.md structure
+
+<!-- 
+  ============================================================================
+  IMPORTANT: The tasks below are SAMPLE TASKS for illustration purposes only.
+  
+  The __SPECKIT_COMMAND_TASKS__ command MUST replace these with actual tasks based on:
+  - User stories from spec.md (with their priorities P1, P2, P3...)
+  - Feature requirements from plan.md
+  - Entities from data-model.md
+  - Endpoints from contracts/
+  
+  Tasks MUST be organized by user story so each story can be:
+  - Implemented independently
+  - Tested independently
+  - Delivered as an MVP increment
+  
+  DO NOT keep these sample tasks in the generated tasks.md file.
+  ============================================================================
+-->
+
+## Phase 1: Setup (Shared Infrastructure)
+
+**Purpose**: Project initialization and basic structure
+
+- [ ] T001 Create project structure per implementation plan
+- [ ] T002 Initialize [language] project with [framework] dependencies
+- [ ] T003 [P] Configure linting and formatting tools
+
+---
+
+## Phase 2: Foundational (Blocking Prerequisites)
+
+**Purpose**: Core infrastructure that MUST be complete before ANY user story can be implemented
+
+**⚠️ CRITICAL**: No user story work can begin until this phase is complete
+
+Examples of foundational tasks (adjust based on your project):
+
+- [ ] T004 Setup database schema and migrations framework
+- [ ] T005 [P] Implement authentication/authorization framework
+- [ ] T006 [P] Setup API routing and middleware structure
+- [ ] T007 Create base models/entities that all stories depend on
+- [ ] T008 Configure error handling and logging infrastructure
+- [ ] T009 Setup environment configuration management
+
+**Checkpoint**: Foundation ready - user story implementation can now begin in parallel
+
+---
+
+## Phase 3: User Story 1 - [Title] (Priority: P1) 🎯 MVP
+
+**Goal**: [Brief description of what this story delivers]
+
+**Independent Test**: [How to verify this story works on its own]
+
+### Tests for User Story 1 (OPTIONAL - only if tests requested) ⚠️
+
+> **NOTE: Write these tests FIRST, ensure they FAIL before implementation**
+
+- [ ] T010 [P] [US1] Contract test for [endpoint] in tests/contract/test_[name].py
+- [ ] T011 [P] [US1] Integration test for [user journey] in tests/integration/test_[name].py
+
+### Implementation for User Story 1
+
+- [ ] T012 [P] [US1] Create [Entity1] model in src/models/[entity1].py
+- [ ] T013 [P] [US1] Create [Entity2] model in src/models/[entity2].py
+- [ ] T014 [US1] Implement [Service] in src/services/[service].py (depends on T012, T013)
+- [ ] T015 [US1] Implement [endpoint/feature] in src/[location]/[file].py
+- [ ] T016 [US1] Add validation and error handling
+- [ ] T017 [US1] Add logging for user story 1 operations
+
+**Checkpoint**: At this point, User Story 1 should be fully functional and testable independently
+
+---
+
+## Phase 4: User Story 2 - [Title] (Priority: P2)
+
+**Goal**: [Brief description of what this story delivers]
+
+**Independent Test**: [How to verify this story works on its own]
+
+### Tests for User Story 2 (OPTIONAL - only if tests requested) ⚠️
+
+- [ ] T018 [P] [US2] Contract test for [endpoint] in tests/contract/test_[name].py
+- [ ] T019 [P] [US2] Integration test for [user journey] in tests/integration/test_[name].py
+
+### Implementation for User Story 2
+
+- [ ] T020 [P] [US2] Create [Entity] model in src/models/[entity].py
+- [ ] T021 [US2] Implement [Service] in src/services/[service].py
+- [ ] T022 [US2] Implement [endpoint/feature] in src/[location]/[file].py
+- [ ] T023 [US2] Integrate with User Story 1 components (if needed)
+
+**Checkpoint**: At this point, User Stories 1 AND 2 should both work independently
+
+---
+
+## Phase 5: User Story 3 - [Title] (Priority: P3)
+
+**Goal**: [Brief description of what this story delivers]
+
+**Independent Test**: [How to verify this story works on its own]
+
+### Tests for User Story 3 (OPTIONAL - only if tests requested) ⚠️
+
+- [ ] T024 [P] [US3] Contract test for [endpoint] in tests/contract/test_[name].py
+- [ ] T025 [P] [US3] Integration test for [user journey] in tests/integration/test_[name].py
+
+### Implementation for User Story 3
+
+- [ ] T026 [P] [US3] Create [Entity] model in src/models/[entity].py
+- [ ] T027 [US3] Implement [Service] in src/services/[service].py
+- [ ] T028 [US3] Implement [endpoint/feature] in src/[location]/[file].py
+
+**Checkpoint**: All user stories should now be independently functional
+
+---
+
+[Add more user story phases as needed, following the same pattern]
+
+---
+
+## Phase N: Polish & Cross-Cutting Concerns
+
+**Purpose**: Improvements that affect multiple user stories
+
+- [ ] TXXX [P] Documentation updates in docs/
+- [ ] TXXX Code cleanup and refactoring
+- [ ] TXXX Performance optimization across all stories
+- [ ] TXXX [P] Additional unit tests (if requested) in tests/unit/
+- [ ] TXXX Security hardening
+- [ ] TXXX Run quickstart.md validation
+
+---
+
+## Dependencies & Execution Order
+
+### Phase Dependencies
+
+- **Setup (Phase 1)**: No dependencies - can start immediately
+- **Foundational (Phase 2)**: Depends on Setup completion - BLOCKS all user stories
+- **User Stories (Phase 3+)**: All depend on Foundational phase completion
+  - User stories can then proceed in parallel (if staffed)
+  - Or sequentially in priority order (P1 → P2 → P3)
+- **Polish (Final Phase)**: Depends on all desired user stories being complete
+
+### User Story Dependencies
+
+- **User Story 1 (P1)**: Can start after Foundational (Phase 2) - No dependencies on other stories
+- **User Story 2 (P2)**: Can start after Foundational (Phase 2) - May integrate with US1 but should be independently testable
+- **User Story 3 (P3)**: Can start after Foundational (Phase 2) - May integrate with US1/US2 but should be independently testable
+
+### Within Each User Story
+
+- Tests (if included) MUST be written and FAIL before implementation
+- Models before services
+- Services before endpoints
+- Core implementation before integration
+- Story complete before moving to next priority
+
+### Parallel Opportunities
+
+- All Setup tasks marked [P] can run in parallel
+- All Foundational tasks marked [P] can run in parallel (within Phase 2)
+- Once Foundational phase completes, all user stories can start in parallel (if team capacity allows)
+- All tests for a user story marked [P] can run in parallel
+- Models within a story marked [P] can run in parallel
+- Different user stories can be worked on in parallel by different team members
+
+---
+
+## Parallel Example: User Story 1
+
+\`\`\`bash
+# Launch all tests for User Story 1 together (if tests requested):
+Task: "Contract test for [endpoint] in tests/contract/test_[name].py"
+Task: "Integration test for [user journey] in tests/integration/test_[name].py"
+
+# Launch all models for User Story 1 together:
+Task: "Create [Entity1] model in src/models/[entity1].py"
+Task: "Create [Entity2] model in src/models/[entity2].py"
+\`\`\`
+
+---
+
+## Implementation Strategy
+
+### MVP First (User Story 1 Only)
+
+1. Complete Phase 1: Setup
+2. Complete Phase 2: Foundational (CRITICAL - blocks all stories)
+3. Complete Phase 3: User Story 1
+4. **STOP and VALIDATE**: Test User Story 1 independently
+5. Deploy/demo if ready
+
+### Incremental Delivery
+
+1. Complete Setup + Foundational → Foundation ready
+2. Add User Story 1 → Test independently → Deploy/Demo (MVP!)
+3. Add User Story 2 → Test independently → Deploy/Demo
+4. Add User Story 3 → Test independently → Deploy/Demo
+5. Each story adds value without breaking previous stories
+
+### Parallel Team Strategy
+
+With multiple developers:
+
+1. Team completes Setup + Foundational together
+2. Once Foundational is done:
+   - Developer A: User Story 1
+   - Developer B: User Story 2
+   - Developer C: User Story 3
+3. Stories complete and integrate independently
+
+---
+
+## Notes
+
+- [P] tasks = different files, no dependencies
+- [Story] label maps task to specific user story for traceability
+- Each user story should be independently completable and testable
+- Verify tests fail before implementing
+- Commit after each task or logical group
+- Stop at any checkpoint to validate story independently
+- Avoid: vague tasks, same file conflicts, cross-story dependencies that break independence
+`,
+    executable: false,
+  },
+  ".specify/templates/checklist-template.md": {
+    content: `# [CHECKLIST TYPE] Checklist: [FEATURE NAME]
+
+**Purpose**: [Brief description of what this checklist covers]
+**Created**: [DATE]
+**Feature**: [Link to spec.md or relevant documentation]
+
+**Note**: This checklist is generated by the \`__SPECKIT_COMMAND_CHECKLIST__\` command based on feature context and requirements.
+
+<!-- 
+  ============================================================================
+  IMPORTANT: The checklist items below are SAMPLE ITEMS for illustration only.
+  
+  The __SPECKIT_COMMAND_CHECKLIST__ command MUST replace these with actual items based on:
+  - User's specific checklist request
+  - Feature requirements from spec.md
+  - Technical context from plan.md
+  - Implementation details from tasks.md
+  
+  DO NOT keep these sample items in the generated checklist file.
+  ============================================================================
+-->
+
+## [Category 1]
+
+- [ ] CHK001 First checklist item with clear action
+- [ ] CHK002 Second checklist item
+- [ ] CHK003 Third checklist item
+
+## [Category 2]
+
+- [ ] CHK004 Another category item
+- [ ] CHK005 Item with specific criteria
+- [ ] CHK006 Final item in this category
+
+## Notes
+
+- Check items off as completed: \`[x]\`
+- Add comments or findings inline
+- Link to relevant resources or documentation
+- Items are numbered sequentially for easy reference
+`,
+    executable: false,
+  },
+  ".specify/templates/constitution-template.md": {
+    content: `# [PROJECT_NAME] Constitution
+<!-- Example: Spec Constitution, TaskFlow Constitution, etc. -->
+
+## Core Principles
+
+### [PRINCIPLE_1_NAME]
+<!-- Example: I. Library-First -->
+[PRINCIPLE_1_DESCRIPTION]
+<!-- Example: Every feature starts as a standalone library; Libraries must be self-contained, independently testable, documented; Clear purpose required - no organizational-only libraries -->
+
+### [PRINCIPLE_2_NAME]
+<!-- Example: II. CLI Interface -->
+[PRINCIPLE_2_DESCRIPTION]
+<!-- Example: Every library exposes functionality via CLI; Text in/out protocol: stdin/args → stdout, errors → stderr; Support JSON + human-readable formats -->
+
+### [PRINCIPLE_3_NAME]
+<!-- Example: III. Test-First (NON-NEGOTIABLE) -->
+[PRINCIPLE_3_DESCRIPTION]
+<!-- Example: TDD mandatory: Tests written → User approved → Tests fail → Then implement; Red-Green-Refactor cycle strictly enforced -->
+
+### [PRINCIPLE_4_NAME]
+<!-- Example: IV. Integration Testing -->
+[PRINCIPLE_4_DESCRIPTION]
+<!-- Example: Focus areas requiring integration tests: New library contract tests, Contract changes, Inter-service communication, Shared schemas -->
+
+### [PRINCIPLE_5_NAME]
+<!-- Example: V. Observability, VI. Versioning & Breaking Changes, VII. Simplicity -->
+[PRINCIPLE_5_DESCRIPTION]
+<!-- Example: Text I/O ensures debuggability; Structured logging required; Or: MAJOR.MINOR.BUILD format; Or: Start simple, YAGNI principles -->
+
+## [SECTION_2_NAME]
+<!-- Example: Additional Constraints, Security Requirements, Performance Standards, etc. -->
+
+[SECTION_2_CONTENT]
+<!-- Example: Technology stack requirements, compliance standards, deployment policies, etc. -->
+
+## [SECTION_3_NAME]
+<!-- Example: Development Workflow, Review Process, Quality Gates, etc. -->
+
+[SECTION_3_CONTENT]
+<!-- Example: Code review requirements, testing gates, deployment approval process, etc. -->
+
+## Governance
+<!-- Example: Constitution supersedes all other practices; Amendments require documentation, approval, migration plan -->
+
+[GOVERNANCE_RULES]
+<!-- Example: All PRs/reviews must verify compliance; Complexity must be justified; Use [GUIDANCE_FILE] for runtime development guidance -->
+
+**Version**: [CONSTITUTION_VERSION] | **Ratified**: [RATIFICATION_DATE] | **Last Amended**: [LAST_AMENDED_DATE]
+<!-- Example: Version: 2.1.1 | Ratified: 2025-06-13 | Last Amended: 2025-07-16 -->
+`,
+    executable: false,
+  },
+  ".specify/templates/agent-file-template.md": {
+    content: `# Agent File (Self-Test Preset)
+
+<!-- preset:self-test -->
+
+> This template is provided by the self-test preset.
+
+## Agent Instructions
+
+Follow these guidelines when working on this project.
+`,
+    executable: false,
+  },
+  ".specify/scripts/bash/check-prerequisites.sh": {
+    content: `#!/usr/bin/env bash
+
+# Consolidated prerequisite checking script
+#
+# This script provides unified prerequisite checking for Spec-Driven Development workflow.
+# It replaces the functionality previously spread across multiple scripts.
+#
+# Usage: ./check-prerequisites.sh [OPTIONS]
+#
+# OPTIONS:
+#   --json              Output in JSON format
+#   --require-tasks     Require tasks.md to exist (for implementation phase)
+#   --include-tasks     Include tasks.md in AVAILABLE_DOCS list
+#   --paths-only        Only output path variables (no validation)
+#   --help, -h          Show help message
+#
+# OUTPUTS:
+#   JSON mode: {"FEATURE_DIR":"...", "AVAILABLE_DOCS":["..."]}
+#   Text mode: FEATURE_DIR:... \\n AVAILABLE_DOCS: \\n ✓/✗ file.md
+#   Paths only: REPO_ROOT: ... \\n BRANCH: ... \\n FEATURE_DIR: ... etc.
+
+set -e
+
+# Parse command line arguments
+JSON_MODE=false
+REQUIRE_TASKS=false
+INCLUDE_TASKS=false
+PATHS_ONLY=false
+
+for arg in "\$@"; do
+    case "\$arg" in
+        --json)
+            JSON_MODE=true
+            ;;
+        --require-tasks)
+            REQUIRE_TASKS=true
+            ;;
+        --include-tasks)
+            INCLUDE_TASKS=true
+            ;;
+        --paths-only)
+            PATHS_ONLY=true
+            ;;
+        --help|-h)
+            cat << 'EOF'
+Usage: check-prerequisites.sh [OPTIONS]
+
+Consolidated prerequisite checking for Spec-Driven Development workflow.
+
+OPTIONS:
+  --json              Output in JSON format
+  --require-tasks     Require tasks.md to exist (for implementation phase)
+  --include-tasks     Include tasks.md in AVAILABLE_DOCS list
+  --paths-only        Only output path variables (no prerequisite validation)
+  --help, -h          Show this help message
+
+EXAMPLES:
+  # Check task prerequisites (plan.md required)
+  ./check-prerequisites.sh --json
+  
+  # Check implementation prerequisites (plan.md + tasks.md required)
+  ./check-prerequisites.sh --json --require-tasks --include-tasks
+  
+  # Get feature paths only (no validation)
+  ./check-prerequisites.sh --paths-only
+  
+EOF
+            exit 0
+            ;;
+        *)
+            echo "ERROR: Unknown option '\$arg'. Use --help for usage information." >&2
+            exit 1
+            ;;
+    esac
+done
+
+# Source common functions
+SCRIPT_DIR="\$(CDPATH="" cd "\$(dirname "\${BASH_SOURCE[0]}")" && pwd)"
+source "\$SCRIPT_DIR/common.sh"
+
+# Get feature paths and validate branch
+_paths_output=\$(get_feature_paths) || { echo "ERROR: Failed to resolve feature paths" >&2; exit 1; }
+eval "\$_paths_output"
+unset _paths_output
+check_feature_branch "\$CURRENT_BRANCH" "\$HAS_GIT" || exit 1
+
+# If paths-only mode, output paths and exit (support JSON + paths-only combined)
+if \$PATHS_ONLY; then
+    if \$JSON_MODE; then
+        # Minimal JSON paths payload (no validation performed)
+        if has_jq; then
+            jq -cn \\
+                --arg repo_root "\$REPO_ROOT" \\
+                --arg branch "\$CURRENT_BRANCH" \\
+                --arg feature_dir "\$FEATURE_DIR" \\
+                --arg feature_spec "\$FEATURE_SPEC" \\
+                --arg impl_plan "\$IMPL_PLAN" \\
+                --arg tasks "\$TASKS" \\
+                '{REPO_ROOT:\$repo_root,BRANCH:\$branch,FEATURE_DIR:\$feature_dir,FEATURE_SPEC:\$feature_spec,IMPL_PLAN:\$impl_plan,TASKS:\$tasks}'
+        else
+            printf '{"REPO_ROOT":"%s","BRANCH":"%s","FEATURE_DIR":"%s","FEATURE_SPEC":"%s","IMPL_PLAN":"%s","TASKS":"%s"}\\n' \\
+                "\$(json_escape "\$REPO_ROOT")" "\$(json_escape "\$CURRENT_BRANCH")" "\$(json_escape "\$FEATURE_DIR")" "\$(json_escape "\$FEATURE_SPEC")" "\$(json_escape "\$IMPL_PLAN")" "\$(json_escape "\$TASKS")"
+        fi
+    else
+        echo "REPO_ROOT: \$REPO_ROOT"
+        echo "BRANCH: \$CURRENT_BRANCH"
+        echo "FEATURE_DIR: \$FEATURE_DIR"
+        echo "FEATURE_SPEC: \$FEATURE_SPEC"
+        echo "IMPL_PLAN: \$IMPL_PLAN"
+        echo "TASKS: \$TASKS"
+    fi
+    exit 0
+fi
+
+# Validate required directories and files
+if [[ ! -d "\$FEATURE_DIR" ]]; then
+    echo "ERROR: Feature directory not found: \$FEATURE_DIR" >&2
+    echo "Run /speckit.specify first to create the feature structure." >&2
+    exit 1
+fi
+
+if [[ ! -f "\$IMPL_PLAN" ]]; then
+    echo "ERROR: plan.md not found in \$FEATURE_DIR" >&2
+    echo "Run /speckit.plan first to create the implementation plan." >&2
+    exit 1
+fi
+
+# Check for tasks.md if required
+if \$REQUIRE_TASKS && [[ ! -f "\$TASKS" ]]; then
+    echo "ERROR: tasks.md not found in \$FEATURE_DIR" >&2
+    echo "Run /speckit.tasks first to create the task list." >&2
+    exit 1
+fi
+
+# Build list of available documents
+docs=()
+
+# Always check these optional docs
+[[ -f "\$RESEARCH" ]] && docs+=("research.md")
+[[ -f "\$DATA_MODEL" ]] && docs+=("data-model.md")
+
+# Check contracts directory (only if it exists and has files)
+if [[ -d "\$CONTRACTS_DIR" ]] && [[ -n "\$(ls -A "\$CONTRACTS_DIR" 2>/dev/null)" ]]; then
+    docs+=("contracts/")
+fi
+
+[[ -f "\$QUICKSTART" ]] && docs+=("quickstart.md")
+
+# Include tasks.md if requested and it exists
+if \$INCLUDE_TASKS && [[ -f "\$TASKS" ]]; then
+    docs+=("tasks.md")
+fi
+
+# Output results
+if \$JSON_MODE; then
+    # Build JSON array of documents
+    if has_jq; then
+        if [[ \${#docs[@]} -eq 0 ]]; then
+            json_docs="[]"
+        else
+            json_docs=\$(printf '%s\\n' "\${docs[@]}" | jq -R . | jq -s .)
+        fi
+        jq -cn \\
+            --arg feature_dir "\$FEATURE_DIR" \\
+            --argjson docs "\$json_docs" \\
+            '{FEATURE_DIR:\$feature_dir,AVAILABLE_DOCS:\$docs}'
+    else
+        if [[ \${#docs[@]} -eq 0 ]]; then
+            json_docs="[]"
+        else
+            json_docs=\$(for d in "\${docs[@]}"; do printf '"%s",' "\$(json_escape "\$d")"; done)
+            json_docs="[\${json_docs%,}]"
+        fi
+        printf '{"FEATURE_DIR":"%s","AVAILABLE_DOCS":%s}\\n' "\$(json_escape "\$FEATURE_DIR")" "\$json_docs"
+    fi
+else
+    # Text output
+    echo "FEATURE_DIR:\$FEATURE_DIR"
+    echo "AVAILABLE_DOCS:"
+    
+    # Show status of each potential document
+    check_file "\$RESEARCH" "research.md"
+    check_file "\$DATA_MODEL" "data-model.md"
+    check_dir "\$CONTRACTS_DIR" "contracts/"
+    check_file "\$QUICKSTART" "quickstart.md"
+    
+    if \$INCLUDE_TASKS; then
+        check_file "\$TASKS" "tasks.md"
+    fi
+fi
+`,
+    executable: true,
+  },
+  ".specify/scripts/bash/common.sh": {
+    content: `#!/usr/bin/env bash
+# Common functions and variables for all scripts
+
+# Find repository root by searching upward for .specify directory
+# This is the primary marker for spec-kit projects
+find_specify_root() {
+    local dir="\${1:-\$(pwd)}"
+    # Normalize to absolute path to prevent infinite loop with relative paths
+    # Use -- to handle paths starting with - (e.g., -P, -L)
+    dir="\$(cd -- "\$dir" 2>/dev/null && pwd)" || return 1
+    local prev_dir=""
+    while true; do
+        if [ -d "\$dir/.specify" ]; then
+            echo "\$dir"
+            return 0
+        fi
+        # Stop if we've reached filesystem root or dirname stops changing
+        if [ "\$dir" = "/" ] || [ "\$dir" = "\$prev_dir" ]; then
+            break
+        fi
+        prev_dir="\$dir"
+        dir="\$(dirname "\$dir")"
+    done
+    return 1
+}
+
+# Get repository root, prioritizing .specify directory over git
+# This prevents using a parent git repo when spec-kit is initialized in a subdirectory
+get_repo_root() {
+    # First, look for .specify directory (spec-kit's own marker)
+    local specify_root
+    if specify_root=\$(find_specify_root); then
+        echo "\$specify_root"
+        return
+    fi
+
+    # Fallback to git if no .specify found
+    if git rev-parse --show-toplevel >/dev/null 2>&1; then
+        git rev-parse --show-toplevel
+        return
+    fi
+
+    # Final fallback to script location for non-git repos
+    local script_dir="\$(CDPATH="" cd "\$(dirname "\${BASH_SOURCE[0]}")" && pwd)"
+    (cd "\$script_dir/../../.." && pwd)
+}
+
+# Get current branch, with fallback for non-git repositories
+get_current_branch() {
+    # First check if SPECIFY_FEATURE environment variable is set
+    if [[ -n "\${SPECIFY_FEATURE:-}" ]]; then
+        echo "\$SPECIFY_FEATURE"
+        return
+    fi
+
+    # Then check git if available at the spec-kit root (not parent)
+    local repo_root=\$(get_repo_root)
+    if has_git; then
+        git -C "\$repo_root" rev-parse --abbrev-ref HEAD
+        return
+    fi
+
+    # For non-git repos, try to find the latest feature directory
+    local specs_dir="\$repo_root/specs"
+
+    if [[ -d "\$specs_dir" ]]; then
+        local latest_feature=""
+        local highest=0
+        local latest_timestamp=""
+
+        for dir in "\$specs_dir"/*; do
+            if [[ -d "\$dir" ]]; then
+                local dirname=\$(basename "\$dir")
+                if [[ "\$dirname" =~ ^([0-9]{8}-[0-9]{6})- ]]; then
+                    # Timestamp-based branch: compare lexicographically
+                    local ts="\${BASH_REMATCH[1]}"
+                    if [[ "\$ts" > "\$latest_timestamp" ]]; then
+                        latest_timestamp="\$ts"
+                        latest_feature=\$dirname
+                    fi
+                elif [[ "\$dirname" =~ ^([0-9]{3,})- ]]; then
+                    local number=\${BASH_REMATCH[1]}
+                    number=\$((10#\$number))
+                    if [[ "\$number" -gt "\$highest" ]]; then
+                        highest=\$number
+                        # Only update if no timestamp branch found yet
+                        if [[ -z "\$latest_timestamp" ]]; then
+                            latest_feature=\$dirname
+                        fi
+                    fi
+                fi
+            fi
+        done
+
+        if [[ -n "\$latest_feature" ]]; then
+            echo "\$latest_feature"
+            return
+        fi
+    fi
+
+    echo "main"  # Final fallback
+}
+
+# Check if we have git available at the spec-kit root level
+# Returns true only if git is installed and the repo root is inside a git work tree
+# Handles both regular repos (.git directory) and worktrees/submodules (.git file)
+has_git() {
+    # First check if git command is available (before calling get_repo_root which may use git)
+    command -v git >/dev/null 2>&1 || return 1
+    local repo_root=\$(get_repo_root)
+    # Check if .git exists (directory or file for worktrees/submodules)
+    [ -e "\$repo_root/.git" ] || return 1
+    # Verify it's actually a valid git work tree
+    git -C "\$repo_root" rev-parse --is-inside-work-tree >/dev/null 2>&1
+}
+
+# Strip a single optional path segment (e.g. gitflow "feat/004-name" -> "004-name").
+# Only when the full name is exactly two slash-free segments; otherwise returns the raw name.
+spec_kit_effective_branch_name() {
+    local raw="\$1"
+    if [[ "\$raw" =~ ^([^/]+)/([^/]+)\$ ]]; then
+        printf '%s\\n' "\${BASH_REMATCH[2]}"
+    else
+        printf '%s\\n' "\$raw"
+    fi
+}
+
+check_feature_branch() {
+    local raw="\$1"
+    local has_git_repo="\$2"
+
+    # For non-git repos, we can't enforce branch naming but still provide output
+    if [[ "\$has_git_repo" != "true" ]]; then
+        echo "[specify] Warning: Git repository not detected; skipped branch validation" >&2
+        return 0
+    fi
+
+    local branch
+    branch=\$(spec_kit_effective_branch_name "\$raw")
+
+    # Accept sequential prefix (3+ digits) but exclude malformed timestamps
+    # Malformed: 7-or-8 digit date + 6-digit time with no trailing slug (e.g. "2026031-143022" or "20260319-143022")
+    local is_sequential=false
+    if [[ "\$branch" =~ ^[0-9]{3,}- ]] && [[ ! "\$branch" =~ ^[0-9]{7}-[0-9]{6}- ]] && [[ ! "\$branch" =~ ^[0-9]{7,8}-[0-9]{6}\$ ]]; then
+        is_sequential=true
+    fi
+    if [[ "\$is_sequential" != "true" ]] && [[ ! "\$branch" =~ ^[0-9]{8}-[0-9]{6}- ]]; then
+        echo "ERROR: Not on a feature branch. Current branch: \$raw" >&2
+        echo "Feature branches should be named like: 001-feature-name, 1234-feature-name, or 20260319-143022-feature-name" >&2
+        return 1
+    fi
+
+    return 0
+}
+
+# Find feature directory by numeric prefix instead of exact branch match
+# This allows multiple branches to work on the same spec (e.g., 004-fix-bug, 004-add-feature)
+find_feature_dir_by_prefix() {
+    local repo_root="\$1"
+    local branch_name
+    branch_name=\$(spec_kit_effective_branch_name "\$2")
+    local specs_dir="\$repo_root/specs"
+
+    # Extract prefix from branch (e.g., "004" from "004-whatever" or "20260319-143022" from timestamp branches)
+    local prefix=""
+    if [[ "\$branch_name" =~ ^([0-9]{8}-[0-9]{6})- ]]; then
+        prefix="\${BASH_REMATCH[1]}"
+    elif [[ "\$branch_name" =~ ^([0-9]{3,})- ]]; then
+        prefix="\${BASH_REMATCH[1]}"
+    else
+        # If branch doesn't have a recognized prefix, fall back to exact match
+        echo "\$specs_dir/\$branch_name"
+        return
+    fi
+
+    # Search for directories in specs/ that start with this prefix
+    local matches=()
+    if [[ -d "\$specs_dir" ]]; then
+        for dir in "\$specs_dir"/"\$prefix"-*; do
+            if [[ -d "\$dir" ]]; then
+                matches+=("\$(basename "\$dir")")
+            fi
+        done
+    fi
+
+    # Handle results
+    if [[ \${#matches[@]} -eq 0 ]]; then
+        # No match found - return the branch name path (will fail later with clear error)
+        echo "\$specs_dir/\$branch_name"
+    elif [[ \${#matches[@]} -eq 1 ]]; then
+        # Exactly one match - perfect!
+        echo "\$specs_dir/\${matches[0]}"
+    else
+        # Multiple matches - this shouldn't happen with proper naming convention
+        echo "ERROR: Multiple spec directories found with prefix '\$prefix': \${matches[*]}" >&2
+        echo "Please ensure only one spec directory exists per prefix." >&2
+        return 1
+    fi
+}
+
+get_feature_paths() {
+    local repo_root=\$(get_repo_root)
+    local current_branch=\$(get_current_branch)
+    local has_git_repo="false"
+
+    if has_git; then
+        has_git_repo="true"
+    fi
+
+    # Resolve feature directory.  Priority:
+    #   1. SPECIFY_FEATURE_DIRECTORY env var (explicit override)
+    #   2. .specify/feature.json "feature_directory" key (persisted by /speckit.specify)
+    #   3. Branch-name-based prefix lookup (legacy fallback)
+    local feature_dir
+    if [[ -n "\${SPECIFY_FEATURE_DIRECTORY:-}" ]]; then
+        feature_dir="\$SPECIFY_FEATURE_DIRECTORY"
+        # Normalize relative paths to absolute under repo root
+        [[ "\$feature_dir" != /* ]] && feature_dir="\$repo_root/\$feature_dir"
+    elif [[ -f "\$repo_root/.specify/feature.json" ]]; then
+        local _fd
+        if command -v jq >/dev/null 2>&1; then
+            _fd=\$(jq -r '.feature_directory // empty' "\$repo_root/.specify/feature.json" 2>/dev/null)
+        elif command -v python3 >/dev/null 2>&1; then
+            # Fallback: use Python to parse JSON so pretty-printed/multi-line files work
+            _fd=\$(python3 -c "import json,sys; d=json.load(open(sys.argv[1])); print(d.get('feature_directory',''))" "\$repo_root/.specify/feature.json" 2>/dev/null)
+        else
+            # Last resort: single-line grep fallback (won't work on multi-line JSON)
+            _fd=\$(grep -o '"feature_directory"[[:space:]]*:[[:space:]]*"[^"]*"' "\$repo_root/.specify/feature.json" 2>/dev/null | sed 's/.*"\\([^"]*\\)"\$/\\1/')
+        fi
+        if [[ -n "\$_fd" ]]; then
+            feature_dir="\$_fd"
+            # Normalize relative paths to absolute under repo root
+            [[ "\$feature_dir" != /* ]] && feature_dir="\$repo_root/\$feature_dir"
+        elif ! feature_dir=\$(find_feature_dir_by_prefix "\$repo_root" "\$current_branch"); then
+            echo "ERROR: Failed to resolve feature directory" >&2
+            return 1
+        fi
+    elif ! feature_dir=\$(find_feature_dir_by_prefix "\$repo_root" "\$current_branch"); then
+        echo "ERROR: Failed to resolve feature directory" >&2
+        return 1
+    fi
+
+    # Use printf '%q' to safely quote values, preventing shell injection
+    # via crafted branch names or paths containing special characters
+    printf 'REPO_ROOT=%q\\n' "\$repo_root"
+    printf 'CURRENT_BRANCH=%q\\n' "\$current_branch"
+    printf 'HAS_GIT=%q\\n' "\$has_git_repo"
+    printf 'FEATURE_DIR=%q\\n' "\$feature_dir"
+    printf 'FEATURE_SPEC=%q\\n' "\$feature_dir/spec.md"
+    printf 'IMPL_PLAN=%q\\n' "\$feature_dir/plan.md"
+    printf 'TASKS=%q\\n' "\$feature_dir/tasks.md"
+    printf 'RESEARCH=%q\\n' "\$feature_dir/research.md"
+    printf 'DATA_MODEL=%q\\n' "\$feature_dir/data-model.md"
+    printf 'QUICKSTART=%q\\n' "\$feature_dir/quickstart.md"
+    printf 'CONTRACTS_DIR=%q\\n' "\$feature_dir/contracts"
+}
+
+# Check if jq is available for safe JSON construction
+has_jq() {
+    command -v jq >/dev/null 2>&1
+}
+
+# Escape a string for safe embedding in a JSON value (fallback when jq is unavailable).
+# Handles backslash, double-quote, and JSON-required control character escapes (RFC 8259).
+json_escape() {
+    local s="\$1"
+    s="\${s//\\\\/\\\\\\\\}"
+    s="\${s//\\"/\\\\\\"}"
+    s="\${s//\$'\\n'/\\\\n}"
+    s="\${s//\$'\\t'/\\\\t}"
+    s="\${s//\$'\\r'/\\\\r}"
+    s="\${s//\$'\\b'/\\\\b}"
+    s="\${s//\$'\\f'/\\\\f}"
+    # Escape any remaining U+0001-U+001F control characters as \\uXXXX.
+    # (U+0000/NUL cannot appear in bash strings and is excluded.)
+    # LC_ALL=C ensures \${#s} counts bytes and \${s:\$i:1} yields single bytes,
+    # so multi-byte UTF-8 sequences (first byte >= 0xC0) pass through intact.
+    local LC_ALL=C
+    local i char code
+    for (( i=0; i<\${#s}; i++ )); do
+        char="\${s:\$i:1}"
+        printf -v code '%d' "'\$char" 2>/dev/null || code=256
+        if (( code >= 1 && code <= 31 )); then
+            printf '\\\\u%04x' "\$code"
+        else
+            printf '%s' "\$char"
+        fi
+    done
+}
+
+check_file() { [[ -f "\$1" ]] && echo "  ✓ \$2" || echo "  ✗ \$2"; }
+check_dir() { [[ -d "\$1" && -n \$(ls -A "\$1" 2>/dev/null) ]] && echo "  ✓ \$2" || echo "  ✗ \$2"; }
+
+# Resolve a template name to a file path using the priority stack:
+#   1. .specify/templates/overrides/
+#   2. .specify/presets/<preset-id>/templates/ (sorted by priority from .registry)
+#   3. .specify/extensions/<ext-id>/templates/
+#   4. .specify/templates/ (core)
+resolve_template() {
+    local template_name="\$1"
+    local repo_root="\$2"
+    local base="\$repo_root/.specify/templates"
+
+    # Priority 1: Project overrides
+    local override="\$base/overrides/\${template_name}.md"
+    [ -f "\$override" ] && echo "\$override" && return 0
+
+    # Priority 2: Installed presets (sorted by priority from .registry)
+    local presets_dir="\$repo_root/.specify/presets"
+    if [ -d "\$presets_dir" ]; then
+        local registry_file="\$presets_dir/.registry"
+        if [ -f "\$registry_file" ] && command -v python3 >/dev/null 2>&1; then
+            # Read preset IDs sorted by priority (lower number = higher precedence).
+            # The python3 call is wrapped in an if-condition so that set -e does not
+            # abort the function when python3 exits non-zero (e.g. invalid JSON).
+            local sorted_presets=""
+            if sorted_presets=\$(SPECKIT_REGISTRY="\$registry_file" python3 -c "
+import json, sys, os
+try:
+    with open(os.environ['SPECKIT_REGISTRY']) as f:
+        data = json.load(f)
+    presets = data.get('presets', {})
+    for pid, meta in sorted(presets.items(), key=lambda x: x[1].get('priority', 10) if isinstance(x[1], dict) else 10):
+        if isinstance(meta, dict) and meta.get('enabled', True) is not False:
+            print(pid)
+except Exception:
+    sys.exit(1)
+" 2>/dev/null); then
+                if [ -n "\$sorted_presets" ]; then
+                    # python3 succeeded and returned preset IDs — search in priority order
+                    while IFS= read -r preset_id; do
+                        local candidate="\$presets_dir/\$preset_id/templates/\${template_name}.md"
+                        [ -f "\$candidate" ] && echo "\$candidate" && return 0
+                    done <<< "\$sorted_presets"
+                fi
+                # python3 succeeded but registry has no presets — nothing to search
+            else
+                # python3 failed (missing, or registry parse error) — fall back to unordered directory scan
+                for preset in "\$presets_dir"/*/; do
+                    [ -d "\$preset" ] || continue
+                    local candidate="\$preset/templates/\${template_name}.md"
+                    [ -f "\$candidate" ] && echo "\$candidate" && return 0
+                done
+            fi
+        else
+            # Fallback: alphabetical directory order (no python3 available)
+            for preset in "\$presets_dir"/*/; do
+                [ -d "\$preset" ] || continue
+                local candidate="\$preset/templates/\${template_name}.md"
+                [ -f "\$candidate" ] && echo "\$candidate" && return 0
+            done
+        fi
+    fi
+
+    # Priority 3: Extension-provided templates
+    local ext_dir="\$repo_root/.specify/extensions"
+    if [ -d "\$ext_dir" ]; then
+        for ext in "\$ext_dir"/*/; do
+            [ -d "\$ext" ] || continue
+            # Skip hidden directories (e.g. .backup, .cache)
+            case "\$(basename "\$ext")" in .*) continue;; esac
+            local candidate="\$ext/templates/\${template_name}.md"
+            [ -f "\$candidate" ] && echo "\$candidate" && return 0
+        done
+    fi
+
+    # Priority 4: Core templates
+    local core="\$base/\${template_name}.md"
+    [ -f "\$core" ] && echo "\$core" && return 0
+
+    # Template not found in any location.
+    # Return 1 so callers can distinguish "not found" from "found".
+    # Callers running under set -e should use: TEMPLATE=\$(resolve_template ...) || true
+    return 1
+}
+
+# Resolve a template name to composed content using composition strategies.
+# Reads strategy metadata from preset manifests and composes content
+# from multiple layers using prepend, append, or wrap strategies.
+#
+# Usage: CONTENT=\$(resolve_template_content "template-name" "\$REPO_ROOT")
+# Returns composed content string on stdout; exit code 1 if not found.
+resolve_template_content() {
+    local template_name="\$1"
+    local repo_root="\$2"
+    local base="\$repo_root/.specify/templates"
+
+    # Collect all layers (highest priority first)
+    local -a layer_paths=()
+    local -a layer_strategies=()
+
+    # Priority 1: Project overrides (always "replace")
+    local override="\$base/overrides/\${template_name}.md"
+    if [ -f "\$override" ]; then
+        layer_paths+=("\$override")
+        layer_strategies+=("replace")
+    fi
+
+    # Priority 2: Installed presets (sorted by priority from .registry)
+    local presets_dir="\$repo_root/.specify/presets"
+    if [ -d "\$presets_dir" ]; then
+        local registry_file="\$presets_dir/.registry"
+        local sorted_presets=""
+        if [ -f "\$registry_file" ] && command -v python3 >/dev/null 2>&1; then
+            if sorted_presets=\$(SPECKIT_REGISTRY="\$registry_file" python3 -c "
+import json, sys, os
+try:
+    with open(os.environ['SPECKIT_REGISTRY']) as f:
+        data = json.load(f)
+    presets = data.get('presets', {})
+    for pid, meta in sorted(presets.items(), key=lambda x: x[1].get('priority', 10) if isinstance(x[1], dict) else 10):
+        if isinstance(meta, dict) and meta.get('enabled', True) is not False:
+            print(pid)
+except Exception:
+    sys.exit(1)
+" 2>/dev/null); then
+                if [ -n "\$sorted_presets" ]; then
+                    local yaml_warned=false
+                    while IFS= read -r preset_id; do
+                        # Read strategy and file path from preset manifest
+                        local strategy="replace"
+                        local manifest_file=""
+                        local manifest="\$presets_dir/\$preset_id/preset.yml"
+                        if [ -f "\$manifest" ] && command -v python3 >/dev/null 2>&1; then
+                            # Requires PyYAML; falls back to replace/convention if unavailable
+                            local result
+                            local py_stderr
+                            py_stderr=\$(mktemp)
+                            result=\$(SPECKIT_MANIFEST="\$manifest" SPECKIT_TMPL="\$template_name" python3 -c "
+import sys, os
+try:
+    import yaml
+except ImportError:
+    print('yaml_missing', file=sys.stderr)
+    print('replace\\t')
+    sys.exit(0)
+try:
+    with open(os.environ['SPECKIT_MANIFEST']) as f:
+        data = yaml.safe_load(f)
+    for t in data.get('provides', {}).get('templates', []):
+        if t.get('name') == os.environ['SPECKIT_TMPL'] and t.get('type', 'template') == 'template':
+            print(t.get('strategy', 'replace') + '\\t' + t.get('file', ''))
+            sys.exit(0)
+    print('replace\\t')
+except Exception:
+    print('replace\\t')
+" 2>"\$py_stderr")
+                            local parse_status=\$?
+                            if [ \$parse_status -eq 0 ] && [ -n "\$result" ]; then
+                                IFS=\$'\\t' read -r strategy manifest_file <<< "\$result"
+                                strategy=\$(printf '%s' "\$strategy" | tr '[:upper:]' '[:lower:]')
+                            fi
+                            if [ "\$yaml_warned" = false ] && grep -q 'yaml_missing' "\$py_stderr" 2>/dev/null; then
+                                echo "Warning: PyYAML not available; composition strategies may be ignored" >&2
+                                yaml_warned=true
+                            fi
+                            rm -f "\$py_stderr"
+                        fi
+                        # Try manifest file path first, then convention path
+                        local candidate=""
+                        if [ -n "\$manifest_file" ]; then
+                            # Reject absolute paths and parent traversal
+                            case "\$manifest_file" in
+                                /*|*../*|../*) manifest_file="" ;;
+                            esac
+                        fi
+                        if [ -n "\$manifest_file" ]; then
+                            local mf="\$presets_dir/\$preset_id/\$manifest_file"
+                            [ -f "\$mf" ] && candidate="\$mf"
+                        fi
+                        if [ -z "\$candidate" ]; then
+                            local cf="\$presets_dir/\$preset_id/templates/\${template_name}.md"
+                            [ -f "\$cf" ] && candidate="\$cf"
+                        fi
+                        if [ -n "\$candidate" ]; then
+                            layer_paths+=("\$candidate")
+                            layer_strategies+=("\$strategy")
+                        fi
+                    done <<< "\$sorted_presets"
+                fi
+            else
+                # python3 failed — fall back to unordered directory scan (replace only)
+                for preset in "\$presets_dir"/*/; do
+                    [ -d "\$preset" ] || continue
+                    local candidate="\$preset/templates/\${template_name}.md"
+                    if [ -f "\$candidate" ]; then
+                        layer_paths+=("\$candidate")
+                        layer_strategies+=("replace")
+                    fi
+                done
+            fi
+        else
+            # No python3 or registry — fall back to unordered directory scan (replace only)
+            for preset in "\$presets_dir"/*/; do
+                [ -d "\$preset" ] || continue
+                local candidate="\$preset/templates/\${template_name}.md"
+                if [ -f "\$candidate" ]; then
+                    layer_paths+=("\$candidate")
+                    layer_strategies+=("replace")
+                fi
+            done
+        fi
+    fi
+
+    # Priority 3: Extension-provided templates (always "replace")
+    local ext_dir="\$repo_root/.specify/extensions"
+    if [ -d "\$ext_dir" ]; then
+        for ext in "\$ext_dir"/*/; do
+            [ -d "\$ext" ] || continue
+            case "\$(basename "\$ext")" in .*) continue;; esac
+            local candidate="\$ext/templates/\${template_name}.md"
+            if [ -f "\$candidate" ]; then
+                layer_paths+=("\$candidate")
+                layer_strategies+=("replace")
+            fi
+        done
+    fi
+
+    # Priority 4: Core templates (always "replace")
+    local core="\$base/\${template_name}.md"
+    if [ -f "\$core" ]; then
+        layer_paths+=("\$core")
+        layer_strategies+=("replace")
+    fi
+
+    local count=\${#layer_paths[@]}
+    [ "\$count" -eq 0 ] && return 1
+
+    # Check if any layer uses a non-replace strategy
+    local has_composition=false
+    for s in "\${layer_strategies[@]}"; do
+        [ "\$s" != "replace" ] && has_composition=true && break
+    done
+
+    # If the top (highest-priority) layer is replace, it wins entirely —
+    # lower layers are irrelevant regardless of their strategies.
+    if [ "\${layer_strategies[0]}" = "replace" ]; then
+        cat "\${layer_paths[0]}"
+        return 0
+    fi
+
+    if [ "\$has_composition" = false ]; then
+        cat "\${layer_paths[0]}"
+        return 0
+    fi
+
+    # Find the effective base: scan from highest priority (index 0) downward
+    # to find the nearest replace layer. Only compose layers above that base.
+    local base_idx=-1
+    local i
+    for (( i=0; i<count; i++ )); do
+        if [ "\${layer_strategies[\$i]}" = "replace" ]; then
+            base_idx=\$i
+            break
+        fi
+    done
+
+    if [ \$base_idx -lt 0 ]; then
+        return 1  # no base layer found
+    fi
+
+    # Read the base content; compose layers above the base (higher priority)
+    local content
+    content=\$(cat "\${layer_paths[\$base_idx]}"; printf x)
+    content="\${content%x}"
+
+    for (( i=base_idx-1; i>=0; i-- )); do
+        local path="\${layer_paths[\$i]}"
+        local strat="\${layer_strategies[\$i]}"
+        local layer_content
+        # Preserve trailing newlines
+        layer_content=\$(cat "\$path"; printf x)
+        layer_content="\${layer_content%x}"
+
+        case "\$strat" in
+            replace) content="\$layer_content" ;;
+            prepend) content="\$(printf '%s\\n\\n%s' "\$layer_content" "\$content")" ;;
+            append)  content="\$(printf '%s\\n\\n%s' "\$content" "\$layer_content")" ;;
+            wrap)
+                case "\$layer_content" in
+                    *'{CORE_TEMPLATE}'*) ;;
+                    *) echo "Error: wrap strategy missing {CORE_TEMPLATE} placeholder" >&2; return 1 ;;
+                esac
+                while [[ "\$layer_content" == *'{CORE_TEMPLATE}'* ]]; do
+                    local before="\${layer_content%%\\{CORE_TEMPLATE\\}*}"
+                    local after="\${layer_content#*\\{CORE_TEMPLATE\\}}"
+                    layer_content="\${before}\${content}\${after}"
+                done
+                content="\$layer_content"
+                ;;
+            *) echo "Error: unknown strategy '\$strat'" >&2; return 1 ;;
+        esac
+    done
+
+    printf '%s' "\$content"
+    return 0
+}
+
+`,
+    executable: true,
+  },
+  ".specify/scripts/bash/create-new-feature.sh": {
+    content: `#!/usr/bin/env bash
+
+set -e
+
+JSON_MODE=false
+DRY_RUN=false
+ALLOW_EXISTING=false
+SHORT_NAME=""
+BRANCH_NUMBER=""
+USE_TIMESTAMP=false
+ARGS=()
+i=1
+while [ \$i -le \$# ]; do
+    arg="\${!i}"
+    case "\$arg" in
+        --json)
+            JSON_MODE=true
+            ;;
+        --dry-run)
+            DRY_RUN=true
+            ;;
+        --allow-existing-branch)
+            ALLOW_EXISTING=true
+            ;;
+        --short-name)
+            if [ \$((i + 1)) -gt \$# ]; then
+                echo 'Error: --short-name requires a value' >&2
+                exit 1
+            fi
+            i=\$((i + 1))
+            next_arg="\${!i}"
+            # Check if the next argument is another option (starts with --)
+            if [[ "\$next_arg" == --* ]]; then
+                echo 'Error: --short-name requires a value' >&2
+                exit 1
+            fi
+            SHORT_NAME="\$next_arg"
+            ;;
+        --number)
+            if [ \$((i + 1)) -gt \$# ]; then
+                echo 'Error: --number requires a value' >&2
+                exit 1
+            fi
+            i=\$((i + 1))
+            next_arg="\${!i}"
+            if [[ "\$next_arg" == --* ]]; then
+                echo 'Error: --number requires a value' >&2
+                exit 1
+            fi
+            BRANCH_NUMBER="\$next_arg"
+            ;;
+        --timestamp)
+            USE_TIMESTAMP=true
+            ;;
+        --help|-h)
+            echo "Usage: \$0 [--json] [--dry-run] [--allow-existing-branch] [--short-name <name>] [--number N] [--timestamp] <feature_description>"
+            echo ""
+            echo "Options:"
+            echo "  --json              Output in JSON format"
+            echo "  --dry-run           Compute branch name and paths without creating branches, directories, or files"
+            echo "  --allow-existing-branch  Switch to branch if it already exists instead of failing"
+            echo "  --short-name <name> Provide a custom short name (2-4 words) for the branch"
+            echo "  --number N          Specify branch number manually (overrides auto-detection)"
+            echo "  --timestamp         Use timestamp prefix (YYYYMMDD-HHMMSS) instead of sequential numbering"
+            echo "  --help, -h          Show this help message"
+            echo ""
+            echo "Examples:"
+            echo "  \$0 'Add user authentication system' --short-name 'user-auth'"
+            echo "  \$0 'Implement OAuth2 integration for API' --number 5"
+            echo "  \$0 --timestamp --short-name 'user-auth' 'Add user authentication'"
+            exit 0
+            ;;
+        *)
+            ARGS+=("\$arg")
+            ;;
+    esac
+    i=\$((i + 1))
+done
+
+FEATURE_DESCRIPTION="\${ARGS[*]}"
+if [ -z "\$FEATURE_DESCRIPTION" ]; then
+    echo "Usage: \$0 [--json] [--dry-run] [--allow-existing-branch] [--short-name <name>] [--number N] [--timestamp] <feature_description>" >&2
+    exit 1
+fi
+
+# Trim whitespace and validate description is not empty (e.g., user passed only whitespace)
+FEATURE_DESCRIPTION=\$(echo "\$FEATURE_DESCRIPTION" | sed -E 's/^[[:space:]]+|[[:space:]]+\$//g')
+if [ -z "\$FEATURE_DESCRIPTION" ]; then
+    echo "Error: Feature description cannot be empty or contain only whitespace" >&2
+    exit 1
+fi
+
+# Function to get highest number from specs directory
+get_highest_from_specs() {
+    local specs_dir="\$1"
+    local highest=0
+    
+    if [ -d "\$specs_dir" ]; then
+        for dir in "\$specs_dir"/*; do
+            [ -d "\$dir" ] || continue
+            dirname=\$(basename "\$dir")
+            # Match sequential prefixes (>=3 digits), but skip timestamp dirs.
+            if echo "\$dirname" | grep -Eq '^[0-9]{3,}-' && ! echo "\$dirname" | grep -Eq '^[0-9]{8}-[0-9]{6}-'; then
+                number=\$(echo "\$dirname" | grep -Eo '^[0-9]+')
+                number=\$((10#\$number))
+                if [ "\$number" -gt "\$highest" ]; then
+                    highest=\$number
+                fi
+            fi
+        done
+    fi
+    
+    echo "\$highest"
+}
+
+# Function to get highest number from git branches
+get_highest_from_branches() {
+    git branch -a 2>/dev/null | sed 's/^[* ]*//; s|^remotes/[^/]*/||' | _extract_highest_number
+}
+
+# Extract the highest sequential feature number from a list of ref names (one per line).
+# Shared by get_highest_from_branches and get_highest_from_remote_refs.
+_extract_highest_number() {
+    local highest=0
+    while IFS= read -r name; do
+        [ -z "\$name" ] && continue
+        if echo "\$name" | grep -Eq '^[0-9]{3,}-' && ! echo "\$name" | grep -Eq '^[0-9]{8}-[0-9]{6}-'; then
+            number=\$(echo "\$name" | grep -Eo '^[0-9]+' || echo "0")
+            number=\$((10#\$number))
+            if [ "\$number" -gt "\$highest" ]; then
+                highest=\$number
+            fi
+        fi
+    done
+    echo "\$highest"
+}
+
+# Function to get highest number from remote branches without fetching (side-effect-free)
+get_highest_from_remote_refs() {
+    local highest=0
+
+    for remote in \$(git remote 2>/dev/null); do
+        local remote_highest
+        remote_highest=\$(GIT_TERMINAL_PROMPT=0 git ls-remote --heads "\$remote" 2>/dev/null | sed 's|.*refs/heads/||' | _extract_highest_number)
+        if [ "\$remote_highest" -gt "\$highest" ]; then
+            highest=\$remote_highest
+        fi
+    done
+
+    echo "\$highest"
+}
+
+# Function to check existing branches (local and remote) and return next available number.
+# When skip_fetch is true, queries remotes via ls-remote (read-only) instead of fetching.
+check_existing_branches() {
+    local specs_dir="\$1"
+    local skip_fetch="\${2:-false}"
+
+    if [ "\$skip_fetch" = true ]; then
+        # Side-effect-free: query remotes via ls-remote
+        local highest_remote=\$(get_highest_from_remote_refs)
+        local highest_branch=\$(get_highest_from_branches)
+        if [ "\$highest_remote" -gt "\$highest_branch" ]; then
+            highest_branch=\$highest_remote
+        fi
+    else
+        # Fetch all remotes to get latest branch info (suppress errors if no remotes)
+        git fetch --all --prune >/dev/null 2>&1 || true
+        local highest_branch=\$(get_highest_from_branches)
+    fi
+
+    # Get highest number from ALL specs (not just matching short name)
+    local highest_spec=\$(get_highest_from_specs "\$specs_dir")
+
+    # Take the maximum of both
+    local max_num=\$highest_branch
+    if [ "\$highest_spec" -gt "\$max_num" ]; then
+        max_num=\$highest_spec
+    fi
+
+    # Return next number
+    echo \$((max_num + 1))
+}
+
+# Function to clean and format a branch name
+clean_branch_name() {
+    local name="\$1"
+    echo "\$name" | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9]/-/g' | sed 's/-\\+/-/g' | sed 's/^-//' | sed 's/-\$//'
+}
+
+# Resolve repository root using common.sh functions which prioritize .specify over git
+SCRIPT_DIR="\$(CDPATH="" cd "\$(dirname "\${BASH_SOURCE[0]}")" && pwd)"
+source "\$SCRIPT_DIR/common.sh"
+
+REPO_ROOT=\$(get_repo_root)
+
+# Check if git is available at this repo root (not a parent)
+if has_git; then
+    HAS_GIT=true
+else
+    HAS_GIT=false
+fi
+
+cd "\$REPO_ROOT"
+
+SPECS_DIR="\$REPO_ROOT/specs"
+if [ "\$DRY_RUN" != true ]; then
+    mkdir -p "\$SPECS_DIR"
+fi
+
+# Function to generate branch name with stop word filtering and length filtering
+generate_branch_name() {
+    local description="\$1"
+    
+    # Common stop words to filter out
+    local stop_words="^(i|a|an|the|to|for|of|in|on|at|by|with|from|is|are|was|were|be|been|being|have|has|had|do|does|did|will|would|should|could|can|may|might|must|shall|this|that|these|those|my|your|our|their|want|need|add|get|set)\$"
+    
+    # Convert to lowercase and split into words
+    local clean_name=\$(echo "\$description" | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9]/ /g')
+    
+    # Filter words: remove stop words and words shorter than 3 chars (unless they're uppercase acronyms in original)
+    local meaningful_words=()
+    for word in \$clean_name; do
+        # Skip empty words
+        [ -z "\$word" ] && continue
+        
+        # Keep words that are NOT stop words AND (length >= 3 OR are potential acronyms)
+        if ! echo "\$word" | grep -qiE "\$stop_words"; then
+            if [ \${#word} -ge 3 ]; then
+                meaningful_words+=("\$word")
+            elif echo "\$description" | grep -q "\\b\${word^^}\\b"; then
+                # Keep short words if they appear as uppercase in original (likely acronyms)
+                meaningful_words+=("\$word")
+            fi
+        fi
+    done
+    
+    # If we have meaningful words, use first 3-4 of them
+    if [ \${#meaningful_words[@]} -gt 0 ]; then
+        local max_words=3
+        if [ \${#meaningful_words[@]} -eq 4 ]; then max_words=4; fi
+        
+        local result=""
+        local count=0
+        for word in "\${meaningful_words[@]}"; do
+            if [ \$count -ge \$max_words ]; then break; fi
+            if [ -n "\$result" ]; then result="\$result-"; fi
+            result="\$result\$word"
+            count=\$((count + 1))
+        done
+        echo "\$result"
+    else
+        # Fallback to original logic if no meaningful words found
+        local cleaned=\$(clean_branch_name "\$description")
+        echo "\$cleaned" | tr '-' '\\n' | grep -v '^\$' | head -3 | tr '\\n' '-' | sed 's/-\$//'
+    fi
+}
+
+# Generate branch name
+if [ -n "\$SHORT_NAME" ]; then
+    # Use provided short name, just clean it up
+    BRANCH_SUFFIX=\$(clean_branch_name "\$SHORT_NAME")
+else
+    # Generate from description with smart filtering
+    BRANCH_SUFFIX=\$(generate_branch_name "\$FEATURE_DESCRIPTION")
+fi
+
+# Warn if --number and --timestamp are both specified
+if [ "\$USE_TIMESTAMP" = true ] && [ -n "\$BRANCH_NUMBER" ]; then
+    >&2 echo "[specify] Warning: --number is ignored when --timestamp is used"
+    BRANCH_NUMBER=""
+fi
+
+# Determine branch prefix
+if [ "\$USE_TIMESTAMP" = true ]; then
+    FEATURE_NUM=\$(date +%Y%m%d-%H%M%S)
+    BRANCH_NAME="\${FEATURE_NUM}-\${BRANCH_SUFFIX}"
+else
+    # Determine branch number
+    if [ -z "\$BRANCH_NUMBER" ]; then
+        if [ "\$DRY_RUN" = true ] && [ "\$HAS_GIT" = true ]; then
+            # Dry-run: query remotes via ls-remote (side-effect-free, no fetch)
+            BRANCH_NUMBER=\$(check_existing_branches "\$SPECS_DIR" true)
+        elif [ "\$DRY_RUN" = true ]; then
+            # Dry-run without git: local spec dirs only
+            HIGHEST=\$(get_highest_from_specs "\$SPECS_DIR")
+            BRANCH_NUMBER=\$((HIGHEST + 1))
+        elif [ "\$HAS_GIT" = true ]; then
+            # Check existing branches on remotes
+            BRANCH_NUMBER=\$(check_existing_branches "\$SPECS_DIR")
+        else
+            # Fall back to local directory check
+            HIGHEST=\$(get_highest_from_specs "\$SPECS_DIR")
+            BRANCH_NUMBER=\$((HIGHEST + 1))
+        fi
+    fi
+
+    # Force base-10 interpretation to prevent octal conversion (e.g., 010 → 8 in octal, but should be 10 in decimal)
+    FEATURE_NUM=\$(printf "%03d" "\$((10#\$BRANCH_NUMBER))")
+    BRANCH_NAME="\${FEATURE_NUM}-\${BRANCH_SUFFIX}"
+fi
+
+# GitHub enforces a 244-byte limit on branch names
+# Validate and truncate if necessary
+MAX_BRANCH_LENGTH=244
+if [ \${#BRANCH_NAME} -gt \$MAX_BRANCH_LENGTH ]; then
+    # Calculate how much we need to trim from suffix
+    # Account for prefix length: timestamp (15) + hyphen (1) = 16, or sequential (3) + hyphen (1) = 4
+    PREFIX_LENGTH=\$(( \${#FEATURE_NUM} + 1 ))
+    MAX_SUFFIX_LENGTH=\$((MAX_BRANCH_LENGTH - PREFIX_LENGTH))
+    
+    # Truncate suffix at word boundary if possible
+    TRUNCATED_SUFFIX=\$(echo "\$BRANCH_SUFFIX" | cut -c1-\$MAX_SUFFIX_LENGTH)
+    # Remove trailing hyphen if truncation created one
+    TRUNCATED_SUFFIX=\$(echo "\$TRUNCATED_SUFFIX" | sed 's/-\$//')
+    
+    ORIGINAL_BRANCH_NAME="\$BRANCH_NAME"
+    BRANCH_NAME="\${FEATURE_NUM}-\${TRUNCATED_SUFFIX}"
+    
+    >&2 echo "[specify] Warning: Branch name exceeded GitHub's 244-byte limit"
+    >&2 echo "[specify] Original: \$ORIGINAL_BRANCH_NAME (\${#ORIGINAL_BRANCH_NAME} bytes)"
+    >&2 echo "[specify] Truncated to: \$BRANCH_NAME (\${#BRANCH_NAME} bytes)"
+fi
+
+FEATURE_DIR="\$SPECS_DIR/\$BRANCH_NAME"
+SPEC_FILE="\$FEATURE_DIR/spec.md"
+
+if [ "\$DRY_RUN" != true ]; then
+    if [ "\$HAS_GIT" = true ]; then
+        branch_create_error=""
+        if ! branch_create_error=\$(git checkout -q -b "\$BRANCH_NAME" 2>&1); then
+            current_branch="\$(git rev-parse --abbrev-ref HEAD 2>/dev/null || true)"
+            # Check if branch already exists
+            if git branch --list "\$BRANCH_NAME" | grep -q .; then
+                if [ "\$ALLOW_EXISTING" = true ]; then
+                    # If we're already on the branch, continue without another checkout.
+                    if [ "\$current_branch" = "\$BRANCH_NAME" ]; then
+                        :
+                    # Otherwise switch to the existing branch instead of failing.
+                    elif ! switch_branch_error=\$(git checkout -q "\$BRANCH_NAME" 2>&1); then
+                        >&2 echo "Error: Failed to switch to existing branch '\$BRANCH_NAME'. Please resolve any local changes or conflicts and try again."
+                        if [ -n "\$switch_branch_error" ]; then
+                            >&2 printf '%s\\n' "\$switch_branch_error"
+                        fi
+                        exit 1
+                    fi
+                elif [ "\$USE_TIMESTAMP" = true ]; then
+                    >&2 echo "Error: Branch '\$BRANCH_NAME' already exists. Rerun to get a new timestamp or use a different --short-name."
+                    exit 1
+                else
+                    >&2 echo "Error: Branch '\$BRANCH_NAME' already exists. Please use a different feature name or specify a different number with --number."
+                    exit 1
+                fi
+            else
+                >&2 echo "Error: Failed to create git branch '\$BRANCH_NAME'."
+                if [ -n "\$branch_create_error" ]; then
+                    >&2 printf '%s\\n' "\$branch_create_error"
+                else
+                    >&2 echo "Please check your git configuration and try again."
+                fi
+                exit 1
+            fi
+        fi
+    else
+        >&2 echo "[specify] Warning: Git repository not detected; skipped branch creation for \$BRANCH_NAME"
+    fi
+
+    mkdir -p "\$FEATURE_DIR"
+
+    if [ ! -f "\$SPEC_FILE" ]; then
+        TEMPLATE=\$(resolve_template "spec-template" "\$REPO_ROOT") || true
+        if [ -n "\$TEMPLATE" ] && [ -f "\$TEMPLATE" ]; then
+            cp "\$TEMPLATE" "\$SPEC_FILE"
+        else
+            echo "Warning: Spec template not found; created empty spec file" >&2
+            touch "\$SPEC_FILE"
+        fi
+    fi
+
+    # Inform the user how to persist the feature variable in their own shell
+    printf '# To persist: export SPECIFY_FEATURE=%q\\n' "\$BRANCH_NAME" >&2
+fi
+
+if \$JSON_MODE; then
+    if command -v jq >/dev/null 2>&1; then
+        if [ "\$DRY_RUN" = true ]; then
+            jq -cn \\
+                --arg branch_name "\$BRANCH_NAME" \\
+                --arg spec_file "\$SPEC_FILE" \\
+                --arg feature_num "\$FEATURE_NUM" \\
+                '{BRANCH_NAME:\$branch_name,SPEC_FILE:\$spec_file,FEATURE_NUM:\$feature_num,DRY_RUN:true}'
+        else
+            jq -cn \\
+                --arg branch_name "\$BRANCH_NAME" \\
+                --arg spec_file "\$SPEC_FILE" \\
+                --arg feature_num "\$FEATURE_NUM" \\
+                '{BRANCH_NAME:\$branch_name,SPEC_FILE:\$spec_file,FEATURE_NUM:\$feature_num}'
+        fi
+    else
+        if [ "\$DRY_RUN" = true ]; then
+            printf '{"BRANCH_NAME":"%s","SPEC_FILE":"%s","FEATURE_NUM":"%s","DRY_RUN":true}\\n' "\$(json_escape "\$BRANCH_NAME")" "\$(json_escape "\$SPEC_FILE")" "\$(json_escape "\$FEATURE_NUM")"
+        else
+            printf '{"BRANCH_NAME":"%s","SPEC_FILE":"%s","FEATURE_NUM":"%s"}\\n' "\$(json_escape "\$BRANCH_NAME")" "\$(json_escape "\$SPEC_FILE")" "\$(json_escape "\$FEATURE_NUM")"
+        fi
+    fi
+else
+    echo "BRANCH_NAME: \$BRANCH_NAME"
+    echo "SPEC_FILE: \$SPEC_FILE"
+    echo "FEATURE_NUM: \$FEATURE_NUM"
+    if [ "\$DRY_RUN" != true ]; then
+        printf '# To persist in your shell: export SPECIFY_FEATURE=%q\\n' "\$BRANCH_NAME"
+    fi
+fi
+`,
+    executable: true,
+  },
+  ".specify/scripts/bash/setup-plan.sh": {
+    content: `#!/usr/bin/env bash
+
+set -e
+
+# Parse command line arguments
+JSON_MODE=false
+ARGS=()
+
+for arg in "\$@"; do
+    case "\$arg" in
+        --json) 
+            JSON_MODE=true 
+            ;;
+        --help|-h) 
+            echo "Usage: \$0 [--json]"
+            echo "  --json    Output results in JSON format"
+            echo "  --help    Show this help message"
+            exit 0 
+            ;;
+        *) 
+            ARGS+=("\$arg") 
+            ;;
+    esac
+done
+
+# Get script directory and load common functions
+SCRIPT_DIR="\$(CDPATH="" cd "\$(dirname "\${BASH_SOURCE[0]}")" && pwd)"
+source "\$SCRIPT_DIR/common.sh"
+
+# Get all paths and variables from common functions
+_paths_output=\$(get_feature_paths) || { echo "ERROR: Failed to resolve feature paths" >&2; exit 1; }
+eval "\$_paths_output"
+unset _paths_output
+
+# Check if we're on a proper feature branch (only for git repos)
+check_feature_branch "\$CURRENT_BRANCH" "\$HAS_GIT" || exit 1
+
+# Ensure the feature directory exists
+mkdir -p "\$FEATURE_DIR"
+
+# Copy plan template if it exists
+TEMPLATE=\$(resolve_template "plan-template" "\$REPO_ROOT") || true
+if [[ -n "\$TEMPLATE" ]] && [[ -f "\$TEMPLATE" ]]; then
+    cp "\$TEMPLATE" "\$IMPL_PLAN"
+    echo "Copied plan template to \$IMPL_PLAN"
+else
+    echo "Warning: Plan template not found"
+    # Create a basic plan file if template doesn't exist
+    touch "\$IMPL_PLAN"
+fi
+
+# Output results
+if \$JSON_MODE; then
+    if has_jq; then
+        jq -cn \\
+            --arg feature_spec "\$FEATURE_SPEC" \\
+            --arg impl_plan "\$IMPL_PLAN" \\
+            --arg specs_dir "\$FEATURE_DIR" \\
+            --arg branch "\$CURRENT_BRANCH" \\
+            --arg has_git "\$HAS_GIT" \\
+            '{FEATURE_SPEC:\$feature_spec,IMPL_PLAN:\$impl_plan,SPECS_DIR:\$specs_dir,BRANCH:\$branch,HAS_GIT:\$has_git}'
+    else
+        printf '{"FEATURE_SPEC":"%s","IMPL_PLAN":"%s","SPECS_DIR":"%s","BRANCH":"%s","HAS_GIT":"%s"}\\n' \\
+            "\$(json_escape "\$FEATURE_SPEC")" "\$(json_escape "\$IMPL_PLAN")" "\$(json_escape "\$FEATURE_DIR")" "\$(json_escape "\$CURRENT_BRANCH")" "\$(json_escape "\$HAS_GIT")"
+    fi
+else
+    echo "FEATURE_SPEC: \$FEATURE_SPEC"
+    echo "IMPL_PLAN: \$IMPL_PLAN" 
+    echo "SPECS_DIR: \$FEATURE_DIR"
+    echo "BRANCH: \$CURRENT_BRANCH"
+    echo "HAS_GIT: \$HAS_GIT"
+fi
+
+`,
+    executable: true,
+  },
+  ".specify/scripts/bash/update-agent-context.sh": {
+    content: `#!/usr/bin/env bash
+# update-agent-context.sh
+#
+# Updates the agent context files (.specify/memory, .specify/CLAUDE.md, etc.)
+# with task status, findings, and project state.
+#
+# Usage:
+#   ./update-agent-context.sh [project-root]
+
+set -e
+
+PROJECT_ROOT="\${1:-.}"
+
+# Ensure required directories exist
+mkdir -p "\$PROJECT_ROOT/.specify/memory"
+
+# Placeholder implementation
+echo "Agent context update stub - implementation TBD"
+`,
+    executable: true,
+  },
+  ".specify/scripts/powershell/check-prerequisites.ps1": {
+    content: `#!/usr/bin/env pwsh
+
+# Consolidated prerequisite checking script (PowerShell)
+#
+# This script provides unified prerequisite checking for Spec-Driven Development workflow.
+# It replaces the functionality previously spread across multiple scripts.
+#
+# Usage: ./check-prerequisites.ps1 [OPTIONS]
+#
+# OPTIONS:
+#   -Json               Output in JSON format
+#   -RequireTasks       Require tasks.md to exist (for implementation phase)
+#   -IncludeTasks       Include tasks.md in AVAILABLE_DOCS list
+#   -PathsOnly          Only output path variables (no validation)
+#   -Help, -h           Show help message
+
+[CmdletBinding()]
+param(
+    [switch]\$Json,
+    [switch]\$RequireTasks,
+    [switch]\$IncludeTasks,
+    [switch]\$PathsOnly,
+    [switch]\$Help
+)
+
+\$ErrorActionPreference = 'Stop'
+
+# Show help if requested
+if (\$Help) {
+    Write-Output @"
+Usage: check-prerequisites.ps1 [OPTIONS]
+
+Consolidated prerequisite checking for Spec-Driven Development workflow.
+
+OPTIONS:
+  -Json               Output in JSON format
+  -RequireTasks       Require tasks.md to exist (for implementation phase)
+  -IncludeTasks       Include tasks.md in AVAILABLE_DOCS list
+  -PathsOnly          Only output path variables (no prerequisite validation)
+  -Help, -h           Show this help message
+
+EXAMPLES:
+  # Check task prerequisites (plan.md required)
+  .\\check-prerequisites.ps1 -Json
+  
+  # Check implementation prerequisites (plan.md + tasks.md required)
+  .\\check-prerequisites.ps1 -Json -RequireTasks -IncludeTasks
+  
+  # Get feature paths only (no validation)
+  .\\check-prerequisites.ps1 -PathsOnly
+
+"@
+    exit 0
+}
+
+# Source common functions
+. "\$PSScriptRoot/common.ps1"
+
+# Get feature paths and validate branch
+\$paths = Get-FeaturePathsEnv
+
+if (-not (Test-FeatureBranch -Branch \$paths.CURRENT_BRANCH -HasGit:\$paths.HAS_GIT)) { 
+    exit 1 
+}
+
+# If paths-only mode, output paths and exit (support combined -Json -PathsOnly)
+if (\$PathsOnly) {
+    if (\$Json) {
+        [PSCustomObject]@{
+            REPO_ROOT    = \$paths.REPO_ROOT
+            BRANCH       = \$paths.CURRENT_BRANCH
+            FEATURE_DIR  = \$paths.FEATURE_DIR
+            FEATURE_SPEC = \$paths.FEATURE_SPEC
+            IMPL_PLAN    = \$paths.IMPL_PLAN
+            TASKS        = \$paths.TASKS
+        } | ConvertTo-Json -Compress
+    } else {
+        Write-Output "REPO_ROOT: \$(\$paths.REPO_ROOT)"
+        Write-Output "BRANCH: \$(\$paths.CURRENT_BRANCH)"
+        Write-Output "FEATURE_DIR: \$(\$paths.FEATURE_DIR)"
+        Write-Output "FEATURE_SPEC: \$(\$paths.FEATURE_SPEC)"
+        Write-Output "IMPL_PLAN: \$(\$paths.IMPL_PLAN)"
+        Write-Output "TASKS: \$(\$paths.TASKS)"
+    }
+    exit 0
+}
+
+# Validate required directories and files
+if (-not (Test-Path \$paths.FEATURE_DIR -PathType Container)) {
+    Write-Output "ERROR: Feature directory not found: \$(\$paths.FEATURE_DIR)"
+    Write-Output "Run /speckit.specify first to create the feature structure."
+    exit 1
+}
+
+if (-not (Test-Path \$paths.IMPL_PLAN -PathType Leaf)) {
+    Write-Output "ERROR: plan.md not found in \$(\$paths.FEATURE_DIR)"
+    Write-Output "Run /speckit.plan first to create the implementation plan."
+    exit 1
+}
+
+# Check for tasks.md if required
+if (\$RequireTasks -and -not (Test-Path \$paths.TASKS -PathType Leaf)) {
+    Write-Output "ERROR: tasks.md not found in \$(\$paths.FEATURE_DIR)"
+    Write-Output "Run /speckit.tasks first to create the task list."
+    exit 1
+}
+
+# Build list of available documents
+\$docs = @()
+
+# Always check these optional docs
+if (Test-Path \$paths.RESEARCH) { \$docs += 'research.md' }
+if (Test-Path \$paths.DATA_MODEL) { \$docs += 'data-model.md' }
+
+# Check contracts directory (only if it exists and has files)
+if ((Test-Path \$paths.CONTRACTS_DIR) -and (Get-ChildItem -Path \$paths.CONTRACTS_DIR -ErrorAction SilentlyContinue | Select-Object -First 1)) { 
+    \$docs += 'contracts/' 
+}
+
+if (Test-Path \$paths.QUICKSTART) { \$docs += 'quickstart.md' }
+
+# Include tasks.md if requested and it exists
+if (\$IncludeTasks -and (Test-Path \$paths.TASKS)) { 
+    \$docs += 'tasks.md' 
+}
+
+# Output results
+if (\$Json) {
+    # JSON output
+    [PSCustomObject]@{ 
+        FEATURE_DIR = \$paths.FEATURE_DIR
+        AVAILABLE_DOCS = \$docs 
+    } | ConvertTo-Json -Compress
+} else {
+    # Text output
+    Write-Output "FEATURE_DIR:\$(\$paths.FEATURE_DIR)"
+    Write-Output "AVAILABLE_DOCS:"
+    
+    # Show status of each potential document
+    Test-FileExists -Path \$paths.RESEARCH -Description 'research.md' | Out-Null
+    Test-FileExists -Path \$paths.DATA_MODEL -Description 'data-model.md' | Out-Null
+    Test-DirHasFiles -Path \$paths.CONTRACTS_DIR -Description 'contracts/' | Out-Null
+    Test-FileExists -Path \$paths.QUICKSTART -Description 'quickstart.md' | Out-Null
+    
+    if (\$IncludeTasks) {
+        Test-FileExists -Path \$paths.TASKS -Description 'tasks.md' | Out-Null
+    }
+}
+`,
+    executable: false,
+  },
+  ".specify/scripts/powershell/common.ps1": {
+    content: `#!/usr/bin/env pwsh
+# Common PowerShell functions analogous to common.sh
+
+# Find repository root by searching upward for .specify directory
+# This is the primary marker for spec-kit projects
+function Find-SpecifyRoot {
+    param([string]\$StartDir = (Get-Location).Path)
+
+    # Normalize to absolute path to prevent issues with relative paths
+    # Use -LiteralPath to handle paths with wildcard characters ([, ], *, ?)
+    \$resolved = Resolve-Path -LiteralPath \$StartDir -ErrorAction SilentlyContinue
+    \$current = if (\$resolved) { \$resolved.Path } else { \$null }
+    if (-not \$current) { return \$null }
+
+    while (\$true) {
+        if (Test-Path -LiteralPath (Join-Path \$current ".specify") -PathType Container) {
+            return \$current
+        }
+        \$parent = Split-Path \$current -Parent
+        if ([string]::IsNullOrEmpty(\$parent) -or \$parent -eq \$current) {
+            return \$null
+        }
+        \$current = \$parent
+    }
+}
+
+# Get repository root, prioritizing .specify directory over git
+# This prevents using a parent git repo when spec-kit is initialized in a subdirectory
+function Get-RepoRoot {
+    # First, look for .specify directory (spec-kit's own marker)
+    \$specifyRoot = Find-SpecifyRoot
+    if (\$specifyRoot) {
+        return \$specifyRoot
+    }
+
+    # Fallback to git if no .specify found
+    try {
+        \$result = git rev-parse --show-toplevel 2>\$null
+        if (\$LASTEXITCODE -eq 0) {
+            return \$result
+        }
+    } catch {
+        # Git command failed
+    }
+
+    # Final fallback to script location for non-git repos
+    # Use -LiteralPath to handle paths with wildcard characters
+    return (Resolve-Path -LiteralPath (Join-Path \$PSScriptRoot "../../..")).Path
+}
+
+function Get-CurrentBranch {
+    # First check if SPECIFY_FEATURE environment variable is set
+    if (\$env:SPECIFY_FEATURE) {
+        return \$env:SPECIFY_FEATURE
+    }
+
+    # Then check git if available at the spec-kit root (not parent)
+    \$repoRoot = Get-RepoRoot
+    if (Test-HasGit) {
+        try {
+            \$result = git -C \$repoRoot rev-parse --abbrev-ref HEAD 2>\$null
+            if (\$LASTEXITCODE -eq 0) {
+                return \$result
+            }
+        } catch {
+            # Git command failed
+        }
+    }
+
+    # For non-git repos, try to find the latest feature directory
+    \$specsDir = Join-Path \$repoRoot "specs"
+    
+    if (Test-Path \$specsDir) {
+        \$latestFeature = ""
+        \$highest = 0
+        \$latestTimestamp = ""
+
+        Get-ChildItem -Path \$specsDir -Directory | ForEach-Object {
+            if (\$_.Name -match '^(\\d{8}-\\d{6})-') {
+                # Timestamp-based branch: compare lexicographically
+                \$ts = \$matches[1]
+                if (\$ts -gt \$latestTimestamp) {
+                    \$latestTimestamp = \$ts
+                    \$latestFeature = \$_.Name
+                }
+            } elseif (\$_.Name -match '^(\\d{3,})-') {
+                \$num = [long]\$matches[1]
+                if (\$num -gt \$highest) {
+                    \$highest = \$num
+                    # Only update if no timestamp branch found yet
+                    if (-not \$latestTimestamp) {
+                        \$latestFeature = \$_.Name
+                    }
+                }
+            }
+        }
+
+        if (\$latestFeature) {
+            return \$latestFeature
+        }
+    }
+    
+    # Final fallback
+    return "main"
+}
+
+# Check if we have git available at the spec-kit root level
+# Returns true only if git is installed and the repo root is inside a git work tree
+# Handles both regular repos (.git directory) and worktrees/submodules (.git file)
+function Test-HasGit {
+    # First check if git command is available (before calling Get-RepoRoot which may use git)
+    if (-not (Get-Command git -ErrorAction SilentlyContinue)) {
+        return \$false
+    }
+    \$repoRoot = Get-RepoRoot
+    # Check if .git exists (directory or file for worktrees/submodules)
+    # Use -LiteralPath to handle paths with wildcard characters
+    if (-not (Test-Path -LiteralPath (Join-Path \$repoRoot ".git"))) {
+        return \$false
+    }
+    # Verify it's actually a valid git work tree
+    try {
+        \$null = git -C \$repoRoot rev-parse --is-inside-work-tree 2>\$null
+        return (\$LASTEXITCODE -eq 0)
+    } catch {
+        return \$false
+    }
+}
+
+# Strip a single optional path segment (e.g. gitflow "feat/004-name" -> "004-name").
+# Only when the full name is exactly two slash-free segments; otherwise returns the raw name.
+function Get-SpecKitEffectiveBranchName {
+    param([string]\$Branch)
+    if (\$Branch -match '^([^/]+)/([^/]+)\$') {
+        return \$Matches[2]
+    }
+    return \$Branch
+}
+
+function Test-FeatureBranch {
+    param(
+        [string]\$Branch,
+        [bool]\$HasGit = \$true
+    )
+    
+    # For non-git repos, we can't enforce branch naming but still provide output
+    if (-not \$HasGit) {
+        Write-Warning "[specify] Warning: Git repository not detected; skipped branch validation"
+        return \$true
+    }
+
+    \$raw = \$Branch
+    \$Branch = Get-SpecKitEffectiveBranchName \$raw
+    
+    # Accept sequential prefix (3+ digits) but exclude malformed timestamps
+    # Malformed: 7-or-8 digit date + 6-digit time with no trailing slug (e.g. "2026031-143022" or "20260319-143022")
+    \$hasMalformedTimestamp = (\$Branch -match '^[0-9]{7}-[0-9]{6}-') -or (\$Branch -match '^(?:\\d{7}|\\d{8})-\\d{6}\$')
+    \$isSequential = (\$Branch -match '^[0-9]{3,}-') -and (-not \$hasMalformedTimestamp)
+    if (-not \$isSequential -and \$Branch -notmatch '^\\d{8}-\\d{6}-') {
+        [Console]::Error.WriteLine("ERROR: Not on a feature branch. Current branch: \$raw")
+        [Console]::Error.WriteLine("Feature branches should be named like: 001-feature-name, 1234-feature-name, or 20260319-143022-feature-name")
+        return \$false
+    }
+    return \$true
+}
+
+# Resolve specs/<feature-dir> by numeric/timestamp prefix (mirrors scripts/bash/common.sh find_feature_dir_by_prefix).
+function Find-FeatureDirByPrefix {
+    param(
+        [Parameter(Mandatory = \$true)][string]\$RepoRoot,
+        [Parameter(Mandatory = \$true)][string]\$Branch
+    )
+    \$specsDir = Join-Path \$RepoRoot 'specs'
+    \$branchName = Get-SpecKitEffectiveBranchName \$Branch
+
+    \$prefix = \$null
+    if (\$branchName -match '^(\\d{8}-\\d{6})-') {
+        \$prefix = \$Matches[1]
+    } elseif (\$branchName -match '^(\\d{3,})-') {
+        \$prefix = \$Matches[1]
+    } else {
+        return (Join-Path \$specsDir \$branchName)
+    }
+
+    \$dirMatches = @()
+    if (Test-Path -LiteralPath \$specsDir -PathType Container) {
+        \$dirMatches = @(Get-ChildItem -LiteralPath \$specsDir -Filter "\$prefix-*" -Directory -ErrorAction SilentlyContinue)
+    }
+
+    if (\$dirMatches.Count -eq 0) {
+        return (Join-Path \$specsDir \$branchName)
+    }
+    if (\$dirMatches.Count -eq 1) {
+        return \$dirMatches[0].FullName
+    }
+    \$names = (\$dirMatches | ForEach-Object { \$_.Name }) -join ' '
+    [Console]::Error.WriteLine("ERROR: Multiple spec directories found with prefix '\$prefix': \$names")
+    [Console]::Error.WriteLine('Please ensure only one spec directory exists per prefix.')
+    return \$null
+}
+
+# Branch-based prefix resolution; mirrors bash get_feature_paths failure (stderr + exit 1).
+function Get-FeatureDirFromBranchPrefixOrExit {
+    param(
+        [Parameter(Mandatory = \$true)][string]\$RepoRoot,
+        [Parameter(Mandatory = \$true)][string]\$CurrentBranch
+    )
+    \$resolved = Find-FeatureDirByPrefix -RepoRoot \$RepoRoot -Branch \$CurrentBranch
+    if (\$null -eq \$resolved) {
+        [Console]::Error.WriteLine('ERROR: Failed to resolve feature directory')
+        exit 1
+    }
+    return \$resolved
+}
+
+function Get-FeaturePathsEnv {
+    \$repoRoot = Get-RepoRoot
+    \$currentBranch = Get-CurrentBranch
+    \$hasGit = Test-HasGit
+
+    # Resolve feature directory.  Priority:
+    #   1. SPECIFY_FEATURE_DIRECTORY env var (explicit override)
+    #   2. .specify/feature.json "feature_directory" key (persisted by /speckit.specify)
+    #   3. Branch-name-based prefix lookup (same as scripts/bash/common.sh)
+    \$featureJson = Join-Path \$repoRoot '.specify/feature.json'
+    if (\$env:SPECIFY_FEATURE_DIRECTORY) {
+        \$featureDir = \$env:SPECIFY_FEATURE_DIRECTORY
+        # Normalize relative paths to absolute under repo root
+        if (-not [System.IO.Path]::IsPathRooted(\$featureDir)) {
+            \$featureDir = Join-Path \$repoRoot \$featureDir
+        }
+    } elseif (Test-Path \$featureJson) {
+        \$featureJsonRaw = Get-Content -LiteralPath \$featureJson -Raw
+        try {
+            \$featureConfig = \$featureJsonRaw | ConvertFrom-Json
+        } catch {
+            [Console]::Error.WriteLine("ERROR: Failed to parse .specify/feature.json: \$_")
+            exit 1
+        }
+        if (\$featureConfig.feature_directory) {
+            \$featureDir = \$featureConfig.feature_directory
+            # Normalize relative paths to absolute under repo root
+            if (-not [System.IO.Path]::IsPathRooted(\$featureDir)) {
+                \$featureDir = Join-Path \$repoRoot \$featureDir
+            }
+        } else {
+            \$featureDir = Get-FeatureDirFromBranchPrefixOrExit -RepoRoot \$repoRoot -CurrentBranch \$currentBranch
+        }
+    } else {
+        \$featureDir = Get-FeatureDirFromBranchPrefixOrExit -RepoRoot \$repoRoot -CurrentBranch \$currentBranch
+    }
+    
+    [PSCustomObject]@{
+        REPO_ROOT     = \$repoRoot
+        CURRENT_BRANCH = \$currentBranch
+        HAS_GIT       = \$hasGit
+        FEATURE_DIR   = \$featureDir
+        FEATURE_SPEC  = Join-Path \$featureDir 'spec.md'
+        IMPL_PLAN     = Join-Path \$featureDir 'plan.md'
+        TASKS         = Join-Path \$featureDir 'tasks.md'
+        RESEARCH      = Join-Path \$featureDir 'research.md'
+        DATA_MODEL    = Join-Path \$featureDir 'data-model.md'
+        QUICKSTART    = Join-Path \$featureDir 'quickstart.md'
+        CONTRACTS_DIR = Join-Path \$featureDir 'contracts'
+    }
+}
+
+function Test-FileExists {
+    param([string]\$Path, [string]\$Description)
+    if (Test-Path -Path \$Path -PathType Leaf) {
+        Write-Output "  ✓ \$Description"
+        return \$true
+    } else {
+        Write-Output "  ✗ \$Description"
+        return \$false
+    }
+}
+
+function Test-DirHasFiles {
+    param([string]\$Path, [string]\$Description)
+    if ((Test-Path -Path \$Path -PathType Container) -and (Get-ChildItem -Path \$Path -ErrorAction SilentlyContinue | Where-Object { -not \$_.PSIsContainer } | Select-Object -First 1)) {
+        Write-Output "  ✓ \$Description"
+        return \$true
+    } else {
+        Write-Output "  ✗ \$Description"
+        return \$false
+    }
+}
+
+# Find a usable Python 3 executable (python3, python, or py -3).
+# Returns the command/arguments as an array, or \$null if none found.
+function Get-Python3Command {
+    if (Get-Command python3 -ErrorAction SilentlyContinue) { return @('python3') }
+    if (Get-Command python -ErrorAction SilentlyContinue) {
+        \$ver = & python --version 2>&1
+        if (\$ver -match 'Python 3') { return @('python') }
+    }
+    if (Get-Command py -ErrorAction SilentlyContinue) {
+        \$ver = & py -3 --version 2>&1
+        if (\$ver -match 'Python 3') { return @('py', '-3') }
+    }
+    return \$null
+}
+
+# Resolve a template name to a file path using the priority stack:
+#   1. .specify/templates/overrides/
+#   2. .specify/presets/<preset-id>/templates/ (sorted by priority from .registry)
+#   3. .specify/extensions/<ext-id>/templates/
+#   4. .specify/templates/ (core)
+function Resolve-Template {
+    param(
+        [Parameter(Mandatory=\$true)][string]\$TemplateName,
+        [Parameter(Mandatory=\$true)][string]\$RepoRoot
+    )
+
+    \$base = Join-Path \$RepoRoot '.specify/templates'
+
+    # Priority 1: Project overrides
+    \$override = Join-Path \$base "overrides/\$TemplateName.md"
+    if (Test-Path \$override) { return \$override }
+
+    # Priority 2: Installed presets (sorted by priority from .registry)
+    \$presetsDir = Join-Path \$RepoRoot '.specify/presets'
+    if (Test-Path \$presetsDir) {
+        \$registryFile = Join-Path \$presetsDir '.registry'
+        \$sortedPresets = @()
+        if (Test-Path \$registryFile) {
+            try {
+                \$registryData = Get-Content \$registryFile -Raw | ConvertFrom-Json
+                \$presets = \$registryData.presets
+                if (\$presets) {
+                    \$sortedPresets = \$presets.PSObject.Properties |
+                        Where-Object { \$null -eq \$_.Value.enabled -or \$_.Value.enabled -ne \$false } |
+                        Sort-Object { if (\$null -ne \$_.Value.priority) { \$_.Value.priority } else { 10 } } |
+                        ForEach-Object { \$_.Name }
+                }
+            } catch {
+                # Fallback: alphabetical directory order
+                \$sortedPresets = @()
+            }
+        }
+
+        if (\$sortedPresets.Count -gt 0) {
+            foreach (\$presetId in \$sortedPresets) {
+                \$candidate = Join-Path \$presetsDir "\$presetId/templates/\$TemplateName.md"
+                if (Test-Path \$candidate) { return \$candidate }
+            }
+        } else {
+            # Fallback: alphabetical directory order
+            foreach (\$preset in Get-ChildItem -Path \$presetsDir -Directory -ErrorAction SilentlyContinue | Where-Object { \$_.Name -notlike '.*' }) {
+                \$candidate = Join-Path \$preset.FullName "templates/\$TemplateName.md"
+                if (Test-Path \$candidate) { return \$candidate }
+            }
+        }
+    }
+
+    # Priority 3: Extension-provided templates
+    \$extDir = Join-Path \$RepoRoot '.specify/extensions'
+    if (Test-Path \$extDir) {
+        foreach (\$ext in Get-ChildItem -Path \$extDir -Directory -ErrorAction SilentlyContinue | Where-Object { \$_.Name -notlike '.*' } | Sort-Object Name) {
+            \$candidate = Join-Path \$ext.FullName "templates/\$TemplateName.md"
+            if (Test-Path \$candidate) { return \$candidate }
+        }
+    }
+
+    # Priority 4: Core templates
+    \$core = Join-Path \$base "\$TemplateName.md"
+    if (Test-Path \$core) { return \$core }
+
+    return \$null
+}
+
+# Resolve a template name to composed content using composition strategies.
+# Reads strategy metadata from preset manifests and composes content
+# from multiple layers using prepend, append, or wrap strategies.
+function Resolve-TemplateContent {
+    param(
+        [Parameter(Mandatory=\$true)][string]\$TemplateName,
+        [Parameter(Mandatory=\$true)][string]\$RepoRoot
+    )
+
+    \$base = Join-Path \$RepoRoot '.specify/templates'
+
+    # Collect all layers (highest priority first)
+    \$layerPaths = @()
+    \$layerStrategies = @()
+
+    # Priority 1: Project overrides (always "replace")
+    \$override = Join-Path \$base "overrides/\$TemplateName.md"
+    if (Test-Path \$override) {
+        \$layerPaths += \$override
+        \$layerStrategies += 'replace'
+    }
+
+    # Priority 2: Installed presets (sorted by priority from .registry)
+    \$presetsDir = Join-Path \$RepoRoot '.specify/presets'
+    if (Test-Path \$presetsDir) {
+        \$registryFile = Join-Path \$presetsDir '.registry'
+        \$sortedPresets = @()
+        if (Test-Path \$registryFile) {
+            try {
+                \$registryData = Get-Content \$registryFile -Raw | ConvertFrom-Json
+                \$presets = \$registryData.presets
+                if (\$presets) {
+                    \$sortedPresets = \$presets.PSObject.Properties |
+                        Where-Object { \$null -eq \$_.Value.enabled -or \$_.Value.enabled -ne \$false } |
+                        Sort-Object { if (\$null -ne \$_.Value.priority) { \$_.Value.priority } else { 10 } } |
+                        ForEach-Object { \$_.Name }
+                }
+            } catch {
+                \$sortedPresets = @()
+            }
+        }
+
+        if (\$sortedPresets.Count -gt 0) {
+            \$pyCmd = Get-Python3Command
+            if (-not \$pyCmd) {
+                # Check if any preset has strategy fields that would be ignored
+                foreach (\$pid in \$sortedPresets) {
+                    \$mf = Join-Path \$presetsDir "\$pid/preset.yml"
+                    if ((Test-Path \$mf) -and (Select-String -Path \$mf -Pattern 'strategy:' -Quiet -ErrorAction SilentlyContinue)) {
+                        Write-Warning "No Python 3 found; preset composition strategies will be ignored"
+                        break
+                    }
+                }
+            }
+            \$yamlWarned = \$false
+            foreach (\$presetId in \$sortedPresets) {
+                # Read strategy and file path from preset manifest
+                \$strategy = 'replace'
+                \$manifestFilePath = ''
+                \$manifest = Join-Path \$presetsDir "\$presetId/preset.yml"
+                if ((Test-Path \$manifest) -and \$pyCmd) {
+                    try {
+                        # Use Python to parse YAML manifest for strategy and file path
+                        \$pyArgs = if (\$pyCmd.Count -gt 1) { \$pyCmd[1..(\$pyCmd.Count-1)] } else { @() }
+                        \$pyStderrFile = [System.IO.Path]::GetTempFileName()
+                        \$stratResult = & \$pyCmd[0] @pyArgs -c @"
+import sys
+try:
+    import yaml
+except ImportError:
+    print('yaml_missing', file=sys.stderr)
+    print('replace\\t')
+    sys.exit(0)
+try:
+    with open(sys.argv[1]) as f:
+        data = yaml.safe_load(f)
+    for t in data.get('provides', {}).get('templates', []):
+        if t.get('name') == sys.argv[2] and t.get('type', 'template') == 'template':
+            print(t.get('strategy', 'replace') + '\\t' + t.get('file', ''))
+            sys.exit(0)
+    print('replace\\t')
+except Exception:
+    print('replace\\t')
+"@ \$manifest \$TemplateName 2>\$pyStderrFile
+                        if (\$stratResult) {
+                            \$parts = \$stratResult.Trim() -split "\`t", 2
+                            \$strategy = \$parts[0].ToLowerInvariant()
+                            if (\$parts.Count -gt 1 -and \$parts[1]) { \$manifestFilePath = \$parts[1] }
+                        }
+                        if (-not \$yamlWarned -and (Test-Path \$pyStderrFile) -and (Get-Content \$pyStderrFile -Raw -ErrorAction SilentlyContinue) -match 'yaml_missing') {
+                            Write-Warning "PyYAML not available; composition strategies may be ignored"
+                            \$yamlWarned = \$true
+                        }
+                        Remove-Item \$pyStderrFile -Force -ErrorAction SilentlyContinue
+                    } catch {
+                        \$strategy = 'replace'
+                        if (\$pyStderrFile) { Remove-Item \$pyStderrFile -Force -ErrorAction SilentlyContinue }
+                    }
+                }
+                # Try manifest file path first, then convention path
+                \$candidate = \$null
+                if (\$manifestFilePath) {
+                    # Reject absolute paths and parent traversal
+                    if ([System.IO.Path]::IsPathRooted(\$manifestFilePath) -or \$manifestFilePath -match '\\.\\.[\\\\/]') {
+                        \$manifestFilePath = ''
+                    }
+                }
+                if (\$manifestFilePath) {
+                    \$mf = Join-Path \$presetsDir "\$presetId/\$manifestFilePath"
+                    if (Test-Path \$mf) { \$candidate = \$mf }
+                }
+                if (-not \$candidate) {
+                    \$cf = Join-Path \$presetsDir "\$presetId/templates/\$TemplateName.md"
+                    if (Test-Path \$cf) { \$candidate = \$cf }
+                }
+                if (\$candidate) {
+                    \$layerPaths += \$candidate
+                    \$layerStrategies += \$strategy
+                }
+            }
+        } else {
+            # Fallback: alphabetical directory order (no registry or parse failure)
+            foreach (\$preset in Get-ChildItem -Path \$presetsDir -Directory -ErrorAction SilentlyContinue | Where-Object { \$_.Name -notlike '.*' }) {
+                \$candidate = Join-Path \$preset.FullName "templates/\$TemplateName.md"
+                if (Test-Path \$candidate) {
+                    \$layerPaths += \$candidate
+                    \$layerStrategies += 'replace'
+                }
+            }
+        }
+    }
+
+    # Priority 3: Extension-provided templates (always "replace")
+    \$extDir = Join-Path \$RepoRoot '.specify/extensions'
+    if (Test-Path \$extDir) {
+        foreach (\$ext in Get-ChildItem -Path \$extDir -Directory -ErrorAction SilentlyContinue | Where-Object { \$_.Name -notlike '.*' } | Sort-Object Name) {
+            \$candidate = Join-Path \$ext.FullName "templates/\$TemplateName.md"
+            if (Test-Path \$candidate) {
+                \$layerPaths += \$candidate
+                \$layerStrategies += 'replace'
+            }
+        }
+    }
+
+    # Priority 4: Core templates (always "replace")
+    \$core = Join-Path \$base "\$TemplateName.md"
+    if (Test-Path \$core) {
+        \$layerPaths += \$core
+        \$layerStrategies += 'replace'
+    }
+
+    if (\$layerPaths.Count -eq 0) { return \$null }
+
+    # If the top (highest-priority) layer is replace, it wins entirely —
+    # lower layers are irrelevant regardless of their strategies.
+    if (\$layerStrategies[0] -eq 'replace') {
+        return (Get-Content \$layerPaths[0] -Raw)
+    }
+
+    # Check if any layer uses a non-replace strategy
+    \$hasComposition = \$false
+    foreach (\$s in \$layerStrategies) {
+        if (\$s -ne 'replace') { \$hasComposition = \$true; break }
+    }
+
+    if (-not \$hasComposition) {
+        return (Get-Content \$layerPaths[0] -Raw)
+    }
+
+    # Find the effective base: scan from highest priority (index 0) downward
+    # to find the nearest replace layer. Only compose layers above that base.
+    \$baseIdx = -1
+    for (\$i = 0; \$i -lt \$layerPaths.Count; \$i++) {
+        if (\$layerStrategies[\$i] -eq 'replace') {
+            \$baseIdx = \$i
+            break
+        }
+    }
+    if (\$baseIdx -lt 0) { return \$null }
+
+    \$content = Get-Content \$layerPaths[\$baseIdx] -Raw
+
+    for (\$i = \$baseIdx - 1; \$i -ge 0; \$i--) {
+        \$path = \$layerPaths[\$i]
+        \$strat = \$layerStrategies[\$i]
+        \$layerContent = Get-Content \$path -Raw
+
+        switch (\$strat) {
+            'replace' { \$content = \$layerContent }
+            'prepend' { \$content = "\$layerContent\`n\`n\$content" }
+            'append'  { \$content = "\$content\`n\`n\$layerContent" }
+            'wrap'    {
+                if (-not \$layerContent.Contains('{CORE_TEMPLATE}')) {
+                    throw "Wrap strategy missing {CORE_TEMPLATE} placeholder"
+                }
+                \$content = \$layerContent.Replace('{CORE_TEMPLATE}', \$content)
+            }
+            default { throw "Unknown strategy: \$strat" }
+        }
+    }
+
+    return \$content
+}`,
+    executable: false,
+  },
+  ".specify/scripts/powershell/create-new-feature.ps1": {
+    content: `#!/usr/bin/env pwsh
+# Create a new feature
+[CmdletBinding()]
+param(
+    [switch]\$Json,
+    [switch]\$AllowExistingBranch,
+    [switch]\$DryRun,
+    [string]\$ShortName,
+    [Parameter()]
+    [long]\$Number = 0,
+    [switch]\$Timestamp,
+    [switch]\$Help,
+    [Parameter(Position = 0, ValueFromRemainingArguments = \$true)]
+    [string[]]\$FeatureDescription
+)
+\$ErrorActionPreference = 'Stop'
+
+# Show help if requested
+if (\$Help) {
+    Write-Host "Usage: ./create-new-feature.ps1 [-Json] [-DryRun] [-AllowExistingBranch] [-ShortName <name>] [-Number N] [-Timestamp] <feature description>"
+    Write-Host ""
+    Write-Host "Options:"
+    Write-Host "  -Json               Output in JSON format"
+    Write-Host "  -DryRun             Compute branch name and paths without creating branches, directories, or files"
+    Write-Host "  -AllowExistingBranch  Switch to branch if it already exists instead of failing"
+    Write-Host "  -ShortName <name>   Provide a custom short name (2-4 words) for the branch"
+    Write-Host "  -Number N           Specify branch number manually (overrides auto-detection)"
+    Write-Host "  -Timestamp          Use timestamp prefix (YYYYMMDD-HHMMSS) instead of sequential numbering"
+    Write-Host "  -Help               Show this help message"
+    Write-Host ""
+    Write-Host "Examples:"
+    Write-Host "  ./create-new-feature.ps1 'Add user authentication system' -ShortName 'user-auth'"
+    Write-Host "  ./create-new-feature.ps1 'Implement OAuth2 integration for API'"
+    Write-Host "  ./create-new-feature.ps1 -Timestamp -ShortName 'user-auth' 'Add user authentication'"
+    exit 0
+}
+
+# Check if feature description provided
+if (-not \$FeatureDescription -or \$FeatureDescription.Count -eq 0) {
+    Write-Error "Usage: ./create-new-feature.ps1 [-Json] [-DryRun] [-AllowExistingBranch] [-ShortName <name>] [-Number N] [-Timestamp] <feature description>"
+    exit 1
+}
+
+\$featureDesc = (\$FeatureDescription -join ' ').Trim()
+
+# Validate description is not empty after trimming (e.g., user passed only whitespace)
+if ([string]::IsNullOrWhiteSpace(\$featureDesc)) {
+    Write-Error "Error: Feature description cannot be empty or contain only whitespace"
+    exit 1
+}
+
+function Get-HighestNumberFromSpecs {
+    param([string]\$SpecsDir)
+
+    [long]\$highest = 0
+    if (Test-Path \$SpecsDir) {
+        Get-ChildItem -Path \$SpecsDir -Directory | ForEach-Object {
+            # Match sequential prefixes (>=3 digits), but skip timestamp dirs.
+            if (\$_.Name -match '^(\\d{3,})-' -and \$_.Name -notmatch '^\\d{8}-\\d{6}-') {
+                [long]\$num = 0
+                if ([long]::TryParse(\$matches[1], [ref]\$num) -and \$num -gt \$highest) {
+                    \$highest = \$num
+                }
+            }
+        }
+    }
+    return \$highest
+}
+
+# Extract the highest sequential feature number from a list of branch/ref names.
+# Shared by Get-HighestNumberFromBranches and Get-HighestNumberFromRemoteRefs.
+function Get-HighestNumberFromNames {
+    param([string[]]\$Names)
+
+    [long]\$highest = 0
+    foreach (\$name in \$Names) {
+        if (\$name -match '^(\\d{3,})-' -and \$name -notmatch '^\\d{8}-\\d{6}-') {
+            [long]\$num = 0
+            if ([long]::TryParse(\$matches[1], [ref]\$num) -and \$num -gt \$highest) {
+                \$highest = \$num
+            }
+        }
+    }
+    return \$highest
+}
+
+function Get-HighestNumberFromBranches {
+    param()
+
+    try {
+        \$branches = git branch -a 2>\$null
+        if (\$LASTEXITCODE -eq 0 -and \$branches) {
+            \$cleanNames = \$branches | ForEach-Object {
+                \$_.Trim() -replace '^\\*?\\s+', '' -replace '^remotes/[^/]+/', ''
+            }
+            return Get-HighestNumberFromNames -Names \$cleanNames
+        }
+    } catch {
+        Write-Verbose "Could not check Git branches: \$_"
+    }
+    return 0
+}
+
+function Get-HighestNumberFromRemoteRefs {
+    [long]\$highest = 0
+    try {
+        \$remotes = git remote 2>\$null
+        if (\$remotes) {
+            foreach (\$remote in \$remotes) {
+                \$env:GIT_TERMINAL_PROMPT = '0'
+                \$refs = git ls-remote --heads \$remote 2>\$null
+                \$env:GIT_TERMINAL_PROMPT = \$null
+                if (\$LASTEXITCODE -eq 0 -and \$refs) {
+                    \$refNames = \$refs | ForEach-Object {
+                        if (\$_ -match 'refs/heads/(.+)\$') { \$matches[1] }
+                    } | Where-Object { \$_ }
+                    \$remoteHighest = Get-HighestNumberFromNames -Names \$refNames
+                    if (\$remoteHighest -gt \$highest) { \$highest = \$remoteHighest }
+                }
+            }
+        }
+    } catch {
+        Write-Verbose "Could not query remote refs: \$_"
+    }
+    return \$highest
+}
+
+# Return next available branch number. When SkipFetch is true, queries remotes
+# via ls-remote (read-only) instead of fetching.
+function Get-NextBranchNumber {
+    param(
+        [string]\$SpecsDir,
+        [switch]\$SkipFetch
+    )
+
+    if (\$SkipFetch) {
+        # Side-effect-free: query remotes via ls-remote
+        \$highestBranch = Get-HighestNumberFromBranches
+        \$highestRemote = Get-HighestNumberFromRemoteRefs
+        \$highestBranch = [Math]::Max(\$highestBranch, \$highestRemote)
+    } else {
+        # Fetch all remotes to get latest branch info (suppress errors if no remotes)
+        try {
+            git fetch --all --prune 2>\$null | Out-Null
+        } catch {
+            # Ignore fetch errors
+        }
+        \$highestBranch = Get-HighestNumberFromBranches
+    }
+
+    # Get highest number from ALL specs (not just matching short name)
+    \$highestSpec = Get-HighestNumberFromSpecs -SpecsDir \$SpecsDir
+
+    # Take the maximum of both
+    \$maxNum = [Math]::Max(\$highestBranch, \$highestSpec)
+
+    # Return next number
+    return \$maxNum + 1
+}
+
+function ConvertTo-CleanBranchName {
+    param([string]\$Name)
+
+    return \$Name.ToLower() -replace '[^a-z0-9]', '-' -replace '-{2,}', '-' -replace '^-', '' -replace '-\$', ''
+}
+# Load common functions (includes Get-RepoRoot, Test-HasGit, Resolve-Template)
+. "\$PSScriptRoot/common.ps1"
+
+# Use common.ps1 functions which prioritize .specify over git
+\$repoRoot = Get-RepoRoot
+
+# Check if git is available at this repo root (not a parent)
+\$hasGit = Test-HasGit
+
+Set-Location \$repoRoot
+
+\$specsDir = Join-Path \$repoRoot 'specs'
+if (-not \$DryRun) {
+    New-Item -ItemType Directory -Path \$specsDir -Force | Out-Null
+}
+
+# Function to generate branch name with stop word filtering and length filtering
+function Get-BranchName {
+    param([string]\$Description)
+
+    # Common stop words to filter out
+    \$stopWords = @(
+        'i', 'a', 'an', 'the', 'to', 'for', 'of', 'in', 'on', 'at', 'by', 'with', 'from',
+        'is', 'are', 'was', 'were', 'be', 'been', 'being', 'have', 'has', 'had',
+        'do', 'does', 'did', 'will', 'would', 'should', 'could', 'can', 'may', 'might', 'must', 'shall',
+        'this', 'that', 'these', 'those', 'my', 'your', 'our', 'their',
+        'want', 'need', 'add', 'get', 'set'
+    )
+
+    # Convert to lowercase and extract words (alphanumeric only)
+    \$cleanName = \$Description.ToLower() -replace '[^a-z0-9\\s]', ' '
+    \$words = \$cleanName -split '\\s+' | Where-Object { \$_ }
+
+    # Filter words: remove stop words and words shorter than 3 chars (unless they're uppercase acronyms in original)
+    \$meaningfulWords = @()
+    foreach (\$word in \$words) {
+        # Skip stop words
+        if (\$stopWords -contains \$word) { continue }
+
+        # Keep words that are length >= 3 OR appear as uppercase in original (likely acronyms)
+        if (\$word.Length -ge 3) {
+            \$meaningfulWords += \$word
+        } elseif (\$Description -match "\\b\$(\$word.ToUpper())\\b") {
+            # Keep short words if they appear as uppercase in original (likely acronyms)
+            \$meaningfulWords += \$word
+        }
+    }
+
+    # If we have meaningful words, use first 3-4 of them
+    if (\$meaningfulWords.Count -gt 0) {
+        \$maxWords = if (\$meaningfulWords.Count -eq 4) { 4 } else { 3 }
+        \$result = (\$meaningfulWords | Select-Object -First \$maxWords) -join '-'
+        return \$result
+    } else {
+        # Fallback to original logic if no meaningful words found
+        \$result = ConvertTo-CleanBranchName -Name \$Description
+        \$fallbackWords = (\$result -split '-') | Where-Object { \$_ } | Select-Object -First 3
+        return [string]::Join('-', \$fallbackWords)
+    }
+}
+
+# Generate branch name
+if (\$ShortName) {
+    # Use provided short name, just clean it up
+    \$branchSuffix = ConvertTo-CleanBranchName -Name \$ShortName
+} else {
+    # Generate from description with smart filtering
+    \$branchSuffix = Get-BranchName -Description \$featureDesc
+}
+
+# Warn if -Number and -Timestamp are both specified
+if (\$Timestamp -and \$Number -ne 0) {
+    Write-Warning "[specify] Warning: -Number is ignored when -Timestamp is used"
+    \$Number = 0
+}
+
+# Determine branch prefix
+if (\$Timestamp) {
+    \$featureNum = Get-Date -Format 'yyyyMMdd-HHmmss'
+    \$branchName = "\$featureNum-\$branchSuffix"
+} else {
+    # Determine branch number
+    if (\$Number -eq 0) {
+        if (\$DryRun -and \$hasGit) {
+            # Dry-run: query remotes via ls-remote (side-effect-free, no fetch)
+            \$Number = Get-NextBranchNumber -SpecsDir \$specsDir -SkipFetch
+        } elseif (\$DryRun) {
+            # Dry-run without git: local spec dirs only
+            \$Number = (Get-HighestNumberFromSpecs -SpecsDir \$specsDir) + 1
+        } elseif (\$hasGit) {
+            # Check existing branches on remotes
+            \$Number = Get-NextBranchNumber -SpecsDir \$specsDir
+        } else {
+            # Fall back to local directory check
+            \$Number = (Get-HighestNumberFromSpecs -SpecsDir \$specsDir) + 1
+        }
+    }
+
+    \$featureNum = ('{0:000}' -f \$Number)
+    \$branchName = "\$featureNum-\$branchSuffix"
+}
+
+# GitHub enforces a 244-byte limit on branch names
+# Validate and truncate if necessary
+\$maxBranchLength = 244
+if (\$branchName.Length -gt \$maxBranchLength) {
+    # Calculate how much we need to trim from suffix
+    # Account for prefix length: timestamp (15) + hyphen (1) = 16, or sequential (3) + hyphen (1) = 4
+    \$prefixLength = \$featureNum.Length + 1
+    \$maxSuffixLength = \$maxBranchLength - \$prefixLength
+
+    # Truncate suffix
+    \$truncatedSuffix = \$branchSuffix.Substring(0, [Math]::Min(\$branchSuffix.Length, \$maxSuffixLength))
+    # Remove trailing hyphen if truncation created one
+    \$truncatedSuffix = \$truncatedSuffix -replace '-\$', ''
+
+    \$originalBranchName = \$branchName
+    \$branchName = "\$featureNum-\$truncatedSuffix"
+
+    Write-Warning "[specify] Branch name exceeded GitHub's 244-byte limit"
+    Write-Warning "[specify] Original: \$originalBranchName (\$(\$originalBranchName.Length) bytes)"
+    Write-Warning "[specify] Truncated to: \$branchName (\$(\$branchName.Length) bytes)"
+}
+
+\$featureDir = Join-Path \$specsDir \$branchName
+\$specFile = Join-Path \$featureDir 'spec.md'
+
+if (-not \$DryRun) {
+    if (\$hasGit) {
+        \$branchCreated = \$false
+        \$branchCreateError = ''
+        try {
+            \$branchCreateError = git checkout -q -b \$branchName 2>&1 | Out-String
+            if (\$LASTEXITCODE -eq 0) {
+                \$branchCreated = \$true
+            }
+        } catch {
+            \$branchCreateError = \$_.Exception.Message
+        }
+
+        if (-not \$branchCreated) {
+            \$currentBranch = ''
+            try { \$currentBranch = (git rev-parse --abbrev-ref HEAD 2>\$null).Trim() } catch {}
+            # Check if branch already exists
+            \$existingBranch = git branch --list \$branchName 2>\$null
+            if (\$existingBranch) {
+                if (\$AllowExistingBranch) {
+                    # If we're already on the branch, continue without another checkout.
+                    if (\$currentBranch -eq \$branchName) {
+                        # Already on the target branch — nothing to do
+                    } else {
+                        # Otherwise switch to the existing branch instead of failing.
+                        \$switchBranchError = git checkout -q \$branchName 2>&1 | Out-String
+                        if (\$LASTEXITCODE -ne 0) {
+                            if (\$switchBranchError) {
+                                Write-Error "Error: Branch '\$branchName' exists but could not be checked out.\`n\$(\$switchBranchError.Trim())"
+                            } else {
+                                Write-Error "Error: Branch '\$branchName' exists but could not be checked out. Resolve any uncommitted changes or conflicts and try again."
+                            }
+                            exit 1
+                        }
+                    }
+                } elseif (\$Timestamp) {
+                    Write-Error "Error: Branch '\$branchName' already exists. Rerun to get a new timestamp or use a different -ShortName."
+                    exit 1
+                } else {
+                    Write-Error "Error: Branch '\$branchName' already exists. Please use a different feature name or specify a different number with -Number."
+                    exit 1
+                }
+            } else {
+                if (\$branchCreateError) {
+                    Write-Error "Error: Failed to create git branch '\$branchName'.\`n\$(\$branchCreateError.Trim())"
+                } else {
+                    Write-Error "Error: Failed to create git branch '\$branchName'. Please check your git configuration and try again."
+                }
+                exit 1
+            }
+        }
+    } else {
+        Write-Warning "[specify] Warning: Git repository not detected; skipped branch creation for \$branchName"
+    }
+
+    New-Item -ItemType Directory -Path \$featureDir -Force | Out-Null
+
+    if (-not (Test-Path -PathType Leaf \$specFile)) {
+        \$template = Resolve-Template -TemplateName 'spec-template' -RepoRoot \$repoRoot
+        if (\$template -and (Test-Path \$template)) {
+            Copy-Item \$template \$specFile -Force
+        } else {
+            New-Item -ItemType File -Path \$specFile -Force | Out-Null
+        }
+    }
+
+    # Set the SPECIFY_FEATURE environment variable for the current session
+    \$env:SPECIFY_FEATURE = \$branchName
+}
+
+if (\$Json) {
+    \$obj = [PSCustomObject]@{
+        BRANCH_NAME = \$branchName
+        SPEC_FILE = \$specFile
+        FEATURE_NUM = \$featureNum
+        HAS_GIT = \$hasGit
+    }
+    if (\$DryRun) {
+        \$obj | Add-Member -NotePropertyName 'DRY_RUN' -NotePropertyValue \$true
+    }
+    \$obj | ConvertTo-Json -Compress
+} else {
+    Write-Output "BRANCH_NAME: \$branchName"
+    Write-Output "SPEC_FILE: \$specFile"
+    Write-Output "FEATURE_NUM: \$featureNum"
+    Write-Output "HAS_GIT: \$hasGit"
+    if (-not \$DryRun) {
+        Write-Output "SPECIFY_FEATURE environment variable set to: \$branchName"
+    }
+}
+`,
+    executable: false,
+  },
+  ".specify/scripts/powershell/setup-plan.ps1": {
+    content: `#!/usr/bin/env pwsh
+# Setup implementation plan for a feature
+
+[CmdletBinding()]
+param(
+    [switch]\$Json,
+    [switch]\$Help
+)
+
+\$ErrorActionPreference = 'Stop'
+
+# Show help if requested
+if (\$Help) {
+    Write-Output "Usage: ./setup-plan.ps1 [-Json] [-Help]"
+    Write-Output "  -Json     Output results in JSON format"
+    Write-Output "  -Help     Show this help message"
+    exit 0
+}
+
+# Load common functions
+. "\$PSScriptRoot/common.ps1"
+
+# Get all paths and variables from common functions
+\$paths = Get-FeaturePathsEnv
+
+# Check if we're on a proper feature branch (only for git repos)
+if (-not (Test-FeatureBranch -Branch \$paths.CURRENT_BRANCH -HasGit \$paths.HAS_GIT)) { 
+    exit 1 
+}
+
+# Ensure the feature directory exists
+New-Item -ItemType Directory -Path \$paths.FEATURE_DIR -Force | Out-Null
+
+# Copy plan template if it exists, otherwise note it or create empty file
+\$template = Resolve-Template -TemplateName 'plan-template' -RepoRoot \$paths.REPO_ROOT
+if (\$template -and (Test-Path \$template)) { 
+    Copy-Item \$template \$paths.IMPL_PLAN -Force
+    Write-Output "Copied plan template to \$(\$paths.IMPL_PLAN)"
+} else {
+    Write-Warning "Plan template not found"
+    # Create a basic plan file if template doesn't exist
+    New-Item -ItemType File -Path \$paths.IMPL_PLAN -Force | Out-Null
+}
+
+# Output results
+if (\$Json) {
+    \$result = [PSCustomObject]@{ 
+        FEATURE_SPEC = \$paths.FEATURE_SPEC
+        IMPL_PLAN = \$paths.IMPL_PLAN
+        SPECS_DIR = \$paths.FEATURE_DIR
+        BRANCH = \$paths.CURRENT_BRANCH
+        HAS_GIT = \$paths.HAS_GIT
+    }
+    \$result | ConvertTo-Json -Compress
+} else {
+    Write-Output "FEATURE_SPEC: \$(\$paths.FEATURE_SPEC)"
+    Write-Output "IMPL_PLAN: \$(\$paths.IMPL_PLAN)"
+    Write-Output "SPECS_DIR: \$(\$paths.FEATURE_DIR)"
+    Write-Output "BRANCH: \$(\$paths.CURRENT_BRANCH)"
+    Write-Output "HAS_GIT: \$(\$paths.HAS_GIT)"
+}
+`,
+    executable: false,
+  },
+};

@@ -1,4 +1,74 @@
 {
   "version": "0.1.0",
-  "files": []
+  "files": [
+    {
+      "source": "specify/memory/constitution.md",
+      "destination": ".specify/memory/constitution.md"
+    },
+    {
+      "source": "specify/templates/spec-template.md",
+      "destination": ".specify/templates/spec-template.md"
+    },
+    {
+      "source": "specify/templates/plan-template.md",
+      "destination": ".specify/templates/plan-template.md"
+    },
+    {
+      "source": "specify/templates/tasks-template.md",
+      "destination": ".specify/templates/tasks-template.md"
+    },
+    {
+      "source": "specify/templates/checklist-template.md",
+      "destination": ".specify/templates/checklist-template.md"
+    },
+    {
+      "source": "specify/templates/constitution-template.md",
+      "destination": ".specify/templates/constitution-template.md"
+    },
+    {
+      "source": "specify/templates/agent-file-template.md",
+      "destination": ".specify/templates/agent-file-template.md"
+    },
+    {
+      "source": "specify/scripts/bash/check-prerequisites.sh",
+      "destination": ".specify/scripts/bash/check-prerequisites.sh",
+      "executable": true
+    },
+    {
+      "source": "specify/scripts/bash/common.sh",
+      "destination": ".specify/scripts/bash/common.sh",
+      "executable": true
+    },
+    {
+      "source": "specify/scripts/bash/create-new-feature.sh",
+      "destination": ".specify/scripts/bash/create-new-feature.sh",
+      "executable": true
+    },
+    {
+      "source": "specify/scripts/bash/setup-plan.sh",
+      "destination": ".specify/scripts/bash/setup-plan.sh",
+      "executable": true
+    },
+    {
+      "source": "specify/scripts/bash/update-agent-context.sh",
+      "destination": ".specify/scripts/bash/update-agent-context.sh",
+      "executable": true
+    },
+    {
+      "source": "specify/scripts/powershell/check-prerequisites.ps1",
+      "destination": ".specify/scripts/powershell/check-prerequisites.ps1"
+    },
+    {
+      "source": "specify/scripts/powershell/common.ps1",
+      "destination": ".specify/scripts/powershell/common.ps1"
+    },
+    {
+      "source": "specify/scripts/powershell/create-new-feature.ps1",
+      "destination": ".specify/scripts/powershell/create-new-feature.ps1"
+    },
+    {
+      "source": "specify/scripts/powershell/setup-plan.ps1",
+      "destination": ".specify/scripts/powershell/setup-plan.ps1"
+    }
+  ]
 }
