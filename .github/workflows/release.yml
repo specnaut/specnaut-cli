@@ -1,0 +1,43 @@
+name: release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
+      - name: Bundle templates
+        run: deno task bundle
+      - name: Cross-compile all targets
+        run: deno run --allow-read --allow-write --allow-run --allow-env scripts/build.ts
+      - name: Compute checksums
+        run: |
+          cd dist
+          for f in *; do
+            shasum -a 256 "$f" > "$f.sha256"
+          done
+      - name: Create release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            dist/specflow-macos-x64
+            dist/specflow-macos-x64.sha256
+            dist/specflow-macos-arm64
+            dist/specflow-macos-arm64.sha256
+            dist/specflow-linux-x64
+            dist/specflow-linux-x64.sha256
+            dist/specflow-linux-arm64
+            dist/specflow-linux-arm64.sha256
+            dist/specflow-windows-x64.exe
+            dist/specflow-windows-x64.exe.sha256
+          generate_release_notes: true
