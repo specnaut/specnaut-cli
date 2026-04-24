@@ -4,29 +4,40 @@
 
 ## Vision
 
-Specflow est un **fork repensé de [GitHub Spec Kit](https://github.com/github/spec-kit)**. Kevin a beaucoup utilisé et modifié Spec Kit ; ce projet consolide ces modifications en un outil autonome.
+Specflow est un **fork amélioré du CLI `specify`** de [GitHub Spec Kit](https://github.com/github/spec-kit), distribué comme **binaire natif** (plus de pré-requis Python côté utilisateur).
 
-Différences fondamentales avec l'amont :
+Le rôle de Specflow est **exactement** celui de `specify init` upstream : scaffolder, dans un projet existant, les fichiers consommés par le harnais IA de l'utilisateur (Claude Code, Cursor, Copilot, Codex, Gemini CLI, …) — commandes SpecKit, templates de spec/plan/tasks, constitution, scripts utilitaires. **Specflow ne parle à aucun LLM. Specflow n'orchestre aucun agent. C'est le harnais de l'utilisateur qui consomme les fichiers générés.**
 
-1. **Binaire natif, pas Python** — installable sur n'importe quelle plateforme sans runtime préinstallé.
-2. **Mode automatique** — l'IA enchaîne clarify → plan → tasks → implement → checklist sans interrompre l'utilisateur à chaque étape.
-3. **Multi-agents** — rôles spécialisés (Product Owner, QA, Dev, DevOps, Security, …) qui s'appuient sur le LLM choisi (Claude, OpenAI, Gemini…) et leurs capacités respectives.
-4. **Gestion de backlog** — commande dédiée pour que le PO gère un vrai backlog, fonctionnalité absente de Spec Kit et que Kevin a déjà dû surcharger manuellement.
-5. **Sources pluggables** — l'utilisateur choisit où vivent les specs/backlog : Markdown local, GitHub Issues, GitLab, Bitbucket, etc. Pas uniquement du Markdown local.
+### Les 3 seules différences avec l'amont
 
-## Frustrations avec Spec Kit actuel
+1. **Mode automatique par défaut** — le skill/command `specify` généré enchaîne `clarify → plan → tasks → analyze → implement → review → merge` dans la même session, en ne s'arrêtant que sur (a) des clarifications nécessaires, (b) la validation pré-merge. Upstream est 100 % manuel étape par étape.
 
-- Étapes manuelles imposées à l'utilisateur à chaque transition
-- Pas de backlog : Spec Kit code une tâche à la fois, sans vision produit à plus long terme
-- Verrouillé sur Markdown local
-- Peu orienté "agents" : un seul modèle fait tout
+2. **Étape `review` post-implement** — une phase dédiée qui exécute des contrôles structurels (architecture, silent catches, exposition d'IDs internes, cache, couverture de tests) puis les quality gates (format / lint / typecheck / tests). La boucle `implement → review → fix → re-review` est scriptée dans le skill généré. Upstream n'a pas cette phase.
+
+3. **Commande `backlog` + agent Product Owner** — un système de backlog de tâches (index `tasks/backlog.md` + fichiers `tasks/backlog/NNN-slug.md` avec frontmatter typé) géré par un agent PO fourni dans les templates, avec un script de sync vers un backend distant (GitHub Issues + Project V2 en v1 ; GitLab, Bitbucket envisagés plus tard). Upstream n'a aucune notion de backlog produit.
+
+## Ce que Specflow n'est pas
+
+- Pas un harnais IA
+- Pas un orchestrateur multi-LLM
+- Pas un runtime d'agents
+- Pas un moteur de spécifications exécutable
+- Pas une réécriture de Claude Code
+
+Si la question est "est-ce que Specflow peut tourner sans que l'utilisateur ait un harnais IA ?" → **non**. Specflow écrit des fichiers que Claude Code (ou Cursor, etc.) lit pour fonctionner. Le langage du binaire est une question d'installation et de distribution, pas d'exécution.
+
+## Frustrations avec Spec Kit upstream
+
+- Étapes manuelles imposées à chaque transition (pas d'auto-chain)
+- Pas de phase `review` structurée après l'implémentation
+- Pas de notion de **backlog produit** : une feature à la fois, sans vue d'ensemble
+- Sync avec un tracker distant (GitHub Issues…) à faire à la main
 
 ## Choix techniques à trancher
 
-- **Langage** : Rust | Deno | Bun | Node — critère clé = binaire cross-platform facile à distribuer
-- **Format du backlog** : à définir (SQLite local ? JSON ? miroir d'issues distantes ?)
-- **Abstraction LLM** : à définir (couche provider unifiée ? adapters par modèle ?)
-- **Intégration harnais IA** : standalone CLI uniquement, ou aussi plugin Claude Code / Cursor / etc. ?
+- **Langage** : Rust | Go | Deno | Bun | Node — critère clé = binaire cross-platform facile à distribuer via Homebrew / `curl | sh` / GitHub Releases. Le binaire ne fait que copier des templates et piloter quelques scripts locaux (`git`, `gh`) — la charge CPU est nulle, donc le choix est un choix d'**ergonomie de distribution** et de **vélocité de développement**, pas de perf.
+- **Backlog storage** : en v1, fichiers Markdown locaux (index + un fichier par tâche) + push one-way vers GitHub Issues/Project via `gh`. Formats distants additionnels (GitLab, Bitbucket) = v2+.
+- **Harnais cibles pour le scaffolding** : upstream supporte Claude, Cursor, Copilot, Codex, Gemini, Windsurf, Qwen, etc. À décider lesquels on supporte en v0.1.
 
 ## Méthodologie observée dans `examples/` (de référence, pas à recopier)
 
