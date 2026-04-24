@@ -1,5 +1,6 @@
 import type { Bundle } from "../domain/template.ts";
 import type { Release } from "../domain/release.ts";
+import type { CheckOutcome } from "../domain/check_result.ts";
 
 export interface FsWriter {
   detectConflicts(bundle: Bundle, targetDir: string): Promise<string[]>;
@@ -73,3 +74,13 @@ export type SubprocessResult = {
   stdout: string;
   stderr: string;
 };
+
+export interface EnvironmentProbe {
+  probeGit(): Promise<CheckOutcome>;
+  probeGh(): Promise<CheckOutcome>;
+  probeDeno(): Promise<CheckOutcome>;
+}
+
+export interface ProjectInspector {
+  inspect(projectDir: string, templatesVersion: string): Promise<CheckOutcome[]>;
+}
