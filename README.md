@@ -30,7 +30,7 @@ Specflow ne parle à aucun LLM. Specflow n'orchestre aucun agent. Il faut un har
 ### curl | bash
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/kevinraimbaud/specflow/main/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/mkrlabs/specflow/main/install.sh | bash
 ```
 
 Pin a version: `VERSION=v0.1.0-alpha.1`. Change install dir: `PREFIX=$HOME/.local/bin`.
@@ -47,8 +47,8 @@ brew install specflow
 ### Manual
 
 Download the binary for your OS/arch from
-[GitHub Releases](https://github.com/kevinraimbaud/specflow/releases), run `chmod +x` and place it
-in your `$PATH`.
+[GitHub Releases](https://github.com/mkrlabs/specflow/releases), run `chmod +x` and place it in your
+`$PATH`.
 
 On macOS, you may need to clear the quarantine attribute after download:
 
@@ -73,7 +73,7 @@ local edits and avoid overwriting them. Commit this lock file with your project.
 ## Development setup
 
 ```bash
-git clone https://github.com/kevinraimbaud/specflow.git
+git clone https://github.com/mkrlabs/specflow.git
 cd specflow
 deno task setup          # installs the pre-commit hook
 deno task test           # sanity check — all green

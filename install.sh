@@ -3,14 +3,14 @@
 # verifies SHA256, and places it in $PREFIX (default /usr/local/bin).
 #
 # Usage:
-#   curl -fsSL https://raw.githubusercontent.com/kevinraimbaud/specflow/main/install.sh | bash
+#   curl -fsSL https://raw.githubusercontent.com/mkrlabs/specflow/main/install.sh | bash
 #   curl -fsSL https://.../install.sh | VERSION=v0.1.0-alpha.1 bash
 #   curl -fsSL https://.../install.sh | PREFIX=$HOME/.local/bin bash
 #   curl -fsSL https://.../install.sh | DRY_RUN=1 bash
 #
 set -euo pipefail
 
-REPO="${REPO:-kevinraimbaud/specflow}"
+REPO="${REPO:-mkrlabs/specflow}"
 PREFIX="${PREFIX:-/usr/local/bin}"
 VERSION="${VERSION:-}"
 DRY_RUN="${DRY_RUN:-}"

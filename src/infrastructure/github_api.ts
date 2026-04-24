@@ -1,7 +1,7 @@
 import type { Downloader, ReleaseChecker } from "../application/ports.ts";
 import { type Asset, Release, SemVer } from "../domain/release.ts";
 
-const DEFAULT_REPO = "kevinraimbaud/specflow";
+const DEFAULT_REPO = "mkrlabs/specflow";
 
 type RawAsset = { name: string; browser_download_url: string };
 type RawRelease = { tag_name: string; assets: RawAsset[] };

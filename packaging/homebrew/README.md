@@ -9,7 +9,7 @@ This directory ships the Homebrew formula source of truth for Specflow.
 
    ```bash
    for f in specflow-macos-arm64 specflow-macos-x64 specflow-linux-arm64 specflow-linux-x64; do
-     curl -fsSL "https://github.com/kevinraimbaud/specflow/releases/download/vX.Y.Z/${f}.sha256"
+     curl -fsSL "https://github.com/mkrlabs/specflow/releases/download/vX.Y.Z/${f}.sha256"
    done
    ```
 
