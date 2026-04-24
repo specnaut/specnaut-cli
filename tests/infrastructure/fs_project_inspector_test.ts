@@ -119,3 +119,59 @@ Deno.test("inspect warns when .specflow/config.yml is missing (optional)", async
     },
   );
 });
+
+Deno.test("inspect passes when lock templates_version matches binary", async () => {
+  await withProjectDir(
+    async (dir) => {
+      await Deno.mkdir(join(dir, ".specflow"), { recursive: true });
+      await Deno.writeTextFile(
+        join(dir, ".specflow/installed.lock"),
+        `version: 1
+templates_version: 0.2.0
+entries: {}
+`,
+      );
+    },
+    async (dir) => {
+      const inspector = new FsProjectInspector();
+      const outcomes = await inspector.inspect(dir, "0.2.0");
+      const tv = outcomes.find((o) => o.name === "templates version");
+      assertEquals(tv?.status, "pass");
+    },
+  );
+});
+
+Deno.test("inspect warns when lock templates_version differs from binary", async () => {
+  await withProjectDir(
+    async (dir) => {
+      await Deno.mkdir(join(dir, ".specflow"), { recursive: true });
+      await Deno.writeTextFile(
+        join(dir, ".specflow/installed.lock"),
+        `version: 1
+templates_version: 0.1.0
+entries: {}
+`,
+      );
+    },
+    async (dir) => {
+      const inspector = new FsProjectInspector();
+      const outcomes = await inspector.inspect(dir, "0.2.0");
+      const tv = outcomes.find((o) => o.name === "templates version");
+      assertEquals(tv?.status, "warn");
+      assertEquals(tv?.message.includes("specflow upgrade"), true);
+    },
+  );
+});
+
+Deno.test("inspect warns when no installed.lock is present", async () => {
+  await withProjectDir(
+    async (_dir) => {},
+    async (dir) => {
+      const inspector = new FsProjectInspector();
+      const outcomes = await inspector.inspect(dir, "0.2.0");
+      const tv = outcomes.find((o) => o.name === "templates version");
+      assertEquals(tv?.status, "warn");
+      assertEquals(tv?.message.includes("installed.lock"), true);
+    },
+  );
+});

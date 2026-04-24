@@ -50,6 +50,13 @@ export async function handleSelfUpdate(intent: SelfUpdateIntent): Promise<number
         return 0;
       case "updated":
         console.log(green(`✓ updated ${result.previousVersion} → ${result.newVersion}`));
+        console.log();
+        console.log(
+          dim(
+            "Don't forget to run `specflow upgrade` in each project that was\n" +
+              "previously scaffolded with `specflow init` to pull in new templates.",
+          ),
+        );
         return 0;
     }
   } catch (err) {
