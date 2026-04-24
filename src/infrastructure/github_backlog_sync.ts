@@ -2,7 +2,7 @@ import type { ApplyResult, BacklogSyncTarget, SubprocessRunner } from "../applic
 import type { BacklogTask } from "../domain/backlog/task.ts";
 import type { ExistingIssue, SyncAction } from "../domain/backlog/sync_plan.ts";
 import type { SyncConfig } from "../domain/sync_config.ts";
-import { GhCli } from "./gh_cli.ts";
+import { GhCli, type ProjectField } from "./gh_cli.ts";
 
 export class GitHubBacklogSyncTarget implements BacklogSyncTarget {
   private readonly gh: GhCli;
@@ -37,11 +37,13 @@ export class GitHubBacklogSyncTarget implements BacklogSyncTarget {
 
         case "create": {
           const number = await this.doCreate(action.task, config);
+          await this.syncToProject(number, action.task, config);
           return { ok: true, issueNumber: number, action: "create" };
         }
 
         case "update": {
           await this.doUpdate(action.task, action.issueNumber, config);
+          await this.syncToProject(action.issueNumber, action.task, config);
           return { ok: true, issueNumber: action.issueNumber, action: "update" };
         }
 
@@ -99,6 +101,66 @@ export class GitHubBacklogSyncTarget implements BacklogSyncTarget {
       await Deno.remove(bodyPath).catch(() => {});
     }
   }
+
+  private async syncToProject(
+    issueNumber: number,
+    task: BacklogTask,
+    config: SyncConfig,
+  ): Promise<void> {
+    const project = config.sync.project;
+    if (!project) return;
+
+    const projectNodeId = await this.gh.resolveProjectNodeId(project.owner, project.number);
+    const issueNodeId = await this.gh.getIssueNodeId(config.sync.repo, issueNumber);
+    const itemId = await this.gh.addProjectItem(projectNodeId, issueNodeId);
+    const fields = await this.gh.getProjectFields(projectNodeId);
+
+    const findField = (name: string): ProjectField | undefined =>
+      fields.find((f) => f.name === name);
+
+    const statusField = findField(project.fieldMap.status);
+    if (statusField && statusField.dataType === "SINGLE_SELECT") {
+      const option = statusField.options?.find(
+        (o) => normaliseStatusLabel(o.name) === task.status,
+      );
+      if (option) {
+        await this.gh.updateProjectSingleSelectField(
+          projectNodeId,
+          itemId,
+          statusField.id,
+          option.id,
+        );
+      }
+    }
+
+    const priorityField = findField(project.fieldMap.priority);
+    if (priorityField && priorityField.dataType === "NUMBER") {
+      await this.gh.updateProjectNumberField(
+        projectNodeId,
+        itemId,
+        priorityField.id,
+        priorityToNumber(task.priority),
+      );
+    }
+
+    const complexityField = findField(project.fieldMap.complexity);
+    if (complexityField && complexityField.dataType === "NUMBER") {
+      await this.gh.updateProjectNumberField(
+        projectNodeId,
+        itemId,
+        complexityField.id,
+        task.complexity,
+      );
+    }
+  }
+}
+
+function normaliseStatusLabel(label: string): string {
+  return label.toLowerCase().replace(/\s+/g, "_");
+}
+
+function priorityToNumber(p: BacklogTask["priority"]): number {
+  return { critical: 1, high: 2, medium: 3, low: 4 }[p];
 }
 
 function renderIssueBody(task: BacklogTask): string {

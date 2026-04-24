@@ -22,6 +22,13 @@ export type EditIssueInput = {
   removeLabels?: ReadonlyArray<string>;
 };
 
+export type ProjectField = {
+  id: string;
+  name: string;
+  dataType: "SINGLE_SELECT" | "NUMBER" | "TEXT" | "ITERATION" | "DATE";
+  options?: Array<{ id: string; name: string }>;
+};
+
 export class GhCli {
   constructor(private readonly runner: SubprocessRunner) {}
 
@@ -130,5 +137,94 @@ export class GhCli {
     const res = await this.runner.run("gh", args);
     if (res.code !== 0) throw new Error(`gh api graphql failed: ${res.stderr.trim()}`);
     return JSON.parse(res.stdout) as T;
+  }
+
+  async getIssueNodeId(repo: string, number: number): Promise<string> {
+    const [owner, name] = repo.split("/");
+    const query =
+      `query($owner: String!, $name: String!, $num: Int!) { repository(owner: $owner, name: $name) { issue(number: $num) { id } } }`;
+    const res = await this.runner.run("gh", [
+      "api",
+      "graphql",
+      "-f",
+      `query=${query}`,
+      "-F",
+      `owner=${owner}`,
+      "-F",
+      `name=${name}`,
+      "-F",
+      `num=${number}`,
+    ]);
+    if (res.code !== 0) throw new Error(`getIssueNodeId failed: ${res.stderr.trim()}`);
+    const parsed = JSON.parse(res.stdout) as {
+      data: { repository: { issue: { id: string } | null } };
+    };
+    const id = parsed.data.repository.issue?.id;
+    if (!id) throw new Error(`Issue #${number} not found in ${repo}`);
+    return id;
+  }
+
+  async resolveProjectNodeId(owner: string, number: number): Promise<string> {
+    const query =
+      `query($login: String!, $num: Int!) { user(login: $login) { projectV2(number: $num) { id } } organization(login: $login) { projectV2(number: $num) { id } } }`;
+    const res = await this.graphql<{
+      data: {
+        user: { projectV2: { id: string } | null } | null;
+        organization: { projectV2: { id: string } | null } | null;
+      };
+    }>(query, { login: owner, num: String(number) });
+    const id = res.data.user?.projectV2?.id ?? res.data.organization?.projectV2?.id;
+    if (!id) throw new Error(`Project #${number} not found for ${owner}`);
+    return id;
+  }
+
+  async getProjectFields(projectNodeId: string): Promise<ProjectField[]> {
+    const query =
+      `query($id: ID!) { node(id: $id) { ... on ProjectV2 { fields(first: 50) { nodes { ... on ProjectV2Field { id name dataType } ... on ProjectV2SingleSelectField { id name dataType options { id name } } } } } } }`;
+    const res = await this.graphql<{
+      data: { node: { fields: { nodes: ProjectField[] } } };
+    }>(query, { id: projectNodeId });
+    return res.data.node.fields.nodes;
+  }
+
+  async addProjectItem(projectNodeId: string, contentNodeId: string): Promise<string> {
+    const mutation =
+      `mutation($p: ID!, $c: ID!) { addProjectV2ItemById(input: {projectId: $p, contentId: $c}) { item { id } } }`;
+    const res = await this.graphql<{
+      data: { addProjectV2ItemById: { item: { id: string } } };
+    }>(mutation, { p: projectNodeId, c: contentNodeId });
+    return res.data.addProjectV2ItemById.item.id;
+  }
+
+  async updateProjectNumberField(
+    projectNodeId: string,
+    itemNodeId: string,
+    fieldNodeId: string,
+    value: number,
+  ): Promise<void> {
+    const mutation =
+      `mutation($p: ID!, $i: ID!, $f: ID!, $v: Float!) { updateProjectV2ItemFieldValue(input: { projectId: $p, itemId: $i, fieldId: $f, value: { number: $v } }) { projectV2Item { id } } }`;
+    await this.graphql(mutation, {
+      p: projectNodeId,
+      i: itemNodeId,
+      f: fieldNodeId,
+      v: String(value),
+    });
+  }
+
+  async updateProjectSingleSelectField(
+    projectNodeId: string,
+    itemNodeId: string,
+    fieldNodeId: string,
+    optionId: string,
+  ): Promise<void> {
+    const mutation =
+      `mutation($p: ID!, $i: ID!, $f: ID!, $o: String!) { updateProjectV2ItemFieldValue(input: { projectId: $p, itemId: $i, fieldId: $f, value: { singleSelectOptionId: $o } }) { projectV2Item { id } } }`;
+    await this.graphql(mutation, {
+      p: projectNodeId,
+      i: itemNodeId,
+      f: fieldNodeId,
+      o: optionId,
+    });
   }
 }
