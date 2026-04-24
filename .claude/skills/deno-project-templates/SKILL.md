@@ -21,20 +21,23 @@ This skill provides templates for creating new Deno projects with modern best pr
 
 This skill applies **only** when the user asks for a Deno project. Follow these rules:
 
-- If the user asks for a **Node.js, Python, Go, Rust, or other non-Deno project**, answer using that technology's project setup directly. Do not suggest Deno templates.
-- Only use these templates when the user explicitly asks for a Deno project or is working in a Deno environment.
-- When mentioning deprecated patterns, describe them generically. Do not write out deprecated URLs or import syntax — only show the correct modern approach.
+- If the user asks for a **Node.js, Python, Go, Rust, or other non-Deno project**, answer using that
+  technology's project setup directly. Do not suggest Deno templates.
+- Only use these templates when the user explicitly asks for a Deno project or is working in a Deno
+  environment.
+- When mentioning deprecated patterns, describe them generically. Do not write out deprecated URLs
+  or import syntax — only show the correct modern approach.
 
 ## Project Types
 
 Choose the appropriate template based on what you want to build:
 
-| Type | Use Case | Key Files |
-|------|----------|-----------|
+| Type              | Use Case                                        | Key Files                        |
+| ----------------- | ----------------------------------------------- | -------------------------------- |
 | **Fresh web app** | Full-stack web application with Fresh framework | `main.ts`, `routes/`, `islands/` |
-| **CLI tool** | Command-line application | `main.ts` with arg parsing |
-| **Library** | Reusable package to publish on JSR | `mod.ts`, `mod_test.ts` |
-| **API server** | Backend API without frontend | `main.ts` with HTTP handlers |
+| **CLI tool**      | Command-line application                        | `main.ts` with arg parsing       |
+| **Library**       | Reusable package to publish on JSR              | `mod.ts`, `mod_test.ts`          |
+| **API server**    | Backend API without frontend                    | `main.ts` with HTTP handlers     |
 
 ## Fresh Web App
 
@@ -46,6 +49,7 @@ cd my-project
 ```
 
 This creates:
+
 - `deno.json` - Project configuration and dependencies
 - `main.ts` - Server entry point
 - `client.ts` - Client entry point (CSS imports)
@@ -141,7 +145,7 @@ Create a reusable package for publishing to JSR.
 
 ### mod.ts
 
-```typescript
+````typescript
 /**
  * my-library - A Deno library
  *
@@ -163,7 +167,7 @@ Create a reusable package for publishing to JSR.
 export function greet(name: string): string {
   return `Hello, ${name}`;
 }
-```
+````
 
 ### mod_test.ts
 
@@ -236,16 +240,17 @@ deno lint             # Check for issues
 
 ## Development Commands by Project Type
 
-| Project Type | Start Development | Build/Compile |
-|--------------|-------------------|---------------|
-| Fresh | `deno task dev` (port 5173) | `deno task build` |
-| CLI | `deno task dev` | `deno task compile` |
-| Library | `deno test` | N/A |
-| API | `deno task dev` | N/A |
+| Project Type | Start Development           | Build/Compile       |
+| ------------ | --------------------------- | ------------------- |
+| Fresh        | `deno task dev` (port 5173) | `deno task build`   |
+| CLI          | `deno task dev`             | `deno task compile` |
+| Library      | `deno test`                 | N/A                 |
+| API          | `deno task dev`             | N/A                 |
 
 ## Deployment
 
 When ready to deploy:
+
 - Fresh: `deno task build && deno deploy --prod`
 - CLI: `deno task compile` (creates standalone binary)
 - Library: `deno publish` (publishes to JSR)

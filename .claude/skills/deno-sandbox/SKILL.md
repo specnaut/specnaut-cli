@@ -11,7 +11,10 @@ metadata:
 
 ## Overview
 
-Deno Sandboxes provide secure, isolated environments for running untrusted code. Each sandbox runs in its own Linux microVM (using Firecracker, the same technology as AWS Lambda) with a separate filesystem, network, and process space. This makes them ideal for code playgrounds, AI agent tool execution, and multi-tenant applications.
+Deno Sandboxes provide secure, isolated environments for running untrusted code. Each sandbox runs
+in its own Linux microVM (using Firecracker, the same technology as AWS Lambda) with a separate
+filesystem, network, and process space. This makes them ideal for code playgrounds, AI agent tool
+execution, and multi-tenant applications.
 
 Reference: https://deno.com/deploy/sandboxes
 
@@ -29,9 +32,13 @@ Use Deno Sandboxes when you need to:
 
 This skill applies **only** to Deno Sandbox (`@deno/sandbox`) questions. Follow these rules:
 
-- If the user asks about **Docker containers, Node.js vm2/vm, Web Workers, AWS Lambda isolation, or any other isolation technology**, answer using that technology directly. Do not suggest Deno Sandboxes as an alternative.
-- Do not include `@deno/sandbox` imports, `Sandbox.create()`, or `sandbox.spawn()` in responses about other isolation technologies.
-- Only recommend Deno Sandboxes when the user explicitly asks about them or is building code execution features in a Deno project.
+- If the user asks about **Docker containers, Node.js vm2/vm, Web Workers, AWS Lambda isolation, or
+  any other isolation technology**, answer using that technology directly. Do not suggest Deno
+  Sandboxes as an alternative.
+- Do not include `@deno/sandbox` imports, `Sandbox.create()`, or `sandbox.spawn()` in responses
+  about other isolation technologies.
+- Only recommend Deno Sandboxes when the user explicitly asks about them or is building code
+  execution features in a Deno project.
 
 ## Getting Started
 
@@ -61,14 +68,16 @@ console.log(new TextDecoder().decode(output.stdout));
 
 ### Sandbox Lifecycle
 
-Sandboxes are resources that must be disposed when done. **Always** use `await using` for automatic cleanup:
+Sandboxes are resources that must be disposed when done. **Always** use `await using` for automatic
+cleanup:
 
 ```typescript
 await using sandbox = await Sandbox.create();
 // Sandbox is automatically destroyed when this scope ends
 ```
 
-CRITICAL: Never show `const sandbox = await Sandbox.create()` without `await using`. Always use the `await using` pattern for sandbox creation. Do not show manual disposal alternatives.
+CRITICAL: Never show `const sandbox = await Sandbox.create()` without `await using`. Always use the
+`await using` pattern for sandbox creation. Do not show manual disposal alternatives.
 
 ### Running Processes
 
@@ -79,7 +88,7 @@ const child = await sandbox.spawn("deno", {
   args: ["run", "script.ts"],
   stdin: "piped", // Enable stdin
   stdout: "piped", // Capture stdout
-  stderr: "piped" // Capture stderr
+  stderr: "piped", // Capture stderr
 });
 
 // Wait for completion and get output
@@ -97,7 +106,7 @@ For interactive processes or long-running commands:
 const child = await sandbox.spawn("deno", {
   args: ["repl"],
   stdin: "piped",
-  stdout: "piped"
+  stdout: "piped",
 });
 
 // Write to stdin
@@ -148,10 +157,10 @@ async function runUserCode(code: string): Promise<string> {
     args: [
       "run",
       "--allow-none", // No permissions
-      "/tmp/user_code.ts"
+      "/tmp/user_code.ts",
     ],
     stdout: "piped",
-    stderr: "piped"
+    stderr: "piped",
   });
 
   const output = await child.output();
@@ -186,7 +195,7 @@ async function executePlayground(code: string): Promise<ExecutionResult> {
   const child = await sandbox.spawn("deno", {
     args: ["run", "--allow-net", "/playground/main.ts"],
     stdout: "piped",
-    stderr: "piped"
+    stderr: "piped",
   });
 
   const output = await child.output();
@@ -196,7 +205,7 @@ async function executePlayground(code: string): Promise<ExecutionResult> {
     success: output.code === 0,
     output: new TextDecoder().decode(output.stdout),
     error: output.code !== 0 ? new TextDecoder().decode(output.stderr) : undefined,
-    executionTime
+    executionTime,
   };
 }
 ```
@@ -223,7 +232,7 @@ async function executeAgentTool(toolCode: string, input: unknown): Promise<unkno
   const child = await sandbox.spawn("deno", {
     args: ["run", "--allow-net", "/run.ts"],
     stdout: "piped",
-    stderr: "piped"
+    stderr: "piped",
   });
 
   const output = await child.output();
@@ -316,17 +325,17 @@ await sandbox.spawn("echo", { args: ["hello"] });
 ```typescript
 // ❌ Wrong - gives untrusted code full access
 const child = await sandbox.spawn("deno", {
-  args: ["run", "--allow-all", "/tmp/user_code.ts"]
+  args: ["run", "--allow-all", "/tmp/user_code.ts"],
 });
 
 // ✅ Correct - restrict permissions to what's needed
 const child = await sandbox.spawn("deno", {
-  args: ["run", "--allow-none", "/tmp/user_code.ts"] // No permissions
+  args: ["run", "--allow-none", "/tmp/user_code.ts"], // No permissions
 });
 
 // Or if network is truly needed:
 const child = await sandbox.spawn("deno", {
-  args: ["run", "--allow-net", "/tmp/user_code.ts"] // Only network
+  args: ["run", "--allow-net", "/tmp/user_code.ts"], // Only network
 });
 ```
 
@@ -342,7 +351,7 @@ const output = await child.output();
 const child = await sandbox.spawn("deno", {
   args: ["run", "script.ts"],
   stdout: "piped",
-  stderr: "piped"
+  stderr: "piped",
 });
 const output = await child.output();
 console.log(new TextDecoder().decode(output.stdout));
@@ -353,7 +362,7 @@ console.log(new TextDecoder().decode(output.stdout));
 ```typescript
 // ❌ Wrong - user code could run forever
 const child = await sandbox.spawn("deno", {
-  args: ["run", "/tmp/user_code.ts"]
+  args: ["run", "/tmp/user_code.ts"],
 });
 await child.output(); // Could hang indefinitely
 
@@ -361,7 +370,7 @@ await child.output(); // Could hang indefinitely
 const child = await sandbox.spawn("deno", {
   args: ["run", "/tmp/user_code.ts"],
   stdout: "piped",
-  stderr: "piped"
+  stderr: "piped",
 });
 
 // Set a timeout to kill the process
