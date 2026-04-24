@@ -5468,8 +5468,9 @@ description: Manage the product backlog — list, add, update, groom, brief, and
 | \`status\`            | Dashboard summary                           |
 | \`groom\`             | Full grooming session                       |
 | \`brief <id>\`        | Generate PO business brief                  |
-| \`sync\`              | (Future) push all tasks to remote tracker   |
-| \`sync <id>\`         | (Future) push a single task                 |
+| \`sync\`              | Push all tasks to GitHub Issues + Project V2 (via \`specflow backlog sync\`) |
+| \`sync <id>\`         | Push a single task by id (via \`specflow backlog sync --id NNN\`) |
+| \`configure\`         | Set up \`.specflow/config.yml\` interactively (via \`specflow backlog configure\`) |
 | \`<number>\`          | Show details for task NNN                   |
 
 ## Rules
@@ -5482,9 +5483,10 @@ description: Manage the product backlog — list, add, update, groom, brief, and
    \`chore(backlog): add task NNN — <short title>\` or
    \`chore(backlog): update task NNN — <what changed>\`. Stage only
    \`tasks/backlog.md\` and \`tasks/backlog/*.md\`.
-3. The \`sync\` sub-commands currently emit a stub that tells the user the
-   feature is not yet available in this Specflow version. Do not fabricate a
-   sync behavior.
+3. After any mutation (add / update / groom / estimate), the orchestrator
+   MUST run \`specflow backlog sync --id NNN\` (or \`specflow backlog sync\` for
+   bulk mutations) to push changes to GitHub. The product-owner agent will emit
+   the appropriate sync directive.
 
 ## Backlog layout
 
@@ -5654,9 +5656,22 @@ user stories, gotchas, acceptance criteria.
 
 ### \`/backlog sync\` and \`/backlog sync <id>\`
 
-Not yet available in this Specflow version. Tell the user: "Remote backlog sync
-is planned for a future Specflow release. Your tasks are persisted locally in
-\`tasks/backlog/\` and \`tasks/backlog.md\`."
+Runs \`specflow backlog sync\` (all tasks) or \`specflow backlog sync --id NNN\`
+(single task) via shell. Preconditions:
+
+1. A config must exist at \`.specflow/config.yml\`. If missing, prompt the user to
+   run \`/backlog configure\` (which calls \`specflow backlog configure\`).
+2. \`gh\` CLI must be installed and authenticated.
+
+After every mutation from \`add\`/\`update\`/\`groom\`/\`estimate\`, you MUST emit this
+directive to the orchestrator so the sync runs immediately:
+
+> 🔄 **Sync required**: run \`specflow backlog sync --id NNN\` after commit.
+
+For \`groom\` (which mutates many tasks), emit \`specflow backlog sync\` without
+\`--id\`. The orchestrator is responsible for executing the shell command; you do
+not have Bash permission. This is non-negotiable: missing the sync creates
+silent divergence between filesystem and GitHub, and that has happened before.
 
 ## Rules
 

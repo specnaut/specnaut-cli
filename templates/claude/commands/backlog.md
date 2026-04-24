@@ -20,8 +20,9 @@ $ARGUMENTS
 | `status`            | Dashboard summary                           |
 | `groom`             | Full grooming session                       |
 | `brief <id>`        | Generate PO business brief                  |
-| `sync`              | (Future) push all tasks to remote tracker   |
-| `sync <id>`         | (Future) push a single task                 |
+| `sync`              | Push all tasks to GitHub Issues + Project V2 (via `specflow backlog sync`) |
+| `sync <id>`         | Push a single task by id (via `specflow backlog sync --id NNN`) |
+| `configure`         | Set up `.specflow/config.yml` interactively (via `specflow backlog configure`) |
 | `<number>`          | Show details for task NNN                   |
 
 ## Rules
@@ -34,9 +35,10 @@ $ARGUMENTS
    `chore(backlog): add task NNN — <short title>` or
    `chore(backlog): update task NNN — <what changed>`. Stage only
    `tasks/backlog.md` and `tasks/backlog/*.md`.
-3. The `sync` sub-commands currently emit a stub that tells the user the
-   feature is not yet available in this Specflow version. Do not fabricate a
-   sync behavior.
+3. After any mutation (add / update / groom / estimate), the orchestrator
+   MUST run `specflow backlog sync --id NNN` (or `specflow backlog sync` for
+   bulk mutations) to push changes to GitHub. The product-owner agent will emit
+   the appropriate sync directive.
 
 ## Backlog layout
 

@@ -127,9 +127,22 @@ user stories, gotchas, acceptance criteria.
 
 ### `/backlog sync` and `/backlog sync <id>`
 
-Not yet available in this Specflow version. Tell the user: "Remote backlog sync
-is planned for a future Specflow release. Your tasks are persisted locally in
-`tasks/backlog/` and `tasks/backlog.md`."
+Runs `specflow backlog sync` (all tasks) or `specflow backlog sync --id NNN`
+(single task) via shell. Preconditions:
+
+1. A config must exist at `.specflow/config.yml`. If missing, prompt the user to
+   run `/backlog configure` (which calls `specflow backlog configure`).
+2. `gh` CLI must be installed and authenticated.
+
+After every mutation from `add`/`update`/`groom`/`estimate`, you MUST emit this
+directive to the orchestrator so the sync runs immediately:
+
+> 🔄 **Sync required**: run `specflow backlog sync --id NNN` after commit.
+
+For `groom` (which mutates many tasks), emit `specflow backlog sync` without
+`--id`. The orchestrator is responsible for executing the shell command; you do
+not have Bash permission. This is non-negotiable: missing the sync creates
+silent divergence between filesystem and GitHub, and that has happened before.
 
 ## Rules
 
