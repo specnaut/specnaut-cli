@@ -10,7 +10,7 @@ function fakeFsWriter(conflicts: string[] = []): FsWriter & { written: string[] 
     detectConflicts: () => Promise.resolve(conflicts),
     writeBundle: (bundle, targetDir) => {
       for (const dest of Object.keys(bundle)) written.push(`${targetDir}:${dest}`);
-      return Promise.resolve();
+      return Promise.resolve({ backups: [] });
     },
   };
 }

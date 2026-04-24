@@ -7,9 +7,13 @@ export interface FsWriter {
   writeBundle(
     bundle: Bundle,
     targetDir: string,
-    options: { overwrite?: boolean },
-  ): Promise<void>;
+    options: { overwrite?: boolean; backupExisting?: boolean },
+  ): Promise<BackupReport>;
 }
+
+export type BackupReport = {
+  readonly backups: ReadonlyArray<{ readonly dest: string; readonly backupPath: string }>;
+};
 
 export interface GitAdapter {
   isAvailable(): Promise<boolean>;

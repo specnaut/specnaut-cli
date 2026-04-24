@@ -94,3 +94,82 @@ Deno.test("DenoFsWriter.writeBundle rejects destinations that escape the target"
     );
   });
 });
+
+Deno.test("writeBundle with backupExisting renames existing file to .specflow.bak", async () => {
+  await withTempDir(async (dir) => {
+    await Deno.mkdir(join(dir, ".claude/commands"), { recursive: true });
+    const destRel = ".claude/commands/hello.md";
+    await Deno.writeTextFile(join(dir, destRel), "OLD CONTENT");
+
+    const writer = new DenoFsWriter();
+    const report = await writer.writeBundle(
+      { [destRel]: { content: "NEW CONTENT\n", executable: false } },
+      dir,
+      { overwrite: true, backupExisting: true },
+    );
+
+    const newContent = await Deno.readTextFile(join(dir, destRel));
+    const bakContent = await Deno.readTextFile(join(dir, `${destRel}.specflow.bak`));
+    assertEquals(newContent.trim(), "NEW CONTENT");
+    assertEquals(bakContent, "OLD CONTENT");
+
+    assertEquals(report.backups.length, 1);
+    assertEquals(report.backups[0].dest, destRel);
+    assertEquals(report.backups[0].backupPath, `${destRel}.specflow.bak`);
+  });
+});
+
+Deno.test("writeBundle with backupExisting overwrites a pre-existing .specflow.bak", async () => {
+  await withTempDir(async (dir) => {
+    await Deno.mkdir(join(dir, ".claude"), { recursive: true });
+    const destRel = ".claude/x.md";
+    await Deno.writeTextFile(join(dir, destRel), "CURRENT");
+    await Deno.writeTextFile(join(dir, `${destRel}.specflow.bak`), "ANCIENT");
+
+    const writer = new DenoFsWriter();
+    await writer.writeBundle(
+      { [destRel]: { content: "NEWEST\n", executable: false } },
+      dir,
+      { overwrite: true, backupExisting: true },
+    );
+
+    const bakContent = await Deno.readTextFile(join(dir, `${destRel}.specflow.bak`));
+    assertEquals(bakContent, "CURRENT");
+  });
+});
+
+Deno.test("writeBundle without backupExisting does not create .bak files", async () => {
+  await withTempDir(async (dir) => {
+    await Deno.mkdir(join(dir, ".claude"), { recursive: true });
+    const destRel = ".claude/x.md";
+    await Deno.writeTextFile(join(dir, destRel), "OLD");
+
+    const writer = new DenoFsWriter();
+    const report = await writer.writeBundle(
+      { [destRel]: { content: "NEW\n", executable: false } },
+      dir,
+      { overwrite: true },
+    );
+
+    assertEquals(report.backups.length, 0);
+    let bakExists = true;
+    try {
+      await Deno.stat(join(dir, `${destRel}.specflow.bak`));
+    } catch {
+      bakExists = false;
+    }
+    assertEquals(bakExists, false);
+  });
+});
+
+Deno.test("writeBundle returns empty backups for fresh installs", async () => {
+  await withTempDir(async (dir) => {
+    const writer = new DenoFsWriter();
+    const report = await writer.writeBundle(
+      { ".claude/x.md": { content: "fresh", executable: false } },
+      dir,
+      { backupExisting: true },
+    );
+    assertEquals(report.backups.length, 0);
+  });
+});
