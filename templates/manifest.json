@@ -109,6 +109,11 @@
     { "source": "claude/agents/test-reviewer.md",              "destination": ".claude/agents/test-reviewer.md" },
     { "source": "claude/commands/backlog.md",        "destination": ".claude/commands/backlog.md" },
     { "source": "claude/agents/product-owner.md",    "destination": ".claude/agents/product-owner.md" },
-    { "source": "root/tasks/backlog.md",             "destination": "tasks/backlog.md" }
+    { "source": "root/tasks/backlog.md",             "destination": "tasks/backlog.md" },
+    { "source": "claude/agents/developer.md",         "destination": ".claude/agents/developer.md" },
+    { "source": "claude/agents/workflow-manager.md",  "destination": ".claude/agents/workflow-manager.md" },
+    { "source": "claude/agents/qa-tester.md",         "destination": ".claude/agents/qa-tester.md" },
+    { "source": "root/CLAUDE.md",                     "destination": "CLAUDE.md" },
+    { "source": "root/AGENTS.md",                     "destination": "AGENTS.md" }
   ]
 }
