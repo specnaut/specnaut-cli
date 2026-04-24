@@ -8,6 +8,9 @@ ${bold("Usage:")}
   specflow init <project-name>        Bootstrap a new project in ./<project-name>
   specflow init --here                Bootstrap in the current directory
   specflow self-update [--check]      Update the specflow binary
+  specflow backlog sync [--id NNN] [--dry-run] [--allow-secrets]
+                                     Sync tasks/backlog/ to GitHub Issues + Project V2
+  specflow backlog configure         Interactive setup of .specflow/config.yml
   specflow --version                  Print version
   specflow --help                     Show this help
 

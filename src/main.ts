@@ -22,6 +22,14 @@ export async function run(argv: string[]): Promise<number> {
       );
       return await handleSelfUpdate(intent);
     }
+    case "backlog-sync": {
+      const { runBacklogSync } = await import("./cli/handlers/backlog_sync_handler.ts");
+      return await runBacklogSync(intent);
+    }
+    case "backlog-configure": {
+      const { runBacklogConfigure } = await import("./cli/handlers/backlog_configure_handler.ts");
+      return await runBacklogConfigure(intent);
+    }
     case "unknown":
       console.error(red(`Unknown command: "${intent.received}"`));
       console.error(HELP);
