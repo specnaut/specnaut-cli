@@ -1,5 +1,5 @@
 import { resolve } from "@std/path";
-import { bold, green, red, yellow } from "@std/fmt/colors";
+import { bold, dim, green, red, yellow } from "@std/fmt/colors";
 import { InitProjectUseCase } from "../../application/init_project.ts";
 import { DenoFsWriter } from "../../infrastructure/deno_fs_writer.ts";
 import { DenoGit } from "../../infrastructure/deno_git.ts";
@@ -11,6 +11,7 @@ export type InitIntent = {
   here: boolean;
   noGit: boolean;
   ai: "claude";
+  force: boolean;
 };
 
 export async function runInit(intent: InitIntent): Promise<number> {
@@ -38,6 +39,7 @@ export async function runInit(intent: InitIntent): Promise<number> {
   const result = await useCase.execute({
     targetDir,
     initGit: !intent.noGit,
+    force: intent.force,
   });
 
   if (result.status === "conflicts") {
@@ -53,6 +55,7 @@ export async function runInit(intent: InitIntent): Promise<number> {
   }
 
   for (const w of result.warnings) console.error(yellow(`warn: ${w}`));
+  for (const b of result.backups) console.log(dim(`↳ backed up ${b} → ${b}.specflow.bak`));
   console.log(green(`✓ wrote ${result.filesWritten} files`));
   console.log("\nNext steps:");
   console.log(`  1. Edit ${bold("AGENTS.md")} and ${bold(".specify/memory/constitution.md")}`);

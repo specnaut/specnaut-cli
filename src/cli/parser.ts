@@ -9,6 +9,7 @@ export type Intent =
     here: boolean;
     noGit: boolean;
     ai: "claude";
+    force: boolean;
   }
   | { kind: "self-update"; checkOnly: boolean }
   | { kind: "backlog-sync"; singleId: string | null; dryRun: boolean; allowSecrets: boolean }
@@ -20,7 +21,17 @@ export function parseArgs(argv: string[]): Intent {
   if (argv.length === 0) return { kind: "help" };
 
   const parsed = stdParseArgs(argv, {
-    boolean: ["version", "help", "here", "no-git", "check", "dry-run", "allow-secrets", "project"],
+    boolean: [
+      "version",
+      "help",
+      "here",
+      "no-git",
+      "force",
+      "check",
+      "dry-run",
+      "allow-secrets",
+      "project",
+    ],
     string: ["id"],
     alias: { v: "version", h: "help" },
   });
@@ -36,6 +47,7 @@ export function parseArgs(argv: string[]): Intent {
       here: Boolean(parsed.here),
       noGit: Boolean(parsed["no-git"]),
       ai: "claude",
+      force: Boolean(parsed.force),
     };
   }
 

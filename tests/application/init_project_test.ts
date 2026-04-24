@@ -43,6 +43,7 @@ Deno.test("InitProjectUseCase writes the bundle to the target dir (happy path)",
   const result = await useCase.execute({
     targetDir: "/tmp/demo",
     initGit: true,
+    force: false,
   });
   assertEquals(result.status, "initialized");
   if (result.status === "initialized") {
@@ -62,6 +63,7 @@ Deno.test("InitProjectUseCase fails with 'conflicts' when target already has spe
   const result = await useCase.execute({
     targetDir: "/tmp/demo",
     initGit: true,
+    force: false,
   });
   assertEquals(result.status, "conflicts");
   if (result.status === "conflicts") assertEquals(result.conflicts, ["CLAUDE.md"]);
@@ -75,7 +77,7 @@ Deno.test("InitProjectUseCase calls git.init when repo not initialized and initG
     bundle,
     ensureDir: () => Promise.resolve(),
   });
-  await useCase.execute({ targetDir: "/tmp/demo", initGit: true });
+  await useCase.execute({ targetDir: "/tmp/demo", initGit: true, force: false });
   assert(initCalled.value, "git.init should have been called");
 });
 
@@ -87,7 +89,7 @@ Deno.test("InitProjectUseCase skips git.init when initGit=false", async () => {
     bundle,
     ensureDir: () => Promise.resolve(),
   });
-  await useCase.execute({ targetDir: "/tmp/demo", initGit: false });
+  await useCase.execute({ targetDir: "/tmp/demo", initGit: false, force: false });
   assertEquals(initCalled.value, false);
 });
 
@@ -99,7 +101,7 @@ Deno.test("InitProjectUseCase skips git.init when git not available", async () =
     bundle,
     ensureDir: () => Promise.resolve(),
   });
-  const result = await useCase.execute({ targetDir: "/tmp/demo", initGit: true });
+  const result = await useCase.execute({ targetDir: "/tmp/demo", initGit: true, force: false });
   assertEquals(initCalled.value, false);
   assertEquals(result.status, "initialized");
   // Warning about missing git should be in warnings
@@ -116,6 +118,58 @@ Deno.test("InitProjectUseCase skips git.init when repo already initialized", asy
     bundle,
     ensureDir: () => Promise.resolve(),
   });
-  await useCase.execute({ targetDir: "/tmp/demo", initGit: true });
+  await useCase.execute({ targetDir: "/tmp/demo", initGit: true, force: false });
   assertEquals(initCalled.value, false);
+});
+
+Deno.test("InitProjectUseCase with force=true skips conflict detection and requests backup", async () => {
+  let passedBackupExisting = false;
+  const writer: FsWriter = {
+    detectConflicts: () => {
+      throw new Error("detectConflicts should NOT be called when force=true");
+    },
+    writeBundle: (_b, _t, options) => {
+      passedBackupExisting = options?.backupExisting === true;
+      return Promise.resolve({ backups: [] });
+    },
+  };
+  const useCase = new InitProjectUseCase({
+    writer,
+    git: fakeGit(),
+    bundle,
+    ensureDir: () => Promise.resolve(),
+  });
+  const result = await useCase.execute({
+    targetDir: "/tmp/demo",
+    initGit: false,
+    force: true,
+  });
+  assertEquals(result.status, "initialized");
+  assertEquals(passedBackupExisting, true);
+});
+
+Deno.test("InitProjectUseCase returns backups array from writer report", async () => {
+  const writer: FsWriter = {
+    detectConflicts: () => Promise.resolve([]),
+    writeBundle: () =>
+      Promise.resolve({
+        backups: [
+          { dest: ".claude/x.md", backupPath: ".claude/x.md.specflow.bak" },
+        ],
+      }),
+  };
+  const useCase = new InitProjectUseCase({
+    writer,
+    git: fakeGit(),
+    bundle,
+    ensureDir: () => Promise.resolve(),
+  });
+  const result = await useCase.execute({
+    targetDir: "/tmp/demo",
+    initGit: false,
+    force: true,
+  });
+  if (result.status === "initialized") {
+    assertEquals(result.backups, [".claude/x.md"]);
+  }
 });

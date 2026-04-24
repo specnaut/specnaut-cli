@@ -2,7 +2,7 @@ import type { Bundle } from "../domain/template.ts";
 import type { FsWriter, GitAdapter } from "./ports.ts";
 
 export type InitResult =
-  | { status: "initialized"; filesWritten: number; warnings: string[] }
+  | { status: "initialized"; filesWritten: number; warnings: string[]; backups: string[] }
   | { status: "conflicts"; conflicts: string[] };
 
 export type InitProjectDeps = {
@@ -16,6 +16,7 @@ export type InitProjectDeps = {
 export type InitProjectInput = {
   targetDir: string;
   initGit: boolean;
+  force: boolean;
 };
 
 export class InitProjectUseCase {
@@ -27,12 +28,17 @@ export class InitProjectUseCase {
 
     await ensureDir(input.targetDir);
 
-    const conflicts = await writer.detectConflicts(bundle, input.targetDir);
-    if (conflicts.length > 0) {
-      return { status: "conflicts", conflicts };
+    if (!input.force) {
+      const conflicts = await writer.detectConflicts(bundle, input.targetDir);
+      if (conflicts.length > 0) {
+        return { status: "conflicts", conflicts };
+      }
     }
 
-    await writer.writeBundle(bundle, input.targetDir, { overwrite: false });
+    const report = await writer.writeBundle(bundle, input.targetDir, {
+      overwrite: input.force,
+      backupExisting: input.force,
+    });
 
     if (input.initGit) {
       const available = await git.isAvailable();
@@ -55,6 +61,7 @@ export class InitProjectUseCase {
       status: "initialized",
       filesWritten: Object.keys(bundle).length,
       warnings,
+      backups: report.backups.map((b) => b.dest),
     };
   }
 }

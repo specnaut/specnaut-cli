@@ -19,6 +19,7 @@ Deno.test("parseArgs returns init intent with a project name", () => {
     here: false,
     noGit: false,
     ai: "claude",
+    force: false,
   });
 });
 
@@ -29,6 +30,7 @@ Deno.test("parseArgs returns init intent with --here", () => {
     here: true,
     noGit: false,
     ai: "claude",
+    force: false,
   });
 });
 
@@ -39,6 +41,7 @@ Deno.test("parseArgs returns init intent with --no-git", () => {
     here: false,
     noGit: true,
     ai: "claude",
+    force: false,
   });
 });
 
@@ -95,4 +98,20 @@ Deno.test("parseArgs returns check intent without --project", () => {
 
 Deno.test("parseArgs returns check intent with --project", () => {
   assertEquals(parseArgs(["check", "--project"]), { kind: "check", projectMode: true });
+});
+
+Deno.test("parseArgs init with --force", () => {
+  assertEquals(parseArgs(["init", "demo", "--force"]), {
+    kind: "init",
+    projectName: "demo",
+    here: false,
+    noGit: false,
+    ai: "claude",
+    force: true,
+  });
+});
+
+Deno.test("parseArgs init without --force defaults to false", () => {
+  const result = parseArgs(["init", "demo"]);
+  if (result.kind === "init") assertEquals(result.force, false);
 });
