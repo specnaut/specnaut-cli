@@ -100,6 +100,7 @@
     {
       "source": "claude/commands/speckit.merge.md",
       "destination": ".claude/commands/speckit.merge.md"
-    }
+    },
+    { "source": "claude/skills/speckit/SKILL.md", "destination": ".claude/skills/speckit/SKILL.md" }
   ]
 }
