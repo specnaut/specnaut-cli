@@ -152,9 +152,8 @@ No `HARNESS_STATIC.windsurf` overlay. No `ensureSkillFrontmatter` call. No TOML.
 
 ### Expected final count
 
-Current 259 + 8 (windsurf_harness) + 1 (integration) + 1 (lock) + 1 (parser)
-
-- 2 (inspector) = **272**.
+Current 259 plus 8 (windsurf_harness) plus 1 (integration) plus 1 (lock) plus 1 (parser) plus 2
+(inspector) equals **272**.
 
 ---
 
