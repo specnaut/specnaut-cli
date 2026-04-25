@@ -22,12 +22,44 @@ export class FsProjectInspector implements ProjectInspector {
     const outcomes: CheckOutcome[] = [];
 
     outcomes.push(await this.checkDir(projectDir, ".specify/"));
-    outcomes.push(await this.checkDir(projectDir, ".claude/"));
+    outcomes.push(await this.checkHarness(projectDir));
     outcomes.push(await this.checkConstitution(projectDir));
     outcomes.push(await this.checkBacklogConfig(projectDir));
     outcomes.push(await this.checkTemplatesVersion(projectDir, templatesVersion));
 
     return outcomes;
+  }
+
+  private async checkHarness(projectDir: string): Promise<CheckOutcome> {
+    const path = join(projectDir, ".specflow/installed.lock");
+    if (!(await exists(path))) {
+      return {
+        name: "harness",
+        status: "warn",
+        message: "no installed.lock (pre-upgrade-tracking project)",
+      };
+    }
+    try {
+      const raw = await Deno.readTextFile(path);
+      const lock = parseLock(raw);
+      const expectedFolder = lock.harness === "claude" ? ".claude/" : ".cursor/";
+      const folderPresent = await exists(join(projectDir, expectedFolder));
+      if (!folderPresent) {
+        return {
+          name: "harness",
+          status: "fail",
+          message: `lock says ${lock.harness} but ${expectedFolder} is missing`,
+        };
+      }
+      return {
+        name: "harness",
+        status: "pass",
+        message: `${lock.harness} — ${expectedFolder} present`,
+      };
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      return { name: "harness", status: "fail", message: `corrupt lock — ${msg}` };
+    }
   }
 
   private async checkTemplatesVersion(

@@ -54,14 +54,16 @@ installation/distribution concern, not a runtime one.
 
 - **Language**: **Deno** (TypeScript, native compile via `deno compile`, zero-deps standard library,
   official `denoland/skills` for dev velocity).
-- **v0.1 scope — "Claude Code parity + the delta"**:
-  - Single target harness: **Claude Code** (`.claude/` + `.specify/`)
+- **v0.2 scope — multi-harness ready**:
+  - Two target harnesses: **Claude Code** (default, `.claude/` + `.specify/`) and **Cursor**
+    (`.cursor/skills/` + `.cursor/rules/` + `.specify/`) — single harness per invocation, selected
+    via `--ai claude|cursor`
   - CLI surface and behaviour equivalent to upstream `specify init`
   - The **3 differentiating features embedded by default**: auto-chain, `review` phase, backlog +
     Product Owner agent
-- **v0.1 backlog storage**: local Markdown files (index + one file per task) + one-way sync script
-  to GitHub Issues/Project V2 via `gh`. GitLab/Bitbucket in v2+.
-- **Additional harnesses** (Cursor, Copilot, Codex, Gemini, Windsurf, …): v0.2+.
+- **Backlog storage**: local Markdown files (index + one file per task) + one-way sync script to
+  GitHub Issues/Project V2 via `gh`. GitLab/Bitbucket in v2+.
+- **Additional harnesses** (Codex, Copilot, Gemini, Windsurf, …): v0.3+.
 
 ## Methodology observed in `examples/` (reference, not to copy verbatim)
 

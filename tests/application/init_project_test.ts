@@ -1,8 +1,8 @@
 import { assert, assertEquals } from "@std/assert";
 import { InitProjectUseCase } from "../../src/application/init_project.ts";
-import type { FsWriter, GitAdapter, LockStore } from "../../src/application/ports.ts";
-import type { Bundle } from "../../src/domain/template.ts";
+import type { FsWriter, GitAdapter, Harness, LockStore } from "../../src/application/ports.ts";
 import type { InstalledLock } from "../../src/domain/installed_lock.ts";
+import type { CoreBundle } from "../../src/domain/core_bundle.ts";
 
 function fakeLockStore(): LockStore & { lastWritten: InstalledLock | null } {
   const state: { lastWritten: InstalledLock | null } = { lastWritten: null };
@@ -44,9 +44,31 @@ function fakeGit(
   };
 }
 
-const bundle: Bundle = {
-  "CLAUDE.md": { content: "# hi\n", executable: false },
-};
+function fakeClaudeHarness(): Harness {
+  return {
+    key: "claude",
+    displayName: "Claude Code (fake)",
+    mapBundle: (core) => {
+      const out: Record<string, { content: string; executable: boolean }> = {};
+      for (const e of core) {
+        if (e.category === "project-root" && e.suffix) {
+          out[e.suffix] = { content: e.content, executable: e.executable };
+        }
+      }
+      return out;
+    },
+  };
+}
+
+const SAMPLE_CORE: CoreBundle = [
+  {
+    category: "project-root",
+    name: "root",
+    suffix: "CLAUDE.md",
+    content: "# hi\n",
+    executable: false,
+  },
+];
 
 Deno.test("InitProjectUseCase writes the bundle to the target dir (happy path)", async () => {
   const writer = fakeFsWriter();
@@ -54,7 +76,8 @@ Deno.test("InitProjectUseCase writes the bundle to the target dir (happy path)",
     writer,
     git: fakeGit(),
     lockStore: fakeLockStore(),
-    bundle,
+    harness: fakeClaudeHarness(),
+    core: SAMPLE_CORE,
     ensureDir: () => Promise.resolve(),
   });
   const result = await useCase.execute({
@@ -75,7 +98,8 @@ Deno.test("InitProjectUseCase fails with 'conflicts' when target already has spe
     writer,
     git: fakeGit(),
     lockStore: fakeLockStore(),
-    bundle,
+    harness: fakeClaudeHarness(),
+    core: SAMPLE_CORE,
     ensureDir: () => Promise.resolve(),
   });
   const result = await useCase.execute({
@@ -93,7 +117,8 @@ Deno.test("InitProjectUseCase calls git.init when repo not initialized and initG
     writer: fakeFsWriter(),
     git: fakeGit({ available: true, initialized: false, initCalled }),
     lockStore: fakeLockStore(),
-    bundle,
+    harness: fakeClaudeHarness(),
+    core: SAMPLE_CORE,
     ensureDir: () => Promise.resolve(),
   });
   await useCase.execute({ targetDir: "/tmp/demo", initGit: true, force: false });
@@ -106,7 +131,8 @@ Deno.test("InitProjectUseCase skips git.init when initGit=false", async () => {
     writer: fakeFsWriter(),
     git: fakeGit({ available: true, initialized: false, initCalled }),
     lockStore: fakeLockStore(),
-    bundle,
+    harness: fakeClaudeHarness(),
+    core: SAMPLE_CORE,
     ensureDir: () => Promise.resolve(),
   });
   await useCase.execute({ targetDir: "/tmp/demo", initGit: false, force: false });
@@ -119,7 +145,8 @@ Deno.test("InitProjectUseCase skips git.init when git not available", async () =
     writer: fakeFsWriter(),
     git: fakeGit({ available: false, initCalled }),
     lockStore: fakeLockStore(),
-    bundle,
+    harness: fakeClaudeHarness(),
+    core: SAMPLE_CORE,
     ensureDir: () => Promise.resolve(),
   });
   const result = await useCase.execute({ targetDir: "/tmp/demo", initGit: true, force: false });
@@ -137,7 +164,8 @@ Deno.test("InitProjectUseCase skips git.init when repo already initialized", asy
     writer: fakeFsWriter(),
     git: fakeGit({ available: true, initialized: true, initCalled }),
     lockStore: fakeLockStore(),
-    bundle,
+    harness: fakeClaudeHarness(),
+    core: SAMPLE_CORE,
     ensureDir: () => Promise.resolve(),
   });
   await useCase.execute({ targetDir: "/tmp/demo", initGit: true, force: false });
@@ -159,7 +187,8 @@ Deno.test("InitProjectUseCase with force=true skips conflict detection and reque
     writer,
     git: fakeGit(),
     lockStore: fakeLockStore(),
-    bundle,
+    harness: fakeClaudeHarness(),
+    core: SAMPLE_CORE,
     ensureDir: () => Promise.resolve(),
   });
   const result = await useCase.execute({
@@ -185,7 +214,8 @@ Deno.test("InitProjectUseCase returns backups array from writer report", async (
     writer,
     git: fakeGit(),
     lockStore: fakeLockStore(),
-    bundle,
+    harness: fakeClaudeHarness(),
+    core: SAMPLE_CORE,
     ensureDir: () => Promise.resolve(),
   });
   const result = await useCase.execute({
@@ -204,10 +234,23 @@ Deno.test("InitProjectUseCase persists an installed.lock with SHA256 of every fi
     writer: fakeFsWriter(),
     git: fakeGit(),
     lockStore,
-    bundle: {
-      "a.md": { content: "alpha", executable: false },
-      "b.md": { content: "beta", executable: false },
-    },
+    harness: fakeClaudeHarness(),
+    core: [
+      {
+        category: "project-root",
+        name: "root",
+        suffix: "a.md",
+        content: "alpha",
+        executable: false,
+      },
+      {
+        category: "project-root",
+        name: "root",
+        suffix: "b.md",
+        content: "beta",
+        executable: false,
+      },
+    ] as CoreBundle,
     ensureDir: () => Promise.resolve(),
     now: () => new Date("2026-04-25T10:00:00Z"),
   });
@@ -223,4 +266,33 @@ Deno.test("InitProjectUseCase persists an installed.lock with SHA256 of every fi
   assert(aEntry !== undefined);
   assertEquals(aEntry!.installedAt, "2026-04-25T10:00:00.000Z");
   assertEquals(aEntry!.sha256.length, 64);
+});
+
+Deno.test("InitProjectUseCase records harness.key in the installed lock", async () => {
+  const lockStore = fakeLockStore();
+  const uc = new InitProjectUseCase({
+    writer: fakeFsWriter(),
+    git: fakeGit(),
+    lockStore,
+    harness: fakeClaudeHarness(),
+    core: SAMPLE_CORE,
+    ensureDir: () => Promise.resolve(),
+  });
+  await uc.execute({ targetDir: "/tmp/demo", initGit: false, force: false });
+  assertEquals(lockStore.lastWritten?.harness, "claude");
+});
+
+Deno.test("InitProjectUseCase uses harness.mapBundle output as the file tree", async () => {
+  const writer = fakeFsWriter();
+  const uc = new InitProjectUseCase({
+    writer,
+    git: fakeGit(),
+    lockStore: fakeLockStore(),
+    harness: fakeClaudeHarness(),
+    core: SAMPLE_CORE,
+    ensureDir: () => Promise.resolve(),
+  });
+  await uc.execute({ targetDir: "/tmp/demo", initGit: false, force: false });
+  // The fake harness maps project-root suffix → flat dest.
+  assert(writer.written.includes("/tmp/demo:CLAUDE.md"));
 });

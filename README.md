@@ -18,6 +18,16 @@ to drive a spec-driven workflow inside your project. It adds three things upstre
 Specflow does not talk to any LLM. Specflow does not orchestrate any agent. You need a compatible AI
 harness (same as upstream).
 
+## Supported AI harnesses
+
+Specflow scaffolds for one AI harness per invocation:
+
+- **Claude Code** (default) — `specflow init <name>` or `--ai claude`
+- **Cursor** — `specflow init <name> --ai cursor`
+
+Additional harnesses (Codex CLI, GitHub Copilot, Gemini CLI, Windsurf, …) are planned for later
+releases. See `AGENTS.md` for the roadmap.
+
 ## Installation
 
 ### curl | bash

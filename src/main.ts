@@ -1,7 +1,8 @@
 import { red } from "@std/fmt/colors";
 import { HELP, renderVersionLine } from "./cli/help.ts";
 import { parseArgs } from "./cli/parser.ts";
-import { TEMPLATES_VERSION, VERSION } from "./domain/version.ts";
+import { VERSION } from "./domain/version.ts";
+import { TEMPLATES_VERSION } from "./templates_bundle.ts";
 
 export async function run(argv: string[]): Promise<number> {
   const intent = parseArgs(argv);

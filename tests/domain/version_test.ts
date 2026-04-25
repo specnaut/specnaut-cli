@@ -1,5 +1,6 @@
 import { assert, assertMatch } from "@std/assert";
-import { TEMPLATES_VERSION, VERSION } from "../../src/domain/version.ts";
+import { VERSION } from "../../src/domain/version.ts";
+import { TEMPLATES_VERSION } from "../../src/templates_bundle.ts";
 
 Deno.test("VERSION is a semver string", () => {
   assertMatch(VERSION, /^\d+\.\d+\.\d+(-[\w.]+)?$/);

@@ -1,7 +1,7 @@
-import type { Bundle } from "../domain/template.ts";
-import type { FsWriter, GitAdapter, LockStore } from "./ports.ts";
+import type { FsWriter, GitAdapter, Harness, LockStore } from "./ports.ts";
 import { sha256Hex } from "../domain/sha256.ts";
-import type { InstalledLock, LockEntry } from "../domain/installed_lock.ts";
+import type { InstalledLock, KnownHarness, LockEntry } from "../domain/installed_lock.ts";
+import type { CoreBundle } from "../domain/core_bundle.ts";
 import { TEMPLATES_VERSION } from "../templates_bundle.ts";
 
 export type InitResult =
@@ -18,7 +18,8 @@ export type InitProjectDeps = {
   writer: FsWriter;
   git: GitAdapter;
   lockStore: LockStore;
-  bundle: Bundle;
+  harness: Harness;
+  core: CoreBundle;
   /** Creates the target directory if it does not exist (idempotent). */
   ensureDir(path: string): Promise<void>;
   now?: () => Date; // test seam
@@ -34,10 +35,12 @@ export class InitProjectUseCase {
   constructor(private readonly deps: InitProjectDeps) {}
 
   async execute(input: InitProjectInput): Promise<InitResult> {
-    const { writer, git, lockStore, bundle, ensureDir } = this.deps;
+    const { writer, git, lockStore, harness, core, ensureDir } = this.deps;
     const warnings: string[] = [];
 
     await ensureDir(input.targetDir);
+
+    const bundle = harness.mapBundle(core);
 
     if (!input.force) {
       const conflicts = await writer.detectConflicts(bundle, input.targetDir);
@@ -51,7 +54,6 @@ export class InitProjectUseCase {
       backupExisting: input.force,
     });
 
-    // Persist the installed lock.
     const now = (this.deps.now ?? (() => new Date()))().toISOString();
     const lockEntries = new Map<string, LockEntry>();
     for (const [dest, file] of Object.entries(bundle)) {
@@ -62,7 +64,8 @@ export class InitProjectUseCase {
       });
     }
     const lock: InstalledLock = {
-      version: 1,
+      version: 2,
+      harness: harness.key as KnownHarness,
       templatesVersion: TEMPLATES_VERSION,
       entries: lockEntries,
     };

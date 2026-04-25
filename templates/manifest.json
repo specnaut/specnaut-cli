@@ -1,120 +1,51 @@
 {
-  "version": "0.1.0",
-  "files": [
-    {
-      "source": "specify/memory/constitution.md",
-      "destination": ".specify/memory/constitution.md"
-    },
-    {
-      "source": "specify/templates/spec-template.md",
-      "destination": ".specify/templates/spec-template.md"
-    },
-    {
-      "source": "specify/templates/plan-template.md",
-      "destination": ".specify/templates/plan-template.md"
-    },
-    {
-      "source": "specify/templates/tasks-template.md",
-      "destination": ".specify/templates/tasks-template.md"
-    },
-    {
-      "source": "specify/templates/checklist-template.md",
-      "destination": ".specify/templates/checklist-template.md"
-    },
-    {
-      "source": "specify/templates/constitution-template.md",
-      "destination": ".specify/templates/constitution-template.md"
-    },
-    {
-      "source": "specify/templates/agent-file-template.md",
-      "destination": ".specify/templates/agent-file-template.md"
-    },
-    {
-      "source": "specify/scripts/bash/check-prerequisites.sh",
-      "destination": ".specify/scripts/bash/check-prerequisites.sh",
-      "executable": true
-    },
-    {
-      "source": "specify/scripts/bash/common.sh",
-      "destination": ".specify/scripts/bash/common.sh",
-      "executable": true
-    },
-    {
-      "source": "specify/scripts/bash/create-new-feature.sh",
-      "destination": ".specify/scripts/bash/create-new-feature.sh",
-      "executable": true
-    },
-    {
-      "source": "specify/scripts/bash/setup-plan.sh",
-      "destination": ".specify/scripts/bash/setup-plan.sh",
-      "executable": true
-    },
-    {
-      "source": "specify/scripts/powershell/check-prerequisites.ps1",
-      "destination": ".specify/scripts/powershell/check-prerequisites.ps1"
-    },
-    {
-      "source": "specify/scripts/powershell/common.ps1",
-      "destination": ".specify/scripts/powershell/common.ps1"
-    },
-    {
-      "source": "specify/scripts/powershell/create-new-feature.ps1",
-      "destination": ".specify/scripts/powershell/create-new-feature.ps1"
-    },
-    {
-      "source": "specify/scripts/powershell/setup-plan.ps1",
-      "destination": ".specify/scripts/powershell/setup-plan.ps1"
-    },
-    {
-      "source": "claude/commands/speckit.specify.md",
-      "destination": ".claude/commands/speckit.specify.md"
-    },
-    {
-      "source": "claude/commands/speckit.clarify.md",
-      "destination": ".claude/commands/speckit.clarify.md"
-    },
-    {
-      "source": "claude/commands/speckit.plan.md",
-      "destination": ".claude/commands/speckit.plan.md"
-    },
-    {
-      "source": "claude/commands/speckit.tasks.md",
-      "destination": ".claude/commands/speckit.tasks.md"
-    },
-    {
-      "source": "claude/commands/speckit.analyze.md",
-      "destination": ".claude/commands/speckit.analyze.md"
-    },
-    {
-      "source": "claude/commands/speckit.implement.md",
-      "destination": ".claude/commands/speckit.implement.md"
-    },
-    {
-      "source": "claude/commands/speckit.constitution.md",
-      "destination": ".claude/commands/speckit.constitution.md"
-    },
-    {
-      "source": "claude/commands/speckit.checklist.md",
-      "destination": ".claude/commands/speckit.checklist.md"
-    },
-    {
-      "source": "claude/commands/speckit.merge.md",
-      "destination": ".claude/commands/speckit.merge.md"
-    },
-    { "source": "claude/skills/speckit/SKILL.md", "destination": ".claude/skills/speckit/SKILL.md" },
-    { "source": "claude/commands/speckit.review.md",           "destination": ".claude/commands/speckit.review.md" },
-    { "source": "claude/agents/review-coordinator.md",         "destination": ".claude/agents/review-coordinator.md" },
-    { "source": "claude/agents/code-reviewer.md",              "destination": ".claude/agents/code-reviewer.md" },
-    { "source": "claude/agents/security-auditor.md",           "destination": ".claude/agents/security-auditor.md" },
-    { "source": "claude/agents/test-reviewer.md",              "destination": ".claude/agents/test-reviewer.md" },
-    { "source": "claude/commands/backlog.md",        "destination": ".claude/commands/backlog.md" },
-    { "source": "claude/agents/product-owner.md",    "destination": ".claude/agents/product-owner.md" },
-    { "source": "root/tasks/backlog.md",             "destination": "tasks/backlog.md" },
-    { "source": "claude/agents/developer.md",         "destination": ".claude/agents/developer.md" },
-    { "source": "claude/agents/workflow-manager.md",  "destination": ".claude/agents/workflow-manager.md" },
-    { "source": "claude/agents/qa-tester.md",         "destination": ".claude/agents/qa-tester.md" },
-    { "source": "root/CLAUDE.md",                     "destination": "CLAUDE.md" },
-    { "source": "root/AGENTS.md",                     "destination": "AGENTS.md" },
-    { "source": "root/.gitignore",                    "destination": ".gitignore" }
+  "version": "0.3.0",
+  "core": [
+    { "category": "command", "name": "specify", "source": "core/commands/speckit.specify.md" },
+    { "category": "command", "name": "clarify", "source": "core/commands/speckit.clarify.md" },
+    { "category": "command", "name": "plan", "source": "core/commands/speckit.plan.md" },
+    { "category": "command", "name": "tasks", "source": "core/commands/speckit.tasks.md" },
+    { "category": "command", "name": "analyze", "source": "core/commands/speckit.analyze.md" },
+    { "category": "command", "name": "implement", "source": "core/commands/speckit.implement.md" },
+    { "category": "command", "name": "constitution", "source": "core/commands/speckit.constitution.md" },
+    { "category": "command", "name": "checklist", "source": "core/commands/speckit.checklist.md" },
+    { "category": "command", "name": "merge", "source": "core/commands/speckit.merge.md" },
+    { "category": "command", "name": "review", "source": "core/commands/speckit.review.md" },
+    { "category": "backlog-cmd", "name": "backlog", "source": "core/commands/backlog.md" },
+
+    { "category": "agent", "name": "product-owner", "source": "core/agents/product-owner.md" },
+    { "category": "agent", "name": "developer", "source": "core/agents/developer.md" },
+    { "category": "agent", "name": "review-coordinator", "source": "core/agents/review-coordinator.md" },
+    { "category": "agent", "name": "code-reviewer", "source": "core/agents/code-reviewer.md" },
+    { "category": "agent", "name": "security-auditor", "source": "core/agents/security-auditor.md" },
+    { "category": "agent", "name": "test-reviewer", "source": "core/agents/test-reviewer.md" },
+    { "category": "agent", "name": "qa-tester", "source": "core/agents/qa-tester.md" },
+    { "category": "agent", "name": "workflow-manager", "source": "core/agents/workflow-manager.md" },
+
+    { "category": "skill", "name": "speckit", "source": "core/skills/speckit/SKILL.md" },
+
+    { "category": "spec-root", "name": "specify", "suffix": "memory/constitution.md", "source": "core/specify/memory/constitution.md" },
+    { "category": "spec-root", "name": "specify", "suffix": "templates/spec-template.md", "source": "core/specify/templates/spec-template.md" },
+    { "category": "spec-root", "name": "specify", "suffix": "templates/plan-template.md", "source": "core/specify/templates/plan-template.md" },
+    { "category": "spec-root", "name": "specify", "suffix": "templates/tasks-template.md", "source": "core/specify/templates/tasks-template.md" },
+    { "category": "spec-root", "name": "specify", "suffix": "templates/checklist-template.md", "source": "core/specify/templates/checklist-template.md" },
+    { "category": "spec-root", "name": "specify", "suffix": "templates/constitution-template.md", "source": "core/specify/templates/constitution-template.md" },
+    { "category": "spec-root", "name": "specify", "suffix": "templates/agent-file-template.md", "source": "core/specify/templates/agent-file-template.md" },
+    { "category": "spec-root", "name": "specify", "suffix": "scripts/bash/check-prerequisites.sh", "source": "core/specify/scripts/bash/check-prerequisites.sh", "executable": true },
+    { "category": "spec-root", "name": "specify", "suffix": "scripts/bash/common.sh", "source": "core/specify/scripts/bash/common.sh", "executable": true },
+    { "category": "spec-root", "name": "specify", "suffix": "scripts/bash/create-new-feature.sh", "source": "core/specify/scripts/bash/create-new-feature.sh", "executable": true },
+    { "category": "spec-root", "name": "specify", "suffix": "scripts/bash/setup-plan.sh", "source": "core/specify/scripts/bash/setup-plan.sh", "executable": true },
+    { "category": "spec-root", "name": "specify", "suffix": "scripts/powershell/check-prerequisites.ps1", "source": "core/specify/scripts/powershell/check-prerequisites.ps1" },
+    { "category": "spec-root", "name": "specify", "suffix": "scripts/powershell/common.ps1", "source": "core/specify/scripts/powershell/common.ps1" },
+    { "category": "spec-root", "name": "specify", "suffix": "scripts/powershell/create-new-feature.ps1", "source": "core/specify/scripts/powershell/create-new-feature.ps1" },
+    { "category": "spec-root", "name": "specify", "suffix": "scripts/powershell/setup-plan.ps1", "source": "core/specify/scripts/powershell/setup-plan.ps1" },
+
+    { "category": "project-root", "name": "root", "suffix": "AGENTS.md", "source": "core/root/AGENTS.md" },
+    { "category": "project-root", "name": "root", "suffix": "tasks/backlog.md", "source": "core/root/tasks/backlog.md" },
+    { "category": "project-root", "name": "root", "suffix": ".gitignore", "source": "core/root/.gitignore" }
+  ],
+  "harness_static": [
+    { "harness": "claude", "destination": "CLAUDE.md", "source": "harness-specific/claude/CLAUDE.md" },
+    { "harness": "cursor", "destination": ".cursor/rules/specify-rules.mdc", "source": "harness-specific/cursor/specify-rules.mdc" }
   ]
 }

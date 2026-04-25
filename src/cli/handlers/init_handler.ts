@@ -1,17 +1,18 @@
 import { resolve } from "@std/path";
 import { bold, dim, green, red, yellow } from "@std/fmt/colors";
 import { InitProjectUseCase } from "../../application/init_project.ts";
+import { findHarness } from "../../application/harnesses.ts";
 import { DenoFsWriter } from "../../infrastructure/deno_fs_writer.ts";
 import { DenoGit } from "../../infrastructure/deno_git.ts";
 import { FsLockStore } from "../../infrastructure/fs_lock_store.ts";
-import { TEMPLATES } from "../../templates_bundle.ts";
+import { CORE_BUNDLE } from "../../templates_bundle.ts";
 
 export type InitIntent = {
   kind: "init";
   projectName: string | null;
   here: boolean;
   noGit: boolean;
-  ai: "claude";
+  ai: "claude" | "cursor";
   force: boolean;
 };
 
@@ -28,13 +29,20 @@ export async function runInit(intent: InitIntent): Promise<number> {
     return 2;
   }
 
+  const harness = findHarness(intent.ai);
+  if (!harness) {
+    console.error(red(`error: unknown harness '${intent.ai}'`));
+    return 2;
+  }
+
   console.log(`Initializing into ${bold(targetDir)}`);
 
   const useCase = new InitProjectUseCase({
     writer: new DenoFsWriter(),
     git: new DenoGit(),
     lockStore: new FsLockStore(),
-    bundle: TEMPLATES,
+    harness,
+    core: CORE_BUNDLE,
     ensureDir: (path) => Deno.mkdir(path, { recursive: true }),
   });
 
@@ -61,7 +69,7 @@ export async function runInit(intent: InitIntent): Promise<number> {
   console.log(green(`✓ wrote ${result.filesWritten} files`));
   console.log("\nNext steps:");
   console.log(`  1. Edit ${bold("AGENTS.md")} and ${bold(".specify/memory/constitution.md")}`);
-  console.log(`  2. Open the project in Claude Code`);
+  console.log(`  2. Open the project in ${harness.displayName}`);
   console.log(`  3. Run ${bold('/backlog add "<first task title>"')}`);
   return 0;
 }

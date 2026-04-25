@@ -48,6 +48,14 @@ sync:
   label_prefix: backlog/
 `,
   );
+  await Deno.writeTextFile(
+    join(dir, ".specflow/installed.lock"),
+    `version: 2
+harness: claude
+templates_version: 0.2.0
+entries: {}
+`,
+  );
 }
 
 Deno.test("inspect returns all-pass for well-formed project", async () => {
@@ -63,8 +71,9 @@ Deno.test("inspect returns all-pass for well-formed project", async () => {
     }
     const specify = outcomes.find((o) => o.name === ".specify/");
     assertEquals(specify?.status, "pass");
-    const claude = outcomes.find((o) => o.name === ".claude/");
-    assertEquals(claude?.status, "pass");
+    const harness = outcomes.find((o) => o.name === "harness");
+    assertEquals(harness?.status, "pass");
+    assertEquals(harness?.message.includes("claude"), true);
   });
 });
 
@@ -172,6 +181,54 @@ Deno.test("inspect warns when no installed.lock is present", async () => {
       const tv = outcomes.find((o) => o.name === "templates version");
       assertEquals(tv?.status, "warn");
       assertEquals(tv?.message.includes("installed.lock"), true);
+    },
+  );
+});
+
+Deno.test("inspect surfaces harness=claude when lock says claude and .claude/ exists", async () => {
+  await withProjectDir(
+    async (dir) => {
+      await Deno.mkdir(join(dir, ".claude"), { recursive: true });
+      await Deno.mkdir(join(dir, ".specflow"), { recursive: true });
+      await Deno.writeTextFile(
+        join(dir, ".specflow/installed.lock"),
+        `version: 2
+harness: claude
+templates_version: 0.3.0
+entries: {}
+`,
+      );
+    },
+    async (dir) => {
+      const inspector = new FsProjectInspector();
+      const outcomes = await inspector.inspect(dir, "0.3.0");
+      const h = outcomes.find((o) => o.name === "harness");
+      assertEquals(h?.status, "pass");
+      assertEquals(h?.message.includes("claude"), true);
+    },
+  );
+});
+
+Deno.test("inspect reports fail when lock harness does not match folder on disk", async () => {
+  await withProjectDir(
+    async (dir) => {
+      // lock says cursor but only .claude/ is present
+      await Deno.mkdir(join(dir, ".claude"), { recursive: true });
+      await Deno.mkdir(join(dir, ".specflow"), { recursive: true });
+      await Deno.writeTextFile(
+        join(dir, ".specflow/installed.lock"),
+        `version: 2
+harness: cursor
+templates_version: 0.3.0
+entries: {}
+`,
+      );
+    },
+    async (dir) => {
+      const inspector = new FsProjectInspector();
+      const outcomes = await inspector.inspect(dir, "0.3.0");
+      const h = outcomes.find((o) => o.name === "harness");
+      assertEquals(h?.status, "fail");
     },
   );
 });

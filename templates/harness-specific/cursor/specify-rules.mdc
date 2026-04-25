@@ -1,0 +1,51 @@
+---
+description: Specflow workflow for this project — spec-driven development with auto-chained phases, structured review, and product backlog.
+globs:
+alwaysApply: true
+---
+
+# Specflow workflow rules
+
+This project uses Specflow — an enhanced Spec Kit fork — to drive feature development through a
+spec-driven workflow. When working with the user, consult the skills below.
+
+## Workflow overview
+
+```
+
+specify → clarify → plan → tasks → analyze → implement → review → merge ▲ ▲ STOP #1 (only if
+clarifications needed) STOP #2 (pre-merge validation)
+
+```
+
+## Skills available
+
+- `/speckit-specify` — scaffold a new feature spec from a description
+- `/speckit-clarify` — resolve outstanding questions in `spec.md`
+- `/speckit-plan` — produce the implementation plan
+- `/speckit-tasks` — break the plan into tasks
+- `/speckit-analyze` — cross-artefact consistency check
+- `/speckit-implement` — run the developer → review-coordinator → qa-tester pipeline
+- `/speckit-review` — architecture + quality gates
+- `/speckit-merge` — merge the feature branch to main
+- `/specflow-backlog` — manage the product backlog (via the PO agent)
+- `/specflow-auto-chain` — auto-chain dispatcher invoked by `/speckit-specify`
+
+## Agent roles (invocable manually as skills)
+
+- `/specflow-agent-product-owner` — business guardian, backlog management
+- `/specflow-agent-developer` — implementation work
+- `/specflow-agent-review-coordinator` — parallel review orchestration
+- `/specflow-agent-code-reviewer` — code quality review
+- `/specflow-agent-security-auditor` — security review
+- `/specflow-agent-test-reviewer` — test coverage review
+- `/specflow-agent-qa-tester` — QA + test writing
+- `/specflow-agent-workflow-manager` — long-running orchestration
+
+## Project context
+
+- Constitution lives at `.specify/memory/constitution.md` — treat as non-negotiable rules.
+- Product backlog lives at `tasks/backlog.md` (index) and `tasks/backlog/NNN-*.md` (task files).
+- Project conventions: `AGENTS.md` at project root.
+
+Read the constitution and AGENTS.md before starting any significant work.

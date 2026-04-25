@@ -99,3 +99,11 @@ export interface LockStore {
 export interface FsReader {
   readText(projectDir: string, rel: string): Promise<string | null>;
 }
+
+import type { CoreBundle } from "../domain/core_bundle.ts";
+
+export interface Harness {
+  readonly key: string;
+  readonly displayName: string;
+  mapBundle(core: CoreBundle): Bundle;
+}

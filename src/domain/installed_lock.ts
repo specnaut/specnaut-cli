@@ -1,5 +1,8 @@
 import { parse as parseYaml, stringify as stringifyYaml } from "@std/yaml";
 
+export type KnownHarness = "claude" | "cursor";
+export const KNOWN_HARNESSES: ReadonlyArray<KnownHarness> = ["claude", "cursor"];
+
 export type LockEntry = {
   readonly sha256: string;
   readonly installedAt: string;
@@ -7,7 +10,8 @@ export type LockEntry = {
 };
 
 export type InstalledLock = {
-  readonly version: 1;
+  readonly version: 2;
+  readonly harness: KnownHarness;
   readonly templatesVersion: string;
   readonly entries: ReadonlyMap<string, LockEntry>;
 };
@@ -19,14 +23,29 @@ function asObject(v: unknown, name: string): Record<string, unknown> {
   return v as Record<string, unknown>;
 }
 
-export function parseLock(yaml: string): InstalledLock {
-  const root = asObject(parseYaml(yaml), "lock root");
-
-  if (root.version !== 1) {
+function assertKnownHarness(v: unknown): asserts v is KnownHarness {
+  if (typeof v !== "string" || !KNOWN_HARNESSES.includes(v as KnownHarness)) {
     throw new Error(
-      `Unsupported lock version (expected 1): ${String(root.version)}`,
+      `Unsupported harness '${String(v)}' — known: ${KNOWN_HARNESSES.join(", ")}`,
     );
   }
+}
+
+export function parseLock(yaml: string): InstalledLock {
+  const root = asObject(parseYaml(yaml), "lock root");
+  const rawVersion = root.version;
+  if (rawVersion !== 1 && rawVersion !== 2) {
+    throw new Error(`Unsupported lock version (expected 1 or 2): ${String(rawVersion)}`);
+  }
+
+  let harness: KnownHarness;
+  if (rawVersion === 2) {
+    assertKnownHarness(root.harness);
+    harness = root.harness;
+  } else {
+    harness = "claude";
+  }
+
   const templatesVersion = root.templates_version;
   if (typeof templatesVersion !== "string") {
     throw new Error("missing top-level templates_version");
@@ -38,9 +57,7 @@ export function parseLock(yaml: string): InstalledLock {
     const sha256 = entry.sha256;
     const installedAt = entry.installed_at;
     const ver = entry.templates_version;
-    if (typeof sha256 !== "string") {
-      throw new Error(`entries[${path}].sha256 must be string`);
-    }
+    if (typeof sha256 !== "string") throw new Error(`entries[${path}].sha256 must be string`);
     if (typeof installedAt !== "string") {
       throw new Error(`entries[${path}].installed_at must be string`);
     }
@@ -49,7 +66,7 @@ export function parseLock(yaml: string): InstalledLock {
     }
     entries.set(path, { sha256, installedAt, templatesVersion: ver });
   }
-  return { version: 1, templatesVersion, entries };
+  return { version: 2, harness, templatesVersion, entries };
 }
 
 export function serializeLock(lock: InstalledLock): string {
@@ -64,7 +81,8 @@ export function serializeLock(lock: InstalledLock): string {
     };
   }
   return stringifyYaml({
-    version: 1,
+    version: 2,
+    harness: lock.harness,
     templates_version: lock.templatesVersion,
     entries: entriesObj,
   });

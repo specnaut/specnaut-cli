@@ -1,7 +1,8 @@
-import type { FsReader, FsWriter, LockStore } from "./ports.ts";
+import type { FsReader, FsWriter, Harness, LockStore } from "./ports.ts";
 import type { Bundle, TemplateFile } from "../domain/template.ts";
 import { sha256Hex } from "../domain/sha256.ts";
 import type { InstalledLock, LockEntry } from "../domain/installed_lock.ts";
+import type { CoreBundle } from "../domain/core_bundle.ts";
 import { computeUpgradePlan, type UpgradePlan } from "../domain/upgrade_plan.ts";
 
 export type UpgradeProjectInput = {
@@ -30,8 +31,9 @@ export type UpgradeProjectDeps = {
   reader: FsReader;
   writer: FsWriter;
   lockStore: LockStore;
-  bundle: Bundle;
+  core: CoreBundle;
   templatesVersion: string;
+  findHarness: (key: string) => Harness | null;
   now?: () => Date;
 };
 
@@ -39,7 +41,7 @@ export class UpgradeProjectUseCase {
   constructor(private readonly deps: UpgradeProjectDeps) {}
 
   async execute(input: UpgradeProjectInput): Promise<UpgradeProjectResult> {
-    const { reader, writer, lockStore, bundle, templatesVersion } = this.deps;
+    const { reader, writer, lockStore, core, templatesVersion, findHarness } = this.deps;
 
     const lock = await lockStore.read(input.projectDir);
     if (lock === null) {
@@ -47,6 +49,11 @@ export class UpgradeProjectUseCase {
         "no .specflow/installed.lock found. Run `specflow init --here --force` to enable upgrades.",
       );
     }
+    const harness = findHarness(lock.harness);
+    if (!harness) {
+      throw new Error(`unknown harness in lock: ${lock.harness}`);
+    }
+    const bundle = harness.mapBundle(core);
 
     const destPaths = new Set<string>([
       ...Object.keys(bundle),
@@ -114,7 +121,8 @@ export class UpgradeProjectUseCase {
       });
     }
     const newLock: InstalledLock = {
-      version: 1,
+      version: 2,
+      harness: lock.harness,
       templatesVersion,
       entries: updatedEntries,
     };

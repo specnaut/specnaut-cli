@@ -8,7 +8,7 @@ export type Intent =
     projectName: string | null;
     here: boolean;
     noGit: boolean;
-    ai: "claude";
+    ai: "claude" | "cursor";
     force: boolean;
   }
   | { kind: "self-update"; checkOnly: boolean }
@@ -33,7 +33,7 @@ export function parseArgs(argv: string[]): Intent {
       "allow-secrets",
       "project",
     ],
-    string: ["id"],
+    string: ["id", "ai"],
     alias: { v: "version", h: "help" },
   });
 
@@ -42,12 +42,16 @@ export function parseArgs(argv: string[]): Intent {
 
   const [command, ...rest] = parsed._.map(String);
   if (command === "init") {
+    const aiRaw = typeof parsed.ai === "string" ? parsed.ai : "claude";
+    if (aiRaw !== "claude" && aiRaw !== "cursor") {
+      return { kind: "unknown", received: `init --ai ${aiRaw}` };
+    }
     return {
       kind: "init",
       projectName: rest[0] ?? null,
       here: Boolean(parsed.here),
       noGit: Boolean(parsed["no-git"]),
-      ai: "claude",
+      ai: aiRaw,
       force: Boolean(parsed.force),
     };
   }

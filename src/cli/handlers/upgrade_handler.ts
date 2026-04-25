@@ -1,10 +1,11 @@
 import { resolve } from "@std/path";
 import { bold, cyan, dim, green, red, yellow } from "@std/fmt/colors";
 import { UpgradeProjectUseCase } from "../../application/upgrade_project.ts";
+import { findHarness } from "../../application/harnesses.ts";
 import { DenoFsReader } from "../../infrastructure/fs_reader.ts";
 import { DenoFsWriter } from "../../infrastructure/deno_fs_writer.ts";
 import { FsLockStore } from "../../infrastructure/fs_lock_store.ts";
-import { TEMPLATES, TEMPLATES_VERSION } from "../../templates_bundle.ts";
+import { CORE_BUNDLE, TEMPLATES_VERSION } from "../../templates_bundle.ts";
 import { renderUnifiedDiff } from "../../domain/diff.ts";
 import type { UpgradePlan } from "../../domain/upgrade_plan.ts";
 
@@ -57,8 +58,9 @@ export async function runUpgrade(intent: UpgradeIntent): Promise<number> {
     reader: new DenoFsReader(),
     writer: new DenoFsWriter(),
     lockStore: new FsLockStore(),
-    bundle: TEMPLATES,
+    core: CORE_BUNDLE,
     templatesVersion: TEMPLATES_VERSION,
+    findHarness,
   });
 
   let result;
@@ -89,8 +91,13 @@ export async function runUpgrade(intent: UpgradeIntent): Promise<number> {
           "Re-run with --force to overwrite them (edits will be backed up to .specflow.bak).\n",
       ),
     );
+    // Resolve the harness from the lock to render diffs in the correct file tree.
+    const lockStore = new FsLockStore();
+    const lock = await lockStore.read(projectDir);
+    const harness = lock ? findHarness(lock.harness) : null;
+    const previewBundle = harness ? harness.mapBundle(CORE_BUNDLE) : {};
     for (const action of preserves) {
-      const file = TEMPLATES[action.dest];
+      const file = previewBundle[action.dest];
       if (!file) continue;
       const diskContent = await new DenoFsReader().readText(projectDir, action.dest);
       if (diskContent === null) continue;

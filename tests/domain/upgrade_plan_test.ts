@@ -3,14 +3,16 @@ import { computeUpgradePlan, type UpgradeAction } from "../../src/domain/upgrade
 import type { InstalledLock } from "../../src/domain/installed_lock.ts";
 
 const emptyLock: InstalledLock = {
-  version: 1,
+  version: 2,
+  harness: "claude",
   templatesVersion: "0.1.0",
   entries: new Map(),
 };
 
 function lockWith(path: string, sha: string): InstalledLock {
   return {
-    version: 1,
+    version: 2,
+    harness: "claude",
     templatesVersion: "0.1.0",
     entries: new Map([[
       path,

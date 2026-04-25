@@ -131,3 +131,20 @@ Deno.test("parseArgs returns upgrade intent with --dry-run --force", () => {
     force: true,
   });
 });
+
+Deno.test("parseArgs accepts init --ai cursor", () => {
+  const r = parseArgs(["init", "demo", "--ai", "cursor"]);
+  if (r.kind === "init") assertEquals(r.ai, "cursor");
+});
+
+Deno.test("parseArgs returns unknown for invalid --ai value", () => {
+  assertEquals(parseArgs(["init", "demo", "--ai", "bogus"]), {
+    kind: "unknown",
+    received: "init --ai bogus",
+  });
+});
+
+Deno.test("parseArgs init defaults --ai to claude", () => {
+  const r = parseArgs(["init", "demo"]);
+  if (r.kind === "init") assertEquals(r.ai, "claude");
+});

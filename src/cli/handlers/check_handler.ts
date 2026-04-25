@@ -4,7 +4,7 @@ import { RunChecksUseCase } from "../../application/run_checks.ts";
 import { DenoSubprocessRunner } from "../../infrastructure/deno_subprocess.ts";
 import { DenoEnvironmentProbe } from "../../infrastructure/deno_environment_probe.ts";
 import { FsProjectInspector } from "../../infrastructure/fs_project_inspector.ts";
-import { TEMPLATES_VERSION } from "../../domain/version.ts";
+import { TEMPLATES_VERSION } from "../../templates_bundle.ts";
 import { type CheckOutcome, worstStatusOf } from "../../domain/check_result.ts";
 
 export type CheckIntent = { kind: "check"; projectMode: boolean };
