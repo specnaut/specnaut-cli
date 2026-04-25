@@ -71,10 +71,10 @@ Deno.test("CursorHarness maps agents to .cursor/skills/specflow-agent-<name>/SKI
   assert(".cursor/skills/specflow-agent-product-owner/SKILL.md" in mapped);
 });
 
-Deno.test("CursorHarness maps the auto-chain skill to .cursor/skills/specflow-auto-chain/SKILL.md", () => {
+Deno.test("CursorHarness maps skills to .cursor/skills/specflow-<name>/SKILL.md", () => {
   const h = new CursorHarness();
   const mapped = h.mapBundle(SAMPLE);
-  assert(".cursor/skills/specflow-auto-chain/SKILL.md" in mapped);
+  assert(".cursor/skills/specflow-speckit/SKILL.md" in mapped);
 });
 
 Deno.test("CursorHarness keeps spec-root and project-root paths unchanged", () => {

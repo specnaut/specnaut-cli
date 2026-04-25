@@ -1,4 +1,4 @@
-import type { Harness } from "./ports.ts";
+import type { Harness } from "../application/ports.ts";
 import { ClaudeHarness } from "../infrastructure/harness/claude_harness.ts";
 import { CursorHarness } from "../infrastructure/harness/cursor_harness.ts";
 

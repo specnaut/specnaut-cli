@@ -1,7 +1,9 @@
 import { isAbsolute, normalize, SEPARATOR } from "@std/path";
 
-export type { TemplateFile } from "../templates_bundle.ts";
-import type { TemplateFile } from "../templates_bundle.ts";
+export type TemplateFile = {
+  content: string;
+  executable: boolean;
+};
 
 export type Bundle = Record<string, TemplateFile>;
 

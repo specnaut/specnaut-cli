@@ -1,7 +1,7 @@
 import { resolve } from "@std/path";
 import { bold, cyan, dim, green, red, yellow } from "@std/fmt/colors";
 import { UpgradeProjectUseCase } from "../../application/upgrade_project.ts";
-import { findHarness } from "../../application/harnesses.ts";
+import { findHarness } from "../harnesses.ts";
 import { DenoFsReader } from "../../infrastructure/fs_reader.ts";
 import { DenoFsWriter } from "../../infrastructure/deno_fs_writer.ts";
 import { FsLockStore } from "../../infrastructure/fs_lock_store.ts";

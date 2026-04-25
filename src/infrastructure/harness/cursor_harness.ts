@@ -13,10 +13,8 @@ function cursorSkillName(entry: CoreEntry): string {
       return `specflow-${entry.name}`;
     case "agent":
       return `specflow-agent-${entry.name}`;
-    // Only one core skill exists today (the speckit auto-chain dispatcher).
-    // If a second skill is ever added, this hardcoded mapping will collide — revisit then.
     case "skill":
-      return `specflow-auto-chain`;
+      return `specflow-${entry.name}`;
     default:
       throw new Error(`cursorSkillName not applicable for category: ${entry.category}`);
   }
