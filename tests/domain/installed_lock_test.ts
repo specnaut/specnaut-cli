@@ -169,3 +169,18 @@ entries:
   assertEquals(lock.version, 2);
   assertEquals(lock.harness, "copilot");
 });
+
+Deno.test("parseLock accepts v2 lock with harness=opencode", () => {
+  const v2 = `version: 2
+harness: opencode
+templates_version: 0.7.0
+entries:
+  .opencode/commands/specflow.specify.md:
+    sha256: ggg
+    installed_at: "2026-04-25T00:00:00Z"
+    templates_version: "0.7.0"
+`;
+  const lock = parseLock(v2);
+  assertEquals(lock.version, 2);
+  assertEquals(lock.harness, "opencode");
+});

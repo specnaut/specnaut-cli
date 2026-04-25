@@ -5,6 +5,7 @@ import { CodexHarness } from "../infrastructure/harness/codex_harness.ts";
 import { GeminiHarness } from "../infrastructure/harness/gemini_harness.ts";
 import { WindsurfHarness } from "../infrastructure/harness/windsurf_harness.ts";
 import { CopilotHarness } from "../infrastructure/harness/copilot_harness.ts";
+import { OpenCodeHarness } from "../infrastructure/harness/opencode_harness.ts";
 
 export const HARNESSES: ReadonlyArray<Harness> = [
   new ClaudeHarness(),
@@ -13,6 +14,7 @@ export const HARNESSES: ReadonlyArray<Harness> = [
   new GeminiHarness(),
   new WindsurfHarness(),
   new CopilotHarness(),
+  new OpenCodeHarness(),
 ];
 
 export function findHarness(key: string): Harness | null {

@@ -168,3 +168,9 @@ Deno.test("parseArgs accepts init --ai copilot", () => {
   const r = parseArgs(["init", "demo", "--ai", "copilot"]);
   if (r.kind === "init") assertEquals(r.ai, "copilot");
 });
+
+Deno.test("parseArgs accepts --ai opencode", () => {
+  const intent = parseArgs(["init", "demo", "--ai", "opencode"]);
+  assertEquals(intent.kind, "init");
+  if (intent.kind === "init") assertEquals(intent.ai, "opencode");
+});

@@ -6,7 +6,8 @@ export type KnownHarness =
   | "codex"
   | "gemini"
   | "windsurf"
-  | "copilot";
+  | "copilot"
+  | "opencode";
 export const KNOWN_HARNESSES: ReadonlyArray<KnownHarness> = [
   "claude",
   "cursor",
@@ -14,6 +15,7 @@ export const KNOWN_HARNESSES: ReadonlyArray<KnownHarness> = [
   "gemini",
   "windsurf",
   "copilot",
+  "opencode",
 ];
 
 export type LockEntry = {

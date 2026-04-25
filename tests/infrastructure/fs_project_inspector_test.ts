@@ -417,3 +417,27 @@ entries: {}
     },
   );
 });
+
+Deno.test("inspect reports pass when opencode harness is set and .opencode/ exists", async () => {
+  await withProjectDir(
+    async (dir) => {
+      await Deno.mkdir(join(dir, ".specflow"), { recursive: true });
+      await Deno.mkdir(join(dir, ".opencode/agents"), { recursive: true });
+      await Deno.writeTextFile(
+        join(dir, ".specflow/installed.lock"),
+        `version: 2
+harness: opencode
+templates_version: 0.7.0
+entries: {}
+`,
+      );
+    },
+    async (dir) => {
+      const inspector = new FsProjectInspector();
+      const outcomes = await inspector.inspect(dir, "0.7.0");
+      const harness = outcomes.find((o) => o.name === "harness");
+      assertEquals(harness?.status, "pass");
+      assertEquals(harness?.message, "opencode — .opencode/ present");
+    },
+  );
+});
