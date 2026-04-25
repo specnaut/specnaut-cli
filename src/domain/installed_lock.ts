@@ -1,12 +1,19 @@
 import { parse as parseYaml, stringify as stringifyYaml } from "@std/yaml";
 
-export type KnownHarness = "claude" | "cursor" | "codex" | "gemini" | "windsurf";
+export type KnownHarness =
+  | "claude"
+  | "cursor"
+  | "codex"
+  | "gemini"
+  | "windsurf"
+  | "copilot";
 export const KNOWN_HARNESSES: ReadonlyArray<KnownHarness> = [
   "claude",
   "cursor",
   "codex",
   "gemini",
   "windsurf",
+  "copilot",
 ];
 
 export type LockEntry = {

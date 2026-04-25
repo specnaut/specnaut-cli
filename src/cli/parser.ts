@@ -8,7 +8,7 @@ export type Intent =
     projectName: string | null;
     here: boolean;
     noGit: boolean;
-    ai: "claude" | "cursor" | "codex" | "gemini" | "windsurf";
+    ai: "claude" | "cursor" | "codex" | "gemini" | "windsurf" | "copilot";
     force: boolean;
   }
   | { kind: "self-update"; checkOnly: boolean }
@@ -48,7 +48,8 @@ export function parseArgs(argv: string[]): Intent {
       aiRaw !== "cursor" &&
       aiRaw !== "codex" &&
       aiRaw !== "gemini" &&
-      aiRaw !== "windsurf"
+      aiRaw !== "windsurf" &&
+      aiRaw !== "copilot"
     ) {
       return { kind: "unknown", received: `init --ai ${aiRaw}` };
     }

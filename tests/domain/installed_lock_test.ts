@@ -154,3 +154,18 @@ entries:
   assertEquals(lock.version, 2);
   assertEquals(lock.harness, "windsurf");
 });
+
+Deno.test("parseLock accepts v2 lock with harness=copilot", () => {
+  const v2 = `version: 2
+harness: copilot
+templates_version: 0.7.0
+entries:
+  .github/instructions/specflow-specify.instructions.md:
+    sha256: fff
+    installed_at: "2026-04-25T00:00:00Z"
+    templates_version: "0.7.0"
+`;
+  const lock = parseLock(v2);
+  assertEquals(lock.version, 2);
+  assertEquals(lock.harness, "copilot");
+});

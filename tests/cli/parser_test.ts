@@ -163,3 +163,8 @@ Deno.test("parseArgs accepts init --ai windsurf", () => {
   const r = parseArgs(["init", "demo", "--ai", "windsurf"]);
   if (r.kind === "init") assertEquals(r.ai, "windsurf");
 });
+
+Deno.test("parseArgs accepts init --ai copilot", () => {
+  const r = parseArgs(["init", "demo", "--ai", "copilot"]);
+  if (r.kind === "init") assertEquals(r.ai, "copilot");
+});
