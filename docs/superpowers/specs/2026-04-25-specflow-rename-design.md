@@ -138,7 +138,7 @@ produces the new tree. If that passes, the rename is consistent across the pipel
 
 ## Out of scope
 
-- Codex harness adapter (separate brick, ships as v0.3.0-alpha.2 on top of this).
+- Codex harness adapter (separate brick, rides on top of this in the same release).
 - Upgrade migration logic (Option A decided).
 - Backward-compat aliases for the old command names or old directory.
 - Rename of the `speckit` internal skill bundled under `templates/core/skills/speckit/` (this is the
