@@ -32,10 +32,10 @@ async function withProjectDir(
 }
 
 async function filledProject(dir: string) {
-  await Deno.mkdir(join(dir, ".specify/memory"), { recursive: true });
+  await Deno.mkdir(join(dir, ".specflow/memory"), { recursive: true });
   await Deno.mkdir(join(dir, ".claude/commands"), { recursive: true });
   await Deno.writeTextFile(
-    join(dir, ".specify/memory/constitution.md"),
+    join(dir, ".specflow/memory/constitution.md"),
     CONSTITUTION_FILLED,
   );
   await Deno.mkdir(join(dir, ".specflow"), { recursive: true });
@@ -69,7 +69,7 @@ Deno.test("inspect returns all-pass for well-formed project", async () => {
         `${o.name} should be pass/warn`,
       );
     }
-    const specify = outcomes.find((o) => o.name === ".specify/");
+    const specify = outcomes.find((o) => o.name === ".specflow/");
     assertEquals(specify?.status, "pass");
     const harness = outcomes.find((o) => o.name === "harness");
     assertEquals(harness?.status, "pass");
@@ -77,7 +77,7 @@ Deno.test("inspect returns all-pass for well-formed project", async () => {
   });
 });
 
-Deno.test("inspect reports fail when .specify missing", async () => {
+Deno.test("inspect reports fail when .specflow missing", async () => {
   await withProjectDir(
     async (dir) => {
       await Deno.mkdir(join(dir, ".claude"), { recursive: true });
@@ -85,7 +85,7 @@ Deno.test("inspect reports fail when .specify missing", async () => {
     async (dir) => {
       const inspector = new FsProjectInspector();
       const outcomes = await inspector.inspect(dir, "0.2.0");
-      const specify = outcomes.find((o) => o.name === ".specify/");
+      const specify = outcomes.find((o) => o.name === ".specflow/");
       assertEquals(specify?.status, "fail");
     },
   );
@@ -94,10 +94,10 @@ Deno.test("inspect reports fail when .specify missing", async () => {
 Deno.test("inspect reports warn for empty placeholder constitution", async () => {
   await withProjectDir(
     async (dir) => {
-      await Deno.mkdir(join(dir, ".specify/memory"), { recursive: true });
+      await Deno.mkdir(join(dir, ".specflow/memory"), { recursive: true });
       await Deno.mkdir(join(dir, ".claude"), { recursive: true });
       await Deno.writeTextFile(
-        join(dir, ".specify/memory/constitution.md"),
+        join(dir, ".specflow/memory/constitution.md"),
         CONSTITUTION_EMPTY_PLACEHOLDER,
       );
     },
@@ -113,10 +113,10 @@ Deno.test("inspect reports warn for empty placeholder constitution", async () =>
 Deno.test("inspect warns when .specflow/config.yml is missing (optional)", async () => {
   await withProjectDir(
     async (dir) => {
-      await Deno.mkdir(join(dir, ".specify/memory"), { recursive: true });
+      await Deno.mkdir(join(dir, ".specflow/memory"), { recursive: true });
       await Deno.mkdir(join(dir, ".claude"), { recursive: true });
       await Deno.writeTextFile(
-        join(dir, ".specify/memory/constitution.md"),
+        join(dir, ".specflow/memory/constitution.md"),
         CONSTITUTION_FILLED,
       );
     },

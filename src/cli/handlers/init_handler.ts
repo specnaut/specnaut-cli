@@ -68,7 +68,7 @@ export async function runInit(intent: InitIntent): Promise<number> {
   for (const b of result.backups) console.log(dim(`↳ backed up ${b} → ${b}.specflow.bak`));
   console.log(green(`✓ wrote ${result.filesWritten} files`));
   console.log("\nNext steps:");
-  console.log(`  1. Edit ${bold("AGENTS.md")} and ${bold(".specify/memory/constitution.md")}`);
+  console.log(`  1. Edit ${bold("AGENTS.md")} and ${bold(".specflow/memory/constitution.md")}`);
   console.log(`  2. Open the project in ${harness.displayName}`);
   console.log(`  3. Run ${bold('/backlog add "<first task title>"')}`);
   return 0;

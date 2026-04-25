@@ -49,7 +49,7 @@ Deno.test("specflow init --ai cursor scaffolds a Cursor layout", async () => {
 
     const root = join(parent, "demo");
     // Cursor-specific
-    assertEquals(await exists(join(root, ".cursor/skills/speckit-specify/SKILL.md")), true);
+    assertEquals(await exists(join(root, ".cursor/skills/specflow-specify/SKILL.md")), true);
     assertEquals(
       await exists(join(root, ".cursor/skills/specflow-agent-product-owner/SKILL.md")),
       true,
@@ -57,7 +57,7 @@ Deno.test("specflow init --ai cursor scaffolds a Cursor layout", async () => {
     assertEquals(await exists(join(root, ".cursor/skills/specflow-speckit/SKILL.md")), true);
     assertEquals(await exists(join(root, ".cursor/rules/specify-rules.mdc")), true);
     // Shared
-    assertEquals(await exists(join(root, ".specify/memory/constitution.md")), true);
+    assertEquals(await exists(join(root, ".specflow/memory/constitution.md")), true);
     assertEquals(await exists(join(root, "AGENTS.md")), true);
     assertEquals(await exists(join(root, "tasks/backlog.md")), true);
     // NOT emitted for cursor

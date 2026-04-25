@@ -21,7 +21,7 @@ export class FsProjectInspector implements ProjectInspector {
   async inspect(projectDir: string, templatesVersion: string): Promise<CheckOutcome[]> {
     const outcomes: CheckOutcome[] = [];
 
-    outcomes.push(await this.checkDir(projectDir, ".specify/"));
+    outcomes.push(await this.checkDir(projectDir, ".specflow/"));
     outcomes.push(await this.checkHarness(projectDir));
     outcomes.push(await this.checkConstitution(projectDir));
     outcomes.push(await this.checkBacklogConfig(projectDir));
@@ -105,12 +105,12 @@ export class FsProjectInspector implements ProjectInspector {
   }
 
   private async checkConstitution(projectDir: string): Promise<CheckOutcome> {
-    const path = join(projectDir, ".specify/memory/constitution.md");
+    const path = join(projectDir, ".specflow/memory/constitution.md");
     if (!(await exists(path))) {
       return {
         name: "constitution",
         status: "fail",
-        message: "missing .specify/memory/constitution.md",
+        message: "missing .specflow/memory/constitution.md",
       };
     }
     const text = await Deno.readTextFile(path);
@@ -118,7 +118,7 @@ export class FsProjectInspector implements ProjectInspector {
       return {
         name: "constitution",
         status: "warn",
-        message: "placeholder — edit .specify/memory/constitution.md",
+        message: "placeholder — edit .specflow/memory/constitution.md",
       };
     }
     return { name: "constitution", status: "pass", message: "populated" };

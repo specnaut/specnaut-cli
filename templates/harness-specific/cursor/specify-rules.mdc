@@ -20,16 +20,16 @@ clarifications needed) STOP #2 (pre-merge validation)
 
 ## Skills available
 
-- `/speckit-specify` — scaffold a new feature spec from a description
-- `/speckit-clarify` — resolve outstanding questions in `spec.md`
-- `/speckit-plan` — produce the implementation plan
-- `/speckit-tasks` — break the plan into tasks
-- `/speckit-analyze` — cross-artefact consistency check
-- `/speckit-implement` — run the developer → review-coordinator → qa-tester pipeline
-- `/speckit-review` — architecture + quality gates
-- `/speckit-merge` — merge the feature branch to main
+- `/specflow-specify` — scaffold a new feature spec from a description
+- `/specflow-clarify` — resolve outstanding questions in `spec.md`
+- `/specflow-plan` — produce the implementation plan
+- `/specflow-tasks` — break the plan into tasks
+- `/specflow-analyze` — cross-artefact consistency check
+- `/specflow-implement` — run the developer → review-coordinator → qa-tester pipeline
+- `/specflow-review` — architecture + quality gates
+- `/specflow-merge` — merge the feature branch to main
 - `/specflow-backlog` — manage the product backlog (via the PO agent)
-- `/specflow-speckit` — auto-chain dispatcher invoked by `/speckit-specify`
+- `/specflow-speckit` — auto-chain dispatcher invoked by `/specflow-specify`
 
 ## Agent roles (invocable manually as skills)
 
@@ -44,7 +44,7 @@ clarifications needed) STOP #2 (pre-merge validation)
 
 ## Project context
 
-- Constitution lives at `.specify/memory/constitution.md` — treat as non-negotiable rules.
+- Constitution lives at `.specflow/memory/constitution.md` — treat as non-negotiable rules.
 - Product backlog lives at `tasks/backlog.md` (index) and `tasks/backlog/NNN-*.md` (task files).
 - Project conventions: `AGENTS.md` at project root.
 

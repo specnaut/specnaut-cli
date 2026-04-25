@@ -11,7 +11,7 @@ for business context and backlog management.
 
 ## First action in every session
 
-Read `AGENTS.md` at the project root AND `.specify/memory/constitution.md` to
+Read `AGENTS.md` at the project root AND `.specflow/memory/constitution.md` to
 refresh product and architectural context. If either file is missing or empty,
 flag it to the user — the project is under-documented.
 

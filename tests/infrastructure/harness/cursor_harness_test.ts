@@ -53,10 +53,10 @@ Deno.test("CursorHarness.key and displayName", () => {
   assertEquals(h.displayName, "Cursor");
 });
 
-Deno.test("CursorHarness maps commands to .cursor/skills/speckit-<name>/SKILL.md", () => {
+Deno.test("CursorHarness maps commands to .cursor/skills/specflow-<name>/SKILL.md", () => {
   const h = new CursorHarness();
   const mapped = h.mapBundle(SAMPLE);
-  assert(".cursor/skills/speckit-specify/SKILL.md" in mapped);
+  assert(".cursor/skills/specflow-specify/SKILL.md" in mapped);
 });
 
 Deno.test("CursorHarness maps the backlog command to .cursor/skills/specflow-backlog/SKILL.md", () => {
@@ -77,10 +77,10 @@ Deno.test("CursorHarness maps skills to .cursor/skills/specflow-<name>/SKILL.md"
   assert(".cursor/skills/specflow-speckit/SKILL.md" in mapped);
 });
 
-Deno.test("CursorHarness keeps spec-root and project-root paths unchanged", () => {
+Deno.test("CursorHarness maps spec-root to .specflow/ and project-root unchanged", () => {
   const h = new CursorHarness();
   const mapped = h.mapBundle(SAMPLE);
-  assert(".specify/memory/constitution.md" in mapped);
+  assert(".specflow/memory/constitution.md" in mapped);
   assert("AGENTS.md" in mapped);
 });
 
@@ -94,9 +94,9 @@ Deno.test("CursorHarness injects name: frontmatter when absent", () => {
   }];
   const h = new CursorHarness();
   const mapped = h.mapBundle(withoutName);
-  const skill = mapped[".cursor/skills/speckit-specify/SKILL.md"];
+  const skill = mapped[".cursor/skills/specflow-specify/SKILL.md"];
   assert(skill?.content.startsWith("---\n"));
-  assert(skill?.content.includes("name: speckit-specify"));
+  assert(skill?.content.includes("name: specflow-specify"));
 });
 
 Deno.test("CursorHarness preserves original name: when already present", () => {
@@ -109,7 +109,7 @@ Deno.test("CursorHarness preserves original name: when already present", () => {
   }];
   const h = new CursorHarness();
   const mapped = h.mapBundle(withName);
-  const skill = mapped[".cursor/skills/speckit-specify/SKILL.md"];
+  const skill = mapped[".cursor/skills/specflow-specify/SKILL.md"];
   // Original frontmatter is preserved — we do not override a user-provided name.
   assertEquals(skill?.content.includes("name: custom-name"), true);
 });

@@ -33,7 +33,7 @@ Deno.test("RunChecksUseCase with projectDir runs both sections", async () => {
   const uc = new RunChecksUseCase({
     env: allPassEnv,
     inspector: fakeInspector([
-      { name: ".specify/", status: "pass", message: "present" },
+      { name: ".specflow/", status: "pass", message: "present" },
       { name: ".claude/", status: "pass", message: "present" },
     ]),
   });
@@ -56,10 +56,10 @@ Deno.test("RunChecksUseCase propagates failures from project inspector", async (
   const uc = new RunChecksUseCase({
     env: allPassEnv,
     inspector: fakeInspector([
-      { name: ".specify/", status: "fail", message: "missing" },
+      { name: ".specflow/", status: "fail", message: "missing" },
     ]),
   });
   const result = await uc.execute({ projectDir: "/p", templatesVersion: "0.2.0" });
-  const specify = result.project.find((o) => o.name === ".specify/");
+  const specify = result.project.find((o) => o.name === ".specflow/");
   assertEquals(specify?.status, "fail");
 });

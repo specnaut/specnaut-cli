@@ -2,7 +2,7 @@
 description: Identify underspecified areas in the current feature spec by asking up to 5 highly targeted clarification questions and encoding answers back into the spec.
 handoffs: 
   - label: Build Technical Plan
-    agent: speckit.plan
+    agent: specflow.plan
     prompt: Create a plan for the spec. I am building with...
 scripts:
    sh: scripts/bash/check-prerequisites.sh --json --paths-only
@@ -20,7 +20,7 @@ You **MUST** consider the user input before proceeding (if not empty).
 ## Pre-Execution Checks
 
 **Check for extension hooks (before clarification)**:
-- Check if `.specify/extensions.yml` exists in the project root.
+- Check if `.specflow/extensions.yml` exists in the project root.
 - If it exists, read it and look for entries under the `hooks.before_clarify` key
 - If the YAML cannot be parsed or is invalid, skip hook checking silently and continue normally
 - Filter out hooks where `enabled` is explicitly `false`. Treat hooks without an `enabled` field as enabled by default.
@@ -49,7 +49,7 @@ You **MUST** consider the user input before proceeding (if not empty).
 
     Wait for the result of the hook command before proceeding to the Outline.
     ```
-- If no hooks are registered or `.specify/extensions.yml` does not exist, skip silently
+- If no hooks are registered or `.specflow/extensions.yml` does not exist, skip silently
 
 ## Outline
 
@@ -220,7 +220,7 @@ Context for prioritization: {ARGS}
 ## Post-Execution Checks
 
 **Check for extension hooks (after clarification)**:
-Check if `.specify/extensions.yml` exists in the project root.
+Check if `.specflow/extensions.yml` exists in the project root.
 - If it exists, read it and look for entries under the `hooks.after_clarify` key
 - If the YAML cannot be parsed or is invalid, skip hook checking silently and continue normally
 - Filter out hooks where `enabled` is explicitly `false`. Treat hooks without an `enabled` field as enabled by default.
@@ -247,4 +247,4 @@ Check if `.specify/extensions.yml` exists in the project root.
     Executing: `/{command}`
     EXECUTE_COMMAND: {command}
     ```
-- If no hooks are registered or `.specify/extensions.yml` does not exist, skip silently
+- If no hooks are registered or `.specflow/extensions.yml` does not exist, skip silently

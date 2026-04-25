@@ -1,6 +1,6 @@
 ---
 name: qa-tester
-description: Audits test coverage, writes missing tests, and runs the full suite. Spawned by /speckit.implement after the review gate passes.
+description: Audits test coverage, writes missing tests, and runs the full suite. Spawned by /specflow.implement after the review gate passes.
 model: opus
 tools: Read, Write, Edit, Grep, Glob, Bash
 permissionMode: acceptEdits

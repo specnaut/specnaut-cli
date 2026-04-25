@@ -220,9 +220,9 @@ function Get-FeaturePathsEnv {
 
     # Resolve feature directory.  Priority:
     #   1. SPECIFY_FEATURE_DIRECTORY env var (explicit override)
-    #   2. .specify/feature.json "feature_directory" key (persisted by /speckit.specify)
+    #   2. .specflow/feature.json "feature_directory" key (persisted by /specflow.specify)
     #   3. Branch-name-based prefix lookup (same as scripts/bash/common.sh)
-    $featureJson = Join-Path $repoRoot '.specify/feature.json'
+    $featureJson = Join-Path $repoRoot '.specflow/feature.json'
     if ($env:SPECIFY_FEATURE_DIRECTORY) {
         $featureDir = $env:SPECIFY_FEATURE_DIRECTORY
         # Normalize relative paths to absolute under repo root
@@ -234,7 +234,7 @@ function Get-FeaturePathsEnv {
         try {
             $featureConfig = $featureJsonRaw | ConvertFrom-Json
         } catch {
-            [Console]::Error.WriteLine("ERROR: Failed to parse .specify/feature.json: $_")
+            [Console]::Error.WriteLine("ERROR: Failed to parse .specflow/feature.json: $_")
             exit 1
         }
         if ($featureConfig.feature_directory) {
@@ -303,24 +303,24 @@ function Get-Python3Command {
 }
 
 # Resolve a template name to a file path using the priority stack:
-#   1. .specify/templates/overrides/
-#   2. .specify/presets/<preset-id>/templates/ (sorted by priority from .registry)
-#   3. .specify/extensions/<ext-id>/templates/
-#   4. .specify/templates/ (core)
+#   1. .specflow/templates/overrides/
+#   2. .specflow/presets/<preset-id>/templates/ (sorted by priority from .registry)
+#   3. .specflow/extensions/<ext-id>/templates/
+#   4. .specflow/templates/ (core)
 function Resolve-Template {
     param(
         [Parameter(Mandatory=$true)][string]$TemplateName,
         [Parameter(Mandatory=$true)][string]$RepoRoot
     )
 
-    $base = Join-Path $RepoRoot '.specify/templates'
+    $base = Join-Path $RepoRoot '.specflow/templates'
 
     # Priority 1: Project overrides
     $override = Join-Path $base "overrides/$TemplateName.md"
     if (Test-Path $override) { return $override }
 
     # Priority 2: Installed presets (sorted by priority from .registry)
-    $presetsDir = Join-Path $RepoRoot '.specify/presets'
+    $presetsDir = Join-Path $RepoRoot '.specflow/presets'
     if (Test-Path $presetsDir) {
         $registryFile = Join-Path $presetsDir '.registry'
         $sortedPresets = @()
@@ -355,7 +355,7 @@ function Resolve-Template {
     }
 
     # Priority 3: Extension-provided templates
-    $extDir = Join-Path $RepoRoot '.specify/extensions'
+    $extDir = Join-Path $RepoRoot '.specflow/extensions'
     if (Test-Path $extDir) {
         foreach ($ext in Get-ChildItem -Path $extDir -Directory -ErrorAction SilentlyContinue | Where-Object { $_.Name -notlike '.*' } | Sort-Object Name) {
             $candidate = Join-Path $ext.FullName "templates/$TemplateName.md"
@@ -379,7 +379,7 @@ function Resolve-TemplateContent {
         [Parameter(Mandatory=$true)][string]$RepoRoot
     )
 
-    $base = Join-Path $RepoRoot '.specify/templates'
+    $base = Join-Path $RepoRoot '.specflow/templates'
 
     # Collect all layers (highest priority first)
     $layerPaths = @()
@@ -393,7 +393,7 @@ function Resolve-TemplateContent {
     }
 
     # Priority 2: Installed presets (sorted by priority from .registry)
-    $presetsDir = Join-Path $RepoRoot '.specify/presets'
+    $presetsDir = Join-Path $RepoRoot '.specflow/presets'
     if (Test-Path $presetsDir) {
         $registryFile = Join-Path $presetsDir '.registry'
         $sortedPresets = @()
@@ -503,7 +503,7 @@ except Exception:
     }
 
     # Priority 3: Extension-provided templates (always "replace")
-    $extDir = Join-Path $RepoRoot '.specify/extensions'
+    $extDir = Join-Path $RepoRoot '.specflow/extensions'
     if (Test-Path $extDir) {
         foreach ($ext in Get-ChildItem -Path $extDir -Directory -ErrorAction SilentlyContinue | Where-Object { $_.Name -notlike '.*' } | Sort-Object Name) {
             $candidate = Join-Path $ext.FullName "templates/$TemplateName.md"

@@ -4,3 +4,4 @@ dist/
 node_modules/
 /tmp/
 spec-kit/
+.claude/scheduled_tasks.lock

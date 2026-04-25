@@ -8,7 +8,7 @@ const FRONTMATTER_RE = /^---\n([\s\S]*?)\n---\n?([\s\S]*)$/;
 function cursorSkillName(entry: CoreEntry): string {
   switch (entry.category) {
     case "command":
-      return `speckit-${entry.name}`;
+      return `specflow-${entry.name}`;
     case "backlog-cmd":
       return `specflow-${entry.name}`;
     case "agent":
@@ -29,7 +29,7 @@ function destinationFor(entry: CoreEntry): string {
       return `.cursor/skills/${cursorSkillName(entry)}/SKILL.md`;
     case "spec-root":
       if (!entry.suffix) throw new Error(`spec-root needs suffix`);
-      return `.specify/${entry.suffix}`;
+      return `.specflow/${entry.suffix}`;
     case "project-root":
       if (!entry.suffix) throw new Error(`project-root needs suffix`);
       return entry.suffix;

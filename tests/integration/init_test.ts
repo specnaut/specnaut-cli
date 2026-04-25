@@ -48,10 +48,10 @@ Deno.test("specflow init <name> writes a complete tree", async () => {
     assertEquals(await exists(join(root, "CLAUDE.md")), true);
     assertEquals(await exists(join(root, "AGENTS.md")), true);
     assertEquals(await exists(join(root, "tasks/backlog.md")), true);
-    assertEquals(await exists(join(root, ".specify/memory/constitution.md")), true);
-    assertEquals(await exists(join(root, ".specify/templates/spec-template.md")), true);
-    assertEquals(await exists(join(root, ".claude/commands/speckit.specify.md")), true);
-    assertEquals(await exists(join(root, ".claude/commands/speckit.review.md")), true);
+    assertEquals(await exists(join(root, ".specflow/memory/constitution.md")), true);
+    assertEquals(await exists(join(root, ".specflow/templates/spec-template.md")), true);
+    assertEquals(await exists(join(root, ".claude/commands/specflow.specify.md")), true);
+    assertEquals(await exists(join(root, ".claude/commands/specflow.review.md")), true);
     assertEquals(await exists(join(root, ".claude/commands/backlog.md")), true);
     assertEquals(await exists(join(root, ".claude/agents/product-owner.md")), true);
     assertEquals(await exists(join(root, ".claude/skills/speckit/SKILL.md")), true);
@@ -70,12 +70,12 @@ Deno.test("specflow init refuses to overwrite a pre-existing .claude/", async ()
   await withTempDir(async (dir) => {
     await Deno.mkdir(join(dir, "demo/.claude/commands"), { recursive: true });
     await Deno.writeTextFile(
-      join(dir, "demo/.claude/commands/speckit.specify.md"),
+      join(dir, "demo/.claude/commands/specflow.specify.md"),
       "custom",
     );
     const { code, stderr } = await runSpecflow(["init", "demo", "--no-git"], { cwd: dir });
     assertEquals(code, 3);
-    assertStringIncludes(stderr, ".claude/commands/speckit.specify.md");
+    assertStringIncludes(stderr, ".claude/commands/specflow.specify.md");
   });
 });
 

@@ -43,10 +43,10 @@ Deno.test(
   "init --force overwrites a pre-existing .claude/ and creates .specflow.bak files",
   async () => {
     await withTempDir(async (dir) => {
-      // Pre-seed a custom .claude/commands/speckit.specify.md so init conflicts without --force
+      // Pre-seed a custom .claude/commands/specflow.specify.md so init conflicts without --force
       await Deno.mkdir(join(dir, "demo/.claude/commands"), { recursive: true });
       await Deno.writeTextFile(
-        join(dir, "demo/.claude/commands/speckit.specify.md"),
+        join(dir, "demo/.claude/commands/specflow.specify.md"),
         "CUSTOM CONTENT FROM USER",
       );
 
@@ -65,19 +65,19 @@ Deno.test(
 
       const bakPath = join(
         dir,
-        "demo/.claude/commands/speckit.specify.md.specflow.bak",
+        "demo/.claude/commands/specflow.specify.md.specflow.bak",
       );
       const bakContent = await Deno.readTextFile(bakPath);
       assertEquals(bakContent, "CUSTOM CONTENT FROM USER");
 
       const newContent = await Deno.readTextFile(
-        join(dir, "demo/.claude/commands/speckit.specify.md"),
+        join(dir, "demo/.claude/commands/specflow.specify.md"),
       );
       assertEquals(newContent.includes("CUSTOM CONTENT"), false);
 
       assertEquals(await exists(join(dir, "demo/AGENTS.md")), true);
       assertEquals(
-        await exists(join(dir, "demo/.specify/memory/constitution.md")),
+        await exists(join(dir, "demo/.specflow/memory/constitution.md")),
         true,
       );
     });

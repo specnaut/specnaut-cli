@@ -1,6 +1,6 @@
 ---
 name: review-coordinator
-description: Coordinates parallel structural review agents (code, security, tests) and aggregates their findings. Use when /speckit.review is running Phase 1.
+description: Coordinates parallel structural review agents (code, security, tests) and aggregates their findings. Use when /specflow.review is running Phase 1.
 model: sonnet
 tools: Read, Grep, Glob, Bash, Agent(code-reviewer, security-auditor, test-reviewer)
 maxTurns: 30
@@ -12,7 +12,7 @@ in parallel and aggregate results.
 ## Inputs
 
 - The list of files changed in the current feature branch (provided by
-  `/speckit.review`).
+  `/specflow.review`).
 
 ## Protocol
 

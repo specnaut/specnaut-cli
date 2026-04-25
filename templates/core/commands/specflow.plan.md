@@ -2,11 +2,11 @@
 description: Execute the implementation planning workflow using the plan template to generate design artifacts.
 handoffs: 
   - label: Create Tasks
-    agent: speckit.tasks
+    agent: specflow.tasks
     prompt: Break the plan into tasks
     send: true
   - label: Create Checklist
-    agent: speckit.checklist
+    agent: specflow.checklist
     prompt: Create a checklist for the following domain...
 scripts:
   sh: scripts/bash/setup-plan.sh --json
@@ -24,7 +24,7 @@ You **MUST** consider the user input before proceeding (if not empty).
 ## Pre-Execution Checks
 
 **Check for extension hooks (before planning)**:
-- Check if `.specify/extensions.yml` exists in the project root.
+- Check if `.specflow/extensions.yml` exists in the project root.
 - If it exists, read it and look for entries under the `hooks.before_plan` key
 - If the YAML cannot be parsed or is invalid, skip hook checking silently and continue normally
 - Filter out hooks where `enabled` is explicitly `false`. Treat hooks without an `enabled` field as enabled by default.
@@ -53,7 +53,7 @@ You **MUST** consider the user input before proceeding (if not empty).
 
     Wait for the result of the hook command before proceeding to the Outline.
     ```
-- If no hooks are registered or `.specify/extensions.yml` does not exist, skip silently
+- If no hooks are registered or `.specflow/extensions.yml` does not exist, skip silently
 
 ## Outline
 
@@ -72,7 +72,7 @@ You **MUST** consider the user input before proceeding (if not empty).
 
 4. **Stop and report**: Command ends after Phase 2 planning. Report branch, IMPL_PLAN path, and generated artifacts.
 
-5. **Check for extension hooks**: After reporting, check if `.specify/extensions.yml` exists in the project root.
+5. **Check for extension hooks**: After reporting, check if `.specflow/extensions.yml` exists in the project root.
    - If it exists, read it and look for entries under the `hooks.after_plan` key
    - If the YAML cannot be parsed or is invalid, skip hook checking silently and continue normally
    - Filter out hooks where `enabled` is explicitly `false`. Treat hooks without an `enabled` field as enabled by default.
@@ -99,7 +99,7 @@ You **MUST** consider the user input before proceeding (if not empty).
        Executing: `/{command}`
        EXECUTE_COMMAND: {command}
        ```
-   - If no hooks are registered or `.specify/extensions.yml` does not exist, skip silently
+   - If no hooks are registered or `.specflow/extensions.yml` does not exist, skip silently
 
 ## Phases
 

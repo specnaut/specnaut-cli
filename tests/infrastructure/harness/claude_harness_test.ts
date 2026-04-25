@@ -8,17 +8,17 @@ Deno.test("ClaudeHarness.key and displayName", () => {
   assertEquals(h.displayName, "Claude Code");
 });
 
-Deno.test("ClaudeHarness.mapBundle emits the v0.2-era Claude tree", () => {
+Deno.test("ClaudeHarness.mapBundle emits the Claude tree", () => {
   const h = new ClaudeHarness();
   const mapped = h.mapBundle(CORE_BUNDLE);
   const keys = Object.keys(mapped).sort();
   assertEquals(keys.length, 39); // 38 core + CLAUDE.md
   // Spot-check canonical paths
-  assert(".claude/commands/speckit.specify.md" in mapped);
+  assert(".claude/commands/specflow.specify.md" in mapped);
   assert(".claude/commands/backlog.md" in mapped);
   assert(".claude/agents/product-owner.md" in mapped);
   assert(".claude/skills/speckit/SKILL.md" in mapped);
-  assert(".specify/memory/constitution.md" in mapped);
+  assert(".specflow/memory/constitution.md" in mapped);
   assert("AGENTS.md" in mapped);
   assert("CLAUDE.md" in mapped);
 });

@@ -6,7 +6,7 @@ import { HARNESS_STATIC } from "../../templates_bundle.ts";
 function destinationFor(entry: CoreEntry): string {
   switch (entry.category) {
     case "command":
-      return `.claude/commands/speckit.${entry.name}.md`;
+      return `.claude/commands/specflow.${entry.name}.md`;
     case "backlog-cmd":
       return `.claude/commands/${entry.name}.md`;
     case "agent":
@@ -15,7 +15,7 @@ function destinationFor(entry: CoreEntry): string {
       return `.claude/skills/${entry.name}/SKILL.md`;
     case "spec-root":
       if (!entry.suffix) throw new Error(`spec-root entry needs suffix: ${entry.name}`);
-      return `.specify/${entry.suffix}`;
+      return `.specflow/${entry.suffix}`;
     case "project-root":
       if (!entry.suffix) throw new Error(`project-root entry needs suffix: ${entry.name}`);
       return entry.suffix;

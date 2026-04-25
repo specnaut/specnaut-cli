@@ -23,7 +23,7 @@ Spawn the `review-coordinator` agent with the list of changed files. It in turn
 spawns:
 
 - `code-reviewer` (always) — architecture, DRY, YAGNI, readability, alignment
-  with `.specify/memory/constitution.md`.
+  with `.specflow/memory/constitution.md`.
 - `security-auditor` (always) — input validation, auth/authz, secret handling,
   SQL/command injection, path traversal, silent catches that swallow errors.
 - `test-reviewer` (if test files are in the diff) — adequacy of coverage, test
@@ -84,5 +84,5 @@ Remaining findings (MEDIUM/LOW, non-blocking)
 Overall: PASS | FAIL
 ```
 
-If Overall = PASS, invoke `/speckit.merge` (or hand back to the auto-chain for
+If Overall = PASS, invoke `/specflow.merge` (or hand back to the auto-chain for
 STOP #2). If FAIL, stop and report to the user.

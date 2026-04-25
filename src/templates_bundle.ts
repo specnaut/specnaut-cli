@@ -13,10 +13,10 @@ export const CORE_BUNDLE: CoreBundle = [
 description: Create or update the feature specification from a natural language feature description.
 handoffs: 
   - label: Build Technical Plan
-    agent: speckit.plan
+    agent: specflow.plan
     prompt: Create a plan for the spec. I am building with...
   - label: Clarify Spec Requirements
-    agent: speckit.clarify
+    agent: specflow.clarify
     prompt: Clarify specification requirements
     send: true
 ---
@@ -32,7 +32,7 @@ You **MUST** consider the user input before proceeding (if not empty).
 ## Pre-Execution Checks
 
 **Check for extension hooks (before specification)**:
-- Check if \`.specify/extensions.yml\` exists in the project root.
+- Check if \`.specflow/extensions.yml\` exists in the project root.
 - If it exists, read it and look for entries under the \`hooks.before_specify\` key
 - If the YAML cannot be parsed or is invalid, skip hook checking silently and continue normally
 - Filter out hooks where \`enabled\` is explicitly \`false\`. Treat hooks without an \`enabled\` field as enabled by default.
@@ -61,7 +61,7 @@ You **MUST** consider the user input before proceeding (if not empty).
 
     Wait for the result of the hook command before proceeding to the Outline.
     \`\`\`
-- If no hooks are registered or \`.specify/extensions.yml\` does not exist, skip silently
+- If no hooks are registered or \`.specflow/extensions.yml\` does not exist, skip silently
 
 ## Outline
 
@@ -94,7 +94,7 @@ Given that feature description, do this:
    **Resolution order for \`SPECIFY_FEATURE_DIRECTORY\`**:
    1. If the user explicitly provided \`SPECIFY_FEATURE_DIRECTORY\` (e.g., via environment variable, argument, or configuration), use it as-is
    2. Otherwise, auto-generate it under \`specs/\`:
-      - Check \`.specify/init-options.json\` for \`branch_numbering\`
+      - Check \`.specflow/init-options.json\` for \`branch_numbering\`
       - If \`"timestamp"\`: prefix is \`YYYYMMDD-HHMMSS\` (current timestamp)
       - If \`"sequential"\` or absent: prefix is \`NNN\` (next available 3-digit number after scanning existing directories in \`specs/\`)
       - Construct the directory name: \`<prefix>-<short-name>\` (e.g., \`003-user-auth\` or \`20260319-143022-user-auth\`)
@@ -104,7 +104,7 @@ Given that feature description, do this:
    - \`mkdir -p SPECIFY_FEATURE_DIRECTORY\`
    - Copy \`templates/spec-template.md\` to \`SPECIFY_FEATURE_DIRECTORY/spec.md\` as the starting point
    - Set \`SPEC_FILE\` to \`SPECIFY_FEATURE_DIRECTORY/spec.md\`
-   - Persist the resolved path to \`.specify/feature.json\`:
+   - Persist the resolved path to \`.specflow/feature.json\`:
      \`\`\`json
      {
        "feature_directory": "<resolved feature dir>"
@@ -245,7 +245,7 @@ Given that feature description, do this:
    - Checklist results summary
    - Readiness for the next phase (\`__SPECKIT_COMMAND_CLARIFY__\` or \`__SPECKIT_COMMAND_PLAN__\`)
 
-9. **Check for extension hooks**: After reporting completion, check if \`.specify/extensions.yml\` exists in the project root.
+9. **Check for extension hooks**: After reporting completion, check if \`.specflow/extensions.yml\` exists in the project root.
    - If it exists, read it and look for entries under the \`hooks.after_specify\` key
    - If the YAML cannot be parsed or is invalid, skip hook checking silently and continue normally
    - Filter out hooks where \`enabled\` is explicitly \`false\`. Treat hooks without an \`enabled\` field as enabled by default.
@@ -272,7 +272,7 @@ Given that feature description, do this:
        Executing: \`/{command}\`
        EXECUTE_COMMAND: {command}
        \`\`\`
-   - If no hooks are registered or \`.specify/extensions.yml\` does not exist, skip silently
+   - If no hooks are registered or \`.specflow/extensions.yml\` does not exist, skip silently
 
 **NOTE:** Branch creation is handled by the \`before_specify\` hook (git extension). Spec directory and file creation are always handled by this core command.
 
@@ -347,7 +347,7 @@ Success criteria must be:
 description: Identify underspecified areas in the current feature spec by asking up to 5 highly targeted clarification questions and encoding answers back into the spec.
 handoffs: 
   - label: Build Technical Plan
-    agent: speckit.plan
+    agent: specflow.plan
     prompt: Create a plan for the spec. I am building with...
 scripts:
    sh: scripts/bash/check-prerequisites.sh --json --paths-only
@@ -365,7 +365,7 @@ You **MUST** consider the user input before proceeding (if not empty).
 ## Pre-Execution Checks
 
 **Check for extension hooks (before clarification)**:
-- Check if \`.specify/extensions.yml\` exists in the project root.
+- Check if \`.specflow/extensions.yml\` exists in the project root.
 - If it exists, read it and look for entries under the \`hooks.before_clarify\` key
 - If the YAML cannot be parsed or is invalid, skip hook checking silently and continue normally
 - Filter out hooks where \`enabled\` is explicitly \`false\`. Treat hooks without an \`enabled\` field as enabled by default.
@@ -394,7 +394,7 @@ You **MUST** consider the user input before proceeding (if not empty).
 
     Wait for the result of the hook command before proceeding to the Outline.
     \`\`\`
-- If no hooks are registered or \`.specify/extensions.yml\` does not exist, skip silently
+- If no hooks are registered or \`.specflow/extensions.yml\` does not exist, skip silently
 
 ## Outline
 
@@ -565,7 +565,7 @@ Context for prioritization: {ARGS}
 ## Post-Execution Checks
 
 **Check for extension hooks (after clarification)**:
-Check if \`.specify/extensions.yml\` exists in the project root.
+Check if \`.specflow/extensions.yml\` exists in the project root.
 - If it exists, read it and look for entries under the \`hooks.after_clarify\` key
 - If the YAML cannot be parsed or is invalid, skip hook checking silently and continue normally
 - Filter out hooks where \`enabled\` is explicitly \`false\`. Treat hooks without an \`enabled\` field as enabled by default.
@@ -592,7 +592,7 @@ Check if \`.specify/extensions.yml\` exists in the project root.
     Executing: \`/{command}\`
     EXECUTE_COMMAND: {command}
     \`\`\`
-- If no hooks are registered or \`.specify/extensions.yml\` does not exist, skip silently
+- If no hooks are registered or \`.specflow/extensions.yml\` does not exist, skip silently
 `,
     executable: false,
   },
@@ -604,11 +604,11 @@ Check if \`.specify/extensions.yml\` exists in the project root.
 description: Execute the implementation planning workflow using the plan template to generate design artifacts.
 handoffs: 
   - label: Create Tasks
-    agent: speckit.tasks
+    agent: specflow.tasks
     prompt: Break the plan into tasks
     send: true
   - label: Create Checklist
-    agent: speckit.checklist
+    agent: specflow.checklist
     prompt: Create a checklist for the following domain...
 scripts:
   sh: scripts/bash/setup-plan.sh --json
@@ -626,7 +626,7 @@ You **MUST** consider the user input before proceeding (if not empty).
 ## Pre-Execution Checks
 
 **Check for extension hooks (before planning)**:
-- Check if \`.specify/extensions.yml\` exists in the project root.
+- Check if \`.specflow/extensions.yml\` exists in the project root.
 - If it exists, read it and look for entries under the \`hooks.before_plan\` key
 - If the YAML cannot be parsed or is invalid, skip hook checking silently and continue normally
 - Filter out hooks where \`enabled\` is explicitly \`false\`. Treat hooks without an \`enabled\` field as enabled by default.
@@ -655,7 +655,7 @@ You **MUST** consider the user input before proceeding (if not empty).
 
     Wait for the result of the hook command before proceeding to the Outline.
     \`\`\`
-- If no hooks are registered or \`.specify/extensions.yml\` does not exist, skip silently
+- If no hooks are registered or \`.specflow/extensions.yml\` does not exist, skip silently
 
 ## Outline
 
@@ -674,7 +674,7 @@ You **MUST** consider the user input before proceeding (if not empty).
 
 4. **Stop and report**: Command ends after Phase 2 planning. Report branch, IMPL_PLAN path, and generated artifacts.
 
-5. **Check for extension hooks**: After reporting, check if \`.specify/extensions.yml\` exists in the project root.
+5. **Check for extension hooks**: After reporting, check if \`.specflow/extensions.yml\` exists in the project root.
    - If it exists, read it and look for entries under the \`hooks.after_plan\` key
    - If the YAML cannot be parsed or is invalid, skip hook checking silently and continue normally
    - Filter out hooks where \`enabled\` is explicitly \`false\`. Treat hooks without an \`enabled\` field as enabled by default.
@@ -701,7 +701,7 @@ You **MUST** consider the user input before proceeding (if not empty).
        Executing: \`/{command}\`
        EXECUTE_COMMAND: {command}
        \`\`\`
-   - If no hooks are registered or \`.specify/extensions.yml\` does not exist, skip silently
+   - If no hooks are registered or \`.specflow/extensions.yml\` does not exist, skip silently
 
 ## Phases
 
@@ -763,11 +763,11 @@ You **MUST** consider the user input before proceeding (if not empty).
 description: Generate an actionable, dependency-ordered tasks.md for the feature based on available design artifacts.
 handoffs: 
   - label: Analyze For Consistency
-    agent: speckit.analyze
+    agent: specflow.analyze
     prompt: Run a project analysis for consistency
     send: true
   - label: Implement Project
-    agent: speckit.implement
+    agent: specflow.implement
     prompt: Start the implementation in phases
     send: true
 scripts:
@@ -786,7 +786,7 @@ You **MUST** consider the user input before proceeding (if not empty).
 ## Pre-Execution Checks
 
 **Check for extension hooks (before tasks generation)**:
-- Check if \`.specify/extensions.yml\` exists in the project root.
+- Check if \`.specflow/extensions.yml\` exists in the project root.
 - If it exists, read it and look for entries under the \`hooks.before_tasks\` key
 - If the YAML cannot be parsed or is invalid, skip hook checking silently and continue normally
 - Filter out hooks where \`enabled\` is explicitly \`false\`. Treat hooks without an \`enabled\` field as enabled by default.
@@ -815,7 +815,7 @@ You **MUST** consider the user input before proceeding (if not empty).
     
     Wait for the result of the hook command before proceeding to the Outline.
     \`\`\`
-- If no hooks are registered or \`.specify/extensions.yml\` does not exist, skip silently
+- If no hooks are registered or \`.specflow/extensions.yml\` does not exist, skip silently
 
 ## Outline
 
@@ -858,7 +858,7 @@ You **MUST** consider the user input before proceeding (if not empty).
    - Suggested MVP scope (typically just User Story 1)
    - Format validation: Confirm ALL tasks follow the checklist format (checkbox, ID, labels, file paths)
 
-6. **Check for extension hooks**: After tasks.md is generated, check if \`.specify/extensions.yml\` exists in the project root.
+6. **Check for extension hooks**: After tasks.md is generated, check if \`.specflow/extensions.yml\` exists in the project root.
    - If it exists, read it and look for entries under the \`hooks.after_tasks\` key
    - If the YAML cannot be parsed or is invalid, skip hook checking silently and continue normally
    - Filter out hooks where \`enabled\` is explicitly \`false\`. Treat hooks without an \`enabled\` field as enabled by default.
@@ -885,7 +885,7 @@ You **MUST** consider the user input before proceeding (if not empty).
        Executing: \`/{command}\`
        EXECUTE_COMMAND: {command}
        \`\`\`
-   - If no hooks are registered or \`.specify/extensions.yml\` does not exist, skip silently
+   - If no hooks are registered or \`.specflow/extensions.yml\` does not exist, skip silently
 
 Context for task generation: {ARGS}
 
@@ -987,7 +987,7 @@ You **MUST** consider the user input before proceeding (if not empty).
 ## Pre-Execution Checks
 
 **Check for extension hooks (before analysis)**:
-- Check if \`.specify/extensions.yml\` exists in the project root.
+- Check if \`.specflow/extensions.yml\` exists in the project root.
 - If it exists, read it and look for entries under the \`hooks.before_analyze\` key
 - If the YAML cannot be parsed or is invalid, skip hook checking silently and continue normally
 - Filter out hooks where \`enabled\` is explicitly \`false\`. Treat hooks without an \`enabled\` field as enabled by default.
@@ -1016,7 +1016,7 @@ You **MUST** consider the user input before proceeding (if not empty).
 
     Wait for the result of the hook command before proceeding to the Goal.
     \`\`\`
-- If no hooks are registered or \`.specify/extensions.yml\` does not exist, skip silently
+- If no hooks are registered or \`.specflow/extensions.yml\` does not exist, skip silently
 
 ## Goal
 
@@ -1172,7 +1172,7 @@ Ask the user: "Would you like me to suggest concrete remediation edits for the t
 
 ### 9. Check for extension hooks
 
-After reporting, check if \`.specify/extensions.yml\` exists in the project root.
+After reporting, check if \`.specflow/extensions.yml\` exists in the project root.
 - If it exists, read it and look for entries under the \`hooks.after_analyze\` key
 - If the YAML cannot be parsed or is invalid, skip hook checking silently and continue normally
 - Filter out hooks where \`enabled\` is explicitly \`false\`. Treat hooks without an \`enabled\` field as enabled by default.
@@ -1199,7 +1199,7 @@ After reporting, check if \`.specify/extensions.yml\` exists in the project root
     Executing: \`/{command}\`
     EXECUTE_COMMAND: {command}
     \`\`\`
-- If no hooks are registered or \`.specify/extensions.yml\` does not exist, skip silently
+- If no hooks are registered or \`.specflow/extensions.yml\` does not exist, skip silently
 
 ## Operating Principles
 
@@ -1246,7 +1246,7 @@ You **MUST** consider the user input before proceeding (if not empty).
 ## Pre-Execution Checks
 
 **Check for extension hooks (before implementation)**:
-- Check if \`.specify/extensions.yml\` exists in the project root.
+- Check if \`.specflow/extensions.yml\` exists in the project root.
 - If it exists, read it and look for entries under the \`hooks.before_implement\` key
 - If the YAML cannot be parsed or is invalid, skip hook checking silently and continue normally
 - Filter out hooks where \`enabled\` is explicitly \`false\`. Treat hooks without an \`enabled\` field as enabled by default.
@@ -1275,7 +1275,7 @@ You **MUST** consider the user input before proceeding (if not empty).
     
     Wait for the result of the hook command before proceeding to the Outline.
     \`\`\`
-- If no hooks are registered or \`.specify/extensions.yml\` does not exist, skip silently
+- If no hooks are registered or \`.specflow/extensions.yml\` does not exist, skip silently
 
 ## Outline
 
@@ -1401,7 +1401,7 @@ You **MUST** consider the user input before proceeding (if not empty).
 
 Note: This command assumes a complete task breakdown exists in tasks.md. If tasks are incomplete or missing, suggest running \`__SPECKIT_COMMAND_TASKS__\` first to regenerate the task list.
 
-10. **Check for extension hooks**: After completion validation, check if \`.specify/extensions.yml\` exists in the project root.
+10. **Check for extension hooks**: After completion validation, check if \`.specflow/extensions.yml\` exists in the project root.
     - If it exists, read it and look for entries under the \`hooks.after_implement\` key
     - If the YAML cannot be parsed or is invalid, skip hook checking silently and continue normally
     - Filter out hooks where \`enabled\` is explicitly \`false\`. Treat hooks without an \`enabled\` field as enabled by default.
@@ -1428,7 +1428,7 @@ Note: This command assumes a complete task breakdown exists in tasks.md. If task
         Executing: \`/{command}\`
         EXECUTE_COMMAND: {command}
         \`\`\`
-    - If no hooks are registered or \`.specify/extensions.yml\` does not exist, skip silently
+    - If no hooks are registered or \`.specflow/extensions.yml\` does not exist, skip silently
 `,
     executable: false,
   },
@@ -1440,7 +1440,7 @@ Note: This command assumes a complete task breakdown exists in tasks.md. If task
 description: Create or update the project constitution from interactive or provided principle inputs, ensuring all dependent templates stay in sync.
 handoffs: 
   - label: Build Specification
-    agent: speckit.specify
+    agent: specflow.specify
     prompt: Implement the feature specification based on the updated constitution. I want to build...
 ---
 
@@ -1455,7 +1455,7 @@ You **MUST** consider the user input before proceeding (if not empty).
 ## Pre-Execution Checks
 
 **Check for extension hooks (before constitution update)**:
-- Check if \`.specify/extensions.yml\` exists in the project root.
+- Check if \`.specflow/extensions.yml\` exists in the project root.
 - If it exists, read it and look for entries under the \`hooks.before_constitution\` key
 - If the YAML cannot be parsed or is invalid, skip hook checking silently and continue normally
 - Filter out hooks where \`enabled\` is explicitly \`false\`. Treat hooks without an \`enabled\` field as enabled by default.
@@ -1484,17 +1484,17 @@ You **MUST** consider the user input before proceeding (if not empty).
 
     Wait for the result of the hook command before proceeding to the Outline.
     \`\`\`
-- If no hooks are registered or \`.specify/extensions.yml\` does not exist, skip silently
+- If no hooks are registered or \`.specflow/extensions.yml\` does not exist, skip silently
 
 ## Outline
 
-You are updating the project constitution at \`.specify/memory/constitution.md\`. This file is a TEMPLATE containing placeholder tokens in square brackets (e.g. \`[PROJECT_NAME]\`, \`[PRINCIPLE_1_NAME]\`). Your job is to (a) collect/derive concrete values, (b) fill the template precisely, and (c) propagate any amendments across dependent artifacts.
+You are updating the project constitution at \`.specflow/memory/constitution.md\`. This file is a TEMPLATE containing placeholder tokens in square brackets (e.g. \`[PROJECT_NAME]\`, \`[PRINCIPLE_1_NAME]\`). Your job is to (a) collect/derive concrete values, (b) fill the template precisely, and (c) propagate any amendments across dependent artifacts.
 
-**Note**: If \`.specify/memory/constitution.md\` does not exist yet, it should have been initialized from \`.specify/templates/constitution-template.md\` during project setup. If it's missing, copy the template first.
+**Note**: If \`.specflow/memory/constitution.md\` does not exist yet, it should have been initialized from \`.specflow/templates/constitution-template.md\` during project setup. If it's missing, copy the template first.
 
 Follow this execution flow:
 
-1. Load the existing constitution at \`.specify/memory/constitution.md\`.
+1. Load the existing constitution at \`.specflow/memory/constitution.md\`.
    - Identify every placeholder token of the form \`[ALL_CAPS_IDENTIFIER]\`.
    **IMPORTANT**: The user might require less or more principles than the ones used in the template. If a number is specified, respect that - follow the general template. You will update the doc accordingly.
 
@@ -1515,10 +1515,10 @@ Follow this execution flow:
    - Ensure Governance section lists amendment procedure, versioning policy, and compliance review expectations.
 
 4. Consistency propagation checklist (convert prior checklist into active validations):
-   - Read \`.specify/templates/plan-template.md\` and ensure any "Constitution Check" or rules align with updated principles.
-   - Read \`.specify/templates/spec-template.md\` for scope/requirements alignment—update if constitution adds/removes mandatory sections or constraints.
-   - Read \`.specify/templates/tasks-template.md\` and ensure task categorization reflects new or removed principle-driven task types (e.g., observability, versioning, testing discipline).
-   - Read each command file in \`.specify/templates/commands/*.md\` (including this one) to verify no outdated references (agent-specific names like CLAUDE only) remain when generic guidance is required.
+   - Read \`.specflow/templates/plan-template.md\` and ensure any "Constitution Check" or rules align with updated principles.
+   - Read \`.specflow/templates/spec-template.md\` for scope/requirements alignment—update if constitution adds/removes mandatory sections or constraints.
+   - Read \`.specflow/templates/tasks-template.md\` and ensure task categorization reflects new or removed principle-driven task types (e.g., observability, versioning, testing discipline).
+   - Read each command file in \`.specflow/templates/commands/*.md\` (including this one) to verify no outdated references (agent-specific names like CLAUDE only) remain when generic guidance is required.
    - Read any runtime guidance docs (e.g., \`README.md\`, \`docs/quickstart.md\`, or agent-specific guidance files if present). Update references to principles changed.
 
 5. Produce a Sync Impact Report (prepend as an HTML comment at top of the constitution file after update):
@@ -1535,7 +1535,7 @@ Follow this execution flow:
    - Dates ISO format YYYY-MM-DD.
    - Principles are declarative, testable, and free of vague language ("should" → replace with MUST/SHOULD rationale where appropriate).
 
-7. Write the completed constitution back to \`.specify/memory/constitution.md\` (overwrite).
+7. Write the completed constitution back to \`.specflow/memory/constitution.md\` (overwrite).
 
 8. Output a final summary to the user with:
    - New version and bump rationale.
@@ -1553,12 +1553,12 @@ If the user supplies partial updates (e.g., only one principle revision), still 
 
 If critical info missing (e.g., ratification date truly unknown), insert \`TODO(<FIELD_NAME>): explanation\` and include in the Sync Impact Report under deferred items.
 
-Do not create a new template; always operate on the existing \`.specify/memory/constitution.md\` file.
+Do not create a new template; always operate on the existing \`.specflow/memory/constitution.md\` file.
 
 ## Post-Execution Checks
 
 **Check for extension hooks (after constitution update)**:
-Check if \`.specify/extensions.yml\` exists in the project root.
+Check if \`.specflow/extensions.yml\` exists in the project root.
 - If it exists, read it and look for entries under the \`hooks.after_constitution\` key
 - If the YAML cannot be parsed or is invalid, skip hook checking silently and continue normally
 - Filter out hooks where \`enabled\` is explicitly \`false\`. Treat hooks without an \`enabled\` field as enabled by default.
@@ -1585,7 +1585,7 @@ Check if \`.specify/extensions.yml\` exists in the project root.
     Executing: \`/{command}\`
     EXECUTE_COMMAND: {command}
     \`\`\`
-- If no hooks are registered or \`.specify/extensions.yml\` does not exist, skip silently
+- If no hooks are registered or \`.specflow/extensions.yml\` does not exist, skip silently
 `,
     executable: false,
   },
@@ -1632,7 +1632,7 @@ You **MUST** consider the user input before proceeding (if not empty).
 ## Pre-Execution Checks
 
 **Check for extension hooks (before checklist generation)**:
-- Check if \`.specify/extensions.yml\` exists in the project root.
+- Check if \`.specflow/extensions.yml\` exists in the project root.
 - If it exists, read it and look for entries under the \`hooks.before_checklist\` key
 - If the YAML cannot be parsed or is invalid, skip hook checking silently and continue normally
 - Filter out hooks where \`enabled\` is explicitly \`false\`. Treat hooks without an \`enabled\` field as enabled by default.
@@ -1661,7 +1661,7 @@ You **MUST** consider the user input before proceeding (if not empty).
 
     Wait for the result of the hook command before proceeding to the Execution Steps.
     \`\`\`
-- If no hooks are registered or \`.specify/extensions.yml\` does not exist, skip silently
+- If no hooks are registered or \`.specflow/extensions.yml\` does not exist, skip silently
 
 ## Execution Steps
 
@@ -1929,7 +1929,7 @@ Sample items:
 ## Post-Execution Checks
 
 **Check for extension hooks (after checklist generation)**:
-Check if \`.specify/extensions.yml\` exists in the project root.
+Check if \`.specflow/extensions.yml\` exists in the project root.
 - If it exists, read it and look for entries under the \`hooks.after_checklist\` key
 - If the YAML cannot be parsed or is invalid, skip hook checking silently and continue normally
 - Filter out hooks where \`enabled\` is explicitly \`false\`. Treat hooks without an \`enabled\` field as enabled by default.
@@ -1956,7 +1956,7 @@ Check if \`.specify/extensions.yml\` exists in the project root.
     Executing: \`/{command}\`
     EXECUTE_COMMAND: {command}
     \`\`\`
-- If no hooks are registered or \`.specify/extensions.yml\` does not exist, skip silently
+- If no hooks are registered or \`.specflow/extensions.yml\` does not exist, skip silently
 `,
     executable: false,
   },
@@ -2030,7 +2030,7 @@ Spawn the \`review-coordinator\` agent with the list of changed files. It in tur
 spawns:
 
 - \`code-reviewer\` (always) — architecture, DRY, YAGNI, readability, alignment
-  with \`.specify/memory/constitution.md\`.
+  with \`.specflow/memory/constitution.md\`.
 - \`security-auditor\` (always) — input validation, auth/authz, secret handling,
   SQL/command injection, path traversal, silent catches that swallow errors.
 - \`test-reviewer\` (if test files are in the diff) — adequacy of coverage, test
@@ -2091,7 +2091,7 @@ Remaining findings (MEDIUM/LOW, non-blocking)
 Overall: PASS | FAIL
 \`\`\`
 
-If Overall = PASS, invoke \`/speckit.merge\` (or hand back to the auto-chain for
+If Overall = PASS, invoke \`/specflow.merge\` (or hand back to the auto-chain for
 STOP #2). If FAIL, stop and report to the user.
 `,
     executable: false,
@@ -2197,7 +2197,7 @@ for business context and backlog management.
 
 ## First action in every session
 
-Read \`AGENTS.md\` at the project root AND \`.specify/memory/constitution.md\` to
+Read \`AGENTS.md\` at the project root AND \`.specflow/memory/constitution.md\` to
 refresh product and architectural context. If either file is missing or empty,
 flag it to the user — the project is under-documented.
 
@@ -2362,7 +2362,7 @@ architecture.
 ## First action in every session
 
 1. Read \`AGENTS.md\` at the project root to learn the tech stack and rules.
-2. Read \`.specify/memory/constitution.md\` for non-negotiable invariants.
+2. Read \`.specflow/memory/constitution.md\` for non-negotiable invariants.
 3. Read the current feature's \`spec.md\`, \`plan.md\`, and \`tasks.md\` if a
    Speckit feature directory is in context.
 
@@ -2422,7 +2422,7 @@ failed, and what decision the next owner needs to make.
     suffix: null,
     content: `---
 name: review-coordinator
-description: Coordinates parallel structural review agents (code, security, tests) and aggregates their findings. Use when /speckit.review is running Phase 1.
+description: Coordinates parallel structural review agents (code, security, tests) and aggregates their findings. Use when /specflow.review is running Phase 1.
 model: sonnet
 tools: Read, Grep, Glob, Bash, Agent(code-reviewer, security-auditor, test-reviewer)
 maxTurns: 30
@@ -2434,7 +2434,7 @@ in parallel and aggregate results.
 ## Inputs
 
 - The list of files changed in the current feature branch (provided by
-  \`/speckit.review\`).
+  \`/specflow.review\`).
 
 ## Protocol
 
@@ -2476,7 +2476,7 @@ MEDIUM / LOW findings: <N>, list suppressed — see per-agent reports for detail
     suffix: null,
     content: `---
 name: code-reviewer
-description: Reviews code quality, architecture, DRY/YAGNI, readability, and conformance to the project constitution. Spawned by the review-coordinator during /speckit.review.
+description: Reviews code quality, architecture, DRY/YAGNI, readability, and conformance to the project constitution. Spawned by the review-coordinator during /specflow.review.
 model: sonnet
 tools: Read, Grep, Glob
 maxTurns: 20
@@ -2487,7 +2487,7 @@ explore the rest of the codebase unless strictly necessary for context.
 
 ## Always-check rules
 
-1. **Constitution compliance**: read \`.specify/memory/constitution.md\` first.
+1. **Constitution compliance**: read \`.specflow/memory/constitution.md\` first.
    Any violation is at least HIGH severity.
 2. **Silent error handling**: any \`catch\` block that swallows the error (empty
    body, comment-only, or discards the error object) is CRITICAL.
@@ -2529,7 +2529,7 @@ PASS if zero CRITICAL and zero HIGH findings. Otherwise FAIL.
     suffix: null,
     content: `---
 name: security-auditor
-description: Reviews code for security issues — input validation, authz, secrets, injection, SSRF, path traversal, silent error swallowing. Spawned by the review-coordinator during /speckit.review.
+description: Reviews code for security issues — input validation, authz, secrets, injection, SSRF, path traversal, silent error swallowing. Spawned by the review-coordinator during /specflow.review.
 model: sonnet
 tools: Read, Grep, Glob
 maxTurns: 20
@@ -2603,7 +2603,7 @@ Same \`FINDING\` / \`VERDICT\` structure as code-reviewer.
     suffix: null,
     content: `---
 name: qa-tester
-description: Audits test coverage, writes missing tests, and runs the full suite. Spawned by /speckit.implement after the review gate passes.
+description: Audits test coverage, writes missing tests, and runs the full suite. Spawned by /specflow.implement after the review gate passes.
 model: opus
 tools: Read, Write, Edit, Grep, Glob, Bash
 permissionMode: acceptEdits
@@ -2746,12 +2746,12 @@ log is sufficient.
 
 ## STOP #1 — Clarification checkpoint
 
-After \`/speckit.clarify\` finishes:
+After \`/specflow.clarify\` finishes:
 
 - If zero \`[NEEDS CLARIFICATION]\` markers remain in \`spec.md\`, continue silently
-  to \`/speckit.plan\`.
+  to \`/specflow.plan\`.
 - If markers remain, present the top 3 questions to the user (per the
-  \`/speckit.clarify\` format) and wait for answers. Once the spec is updated,
+  \`/specflow.clarify\` format) and wait for answers. Once the spec is updated,
   resume the chain automatically.
 
 ## Silent gates
@@ -2759,18 +2759,18 @@ After \`/speckit.clarify\` finishes:
 These phases run without user interruption unless they fail hard or surface
 CRITICAL findings:
 
-- \`/speckit.plan\` — generates plan + research + data-model + contracts + quickstart.
-- \`/speckit.tasks\` — generates tasks.md.
-- \`/speckit.analyze\` — cross-artifact consistency check. On LOW/MEDIUM findings,
+- \`/specflow.plan\` — generates plan + research + data-model + contracts + quickstart.
+- \`/specflow.tasks\` — generates tasks.md.
+- \`/specflow.analyze\` — cross-artifact consistency check. On LOW/MEDIUM findings,
   log a summary and continue. On CRITICAL findings, stop and surface them.
-- \`/speckit.implement\` — runs the developer → review-coordinator → qa-tester
+- \`/specflow.implement\` — runs the developer → review-coordinator → qa-tester
   pipeline. Has its own internal fix loop for review findings; do not intercept.
-- \`/speckit.review\` — final quality scan.
+- \`/specflow.review\` — final quality scan.
 
 ## STOP #2 — Pre-merge validation
 
-After \`/speckit.review\` passes, ALWAYS stop and present a compact summary
-before invoking \`/speckit.merge\`. The summary must include:
+After \`/specflow.review\` passes, ALWAYS stop and present a compact summary
+before invoking \`/specflow.merge\`. The summary must include:
 
 - Feature name and branch
 - Files created / modified (count + key paths)
@@ -2779,14 +2779,14 @@ before invoking \`/speckit.merge\`. The summary must include:
 - Open risks / deferred items
 - One-line business outcome
 
-Then ask explicitly: "Ready to merge? (yes to run /speckit.merge, no to stay on
+Then ask explicitly: "Ready to merge? (yes to run /specflow.merge, no to stay on
 the branch)". Wait for explicit confirmation. On "yes", invoke
-\`/speckit.merge\`. After merge, the chain ends.
+\`/specflow.merge\`. After merge, the chain ends.
 
 ## Opt-out
 
 If the user invokes \`/speckit specify --manual "<description>"\`, run
-\`/speckit.specify\` only and stop. Do not auto-chain. Each subsequent phase must
+\`/specflow.specify\` only and stop. Do not auto-chain. Each subsequent phase must
 be invoked manually by the user.
 
 ## Single-phase invocations
@@ -2803,12 +2803,12 @@ re-running phases on an existing feature.
 - Task-level blockers reported by the developer agent during \`implement\`: the
   implement workflow has its own fix loop; do not intercept.
 - \`clarify\` producing more than 5 questions: present the top 3 per the
-  \`/speckit.clarify\` quota; the rest can be asked later.
+  \`/specflow.clarify\` quota; the rest can be asked later.
 
 ## Context budget
 
 Long features (≥13 story points or ≥30 tasks) may exhaust context during
-\`/speckit.implement\`. If compaction occurs mid-chain, inform the user and let
+\`/specflow.implement\`. If compaction occurs mid-chain, inform the user and let
 them resume manually from the last completed phase.
 `,
     executable: false,
@@ -2823,7 +2823,7 @@ them resume manually from the last completed phase.
 > non-negotiable policies. Specflow, Spec Kit commands, and review agents read it at every step.
 >
 > Replace this placeholder with your own constitution. Use
-> \`.specify/templates/constitution-template.md\` as a starting point.
+> \`.specflow/templates/constitution-template.md\` as a starting point.
 
 ## Principles
 
@@ -2975,7 +2975,7 @@ them resume manually from the last completed phase.
 **Branch**: \`[###-feature-name]\` | **Date**: [DATE] | **Spec**: [link]
 **Input**: Feature specification from \`/specs/[###-feature-name]/spec.md\`
 
-**Note**: This template is filled in by the \`__SPECKIT_COMMAND_PLAN__\` command. See \`.specify/templates/plan-template.md\` for the execution workflow.
+**Note**: This template is filled in by the \`__SPECKIT_COMMAND_PLAN__\` command. See \`.specflow/templates/plan-template.md\` for the execution workflow.
 
 ## Summary
 
@@ -3595,20 +3595,20 @@ fi
 # Validate required directories and files
 if [[ ! -d "\$FEATURE_DIR" ]]; then
     echo "ERROR: Feature directory not found: \$FEATURE_DIR" >&2
-    echo "Run /speckit.specify first to create the feature structure." >&2
+    echo "Run /specflow.specify first to create the feature structure." >&2
     exit 1
 fi
 
 if [[ ! -f "\$IMPL_PLAN" ]]; then
     echo "ERROR: plan.md not found in \$FEATURE_DIR" >&2
-    echo "Run /speckit.plan first to create the implementation plan." >&2
+    echo "Run /specflow.plan first to create the implementation plan." >&2
     exit 1
 fi
 
 # Check for tasks.md if required
 if \$REQUIRE_TASKS && [[ ! -f "\$TASKS" ]]; then
     echo "ERROR: tasks.md not found in \$FEATURE_DIR" >&2
-    echo "Run /speckit.tasks first to create the task list." >&2
+    echo "Run /specflow.tasks first to create the task list." >&2
     exit 1
 fi
 
@@ -3886,23 +3886,23 @@ get_feature_paths() {
 
     # Resolve feature directory.  Priority:
     #   1. SPECIFY_FEATURE_DIRECTORY env var (explicit override)
-    #   2. .specify/feature.json "feature_directory" key (persisted by /speckit.specify)
+    #   2. .specflow/feature.json "feature_directory" key (persisted by /specflow.specify)
     #   3. Branch-name-based prefix lookup (legacy fallback)
     local feature_dir
     if [[ -n "\${SPECIFY_FEATURE_DIRECTORY:-}" ]]; then
         feature_dir="\$SPECIFY_FEATURE_DIRECTORY"
         # Normalize relative paths to absolute under repo root
         [[ "\$feature_dir" != /* ]] && feature_dir="\$repo_root/\$feature_dir"
-    elif [[ -f "\$repo_root/.specify/feature.json" ]]; then
+    elif [[ -f "\$repo_root/.specflow/feature.json" ]]; then
         local _fd
         if command -v jq >/dev/null 2>&1; then
-            _fd=\$(jq -r '.feature_directory // empty' "\$repo_root/.specify/feature.json" 2>/dev/null)
+            _fd=\$(jq -r '.feature_directory // empty' "\$repo_root/.specflow/feature.json" 2>/dev/null)
         elif command -v python3 >/dev/null 2>&1; then
             # Fallback: use Python to parse JSON so pretty-printed/multi-line files work
-            _fd=\$(python3 -c "import json,sys; d=json.load(open(sys.argv[1])); print(d.get('feature_directory',''))" "\$repo_root/.specify/feature.json" 2>/dev/null)
+            _fd=\$(python3 -c "import json,sys; d=json.load(open(sys.argv[1])); print(d.get('feature_directory',''))" "\$repo_root/.specflow/feature.json" 2>/dev/null)
         else
             # Last resort: single-line grep fallback (won't work on multi-line JSON)
-            _fd=\$(grep -o '"feature_directory"[[:space:]]*:[[:space:]]*"[^"]*"' "\$repo_root/.specify/feature.json" 2>/dev/null | sed 's/.*"\\([^"]*\\)"\$/\\1/')
+            _fd=\$(grep -o '"feature_directory"[[:space:]]*:[[:space:]]*"[^"]*"' "\$repo_root/.specflow/feature.json" 2>/dev/null | sed 's/.*"\\([^"]*\\)"\$/\\1/')
         fi
         if [[ -n "\$_fd" ]]; then
             feature_dir="\$_fd"
@@ -3969,21 +3969,21 @@ check_file() { [[ -f "\$1" ]] && echo "  ✓ \$2" || echo "  ✗ \$2"; }
 check_dir() { [[ -d "\$1" && -n \$(ls -A "\$1" 2>/dev/null) ]] && echo "  ✓ \$2" || echo "  ✗ \$2"; }
 
 # Resolve a template name to a file path using the priority stack:
-#   1. .specify/templates/overrides/
-#   2. .specify/presets/<preset-id>/templates/ (sorted by priority from .registry)
-#   3. .specify/extensions/<ext-id>/templates/
-#   4. .specify/templates/ (core)
+#   1. .specflow/templates/overrides/
+#   2. .specflow/presets/<preset-id>/templates/ (sorted by priority from .registry)
+#   3. .specflow/extensions/<ext-id>/templates/
+#   4. .specflow/templates/ (core)
 resolve_template() {
     local template_name="\$1"
     local repo_root="\$2"
-    local base="\$repo_root/.specify/templates"
+    local base="\$repo_root/.specflow/templates"
 
     # Priority 1: Project overrides
     local override="\$base/overrides/\${template_name}.md"
     [ -f "\$override" ] && echo "\$override" && return 0
 
     # Priority 2: Installed presets (sorted by priority from .registry)
-    local presets_dir="\$repo_root/.specify/presets"
+    local presets_dir="\$repo_root/.specflow/presets"
     if [ -d "\$presets_dir" ]; then
         local registry_file="\$presets_dir/.registry"
         if [ -f "\$registry_file" ] && command -v python3 >/dev/null 2>&1; then
@@ -4030,7 +4030,7 @@ except Exception:
     fi
 
     # Priority 3: Extension-provided templates
-    local ext_dir="\$repo_root/.specify/extensions"
+    local ext_dir="\$repo_root/.specflow/extensions"
     if [ -d "\$ext_dir" ]; then
         for ext in "\$ext_dir"/*/; do
             [ -d "\$ext" ] || continue
@@ -4060,7 +4060,7 @@ except Exception:
 resolve_template_content() {
     local template_name="\$1"
     local repo_root="\$2"
-    local base="\$repo_root/.specify/templates"
+    local base="\$repo_root/.specflow/templates"
 
     # Collect all layers (highest priority first)
     local -a layer_paths=()
@@ -4074,7 +4074,7 @@ resolve_template_content() {
     fi
 
     # Priority 2: Installed presets (sorted by priority from .registry)
-    local presets_dir="\$repo_root/.specify/presets"
+    local presets_dir="\$repo_root/.specflow/presets"
     if [ -d "\$presets_dir" ]; then
         local registry_file="\$presets_dir/.registry"
         local sorted_presets=""
@@ -4180,7 +4180,7 @@ except Exception:
     fi
 
     # Priority 3: Extension-provided templates (always "replace")
-    local ext_dir="\$repo_root/.specify/extensions"
+    local ext_dir="\$repo_root/.specflow/extensions"
     if [ -d "\$ext_dir" ]; then
         for ext in "\$ext_dir"/*/; do
             [ -d "\$ext" ] || continue
@@ -4870,20 +4870,20 @@ if (\$PathsOnly) {
 # Validate required directories and files
 if (-not (Test-Path \$paths.FEATURE_DIR -PathType Container)) {
     Write-Output "ERROR: Feature directory not found: \$(\$paths.FEATURE_DIR)"
-    Write-Output "Run /speckit.specify first to create the feature structure."
+    Write-Output "Run /specflow.specify first to create the feature structure."
     exit 1
 }
 
 if (-not (Test-Path \$paths.IMPL_PLAN -PathType Leaf)) {
     Write-Output "ERROR: plan.md not found in \$(\$paths.FEATURE_DIR)"
-    Write-Output "Run /speckit.plan first to create the implementation plan."
+    Write-Output "Run /specflow.plan first to create the implementation plan."
     exit 1
 }
 
 # Check for tasks.md if required
 if (\$RequireTasks -and -not (Test-Path \$paths.TASKS -PathType Leaf)) {
     Write-Output "ERROR: tasks.md not found in \$(\$paths.FEATURE_DIR)"
-    Write-Output "Run /speckit.tasks first to create the task list."
+    Write-Output "Run /specflow.tasks first to create the task list."
     exit 1
 }
 
@@ -5157,9 +5157,9 @@ function Get-FeaturePathsEnv {
 
     # Resolve feature directory.  Priority:
     #   1. SPECIFY_FEATURE_DIRECTORY env var (explicit override)
-    #   2. .specify/feature.json "feature_directory" key (persisted by /speckit.specify)
+    #   2. .specflow/feature.json "feature_directory" key (persisted by /specflow.specify)
     #   3. Branch-name-based prefix lookup (same as scripts/bash/common.sh)
-    \$featureJson = Join-Path \$repoRoot '.specify/feature.json'
+    \$featureJson = Join-Path \$repoRoot '.specflow/feature.json'
     if (\$env:SPECIFY_FEATURE_DIRECTORY) {
         \$featureDir = \$env:SPECIFY_FEATURE_DIRECTORY
         # Normalize relative paths to absolute under repo root
@@ -5171,7 +5171,7 @@ function Get-FeaturePathsEnv {
         try {
             \$featureConfig = \$featureJsonRaw | ConvertFrom-Json
         } catch {
-            [Console]::Error.WriteLine("ERROR: Failed to parse .specify/feature.json: \$_")
+            [Console]::Error.WriteLine("ERROR: Failed to parse .specflow/feature.json: \$_")
             exit 1
         }
         if (\$featureConfig.feature_directory) {
@@ -5240,24 +5240,24 @@ function Get-Python3Command {
 }
 
 # Resolve a template name to a file path using the priority stack:
-#   1. .specify/templates/overrides/
-#   2. .specify/presets/<preset-id>/templates/ (sorted by priority from .registry)
-#   3. .specify/extensions/<ext-id>/templates/
-#   4. .specify/templates/ (core)
+#   1. .specflow/templates/overrides/
+#   2. .specflow/presets/<preset-id>/templates/ (sorted by priority from .registry)
+#   3. .specflow/extensions/<ext-id>/templates/
+#   4. .specflow/templates/ (core)
 function Resolve-Template {
     param(
         [Parameter(Mandatory=\$true)][string]\$TemplateName,
         [Parameter(Mandatory=\$true)][string]\$RepoRoot
     )
 
-    \$base = Join-Path \$RepoRoot '.specify/templates'
+    \$base = Join-Path \$RepoRoot '.specflow/templates'
 
     # Priority 1: Project overrides
     \$override = Join-Path \$base "overrides/\$TemplateName.md"
     if (Test-Path \$override) { return \$override }
 
     # Priority 2: Installed presets (sorted by priority from .registry)
-    \$presetsDir = Join-Path \$RepoRoot '.specify/presets'
+    \$presetsDir = Join-Path \$RepoRoot '.specflow/presets'
     if (Test-Path \$presetsDir) {
         \$registryFile = Join-Path \$presetsDir '.registry'
         \$sortedPresets = @()
@@ -5292,7 +5292,7 @@ function Resolve-Template {
     }
 
     # Priority 3: Extension-provided templates
-    \$extDir = Join-Path \$RepoRoot '.specify/extensions'
+    \$extDir = Join-Path \$RepoRoot '.specflow/extensions'
     if (Test-Path \$extDir) {
         foreach (\$ext in Get-ChildItem -Path \$extDir -Directory -ErrorAction SilentlyContinue | Where-Object { \$_.Name -notlike '.*' } | Sort-Object Name) {
             \$candidate = Join-Path \$ext.FullName "templates/\$TemplateName.md"
@@ -5316,7 +5316,7 @@ function Resolve-TemplateContent {
         [Parameter(Mandatory=\$true)][string]\$RepoRoot
     )
 
-    \$base = Join-Path \$RepoRoot '.specify/templates'
+    \$base = Join-Path \$RepoRoot '.specflow/templates'
 
     # Collect all layers (highest priority first)
     \$layerPaths = @()
@@ -5330,7 +5330,7 @@ function Resolve-TemplateContent {
     }
 
     # Priority 2: Installed presets (sorted by priority from .registry)
-    \$presetsDir = Join-Path \$RepoRoot '.specify/presets'
+    \$presetsDir = Join-Path \$RepoRoot '.specflow/presets'
     if (Test-Path \$presetsDir) {
         \$registryFile = Join-Path \$presetsDir '.registry'
         \$sortedPresets = @()
@@ -5440,7 +5440,7 @@ except Exception:
     }
 
     # Priority 3: Extension-provided templates (always "replace")
-    \$extDir = Join-Path \$RepoRoot '.specify/extensions'
+    \$extDir = Join-Path \$RepoRoot '.specflow/extensions'
     if (Test-Path \$extDir) {
         foreach (\$ext in Get-ChildItem -Path \$extDir -Directory -ErrorAction SilentlyContinue | Where-Object { \$_.Name -notlike '.*' } | Sort-Object Name) {
             \$candidate = Join-Path \$ext.FullName "templates/\$TemplateName.md"
@@ -6111,16 +6111,16 @@ clarifications needed) STOP #2 (pre-merge validation)
 
 ## Skills available
 
-- \`/speckit-specify\` — scaffold a new feature spec from a description
-- \`/speckit-clarify\` — resolve outstanding questions in \`spec.md\`
-- \`/speckit-plan\` — produce the implementation plan
-- \`/speckit-tasks\` — break the plan into tasks
-- \`/speckit-analyze\` — cross-artefact consistency check
-- \`/speckit-implement\` — run the developer → review-coordinator → qa-tester pipeline
-- \`/speckit-review\` — architecture + quality gates
-- \`/speckit-merge\` — merge the feature branch to main
+- \`/specflow-specify\` — scaffold a new feature spec from a description
+- \`/specflow-clarify\` — resolve outstanding questions in \`spec.md\`
+- \`/specflow-plan\` — produce the implementation plan
+- \`/specflow-tasks\` — break the plan into tasks
+- \`/specflow-analyze\` — cross-artefact consistency check
+- \`/specflow-implement\` — run the developer → review-coordinator → qa-tester pipeline
+- \`/specflow-review\` — architecture + quality gates
+- \`/specflow-merge\` — merge the feature branch to main
 - \`/specflow-backlog\` — manage the product backlog (via the PO agent)
-- \`/specflow-speckit\` — auto-chain dispatcher invoked by \`/speckit-specify\`
+- \`/specflow-speckit\` — auto-chain dispatcher invoked by \`/specflow-specify\`
 
 ## Agent roles (invocable manually as skills)
 
@@ -6135,7 +6135,7 @@ clarifications needed) STOP #2 (pre-merge validation)
 
 ## Project context
 
-- Constitution lives at \`.specify/memory/constitution.md\` — treat as non-negotiable rules.
+- Constitution lives at \`.specflow/memory/constitution.md\` — treat as non-negotiable rules.
 - Product backlog lives at \`tasks/backlog.md\` (index) and \`tasks/backlog/NNN-*.md\` (task files).
 - Project conventions: \`AGENTS.md\` at project root.
 
