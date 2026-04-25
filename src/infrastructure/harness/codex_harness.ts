@@ -3,17 +3,15 @@ import type { Harness } from "../../application/ports.ts";
 import type { CoreBundle, CoreEntry } from "../../domain/core_bundle.ts";
 import type { Bundle } from "../../domain/template.ts";
 import { ensureSkillFrontmatter, skillFolderName } from "./skill_folder.ts";
-
-const FRONTMATTER_RE = /^---\n([\s\S]*?)\n---\n?([\s\S]*)$/;
+import { frontmatterField, splitFrontmatter } from "./frontmatter.ts";
 
 function parseAgentFrontmatter(content: string): { description: string; body: string } {
-  const m = FRONTMATTER_RE.exec(content);
-  if (!m) return { description: "", body: content };
-  const fmBody = m[1];
-  const restBody = m[2].replace(/^\n+/, "");
-  const descMatch = /^description:\s*(.+)$/m.exec(fmBody);
-  const description = descMatch ? descMatch[1].trim() : "";
-  return { description, body: restBody };
+  const split = splitFrontmatter(content);
+  if (!split) return { description: "", body: content };
+  return {
+    description: frontmatterField(split.fmBody, "description") ?? "",
+    body: split.rest.replace(/^\n+/, ""),
+  };
 }
 
 function toCodexSubagentToml(entry: CoreEntry): string {

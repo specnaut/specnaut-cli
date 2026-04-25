@@ -1,4 +1,5 @@
 import type { CoreEntry } from "../../domain/core_bundle.ts";
+import { splitFrontmatter } from "./frontmatter.ts";
 
 /**
  * Returns the folder name for a skill-emitting core entry, used by harnesses that
@@ -19,20 +20,18 @@ export function skillFolderName(entry: CoreEntry): string {
   }
 }
 
-const FRONTMATTER_RE = /^---\n([\s\S]*?)\n---\n?([\s\S]*)$/;
-
 /**
  * Injects `name:` and `description:` into a SKILL.md's frontmatter when missing.
  * Preserves any existing values. Used by harnesses whose skill registries require
  * these fields (Cursor, Codex).
  */
 export function ensureSkillFrontmatter(content: string, skillName: string): string {
-  const m = FRONTMATTER_RE.exec(content);
-  if (!m) {
+  const split = splitFrontmatter(content);
+  if (!split) {
     return `---\nname: ${skillName}\ndescription: Specflow skill: ${skillName}\n---\n\n${content}`;
   }
-  const fmBody = m[1];
-  const rest = m[2];
+  const fmBody = split.fmBody;
+  const rest = split.rest;
   const hasName = /^name:\s/m.test(fmBody);
   const hasDescription = /^description:\s/m.test(fmBody);
   let newFm = fmBody;

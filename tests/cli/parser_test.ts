@@ -153,3 +153,8 @@ Deno.test("parseArgs accepts init --ai codex", () => {
   const r = parseArgs(["init", "demo", "--ai", "codex"]);
   if (r.kind === "init") assertEquals(r.ai, "codex");
 });
+
+Deno.test("parseArgs accepts init --ai gemini", () => {
+  const r = parseArgs(["init", "demo", "--ai", "gemini"]);
+  if (r.kind === "init") assertEquals(r.ai, "gemini");
+});

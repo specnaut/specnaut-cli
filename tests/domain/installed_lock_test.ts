@@ -124,3 +124,18 @@ entries:
   assertEquals(lock.version, 2);
   assertEquals(lock.harness, "codex");
 });
+
+Deno.test("parseLock accepts v2 lock with harness=gemini", () => {
+  const v2 = `version: 2
+harness: gemini
+templates_version: 0.5.0
+entries:
+  .gemini/commands/specflow-specify.toml:
+    sha256: ddd
+    installed_at: "2026-04-25T00:00:00Z"
+    templates_version: "0.5.0"
+`;
+  const lock = parseLock(v2);
+  assertEquals(lock.version, 2);
+  assertEquals(lock.harness, "gemini");
+});
