@@ -11,9 +11,16 @@ import { sha256Hex } from "../../src/domain/sha256.ts";
 import type { InstalledLock } from "../../src/domain/installed_lock.ts";
 import type { CoreBundle } from "../../src/domain/core_bundle.ts";
 
-function fakeWriter(): FsWriter & { written: Map<string, string>; backupsRequested: boolean } {
+function fakeWriter(): FsWriter & {
+  written: Map<string, string>;
+  backupsRequested: boolean;
+  deleted: string[];
+  deleteBackupsRequested: boolean;
+} {
   const written = new Map<string, string>();
   let backupsRequested = false;
+  const deleted: string[] = [];
+  let deleteBackupsRequested = false;
   return {
     get written() {
       return written;
@@ -21,12 +28,23 @@ function fakeWriter(): FsWriter & { written: Map<string, string>; backupsRequest
     get backupsRequested() {
       return backupsRequested;
     },
+    get deleted() {
+      return deleted;
+    },
+    get deleteBackupsRequested() {
+      return deleteBackupsRequested;
+    },
     detectConflicts: () => Promise.resolve([]),
     writeBundle: (bundle, _t, options) => {
       if (options?.backupExisting) backupsRequested = true;
       for (const [dest, file] of Object.entries(bundle)) {
         written.set(dest, file.content);
       }
+      return Promise.resolve({ backups: [] } as BackupReport);
+    },
+    deletePaths: (paths, _t, options) => {
+      if (options.backupExisting) deleteBackupsRequested = true;
+      for (const p of paths) deleted.push(p);
       return Promise.resolve({ backups: [] } as BackupReport);
     },
   };
@@ -224,4 +242,104 @@ Deno.test("UpgradeProjectUseCase with --force overwrites preserve actions with b
   assertEquals(result.status, "applied");
   assertEquals(writer.written.get("a.md"), "OURS-NEW");
   assertEquals(writer.backupsRequested, true);
+});
+
+Deno.test("UpgradeProjectUseCase deletes clean orphans (lock entry + on disk + matches lock SHA + not in bundle)", async () => {
+  const orphanContent = "old\n";
+  const orphanSha = await sha256Hex(orphanContent);
+  const lock: InstalledLock = {
+    version: 2,
+    harness: "claude",
+    templatesVersion: "0.6.1",
+    entries: new Map([
+      ["a.md", {
+        sha256: await sha256Hex("alpha"),
+        installedAt: "2026-04-25T00:00:00Z",
+        templatesVersion: "0.6.1",
+      }],
+      ["orphan.md", {
+        sha256: orphanSha,
+        installedAt: "2026-04-25T00:00:00Z",
+        templatesVersion: "0.6.1",
+      }],
+    ]),
+  };
+  const writer = fakeWriter();
+  const uc = new UpgradeProjectUseCase({
+    reader: fakeReader({ "a.md": "alpha", "orphan.md": orphanContent }),
+    writer,
+    lockStore: fakeLockStore(lock),
+    core: coreFromBundle({ "a.md": { content: "alpha", executable: false } }),
+    templatesVersion: "0.7.0",
+    findHarness: findFakeHarness,
+  });
+  const result = await uc.execute({ projectDir: "/p", dryRun: false, force: false });
+  assertEquals(result.status, "applied");
+  assertEquals(writer.deleted, ["orphan.md"]);
+  assertEquals(writer.deleteBackupsRequested, false);
+});
+
+Deno.test("UpgradeProjectUseCase preserves customized orphan without --force, drops lock entry", async () => {
+  const lock: InstalledLock = {
+    version: 2,
+    harness: "claude",
+    templatesVersion: "0.6.1",
+    entries: new Map([
+      ["a.md", {
+        sha256: await sha256Hex("alpha"),
+        installedAt: "2026-04-25T00:00:00Z",
+        templatesVersion: "0.6.1",
+      }],
+      ["orphan.md", {
+        sha256: await sha256Hex("original"),
+        installedAt: "2026-04-25T00:00:00Z",
+        templatesVersion: "0.6.1",
+      }],
+    ]),
+  };
+  const writer = fakeWriter();
+  const lockStore = fakeLockStore(lock);
+  const uc = new UpgradeProjectUseCase({
+    reader: fakeReader({ "a.md": "alpha", "orphan.md": "user-edited" }),
+    writer,
+    lockStore,
+    core: coreFromBundle({ "a.md": { content: "alpha", executable: false } }),
+    templatesVersion: "0.7.0",
+    findHarness: findFakeHarness,
+  });
+  const result = await uc.execute({ projectDir: "/p", dryRun: false, force: false });
+  // Without --force, the customized orphan is left on disk
+  assertEquals(writer.deleted.includes("orphan.md"), false);
+  // Lock no longer has the orphan entry
+  assertEquals(lockStore.last?.entries.has("orphan.md"), false);
+  // up-to-date OR applied; the key invariant is the lock entry is gone
+  assert(result.status === "applied" || result.status === "up-to-date");
+});
+
+Deno.test("UpgradeProjectUseCase with --force deletes customized orphan with backup", async () => {
+  const lock: InstalledLock = {
+    version: 2,
+    harness: "claude",
+    templatesVersion: "0.6.1",
+    entries: new Map([
+      ["orphan.md", {
+        sha256: await sha256Hex("original"),
+        installedAt: "2026-04-25T00:00:00Z",
+        templatesVersion: "0.6.1",
+      }],
+    ]),
+  };
+  const writer = fakeWriter();
+  const uc = new UpgradeProjectUseCase({
+    reader: fakeReader({ "orphan.md": "user-edited" }),
+    writer,
+    lockStore: fakeLockStore(lock),
+    core: coreFromBundle({}),
+    templatesVersion: "0.7.0",
+    findHarness: findFakeHarness,
+  });
+  const result = await uc.execute({ projectDir: "/p", dryRun: false, force: true });
+  assertEquals(result.status, "applied");
+  assertEquals(writer.deleted, ["orphan.md"]);
+  assertEquals(writer.deleteBackupsRequested, true);
 });

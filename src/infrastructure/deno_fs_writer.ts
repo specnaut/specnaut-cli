@@ -67,4 +67,29 @@ export class DenoFsWriter implements FsWriter {
 
     return { backups };
   }
+
+  async deletePaths(
+    paths: ReadonlyArray<string>,
+    targetDir: string,
+    options: { backupExisting: boolean },
+  ): Promise<BackupReport> {
+    const resolved = resolve(targetDir);
+    const backups: { dest: string; backupPath: string }[] = [];
+
+    for (const dest of paths) {
+      assertSafeDestination(dest);
+      const abs = join(resolved, dest);
+      if (!(await fileExists(abs))) continue;
+
+      if (options.backupExisting) {
+        const backupAbs = `${abs}${BACKUP_SUFFIX}`;
+        await Deno.rename(abs, backupAbs);
+        backups.push({ dest, backupPath: `${dest}${BACKUP_SUFFIX}` });
+      } else {
+        await Deno.remove(abs);
+      }
+    }
+
+    return { backups };
+  }
 }

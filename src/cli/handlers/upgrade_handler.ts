@@ -21,6 +21,8 @@ function renderSummary(plan: UpgradePlan, from: string, to: string) {
     preserve: plan.filter((a) => a.kind === "preserve"),
     added: plan.filter((a) => a.kind === "add-new"),
     unchanged: plan.filter((a) => a.kind === "unchanged"),
+    removed: plan.filter((a) => a.kind === "remove" && !a.wasCustomized),
+    orphanPreserved: plan.filter((a) => a.kind === "remove" && a.wasCustomized),
   };
 
   console.log(
@@ -42,11 +44,22 @@ function renderSummary(plan: UpgradePlan, from: string, to: string) {
     for (const a of groups.preserve) console.log(yellow(`    ⚠ ${a.dest}`));
     console.log();
   }
+  if (groups.removed.length > 0) {
+    console.log(bold("  removed (no longer in templates)"));
+    for (const a of groups.removed) console.log(red(`    ✗ ${a.dest}`));
+    console.log();
+  }
+  if (groups.orphanPreserved.length > 0) {
+    console.log(bold("  removed but customized (not touched without --force)"));
+    for (const a of groups.orphanPreserved) console.log(yellow(`    ⚠ ${a.dest}`));
+    console.log();
+  }
 
   console.log(
     dim(
       `  ${groups.auto.length} auto-update, ${groups.preserve.length} preserved, ` +
-        `${groups.added.length} added, ${groups.unchanged.length} unchanged`,
+        `${groups.added.length} added, ${groups.removed.length} removed, ` +
+        `${groups.orphanPreserved.length} orphan-preserved, ${groups.unchanged.length} unchanged`,
     ),
   );
 }

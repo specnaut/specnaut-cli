@@ -10,6 +10,11 @@ export interface FsWriter {
     targetDir: string,
     options: { overwrite?: boolean; backupExisting?: boolean },
   ): Promise<BackupReport>;
+  deletePaths(
+    paths: ReadonlyArray<string>,
+    targetDir: string,
+    options: { backupExisting: boolean },
+  ): Promise<BackupReport>;
 }
 
 export type BackupReport = {

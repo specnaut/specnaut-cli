@@ -101,3 +101,45 @@ Deno.test("upgrade --force overwrites a customized file with backup", async () =
     assertEquals(after.includes("# User customization"), false);
   });
 });
+
+Deno.test("upgrade auto-deletes a clean orphan and drops it from the lock", async () => {
+  await withTempDir(async (parent) => {
+    const init = await runSpecflow(["init", "demo", "--no-git"], { cwd: parent });
+    assertEquals(init.code, 0);
+
+    const projectDir = join(parent, "demo");
+    const orphanRel = ".claude/commands/specflow.fake-orphan.md";
+    const orphanAbs = join(projectDir, orphanRel);
+    const orphanContent = "fake orphan content\n";
+    await Deno.writeTextFile(orphanAbs, orphanContent);
+
+    // Compute SHA-256 of the orphan content (matches the lock format).
+    const buf = new TextEncoder().encode(orphanContent);
+    const hash = await crypto.subtle.digest("SHA-256", buf);
+    const orphanSha = Array.from(new Uint8Array(hash))
+      .map((b) => b.toString(16).padStart(2, "0"))
+      .join("");
+
+    // Inject a fake orphan entry into the existing installed.lock.
+    const lockPath = join(projectDir, ".specflow/installed.lock");
+    const lockYaml = await Deno.readTextFile(lockPath);
+    const injected = lockYaml.replace(
+      /(entries:\s*\n)/,
+      `$1  ${orphanRel}:\n` +
+        `    sha256: ${orphanSha}\n` +
+        `    installed_at: "2026-04-25T00:00:00Z"\n` +
+        `    templates_version: "0.7.0"\n`,
+    );
+    await Deno.writeTextFile(lockPath, injected);
+
+    const upgrade = await runSpecflow(["upgrade"], { cwd: projectDir });
+    assertEquals(upgrade.code, 0);
+
+    // Orphan file deleted on disk.
+    assertEquals(await exists(orphanAbs), false);
+
+    // Lock no longer contains the orphan entry.
+    const newLockYaml = await Deno.readTextFile(lockPath);
+    assertEquals(newLockYaml.includes("specflow.fake-orphan.md"), false);
+  });
+});

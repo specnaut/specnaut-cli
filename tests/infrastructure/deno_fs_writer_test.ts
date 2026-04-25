@@ -1,4 +1,5 @@
 import { assertEquals, assertRejects, assertStringIncludes } from "@std/assert";
+import { exists } from "@std/fs/exists";
 import { join } from "@std/path";
 import { DenoFsWriter } from "../../src/infrastructure/deno_fs_writer.ts";
 import type { Bundle } from "../../src/domain/template.ts";
@@ -172,4 +173,50 @@ Deno.test("writeBundle returns empty backups for fresh installs", async () => {
     );
     assertEquals(report.backups.length, 0);
   });
+});
+
+Deno.test("DenoFsWriter.deletePaths deletes specified files; missing files silently skipped", async () => {
+  const dir = await Deno.makeTempDir({ prefix: "specflow-fswriter-delete-" });
+  try {
+    await Deno.mkdir(join(dir, "sub"), { recursive: true });
+    await Deno.writeTextFile(join(dir, "a.md"), "a");
+    await Deno.writeTextFile(join(dir, "sub/b.md"), "b");
+
+    const writer = new DenoFsWriter();
+    const report = await writer.deletePaths(
+      ["a.md", "sub/b.md", "missing.md"],
+      dir,
+      { backupExisting: false },
+    );
+
+    assertEquals(report.backups.length, 0);
+    assertEquals(await exists(join(dir, "a.md")), false);
+    assertEquals(await exists(join(dir, "sub/b.md")), false);
+  } finally {
+    await Deno.remove(dir, { recursive: true });
+  }
+});
+
+Deno.test("DenoFsWriter.deletePaths with backupExisting renames to .specflow.bak before delete", async () => {
+  const dir = await Deno.makeTempDir({ prefix: "specflow-fswriter-delete-bak-" });
+  try {
+    await Deno.writeTextFile(join(dir, "a.md"), "alpha");
+
+    const writer = new DenoFsWriter();
+    const report = await writer.deletePaths(
+      ["a.md"],
+      dir,
+      { backupExisting: true },
+    );
+
+    assertEquals(report.backups.length, 1);
+    assertEquals(report.backups[0].dest, "a.md");
+    assertEquals(report.backups[0].backupPath, "a.md.specflow.bak");
+    assertEquals(await exists(join(dir, "a.md")), false);
+    assertEquals(await exists(join(dir, "a.md.specflow.bak")), true);
+    const bakContent = await Deno.readTextFile(join(dir, "a.md.specflow.bak"));
+    assertEquals(bakContent, "alpha");
+  } finally {
+    await Deno.remove(dir, { recursive: true });
+  }
 });

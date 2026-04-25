@@ -28,6 +28,7 @@ function fakeFsWriter(conflicts: string[] = []): FsWriter & { written: string[] 
       for (const dest of Object.keys(bundle)) written.push(`${targetDir}:${dest}`);
       return Promise.resolve({ backups: [] });
     },
+    deletePaths: () => Promise.resolve({ backups: [] }),
   };
 }
 
@@ -182,6 +183,7 @@ Deno.test("InitProjectUseCase with force=true skips conflict detection and reque
       passedBackupExisting = options?.backupExisting === true;
       return Promise.resolve({ backups: [] });
     },
+    deletePaths: () => Promise.resolve({ backups: [] }),
   };
   const useCase = new InitProjectUseCase({
     writer,
@@ -209,6 +211,7 @@ Deno.test("InitProjectUseCase returns backups array from writer report", async (
           { dest: ".claude/x.md", backupPath: ".claude/x.md.specflow.bak" },
         ],
       }),
+    deletePaths: () => Promise.resolve({ backups: [] }),
   };
   const useCase = new InitProjectUseCase({
     writer,

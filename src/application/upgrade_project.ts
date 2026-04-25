@@ -73,8 +73,10 @@ export class UpgradeProjectUseCase {
     const plan = computeUpgradePlan(diskShas, lock, newShas);
 
     const hasActualWork = plan.some((a) =>
-      a.kind === "auto-update" || a.kind === "add-new" ||
-      (a.kind === "preserve" && input.force)
+      a.kind === "auto-update" ||
+      a.kind === "add-new" ||
+      (a.kind === "preserve" && input.force) ||
+      (a.kind === "remove" && (!a.wasCustomized || input.force))
     );
     if (!hasActualWork && plan.every((a) => a.kind === "unchanged")) {
       return { status: "up-to-date", currentVersion: lock.templatesVersion };
@@ -106,6 +108,31 @@ export class UpgradeProjectUseCase {
       backupExisting: input.force,
     });
 
+    const cleanRemovals = plan
+      .filter((a): a is Extract<typeof a, { kind: "remove" }> =>
+        a.kind === "remove" && !a.wasCustomized
+      )
+      .map((a) => a.dest);
+    const customizedRemovals = plan
+      .filter((a): a is Extract<typeof a, { kind: "remove" }> =>
+        a.kind === "remove" && a.wasCustomized
+      )
+      .map((a) => a.dest);
+
+    let extraBackups: ReadonlyArray<{ dest: string; backupPath: string }> = [];
+    if (cleanRemovals.length > 0) {
+      const r = await writer.deletePaths(cleanRemovals, input.projectDir, {
+        backupExisting: false,
+      });
+      extraBackups = [...extraBackups, ...r.backups];
+    }
+    if (input.force && customizedRemovals.length > 0) {
+      const r = await writer.deletePaths(customizedRemovals, input.projectDir, {
+        backupExisting: true,
+      });
+      extraBackups = [...extraBackups, ...r.backups];
+    }
+
     const now = (this.deps.now ?? (() => new Date()))().toISOString();
     const updatedEntries = new Map<string, LockEntry>();
     for (const [dest] of newShas) {
@@ -133,7 +160,7 @@ export class UpgradeProjectUseCase {
       plan,
       fromVersion: lock.templatesVersion,
       toVersion: templatesVersion,
-      backups: backupReport.backups.map((b) => b.dest),
+      backups: [...backupReport.backups, ...extraBackups].map((b) => b.dest),
     };
   }
 }
