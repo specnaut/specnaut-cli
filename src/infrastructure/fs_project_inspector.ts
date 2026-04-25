@@ -42,19 +42,24 @@ export class FsProjectInspector implements ProjectInspector {
     try {
       const raw = await Deno.readTextFile(path);
       const lock = parseLock(raw);
-      const expectedFolder = lock.harness === "claude" ? ".claude/" : ".cursor/";
-      const folderPresent = await exists(join(projectDir, expectedFolder));
+      const expectedFolder: Record<"claude" | "cursor" | "codex", string> = {
+        claude: ".claude/",
+        cursor: ".cursor/",
+        codex: ".agents/",
+      };
+      const folder = expectedFolder[lock.harness];
+      const folderPresent = await exists(join(projectDir, folder));
       if (!folderPresent) {
         return {
           name: "harness",
           status: "fail",
-          message: `lock says ${lock.harness} but ${expectedFolder} is missing`,
+          message: `lock says ${lock.harness} but ${folder} is missing`,
         };
       }
       return {
         name: "harness",
         status: "pass",
-        message: `${lock.harness} — ${expectedFolder} present`,
+        message: `${lock.harness} — ${folder} present`,
       };
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);

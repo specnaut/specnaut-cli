@@ -148,3 +148,8 @@ Deno.test("parseArgs init defaults --ai to claude", () => {
   const r = parseArgs(["init", "demo"]);
   if (r.kind === "init") assertEquals(r.ai, "claude");
 });
+
+Deno.test("parseArgs accepts init --ai codex", () => {
+  const r = parseArgs(["init", "demo", "--ai", "codex"]);
+  if (r.kind === "init") assertEquals(r.ai, "codex");
+});

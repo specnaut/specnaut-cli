@@ -232,3 +232,50 @@ entries: {}
     },
   );
 });
+
+Deno.test("inspect surfaces harness=codex when lock says codex and .agents/ exists", async () => {
+  await withProjectDir(
+    async (dir) => {
+      await Deno.mkdir(join(dir, ".agents/skills"), { recursive: true });
+      await Deno.mkdir(join(dir, ".specflow"), { recursive: true });
+      await Deno.writeTextFile(
+        join(dir, ".specflow/installed.lock"),
+        `version: 2
+harness: codex
+templates_version: 0.4.0
+entries: {}
+`,
+      );
+    },
+    async (dir) => {
+      const inspector = new FsProjectInspector();
+      const outcomes = await inspector.inspect(dir, "0.4.0");
+      const h = outcomes.find((o) => o.name === "harness");
+      assertEquals(h?.status, "pass");
+      assertEquals(h?.message.includes("codex"), true);
+    },
+  );
+});
+
+Deno.test("inspect reports fail for codex lock when .agents/ missing", async () => {
+  await withProjectDir(
+    async (dir) => {
+      // Lock says codex but no .agents/ directory on disk.
+      await Deno.mkdir(join(dir, ".specflow"), { recursive: true });
+      await Deno.writeTextFile(
+        join(dir, ".specflow/installed.lock"),
+        `version: 2
+harness: codex
+templates_version: 0.4.0
+entries: {}
+`,
+      );
+    },
+    async (dir) => {
+      const inspector = new FsProjectInspector();
+      const outcomes = await inspector.inspect(dir, "0.4.0");
+      const h = outcomes.find((o) => o.name === "harness");
+      assertEquals(h?.status, "fail");
+    },
+  );
+});

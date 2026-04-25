@@ -1,7 +1,11 @@
 import { parse as parseYaml, stringify as stringifyYaml } from "@std/yaml";
 
-export type KnownHarness = "claude" | "cursor";
-export const KNOWN_HARNESSES: ReadonlyArray<KnownHarness> = ["claude", "cursor"];
+export type KnownHarness = "claude" | "cursor" | "codex";
+export const KNOWN_HARNESSES: ReadonlyArray<KnownHarness> = [
+  "claude",
+  "cursor",
+  "codex",
+];
 
 export type LockEntry = {
   readonly sha256: string;

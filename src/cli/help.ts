@@ -20,7 +20,7 @@ ${bold("Usage:")}
 ${bold("Flags (for init):")}
   --here         Scaffold into the current directory instead of creating a new one
   --no-git       Skip "git init" detection and prompt
-  --ai <name>    Target AI harness: claude (default) | cursor
+  --ai <name>    Target AI harness: claude (default) | cursor | codex
 
 ${bold("Docs:")}  ${cyan("https://github.com/mkrlabs/specflow")}`;
 

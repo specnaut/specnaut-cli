@@ -109,3 +109,18 @@ Deno.test("serializeLock writes version 2 with harness field", () => {
   assertEquals(yaml.includes("version: 2"), true);
   assertEquals(yaml.includes("harness: cursor"), true);
 });
+
+Deno.test("parseLock accepts v2 lock with harness=codex", () => {
+  const v2 = `version: 2
+harness: codex
+templates_version: 0.4.0
+entries:
+  .agents/skills/specflow-specify/SKILL.md:
+    sha256: ccc
+    installed_at: "2026-04-25T00:00:00Z"
+    templates_version: "0.4.0"
+`;
+  const lock = parseLock(v2);
+  assertEquals(lock.version, 2);
+  assertEquals(lock.harness, "codex");
+});

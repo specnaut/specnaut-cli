@@ -2,23 +2,7 @@ import type { Harness } from "../../application/ports.ts";
 import type { CoreBundle, CoreEntry } from "../../domain/core_bundle.ts";
 import type { Bundle, TemplateFile } from "../../domain/template.ts";
 import { HARNESS_STATIC } from "../../templates_bundle.ts";
-
-const FRONTMATTER_RE = /^---\n([\s\S]*?)\n---\n?([\s\S]*)$/;
-
-function cursorSkillName(entry: CoreEntry): string {
-  switch (entry.category) {
-    case "command":
-      return `specflow-${entry.name}`;
-    case "backlog-cmd":
-      return `specflow-${entry.name}`;
-    case "agent":
-      return `specflow-agent-${entry.name}`;
-    case "skill":
-      return `specflow-${entry.name}`;
-    default:
-      throw new Error(`cursorSkillName not applicable for category: ${entry.category}`);
-  }
-}
+import { ensureSkillFrontmatter, skillFolderName } from "./skill_folder.ts";
 
 function destinationFor(entry: CoreEntry): string {
   switch (entry.category) {
@@ -26,7 +10,7 @@ function destinationFor(entry: CoreEntry): string {
     case "backlog-cmd":
     case "agent":
     case "skill":
-      return `.cursor/skills/${cursorSkillName(entry)}/SKILL.md`;
+      return `.cursor/skills/${skillFolderName(entry)}/SKILL.md`;
     case "spec-root":
       if (!entry.suffix) throw new Error(`spec-root needs suffix`);
       return `.specflow/${entry.suffix}`;
@@ -34,24 +18,6 @@ function destinationFor(entry: CoreEntry): string {
       if (!entry.suffix) throw new Error(`project-root needs suffix`);
       return entry.suffix;
   }
-}
-
-function ensureSkillFrontmatter(content: string, skillName: string): string {
-  const m = FRONTMATTER_RE.exec(content);
-  if (!m) {
-    // No frontmatter → synthesize one
-    return `---\nname: ${skillName}\ndescription: Specflow skill: ${skillName}\n---\n\n${content}`;
-  }
-  const fmBody = m[1];
-  const rest = m[2];
-  const hasName = /^name:\s/m.test(fmBody);
-  const hasDescription = /^description:\s/m.test(fmBody);
-  let newFm = fmBody;
-  if (!hasName) newFm = `name: ${skillName}\n${newFm}`;
-  if (!hasDescription) {
-    newFm = `${newFm}\ndescription: Specflow skill: ${skillName}`;
-  }
-  return `---\n${newFm}\n---\n${rest}`;
 }
 
 export class CursorHarness implements Harness {
@@ -68,8 +34,7 @@ export class CursorHarness implements Harness {
         entry.category === "agent" ||
         entry.category === "skill";
       if (isSkillFile) {
-        const skillName = cursorSkillName(entry);
-        content = ensureSkillFrontmatter(content, skillName);
+        content = ensureSkillFrontmatter(content, skillFolderName(entry));
       }
       out[dest] = { content, executable: entry.executable } satisfies TemplateFile;
     }

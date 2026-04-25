@@ -84,36 +84,6 @@ Deno.test("CursorHarness maps spec-root to .specflow/ and project-root unchanged
   assert("AGENTS.md" in mapped);
 });
 
-Deno.test("CursorHarness injects name: frontmatter when absent", () => {
-  const withoutName: CoreBundle = [{
-    category: "command",
-    name: "specify",
-    suffix: null,
-    content: "# no frontmatter\n",
-    executable: false,
-  }];
-  const h = new CursorHarness();
-  const mapped = h.mapBundle(withoutName);
-  const skill = mapped[".cursor/skills/specflow-specify/SKILL.md"];
-  assert(skill?.content.startsWith("---\n"));
-  assert(skill?.content.includes("name: specflow-specify"));
-});
-
-Deno.test("CursorHarness preserves original name: when already present", () => {
-  const withName: CoreBundle = [{
-    category: "command",
-    name: "specify",
-    suffix: null,
-    content: "---\nname: custom-name\ndescription: Explicit\n---\n\n# body\n",
-    executable: false,
-  }];
-  const h = new CursorHarness();
-  const mapped = h.mapBundle(withName);
-  const skill = mapped[".cursor/skills/specflow-specify/SKILL.md"];
-  // Original frontmatter is preserved — we do not override a user-provided name.
-  assertEquals(skill?.content.includes("name: custom-name"), true);
-});
-
 Deno.test("CursorHarness includes .cursor/rules/specify-rules.mdc from HARNESS_STATIC", () => {
   const h = new CursorHarness();
   const mapped = h.mapBundle(SAMPLE);
