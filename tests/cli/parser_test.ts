@@ -158,3 +158,8 @@ Deno.test("parseArgs accepts init --ai gemini", () => {
   const r = parseArgs(["init", "demo", "--ai", "gemini"]);
   if (r.kind === "init") assertEquals(r.ai, "gemini");
 });
+
+Deno.test("parseArgs accepts init --ai windsurf", () => {
+  const r = parseArgs(["init", "demo", "--ai", "windsurf"]);
+  if (r.kind === "init") assertEquals(r.ai, "windsurf");
+});

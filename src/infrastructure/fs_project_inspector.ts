@@ -42,11 +42,15 @@ export class FsProjectInspector implements ProjectInspector {
     try {
       const raw = await Deno.readTextFile(path);
       const lock = parseLock(raw);
-      const expectedFolder: Record<"claude" | "cursor" | "codex" | "gemini", string> = {
+      const expectedFolder: Record<
+        "claude" | "cursor" | "codex" | "gemini" | "windsurf",
+        string
+      > = {
         claude: ".claude/",
         cursor: ".cursor/",
         codex: ".agents/",
         gemini: ".gemini/",
+        windsurf: ".windsurf/",
       };
       const folder = expectedFolder[lock.harness];
       const folderPresent = await exists(join(projectDir, folder));

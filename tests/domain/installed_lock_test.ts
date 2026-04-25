@@ -139,3 +139,18 @@ entries:
   assertEquals(lock.version, 2);
   assertEquals(lock.harness, "gemini");
 });
+
+Deno.test("parseLock accepts v2 lock with harness=windsurf", () => {
+  const v2 = `version: 2
+harness: windsurf
+templates_version: 0.6.0
+entries:
+  .windsurf/workflows/specflow-specify.md:
+    sha256: eee
+    installed_at: "2026-04-25T00:00:00Z"
+    templates_version: "0.6.0"
+`;
+  const lock = parseLock(v2);
+  assertEquals(lock.version, 2);
+  assertEquals(lock.harness, "windsurf");
+});
