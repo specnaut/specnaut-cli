@@ -31,311 +31,185 @@ You **MUST** consider the user input before proceeding (if not empty).
 
 ## Pre-Execution Checks
 
-**Check for extension hooks (before specification)**:
-- Check if \`.specflow/extensions.yml\` exists in the project root.
-- If it exists, read it and look for entries under the \`hooks.before_specify\` key
-- If the YAML cannot be parsed or is invalid, skip hook checking silently and continue normally
-- Filter out hooks where \`enabled\` is explicitly \`false\`. Treat hooks without an \`enabled\` field as enabled by default.
-- For each remaining hook, do **not** attempt to interpret or evaluate hook \`condition\` expressions:
-  - If the hook has no \`condition\` field, or it is null/empty, treat the hook as executable
-  - If the hook defines a non-empty \`condition\`, skip the hook and leave condition evaluation to the HookExecutor implementation
-- For each executable hook, output the following based on its \`optional\` flag:
-  - **Optional hook** (\`optional: true\`):
-    \`\`\`
-    ## Extension Hooks
+**Check extension hooks (\`hooks.before_specify\` in \`.specflow/extensions.yml\`)**:
+Skip silently if the file is absent or unparseable. For each enabled entry
+(treat missing \`enabled\` as \`true\`) without a non-empty \`condition\`, emit:
 
-    **Optional Pre-Hook**: {extension}
-    Command: \`/{command}\`
-    Description: {description}
+- \`optional: true\` → \`## Extension Hooks\` block with \`**Optional Pre-Hook**: {extension}\`,
+  command, description, and prompt.
+- \`optional: false\` → \`## Extension Hooks\` block with \`**Automatic Pre-Hook**: {extension}\`,
+  \`EXECUTE_COMMAND: {command}\`, and wait for the result before proceeding.
 
-    Prompt: {prompt}
-    To execute: \`/{command}\`
-    \`\`\`
-  - **Mandatory hook** (\`optional: false\`):
-    \`\`\`
-    ## Extension Hooks
-
-    **Automatic Pre-Hook**: {extension}
-    Executing: \`/{command}\`
-    EXECUTE_COMMAND: {command}
-
-    Wait for the result of the hook command before proceeding to the Outline.
-    \`\`\`
-- If no hooks are registered or \`.specflow/extensions.yml\` does not exist, skip silently
+Hooks with non-empty \`condition\` are deferred to the HookExecutor.
 
 ## Outline
 
-The text the user typed after \`__SPECKIT_COMMAND_SPECIFY__\` in the triggering message **is** the feature description. Assume you always have it available in this conversation even if \`{ARGS}\` appears literally below. Do not ask the user to repeat it unless they provided an empty command.
+The text the user typed after \`__SPECKIT_COMMAND_SPECIFY__\` is the feature description. Do not ask the user to repeat it unless they provided an empty command.
 
 Given that feature description, do this:
 
 1. **Generate a concise short name** (2-4 words) for the feature:
-   - Analyze the feature description and extract the most meaningful keywords
-   - Create a 2-4 word short name that captures the essence of the feature
    - Use action-noun format when possible (e.g., "add-user-auth", "fix-payment-bug")
    - Preserve technical terms and acronyms (OAuth2, API, JWT, etc.)
-   - Keep it concise but descriptive enough to understand the feature at a glance
-   - Examples:
-     - "I want to add user authentication" → "user-auth"
-     - "Implement OAuth2 integration for the API" → "oauth2-api-integration"
-     - "Create a dashboard for analytics" → "analytics-dashboard"
-     - "Fix payment processing timeout bug" → "fix-payment-timeout"
 
 2. **Branch creation** (optional, via hook):
 
-   If a \`before_specify\` hook ran successfully in the Pre-Execution Checks above, it will have created/switched to a git branch and output JSON containing \`BRANCH_NAME\` and \`FEATURE_NUM\`. Note these values for reference, but the branch name does **not** dictate the spec directory name.
+   If a \`before_specify\` hook ran, it will have created/switched to a git branch and output JSON with \`BRANCH_NAME\` and \`FEATURE_NUM\`. Note these for reference; the branch name does **not** dictate the spec directory name.
 
-   If the user explicitly provided \`GIT_BRANCH_NAME\`, pass it through to the hook so the branch script uses the exact value as the branch name (bypassing all prefix/suffix generation).
+   If the user explicitly provided \`GIT_BRANCH_NAME\`, pass it to the hook so it uses that exact value.
 
 3. **Create the spec feature directory**:
 
-   Specs live under the default \`specs/\` directory unless the user explicitly provides \`SPECIFY_FEATURE_DIRECTORY\`.
+   Specs live under \`specs/\` unless the user provides \`SPECIFY_FEATURE_DIRECTORY\`.
 
    **Resolution order for \`SPECIFY_FEATURE_DIRECTORY\`**:
-   1. If the user explicitly provided \`SPECIFY_FEATURE_DIRECTORY\` (e.g., via environment variable, argument, or configuration), use it as-is
-   2. Otherwise, auto-generate it under \`specs/\`:
+   1. If the user explicitly provided it, use as-is.
+   2. Otherwise auto-generate under \`specs/\`:
       - Check \`.specflow/init-options.json\` for \`branch_numbering\`
-      - If \`"timestamp"\`: prefix is \`YYYYMMDD-HHMMSS\` (current timestamp)
-      - If \`"sequential"\` or absent: prefix is \`NNN\` (next available 3-digit number after scanning existing directories in \`specs/\`)
-      - Construct the directory name: \`<prefix>-<short-name>\` (e.g., \`003-user-auth\` or \`20260319-143022-user-auth\`)
+      - \`"timestamp"\`: prefix is \`YYYYMMDD-HHMMSS\`
+      - \`"sequential"\` or absent: prefix is \`NNN\` (next available 3-digit number)
+      - Construct: \`<prefix>-<short-name>\` (e.g., \`003-user-auth\`)
       - Set \`SPECIFY_FEATURE_DIRECTORY\` to \`specs/<directory-name>\`
 
    **Create the directory and spec file**:
    - \`mkdir -p SPECIFY_FEATURE_DIRECTORY\`
-   - Copy \`templates/spec-template.md\` to \`SPECIFY_FEATURE_DIRECTORY/spec.md\` as the starting point
+   - Copy \`templates/spec-template.md\` to \`SPECIFY_FEATURE_DIRECTORY/spec.md\`
    - Set \`SPEC_FILE\` to \`SPECIFY_FEATURE_DIRECTORY/spec.md\`
-   - Persist the resolved path to \`.specflow/feature.json\`:
+   - Persist to \`.specflow/feature.json\`:
      \`\`\`json
-     {
-       "feature_directory": "<resolved feature dir>"
-     }
+     { "feature_directory": "<resolved feature dir>" }
      \`\`\`
-     Write the actual resolved directory path value (for example, \`specs/003-user-auth\`), not the literal string \`SPECIFY_FEATURE_DIRECTORY\`.
-     This allows downstream commands (\`__SPECKIT_COMMAND_PLAN__\`, \`__SPECKIT_COMMAND_TASKS__\`, etc.) to locate the feature directory without relying on git branch name conventions.
+     Write the actual resolved path (e.g., \`specs/003-user-auth\`), not the literal string.
+     This lets downstream commands (\`__SPECKIT_COMMAND_PLAN__\`, \`__SPECKIT_COMMAND_TASKS__\`, etc.) locate the feature directory.
 
    **IMPORTANT**:
-   - You must only create one feature per \`__SPECKIT_COMMAND_SPECIFY__\` invocation
-   - The spec directory name and the git branch name are independent — they may be the same but that is the user's choice
-   - The spec directory and file are always created by this command, never by the hook
+   - Create only one feature per \`__SPECKIT_COMMAND_SPECIFY__\` invocation.
+   - The spec directory name and git branch name are independent.
+   - The spec directory and file are always created by this command, never by the hook.
 
 4. Load \`templates/spec-template.md\` to understand required sections.
 
 5. Follow this execution flow:
-    1. Parse user description from arguments
-       If empty: ERROR "No feature description provided"
-    2. Extract key concepts from description
-       Identify: actors, actions, data, constraints
-    3. For unclear aspects:
-       - Make informed guesses based on context and industry standards
-       - Only mark with [NEEDS CLARIFICATION: specific question] if:
-         - The choice significantly impacts feature scope or user experience
-         - Multiple reasonable interpretations exist with different implications
-         - No reasonable default exists
-       - **LIMIT: Maximum 3 [NEEDS CLARIFICATION] markers total**
-       - Prioritize clarifications by impact: scope > security/privacy > user experience > technical details
-    4. Fill User Scenarios & Testing section
-       If no clear user flow: ERROR "Cannot determine user scenarios"
-    5. Generate Functional Requirements
-       Each requirement must be testable
-       Use reasonable defaults for unspecified details (document assumptions in Assumptions section)
-    6. Define Success Criteria
-       Create measurable, technology-agnostic outcomes
-       Include both quantitative metrics (time, performance, volume) and qualitative measures (user satisfaction, task completion)
-       Each criterion must be verifiable without implementation details
+    1. Parse user description; if empty: ERROR "No feature description provided"
+    2. Extract key concepts: actors, actions, data, constraints
+    3. For unclear aspects, make informed guesses. Mark with \`[NEEDS CLARIFICATION: question]\` only when the choice significantly impacts scope/UX and no reasonable default exists. **Maximum 3 markers total.**
+    4. Fill User Scenarios & Testing; if no clear user flow: ERROR "Cannot determine user scenarios"
+    5. Generate Functional Requirements — each must be testable
+    6. Define Success Criteria — measurable, technology-agnostic, verifiable
     7. Identify Key Entities (if data involved)
     8. Return: SUCCESS (spec ready for planning)
 
-6. Write the specification to SPEC_FILE using the template structure, replacing placeholders with concrete details derived from the feature description (arguments) while preserving section order and headings.
+6. Write the specification to \`SPEC_FILE\` using the template structure, replacing placeholders with concrete details while preserving section order and headings.
 
-7. **Specification Quality Validation**: After writing the initial spec, validate it against quality criteria:
+7. **Specification Quality Validation**: After writing the spec, validate it:
 
-   a. **Create Spec Quality Checklist**: Generate a checklist file at \`SPECIFY_FEATURE_DIRECTORY/checklists/requirements.md\` using the checklist template structure with these validation items:
+   a. **Create Spec Quality Checklist** at \`SPECIFY_FEATURE_DIRECTORY/checklists/requirements.md\`:
 
       \`\`\`markdown
       # Specification Quality Checklist: [FEATURE NAME]
-      
-      **Purpose**: Validate specification completeness and quality before proceeding to planning
+
+      **Purpose**: Validate specification completeness before planning
       **Created**: [DATE]
       **Feature**: [Link to spec.md]
-      
+
       ## Content Quality
-      
       - [ ] No implementation details (languages, frameworks, APIs)
       - [ ] Focused on user value and business needs
-      - [ ] Written for non-technical stakeholders
       - [ ] All mandatory sections completed
-      
+
       ## Requirement Completeness
-      
       - [ ] No [NEEDS CLARIFICATION] markers remain
       - [ ] Requirements are testable and unambiguous
-      - [ ] Success criteria are measurable
-      - [ ] Success criteria are technology-agnostic (no implementation details)
-      - [ ] All acceptance scenarios are defined
-      - [ ] Edge cases are identified
-      - [ ] Scope is clearly bounded
-      - [ ] Dependencies and assumptions identified
-      
+      - [ ] Success criteria are measurable and technology-agnostic
+      - [ ] All acceptance scenarios defined; edge cases identified
+      - [ ] Scope clearly bounded; dependencies and assumptions identified
+
       ## Feature Readiness
-      
-      - [ ] All functional requirements have clear acceptance criteria
+      - [ ] All functional requirements have acceptance criteria
       - [ ] User scenarios cover primary flows
-      - [ ] Feature meets measurable outcomes defined in Success Criteria
-      - [ ] No implementation details leak into specification
-      
+      - [ ] No implementation details in specification
+
       ## Notes
-      
-      - Items marked incomplete require spec updates before \`__SPECKIT_COMMAND_CLARIFY__\` or \`__SPECKIT_COMMAND_PLAN__\`
+      Items marked incomplete require spec updates before \`__SPECKIT_COMMAND_CLARIFY__\` or \`__SPECKIT_COMMAND_PLAN__\`
       \`\`\`
 
-   b. **Run Validation Check**: Review the spec against each checklist item:
-      - For each item, determine if it passes or fails
-      - Document specific issues found (quote relevant spec sections)
+   b. **Run Validation**: Review spec against each checklist item; document specific failures.
 
-   c. **Handle Validation Results**:
+   c. **Handle Results**:
 
-      - **If all items pass**: Mark checklist complete and proceed to step 7
+      - **All pass**: Mark checklist complete and proceed to step 8.
 
-      - **If items fail (excluding [NEEDS CLARIFICATION])**:
-        1. List the failing items and specific issues
-        2. Update the spec to address each issue
-        3. Re-run validation until all items pass (max 3 iterations)
-        4. If still failing after 3 iterations, document remaining issues in checklist notes and warn user
+      - **Items fail** (excluding [NEEDS CLARIFICATION]):
+        1. List failing items and issues; update spec; re-run (max 3 iterations).
+        2. After 3 iterations, document remaining issues and warn user.
 
-      - **If [NEEDS CLARIFICATION] markers remain**:
-        1. Extract all [NEEDS CLARIFICATION: ...] markers from the spec
-        2. **LIMIT CHECK**: If more than 3 markers exist, keep only the 3 most critical (by scope/security/UX impact) and make informed guesses for the rest
-        3. For each clarification needed (max 3), present options to user in this format:
+      - **[NEEDS CLARIFICATION] markers remain**:
+        1. Keep only the 3 most critical; make informed guesses for the rest.
+        2. For each (max 3), present to user:
 
            \`\`\`markdown
            ## Question [N]: [Topic]
-           
+
            **Context**: [Quote relevant spec section]
-           
-           **What we need to know**: [Specific question from NEEDS CLARIFICATION marker]
-           
+           **What we need to know**: [Specific question]
+
            **Suggested Answers**:
-           
+
            | Option | Answer | Implications |
            |--------|--------|--------------|
-           | A      | [First suggested answer] | [What this means for the feature] |
-           | B      | [Second suggested answer] | [What this means for the feature] |
-           | C      | [Third suggested answer] | [What this means for the feature] |
-           | Custom | Provide your own answer | [Explain how to provide custom input] |
-           
+           | A      | [First answer] | [Implications] |
+           | B      | [Second answer] | [Implications] |
+           | Custom | Provide your own | — |
+
            **Your choice**: _[Wait for user response]_
            \`\`\`
 
-        4. **CRITICAL - Table Formatting**: Ensure markdown tables are properly formatted:
-           - Use consistent spacing with pipes aligned
-           - Each cell should have spaces around content: \`| Content |\` not \`|Content|\`
-           - Header separator must have at least 3 dashes: \`|--------|\`
-           - Test that the table renders correctly in markdown preview
-        5. Number questions sequentially (Q1, Q2, Q3 - max 3 total)
-        6. Present all questions together before waiting for responses
-        7. Wait for user to respond with their choices for all questions (e.g., "Q1: A, Q2: Custom - [details], Q3: B")
-        8. Update the spec by replacing each [NEEDS CLARIFICATION] marker with the user's selected or provided answer
-        9. Re-run validation after all clarifications are resolved
+        3. Number questions Q1–Q3; present all before waiting for responses.
+        4. Update spec with user's answers; re-run validation.
 
-   d. **Update Checklist**: After each validation iteration, update the checklist file with current pass/fail status
+   d. **Update Checklist** after each validation iteration.
 
-8. **Report completion** to the user with:
-   - \`SPECIFY_FEATURE_DIRECTORY\` — the feature directory path
-   - \`SPEC_FILE\` — the spec file path
+8. **Report completion** with:
+   - \`SPECIFY_FEATURE_DIRECTORY\` and \`SPEC_FILE\`
    - Checklist results summary
-   - Readiness for the next phase (\`__SPECKIT_COMMAND_CLARIFY__\` or \`__SPECKIT_COMMAND_PLAN__\`)
+   - Readiness for next phase (\`__SPECKIT_COMMAND_CLARIFY__\` or \`__SPECKIT_COMMAND_PLAN__\`)
 
-9. **Check for extension hooks**: After reporting completion, check if \`.specflow/extensions.yml\` exists in the project root.
-   - If it exists, read it and look for entries under the \`hooks.after_specify\` key
-   - If the YAML cannot be parsed or is invalid, skip hook checking silently and continue normally
-   - Filter out hooks where \`enabled\` is explicitly \`false\`. Treat hooks without an \`enabled\` field as enabled by default.
-   - For each remaining hook, do **not** attempt to interpret or evaluate hook \`condition\` expressions:
-     - If the hook has no \`condition\` field, or it is null/empty, treat the hook as executable
-     - If the hook defines a non-empty \`condition\`, skip the hook and leave condition evaluation to the HookExecutor implementation
-   - For each executable hook, output the following based on its \`optional\` flag:
-     - **Optional hook** (\`optional: true\`):
-       \`\`\`
-       ## Extension Hooks
+9. **Check extension hooks (\`hooks.after_specify\` in \`.specflow/extensions.yml\`)**:
+   Same rules as Pre-Execution Checks. For each executable hook emit:
 
-       **Optional Hook**: {extension}
-       Command: \`/{command}\`
-       Description: {description}
+   - \`optional: true\` → \`## Extension Hooks\` block with \`**Optional Hook**: {extension}\`, command, description, prompt.
+   - \`optional: false\` → \`## Extension Hooks\` block with \`**Automatic Hook**: {extension}\`, \`EXECUTE_COMMAND: {command}\`.
 
-       Prompt: {prompt}
-       To execute: \`/{command}\`
-       \`\`\`
-     - **Mandatory hook** (\`optional: false\`):
-       \`\`\`
-       ## Extension Hooks
-
-       **Automatic Hook**: {extension}
-       Executing: \`/{command}\`
-       EXECUTE_COMMAND: {command}
-       \`\`\`
-   - If no hooks are registered or \`.specflow/extensions.yml\` does not exist, skip silently
-
-**NOTE:** Branch creation is handled by the \`before_specify\` hook (git extension). Spec directory and file creation are always handled by this core command.
+**NOTE:** Branch creation is handled by the \`before_specify\` hook. Spec directory and file creation are always handled by this core command.
 
 ## Quick Guidelines
 
-- Focus on **WHAT** users need and **WHY**.
-- Avoid HOW to implement (no tech stack, APIs, code structure).
+- Focus on **WHAT** users need and **WHY**. Avoid HOW (no tech stack, APIs, code structure).
 - Written for business stakeholders, not developers.
-- DO NOT create any checklists that are embedded in the spec. That will be a separate command.
+- Do NOT embed checklists in the spec itself — that is a separate command.
 
 ### Section Requirements
 
-- **Mandatory sections**: Must be completed for every feature
-- **Optional sections**: Include only when relevant to the feature
-- When a section doesn't apply, remove it entirely (don't leave as "N/A")
+- **Mandatory sections**: complete for every feature.
+- **Optional sections**: include only when relevant; remove inapplicable sections entirely (don't leave "N/A").
 
 ### For AI Generation
 
-When creating this spec from a user prompt:
+1. **Make informed guesses** using context, industry standards, and common patterns.
+2. **Document assumptions** in the Assumptions section.
+3. **Limit clarifications**: max 3 \`[NEEDS CLARIFICATION]\` markers — only for critical decisions with no reasonable default.
+4. **Prioritize**: scope > security/privacy > user experience > technical details.
+5. **Think like a tester**: vague requirements should fail the "testable and unambiguous" check.
 
-1. **Make informed guesses**: Use context, industry standards, and common patterns to fill gaps
-2. **Document assumptions**: Record reasonable defaults in the Assumptions section
-3. **Limit clarifications**: Maximum 3 [NEEDS CLARIFICATION] markers - use only for critical decisions that:
-   - Significantly impact feature scope or user experience
-   - Have multiple reasonable interpretations with different implications
-   - Lack any reasonable default
-4. **Prioritize clarifications**: scope > security/privacy > user experience > technical details
-5. **Think like a tester**: Every vague requirement should fail the "testable and unambiguous" checklist item
-6. **Common areas needing clarification** (only if no reasonable default exists):
-   - Feature scope and boundaries (include/exclude specific use cases)
-   - User types and permissions (if multiple conflicting interpretations possible)
-   - Security/compliance requirements (when legally/financially significant)
-
-**Examples of reasonable defaults** (don't ask about these):
-
-- Data retention: Industry-standard practices for the domain
-- Performance targets: Standard web/mobile app expectations unless specified
-- Error handling: User-friendly messages with appropriate fallbacks
-- Authentication method: Standard session-based or OAuth2 for web apps
-- Integration patterns: Use project-appropriate patterns (REST/GraphQL for web services, function calls for libraries, CLI args for tools, etc.)
+**Reasonable defaults** (don't ask about these): data retention, performance targets, error handling, authentication method, integration patterns.
 
 ### Success Criteria Guidelines
 
-Success criteria must be:
+Success criteria must be **measurable** (specific metrics), **technology-agnostic** (no frameworks/databases), **user-focused** (outcomes from user/business perspective), and **verifiable** without implementation knowledge.
 
-1. **Measurable**: Include specific metrics (time, percentage, count, rate)
-2. **Technology-agnostic**: No mention of frameworks, languages, databases, or tools
-3. **User-focused**: Describe outcomes from user/business perspective, not system internals
-4. **Verifiable**: Can be tested/validated without knowing implementation details
+**Good**: "Users can complete checkout in under 3 minutes" · "System supports 10,000 concurrent users" · "95% of searches return results in under 1 second"
 
-**Good examples**:
-
-- "Users can complete checkout in under 3 minutes"
-- "System supports 10,000 concurrent users"
-- "95% of searches return results in under 1 second"
-- "Task completion rate improves by 40%"
-
-**Bad examples** (implementation-focused):
-
-- "API response time is under 200ms" (too technical, use "Users see results instantly")
-- "Database can handle 1000 TPS" (implementation detail, use user-facing metric)
-- "React components render efficiently" (framework-specific)
-- "Redis cache hit rate above 80%" (technology-specific)
+**Bad**: "API response time under 200ms" (too technical) · "Database handles 1000 TPS" (implementation detail) · "React components render efficiently" (framework-specific)
 `,
     executable: false,
   },
@@ -364,37 +238,16 @@ You **MUST** consider the user input before proceeding (if not empty).
 
 ## Pre-Execution Checks
 
-**Check for extension hooks (before clarification)**:
-- Check if \`.specflow/extensions.yml\` exists in the project root.
-- If it exists, read it and look for entries under the \`hooks.before_clarify\` key
-- If the YAML cannot be parsed or is invalid, skip hook checking silently and continue normally
-- Filter out hooks where \`enabled\` is explicitly \`false\`. Treat hooks without an \`enabled\` field as enabled by default.
-- For each remaining hook, do **not** attempt to interpret or evaluate hook \`condition\` expressions:
-  - If the hook has no \`condition\` field, or it is null/empty, treat the hook as executable
-  - If the hook defines a non-empty \`condition\`, skip the hook and leave condition evaluation to the HookExecutor implementation
-- For each executable hook, output the following based on its \`optional\` flag:
-  - **Optional hook** (\`optional: true\`):
-    \`\`\`
-    ## Extension Hooks
+**Check extension hooks (\`hooks.before_clarify\` in \`.specflow/extensions.yml\`)**:
+Skip silently if the file is absent or unparseable. For each enabled entry
+(treat missing \`enabled\` as \`true\`) without a non-empty \`condition\`, emit:
 
-    **Optional Pre-Hook**: {extension}
-    Command: \`/{command}\`
-    Description: {description}
+- \`optional: true\` → \`## Extension Hooks\` block with \`**Optional Pre-Hook**: {extension}\`,
+  command, description, and prompt.
+- \`optional: false\` → \`## Extension Hooks\` block with \`**Automatic Pre-Hook**: {extension}\`,
+  \`EXECUTE_COMMAND: {command}\`, and wait for the result before proceeding.
 
-    Prompt: {prompt}
-    To execute: \`/{command}\`
-    \`\`\`
-  - **Mandatory hook** (\`optional: false\`):
-    \`\`\`
-    ## Extension Hooks
-
-    **Automatic Pre-Hook**: {extension}
-    Executing: \`/{command}\`
-    EXECUTE_COMMAND: {command}
-
-    Wait for the result of the hook command before proceeding to the Outline.
-    \`\`\`
-- If no hooks are registered or \`.specflow/extensions.yml\` does not exist, skip silently
+Hooks with non-empty \`condition\` are deferred to the HookExecutor.
 
 ## Outline
 
@@ -411,61 +264,21 @@ Execution steps:
    - If JSON parsing fails, abort and instruct user to re-run \`__SPECKIT_COMMAND_SPECIFY__\` or verify feature branch environment.
    - For single quotes in args like "I'm Groot", use escape syntax: e.g 'I'\\''m Groot' (or double-quote if possible: "I'm Groot").
 
-2. Load the current spec file. Perform a structured ambiguity & coverage scan using this taxonomy. For each category, mark status: Clear / Partial / Missing. Produce an internal coverage map used for prioritization (do not output raw map unless no questions will be asked).
+2. Load the current spec file. Perform a structured ambiguity & coverage scan. For each category mark status: Clear / Partial / Missing (internal map only; do not output unless no questions will be asked).
 
-   Functional Scope & Behavior:
-   - Core user goals & success criteria
-   - Explicit out-of-scope declarations
-   - User roles / personas differentiation
+   Taxonomy categories:
+   - Functional Scope & Behavior (goals, out-of-scope, roles)
+   - Domain & Data Model (entities, identity, lifecycle, scale)
+   - Interaction & UX Flow (journeys, error/empty states, a11y)
+   - Non-Functional Quality Attributes (perf, scalability, reliability, observability, security, compliance)
+   - Integration & External Dependencies (APIs, formats, versioning)
+   - Edge Cases & Failure Handling (negatives, rate-limiting, conflicts)
+   - Constraints & Tradeoffs (technical constraints, rejected alternatives)
+   - Terminology & Consistency (canonical terms, avoided synonyms)
+   - Completion Signals (testable AC, measurable DoD indicators)
+   - Misc / Placeholders (TODOs, vague adjectives lacking quantification)
 
-   Domain & Data Model:
-   - Entities, attributes, relationships
-   - Identity & uniqueness rules
-   - Lifecycle/state transitions
-   - Data volume / scale assumptions
-
-   Interaction & UX Flow:
-   - Critical user journeys / sequences
-   - Error/empty/loading states
-   - Accessibility or localization notes
-
-   Non-Functional Quality Attributes:
-   - Performance (latency, throughput targets)
-   - Scalability (horizontal/vertical, limits)
-   - Reliability & availability (uptime, recovery expectations)
-   - Observability (logging, metrics, tracing signals)
-   - Security & privacy (authN/Z, data protection, threat assumptions)
-   - Compliance / regulatory constraints (if any)
-
-   Integration & External Dependencies:
-   - External services/APIs and failure modes
-   - Data import/export formats
-   - Protocol/versioning assumptions
-
-   Edge Cases & Failure Handling:
-   - Negative scenarios
-   - Rate limiting / throttling
-   - Conflict resolution (e.g., concurrent edits)
-
-   Constraints & Tradeoffs:
-   - Technical constraints (language, storage, hosting)
-   - Explicit tradeoffs or rejected alternatives
-
-   Terminology & Consistency:
-   - Canonical glossary terms
-   - Avoided synonyms / deprecated terms
-
-   Completion Signals:
-   - Acceptance criteria testability
-   - Measurable Definition of Done style indicators
-
-   Misc / Placeholders:
-   - TODO markers / unresolved decisions
-   - Ambiguous adjectives ("robust", "intuitive") lacking quantification
-
-   For each category with Partial or Missing status, add a candidate question opportunity unless:
-   - Clarification would not materially change implementation or validation strategy
-   - Information is better deferred to planning phase (note internally)
+   For each Partial or Missing category, add a candidate question unless clarification would not materially change implementation or is better deferred to planning.
 
 3. Generate (internally) a prioritized queue of candidate clarification questions (maximum 5). Do NOT output them all at once. Apply these constraints:
     - Maximum of 5 total questions across the whole session.
@@ -481,14 +294,9 @@ Execution steps:
 4. Sequential questioning loop (interactive):
     - Present EXACTLY ONE question at a time.
     - For multiple‑choice questions:
-       - **Analyze all options** and determine the **most suitable option** based on:
-          - Best practices for the project type
-          - Common patterns in similar implementations
-          - Risk reduction (security, performance, maintainability)
-          - Alignment with any explicit project goals or constraints visible in the spec
-       - Present your **recommended option prominently** at the top with clear reasoning (1-2 sentences explaining why this is the best choice).
-       - Format as: \`**Recommended:** Option [X] - <reasoning>\`
-       - Then render all options as a Markdown table:
+       - **Analyze all options** and determine the **most suitable option** based on best practices, common patterns, risk reduction, and alignment with project goals.
+       - Present your **recommended option prominently** at the top: \`**Recommended:** Option [X] - <reasoning>\`
+       - Render all options as a Markdown table:
 
        | Option | Description |
        |--------|-------------|
@@ -522,10 +330,10 @@ Execution steps:
     - Append a bullet line immediately after acceptance: \`- Q: <question> → A: <final answer>\`.
     - Then immediately apply the clarification to the most appropriate section(s):
        - Functional ambiguity → Update or add a bullet in Functional Requirements.
-       - User interaction / actor distinction → Update User Stories or Actors subsection (if present) with clarified role, constraint, or scenario.
-       - Data shape / entities → Update Data Model (add fields, types, relationships) preserving ordering; note added constraints succinctly.
-       - Non-functional constraint → Add/modify measurable criteria in Success Criteria > Measurable Outcomes (convert vague adjective to metric or explicit target).
-       - Edge case / negative flow → Add a new bullet under Edge Cases / Error Handling (or create such subsection if template provides placeholder for it).
+       - User interaction / actor distinction → Update User Stories or Actors subsection (if present).
+       - Data shape / entities → Update Data Model (add fields, types, relationships) preserving ordering.
+       - Non-functional constraint → Add/modify measurable criteria in Success Criteria > Measurable Outcomes.
+       - Edge case / negative flow → Add a new bullet under Edge Cases / Error Handling (or create subsection if missing).
        - Terminology conflict → Normalize term across spec; retain original only if necessary by adding \`(formerly referred to as "X")\` once.
     - If the clarification invalidates an earlier ambiguous statement, replace that statement instead of duplicating; leave no obsolete contradictory text.
     - Save the spec file AFTER each integration to minimize risk of context loss (atomic overwrite).
@@ -536,7 +344,7 @@ Execution steps:
    - Clarifications session contains exactly one bullet per accepted answer (no duplicates).
    - Total asked (accepted) questions ≤ 5.
    - Updated sections contain no lingering vague placeholders the new answer was meant to resolve.
-   - No contradictory earlier statement remains (scan for now-invalid alternative choices removed).
+   - No contradictory earlier statement remains.
    - Markdown structure valid; only allowed new headings: \`## Clarifications\`, \`### Session YYYY-MM-DD\`.
    - Terminology consistency: same canonical term used across all updated sections.
 
@@ -546,13 +354,13 @@ Execution steps:
    - Number of questions asked & answered.
    - Path to updated spec.
    - Sections touched (list names).
-   - Coverage summary table listing each taxonomy category with Status: Resolved (was Partial/Missing and addressed), Deferred (exceeds question quota or better suited for planning), Clear (already sufficient), Outstanding (still Partial/Missing but low impact).
-   - If any Outstanding or Deferred remain, recommend whether to proceed to \`__SPECKIT_COMMAND_PLAN__\` or run \`__SPECKIT_COMMAND_CLARIFY__\` again later post-plan.
+   - Coverage summary table: each taxonomy category with Status: Resolved / Deferred / Clear / Outstanding.
+   - If any Outstanding or Deferred remain, recommend whether to proceed to \`__SPECKIT_COMMAND_PLAN__\` or run \`__SPECKIT_COMMAND_CLARIFY__\` again.
    - Suggested next command.
 
 Behavior rules:
 
-- If no meaningful ambiguities found (or all potential questions would be low-impact), respond: "No critical ambiguities detected worth formal clarification." and suggest proceeding.
+- If no meaningful ambiguities found, respond: "No critical ambiguities detected worth formal clarification." and suggest proceeding.
 - If spec file missing, instruct user to run \`__SPECKIT_COMMAND_SPECIFY__\` first (do not create a new spec here).
 - Never exceed 5 total asked questions (clarification retries for a single question do not count as new questions).
 - Avoid speculative tech stack questions unless the absence blocks functional clarity.
@@ -564,35 +372,16 @@ Context for prioritization: {ARGS}
 
 ## Post-Execution Checks
 
-**Check for extension hooks (after clarification)**:
-Check if \`.specflow/extensions.yml\` exists in the project root.
-- If it exists, read it and look for entries under the \`hooks.after_clarify\` key
-- If the YAML cannot be parsed or is invalid, skip hook checking silently and continue normally
-- Filter out hooks where \`enabled\` is explicitly \`false\`. Treat hooks without an \`enabled\` field as enabled by default.
-- For each remaining hook, do **not** attempt to interpret or evaluate hook \`condition\` expressions:
-  - If the hook has no \`condition\` field, or it is null/empty, treat the hook as executable
-  - If the hook defines a non-empty \`condition\`, skip the hook and leave condition evaluation to the HookExecutor implementation
-- For each executable hook, output the following based on its \`optional\` flag:
-  - **Optional hook** (\`optional: true\`):
-    \`\`\`
-    ## Extension Hooks
+**Check extension hooks (\`hooks.after_clarify\` in \`.specflow/extensions.yml\`)**:
+Skip silently if the file is absent or unparseable. For each enabled entry
+(treat missing \`enabled\` as \`true\`) without a non-empty \`condition\`, emit:
 
-    **Optional Hook**: {extension}
-    Command: \`/{command}\`
-    Description: {description}
+- \`optional: true\` → \`## Extension Hooks\` block with \`**Optional Hook**: {extension}\`,
+  command, description, and prompt.
+- \`optional: false\` → \`## Extension Hooks\` block with \`**Automatic Hook**: {extension}\`,
+  \`EXECUTE_COMMAND: {command}\`.
 
-    Prompt: {prompt}
-    To execute: \`/{command}\`
-    \`\`\`
-  - **Mandatory hook** (\`optional: false\`):
-    \`\`\`
-    ## Extension Hooks
-
-    **Automatic Hook**: {extension}
-    Executing: \`/{command}\`
-    EXECUTE_COMMAND: {command}
-    \`\`\`
-- If no hooks are registered or \`.specflow/extensions.yml\` does not exist, skip silently
+Hooks with non-empty \`condition\` are deferred to the HookExecutor.
 `,
     executable: false,
   },
@@ -1602,24 +1391,14 @@ scripts:
 
 ## Checklist Purpose: "Unit Tests for English"
 
-**CRITICAL CONCEPT**: Checklists are **UNIT TESTS FOR REQUIREMENTS WRITING** - they validate the quality, clarity, and completeness of requirements in a given domain.
+**CRITICAL CONCEPT**: Checklists are **UNIT TESTS FOR REQUIREMENTS WRITING** — they validate quality, clarity, and completeness of requirements. They do NOT verify implementation behavior.
 
-**NOT for verification/testing**:
-
-- ❌ NOT "Verify the button clicks correctly"
-- ❌ NOT "Test error handling works"
-- ❌ NOT "Confirm the API returns 200"
-- ❌ NOT checking if code/implementation matches the spec
-
-**FOR requirements quality validation**:
-
-- ✅ "Are visual hierarchy requirements defined for all card types?" (completeness)
+- ❌ NOT "Verify the button clicks correctly" / "Test error handling works" / "Confirm API returns 200"
 - ✅ "Is 'prominent display' quantified with specific sizing/positioning?" (clarity)
 - ✅ "Are hover state requirements consistent across all interactive elements?" (consistency)
-- ✅ "Are accessibility requirements defined for keyboard navigation?" (coverage)
 - ✅ "Does the spec define what happens when logo image fails to load?" (edge cases)
 
-**Metaphor**: If your spec is code written in English, the checklist is its unit test suite. You're testing whether the requirements are well-written, complete, unambiguous, and ready for implementation - NOT whether the implementation works.
+If your spec is code written in English, the checklist is its unit test suite — testing whether requirements are well-written and ready for implementation, NOT whether the implementation works.
 
 ## User Input
 
@@ -1631,37 +1410,16 @@ You **MUST** consider the user input before proceeding (if not empty).
 
 ## Pre-Execution Checks
 
-**Check for extension hooks (before checklist generation)**:
-- Check if \`.specflow/extensions.yml\` exists in the project root.
-- If it exists, read it and look for entries under the \`hooks.before_checklist\` key
-- If the YAML cannot be parsed or is invalid, skip hook checking silently and continue normally
-- Filter out hooks where \`enabled\` is explicitly \`false\`. Treat hooks without an \`enabled\` field as enabled by default.
-- For each remaining hook, do **not** attempt to interpret or evaluate hook \`condition\` expressions:
-  - If the hook has no \`condition\` field, or it is null/empty, treat the hook as executable
-  - If the hook defines a non-empty \`condition\`, skip the hook and leave condition evaluation to the HookExecutor implementation
-- For each executable hook, output the following based on its \`optional\` flag:
-  - **Optional hook** (\`optional: true\`):
-    \`\`\`
-    ## Extension Hooks
+**Check extension hooks (\`hooks.before_checklist\` in \`.specflow/extensions.yml\`)**:
+Skip silently if the file is absent or unparseable. For each enabled entry
+(treat missing \`enabled\` as \`true\`) without a non-empty \`condition\`, emit:
 
-    **Optional Pre-Hook**: {extension}
-    Command: \`/{command}\`
-    Description: {description}
+- \`optional: true\` → \`## Extension Hooks\` block with \`**Optional Pre-Hook**: {extension}\`,
+  command, description, and prompt.
+- \`optional: false\` → \`## Extension Hooks\` block with \`**Automatic Pre-Hook**: {extension}\`,
+  \`EXECUTE_COMMAND: {command}\`, and wait for the result before proceeding.
 
-    Prompt: {prompt}
-    To execute: \`/{command}\`
-    \`\`\`
-  - **Mandatory hook** (\`optional: false\`):
-    \`\`\`
-    ## Extension Hooks
-
-    **Automatic Pre-Hook**: {extension}
-    Executing: \`/{command}\`
-    EXECUTE_COMMAND: {command}
-
-    Wait for the result of the hook command before proceeding to the Execution Steps.
-    \`\`\`
-- If no hooks are registered or \`.specflow/extensions.yml\` does not exist, skip silently
+Hooks with non-empty \`condition\` are deferred to the HookExecutor.
 
 ## Execution Steps
 
@@ -1669,37 +1427,13 @@ You **MUST** consider the user input before proceeding (if not empty).
    - All file paths must be absolute.
    - For single quotes in args like "I'm Groot", use escape syntax: e.g 'I'\\''m Groot' (or double-quote if possible: "I'm Groot").
 
-2. **Clarify intent (dynamic)**: Derive up to THREE initial contextual clarifying questions (no pre-baked catalog). They MUST:
-   - Be generated from the user's phrasing + extracted signals from spec/plan/tasks
-   - Only ask about information that materially changes checklist content
-   - Be skipped individually if already unambiguous in \`\$ARGUMENTS\`
-   - Prefer precision over breadth
+2. **Clarify intent (dynamic)**: Derive up to THREE contextual clarifying questions (no pre-baked catalog). Questions MUST be generated from the user's phrasing + signals extracted from spec/plan/tasks; skip any already answered in \`\$ARGUMENTS\`; cover only information that materially changes checklist content.
 
-   Generation algorithm:
-   1. Extract signals: feature domain keywords (e.g., auth, latency, UX, API), risk indicators ("critical", "must", "compliance"), stakeholder hints ("QA", "review", "security team"), and explicit deliverables ("a11y", "rollback", "contracts").
-   2. Cluster signals into candidate focus areas (max 4) ranked by relevance.
-   3. Identify probable audience & timing (author, reviewer, QA, release) if not explicit.
-   4. Detect missing dimensions: scope breadth, depth/rigor, risk emphasis, exclusion boundaries, measurable acceptance criteria.
-   5. Formulate questions chosen from these archetypes:
-      - Scope refinement (e.g., "Should this include integration touchpoints with X and Y or stay limited to local module correctness?")
-      - Risk prioritization (e.g., "Which of these potential risk areas should receive mandatory gating checks?")
-      - Depth calibration (e.g., "Is this a lightweight pre-commit sanity list or a formal release gate?")
-      - Audience framing (e.g., "Will this be used by the author only or peers during PR review?")
-      - Boundary exclusion (e.g., "Should we explicitly exclude performance tuning items this round?")
-      - Scenario class gap (e.g., "No recovery flows detected—are rollback / partial failure paths in scope?")
+   Archetypes: scope refinement, risk prioritization, depth calibration (lightweight sanity vs. formal release gate), audience framing (author vs. PR reviewer), boundary exclusion, scenario class gaps (recovery/rollback in scope?). Present options as a compact table (Option | Candidate | Why It Matters), max A–E; use free-form if clearer. Never ask the user to restate what they said.
 
-   Question formatting rules:
-   - If presenting options, generate a compact table with columns: Option | Candidate | Why It Matters
-   - Limit to A–E options maximum; omit table if a free-form answer is clearer
-   - Never ask the user to restate what they already said
-   - Avoid speculative categories (no hallucination). If uncertain, ask explicitly: "Confirm whether X belongs in scope."
+   Defaults when interaction impossible: Depth=Standard; Audience=Reviewer(PR) for code, Author otherwise; Focus=top 2 relevance clusters.
 
-   Defaults when interaction impossible:
-   - Depth: Standard
-   - Audience: Reviewer (PR) if code-related; Author otherwise
-   - Focus: Top 2 relevance clusters
-
-   Output the questions (label Q1/Q2/Q3). After answers: if ≥2 scenario classes (Alternate / Exception / Recovery / Non-Functional domain) remain unclear, you MAY ask up to TWO more targeted follow‑ups (Q4/Q5) with a one-line justification each (e.g., "Unresolved recovery path risk"). Do not exceed five total questions. Skip escalation if user explicitly declines more.
+   Label Q1/Q2/Q3. After answers, if ≥2 scenario classes (Alternate/Exception/Recovery/NFR) remain unclear, ask up to TWO follow-ups Q4/Q5 with one-line justification each. Max five questions total; skip escalation if user declines.
 
 3. **Understand user request**: Combine \`\$ARGUMENTS\` + clarifying answers:
    - Derive checklist theme (e.g., security, review, deploy, ux)
@@ -1720,13 +1454,8 @@ You **MUST** consider the user input before proceeding (if not empty).
 
 5. **Generate checklist** - Create "Unit Tests for Requirements":
    - Create \`FEATURE_DIR/checklists/\` directory if it doesn't exist
-   - Generate unique checklist filename:
-     - Use short, descriptive name based on domain (e.g., \`ux.md\`, \`api.md\`, \`security.md\`)
-     - Format: \`[domain].md\`
-   - File handling behavior:
-     - If file does NOT exist: Create new file and number items starting from CHK001
-     - If file exists: Append new items to existing file, continuing from the last CHK ID (e.g., if last item is CHK015, start new items at CHK016)
-   - Never delete or replace existing checklist content - always preserve and append
+   - Generate unique checklist filename using short, descriptive domain name (e.g., \`ux.md\`, \`api.md\`, \`security.md\`)
+   - File handling: if file does NOT exist create new and number from CHK001; if file exists append continuing from last CHK ID. Never delete or replace existing content.
 
    **CORE PRINCIPLE - Test the Requirements, Not the Implementation**:
    Every checklist item MUST evaluate the REQUIREMENTS THEMSELVES for:
@@ -1737,162 +1466,55 @@ You **MUST** consider the user input before proceeding (if not empty).
    - **Coverage**: Are all scenarios/edge cases addressed?
 
    **Category Structure** - Group items by requirement quality dimensions:
-   - **Requirement Completeness** (Are all necessary requirements documented?)
-   - **Requirement Clarity** (Are requirements specific and unambiguous?)
-   - **Requirement Consistency** (Do requirements align without conflicts?)
-   - **Acceptance Criteria Quality** (Are success criteria measurable?)
-   - **Scenario Coverage** (Are all flows/cases addressed?)
-   - **Edge Case Coverage** (Are boundary conditions defined?)
-   - **Non-Functional Requirements** (Performance, Security, Accessibility, etc. - are they specified?)
-   - **Dependencies & Assumptions** (Are they documented and validated?)
-   - **Ambiguities & Conflicts** (What needs clarification?)
+   - **Requirement Completeness**, **Requirement Clarity**, **Requirement Consistency**
+   - **Acceptance Criteria Quality**, **Scenario Coverage**, **Edge Case Coverage**
+   - **Non-Functional Requirements** (Performance, Security, Accessibility)
+   - **Dependencies & Assumptions**, **Ambiguities & Conflicts**
 
-   **HOW TO WRITE CHECKLIST ITEMS - "Unit Tests for English"**:
+   **ITEM STRUCTURE**: Question format testing requirement quality. Include quality dimension in brackets. Reference \`[Spec §X.Y]\` for existing requirements; use \`[Gap]\` for missing ones. MINIMUM ≥80% of items MUST carry a traceability marker: \`[Spec §X.Y]\`, \`[Gap]\`, \`[Ambiguity]\`, \`[Conflict]\`, or \`[Assumption]\`.
 
-   ❌ **WRONG** (Testing implementation):
-   - "Verify landing page displays 3 episode cards"
-   - "Test hover states work on desktop"
-   - "Confirm logo click navigates home"
+   Examples by dimension:
+   - Completeness: \`"Are error handling requirements defined for all API failure modes? [Gap]"\`
+   - Clarity: \`"Is 'fast loading' quantified with specific thresholds? [Clarity, Spec §NFR-2]"\`
+   - Consistency: \`"Do navigation requirements align across all pages? [Consistency, Spec §FR-10]"\`
+   - Coverage: \`"Are requirements defined for zero-state scenarios? [Coverage, Edge Case]"\`
+   - Measurability: \`"Can 'balanced visual weight' be objectively verified? [Measurability, Spec §FR-2]"\`
 
-   ✅ **CORRECT** (Testing requirements quality):
-   - "Are the exact number and layout of featured episodes specified?" [Completeness]
-   - "Is 'prominent display' quantified with specific sizing/positioning?" [Clarity]
-   - "Are hover state requirements consistent across all interactive elements?" [Consistency]
-   - "Are keyboard navigation requirements defined for all interactive UI?" [Coverage]
-   - "Is the fallback behavior specified when logo image fails to load?" [Edge Cases]
-   - "Are loading states defined for asynchronous episode data?" [Completeness]
-   - "Does the spec define visual hierarchy for competing UI elements?" [Clarity]
+   **Scenario Classification**: Confirm requirements exist for Primary, Alternate, Exception/Error, Recovery, and Non-Functional scenarios. For any missing class: "Are [scenario type] requirements intentionally excluded? [Gap]". Include rollback requirements when state mutation occurs.
 
-   **ITEM STRUCTURE**:
-   Each item should follow this pattern:
-   - Question format asking about requirement quality
-   - Focus on what's WRITTEN (or not written) in the spec/plan
-   - Include quality dimension in brackets [Completeness/Clarity/Consistency/etc.]
-   - Reference spec section \`[Spec §X.Y]\` when checking existing requirements
-   - Use \`[Gap]\` marker when checking for missing requirements
+   **Content Consolidation**: Soft cap 40 items — prioritize by risk/impact, merge near-duplicates, collapse >5 low-impact edge cases into one item.
 
-   **EXAMPLES BY QUALITY DIMENSION**:
+   **🚫 PROHIBITED**: Items starting with "Verify/Test/Confirm/Check" + behavior; references to code execution or user actions; "displays correctly", "works properly", implementation details.
 
-   Completeness:
-   - "Are error handling requirements defined for all API failure modes? [Gap]"
-   - "Are accessibility requirements specified for all interactive elements? [Completeness]"
-   - "Are mobile breakpoint requirements defined for responsive layouts? [Gap]"
-
-   Clarity:
-   - "Is 'fast loading' quantified with specific timing thresholds? [Clarity, Spec §NFR-2]"
-   - "Are 'related episodes' selection criteria explicitly defined? [Clarity, Spec §FR-5]"
-   - "Is 'prominent' defined with measurable visual properties? [Ambiguity, Spec §FR-4]"
-
-   Consistency:
-   - "Do navigation requirements align across all pages? [Consistency, Spec §FR-10]"
-   - "Are card component requirements consistent between landing and detail pages? [Consistency]"
-
-   Coverage:
-   - "Are requirements defined for zero-state scenarios (no episodes)? [Coverage, Edge Case]"
-   - "Are concurrent user interaction scenarios addressed? [Coverage, Gap]"
-   - "Are requirements specified for partial data loading failures? [Coverage, Exception Flow]"
-
-   Measurability:
-   - "Are visual hierarchy requirements measurable/testable? [Acceptance Criteria, Spec §FR-1]"
-   - "Can 'balanced visual weight' be objectively verified? [Measurability, Spec §FR-2]"
-
-   **Scenario Classification & Coverage** (Requirements Quality Focus):
-   - Check if requirements exist for: Primary, Alternate, Exception/Error, Recovery, Non-Functional scenarios
-   - For each scenario class, ask: "Are [scenario type] requirements complete, clear, and consistent?"
-   - If scenario class missing: "Are [scenario type] requirements intentionally excluded or missing? [Gap]"
-   - Include resilience/rollback when state mutation occurs: "Are rollback requirements defined for migration failures? [Gap]"
-
-   **Traceability Requirements**:
-   - MINIMUM: ≥80% of items MUST include at least one traceability reference
-   - Each item should reference: spec section \`[Spec §X.Y]\`, or use markers: \`[Gap]\`, \`[Ambiguity]\`, \`[Conflict]\`, \`[Assumption]\`
-   - If no ID system exists: "Is a requirement & acceptance criteria ID scheme established? [Traceability]"
-
-   **Surface & Resolve Issues** (Requirements Quality Problems):
-   Ask questions about the requirements themselves:
-   - Ambiguities: "Is the term 'fast' quantified with specific metrics? [Ambiguity, Spec §NFR-1]"
-   - Conflicts: "Do navigation requirements conflict between §FR-10 and §FR-10a? [Conflict]"
-   - Assumptions: "Is the assumption of 'always available podcast API' validated? [Assumption]"
-   - Dependencies: "Are external podcast API requirements documented? [Dependency, Gap]"
-   - Missing definitions: "Is 'visual hierarchy' defined with measurable criteria? [Gap]"
-
-   **Content Consolidation**:
-   - Soft cap: If raw candidate items > 40, prioritize by risk/impact
-   - Merge near-duplicates checking the same requirement aspect
-   - If >5 low-impact edge cases, create one item: "Are edge cases X, Y, Z addressed in requirements? [Coverage]"
-
-   **🚫 ABSOLUTELY PROHIBITED** - These make it an implementation test, not a requirements test:
-   - ❌ Any item starting with "Verify", "Test", "Confirm", "Check" + implementation behavior
-   - ❌ References to code execution, user actions, system behavior
-   - ❌ "Displays correctly", "works properly", "functions as expected"
-   - ❌ "Click", "navigate", "render", "load", "execute"
-   - ❌ Test cases, test plans, QA procedures
-   - ❌ Implementation details (frameworks, APIs, algorithms)
-
-   **✅ REQUIRED PATTERNS** - These test requirements quality:
-   - ✅ "Are [requirement type] defined/specified/documented for [scenario]?"
-   - ✅ "Is [vague term] quantified/clarified with specific criteria?"
-   - ✅ "Are requirements consistent between [section A] and [section B]?"
-   - ✅ "Can [requirement] be objectively measured/verified?"
-   - ✅ "Are [edge cases/scenarios] addressed in requirements?"
-   - ✅ "Does the spec define [missing aspect]?"
+   **✅ REQUIRED**: "Are [X] defined/specified for [scenario]?" · "Is [vague term] quantified?" · "Are requirements consistent between [A] and [B]?" · "Can [requirement] be objectively measured?"
 
 6. **Structure Reference**: Generate the checklist following the canonical template in \`templates/checklist-template.md\` for title, meta section, category headings, and ID formatting. If template is unavailable, use: H1 title, purpose/created meta lines, \`##\` category sections containing \`- [ ] CHK### <requirement item>\` lines with globally incrementing IDs starting at CHK001.
 
-7. **Report**: Output full path to checklist file, item count, and summarize whether the run created a new file or appended to an existing one. Summarize:
-   - Focus areas selected
-   - Depth level
-   - Actor/timing
-   - Any explicit user-specified must-have items incorporated
+7. **Report**: Output full path to checklist file, item count, and summarize whether the run created a new file or appended to an existing one. Summarize focus areas selected, depth level, actor/timing, and any explicit user-specified must-have items incorporated.
 
-**Important**: Each \`__SPECKIT_COMMAND_CHECKLIST__\` command invocation uses a short, descriptive checklist filename and either creates a new file or appends to an existing one. This allows:
-
-- Multiple checklists of different types (e.g., \`ux.md\`, \`test.md\`, \`security.md\`)
-- Simple, memorable filenames that indicate checklist purpose
-- Easy identification and navigation in the \`checklists/\` folder
-
-To avoid clutter, use descriptive types and clean up obsolete checklists when done.
+**Important**: Each \`__SPECKIT_COMMAND_CHECKLIST__\` command invocation uses a short, descriptive checklist filename and either creates a new file or appends to an existing one — allowing multiple checklists of different types (e.g., \`ux.md\`, \`test.md\`, \`security.md\`). Use descriptive types and clean up obsolete checklists when done.
 
 ## Example Checklist Types & Sample Items
 
 **UX Requirements Quality:** \`ux.md\`
-
-Sample items (testing the requirements, NOT the implementation):
-
 - "Are visual hierarchy requirements defined with measurable criteria? [Clarity, Spec §FR-1]"
-- "Is the number and positioning of UI elements explicitly specified? [Completeness, Spec §FR-1]"
 - "Are interaction state requirements (hover, focus, active) consistently defined? [Consistency]"
 - "Are accessibility requirements specified for all interactive elements? [Coverage, Gap]"
 - "Is fallback behavior defined when images fail to load? [Edge Case, Gap]"
-- "Can 'prominent display' be objectively measured? [Measurability, Spec §FR-4]"
 
 **API Requirements Quality:** \`api.md\`
-
-Sample items:
-
 - "Are error response formats specified for all failure scenarios? [Completeness]"
 - "Are rate limiting requirements quantified with specific thresholds? [Clarity]"
-- "Are authentication requirements consistent across all endpoints? [Consistency]"
 - "Are retry/timeout requirements defined for external dependencies? [Coverage, Gap]"
-- "Is versioning strategy documented in requirements? [Gap]"
 
 **Performance Requirements Quality:** \`performance.md\`
-
-Sample items:
-
 - "Are performance requirements quantified with specific metrics? [Clarity]"
 - "Are performance targets defined for all critical user journeys? [Coverage]"
-- "Are performance requirements under different load conditions specified? [Completeness]"
-- "Can performance requirements be objectively measured? [Measurability]"
 - "Are degradation requirements defined for high-load scenarios? [Edge Case, Gap]"
 
 **Security Requirements Quality:** \`security.md\`
-
-Sample items:
-
 - "Are authentication requirements specified for all protected resources? [Coverage]"
-- "Are data protection requirements defined for sensitive information? [Completeness]"
 - "Is the threat model documented and requirements aligned to it? [Traceability]"
-- "Are security requirements consistent with compliance obligations? [Consistency]"
 - "Are security failure/breach response requirements defined? [Gap, Exception Flow]"
 
 ## Anti-Examples: What NOT To Do
@@ -1903,7 +1525,6 @@ Sample items:
 - [ ] CHK001 - Verify landing page displays 3 episode cards [Spec §FR-001]
 - [ ] CHK002 - Test hover states work correctly on desktop [Spec §FR-003]
 - [ ] CHK003 - Confirm logo click navigates to home page [Spec §FR-010]
-- [ ] CHK004 - Check that related episodes section shows 3-5 items [Spec §FR-005]
 \`\`\`
 
 **✅ CORRECT - These test requirements quality:**
@@ -1913,50 +1534,23 @@ Sample items:
 - [ ] CHK002 - Are hover state requirements consistently defined for all interactive elements? [Consistency, Spec §FR-003]
 - [ ] CHK003 - Are navigation requirements clear for all clickable brand elements? [Clarity, Spec §FR-010]
 - [ ] CHK004 - Is the selection criteria for related episodes documented? [Gap, Spec §FR-005]
-- [ ] CHK005 - Are loading state requirements defined for asynchronous episode data? [Gap]
-- [ ] CHK006 - Can "visual hierarchy" requirements be objectively measured? [Measurability, Spec §FR-001]
+- [ ] CHK005 - Can "visual hierarchy" requirements be objectively measured? [Measurability, Spec §FR-001]
 \`\`\`
 
-**Key Differences:**
-
-- Wrong: Tests if the system works correctly
-- Correct: Tests if the requirements are written correctly
-- Wrong: Verification of behavior
-- Correct: Validation of requirement quality
-- Wrong: "Does it do X?"
-- Correct: "Is X clearly specified?"
+Key differences: Wrong tests if the system *works*; Correct tests if requirements are *written correctly*. Wrong: "Does it do X?" — Correct: "Is X clearly specified?"
 
 ## Post-Execution Checks
 
-**Check for extension hooks (after checklist generation)**:
-Check if \`.specflow/extensions.yml\` exists in the project root.
-- If it exists, read it and look for entries under the \`hooks.after_checklist\` key
-- If the YAML cannot be parsed or is invalid, skip hook checking silently and continue normally
-- Filter out hooks where \`enabled\` is explicitly \`false\`. Treat hooks without an \`enabled\` field as enabled by default.
-- For each remaining hook, do **not** attempt to interpret or evaluate hook \`condition\` expressions:
-  - If the hook has no \`condition\` field, or it is null/empty, treat the hook as executable
-  - If the hook defines a non-empty \`condition\`, skip the hook and leave condition evaluation to the HookExecutor implementation
-- For each executable hook, output the following based on its \`optional\` flag:
-  - **Optional hook** (\`optional: true\`):
-    \`\`\`
-    ## Extension Hooks
+**Check extension hooks (\`hooks.after_checklist\` in \`.specflow/extensions.yml\`)**:
+Skip silently if the file is absent or unparseable. For each enabled entry
+(treat missing \`enabled\` as \`true\`) without a non-empty \`condition\`, emit:
 
-    **Optional Hook**: {extension}
-    Command: \`/{command}\`
-    Description: {description}
+- \`optional: true\` → \`## Extension Hooks\` block with \`**Optional Hook**: {extension}\`,
+  command, description, and prompt.
+- \`optional: false\` → \`## Extension Hooks\` block with \`**Automatic Hook**: {extension}\`,
+  \`EXECUTE_COMMAND: {command}\`.
 
-    Prompt: {prompt}
-    To execute: \`/{command}\`
-    \`\`\`
-  - **Mandatory hook** (\`optional: false\`):
-    \`\`\`
-    ## Extension Hooks
-
-    **Automatic Hook**: {extension}
-    Executing: \`/{command}\`
-    EXECUTE_COMMAND: {command}
-    \`\`\`
-- If no hooks are registered or \`.specflow/extensions.yml\` does not exist, skip silently
+Hooks with non-empty \`condition\` are deferred to the HookExecutor.
 `,
     executable: false,
   },

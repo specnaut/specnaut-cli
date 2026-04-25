@@ -3,6 +3,15 @@ import type { CoreBundle, CoreEntry } from "../../domain/core_bundle.ts";
 import type { Bundle } from "../../domain/template.ts";
 import { skillFolderName } from "./skill_folder.ts";
 
+/**
+ * Windsurf's per-workflow character cap. Cascade silently truncates at this
+ * boundary, so we hard-fail at test time when any emitted workflow would
+ * exceed it.
+ *
+ * Documented at https://docs.windsurf.com/windsurf/cascade/workflows
+ */
+export const WINDSURF_WORKFLOW_MAX_CHARS = 12_000;
+
 function destinationFor(entry: CoreEntry): string {
   switch (entry.category) {
     case "command":

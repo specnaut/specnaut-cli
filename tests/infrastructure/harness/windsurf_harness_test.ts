@@ -1,6 +1,8 @@
 import { assert, assertEquals } from "@std/assert";
 import { WindsurfHarness } from "../../../src/infrastructure/harness/windsurf_harness.ts";
 import type { CoreBundle } from "../../../src/domain/core_bundle.ts";
+import { CORE_BUNDLE } from "../../../src/templates_bundle.ts";
+import { WINDSURF_WORKFLOW_MAX_CHARS } from "../../../src/infrastructure/harness/windsurf_harness.ts";
 
 const SAMPLE: CoreBundle = [
   {
@@ -103,4 +105,16 @@ Deno.test("WindsurfHarness emits no Claude/Cursor/Codex/Gemini artefacts", () =>
   assert(!keys.some((k) => k.startsWith(".codex/")), "no .codex/");
   assert(!keys.some((k) => k.startsWith(".gemini/")), "no .gemini/");
   assert(!keys.includes("CLAUDE.md"), "no CLAUDE.md");
+});
+
+Deno.test("WindsurfHarness emits no workflow exceeding the Cascade cap", () => {
+  const h = new WindsurfHarness();
+  const mapped = h.mapBundle(CORE_BUNDLE);
+  for (const [path, file] of Object.entries(mapped)) {
+    if (!path.startsWith(".windsurf/workflows/")) continue;
+    assert(
+      file.content.length <= WINDSURF_WORKFLOW_MAX_CHARS,
+      `${path} exceeds ${WINDSURF_WORKFLOW_MAX_CHARS} chars: ${file.content.length}`,
+    );
+  }
 });
