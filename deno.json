@@ -1,6 +1,6 @@
 {
   "name": "@mkrlabs/specflow",
-  "version": "0.6.0-alpha.1",
+  "version": "0.6.0-alpha.2",
   "tasks": {
     "bundle": "deno run --allow-read --allow-write scripts/bundle-templates.ts",
     "dev": "deno run --allow-read --allow-write --allow-run --allow-env src/main.ts",
