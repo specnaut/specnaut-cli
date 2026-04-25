@@ -199,13 +199,37 @@ Plus a Cursor-specific generated file:
 - `.cursor/rules/specify-rules.mdc` — a concise rules file that points the Cursor Agent at the
   skills and the workflow. Static content templated into the binary, not in CoreBundle.
 
-### 5.2 `SKILL.md` structure
+### 5.2 `SKILL.md` structure (verified against cursor.com/docs/skills)
 
-Cursor expects a front-matter-bearing markdown file with a `description` that the agent uses to
-decide when to invoke the skill. The existing Claude `speckit.specify.md` has a top YAML block with
-`description:`. CursorHarness passes the file content through unchanged, trusting upstream Claude
-and Cursor to share enough convention there. If a real-world Cursor user reports a rendering
-problem, we iterate.
+Cursor's SKILL.md **requires** two frontmatter fields:
+
+- `name` — lowercase letters, numbers, and hyphens only (e.g. `speckit-specify`)
+- `description` — what the skill does and when to use it
+
+Optional fields include `license`, `compatibility`, `metadata`, and `disable-model-invocation` (set
+to `true` to force manual invocation only).
+
+Skills are invoked either **automatically** (the agent picks based on description) or **manually**
+via `/skill-name` in Agent chat. Our shipped skill names (`speckit-specify`, `speckit-clarify`, …,
+`specflow-agent-product-owner`, `specflow-auto-chain`) all respect the `[a-z0-9-]+` constraint.
+
+The Claude commands already carry a top YAML block with `description:`. CursorHarness adds the
+required `name:` field (derived from the skill folder name) and leaves `description` intact. If the
+Claude command frontmatter has no `description`, CursorHarness falls back to
+`"Specflow skill: <name>"` to satisfy the Cursor requirement — logged as a warning during mapping so
+we can fix the core bundle later.
+
+### 5.2b `.cursor/rules/specify-rules.mdc` structure (verified against cursor.com/docs/rules)
+
+Cursor rules live in `.cursor/rules/` as `.md` or `.mdc` files. We use `.mdc` because the file needs
+explicit frontmatter. Expected keys:
+
+- `description` — shown to the agent when deciding whether to apply the rule
+- `globs` — glob patterns for when the rule applies (we leave empty — project-wide)
+- `alwaysApply` — boolean; if `true`, the rule is applied to every chat session
+
+Our generated rule file uses `alwaysApply: true` so the Cursor Agent always sees our workflow
+context, plus a concise `description` describing the Specflow workflow.
 
 ### 5.3 No `CLAUDE.md` equivalent
 
