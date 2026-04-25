@@ -55,6 +55,15 @@ Deno.test("specflow init <name> writes a complete tree", async () => {
     assertEquals(await exists(join(root, ".claude/commands/backlog.md")), true);
     assertEquals(await exists(join(root, ".claude/agents/product-owner.md")), true);
     assertEquals(await exists(join(root, ".claude/skills/speckit/SKILL.md")), true);
+
+    const commandsCount = (await Array.fromAsync(
+      Deno.readDir(join(root, ".claude/commands")),
+    )).length;
+    assertEquals(commandsCount, 11);
+    const agentsCount = (await Array.fromAsync(
+      Deno.readDir(join(root, ".claude/agents")),
+    )).length;
+    assertEquals(agentsCount, 8);
   });
 });
 

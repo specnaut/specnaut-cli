@@ -56,6 +56,12 @@ Deno.test("specflow init --ai cursor scaffolds a Cursor layout", async () => {
     );
     assertEquals(await exists(join(root, ".cursor/skills/specflow-speckit/SKILL.md")), true);
     assertEquals(await exists(join(root, ".cursor/rules/specify-rules.mdc")), true);
+
+    const skillsCount = (await Array.fromAsync(
+      Deno.readDir(join(root, ".cursor/skills")),
+    )).length;
+    assertEquals(skillsCount, 20);
+
     // Shared
     assertEquals(await exists(join(root, ".specflow/memory/constitution.md")), true);
     assertEquals(await exists(join(root, "AGENTS.md")), true);

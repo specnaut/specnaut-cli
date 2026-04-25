@@ -1,7 +1,7 @@
 import { join } from "@std/path";
 import type { ProjectInspector } from "../application/ports.ts";
 import type { CheckOutcome } from "../domain/check_result.ts";
-import { parseLock } from "../domain/installed_lock.ts";
+import { type KnownHarness, parseLock } from "../domain/installed_lock.ts";
 
 async function exists(path: string): Promise<boolean> {
   try {
@@ -42,10 +42,7 @@ export class FsProjectInspector implements ProjectInspector {
     try {
       const raw = await Deno.readTextFile(path);
       const lock = parseLock(raw);
-      const expectedFolder: Record<
-        "claude" | "cursor" | "codex" | "gemini" | "windsurf",
-        string
-      > = {
+      const expectedFolder: Record<KnownHarness, string> = {
         claude: ".claude/",
         cursor: ".cursor/",
         codex: ".agents/",

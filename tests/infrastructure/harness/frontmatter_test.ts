@@ -29,3 +29,17 @@ Deno.test("frontmatterField: returns null when key absent", () => {
   const fmBody = "name: thing\n";
   assertEquals(frontmatterField(fmBody, "description"), null);
 });
+
+Deno.test("frontmatterField: handles block scalar (|)", () => {
+  const fmBody = "description: |\n  Line one.\n  Line two.\n";
+  const value = frontmatterField(fmBody, "description");
+  assertEquals(typeof value, "string");
+  assert(value!.includes("Line one"));
+  assert(value!.includes("Line two"));
+});
+
+Deno.test("frontmatterField: returns null for non-string values", () => {
+  const fmBody = "count: 5\nflag: true\n";
+  assertEquals(frontmatterField(fmBody, "count"), null);
+  assertEquals(frontmatterField(fmBody, "flag"), null);
+});
