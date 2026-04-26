@@ -11,14 +11,22 @@
 set -euo pipefail
 
 REPO="${REPO:-mkrlabs/specflow}"
+PREFIX_EXPLICIT="${PREFIX+1}"
 PREFIX="${PREFIX:-/usr/local/bin}"
 VERSION="${VERSION:-}"
 DRY_RUN="${DRY_RUN:-}"
 
-abort() {
-  echo "error: $*" >&2
-  exit 1
-}
+if [[ -t 1 ]]; then
+  BOLD=$'\033[1m'; DIM=$'\033[2m'; GREEN=$'\033[32m'; YELLOW=$'\033[33m'; RED=$'\033[31m'; CYAN=$'\033[36m'; RESET=$'\033[0m'
+else
+  BOLD=""; DIM=""; GREEN=""; YELLOW=""; RED=""; CYAN=""; RESET=""
+fi
+
+step()  { printf "%s→%s %s\n" "$CYAN$BOLD" "$RESET" "$*"; }
+info()  { printf "  %s\n" "$*"; }
+ok()    { printf "  %s✓%s %s\n" "$GREEN" "$RESET" "$*"; }
+warn()  { printf "  %s!%s %s\n" "$YELLOW" "$RESET" "$*" >&2; }
+abort() { printf "%serror:%s %s\n" "$RED$BOLD" "$RESET" "$*" >&2; exit 1; }
 
 require() {
   command -v "$1" >/dev/null 2>&1 || abort "$1 is required but not found in PATH"
@@ -39,20 +47,61 @@ detect_target() {
     arm64|aarch64) arch="arm64" ;;
     *) abort "unsupported arch: $arch" ;;
   esac
-  echo "specflow-${os}-${arch}"
+  printf "specflow-%s-%s" "$os" "$arch"
 }
 
 latest_version() {
-  require curl
   curl -fsSL "https://api.github.com/repos/${REPO}/releases/latest" \
     | grep -Eo '"tag_name":\s*"[^"]+"' \
     | head -n1 \
     | sed -E 's/.*"([^"]+)"$/\1/'
 }
 
+# Move $1 to $2, handling permission elevation transparently.
+# Sets FINAL_DEST to the actual install path (may differ from $2 on fallback).
+install_binary() {
+  local src="$1" dest="$2" dest_dir
+  dest_dir="$(dirname "$dest")"
+  FINAL_DEST=""
+
+  # Best case: directory exists and is writable.
+  if [[ -d "$dest_dir" && -w "$dest_dir" ]]; then
+    mv -f "$src" "$dest"
+    chmod 755 "$dest"
+    FINAL_DEST="$dest"
+    return 0
+  fi
+
+  # Try elevating with sudo (reads password from controlling tty even when
+  # this script's stdin is the curl pipe).
+  if [[ -e /dev/tty ]] && command -v sudo >/dev/null 2>&1; then
+    info "${dest_dir} requires admin access — you'll be prompted for your password."
+    if sudo -p "  [sudo] password for %u: " mkdir -p "$dest_dir" </dev/tty \
+       && sudo mv -f "$src" "$dest" </dev/tty \
+       && sudo chmod 755 "$dest" </dev/tty; then
+      FINAL_DEST="$dest"
+      return 0
+    fi
+    warn "sudo failed — falling back to a user-writable location."
+  fi
+
+  # Fallback: install into $HOME/.local/bin (no admin needed).
+  if [[ -n "${PREFIX_EXPLICIT:-}" && "$PREFIX" != "/usr/local/bin" ]]; then
+    abort "cannot write to ${dest_dir} and you set PREFIX explicitly — aborting."
+  fi
+  local fallback_dir="$HOME/.local/bin"
+  mkdir -p "$fallback_dir"
+  local fallback_dest="$fallback_dir/specflow"
+  mv -f "$src" "$fallback_dest"
+  chmod 755 "$fallback_dest"
+  warn "installed to ${fallback_dir} instead of ${dest_dir}."
+  FINAL_DEST="$fallback_dest"
+}
+
 main() {
   require curl
 
+  local SHA_CMD
   if command -v shasum >/dev/null 2>&1; then
     SHA_CMD="shasum -a 256"
   elif command -v sha256sum >/dev/null 2>&1; then
@@ -72,23 +121,23 @@ main() {
   bin_url="https://github.com/${REPO}/releases/download/${version}/${target}"
   sha_url="${bin_url}.sha256"
 
-  echo "→ specflow ${version} (${target})"
-  echo "  prefix: ${PREFIX}"
+  step "specflow ${BOLD}${version}${RESET} ${DIM}(${target})${RESET}"
+  info "${DIM}prefix:${RESET} ${PREFIX}"
 
   if [[ -n "$DRY_RUN" ]]; then
-    echo "DRY_RUN=1 — would download:"
-    echo "  $bin_url"
-    echo "  $sha_url"
-    echo "  and install to ${PREFIX}/specflow"
+    info "DRY_RUN=1 — would download:"
+    info "  $bin_url"
+    info "  $sha_url"
+    info "  and install to ${PREFIX}/specflow"
     exit 0
   fi
 
   tmp="$(mktemp -d)"
-  trap 'rm -rf "$tmp"' EXIT
+  trap "rm -rf '$tmp'" EXIT
 
-  echo "  downloading binary..."
+  info "downloading binary..."
   curl -fsSL "$bin_url" -o "$tmp/specflow"
-  echo "  downloading checksum..."
+  info "downloading checksum..."
   curl -fsSL "$sha_url" -o "$tmp/specflow.sha256"
 
   expected_sha="$(awk '{print $1}' < "$tmp/specflow.sha256")"
@@ -96,21 +145,30 @@ main() {
   if [[ "$expected_sha" != "$actual_sha" ]]; then
     abort "checksum mismatch: expected $expected_sha, got $actual_sha"
   fi
-  echo "  checksum verified"
+  ok "checksum verified"
 
   chmod 755 "$tmp/specflow"
   dest="${PREFIX}/specflow"
 
-  if [[ -w "$PREFIX" ]]; then
-    mv "$tmp/specflow" "$dest"
-  else
-    echo "  $PREFIX is not writable — run the following manually:" >&2
-    echo "    sudo mv \"$tmp/specflow\" \"$dest\"" >&2
-    exit 1
-  fi
+  install_binary "$tmp/specflow" "$dest"
+  dest="$FINAL_DEST"
 
   echo
-  echo "installed $dest"
+  ok "installed ${BOLD}${dest}${RESET}"
+
+  local dest_dir
+  dest_dir="$(dirname "$dest")"
+  case ":$PATH:" in
+    *":$dest_dir:"*) ;;
+    *)
+      echo
+      warn "${dest_dir} is not in your PATH."
+      info "Add this to your shell profile (~/.zshrc, ~/.bashrc, …):"
+      info "  ${BOLD}export PATH=\"${dest_dir}:\$PATH\"${RESET}"
+      info "Then restart your shell, or run: ${BOLD}source ~/.zshrc${RESET}"
+      ;;
+  esac
+
   echo
   "$dest" --version || true
 }
