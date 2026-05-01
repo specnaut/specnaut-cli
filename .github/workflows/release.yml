@@ -13,6 +13,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          # Full history + tags so `git describe` and `git log <prev>..HEAD`
+          # can produce the changelog.
+          fetch-depth: 0
       - uses: denoland/setup-deno@v2
         with:
           deno-version: v2.x
@@ -23,9 +27,11 @@ jobs:
       - name: Compute checksums
         run: |
           cd dist
-          for f in *; do
+          for f in specflow-*; do
             shasum -a 256 "$f" > "$f.sha256"
           done
+      - name: Generate release notes
+        run: deno run --allow-read --allow-write --allow-run scripts/gen-changelog.ts
       - name: Create release
         uses: softprops/action-gh-release@v2
         with:
@@ -40,4 +46,4 @@ jobs:
             dist/specflow-linux-arm64.sha256
             dist/specflow-windows-x64.exe
             dist/specflow-windows-x64.exe.sha256
-          generate_release_notes: true
+          body_path: dist/release-notes.md

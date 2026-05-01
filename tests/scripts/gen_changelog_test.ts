@@ -1,0 +1,123 @@
+import { assertEquals, assertStringIncludes } from "@std/assert";
+import { type Classified, classifyCommit, formatChangelog } from "../../scripts/gen-changelog.ts";
+
+Deno.test("classifyCommit categorises feat:", () => {
+  const r = classifyCommit({ hash: "abc", subject: "feat: add antigravity harness" });
+  assertEquals(r.category, "feat");
+  assertEquals(r.cleanedSubject, "Add antigravity harness");
+});
+
+Deno.test("classifyCommit categorises feat(scope):", () => {
+  const r = classifyCommit({
+    hash: "abc",
+    subject: "feat(harness): add 8th target",
+  });
+  assertEquals(r.category, "feat");
+  assertEquals(r.cleanedSubject, "Add 8th target");
+});
+
+Deno.test("classifyCommit categorises fix(scope):", () => {
+  const r = classifyCommit({
+    hash: "abc",
+    subject: "fix(install): handle missing tty",
+  });
+  assertEquals(r.category, "fix");
+  assertEquals(r.cleanedSubject, "Handle missing tty");
+});
+
+Deno.test("classifyCommit handles breaking-change marker (feat!:)", () => {
+  const r = classifyCommit({ hash: "abc", subject: "feat!: rewire ports" });
+  assertEquals(r.category, "feat");
+  assertEquals(r.cleanedSubject, "Rewire ports");
+});
+
+Deno.test("classifyCommit buckets refactor/docs/test/ci/style/perf/build as chore", () => {
+  for (const t of ["chore", "refactor", "docs", "test", "ci", "style", "perf", "build"]) {
+    const r = classifyCommit({ hash: "abc", subject: `${t}: tweak` });
+    assertEquals(r.category, "chore", `expected chore for prefix ${t}`);
+  }
+});
+
+Deno.test("classifyCommit buckets unknown prefix as chore", () => {
+  const r = classifyCommit({ hash: "abc", subject: "wip: something" });
+  assertEquals(r.category, "chore");
+  assertEquals(r.cleanedSubject, "Something");
+});
+
+Deno.test("classifyCommit handles no prefix as chore", () => {
+  const r = classifyCommit({ hash: "abc", subject: "merge pr" });
+  assertEquals(r.category, "chore");
+  assertEquals(r.cleanedSubject, "Merge pr");
+});
+
+Deno.test("classifyCommit skips release bump commits", () => {
+  const r = classifyCommit({ hash: "abc", subject: "chore: release v0.7.3" });
+  assertEquals(r.category, "skip");
+});
+
+Deno.test("classifyCommit skips release bump with patch number", () => {
+  const r = classifyCommit({ hash: "abc", subject: "chore: release v1.10.42" });
+  assertEquals(r.category, "skip");
+});
+
+function classified(category: Classified["category"], cleaned: string): Classified {
+  return { hash: "abc", subject: "x", category, cleanedSubject: cleaned };
+}
+
+Deno.test("formatChangelog with mixed commits emits all three sections", () => {
+  const commits: Classified[] = [
+    classified("feat", "Add harness"),
+    classified("fix", "Net allowlist"),
+    classified("chore", "Bump deps"),
+  ];
+  const md = formatChangelog(commits, { fromTag: "v0.1.0", toTag: "v0.2.0" });
+  assertStringIncludes(md, "## What's changed in v0.2.0");
+  assertStringIncludes(md, "### Features");
+  assertStringIncludes(md, "- Add harness");
+  assertStringIncludes(md, "### Bug fixes");
+  assertStringIncludes(md, "- Net allowlist");
+  assertStringIncludes(md, "### Internal / chores");
+  assertStringIncludes(md, "<details>");
+  assertStringIncludes(md, "<summary>1 internal change</summary>");
+  assertStringIncludes(md, "- Bump deps");
+});
+
+Deno.test("formatChangelog pluralises chore summary", () => {
+  const commits: Classified[] = [
+    classified("chore", "A"),
+    classified("chore", "B"),
+  ];
+  const md = formatChangelog(commits, { fromTag: "v0", toTag: "v1" });
+  assertStringIncludes(md, "<summary>2 internal changes</summary>");
+});
+
+Deno.test("formatChangelog omits empty sections", () => {
+  const commits: Classified[] = [classified("fix", "Only fix")];
+  const md = formatChangelog(commits, { fromTag: "v0", toTag: "v1" });
+  assertEquals(md.includes("### Features"), false);
+  assertEquals(md.includes("### Internal"), false);
+  assertStringIncludes(md, "### Bug fixes");
+});
+
+Deno.test("formatChangelog with empty commit list emits placeholder", () => {
+  const md = formatChangelog([], { fromTag: "v0", toTag: "v1" });
+  assertStringIncludes(md, "_No user-facing changes since the previous release._");
+});
+
+Deno.test("formatChangelog appends compare URL when fromTag and repoUrl set", () => {
+  const md = formatChangelog([classified("feat", "X")], {
+    fromTag: "v0",
+    toTag: "v1",
+    repoUrl: "https://github.com/x/y",
+  });
+  assertStringIncludes(md, "**Full changelog:** https://github.com/x/y/compare/v0...v1");
+});
+
+Deno.test("formatChangelog omits compare URL when fromTag is null", () => {
+  const md = formatChangelog([classified("feat", "X")], {
+    fromTag: null,
+    toTag: "v1",
+    repoUrl: "https://github.com/x/y",
+  });
+  assertEquals(md.includes("Full changelog"), false);
+});
