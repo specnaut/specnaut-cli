@@ -12,7 +12,15 @@ export type InitIntent = {
   projectName: string | null;
   here: boolean;
   noGit: boolean;
-  ai: "claude" | "cursor" | "codex" | "gemini" | "windsurf" | "copilot" | "opencode";
+  ai:
+    | "claude"
+    | "cursor"
+    | "codex"
+    | "gemini"
+    | "windsurf"
+    | "copilot"
+    | "opencode"
+    | "antigravity";
   force: boolean;
 };
 
