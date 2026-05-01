@@ -38,7 +38,11 @@ export async function handleSelfUpdate(intent: SelfUpdateIntent): Promise<number
     const result = await useCase.execute({ checkOnly: intent.checkOnly });
     switch (result.status) {
       case "up-to-date":
-        console.log(green(`✓ already up to date (${result.currentVersion})`));
+        if (intent.checkOnly) {
+          console.log(green(`✓ no update available — current ${result.currentVersion}`));
+        } else {
+          console.log(green(`✓ already up to date (${result.currentVersion})`));
+        }
         return 0;
       case "available":
         console.log(

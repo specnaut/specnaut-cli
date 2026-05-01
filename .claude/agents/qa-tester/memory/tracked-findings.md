@@ -16,23 +16,6 @@ the fix (no finding) or re-flag a regression.
 
 ---
 
-## Issue #15 — `self-update --check` indistinguishable from bare self-update in up-to-date path
-
-**Symptom to suppress:** running `specflow self-update --check` and
-`specflow self-update` (no flag) on a freshly-init'd or up-to-date project
-both print `✓ already up to date (templates X.Y.Z)` and exit 0. The two
-forms produce identical output in the up-to-date path.
-
-**Why suppressed:** tracked in https://github.com/mkrlabs/specflow/issues/15.
-
-**How to apply:** if T8 (or any other test that probes self-update) sees
-this exact behaviour, count it as expected, do not file a finding. If
-the bare form starts behaving differently from `--check` (e.g. starts
-trying to download in the up-to-date path), that's a regression — flag
-it as a BLOCKER.
-
----
-
 ## Issue #16 — init reports "wrote 39 files" but collision guard says "38 specflow-managed file(s)"
 
 **Symptom to suppress:** in T3 the `specflow init --here --ai claude`
