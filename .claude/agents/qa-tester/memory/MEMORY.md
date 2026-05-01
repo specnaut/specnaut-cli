@@ -14,11 +14,11 @@ re-flag a regression on their own).
 ## Tracked in backlog (re-flag once the ticket closes)
 
 - [Tracked findings](tracked-findings.md) — symptoms covered by open
-  tickets #15 (self-update --check), #16 (init file-count discrepancy).
-  Suppress these in reports until the matching ticket closes. (#18 closed
-  by PR #22, #19 closed by PR #24, #17 closed by PR #25, #20 closed by
-  PR for check-project-version-phrasing — sections removed; the next QA
-  run will re-verify those fixes from a fresh-eyes perspective.)
+  ticket #16 (init file-count discrepancy). Suppress this in reports
+  until the matching ticket closes. (#18 closed by PR #22, #19 closed
+  by PR #24, #17 closed by PR #25, #20 closed by PR #26, #15 closed by
+  PR for self-update-check-differentiate — sections removed; the next
+  QA run will re-verify those fixes from a fresh-eyes perspective.)
 
 ## Patterns
 
