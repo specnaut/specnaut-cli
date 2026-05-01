@@ -22,7 +22,8 @@ ${bold("Flags (for init):")}
   --no-git       Skip "git init" detection and prompt
   --ai <name>    Target AI harness: claude (default) | cursor | codex | gemini | windsurf | copilot | opencode | antigravity
 
-${bold("Docs:")}  ${cyan("https://github.com/mkrlabs/specflow")}`;
+${bold("Docs:")}    ${cyan("https://specflow.makerlabs.dev")}
+${bold("Source:")}  ${cyan("https://github.com/mkrlabs/specflow")}`;
 
 export function renderVersionLine(
   version: string,
