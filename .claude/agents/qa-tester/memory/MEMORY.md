@@ -13,7 +13,11 @@ re-flag a regression on their own).
 
 ## Tracked in backlog (re-flag once the ticket closes)
 
-_(empty — add entries here as backlog tickets get opened for QA findings)_
+- [Tracked findings](tracked-findings.md) — symptoms covered by open
+  tickets #15 (self-update --check), #16 (init file-count discrepancy),
+  #17 (init next-steps vs docs), #18 (speckit name leak), #19 (--help
+  docs URL), #20 (check --project version phrasing). Suppress these in
+  reports until the matching ticket closes.
 
 ## Patterns
 
