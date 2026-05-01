@@ -4,6 +4,7 @@ import { sha256Hex } from "../domain/sha256.ts";
 import type { InstalledLock, LockEntry } from "../domain/installed_lock.ts";
 import type { CoreBundle } from "../domain/core_bundle.ts";
 import { computeUpgradePlan, type UpgradePlan } from "../domain/upgrade_plan.ts";
+import { canonicalBlockBody, extractBlock } from "../domain/merge_block.ts";
 
 export type UpgradeProjectInput = {
   projectDir: string;
@@ -62,12 +63,25 @@ export class UpgradeProjectUseCase {
     const diskShas = new Map<string, string>();
     for (const dest of destPaths) {
       const content = await reader.readText(input.projectDir, dest);
-      if (content !== null) diskShas.set(dest, await sha256Hex(content));
+      if (content === null) continue;
+      // For mergeable files we hash the *block content only* (not the whole
+      // user-owned file) so the SHA is comparable against the lock entry,
+      // which also stores only the block content.
+      const file = bundle[dest];
+      if (file?.mergeBlock !== undefined) {
+        const block = extractBlock(content, file.mergeBlock) ?? "";
+        diskShas.set(dest, await sha256Hex(block));
+      } else {
+        diskShas.set(dest, await sha256Hex(content));
+      }
     }
 
     const newShas = new Map<string, string>();
     for (const [dest, file] of Object.entries(bundle)) {
-      newShas.set(dest, await sha256Hex(file.content));
+      const shaInput = file.mergeBlock !== undefined
+        ? canonicalBlockBody(file.content)
+        : file.content;
+      newShas.set(dest, await sha256Hex(shaInput));
     }
 
     const plan = computeUpgradePlan(diskShas, lock, newShas);

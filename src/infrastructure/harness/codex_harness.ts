@@ -61,6 +61,14 @@ export class CodexHarness implements Harness {
             executable: entry.executable,
           };
           break;
+        case "mergeable-project-root":
+          if (!entry.suffix) throw new Error(`mergeable-project-root needs suffix`);
+          out[entry.suffix] = {
+            content: entry.content,
+            executable: entry.executable,
+            mergeBlock: "gitignore",
+          };
+          break;
       }
     }
     return out;

@@ -23,7 +23,8 @@ function destinationFor(entry: CoreEntry): string {
       if (!entry.suffix) throw new Error(`spec-root needs suffix`);
       return `.specflow/${entry.suffix}`;
     case "project-root":
-      if (!entry.suffix) throw new Error(`project-root needs suffix`);
+    case "mergeable-project-root":
+      if (!entry.suffix) throw new Error(`${entry.category} needs suffix`);
       return entry.suffix;
   }
 }
@@ -38,6 +39,7 @@ export class WindsurfHarness implements Harness {
       out[destinationFor(entry)] = {
         content: entry.content,
         executable: entry.executable,
+        ...(entry.category === "mergeable-project-root" ? { mergeBlock: "gitignore" } : {}),
       };
     }
     return out;

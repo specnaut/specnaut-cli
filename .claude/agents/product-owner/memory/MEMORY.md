@@ -11,5 +11,4 @@ treatment is now part of normal conventions).
 
 ## Entries
 
-_(empty — populate as user preferences, item-category patterns, and triage
-rationales accumulate)_
+- [Architect handoff pattern](architect-handoff-pattern.md) — when architect has already designed a solution, wire AC directly from the spec without re-deriving strategy

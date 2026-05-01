@@ -17,7 +17,8 @@ function destinationFor(entry: CoreEntry): string {
       if (!entry.suffix) throw new Error(`spec-root entry needs suffix: ${entry.name}`);
       return `.specflow/${entry.suffix}`;
     case "project-root":
-      if (!entry.suffix) throw new Error(`project-root entry needs suffix: ${entry.name}`);
+    case "mergeable-project-root":
+      if (!entry.suffix) throw new Error(`${entry.category} needs suffix: ${entry.name}`);
       return entry.suffix;
   }
 }
@@ -32,6 +33,7 @@ export class ClaudeHarness implements Harness {
       out[destinationFor(entry)] = {
         content: entry.content,
         executable: entry.executable,
+        ...(entry.category === "mergeable-project-root" ? { mergeBlock: "gitignore" } : {}),
       };
     }
     const staticFiles = HARNESS_STATIC[this.key] ?? {};
