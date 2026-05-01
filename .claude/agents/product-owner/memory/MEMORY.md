@@ -12,3 +12,4 @@ treatment is now part of normal conventions).
 ## Entries
 
 - [Architect handoff pattern](architect-handoff-pattern.md) — when architect has already designed a solution, wire AC directly from the spec without re-deriving strategy
+- [Docs domain](docs-domain.md) — Specflow docs are at https://specflow.makerlabs.dev (custom domain on GH Pages); use this URL in docs-related issues and AC.
