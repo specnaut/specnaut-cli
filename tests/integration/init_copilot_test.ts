@@ -59,7 +59,7 @@ Deno.test("specflow init --ai copilot scaffolds a Copilot layout", async () => {
       true,
     );
     assertEquals(
-      await exists(join(root, ".github/instructions/specflow-speckit.instructions.md")),
+      await exists(join(root, ".github/instructions/specflow-auto-chain.instructions.md")),
       true,
     );
     assertEquals(

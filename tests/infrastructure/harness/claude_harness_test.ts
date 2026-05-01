@@ -17,7 +17,7 @@ Deno.test("ClaudeHarness.mapBundle emits the Claude tree", () => {
   assert(".claude/commands/specflow.specify.md" in mapped);
   assert(".claude/commands/backlog.md" in mapped);
   assert(".claude/agents/product-owner.md" in mapped);
-  assert(".claude/skills/speckit/SKILL.md" in mapped);
+  assert(".claude/skills/auto-chain/SKILL.md" in mapped);
   assert(".specflow/memory/constitution.md" in mapped);
   assert("AGENTS.md" in mapped);
   assert("CLAUDE.md" in mapped);

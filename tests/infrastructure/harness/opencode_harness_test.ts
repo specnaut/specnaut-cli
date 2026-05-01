@@ -120,11 +120,11 @@ Deno.test("agent with no tools field emits no permission block", () => {
 });
 
 Deno.test("skill emits to .opencode/skills/specflow-<name>/SKILL.md with name+description", () => {
-  const bundle = harness.mapBundle([skillEntry("speckit")]);
-  const dest = ".opencode/skills/specflow-speckit/SKILL.md";
+  const bundle = harness.mapBundle([skillEntry("auto-chain")]);
+  const dest = ".opencode/skills/specflow-auto-chain/SKILL.md";
   assertEquals(Object.keys(bundle), [dest]);
-  assertStringIncludes(bundle[dest].content, "name: speckit");
-  assertStringIncludes(bundle[dest].content, "description: speckit skill");
+  assertStringIncludes(bundle[dest].content, "name: auto-chain");
+  assertStringIncludes(bundle[dest].content, "description: auto-chain skill");
 });
 
 Deno.test("spec-root and project-root pass through unchanged", () => {

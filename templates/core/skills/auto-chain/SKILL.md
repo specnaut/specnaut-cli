@@ -1,13 +1,13 @@
 ---
-name: speckit
-description: Auto-chain Speckit workflow — when the user runs /speckit specify, chain clarify → plan → tasks → analyze → implement → review → merge, stopping only for required clarifications and final pre-merge validation.
+name: auto-chain
+description: Auto-chain Specflow workflow — when the user runs /auto-chain specify, chain clarify → plan → tasks → analyze → implement → review → merge, stopping only for required clarifications and final pre-merge validation.
 ---
 
-# Speckit Auto-Chain
+# Specflow Auto-Chain
 
-This skill turns the Speckit workflow into a single-command operation. When the
-user invokes `/speckit specify "<feature description>"`, you MUST chain every
-Speckit phase in the same session without asking the user between phases,
+This skill turns the Specflow workflow into a single-command operation. When the
+user invokes `/auto-chain specify "<feature description>"`, you MUST chain every
+Specflow phase in the same session without asking the user between phases,
 EXCEPT at the two checkpoints defined below.
 
 ## Default flow
@@ -66,14 +66,14 @@ the branch)". Wait for explicit confirmation. On "yes", invoke
 
 ## Opt-out
 
-If the user invokes `/speckit specify --manual "<description>"`, run
+If the user invokes `/auto-chain specify --manual "<description>"`, run
 `/specflow.specify` only and stop. Do not auto-chain. Each subsequent phase must
 be invoked manually by the user.
 
 ## Single-phase invocations
 
-When the user invokes any phase directly (e.g. `/speckit clarify 042`,
-`/speckit plan 042`) — i.e. NOT via the entry point `/speckit specify` — the
+When the user invokes any phase directly (e.g. `/auto-chain clarify 042`,
+`/auto-chain plan 042`) — i.e. NOT via the entry point `/auto-chain specify` — the
 command is one-shot. Do NOT auto-chain. Single-phase invocations exist for
 re-running phases on an existing feature.
 

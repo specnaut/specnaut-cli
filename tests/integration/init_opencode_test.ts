@@ -73,10 +73,10 @@ Deno.test("specflow init --ai opencode scaffolds a complete OpenCode project lay
     assertStringIncludes(developer, "bash:");
 
     // Skills in .opencode/skills/specflow-<name>/SKILL.md
-    const speckitSkill = await Deno.readTextFile(
-      join(root, ".opencode/skills/specflow-speckit/SKILL.md"),
+    const autoChainSkill = await Deno.readTextFile(
+      join(root, ".opencode/skills/specflow-auto-chain/SKILL.md"),
     );
-    assertStringIncludes(speckitSkill, "name: speckit");
+    assertStringIncludes(autoChainSkill, "name: auto-chain");
 
     // Shared (cross-harness)
     assertEquals(await exists(join(root, ".specflow/memory/constitution.md")), true);

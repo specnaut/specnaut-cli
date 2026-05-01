@@ -29,7 +29,7 @@ clarifications needed) STOP #2 (pre-merge validation)
 - `/specflow-review` — architecture + quality gates
 - `/specflow-merge` — merge the feature branch to main
 - `/specflow-backlog` — manage the product backlog (via the PO agent)
-- `/specflow-speckit` — auto-chain dispatcher invoked by `/specflow-specify`
+- `/specflow-auto-chain` — auto-chain dispatcher invoked by `/specflow-specify`
 
 ## Agent roles (invocable manually as skills)
 

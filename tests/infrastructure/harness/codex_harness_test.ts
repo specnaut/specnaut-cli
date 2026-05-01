@@ -20,7 +20,7 @@ const SAMPLE: CoreBundle = [
   },
   {
     category: "skill",
-    name: "speckit",
+    name: "auto-chain",
     suffix: null,
     content: "---\ndescription: Auto-chain dispatcher\n---\n\n# body\n",
     executable: false,
@@ -70,7 +70,7 @@ Deno.test("CodexHarness maps backlog-cmd to .agents/skills/specflow-backlog/SKIL
 Deno.test("CodexHarness maps skill to .agents/skills/specflow-<name>/SKILL.md", () => {
   const h = new CodexHarness();
   const mapped = h.mapBundle(SAMPLE);
-  assert(".agents/skills/specflow-speckit/SKILL.md" in mapped);
+  assert(".agents/skills/specflow-auto-chain/SKILL.md" in mapped);
 });
 
 Deno.test("CodexHarness maps agent to .codex/agents/<name>.toml with valid TOML", () => {

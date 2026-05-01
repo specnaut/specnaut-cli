@@ -18,7 +18,7 @@ Deno.test("skillFolderName: backlog-cmd → specflow-<name>", () => {
 });
 
 Deno.test("skillFolderName: skill → specflow-<name>", () => {
-  assertEquals(skillFolderName(entry("skill", "speckit")), "specflow-speckit");
+  assertEquals(skillFolderName(entry("skill", "auto-chain")), "specflow-auto-chain");
 });
 
 Deno.test("skillFolderName: agent → specflow-agent-<name>", () => {
