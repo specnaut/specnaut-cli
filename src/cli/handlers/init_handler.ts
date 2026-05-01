@@ -57,9 +57,14 @@ export async function runInit(intent: InitIntent): Promise<number> {
       red(`error: target already contains ${result.conflicts.length} specflow-managed file(s):`),
     );
     for (const c of result.conflicts) console.error(red(`  - ${c}`));
+    console.error("\nTo proceed:");
     console.error(
-      "\nSpecflow v0.1 does not yet support upgrading an existing project. " +
-        "Remove these files or run init into a clean directory.",
+      `  • Run ${bold("specflow init --here --force")} to re-initialise in place ` +
+        "(existing files are backed up to *.specflow.bak).",
+    );
+    console.error(
+      `  • Or run ${bold("specflow upgrade")} if this project was previously ` +
+        "initialised by Specflow.",
     );
     return 3;
   }

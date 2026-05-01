@@ -85,6 +85,9 @@ Deno.test("specflow init refuses to overwrite a pre-existing .claude/", async ()
     const { code, stderr } = await runSpecflow(["init", "demo", "--no-git"], { cwd: dir });
     assertEquals(code, 3);
     assertStringIncludes(stderr, ".claude/commands/specflow.specify.md");
+    assertStringIncludes(stderr, "specflow init --here --force");
+    assertStringIncludes(stderr, "specflow upgrade");
+    assertEquals(stderr.includes("v0.1"), false, "error message must not hardcode a version");
   });
 });
 
