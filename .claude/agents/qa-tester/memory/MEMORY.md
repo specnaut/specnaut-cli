@@ -15,9 +15,9 @@ re-flag a regression on their own).
 
 - [Tracked findings](tracked-findings.md) — symptoms covered by open
   tickets #15 (self-update --check), #16 (init file-count discrepancy),
-  #17 (init next-steps vs docs), #20 (check --project version phrasing).
-  Suppress these in reports until the matching ticket closes. (#18 closed
-  by PR #22, #19 closed by PR for help-docs-url — sections removed; the
+  #20 (check --project version phrasing). Suppress these in reports until
+  the matching ticket closes. (#18 closed by PR #22, #19 closed by PR #24,
+  #17 closed by PR for init-next-steps-align-docs — sections removed; the
   next QA run will re-verify those fixes from a fresh-eyes perspective.)
 
 ## Patterns
