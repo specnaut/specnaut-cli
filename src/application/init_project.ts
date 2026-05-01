@@ -8,7 +8,10 @@ import { canonicalBlockBody } from "../domain/merge_block.ts";
 export type InitResult =
   | {
     status: "initialized";
+    /** Count of non-mergeable files written. Matches the collision-guard count. */
     filesWritten: number;
+    /** Paths of mergeable files (e.g. .gitignore) merged into pre-existing user content. */
+    filesMerged: string[];
     warnings: string[];
     backups: string[];
     lockWritten: boolean;
@@ -95,9 +98,20 @@ export class InitProjectUseCase {
       }
     }
 
+    const mergedPaths: string[] = [];
+    let writtenCount = 0;
+    for (const [dest, file] of Object.entries(bundle)) {
+      if (file.mergeBlock !== undefined) {
+        mergedPaths.push(dest);
+      } else {
+        writtenCount++;
+      }
+    }
+
     return {
       status: "initialized",
-      filesWritten: Object.keys(bundle).length,
+      filesWritten: writtenCount,
+      filesMerged: mergedPaths,
       warnings,
       backups: report.backups.map((b) => b.dest),
       lockWritten: true,
