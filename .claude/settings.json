@@ -35,9 +35,6 @@
     ],
     "deny": [
       "Bash(rm *)",
-      "Bash(git push *)",
-      "Bash(git commit *)",
-      "Bash(git reset *)",
       "Bash(gh release *)",
       "Bash(gh repo delete *)"
     ]

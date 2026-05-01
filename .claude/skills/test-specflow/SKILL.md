@@ -54,6 +54,16 @@ bash .claude/skills/test-specflow/scripts/clean.sh demo            # one project
 bash .claude/skills/test-specflow/scripts/clean.sh                 # everything under test/
 ```
 
+### Hands-off UX pass — dispatch the QA agent
+
+For a fresh-eyes audit (bootstrap + init + inspect + report) without
+running each script yourself, dispatch the `qa-tester` subagent (defined
+at `.claude/agents/qa-tester.md`). It reads the public docs at
+`specflow.makerlabs.dev/llms.txt`, runs Specflow against a clean Vite
+scenario as a brand-new user would, and writes a checklist report to
+`test/qa-report-<stamp>.md` listing every blocker / friction / nit. The
+agent never modifies the codebase — it only reports.
+
 ## Conventions
 
 - Test projects always live under `test/<name>/`. The `test/` directory is gitignored at the repo root — never commit anything from it.
