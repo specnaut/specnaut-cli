@@ -1,14 +1,16 @@
 ---
 name: qa-tester
 description: >
-  Specflow QA tester. Runs a fixed catalogue of 8 numbered scenarios (T1–T8)
-  against a clean Vite brownfield project, following the public docs at
-  specflow.makerlabs.dev/llms.txt, and writes a checklist report. Stops
+  Specflow QA tester. Runs a fixed catalogue of numbered scenarios (T0–T8)
+  against the **released binary** (after self-updating to the latest
+  version) on a clean Vite brownfield project, following the public docs
+  at specflow.makerlabs.dev/llms.txt, and writes a checklist report. Stops
   early at 10 findings (configurable) so the next run gets a fresh slate
   after triage. Reads its own memory first to suppress already-acknowledged
   findings — no re-flagging the same issue every run. Default harness is
-  `claude`. Use to dogfood Specflow before a release, after a non-trivial
-  change to `init` / `upgrade` / `check`, or on demand.
+  `claude`. Use to dogfood the latest released Specflow before announcing
+  it, after a non-trivial change to `init` / `upgrade` / `check`, or on
+  demand.
 model: sonnet
 tools: Read, Grep, Glob, Bash, WebFetch, Write
 ---
@@ -27,9 +29,13 @@ explain a bug. You are the canary — the value is in being naïve.
 - Project shape: Vite React-TS brownfield (`bootstrap-vite.sh`)
 - Docs source: https://specflow.makerlabs.dev/llms.txt — fall back to
   https://specflow.makerlabs.dev if `.txt` 404s.
-- Test toolbox: `.claude/skills/test-specflow/scripts/`. The scripts run
-  `deno run` on the working tree, so you are testing what's on the current
-  branch, not the released binary.
+- **Source under test: the `specflow` binary on PATH, refreshed to the
+  latest GitHub Release via T0 (`specflow self-update`).** This is what
+  end users actually run. The test-specflow toolbox scripts you DO use
+  (`bootstrap-vite.sh`, `inspect.sh`, `clean.sh`) are harness-agnostic
+  scaffolding — they don't invoke specflow themselves. You bypass
+  `run-init.sh` / `compare-harnesses.sh` because those use `deno run` on
+  the working tree, which is dev-time validation, not release-validation.
 - Findings cap: **10**. Override only when the dispatcher asks (e.g.
   "exhaustive run", "run all 8 harnesses").
 
@@ -52,7 +58,7 @@ skip it. Do not bump the findings counter for it. Mention it in the
 ## Findings counter
 
 You maintain a single counter `findings = 0`. Every BLOCKER / FRICTION /
-NIT you decide to record bumps it by 1. After each test (T1 through T8),
+NIT you decide to record bumps it by 1. After each test (T0 through T8),
 check the counter:
 
 - **If `findings >= cap`** (default 10): stop running new tests, jump
@@ -79,11 +85,33 @@ If you're unsure which kind a failure is: continue. The worst case is
 one extra finding; the worse-than-worst case is missing five tests
 because of a false abort.
 
-## Test catalogue (T1–T8)
+## Test catalogue (T0–T8)
 
 Each test has: a one-line goal, the exact command(s), the expected
 outcome (per docs or per stable behaviour), and which findings are
 abort-BLOCKERs vs finding-BLOCKERs.
+
+### T0 — Refresh `specflow` to the latest released binary
+
+- **Goal:** every QA run validates the version end users will install
+  today, not yesterday's binary or the working tree.
+- **Commands:**
+  ```bash
+  command -v specflow            # confirm specflow is on PATH
+  specflow self-update           # update to latest release
+  specflow --version             # capture for the report header
+  ```
+- **Expected:** `command -v` prints the binary path; `self-update`
+  prints either `✓ updated X.Y.Z → A.B.C` or `✓ already up to date
+  (X.Y.Z)`; `--version` prints `specflow X.Y.Z (templates A.B.C)`.
+  Record `X.Y.Z` (the latest version under test) in the report header
+  alongside `A.B.C` (the bundled templates version).
+- **Abort-BLOCKER:** `specflow` not on PATH (the QA premise — testing
+  the released binary — collapses if there's nothing to test); or
+  `self-update` non-zero exit AND the binary is on a stale version.
+- **Finding-BLOCKER:** `self-update` prompts for permissions (the
+  permissions issue from #12 is supposed to be fixed since v0.7.2);
+  `--version` line malformed.
 
 ### T1 — Docs are reachable and listing the documented commands
 
@@ -114,17 +142,22 @@ abort-BLOCKERs vs finding-BLOCKERs.
 
 ### T3 — `init --here --ai claude` succeeds end-to-end
 
-- **Command:**
+- **Command:** invoke the released binary directly inside the test
+  directory (do NOT use `run-init.sh` — that runs `deno run` against
+  the working tree, which is not what we're testing).
   ```bash
-  bash .claude/skills/test-specflow/scripts/run-init.sh qa-<stamp> claude
+  cd test/qa-<stamp> && specflow init --here --no-git --ai claude
   ```
 - **Expected:** exit 0; stdout includes "Initializing into …" and
-  "✓ wrote N files" (N around 38–40); a "Next steps" block follows.
+  "✓ wrote N files (+ merged: .gitignore)" (N around 38–40); a
+  "Next steps" block follows that recommends `/specflow.specify`
+  before `/backlog add`.
 - **Abort-BLOCKER:** non-zero exit. Without a successful init, T4–T7
   cannot run on this scenario.
 - **Finding-BLOCKER:** "Next steps" suggests a command that doesn't
   exist after init (cross-check the slash command file in
-  `.claude/commands/`); file count outside 30–60.
+  `.claude/commands/`); file count outside 30–60; merged-file suffix
+  missing when `.gitignore` was preserved.
 
 ### T4 — Brownfield `.gitignore` merge preserves Vite content and fences the Specflow block
 
@@ -147,22 +180,24 @@ abort-BLOCKERs vs finding-BLOCKERs.
 
 - **Command:**
   ```bash
-  bash .claude/skills/test-specflow/scripts/run-init.sh qa-<stamp> claude
+  cd test/qa-<stamp> && specflow init --here --no-git --ai claude
   ```
 - **Expected:** non-zero exit (currently 3); error names the existing
-  files; **and** suggests both `specflow init --here --force` and
-  `specflow upgrade` as recovery paths.
+  files; the count printed (`target already contains N specflow-managed
+  file(s)`) matches T3's `wrote N files` (after #16, both surface the
+  same number); **and** suggests both `specflow init --here --force`
+  and `specflow upgrade` as recovery paths.
 - **Finding-BLOCKER:** zero exit (silently overwrites — would be
   catastrophic), error message names only one of the two recovery
-  paths, error message references a stale version string.
+  paths, error message references a stale version string, or the count
+  diverges from T3 by more than zero.
 
 ### T6 — `check` reports the environment cleanly
 
 - **Command:**
   ```bash
-  deno run --allow-all /Users/kevin/Sites/specflow/src/main.ts check
+  specflow check
   ```
-  (use the absolute path to dodge `cd` traps in the persistent shell)
 - **Expected:** exit 0; lists `git`, `gh`, `deno` each with a
   ✓ checkmark and a version string; ends with "All checks passed."
 - **Finding-BLOCKER:** missing tool from the list, ✗ on a tool that's
@@ -173,7 +208,7 @@ abort-BLOCKERs vs finding-BLOCKERs.
 
 - **Command:**
   ```bash
-  cd test/qa-<stamp> && deno run --allow-all /Users/kevin/Sites/specflow/src/main.ts check --project
+  cd test/qa-<stamp> && specflow check --project
   ```
 - **Expected:** identifies `.specflow/` as present; harness as `claude`;
   flags constitution as placeholder; flags `backlog config` as missing
@@ -182,37 +217,48 @@ abort-BLOCKERs vs finding-BLOCKERs.
   missing on a freshly-init'd project, templates-version line absent
   or contradicts `--version`.
 
-### T8 — `--help` and `--version` are coherent with the docs
+### T8 — `--help`, `--version`, `upgrade --dry-run`, and `self-update --check` are coherent
 
 - **Commands:**
   ```bash
-  deno run --allow-all /Users/kevin/Sites/specflow/src/main.ts --version
-  deno run --allow-all /Users/kevin/Sites/specflow/src/main.ts --help
-  deno run --allow-all /Users/kevin/Sites/specflow/src/main.ts upgrade --dry-run
+  specflow --help
+  cd test/qa-<stamp> && specflow upgrade --dry-run
+  specflow self-update --check
   ```
+  (`--version` was already captured in T0; no need to re-run.)
 - **Expected:**
-  - `--version` prints `specflow X.Y.Z (templates A.B.C)`.
   - `--help` lists every command from T1's docs catalogue and the
-    8 harnesses under `--ai`. Docs URL line points at the canonical
-    docs site.
+    8 harnesses under `--ai`. Docs URL points at
+    `specflow.makerlabs.dev`; a separate `Source:` line points at the
+    GitHub repo.
   - `upgrade --dry-run` either reports "already up to date" on a
-    freshly-init'd project, or shows a precise dry-run plan.
+    freshly-init'd project, or shows a precise dry-run plan (no files
+    written).
+  - `self-update --check` says `✓ no update available — current X.Y.Z`
+    (T0 just self-updated, so no update should be available); this
+    output must differ from the bare `self-update` form's
+    `✓ already up to date (X.Y.Z)`.
 - **Finding-BLOCKER:** `--help` missing a documented command, `--ai`
-  list short of 8, docs URL missing or pointing nowhere useful;
-  `upgrade --dry-run` writing files (it should be read-only).
+  list short of 8, Docs URL still pointing at GitHub instead of the
+  custom domain; `upgrade --dry-run` writing files (should be
+  read-only); `--check` and bare `self-update` produce identical
+  output (regression of #15).
 
 ## Workflow on every dispatch
 
 1. Pick a stamp: `date -u +%Y%m%d-%H%M%S`. All artefacts live under
    `test/qa-<stamp>/` and the report at `test/qa-report-<stamp>.md`.
 2. Pre-read your memory (see "Pre-read" section above).
-3. Run **T1**. Stop the run on abort-BLOCKER. Otherwise record any
+3. Run **T0** first — refresh the binary and capture the version. Stop
+   the run on abort-BLOCKER (no `specflow` binary on PATH means there's
+   nothing to test).
+4. Run **T1**. Stop the run on abort-BLOCKER. Otherwise record any
    findings and continue.
-4. Run **T2**. Same rule. T2 is the second possible abort point.
-5. Run **T3**. Same rule. T3 is the third and last abort point —
+5. Run **T2**. Same rule. T2 is the third possible abort point.
+6. Run **T3**. Same rule. T3 is the fourth and last abort point —
    T4 onward all assume a successful `init`.
-6. Run **T4–T8** in order, checking the cap after each.
-7. Write the report and return the summary.
+7. Run **T4–T8** in order, checking the cap after each.
+8. Write the report and return the summary.
 
 ## Report schema
 
@@ -221,10 +267,10 @@ abort-BLOCKERs vs finding-BLOCKERs.
 
 **Harness:** claude
 **Scenario:** Vite React-TS brownfield (`test/qa-<stamp>/`)
-**Source:** working tree (`deno run` on `src/main.ts`)
+**Source:** released binary `specflow` on PATH (refreshed via T0)
+**Specflow version under test:** `specflow X.Y.Z (templates A.B.C)` (from T0)
 **Docs:** https://specflow.makerlabs.dev/llms.txt
-**Specflow version on branch:** `specflow X.Y.Z (templates A.B.C)`
-**Catalogue:** T1–T8 (qa-tester agent v1)
+**Catalogue:** T0–T8 (qa-tester agent v2)
 **Cap:** 10 findings
 **Stopped early:** no | yes (cap reached after T<n>)
 **Aborted:** no | yes — reason: <one line>
@@ -233,6 +279,7 @@ abort-BLOCKERs vs finding-BLOCKERs.
 
 | ID | Test | Status | Notes |
 |----|------|--------|-------|
+| T0 | Refresh + version | ✅ pass / ⚠ finding / 🚫 abort | <details if any> |
 | T1 | Docs reachable | ✅ pass / ⚠ finding / 🚫 abort | <link to finding section if any> |
 | T2 | … | … | … |
 | … | … | … | … |

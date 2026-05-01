@@ -4,8 +4,15 @@ description: Stderr "exports field should be specified" warning from deno.json â
 type: feedback
 ---
 
+**Note (v2 catalogue):** Since the qa-tester switched to testing the
+released binary (`specflow` on PATH, refreshed via T0), this warning
+should NOT appear during a normal QA run. It's kept here as a fallback
+in case the dispatcher explicitly opts into the dev-time `deno run`
+mode (e.g. branch-validation before tagging a release).
+
 When running specflow via `deno run --allow-all src/main.ts <cmd>` (which
-is what the test-specflow scripts do), every invocation prints to stderr:
+the test-specflow `run-init.sh` / `compare-harnesses.sh` scripts still
+do for branch-validation), every invocation prints to stderr:
 
 ```
 Warning "exports" field should be specified when specifying a "name".
