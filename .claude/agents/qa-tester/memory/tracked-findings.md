@@ -50,25 +50,6 @@ discrepancy — flag it.
 
 ---
 
-## Issue #17 — init "Next steps" steers users to a different command than the docs quickstart
-
-**Symptom to suppress:** in T3 the init output's "Next steps" section
-ends with `Run /backlog add "<first task title>"`. The docs at
-`specflow.makerlabs.dev/llms.txt` say a fresh user should run
-`/specflow.specify` first. The `/specflow.specify` command IS scaffolded
-at `.claude/commands/specflow.specify.md` — only the init message
-diverges.
-
-**Why suppressed:** tracked in https://github.com/mkrlabs/specflow/issues/17.
-
-**How to apply:** if the init output recommends `/backlog add` as the
-first user-facing action, do not flag. If the init output starts
-recommending `/specflow.specify`, the ticket is fixed — flag a
-"unexpected fix detected, please re-verify by reading docs" reminder
-in the report and stop suppressing.
-
----
-
 ## Issue #20 — `check --project` template-version phrasing reads as if binary is the templates version
 
 **Symptom to suppress:** `specflow check --project` prints a line of the
