@@ -79,7 +79,10 @@ export async function runInit(intent: InitIntent): Promise<number> {
 
   for (const w of result.warnings) console.error(yellow(`warn: ${w}`));
   for (const b of result.backups) console.log(dim(`↳ backed up ${b} → ${b}.specflow.bak`));
-  console.log(green(`✓ wrote ${result.filesWritten} files`));
+  const mergedSuffix = result.filesMerged.length > 0
+    ? ` (+ merged: ${result.filesMerged.join(", ")})`
+    : "";
+  console.log(green(`✓ wrote ${result.filesWritten} files${mergedSuffix}`));
   console.log("\nNext steps:");
   console.log(`  1. Edit ${bold("AGENTS.md")} and ${bold(".specflow/memory/constitution.md")}`);
   console.log(`  2. Open the project in ${harness.displayName}`);
