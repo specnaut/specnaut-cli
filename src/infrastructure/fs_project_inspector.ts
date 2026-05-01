@@ -73,7 +73,7 @@ export class FsProjectInspector implements ProjectInspector {
 
   private async checkTemplatesVersion(
     projectDir: string,
-    binaryVersion: string,
+    bundledTemplatesVersion: string,
   ): Promise<CheckOutcome> {
     const path = join(projectDir, ".specflow/installed.lock");
     if (!(await exists(path))) {
@@ -87,18 +87,18 @@ export class FsProjectInspector implements ProjectInspector {
     try {
       const raw = await Deno.readTextFile(path);
       const lock = parseLock(raw);
-      if (lock.templatesVersion === binaryVersion) {
+      if (lock.templatesVersion === bundledTemplatesVersion) {
         return {
           name: "templates version",
           status: "pass",
-          message: `matches binary (${binaryVersion})`,
+          message: `lock matches bundled (${bundledTemplatesVersion})`,
         };
       }
       return {
         name: "templates version",
         status: "warn",
         message:
-          `project on ${lock.templatesVersion}, binary on ${binaryVersion} — run 'specflow upgrade'`,
+          `project on ${lock.templatesVersion}, bundled on ${bundledTemplatesVersion} — run 'specflow upgrade'`,
       };
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);

@@ -129,7 +129,7 @@ Deno.test("inspect warns when .specflow/config.yml is missing (optional)", async
   );
 });
 
-Deno.test("inspect passes when lock templates_version matches binary", async () => {
+Deno.test("inspect passes when lock templates_version matches bundled", async () => {
   await withProjectDir(
     async (dir) => {
       await Deno.mkdir(join(dir, ".specflow"), { recursive: true });
@@ -150,7 +150,7 @@ entries: {}
   );
 });
 
-Deno.test("inspect warns when lock templates_version differs from binary", async () => {
+Deno.test("inspect warns when lock templates_version differs from bundled", async () => {
   await withProjectDir(
     async (dir) => {
       await Deno.mkdir(join(dir, ".specflow"), { recursive: true });

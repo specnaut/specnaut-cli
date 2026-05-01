@@ -48,18 +48,3 @@ entry, written but excluded from the collision count).
 the gap grows beyond 1 (e.g. wrote 40 / contains 38), that's a new
 discrepancy — flag it.
 
----
-
-## Issue #20 — `check --project` template-version phrasing reads as if binary is the templates version
-
-**Symptom to suppress:** `specflow check --project` prints a line of the
-form `templates version  ✓ matches binary (X.Y.Z)`, where `X.Y.Z` is the
-templates version. `--version` shows the binary version separately as
-`specflow A.B.C (templates X.Y.Z)`. The two surfaces look like they
-contradict each other.
-
-**Why suppressed:** tracked in https://github.com/mkrlabs/specflow/issues/20.
-
-**How to apply:** if the wording is `matches binary (...)`, do not flag.
-If the wording changes (e.g. `matches bundled (...)`, `lock matches bundled`,
-or split into two lines), the ticket is fixed — stop suppressing.
