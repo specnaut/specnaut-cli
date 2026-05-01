@@ -3,6 +3,7 @@ import { sha256Hex } from "../domain/sha256.ts";
 import type { InstalledLock, KnownHarness, LockEntry } from "../domain/installed_lock.ts";
 import type { CoreBundle } from "../domain/core_bundle.ts";
 import { TEMPLATES_VERSION } from "../templates_bundle.ts";
+import { canonicalBlockBody } from "../domain/merge_block.ts";
 
 export type InitResult =
   | {
@@ -57,8 +58,14 @@ export class InitProjectUseCase {
     const now = (this.deps.now ?? (() => new Date()))().toISOString();
     const lockEntries = new Map<string, LockEntry>();
     for (const [dest, file] of Object.entries(bundle)) {
+      // For mergeable files the lock holds the SHA of the *block body in
+      // canonical form* (no leading/trailing newlines) so it stays
+      // comparable against the body extracted from disk on upgrade reads.
+      const shaInput = file.mergeBlock !== undefined
+        ? canonicalBlockBody(file.content)
+        : file.content;
       lockEntries.set(dest, {
-        sha256: await sha256Hex(file.content),
+        sha256: await sha256Hex(shaInput),
         installedAt: now,
         templatesVersion: TEMPLATES_VERSION,
       });

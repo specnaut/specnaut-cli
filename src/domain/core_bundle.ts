@@ -4,7 +4,8 @@ export type CoreCategory =
   | "skill"
   | "spec-root"
   | "project-root"
-  | "backlog-cmd";
+  | "backlog-cmd"
+  | "mergeable-project-root";
 
 export type CoreEntry = {
   readonly category: CoreCategory;

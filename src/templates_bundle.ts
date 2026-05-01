@@ -5655,11 +5655,10 @@ _No tasks yet._
     executable: false,
   },
   {
-    category: "project-root",
+    category: "mergeable-project-root",
     name: "root",
     suffix: ".gitignore",
-    content: `# Specflow
-*.specflow.bak
+    content: `*.specflow.bak
 .specflow/config.yml.local
 `,
     executable: false,

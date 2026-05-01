@@ -1,3 +1,2 @@
-# Specflow
 *.specflow.bak
 .specflow/config.yml.local

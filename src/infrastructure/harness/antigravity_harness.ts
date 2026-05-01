@@ -45,7 +45,8 @@ function destinationFor(entry: CoreEntry): string {
       if (!entry.suffix) throw new Error(`spec-root needs suffix`);
       return `.specflow/${entry.suffix}`;
     case "project-root":
-      if (!entry.suffix) throw new Error(`project-root needs suffix`);
+    case "mergeable-project-root":
+      if (!entry.suffix) throw new Error(`${entry.category} needs suffix`);
       return entry.suffix;
   }
 }
@@ -73,7 +74,11 @@ export class AntigravityHarness implements Harness {
         default:
           content = entry.content;
       }
-      out[dest] = { content, executable: entry.executable };
+      out[dest] = {
+        content,
+        executable: entry.executable,
+        ...(entry.category === "mergeable-project-root" ? { mergeBlock: "gitignore" } : {}),
+      };
     }
     return out;
   }

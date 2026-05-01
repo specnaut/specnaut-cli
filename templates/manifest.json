@@ -42,7 +42,7 @@
 
     { "category": "project-root", "name": "root", "suffix": "AGENTS.md", "source": "core/root/AGENTS.md" },
     { "category": "project-root", "name": "root", "suffix": "tasks/backlog.md", "source": "core/root/tasks/backlog.md" },
-    { "category": "project-root", "name": "root", "suffix": ".gitignore", "source": "core/root/.gitignore" }
+    { "category": "mergeable-project-root", "name": "root", "suffix": ".gitignore", "source": "core/root/.gitignore" }
   ],
   "harness_static": [
     { "harness": "claude", "destination": "CLAUDE.md", "source": "harness-specific/claude/CLAUDE.md" },

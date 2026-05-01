@@ -1,5 +1,6 @@
 import { dirname, join, resolve } from "@std/path";
 import { assertSafeDestination, type Bundle } from "../domain/template.ts";
+import { mergeIntoFile } from "../domain/merge_block.ts";
 import type { BackupReport, FsWriter } from "../application/ports.ts";
 
 const BACKUP_SUFFIX = ".specflow.bak";
@@ -14,12 +15,24 @@ async function fileExists(path: string): Promise<boolean> {
   }
 }
 
+async function readIfExists(path: string): Promise<string | null> {
+  try {
+    return await Deno.readTextFile(path);
+  } catch (err) {
+    if (err instanceof Deno.errors.NotFound) return null;
+    throw err;
+  }
+}
+
 export class DenoFsWriter implements FsWriter {
   async detectConflicts(bundle: Bundle, targetDir: string): Promise<string[]> {
     const conflicts: string[] = [];
     const resolved = resolve(targetDir);
-    for (const dest of Object.keys(bundle)) {
+    for (const [dest, file] of Object.entries(bundle)) {
       assertSafeDestination(dest);
+      // Mergeable files merge non-destructively into any pre-existing content,
+      // so they are never conflicts.
+      if (file.mergeBlock !== undefined) continue;
       const abs = join(resolved, dest);
       if (await fileExists(abs)) conflicts.push(dest);
     }
@@ -52,6 +65,16 @@ export class DenoFsWriter implements FsWriter {
     for (const [dest, file] of Object.entries(bundle)) {
       const abs = join(resolved, dest);
       await Deno.mkdir(dirname(abs), { recursive: true });
+
+      // Mergeable files are never backed up: merge is non-destructive and
+      // writing a backup of an unchanged user file is noisy. They also
+      // bypass the overwrite/conflict path entirely.
+      if (file.mergeBlock !== undefined) {
+        const existing = await readIfExists(abs);
+        const merged = mergeIntoFile(existing, file.content, file.mergeBlock);
+        await Deno.writeTextFile(abs, merged);
+        continue;
+      }
 
       if (backupExisting && (await fileExists(abs))) {
         const backupAbs = `${abs}${BACKUP_SUFFIX}`;
