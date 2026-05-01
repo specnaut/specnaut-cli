@@ -13,7 +13,18 @@ const SOURCE = "docs/llms.md";
 const OUT_DIR = "docs-dist";
 const OUT_HTML = `${OUT_DIR}/index.html`;
 const OUT_MD = `${OUT_DIR}/llms.txt`;
+const OUT_CNAME = `${OUT_DIR}/CNAME`;
 const TITLE = "Specflow — documentation";
+
+/**
+ * GitHub Pages custom domain. Emitted as `docs-dist/CNAME` so each deploy
+ * republishes it; without this, GitHub Pages drops the custom domain on
+ * subsequent workflow deploys (build_type=workflow ignores the repo
+ * settings UI alone — the artifact's CNAME file is the source of truth).
+ *
+ * The CNAME on OVH (`specflow → mkrlabs.github.io.`) routes traffic here.
+ */
+const CUSTOM_DOMAIN = "specflow.makerlabs.dev";
 
 const HTML_TEMPLATE = (body: string) =>
   `<!DOCTYPE html>
@@ -23,7 +34,7 @@ const HTML_TEMPLATE = (body: string) =>
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>${TITLE}</title>
   <meta name="description" content="Specflow — enhanced spec-kit CLI with auto-chain, review phase, and backlog. Distributed as a single native binary." />
-  <link rel="canonical" href="https://mkrlabs.github.io/specflow/" />
+  <link rel="canonical" href="https://specflow.makerlabs.dev/" />
   <link rel="alternate" type="text/markdown" href="./llms.txt" />
   <style>
     ${CSS}
@@ -84,6 +95,7 @@ export async function buildDocs(opts: {
   await Deno.mkdir(outDir, { recursive: true });
   await Deno.writeTextFile(outHtml, html);
   await Deno.writeTextFile(outMd, markdown);
+  await Deno.writeTextFile(`${outDir}/CNAME`, `${CUSTOM_DOMAIN}\n`);
 
   return { html, markdown };
 }
@@ -92,4 +104,5 @@ if (import.meta.main) {
   const { html } = await buildDocs();
   console.log(`✓ wrote ${OUT_HTML} (${html.length} bytes)`);
   console.log(`✓ wrote ${OUT_MD}`);
+  console.log(`✓ wrote ${OUT_CNAME} (${CUSTOM_DOMAIN})`);
 }
