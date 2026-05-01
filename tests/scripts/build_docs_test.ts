@@ -25,6 +25,7 @@ Deno.test("buildDocs writes index.html and llms.txt with rendered markdown", asy
 
     assertEquals(await exists(join(outDir, "index.html")), true);
     assertEquals(await exists(join(outDir, "llms.txt")), true);
+    assertEquals(await exists(join(outDir, "CNAME")), true);
 
     const html = await Deno.readTextFile(join(outDir, "index.html"));
     assertStringIncludes(html, "<h1");
@@ -36,6 +37,11 @@ Deno.test("buildDocs writes index.html and llms.txt with rendered markdown", asy
 
     const txt = await Deno.readTextFile(join(outDir, "llms.txt"));
     assertEquals(txt, md, "llms.txt must be a verbatim copy of the source markdown");
+
+    // CNAME is emitted on every build so the custom-domain config persists
+    // across workflow deploys.
+    const cname = await Deno.readTextFile(join(outDir, "CNAME"));
+    assertEquals(cname.trim(), "specflow.makerlabs.dev");
   });
 });
 
