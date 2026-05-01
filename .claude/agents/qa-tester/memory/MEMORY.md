@@ -15,9 +15,10 @@ re-flag a regression on their own).
 
 - [Tracked findings](tracked-findings.md) — symptoms covered by open
   tickets #15 (self-update --check), #16 (init file-count discrepancy),
-  #17 (init next-steps vs docs), #18 (speckit name leak), #19 (--help
-  docs URL), #20 (check --project version phrasing). Suppress these in
-  reports until the matching ticket closes.
+  #17 (init next-steps vs docs), #19 (--help docs URL), #20 (check
+  --project version phrasing). Suppress these in reports until the
+  matching ticket closes. (#18 closed by PR #22 — section removed; the
+  next QA run will re-verify the rename from a fresh-eyes perspective.)
 
 ## Patterns
 
