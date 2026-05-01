@@ -129,7 +129,7 @@ function Test-HasGit {
 
 # Strip a single optional path segment (e.g. gitflow "feat/004-name" -> "004-name").
 # Only when the full name is exactly two slash-free segments; otherwise returns the raw name.
-function Get-SpecKitEffectiveBranchName {
+function Get-SpecflowEffectiveBranchName {
     param([string]$Branch)
     if ($Branch -match '^([^/]+)/([^/]+)$') {
         return $Matches[2]
@@ -150,7 +150,7 @@ function Test-FeatureBranch {
     }
 
     $raw = $Branch
-    $Branch = Get-SpecKitEffectiveBranchName $raw
+    $Branch = Get-SpecflowEffectiveBranchName $raw
     
     # Accept sequential prefix (3+ digits) but exclude malformed timestamps
     # Malformed: 7-or-8 digit date + 6-digit time with no trailing slug (e.g. "2026031-143022" or "20260319-143022")
@@ -171,7 +171,7 @@ function Find-FeatureDirByPrefix {
         [Parameter(Mandatory = $true)][string]$Branch
     )
     $specsDir = Join-Path $RepoRoot 'specs'
-    $branchName = Get-SpecKitEffectiveBranchName $Branch
+    $branchName = Get-SpecflowEffectiveBranchName $Branch
 
     $prefix = $null
     if ($branchName -match '^(\d{8}-\d{6})-') {

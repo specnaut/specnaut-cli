@@ -33,7 +33,7 @@ Hooks with non-empty `condition` are deferred to the HookExecutor.
 
 ## Outline
 
-The text the user typed after `__SPECKIT_COMMAND_SPECIFY__` is the feature description. Do not ask the user to repeat it unless they provided an empty command.
+The text the user typed after `__SPECFLOW_COMMAND_SPECIFY__` is the feature description. Do not ask the user to repeat it unless they provided an empty command.
 
 Given that feature description, do this:
 
@@ -69,10 +69,10 @@ Given that feature description, do this:
      { "feature_directory": "<resolved feature dir>" }
      ```
      Write the actual resolved path (e.g., `specs/003-user-auth`), not the literal string.
-     This lets downstream commands (`__SPECKIT_COMMAND_PLAN__`, `__SPECKIT_COMMAND_TASKS__`, etc.) locate the feature directory.
+     This lets downstream commands (`__SPECFLOW_COMMAND_PLAN__`, `__SPECFLOW_COMMAND_TASKS__`, etc.) locate the feature directory.
 
    **IMPORTANT**:
-   - Create only one feature per `__SPECKIT_COMMAND_SPECIFY__` invocation.
+   - Create only one feature per `__SPECFLOW_COMMAND_SPECIFY__` invocation.
    - The spec directory name and git branch name are independent.
    - The spec directory and file are always created by this command, never by the hook.
 
@@ -119,7 +119,7 @@ Given that feature description, do this:
       - [ ] No implementation details in specification
 
       ## Notes
-      Items marked incomplete require spec updates before `__SPECKIT_COMMAND_CLARIFY__` or `__SPECKIT_COMMAND_PLAN__`
+      Items marked incomplete require spec updates before `__SPECFLOW_COMMAND_CLARIFY__` or `__SPECFLOW_COMMAND_PLAN__`
       ```
 
    b. **Run Validation**: Review spec against each checklist item; document specific failures.
@@ -161,7 +161,7 @@ Given that feature description, do this:
 8. **Report completion** with:
    - `SPECIFY_FEATURE_DIRECTORY` and `SPEC_FILE`
    - Checklist results summary
-   - Readiness for next phase (`__SPECKIT_COMMAND_CLARIFY__` or `__SPECKIT_COMMAND_PLAN__`)
+   - Readiness for next phase (`__SPECFLOW_COMMAND_CLARIFY__` or `__SPECFLOW_COMMAND_PLAN__`)
 
 9. **Check extension hooks (`hooks.after_specify` in `.specflow/extensions.yml`)**:
    Same rules as Pre-Execution Checks. For each executable hook emit:

@@ -68,7 +68,7 @@ Deno.test("specflow init --ai antigravity scaffolds an Antigravity layout", asyn
 
     // Skill subfolders use the standard SKILL.md filename.
     assertEquals(
-      await exists(join(root, ".agent/skills/specflow-speckit/SKILL.md")),
+      await exists(join(root, ".agent/skills/specflow-auto-chain/SKILL.md")),
       true,
     );
 

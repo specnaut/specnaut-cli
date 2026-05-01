@@ -44,7 +44,7 @@ Hooks with non-empty \`condition\` are deferred to the HookExecutor.
 
 ## Outline
 
-The text the user typed after \`__SPECKIT_COMMAND_SPECIFY__\` is the feature description. Do not ask the user to repeat it unless they provided an empty command.
+The text the user typed after \`__SPECFLOW_COMMAND_SPECIFY__\` is the feature description. Do not ask the user to repeat it unless they provided an empty command.
 
 Given that feature description, do this:
 
@@ -80,10 +80,10 @@ Given that feature description, do this:
      { "feature_directory": "<resolved feature dir>" }
      \`\`\`
      Write the actual resolved path (e.g., \`specs/003-user-auth\`), not the literal string.
-     This lets downstream commands (\`__SPECKIT_COMMAND_PLAN__\`, \`__SPECKIT_COMMAND_TASKS__\`, etc.) locate the feature directory.
+     This lets downstream commands (\`__SPECFLOW_COMMAND_PLAN__\`, \`__SPECFLOW_COMMAND_TASKS__\`, etc.) locate the feature directory.
 
    **IMPORTANT**:
-   - Create only one feature per \`__SPECKIT_COMMAND_SPECIFY__\` invocation.
+   - Create only one feature per \`__SPECFLOW_COMMAND_SPECIFY__\` invocation.
    - The spec directory name and git branch name are independent.
    - The spec directory and file are always created by this command, never by the hook.
 
@@ -130,7 +130,7 @@ Given that feature description, do this:
       - [ ] No implementation details in specification
 
       ## Notes
-      Items marked incomplete require spec updates before \`__SPECKIT_COMMAND_CLARIFY__\` or \`__SPECKIT_COMMAND_PLAN__\`
+      Items marked incomplete require spec updates before \`__SPECFLOW_COMMAND_CLARIFY__\` or \`__SPECFLOW_COMMAND_PLAN__\`
       \`\`\`
 
    b. **Run Validation**: Review spec against each checklist item; document specific failures.
@@ -172,7 +172,7 @@ Given that feature description, do this:
 8. **Report completion** with:
    - \`SPECIFY_FEATURE_DIRECTORY\` and \`SPEC_FILE\`
    - Checklist results summary
-   - Readiness for next phase (\`__SPECKIT_COMMAND_CLARIFY__\` or \`__SPECKIT_COMMAND_PLAN__\`)
+   - Readiness for next phase (\`__SPECFLOW_COMMAND_CLARIFY__\` or \`__SPECFLOW_COMMAND_PLAN__\`)
 
 9. **Check extension hooks (\`hooks.after_specify\` in \`.specflow/extensions.yml\`)**:
    Same rules as Pre-Execution Checks. For each executable hook emit:
@@ -253,7 +253,7 @@ Hooks with non-empty \`condition\` are deferred to the HookExecutor.
 
 Goal: Detect and reduce ambiguity or missing decision points in the active feature specification and record the clarifications directly in the spec file.
 
-Note: This clarification workflow is expected to run (and be completed) BEFORE invoking \`__SPECKIT_COMMAND_PLAN__\`. If the user explicitly states they are skipping clarification (e.g., exploratory spike), you may proceed, but must warn that downstream rework risk increases.
+Note: This clarification workflow is expected to run (and be completed) BEFORE invoking \`__SPECFLOW_COMMAND_PLAN__\`. If the user explicitly states they are skipping clarification (e.g., exploratory spike), you may proceed, but must warn that downstream rework risk increases.
 
 Execution steps:
 
@@ -261,7 +261,7 @@ Execution steps:
    - \`FEATURE_DIR\`
    - \`FEATURE_SPEC\`
    - (Optionally capture \`IMPL_PLAN\`, \`TASKS\` for future chained flows.)
-   - If JSON parsing fails, abort and instruct user to re-run \`__SPECKIT_COMMAND_SPECIFY__\` or verify feature branch environment.
+   - If JSON parsing fails, abort and instruct user to re-run \`__SPECFLOW_COMMAND_SPECIFY__\` or verify feature branch environment.
    - For single quotes in args like "I'm Groot", use escape syntax: e.g 'I'\\''m Groot' (or double-quote if possible: "I'm Groot").
 
 2. Load the current spec file. Perform a structured ambiguity & coverage scan. For each category mark status: Clear / Partial / Missing (internal map only; do not output unless no questions will be asked).
@@ -355,13 +355,13 @@ Execution steps:
    - Path to updated spec.
    - Sections touched (list names).
    - Coverage summary table: each taxonomy category with Status: Resolved / Deferred / Clear / Outstanding.
-   - If any Outstanding or Deferred remain, recommend whether to proceed to \`__SPECKIT_COMMAND_PLAN__\` or run \`__SPECKIT_COMMAND_CLARIFY__\` again.
+   - If any Outstanding or Deferred remain, recommend whether to proceed to \`__SPECFLOW_COMMAND_PLAN__\` or run \`__SPECFLOW_COMMAND_CLARIFY__\` again.
    - Suggested next command.
 
 Behavior rules:
 
 - If no meaningful ambiguities found, respond: "No critical ambiguities detected worth formal clarification." and suggest proceeding.
-- If spec file missing, instruct user to run \`__SPECKIT_COMMAND_SPECIFY__\` first (do not create a new spec here).
+- If spec file missing, instruct user to run \`__SPECFLOW_COMMAND_SPECIFY__\` first (do not create a new spec here).
 - Never exceed 5 total asked questions (clarification retries for a single question do not count as new questions).
 - Avoid speculative tech stack questions unless the absence blocks functional clarity.
 - Respect user early termination signals ("stop", "done", "proceed").
@@ -533,7 +533,7 @@ You **MUST** consider the user input before proceeding (if not empty).
    - Skip if project is purely internal (build scripts, one-off tools, etc.)
 
 3. **Agent context update**:
-   - Update the plan reference between the \`<!-- SPECKIT START -->\` and \`<!-- SPECKIT END -->\` markers in \`__CONTEXT_FILE__\` to point to the plan file created in step 1 (the IMPL_PLAN path)
+   - Update the plan reference between the \`<!-- SPECFLOW START -->\` and \`<!-- SPECFLOW END -->\` markers in \`__CONTEXT_FILE__\` to point to the plan file created in step 1 (the IMPL_PLAN path)
 
 **Output**: data-model.md, /contracts/*, quickstart.md, updated agent context file
 
@@ -809,13 +809,13 @@ You **MUST** consider the user input before proceeding (if not empty).
 
 ## Goal
 
-Identify inconsistencies, duplications, ambiguities, and underspecified items across the three core artifacts (\`spec.md\`, \`plan.md\`, \`tasks.md\`) before implementation. This command MUST run only after \`__SPECKIT_COMMAND_TASKS__\` has successfully produced a complete \`tasks.md\`.
+Identify inconsistencies, duplications, ambiguities, and underspecified items across the three core artifacts (\`spec.md\`, \`plan.md\`, \`tasks.md\`) before implementation. This command MUST run only after \`__SPECFLOW_COMMAND_TASKS__\` has successfully produced a complete \`tasks.md\`.
 
 ## Operating Constraints
 
 **STRICTLY READ-ONLY**: Do **not** modify any files. Output a structured analysis report. Offer an optional remediation plan (user must explicitly approve before any follow-up editing commands would be invoked manually).
 
-**Constitution Authority**: The project constitution (\`/memory/constitution.md\`) is **non-negotiable** within this analysis scope. Constitution conflicts are automatically CRITICAL and require adjustment of the spec, plan, or tasks—not dilution, reinterpretation, or silent ignoring of the principle. If a principle itself needs to change, that must occur in a separate, explicit constitution update outside \`__SPECKIT_COMMAND_ANALYZE__\`.
+**Constitution Authority**: The project constitution (\`/memory/constitution.md\`) is **non-negotiable** within this analysis scope. Constitution conflicts are automatically CRITICAL and require adjustment of the spec, plan, or tasks—not dilution, reinterpretation, or silent ignoring of the principle. If a principle itself needs to change, that must occur in a separate, explicit constitution update outside \`__SPECFLOW_COMMAND_ANALYZE__\`.
 
 ## Execution Steps
 
@@ -951,9 +951,9 @@ Output a Markdown report (no file writes) with the following structure:
 
 At end of report, output a concise Next Actions block:
 
-- If CRITICAL issues exist: Recommend resolving before \`__SPECKIT_COMMAND_IMPLEMENT__\`
+- If CRITICAL issues exist: Recommend resolving before \`__SPECFLOW_COMMAND_IMPLEMENT__\`
 - If only LOW/MEDIUM: User may proceed, but provide improvement suggestions
-- Provide explicit command suggestions: e.g., "Run __SPECKIT_COMMAND_SPECIFY__ with refinement", "Run __SPECKIT_COMMAND_PLAN__ to adjust architecture", "Manually edit tasks.md to add coverage for 'performance-metrics'"
+- Provide explicit command suggestions: e.g., "Run __SPECFLOW_COMMAND_SPECIFY__ with refinement", "Run __SPECFLOW_COMMAND_PLAN__ to adjust architecture", "Manually edit tasks.md to add coverage for 'performance-metrics'"
 
 ### 8. Offer Remediation
 
@@ -1188,7 +1188,7 @@ You **MUST** consider the user input before proceeding (if not empty).
    - Confirm the implementation follows the technical plan
    - Report final status with summary of completed work
 
-Note: This command assumes a complete task breakdown exists in tasks.md. If tasks are incomplete or missing, suggest running \`__SPECKIT_COMMAND_TASKS__\` first to regenerate the task list.
+Note: This command assumes a complete task breakdown exists in tasks.md. If tasks are incomplete or missing, suggest running \`__SPECFLOW_COMMAND_TASKS__\` first to regenerate the task list.
 
 10. **Check for extension hooks**: After completion validation, check if \`.specflow/extensions.yml\` exists in the project root.
     - If it exists, read it and look for entries under the \`hooks.after_implement\` key
@@ -1492,7 +1492,7 @@ Hooks with non-empty \`condition\` are deferred to the HookExecutor.
 
 7. **Report**: Output full path to checklist file, item count, and summarize whether the run created a new file or appended to an existing one. Summarize focus areas selected, depth level, actor/timing, and any explicit user-specified must-have items incorporated.
 
-**Important**: Each \`__SPECKIT_COMMAND_CHECKLIST__\` command invocation uses a short, descriptive checklist filename and either creates a new file or appends to an existing one — allowing multiple checklists of different types (e.g., \`ux.md\`, \`test.md\`, \`security.md\`). Use descriptive types and clean up obsolete checklists when done.
+**Important**: Each \`__SPECFLOW_COMMAND_CHECKLIST__\` command invocation uses a short, descriptive checklist filename and either creates a new file or appends to an existing one — allowing multiple checklists of different types (e.g., \`ux.md\`, \`test.md\`, \`security.md\`). Use descriptive types and clean up obsolete checklists when done.
 
 ## Example Checklist Types & Sample Items
 
@@ -1571,7 +1571,7 @@ description: Merge the current feature branch into the base branch after pre-mer
 ## Preconditions
 
 - The feature branch must be checked out.
-- All Speckit phases must have completed successfully (clarify, plan, tasks, analyze, implement,
+- All Specflow phases must have completed successfully (clarify, plan, tasks, analyze, implement,
   review).
 - \`\$ARGUMENTS\` is optional. If empty, the base branch is \`main\`. Otherwise it is the first token of
   \`\$ARGUMENTS\`.
@@ -1780,7 +1780,7 @@ created: YYYY-MM-DD
     suffix: null,
     content: `---
 name: product-owner
-description: Product Owner and business guardian. Owns the product backlog, all mutation semantics, and recommends workflow (Speckit spec vs direct implementation) for each task. Use when the user asks about backlog, priorities, or "what next".
+description: Product Owner and business guardian. Owns the product backlog, all mutation semantics, and recommends workflow (Specflow spec vs direct implementation) for each task. Use when the user asks about backlog, priorities, or "what next".
 model: opus
 tools: Read, Write, Edit, Grep, Glob, Bash(git log *), Bash(git diff *)
 maxTurns: 30
@@ -1798,7 +1798,7 @@ flag it to the user — the project is under-documented.
 ## Responsibilities
 
 1. **Own the backlog** — prioritize, estimate, groom, add, update tasks.
-2. **Workflow advice** — decide whether a task needs a full Speckit spec or
+2. **Workflow advice** — decide whether a task needs a full Specflow spec or
    can go straight to implementation on the base branch.
 3. **Business briefs** — provide context to other agents before they build.
 4. **Priority justification** — explain every priority change.
@@ -1819,7 +1819,7 @@ priority: critical | high | medium | low
 complexity: 1 | 2 | 3 | 5 | 8 | 13 | 21   # Fibonacci
 status: todo | in_progress | done | deferred | blocked
 depends_on: [string]   # list of other task titles or ids
-spec: string | null    # Speckit spec id if attached
+spec: string | null    # Specflow spec id if attached
 tags: [string]
 created: YYYY-MM-DD
 ---
@@ -1840,7 +1840,7 @@ Total > 7 → critical, 5–7 → high, 3–5 → medium, < 3 → low.
 
 ## Workflow decision tree
 
-### Needs a Speckit spec
+### Needs a Specflow spec
 
 - Complexity ≥ 8 story points
 - New entities / data model changes
@@ -1958,7 +1958,7 @@ architecture.
 1. Read \`AGENTS.md\` at the project root to learn the tech stack and rules.
 2. Read \`.specflow/memory/constitution.md\` for non-negotiable invariants.
 3. Read the current feature's \`spec.md\`, \`plan.md\`, and \`tasks.md\` if a
-   Speckit feature directory is in context.
+   Specflow feature directory is in context.
 
 ## Non-negotiable rules
 
@@ -2309,18 +2309,18 @@ review or QA fails twice on the same issue family, stop and escalate.
   },
   {
     category: "skill",
-    name: "speckit",
+    name: "auto-chain",
     suffix: null,
     content: `---
-name: speckit
-description: Auto-chain Speckit workflow — when the user runs /speckit specify, chain clarify → plan → tasks → analyze → implement → review → merge, stopping only for required clarifications and final pre-merge validation.
+name: auto-chain
+description: Auto-chain Specflow workflow — when the user runs /auto-chain specify, chain clarify → plan → tasks → analyze → implement → review → merge, stopping only for required clarifications and final pre-merge validation.
 ---
 
-# Speckit Auto-Chain
+# Specflow Auto-Chain
 
-This skill turns the Speckit workflow into a single-command operation. When the
-user invokes \`/speckit specify "<feature description>"\`, you MUST chain every
-Speckit phase in the same session without asking the user between phases,
+This skill turns the Specflow workflow into a single-command operation. When the
+user invokes \`/auto-chain specify "<feature description>"\`, you MUST chain every
+Specflow phase in the same session without asking the user between phases,
 EXCEPT at the two checkpoints defined below.
 
 ## Default flow
@@ -2379,14 +2379,14 @@ the branch)". Wait for explicit confirmation. On "yes", invoke
 
 ## Opt-out
 
-If the user invokes \`/speckit specify --manual "<description>"\`, run
+If the user invokes \`/auto-chain specify --manual "<description>"\`, run
 \`/specflow.specify\` only and stop. Do not auto-chain. Each subsequent phase must
 be invoked manually by the user.
 
 ## Single-phase invocations
 
-When the user invokes any phase directly (e.g. \`/speckit clarify 042\`,
-\`/speckit plan 042\`) — i.e. NOT via the entry point \`/speckit specify\` — the
+When the user invokes any phase directly (e.g. \`/auto-chain clarify 042\`,
+\`/auto-chain plan 042\`) — i.e. NOT via the entry point \`/auto-chain specify\` — the
 command is one-shot. Do NOT auto-chain. Single-phase invocations exist for
 re-running phases on an existing feature.
 
@@ -2414,7 +2414,7 @@ them resume manually from the last completed phase.
     content: `# Project Constitution
 
 > This file holds the invariants of your project: architecture rules, conventions, and
-> non-negotiable policies. Specflow, Spec Kit commands, and review agents read it at every step.
+> non-negotiable policies. Specflow commands and review agents read it at every step.
 >
 > Replace this placeholder with your own constitution. Use
 > \`.specflow/templates/constitution-template.md\` as a starting point.
@@ -2569,7 +2569,7 @@ them resume manually from the last completed phase.
 **Branch**: \`[###-feature-name]\` | **Date**: [DATE] | **Spec**: [link]
 **Input**: Feature specification from \`/specs/[###-feature-name]/spec.md\`
 
-**Note**: This template is filled in by the \`__SPECKIT_COMMAND_PLAN__\` command. See \`.specflow/templates/plan-template.md\` for the execution workflow.
+**Note**: This template is filled in by the \`__SPECFLOW_COMMAND_PLAN__\` command. See \`.specflow/templates/plan-template.md\` for the execution workflow.
 
 ## Summary
 
@@ -2605,12 +2605,12 @@ them resume manually from the last completed phase.
 
 \`\`\`text
 specs/[###-feature]/
-├── plan.md              # This file (__SPECKIT_COMMAND_PLAN__ command output)
-├── research.md          # Phase 0 output (__SPECKIT_COMMAND_PLAN__ command)
-├── data-model.md        # Phase 1 output (__SPECKIT_COMMAND_PLAN__ command)
-├── quickstart.md        # Phase 1 output (__SPECKIT_COMMAND_PLAN__ command)
-├── contracts/           # Phase 1 output (__SPECKIT_COMMAND_PLAN__ command)
-└── tasks.md             # Phase 2 output (__SPECKIT_COMMAND_TASKS__ command - NOT created by __SPECKIT_COMMAND_PLAN__)
+├── plan.md              # This file (__SPECFLOW_COMMAND_PLAN__ command output)
+├── research.md          # Phase 0 output (__SPECFLOW_COMMAND_PLAN__ command)
+├── data-model.md        # Phase 1 output (__SPECFLOW_COMMAND_PLAN__ command)
+├── quickstart.md        # Phase 1 output (__SPECFLOW_COMMAND_PLAN__ command)
+├── contracts/           # Phase 1 output (__SPECFLOW_COMMAND_PLAN__ command)
+└── tasks.md             # Phase 2 output (__SPECFLOW_COMMAND_TASKS__ command - NOT created by __SPECFLOW_COMMAND_PLAN__)
 \`\`\`
 
 ### Source Code (repository root)
@@ -2706,7 +2706,7 @@ description: "Task list template for feature implementation"
   ============================================================================
   IMPORTANT: The tasks below are SAMPLE TASKS for illustration purposes only.
   
-  The __SPECKIT_COMMAND_TASKS__ command MUST replace these with actual tasks based on:
+  The __SPECFLOW_COMMAND_TASKS__ command MUST replace these with actual tasks based on:
   - User stories from spec.md (with their priorities P1, P2, P3...)
   - Feature requirements from plan.md
   - Entities from data-model.md
@@ -2939,13 +2939,13 @@ With multiple developers:
 **Created**: [DATE]
 **Feature**: [Link to spec.md or relevant documentation]
 
-**Note**: This checklist is generated by the \`__SPECKIT_COMMAND_CHECKLIST__\` command based on feature context and requirements.
+**Note**: This checklist is generated by the \`__SPECFLOW_COMMAND_CHECKLIST__\` command based on feature context and requirements.
 
 <!-- 
   ============================================================================
   IMPORTANT: The checklist items below are SAMPLE ITEMS for illustration only.
   
-  The __SPECKIT_COMMAND_CHECKLIST__ command MUST replace these with actual items based on:
+  The __SPECFLOW_COMMAND_CHECKLIST__ command MUST replace these with actual items based on:
   - User's specific checklist request
   - Feature requirements from spec.md
   - Technical context from plan.md
@@ -3585,10 +3585,10 @@ resolve_template() {
             # The python3 call is wrapped in an if-condition so that set -e does not
             # abort the function when python3 exits non-zero (e.g. invalid JSON).
             local sorted_presets=""
-            if sorted_presets=\$(SPECKIT_REGISTRY="\$registry_file" python3 -c "
+            if sorted_presets=\$(SPECFLOW_REGISTRY="\$registry_file" python3 -c "
 import json, sys, os
 try:
-    with open(os.environ['SPECKIT_REGISTRY']) as f:
+    with open(os.environ['SPECFLOW_REGISTRY']) as f:
         data = json.load(f)
     presets = data.get('presets', {})
     for pid, meta in sorted(presets.items(), key=lambda x: x[1].get('priority', 10) if isinstance(x[1], dict) else 10):
@@ -3673,10 +3673,10 @@ resolve_template_content() {
         local registry_file="\$presets_dir/.registry"
         local sorted_presets=""
         if [ -f "\$registry_file" ] && command -v python3 >/dev/null 2>&1; then
-            if sorted_presets=\$(SPECKIT_REGISTRY="\$registry_file" python3 -c "
+            if sorted_presets=\$(SPECFLOW_REGISTRY="\$registry_file" python3 -c "
 import json, sys, os
 try:
-    with open(os.environ['SPECKIT_REGISTRY']) as f:
+    with open(os.environ['SPECFLOW_REGISTRY']) as f:
         data = json.load(f)
     presets = data.get('presets', {})
     for pid, meta in sorted(presets.items(), key=lambda x: x[1].get('priority', 10) if isinstance(x[1], dict) else 10):
@@ -3697,7 +3697,7 @@ except Exception:
                             local result
                             local py_stderr
                             py_stderr=\$(mktemp)
-                            result=\$(SPECKIT_MANIFEST="\$manifest" SPECKIT_TMPL="\$template_name" python3 -c "
+                            result=\$(SPECFLOW_MANIFEST="\$manifest" SPECFLOW_TMPL="\$template_name" python3 -c "
 import sys, os
 try:
     import yaml
@@ -3706,10 +3706,10 @@ except ImportError:
     print('replace\\t')
     sys.exit(0)
 try:
-    with open(os.environ['SPECKIT_MANIFEST']) as f:
+    with open(os.environ['SPECFLOW_MANIFEST']) as f:
         data = yaml.safe_load(f)
     for t in data.get('provides', {}).get('templates', []):
-        if t.get('name') == os.environ['SPECKIT_TMPL'] and t.get('type', 'template') == 'template':
+        if t.get('name') == os.environ['SPECFLOW_TMPL'] and t.get('type', 'template') == 'template':
             print(t.get('strategy', 'replace') + '\\t' + t.get('file', ''))
             sys.exit(0)
     print('replace\\t')
@@ -4660,7 +4660,7 @@ function Test-HasGit {
 
 # Strip a single optional path segment (e.g. gitflow "feat/004-name" -> "004-name").
 # Only when the full name is exactly two slash-free segments; otherwise returns the raw name.
-function Get-SpecKitEffectiveBranchName {
+function Get-SpecflowEffectiveBranchName {
     param([string]\$Branch)
     if (\$Branch -match '^([^/]+)/([^/]+)\$') {
         return \$Matches[2]
@@ -4681,7 +4681,7 @@ function Test-FeatureBranch {
     }
 
     \$raw = \$Branch
-    \$Branch = Get-SpecKitEffectiveBranchName \$raw
+    \$Branch = Get-SpecflowEffectiveBranchName \$raw
     
     # Accept sequential prefix (3+ digits) but exclude malformed timestamps
     # Malformed: 7-or-8 digit date + 6-digit time with no trailing slug (e.g. "2026031-143022" or "20260319-143022")
@@ -4702,7 +4702,7 @@ function Find-FeatureDirByPrefix {
         [Parameter(Mandatory = \$true)][string]\$Branch
     )
     \$specsDir = Join-Path \$RepoRoot 'specs'
-    \$branchName = Get-SpecKitEffectiveBranchName \$Branch
+    \$branchName = Get-SpecflowEffectiveBranchName \$Branch
 
     \$prefix = \$null
     if (\$branchName -match '^(\\d{8}-\\d{6})-') {
@@ -5673,7 +5673,7 @@ export const HARNESS_STATIC: Record<string, Record<string, TemplateFile>> = {
 - **Project documentation and rules**: the primary reference is \`AGENTS.md\` at
   the project root. Read it first.
 - **Skills**: installed skills live in \`.claude/skills/\`.
-- **Speckit commands**: custom Speckit commands live in \`.claude/commands/\`.
+- **Specflow commands**: custom Specflow commands live in \`.claude/commands/\`.
 - **Agents**: specialized agents live in \`.claude/agents/\`.
 - **Backlog**: managed via \`/backlog\` — see \`tasks/backlog.md\`.
 `,
@@ -5713,7 +5713,7 @@ clarifications needed) STOP #2 (pre-merge validation)
 - \`/specflow-review\` — architecture + quality gates
 - \`/specflow-merge\` — merge the feature branch to main
 - \`/specflow-backlog\` — manage the product backlog (via the PO agent)
-- \`/specflow-speckit\` — auto-chain dispatcher invoked by \`/specflow-specify\`
+- \`/specflow-auto-chain\` — auto-chain dispatcher invoked by \`/specflow-specify\`
 
 ## Agent roles (invocable manually as skills)
 

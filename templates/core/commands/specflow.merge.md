@@ -11,7 +11,7 @@ $ARGUMENTS
 ## Preconditions
 
 - The feature branch must be checked out.
-- All Speckit phases must have completed successfully (clarify, plan, tasks, analyze, implement,
+- All Specflow phases must have completed successfully (clarify, plan, tasks, analyze, implement,
   review).
 - `$ARGUMENTS` is optional. If empty, the base branch is `main`. Otherwise it is the first token of
   `$ARGUMENTS`.

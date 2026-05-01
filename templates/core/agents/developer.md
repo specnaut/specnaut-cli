@@ -16,7 +16,7 @@ architecture.
 1. Read `AGENTS.md` at the project root to learn the tech stack and rules.
 2. Read `.specflow/memory/constitution.md` for non-negotiable invariants.
 3. Read the current feature's `spec.md`, `plan.md`, and `tasks.md` if a
-   Speckit feature directory is in context.
+   Specflow feature directory is in context.
 
 ## Non-negotiable rules
 

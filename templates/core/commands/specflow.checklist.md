@@ -108,7 +108,7 @@ Hooks with non-empty `condition` are deferred to the HookExecutor.
 
 7. **Report**: Output full path to checklist file, item count, and summarize whether the run created a new file or appended to an existing one. Summarize focus areas selected, depth level, actor/timing, and any explicit user-specified must-have items incorporated.
 
-**Important**: Each `__SPECKIT_COMMAND_CHECKLIST__` command invocation uses a short, descriptive checklist filename and either creates a new file or appends to an existing one — allowing multiple checklists of different types (e.g., `ux.md`, `test.md`, `security.md`). Use descriptive types and clean up obsolete checklists when done.
+**Important**: Each `__SPECFLOW_COMMAND_CHECKLIST__` command invocation uses a short, descriptive checklist filename and either creates a new file or appends to an existing one — allowing multiple checklists of different types (e.g., `ux.md`, `test.md`, `security.md`). Use descriptive types and clean up obsolete checklists when done.
 
 ## Example Checklist Types & Sample Items
 

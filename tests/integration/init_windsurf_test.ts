@@ -59,7 +59,7 @@ Deno.test("specflow init --ai windsurf scaffolds a Windsurf layout", async () =>
       true,
     );
     assertEquals(
-      await exists(join(root, ".windsurf/workflows/specflow-speckit.md")),
+      await exists(join(root, ".windsurf/workflows/specflow-auto-chain.md")),
       true,
     );
     assertEquals(

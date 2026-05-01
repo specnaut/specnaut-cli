@@ -53,7 +53,7 @@ Deno.test("specflow init --ai codex scaffolds a Codex layout", async () => {
     // Codex team-shared skills
     assertEquals(await exists(join(root, ".agents/skills/specflow-specify/SKILL.md")), true);
     assertEquals(await exists(join(root, ".agents/skills/specflow-backlog/SKILL.md")), true);
-    assertEquals(await exists(join(root, ".agents/skills/specflow-speckit/SKILL.md")), true);
+    assertEquals(await exists(join(root, ".agents/skills/specflow-auto-chain/SKILL.md")), true);
 
     // Codex subagents (TOML)
     assertEquals(await exists(join(root, ".codex/agents/product-owner.toml")), true);
