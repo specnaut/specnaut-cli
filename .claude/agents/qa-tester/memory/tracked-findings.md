@@ -69,25 +69,6 @@ in the report and stop suppressing.
 
 ---
 
-## Issue #18 — upstream "speckit" name leaks into the user-facing scaffold
-
-**Symptom to suppress:** after init, two locations contain the upstream
-"Speckit" / "speckit" name:
-
-- `test/qa-<stamp>/.claude/skills/speckit/SKILL.md` — directory named
-  `speckit` (lowercase upstream).
-- `test/qa-<stamp>/CLAUDE.md` contains the line "Speckit commands:
-  custom Speckit commands live in `.claude/commands/`."
-
-**Why suppressed:** tracked in https://github.com/mkrlabs/specflow/issues/18.
-
-**How to apply:** `grep -ri speckit test/qa-<stamp>/` returning hits
-matches the known finding — do not flag. If `grep` returns NO hits,
-the rename has shipped — the ticket can close. If a NEW path containing
-"speckit" appears that wasn't here before, flag it as net-new.
-
----
-
 ## Issue #19 — `specflow --help` footer points at the GitHub repo instead of the canonical docs site
 
 **Symptom to suppress:** `specflow --help` prints
