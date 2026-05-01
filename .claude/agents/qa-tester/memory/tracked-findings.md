@@ -69,20 +69,6 @@ in the report and stop suppressing.
 
 ---
 
-## Issue #19 — `specflow --help` footer points at the GitHub repo instead of the canonical docs site
-
-**Symptom to suppress:** `specflow --help` prints
-`Docs:  https://github.com/mkrlabs/specflow` in its footer. The
-canonical docs site is `https://specflow.makerlabs.dev`.
-
-**Why suppressed:** tracked in https://github.com/mkrlabs/specflow/issues/19.
-
-**How to apply:** if the Docs URL line still mentions `github.com`, do
-not flag. If it mentions `specflow.makerlabs.dev`, the ticket is
-fixed — stop suppressing.
-
----
-
 ## Issue #20 — `check --project` template-version phrasing reads as if binary is the templates version
 
 **Symptom to suppress:** `specflow check --project` prints a line of the
