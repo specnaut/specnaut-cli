@@ -14,8 +14,8 @@ bash "$SCRIPT_DIR/bootstrap-vite.sh" "$NAME"
 
 for h in "${HARNESSES[@]}"; do
   variant="$NAME-$h"
-  rm -rf "$ROOT/test/$variant"
-  cp -R "$ROOT/test/$NAME" "$ROOT/test/$variant"
+  rm -rf "$ROOT/sandbox/$variant"
+  cp -R "$ROOT/sandbox/$NAME" "$ROOT/sandbox/$variant"
   echo
   echo "=== init --ai $h ==="
   bash "$SCRIPT_DIR/run-init.sh" "$variant" "$h"

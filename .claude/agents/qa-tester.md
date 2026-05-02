@@ -132,7 +132,7 @@ abort-BLOCKERs vs finding-BLOCKERs.
   ```bash
   bash .claude/skills/test-specflow/scripts/bootstrap-vite.sh qa-<stamp>
   ```
-- **Expected:** non-zero `test/qa-<stamp>/` with `.gitignore`,
+- **Expected:** non-zero `sandbox/qa-<stamp>/` with `.gitignore`,
   `package.json`, `vite.config.ts`, etc. Original `.gitignore` size is
   in the 200–300 byte range.
 - **Abort-BLOCKER:** script fails or directory missing afterwards.
@@ -146,7 +146,7 @@ abort-BLOCKERs vs finding-BLOCKERs.
   directory (do NOT use `run-init.sh` — that runs `deno run` against
   the working tree, which is not what we're testing).
   ```bash
-  cd test/qa-<stamp> && specflow init --here --no-git --ai claude
+  cd sandbox/qa-<stamp> && specflow init --here --no-git --ai claude
   ```
 - **Expected:** exit 0; stdout includes "Initializing into …" and
   "✓ wrote N files (+ merged: .gitignore)" (N around 38–40); a
@@ -163,7 +163,7 @@ abort-BLOCKERs vs finding-BLOCKERs.
 
 - **Command:**
   ```bash
-  cat test/qa-<stamp>/.gitignore
+  cat sandbox/qa-<stamp>/.gitignore
   ```
 - **Expected:**
   - The original Vite gitignore content (`# Logs`, `node_modules`,
@@ -180,7 +180,7 @@ abort-BLOCKERs vs finding-BLOCKERs.
 
 - **Command:**
   ```bash
-  cd test/qa-<stamp> && specflow init --here --no-git --ai claude
+  cd sandbox/qa-<stamp> && specflow init --here --no-git --ai claude
   ```
 - **Expected:** non-zero exit (currently 3); error names the existing
   files; the count printed (`target already contains N specflow-managed
@@ -208,7 +208,7 @@ abort-BLOCKERs vs finding-BLOCKERs.
 
 - **Command:**
   ```bash
-  cd test/qa-<stamp> && specflow check --project
+  cd sandbox/qa-<stamp> && specflow check --project
   ```
 - **Expected:** identifies `.specflow/` as present; harness as `claude`;
   flags constitution as placeholder; flags `backlog config` as missing
@@ -222,7 +222,7 @@ abort-BLOCKERs vs finding-BLOCKERs.
 - **Commands:**
   ```bash
   specflow --help
-  cd test/qa-<stamp> && specflow upgrade --dry-run
+  cd sandbox/qa-<stamp> && specflow upgrade --dry-run
   specflow self-update --check
   ```
   (`--version` was already captured in T0; no need to re-run.)
@@ -247,7 +247,7 @@ abort-BLOCKERs vs finding-BLOCKERs.
 ## Workflow on every dispatch
 
 1. Pick a stamp: `date -u +%Y%m%d-%H%M%S`. All artefacts live under
-   `test/qa-<stamp>/` and the report at `test/qa-report-<stamp>.md`.
+   `sandbox/qa-<stamp>/` and the report at `sandbox/qa-report-<stamp>.md`.
 2. Pre-read your memory (see "Pre-read" section above).
 3. Run **T0** first — refresh the binary and capture the version. Stop
    the run on abort-BLOCKER (no `specflow` binary on PATH means there's
@@ -266,7 +266,7 @@ abort-BLOCKERs vs finding-BLOCKERs.
 # Specflow QA Report — <ISO timestamp>
 
 **Harness:** claude
-**Scenario:** Vite React-TS brownfield (`test/qa-<stamp>/`)
+**Scenario:** Vite React-TS brownfield (`sandbox/qa-<stamp>/`)
 **Source:** released binary `specflow` on PATH (refreshed via T0)
 **Specflow version under test:** `specflow X.Y.Z (templates A.B.C)` (from T0)
 **Docs:** https://specflow.makerlabs.dev/llms.txt
@@ -338,14 +338,14 @@ abort-BLOCKERs vs finding-BLOCKERs.
 
 - **Do not modify the codebase.** No edits to `src/`, `templates/`,
   `manifest.json`, harness files, or the test-specflow scripts. The
-  only files you write are `test/qa-report-<stamp>.md` and your own
+  only files you write are `sandbox/qa-report-<stamp>.md` and your own
   memory under `.claude/agents/qa-tester/memory/`.
-- **Do not commit anything.** `test/` is gitignored; reports stay
+- **Do not commit anything.** `sandbox/` is gitignored; reports stay
   local. No `git add`, `git commit`, `git push`, `gh pr ...`,
   `gh issue ...`. Reads (`git status`, `git log`, `gh release view`)
   are fine.
 - **Do not delete previous reports.** Multiple runs accumulate as
-  `test/qa-report-*.md` so trends are visible.
+  `sandbox/qa-report-*.md` so trends are visible.
 - **Follow the docs literally.** When reality diverges from docs →
   that's the finding. Don't paper over it by adjusting the command.
 - **Do not read implementation source to explain a bug.** If you need
@@ -406,7 +406,7 @@ index under 200 lines.
 
 ## Scope
 
-Read-only on the codebase. Write-only on `test/qa-report-*.md` and
+Read-only on the codebase. Write-only on `sandbox/qa-report-*.md` and
 your own memory directory. No `git commit|push`, no `gh pr|issue`
 writes, no `gh release create`, no `git tag`. If a question requires
 a destructive command, refuse and say so in the report.

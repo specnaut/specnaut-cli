@@ -1,6 +1,6 @@
 ---
 name: test-specflow
-description: Spin up controlled test environments (Vite, Next-style brownfield, empty greenfield) under the gitignored `test/` directory and run Specflow against them using the current source tree (not the installed binary). Use whenever you need to manually validate the UX of `specflow init` / `upgrade` / `check` on a real-world project shape, reproduce a brownfield bug, or eyeball cross-harness output side-by-side. Each script is idempotent.
+description: Spin up controlled test environments (Vite, Next-style brownfield, empty greenfield) under the gitignored `sandbox/` directory and run Specflow against them using the current source tree (not the installed binary). Use whenever you need to manually validate the UX of `specflow init` / `upgrade` / `check` on a real-world project shape, reproduce a brownfield bug, or eyeball cross-harness output side-by-side. Each script is idempotent.
 allowed-tools: Bash(${CLAUDE_SKILL_DIR}/scripts/*.sh) Bash(${CLAUDE_SKILL_DIR}/scripts/*.sh *) Bash(deno *) Bash(ls *) Bash(find *) Bash(cat *) Bash(diff *) Bash(rm *) Bash(npm *) Bash(git *)
 ---
 
@@ -8,7 +8,7 @@ allowed-tools: Bash(${CLAUDE_SKILL_DIR}/scripts/*.sh) Bash(${CLAUDE_SKILL_DIR}/s
 
 When you need to verify how `specflow init`, `specflow upgrade`, etc. behave on real-world project shapes — without recompiling the binary or installing it system-wide — use this skill.
 
-Each script bootstraps a controlled scenario inside `test/<name>/` (the `test/` dir is gitignored at the repo root, so nothing leaks to commits), then optionally runs Specflow against it from the current source tree (`deno run --allow-all src/main.ts ...`). That way you're testing the working-tree behaviour, not the released binary.
+Each script bootstraps a controlled scenario inside `sandbox/<name>/` (the `sandbox/` dir is gitignored at the repo root, so nothing leaks to commits), then optionally runs Specflow against it from the current source tree (`deno run --allow-all src/main.ts ...`). That way you're testing the working-tree behaviour, not the released binary.
 
 ## When to use
 
@@ -22,9 +22,9 @@ Each script bootstraps a controlled scenario inside `test/<name>/` (the `test/` 
 .claude/skills/test-specflow/scripts/bootstrap-vite.sh <name>      # Vite React-TS scaffold
 .claude/skills/test-specflow/scripts/bootstrap-empty.sh <name>     # empty greenfield (git init + stub package.json)
 .claude/skills/test-specflow/scripts/run-init.sh <name> <harness>  # specflow init --here --ai <harness> (uses current source)
-.claude/skills/test-specflow/scripts/inspect.sh <name>             # summarize specflow output paths in test/<name>/
+.claude/skills/test-specflow/scripts/inspect.sh <name>             # summarize specflow output paths in sandbox/<name>/
 .claude/skills/test-specflow/scripts/compare-harnesses.sh <name>   # bootstrap once + run all 8 harnesses on copies, print summaries
-.claude/skills/test-specflow/scripts/clean.sh [<name>]             # wipe one test dir or the whole test/ tree
+.claude/skills/test-specflow/scripts/clean.sh [<name>]             # wipe one scenario or the whole sandbox/ tree
 ```
 
 `<harness>` ∈ `claude` (default) | `cursor` | `codex` | `gemini` | `windsurf` | `copilot` | `opencode` | `antigravity`.
@@ -37,21 +37,21 @@ Each script bootstraps a controlled scenario inside `test/<name>/` (the `test/` 
 bash .claude/skills/test-specflow/scripts/bootstrap-vite.sh demo
 bash .claude/skills/test-specflow/scripts/run-init.sh demo claude
 bash .claude/skills/test-specflow/scripts/inspect.sh demo
-cat test/demo/.gitignore                       # eyeball the merged result
+cat sandbox/demo/.gitignore                       # eyeball the merged result
 ```
 
 ### Reproduce an issue across all harnesses
 
 ```bash
 bash .claude/skills/test-specflow/scripts/compare-harnesses.sh demo
-ls test/                                       # demo, demo-claude, demo-cursor, …
+ls sandbox/                                       # demo, demo-claude, demo-cursor, …
 ```
 
 ### Reset between runs
 
 ```bash
 bash .claude/skills/test-specflow/scripts/clean.sh demo            # one project
-bash .claude/skills/test-specflow/scripts/clean.sh                 # everything under test/
+bash .claude/skills/test-specflow/scripts/clean.sh                 # everything under sandbox/
 ```
 
 ### Hands-off UX pass — dispatch the QA agent
@@ -61,14 +61,14 @@ running each script yourself, dispatch the `qa-tester` subagent (defined
 at `.claude/agents/qa-tester.md`). It reads the public docs at
 `specflow.makerlabs.dev/llms.txt`, runs Specflow against a clean Vite
 scenario as a brand-new user would, and writes a checklist report to
-`test/qa-report-<stamp>.md` listing every blocker / friction / nit. The
+`sandbox/qa-report-<stamp>.md` listing every blocker / friction / nit. The
 agent never modifies the codebase — it only reports.
 
 ## Conventions
 
-- Test projects always live under `test/<name>/`. The `test/` directory is gitignored at the repo root — never commit anything from it.
+- Sandbox scenarios always live under `sandbox/<name>/`. The `sandbox/` directory is gitignored at the repo root — never commit anything from it.
 - Scripts run `deno run --allow-all` on `src/main.ts` so you're testing the working tree, **not** the installed `specflow` binary. To test the released binary instead, run `specflow` directly without going through this skill.
-- All scripts are idempotent. Re-running is always safe; pre-existing `test/<name>/` is wiped before re-bootstrapping.
+- All scripts are idempotent. Re-running is always safe; pre-existing `sandbox/<name>/` is wiped before re-bootstrapping.
 - Bootstrap scripts skip `npm install` — Specflow's filesystem ops don't depend on `node_modules` being populated, and skipping the install keeps each scenario fast and small.
 
 ## When NOT to use
