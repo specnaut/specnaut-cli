@@ -45,7 +45,8 @@ Deno.test("specflow init <name> writes a complete tree", async () => {
     assertEquals(code, 0, `init failed: ${stderr}`);
 
     const root = join(dir, "demo");
-    assertEquals(await exists(join(root, "CLAUDE.md")), true);
+    assertEquals(await exists(join(root, ".claude/CLAUDE.md")), true);
+    assertEquals(await exists(join(root, "CLAUDE.md")), false);
     assertEquals(await exists(join(root, "AGENTS.md")), true);
     assertEquals(await exists(join(root, "tasks/backlog.md")), true);
     assertEquals(await exists(join(root, ".specflow/memory/constitution.md")), true);
@@ -71,7 +72,8 @@ Deno.test("specflow init --here writes into cwd", async () => {
   await withTempDir(async (dir) => {
     const { code, stderr } = await runSpecflow(["init", "--here", "--no-git"], { cwd: dir });
     assertEquals(code, 0, `init --here failed: ${stderr}`);
-    assertEquals(await exists(join(dir, "CLAUDE.md")), true);
+    assertEquals(await exists(join(dir, ".claude/CLAUDE.md")), true);
+    assertEquals(await exists(join(dir, "CLAUDE.md")), false);
   });
 });
 

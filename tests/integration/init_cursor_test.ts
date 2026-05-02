@@ -82,7 +82,8 @@ Deno.test("specflow init (no --ai) still defaults to Claude", async () => {
     assertEquals(code, 0);
     const root = join(parent, "demo");
     assertEquals(await exists(join(root, ".claude/")), true);
-    assertEquals(await exists(join(root, "CLAUDE.md")), true);
+    assertEquals(await exists(join(root, ".claude/CLAUDE.md")), true);
+    assertEquals(await exists(join(root, "CLAUDE.md")), false);
     assertEquals(await exists(join(root, ".cursor/")), false);
   });
 });

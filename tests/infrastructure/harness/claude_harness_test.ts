@@ -12,7 +12,7 @@ Deno.test("ClaudeHarness.mapBundle emits the Claude tree", () => {
   const h = new ClaudeHarness();
   const mapped = h.mapBundle(CORE_BUNDLE);
   const keys = Object.keys(mapped).sort();
-  assertEquals(keys.length, 39); // 38 core + CLAUDE.md
+  assertEquals(keys.length, 39); // 38 core + .claude/CLAUDE.md
   // Spot-check canonical paths
   assert(".claude/commands/specflow.specify.md" in mapped);
   assert(".claude/commands/backlog.md" in mapped);
@@ -20,13 +20,14 @@ Deno.test("ClaudeHarness.mapBundle emits the Claude tree", () => {
   assert(".claude/skills/auto-chain/SKILL.md" in mapped);
   assert(".specflow/memory/constitution.md" in mapped);
   assert("AGENTS.md" in mapped);
-  assert("CLAUDE.md" in mapped);
+  assert(".claude/CLAUDE.md" in mapped);
+  assert(!("CLAUDE.md" in mapped), "CLAUDE.md must not live at project root");
 });
 
-Deno.test("ClaudeHarness includes HARNESS_STATIC claude files (CLAUDE.md)", () => {
+Deno.test("ClaudeHarness includes HARNESS_STATIC claude files (.claude/CLAUDE.md)", () => {
   const h = new ClaudeHarness();
   const mapped = h.mapBundle(CORE_BUNDLE);
-  const claudeMd = mapped["CLAUDE.md"];
-  const staticClaude = HARNESS_STATIC.claude["CLAUDE.md"];
+  const claudeMd = mapped[".claude/CLAUDE.md"];
+  const staticClaude = HARNESS_STATIC.claude[".claude/CLAUDE.md"];
   assertEquals(claudeMd?.content, staticClaude?.content);
 });

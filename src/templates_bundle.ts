@@ -5667,7 +5667,7 @@ _No tasks yet._
 
 export const HARNESS_STATIC: Record<string, Record<string, TemplateFile>> = {
   "claude": {
-    "CLAUDE.md": {
+    ".claude/CLAUDE.md": {
       content: `# Claude Reference
 
 - **Project documentation and rules**: the primary reference is \`AGENTS.md\` at
