@@ -18,7 +18,7 @@ Deno.test("parseArgs returns init intent with a project name", () => {
     projectName: "my-project",
     here: false,
     noGit: false,
-    ai: "claude",
+    ai: null,
     force: false,
   });
 });
@@ -29,7 +29,7 @@ Deno.test("parseArgs returns init intent with --here", () => {
     projectName: null,
     here: true,
     noGit: false,
-    ai: "claude",
+    ai: null,
     force: false,
   });
 });
@@ -40,7 +40,7 @@ Deno.test("parseArgs returns init intent with --no-git", () => {
     projectName: "x",
     here: false,
     noGit: true,
-    ai: "claude",
+    ai: null,
     force: false,
   });
 });
@@ -106,7 +106,7 @@ Deno.test("parseArgs init with --force", () => {
     projectName: "demo",
     here: false,
     noGit: false,
-    ai: "claude",
+    ai: null,
     force: true,
   });
 });
@@ -144,9 +144,9 @@ Deno.test("parseArgs returns unknown for invalid --ai value", () => {
   });
 });
 
-Deno.test("parseArgs init defaults --ai to claude", () => {
+Deno.test("parseArgs init leaves --ai null when not provided (resolved by handler)", () => {
   const r = parseArgs(["init", "demo"]);
-  if (r.kind === "init") assertEquals(r.ai, "claude");
+  if (r.kind === "init") assertEquals(r.ai, null);
 });
 
 Deno.test("parseArgs accepts init --ai codex", () => {

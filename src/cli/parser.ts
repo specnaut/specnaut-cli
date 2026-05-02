@@ -8,6 +8,12 @@ export type Intent =
     projectName: string | null;
     here: boolean;
     noGit: boolean;
+    /**
+     * Harness key when `--ai` was passed on the CLI; `null` when the user
+     * did not specify one. The init handler is responsible for resolving
+     * `null` to a concrete harness — interactively when stdin is a TTY,
+     * silently to the default when it isn't (preserves CI behaviour).
+     */
     ai:
       | "claude"
       | "cursor"
@@ -16,7 +22,8 @@ export type Intent =
       | "windsurf"
       | "copilot"
       | "opencode"
-      | "antigravity";
+      | "antigravity"
+      | null;
     force: boolean;
   }
   | { kind: "self-update"; checkOnly: boolean }
@@ -50,8 +57,10 @@ export function parseArgs(argv: string[]): Intent {
 
   const [command, ...rest] = parsed._.map(String);
   if (command === "init") {
-    const aiRaw = typeof parsed.ai === "string" ? parsed.ai : "claude";
+    const aiProvided = typeof parsed.ai === "string";
+    const aiRaw = aiProvided ? (parsed.ai as string) : null;
     if (
+      aiRaw !== null &&
       aiRaw !== "claude" &&
       aiRaw !== "cursor" &&
       aiRaw !== "codex" &&
