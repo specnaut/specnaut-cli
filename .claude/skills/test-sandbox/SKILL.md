@@ -1,10 +1,10 @@
 ---
-name: test-specflow
+name: test-sandbox
 description: Spin up controlled test environments (Vite, Next-style brownfield, empty greenfield) under the gitignored `sandbox/` directory and run Specflow against them using the current source tree (not the installed binary). Use whenever you need to manually validate the UX of `specflow init` / `upgrade` / `check` on a real-world project shape, reproduce a brownfield bug, or eyeball cross-harness output side-by-side. Each script is idempotent.
 allowed-tools: Bash(${CLAUDE_SKILL_DIR}/scripts/*.sh) Bash(${CLAUDE_SKILL_DIR}/scripts/*.sh *) Bash(deno *) Bash(ls *) Bash(find *) Bash(cat *) Bash(diff *) Bash(rm *) Bash(npm *) Bash(git *)
 ---
 
-# test-specflow skill — Specflow UX testing toolbox
+# test-sandbox skill — Specflow UX testing toolbox
 
 When you need to verify how `specflow init`, `specflow upgrade`, etc. behave on real-world project shapes — without recompiling the binary or installing it system-wide — use this skill.
 
@@ -19,12 +19,12 @@ Each script bootstraps a controlled scenario inside `sandbox/<name>/` (the `sand
 ## Scripts
 
 ```bash
-.claude/skills/test-specflow/scripts/bootstrap-vite.sh <name>      # Vite React-TS scaffold
-.claude/skills/test-specflow/scripts/bootstrap-empty.sh <name>     # empty greenfield (git init + stub package.json)
-.claude/skills/test-specflow/scripts/run-init.sh <name> <harness>  # specflow init --here --ai <harness> (uses current source)
-.claude/skills/test-specflow/scripts/inspect.sh <name>             # summarize specflow output paths in sandbox/<name>/
-.claude/skills/test-specflow/scripts/compare-harnesses.sh <name>   # bootstrap once + run all 8 harnesses on copies, print summaries
-.claude/skills/test-specflow/scripts/clean.sh [<name>]             # wipe one scenario or the whole sandbox/ tree
+.claude/skills/test-sandbox/scripts/bootstrap-vite.sh <name>      # Vite React-TS scaffold
+.claude/skills/test-sandbox/scripts/bootstrap-empty.sh <name>     # empty greenfield (git init + stub package.json)
+.claude/skills/test-sandbox/scripts/run-init.sh <name> <harness>  # specflow init --here --ai <harness> (uses current source)
+.claude/skills/test-sandbox/scripts/inspect.sh <name>             # summarize specflow output paths in sandbox/<name>/
+.claude/skills/test-sandbox/scripts/compare-harnesses.sh <name>   # bootstrap once + run all 8 harnesses on copies, print summaries
+.claude/skills/test-sandbox/scripts/clean.sh [<name>]             # wipe one scenario or the whole sandbox/ tree
 ```
 
 `<harness>` ∈ `claude` (default) | `cursor` | `codex` | `gemini` | `windsurf` | `copilot` | `opencode` | `antigravity`.
@@ -34,24 +34,24 @@ Each script bootstraps a controlled scenario inside `sandbox/<name>/` (the `sand
 ### Validate a brownfield fix before merging
 
 ```bash
-bash .claude/skills/test-specflow/scripts/bootstrap-vite.sh demo
-bash .claude/skills/test-specflow/scripts/run-init.sh demo claude
-bash .claude/skills/test-specflow/scripts/inspect.sh demo
+bash .claude/skills/test-sandbox/scripts/bootstrap-vite.sh demo
+bash .claude/skills/test-sandbox/scripts/run-init.sh demo claude
+bash .claude/skills/test-sandbox/scripts/inspect.sh demo
 cat sandbox/demo/.gitignore                       # eyeball the merged result
 ```
 
 ### Reproduce an issue across all harnesses
 
 ```bash
-bash .claude/skills/test-specflow/scripts/compare-harnesses.sh demo
+bash .claude/skills/test-sandbox/scripts/compare-harnesses.sh demo
 ls sandbox/                                       # demo, demo-claude, demo-cursor, …
 ```
 
 ### Reset between runs
 
 ```bash
-bash .claude/skills/test-specflow/scripts/clean.sh demo            # one project
-bash .claude/skills/test-specflow/scripts/clean.sh                 # everything under sandbox/
+bash .claude/skills/test-sandbox/scripts/clean.sh demo            # one project
+bash .claude/skills/test-sandbox/scripts/clean.sh                 # everything under sandbox/
 ```
 
 ### Hands-off UX pass — dispatch the QA agent
