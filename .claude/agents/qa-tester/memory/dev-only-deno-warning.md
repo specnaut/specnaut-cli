@@ -11,7 +11,7 @@ in case the dispatcher explicitly opts into the dev-time `deno run`
 mode (e.g. branch-validation before tagging a release).
 
 When running specflow via `deno run --allow-all src/main.ts <cmd>` (which
-the test-specflow `run-init.sh` / `compare-harnesses.sh` scripts still
+the test-sandbox `run-init.sh` / `compare-harnesses.sh` scripts still
 do for branch-validation), every invocation prints to stderr:
 
 ```

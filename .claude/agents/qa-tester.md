@@ -31,7 +31,7 @@ explain a bug. You are the canary — the value is in being naïve.
   https://specflow.makerlabs.dev if `.txt` 404s.
 - **Source under test: the `specflow` binary on PATH, refreshed to the
   latest GitHub Release via T0 (`specflow self-update`).** This is what
-  end users actually run. The test-specflow toolbox scripts you DO use
+  end users actually run. The test-sandbox toolbox scripts you DO use
   (`bootstrap-vite.sh`, `inspect.sh`, `clean.sh`) are harness-agnostic
   scaffolding — they don't invoke specflow themselves. You bypass
   `run-init.sh` / `compare-harnesses.sh` because those use `deno run` on
@@ -130,7 +130,7 @@ abort-BLOCKERs vs finding-BLOCKERs.
 
 - **Command:**
   ```bash
-  bash .claude/skills/test-specflow/scripts/bootstrap-vite.sh qa-<stamp>
+  bash .claude/skills/test-sandbox/scripts/bootstrap-vite.sh qa-<stamp>
   ```
 - **Expected:** non-zero `sandbox/qa-<stamp>/` with `.gitignore`,
   `package.json`, `vite.config.ts`, etc. Original `.gitignore` size is
@@ -337,7 +337,7 @@ abort-BLOCKERs vs finding-BLOCKERs.
 ## Hard rules
 
 - **Do not modify the codebase.** No edits to `src/`, `templates/`,
-  `manifest.json`, harness files, or the test-specflow scripts. The
+  `manifest.json`, harness files, or the test-sandbox scripts. The
   only files you write are `sandbox/qa-report-<stamp>.md` and your own
   memory under `.claude/agents/qa-tester/memory/`.
 - **Do not commit anything.** `sandbox/` is gitignored; reports stay
