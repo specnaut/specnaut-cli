@@ -76,7 +76,10 @@ Deno.test("specflow init --ai cursor scaffolds a Cursor layout", async () => {
   });
 });
 
-Deno.test("specflow init (no --ai) still defaults to Claude", async () => {
+Deno.test("specflow init (no --ai) defaults to Claude in non-TTY environments", async () => {
+  // Deno.Command pipes stdin, so Deno.stdin.isTerminal() is false here.
+  // The init handler must therefore skip the interactive harness picker
+  // and fall through to the default — preserving CI / scripted usage.
   await withTempDir(async (parent) => {
     const { code } = await runSpecflow(["init", "demo", "--no-git"], { cwd: parent });
     assertEquals(code, 0);

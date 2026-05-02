@@ -2,6 +2,7 @@ import { resolve } from "@std/path";
 import { bold, dim, green, red, yellow } from "@std/fmt/colors";
 import { InitProjectUseCase } from "../../application/init_project.ts";
 import { findHarness } from "../harnesses.ts";
+import { DEFAULT_HARNESS, type HarnessKey, pickHarness } from "../harness_picker.ts";
 import { DenoFsWriter } from "../../infrastructure/deno_fs_writer.ts";
 import { DenoGit } from "../../infrastructure/deno_git.ts";
 import { FsLockStore } from "../../infrastructure/fs_lock_store.ts";
@@ -12,17 +13,19 @@ export type InitIntent = {
   projectName: string | null;
   here: boolean;
   noGit: boolean;
-  ai:
-    | "claude"
-    | "cursor"
-    | "codex"
-    | "gemini"
-    | "windsurf"
-    | "copilot"
-    | "opencode"
-    | "antigravity";
+  ai: HarnessKey | null;
   force: boolean;
 };
+
+function resolveHarnessKey(explicit: HarnessKey | null): HarnessKey {
+  if (explicit !== null) return explicit;
+  if (!Deno.stdin.isTerminal()) return DEFAULT_HARNESS;
+  return pickHarness({
+    readLine: () => prompt("Choose [1-8]:"),
+    log: (s) => console.log(s),
+    errLog: (s) => console.error(red(s)),
+  });
+}
 
 export async function runInit(intent: InitIntent): Promise<number> {
   const cwd = Deno.cwd();
@@ -37,9 +40,10 @@ export async function runInit(intent: InitIntent): Promise<number> {
     return 2;
   }
 
-  const harness = findHarness(intent.ai);
+  const aiKey = resolveHarnessKey(intent.ai);
+  const harness = findHarness(aiKey);
   if (!harness) {
-    console.error(red(`error: unknown harness '${intent.ai}'`));
+    console.error(red(`error: unknown harness '${aiKey}'`));
     return 2;
   }
 
