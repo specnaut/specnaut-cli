@@ -1,16 +1,16 @@
 #!/usr/bin/env bash
-# Wipe a single test scenario or the entire test/ tree.
+# Wipe a single sandbox scenario or the entire sandbox/ tree.
 # Usage:
-#   clean.sh           # removes the whole test/ tree
-#   clean.sh <name>    # removes just test/<name>/
+#   clean.sh           # removes the whole sandbox/ tree
+#   clean.sh <name>    # removes just sandbox/<name>/
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/../../../.." && pwd)"
 
 if [ $# -eq 0 ]; then
-  rm -rf "$ROOT/test"
-  echo "✓ wiped test/"
+  rm -rf "$ROOT/sandbox"
+  echo "✓ wiped sandbox/"
 else
-  rm -rf "$ROOT/test/$1"
-  echo "✓ removed test/$1"
+  rm -rf "$ROOT/sandbox/$1"
+  echo "✓ removed sandbox/$1"
 fi
