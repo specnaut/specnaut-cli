@@ -2,7 +2,7 @@ import { bold, cyan, dim } from "@std/fmt/colors";
 
 export const HELP = `${
   bold("specflow")
-} — improved spec-kit CLI with auto-chain, review, and backlog
+} — AI project scaffolding CLI with auto-chain, review, and backlog
 
 ${bold("Usage:")}
   specflow init <project-name>        Bootstrap a new project in ./<project-name>

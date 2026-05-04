@@ -127,6 +127,16 @@ Deno.test("specflow --help advertises -v and -h shortcuts", async () => {
   assertStringIncludes(stdout, "--help, -h");
 });
 
+Deno.test("specflow --help tagline does not mention spec-kit", async () => {
+  const { stdout } = await runSpecflow(["--help"]);
+  assertStringIncludes(stdout, "AI project scaffolding CLI");
+  assertEquals(
+    stdout.toLowerCase().includes("spec-kit"),
+    false,
+    "help tagline must not mention spec-kit (lineage belongs in README/AGENTS.md)",
+  );
+});
+
 Deno.test("specflow bogus returns exit code 2", async () => {
   const { code } = await runSpecflow(["bogus"]);
   assertEquals(code, 2);
