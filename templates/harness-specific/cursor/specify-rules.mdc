@@ -41,11 +41,13 @@ clarifications needed) STOP #2 (pre-merge validation)
 - `/specflow-agent-test-reviewer` — test coverage review
 - `/specflow-agent-qa-tester` — QA + test writing
 - `/specflow-agent-workflow-manager` — long-running orchestration
+- `/specflow-agent-devops-sre` — cloud infrastructure, CI/CD, observability
 
 ## Project context
 
 - Constitution lives at `.specflow/memory/constitution.md` — treat as non-negotiable rules.
-- Product backlog lives at `tasks/backlog.md` (index) and `tasks/backlog/NNN-*.md` (task files).
+- Product backlog (when local Markdown backend): index at `.specflow/backlog.md`,
+  task files at `.specflow/backlog/NNN-*.md`.
 - Project conventions: `AGENTS.md` at project root.
 
 Read the constitution and AGENTS.md before starting any significant work.

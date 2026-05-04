@@ -5,4 +5,5 @@
 - **Skills**: installed skills live in `.claude/skills/`.
 - **Specflow commands**: custom Specflow commands live in `.claude/commands/`.
 - **Agents**: specialized agents live in `.claude/agents/`.
-- **Backlog**: managed via `/backlog` — see `tasks/backlog.md`.
+- **Backlog**: managed via `/backlog` — when the project uses the local
+  Markdown backend, see `.specflow/backlog.md`.

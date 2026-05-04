@@ -31,6 +31,15 @@ export async function run(argv: string[]): Promise<number> {
       const { runUpgrade } = await import("./cli/handlers/upgrade_handler.ts");
       return await runUpgrade(intent);
     }
+    case "backlog-removed":
+      console.error(
+        red(
+          "error: `specflow backlog` was removed in v0.9.0. " +
+            "Manage the backlog from your AI harness via the /backlog slash-command, " +
+            "which dispatches the product-owner agent.",
+        ),
+      );
+      return 2;
     case "unknown":
       console.error(red(`Unknown command: "${intent.received}"`));
       console.error(HELP);

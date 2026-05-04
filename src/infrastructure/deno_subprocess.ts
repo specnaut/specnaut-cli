@@ -29,10 +29,20 @@ export class DenoSubprocessRunner implements SubprocessRunner {
         stderr: new TextDecoder().decode(stderr),
       };
     } catch (err) {
-      // Binary missing from PATH: return a synthetic 127 instead of throwing,
-      // so probes (probeGit/probeGh/probeDeno) can render a clean check row.
+      // Synthesise POSIX-style exit codes for the failure modes that surface
+      // as exceptions on `Deno.Command.spawn()`, so probes can render a clean
+      // fail/warn row instead of crashing with a stack trace.
       if (err instanceof Deno.errors.NotFound) {
+        // 127 — binary missing from PATH.
         return { code: 127, stdout: "", stderr: `${cmd}: command not found` };
+      }
+      if (
+        err instanceof Deno.errors.PermissionDenied ||
+        err instanceof Deno.errors.NotCapable
+      ) {
+        // 126 — binary exists but cannot be executed (chmod 000, --allow-run
+        // denial, SELinux deny, etc.).
+        return { code: 126, stdout: "", stderr: `${cmd}: permission denied` };
       }
       throw err;
     }
