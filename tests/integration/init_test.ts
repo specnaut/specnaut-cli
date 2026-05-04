@@ -70,6 +70,24 @@ Deno.test("specflow init <name> writes a complete tree", async () => {
   });
 });
 
+Deno.test("scaffolded product-owner agent documents epic / sub-task support", async () => {
+  await withTempDir(async (dir) => {
+    const { code } = await runSpecflow(["init", "demo", "--no-git"], { cwd: dir });
+    assertEquals(code, 0);
+    const po = await Deno.readTextFile(
+      join(dir, "demo/.claude/agents/product-owner.md"),
+    );
+    // Epic concept is documented for both backends.
+    assertStringIncludes(po, "Epic concept");
+    assertStringIncludes(po, "sub_issues"); // GitHub native sub-issues API
+    assertStringIncludes(po, 'parent: "#NNN"'); // local Markdown convention
+    // Path move from #45 carried through here too.
+    assertStringIncludes(po, ".specflow/backlog.md");
+    // The dead sync flow is fully scrubbed from the scaffolded agent.
+    assertEquals(po.includes("specflow backlog sync"), false);
+  });
+});
+
 Deno.test("specflow init's Next steps nudges towards /specflow.constitution first", async () => {
   await withTempDir(async (dir) => {
     const { code, stdout } = await runSpecflow(["init", "demo", "--no-git"], { cwd: dir });
