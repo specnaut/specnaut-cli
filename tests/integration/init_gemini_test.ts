@@ -94,6 +94,7 @@ Deno.test("specflow init --ai gemini scaffolds a Gemini layout", async () => {
     assertEquals(await exists(join(root, ".specflow/memory/constitution.md")), true);
     assertEquals(await exists(join(root, "AGENTS.md")), true);
     assertEquals(await exists(join(root, "tasks/backlog.md")), false);
+    assertEquals(await exists(join(root, ".specflow/backlog.md")), true);
 
     // NOT emitted for gemini
     assertEquals(await exists(join(root, ".claude/")), false);

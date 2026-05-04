@@ -1,4 +1,5 @@
-import { resolve } from "@std/path";
+import { join, resolve } from "@std/path";
+import { exists } from "@std/fs/exists";
 import { bold, cyan, dim, green, red, yellow } from "@std/fmt/colors";
 import { UpgradeProjectUseCase } from "../../application/upgrade_project.ts";
 import { findHarness } from "../harnesses.ts";
@@ -8,6 +9,48 @@ import { FsLockStore } from "../../infrastructure/fs_lock_store.ts";
 import { CORE_BUNDLE, TEMPLATES_VERSION } from "../../templates_bundle.ts";
 import { renderUnifiedDiff } from "../../domain/diff.ts";
 import type { UpgradePlan } from "../../domain/upgrade_plan.ts";
+
+/**
+ * One-shot migration for projects that pre-date #45. Move
+ * `tasks/backlog.md` and `tasks/backlog/` (the old local-Markdown
+ * backlog locations) into `.specflow/`. Idempotent: if the new path
+ * already exists, the old one is left alone (the user must resolve
+ * the conflict manually).
+ */
+export async function migrateLegacyBacklogPaths(
+  projectDir: string,
+): Promise<ReadonlyArray<string>> {
+  const moves: string[] = [];
+
+  const oldIndex = join(projectDir, "tasks/backlog.md");
+  const newIndex = join(projectDir, ".specflow/backlog.md");
+  if ((await exists(oldIndex)) && !(await exists(newIndex))) {
+    await Deno.mkdir(join(projectDir, ".specflow"), { recursive: true });
+    await Deno.rename(oldIndex, newIndex);
+    moves.push("tasks/backlog.md → .specflow/backlog.md");
+  }
+
+  const oldDir = join(projectDir, "tasks/backlog");
+  const newDir = join(projectDir, ".specflow/backlog");
+  if ((await exists(oldDir)) && !(await exists(newDir))) {
+    await Deno.mkdir(join(projectDir, ".specflow"), { recursive: true });
+    await Deno.rename(oldDir, newDir);
+    moves.push("tasks/backlog/ → .specflow/backlog/");
+  }
+
+  // Tidy up: drop the empty `tasks/` dir if Specflow was its only tenant.
+  const tasksDir = join(projectDir, "tasks");
+  if (await exists(tasksDir)) {
+    let empty = true;
+    for await (const _ of Deno.readDir(tasksDir)) {
+      empty = false;
+      break;
+    }
+    if (empty) await Deno.remove(tasksDir);
+  }
+
+  return moves;
+}
 
 export type UpgradeIntent = {
   kind: "upgrade";
@@ -66,6 +109,11 @@ function renderSummary(plan: UpgradePlan, from: string, to: string) {
 
 export async function runUpgrade(intent: UpgradeIntent): Promise<number> {
   const projectDir = resolve(Deno.cwd());
+
+  if (!intent.dryRun) {
+    const moves = await migrateLegacyBacklogPaths(projectDir);
+    for (const m of moves) console.log(dim(`↳ migrated ${m}`));
+  }
 
   const useCase = new UpgradeProjectUseCase({
     reader: new DenoFsReader(),
