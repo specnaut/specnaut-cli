@@ -24,7 +24,6 @@ export class FsProjectInspector implements ProjectInspector {
     outcomes.push(await this.checkDir(projectDir, ".specflow/"));
     outcomes.push(await this.checkHarness(projectDir));
     outcomes.push(await this.checkConstitution(projectDir));
-    outcomes.push(await this.checkBacklogConfig(projectDir));
     outcomes.push(await this.checkTemplatesVersion(projectDir, templatesVersion));
 
     return outcomes;
@@ -131,21 +130,5 @@ export class FsProjectInspector implements ProjectInspector {
       };
     }
     return { name: "constitution", status: "pass", message: "populated" };
-  }
-
-  private async checkBacklogConfig(projectDir: string): Promise<CheckOutcome> {
-    const path = join(projectDir, ".specflow/config.yml");
-    if (!(await exists(path))) {
-      return {
-        name: "backlog config",
-        status: "warn",
-        message: "no .specflow/config.yml — run 'specflow backlog configure' if needed",
-      };
-    }
-    return {
-      name: "backlog config",
-      status: "pass",
-      message: ".specflow/config.yml present",
-    };
   }
 }

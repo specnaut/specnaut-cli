@@ -60,8 +60,8 @@ cd my-project
 ```
 
 This scaffolds a tree configured for the **Claude Code** harness by default (`.claude/`,
-`.specflow/`, `AGENTS.md`, `tasks/backlog.md`, …). Open the project in your harness — that's where
-you'll run the rest.
+`.specflow/`, `AGENTS.md`, `.specflow/backlog.md`, …). Open the project in your harness — that's
+where you'll run the rest.
 
 ### Step 1 after `init`: run `/specflow.constitution`
 
@@ -118,8 +118,6 @@ specflow upgrade --dry-run        # preview the upgrade plan
 specflow upgrade --force          # apply destructive changes (backs up customizations)
 specflow self-update              # upgrade the binary itself
 specflow self-update --check      # only report whether an update is available
-specflow backlog configure        # wire the backlog to a remote (GitHub Issues + Project V2)
-specflow backlog sync             # push backlog mutations to the remote
 specflow --version                # print version
 specflow --help                   # full usage
 ```
@@ -160,11 +158,17 @@ loop is `implement → review → fix → re-review` — also automatic.
 
 ### 3. Backlog as product source of truth
 
-The generated project ships with a `tasks/backlog.md` index plus per-task files under
-`tasks/backlog/NNN-slug.md` (typed frontmatter: id, title, category, priority, complexity, status,
-depends_on, spec, tags, created). A Product Owner agent gates every mutation.
-`specflow backlog sync` pushes the backlog to a remote (GitHub Issues + Project V2 in v1; GitLab and
-Bitbucket planned for later).
+A Product Owner agent gates every mutation, and supports two backends:
+
+- **Local Markdown** — index at `.specflow/backlog.md`, task files at
+  `.specflow/backlog/NNN-slug.md` (typed frontmatter: id, title, category, priority, complexity,
+  status, parent, depends_on, spec, tags, created). Sub-tasks reference their parent via
+  `parent: "#NNN"`.
+- **GitHub Issues + Projects** — the agent talks directly to the backend via `gh` CLI; epics use the
+  native sub-issues API. No local mirror, no sync command — the remote is the source of truth.
+
+The user picks one backend per project; the PO auto-detects which is in play by checking whether
+`.specflow/backlog.md` exists.
 
 ## Design principles
 
@@ -173,8 +177,8 @@ Bitbucket planned for later).
 - **Agnostic of the LLM** — Claude, OpenAI, Gemini, local models, anything your harness supports.
 - **Agnostic of the AI harness** — eight first-class targets today, with the same core content for
   all.
-- **Agnostic of the backlog source** — local Markdown is the source of truth, with one-way sync to
-  the remote of your choice.
+- **Agnostic of the backlog source** — pick local Markdown or your remote tracker (GitHub Issues +
+  Projects today, GitLab and Bitbucket planned). The PO agent talks to whichever you chose.
 - **Single binary** — distributed via `deno compile` for macOS arm64/x64, Linux arm64/x64, and
   Windows x64. No Python, no `pip`, no extra runtimes on the user's machine.
 

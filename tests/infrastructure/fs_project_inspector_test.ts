@@ -38,16 +38,6 @@ async function filledProject(dir: string) {
     join(dir, ".specflow/memory/constitution.md"),
     CONSTITUTION_FILLED,
   );
-  await Deno.mkdir(join(dir, ".specflow"), { recursive: true });
-  await Deno.writeTextFile(
-    join(dir, ".specflow/config.yml"),
-    `version: 1
-sync:
-  provider: github
-  repo: kevinraimbaud/specflow
-  label_prefix: backlog/
-`,
-  );
   await Deno.writeTextFile(
     join(dir, ".specflow/installed.lock"),
     `version: 2
@@ -106,25 +96,6 @@ Deno.test("inspect reports warn for empty placeholder constitution", async () =>
       const outcomes = await inspector.inspect(dir, "0.2.0");
       const constitution = outcomes.find((o) => o.name === "constitution");
       assertEquals(constitution?.status, "warn");
-    },
-  );
-});
-
-Deno.test("inspect warns when .specflow/config.yml is missing (optional)", async () => {
-  await withProjectDir(
-    async (dir) => {
-      await Deno.mkdir(join(dir, ".specflow/memory"), { recursive: true });
-      await Deno.mkdir(join(dir, ".claude"), { recursive: true });
-      await Deno.writeTextFile(
-        join(dir, ".specflow/memory/constitution.md"),
-        CONSTITUTION_FILLED,
-      );
-    },
-    async (dir) => {
-      const inspector = new FsProjectInspector();
-      const outcomes = await inspector.inspect(dir, "0.2.0");
-      const backlog = outcomes.find((o) => o.name === "backlog config");
-      assertEquals(backlog?.status, "warn");
     },
   );
 });

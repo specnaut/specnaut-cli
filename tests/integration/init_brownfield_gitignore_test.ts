@@ -79,7 +79,6 @@ Deno.test("init --here on a Vite-style project preserves the user .gitignore via
     // Specflow block is fenced and at the end.
     assertStringIncludes(merged, "# --- Specflow: gitignore ---");
     assertStringIncludes(merged, "*.specflow.bak");
-    assertStringIncludes(merged, ".specflow/config.yml.local");
     assertStringIncludes(merged, "# --- End Specflow: gitignore ---");
     // No backup created — merge is non-destructive.
     assertEquals(await exists(join(root, ".gitignore.specflow.bak")), false);
@@ -119,7 +118,6 @@ Deno.test("init --here greenfield writes the .gitignore wrapped in fence markers
     const content = await Deno.readTextFile(join(root, ".gitignore"));
     assertStringIncludes(content, "# --- Specflow: gitignore ---");
     assertStringIncludes(content, "*.specflow.bak");
-    assertStringIncludes(content, ".specflow/config.yml.local");
     assertStringIncludes(content, "# --- End Specflow: gitignore ---");
   });
 });
