@@ -48,7 +48,7 @@ Deno.test("specflow init <name> writes a complete tree", async () => {
     assertEquals(await exists(join(root, ".claude/CLAUDE.md")), true);
     assertEquals(await exists(join(root, "CLAUDE.md")), false);
     assertEquals(await exists(join(root, "AGENTS.md")), true);
-    assertEquals(await exists(join(root, "tasks/backlog.md")), true);
+    assertEquals(await exists(join(root, "tasks/backlog.md")), false);
     assertEquals(await exists(join(root, ".specflow/memory/constitution.md")), true);
     assertEquals(await exists(join(root, ".specflow/templates/spec-template.md")), true);
     assertEquals(await exists(join(root, ".claude/commands/specflow.specify.md")), true);

@@ -42,7 +42,6 @@
     { "category": "spec-root", "name": "specify", "suffix": "scripts/powershell/setup-plan.ps1", "source": "core/specflow/scripts/powershell/setup-plan.ps1" },
 
     { "category": "project-root", "name": "root", "suffix": "AGENTS.md", "source": "core/root/AGENTS.md" },
-    { "category": "project-root", "name": "root", "suffix": "tasks/backlog.md", "source": "core/root/tasks/backlog.md" },
     { "category": "mergeable-project-root", "name": "root", "suffix": ".gitignore", "source": "core/root/.gitignore" }
   ],
   "harness_static": [

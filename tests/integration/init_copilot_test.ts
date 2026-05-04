@@ -86,7 +86,7 @@ Deno.test("specflow init --ai copilot scaffolds a Copilot layout", async () => {
     // Shared (cross-harness)
     assertEquals(await exists(join(root, ".specflow/memory/constitution.md")), true);
     assertEquals(await exists(join(root, "AGENTS.md")), true);
-    assertEquals(await exists(join(root, "tasks/backlog.md")), true);
+    assertEquals(await exists(join(root, "tasks/backlog.md")), false);
 
     // NOT emitted for copilot
     assertEquals(await exists(join(root, ".claude/")), false);
