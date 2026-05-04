@@ -88,8 +88,16 @@ export async function runInit(intent: InitIntent): Promise<number> {
     : "";
   console.log(green(`✓ wrote ${result.filesWritten} files${mergedSuffix}`));
   console.log("\nNext steps:");
-  console.log(`  1. Edit ${bold("AGENTS.md")} and ${bold(".specflow/memory/constitution.md")}`);
-  console.log(`  2. Open the project in ${harness.displayName}`);
+  console.log(
+    `  1. Open the project in ${harness.displayName}, then run ${
+      bold("/specflow.constitution")
+    } to scaffold your project's guiding principles`,
+  );
+  console.log(
+    `  2. Edit ${bold("AGENTS.md")} and refine ${
+      bold(".specflow/memory/constitution.md")
+    } for your stack`,
+  );
   console.log(
     `  3. Run ${bold('/specflow.specify "<feature description>"')} to scaffold your first feature`,
   );
