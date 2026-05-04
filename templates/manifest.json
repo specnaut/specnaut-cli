@@ -21,6 +21,7 @@
     { "category": "agent", "name": "test-reviewer", "source": "core/agents/test-reviewer.md" },
     { "category": "agent", "name": "qa-tester", "source": "core/agents/qa-tester.md" },
     { "category": "agent", "name": "workflow-manager", "source": "core/agents/workflow-manager.md" },
+    { "category": "agent", "name": "devops-sre", "source": "core/agents/devops-sre.md" },
 
     { "category": "skill", "name": "auto-chain", "source": "core/skills/auto-chain/SKILL.md" },
 
