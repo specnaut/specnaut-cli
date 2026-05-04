@@ -74,6 +74,19 @@ Specflow merges its `.gitignore` block into your existing file (non-destructivel
 `# --- Specflow: gitignore ---` markers). Other specflow-managed files use upgrade-aware semantics:
 if you customize a generated file, `specflow upgrade` will preserve it unless you pass `--force`.
 
+### What's in `.specflow/installed.lock` and should I commit it?
+
+`specflow init` writes a small YAML file at `.specflow/installed.lock`. It records the harness you
+chose, the templates version installed, and a SHA-256 + install timestamp for every file Specflow
+emitted. It contains no secrets — only file paths, content hashes, and version strings.
+
+**Commit it.** `specflow upgrade` reads this lock to know which harness to map templates to, to
+detect files you have customized (so it doesn't clobber them), and to drop orphaned files that are
+no longer part of the bundle. `specflow check --project` also surfaces the harness and templates
+version from this file. Without the lock, both commands degrade gracefully but cannot do their real
+job — `specflow upgrade` will refuse and ask you to re-run `specflow init --here --force` to rebuild
+the lock from scratch.
+
 ### Pick a different harness
 
 ```bash
