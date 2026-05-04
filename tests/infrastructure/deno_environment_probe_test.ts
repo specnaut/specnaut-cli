@@ -76,4 +76,8 @@ Deno.test("probeDeno returns warn when missing (not required)", async () => {
   const probe = new DenoEnvironmentProbe(runner);
   const outcome = await probe.probeDeno();
   assertEquals(outcome.status, "warn");
+  assertEquals(
+    outcome.message,
+    "deno not found in PATH (optional — only needed for Specflow development)",
+  );
 });
