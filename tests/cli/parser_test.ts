@@ -63,33 +63,10 @@ Deno.test("parseArgs returns self-update intent without --check", () => {
   });
 });
 
-Deno.test("parseArgs returns backlog-sync intent with no args", () => {
-  assertEquals(parseArgs(["backlog", "sync"]), {
-    kind: "backlog-sync",
-    singleId: null,
-    dryRun: false,
-    allowSecrets: false,
-  });
-});
-
-Deno.test("parseArgs returns backlog-sync intent with --id and --dry-run", () => {
-  assertEquals(parseArgs(["backlog", "sync", "--id", "042", "--dry-run"]), {
-    kind: "backlog-sync",
-    singleId: "042",
-    dryRun: true,
-    allowSecrets: false,
-  });
-});
-
-Deno.test("parseArgs returns backlog-configure intent", () => {
-  assertEquals(parseArgs(["backlog", "configure"]), { kind: "backlog-configure" });
-});
-
-Deno.test("parseArgs rejects backlog without subcommand", () => {
-  assertEquals(parseArgs(["backlog"]), {
-    kind: "unknown",
-    received: "backlog (missing subcommand)",
-  });
+Deno.test("parseArgs returns unknown for backlog (sync command removed)", () => {
+  assertEquals(parseArgs(["backlog"]), { kind: "unknown", received: "backlog" });
+  assertEquals(parseArgs(["backlog", "sync"]), { kind: "unknown", received: "backlog" });
+  assertEquals(parseArgs(["backlog", "configure"]), { kind: "unknown", received: "backlog" });
 });
 
 Deno.test("parseArgs returns check intent without --project", () => {

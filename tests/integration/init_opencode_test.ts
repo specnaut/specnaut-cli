@@ -83,7 +83,7 @@ Deno.test("specflow init --ai opencode scaffolds a complete OpenCode project lay
     assertEquals(await exists(join(root, "AGENTS.md")), true);
     const agentsRoot = await Deno.readTextFile(join(root, "AGENTS.md"));
     assertEquals(agentsRoot.length > 0, true);
-    assertEquals(await exists(join(root, "tasks/backlog.md")), true);
+    assertEquals(await exists(join(root, "tasks/backlog.md")), false);
 
     // NOT emitted for opencode
     assertEquals(await exists(join(root, ".claude/")), false);

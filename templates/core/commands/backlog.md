@@ -1,5 +1,5 @@
 ---
-description: Manage the product backlog — list, add, update, groom, brief, and sync tasks. All mutations route through the product-owner agent.
+description: Manage the product backlog — list, add, update, groom, and brief tasks. All mutations route through the product-owner agent.
 ---
 
 ## User Input
@@ -20,9 +20,6 @@ $ARGUMENTS
 | `status`            | Dashboard summary                           |
 | `groom`             | Full grooming session                       |
 | `brief <id>`        | Generate PO business brief                  |
-| `sync`              | Push all tasks to GitHub Issues + Project V2 (via `specflow backlog sync`) |
-| `sync <id>`         | Push a single task by id (via `specflow backlog sync --id NNN`) |
-| `configure`         | Set up `.specflow/config.yml` interactively (via `specflow backlog configure`) |
 | `<number>`          | Show details for task NNN                   |
 
 ## Rules
@@ -33,19 +30,17 @@ $ARGUMENTS
 2. After any mutation (add / update / groom / estimate), the orchestrator
    commits the backlog changes with a message like
    `chore(backlog): add task NNN — <short title>` or
-   `chore(backlog): update task NNN — <what changed>`. Stage only
-   `tasks/backlog.md` and `tasks/backlog/*.md`.
-3. After any mutation (add / update / groom / estimate), the orchestrator
-   MUST run `specflow backlog sync --id NNN` (or `specflow backlog sync` for
-   bulk mutations) to push changes to GitHub. The product-owner agent will emit
-   the appropriate sync directive.
+   `chore(backlog): update task NNN — <what changed>`. Stage only the
+   files the product-owner agent reports as touched.
 
-## Backlog layout
+## Backlog storage
 
-- Index: `tasks/backlog.md`
-- Task files: `tasks/backlog/NNN-slug.md` with YAML frontmatter
+The product-owner agent reads and writes the backlog directly to whichever
+backend the project uses (local Markdown files, GitHub Issues + Project V2,
+GitLab, etc.). The CLI does not push or pull on its own; the agent is
+responsible for talking to the backend.
 
-## Frontmatter schema (enforced by product-owner)
+## Frontmatter schema (used when the backend is local Markdown)
 
 ```yaml
 ---
