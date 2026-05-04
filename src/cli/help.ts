@@ -14,8 +14,8 @@ ${bold("Usage:")}
   specflow check [--project]         Diagnose the environment (and optionally the project)
   specflow upgrade [--dry-run] [--force]
                                      Update project templates to the binary's version
-  specflow --version                  Print version
-  specflow --help                     Show this help
+  specflow --version, -v              Print version
+  specflow --help, -h                 Show this help
 
 ${bold("Flags (for init):")}
   --here         Scaffold into the current directory instead of creating a new one

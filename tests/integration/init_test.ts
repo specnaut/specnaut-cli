@@ -100,11 +100,31 @@ Deno.test("specflow --version prints semver line", async () => {
   assertStringIncludes(stdout, "templates ");
 });
 
+Deno.test("specflow -v matches --version", async () => {
+  const long = await runSpecflow(["--version"]);
+  const short = await runSpecflow(["-v"]);
+  assertEquals(short.code, 0);
+  assertEquals(short.stdout, long.stdout);
+});
+
 Deno.test("specflow --help prints usage", async () => {
   const { code, stdout } = await runSpecflow(["--help"]);
   assertEquals(code, 0);
   assertStringIncludes(stdout, "Usage:");
   assertStringIncludes(stdout, "specflow init");
+});
+
+Deno.test("specflow -h matches --help", async () => {
+  const long = await runSpecflow(["--help"]);
+  const short = await runSpecflow(["-h"]);
+  assertEquals(short.code, 0);
+  assertEquals(short.stdout, long.stdout);
+});
+
+Deno.test("specflow --help advertises -v and -h shortcuts", async () => {
+  const { stdout } = await runSpecflow(["--help"]);
+  assertStringIncludes(stdout, "--version, -v");
+  assertStringIncludes(stdout, "--help, -h");
 });
 
 Deno.test("specflow bogus returns exit code 2", async () => {
