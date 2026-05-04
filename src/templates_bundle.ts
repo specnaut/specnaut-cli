@@ -1732,9 +1732,14 @@ description: Manage the product backlog — list, add, update, groom, and brief 
 ## Backlog storage
 
 The product-owner agent reads and writes the backlog directly to whichever
-backend the project uses (local Markdown files, GitHub Issues + Project V2,
-GitLab, etc.). The CLI does not push or pull on its own; the agent is
-responsible for talking to the backend.
+backend the project uses. When the backend is local Markdown:
+
+- Index: \`.specflow/backlog.md\`
+- Task files: \`.specflow/backlog/NNN-slug.md\`
+
+When the backend is remote (GitHub Issues + Project V2, GitLab, etc.) the
+agent talks to that backend directly — the CLI does not push or pull on
+its own.
 
 ## Frontmatter schema (used when the backend is local Markdown)
 
@@ -2528,6 +2533,65 @@ them resume manually from the last completed phase.
 ## Principles
 
 (none defined yet)
+`,
+    executable: false,
+  },
+  {
+    category: "spec-root",
+    name: "specify",
+    suffix: "backlog.md",
+    content: `# Backlog
+
+> Managed by the Product Owner agent (\`/backlog\`). Each task lives in
+> \`.specflow/backlog/NNN-slug.md\` with structured frontmatter.
+
+## Scoring
+
+- **Complexity**: Fibonacci (1, 2, 3, 5, 8, 13, 21) — story points
+- **Priority**: critical > high > medium > low
+- **Status**: \`todo\` | \`in_progress\` | \`done\` | \`deferred\` | \`blocked\`
+
+---
+
+## Critical
+
+_No tasks yet._
+
+## High Priority
+
+_No tasks yet._
+
+## Medium Priority
+
+_No tasks yet._
+
+## Low Priority
+
+_No tasks yet._
+
+## Deferred
+
+_No tasks yet._
+
+## Done
+
+_No tasks yet._
+
+---
+
+## Summary
+
+| Metric             | Value |
+|--------------------|-------|
+| Total tasks        | 0     |
+| Critical           | 0     |
+| High               | 0     |
+| Medium             | 0     |
+| Low                | 0     |
+| Deferred           | 0     |
+| Done               | 0     |
+| Total story points | 0     |
+| Done points        | 0     |
 `,
     executable: false,
   },

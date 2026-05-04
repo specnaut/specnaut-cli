@@ -88,6 +88,7 @@ Deno.test("specflow init --ai antigravity scaffolds an Antigravity layout", asyn
     assertEquals(await exists(join(root, ".specflow/memory/constitution.md")), true);
     assertEquals(await exists(join(root, "AGENTS.md")), true);
     assertEquals(await exists(join(root, "tasks/backlog.md")), false);
+    assertEquals(await exists(join(root, ".specflow/backlog.md")), true);
 
     // No other harnesses' output trees.
     assertEquals(await exists(join(root, ".claude/")), false);

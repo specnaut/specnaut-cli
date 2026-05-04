@@ -36,9 +36,14 @@ $ARGUMENTS
 ## Backlog storage
 
 The product-owner agent reads and writes the backlog directly to whichever
-backend the project uses (local Markdown files, GitHub Issues + Project V2,
-GitLab, etc.). The CLI does not push or pull on its own; the agent is
-responsible for talking to the backend.
+backend the project uses. When the backend is local Markdown:
+
+- Index: `.specflow/backlog.md`
+- Task files: `.specflow/backlog/NNN-slug.md`
+
+When the backend is remote (GitHub Issues + Project V2, GitLab, etc.) the
+agent talks to that backend directly — the CLI does not push or pull on
+its own.
 
 ## Frontmatter schema (used when the backend is local Markdown)
 

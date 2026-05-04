@@ -102,6 +102,47 @@ Deno.test("upgrade --force overwrites a customized file with backup", async () =
   });
 });
 
+Deno.test("upgrade migrates legacy tasks/backlog paths into .specflow/", async () => {
+  await withTempDir(async (parent) => {
+    const init = await runSpecflow(["init", "demo", "--no-git"], { cwd: parent });
+    assertEquals(init.code, 0);
+
+    const projectDir = join(parent, "demo");
+
+    // Simulate a project that pre-dates #45: the new index doesn't exist
+    // yet (the user installed Specflow before the path moved), and the
+    // legacy layout under tasks/ is in place.
+    await Deno.remove(join(projectDir, ".specflow/backlog.md"));
+    await Deno.mkdir(join(projectDir, "tasks/backlog"), { recursive: true });
+    await Deno.writeTextFile(
+      join(projectDir, "tasks/backlog.md"),
+      "# Legacy backlog index\n",
+    );
+    await Deno.writeTextFile(
+      join(projectDir, "tasks/backlog/001-legacy.md"),
+      "# Legacy task\n",
+    );
+
+    const upgrade = await runSpecflow(["upgrade"], { cwd: projectDir });
+    assertEquals(upgrade.code, 0, `upgrade failed: ${upgrade.stderr}`);
+    assertStringIncludes(upgrade.stdout, "tasks/backlog.md → .specflow/backlog.md");
+    assertStringIncludes(upgrade.stdout, "tasks/backlog/ → .specflow/backlog/");
+
+    // Old paths gone, new paths populated with the user's content preserved.
+    assertEquals(await exists(join(projectDir, "tasks/backlog.md")), false);
+    assertEquals(await exists(join(projectDir, "tasks/backlog")), false);
+    assertEquals(await exists(join(projectDir, "tasks")), false); // tidy-up
+    const migratedIndex = await Deno.readTextFile(
+      join(projectDir, ".specflow/backlog.md"),
+    );
+    assertStringIncludes(migratedIndex, "Legacy backlog index");
+    const migratedTask = await Deno.readTextFile(
+      join(projectDir, ".specflow/backlog/001-legacy.md"),
+    );
+    assertStringIncludes(migratedTask, "Legacy task");
+  });
+});
+
 Deno.test("upgrade auto-deletes a clean orphan and drops it from the lock", async () => {
   await withTempDir(async (parent) => {
     const init = await runSpecflow(["init", "demo", "--no-git"], { cwd: parent });

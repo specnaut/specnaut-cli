@@ -26,6 +26,7 @@
     { "category": "skill", "name": "auto-chain", "source": "core/skills/auto-chain/SKILL.md" },
 
     { "category": "spec-root", "name": "specify", "suffix": "memory/constitution.md", "source": "core/specflow/memory/constitution.md" },
+    { "category": "spec-root", "name": "specify", "suffix": "backlog.md", "source": "core/specflow/backlog.md" },
     { "category": "spec-root", "name": "specify", "suffix": "templates/spec-template.md", "source": "core/specflow/templates/spec-template.md" },
     { "category": "spec-root", "name": "specify", "suffix": "templates/plan-template.md", "source": "core/specflow/templates/plan-template.md" },
     { "category": "spec-root", "name": "specify", "suffix": "templates/tasks-template.md", "source": "core/specflow/templates/tasks-template.md" },
