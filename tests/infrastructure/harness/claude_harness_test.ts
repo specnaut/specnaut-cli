@@ -12,7 +12,7 @@ Deno.test("ClaudeHarness.mapBundle emits the Claude tree", () => {
   const h = new ClaudeHarness();
   const mapped = h.mapBundle(CORE_BUNDLE);
   const keys = Object.keys(mapped).sort();
-  assertEquals(keys.length, 39); // 38 core + .claude/CLAUDE.md
+  assertEquals(keys.length, 40); // 39 core + .claude/CLAUDE.md
   // Spot-check canonical paths
   assert(".claude/commands/specflow.specify.md" in mapped);
   assert(".claude/commands/backlog.md" in mapped);
