@@ -1741,22 +1741,11 @@ When the backend is remote (GitHub Issues + Project V2, GitLab, etc.) the
 agent talks to that backend directly — the CLI does not push or pull on
 its own.
 
-## Frontmatter schema (used when the backend is local Markdown)
+## Frontmatter schema
 
-\`\`\`yaml
----
-id: NNN                # zero-padded 3 digits
-title: string
-category: string
-priority: critical | high | medium | low
-complexity: 1 | 2 | 3 | 5 | 8 | 13 | 21    # Fibonacci story points
-status: todo | in_progress | done | deferred | blocked
-depends_on: [string]
-spec: string | null
-tags: [string]
-created: YYYY-MM-DD
----
-\`\`\`
+The product-owner agent owns the canonical schema (see
+\`.claude/agents/product-owner.md\` or the equivalent path for your harness).
+Do not duplicate it here — the dispatcher defers to the agent.
 
 ## Quick reference
 
@@ -5881,7 +5870,8 @@ export const HARNESS_STATIC: Record<string, Record<string, TemplateFile>> = {
 - **Skills**: installed skills live in \`.claude/skills/\`.
 - **Specflow commands**: custom Specflow commands live in \`.claude/commands/\`.
 - **Agents**: specialized agents live in \`.claude/agents/\`.
-- **Backlog**: managed via \`/backlog\` — see \`tasks/backlog.md\`.
+- **Backlog**: managed via \`/backlog\` — when the project uses the local
+  Markdown backend, see \`.specflow/backlog.md\`.
 `,
       executable: false,
     },
@@ -5931,11 +5921,13 @@ clarifications needed) STOP #2 (pre-merge validation)
 - \`/specflow-agent-test-reviewer\` — test coverage review
 - \`/specflow-agent-qa-tester\` — QA + test writing
 - \`/specflow-agent-workflow-manager\` — long-running orchestration
+- \`/specflow-agent-devops-sre\` — cloud infrastructure, CI/CD, observability
 
 ## Project context
 
 - Constitution lives at \`.specflow/memory/constitution.md\` — treat as non-negotiable rules.
-- Product backlog lives at \`tasks/backlog.md\` (index) and \`tasks/backlog/NNN-*.md\` (task files).
+- Product backlog (when local Markdown backend): index at \`.specflow/backlog.md\`,
+  task files at \`.specflow/backlog/NNN-*.md\`.
 - Project conventions: \`AGENTS.md\` at project root.
 
 Read the constitution and AGENTS.md before starting any significant work.

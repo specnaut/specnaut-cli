@@ -63,10 +63,10 @@ Deno.test("parseArgs returns self-update intent without --check", () => {
   });
 });
 
-Deno.test("parseArgs returns unknown for backlog (sync command removed)", () => {
-  assertEquals(parseArgs(["backlog"]), { kind: "unknown", received: "backlog" });
-  assertEquals(parseArgs(["backlog", "sync"]), { kind: "unknown", received: "backlog" });
-  assertEquals(parseArgs(["backlog", "configure"]), { kind: "unknown", received: "backlog" });
+Deno.test("parseArgs returns backlog-removed for any backlog invocation (post-v0.9.0)", () => {
+  assertEquals(parseArgs(["backlog"]), { kind: "backlog-removed" });
+  assertEquals(parseArgs(["backlog", "sync"]), { kind: "backlog-removed" });
+  assertEquals(parseArgs(["backlog", "configure"]), { kind: "backlog-removed" });
 });
 
 Deno.test("parseArgs returns check intent without --project", () => {

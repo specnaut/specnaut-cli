@@ -45,22 +45,11 @@ When the backend is remote (GitHub Issues + Project V2, GitLab, etc.) the
 agent talks to that backend directly — the CLI does not push or pull on
 its own.
 
-## Frontmatter schema (used when the backend is local Markdown)
+## Frontmatter schema
 
-```yaml
----
-id: NNN                # zero-padded 3 digits
-title: string
-category: string
-priority: critical | high | medium | low
-complexity: 1 | 2 | 3 | 5 | 8 | 13 | 21    # Fibonacci story points
-status: todo | in_progress | done | deferred | blocked
-depends_on: [string]
-spec: string | null
-tags: [string]
-created: YYYY-MM-DD
----
-```
+The product-owner agent owns the canonical schema (see
+`.claude/agents/product-owner.md` or the equivalent path for your harness).
+Do not duplicate it here — the dispatcher defers to the agent.
 
 ## Quick reference
 

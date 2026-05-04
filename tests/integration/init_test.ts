@@ -70,6 +70,45 @@ Deno.test("specflow init <name> writes a complete tree", async () => {
   });
 });
 
+async function* walkFiles(root: string): AsyncIterable<string> {
+  for await (const entry of Deno.readDir(root)) {
+    const full = join(root, entry.name);
+    if (entry.isDirectory) {
+      yield* walkFiles(full);
+    } else if (entry.isFile) {
+      yield full;
+    }
+  }
+}
+
+Deno.test("no scaffolded file references the legacy tasks/backlog path", async () => {
+  // Drift guard: PR #45 moved the local Markdown backlog under .specflow/.
+  // Several harness-static templates kept hardcoded `tasks/backlog.md`
+  // strings on the v0.9.0 release; this test ensures every harness's
+  // scaffolded output stays consistent on any future template edit.
+  for (const harness of ["claude", "cursor", "codex", "gemini"] as const) {
+    await withTempDir(async (parent) => {
+      const { code } = await runSpecflow(
+        ["init", "demo", "--no-git", "--ai", harness],
+        { cwd: parent },
+      );
+      assertEquals(code, 0);
+      const root = join(parent, "demo");
+      for await (const path of walkFiles(root)) {
+        // The lock file legitimately tracks paths; only flag content drift
+        // in user-facing prompt / rule / workflow files.
+        if (path.endsWith(".specflow/installed.lock")) continue;
+        const content = await Deno.readTextFile(path);
+        assertEquals(
+          content.includes("tasks/backlog"),
+          false,
+          `${path} (harness=${harness}) still references the legacy tasks/backlog path`,
+        );
+      }
+    });
+  }
+});
+
 Deno.test("scaffolded product-owner agent documents epic / sub-task support", async () => {
   await withTempDir(async (dir) => {
     const { code } = await runSpecflow(["init", "demo", "--no-git"], { cwd: dir });
