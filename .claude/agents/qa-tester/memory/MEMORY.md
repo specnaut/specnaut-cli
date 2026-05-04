@@ -10,6 +10,10 @@ re-flag a regression on their own).
 - [Dev-only Deno "exports" warning](dev-only-deno-warning.md) — benign
   stderr noise from `deno run` path; never appears in the compiled
   binary; do not flag.
+- [WebFetch cache after recent docs deploy](webfetch-cache-after-recent-deploy.md)
+  — `WebFetch` may return stale `llms.txt` content for minutes after
+  a GitHub Pages deploy; cross-check with `curl ?cb=$(date +%s)` before
+  recording a T1 docs finding.
 
 ## Tracked in backlog (re-flag once the ticket closes)
 
