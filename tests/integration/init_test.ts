@@ -69,6 +69,23 @@ Deno.test("specflow init <name> writes a complete tree", async () => {
   });
 });
 
+Deno.test("specflow init's Next steps nudges towards /specflow.constitution first", async () => {
+  await withTempDir(async (dir) => {
+    const { code, stdout } = await runSpecflow(["init", "demo", "--no-git"], { cwd: dir });
+    assertEquals(code, 0);
+    assertStringIncludes(stdout, "Next steps:");
+    assertStringIncludes(stdout, "/specflow.constitution");
+    // The constitution step must come before /specflow.specify in the rendered list.
+    const constitutionIdx = stdout.indexOf("/specflow.constitution");
+    const specifyIdx = stdout.indexOf("/specflow.specify");
+    assertEquals(
+      constitutionIdx > 0 && constitutionIdx < specifyIdx,
+      true,
+      "constitution step must precede specify step in Next steps",
+    );
+  });
+});
+
 Deno.test("specflow init --here writes into cwd", async () => {
   await withTempDir(async (dir) => {
     const { code, stderr } = await runSpecflow(["init", "--here", "--no-git"], { cwd: dir });
