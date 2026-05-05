@@ -15,6 +15,14 @@ const OUT_HTML = `${OUT_DIR}/index.html`;
 const OUT_MD = `${OUT_DIR}/llms.txt`;
 const OUT_CNAME = `${OUT_DIR}/CNAME`;
 const TITLE = "Specflow — documentation";
+const REPO_URL = "https://github.com/mkrlabs/specflow";
+
+async function readVersion(denoJsonPath = "deno.json"): Promise<string> {
+  const raw = await Deno.readTextFile(denoJsonPath);
+  const { version } = JSON.parse(raw) as { version?: string };
+  if (!version) throw new Error(`No "version" field in ${denoJsonPath}`);
+  return version;
+}
 
 /**
  * GitHub Pages custom domain. Emitted as `docs-dist/CNAME` so each deploy
@@ -26,7 +34,7 @@ const TITLE = "Specflow — documentation";
  */
 const CUSTOM_DOMAIN = "specflow.makerlabs.dev";
 
-const HTML_TEMPLATE = (body: string) =>
+const HTML_TEMPLATE = (body: string, version: string) =>
   `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -34,6 +42,7 @@ const HTML_TEMPLATE = (body: string) =>
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>${TITLE}</title>
   <meta name="description" content="Specflow — enhanced spec-kit CLI with auto-chain, review phase, and backlog. Distributed as a single native binary." />
+  <meta name="specflow-version" content="${version}" />
   <link rel="canonical" href="https://specflow.makerlabs.dev/" />
   <link rel="alternate" type="text/markdown" href="./llms.txt" />
   <style>
@@ -72,8 +81,9 @@ const HTML_TEMPLATE = (body: string) =>
 ${body}
   </main>
   <footer class="doc-footer">
-    Raw Markdown for LLMs: <a href="./llms.txt">llms.txt</a>
-    · Source: <a href="https://github.com/mkrlabs/specflow">github.com/mkrlabs/specflow</a>
+    Specflow <a href="${REPO_URL}/releases/tag/v${version}">v${version}</a>
+    · Raw Markdown for LLMs: <a href="./llms.txt">llms.txt</a>
+    · Source: <a href="${REPO_URL}">github.com/mkrlabs/specflow</a>
   </footer>
 </body>
 </html>
@@ -82,27 +92,30 @@ ${body}
 export async function buildDocs(opts: {
   source?: string;
   outDir?: string;
-} = {}): Promise<{ html: string; markdown: string }> {
+  version?: string;
+} = {}): Promise<{ html: string; markdown: string; version: string }> {
   const source = opts.source ?? SOURCE;
   const outDir = opts.outDir ?? OUT_DIR;
+  const version = opts.version ?? await readVersion();
   const outHtml = `${outDir}/index.html`;
   const outMd = `${outDir}/llms.txt`;
 
-  const markdown = await Deno.readTextFile(source);
-  const rendered = render(markdown, { allowIframes: false });
-  const html = HTML_TEMPLATE(rendered);
+  const sourceMarkdown = await Deno.readTextFile(source);
+  const rendered = render(sourceMarkdown, { allowIframes: false });
+  const html = HTML_TEMPLATE(rendered, version);
+  const markdown = `<!-- Specflow v${version} — ${REPO_URL} -->\n\n${sourceMarkdown}`;
 
   await Deno.mkdir(outDir, { recursive: true });
   await Deno.writeTextFile(outHtml, html);
   await Deno.writeTextFile(outMd, markdown);
   await Deno.writeTextFile(`${outDir}/CNAME`, `${CUSTOM_DOMAIN}\n`);
 
-  return { html, markdown };
+  return { html, markdown, version };
 }
 
 if (import.meta.main) {
-  const { html } = await buildDocs();
-  console.log(`✓ wrote ${OUT_HTML} (${html.length} bytes)`);
+  const { html, version } = await buildDocs();
+  console.log(`✓ wrote ${OUT_HTML} (${html.length} bytes, v${version})`);
   console.log(`✓ wrote ${OUT_MD}`);
   console.log(`✓ wrote ${OUT_CNAME} (${CUSTOM_DOMAIN})`);
 }

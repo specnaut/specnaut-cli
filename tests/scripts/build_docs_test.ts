@@ -21,7 +21,7 @@ async function withTempSource(
 Deno.test("buildDocs writes index.html and llms.txt with rendered markdown", async () => {
   const md = "# Hello Specflow\n\nThis is a **test** doc.\n";
   await withTempSource(md, async (source, outDir) => {
-    await buildDocs({ source, outDir });
+    await buildDocs({ source, outDir, version: "9.9.9" });
 
     assertEquals(await exists(join(outDir, "index.html")), true);
     assertEquals(await exists(join(outDir, "llms.txt")), true);
@@ -34,14 +34,30 @@ Deno.test("buildDocs writes index.html and llms.txt with rendered markdown", asy
     assertStringIncludes(html, "<!DOCTYPE html>");
     // Raw-markdown alt link is present.
     assertStringIncludes(html, 'href="./llms.txt"');
+    // Version surfaced in footer + meta tag so users can tell which Specflow
+    // release the docs describe.
+    assertStringIncludes(html, '<meta name="specflow-version" content="9.9.9"');
+    assertStringIncludes(html, "v9.9.9");
 
     const txt = await Deno.readTextFile(join(outDir, "llms.txt"));
-    assertEquals(txt, md, "llms.txt must be a verbatim copy of the source markdown");
+    assertStringIncludes(txt, "<!-- Specflow v9.9.9");
+    assertStringIncludes(txt, md, "llms.txt must include the source markdown verbatim");
 
     // CNAME is emitted on every build so the custom-domain config persists
     // across workflow deploys.
     const cname = await Deno.readTextFile(join(outDir, "CNAME"));
     assertEquals(cname.trim(), "specflow.makerlabs.dev");
+  });
+});
+
+Deno.test("buildDocs reads version from deno.json by default", async () => {
+  const md = "# Hello\n";
+  await withTempSource(md, async (source, outDir) => {
+    const result = await buildDocs({ source, outDir });
+    const denoJson = JSON.parse(await Deno.readTextFile("deno.json"));
+    assertEquals(result.version, denoJson.version);
+    assertStringIncludes(result.html, `v${denoJson.version}`);
+    assertStringIncludes(result.markdown, `<!-- Specflow v${denoJson.version}`);
   });
 });
 
@@ -51,6 +67,7 @@ Deno.test("buildDocs renders the actual Specflow docs without error", async () =
     const result = await buildDocs({
       source: "docs/llms.md",
       outDir: root,
+      version: "9.9.9",
     });
     // Sanity: the real docs mention install + harnesses, which are headline
     // sections that should never disappear silently.
