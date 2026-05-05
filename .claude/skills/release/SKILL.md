@@ -111,6 +111,19 @@ Specflow repo.
     Report: binary names, sizes, checksum SHA256 of each, and confirm the
     release body shows the **Features / Bug fixes / Internal** sections.
 
+    **Also confirm the homebrew-tap formula bumped automatically.** The
+    release workflow's last step pushes `Formula/specflow.rb` on
+    `mkrlabs/homebrew-tap` to the new version + checksums. Verify with:
+
+    ```bash
+    gh api repos/mkrlabs/homebrew-tap/commits/main --jq '.commit.message'
+    ```
+
+    Expected: `chore: bump specflow to <NEXT>` as the latest commit. If the
+    step was skipped, the workflow log will say `HOMEBREW_TAP_TOKEN not
+    set — skipping ...`. In that case the secret needs to be (re)provisioned
+    — see "Prerequisites" at the bottom of this skill.
+
 11. **Refresh the local binary** — keep `~/.local/bin/specflow` (or
     wherever `command -v specflow` resolves) in sync with what you just
     shipped, so the next qa-tester dispatch and Kevin's day-to-day usage
@@ -171,4 +184,26 @@ If a release goes wrong:
 2. Delete the local tag: `git tag -d v<BAD>`
 3. Delete the GitHub Release via the web UI (tag deletion does not auto-delete
    the release).
-4. Fix the issue, bump again (patch), and re-release.
+4. Revert the homebrew-tap bump if it landed (`gh api -X DELETE` is not
+   exposed for branches; instead push a force-revert commit on
+   `mkrlabs/homebrew-tap` main, or land a new bump from the corrected
+   patch release).
+5. Fix the issue, bump again (patch), and re-release.
+
+## Prerequisites
+
+The release workflow needs one secret on `mkrlabs/specflow` for the
+homebrew-tap bump step to work:
+
+- **`HOMEBREW_TAP_TOKEN`** — fine-grained GitHub Personal Access Token,
+  scoped to `mkrlabs/homebrew-tap` only, with `Contents: Read and write`.
+  Created in GitHub → Settings → Developer settings → Personal access
+  tokens → Fine-grained tokens. Add it under
+  `mkrlabs/specflow` → Settings → Secrets and variables → Actions →
+  New repository secret.
+
+If the secret is missing, the bump step exits 0 with a workflow warning
+(`HOMEBREW_TAP_TOKEN not set — skipping ...`). The release itself still
+ships; only the formula bump is skipped, and `brew upgrade specflow`
+will silently keep serving the previous version until the next release
+that does have the secret.

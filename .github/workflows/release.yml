@@ -47,3 +47,9 @@ jobs:
             dist/specflow-windows-x64.exe
             dist/specflow-windows-x64.exe.sha256
           body_path: dist/release-notes.md
+      - name: Bump mkrlabs/homebrew-tap formula
+        env:
+          HOMEBREW_TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+        run: |
+          deno run --allow-read --allow-write --allow-run --allow-env \
+            scripts/bump-tap-formula.ts
