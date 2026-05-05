@@ -23,6 +23,13 @@ project vision; this file only encodes how Kevin wants to be collaborated with.
 - **Every backlog mutation goes through the `product-owner` subagent** — don't run `add.sh` /
   `move.sh` / `gh issue {create,close,edit}` inline. Dispatch the PO and let it execute. (See
   `.claude/skills/backlog/SKILL.md`.)
+- **Every release / pipeline / distribution change goes through the `devops-sre` subagent
+  first** — before editing `.github/workflows/*.yml`, `install.sh`, `scripts/build.ts`,
+  `scripts/bump-tap-formula.ts`, anything in `mkrlabs/homebrew-tap`, or running `/release`,
+  dispatch `devops-sre` for an advisory pass. The agent is read-only (same pattern as the
+  architect): it returns findings + recommendations; the main session executes the change.
+  Skip the dispatch only for trivial doc tweaks inside the same area (e.g. typo in a comment).
+  (See `.claude/agents/devops-sre.md`.)
 
 ## Implementation defaults
 
