@@ -1,7 +1,7 @@
 # Implementation Plan: [FEATURE]
 
 **Branch**: `[###-feature-name]` | **Date**: [DATE] | **Spec**: [link]
-**Input**: Feature specification from `/specs/[###-feature-name]/spec.md`
+**Input**: Feature specification from `/.specflow/specs/[###-feature-name]/spec.md`
 
 **Note**: This template is filled in by the `__SPECFLOW_COMMAND_PLAN__` command. See `.specflow/templates/plan-template.md` for the execution workflow.
 
@@ -38,7 +38,7 @@
 ### Documentation (this feature)
 
 ```text
-specs/[###-feature]/
+.specflow/specs/[###-feature]/
 ├── plan.md              # This file (__SPECFLOW_COMMAND_PLAN__ command output)
 ├── research.md          # Phase 0 output (__SPECFLOW_COMMAND_PLAN__ command)
 ├── data-model.md        # Phase 1 output (__SPECFLOW_COMMAND_PLAN__ command)

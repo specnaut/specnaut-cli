@@ -68,7 +68,7 @@ function Get-CurrentBranch {
     }
 
     # For non-git repos, try to find the latest feature directory
-    $specsDir = Join-Path $repoRoot "specs"
+    $specsDir = Join-Path $repoRoot ".specflow" "specs"
     
     if (Test-Path $specsDir) {
         $latestFeature = ""
@@ -164,13 +164,13 @@ function Test-FeatureBranch {
     return $true
 }
 
-# Resolve specs/<feature-dir> by numeric/timestamp prefix (mirrors scripts/bash/common.sh find_feature_dir_by_prefix).
+# Resolve .specflow/specs/<feature-dir> by numeric/timestamp prefix (mirrors scripts/bash/common.sh find_feature_dir_by_prefix).
 function Find-FeatureDirByPrefix {
     param(
         [Parameter(Mandatory = $true)][string]$RepoRoot,
         [Parameter(Mandatory = $true)][string]$Branch
     )
-    $specsDir = Join-Path $RepoRoot 'specs'
+    $specsDir = Join-Path $RepoRoot '.specflow' 'specs'
     $branchName = Get-SpecflowEffectiveBranchName $Branch
 
     $prefix = $null

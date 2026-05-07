@@ -143,6 +143,34 @@ Deno.test("upgrade migrates legacy tasks/backlog paths into .specflow/", async (
   });
 });
 
+Deno.test("upgrade migrates legacy specs/ into .specflow/specs/", async () => {
+  await withTempDir(async (parent) => {
+    const init = await runSpecflow(["init", "demo", "--no-git"], { cwd: parent });
+    assertEquals(init.code, 0);
+
+    const projectDir = join(parent, "demo");
+
+    // Simulate a project that pre-dates #67: a feature directory exists
+    // at the legacy top-level `specs/` path (where SpecKit puts them).
+    await Deno.mkdir(join(projectDir, "specs/001-legacy-feature"), { recursive: true });
+    await Deno.writeTextFile(
+      join(projectDir, "specs/001-legacy-feature/spec.md"),
+      "# Legacy spec\n",
+    );
+
+    const upgrade = await runSpecflow(["upgrade"], { cwd: projectDir });
+    assertEquals(upgrade.code, 0, `upgrade failed: ${upgrade.stderr}`);
+    assertStringIncludes(upgrade.stdout, "specs/ → .specflow/specs/");
+
+    // Old path gone, new path populated with the user's content preserved.
+    assertEquals(await exists(join(projectDir, "specs")), false);
+    const migrated = await Deno.readTextFile(
+      join(projectDir, ".specflow/specs/001-legacy-feature/spec.md"),
+    );
+    assertStringIncludes(migrated, "Legacy spec");
+  });
+});
+
 Deno.test("upgrade auto-deletes a clean orphan and drops it from the lock", async () => {
   await withTempDir(async (parent) => {
     const init = await runSpecflow(["init", "demo", "--no-git"], { cwd: parent });
