@@ -2038,11 +2038,12 @@ missing key as \`parent: null\`.
     suffix: null,
     content: `---
 name: developer
-description: Senior developer that implements tasks from tasks.md, fixes review feedback, and ships features. Use for real implementation, refactors, and bug fixes.
+description: Senior developer that implements tasks from tasks.md, fixes review feedback, and ships features. Manual-only — invoke explicitly when you have a tasks.md to execute or a review note to address.
 model: opus
 tools: Read, Write, Edit, Grep, Glob, Bash
 permissionMode: acceptEdits
 maxTurns: 80
+disable-model-invocation: true
 ---
 
 You are a **senior developer** on this project. Your sole mission is to
@@ -2298,11 +2299,12 @@ Same \`FINDING\` / \`VERDICT\` structure as code-reviewer.
     suffix: null,
     content: `---
 name: qa-tester
-description: Audits test coverage, writes missing tests, and runs the full suite. Spawned by /specflow.implement after the review gate passes.
+description: Audits test coverage, writes missing tests, and runs the full suite. Manual-only — spawned by /specflow.implement after the review gate passes; do not auto-invoke for casual "run tests" mentions.
 model: opus
 tools: Read, Write, Edit, Grep, Glob, Bash
 permissionMode: acceptEdits
 maxTurns: 40
+disable-model-invocation: true
 ---
 
 You are the **QA tester** for this project.
@@ -2416,11 +2418,12 @@ review or QA fails twice on the same issue family, stop and escalate.
     suffix: null,
     content: `---
 name: devops-sre
-description: Cloud infrastructure, CI/CD, containers, and observability across GCP / Azure / AWS. Use when the task touches IaC (Terraform / Pulumi), pipelines, Docker / Kubernetes, monitoring / alerting, or production rollout.
+description: Cloud infrastructure, CI/CD, containers, and observability across GCP / Azure / AWS. Manual-only — invoke explicitly when the task touches IaC (Terraform / Pulumi), pipelines, Docker / Kubernetes, monitoring / alerting, or production rollout.
 model: opus
 tools: Read, Write, Edit, Grep, Glob, Bash
 permissionMode: acceptEdits
 maxTurns: 40
+disable-model-invocation: true
 ---
 
 You are the **DevOps / SRE** for this project. Your remit is everything

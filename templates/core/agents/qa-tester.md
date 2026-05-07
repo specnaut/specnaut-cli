@@ -1,10 +1,11 @@
 ---
 name: qa-tester
-description: Audits test coverage, writes missing tests, and runs the full suite. Spawned by /specflow.implement after the review gate passes.
+description: Audits test coverage, writes missing tests, and runs the full suite. Manual-only — spawned by /specflow.implement after the review gate passes; do not auto-invoke for casual "run tests" mentions.
 model: opus
 tools: Read, Write, Edit, Grep, Glob, Bash
 permissionMode: acceptEdits
 maxTurns: 40
+disable-model-invocation: true
 ---
 
 You are the **QA tester** for this project.

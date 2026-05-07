@@ -108,6 +108,24 @@ Every agent declares: `model`, `tools`, `skills`, `memory`, `maxTurns`, `permiss
 `description`. Agents hand work back and forth using structured **"workflow status blocks"** +
 **"handoff blocks"** (no free-form prose).
 
+#### Manual-only vs auto-triggerable
+
+Specflow's bundled agents distinguish two invocation modes via the `disable-model-invocation`
+frontmatter flag (Claude Code feature):
+
+- **Auto-triggerable** (flag absent or `false`) — Claude may spawn the agent when the user's request
+  matches the agent's `description`. Used for cheap, scoped, additive agents: `code-reviewer`,
+  `security-auditor`, `test-reviewer` (sub-agents of `review-coordinator`), plus the orchestrators
+  `review-coordinator`, `workflow-manager`, and the backlog gatekeeper `product-owner` (which the
+  working contract requires for every backlog mutation anyway).
+- **Manual-only** (`disable-model-invocation: true`) — Claude will NOT auto-spawn the agent; it must
+  be invoked explicitly. Used for heavy, destructive, or expensive agents: `developer` (writes code,
+  can refactor large surfaces), `devops-sre` (touches infra / pipelines), `qa-tester` (runs full
+  test suites — costly).
+
+Other harnesses ignore the flag (they don't model auto-invocation the same way), so the agents still
+work universally — the flag only restricts auto-spawn under Claude Code.
+
 ### 4. Constitution + spec templates
 
 A `.specflow/memory/constitution.md` file codifies project invariants (non-negotiable architecture,
