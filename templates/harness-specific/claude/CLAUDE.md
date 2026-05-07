@@ -26,7 +26,9 @@ team's needs.
 
 - **Headless / CI invocation** — `claude -p "<prompt>"` runs Claude Code
   non-interactively, useful for CI gates, pre-commit hooks, and cron jobs
-  that dispatch a specific agent. See
+  that dispatch a specific agent. Specflow ships a wrapper at
+  `.claude/scripts/dispatch-agent.sh <agent-name> "<prompt>"` that auto-
+  derives the right `--allowedTools` from the agent's frontmatter. See
   https://code.claude.com/docs/fr/headless.
 
 - **Deep links** — a `claude-cli://open?repo=<owner>/<repo>&q=<prompt>` URL
