@@ -15,6 +15,7 @@ async function withProjectDir(fn: (dir: string) => Promise<void>) {
 const SAMPLE: InstalledLock = {
   version: 2,
   harness: "claude",
+  backlogBackend: "local",
   templatesVersion: "0.3.0",
   entries: new Map([
     ["CLAUDE.md", {

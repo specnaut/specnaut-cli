@@ -9,6 +9,8 @@ import { FsLockStore } from "../../infrastructure/fs_lock_store.ts";
 import { CORE_BUNDLE, TEMPLATES_VERSION } from "../../templates_bundle.ts";
 import { renderUnifiedDiff } from "../../domain/diff.ts";
 import type { UpgradePlan } from "../../domain/upgrade_plan.ts";
+import type { BacklogBackend, InstalledLock } from "../../domain/installed_lock.ts";
+import { sha256Hex } from "../../domain/sha256.ts";
 
 /**
  * One-shot migration for projects that pre-date #45. Move
@@ -78,7 +80,104 @@ export type UpgradeIntent = {
   kind: "upgrade";
   dryRun: boolean;
   force: boolean;
+  backlog: BacklogBackend | null;
 };
+
+/**
+ * One-shot routine: switch the recorded backlog backend, re-render the
+ * bundled backlog skill files for the new backend, and update the lock.
+ *
+ * Existing user data (markdown files for local, GitHub issues for github)
+ * is NOT migrated — the caller logs that explicitly.
+ */
+export async function switchBacklogBackend(
+  projectDir: string,
+  newBackend: BacklogBackend,
+): Promise<{ switched: boolean; from: BacklogBackend }> {
+  const lockStore = new FsLockStore();
+  const lock = await lockStore.read(projectDir);
+  if (lock === null) {
+    throw new Error(
+      "no .specflow/installed.lock found. Run `specflow init --here --force` first.",
+    );
+  }
+  const from = lock.backlogBackend;
+  if (from === newBackend) return { switched: false, from };
+
+  const harness = findHarness(lock.harness);
+  if (!harness) throw new Error(`unknown harness in lock: ${lock.harness}`);
+
+  const newBundle = harness.mapBundle(CORE_BUNDLE, { backlogBackend: newBackend });
+  const oldBundle = harness.mapBundle(CORE_BUNDLE, { backlogBackend: from });
+
+  const writer = new DenoFsWriter();
+  const reader = new DenoFsReader();
+
+  // Identify backlog-skill + backlog-script destinations by diffing the two
+  // bundles: any path that differs (or is exclusive to one bundle) is part
+  // of the backlog skill surface.
+  const partial: Record<string, { content: string; executable: boolean }> = {};
+  const oldOnly = new Set<string>();
+  for (const [dest, file] of Object.entries(newBundle)) {
+    const oldFile = oldBundle[dest];
+    if (oldFile === undefined || oldFile.content !== file.content) {
+      partial[dest] = file;
+    }
+  }
+  for (const dest of Object.keys(oldBundle)) {
+    if (newBundle[dest] === undefined) oldOnly.add(dest);
+  }
+
+  // Customization guard: refuse to switch if any of the on-disk skill files
+  // were customized vs the recorded SHA. Force-overwrite is the user's
+  // escape hatch.
+  const customized: string[] = [];
+  for (const dest of Object.keys(partial)) {
+    const lockEntry = lock.entries.get(dest);
+    if (!lockEntry) continue;
+    const onDisk = await reader.readText(projectDir, dest);
+    if (onDisk === null) continue;
+    const sha = await sha256Hex(onDisk);
+    if (sha !== lockEntry.sha256) customized.push(dest);
+  }
+  if (customized.length > 0) {
+    throw new Error(
+      `refusing to switch backlog backend: the following files were customized locally:\n` +
+        customized.map((c) => `  - ${c}`).join("\n") +
+        `\n\nReview the diffs, then re-run \`specflow upgrade --backlog ${newBackend} --force\` ` +
+        `to overwrite them (existing files are backed up to *.specflow.bak).`,
+    );
+  }
+
+  const report = await writer.writeBundle(partial, projectDir, {
+    overwrite: true,
+    backupExisting: false,
+  });
+  if (oldOnly.size > 0) {
+    await writer.deletePaths([...oldOnly], projectDir, { backupExisting: false });
+  }
+
+  const updatedEntries = new Map(lock.entries);
+  for (const [dest, file] of Object.entries(partial)) {
+    updatedEntries.set(dest, {
+      sha256: await sha256Hex(file.content),
+      installedAt: new Date().toISOString(),
+      templatesVersion: TEMPLATES_VERSION,
+    });
+  }
+  for (const dest of oldOnly) updatedEntries.delete(dest);
+
+  const newLock: InstalledLock = {
+    version: 2,
+    harness: lock.harness,
+    backlogBackend: newBackend,
+    templatesVersion: lock.templatesVersion,
+    entries: updatedEntries,
+  };
+  await lockStore.write(projectDir, newLock);
+  void report;
+  return { switched: true, from };
+}
 
 function renderSummary(plan: UpgradePlan, from: string, to: string) {
   const groups = {
@@ -137,6 +236,31 @@ export async function runUpgrade(intent: UpgradeIntent): Promise<number> {
     for (const m of backlogMoves) console.log(dim(`↳ migrated ${m}`));
     const specsMoves = await migrateLegacySpecsPaths(projectDir);
     for (const m of specsMoves) console.log(dim(`↳ migrated ${m}`));
+
+    if (intent.backlog !== null) {
+      try {
+        const { switched, from } = await switchBacklogBackend(
+          projectDir,
+          intent.backlog,
+        );
+        if (switched) {
+          console.log(
+            dim(`↳ switched backlog backend: ${from} → ${intent.backlog}`),
+          );
+          console.log(
+            dim(
+              `  existing items in the previous backend were NOT migrated automatically.`,
+            ),
+          );
+        } else {
+          console.log(dim(`↳ already using backend: ${intent.backlog} — nothing to switch`));
+        }
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        console.error(red(`error: ${msg}`));
+        return 2;
+      }
+    }
   }
 
   const useCase = new UpgradeProjectUseCase({
@@ -180,7 +304,9 @@ export async function runUpgrade(intent: UpgradeIntent): Promise<number> {
     const lockStore = new FsLockStore();
     const lock = await lockStore.read(projectDir);
     const harness = lock ? findHarness(lock.harness) : null;
-    const previewBundle = harness ? harness.mapBundle(CORE_BUNDLE) : {};
+    const previewBundle = harness && lock
+      ? harness.mapBundle(CORE_BUNDLE, { backlogBackend: lock.backlogBackend })
+      : {};
     for (const action of preserves) {
       const file = previewBundle[action.dest];
       if (!file) continue;

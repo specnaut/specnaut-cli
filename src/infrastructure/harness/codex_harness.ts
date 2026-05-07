@@ -1,9 +1,10 @@
 import { stringify as stringifyToml } from "@std/toml";
-import type { Harness } from "../../application/ports.ts";
+import type { BundleOptions, Harness } from "../../application/ports.ts";
 import type { CoreBundle, CoreEntry } from "../../domain/core_bundle.ts";
 import type { Bundle } from "../../domain/template.ts";
 import { ensureSkillFrontmatter, skillFolderName } from "./skill_folder.ts";
 import { frontmatterField, splitFrontmatter } from "./frontmatter.ts";
+import { applyBackend, backlogScriptDestination } from "./backlog_filter.ts";
 
 function parseAgentFrontmatter(content: string): { description: string; body: string } {
   const split = splitFrontmatter(content);
@@ -27,9 +28,11 @@ export class CodexHarness implements Harness {
   readonly key = "codex";
   readonly displayName = "Codex CLI";
 
-  mapBundle(core: CoreBundle): Bundle {
+  mapBundle(core: CoreBundle, opts: BundleOptions): Bundle {
     const out: Bundle = {};
-    for (const entry of core) {
+    for (const raw of core) {
+      const entry = applyBackend(raw, opts);
+      if (entry === null) continue;
       switch (entry.category) {
         case "agent":
           out[`.codex/agents/${entry.name}.toml`] = {
@@ -39,7 +42,8 @@ export class CodexHarness implements Harness {
           break;
         case "command":
         case "backlog-cmd":
-        case "skill": {
+        case "skill":
+        case "backlog-skill": {
           const name = skillFolderName(entry);
           out[`.agents/skills/${name}/SKILL.md`] = {
             content: ensureSkillFrontmatter(entry.content, name),
@@ -47,6 +51,12 @@ export class CodexHarness implements Harness {
           };
           break;
         }
+        case "backlog-script":
+          out[backlogScriptDestination(entry)] = {
+            content: entry.content,
+            executable: entry.executable,
+          };
+          break;
         case "spec-root":
           if (!entry.suffix) throw new Error(`spec-root needs suffix`);
           out[`.specflow/${entry.suffix}`] = {

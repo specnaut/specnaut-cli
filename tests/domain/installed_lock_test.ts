@@ -43,6 +43,7 @@ Deno.test("serializeLock round-trips", () => {
   const lock: InstalledLock = {
     version: 2,
     harness: "claude",
+    backlogBackend: "local",
     templatesVersion: "0.3.0",
     entries: new Map<string, LockEntry>([
       ["CLAUDE.md", {
@@ -56,6 +57,7 @@ Deno.test("serializeLock round-trips", () => {
   const roundtrip = parseLock(yaml);
   assertEquals(roundtrip.version, 2);
   assertEquals(roundtrip.templatesVersion, lock.templatesVersion);
+  assertEquals(roundtrip.backlogBackend, "local");
   assertEquals(roundtrip.entries.get("CLAUDE.md")?.sha256, "aaa");
 });
 
@@ -102,12 +104,48 @@ Deno.test("serializeLock writes version 2 with harness field", () => {
   const lock: InstalledLock = {
     version: 2,
     harness: "cursor",
+    backlogBackend: "local",
     templatesVersion: "0.3.0",
     entries: new Map(),
   };
   const yaml = serializeLock(lock);
   assertEquals(yaml.includes("version: 2"), true);
   assertEquals(yaml.includes("harness: cursor"), true);
+  assertEquals(yaml.includes("backlog_backend: local"), true);
+});
+
+Deno.test("parseLock defaults backlog_backend to local when absent", () => {
+  const v2 = `version: 2
+harness: claude
+templates_version: 0.7.0
+entries: {}
+`;
+  const lock = parseLock(v2);
+  assertEquals(lock.backlogBackend, "local");
+});
+
+Deno.test("parseLock accepts backlog_backend=github", () => {
+  const v2 = `version: 2
+harness: claude
+backlog_backend: github
+templates_version: 0.7.0
+entries: {}
+`;
+  const lock = parseLock(v2);
+  assertEquals(lock.backlogBackend, "github");
+});
+
+Deno.test("parseLock falls back to local on unknown backlog_backend value", () => {
+  // Unknown values are silently coerced to "local" rather than thrown,
+  // matching how missing harness fields default in v1 → v2 migration.
+  const v2 = `version: 2
+harness: claude
+backlog_backend: not-a-backend
+templates_version: 0.7.0
+entries: {}
+`;
+  const lock = parseLock(v2);
+  assertEquals(lock.backlogBackend, "local");
 });
 
 Deno.test("parseLock accepts v2 lock with harness=codex", () => {

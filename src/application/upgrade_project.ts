@@ -54,7 +54,7 @@ export class UpgradeProjectUseCase {
     if (!harness) {
       throw new Error(`unknown harness in lock: ${lock.harness}`);
     }
-    const bundle = harness.mapBundle(core);
+    const bundle = harness.mapBundle(core, { backlogBackend: lock.backlogBackend });
 
     const destPaths = new Set<string>([
       ...Object.keys(bundle),
@@ -164,6 +164,7 @@ export class UpgradeProjectUseCase {
     const newLock: InstalledLock = {
       version: 2,
       harness: lock.harness,
+      backlogBackend: lock.backlogBackend,
       templatesVersion,
       entries: updatedEntries,
     };

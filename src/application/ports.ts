@@ -73,9 +73,19 @@ export interface FsReader {
 }
 
 import type { CoreBundle } from "../domain/core_bundle.ts";
+import type { BacklogBackend } from "../domain/installed_lock.ts";
+
+export type BundleOptions = {
+  /**
+   * Which backlog backend's conditional sections and scripts the harness
+   * should keep. Entries tagged with a different backend are filtered out;
+   * the bundled SKILL.md is rendered with the matching markers stripped.
+   */
+  readonly backlogBackend: BacklogBackend;
+};
 
 export interface Harness {
   readonly key: string;
   readonly displayName: string;
-  mapBundle(core: CoreBundle): Bundle;
+  mapBundle(core: CoreBundle, opts: BundleOptions): Bundle;
 }

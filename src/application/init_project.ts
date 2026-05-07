@@ -1,6 +1,11 @@
 import type { FsWriter, GitAdapter, Harness, LockStore } from "./ports.ts";
 import { sha256Hex } from "../domain/sha256.ts";
-import type { InstalledLock, KnownHarness, LockEntry } from "../domain/installed_lock.ts";
+import type {
+  BacklogBackend,
+  InstalledLock,
+  KnownHarness,
+  LockEntry,
+} from "../domain/installed_lock.ts";
 import type { CoreBundle } from "../domain/core_bundle.ts";
 import { TEMPLATES_VERSION } from "../templates_bundle.ts";
 import { canonicalBlockBody } from "../domain/merge_block.ts";
@@ -23,6 +28,7 @@ export type InitProjectDeps = {
   git: GitAdapter;
   lockStore: LockStore;
   harness: Harness;
+  backlogBackend: BacklogBackend;
   core: CoreBundle;
   /** Creates the target directory if it does not exist (idempotent). */
   ensureDir(path: string): Promise<void>;
@@ -39,12 +45,12 @@ export class InitProjectUseCase {
   constructor(private readonly deps: InitProjectDeps) {}
 
   async execute(input: InitProjectInput): Promise<InitResult> {
-    const { writer, git, lockStore, harness, core, ensureDir } = this.deps;
+    const { writer, git, lockStore, harness, backlogBackend, core, ensureDir } = this.deps;
     const warnings: string[] = [];
 
     await ensureDir(input.targetDir);
 
-    const bundle = harness.mapBundle(core);
+    const bundle = harness.mapBundle(core, { backlogBackend });
 
     if (!input.force) {
       const conflicts = await writer.detectConflicts(bundle, input.targetDir);
@@ -76,6 +82,7 @@ export class InitProjectUseCase {
     const lock: InstalledLock = {
       version: 2,
       harness: harness.key as KnownHarness,
+      backlogBackend,
       templatesVersion: TEMPLATES_VERSION,
       entries: lockEntries,
     };

@@ -24,11 +24,27 @@ export type Intent =
       | "opencode"
       | "antigravity"
       | null;
+    /**
+     * Backlog backend when `--backlog` was passed; `null` when not. Same
+     * resolution semantics as `ai`: interactive prompt when stdin is a TTY,
+     * default fallback otherwise.
+     */
+    backlog: "local" | "github" | null;
     force: boolean;
   }
   | { kind: "self-update"; checkOnly: boolean }
   | { kind: "check"; projectMode: boolean }
-  | { kind: "upgrade"; dryRun: boolean; force: boolean }
+  | {
+    kind: "upgrade";
+    dryRun: boolean;
+    force: boolean;
+    /**
+     * When set, switch the backlog backend to this value. Re-renders the
+     * bundled backlog skill and updates the lock. `null` keeps the lock's
+     * current backend.
+     */
+    backlog: "local" | "github" | null;
+  }
   | { kind: "backlog-removed" }
   | { kind: "unknown"; received: string };
 
@@ -46,7 +62,7 @@ export function parseArgs(argv: string[]): Intent {
       "dry-run",
       "project",
     ],
-    string: ["ai"],
+    string: ["ai", "backlog"],
     alias: { v: "version", h: "help" },
   });
 
@@ -70,12 +86,22 @@ export function parseArgs(argv: string[]): Intent {
     ) {
       return { kind: "unknown", received: `init --ai ${aiRaw}` };
     }
+    const backlogProvided = typeof parsed.backlog === "string";
+    const backlogRaw = backlogProvided ? (parsed.backlog as string) : null;
+    if (
+      backlogRaw !== null &&
+      backlogRaw !== "local" &&
+      backlogRaw !== "github"
+    ) {
+      return { kind: "unknown", received: `init --backlog ${backlogRaw}` };
+    }
     return {
       kind: "init",
       projectName: rest[0] ?? null,
       here: Boolean(parsed.here),
       noGit: Boolean(parsed["no-git"]),
       ai: aiRaw,
+      backlog: backlogRaw,
       force: Boolean(parsed.force),
     };
   }
@@ -89,10 +115,20 @@ export function parseArgs(argv: string[]): Intent {
   }
 
   if (command === "upgrade") {
+    const backlogProvided = typeof parsed.backlog === "string";
+    const backlogRaw = backlogProvided ? (parsed.backlog as string) : null;
+    if (
+      backlogRaw !== null &&
+      backlogRaw !== "local" &&
+      backlogRaw !== "github"
+    ) {
+      return { kind: "unknown", received: `upgrade --backlog ${backlogRaw}` };
+    }
     return {
       kind: "upgrade",
       dryRun: Boolean(parsed["dry-run"]),
       force: Boolean(parsed.force),
+      backlog: backlogRaw,
     };
   }
 

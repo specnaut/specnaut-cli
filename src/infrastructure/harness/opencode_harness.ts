@@ -1,8 +1,9 @@
-import type { Harness } from "../../application/ports.ts";
+import type { BundleOptions, Harness } from "../../application/ports.ts";
 import type { CoreBundle, CoreEntry } from "../../domain/core_bundle.ts";
 import type { Bundle } from "../../domain/template.ts";
 import { ensureSkillFrontmatter, skillFolderName } from "./skill_folder.ts";
 import { frontmatterField, splitFrontmatter } from "./frontmatter.ts";
+import { applyBackend, backlogScriptDestination } from "./backlog_filter.ts";
 
 type PermissionValue = "allow" | "ask" | "deny" | { "*": "ask" | "allow" | "deny" };
 type PermissionMap = Record<string, PermissionValue>;
@@ -103,7 +104,10 @@ function destinationFor(entry: CoreEntry): string {
     case "agent":
       return `.opencode/agents/specflow-${entry.name}.md`;
     case "skill":
+    case "backlog-skill":
       return `.opencode/skills/${skillFolderName(entry)}/SKILL.md`;
+    case "backlog-script":
+      return backlogScriptDestination(entry);
     case "spec-root":
       if (!entry.suffix) throw new Error(`spec-root needs suffix`);
       return `.specflow/${entry.suffix}`;
@@ -118,9 +122,11 @@ export class OpenCodeHarness implements Harness {
   readonly key = "opencode";
   readonly displayName = "OpenCode";
 
-  mapBundle(core: CoreBundle): Bundle {
+  mapBundle(core: CoreBundle, opts: BundleOptions): Bundle {
     const out: Bundle = {};
-    for (const entry of core) {
+    for (const raw of core) {
+      const entry = applyBackend(raw, opts);
+      if (entry === null) continue;
       const dest = destinationFor(entry);
       let content: string;
       switch (entry.category) {
@@ -132,6 +138,7 @@ export class OpenCodeHarness implements Harness {
           content = toOpenCodeAgentMarkdown(entry);
           break;
         case "skill":
+        case "backlog-skill":
           content = ensureSkillFrontmatter(entry.content, entry.name);
           break;
         default:

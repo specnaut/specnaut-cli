@@ -212,6 +212,7 @@ Success criteria must be **measurable** (specific metrics), **technology-agnosti
 **Bad**: "API response time under 200ms" (too technical) · "Database handles 1000 TPS" (implementation detail) · "React components render efficiently" (framework-specific)
 `,
     executable: false,
+    backend: null,
   },
   {
     category: "command",
@@ -384,6 +385,7 @@ Skip silently if the file is absent or unparseable. For each enabled entry
 Hooks with non-empty \`condition\` are deferred to the HookExecutor.
 `,
     executable: false,
+    backend: null,
   },
   {
     category: "command",
@@ -543,6 +545,7 @@ You **MUST** consider the user input before proceeding (if not empty).
 - ERROR on gate failures or unresolved clarifications
 `,
     executable: false,
+    backend: null,
   },
   {
     category: "command",
@@ -753,6 +756,7 @@ Every task MUST strictly follow this format:
 - **Final Phase**: Polish & Cross-Cutting Concerns
 `,
     executable: false,
+    backend: null,
   },
   {
     category: "command",
@@ -1012,6 +1016,7 @@ After reporting, check if \`.specflow/extensions.yml\` exists in the project roo
 {ARGS}
 `,
     executable: false,
+    backend: null,
   },
   {
     category: "command",
@@ -1220,6 +1225,7 @@ Note: This command assumes a complete task breakdown exists in tasks.md. If task
     - If no hooks are registered or \`.specflow/extensions.yml\` does not exist, skip silently
 `,
     executable: false,
+    backend: null,
   },
   {
     category: "command",
@@ -1377,6 +1383,7 @@ Check if \`.specflow/extensions.yml\` exists in the project root.
 - If no hooks are registered or \`.specflow/extensions.yml\` does not exist, skip silently
 `,
     executable: false,
+    backend: null,
   },
   {
     category: "command",
@@ -1553,6 +1560,7 @@ Skip silently if the file is absent or unparseable. For each enabled entry
 Hooks with non-empty \`condition\` are deferred to the HookExecutor.
 `,
     executable: false,
+    backend: null,
   },
   {
     category: "command",
@@ -1594,6 +1602,7 @@ A structured report with: files merged, commits merged, whether the user chose t
 suggested action (e.g. \`/backlog update <id> --status done\`).
 `,
     executable: false,
+    backend: null,
   },
   {
     category: "command",
@@ -1689,6 +1698,7 @@ If Overall = PASS, invoke \`/specflow.merge\` (or hand back to the auto-chain fo
 STOP #2). If FAIL, stop and report to the user.
 `,
     executable: false,
+    backend: null,
   },
   {
     category: "backlog-cmd",
@@ -1762,6 +1772,7 @@ Do not duplicate it here — the dispatcher defers to the agent.
 \`\`\`
 `,
     executable: false,
+    backend: null,
   },
   {
     category: "agent",
@@ -2019,6 +2030,7 @@ PO onward. Older projects that pre-date this template will not have the
 missing key as \`parent: null\`.
 `,
     executable: false,
+    backend: null,
   },
   {
     category: "agent",
@@ -2093,6 +2105,7 @@ Never report done if a validation failed. If blocked, say what you tried, what
 failed, and what decision the next owner needs to make.
 `,
     executable: false,
+    backend: null,
   },
   {
     category: "agent",
@@ -2147,6 +2160,7 @@ MEDIUM / LOW findings: <N>, list suppressed — see per-agent reports for detail
 - Never edit files yourself — you coordinate, you do not fix.
 `,
     executable: false,
+    backend: null,
   },
   {
     category: "agent",
@@ -2200,6 +2214,7 @@ VERDICT: PASS | FAIL (<N> CRITICAL, <M> HIGH)
 PASS if zero CRITICAL and zero HIGH findings. Otherwise FAIL.
 `,
     executable: false,
+    backend: null,
   },
   {
     category: "agent",
@@ -2238,6 +2253,7 @@ You are a **security auditor**. Review ONLY the files provided.
 Same \`FINDING\` / \`VERDICT\` structure as code-reviewer.
 `,
     executable: false,
+    backend: null,
   },
   {
     category: "agent",
@@ -2274,6 +2290,7 @@ referenced against the implementation files they cover.
 Same \`FINDING\` / \`VERDICT\` structure as code-reviewer.
 `,
     executable: false,
+    backend: null,
   },
   {
     category: "agent",
@@ -2330,6 +2347,7 @@ QA SUMMARY
 \`\`\`
 `,
     executable: false,
+    backend: null,
   },
   {
     category: "agent",
@@ -2390,6 +2408,7 @@ Blocked? Report owner, blocker, impact, and the exact decision needed. If
 review or QA fails twice on the same issue family, stop and escalate.
 `,
     executable: false,
+    backend: null,
   },
   {
     category: "agent",
@@ -2501,6 +2520,7 @@ End with a single \`VERDICT\` line: \`VERDICT: pass\` or
 \`VERDICT: changes-requested\` followed by a one-sentence summary.
 `,
     executable: false,
+    backend: null,
   },
   {
     category: "skill",
@@ -2601,6 +2621,591 @@ Long features (≥13 story points or ≥30 tasks) may exhaust context during
 them resume manually from the last completed phase.
 `,
     executable: false,
+    backend: null,
+  },
+  {
+    category: "backlog-skill",
+    name: "backlog",
+    suffix: null,
+    content: `---
+name: backlog
+description: Manage this project's backlog — add, list, view, move, and clarify items. The backend is fixed at init time and recorded in \`.specflow/installed.lock\`. Run \`specflow upgrade --backlog <new>\` to switch.
+---
+
+# Backlog skill
+
+Use this skill when the user says "add to backlog", "list backlog", "what's
+next?", "move task X to in-progress", or any backlog mutation. The exact
+flow depends on the backend chosen at \`specflow init\` (or the most recent
+\`specflow upgrade --backlog <name>\`).
+
+## All mutations go through the Product Owner agent
+
+The main session does **not** run the scripts directly. Dispatch the
+\`product-owner\` subagent for any mutation: creating items, clarifying
+bodies, moving status, closing. The PO is the single owner of the backlog
+lifecycle (see \`.claude/agents/product-owner.md\`).
+
+The scripts under \`.specflow/scripts/backlog/\` are the toolbox the PO
+uses. The main session may call the read-only ones (\`list.sh\`, \`view.sh\`)
+to inspect state, but every write goes through the PO.
+
+<!-- BEGIN: backend=local -->
+## Backend: local Markdown files
+
+This project's backlog lives entirely on disk under \`.specflow/\`. No remote
+service required.
+
+| Path | Purpose |
+|---|---|
+| \`.specflow/backlog.md\` | Top-level index — one line per item with status |
+| \`.specflow/backlog/<NNN>-<slug>.md\` | One file per item (frontmatter + body) |
+
+### Scripts (preferred path)
+
+\`\`\`bash
+.specflow/scripts/backlog/list.sh [Status]            # all items, optional Status filter
+.specflow/scripts/backlog/view.sh <number>            # one item + body
+.specflow/scripts/backlog/add.sh "<title>" [body]     # create new item, auto-numbered
+.specflow/scripts/backlog/move.sh <number> <Status>   # Backlog|Ready|In progress|In review|Done
+.specflow/scripts/backlog/clarify-comment.sh <num> "<question>"
+\`\`\`
+
+### Conventions
+
+- Items are numbered sequentially (\`001\`, \`002\`, …) — the \`add.sh\` script
+  picks the next free number.
+- Status is tracked in each item's YAML frontmatter and mirrored in the
+  index for fast listing.
+- **Closing** an item = move to \`Done\`. The file stays on disk as the
+  audit trail; nothing is deleted.
+- Bodies follow \`## Why\` / \`## Acceptance criteria\` / \`## Out of scope\`.
+- Titles are short imperatives ("Add docx skill", not "I want to add a docx skill").
+<!-- END: backend=local -->
+
+<!-- BEGIN: backend=github -->
+## Backend: GitHub Issues + Project
+
+This project's backlog lives on a GitHub Project linked to issues in the
+configured repo. Configuration is read from \`.specflow/backlog-config.yml\`
+at runtime — fill in \`repo\` and \`project_number\` before running any
+mutation.
+
+### Configuration file
+
+\`\`\`yaml
+# .specflow/backlog-config.yml
+repo: myorg/myproject              # GitHub repo (owner/name)
+project_number: 4                   # GitHub Project V2 number
+project_node_id: ""                 # cached on first run
+status_field_id: ""                 # cached on first run
+\`\`\`
+
+The PO will refresh \`project_node_id\` / \`status_field_id\` automatically
+on first invocation if they are blank.
+
+### Scripts (preferred path)
+
+\`\`\`bash
+.specflow/scripts/backlog/list.sh [Status]            # all items, optional Status filter
+.specflow/scripts/backlog/view.sh <number>            # one issue + comments
+.specflow/scripts/backlog/add.sh "<title>" [body] [labels-csv]
+.specflow/scripts/backlog/move.sh <number> <Status>   # sets Project Status field
+.specflow/scripts/backlog/clarify-comment.sh <num> "<question>"
+\`\`\`
+
+For closing or editing, just use \`gh\` directly:
+
+\`\`\`bash
+gh issue close  <num> --repo <repo> --reason completed     # or not_planned
+gh issue edit   <num> --repo <repo> --title "…" --body "…"
+\`\`\`
+
+### Conventions
+
+- **Titles** — short imperative phrases. Lowercase OK; no leading emoji.
+- **Bodies** — \`## Why\` / \`## Acceptance criteria\` / \`## Out of scope\`.
+- **Closing** — close the issue (don't just move to Done). The repo's
+  issue history is the audit trail.
+- **Drafts** are not used. Every task is a real issue.
+
+### Prerequisites
+
+The \`gh\` CLI must be authenticated with the \`project\` scope. If
+\`gh project\` returns 404, run \`gh auth refresh -s project\`.
+<!-- END: backend=github -->
+
+## When NOT to use this skill
+
+- The user is implementing a backlog item — that's normal coding work;
+  return here only when they want to update its status afterwards.
+- The user asks about another project's backlog — this skill is wired to
+  this project only.
+`,
+    executable: false,
+    backend: null,
+  },
+  {
+    category: "backlog-script",
+    name: "list",
+    suffix: "list.sh",
+    content: `#!/usr/bin/env bash
+# List backlog items from .specflow/backlog/. Optional Status filter.
+set -euo pipefail
+
+ROOT="\$(cd "\$(dirname "\$0")/../../.." && pwd)"
+BACKLOG_DIR="\$ROOT/.specflow/backlog"
+FILTER="\${1:-}"
+
+if [ ! -d "\$BACKLOG_DIR" ]; then
+  echo "(no backlog yet — run 'add.sh' to create the first item)"
+  exit 0
+fi
+
+shopt -s nullglob
+for f in "\$BACKLOG_DIR"/*.md; do
+  status=\$(awk '/^---\$/{n++; next} n==1 && /^status:/ {sub(/^status:[[:space:]]*/, ""); print; exit}' "\$f")
+  title=\$(awk '/^---\$/{n++; next} n==1 && /^title:/ {sub(/^title:[[:space:]]*/, ""); print; exit}' "\$f")
+  num=\$(basename "\$f" | cut -d- -f1)
+  if [ -z "\$FILTER" ] || [ "\$status" = "\$FILTER" ]; then
+    printf "  #%-4s  %-12s  %s\\n" "\$num" "\$status" "\$title"
+  fi
+done
+`,
+    executable: true,
+    backend: "local",
+  },
+  {
+    category: "backlog-script",
+    name: "view",
+    suffix: "view.sh",
+    content: `#!/usr/bin/env bash
+# Print one backlog item by number.
+set -euo pipefail
+
+if [ "\$#" -lt 1 ]; then
+  echo "usage: \$0 <number>" >&2
+  exit 2
+fi
+NUM=\$(printf "%03d" "\$1" 2>/dev/null || echo "\$1")
+ROOT="\$(cd "\$(dirname "\$0")/../../.." && pwd)"
+BACKLOG_DIR="\$ROOT/.specflow/backlog"
+
+shopt -s nullglob
+matches=("\$BACKLOG_DIR/\$NUM-"*.md)
+if [ "\${#matches[@]}" -eq 0 ]; then
+  echo "no backlog item #\$NUM" >&2
+  exit 1
+fi
+cat "\${matches[0]}"
+`,
+    executable: true,
+    backend: "local",
+  },
+  {
+    category: "backlog-script",
+    name: "add",
+    suffix: "add.sh",
+    content: `#!/usr/bin/env bash
+# Add a new backlog item. Auto-numbers + slugifies. Status starts at "Backlog".
+# Usage: add.sh "<title>" [body]
+set -euo pipefail
+
+if [ "\$#" -lt 1 ]; then
+  echo 'usage: add.sh "<title>" [body]' >&2
+  exit 2
+fi
+TITLE="\$1"
+BODY="\${2:-}"
+
+ROOT="\$(cd "\$(dirname "\$0")/../../.." && pwd)"
+BACKLOG_DIR="\$ROOT/.specflow/backlog"
+INDEX="\$ROOT/.specflow/backlog.md"
+mkdir -p "\$BACKLOG_DIR"
+
+# Next free number
+shopt -s nullglob
+HIGH=0
+for f in "\$BACKLOG_DIR"/*.md; do
+  n=\$(basename "\$f" | cut -d- -f1 | sed 's/^0*//')
+  [ -z "\$n" ] && n=0
+  if [ "\$n" -gt "\$HIGH" ]; then HIGH=\$n; fi
+done
+NEXT=\$(printf "%03d" \$((HIGH + 1)))
+
+# Slug from title — lowercase, hyphenate, drop punctuation, cap to 40 chars
+SLUG=\$(echo "\$TITLE" | tr '[:upper:]' '[:lower:]' | sed -E 's/[^a-z0-9]+/-/g; s/^-+//; s/-+\$//' | cut -c1-40)
+[ -z "\$SLUG" ] && SLUG="item"
+
+FILE="\$BACKLOG_DIR/\$NEXT-\$SLUG.md"
+NOW=\$(date -u +%Y-%m-%dT%H:%M:%SZ)
+
+cat > "\$FILE" <<EOF
+---
+number: \$NEXT
+title: \$TITLE
+status: Backlog
+created: \$NOW
+---
+
+\$BODY
+EOF
+
+# Append to (or create) the index
+if [ ! -f "\$INDEX" ]; then
+  echo "# Backlog" > "\$INDEX"
+  echo "" >> "\$INDEX"
+fi
+echo "- [#\$NEXT](backlog/\$NEXT-\$SLUG.md) Backlog — \$TITLE" >> "\$INDEX"
+
+echo "✓ created #\$NEXT — \$TITLE"
+echo "  \$FILE"
+`,
+    executable: true,
+    backend: "local",
+  },
+  {
+    category: "backlog-script",
+    name: "move",
+    suffix: "move.sh",
+    content: `#!/usr/bin/env bash
+# Move a backlog item to a new status. Updates the file's frontmatter and
+# the line in the index.
+# Usage: move.sh <number> <Status>
+set -euo pipefail
+
+if [ "\$#" -lt 2 ]; then
+  echo 'usage: move.sh <number> <Status>' >&2
+  echo '  Status one of: Backlog, Ready, "In progress", "In review", Done' >&2
+  exit 2
+fi
+NUM=\$(printf "%03d" "\$1" 2>/dev/null || echo "\$1")
+STATUS="\$2"
+
+case "\$STATUS" in
+  Backlog|Ready|"In progress"|"In review"|Done) ;;
+  *)
+    echo "unknown status '\$STATUS' — expected: Backlog, Ready, 'In progress', 'In review', Done" >&2
+    exit 2
+    ;;
+esac
+
+ROOT="\$(cd "\$(dirname "\$0")/../../.." && pwd)"
+BACKLOG_DIR="\$ROOT/.specflow/backlog"
+INDEX="\$ROOT/.specflow/backlog.md"
+
+shopt -s nullglob
+matches=("\$BACKLOG_DIR/\$NUM-"*.md)
+if [ "\${#matches[@]}" -eq 0 ]; then
+  echo "no backlog item #\$NUM" >&2
+  exit 1
+fi
+FILE="\${matches[0]}"
+
+# Update frontmatter status (between the first two \`---\` lines)
+awk -v new="\$STATUS" '
+  BEGIN {n=0}
+  /^---\$/ {n++; print; next}
+  n==1 && /^status:/ {print "status: " new; updated=1; next}
+  {print}
+  END {if (!updated) exit 3}
+' "\$FILE" > "\$FILE.tmp" && mv "\$FILE.tmp" "\$FILE"
+
+# Update the matching index line
+if [ -f "\$INDEX" ]; then
+  awk -v num="\$NUM" -v new="\$STATUS" '
+    {
+      if (\$0 ~ "\\\\[#" num "\\\\]") {
+        # Replace the status word: format is "...) <Status> — title"
+        sub(/\\) [A-Za-z][^—]*—/, ") " new " —")
+      }
+      print
+    }
+  ' "\$INDEX" > "\$INDEX.tmp" && mv "\$INDEX.tmp" "\$INDEX"
+fi
+
+echo "✓ #\$NUM → \$STATUS"
+`,
+    executable: true,
+    backend: "local",
+  },
+  {
+    category: "backlog-script",
+    name: "clarify-comment",
+    suffix: "clarify-comment.sh",
+    content: `#!/usr/bin/env bash
+# Append a clarification block to a backlog item file.
+# Usage: clarify-comment.sh <number> "<question>"
+set -euo pipefail
+
+if [ "\$#" -lt 2 ]; then
+  echo 'usage: clarify-comment.sh <number> "<question>"' >&2
+  exit 2
+fi
+NUM=\$(printf "%03d" "\$1" 2>/dev/null || echo "\$1")
+QUESTION="\$2"
+
+ROOT="\$(cd "\$(dirname "\$0")/../../.." && pwd)"
+BACKLOG_DIR="\$ROOT/.specflow/backlog"
+
+shopt -s nullglob
+matches=("\$BACKLOG_DIR/\$NUM-"*.md)
+if [ "\${#matches[@]}" -eq 0 ]; then
+  echo "no backlog item #\$NUM" >&2
+  exit 1
+fi
+FILE="\${matches[0]}"
+NOW=\$(date -u +%Y-%m-%dT%H:%M:%SZ)
+
+cat >> "\$FILE" <<EOF
+
+## Clarification (\$NOW)
+
+\$QUESTION
+EOF
+
+echo "✓ added clarification on #\$NUM"
+`,
+    executable: true,
+    backend: "local",
+  },
+  {
+    category: "backlog-script",
+    name: "_config",
+    suffix: "_config.sh",
+    content: `#!/usr/bin/env bash
+# Helper: read repo + project_number from .specflow/backlog-config.yml.
+# Sourced by the other github-backend scripts.
+set -euo pipefail
+
+ROOT="\$(cd "\$(dirname "\$0")/../../.." && pwd)"
+CONFIG="\$ROOT/.specflow/backlog-config.yml"
+
+if [ ! -f "\$CONFIG" ]; then
+  echo "error: \$CONFIG not found. Fill in repo + project_number first." >&2
+  exit 2
+fi
+
+# Extract YAML scalars: repo, project_number. Strip surrounding quotes.
+extract() {
+  awk -v key="\$1" '
+    \$0 ~ "^"key":" {
+      sub("^"key":[[:space:]]*", "")
+      gsub(/^["'"'"']|["'"'"']\$/, "")
+      print
+      exit
+    }
+  ' "\$CONFIG"
+}
+
+REPO=\$(extract repo)
+PROJECT_NUMBER=\$(extract project_number)
+
+if [ -z "\$REPO" ] || [ -z "\$PROJECT_NUMBER" ]; then
+  echo "error: backlog-config.yml is missing 'repo' or 'project_number'." >&2
+  echo "Edit \$CONFIG before running this command." >&2
+  exit 2
+fi
+
+REPO_OWNER="\${REPO%%/*}"
+REPO_NAME="\${REPO##*/}"
+
+export REPO REPO_OWNER REPO_NAME PROJECT_NUMBER
+`,
+    executable: true,
+    backend: "github",
+  },
+  {
+    category: "backlog-script",
+    name: "list",
+    suffix: "list.sh",
+    content: `#!/usr/bin/env bash
+# List items on the configured GitHub Project, with Status. Optional filter.
+# Usage: list.sh [Status]
+set -euo pipefail
+
+# shellcheck source=./_config.sh
+. "\$(dirname "\$0")/_config.sh"
+
+FILTER="\${1:-}"
+
+JSON=\$(gh api graphql -f query='
+  query(\$owner:String!, \$name:String!, \$project:Int!) {
+    repository(owner:\$owner, name:\$name) {
+      issues(first:100, states:OPEN) {
+        nodes {
+          number title
+          projectItems(first:5) {
+            nodes {
+              project { number }
+              fieldValues(first:8) {
+                nodes {
+                  ... on ProjectV2ItemFieldSingleSelectValue {
+                    name
+                    field { ... on ProjectV2SingleSelectField { name } }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }' \\
+  -f owner="\$REPO_OWNER" \\
+  -f name="\$REPO_NAME" \\
+  -F project="\$PROJECT_NUMBER")
+
+echo "\$JSON" | jq -r --argjson project "\$PROJECT_NUMBER" --arg filter "\$FILTER" '
+  .data.repository.issues.nodes[]
+  | . as \$issue
+  | (.projectItems.nodes[] | select(.project.number == \$project)) as \$item
+  | ((\$item.fieldValues.nodes[]
+       | select(.field.name == "Status") | .name) // "—") as \$status
+  | select(\$filter == "" or \$status == \$filter)
+  | "  #\\(.number)  \\(\$status)  \\(.title)"
+'
+`,
+    executable: true,
+    backend: "github",
+  },
+  {
+    category: "backlog-script",
+    name: "view",
+    suffix: "view.sh",
+    content: `#!/usr/bin/env bash
+# Show one GitHub issue + its comments.
+# Usage: view.sh <number>
+set -euo pipefail
+
+# shellcheck source=./_config.sh
+. "\$(dirname "\$0")/_config.sh"
+
+if [ "\$#" -lt 1 ]; then
+  echo "usage: \$0 <number>" >&2
+  exit 2
+fi
+
+gh issue view "\$1" --repo "\$REPO" --comments
+`,
+    executable: true,
+    backend: "github",
+  },
+  {
+    category: "backlog-script",
+    name: "add",
+    suffix: "add.sh",
+    content: `#!/usr/bin/env bash
+# Create a GitHub Issue and attach it to the configured Project.
+# Usage: add.sh "<title>" [body] [labels-csv]
+set -euo pipefail
+
+# shellcheck source=./_config.sh
+. "\$(dirname "\$0")/_config.sh"
+
+if [ "\$#" -lt 1 ]; then
+  echo 'usage: add.sh "<title>" [body] [labels-csv]' >&2
+  exit 2
+fi
+TITLE="\$1"
+BODY="\${2:-}"
+LABELS="\${3:-}"
+
+ARGS=("--repo" "\$REPO" "--title" "\$TITLE")
+if [ -n "\$BODY" ]; then ARGS+=("--body" "\$BODY"); else ARGS+=("--body" ""); fi
+if [ -n "\$LABELS" ]; then ARGS+=("--label" "\$LABELS"); fi
+
+URL=\$(gh issue create "\${ARGS[@]}")
+echo "✓ created: \$URL"
+
+# Attach to the project
+gh project item-add "\$PROJECT_NUMBER" --owner "\$REPO_OWNER" --url "\$URL" >/dev/null
+echo "✓ attached to Project #\$PROJECT_NUMBER"
+`,
+    executable: true,
+    backend: "github",
+  },
+  {
+    category: "backlog-script",
+    name: "move",
+    suffix: "move.sh",
+    content: `#!/usr/bin/env bash
+# Move an issue's Project Status to <Status>.
+# Usage: move.sh <number> <Status>
+set -euo pipefail
+
+# shellcheck source=./_config.sh
+. "\$(dirname "\$0")/_config.sh"
+
+if [ "\$#" -lt 2 ]; then
+  echo 'usage: move.sh <number> <Status>' >&2
+  echo '  Status one of: Backlog, Ready, "In progress", "In review", Done' >&2
+  exit 2
+fi
+NUM="\$1"
+STATUS="\$2"
+
+# Resolve project + status field IDs lazily (cached client-side per call).
+PROJECT_NODE_ID=\$(gh project view "\$PROJECT_NUMBER" --owner "\$REPO_OWNER" --format json | jq -r '.id')
+STATUS_FIELD_JSON=\$(gh project field-list "\$PROJECT_NUMBER" --owner "\$REPO_OWNER" --format json)
+STATUS_FIELD_ID=\$(echo "\$STATUS_FIELD_JSON" | jq -r '.fields[] | select(.name=="Status") | .id')
+OPTION_ID=\$(echo "\$STATUS_FIELD_JSON" | jq -r --arg s "\$STATUS" '.fields[] | select(.name=="Status") | .options[] | select(.name==\$s) | .id')
+
+if [ -z "\$OPTION_ID" ] || [ "\$OPTION_ID" = "null" ]; then
+  echo "unknown status '\$STATUS' in Project #\$PROJECT_NUMBER" >&2
+  exit 1
+fi
+
+ISSUE_NODE_ID=\$(gh issue view "\$NUM" --repo "\$REPO" --json id --jq '.id')
+
+# Find the project item ID for this issue
+ITEM_ID=\$(gh api graphql -f query='
+  query(\$issue:ID!) {
+    node(id:\$issue) {
+      ... on Issue {
+        projectItems(first:10) { nodes { id project { id } } }
+      }
+    }
+  }' -f issue="\$ISSUE_NODE_ID" \\
+  | jq -r --arg p "\$PROJECT_NODE_ID" '.data.node.projectItems.nodes[] | select(.project.id==\$p) | .id' | head -1)
+
+if [ -z "\$ITEM_ID" ]; then
+  echo "issue #\$NUM is not on Project #\$PROJECT_NUMBER" >&2
+  exit 1
+fi
+
+gh project item-edit \\
+  --id "\$ITEM_ID" \\
+  --project-id "\$PROJECT_NODE_ID" \\
+  --field-id "\$STATUS_FIELD_ID" \\
+  --single-select-option-id "\$OPTION_ID" >/dev/null
+
+echo "✓ #\$NUM → \$STATUS"
+`,
+    executable: true,
+    backend: "github",
+  },
+  {
+    category: "backlog-script",
+    name: "clarify-comment",
+    suffix: "clarify-comment.sh",
+    content: `#!/usr/bin/env bash
+# Post a clarification comment on a GitHub issue.
+# Usage: clarify-comment.sh <number> "<question>"
+set -euo pipefail
+
+# shellcheck source=./_config.sh
+. "\$(dirname "\$0")/_config.sh"
+
+if [ "\$#" -lt 2 ]; then
+  echo 'usage: clarify-comment.sh <number> "<question>"' >&2
+  exit 2
+fi
+
+gh issue comment "\$1" --repo "\$REPO" --body "\$2"
+`,
+    executable: true,
+    backend: "github",
   },
   {
     category: "spec-root",
@@ -2619,6 +3224,7 @@ them resume manually from the last completed phase.
 (none defined yet)
 `,
     executable: false,
+    backend: null,
   },
   {
     category: "spec-root",
@@ -2678,6 +3284,7 @@ _No tasks yet._
 | Done points        | 0     |
 `,
     executable: false,
+    backend: null,
   },
   {
     category: "spec-root",
@@ -2813,6 +3420,7 @@ _No tasks yet._
 - [Dependency on existing system/service, e.g., "Requires access to the existing user profile API"]
 `,
     executable: false,
+    backend: null,
   },
   {
     category: "spec-root",
@@ -2924,6 +3532,7 @@ directories captured above]
 | [e.g., Repository pattern] | [specific problem] | [why direct DB access insufficient] |
 `,
     executable: false,
+    backend: null,
   },
   {
     category: "spec-root",
@@ -3182,6 +3791,7 @@ With multiple developers:
 - Avoid: vague tasks, same file conflicts, cross-story dependencies that break independence
 `,
     executable: false,
+    backend: null,
   },
   {
     category: "spec-root",
@@ -3229,6 +3839,7 @@ With multiple developers:
 - Items are numbered sequentially for easy reference
 `,
     executable: false,
+    backend: null,
   },
   {
     category: "spec-root",
@@ -3286,6 +3897,7 @@ With multiple developers:
 <!-- Example: Version: 2.1.1 | Ratified: 2025-06-13 | Last Amended: 2025-07-16 -->
 `,
     executable: false,
+    backend: null,
   },
   {
     category: "spec-root",
@@ -3321,6 +3933,7 @@ Auto-generated from all feature plans. Last updated: [DATE]
 <!-- MANUAL ADDITIONS END -->
 `,
     executable: false,
+    backend: null,
   },
   {
     category: "spec-root",
@@ -3518,6 +4131,7 @@ else
 fi
 `,
     executable: true,
+    backend: null,
   },
   {
     category: "spec-root",
@@ -4123,6 +4737,7 @@ except Exception:
 
 `,
     executable: true,
+    backend: null,
   },
   {
     category: "spec-root",
@@ -4543,6 +5158,7 @@ else
 fi
 `,
     executable: true,
+    backend: null,
   },
   {
     category: "spec-root",
@@ -4623,6 +5239,7 @@ fi
 
 `,
     executable: true,
+    backend: null,
   },
   {
     category: "spec-root",
@@ -4778,6 +5395,7 @@ if (\$Json) {
 }
 `,
     executable: false,
+    backend: null,
   },
   {
     category: "spec-root",
@@ -5359,6 +5977,7 @@ except Exception:
     return \$content
 }`,
     executable: false,
+    backend: null,
   },
   {
     category: "spec-root",
@@ -5748,6 +6367,7 @@ if (\$Json) {
 }
 `,
     executable: false,
+    backend: null,
   },
   {
     category: "spec-root",
@@ -5816,6 +6436,7 @@ if (\$Json) {
 }
 `,
     executable: false,
+    backend: null,
   },
   {
     category: "project-root",
@@ -5848,6 +6469,7 @@ _(Sharp edges new contributors must know.)_
 Generated by Specflow. Edit freely.
 `,
     executable: false,
+    backend: null,
   },
   {
     category: "mergeable-project-root",
@@ -5856,6 +6478,7 @@ Generated by Specflow. Edit freely.
     content: `*.specflow.bak
 `,
     executable: false,
+    backend: null,
   },
 ];
 

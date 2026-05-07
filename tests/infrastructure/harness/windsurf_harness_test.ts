@@ -57,38 +57,38 @@ Deno.test("WindsurfHarness.key and displayName", () => {
 
 Deno.test("WindsurfHarness maps commands to .windsurf/workflows/specflow-<name>.md", () => {
   const h = new WindsurfHarness();
-  const mapped = h.mapBundle(SAMPLE);
+  const mapped = h.mapBundle(SAMPLE, { backlogBackend: "local" });
   assert(".windsurf/workflows/specflow-specify.md" in mapped);
 });
 
 Deno.test("WindsurfHarness maps backlog-cmd to .windsurf/workflows/specflow-backlog.md", () => {
   const h = new WindsurfHarness();
-  const mapped = h.mapBundle(SAMPLE);
+  const mapped = h.mapBundle(SAMPLE, { backlogBackend: "local" });
   assert(".windsurf/workflows/specflow-backlog.md" in mapped);
 });
 
 Deno.test("WindsurfHarness maps skill to .windsurf/workflows/specflow-<name>.md", () => {
   const h = new WindsurfHarness();
-  const mapped = h.mapBundle(SAMPLE);
+  const mapped = h.mapBundle(SAMPLE, { backlogBackend: "local" });
   assert(".windsurf/workflows/specflow-auto-chain.md" in mapped);
 });
 
 Deno.test("WindsurfHarness maps agents to .windsurf/workflows/specflow-agent-<name>.md", () => {
   const h = new WindsurfHarness();
-  const mapped = h.mapBundle(SAMPLE);
+  const mapped = h.mapBundle(SAMPLE, { backlogBackend: "local" });
   assert(".windsurf/workflows/specflow-agent-product-owner.md" in mapped);
 });
 
 Deno.test("WindsurfHarness maps spec-root to .specflow/<suffix> and project-root to <suffix>", () => {
   const h = new WindsurfHarness();
-  const mapped = h.mapBundle(SAMPLE);
+  const mapped = h.mapBundle(SAMPLE, { backlogBackend: "local" });
   assert(".specflow/memory/constitution.md" in mapped);
   assert("AGENTS.md" in mapped);
 });
 
 Deno.test("WindsurfHarness emits content byte-identical to entry.content (no frontmatter rewrite)", () => {
   const h = new WindsurfHarness();
-  const mapped = h.mapBundle(SAMPLE);
+  const mapped = h.mapBundle(SAMPLE, { backlogBackend: "local" });
   const cmd = mapped[".windsurf/workflows/specflow-specify.md"];
   assertEquals(cmd.content, SAMPLE[0].content);
   const agent = mapped[".windsurf/workflows/specflow-agent-product-owner.md"];
@@ -97,7 +97,7 @@ Deno.test("WindsurfHarness emits content byte-identical to entry.content (no fro
 
 Deno.test("WindsurfHarness emits no Claude/Cursor/Codex/Gemini artefacts", () => {
   const h = new WindsurfHarness();
-  const mapped = h.mapBundle(SAMPLE);
+  const mapped = h.mapBundle(SAMPLE, { backlogBackend: "local" });
   const keys = Object.keys(mapped);
   assert(!keys.some((k) => k.startsWith(".claude/")), "no .claude/");
   assert(!keys.some((k) => k.startsWith(".cursor/")), "no .cursor/");
@@ -109,7 +109,7 @@ Deno.test("WindsurfHarness emits no Claude/Cursor/Codex/Gemini artefacts", () =>
 
 Deno.test("WindsurfHarness emits no workflow exceeding the Cascade cap", () => {
   const h = new WindsurfHarness();
-  const mapped = h.mapBundle(CORE_BUNDLE);
+  const mapped = h.mapBundle(CORE_BUNDLE, { backlogBackend: "local" });
   for (const [path, file] of Object.entries(mapped)) {
     if (!path.startsWith(".windsurf/workflows/")) continue;
     assert(
