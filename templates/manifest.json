@@ -23,6 +23,12 @@
     { "category": "agent", "name": "workflow-manager", "source": "core/agents/workflow-manager.md" },
     { "category": "agent", "name": "devops-sre", "source": "core/agents/devops-sre.md" },
 
+    { "category": "agent-memory", "name": "product-owner", "suffix": "MEMORY.md", "source": "core/agents/product-owner/memory/MEMORY.md" },
+    { "category": "agent-memory", "name": "developer", "suffix": "MEMORY.md", "source": "core/agents/developer/memory/MEMORY.md" },
+    { "category": "agent-memory", "name": "qa-tester", "suffix": "MEMORY.md", "source": "core/agents/qa-tester/memory/MEMORY.md" },
+    { "category": "agent-memory", "name": "devops-sre", "suffix": "MEMORY.md", "source": "core/agents/devops-sre/memory/MEMORY.md" },
+    { "category": "agent-memory", "name": "security-auditor", "suffix": "MEMORY.md", "source": "core/agents/security-auditor/memory/MEMORY.md" },
+
     { "category": "skill", "name": "auto-chain", "source": "core/skills/auto-chain/SKILL.md" },
 
     { "category": "backlog-skill", "name": "backlog", "source": "core/skills/backlog/SKILL.md" },

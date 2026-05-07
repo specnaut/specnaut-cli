@@ -12,6 +12,9 @@ function destinationFor(entry: CoreEntry): string {
       return `.claude/commands/${entry.name}.md`;
     case "agent":
       return `.claude/agents/${entry.name}.md`;
+    case "agent-memory":
+      if (!entry.suffix) throw new Error(`agent-memory needs suffix: ${entry.name}`);
+      return `.claude/agents/${entry.name}/memory/${entry.suffix}`;
     case "skill":
     case "backlog-skill":
       return `.claude/skills/${entry.name}/SKILL.md`;
