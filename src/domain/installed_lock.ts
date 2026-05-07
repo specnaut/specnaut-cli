@@ -18,6 +18,12 @@ export const KNOWN_HARNESSES: ReadonlyArray<KnownHarness> = [
   "opencode",
 ];
 
+export type BacklogBackend = "local" | "github";
+export const KNOWN_BACKLOG_BACKENDS: ReadonlyArray<BacklogBackend> = [
+  "local",
+  "github",
+];
+
 export type LockEntry = {
   readonly sha256: string;
   readonly installedAt: string;
@@ -27,6 +33,7 @@ export type LockEntry = {
 export type InstalledLock = {
   readonly version: 2;
   readonly harness: KnownHarness;
+  readonly backlogBackend: BacklogBackend;
   readonly templatesVersion: string;
   readonly entries: ReadonlyMap<string, LockEntry>;
 };
@@ -61,6 +68,14 @@ export function parseLock(yaml: string): InstalledLock {
     harness = "claude";
   }
 
+  // Default to "local" when absent: existing locks pre-date the backend
+  // selection feature, and the local-md flow is what was implicitly active.
+  const rawBackend = root.backlog_backend;
+  const backlogBackend: BacklogBackend = typeof rawBackend === "string" &&
+      KNOWN_BACKLOG_BACKENDS.includes(rawBackend as BacklogBackend)
+    ? (rawBackend as BacklogBackend)
+    : "local";
+
   const templatesVersion = root.templates_version;
   if (typeof templatesVersion !== "string") {
     throw new Error("missing top-level templates_version");
@@ -81,7 +96,7 @@ export function parseLock(yaml: string): InstalledLock {
     }
     entries.set(path, { sha256, installedAt, templatesVersion: ver });
   }
-  return { version: 2, harness, templatesVersion, entries };
+  return { version: 2, harness, backlogBackend, templatesVersion, entries };
 }
 
 export function serializeLock(lock: InstalledLock): string {
@@ -98,6 +113,7 @@ export function serializeLock(lock: InstalledLock): string {
   return stringifyYaml({
     version: 2,
     harness: lock.harness,
+    backlog_backend: lock.backlogBackend,
     templates_version: lock.templatesVersion,
     entries: entriesObj,
   });

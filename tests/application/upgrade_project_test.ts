@@ -128,6 +128,7 @@ Deno.test("UpgradeProjectUseCase returns up-to-date when disk + lock + bundle al
   const lock: InstalledLock = {
     version: 2,
     harness: "claude",
+    backlogBackend: "local",
     templatesVersion: "0.3.0",
     entries: new Map([["a.md", {
       sha256: sha,
@@ -154,6 +155,7 @@ Deno.test("UpgradeProjectUseCase returns planned (no writes) in dry-run", async 
   const lock: InstalledLock = {
     version: 2,
     harness: "claude",
+    backlogBackend: "local",
     templatesVersion: "0.2.0",
     entries: new Map([["a.md", {
       sha256: oldSha,
@@ -183,6 +185,7 @@ Deno.test("UpgradeProjectUseCase applies auto-update and skips preserve", async 
   const lock: InstalledLock = {
     version: 2,
     harness: "claude",
+    backlogBackend: "local",
     templatesVersion: "0.2.0",
     entries: new Map([
       ["clean.md", {
@@ -222,6 +225,7 @@ Deno.test("UpgradeProjectUseCase with --force overwrites preserve actions with b
   const lock: InstalledLock = {
     version: 2,
     harness: "claude",
+    backlogBackend: "local",
     templatesVersion: "0.2.0",
     entries: new Map([["a.md", {
       sha256: await sha256Hex("ORIGINAL"),
@@ -250,6 +254,7 @@ Deno.test("UpgradeProjectUseCase deletes clean orphans (lock entry + on disk + m
   const lock: InstalledLock = {
     version: 2,
     harness: "claude",
+    backlogBackend: "local",
     templatesVersion: "0.6.1",
     entries: new Map([
       ["a.md", {
@@ -283,6 +288,7 @@ Deno.test("UpgradeProjectUseCase preserves customized orphan without --force, dr
   const lock: InstalledLock = {
     version: 2,
     harness: "claude",
+    backlogBackend: "local",
     templatesVersion: "0.6.1",
     entries: new Map([
       ["a.md", {
@@ -320,6 +326,7 @@ Deno.test("UpgradeProjectUseCase with --force deletes customized orphan with bac
   const lock: InstalledLock = {
     version: 2,
     harness: "claude",
+    backlogBackend: "local",
     templatesVersion: "0.6.1",
     entries: new Map([
       ["orphan.md", {

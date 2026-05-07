@@ -13,6 +13,8 @@ type CoreManifestEntry = {
   suffix?: string;
   source: string;
   executable?: boolean;
+  /** When set, the entry only applies if this backend is selected. */
+  backend?: "local" | "github";
 };
 
 type HarnessStaticManifestEntry = {
@@ -65,6 +67,7 @@ async function buildCoreEntries(m: Manifest): Promise<string[]> {
     const abs = new URL(entry.source, TEMPLATES_DIR);
     const content = await Deno.readTextFile(abs);
     const suffix = entry.suffix === undefined ? "null" : JSON.stringify(entry.suffix);
+    const backend = entry.backend === undefined ? "null" : JSON.stringify(entry.backend);
     lines.push(
       `  {\n` +
         `    category: ${JSON.stringify(entry.category)},\n` +
@@ -72,6 +75,7 @@ async function buildCoreEntries(m: Manifest): Promise<string[]> {
         `    suffix: ${suffix},\n` +
         `    content: \`${escapeTemplateLiteral(content)}\`,\n` +
         `    executable: ${entry.executable === true},\n` +
+        `    backend: ${backend},\n` +
         `  }`,
     );
   }

@@ -78,6 +78,7 @@ Deno.test("InitProjectUseCase writes the bundle to the target dir (happy path)",
     git: fakeGit(),
     lockStore: fakeLockStore(),
     harness: fakeClaudeHarness(),
+    backlogBackend: "local",
     core: SAMPLE_CORE,
     ensureDir: () => Promise.resolve(),
   });
@@ -100,6 +101,7 @@ Deno.test("InitProjectUseCase fails with 'conflicts' when target already has spe
     git: fakeGit(),
     lockStore: fakeLockStore(),
     harness: fakeClaudeHarness(),
+    backlogBackend: "local",
     core: SAMPLE_CORE,
     ensureDir: () => Promise.resolve(),
   });
@@ -119,6 +121,7 @@ Deno.test("InitProjectUseCase calls git.init when repo not initialized and initG
     git: fakeGit({ available: true, initialized: false, initCalled }),
     lockStore: fakeLockStore(),
     harness: fakeClaudeHarness(),
+    backlogBackend: "local",
     core: SAMPLE_CORE,
     ensureDir: () => Promise.resolve(),
   });
@@ -133,6 +136,7 @@ Deno.test("InitProjectUseCase skips git.init when initGit=false", async () => {
     git: fakeGit({ available: true, initialized: false, initCalled }),
     lockStore: fakeLockStore(),
     harness: fakeClaudeHarness(),
+    backlogBackend: "local",
     core: SAMPLE_CORE,
     ensureDir: () => Promise.resolve(),
   });
@@ -147,6 +151,7 @@ Deno.test("InitProjectUseCase skips git.init when git not available", async () =
     git: fakeGit({ available: false, initCalled }),
     lockStore: fakeLockStore(),
     harness: fakeClaudeHarness(),
+    backlogBackend: "local",
     core: SAMPLE_CORE,
     ensureDir: () => Promise.resolve(),
   });
@@ -166,6 +171,7 @@ Deno.test("InitProjectUseCase skips git.init when repo already initialized", asy
     git: fakeGit({ available: true, initialized: true, initCalled }),
     lockStore: fakeLockStore(),
     harness: fakeClaudeHarness(),
+    backlogBackend: "local",
     core: SAMPLE_CORE,
     ensureDir: () => Promise.resolve(),
   });
@@ -190,6 +196,7 @@ Deno.test("InitProjectUseCase with force=true skips conflict detection and reque
     git: fakeGit(),
     lockStore: fakeLockStore(),
     harness: fakeClaudeHarness(),
+    backlogBackend: "local",
     core: SAMPLE_CORE,
     ensureDir: () => Promise.resolve(),
   });
@@ -218,6 +225,7 @@ Deno.test("InitProjectUseCase returns backups array from writer report", async (
     git: fakeGit(),
     lockStore: fakeLockStore(),
     harness: fakeClaudeHarness(),
+    backlogBackend: "local",
     core: SAMPLE_CORE,
     ensureDir: () => Promise.resolve(),
   });
@@ -238,6 +246,7 @@ Deno.test("InitProjectUseCase persists an installed.lock with SHA256 of every fi
     git: fakeGit(),
     lockStore,
     harness: fakeClaudeHarness(),
+    backlogBackend: "local",
     core: [
       {
         category: "project-root",
@@ -278,6 +287,7 @@ Deno.test("InitProjectUseCase records harness.key in the installed lock", async 
     git: fakeGit(),
     lockStore,
     harness: fakeClaudeHarness(),
+    backlogBackend: "local",
     core: SAMPLE_CORE,
     ensureDir: () => Promise.resolve(),
   });
@@ -292,6 +302,7 @@ Deno.test("InitProjectUseCase uses harness.mapBundle output as the file tree", a
     git: fakeGit(),
     lockStore: fakeLockStore(),
     harness: fakeClaudeHarness(),
+    backlogBackend: "local",
     core: SAMPLE_CORE,
     ensureDir: () => Promise.resolve(),
   });

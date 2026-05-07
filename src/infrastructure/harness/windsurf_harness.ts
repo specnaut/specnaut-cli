@@ -1,7 +1,8 @@
-import type { Harness } from "../../application/ports.ts";
+import type { BundleOptions, Harness } from "../../application/ports.ts";
 import type { CoreBundle, CoreEntry } from "../../domain/core_bundle.ts";
 import type { Bundle } from "../../domain/template.ts";
 import { skillFolderName } from "./skill_folder.ts";
+import { applyBackend, backlogScriptDestination } from "./backlog_filter.ts";
 
 /**
  * Windsurf's per-workflow character cap. Cascade silently truncates at this
@@ -18,7 +19,10 @@ function destinationFor(entry: CoreEntry): string {
     case "backlog-cmd":
     case "agent":
     case "skill":
+    case "backlog-skill":
       return `.windsurf/workflows/${skillFolderName(entry)}.md`;
+    case "backlog-script":
+      return backlogScriptDestination(entry);
     case "spec-root":
       if (!entry.suffix) throw new Error(`spec-root needs suffix`);
       return `.specflow/${entry.suffix}`;
@@ -33,9 +37,11 @@ export class WindsurfHarness implements Harness {
   readonly key = "windsurf";
   readonly displayName = "Windsurf";
 
-  mapBundle(core: CoreBundle): Bundle {
+  mapBundle(core: CoreBundle, opts: BundleOptions): Bundle {
     const out: Bundle = {};
-    for (const entry of core) {
+    for (const raw of core) {
+      const entry = applyBackend(raw, opts);
+      if (entry === null) continue;
       out[destinationFor(entry)] = {
         content: entry.content,
         executable: entry.executable,

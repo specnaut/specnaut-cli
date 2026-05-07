@@ -58,7 +58,7 @@ Deno.test("GeminiHarness.key and displayName", () => {
 
 Deno.test("GeminiHarness maps commands to .gemini/commands/specflow-<name>.toml as parseable TOML", () => {
   const h = new GeminiHarness();
-  const mapped = h.mapBundle(SAMPLE);
+  const mapped = h.mapBundle(SAMPLE, { backlogBackend: "local" });
   const cmd = mapped[".gemini/commands/specflow-specify.toml"];
   assert(cmd, "command TOML not emitted");
   const parsed = parseToml(cmd.content);
@@ -72,19 +72,19 @@ Deno.test("GeminiHarness maps commands to .gemini/commands/specflow-<name>.toml 
 
 Deno.test("GeminiHarness maps backlog-cmd to .gemini/commands/specflow-backlog.toml", () => {
   const h = new GeminiHarness();
-  const mapped = h.mapBundle(SAMPLE);
+  const mapped = h.mapBundle(SAMPLE, { backlogBackend: "local" });
   assert(".gemini/commands/specflow-backlog.toml" in mapped);
 });
 
 Deno.test("GeminiHarness maps skill to .gemini/skills/specflow-<name>/SKILL.md", () => {
   const h = new GeminiHarness();
-  const mapped = h.mapBundle(SAMPLE);
+  const mapped = h.mapBundle(SAMPLE, { backlogBackend: "local" });
   assert(".gemini/skills/specflow-auto-chain/SKILL.md" in mapped);
 });
 
 Deno.test("GeminiHarness maps agent to .gemini/agents/<name>.md with stripped frontmatter", () => {
   const h = new GeminiHarness();
-  const mapped = h.mapBundle(SAMPLE);
+  const mapped = h.mapBundle(SAMPLE, { backlogBackend: "local" });
   const agent = mapped[".gemini/agents/product-owner.md"];
   assert(agent, "agent markdown not emitted");
   assert(agent.content.startsWith("---\n"), "missing frontmatter");
@@ -100,14 +100,14 @@ Deno.test("GeminiHarness maps agent to .gemini/agents/<name>.md with stripped fr
 
 Deno.test("GeminiHarness maps spec-root to .specflow/<suffix> and project-root to <suffix>", () => {
   const h = new GeminiHarness();
-  const mapped = h.mapBundle(SAMPLE);
+  const mapped = h.mapBundle(SAMPLE, { backlogBackend: "local" });
   assert(".specflow/memory/constitution.md" in mapped);
   assert("AGENTS.md" in mapped);
 });
 
 Deno.test("GeminiHarness emits no Claude/Cursor/Codex artefacts", () => {
   const h = new GeminiHarness();
-  const mapped = h.mapBundle(SAMPLE);
+  const mapped = h.mapBundle(SAMPLE, { backlogBackend: "local" });
   const keys = Object.keys(mapped);
   assert(!keys.some((k) => k.startsWith(".claude/")), "no .claude/");
   assert(!keys.some((k) => k.startsWith(".cursor/")), "no .cursor/");
@@ -125,7 +125,7 @@ Deno.test("GeminiHarness omits TOML description when source frontmatter has none
     executable: false,
   }];
   const h = new GeminiHarness();
-  const mapped = h.mapBundle(core);
+  const mapped = h.mapBundle(core, { backlogBackend: "local" });
   const parsed = parseToml(
     mapped[".gemini/commands/specflow-specify.toml"].content,
   );
@@ -142,7 +142,7 @@ Deno.test("GeminiHarness synthesises agent description when source has none", ()
     executable: false,
   }];
   const h = new GeminiHarness();
-  const mapped = h.mapBundle(core);
+  const mapped = h.mapBundle(core, { backlogBackend: "local" });
   const agent = mapped[".gemini/agents/lonely-agent.md"];
   assert(agent.content.includes("name: lonely-agent"));
   assert(agent.content.includes("description: Specflow lonely-agent agent"));

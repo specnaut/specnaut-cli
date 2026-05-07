@@ -10,6 +10,7 @@ export function skillFolderName(entry: CoreEntry): string {
     case "command":
     case "backlog-cmd":
     case "skill":
+    case "backlog-skill":
       return `specflow-${entry.name}`;
     case "agent":
       return `specflow-agent-${entry.name}`;

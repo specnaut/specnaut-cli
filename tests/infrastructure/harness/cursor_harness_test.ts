@@ -55,37 +55,37 @@ Deno.test("CursorHarness.key and displayName", () => {
 
 Deno.test("CursorHarness maps commands to .cursor/skills/specflow-<name>/SKILL.md", () => {
   const h = new CursorHarness();
-  const mapped = h.mapBundle(SAMPLE);
+  const mapped = h.mapBundle(SAMPLE, { backlogBackend: "local" });
   assert(".cursor/skills/specflow-specify/SKILL.md" in mapped);
 });
 
 Deno.test("CursorHarness maps the backlog command to .cursor/skills/specflow-backlog/SKILL.md", () => {
   const h = new CursorHarness();
-  const mapped = h.mapBundle(SAMPLE);
+  const mapped = h.mapBundle(SAMPLE, { backlogBackend: "local" });
   assert(".cursor/skills/specflow-backlog/SKILL.md" in mapped);
 });
 
 Deno.test("CursorHarness maps agents to .cursor/skills/specflow-agent-<name>/SKILL.md", () => {
   const h = new CursorHarness();
-  const mapped = h.mapBundle(SAMPLE);
+  const mapped = h.mapBundle(SAMPLE, { backlogBackend: "local" });
   assert(".cursor/skills/specflow-agent-product-owner/SKILL.md" in mapped);
 });
 
 Deno.test("CursorHarness maps skills to .cursor/skills/specflow-<name>/SKILL.md", () => {
   const h = new CursorHarness();
-  const mapped = h.mapBundle(SAMPLE);
+  const mapped = h.mapBundle(SAMPLE, { backlogBackend: "local" });
   assert(".cursor/skills/specflow-auto-chain/SKILL.md" in mapped);
 });
 
 Deno.test("CursorHarness maps spec-root to .specflow/ and project-root unchanged", () => {
   const h = new CursorHarness();
-  const mapped = h.mapBundle(SAMPLE);
+  const mapped = h.mapBundle(SAMPLE, { backlogBackend: "local" });
   assert(".specflow/memory/constitution.md" in mapped);
   assert("AGENTS.md" in mapped);
 });
 
 Deno.test("CursorHarness includes .cursor/rules/specify-rules.mdc from HARNESS_STATIC", () => {
   const h = new CursorHarness();
-  const mapped = h.mapBundle(SAMPLE);
+  const mapped = h.mapBundle(SAMPLE, { backlogBackend: "local" });
   assert(".cursor/rules/specify-rules.mdc" in mapped);
 });

@@ -1,9 +1,10 @@
 import { stringify as stringifyToml } from "@std/toml";
-import type { Harness } from "../../application/ports.ts";
+import type { BundleOptions, Harness } from "../../application/ports.ts";
 import type { CoreBundle, CoreEntry } from "../../domain/core_bundle.ts";
 import type { Bundle } from "../../domain/template.ts";
 import { ensureSkillFrontmatter, skillFolderName } from "./skill_folder.ts";
 import { frontmatterField, splitFrontmatter } from "./frontmatter.ts";
+import { applyBackend, backlogScriptDestination } from "./backlog_filter.ts";
 
 function toGeminiCommandToml(entry: CoreEntry): string {
   const split = splitFrontmatter(entry.content);
@@ -28,9 +29,11 @@ export class GeminiHarness implements Harness {
   readonly key = "gemini";
   readonly displayName = "Gemini CLI";
 
-  mapBundle(core: CoreBundle): Bundle {
+  mapBundle(core: CoreBundle, opts: BundleOptions): Bundle {
     const out: Bundle = {};
-    for (const entry of core) {
+    for (const raw of core) {
+      const entry = applyBackend(raw, opts);
+      if (entry === null) continue;
       switch (entry.category) {
         case "command":
         case "backlog-cmd": {
@@ -41,7 +44,8 @@ export class GeminiHarness implements Harness {
           };
           break;
         }
-        case "skill": {
+        case "skill":
+        case "backlog-skill": {
           const name = skillFolderName(entry);
           out[`.gemini/skills/${name}/SKILL.md`] = {
             content: ensureSkillFrontmatter(entry.content, name),
@@ -49,6 +53,12 @@ export class GeminiHarness implements Harness {
           };
           break;
         }
+        case "backlog-script":
+          out[backlogScriptDestination(entry)] = {
+            content: entry.content,
+            executable: entry.executable,
+          };
+          break;
         case "agent":
           out[`.gemini/agents/${entry.name}.md`] = {
             content: toGeminiSubagentMarkdown(entry),

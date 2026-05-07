@@ -1,0 +1,95 @@
+import type { BacklogBackend } from "./installed_lock.ts";
+import { KNOWN_BACKLOG_BACKENDS } from "./installed_lock.ts";
+
+const BEGIN_RE = /^\s*<!--\s*BEGIN:\s*backend=([a-zA-Z0-9_-]+)\s*-->\s*$/;
+const END_RE = /^\s*<!--\s*END:\s*backend=([a-zA-Z0-9_-]+)\s*-->\s*$/;
+const FENCE_RE = /^\s*```/;
+
+/**
+ * Strip backend-conditional sections from a Markdown source.
+ *
+ * Markers are HTML comments on their own line:
+ *   <!-- BEGIN: backend=local -->
+ *   ...content kept when backend === "local"...
+ *   <!-- END: backend=local -->
+ *
+ * For the `active` backend, the content is preserved and only the
+ * surrounding marker lines are removed. For any other backend, the
+ * markers AND the content between them are removed.
+ *
+ * Markers inside fenced code blocks are treated as plain content.
+ *
+ * Throws on unmatched markers (BEGIN without END, END without BEGIN)
+ * and on nested markers.
+ */
+export function renderBackend(source: string, active: BacklogBackend): string {
+  const lines = source.split("\n");
+  const out: string[] = [];
+  let insideFence = false;
+  let openBackend: string | null = null;
+  let openLine = -1;
+  let keepBlock = false;
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+
+    if (FENCE_RE.test(line)) {
+      insideFence = !insideFence;
+      if (openBackend === null || keepBlock) out.push(line);
+      continue;
+    }
+
+    if (!insideFence) {
+      const beginMatch = line.match(BEGIN_RE);
+      if (beginMatch) {
+        if (openBackend !== null) {
+          throw new Error(
+            `nested backend marker at line ${i + 1}: BEGIN ${beginMatch[1]} ` +
+              `inside open block ${openBackend} (started at line ${openLine + 1})`,
+          );
+        }
+        openBackend = beginMatch[1];
+        openLine = i;
+        keepBlock = openBackend === active;
+        continue;
+      }
+
+      const endMatch = line.match(END_RE);
+      if (endMatch) {
+        if (openBackend === null) {
+          throw new Error(
+            `unmatched END marker at line ${i + 1}: backend=${endMatch[1]}`,
+          );
+        }
+        if (endMatch[1] !== openBackend) {
+          throw new Error(
+            `mismatched END marker at line ${i + 1}: expected backend=${openBackend} ` +
+              `(opened at line ${openLine + 1}), got backend=${endMatch[1]}`,
+          );
+        }
+        openBackend = null;
+        keepBlock = false;
+        continue;
+      }
+    }
+
+    if (openBackend === null || keepBlock) out.push(line);
+  }
+
+  if (openBackend !== null) {
+    throw new Error(
+      `unmatched BEGIN marker at line ${openLine + 1}: backend=${openBackend}`,
+    );
+  }
+
+  return out.join("\n");
+}
+
+/** Throws if `s` is not a known backlog backend. */
+export function assertKnownBackend(s: string): asserts s is BacklogBackend {
+  if (!KNOWN_BACKLOG_BACKENDS.includes(s as BacklogBackend)) {
+    throw new Error(
+      `unknown backlog backend '${s}' — known: ${KNOWN_BACKLOG_BACKENDS.join(", ")}`,
+    );
+  }
+}

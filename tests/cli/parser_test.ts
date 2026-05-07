@@ -19,6 +19,7 @@ Deno.test("parseArgs returns init intent with a project name", () => {
     here: false,
     noGit: false,
     ai: null,
+    backlog: null,
     force: false,
   });
 });
@@ -30,6 +31,7 @@ Deno.test("parseArgs returns init intent with --here", () => {
     here: true,
     noGit: false,
     ai: null,
+    backlog: null,
     force: false,
   });
 });
@@ -41,6 +43,7 @@ Deno.test("parseArgs returns init intent with --no-git", () => {
     here: false,
     noGit: true,
     ai: null,
+    backlog: null,
     force: false,
   });
 });
@@ -84,6 +87,7 @@ Deno.test("parseArgs init with --force", () => {
     here: false,
     noGit: false,
     ai: null,
+    backlog: null,
     force: true,
   });
 });
@@ -98,6 +102,7 @@ Deno.test("parseArgs returns upgrade intent", () => {
     kind: "upgrade",
     dryRun: false,
     force: false,
+    backlog: null,
   });
 });
 
@@ -106,6 +111,7 @@ Deno.test("parseArgs returns upgrade intent with --dry-run --force", () => {
     kind: "upgrade",
     dryRun: true,
     force: true,
+    backlog: null,
   });
 });
 
@@ -139,6 +145,45 @@ Deno.test("parseArgs accepts init --ai gemini", () => {
 Deno.test("parseArgs accepts init --ai windsurf", () => {
   const r = parseArgs(["init", "demo", "--ai", "windsurf"]);
   if (r.kind === "init") assertEquals(r.ai, "windsurf");
+});
+
+Deno.test("parseArgs accepts init --backlog local", () => {
+  const r = parseArgs(["init", "demo", "--backlog", "local"]);
+  if (r.kind === "init") assertEquals(r.backlog, "local");
+});
+
+Deno.test("parseArgs accepts init --backlog github", () => {
+  const r = parseArgs(["init", "demo", "--backlog", "github"]);
+  if (r.kind === "init") assertEquals(r.backlog, "github");
+});
+
+Deno.test("parseArgs returns unknown for invalid init --backlog value", () => {
+  assertEquals(parseArgs(["init", "demo", "--backlog", "gitlab"]), {
+    kind: "unknown",
+    received: "init --backlog gitlab",
+  });
+});
+
+Deno.test("parseArgs init leaves --backlog null when not provided", () => {
+  const r = parseArgs(["init", "demo"]);
+  if (r.kind === "init") assertEquals(r.backlog, null);
+});
+
+Deno.test("parseArgs accepts upgrade --backlog github", () => {
+  const r = parseArgs(["upgrade", "--backlog", "github"]);
+  if (r.kind === "upgrade") assertEquals(r.backlog, "github");
+});
+
+Deno.test("parseArgs returns unknown for invalid upgrade --backlog value", () => {
+  assertEquals(parseArgs(["upgrade", "--backlog", "gitlab"]), {
+    kind: "unknown",
+    received: "upgrade --backlog gitlab",
+  });
+});
+
+Deno.test("parseArgs upgrade leaves --backlog null when not provided", () => {
+  const r = parseArgs(["upgrade"]);
+  if (r.kind === "upgrade") assertEquals(r.backlog, null);
 });
 
 Deno.test("parseArgs accepts init --ai copilot", () => {
