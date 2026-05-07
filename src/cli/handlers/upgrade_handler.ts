@@ -52,6 +52,28 @@ export async function migrateLegacyBacklogPaths(
   return moves;
 }
 
+/**
+ * One-shot migration for projects that pre-date #67. Move a top-level
+ * `specs/` directory (the legacy SpecKit-style location) into
+ * `.specflow/specs/`. Idempotent: if the new path already exists, the
+ * old one is left alone.
+ */
+export async function migrateLegacySpecsPaths(
+  projectDir: string,
+): Promise<ReadonlyArray<string>> {
+  const moves: string[] = [];
+
+  const oldDir = join(projectDir, "specs");
+  const newDir = join(projectDir, ".specflow/specs");
+  if ((await exists(oldDir)) && !(await exists(newDir))) {
+    await Deno.mkdir(join(projectDir, ".specflow"), { recursive: true });
+    await Deno.rename(oldDir, newDir);
+    moves.push("specs/ → .specflow/specs/");
+  }
+
+  return moves;
+}
+
 export type UpgradeIntent = {
   kind: "upgrade";
   dryRun: boolean;
@@ -111,8 +133,10 @@ export async function runUpgrade(intent: UpgradeIntent): Promise<number> {
   const projectDir = resolve(Deno.cwd());
 
   if (!intent.dryRun) {
-    const moves = await migrateLegacyBacklogPaths(projectDir);
-    for (const m of moves) console.log(dim(`↳ migrated ${m}`));
+    const backlogMoves = await migrateLegacyBacklogPaths(projectDir);
+    for (const m of backlogMoves) console.log(dim(`↳ migrated ${m}`));
+    const specsMoves = await migrateLegacySpecsPaths(projectDir);
+    for (const m of specsMoves) console.log(dim(`↳ migrated ${m}`));
   }
 
   const useCase = new UpgradeProjectUseCase({

@@ -49,16 +49,16 @@ Given that feature description, do this:
 
 3. **Create the spec feature directory**:
 
-   Specs live under `specs/` unless the user provides `SPECIFY_FEATURE_DIRECTORY`.
+   Specs live under `.specflow/specs/` unless the user provides `SPECIFY_FEATURE_DIRECTORY`.
 
    **Resolution order for `SPECIFY_FEATURE_DIRECTORY`**:
    1. If the user explicitly provided it, use as-is.
-   2. Otherwise auto-generate under `specs/`:
+   2. Otherwise auto-generate under `.specflow/specs/`:
       - Check `.specflow/init-options.json` for `branch_numbering`
       - `"timestamp"`: prefix is `YYYYMMDD-HHMMSS`
       - `"sequential"` or absent: prefix is `NNN` (next available 3-digit number)
       - Construct: `<prefix>-<short-name>` (e.g., `003-user-auth`)
-      - Set `SPECIFY_FEATURE_DIRECTORY` to `specs/<directory-name>`
+      - Set `SPECIFY_FEATURE_DIRECTORY` to `.specflow/specs/<directory-name>`
 
    **Create the directory and spec file**:
    - `mkdir -p SPECIFY_FEATURE_DIRECTORY`
@@ -68,7 +68,7 @@ Given that feature description, do this:
      ```json
      { "feature_directory": "<resolved feature dir>" }
      ```
-     Write the actual resolved path (e.g., `specs/003-user-auth`), not the literal string.
+     Write the actual resolved path (e.g., `.specflow/specs/003-user-auth`), not the literal string.
      This lets downstream commands (`__SPECFLOW_COMMAND_PLAN__`, `__SPECFLOW_COMMAND_TASKS__`, etc.) locate the feature directory.
 
    **IMPORTANT**:

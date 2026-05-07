@@ -60,16 +60,16 @@ Given that feature description, do this:
 
 3. **Create the spec feature directory**:
 
-   Specs live under \`specs/\` unless the user provides \`SPECIFY_FEATURE_DIRECTORY\`.
+   Specs live under \`.specflow/specs/\` unless the user provides \`SPECIFY_FEATURE_DIRECTORY\`.
 
    **Resolution order for \`SPECIFY_FEATURE_DIRECTORY\`**:
    1. If the user explicitly provided it, use as-is.
-   2. Otherwise auto-generate under \`specs/\`:
+   2. Otherwise auto-generate under \`.specflow/specs/\`:
       - Check \`.specflow/init-options.json\` for \`branch_numbering\`
       - \`"timestamp"\`: prefix is \`YYYYMMDD-HHMMSS\`
       - \`"sequential"\` or absent: prefix is \`NNN\` (next available 3-digit number)
       - Construct: \`<prefix>-<short-name>\` (e.g., \`003-user-auth\`)
-      - Set \`SPECIFY_FEATURE_DIRECTORY\` to \`specs/<directory-name>\`
+      - Set \`SPECIFY_FEATURE_DIRECTORY\` to \`.specflow/specs/<directory-name>\`
 
    **Create the directory and spec file**:
    - \`mkdir -p SPECIFY_FEATURE_DIRECTORY\`
@@ -79,7 +79,7 @@ Given that feature description, do this:
      \`\`\`json
      { "feature_directory": "<resolved feature dir>" }
      \`\`\`
-     Write the actual resolved path (e.g., \`specs/003-user-auth\`), not the literal string.
+     Write the actual resolved path (e.g., \`.specflow/specs/003-user-auth\`), not the literal string.
      This lets downstream commands (\`__SPECFLOW_COMMAND_PLAN__\`, \`__SPECFLOW_COMMAND_TASKS__\`, etc.) locate the feature directory.
 
    **IMPORTANT**:
@@ -2821,7 +2821,7 @@ _No tasks yet._
     content: `# Implementation Plan: [FEATURE]
 
 **Branch**: \`[###-feature-name]\` | **Date**: [DATE] | **Spec**: [link]
-**Input**: Feature specification from \`/specs/[###-feature-name]/spec.md\`
+**Input**: Feature specification from \`/.specflow/specs/[###-feature-name]/spec.md\`
 
 **Note**: This template is filled in by the \`__SPECFLOW_COMMAND_PLAN__\` command. See \`.specflow/templates/plan-template.md\` for the execution workflow.
 
@@ -2858,7 +2858,7 @@ _No tasks yet._
 ### Documentation (this feature)
 
 \`\`\`text
-specs/[###-feature]/
+.specflow/specs/[###-feature]/
 ├── plan.md              # This file (__SPECFLOW_COMMAND_PLAN__ command output)
 ├── research.md          # Phase 0 output (__SPECFLOW_COMMAND_PLAN__ command)
 ├── data-model.md        # Phase 1 output (__SPECFLOW_COMMAND_PLAN__ command)
@@ -2936,7 +2936,7 @@ description: "Task list template for feature implementation"
 
 # Tasks: [FEATURE NAME]
 
-**Input**: Design documents from \`/specs/[###-feature-name]/\`
+**Input**: Design documents from \`/.specflow/specs/[###-feature-name]/\`
 **Prerequisites**: plan.md (required), spec.md (required for user stories), research.md, data-model.md, contracts/
 
 **Tests**: The examples below include test tasks. Tests are OPTIONAL - only include them if explicitly requested in the feature specification.
@@ -3586,7 +3586,7 @@ get_current_branch() {
     fi
 
     # For non-git repos, try to find the latest feature directory
-    local specs_dir="\$repo_root/specs"
+    local specs_dir="\$repo_root/.specflow/specs"
 
     if [[ -d "\$specs_dir" ]]; then
         local latest_feature=""
@@ -3684,7 +3684,7 @@ find_feature_dir_by_prefix() {
     local repo_root="\$1"
     local branch_name
     branch_name=\$(spec_kit_effective_branch_name "\$2")
-    local specs_dir="\$repo_root/specs"
+    local specs_dir="\$repo_root/.specflow/specs"
 
     # Extract prefix from branch (e.g., "004" from "004-whatever" or "20260319-143022" from timestamp branches)
     local prefix=""
@@ -3698,7 +3698,7 @@ find_feature_dir_by_prefix() {
         return
     fi
 
-    # Search for directories in specs/ that start with this prefix
+    # Search for directories in .specflow/specs/ that start with this prefix
     local matches=()
     if [[ -d "\$specs_dir" ]]; then
         for dir in "\$specs_dir"/"\$prefix"-*; do
@@ -4333,7 +4333,7 @@ fi
 
 cd "\$REPO_ROOT"
 
-SPECS_DIR="\$REPO_ROOT/specs"
+SPECS_DIR="\$REPO_ROOT/.specflow/specs"
 if [ "\$DRY_RUN" != true ]; then
     mkdir -p "\$SPECS_DIR"
 fi
@@ -4853,7 +4853,7 @@ function Get-CurrentBranch {
     }
 
     # For non-git repos, try to find the latest feature directory
-    \$specsDir = Join-Path \$repoRoot "specs"
+    \$specsDir = Join-Path \$repoRoot ".specflow" "specs"
     
     if (Test-Path \$specsDir) {
         \$latestFeature = ""
@@ -4949,13 +4949,13 @@ function Test-FeatureBranch {
     return \$true
 }
 
-# Resolve specs/<feature-dir> by numeric/timestamp prefix (mirrors scripts/bash/common.sh find_feature_dir_by_prefix).
+# Resolve .specflow/specs/<feature-dir> by numeric/timestamp prefix (mirrors scripts/bash/common.sh find_feature_dir_by_prefix).
 function Find-FeatureDirByPrefix {
     param(
         [Parameter(Mandatory = \$true)][string]\$RepoRoot,
         [Parameter(Mandatory = \$true)][string]\$Branch
     )
-    \$specsDir = Join-Path \$RepoRoot 'specs'
+    \$specsDir = Join-Path \$RepoRoot '.specflow' 'specs'
     \$branchName = Get-SpecflowEffectiveBranchName \$Branch
 
     \$prefix = \$null
@@ -5540,7 +5540,7 @@ function ConvertTo-CleanBranchName {
 
 Set-Location \$repoRoot
 
-\$specsDir = Join-Path \$repoRoot 'specs'
+\$specsDir = Join-Path \$repoRoot '.specflow' 'specs'
 if (-not \$DryRun) {
     New-Item -ItemType Directory -Path \$specsDir -Force | Out-Null
 }
