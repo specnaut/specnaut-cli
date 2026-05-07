@@ -63,10 +63,20 @@ Deno.test("specflow init <name> writes a complete tree", async () => {
       Deno.readDir(join(root, ".claude/commands")),
     )).length;
     assertEquals(commandsCount, 11);
-    const agentsCount = (await Array.fromAsync(
+    // 9 agent .md files + 5 memory subfolders (product-owner, developer,
+    // qa-tester, devops-sre, security-auditor)
+    const agentDirEntries = await Array.fromAsync(
       Deno.readDir(join(root, ".claude/agents")),
-    )).length;
-    assertEquals(agentsCount, 9);
+    );
+    const agentMdCount = agentDirEntries.filter((e) => e.isFile && e.name.endsWith(".md")).length;
+    assertEquals(agentMdCount, 9);
+    const memoryDirCount = agentDirEntries.filter((e) => e.isDirectory).length;
+    assertEquals(memoryDirCount, 5);
+    // Spot-check one memory file
+    assertEquals(
+      await exists(join(root, ".claude/agents/product-owner/memory/MEMORY.md")),
+      true,
+    );
   });
 });
 

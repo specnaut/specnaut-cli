@@ -34,6 +34,8 @@ export class GeminiHarness implements Harness {
     for (const raw of core) {
       const entry = applyBackend(raw, opts);
       if (entry === null) continue;
+      // agent-memory is Claude-only (folder convention); other harnesses skip.
+      if (entry.category === "agent-memory") continue;
       switch (entry.category) {
         case "command":
         case "backlog-cmd": {

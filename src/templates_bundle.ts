@@ -2526,6 +2526,220 @@ End with a single \`VERDICT\` line: \`VERDICT: pass\` or
     backend: null,
   },
   {
+    category: "agent-memory",
+    name: "product-owner",
+    suffix: "MEMORY.md",
+    content: `# Product Owner agent memory
+
+Index of persistent notes for the \`product-owner\` subagent. Each entry below
+points to a single-topic Markdown file in this same directory.
+
+**Format:** \`- [Title](file.md) — one-line hook describing why this is worth remembering\`
+
+**Keep the index under 200 lines.** Prune entries that are no longer
+load-bearing — once a decision is encoded in \`AGENTS.md\` or in a closed
+ticket, the memory entry can be retired.
+
+## When to add an entry here
+
+Add a new memory file when the PO discovers something that should survive
+across sessions and isn't captured elsewhere:
+
+- Recurring backlog conventions specific to this project (label taxonomy,
+  body shape preferences, escalation patterns).
+- Stakeholder preferences ("Kevin always wants AC bullets to start with
+  testable verbs").
+- Incidents and their resolutions ("when \`gh\` returns 404 on a project
+  command, refresh the auth token with \`gh auth refresh -s project\`").
+- External-tracker quirks (project field IDs that drift, GraphQL
+  endpoints that misbehave in some account contexts).
+
+## When NOT to add an entry
+
+- Project-vision-level facts → those go in \`AGENTS.md\`.
+- One-off facts about a single ticket → those go in the ticket body.
+- Anything derivable from \`gh\` / \`git log\` — the PO can re-query.
+
+## Entries
+
+<!-- (this stub starts empty — the PO populates it as it learns) -->
+`,
+    executable: false,
+    backend: null,
+  },
+  {
+    category: "agent-memory",
+    name: "developer",
+    suffix: "MEMORY.md",
+    content: `# Developer agent memory
+
+Index of persistent notes for the \`developer\` subagent. Each entry below
+points to a single-topic Markdown file in this same directory.
+
+**Format:** \`- [Title](file.md) — one-line hook describing why this is worth remembering\`
+
+**Keep the index under 200 lines.** Prune entries that are no longer
+load-bearing — once a workaround is captured in code or a fix lands
+upstream, the memory entry can be retired.
+
+## When to add an entry here
+
+Add a new memory file when the developer discovers something that should
+survive across sessions and isn't captured elsewhere:
+
+- Codebase gotchas ("file X has a load-bearing side effect at import time;
+  do not move it").
+- Failed approaches ("we tried Y to solve Z and it didn't work because…").
+- Library quirks specific to the version this project pins.
+- Build / test environment specifics ("Deno 2.x emits a benign warning
+  about exports field; ignore in \`deno run\`, not in compiled binary").
+
+## When NOT to add an entry
+
+- Architecture decisions → those go in \`AGENTS.md\` or \`.specflow/memory/constitution.md\`.
+- One-off bug fixes that are captured in the commit message → no memory
+  needed.
+- Anything the developer can re-derive by reading the current code.
+
+## Entries
+
+<!-- (this stub starts empty — the developer populates it as it learns) -->
+`,
+    executable: false,
+    backend: null,
+  },
+  {
+    category: "agent-memory",
+    name: "qa-tester",
+    suffix: "MEMORY.md",
+    content: `# QA tester agent memory
+
+Index of persistent notes for the \`qa-tester\` subagent. Each entry below
+points to a single-topic Markdown file in this same directory.
+
+**Format:** \`- [Title](file.md) — one-line hook describing why this is worth remembering\`
+
+**Keep the index under 200 lines.** Prune entries that are no longer
+load-bearing — once a flaky test is fixed or a known-good finding is filed
+as a ticket, the memory entry can be retired.
+
+## When to add an entry here
+
+Add a new memory file when the QA tester discovers something that should
+survive across sessions and isn't captured elsewhere:
+
+- **Tracked findings** — items already filed as tickets that the tester
+  should NOT re-flag in subsequent runs (until the ticket closes and the
+  fix needs verification).
+- **Flaky tests** — ones that fail intermittently for known
+  environment-specific reasons; record the trigger and the workaround.
+- **Test fixture quirks** — load-bearing setup details that aren't obvious
+  from reading the test code.
+- **Caching caveats** — e.g. CDNs, package managers, or third-party APIs
+  whose responses can be stale right after a deploy.
+
+## When NOT to add an entry
+
+- Test failures that map directly to a real bug → file a ticket via the
+  PO, not a memory entry.
+- One-off transient errors that resolve on retry → no memory needed.
+
+## Entries
+
+<!-- (this stub starts empty — the QA tester populates it as it learns) -->
+`,
+    executable: false,
+    backend: null,
+  },
+  {
+    category: "agent-memory",
+    name: "devops-sre",
+    suffix: "MEMORY.md",
+    content: `# DevOps / SRE agent memory
+
+Index of persistent notes for the \`devops-sre\` subagent. Each entry below
+points to a single-topic Markdown file in this same directory.
+
+**Format:** \`- [Title](file.md) — one-line hook describing why this is worth remembering\`
+
+**Keep the index under 200 lines.** Prune entries that are no longer
+load-bearing — once an incident is post-mortemed and the fix is in IaC,
+the memory entry can be retired.
+
+## When to add an entry here
+
+Add a new memory file when the devops-sre agent discovers something that
+should survive across sessions and isn't captured elsewhere:
+
+- **Pipeline quirks** — flaky CI steps, runner availability windows,
+  rate-limit gotchas with cloud providers.
+- **Deployment gotchas** — order-of-operations issues ("must apply X
+  migration BEFORE rolling out service Y"), dual-region propagation lags.
+- **Secret / credential locations** — which secrets live where, who
+  rotates them, what breaks when they expire.
+- **Observability blind spots** — metrics or logs that don't capture an
+  important class of incident; pointers to the dashboards that do.
+
+## When NOT to add an entry
+
+- IaC / pipeline definitions → those live in the actual config files.
+- Architecture choices → those go in \`AGENTS.md\` or
+  \`.specflow/memory/constitution.md\`.
+- One-off incidents that are fully resolved with no recurring risk → no
+  memory needed.
+
+## Entries
+
+<!-- (this stub starts empty — the devops-sre populates it as it learns) -->
+`,
+    executable: false,
+    backend: null,
+  },
+  {
+    category: "agent-memory",
+    name: "security-auditor",
+    suffix: "MEMORY.md",
+    content: `# Security auditor agent memory
+
+Index of persistent notes for the \`security-auditor\` subagent. Each entry
+below points to a single-topic Markdown file in this same directory.
+
+**Format:** \`- [Title](file.md) — one-line hook describing why this is worth remembering\`
+
+**Keep the index under 200 lines.** Prune entries that are no longer
+load-bearing — once a class of finding is fully addressed in code (e.g.
+all input validation centralised behind one helper), the memory entry can
+be retired.
+
+## When to add an entry here
+
+Add a new memory file when the security auditor discovers something that
+should survive across sessions and isn't captured elsewhere:
+
+- **Project-specific threat model** — assets, attackers, abuse paths the
+  auditor should weigh more heavily here than in a generic review.
+- **Recurring finding patterns** — e.g. "this repo tends to swallow
+  errors silently in catch blocks; flag any new occurrence".
+- **False-positive patterns** — patterns that LOOK like findings but
+  aren't (e.g. internal-only fields that are intentionally exposed
+  because a downstream service needs them).
+- **Compliance constraints** — data-residency, retention, or
+  encryption requirements specific to this project.
+
+## When NOT to add an entry
+
+- Generic OWASP / CWE knowledge → that's already in the auditor's base
+  prompt.
+- Specific findings on a single PR → those go in the review report.
+
+## Entries
+
+<!-- (this stub starts empty — the security auditor populates it as it learns) -->
+`,
+    executable: false,
+    backend: null,
+  },
+  {
     category: "skill",
     name: "auto-chain",
     suffix: null,

@@ -21,6 +21,8 @@ function destinationFor(entry: CoreEntry): string {
       return `.github/instructions/${skillFolderName(entry)}.instructions.md`;
     case "backlog-script":
       return backlogScriptDestination(entry);
+    case "agent-memory":
+      throw new Error("agent-memory entries should be filtered before destinationFor");
     case "spec-root":
       if (!entry.suffix) throw new Error(`spec-root needs suffix`);
       return `.specflow/${entry.suffix}`;
@@ -40,6 +42,8 @@ export class CopilotHarness implements Harness {
     for (const raw of core) {
       const entry = applyBackend(raw, opts);
       if (entry === null) continue;
+      // agent-memory is Claude-only (folder convention); other harnesses skip.
+      if (entry.category === "agent-memory") continue;
       const dest = destinationFor(entry);
       const isInstruction = entry.category === "command" ||
         entry.category === "backlog-cmd" ||
