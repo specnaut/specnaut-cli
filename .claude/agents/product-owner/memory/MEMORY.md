@@ -17,3 +17,4 @@ treatment is now part of normal conventions).
 - [Docs domain](docs-domain.md) — Specflow docs are at https://specflow.makerlabs.dev (custom domain on GH Pages); use this URL in docs-related issues and AC.
 - [GitHub labels](github-labels.md) — only the 9 default GitHub labels exist; do not use ux/docs/friction slugs
 - [Plugin distribution](plugin-distribution.md) — install command, slash-command namespace, 21 assets, 3 install paths, upgrade migration, check --project gap warn
+- [Size and priority labels](size-priority-labels.md) — T-shirt sizes (size:XS–XL) + P0–P3 priority labels; create-if-absent pattern; confirmed in #129
