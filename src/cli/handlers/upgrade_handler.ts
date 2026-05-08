@@ -6,6 +6,7 @@ import { findHarness } from "../harnesses.ts";
 import { DenoFsReader } from "../../infrastructure/fs_reader.ts";
 import { DenoFsWriter } from "../../infrastructure/deno_fs_writer.ts";
 import { FsLockStore } from "../../infrastructure/fs_lock_store.ts";
+import { FsPluginDetector } from "../../infrastructure/fs_plugin_detector.ts";
 import { CORE_BUNDLE, TEMPLATES_VERSION } from "../../templates_bundle.ts";
 import { renderUnifiedDiff } from "../../domain/diff.ts";
 import type { UpgradePlan } from "../../domain/upgrade_plan.ts";
@@ -187,6 +188,8 @@ function renderSummary(plan: UpgradePlan, from: string, to: string) {
     unchanged: plan.filter((a) => a.kind === "unchanged"),
     removed: plan.filter((a) => a.kind === "remove" && !a.wasCustomized),
     orphanPreserved: plan.filter((a) => a.kind === "remove" && a.wasCustomized),
+    migrated: plan.filter((a) => a.kind === "migrate-to-plugin"),
+    deferred: plan.filter((a) => a.kind === "defer-to-plugin"),
   };
 
   console.log(
@@ -205,7 +208,12 @@ function renderSummary(plan: UpgradePlan, from: string, to: string) {
   }
   if (groups.preserve.length > 0) {
     console.log(bold("  customized locally (not touched)"));
-    for (const a of groups.preserve) console.log(yellow(`    ⚠ ${a.dest}`));
+    for (const a of groups.preserve) {
+      const tag = a.kind === "preserve" && a.pluginAvailable
+        ? ` ${dim("[plugin available — reconcile manually]")}`
+        : "";
+      console.log(yellow(`    ⚠ ${a.dest}${tag}`));
+    }
     console.log();
   }
   if (groups.removed.length > 0) {
@@ -218,12 +226,23 @@ function renderSummary(plan: UpgradePlan, from: string, to: string) {
     for (const a of groups.orphanPreserved) console.log(yellow(`    ⚠ ${a.dest}`));
     console.log();
   }
+  if (groups.migrated.length > 0) {
+    console.log(bold("  migrated to claude-specflow plugin (backed up + removed)"));
+    for (const a of groups.migrated) console.log(cyan(`    → ${a.dest}`));
+    console.log();
+  }
+  if (groups.deferred.length > 0) {
+    console.log(bold("  deferred to claude-specflow plugin (was missing on disk)"));
+    for (const a of groups.deferred) console.log(dim(`    · ${a.dest}`));
+    console.log();
+  }
 
   console.log(
     dim(
       `  ${groups.auto.length} auto-update, ${groups.preserve.length} preserved, ` +
         `${groups.added.length} added, ${groups.removed.length} removed, ` +
-        `${groups.orphanPreserved.length} orphan-preserved, ${groups.unchanged.length} unchanged`,
+        `${groups.orphanPreserved.length} orphan-preserved, ${groups.migrated.length} migrated, ` +
+        `${groups.deferred.length} deferred, ${groups.unchanged.length} unchanged`,
     ),
   );
 }
@@ -270,6 +289,7 @@ export async function runUpgrade(intent: UpgradeIntent): Promise<number> {
     core: CORE_BUNDLE,
     templatesVersion: TEMPLATES_VERSION,
     findHarness,
+    pluginDetector: new FsPluginDetector(),
   });
 
   let result;

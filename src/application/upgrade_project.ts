@@ -1,10 +1,14 @@
-import type { FsReader, FsWriter, Harness, LockStore } from "./ports.ts";
+import type { FsReader, FsWriter, Harness, LockStore, PluginDetector } from "./ports.ts";
 import type { Bundle, TemplateFile } from "../domain/template.ts";
 import { sha256Hex } from "../domain/sha256.ts";
 import type { InstalledLock, LockEntry } from "../domain/installed_lock.ts";
 import type { CoreBundle } from "../domain/core_bundle.ts";
 import { computeUpgradePlan, type UpgradePlan } from "../domain/upgrade_plan.ts";
 import { canonicalBlockBody, extractBlock } from "../domain/merge_block.ts";
+import { isPluginCoveredPath } from "../domain/plugin_coverage.ts";
+
+/** The plugin name used for both the install probe and the cache directory. */
+export const PLUGIN_NAME = "claude-specflow";
 
 export type UpgradeProjectInput = {
   projectDir: string;
@@ -35,6 +39,15 @@ export type UpgradeProjectDeps = {
   core: CoreBundle;
   templatesVersion: string;
   findHarness: (key: string) => Harness | null;
+  /**
+   * Optional plugin probe. Drives the v0.x → plugin migration table
+   * for #73 — when the plugin is installed and the harness is
+   * `claude`, vanilla on-disk agent / command files are auto-migrated
+   * (backed up + deleted; plugin serves them going forward) and
+   * customized files are preserved with a "plugin available" warning.
+   * Tests omit this dep to skip migration entirely (legacy behavior).
+   */
+  pluginDetector?: PluginDetector;
   now?: () => Date;
 };
 
@@ -84,11 +97,21 @@ export class UpgradeProjectUseCase {
       newShas.set(dest, await sha256Hex(shaInput));
     }
 
-    const plan = computeUpgradePlan(diskShas, lock, newShas);
+    const pluginInstalled = this.deps.pluginDetector !== undefined &&
+      await this.deps.pluginDetector.isPluginInstalled(PLUGIN_NAME);
+    const plan = computeUpgradePlan(
+      diskShas,
+      lock,
+      newShas,
+      pluginInstalled,
+      (dest) => isPluginCoveredPath(lock.harness, dest),
+    );
 
     const hasActualWork = plan.some((a) =>
       a.kind === "auto-update" ||
       a.kind === "add-new" ||
+      a.kind === "migrate-to-plugin" ||
+      a.kind === "defer-to-plugin" ||
       (a.kind === "preserve" && input.force) ||
       (a.kind === "remove" && (!a.wasCustomized || input.force))
     );
@@ -147,9 +170,34 @@ export class UpgradeProjectUseCase {
       extraBackups = [...extraBackups, ...r.backups];
     }
 
+    // Plugin migrations: vanilla file on disk + plugin installed →
+    // backup + delete; plugin serves the file going forward. Always
+    // back up (the on-disk copy is exactly what the plugin will serve,
+    // but the user may want to recover it later if they uninstall the
+    // plugin).
+    const pluginMigrations = plan
+      .filter((a): a is Extract<typeof a, { kind: "migrate-to-plugin" }> =>
+        a.kind === "migrate-to-plugin"
+      )
+      .map((a) => a.dest);
+    if (pluginMigrations.length > 0) {
+      const r = await writer.deletePaths(pluginMigrations, input.projectDir, {
+        backupExisting: true,
+      });
+      extraBackups = [...extraBackups, ...r.backups];
+    }
+
     const now = (this.deps.now ?? (() => new Date()))().toISOString();
+    // Dests handed off to the plugin are dropped from the new lock —
+    // the binary is no longer the owner of those files.
+    const droppedToPlugin = new Set<string>(
+      plan
+        .filter((a) => a.kind === "migrate-to-plugin" || a.kind === "defer-to-plugin")
+        .map((a) => a.dest),
+    );
     const updatedEntries = new Map<string, LockEntry>();
     for (const [dest] of newShas) {
+      if (droppedToPlugin.has(dest)) continue;
       const existing = lock.entries.get(dest);
       const sha = await shaOfBundle(bundle[dest]);
       const wrote = toWrite[dest] !== undefined;

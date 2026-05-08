@@ -191,3 +191,99 @@ Deno.test("computeUpgradePlan emits no action for orphan-not-on-disk (user alrea
   const plan = computeUpgradePlan(diskShas, lock, newShas);
   assertEquals(plan.find((p) => p.kind === "remove"), undefined);
 });
+
+// ── Plugin migration table (#73) ───────────────────────────────────────────
+//
+// Each test exercises one cell of the 6-state architect spec:
+// (on-disk state) × (plugin state) → action.
+
+const PLUGIN_PATH = ".claude/agents/product-owner.md";
+const isCovered = (dest: string) => dest === PLUGIN_PATH;
+
+Deno.test("plugin migration: vanilla on disk + plugin installed → migrate-to-plugin", async () => {
+  const sha = await sha256Hex("original");
+  const lock = lockWith(PLUGIN_PATH, sha);
+  const diskShas = new Map([[PLUGIN_PATH, sha]]);
+  const newShas = new Map([[PLUGIN_PATH, await sha256Hex("upstream-update")]]);
+  const plan = computeUpgradePlan(diskShas, lock, newShas, true, isCovered);
+  const a = plan.find((p) => p.dest === PLUGIN_PATH);
+  assertEquals(a?.kind, "migrate-to-plugin");
+  if (a?.kind === "migrate-to-plugin") {
+    assertEquals(a.oldSha, sha);
+  }
+});
+
+Deno.test("plugin migration: vanilla on disk + plugin installed (already at latest) → migrate-to-plugin (still hand off)", async () => {
+  // Even when disk SHA already matches new bundle (would normally be
+  // "unchanged"), with plugin installed we still hand the file off.
+  const sha = await sha256Hex("identical-everywhere");
+  const lock = lockWith(PLUGIN_PATH, sha);
+  const diskShas = new Map([[PLUGIN_PATH, sha]]);
+  const newShas = new Map([[PLUGIN_PATH, sha]]);
+  const plan = computeUpgradePlan(diskShas, lock, newShas, true, isCovered);
+  assertEquals(plan.find((p) => p.dest === PLUGIN_PATH)?.kind, "migrate-to-plugin");
+});
+
+Deno.test("plugin migration: customized on disk + plugin installed → preserve with pluginAvailable=true", async () => {
+  const lockSha = await sha256Hex("original");
+  const lock = lockWith(PLUGIN_PATH, lockSha);
+  const diskShas = new Map([[PLUGIN_PATH, await sha256Hex("user-edits")]]);
+  const newShas = new Map([[PLUGIN_PATH, await sha256Hex("upstream-update")]]);
+  const plan = computeUpgradePlan(diskShas, lock, newShas, true, isCovered);
+  const a = plan.find((p) => p.dest === PLUGIN_PATH);
+  assertEquals(a?.kind, "preserve");
+  if (a?.kind === "preserve") {
+    assertEquals(a.pluginAvailable, true);
+    assertEquals(a.reason, "customized");
+  }
+});
+
+Deno.test("plugin migration: missing on disk + plugin installed → defer-to-plugin", async () => {
+  const lock = lockWith(PLUGIN_PATH, await sha256Hex("original"));
+  const diskShas = new Map<string, string>(); // user deleted it
+  const newShas = new Map([[PLUGIN_PATH, await sha256Hex("upstream-update")]]);
+  const plan = computeUpgradePlan(diskShas, lock, newShas, true, isCovered);
+  assertEquals(plan.find((p) => p.dest === PLUGIN_PATH)?.kind, "defer-to-plugin");
+});
+
+Deno.test("plugin migration: vanilla on disk + plugin NOT installed → existing auto-update behavior", async () => {
+  const sha = await sha256Hex("original");
+  const lock = lockWith(PLUGIN_PATH, sha);
+  const diskShas = new Map([[PLUGIN_PATH, sha]]);
+  const newShas = new Map([[PLUGIN_PATH, await sha256Hex("upstream-update")]]);
+  const plan = computeUpgradePlan(diskShas, lock, newShas, false, isCovered);
+  assertEquals(plan.find((p) => p.dest === PLUGIN_PATH)?.kind, "auto-update");
+});
+
+Deno.test("plugin migration: customized on disk + plugin NOT installed → preserve with pluginAvailable=false", async () => {
+  const lockSha = await sha256Hex("original");
+  const lock = lockWith(PLUGIN_PATH, lockSha);
+  const diskShas = new Map([[PLUGIN_PATH, await sha256Hex("user-edits")]]);
+  const newShas = new Map([[PLUGIN_PATH, await sha256Hex("upstream-update")]]);
+  const plan = computeUpgradePlan(diskShas, lock, newShas, false, isCovered);
+  const a = plan.find((p) => p.dest === PLUGIN_PATH);
+  assertEquals(a?.kind, "preserve");
+  if (a?.kind === "preserve") {
+    assertEquals(a.pluginAvailable, false);
+  }
+});
+
+Deno.test("plugin migration: missing on disk + plugin NOT installed → existing add-new behavior", async () => {
+  const lock = lockWith(PLUGIN_PATH, await sha256Hex("original"));
+  const diskShas = new Map<string, string>();
+  const newShas = new Map([[PLUGIN_PATH, await sha256Hex("upstream")]]);
+  const plan = computeUpgradePlan(diskShas, lock, newShas, false, isCovered);
+  assertEquals(plan.find((p) => p.dest === PLUGIN_PATH)?.kind, "add-new");
+});
+
+Deno.test("plugin migration: uncovered path + plugin installed → existing behavior (covered=false)", async () => {
+  // Even when plugin is installed, a path the plugin doesn't own
+  // (like .claude/settings.json) goes through the normal flow.
+  const UNCOVERED = ".claude/settings.json";
+  const sha = await sha256Hex("hooks: {}");
+  const lock = lockWith(UNCOVERED, sha);
+  const diskShas = new Map([[UNCOVERED, sha]]);
+  const newShas = new Map([[UNCOVERED, await sha256Hex("hooks: { ... }")]]);
+  const plan = computeUpgradePlan(diskShas, lock, newShas, true, isCovered);
+  assertEquals(plan.find((p) => p.dest === UNCOVERED)?.kind, "auto-update");
+});

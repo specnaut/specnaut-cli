@@ -350,3 +350,158 @@ Deno.test("UpgradeProjectUseCase with --force deletes customized orphan with bac
   assertEquals(writer.deleted, ["orphan.md"]);
   assertEquals(writer.deleteBackupsRequested, true);
 });
+
+// ── Plugin migration end-to-end (#73 slice 6) ──────────────────────────────
+
+const PLUGIN_DEST = ".claude/agents/product-owner.md";
+
+function fakePluginDetector(installed: boolean) {
+  return { isPluginInstalled: (_n: string) => Promise.resolve(installed) };
+}
+
+Deno.test("UpgradeProjectUseCase: vanilla on-disk + plugin installed → backed up + deleted + dropped from lock", async () => {
+  const sha = await sha256Hex("vanilla content");
+  const lock: InstalledLock = {
+    version: 2,
+    harness: "claude",
+    backlogBackend: "local",
+    templatesVersion: "0.7.0",
+    entries: new Map([[
+      PLUGIN_DEST,
+      { sha256: sha, installedAt: "2026-05-01T00:00:00Z", templatesVersion: "0.7.0" },
+    ]]),
+  };
+  const writer = fakeWriter();
+  const lockStore = fakeLockStore(lock);
+  const uc = new UpgradeProjectUseCase({
+    reader: fakeReader({ [PLUGIN_DEST]: "vanilla content" }),
+    writer,
+    lockStore,
+    core: coreFromBundle({
+      [PLUGIN_DEST]: { content: "upstream update", executable: false },
+    }),
+    templatesVersion: "0.7.1",
+    findHarness: findFakeHarness,
+    pluginDetector: fakePluginDetector(true),
+  });
+  const result = await uc.execute({ projectDir: "/p", dryRun: false, force: false });
+  assertEquals(result.status, "applied");
+  // File deleted with backup (the on-disk copy must be recoverable)
+  assertEquals(writer.deleted, [PLUGIN_DEST]);
+  assertEquals(writer.deleteBackupsRequested, true);
+  // Lock no longer references the migrated file
+  assertEquals(lockStore.last?.entries.has(PLUGIN_DEST), false);
+  // No write happened — the plugin owns the file now
+  assertEquals(writer.written.has(PLUGIN_DEST), false);
+});
+
+Deno.test("UpgradeProjectUseCase: customized on-disk + plugin installed → preserved with pluginAvailable=true (no delete)", async () => {
+  const lock: InstalledLock = {
+    version: 2,
+    harness: "claude",
+    backlogBackend: "local",
+    templatesVersion: "0.7.0",
+    entries: new Map([[
+      PLUGIN_DEST,
+      {
+        sha256: await sha256Hex("original"),
+        installedAt: "2026-05-01T00:00:00Z",
+        templatesVersion: "0.7.0",
+      },
+    ]]),
+  };
+  const writer = fakeWriter();
+  const lockStore = fakeLockStore(lock);
+  const uc = new UpgradeProjectUseCase({
+    reader: fakeReader({ [PLUGIN_DEST]: "user-edited content" }),
+    writer,
+    lockStore,
+    core: coreFromBundle({
+      [PLUGIN_DEST]: { content: "upstream update", executable: false },
+    }),
+    templatesVersion: "0.7.1",
+    findHarness: findFakeHarness,
+    pluginDetector: fakePluginDetector(true),
+  });
+  const result = await uc.execute({ projectDir: "/p", dryRun: false, force: false });
+  assertEquals(result.status, "applied");
+  // File preserved — NOT deleted
+  assertEquals(writer.deleted.includes(PLUGIN_DEST), false);
+  // Lock still tracks it (preserve, not migrate)
+  assertEquals(lockStore.last?.entries.has(PLUGIN_DEST), true);
+  // The plan should mark it as preserve with pluginAvailable=true
+  if (result.status === "applied") {
+    const action = result.plan.find((a) => a.dest === PLUGIN_DEST);
+    assertEquals(action?.kind, "preserve");
+    if (action?.kind === "preserve") {
+      assertEquals(action.pluginAvailable, true);
+    }
+  }
+});
+
+Deno.test("UpgradeProjectUseCase: missing on-disk + plugin installed → deferred (no add-new, no lock entry)", async () => {
+  const lock: InstalledLock = {
+    version: 2,
+    harness: "claude",
+    backlogBackend: "local",
+    templatesVersion: "0.7.0",
+    entries: new Map([[
+      PLUGIN_DEST,
+      {
+        sha256: await sha256Hex("original"),
+        installedAt: "2026-05-01T00:00:00Z",
+        templatesVersion: "0.7.0",
+      },
+    ]]),
+  };
+  const writer = fakeWriter();
+  const lockStore = fakeLockStore(lock);
+  const uc = new UpgradeProjectUseCase({
+    reader: fakeReader({}), // user deleted the file
+    writer,
+    lockStore,
+    core: coreFromBundle({
+      [PLUGIN_DEST]: { content: "upstream update", executable: false },
+    }),
+    templatesVersion: "0.7.1",
+    findHarness: findFakeHarness,
+    pluginDetector: fakePluginDetector(true),
+  });
+  const result = await uc.execute({ projectDir: "/p", dryRun: false, force: false });
+  assertEquals(result.status, "applied");
+  // No file written (would have been add-new without plugin)
+  assertEquals(writer.written.has(PLUGIN_DEST), false);
+  // Lock entry dropped
+  assertEquals(lockStore.last?.entries.has(PLUGIN_DEST), false);
+});
+
+Deno.test("UpgradeProjectUseCase: vanilla on-disk + plugin NOT installed → existing auto-update behavior (no delete)", async () => {
+  const sha = await sha256Hex("vanilla content");
+  const lock: InstalledLock = {
+    version: 2,
+    harness: "claude",
+    backlogBackend: "local",
+    templatesVersion: "0.7.0",
+    entries: new Map([[
+      PLUGIN_DEST,
+      { sha256: sha, installedAt: "2026-05-01T00:00:00Z", templatesVersion: "0.7.0" },
+    ]]),
+  };
+  const writer = fakeWriter();
+  const uc = new UpgradeProjectUseCase({
+    reader: fakeReader({ [PLUGIN_DEST]: "vanilla content" }),
+    writer,
+    lockStore: fakeLockStore(lock),
+    core: coreFromBundle({
+      [PLUGIN_DEST]: { content: "upstream update", executable: false },
+    }),
+    templatesVersion: "0.7.1",
+    findHarness: findFakeHarness,
+    pluginDetector: fakePluginDetector(false),
+  });
+  const result = await uc.execute({ projectDir: "/p", dryRun: false, force: false });
+  assertEquals(result.status, "applied");
+  // Auto-update: file written with new content, NOT deleted
+  assertEquals(writer.written.get(PLUGIN_DEST), "upstream update");
+  assertEquals(writer.deleted.includes(PLUGIN_DEST), false);
+});
