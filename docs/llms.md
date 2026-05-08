@@ -108,6 +108,31 @@ specflow init my-project --ai gemini
 Eight harness targets are supported: `claude` (default), `cursor`, `codex`, `gemini`, `windsurf`,
 `copilot`, `opencode`, `antigravity`. Each emits files in the convention that harness expects.
 
+### Pick a backlog backend
+
+```bash
+specflow init my-project --backlog github
+specflow init my-project --backlog gitlab
+specflow init my-project --backlog local      # default
+```
+
+Three backends are supported: `local` (default), `github`, `gitlab`. See
+[Backlog as product source of truth](#3-backlog-as-product-source-of-truth) for what each one stores
+and how the PO agent talks to it.
+
+### Run `init` non-interactively (CI / scripts)
+
+When you pass both `--ai` and `--backlog`, no interactive prompt is shown — `specflow init` runs
+fully unattended, which is what you want in CI or scripted setup:
+
+```bash
+specflow init my-project --ai claude --backlog github
+specflow init --here --no-git --ai cursor --backlog gitlab
+```
+
+Without those flags, `specflow init` shows an arrow-key picker (↑/↓ to move, space/enter to select)
+when stdin is a TTY, and falls back to a numeric prompt — or the defaults — when stdin is piped.
+
 ### Other commands
 
 ```bash
@@ -158,17 +183,21 @@ loop is `implement → review → fix → re-review` — also automatic.
 
 ### 3. Backlog as product source of truth
 
-A Product Owner agent gates every mutation, and supports two backends:
+A Product Owner agent gates every mutation, and supports three backends:
 
-- **Local Markdown** — index at `.specflow/backlog.md`, task files at
+- **Local Markdown** (`--backlog local`, default) — index at `.specflow/backlog.md`, task files at
   `.specflow/backlog/NNN-slug.md` (typed frontmatter: id, title, category, priority, complexity,
   status, parent, depends_on, spec, tags, created). Sub-tasks reference their parent via
   `parent: "#NNN"`.
-- **GitHub Issues + Projects** — the agent talks directly to the backend via `gh` CLI; epics use the
-  native sub-issues API. No local mirror, no sync command — the remote is the source of truth.
+- **GitHub Issues + Projects** (`--backlog github`) — the agent talks directly to the backend via
+  `gh` CLI; epics use the native sub-issues API. No local mirror, no sync command — the remote is
+  the source of truth.
+- **GitLab Issues** (`--backlog gitlab`) — the agent talks to GitLab via `glab` CLI. Status is
+  tracked via scoped `Status::*` labels rather than a native column field; otherwise the model
+  mirrors the GitHub backend (no local mirror, no sync command).
 
-The user picks one backend per project; the PO auto-detects which is in play by checking whether
-`.specflow/backlog.md` exists.
+The user picks one backend per project. The chosen backend is recorded in `.specflow/installed.lock`
+so the PO knows which one to use without auto-detection.
 
 ## Design principles
 
@@ -178,7 +207,7 @@ The user picks one backend per project; the PO auto-detects which is in play by 
 - **Agnostic of the AI harness** — eight first-class targets today, with the same core content for
   all.
 - **Agnostic of the backlog source** — pick local Markdown or your remote tracker (GitHub Issues +
-  Projects today, GitLab and Bitbucket planned). The PO agent talks to whichever you chose.
+  Projects, GitLab Issues; Bitbucket planned). The PO agent talks to whichever you chose.
 - **Single binary** — distributed via `deno compile` for macOS arm64/x64, Linux arm64/x64, and
   Windows x64. No Python, no `pip`, no extra runtimes on the user's machine.
 
