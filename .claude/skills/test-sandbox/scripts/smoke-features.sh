@@ -51,18 +51,18 @@ echo "═══ #76  commands → skill folders ═══"
 check ".claude/commands/ has only 1 file (backlog)" \
   '[ "$(find .claude/commands -maxdepth 1 -type f -name "*.md" | wc -l | tr -d " ")" = "1" ]'
 for skill in specify constitution clarify plan tasks analyze implement merge review checklist; do
-  check ".claude/skills/specflow.$skill/SKILL.md present" \
-    "[ -f .claude/skills/specflow.$skill/SKILL.md ]"
+  check ".claude/skills/specflow-$skill/SKILL.md present" \
+    "[ -f .claude/skills/specflow-$skill/SKILL.md ]"
 done
-check "name: injected on specflow.specify SKILL.md (post-#92)" \
-  'head -3 .claude/skills/specflow.specify/SKILL.md | grep -q "name: specflow.specify"'
+check "name: injected on specflow-specify SKILL.md (post-#92)" \
+  'head -3 .claude/skills/specflow-specify/SKILL.md | grep -q "name: specflow-specify"'
 
 echo
-echo "═══ #75  loop.md + /specflow.groom ═══"
+echo "═══ #75  loop.md + /specflow-groom ═══"
 check ".claude/loop.md scaffolded" '[ -f .claude/loop.md ]'
-check "specflow.groom skill present" '[ -f .claude/skills/specflow.groom/SKILL.md ]'
+check "specflow-groom skill present" '[ -f .claude/skills/specflow-groom/SKILL.md ]'
 check "groom skill has name: (post-#92)" \
-  'head -3 .claude/skills/specflow.groom/SKILL.md | grep -q "name: specflow.groom"'
+  'head -3 .claude/skills/specflow-groom/SKILL.md | grep -q "name: specflow-groom"'
 
 echo
 echo "═══ #77  manual-only flags ═══"
