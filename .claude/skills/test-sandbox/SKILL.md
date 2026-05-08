@@ -34,20 +34,30 @@ Each script bootstraps a controlled scenario inside `sandbox/<name>/` (the `sand
 These wrap a fresh `init --ai claude --backlog local` and exercise specific feature surfaces. Each prints a `✓` / `❌` line per check and exits 0 on full pass, 1 on any failure — usable as guard rails in pre-release runs or after a refactor that touches bundled artefacts.
 
 ```bash
-.claude/skills/test-sandbox/scripts/smoke-features.sh <name>      # presence + frontmatter checks for every feature shipped after v0.9
-.claude/skills/test-sandbox/scripts/smoke-backlog-local.sh <name> # add → list → move → view → clarify-comment round-trip on the local backend
-.claude/skills/test-sandbox/scripts/smoke-hooks.sh <name>         # fire each bundled hook with synthetic stdin, verify behavior + soft-warn semantics
-.claude/skills/test-sandbox/scripts/smoke-picker.sh <name>        # drive the interactive arrow-key picker over a real PTY (requires python3)
+.claude/skills/test-sandbox/scripts/smoke-features.sh <name>        # presence + frontmatter checks for every feature shipped after v0.9
+.claude/skills/test-sandbox/scripts/smoke-backlog-local.sh <name>   # add → list → move → view → clarify-comment round-trip on the local backend
+.claude/skills/test-sandbox/scripts/smoke-hooks.sh <name>           # fire each bundled hook with synthetic stdin, verify behavior + soft-warn semantics
+.claude/skills/test-sandbox/scripts/smoke-picker.sh <name>          # drive the interactive arrow-key picker over a real PTY (requires python3)
+.claude/skills/test-sandbox/scripts/smoke-all-harnesses.sh <name>   # init across all 8 harnesses, assert each scaffold is correct (auto-cleans on exit)
 ```
 
-Run all four back-to-back for a comprehensive post-refactor smoke:
+Run all five back-to-back for a comprehensive post-refactor smoke:
 
 ```bash
 bash .claude/skills/test-sandbox/scripts/smoke-features.sh feat
 bash .claude/skills/test-sandbox/scripts/smoke-backlog-local.sh backlog
 bash .claude/skills/test-sandbox/scripts/smoke-hooks.sh hooks
 bash .claude/skills/test-sandbox/scripts/smoke-picker.sh picker
+bash .claude/skills/test-sandbox/scripts/smoke-all-harnesses.sh allharness
 ```
+
+`smoke-all-harnesses.sh` is the cross-harness coverage gate: it bootstraps a
+fresh empty project per harness, runs `specflow init --here --no-git --ai
+<harness> --backlog local`, and asserts the harness-specific output root
+exists AND `.specflow/installed.lock` declares the right harness. Prints
+`✓ <harness>: scaffold ok` on pass and `❌ <harness>: <reason>` on fail. A
+trap on EXIT cleans up every `sandbox/<name>-<harness>/` directory it
+created, success or failure — no orphans.
 
 `smoke-picker.sh` uses Python's `pty` module to allocate a real pseudo-TTY for the
 `specflow init` subprocess so `Deno.stdin.isTerminal()` returns true and the
