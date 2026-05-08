@@ -59,10 +59,20 @@ projects** without running `specflow init`, install the Claude Code plugin:
 /plugin install mkrlabs/specflow-plugin
 ```
 
-The plugin ships the same 21 assets the binary scaffolds — 10 slash-command skills, 1 auto-chain
-skill, 1 groom skill, and 9 sub-agents — but at user scope, versioned, and auto-updated via
-`/plugin update`. Slash-commands are namespaced: `/specflow-plugin:specify`,
-`/specflow-plugin:plan`, etc.
+The plugin ships the same 23 assets the binary scaffolds — the consolidated `specflow` router skill
+(with 11 phase docs), the `specflow-review` auto-invoke alias, the `auto-chain` skill, and 9
+sub-agents — but at user scope, versioned, and auto-updated via `/plugin update`. Because the
+plugin's slash-commands are namespaced and the consolidated router itself is named `specflow`,
+you'll see a double-prefix at the call site:
+
+```
+/specflow-plugin:specflow specify "<feature description>"
+/specflow-plugin:specflow plan
+/specflow-plugin:auto-chain specify "<feature description>"
+```
+
+Slightly verbose, but unambiguous. If you scaffold project-local with `specflow init`, you get the
+shorter `/specflow specify "..."` form.
 
 To test a local checkout of the plugin without publishing:
 
@@ -72,13 +82,13 @@ claude --plugin-dir /path/to/specflow/plugin
 
 **Plugin vs `specflow init`** — they complement each other:
 
-| Aspect                             | Binary (`specflow init`)    | Plugin (`/plugin install`)              |
-| ---------------------------------- | --------------------------- | --------------------------------------- |
-| Scope                              | Project-local (`.claude/`)  | User-scope (all projects)               |
-| Slash-command style                | `/specify`, `/plan` (short) | `/specflow-plugin:specify` (namespaced) |
-| Customizable per-project           | Yes                         | No (user-scope, shared)                 |
-| Backlog skill, hooks, `.specflow/` | Yes                         | No (project-stateful — binary-only)     |
-| Kept in sync                       | `specflow upgrade`          | `/plugin update`                        |
+| Aspect                             | Binary (`specflow init`)    | Plugin (`/plugin install`)          |
+| ---------------------------------- | --------------------------- | ----------------------------------- |
+| Scope                              | Project-local (`.claude/`)  | User-scope (all projects)           |
+| Slash-command style                | `/specflow specify` (short) | `/specflow-plugin:specflow specify` |
+| Customizable per-project           | Yes                         | No (user-scope, shared)             |
+| Backlog skill, hooks, `.specflow/` | Yes                         | No (project-stateful — binary-only) |
+| Kept in sync                       | `specflow upgrade`          | `/plugin update`                    |
 
 Most teams use both: the plugin provides discoverability and keeps the agents up-to-date across all
 projects; `specflow init` provides the short slash-commands and project-local customization.
@@ -96,14 +106,14 @@ This scaffolds a tree configured for the **Claude Code** harness by default (`.c
 `.specflow/`, `AGENTS.md`, `.specflow/backlog.md`, …). Open the project in your harness — that's
 where you'll run the rest.
 
-### Step 1 after `init`: run `/specflow-constitution`
+### Step 1 after `init`: run `/specflow constitution`
 
-`/specflow-constitution` is the expected first action after `specflow init`. It scaffolds your
+`/specflow constitution` is the expected first action after `specflow init`. It scaffolds your
 project's guiding principles (architecture, quality gates, ways of working) into
-`.specflow/memory/constitution.md` so the rest of the pipeline (`/specflow-specify`,
-`/specflow-plan`, `/specflow-tasks`, `/specflow-implement`) has something to anchor on. Refine the
+`.specflow/memory/constitution.md` so the rest of the pipeline (`/specflow specify`,
+`/specflow plan`, `/specflow tasks`, `/specflow implement`) has something to anchor on. Refine the
 generated constitution and the root `AGENTS.md` for your stack, then move on to
-`/specflow-specify "<feature description>"` for your first feature.
+`/specflow specify "<feature description>"` for your first feature.
 
 ### Add Specflow to an existing project
 
@@ -246,10 +256,10 @@ marketplace:
 ```
 
 The plugin gives any Claude Code user instant access to the full Specflow slash-command suite and
-sub-agents — no binary, no `specflow init` required. The 21 plugin assets (10 slash-command skills
-
-- auto-chain + groom + 9 sub-agents) are namespaced under `/specflow-plugin:*` so they coexist with
-  project-local copies without collision.
+sub-agents — no binary, no `specflow init` required. The 23 plugin assets (the consolidated
+`specflow` router skill with 11 phase docs, the `specflow-review` auto-invoke alias, the
+`auto-chain` skill, and 9 sub-agents) are namespaced under `/specflow-plugin:*` so they coexist with
+project-local copies without collision.
 
 When both the plugin and the binary are in use, `specflow upgrade` detects the plugin and
 auto-migrates vanilla on-disk agents and command files (backed up, then deleted — the plugin serves

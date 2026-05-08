@@ -20,16 +20,16 @@ clarifications needed) STOP #2 (pre-merge validation)
 
 ## Skills available
 
-- `/specflow-specify` — scaffold a new feature spec from a description
-- `/specflow-clarify` — resolve outstanding questions in `spec.md`
-- `/specflow-plan` — produce the implementation plan
-- `/specflow-tasks` — break the plan into tasks
-- `/specflow-analyze` — cross-artefact consistency check
-- `/specflow-implement` — run the developer → review-coordinator → qa-tester pipeline
-- `/specflow-review` — architecture + quality gates
-- `/specflow-merge` — merge the feature branch to main
+- `/specflow specify` — scaffold a new feature spec from a description
+- `/specflow clarify` — resolve outstanding questions in `spec.md`
+- `/specflow plan` — produce the implementation plan
+- `/specflow tasks` — break the plan into tasks
+- `/specflow analyze` — cross-artefact consistency check
+- `/specflow implement` — run the developer → review-coordinator → qa-tester pipeline
+- `/specflow review` — architecture + quality gates
+- `/specflow merge` — merge the feature branch to main
 - `/specflow-backlog` — manage the product backlog (via the PO agent)
-- `/specflow-auto-chain` — auto-chain dispatcher invoked by `/specflow-specify`
+- `/specflow-auto-chain` — auto-chain dispatcher invoked by `/specflow specify`
 
 ## Agent roles (invocable manually as skills)
 
