@@ -1,0 +1,11 @@
+{
+  "name": "claude-specflow",
+  "description": "Specflow's auto-chain skill, slash commands, and sub-agents for Claude Code — the same content the binary scaffolds, available as a versioned plugin.",
+  "version": "0.0.1",
+  "author": {
+    "name": "MakerLabs"
+  },
+  "homepage": "https://specflow.makerlabs.dev",
+  "repository": "https://github.com/mkrlabs/specflow",
+  "license": "MIT"
+}
