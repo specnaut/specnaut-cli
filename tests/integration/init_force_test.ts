@@ -45,11 +45,11 @@ Deno.test(
     await withTempDir(async (dir) => {
       // Pre-seed a custom skill folder so init conflicts without --force
       // (specflow.* commands now scaffold as skill folders per #76).
-      await Deno.mkdir(join(dir, "demo/.claude/skills/specflow.specify"), {
+      await Deno.mkdir(join(dir, "demo/.claude/skills/specflow-specify"), {
         recursive: true,
       });
       await Deno.writeTextFile(
-        join(dir, "demo/.claude/skills/specflow.specify/SKILL.md"),
+        join(dir, "demo/.claude/skills/specflow-specify/SKILL.md"),
         "CUSTOM CONTENT FROM USER",
       );
 
@@ -68,13 +68,13 @@ Deno.test(
 
       const bakPath = join(
         dir,
-        "demo/.claude/skills/specflow.specify/SKILL.md.specflow.bak",
+        "demo/.claude/skills/specflow-specify/SKILL.md.specflow.bak",
       );
       const bakContent = await Deno.readTextFile(bakPath);
       assertEquals(bakContent, "CUSTOM CONTENT FROM USER");
 
       const newContent = await Deno.readTextFile(
-        join(dir, "demo/.claude/skills/specflow.specify/SKILL.md"),
+        join(dir, "demo/.claude/skills/specflow-specify/SKILL.md"),
       );
       assertEquals(newContent.includes("CUSTOM CONTENT"), false);
 

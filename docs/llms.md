@@ -96,14 +96,14 @@ This scaffolds a tree configured for the **Claude Code** harness by default (`.c
 `.specflow/`, `AGENTS.md`, `.specflow/backlog.md`, …). Open the project in your harness — that's
 where you'll run the rest.
 
-### Step 1 after `init`: run `/specflow.constitution`
+### Step 1 after `init`: run `/specflow-constitution`
 
-`/specflow.constitution` is the expected first action after `specflow init`. It scaffolds your
+`/specflow-constitution` is the expected first action after `specflow init`. It scaffolds your
 project's guiding principles (architecture, quality gates, ways of working) into
-`.specflow/memory/constitution.md` so the rest of the pipeline (`/specflow.specify`,
-`/specflow.plan`, `/specflow.tasks`, `/specflow.implement`) has something to anchor on. Refine the
+`.specflow/memory/constitution.md` so the rest of the pipeline (`/specflow-specify`,
+`/specflow-plan`, `/specflow-tasks`, `/specflow-implement`) has something to anchor on. Refine the
 generated constitution and the root `AGENTS.md` for your stack, then move on to
-`/specflow.specify "<feature description>"` for your first feature.
+`/specflow-specify "<feature description>"` for your first feature.
 
 ### Add Specflow to an existing project
 

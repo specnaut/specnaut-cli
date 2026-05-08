@@ -3,11 +3,11 @@ disable-model-invocation: true
 description: Generate an actionable, dependency-ordered tasks.md for the feature based on available design artifacts.
 handoffs: 
   - label: Analyze For Consistency
-    agent: specflow.analyze
+    agent: specflow-analyze
     prompt: Run a project analysis for consistency
     send: true
   - label: Implement Project
-    agent: specflow.implement
+    agent: specflow-implement
     prompt: Start the implementation in phases
     send: true
 scripts:

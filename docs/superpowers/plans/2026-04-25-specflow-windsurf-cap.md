@@ -7,8 +7,8 @@
 **Goal:** Trim three oversized command templates so every Windsurf workflow fits under Cascade's 12
 000-char cap, and add a CI-level guard that prevents future overflow from shipping.
 
-**Architecture:** Editorial trim of `specflow.checklist.md`, `specflow.specify.md`, and
-`specflow.clarify.md`, one per task — same content semantics, less verbose prose. Then a
+**Architecture:** Editorial trim of `specflow-checklist.md`, `specflow-specify.md`, and
+`specflow-clarify.md`, one per task — same content semantics, less verbose prose. Then a
 `WINDSURF_WORKFLOW_MAX_CHARS` constant and a single test that walks the real `CORE_BUNDLE` through
 `WindsurfHarness.mapBundle()` and asserts every emitted workflow is within the cap.
 
@@ -23,9 +23,9 @@ pipeline; trimming is a content edit only.
 
 ```
 templates/core/commands/
-├── specflow.checklist.md                            MODIFY (19 872 → ≤11 500 chars)
-├── specflow.specify.md                              MODIFY (16 433 → ≤11 500 chars)
-└── specflow.clarify.md                              MODIFY (14 224 → ≤11 500 chars)
+├── specflow-checklist.md                            MODIFY (19 872 → ≤11 500 chars)
+├── specflow-specify.md                              MODIFY (16 433 → ≤11 500 chars)
+└── specflow-clarify.md                              MODIFY (14 224 → ≤11 500 chars)
 
 src/
 └── infrastructure/harness/windsurf_harness.ts       MODIFY (add WINDSURF_WORKFLOW_MAX_CHARS)
@@ -137,11 +137,11 @@ deno task test
 
 ---
 
-## Task 1: Trim `specflow.checklist.md` (19 872 → ≤11 500)
+## Task 1: Trim `specflow-checklist.md` (19 872 → ≤11 500)
 
 **Files:**
 
-- Modify: `templates/core/commands/specflow.checklist.md`
+- Modify: `templates/core/commands/specflow-checklist.md`
 
 The file has 7 sections: `## Checklist Purpose: "Unit Tests for English"`, `## User Input`,
 `## Pre-Execution Checks`, `## Execution Steps`, `## Example Checklist Types & Sample Items`,
@@ -151,13 +151,13 @@ The file has 7 sections: `## Checklist Purpose: "Unit Tests for English"`, `## U
 
 ```bash
 cd /Users/kevin/Sites/specflow
-cat templates/core/commands/specflow.checklist.md | wc -c
+cat templates/core/commands/specflow-checklist.md | wc -c
 # expected: 19872 (before trim)
 ```
 
 - [ ] **Step 2: Apply the trim**
 
-Edit `templates/core/commands/specflow.checklist.md` per the shared strategy above. Specifically:
+Edit `templates/core/commands/specflow-checklist.md` per the shared strategy above. Specifically:
 
 - Compress `## Pre-Execution Checks` extension-hook block per the worked example.
 - `## Example Checklist Types & Sample Items` and `## Anti-Examples: What NOT
@@ -170,7 +170,7 @@ Edit `templates/core/commands/specflow.checklist.md` per the shared strategy abo
 - [ ] **Step 3: Verify size**
 
 ```bash
-deno eval --allow-read 'console.log((await Deno.readTextFile("templates/core/commands/specflow.checklist.md")).length)'
+deno eval --allow-read 'console.log((await Deno.readTextFile("templates/core/commands/specflow-checklist.md")).length)'
 ```
 
 Expected: `≤ 11500`.
@@ -190,17 +190,17 @@ but no test asserts on specific template content, so the count and pass-state st
 - [ ] **Step 5: Commit**
 
 ```bash
-git add templates/core/commands/specflow.checklist.md src/templates_bundle.ts
-git commit -m "refactor(templates): trim specflow.checklist.md under Windsurf 12k cap"
+git add templates/core/commands/specflow-checklist.md src/templates_bundle.ts
+git commit -m "refactor(templates): trim specflow-checklist.md under Windsurf 12k cap"
 ```
 
 ---
 
-## Task 2: Trim `specflow.specify.md` (16 433 → ≤11 500)
+## Task 2: Trim `specflow-specify.md` (16 433 → ≤11 500)
 
 **Files:**
 
-- Modify: `templates/core/commands/specflow.specify.md`
+- Modify: `templates/core/commands/specflow-specify.md`
 
 The file has 4 sections: `## User Input`, `## Pre-Execution Checks`, `## Outline`,
 `## Quick Guidelines`.
@@ -209,13 +209,13 @@ The file has 4 sections: `## User Input`, `## Pre-Execution Checks`, `## Outline
 
 ```bash
 cd /Users/kevin/Sites/specflow
-cat templates/core/commands/specflow.specify.md | wc -c
+cat templates/core/commands/specflow-specify.md | wc -c
 # expected: 16433 (before trim)
 ```
 
 - [ ] **Step 2: Apply the trim**
 
-Edit `templates/core/commands/specflow.specify.md` per the shared strategy:
+Edit `templates/core/commands/specflow-specify.md` per the shared strategy:
 
 - Compress `## Pre-Execution Checks` extension-hook block per the worked example.
 - `## Quick Guidelines` typically carries verbose explanatory prose that meta- comments on the
@@ -228,7 +228,7 @@ Edit `templates/core/commands/specflow.specify.md` per the shared strategy:
 - [ ] **Step 3: Verify size**
 
 ```bash
-deno eval --allow-read 'console.log((await Deno.readTextFile("templates/core/commands/specflow.specify.md")).length)'
+deno eval --allow-read 'console.log((await Deno.readTextFile("templates/core/commands/specflow-specify.md")).length)'
 ```
 
 Expected: `≤ 11500`.
@@ -244,17 +244,17 @@ Expected: `ok | 272 passed | 0 failed`.
 - [ ] **Step 5: Commit**
 
 ```bash
-git add templates/core/commands/specflow.specify.md src/templates_bundle.ts
-git commit -m "refactor(templates): trim specflow.specify.md under Windsurf 12k cap"
+git add templates/core/commands/specflow-specify.md src/templates_bundle.ts
+git commit -m "refactor(templates): trim specflow-specify.md under Windsurf 12k cap"
 ```
 
 ---
 
-## Task 3: Trim `specflow.clarify.md` (14 224 → ≤11 500)
+## Task 3: Trim `specflow-clarify.md` (14 224 → ≤11 500)
 
 **Files:**
 
-- Modify: `templates/core/commands/specflow.clarify.md`
+- Modify: `templates/core/commands/specflow-clarify.md`
 
 The file has 4 sections: `## User Input`, `## Pre-Execution Checks`, `## Outline`,
 `## Post-Execution Checks`.
@@ -263,13 +263,13 @@ The file has 4 sections: `## User Input`, `## Pre-Execution Checks`, `## Outline
 
 ```bash
 cd /Users/kevin/Sites/specflow
-cat templates/core/commands/specflow.clarify.md | wc -c
+cat templates/core/commands/specflow-clarify.md | wc -c
 # expected: 14224 (before trim)
 ```
 
 - [ ] **Step 2: Apply the trim**
 
-Edit `templates/core/commands/specflow.clarify.md` per the shared strategy:
+Edit `templates/core/commands/specflow-clarify.md` per the shared strategy:
 
 - Compress `## Pre-Execution Checks` extension-hook block per the worked example.
 - `## Outline` typically carries multi-paragraph framing for each step; keep the procedural list,
@@ -282,7 +282,7 @@ Edit `templates/core/commands/specflow.clarify.md` per the shared strategy:
 - [ ] **Step 3: Verify size**
 
 ```bash
-deno eval --allow-read 'console.log((await Deno.readTextFile("templates/core/commands/specflow.clarify.md")).length)'
+deno eval --allow-read 'console.log((await Deno.readTextFile("templates/core/commands/specflow-clarify.md")).length)'
 ```
 
 Expected: `≤ 11500`.
@@ -301,8 +301,8 @@ Expected: `ok | 272 passed | 0 failed`.
 - [ ] **Step 5: Commit**
 
 ```bash
-git add templates/core/commands/specflow.clarify.md src/templates_bundle.ts
-git commit -m "refactor(templates): trim specflow.clarify.md under Windsurf 12k cap"
+git add templates/core/commands/specflow-clarify.md src/templates_bundle.ts
+git commit -m "refactor(templates): trim specflow-clarify.md under Windsurf 12k cap"
 ```
 
 ---

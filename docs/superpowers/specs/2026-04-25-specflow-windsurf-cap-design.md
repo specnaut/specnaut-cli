@@ -16,9 +16,9 @@ fix, no new features.
 
 | File                                            | Current | Target  | Reduction |
 | ----------------------------------------------- | ------- | ------- | --------- |
-| `templates/core/commands/specflow.checklist.md` | 19 872  | ≤11 500 | ~42%      |
-| `templates/core/commands/specflow.specify.md`   | 16 433  | ≤11 500 | ~30%      |
-| `templates/core/commands/specflow.clarify.md`   | 14 224  | ≤11 500 | ~19%      |
+| `templates/core/commands/specflow-checklist.md` | 19 872  | ≤11 500 | ~42%      |
+| `templates/core/commands/specflow-specify.md`   | 16 433  | ≤11 500 | ~30%      |
+| `templates/core/commands/specflow-clarify.md`   | 14 224  | ≤11 500 | ~19%      |
 
 The 11 500-char target leaves ~4% headroom under the 12 000-char cap.
 

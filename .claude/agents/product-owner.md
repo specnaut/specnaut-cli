@@ -274,13 +274,13 @@ Four files / file groups, in priority order:
    sees on GitHub. Less detailed than `llms.md`, but flag references
    and the install snippet must match reality.
 3. **`templates/core/commands/specflow.*.md`** — the slash-command
-   sources (`specflow.specify`, `specflow.plan`, `specflow.tasks`,
-   `specflow.implement`, `specflow.analyze`, `specflow.review`,
-   `specflow.merge`, `specflow.constitution`, `specflow.checklist`,
-   `specflow.clarify`). These ship into every user project — drift
+   sources (`specflow-specify`, `specflow-plan`, `specflow-tasks`,
+   `specflow-implement`, `specflow-analyze`, `specflow-review`,
+   `specflow-merge`, `specflow-constitution`, `specflow-checklist`,
+   `specflow-clarify`). These ship into every user project — drift
    here means every harness gets the wrong help text.
 4. **`templates/core/skills/*/SKILL.md`** — the auto-chain, backlog,
-   and specflow.groom skill sources. Same mechanism as the commands.
+   and specflow-groom skill sources. Same mechanism as the commands.
 
 ### Definition of "user-visible"
 
@@ -317,7 +317,7 @@ user-visible — note that explicitly in your report when relevant.
    |---------|--------|--------------------|
    | docs/llms.md | drift | Line 167: still says "supports two backends" — should say "three" after #70. Suggested patch: …
    | README.md | in sync | … |
-   | templates/core/commands/specflow.specify.md | n/a | not affected by this change |
+   | templates/core/commands/specflow-specify.md | n/a | not affected by this change |
    | templates/core/skills/auto-chain/SKILL.md | drift | … |
    ```
 

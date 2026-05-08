@@ -819,7 +819,7 @@ Deno.test("inspect: plugin gap check emits no warnings when plugin IS installed"
     const outcomes = await inspector.inspect(dir, "0.2.0");
     const gapOutcomes = outcomes.filter((o) =>
       o.name.startsWith(".claude/agents/") ||
-      o.name.startsWith(".claude/skills/specflow.")
+      o.name.startsWith(".claude/skills/specflow-")
     );
     assertEquals(gapOutcomes.length, 0);
   });
@@ -831,7 +831,7 @@ Deno.test("inspect: plugin gap check warns for each missing covered path when pl
     const outcomes = await inspector.inspect(dir, "0.2.0");
     const gapOutcomes = outcomes.filter((o) =>
       (o.name.startsWith(".claude/agents/") ||
-        o.name.startsWith(".claude/skills/specflow.") ||
+        o.name.startsWith(".claude/skills/specflow-") ||
         o.name === ".claude/skills/auto-chain/SKILL.md") &&
       o.status === "warn"
     );
@@ -896,9 +896,9 @@ Deno.test("inspect: plugin gap check warns ONLY for the agents the user actually
       // Scaffold all skills + commands too (only the agent gap should warn)
       await Deno.mkdir(join(dir, ".claude/skills/auto-chain"), { recursive: true });
       await Deno.writeTextFile(join(dir, ".claude/skills/auto-chain/SKILL.md"), "stub");
-      await Deno.mkdir(join(dir, ".claude/skills/specflow.groom"), { recursive: true });
+      await Deno.mkdir(join(dir, ".claude/skills/specflow-groom"), { recursive: true });
       await Deno.writeTextFile(
-        join(dir, ".claude/skills/specflow.groom/SKILL.md"),
+        join(dir, ".claude/skills/specflow-groom/SKILL.md"),
         "stub",
       );
       for (
@@ -915,11 +915,11 @@ Deno.test("inspect: plugin gap check warns ONLY for the agents the user actually
           "tasks",
         ]
       ) {
-        await Deno.mkdir(join(dir, `.claude/skills/specflow.${name}`), {
+        await Deno.mkdir(join(dir, `.claude/skills/specflow-${name}`), {
           recursive: true,
         });
         await Deno.writeTextFile(
-          join(dir, `.claude/skills/specflow.${name}/SKILL.md`),
+          join(dir, `.claude/skills/specflow-${name}/SKILL.md`),
           "stub",
         );
       }

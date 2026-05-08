@@ -24,7 +24,7 @@ about any plugin-covered files that are missing when the plugin is uninstalled.
 ### Known caveat: handoff IDs
 
 The 10 command SKILL.md files include `handoffs:` frontmatter that references peer commands by their
-**binary-scaffolded** IDs (`specflow.plan`, `specflow.clarify`, …). In plugin scope those IDs are
+**binary-scaffolded** IDs (`specflow-plan`, `specflow-clarify`, …). In plugin scope those IDs are
 `specflow-plugin:plan` etc., so the clickable handoff buttons may not resolve. For the full handoff
 UX today, use the binary-scaffolded copies (run `specflow init`) — the plugin versions are the
 discoverability layer, not the polished workflow. Handoff rewriting is a known follow-up task on

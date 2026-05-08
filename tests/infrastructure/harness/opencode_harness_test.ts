@@ -40,7 +40,7 @@ function skillEntry(name: string): CoreBundle[number] {
 
 Deno.test("command emits to .opencode/commands/specflow.<name>.md", () => {
   const bundle = harness.mapBundle([commandEntry("specify")], { backlogBackend: "local" });
-  const dest = ".opencode/commands/specflow.specify.md";
+  const dest = ".opencode/commands/specflow-specify.md";
   assertEquals(Object.keys(bundle), [dest]);
   assertStringIncludes(bundle[dest].content, "description: specify command");
   assertEquals(bundle[dest].content.includes("argument-hint"), false);

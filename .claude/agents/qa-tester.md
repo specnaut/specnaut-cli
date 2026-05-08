@@ -150,7 +150,7 @@ abort-BLOCKERs vs finding-BLOCKERs.
   ```
 - **Expected:** exit 0; stdout includes "Initializing into …" and
   "✓ wrote N files (+ merged: .gitignore)" (N around 38–40); a
-  "Next steps" block follows that recommends `/specflow.specify`
+  "Next steps" block follows that recommends `/specflow-specify`
   before `/backlog add`.
 - **Abort-BLOCKER:** non-zero exit. Without a successful init, T4–T7
   cannot run on this scenario.

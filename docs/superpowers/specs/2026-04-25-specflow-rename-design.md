@@ -122,7 +122,7 @@ rename-detection logic — there is no installed base to protect. A fresh
 Every snapshot / destination assertion referring to the old paths is updated in place:
 
 - `tests/infrastructure/harness/claude_harness_test.ts` — spot-checks include
-  `.claude/commands/specflow.specify.md`, `.specflow/memory/constitution.md`
+  `.claude/commands/specflow-specify.md`, `.specflow/memory/constitution.md`
 - `tests/infrastructure/harness/cursor_harness_test.ts` — skill-folder assertions use
   `specflow-specify`
 - `tests/integration/init_cursor_test.ts` — expects `.cursor/skills/specflow-specify/SKILL.md` and
