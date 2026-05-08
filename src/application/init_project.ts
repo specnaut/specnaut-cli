@@ -21,7 +21,16 @@ export type InitResult =
     backups: string[];
     lockWritten: boolean;
   }
-  | { status: "conflicts"; conflicts: string[] };
+  | {
+    status: "conflicts";
+    conflicts: string[];
+    /**
+     * True when a `.specflow/installed.lock` already exists at the target —
+     * lets the CLI suggest `specflow upgrade` instead of `--force` for
+     * projects that were previously initialised by Specflow.
+     */
+    lockExists: boolean;
+  };
 
 export type InitProjectDeps = {
   writer: FsWriter;
@@ -55,7 +64,12 @@ export class InitProjectUseCase {
     if (!input.force) {
       const conflicts = await writer.detectConflicts(bundle, input.targetDir);
       if (conflicts.length > 0) {
-        return { status: "conflicts", conflicts };
+        const existingLock = await lockStore.read(input.targetDir);
+        return {
+          status: "conflicts",
+          conflicts,
+          lockExists: existingLock !== null,
+        };
       }
     }
 
