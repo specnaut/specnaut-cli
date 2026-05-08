@@ -48,8 +48,10 @@ check "no orphan END markers" \
 
 echo
 echo "═══ v1.0.0  consolidated specflow router ═══"
-check ".claude/commands/ has only 1 file (backlog)" \
-  '[ "$(find .claude/commands -maxdepth 1 -type f -name "*.md" | wc -l | tr -d " ")" = "1" ]'
+check ".claude/commands/ has 2 files (backlog + specflow)" \
+  '[ "$(find .claude/commands -maxdepth 1 -type f -name "*.md" | wc -l | tr -d " ")" = "2" ]'
+check ".claude/commands/specflow.md present (slash-command shim, post-F3)" \
+  '[ -f .claude/commands/specflow.md ]'
 check "router .claude/skills/specflow/SKILL.md present" \
   '[ -f .claude/skills/specflow/SKILL.md ]'
 for phase in specify constitution clarify plan tasks analyze implement merge review checklist groom; do
