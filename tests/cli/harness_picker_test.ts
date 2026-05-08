@@ -1,6 +1,24 @@
 import { assertEquals } from "@std/assert";
-import { DEFAULT_HARNESS, type PickerIO, pickHarness } from "../../src/cli/harness_picker.ts";
+import {
+  DEFAULT_HARNESS,
+  type PickerIO,
+  pickHarness,
+  pickHarnessInteractive,
+} from "../../src/cli/harness_picker.ts";
 import { HARNESSES } from "../../src/cli/harnesses.ts";
+import type { SelectIO } from "../../src/cli/select.ts";
+
+function scriptedIO(reads: ReadonlyArray<Uint8Array | null>): SelectIO {
+  const queue = [...reads];
+  return {
+    write: () => {},
+    readBytes: () => {
+      const next = queue.shift();
+      return Promise.resolve(next === undefined ? null : next);
+    },
+    teardown: () => {},
+  };
+}
 
 function makeIO(inputs: ReadonlyArray<string | null>): {
   io: PickerIO;
@@ -60,4 +78,22 @@ Deno.test("pickHarness treats whitespace-only input as the default", () => {
 Deno.test("pickHarness treats null (EOF / Ctrl-D) as the default", () => {
   const { io } = makeIO([null]);
   assertEquals(pickHarness(io), DEFAULT_HARNESS);
+});
+
+Deno.test("pickHarnessInteractive returns the default when Enter is pressed first", async () => {
+  const io = scriptedIO([new Uint8Array([0x0d])]);
+  assertEquals(await pickHarnessInteractive(io), DEFAULT_HARNESS);
+});
+
+Deno.test("pickHarnessInteractive returns the next harness after one arrow-down + space", async () => {
+  const io = scriptedIO([
+    new Uint8Array([0x1b, 0x5b, 0x42]),
+    new Uint8Array([0x20]),
+  ]);
+  assertEquals(await pickHarnessInteractive(io), HARNESSES[1].key);
+});
+
+Deno.test("pickHarnessInteractive returns null on Ctrl-C cancel", async () => {
+  const io = scriptedIO([new Uint8Array([0x03])]);
+  assertEquals(await pickHarnessInteractive(io), null);
 });

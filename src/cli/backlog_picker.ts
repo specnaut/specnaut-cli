@@ -1,5 +1,6 @@
 import { type BacklogBackend } from "../domain/installed_lock.ts";
 import { BACKLOG_STRATEGIES } from "../domain/backlog_strategies/registry.ts";
+import { selectInteractive, type SelectIO } from "./select.ts";
 
 export const DEFAULT_BACKLOG_BACKEND: BacklogBackend = "local";
 
@@ -31,4 +32,22 @@ export function pickBacklogBackend(io: BacklogPickerIO): BacklogBackend {
       `invalid choice "${raw}" — expected 1-${BACKLOG_STRATEGIES.length} or empty for default`,
     );
   }
+}
+
+export async function pickBacklogBackendInteractive(
+  io: SelectIO,
+): Promise<BacklogBackend | null> {
+  const defaultIdx = BACKLOG_STRATEGIES.findIndex(
+    (s) => s.key === DEFAULT_BACKLOG_BACKEND,
+  );
+  const items = BACKLOG_STRATEGIES.map((s) => ({
+    key: s.key,
+    label: s.key === DEFAULT_BACKLOG_BACKEND ? `${s.displayName} (default)` : s.displayName,
+  }));
+  return await selectInteractive(
+    items,
+    defaultIdx >= 0 ? defaultIdx : 0,
+    io,
+    "Choose your backlog backend (↑/↓ to move, space/enter to select, Ctrl-C to cancel):",
+  );
 }
