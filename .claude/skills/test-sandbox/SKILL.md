@@ -29,6 +29,24 @@ Each script bootstraps a controlled scenario inside `sandbox/<name>/` (the `sand
 
 `<harness>` ∈ `claude` (default) | `cursor` | `codex` | `gemini` | `windsurf` | `copilot` | `opencode` | `antigravity`.
 
+### Smoke tests for bundled features
+
+These wrap a fresh `init --ai claude --backlog local` and exercise specific feature surfaces. Each prints a `✓` / `❌` line per check and exits 0 on full pass, 1 on any failure — usable as guard rails in pre-release runs or after a refactor that touches bundled artefacts.
+
+```bash
+.claude/skills/test-sandbox/scripts/smoke-features.sh <name>      # presence + frontmatter checks for every feature shipped after v0.9
+.claude/skills/test-sandbox/scripts/smoke-backlog-local.sh <name> # add → list → move → view → clarify-comment round-trip on the local backend
+.claude/skills/test-sandbox/scripts/smoke-hooks.sh <name>         # fire each bundled hook with synthetic stdin, verify behavior + soft-warn semantics
+```
+
+Run all three back-to-back for a comprehensive post-refactor smoke:
+
+```bash
+bash .claude/skills/test-sandbox/scripts/smoke-features.sh feat
+bash .claude/skills/test-sandbox/scripts/smoke-backlog-local.sh backlog
+bash .claude/skills/test-sandbox/scripts/smoke-hooks.sh hooks
+```
+
 ## Typical workflows
 
 ### Validate a brownfield fix before merging
