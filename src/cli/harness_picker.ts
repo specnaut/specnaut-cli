@@ -1,4 +1,5 @@
 import { HARNESSES } from "./harnesses.ts";
+import { selectInteractive, type SelectIO } from "./select.ts";
 
 export type HarnessKey =
   | "claude"
@@ -36,4 +37,20 @@ export function pickHarness(io: PickerIO): HarnessKey {
       `invalid choice "${raw}" — expected 1-${HARNESSES.length} or empty for default`,
     );
   }
+}
+
+export async function pickHarnessInteractive(
+  io: SelectIO,
+): Promise<HarnessKey | null> {
+  const defaultIdx = HARNESSES.findIndex((h) => h.key === DEFAULT_HARNESS);
+  const items = HARNESSES.map((h) => ({
+    key: h.key as HarnessKey,
+    label: h.key === DEFAULT_HARNESS ? `${h.displayName} (default)` : h.displayName,
+  }));
+  return await selectInteractive(
+    items,
+    defaultIdx >= 0 ? defaultIdx : 0,
+    io,
+    "Choose your AI harness (↑/↓ to move, space/enter to select, Ctrl-C to cancel):",
+  );
 }

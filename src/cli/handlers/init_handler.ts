@@ -2,8 +2,9 @@ import { resolve } from "@std/path";
 import { bold, dim, green, red, yellow } from "@std/fmt/colors";
 import { InitProjectUseCase } from "../../application/init_project.ts";
 import { findHarness } from "../harnesses.ts";
-import { DEFAULT_HARNESS, type HarnessKey, pickHarness } from "../harness_picker.ts";
-import { DEFAULT_BACKLOG_BACKEND, pickBacklogBackend } from "../backlog_picker.ts";
+import { type HarnessKey, pickHarness, pickHarnessInteractive } from "../harness_picker.ts";
+import { pickBacklogBackend, pickBacklogBackendInteractive } from "../backlog_picker.ts";
+import { makeStdinSelectIO } from "../select.ts";
 import type { BacklogBackend } from "../../domain/installed_lock.ts";
 import { findBacklogStrategy } from "../../domain/backlog_strategies/registry.ts";
 import { DenoFsWriter } from "../../infrastructure/deno_fs_writer.ts";
@@ -21,24 +22,42 @@ export type InitIntent = {
   force: boolean;
 };
 
-function resolveHarnessKey(explicit: HarnessKey | null): HarnessKey {
+async function resolveHarnessKey(
+  explicit: HarnessKey | null,
+): Promise<HarnessKey> {
   if (explicit !== null) return explicit;
-  if (!Deno.stdin.isTerminal()) return DEFAULT_HARNESS;
-  return pickHarness({
-    readLine: () => prompt("Choose [1-8]:"),
-    log: (s) => console.log(s),
-    errLog: (s) => console.error(red(s)),
-  });
+  if (!Deno.stdin.isTerminal()) {
+    return pickHarness({
+      readLine: () => prompt("Choose [1-8]:"),
+      log: (s) => console.log(s),
+      errLog: (s) => console.error(red(s)),
+    });
+  }
+  const picked = await pickHarnessInteractive(makeStdinSelectIO());
+  if (picked === null) {
+    console.error(red("aborted."));
+    Deno.exit(130);
+  }
+  return picked;
 }
 
-function resolveBacklogBackend(explicit: BacklogBackend | null): BacklogBackend {
+async function resolveBacklogBackend(
+  explicit: BacklogBackend | null,
+): Promise<BacklogBackend> {
   if (explicit !== null) return explicit;
-  if (!Deno.stdin.isTerminal()) return DEFAULT_BACKLOG_BACKEND;
-  return pickBacklogBackend({
-    readLine: () => prompt("Choose [1-3]:"),
-    log: (s) => console.log(s),
-    errLog: (s) => console.error(red(s)),
-  });
+  if (!Deno.stdin.isTerminal()) {
+    return pickBacklogBackend({
+      readLine: () => prompt("Choose [1-3]:"),
+      log: (s) => console.log(s),
+      errLog: (s) => console.error(red(s)),
+    });
+  }
+  const picked = await pickBacklogBackendInteractive(makeStdinSelectIO());
+  if (picked === null) {
+    console.error(red("aborted."));
+    Deno.exit(130);
+  }
+  return picked;
 }
 
 async function writeBacklogConfigStub(
@@ -76,14 +95,14 @@ export async function runInit(intent: InitIntent): Promise<number> {
     return 2;
   }
 
-  const aiKey = resolveHarnessKey(intent.ai);
+  const aiKey = await resolveHarnessKey(intent.ai);
   const harness = findHarness(aiKey);
   if (!harness) {
     console.error(red(`error: unknown harness '${aiKey}'`));
     return 2;
   }
 
-  const backlogBackend = resolveBacklogBackend(intent.backlog);
+  const backlogBackend = await resolveBacklogBackend(intent.backlog);
 
   console.log(`Initializing into ${bold(targetDir)}`);
 
