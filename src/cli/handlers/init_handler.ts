@@ -64,6 +64,11 @@ async function writeBacklogConfigStub(targetDir: string): Promise<void> {
       "↳ wrote .specflow/backlog-config.yml — fill in repo + project_number before running /backlog",
     ),
   );
+  console.log(
+    dim(
+      "  tip: for a richer experience, enable the GitHub MCP connector via `/mcp` in Claude Code",
+    ),
+  );
 }
 
 export async function runInit(intent: InitIntent): Promise<number> {

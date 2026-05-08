@@ -75,7 +75,50 @@ status_field_id: ""                 # cached on first run
 The PO will refresh `project_node_id` / `status_field_id` automatically
 on first invocation if they are blank.
 
-### Scripts (preferred path)
+### Two paths to GitHub: MCP (preferred) and shell (always available)
+
+Two ways to talk to GitHub from this project. Pick whichever fits your
+setup; the skill works either way.
+
+#### A. GitHub MCP — preferred when available
+
+If the **GitHub MCP server is wired up in Claude Code**, the PO
+subagent should call its tools directly: `mcp__github__issue_write`,
+`mcp__github__issue_read`, `mcp__github__add_issue_comment`,
+`mcp__github__list_issues`, `mcp__github__search_issues`, etc. They
+return structured data, no shell parsing needed.
+
+Two ways to enable the GitHub MCP:
+
+1. **Claude Code cloud connector (recommended)** — open a Claude Code
+   session in this project, run `/mcp`, choose **GitHub**, and complete
+   the OAuth flow. No file lives in this repo for that — it's stored
+   in your Claude Code account.
+
+2. **Self-hosted MCP** — add the official server to the project's
+   `.mcp.json` (creates the file if absent). Specflow does NOT scaffold
+   this for you because it requires Node + a GitHub token; do it
+   manually:
+
+   ```json
+   {
+     "mcpServers": {
+       "github": {
+         "command": "npx",
+         "args": ["-y", "@modelcontextprotocol/server-github"],
+         "env": { "GITHUB_PERSONAL_ACCESS_TOKEN": "${GITHUB_TOKEN}" }
+       }
+     }
+   }
+   ```
+
+   Then restart your Claude Code session.
+
+#### B. Shell scripts — always available
+
+The `gh` CLI scripts under `.specflow/scripts/backlog/` are scaffolded
+unconditionally and work without MCP. They wrap `gh issue` / `gh
+project` calls and read configuration from `backlog-config.yml`.
 
 ```bash
 .specflow/scripts/backlog/list.sh [Status]            # all items, optional Status filter
@@ -85,12 +128,22 @@ on first invocation if they are blank.
 .specflow/scripts/backlog/clarify-comment.sh <num> "<question>"
 ```
 
-For closing or editing, just use `gh` directly:
+For closing or editing, use `gh` directly:
 
 ```bash
 gh issue close  <num> --repo <repo> --reason completed     # or not_planned
 gh issue edit   <num> --repo <repo> --title "…" --body "…"
 ```
+
+#### Decision rule for the PO subagent
+
+When dispatched, the PO checks tool availability at runtime:
+
+1. If `mcp__github__*` tools are visible in the session, prefer them.
+2. Otherwise fall back to the shell scripts.
+
+This means a project can switch from shell to MCP (or back) without any
+Specflow change — the skill is path-aware.
 
 ### Conventions
 
@@ -102,8 +155,11 @@ gh issue edit   <num> --repo <repo> --title "…" --body "…"
 
 ### Prerequisites
 
-The `gh` CLI must be authenticated with the `project` scope. If
-`gh project` returns 404, run `gh auth refresh -s project`.
+For the **shell path**: the `gh` CLI must be authenticated with the
+`project` scope. If `gh project` returns 404, run
+`gh auth refresh -s project`.
+
+For the **MCP path**: see "Two paths to GitHub" above.
 <!-- END: backend=github -->
 
 ## When NOT to use this skill
