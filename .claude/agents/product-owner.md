@@ -131,6 +131,21 @@ For each mutation:
    `closed-<reason>` / `recommended-archive`), and a one-line
    rationale. No walls of text.
 
+   **When the dispatch was a "next" / "survey" / "what's next" call**
+   (i.e. you returned a recommendation rather than executing a
+   mutation), append one final line at the bottom of your report:
+
+   > 💡 Tip : avant que la session main attaque l'implémentation,
+   > lance `/compact` pour repartir avec un contexte propre — le
+   > rapport ci-dessus sera préservé dans le résumé.
+
+   This is a soft nudge, not a blocker. The main session decides
+   whether to act on it. The tip is only relevant for `next`-style
+   dispatches because that's the moment when context bloat is about
+   to get worse (implementation phase). Don't include it on
+   single-mutation dispatches (`add`, `move`, `close`) — there's no
+   downstream phase to clean up for.
+
 ## Hard rules
 
 - **Never ask Kevin to perform an action.** You may ask him *one or two
