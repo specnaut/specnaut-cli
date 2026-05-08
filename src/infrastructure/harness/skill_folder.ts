@@ -7,11 +7,18 @@ import { splitFrontmatter } from "./frontmatter.ts";
  */
 export function skillFolderName(entry: CoreEntry): string {
   switch (entry.category) {
-    case "command":
     case "backlog-cmd":
+      return `specflow-${entry.name}`;
     case "skill":
     case "backlog-skill":
-      return `specflow-${entry.name}`;
+      // Skill names that already begin with "specflow" are emitted as-is
+      // (the router itself is "specflow"; the auto-invoke alias is
+      // "specflow-review"). Other skills (`auto-chain`, `backlog`, …)
+      // get the namespacing prefix to avoid clashes inside a global
+      // skills registry.
+      return entry.name === "specflow" || entry.name.startsWith("specflow-")
+        ? entry.name
+        : `specflow-${entry.name}`;
     case "agent":
       return `specflow-agent-${entry.name}`;
     default:

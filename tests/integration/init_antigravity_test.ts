@@ -49,24 +49,27 @@ Deno.test("specflow init --ai antigravity scaffolds an Antigravity layout", asyn
 
     const root = join(parent, "demo");
 
-    // Workflows — slash commands carry the specflow- prefix; the backlog
-    // command is intentionally unprefixed so it lands as a first-class
-    // user command.
-    assertEquals(
-      await exists(join(root, ".agent/workflows/specflow-specify.md")),
-      true,
-    );
+    // v1.0.0: backlog command remains as a flat workflow.
     assertEquals(
       await exists(join(root, ".agent/workflows/backlog.md")),
       true,
     );
-    const workflowContent = await Deno.readTextFile(
-      join(root, ".agent/workflows/specflow-specify.md"),
+    // Per-phase command workflows are gone post-consolidation.
+    assertEquals(
+      await exists(join(root, ".agent/workflows/specflow-specify.md")),
+      false,
     );
-    assertEquals(workflowContent.startsWith("---\n"), true);
-    assertEquals(workflowContent.includes("description:"), true);
 
-    // Skill subfolders use the standard SKILL.md filename.
+    // Consolidated router skill + phase docs in .agent/skills/specflow/.
+    assertEquals(
+      await exists(join(root, ".agent/skills/specflow/SKILL.md")),
+      true,
+    );
+    assertEquals(
+      await exists(join(root, ".agent/skills/specflow/phases/specify.md")),
+      true,
+    );
+    // Auto-chain still ships as its own skill folder.
     assertEquals(
       await exists(join(root, ".agent/skills/specflow-auto-chain/SKILL.md")),
       true,

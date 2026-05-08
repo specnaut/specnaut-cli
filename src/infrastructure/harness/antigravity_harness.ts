@@ -34,8 +34,6 @@ function toAntigravityAgentMarkdown(entry: CoreEntry): string {
 
 function destinationFor(entry: CoreEntry): string {
   switch (entry.category) {
-    case "command":
-      return `.agent/workflows/specflow-${entry.name}.md`;
     case "backlog-cmd":
       return `.agent/workflows/${entry.name}.md`;
     case "agent":
@@ -43,6 +41,9 @@ function destinationFor(entry: CoreEntry): string {
     case "skill":
     case "backlog-skill":
       return `.agent/skills/${skillFolderName(entry)}/SKILL.md`;
+    case "phase":
+      if (!entry.suffix) throw new Error(`phase needs suffix: ${entry.name}`);
+      return `.agent/skills/specflow/phases/${entry.suffix}`;
     case "backlog-script":
       return backlogScriptDestination(entry);
     case "agent-memory":
@@ -71,7 +72,6 @@ export class AntigravityHarness implements Harness {
       const dest = destinationFor(entry);
       let content: string;
       switch (entry.category) {
-        case "command":
         case "backlog-cmd":
           content = toAntigravityWorkflowMarkdown(entry);
           break;

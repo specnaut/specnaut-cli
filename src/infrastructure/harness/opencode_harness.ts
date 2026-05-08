@@ -97,8 +97,6 @@ function toOpenCodeAgentMarkdown(entry: CoreEntry): string {
 
 function destinationFor(entry: CoreEntry): string {
   switch (entry.category) {
-    case "command":
-      return `.opencode/commands/${skillFolderName(entry)}.md`;
     case "backlog-cmd":
       return `.opencode/commands/${entry.name}.md`;
     case "agent":
@@ -106,6 +104,9 @@ function destinationFor(entry: CoreEntry): string {
     case "skill":
     case "backlog-skill":
       return `.opencode/skills/${skillFolderName(entry)}/SKILL.md`;
+    case "phase":
+      if (!entry.suffix) throw new Error(`phase needs suffix: ${entry.name}`);
+      return `.opencode/skills/specflow/phases/${entry.suffix}`;
     case "backlog-script":
       return backlogScriptDestination(entry);
     case "agent-memory":
@@ -134,7 +135,6 @@ export class OpenCodeHarness implements Harness {
       const dest = destinationFor(entry);
       let content: string;
       switch (entry.category) {
-        case "command":
         case "backlog-cmd":
           content = toOpenCodeCommandMarkdown(entry);
           break;

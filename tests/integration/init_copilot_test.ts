@@ -49,7 +49,12 @@ Deno.test("specflow init --ai copilot scaffolds a Copilot layout", async () => {
 
     const root = join(parent, "demo");
 
-    // Path-specific instruction files for commands, backlog, skill, agents
+    // v1.0.0: router instruction + 11 phase instructions + auto-chain +
+    // specflow-review + backlog + 9 agent instructions.
+    assertEquals(
+      await exists(join(root, ".github/instructions/specflow.instructions.md")),
+      true,
+    );
     assertEquals(
       await exists(join(root, ".github/instructions/specflow-specify.instructions.md")),
       true,
@@ -71,17 +76,17 @@ Deno.test("specflow init --ai copilot scaffolds a Copilot layout", async () => {
 
     // Frontmatter rewritten — applyTo: "**" present, Claude fields stripped
     const cmdContent = await Deno.readTextFile(
-      join(root, ".github/instructions/specflow-specify.instructions.md"),
+      join(root, ".github/instructions/specflow.instructions.md"),
     );
     assertEquals(cmdContent.includes('applyTo: "**"'), true);
     assertEquals(cmdContent.includes("model: opus"), false);
     assertEquals(cmdContent.includes("tools:"), false);
 
-    // Per-directory file count
+    // Router + 11 phases + auto-chain + specflow-review + backlog + 9 agents = 23.
     const instructionsCount = (await Array.fromAsync(
       Deno.readDir(join(root, ".github/instructions")),
     )).length;
-    assertEquals(instructionsCount, 22);
+    assertEquals(instructionsCount, 23);
 
     // Shared (cross-harness)
     assertEquals(await exists(join(root, ".specflow/memory/constitution.md")), true);

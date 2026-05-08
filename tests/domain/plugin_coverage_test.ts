@@ -32,7 +32,14 @@ Deno.test("isPluginCoveredPath: claude + architect.md is NOT covered (contributo
   );
 });
 
-Deno.test("isPluginCoveredPath: claude + .claude/skills/specflow-<name>/SKILL.md is covered", () => {
+Deno.test("isPluginCoveredPath: claude + .claude/skills/specflow/SKILL.md (router) is covered", () => {
+  assertEquals(
+    isPluginCoveredPath("claude", ".claude/skills/specflow/SKILL.md"),
+    true,
+  );
+});
+
+Deno.test("isPluginCoveredPath: claude + .claude/skills/specflow/phases/<phase>.md is covered", () => {
   for (
     const name of [
       "specify",
@@ -45,15 +52,16 @@ Deno.test("isPluginCoveredPath: claude + .claude/skills/specflow-<name>/SKILL.md
       "constitution",
       "checklist",
       "clarify",
+      "groom",
     ]
   ) {
     assertEquals(
       isPluginCoveredPath(
         "claude",
-        `.claude/skills/specflow-${name}/SKILL.md`,
+        `.claude/skills/specflow/phases/${name}.md`,
       ),
       true,
-      `command ${name} should be plugin-covered`,
+      `phase ${name} should be plugin-covered`,
     );
   }
 });
@@ -65,9 +73,9 @@ Deno.test("isPluginCoveredPath: claude + auto-chain skill is covered", () => {
   );
 });
 
-Deno.test("isPluginCoveredPath: claude + specflow-groom skill is covered", () => {
+Deno.test("isPluginCoveredPath: claude + specflow-review alias is covered", () => {
   assertEquals(
-    isPluginCoveredPath("claude", ".claude/skills/specflow-groom/SKILL.md"),
+    isPluginCoveredPath("claude", ".claude/skills/specflow-review/SKILL.md"),
     true,
   );
 });
@@ -142,7 +150,7 @@ Deno.test("isPluginCoveredPath: non-claude harnesses are never covered (plugin i
       `${harness} should never have plugin-covered files`,
     );
     assertEquals(
-      isPluginCoveredPath(harness, ".claude/skills/specflow-specify/SKILL.md"),
+      isPluginCoveredPath(harness, ".claude/skills/specflow/SKILL.md"),
       false,
     );
   }

@@ -37,7 +37,6 @@ export class GeminiHarness implements Harness {
       // agent-memory is Claude-only (folder convention); other harnesses skip.
       if (entry.category === "agent-memory") continue;
       switch (entry.category) {
-        case "command":
         case "backlog-cmd": {
           const name = skillFolderName(entry);
           out[`.gemini/commands/${name}.toml`] = {
@@ -51,6 +50,14 @@ export class GeminiHarness implements Harness {
           const name = skillFolderName(entry);
           out[`.gemini/skills/${name}/SKILL.md`] = {
             content: ensureSkillFrontmatter(entry.content, name),
+            executable: entry.executable,
+          };
+          break;
+        }
+        case "phase": {
+          if (!entry.suffix) throw new Error(`phase needs suffix: ${entry.name}`);
+          out[`.gemini/skills/specflow/phases/${entry.suffix}`] = {
+            content: entry.content,
             executable: entry.executable,
           };
           break;

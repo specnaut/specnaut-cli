@@ -42,13 +42,20 @@ export class CodexHarness implements Harness {
             executable: false,
           };
           break;
-        case "command":
         case "backlog-cmd":
         case "skill":
         case "backlog-skill": {
           const name = skillFolderName(entry);
           out[`.agents/skills/${name}/SKILL.md`] = {
             content: ensureSkillFrontmatter(entry.content, name),
+            executable: entry.executable,
+          };
+          break;
+        }
+        case "phase": {
+          if (!entry.suffix) throw new Error(`phase needs suffix: ${entry.name}`);
+          out[`.agents/skills/specflow/phases/${entry.suffix}`] = {
+            content: entry.content,
             executable: entry.executable,
           };
           break;

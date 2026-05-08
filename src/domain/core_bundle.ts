@@ -1,10 +1,10 @@
 import type { BacklogBackend } from "./installed_lock.ts";
 
 export type CoreCategory =
-  | "command"
   | "agent"
   | "agent-memory"
   | "skill"
+  | "phase"
   | "spec-root"
   | "project-root"
   | "backlog-cmd"

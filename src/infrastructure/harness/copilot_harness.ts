@@ -13,12 +13,15 @@ function toCopilotInstructionMarkdown(entry: CoreEntry): string {
 
 function destinationFor(entry: CoreEntry): string {
   switch (entry.category) {
-    case "command":
     case "backlog-cmd":
     case "agent":
     case "skill":
     case "backlog-skill":
       return `.github/instructions/${skillFolderName(entry)}.instructions.md`;
+    case "phase":
+      // Copilot is flat — phase docs become sibling instruction files.
+      if (!entry.suffix) throw new Error(`phase needs suffix: ${entry.name}`);
+      return `.github/instructions/specflow-${entry.suffix.replace(/\.md$/, "")}.instructions.md`;
     case "backlog-script":
       return backlogScriptDestination(entry);
     case "agent-memory":
@@ -45,11 +48,11 @@ export class CopilotHarness implements Harness {
       // agent-memory is Claude-only (folder convention); other harnesses skip.
       if (entry.category === "agent-memory") continue;
       const dest = destinationFor(entry);
-      const isInstruction = entry.category === "command" ||
-        entry.category === "backlog-cmd" ||
+      const isInstruction = entry.category === "backlog-cmd" ||
         entry.category === "agent" ||
         entry.category === "skill" ||
-        entry.category === "backlog-skill";
+        entry.category === "backlog-skill" ||
+        entry.category === "phase";
       out[dest] = {
         content: isInstruction ? toCopilotInstructionMarkdown(entry) : entry.content,
         executable: entry.executable,

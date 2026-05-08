@@ -48,19 +48,23 @@ Deno.test("specflow init --ai cursor scaffolds a Cursor layout", async () => {
     assertEquals(code, 0, `init failed: ${stderr}`);
 
     const root = join(parent, "demo");
-    // Cursor-specific
-    assertEquals(await exists(join(root, ".cursor/skills/specflow-specify/SKILL.md")), true);
+    // Cursor-specific (v1.0.0 consolidated layout)
+    assertEquals(await exists(join(root, ".cursor/skills/specflow/SKILL.md")), true);
+    assertEquals(
+      await exists(join(root, ".cursor/skills/specflow/phases/specify.md")),
+      true,
+    );
     assertEquals(
       await exists(join(root, ".cursor/skills/specflow-agent-product-owner/SKILL.md")),
       true,
     );
     assertEquals(await exists(join(root, ".cursor/skills/specflow-auto-chain/SKILL.md")), true);
     assertEquals(await exists(join(root, ".cursor/rules/specify-rules.mdc")), true);
-
-    const skillsCount = (await Array.fromAsync(
-      Deno.readDir(join(root, ".cursor/skills")),
-    )).length;
-    assertEquals(skillsCount, 22);
+    // Old per-phase folders are gone post-consolidation.
+    assertEquals(
+      await exists(join(root, ".cursor/skills/specflow-specify/SKILL.md")),
+      false,
+    );
 
     // Shared
     assertEquals(await exists(join(root, ".specflow/memory/constitution.md")), true);

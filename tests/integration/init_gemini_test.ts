@@ -50,17 +50,22 @@ Deno.test("specflow init --ai gemini scaffolds a Gemini layout", async () => {
 
     const root = join(parent, "demo");
 
-    // TOML commands
+    // v1.0.0 consolidated layout: router skill + 11 phase docs.
     assertEquals(
-      await exists(join(root, ".gemini/commands/specflow-specify.toml")),
+      await exists(join(root, ".gemini/skills/specflow/SKILL.md")),
       true,
     );
+    assertEquals(
+      await exists(join(root, ".gemini/skills/specflow/phases/specify.md")),
+      true,
+    );
+    // Backlog command stays as TOML.
     assertEquals(
       await exists(join(root, ".gemini/commands/specflow-backlog.toml")),
       true,
     );
     const cmdContent = await Deno.readTextFile(
-      join(root, ".gemini/commands/specflow-specify.toml"),
+      join(root, ".gemini/commands/specflow-backlog.toml"),
     );
     const parsedCmd = parseToml(cmdContent);
     assertEquals(typeof parsedCmd.prompt, "string");
@@ -69,6 +74,11 @@ Deno.test("specflow init --ai gemini scaffolds a Gemini layout", async () => {
     assertEquals(
       await exists(join(root, ".gemini/skills/specflow-auto-chain/SKILL.md")),
       true,
+    );
+    // Old per-phase commands are gone post-consolidation.
+    assertEquals(
+      await exists(join(root, ".gemini/commands/specflow-specify.toml")),
+      false,
     );
 
     // Markdown subagent — frontmatter has only name + description
@@ -81,10 +91,11 @@ Deno.test("specflow init --ai gemini scaffolds a Gemini layout", async () => {
     assertEquals(agentContent.includes("model:"), false);
     assertEquals(agentContent.includes("tools:"), false);
 
+    // Only the /backlog command remains under .gemini/commands/ post-consolidation.
     const commandsCount = (await Array.fromAsync(
       Deno.readDir(join(root, ".gemini/commands")),
     )).length;
-    assertEquals(commandsCount, 11);
+    assertEquals(commandsCount, 1);
     const agentsCount = (await Array.fromAsync(
       Deno.readDir(join(root, ".gemini/agents")),
     )).length;

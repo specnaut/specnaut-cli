@@ -7,12 +7,14 @@ import { applyBackend, backlogScriptDestination } from "./backlog_filter.ts";
 
 function destinationFor(entry: CoreEntry): string {
   switch (entry.category) {
-    case "command":
     case "backlog-cmd":
     case "agent":
     case "skill":
     case "backlog-skill":
       return `.cursor/skills/${skillFolderName(entry)}/SKILL.md`;
+    case "phase":
+      if (!entry.suffix) throw new Error(`phase needs suffix: ${entry.name}`);
+      return `.cursor/skills/specflow/phases/${entry.suffix}`;
     case "backlog-script":
       return backlogScriptDestination(entry);
     case "agent-memory":
@@ -40,8 +42,7 @@ export class CursorHarness implements Harness {
       if (entry.category === "agent-memory") continue;
       const dest = destinationFor(entry);
       let content = entry.content;
-      const isSkillFile = entry.category === "command" ||
-        entry.category === "backlog-cmd" ||
+      const isSkillFile = entry.category === "backlog-cmd" ||
         entry.category === "agent" ||
         entry.category === "skill" ||
         entry.category === "backlog-skill";

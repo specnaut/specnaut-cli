@@ -12,33 +12,38 @@ import { fromFileUrl } from "@std/path";
  * against rewraps.
  */
 const SYNC_PAIRS: ReadonlyArray<{ plugin: string; source: string }> = [
-  // The auto-chain skill is plugin-only at the destination, but the
-  // body is sourced from the bundled core skill so the binary's
-  // backwards-compatible scaffold can stay byte-equivalent during
-  // the migration period.
+  // Consolidated router skill (v1.0.0).
+  {
+    plugin: "plugin/skills/specflow/SKILL.md",
+    source: "templates/core/skills/specflow/SKILL.md",
+  },
+  // 11 phase reference docs, loaded by the router on demand.
+  ...[
+    "specify",
+    "clarify",
+    "plan",
+    "tasks",
+    "analyze",
+    "implement",
+    "review",
+    "merge",
+    "constitution",
+    "checklist",
+    "groom",
+  ].map((name) => ({
+    plugin: `plugin/skills/specflow/phases/${name}.md`,
+    source: `templates/core/skills/specflow/phases/${name}.md`,
+  })),
+  // Auto-chain stays as a separate skill (own slash-command identity).
   {
     plugin: "plugin/skills/auto-chain/SKILL.md",
     source: "templates/core/skills/auto-chain/SKILL.md",
   },
-  // Dual-copy commands: 10 specflow.* sources, each landing as
-  // `plugin/skills/<name>/SKILL.md` (the `specflow.` prefix is
-  // dropped because the plugin namespace `specflow-plugin:` already
-  // disambiguates).
-  ...[
-    "analyze",
-    "checklist",
-    "clarify",
-    "constitution",
-    "implement",
-    "merge",
-    "plan",
-    "review",
-    "specify",
-    "tasks",
-  ].map((name) => ({
-    plugin: `plugin/skills/${name}/SKILL.md`,
-    source: `templates/core/commands/specflow-${name}.md`,
-  })),
+  // Thin alias preserving auto-invocation for the review phase.
+  {
+    plugin: "plugin/skills/specflow-review/SKILL.md",
+    source: "templates/core/skills/specflow-review/SKILL.md",
+  },
   // Dual-copy agents: 9 sub-agent definitions, each landing as
   // `plugin/agents/<name>.md`. Claude Code resolves agents by file
   // basename in plugin scope; no namespacing needed for invocation
@@ -57,15 +62,6 @@ const SYNC_PAIRS: ReadonlyArray<{ plugin: string; source: string }> = [
     plugin: `plugin/agents/${name}.md`,
     source: `templates/core/agents/${name}.md`,
   })),
-  // The groom skill: source folder is `templates/core/skills/specflow-groom/`
-  // (binary scaffolds it as a project skill with the namespaced short
-  // form), but the plugin folder drops the `specflow.` prefix because
-  // the plugin namespace `specflow-plugin:` already disambiguates —
-  // the plugin command becomes `/specflow-plugin:groom`.
-  {
-    plugin: "plugin/skills/groom/SKILL.md",
-    source: "templates/core/skills/specflow-groom/SKILL.md",
-  },
 ];
 
 function abs(rel: string): string {

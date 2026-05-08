@@ -49,18 +49,24 @@ Deno.test("specflow init --ai opencode scaffolds a complete OpenCode project lay
 
     const root = join(parent, "demo");
 
-    // Commands in .opencode/commands/
+    // v1.0.0 consolidated layout: router + phase docs.
     assertEquals(
-      await exists(join(root, ".opencode/commands/specflow-specify.md")),
+      await exists(join(root, ".opencode/skills/specflow/SKILL.md")),
       true,
     );
     assertEquals(
-      await exists(join(root, ".opencode/commands/specflow-plan.md")),
+      await exists(join(root, ".opencode/skills/specflow/phases/specify.md")),
       true,
     );
+    // /backlog command stays as a flat command file.
     assertEquals(
       await exists(join(root, ".opencode/commands/backlog.md")),
       true,
+    );
+    // Old per-phase command files are gone post-consolidation.
+    assertEquals(
+      await exists(join(root, ".opencode/commands/specflow-specify.md")),
+      false,
     );
 
     // Agents in .opencode/agents/ with mode: subagent + permission block
@@ -72,7 +78,7 @@ Deno.test("specflow init --ai opencode scaffolds a complete OpenCode project lay
     assertStringIncludes(developer, "read: allow");
     assertStringIncludes(developer, "bash:");
 
-    // Skills in .opencode/skills/specflow-<name>/SKILL.md
+    // Auto-chain still ships as its own skill folder.
     const autoChainSkill = await Deno.readTextFile(
       join(root, ".opencode/skills/specflow-auto-chain/SKILL.md"),
     );

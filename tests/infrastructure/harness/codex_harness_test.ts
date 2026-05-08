@@ -5,10 +5,17 @@ import type { CoreBundle } from "../../../src/domain/core_bundle.ts";
 
 const SAMPLE: CoreBundle = [
   {
-    category: "command",
-    name: "specify",
+    category: "skill",
+    name: "specflow",
     suffix: null,
-    content: "---\nname: specify\ndescription: Scaffold feature spec\n---\n\n# body\n",
+    content: "---\nname: specflow\ndescription: Specflow router\n---\n\n# body\n",
+    executable: false,
+  },
+  {
+    category: "phase",
+    name: "specify",
+    suffix: "specify.md",
+    content: "# Specify phase\n",
     executable: false,
   },
   {
@@ -55,10 +62,16 @@ Deno.test("CodexHarness.key and displayName", () => {
   assertEquals(h.displayName, "Codex CLI");
 });
 
-Deno.test("CodexHarness maps commands to .agents/skills/specflow-<name>/SKILL.md", () => {
+Deno.test("CodexHarness maps router skill to .agents/skills/specflow/SKILL.md", () => {
   const h = new CodexHarness();
   const mapped = h.mapBundle(SAMPLE, { backlogBackend: "local" });
-  assert(".agents/skills/specflow-specify/SKILL.md" in mapped);
+  assert(".agents/skills/specflow/SKILL.md" in mapped);
+});
+
+Deno.test("CodexHarness maps phase docs under .agents/skills/specflow/phases/", () => {
+  const h = new CodexHarness();
+  const mapped = h.mapBundle(SAMPLE, { backlogBackend: "local" });
+  assert(".agents/skills/specflow/phases/specify.md" in mapped);
 });
 
 Deno.test("CodexHarness maps backlog-cmd to .agents/skills/specflow-backlog/SKILL.md", () => {
@@ -109,15 +122,15 @@ Deno.test("CodexHarness emits no Claude/Cursor artefacts", () => {
 
 Deno.test("CodexHarness injects name+description into SKILL.md when absent", () => {
   const core: CoreBundle = [{
-    category: "command",
-    name: "specify",
+    category: "skill",
+    name: "auto-chain",
     suffix: null,
     content: "# no frontmatter\n",
     executable: false,
   }];
   const h = new CodexHarness();
   const mapped = h.mapBundle(core, { backlogBackend: "local" });
-  const skill = mapped[".agents/skills/specflow-specify/SKILL.md"];
+  const skill = mapped[".agents/skills/specflow-auto-chain/SKILL.md"];
   assert(skill?.content.startsWith("---\n"));
-  assert(skill?.content.includes("name: specflow-specify"));
+  assert(skill?.content.includes("name: specflow-auto-chain"));
 });

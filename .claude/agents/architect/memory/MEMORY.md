@@ -14,3 +14,4 @@ obsolete once they are encoded in `AGENTS.md`).
 - [Antigravity Harness Research](antigravity-harness-research.md) — Canonical `.agent/` layout resolved from primary sources; resolves the .agent vs .agents ambiguity in issue #2
 - [Claude plugin boundary](claude-plugin-boundary.md) — which templates go to the plugin vs stay binary-owned; the project-state rule
 - [Claude plugin backwards compat](claude-plugin-compat.md) — state table + detection method for v0.x inline agents when plugin is installed
+- [Router skill consolidation](router-skill-consolidation.md) — decisions for collapsing 11 specflow-* phase skills into a single /specflow router + phases/ subdirectory

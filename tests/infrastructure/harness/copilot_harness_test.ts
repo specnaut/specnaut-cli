@@ -4,11 +4,18 @@ import type { CoreBundle } from "../../../src/domain/core_bundle.ts";
 
 const SAMPLE: CoreBundle = [
   {
-    category: "command",
-    name: "specify",
+    category: "skill",
+    name: "specflow",
     suffix: null,
     content:
-      "---\nname: specify\ndescription: Scaffold feature spec\nmodel: opus\ntools: Read, Write\nmaxTurns: 30\n---\n\n# Body\n\nDo the thing.\n",
+      "---\nname: specflow\ndescription: Specflow router\nmodel: opus\ntools: Read, Write\nmaxTurns: 30\n---\n\n# Body\n\nDo the thing.\n",
+    executable: false,
+  },
+  {
+    category: "phase",
+    name: "specify",
+    suffix: "specify.md",
+    content: "# Specify phase\n\nDo the specify thing.\n",
     executable: false,
   },
   {
@@ -55,7 +62,13 @@ Deno.test("CopilotHarness.key and displayName", () => {
   assertEquals(h.displayName, "GitHub Copilot CLI");
 });
 
-Deno.test("CopilotHarness maps commands to .github/instructions/specflow-<name>.instructions.md", () => {
+Deno.test("CopilotHarness maps router skill to .github/instructions/specflow.instructions.md", () => {
+  const h = new CopilotHarness();
+  const mapped = h.mapBundle(SAMPLE, { backlogBackend: "local" });
+  assert(".github/instructions/specflow.instructions.md" in mapped);
+});
+
+Deno.test("CopilotHarness maps phase docs to .github/instructions/specflow-<phase>.instructions.md", () => {
   const h = new CopilotHarness();
   const mapped = h.mapBundle(SAMPLE, { backlogBackend: "local" });
   assert(".github/instructions/specflow-specify.instructions.md" in mapped);
@@ -82,7 +95,7 @@ Deno.test("CopilotHarness maps agents to .github/instructions/specflow-agent-<na
 Deno.test('CopilotHarness rewrites instruction frontmatter to applyTo: "**" and strips Claude fields', () => {
   const h = new CopilotHarness();
   const mapped = h.mapBundle(SAMPLE, { backlogBackend: "local" });
-  const cmd = mapped[".github/instructions/specflow-specify.instructions.md"];
+  const cmd = mapped[".github/instructions/specflow.instructions.md"];
   assert(cmd, "instruction file not emitted");
   assert(cmd.content.startsWith("---\n"));
   assert(cmd.content.includes('applyTo: "**"'));

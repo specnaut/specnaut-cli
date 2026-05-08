@@ -4,10 +4,17 @@ import type { CoreBundle } from "../../../src/domain/core_bundle.ts";
 
 const SAMPLE: CoreBundle = [
   {
-    category: "command",
-    name: "specify",
+    category: "skill",
+    name: "specflow",
     suffix: null,
-    content: "---\ndescription: Scaffold feature spec\n---\n\n# body\n",
+    content: "---\nname: specflow\ndescription: Specflow router\n---\n\n# body\n",
+    executable: false,
+  },
+  {
+    category: "phase",
+    name: "specify",
+    suffix: "specify.md",
+    content: "# Specify phase\n",
     executable: false,
   },
   {
@@ -53,10 +60,16 @@ Deno.test("CursorHarness.key and displayName", () => {
   assertEquals(h.displayName, "Cursor");
 });
 
-Deno.test("CursorHarness maps commands to .cursor/skills/specflow-<name>/SKILL.md", () => {
+Deno.test("CursorHarness maps router skill to .cursor/skills/specflow/SKILL.md", () => {
   const h = new CursorHarness();
   const mapped = h.mapBundle(SAMPLE, { backlogBackend: "local" });
-  assert(".cursor/skills/specflow-specify/SKILL.md" in mapped);
+  assert(".cursor/skills/specflow/SKILL.md" in mapped);
+});
+
+Deno.test("CursorHarness maps phase docs under .cursor/skills/specflow/phases/", () => {
+  const h = new CursorHarness();
+  const mapped = h.mapBundle(SAMPLE, { backlogBackend: "local" });
+  assert(".cursor/skills/specflow/phases/specify.md" in mapped);
 });
 
 Deno.test("CursorHarness maps the backlog command to .cursor/skills/specflow-backlog/SKILL.md", () => {
