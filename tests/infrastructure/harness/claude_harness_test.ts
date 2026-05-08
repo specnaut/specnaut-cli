@@ -12,10 +12,12 @@ Deno.test("ClaudeHarness.mapBundle emits the Claude tree", () => {
   const h = new ClaudeHarness();
   const mapped = h.mapBundle(CORE_BUNDLE, { backlogBackend: "local" });
   const keys = Object.keys(mapped).sort();
-  // 39 base core + 1 backlog skill + 5 local backlog scripts + 5 agent
-  // memory stubs (Claude only) + .claude/CLAUDE.md +
-  // .claude/scripts/dispatch-agent.sh
-  assertEquals(keys.length, 52);
+  // 40 base core (39 + specflow.groom skill) + 1 backlog skill +
+  // 5 local backlog scripts + 5 agent memory stubs (Claude only) +
+  // .claude/CLAUDE.md + .claude/scripts/dispatch-agent.sh + .claude/loop.md
+  assertEquals(keys.length, 54);
+  assert(".claude/skills/specflow.groom/SKILL.md" in mapped);
+  assert(".claude/loop.md" in mapped);
   // Spot-check canonical paths
   assert(".claude/commands/specflow.specify.md" in mapped);
   assert(".claude/commands/backlog.md" in mapped);

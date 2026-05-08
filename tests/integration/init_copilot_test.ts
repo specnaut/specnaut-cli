@@ -81,7 +81,7 @@ Deno.test("specflow init --ai copilot scaffolds a Copilot layout", async () => {
     const instructionsCount = (await Array.fromAsync(
       Deno.readDir(join(root, ".github/instructions")),
     )).length;
-    assertEquals(instructionsCount, 21);
+    assertEquals(instructionsCount, 22);
 
     // Shared (cross-harness)
     assertEquals(await exists(join(root, ".specflow/memory/constitution.md")), true);

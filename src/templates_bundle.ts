@@ -2841,6 +2841,102 @@ them resume manually from the last completed phase.
     backend: null,
   },
   {
+    category: "skill",
+    name: "specflow.groom",
+    suffix: null,
+    content: `---
+description: Run a periodic hygiene pass on this Specflow project — groom Backlog items, surface stale PRs, list orphan specs. Designed to be called from \`/loop\` or as a manual one-off.
+disable-model-invocation: true
+---
+
+# /specflow.groom
+
+A maintenance pass that keeps the project's backlog and review pipeline
+flowing without human intervention. Designed to be invoked manually or
+on a timer via \`/loop\`.
+
+This skill is **manual-only** (\`disable-model-invocation: true\`) — it
+should not auto-trigger on casual user prompts. The user invokes it
+explicitly with \`/specflow.groom\` or schedules it with
+\`/loop 1h /specflow.groom\`.
+
+## What this skill does
+
+A grooming pass runs three independent checks. Each is delegated to the
+right subagent so this skill stays small and the heavy lifting is owned
+by the agent that has the right tools and prompt for the job.
+
+### 1. Backlog grooming
+
+Dispatch the **\`product-owner\`** subagent to clarify any items currently
+in the \`Backlog\` column (i.e. not yet promoted to \`Ready\`).
+
+The PO will:
+
+- Read each item's body and existing comments.
+- **Skip** items it has already commented on in a previous run (look for
+  the marker \`🤖 specflow-groom\` at the start of any comment).
+- For each remaining item:
+  - If the body is already clarified (Why / AC / Out of scope all present
+    and concrete), promote to \`Ready\`.
+  - If 1–3 scope decisions remain, leave a clarification comment marked
+    with the \`🤖 specflow-groom\` prefix so subsequent runs skip it.
+  - If the item is genuinely stale or duplicates a closed ticket, the PO
+    can recommend closure with \`not_planned\` (but does not close
+    autonomously — the recommendation lands as a comment).
+
+The PO must respect the standard backlog skill — do not bypass its
+scripts.
+
+### 2. Stale PR surface
+
+For each open PR on this repository, check whether it has been waiting
+on review or CI for more than 48 hours. List them in the report so the
+user can decide whether to ping, close, or merge.
+
+This step is read-only; do not mutate PRs.
+
+### 3. Orphan spec detection
+
+Walk \`.specflow/specs/\` (if present) and surface any feature directory
+that is missing the next expected artefact:
+
+- Has \`spec.md\` but no \`plan.md\` → flag as "needs \`/specflow.plan\`".
+- Has \`plan.md\` but no \`tasks.md\` → flag as "needs \`/specflow.tasks\`".
+- Has \`tasks.md\` but no \`installed\` markers in commits → flag as
+  "needs \`/specflow.implement\`".
+
+This is also read-only; never delete or modify spec files.
+
+## Output format
+
+End with a single summary block:
+
+\`\`\`
+specflow.groom report
+─────────────────────
+Backlog:    <N> items reviewed, <P> promoted to Ready, <C> awaiting clarification
+Stale PRs:  <S> open PRs idle > 48h
+Orphan specs: <O> spec directories missing the next artefact
+
+Next action: <one-line recommendation, or "no action needed">
+\`\`\`
+
+If nothing needed action, say so explicitly. The point of the skill is
+to be a **no-op when the project is healthy**.
+
+## When NOT to use this skill
+
+- For a single-item backlog clarification → invoke the \`product-owner\`
+  subagent directly with the item number.
+- For PR review on a specific PR → invoke \`code-reviewer\` /
+  \`security-auditor\` directly.
+- For implementing a spec → invoke \`/specflow.implement\` directly.
+`,
+    executable: false,
+    backend: null,
+  },
+  {
     category: "backlog-skill",
     name: "backlog",
     suffix: null,
@@ -6718,9 +6814,10 @@ These are Claude Code features Specflow does NOT configure by default, but
 that pair well with the scaffolded workflow. Set them up if they fit your
 team's needs.
 
-- **Periodic maintenance** — \`/loop 1h\` runs a recurring prompt every hour
-  (e.g. groom backlog, surface stale PRs, check for orphan specs). Customize
-  the loop prompt by creating \`.claude/loop.md\` in this project. See
+- **Periodic maintenance** — \`/loop 1h\` runs the prompt in
+  \`.claude/loop.md\` every hour. The bundled default delegates to the
+  \`/specflow.groom\` skill (groom backlog, surface stale PRs, list orphan
+  specs); edit \`loop.md\` freely to add project-specific checks. See
   https://code.claude.com/docs/fr/scheduled-tasks.
 
 - **Async notifications** — install one of the channel plugins (Telegram,
@@ -6825,6 +6922,44 @@ fi
 exec claude "\${ARGS[@]}"
 `,
       executable: true,
+    },
+    ".claude/loop.md": {
+      content: `# Project loop prompt
+
+This file customizes what \`/loop\` does when invoked without an explicit
+prompt. Specflow ships a sensible default below — edit freely to match
+this project's hygiene needs.
+
+## Default prompt
+
+Run a hygiene pass on this Specflow project:
+
+1. Invoke the \`/specflow.groom\` skill — it grooms the backlog, surfaces
+   stale PRs, and flags orphan specs.
+2. If anything actionable came out of the pass, summarize it concisely
+   so the human reading the loop output can decide what to do.
+3. If everything is healthy, say so in one sentence and stop. Do not
+   manufacture work.
+
+## Recommended schedules
+
+- **Active development**: \`/loop 1h\` — frequent grooming during a sprint.
+- **Quiet projects**: \`/loop 12h\` or \`/loop 24h\` — daily cadence.
+- **One-off check**: just \`/specflow.groom\` (no loop) — runs once and exits.
+
+## Customizing further
+
+Add project-specific checks below the default by appending bullets to the
+prompt above. Examples:
+
+- "Check that the staging deploy from the last \`main\` commit succeeded."
+- "Verify the daily backup ran in the last 24 hours."
+- "Ping if any feature flag is still enabled after its sunset date."
+
+Each loop iteration runs the entire prompt, so keep it focused — long
+prompts cost more tokens and drift out of relevance.
+`,
+      executable: false,
     },
   },
   "cursor": {
