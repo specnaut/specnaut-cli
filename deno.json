@@ -40,6 +40,7 @@
     "templates/",
     ".claude/",
     "packaging/",
-    "plugin/skills/"
+    "plugin/skills/",
+    "plugin/agents/"
   ]
 }

@@ -7,8 +7,9 @@ import { fromFileUrl } from "@std/path";
  * Each row maps a plugin asset to its bundled source. The plugin must be
  * a verbatim copy: any divergence breaks the user-visible UX guarantee
  * that `specflow init`-scaffolded commands and the plugin-installed
- * versions behave identically. `plugin/skills/` is excluded from
- * `deno fmt` (see deno.json) so this contract holds against rewraps.
+ * versions behave identically. `plugin/skills/` and `plugin/agents/` are
+ * excluded from `deno fmt` (see deno.json) so this contract holds
+ * against rewraps.
  */
 const SYNC_PAIRS: ReadonlyArray<{ plugin: string; source: string }> = [
   // The auto-chain skill is plugin-only at the destination, but the
@@ -37,6 +38,24 @@ const SYNC_PAIRS: ReadonlyArray<{ plugin: string; source: string }> = [
   ].map((name) => ({
     plugin: `plugin/skills/${name}/SKILL.md`,
     source: `templates/core/commands/specflow.${name}.md`,
+  })),
+  // Dual-copy agents: 9 sub-agent definitions, each landing as
+  // `plugin/agents/<name>.md`. Claude Code resolves agents by file
+  // basename in plugin scope; no namespacing needed for invocation
+  // (agents are not user-invokable like slash commands).
+  ...[
+    "code-reviewer",
+    "developer",
+    "devops-sre",
+    "product-owner",
+    "qa-tester",
+    "review-coordinator",
+    "security-auditor",
+    "test-reviewer",
+    "workflow-manager",
+  ].map((name) => ({
+    plugin: `plugin/agents/${name}.md`,
+    source: `templates/core/agents/${name}.md`,
   })),
 ];
 
