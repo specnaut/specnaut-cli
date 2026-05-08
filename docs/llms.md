@@ -91,10 +91,11 @@ emitted. It contains no secrets — only file paths, content hashes, and version
 
 **Commit it.** `specflow upgrade` reads this lock to know which harness to map templates to, to
 detect files you have customized (so it doesn't clobber them), and to drop orphaned files that are
-no longer part of the bundle. `specflow check --project` also surfaces the harness and templates
-version from this file. Without the lock, both commands degrade gracefully but cannot do their real
-job — `specflow upgrade` will refuse and ask you to re-run `specflow init --here --force` to rebuild
-the lock from scratch.
+no longer part of the bundle. `specflow check --project` also surfaces the harness, templates
+version, and backlog backend from this file (and warns when `backlog-config.yml` has empty required
+fields for the github / gitlab backends). Without the lock, both commands degrade gracefully but
+cannot do their real job — `specflow upgrade` will refuse and ask you to re-run
+`specflow init --here --force` to rebuild the lock from scratch.
 
 ### Pick a different harness
 
