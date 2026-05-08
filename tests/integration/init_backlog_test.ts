@@ -91,6 +91,11 @@ Deno.test("init --backlog github renders the github skill + writes config stub",
     );
     assertStringIncludes(skill, "Backend: GitHub Issues + Project");
     assertEquals(skill.includes("Backend: local Markdown"), false);
+    // The github skill now documents both MCP and shell paths
+    assertStringIncludes(skill, "GitHub MCP — preferred when available");
+    assertStringIncludes(skill, "mcp__github__issue_write");
+    assertStringIncludes(skill, "Shell scripts — always available");
+    assertStringIncludes(skill, "@modelcontextprotocol/server-github");
 
     // GitHub-flavored scripts present, local ones filtered out
     assertEquals(
