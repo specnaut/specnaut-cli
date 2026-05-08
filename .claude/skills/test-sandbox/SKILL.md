@@ -37,15 +37,24 @@ These wrap a fresh `init --ai claude --backlog local` and exercise specific feat
 .claude/skills/test-sandbox/scripts/smoke-features.sh <name>      # presence + frontmatter checks for every feature shipped after v0.9
 .claude/skills/test-sandbox/scripts/smoke-backlog-local.sh <name> # add → list → move → view → clarify-comment round-trip on the local backend
 .claude/skills/test-sandbox/scripts/smoke-hooks.sh <name>         # fire each bundled hook with synthetic stdin, verify behavior + soft-warn semantics
+.claude/skills/test-sandbox/scripts/smoke-picker.sh <name>        # drive the interactive arrow-key picker over a real PTY (requires python3)
 ```
 
-Run all three back-to-back for a comprehensive post-refactor smoke:
+Run all four back-to-back for a comprehensive post-refactor smoke:
 
 ```bash
 bash .claude/skills/test-sandbox/scripts/smoke-features.sh feat
 bash .claude/skills/test-sandbox/scripts/smoke-backlog-local.sh backlog
 bash .claude/skills/test-sandbox/scripts/smoke-hooks.sh hooks
+bash .claude/skills/test-sandbox/scripts/smoke-picker.sh picker
 ```
+
+`smoke-picker.sh` uses Python's `pty` module to allocate a real pseudo-TTY for the
+`specflow init` subprocess so `Deno.stdin.isTerminal()` returns true and the
+interactive code path actually runs (a normal piped subprocess would fall back
+to the non-TTY numeric prompt). It scripts arrow-down + enter keystrokes,
+captures the rendered frames, and asserts that the highlight moved correctly
+and the resulting init landed the right harness + backlog backend.
 
 ## Typical workflows
 
