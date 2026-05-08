@@ -22,11 +22,16 @@ harness (same as upstream).
 
 Specflow scaffolds for one AI harness per invocation:
 
-- **Claude Code** (default) — `specflow init <name>` or `--ai claude`
-- **Cursor** — `specflow init <name> --ai cursor`
-
-Additional harnesses (Codex CLI, GitHub Copilot, Gemini CLI, Windsurf, …) are planned for later
-releases. See `AGENTS.md` for the roadmap.
+| Flag                    | Harness            |
+| ----------------------- | ------------------ |
+| `--ai claude` (default) | Claude Code        |
+| `--ai cursor`           | Cursor             |
+| `--ai codex`            | Codex CLI          |
+| `--ai gemini`           | Gemini CLI         |
+| `--ai windsurf`         | Windsurf           |
+| `--ai copilot`          | GitHub Copilot CLI |
+| `--ai opencode`         | OpenCode           |
+| `--ai antigravity`      | Antigravity        |
 
 ## Installation
 
@@ -59,6 +64,26 @@ On macOS, you may need to clear the quarantine attribute after download:
 xattr -d com.apple.quarantine /path/to/specflow
 ```
 
+## Claude Code plugin
+
+If you use Claude Code, you can also install Specflow as a user-scope plugin — no binary required,
+available across all your projects:
+
+```
+/plugin install mkrlabs/specflow-plugin
+```
+
+The plugin ships 10 slash-command skills, 1 auto-chain skill, 1 groom skill, and 9 sub-agents.
+Slash-commands are namespaced (`/specflow-plugin:specify`, `/specflow-plugin:plan`, etc.) and
+coexist with project-local copies from `specflow init`.
+
+**When to use the plugin vs the binary:**
+
+- Plugin: cross-project, always up-to-date, no `specflow init` needed, namespaced commands.
+- Binary: project-local customization, short slash-commands (`/specify`), backlog + hooks support.
+
+Most teams use both. See [the docs](https://specflow.makerlabs.dev) for the full boundary table.
+
 ## Upgrading an existing project
 
 When you update the `specflow` binary (via `specflow self-update` or Homebrew), the bundled
@@ -72,6 +97,12 @@ specflow upgrade --force      # overwrite customized files (backed up to .specfl
 
 Specflow tracks the SHA256 of each template in `.specflow/installed.lock` so it can detect your
 local edits and avoid overwriting them. Commit this lock file alongside your project.
+
+When the `specflow-plugin` Claude Code plugin is installed and the project harness is `claude`,
+`specflow upgrade` auto-migrates vanilla agent and command files to the plugin (backs them up, then
+removes them from disk — the plugin serves them going forward). Customized files are preserved with
+a warning. If you later uninstall the plugin, `specflow check --project` will warn about any covered
+files that are now missing and tell you how to recover them.
 
 ## Development setup
 
