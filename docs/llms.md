@@ -50,6 +50,39 @@ Manual download: pick the binary for your OS/arch from
 `$PATH`. On macOS clear the quarantine attribute with
 `xattr -d com.apple.quarantine /path/to/specflow`.
 
+### Install the Claude Code plugin
+
+If you use Claude Code and want Specflow's slash-commands and sub-agents available across **all your
+projects** without running `specflow init`, install the Claude Code plugin:
+
+```
+/plugin install mkrlabs/specflow-plugin
+```
+
+The plugin ships the same 21 assets the binary scaffolds — 10 slash-command skills, 1 auto-chain
+skill, 1 groom skill, and 9 sub-agents — but at user scope, versioned, and auto-updated via
+`/plugin update`. Slash-commands are namespaced: `/specflow-plugin:specify`,
+`/specflow-plugin:plan`, etc.
+
+To test a local checkout of the plugin without publishing:
+
+```bash
+claude --plugin-dir /path/to/specflow/plugin
+```
+
+**Plugin vs `specflow init`** — they complement each other:
+
+| Aspect                             | Binary (`specflow init`)    | Plugin (`/plugin install`)              |
+| ---------------------------------- | --------------------------- | --------------------------------------- |
+| Scope                              | Project-local (`.claude/`)  | User-scope (all projects)               |
+| Slash-command style                | `/specify`, `/plan` (short) | `/specflow-plugin:specify` (namespaced) |
+| Customizable per-project           | Yes                         | No (user-scope, shared)                 |
+| Backlog skill, hooks, `.specflow/` | Yes                         | No (project-stateful — binary-only)     |
+| Kept in sync                       | `specflow upgrade`          | `/plugin update`                        |
+
+Most teams use both: the plugin provides discoverability and keeps the agents up-to-date across all
+projects; `specflow init` provides the short slash-commands and project-local customization.
+
 ## Quickstart
 
 ### Create a new project
@@ -139,7 +172,10 @@ when stdin is a TTY, and falls back to a numeric prompt — or the defaults — 
 ```bash
 specflow check                    # diagnose your environment
 specflow check --project          # also diagnose the current specflow project
+                                  #   (warns if the plugin was uninstalled after migration)
 specflow upgrade                  # update templates to the binary's version
+                                  #   (when specflow-plugin is installed + harness=claude:
+                                  #    vanilla agent/command files are auto-migrated to the plugin)
 specflow upgrade --dry-run        # preview the upgrade plan
 specflow upgrade --force          # apply destructive changes (backs up customizations)
 specflow self-update              # upgrade the binary itself
@@ -167,7 +203,7 @@ frontmatter conventions.
 
 ## What makes Specflow different from upstream Spec Kit
 
-Specflow is a fork of the official `specify` CLI with three additions:
+Specflow is a fork of the official `specify` CLI with four additions:
 
 ### 1. Auto-chained pipeline
 
@@ -199,6 +235,26 @@ A Product Owner agent gates every mutation, and supports three backends:
 
 The user picks one backend per project. The chosen backend is recorded in `.specflow/installed.lock`
 so the PO knows which one to use without auto-detection.
+
+### 4. Claude Code plugin distribution
+
+Specflow ships a first-class Claude Code plugin (`specflow-plugin`) available via the Claude Code
+marketplace:
+
+```
+/plugin install mkrlabs/specflow-plugin
+```
+
+The plugin gives any Claude Code user instant access to the full Specflow slash-command suite and
+sub-agents — no binary, no `specflow init` required. The 21 plugin assets (10 slash-command skills
+
+- auto-chain + groom + 9 sub-agents) are namespaced under `/specflow-plugin:*` so they coexist with
+  project-local copies without collision.
+
+When both the plugin and the binary are in use, `specflow upgrade` detects the plugin and
+auto-migrates vanilla on-disk agents and command files (backed up, then deleted — the plugin serves
+them going forward). `specflow check --project` warns when covered files are missing and the plugin
+is not installed, with a recovery hint.
 
 ## Design principles
 

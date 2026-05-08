@@ -6,18 +6,20 @@ into projects — just as a user-scope plugin instead.
 
 ## What's in here
 
-| Path                                                                                                                                        | Contents                                                          |
-| ------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------- |
-| `.claude-plugin/plugin.json`                                                                                                                | Plugin manifest (`specflow-plugin`, v0.0.1 alpha)                 |
-| `skills/auto-chain/SKILL.md`                                                                                                                | Auto-chain skill — `/specflow-plugin:auto-chain`                  |
-| `skills/{specify,plan,tasks,implement,analyze,review,merge,constitution,checklist,clarify}/SKILL.md`                                        | The 10 Specflow slash-commands — `/specflow-plugin:specify`, etc. |
-| `agents/{code-reviewer,developer,devops-sre,product-owner,qa-tester,review-coordinator,security-auditor,test-reviewer,workflow-manager}.md` | 9 sub-agents available to invoke in plugin scope                  |
-| `skills/groom/SKILL.md`                                                                                                                     | Groom skill — `/specflow-plugin:groom`                            |
+| Path                                                                                                                                        | Contents                                                              |
+| ------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------- |
+| `.claude-plugin/plugin.json`                                                                                                                | Plugin manifest (`specflow-plugin`, lockstep with the binary version) |
+| `skills/auto-chain/SKILL.md`                                                                                                                | Auto-chain skill — `/specflow-plugin:auto-chain`                      |
+| `skills/{specify,plan,tasks,implement,analyze,review,merge,constitution,checklist,clarify}/SKILL.md`                                        | The 10 Specflow slash-commands — `/specflow-plugin:specify`, etc.     |
+| `agents/{code-reviewer,developer,devops-sre,product-owner,qa-tester,review-coordinator,security-auditor,test-reviewer,workflow-manager}.md` | 9 sub-agents available to invoke in plugin scope                      |
+| `skills/groom/SKILL.md`                                                                                                                     | Groom skill — `/specflow-plugin:groom`                                |
 
-**Coming in subsequent slices** (tracked in
-[issue #73](https://github.com/mkrlabs/specflow/issues/73)):
-
-- `PluginDetector` port + the v0.x → plugin migration logic in `specflow upgrade`.
+The full plugin migration shipped in v0.12.x (issue
+[#73](https://github.com/mkrlabs/specflow/issues/73)). When the plugin is installed and the project
+harness is `claude`, `specflow upgrade` auto-migrates vanilla on-disk agents to the plugin (backs
+them up, then removes them — the plugin serves them going forward). `specflow check
+--project` warns
+about any plugin-covered files that are missing when the plugin is uninstalled.
 
 ### Known caveat: handoff IDs
 
@@ -41,13 +43,11 @@ discoverability layer, not the polished workflow. Handoff rewriting is a known f
 See [the design doc](../docs/superpowers/specs/2026-05-08-claude-plugin-design.md) for the full
 plugin / binary boundary and the v0.x → plugin migration logic.
 
-## Install (when ready)
+## Install
 
 ```bash
 /plugin install mkrlabs/specflow-plugin
 ```
-
-(The plugin is currently `0.0.1` — pre-release. Wait for v0.1.0 before relying on it in production.)
 
 ## Local development
 
@@ -61,5 +61,6 @@ Then invoke any plugin skill: `/specflow-plugin:auto-chain specify "…"`.
 
 ## Versioning
 
-The plugin is on `0.0.1` and will move to lockstep with the `specflow` binary once the migration
-logic (slices 4–6 in #73) lands. Until then, treat it as alpha — bumps may be breaking.
+The plugin's `version` field in `.claude-plugin/plugin.json` is kept in lockstep with the `specflow`
+binary by `scripts/bump-version.ts`, which is run as part of every `/release`. The release pipeline
+(`.github/workflows/release.yml`) hard-fails on any drift between the two.
