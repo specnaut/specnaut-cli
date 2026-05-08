@@ -84,6 +84,17 @@
           }
         ]
       }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": ".claude/hooks/check-docs-drift.sh",
+            "timeout": 5
+          }
+        ]
+      }
     ]
   }
 }
