@@ -14,9 +14,10 @@ These are Claude Code features Specflow does NOT configure by default, but
 that pair well with the scaffolded workflow. Set them up if they fit your
 team's needs.
 
-- **Periodic maintenance** — `/loop 1h` runs a recurring prompt every hour
-  (e.g. groom backlog, surface stale PRs, check for orphan specs). Customize
-  the loop prompt by creating `.claude/loop.md` in this project. See
+- **Periodic maintenance** — `/loop 1h` runs the prompt in
+  `.claude/loop.md` every hour. The bundled default delegates to the
+  `/specflow.groom` skill (groom backlog, surface stale PRs, list orphan
+  specs); edit `loop.md` freely to add project-specific checks. See
   https://code.claude.com/docs/fr/scheduled-tasks.
 
 - **Async notifications** — install one of the channel plugins (Telegram,
