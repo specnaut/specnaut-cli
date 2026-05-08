@@ -4,13 +4,15 @@ import type { FsWriter, GitAdapter, Harness, LockStore } from "../../src/applica
 import type { InstalledLock } from "../../src/domain/installed_lock.ts";
 import type { CoreBundle } from "../../src/domain/core_bundle.ts";
 
-function fakeLockStore(): LockStore & { lastWritten: InstalledLock | null } {
+function fakeLockStore(
+  opts: { existing?: InstalledLock | null } = {},
+): LockStore & { lastWritten: InstalledLock | null } {
   const state: { lastWritten: InstalledLock | null } = { lastWritten: null };
   return {
     get lastWritten() {
       return state.lastWritten;
     },
-    read: () => Promise.resolve(null),
+    read: () => Promise.resolve(opts.existing ?? null),
     write: (_d, lock) => {
       state.lastWritten = lock;
       return Promise.resolve();
@@ -111,7 +113,39 @@ Deno.test("InitProjectUseCase fails with 'conflicts' when target already has spe
     force: false,
   });
   assertEquals(result.status, "conflicts");
-  if (result.status === "conflicts") assertEquals(result.conflicts, ["CLAUDE.md"]);
+  if (result.status === "conflicts") {
+    assertEquals(result.conflicts, ["CLAUDE.md"]);
+    assertEquals(result.lockExists, false);
+  }
+});
+
+Deno.test("InitProjectUseCase reports lockExists=true when conflicts hit a previously-initialised project", async () => {
+  const writer = fakeFsWriter(["CLAUDE.md"]);
+  const existingLock: InstalledLock = {
+    version: 2,
+    harness: "claude",
+    backlogBackend: "local",
+    templatesVersion: "0.0.0",
+    entries: new Map(),
+  };
+  const useCase = new InitProjectUseCase({
+    writer,
+    git: fakeGit(),
+    lockStore: fakeLockStore({ existing: existingLock }),
+    harness: fakeClaudeHarness(),
+    backlogBackend: "local",
+    core: SAMPLE_CORE,
+    ensureDir: () => Promise.resolve(),
+  });
+  const result = await useCase.execute({
+    targetDir: "/tmp/demo",
+    initGit: true,
+    force: false,
+  });
+  assertEquals(result.status, "conflicts");
+  if (result.status === "conflicts") {
+    assertEquals(result.lockExists, true);
+  }
 });
 
 Deno.test("InitProjectUseCase calls git.init when repo not initialized and initGit=true", async () => {

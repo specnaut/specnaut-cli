@@ -172,7 +172,7 @@ Deno.test("specflow init --here writes into cwd", async () => {
   });
 });
 
-Deno.test("specflow init refuses to overwrite a pre-existing .claude/", async () => {
+Deno.test("specflow init on a fresh project recommends --force (no lock present)", async () => {
   await withTempDir(async (dir) => {
     // specflow.specify now scaffolds as a skill folder (.claude/skills/...).
     await Deno.mkdir(join(dir, "demo/.claude/skills/specflow.specify"), {
@@ -185,9 +185,48 @@ Deno.test("specflow init refuses to overwrite a pre-existing .claude/", async ()
     const { code, stderr } = await runSpecflow(["init", "demo", "--no-git"], { cwd: dir });
     assertEquals(code, 3);
     assertStringIncludes(stderr, ".claude/skills/specflow.specify/SKILL.md");
+    assertStringIncludes(stderr, "would be overwritten");
     assertStringIncludes(stderr, "specflow init --here --force");
-    assertStringIncludes(stderr, "specflow upgrade");
+    assertEquals(
+      stderr.includes("specflow upgrade"),
+      false,
+      "must not suggest upgrade when no lock is present",
+    );
     assertEquals(stderr.includes("v0.1"), false, "error message must not hardcode a version");
+  });
+});
+
+Deno.test("specflow init on a previously-initialised project recommends upgrade (lock present)", async () => {
+  await withTempDir(async (dir) => {
+    await Deno.mkdir(join(dir, "demo/.claude/skills/specflow.specify"), {
+      recursive: true,
+    });
+    await Deno.writeTextFile(
+      join(dir, "demo/.claude/skills/specflow.specify/SKILL.md"),
+      "custom",
+    );
+    // Drop a stub lock so the conflict path treats this as a re-init.
+    await Deno.mkdir(join(dir, "demo/.specflow"), { recursive: true });
+    await Deno.writeTextFile(
+      join(dir, "demo/.specflow/installed.lock"),
+      [
+        "version: 2",
+        "harness: claude",
+        "backlog_backend: local",
+        "templates_version: 0.0.0",
+        "entries: {}",
+        "",
+      ].join("\n"),
+    );
+    const { code, stderr } = await runSpecflow(["init", "demo", "--no-git"], { cwd: dir });
+    assertEquals(code, 3);
+    assertStringIncludes(stderr, "would be overwritten");
+    assertStringIncludes(stderr, "specflow upgrade");
+    assertEquals(
+      stderr.includes("specflow init --here --force"),
+      false,
+      "must not suggest --force when a lock is present",
+    );
   });
 });
 
