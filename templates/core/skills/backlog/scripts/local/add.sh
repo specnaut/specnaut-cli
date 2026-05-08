@@ -13,6 +13,7 @@ BODY="${2:-}"
 ROOT="$(cd "$(dirname "$0")/../../.." && pwd)"
 BACKLOG_DIR="$ROOT/.specflow/backlog"
 INDEX="$ROOT/.specflow/backlog.md"
+RENDER="$(dirname "$0")/render-index.sh"
 mkdir -p "$BACKLOG_DIR"
 
 # Next free number
@@ -37,18 +38,16 @@ cat > "$FILE" <<EOF
 number: $NEXT
 title: $TITLE
 status: Backlog
+size:
+priority:
 created: $NOW
 ---
 
 $BODY
 EOF
 
-# Append to (or create) the index
-if [ ! -f "$INDEX" ]; then
-  echo "# Backlog" > "$INDEX"
-  echo "" >> "$INDEX"
-fi
-echo "- [#$NEXT](backlog/$NEXT-$SLUG.md) Backlog — $TITLE" >> "$INDEX"
+# Regenerate the column-organised index from the file tree.
+bash "$RENDER" "$ROOT"
 
 echo "✓ created #$NEXT — $TITLE"
 echo "  $FILE"

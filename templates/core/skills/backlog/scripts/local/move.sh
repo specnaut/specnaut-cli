@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Move a backlog item to a new status. Updates the file's frontmatter and
-# the line in the index.
+# regenerates the column-organised index.
 # Usage: move.sh <number> <Status>
 set -euo pipefail
 
@@ -22,7 +22,7 @@ esac
 
 ROOT="$(cd "$(dirname "$0")/../../.." && pwd)"
 BACKLOG_DIR="$ROOT/.specflow/backlog"
-INDEX="$ROOT/.specflow/backlog.md"
+RENDER="$(dirname "$0")/render-index.sh"
 
 shopt -s nullglob
 matches=("$BACKLOG_DIR/$NUM-"*.md)
@@ -41,17 +41,7 @@ awk -v new="$STATUS" '
   END {if (!updated) exit 3}
 ' "$FILE" > "$FILE.tmp" && mv "$FILE.tmp" "$FILE"
 
-# Update the matching index line
-if [ -f "$INDEX" ]; then
-  awk -v num="$NUM" -v new="$STATUS" '
-    {
-      if ($0 ~ "\\[#" num "\\]") {
-        # Replace the status word: format is "...) <Status> — title"
-        sub(/\) [A-Za-z][^—]*—/, ") " new " —")
-      }
-      print
-    }
-  ' "$INDEX" > "$INDEX.tmp" && mv "$INDEX.tmp" "$INDEX"
-fi
+# Regenerate the column-organised index from the file tree.
+bash "$RENDER" "$ROOT"
 
 echo "✓ #$NUM → $STATUS"
