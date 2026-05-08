@@ -34,7 +34,7 @@ function resolveBacklogBackend(explicit: BacklogBackend | null): BacklogBackend 
   if (explicit !== null) return explicit;
   if (!Deno.stdin.isTerminal()) return DEFAULT_BACKLOG_BACKEND;
   return pickBacklogBackend({
-    readLine: () => prompt("Choose [1-2]:"),
+    readLine: () => prompt("Choose [1-3]:"),
     log: (s) => console.log(s),
     errLog: (s) => console.error(red(s)),
   });

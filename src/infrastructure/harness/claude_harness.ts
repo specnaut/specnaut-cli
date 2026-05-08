@@ -3,6 +3,7 @@ import type { CoreBundle, CoreEntry } from "../../domain/core_bundle.ts";
 import type { Bundle } from "../../domain/template.ts";
 import { HARNESS_STATIC } from "../../templates_bundle.ts";
 import { applyBackend, backlogScriptDestination } from "./backlog_filter.ts";
+import { ensureSkillFrontmatter } from "./skill_folder.ts";
 
 function destinationFor(entry: CoreEntry): string {
   switch (entry.category) {
@@ -42,8 +43,22 @@ export class ClaudeHarness implements Harness {
     for (const raw of core) {
       const entry = applyBackend(raw, opts);
       if (entry === null) continue;
+
+      // Skill-folder categories ship as `.claude/skills/<name>/SKILL.md`.
+      // Claude Code derives the skill name from the folder, but we inject
+      // an explicit `name:` (matching the folder) for parity with how
+      // cursor / codex / gemini emit their skill folders. This also
+      // guarantees the SKILL.md self-identifies if Claude Code's resolver
+      // ever requires it.
+      let content = entry.content;
+      if (entry.category === "command") {
+        content = ensureSkillFrontmatter(content, `specflow.${entry.name}`);
+      } else if (entry.category === "skill" || entry.category === "backlog-skill") {
+        content = ensureSkillFrontmatter(content, entry.name);
+      }
+
       out[destinationFor(entry)] = {
-        content: entry.content,
+        content,
         executable: entry.executable,
         ...(entry.category === "mergeable-project-root" ? { mergeBlock: "gitignore" } : {}),
       };
