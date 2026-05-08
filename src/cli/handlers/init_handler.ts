@@ -60,6 +60,29 @@ async function resolveBacklogBackend(
   return picked;
 }
 
+function printConflictsError(
+  conflicts: string[],
+  lockExists: boolean,
+): void {
+  const n = conflicts.length;
+  const noun = n === 1 ? "file" : "files";
+  console.error(red(`error: ${n} ${noun} would be overwritten:`));
+  for (const c of conflicts) console.error(red(`  - ${c}`));
+  console.error("");
+  if (lockExists) {
+    console.error(
+      `This project was previously initialised by Specflow — run ${
+        bold("specflow upgrade")
+      } to update the managed files in place.`,
+    );
+  } else {
+    console.error(
+      `Re-run with ${bold("specflow init --here --force")} to overwrite ` +
+        "(existing files are backed up to *.specflow.bak).",
+    );
+  }
+}
+
 async function writeBacklogConfigStub(
   targetDir: string,
   backend: BacklogBackend,
@@ -102,6 +125,28 @@ export async function runInit(intent: InitIntent): Promise<number> {
     return 2;
   }
 
+  // Pre-flight conflict check — runs BEFORE the backlog-backend picker so
+  // a doomed init doesn't drag the user through a prompt for nothing
+  // (regression #103). The probe-bundle uses the `local` backend as a
+  // placeholder: only `backlog-script` paths differ between backends, so
+  // any existing managed file (CLAUDE.md, settings.json, SKILL.md, …)
+  // shows up in every backend's bundle and is enough to flag the conflict
+  // here. The use case still re-checks after the real backend is picked,
+  // so the path stays correct even if the probe missed something.
+  if (!intent.force) {
+    const writer = new DenoFsWriter();
+    const lockStore = new FsLockStore();
+    const probeBundle = harness.mapBundle(CORE_BUNDLE, {
+      backlogBackend: "local",
+    });
+    const conflicts = await writer.detectConflicts(probeBundle, targetDir);
+    if (conflicts.length > 0) {
+      const lock = await lockStore.read(targetDir);
+      printConflictsError(conflicts, lock !== null);
+      return 3;
+    }
+  }
+
   const backlogBackend = await resolveBacklogBackend(intent.backlog);
 
   console.log(`Initializing into ${bold(targetDir)}`);
@@ -123,23 +168,7 @@ export async function runInit(intent: InitIntent): Promise<number> {
   });
 
   if (result.status === "conflicts") {
-    const n = result.conflicts.length;
-    const noun = n === 1 ? "file" : "files";
-    console.error(red(`error: ${n} ${noun} would be overwritten:`));
-    for (const c of result.conflicts) console.error(red(`  - ${c}`));
-    console.error("");
-    if (result.lockExists) {
-      console.error(
-        `This project was previously initialised by Specflow — run ${
-          bold("specflow upgrade")
-        } to update the managed files in place.`,
-      );
-    } else {
-      console.error(
-        `Re-run with ${bold("specflow init --here --force")} to overwrite ` +
-          "(existing files are backed up to *.specflow.bak).",
-      );
-    }
+    printConflictsError(result.conflicts, result.lockExists);
     return 3;
   }
 

@@ -196,6 +196,33 @@ Deno.test("specflow init on a fresh project recommends --force (no lock present)
   });
 });
 
+Deno.test("specflow init aborts on conflicts BEFORE prompting for backlog backend (regression #103)", async () => {
+  await withTempDir(async (dir) => {
+    // Pre-seed a managed file to force a conflict on re-init.
+    await Deno.mkdir(join(dir, "demo/.claude/skills/specflow.specify"), {
+      recursive: true,
+    });
+    await Deno.writeTextFile(
+      join(dir, "demo/.claude/skills/specflow.specify/SKILL.md"),
+      "custom",
+    );
+    // Pass --ai claude so the harness picker doesn't fire (it's only the
+    // backlog-backend picker we're asserting against). Crucially, we omit
+    // --backlog so the backend would normally be resolved interactively.
+    const { code, stdout, stderr } = await runSpecflow(
+      ["init", "demo", "--no-git", "--ai", "claude"],
+      { cwd: dir },
+    );
+    assertEquals(code, 3);
+    assertStringIncludes(stderr, "would be overwritten");
+    assertEquals(
+      stdout.includes("Choose your backlog backend"),
+      false,
+      "regression #103: backlog-backend picker must not run when init is going to abort on conflicts",
+    );
+  });
+});
+
 Deno.test("specflow init on a previously-initialised project recommends upgrade (lock present)", async () => {
   await withTempDir(async (dir) => {
     await Deno.mkdir(join(dir, "demo/.claude/skills/specflow.specify"), {
