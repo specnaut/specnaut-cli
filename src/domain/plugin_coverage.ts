@@ -4,7 +4,7 @@ import type { KnownHarness } from "./installed_lock.ts";
  * Pure predicate: does the `specflow-plugin` plugin own a copy of the
  * file at `dest` (relative to the project root)?
  *
- * Used by the upgrade use case to decide whether to apply the v0.x →
+ * Used by the upgrade use case to decide whether to apply the binary →
  * plugin migration table for a given lock-tracked file. When the plugin
  * is installed AND a file is plugin-covered, the upgrade plan
  * branches:

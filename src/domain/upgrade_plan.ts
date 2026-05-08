@@ -42,8 +42,7 @@ export type UpgradePlan = ReadonlyArray<UpgradeAction>;
  *   - `lock`     : the .specflow/installed.lock
  *   - `newShas`  : SHA of each file in the binary's embedded templates
  *
- * Plus two parameters that drive the v0.x → plugin migration table for
- * issue #73:
+ * Plus two parameters that drive the binary → plugin migration table:
  *   - `pluginInstalled`  : whether the `specflow-plugin` plugin is on
  *                          the host (probed at use-case entry by the
  *                          `PluginDetector` port).

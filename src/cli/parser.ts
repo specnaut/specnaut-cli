@@ -58,7 +58,6 @@ export type Intent =
      */
     backlog: "local" | "github" | "gitlab" | null;
   }
-  | { kind: "backlog-removed" }
   | { kind: "unknown"; received: string };
 
 export function parseArgs(argv: string[]): Intent {
@@ -138,11 +137,6 @@ export function parseArgs(argv: string[]): Intent {
       backlog: backlogResult.value,
     };
   }
-
-  // The `backlog` CLI command (sync + configure) was removed in v0.9.0.
-  // Catch it explicitly so we can emit a friendlier upgrade hint instead
-  // of the generic "Unknown command" + full help dump.
-  if (command === "backlog") return { kind: "backlog-removed" };
 
   return { kind: "unknown", received: command ?? "" };
 }

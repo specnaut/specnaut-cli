@@ -40,12 +40,12 @@ export type UpgradeProjectDeps = {
   templatesVersion: string;
   findHarness: (key: string) => Harness | null;
   /**
-   * Optional plugin probe. Drives the v0.x → plugin migration table
-   * for #73 — when the plugin is installed and the harness is
-   * `claude`, vanilla on-disk agent / command files are auto-migrated
-   * (backed up + deleted; plugin serves them going forward) and
-   * customized files are preserved with a "plugin available" warning.
-   * Tests omit this dep to skip migration entirely (legacy behavior).
+   * Optional plugin probe. Drives the binary → plugin migration table —
+   * when the plugin is installed and the harness is `claude`, vanilla
+   * on-disk agent / skill files are auto-migrated (backed up + deleted;
+   * plugin serves them going forward) and customized files are
+   * preserved with a "plugin available" warning. Tests omit this dep
+   * to skip migration entirely.
    */
   pluginDetector?: PluginDetector;
   now?: () => Date;
