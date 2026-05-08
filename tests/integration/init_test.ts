@@ -52,17 +52,26 @@ Deno.test("specflow init <name> writes a complete tree", async () => {
     assertEquals(await exists(join(root, ".specflow/backlog.md")), true);
     assertEquals(await exists(join(root, ".specflow/memory/constitution.md")), true);
     assertEquals(await exists(join(root, ".specflow/templates/spec-template.md")), true);
-    assertEquals(await exists(join(root, ".claude/commands/specflow.specify.md")), true);
-    assertEquals(await exists(join(root, ".claude/commands/specflow.review.md")), true);
+    // specflow.* commands now scaffold as skill folders (#76).
+    assertEquals(
+      await exists(join(root, ".claude/skills/specflow.specify/SKILL.md")),
+      true,
+    );
+    assertEquals(
+      await exists(join(root, ".claude/skills/specflow.review/SKILL.md")),
+      true,
+    );
+    // The /backlog command (different category) keeps the flat-file format.
     assertEquals(await exists(join(root, ".claude/commands/backlog.md")), true);
     assertEquals(await exists(join(root, ".claude/agents/product-owner.md")), true);
     assertEquals(await exists(join(root, ".claude/agents/devops-sre.md")), true);
     assertEquals(await exists(join(root, ".claude/skills/auto-chain/SKILL.md")), true);
 
+    // Only the backlog command stays in .claude/commands/
     const commandsCount = (await Array.fromAsync(
       Deno.readDir(join(root, ".claude/commands")),
     )).length;
-    assertEquals(commandsCount, 11);
+    assertEquals(commandsCount, 1);
     // 9 agent .md files + 5 memory subfolders (product-owner, developer,
     // qa-tester, devops-sre, security-auditor)
     const agentDirEntries = await Array.fromAsync(
@@ -165,14 +174,17 @@ Deno.test("specflow init --here writes into cwd", async () => {
 
 Deno.test("specflow init refuses to overwrite a pre-existing .claude/", async () => {
   await withTempDir(async (dir) => {
-    await Deno.mkdir(join(dir, "demo/.claude/commands"), { recursive: true });
+    // specflow.specify now scaffolds as a skill folder (.claude/skills/...).
+    await Deno.mkdir(join(dir, "demo/.claude/skills/specflow.specify"), {
+      recursive: true,
+    });
     await Deno.writeTextFile(
-      join(dir, "demo/.claude/commands/specflow.specify.md"),
+      join(dir, "demo/.claude/skills/specflow.specify/SKILL.md"),
       "custom",
     );
     const { code, stderr } = await runSpecflow(["init", "demo", "--no-git"], { cwd: dir });
     assertEquals(code, 3);
-    assertStringIncludes(stderr, ".claude/commands/specflow.specify.md");
+    assertStringIncludes(stderr, ".claude/skills/specflow.specify/SKILL.md");
     assertStringIncludes(stderr, "specflow init --here --force");
     assertStringIncludes(stderr, "specflow upgrade");
     assertEquals(stderr.includes("v0.1"), false, "error message must not hardcode a version");

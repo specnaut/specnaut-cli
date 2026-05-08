@@ -1,4 +1,5 @@
 ---
+disable-model-invocation: true
 description: Merge the current feature branch into the base branch after pre-merge validation.
 ---
 

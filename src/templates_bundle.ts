@@ -10,6 +10,7 @@ export const CORE_BUNDLE: CoreBundle = [
     name: "specify",
     suffix: null,
     content: `---
+disable-model-invocation: true
 description: Create or update the feature specification from a natural language feature description.
 handoffs: 
   - label: Build Technical Plan
@@ -219,6 +220,7 @@ Success criteria must be **measurable** (specific metrics), **technology-agnosti
     name: "clarify",
     suffix: null,
     content: `---
+disable-model-invocation: true
 description: Identify underspecified areas in the current feature spec by asking up to 5 highly targeted clarification questions and encoding answers back into the spec.
 handoffs: 
   - label: Build Technical Plan
@@ -392,6 +394,7 @@ Hooks with non-empty \`condition\` are deferred to the HookExecutor.
     name: "plan",
     suffix: null,
     content: `---
+disable-model-invocation: true
 description: Execute the implementation planning workflow using the plan template to generate design artifacts.
 handoffs: 
   - label: Create Tasks
@@ -552,6 +555,7 @@ You **MUST** consider the user input before proceeding (if not empty).
     name: "tasks",
     suffix: null,
     content: `---
+disable-model-invocation: true
 description: Generate an actionable, dependency-ordered tasks.md for the feature based on available design artifacts.
 handoffs: 
   - label: Analyze For Consistency
@@ -763,6 +767,7 @@ Every task MUST strictly follow this format:
     name: "analyze",
     suffix: null,
     content: `---
+disable-model-invocation: true
 description: Perform a non-destructive cross-artifact consistency and quality analysis across spec.md, plan.md, and tasks.md after task generation.
 scripts:
   sh: scripts/bash/check-prerequisites.sh --json --require-tasks --include-tasks
@@ -1023,6 +1028,7 @@ After reporting, check if \`.specflow/extensions.yml\` exists in the project roo
     name: "implement",
     suffix: null,
     content: `---
+disable-model-invocation: true
 description: Execute the implementation plan by processing and executing all tasks defined in tasks.md
 scripts:
   sh: scripts/bash/check-prerequisites.sh --json --require-tasks --include-tasks
@@ -1232,6 +1238,7 @@ Note: This command assumes a complete task breakdown exists in tasks.md. If task
     name: "constitution",
     suffix: null,
     content: `---
+disable-model-invocation: true
 description: Create or update the project constitution from interactive or provided principle inputs, ensuring all dependent templates stay in sync.
 handoffs: 
   - label: Build Specification
@@ -1567,6 +1574,7 @@ Hooks with non-empty \`condition\` are deferred to the HookExecutor.
     name: "merge",
     suffix: null,
     content: `---
+disable-model-invocation: true
 description: Merge the current feature branch into the base branch after pre-merge validation.
 ---
 
