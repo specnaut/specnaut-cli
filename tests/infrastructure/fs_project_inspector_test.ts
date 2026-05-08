@@ -611,3 +611,185 @@ entries: {}
     },
   );
 });
+
+// ── backlog backend (#104) ─────────────────────────────────────────────────
+
+async function backlogProject(
+  dir: string,
+  backend: "local" | "github" | "gitlab",
+  configYml?: string,
+): Promise<void> {
+  await Deno.mkdir(join(dir, ".specflow/memory"), { recursive: true });
+  await Deno.mkdir(join(dir, ".claude"), { recursive: true });
+  await Deno.writeTextFile(
+    join(dir, ".specflow/memory/constitution.md"),
+    CONSTITUTION_FILLED,
+  );
+  await Deno.writeTextFile(
+    join(dir, ".specflow/installed.lock"),
+    `version: 2
+harness: claude
+backlog_backend: ${backend}
+templates_version: 0.7.0
+entries: {}
+`,
+  );
+  if (configYml !== undefined) {
+    await Deno.writeTextFile(
+      join(dir, ".specflow/backlog-config.yml"),
+      configYml,
+    );
+  }
+}
+
+Deno.test("inspect surfaces backlog backend = local with pass status (zero-config)", async () => {
+  await withProjectDir(
+    (dir) => backlogProject(dir, "local"),
+    async (dir) => {
+      const inspector = new FsProjectInspector();
+      const outcomes = await inspector.inspect(dir, "0.7.0");
+      const o = outcomes.find((x) => x.name === "backlog backend");
+      assertEquals(o?.status, "pass");
+      assertEquals(o?.message, "local — zero-config");
+    },
+  );
+});
+
+Deno.test("inspect warns when github backend has empty repo and project_number", async () => {
+  await withProjectDir(
+    (dir) =>
+      backlogProject(
+        dir,
+        "github",
+        `repo: ""
+project_number: ""
+project_node_id: ""
+status_field_id: ""
+`,
+      ),
+    async (dir) => {
+      const inspector = new FsProjectInspector();
+      const outcomes = await inspector.inspect(dir, "0.7.0");
+      const o = outcomes.find((x) => x.name === "backlog backend");
+      assertEquals(o?.status, "warn");
+      assertEquals(o?.message.includes("repo"), true);
+      assertEquals(o?.message.includes("project_number"), true);
+      assertEquals(o?.message.includes("PO will fail at runtime"), true);
+    },
+  );
+});
+
+Deno.test("inspect warns when github backend has only repo filled (project_number still empty)", async () => {
+  await withProjectDir(
+    (dir) =>
+      backlogProject(
+        dir,
+        "github",
+        `repo: myorg/myproject
+project_number: ""
+`,
+      ),
+    async (dir) => {
+      const inspector = new FsProjectInspector();
+      const outcomes = await inspector.inspect(dir, "0.7.0");
+      const o = outcomes.find((x) => x.name === "backlog backend");
+      assertEquals(o?.status, "warn");
+      assertEquals(o?.message.includes("project_number"), true);
+      assertEquals(o?.message.includes("repo"), false);
+    },
+  );
+});
+
+Deno.test("inspect passes when github backend has both required fields filled", async () => {
+  await withProjectDir(
+    (dir) =>
+      backlogProject(
+        dir,
+        "github",
+        `repo: myorg/myproject
+project_number: 4
+`,
+      ),
+    async (dir) => {
+      const inspector = new FsProjectInspector();
+      const outcomes = await inspector.inspect(dir, "0.7.0");
+      const o = outcomes.find((x) => x.name === "backlog backend");
+      assertEquals(o?.status, "pass");
+      assertEquals(o?.message, "github — backlog-config.yml configured");
+    },
+  );
+});
+
+Deno.test("inspect warns when gitlab backend has empty project_id", async () => {
+  await withProjectDir(
+    (dir) =>
+      backlogProject(
+        dir,
+        "gitlab",
+        `host: gitlab.com
+project_id: ""
+`,
+      ),
+    async (dir) => {
+      const inspector = new FsProjectInspector();
+      const outcomes = await inspector.inspect(dir, "0.7.0");
+      const o = outcomes.find((x) => x.name === "backlog backend");
+      assertEquals(o?.status, "warn");
+      assertEquals(o?.message.includes("project_id"), true);
+    },
+  );
+});
+
+Deno.test("inspect passes when gitlab backend has project_id filled", async () => {
+  await withProjectDir(
+    (dir) =>
+      backlogProject(
+        dir,
+        "gitlab",
+        `host: gitlab.com
+project_id: 12345
+`,
+      ),
+    async (dir) => {
+      const inspector = new FsProjectInspector();
+      const outcomes = await inspector.inspect(dir, "0.7.0");
+      const o = outcomes.find((x) => x.name === "backlog backend");
+      assertEquals(o?.status, "pass");
+      assertEquals(o?.message, "gitlab — backlog-config.yml configured");
+    },
+  );
+});
+
+Deno.test("inspect warns when github backend lock is set but backlog-config.yml is missing", async () => {
+  await withProjectDir(
+    (dir) => backlogProject(dir, "github" /* no configYml */),
+    async (dir) => {
+      const inspector = new FsProjectInspector();
+      const outcomes = await inspector.inspect(dir, "0.7.0");
+      const o = outcomes.find((x) => x.name === "backlog backend");
+      assertEquals(o?.status, "warn");
+      assertEquals(o?.message.includes("backlog-config.yml missing"), true);
+      assertEquals(o?.message.includes("specflow upgrade --backlog github"), true);
+    },
+  );
+});
+
+Deno.test("inspect fails when backlog-config.yml is invalid YAML", async () => {
+  await withProjectDir(
+    (dir) =>
+      backlogProject(
+        dir,
+        "github",
+        `repo: "myorg/myproject
+project_number: 4
+`, // unterminated quote
+      ),
+    async (dir) => {
+      const inspector = new FsProjectInspector();
+      const outcomes = await inspector.inspect(dir, "0.7.0");
+      const o = outcomes.find((x) => x.name === "backlog backend");
+      assertEquals(o?.status, "fail");
+      assertEquals(o?.message.includes("invalid YAML"), true);
+    },
+  );
+});
