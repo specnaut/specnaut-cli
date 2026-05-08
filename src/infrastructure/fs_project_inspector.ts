@@ -1,8 +1,11 @@
 import { join } from "@std/path";
 import { parse as parseYaml } from "@std/yaml";
-import type { ProjectInspector } from "../application/ports.ts";
+import type { PluginDetector, ProjectInspector } from "../application/ports.ts";
 import type { CheckOutcome } from "../domain/check_result.ts";
 import { type BacklogBackend, type KnownHarness, parseLock } from "../domain/installed_lock.ts";
+import { PLUGIN_COVERED_PATHS_CLAUDE } from "../domain/plugin_coverage.ts";
+
+const PLUGIN_NAME = "claude-specflow";
 
 async function exists(path: string): Promise<boolean> {
   try {
@@ -57,6 +60,14 @@ function validateHooks(hooks: unknown): string[] {
 }
 
 export class FsProjectInspector implements ProjectInspector {
+  /**
+   * `pluginDetector` is optional — when omitted, the "plugin gap"
+   * check (slice 7 of #73) is skipped silently. The check_handler
+   * always injects an `FsPluginDetector` in production; tests opt in
+   * by constructing the inspector with one.
+   */
+  constructor(private readonly pluginDetector: PluginDetector | null = null) {}
+
   async inspect(projectDir: string, templatesVersion: string): Promise<CheckOutcome[]> {
     const outcomes: CheckOutcome[] = [];
 
@@ -66,7 +77,51 @@ export class FsProjectInspector implements ProjectInspector {
     outcomes.push(await this.checkTemplatesVersion(projectDir, templatesVersion));
     outcomes.push(await this.checkBacklogConfig(projectDir));
     outcomes.push(...await this.checkClaudeConfig(projectDir));
+    outcomes.push(...await this.checkPluginGap(projectDir));
 
+    return outcomes;
+  }
+
+  /**
+   * Detects the "plugin uninstalled after migration" edge case (#73
+   * slice 7): when `specflow upgrade` previously migrated vanilla
+   * agent files to the `claude-specflow` plugin (deleted from disk +
+   * dropped from lock), and the user later uninstalled the plugin,
+   * those files are now silently absent. This check warns once per
+   * missing path so the user can recover via `specflow upgrade` or
+   * by re-installing the plugin.
+   *
+   * Returns an empty list when no `pluginDetector` is configured, the
+   * lock is missing or non-claude, or the plugin is currently
+   * installed (no gap can exist).
+   */
+  private async checkPluginGap(projectDir: string): Promise<CheckOutcome[]> {
+    if (this.pluginDetector === null) return [];
+
+    const lockPath = join(projectDir, ".specflow/installed.lock");
+    if (!(await exists(lockPath))) return [];
+    let harness: KnownHarness;
+    try {
+      harness = parseLock(await Deno.readTextFile(lockPath)).harness;
+    } catch {
+      return [];
+    }
+    if (harness !== "claude") return [];
+
+    const installed = await this.pluginDetector.isPluginInstalled(PLUGIN_NAME);
+    if (installed) return [];
+
+    const outcomes: CheckOutcome[] = [];
+    for (const dest of PLUGIN_COVERED_PATHS_CLAUDE) {
+      const present = await exists(join(projectDir, dest));
+      if (present) continue;
+      outcomes.push({
+        name: dest,
+        status: "warn",
+        message:
+          "missing — restore via `specflow upgrade` or install the plugin (`/plugin install claude-specflow`)",
+      });
+    }
     return outcomes;
   }
 
