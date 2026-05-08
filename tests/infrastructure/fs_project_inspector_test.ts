@@ -389,6 +389,205 @@ entries: {}
   );
 });
 
+// Helper: write a Claude-harness lock so checkClaudeConfig kicks in.
+async function writeClaudeLock(dir: string) {
+  await Deno.mkdir(join(dir, ".specflow"), { recursive: true });
+  await Deno.writeTextFile(
+    join(dir, ".specflow/installed.lock"),
+    `version: 2
+harness: claude
+templates_version: 0.7.0
+entries: {}
+`,
+  );
+}
+
+Deno.test("inspect skips Claude-config checks for non-Claude harnesses", async () => {
+  await withProjectDir(
+    async (dir) => {
+      await Deno.mkdir(join(dir, ".cursor"), { recursive: true });
+      await Deno.mkdir(join(dir, ".specflow"), { recursive: true });
+      await Deno.writeTextFile(
+        join(dir, ".specflow/installed.lock"),
+        `version: 2
+harness: cursor
+templates_version: 0.7.0
+entries: {}
+`,
+      );
+      // Even with a malformed settings.json sitting around, cursor harness
+      // means we don't lint it.
+      await Deno.mkdir(join(dir, ".claude"), { recursive: true });
+      await Deno.writeTextFile(
+        join(dir, ".claude/settings.json"),
+        `{ "hooks": { "PostToolUse": [ { "matcher": ["Edit"] } ] } }`,
+      );
+    },
+    async (dir) => {
+      const inspector = new FsProjectInspector();
+      const outcomes = await inspector.inspect(dir, "0.7.0");
+      assertEquals(
+        outcomes.find((o) => o.name.includes("settings.json")),
+        undefined,
+      );
+    },
+  );
+});
+
+Deno.test("inspect passes when .claude/settings.json has valid hooks", async () => {
+  await withProjectDir(
+    async (dir) => {
+      await writeClaudeLock(dir);
+      await Deno.mkdir(join(dir, ".claude"), { recursive: true });
+      await Deno.writeTextFile(
+        join(dir, ".claude/settings.json"),
+        JSON.stringify({
+          hooks: {
+            PostToolUse: [
+              { matcher: "Edit|Write", hooks: [{ type: "command", command: "echo" }] },
+            ],
+          },
+        }),
+      );
+    },
+    async (dir) => {
+      const inspector = new FsProjectInspector();
+      const outcomes = await inspector.inspect(dir, "0.7.0");
+      const o = outcomes.find((o) => o.name === ".claude/settings.json hooks");
+      assertEquals(o?.status, "pass");
+    },
+  );
+});
+
+Deno.test("inspect fails when hooks matcher is an array (common mistake)", async () => {
+  await withProjectDir(
+    async (dir) => {
+      await writeClaudeLock(dir);
+      await Deno.mkdir(join(dir, ".claude"), { recursive: true });
+      await Deno.writeTextFile(
+        join(dir, ".claude/settings.json"),
+        JSON.stringify({
+          hooks: {
+            PostToolUse: [
+              { matcher: ["Edit", "Write"], hooks: [{ type: "command", command: "echo" }] },
+            ],
+          },
+        }),
+      );
+    },
+    async (dir) => {
+      const inspector = new FsProjectInspector();
+      const outcomes = await inspector.inspect(dir, "0.7.0");
+      const o = outcomes.find((o) => o.name === ".claude/settings.json hooks");
+      assertEquals(o?.status, "fail");
+      assertEquals(o?.message.includes("matcher must be a string"), true);
+    },
+  );
+});
+
+Deno.test("inspect fails when hooks entries[].hooks is missing", async () => {
+  await withProjectDir(
+    async (dir) => {
+      await writeClaudeLock(dir);
+      await Deno.mkdir(join(dir, ".claude"), { recursive: true });
+      await Deno.writeTextFile(
+        join(dir, ".claude/settings.json"),
+        JSON.stringify({
+          hooks: {
+            PostToolUse: [{ matcher: "Edit" }], // forgot the inner hooks array
+          },
+        }),
+      );
+    },
+    async (dir) => {
+      const inspector = new FsProjectInspector();
+      const outcomes = await inspector.inspect(dir, "0.7.0");
+      const o = outcomes.find((o) => o.name === ".claude/settings.json hooks");
+      assertEquals(o?.status, "fail");
+    },
+  );
+});
+
+Deno.test("inspect fails when settings.json is invalid JSON", async () => {
+  await withProjectDir(
+    async (dir) => {
+      await writeClaudeLock(dir);
+      await Deno.mkdir(join(dir, ".claude"), { recursive: true });
+      await Deno.writeTextFile(
+        join(dir, ".claude/settings.json"),
+        `{ "hooks": [`,
+      );
+    },
+    async (dir) => {
+      const inspector = new FsProjectInspector();
+      const outcomes = await inspector.inspect(dir, "0.7.0");
+      const o = outcomes.find((o) => o.name === ".claude/settings.json");
+      assertEquals(o?.status, "fail");
+      assertEquals(o?.message.includes("invalid JSON"), true);
+    },
+  );
+});
+
+Deno.test("inspect warns on .mcp.json with relative command path", async () => {
+  await withProjectDir(
+    async (dir) => {
+      await writeClaudeLock(dir);
+      await Deno.writeTextFile(
+        join(dir, ".mcp.json"),
+        JSON.stringify({
+          mcpServers: {
+            github: { command: "./bin/github-mcp", args: [] },
+          },
+        }),
+      );
+    },
+    async (dir) => {
+      const inspector = new FsProjectInspector();
+      const outcomes = await inspector.inspect(dir, "0.7.0");
+      const o = outcomes.find((o) => o.name === ".mcp.json");
+      assertEquals(o?.status, "warn");
+      assertEquals(o?.message.includes("relative path"), true);
+    },
+  );
+});
+
+Deno.test("inspect passes on .mcp.json with absolute / npx command", async () => {
+  await withProjectDir(
+    async (dir) => {
+      await writeClaudeLock(dir);
+      await Deno.writeTextFile(
+        join(dir, ".mcp.json"),
+        JSON.stringify({
+          mcpServers: {
+            github: { command: "npx", args: ["-y", "@github/mcp"] },
+          },
+        }),
+      );
+    },
+    async (dir) => {
+      const inspector = new FsProjectInspector();
+      const outcomes = await inspector.inspect(dir, "0.7.0");
+      const o = outcomes.find((o) => o.name === ".mcp.json");
+      assertEquals(o?.status, "pass");
+    },
+  );
+});
+
+Deno.test("inspect fails on invalid JSON in .mcp.json", async () => {
+  await withProjectDir(
+    async (dir) => {
+      await writeClaudeLock(dir);
+      await Deno.writeTextFile(join(dir, ".mcp.json"), `{ broken`);
+    },
+    async (dir) => {
+      const inspector = new FsProjectInspector();
+      const outcomes = await inspector.inspect(dir, "0.7.0");
+      const o = outcomes.find((o) => o.name === ".mcp.json");
+      assertEquals(o?.status, "fail");
+    },
+  );
+});
+
 Deno.test("inspect reports pass when opencode harness is set and .opencode/ exists", async () => {
   await withProjectDir(
     async (dir) => {
