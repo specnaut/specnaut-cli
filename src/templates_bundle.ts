@@ -2318,7 +2318,7 @@ failed, and what decision the next owner needs to make.
     suffix: null,
     content: `---
 name: review-coordinator
-description: Coordinates parallel structural review agents (code, security, tests) and aggregates their findings. Use when /specflow-review is running Phase 1.
+description: Coordinates parallel structural review agents (code, security, tests) and aggregates their findings. Use when /specflow review is running Phase 1.
 model: sonnet
 tools: Read, Grep, Glob, Bash, Agent(code-reviewer, security-auditor, test-reviewer)
 maxTurns: 30
@@ -2330,7 +2330,7 @@ in parallel and aggregate results.
 ## Inputs
 
 - The list of files changed in the current feature branch (provided by
-  \`/specflow-review\`).
+  \`/specflow review\`).
 
 ## Protocol
 
@@ -2374,7 +2374,7 @@ MEDIUM / LOW findings: <N>, list suppressed — see per-agent reports for detail
     suffix: null,
     content: `---
 name: code-reviewer
-description: Reviews code quality, architecture, DRY/YAGNI, readability, and conformance to the project constitution. Spawned by the review-coordinator during /specflow-review.
+description: Reviews code quality, architecture, DRY/YAGNI, readability, and conformance to the project constitution. Spawned by the review-coordinator during /specflow review.
 model: sonnet
 tools: Read, Grep, Glob
 maxTurns: 20
@@ -2429,7 +2429,7 @@ PASS if zero CRITICAL and zero HIGH findings. Otherwise FAIL.
     suffix: null,
     content: `---
 name: security-auditor
-description: Reviews code for security issues — input validation, authz, secrets, injection, SSRF, path traversal, silent error swallowing. Spawned by the review-coordinator during /specflow-review.
+description: Reviews code for security issues — input validation, authz, secrets, injection, SSRF, path traversal, silent error swallowing. Spawned by the review-coordinator during /specflow review.
 model: sonnet
 tools: Read, Grep, Glob
 maxTurns: 20
@@ -2507,7 +2507,7 @@ Same \`FINDING\` / \`VERDICT\` structure as code-reviewer.
     suffix: null,
     content: `---
 name: qa-tester
-description: Audits test coverage, writes missing tests, and runs the full suite. Manual-only — spawned by /specflow-implement after the review gate passes; do not auto-invoke for casual "run tests" mentions.
+description: Audits test coverage, writes missing tests, and runs the full suite. Manual-only — spawned by /specflow implement after the review gate passes; do not auto-invoke for casual "run tests" mentions.
 model: opus
 tools: Read, Write, Edit, Grep, Glob, Bash
 permissionMode: acceptEdits
@@ -4940,20 +4940,20 @@ fi
 # Validate required directories and files
 if [[ ! -d "\$FEATURE_DIR" ]]; then
     echo "ERROR: Feature directory not found: \$FEATURE_DIR" >&2
-    echo "Run /specflow-specify first to create the feature structure." >&2
+    echo "Run /specflow specify first to create the feature structure." >&2
     exit 1
 fi
 
 if [[ ! -f "\$IMPL_PLAN" ]]; then
     echo "ERROR: plan.md not found in \$FEATURE_DIR" >&2
-    echo "Run /specflow-plan first to create the implementation plan." >&2
+    echo "Run /specflow plan first to create the implementation plan." >&2
     exit 1
 fi
 
 # Check for tasks.md if required
 if \$REQUIRE_TASKS && [[ ! -f "\$TASKS" ]]; then
     echo "ERROR: tasks.md not found in \$FEATURE_DIR" >&2
-    echo "Run /specflow-tasks first to create the task list." >&2
+    echo "Run /specflow tasks first to create the task list." >&2
     exit 1
 fi
 
@@ -5233,7 +5233,7 @@ get_feature_paths() {
 
     # Resolve feature directory.  Priority:
     #   1. SPECIFY_FEATURE_DIRECTORY env var (explicit override)
-    #   2. .specflow/feature.json "feature_directory" key (persisted by /specflow-specify)
+    #   2. .specflow/feature.json "feature_directory" key (persisted by /specflow specify)
     #   3. Branch-name-based prefix lookup (legacy fallback)
     local feature_dir
     if [[ -n "\${SPECIFY_FEATURE_DIRECTORY:-}" ]]; then
@@ -7398,7 +7398,7 @@ team's needs.
 
 - **Periodic maintenance** — \`/loop 1h\` runs the prompt in
   \`.claude/loop.md\` every hour. The bundled default delegates to the
-  \`/specflow-groom\` skill (groom backlog, surface stale PRs, list orphan
+  \`/specflow groom\` skill (groom backlog, surface stale PRs, list orphan
   specs); edit \`loop.md\` freely to add project-specific checks. See
   https://code.claude.com/docs/fr/scheduled-tasks.
 
@@ -7584,7 +7584,7 @@ this project's hygiene needs.
 
 Run a hygiene pass on this Specflow project:
 
-1. Invoke the \`/specflow-groom\` skill — it grooms the backlog, surfaces
+1. Invoke the \`/specflow groom\` skill — it grooms the backlog, surfaces
    stale PRs, and flags orphan specs.
 2. If anything actionable came out of the pass, summarize it concisely
    so the human reading the loop output can decide what to do.
@@ -7595,7 +7595,7 @@ Run a hygiene pass on this Specflow project:
 
 - **Active development**: \`/loop 1h\` — frequent grooming during a sprint.
 - **Quiet projects**: \`/loop 12h\` or \`/loop 24h\` — daily cadence.
-- **One-off check**: just \`/specflow-groom\` (no loop) — runs once and exits.
+- **One-off check**: just \`/specflow groom\` (no loop) — runs once and exits.
 
 ## Customizing further
 
@@ -7822,16 +7822,16 @@ clarifications needed) STOP #2 (pre-merge validation)
 
 ## Skills available
 
-- \`/specflow-specify\` — scaffold a new feature spec from a description
-- \`/specflow-clarify\` — resolve outstanding questions in \`spec.md\`
-- \`/specflow-plan\` — produce the implementation plan
-- \`/specflow-tasks\` — break the plan into tasks
-- \`/specflow-analyze\` — cross-artefact consistency check
-- \`/specflow-implement\` — run the developer → review-coordinator → qa-tester pipeline
-- \`/specflow-review\` — architecture + quality gates
-- \`/specflow-merge\` — merge the feature branch to main
+- \`/specflow specify\` — scaffold a new feature spec from a description
+- \`/specflow clarify\` — resolve outstanding questions in \`spec.md\`
+- \`/specflow plan\` — produce the implementation plan
+- \`/specflow tasks\` — break the plan into tasks
+- \`/specflow analyze\` — cross-artefact consistency check
+- \`/specflow implement\` — run the developer → review-coordinator → qa-tester pipeline
+- \`/specflow review\` — architecture + quality gates
+- \`/specflow merge\` — merge the feature branch to main
 - \`/specflow-backlog\` — manage the product backlog (via the PO agent)
-- \`/specflow-auto-chain\` — auto-chain dispatcher invoked by \`/specflow-specify\`
+- \`/specflow-auto-chain\` — auto-chain dispatcher invoked by \`/specflow specify\`
 
 ## Agent roles (invocable manually as skills)
 

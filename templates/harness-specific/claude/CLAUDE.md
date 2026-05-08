@@ -16,7 +16,7 @@ team's needs.
 
 - **Periodic maintenance** — `/loop 1h` runs the prompt in
   `.claude/loop.md` every hour. The bundled default delegates to the
-  `/specflow-groom` skill (groom backlog, surface stale PRs, list orphan
+  `/specflow groom` skill (groom backlog, surface stale PRs, list orphan
   specs); edit `loop.md` freely to add project-specific checks. See
   https://code.claude.com/docs/fr/scheduled-tasks.
 

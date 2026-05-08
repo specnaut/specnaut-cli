@@ -4,7 +4,6 @@ name: Deploy docs to Pages
 on:
   push:
     branches: ["main"]
-    tags: ["v*"]
     paths:
       - "docs/**"
       - "scripts/build-docs.ts"

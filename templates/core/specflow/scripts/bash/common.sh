@@ -209,7 +209,7 @@ get_feature_paths() {
 
     # Resolve feature directory.  Priority:
     #   1. SPECIFY_FEATURE_DIRECTORY env var (explicit override)
-    #   2. .specflow/feature.json "feature_directory" key (persisted by /specflow-specify)
+    #   2. .specflow/feature.json "feature_directory" key (persisted by /specflow specify)
     #   3. Branch-name-based prefix lookup (legacy fallback)
     local feature_dir
     if [[ -n "${SPECIFY_FEATURE_DIRECTORY:-}" ]]; then
