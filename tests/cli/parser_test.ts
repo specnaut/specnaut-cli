@@ -157,10 +157,15 @@ Deno.test("parseArgs accepts init --backlog github", () => {
   if (r.kind === "init") assertEquals(r.backlog, "github");
 });
 
+Deno.test("parseArgs accepts init --backlog gitlab", () => {
+  const r = parseArgs(["init", "demo", "--backlog", "gitlab"]);
+  if (r.kind === "init") assertEquals(r.backlog, "gitlab");
+});
+
 Deno.test("parseArgs returns unknown for invalid init --backlog value", () => {
-  assertEquals(parseArgs(["init", "demo", "--backlog", "gitlab"]), {
+  assertEquals(parseArgs(["init", "demo", "--backlog", "bitbucket"]), {
     kind: "unknown",
-    received: "init --backlog gitlab",
+    received: "init --backlog bitbucket",
   });
 });
 
@@ -174,10 +179,15 @@ Deno.test("parseArgs accepts upgrade --backlog github", () => {
   if (r.kind === "upgrade") assertEquals(r.backlog, "github");
 });
 
+Deno.test("parseArgs accepts upgrade --backlog gitlab", () => {
+  const r = parseArgs(["upgrade", "--backlog", "gitlab"]);
+  if (r.kind === "upgrade") assertEquals(r.backlog, "gitlab");
+});
+
 Deno.test("parseArgs returns unknown for invalid upgrade --backlog value", () => {
-  assertEquals(parseArgs(["upgrade", "--backlog", "gitlab"]), {
+  assertEquals(parseArgs(["upgrade", "--backlog", "bitbucket"]), {
     kind: "unknown",
-    received: "upgrade --backlog gitlab",
+    received: "upgrade --backlog bitbucket",
   });
 });
 

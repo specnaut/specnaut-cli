@@ -18,10 +18,11 @@ export const KNOWN_HARNESSES: ReadonlyArray<KnownHarness> = [
   "opencode",
 ];
 
-export type BacklogBackend = "local" | "github";
+export type BacklogBackend = "local" | "github" | "gitlab";
 export const KNOWN_BACKLOG_BACKENDS: ReadonlyArray<BacklogBackend> = [
   "local",
   "github",
+  "gitlab",
 ];
 
 export type LockEntry = {

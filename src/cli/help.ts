@@ -18,12 +18,12 @@ ${bold("Flags (for init):")}
   --here              Scaffold into the current directory instead of creating a new one
   --no-git            Skip "git init" detection and prompt
   --ai <name>         Target AI harness: claude (default) | cursor | codex | gemini | windsurf | copilot | opencode | antigravity
-  --backlog <name>    Backlog backend: local (default) | github
+  --backlog <name>    Backlog backend: local (default) | github | gitlab
 
 ${bold("Flags (for upgrade):")}
   --dry-run           Show the plan without writing
   --force             Overwrite locally-customized files (existing content backed up to *.specflow.bak)
-  --backlog <name>    Switch the backlog backend (local | github). Re-renders the backlog skill;
+  --backlog <name>    Switch the backlog backend (local | github | gitlab). Re-renders the backlog skill;
                       existing data in the previous backend is NOT migrated.
 
 ${bold("Docs:")}    ${cyan("https://specflow.makerlabs.dev")}

@@ -121,6 +121,47 @@ Deno.test("init --backlog github renders the github skill + writes config stub",
   });
 });
 
+Deno.test("init --backlog gitlab renders the gitlab skill + writes config stub", async () => {
+  await withTempDir(async (parent) => {
+    const r = await runSpecflow(
+      ["init", "demo", "--no-git", "--ai", "claude", "--backlog", "gitlab"],
+      { cwd: parent },
+    );
+    assertEquals(r.code, 0, r.stderr);
+
+    const skill = await Deno.readTextFile(
+      join(parent, "demo/.claude/skills/backlog/SKILL.md"),
+    );
+    assertStringIncludes(skill, "Backend: GitLab Issues + scoped Status labels");
+    assertEquals(skill.includes("Backend: local Markdown"), false);
+    assertEquals(skill.includes("Backend: GitHub"), false);
+    assertStringIncludes(skill, "glab issue close");
+
+    // GitLab-flavored scripts present
+    assertEquals(
+      await exists(join(parent, "demo/.specflow/scripts/backlog/_config.sh")),
+      true,
+    );
+    const addScript = await Deno.readTextFile(
+      join(parent, "demo/.specflow/scripts/backlog/add.sh"),
+    );
+    assertStringIncludes(addScript, "glab issue create");
+    assertStringIncludes(addScript, "Status::Backlog");
+
+    // Config stub written + lock records backend
+    const config = await Deno.readTextFile(
+      join(parent, "demo/.specflow/backlog-config.yml"),
+    );
+    assertStringIncludes(config, "host:");
+    assertStringIncludes(config, "project_id:");
+
+    const lock = await Deno.readTextFile(
+      join(parent, "demo/.specflow/installed.lock"),
+    );
+    assertStringIncludes(lock, "backlog_backend: gitlab");
+  });
+});
+
 Deno.test("upgrade --backlog github switches a local project to github", async () => {
   await withTempDir(async (parent) => {
     const init = await runSpecflow(

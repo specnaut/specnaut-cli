@@ -3112,6 +3112,68 @@ For the **shell path**: the \`gh\` CLI must be authenticated with the
 For the **MCP path**: see "Two paths to GitHub" above.
 <!-- END: backend=github -->
 
+<!-- BEGIN: backend=gitlab -->
+## Backend: GitLab Issues + scoped Status labels
+
+This project's backlog lives on GitLab Issues, with workflow state
+tracked via scoped labels (\`Status::Backlog\`, \`Status::Ready\`,
+\`Status::"In progress"\`, \`Status::"In review"\`, \`Status::Done\`).
+GitLab doesn't have a Project Status field equivalent to GitHub's
+Projects V2 — scoped labels are the canonical way to model kanban-
+style state on GitLab.
+
+Configuration is read from \`.specflow/backlog-config.yml\` at runtime —
+fill in \`host\` and \`project_id\` before running any mutation.
+
+### Configuration file
+
+\`\`\`yaml
+# .specflow/backlog-config.yml
+host: gitlab.com         # or your self-hosted instance
+project_id: ""           # numeric id (e.g. "12345") or path "group/project"
+\`\`\`
+
+### Scripts (preferred path)
+
+\`\`\`bash
+.specflow/scripts/backlog/list.sh [Status]            # all issues, optional Status:: filter
+.specflow/scripts/backlog/view.sh <number>            # one issue + comments
+.specflow/scripts/backlog/add.sh "<title>" [body] [labels-csv]
+.specflow/scripts/backlog/move.sh <number> <Status>   # swaps the Status:: label
+.specflow/scripts/backlog/clarify-comment.sh <num> "<question>"
+\`\`\`
+
+For closing or editing, use \`glab\` directly:
+
+\`\`\`bash
+glab issue close   <num> --repo <project_id>
+glab issue update  <num> --repo <project_id> --title "…" --description "…"
+\`\`\`
+
+### Conventions
+
+- **Titles** — short imperative phrases. Lowercase OK; no leading emoji.
+- **Bodies** — \`## Why\` / \`## Acceptance criteria\` / \`## Out of scope\`.
+- **Status** — set by adding/swapping a \`Status::*\` scoped label.
+  Scoped labels are mutually exclusive on the same scope, so swapping
+  is atomic.
+- **Closing** — close the issue (don't just move to Done). The repo's
+  issue history is the audit trail.
+- **Drafts** are not used. Every task is a real issue.
+
+### Prerequisites
+
+The \`glab\` CLI must be installed and authenticated.
+
+- Install: https://gitlab.com/gitlab-org/cli
+- Authenticate: \`glab auth login\` (use the same host as in
+  \`backlog-config.yml\`)
+
+The first time the PO runs against this project, it will create the 5
+\`Status::*\` scoped labels if they don't exist (\`Backlog\`, \`Ready\`,
+\`In progress\`, \`In review\`, \`Done\`).
+<!-- END: backend=gitlab -->
+
 ## When NOT to use this skill
 
 - The user is implementing a backlog item — that's normal coding work;
@@ -3583,6 +3645,212 @@ gh issue comment "\$1" --repo "\$REPO" --body "\$2"
 `,
     executable: true,
     backend: "github",
+  },
+  {
+    category: "backlog-script",
+    name: "_config",
+    suffix: "_config.sh",
+    content: `#!/usr/bin/env bash
+# Helper: read host + project_id from .specflow/backlog-config.yml.
+# Sourced by the other gitlab-backend scripts.
+set -euo pipefail
+
+ROOT="\$(cd "\$(dirname "\$0")/../../.." && pwd)"
+CONFIG="\$ROOT/.specflow/backlog-config.yml"
+
+if [ ! -f "\$CONFIG" ]; then
+  echo "error: \$CONFIG not found. Fill in host + project_id first." >&2
+  exit 2
+fi
+
+extract() {
+  awk -v key="\$1" '
+    \$0 ~ "^"key":" {
+      sub("^"key":[[:space:]]*", "")
+      gsub(/^["'"'"']|["'"'"']\$/, "")
+      print
+      exit
+    }
+  ' "\$CONFIG"
+}
+
+HOST=\$(extract host)
+PROJECT_ID=\$(extract project_id)
+
+if [ -z "\$HOST" ] || [ -z "\$PROJECT_ID" ]; then
+  echo "error: backlog-config.yml is missing 'host' or 'project_id'." >&2
+  echo "Edit \$CONFIG before running this command." >&2
+  exit 2
+fi
+
+# \`glab\` reads the host from the GITLAB_HOST env var; the --repo flag
+# accepts either a numeric id or a "group/project" path.
+export GITLAB_HOST="\$HOST"
+export PROJECT_ID
+`,
+    executable: true,
+    backend: "gitlab",
+  },
+  {
+    category: "backlog-script",
+    name: "list",
+    suffix: "list.sh",
+    content: `#!/usr/bin/env bash
+# List open issues on the configured GitLab project, with their Status::
+# scoped label. Optional Status filter.
+# Usage: list.sh [Status]
+set -euo pipefail
+
+# shellcheck source=./_config.sh
+. "\$(dirname "\$0")/_config.sh"
+
+FILTER="\${1:-}"
+
+JSON=\$(glab issue list --repo "\$PROJECT_ID" --output json --per-page 100 \\
+  --state opened 2>/dev/null || echo "[]")
+
+echo "\$JSON" | jq -r --arg filter "\$FILTER" '
+  .[]
+  | . as \$issue
+  | (
+      [.labels[]? | select(startswith("Status::"))][0] // "—"
+    ) as \$rawStatus
+  | (\$rawStatus | sub("^Status::"; "")) as \$status
+  | select(\$filter == "" or \$status == \$filter)
+  | "  #\\(.iid)  \\(\$status)  \\(.title)"
+'
+`,
+    executable: true,
+    backend: "gitlab",
+  },
+  {
+    category: "backlog-script",
+    name: "view",
+    suffix: "view.sh",
+    content: `#!/usr/bin/env bash
+# Show one GitLab issue + its comments.
+# Usage: view.sh <number>
+set -euo pipefail
+
+# shellcheck source=./_config.sh
+. "\$(dirname "\$0")/_config.sh"
+
+if [ "\$#" -lt 1 ]; then
+  echo "usage: \$0 <number>" >&2
+  exit 2
+fi
+
+glab issue view "\$1" --repo "\$PROJECT_ID" --comments
+`,
+    executable: true,
+    backend: "gitlab",
+  },
+  {
+    category: "backlog-script",
+    name: "add",
+    suffix: "add.sh",
+    content: `#!/usr/bin/env bash
+# Create a GitLab Issue with the Status::Backlog scoped label.
+# Usage: add.sh "<title>" [body] [labels-csv]
+set -euo pipefail
+
+# shellcheck source=./_config.sh
+. "\$(dirname "\$0")/_config.sh"
+
+if [ "\$#" -lt 1 ]; then
+  echo 'usage: add.sh "<title>" [body] [labels-csv]' >&2
+  exit 2
+fi
+TITLE="\$1"
+BODY="\${2:-}"
+EXTRA_LABELS="\${3:-}"
+
+LABELS="Status::Backlog"
+if [ -n "\$EXTRA_LABELS" ]; then
+  LABELS="\$LABELS,\$EXTRA_LABELS"
+fi
+
+ARGS=(
+  "--repo" "\$PROJECT_ID"
+  "--title" "\$TITLE"
+  "--label" "\$LABELS"
+  "--description" "\$BODY"
+)
+
+URL=\$(glab issue create "\${ARGS[@]}" 2>&1 | grep -oE 'https://[^ ]+' | head -1)
+echo "✓ created: \$URL"
+`,
+    executable: true,
+    backend: "gitlab",
+  },
+  {
+    category: "backlog-script",
+    name: "move",
+    suffix: "move.sh",
+    content: `#!/usr/bin/env bash
+# Move an issue to a new status by swapping the Status:: scoped label.
+# Scoped labels on the same scope are mutually exclusive in GitLab, so
+# adding the new one removes the old one atomically.
+# Usage: move.sh <number> <Status>
+set -euo pipefail
+
+# shellcheck source=./_config.sh
+. "\$(dirname "\$0")/_config.sh"
+
+if [ "\$#" -lt 2 ]; then
+  echo 'usage: move.sh <number> <Status>' >&2
+  echo '  Status one of: Backlog, Ready, "In progress", "In review", Done' >&2
+  exit 2
+fi
+NUM="\$1"
+STATUS="\$2"
+
+case "\$STATUS" in
+  Backlog|Ready|"In progress"|"In review"|Done) ;;
+  *)
+    echo "unknown status '\$STATUS' — expected: Backlog, Ready, 'In progress', 'In review', Done" >&2
+    exit 2
+    ;;
+esac
+
+# Find the existing Status:: label and remove it; add the new one.
+EXISTING=\$(glab issue view "\$NUM" --repo "\$PROJECT_ID" --output json 2>/dev/null \\
+  | jq -r '.labels[]? | select(startswith("Status::"))' | head -1 || true)
+
+if [ -n "\$EXISTING" ]; then
+  glab issue update "\$NUM" --repo "\$PROJECT_ID" \\
+    --unlabel "\$EXISTING" >/dev/null
+fi
+
+glab issue update "\$NUM" --repo "\$PROJECT_ID" \\
+  --label "Status::\$STATUS" >/dev/null
+
+echo "✓ #\$NUM → Status::\$STATUS"
+`,
+    executable: true,
+    backend: "gitlab",
+  },
+  {
+    category: "backlog-script",
+    name: "clarify-comment",
+    suffix: "clarify-comment.sh",
+    content: `#!/usr/bin/env bash
+# Post a clarification comment on a GitLab issue.
+# Usage: clarify-comment.sh <number> "<question>"
+set -euo pipefail
+
+# shellcheck source=./_config.sh
+. "\$(dirname "\$0")/_config.sh"
+
+if [ "\$#" -lt 2 ]; then
+  echo 'usage: clarify-comment.sh <number> "<question>"' >&2
+  exit 2
+fi
+
+glab issue note "\$1" --repo "\$PROJECT_ID" --message "\$2"
+`,
+    executable: true,
+    backend: "gitlab",
   },
   {
     category: "spec-root",
@@ -7157,9 +7425,9 @@ exit 0
     ".claude/hooks/check-backlog-prereqs.sh": {
       content: `#!/usr/bin/env bash
 # Self-gates on .specflow/installed.lock: if the project's backlog
-# backend is \`github\` and \`gh\` is missing or unauthenticated, prints a
-# stderr warning at SessionStart so the user knows before they try to
-# run a backlog command.
+# backend is \`github\` or \`gitlab\`, checks the corresponding CLI is
+# installed and authenticated. Prints a stderr warning at SessionStart
+# so the user knows before they try to run a backlog command.
 #
 # Always exits 0 — this is informational, not blocking.
 set -euo pipefail
@@ -7168,24 +7436,45 @@ LOCK="\$(pwd)/.specflow/installed.lock"
 [ -f "\$LOCK" ] || exit 0
 
 BACKEND=\$(awk '/^backlog_backend:/ {gsub(/[\\047"]/, "", \$2); print \$2; exit}' "\$LOCK")
-[ "\$BACKEND" = "github" ] || exit 0
 
-if ! command -v gh >/dev/null 2>&1; then
-  cat >&2 <<'WARN'
+case "\$BACKEND" in
+  github)
+    if ! command -v gh >/dev/null 2>&1; then
+      cat >&2 <<'WARN'
 warn: backlog backend is 'github' but the \`gh\` CLI is not on PATH.
       Install from https://cli.github.com — backlog scripts will fail
       until then.
 WARN
-  exit 0
-fi
-
-if ! gh auth status >/dev/null 2>&1; then
-  cat >&2 <<'WARN'
+      exit 0
+    fi
+    if ! gh auth status >/dev/null 2>&1; then
+      cat >&2 <<'WARN'
 warn: backlog backend is 'github' but \`gh\` is not authenticated.
       Run \`gh auth login\` (and \`gh auth refresh -s project\` if the
       Project scope is missing) — backlog scripts will fail until then.
 WARN
-fi
+    fi
+    ;;
+  gitlab)
+    if ! command -v glab >/dev/null 2>&1; then
+      cat >&2 <<'WARN'
+warn: backlog backend is 'gitlab' but the \`glab\` CLI is not on PATH.
+      Install from https://gitlab.com/gitlab-org/cli — backlog scripts
+      will fail until then.
+WARN
+      exit 0
+    fi
+    if ! glab auth status >/dev/null 2>&1; then
+      cat >&2 <<'WARN'
+warn: backlog backend is 'gitlab' but \`glab\` is not authenticated.
+      Run \`glab auth login\` — backlog scripts will fail until then.
+WARN
+    fi
+    ;;
+  *)
+    exit 0
+    ;;
+esac
 
 exit 0
 `,
