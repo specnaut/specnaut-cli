@@ -793,3 +793,145 @@ project_number: 4
     },
   );
 });
+
+// ── Plugin gap detection (#73 slice 7) ─────────────────────────────────────
+
+import type { PluginDetector } from "../../src/application/ports.ts";
+
+function fakePluginDetector(installed: boolean): PluginDetector {
+  return { isPluginInstalled: (_n: string) => Promise.resolve(installed) };
+}
+
+Deno.test("inspect: plugin gap check skipped when no pluginDetector is configured", async () => {
+  await withProjectDir(filledProject, async (dir) => {
+    const inspector = new FsProjectInspector();
+    const outcomes = await inspector.inspect(dir, "0.2.0");
+    const gapOutcomes = outcomes.filter((o) =>
+      o.name.startsWith(".claude/agents/") || o.name.startsWith(".claude/skills/")
+    );
+    assertEquals(gapOutcomes.length, 0);
+  });
+});
+
+Deno.test("inspect: plugin gap check emits no warnings when plugin IS installed", async () => {
+  await withProjectDir(filledProject, async (dir) => {
+    const inspector = new FsProjectInspector(fakePluginDetector(true));
+    const outcomes = await inspector.inspect(dir, "0.2.0");
+    const gapOutcomes = outcomes.filter((o) =>
+      o.name.startsWith(".claude/agents/") ||
+      o.name.startsWith(".claude/skills/specflow.")
+    );
+    assertEquals(gapOutcomes.length, 0);
+  });
+});
+
+Deno.test("inspect: plugin gap check warns for each missing covered path when plugin NOT installed", async () => {
+  await withProjectDir(filledProject, async (dir) => {
+    const inspector = new FsProjectInspector(fakePluginDetector(false));
+    const outcomes = await inspector.inspect(dir, "0.2.0");
+    const gapOutcomes = outcomes.filter((o) =>
+      (o.name.startsWith(".claude/agents/") ||
+        o.name.startsWith(".claude/skills/specflow.") ||
+        o.name === ".claude/skills/auto-chain/SKILL.md") &&
+      o.status === "warn"
+    );
+    // 9 agents + 10 commands + 2 skills = 21 covered paths, all missing
+    assertEquals(gapOutcomes.length, 21);
+    for (const o of gapOutcomes) {
+      assertEquals(o.message.includes("missing"), true);
+      assertEquals(o.message.includes("specflow upgrade"), true);
+      assertEquals(o.message.includes("/plugin install claude-specflow"), true);
+    }
+  });
+});
+
+Deno.test("inspect: plugin gap check skipped on non-claude harnesses", async () => {
+  await withProjectDir(
+    async (dir) => {
+      await Deno.mkdir(join(dir, ".specflow/memory"), { recursive: true });
+      await Deno.mkdir(join(dir, ".cursor"), { recursive: true });
+      await Deno.writeTextFile(
+        join(dir, ".specflow/memory/constitution.md"),
+        CONSTITUTION_FILLED,
+      );
+      await Deno.writeTextFile(
+        join(dir, ".specflow/installed.lock"),
+        `version: 2
+harness: cursor
+templates_version: 0.7.0
+entries: {}
+`,
+      );
+    },
+    async (dir) => {
+      const inspector = new FsProjectInspector(fakePluginDetector(false));
+      const outcomes = await inspector.inspect(dir, "0.7.0");
+      const gapOutcomes = outcomes.filter((o) => o.name.startsWith(".claude/"));
+      assertEquals(gapOutcomes.length, 0);
+    },
+  );
+});
+
+Deno.test("inspect: plugin gap check warns ONLY for the agents the user actually deleted", async () => {
+  await withProjectDir(
+    async (dir) => {
+      await filledProject(dir);
+      await Deno.mkdir(join(dir, ".claude/agents"), { recursive: true });
+      // Scaffold all 9 agents EXCEPT product-owner (simulating that
+      // one alone got deleted post-migration).
+      for (
+        const name of [
+          "code-reviewer",
+          "developer",
+          "devops-sre",
+          "qa-tester",
+          "review-coordinator",
+          "security-auditor",
+          "test-reviewer",
+          "workflow-manager",
+        ]
+      ) {
+        await Deno.writeTextFile(join(dir, `.claude/agents/${name}.md`), "stub");
+      }
+      // Scaffold all skills + commands too (only the agent gap should warn)
+      await Deno.mkdir(join(dir, ".claude/skills/auto-chain"), { recursive: true });
+      await Deno.writeTextFile(join(dir, ".claude/skills/auto-chain/SKILL.md"), "stub");
+      await Deno.mkdir(join(dir, ".claude/skills/specflow.groom"), { recursive: true });
+      await Deno.writeTextFile(
+        join(dir, ".claude/skills/specflow.groom/SKILL.md"),
+        "stub",
+      );
+      for (
+        const name of [
+          "analyze",
+          "checklist",
+          "clarify",
+          "constitution",
+          "implement",
+          "merge",
+          "plan",
+          "review",
+          "specify",
+          "tasks",
+        ]
+      ) {
+        await Deno.mkdir(join(dir, `.claude/skills/specflow.${name}`), {
+          recursive: true,
+        });
+        await Deno.writeTextFile(
+          join(dir, `.claude/skills/specflow.${name}/SKILL.md`),
+          "stub",
+        );
+      }
+    },
+    async (dir) => {
+      const inspector = new FsProjectInspector(fakePluginDetector(false));
+      const outcomes = await inspector.inspect(dir, "0.2.0");
+      const gapOutcomes = outcomes.filter((o) =>
+        o.name.startsWith(".claude/agents/") && o.status === "warn"
+      );
+      assertEquals(gapOutcomes.length, 1);
+      assertEquals(gapOutcomes[0].name, ".claude/agents/product-owner.md");
+    },
+  );
+});

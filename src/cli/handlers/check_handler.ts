@@ -4,6 +4,7 @@ import { RunChecksUseCase } from "../../application/run_checks.ts";
 import { DenoSubprocessRunner } from "../../infrastructure/deno_subprocess.ts";
 import { DenoEnvironmentProbe } from "../../infrastructure/deno_environment_probe.ts";
 import { FsProjectInspector } from "../../infrastructure/fs_project_inspector.ts";
+import { FsPluginDetector } from "../../infrastructure/fs_plugin_detector.ts";
 import { TEMPLATES_VERSION } from "../../templates_bundle.ts";
 import { type CheckOutcome, worstStatusOf } from "../../domain/check_result.ts";
 
@@ -31,7 +32,7 @@ function renderSection(title: string, outcomes: ReadonlyArray<CheckOutcome>) {
 export async function runCheck(intent: CheckIntent): Promise<number> {
   const runner = new DenoSubprocessRunner();
   const env = new DenoEnvironmentProbe(runner);
-  const inspector = new FsProjectInspector();
+  const inspector = new FsProjectInspector(new FsPluginDetector());
 
   const projectDir = intent.projectMode ? resolve(Deno.cwd()) : null;
   const uc = new RunChecksUseCase({ env, inspector });
