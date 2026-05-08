@@ -54,6 +54,7 @@ export class CopilotHarness implements Harness {
         content: isInstruction ? toCopilotInstructionMarkdown(entry) : entry.content,
         executable: entry.executable,
         ...(entry.category === "mergeable-project-root" ? { mergeBlock: "gitignore" } : {}),
+        ...(entry.skipIfExists ? { skipIfExists: true as const } : {}),
       };
     }
     return out;

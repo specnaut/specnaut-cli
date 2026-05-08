@@ -15,6 +15,8 @@ type CoreManifestEntry = {
   executable?: boolean;
   /** When set, the entry only applies if this backend is selected. */
   backend?: "local" | "github" | "gitlab";
+  /** When true, the file is only written if absent (placeholder semantics). */
+  skipIfExists?: boolean;
 };
 
 type HarnessStaticManifestEntry = {
@@ -68,6 +70,7 @@ async function buildCoreEntries(m: Manifest): Promise<string[]> {
     const content = await Deno.readTextFile(abs);
     const suffix = entry.suffix === undefined ? "null" : JSON.stringify(entry.suffix);
     const backend = entry.backend === undefined ? "null" : JSON.stringify(entry.backend);
+    const skipIfExists = entry.skipIfExists === true ? "true" : "false";
     lines.push(
       `  {\n` +
         `    category: ${JSON.stringify(entry.category)},\n` +
@@ -76,6 +79,7 @@ async function buildCoreEntries(m: Manifest): Promise<string[]> {
         `    content: \`${escapeTemplateLiteral(content)}\`,\n` +
         `    executable: ${entry.executable === true},\n` +
         `    backend: ${backend},\n` +
+        `    skipIfExists: ${skipIfExists},\n` +
         `  }`,
     );
   }

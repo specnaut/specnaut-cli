@@ -214,6 +214,7 @@ Success criteria must be **measurable** (specific metrics), **technology-agnosti
 `,
     executable: false,
     backend: null,
+    skipIfExists: false,
   },
   {
     category: "command",
@@ -388,6 +389,7 @@ Hooks with non-empty \`condition\` are deferred to the HookExecutor.
 `,
     executable: false,
     backend: null,
+    skipIfExists: false,
   },
   {
     category: "command",
@@ -549,6 +551,7 @@ You **MUST** consider the user input before proceeding (if not empty).
 `,
     executable: false,
     backend: null,
+    skipIfExists: false,
   },
   {
     category: "command",
@@ -761,6 +764,7 @@ Every task MUST strictly follow this format:
 `,
     executable: false,
     backend: null,
+    skipIfExists: false,
   },
   {
     category: "command",
@@ -1022,6 +1026,7 @@ After reporting, check if \`.specflow/extensions.yml\` exists in the project roo
 `,
     executable: false,
     backend: null,
+    skipIfExists: false,
   },
   {
     category: "command",
@@ -1232,6 +1237,7 @@ Note: This command assumes a complete task breakdown exists in tasks.md. If task
 `,
     executable: false,
     backend: null,
+    skipIfExists: false,
   },
   {
     category: "command",
@@ -1391,6 +1397,7 @@ Check if \`.specflow/extensions.yml\` exists in the project root.
 `,
     executable: false,
     backend: null,
+    skipIfExists: false,
   },
   {
     category: "command",
@@ -1568,6 +1575,7 @@ Hooks with non-empty \`condition\` are deferred to the HookExecutor.
 `,
     executable: false,
     backend: null,
+    skipIfExists: false,
   },
   {
     category: "command",
@@ -1611,6 +1619,7 @@ suggested action (e.g. \`/backlog update <id> --status done\`).
 `,
     executable: false,
     backend: null,
+    skipIfExists: false,
   },
   {
     category: "command",
@@ -1707,6 +1716,7 @@ STOP #2). If FAIL, stop and report to the user.
 `,
     executable: false,
     backend: null,
+    skipIfExists: false,
   },
   {
     category: "backlog-cmd",
@@ -1781,6 +1791,7 @@ Do not duplicate it here — the dispatcher defers to the agent.
 `,
     executable: false,
     backend: null,
+    skipIfExists: false,
   },
   {
     category: "agent",
@@ -2039,6 +2050,7 @@ missing key as \`parent: null\`.
 `,
     executable: false,
     backend: null,
+    skipIfExists: false,
   },
   {
     category: "agent",
@@ -2115,6 +2127,7 @@ failed, and what decision the next owner needs to make.
 `,
     executable: false,
     backend: null,
+    skipIfExists: false,
   },
   {
     category: "agent",
@@ -2170,6 +2183,7 @@ MEDIUM / LOW findings: <N>, list suppressed — see per-agent reports for detail
 `,
     executable: false,
     backend: null,
+    skipIfExists: false,
   },
   {
     category: "agent",
@@ -2224,6 +2238,7 @@ PASS if zero CRITICAL and zero HIGH findings. Otherwise FAIL.
 `,
     executable: false,
     backend: null,
+    skipIfExists: false,
   },
   {
     category: "agent",
@@ -2263,6 +2278,7 @@ Same \`FINDING\` / \`VERDICT\` structure as code-reviewer.
 `,
     executable: false,
     backend: null,
+    skipIfExists: false,
   },
   {
     category: "agent",
@@ -2300,6 +2316,7 @@ Same \`FINDING\` / \`VERDICT\` structure as code-reviewer.
 `,
     executable: false,
     backend: null,
+    skipIfExists: false,
   },
   {
     category: "agent",
@@ -2358,6 +2375,7 @@ QA SUMMARY
 `,
     executable: false,
     backend: null,
+    skipIfExists: false,
   },
   {
     category: "agent",
@@ -2419,6 +2437,7 @@ review or QA fails twice on the same issue family, stop and escalate.
 `,
     executable: false,
     backend: null,
+    skipIfExists: false,
   },
   {
     category: "agent",
@@ -2532,6 +2551,7 @@ End with a single \`VERDICT\` line: \`VERDICT: pass\` or
 `,
     executable: false,
     backend: null,
+    skipIfExists: false,
   },
   {
     category: "agent-memory",
@@ -2574,6 +2594,7 @@ across sessions and isn't captured elsewhere:
 `,
     executable: false,
     backend: null,
+    skipIfExists: false,
   },
   {
     category: "agent-memory",
@@ -2615,6 +2636,7 @@ survive across sessions and isn't captured elsewhere:
 `,
     executable: false,
     backend: null,
+    skipIfExists: false,
   },
   {
     category: "agent-memory",
@@ -2658,6 +2680,7 @@ survive across sessions and isn't captured elsewhere:
 `,
     executable: false,
     backend: null,
+    skipIfExists: false,
   },
   {
     category: "agent-memory",
@@ -2702,6 +2725,7 @@ should survive across sessions and isn't captured elsewhere:
 `,
     executable: false,
     backend: null,
+    skipIfExists: false,
   },
   {
     category: "agent-memory",
@@ -2746,6 +2770,7 @@ should survive across sessions and isn't captured elsewhere:
 `,
     executable: false,
     backend: null,
+    skipIfExists: false,
   },
   {
     category: "skill",
@@ -2847,6 +2872,7 @@ them resume manually from the last completed phase.
 `,
     executable: false,
     backend: null,
+    skipIfExists: false,
   },
   {
     category: "skill",
@@ -2943,6 +2969,7 @@ to be a **no-op when the project is healthy**.
 `,
     executable: false,
     backend: null,
+    skipIfExists: false,
   },
   {
     category: "backlog-skill",
@@ -3183,6 +3210,7 @@ The first time the PO runs against this project, it will create the 5
 `,
     executable: false,
     backend: null,
+    skipIfExists: false,
   },
   {
     category: "backlog-script",
@@ -3213,6 +3241,7 @@ done
 `,
     executable: true,
     backend: "local",
+    skipIfExists: false,
   },
   {
     category: "backlog-script",
@@ -3240,6 +3269,7 @@ cat "\${matches[0]}"
 `,
     executable: true,
     backend: "local",
+    skipIfExists: false,
   },
   {
     category: "backlog-script",
@@ -3302,6 +3332,7 @@ echo "  \$FILE"
 `,
     executable: true,
     backend: "local",
+    skipIfExists: false,
   },
   {
     category: "backlog-script",
@@ -3367,6 +3398,7 @@ echo "✓ #\$NUM → \$STATUS"
 `,
     executable: true,
     backend: "local",
+    skipIfExists: false,
   },
   {
     category: "backlog-script",
@@ -3407,6 +3439,7 @@ echo "✓ added clarification on #\$NUM"
 `,
     executable: true,
     backend: "local",
+    skipIfExists: false,
   },
   {
     category: "backlog-script",
@@ -3453,6 +3486,7 @@ export REPO REPO_OWNER REPO_NAME PROJECT_NUMBER
 `,
     executable: true,
     backend: "github",
+    skipIfExists: false,
   },
   {
     category: "backlog-script",
@@ -3507,6 +3541,7 @@ echo "\$JSON" | jq -r --argjson project "\$PROJECT_NUMBER" --arg filter "\$FILTE
 `,
     executable: true,
     backend: "github",
+    skipIfExists: false,
   },
   {
     category: "backlog-script",
@@ -3529,6 +3564,7 @@ gh issue view "\$1" --repo "\$REPO" --comments
 `,
     executable: true,
     backend: "github",
+    skipIfExists: false,
   },
   {
     category: "backlog-script",
@@ -3563,6 +3599,7 @@ echo "✓ attached to Project #\$PROJECT_NUMBER"
 `,
     executable: true,
     backend: "github",
+    skipIfExists: false,
   },
   {
     category: "backlog-script",
@@ -3623,6 +3660,7 @@ echo "✓ #\$NUM → \$STATUS"
 `,
     executable: true,
     backend: "github",
+    skipIfExists: false,
   },
   {
     category: "backlog-script",
@@ -3645,6 +3683,7 @@ gh issue comment "\$1" --repo "\$REPO" --body "\$2"
 `,
     executable: true,
     backend: "github",
+    skipIfExists: false,
   },
   {
     category: "backlog-script",
@@ -3690,6 +3729,7 @@ export PROJECT_ID
 `,
     executable: true,
     backend: "gitlab",
+    skipIfExists: false,
   },
   {
     category: "backlog-script",
@@ -3722,6 +3762,7 @@ echo "\$JSON" | jq -r --arg filter "\$FILTER" '
 `,
     executable: true,
     backend: "gitlab",
+    skipIfExists: false,
   },
   {
     category: "backlog-script",
@@ -3744,6 +3785,7 @@ glab issue view "\$1" --repo "\$PROJECT_ID" --comments
 `,
     executable: true,
     backend: "gitlab",
+    skipIfExists: false,
   },
   {
     category: "backlog-script",
@@ -3782,6 +3824,7 @@ echo "✓ created: \$URL"
 `,
     executable: true,
     backend: "gitlab",
+    skipIfExists: false,
   },
   {
     category: "backlog-script",
@@ -3829,6 +3872,7 @@ echo "✓ #\$NUM → Status::\$STATUS"
 `,
     executable: true,
     backend: "gitlab",
+    skipIfExists: false,
   },
   {
     category: "backlog-script",
@@ -3851,6 +3895,7 @@ glab issue note "\$1" --repo "\$PROJECT_ID" --message "\$2"
 `,
     executable: true,
     backend: "gitlab",
+    skipIfExists: false,
   },
   {
     category: "spec-root",
@@ -3870,6 +3915,7 @@ glab issue note "\$1" --repo "\$PROJECT_ID" --message "\$2"
 `,
     executable: false,
     backend: null,
+    skipIfExists: true,
   },
   {
     category: "spec-root",
@@ -3930,6 +3976,7 @@ _No tasks yet._
 `,
     executable: false,
     backend: null,
+    skipIfExists: false,
   },
   {
     category: "spec-root",
@@ -4066,6 +4113,7 @@ _No tasks yet._
 `,
     executable: false,
     backend: null,
+    skipIfExists: false,
   },
   {
     category: "spec-root",
@@ -4178,6 +4226,7 @@ directories captured above]
 `,
     executable: false,
     backend: null,
+    skipIfExists: false,
   },
   {
     category: "spec-root",
@@ -4437,6 +4486,7 @@ With multiple developers:
 `,
     executable: false,
     backend: null,
+    skipIfExists: false,
   },
   {
     category: "spec-root",
@@ -4485,6 +4535,7 @@ With multiple developers:
 `,
     executable: false,
     backend: null,
+    skipIfExists: false,
   },
   {
     category: "spec-root",
@@ -4543,6 +4594,7 @@ With multiple developers:
 `,
     executable: false,
     backend: null,
+    skipIfExists: false,
   },
   {
     category: "spec-root",
@@ -4579,6 +4631,7 @@ Auto-generated from all feature plans. Last updated: [DATE]
 `,
     executable: false,
     backend: null,
+    skipIfExists: false,
   },
   {
     category: "spec-root",
@@ -4777,6 +4830,7 @@ fi
 `,
     executable: true,
     backend: null,
+    skipIfExists: false,
   },
   {
     category: "spec-root",
@@ -5383,6 +5437,7 @@ except Exception:
 `,
     executable: true,
     backend: null,
+    skipIfExists: false,
   },
   {
     category: "spec-root",
@@ -5804,6 +5859,7 @@ fi
 `,
     executable: true,
     backend: null,
+    skipIfExists: false,
   },
   {
     category: "spec-root",
@@ -5885,6 +5941,7 @@ fi
 `,
     executable: true,
     backend: null,
+    skipIfExists: false,
   },
   {
     category: "spec-root",
@@ -6041,6 +6098,7 @@ if (\$Json) {
 `,
     executable: false,
     backend: null,
+    skipIfExists: false,
   },
   {
     category: "spec-root",
@@ -6623,6 +6681,7 @@ except Exception:
 }`,
     executable: false,
     backend: null,
+    skipIfExists: false,
   },
   {
     category: "spec-root",
@@ -7013,6 +7072,7 @@ if (\$Json) {
 `,
     executable: false,
     backend: null,
+    skipIfExists: false,
   },
   {
     category: "spec-root",
@@ -7082,6 +7142,7 @@ if (\$Json) {
 `,
     executable: false,
     backend: null,
+    skipIfExists: false,
   },
   {
     category: "project-root",
@@ -7115,6 +7176,7 @@ Generated by Specflow. Edit freely.
 `,
     executable: false,
     backend: null,
+    skipIfExists: true,
   },
   {
     category: "mergeable-project-root",
@@ -7125,6 +7187,7 @@ Generated by Specflow. Edit freely.
 `,
     executable: false,
     backend: null,
+    skipIfExists: false,
   },
 ];
 

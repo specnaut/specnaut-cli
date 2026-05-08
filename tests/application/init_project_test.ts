@@ -28,9 +28,9 @@ function fakeFsWriter(conflicts: string[] = []): FsWriter & { written: string[] 
     detectConflicts: () => Promise.resolve(conflicts),
     writeBundle: (bundle, targetDir) => {
       for (const dest of Object.keys(bundle)) written.push(`${targetDir}:${dest}`);
-      return Promise.resolve({ backups: [] });
+      return Promise.resolve({ backups: [], skippedSkipIfExists: [] });
     },
-    deletePaths: () => Promise.resolve({ backups: [] }),
+    deletePaths: () => Promise.resolve({ backups: [], skippedSkipIfExists: [] }),
   };
 }
 
@@ -221,9 +221,9 @@ Deno.test("InitProjectUseCase with force=true skips conflict detection and reque
     },
     writeBundle: (_b, _t, options) => {
       passedBackupExisting = options?.backupExisting === true;
-      return Promise.resolve({ backups: [] });
+      return Promise.resolve({ backups: [], skippedSkipIfExists: [] });
     },
-    deletePaths: () => Promise.resolve({ backups: [] }),
+    deletePaths: () => Promise.resolve({ backups: [], skippedSkipIfExists: [] }),
   };
   const useCase = new InitProjectUseCase({
     writer,
@@ -251,8 +251,9 @@ Deno.test("InitProjectUseCase returns backups array from writer report", async (
         backups: [
           { dest: ".claude/x.md", backupPath: ".claude/x.md.specflow.bak" },
         ],
+        skippedSkipIfExists: [],
       }),
-    deletePaths: () => Promise.resolve({ backups: [] }),
+    deletePaths: () => Promise.resolve({ backups: [], skippedSkipIfExists: [] }),
   };
   const useCase = new InitProjectUseCase({
     writer,

@@ -305,3 +305,89 @@ Deno.test("specflow bogus returns exit code 2", async () => {
   const { code } = await runSpecflow(["bogus"]);
   assertEquals(code, 2);
 });
+
+// ── Skip-if-exists placeholders (#119) ─────────────────────────────────────
+
+Deno.test("specflow init --here on a project with existing AGENTS.md does NOT error and leaves AGENTS.md untouched", async () => {
+  await withTempDir(async (dir) => {
+    const target = join(dir, "demo");
+    await Deno.mkdir(target, { recursive: true });
+    const userAgents = "# My Project\n\nMy own architecture rules.\nLine 3.\n";
+    await Deno.writeTextFile(join(target, "AGENTS.md"), userAgents);
+
+    const { code, stderr } = await runSpecflow(
+      ["init", "--here", "--no-git", "--ai", "claude", "--backlog", "local"],
+      { cwd: target },
+    );
+    assertEquals(code, 0);
+    assertEquals(
+      stderr.includes("would be overwritten"),
+      false,
+      "AGENTS.md should NOT trigger the conflict path",
+    );
+
+    // User content preserved verbatim
+    const after = await Deno.readTextFile(join(target, "AGENTS.md"));
+    assertEquals(after, userAgents);
+
+    // Init succeeded → other Specflow files installed
+    assertEquals(await exists(join(target, ".claude/CLAUDE.md")), true);
+    assertEquals(await exists(join(target, ".specflow/installed.lock")), true);
+
+    // Lock should NOT track AGENTS.md (it's user-owned)
+    const lock = await Deno.readTextFile(
+      join(target, ".specflow/installed.lock"),
+    );
+    assertEquals(
+      lock.includes("AGENTS.md"),
+      false,
+      "skip-if-exists files that pre-existed must not be in the lock",
+    );
+  });
+});
+
+Deno.test("specflow init on a fresh project writes AGENTS.md normally and tracks it in the lock", async () => {
+  await withTempDir(async (dir) => {
+    const { code } = await runSpecflow(
+      ["init", "demo", "--no-git", "--ai", "claude", "--backlog", "local"],
+      { cwd: dir },
+    );
+    assertEquals(code, 0);
+
+    const target = join(dir, "demo");
+    const agents = await Deno.readTextFile(join(target, "AGENTS.md"));
+    assertStringIncludes(agents, "AGENTS.md — Project Context");
+
+    const lock = await Deno.readTextFile(
+      join(target, ".specflow/installed.lock"),
+    );
+    assertStringIncludes(
+      lock,
+      "AGENTS.md",
+      "fresh-write skip-if-exists files DO get a lock entry",
+    );
+  });
+});
+
+Deno.test("specflow init --here on a project with existing constitution.md leaves it untouched", async () => {
+  await withTempDir(async (dir) => {
+    const target = join(dir, "demo");
+    await Deno.mkdir(join(target, ".specflow/memory"), { recursive: true });
+    const userConstitution = "# My Project Constitution\n\nMy own principles.\n";
+    await Deno.writeTextFile(
+      join(target, ".specflow/memory/constitution.md"),
+      userConstitution,
+    );
+
+    const { code } = await runSpecflow(
+      ["init", "--here", "--no-git", "--ai", "claude", "--backlog", "local"],
+      { cwd: target },
+    );
+    assertEquals(code, 0);
+
+    const after = await Deno.readTextFile(
+      join(target, ".specflow/memory/constitution.md"),
+    );
+    assertEquals(after, userConstitution);
+  });
+});

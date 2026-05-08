@@ -23,6 +23,13 @@ export type CoreEntry = {
    * Absent or `null` means the entry applies regardless of backend.
    */
   readonly backend?: BacklogBackend | null;
+  /**
+   * When `true`, the harness's `mapBundle` propagates this to the resulting
+   * `TemplateFile.skipIfExists`. Used for placeholder files (`AGENTS.md`,
+   * `.specflow/memory/constitution.md`) where the user's existing content
+   * is always more useful than our empty template — see #119.
+   */
+  readonly skipIfExists?: boolean;
 };
 
 export type CoreBundle = ReadonlyArray<CoreEntry>;

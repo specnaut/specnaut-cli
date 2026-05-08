@@ -13,6 +13,18 @@ export type TemplateFile = {
    * on disk, it is replaced; otherwise it is appended to the end.
    */
   mergeBlock?: string;
+  /**
+   * When `true`, the file is treated as a placeholder: the bundled `content`
+   * is only written when no file already exists at the destination. If a
+   * file is already there (e.g. brownfield project with an existing
+   * `AGENTS.md`), the binary leaves it untouched, no error, no `--force`
+   * needed. The user's existing content is always more useful than the
+   * empty placeholder we ship.
+   *
+   * Skip-if-exists files that pre-existed are NOT recorded in
+   * `installed.lock` — they are user-owned, not Specflow-managed.
+   */
+  skipIfExists?: true;
 };
 
 export type Bundle = Record<string, TemplateFile>;

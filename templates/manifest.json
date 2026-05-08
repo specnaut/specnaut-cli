@@ -51,7 +51,7 @@
     { "category": "backlog-script", "name": "move", "suffix": "move.sh", "source": "core/skills/backlog/scripts/gitlab/move.sh", "executable": true, "backend": "gitlab" },
     { "category": "backlog-script", "name": "clarify-comment", "suffix": "clarify-comment.sh", "source": "core/skills/backlog/scripts/gitlab/clarify-comment.sh", "executable": true, "backend": "gitlab" },
 
-    { "category": "spec-root", "name": "specify", "suffix": "memory/constitution.md", "source": "core/specflow/memory/constitution.md" },
+    { "category": "spec-root", "name": "specify", "suffix": "memory/constitution.md", "source": "core/specflow/memory/constitution.md", "skipIfExists": true },
     { "category": "spec-root", "name": "specify", "suffix": "backlog.md", "source": "core/specflow/backlog.md" },
     { "category": "spec-root", "name": "specify", "suffix": "templates/spec-template.md", "source": "core/specflow/templates/spec-template.md" },
     { "category": "spec-root", "name": "specify", "suffix": "templates/plan-template.md", "source": "core/specflow/templates/plan-template.md" },
@@ -68,7 +68,7 @@
     { "category": "spec-root", "name": "specify", "suffix": "scripts/powershell/create-new-feature.ps1", "source": "core/specflow/scripts/powershell/create-new-feature.ps1" },
     { "category": "spec-root", "name": "specify", "suffix": "scripts/powershell/setup-plan.ps1", "source": "core/specflow/scripts/powershell/setup-plan.ps1" },
 
-    { "category": "project-root", "name": "root", "suffix": "AGENTS.md", "source": "core/root/AGENTS.md" },
+    { "category": "project-root", "name": "root", "suffix": "AGENTS.md", "source": "core/root/AGENTS.md", "skipIfExists": true },
     { "category": "mergeable-project-root", "name": "root", "suffix": ".gitignore", "source": "core/root/.gitignore" }
   ],
   "harness_static": [

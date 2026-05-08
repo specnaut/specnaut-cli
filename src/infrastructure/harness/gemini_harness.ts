@@ -72,6 +72,7 @@ export class GeminiHarness implements Harness {
           out[`.specflow/${entry.suffix}`] = {
             content: entry.content,
             executable: entry.executable,
+            ...(entry.skipIfExists ? { skipIfExists: true as const } : {}),
           };
           break;
         case "project-root":
@@ -79,6 +80,7 @@ export class GeminiHarness implements Harness {
           out[entry.suffix] = {
             content: entry.content,
             executable: entry.executable,
+            ...(entry.skipIfExists ? { skipIfExists: true as const } : {}),
           };
           break;
         case "mergeable-project-root":
