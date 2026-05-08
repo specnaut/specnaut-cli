@@ -72,6 +72,22 @@ export interface FsReader {
   readText(projectDir: string, rel: string): Promise<string | null>;
 }
 
+/**
+ * Detects whether a Claude Code plugin is currently installed.
+ *
+ * The default implementation probes
+ * `~/.claude/plugins/cache/<name>/` (per the Claude Code
+ * discover-plugins docs); test seams can stub this to return any value.
+ *
+ * Used by the upgrade use case to drive the v0.x → plugin migration
+ * table for issue #73: when the plugin is installed, vanilla on-disk
+ * agent files are auto-migrated; customized files are preserved with
+ * a warning. See `docs/superpowers/specs/2026-05-08-claude-plugin-design.md`.
+ */
+export interface PluginDetector {
+  isPluginInstalled(name: string): Promise<boolean>;
+}
+
 import type { CoreBundle } from "../domain/core_bundle.ts";
 import type { BacklogBackend } from "../domain/installed_lock.ts";
 
