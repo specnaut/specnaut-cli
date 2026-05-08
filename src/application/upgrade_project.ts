@@ -8,7 +8,7 @@ import { canonicalBlockBody, extractBlock } from "../domain/merge_block.ts";
 import { isPluginCoveredPath } from "../domain/plugin_coverage.ts";
 
 /** The plugin name used for both the install probe and the cache directory. */
-export const PLUGIN_NAME = "claude-specflow";
+export const PLUGIN_NAME = "specflow-plugin";
 
 export type UpgradeProjectInput = {
   projectDir: string;

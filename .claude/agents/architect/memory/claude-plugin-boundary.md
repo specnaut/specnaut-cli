@@ -1,6 +1,6 @@
 ---
 name: claude-plugin-boundary
-description: Which Specflow templates go to the claude-specflow plugin vs stay binary-owned — decision from issue #73 design
+description: Which Specflow templates go to the specflow-plugin plugin vs stay binary-owned — decision from issue #73 design
 type: decision
 ---
 
@@ -19,4 +19,4 @@ $(pwd)/.specflow/installed.lock, and cannot be conditionally rendered.
 - All harness-specific static files (CLAUDE.md, settings.json, loop.md, dispatch-agent.sh): binary only (reference project-local paths)
 - spec-root, agent-memory, project-root files: binary only (project-stateful by definition)
 
-Plugin skills are namespaced (/claude-specflow:specify); binary-scaffolded project skills keep the short form (/specify). Both coexist.
+Plugin skills are namespaced (/specflow-plugin:specify); binary-scaffolded project skills keep the short form (/specify). Both coexist.

@@ -227,12 +227,12 @@ function renderSummary(plan: UpgradePlan, from: string, to: string) {
     console.log();
   }
   if (groups.migrated.length > 0) {
-    console.log(bold("  migrated to claude-specflow plugin (backed up + removed)"));
+    console.log(bold("  migrated to specflow-plugin plugin (backed up + removed)"));
     for (const a of groups.migrated) console.log(cyan(`    → ${a.dest}`));
     console.log();
   }
   if (groups.deferred.length > 0) {
-    console.log(bold("  deferred to claude-specflow plugin (was missing on disk)"));
+    console.log(bold("  deferred to specflow-plugin plugin (was missing on disk)"));
     for (const a of groups.deferred) console.log(dim(`    · ${a.dest}`));
     console.log();
   }

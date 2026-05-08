@@ -7,7 +7,7 @@ export type UpgradeAction =
     dest: string;
     reason: "customized";
     /**
-     * True when the `claude-specflow` plugin owns this path AND the
+     * True when the `specflow-plugin` plugin owns this path AND the
      * plugin is installed on the host. The handler surfaces an extra
      * warn line in this case ("plugin version is also available;
      * reconcile manually or pass --force"); the file content stays
@@ -44,7 +44,7 @@ export type UpgradePlan = ReadonlyArray<UpgradeAction>;
  *
  * Plus two parameters that drive the v0.x → plugin migration table for
  * issue #73:
- *   - `pluginInstalled`  : whether the `claude-specflow` plugin is on
+ *   - `pluginInstalled`  : whether the `specflow-plugin` plugin is on
  *                          the host (probed at use-case entry by the
  *                          `PluginDetector` port).
  *   - `isPluginCovered`  : predicate `(dest) => boolean` returning true

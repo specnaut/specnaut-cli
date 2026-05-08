@@ -1,7 +1,7 @@
 import type { KnownHarness } from "./installed_lock.ts";
 
 /**
- * Pure predicate: does the `claude-specflow` plugin own a copy of the
+ * Pure predicate: does the `specflow-plugin` plugin own a copy of the
  * file at `dest` (relative to the project root)?
  *
  * Used by the upgrade use case to decide whether to apply the v0.x →
@@ -53,7 +53,7 @@ export function isPluginCoveredPath(
 
 /**
  * The canonical list of project-relative paths the binary scaffolds for
- * the Claude harness AND the `claude-specflow` plugin owns. Used by
+ * the Claude harness AND the `specflow-plugin` plugin owns. Used by
  * `check --project` to detect the "plugin uninstalled after migration"
  * gap: each path that is missing on disk AND for which the plugin is
  * not installed is a recoverable hole the user should know about

@@ -64,7 +64,7 @@ async function writeVersions(next: string): Promise<void> {
   );
   await Deno.writeTextFile(verPath, updatedVer);
 
-  // Lockstep the claude-specflow plugin manifest (#73 slice 8). The
+  // Lockstep the specflow-plugin plugin manifest (#73 slice 8). The
   // release workflow's pre-flight step compares deno.json `version`
   // against this file's `version` and fails fast on drift.
   const pluginManifestPath = "plugin/.claude-plugin/plugin.json";
