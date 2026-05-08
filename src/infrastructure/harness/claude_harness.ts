@@ -7,7 +7,10 @@ import { applyBackend, backlogScriptDestination } from "./backlog_filter.ts";
 function destinationFor(entry: CoreEntry): string {
   switch (entry.category) {
     case "command":
-      return `.claude/commands/specflow.${entry.name}.md`;
+      // Claude harness uses skill-folder format for specflow.* commands
+      // (per the modern Claude Code convention — flat command files are
+      // deprecated). Other harnesses keep their existing destinations.
+      return `.claude/skills/specflow.${entry.name}/SKILL.md`;
     case "backlog-cmd":
       return `.claude/commands/${entry.name}.md`;
     case "agent":

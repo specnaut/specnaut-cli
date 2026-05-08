@@ -17,15 +17,20 @@ Deno.test("ClaudeHarness.mapBundle emits the Claude tree", () => {
   // .claude/CLAUDE.md + .claude/scripts/dispatch-agent.sh + .claude/loop.md
   // + .claude/settings.json + 3 .claude/hooks/*.sh
   assertEquals(keys.length, 58);
+  // specflow.* commands ship as skill folders (#76)
+  assert(".claude/skills/specflow.specify/SKILL.md" in mapped);
+  assert(".claude/skills/specflow.review/SKILL.md" in mapped);
+  // /backlog stays as a flat command (different category)
+  assert(".claude/commands/backlog.md" in mapped);
+  // Bundled assets unchanged
   assert(".claude/skills/specflow.groom/SKILL.md" in mapped);
   assert(".claude/loop.md" in mapped);
   assert(".claude/settings.json" in mapped);
   assert(".claude/hooks/protect-generated.sh" in mapped);
   assert(".claude/hooks/log-subagent.sh" in mapped);
   assert(".claude/hooks/check-backlog-prereqs.sh" in mapped);
-  // Spot-check canonical paths
-  assert(".claude/commands/specflow.specify.md" in mapped);
-  assert(".claude/commands/backlog.md" in mapped);
+  // Spot-check canonical paths (specflow.* moved to skills/)
+  assert(!(".claude/commands/specflow.specify.md" in mapped));
   assert(".claude/agents/product-owner.md" in mapped);
   assert(".claude/skills/auto-chain/SKILL.md" in mapped);
   assert(".claude/skills/backlog/SKILL.md" in mapped);
