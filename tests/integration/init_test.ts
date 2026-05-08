@@ -79,17 +79,20 @@ Deno.test("specflow init <name> writes a complete tree", async () => {
       await exists(join(root, ".claude/skills/specflow-groom/SKILL.md")),
       false,
     );
-    // The /backlog command (different category) keeps the flat-file format.
+    // The /backlog command keeps the flat-file format. The /specflow
+    // command is a thin slash-command shim added post-v1.0.0 so users
+    // can type `/specflow specify ...` literally (Claude-only — see F3).
     assertEquals(await exists(join(root, ".claude/commands/backlog.md")), true);
+    assertEquals(await exists(join(root, ".claude/commands/specflow.md")), true);
     assertEquals(await exists(join(root, ".claude/agents/product-owner.md")), true);
     assertEquals(await exists(join(root, ".claude/agents/devops-sre.md")), true);
     assertEquals(await exists(join(root, ".claude/skills/auto-chain/SKILL.md")), true);
 
-    // Only the backlog command stays in .claude/commands/
+    // Two commands ship at the moment: backlog + specflow router.
     const commandsCount = (await Array.fromAsync(
       Deno.readDir(join(root, ".claude/commands")),
     )).length;
-    assertEquals(commandsCount, 1);
+    assertEquals(commandsCount, 2);
     // 9 agent .md files + 5 memory subfolders (product-owner, developer,
     // qa-tester, devops-sre, security-auditor)
     const agentDirEntries = await Array.fromAsync(
@@ -267,11 +270,9 @@ Deno.test("specflow init on a previously-initialised project recommends upgrade 
     assertEquals(code, 3);
     assertStringIncludes(stderr, "would be overwritten");
     assertStringIncludes(stderr, "specflow upgrade");
-    assertEquals(
-      stderr.includes("specflow init --here --force"),
-      false,
-      "must not suggest --force when a lock is present",
-    );
+    // Post-#129/F4: --force is also offered as an escape hatch (e.g. for
+    // switching harness or backlog backend). Both options surface.
+    assertStringIncludes(stderr, "specflow init --here --force");
   });
 });
 

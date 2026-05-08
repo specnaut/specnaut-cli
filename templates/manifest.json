@@ -76,6 +76,7 @@
   ],
   "harness_static": [
     { "harness": "claude", "destination": ".claude/CLAUDE.md", "source": "harness-specific/claude/CLAUDE.md" },
+    { "harness": "claude", "destination": ".claude/commands/specflow.md", "source": "harness-specific/claude/commands/specflow.md" },
     { "harness": "claude", "destination": ".claude/scripts/dispatch-agent.sh", "source": "harness-specific/claude/scripts/dispatch-agent.sh", "executable": true },
     { "harness": "claude", "destination": ".claude/loop.md", "source": "harness-specific/claude/loop.md" },
     { "harness": "claude", "destination": ".claude/settings.json", "source": "harness-specific/claude/settings.json" },

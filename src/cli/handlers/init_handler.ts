@@ -73,7 +73,12 @@ function printConflictsError(
     console.error(
       `This project was previously initialised by Specflow — run ${
         bold("specflow upgrade")
-      } to update the managed files in place.`,
+      } to update the managed files in place,`,
+    );
+    console.error(
+      `or re-run with ${
+        bold("specflow init --here --force")
+      } to overwrite (existing files are backed up to *.specflow.bak).`,
     );
   } else {
     console.error(
