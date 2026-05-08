@@ -831,12 +831,15 @@ Deno.test("inspect: plugin gap check warns for each missing covered path when pl
     const outcomes = await inspector.inspect(dir, "0.2.0");
     const gapOutcomes = outcomes.filter((o) =>
       (o.name.startsWith(".claude/agents/") ||
-        o.name.startsWith(".claude/skills/specflow-") ||
+        o.name.startsWith(".claude/skills/specflow/") ||
+        o.name === ".claude/skills/specflow/SKILL.md" ||
+        o.name === ".claude/skills/specflow-review/SKILL.md" ||
         o.name === ".claude/skills/auto-chain/SKILL.md") &&
       o.status === "warn"
     );
-    // 9 agents + 10 commands + 2 skills = 21 covered paths, all missing
-    assertEquals(gapOutcomes.length, 21);
+    // 9 agents + 1 router skill + 11 phase docs + specflow-review alias +
+    // auto-chain = 23 covered paths, all missing.
+    assertEquals(gapOutcomes.length, 23);
     for (const o of gapOutcomes) {
       assertEquals(o.message.includes("missing"), true);
       assertEquals(o.message.includes("specflow upgrade"), true);

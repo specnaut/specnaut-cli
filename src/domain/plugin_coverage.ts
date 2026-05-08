@@ -20,16 +20,14 @@ import type { KnownHarness } from "./installed_lock.ts";
  * Cursor/Codex/Gemini/etc. projects keep their on-disk files binary-
  * owned regardless of plugin install state on the host machine.
  *
- * Coverage map (per architect's design at
- * `docs/superpowers/specs/2026-05-08-claude-plugin-design.md`):
+ * Coverage map (post-consolidation, v1.0.0):
  *
  *   - `.claude/agents/<name>.md` (excluding `architect.md` — that's a
  *     contributor-only agent, not bundled into user projects)
- *   - `.claude/skills/specflow-<name>/SKILL.md` — the 10 slash commands
- *     scaffolded as skill folders since #76 (hyphen separator —
- *     Claude Code rejects dots in skill names per #123)
+ *   - `.claude/skills/specflow/SKILL.md` — the consolidated router skill
+ *   - `.claude/skills/specflow/phases/<phase>.md` — the 11 phase docs
+ *   - `.claude/skills/specflow-review/SKILL.md` — auto-invoke alias
  *   - `.claude/skills/auto-chain/SKILL.md`
- *   - `.claude/skills/specflow-groom/SKILL.md`
  *
  * Everything else (project-stateful files in `.specflow/`, harness-
  * static files like `.claude/settings.json`, hooks, `CLAUDE.md`,
@@ -44,10 +42,10 @@ export function isPluginCoveredPath(
   const agentMatch = dest.match(/^\.claude\/agents\/([^/]+)\.md$/);
   if (agentMatch !== null) return agentMatch[1] !== "architect";
 
-  if (/^\.claude\/skills\/specflow-[a-z]+\/SKILL\.md$/.test(dest)) return true;
-
+  if (dest === ".claude/skills/specflow/SKILL.md") return true;
+  if (/^\.claude\/skills\/specflow\/phases\/[a-z]+\.md$/.test(dest)) return true;
+  if (dest === ".claude/skills/specflow-review/SKILL.md") return true;
   if (dest === ".claude/skills/auto-chain/SKILL.md") return true;
-  if (dest === ".claude/skills/specflow-groom/SKILL.md") return true;
 
   return false;
 }
@@ -61,9 +59,9 @@ export function isPluginCoveredPath(
  * (either re-install the plugin or run `specflow upgrade` to restore
  * the bundled snapshot).
  *
- * Kept in sync with `isPluginCoveredPath` above. Total: 21 paths
- * (9 agents excluding architect + 10 specflow-* commands as skill
- * folders + auto-chain + specflow-groom).
+ * Kept in sync with `isPluginCoveredPath` above. Total: 23 paths
+ * (9 agents excluding architect + 1 router skill + 11 phase docs +
+ * specflow-review alias + auto-chain).
  */
 export const PLUGIN_COVERED_PATHS_CLAUDE: ReadonlyArray<string> = [
   ...[
@@ -77,18 +75,20 @@ export const PLUGIN_COVERED_PATHS_CLAUDE: ReadonlyArray<string> = [
     "test-reviewer",
     "workflow-manager",
   ].map((name) => `.claude/agents/${name}.md`),
+  ".claude/skills/specflow/SKILL.md",
   ...[
-    "analyze",
-    "checklist",
-    "clarify",
-    "constitution",
-    "implement",
-    "merge",
-    "plan",
-    "review",
     "specify",
+    "clarify",
+    "plan",
     "tasks",
-  ].map((name) => `.claude/skills/specflow-${name}/SKILL.md`),
+    "analyze",
+    "implement",
+    "review",
+    "merge",
+    "constitution",
+    "checklist",
+    "groom",
+  ].map((name) => `.claude/skills/specflow/phases/${name}.md`),
+  ".claude/skills/specflow-review/SKILL.md",
   ".claude/skills/auto-chain/SKILL.md",
-  ".claude/skills/specflow-groom/SKILL.md",
 ];

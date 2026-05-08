@@ -15,12 +15,16 @@ export const WINDSURF_WORKFLOW_MAX_CHARS = 12_000;
 
 function destinationFor(entry: CoreEntry): string {
   switch (entry.category) {
-    case "command":
     case "backlog-cmd":
     case "agent":
     case "skill":
     case "backlog-skill":
       return `.windsurf/workflows/${skillFolderName(entry)}.md`;
+    case "phase":
+      // Windsurf is flat — no nested skill folders. Each phase doc
+      // becomes a sibling workflow file the router references by name.
+      if (!entry.suffix) throw new Error(`phase needs suffix: ${entry.name}`);
+      return `.windsurf/workflows/specflow-${entry.suffix.replace(/\.md$/, "")}.md`;
     case "backlog-script":
       return backlogScriptDestination(entry);
     case "agent-memory":

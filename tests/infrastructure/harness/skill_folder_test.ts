@@ -9,16 +9,20 @@ function entry(category: CoreEntry["category"], name: string): CoreEntry {
   return { category, name, suffix: null, content: "", executable: false };
 }
 
-Deno.test("skillFolderName: command → specflow-<name>", () => {
-  assertEquals(skillFolderName(entry("command", "specify")), "specflow-specify");
-});
-
 Deno.test("skillFolderName: backlog-cmd → specflow-<name>", () => {
   assertEquals(skillFolderName(entry("backlog-cmd", "backlog")), "specflow-backlog");
 });
 
 Deno.test("skillFolderName: skill → specflow-<name>", () => {
   assertEquals(skillFolderName(entry("skill", "auto-chain")), "specflow-auto-chain");
+});
+
+Deno.test("skillFolderName: skill named 'specflow' is not double-prefixed", () => {
+  assertEquals(skillFolderName(entry("skill", "specflow")), "specflow");
+});
+
+Deno.test("skillFolderName: skill already starting with 'specflow-' is kept as-is", () => {
+  assertEquals(skillFolderName(entry("skill", "specflow-review")), "specflow-review");
 });
 
 Deno.test("skillFolderName: agent → specflow-agent-<name>", () => {

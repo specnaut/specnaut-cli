@@ -50,10 +50,19 @@ Deno.test("specflow init --ai codex scaffolds a Codex layout", async () => {
 
     const root = join(parent, "demo");
 
-    // Codex team-shared skills
-    assertEquals(await exists(join(root, ".agents/skills/specflow-specify/SKILL.md")), true);
+    // Codex team-shared skills (v1.0.0 consolidated layout)
+    assertEquals(await exists(join(root, ".agents/skills/specflow/SKILL.md")), true);
+    assertEquals(
+      await exists(join(root, ".agents/skills/specflow/phases/specify.md")),
+      true,
+    );
     assertEquals(await exists(join(root, ".agents/skills/specflow-backlog/SKILL.md")), true);
     assertEquals(await exists(join(root, ".agents/skills/specflow-auto-chain/SKILL.md")), true);
+    // Old per-phase folders are gone post-consolidation.
+    assertEquals(
+      await exists(join(root, ".agents/skills/specflow-specify/SKILL.md")),
+      false,
+    );
 
     // Codex subagents (TOML)
     assertEquals(await exists(join(root, ".codex/agents/product-owner.toml")), true);
@@ -65,10 +74,12 @@ Deno.test("specflow init --ai codex scaffolds a Codex layout", async () => {
     assertEquals(typeof parsed.description, "string");
     assertEquals(typeof parsed.developer_instructions, "string");
 
+    // Top-level skill folders post-consolidation: specflow router +
+    // auto-chain + specflow-review alias + specflow-backlog = 4.
     const agentsSkillsCount = (await Array.fromAsync(
       Deno.readDir(join(root, ".agents/skills")),
     )).length;
-    assertEquals(agentsSkillsCount, 13);
+    assertEquals(agentsSkillsCount, 4);
     const codexAgentsCount = (await Array.fromAsync(
       Deno.readDir(join(root, ".codex/agents")),
     )).length;

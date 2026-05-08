@@ -5,11 +5,17 @@ import type { CoreBundle } from "../../../src/domain/core_bundle.ts";
 
 const SAMPLE: CoreBundle = [
   {
-    category: "command",
-    name: "specify",
+    category: "skill",
+    name: "specflow",
     suffix: null,
-    content:
-      "---\nname: specify\ndescription: Scaffold feature spec\n---\n\n# Body\n\nDo the thing.\n",
+    content: "---\nname: specflow\ndescription: Specflow router\n---\n\n# Body\n\nRouter.\n",
+    executable: false,
+  },
+  {
+    category: "phase",
+    name: "specify",
+    suffix: "specify.md",
+    content: "# Specify phase\n\nDo the thing.\n",
     executable: false,
   },
   {
@@ -56,18 +62,16 @@ Deno.test("GeminiHarness.key and displayName", () => {
   assertEquals(h.displayName, "Gemini CLI");
 });
 
-Deno.test("GeminiHarness maps commands to .gemini/commands/specflow-<name>.toml as parseable TOML", () => {
+Deno.test("GeminiHarness maps router skill to .gemini/skills/specflow/SKILL.md", () => {
   const h = new GeminiHarness();
   const mapped = h.mapBundle(SAMPLE, { backlogBackend: "local" });
-  const cmd = mapped[".gemini/commands/specflow-specify.toml"];
-  assert(cmd, "command TOML not emitted");
-  const parsed = parseToml(cmd.content);
-  assertEquals(parsed.description, "Scaffold feature spec");
-  assert(typeof parsed.prompt === "string");
-  assert(
-    (parsed.prompt as string).includes("Do the thing"),
-    "command body should land in `prompt` field",
-  );
+  assert(".gemini/skills/specflow/SKILL.md" in mapped);
+});
+
+Deno.test("GeminiHarness maps phase docs under .gemini/skills/specflow/phases/", () => {
+  const h = new GeminiHarness();
+  const mapped = h.mapBundle(SAMPLE, { backlogBackend: "local" });
+  assert(".gemini/skills/specflow/phases/specify.md" in mapped);
 });
 
 Deno.test("GeminiHarness maps backlog-cmd to .gemini/commands/specflow-backlog.toml", () => {
@@ -118,8 +122,8 @@ Deno.test("GeminiHarness emits no Claude/Cursor/Codex artefacts", () => {
 
 Deno.test("GeminiHarness omits TOML description when source frontmatter has none", () => {
   const core: CoreBundle = [{
-    category: "command",
-    name: "specify",
+    category: "backlog-cmd",
+    name: "backlog",
     suffix: null,
     content: "no frontmatter at all\n",
     executable: false,
@@ -127,7 +131,7 @@ Deno.test("GeminiHarness omits TOML description when source frontmatter has none
   const h = new GeminiHarness();
   const mapped = h.mapBundle(core, { backlogBackend: "local" });
   const parsed = parseToml(
-    mapped[".gemini/commands/specflow-specify.toml"].content,
+    mapped[".gemini/commands/specflow-backlog.toml"].content,
   );
   assertEquals("description" in parsed, false);
   assertEquals(parsed.prompt, "no frontmatter at all\n");

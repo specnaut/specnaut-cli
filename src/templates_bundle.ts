@@ -2,26 +2,114 @@
 import type { CoreBundle } from "./domain/core_bundle.ts";
 import type { TemplateFile } from "./domain/template.ts";
 
-export const TEMPLATES_VERSION = "0.7.0";
+export const TEMPLATES_VERSION = "1.0.0";
 
 export const CORE_BUNDLE: CoreBundle = [
   {
-    category: "command",
-    name: "specify",
+    category: "skill",
+    name: "specflow",
     suffix: null,
     content: `---
+name: specflow
 disable-model-invocation: true
-description: Create or update the feature specification from a natural language feature description.
-handoffs: 
-  - label: Build Technical Plan
-    agent: specflow-plan
-    prompt: Create a plan for the spec. I am building with...
-  - label: Clarify Spec Requirements
-    agent: specflow-clarify
-    prompt: Clarify specification requirements
-    send: true
+description: Specflow workflow router — entry point for the spec-driven pipeline. \`/specflow <phase> [args]\` dispatches to a single phase (specify, clarify, plan, tasks, analyze, implement, review, merge, constitution, checklist, groom). \`/specflow\` with no args prints the workflow overview.
+when_to_use: |
+  Trigger phrases that should route here:
+  - specify: "spec out a feature", "write a spec", "create a specification"
+  - clarify: "clarify requirements", "fill in gaps in the spec"
+  - plan: "plan a feature", "build a technical plan"
+  - tasks: "generate tasks", "break down the plan"
+  - analyze: "check consistency", "analyze artifacts"
+  - implement: "implement the feature", "start coding"
+  - review: "review the implementation", "run quality gates"
+  - merge: "merge the branch", "ship the feature"
+  - constitution: "update the constitution", "edit project rules"
+  - checklist: "generate a checklist"
+  - groom: "groom the backlog", "run a hygiene pass"
 ---
 
+# Specflow router
+
+\`\$ARGUMENTS\` carries the user's input. Parse it as \`<phase> [rest]\`:
+
+- The first token is the phase name.
+- Everything after the first whitespace is the argument string for that phase.
+
+If \`\$ARGUMENTS\` is empty, render the **Workflow overview** below and stop. Do not pick a phase yourself.
+
+## Phase index
+
+| Phase | Reference | One-liner |
+|-------|-----------|-----------|
+| \`specify\` | \`phases/specify.md\` | Create or update the feature spec from a natural-language description. |
+| \`clarify\` | \`phases/clarify.md\` | Resolve ambiguities in the spec via structured questioning. |
+| \`plan\` | \`phases/plan.md\` | Generate the technical plan, research, data model, contracts, quickstart. |
+| \`tasks\` | \`phases/tasks.md\` | Produce \`tasks.md\` from the plan. |
+| \`analyze\` | \`phases/analyze.md\` | Cross-artifact consistency check (spec ↔ plan ↔ tasks). |
+| \`implement\` | \`phases/implement.md\` | Run the developer → review-coordinator → qa-tester pipeline against \`tasks.md\`. |
+| \`review\` | \`phases/review.md\` | Final quality scan over the implementation. |
+| \`merge\` | \`phases/merge.md\` | Pre-merge validation and merge the feature branch. |
+| \`constitution\` | \`phases/constitution.md\` | Edit the project's \`constitution.md\` rules. |
+| \`checklist\` | \`phases/checklist.md\` | Generate a quality checklist for the current spec. |
+| \`groom\` | \`phases/groom.md\` | Backlog hygiene pass via the product-owner agent. |
+
+## Routing
+
+1. **Read** the phase reference file (\`phases/<phase>.md\`) for the requested phase using the \`Read\` tool.
+2. **Substitute** the remainder of \`\$ARGUMENTS\` for the phase's input.
+3. **Execute** the procedure in the reference file end-to-end.
+
+Unknown phase → print the index above and stop.
+
+## Workflow overview
+
+\`\`\`
+specify → clarify → plan → tasks → analyze → implement → review → merge
+                                                                    ▲
+                                                          STOP for pre-merge validation
+\`\`\`
+
+\`constitution\`, \`checklist\`, and \`groom\` are out-of-band utilities, not part of the linear flow.
+
+## Typical flow
+
+\`\`\`
+/specflow specify "Add OAuth2 login"
+  → spec drafted in .specflow/specs/<NNN>-add-oauth2-login/spec.md
+
+/specflow clarify
+  → resolves any [NEEDS CLARIFICATION] markers
+
+/specflow plan
+  → research, data-model, contracts, quickstart written
+
+/specflow tasks
+  → tasks.md generated
+
+/specflow analyze
+  → cross-artifact consistency check
+
+/specflow implement
+  → developer → review-coordinator → qa-tester pipeline
+
+/specflow review
+  → final quality scan
+
+/specflow merge
+  → pre-merge validation + merge
+\`\`\`
+
+For an end-to-end run that auto-chains the silent gates, use \`/auto-chain specify "<feature>"\`.
+`,
+    executable: false,
+    backend: null,
+    skipIfExists: false,
+  },
+  {
+    category: "phase",
+    name: "specify",
+    suffix: "specify.md",
+    content: `
 ## User Input
 
 \`\`\`text
@@ -45,7 +133,7 @@ Hooks with non-empty \`condition\` are deferred to the HookExecutor.
 
 ## Outline
 
-The text the user typed after \`__SPECFLOW_COMMAND_SPECIFY__\` is the feature description. Do not ask the user to repeat it unless they provided an empty command.
+The text the user typed after \`/specflow specify\` is the feature description. Do not ask the user to repeat it unless they provided an empty command.
 
 Given that feature description, do this:
 
@@ -81,10 +169,10 @@ Given that feature description, do this:
      { "feature_directory": "<resolved feature dir>" }
      \`\`\`
      Write the actual resolved path (e.g., \`.specflow/specs/003-user-auth\`), not the literal string.
-     This lets downstream commands (\`__SPECFLOW_COMMAND_PLAN__\`, \`__SPECFLOW_COMMAND_TASKS__\`, etc.) locate the feature directory.
+     This lets downstream commands (\`/specflow plan\`, \`/specflow tasks\`, etc.) locate the feature directory.
 
    **IMPORTANT**:
-   - Create only one feature per \`__SPECFLOW_COMMAND_SPECIFY__\` invocation.
+   - Create only one feature per \`/specflow specify\` invocation.
    - The spec directory name and git branch name are independent.
    - The spec directory and file are always created by this command, never by the hook.
 
@@ -131,7 +219,7 @@ Given that feature description, do this:
       - [ ] No implementation details in specification
 
       ## Notes
-      Items marked incomplete require spec updates before \`__SPECFLOW_COMMAND_CLARIFY__\` or \`__SPECFLOW_COMMAND_PLAN__\`
+      Items marked incomplete require spec updates before \`/specflow clarify\` or \`/specflow plan\`
       \`\`\`
 
    b. **Run Validation**: Review spec against each checklist item; document specific failures.
@@ -173,7 +261,7 @@ Given that feature description, do this:
 8. **Report completion** with:
    - \`SPECIFY_FEATURE_DIRECTORY\` and \`SPEC_FILE\`
    - Checklist results summary
-   - Readiness for next phase (\`__SPECFLOW_COMMAND_CLARIFY__\` or \`__SPECFLOW_COMMAND_PLAN__\`)
+   - Readiness for next phase (\`/specflow clarify\` or \`/specflow plan\`)
 
 9. **Check extension hooks (\`hooks.after_specify\` in \`.specflow/extensions.yml\`)**:
    Same rules as Pre-Execution Checks. For each executable hook emit:
@@ -217,21 +305,10 @@ Success criteria must be **measurable** (specific metrics), **technology-agnosti
     skipIfExists: false,
   },
   {
-    category: "command",
+    category: "phase",
     name: "clarify",
-    suffix: null,
-    content: `---
-disable-model-invocation: true
-description: Identify underspecified areas in the current feature spec by asking up to 5 highly targeted clarification questions and encoding answers back into the spec.
-handoffs: 
-  - label: Build Technical Plan
-    agent: specflow-plan
-    prompt: Create a plan for the spec. I am building with...
-scripts:
-   sh: scripts/bash/check-prerequisites.sh --json --paths-only
-   ps: scripts/powershell/check-prerequisites.ps1 -Json -PathsOnly
----
-
+    suffix: "clarify.md",
+    content: `
 ## User Input
 
 \`\`\`text
@@ -257,7 +334,7 @@ Hooks with non-empty \`condition\` are deferred to the HookExecutor.
 
 Goal: Detect and reduce ambiguity or missing decision points in the active feature specification and record the clarifications directly in the spec file.
 
-Note: This clarification workflow is expected to run (and be completed) BEFORE invoking \`__SPECFLOW_COMMAND_PLAN__\`. If the user explicitly states they are skipping clarification (e.g., exploratory spike), you may proceed, but must warn that downstream rework risk increases.
+Note: This clarification workflow is expected to run (and be completed) BEFORE invoking \`/specflow plan\`. If the user explicitly states they are skipping clarification (e.g., exploratory spike), you may proceed, but must warn that downstream rework risk increases.
 
 Execution steps:
 
@@ -265,7 +342,7 @@ Execution steps:
    - \`FEATURE_DIR\`
    - \`FEATURE_SPEC\`
    - (Optionally capture \`IMPL_PLAN\`, \`TASKS\` for future chained flows.)
-   - If JSON parsing fails, abort and instruct user to re-run \`__SPECFLOW_COMMAND_SPECIFY__\` or verify feature branch environment.
+   - If JSON parsing fails, abort and instruct user to re-run \`/specflow specify\` or verify feature branch environment.
    - For single quotes in args like "I'm Groot", use escape syntax: e.g 'I'\\''m Groot' (or double-quote if possible: "I'm Groot").
 
 2. Load the current spec file. Perform a structured ambiguity & coverage scan. For each category mark status: Clear / Partial / Missing (internal map only; do not output unless no questions will be asked).
@@ -359,13 +436,13 @@ Execution steps:
    - Path to updated spec.
    - Sections touched (list names).
    - Coverage summary table: each taxonomy category with Status: Resolved / Deferred / Clear / Outstanding.
-   - If any Outstanding or Deferred remain, recommend whether to proceed to \`__SPECFLOW_COMMAND_PLAN__\` or run \`__SPECFLOW_COMMAND_CLARIFY__\` again.
+   - If any Outstanding or Deferred remain, recommend whether to proceed to \`/specflow plan\` or run \`/specflow clarify\` again.
    - Suggested next command.
 
 Behavior rules:
 
 - If no meaningful ambiguities found, respond: "No critical ambiguities detected worth formal clarification." and suggest proceeding.
-- If spec file missing, instruct user to run \`__SPECFLOW_COMMAND_SPECIFY__\` first (do not create a new spec here).
+- If spec file missing, instruct user to run \`/specflow specify\` first (do not create a new spec here).
 - Never exceed 5 total asked questions (clarification retries for a single question do not count as new questions).
 - Avoid speculative tech stack questions unless the absence blocks functional clarity.
 - Respect user early termination signals ("stop", "done", "proceed").
@@ -392,25 +469,10 @@ Hooks with non-empty \`condition\` are deferred to the HookExecutor.
     skipIfExists: false,
   },
   {
-    category: "command",
+    category: "phase",
     name: "plan",
-    suffix: null,
-    content: `---
-disable-model-invocation: true
-description: Execute the implementation planning workflow using the plan template to generate design artifacts.
-handoffs: 
-  - label: Create Tasks
-    agent: specflow-tasks
-    prompt: Break the plan into tasks
-    send: true
-  - label: Create Checklist
-    agent: specflow-checklist
-    prompt: Create a checklist for the following domain...
-scripts:
-  sh: scripts/bash/setup-plan.sh --json
-  ps: scripts/powershell/setup-plan.ps1 -Json
----
-
+    suffix: "plan.md",
+    content: `
 ## User Input
 
 \`\`\`text
@@ -554,26 +616,10 @@ You **MUST** consider the user input before proceeding (if not empty).
     skipIfExists: false,
   },
   {
-    category: "command",
+    category: "phase",
     name: "tasks",
-    suffix: null,
-    content: `---
-disable-model-invocation: true
-description: Generate an actionable, dependency-ordered tasks.md for the feature based on available design artifacts.
-handoffs: 
-  - label: Analyze For Consistency
-    agent: specflow-analyze
-    prompt: Run a project analysis for consistency
-    send: true
-  - label: Implement Project
-    agent: specflow-implement
-    prompt: Start the implementation in phases
-    send: true
-scripts:
-  sh: scripts/bash/check-prerequisites.sh --json
-  ps: scripts/powershell/check-prerequisites.ps1 -Json
----
-
+    suffix: "tasks.md",
+    content: `
 ## User Input
 
 \`\`\`text
@@ -767,17 +813,10 @@ Every task MUST strictly follow this format:
     skipIfExists: false,
   },
   {
-    category: "command",
+    category: "phase",
     name: "analyze",
-    suffix: null,
-    content: `---
-disable-model-invocation: true
-description: Perform a non-destructive cross-artifact consistency and quality analysis across spec.md, plan.md, and tasks.md after task generation.
-scripts:
-  sh: scripts/bash/check-prerequisites.sh --json --require-tasks --include-tasks
-  ps: scripts/powershell/check-prerequisites.ps1 -Json -RequireTasks -IncludeTasks
----
-
+    suffix: "analyze.md",
+    content: `
 ## User Input
 
 \`\`\`text
@@ -822,13 +861,13 @@ You **MUST** consider the user input before proceeding (if not empty).
 
 ## Goal
 
-Identify inconsistencies, duplications, ambiguities, and underspecified items across the three core artifacts (\`spec.md\`, \`plan.md\`, \`tasks.md\`) before implementation. This command MUST run only after \`__SPECFLOW_COMMAND_TASKS__\` has successfully produced a complete \`tasks.md\`.
+Identify inconsistencies, duplications, ambiguities, and underspecified items across the three core artifacts (\`spec.md\`, \`plan.md\`, \`tasks.md\`) before implementation. This command MUST run only after \`/specflow tasks\` has successfully produced a complete \`tasks.md\`.
 
 ## Operating Constraints
 
 **STRICTLY READ-ONLY**: Do **not** modify any files. Output a structured analysis report. Offer an optional remediation plan (user must explicitly approve before any follow-up editing commands would be invoked manually).
 
-**Constitution Authority**: The project constitution (\`/memory/constitution.md\`) is **non-negotiable** within this analysis scope. Constitution conflicts are automatically CRITICAL and require adjustment of the spec, plan, or tasks—not dilution, reinterpretation, or silent ignoring of the principle. If a principle itself needs to change, that must occur in a separate, explicit constitution update outside \`__SPECFLOW_COMMAND_ANALYZE__\`.
+**Constitution Authority**: The project constitution (\`/memory/constitution.md\`) is **non-negotiable** within this analysis scope. Constitution conflicts are automatically CRITICAL and require adjustment of the spec, plan, or tasks—not dilution, reinterpretation, or silent ignoring of the principle. If a principle itself needs to change, that must occur in a separate, explicit constitution update outside \`/specflow analyze\`.
 
 ## Execution Steps
 
@@ -964,9 +1003,9 @@ Output a Markdown report (no file writes) with the following structure:
 
 At end of report, output a concise Next Actions block:
 
-- If CRITICAL issues exist: Recommend resolving before \`__SPECFLOW_COMMAND_IMPLEMENT__\`
+- If CRITICAL issues exist: Recommend resolving before \`/specflow implement\`
 - If only LOW/MEDIUM: User may proceed, but provide improvement suggestions
-- Provide explicit command suggestions: e.g., "Run __SPECFLOW_COMMAND_SPECIFY__ with refinement", "Run __SPECFLOW_COMMAND_PLAN__ to adjust architecture", "Manually edit tasks.md to add coverage for 'performance-metrics'"
+- Provide explicit command suggestions: e.g., "Run /specflow specify with refinement", "Run /specflow plan to adjust architecture", "Manually edit tasks.md to add coverage for 'performance-metrics'"
 
 ### 8. Offer Remediation
 
@@ -1029,17 +1068,10 @@ After reporting, check if \`.specflow/extensions.yml\` exists in the project roo
     skipIfExists: false,
   },
   {
-    category: "command",
+    category: "phase",
     name: "implement",
-    suffix: null,
-    content: `---
-disable-model-invocation: true
-description: Execute the implementation plan by processing and executing all tasks defined in tasks.md
-scripts:
-  sh: scripts/bash/check-prerequisites.sh --json --require-tasks --include-tasks
-  ps: scripts/powershell/check-prerequisites.ps1 -Json -RequireTasks -IncludeTasks
----
-
+    suffix: "implement.md",
+    content: `
 ## User Input
 
 \`\`\`text
@@ -1204,7 +1236,7 @@ You **MUST** consider the user input before proceeding (if not empty).
    - Confirm the implementation follows the technical plan
    - Report final status with summary of completed work
 
-Note: This command assumes a complete task breakdown exists in tasks.md. If tasks are incomplete or missing, suggest running \`__SPECFLOW_COMMAND_TASKS__\` first to regenerate the task list.
+Note: This command assumes a complete task breakdown exists in tasks.md. If tasks are incomplete or missing, suggest running \`/specflow tasks\` first to regenerate the task list.
 
 10. **Check for extension hooks**: After completion validation, check if \`.specflow/extensions.yml\` exists in the project root.
     - If it exists, read it and look for entries under the \`hooks.after_implement\` key
@@ -1240,18 +1272,144 @@ Note: This command assumes a complete task breakdown exists in tasks.md. If task
     skipIfExists: false,
   },
   {
-    category: "command",
-    name: "constitution",
-    suffix: null,
-    content: `---
-disable-model-invocation: true
-description: Create or update the project constitution from interactive or provided principle inputs, ensuring all dependent templates stay in sync.
-handoffs: 
-  - label: Build Specification
-    agent: specflow-specify
-    prompt: Implement the feature specification based on the updated constitution. I want to build...
----
+    category: "phase",
+    name: "review",
+    suffix: "review.md",
+    content: `
+## User Input
 
+\`\`\`text
+\$ARGUMENTS
+\`\`\`
+
+## Outline
+
+1. Identify files modified in the current feature branch:
+   \`git diff --name-only \$(git merge-base HEAD main)\`
+2. Delegate structural review to parallel sub-agents via the \`review-coordinator\`.
+3. Detect the project's toolchain and run its quality gates.
+4. If CRITICAL or HIGH findings exist, route fixes to the implementer and re-run.
+5. Produce a final pass/fail report.
+
+## Phase 1 — Structural review
+
+Spawn the \`review-coordinator\` agent with the list of changed files. It in turn
+spawns:
+
+- \`code-reviewer\` (always) — architecture, DRY, YAGNI, readability, alignment
+  with \`.specflow/memory/constitution.md\`.
+- \`security-auditor\` (always) — input validation, auth/authz, secret handling,
+  SQL/command injection, path traversal, silent catches that swallow errors.
+- \`test-reviewer\` (if test files are in the diff) — adequacy of coverage, test
+  quality, mocking boundaries.
+
+Each sub-agent returns findings at severity CRITICAL / HIGH / MEDIUM / LOW with
+file:line references and a suggested fix. The coordinator aggregates them into
+a single report.
+
+## Phase 2 — Quality gates (auto-detected)
+
+Detect the project's toolchain by looking for marker files and run the
+corresponding commands. Stop at the first failure.
+
+| Marker file       | Format command        | Lint command       | Type-check command | Test command        |
+|-------------------|-----------------------|--------------------|--------------------|---------------------|
+| \`deno.json(c)\`    | \`deno fmt --check\`    | \`deno lint\`        | \`deno check **/*.ts\` | \`deno test\`      |
+| \`package.json\`    | \`npm run format:check\` if defined, else \`npx prettier --check .\` | \`npm run lint\` if defined, else \`npx eslint .\` | \`npm run typecheck\` if defined, else skip | \`npm test\` if defined, else skip |
+| \`Cargo.toml\`      | \`cargo fmt -- --check\`| \`cargo clippy -- -D warnings\` | \`cargo check\` | \`cargo test\`          |
+| \`go.mod\`          | \`gofmt -l .\`          | \`go vet ./...\`     | (built into compile) | \`go test ./...\`   |
+| \`pyproject.toml\`  | \`ruff format --check .\` or \`black --check .\` if declared | \`ruff check .\` if declared | \`mypy .\` if declared | \`pytest\` if declared |
+
+If none of the markers match, skip Phase 2 and note it in the report.
+
+## Phase 3 — Fix loop
+
+For each CRITICAL or HIGH finding, spawn the \`developer\` agent with the finding
+and the target file:line. After the developer reports the fix, re-run the
+specific check that failed (or the full quality gate if the fix is broad).
+
+Repeat until only MEDIUM / LOW remain OR a fix has cycled twice without
+resolution — in the latter case, stop and escalate to the user.
+
+## Phase 4 — Final report
+
+Emit a single report in this exact structure:
+
+\`\`\`
+📋 Review Summary — <feature name>
+
+Structural
+  code-reviewer       : PASS | FAIL (N CRITICAL, M HIGH, …)
+  security-auditor    : …
+  test-reviewer       : … (or SKIPPED)
+
+Quality gates
+  format              : PASS | FAIL | SKIPPED
+  lint                : PASS | FAIL | SKIPPED
+  typecheck           : PASS | FAIL | SKIPPED
+  test                : PASS | FAIL | SKIPPED
+
+Fixes applied
+  - <file>:<line> — <one-line summary>
+
+Remaining findings (MEDIUM/LOW, non-blocking)
+  - …
+
+Overall: PASS | FAIL
+\`\`\`
+
+If Overall = PASS, invoke \`/specflow merge\` (or hand back to the auto-chain for
+STOP #2). If FAIL, stop and report to the user.
+`,
+    executable: false,
+    backend: null,
+    skipIfExists: false,
+  },
+  {
+    category: "phase",
+    name: "merge",
+    suffix: "merge.md",
+    content: `
+## User Input
+
+\`\`\`text
+\$ARGUMENTS
+\`\`\`
+
+## Preconditions
+
+- The feature branch must be checked out.
+- All Specflow phases must have completed successfully (clarify, plan, tasks, analyze, implement,
+  review).
+- \`\$ARGUMENTS\` is optional. If empty, the base branch is \`main\`. Otherwise it is the first token of
+  \`\$ARGUMENTS\`.
+
+## Steps
+
+1. Determine the base branch from \`\$ARGUMENTS\` (default \`main\`).
+2. Run \`git status --porcelain\` — abort if the working tree is dirty.
+3. Run \`git fetch origin <base>\` and verify the current branch is up-to-date with \`origin/<base>\`
+   (fast-forward or rebase first if behind).
+4. Run \`git checkout <base>\`.
+5. Run \`git merge --ff-only <feature-branch>\`. If fast-forward is not possible, stop and ask the
+   user whether to rebase.
+6. Print the merge summary (files changed, commits merged).
+7. Ask the user: "Push to origin <base>? (yes/no)". Do NOT auto-push.
+
+## Output
+
+A structured report with: files merged, commits merged, whether the user chose to push, and the next
+suggested action (e.g. \`/backlog update <id> --status done\`).
+`,
+    executable: false,
+    backend: null,
+    skipIfExists: false,
+  },
+  {
+    category: "phase",
+    name: "constitution",
+    suffix: "constitution.md",
+    content: `
 ## User Input
 
 \`\`\`text
@@ -1400,16 +1558,10 @@ Check if \`.specflow/extensions.yml\` exists in the project root.
     skipIfExists: false,
   },
   {
-    category: "command",
+    category: "phase",
     name: "checklist",
-    suffix: null,
-    content: `---
-description: Generate a custom checklist for the current feature based on user requirements.
-scripts:
-  sh: scripts/bash/check-prerequisites.sh --json
-  ps: scripts/powershell/check-prerequisites.ps1 -Json
----
-
+    suffix: "checklist.md",
+    content: `
 ## Checklist Purpose: "Unit Tests for English"
 
 **CRITICAL CONCEPT**: Checklists are **UNIT TESTS FOR REQUIREMENTS WRITING** — they validate quality, clarity, and completeness of requirements. They do NOT verify implementation behavior.
@@ -1513,7 +1665,7 @@ Hooks with non-empty \`condition\` are deferred to the HookExecutor.
 
 7. **Report**: Output full path to checklist file, item count, and summarize whether the run created a new file or appended to an existing one. Summarize focus areas selected, depth level, actor/timing, and any explicit user-specified must-have items incorporated.
 
-**Important**: Each \`__SPECFLOW_COMMAND_CHECKLIST__\` command invocation uses a short, descriptive checklist filename and either creates a new file or appends to an existing one — allowing multiple checklists of different types (e.g., \`ux.md\`, \`test.md\`, \`security.md\`). Use descriptive types and clean up obsolete checklists when done.
+**Important**: Each \`/specflow checklist\` command invocation uses a short, descriptive checklist filename and either creates a new file or appends to an existing one — allowing multiple checklists of different types (e.g., \`ux.md\`, \`test.md\`, \`security.md\`). Use descriptive types and clean up obsolete checklists when done.
 
 ## Example Checklist Types & Sample Items
 
@@ -1578,141 +1730,120 @@ Hooks with non-empty \`condition\` are deferred to the HookExecutor.
     skipIfExists: false,
   },
   {
-    category: "command",
-    name: "merge",
-    suffix: null,
-    content: `---
-disable-model-invocation: true
-description: Merge the current feature branch into the base branch after pre-merge validation.
----
+    category: "phase",
+    name: "groom",
+    suffix: "groom.md",
+    content: `
+# /specflow groom
 
-## User Input
+A maintenance pass that keeps the project's backlog and review pipeline
+flowing without human intervention. Designed to be invoked manually or
+on a timer via \`/loop\`.
 
-\`\`\`text
-\$ARGUMENTS
+This skill is **manual-only** (\`disable-model-invocation: true\`) — it
+should not auto-trigger on casual user prompts. The user invokes it
+explicitly with \`/specflow groom\` or schedules it with
+\`/loop 1h /specflow groom\`.
+
+## What this skill does
+
+A grooming pass runs three independent checks. Each is delegated to the
+right subagent so this skill stays small and the heavy lifting is owned
+by the agent that has the right tools and prompt for the job.
+
+### 1. Backlog grooming
+
+Dispatch the **\`product-owner\`** subagent to clarify any items currently
+in the \`Backlog\` column (i.e. not yet promoted to \`Ready\`).
+
+The PO will:
+
+- Read each item's body and existing comments.
+- **Skip** items it has already commented on in a previous run (look for
+  the marker \`🤖 specflow-groom\` at the start of any comment).
+- For each remaining item:
+  - If the body is already clarified (Why / AC / Out of scope all present
+    and concrete), promote to \`Ready\`.
+  - If 1–3 scope decisions remain, leave a clarification comment marked
+    with the \`🤖 specflow-groom\` prefix so subsequent runs skip it.
+  - If the item is genuinely stale or duplicates a closed ticket, the PO
+    can recommend closure with \`not_planned\` (but does not close
+    autonomously — the recommendation lands as a comment).
+
+The PO must respect the standard backlog skill — do not bypass its
+scripts.
+
+### 2. Stale PR surface
+
+For each open PR on this repository, check whether it has been waiting
+on review or CI for more than 48 hours. List them in the report so the
+user can decide whether to ping, close, or merge.
+
+This step is read-only; do not mutate PRs.
+
+### 3. Orphan spec detection
+
+Walk \`.specflow/specs/\` (if present) and surface any feature directory
+that is missing the next expected artefact:
+
+- Has \`spec.md\` but no \`plan.md\` → flag as "needs \`/specflow plan\`".
+- Has \`plan.md\` but no \`tasks.md\` → flag as "needs \`/specflow tasks\`".
+- Has \`tasks.md\` but no \`installed\` markers in commits → flag as
+  "needs \`/specflow implement\`".
+
+This is also read-only; never delete or modify spec files.
+
+## Output format
+
+End with a single summary block:
+
+\`\`\`
+specflow-groom report
+─────────────────────
+Backlog:    <N> items reviewed, <P> promoted to Ready, <C> awaiting clarification
+Stale PRs:  <S> open PRs idle > 48h
+Orphan specs: <O> spec directories missing the next artefact
+
+Next action: <one-line recommendation, or "no action needed">
 \`\`\`
 
-## Preconditions
+If nothing needed action, say so explicitly. The point of the skill is
+to be a **no-op when the project is healthy**.
 
-- The feature branch must be checked out.
-- All Specflow phases must have completed successfully (clarify, plan, tasks, analyze, implement,
-  review).
-- \`\$ARGUMENTS\` is optional. If empty, the base branch is \`main\`. Otherwise it is the first token of
-  \`\$ARGUMENTS\`.
+## When NOT to use this skill
 
-## Steps
-
-1. Determine the base branch from \`\$ARGUMENTS\` (default \`main\`).
-2. Run \`git status --porcelain\` — abort if the working tree is dirty.
-3. Run \`git fetch origin <base>\` and verify the current branch is up-to-date with \`origin/<base>\`
-   (fast-forward or rebase first if behind).
-4. Run \`git checkout <base>\`.
-5. Run \`git merge --ff-only <feature-branch>\`. If fast-forward is not possible, stop and ask the
-   user whether to rebase.
-6. Print the merge summary (files changed, commits merged).
-7. Ask the user: "Push to origin <base>? (yes/no)". Do NOT auto-push.
-
-## Output
-
-A structured report with: files merged, commits merged, whether the user chose to push, and the next
-suggested action (e.g. \`/backlog update <id> --status done\`).
+- For a single-item backlog clarification → invoke the \`product-owner\`
+  subagent directly with the item number.
+- For PR review on a specific PR → invoke \`code-reviewer\` /
+  \`security-auditor\` directly.
+- For implementing a spec → invoke \`/specflow implement\` directly.
 `,
     executable: false,
     backend: null,
     skipIfExists: false,
   },
   {
-    category: "command",
-    name: "review",
+    category: "skill",
+    name: "specflow-review",
     suffix: null,
     content: `---
-description: Run a structured review of the implemented feature — architecture, silent errors, test coverage, and quality gates (format/lint/typecheck/tests) with auto-detection of the project's toolchain.
+name: specflow-review
+description: Review the implementation against spec, plan, and tasks before merge — runs the quality gates (functional acceptance, test coverage, constitution checks). Auto-invokable when the user signals readiness to merge or asks for a final review pass.
+when_to_use: |
+  Trigger phrases:
+  - "review the implementation"
+  - "run quality gates"
+  - "final review before merge"
+  - "is this ready to ship?"
 ---
 
-## User Input
+# Specflow review (auto-invoke alias)
 
-\`\`\`text
-\$ARGUMENTS
-\`\`\`
+This is a thin alias that exists solely so Claude Code can auto-invoke the review phase from natural-language prompts (the main \`specflow\` skill is \`disable-model-invocation: true\`).
 
-## Outline
+When this skill fires, dispatch immediately to the router by reading and executing the procedure in \`.claude/skills/specflow/phases/review.md\`. Pass any \`\$ARGUMENTS\` through unchanged.
 
-1. Identify files modified in the current feature branch:
-   \`git diff --name-only \$(git merge-base HEAD main)\`
-2. Delegate structural review to parallel sub-agents via the \`review-coordinator\`.
-3. Detect the project's toolchain and run its quality gates.
-4. If CRITICAL or HIGH findings exist, route fixes to the implementer and re-run.
-5. Produce a final pass/fail report.
-
-## Phase 1 — Structural review
-
-Spawn the \`review-coordinator\` agent with the list of changed files. It in turn
-spawns:
-
-- \`code-reviewer\` (always) — architecture, DRY, YAGNI, readability, alignment
-  with \`.specflow/memory/constitution.md\`.
-- \`security-auditor\` (always) — input validation, auth/authz, secret handling,
-  SQL/command injection, path traversal, silent catches that swallow errors.
-- \`test-reviewer\` (if test files are in the diff) — adequacy of coverage, test
-  quality, mocking boundaries.
-
-Each sub-agent returns findings at severity CRITICAL / HIGH / MEDIUM / LOW with
-file:line references and a suggested fix. The coordinator aggregates them into
-a single report.
-
-## Phase 2 — Quality gates (auto-detected)
-
-Detect the project's toolchain by looking for marker files and run the
-corresponding commands. Stop at the first failure.
-
-| Marker file       | Format command        | Lint command       | Type-check command | Test command        |
-|-------------------|-----------------------|--------------------|--------------------|---------------------|
-| \`deno.json(c)\`    | \`deno fmt --check\`    | \`deno lint\`        | \`deno check **/*.ts\` | \`deno test\`      |
-| \`package.json\`    | \`npm run format:check\` if defined, else \`npx prettier --check .\` | \`npm run lint\` if defined, else \`npx eslint .\` | \`npm run typecheck\` if defined, else skip | \`npm test\` if defined, else skip |
-| \`Cargo.toml\`      | \`cargo fmt -- --check\`| \`cargo clippy -- -D warnings\` | \`cargo check\` | \`cargo test\`          |
-| \`go.mod\`          | \`gofmt -l .\`          | \`go vet ./...\`     | (built into compile) | \`go test ./...\`   |
-| \`pyproject.toml\`  | \`ruff format --check .\` or \`black --check .\` if declared | \`ruff check .\` if declared | \`mypy .\` if declared | \`pytest\` if declared |
-
-If none of the markers match, skip Phase 2 and note it in the report.
-
-## Phase 3 — Fix loop
-
-For each CRITICAL or HIGH finding, spawn the \`developer\` agent with the finding
-and the target file:line. After the developer reports the fix, re-run the
-specific check that failed (or the full quality gate if the fix is broad).
-
-Repeat until only MEDIUM / LOW remain OR a fix has cycled twice without
-resolution — in the latter case, stop and escalate to the user.
-
-## Phase 4 — Final report
-
-Emit a single report in this exact structure:
-
-\`\`\`
-📋 Review Summary — <feature name>
-
-Structural
-  code-reviewer       : PASS | FAIL (N CRITICAL, M HIGH, …)
-  security-auditor    : …
-  test-reviewer       : … (or SKIPPED)
-
-Quality gates
-  format              : PASS | FAIL | SKIPPED
-  lint                : PASS | FAIL | SKIPPED
-  typecheck           : PASS | FAIL | SKIPPED
-  test                : PASS | FAIL | SKIPPED
-
-Fixes applied
-  - <file>:<line> — <one-line summary>
-
-Remaining findings (MEDIUM/LOW, non-blocking)
-  - …
-
-Overall: PASS | FAIL
-\`\`\`
-
-If Overall = PASS, invoke \`/specflow-merge\` (or hand back to the auto-chain for
-STOP #2). If FAIL, stop and report to the user.
+Do not duplicate the review procedure here — it lives in \`phases/review.md\` and is the single source of truth.
 `,
     executable: false,
     backend: null,
@@ -2805,12 +2936,12 @@ log is sufficient.
 
 ## STOP #1 — Clarification checkpoint
 
-After \`/specflow-clarify\` finishes:
+After \`/specflow clarify\` finishes:
 
 - If zero \`[NEEDS CLARIFICATION]\` markers remain in \`spec.md\`, continue silently
-  to \`/specflow-plan\`.
+  to \`/specflow plan\`.
 - If markers remain, present the top 3 questions to the user (per the
-  \`/specflow-clarify\` format) and wait for answers. Once the spec is updated,
+  \`/specflow clarify\` format) and wait for answers. Once the spec is updated,
   resume the chain automatically.
 
 ## Silent gates
@@ -2818,18 +2949,18 @@ After \`/specflow-clarify\` finishes:
 These phases run without user interruption unless they fail hard or surface
 CRITICAL findings:
 
-- \`/specflow-plan\` — generates plan + research + data-model + contracts + quickstart.
-- \`/specflow-tasks\` — generates tasks.md.
-- \`/specflow-analyze\` — cross-artifact consistency check. On LOW/MEDIUM findings,
+- \`/specflow plan\` — generates plan + research + data-model + contracts + quickstart.
+- \`/specflow tasks\` — generates tasks.md.
+- \`/specflow analyze\` — cross-artifact consistency check. On LOW/MEDIUM findings,
   log a summary and continue. On CRITICAL findings, stop and surface them.
-- \`/specflow-implement\` — runs the developer → review-coordinator → qa-tester
+- \`/specflow implement\` — runs the developer → review-coordinator → qa-tester
   pipeline. Has its own internal fix loop for review findings; do not intercept.
-- \`/specflow-review\` — final quality scan.
+- \`/specflow review\` — final quality scan.
 
 ## STOP #2 — Pre-merge validation
 
-After \`/specflow-review\` passes, ALWAYS stop and present a compact summary
-before invoking \`/specflow-merge\`. The summary must include:
+After \`/specflow review\` passes, ALWAYS stop and present a compact summary
+before invoking \`/specflow merge\`. The summary must include:
 
 - Feature name and branch
 - Files created / modified (count + key paths)
@@ -2838,14 +2969,14 @@ before invoking \`/specflow-merge\`. The summary must include:
 - Open risks / deferred items
 - One-line business outcome
 
-Then ask explicitly: "Ready to merge? (yes to run /specflow-merge, no to stay on
+Then ask explicitly: "Ready to merge? (yes to run /specflow merge, no to stay on
 the branch)". Wait for explicit confirmation. On "yes", invoke
-\`/specflow-merge\`. After merge, the chain ends.
+\`/specflow merge\`. After merge, the chain ends.
 
 ## Opt-out
 
 If the user invokes \`/auto-chain specify --manual "<description>"\`, run
-\`/specflow-specify\` only and stop. Do not auto-chain. Each subsequent phase must
+\`/specflow specify\` only and stop. Do not auto-chain. Each subsequent phase must
 be invoked manually by the user.
 
 ## Single-phase invocations
@@ -2862,110 +2993,13 @@ re-running phases on an existing feature.
 - Task-level blockers reported by the developer agent during \`implement\`: the
   implement workflow has its own fix loop; do not intercept.
 - \`clarify\` producing more than 5 questions: present the top 3 per the
-  \`/specflow-clarify\` quota; the rest can be asked later.
+  \`/specflow clarify\` quota; the rest can be asked later.
 
 ## Context budget
 
 Long features (≥13 story points or ≥30 tasks) may exhaust context during
-\`/specflow-implement\`. If compaction occurs mid-chain, inform the user and let
+\`/specflow implement\`. If compaction occurs mid-chain, inform the user and let
 them resume manually from the last completed phase.
-`,
-    executable: false,
-    backend: null,
-    skipIfExists: false,
-  },
-  {
-    category: "skill",
-    name: "specflow-groom",
-    suffix: null,
-    content: `---
-description: Run a periodic hygiene pass on this Specflow project — groom Backlog items, surface stale PRs, list orphan specs. Designed to be called from \`/loop\` or as a manual one-off.
-disable-model-invocation: true
----
-
-# /specflow-groom
-
-A maintenance pass that keeps the project's backlog and review pipeline
-flowing without human intervention. Designed to be invoked manually or
-on a timer via \`/loop\`.
-
-This skill is **manual-only** (\`disable-model-invocation: true\`) — it
-should not auto-trigger on casual user prompts. The user invokes it
-explicitly with \`/specflow-groom\` or schedules it with
-\`/loop 1h /specflow-groom\`.
-
-## What this skill does
-
-A grooming pass runs three independent checks. Each is delegated to the
-right subagent so this skill stays small and the heavy lifting is owned
-by the agent that has the right tools and prompt for the job.
-
-### 1. Backlog grooming
-
-Dispatch the **\`product-owner\`** subagent to clarify any items currently
-in the \`Backlog\` column (i.e. not yet promoted to \`Ready\`).
-
-The PO will:
-
-- Read each item's body and existing comments.
-- **Skip** items it has already commented on in a previous run (look for
-  the marker \`🤖 specflow-groom\` at the start of any comment).
-- For each remaining item:
-  - If the body is already clarified (Why / AC / Out of scope all present
-    and concrete), promote to \`Ready\`.
-  - If 1–3 scope decisions remain, leave a clarification comment marked
-    with the \`🤖 specflow-groom\` prefix so subsequent runs skip it.
-  - If the item is genuinely stale or duplicates a closed ticket, the PO
-    can recommend closure with \`not_planned\` (but does not close
-    autonomously — the recommendation lands as a comment).
-
-The PO must respect the standard backlog skill — do not bypass its
-scripts.
-
-### 2. Stale PR surface
-
-For each open PR on this repository, check whether it has been waiting
-on review or CI for more than 48 hours. List them in the report so the
-user can decide whether to ping, close, or merge.
-
-This step is read-only; do not mutate PRs.
-
-### 3. Orphan spec detection
-
-Walk \`.specflow/specs/\` (if present) and surface any feature directory
-that is missing the next expected artefact:
-
-- Has \`spec.md\` but no \`plan.md\` → flag as "needs \`/specflow-plan\`".
-- Has \`plan.md\` but no \`tasks.md\` → flag as "needs \`/specflow-tasks\`".
-- Has \`tasks.md\` but no \`installed\` markers in commits → flag as
-  "needs \`/specflow-implement\`".
-
-This is also read-only; never delete or modify spec files.
-
-## Output format
-
-End with a single summary block:
-
-\`\`\`
-specflow-groom report
-─────────────────────
-Backlog:    <N> items reviewed, <P> promoted to Ready, <C> awaiting clarification
-Stale PRs:  <S> open PRs idle > 48h
-Orphan specs: <O> spec directories missing the next artefact
-
-Next action: <one-line recommendation, or "no action needed">
-\`\`\`
-
-If nothing needed action, say so explicitly. The point of the skill is
-to be a **no-op when the project is healthy**.
-
-## When NOT to use this skill
-
-- For a single-item backlog clarification → invoke the \`product-owner\`
-  subagent directly with the item number.
-- For PR review on a specific PR → invoke \`code-reviewer\` /
-  \`security-auditor\` directly.
-- For implementing a spec → invoke \`/specflow-implement\` directly.
 `,
     executable: false,
     backend: null,

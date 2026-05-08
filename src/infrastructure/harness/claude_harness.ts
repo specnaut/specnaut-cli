@@ -3,19 +3,10 @@ import type { CoreBundle, CoreEntry } from "../../domain/core_bundle.ts";
 import type { Bundle } from "../../domain/template.ts";
 import { HARNESS_STATIC } from "../../templates_bundle.ts";
 import { applyBackend, backlogScriptDestination } from "./backlog_filter.ts";
-import { ensureSkillFrontmatter, skillFolderName } from "./skill_folder.ts";
+import { ensureSkillFrontmatter } from "./skill_folder.ts";
 
 function destinationFor(entry: CoreEntry): string {
   switch (entry.category) {
-    case "command":
-      // Claude harness uses skill-folder format for specflow-* commands
-      // (per the modern Claude Code convention — flat command files are
-      // deprecated). The folder name uses a hyphen separator because
-      // Claude Code's runtime validator rejects dots in skill names
-      // (`Skill name may only contain lowercase letters, numbers, and
-      // hyphens`). `skillFolderName` is the shared helper the other
-      // harnesses already use — claude was the only outlier.
-      return `.claude/skills/${skillFolderName(entry)}/SKILL.md`;
     case "backlog-cmd":
       return `.claude/commands/${entry.name}.md`;
     case "agent":
@@ -25,7 +16,15 @@ function destinationFor(entry: CoreEntry): string {
       return `.claude/agents/${entry.name}/memory/${entry.suffix}`;
     case "skill":
     case "backlog-skill":
+      // Claude doesn't add a `specflow-` prefix — skill names are emitted
+      // verbatim as the folder name (`specflow`, `auto-chain`, `backlog`,
+      // `specflow-review`, …).
       return `.claude/skills/${entry.name}/SKILL.md`;
+    case "phase":
+      // Phase reference docs sit beside the router skill so the router
+      // can load them via `phases/<phase>.md` from its own directory.
+      if (!entry.suffix) throw new Error(`phase needs suffix: ${entry.name}`);
+      return `.claude/skills/specflow/phases/${entry.suffix}`;
     case "backlog-script":
       return backlogScriptDestination(entry);
     case "spec-root":
@@ -51,13 +50,9 @@ export class ClaudeHarness implements Harness {
       // Skill-folder categories ship as `.claude/skills/<name>/SKILL.md`.
       // Claude Code derives the skill name from the folder, but we inject
       // an explicit `name:` (matching the folder) for parity with how
-      // cursor / codex / gemini emit their skill folders. This also
-      // guarantees the SKILL.md self-identifies if Claude Code's resolver
-      // ever requires it.
+      // cursor / codex / gemini emit their skill folders.
       let content = entry.content;
-      if (entry.category === "command") {
-        content = ensureSkillFrontmatter(content, skillFolderName(entry));
-      } else if (entry.category === "skill" || entry.category === "backlog-skill") {
+      if (entry.category === "skill" || entry.category === "backlog-skill") {
         content = ensureSkillFrontmatter(content, entry.name);
       }
 

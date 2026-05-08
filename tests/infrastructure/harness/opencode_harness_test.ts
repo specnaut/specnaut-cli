@@ -4,13 +4,22 @@ import type { CoreBundle } from "../../../src/domain/core_bundle.ts";
 
 const harness = new OpenCodeHarness();
 
-function commandEntry(name: string, body = "Body content"): CoreBundle[number] {
+function phaseEntry(name: string, body = "Body content"): CoreBundle[number] {
   return {
-    category: "command",
+    category: "phase",
     name,
+    suffix: `${name}.md`,
+    content: body,
+    executable: false,
+  };
+}
+
+function routerSkillEntry(): CoreBundle[number] {
+  return {
+    category: "skill",
+    name: "specflow",
     suffix: null,
-    content:
-      `---\ndescription: ${name} command\nargument-hint: <foo>\nallowed-tools: Read\n---\n${body}`,
+    content: `---\nname: specflow\ndescription: Specflow router\n---\n\nRouter body`,
     executable: false,
   };
 }
@@ -38,13 +47,17 @@ function skillEntry(name: string): CoreBundle[number] {
   };
 }
 
-Deno.test("command emits to .opencode/commands/specflow.<name>.md", () => {
-  const bundle = harness.mapBundle([commandEntry("specify")], { backlogBackend: "local" });
-  const dest = ".opencode/commands/specflow-specify.md";
+Deno.test("router skill emits to .opencode/skills/specflow/SKILL.md", () => {
+  const bundle = harness.mapBundle([routerSkillEntry()], { backlogBackend: "local" });
+  const dest = ".opencode/skills/specflow/SKILL.md";
   assertEquals(Object.keys(bundle), [dest]);
-  assertStringIncludes(bundle[dest].content, "description: specify command");
-  assertEquals(bundle[dest].content.includes("argument-hint"), false);
-  assertEquals(bundle[dest].content.includes("allowed-tools"), false);
+  assertStringIncludes(bundle[dest].content, "name: specflow");
+});
+
+Deno.test("phase emits to .opencode/skills/specflow/phases/<name>.md", () => {
+  const bundle = harness.mapBundle([phaseEntry("specify")], { backlogBackend: "local" });
+  const dest = ".opencode/skills/specflow/phases/specify.md";
+  assertEquals(Object.keys(bundle), [dest]);
   assertStringIncludes(bundle[dest].content, "Body content");
 });
 
@@ -131,6 +144,11 @@ Deno.test("skill emits to .opencode/skills/specflow-<name>/SKILL.md with name+de
   assertEquals(Object.keys(bundle), [dest]);
   assertStringIncludes(bundle[dest].content, "name: auto-chain");
   assertStringIncludes(bundle[dest].content, "description: auto-chain skill");
+});
+
+Deno.test("router skill named 'specflow' is not double-prefixed", () => {
+  const bundle = harness.mapBundle([routerSkillEntry()], { backlogBackend: "local" });
+  assertEquals(Object.keys(bundle), [".opencode/skills/specflow/SKILL.md"]);
 });
 
 Deno.test("spec-root and project-root pass through unchanged", () => {

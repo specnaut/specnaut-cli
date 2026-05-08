@@ -52,14 +52,32 @@ Deno.test("specflow init <name> writes a complete tree", async () => {
     assertEquals(await exists(join(root, ".specflow/backlog.md")), true);
     assertEquals(await exists(join(root, ".specflow/memory/constitution.md")), true);
     assertEquals(await exists(join(root, ".specflow/templates/spec-template.md")), true);
-    // specflow.* commands now scaffold as skill folders (#76).
+    // v1.0.0: 11 phases consolidated into the specflow router skill.
     assertEquals(
-      await exists(join(root, ".claude/skills/specflow-specify/SKILL.md")),
+      await exists(join(root, ".claude/skills/specflow/SKILL.md")),
       true,
     );
     assertEquals(
+      await exists(join(root, ".claude/skills/specflow/phases/specify.md")),
+      true,
+    );
+    assertEquals(
+      await exists(join(root, ".claude/skills/specflow/phases/groom.md")),
+      true,
+    );
+    // Auto-invoke alias for the review phase.
+    assertEquals(
       await exists(join(root, ".claude/skills/specflow-review/SKILL.md")),
       true,
+    );
+    // Old per-phase folders are gone post-consolidation.
+    assertEquals(
+      await exists(join(root, ".claude/skills/specflow-specify/SKILL.md")),
+      false,
+    );
+    assertEquals(
+      await exists(join(root, ".claude/skills/specflow-groom/SKILL.md")),
+      false,
     );
     // The /backlog command (different category) keeps the flat-file format.
     assertEquals(await exists(join(root, ".claude/commands/backlog.md")), true);
@@ -151,10 +169,10 @@ Deno.test("specflow init's Next steps nudges towards /specflow-constitution firs
     const { code, stdout } = await runSpecflow(["init", "demo", "--no-git"], { cwd: dir });
     assertEquals(code, 0);
     assertStringIncludes(stdout, "Next steps:");
-    assertStringIncludes(stdout, "/specflow-constitution");
-    // The constitution step must come before /specflow-specify in the rendered list.
-    const constitutionIdx = stdout.indexOf("/specflow-constitution");
-    const specifyIdx = stdout.indexOf("/specflow-specify");
+    assertStringIncludes(stdout, "/specflow constitution");
+    // The constitution step must come before /specflow specify in the rendered list.
+    const constitutionIdx = stdout.indexOf("/specflow constitution");
+    const specifyIdx = stdout.indexOf("/specflow specify");
     assertEquals(
       constitutionIdx > 0 && constitutionIdx < specifyIdx,
       true,
@@ -174,17 +192,17 @@ Deno.test("specflow init --here writes into cwd", async () => {
 
 Deno.test("specflow init on a fresh project recommends --force (no lock present)", async () => {
   await withTempDir(async (dir) => {
-    // specflow-specify now scaffolds as a skill folder (.claude/skills/...).
-    await Deno.mkdir(join(dir, "demo/.claude/skills/specflow-specify"), {
+    // Pre-seed a managed file (the router skill) to force a conflict.
+    await Deno.mkdir(join(dir, "demo/.claude/skills/specflow"), {
       recursive: true,
     });
     await Deno.writeTextFile(
-      join(dir, "demo/.claude/skills/specflow-specify/SKILL.md"),
+      join(dir, "demo/.claude/skills/specflow/SKILL.md"),
       "custom",
     );
     const { code, stderr } = await runSpecflow(["init", "demo", "--no-git"], { cwd: dir });
     assertEquals(code, 3);
-    assertStringIncludes(stderr, ".claude/skills/specflow-specify/SKILL.md");
+    assertStringIncludes(stderr, ".claude/skills/specflow/SKILL.md");
     assertStringIncludes(stderr, "would be overwritten");
     assertStringIncludes(stderr, "specflow init --here --force");
     assertEquals(
@@ -199,11 +217,11 @@ Deno.test("specflow init on a fresh project recommends --force (no lock present)
 Deno.test("specflow init aborts on conflicts BEFORE prompting for backlog backend (regression #103)", async () => {
   await withTempDir(async (dir) => {
     // Pre-seed a managed file to force a conflict on re-init.
-    await Deno.mkdir(join(dir, "demo/.claude/skills/specflow-specify"), {
+    await Deno.mkdir(join(dir, "demo/.claude/skills/specflow"), {
       recursive: true,
     });
     await Deno.writeTextFile(
-      join(dir, "demo/.claude/skills/specflow-specify/SKILL.md"),
+      join(dir, "demo/.claude/skills/specflow/SKILL.md"),
       "custom",
     );
     // Pass --ai claude so the harness picker doesn't fire (it's only the
@@ -225,11 +243,11 @@ Deno.test("specflow init aborts on conflicts BEFORE prompting for backlog backen
 
 Deno.test("specflow init on a previously-initialised project recommends upgrade (lock present)", async () => {
   await withTempDir(async (dir) => {
-    await Deno.mkdir(join(dir, "demo/.claude/skills/specflow-specify"), {
+    await Deno.mkdir(join(dir, "demo/.claude/skills/specflow"), {
       recursive: true,
     });
     await Deno.writeTextFile(
-      join(dir, "demo/.claude/skills/specflow-specify/SKILL.md"),
+      join(dir, "demo/.claude/skills/specflow/SKILL.md"),
       "custom",
     );
     // Drop a stub lock so the conflict path treats this as a re-init.
@@ -392,9 +410,9 @@ Deno.test("specflow init --here on a project with existing constitution.md leave
   });
 });
 
-// ── Hyphen-only skill names (#123) ─────────────────────────────────────────
+// ── Consolidated router skill (v1.0.0) ──────────────────────────────────
 
-Deno.test("specflow init scaffolds claude skills with hyphen separator (no dot — Claude Code rejects dots)", async () => {
+Deno.test("specflow init scaffolds the consolidated router skill + 11 phase docs", async () => {
   await withTempDir(async (dir) => {
     const { code } = await runSpecflow(
       ["init", "demo", "--no-git", "--ai", "claude", "--backlog", "local"],
@@ -403,6 +421,10 @@ Deno.test("specflow init scaffolds claude skills with hyphen separator (no dot �
     assertEquals(code, 0);
 
     const root = join(dir, "demo");
+    assertEquals(
+      await exists(join(root, ".claude/skills/specflow/SKILL.md")),
+      true,
+    );
     for (
       const name of [
         "specify",
@@ -415,31 +437,40 @@ Deno.test("specflow init scaffolds claude skills with hyphen separator (no dot �
         "constitution",
         "checklist",
         "clarify",
+        "groom",
       ]
     ) {
       assertEquals(
-        await exists(join(root, `.claude/skills/specflow-${name}/SKILL.md`)),
+        await exists(
+          join(root, `.claude/skills/specflow/phases/${name}.md`),
+        ),
         true,
-        `expected .claude/skills/specflow-${name}/SKILL.md (hyphen)`,
+        `expected .claude/skills/specflow/phases/${name}.md`,
       );
-      assertEquals(
-        await exists(join(root, `.claude/skills/specflow.${name}/SKILL.md`)),
-        false,
-        `legacy dotted path must NOT exist`,
-      );
+      // Old per-phase folders are gone post-consolidation.
+      // Exception: `specflow-review` is the auto-invoke alias (kept).
+      if (name !== "review") {
+        assertEquals(
+          await exists(join(root, `.claude/skills/specflow-${name}/SKILL.md`)),
+          false,
+          `legacy per-phase folder must NOT exist`,
+        );
+      }
     }
+    // Old standalone groom skill removed.
     assertEquals(
       await exists(join(root, ".claude/skills/specflow-groom/SKILL.md")),
+      false,
+    );
+    // Auto-invoke alias still ships.
+    assertEquals(
+      await exists(join(root, ".claude/skills/specflow-review/SKILL.md")),
       true,
     );
-    const specifyContent = await Deno.readTextFile(
-      join(root, ".claude/skills/specflow-specify/SKILL.md"),
+    const routerContent = await Deno.readTextFile(
+      join(root, ".claude/skills/specflow/SKILL.md"),
     );
-    assertStringIncludes(specifyContent, "name: specflow-specify");
-    assertEquals(
-      specifyContent.includes("name: specflow.specify"),
-      false,
-      "frontmatter `name:` must not contain a dot",
-    );
+    assertStringIncludes(routerContent, "name: specflow");
+    assertStringIncludes(routerContent, "disable-model-invocation: true");
   });
 });

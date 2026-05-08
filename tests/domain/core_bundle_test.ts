@@ -3,9 +3,9 @@ import type { CoreCategory, CoreEntry } from "../../src/domain/core_bundle.ts";
 
 Deno.test("CoreCategory is a narrow union", () => {
   const values: CoreCategory[] = [
-    "command",
     "agent",
     "skill",
+    "phase",
     "spec-root",
     "project-root",
     "backlog-cmd",

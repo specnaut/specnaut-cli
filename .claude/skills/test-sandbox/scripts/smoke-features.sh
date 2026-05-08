@@ -47,22 +47,27 @@ check "no orphan END markers" \
   '! grep -q "END: backend=" .claude/skills/backlog/SKILL.md'
 
 echo
-echo "═══ #76  commands → skill folders ═══"
+echo "═══ v1.0.0  consolidated specflow router ═══"
 check ".claude/commands/ has only 1 file (backlog)" \
   '[ "$(find .claude/commands -maxdepth 1 -type f -name "*.md" | wc -l | tr -d " ")" = "1" ]'
-for skill in specify constitution clarify plan tasks analyze implement merge review checklist; do
-  check ".claude/skills/specflow-$skill/SKILL.md present" \
-    "[ -f .claude/skills/specflow-$skill/SKILL.md ]"
+check "router .claude/skills/specflow/SKILL.md present" \
+  '[ -f .claude/skills/specflow/SKILL.md ]'
+for phase in specify constitution clarify plan tasks analyze implement merge review checklist groom; do
+  check ".claude/skills/specflow/phases/$phase.md present" \
+    "[ -f .claude/skills/specflow/phases/$phase.md ]"
 done
-check "name: injected on specflow-specify SKILL.md (post-#92)" \
-  'head -3 .claude/skills/specflow-specify/SKILL.md | grep -q "name: specflow-specify"'
+check "name: specflow on the router SKILL.md" \
+  'head -3 .claude/skills/specflow/SKILL.md | grep -q "name: specflow"'
+check "disable-model-invocation set on the router" \
+  'grep -q "disable-model-invocation: true" .claude/skills/specflow/SKILL.md'
+check "specflow-review auto-invoke alias present" \
+  '[ -f .claude/skills/specflow-review/SKILL.md ]'
 
 echo
-echo "═══ #75  loop.md + /specflow-groom ═══"
+echo "═══ #75  loop.md + groom phase ═══"
 check ".claude/loop.md scaffolded" '[ -f .claude/loop.md ]'
-check "specflow-groom skill present" '[ -f .claude/skills/specflow-groom/SKILL.md ]'
-check "groom skill has name: (post-#92)" \
-  'head -3 .claude/skills/specflow-groom/SKILL.md | grep -q "name: specflow-groom"'
+check "groom phase doc present" \
+  '[ -f .claude/skills/specflow/phases/groom.md ]'
 
 echo
 echo "═══ #77  manual-only flags ═══"

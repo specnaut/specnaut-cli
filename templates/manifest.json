@@ -1,16 +1,19 @@
 {
-  "version": "0.7.0",
+  "version": "1.0.0",
   "core": [
-    { "category": "command", "name": "specify", "source": "core/commands/specflow-specify.md" },
-    { "category": "command", "name": "clarify", "source": "core/commands/specflow-clarify.md" },
-    { "category": "command", "name": "plan", "source": "core/commands/specflow-plan.md" },
-    { "category": "command", "name": "tasks", "source": "core/commands/specflow-tasks.md" },
-    { "category": "command", "name": "analyze", "source": "core/commands/specflow-analyze.md" },
-    { "category": "command", "name": "implement", "source": "core/commands/specflow-implement.md" },
-    { "category": "command", "name": "constitution", "source": "core/commands/specflow-constitution.md" },
-    { "category": "command", "name": "checklist", "source": "core/commands/specflow-checklist.md" },
-    { "category": "command", "name": "merge", "source": "core/commands/specflow-merge.md" },
-    { "category": "command", "name": "review", "source": "core/commands/specflow-review.md" },
+    { "category": "skill", "name": "specflow", "source": "core/skills/specflow/SKILL.md" },
+    { "category": "phase", "name": "specify", "suffix": "specify.md", "source": "core/skills/specflow/phases/specify.md" },
+    { "category": "phase", "name": "clarify", "suffix": "clarify.md", "source": "core/skills/specflow/phases/clarify.md" },
+    { "category": "phase", "name": "plan", "suffix": "plan.md", "source": "core/skills/specflow/phases/plan.md" },
+    { "category": "phase", "name": "tasks", "suffix": "tasks.md", "source": "core/skills/specflow/phases/tasks.md" },
+    { "category": "phase", "name": "analyze", "suffix": "analyze.md", "source": "core/skills/specflow/phases/analyze.md" },
+    { "category": "phase", "name": "implement", "suffix": "implement.md", "source": "core/skills/specflow/phases/implement.md" },
+    { "category": "phase", "name": "review", "suffix": "review.md", "source": "core/skills/specflow/phases/review.md" },
+    { "category": "phase", "name": "merge", "suffix": "merge.md", "source": "core/skills/specflow/phases/merge.md" },
+    { "category": "phase", "name": "constitution", "suffix": "constitution.md", "source": "core/skills/specflow/phases/constitution.md" },
+    { "category": "phase", "name": "checklist", "suffix": "checklist.md", "source": "core/skills/specflow/phases/checklist.md" },
+    { "category": "phase", "name": "groom", "suffix": "groom.md", "source": "core/skills/specflow/phases/groom.md" },
+    { "category": "skill", "name": "specflow-review", "source": "core/skills/specflow-review/SKILL.md" },
     { "category": "backlog-cmd", "name": "backlog", "source": "core/commands/backlog.md" },
 
     { "category": "agent", "name": "product-owner", "source": "core/agents/product-owner.md" },
@@ -30,7 +33,6 @@
     { "category": "agent-memory", "name": "security-auditor", "suffix": "MEMORY.md", "source": "core/agents/security-auditor/memory/MEMORY.md" },
 
     { "category": "skill", "name": "auto-chain", "source": "core/skills/auto-chain/SKILL.md" },
-    { "category": "skill", "name": "specflow-groom", "source": "core/skills/specflow-groom/SKILL.md" },
 
     { "category": "backlog-skill", "name": "backlog", "source": "core/skills/backlog/SKILL.md" },
     { "category": "backlog-script", "name": "list", "suffix": "list.sh", "source": "core/skills/backlog/scripts/local/list.sh", "executable": true, "backend": "local" },

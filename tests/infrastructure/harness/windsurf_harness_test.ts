@@ -6,10 +6,17 @@ import { WINDSURF_WORKFLOW_MAX_CHARS } from "../../../src/infrastructure/harness
 
 const SAMPLE: CoreBundle = [
   {
-    category: "command",
-    name: "specify",
+    category: "skill",
+    name: "specflow",
     suffix: null,
-    content: "---\nname: specify\ndescription: Scaffold feature spec\n---\n\n# Body\n",
+    content: "---\nname: specflow\ndescription: Specflow router\n---\n\n# Body\n",
+    executable: false,
+  },
+  {
+    category: "phase",
+    name: "specify",
+    suffix: "specify.md",
+    content: "# Specify phase\n",
     executable: false,
   },
   {
@@ -55,7 +62,13 @@ Deno.test("WindsurfHarness.key and displayName", () => {
   assertEquals(h.displayName, "Windsurf");
 });
 
-Deno.test("WindsurfHarness maps commands to .windsurf/workflows/specflow-<name>.md", () => {
+Deno.test("WindsurfHarness maps router skill to .windsurf/workflows/specflow.md", () => {
+  const h = new WindsurfHarness();
+  const mapped = h.mapBundle(SAMPLE, { backlogBackend: "local" });
+  assert(".windsurf/workflows/specflow.md" in mapped);
+});
+
+Deno.test("WindsurfHarness maps phase docs to sibling specflow-<phase>.md files", () => {
   const h = new WindsurfHarness();
   const mapped = h.mapBundle(SAMPLE, { backlogBackend: "local" });
   assert(".windsurf/workflows/specflow-specify.md" in mapped);
@@ -89,10 +102,10 @@ Deno.test("WindsurfHarness maps spec-root to .specflow/<suffix> and project-root
 Deno.test("WindsurfHarness emits content byte-identical to entry.content (no frontmatter rewrite)", () => {
   const h = new WindsurfHarness();
   const mapped = h.mapBundle(SAMPLE, { backlogBackend: "local" });
-  const cmd = mapped[".windsurf/workflows/specflow-specify.md"];
-  assertEquals(cmd.content, SAMPLE[0].content);
-  const agent = mapped[".windsurf/workflows/specflow-agent-product-owner.md"];
-  assertEquals(agent.content, SAMPLE[3].content);
+  const router = mapped[".windsurf/workflows/specflow.md"];
+  assertEquals(router.content, SAMPLE[0].content);
+  const phase = mapped[".windsurf/workflows/specflow-specify.md"];
+  assertEquals(phase.content, SAMPLE[1].content);
 });
 
 Deno.test("WindsurfHarness emits no Claude/Cursor/Codex/Gemini artefacts", () => {
