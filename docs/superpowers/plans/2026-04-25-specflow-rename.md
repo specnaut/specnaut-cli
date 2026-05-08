@@ -78,7 +78,7 @@ Verify:
 
 ```bash
 ls templates/core/commands/
-# expected: backlog.md, specflow.analyze.md, specflow.checklist.md, …, specflow.tasks.md
+# expected: backlog.md, specflow-analyze.md, specflow-checklist.md, …, specflow-tasks.md
 ```
 
 - [ ] **Step 2: Update `templates/manifest.json` source paths**
@@ -204,7 +204,7 @@ Deno.test("ClaudeHarness.mapBundle emits the Claude tree", () => {
   const keys = Object.keys(mapped).sort();
   assertEquals(keys.length, 39); // 38 core + CLAUDE.md
   // Spot-check canonical paths
-  assert(".claude/commands/specflow.specify.md" in mapped);
+  assert(".claude/commands/specflow-specify.md" in mapped);
   assert(".claude/commands/backlog.md" in mapped);
   assert(".claude/agents/product-owner.md" in mapped);
   assert(".claude/skills/speckit/SKILL.md" in mapped);
@@ -229,7 +229,7 @@ Note: the internal skill folder source `templates/core/skills/speckit/SKILL.md` 
 
 ```bash
 deno test tests/infrastructure/harness/claude_harness_test.ts
-# expected: FAIL — ".claude/commands/specflow.specify.md" not in mapped; got ".claude/commands/speckit.specify.md"
+# expected: FAIL — ".claude/commands/specflow-specify.md" not in mapped; got ".claude/commands/speckit.specify.md"
 ```
 
 - [ ] **Step 3: Update `ClaudeHarness.destinationFor`**
@@ -693,7 +693,7 @@ rm -rf /tmp/sf-rename-demo && mkdir /tmp/sf-rename-demo
 cd /tmp/sf-rename-demo
 deno run --allow-all /Users/kevin/Sites/specflow/src/main.ts init claude-demo --no-git
 ls claude-demo/.claude/commands/ | head
-# expected: backlog.md, specflow.analyze.md, specflow.checklist.md, ...
+# expected: backlog.md, specflow-analyze.md, specflow-checklist.md, ...
 ls claude-demo/.specflow/memory/
 # expected: constitution.md
 cd -

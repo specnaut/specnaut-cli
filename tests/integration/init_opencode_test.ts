@@ -51,11 +51,11 @@ Deno.test("specflow init --ai opencode scaffolds a complete OpenCode project lay
 
     // Commands in .opencode/commands/
     assertEquals(
-      await exists(join(root, ".opencode/commands/specflow.specify.md")),
+      await exists(join(root, ".opencode/commands/specflow-specify.md")),
       true,
     );
     assertEquals(
-      await exists(join(root, ".opencode/commands/specflow.plan.md")),
+      await exists(join(root, ".opencode/commands/specflow-plan.md")),
       true,
     );
     assertEquals(

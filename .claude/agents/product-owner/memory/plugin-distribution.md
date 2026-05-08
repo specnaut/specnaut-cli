@@ -29,7 +29,7 @@ Binary-scaffolded project copies use the short form: `/specify`, `/plan`, etc.
 
 - 10 specflow.* slash-command skills (`specify`, `plan`, `tasks`, `implement`, `analyze`, `review`, `merge`, `constitution`, `checklist`, `clarify`) — in `plugin/skills/`
 - 1 auto-chain skill — `plugin/skills/auto-chain/SKILL.md`
-- 1 groom skill — `plugin/skills/specflow.groom/SKILL.md`
+- 1 groom skill — `plugin/skills/specflow-groom/SKILL.md`
 - 9 sub-agents (`code-reviewer`, `developer`, `devops-sre`, `product-owner`, `qa-tester`, `review-coordinator`, `security-auditor`, `test-reviewer`, `workflow-manager`) — in `plugin/agents/`
 
 **Not in the plugin** (binary-owned, project-stateful): backlog skill, backlog scripts, hooks, settings.json, CLAUDE.md, AGENTS.md, .specflow/ tree, architect agent.
@@ -46,7 +46,7 @@ Binary-scaffolded project copies use the short form: `/specify`, `/plan`, etc.
 
 `src/domain/plugin_coverage.ts` — `isPluginCoveredPath(harness, dest)`:
 - Claude harness only.
-- Covers: `.claude/agents/<name>.md` (all except `architect.md`) + `.claude/skills/specflow.*/SKILL.md` (10 files) + `.claude/skills/auto-chain/SKILL.md` + `.claude/skills/specflow.groom/SKILL.md`.
+- Covers: `.claude/agents/<name>.md` (all except `architect.md`) + `.claude/skills/specflow.*/SKILL.md` (10 files) + `.claude/skills/auto-chain/SKILL.md` + `.claude/skills/specflow-groom/SKILL.md`.
 - Total: 21 covered paths (`PLUGIN_COVERED_PATHS_CLAUDE` array).
 
 ## upgrade-time migration behavior
@@ -70,4 +70,4 @@ This fires when a user previously ran `specflow upgrade` with the plugin install
 
 ## Known caveat (as of v0.12.1)
 
-Handoff IDs in plugin skill SKILL.md files reference binary-scaffolded IDs (`specflow.plan`, etc.), not plugin-namespaced IDs (`specflow-plugin:plan`). Clickable handoff buttons may not resolve in plugin scope. Tracked in issue #73.
+Handoff IDs in plugin skill SKILL.md files reference binary-scaffolded IDs (`specflow-plan`, etc.), not plugin-namespaced IDs (`specflow-plugin:plan`). Clickable handoff buttons may not resolve in plugin scope. Tracked in issue #73.

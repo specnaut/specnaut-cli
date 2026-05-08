@@ -3,7 +3,7 @@ description: Run a periodic hygiene pass on this Specflow project — groom Back
 disable-model-invocation: true
 ---
 
-# /specflow.groom
+# /specflow-groom
 
 A maintenance pass that keeps the project's backlog and review pipeline
 flowing without human intervention. Designed to be invoked manually or
@@ -11,8 +11,8 @@ on a timer via `/loop`.
 
 This skill is **manual-only** (`disable-model-invocation: true`) — it
 should not auto-trigger on casual user prompts. The user invokes it
-explicitly with `/specflow.groom` or schedules it with
-`/loop 1h /specflow.groom`.
+explicitly with `/specflow-groom` or schedules it with
+`/loop 1h /specflow-groom`.
 
 ## What this skill does
 
@@ -55,10 +55,10 @@ This step is read-only; do not mutate PRs.
 Walk `.specflow/specs/` (if present) and surface any feature directory
 that is missing the next expected artefact:
 
-- Has `spec.md` but no `plan.md` → flag as "needs `/specflow.plan`".
-- Has `plan.md` but no `tasks.md` → flag as "needs `/specflow.tasks`".
+- Has `spec.md` but no `plan.md` → flag as "needs `/specflow-plan`".
+- Has `plan.md` but no `tasks.md` → flag as "needs `/specflow-tasks`".
 - Has `tasks.md` but no `installed` markers in commits → flag as
-  "needs `/specflow.implement`".
+  "needs `/specflow-implement`".
 
 This is also read-only; never delete or modify spec files.
 
@@ -67,7 +67,7 @@ This is also read-only; never delete or modify spec files.
 End with a single summary block:
 
 ```
-specflow.groom report
+specflow-groom report
 ─────────────────────
 Backlog:    <N> items reviewed, <P> promoted to Ready, <C> awaiting clarification
 Stale PRs:  <S> open PRs idle > 48h
@@ -85,4 +85,4 @@ to be a **no-op when the project is healthy**.
   subagent directly with the item number.
 - For PR review on a specific PR → invoke `code-reviewer` /
   `security-auditor` directly.
-- For implementing a spec → invoke `/specflow.implement` directly.
+- For implementing a spec → invoke `/specflow-implement` directly.

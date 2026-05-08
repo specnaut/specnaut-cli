@@ -10,7 +10,7 @@ four surfaces, in priority order:
 1. `docs/llms.md` — canonical website + `/llms.txt`
 2. `README.md` — repo root
 3. `templates/core/commands/specflow.*.md` — slash-command sources (specify, plan, tasks, implement, analyze, review, merge, constitution, checklist, clarify)
-4. `templates/core/skills/*/SKILL.md` — auto-chain, backlog, specflow.groom skills
+4. `templates/core/skills/*/SKILL.md` — auto-chain, backlog, specflow-groom skills
 
 **Rule:** When clarifying any ticket that touches user-visible surfaces (CLI
 flags, command branches, `--help` output, handler stdout / error messages, prompt

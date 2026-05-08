@@ -183,7 +183,7 @@ export async function runInit(intent: InitIntent): Promise<number> {
   console.log("\nNext steps:");
   console.log(
     `  1. Open the project in ${harness.displayName}, then run ${
-      bold("/specflow.constitution")
+      bold("/specflow-constitution")
     } to scaffold your project's guiding principles`,
   );
   console.log(
@@ -192,7 +192,7 @@ export async function runInit(intent: InitIntent): Promise<number> {
     } for your stack`,
   );
   console.log(
-    `  3. Run ${bold('/specflow.specify "<feature description>"')} to scaffold your first feature`,
+    `  3. Run ${bold('/specflow-specify "<feature description>"')} to scaffold your first feature`,
   );
   console.log(`  4. Use ${bold('/backlog add "<task title>"')} for follow-up work`);
   return 0;

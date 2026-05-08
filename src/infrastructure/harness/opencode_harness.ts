@@ -98,7 +98,7 @@ function toOpenCodeAgentMarkdown(entry: CoreEntry): string {
 function destinationFor(entry: CoreEntry): string {
   switch (entry.category) {
     case "command":
-      return `.opencode/commands/specflow.${entry.name}.md`;
+      return `.opencode/commands/${skillFolderName(entry)}.md`;
     case "backlog-cmd":
       return `.opencode/commands/${entry.name}.md`;
     case "agent":

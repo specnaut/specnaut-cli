@@ -3,7 +3,7 @@ disable-model-invocation: true
 description: Create or update the project constitution from interactive or provided principle inputs, ensuring all dependent templates stay in sync.
 handoffs: 
   - label: Build Specification
-    agent: specflow.specify
+    agent: specflow-specify
     prompt: Implement the feature specification based on the updated constitution. I want to build...
 ---
 

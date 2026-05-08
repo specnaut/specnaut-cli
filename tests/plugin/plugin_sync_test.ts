@@ -37,7 +37,7 @@ const SYNC_PAIRS: ReadonlyArray<{ plugin: string; source: string }> = [
     "tasks",
   ].map((name) => ({
     plugin: `plugin/skills/${name}/SKILL.md`,
-    source: `templates/core/commands/specflow.${name}.md`,
+    source: `templates/core/commands/specflow-${name}.md`,
   })),
   // Dual-copy agents: 9 sub-agent definitions, each landing as
   // `plugin/agents/<name>.md`. Claude Code resolves agents by file
@@ -57,14 +57,14 @@ const SYNC_PAIRS: ReadonlyArray<{ plugin: string; source: string }> = [
     plugin: `plugin/agents/${name}.md`,
     source: `templates/core/agents/${name}.md`,
   })),
-  // The groom skill: source folder is `templates/core/skills/specflow.groom/`
+  // The groom skill: source folder is `templates/core/skills/specflow-groom/`
   // (binary scaffolds it as a project skill with the namespaced short
   // form), but the plugin folder drops the `specflow.` prefix because
   // the plugin namespace `specflow-plugin:` already disambiguates —
   // the plugin command becomes `/specflow-plugin:groom`.
   {
     plugin: "plugin/skills/groom/SKILL.md",
-    source: "templates/core/skills/specflow.groom/SKILL.md",
+    source: "templates/core/skills/specflow-groom/SKILL.md",
   },
 ];
 

@@ -3,15 +3,19 @@ import type { CoreBundle, CoreEntry } from "../../domain/core_bundle.ts";
 import type { Bundle } from "../../domain/template.ts";
 import { HARNESS_STATIC } from "../../templates_bundle.ts";
 import { applyBackend, backlogScriptDestination } from "./backlog_filter.ts";
-import { ensureSkillFrontmatter } from "./skill_folder.ts";
+import { ensureSkillFrontmatter, skillFolderName } from "./skill_folder.ts";
 
 function destinationFor(entry: CoreEntry): string {
   switch (entry.category) {
     case "command":
-      // Claude harness uses skill-folder format for specflow.* commands
+      // Claude harness uses skill-folder format for specflow-* commands
       // (per the modern Claude Code convention — flat command files are
-      // deprecated). Other harnesses keep their existing destinations.
-      return `.claude/skills/specflow.${entry.name}/SKILL.md`;
+      // deprecated). The folder name uses a hyphen separator because
+      // Claude Code's runtime validator rejects dots in skill names
+      // (`Skill name may only contain lowercase letters, numbers, and
+      // hyphens`). `skillFolderName` is the shared helper the other
+      // harnesses already use — claude was the only outlier.
+      return `.claude/skills/${skillFolderName(entry)}/SKILL.md`;
     case "backlog-cmd":
       return `.claude/commands/${entry.name}.md`;
     case "agent":
@@ -52,7 +56,7 @@ export class ClaudeHarness implements Harness {
       // ever requires it.
       let content = entry.content;
       if (entry.category === "command") {
-        content = ensureSkillFrontmatter(content, `specflow.${entry.name}`);
+        content = ensureSkillFrontmatter(content, skillFolderName(entry));
       } else if (entry.category === "skill" || entry.category === "backlog-skill") {
         content = ensureSkillFrontmatter(content, entry.name);
       }

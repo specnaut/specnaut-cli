@@ -84,5 +84,5 @@ Remaining findings (MEDIUM/LOW, non-blocking)
 Overall: PASS | FAIL
 ```
 
-If Overall = PASS, invoke `/specflow.merge` (or hand back to the auto-chain for
+If Overall = PASS, invoke `/specflow-merge` (or hand back to the auto-chain for
 STOP #2). If FAIL, stop and report to the user.

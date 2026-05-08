@@ -202,7 +202,7 @@ function skillEntry(name: string): CoreBundle[number] {
 
 Deno.test("command emits to .opencode/commands/specflow.<name>.md", () => {
   const bundle = harness.mapBundle([commandEntry("specify")]);
-  const dest = ".opencode/commands/specflow.specify.md";
+  const dest = ".opencode/commands/specflow-specify.md";
   assertEquals(Object.keys(bundle), [dest]);
   assertStringIncludes(bundle[dest].content, "description: specify command");
   assertEquals(bundle[dest].content.includes("argument-hint"), false);
@@ -623,8 +623,8 @@ Deno.test("specflow init --ai opencode scaffolds a complete OpenCode project lay
 
   // Commands
   const commands = await listFiles(join(projectRoot, ".opencode/commands"));
-  assertEquals(commands.includes("specflow.specify.md"), true);
-  assertEquals(commands.includes("specflow.plan.md"), true);
+  assertEquals(commands.includes("specflow-specify.md"), true);
+  assertEquals(commands.includes("specflow-plan.md"), true);
   assertEquals(commands.includes("backlog.md"), true);
 
   // Agents — pick one and verify mode: subagent + permission block

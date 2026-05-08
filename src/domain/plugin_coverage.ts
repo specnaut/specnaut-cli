@@ -25,10 +25,11 @@ import type { KnownHarness } from "./installed_lock.ts";
  *
  *   - `.claude/agents/<name>.md` (excluding `architect.md` — that's a
  *     contributor-only agent, not bundled into user projects)
- *   - `.claude/skills/specflow.<name>/SKILL.md` — the 10 slash commands
- *     scaffolded as skill folders since #76
+ *   - `.claude/skills/specflow-<name>/SKILL.md` — the 10 slash commands
+ *     scaffolded as skill folders since #76 (hyphen separator —
+ *     Claude Code rejects dots in skill names per #123)
  *   - `.claude/skills/auto-chain/SKILL.md`
- *   - `.claude/skills/specflow.groom/SKILL.md`
+ *   - `.claude/skills/specflow-groom/SKILL.md`
  *
  * Everything else (project-stateful files in `.specflow/`, harness-
  * static files like `.claude/settings.json`, hooks, `CLAUDE.md`,
@@ -43,10 +44,10 @@ export function isPluginCoveredPath(
   const agentMatch = dest.match(/^\.claude\/agents\/([^/]+)\.md$/);
   if (agentMatch !== null) return agentMatch[1] !== "architect";
 
-  if (/^\.claude\/skills\/specflow\.[a-z]+\/SKILL\.md$/.test(dest)) return true;
+  if (/^\.claude\/skills\/specflow-[a-z]+\/SKILL\.md$/.test(dest)) return true;
 
   if (dest === ".claude/skills/auto-chain/SKILL.md") return true;
-  if (dest === ".claude/skills/specflow.groom/SKILL.md") return true;
+  if (dest === ".claude/skills/specflow-groom/SKILL.md") return true;
 
   return false;
 }
@@ -61,8 +62,8 @@ export function isPluginCoveredPath(
  * the bundled snapshot).
  *
  * Kept in sync with `isPluginCoveredPath` above. Total: 21 paths
- * (9 agents excluding architect + 10 specflow.* commands as skill
- * folders + auto-chain + specflow.groom).
+ * (9 agents excluding architect + 10 specflow-* commands as skill
+ * folders + auto-chain + specflow-groom).
  */
 export const PLUGIN_COVERED_PATHS_CLAUDE: ReadonlyArray<string> = [
   ...[
@@ -87,7 +88,7 @@ export const PLUGIN_COVERED_PATHS_CLAUDE: ReadonlyArray<string> = [
     "review",
     "specify",
     "tasks",
-  ].map((name) => `.claude/skills/specflow.${name}/SKILL.md`),
+  ].map((name) => `.claude/skills/specflow-${name}/SKILL.md`),
   ".claude/skills/auto-chain/SKILL.md",
-  ".claude/skills/specflow.groom/SKILL.md",
+  ".claude/skills/specflow-groom/SKILL.md",
 ];

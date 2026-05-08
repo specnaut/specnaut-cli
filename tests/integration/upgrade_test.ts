@@ -212,3 +212,62 @@ Deno.test("upgrade auto-deletes a clean orphan and drops it from the lock", asyn
     assertEquals(newLockYaml.includes("specflow.fake-orphan.md"), false);
   });
 });
+
+Deno.test("upgrade migrates legacy specflow.<name>/ skill folders to specflow-<name>/ (#123)", async () => {
+  await withTempDir(async (parent) => {
+    const init = await runSpecflow(["init", "demo", "--no-git"], { cwd: parent });
+    assertEquals(init.code, 0);
+
+    const projectDir = join(parent, "demo");
+
+    // Simulate a v0.13 project layout: rename one new folder back to the
+    // dotted form, plus rewrite the lock so its entry uses the dotted
+    // path. (We cannot easily cross-spawn the previous binary, so we
+    // build the legacy state by hand.)
+    const newPath = join(projectDir, ".claude/skills/specflow-specify/SKILL.md");
+    const oldDir = join(projectDir, ".claude/skills/specflow.specify");
+    await Deno.mkdir(oldDir, { recursive: true });
+    await Deno.rename(
+      newPath,
+      join(oldDir, "SKILL.md"),
+    );
+    await Deno.remove(join(projectDir, ".claude/skills/specflow-specify"));
+
+    const lockPath = join(projectDir, ".specflow/installed.lock");
+    let lockYaml = await Deno.readTextFile(lockPath);
+    lockYaml = lockYaml.replaceAll(
+      ".claude/skills/specflow-specify/SKILL.md",
+      ".claude/skills/specflow.specify/SKILL.md",
+    );
+    await Deno.writeTextFile(lockPath, lockYaml);
+
+    // Now run upgrade on the legacy-shaped project.
+    const upgrade = await runSpecflow(["upgrade"], { cwd: projectDir });
+    assertEquals(upgrade.code, 0);
+    assertStringIncludes(
+      upgrade.stdout,
+      "↳ migrated .claude/skills/specflow.specify/ → .claude/skills/specflow-specify/",
+    );
+
+    // Old folder gone, new folder back, lock updated.
+    assertEquals(
+      await exists(join(projectDir, ".claude/skills/specflow.specify")),
+      false,
+    );
+    assertEquals(
+      await exists(
+        join(projectDir, ".claude/skills/specflow-specify/SKILL.md"),
+      ),
+      true,
+    );
+    const newLockYaml = await Deno.readTextFile(lockPath);
+    assertStringIncludes(
+      newLockYaml,
+      ".claude/skills/specflow-specify/SKILL.md",
+    );
+    assertEquals(
+      newLockYaml.includes(".claude/skills/specflow.specify/SKILL.md"),
+      false,
+    );
+  });
+});

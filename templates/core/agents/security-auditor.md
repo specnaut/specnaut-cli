@@ -1,6 +1,6 @@
 ---
 name: security-auditor
-description: Reviews code for security issues — input validation, authz, secrets, injection, SSRF, path traversal, silent error swallowing. Spawned by the review-coordinator during /specflow.review.
+description: Reviews code for security issues — input validation, authz, secrets, injection, SSRF, path traversal, silent error swallowing. Spawned by the review-coordinator during /specflow-review.
 model: sonnet
 tools: Read, Grep, Glob
 maxTurns: 20

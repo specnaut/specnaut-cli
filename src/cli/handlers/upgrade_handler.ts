@@ -10,7 +10,7 @@ import { FsPluginDetector } from "../../infrastructure/fs_plugin_detector.ts";
 import { CORE_BUNDLE, TEMPLATES_VERSION } from "../../templates_bundle.ts";
 import { renderUnifiedDiff } from "../../domain/diff.ts";
 import type { UpgradePlan } from "../../domain/upgrade_plan.ts";
-import type { BacklogBackend, InstalledLock } from "../../domain/installed_lock.ts";
+import type { BacklogBackend, InstalledLock, LockEntry } from "../../domain/installed_lock.ts";
 import { sha256Hex } from "../../domain/sha256.ts";
 
 /**
@@ -72,6 +72,60 @@ export async function migrateLegacySpecsPaths(
     await Deno.mkdir(join(projectDir, ".specflow"), { recursive: true });
     await Deno.rename(oldDir, newDir);
     moves.push("specs/ → .specflow/specs/");
+  }
+
+  return moves;
+}
+
+/**
+ * One-shot migration for projects that pre-date #123. Rename
+ * `.claude/skills/specflow.<name>/` folders to `.claude/skills/specflow-<name>/`.
+ * Claude Code's runtime validator rejects skill names with dots
+ * ("Skill name may only contain lowercase letters, numbers, and
+ * hyphens"); v0.13 and earlier shipped the dotted form. This
+ * migration renames each old folder, transferring lock entries
+ * atomically (caller updates the lock).
+ *
+ * Idempotent: if the new path already exists, the old folder is
+ * left alone (manual resolution required). Returns the list of
+ * (oldPath → newPath) moves that happened.
+ */
+export async function migrateLegacyDottedSkillFolders(
+  projectDir: string,
+): Promise<ReadonlyArray<string>> {
+  const moves: string[] = [];
+  const skillsDir = join(projectDir, ".claude/skills");
+  if (!(await exists(skillsDir))) return moves;
+
+  for await (const entry of Deno.readDir(skillsDir)) {
+    if (!entry.isDirectory) continue;
+    if (!entry.name.startsWith("specflow.")) continue;
+    const renamed = entry.name.replace(/^specflow\./, "specflow-");
+    const oldPath = join(skillsDir, entry.name);
+    const newPath = join(skillsDir, renamed);
+    if (await exists(newPath)) continue; // don't clobber
+    await Deno.rename(oldPath, newPath);
+    moves.push(`.claude/skills/${entry.name}/ → .claude/skills/${renamed}/`);
+  }
+
+  // Update lock entries: any "specflow.<name>" path becomes
+  // "specflow-<name>". Lock-rebuilding logic in the upgrade use case
+  // would re-add these as add-new + remove orphans without this step,
+  // losing any user customizations.
+  if (moves.length > 0) {
+    const lockStore = new FsLockStore();
+    const lock = await lockStore.read(projectDir);
+    if (lock !== null) {
+      const updated = new Map<string, LockEntry>();
+      for (const [dest, entry] of lock.entries) {
+        const renamed = dest.replace(
+          /^\.claude\/skills\/specflow\.([a-z]+)\/SKILL\.md$/,
+          ".claude/skills/specflow-$1/SKILL.md",
+        );
+        updated.set(renamed, entry);
+      }
+      await lockStore.write(projectDir, { ...lock, entries: updated });
+    }
   }
 
   return moves;
@@ -255,6 +309,8 @@ export async function runUpgrade(intent: UpgradeIntent): Promise<number> {
     for (const m of backlogMoves) console.log(dim(`↳ migrated ${m}`));
     const specsMoves = await migrateLegacySpecsPaths(projectDir);
     for (const m of specsMoves) console.log(dim(`↳ migrated ${m}`));
+    const dottedSkillMoves = await migrateLegacyDottedSkillFolders(projectDir);
+    for (const m of dottedSkillMoves) console.log(dim(`↳ migrated ${m}`));
 
     if (intent.backlog !== null) {
       try {

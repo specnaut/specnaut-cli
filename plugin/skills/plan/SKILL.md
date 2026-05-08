@@ -3,11 +3,11 @@ disable-model-invocation: true
 description: Execute the implementation planning workflow using the plan template to generate design artifacts.
 handoffs: 
   - label: Create Tasks
-    agent: specflow.tasks
+    agent: specflow-tasks
     prompt: Break the plan into tasks
     send: true
   - label: Create Checklist
-    agent: specflow.checklist
+    agent: specflow-checklist
     prompt: Create a checklist for the following domain...
 scripts:
   sh: scripts/bash/setup-plan.sh --json
