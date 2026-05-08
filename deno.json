@@ -33,5 +33,13 @@
   "lint": {
     "rules": { "tags": ["recommended"] }
   },
-  "exclude": ["dist/", "spec-kit/", "examples/", "templates/", ".claude/", "packaging/"]
+  "exclude": [
+    "dist/",
+    "spec-kit/",
+    "examples/",
+    "templates/",
+    ".claude/",
+    "packaging/",
+    "plugin/skills/"
+  ]
 }
