@@ -1,7 +1,8 @@
 import { join } from "@std/path";
+import { parse as parseYaml } from "@std/yaml";
 import type { ProjectInspector } from "../application/ports.ts";
 import type { CheckOutcome } from "../domain/check_result.ts";
-import { type KnownHarness, parseLock } from "../domain/installed_lock.ts";
+import { type BacklogBackend, type KnownHarness, parseLock } from "../domain/installed_lock.ts";
 
 async function exists(path: string): Promise<boolean> {
   try {
@@ -63,9 +64,96 @@ export class FsProjectInspector implements ProjectInspector {
     outcomes.push(await this.checkHarness(projectDir));
     outcomes.push(await this.checkConstitution(projectDir));
     outcomes.push(await this.checkTemplatesVersion(projectDir, templatesVersion));
+    outcomes.push(await this.checkBacklogConfig(projectDir));
     outcomes.push(...await this.checkClaudeConfig(projectDir));
 
     return outcomes;
+  }
+
+  /**
+   * Surfaces the active backlog backend and validates that the per-backend
+   * config file is wired up enough to actually run. The PO will fail at
+   * runtime if `backlog-config.yml` has empty required fields, so flagging
+   * here saves the user from a confusing first `/backlog add` failure.
+   *
+   * Local backend is zero-config: a single `pass` line, no file lookup.
+   */
+  private async checkBacklogConfig(projectDir: string): Promise<CheckOutcome> {
+    const lockPath = join(projectDir, ".specflow/installed.lock");
+    if (!(await exists(lockPath))) {
+      return {
+        name: "backlog backend",
+        status: "warn",
+        message: "no installed.lock — cannot determine backend",
+      };
+    }
+    let backend: BacklogBackend;
+    try {
+      backend = parseLock(await Deno.readTextFile(lockPath)).backlogBackend;
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      return { name: "backlog backend", status: "fail", message: `corrupt lock — ${msg}` };
+    }
+
+    if (backend === "local") {
+      return {
+        name: "backlog backend",
+        status: "pass",
+        message: "local — zero-config",
+      };
+    }
+
+    const cfgPath = join(projectDir, ".specflow/backlog-config.yml");
+    if (!(await exists(cfgPath))) {
+      return {
+        name: "backlog backend",
+        status: "warn",
+        message:
+          `${backend} — backlog-config.yml missing (run \`specflow upgrade --backlog ${backend}\` to scaffold)`,
+      };
+    }
+
+    let parsed: Record<string, unknown>;
+    try {
+      const raw = await Deno.readTextFile(cfgPath);
+      parsed = (parseYaml(raw) ?? {}) as Record<string, unknown>;
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      return {
+        name: "backlog backend",
+        status: "fail",
+        message: `${backend} — backlog-config.yml is invalid YAML: ${msg}`,
+      };
+    }
+
+    const requiredFields: Record<"github" | "gitlab", string[]> = {
+      github: ["repo", "project_number"],
+      gitlab: ["project_id"],
+    };
+
+    const missing: string[] = [];
+    for (const field of requiredFields[backend]) {
+      const v = parsed[field];
+      if (v === undefined || v === null || v === "") {
+        missing.push(field);
+      }
+    }
+
+    if (missing.length > 0) {
+      return {
+        name: "backlog backend",
+        status: "warn",
+        message: `${backend} — backlog-config.yml has empty ${
+          missing.join(", ")
+        } (PO will fail at runtime)`,
+      };
+    }
+
+    return {
+      name: "backlog backend",
+      status: "pass",
+      message: `${backend} — backlog-config.yml configured`,
+    };
   }
 
   /**
