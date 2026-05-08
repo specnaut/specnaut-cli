@@ -1,1 +1,2 @@
 *.specflow.bak
+.specflow/logs/

@@ -69,6 +69,10 @@
     { "harness": "claude", "destination": ".claude/CLAUDE.md", "source": "harness-specific/claude/CLAUDE.md" },
     { "harness": "claude", "destination": ".claude/scripts/dispatch-agent.sh", "source": "harness-specific/claude/scripts/dispatch-agent.sh", "executable": true },
     { "harness": "claude", "destination": ".claude/loop.md", "source": "harness-specific/claude/loop.md" },
+    { "harness": "claude", "destination": ".claude/settings.json", "source": "harness-specific/claude/settings.json" },
+    { "harness": "claude", "destination": ".claude/hooks/protect-generated.sh", "source": "harness-specific/claude/hooks/protect-generated.sh", "executable": true },
+    { "harness": "claude", "destination": ".claude/hooks/log-subagent.sh", "source": "harness-specific/claude/hooks/log-subagent.sh", "executable": true },
+    { "harness": "claude", "destination": ".claude/hooks/check-backlog-prereqs.sh", "source": "harness-specific/claude/hooks/check-backlog-prereqs.sh", "executable": true },
     { "harness": "cursor", "destination": ".cursor/rules/specify-rules.mdc", "source": "harness-specific/cursor/specify-rules.mdc" }
   ]
 }

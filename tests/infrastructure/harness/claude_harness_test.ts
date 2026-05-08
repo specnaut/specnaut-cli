@@ -15,9 +15,14 @@ Deno.test("ClaudeHarness.mapBundle emits the Claude tree", () => {
   // 40 base core (39 + specflow.groom skill) + 1 backlog skill +
   // 5 local backlog scripts + 5 agent memory stubs (Claude only) +
   // .claude/CLAUDE.md + .claude/scripts/dispatch-agent.sh + .claude/loop.md
-  assertEquals(keys.length, 54);
+  // + .claude/settings.json + 3 .claude/hooks/*.sh
+  assertEquals(keys.length, 58);
   assert(".claude/skills/specflow.groom/SKILL.md" in mapped);
   assert(".claude/loop.md" in mapped);
+  assert(".claude/settings.json" in mapped);
+  assert(".claude/hooks/protect-generated.sh" in mapped);
+  assert(".claude/hooks/log-subagent.sh" in mapped);
+  assert(".claude/hooks/check-backlog-prereqs.sh" in mapped);
   // Spot-check canonical paths
   assert(".claude/commands/specflow.specify.md" in mapped);
   assert(".claude/commands/backlog.md" in mapped);
