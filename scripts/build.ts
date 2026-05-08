@@ -1,4 +1,4 @@
-// Compiles specflow for the five v0.1 targets into dist/.
+// Compiles specflow for the five supported targets into dist/.
 // Requires: deno task bundle to have been run first (deno task build does both).
 
 const ROOT = new URL("..", import.meta.url);
