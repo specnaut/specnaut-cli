@@ -135,6 +135,17 @@ entries: {}
   assertEquals(lock.backlogBackend, "github");
 });
 
+Deno.test("parseLock accepts backlog_backend=gitlab", () => {
+  const v2 = `version: 2
+harness: claude
+backlog_backend: gitlab
+templates_version: 0.7.0
+entries: {}
+`;
+  const lock = parseLock(v2);
+  assertEquals(lock.backlogBackend, "gitlab");
+});
+
 Deno.test("parseLock falls back to local on unknown backlog_backend value", () => {
   // Unknown values are silently coerced to "local" rather than thrown,
   // matching how missing harness fields default in v1 → v2 migration.

@@ -36,6 +36,11 @@ Deno.test("pickBacklogBackend picks 2 for github", () => {
   assertEquals(pickBacklogBackend(io), "github");
 });
 
+Deno.test("pickBacklogBackend picks 3 for gitlab", () => {
+  const { io } = fakeIO(["3"]);
+  assertEquals(pickBacklogBackend(io), "gitlab");
+});
+
 Deno.test("pickBacklogBackend re-prompts on invalid input", () => {
   const { io, errLog } = fakeIO(["999", "bad", "1"]);
   assertEquals(pickBacklogBackend(io), "local");

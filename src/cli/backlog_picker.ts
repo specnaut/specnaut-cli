@@ -5,6 +5,7 @@ export const DEFAULT_BACKLOG_BACKEND: BacklogBackend = "local";
 const DISPLAY_NAMES: Record<BacklogBackend, string> = {
   local: "Local Markdown files (.specflow/backlog/)",
   github: "GitHub Issues + Project (requires gh CLI)",
+  gitlab: "GitLab Issues + scoped Status labels (requires glab CLI)",
 };
 
 export type BacklogPickerIO = {

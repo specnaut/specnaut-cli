@@ -162,6 +162,68 @@ For the **shell path**: the `gh` CLI must be authenticated with the
 For the **MCP path**: see "Two paths to GitHub" above.
 <!-- END: backend=github -->
 
+<!-- BEGIN: backend=gitlab -->
+## Backend: GitLab Issues + scoped Status labels
+
+This project's backlog lives on GitLab Issues, with workflow state
+tracked via scoped labels (`Status::Backlog`, `Status::Ready`,
+`Status::"In progress"`, `Status::"In review"`, `Status::Done`).
+GitLab doesn't have a Project Status field equivalent to GitHub's
+Projects V2 — scoped labels are the canonical way to model kanban-
+style state on GitLab.
+
+Configuration is read from `.specflow/backlog-config.yml` at runtime —
+fill in `host` and `project_id` before running any mutation.
+
+### Configuration file
+
+```yaml
+# .specflow/backlog-config.yml
+host: gitlab.com         # or your self-hosted instance
+project_id: ""           # numeric id (e.g. "12345") or path "group/project"
+```
+
+### Scripts (preferred path)
+
+```bash
+.specflow/scripts/backlog/list.sh [Status]            # all issues, optional Status:: filter
+.specflow/scripts/backlog/view.sh <number>            # one issue + comments
+.specflow/scripts/backlog/add.sh "<title>" [body] [labels-csv]
+.specflow/scripts/backlog/move.sh <number> <Status>   # swaps the Status:: label
+.specflow/scripts/backlog/clarify-comment.sh <num> "<question>"
+```
+
+For closing or editing, use `glab` directly:
+
+```bash
+glab issue close   <num> --repo <project_id>
+glab issue update  <num> --repo <project_id> --title "…" --description "…"
+```
+
+### Conventions
+
+- **Titles** — short imperative phrases. Lowercase OK; no leading emoji.
+- **Bodies** — `## Why` / `## Acceptance criteria` / `## Out of scope`.
+- **Status** — set by adding/swapping a `Status::*` scoped label.
+  Scoped labels are mutually exclusive on the same scope, so swapping
+  is atomic.
+- **Closing** — close the issue (don't just move to Done). The repo's
+  issue history is the audit trail.
+- **Drafts** are not used. Every task is a real issue.
+
+### Prerequisites
+
+The `glab` CLI must be installed and authenticated.
+
+- Install: https://gitlab.com/gitlab-org/cli
+- Authenticate: `glab auth login` (use the same host as in
+  `backlog-config.yml`)
+
+The first time the PO runs against this project, it will create the 5
+`Status::*` scoped labels if they don't exist (`Backlog`, `Ready`,
+`In progress`, `In review`, `Done`).
+<!-- END: backend=gitlab -->
+
 ## When NOT to use this skill
 
 - The user is implementing a backlog item — that's normal coding work;

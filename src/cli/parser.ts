@@ -29,7 +29,7 @@ export type Intent =
      * resolution semantics as `ai`: interactive prompt when stdin is a TTY,
      * default fallback otherwise.
      */
-    backlog: "local" | "github" | null;
+    backlog: "local" | "github" | "gitlab" | null;
     force: boolean;
   }
   | { kind: "self-update"; checkOnly: boolean }
@@ -43,7 +43,7 @@ export type Intent =
      * bundled backlog skill and updates the lock. `null` keeps the lock's
      * current backend.
      */
-    backlog: "local" | "github" | null;
+    backlog: "local" | "github" | "gitlab" | null;
   }
   | { kind: "backlog-removed" }
   | { kind: "unknown"; received: string };
@@ -91,7 +91,8 @@ export function parseArgs(argv: string[]): Intent {
     if (
       backlogRaw !== null &&
       backlogRaw !== "local" &&
-      backlogRaw !== "github"
+      backlogRaw !== "github" &&
+      backlogRaw !== "gitlab"
     ) {
       return { kind: "unknown", received: `init --backlog ${backlogRaw}` };
     }
@@ -120,7 +121,8 @@ export function parseArgs(argv: string[]): Intent {
     if (
       backlogRaw !== null &&
       backlogRaw !== "local" &&
-      backlogRaw !== "github"
+      backlogRaw !== "github" &&
+      backlogRaw !== "gitlab"
     ) {
       return { kind: "unknown", received: `upgrade --backlog ${backlogRaw}` };
     }

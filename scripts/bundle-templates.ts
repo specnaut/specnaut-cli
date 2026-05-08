@@ -14,7 +14,7 @@ type CoreManifestEntry = {
   source: string;
   executable?: boolean;
   /** When set, the entry only applies if this backend is selected. */
-  backend?: "local" | "github";
+  backend?: "local" | "github" | "gitlab";
 };
 
 type HarnessStaticManifestEntry = {
