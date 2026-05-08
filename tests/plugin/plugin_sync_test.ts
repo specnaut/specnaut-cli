@@ -57,6 +57,15 @@ const SYNC_PAIRS: ReadonlyArray<{ plugin: string; source: string }> = [
     plugin: `plugin/agents/${name}.md`,
     source: `templates/core/agents/${name}.md`,
   })),
+  // The groom skill: source folder is `templates/core/skills/specflow.groom/`
+  // (binary scaffolds it as a project skill with the namespaced short
+  // form), but the plugin folder drops the `specflow.` prefix because
+  // the plugin namespace `claude-specflow:` already disambiguates —
+  // the plugin command becomes `/claude-specflow:groom`.
+  {
+    plugin: "plugin/skills/groom/SKILL.md",
+    source: "templates/core/skills/specflow.groom/SKILL.md",
+  },
 ];
 
 function abs(rel: string): string {

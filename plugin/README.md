@@ -12,11 +12,11 @@ into projects — just as a user-scope plugin instead.
 | `skills/auto-chain/SKILL.md`                                                                                                                | Auto-chain skill — `/claude-specflow:auto-chain`                  |
 | `skills/{specify,plan,tasks,implement,analyze,review,merge,constitution,checklist,clarify}/SKILL.md`                                        | The 10 Specflow slash-commands — `/claude-specflow:specify`, etc. |
 | `agents/{code-reviewer,developer,devops-sre,product-owner,qa-tester,review-coordinator,security-auditor,test-reviewer,workflow-manager}.md` | 9 sub-agents available to invoke in plugin scope                  |
+| `skills/groom/SKILL.md`                                                                                                                     | Groom skill — `/claude-specflow:groom`                            |
 
 **Coming in subsequent slices** (tracked in
 [issue #73](https://github.com/mkrlabs/specflow/issues/73)):
 
-- `skills/specflow.groom/` — the groom skill.
 - `PluginDetector` port + the v0.x → plugin migration logic in `specflow upgrade`.
 
 ### Known caveat: handoff IDs
