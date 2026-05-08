@@ -32,12 +32,15 @@ Specflow repo.
    deno run --allow-read --allow-write scripts/bump-version.ts <kind>
    ```
 
-   This updates `deno.json` and `src/domain/version.ts` in lockstep.
+   This updates `deno.json`, `src/domain/version.ts`, AND
+   `plugin/.claude-plugin/plugin.json` in lockstep. The
+   release.yml pre-flight step fails fast on plugin/binary version
+   drift, so all three must move together.
 
 2. **Review the diff** and confirm with Kevin:
 
    ```bash
-   git diff deno.json src/domain/version.ts
+   git diff deno.json src/domain/version.ts plugin/.claude-plugin/plugin.json
    ```
 
 3. **Regenerate the bundle** in case templates changed since the last release:
@@ -73,7 +76,8 @@ Specflow repo.
 6. **Commit the bump**:
 
    ```bash
-   git add deno.json src/domain/version.ts src/templates_bundle.ts
+   git add deno.json src/domain/version.ts src/templates_bundle.ts \
+           plugin/.claude-plugin/plugin.json
    git commit -m "chore: release v<NEXT>"
    ```
 
