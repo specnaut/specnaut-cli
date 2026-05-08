@@ -22,6 +22,23 @@ jobs:
           deno-version: v2.x
       - name: Bundle templates
         run: deno task bundle
+      - name: Plugin pre-flight (version lockstep + scaffold integrity)
+        run: |
+          set -euo pipefail
+          # 1. plugin.json must be parseable JSON
+          jq -e . plugin/.claude-plugin/plugin.json > /dev/null
+          # 2. Plugin scaffold must contain at minimum the auto-chain skill
+          # (catches an accidentally truncated plugin/ directory).
+          test -f plugin/skills/auto-chain/SKILL.md
+          # 3. Hard fail if plugin.json version drifts from deno.json version.
+          # The two are kept in lockstep by scripts/bump-version.ts.
+          BIN_VERSION=$(jq -r .version deno.json)
+          PLUGIN_VERSION=$(jq -r .version plugin/.claude-plugin/plugin.json)
+          if [ "$BIN_VERSION" != "$PLUGIN_VERSION" ]; then
+            echo "::error::plugin/.claude-plugin/plugin.json version ($PLUGIN_VERSION) does not match deno.json version ($BIN_VERSION). Re-run scripts/bump-version.ts."
+            exit 1
+          fi
+          echo "✓ plugin manifest valid, scaffold present, version $PLUGIN_VERSION matches binary"
       - name: Cross-compile all targets
         run: deno run --allow-read --allow-write --allow-run --allow-env scripts/build.ts
       - name: Compute checksums

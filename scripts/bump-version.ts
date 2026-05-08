@@ -63,6 +63,17 @@ async function writeVersions(next: string): Promise<void> {
     `export const VERSION = "${next}"`,
   );
   await Deno.writeTextFile(verPath, updatedVer);
+
+  // Lockstep the claude-specflow plugin manifest (#73 slice 8). The
+  // release workflow's pre-flight step compares deno.json `version`
+  // against this file's `version` and fails fast on drift.
+  const pluginManifestPath = "plugin/.claude-plugin/plugin.json";
+  const pluginRaw = await Deno.readTextFile(pluginManifestPath);
+  const updatedPlugin = pluginRaw.replace(
+    /"version":\s*"[^"]+"/,
+    `"version": "${next}"`,
+  );
+  await Deno.writeTextFile(pluginManifestPath, updatedPlugin);
 }
 
 async function main() {
@@ -77,7 +88,9 @@ async function main() {
   const next = computeNextVersion(version, kind as BumpKind);
   await writeVersions(next);
   console.log(`Bumped ${version} → ${next}`);
-  console.log(`Updated: deno.json, src/domain/version.ts`);
+  console.log(
+    `Updated: deno.json, src/domain/version.ts, plugin/.claude-plugin/plugin.json`,
+  );
 }
 
 if (import.meta.main) await main();
