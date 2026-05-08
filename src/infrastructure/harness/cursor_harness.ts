@@ -52,6 +52,7 @@ export class CursorHarness implements Harness {
         content,
         executable: entry.executable,
         ...(entry.category === "mergeable-project-root" ? { mergeBlock: "gitignore" } : {}),
+        ...(entry.skipIfExists ? { skipIfExists: true as const } : {}),
       } satisfies TemplateFile;
     }
     const staticFiles = HARNESS_STATIC[this.key] ?? {};

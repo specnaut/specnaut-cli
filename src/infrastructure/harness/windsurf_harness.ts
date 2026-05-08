@@ -50,6 +50,7 @@ export class WindsurfHarness implements Harness {
         content: entry.content,
         executable: entry.executable,
         ...(entry.category === "mergeable-project-root" ? { mergeBlock: "gitignore" } : {}),
+        ...(entry.skipIfExists ? { skipIfExists: true as const } : {}),
       };
     }
     return out;

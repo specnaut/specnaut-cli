@@ -79,8 +79,13 @@ export class InitProjectUseCase {
     });
 
     const now = (this.deps.now ?? (() => new Date()))().toISOString();
+    // Skip-if-exists files that pre-existed are user-owned, not
+    // Specflow-managed — keep them out of the lock so future upgrades
+    // don't try to reconcile them against the placeholder content.
+    const skippedSet = new Set(report.skippedSkipIfExists);
     const lockEntries = new Map<string, LockEntry>();
     for (const [dest, file] of Object.entries(bundle)) {
+      if (skippedSet.has(dest)) continue;
       // For mergeable files the lock holds the SHA of the *block body in
       // canonical form* (no leading/trailing newlines) so it stays
       // comparable against the body extracted from disk on upgrade reads.

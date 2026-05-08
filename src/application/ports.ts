@@ -19,6 +19,14 @@ export interface FsWriter {
 
 export type BackupReport = {
   readonly backups: ReadonlyArray<{ readonly dest: string; readonly backupPath: string }>;
+  /**
+   * Dests that were silently skipped because the file pre-existed AND the
+   * bundle entry had `skipIfExists: true` (placeholder semantics — the
+   * user's existing content always wins). Always present; empty when no
+   * placeholder skipping happened. The init use case omits these dests
+   * from the lock since they aren't Specflow-managed.
+   */
+  readonly skippedSkipIfExists: ReadonlyArray<string>;
 };
 
 export interface GitAdapter {

@@ -40,12 +40,12 @@ function fakeWriter(): FsWriter & {
       for (const [dest, file] of Object.entries(bundle)) {
         written.set(dest, file.content);
       }
-      return Promise.resolve({ backups: [] } as BackupReport);
+      return Promise.resolve({ backups: [], skippedSkipIfExists: [] } as BackupReport);
     },
     deletePaths: (paths, _t, options) => {
       if (options.backupExisting) deleteBackupsRequested = true;
       for (const p of paths) deleted.push(p);
-      return Promise.resolve({ backups: [] } as BackupReport);
+      return Promise.resolve({ backups: [], skippedSkipIfExists: [] } as BackupReport);
     },
   };
 }

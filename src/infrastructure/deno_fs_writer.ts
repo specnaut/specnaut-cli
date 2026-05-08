@@ -33,6 +33,9 @@ export class DenoFsWriter implements FsWriter {
       // Mergeable files merge non-destructively into any pre-existing content,
       // so they are never conflicts.
       if (file.mergeBlock !== undefined) continue;
+      // Skip-if-exists files (placeholders like AGENTS.md) silently leave
+      // the user's existing file alone — also never a conflict.
+      if (file.skipIfExists === true) continue;
       const abs = join(resolved, dest);
       if (await fileExists(abs)) conflicts.push(dest);
     }
@@ -61,6 +64,7 @@ export class DenoFsWriter implements FsWriter {
     }
 
     const backups: { dest: string; backupPath: string }[] = [];
+    const skippedSkipIfExists: string[] = [];
 
     for (const [dest, file] of Object.entries(bundle)) {
       const abs = join(resolved, dest);
@@ -76,6 +80,20 @@ export class DenoFsWriter implements FsWriter {
         continue;
       }
 
+      // Skip-if-exists placeholders: only write if the file is absent
+      // AND the caller didn't request overwrite. With overwrite=true
+      // (i.e. `--force` from init or any upgrade call), the placeholder
+      // is treated like an owned file: the existing content is backed
+      // up and the bundle content is written. This preserves the
+      // existing `upgrade --force` semantics for files that init
+      // originally created (lock-tracked → standard upgrade path).
+      if (
+        file.skipIfExists === true && !overwrite && (await fileExists(abs))
+      ) {
+        skippedSkipIfExists.push(dest);
+        continue;
+      }
+
       if (backupExisting && (await fileExists(abs))) {
         const backupAbs = `${abs}${BACKUP_SUFFIX}`;
         await Deno.rename(abs, backupAbs);
@@ -88,7 +106,7 @@ export class DenoFsWriter implements FsWriter {
       }
     }
 
-    return { backups };
+    return { backups, skippedSkipIfExists };
   }
 
   async deletePaths(
@@ -113,6 +131,6 @@ export class DenoFsWriter implements FsWriter {
       }
     }
 
-    return { backups };
+    return { backups, skippedSkipIfExists: [] };
   }
 }
