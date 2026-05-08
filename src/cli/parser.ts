@@ -1,4 +1,17 @@
 import { parseArgs as stdParseArgs } from "@std/cli/parse-args";
+import { type BacklogBackend, KNOWN_BACKLOG_BACKENDS } from "../domain/installed_lock.ts";
+
+function validateBacklogArg(
+  raw: string | null,
+):
+  | { ok: true; value: BacklogBackend | null }
+  | { ok: false } {
+  if (raw === null) return { ok: true, value: null };
+  if ((KNOWN_BACKLOG_BACKENDS as ReadonlyArray<string>).includes(raw)) {
+    return { ok: true, value: raw as BacklogBackend };
+  }
+  return { ok: false };
+}
 
 export type Intent =
   | { kind: "version" }
@@ -88,12 +101,8 @@ export function parseArgs(argv: string[]): Intent {
     }
     const backlogProvided = typeof parsed.backlog === "string";
     const backlogRaw = backlogProvided ? (parsed.backlog as string) : null;
-    if (
-      backlogRaw !== null &&
-      backlogRaw !== "local" &&
-      backlogRaw !== "github" &&
-      backlogRaw !== "gitlab"
-    ) {
+    const backlogResult = validateBacklogArg(backlogRaw);
+    if (!backlogResult.ok) {
       return { kind: "unknown", received: `init --backlog ${backlogRaw}` };
     }
     return {
@@ -102,7 +111,7 @@ export function parseArgs(argv: string[]): Intent {
       here: Boolean(parsed.here),
       noGit: Boolean(parsed["no-git"]),
       ai: aiRaw,
-      backlog: backlogRaw,
+      backlog: backlogResult.value,
       force: Boolean(parsed.force),
     };
   }
@@ -118,19 +127,15 @@ export function parseArgs(argv: string[]): Intent {
   if (command === "upgrade") {
     const backlogProvided = typeof parsed.backlog === "string";
     const backlogRaw = backlogProvided ? (parsed.backlog as string) : null;
-    if (
-      backlogRaw !== null &&
-      backlogRaw !== "local" &&
-      backlogRaw !== "github" &&
-      backlogRaw !== "gitlab"
-    ) {
+    const backlogResult = validateBacklogArg(backlogRaw);
+    if (!backlogResult.ok) {
       return { kind: "unknown", received: `upgrade --backlog ${backlogRaw}` };
     }
     return {
       kind: "upgrade",
       dryRun: Boolean(parsed["dry-run"]),
       force: Boolean(parsed.force),
-      backlog: backlogRaw,
+      backlog: backlogResult.value,
     };
   }
 
