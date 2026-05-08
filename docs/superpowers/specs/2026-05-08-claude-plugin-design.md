@@ -1,4 +1,4 @@
-# Claude plugin (`claude-specflow`) — boundary and backwards-compat design
+# Claude plugin (`specflow-plugin`) — boundary and backwards-compat design
 
 **Goal.** Define (a) which Specflow template files move to the plugin vs stay binary-owned, and (b)
 how `specflow upgrade` handles v0.x users who have inline on-disk agents once the plugin exists.
@@ -10,7 +10,7 @@ This is the design-only document for issue #73; no code ships until AC are writt
 
 The Claude plugin system (`code.claude.com/docs/en/plugins`) installs a plugin repo's content at
 user scope (cached under `~/.claude/plugins/cache/<name>/`) when the user runs
-`/plugin install claude-specflow`. Plugin skills are **namespaced** (`/claude-specflow:specify`), so
+`/plugin install specflow-plugin`. Plugin skills are **namespaced** (`/specflow-plugin:specify`), so
 they coexist with but do not replace project-level `.claude/skills/` files. Hooks in a plugin live
 in `hooks/hooks.json`, not in `settings.json`. Agents in a plugin live in `agents/`.
 
@@ -24,7 +24,7 @@ Anything that requires project-state stays binary-owned.
 
 | Template path (relative to `templates/`)                 | Category        | Destination                       | Rationale                                                                                                                                                                                                                                                                                                                         |
 | -------------------------------------------------------- | --------------- | --------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `core/commands/specflow.*.md` (10 files)                 | Skills          | **Both**                          | Plugin ships the generic version (namespaced `/claude-specflow:specify`). Binary continues to scaffold project-local copies in `.claude/skills/specflow.*/SKILL.md` (unlocked, un-namespaced `/specify`). Users get the convenience of the plugin AND the short slash-command. On upgrade, binary version wins for project files. |
+| `core/commands/specflow.*.md` (10 files)                 | Skills          | **Both**                          | Plugin ships the generic version (namespaced `/specflow-plugin:specify`). Binary continues to scaffold project-local copies in `.claude/skills/specflow.*/SKILL.md` (unlocked, un-namespaced `/specify`). Users get the convenience of the plugin AND the short slash-command. On upgrade, binary version wins for project files. |
 | `core/commands/backlog.md`                               | Backlog command | **Binary only**                   | Content varies by backend (conditional-render markers). Plugin cannot pre-render per-backend.                                                                                                                                                                                                                                     |
 | `core/agents/*.md` (9 agents)                            | Agents          | **Both**                          | Plugin ships the canonical latest version. Binary scaffolds the snapshot at init time. See Q4 for migration.                                                                                                                                                                                                                      |
 | `core/agents/*/memory/MEMORY.md` (5 files)               | Agent memory    | **Binary only**                   | These are project-local memory files meant to be mutated per-project. Plugin scope makes no sense.                                                                                                                                                                                                                                |
@@ -52,7 +52,7 @@ hook `command` paths resolve relative to plugin root, keep it binary-owned and r
 
 ### Naming note
 
-Plugin skills are namespaced: `/claude-specflow:specify`, not `/specify`. Binary-scaffolded project
+Plugin skills are namespaced: `/specflow-plugin:specify`, not `/specify`. Binary-scaffolded project
 skills keep the short form. This is the correct UX: the plugin provides discoverability for new
 users; the binary provides the customizable project-local copy with the short slash-command.
 
@@ -67,7 +67,7 @@ users; the binary provides the customizable project-local copy with the short sl
 the two differ. This is already implemented in `src/domain/installed_lock.ts` and used by the
 upgrade path — no new infrastructure needed.
 
-Plugin install detection: check whether `~/.claude/plugins/cache/claude-specflow/` exists (the
+Plugin install detection: check whether `~/.claude/plugins/cache/specflow-plugin/` exists (the
 canonical cache path per the discover-plugins docs). The binary reads this path via a new
 `PluginDetector` port method `isPluginInstalled(name: string): Promise<boolean>` backed by a
 `Deno.stat` check in `src/infrastructure/fs_plugin_detector.ts`.
@@ -78,8 +78,8 @@ canonical cache path per the discover-plugins docs). The binary reads this path 
 | -------------------------- | ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | Vanilla (SHA matches lock) | Not installed | Normal upgrade: overwrite with latest bundle snapshot.                                                                                                                                                                                                                                                 |
 | Customized (SHA differs)   | Not installed | Normal upgrade: preserve unless `--force`. No change from today.                                                                                                                                                                                                                                       |
-| Vanilla                    | Installed     | **Auto-migrate**: backup the file to `.specflow/backups/<timestamp>/`, delete the on-disk copy, drop the lock entry. Print: `info: agent 'product-owner' removed — now served by the claude-specflow plugin`.                                                                                          |
-| Customized                 | Installed     | **Warn + preserve**: keep the on-disk copy (it wins over plugin per Claude Code loading order). Print: `warn: agent 'product-owner' is customized and the claude-specflow plugin is installed. The on-disk version takes precedence. Reconcile manually or run specflow upgrade --force to overwrite.` |
+| Vanilla                    | Installed     | **Auto-migrate**: backup the file to `.specflow/backups/<timestamp>/`, delete the on-disk copy, drop the lock entry. Print: `info: agent 'product-owner' removed — now served by the specflow-plugin plugin`.                                                                                          |
+| Customized                 | Installed     | **Warn + preserve**: keep the on-disk copy (it wins over plugin per Claude Code loading order). Print: `warn: agent 'product-owner' is customized and the specflow-plugin plugin is installed. The on-disk version takes precedence. Reconcile manually or run specflow upgrade --force to overwrite.` |
 | Missing (user deleted)     | Not installed | Drop lock entry, nothing on disk to act on.                                                                                                                                                                                                                                                            |
 | Missing (user deleted)     | Installed     | Drop lock entry. Plugin serves the agent. No action needed.                                                                                                                                                                                                                                            |
 
@@ -106,8 +106,8 @@ plugin is not installed. It emits:
 
 ```
 warn: .claude/agents/product-owner.md is tracked in the lock but missing from disk.
-      The claude-specflow plugin is not installed. Run `specflow upgrade` to restore
-      the bundled version, or install the plugin: /plugin install claude-specflow.
+      The specflow-plugin plugin is not installed. Run `specflow upgrade` to restore
+      the bundled version, or install the plugin: /plugin install specflow-plugin.
 ```
 
 `specflow upgrade` restores the file from the bundle (same path as `add-new` action). No new action
@@ -123,7 +123,7 @@ kind needed — the existing `add-new` path handles it.
    - customizability) but adds upgrade complexity. Accept this as a first-party first-mover cost, or
      decide the plugin is the only source and force namespaced commands on all users. **Recommend:
      keep both.** The `/specify` short form is a core UX property; namespaced
-     `/claude-specflow:specify` is the discoverability layer.
+     `/specflow-plugin:specify` is the discoverability layer.
 
 2. **`log-subagent.sh` plugin vs binary.** Defer to plugin GA when hook path resolution from plugin
    cache is documented. Until then, binary-owned. **Recommend: defer.**
@@ -134,7 +134,7 @@ kind needed — the existing `add-new` path handles it.
    auto-migrate with backup + explicit `info:` line per file.** The backup path is the safety net;
    the log line is the audit trail. Explicit flag adds friction for the common case.
 
-4. **Plugin install detection path.** `~/.claude/plugins/cache/claude-specflow/` is inferred from
+4. **Plugin install detection path.** `~/.claude/plugins/cache/specflow-plugin/` is inferred from
    docs; the actual path is not formally guaranteed by the Claude Code API surface. If the path
    changes, the detector silently fails (no migration, no warning). Accept this fragility at v0.12,
    revisit once Claude Code publishes a stable plugin query API. **Recommend: accept.** Fallback

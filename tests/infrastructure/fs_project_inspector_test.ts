@@ -840,7 +840,7 @@ Deno.test("inspect: plugin gap check warns for each missing covered path when pl
     for (const o of gapOutcomes) {
       assertEquals(o.message.includes("missing"), true);
       assertEquals(o.message.includes("specflow upgrade"), true);
-      assertEquals(o.message.includes("/plugin install claude-specflow"), true);
+      assertEquals(o.message.includes("/plugin install specflow-plugin"), true);
     }
   });
 });

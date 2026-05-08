@@ -1,10 +1,10 @@
 ---
 name: claude-plugin-compat
-description: Backwards-compat strategy for v0.x inline agents when claude-specflow plugin is installed — issue #73
+description: Backwards-compat strategy for v0.x inline agents when specflow-plugin plugin is installed — issue #73
 type: decision
 ---
 
-**Detection method:** SHA comparison against InstalledLock.entries (already implemented in src/domain/installed_lock.ts). Plugin presence detected via Deno.stat on ~/.claude/plugins/cache/claude-specflow/ through a new PluginDetector port + fs_plugin_detector.ts adapter.
+**Detection method:** SHA comparison against InstalledLock.entries (already implemented in src/domain/installed_lock.ts). Plugin presence detected via Deno.stat on ~/.claude/plugins/cache/specflow-plugin/ through a new PluginDetector port + fs_plugin_detector.ts adapter.
 
 **Rule: auto-migrate vanilla files, warn-and-preserve customized files.**
 

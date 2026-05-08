@@ -22,7 +22,7 @@ const SYNC_PAIRS: ReadonlyArray<{ plugin: string; source: string }> = [
   },
   // Dual-copy commands: 10 specflow.* sources, each landing as
   // `plugin/skills/<name>/SKILL.md` (the `specflow.` prefix is
-  // dropped because the plugin namespace `claude-specflow:` already
+  // dropped because the plugin namespace `specflow-plugin:` already
   // disambiguates).
   ...[
     "analyze",
@@ -60,8 +60,8 @@ const SYNC_PAIRS: ReadonlyArray<{ plugin: string; source: string }> = [
   // The groom skill: source folder is `templates/core/skills/specflow.groom/`
   // (binary scaffolds it as a project skill with the namespaced short
   // form), but the plugin folder drops the `specflow.` prefix because
-  // the plugin namespace `claude-specflow:` already disambiguates —
-  // the plugin command becomes `/claude-specflow:groom`.
+  // the plugin namespace `specflow-plugin:` already disambiguates —
+  // the plugin command becomes `/specflow-plugin:groom`.
   {
     plugin: "plugin/skills/groom/SKILL.md",
     source: "templates/core/skills/specflow.groom/SKILL.md",
@@ -89,12 +89,12 @@ for (const pair of SYNC_PAIRS) {
 }
 
 Deno.test(
-  "plugin/.claude-plugin/plugin.json declares name 'claude-specflow'",
+  "plugin/.claude-plugin/plugin.json declares name 'specflow-plugin'",
   async () => {
     const manifest = JSON.parse(
       await Deno.readTextFile(abs("plugin/.claude-plugin/plugin.json")),
     );
-    assertEquals(manifest.name, "claude-specflow");
+    assertEquals(manifest.name, "specflow-plugin");
     assertEquals(typeof manifest.description, "string");
     assertEquals(typeof manifest.version, "string");
   },
