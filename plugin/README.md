@@ -6,17 +6,18 @@ into projects — just as a user-scope plugin instead.
 
 ## What's in here
 
-| Path                                                                                                 | Contents                                                          |
-| ---------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------- |
-| `.claude-plugin/plugin.json`                                                                         | Plugin manifest (`claude-specflow`, v0.0.1 alpha)                 |
-| `skills/auto-chain/SKILL.md`                                                                         | Auto-chain skill — `/claude-specflow:auto-chain`                  |
-| `skills/{specify,plan,tasks,implement,analyze,review,merge,constitution,checklist,clarify}/SKILL.md` | The 10 Specflow slash-commands — `/claude-specflow:specify`, etc. |
+| Path                                                                                                                                        | Contents                                                          |
+| ------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------- |
+| `.claude-plugin/plugin.json`                                                                                                                | Plugin manifest (`claude-specflow`, v0.0.1 alpha)                 |
+| `skills/auto-chain/SKILL.md`                                                                                                                | Auto-chain skill — `/claude-specflow:auto-chain`                  |
+| `skills/{specify,plan,tasks,implement,analyze,review,merge,constitution,checklist,clarify}/SKILL.md`                                        | The 10 Specflow slash-commands — `/claude-specflow:specify`, etc. |
+| `agents/{code-reviewer,developer,devops-sre,product-owner,qa-tester,review-coordinator,security-auditor,test-reviewer,workflow-manager}.md` | 9 sub-agents available to invoke in plugin scope                  |
 
 **Coming in subsequent slices** (tracked in
 [issue #73](https://github.com/mkrlabs/specflow/issues/73)):
 
-- `agents/` — the 9 sub-agent definitions (architect, product-owner, qa-tester, devops-sre, …).
 - `skills/specflow.groom/` — the groom skill.
+- `PluginDetector` port + the v0.x → plugin migration logic in `specflow upgrade`.
 
 ### Known caveat: handoff IDs
 
