@@ -50,9 +50,56 @@ if [ ! -f "$AGENT_FILE" ]; then
 fi
 
 # Extract the `tools:` line from the agent's frontmatter (between the first
-# two `---` delimiters). Comma-separated tool names map directly onto
-# claude's --allowedTools.
-TOOLS=$(awk '/^---$/{n++; next} n==1 && /^tools:/ {sub(/^tools:[[:space:]]*/, ""); print; exit}' "$AGENT_FILE")
+# two `---` delimiters). The raw value can include commas inside parens, e.g.
+# `Read, Bash(git log *), Agent(code-reviewer, security-auditor)` — naive
+# comma-splitting would break those compound entries. We do a depth-aware
+# split, trim each token, and rejoin with commas (no spaces) so the value
+# is unambiguous to claude's --allowedTools parser regardless of how it
+# tokenises the flag value.
+RAW_TOOLS=$(awk '/^---$/{n++; next} n==1 && /^tools:/ {sub(/^tools:[[:space:]]*/, ""); print; exit}' "$AGENT_FILE")
+
+split_tools() {
+  local input="$1"
+  local depth=0
+  local current=""
+  local out=""
+  local len=${#input}
+  local i=0
+  local c
+  while [ $i -lt $len ]; do
+    c="${input:$i:1}"
+    case "$c" in
+      "(") depth=$((depth + 1)); current="$current$c" ;;
+      ")") depth=$((depth - 1)); current="$current$c" ;;
+      ",")
+        if [ $depth -eq 0 ]; then
+          # Trim leading/trailing whitespace from current token.
+          current="${current#"${current%%[![:space:]]*}"}"
+          current="${current%"${current##*[![:space:]]}"}"
+          if [ -n "$current" ]; then
+            if [ -z "$out" ]; then out="$current"; else out="$out,$current"; fi
+          fi
+          current=""
+        else
+          current="$current$c"
+        fi
+        ;;
+      *) current="$current$c" ;;
+    esac
+    i=$((i + 1))
+  done
+  current="${current#"${current%%[![:space:]]*}"}"
+  current="${current%"${current##*[![:space:]]}"}"
+  if [ -n "$current" ]; then
+    if [ -z "$out" ]; then out="$current"; else out="$out,$current"; fi
+  fi
+  echo "$out"
+}
+
+TOOLS=""
+if [ -n "$RAW_TOOLS" ]; then
+  TOOLS=$(split_tools "$RAW_TOOLS")
+fi
 
 WRAPPED_PROMPT="You are the \`$AGENT\` subagent for this project. Read your full definition at \`.claude/agents/$AGENT.md\` (frontmatter + body) before doing anything. Then perform the task below.
 
