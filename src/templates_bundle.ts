@@ -1781,15 +1781,14 @@ The PO will:
      \`## Notes\` shape, using correct business and technical vocabulary
      so the result is readable by a developer or a future PO who has no
      prior context.
-  2. **Assign a size label.** Apply exactly one of \`size:XS\`, \`size:S\`,
-     \`size:M\`, \`size:L\`, \`size:XL\`. T-shirt scale rationale:
+  2. **Assign a size value.** Apply exactly one of \`XS\`, \`S\`, \`M\`, \`L\`, \`XL\`.
+     T-shirt scale rationale:
      - \`XS\` — < 1 hour, trivial doc / config tweak
      - \`S\` — 1–4 hours, single-file or single-test change
      - \`M\` — half-day to a day, one subsystem touched, tests included
      - \`L\` — multi-day, crosses subsystems, requires a plan
      - \`XL\` — multi-PR effort; consider splitting into sub-tickets
-  3. **Assign a priority label.** Apply exactly one of \`priority:P0\`,
-     \`priority:P1\`, \`priority:P2\`, \`priority:P3\`:
+  3. **Assign a priority value.** Apply exactly one of \`P0\`, \`P1\`, \`P2\`, \`P3\`:
      - \`P0\` — incident / blocker; drop everything
      - \`P1\` — must-have for the next sprint or release
      - \`P2\` — important but deferrable; standard work
@@ -1808,43 +1807,81 @@ The PO will:
        reflecting the recommendation, e.g. \`priority:P3\`). Do not close
        autonomously.
 
-  **Mandatory labelling contract.** Steps 2 and 3 are NOT optional and
-  NOT discretionary — every ticket the PO touches in a groom run MUST
-  exit with both a \`size:*\` and a \`priority:*\` label, regardless of the
-  outcome chosen at step 4. If labelling fails for an external reason
-  (e.g. \`gh label create\` returned an error, the user lacks the
-  \`repo\` scope, the API rate-limited), the PO MUST capture the failure
-  reason and surface it under "⚠ labels missing" in the final report —
-  silent skip is a contract violation.
+  **Mandatory sizing + priority contract.** Steps 2 and 3 are NOT
+  optional and NOT discretionary — every ticket the PO touches in a
+  groom run MUST exit with both a size and a priority value persisted,
+  regardless of the outcome chosen at step 4. If persistence fails for
+  an external reason (the user lacks scope, the API rate-limited, etc.),
+  the PO MUST capture the failure reason and surface it under "⚠ size /
+  priority missing" in the final report — silent skip is a contract
+  violation.
 
 The PO must respect the standard backlog skill — do not bypass its
 scripts.
 
-#### Label management
+#### How size and priority are persisted (field-first, label fallback)
 
-Size and priority labels are scoped to the repo. Before assigning a
-label, the PO MUST ensure it exists:
+Size and priority are conceptually two single-select dimensions. They
+can live on a ticket in two surfaces:
 
-- **GitHub backend** (\`gh\`):
-  - \`gh label list --repo <owner>/<repo>\` to enumerate existing labels.
-  - \`gh label create "<name>" --color <hex> --description "<desc>" --repo <owner>/<repo>\`
-    to create one if absent. Suggested colors:
-    - \`size:XS\` \`#c2e0c6\` · \`size:S\` \`#bfdadc\` · \`size:M\` \`#bfd4f2\` · \`size:L\` \`#d4c5f9\` · \`size:XL\` \`#f9d0c4\`
-    - \`priority:P0\` \`#b60205\` · \`priority:P1\` \`#d93f0b\` · \`priority:P2\` \`#fbca04\` · \`priority:P3\` \`#0e8a16\`
-  - \`gh issue edit <num> --add-label "size:M" --add-label "priority:P2" --repo <owner>/<repo>\`
-    to apply (use \`--remove-label\` to swap a previously-assigned label
-    when re-grooming).
+1. **Native Project V2 single-select fields** named \`Priority\` and
+   \`Size\`. Every Specflow project ships with these as the canonical
+   surface — they group on the project board, query cleanly via
+   GraphQL, and don't pollute the label namespace.
+2. **GitHub / GitLab labels** (\`priority:P0..P3\`, \`size:XS..XL\`). Used
+   as a fallback when the project does not have native fields, or when
+   the value has no matching native option (only known case today:
+   \`priority:P3\` on a 3-level field). Also used by the local Markdown
+   backend, which has no native fields at all.
 
-- **GitLab backend** (\`glab\`): same flow with \`glab label list\` /
-  \`glab label create -n <name> --color "#hex" --description "<desc>"\` /
-  \`glab issue update <num> --label "size:M,priority:P2"\`.
+**Field wins.** If a native field exists for the dimension, write to
+the field. Do NOT also apply the label — double-writing creates drift.
 
-- **Local markdown backend**: when the local backend ships support for
-  the 5-column model (tracked in #130), size and priority will be
-  applied as front-matter or inline markers per that ticket's
-  convention. Until then, the local backend has no column model and
-  this groom phase is a no-op for it (the PO should report
-  "skipped — local backend predates the column model").
+##### GitHub backend
+
+Use the bundled scripts at \`.specflow/scripts/backlog/\`:
+
+- \`detect-fields.sh\` — emits eval-friendly env lines listing the
+  \`Priority\` / \`Size\` field IDs and option IDs (case-insensitive name
+  match). Run **once per groom run**, not per ticket.
+- \`set-field.sh <issue> <Priority|Size> <value>\` — writes the field if
+  present. Exit codes:
+  - \`0\` → wrote the field, do not apply a label for this dimension.
+  - \`10\` → no such native field (e.g. user added neither \`Priority\` nor
+    \`Size\` to their project). Caller MUST apply the corresponding label
+    (\`priority:P2\` / \`size:M\`) instead.
+  - \`11\` → field exists but the value option is missing (only
+    \`priority:P3\` today). Caller MUST apply the matching label.
+  - \`12\` → issue is not on the project. Caller MUST report the
+    discrepancy under "⚠ size / priority missing" — neither path can
+    persist the value.
+
+**Label fallback** (for exit code \`10\` / \`11\` only):
+
+- \`gh label list --repo <owner>/<repo>\` to enumerate existing labels.
+- \`gh label create "<name>" --color <hex> --description "<desc>" --repo <owner>/<repo>\`
+  to create one if absent. Suggested colors:
+  - \`size:XS\` \`#c2e0c6\` · \`size:S\` \`#bfdadc\` · \`size:M\` \`#bfd4f2\` · \`size:L\` \`#d4c5f9\` · \`size:XL\` \`#f9d0c4\`
+  - \`priority:P0\` \`#b60205\` · \`priority:P1\` \`#d93f0b\` · \`priority:P2\` \`#fbca04\` · \`priority:P3\` \`#0e8a16\`
+- \`gh issue edit <num> --add-label "size:M" --add-label "priority:P2" --repo <owner>/<repo>\`
+  to apply (use \`--remove-label\` to swap a previously-assigned label
+  when re-grooming).
+
+##### GitLab backend
+
+GitLab does not yet have a parallel \`set-field.sh\` helper; the PO
+applies scoped labels directly: \`glab label list\` / \`glab label create
+-n <name> --color "#hex" --description "<desc>"\` / \`glab issue update
+<num> --label "size:M,priority:P2"\`.
+
+##### Local Markdown backend
+
+When the local backend ships support for the 5-column model (tracked
+in #130), size and priority will be applied as front-matter keys
+(\`priority:\` and \`complexity:\`) per that ticket's convention. Until
+then, the local backend has no column model and this groom phase is a
+no-op for it (the PO should report "skipped — local backend predates
+the column model").
 
 ### 2. Stale PR surface
 
@@ -1868,14 +1905,21 @@ This is also read-only; never delete or modify spec files.
 
 ## Output format
 
-End with a single summary block. **The per-ticket lines and the labels-
-missing escalation block are mandatory contract output, not optional**
-— they are how the user verifies the labelling contract was honoured.
+End with a single summary block. **The per-ticket lines and the
+size/priority-missing escalation block are mandatory contract output,
+not optional** — they are how the user verifies the sizing + priority
+contract was honoured.
+
+Per-ticket lines should note when a value was persisted as a label
+fallback rather than a native field — typically because the project
+has no \`Priority\` / \`Size\` field, or because \`priority:P3\` does not
+match a 3-level field. This makes the field-vs-label routing visible
+in the report.
 
 \`\`\`
 specflow-groom report
 ─────────────────────
-⚠  groom completed with <K> un-labelled tickets — re-run or fix manually
+⚠  groom completed with <K> un-sized/un-prioritised tickets — re-run or fix manually
     (only emitted when K > 0, at the very top of the summary)
 
 Backlog:    <N> items reviewed, <P> promoted to Ready, <C> awaiting clarification
@@ -1883,12 +1927,12 @@ Backlog:    <N> items reviewed, <P> promoted to Ready, <C> awaiting clarificatio
 
 Per-ticket:
   ↳ #<num> "<short title>" → promoted/comment/closure-recommended
-       size:<X> + priority:<P> applied
+       size=<X> + priority=<P> (field)
   ↳ #<num> "<short title>" → comment
-       size:<X> + priority:<P> applied
+       size=<X> (field) + priority=P3 (label fallback — no native option)
   ↳ ...
 
-⚠ labels missing:
+⚠ size / priority missing:
   ↳ #<num> "<short title>" — <reason: e.g. gh label create failed (rate-limited)>
   ↳ ...
   (omit this whole section when K == 0)
@@ -2050,35 +2094,36 @@ missing or empty, flag it to the user — the project is under-documented.
 4. **Business briefs** — provide context to other agents before they build.
 5. **Priority justification** — explain every priority change.
 
-## Mandatory labelling contract (GitHub / GitLab backends)
+## Mandatory sizing + priority contract (GitHub / GitLab backends)
 
-When you clarify, promote, comment on, or otherwise touch a backlog item on
-the GitHub or GitLab backend, you MUST exit that operation with both a
-\`size:*\` and a \`priority:*\` label applied to the item — regardless of which
-entry point dispatched you (\`/specflow groom\`, \`/backlog clarify\`,
-\`/backlog add\` on a vague request, etc.). Labelling is a **gate**, not an
-optional polish step.
+Every backlog item you touch MUST exit with both a size
+(\`XS\`..\`XL\`) and a priority (\`P0\`..\`P3\`) persisted. **Gate**, not polish.
 
-- Sizes: exactly one of \`size:XS\`, \`size:S\`, \`size:M\`, \`size:L\`, \`size:XL\`.
-- Priorities: exactly one of \`priority:P0\`, \`priority:P1\`, \`priority:P2\`,
-  \`priority:P3\`.
-- If the matching label does not exist on the repo, **create it first**
-  via \`gh label create\` / \`glab label create\` (suggested colors live in
-  the groom phase template) and only then apply it via \`gh issue edit
-  --add-label\` / \`glab issue update --label\`.
-- If labelling fails for an external reason (auth scope, API rate-limit,
-  network), capture the reason and surface it in your final report under
-  a \`⚠ labels missing\` block — never silently skip. Silent skip is a
-  contract violation.
+**GitHub — field-first, label fallback.** Specflow projects ship with
+native single-select fields \`Priority\` and \`Size\`. When present, write
+to the field; do NOT also apply a label (drift). When absent, fall
+back to \`priority:*\` / \`size:*\` labels. Bundled scripts at
+\`.specflow/scripts/backlog/\`:
 
-This contract is restated in detail by \`/specflow groom\`'s phase
-template; it lives here too so it applies to every PO entry point, not
-just the groom phase.
+- \`detect-fields.sh\` — env lines with field/option IDs (case-insensitive
+  match). Run once per groom run.
+- \`set-field.sh <issue> <Priority|Size> <value>\` — exit codes:
+  - \`0\` → wrote field, no label.
+  - \`10\` → no such field → apply matching label.
+  - \`11\` → field exists but option missing (today: \`priority:P3\` —
+    canonical fields ship with P0..P2) → apply matching label.
+  - \`12\` → not on project → surface under \`⚠ size / priority missing\`.
 
-Out-of-scope: the **local Markdown** backend has no GitHub-style issue-
-label surface; sizing and priority are tracked via frontmatter on the
-task file (\`priority:\` and \`complexity:\` keys) instead. Apply the
-frontmatter equivalents with the same per-ticket discipline.
+If the fallback label is missing, \`gh label create\` / \`glab label
+create\` it (colors in the groom phase template), then \`gh issue edit
+--add-label\` / \`glab issue update --label\`. Persistence failures
+(auth, rate-limit) MUST land under \`⚠ size / priority missing\` —
+silent skip is a contract violation. Full routing + migration details
+in \`/specflow groom\`'s phase template.
+
+**GitLab** has no \`set-field.sh\` analogue yet; falls straight to
+scoped labels via \`glab\`. **Local Markdown** uses frontmatter
+(\`priority:\` / \`complexity:\` keys) instead of fields or labels.
 
 ## Backlog backend
 
@@ -3947,6 +3992,137 @@ if [ "\$#" -lt 2 ]; then
 fi
 
 gh issue comment "\$1" --repo "\$REPO" --body "\$2"
+`,
+    executable: true,
+    backend: "github",
+    skipIfExists: false,
+  },
+  {
+    category: "backlog-script",
+    name: "detect-fields",
+    suffix: "detect-fields.sh",
+    content: `#!/usr/bin/env bash
+# Detect native Project V2 single-select fields for Priority and Size.
+# Outputs eval-friendly env lines on stdout. Empty *_FIELD_ID means the field
+# does not exist on the project — caller should fall back to labels.
+# Usage: eval "\$(detect-fields.sh)"
+set -euo pipefail
+
+# shellcheck source=./_config.sh
+. "\$(dirname "\$0")/_config.sh"
+
+FIELDS_JSON=\$(gh project field-list "\$PROJECT_NUMBER" --owner "\$REPO_OWNER" --format json)
+
+emit() {
+  local field="\$1" prefix="\$2"
+  local field_block
+  field_block=\$(echo "\$FIELDS_JSON" | jq -r --arg n "\$field" '
+    .fields[]
+    | select(.type == "ProjectV2SingleSelectField")
+    | select((.name | ascii_downcase) == (\$n | ascii_downcase))
+  ')
+  if [ -z "\$field_block" ]; then
+    echo "\${prefix}_FIELD_ID="
+    return
+  fi
+  echo "\${prefix}_FIELD_ID=\$(echo "\$field_block" | jq -r '.id')"
+  echo "\$field_block" | jq -r --arg p "\$prefix" '
+    .options[] | "\\(\$p)_OPT_\\(.name | ascii_upcase)=\\(.id)"
+  '
+}
+
+emit Priority PRIORITY
+emit Size SIZE
+
+# Project node ID — handy for callers that also want to write field values.
+echo "PROJECT_NODE_ID=\$(gh project view "\$PROJECT_NUMBER" --owner "\$REPO_OWNER" --format json | jq -r '.id')"
+`,
+    executable: true,
+    backend: "github",
+    skipIfExists: false,
+  },
+  {
+    category: "backlog-script",
+    name: "set-field",
+    suffix: "set-field.sh",
+    content: `#!/usr/bin/env bash
+# Set a native Project V2 single-select field value (Priority or Size) on an issue.
+# Usage: set-field.sh <issue-number> <Priority|Size> <value>
+#   Examples:
+#     set-field.sh 42 Priority P1
+#     set-field.sh 42 Size M
+#
+# Exit codes:
+#   0   field updated
+#   10  no such field on the project (caller should fall back to a label)
+#   11  field exists but has no option matching <value> (caller should fall back to a label)
+#   12  issue is not on the project
+#   1   usage / unexpected error
+set -euo pipefail
+
+# shellcheck source=./_config.sh
+. "\$(dirname "\$0")/_config.sh"
+
+if [ "\$#" -lt 3 ]; then
+  echo 'usage: set-field.sh <issue-number> <Priority|Size> <value>' >&2
+  exit 1
+fi
+NUM="\$1"
+FIELD_NAME="\$2"
+VALUE="\$3"
+
+# Normalize field name to one of the canonical labels we support.
+FIELD_LOWER=\$(echo "\$FIELD_NAME" | tr '[:upper:]' '[:lower:]')
+case "\$FIELD_LOWER" in
+  priority) PREFIX="PRIORITY" CANONICAL="Priority" ;;
+  size)     PREFIX="SIZE"     CANONICAL="Size" ;;
+  *)
+    echo "error: unsupported field '\$FIELD_NAME' (Priority|Size)" >&2
+    exit 1
+    ;;
+esac
+
+eval "\$("\$(dirname "\$0")/detect-fields.sh")"
+
+FIELD_ID_VAR="\${PREFIX}_FIELD_ID"
+FIELD_ID="\${!FIELD_ID_VAR-}"
+if [ -z "\$FIELD_ID" ]; then
+  echo "no native '\$CANONICAL' field on Project #\$PROJECT_NUMBER — fall back to label" >&2
+  exit 10
+fi
+
+VALUE_KEY=\$(echo "\$VALUE" | tr '[:lower:]' '[:upper:]')
+OPT_VAR="\${PREFIX}_OPT_\${VALUE_KEY}"
+OPT_ID="\${!OPT_VAR-}"
+if [ -z "\$OPT_ID" ]; then
+  echo "field '\$CANONICAL' has no option '\$VALUE' — fall back to label" >&2
+  exit 11
+fi
+
+ISSUE_NODE_ID=\$(gh issue view "\$NUM" --repo "\$REPO" --json id --jq '.id')
+
+ITEM_ID=\$(gh api graphql -f query='
+  query(\$issue:ID!) {
+    node(id:\$issue) {
+      ... on Issue {
+        projectItems(first:10) { nodes { id project { id } } }
+      }
+    }
+  }' -f issue="\$ISSUE_NODE_ID" \\
+  | jq -r --arg p "\$PROJECT_NODE_ID" '.data.node.projectItems.nodes[] | select(.project.id==\$p) | .id' | head -1)
+
+if [ -z "\$ITEM_ID" ]; then
+  echo "issue #\$NUM is not on Project #\$PROJECT_NUMBER" >&2
+  exit 12
+fi
+
+gh project item-edit \\
+  --id "\$ITEM_ID" \\
+  --project-id "\$PROJECT_NODE_ID" \\
+  --field-id "\$FIELD_ID" \\
+  --single-select-option-id "\$OPT_ID" >/dev/null
+
+echo "✓ #\$NUM \$CANONICAL → \$VALUE"
 `,
     executable: true,
     backend: "github",

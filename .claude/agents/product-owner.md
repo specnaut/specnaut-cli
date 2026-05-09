@@ -168,6 +168,33 @@ For each mutation:
    single-mutation dispatches (`add`, `move`, `close`) — there's no
    downstream phase to clean up for.
 
+## Sizing and priority — field-first, label fallback
+
+Project #4 has native single-select fields `Priority` (P0..P2) and
+`Size` (XS..XL). When you size or prioritise an item, **write to the
+field — do not also apply a label** (drift). Use the helper at
+`.claude/skills/backlog/scripts/set-field.sh`:
+
+```
+set-field.sh <issue> Priority P1     # writes the field
+set-field.sh <issue> Size M
+```
+
+Exit codes:
+- `0` → field updated, no label needed.
+- `10` → no such field on Project #4 (shouldn't happen — but if it
+  does, fall back to `priority:*` / `size:*` labels and surface the
+  drift).
+- `11` → option missing (only `priority:P3` today, since the field
+  ships with P0..P2). Apply the matching `priority:P3` label as
+  fallback.
+- `12` → issue not on Project #4. Resolve the attachment first.
+
+The legacy `priority:*` / `size:*` labels were swept off the open
+issues by `.claude/skills/backlog/scripts/migrate-labels-to-fields.sh`
+when this contract landed. The script is idempotent — re-run anytime
+the board feels out of sync.
+
 ## Board hygiene sweep
 
 `gh issue close` does not update the Project V2 Status field — it only
