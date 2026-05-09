@@ -92,6 +92,15 @@ for agent in product-owner developer qa-tester devops-sre security-auditor; do
 done
 
 echo
+echo "═══ #164  specflow-expert agent ═══"
+check "specflow-expert agent present" \
+  '[ -f .claude/agents/specflow-expert.md ]'
+check "specflow-expert is auto-triggerable (no disable-model-invocation: true)" \
+  '! grep -q "disable-model-invocation: true" .claude/agents/specflow-expert.md'
+check "specflow-expert grants WebFetch" \
+  'grep -q "WebFetch" .claude/agents/specflow-expert.md'
+
+echo
 echo "═══ #88  hooks bundled ═══"
 check ".claude/settings.json scaffolded" '[ -f .claude/settings.json ]'
 check "PreToolUse hook registered" 'grep -q "PreToolUse" .claude/settings.json'

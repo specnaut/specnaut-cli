@@ -837,9 +837,9 @@ Deno.test("inspect: plugin gap check warns for each missing covered path when pl
         o.name === ".claude/skills/specflow-auto/SKILL.md") &&
       o.status === "warn"
     );
-    // 9 agents + 1 router skill + 11 phase docs + specflow-review alias +
-    // specflow-auto = 23 covered paths, all missing.
-    assertEquals(gapOutcomes.length, 23);
+    // 10 agents + 1 router skill + 11 phase docs + specflow-review alias +
+    // specflow-auto = 24 covered paths, all missing.
+    assertEquals(gapOutcomes.length, 24);
     for (const o of gapOutcomes) {
       assertEquals(o.message.includes("missing"), true);
       assertEquals(o.message.includes("specflow upgrade"), true);
@@ -880,7 +880,7 @@ Deno.test("inspect: plugin gap check warns ONLY for the agents the user actually
     async (dir) => {
       await filledProject(dir);
       await Deno.mkdir(join(dir, ".claude/agents"), { recursive: true });
-      // Scaffold all 9 agents EXCEPT product-owner (simulating that
+      // Scaffold all 10 agents EXCEPT product-owner (simulating that
       // one alone got deleted post-migration).
       for (
         const name of [
@@ -890,6 +890,7 @@ Deno.test("inspect: plugin gap check warns ONLY for the agents the user actually
           "qa-tester",
           "review-coordinator",
           "security-auditor",
+          "specflow-expert",
           "test-reviewer",
           "workflow-manager",
         ]

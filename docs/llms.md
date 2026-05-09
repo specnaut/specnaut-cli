@@ -301,15 +301,25 @@ marketplace:
 ```
 
 The plugin gives any Claude Code user instant access to the full Specflow slash-command suite and
-sub-agents — no binary, no `specflow init` required. The 23 plugin assets (the consolidated
+sub-agents — no binary, no `specflow init` required. The 24 plugin assets (the consolidated
 `specflow` router skill with 11 phase docs, the `specflow-review` auto-invoke alias, the
-`specflow-auto` skill, and 9 sub-agents) are namespaced under `/specflow-plugin:*` so they coexist
+`specflow-auto` skill, and 10 sub-agents) are namespaced under `/specflow-plugin:*` so they coexist
 with project-local copies without collision.
 
 When both the plugin and the binary are in use, `specflow upgrade` detects the plugin and
 auto-migrates vanilla on-disk agents and command files (backed up, then deleted — the plugin serves
 them going forward). `specflow check --project` warns when covered files are missing and the plugin
 is not installed, with a recovery hint.
+
+### 5. Bundled `specflow-expert` agent
+
+Every scaffold ships a `specflow-expert` agent that knows Specflow itself — its commands, harnesses,
+backlog backends, and what changed between releases. It auto-triggers on Specflow-related questions
+("how does specflow X", "what is /specflow Y", "quoi de neuf") so users on a Specflow-scaffolded
+project can ask the harness about the tool without copy-pasting docs. It uses a vendored knowledge
+snapshot for offline / deterministic answers and `WebFetch` against
+<https://specflow.makerlabs.dev/llms.txt> + the GitHub Releases API for live "what's new" queries.
+Manual dispatch via `/specflow-expert <question>` is also supported.
 
 ## Design principles
 
