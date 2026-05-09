@@ -291,6 +291,13 @@ A Product Owner agent gates every mutation, and supports three backends:
 The user picks one backend per project. The chosen backend is recorded in `.specflow/installed.lock`
 so the PO knows which one to use without auto-detection.
 
+**Semantic label bootstrap.** For GitHub and GitLab backends, `specflow init` scaffolds
+`.specflow/scripts/backlog/ensure-labels.sh`. Run it once to seed seven canonical labels —
+`security`, `refactor`, `docs`, `tech-debt`, `dx`, `performance`, `dependency` — into the remote
+repo. Idempotent; never edits or deletes existing labels. The GitHub default `bug` label is verified
+but never re-created. The full reference lives in `.specflow/LABELS.md` next to the install —
+including a guidance note for local backend users on tagging via task-file frontmatter.
+
 ### 4. Claude Code plugin distribution
 
 Specflow ships a first-class Claude Code plugin (`specflow-plugin`) available via the Claude Code

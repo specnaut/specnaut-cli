@@ -3577,6 +3577,7 @@ project\` calls and read configuration from \`backlog-config.yml\`.
 .specflow/scripts/backlog/clarify-comment.sh <num> "<question>"
 .specflow/scripts/backlog/detect-fields.sh                                 # discover native Priority/Size single-select fields → env lines
 .specflow/scripts/backlog/set-field.sh <num> <Priority|Size> <value>       # set the native Project V2 field; exit codes 10/11/12 signal label fallback
+.specflow/scripts/backlog/ensure-labels.sh                                 # idempotently bootstrap the 7 Specflow semantic labels (security/refactor/docs/tech-debt/dx/performance/dependency)
 \`\`\`
 
 For closing or editing, use \`gh\` directly:
@@ -4396,6 +4397,62 @@ echo "✓ #\$NUM \$CANONICAL → \$VALUE"
   },
   {
     category: "backlog-script",
+    name: "ensure-labels",
+    suffix: "ensure-labels.sh",
+    content: `#!/usr/bin/env bash
+# Bootstrap the Specflow semantic label set on the configured GitHub repo.
+# Idempotent: creates only missing labels; never edits or deletes existing
+# ones (preserves user customisation of color / description).
+#
+# Usage: ensure-labels.sh
+#
+# Exit codes:
+#   0  success (every label either created or already present)
+#   1  unexpected failure (auth, network, gh missing, etc.)
+set -euo pipefail
+
+# shellcheck source=./_config.sh
+. "\$(dirname "\$0")/_config.sh"
+
+# Cache the existing label list once. Each \`gh label create\` call already
+# fails fast on duplicate, but we want to skip the API hit entirely when
+# the label is present — that's the idempotency guarantee.
+EXISTING=\$(gh label list --repo "\$REPO" --limit 200 --json name --jq '.[].name' 2>/dev/null || true)
+
+ensure_label() {
+  local name="\$1" color="\$2" desc="\$3"
+  if echo "\$EXISTING" | grep -qxF "\$name"; then
+    echo "  ok (already present): \$name"
+  else
+    gh label create "\$name" --repo "\$REPO" --color "\$color" --description "\$desc" >/dev/null
+    echo "  created: \$name"
+  fi
+}
+
+echo "Bootstrapping Specflow semantic labels on \$REPO …"
+ensure_label "security"    "b60205" "Security-sensitive work (auth, secrets, RCE, supply chain)"
+ensure_label "refactor"    "0e8a16" "Internal cleanup with no behavior change"
+ensure_label "docs"        "0075ca" "Documentation-only change"
+ensure_label "tech-debt"   "fbca04" "Known shortcut to repay later"
+ensure_label "dx"          "5319e7" "Developer experience (tooling, onboarding, ergonomics)"
+ensure_label "performance" "e99695" "Latency, throughput, or memory improvements"
+ensure_label "dependency"  "cccccc" "Dependency bump or vendoring"
+
+# \`bug\` is created by GitHub on every new repo. We don't re-create it,
+# but we do warn if it's missing — that's an unusual configuration.
+if echo "\$EXISTING" | grep -qxF "bug"; then
+  echo "  ok (already present): bug"
+else
+  echo "  warn: 'bug' label missing — usually a GitHub default. Check repo settings if you want it." >&2
+fi
+echo "done."
+`,
+    executable: true,
+    backend: "github",
+    skipIfExists: false,
+  },
+  {
+    category: "backlog-script",
     name: "_config",
     suffix: "_config.sh",
     content: `#!/usr/bin/env bash
@@ -4607,6 +4664,61 @@ glab issue note "\$1" --repo "\$PROJECT_ID" --message "\$2"
     skipIfExists: false,
   },
   {
+    category: "backlog-script",
+    name: "ensure-labels",
+    suffix: "ensure-labels.sh",
+    content: `#!/usr/bin/env bash
+# Bootstrap the Specflow semantic label set on the configured GitLab project.
+# Idempotent: creates only missing labels; never edits or deletes existing
+# ones (preserves user customisation of color / description).
+#
+# Usage: ensure-labels.sh
+#
+# Exit codes:
+#   0  success (every label either created or already present)
+#   1  unexpected failure (auth, network, glab missing, etc.)
+set -euo pipefail
+
+# shellcheck source=./_config.sh
+. "\$(dirname "\$0")/_config.sh"
+
+# \`glab label list\` paginates by default. \`--per-page 200\` covers any
+# realistic project; output uses the table format whose first column is
+# the label name. We tolerate a leading "•" / "*" bullet some glab
+# versions print and strip ANSI colors with \`sed\`.
+EXISTING=\$(
+  glab label list --repo "\$PROJECT_ID" --per-page 200 2>/dev/null \\
+    | sed -E 's/\\x1b\\[[0-9;]*m//g' \\
+    | awk 'NR>1 && NF { sub(/^[•*]\\s*/, ""); print \$1 }' \\
+    | tr -d '\\r' \\
+    || true
+)
+
+ensure_label() {
+  local name="\$1" color="\$2" desc="\$3"
+  if echo "\$EXISTING" | grep -qxF "\$name"; then
+    echo "  ok (already present): \$name"
+  else
+    glab label create --repo "\$PROJECT_ID" -n "\$name" --color "#\$color" --description "\$desc" >/dev/null
+    echo "  created: \$name"
+  fi
+}
+
+echo "Bootstrapping Specflow semantic labels on \$PROJECT_ID …"
+ensure_label "security"    "b60205" "Security-sensitive work (auth, secrets, RCE, supply chain)"
+ensure_label "refactor"    "0e8a16" "Internal cleanup with no behavior change"
+ensure_label "docs"        "0075ca" "Documentation-only change"
+ensure_label "tech-debt"   "fbca04" "Known shortcut to repay later"
+ensure_label "dx"          "5319e7" "Developer experience (tooling, onboarding, ergonomics)"
+ensure_label "performance" "e99695" "Latency, throughput, or memory improvements"
+ensure_label "dependency"  "cccccc" "Dependency bump or vendoring"
+echo "done."
+`,
+    executable: true,
+    backend: "gitlab",
+    skipIfExists: false,
+  },
+  {
     category: "spec-root",
     name: "specify",
     suffix: "memory/constitution.md",
@@ -4684,6 +4796,70 @@ _No tasks yet._
 ## Done
 
 _No tasks yet._
+`,
+    executable: false,
+    backend: null,
+    skipIfExists: false,
+  },
+  {
+    category: "spec-root",
+    name: "specify",
+    suffix: "LABELS.md",
+    content: `# Specflow semantic labels
+
+Specflow ships a canonical set of generic, semantic labels that every
+project should agree on. They are deliberately stack-agnostic — no
+\`frontend\`, \`backend\`, \`ios\`, etc. Pick those per project and add them
+on top of this baseline if you need them.
+
+| Label         | Color     | Purpose                                                        |
+|---------------|-----------|----------------------------------------------------------------|
+| \`bug\`         | \`#d73a4a\` | Defect / regression (GitHub default — already present)         |
+| \`security\`    | \`#b60205\` | Security-sensitive work (auth, secrets, RCE, supply chain)     |
+| \`refactor\`    | \`#0e8a16\` | Internal cleanup with no behavior change                       |
+| \`docs\`        | \`#0075ca\` | Documentation-only change                                      |
+| \`tech-debt\`   | \`#fbca04\` | Known shortcut to repay later                                  |
+| \`dx\`          | \`#5319e7\` | Developer experience (tooling, onboarding, ergonomics)         |
+| \`performance\` | \`#e99695\` | Latency, throughput, or memory improvements                    |
+| \`dependency\`  | \`#cccccc\` | Dependency bump or vendoring                                   |
+
+## Bootstrapping the set
+
+### GitHub backend
+
+\`\`\`bash
+.specflow/scripts/backlog/ensure-labels.sh
+\`\`\`
+
+Idempotent — creates only missing labels, never edits or deletes
+existing ones. Verifies that GitHub's default \`bug\` label is present and
+warns if it is not. Run once after \`specflow init\` (or any time you want
+to bring an existing repo into alignment).
+
+### GitLab backend
+
+\`\`\`bash
+.specflow/scripts/backlog/ensure-labels.sh
+\`\`\`
+
+Same shape as the GitHub helper. Uses \`glab label create\`.
+
+### Local Markdown backend
+
+There are no labels — the local backend tracks tags in task-file
+frontmatter (\`tags:\` array). When in doubt, draw from the same vocabulary
+above so projects that later migrate to a remote backend keep continuity.
+
+## Conventions
+
+- **Don't rename Specflow's labels.** The \`product-owner\` agent
+  recognises them by name when grooming.
+- **Add domain labels in addition** — \`frontend\`, \`auth\`, \`billing\` —
+  but keep this base set stable.
+- **\`priority:*\` and \`size:*\` labels are deprecated.** Specflow now
+  writes those to native Project V2 fields (\`Priority\` / \`Size\`) when
+  available — see \`set-field.sh\`. Existing label-only projects still
+  work via the same fallback path.
 `,
     executable: false,
     backend: null,
