@@ -1,5 +1,6 @@
 ---
 description: Manage the product backlog — list, add, update, groom, and brief tasks. All mutations route through the product-owner agent.
+argument-hint: [list|next|add|update|estimate|status|groom|brief] [args]
 ---
 
 ## User Input

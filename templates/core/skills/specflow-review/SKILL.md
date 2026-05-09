@@ -1,6 +1,7 @@
 ---
 name: specflow-review
 description: Review the implementation against spec, plan, and tasks before merge — runs the quality gates (functional acceptance, test coverage, constitution checks). Auto-invokable when the user signals readiness to merge or asks for a final review pass.
+argument-hint: [feature-path-or-PR-number]
 when_to_use: |
   Trigger phrases:
   - "review the implementation"

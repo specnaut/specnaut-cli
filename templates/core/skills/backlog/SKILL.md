@@ -1,6 +1,7 @@
 ---
 name: backlog
 description: Manage this project's backlog — add, list, view, move, and clarify items. The backend is fixed at init time and recorded in `.specflow/installed.lock`. Run `specflow upgrade --backlog <new>` to switch.
+argument-hint: [list|next|add|update|estimate|status|groom|brief] [args]
 ---
 
 # Backlog skill
