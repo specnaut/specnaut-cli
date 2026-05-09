@@ -129,6 +129,7 @@ project` calls and read configuration from `backlog-config.yml`.
 .specflow/scripts/backlog/clarify-comment.sh <num> "<question>"
 .specflow/scripts/backlog/detect-fields.sh                                 # discover native Priority/Size single-select fields → env lines
 .specflow/scripts/backlog/set-field.sh <num> <Priority|Size> <value>       # set the native Project V2 field; exit codes 10/11/12 signal label fallback
+.specflow/scripts/backlog/ensure-labels.sh                                 # idempotently bootstrap the 7 Specflow semantic labels (security/refactor/docs/tech-debt/dx/performance/dependency)
 ```
 
 For closing or editing, use `gh` directly:
