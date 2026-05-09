@@ -7,6 +7,7 @@ import { pickBacklogBackend, pickBacklogBackendInteractive } from "../backlog_pi
 import { makeStdinSelectIO } from "../select.ts";
 import type { BacklogBackend } from "../../domain/installed_lock.ts";
 import { findBacklogStrategy } from "../../domain/backlog_strategies/registry.ts";
+import { ClaudeSettingsParseError } from "../../domain/claude_settings_merge.ts";
 import { DenoFsWriter } from "../../infrastructure/deno_fs_writer.ts";
 import { DenoGit } from "../../infrastructure/deno_git.ts";
 import { FsLockStore } from "../../infrastructure/fs_lock_store.ts";
@@ -203,11 +204,25 @@ export async function runInit(intent: InitIntent): Promise<number> {
     ensureDir: (path) => Deno.mkdir(path, { recursive: true }),
   });
 
-  const result = await useCase.execute({
-    targetDir,
-    initGit: !intent.noGit,
-    force: intent.force,
-  });
+  let result;
+  try {
+    result = await useCase.execute({
+      targetDir,
+      initGit: !intent.noGit,
+      force: intent.force,
+    });
+  } catch (err) {
+    // Surface the actionable first-line message for known structured
+    // errors (currently only the JSON merge of `.claude/settings.json`).
+    // Without this catch, Deno's default top-level handler prints a
+    // 10-line stack trace from inside the compiled binary's cache —
+    // unprofessional and noisy for what is a user-fixable typo.
+    if (err instanceof ClaudeSettingsParseError) {
+      console.error(red(err.message));
+      return 2;
+    }
+    throw err;
+  }
 
   if (result.status === "conflicts") {
     // Re-derive the managed file count for the secondary conflict path
