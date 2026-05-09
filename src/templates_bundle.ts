@@ -7664,6 +7664,7 @@ prompts cost more tokens and drift out of relevance.
 }
 `,
       executable: false,
+      mergeJson: "claude-settings",
     },
     ".claude/hooks/protect-generated.sh": {
       content: `#!/usr/bin/env bash

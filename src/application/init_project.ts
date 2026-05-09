@@ -86,6 +86,12 @@ export class InitProjectUseCase {
     const lockEntries = new Map<string, LockEntry>();
     for (const [dest, file] of Object.entries(bundle)) {
       if (skippedSet.has(dest)) continue;
+      // JSON-merged files (#139) live entirely in user-owned space — the
+      // user's settings.json may diverge from our bundled snapshot in
+      // arbitrary ways (theme, permissions, env, …) and that's fine.
+      // We never overwrite or upgrade them, so they don't belong in the
+      // lock. Same logic as skipIfExists.
+      if (file.mergeJson !== undefined) continue;
       // For mergeable files the lock holds the SHA of the *block body in
       // canonical form* (no leading/trailing newlines) so it stays
       // comparable against the body extracted from disk on upgrade reads.
@@ -127,7 +133,7 @@ export class InitProjectUseCase {
     const mergedPaths: string[] = [];
     let writtenCount = 0;
     for (const [dest, file] of Object.entries(bundle)) {
-      if (file.mergeBlock !== undefined) {
+      if (file.mergeBlock !== undefined || file.mergeJson !== undefined) {
         mergedPaths.push(dest);
       } else {
         writtenCount++;
