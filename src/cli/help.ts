@@ -19,6 +19,9 @@ ${bold("Flags (for init):")}
   --no-git            Skip "git init" detection and prompt
   --ai <name>         Target AI harness: claude (default) | cursor | codex | gemini | windsurf | copilot | opencode | antigravity
   --backlog <name>    Backlog backend: local (default) | github | gitlab
+  --backlog-url <url> Kanban / project URL (e.g. https://github.com/orgs/<org>/projects/<N>)
+                      Required for github/gitlab in non-interactive mode; pre-fills .specflow/backlog-config.yml
+  --backlog-repo <r>  GitHub repo override <owner>/<name>; falls back to "git remote get-url origin"
 
 ${bold("Flags (for upgrade):")}
   --dry-run           Show the plan without writing

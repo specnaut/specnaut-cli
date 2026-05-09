@@ -43,6 +43,19 @@ export type Intent =
      * default fallback otherwise.
      */
     backlog: "local" | "github" | "gitlab" | null;
+    /**
+     * Raw Kanban / project URL passed via `--backlog-url`. The init handler
+     * parses it via `parseKanbanURL` and writes the populated config stub.
+     * `null` when not supplied — interactive prompt fires in TTY mode,
+     * non-TTY + remote backend fails fast.
+     */
+    backlogUrl: string | null;
+    /**
+     * Optional GitHub repo override (`<owner>/<name>`) for the populated
+     * config. When `null` and the backend is github, init derives it from
+     * `git remote get-url origin`.
+     */
+    backlogRepo: string | null;
     force: boolean;
   }
   | { kind: "self-update"; checkOnly: boolean }
@@ -74,7 +87,7 @@ export function parseArgs(argv: string[]): Intent {
       "dry-run",
       "project",
     ],
-    string: ["ai", "backlog"],
+    string: ["ai", "backlog", "backlog-url", "backlog-repo"],
     alias: { v: "version", h: "help" },
   });
 
@@ -104,6 +117,12 @@ export function parseArgs(argv: string[]): Intent {
     if (!backlogResult.ok) {
       return { kind: "unknown", received: `init --backlog ${backlogRaw}` };
     }
+    const backlogUrlRaw = typeof parsed["backlog-url"] === "string"
+      ? (parsed["backlog-url"] as string)
+      : null;
+    const backlogRepoRaw = typeof parsed["backlog-repo"] === "string"
+      ? (parsed["backlog-repo"] as string)
+      : null;
     return {
       kind: "init",
       projectName: rest[0] ?? null,
@@ -111,6 +130,8 @@ export function parseArgs(argv: string[]): Intent {
       noGit: Boolean(parsed["no-git"]),
       ai: aiRaw,
       backlog: backlogResult.value,
+      backlogUrl: backlogUrlRaw,
+      backlogRepo: backlogRepoRaw,
       force: Boolean(parsed.force),
     };
   }

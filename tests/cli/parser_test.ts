@@ -20,6 +20,8 @@ Deno.test("parseArgs returns init intent with a project name", () => {
     noGit: false,
     ai: null,
     backlog: null,
+    backlogUrl: null,
+    backlogRepo: null,
     force: false,
   });
 });
@@ -32,6 +34,8 @@ Deno.test("parseArgs returns init intent with --here", () => {
     noGit: false,
     ai: null,
     backlog: null,
+    backlogUrl: null,
+    backlogRepo: null,
     force: false,
   });
 });
@@ -44,6 +48,8 @@ Deno.test("parseArgs returns init intent with --no-git", () => {
     noGit: true,
     ai: null,
     backlog: null,
+    backlogUrl: null,
+    backlogRepo: null,
     force: false,
   });
 });
@@ -82,6 +88,8 @@ Deno.test("parseArgs init with --force", () => {
     noGit: false,
     ai: null,
     backlog: null,
+    backlogUrl: null,
+    backlogRepo: null,
     force: true,
   });
 });
@@ -199,4 +207,46 @@ Deno.test("parseArgs accepts --ai opencode", () => {
   const intent = parseArgs(["init", "demo", "--ai", "opencode"]);
   assertEquals(intent.kind, "init");
   if (intent.kind === "init") assertEquals(intent.ai, "opencode");
+});
+
+Deno.test("parseArgs accepts --backlog-url", () => {
+  const intent = parseArgs([
+    "init",
+    "--here",
+    "--backlog",
+    "github",
+    "--backlog-url",
+    "https://github.com/orgs/myorg/projects/1",
+  ]);
+  assertEquals(intent.kind, "init");
+  if (intent.kind === "init") {
+    assertEquals(
+      intent.backlogUrl,
+      "https://github.com/orgs/myorg/projects/1",
+    );
+    assertEquals(intent.backlog, "github");
+  }
+});
+
+Deno.test("parseArgs accepts --backlog-repo", () => {
+  const intent = parseArgs([
+    "init",
+    "--here",
+    "--backlog",
+    "github",
+    "--backlog-repo",
+    "myorg/myrepo",
+  ]);
+  assertEquals(intent.kind, "init");
+  if (intent.kind === "init") {
+    assertEquals(intent.backlogRepo, "myorg/myrepo");
+  }
+});
+
+Deno.test("parseArgs defaults backlogUrl and backlogRepo to null", () => {
+  const intent = parseArgs(["init", "demo"]);
+  if (intent.kind === "init") {
+    assertEquals(intent.backlogUrl, null);
+    assertEquals(intent.backlogRepo, null);
+  }
 });

@@ -33,6 +33,13 @@ export interface GitAdapter {
   isAvailable(): Promise<boolean>;
   isInitialized(dir: string): Promise<boolean>;
   init(dir: string): Promise<void>;
+  /**
+   * Returns the URL for `git remote get-url <remote>` in `dir`, or `null`
+   * if the directory is not a git repo, the remote does not exist, or git
+   * is not on PATH. Used at init time to derive the GitHub `repo` field
+   * from the user's `origin` remote when they provide a Project URL.
+   */
+  getRemoteUrl(dir: string, remote: string): Promise<string | null>;
 }
 
 export interface ReleaseChecker {
