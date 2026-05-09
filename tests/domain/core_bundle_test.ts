@@ -16,7 +16,7 @@ Deno.test("CoreCategory is a narrow union", () => {
 Deno.test("CoreEntry enforces the expected shape", () => {
   const entry: CoreEntry = {
     category: "skill",
-    name: "auto-chain",
+    name: "specflow-auto",
     suffix: null,
     content: "# skill\n",
     executable: false,

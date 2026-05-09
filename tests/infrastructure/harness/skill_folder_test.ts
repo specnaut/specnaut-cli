@@ -14,7 +14,7 @@ Deno.test("skillFolderName: backlog-cmd → specflow-<name>", () => {
 });
 
 Deno.test("skillFolderName: skill → specflow-<name>", () => {
-  assertEquals(skillFolderName(entry("skill", "auto-chain")), "specflow-auto-chain");
+  assertEquals(skillFolderName(entry("skill", "specflow-auto")), "specflow-auto");
 });
 
 Deno.test("skillFolderName: skill named 'specflow' is not double-prefixed", () => {

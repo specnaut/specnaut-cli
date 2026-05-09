@@ -49,7 +49,7 @@ Deno.test("specflow init --ai copilot scaffolds a Copilot layout", async () => {
 
     const root = join(parent, "demo");
 
-    // v1.0.0: router instruction + 11 phase instructions + auto-chain +
+    // v1.0.0: router instruction + 11 phase instructions + specflow-auto +
     // specflow-review + backlog + 9 agent instructions.
     assertEquals(
       await exists(join(root, ".github/instructions/specflow.instructions.md")),
@@ -64,7 +64,7 @@ Deno.test("specflow init --ai copilot scaffolds a Copilot layout", async () => {
       true,
     );
     assertEquals(
-      await exists(join(root, ".github/instructions/specflow-auto-chain.instructions.md")),
+      await exists(join(root, ".github/instructions/specflow-auto.instructions.md")),
       true,
     );
     assertEquals(
@@ -82,7 +82,7 @@ Deno.test("specflow init --ai copilot scaffolds a Copilot layout", async () => {
     assertEquals(cmdContent.includes("model: opus"), false);
     assertEquals(cmdContent.includes("tools:"), false);
 
-    // Router + 11 phases + auto-chain + specflow-review + backlog + 9 agents = 23.
+    // Router + 11 phases + specflow-auto + specflow-review + backlog + 9 agents = 23.
     const instructionsCount = (await Array.fromAsync(
       Deno.readDir(join(root, ".github/instructions")),
     )).length;

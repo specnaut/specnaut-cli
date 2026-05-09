@@ -13,9 +13,9 @@ export function skillFolderName(entry: CoreEntry): string {
     case "backlog-skill":
       // Skill names that already begin with "specflow" are emitted as-is
       // (the router itself is "specflow"; the auto-invoke alias is
-      // "specflow-review"). Other skills (`auto-chain`, `backlog`, …)
-      // get the namespacing prefix to avoid clashes inside a global
-      // skills registry.
+      // "specflow-review"; the auto-chainer is "specflow-auto"). Other
+      // skills (`backlog`, …) get the namespacing prefix to avoid
+      // clashes inside a global skills registry.
       return entry.name === "specflow" || entry.name.startsWith("specflow-")
         ? entry.name
         : `specflow-${entry.name}`;

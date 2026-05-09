@@ -27,7 +27,7 @@ const SAMPLE: CoreBundle = [
   },
   {
     category: "skill",
-    name: "auto-chain",
+    name: "specflow-auto",
     suffix: null,
     content: "---\ndescription: Auto-chain dispatcher\n---\n\n# body\n",
     executable: false,
@@ -83,7 +83,7 @@ Deno.test("CopilotHarness maps backlog-cmd to .github/instructions/specflow-back
 Deno.test("CopilotHarness maps skill to .github/instructions/specflow-<name>.instructions.md", () => {
   const h = new CopilotHarness();
   const mapped = h.mapBundle(SAMPLE, { backlogBackend: "local" });
-  assert(".github/instructions/specflow-auto-chain.instructions.md" in mapped);
+  assert(".github/instructions/specflow-auto.instructions.md" in mapped);
 });
 
 Deno.test("CopilotHarness maps agents to .github/instructions/specflow-agent-<name>.instructions.md", () => {

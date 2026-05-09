@@ -71,7 +71,7 @@ Deno.test("specflow init --ai antigravity scaffolds an Antigravity layout", asyn
     );
     // Auto-chain still ships as its own skill folder.
     assertEquals(
-      await exists(join(root, ".agent/skills/specflow-auto-chain/SKILL.md")),
+      await exists(join(root, ".agent/skills/specflow-auto/SKILL.md")),
       true,
     );
 

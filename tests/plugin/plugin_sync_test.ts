@@ -36,8 +36,8 @@ const SYNC_PAIRS: ReadonlyArray<{ plugin: string; source: string }> = [
   })),
   // Auto-chain stays as a separate skill (own slash-command identity).
   {
-    plugin: "plugin/skills/auto-chain/SKILL.md",
-    source: "templates/core/skills/auto-chain/SKILL.md",
+    plugin: "plugin/skills/specflow-auto/SKILL.md",
+    source: "templates/core/skills/specflow-auto/SKILL.md",
   },
   // Thin alias preserving auto-invocation for the review phase.
   {

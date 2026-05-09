@@ -80,9 +80,9 @@ Deno.test("specflow init --ai opencode scaffolds a complete OpenCode project lay
 
     // Auto-chain still ships as its own skill folder.
     const autoChainSkill = await Deno.readTextFile(
-      join(root, ".opencode/skills/specflow-auto-chain/SKILL.md"),
+      join(root, ".opencode/skills/specflow-auto/SKILL.md"),
     );
-    assertStringIncludes(autoChainSkill, "name: auto-chain");
+    assertStringIncludes(autoChainSkill, "name: specflow-auto");
 
     // Shared (cross-harness)
     assertEquals(await exists(join(root, ".specflow/memory/constitution.md")), true);

@@ -57,7 +57,7 @@ Deno.test("specflow init --ai codex scaffolds a Codex layout", async () => {
       true,
     );
     assertEquals(await exists(join(root, ".agents/skills/specflow-backlog/SKILL.md")), true);
-    assertEquals(await exists(join(root, ".agents/skills/specflow-auto-chain/SKILL.md")), true);
+    assertEquals(await exists(join(root, ".agents/skills/specflow-auto/SKILL.md")), true);
     // Old per-phase folders are gone post-consolidation.
     assertEquals(
       await exists(join(root, ".agents/skills/specflow-specify/SKILL.md")),
@@ -75,7 +75,7 @@ Deno.test("specflow init --ai codex scaffolds a Codex layout", async () => {
     assertEquals(typeof parsed.developer_instructions, "string");
 
     // Top-level skill folders post-consolidation: specflow router +
-    // auto-chain + specflow-review alias + specflow-backlog = 4.
+    // specflow-auto + specflow-review alias + specflow-backlog = 4.
     const agentsSkillsCount = (await Array.fromAsync(
       Deno.readDir(join(root, ".agents/skills")),
     )).length;

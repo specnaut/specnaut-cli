@@ -27,7 +27,7 @@ import type { KnownHarness } from "./installed_lock.ts";
  *   - `.claude/skills/specflow/SKILL.md` — the consolidated router skill
  *   - `.claude/skills/specflow/phases/<phase>.md` — the 11 phase docs
  *   - `.claude/skills/specflow-review/SKILL.md` — auto-invoke alias
- *   - `.claude/skills/auto-chain/SKILL.md`
+ *   - `.claude/skills/specflow-auto/SKILL.md`
  *
  * Everything else (project-stateful files in `.specflow/`, harness-
  * static files like `.claude/settings.json`, hooks, `CLAUDE.md`,
@@ -45,7 +45,7 @@ export function isPluginCoveredPath(
   if (dest === ".claude/skills/specflow/SKILL.md") return true;
   if (/^\.claude\/skills\/specflow\/phases\/[a-z]+\.md$/.test(dest)) return true;
   if (dest === ".claude/skills/specflow-review/SKILL.md") return true;
-  if (dest === ".claude/skills/auto-chain/SKILL.md") return true;
+  if (dest === ".claude/skills/specflow-auto/SKILL.md") return true;
 
   return false;
 }
@@ -61,7 +61,7 @@ export function isPluginCoveredPath(
  *
  * Kept in sync with `isPluginCoveredPath` above. Total: 23 paths
  * (9 agents excluding architect + 1 router skill + 11 phase docs +
- * specflow-review alias + auto-chain).
+ * specflow-review alias + specflow-auto).
  */
 export const PLUGIN_COVERED_PATHS_CLAUDE: ReadonlyArray<string> = [
   ...[
@@ -90,5 +90,5 @@ export const PLUGIN_COVERED_PATHS_CLAUDE: ReadonlyArray<string> = [
     "groom",
   ].map((name) => `.claude/skills/specflow/phases/${name}.md`),
   ".claude/skills/specflow-review/SKILL.md",
-  ".claude/skills/auto-chain/SKILL.md",
+  ".claude/skills/specflow-auto/SKILL.md",
 ];

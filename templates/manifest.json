@@ -32,7 +32,7 @@
     { "category": "agent-memory", "name": "devops-sre", "suffix": "MEMORY.md", "source": "core/agents/devops-sre/memory/MEMORY.md" },
     { "category": "agent-memory", "name": "security-auditor", "suffix": "MEMORY.md", "source": "core/agents/security-auditor/memory/MEMORY.md" },
 
-    { "category": "skill", "name": "auto-chain", "source": "core/skills/auto-chain/SKILL.md" },
+    { "category": "skill", "name": "specflow-auto", "source": "core/skills/specflow-auto/SKILL.md" },
 
     { "category": "backlog-skill", "name": "backlog", "source": "core/skills/backlog/SKILL.md" },
     { "category": "backlog-script", "name": "list", "suffix": "list.sh", "source": "core/skills/backlog/scripts/local/list.sh", "executable": true, "backend": "local" },

@@ -1,15 +1,15 @@
 # specflow-plugin — Claude Code plugin for Specflow
 
 This is the Claude Code plugin distribution of [Specflow](https://specflow.makerlabs.dev). It ships
-the same slash-commands, sub-agents, and the auto-chain skill that the `specflow` binary scaffolds
-into projects — just as a user-scope plugin instead.
+the same slash-commands, sub-agents, and the specflow-auto skill that the `specflow` binary
+scaffolds into projects — just as a user-scope plugin instead.
 
 ## What's in here
 
 | Path                                                                                                                                        | Contents                                                              |
 | ------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------- |
 | `.claude-plugin/plugin.json`                                                                                                                | Plugin manifest (`specflow-plugin`, lockstep with the binary version) |
-| `skills/auto-chain/SKILL.md`                                                                                                                | Auto-chain skill — `/specflow-plugin:auto-chain`                      |
+| `skills/specflow-auto/SKILL.md`                                                                                                             | Auto-chain skill — `/specflow-plugin:specflow-auto`                   |
 | `skills/{specify,plan,tasks,implement,analyze,review,merge,constitution,checklist,clarify}/SKILL.md`                                        | The 10 Specflow slash-commands — `/specflow-plugin:specify`, etc.     |
 | `agents/{code-reviewer,developer,devops-sre,product-owner,qa-tester,review-coordinator,security-auditor,test-reviewer,workflow-manager}.md` | 9 sub-agents available to invoke in plugin scope                      |
 | `skills/groom/SKILL.md`                                                                                                                     | Groom skill — `/specflow-plugin:groom`                                |
@@ -57,7 +57,7 @@ To test changes to the plugin without publishing:
 claude --plugin-dir /path/to/specflow/plugin
 ```
 
-Then invoke any plugin skill: `/specflow-plugin:auto-chain specify "…"`.
+Then invoke any plugin skill: `/specflow-plugin:specflow-auto specify "…"`.
 
 ## Versioning
 

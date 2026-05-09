@@ -27,7 +27,7 @@ const SAMPLE: CoreBundle = [
   },
   {
     category: "skill",
-    name: "auto-chain",
+    name: "specflow-auto",
     suffix: null,
     content: "---\ndescription: Auto-chain dispatcher\n---\n\n# body\n",
     executable: false,
@@ -83,7 +83,7 @@ Deno.test("CodexHarness maps backlog-cmd to .agents/skills/specflow-backlog/SKIL
 Deno.test("CodexHarness maps skill to .agents/skills/specflow-<name>/SKILL.md", () => {
   const h = new CodexHarness();
   const mapped = h.mapBundle(SAMPLE, { backlogBackend: "local" });
-  assert(".agents/skills/specflow-auto-chain/SKILL.md" in mapped);
+  assert(".agents/skills/specflow-auto/SKILL.md" in mapped);
 });
 
 Deno.test("CodexHarness maps agent to .codex/agents/<name>.toml with valid TOML", () => {
@@ -123,14 +123,14 @@ Deno.test("CodexHarness emits no Claude/Cursor artefacts", () => {
 Deno.test("CodexHarness injects name+description into SKILL.md when absent", () => {
   const core: CoreBundle = [{
     category: "skill",
-    name: "auto-chain",
+    name: "specflow-auto",
     suffix: null,
     content: "# no frontmatter\n",
     executable: false,
   }];
   const h = new CodexHarness();
   const mapped = h.mapBundle(core, { backlogBackend: "local" });
-  const skill = mapped[".agents/skills/specflow-auto-chain/SKILL.md"];
+  const skill = mapped[".agents/skills/specflow-auto/SKILL.md"];
   assert(skill?.content.startsWith("---\n"));
-  assert(skill?.content.includes("name: specflow-auto-chain"));
+  assert(skill?.content.includes("name: specflow-auto"));
 });

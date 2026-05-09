@@ -1,12 +1,12 @@
 ---
-name: auto-chain
-description: Auto-chain Specflow workflow — when the user runs /auto-chain specify, chain clarify → plan → tasks → analyze → implement → review → merge, stopping only for required clarifications and final pre-merge validation.
+name: specflow-auto
+description: Auto-chain Specflow workflow — when the user runs /specflow-auto specify, chain clarify → plan → tasks → analyze → implement → review → merge, stopping only for required clarifications and final pre-merge validation.
 ---
 
 # Specflow Auto-Chain
 
 This skill turns the Specflow workflow into a single-command operation. When the
-user invokes `/auto-chain specify "<feature description>"`, you MUST chain every
+user invokes `/specflow-auto specify "<feature description>"`, you MUST chain every
 Specflow phase in the same session without asking the user between phases,
 EXCEPT at the two checkpoints defined below.
 
@@ -66,14 +66,14 @@ the branch)". Wait for explicit confirmation. On "yes", invoke
 
 ## Opt-out
 
-If the user invokes `/auto-chain specify --manual "<description>"`, run
+If the user invokes `/specflow-auto specify --manual "<description>"`, run
 `/specflow specify` only and stop. Do not auto-chain. Each subsequent phase must
 be invoked manually by the user.
 
 ## Single-phase invocations
 
-When the user invokes any phase directly (e.g. `/auto-chain clarify 042`,
-`/auto-chain plan 042`) — i.e. NOT via the entry point `/auto-chain specify` — the
+When the user invokes any phase directly (e.g. `/specflow-auto clarify 042`,
+`/specflow-auto plan 042`) — i.e. NOT via the entry point `/specflow-auto specify` — the
 command is one-shot. Do NOT auto-chain. Single-phase invocations exist for
 re-running phases on an existing feature.
 

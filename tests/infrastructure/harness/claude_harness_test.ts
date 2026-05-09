@@ -11,7 +11,7 @@ Deno.test("ClaudeHarness.key and displayName", () => {
 Deno.test("ClaudeHarness.mapBundle emits the Claude tree", () => {
   const h = new ClaudeHarness();
   const mapped = h.mapBundle(CORE_BUNDLE, { backlogBackend: "local" });
-  // Router skill + 11 phase docs + auto-chain + specflow-review alias +
+  // Router skill + 11 phase docs + specflow-auto + specflow-review alias +
   // backlog skill + 1 backlog cmd + 9 agents + 5 agent-memory stubs +
   // 16 spec-root entries + AGENTS.md + .gitignore + 5 backlog scripts +
   // .claude/CLAUDE.md + dispatch-agent.sh + loop.md + settings.json + 3 hooks.
@@ -34,7 +34,7 @@ Deno.test("ClaudeHarness.mapBundle emits the Claude tree", () => {
   assert(".claude/hooks/log-subagent.sh" in mapped);
   assert(".claude/hooks/check-backlog-prereqs.sh" in mapped);
   assert(".claude/agents/product-owner.md" in mapped);
-  assert(".claude/skills/auto-chain/SKILL.md" in mapped);
+  assert(".claude/skills/specflow-auto/SKILL.md" in mapped);
   assert(".claude/skills/backlog/SKILL.md" in mapped);
   assert(".specflow/scripts/backlog/list.sh" in mapped);
   assert(".specflow/memory/constitution.md" in mapped);
