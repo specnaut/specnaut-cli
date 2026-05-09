@@ -1766,35 +1766,56 @@ The PO will:
 - Read each item's body and existing comments.
 - **Skip** items it has already commented on in a previous run (look for
   the marker \`🤖 specflow-groom\` at the start of any comment).
-- For each remaining item:
-  - **Rewrite the body when it's poorly worded.** If the description is
-    missing, incomplete, or unclear, the PO MUST rewrite it in the
-    standard \`## Why\` / \`## Acceptance criteria\` / \`## Out of scope\` /
-    \`## Notes\` shape, using correct business and technical vocabulary
-    so the result is readable by a developer or a future PO who has no
-    prior context.
-  - **Assign a size label.** Apply exactly one of \`size:XS\`, \`size:S\`,
-    \`size:M\`, \`size:L\`, \`size:XL\`. T-shirt scale rationale:
-    - \`XS\` — < 1 hour, trivial doc / config tweak
-    - \`S\` — 1–4 hours, single-file or single-test change
-    - \`M\` — half-day to a day, one subsystem touched, tests included
-    - \`L\` — multi-day, crosses subsystems, requires a plan
-    - \`XL\` — multi-PR effort; consider splitting into sub-tickets
-  - **Assign a priority label.** Apply exactly one of \`priority:P0\`,
-    \`priority:P1\`, \`priority:P2\`, \`priority:P3\`:
-    - \`P0\` — incident / blocker; drop everything
-    - \`P1\` — must-have for the next sprint or release
-    - \`P2\` — important but deferrable; standard work
-    - \`P3\` — nice-to-have / long horizon; pick up when slack appears
-  - **Promote to \`Ready\`** when the body is clear AND both labels are
-    applied AND no scope decisions remain.
-  - **Leave a clarification comment** marked with the \`🤖 specflow-groom\`
-    prefix when 1–3 scope decisions still need Kevin's input. Apply
-    size + priority anyway (best estimate from available context). The
-    item stays in \`Backlog\` until Kevin replies.
-  - **Recommend closure** if the item is genuinely stale or duplicates a
-    closed ticket — leave a comment recommending \`not_planned\`. Do not
-    close autonomously.
+- **Process tickets one at a time, end-to-end** — body → size → priority
+  → promote/comment, fully complete on ticket N before moving to N+1.
+  Do NOT batch-clarify-then-batch-label across all tickets; the
+  per-ticket loop must close labelling before the PO can consider a
+  ticket "done for this run". Batched labelling-as-an-afterthought is
+  the failure mode this contract exists to prevent.
+- For each remaining item, the loop is a strict 4-step sequence and **a
+  ticket is NOT considered processed until both labels are applied**:
+
+  1. **Rewrite the body when it's poorly worded.** If the description is
+     missing, incomplete, or unclear, the PO MUST rewrite it in the
+     standard \`## Why\` / \`## Acceptance criteria\` / \`## Out of scope\` /
+     \`## Notes\` shape, using correct business and technical vocabulary
+     so the result is readable by a developer or a future PO who has no
+     prior context.
+  2. **Assign a size label.** Apply exactly one of \`size:XS\`, \`size:S\`,
+     \`size:M\`, \`size:L\`, \`size:XL\`. T-shirt scale rationale:
+     - \`XS\` — < 1 hour, trivial doc / config tweak
+     - \`S\` — 1–4 hours, single-file or single-test change
+     - \`M\` — half-day to a day, one subsystem touched, tests included
+     - \`L\` — multi-day, crosses subsystems, requires a plan
+     - \`XL\` — multi-PR effort; consider splitting into sub-tickets
+  3. **Assign a priority label.** Apply exactly one of \`priority:P0\`,
+     \`priority:P1\`, \`priority:P2\`, \`priority:P3\`:
+     - \`P0\` — incident / blocker; drop everything
+     - \`P1\` — must-have for the next sprint or release
+     - \`P2\` — important but deferrable; standard work
+     - \`P3\` — nice-to-have / long horizon; pick up when slack appears
+  4. **Decide the outcome:**
+     - **Promote to \`Ready\`** when the body is clear, both labels are
+       applied, AND no scope decisions remain.
+     - **Leave a clarification comment** marked with the \`🤖 specflow-groom\`
+       prefix when 1–3 scope decisions still need Kevin's input. Steps 2
+       and 3 are still mandatory — apply best-estimate labels from
+       available context; the item stays in \`Backlog\` until Kevin
+       replies.
+     - **Recommend closure** if the item is genuinely stale or
+       duplicates a closed ticket — leave a comment recommending
+       \`not_planned\`. Steps 2 and 3 are still mandatory (apply labels
+       reflecting the recommendation, e.g. \`priority:P3\`). Do not close
+       autonomously.
+
+  **Mandatory labelling contract.** Steps 2 and 3 are NOT optional and
+  NOT discretionary — every ticket the PO touches in a groom run MUST
+  exit with both a \`size:*\` and a \`priority:*\` label, regardless of the
+  outcome chosen at step 4. If labelling fails for an external reason
+  (e.g. \`gh label create\` returned an error, the user lacks the
+  \`repo\` scope, the API rate-limited), the PO MUST capture the failure
+  reason and surface it under "⚠ labels missing" in the final report —
+  silent skip is a contract violation.
 
 The PO must respect the standard backlog skill — do not bypass its
 scripts.
@@ -1847,13 +1868,31 @@ This is also read-only; never delete or modify spec files.
 
 ## Output format
 
-End with a single summary block:
+End with a single summary block. **The per-ticket lines and the labels-
+missing escalation block are mandatory contract output, not optional**
+— they are how the user verifies the labelling contract was honoured.
 
 \`\`\`
 specflow-groom report
 ─────────────────────
+⚠  groom completed with <K> un-labelled tickets — re-run or fix manually
+    (only emitted when K > 0, at the very top of the summary)
+
 Backlog:    <N> items reviewed, <P> promoted to Ready, <C> awaiting clarification
             <R> body rewrites, <S> sized, <Z> prioritised
+
+Per-ticket:
+  ↳ #<num> "<short title>" → promoted/comment/closure-recommended
+       size:<X> + priority:<P> applied
+  ↳ #<num> "<short title>" → comment
+       size:<X> + priority:<P> applied
+  ↳ ...
+
+⚠ labels missing:
+  ↳ #<num> "<short title>" — <reason: e.g. gh label create failed (rate-limited)>
+  ↳ ...
+  (omit this whole section when K == 0)
+
 Stale PRs:  <S> open PRs idle > 48h
 Orphan specs: <O> spec directories missing the next artefact
 
@@ -2010,6 +2049,36 @@ missing or empty, flag it to the user — the project is under-documented.
    can go straight to implementation on the base branch.
 4. **Business briefs** — provide context to other agents before they build.
 5. **Priority justification** — explain every priority change.
+
+## Mandatory labelling contract (GitHub / GitLab backends)
+
+When you clarify, promote, comment on, or otherwise touch a backlog item on
+the GitHub or GitLab backend, you MUST exit that operation with both a
+\`size:*\` and a \`priority:*\` label applied to the item — regardless of which
+entry point dispatched you (\`/specflow groom\`, \`/backlog clarify\`,
+\`/backlog add\` on a vague request, etc.). Labelling is a **gate**, not an
+optional polish step.
+
+- Sizes: exactly one of \`size:XS\`, \`size:S\`, \`size:M\`, \`size:L\`, \`size:XL\`.
+- Priorities: exactly one of \`priority:P0\`, \`priority:P1\`, \`priority:P2\`,
+  \`priority:P3\`.
+- If the matching label does not exist on the repo, **create it first**
+  via \`gh label create\` / \`glab label create\` (suggested colors live in
+  the groom phase template) and only then apply it via \`gh issue edit
+  --add-label\` / \`glab issue update --label\`.
+- If labelling fails for an external reason (auth scope, API rate-limit,
+  network), capture the reason and surface it in your final report under
+  a \`⚠ labels missing\` block — never silently skip. Silent skip is a
+  contract violation.
+
+This contract is restated in detail by \`/specflow groom\`'s phase
+template; it lives here too so it applies to every PO entry point, not
+just the groom phase.
+
+Out-of-scope: the **local Markdown** backend has no GitHub-style issue-
+label surface; sizing and priority are tracked via frontmatter on the
+task file (\`priority:\` and \`complexity:\` keys) instead. Apply the
+frontmatter equivalents with the same per-ticket discipline.
 
 ## Backlog backend
 
