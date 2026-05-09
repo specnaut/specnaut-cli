@@ -97,6 +97,24 @@ Triggered on push to `main` that touches `docs/`. Builds `docs/llms.md`
 WebFetch can cache for several minutes after — see the `qa-tester`
 memory note `webfetch-cache-after-recent-deploy.md`.
 
+The build also emits two extras alongside `index.html` / `llms.txt`:
+
+- `specflow.makerlabs.dev/version.json` — `{"version": "X.Y.Z",
+  "released_at": "YYYY-MM-DD"}`. Lightweight machine-readable endpoint
+  consumed by the bundled `specflow-expert` agent to detect when a
+  scaffolded project is behind. Source of truth: the `version` field
+  in `deno.json` at build time.
+- A "Recent releases" section appended to `llms.txt` / the rendered
+  HTML, fetched from the GitHub Releases API at build time. Silent-fail
+  with `::warning::` on stderr if the API is unreachable — the docs
+  deploy must not break over a cosmetic section.
+
+**Post-release verification.** After a tag push triggers `release.yml`,
+also confirm `static.yml` redeployed and `version.json` reports the new
+version: `curl -fsSL https://specflow.makerlabs.dev/version.json | jq`.
+Stale `version.json` after a release means the docs deploy didn't run
+or failed silently.
+
 ### Pre-commit hook (`scripts/install-hooks.ts`)
 
 Local-only. Runs `fmt --check`, `lint`, `bundle`, and `deno check` on

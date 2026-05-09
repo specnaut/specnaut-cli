@@ -364,6 +364,11 @@ Four files / file groups, in priority order:
 1. **`docs/llms.md`** — the canonical website at
    `specflow.makerlabs.dev` and the LLM-consumption page at `/llms.txt`.
    This is the highest-priority surface — it's what new users land on.
+   The build also emits `specflow.makerlabs.dev/version.json` (shape
+   `{"version": "X.Y.Z", "released_at": "YYYY-MM-DD"}`) — consumed by
+   the bundled `specflow-expert` agent for the proactive upgrade nudge.
+   When clarifying a ticket about versioning or upgrade UX, reference
+   that endpoint as the canonical "what's the latest" surface.
 2. **`README.md`** — the repo root README. The first thing a developer
    sees on GitHub. Less detailed than `llms.md`, but flag references
    and the install snippet must match reality.

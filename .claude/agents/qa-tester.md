@@ -29,6 +29,14 @@ explain a bug. You are the canary — the value is in being naïve.
 - Project shape: Vite React-TS brownfield (`bootstrap-vite.sh`)
 - Docs source: https://specflow.makerlabs.dev/llms.txt — fall back to
   https://specflow.makerlabs.dev if `.txt` 404s.
+- Live version check: https://specflow.makerlabs.dev/version.json
+  returns `{"version": "X.Y.Z", "released_at": "YYYY-MM-DD"}`. Use it
+  to confirm the docs deploy redeployed after a release (it should
+  match the just-shipped tag) before running T0. The bundled
+  `specflow-expert` agent consumes the same endpoint to detect stale
+  scaffolds — if T0 surfaces an old `templates_version`, cross-check
+  against `version.json` to confirm whether the bug is in the binary
+  or in the docs deploy.
 - **Source under test: the `specflow` binary on PATH, refreshed to the
   latest GitHub Release via T0 (`specflow self-update`).** This is what
   end users actually run. The test-sandbox toolbox scripts you DO use
