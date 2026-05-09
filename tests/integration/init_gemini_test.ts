@@ -72,7 +72,7 @@ Deno.test("specflow init --ai gemini scaffolds a Gemini layout", async () => {
 
     // Markdown skill
     assertEquals(
-      await exists(join(root, ".gemini/skills/specflow-auto-chain/SKILL.md")),
+      await exists(join(root, ".gemini/skills/specflow-auto/SKILL.md")),
       true,
     );
     // Old per-phase commands are gone post-consolidation.

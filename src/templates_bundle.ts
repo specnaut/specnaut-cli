@@ -100,7 +100,7 @@ specify → clarify → plan → tasks → analyze → implement → review → 
   → pre-merge validation + merge
 \`\`\`
 
-For an end-to-end run that auto-chains the silent gates, use \`/auto-chain specify "<feature>"\`.
+For an end-to-end run that auto-chains the silent gates, use \`/specflow-auto specify "<feature>"\`.
 `,
     executable: false,
     backend: null,
@@ -1359,8 +1359,8 @@ Remaining findings (MEDIUM/LOW, non-blocking)
 Overall: PASS | FAIL
 \`\`\`
 
-If Overall = PASS, invoke \`/specflow merge\` (or hand back to the auto-chain for
-STOP #2). If FAIL, stop and report to the user.
+If Overall = PASS, invoke \`/specflow merge\` (or hand back to \`/specflow-auto\`
+for STOP #2). If FAIL, stop and report to the user.
 `,
     executable: false,
     backend: null,
@@ -3029,17 +3029,17 @@ should survive across sessions and isn't captured elsewhere:
   },
   {
     category: "skill",
-    name: "auto-chain",
+    name: "specflow-auto",
     suffix: null,
     content: `---
-name: auto-chain
-description: Auto-chain Specflow workflow — when the user runs /auto-chain specify, chain clarify → plan → tasks → analyze → implement → review → merge, stopping only for required clarifications and final pre-merge validation.
+name: specflow-auto
+description: Auto-chain Specflow workflow — when the user runs /specflow-auto specify, chain clarify → plan → tasks → analyze → implement → review → merge, stopping only for required clarifications and final pre-merge validation.
 ---
 
 # Specflow Auto-Chain
 
 This skill turns the Specflow workflow into a single-command operation. When the
-user invokes \`/auto-chain specify "<feature description>"\`, you MUST chain every
+user invokes \`/specflow-auto specify "<feature description>"\`, you MUST chain every
 Specflow phase in the same session without asking the user between phases,
 EXCEPT at the two checkpoints defined below.
 
@@ -3099,14 +3099,14 @@ the branch)". Wait for explicit confirmation. On "yes", invoke
 
 ## Opt-out
 
-If the user invokes \`/auto-chain specify --manual "<description>"\`, run
+If the user invokes \`/specflow-auto specify --manual "<description>"\`, run
 \`/specflow specify\` only and stop. Do not auto-chain. Each subsequent phase must
 be invoked manually by the user.
 
 ## Single-phase invocations
 
-When the user invokes any phase directly (e.g. \`/auto-chain clarify 042\`,
-\`/auto-chain plan 042\`) — i.e. NOT via the entry point \`/auto-chain specify\` — the
+When the user invokes any phase directly (e.g. \`/specflow-auto clarify 042\`,
+\`/specflow-auto plan 042\`) — i.e. NOT via the entry point \`/specflow-auto specify\` — the
 command is one-shot. Do NOT auto-chain. Single-phase invocations exist for
 re-running phases on an existing feature.
 
@@ -7906,7 +7906,7 @@ clarifications needed) STOP #2 (pre-merge validation)
 - \`/specflow review\` — architecture + quality gates
 - \`/specflow merge\` — merge the feature branch to main
 - \`/specflow-backlog\` — manage the product backlog (via the PO agent)
-- \`/specflow-auto-chain\` — auto-chain dispatcher invoked by \`/specflow specify\`
+- \`/specflow-auto\` — auto-chain dispatcher invoked by \`/specflow specify\`
 
 ## Agent roles (invocable manually as skills)
 

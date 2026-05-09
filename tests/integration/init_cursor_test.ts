@@ -58,7 +58,7 @@ Deno.test("specflow init --ai cursor scaffolds a Cursor layout", async () => {
       await exists(join(root, ".cursor/skills/specflow-agent-product-owner/SKILL.md")),
       true,
     );
-    assertEquals(await exists(join(root, ".cursor/skills/specflow-auto-chain/SKILL.md")), true);
+    assertEquals(await exists(join(root, ".cursor/skills/specflow-auto/SKILL.md")), true);
     assertEquals(await exists(join(root, ".cursor/rules/specify-rules.mdc")), true);
     // Old per-phase folders are gone post-consolidation.
     assertEquals(

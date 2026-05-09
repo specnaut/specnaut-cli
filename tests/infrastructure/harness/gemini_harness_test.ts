@@ -27,7 +27,7 @@ const SAMPLE: CoreBundle = [
   },
   {
     category: "skill",
-    name: "auto-chain",
+    name: "specflow-auto",
     suffix: null,
     content: "---\ndescription: Auto-chain dispatcher\n---\n\n# body\n",
     executable: false,
@@ -83,7 +83,7 @@ Deno.test("GeminiHarness maps backlog-cmd to .gemini/commands/specflow-backlog.t
 Deno.test("GeminiHarness maps skill to .gemini/skills/specflow-<name>/SKILL.md", () => {
   const h = new GeminiHarness();
   const mapped = h.mapBundle(SAMPLE, { backlogBackend: "local" });
-  assert(".gemini/skills/specflow-auto-chain/SKILL.md" in mapped);
+  assert(".gemini/skills/specflow-auto/SKILL.md" in mapped);
 });
 
 Deno.test("GeminiHarness maps agent to .gemini/agents/<name>.md with stripped frontmatter", () => {

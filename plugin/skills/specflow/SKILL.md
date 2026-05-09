@@ -89,4 +89,4 @@ specify → clarify → plan → tasks → analyze → implement → review → 
   → pre-merge validation + merge
 ```
 
-For an end-to-end run that auto-chains the silent gates, use `/auto-chain specify "<feature>"`.
+For an end-to-end run that auto-chains the silent gates, use `/specflow-auto specify "<feature>"`.

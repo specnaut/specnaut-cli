@@ -139,11 +139,11 @@ Deno.test("agent with no tools field emits no permission block", () => {
 });
 
 Deno.test("skill emits to .opencode/skills/specflow-<name>/SKILL.md with name+description", () => {
-  const bundle = harness.mapBundle([skillEntry("auto-chain")], { backlogBackend: "local" });
-  const dest = ".opencode/skills/specflow-auto-chain/SKILL.md";
+  const bundle = harness.mapBundle([skillEntry("specflow-auto")], { backlogBackend: "local" });
+  const dest = ".opencode/skills/specflow-auto/SKILL.md";
   assertEquals(Object.keys(bundle), [dest]);
-  assertStringIncludes(bundle[dest].content, "name: auto-chain");
-  assertStringIncludes(bundle[dest].content, "description: auto-chain skill");
+  assertStringIncludes(bundle[dest].content, "name: specflow-auto");
+  assertStringIncludes(bundle[dest].content, "description: specflow-auto skill");
 });
 
 Deno.test("router skill named 'specflow' is not double-prefixed", () => {

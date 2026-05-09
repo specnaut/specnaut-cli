@@ -49,7 +49,7 @@ Deno.test("specflow init --ai windsurf scaffolds a Windsurf layout", async () =>
 
     const root = join(parent, "demo");
 
-    // v1.0.0: router workflow + 11 sibling phase workflows + auto-chain +
+    // v1.0.0: router workflow + 11 sibling phase workflows + specflow-auto +
     // specflow-review alias + backlog + 9 agent workflows.
     assertEquals(
       await exists(join(root, ".windsurf/workflows/specflow.md")),
@@ -64,7 +64,7 @@ Deno.test("specflow init --ai windsurf scaffolds a Windsurf layout", async () =>
       true,
     );
     assertEquals(
-      await exists(join(root, ".windsurf/workflows/specflow-auto-chain.md")),
+      await exists(join(root, ".windsurf/workflows/specflow-auto.md")),
       true,
     );
     assertEquals(
@@ -74,7 +74,7 @@ Deno.test("specflow init --ai windsurf scaffolds a Windsurf layout", async () =>
       true,
     );
 
-    // Router + 11 phases + auto-chain + specflow-review alias + backlog +
+    // Router + 11 phases + specflow-auto + specflow-review alias + backlog +
     // 9 agent workflows = 23.
     const workflowsCount = (await Array.fromAsync(
       Deno.readDir(join(root, ".windsurf/workflows")),

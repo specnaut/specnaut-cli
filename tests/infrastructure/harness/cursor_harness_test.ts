@@ -33,7 +33,7 @@ const SAMPLE: CoreBundle = [
   },
   {
     category: "skill",
-    name: "auto-chain",
+    name: "specflow-auto",
     suffix: null,
     content: "---\ndescription: Auto-chain dispatcher\n---\n\n# body\n",
     executable: false,
@@ -87,7 +87,7 @@ Deno.test("CursorHarness maps agents to .cursor/skills/specflow-agent-<name>/SKI
 Deno.test("CursorHarness maps skills to .cursor/skills/specflow-<name>/SKILL.md", () => {
   const h = new CursorHarness();
   const mapped = h.mapBundle(SAMPLE, { backlogBackend: "local" });
-  assert(".cursor/skills/specflow-auto-chain/SKILL.md" in mapped);
+  assert(".cursor/skills/specflow-auto/SKILL.md" in mapped);
 });
 
 Deno.test("CursorHarness maps spec-root to .specflow/ and project-root unchanged", () => {

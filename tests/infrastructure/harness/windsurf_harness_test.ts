@@ -28,7 +28,7 @@ const SAMPLE: CoreBundle = [
   },
   {
     category: "skill",
-    name: "auto-chain",
+    name: "specflow-auto",
     suffix: null,
     content: "---\ndescription: Auto-chain dispatcher\n---\n\n# body\n",
     executable: false,
@@ -83,7 +83,7 @@ Deno.test("WindsurfHarness maps backlog-cmd to .windsurf/workflows/specflow-back
 Deno.test("WindsurfHarness maps skill to .windsurf/workflows/specflow-<name>.md", () => {
   const h = new WindsurfHarness();
   const mapped = h.mapBundle(SAMPLE, { backlogBackend: "local" });
-  assert(".windsurf/workflows/specflow-auto-chain.md" in mapped);
+  assert(".windsurf/workflows/specflow-auto.md" in mapped);
 });
 
 Deno.test("WindsurfHarness maps agents to .windsurf/workflows/specflow-agent-<name>.md", () => {

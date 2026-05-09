@@ -834,11 +834,11 @@ Deno.test("inspect: plugin gap check warns for each missing covered path when pl
         o.name.startsWith(".claude/skills/specflow/") ||
         o.name === ".claude/skills/specflow/SKILL.md" ||
         o.name === ".claude/skills/specflow-review/SKILL.md" ||
-        o.name === ".claude/skills/auto-chain/SKILL.md") &&
+        o.name === ".claude/skills/specflow-auto/SKILL.md") &&
       o.status === "warn"
     );
     // 9 agents + 1 router skill + 11 phase docs + specflow-review alias +
-    // auto-chain = 23 covered paths, all missing.
+    // specflow-auto = 23 covered paths, all missing.
     assertEquals(gapOutcomes.length, 23);
     for (const o of gapOutcomes) {
       assertEquals(o.message.includes("missing"), true);
@@ -897,8 +897,8 @@ Deno.test("inspect: plugin gap check warns ONLY for the agents the user actually
         await Deno.writeTextFile(join(dir, `.claude/agents/${name}.md`), "stub");
       }
       // Scaffold all skills + commands too (only the agent gap should warn)
-      await Deno.mkdir(join(dir, ".claude/skills/auto-chain"), { recursive: true });
-      await Deno.writeTextFile(join(dir, ".claude/skills/auto-chain/SKILL.md"), "stub");
+      await Deno.mkdir(join(dir, ".claude/skills/specflow-auto"), { recursive: true });
+      await Deno.writeTextFile(join(dir, ".claude/skills/specflow-auto/SKILL.md"), "stub");
       await Deno.mkdir(join(dir, ".claude/skills/specflow-groom"), { recursive: true });
       await Deno.writeTextFile(
         join(dir, ".claude/skills/specflow-groom/SKILL.md"),

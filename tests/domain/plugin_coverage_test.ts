@@ -66,9 +66,9 @@ Deno.test("isPluginCoveredPath: claude + .claude/skills/specflow/phases/<phase>.
   }
 });
 
-Deno.test("isPluginCoveredPath: claude + auto-chain skill is covered", () => {
+Deno.test("isPluginCoveredPath: claude + specflow-auto skill is covered", () => {
   assertEquals(
-    isPluginCoveredPath("claude", ".claude/skills/auto-chain/SKILL.md"),
+    isPluginCoveredPath("claude", ".claude/skills/specflow-auto/SKILL.md"),
     true,
   );
 });
