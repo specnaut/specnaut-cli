@@ -67,7 +67,20 @@ export class UpgradeProjectUseCase {
     if (!harness) {
       throw new Error(`unknown harness in lock: ${lock.harness}`);
     }
-    const bundle = harness.mapBundle(core, { backlogBackend: lock.backlogBackend });
+    const fullBundle = harness.mapBundle(core, { backlogBackend: lock.backlogBackend });
+
+    // JSON-merged files (e.g. `.claude/settings.json`) are user-owned: we
+    // never overwrite them, only graft our entries in. They live outside
+    // the lock-tracked plan and are re-merged at the end as a flat write.
+    const jsonMergedBundle: Bundle = {};
+    const bundle: Bundle = {};
+    for (const [dest, file] of Object.entries(fullBundle)) {
+      if (file.mergeJson !== undefined) {
+        jsonMergedBundle[dest] = file;
+      } else {
+        bundle[dest] = file;
+      }
+    }
 
     const destPaths = new Set<string>([
       ...Object.keys(bundle),
@@ -144,6 +157,18 @@ export class UpgradeProjectUseCase {
       overwrite: true,
       backupExisting: input.force,
     });
+
+    // JSON-merged files are not part of the plan; re-graft the bundled
+    // entries into whatever the user has on disk (idempotent — already-
+    // present entries are skipped by the merge logic). Greenfield case
+    // is handled too: writeBundle will just write the bundled content
+    // when no file is present.
+    if (Object.keys(jsonMergedBundle).length > 0) {
+      await writer.writeBundle(jsonMergedBundle, input.projectDir, {
+        overwrite: true,
+        backupExisting: false,
+      });
+    }
 
     const cleanRemovals = plan
       .filter((a): a is Extract<typeof a, { kind: "remove" }> =>

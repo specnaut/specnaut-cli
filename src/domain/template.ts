@@ -14,6 +14,25 @@ export type TemplateFile = {
    */
   mergeBlock?: string;
   /**
+   * When set, the file is treated as a *structured JSON merge* rather than a
+   * fenced text block. The bundled `content` is parsed as JSON, and a
+   * flavor-specific splice rule grafts our keys into any pre-existing file
+   * at the destination — preserving every other field the user has set.
+   *
+   * Currently supported flavors:
+   *
+   *   - `"claude-settings"` — `.claude/settings.json` (Claude Code).
+   *     Splice rule: for each `hooks.<event>` entry in our content, append
+   *     it to the user's existing matcher group (or create one). The match
+   *     key is the hook's `command:` path — re-running is idempotent.
+   *     Other top-level fields (theme, permissions, env, attribution,
+   *     plugins, MCP, etc.) are passed through verbatim.
+   *
+   * JSON-merged files are NEVER raised as conflicts (`detectConflicts`
+   * skips them, same as `mergeBlock` and `skipIfExists`).
+   */
+  mergeJson?: "claude-settings";
+  /**
    * When `true`, the file is treated as a placeholder: the bundled `content`
    * is only written when no file already exists at the destination. If a
    * file is already there (e.g. brownfield project with an existing

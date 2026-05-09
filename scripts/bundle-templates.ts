@@ -24,6 +24,8 @@ type HarnessStaticManifestEntry = {
   destination: string;
   source: string;
   executable?: boolean;
+  /** When set, the file is merged structurally rather than written verbatim. */
+  mergeJson?: "claude-settings";
 };
 
 type Manifest = {
@@ -89,7 +91,12 @@ async function buildCoreEntries(m: Manifest): Promise<string[]> {
 async function buildHarnessStatic(m: Manifest): Promise<string> {
   const byHarness: Record<
     string,
-    Array<{ destination: string; content: string; executable: boolean }>
+    Array<{
+      destination: string;
+      content: string;
+      executable: boolean;
+      mergeJson?: "claude-settings";
+    }>
   > = {};
   for (const e of m.harness_static) {
     const abs = new URL(e.source, TEMPLATES_DIR);
@@ -99,16 +106,23 @@ async function buildHarnessStatic(m: Manifest): Promise<string> {
       destination: e.destination,
       content,
       executable: e.executable === true,
+      ...(e.mergeJson ? { mergeJson: e.mergeJson } : {}),
     });
   }
   const outer: string[] = [];
   for (const harness of Object.keys(byHarness).sort()) {
-    const inner = byHarness[harness].map((f) =>
-      `    ${JSON.stringify(f.destination)}: {\n` +
-      `      content: \`${escapeTemplateLiteral(f.content)}\`,\n` +
-      `      executable: ${f.executable},\n` +
-      `    }`
-    ).join(",\n");
+    const inner = byHarness[harness].map((f) => {
+      const mergeJsonLine = f.mergeJson !== undefined
+        ? `      mergeJson: ${JSON.stringify(f.mergeJson)},\n`
+        : "";
+      return (
+        `    ${JSON.stringify(f.destination)}: {\n` +
+        `      content: \`${escapeTemplateLiteral(f.content)}\`,\n` +
+        `      executable: ${f.executable},\n` +
+        mergeJsonLine +
+        `    }`
+      );
+    }).join(",\n");
     outer.push(`  ${JSON.stringify(harness)}: {\n${inner},\n  }`);
   }
   return outer.join(",\n");

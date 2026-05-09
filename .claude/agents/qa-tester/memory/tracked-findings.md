@@ -16,14 +16,5 @@ the fix (no finding) or re-flag a regression.
 
 ---
 
-## #135 — file-count-divergence
-
-**Symptom:** The count printed by `specflow init` ("wrote N files") diverges
-from the count printed by the re-init guard ("target already contains N
-specflow-managed file(s)") in T5.
-
-**Do not flag** any T5 finding where the two counts differ. This is a known
-issue being tracked and framed in #135.
-
-**When to remove:** when #135 closes and its fix ships; the next QA run will
-re-verify alignment from a fresh-eyes perspective.
+_(empty — no open QA-finding tickets. #135 file-count-divergence closed: fixed
+in PR #138, verified clean on v1.1.2 QA run 2026-05-09.)_

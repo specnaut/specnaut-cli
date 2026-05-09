@@ -1,6 +1,7 @@
 import { dirname, join, resolve } from "@std/path";
 import { assertSafeDestination, type Bundle } from "../domain/template.ts";
 import { mergeIntoFile } from "../domain/merge_block.ts";
+import { mergeClaudeSettings } from "../domain/claude_settings_merge.ts";
 import type { BackupReport, FsWriter } from "../application/ports.ts";
 
 const BACKUP_SUFFIX = ".specflow.bak";
@@ -33,6 +34,9 @@ export class DenoFsWriter implements FsWriter {
       // Mergeable files merge non-destructively into any pre-existing content,
       // so they are never conflicts.
       if (file.mergeBlock !== undefined) continue;
+      // JSON-merged files (e.g. `.claude/settings.json`) are also merged
+      // structurally into any pre-existing user content — never a conflict.
+      if (file.mergeJson !== undefined) continue;
       // Skip-if-exists files (placeholders like AGENTS.md) silently leave
       // the user's existing file alone — also never a conflict.
       if (file.skipIfExists === true) continue;
@@ -76,6 +80,17 @@ export class DenoFsWriter implements FsWriter {
       if (file.mergeBlock !== undefined) {
         const existing = await readIfExists(abs);
         const merged = mergeIntoFile(existing, file.content, file.mergeBlock);
+        await Deno.writeTextFile(abs, merged);
+        continue;
+      }
+
+      // JSON-merged files: same non-destructive contract as mergeBlock,
+      // but the splice rule is structured (per-flavor) rather than a
+      // fenced text block.
+      if (file.mergeJson !== undefined) {
+        const existing = await readIfExists(abs);
+        // Currently only one flavor — switch when more land.
+        const merged = mergeClaudeSettings(existing, file.content, dest);
         await Deno.writeTextFile(abs, merged);
         continue;
       }

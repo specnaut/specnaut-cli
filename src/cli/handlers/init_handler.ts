@@ -118,6 +118,7 @@ function countManagedFiles(bundle: Bundle): number {
   let count = 0;
   for (const file of Object.values(bundle)) {
     if (file.mergeBlock !== undefined) continue;
+    if (file.mergeJson !== undefined) continue;
     count++;
   }
   return count;
