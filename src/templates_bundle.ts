@@ -13,6 +13,7 @@ export const CORE_BUNDLE: CoreBundle = [
 name: specflow
 disable-model-invocation: true
 description: Specflow workflow router — entry point for the spec-driven pipeline. \`/specflow <phase> [args]\` dispatches to a single phase (specify, clarify, plan, tasks, analyze, implement, review, merge, constitution, checklist, groom). \`/specflow\` with no args prints the workflow overview.
+argument-hint: <specify|clarify|plan|tasks|analyze|implement|review|merge|constitution|checklist|groom> [args]
 when_to_use: |
   Trigger phrases that should route here:
   - specify: "spec out a feature", "write a spec", "create a specification"
@@ -1881,6 +1882,7 @@ to be a **no-op when the project is healthy**.
     content: `---
 name: specflow-review
 description: Review the implementation against spec, plan, and tasks before merge — runs the quality gates (functional acceptance, test coverage, constitution checks). Auto-invokable when the user signals readiness to merge or asks for a final review pass.
+argument-hint: [feature-path-or-PR-number]
 when_to_use: |
   Trigger phrases:
   - "review the implementation"
@@ -1907,6 +1909,7 @@ Do not duplicate the review procedure here — it lives in \`phases/review.md\` 
     suffix: null,
     content: `---
 description: Manage the product backlog — list, add, update, groom, and brief tasks. All mutations route through the product-owner agent.
+argument-hint: [list|next|add|update|estimate|status|groom|brief] [args]
 ---
 
 ## User Input
@@ -3064,6 +3067,7 @@ them resume manually from the last completed phase.
     content: `---
 name: backlog
 description: Manage this project's backlog — add, list, view, move, and clarify items. The backend is fixed at init time and recorded in \`.specflow/installed.lock\`. Run \`specflow upgrade --backlog <new>\` to switch.
+argument-hint: [list|next|add|update|estimate|status|groom|brief] [args]
 ---
 
 # Backlog skill
@@ -7427,6 +7431,7 @@ team's needs.
     ".claude/commands/specflow.md": {
       content: `---
 description: Specflow workflow router — dispatches to the specflow skill (router phases live at .claude/skills/specflow/phases/<phase>.md). \`/specflow <phase> [args]\` runs a single phase.
+argument-hint: <specify|clarify|plan|tasks|analyze|implement|review|merge|constitution|checklist|groom> [args]
 ---
 
 ## User Input

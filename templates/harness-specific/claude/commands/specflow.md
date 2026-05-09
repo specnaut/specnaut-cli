@@ -1,5 +1,6 @@
 ---
 description: Specflow workflow router — dispatches to the specflow skill (router phases live at .claude/skills/specflow/phases/<phase>.md). `/specflow <phase> [args]` runs a single phase.
+argument-hint: <specify|clarify|plan|tasks|analyze|implement|review|merge|constitution|checklist|groom> [args]
 ---
 
 ## User Input
