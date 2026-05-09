@@ -36,4 +36,21 @@ export class DenoGit implements GitAdapter {
       throw new Error("git init failed");
     }
   }
+
+  async getRemoteUrl(dir: string, remote: string): Promise<string | null> {
+    try {
+      const p = new Deno.Command("git", {
+        args: ["remote", "get-url", remote],
+        cwd: dir,
+        stdout: "piped",
+        stderr: "null",
+      });
+      const out = await p.output();
+      if (!out.success) return null;
+      const url = new TextDecoder().decode(out.stdout).trim();
+      return url.length > 0 ? url : null;
+    } catch {
+      return null;
+    }
+  }
 }

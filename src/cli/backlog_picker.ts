@@ -1,5 +1,9 @@
 import { type BacklogBackend } from "../domain/installed_lock.ts";
 import { BACKLOG_STRATEGIES } from "../domain/backlog_strategies/registry.ts";
+import {
+  type ParsedKanbanURL,
+  parseKanbanURL,
+} from "../domain/backlog_strategies/kanban_url_parser.ts";
 import { selectInteractive, type SelectIO } from "./select.ts";
 
 export const DEFAULT_BACKLOG_BACKEND: BacklogBackend = "local";
@@ -50,4 +54,47 @@ export async function pickBacklogBackendInteractive(
     io,
     "Choose your backlog backend (↑/↓ to move, space/enter to select, Ctrl-C to cancel):",
   );
+}
+
+const URL_PROMPT_RETRIES = 3;
+
+/**
+ * Prompts for a Kanban / project URL when the user picked a remote
+ * backlog backend (`github` or `gitlab`). Loops on malformed input up
+ * to `URL_PROMPT_RETRIES` times, then returns `null` so the caller
+ * can decide whether to fall through (empty stub) or abort.
+ *
+ * Pure I/O via the `BacklogPickerIO` interface — testable with a
+ * fakeIO that scripts a sequence of `readLine` returns.
+ */
+export function promptKanbanURL(
+  backend: "github" | "gitlab",
+  io: BacklogPickerIO,
+): ParsedKanbanURL | null {
+  const example = backend === "github"
+    ? "https://github.com/orgs/<org>/projects/<N>  (or /users/<user>/projects/<N>)"
+    : "https://gitlab.com/<group>/<project>  (or your self-hosted host)";
+  io.log(`Paste your ${backend} project URL (Enter to skip and fill in by hand):`);
+  io.log(`  example: ${example}`);
+
+  for (let attempt = 0; attempt < URL_PROMPT_RETRIES; attempt++) {
+    const raw = (io.readLine() ?? "").trim();
+    if (raw === "") return null; // user explicitly skipped
+    const parsed = parseKanbanURL(raw);
+    if (parsed === null) {
+      io.errLog(
+        `couldn't parse "${raw}" — expected ${example}`,
+      );
+      continue;
+    }
+    if (parsed.kind !== backend) {
+      io.errLog(
+        `URL looks like a ${parsed.kind} URL, but you picked ${backend} — re-enter the right URL or press Enter to skip`,
+      );
+      continue;
+    }
+    return parsed;
+  }
+  io.errLog(`giving up after ${URL_PROMPT_RETRIES} tries — falling back to empty stub`);
+  return null;
 }

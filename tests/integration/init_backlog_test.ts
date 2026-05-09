@@ -81,7 +81,19 @@ Deno.test("init --backlog local renders the local backlog skill", async () => {
 Deno.test("init --backlog github renders the github skill + writes config stub", async () => {
   await withTempDir(async (parent) => {
     const r = await runSpecflow(
-      ["init", "demo", "--no-git", "--ai", "claude", "--backlog", "github"],
+      [
+        "init",
+        "demo",
+        "--no-git",
+        "--ai",
+        "claude",
+        "--backlog",
+        "github",
+        "--backlog-url",
+        "https://github.com/orgs/myorg/projects/42",
+        "--backlog-repo",
+        "myorg/myrepo",
+      ],
       { cwd: parent },
     );
     assertEquals(r.code, 0, r.stderr);
@@ -107,12 +119,14 @@ Deno.test("init --backlog github renders the github skill + writes config stub",
     );
     assertStringIncludes(addScript, "gh issue create");
 
-    // Config stub written + lock records backend
+    // Config stub written + populated from --backlog-url + --backlog-repo
     const config = await Deno.readTextFile(
       join(parent, "demo/.specflow/backlog-config.yml"),
     );
-    assertStringIncludes(config, "repo:");
-    assertStringIncludes(config, "project_number:");
+    assertStringIncludes(config, `repo: "myorg/myrepo"`);
+    assertStringIncludes(config, `project_number: "42"`);
+    // No "Fill in" reminder when populated stub renders
+    assertEquals(config.includes("Fill in"), false);
 
     const lock = await Deno.readTextFile(
       join(parent, "demo/.specflow/installed.lock"),
@@ -124,7 +138,17 @@ Deno.test("init --backlog github renders the github skill + writes config stub",
 Deno.test("init --backlog gitlab renders the gitlab skill + writes config stub", async () => {
   await withTempDir(async (parent) => {
     const r = await runSpecflow(
-      ["init", "demo", "--no-git", "--ai", "claude", "--backlog", "gitlab"],
+      [
+        "init",
+        "demo",
+        "--no-git",
+        "--ai",
+        "claude",
+        "--backlog",
+        "gitlab",
+        "--backlog-url",
+        "https://gitlab.com/mygroup/myproject",
+      ],
       { cwd: parent },
     );
     assertEquals(r.code, 0, r.stderr);
@@ -148,12 +172,13 @@ Deno.test("init --backlog gitlab renders the gitlab skill + writes config stub",
     assertStringIncludes(addScript, "glab issue create");
     assertStringIncludes(addScript, "Status::Backlog");
 
-    // Config stub written + lock records backend
+    // Config stub populated from --backlog-url
     const config = await Deno.readTextFile(
       join(parent, "demo/.specflow/backlog-config.yml"),
     );
-    assertStringIncludes(config, "host:");
-    assertStringIncludes(config, "project_id:");
+    assertStringIncludes(config, `host: gitlab.com`);
+    assertStringIncludes(config, `project_id: "mygroup/myproject"`);
+    assertEquals(config.includes("Fill in"), false);
 
     const lock = await Deno.readTextFile(
       join(parent, "demo/.specflow/installed.lock"),
@@ -161,6 +186,47 @@ Deno.test("init --backlog gitlab renders the gitlab skill + writes config stub",
     assertStringIncludes(lock, "backlog_backend: gitlab");
   });
 });
+
+Deno.test(
+  "init --backlog github without --backlog-url fails fast in non-TTY",
+  async () => {
+    await withTempDir(async (parent) => {
+      const r = await runSpecflow(
+        ["init", "demo", "--no-git", "--ai", "claude", "--backlog", "github"],
+        { cwd: parent },
+      );
+      assertEquals(r.code, 2, r.stdout + r.stderr);
+      assertStringIncludes(
+        r.stderr,
+        "--backlog github requires --backlog-url",
+      );
+    });
+  },
+);
+
+Deno.test(
+  "init --backlog github with malformed --backlog-url fails with clear message",
+  async () => {
+    await withTempDir(async (parent) => {
+      const r = await runSpecflow(
+        [
+          "init",
+          "demo",
+          "--no-git",
+          "--ai",
+          "claude",
+          "--backlog",
+          "github",
+          "--backlog-url",
+          "not-a-url",
+        ],
+        { cwd: parent },
+      );
+      assertEquals(r.code, 2, r.stdout + r.stderr);
+      assertStringIncludes(r.stderr, "not a recognised project URL");
+    });
+  },
+);
 
 Deno.test("upgrade --backlog github switches a local project to github", async () => {
   await withTempDir(async (parent) => {

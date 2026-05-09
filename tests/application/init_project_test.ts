@@ -44,6 +44,7 @@ function fakeGit(
       if (opts.initCalled) opts.initCalled.value = true;
       return Promise.resolve();
     },
+    getRemoteUrl: () => Promise.resolve(null),
   };
 }
 

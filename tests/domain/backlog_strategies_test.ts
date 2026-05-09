@@ -83,6 +83,105 @@ Deno.test("GitlabBacklogStrategy.initConfigMessages mentions glab CLI prerequisi
   assertEquals(joined.includes("glab"), true);
 });
 
+// ── Stub population from Kanban URL (#147) ─────────────────────────────────
+
+Deno.test(
+  "GithubBacklogStrategy.initConfigStub fills repo + project_number when ctx provides url + repo",
+  () => {
+    const stub = new GithubBacklogStrategy().initConfigStub({
+      url: {
+        kind: "github",
+        owner: "mkrlabs",
+        ownerType: "org",
+        projectNumber: 6,
+      },
+      repo: "mkrlabs/specflow",
+    });
+    assertEquals(typeof stub, "string");
+    assertEquals(stub.includes(`repo: "mkrlabs/specflow"`), true);
+    assertEquals(stub.includes(`project_number: "6"`), true);
+    // No "Fill in" reminder when the populated stub is rendered
+    assertEquals(stub.includes("Fill in"), false);
+  },
+);
+
+Deno.test(
+  "GithubBacklogStrategy.initConfigStub falls back to empty stub when repo is missing",
+  () => {
+    const stub = new GithubBacklogStrategy().initConfigStub({
+      url: {
+        kind: "github",
+        owner: "mkrlabs",
+        ownerType: "org",
+        projectNumber: 6,
+      },
+    });
+    // No repo → empty stub, even if URL is present
+    assertEquals(stub.includes(`repo: ""`), true);
+    assertEquals(stub.includes("Fill in"), true);
+  },
+);
+
+Deno.test(
+  "GitlabBacklogStrategy.initConfigStub fills host + project_id from URL",
+  () => {
+    const stub = new GitlabBacklogStrategy().initConfigStub({
+      url: {
+        kind: "gitlab",
+        host: "gitlab.example.com",
+        projectPath: "team/repo",
+      },
+    });
+    assertEquals(stub.includes(`host: gitlab.example.com`), true);
+    assertEquals(stub.includes(`project_id: "team/repo"`), true);
+    assertEquals(stub.includes("Fill in"), false);
+  },
+);
+
+Deno.test(
+  "GithubBacklogStrategy.initConfigMessages says 'ready to run' when ctx is populated",
+  () => {
+    const msgs = new GithubBacklogStrategy().initConfigMessages({
+      url: {
+        kind: "github",
+        owner: "mkrlabs",
+        ownerType: "org",
+        projectNumber: 6,
+      },
+      repo: "mkrlabs/specflow",
+    });
+    const joined = msgs.join("\n");
+    assertEquals(joined.includes("ready to run /backlog"), true);
+    assertEquals(joined.includes("mkrlabs/specflow"), true);
+    assertEquals(joined.includes("project #6"), true);
+    assertEquals(joined.includes("fill in"), false);
+  },
+);
+
+Deno.test(
+  "GitlabBacklogStrategy.initConfigMessages references the parsed host/project when populated",
+  () => {
+    const msgs = new GitlabBacklogStrategy().initConfigMessages({
+      url: {
+        kind: "gitlab",
+        host: "gitlab.example.com",
+        projectPath: "team/repo",
+      },
+    });
+    const joined = msgs.join("\n");
+    assertEquals(joined.includes("gitlab.example.com/team/repo"), true);
+    assertEquals(joined.includes("ready to run /backlog"), true);
+  },
+);
+
+Deno.test("strategies still return valid stubs when called with no argument", () => {
+  // Backward-compat: existing call sites passing no ctx.
+  const gh = new GithubBacklogStrategy().initConfigStub();
+  const gl = new GitlabBacklogStrategy().initConfigStub();
+  assertEquals(gh.includes(`repo:`), true);
+  assertEquals(gl.includes(`project_id:`), true);
+});
+
 // ── Registry ────────────────────────────────────────────────────────────────
 
 Deno.test("BACKLOG_STRATEGIES covers every value of KNOWN_BACKLOG_BACKENDS", () => {
