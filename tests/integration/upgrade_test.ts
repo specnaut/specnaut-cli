@@ -51,6 +51,45 @@ Deno.test("upgrade on freshly-init'd project is up-to-date", async () => {
   });
 });
 
+// Regression guard for #163: a fresh init followed by `upgrade --dry-run`
+// MUST report "already up to date". Before the fix, AGENTS.md and
+// .specflow/memory/constitution.md (skipIfExists files) were classified
+// as "customized locally" because they had no lock entry. The guard
+// catches any future regression that re-introduces a similar
+// false-positive on a never-edited project.
+Deno.test("upgrade --dry-run on freshly-init'd project reports zero customized files", async () => {
+  await withTempDir(async (parent) => {
+    const init = await runSpecflow(["init", "demo", "--no-git"], { cwd: parent });
+    assertEquals(init.code, 0);
+
+    const projectDir = join(parent, "demo");
+    const dry = await runSpecflow(["upgrade", "--dry-run"], { cwd: projectDir });
+    assertEquals(dry.code, 0, dry.stderr);
+    assertStringIncludes(dry.stdout, "already up to date");
+    assertEquals(
+      dry.stdout.includes("customized locally"),
+      false,
+      "fresh init must not produce any customized-locally warning",
+    );
+  });
+});
+
+// `--reset-baseline` is a no-op on a clean install (nothing to heal) but
+// must not error out. Smoke-tests that the flag plumbing works end-to-end.
+Deno.test("upgrade --reset-baseline on freshly-init'd project is also up-to-date", async () => {
+  await withTempDir(async (parent) => {
+    const init = await runSpecflow(["init", "demo", "--no-git"], { cwd: parent });
+    assertEquals(init.code, 0);
+
+    const projectDir = join(parent, "demo");
+    const upgrade = await runSpecflow(["upgrade", "--reset-baseline", "--dry-run"], {
+      cwd: projectDir,
+    });
+    assertEquals(upgrade.code, 0, upgrade.stderr);
+    assertStringIncludes(upgrade.stdout, "already up to date");
+  });
+});
+
 Deno.test("upgrade fails with clear message when lock missing", async () => {
   await withTempDir(async (dir) => {
     const upgrade = await runSpecflow(["upgrade"], { cwd: dir });
