@@ -33,7 +33,7 @@ Deno.test("probeGit returns fail when binary missing", async () => {
   assertEquals(outcome.status, "fail");
 });
 
-Deno.test("probeGh returns pass with authenticated login", async () => {
+Deno.test("probeGh parses login from stderr (legacy gh < 2.7)", async () => {
   const runner = fakeRunner((_cmd, args) => {
     if (args[0] === "--version") {
       return { code: 0, stdout: "gh version 2.50.0", stderr: "" };
@@ -49,6 +49,31 @@ Deno.test("probeGh returns pass with authenticated login", async () => {
   assertEquals(outcome.status, "pass");
   assertEquals(outcome.message.includes("2.50.0"), true);
   assertEquals(outcome.message.includes("kevinraimbaud"), true);
+});
+
+Deno.test("probeGh parses login from stdout (gh 2.7+ — real 2.92.0 output)", async () => {
+  const runner = fakeRunner((_cmd, args) => {
+    if (args[0] === "--version") {
+      return { code: 0, stdout: "gh version 2.92.0 (2026-04-15)", stderr: "" };
+    }
+    // Verbatim shape of `gh auth status` on gh 2.92.0
+    return {
+      code: 0,
+      stdout: "github.com\n" +
+        "  ✓ Logged in to github.com account kevinkod (keyring)\n" +
+        "  - Active account: true\n" +
+        "  - Git operations protocol: ssh\n" +
+        "  - Token: gho_************************************\n" +
+        "  - Token scopes: 'admin:public_key', 'gist', 'project'\n",
+      stderr: "",
+    };
+  });
+  const probe = new DenoEnvironmentProbe(runner);
+  const outcome = await probe.probeGh();
+  assertEquals(outcome.status, "pass");
+  assertEquals(outcome.message.includes("2.92.0"), true);
+  assertEquals(outcome.message.includes("kevinkod"), true);
+  assertEquals(outcome.message.includes("unknown"), false);
 });
 
 Deno.test("probeGh returns warn when installed but not authenticated", async () => {
