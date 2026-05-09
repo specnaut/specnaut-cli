@@ -11,6 +11,7 @@ import { DenoFsWriter } from "../../infrastructure/deno_fs_writer.ts";
 import { DenoGit } from "../../infrastructure/deno_git.ts";
 import { FsLockStore } from "../../infrastructure/fs_lock_store.ts";
 import { CORE_BUNDLE } from "../../templates_bundle.ts";
+import type { Bundle } from "../../domain/template.ts";
 
 export type InitIntent = {
   kind: "init";
@@ -63,10 +64,25 @@ async function resolveBacklogBackend(
 function printConflictsError(
   conflicts: string[],
   lockExists: boolean,
+  totalManagedFiles: number,
 ): void {
   const n = conflicts.length;
   const noun = n === 1 ? "file" : "files";
-  console.error(red(`error: ${n} ${noun} would be overwritten:`));
+  // Surface the gap between `wrote N files` (init success) and the
+  // overwrite count when the two diverge. The difference is files
+  // that are managed but never overwritten without --force —
+  // skipIfExists placeholders like AGENTS.md and the constitution
+  // template. Without this framing, a fresh user reads the two counts
+  // as contradictory (#135).
+  const owned = totalManagedFiles - n;
+  const gapSuffix = owned > 0
+    ? dim(
+      ` (of ${totalManagedFiles} managed; ${owned} user-owned placeholder${
+        owned === 1 ? "" : "s"
+      } excluded — never overwritten without --force)`,
+    )
+    : "";
+  console.error(red(`error: ${n} ${noun} would be overwritten${gapSuffix}:`));
   for (const c of conflicts) console.error(red(`  - ${c}`));
   console.error("");
   if (lockExists) {
@@ -86,6 +102,25 @@ function printConflictsError(
         "(existing files are backed up to *.specflow.bak).",
     );
   }
+}
+
+/**
+ * Number of managed files emitted by the bundle — i.e. everything
+ * `init` reports as `wrote N files`. Excludes mergeable files (counted
+ * separately in the merged-paths suffix). Includes both writeable and
+ * `skipIfExists` placeholder entries: the latter are part of the
+ * managed set, just immune to overwrite without `--force`.
+ *
+ * Used to surface the gap between the success and conflict messages
+ * in `printConflictsError` (#135).
+ */
+function countManagedFiles(bundle: Bundle): number {
+  let count = 0;
+  for (const file of Object.values(bundle)) {
+    if (file.mergeBlock !== undefined) continue;
+    count++;
+  }
+  return count;
 }
 
 async function writeBacklogConfigStub(
@@ -147,7 +182,8 @@ export async function runInit(intent: InitIntent): Promise<number> {
     const conflicts = await writer.detectConflicts(probeBundle, targetDir);
     if (conflicts.length > 0) {
       const lock = await lockStore.read(targetDir);
-      printConflictsError(conflicts, lock !== null);
+      const totalManaged = countManagedFiles(probeBundle);
+      printConflictsError(conflicts, lock !== null, totalManaged);
       return 3;
     }
   }
@@ -173,7 +209,14 @@ export async function runInit(intent: InitIntent): Promise<number> {
   });
 
   if (result.status === "conflicts") {
-    printConflictsError(result.conflicts, result.lockExists);
+    // Re-derive the managed file count for the secondary conflict path
+    // (use-case detection). Bundle is the same shape as the probe; the
+    // backlog backend chosen here may differ from the probe's "local"
+    // default, but the managed count is invariant — backlog-script
+    // entries are present regardless of backend.
+    const probeBundle = harness.mapBundle(CORE_BUNDLE, { backlogBackend });
+    const totalManaged = countManagedFiles(probeBundle);
+    printConflictsError(result.conflicts, result.lockExists, totalManaged);
     return 3;
   }
 
