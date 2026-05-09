@@ -127,6 +127,8 @@ project` calls and read configuration from `backlog-config.yml`.
 .specflow/scripts/backlog/add.sh "<title>" [body] [labels-csv]
 .specflow/scripts/backlog/move.sh <number> <Status>   # sets Project Status field
 .specflow/scripts/backlog/clarify-comment.sh <num> "<question>"
+.specflow/scripts/backlog/detect-fields.sh                                 # discover native Priority/Size single-select fields → env lines
+.specflow/scripts/backlog/set-field.sh <num> <Priority|Size> <value>       # set the native Project V2 field; exit codes 10/11/12 signal label fallback
 ```
 
 For closing or editing, use `gh` directly:
@@ -153,6 +155,12 @@ Specflow change — the skill is path-aware.
 - **Closing** — close the issue (don't just move to Done). The repo's
   issue history is the audit trail.
 - **Drafts** are not used. Every task is a real issue.
+- **Priority / Size** — when the project has native single-select
+  `Priority` and/or `Size` fields, prefer `set-field.sh` over text
+  labels. Non-zero exit codes tell the caller when to fall back to
+  labels: `10` = no such field on the project, `11` = field exists but
+  the value option is missing (e.g. `priority:P3` on a 3-level field),
+  `12` = issue not on the project.
 
 ### Prerequisites
 
