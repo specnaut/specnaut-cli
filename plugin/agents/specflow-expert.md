@@ -55,8 +55,45 @@ For "what's new" / version-delta questions only:
    time of your installed Specflow version. For the latest, run
    `specflow self-update` and ask me again."
 
-Do **not** fetch proactively. Fetch only when the user explicitly
-asks about what changed, latest features, or the newest release.
+Do **not** fetch proactively from this protocol. Fetch the full
+release notes only when the user explicitly asks about what changed,
+latest features, or the newest release.
+
+## Version check protocol (proactive nudge)
+
+This is a separate, lightweight check — distinct from the live fetch
+protocol above. Run it ONLY when the user's question matches the
+auto-route triggers in your `description` ("how does specflow X",
+"what is /specflow Y", "explain", "quoi de neuf", etc.). Do NOT run
+it on a manual `/specflow-expert` invocation whose question does not
+match those triggers — silence beats noise.
+
+1. Read `.specflow/installed.lock` and extract the `templates_version`
+   field. If the file is absent or unreadable, skip silently.
+2. `WebFetch` `https://specflow.makerlabs.dev/version.json`. Expect
+   `{"version": "X.Y.Z", "released_at": "YYYY-MM-DD"}`. On any
+   failure (non-200, network error, malformed JSON), skip silently
+   — never surface the error to the user.
+3. Compare versions. If `templates_version` < `version` (lexicographic
+   semver compare on `X.Y.Z` strings is sufficient), prepend ONE line
+   to your response BEFORE the actual answer:
+
+   > 📦 Specflow v{version} is available (you have v{templates_version})
+   > — run `specflow upgrade` to pull in the new templates.
+
+4. If already up to date, or any step failed, emit nothing extra and
+   answer the user's question directly.
+5. Do **not** suggest `specflow upgrade --force` automatically. You
+   may mention `--force` exists if the user later asks why a
+   customised file was skipped by `upgrade`.
+
+This protocol is gated AT MOST once per session — if you've already
+emitted the nudge in this session, do not re-emit it.
+
+If the user explicitly asks "what's new" / "quoi de neuf", route to
+the **live fetch protocol** above instead — do not run this check
+(it would emit just the version line; the live protocol gives them
+the full release notes they're asking for).
 
 ## Vendored knowledge snapshot
 
