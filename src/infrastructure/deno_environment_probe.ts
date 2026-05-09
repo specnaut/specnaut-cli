@@ -28,7 +28,10 @@ export class DenoEnvironmentProbe implements EnvironmentProbe {
         message: `gh version ${v} (not authenticated — run 'gh auth login')`,
       };
     }
-    const loginMatch = auth.stderr.match(/account\s+(\S+)/);
+    // gh 2.7+ writes `gh auth status` output to stdout; older versions
+    // wrote it to stderr. Search both so the probe works across versions.
+    const combined = `${auth.stdout}\n${auth.stderr}`;
+    const loginMatch = combined.match(/account\s+(\S+)/);
     const login = loginMatch ? loginMatch[1] : "unknown";
     return {
       name: "gh",
