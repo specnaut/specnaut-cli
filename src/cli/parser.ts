@@ -70,6 +70,11 @@ export type Intent =
      * current backend.
      */
     backlog: "local" | "github" | "gitlab" | null;
+    /**
+     * `--reset-baseline`. Heals stale lock SHAs by trusting the on-disk
+     * content as the new baseline. See `UpgradeProjectInput.resetBaseline`.
+     */
+    resetBaseline: boolean;
   }
   | { kind: "unknown"; received: string };
 
@@ -86,6 +91,7 @@ export function parseArgs(argv: string[]): Intent {
       "check",
       "dry-run",
       "project",
+      "reset-baseline",
     ],
     string: ["ai", "backlog", "backlog-url", "backlog-repo"],
     alias: { v: "version", h: "help" },
@@ -156,6 +162,7 @@ export function parseArgs(argv: string[]): Intent {
       dryRun: Boolean(parsed["dry-run"]),
       force: Boolean(parsed.force),
       backlog: backlogResult.value,
+      resetBaseline: Boolean(parsed["reset-baseline"]),
     };
   }
 

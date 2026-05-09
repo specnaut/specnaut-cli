@@ -66,22 +66,70 @@ export type UpgradePlan = ReadonlyArray<UpgradeAction>;
  * produce no action — the caller drops them from the new lock
  * implicitly by iterating only `newShas`.
  */
+/**
+ * Optional inputs that didn't exist in the v1.0 plan signature. Carried as
+ * a single object so future additions don't keep growing the positional
+ * parameter list.
+ */
+export type UpgradePlanOptions = {
+  pluginInstalled?: boolean;
+  isPluginCovered?: (dest: string) => boolean;
+  /**
+   * Predicate identifying `skipIfExists` bundle entries. Such files
+   * (e.g. `AGENTS.md`, `.specflow/memory/constitution.md`) may exist on
+   * disk before init touches them — in which case init deliberately
+   * skips writing AND skips recording them in the lock. Without this
+   * predicate, upgrade saw `diskSha defined + lockSha undefined` and
+   * misclassified the user-owned file as "customized locally". With
+   * the predicate, those files are silently omitted from the plan —
+   * they were never specflow-managed.
+   */
+  isSkipIfExists?: (dest: string) => boolean;
+  /**
+   * `--reset-baseline` mode. When true, files where `diskSha != lockSha`
+   * have their lock SHA force-reset to the disk SHA before the plan is
+   * computed. Net effect: stale locks (e.g. from a pre-v1.0 binary that
+   * recorded the wrong SHA) get re-aligned with reality and the plan
+   * compares disk against bundle directly. Risk: a user who genuinely
+   * customised a file loses their edit signal. Document accordingly.
+   */
+  resetBaseline?: boolean;
+};
+
 export function computeUpgradePlan(
   diskShas: Map<string, string>,
   lock: InstalledLock,
   newShas: Map<string, string>,
-  pluginInstalled: boolean = false,
+  pluginInstalledOrOpts: boolean | UpgradePlanOptions = false,
   isPluginCovered: (dest: string) => boolean = () => false,
 ): UpgradePlan {
+  // Accept both legacy positional form (boolean + predicate) and the new
+  // options-bag form. Existing callers and tests use the legacy shape.
+  const opts: UpgradePlanOptions = typeof pluginInstalledOrOpts === "object"
+    ? pluginInstalledOrOpts
+    : { pluginInstalled: pluginInstalledOrOpts, isPluginCovered };
+  const pluginInstalled = opts.pluginInstalled ?? false;
+  const isPluginCoveredFn = opts.isPluginCovered ?? (() => false);
+  const isSkipIfExists = opts.isSkipIfExists ?? (() => false);
+  const resetBaseline = opts.resetBaseline ?? false;
   const actions: UpgradeAction[] = [];
   const sortedDests = [...newShas.keys()].sort();
 
   for (const dest of sortedDests) {
     const newSha = newShas.get(dest)!;
     const diskSha = diskShas.get(dest);
-    const lockSha = lock.entries.get(dest)?.sha256;
+    let lockSha = lock.entries.get(dest)?.sha256;
 
-    const covered = pluginInstalled && isPluginCovered(dest);
+    // Reset-baseline: if the on-disk content disagrees with the lock SHA,
+    // trust the disk. This heals stale locks left by pre-v1.0 binaries
+    // and is the migration path for the false-positive "customized"
+    // bug (#163). Skipped when the lock genuinely has no entry — that
+    // case still falls through to the skipIfExists / customized branch.
+    if (resetBaseline && diskSha !== undefined && lockSha !== undefined && diskSha !== lockSha) {
+      lockSha = diskSha;
+    }
+
+    const covered = pluginInstalled && isPluginCoveredFn(dest);
 
     if (diskSha === undefined) {
       // File missing on disk. Plugin-covered + plugin installed:
@@ -107,6 +155,14 @@ export function computeUpgradePlan(
       continue;
     }
     if (lockSha === undefined) {
+      // skipIfExists files (AGENTS.md, .specflow/memory/constitution.md, …)
+      // that the user already had at init time were deliberately not
+      // tracked by the lock. They were never specflow-managed; do not
+      // emit any action — silent skip prevents the false-positive
+      // "customized locally" report (#163).
+      if (isSkipIfExists(dest)) {
+        continue;
+      }
       actions.push({
         kind: "preserve",
         dest,

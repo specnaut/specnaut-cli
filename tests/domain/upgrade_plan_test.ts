@@ -287,3 +287,58 @@ Deno.test("plugin migration: uncovered path + plugin installed → existing beha
   const plan = computeUpgradePlan(diskShas, lock, newShas, true, isCovered);
   assertEquals(plan.find((p) => p.dest === UNCOVERED)?.kind, "auto-update");
 });
+
+// #163: skipIfExists files (AGENTS.md etc.) that pre-existed at init are
+// silently skipped — their absence from the lock must not flag them as
+// "customized locally".
+Deno.test("computeUpgradePlan: skipIfExists file not in lock → silently omitted", async () => {
+  const path = "AGENTS.md";
+  const newSha = await sha256Hex("# new bundled content\n");
+  const diskSha = await sha256Hex("# user's pre-existing AGENTS.md\n");
+  // No entry for AGENTS.md in the lock — typical of a brownfield init
+  // where the file already existed and was therefore not written by
+  // specflow (and not recorded).
+  const plan = computeUpgradePlan(
+    new Map([[path, diskSha]]),
+    emptyLock,
+    new Map([[path, newSha]]),
+    { isSkipIfExists: (d) => d === path },
+  );
+  // No action emitted for the skipIfExists file.
+  assertEquals(plan.length, 0);
+});
+
+// #163: --reset-baseline (resetBaseline=true) heals stale lock SHAs by
+// trusting the on-disk content as the new baseline. The plan then
+// auto-updates against the bundle.
+Deno.test("computeUpgradePlan: resetBaseline aligns stale lock with disk → auto-update", async () => {
+  const path = ".claude/skills/specflow/SKILL.md";
+  const diskSha = await sha256Hex("router skill — current on disk\n");
+  const newSha = await sha256Hex("router skill — new bundle content\n");
+  const lock = lockWith(path, "stale-sha-from-an-old-binary");
+  const plan = computeUpgradePlan(
+    new Map([[path, diskSha]]),
+    lock,
+    new Map([[path, newSha]]),
+    { resetBaseline: true },
+  );
+  // resetBaseline forced lockSha to diskSha → diskSha matches lockSha →
+  // auto-update against the new bundle.
+  assertEquals(plan.length, 1);
+  assertEquals(plan[0].kind, "auto-update");
+});
+
+// Same scenario WITHOUT --reset-baseline → preserved as "customized".
+Deno.test("computeUpgradePlan: stale lock without resetBaseline → preserve customized", async () => {
+  const path = ".claude/skills/specflow/SKILL.md";
+  const diskSha = await sha256Hex("router skill — current on disk\n");
+  const newSha = await sha256Hex("router skill — new bundle content\n");
+  const lock = lockWith(path, "stale-sha-from-an-old-binary");
+  const plan = computeUpgradePlan(
+    new Map([[path, diskSha]]),
+    lock,
+    new Map([[path, newSha]]),
+  );
+  assertEquals(plan.length, 1);
+  assertEquals(plan[0].kind, "preserve");
+});

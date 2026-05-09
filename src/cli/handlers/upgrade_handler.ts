@@ -17,6 +17,7 @@ export type UpgradeIntent = {
   dryRun: boolean;
   force: boolean;
   backlog: BacklogBackend | null;
+  resetBaseline: boolean;
 };
 
 /**
@@ -228,6 +229,7 @@ export async function runUpgrade(intent: UpgradeIntent): Promise<number> {
       projectDir,
       dryRun: intent.dryRun,
       force: intent.force,
+      resetBaseline: intent.resetBaseline,
     });
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
@@ -247,7 +249,10 @@ export async function runUpgrade(intent: UpgradeIntent): Promise<number> {
     console.log(
       dim(
         "\nFor customized files, review the diff below and merge manually if desired.\n" +
-          "Re-run with --force to overwrite them (edits will be backed up to .specflow.bak).\n",
+          "Re-run with --force to overwrite them (edits will be backed up to .specflow.bak).\n" +
+          "If you never edited these files, the lock baseline is stale — re-run with\n" +
+          "`specflow upgrade --reset-baseline` to trust the on-disk content as the new\n" +
+          "baseline and apply the upstream updates cleanly.\n",
       ),
     );
     // Resolve the harness from the lock to render diffs in the correct file tree.

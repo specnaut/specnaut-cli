@@ -14,6 +14,15 @@ export type UpgradeProjectInput = {
   projectDir: string;
   dryRun: boolean;
   force: boolean;
+  /**
+   * `--reset-baseline` flag. Heals stale lock SHAs left by older binaries
+   * (and any other source of disk/lock divergence) by trusting the
+   * on-disk content as the new baseline. Existing files where
+   * `diskSha != lockSha` get their lock SHA force-reset; the plan then
+   * compares disk vs bundle directly. Use after the user confirms they
+   * never edited the affected files.
+   */
+  resetBaseline?: boolean;
 };
 
 export type UpgradeProjectResult =
@@ -116,8 +125,12 @@ export class UpgradeProjectUseCase {
       diskShas,
       lock,
       newShas,
-      pluginInstalled,
-      (dest) => isPluginCoveredPath(lock.harness, dest),
+      {
+        pluginInstalled,
+        isPluginCovered: (dest) => isPluginCoveredPath(lock.harness, dest),
+        isSkipIfExists: (dest) => bundle[dest]?.skipIfExists === true,
+        resetBaseline: input.resetBaseline ?? false,
+      },
     );
 
     const hasActualWork = plan.some((a) =>
@@ -255,5 +268,10 @@ export class UpgradeProjectUseCase {
 
 async function shaOfBundle(file: TemplateFile | undefined): Promise<string> {
   if (!file) return "";
-  return await sha256Hex(file.content);
+  // Mirror init_project's hash logic: mergeBlock files are hashed on the
+  // *block body* only, not the full file. Keeping these two paths in
+  // lockstep is critical — a divergence here is what caused #163's
+  // false-positive "customized" reports on `.gitignore` upgrades.
+  const shaInput = file.mergeBlock !== undefined ? canonicalBlockBody(file.content) : file.content;
+  return await sha256Hex(shaInput);
 }

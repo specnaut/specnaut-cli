@@ -9,7 +9,7 @@ ${bold("Usage:")}
   specflow init --here                Bootstrap in the current directory
   specflow self-update [--check]      Update the specflow binary
   specflow check [--project]          Diagnose the environment (and optionally the project)
-  specflow upgrade [--dry-run] [--force] [--backlog <name>]
+  specflow upgrade [--dry-run] [--force] [--backlog <name>] [--reset-baseline]
                                       Update project templates to the binary's version
   specflow --version, -v              Print version
   specflow --help, -h                 Show this help
@@ -28,6 +28,9 @@ ${bold("Flags (for upgrade):")}
   --force             Overwrite locally-customized files (existing content backed up to *.specflow.bak)
   --backlog <name>    Switch the backlog backend (local | github | gitlab). Re-renders the backlog skill;
                       existing data in the previous backend is NOT migrated.
+  --reset-baseline    Trust the on-disk content as the new SHA baseline. Use when files are flagged
+                      "customized locally" but you never edited them (heals stale lock SHAs). Combine
+                      with --dry-run to preview what would change.
 
 ${bold("Docs:")}    ${cyan("https://specflow.makerlabs.dev")}
 ${bold("Source:")}  ${cyan("https://github.com/mkrlabs/specflow")}`;

@@ -105,6 +105,7 @@ Deno.test("parseArgs returns upgrade intent", () => {
     dryRun: false,
     force: false,
     backlog: null,
+    resetBaseline: false,
   });
 });
 
@@ -114,6 +115,17 @@ Deno.test("parseArgs returns upgrade intent with --dry-run --force", () => {
     dryRun: true,
     force: true,
     backlog: null,
+    resetBaseline: false,
+  });
+});
+
+Deno.test("parseArgs returns upgrade intent with --reset-baseline", () => {
+  assertEquals(parseArgs(["upgrade", "--reset-baseline"]), {
+    kind: "upgrade",
+    dryRun: false,
+    force: false,
+    backlog: null,
+    resetBaseline: true,
   });
 });
 
