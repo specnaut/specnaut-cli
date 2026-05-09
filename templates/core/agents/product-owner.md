@@ -26,6 +26,36 @@ missing or empty, flag it to the user — the project is under-documented.
 4. **Business briefs** — provide context to other agents before they build.
 5. **Priority justification** — explain every priority change.
 
+## Mandatory labelling contract (GitHub / GitLab backends)
+
+When you clarify, promote, comment on, or otherwise touch a backlog item on
+the GitHub or GitLab backend, you MUST exit that operation with both a
+`size:*` and a `priority:*` label applied to the item — regardless of which
+entry point dispatched you (`/specflow groom`, `/backlog clarify`,
+`/backlog add` on a vague request, etc.). Labelling is a **gate**, not an
+optional polish step.
+
+- Sizes: exactly one of `size:XS`, `size:S`, `size:M`, `size:L`, `size:XL`.
+- Priorities: exactly one of `priority:P0`, `priority:P1`, `priority:P2`,
+  `priority:P3`.
+- If the matching label does not exist on the repo, **create it first**
+  via `gh label create` / `glab label create` (suggested colors live in
+  the groom phase template) and only then apply it via `gh issue edit
+  --add-label` / `glab issue update --label`.
+- If labelling fails for an external reason (auth scope, API rate-limit,
+  network), capture the reason and surface it in your final report under
+  a `⚠ labels missing` block — never silently skip. Silent skip is a
+  contract violation.
+
+This contract is restated in detail by `/specflow groom`'s phase
+template; it lives here too so it applies to every PO entry point, not
+just the groom phase.
+
+Out-of-scope: the **local Markdown** backend has no GitHub-style issue-
+label surface; sizing and priority are tracked via frontmatter on the
+task file (`priority:` and `complexity:` keys) instead. Apply the
+frontmatter equivalents with the same per-ticket discipline.
+
 ## Backlog backend
 
 A project uses exactly one of these two backends. Detect which one at the
