@@ -33,7 +33,7 @@ type RenderInput = {
 export function renderFormula(opts: RenderInput): string {
   const baseUrl = `https://github.com/mkrlabs/specflow/releases/download/${opts.tag}`;
   return `class Specflow < Formula
-  desc "AI project scaffolding CLI with auto-chain, review, and backlog"
+  desc "AI project scaffolding CLI with auto-chained workflow, review, and backlog"
   homepage "https://specflow.makerlabs.dev"
   version "${opts.version}"
   license "MIT"

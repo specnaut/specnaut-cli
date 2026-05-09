@@ -41,7 +41,7 @@ const HTML_TEMPLATE = (body: string, version: string) =>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>${TITLE}</title>
-  <meta name="description" content="Specflow — enhanced spec-kit CLI with auto-chain, review phase, and backlog. Distributed as a single native binary." />
+  <meta name="description" content="Specflow — enhanced spec-kit CLI with auto-chained workflow, review phase, and backlog. Distributed as a single native binary." />
   <meta name="specflow-version" content="${version}" />
   <link rel="canonical" href="https://specflow.makerlabs.dev/" />
   <link rel="alternate" type="text/markdown" href="./llms.txt" />
