@@ -25,6 +25,66 @@ async function readVersion(denoJsonPath = "deno.json"): Promise<string> {
 }
 
 /**
+ * Fetch the last `count` GitHub releases and render a "Recent releases"
+ * Markdown section. On any failure (network, non-2xx, malformed payload),
+ * emit a warning to stderr and return an empty string — the docs deploy
+ * MUST NOT fail because of a cosmetic section.
+ *
+ * Public-repo unauthenticated calls have a 60 req/hr ceiling on GitHub
+ * runners — sufficient for the build cadence.
+ */
+export async function fetchRecentReleases(count = 5): Promise<string> {
+  const url = `https://api.github.com/repos/mkrlabs/specflow/releases?per_page=${count}`;
+  let releases: Array<{ tag_name: string; body: string }>;
+  try {
+    const res = await fetch(url, {
+      headers: { Accept: "application/vnd.github+json" },
+    });
+    if (!res.ok) {
+      console.warn(
+        `::warning::fetchRecentReleases: HTTP ${res.status} from ${url} — skipping section`,
+      );
+      return "";
+    }
+    releases = await res.json();
+  } catch (err) {
+    console.warn(
+      `::warning::fetchRecentReleases: ${
+        err instanceof Error ? err.message : err
+      } — skipping section`,
+    );
+    return "";
+  }
+  if (!Array.isArray(releases) || releases.length === 0) return "";
+
+  const lines: string[] = ["## Recent releases", ""];
+  for (const r of releases.slice(0, count)) {
+    const oneLiner = extractOneLiner(r.body ?? "");
+    const tagUrl = `${REPO_URL}/releases/tag/${r.tag_name}`;
+    lines.push(`- [${r.tag_name}](${tagUrl}) — ${oneLiner}`);
+  }
+  return lines.join("\n");
+}
+
+/**
+ * Extracts a one-liner summary from a `gen-changelog.ts`-style release body.
+ * Skips heading lines (`##`, `###`) and the trailing `**Full changelog:**`.
+ * Returns the first bullet text, or the first non-empty non-heading line if
+ * no bullet is present.
+ */
+export function extractOneLiner(body: string): string {
+  for (const raw of body.split("\n")) {
+    const line = raw.trim();
+    if (!line) continue;
+    if (line.startsWith("#")) continue;
+    if (line.startsWith("**Full changelog")) continue;
+    if (line.startsWith("- ")) return line.slice(2).trim();
+    return line;
+  }
+  return "";
+}
+
+/**
  * GitHub Pages custom domain. Emitted as `docs-dist/CNAME` so each deploy
  * republishes it; without this, GitHub Pages drops the custom domain on
  * subsequent workflow deploys (build_type=workflow ignores the repo
@@ -93,24 +153,44 @@ export async function buildDocs(opts: {
   source?: string;
   outDir?: string;
   version?: string;
-} = {}): Promise<{ html: string; markdown: string; version: string }> {
+  fetchReleases?: () => Promise<string>;
+} = {}): Promise<
+  { html: string; markdown: string; version: string; versionJson: string }
+> {
   const source = opts.source ?? SOURCE;
   const outDir = opts.outDir ?? OUT_DIR;
   const version = opts.version ?? await readVersion();
+  const fetchReleases = opts.fetchReleases ?? (() => fetchRecentReleases());
   const outHtml = `${outDir}/index.html`;
   const outMd = `${outDir}/llms.txt`;
+  const outVersionJson = `${outDir}/version.json`;
 
   const sourceMarkdown = await Deno.readTextFile(source);
-  const rendered = render(sourceMarkdown, { allowIframes: false });
+  const releaseSection = await fetchReleases();
+  const enrichedMarkdown = releaseSection
+    ? `${sourceMarkdown}\n\n${releaseSection}\n`
+    : sourceMarkdown;
+  const rendered = render(enrichedMarkdown, { allowIframes: false });
   const html = HTML_TEMPLATE(rendered, version);
-  const markdown = `<!-- Specflow v${version} — ${REPO_URL} -->\n\n${sourceMarkdown}`;
+  const markdown = `<!-- Specflow v${version} — ${REPO_URL} -->\n\n${enrichedMarkdown}`;
+
+  // Lightweight machine-readable endpoint consumed by the `specflow-expert`
+  // agent to compare the user's installed version against the latest
+  // released one. `released_at` is the build timestamp — accurate within
+  // the day since static.yml redeploys on every release commit.
+  const versionJson = JSON.stringify(
+    { version, released_at: new Date().toISOString().split("T")[0] },
+    null,
+    2,
+  ) + "\n";
 
   await Deno.mkdir(outDir, { recursive: true });
   await Deno.writeTextFile(outHtml, html);
   await Deno.writeTextFile(outMd, markdown);
   await Deno.writeTextFile(`${outDir}/CNAME`, `${CUSTOM_DOMAIN}\n`);
+  await Deno.writeTextFile(outVersionJson, versionJson);
 
-  return { html, markdown, version };
+  return { html, markdown, version, versionJson };
 }
 
 if (import.meta.main) {
@@ -118,4 +198,5 @@ if (import.meta.main) {
   console.log(`✓ wrote ${OUT_HTML} (${html.length} bytes, v${version})`);
   console.log(`✓ wrote ${OUT_MD}`);
   console.log(`✓ wrote ${OUT_CNAME} (${CUSTOM_DOMAIN})`);
+  console.log(`✓ wrote ${OUT_DIR}/version.json (v${version})`);
 }
