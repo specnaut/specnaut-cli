@@ -60,8 +60,8 @@ for phase in specify constitution clarify plan tasks analyze implement merge rev
 done
 check "name: specflow on the router SKILL.md" \
   'head -3 .claude/skills/specflow/SKILL.md | grep -q "name: specflow"'
-check "disable-model-invocation set on the router" \
-  'grep -q "disable-model-invocation: true" .claude/skills/specflow/SKILL.md'
+check "disable-model-invocation NOT set on the router (Skill-tool chaining must work)" \
+  '! grep -q "disable-model-invocation: true" .claude/skills/specflow/SKILL.md'
 check "specflow-review auto-invoke alias present" \
   '[ -f .claude/skills/specflow-review/SKILL.md ]'
 
