@@ -149,15 +149,19 @@ abort-BLOCKERs vs finding-BLOCKERs.
   cd sandbox/qa-<stamp> && specflow init --here --no-git --ai claude
   ```
 - **Expected:** exit 0; stdout includes "Initializing into …" and
-  "✓ wrote N files (+ merged: .gitignore)" (N around 38–40); a
-  "Next steps" block follows that recommends `/specflow-specify`
-  before `/backlog add`.
+  "✓ wrote N files (+ merged: .gitignore)" (N within roughly 50–80 —
+  the count grows as new bundled files ship; bump the upper bound
+  here if a future release legitimately exceeds it); a "Next steps"
+  block follows that recommends `/specflow specify` before
+  `/backlog add`. Note the post-v1.0.0 syntax: `/specflow <phase>`
+  (no hyphen between `specflow` and the phase name).
 - **Abort-BLOCKER:** non-zero exit. Without a successful init, T4–T7
   cannot run on this scenario.
 - **Finding-BLOCKER:** "Next steps" suggests a command that doesn't
-  exist after init (cross-check the slash command file in
-  `.claude/commands/`); file count outside 30–60; merged-file suffix
-  missing when `.gitignore` was preserved.
+  exist after init (cross-check the slash command files in
+  `.claude/commands/` — post-v1.0.0 should contain at least
+  `backlog.md` and `specflow.md`); file count outside 30–80;
+  merged-file suffix missing when `.gitignore` was preserved.
 
 ### T4 — Brownfield `.gitignore` merge preserves Vite content and fences the Specflow block
 
@@ -211,8 +215,15 @@ abort-BLOCKERs vs finding-BLOCKERs.
   cd sandbox/qa-<stamp> && specflow check --project
   ```
 - **Expected:** identifies `.specflow/` as present; harness as `claude`;
-  flags constitution as placeholder; flags `backlog config` as missing
-  (no config file yet); reports a templates-version line.
+  flags constitution as placeholder; reports a templates-version line.
+  The expected backlog-backend output **branches on which backend the
+  init resolved to**:
+  - `local` (the default in scripted/non-TTY contexts) → reports
+    `backlog backend ✓ local — zero-config` (no config file is
+    required for the local backend; it's a markdown-on-disk backend).
+  - `github` or `gitlab` → flags `backlog config` as missing or
+    incomplete (no `backlog-config.yml` yet, or required fields
+    empty). This is the case where a warning is expected.
 - **Finding-BLOCKER:** harness misidentified, `.specflow/` reported
   missing on a freshly-init'd project, templates-version line absent
   or contradicts `--version`.
