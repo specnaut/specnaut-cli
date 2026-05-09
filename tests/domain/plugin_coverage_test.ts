@@ -13,6 +13,7 @@ Deno.test("isPluginCoveredPath: claude + .claude/agents/<name>.md (non-architect
       "qa-tester",
       "review-coordinator",
       "security-auditor",
+      "specflow-expert",
       "test-reviewer",
       "workflow-manager",
     ]

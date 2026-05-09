@@ -44,7 +44,7 @@ const SYNC_PAIRS: ReadonlyArray<{ plugin: string; source: string }> = [
     plugin: "plugin/skills/specflow-review/SKILL.md",
     source: "templates/core/skills/specflow-review/SKILL.md",
   },
-  // Dual-copy agents: 9 sub-agent definitions, each landing as
+  // Dual-copy agents: 10 sub-agent definitions, each landing as
   // `plugin/agents/<name>.md`. Claude Code resolves agents by file
   // basename in plugin scope; no namespacing needed for invocation
   // (agents are not user-invokable like slash commands).
@@ -56,6 +56,7 @@ const SYNC_PAIRS: ReadonlyArray<{ plugin: string; source: string }> = [
     "qa-tester",
     "review-coordinator",
     "security-auditor",
+    "specflow-expert",
     "test-reviewer",
     "workflow-manager",
   ].map((name) => ({

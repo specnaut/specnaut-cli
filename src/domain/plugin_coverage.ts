@@ -59,8 +59,8 @@ export function isPluginCoveredPath(
  * (either re-install the plugin or run `specflow upgrade` to restore
  * the bundled snapshot).
  *
- * Kept in sync with `isPluginCoveredPath` above. Total: 23 paths
- * (9 agents excluding architect + 1 router skill + 11 phase docs +
+ * Kept in sync with `isPluginCoveredPath` above. Total: 24 paths
+ * (10 agents excluding architect + 1 router skill + 11 phase docs +
  * specflow-review alias + specflow-auto).
  */
 export const PLUGIN_COVERED_PATHS_CLAUDE: ReadonlyArray<string> = [
@@ -72,6 +72,7 @@ export const PLUGIN_COVERED_PATHS_CLAUDE: ReadonlyArray<string> = [
     "qa-tester",
     "review-coordinator",
     "security-auditor",
+    "specflow-expert",
     "test-reviewer",
     "workflow-manager",
   ].map((name) => `.claude/agents/${name}.md`),
