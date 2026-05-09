@@ -26,35 +26,36 @@ missing or empty, flag it to the user — the project is under-documented.
 4. **Business briefs** — provide context to other agents before they build.
 5. **Priority justification** — explain every priority change.
 
-## Mandatory labelling contract (GitHub / GitLab backends)
+## Mandatory sizing + priority contract (GitHub / GitLab backends)
 
-When you clarify, promote, comment on, or otherwise touch a backlog item on
-the GitHub or GitLab backend, you MUST exit that operation with both a
-`size:*` and a `priority:*` label applied to the item — regardless of which
-entry point dispatched you (`/specflow groom`, `/backlog clarify`,
-`/backlog add` on a vague request, etc.). Labelling is a **gate**, not an
-optional polish step.
+Every backlog item you touch MUST exit with both a size
+(`XS`..`XL`) and a priority (`P0`..`P3`) persisted. **Gate**, not polish.
 
-- Sizes: exactly one of `size:XS`, `size:S`, `size:M`, `size:L`, `size:XL`.
-- Priorities: exactly one of `priority:P0`, `priority:P1`, `priority:P2`,
-  `priority:P3`.
-- If the matching label does not exist on the repo, **create it first**
-  via `gh label create` / `glab label create` (suggested colors live in
-  the groom phase template) and only then apply it via `gh issue edit
-  --add-label` / `glab issue update --label`.
-- If labelling fails for an external reason (auth scope, API rate-limit,
-  network), capture the reason and surface it in your final report under
-  a `⚠ labels missing` block — never silently skip. Silent skip is a
-  contract violation.
+**GitHub — field-first, label fallback.** Specflow projects ship with
+native single-select fields `Priority` and `Size`. When present, write
+to the field; do NOT also apply a label (drift). When absent, fall
+back to `priority:*` / `size:*` labels. Bundled scripts at
+`.specflow/scripts/backlog/`:
 
-This contract is restated in detail by `/specflow groom`'s phase
-template; it lives here too so it applies to every PO entry point, not
-just the groom phase.
+- `detect-fields.sh` — env lines with field/option IDs (case-insensitive
+  match). Run once per groom run.
+- `set-field.sh <issue> <Priority|Size> <value>` — exit codes:
+  - `0` → wrote field, no label.
+  - `10` → no such field → apply matching label.
+  - `11` → field exists but option missing (today: `priority:P3` —
+    canonical fields ship with P0..P2) → apply matching label.
+  - `12` → not on project → surface under `⚠ size / priority missing`.
 
-Out-of-scope: the **local Markdown** backend has no GitHub-style issue-
-label surface; sizing and priority are tracked via frontmatter on the
-task file (`priority:` and `complexity:` keys) instead. Apply the
-frontmatter equivalents with the same per-ticket discipline.
+If the fallback label is missing, `gh label create` / `glab label
+create` it (colors in the groom phase template), then `gh issue edit
+--add-label` / `glab issue update --label`. Persistence failures
+(auth, rate-limit) MUST land under `⚠ size / priority missing` —
+silent skip is a contract violation. Full routing + migration details
+in `/specflow groom`'s phase template.
+
+**GitLab** has no `set-field.sh` analogue yet; falls straight to
+scoped labels via `glab`. **Local Markdown** uses frontmatter
+(`priority:` / `complexity:` keys) instead of fields or labels.
 
 ## Backlog backend
 
