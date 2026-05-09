@@ -164,14 +164,59 @@ Three backends are supported: `local` (default), `github`, `gitlab`. See
 [Backlog as product source of truth](#3-backlog-as-product-source-of-truth) for what each one stores
 and how the PO agent talks to it.
 
-### Run `init` non-interactively (CI / scripts)
+#### Pre-fill the backlog config with `--backlog-url`
 
-When you pass both `--ai` and `--backlog`, no interactive prompt is shown — `specflow init` runs
-fully unattended, which is what you want in CI or scripted setup:
+When the chosen backend is `github` or `gitlab`, `specflow init` can take the project's Kanban URL
+up front and write a fully-populated `.specflow/backlog-config.yml` — no manual edit needed before
+running `/backlog`. Pass the project URL via `--backlog-url`:
 
 ```bash
-specflow init my-project --ai claude --backlog github
-specflow init --here --no-git --ai cursor --backlog gitlab
+# GitHub org-owned project
+specflow init --here --ai claude --backlog github \
+  --backlog-url https://github.com/orgs/myorg/projects/1
+
+# GitHub user-owned project
+specflow init --here --ai claude --backlog github \
+  --backlog-url https://github.com/users/alice/projects/12
+
+# GitLab (gitlab.com or self-hosted)
+specflow init --here --ai claude --backlog gitlab \
+  --backlog-url https://gitlab.com/mygroup/myproject
+```
+
+Three URL formats are supported:
+
+- GitHub org-owned: `https://github.com/orgs/<org>/projects/<N>`
+- GitHub user-owned: `https://github.com/users/<user>/projects/<N>`
+- GitLab project: `https://<host>/<group>/<project>`
+
+For GitHub, the `repo:` field of the populated config is derived from `git remote get-url origin`
+(both HTTPS and SSH remote shapes are recognised). Pass `--backlog-repo <owner>/<name>` to override
+that derivation when the project lives across multiple repos or the local remote isn't `origin`.
+
+Without `--backlog-url` on a TTY, `specflow init` interactively prompts for the URL after the
+backend picker. **In non-TTY mode (CI / scripted setup) `--backlog-url` is required when `--backlog`
+is `github` or `gitlab`** — omitting it exits with code `2` and a clear error message. The
+non-clobber invariant still holds: re-running `init` against a project with an existing
+`backlog-config.yml` does NOT overwrite it.
+
+### Run `init` non-interactively (CI / scripts)
+
+When you pass both `--ai` and `--backlog` (and `--backlog-url` when the backend is remote), no
+interactive prompt is shown — `specflow init` runs fully unattended, which is what you want in CI or
+scripted setup:
+
+```bash
+# Local backend — zero-config, just the two flags
+specflow init my-project --ai claude --backlog local
+
+# GitHub backend — --backlog-url is required in non-TTY mode
+specflow init my-project --ai claude --backlog github \
+  --backlog-url https://github.com/orgs/myorg/projects/1
+
+# GitLab backend — same shape
+specflow init --here --no-git --ai cursor --backlog gitlab \
+  --backlog-url https://gitlab.com/mygroup/myproject
 ```
 
 Without those flags, `specflow init` shows an arrow-key picker (↑/↓ to move, space/enter to select)
