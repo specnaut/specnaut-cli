@@ -38,7 +38,16 @@ jobs:
             echo "::error::plugin/.claude-plugin/plugin.json version ($PLUGIN_VERSION) does not match deno.json version ($BIN_VERSION). Re-run scripts/bump-version.ts."
             exit 1
           fi
-          echo "✓ plugin manifest valid, scaffold present, version $PLUGIN_VERSION matches binary"
+          # 4. Hard fail if templates/manifest.json version drifts.
+          # `TEMPLATES_VERSION` in src/templates_bundle.ts is generated
+          # from this file; surfacing a stale value would mislabel the
+          # binary's `--version` output.
+          MANIFEST_VERSION=$(jq -r .version templates/manifest.json)
+          if [ "$BIN_VERSION" != "$MANIFEST_VERSION" ]; then
+            echo "::error::templates/manifest.json version ($MANIFEST_VERSION) does not match deno.json version ($BIN_VERSION). Re-run scripts/bump-version.ts."
+            exit 1
+          fi
+          echo "✓ plugin manifest valid, scaffold present, versions $PLUGIN_VERSION/$MANIFEST_VERSION match binary"
       - name: Cross-compile all targets
         run: deno run --allow-read --allow-write --allow-run --allow-env scripts/build.ts
       - name: Compute checksums
