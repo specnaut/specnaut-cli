@@ -11,7 +11,6 @@ export const CORE_BUNDLE: CoreBundle = [
     suffix: null,
     content: `---
 name: specflow
-disable-model-invocation: true
 description: Specflow workflow router — entry point for the spec-driven pipeline. \`/specflow <phase> [args]\` dispatches to a single phase (specify, clarify, plan, tasks, analyze, implement, review, merge, constitution, checklist, groom). \`/specflow\` with no args prints the workflow overview.
 argument-hint: <specify|clarify|plan|tasks|analyze|implement|review|merge|constitution|checklist|groom> [args]
 when_to_use: |

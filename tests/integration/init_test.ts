@@ -478,6 +478,12 @@ Deno.test("specflow init scaffolds the consolidated router skill + 11 phase docs
       join(root, ".claude/skills/specflow/SKILL.md"),
     );
     assertStringIncludes(routerContent, "name: specflow");
-    assertStringIncludes(routerContent, "disable-model-invocation: true");
+    // The router must NOT carry `disable-model-invocation: true` —
+    // /specflow-auto chains phases via `Skill(specflow, "<phase>")`,
+    // and that flag would block the chain on Claude Code (#166).
+    assertEquals(
+      routerContent.includes("disable-model-invocation: true"),
+      false,
+    );
   });
 });
