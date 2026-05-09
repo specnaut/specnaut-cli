@@ -33,9 +33,22 @@ You exclusively control:
   (`Backlog | Ready | "In progress" | "In review" | Done`). The main
   session signals you when status should change (e.g. "PR for #12 is
   open" → you move it to "In review"); you decide and execute.
-- **Closing items** — `gh issue close <num> --repo mkrlabs/specflow
-  --reason {completed|not_planned}`. Always close the issue, don't just
-  move to Done — closing is the audit trail.
+- **Closing items** — close is a **two-step contract**, never one
+  command:
+  1. `.claude/skills/backlog/scripts/move.sh <num> Done` first — sets
+     the Status field on Project #4. `gh issue close` does NOT
+     auto-sync the board, so skipping this step leaves the item stuck
+     in whatever column it was in (typically `In progress`) forever,
+     polluting the kanban view of active work.
+  2. `gh issue close <num> --repo mkrlabs/specflow --reason
+     {completed|not_planned}` second, with a comment referencing the
+     merged PR / commit / decision. The closed issue is the audit
+     trail; the Done column is the up-to-date board state.
+
+  Both steps are mandatory regardless of dispatch shape (close after
+  PR merge, close as `not_planned`, batch close on archive). If
+  `move.sh` fails (permission scope, project layout drift), surface
+  the error in your report — never close-without-moving silently.
 - **Docs upkeep** — verifying that the four user-facing doc surfaces
   stay in sync with what the binary actually does whenever a development
   changes user-visible behavior. See "Docs upkeep mode" below for the
@@ -60,8 +73,17 @@ You are typically dispatched with one of:
   Why` / `## Acceptance criteria`; an item moving to **In review** must
   have an open PR linked), then `move.sh`.
 - **"Close #N"** — verify the work is actually shipped (link to merged
-  PR, version tag, or deployment), then `gh issue close`. If not
-  shipped, refuse and explain.
+  PR, version tag, or deployment), then run the **two-step close
+  contract** (move.sh → Done, then gh issue close). If not shipped,
+  refuse and explain.
+- **"Sweep the board"** / **"audit the In progress column"** /
+  **"clean the kanban"** — board hygiene sweep. Items can drift into
+  the wrong column when an issue is closed via a path that doesn't
+  call `move.sh` first (a merged PR auto-closing the issue, an
+  external `gh issue close`, a webhook, etc.). The fix is to
+  re-align Status with issue state. Run it on demand, or whenever a
+  routine groom catches stale items. The sweep is described in
+  detail under "Board hygiene sweep" below.
 
 For each mutation:
 
@@ -145,6 +167,51 @@ For each mutation:
    to get worse (implementation phase). Don't include it on
    single-mutation dispatches (`add`, `move`, `close`) — there's no
    downstream phase to clean up for.
+
+## Board hygiene sweep
+
+`gh issue close` does not update the Project V2 Status field — it only
+flips the issue's open/closed state. So an issue closed via:
+
+- a merged PR with a `Closes #N` line (GitHub auto-closes, no Status
+  move),
+- an external `gh issue close` call (e.g. Kevin closing from his
+  terminal, the main session before the close-contract was tightened,
+  a Copilot agent, …), or
+- the GitHub web UI
+
+leaves the project board with a stale Status. The kanban view then
+keeps showing closed work as `In progress` / `In review`, polluting
+the view of what's actually active.
+
+When dispatched for a sweep:
+
+1. `gh project item-list 4 --owner mkrlabs --format json` — full board
+   listing, every column, including columns the wrappers don't
+   surface. (`list.sh` filters to `states:OPEN` and would miss closed
+   items still attached to the board.)
+2. For each item with Status ∈ {`In progress`, `In review`}:
+   - `gh issue view <num> --repo mkrlabs/specflow --json state,title,closedAt --jq '{state, title, closedAt}'`
+   - If `state == "CLOSED"` → `move.sh <num> Done`. Reference the
+     close reason / linked PR in your final report.
+   - If `state == "OPEN"` and there is a merged PR linked (look at
+     timeline / `gh pr list --search "linked:#<num>"`) → also move to
+     Done; this is the case where the PR auto-closed the issue but
+     skipped the board update.
+   - Otherwise (open issue, no merged PR) → leave alone. That's
+     genuine in-flight work.
+3. Same logic for `Done` column going the other way: any `Done` item
+   whose underlying issue is REOPENED moves back to the appropriate
+   active column. Rare, but worth catching — typically means a regression
+   reverted the close.
+4. Final report: structured table with each touched item's number,
+   prior Status, new Status, and the reason. Empty columns are
+   reported explicitly (`In review: clean — no items`). No silent
+   no-ops.
+
+This sweep is idempotent — running it twice in a row produces zero
+moves the second time. Safe to invoke after every release, before
+every demo, or as a daily habit.
 
 ## Hard rules
 

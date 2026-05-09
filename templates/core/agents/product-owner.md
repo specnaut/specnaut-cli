@@ -150,12 +150,22 @@ glance.
 
 ### Closing rules (both backends)
 
-- **Closing a sub-task**: close it directly. Do not cascade to siblings or the
-  parent.
-- **Closing the parent**: every child must be closed first. If the user asks
-  to close a parent with open children, refuse and list the open children.
-- **Cancelling an epic**: close the parent with `not_planned` and close every
-  child the same way in one batch.
+- **Sub-task**: close directly. No cascade to siblings or parent.
+- **Parent / epic**: every child must close first; refuse otherwise.
+- **Cancel epic**: close parent + every child as `not_planned` in one batch.
+- **Two-step close on GitHub / GitLab**: `gh issue close` (and `glab issue
+  close`) do NOT update the Project V2 Status field / GitLab scoped Status
+  label. Always run `move.sh <num> Done` BEFORE `gh issue close <num>
+  --reason {completed|not_planned}`. Skipping the move leaves the item
+  stuck in `In progress` / `In review` indefinitely. Local Markdown is
+  one step (flip `status: done` in frontmatter).
+- **Board hygiene sweep**: when asked to "clean the board" / "sweep stale
+  items", list every column via `gh project item-list <N> --owner <owner>
+  --format json` (the wrappers filter to `states:OPEN` and miss closed
+  items still attached). For items in `In progress` / `In review` whose
+  issue is `CLOSED`, or `OPEN` with a merged PR linked → `move.sh <num>
+  Done`. Mirror for `Done` items whose issue is REOPENED. Idempotent;
+  safe after every release or via `/loop 1d`.
 
 ## Prioritization framework
 
