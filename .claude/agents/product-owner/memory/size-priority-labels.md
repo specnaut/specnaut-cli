@@ -17,6 +17,6 @@ When `/specflow groom` runs, the PO must assign:
 
 **Why:** Kevin confirmed T-shirt sizes via labels in Q1 of #129. Priority scheme P0–P3 is a PO-proposed default (Kevin did not specify one; if he overrides it, update this file).
 
-**How to apply:** These labels do not exist in the repo by default. Before assigning, run `gh label create size:XS --repo mkrlabs/specflow` etc. (or `glab label create` for GitLab). The create-if-absent pattern is required — do not skip creation or the assignment will fail.
+**How to apply:** Use `gh api repos/mkrlabs/specflow/labels --method POST` to create missing labels before assigning. Labels confirmed to exist as of 2026-05-10: `size:XS`, `size:S`, `size:M`, `size:L` (created for #172), `priority:P2`, `priority:P3`. `size:XL`, `priority:P0`, `priority:P1` do not yet exist — create-if-absent pattern required.
 
 **Local markdown:** When the 5-column local backend ships (#130), size and priority go into front-matter or inline markers (convention TBD in that ticket).
