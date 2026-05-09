@@ -42,21 +42,34 @@ function bump(
   return `${major}.${minor}.${patch}`;
 }
 
-async function readCurrentVersion(): Promise<string> {
-  const raw = await Deno.readTextFile("deno.json");
+// File targets that all four version fields live in. Exported so tests can
+// assert the same set the bump script writes to, and so `writeVersions`
+// stays single-source-of-truth.
+export const VERSIONED_FILES = [
+  "deno.json",
+  "src/domain/version.ts",
+  "plugin/.claude-plugin/plugin.json",
+  "templates/manifest.json",
+] as const;
+
+async function readCurrentVersion(baseDir: string): Promise<string> {
+  const raw = await Deno.readTextFile(`${baseDir}/deno.json`);
   const parsed = JSON.parse(raw) as { version: string };
   return parsed.version;
 }
 
-async function writeVersions(next: string): Promise<void> {
-  const denoRaw = await Deno.readTextFile("deno.json");
+export async function writeVersions(
+  next: string,
+  baseDir: string = ".",
+): Promise<void> {
+  const denoRaw = await Deno.readTextFile(`${baseDir}/deno.json`);
   const updatedDeno = denoRaw.replace(
     /"version":\s*"[^"]+"/,
     `"version": "${next}"`,
   );
-  await Deno.writeTextFile("deno.json", updatedDeno);
+  await Deno.writeTextFile(`${baseDir}/deno.json`, updatedDeno);
 
-  const verPath = "src/domain/version.ts";
+  const verPath = `${baseDir}/src/domain/version.ts`;
   const verRaw = await Deno.readTextFile(verPath);
   const updatedVer = verRaw.replace(
     /export const VERSION\s*=\s*"[^"]+"/,
@@ -67,13 +80,26 @@ async function writeVersions(next: string): Promise<void> {
   // Lockstep the specflow-plugin plugin manifest (#73 slice 8). The
   // release workflow's pre-flight step compares deno.json `version`
   // against this file's `version` and fails fast on drift.
-  const pluginManifestPath = "plugin/.claude-plugin/plugin.json";
+  const pluginManifestPath = `${baseDir}/plugin/.claude-plugin/plugin.json`;
   const pluginRaw = await Deno.readTextFile(pluginManifestPath);
   const updatedPlugin = pluginRaw.replace(
     /"version":\s*"[^"]+"/,
     `"version": "${next}"`,
   );
   await Deno.writeTextFile(pluginManifestPath, updatedPlugin);
+
+  // Lockstep the templates manifest. `TEMPLATES_VERSION` in
+  // `src/templates_bundle.ts` is regenerated from this file by
+  // `deno task bundle`, and it's what the binary surfaces under
+  // `specflow --version` (the "templates X.Y.Z" suffix). Skipping
+  // this bump leaves a cosmetic drift visible to every user.
+  const templatesManifestPath = `${baseDir}/templates/manifest.json`;
+  const templatesRaw = await Deno.readTextFile(templatesManifestPath);
+  const updatedTemplates = templatesRaw.replace(
+    /"version":\s*"[^"]+"/,
+    `"version": "${next}"`,
+  );
+  await Deno.writeTextFile(templatesManifestPath, updatedTemplates);
 }
 
 async function main() {
@@ -84,13 +110,11 @@ async function main() {
     );
     Deno.exit(2);
   }
-  const version = await readCurrentVersion();
+  const version = await readCurrentVersion(".");
   const next = computeNextVersion(version, kind as BumpKind);
   await writeVersions(next);
   console.log(`Bumped ${version} → ${next}`);
-  console.log(
-    `Updated: deno.json, src/domain/version.ts, plugin/.claude-plugin/plugin.json`,
-  );
+  console.log(`Updated: ${VERSIONED_FILES.join(", ")}`);
 }
 
 if (import.meta.main) await main();
