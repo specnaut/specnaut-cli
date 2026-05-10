@@ -1,0 +1,85 @@
+# Mirror docs/llms.md to the GitHub Wiki's Home.md on every push to main.
+# The wiki is a separate git repository at <repo>.wiki.git; the default
+# GITHUB_TOKEN does NOT have access to it, so this workflow needs a
+# fine-grained PAT (`WIKI_SYNC_TOKEN`) scoped to `Wiki: Read and write` on
+# `mkrlabs/specflow` only. See the release SKILL.md "Prerequisites" section
+# for setup instructions.
+#
+# First-time setup: visit https://github.com/mkrlabs/specflow/wiki once
+# after enabling the wiki feature so GitHub auto-initializes the default
+# Home.md on the `master` branch (yes, master — wiki repos default to
+# `master` regardless of the source repo's default branch).
+name: wiki
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "docs/llms.md"
+      - ".github/workflows/wiki.yml"
+  workflow_dispatch:
+
+# Two rapid pushes touching `docs/` would queue overlapping syncs that
+# race on `git push` (non-fast-forward rejection). Serialize them.
+# `cancel-in-progress: false` so an in-flight push completes cleanly
+# rather than leaving the wiki in an intermediate state.
+concurrency:
+  group: wiki-sync
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Guard — bail if the PAT isn't provisioned yet
+        env:
+          WIKI_SYNC_TOKEN: ${{ secrets.WIKI_SYNC_TOKEN }}
+        run: |
+          if [ -z "${WIKI_SYNC_TOKEN:-}" ]; then
+            echo "::warning::WIKI_SYNC_TOKEN not set — skipping wiki sync. Provision the secret per the release SKILL.md prerequisites to enable."
+            exit 0
+          fi
+
+      - uses: actions/checkout@v4
+
+      - name: Sync docs/llms.md → Wiki Home.md
+        env:
+          WIKI_SYNC_TOKEN: ${{ secrets.WIKI_SYNC_TOKEN }}
+        run: |
+          set -euo pipefail
+
+          # Re-check the token here too — the previous step's `exit 0`
+          # only ends THAT step, not the job, on GitHub Actions runners.
+          if [ -z "${WIKI_SYNC_TOKEN:-}" ]; then
+            echo "skipping (no token)"
+            exit 0
+          fi
+
+          WIKI_DIR="$(mktemp -d)"
+          REPO="mkrlabs/specflow"
+          git clone --depth 1 \
+            "https://x-access-token:${WIKI_SYNC_TOKEN}@github.com/${REPO}.wiki.git" \
+            "$WIKI_DIR"
+
+          cp docs/llms.md "$WIKI_DIR/Home.md"
+
+          cd "$WIKI_DIR"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git config user.name  "github-actions[bot]"
+          git add Home.md
+
+          # Skip the commit when nothing changed (idempotent re-run).
+          # Only the commit is guarded — the push must surface real
+          # errors (e.g. a non-fast-forward rejection during a race the
+          # concurrency group failed to prevent).
+          if git diff --cached --quiet; then
+            echo "::notice::Wiki Home.md is already in sync with docs/llms.md — no commit needed."
+            exit 0
+          fi
+
+          git commit -m "chore: sync from main @ ${GITHUB_SHA::7}"
+          git push
+          echo "::notice::Wiki Home.md synced from docs/llms.md @ ${GITHUB_SHA::7}."
