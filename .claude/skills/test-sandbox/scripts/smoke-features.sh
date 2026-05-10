@@ -158,7 +158,7 @@ check "PO doc documents the epic detection heuristic" \
 check "PO doc references cascade-check.sh as the close gate" \
   'grep -q "cascade-check.sh" .claude/agents/product-owner.md'
 check "PO doc covers GitLab backend epic story (parent::# scoped label)" \
-  'grep -q "On the GitLab backend" .claude/agents/product-owner.md'
+  'grep -q "parent::#" .claude/agents/product-owner.md'
 
 echo
 echo "═══ #180  SKILL.md — Epics & sub-tasks section ═══"
