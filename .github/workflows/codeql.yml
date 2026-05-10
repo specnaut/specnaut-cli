@@ -1,0 +1,55 @@
+# CodeQL static-analysis security scanning. Free for public repos and
+# complementary to secret-scanning + dependabot — those catch credentials
+# and known-vulnerable deps; CodeQL catches code-level vulns (injection,
+# unsafe deserialisation, ReDoS, prototype pollution, etc.).
+#
+# Findings show up in the Security tab → Code scanning. The release-time
+# `security-preflight` job in `release.yml` reads them and gates the
+# release on critical/high.
+#
+# CodeQL note for Deno TS: the `javascript-typescript` extractor parses
+# Deno code as standard TS but doesn't model `Deno.*` globals or URL
+# imports. Initial findings are expected to be a small set (0-5) of
+# generic style/safety issues — triage manually via the security-auditor
+# agent.
+name: codeql
+
+on:
+  pull_request:
+    branches: [main]
+  schedule:
+    # Weekly Monday 04:00 UTC — catches CodeQL's own query updates that
+    # might surface new findings on existing code.
+    - cron: "0 4 * * 1"
+  workflow_dispatch:
+
+jobs:
+  analyze:
+    name: Analyze (javascript-typescript)
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read
+      contents: read
+      # `security-events: write` is required for the analyze step to upload
+      # the SARIF results back to GitHub. `read` is not enough — without
+      # `write`, the upload step fails with 403 and findings never reach
+      # the Security tab.
+      security-events: write
+    strategy:
+      fail-fast: false
+      matrix:
+        language: [javascript-typescript]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v3
+        with:
+          languages: ${{ matrix.language }}
+          queries: security-extended
+
+      - name: Perform CodeQL Analysis
+        uses: github/codeql-action/analyze@v3
+        with:
+          category: "/language:${{ matrix.language }}"

@@ -5,12 +5,104 @@ on:
     tags:
       - "v*"
 
-permissions:
-  contents: write
+# No top-level permissions — each job declares its own minimal block.
+# `security-preflight` is read-only on three security endpoints; `build`
+# keeps `contents: write` for the actual release publish + tap bump.
 
 jobs:
-  build:
+  # Hybrid security gate (#188's sibling): checks GitHub-side alert state
+  # before we let the release build proceed. Critical alerts block the
+  # release; high/medium surface as a workflow summary the local /release
+  # session reads during step 9 of the release skill, then dispatches the
+  # security-auditor agent for triage. Low alerts are logged silently.
+  #
+  # The release tag is already pushed at this point; failing here is the
+  # safest possible failure mode — no GitHub Release object is created,
+  # so users on the previous version stay on the previous version (no
+  # broken binary reaches them via `specflow self-update` or the install
+  # script). Re-run the workflow after dismissing the alert; the same tag
+  # rebuilds cleanly because the commit is unchanged.
+  security-preflight:
     runs-on: ubuntu-latest
+    permissions:
+      security-events: read # secret-scanning + code-scanning alert reads
+      repository-advisories: read # private vulnerability reports
+      contents: read # dependabot alerts (separate permission family)
+    steps:
+      - name: Query open security alerts
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+
+          # 1. Secret scanning — pattern-based credential leak detection
+          secret_open=$(gh api "repos/$REPO/secret-scanning/alerts?state=open&per_page=100" \
+            --jq '[.[] | {number, secret_type_display_name, html_url}] | length' 2>/dev/null || echo 0)
+
+          # 2. Dependabot — vulnerable dependencies (severity-aware)
+          dep_critical=$(gh api "repos/$REPO/dependabot/alerts?state=open&per_page=100" \
+            --jq '[.[] | select(.security_advisory.severity=="critical")] | length' 2>/dev/null || echo 0)
+          dep_high=$(gh api "repos/$REPO/dependabot/alerts?state=open&per_page=100" \
+            --jq '[.[] | select(.security_advisory.severity=="high")] | length' 2>/dev/null || echo 0)
+          dep_medium=$(gh api "repos/$REPO/dependabot/alerts?state=open&per_page=100" \
+            --jq '[.[] | select(.security_advisory.severity=="medium")] | length' 2>/dev/null || echo 0)
+
+          # 3. Private vulnerability reports — externally-submitted advisories
+          # `gh api` returns 404 if `repository-advisories: read` is missing — we
+          # explicitly grant it above so this is the real signal.
+          adv_pending=$(gh api "repos/$REPO/security-advisories?state=triage,draft&per_page=100" \
+            --jq '[.[] | {number, summary, severity, html_url}] | length' 2>/dev/null || echo 0)
+
+          # 4. Code scanning (CodeQL — only counts when code scanning is enabled).
+          code_critical=$(gh api "repos/$REPO/code-scanning/alerts?state=open&per_page=100" \
+            --jq '[.[] | select(.rule.security_severity_level=="critical")] | length' 2>/dev/null || echo 0)
+          code_high=$(gh api "repos/$REPO/code-scanning/alerts?state=open&per_page=100" \
+            --jq '[.[] | select(.rule.security_severity_level=="high")] | length' 2>/dev/null || echo 0)
+
+          # Decision tree:
+          #   ANY critical (dep or code) → fail the release.
+          #   Secret-scanning open       → fail (every match is treated as P0
+          #                                regardless of "severity" — credentials
+          #                                in source are always release-blocking).
+          #   Pending advisory in triage → fail (a researcher is waiting; ship
+          #                                a release without acknowledging is bad
+          #                                form).
+          critical_total=$((dep_critical + code_critical))
+
+          # Append a structured summary that the local /release session will
+          # read at step 9 of the release skill — this is the agent triage
+          # payload.
+          {
+            echo "## Security alert preflight"
+            echo
+            echo "| Source | Open count |"
+            echo "| --- | --- |"
+            echo "| Secret scanning | ${secret_open} |"
+            echo "| Dependabot — critical | ${dep_critical} |"
+            echo "| Dependabot — high | ${dep_high} |"
+            echo "| Dependabot — medium | ${dep_medium} |"
+            echo "| Code scanning — critical | ${code_critical} |"
+            echo "| Code scanning — high | ${code_high} |"
+            echo "| Pending private advisories | ${adv_pending} |"
+            echo
+            echo "Critical total (dep + code): **${critical_total}**"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          if [ "$critical_total" -gt 0 ] || [ "$secret_open" -gt 0 ] || [ "$adv_pending" -gt 0 ]; then
+            echo "::error::Security preflight blocked the release. Critical/secret/advisory counts are non-zero. Resolve via the Security tab, then re-run this workflow (the tag stays valid)."
+            exit 1
+          fi
+
+          if [ "$dep_high" -gt 0 ] || [ "$code_high" -gt 0 ]; then
+            echo "::warning::High-severity findings open: $dep_high dependabot + $code_high code-scanning. The release proceeds; dispatch the security-auditor agent locally to triage."
+          fi
+
+  build:
+    needs: [security-preflight]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
       - uses: actions/checkout@v4
         with:

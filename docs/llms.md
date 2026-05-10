@@ -421,6 +421,22 @@ it pre-fills a structured GitHub issue against `mkrlabs/specflow` with a 6-secti
 `https://github.com/mkrlabs/specflow/issues/new?…` URL to review and submit. The agent never
 auto-submits — you always see the body before clicking.
 
+### 6. Bundled `security-auditor` agent — two modes
+
+Every scaffold also ships a `security-auditor` agent with two dispatch shapes:
+
+1. **PR review** — spawned by the `review-coordinator` during `/specflow review`. Audits the diff
+   against eight rules (secrets in source, input validation, authz, injection, path traversal, SSRF,
+   silent catches, internal-ID exposure) and emits a `FINDING` / `VERDICT` report.
+2. **Alert triage** — invoked by the maintainer's `/release` flow when the `security-preflight`
+   workflow surfaces open GitHub-side alerts (secret-scanning, dependabot, code-scanning, private
+   advisories). The agent decides per-alert: open a backlog ticket via the PO, dismiss via
+   `gh api -X PATCH` with a documented `resolution=` reason, or escalate to the user.
+
+The triage mode is release-time only and uses a tightly-constrained `Bash` grant — only the three
+`gh api` alert-dismissal endpoints are permitted. End users never trigger this mode; PR review
+remains the user-facing path.
+
 ## Design principles
 
 - **Agnostic of the user project's language** — Python, TypeScript, Go, PHP, Rust… your project,
