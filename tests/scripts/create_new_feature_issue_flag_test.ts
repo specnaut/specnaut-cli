@@ -5,11 +5,14 @@
 // behavior, so the JSON contract on this seam is load-bearing.
 
 import { assert, assertEquals } from "@std/assert";
+import { fromFileUrl } from "@std/path";
 
-const SCRIPT_PATH = new URL(
-  "../../templates/core/specflow/scripts/bash/create-new-feature.sh",
-  import.meta.url,
-).pathname;
+const SCRIPT_PATH = fromFileUrl(
+  new URL(
+    "../../templates/core/specflow/scripts/bash/create-new-feature.sh",
+    import.meta.url,
+  ),
+);
 
 async function runScript(
   args: string[],
