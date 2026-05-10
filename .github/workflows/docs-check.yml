@@ -1,0 +1,75 @@
+# Fail any PR that touches Specflow's user-visible surface without also
+# updating docs/llms.md (or carrying the `docs:not-needed` bypass label).
+#
+# See `.claude/agents/product-owner.md` (Docs upkeep section) for the
+# canonical list of doc surfaces the PO is meant to keep in sync; this
+# workflow is the mechanical safety net that catches drift at PR time.
+name: docs-check
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, labeled, unlabeled]
+
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  docs-drift:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        # No fetch-depth bump needed — we use the base/head SHAs from the
+        # pull_request event payload, both of which GitHub Actions
+        # pre-fetches into the runner workspace.
+
+      - name: Detect drift
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          PR_LABELS: ${{ toJson(github.event.pull_request.labels) }}
+        run: |
+          set -euo pipefail
+
+          # Bypass: contributor has already asserted no docs change is needed.
+          if echo "$PR_LABELS" | grep -q '"docs:not-needed"'; then
+            echo "::notice::PR carries the 'docs:not-needed' label — skipping docs-drift check."
+            exit 0
+          fi
+
+          changed=$(git diff --name-only "$BASE_SHA"..."$HEAD_SHA")
+          echo "Changed files in this PR:"
+          echo "$changed" | sed 's/^/  /'
+
+          # User-visible surface — anything that affects the public CLI,
+          # bundled scaffold, plugin assets, or the docs index itself.
+          # Keep this in sync with the PO's "Docs upkeep" section in
+          # .claude/agents/product-owner.md.
+          surface_re='^(templates/core/skills/|templates/core/agents/|templates/core/commands/|src/cli/|templates/manifest\.json$|templates/core/specflow/LABELS\.md$|templates/core/specflow/backlog\.md$)'
+
+          touched_surface=$(echo "$changed" | grep -E "$surface_re" || true)
+          touched_docs=$(echo "$changed" | grep -E '^docs/llms\.md$' || true)
+
+          if [ -z "$touched_surface" ]; then
+            echo "::notice::No user-visible surface touched — docs check skipped."
+            exit 0
+          fi
+
+          if [ -n "$touched_docs" ]; then
+            echo "::notice::User-visible surface touched and docs/llms.md updated alongside — OK."
+            exit 0
+          fi
+
+          # User-visible surface changed; docs unchanged; no bypass label.
+          echo "::error::This PR touches user-visible surface but does not update docs/llms.md."
+          echo ""
+          echo "Affected files (matching the user-visible surface heuristic):"
+          echo "$touched_surface" | sed 's/^/  /'
+          echo ""
+          echo "Either update docs/llms.md in the same PR, or add the"
+          echo "'docs:not-needed' label if this change genuinely doesn't"
+          echo "affect the public surface (internal refactor, test-only,"
+          echo "etc.). The PO docs-upkeep contract in"
+          echo ".claude/agents/product-owner.md describes which surfaces"
+          echo "are expected to track docs/llms.md."
+          exit 1

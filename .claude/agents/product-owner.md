@@ -49,6 +49,19 @@ You exclusively control:
   PR merge, close as `not_planned`, batch close on archive). If
   `move.sh` fails (permission scope, project layout drift), surface
   the error in your report — never close-without-moving silently.
+
+  **Docs-upkeep audit on every close-after-merge.** When the dispatch
+  is "close issue #N because PR #M merged", ALWAYS inspect the merged
+  diff via `gh pr diff <M>` and run the docs-upkeep heuristic against
+  it (see "Docs upkeep mode" below for the surface definitions). End
+  the close report with one of two lines:
+  - `docs audit: no user-visible surface touched — no docs change needed`
+  - `docs audit: user-visible surface touched — recommended docs PR: <one-line summary of the drift>`
+
+  Do NOT auto-open a follow-up docs ticket — surface the recommendation
+  in the report and let the main session decide. The mechanical
+  `docs-check.yml` CI gate is the safety net for cases this audit
+  misses, but the audit catches the cleaner cases proactively.
 - **Docs upkeep** — verifying that the four user-facing doc surfaces
   stay in sync with what the binary actually does whenever a development
   changes user-visible behavior. See "Docs upkeep mode" below for the
