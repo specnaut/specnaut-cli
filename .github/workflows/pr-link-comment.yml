@@ -1,0 +1,57 @@
+# When a PR is OPENED with a body referencing one or more issues via
+# `Closes #N` / `Fixes #N` / `Resolves #N`, post a comment on each
+# referenced issue so the reporter has an immediate, visible signal that
+# work has started — instead of silently waiting until the PR merges and
+# the auto-close trailer fires.
+#
+# Tracked at #179. Fires only on `opened` (per spec) so PR edits, branch
+# pushes, and reopens never re-comment. The `opened`-only trigger gives
+# us "exactly once per issue-per-PR pairing" for free.
+name: pr-link-comment
+
+on:
+  pull_request:
+    types: [opened]
+
+jobs:
+  comment-on-linked-issues:
+    # Skip fork PRs entirely. On a `pull_request` event from a fork,
+    # `GITHUB_TOKEN` is read-only and `gh api -X POST .../comments` would
+    # return 403, turning a green PR into a misleading red one. Specflow
+    # is single-maintainer; this guard fails-open on the rare community
+    # fork rather than silently suppressing the error.
+    if: github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write # only credential in play; everything else comes from the event payload
+    steps:
+      - name: Post linked-issue comments
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          PR_URL: ${{ github.event.pull_request.html_url }}
+          PR_BODY: ${{ github.event.pull_request.body }}
+        run: |
+          set -euo pipefail
+          # PR body is user-controlled, so it is passed via the env: block
+          # (not interpolated into the YAML) and dereferenced through
+          # double-quoted "$PR_BODY". This treats the body as a literal
+          # string for grep — word splitting and glob expansion are
+          # suppressed. Do NOT "simplify" the quoting away; that turns
+          # this into a shell-injection sink.
+          issues=$(printf '%s' "$PR_BODY" \
+            | grep -oiE '(closes|fixes|resolves)[[:space:]]+#[0-9]+' \
+            | grep -oE '#[0-9]+' \
+            | sed 's/#//' \
+            | sort -u || true)
+          if [ -z "$issues" ]; then
+            echo "no Closes/Fixes/Resolves references — nothing to comment"
+            exit 0
+          fi
+          for n in $issues; do
+            gh api -X POST "repos/$REPO/issues/$n/comments" \
+              -f body="Work has started on this in PR #$PR_NUMBER ($PR_URL). The issue will close automatically when the PR merges." \
+              >/dev/null
+            echo "✓ commented on #$n"
+          done
