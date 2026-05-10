@@ -384,8 +384,10 @@ link, attaches to the project/board, and refuses (exit 3) when the named parent 
 ```
 
 The bundled `cascade-check.sh <num>` (github + gitlab) is the close gate — exits 11 with the open
-children listed when close is unsafe, exits 0 when all children are closed. The PO runs it before
-`gh issue close` / `glab issue close`. The local backend uses an inline `grep` equivalent.
+children listed when close is unsafe, exits 12 (informational) when the parent is already closed so
+callers don't issue a redundant `close` and 422, exits 3 when the parent doesn't exist, exits 0 when
+all children are closed. The PO runs it before `gh issue close` / `glab issue close`. The local
+backend uses an inline `grep` equivalent.
 
 The Product Owner agent **proactively** proposes epic decomposition during `/backlog add` and during
 grooming whenever a request crosses ≥2 subsystems, has more than 5 acceptance-criteria bullets, or
