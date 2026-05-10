@@ -34,18 +34,20 @@ Each script bootstraps a controlled scenario inside `sandbox/<name>/` (the `sand
 These wrap a fresh `init --ai claude --backlog local` and exercise specific feature surfaces. Each prints a `✓` / `❌` line per check and exits 0 on full pass, 1 on any failure — usable as guard rails in pre-release runs or after a refactor that touches bundled artefacts.
 
 ```bash
-.claude/skills/test-sandbox/scripts/smoke-features.sh <name>        # presence + frontmatter checks for every feature shipped after v0.9
-.claude/skills/test-sandbox/scripts/smoke-backlog-local.sh <name>   # add → list → move → view → clarify-comment round-trip on the local backend
-.claude/skills/test-sandbox/scripts/smoke-hooks.sh <name>           # fire each bundled hook with synthetic stdin, verify behavior + soft-warn semantics
-.claude/skills/test-sandbox/scripts/smoke-picker.sh <name>          # drive the interactive arrow-key picker over a real PTY (requires python3)
-.claude/skills/test-sandbox/scripts/smoke-all-harnesses.sh <name>   # init across all 8 harnesses, assert each scaffold is correct (auto-cleans on exit)
+.claude/skills/test-sandbox/scripts/smoke-features.sh <name>          # presence + frontmatter checks for every feature shipped after v0.9 (specflow-expert protocols, LABELS.md, etc.)
+.claude/skills/test-sandbox/scripts/smoke-backlog-local.sh <name>     # add → list → move → view → clarify-comment round-trip on the local backend
+.claude/skills/test-sandbox/scripts/smoke-backlog-github.sh <name>    # github-backend script presence (set-field, detect-fields, ensure-labels) + SKILL.md references
+.claude/skills/test-sandbox/scripts/smoke-hooks.sh <name>             # fire each bundled hook with synthetic stdin, verify behavior + soft-warn semantics
+.claude/skills/test-sandbox/scripts/smoke-picker.sh <name>            # drive the interactive arrow-key picker over a real PTY (requires python3)
+.claude/skills/test-sandbox/scripts/smoke-all-harnesses.sh <name>     # init across all 8 harnesses, assert each scaffold is correct (auto-cleans on exit)
 ```
 
-Run all five back-to-back for a comprehensive post-refactor smoke:
+Run all six back-to-back for a comprehensive post-refactor smoke:
 
 ```bash
 bash .claude/skills/test-sandbox/scripts/smoke-features.sh feat
 bash .claude/skills/test-sandbox/scripts/smoke-backlog-local.sh backlog
+bash .claude/skills/test-sandbox/scripts/smoke-backlog-github.sh ghback
 bash .claude/skills/test-sandbox/scripts/smoke-hooks.sh hooks
 bash .claude/skills/test-sandbox/scripts/smoke-picker.sh picker
 bash .claude/skills/test-sandbox/scripts/smoke-all-harnesses.sh allharness

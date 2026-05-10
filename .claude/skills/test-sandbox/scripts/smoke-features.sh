@@ -99,6 +99,41 @@ check "specflow-expert is auto-triggerable (no disable-model-invocation: true)" 
   '! grep -q "disable-model-invocation: true" .claude/agents/specflow-expert.md'
 check "specflow-expert grants WebFetch" \
   'grep -q "WebFetch" .claude/agents/specflow-expert.md'
+check "specflow-expert agent body fits Windsurf 12000-char Cascade cap" \
+  'deno eval "const s = await Deno.readTextFile(\".claude/agents/specflow-expert.md\"); Deno.exit(s.length <= 12000 ? 0 : 1);"'
+check "vendored knowledge snapshot present" \
+  'grep -q "## Vendored knowledge snapshot" .claude/agents/specflow-expert.md'
+check "live fetch protocol present" \
+  'grep -q "## Live fetch protocol" .claude/agents/specflow-expert.md'
+
+echo
+echo "═══ #168  version check protocol (proactive upgrade nudge) ═══"
+check "version check protocol section present" \
+  'grep -q "## Version check protocol" .claude/agents/specflow-expert.md'
+check "agent references the /version.json endpoint" \
+  'grep -q "specflow.makerlabs.dev/version.json" .claude/agents/specflow-expert.md'
+check "agent reads templates_version from installed.lock" \
+  'grep -q "templates_version" .claude/agents/specflow-expert.md'
+
+echo
+echo "═══ #172 + #174  bug-report protocol + from:specflow-expert label ═══"
+check "bug-report protocol section present" \
+  'grep -q "## Bug report protocol" .claude/agents/specflow-expert.md'
+check "issues/new URL pre-fill present" \
+  'grep -q "github.com/mkrlabs/specflow/issues/new" .claude/agents/specflow-expert.md'
+check "URL pre-fill auto-applies the from:specflow-expert label (#174)" \
+  'grep -q "from%3Aspecflow-expert" .claude/agents/specflow-expert.md'
+check "scrubbing patterns documented (ghp_/sk-ant-/AKIA)" \
+  'grep -q "ghp_" .claude/agents/specflow-expert.md && grep -q "sk-ant-" .claude/agents/specflow-expert.md && grep -q "AKIA" .claude/agents/specflow-expert.md'
+check "3000-char URL fallback rule documented" \
+  'grep -q "3000" .claude/agents/specflow-expert.md'
+
+echo
+echo "═══ #158  semantic labels reference doc ═══"
+check ".specflow/LABELS.md scaffolded (always-on, regardless of backend)" \
+  '[ -f .specflow/LABELS.md ]'
+check "LABELS.md lists the canonical 7-label palette" \
+  'grep -q "security" .specflow/LABELS.md && grep -q "refactor" .specflow/LABELS.md && grep -q "tech-debt" .specflow/LABELS.md'
 
 echo
 echo "═══ #88  hooks bundled ═══"
