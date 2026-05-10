@@ -1,14 +1,19 @@
 # Mirror docs/llms.md to the GitHub Wiki's Home.md on every push to main.
 # The wiki is a separate git repository at <repo>.wiki.git; the default
-# GITHUB_TOKEN does NOT have access to it, so this workflow needs a
-# fine-grained PAT (`WIKI_SYNC_TOKEN`) scoped to `Wiki: Read and write` on
-# `mkrlabs/specflow` only. See the release SKILL.md "Prerequisites" section
-# for setup instructions.
+# GITHUB_TOKEN does NOT have access to it, AND fine-grained PATs do NOT
+# expose a "Wiki" permission (a real GitHub limitation as of 2026). The
+# clean answer is a Deploy Key: per-repo SSH key, no expiration, scoped
+# to this repo only — and GitHub treats the wiki as part of the repo
+# for deploy-key purposes, so a write-enabled deploy key on
+# `mkrlabs/specflow` can push to `mkrlabs/specflow.wiki.git` too.
 #
-# First-time setup: visit https://github.com/mkrlabs/specflow/wiki once
-# after enabling the wiki feature so GitHub auto-initializes the default
-# Home.md on the `master` branch (yes, master — wiki repos default to
-# `master` regardless of the source repo's default branch).
+# Setup (one-time, by the maintainer): see the release SKILL.md
+# "Prerequisites" section for the keygen + upload + secret-store recipe.
+#
+# First-time wiki init: visit https://github.com/mkrlabs/specflow/wiki
+# once after enabling the wiki feature so GitHub auto-initializes the
+# default Home.md on the `master` branch (yes, master — wiki repos
+# default to `master` regardless of the source repo's default branch).
 name: wiki
 
 on:
@@ -34,34 +39,61 @@ jobs:
   sync:
     runs-on: ubuntu-latest
     steps:
-      - name: Guard — bail if the PAT isn't provisioned yet
+      - name: Guard — bail if the deploy key isn't provisioned yet
         env:
-          WIKI_SYNC_TOKEN: ${{ secrets.WIKI_SYNC_TOKEN }}
+          WIKI_SSH_KEY: ${{ secrets.WIKI_SSH_KEY }}
         run: |
-          if [ -z "${WIKI_SYNC_TOKEN:-}" ]; then
-            echo "::warning::WIKI_SYNC_TOKEN not set — skipping wiki sync. Provision the secret per the release SKILL.md prerequisites to enable."
+          if [ -z "${WIKI_SSH_KEY:-}" ]; then
+            echo "::warning::WIKI_SSH_KEY not set — skipping wiki sync. Provision the deploy key per the release SKILL.md prerequisites to enable."
             exit 0
           fi
 
       - uses: actions/checkout@v4
 
-      - name: Sync docs/llms.md → Wiki Home.md
+      - name: Set up SSH agent with the wiki deploy key
         env:
-          WIKI_SYNC_TOKEN: ${{ secrets.WIKI_SYNC_TOKEN }}
+          WIKI_SSH_KEY: ${{ secrets.WIKI_SSH_KEY }}
         run: |
           set -euo pipefail
+          if [ -z "${WIKI_SSH_KEY:-}" ]; then
+            echo "skipping (no key)"
+            exit 0
+          fi
 
-          # Re-check the token here too — the previous step's `exit 0`
-          # only ends THAT step, not the job, on GitHub Actions runners.
-          if [ -z "${WIKI_SYNC_TOKEN:-}" ]; then
-            echo "skipping (no token)"
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+          # Pre-populate known_hosts so the clone doesn't prompt for
+          # host key verification on a fresh runner.
+          ssh-keyscan -t ed25519 github.com >> ~/.ssh/known_hosts 2>/dev/null
+          chmod 600 ~/.ssh/known_hosts
+
+          # Write the deploy private key.
+          printf '%s\n' "$WIKI_SSH_KEY" > ~/.ssh/wiki_deploy_key
+          chmod 600 ~/.ssh/wiki_deploy_key
+
+          # Force git to use this key for all github.com SSH operations
+          # in this job.
+          cat > ~/.ssh/config <<EOF
+          Host github.com
+            IdentityFile ~/.ssh/wiki_deploy_key
+            IdentitiesOnly yes
+            User git
+          EOF
+          chmod 600 ~/.ssh/config
+
+      - name: Sync docs/llms.md → Wiki Home.md
+        env:
+          WIKI_SSH_KEY: ${{ secrets.WIKI_SSH_KEY }}
+        run: |
+          set -euo pipefail
+          if [ -z "${WIKI_SSH_KEY:-}" ]; then
+            echo "skipping (no key)"
             exit 0
           fi
 
           WIKI_DIR="$(mktemp -d)"
-          REPO="mkrlabs/specflow"
           git clone --depth 1 \
-            "https://x-access-token:${WIKI_SYNC_TOKEN}@github.com/${REPO}.wiki.git" \
+            "git@github.com:mkrlabs/specflow.wiki.git" \
             "$WIKI_DIR"
 
           cp docs/llms.md "$WIKI_DIR/Home.md"
