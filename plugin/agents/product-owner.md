@@ -31,19 +31,20 @@ missing or empty, flag it to the user — the project is under-documented.
 Every backlog item you touch MUST exit with both a size
 (`XS`..`XL`) and a priority (`P0`..`P3`) persisted. **Gate**, not polish.
 
-**GitHub — field-first, label fallback.** Specflow projects ship with
-native single-select fields `Priority` and `Size`. When present, write
-to the field; do NOT also apply a label (drift). When absent, fall
-back to `priority:*` / `size:*` labels. Bundled scripts at
+**GitHub — fields are the source of truth; labels are a STRICT
+fallback.** When the project has native single-select fields `Priority`
+and/or `Size`, write the value to the field and **NEVER** also apply
+a `priority:*` / `size:*` label on the same item — that's the dual-
+signal drift `set-field.sh` exists to prevent. Labels are reserved for
+projects whose board has no such field. Bundled scripts at
 `.specflow/scripts/backlog/`:
 
 - `detect-fields.sh` — env lines with field/option IDs (case-insensitive
   match). Run once per groom run.
 - `set-field.sh <issue> <Priority|Size> <value>` — exit codes:
-  - `0` → wrote field, no label.
-  - `10` → no such field → apply matching label.
-  - `11` → field exists but option missing (today: `priority:P3` —
-    canonical fields ship with P0..P2) → apply matching label.
+  - `0` → wrote field, no label (preferred path).
+  - `10` → field absent on this project → apply matching label.
+  - `11` → field present but option missing → apply matching label.
   - `12` → not on project → surface under `⚠ size / priority missing`.
 
 If the fallback label is missing, `gh label create` / `glab label

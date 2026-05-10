@@ -156,12 +156,18 @@ Specflow change — the skill is path-aware.
 - **Closing** — close the issue (don't just move to Done). The repo's
   issue history is the audit trail.
 - **Drafts** are not used. Every task is a real issue.
-- **Priority / Size** — when the project has native single-select
-  `Priority` and/or `Size` fields, prefer `set-field.sh` over text
-  labels. Non-zero exit codes tell the caller when to fall back to
-  labels: `10` = no such field on the project, `11` = field exists but
-  the value option is missing (e.g. `priority:P3` on a 3-level field),
-  `12` = issue not on the project.
+- **Priority / Size — fields are the source of truth.** When the
+  project has native single-select `Priority` and/or `Size` fields,
+  always write through `set-field.sh` and **NEVER also apply a
+  matching `priority:*` / `size:*` label on the same item** — that
+  dual-signal drift is exactly what the helper exists to prevent.
+  Labels are reserved as a strict fallback for projects whose board
+  has no such field. Non-zero exit codes tell the caller which
+  fallback applies: `10` = field absent on the project (use the
+  label), `11` = field present but the value option is missing
+  (add the option to the field, then re-run; only fall back to a
+  label if you can't add the option), `12` = issue not on the
+  project.
 
 ### Prerequisites
 

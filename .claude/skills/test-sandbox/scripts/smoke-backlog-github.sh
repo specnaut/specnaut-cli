@@ -70,14 +70,20 @@ echo
 echo "═══ #158  semantic labels bootstrap (ensure-labels.sh) ═══"
 check "ensure-labels.sh present + executable" \
   '[ -x .specflow/scripts/backlog/ensure-labels.sh ]'
-check "ensure-labels.sh mentions canonical 7-label palette" \
-  'grep -q "security" .specflow/scripts/backlog/ensure-labels.sh && grep -q "refactor" .specflow/scripts/backlog/ensure-labels.sh && grep -q "tech-debt" .specflow/scripts/backlog/ensure-labels.sh'
+check "ensure-labels.sh seeds the canonical 7-label palette in full" \
+  'for lbl in security refactor docs tech-debt dx performance dependency; do
+     grep -q "ensure_label \"$lbl\"" .specflow/scripts/backlog/ensure-labels.sh || exit 1;
+   done'
+check "ensure-labels.sh seeds zero priority:*/size:* labels (#194)" \
+  '! grep -E "ensure_label \"(priority|size):" .specflow/scripts/backlog/ensure-labels.sh'
 check "ensure-labels.sh idempotent (skips already-present labels)" \
   'grep -q "already present" .specflow/scripts/backlog/ensure-labels.sh'
-check "ensure-labels.sh verifies the GitHub default 'bug' label" \
+check "ensure-labels.sh verifies the GitHub default '"'"'bug'"'"' label" \
   'grep -qF "bug" .specflow/scripts/backlog/ensure-labels.sh'
 check "SKILL.md mentions ensure-labels.sh (#158)" \
   'grep -q "ensure-labels.sh" .claude/skills/backlog/SKILL.md'
+check "SKILL.md states fields are the source of truth (#194)" \
+  'grep -q "fields are the source of truth" .claude/skills/backlog/SKILL.md'
 
 echo
 echo "═══ #157  Priority/Size native fields documented in SKILL.md ═══"

@@ -28,15 +28,12 @@ case "$(echo "$FIELD_NAME" | tr '[:upper:]' '[:lower:]')" in
     FIELD_ID="PVTSSF_lADOBv46cs4BV4GzzhRQrbw"
     CANONICAL="Priority"
     case "$VALUE" in
-      P0) OPT="79628723" ;;
-      P1) OPT="0a877460" ;;
-      P2) OPT="da944a9c" ;;
-      P3)
-        echo "field 'Priority' has no option 'P3' — fall back to label" >&2
-        exit 11
-        ;;
+      P0) OPT="093323d6" ;;
+      P1) OPT="7b8ac56e" ;;
+      P2) OPT="eae399b4" ;;
+      P3) OPT="59c235b3" ;;
       *)
-        echo "unknown Priority value '$VALUE' (P0|P1|P2)" >&2
+        echo "unknown Priority value '$VALUE' (P0|P1|P2|P3)" >&2
         exit 11
         ;;
     esac
