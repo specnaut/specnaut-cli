@@ -111,48 +111,28 @@ An **epic** is a backlog item that owns one or more **sub-tasks**. The PO must
 be able to create them, reference them as a unit, and close the parent only
 when every child is closed.
 
-### On the GitHub backend
+### Creating sub-tasks (all backends)
 
-Use the GitHub native sub-issues API (currently in beta). Reference docs:
-<https://docs.github.com/en/issues/tracking-your-work-with-issues/using-issues/adding-sub-issues>.
+Use `add.sh --parent <num>` — it does the right thing per backend:
 
-Create a sub-issue from an existing parent (the parent must already exist):
+- **github**: creates the child + POSTs to `/issues/<parent>/sub_issues`
+  (native beta API). Project V2 renders children under the parent's
+  `Sub-issues progress` field automatically.
+- **gitlab**: tags the child with a `parent::#NNN` scoped label.
+  Native Epics are Premium-only; the scoped label works on every tier.
+- **local**: writes `parent: "#NNN"` into the child's frontmatter and
+  cross-links under a `## Sub-tasks` section in the parent file.
 
-```bash
-# Step 1 — create the child issue normally
-CHILD=$(gh issue create --title "<child title>" --body "<child body>" --json number --jq '.number')
+Fails fast (exit 3) if the parent doesn't exist.
 
-# Step 2 — fetch the child's node id (REST id, not issue number)
-CHILD_ID=$(gh api repos/:owner/:repo/issues/$CHILD --jq '.id')
-
-# Step 3 — link it under the parent
-gh api -X POST repos/:owner/:repo/issues/<PARENT_NUMBER>/sub_issues \
-  -f sub_issue_id=$CHILD_ID
-```
-
-List, reorder, or unlink sub-issues:
-
-```bash
-gh api repos/:owner/:repo/issues/<PARENT>/sub_issues
-gh api -X DELETE repos/:owner/:repo/issues/<PARENT>/sub_issue \
-  -f sub_issue_id=<CHILD_REST_ID>
-```
-
-### On the local Markdown backend
-
-A sub-task is an ordinary task file with `parent: "#NNN"` in its frontmatter,
-where `NNN` is the parent's local id. The parent itself is a normal task — no
-flag needed; it becomes an "epic" by virtue of having children.
-
-To create a sub-task: scaffold the new file as usual, then set its `parent`
-key. Update both the parent's task file (cross-link in the body) and the
-backlog index (`.specflow/backlog.md`) so the relationship is visible at a
-glance.
-
-### Closing rules (both backends)
+### Closing rules (all three backends)
 
 - **Sub-task**: close directly. No cascade to siblings or parent.
-- **Parent / epic**: every child must close first; refuse otherwise.
+- **Parent / epic**: every child must close first. Run
+  `cascade-check.sh <num>` (github + gitlab) before `gh issue close` /
+  `glab issue close` — exit 11 means open children block close, 0 means
+  safe. On local, `grep -l 'parent: "#NNN"' .specflow/backlog/*.md` is
+  the equivalent check.
 - **Cancel epic**: close parent + every child as `not_planned` in one batch.
 - **Two-step close on GitHub / GitLab**: `gh issue close` (and `glab issue
   close`) do NOT update the Project V2 Status field / GitLab scoped Status
@@ -167,6 +147,22 @@ glance.
   issue is `CLOSED`, or `OPEN` with a merged PR linked → `move.sh <num>
   Done`. Mirror for `Done` items whose issue is REOPENED. Idempotent;
   safe after every release or via `/loop 1d`.
+
+### Epic detection heuristic
+
+Propose epic decomposition on every `/backlog add` and during grooming.
+
+**Triggers:** phrases like "break down", "phased", "rewrite",
+"end-to-end"; >5 AC bullets; scope crosses ≥2 subsystems; size L/XL.
+
+**Behavior:**
+
+- **Obvious split**: auto-create epic + children, report structure.
+- **Ambiguous split**: ask once — "Looks like N sub-tasks: A/B/C/D —
+  create as children of epic #N?"
+- **Cohesive but large**: keep as single task.
+
+Never silently swallow scope.
 
 ## Prioritization framework
 
@@ -244,9 +240,8 @@ Sync the index on the local backend; use `gh issue edit` on GitHub.
 
 ### `/backlog estimate <id>`
 
-Detailed complexity estimate with a sub-task breakdown. If the breakdown
-exceeds one task's worth of work, propose splitting into an epic with
-explicit sub-tasks (offer to create them).
+Detailed complexity estimate. If the work exceeds one task, apply the
+"Epic detection heuristic" above.
 
 ### `/backlog status`
 

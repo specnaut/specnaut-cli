@@ -2178,48 +2178,28 @@ An **epic** is a backlog item that owns one or more **sub-tasks**. The PO must
 be able to create them, reference them as a unit, and close the parent only
 when every child is closed.
 
-### On the GitHub backend
+### Creating sub-tasks (all backends)
 
-Use the GitHub native sub-issues API (currently in beta). Reference docs:
-<https://docs.github.com/en/issues/tracking-your-work-with-issues/using-issues/adding-sub-issues>.
+Use \`add.sh --parent <num>\` — it does the right thing per backend:
 
-Create a sub-issue from an existing parent (the parent must already exist):
+- **github**: creates the child + POSTs to \`/issues/<parent>/sub_issues\`
+  (native beta API). Project V2 renders children under the parent's
+  \`Sub-issues progress\` field automatically.
+- **gitlab**: tags the child with a \`parent::#NNN\` scoped label.
+  Native Epics are Premium-only; the scoped label works on every tier.
+- **local**: writes \`parent: "#NNN"\` into the child's frontmatter and
+  cross-links under a \`## Sub-tasks\` section in the parent file.
 
-\`\`\`bash
-# Step 1 — create the child issue normally
-CHILD=\$(gh issue create --title "<child title>" --body "<child body>" --json number --jq '.number')
+Fails fast (exit 3) if the parent doesn't exist.
 
-# Step 2 — fetch the child's node id (REST id, not issue number)
-CHILD_ID=\$(gh api repos/:owner/:repo/issues/\$CHILD --jq '.id')
-
-# Step 3 — link it under the parent
-gh api -X POST repos/:owner/:repo/issues/<PARENT_NUMBER>/sub_issues \\
-  -f sub_issue_id=\$CHILD_ID
-\`\`\`
-
-List, reorder, or unlink sub-issues:
-
-\`\`\`bash
-gh api repos/:owner/:repo/issues/<PARENT>/sub_issues
-gh api -X DELETE repos/:owner/:repo/issues/<PARENT>/sub_issue \\
-  -f sub_issue_id=<CHILD_REST_ID>
-\`\`\`
-
-### On the local Markdown backend
-
-A sub-task is an ordinary task file with \`parent: "#NNN"\` in its frontmatter,
-where \`NNN\` is the parent's local id. The parent itself is a normal task — no
-flag needed; it becomes an "epic" by virtue of having children.
-
-To create a sub-task: scaffold the new file as usual, then set its \`parent\`
-key. Update both the parent's task file (cross-link in the body) and the
-backlog index (\`.specflow/backlog.md\`) so the relationship is visible at a
-glance.
-
-### Closing rules (both backends)
+### Closing rules (all three backends)
 
 - **Sub-task**: close directly. No cascade to siblings or parent.
-- **Parent / epic**: every child must close first; refuse otherwise.
+- **Parent / epic**: every child must close first. Run
+  \`cascade-check.sh <num>\` (github + gitlab) before \`gh issue close\` /
+  \`glab issue close\` — exit 11 means open children block close, 0 means
+  safe. On local, \`grep -l 'parent: "#NNN"' .specflow/backlog/*.md\` is
+  the equivalent check.
 - **Cancel epic**: close parent + every child as \`not_planned\` in one batch.
 - **Two-step close on GitHub / GitLab**: \`gh issue close\` (and \`glab issue
   close\`) do NOT update the Project V2 Status field / GitLab scoped Status
@@ -2234,6 +2214,22 @@ glance.
   issue is \`CLOSED\`, or \`OPEN\` with a merged PR linked → \`move.sh <num>
   Done\`. Mirror for \`Done\` items whose issue is REOPENED. Idempotent;
   safe after every release or via \`/loop 1d\`.
+
+### Epic detection heuristic
+
+Propose epic decomposition on every \`/backlog add\` and during grooming.
+
+**Triggers:** phrases like "break down", "phased", "rewrite",
+"end-to-end"; >5 AC bullets; scope crosses ≥2 subsystems; size L/XL.
+
+**Behavior:**
+
+- **Obvious split**: auto-create epic + children, report structure.
+- **Ambiguous split**: ask once — "Looks like N sub-tasks: A/B/C/D —
+  create as children of epic #N?"
+- **Cohesive but large**: keep as single task.
+
+Never silently swallow scope.
 
 ## Prioritization framework
 
@@ -2311,9 +2307,8 @@ Sync the index on the local backend; use \`gh issue edit\` on GitHub.
 
 ### \`/backlog estimate <id>\`
 
-Detailed complexity estimate with a sub-task breakdown. If the breakdown
-exceeds one task's worth of work, propose splitting into an epic with
-explicit sub-tasks (offer to create them).
+Detailed complexity estimate. If the work exceeds one task, apply the
+"Epic detection heuristic" above.
 
 ### \`/backlog status\`
 
@@ -3709,6 +3704,35 @@ The first time the PO runs against this project, it will create the 5
 \`In progress\`, \`In review\`, \`Done\`).
 <!-- END: backend=gitlab -->
 
+## Epics & sub-tasks
+
+Big work that needs decomposition lives as a parent **epic** with one or
+more **sub-tasks**. The link mechanism differs per backend, but the PO
+contract is the same: parents cannot close while any child is open.
+
+| Backend | Parent → child link | Discoverability |
+|---|---|---|
+| local | \`parent: "#NNN"\` in the child's frontmatter, plus a \`## Sub-tasks\` cross-link added to the parent file's body | \`grep -l 'parent: "#042"' .specflow/backlog/*.md\` lists every child of #042 |
+| github | Native sub-issues API (\`gh api -X POST .../issues/<parent>/sub_issues\`) | Project V2 boards render the children automatically under the parent's \`Sub-issues progress\` field |
+| gitlab | Scoped label \`parent::#NNN\` on the child (Free-tier compatible; native Epics are Premium-only) | \`glab issue list --label "parent::#042" --opened\` lists every child of #042 |
+
+**Creating a child:** \`add.sh --parent <num>\` does the right thing on
+every backend — writes the link, attaches to the project/board, and
+fails fast if the named parent doesn't exist (exit 3).
+
+**Closing a parent:** \`cascade-check.sh <num>\` (github + gitlab) is the
+close gate — exits 11 with the open children listed when close is
+unsafe, exits 0 when all children are closed. The PO must run it before
+\`gh issue close\` / \`glab issue close\`. The local backend uses an
+inline grep equivalent.
+
+**Auto-detection:** the bundled \`product-owner\` agent proactively
+detects epic-worthy requests (>5 AC bullets, scope crosses ≥2
+subsystems, trigger phrases like "break down" / "phased" / "as an
+epic") and either auto-decomposes or proposes a concrete sub-task list
+— see the "Epic detection heuristic" section in
+\`.claude/agents/product-owner.md\`.
+
 ## When NOT to use this skill
 
 - The user is implementing a backlog item — that's normal coding work;
@@ -3785,21 +3809,61 @@ cat "\${matches[0]}"
     suffix: "add.sh",
     content: `#!/usr/bin/env bash
 # Add a new backlog item. Auto-numbers + slugifies. Status starts at "Backlog".
-# Usage: add.sh "<title>" [body]
+# Optional \`--parent <num>\` flag turns the new item into a sub-task of an
+# existing parent (writes \`parent: "#NNN"\` into frontmatter and cross-links
+# the parent file under a \`## Sub-tasks\` section).
+#
+# Usage:
+#   add.sh "<title>" [body] [labels-csv] [--parent <num>]
 set -euo pipefail
 
-if [ "\$#" -lt 1 ]; then
-  echo 'usage: add.sh "<title>" [body]' >&2
+PARENT=""
+ARGS=()
+while [ \$# -gt 0 ]; do
+  case "\$1" in
+    --parent)
+      if [ \$# -lt 2 ]; then
+        echo 'usage: add.sh "<title>" [body] [labels] [--parent <num>]' >&2
+        exit 2
+      fi
+      PARENT="\$2"
+      shift 2
+      ;;
+    *)
+      ARGS+=("\$1")
+      shift
+      ;;
+  esac
+done
+
+if [ "\${#ARGS[@]}" -lt 1 ]; then
+  echo 'usage: add.sh "<title>" [body] [labels] [--parent <num>]' >&2
   exit 2
 fi
-TITLE="\$1"
-BODY="\${2:-}"
+TITLE="\${ARGS[0]}"
+BODY="\${ARGS[1]:-}"
 
 ROOT="\$(cd "\$(dirname "\$0")/../../.." && pwd)"
 BACKLOG_DIR="\$ROOT/.specflow/backlog"
 INDEX="\$ROOT/.specflow/backlog.md"
 RENDER="\$(dirname "\$0")/render-index.sh"
 mkdir -p "\$BACKLOG_DIR"
+
+# When --parent is set, refuse to create a child of a non-existent parent.
+PARENT_FILE=""
+PARENT_PADDED=""
+if [ -n "\$PARENT" ]; then
+  PARENT_PADDED=\$(printf "%03d" "\$PARENT")
+  shopt -s nullglob
+  for candidate in "\$BACKLOG_DIR/\$PARENT_PADDED"-*.md; do
+    PARENT_FILE="\$candidate"
+    break
+  done
+  if [ -z "\$PARENT_FILE" ]; then
+    echo "✗ parent #\$PARENT_PADDED not found in \$BACKLOG_DIR" >&2
+    exit 3
+  fi
+fi
 
 # Next free number
 shopt -s nullglob
@@ -3818,7 +3882,27 @@ SLUG=\$(echo "\$TITLE" | tr '[:upper:]' '[:lower:]' | sed -E 's/[^a-z0-9]+/-/g; 
 FILE="\$BACKLOG_DIR/\$NEXT-\$SLUG.md"
 NOW=\$(date -u +%Y-%m-%dT%H:%M:%SZ)
 
-cat > "\$FILE" <<EOF
+if [ -n "\$PARENT" ]; then
+  cat > "\$FILE" <<EOF
+---
+number: \$NEXT
+title: \$TITLE
+status: Backlog
+size:
+priority:
+parent: "#\$PARENT_PADDED"
+created: \$NOW
+---
+
+\$BODY
+EOF
+  # Append a cross-link to the parent file under a \`## Sub-tasks\` section.
+  if ! grep -q "^## Sub-tasks\$" "\$PARENT_FILE"; then
+    printf '\\n## Sub-tasks\\n\\n' >> "\$PARENT_FILE"
+  fi
+  printf -- '- #%s — %s\\n' "\$NEXT" "\$TITLE" >> "\$PARENT_FILE"
+else
+  cat > "\$FILE" <<EOF
 ---
 number: \$NEXT
 title: \$TITLE
@@ -3830,12 +3914,16 @@ created: \$NOW
 
 \$BODY
 EOF
+fi
 
 # Regenerate the column-organised index from the file tree.
 bash "\$RENDER" "\$ROOT"
 
 echo "✓ created #\$NEXT — \$TITLE"
 echo "  \$FILE"
+if [ -n "\$PARENT" ]; then
+  echo "  ↳ child of #\$PARENT_PADDED — \$PARENT_FILE"
+fi
 `,
     executable: true,
     backend: "local",
@@ -4176,31 +4264,74 @@ gh issue view "\$1" --repo "\$REPO" --comments
     name: "add",
     suffix: "add.sh",
     content: `#!/usr/bin/env bash
-# Create a GitHub Issue and attach it to the configured Project.
-# Usage: add.sh "<title>" [body] [labels-csv]
+# Create a GitHub Issue and attach it to the configured Project. Optional
+# \`--parent <num>\` flag links the new issue as a sub-issue of an existing
+# parent via GitHub's native \`/sub_issues\` REST endpoint (beta).
+#
+# Usage:
+#   add.sh "<title>" [body] [labels-csv] [--parent <num>]
 set -euo pipefail
 
 # shellcheck source=./_config.sh
 . "\$(dirname "\$0")/_config.sh"
 
-if [ "\$#" -lt 1 ]; then
-  echo 'usage: add.sh "<title>" [body] [labels-csv]' >&2
+PARENT=""
+ARGS=()
+while [ \$# -gt 0 ]; do
+  case "\$1" in
+    --parent)
+      if [ \$# -lt 2 ]; then
+        echo 'usage: add.sh "<title>" [body] [labels-csv] [--parent <num>]' >&2
+        exit 2
+      fi
+      PARENT="\$2"
+      shift 2
+      ;;
+    *)
+      ARGS+=("\$1")
+      shift
+      ;;
+  esac
+done
+
+if [ "\${#ARGS[@]}" -lt 1 ]; then
+  echo 'usage: add.sh "<title>" [body] [labels-csv] [--parent <num>]' >&2
   exit 2
 fi
-TITLE="\$1"
-BODY="\${2:-}"
-LABELS="\${3:-}"
+TITLE="\${ARGS[0]}"
+BODY="\${ARGS[1]:-}"
+LABELS="\${ARGS[2]:-}"
 
-ARGS=("--repo" "\$REPO" "--title" "\$TITLE")
-if [ -n "\$BODY" ]; then ARGS+=("--body" "\$BODY"); else ARGS+=("--body" ""); fi
-if [ -n "\$LABELS" ]; then ARGS+=("--label" "\$LABELS"); fi
+# When --parent is set, fail fast if the parent issue doesn't exist —
+# GitHub's sub_issues POST returns a confusing 404 otherwise.
+if [ -n "\$PARENT" ]; then
+  if ! gh api "repos/\$REPO_OWNER/\$REPO_NAME/issues/\$PARENT" --jq '.number' >/dev/null 2>&1; then
+    echo "✗ parent issue #\$PARENT not found in \$REPO_OWNER/\$REPO_NAME" >&2
+    exit 3
+  fi
+fi
 
-URL=\$(gh issue create "\${ARGS[@]}")
+CREATE_ARGS=("--repo" "\$REPO" "--title" "\$TITLE")
+if [ -n "\$BODY" ]; then CREATE_ARGS+=("--body" "\$BODY"); else CREATE_ARGS+=("--body" ""); fi
+if [ -n "\$LABELS" ]; then CREATE_ARGS+=("--label" "\$LABELS"); fi
+
+URL=\$(gh issue create "\${CREATE_ARGS[@]}")
 echo "✓ created: \$URL"
 
 # Attach to the project
 gh project item-add "\$PROJECT_NUMBER" --owner "\$REPO_OWNER" --url "\$URL" >/dev/null
 echo "✓ attached to Project #\$PROJECT_NUMBER"
+
+# Link as a sub-issue if --parent was given. Two-step: extract the new
+# issue's REST id (NOT its number — sub_issues is keyed by id), then POST
+# to the parent's /sub_issues endpoint.
+if [ -n "\$PARENT" ]; then
+  CHILD_NUM="\${URL##*/}"
+  CHILD_ID=\$(gh api "repos/\$REPO_OWNER/\$REPO_NAME/issues/\$CHILD_NUM" --jq '.id')
+  gh api -X POST "repos/\$REPO_OWNER/\$REPO_NAME/issues/\$PARENT/sub_issues" \\
+    -F sub_issue_id="\$CHILD_ID" >/dev/null
+  echo "✓ linked as sub-issue of #\$PARENT"
+fi
 `,
     executable: true,
     backend: "github",
@@ -4479,6 +4610,54 @@ echo "done."
   },
   {
     category: "backlog-script",
+    name: "cascade-check",
+    suffix: "cascade-check.sh",
+    content: `#!/usr/bin/env bash
+# Verify that a parent issue is safe to close — every linked sub-issue
+# must already be closed. Refuses (exit 11) otherwise so the PO can
+# surface the open children and finish them first.
+#
+# Usage:   cascade-check.sh <issue-number>
+# Exit:    0  parent has no open children — safe to close
+#          11 at least one child is still open — close blocked
+#          2  usage error
+#          3  parent issue does not exist
+set -euo pipefail
+
+# shellcheck source=./_config.sh
+. "\$(dirname "\$0")/_config.sh"
+
+if [ "\$#" -lt 1 ]; then
+  echo 'usage: cascade-check.sh <issue-number>' >&2
+  exit 2
+fi
+NUM="\$1"
+
+if ! gh api "repos/\$REPO_OWNER/\$REPO_NAME/issues/\$NUM" --jq '.number' >/dev/null 2>&1; then
+  echo "✗ issue #\$NUM not found in \$REPO_OWNER/\$REPO_NAME" >&2
+  exit 3
+fi
+
+# Native sub-issues endpoint (beta). Returns [] when no children exist.
+OPEN=\$(gh api "repos/\$REPO_OWNER/\$REPO_NAME/issues/\$NUM/sub_issues" \\
+  --jq '[.[] | select(.state=="open")] | length' 2>/dev/null || echo 0)
+
+if [ "\$OPEN" -gt 0 ]; then
+  echo "✗ #\$NUM has \$OPEN open child issue(s) — close them first"
+  gh api "repos/\$REPO_OWNER/\$REPO_NAME/issues/\$NUM/sub_issues" \\
+    --jq '.[] | select(.state=="open") | "  - #\\(.number) — \\(.title)"'
+  exit 11
+fi
+
+echo "✓ #\$NUM safe to close (no open children)"
+exit 0
+`,
+    executable: true,
+    backend: "github",
+    skipIfExists: false,
+  },
+  {
+    category: "backlog-script",
     name: "_config",
     suffix: "_config.sh",
     content: `#!/usr/bin/env bash
@@ -4584,35 +4763,66 @@ glab issue view "\$1" --repo "\$PROJECT_ID" --comments
     name: "add",
     suffix: "add.sh",
     content: `#!/usr/bin/env bash
-# Create a GitLab Issue with the Status::Backlog scoped label.
-# Usage: add.sh "<title>" [body] [labels-csv]
+# Create a GitLab Issue with the Status::Backlog scoped label. Optional
+# \`--parent <num>\` flag adds a \`parent::#NNN\` scoped label so the new
+# issue can be discovered as a child of an existing parent. (GitLab's
+# native Epics API is Premium-only; the scoped-label fallback works on
+# every tier and stays consistent with the existing Status::* pattern.)
+#
+# Usage:
+#   add.sh "<title>" [body] [labels-csv] [--parent <num>]
 set -euo pipefail
 
 # shellcheck source=./_config.sh
 . "\$(dirname "\$0")/_config.sh"
 
-if [ "\$#" -lt 1 ]; then
-  echo 'usage: add.sh "<title>" [body] [labels-csv]' >&2
+PARENT=""
+ARGS=()
+while [ \$# -gt 0 ]; do
+  case "\$1" in
+    --parent)
+      if [ \$# -lt 2 ]; then
+        echo 'usage: add.sh "<title>" [body] [labels-csv] [--parent <num>]' >&2
+        exit 2
+      fi
+      PARENT="\$2"
+      shift 2
+      ;;
+    *)
+      ARGS+=("\$1")
+      shift
+      ;;
+  esac
+done
+
+if [ "\${#ARGS[@]}" -lt 1 ]; then
+  echo 'usage: add.sh "<title>" [body] [labels-csv] [--parent <num>]' >&2
   exit 2
 fi
-TITLE="\$1"
-BODY="\${2:-}"
-EXTRA_LABELS="\${3:-}"
+TITLE="\${ARGS[0]}"
+BODY="\${ARGS[1]:-}"
+EXTRA_LABELS="\${ARGS[2]:-}"
 
 LABELS="Status::Backlog"
 if [ -n "\$EXTRA_LABELS" ]; then
   LABELS="\$LABELS,\$EXTRA_LABELS"
 fi
+if [ -n "\$PARENT" ]; then
+  LABELS="\$LABELS,parent::#\$PARENT"
+fi
 
-ARGS=(
+CREATE_ARGS=(
   "--repo" "\$PROJECT_ID"
   "--title" "\$TITLE"
   "--label" "\$LABELS"
   "--description" "\$BODY"
 )
 
-URL=\$(glab issue create "\${ARGS[@]}" 2>&1 | grep -oE 'https://[^ ]+' | head -1)
+URL=\$(glab issue create "\${CREATE_ARGS[@]}" 2>&1 | grep -oE 'https://[^ ]+' | head -1)
 echo "✓ created: \$URL"
+if [ -n "\$PARENT" ]; then
+  echo "✓ tagged parent::#\$PARENT (scoped label)"
+fi
 `,
     executable: true,
     backend: "gitlab",
@@ -4739,6 +4949,50 @@ ensure_label "dx"          "5319e7" "Developer experience (tooling, onboarding, 
 ensure_label "performance" "e99695" "Latency, throughput, or memory improvements"
 ensure_label "dependency"  "cccccc" "Dependency bump or vendoring"
 echo "done."
+`,
+    executable: true,
+    backend: "gitlab",
+    skipIfExists: false,
+  },
+  {
+    category: "backlog-script",
+    name: "cascade-check",
+    suffix: "cascade-check.sh",
+    content: `#!/usr/bin/env bash
+# Verify that a parent issue is safe to close — every child tagged with
+# the \`parent::#NNN\` scoped label must already be closed. Refuses (exit
+# 11) otherwise so the PO can surface the open children and finish them
+# first.
+#
+# Usage:   cascade-check.sh <issue-number>
+# Exit:    0  parent has no open children — safe to close
+#          11 at least one child is still open — close blocked
+#          2  usage error
+set -euo pipefail
+
+# shellcheck source=./_config.sh
+. "\$(dirname "\$0")/_config.sh"
+
+if [ "\$#" -lt 1 ]; then
+  echo 'usage: cascade-check.sh <issue-number>' >&2
+  exit 2
+fi
+NUM="\$1"
+
+# Children carry a scoped label \`parent::#NNN\`. Ask glab for open issues
+# with that label; output is one issue per line on the standard format.
+OPEN=\$(glab issue list --repo "\$PROJECT_ID" \\
+  --label "parent::#\$NUM" --opened 2>/dev/null | wc -l | tr -d ' ')
+
+if [ "\$OPEN" -gt 0 ]; then
+  echo "✗ #\$NUM has \$OPEN open child issue(s) — close them first"
+  glab issue list --repo "\$PROJECT_ID" --label "parent::#\$NUM" --opened 2>/dev/null \\
+    | sed 's/^/  /'
+  exit 11
+fi
+
+echo "✓ #\$NUM safe to close (no open children with parent::#\$NUM)"
+exit 0
 `,
     executable: true,
     backend: "gitlab",
