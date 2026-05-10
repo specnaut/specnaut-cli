@@ -324,8 +324,9 @@ A Product Owner agent gates every mutation, and supports three backends:
   `gh` CLI; epics use the native sub-issues API. No local mirror, no sync command — the remote is
   the source of truth.
 - **GitLab Issues** (`--backlog gitlab`) — the agent talks to GitLab via `glab` CLI. Status is
-  tracked via scoped `Status::*` labels rather than a native column field; otherwise the model
-  mirrors the GitHub backend (no local mirror, no sync command).
+  tracked via scoped `Status::*` labels rather than a native column field; sub-tasks use a
+  `parent::#NNN` scoped label (Free-tier compatible — native GitLab Epics are Premium-only).
+  Otherwise the model mirrors the GitHub backend (no local mirror, no sync command).
 
 The user picks one backend per project. The chosen backend is recorded in `.specflow/installed.lock`
 so the PO knows which one to use without auto-detection.
@@ -336,6 +337,33 @@ so the PO knows which one to use without auto-detection.
 repo. Idempotent; never edits or deletes existing labels. The GitHub default `bug` label is verified
 but never re-created. The full reference lives in `.specflow/LABELS.md` next to the install —
 including a guidance note for local backend users on tagging via task-file frontmatter.
+
+**Epics & sub-tasks.** Big work that needs decomposition lives as a parent **epic** with one or more
+**sub-tasks**. The link mechanism differs per backend, but the contract is the same: parents cannot
+close while any child is still open.
+
+| Backend | Parent → child link                                                                                                |
+| ------- | ------------------------------------------------------------------------------------------------------------------ |
+| local   | `parent: "#NNN"` in the child's frontmatter, plus a `## Sub-tasks` cross-link in the parent file                   |
+| github  | Native sub-issues API — children render automatically under the parent's "Sub-issues progress" field on Project V2 |
+| gitlab  | Scoped label `parent::#NNN` on the child (Free-tier compatible)                                                    |
+
+Create a child on any backend with the bundled `add.sh --parent <num>` flag — the script writes the
+link, attaches to the project/board, and refuses (exit 3) when the named parent doesn't exist:
+
+```bash
+.specflow/scripts/backlog/add.sh "Child title" "Child body" "" --parent 42
+```
+
+The bundled `cascade-check.sh <num>` (github + gitlab) is the close gate — exits 11 with the open
+children listed when close is unsafe, exits 0 when all children are closed. The PO runs it before
+`gh issue close` / `glab issue close`. The local backend uses an inline `grep` equivalent.
+
+The Product Owner agent **proactively** proposes epic decomposition during `/backlog add` and during
+grooming whenever a request crosses ≥2 subsystems, has more than 5 acceptance-criteria bullets, or
+carries trigger phrases like "break down", "phased", "rewrite", "end-to-end". Obvious splits get
+auto-created; ambiguous ones get a concrete sub-task list back as a question. You don't have to ask
+for the breakdown — the PO surfaces it on its own.
 
 ### 4. Claude Code plugin distribution
 
