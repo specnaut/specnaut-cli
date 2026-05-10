@@ -4109,7 +4109,7 @@ set -euo pipefail
 FILTER="\${1:-}"
 
 JSON=\$(gh api graphql -f query='
-  query(\$owner:String!, \$name:String!, \$project:Int!) {
+  query(\$owner:String!, \$name:String!) {
     repository(owner:\$owner, name:\$name) {
       issues(first:100, states:OPEN) {
         nodes {
@@ -4132,8 +4132,7 @@ JSON=\$(gh api graphql -f query='
     }
   }' \\
   -f owner="\$REPO_OWNER" \\
-  -f name="\$REPO_NAME" \\
-  -F project="\$PROJECT_NUMBER")
+  -f name="\$REPO_NAME")
 
 echo "\$JSON" | jq -r --argjson project "\$PROJECT_NUMBER" --arg filter "\$FILTER" '
   .data.repository.issues.nodes[]
