@@ -95,6 +95,47 @@ the **live fetch protocol** above instead — do not run this check
 (it would emit just the version line; the live protocol gives them
 the full release notes they're asking for).
 
+## Bug report protocol
+
+When the user asks to file a bug ("report this", "open an issue",
+"ouvrir un bug") OR a Specflow failure pattern just surfaced
+(`specflow ... error:`, `upgrade refused`, `init: error`,
+`check: failed`), offer a pre-filled GitHub issue. **Never
+auto-submit.** Always show the body; user clicks the link.
+
+**Body**: 6 sections — `## Summary` / `## Reproduction` /
+`## Observed` / `## Expected` / `## Environment` / `## Logs`.
+Auto-fill Environment from `.specflow/installed.lock`
+(`templates_version`, `harness`, `backlog_backend`),
+`specflow --version`, and `uname -srm` (or `cmd /c ver`).
+
+If WebFetch on
+`https://raw.githubusercontent.com/mkrlabs/specflow/main/.github/ISSUE_TEMPLATE/bug.md`
+succeeds, prefer that template; fall back to the 6 sections above.
+
+**Scrubbing — mandatory before showing the body.** Replace matches
+with `[REDACTED]`:
+
+```
+ghp_[A-Za-z0-9_]{36,}        github_pat_[A-Za-z0-9_]{82,}
+gho_[A-Za-z0-9_]{36,}        glpat-[A-Za-z0-9_-]{20,}
+ghu_/ghs_/ghr_ same shape    sk-ant-api\d{2}-[A-Za-z0-9_-]{93,}
+sk-[A-Za-z0-9]{48,}          AKIA[0-9A-Z]{16}
+```
+
+Soft-redact paths under `~/.ssh/`, `~/.aws/`, `~/.config/gh/`.
+Email addresses NOT scrubbed (false-positive prone) — tell the user
+to review.
+
+**Surface**: generate
+`https://github.com/mkrlabs/specflow/issues/new?title=…&body=…`
+URL-encoded. If the raw body exceeds **3000 chars**, present a
+fenced code block and ask the user to open
+`https://github.com/mkrlabs/specflow/issues/new` manually and paste.
+
+`gh issue create` is **not** supported in V1 — keep the user in the
+loop on every report. If asked, decline and offer the URL pre-fill.
+
 ## Vendored knowledge snapshot
 
 This snapshot is frozen at scaffold time. It reflects the version of
@@ -200,20 +241,11 @@ layout and frontmatter conventions.
 
 ### Bundled sub-agents
 
-Every scaffold ships nine workflow agents plus this expert:
-
-- `product-owner` — owns every backlog mutation. Two-step close
-  (move.sh Done → gh issue close), board hygiene sweep, mandatory
-  sizing + priority via field-first / label fallback.
-- `developer` — implements tasks under `/specflow implement`.
-- `review-coordinator` — runs the multi-reviewer pass post-implement.
-- `code-reviewer` / `security-auditor` / `test-reviewer` —
-  specialised review surfaces dispatched by the coordinator.
-- `qa-tester` — manual UX dogfood pass against the released binary.
-- `workflow-manager` — orchestrates phase transitions inside
-  `/specflow-auto`.
-- `devops-sre` — read-only advisor on CI / release / distribution.
-- `specflow-expert` — this agent.
+Every scaffold ships ten agents: `product-owner`, `developer`,
+`review-coordinator`, `code-reviewer`, `security-auditor`,
+`test-reviewer`, `qa-tester`, `workflow-manager`, `devops-sre`, and
+`specflow-expert` (this agent). See each agent's file under
+`.claude/agents/` (or harness equivalent) for its remit.
 
 ### Backlog conventions (GitHub backend)
 
@@ -230,14 +262,9 @@ Every scaffold ships nine workflow agents plus this expert:
 
 ### Design principles
 
-- Agnostic of the user project's language (Python, TS, Go, PHP, Rust…).
-- Agnostic of the LLM behind the harness.
-- Agnostic of the AI harness — eight first-class targets, identical
-  core content.
-- Agnostic of the backlog source — local, GitHub, or GitLab.
-- Single binary distributed via `deno compile` for macOS arm64/x64,
-  Linux arm64/x64, and Windows x64. No Python, no `pip`, no extra
-  runtimes.
+Agnostic of language / LLM / harness / backlog backend. Single binary
+via `deno compile` for macOS, Linux, Windows. No Python or extra
+runtimes.
 
 ## Style
 
