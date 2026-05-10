@@ -328,6 +328,14 @@ snapshot for offline / deterministic answers and `WebFetch` against
 <https://specflow.makerlabs.dev/llms.txt> + the GitHub Releases API for live "what's new" queries.
 Manual dispatch via `/specflow-expert <question>` is also supported.
 
+The agent also handles **bug reports**: ask "report this as a bug" (or hit a Specflow failure) and
+it pre-fills a structured GitHub issue against `mkrlabs/specflow` with a 6-section template (Summary
+/ Repro / Observed / Expected / Environment / Logs), auto-populating the environment block from
+`.specflow/installed.lock` + `specflow --version` + `uname -srm`, scrubbing common token shapes
+(GitHub PATs, GitLab PATs, Anthropic / OpenAI keys, AWS access keys), and handing you a pre-filled
+`https://github.com/mkrlabs/specflow/issues/new?…` URL to review and submit. The agent never
+auto-submits — you always see the body before clicking.
+
 ## Design principles
 
 - **Agnostic of the user project's language** — Python, TypeScript, Go, PHP, Rust… your project,
