@@ -26,8 +26,14 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       security-events: read # secret-scanning + code-scanning alert reads
-      repository-advisories: read # private vulnerability reports
       contents: read # dependabot alerts (separate permission family)
+    # Private security-advisories (state=triage,draft) cannot be read via
+    # GITHUB_TOKEN — `repository-advisories` is a fine-grained PAT scope,
+    # not a workflow permissions key, and adding it here silently fails
+    # the workflow parse (zero jobs, 0s run, conclusion=failure). The
+    # advisory query below 404s silently and yields 0; if pending
+    # advisories must gate releases, wire a dedicated PAT secret and
+    # override GH_TOKEN for that step only.
     steps:
       - name: Query open security alerts
         env:
