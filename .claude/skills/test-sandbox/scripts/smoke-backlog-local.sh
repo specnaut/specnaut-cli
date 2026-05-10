@@ -11,6 +11,10 @@ ROOT="$(cd "$(dirname "$0")/../../../.." && pwd)"
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 DIR="$ROOT/sandbox/$NAME"
 
+# Trap-based cleanup: wipe the scenario directory on every exit path
+# (success OR failure) so the sandbox/ tree never accumulates orphans.
+trap 'bash "$SCRIPT_DIR/clean.sh" "$NAME" >/dev/null 2>&1 || true' EXIT
+
 bash "$SCRIPT_DIR/bootstrap-vite.sh" "$NAME" >/dev/null
 (cd "$DIR" && deno run --allow-all "$ROOT/src/main.ts" \
   init --here --no-git --ai claude --backlog local >/dev/null 2>&1)

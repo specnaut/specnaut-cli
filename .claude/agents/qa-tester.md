@@ -278,6 +278,13 @@ abort-BLOCKERs vs finding-BLOCKERs.
    T4 onward all assume a successful `init`.
 7. Run **T4–T8** in order, checking the cap after each.
 8. Write the report and return the summary.
+9. **Cleanup**: `bash .claude/skills/test-sandbox/scripts/clean.sh
+   qa-<stamp>` to wipe the scenario directory. The report at
+   `sandbox/qa-report-<stamp>.md` survives — `clean.sh` only deletes
+   the scenario directory it's given, not sibling reports. After
+   cleanup, `ls sandbox/` should show only `qa-report-*.md` files (no
+   leftover scenario directories). Run cleanup on every exit path,
+   including aborted runs.
 
 ## Report schema
 
