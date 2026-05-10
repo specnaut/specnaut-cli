@@ -447,6 +447,32 @@ The triage mode is release-time only and uses a tightly-constrained `Bash` grant
 `gh api` alert-dismissal endpoints are permitted. End users never trigger this mode; PR review
 remains the user-facing path.
 
+### 7. Bundled `ui-ux-designer` agent
+
+Every scaffold also ships a `ui-ux-designer` agent that owns a single source of truth — the
+project's `DESIGN.md` — that every other agent consults to keep generated UI on-brand. Three modes
+auto-select from `DESIGN.md` state:
+
+1. **Discovery** — when `DESIGN.md` is absent. The agent runs a 2-4 question interview (project +
+   audience, visual mood, brand seed, optional stack hint) and writes a complete first `DESIGN.md`
+   from a canonical template covering typography, palette (light + dark with WCAG-AA contrast
+   rules), 4-point spacing scale, radius / shadow tokens, component primitives, and motion.
+2. **Edit** — when `DESIGN.md` is present and the dispatch is a refactor request. The agent edits
+   the spec in place with a one-line rationale per change and a Decision-log append.
+3. **Audit** — when the dispatch contains the word `audit`. The agent scans
+   `**/*.{tsx,jsx,vue,
+   svelte,html,css,scss}` under `src/` for literal hex colours, off-system
+   fonts, and off-grid spacing values, reports drift in a
+   `| File | Line | Found | Expected token | Severity |` table, and emits `clean` / `drift_minor` /
+   `drift_major`.
+
+The agent is **manual-dispatch only** (`disable-model-invocation: true`) — design decisions are
+intentional and the agent never auto-runs. It produces Markdown, never code; the developer agent is
+what translates `DESIGN.md` into a Tailwind theme, CSS vars, or component library. `DESIGN.md` is
+NOT scaffolded by `specflow init`; it materialises on the agent's first invocation when the user
+actually wants a design system, so backend-only and CLI-only projects don't carry stub spec files
+they never read.
+
 ## Design principles
 
 - **Agnostic of the user project's language** — Python, TypeScript, Go, PHP, Rust… your project,
