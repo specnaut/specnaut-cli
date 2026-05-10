@@ -183,7 +183,9 @@ Specflow repo.
 
 ## Rollback
 
-If a release goes wrong:
+Distinguish two failure modes — the response is different:
+
+### Bad build / bad behavior shipped (true rollback)
 
 1. Delete the remote tag: `git push origin :refs/tags/v<BAD>`
 2. Delete the local tag: `git tag -d v<BAD>`
@@ -194,6 +196,30 @@ If a release goes wrong:
    `mkrlabs/homebrew-tap` main, or land a new bump from the corrected
    patch release).
 5. Fix the issue, bump again (patch), and re-release.
+
+### Security preflight blocked the release (re-run, do NOT rollback)
+
+When the `security-preflight` job in `release.yml` blocks the release on a
+critical / secret-scanning / pending-advisory finding, the tag is fine —
+the code is unchanged, the build never started, and no GitHub Release
+object was created. The fix is **not** to delete the tag.
+
+Instead:
+
+1. Open the failed workflow run via the URL printed in step 9.
+2. Read the `## Security alert preflight` table in the job summary —
+   that is the alert triage payload.
+3. Resolve each alert (real fix → land a PR; false positive → dispatch
+   the `security-auditor` agent in alert-triage mode to dismiss with
+   the right `resolution=` reason via `gh api -X PATCH`).
+4. Re-run the `release.yml` workflow via the GitHub Actions UI ("Re-run
+   failed jobs"). The same tag rebuilds cleanly because the commit is
+   unchanged. The Homebrew tap bump fires this time.
+
+If the alert is real and a fix is needed, the fix lands as a normal PR
+on `main`; that produces a new commit, so the release on `v<BAD>`
+becomes obsolete. In that case, follow the bad-build rollback above:
+delete the tag, then bump and tag again from the corrected `main`.
 
 ## Prerequisites
 
