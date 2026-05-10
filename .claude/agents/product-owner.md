@@ -192,32 +192,37 @@ For each mutation:
    single-mutation dispatches (`add`, `move`, `close`) — there's no
    downstream phase to clean up for.
 
-## Sizing and priority — field-first, label fallback
+## Sizing and priority — fields are the source of truth
 
-Project #4 has native single-select fields `Priority` (P0..P2) and
-`Size` (XS..XL). When you size or prioritise an item, **write to the
-field — do not also apply a label** (drift). Use the helper at
-`.claude/skills/backlog/scripts/set-field.sh`:
+Project #4 has native single-select fields `Priority` (P0..P3) and
+`Size` (XS..XL). When you size or prioritise an item, write the value
+to the field via the helper below — **NEVER also apply a `priority:*`
+/ `size:*` label on an item that already has the native field**. The
+two are not peer signals; the label exists only as a fallback when the
+field cannot accept the value. Anything else is the dual-signal drift
+that prompted #194.
 
 ```
 set-field.sh <issue> Priority P1     # writes the field
 set-field.sh <issue> Size M
 ```
 
-Exit codes:
-- `0` → field updated, no label needed.
+Helper at `.claude/skills/backlog/scripts/set-field.sh`. Exit codes:
+- `0` → field updated, no label needed (the only happy path).
 - `10` → no such field on Project #4 (shouldn't happen — but if it
   does, fall back to `priority:*` / `size:*` labels and surface the
-  drift).
-- `11` → option missing (only `priority:P3` today, since the field
-  ships with P0..P2). Apply the matching `priority:P3` label as
-  fallback.
+  drift in the report).
+- `11` → field present but option missing on Project #4. Add the
+  option to the field (Project settings → field → "+" Add option, or
+  the `updateProjectV2Field` GraphQL mutation) and re-run rather than
+  silently falling back to a label.
 - `12` → issue not on Project #4. Resolve the attachment first.
 
 The legacy `priority:*` / `size:*` labels were swept off the open
 issues by `.claude/skills/backlog/scripts/migrate-labels-to-fields.sh`
-when this contract landed. The script is idempotent — re-run anytime
-the board feels out of sync.
+(landed via #157, completed by #194 once the field gained the missing
+P3 option). The sweep script is idempotent — re-run anytime the board
+feels out of sync.
 
 ## Epic / sub-task detection
 
