@@ -1,0 +1,27 @@
+# Dependabot config — keeps the GitHub Actions used in
+# .github/workflows/ up to date. Specflow is a Deno project, but
+# Dependabot doesn't currently support the Deno / JSR ecosystem
+# directly; opening Deno-side dep PRs is a manual concern (handled
+# by `deno task check` + `deno task test` after `deno cache --reload`).
+#
+# This config covers the actions/* and denoland/setup-deno@v2 pins
+# across ci.yml, release.yml, static.yml, docs-check.yml, wiki.yml.
+version: 2
+updates:
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "08:00"
+      timezone: "Europe/Paris"
+    # Cap the open PR count so we never get flooded.
+    open-pull-requests-limit: 3
+    # Keep the major version pin (e.g. actions/checkout@v4) so Dependabot
+    # only proposes minor / patch bumps within the same major; majors
+    # are reviewed manually.
+    versioning-strategy: increase-if-necessary
+    commit-message:
+      prefix: "chore(deps)"
+    labels:
+      - "dependency"
