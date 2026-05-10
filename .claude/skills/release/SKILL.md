@@ -18,7 +18,18 @@ Specflow repo.
    ```
 2. Verify CI is green on the latest commit (check GitHub Actions for the most
    recent workflow run on `main` — ask the user to confirm if unsure).
-3. Ask the user which bump they want:
+3. **Run the smoke-coverage audit** against the last release tag — catches
+   features shipped without smoke assertions and assertions referencing
+   files that have moved or been deleted:
+   ```bash
+   bash .claude/skills/test-sandbox/scripts/audit.sh
+   ```
+   Triage every coverage gap (add the missing `check`) and every stale
+   assertion (prune or update it) before tagging. The audit never edits
+   smoke scripts — that's on you. This step automates the manual sweep
+   that landed in commit `73e51cf` and exists to prevent it from being
+   needed again.
+4. Ask the user which bump they want:
    - `patch` → bug fixes, no feature changes
    - `minor` → new features, no breaking changes
    - `major` → breaking changes

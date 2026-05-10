@@ -68,6 +68,50 @@ to the non-TTY numeric prompt). It scripts arrow-down + enter keystrokes,
 captures the rendered frames, and asserts that the highlight moved correctly
 and the resulting init landed the right harness + backlog backend.
 
+### Audit smoke coverage before a release (`audit.sh`)
+
+```bash
+.claude/skills/test-sandbox/scripts/audit.sh                 # diff vs latest v*.*.* tag
+.claude/skills/test-sandbox/scripts/audit.sh --since v1.1.18 # custom baseline
+```
+
+`audit.sh` mechanically compares the working tree to the last release tag and
+emits two lists — **coverage gaps** (new user-visible files that no smoke
+mentions by basename) and **stale assertions** (smoke scripts referencing
+runtime paths whose source counterpart no longer exists). It never edits
+the smoke scripts. Run it ad hoc and **expected before `/release`** so a
+release sprint can't ship five features that no smoke knows about (the
+exact 73e51cf-style gap that motivated #176).
+
+#### Audit heuristics
+
+The surface map (in the script header) determines which smoke is expected
+to cover which file kind:
+
+| Source path glob | Expected smoke(s) | Kind |
+| --- | --- | --- |
+| `templates/core/agents/*.md` | `smoke-features.sh`, `smoke-all-harnesses.sh` | bundled-agent |
+| `templates/core/commands/*.md` | `smoke-features.sh` | bundled-command |
+| `templates/core/skills/*/SKILL.md` | `smoke-features.sh` | bundled-skill |
+| `templates/core/skills/specflow/phases/*.md` | `smoke-features.sh` | phase-doc |
+| `templates/core/skills/backlog/scripts/github/*` | `smoke-backlog-github.sh` | github-backlog-script |
+| `templates/core/skills/backlog/scripts/gitlab/*` | `smoke-backlog-gitlab.sh` | gitlab-backlog-script |
+| `templates/core/skills/backlog/scripts/local/*` | `smoke-backlog-local.sh` | local-backlog-script |
+| `templates/core/hooks/*` | `smoke-hooks.sh` | bundled-hook |
+| `templates/core/specflow/scripts/*/*` | `smoke-features.sh` | specflow-helper-script |
+| `templates/core/specflow/LABELS.md` | `smoke-features.sh`, `smoke-backlog-{github,gitlab}.sh` | labels-doc |
+
+The stale-assertion scan walks every `smoke-*.sh`, extracts every
+`(.claude\|.specflow)/...` token, maps it back to a candidate source path
+under `templates/core/` or `templates/harness-specific/<harness>/`, and
+flags the assertion as stale when no candidate exists. Runtime-only
+paths (`.specflow/installed.lock`, `.specflow/specs/`, `.claude/settings.json`,
+etc.) are explicitly skipped.
+
+The audit reports — Kevin patches. Mechanical pattern matching only;
+the audit never infers WHICH assertion a new file should get, just that
+SOME smoke should mention it.
+
 ## Typical workflows
 
 ### Validate a brownfield fix before merging
