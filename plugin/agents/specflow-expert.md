@@ -128,10 +128,10 @@ Email addresses NOT scrubbed (false-positive prone) — tell the user
 to review.
 
 **Surface**: generate
-`https://github.com/mkrlabs/specflow/issues/new?title=…&body=…`
-URL-encoded. If the raw body exceeds **3000 chars**, present a
-fenced code block and ask the user to open
-`https://github.com/mkrlabs/specflow/issues/new` manually and paste.
+`https://github.com/mkrlabs/specflow/issues/new?title=…&body=…&labels=bug,from%3Aspecflow-expert`
+URL-encoded. The label gates the maintainer triage inbox. If the raw
+body exceeds **3000 chars**, present a fenced code block and ask the
+user to paste it into a fresh `issues/new` form.
 
 `gh issue create` is **not** supported in V1 — keep the user in the
 loop on every report. If asked, decline and offer the URL pre-fill.
