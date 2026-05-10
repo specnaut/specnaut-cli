@@ -19,9 +19,13 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-        # No fetch-depth bump needed — we use the base/head SHAs from the
-        # pull_request event payload, both of which GitHub Actions
-        # pre-fetches into the runner workspace.
+        with:
+          # actions/checkout's default shallow clone (depth 1) doesn't
+          # include the PR base commit, so `git diff <base>...<head>`
+          # fails with "Invalid symmetric difference expression". Full
+          # fetch is the simplest reliable fix; the runner cost is
+          # ~5-10s extra on this otherwise sub-second job.
+          fetch-depth: 0
 
       - name: Detect drift
         env:
