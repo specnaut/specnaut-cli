@@ -2,7 +2,7 @@
 import type { CoreBundle } from "./domain/core_bundle.ts";
 import type { TemplateFile } from "./domain/template.ts";
 
-export const TEMPLATES_VERSION = "1.1.18";
+export const TEMPLATES_VERSION = "1.1.19";
 
 export const CORE_BUNDLE: CoreBundle = [
   {
