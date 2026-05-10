@@ -4739,35 +4739,66 @@ glab issue view "\$1" --repo "\$PROJECT_ID" --comments
     name: "add",
     suffix: "add.sh",
     content: `#!/usr/bin/env bash
-# Create a GitLab Issue with the Status::Backlog scoped label.
-# Usage: add.sh "<title>" [body] [labels-csv]
+# Create a GitLab Issue with the Status::Backlog scoped label. Optional
+# \`--parent <num>\` flag adds a \`parent::#NNN\` scoped label so the new
+# issue can be discovered as a child of an existing parent. (GitLab's
+# native Epics API is Premium-only; the scoped-label fallback works on
+# every tier and stays consistent with the existing Status::* pattern.)
+#
+# Usage:
+#   add.sh "<title>" [body] [labels-csv] [--parent <num>]
 set -euo pipefail
 
 # shellcheck source=./_config.sh
 . "\$(dirname "\$0")/_config.sh"
 
-if [ "\$#" -lt 1 ]; then
-  echo 'usage: add.sh "<title>" [body] [labels-csv]' >&2
+PARENT=""
+ARGS=()
+while [ \$# -gt 0 ]; do
+  case "\$1" in
+    --parent)
+      if [ \$# -lt 2 ]; then
+        echo 'usage: add.sh "<title>" [body] [labels-csv] [--parent <num>]' >&2
+        exit 2
+      fi
+      PARENT="\$2"
+      shift 2
+      ;;
+    *)
+      ARGS+=("\$1")
+      shift
+      ;;
+  esac
+done
+
+if [ "\${#ARGS[@]}" -lt 1 ]; then
+  echo 'usage: add.sh "<title>" [body] [labels-csv] [--parent <num>]' >&2
   exit 2
 fi
-TITLE="\$1"
-BODY="\${2:-}"
-EXTRA_LABELS="\${3:-}"
+TITLE="\${ARGS[0]}"
+BODY="\${ARGS[1]:-}"
+EXTRA_LABELS="\${ARGS[2]:-}"
 
 LABELS="Status::Backlog"
 if [ -n "\$EXTRA_LABELS" ]; then
   LABELS="\$LABELS,\$EXTRA_LABELS"
 fi
+if [ -n "\$PARENT" ]; then
+  LABELS="\$LABELS,parent::#\$PARENT"
+fi
 
-ARGS=(
+CREATE_ARGS=(
   "--repo" "\$PROJECT_ID"
   "--title" "\$TITLE"
   "--label" "\$LABELS"
   "--description" "\$BODY"
 )
 
-URL=\$(glab issue create "\${ARGS[@]}" 2>&1 | grep -oE 'https://[^ ]+' | head -1)
+URL=\$(glab issue create "\${CREATE_ARGS[@]}" 2>&1 | grep -oE 'https://[^ ]+' | head -1)
 echo "✓ created: \$URL"
+if [ -n "\$PARENT" ]; then
+  echo "✓ tagged parent::#\$PARENT (scoped label)"
+fi
 `,
     executable: true,
     backend: "gitlab",
@@ -4894,6 +4925,50 @@ ensure_label "dx"          "5319e7" "Developer experience (tooling, onboarding, 
 ensure_label "performance" "e99695" "Latency, throughput, or memory improvements"
 ensure_label "dependency"  "cccccc" "Dependency bump or vendoring"
 echo "done."
+`,
+    executable: true,
+    backend: "gitlab",
+    skipIfExists: false,
+  },
+  {
+    category: "backlog-script",
+    name: "cascade-check",
+    suffix: "cascade-check.sh",
+    content: `#!/usr/bin/env bash
+# Verify that a parent issue is safe to close — every child tagged with
+# the \`parent::#NNN\` scoped label must already be closed. Refuses (exit
+# 11) otherwise so the PO can surface the open children and finish them
+# first.
+#
+# Usage:   cascade-check.sh <issue-number>
+# Exit:    0  parent has no open children — safe to close
+#          11 at least one child is still open — close blocked
+#          2  usage error
+set -euo pipefail
+
+# shellcheck source=./_config.sh
+. "\$(dirname "\$0")/_config.sh"
+
+if [ "\$#" -lt 1 ]; then
+  echo 'usage: cascade-check.sh <issue-number>' >&2
+  exit 2
+fi
+NUM="\$1"
+
+# Children carry a scoped label \`parent::#NNN\`. Ask glab for open issues
+# with that label; output is one issue per line on the standard format.
+OPEN=\$(glab issue list --repo "\$PROJECT_ID" \\
+  --label "parent::#\$NUM" --opened 2>/dev/null | wc -l | tr -d ' ')
+
+if [ "\$OPEN" -gt 0 ]; then
+  echo "✗ #\$NUM has \$OPEN open child issue(s) — close them first"
+  glab issue list --repo "\$PROJECT_ID" --label "parent::#\$NUM" --opened 2>/dev/null \\
+    | sed 's/^/  /'
+  exit 11
+fi
+
+echo "✓ #\$NUM safe to close (no open children with parent::#\$NUM)"
+exit 0
 `,
     executable: true,
     backend: "gitlab",

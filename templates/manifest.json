@@ -59,6 +59,7 @@
     { "category": "backlog-script", "name": "move", "suffix": "move.sh", "source": "core/skills/backlog/scripts/gitlab/move.sh", "executable": true, "backend": "gitlab" },
     { "category": "backlog-script", "name": "clarify-comment", "suffix": "clarify-comment.sh", "source": "core/skills/backlog/scripts/gitlab/clarify-comment.sh", "executable": true, "backend": "gitlab" },
     { "category": "backlog-script", "name": "ensure-labels", "suffix": "ensure-labels.sh", "source": "core/skills/backlog/scripts/gitlab/ensure-labels.sh", "executable": true, "backend": "gitlab" },
+    { "category": "backlog-script", "name": "cascade-check", "suffix": "cascade-check.sh", "source": "core/skills/backlog/scripts/gitlab/cascade-check.sh", "executable": true, "backend": "gitlab" },
 
     { "category": "spec-root", "name": "specify", "suffix": "memory/constitution.md", "source": "core/specflow/memory/constitution.md", "skipIfExists": true },
     { "category": "spec-root", "name": "specify", "suffix": "backlog.md", "source": "core/specflow/backlog.md" },
