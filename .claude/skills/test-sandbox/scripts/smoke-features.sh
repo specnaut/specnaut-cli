@@ -179,6 +179,17 @@ check "specflow-auto SKILL.md describes the --once flag" \
   'grep -q -- "--once" .claude/skills/specflow-auto/SKILL.md'
 
 echo
+echo "═══ #188  /specflow merge auto-closes the linked backlog issue ═══"
+check "create-new-feature.sh exposes --issue flag" \
+  'grep -q -- "--issue" .specflow/scripts/bash/create-new-feature.sh'
+check "specify.md persists linked_issue into feature.json" \
+  'grep -q "linked_issue" .claude/skills/specflow/phases/specify.md'
+check "merge.md reads feature.json.linked_issue and closes the loop" \
+  'grep -q "linked_issue" .claude/skills/specflow/phases/merge.md'
+check "merge.md dispatches the PO for the close comment" \
+  'grep -q "product-owner" .claude/skills/specflow/phases/merge.md'
+
+echo
 if [ "$fails" -eq 0 ]; then
   echo "═══ ALL CHECKS PASSED ═══"
   exit 0

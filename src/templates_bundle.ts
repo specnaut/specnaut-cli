@@ -166,10 +166,16 @@ Given that feature description, do this:
    - Set \`SPEC_FILE\` to \`SPECIFY_FEATURE_DIRECTORY/spec.md\`
    - Persist to \`.specflow/feature.json\`:
      \`\`\`json
-     { "feature_directory": "<resolved feature dir>" }
+     { "feature_directory": "<resolved feature dir>", "linked_issue": <N or null> }
      \`\`\`
      Write the actual resolved path (e.g., \`.specflow/specs/003-user-auth\`), not the literal string.
      This lets downstream commands (\`/specflow plan\`, \`/specflow tasks\`, etc.) locate the feature directory.
+
+     **\`linked_issue\`**: when the user invokes \`/specflow specify\` with \`--issue <id>\` (or the
+     hook's JSON output includes a non-null \`LINKED_ISSUE\`), persist it as a JSON integer here.
+     Otherwise persist \`null\`. The merge phase reads this field to auto-close the linked
+     backlog item on the project board after a successful fast-forward + push. Backward-compat
+     with existing \`feature.json\` files: absent or null is a no-op everywhere downstream.
 
    **IMPORTANT**:
    - Create only one feature per \`/specflow specify\` invocation.
@@ -1395,11 +1401,41 @@ for STOP #2). If FAIL, stop and report to the user.
    user whether to rebase.
 6. Print the merge summary (files changed, commits merged).
 7. Ask the user: "Push to origin <base>? (yes/no)". Do NOT auto-push.
+8. **Close the linked backlog issue** (only if push happened and \`feature.json.linked_issue\` is set):
+   1. Read \`.specflow/feature.json\`. Extract \`linked_issue\` (\`jq -r '.linked_issue // empty'\`).
+      If absent / null / empty, skip the rest of step 8 silently — no backlog backend wiring
+      to act on.
+   2. Detect the backend by checking \`.specflow/installed.lock\` (\`backlog_backend: <local|github|gitlab>\`)
+      or, equivalently, the presence of \`.specflow/backlog-config.yml\` (github/gitlab) vs
+      \`.specflow/backlog.md\` (local).
+   3. **github + gitlab only** — run \`bash .specflow/scripts/backlog/cascade-check.sh <linked_issue>\`.
+      Exit 11 means the parent has open sub-issues; do NOT close. Report the open children to the
+      user and stop (the issue stays in \`In progress\` / \`Ready\` until the children are closed).
+   4. Ask the user: "Close issue #<linked_issue> on the board now? (yes/no)". On \`no\`, skip the
+      rest of step 8 — leave the column flip to a future run or to a manual \`move.sh\`.
+   5. On \`yes\`, run \`bash .specflow/scripts/backlog/move.sh <linked_issue> Done\`. This is the
+      mechanical column flip — \`move.sh\` is idempotent and the working contract permits the merge
+      phase to call it directly (the PO retains exclusive ownership of the close + comment, not
+      the column move).
+   6. **github + gitlab only** — dispatch the \`product-owner\` subagent with the prompt:
+      "PR for issue #<linked_issue> just merged on \`main\`. The mechanical move to Done has
+      already been done via \`move.sh\`. Please run the second half of the two-step close: post
+      a close comment on the issue referencing the merged commit range \`<first-sha>..<last-sha>\`
+      (from step 6's summary), then \`gh issue close <linked_issue> --reason completed\`. Confirm
+      with a one-line report." This keeps the audit comment under PO ownership and surfaces the
+      \`docs audit\` line from the PO's close-step contract.
+   7. **local backend only** — \`move.sh <id> Done\` already flipped the frontmatter; no second
+      step needed. The local backlog has no separate "issue" object beyond the file itself.
+
+   Backward-compat: feature trees without \`linked_issue\` (created before this field existed)
+   skip step 8 silently. Multi-PR features (final PR not yet merged) — the user answers \`no\`
+   in step 8.4 and re-runs \`/specflow merge\` on the last PR.
 
 ## Output
 
-A structured report with: files merged, commits merged, whether the user chose to push, and the next
-suggested action (e.g. \`/backlog update <id> --status done\`).
+A structured report with: files merged, commits merged, whether the user chose to push, and — when
+step 8 ran — whether the linked issue was closed (and via which backend), or skipped (and why:
+no \`linked_issue\`, user declined, or \`cascade-check\` blocked the close).
 `,
     executable: false,
     backend: null,
@@ -6658,6 +6694,7 @@ ALLOW_EXISTING=false
 SHORT_NAME=""
 BRANCH_NUMBER=""
 USE_TIMESTAMP=false
+LINKED_ISSUE=""
 ARGS=()
 i=1
 while [ \$i -le \$# ]; do
@@ -6702,8 +6739,25 @@ while [ \$i -le \$# ]; do
         --timestamp)
             USE_TIMESTAMP=true
             ;;
+        --issue)
+            if [ \$((i + 1)) -gt \$# ]; then
+                echo 'Error: --issue requires a value' >&2
+                exit 1
+            fi
+            i=\$((i + 1))
+            next_arg="\${!i}"
+            if [[ "\$next_arg" == --* ]]; then
+                echo 'Error: --issue requires a value' >&2
+                exit 1
+            fi
+            if ! [[ "\$next_arg" =~ ^[0-9]+\$ ]] || [ "\$next_arg" -lt 1 ]; then
+                echo "Error: --issue must be a positive integer (got '\$next_arg')" >&2
+                exit 1
+            fi
+            LINKED_ISSUE="\$next_arg"
+            ;;
         --help|-h)
-            echo "Usage: \$0 [--json] [--dry-run] [--allow-existing-branch] [--short-name <name>] [--number N] [--timestamp] <feature_description>"
+            echo "Usage: \$0 [--json] [--dry-run] [--allow-existing-branch] [--short-name <name>] [--number N] [--timestamp] [--issue <id>] <feature_description>"
             echo ""
             echo "Options:"
             echo "  --json              Output in JSON format"
@@ -6712,12 +6766,16 @@ while [ \$i -le \$# ]; do
             echo "  --short-name <name> Provide a custom short name (2-4 words) for the branch"
             echo "  --number N          Specify branch number manually (overrides auto-detection)"
             echo "  --timestamp         Use timestamp prefix (YYYYMMDD-HHMMSS) instead of sequential numbering"
+            echo "  --issue <id>        Link this feature to a backlog issue (id is a positive integer);"
+            echo "                      surfaces in JSON output and is persisted to .specflow/feature.json"
+            echo "                      so /specflow merge can close the loop on the project board."
             echo "  --help, -h          Show this help message"
             echo ""
             echo "Examples:"
             echo "  \$0 'Add user authentication system' --short-name 'user-auth'"
             echo "  \$0 'Implement OAuth2 integration for API' --number 5"
             echo "  \$0 --timestamp --short-name 'user-auth' 'Add user authentication'"
+            echo "  \$0 --issue 42 'Fix the off-by-one in pagination'"
             exit 0
             ;;
         *)
@@ -7031,6 +7089,13 @@ if [ "\$DRY_RUN" != true ]; then
     printf '# To persist: export SPECIFY_FEATURE=%q\\n' "\$BRANCH_NAME" >&2
 fi
 
+# Compute the LINKED_ISSUE JSON value: integer when set, JSON null otherwise.
+if [ -n "\$LINKED_ISSUE" ]; then
+    LINKED_ISSUE_JSON="\$LINKED_ISSUE"
+else
+    LINKED_ISSUE_JSON="null"
+fi
+
 if \$JSON_MODE; then
     if command -v jq >/dev/null 2>&1; then
         if [ "\$DRY_RUN" = true ]; then
@@ -7038,25 +7103,30 @@ if \$JSON_MODE; then
                 --arg branch_name "\$BRANCH_NAME" \\
                 --arg spec_file "\$SPEC_FILE" \\
                 --arg feature_num "\$FEATURE_NUM" \\
-                '{BRANCH_NAME:\$branch_name,SPEC_FILE:\$spec_file,FEATURE_NUM:\$feature_num,DRY_RUN:true}'
+                --argjson linked_issue "\$LINKED_ISSUE_JSON" \\
+                '{BRANCH_NAME:\$branch_name,SPEC_FILE:\$spec_file,FEATURE_NUM:\$feature_num,LINKED_ISSUE:\$linked_issue,DRY_RUN:true}'
         else
             jq -cn \\
                 --arg branch_name "\$BRANCH_NAME" \\
                 --arg spec_file "\$SPEC_FILE" \\
                 --arg feature_num "\$FEATURE_NUM" \\
-                '{BRANCH_NAME:\$branch_name,SPEC_FILE:\$spec_file,FEATURE_NUM:\$feature_num}'
+                --argjson linked_issue "\$LINKED_ISSUE_JSON" \\
+                '{BRANCH_NAME:\$branch_name,SPEC_FILE:\$spec_file,FEATURE_NUM:\$feature_num,LINKED_ISSUE:\$linked_issue}'
         fi
     else
         if [ "\$DRY_RUN" = true ]; then
-            printf '{"BRANCH_NAME":"%s","SPEC_FILE":"%s","FEATURE_NUM":"%s","DRY_RUN":true}\\n' "\$(json_escape "\$BRANCH_NAME")" "\$(json_escape "\$SPEC_FILE")" "\$(json_escape "\$FEATURE_NUM")"
+            printf '{"BRANCH_NAME":"%s","SPEC_FILE":"%s","FEATURE_NUM":"%s","LINKED_ISSUE":%s,"DRY_RUN":true}\\n' "\$(json_escape "\$BRANCH_NAME")" "\$(json_escape "\$SPEC_FILE")" "\$(json_escape "\$FEATURE_NUM")" "\$LINKED_ISSUE_JSON"
         else
-            printf '{"BRANCH_NAME":"%s","SPEC_FILE":"%s","FEATURE_NUM":"%s"}\\n' "\$(json_escape "\$BRANCH_NAME")" "\$(json_escape "\$SPEC_FILE")" "\$(json_escape "\$FEATURE_NUM")"
+            printf '{"BRANCH_NAME":"%s","SPEC_FILE":"%s","FEATURE_NUM":"%s","LINKED_ISSUE":%s}\\n' "\$(json_escape "\$BRANCH_NAME")" "\$(json_escape "\$SPEC_FILE")" "\$(json_escape "\$FEATURE_NUM")" "\$LINKED_ISSUE_JSON"
         fi
     fi
 else
     echo "BRANCH_NAME: \$BRANCH_NAME"
     echo "SPEC_FILE: \$SPEC_FILE"
     echo "FEATURE_NUM: \$FEATURE_NUM"
+    if [ -n "\$LINKED_ISSUE" ]; then
+        echo "LINKED_ISSUE: \$LINKED_ISSUE"
+    fi
     if [ "\$DRY_RUN" != true ]; then
         printf '# To persist in your shell: export SPECIFY_FEATURE=%q\\n' "\$BRANCH_NAME"
     fi
@@ -7903,6 +7973,8 @@ param(
     [Parameter()]
     [long]\$Number = 0,
     [switch]\$Timestamp,
+    [Parameter()]
+    [long]\$Issue = 0,
     [switch]\$Help,
     [Parameter(Position = 0, ValueFromRemainingArguments = \$true)]
     [string[]]\$FeatureDescription
@@ -7911,7 +7983,7 @@ param(
 
 # Show help if requested
 if (\$Help) {
-    Write-Host "Usage: ./create-new-feature.ps1 [-Json] [-DryRun] [-AllowExistingBranch] [-ShortName <name>] [-Number N] [-Timestamp] <feature description>"
+    Write-Host "Usage: ./create-new-feature.ps1 [-Json] [-DryRun] [-AllowExistingBranch] [-ShortName <name>] [-Number N] [-Timestamp] [-Issue <id>] <feature description>"
     Write-Host ""
     Write-Host "Options:"
     Write-Host "  -Json               Output in JSON format"
@@ -7920,13 +7992,23 @@ if (\$Help) {
     Write-Host "  -ShortName <name>   Provide a custom short name (2-4 words) for the branch"
     Write-Host "  -Number N           Specify branch number manually (overrides auto-detection)"
     Write-Host "  -Timestamp          Use timestamp prefix (YYYYMMDD-HHMMSS) instead of sequential numbering"
+    Write-Host "  -Issue <id>         Link this feature to a backlog issue (positive integer);"
+    Write-Host "                      surfaces in JSON output and is persisted to .specflow/feature.json"
+    Write-Host "                      so /specflow merge can close the loop on the project board."
     Write-Host "  -Help               Show this help message"
     Write-Host ""
     Write-Host "Examples:"
     Write-Host "  ./create-new-feature.ps1 'Add user authentication system' -ShortName 'user-auth'"
     Write-Host "  ./create-new-feature.ps1 'Implement OAuth2 integration for API'"
     Write-Host "  ./create-new-feature.ps1 -Timestamp -ShortName 'user-auth' 'Add user authentication'"
+    Write-Host "  ./create-new-feature.ps1 -Issue 42 'Fix the off-by-one in pagination'"
     exit 0
+}
+
+# Validate -Issue: must be a positive integer when provided.
+if (\$Issue -lt 0) {
+    Write-Error "Error: -Issue must be a positive integer (got '\$Issue')"
+    exit 1
 }
 
 # Check if feature description provided
@@ -8254,11 +8336,19 @@ if (-not \$DryRun) {
     \$env:SPECIFY_FEATURE = \$branchName
 }
 
+# Render LINKED_ISSUE as a JSON integer when set, JSON null otherwise.
+if (\$Issue -gt 0) {
+    \$linkedIssueValue = \$Issue
+} else {
+    \$linkedIssueValue = \$null
+}
+
 if (\$Json) {
     \$obj = [PSCustomObject]@{
         BRANCH_NAME = \$branchName
         SPEC_FILE = \$specFile
         FEATURE_NUM = \$featureNum
+        LINKED_ISSUE = \$linkedIssueValue
         HAS_GIT = \$hasGit
     }
     if (\$DryRun) {
@@ -8269,6 +8359,9 @@ if (\$Json) {
     Write-Output "BRANCH_NAME: \$branchName"
     Write-Output "SPEC_FILE: \$specFile"
     Write-Output "FEATURE_NUM: \$featureNum"
+    if (\$Issue -gt 0) {
+        Write-Output "LINKED_ISSUE: \$Issue"
+    }
     Write-Output "HAS_GIT: \$hasGit"
     if (-not \$DryRun) {
         Write-Output "SPECIFY_FEATURE environment variable set to: \$branchName"

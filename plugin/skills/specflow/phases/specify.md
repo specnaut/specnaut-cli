@@ -55,10 +55,16 @@ Given that feature description, do this:
    - Set `SPEC_FILE` to `SPECIFY_FEATURE_DIRECTORY/spec.md`
    - Persist to `.specflow/feature.json`:
      ```json
-     { "feature_directory": "<resolved feature dir>" }
+     { "feature_directory": "<resolved feature dir>", "linked_issue": <N or null> }
      ```
      Write the actual resolved path (e.g., `.specflow/specs/003-user-auth`), not the literal string.
      This lets downstream commands (`/specflow plan`, `/specflow tasks`, etc.) locate the feature directory.
+
+     **`linked_issue`**: when the user invokes `/specflow specify` with `--issue <id>` (or the
+     hook's JSON output includes a non-null `LINKED_ISSUE`), persist it as a JSON integer here.
+     Otherwise persist `null`. The merge phase reads this field to auto-close the linked
+     backlog item on the project board after a successful fast-forward + push. Backward-compat
+     with existing `feature.json` files: absent or null is a no-op everywhere downstream.
 
    **IMPORTANT**:
    - Create only one feature per `/specflow specify` invocation.

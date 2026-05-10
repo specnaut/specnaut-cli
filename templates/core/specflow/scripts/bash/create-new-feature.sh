@@ -8,6 +8,7 @@ ALLOW_EXISTING=false
 SHORT_NAME=""
 BRANCH_NUMBER=""
 USE_TIMESTAMP=false
+LINKED_ISSUE=""
 ARGS=()
 i=1
 while [ $i -le $# ]; do
@@ -52,8 +53,25 @@ while [ $i -le $# ]; do
         --timestamp)
             USE_TIMESTAMP=true
             ;;
+        --issue)
+            if [ $((i + 1)) -gt $# ]; then
+                echo 'Error: --issue requires a value' >&2
+                exit 1
+            fi
+            i=$((i + 1))
+            next_arg="${!i}"
+            if [[ "$next_arg" == --* ]]; then
+                echo 'Error: --issue requires a value' >&2
+                exit 1
+            fi
+            if ! [[ "$next_arg" =~ ^[0-9]+$ ]] || [ "$next_arg" -lt 1 ]; then
+                echo "Error: --issue must be a positive integer (got '$next_arg')" >&2
+                exit 1
+            fi
+            LINKED_ISSUE="$next_arg"
+            ;;
         --help|-h)
-            echo "Usage: $0 [--json] [--dry-run] [--allow-existing-branch] [--short-name <name>] [--number N] [--timestamp] <feature_description>"
+            echo "Usage: $0 [--json] [--dry-run] [--allow-existing-branch] [--short-name <name>] [--number N] [--timestamp] [--issue <id>] <feature_description>"
             echo ""
             echo "Options:"
             echo "  --json              Output in JSON format"
@@ -62,12 +80,16 @@ while [ $i -le $# ]; do
             echo "  --short-name <name> Provide a custom short name (2-4 words) for the branch"
             echo "  --number N          Specify branch number manually (overrides auto-detection)"
             echo "  --timestamp         Use timestamp prefix (YYYYMMDD-HHMMSS) instead of sequential numbering"
+            echo "  --issue <id>        Link this feature to a backlog issue (id is a positive integer);"
+            echo "                      surfaces in JSON output and is persisted to .specflow/feature.json"
+            echo "                      so /specflow merge can close the loop on the project board."
             echo "  --help, -h          Show this help message"
             echo ""
             echo "Examples:"
             echo "  $0 'Add user authentication system' --short-name 'user-auth'"
             echo "  $0 'Implement OAuth2 integration for API' --number 5"
             echo "  $0 --timestamp --short-name 'user-auth' 'Add user authentication'"
+            echo "  $0 --issue 42 'Fix the off-by-one in pagination'"
             exit 0
             ;;
         *)
@@ -381,6 +403,13 @@ if [ "$DRY_RUN" != true ]; then
     printf '# To persist: export SPECIFY_FEATURE=%q\n' "$BRANCH_NAME" >&2
 fi
 
+# Compute the LINKED_ISSUE JSON value: integer when set, JSON null otherwise.
+if [ -n "$LINKED_ISSUE" ]; then
+    LINKED_ISSUE_JSON="$LINKED_ISSUE"
+else
+    LINKED_ISSUE_JSON="null"
+fi
+
 if $JSON_MODE; then
     if command -v jq >/dev/null 2>&1; then
         if [ "$DRY_RUN" = true ]; then
@@ -388,25 +417,30 @@ if $JSON_MODE; then
                 --arg branch_name "$BRANCH_NAME" \
                 --arg spec_file "$SPEC_FILE" \
                 --arg feature_num "$FEATURE_NUM" \
-                '{BRANCH_NAME:$branch_name,SPEC_FILE:$spec_file,FEATURE_NUM:$feature_num,DRY_RUN:true}'
+                --argjson linked_issue "$LINKED_ISSUE_JSON" \
+                '{BRANCH_NAME:$branch_name,SPEC_FILE:$spec_file,FEATURE_NUM:$feature_num,LINKED_ISSUE:$linked_issue,DRY_RUN:true}'
         else
             jq -cn \
                 --arg branch_name "$BRANCH_NAME" \
                 --arg spec_file "$SPEC_FILE" \
                 --arg feature_num "$FEATURE_NUM" \
-                '{BRANCH_NAME:$branch_name,SPEC_FILE:$spec_file,FEATURE_NUM:$feature_num}'
+                --argjson linked_issue "$LINKED_ISSUE_JSON" \
+                '{BRANCH_NAME:$branch_name,SPEC_FILE:$spec_file,FEATURE_NUM:$feature_num,LINKED_ISSUE:$linked_issue}'
         fi
     else
         if [ "$DRY_RUN" = true ]; then
-            printf '{"BRANCH_NAME":"%s","SPEC_FILE":"%s","FEATURE_NUM":"%s","DRY_RUN":true}\n' "$(json_escape "$BRANCH_NAME")" "$(json_escape "$SPEC_FILE")" "$(json_escape "$FEATURE_NUM")"
+            printf '{"BRANCH_NAME":"%s","SPEC_FILE":"%s","FEATURE_NUM":"%s","LINKED_ISSUE":%s,"DRY_RUN":true}\n' "$(json_escape "$BRANCH_NAME")" "$(json_escape "$SPEC_FILE")" "$(json_escape "$FEATURE_NUM")" "$LINKED_ISSUE_JSON"
         else
-            printf '{"BRANCH_NAME":"%s","SPEC_FILE":"%s","FEATURE_NUM":"%s"}\n' "$(json_escape "$BRANCH_NAME")" "$(json_escape "$SPEC_FILE")" "$(json_escape "$FEATURE_NUM")"
+            printf '{"BRANCH_NAME":"%s","SPEC_FILE":"%s","FEATURE_NUM":"%s","LINKED_ISSUE":%s}\n' "$(json_escape "$BRANCH_NAME")" "$(json_escape "$SPEC_FILE")" "$(json_escape "$FEATURE_NUM")" "$LINKED_ISSUE_JSON"
         fi
     fi
 else
     echo "BRANCH_NAME: $BRANCH_NAME"
     echo "SPEC_FILE: $SPEC_FILE"
     echo "FEATURE_NUM: $FEATURE_NUM"
+    if [ -n "$LINKED_ISSUE" ]; then
+        echo "LINKED_ISSUE: $LINKED_ISSUE"
+    fi
     if [ "$DRY_RUN" != true ]; then
         printf '# To persist in your shell: export SPECIFY_FEATURE=%q\n' "$BRANCH_NAME"
     fi
