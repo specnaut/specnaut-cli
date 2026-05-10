@@ -266,6 +266,45 @@ The generated `specify` skill chains `clarify → plan → tasks → analyze →
 in a single session. Upstream stops at every step and asks the human to invoke the next one.
 Specflow only stops twice: when clarification is genuinely required, and once before merging.
 
+The chain is invoked through the bundled `/specflow-auto` skill:
+
+```
+/specflow-auto specify "<feature description>"
+```
+
+Two checkpoints inside the chain:
+
+- **STOP #1 — clarify** runs after `clarify`. If `spec.md` still has `[NEEDS CLARIFICATION]`
+  markers, the model surfaces the top 3 questions and waits. Once you answer, the chain resumes
+  automatically. If there are no markers, the chain continues silently.
+- **STOP #2 — pre-merge** runs after `review`. The model summarises the work (files changed, tests,
+  open risks, business outcome) and asks `Ready to merge?` before invoking `merge`. Reply `yes` to
+  finish.
+
+To opt out of the chain entirely (run only `specify` and stop):
+
+```
+/specflow-auto specify --manual "<feature description>"
+```
+
+#### Mid-chain re-entry
+
+Any phase other than `specify` can also enter the chain when invoked through `/specflow-auto` —
+useful for two real workflows:
+
+- **Manual review between early phases** — read `spec.md` after `specify` lands, then
+  `/specflow-auto clarify N` resumes the chain through `plan → tasks → … → STOP #2`.
+- **Context-budget recovery** — open a fresh session after compaction and run
+  `/specflow-auto implement N` to pick up the tail (`→ review → STOP #2`).
+
+The default is **context-aware**: if downstream artefacts under `.specflow/specs/<feature>/` are
+missing, the chain fires; if they exist, the invocation is treated as a single-phase re-run (so
+regenerating `plan.md` doesn't accidentally cascade through the rest). Two explicit overrides when
+the default guesses wrong:
+
+- `/specflow-auto <phase> N --continue` — force the chain regardless of artefact state.
+- `/specflow-auto <phase> N --once` — force one-shot regardless.
+
 ### 2. `review` phase post-implement
 
 After `implement`, the generated workflow runs a dedicated `review` phase that checks structure
