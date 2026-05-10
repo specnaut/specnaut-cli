@@ -2,7 +2,7 @@
 name: Bug report
 about: Report a Specflow problem you hit while running the CLI or using the bundled agents.
 title: ""
-labels: bug
+labels: "bug,from:specflow-expert"
 ---
 
 ## Summary
