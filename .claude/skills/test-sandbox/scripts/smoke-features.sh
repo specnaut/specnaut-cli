@@ -161,6 +161,15 @@ check "PO doc covers GitLab backend epic story (parent::# scoped label)" \
   'grep -q "On the GitLab backend" .claude/agents/product-owner.md'
 
 echo
+echo "═══ #180  SKILL.md — Epics & sub-tasks section ═══"
+check "SKILL.md gains an Epics & sub-tasks section" \
+  'grep -q "Epics & sub-tasks" .claude/skills/backlog/SKILL.md'
+check "SKILL.md describes the --parent flag" \
+  'grep -q -- "--parent" .claude/skills/backlog/SKILL.md'
+check "SKILL.md describes the cascade-check close gate" \
+  'grep -q "cascade-check.sh" .claude/skills/backlog/SKILL.md'
+
+echo
 if [ "$fails" -eq 0 ]; then
   echo "═══ ALL CHECKS PASSED ═══"
   exit 0

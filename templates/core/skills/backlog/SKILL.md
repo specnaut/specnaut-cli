@@ -234,6 +234,35 @@ The first time the PO runs against this project, it will create the 5
 `In progress`, `In review`, `Done`).
 <!-- END: backend=gitlab -->
 
+## Epics & sub-tasks
+
+Big work that needs decomposition lives as a parent **epic** with one or
+more **sub-tasks**. The link mechanism differs per backend, but the PO
+contract is the same: parents cannot close while any child is open.
+
+| Backend | Parent → child link | Discoverability |
+|---|---|---|
+| local | `parent: "#NNN"` in the child's frontmatter, plus a `## Sub-tasks` cross-link added to the parent file's body | `grep -l 'parent: "#042"' .specflow/backlog/*.md` lists every child of #042 |
+| github | Native sub-issues API (`gh api -X POST .../issues/<parent>/sub_issues`) | Project V2 boards render the children automatically under the parent's `Sub-issues progress` field |
+| gitlab | Scoped label `parent::#NNN` on the child (Free-tier compatible; native Epics are Premium-only) | `glab issue list --label "parent::#042" --opened` lists every child of #042 |
+
+**Creating a child:** `add.sh --parent <num>` does the right thing on
+every backend — writes the link, attaches to the project/board, and
+fails fast if the named parent doesn't exist (exit 3).
+
+**Closing a parent:** `cascade-check.sh <num>` (github + gitlab) is the
+close gate — exits 11 with the open children listed when close is
+unsafe, exits 0 when all children are closed. The PO must run it before
+`gh issue close` / `glab issue close`. The local backend uses an
+inline grep equivalent.
+
+**Auto-detection:** the bundled `product-owner` agent proactively
+detects epic-worthy requests (>5 AC bullets, scope crosses ≥2
+subsystems, trigger phrases like "break down" / "phased" / "as an
+epic") and either auto-decomposes or proposes a concrete sub-task list
+— see the "Epic detection heuristic" section in
+`.claude/agents/product-owner.md`.
+
 ## When NOT to use this skill
 
 - The user is implementing a backlog item — that's normal coding work;
