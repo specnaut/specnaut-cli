@@ -8,3 +8,4 @@ spec-kit/
 .specflow/logs/
 sandbox/
 docs-dist/
+.env

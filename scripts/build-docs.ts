@@ -1,21 +1,30 @@
 /**
- * Builds the GitHub Pages site from `docs/llms.md`:
+ * Builds the GitHub Pages site:
  *
- *   docs/llms.md → docs-dist/index.html  (HTML rendering, GFM + embedded CSS)
- *                → docs-dist/llms.txt    (raw markdown copy, llmstxt.org convention)
+ *   docs/site/**            → docs-dist/**            (static landing, copied verbatim;
+ *                                                      `__SPECFLOW_VERSION__` substituted in HTML)
+ *   docs/llms.md            → docs-dist/docs/index.html  (HTML rendering, GFM + embedded CSS)
+ *                           → docs-dist/llms.txt          (raw markdown copy, llmstxt.org convention)
  *
  * Wired up via `deno task docs:build`. Invoked by the `Deploy static content
  * to Pages` workflow on every push to main.
+ *
+ * The landing at `/` is the human-facing front door; the rendered llms.md
+ * docs live at `/docs/`. The `/llms.txt` route serves the raw enriched
+ * Markdown for LLM consumption (llmstxt.org convention) — its path must
+ * NEVER move.
  */
-import { CSS, render } from "@deno/gfm";
+import { render } from "@deno/gfm";
 
 const SOURCE = "docs/llms.md";
+const SITE_DIR = "docs/site";
 const OUT_DIR = "docs-dist";
-const OUT_HTML = `${OUT_DIR}/index.html`;
+const OUT_HTML = `${OUT_DIR}/docs/index.html`;
 const OUT_MD = `${OUT_DIR}/llms.txt`;
 const OUT_CNAME = `${OUT_DIR}/CNAME`;
 const TITLE = "Specflow — documentation";
 const REPO_URL = "https://github.com/mkrlabs/specflow";
+const VERSION_PLACEHOLDER = "__SPECFLOW_VERSION__";
 
 async function readVersion(denoJsonPath = "deno.json"): Promise<string> {
   const raw = await Deno.readTextFile(denoJsonPath);
@@ -97,71 +106,138 @@ const CUSTOM_DOMAIN = "specflow.makerlabs.dev";
 const HTML_TEMPLATE = (body: string, version: string) =>
   `<!DOCTYPE html>
 <html lang="en">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>${TITLE}</title>
-  <meta name="description" content="Specflow — enhanced spec-kit CLI with auto-chained workflow, review phase, and backlog. Distributed as a single native binary." />
-  <meta name="specflow-version" content="${version}" />
-  <link rel="canonical" href="https://specflow.makerlabs.dev/" />
-  <link rel="alternate" type="text/markdown" href="./llms.txt" />
-  <style>
-    ${CSS}
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="color-scheme" content="light dark" />
 
-    body {
-      max-width: 880px;
-      margin: 0 auto;
-      padding: 2rem 1.25rem 4rem;
-      color-scheme: light dark;
-      background: var(--color-canvas-default);
-    }
-    .markdown-body {
-      box-sizing: border-box;
-      min-width: 200px;
-      padding: 0;
-    }
-    @media (max-width: 768px) {
-      body { padding: 1rem 0.75rem 3rem; }
-    }
-    .doc-footer {
-      margin-top: 3rem;
-      padding-top: 1rem;
-      border-top: 1px solid var(--color-border-muted);
-      font-size: 0.875rem;
-      color: var(--color-fg-muted);
-    }
-    .doc-footer a {
-      color: inherit;
-      text-decoration: underline;
-    }
-  </style>
-</head>
-<body>
-  <main class="markdown-body">
+    <title>${TITLE}</title>
+    <meta name="description" content="Specflow — enhanced spec-kit CLI with auto-chained workflow, review phase, and backlog. Distributed as a single native binary." />
+    <meta name="specflow-version" content="${version}" />
+
+    <link rel="canonical" href="https://specflow.makerlabs.dev/docs/" />
+    <link rel="alternate" type="text/markdown" href="/llms.txt" />
+    <link rel="stylesheet" href="/styles.css" />
+
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;600;700&family=JetBrains+Mono:wght@400&display=swap"
+      rel="stylesheet"
+    />
+  </head>
+
+  <body>
+    <header class="site-header">
+      <a href="/" class="brand" aria-label="Specflow home">
+        <span class="brand-mark" aria-hidden="true"></span>
+        <span class="brand-name">Specflow</span>
+      </a>
+      <nav class="site-nav" aria-label="Primary">
+        <a href="/">Home</a>
+        <a href="https://github.com/mkrlabs/specflow">GitHub</a>
+      </nav>
+    </header>
+
+    <main>
+      <section>
+        <p class="doc-header">
+          ← <a href="/">Specflow home</a> · Documentation
+        </p>
+        <article class="markdown-body">
 ${body}
-  </main>
-  <footer class="doc-footer">
-    Specflow <a href="${REPO_URL}/releases/tag/v${version}">v${version}</a>
-    · Raw Markdown for LLMs: <a href="./llms.txt">llms.txt</a>
-    · Source: <a href="${REPO_URL}">github.com/mkrlabs/specflow</a>
-  </footer>
-</body>
+        </article>
+      </section>
+    </main>
+
+    <footer class="site-footer">
+      <p>
+        Specflow
+        <a href="${REPO_URL}/releases/tag/v${version}">v${version}</a>
+        · <a href="/llms.txt">llms.txt</a>
+        · <a href="${REPO_URL}">github.com/mkrlabs/specflow</a>
+      </p>
+    </footer>
+  </body>
 </html>
 `;
 
+/**
+ * Recursively walk `siteDir` and mirror every file into `outDir`, preserving
+ * sub-directory structure. HTML files have `__SPECFLOW_VERSION__` substituted
+ * so the static landing can show the current release version without a build
+ * step of its own.
+ *
+ * Silently no-ops when `siteDir` does not exist — keeps tests with synthetic
+ * temp dirs hermetic while production builds always have `docs/site/` on disk.
+ */
+export async function copyLandingSite(
+  siteDir: string,
+  outDir: string,
+  version: string,
+): Promise<string[]> {
+  let stat: Deno.FileInfo;
+  try {
+    stat = await Deno.stat(siteDir);
+  } catch (err) {
+    if (err instanceof Deno.errors.NotFound) return [];
+    throw err;
+  }
+  if (!stat.isDirectory) return [];
+
+  const written: string[] = [];
+
+  async function walk(current: string, relative: string): Promise<void> {
+    for await (const entry of Deno.readDir(current)) {
+      const src = `${current}/${entry.name}`;
+      const rel = relative ? `${relative}/${entry.name}` : entry.name;
+      const dest = `${outDir}/${rel}`;
+      if (entry.isDirectory) {
+        await Deno.mkdir(dest, { recursive: true });
+        await walk(src, rel);
+        continue;
+      }
+      if (entry.isFile) {
+        if (entry.name.endsWith(".html")) {
+          const raw = await Deno.readTextFile(src);
+          await Deno.writeTextFile(
+            dest,
+            raw.replaceAll(VERSION_PLACEHOLDER, version),
+          );
+        } else {
+          await Deno.copyFile(src, dest);
+        }
+        written.push(dest);
+      }
+    }
+  }
+
+  await Deno.mkdir(outDir, { recursive: true });
+  await walk(siteDir, "");
+  return written;
+}
+
 export async function buildDocs(opts: {
   source?: string;
+  siteDir?: string;
   outDir?: string;
   version?: string;
   fetchReleases?: () => Promise<string>;
 } = {}): Promise<
-  { html: string; markdown: string; version: string; versionJson: string }
+  {
+    html: string;
+    markdown: string;
+    version: string;
+    versionJson: string;
+    siteFiles: string[];
+  }
 > {
   const source = opts.source ?? SOURCE;
+  const siteDir = opts.siteDir ?? SITE_DIR;
   const outDir = opts.outDir ?? OUT_DIR;
   const version = opts.version ?? await readVersion();
   const fetchReleases = opts.fetchReleases ?? (() => fetchRecentReleases());
-  const outHtml = `${outDir}/index.html`;
+  const outHtml = `${outDir}/docs/index.html`;
   const outMd = `${outDir}/llms.txt`;
   const outVersionJson = `${outDir}/version.json`;
 
@@ -184,19 +260,24 @@ export async function buildDocs(opts: {
     2,
   ) + "\n";
 
-  await Deno.mkdir(outDir, { recursive: true });
+  await Deno.mkdir(`${outDir}/docs`, { recursive: true });
   await Deno.writeTextFile(outHtml, html);
   await Deno.writeTextFile(outMd, markdown);
   await Deno.writeTextFile(`${outDir}/CNAME`, `${CUSTOM_DOMAIN}\n`);
   await Deno.writeTextFile(outVersionJson, versionJson);
 
-  return { html, markdown, version, versionJson };
+  // Mirror the static landing on top of `outDir` last so its `index.html`
+  // shadows nothing — the rendered docs HTML lives in `outDir/docs/` now.
+  const siteFiles = await copyLandingSite(siteDir, outDir, version);
+
+  return { html, markdown, version, versionJson, siteFiles };
 }
 
 if (import.meta.main) {
-  const { html, version } = await buildDocs();
+  const { html, version, siteFiles } = await buildDocs();
   console.log(`✓ wrote ${OUT_HTML} (${html.length} bytes, v${version})`);
   console.log(`✓ wrote ${OUT_MD}`);
   console.log(`✓ wrote ${OUT_CNAME} (${CUSTOM_DOMAIN})`);
   console.log(`✓ wrote ${OUT_DIR}/version.json (v${version})`);
+  console.log(`✓ copied ${siteFiles.length} landing files from ${SITE_DIR}/`);
 }

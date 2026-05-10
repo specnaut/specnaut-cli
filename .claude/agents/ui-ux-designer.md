@@ -74,17 +74,22 @@ under `src/` (and any other path the user names). For each scanned
 file:
 
 - Extract literal hex colours, font-family declarations, raw pixel
-  values used as spacing, raw font-size values.
+  values used as spacing, raw font-size values, and any `@media`
+  queries that use `max-width` or hard-coded mobile overrides.
 - Compare against the tokens declared in `DESIGN.md`.
 - Report drift in a table:
 
   ```
-  | File | Line | Found | Expected token | Severity |
-  | ---- | ---- | ----- | -------------- | -------- |
+  | File | Line | Found | Expected token | Responsive | Severity |
+  | ---- | ---- | ----- | -------------- | ---------- | -------- |
   ```
 
-  Severity: `block` (palette drift, off-system font), `warn` (off-grid
-  spacing), `info` (close-but-not-exact value).
+  The **Responsive** column flags `max-width` media queries, missing
+  mobile overrides for Display/H1, off-token breakpoints (raw `768px`
+  etc.), and touch targets below 44 px on mobile. Severity ladder:
+  `block` (palette drift, off-system font, `max-width` query, sub-44px
+  mobile touch target), `warn` (off-grid spacing, hard-coded
+  breakpoint), `info` (close-but-not-exact value).
 
 End with a one-line VERDICT: `clean`, `drift_minor`, `drift_major`.
 Never auto-edit components — the user dispatches the developer agent
@@ -152,6 +157,40 @@ rather than tinting toward middle grey.
 
 No raw pixel values in components. Off-grid sizes are a code-review
 block.
+
+## Responsive
+
+**Mobile-first is non-negotiable.** Every layout starts at 375 px and
+scales up. No `max-width` media queries to patch desktop-first CSS;
+only `min-width` queries are permitted.
+
+| Token     | Value    | Viewport context |
+| --------- | -------- | ---------------- |
+| `--bp-sm` | `480px`  | Large phone      |
+| `--bp-md` | `768px`  | Tablet           |
+| `--bp-lg` | `1024px` | Small laptop     |
+| `--bp-xl` | `1280px` | Desktop          |
+
+Canonical query syntax: `@media (min-width: var(--bp-md))` — always
+`min-width`, never `max-width`.
+
+- **Touch targets** — interactive controls must hit at least 44 × 44 px
+  below `--bp-md` (WCAG 2.5.5). Bump `min-height` from 40 → 44 px at
+  the mobile breakpoint.
+- **Container** — page content uses a single `--container-max: 1200px`.
+  Horizontal padding scales: `--space-4` at mobile, `--space-6` at
+  `--bp-sm`, `--space-12` at `--bp-md`+. Never use fixed margins below
+  `--bp-sm`.
+- **Type scaling** — Display + H1 drop ~25-30% on mobile so heroes never
+  wrap past 3 lines. Suggested defaults: Display 48 → 32 px, H1 32 →
+  26 px below `--bp-md`. Other roles unchanged (already legible at 375
+  px).
+- **Images** — decorative sprites cap at `max-width: 96px` below
+  `--bp-sm`; informational images (OG, screenshots) stay fluid via
+  `max-width: 100%`.
+- **Audit hook** — Mode 3 must add a **Responsive** column in its drift
+  table; flag any `max-width` query or hard-coded mobile override as
+  `block` severity.
 
 ## Radius + shadow
 
