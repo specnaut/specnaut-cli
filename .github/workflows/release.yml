@@ -42,29 +42,58 @@ jobs:
         run: |
           set -euo pipefail
 
+          # `gh api` writes 4xx error JSON to STDOUT (not stderr), so a naive
+          # `2>/dev/null || echo 0` lets non-numeric blobs leak into shell
+          # arithmetic and crashes the job (line "$((dep_critical + ...))"
+          # fails with "syntax error: operand expected"). Wrap every count
+          # through a coercer that rejects anything that isn't pure digits.
+          # Permission gaps surface as 0 here and downstream — a degraded
+          # but non-blocking signal — and a workflow ::warning is emitted
+          # so the local /release session can investigate.
+          missing_perms=()
+          fetch_count() {
+            local label="$1" url="$2" jq_filter="$3"
+            local out
+            out=$(gh api "$url" --jq "$jq_filter" 2>/dev/null || true)
+            if [[ "$out" =~ ^[0-9]+$ ]]; then
+              printf '%s' "$out"
+            else
+              missing_perms+=("$label")
+              printf '0'
+            fi
+          }
+
           # 1. Secret scanning — pattern-based credential leak detection
-          secret_open=$(gh api "repos/$REPO/secret-scanning/alerts?state=open&per_page=100" \
-            --jq '[.[] | {number, secret_type_display_name, html_url}] | length' 2>/dev/null || echo 0)
+          secret_open=$(fetch_count "secret_scanning" \
+            "repos/$REPO/secret-scanning/alerts?state=open&per_page=100" \
+            '[.[] | {number, secret_type_display_name, html_url}] | length')
 
           # 2. Dependabot — vulnerable dependencies (severity-aware)
-          dep_critical=$(gh api "repos/$REPO/dependabot/alerts?state=open&per_page=100" \
-            --jq '[.[] | select(.security_advisory.severity=="critical")] | length' 2>/dev/null || echo 0)
-          dep_high=$(gh api "repos/$REPO/dependabot/alerts?state=open&per_page=100" \
-            --jq '[.[] | select(.security_advisory.severity=="high")] | length' 2>/dev/null || echo 0)
-          dep_medium=$(gh api "repos/$REPO/dependabot/alerts?state=open&per_page=100" \
-            --jq '[.[] | select(.security_advisory.severity=="medium")] | length' 2>/dev/null || echo 0)
+          dep_critical=$(fetch_count "dependabot/critical" \
+            "repos/$REPO/dependabot/alerts?state=open&per_page=100" \
+            '[.[] | select(.security_advisory.severity=="critical")] | length')
+          dep_high=$(fetch_count "dependabot/high" \
+            "repos/$REPO/dependabot/alerts?state=open&per_page=100" \
+            '[.[] | select(.security_advisory.severity=="high")] | length')
+          dep_medium=$(fetch_count "dependabot/medium" \
+            "repos/$REPO/dependabot/alerts?state=open&per_page=100" \
+            '[.[] | select(.security_advisory.severity=="medium")] | length')
 
-          # 3. Private vulnerability reports — externally-submitted advisories
-          # `gh api` returns 404 if `repository-advisories: read` is missing — we
-          # explicitly grant it above so this is the real signal.
-          adv_pending=$(gh api "repos/$REPO/security-advisories?state=triage,draft&per_page=100" \
-            --jq '[.[] | {number, summary, severity, html_url}] | length' 2>/dev/null || echo 0)
+          # 3. Private vulnerability reports — externally-submitted advisories.
+          # `repository-advisories` is a fine-grained PAT scope, NOT a workflow
+          # permissions key, so this returns 0 with GITHUB_TOKEN. Wire a
+          # dedicated PAT secret if pending advisories must hard-gate releases.
+          adv_pending=$(fetch_count "private_advisories" \
+            "repos/$REPO/security-advisories?state=triage,draft&per_page=100" \
+            '[.[] | {number, summary, severity, html_url}] | length')
 
           # 4. Code scanning (CodeQL — only counts when code scanning is enabled).
-          code_critical=$(gh api "repos/$REPO/code-scanning/alerts?state=open&per_page=100" \
-            --jq '[.[] | select(.rule.security_severity_level=="critical")] | length' 2>/dev/null || echo 0)
-          code_high=$(gh api "repos/$REPO/code-scanning/alerts?state=open&per_page=100" \
-            --jq '[.[] | select(.rule.security_severity_level=="high")] | length' 2>/dev/null || echo 0)
+          code_critical=$(fetch_count "code_scanning/critical" \
+            "repos/$REPO/code-scanning/alerts?state=open&per_page=100" \
+            '[.[] | select(.rule.security_severity_level=="critical")] | length')
+          code_high=$(fetch_count "code_scanning/high" \
+            "repos/$REPO/code-scanning/alerts?state=open&per_page=100" \
+            '[.[] | select(.rule.security_severity_level=="high")] | length')
 
           # Decision tree:
           #   ANY critical (dep or code) → fail the release.
@@ -102,6 +131,10 @@ jobs:
 
           if [ "$dep_high" -gt 0 ] || [ "$code_high" -gt 0 ]; then
             echo "::warning::High-severity findings open: $dep_high dependabot + $code_high code-scanning. The release proceeds; dispatch the security-auditor agent locally to triage."
+          fi
+
+          if [ "${#missing_perms[@]}" -gt 0 ]; then
+            echo "::warning::Security preflight had no GITHUB_TOKEN access to: ${missing_perms[*]} — those signals are reported as 0 (degraded mode, not a release block). Wire a dedicated PAT secret if any of these must hard-gate releases."
           fi
 
   build:
