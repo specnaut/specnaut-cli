@@ -70,12 +70,48 @@ If the user invokes `/specflow-auto specify --manual "<description>"`, run
 `/specflow specify` only and stop. Do not auto-chain. Each subsequent phase must
 be invoked manually by the user.
 
-## Single-phase invocations
+## Mid-chain re-entry
 
-When the user invokes any phase directly (e.g. `/specflow-auto clarify 042`,
-`/specflow-auto plan 042`) — i.e. NOT via the entry point `/specflow-auto specify` — the
-command is one-shot. Do NOT auto-chain. Single-phase invocations exist for
-re-running phases on an existing feature.
+When the user invokes any phase other than `specify` directly (e.g.
+`/specflow-auto plan 042`, `/specflow-auto implement 042`), apply this
+context-aware default:
+
+- **Downstream artefacts missing** → chain. The user is resuming an
+  interrupted flow (long session, fresh shell after compaction, manual
+  review between early phases). Continue through the remaining phases →
+  STOP #2 with the same checkpoints as the entry-point flow.
+- **Downstream artefacts present** → one-shot. The user is re-running a
+  single phase (regenerate `plan.md` after a tweak, re-analyse after a
+  spec edit). Do NOT cascade.
+
+"Downstream artefacts" means files under `.specflow/specs/<feature>/`
+produced by phases AFTER the one being invoked:
+
+| Invoked phase | Downstream artefacts to check |
+|---|---|
+| `clarify`   | `plan.md`, `tasks.md` |
+| `plan`      | `tasks.md`, `data-model.md`, `contracts/`, `quickstart.md` |
+| `tasks`     | `tasks.md` markings beyond the initial generation, or any task marked done |
+| `analyze`   | nothing (analyze is a read-only gate; treat as one-shot unless `--continue`) |
+| `implement` | a merged PR, a `review.md`, or task completion past 50% |
+| `review`    | nothing past review (chain-tail is just `merge`); treat as one-shot unless `--continue` |
+
+If any listed artefact is present, infer one-shot intent. If all are
+absent, chain.
+
+### Explicit overrides
+
+- `/specflow-auto <phase> N --continue` — force the chain regardless of
+  artefact state. Useful when you want to regenerate a phase AND cascade
+  downstream work afterwards (e.g. tweak `plan.md`, then re-run
+  `tasks → analyze → implement → review` from scratch).
+- `/specflow-auto <phase> N --once` — force one-shot regardless. Useful
+  when downstream artefacts haven't been generated yet but you only
+  want to run this single phase right now (e.g. inspect the spec
+  before authorising the rest of the chain).
+
+The flags are mutually exclusive; the explicit form always wins over
+the artefact-detection default.
 
 ## Failure handling
 
@@ -89,5 +125,7 @@ re-running phases on an existing feature.
 ## Context budget
 
 Long features (≥13 story points or ≥30 tasks) may exhaust context during
-`/specflow implement`. If compaction occurs mid-chain, inform the user and let
-them resume manually from the last completed phase.
+`/specflow implement`. If compaction occurs mid-chain, inform the user and
+let them resume from a fresh session — the artefact-detection default in
+"Mid-chain re-entry" above will pick up where the previous run stopped, or
+they can pass `--continue` explicitly.

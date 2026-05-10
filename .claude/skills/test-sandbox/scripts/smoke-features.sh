@@ -170,6 +170,15 @@ check "SKILL.md describes the cascade-check close gate" \
   'grep -q "cascade-check.sh" .claude/skills/backlog/SKILL.md'
 
 echo
+echo "═══ #182  specflow-auto — mid-chain re-entry ═══"
+check "specflow-auto SKILL.md documents mid-chain re-entry" \
+  'grep -q "Mid-chain re-entry" .claude/skills/specflow-auto/SKILL.md'
+check "specflow-auto SKILL.md describes the --continue flag" \
+  'grep -q -- "--continue" .claude/skills/specflow-auto/SKILL.md'
+check "specflow-auto SKILL.md describes the --once flag" \
+  'grep -q -- "--once" .claude/skills/specflow-auto/SKILL.md'
+
+echo
 if [ "$fails" -eq 0 ]; then
   echo "═══ ALL CHECKS PASSED ═══"
   exit 0
