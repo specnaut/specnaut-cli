@@ -62,6 +62,9 @@ Deno.test("buildDocs writes docs/index.html and llms.txt with rendered markdown"
     assertStringIncludes(html, 'href="/llms.txt"');
     // Canonical URL points at the new docs location.
     assertStringIncludes(html, 'href="https://specflow.makerlabs.dev/docs/"');
+    // Docs page consumes the shared design-system stylesheet — no
+    // @deno/gfm CSS embedded inline anymore.
+    assertStringIncludes(html, 'href="/styles.css"');
     // Version surfaced in footer + meta tag so users can tell which Specflow
     // release the docs describe.
     assertStringIncludes(html, '<meta name="specflow-version" content="9.9.9"');

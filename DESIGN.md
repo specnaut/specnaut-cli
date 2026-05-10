@@ -67,6 +67,56 @@ names. No JS required.
 No raw pixel values in components. Off-grid sizes are a code-review block. The landing intentionally
 uses large gaps (`--space-16`, `--space-24`) to keep the layout airy around floating sprites.
 
+## Responsive
+
+**Mobile-first is non-negotiable.** Every layout starts at 375 px and scales up. No `max-width`
+media queries to patch desktop-first CSS; only `min-width` queries are permitted.
+
+### Breakpoint tokens
+
+| Token     | Value    | Viewport context |
+| --------- | -------- | ---------------- |
+| `--bp-sm` | `480px`  | Large phone      |
+| `--bp-md` | `768px`  | Tablet           |
+| `--bp-lg` | `1024px` | Small laptop     |
+| `--bp-xl` | `1280px` | Desktop          |
+
+Canonical query syntax: `@media (min-width: var(--bp-md))` — always `min-width`, never `max-width`.
+
+### Touch target rule
+
+Interactive controls (buttons, links, form inputs) must be at least **44 × 44 px** on touch
+breakpoints (below `--bp-md`). This is non-negotiable for accessibility (WCAG 2.5.5). Note the
+existing Button `min-height: 40px` — add `min-height: 44px` at mobile breakpoints to comply.
+
+### Container rule
+
+Page content uses a single `--container-max: 1200px`. Horizontal padding scales with the viewport:
+`--space-4` (16px) at mobile, `--space-6` (24px) at `--bp-sm`, `--space-12` (48px) at `--bp-md` and
+above. Never use fixed horizontal margins below `--bp-sm`.
+
+### Type scaling rule
+
+Display and H1 sizes must drop ~25–30% on mobile so heroes never wrap past 3 lines.
+
+| Role    | Default (≥ `--bp-md`) | Mobile (< `--bp-md`) |
+| ------- | --------------------- | -------------------- |
+| Display | 48px                  | 32px                 |
+| H1      | 32px                  | 26px                 |
+
+H2–Caption and Code scales are unchanged; they are already legible at 375 px.
+
+### Image rule
+
+Decorative sprite images must shrink proportionally on small viewports: `max-width: 96px` below
+`--bp-sm`. Informational images (OG cards, screenshots) stay fluid via `max-width: 100%` at all
+sizes.
+
+### Audit hook
+
+Audit mode (Mode 3) must include a **Responsive** column in its drift table when reviewing a page,
+flagging any `max-width` media queries or hard-coded mobile overrides as `block` severity.
+
 ## Radius + shadow
 
 | Token           | Value                           | Use                          |
@@ -181,3 +231,7 @@ Append-only. Every change to the tokens above lands a one-liner with the date an
   Chose DM Sans (rounded, friendly, pairs well with pixel sprites) over Inter. Chose slate-indigo
   primary + warm peach accent so sprites carry colour interest while chrome stays neutral.
   Floating-sprite bob rule added at 3 s / 8 px per brief requirement.
+- 2026-05-10 — Added `## Responsive` section; made mobile-first non-negotiable after Kevin flagged
+  the /docs/ page wrapping poorly on phones. Established breakpoint token scale, touch-target floor
+  (44 × 44 px, WCAG 2.5.5), container padding ramp, Display/H1 mobile type scale, and sprite shrink
+  rule. Future pages must specify smallest-breakpoint behaviour first.

@@ -14,7 +14,7 @@
  * Markdown for LLM consumption (llmstxt.org convention) — its path must
  * NEVER move.
  */
-import { CSS, render } from "@deno/gfm";
+import { render } from "@deno/gfm";
 
 const SOURCE = "docs/llms.md";
 const SITE_DIR = "docs/site";
@@ -106,69 +106,59 @@ const CUSTOM_DOMAIN = "specflow.makerlabs.dev";
 const HTML_TEMPLATE = (body: string, version: string) =>
   `<!DOCTYPE html>
 <html lang="en">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>${TITLE}</title>
-  <meta name="description" content="Specflow — enhanced spec-kit CLI with auto-chained workflow, review phase, and backlog. Distributed as a single native binary." />
-  <meta name="specflow-version" content="${version}" />
-  <link rel="canonical" href="https://specflow.makerlabs.dev/docs/" />
-  <link rel="alternate" type="text/markdown" href="/llms.txt" />
-  <style>
-    ${CSS}
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="color-scheme" content="light dark" />
 
-    body {
-      max-width: 880px;
-      margin: 0 auto;
-      padding: 2rem 1.25rem 4rem;
-      color-scheme: light dark;
-      background: var(--color-canvas-default);
-    }
-    .markdown-body {
-      box-sizing: border-box;
-      min-width: 200px;
-      padding: 0;
-    }
-    @media (max-width: 768px) {
-      body { padding: 1rem 0.75rem 3rem; }
-    }
-    .doc-header {
-      margin-bottom: 2rem;
-      padding-bottom: 1rem;
-      border-bottom: 1px solid var(--color-border-muted);
-      font-size: 0.875rem;
-      color: var(--color-fg-muted);
-    }
-    .doc-header a {
-      color: inherit;
-      text-decoration: underline;
-    }
-    .doc-footer {
-      margin-top: 3rem;
-      padding-top: 1rem;
-      border-top: 1px solid var(--color-border-muted);
-      font-size: 0.875rem;
-      color: var(--color-fg-muted);
-    }
-    .doc-footer a {
-      color: inherit;
-      text-decoration: underline;
-    }
-  </style>
-</head>
-<body>
-  <p class="doc-header">
-    ← <a href="/">Specflow home</a>
-  </p>
-  <main class="markdown-body">
+    <title>${TITLE}</title>
+    <meta name="description" content="Specflow — enhanced spec-kit CLI with auto-chained workflow, review phase, and backlog. Distributed as a single native binary." />
+    <meta name="specflow-version" content="${version}" />
+
+    <link rel="canonical" href="https://specflow.makerlabs.dev/docs/" />
+    <link rel="alternate" type="text/markdown" href="/llms.txt" />
+    <link rel="stylesheet" href="/styles.css" />
+
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;600;700&family=JetBrains+Mono:wght@400&display=swap"
+      rel="stylesheet"
+    />
+  </head>
+
+  <body>
+    <header class="site-header">
+      <a href="/" class="brand" aria-label="Specflow home">
+        <span class="brand-mark" aria-hidden="true"></span>
+        <span class="brand-name">Specflow</span>
+      </a>
+      <nav class="site-nav" aria-label="Primary">
+        <a href="/">Home</a>
+        <a href="https://github.com/mkrlabs/specflow">GitHub</a>
+      </nav>
+    </header>
+
+    <main>
+      <section>
+        <p class="doc-header">
+          ← <a href="/">Specflow home</a> · Documentation
+        </p>
+        <article class="markdown-body">
 ${body}
-  </main>
-  <footer class="doc-footer">
-    Specflow <a href="${REPO_URL}/releases/tag/v${version}">v${version}</a>
-    · Raw Markdown for LLMs: <a href="/llms.txt">llms.txt</a>
-    · Source: <a href="${REPO_URL}">github.com/mkrlabs/specflow</a>
-  </footer>
-</body>
+        </article>
+      </section>
+    </main>
+
+    <footer class="site-footer">
+      <p>
+        Specflow
+        <a href="${REPO_URL}/releases/tag/v${version}">v${version}</a>
+        · <a href="/llms.txt">llms.txt</a>
+        · <a href="${REPO_URL}">github.com/mkrlabs/specflow</a>
+      </p>
+    </footer>
+  </body>
 </html>
 `;
 
