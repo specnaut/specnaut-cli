@@ -85,6 +85,22 @@ check "SKILL.md describes Priority/Size field-first contract" \
   'grep -q "Priority" .claude/skills/backlog/SKILL.md && grep -q "Size" .claude/skills/backlog/SKILL.md'
 
 echo
+echo "═══ #180  add.sh --parent flag (sub-issues API wiring) ═══"
+check "add.sh parses --parent flag" \
+  'grep -q -- "--parent" .specflow/scripts/backlog/add.sh'
+check "add.sh references the sub_issues REST endpoint" \
+  'grep -q "sub_issues" .specflow/scripts/backlog/add.sh'
+
+echo
+echo "═══ #180  cascade-check.sh present + executable ═══"
+check "cascade-check.sh present + executable" \
+  '[ -x .specflow/scripts/backlog/cascade-check.sh ]'
+check "cascade-check.sh queries sub_issues for open children" \
+  'grep -q "sub_issues" .specflow/scripts/backlog/cascade-check.sh'
+check "cascade-check.sh exits 11 when children block close" \
+  'grep -q "exit 11" .specflow/scripts/backlog/cascade-check.sh'
+
+echo
 if [ "$fails" -eq 0 ]; then
   echo "═══ ALL GITHUB BACKLOG CHECKS PASSED ═══"
   exit 0
