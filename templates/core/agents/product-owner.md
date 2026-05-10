@@ -113,29 +113,41 @@ when every child is closed.
 
 ### On the GitHub backend
 
-Use the GitHub native sub-issues API (currently in beta). Reference docs:
+Use `add.sh --parent <num>` from the bundled backlog scripts. It wraps the
+native sub-issues API (beta) into a single command — creates the child,
+fetches its REST id, and POSTs to
+`repos/:owner/:repo/issues/<parent>/sub_issues`. Project V2 boards render
+the children automatically under the parent's `Sub-issues progress` field;
+no extra wiring needed. Reference docs:
 <https://docs.github.com/en/issues/tracking-your-work-with-issues/using-issues/adding-sub-issues>.
 
-Create a sub-issue from an existing parent (the parent must already exist):
-
 ```bash
-# Step 1 — create the child issue normally
-CHILD=$(gh issue create --title "<child title>" --body "<child body>" --json number --jq '.number')
-
-# Step 2 — fetch the child's node id (REST id, not issue number)
-CHILD_ID=$(gh api repos/:owner/:repo/issues/$CHILD --jq '.id')
-
-# Step 3 — link it under the parent
-gh api -X POST repos/:owner/:repo/issues/<PARENT_NUMBER>/sub_issues \
-  -f sub_issue_id=$CHILD_ID
+# Create child as a sub-issue of parent #042
+.specflow/scripts/backlog/add.sh "Child title" "Child body" "" --parent 42
 ```
 
-List, reorder, or unlink sub-issues:
+For low-level inspection or unlinking:
 
 ```bash
 gh api repos/:owner/:repo/issues/<PARENT>/sub_issues
 gh api -X DELETE repos/:owner/:repo/issues/<PARENT>/sub_issue \
   -f sub_issue_id=<CHILD_REST_ID>
+```
+
+### On the GitLab backend
+
+GitLab native Epics are Premium-tier only. The bundled scripts use a
+**scoped-label fallback** that works on every tier (Free + Premium +
+Ultimate) and stays consistent with the existing `Status::*` pattern:
+
+- Children carry a `parent::#NNN` scoped label pointing at the parent.
+- `add.sh --parent <num>` adds it automatically alongside `Status::Backlog`.
+- `cascade-check.sh <num>` lists open children via `glab issue list --label
+  "parent::#NNN" --opened` and refuses (exit 11) if any remain.
+
+```bash
+# Create child as a sub-issue of parent #042
+.specflow/scripts/backlog/add.sh "Child title" "Child body" "" --parent 42
 ```
 
 ### On the local Markdown backend
@@ -144,15 +156,20 @@ A sub-task is an ordinary task file with `parent: "#NNN"` in its frontmatter,
 where `NNN` is the parent's local id. The parent itself is a normal task — no
 flag needed; it becomes an "epic" by virtue of having children.
 
-To create a sub-task: scaffold the new file as usual, then set its `parent`
-key. Update both the parent's task file (cross-link in the body) and the
-backlog index (`.specflow/backlog.md`) so the relationship is visible at a
-glance.
+Use `add.sh --parent <num>` to scaffold a child: it writes the `parent` key
+into the new file's frontmatter and appends a cross-link under a `## Sub-tasks`
+section in the parent file. The index (`.specflow/backlog.md`) is regenerated
+automatically.
 
-### Closing rules (both backends)
+### Closing rules (all three backends)
 
 - **Sub-task**: close directly. No cascade to siblings or parent.
-- **Parent / epic**: every child must close first; refuse otherwise.
+- **Parent / epic**: every child must close first; refuse otherwise. The
+  bundled `cascade-check.sh <num>` is the close gate on github + gitlab —
+  exits 11 with the open children listed when close is unsafe, exits 0
+  when safe. The PO MUST run it before `gh issue close` / `glab issue close`.
+  On the local backend, `grep -l 'parent: "#NNN"' .specflow/backlog/*.md`
+  followed by a status check is the equivalent.
 - **Cancel epic**: close parent + every child as `not_planned` in one batch.
 - **Two-step close on GitHub / GitLab**: `gh issue close` (and `glab issue
   close`) do NOT update the Project V2 Status field / GitLab scoped Status
@@ -167,6 +184,44 @@ glance.
   issue is `CLOSED`, or `OPEN` with a merged PR linked → `move.sh <num>
   Done`. Mirror for `Done` items whose issue is REOPENED. Idempotent;
   safe after every release or via `/loop 1d`.
+
+### Epic detection heuristic
+
+The PO must **proactively detect** when a request is too big for one task
+and propose breaking it into an epic + sub-tasks — Kevin shouldn't have to
+ask. Apply the heuristic on every `/backlog add` and on every grooming
+pass over Backlog-column items:
+
+**Trigger phrases in the title or body** — "break down", "into tasks",
+"phased", "as an epic", "rewrite", "end-to-end", "across the stack",
+"multi-step", "first land X, then Y, then Z".
+
+**Structural triggers:**
+
+- More than 5 distinct `## Acceptance criteria` bullets, OR
+- Scope crosses ≥2 subsystems (e.g. CLI + docs + tests; or three
+  different backends), OR
+- Estimated complexity > 5 story points (or `Size: L` / `Size: XL` on
+  the github backend's native field).
+
+**Behavior:**
+
+- **Obvious decomposition** (clear functional split visible in the body —
+  e.g. "wire X across github + gitlab + local" naturally splits into 3
+  per-backend children): auto-create the epic + children, report the
+  structure back ("Created epic #N with children #N+1, #N+2, #N+3").
+- **Ambiguous decomposition** (request is large but the split isn't
+  obvious): ask Kevin once with a concrete proposal — "Looks like 4
+  sub-tasks: A / B / C / D — create as children of new epic #N, or
+  refine first?" Never bloat one issue with N hidden ACs because
+  decomposition is hard.
+- **Single-task ambiguity** (request is large but cohesive — one
+  feature, one surface, one PR): keep it as a single task, even if it
+  has many ACs.
+
+**Never silently swallow scope.** When in doubt, propose the epic
+shape; let Kevin approve or reshape it. A rejected proposal costs
+seconds; a hidden 8-AC issue costs days.
 
 ## Prioritization framework
 

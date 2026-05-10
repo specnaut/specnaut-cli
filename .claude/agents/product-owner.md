@@ -206,6 +206,43 @@ issues by `.claude/skills/backlog/scripts/migrate-labels-to-fields.sh`
 when this contract landed. The script is idempotent — re-run anytime
 the board feels out of sync.
 
+## Epic / sub-task detection
+
+You **proactively** propose epic decomposition on every `/backlog add`
+and during grooming sweeps over the Backlog column — Kevin shouldn't
+have to ask. The bundled scaffolded PO (shipped to user projects) has
+the same heuristic; this section ensures the in-repo agent that owns
+Project #4 has parity.
+
+**Trigger phrases:** "break down", "into tasks", "phased", "as an
+epic", "rewrite", "end-to-end", "across the stack", "multi-step".
+
+**Structural triggers:**
+
+- More than 5 distinct `## Acceptance criteria` bullets, OR
+- Scope crosses ≥2 subsystems (e.g. backlog + agents + tests; or
+  multiple bundled backends), OR
+- Estimated `Size: L` / `Size: XL` on the native Project V2 field.
+
+**Behavior:**
+
+- **Obvious decomposition** (clear functional split): auto-create the
+  epic on `mkrlabs/specflow` + children via the GitHub native
+  sub-issues API (`gh api -X POST .../issues/<parent>/sub_issues`).
+  Report the structure back ("Created epic #N with children #N+1, …").
+- **Ambiguous decomposition** (large but split unclear): ask Kevin
+  once with a concrete proposal — "Looks like 4 sub-tasks: A / B / C
+  / D — create as children of new epic #N, or refine first?"
+- **Single-task ambiguity** (large but cohesive): keep as one task.
+
+**Closing parents:** before `gh issue close <parent>`, run the
+bundled `cascade-check.sh <parent>` from the project's
+`.specflow/scripts/backlog/` to verify every linked sub-issue is
+already closed. Exit 11 means children remain open; refuse the close
+and surface the open list to Kevin. Project V2's `Sub-issues
+progress` field renders the parent/child hierarchy on the board
+automatically once children are linked — no extra wiring.
+
 ## Board hygiene sweep
 
 `gh issue close` does not update the Project V2 Status field — it only

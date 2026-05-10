@@ -152,6 +152,15 @@ check ".specflow/logs/ in bundled .gitignore" \
   'grep -q "\.specflow/logs/" .gitignore'
 
 echo
+echo "═══ #180  PO doc — epic detection heuristic + cascade-check refs ═══"
+check "PO doc documents the epic detection heuristic" \
+  'grep -q "Epic detection heuristic" .claude/agents/product-owner.md'
+check "PO doc references cascade-check.sh as the close gate" \
+  'grep -q "cascade-check.sh" .claude/agents/product-owner.md'
+check "PO doc covers GitLab backend epic story (parent::# scoped label)" \
+  'grep -q "On the GitLab backend" .claude/agents/product-owner.md'
+
+echo
 if [ "$fails" -eq 0 ]; then
   echo "═══ ALL CHECKS PASSED ═══"
   exit 0
