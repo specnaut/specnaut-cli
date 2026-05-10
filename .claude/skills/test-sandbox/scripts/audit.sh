@@ -219,6 +219,10 @@ stale_count=0
 for smoke in "$SMOKE_DIR"/smoke-*.sh; do
   [ -f "$smoke" ] || continue
   smoke_name="$(basename "$smoke")"
+  # The audit's own meta-test plants deliberately-fake `.claude/agents/baseline-*.md`
+  # references inside heredocs to verify the staleness scan reports them. Audit-ing
+  # the auditor would always flag those as a false positive — skip it.
+  [ "$smoke_name" = "smoke-audit.sh" ] && continue
   while IFS= read -r path_ref; do
     [ -z "$path_ref" ] && continue
     if ! resolves "$path_ref"; then

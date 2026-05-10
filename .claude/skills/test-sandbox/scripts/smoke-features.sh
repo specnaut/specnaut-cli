@@ -107,6 +107,19 @@ check "specflow-expert agent body fits Windsurf 12000-char Cascade cap" \
   'deno eval "const s = await Deno.readTextFile(\".claude/agents/specflow-expert.md\"); Deno.exit(s.length <= 12000 ? 0 : 1);"'
 check "vendored knowledge snapshot present" \
   'grep -q "## Vendored knowledge snapshot" .claude/agents/specflow-expert.md'
+
+echo
+echo "═══ #198  ui-ux-designer agent ═══"
+check "ui-ux-designer.md present" \
+  '[ -f .claude/agents/ui-ux-designer.md ]'
+check "ui-ux-designer is manual-dispatch only (disable-model-invocation: true)" \
+  'grep -q "disable-model-invocation: true" .claude/agents/ui-ux-designer.md'
+check "ui-ux-designer declares the three modes" \
+  'grep -q "Discovery interview" .claude/agents/ui-ux-designer.md && grep -q "Edit (DESIGN.md present" .claude/agents/ui-ux-designer.md && grep -q "Audit (explicit" .claude/agents/ui-ux-designer.md'
+check "ui-ux-designer ships the canonical DESIGN.md template" \
+  'grep -q "Canonical DESIGN.md template" .claude/agents/ui-ux-designer.md && grep -q "Brand identity" .claude/agents/ui-ux-designer.md && grep -q "Color palette" .claude/agents/ui-ux-designer.md'
+check "ui-ux-designer fits the Windsurf 12000-char Cascade cap" \
+  'deno eval "const s = await Deno.readTextFile(\".claude/agents/ui-ux-designer.md\"); Deno.exit(s.length <= 12000 ? 0 : 1);"'
 check "live fetch protocol present" \
   'grep -q "## Live fetch protocol" .claude/agents/specflow-expert.md'
 
