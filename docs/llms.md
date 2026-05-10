@@ -356,6 +356,16 @@ repo. Idempotent; never edits or deletes existing labels. The GitHub default `bu
 but never re-created. The full reference lives in `.specflow/LABELS.md` next to the install —
 including a guidance note for local backend users on tagging via task-file frontmatter.
 
+**Priority and Size — native fields are the source of truth.** When a GitHub project ships native
+`Priority` and/or `Size` single-select fields on Project V2, the bundled
+`.specflow/scripts/backlog/set-field.sh` writes the value to the field — and the PO **never** also
+applies a `priority:*` / `size:*` label on the same item. Labels are reserved as a strict fallback
+for projects whose board has no such field; they are not a peer signal. `set-field.sh` exit codes
+tell the caller which path applies: `0` = field updated, `10` = field absent (fall back to label),
+`11` = field present but option missing (add the option, then re-run; only fall back to a label if
+you can't add it), `12` = issue not on the project. `detect-fields.sh` (run once per groom) emits
+the field/option IDs into env vars for case-insensitive matching.
+
 **Epics & sub-tasks.** Big work that needs decomposition lives as a parent **epic** with one or more
 **sub-tasks**. The link mechanism differs per backend, but the contract is the same: parents cannot
 close while any child is still open.
