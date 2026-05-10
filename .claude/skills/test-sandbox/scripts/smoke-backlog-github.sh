@@ -107,6 +107,13 @@ check "cascade-check.sh exits 11 when children block close" \
   'grep -q "exit 11" .specflow/scripts/backlog/cascade-check.sh'
 
 echo
+echo "═══ #202  cascade-check.sh short-circuits on already-closed parent ═══"
+check "cascade-check.sh exits 12 when parent already closed" \
+  'grep -q "exit 12" .specflow/scripts/backlog/cascade-check.sh'
+check "cascade-check.sh inspects parent state before children" \
+  'grep -q "PARENT_STATE" .specflow/scripts/backlog/cascade-check.sh'
+
+echo
 if [ "$fails" -eq 0 ]; then
   echo "═══ ALL GITHUB BACKLOG CHECKS PASSED ═══"
   exit 0
