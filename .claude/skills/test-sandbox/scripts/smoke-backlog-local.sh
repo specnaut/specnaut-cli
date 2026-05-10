@@ -97,6 +97,34 @@ bash .specflow/scripts/backlog/add.sh "Second" "" >/dev/null
   || fail "expected 002-second.md" "$(ls .specflow/backlog/)"
 
 echo
+echo "═══ #180  add --parent (sub-task of #001) ═══"
+out=$(bash .specflow/scripts/backlog/add.sh "Subtask of 1" "" --parent 1)
+echo "$out"
+echo "$out" | grep -q "✓ created #003" \
+  && pass "add --parent prints '✓ created #003'" \
+  || fail "add --parent output" "$out"
+[ -f .specflow/backlog/003-subtask-of-1.md ] \
+  && pass "003-subtask-of-1.md created" \
+  || fail "expected 003-subtask-of-1.md" "$(ls .specflow/backlog/)"
+grep -q '^parent: "#001"$' .specflow/backlog/003-subtask-of-1.md \
+  && pass "child frontmatter declares parent: \"#001\"" \
+  || fail "parent key missing in child" "$(head -10 .specflow/backlog/003-subtask-of-1.md)"
+grep -q "^## Sub-tasks$" .specflow/backlog/001-first-item.md \
+  && pass "parent body grew a Sub-tasks section" \
+  || fail "no Sub-tasks section in parent" "$(tail -10 .specflow/backlog/001-first-item.md)"
+grep -q "#003" .specflow/backlog/001-first-item.md \
+  && pass "parent body cross-links to #003" \
+  || fail "parent body missing #003 link" "$(tail -10 .specflow/backlog/001-first-item.md)"
+
+echo
+echo "═══ #180  add --parent refuses unknown parent ═══"
+if bash .specflow/scripts/backlog/add.sh "Orphan" "" --parent 999 2>/dev/null; then
+  fail "should have refused parent #999" "(unexpected exit 0)"
+else
+  pass "refused to create child of non-existent parent #999"
+fi
+
+echo
 if [ "$fails" -eq 0 ]; then
   echo "═══ ALL BACKLOG CHECKS PASSED ═══"
   exit 0
