@@ -1,0 +1,617 @@
+/* ============================================================
+ * Specflow landing — vanilla CSS implementing DESIGN.md tokens.
+ * ============================================================ */
+
+:root {
+  /* Brand */
+  --color-brand-primary: #5b6af0;
+  --color-brand-accent: #f59e6c;
+
+  /* Neutrals */
+  --color-neutral-0: #ffffff;
+  --color-neutral-50: #f7f8fc;
+  --color-neutral-100: #eceef6;
+  --color-neutral-300: #c8ccdf;
+  --color-neutral-700: #4a4e6a;
+  --color-neutral-900: #16182e;
+
+  /* Semantic */
+  --color-success: #10b981;
+  --color-warning: #f59e0b;
+  --color-danger: #ef4444;
+  --color-info: #3b82f6;
+
+  /* Spacing — 4-point scale */
+  --space-0: 0;
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-10: 40px;
+  --space-12: 48px;
+  --space-16: 64px;
+  --space-24: 96px;
+
+  /* Radii */
+  --radius-none: 0;
+  --radius-sm: 4px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --radius-full: 9999px;
+
+  /* Shadows */
+  --shadow-sm: 0 1px 2px rgb(0 0 0 / 0.05);
+  --shadow-md: 0 4px 8px rgb(0 0 0 / 0.08);
+  --shadow-lg: 0 10px 24px rgb(0 0 0 / 0.12);
+
+  /* Motion */
+  --motion-micro: 150ms;
+  --motion-panel: 250ms;
+  --motion-ease: cubic-bezier(0.4, 0, 0.2, 1);
+
+  /* Type */
+  --font-sans:
+    "DM Sans",
+    ui-sans-serif,
+    system-ui,
+    -apple-system,
+    "Segoe UI",
+    Roboto,
+    "Helvetica Neue",
+    Arial,
+    sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, "SF Mono", Menlo, monospace;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --color-brand-primary: #818cf8;
+    --color-brand-accent: #fdba74;
+    --color-neutral-0: #0c0c10;
+    --color-neutral-50: #13131a;
+    --color-neutral-100: #1c1c27;
+    --color-neutral-300: #3a3a52;
+    --color-neutral-700: #9b9fc0;
+    --color-neutral-900: #f0f1fa;
+    --color-success: #34d399;
+    --color-warning: #fbbf24;
+    --color-danger: #f87171;
+    --color-info: #60a5fa;
+  }
+}
+
+/* ---------------------------------------------------------------
+ * Reset (lightweight — only what the landing actually needs)
+ * --------------------------------------------------------------- */
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+  text-rendering: optimizeLegibility;
+}
+
+body {
+  margin: 0;
+  background: var(--color-neutral-50);
+  color: var(--color-neutral-900);
+  font-family: var(--font-sans);
+  font-size: 16px;
+  line-height: 1.6;
+}
+
+img {
+  display: block;
+  max-width: 100%;
+  height: auto;
+}
+
+a {
+  color: var(--color-brand-primary);
+  text-decoration: none;
+}
+
+a:hover {
+  text-decoration: underline;
+}
+
+a:focus-visible,
+button:focus-visible {
+  outline: 2px solid var(--color-brand-primary);
+  outline-offset: 2px;
+  border-radius: var(--radius-sm);
+}
+
+code {
+  font-family: var(--font-mono);
+  font-size: 0.92em;
+  background: var(--color-neutral-100);
+  border-radius: var(--radius-sm);
+  padding: 1px 5px;
+}
+
+/* ---------------------------------------------------------------
+ * Layout primitives
+ * --------------------------------------------------------------- */
+
+.site-header,
+.site-footer,
+main > section {
+  max-width: 1200px;
+  margin-left: auto;
+  margin-right: auto;
+  padding-left: var(--space-6);
+  padding-right: var(--space-6);
+}
+
+@media (min-width: 768px) {
+  .site-header,
+  .site-footer,
+  main > section {
+    padding-left: var(--space-12);
+    padding-right: var(--space-12);
+  }
+}
+
+/* ---------------------------------------------------------------
+ * Site header
+ * --------------------------------------------------------------- */
+
+.site-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-top: var(--space-6);
+  padding-bottom: var(--space-6);
+}
+
+.brand {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-3);
+  color: var(--color-neutral-900);
+  font-weight: 700;
+  font-size: 18px;
+}
+
+.brand:hover {
+  text-decoration: none;
+}
+
+.brand-mark {
+  width: 28px;
+  height: 28px;
+  border-radius: var(--radius-sm);
+  background: var(--color-brand-primary);
+  position: relative;
+  box-shadow: inset 4px 0 0 var(--color-brand-accent);
+}
+
+.brand-mark::after {
+  content: "";
+  position: absolute;
+  inset: 6px 6px auto auto;
+  width: 6px;
+  height: 6px;
+  background: var(--color-neutral-0);
+  border-radius: var(--radius-sm);
+}
+
+.site-nav {
+  display: flex;
+  gap: var(--space-6);
+  font-weight: 600;
+  font-size: 15px;
+}
+
+.site-nav a {
+  color: var(--color-neutral-700);
+}
+
+.site-nav a:hover {
+  color: var(--color-neutral-900);
+  text-decoration: none;
+}
+
+/* ---------------------------------------------------------------
+ * Hero
+ * --------------------------------------------------------------- */
+
+.hero {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--space-12);
+  padding-top: var(--space-12);
+  padding-bottom: var(--space-16);
+  align-items: center;
+}
+
+@media (min-width: 1024px) {
+  .hero {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: var(--space-16);
+    padding-top: var(--space-16);
+    padding-bottom: var(--space-24);
+  }
+}
+
+.eyebrow {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  font-weight: 400;
+  letter-spacing: 0.04em;
+  color: var(--color-brand-primary);
+  margin: 0 0 var(--space-4);
+  text-transform: uppercase;
+}
+
+.hero-copy h1 {
+  font-size: 40px;
+  line-height: 1.1;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  margin: 0 0 var(--space-6);
+}
+
+@media (min-width: 768px) {
+  .hero-copy h1 {
+    font-size: 56px;
+  }
+}
+
+.lede {
+  font-size: 18px;
+  line-height: 1.6;
+  color: var(--color-neutral-700);
+  margin: 0 0 var(--space-8);
+  max-width: 56ch;
+}
+
+.lede strong {
+  color: var(--color-neutral-900);
+  font-weight: 600;
+}
+
+.cta-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  margin-bottom: var(--space-6);
+}
+
+.cta-note {
+  font-size: 13px;
+  color: var(--color-neutral-700);
+  margin: var(--space-3) 0 0;
+}
+
+.cta-note code {
+  font-size: 12px;
+}
+
+/* ---------------------------------------------------------------
+ * Buttons (DESIGN.md: primary / secondary / ghost)
+ * --------------------------------------------------------------- */
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  min-height: 40px;
+  padding: var(--space-3) var(--space-5);
+  border-radius: var(--radius-md);
+  border: 1px solid transparent;
+  font-family: inherit;
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 1;
+  cursor: pointer;
+  text-decoration: none;
+  transition:
+    box-shadow var(--motion-micro) var(--motion-ease),
+    transform var(--motion-micro) var(--motion-ease),
+    filter var(--motion-micro) var(--motion-ease);
+  box-shadow: var(--shadow-sm);
+}
+
+.btn:hover {
+  box-shadow: var(--shadow-md);
+  text-decoration: none;
+}
+
+.btn:active {
+  transform: scale(0.97);
+}
+
+.btn[disabled],
+.btn[aria-disabled="true"] {
+  opacity: 0.45;
+  pointer-events: none;
+}
+
+.btn-primary {
+  background: var(--color-brand-accent);
+  color: var(--color-neutral-900);
+  border-color: var(--color-brand-accent);
+}
+
+.btn-primary:hover {
+  filter: brightness(1.08);
+}
+
+.btn-secondary {
+  background: var(--color-neutral-100);
+  color: var(--color-neutral-900);
+  border-color: var(--color-neutral-300);
+}
+
+.btn-ghost {
+  background: transparent;
+  color: var(--color-brand-primary);
+  border-color: transparent;
+  box-shadow: none;
+}
+
+.btn-ghost:hover {
+  text-decoration: underline;
+  box-shadow: none;
+}
+
+.btn-icon {
+  font-size: 14px;
+  line-height: 1;
+}
+
+/* ---------------------------------------------------------------
+ * Codeblock (install snippet)
+ * --------------------------------------------------------------- */
+
+.codeblock {
+  background: var(--color-neutral-900);
+  color: var(--color-neutral-0);
+  font-family: var(--font-mono);
+  font-size: 13.5px;
+  line-height: 1.5;
+  padding: var(--space-4) var(--space-6);
+  border-radius: var(--radius-md);
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  margin: 0;
+  white-space: pre;
+  box-shadow: var(--shadow-sm);
+}
+
+.codeblock code {
+  background: transparent;
+  padding: 0;
+  font-size: inherit;
+  color: inherit;
+}
+
+/* ---------------------------------------------------------------
+ * Hero cast (9 floating sprites)
+ * --------------------------------------------------------------- */
+
+.hero-cast {
+  position: relative;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-4);
+  align-items: center;
+  justify-items: center;
+  padding: var(--space-4);
+  aspect-ratio: 1 / 1;
+  max-width: 540px;
+  margin: 0 auto;
+}
+
+.sprite {
+  width: 100%;
+  max-width: 140px;
+  aspect-ratio: 1 / 1;
+  object-fit: contain;
+  image-rendering: pixelated;
+  image-rendering: -moz-crisp-edges;
+  image-rendering: crisp-edges;
+  border-radius: var(--radius-none);
+  background: transparent;
+  animation: sprite-bob 3s ease-in-out infinite alternate;
+  will-change: transform;
+}
+
+/* Stagger the bob so the cast doesn't move in lockstep — each sprite
+   starts at a different point in the same 3s cycle. */
+.sprite-product-owner {
+  animation-delay: 0s;
+}
+.sprite-developer {
+  animation-delay: -0.4s;
+}
+.sprite-qa-tester {
+  animation-delay: -0.8s;
+}
+.sprite-code-reviewer {
+  animation-delay: -1.2s;
+}
+.sprite-security-auditor {
+  animation-delay: -1.6s;
+}
+.sprite-devops-sre {
+  animation-delay: -2.0s;
+}
+.sprite-specflow-expert {
+  animation-delay: -2.4s;
+}
+.sprite-architect {
+  animation-delay: -2.8s;
+}
+.sprite-review-coordinator {
+  animation-delay: -1.0s;
+}
+
+@keyframes sprite-bob {
+  from {
+    transform: translateY(0);
+  }
+  to {
+    transform: translateY(-8px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sprite {
+    animation: none;
+  }
+}
+
+/* ---------------------------------------------------------------
+ * Pillars section ("what lands in your repo")
+ * --------------------------------------------------------------- */
+
+.pillars {
+  padding-top: var(--space-12);
+  padding-bottom: var(--space-16);
+}
+
+.section-title {
+  font-size: 28px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  margin: 0 0 var(--space-10);
+  text-align: center;
+}
+
+@media (min-width: 768px) {
+  .section-title {
+    font-size: 32px;
+  }
+}
+
+.pillar-grid {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--space-6);
+}
+
+@media (min-width: 768px) {
+  .pillar-grid {
+    grid-template-columns: repeat(3, 1fr);
+    gap: var(--space-8);
+  }
+}
+
+.card {
+  background: var(--color-neutral-100);
+  border: 1px solid var(--color-neutral-300);
+  border-radius: var(--radius-lg);
+  padding: var(--space-6);
+  box-shadow: var(--shadow-sm);
+  transition:
+    box-shadow var(--motion-panel) var(--motion-ease),
+    border-color var(--motion-panel) var(--motion-ease);
+}
+
+.card:hover {
+  box-shadow: var(--shadow-md);
+  border-color: color-mix(in oklab, var(--color-brand-primary) 60%, transparent);
+}
+
+.card-num {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 40px;
+  height: 40px;
+  padding: 0 var(--space-3);
+  border-radius: var(--radius-full);
+  background: var(--color-brand-primary);
+  color: var(--color-neutral-0);
+  font-family: var(--font-mono);
+  font-size: 16px;
+  font-weight: 400;
+  margin-bottom: var(--space-4);
+}
+
+.card h3 {
+  font-size: 20px;
+  font-weight: 600;
+  line-height: 1.3;
+  margin: 0 0 var(--space-3);
+}
+
+.card p {
+  margin: 0;
+  color: var(--color-neutral-700);
+  font-size: 15px;
+  line-height: 1.6;
+}
+
+.card code {
+  font-size: 12.5px;
+}
+
+/* ---------------------------------------------------------------
+ * Footer
+ * --------------------------------------------------------------- */
+
+.site-footer {
+  border-top: 1px solid var(--color-neutral-300);
+  margin-top: var(--space-12);
+  padding-top: var(--space-8);
+  padding-bottom: var(--space-8);
+  font-size: 14px;
+  color: var(--color-neutral-700);
+}
+
+.site-footer p {
+  margin: 0;
+  text-align: center;
+}
+
+.site-footer a {
+  color: inherit;
+  text-decoration: underline;
+}
+
+.site-footer a:hover {
+  color: var(--color-neutral-900);
+}
+
+/* ---------------------------------------------------------------
+ * Mobile breakpoint refinements (375 px target)
+ * --------------------------------------------------------------- */
+
+@media (max-width: 480px) {
+  .hero-copy h1 {
+    font-size: 32px;
+  }
+  .lede {
+    font-size: 16px;
+  }
+  .codeblock {
+    font-size: 12px;
+    padding: var(--space-3) var(--space-4);
+  }
+  .hero-cast {
+    gap: var(--space-2);
+    padding: var(--space-2);
+  }
+  .sprite {
+    max-width: 96px;
+  }
+  .site-nav {
+    gap: var(--space-4);
+    font-size: 14px;
+  }
+}
