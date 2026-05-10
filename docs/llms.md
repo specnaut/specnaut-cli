@@ -281,6 +281,24 @@ Two checkpoints inside the chain:
   open risks, business outcome) and asks `Ready to merge?` before invoking `merge`. Reply `yes` to
   finish.
 
+#### Linking a feature to a backlog issue
+
+Pass `--issue <id>` to `/specflow specify` (or to the bundled `create-new-feature.sh`) to record the
+originating backlog issue in `.specflow/feature.json`:
+
+```
+/specflow specify "Fix the off-by-one in pagination" --issue 42
+```
+
+After `/specflow merge` fast-forwards the branch onto `main` and you push, the merge phase reads
+`feature.json.linked_issue`, runs `cascade-check.sh` (github / gitlab) to confirm no sub-issues
+block the close, asks `Close issue #42 on the board now? (yes/no)`, and on `yes` flips the project
+column to `Done` via `move.sh` then dispatches the `product-owner` agent to post a close comment
+with the merged commit range and `gh issue close --reason completed`. The board stays in sync with
+`main` instead of drifting.
+
+`--issue` is opt-in; existing feature trees without the field skip the auto-close silently.
+
 To opt out of the chain entirely (run only `specify` and stop):
 
 ```

@@ -9,6 +9,8 @@ param(
     [Parameter()]
     [long]$Number = 0,
     [switch]$Timestamp,
+    [Parameter()]
+    [long]$Issue = 0,
     [switch]$Help,
     [Parameter(Position = 0, ValueFromRemainingArguments = $true)]
     [string[]]$FeatureDescription
@@ -17,7 +19,7 @@ $ErrorActionPreference = 'Stop'
 
 # Show help if requested
 if ($Help) {
-    Write-Host "Usage: ./create-new-feature.ps1 [-Json] [-DryRun] [-AllowExistingBranch] [-ShortName <name>] [-Number N] [-Timestamp] <feature description>"
+    Write-Host "Usage: ./create-new-feature.ps1 [-Json] [-DryRun] [-AllowExistingBranch] [-ShortName <name>] [-Number N] [-Timestamp] [-Issue <id>] <feature description>"
     Write-Host ""
     Write-Host "Options:"
     Write-Host "  -Json               Output in JSON format"
@@ -26,13 +28,23 @@ if ($Help) {
     Write-Host "  -ShortName <name>   Provide a custom short name (2-4 words) for the branch"
     Write-Host "  -Number N           Specify branch number manually (overrides auto-detection)"
     Write-Host "  -Timestamp          Use timestamp prefix (YYYYMMDD-HHMMSS) instead of sequential numbering"
+    Write-Host "  -Issue <id>         Link this feature to a backlog issue (positive integer);"
+    Write-Host "                      surfaces in JSON output and is persisted to .specflow/feature.json"
+    Write-Host "                      so /specflow merge can close the loop on the project board."
     Write-Host "  -Help               Show this help message"
     Write-Host ""
     Write-Host "Examples:"
     Write-Host "  ./create-new-feature.ps1 'Add user authentication system' -ShortName 'user-auth'"
     Write-Host "  ./create-new-feature.ps1 'Implement OAuth2 integration for API'"
     Write-Host "  ./create-new-feature.ps1 -Timestamp -ShortName 'user-auth' 'Add user authentication'"
+    Write-Host "  ./create-new-feature.ps1 -Issue 42 'Fix the off-by-one in pagination'"
     exit 0
+}
+
+# Validate -Issue: must be a positive integer when provided.
+if ($Issue -lt 0) {
+    Write-Error "Error: -Issue must be a positive integer (got '$Issue')"
+    exit 1
 }
 
 # Check if feature description provided
@@ -360,11 +372,19 @@ if (-not $DryRun) {
     $env:SPECIFY_FEATURE = $branchName
 }
 
+# Render LINKED_ISSUE as a JSON integer when set, JSON null otherwise.
+if ($Issue -gt 0) {
+    $linkedIssueValue = $Issue
+} else {
+    $linkedIssueValue = $null
+}
+
 if ($Json) {
     $obj = [PSCustomObject]@{
         BRANCH_NAME = $branchName
         SPEC_FILE = $specFile
         FEATURE_NUM = $featureNum
+        LINKED_ISSUE = $linkedIssueValue
         HAS_GIT = $hasGit
     }
     if ($DryRun) {
@@ -375,6 +395,9 @@ if ($Json) {
     Write-Output "BRANCH_NAME: $branchName"
     Write-Output "SPEC_FILE: $specFile"
     Write-Output "FEATURE_NUM: $featureNum"
+    if ($Issue -gt 0) {
+        Write-Output "LINKED_ISSUE: $Issue"
+    }
     Write-Output "HAS_GIT: $hasGit"
     if (-not $DryRun) {
         Write-Output "SPECIFY_FEATURE environment variable set to: $branchName"
