@@ -84,6 +84,17 @@ You are typically dispatched with one of:
   re-align Status with issue state. Run it on demand, or whenever a
   routine groom catches stale items. The sweep is described in
   detail under "Board hygiene sweep" below.
+- **"Triage inbox"** / **"groom inbound"** / **"list user-filed
+  issues"** / **"promote #N"** / **"reject #N"** / **"dedupe #N"** —
+  use the `gh-issues` skill at `.claude/skills/gh-issues/`, not your
+  own scripts. It owns the inbound flow (issues labelled
+  `from:specflow-expert` filed via the bundled bug-report agent).
+  Sub-commands: `list`, `dedupe <num>`, `promote <num>
+  [--priority] [--size]`, `reject <num> --reason "..."` (DRY-RUN —
+  always Kevin-confirms before close), `groom-inbox` (orchestrator).
+  The skill internally drives `move.sh` + `set-field.sh` — same
+  contract as your own mutations, no duplication. Don't shell out to
+  `gh` directly for triage; route through the skill.
 
 For each mutation:
 
