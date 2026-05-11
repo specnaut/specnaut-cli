@@ -566,7 +566,12 @@ main > section {
   image-rendering: crisp-edges;
   border-radius: var(--radius-none);
   background: transparent;
-  animation: sprite-bob 3s ease-in-out infinite alternate;
+  /* steps() instead of ease-in-out so the bob lands on integer-pixel
+     positions only. Pixelated rendering + sub-pixel transforms produced
+     visible edge shimmer / white halos against the dark page background;
+     discrete steps eliminate the sub-pixel positions entirely and the
+     "hop" cadence matches the pixel-art aesthetic. */
+  animation: sprite-bob 3s steps(4) infinite alternate;
   will-change: transform;
 }
 
