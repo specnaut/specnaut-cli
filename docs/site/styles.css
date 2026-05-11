@@ -328,6 +328,33 @@ main > section {
   font-weight: 600;
 }
 
+/* Rotating harness name in the lede. Width sized for the longest display
+   name ("GitHub Copilot CLI", 18 chars) so the surrounding text never
+   reflows on swap. Fade duration kept in lockstep with the JS swap timer. */
+.harness-rotator {
+  display: inline-block;
+  min-width: 11ch;
+  transition: opacity 350ms ease;
+}
+
+.harness-rotator.is-fading {
+  opacity: 0;
+}
+
+/* Visually-hidden but available to screen readers. Used to expose the
+   full static harness list while the visible slot rotates. */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
 .cta-row {
   display: flex;
   flex-wrap: wrap;
@@ -547,6 +574,10 @@ main > section {
 @media (prefers-reduced-motion: reduce) {
   .sprite {
     animation: none;
+  }
+
+  .harness-rotator {
+    transition: none;
   }
 }
 

@@ -62,8 +62,10 @@
           <p class="lede">
             Specflow scaffolds the files your AI coding harness consumes — slash-commands,
             spec/plan/tasks templates, agents, and a backlog system — across
-            <strong>Claude Code, Cursor, Codex, Gemini, Windsurf, Copilot, OpenCode, and
-              Antigravity</strong>. One native binary. No Python.
+            <strong class="harness-rotator" aria-hidden="true">Claude Code</strong><span
+              class="sr-only"
+            >Claude Code, Cursor, Codex CLI, Gemini CLI, Windsurf, GitHub Copilot CLI, OpenCode,
+              Antigravity</span>. One native binary. No Python.
           </p>
 
           <div class="cta-row">
@@ -159,8 +161,10 @@
     </footer>
 
     <script>
-      // Copy-to-clipboard for the install snippet. Inline because there's exactly one
-      // interaction on this page and a separate script file would just be ceremony.
+      // Inline because the page has only a couple of small interactions and
+      // a separate script file would just be ceremony.
+
+      // Copy-to-clipboard for the install snippet.
       document.addEventListener("click", (e) => {
         const btn = e.target.closest("[data-copy-target]");
         if (!btn) return;
@@ -182,6 +186,37 @@
           setTimeout(restore, 2500);
         });
       });
+
+      // Lede harness rotator. Cycles through the 8 supported harness display
+      // names every 2s with a fade transition. Static fallback for reduced-motion.
+      (() => {
+        const rotator = document.querySelector(".harness-rotator");
+        if (!rotator) return;
+        const harnesses = [
+          "Claude Code",
+          "Cursor",
+          "Codex CLI",
+          "Gemini CLI",
+          "Windsurf",
+          "GitHub Copilot CLI",
+          "OpenCode",
+          "Antigravity",
+        ];
+        const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
+        if (reduceMotion.matches) {
+          rotator.textContent = "your AI coding harness";
+          return;
+        }
+        let i = 0;
+        setInterval(() => {
+          rotator.classList.add("is-fading");
+          setTimeout(() => {
+            i = (i + 1) % harnesses.length;
+            rotator.textContent = harnesses[i];
+            rotator.classList.remove("is-fading");
+          }, 350);
+        }, 2000);
+      })();
     </script>
   </body>
 </html>
