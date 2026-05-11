@@ -2,6 +2,7 @@ import { stringify as stringifyToml } from "@std/toml";
 import type { BundleOptions, Harness } from "../../application/ports.ts";
 import type { CoreBundle, CoreEntry } from "../../domain/core_bundle.ts";
 import type { Bundle } from "../../domain/template.ts";
+import { HARNESS_STATIC } from "../../templates_bundle.ts";
 import { ensureSkillFrontmatter, skillFolderName } from "./skill_folder.ts";
 import { frontmatterField, splitFrontmatter } from "./frontmatter.ts";
 import { applyBackend, backlogScriptDestination } from "./backlog_filter.ts";
@@ -91,6 +92,10 @@ export class CodexHarness implements Harness {
           };
           break;
       }
+    }
+    const staticFiles = HARNESS_STATIC[this.key] ?? {};
+    for (const [dest, file] of Object.entries(staticFiles)) {
+      out[dest] = file;
     }
     return out;
   }

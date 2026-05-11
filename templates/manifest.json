@@ -92,6 +92,8 @@
     { "harness": "claude", "destination": ".claude/hooks/protect-generated.sh", "source": "harness-specific/claude/hooks/protect-generated.sh", "executable": true },
     { "harness": "claude", "destination": ".claude/hooks/log-subagent.sh", "source": "harness-specific/claude/hooks/log-subagent.sh", "executable": true },
     { "harness": "claude", "destination": ".claude/hooks/check-backlog-prereqs.sh", "source": "harness-specific/claude/hooks/check-backlog-prereqs.sh", "executable": true },
+    { "harness": "codex", "destination": ".codex/AGENTS.md", "source": "harness-specific/codex/AGENTS.md" },
+    { "harness": "codex", "destination": ".codex/goal.md", "source": "harness-specific/codex/goal.md" },
     { "harness": "cursor", "destination": ".cursor/rules/specify-rules.mdc", "source": "harness-specific/cursor/specify-rules.mdc" }
   ]
 }

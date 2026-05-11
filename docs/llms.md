@@ -256,6 +256,14 @@ All harnesses share the same source-of-truth content in `templates/core/`. The p
 in `src/infrastructure/harness/` map that core bundle to each harness's directory layout and
 frontmatter conventions.
 
+Some harnesses also ship harness-specific helper files alongside the core scaffold:
+
+- **Claude** — `.claude/CLAUDE.md` (harness reference) + `.claude/loop.md` (default prompt for
+  `/loop`, Claude's recurring periodic-maintenance feature).
+- **Codex** — `.codex/AGENTS.md` (harness reference) + `.codex/goal.md` (default prompt for `/goal`,
+  Codex's experimental one-shot long-horizon feature; enable via `goals = true` under `[features]`
+  in `config.toml`).
+
 ## What makes Specflow different from upstream Spec Kit
 
 Specflow is a fork of the official `specify` CLI with four additions:

@@ -74,6 +74,18 @@ Deno.test("specflow init --ai codex scaffolds a Codex layout", async () => {
     assertEquals(typeof parsed.description, "string");
     assertEquals(typeof parsed.developer_instructions, "string");
 
+    // Codex harness reference doc + /goal prompt template
+    assertEquals(await exists(join(root, ".codex/AGENTS.md")), true);
+    assertEquals(await exists(join(root, ".codex/goal.md")), true);
+    const codexAgentsMd = await Deno.readTextFile(join(root, ".codex/AGENTS.md"));
+    assertEquals(codexAgentsMd.includes("# Codex Reference"), true);
+    assertEquals(codexAgentsMd.includes("## Optional integrations"), true);
+    assertEquals(codexAgentsMd.includes(".codex/goal.md"), true);
+    const codexGoalMd = await Deno.readTextFile(join(root, ".codex/goal.md"));
+    assertEquals(codexGoalMd.includes("# Project goal prompt"), true);
+    assertEquals(codexGoalMd.includes("## Default goal prompt"), true);
+    assertEquals(codexGoalMd.includes("/specflow groom"), true);
+
     // Top-level skill folders post-consolidation: specflow router +
     // specflow-auto + specflow-review alias + specflow-backlog = 4.
     const agentsSkillsCount = (await Array.fromAsync(
