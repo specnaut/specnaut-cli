@@ -257,7 +257,99 @@ Test every color combination:
 - **Large text (24px or 19px bold):** 3:1 minimum
 - **UI components (buttons, inputs):** 3:1 minimum
 
-**Tool:** WebAIM Contrast Checker (https://webaim.org/resources/contrastchecker/)
+**Tools:**
+
+- Coolors Contrast Checker (https://coolors.co/contrast-checker/) — pair two
+  hex values from a palette and read the ratio directly. Works on the URL
+  itself (e.g. `/contrast-checker/112a46-acc8e5`).
+- WebAIM Contrast Checker (https://webaim.org/resources/contrastchecker/) —
+  identical math, alternative UI.
+
+### Color Accessibility Theory
+
+Contrast checking after the fact is firefighting — you keep finding pairs
+that fail and patching them. Design the palette to be accessible from the
+start and the audit becomes a confirmation, not a rescue.
+
+**1. Pick hue and lightness together, not just hue.**
+
+Two colors of the same lightness will never have enough contrast no matter
+how different the hue. WCAG contrast is luminance-based — it ignores hue
+entirely. Heuristics:
+
+- Pair a **dark** (Y < 0.2) with a **light** (Y > 0.5) value. The Y gap
+  drives the ratio.
+- Same-family pairs (two teals, two reds) only work when the lightness gap
+  is large. Two mid-saturation greens at the same lightness will sit at
+  ~1.2:1 — invisible.
+- Pure white on pure black is 21:1. You almost never need that; aim for
+  the AA floor (4.5:1 normal text, 3:1 large text and UI boundaries) and
+  go up only where it matters.
+
+**2. Worked examples — proposed palette**
+
+Palette: `#160F29` (navy) · `#246A73` (teal) · `#368F8B` (light teal) ·
+`#F3DFC1` (cream) · `#DDBEA8` (beige). Validate any of the pairs below at
+https://coolors.co/contrast-checker/ by editing the two hex values in the
+URL.
+
+| Foreground   | Background   | Ratio      | Verdict                                          |
+| ------------ | ------------ | ---------- | ------------------------------------------------ |
+| `#F3DFC1` cream | `#160F29` navy | **14.0:1** | AAA on everything — body text, captions, badges. |
+| `#160F29` navy | `#368F8B` light teal | **4.8:1** | AA normal text. Safe for button labels on the primary surface. |
+| `#DDBEA8` beige | `#246A73` teal | **3.6:1** | AA large text and AA UI components only. **Not** for normal-size body text — flag this in code review. |
+
+The third row is the trap that bites teams: it "passes 3:1" so it ships,
+then a contrast audit flags every paragraph rendered in beige on teal.
+Encode the role in the token name — `--color-on-primary-large` vs.
+`--color-on-primary-body` — so the wrong pair can't be used by accident.
+
+**3. Color-blindness safety**
+
+Roughly 8% of men and 0.5% of women have some form of color-vision
+deficiency — deuteranopia (green-weak) and protanopia (red-weak) are the
+common ones. Two rules:
+
+- **Never communicate state with hue alone.** A red dot and a green dot
+  look identical to a deuteranope. Pair the hue with a glyph (✓ / ✗), a
+  position (left = error, right = success), or a label.
+- **Test the palette under simulation.** Coolors has a "Color blindness"
+  view on every palette; Sim Daltonism (Mac) and Chrome DevTools'
+  Rendering panel both apply live filters.
+
+**4. The 60-30-10 rule, accessibility-aware**
+
+The classic interior-design rule (60% dominant, 30% secondary, 10% accent)
+works for UI when each share maps to a contrast role:
+
+- **60% dominant** — page background and large surfaces. Pick from the
+  lightest two values (`#F3DFC1`, `#DDBEA8`) in light mode, or the darkest
+  (`#160F29`, `#246A73`) in dark mode.
+- **30% secondary** — cards, panels, dividers. One step closer to the
+  dominant in luminance so it reads as elevation, not contrast (e.g.
+  cream on beige).
+- **10% accent** — CTAs, links, focus rings. Must clear 3:1 against the
+  dominant (WCAG 1.4.11). The teal pair (`#246A73` / `#368F8B`) is the
+  accent role in this palette because it sits in the contrast valley
+  between cream/beige and navy.
+
+If your accent fails 3:1 against the dominant, you have the wrong accent —
+not the wrong CTA design.
+
+**5. Semantic meaning vs. cultural perception**
+
+Red = error, green = success is a Western convention, not a universal one.
+In China red signals luck and prosperity; in some financial UIs around the
+world red signals *upward* movement. Two consequences:
+
+- Don't lean on the convention to do the work — always pair with text or
+  an icon. ("Payment failed" + red is fine; red alone is not.)
+- If the product ships in multiple locales, audit the palette against the
+  target cultures. The accessibility cost is the same either way; the
+  cultural cost compounds.
+
+The contrast checker tells you whether the pair is *legible*. It can't
+tell you whether the pair is *meaningful* to the user in front of it.
 
 ### Keyboard Navigation
 
