@@ -7,6 +7,13 @@
   --color-brand-primary: #5b6af0;
   --color-brand-accent: #f59e6c;
 
+  /* Primary button — teal pair that meets WCAG 1.4.11 (≥3:1 boundary vs page bg)
+     and 1.4.3 (≥4.5:1 label vs button bg). Light: #246A73/white = 5.30:1 vs page,
+     5.67:1 vs label. The previous #f59e6c boundary on #f7f8fc was ~2.09:1. */
+  --color-btn-primary-bg: #246a73;
+  --color-btn-primary-fg: #ffffff;
+  --color-btn-primary-border: #246a73;
+
   /* Neutrals */
   --color-neutral-0: #ffffff;
   --color-neutral-50: #f7f8fc;
@@ -87,6 +94,12 @@
     --color-warning: #fbbf24;
     --color-danger: #f87171;
     --color-info: #60a5fa;
+
+    /* Dark mode: lighter teal pops against the dark page bg.
+       #368F8B on #13131a = 5.10:1 vs page, 5.65:1 vs near-black label. */
+    --color-btn-primary-bg: #368f8b;
+    --color-btn-primary-fg: #0c0c10;
+    --color-btn-primary-border: #368f8b;
   }
 }
 
@@ -382,9 +395,9 @@ main > section {
 }
 
 .btn-primary {
-  background: var(--color-brand-accent);
-  color: var(--color-neutral-900);
-  border-color: var(--color-brand-accent);
+  background: var(--color-btn-primary-bg);
+  color: var(--color-btn-primary-fg);
+  border-color: var(--color-btn-primary-border);
 }
 
 .btn-primary:hover {
