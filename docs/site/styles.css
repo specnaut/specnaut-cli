@@ -83,6 +83,7 @@
     Arial,
     sans-serif;
   --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, "SF Mono", Menlo, monospace;
+  --font-pixel: "Press Start 2P", "JetBrains Mono", ui-monospace, monospace;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -514,6 +515,27 @@ main > section {
     gap: var(--space-4);
     padding: var(--space-4);
   }
+}
+
+/* Each sprite is wrapped in a <figure> so its role can be labeled via
+   <figcaption> in pixel-art type. The figure becomes the grid item;
+   the sprite + caption stack vertically inside it. */
+.hero-cast figure {
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+.hero-cast figcaption {
+  font-family: var(--font-pixel);
+  font-size: 7px;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  text-align: center;
+  color: var(--color-neutral-700);
+  line-height: 1.3;
 }
 
 .sprite {
