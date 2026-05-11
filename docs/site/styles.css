@@ -14,6 +14,11 @@
   --color-btn-primary-fg: #ffffff;
   --color-btn-primary-border: #246a73;
 
+  /* Code blocks — pinned to fixed dark values so they stay dark regardless
+     of the OS color scheme. Not overridden in the dark-mode media query. */
+  --codeblock-bg: #16182e;
+  --codeblock-fg: #ffffff;
+
   /* Neutrals */
   --color-neutral-0: #ffffff;
   --color-neutral-50: #f7f8fc;
@@ -459,8 +464,8 @@ main > section {
  * --------------------------------------------------------------- */
 
 .codeblock {
-  background: var(--color-neutral-900);
-  color: var(--color-neutral-0);
+  background: var(--codeblock-bg);
+  color: var(--codeblock-fg);
   font-family: var(--font-mono);
   font-size: 12px;
   line-height: 1.5;
@@ -815,8 +820,8 @@ main > section {
 }
 
 .markdown-body pre {
-  background: var(--color-neutral-900);
-  color: var(--color-neutral-0);
+  background: var(--codeblock-bg);
+  color: var(--codeblock-fg);
   border-radius: var(--radius-md);
   padding: var(--space-4) var(--space-5);
   overflow-x: auto;
