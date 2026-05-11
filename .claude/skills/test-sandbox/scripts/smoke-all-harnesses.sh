@@ -77,6 +77,35 @@ for h in "${HARNESSES[@]}"; do
   pass "$h: scaffold ok ($expected/ + lock declares harness=$h)"
 done
 
+# Harness-specific helper files. Each pair (file path + content anchor)
+# asserts that the harness scaffolds its "ergonomics" extras on top of
+# the generic root + lock. Kept inline (not a loop over harnesses) so
+# additions stay obvious in code review.
+#
+# - Claude: .claude/CLAUDE.md (harness reference) + .claude/loop.md
+#   (default prompt for /loop, recurring maintenance).
+# - Codex: .codex/AGENTS.md (harness reference) + .codex/goal.md
+#   (default prompt for /goal, one-shot long-horizon maintenance,
+#   shipped in v1.2.1).
+check_helper() {
+  local harness="$1" path="$2" anchor="$3"
+  local file="$ROOT/sandbox/$NAME-$harness/$path"
+  if [ ! -f "$file" ]; then
+    fail "$harness helper" "$path missing"
+    return
+  fi
+  if ! grep -q "$anchor" "$file"; then
+    fail "$harness helper" "$path missing anchor '$anchor'"
+    return
+  fi
+  pass "$harness helper: $path ok"
+}
+
+check_helper claude ".claude/CLAUDE.md" "^# Claude Reference"
+check_helper claude ".claude/loop.md"   "^# Project loop prompt"
+check_helper codex  ".codex/AGENTS.md"  "^# Codex Reference"
+check_helper codex  ".codex/goal.md"    "^# Project goal prompt"
+
 echo
 if [ "$fails" -eq 0 ]; then
   echo "═══ ALL 8 HARNESSES PASSED ═══"
