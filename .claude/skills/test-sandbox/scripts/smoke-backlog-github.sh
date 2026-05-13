@@ -114,6 +114,17 @@ check "cascade-check.sh inspects parent state before children" \
   'grep -q "PARENT_STATE" .specflow/scripts/backlog/cascade-check.sh'
 
 echo
+echo "═══ #222  REST/CLI first; raw graphql only for ProjectV2 mutations ═══"
+check "list.sh reads via gh issue list --json projectItems (REST-ish CLI)" \
+  'grep -q "gh issue list" .specflow/scripts/backlog/list.sh && grep -q "projectItems" .specflow/scripts/backlog/list.sh'
+check "list.sh does NOT use bulky gh api graphql for the read path" \
+  '! grep -q "gh api graphql" .specflow/scripts/backlog/list.sh'
+check "move.sh keeps targeted gh api graphql for item-ID lookup" \
+  'grep -q "gh api graphql" .specflow/scripts/backlog/move.sh && grep -q "projectItems(first:5)" .specflow/scripts/backlog/move.sh'
+check "move.sh mutation uses gh project item-edit (CLI wrapper)" \
+  'grep -q "gh project item-edit" .specflow/scripts/backlog/move.sh'
+
+echo
 if [ "$fails" -eq 0 ]; then
   echo "═══ ALL GITHUB BACKLOG CHECKS PASSED ═══"
   exit 0
