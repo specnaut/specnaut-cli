@@ -348,8 +348,14 @@ A Product Owner agent gates every mutation, and supports three backends:
   status, parent, depends_on, spec, tags, created). Sub-tasks reference their parent via
   `parent: "#NNN"`.
 - **GitHub Issues + Projects** (`--backlog github`) — the agent talks directly to the backend via
-  `gh` CLI; epics use the native sub-issues API. No local mirror, no sync command — the remote is
-  the source of truth.
+  `gh` CLI; epics use the native sub-issues API. Read paths use
+  `gh issue list/view --json
+  projectItems` (REST-ish CLI projection of Project V2 fields, ~1–2
+  GraphQL points per call), and raw `gh api graphql` is reserved for the one operation with no CLI
+  equivalent (`gh project
+  item-edit`'s underlying `updateProjectV2ItemFieldValue` mutation). Keeps
+  backlog grooming under the shared 5,000-points-per-hour GitHub API quota. No local mirror, no sync
+  command — the remote is the source of truth.
 - **GitLab Issues** (`--backlog gitlab`) — the agent talks to GitLab via `glab` CLI. Status is
   tracked via scoped `Status::*` labels rather than a native column field; sub-tasks use a
   `parent::#NNN` scoped label (Free-tier compatible — native GitLab Epics are Premium-only).
