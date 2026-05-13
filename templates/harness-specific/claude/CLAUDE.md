@@ -20,6 +20,16 @@ team's needs.
   specs); edit `loop.md` freely to add project-specific checks. See
   https://code.claude.com/docs/fr/scheduled-tasks.
 
+- **Goal-directed sessions** — `/goal <condition>` keeps Claude taking
+  turns until a fast model judges the condition met. Best conditions
+  state one measurable end state and a turn cap, e.g. `/goal the Ready
+  column on the Specflow Project is empty and deno task test exits 0,
+  or stop after 20 turns`. Run headless with `claude -p "/goal …"`.
+  Check status with `/goal`; cancel with `/goal clear` (aliases:
+  `stop`/`off`/`reset`/`cancel`). For recurring periodic checks use
+  `/loop` (see `.claude/loop.md`) instead. See
+  https://code.claude.com/docs/fr/goal.
+
 - **Async notifications** — install one of the channel plugins (Telegram,
   Discord, iMessage) so Claude can ping you when a long-running task or
   agent dispatch finishes. See

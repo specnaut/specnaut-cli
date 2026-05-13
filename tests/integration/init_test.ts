@@ -487,3 +487,21 @@ Deno.test("specflow init scaffolds the consolidated router skill + 11 phase docs
     );
   });
 });
+
+Deno.test("scaffolded .claude/CLAUDE.md documents /goal", async () => {
+  await withTempDir(async (dir) => {
+    const { code, stderr } = await runSpecflow(
+      ["init", "demo", "--no-git", "--ai", "claude", "--backlog", "local"],
+      { cwd: dir },
+    );
+    assertEquals(code, 0, `init failed: ${stderr}`);
+    const claudeMd = await Deno.readTextFile(
+      join(dir, "demo/.claude/CLAUDE.md"),
+    );
+    assertStringIncludes(claudeMd, "## Optional integrations");
+    assertStringIncludes(claudeMd, "Goal-directed sessions");
+    assertStringIncludes(claudeMd, "/goal");
+    assertStringIncludes(claudeMd, "code.claude.com/docs/fr/goal");
+    assertStringIncludes(claudeMd, ".claude/loop.md");
+  });
+});
