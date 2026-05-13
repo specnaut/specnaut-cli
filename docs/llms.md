@@ -258,8 +258,8 @@ frontmatter conventions.
 
 Some harnesses also ship harness-specific helper files alongside the core scaffold:
 
-- **Claude** — `.claude/CLAUDE.md` (harness reference) + `.claude/loop.md` (default prompt for
-  `/loop`, Claude's recurring periodic-maintenance feature).
+- **Claude** — `.claude/CLAUDE.md` (harness reference, including `/goal` and `/loop` usage notes) +
+  `.claude/loop.md` (default prompt for `/loop`, Claude's recurring periodic-maintenance feature).
 - **Codex** — `.codex/AGENTS.md` (harness reference) + `.codex/goal.md` (default prompt for `/goal`,
   Codex's experimental one-shot long-horizon feature; enable via `goals = true` under `[features]`
   in `config.toml`).
