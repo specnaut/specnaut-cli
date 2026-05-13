@@ -1,5 +1,10 @@
 import { parseArgs as stdParseArgs } from "@std/cli/parse-args";
-import { type BacklogBackend, KNOWN_BACKLOG_BACKENDS } from "../domain/installed_lock.ts";
+import {
+  type BacklogBackend,
+  KNOWN_BACKLOG_BACKENDS,
+  KNOWN_VERSION_SCHEMES,
+  type VersionScheme,
+} from "../domain/installed_lock.ts";
 
 function validateBacklogArg(
   raw: string | null,
@@ -9,6 +14,18 @@ function validateBacklogArg(
   if (raw === null) return { ok: true, value: null };
   if ((KNOWN_BACKLOG_BACKENDS as ReadonlyArray<string>).includes(raw)) {
     return { ok: true, value: raw as BacklogBackend };
+  }
+  return { ok: false };
+}
+
+function validateSchemeArg(
+  raw: string | null,
+):
+  | { ok: true; value: VersionScheme | null }
+  | { ok: false } {
+  if (raw === null) return { ok: true, value: null };
+  if ((KNOWN_VERSION_SCHEMES as ReadonlyArray<string>).includes(raw)) {
+    return { ok: true, value: raw as VersionScheme };
   }
   return { ok: false };
 }
@@ -56,6 +73,11 @@ export type Intent =
      * `git remote get-url origin`.
      */
     backlogRepo: string | null;
+    /**
+     * Explicit `--scheme` value. `null` triggers the interactive picker
+     * (TTY) or the auto-detection default (non-TTY).
+     */
+    scheme: "semver" | "date" | null;
     force: boolean;
   }
   | { kind: "self-update"; checkOnly: boolean }
@@ -93,7 +115,7 @@ export function parseArgs(argv: string[]): Intent {
       "project",
       "reset-baseline",
     ],
-    string: ["ai", "backlog", "backlog-url", "backlog-repo"],
+    string: ["ai", "backlog", "backlog-url", "backlog-repo", "scheme"],
     alias: { v: "version", h: "help" },
   });
 
@@ -129,6 +151,12 @@ export function parseArgs(argv: string[]): Intent {
     const backlogRepoRaw = typeof parsed["backlog-repo"] === "string"
       ? (parsed["backlog-repo"] as string)
       : null;
+    const schemeProvided = typeof parsed.scheme === "string";
+    const schemeRaw = schemeProvided ? (parsed.scheme as string) : null;
+    const schemeResult = validateSchemeArg(schemeRaw);
+    if (!schemeResult.ok) {
+      return { kind: "unknown", received: `init --scheme ${schemeRaw}` };
+    }
     return {
       kind: "init",
       projectName: rest[0] ?? null,
@@ -138,6 +166,7 @@ export function parseArgs(argv: string[]): Intent {
       backlog: backlogResult.value,
       backlogUrl: backlogUrlRaw,
       backlogRepo: backlogRepoRaw,
+      scheme: schemeResult.value,
       force: Boolean(parsed.force),
     };
   }

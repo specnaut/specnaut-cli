@@ -3,6 +3,7 @@ import type { CoreBundle, CoreEntry } from "../../domain/core_bundle.ts";
 import type { Bundle } from "../../domain/template.ts";
 import { HARNESS_STATIC } from "../../templates_bundle.ts";
 import { applyBackend, backlogScriptDestination } from "./backlog_filter.ts";
+import { applyScheme, phaseScriptDestination } from "./scheme_filter.ts";
 import { ensureSkillFrontmatter } from "./skill_folder.ts";
 
 function destinationFor(entry: CoreEntry): string {
@@ -25,6 +26,8 @@ function destinationFor(entry: CoreEntry): string {
       // can load them via `phases/<phase>.md` from its own directory.
       if (!entry.suffix) throw new Error(`phase needs suffix: ${entry.name}`);
       return `.claude/skills/specflow/phases/${entry.suffix}`;
+    case "phase-script":
+      return phaseScriptDestination(entry);
     case "backlog-script":
       return backlogScriptDestination(entry);
     case "spec-root":
@@ -44,8 +47,9 @@ export class ClaudeHarness implements Harness {
   mapBundle(core: CoreBundle, opts: BundleOptions): Bundle {
     const out: Bundle = {};
     for (const raw of core) {
-      const entry = applyBackend(raw, opts);
-      if (entry === null) continue;
+      const backendApplied = applyBackend(raw, opts);
+      if (backendApplied === null) continue;
+      const entry = applyScheme(backendApplied, opts);
 
       // Skill-folder categories ship as `.claude/skills/<name>/SKILL.md`.
       // Claude Code derives the skill name from the folder, but we inject

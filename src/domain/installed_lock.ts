@@ -25,6 +25,12 @@ export const KNOWN_BACKLOG_BACKENDS: ReadonlyArray<BacklogBackend> = [
   "gitlab",
 ];
 
+export type VersionScheme = "semver" | "date";
+export const KNOWN_VERSION_SCHEMES: ReadonlyArray<VersionScheme> = [
+  "semver",
+  "date",
+];
+
 export type LockEntry = {
   readonly sha256: string;
   readonly installedAt: string;
@@ -35,6 +41,7 @@ export type InstalledLock = {
   readonly version: 2;
   readonly harness: KnownHarness;
   readonly backlogBackend: BacklogBackend;
+  readonly versionScheme: VersionScheme;
   readonly templatesVersion: string;
   readonly entries: ReadonlyMap<string, LockEntry>;
 };
@@ -77,6 +84,16 @@ export function parseLock(yaml: string): InstalledLock {
     ? (rawBackend as BacklogBackend)
     : "local";
 
+  // Default to "semver" when absent: existing locks pre-date the
+  // tag-release pack. SemVer is the safer default for unknown projects
+  // (a library mis-classified as date-based is more disruptive than the
+  // reverse — consumers downstream reason about version numbers).
+  const rawScheme = root.version_scheme;
+  const versionScheme: VersionScheme = typeof rawScheme === "string" &&
+      KNOWN_VERSION_SCHEMES.includes(rawScheme as VersionScheme)
+    ? (rawScheme as VersionScheme)
+    : "semver";
+
   const templatesVersion = root.templates_version;
   if (typeof templatesVersion !== "string") {
     throw new Error("missing top-level templates_version");
@@ -97,7 +114,14 @@ export function parseLock(yaml: string): InstalledLock {
     }
     entries.set(path, { sha256, installedAt, templatesVersion: ver });
   }
-  return { version: 2, harness, backlogBackend, templatesVersion, entries };
+  return {
+    version: 2,
+    harness,
+    backlogBackend,
+    versionScheme,
+    templatesVersion,
+    entries,
+  };
 }
 
 export function serializeLock(lock: InstalledLock): string {
@@ -115,6 +139,7 @@ export function serializeLock(lock: InstalledLock): string {
     version: 2,
     harness: lock.harness,
     backlog_backend: lock.backlogBackend,
+    version_scheme: lock.versionScheme,
     templates_version: lock.templatesVersion,
     entries: entriesObj,
   });

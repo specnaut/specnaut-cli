@@ -82,6 +82,7 @@ Deno.test("InitProjectUseCase writes the bundle to the target dir (happy path)",
     lockStore: fakeLockStore(),
     harness: fakeClaudeHarness(),
     backlogBackend: "local",
+    versionScheme: "semver",
     core: SAMPLE_CORE,
     ensureDir: () => Promise.resolve(),
   });
@@ -105,6 +106,7 @@ Deno.test("InitProjectUseCase fails with 'conflicts' when target already has spe
     lockStore: fakeLockStore(),
     harness: fakeClaudeHarness(),
     backlogBackend: "local",
+    versionScheme: "semver",
     core: SAMPLE_CORE,
     ensureDir: () => Promise.resolve(),
   });
@@ -126,6 +128,7 @@ Deno.test("InitProjectUseCase reports lockExists=true when conflicts hit a previ
     version: 2,
     harness: "claude",
     backlogBackend: "local",
+    versionScheme: "semver",
     templatesVersion: "0.0.0",
     entries: new Map(),
   };
@@ -135,6 +138,7 @@ Deno.test("InitProjectUseCase reports lockExists=true when conflicts hit a previ
     lockStore: fakeLockStore({ existing: existingLock }),
     harness: fakeClaudeHarness(),
     backlogBackend: "local",
+    versionScheme: "semver",
     core: SAMPLE_CORE,
     ensureDir: () => Promise.resolve(),
   });
@@ -157,6 +161,7 @@ Deno.test("InitProjectUseCase calls git.init when repo not initialized and initG
     lockStore: fakeLockStore(),
     harness: fakeClaudeHarness(),
     backlogBackend: "local",
+    versionScheme: "semver",
     core: SAMPLE_CORE,
     ensureDir: () => Promise.resolve(),
   });
@@ -172,6 +177,7 @@ Deno.test("InitProjectUseCase skips git.init when initGit=false", async () => {
     lockStore: fakeLockStore(),
     harness: fakeClaudeHarness(),
     backlogBackend: "local",
+    versionScheme: "semver",
     core: SAMPLE_CORE,
     ensureDir: () => Promise.resolve(),
   });
@@ -187,6 +193,7 @@ Deno.test("InitProjectUseCase skips git.init when git not available", async () =
     lockStore: fakeLockStore(),
     harness: fakeClaudeHarness(),
     backlogBackend: "local",
+    versionScheme: "semver",
     core: SAMPLE_CORE,
     ensureDir: () => Promise.resolve(),
   });
@@ -207,6 +214,7 @@ Deno.test("InitProjectUseCase skips git.init when repo already initialized", asy
     lockStore: fakeLockStore(),
     harness: fakeClaudeHarness(),
     backlogBackend: "local",
+    versionScheme: "semver",
     core: SAMPLE_CORE,
     ensureDir: () => Promise.resolve(),
   });
@@ -232,6 +240,7 @@ Deno.test("InitProjectUseCase with force=true skips conflict detection and reque
     lockStore: fakeLockStore(),
     harness: fakeClaudeHarness(),
     backlogBackend: "local",
+    versionScheme: "semver",
     core: SAMPLE_CORE,
     ensureDir: () => Promise.resolve(),
   });
@@ -262,6 +271,7 @@ Deno.test("InitProjectUseCase returns backups array from writer report", async (
     lockStore: fakeLockStore(),
     harness: fakeClaudeHarness(),
     backlogBackend: "local",
+    versionScheme: "semver",
     core: SAMPLE_CORE,
     ensureDir: () => Promise.resolve(),
   });
@@ -283,6 +293,7 @@ Deno.test("InitProjectUseCase persists an installed.lock with SHA256 of every fi
     lockStore,
     harness: fakeClaudeHarness(),
     backlogBackend: "local",
+    versionScheme: "semver",
     core: [
       {
         category: "project-root",
@@ -324,6 +335,7 @@ Deno.test("InitProjectUseCase records harness.key in the installed lock", async 
     lockStore,
     harness: fakeClaudeHarness(),
     backlogBackend: "local",
+    versionScheme: "semver",
     core: SAMPLE_CORE,
     ensureDir: () => Promise.resolve(),
   });
@@ -339,6 +351,7 @@ Deno.test("InitProjectUseCase uses harness.mapBundle output as the file tree", a
     lockStore: fakeLockStore(),
     harness: fakeClaudeHarness(),
     backlogBackend: "local",
+    versionScheme: "semver",
     core: SAMPLE_CORE,
     ensureDir: () => Promise.resolve(),
   });

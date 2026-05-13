@@ -5,6 +5,7 @@ import type {
   InstalledLock,
   KnownHarness,
   LockEntry,
+  VersionScheme,
 } from "../domain/installed_lock.ts";
 import type { CoreBundle } from "../domain/core_bundle.ts";
 import { TEMPLATES_VERSION } from "../templates_bundle.ts";
@@ -38,6 +39,7 @@ export type InitProjectDeps = {
   lockStore: LockStore;
   harness: Harness;
   backlogBackend: BacklogBackend;
+  versionScheme: VersionScheme;
   core: CoreBundle;
   /** Creates the target directory if it does not exist (idempotent). */
   ensureDir(path: string): Promise<void>;
@@ -54,12 +56,21 @@ export class InitProjectUseCase {
   constructor(private readonly deps: InitProjectDeps) {}
 
   async execute(input: InitProjectInput): Promise<InitResult> {
-    const { writer, git, lockStore, harness, backlogBackend, core, ensureDir } = this.deps;
+    const {
+      writer,
+      git,
+      lockStore,
+      harness,
+      backlogBackend,
+      versionScheme,
+      core,
+      ensureDir,
+    } = this.deps;
     const warnings: string[] = [];
 
     await ensureDir(input.targetDir);
 
-    const bundle = harness.mapBundle(core, { backlogBackend });
+    const bundle = harness.mapBundle(core, { backlogBackend, versionScheme });
 
     if (!input.force) {
       const conflicts = await writer.detectConflicts(bundle, input.targetDir);
@@ -108,6 +119,7 @@ export class InitProjectUseCase {
       version: 2,
       harness: harness.key as KnownHarness,
       backlogBackend,
+      versionScheme,
       templatesVersion: TEMPLATES_VERSION,
       entries: lockEntries,
     };

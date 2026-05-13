@@ -44,8 +44,14 @@ export async function switchBacklogBackend(
   const harness = findHarness(lock.harness);
   if (!harness) throw new Error(`unknown harness in lock: ${lock.harness}`);
 
-  const newBundle = harness.mapBundle(CORE_BUNDLE, { backlogBackend: newBackend });
-  const oldBundle = harness.mapBundle(CORE_BUNDLE, { backlogBackend: from });
+  const newBundle = harness.mapBundle(CORE_BUNDLE, {
+    backlogBackend: newBackend,
+    versionScheme: lock.versionScheme,
+  });
+  const oldBundle = harness.mapBundle(CORE_BUNDLE, {
+    backlogBackend: from,
+    versionScheme: lock.versionScheme,
+  });
 
   const writer = new DenoFsWriter();
   const reader = new DenoFsReader();
@@ -108,6 +114,7 @@ export async function switchBacklogBackend(
     version: 2,
     harness: lock.harness,
     backlogBackend: newBackend,
+    versionScheme: lock.versionScheme,
     templatesVersion: lock.templatesVersion,
     entries: updatedEntries,
   };
@@ -260,7 +267,10 @@ export async function runUpgrade(intent: UpgradeIntent): Promise<number> {
     const lock = await lockStore.read(projectDir);
     const harness = lock ? findHarness(lock.harness) : null;
     const previewBundle = harness && lock
-      ? harness.mapBundle(CORE_BUNDLE, { backlogBackend: lock.backlogBackend })
+      ? harness.mapBundle(CORE_BUNDLE, {
+        backlogBackend: lock.backlogBackend,
+        versionScheme: lock.versionScheme,
+      })
       : {};
     for (const action of preserves) {
       const file = previewBundle[action.dest];

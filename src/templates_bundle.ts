@@ -11,8 +11,8 @@ export const CORE_BUNDLE: CoreBundle = [
     suffix: null,
     content: `---
 name: specflow
-description: Specflow workflow router — entry point for the spec-driven pipeline. \`/specflow <phase> [args]\` dispatches to a single phase (specify, clarify, plan, tasks, analyze, implement, review, merge, constitution, checklist, groom). \`/specflow\` with no args prints the workflow overview.
-argument-hint: <specify|clarify|plan|tasks|analyze|implement|review|merge|constitution|checklist|groom> [args]
+description: Specflow workflow router — entry point for the spec-driven pipeline. \`/specflow <phase> [args]\` dispatches to a single phase (specify, clarify, plan, tasks, analyze, implement, review, merge, constitution, checklist, groom, tag-version, release-version). \`/specflow\` with no args prints the workflow overview.
+argument-hint: <specify|clarify|plan|tasks|analyze|implement|review|merge|constitution|checklist|groom|tag-version|release-version> [args]
 when_to_use: |
   Trigger phrases that should route here:
   - specify: "spec out a feature", "write a spec", "create a specification"
@@ -26,6 +26,8 @@ when_to_use: |
   - constitution: "update the constitution", "edit project rules"
   - checklist: "generate a checklist"
   - groom: "groom the backlog", "run a hygiene pass"
+  - tag-version: "tag a version", "create a release tag", "bump the version"
+  - release-version: "release", "publish a release", "create release notes"
 ---
 
 # Specflow router
@@ -52,6 +54,8 @@ If \`\$ARGUMENTS\` is empty, render the **Workflow overview** below and stop. Do
 | \`constitution\` | \`phases/constitution.md\` | Edit the project's \`constitution.md\` rules. |
 | \`checklist\` | \`phases/checklist.md\` | Generate a quality checklist for the current spec. |
 | \`groom\` | \`phases/groom.md\` | Backlog hygiene pass via the product-owner agent. |
+| \`tag-version\` | \`phases/tag-version.md\` | Bump + create an annotated git tag using the project's versioning scheme. |
+| \`release-version\` | \`phases/release-version.md\` | Generate categorized release notes for a tag (default: latest). |
 
 ## Routing
 
@@ -69,7 +73,7 @@ specify → clarify → plan → tasks → analyze → implement → review → 
                                                           STOP for pre-merge validation
 \`\`\`
 
-\`constitution\`, \`checklist\`, and \`groom\` are out-of-band utilities, not part of the linear flow.
+\`constitution\`, \`checklist\`, \`groom\`, \`tag-version\`, and \`release-version\` are out-of-band utilities, not part of the linear flow.
 
 ## Typical flow
 
@@ -1990,6 +1994,429 @@ to be a **no-op when the project is healthy**.
 - For implementing a spec → invoke \`/specflow implement\` directly.
 `,
     executable: false,
+    backend: null,
+    skipIfExists: false,
+  },
+  {
+    category: "phase",
+    name: "tag-version",
+    suffix: "tag-version.md",
+    content: `
+## User Input
+
+\`\`\`text
+\$ARGUMENTS
+\`\`\`
+
+You **MUST** consider the user input before proceeding (if not empty).
+Common natural-language requests:
+
+- \`/specflow tag-version\` — tag HEAD with the next version
+- \`/specflow tag-version <sha>\` — tag a specific commit
+- \`/specflow tag-version --bump minor\` — SemVer projects only: bump
+  minor instead of patch (also \`--bump major\` / \`--bump patch\`)
+- \`/specflow tag-version --no-push\` — skip pushing to \`origin\`
+
+## What this command does
+
+Creates an annotated git tag using the **versioning scheme baked into
+this project at \`specflow init\`** (one of SemVer \`v1.2.3\` or date-based
+\`vYY.M.Da\`).
+
+The bundled script does all the work:
+
+\`\`\`bash
+bash .specflow/scripts/release/tag.sh "\$@"
+\`\`\`
+
+What the script does:
+
+1. Runs \`git fetch --tags --quiet\` so the next-tag computation sees
+   every tag that already exists on \`origin\`.
+2. Computes the next tag from the project's scheme:
+   - **SemVer** — finds the latest \`v*.*.*\` tag, applies the bump
+     direction from \`--bump\` (default \`patch\`), validates the result.
+   - **Date-based** — computes today's \`vYY.M.D\` prefix (no leading
+     zeros), scans existing tags for today, increments the letter
+     suffix (\`a\` → \`b\` → … → \`z\`, then errors out at 26 same-day tags).
+3. Creates an annotated tag with the commit subject in the message.
+4. Pushes to \`origin\` if a remote is configured (use \`--no-push\` to
+   skip).
+
+## What this command does NOT do
+
+- It does **not** create a GitHub / GitLab release — pushing a tag
+  alone does not publish a release. Run \`/specflow release-version\`
+  after this to publish the categorized release notes.
+- It does **not** edit version fields in \`package.json\` / \`Cargo.toml\`
+  / \`pyproject.toml\` / etc. The git tag **is** the version — single
+  source of truth.
+- It does **not** run tests, lint, or any quality gate. Run those
+  yourself before tagging if your project needs them — the contract
+  there is project-specific and lives outside Specflow's tag/release
+  flow.
+
+## After running
+
+If the script exits non-zero, read the stderr message — it says
+exactly what failed (validation regex, missing remote, exhausted
+letter suffix, missing tag).
+
+On success, suggest \`/specflow release-version\` as the natural next
+step. Do NOT run it automatically — releasing is an explicit,
+deliberate user action.
+`,
+    executable: false,
+    backend: null,
+    skipIfExists: false,
+  },
+  {
+    category: "phase",
+    name: "release-version",
+    suffix: "release-version.md",
+    content: `
+## User Input
+
+\`\`\`text
+\$ARGUMENTS
+\`\`\`
+
+You **MUST** consider the user input before proceeding (if not empty).
+Common natural-language requests:
+
+- \`/specflow release-version\` — generate notes for the latest tag
+- \`/specflow release-version v1.2.3\` — generate notes for a specific tag
+- \`/specflow release-version --baseline v1.2.0\` — override the baseline
+  (use when the previous tag was never released and you want to skip
+  past it; default baseline is the previous tag chronologically)
+
+## What this command does
+
+Generates **categorized release notes** for the given tag (default:
+latest) covering every commit between a baseline tag and the target
+tag.
+
+The bundled script is stack-agnostic — it just emits the
+release-body Markdown to stdout, with one section per non-empty
+Conventional-Commits bucket. Run it like this:
+
+\`\`\`bash
+bash .specflow/scripts/release/release.sh "\$@"
+\`\`\`
+
+## Buckets (fixed order, empty buckets omitted)
+
+1. **Features** — \`feat:\` / \`feat(scope):\` / \`feat!:\`
+2. **Bug Fixes** — \`fix:\` / \`fix(scope):\` / \`fix!:\`
+3. **Performance** — \`perf:\`
+4. **Refactors** — \`refactor:\`
+5. **Documentation** — \`docs:\`
+6. **Tests** — \`test:\`
+7. **Build & CI** — \`build:\` / \`ci:\`
+8. **Chores** — \`chore:\`
+9. **Style** — \`style:\`
+10. **Other** — anything that does not match a Conventional-Commits prefix
+
+Each commit appears as \`- <short-sha> <subject>\` under its bucket.
+
+## After the script runs
+
+The script writes the release body to **stdout**. What you do with it
+depends on how this project publishes releases:
+
+- **GitHub remote** — pipe it into \`gh release create <tag>
+  --notes-file -\` (or \`--notes "\$(...)"\`).
+- **GitLab remote** — pipe it into \`glab release create <tag>
+  --notes "..."\`.
+- **Local-only** — copy the output somewhere readable (or echo it to
+  the user); there is no remote release to create.
+
+The per-backend wrapper scripts ship as separate Specflow features —
+when one is installed, prefer it to manually piping into \`gh\` / \`glab\`.
+
+## Important — release-notes contract
+
+The script emits the body verbatim. Do NOT:
+
+- Reword sections / re-categorize commits after the fact. If a commit
+  message is wrong (e.g. \`feat:\` for what's really a \`fix:\`), the
+  correct move is to amend the commit message **before** tagging,
+  not to hand-edit the release body.
+- Add a raw \`git diff\` or \`git log\` dump. The whole point of this
+  command is that the body is human-readable on its own.
+- Run release publication without showing the user the generated body
+  first when invoked interactively. The body is the production
+  artifact — surface it for review before posting.
+
+## Workflow
+
+\`\`\`
+/specflow tag-version             → annotated tag created + pushed
+/specflow release-version         → categorized release notes (stdout)
+↳ pipe to gh/glab release create  → release published
+\`\`\`
+`,
+    executable: false,
+    backend: null,
+    skipIfExists: false,
+  },
+  {
+    category: "phase-script",
+    name: "tag",
+    suffix: "tag.sh",
+    content: `#!/usr/bin/env bash
+# Create an annotated git tag using the project's versioning scheme.
+#
+# The scheme is baked at scaffold time — the \`# BEGIN: scheme=X\` blocks
+# below are stripped by the Specflow bundler so only the chosen scheme's
+# logic ships on disk. To change schemes after init, re-run
+# \`specflow init\` and pick the other option.
+#
+# Usage: tag.sh [--no-push] [--bump <major|minor|patch>] [<commit-sha>]
+set -euo pipefail
+
+NO_PUSH=false
+BUMP="patch"
+COMMIT=""
+while [ "\$#" -gt 0 ]; do
+  case "\$1" in
+    --no-push) NO_PUSH=true; shift ;;
+    --bump) BUMP="\$2"; shift 2 ;;
+    --bump=*) BUMP="\${1#--bump=}"; shift ;;
+    --help|-h)
+      echo "usage: tag.sh [--no-push] [--bump <major|minor|patch>] [<commit-sha>]"
+      exit 0
+      ;;
+    -*) echo "unknown flag: \$1" >&2; exit 2 ;;
+    *) COMMIT="\$1"; shift ;;
+  esac
+done
+
+COMMIT="\${COMMIT:-HEAD}"
+COMMIT_SHA=\$(git rev-parse "\$COMMIT")
+git fetch --tags --quiet 2>/dev/null || true
+
+# BEGIN: scheme=semver
+# SemVer scheme: vMAJOR.MINOR.PATCH. The --bump flag picks the bump
+# direction (default patch). When no tag exists yet, start at v0.1.0.
+LATEST=\$(git tag --list 'v[0-9]*.[0-9]*.[0-9]*' --sort=-v:refname | head -n1 || true)
+if [ -z "\$LATEST" ]; then
+  NEW="v0.1.0"
+  echo "no previous semver tag — starting at \$NEW"
+else
+  raw="\${LATEST#v}"
+  IFS='.' read -r MAJOR MINOR PATCH <<<"\$raw"
+  case "\$BUMP" in
+    major) MAJOR=\$((MAJOR + 1)); MINOR=0; PATCH=0 ;;
+    minor) MINOR=\$((MINOR + 1)); PATCH=0 ;;
+    patch) PATCH=\$((PATCH + 1)) ;;
+    *) echo "invalid --bump '\$BUMP' (expected major|minor|patch)" >&2; exit 2 ;;
+  esac
+  NEW="v\${MAJOR}.\${MINOR}.\${PATCH}"
+fi
+
+if ! printf '%s' "\$NEW" | grep -qE '^v[0-9]+\\.[0-9]+\\.[0-9]+\$'; then
+  echo "computed tag '\$NEW' failed SemVer validation" >&2
+  exit 1
+fi
+# END: scheme=semver
+
+# BEGIN: scheme=date
+# Date-based scheme: vYY.M.D[a-z]. No leading zeros on month/day; letter
+# suffix increments for same-day re-tags (a..z; 26th tag in one day
+# aborts — wait for tomorrow or tag manually).
+YY=\$(date +%y)
+M=\$((10#\$(date +%m)))
+D=\$((10#\$(date +%d)))
+PREFIX="v\${YY}.\${M}.\${D}"
+
+LATEST_LETTER=\$(git tag --list "\${PREFIX}[a-z]" | sed -E "s|^\${PREFIX}||" | sort | tail -n1 || true)
+if [ -z "\$LATEST_LETTER" ]; then
+  NEW="\${PREFIX}a"
+elif [ "\$LATEST_LETTER" = "z" ]; then
+  echo "letter suffix exhausted (z) for \$PREFIX — wait for tomorrow or tag manually" >&2
+  exit 1
+else
+  NEXT_LETTER=\$(printf '%s' "\$LATEST_LETTER" | tr 'a-y' 'b-z')
+  NEW="\${PREFIX}\${NEXT_LETTER}"
+fi
+
+if ! printf '%s' "\$NEW" | grep -qE '^v[0-9]{2}\\.([1-9]|1[0-2])\\.([1-9]|[12][0-9]|3[01])[a-z]\$'; then
+  echo "computed tag '\$NEW' failed date-based validation" >&2
+  exit 1
+fi
+# END: scheme=date
+
+if git rev-parse "\$NEW" >/dev/null 2>&1; then
+  echo "tag '\$NEW' already exists — refusing to clobber" >&2
+  exit 1
+fi
+
+SUBJECT=\$(git log -1 --format=%s "\$COMMIT_SHA")
+echo "creating annotated tag \$NEW on \$COMMIT_SHA"
+echo "  subject: \$SUBJECT"
+git tag -a "\$NEW" -m "Release \$NEW
+
+\$SUBJECT" "\$COMMIT_SHA"
+
+if [ "\$NO_PUSH" = "true" ]; then
+  echo "✓ tagged \$NEW (local only — --no-push)"
+elif git remote get-url origin >/dev/null 2>&1; then
+  git push origin "\$NEW"
+  echo "✓ tagged \$NEW and pushed to origin"
+else
+  echo "✓ tagged \$NEW (no origin configured — tag is local-only)"
+fi
+`,
+    executable: true,
+    backend: null,
+    skipIfExists: false,
+  },
+  {
+    category: "phase-script",
+    name: "release",
+    suffix: "release.sh",
+    content: `#!/usr/bin/env bash
+# Generate categorized release notes for commits in <baseline>..<tag>.
+#
+# Stack-agnostic: emits the release-body Markdown to stdout. Per-backend
+# wrappers (release-github.sh, release-gitlab.sh) consume this output
+# and POST it to the respective Releases API.
+#
+# Usage: release.sh [--baseline <tag>] [<tag>]
+#   <tag>           default: latest tag (git describe --tags --abbrev=0)
+#   --baseline      default: previous tag chronologically before <tag>;
+#                   per-backend wrappers override this to "previous
+#                   tag that has a published release attached" so commits
+#                   landed under undeployed tags are not silently skipped.
+set -euo pipefail
+
+BASELINE=""
+TAG=""
+while [ "\$#" -gt 0 ]; do
+  case "\$1" in
+    --baseline) BASELINE="\$2"; shift 2 ;;
+    --baseline=*) BASELINE="\${1#--baseline=}"; shift ;;
+    --help|-h)
+      echo "usage: release.sh [--baseline <tag>] [<tag>]"
+      echo
+      echo "  Emits categorized release-note Markdown to stdout for"
+      echo "  commits in <baseline>..<tag>. Default tag = latest tag."
+      echo "  Default baseline = previous tag chronologically."
+      exit 0
+      ;;
+    -*) echo "unknown flag: \$1" >&2; exit 2 ;;
+    *) TAG="\$1"; shift ;;
+  esac
+done
+
+git fetch --tags --quiet 2>/dev/null || true
+
+if [ -z "\$TAG" ]; then
+  TAG=\$(git describe --tags --abbrev=0 2>/dev/null || true)
+  if [ -z "\$TAG" ]; then
+    echo "no tags found in this repository — create one first with tag.sh" >&2
+    exit 1
+  fi
+fi
+
+if ! git rev-parse "\$TAG" >/dev/null 2>&1; then
+  echo "tag '\$TAG' not found" >&2
+  exit 1
+fi
+
+if [ -z "\$BASELINE" ]; then
+  BASELINE=\$(git tag --sort=-creatordate \\
+    | awk -v cur="\$TAG" 'BEGIN{found=0} \$0==cur{found=1;next} found==1{print;exit}')
+fi
+
+if [ -n "\$BASELINE" ] && ! git rev-parse "\$BASELINE" >/dev/null 2>&1; then
+  echo "baseline tag '\$BASELINE' not found" >&2
+  exit 1
+fi
+
+if [ -z "\$BASELINE" ]; then
+  RANGE_LABEL="_Initial release — all commits up to \\\`\$TAG\\\`._"
+  COMMITS=\$(git log --format='%h %s' "\$TAG")
+else
+  RANGE_LABEL="_Changes from \\\`\$BASELINE\\\` to \\\`\$TAG\\\`._"
+  COMMITS=\$(git log --format='%h %s' "\$BASELINE..\$TAG")
+fi
+
+classify() {
+  # Conventional Commits prefix matching. The \`!\` breaking-change marker
+  # does not change the bucket — \`feat!:\` is still Features.
+  case "\$1" in
+    feat:*|feat\\(*\\)*:*|feat!:*|feat\\(*\\)!:*) printf 'Features' ;;
+    fix:*|fix\\(*\\)*:*|fix!:*|fix\\(*\\)!:*) printf 'Bug Fixes' ;;
+    perf:*|perf\\(*\\)*:*|perf!:*|perf\\(*\\)!:*) printf 'Performance' ;;
+    refactor:*|refactor\\(*\\)*:*|refactor!:*|refactor\\(*\\)!:*) printf 'Refactors' ;;
+    docs:*|docs\\(*\\)*:*|docs!:*|docs\\(*\\)!:*) printf 'Documentation' ;;
+    test:*|test\\(*\\)*:*|test!:*|test\\(*\\)!:*) printf 'Tests' ;;
+    build:*|build\\(*\\)*:*|build!:*|build\\(*\\)!:*|ci:*|ci\\(*\\)*:*|ci!:*|ci\\(*\\)!:*) printf 'Build & CI' ;;
+    chore:*|chore\\(*\\)*:*|chore!:*|chore\\(*\\)!:*) printf 'Chores' ;;
+    style:*|style\\(*\\)*:*|style!:*|style\\(*\\)!:*) printf 'Style' ;;
+    *) printf 'Other' ;;
+  esac
+}
+
+BUCKET_FEATURES=""
+BUCKET_FIXES=""
+BUCKET_PERF=""
+BUCKET_REFACTORS=""
+BUCKET_DOCS=""
+BUCKET_TESTS=""
+BUCKET_BUILD=""
+BUCKET_CHORES=""
+BUCKET_STYLE=""
+BUCKET_OTHER=""
+
+while IFS= read -r line; do
+  [ -z "\$line" ] && continue
+  sha="\${line%% *}"
+  subject="\${line#* }"
+  bucket=\$(classify "\$subject")
+  entry="- \${sha} \${subject}"
+  case "\$bucket" in
+    Features) BUCKET_FEATURES+="\${entry}"\$'\\n' ;;
+    "Bug Fixes") BUCKET_FIXES+="\${entry}"\$'\\n' ;;
+    Performance) BUCKET_PERF+="\${entry}"\$'\\n' ;;
+    Refactors) BUCKET_REFACTORS+="\${entry}"\$'\\n' ;;
+    Documentation) BUCKET_DOCS+="\${entry}"\$'\\n' ;;
+    Tests) BUCKET_TESTS+="\${entry}"\$'\\n' ;;
+    "Build & CI") BUCKET_BUILD+="\${entry}"\$'\\n' ;;
+    Chores) BUCKET_CHORES+="\${entry}"\$'\\n' ;;
+    Style) BUCKET_STYLE+="\${entry}"\$'\\n' ;;
+    *) BUCKET_OTHER+="\${entry}"\$'\\n' ;;
+  esac
+done <<<"\$COMMITS"
+
+emit_bucket() {
+  local label="\$1"
+  local content="\$2"
+  [ -z "\$content" ] && return
+  printf '### %s\\n\\n%s\\n' "\$label" "\$content"
+}
+
+TAG_COMMIT=\$(git rev-parse "\$TAG^{}" 2>/dev/null || git rev-parse "\$TAG")
+TAG_SHORT=\$(git rev-parse --short "\$TAG_COMMIT")
+
+printf '## What'\\''s changed in %s\\n\\n' "\$TAG"
+printf '%s\\n\\n' "\$RANGE_LABEL"
+emit_bucket "Features" "\$BUCKET_FEATURES"
+emit_bucket "Bug Fixes" "\$BUCKET_FIXES"
+emit_bucket "Performance" "\$BUCKET_PERF"
+emit_bucket "Refactors" "\$BUCKET_REFACTORS"
+emit_bucket "Documentation" "\$BUCKET_DOCS"
+emit_bucket "Tests" "\$BUCKET_TESTS"
+emit_bucket "Build & CI" "\$BUCKET_BUILD"
+emit_bucket "Chores" "\$BUCKET_CHORES"
+emit_bucket "Style" "\$BUCKET_STYLE"
+emit_bucket "Other" "\$BUCKET_OTHER"
+
+printf -- '---\\nCommit: \`%s\`\\n' "\$TAG_SHORT"
+`,
+    executable: true,
     backend: null,
     skipIfExists: false,
   },

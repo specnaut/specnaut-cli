@@ -64,37 +64,37 @@ Deno.test("CopilotHarness.key and displayName", () => {
 
 Deno.test("CopilotHarness maps router skill to .github/instructions/specflow.instructions.md", () => {
   const h = new CopilotHarness();
-  const mapped = h.mapBundle(SAMPLE, { backlogBackend: "local" });
+  const mapped = h.mapBundle(SAMPLE, { backlogBackend: "local", versionScheme: "semver" });
   assert(".github/instructions/specflow.instructions.md" in mapped);
 });
 
 Deno.test("CopilotHarness maps phase docs to .github/instructions/specflow-<phase>.instructions.md", () => {
   const h = new CopilotHarness();
-  const mapped = h.mapBundle(SAMPLE, { backlogBackend: "local" });
+  const mapped = h.mapBundle(SAMPLE, { backlogBackend: "local", versionScheme: "semver" });
   assert(".github/instructions/specflow-specify.instructions.md" in mapped);
 });
 
 Deno.test("CopilotHarness maps backlog-cmd to .github/instructions/specflow-backlog.instructions.md", () => {
   const h = new CopilotHarness();
-  const mapped = h.mapBundle(SAMPLE, { backlogBackend: "local" });
+  const mapped = h.mapBundle(SAMPLE, { backlogBackend: "local", versionScheme: "semver" });
   assert(".github/instructions/specflow-backlog.instructions.md" in mapped);
 });
 
 Deno.test("CopilotHarness maps skill to .github/instructions/specflow-<name>.instructions.md", () => {
   const h = new CopilotHarness();
-  const mapped = h.mapBundle(SAMPLE, { backlogBackend: "local" });
+  const mapped = h.mapBundle(SAMPLE, { backlogBackend: "local", versionScheme: "semver" });
   assert(".github/instructions/specflow-auto.instructions.md" in mapped);
 });
 
 Deno.test("CopilotHarness maps agents to .github/instructions/specflow-agent-<name>.instructions.md", () => {
   const h = new CopilotHarness();
-  const mapped = h.mapBundle(SAMPLE, { backlogBackend: "local" });
+  const mapped = h.mapBundle(SAMPLE, { backlogBackend: "local", versionScheme: "semver" });
   assert(".github/instructions/specflow-agent-product-owner.instructions.md" in mapped);
 });
 
 Deno.test('CopilotHarness rewrites instruction frontmatter to applyTo: "**" and strips Claude fields', () => {
   const h = new CopilotHarness();
-  const mapped = h.mapBundle(SAMPLE, { backlogBackend: "local" });
+  const mapped = h.mapBundle(SAMPLE, { backlogBackend: "local", versionScheme: "semver" });
   const cmd = mapped[".github/instructions/specflow.instructions.md"];
   assert(cmd, "instruction file not emitted");
   assert(cmd.content.startsWith("---\n"));
@@ -107,14 +107,14 @@ Deno.test('CopilotHarness rewrites instruction frontmatter to applyTo: "**" and 
 
 Deno.test("CopilotHarness maps spec-root to .specflow/<suffix> and project-root to <suffix>", () => {
   const h = new CopilotHarness();
-  const mapped = h.mapBundle(SAMPLE, { backlogBackend: "local" });
+  const mapped = h.mapBundle(SAMPLE, { backlogBackend: "local", versionScheme: "semver" });
   assert(".specflow/memory/constitution.md" in mapped);
   assert("AGENTS.md" in mapped);
 });
 
 Deno.test("CopilotHarness emits no Claude/Cursor/Codex/Gemini/Windsurf artefacts", () => {
   const h = new CopilotHarness();
-  const mapped = h.mapBundle(SAMPLE, { backlogBackend: "local" });
+  const mapped = h.mapBundle(SAMPLE, { backlogBackend: "local", versionScheme: "semver" });
   const keys = Object.keys(mapped);
   assert(!keys.some((k) => k.startsWith(".claude/")), "no .claude/");
   assert(!keys.some((k) => k.startsWith(".cursor/")), "no .cursor/");

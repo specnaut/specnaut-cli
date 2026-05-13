@@ -17,7 +17,7 @@ const SYNC_PAIRS: ReadonlyArray<{ plugin: string; source: string }> = [
     plugin: "plugin/skills/specflow/SKILL.md",
     source: "templates/core/skills/specflow/SKILL.md",
   },
-  // 11 phase reference docs, loaded by the router on demand.
+  // 13 phase reference docs, loaded by the router on demand.
   ...[
     "specify",
     "clarify",
@@ -30,6 +30,8 @@ const SYNC_PAIRS: ReadonlyArray<{ plugin: string; source: string }> = [
     "constitution",
     "checklist",
     "groom",
+    "tag-version",
+    "release-version",
   ].map((name) => ({
     plugin: `plugin/skills/specflow/phases/${name}.md`,
     source: `templates/core/skills/specflow/phases/${name}.md`,
