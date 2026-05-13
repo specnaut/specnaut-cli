@@ -6,10 +6,13 @@
  *
  *   - GitHub org-owned project:
  *     `https://github.com/orgs/<org>/projects/<N>`
+ *     (a trailing `/views/<M>` is tolerated — that's what the browser
+ *     address bar always contains when viewing a Project V2 board)
  *     → `{ kind: "github", owner: "<org>", ownerType: "org", projectNumber: N }`
  *
  *   - GitHub user-owned project:
- *     `https://github.com/users/<user>/projects/<N>`
+ *     `https://github.com/users/<user>/projects/<N>` (same `/views/<M>`
+ *     tolerance as above)
  *     → `{ kind: "github", owner: "<user>", ownerType: "user", projectNumber: N }`
  *
  *   - GitLab project URL (project page = backlog board, no separate URL):
@@ -49,8 +52,15 @@ export function parseKanbanURL(raw: string): ParsedKanbanURL | null {
   const segments = u.pathname.split("/").filter((s) => s.length > 0);
 
   if (u.host === "github.com") {
-    // GitHub: must be /orgs/<owner>/projects/<N> or /users/<owner>/projects/<N>
-    if (segments.length !== 4) return null;
+    // GitHub: must be /orgs/<owner>/projects/<N> or /users/<owner>/projects/<N>,
+    // optionally followed by /views/<M> (the browser address bar always
+    // appends a view ID when looking at a Project V2 board).
+    if (
+      segments.length !== 4 &&
+      !(segments.length === 6 && segments[4] === "views")
+    ) {
+      return null;
+    }
     const [kindSeg, owner, projectsSeg, numSeg] = segments;
     if (kindSeg !== "orgs" && kindSeg !== "users") return null;
     if (projectsSeg !== "projects") return null;
