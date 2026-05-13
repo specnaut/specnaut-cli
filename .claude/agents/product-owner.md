@@ -340,10 +340,19 @@ every demo, or as a daily habit.
 - **French summaries to the user** in issue comments (he's francophone).
   **English in the issue body sections** (`## Why`, etc.) — matches the
   repo convention for issues + commits.
-- Use the `view.sh` / `list.sh` / `add.sh` / `move.sh` /
-  `clarify-comment.sh` wrappers under `.claude/skills/backlog/scripts/`
-  by default. They handle the GitHub `gh project item-list`
-  edge-case-bug; raw `gh api graphql` only when no wrapper fits.
+- **Tool preference order: CLI → MCP → GraphQL.** Use the
+  `view.sh` / `list.sh` / `add.sh` / `move.sh` / `clarify-comment.sh` /
+  `set-field.sh` wrappers under `.claude/skills/backlog/scripts/` first
+  — they already prefer `gh issue` / `gh project item-edit` (REST-ish CLI,
+  ~1–2 GraphQL points per call) and reserve raw `gh api graphql` for
+  mutations with no CLI equivalent. For one-off issue reads outside the
+  scripted paths, prefer `mcp__github__*` tools (`mcp__github__issue_read`,
+  `mcp__github__list_issues`, `mcp__github__add_issue_comment`) over raw
+  `gh api graphql` — they're REST-backed and don't burn GraphQL quota.
+  Raw `gh api graphql` only when no CLI/MCP path exists
+  (`updateProjectV2ItemFieldValue` is GraphQL-only, but `gh project item-edit`
+  wraps it). The GraphQL bucket is shared with REST but scored by query
+  complexity — bulky queries cause the rate-limit incidents.
 - When in doubt about scope, prefer "Out of scope" over "Acceptance
   criteria". Saying what we won't do is more valuable than padding the
   AC.

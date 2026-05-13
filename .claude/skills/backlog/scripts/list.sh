@@ -1,51 +1,34 @@
 #!/usr/bin/env bash
-# List items on Project #4 with their Status, going through the issue side
-# (gh project item-list can return 0 in some account/permission contexts —
-# we work around it by querying via repository.issues[].projectItems[]).
+# List items on Project #4 with their Status. Uses `gh issue list --json
+# projectItems` — the gh CLI exposes the Project V2 Status field via its
+# REST-ish JSON projection, costing ~1 GraphQL point per call (vs ~20 for
+# the hand-rolled `repository.issues[].projectItems[].fieldValues[]` query
+# that lived here previously and was the main rate-limit offender).
+#
 # Usage: list.sh [STATUS]
 #   STATUS — optional filter: Backlog | Ready | "In progress" | "In review" | Done
+#
+# Default (no filter): every issue NOT in Done — matches the historical
+# "open issues on the board" semantics. Pass `Done` explicitly to see closed
+# items still pinned to the board.
 set -euo pipefail
 
 FILTER="${1:-}"
 
-JSON=$(gh api graphql -f query='
-  query {
-    repository(owner:"mkrlabs", name:"specflow") {
-      issues(first:100, states:OPEN) {
-        nodes {
-          number title
-          projectItems(first:5) {
-            nodes {
-              project { number }
-              fieldValues(first:8) {
-                nodes {
-                  ... on ProjectV2ItemFieldSingleSelectValue {
-                    name
-                    field { ... on ProjectV2SingleSelectField { name } }
-                  }
-                }
-              }
-            }
-          }
-        }
-      }
-    }
-  }')
+JSON=$(gh issue list --repo mkrlabs/specflow --state open --limit 200 \
+  --json number,title,projectItems)
 
-ROWS=$(echo "$JSON" | jq -r '
-  .data.repository.issues.nodes[]
+ROWS=$(echo "$JSON" | jq -r --arg filter "$FILTER" '
+  .[]
   | . as $issue
-  | (.projectItems.nodes[] | select(.project.number == 4)) as $item
-  | (
-      ($item.fieldValues.nodes[]
-        | select(.field?.name == "Status")
-        | .name) // "—"
-    ) as $status
+  | (.projectItems[0].status.name // "—") as $status
+  | select($issue.projectItems | length > 0)
+  | select(
+      if $filter == "" then $status != "Done"
+      else $status == $filter
+      end
+    )
   | "[\($status)]\t#\($issue.number)\t\($issue.title)"
 ')
 
-if [[ -n "$FILTER" ]]; then
-  echo "$ROWS" | grep "^\[$FILTER\]" || true
-else
-  echo "$ROWS"
-fi | sort | column -ts $'\t'
+echo "$ROWS" | sort | column -ts $'\t'

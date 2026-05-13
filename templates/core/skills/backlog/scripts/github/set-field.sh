@@ -1,5 +1,11 @@
 #!/usr/bin/env bash
 # Set a native Project V2 single-select field value (Priority or Size) on an issue.
+#
+# The item-ID lookup uses a small, targeted GraphQL query (one issue,
+# projectItems(first:5)) — negligible quota cost (~2 points). The actual
+# field mutation (`updateProjectV2ItemFieldValue`) is GraphQL-only —
+# `gh project item-edit` is the CLI wrapper, used below.
+#
 # Usage: set-field.sh <issue-number> <Priority|Size> <value>
 #   Examples:
 #     set-field.sh 42 Priority P1
@@ -52,17 +58,17 @@ if [ -z "$OPT_ID" ]; then
   exit 11
 fi
 
-ISSUE_NODE_ID=$(gh issue view "$NUM" --repo "$REPO" --json id --jq '.id')
-
+# Targeted lookup by issue number — much cheaper than fetching the whole
+# project item list (a single issue ~2 GraphQL points, vs paginated list).
 ITEM_ID=$(gh api graphql -f query='
-  query($issue:ID!) {
-    node(id:$issue) {
-      ... on Issue {
-        projectItems(first:10) { nodes { id project { id } } }
+  query($owner:String!, $name:String!, $num:Int!) {
+    repository(owner:$owner, name:$name) {
+      issue(number:$num) {
+        projectItems(first:5) { nodes { id project { id } } }
       }
     }
-  }' -f issue="$ISSUE_NODE_ID" \
-  | jq -r --arg p "$PROJECT_NODE_ID" '.data.node.projectItems.nodes[] | select(.project.id==$p) | .id' | head -1)
+  }' -f owner="$REPO_OWNER" -f name="$REPO_NAME" -F num="$NUM" \
+  | jq -r --arg p "$PROJECT_NODE_ID" '.data.repository.issue.projectItems.nodes[] | select(.project.id==$p) | .id' | head -1)
 
 if [ -z "$ITEM_ID" ]; then
   echo "issue #$NUM is not on Project #$PROJECT_NUMBER" >&2

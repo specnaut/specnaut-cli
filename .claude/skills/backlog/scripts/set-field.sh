@@ -3,6 +3,14 @@
 # issue on Specflow's own Project #4. Hardcoded mirror of the templated helper
 # at templates/core/skills/backlog/scripts/github/set-field.sh.
 #
+# The item-ID lookup uses a small, targeted GraphQL query (one issue,
+# projectItems(first:5)) — negligible quota cost. `gh project item-list` was
+# considered as a replacement but would paginate through 200+ items just to
+# find one (~12x slower). The bulky multi-issue case is in `list.sh`.
+#
+# The actual field mutation (`updateProjectV2ItemFieldValue`) is GraphQL-only
+# — `gh project item-edit` is the CLI wrapper, used below.
+#
 # Usage: set-field.sh <issue-number> <Priority|Size> <value>
 #
 # Exit codes:
