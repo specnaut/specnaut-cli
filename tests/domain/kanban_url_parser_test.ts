@@ -39,6 +39,49 @@ Deno.test("parseKanbanURL parses self-hosted GitLab URL", () => {
   });
 });
 
+Deno.test("parseKanbanURL accepts /views/<N> suffix on org-owned project URL", () => {
+  // GitHub's address bar always appends /views/<M> when viewing a Project V2.
+  const r = parseKanbanURL(
+    "https://github.com/orgs/confeature/projects/1/views/1",
+  );
+  assertEquals(r, {
+    kind: "github",
+    owner: "confeature",
+    ownerType: "org",
+    projectNumber: 1,
+  });
+});
+
+Deno.test("parseKanbanURL accepts /views/<N> suffix on user-owned project URL", () => {
+  const r = parseKanbanURL(
+    "https://github.com/users/alice/projects/12/views/7",
+  );
+  assertEquals(r, {
+    kind: "github",
+    owner: "alice",
+    ownerType: "user",
+    projectNumber: 12,
+  });
+});
+
+Deno.test("parseKanbanURL rejects unknown trailing segment (not /views/)", () => {
+  // Only /views/<M> is tolerated — guard against accidentally loosening too far.
+  assertEquals(
+    parseKanbanURL("https://github.com/orgs/mkrlabs/projects/6/settings/1"),
+    null,
+  );
+  assertEquals(
+    parseKanbanURL("https://github.com/orgs/mkrlabs/projects/6/extra"),
+    null,
+  );
+  assertEquals(
+    parseKanbanURL(
+      "https://github.com/orgs/mkrlabs/projects/6/views/1/anything",
+    ),
+    null,
+  );
+});
+
 Deno.test("parseKanbanURL trims whitespace", () => {
   const r = parseKanbanURL("  https://github.com/orgs/mkrlabs/projects/6  ");
   assertEquals(r, {
