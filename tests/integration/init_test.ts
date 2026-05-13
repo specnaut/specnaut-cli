@@ -505,3 +505,20 @@ Deno.test("scaffolded .claude/CLAUDE.md documents /goal", async () => {
     assertStringIncludes(claudeMd, ".claude/loop.md");
   });
 });
+
+Deno.test("scaffolded .claude/CLAUDE.md documents `claude agents`", async () => {
+  await withTempDir(async (dir) => {
+    const { code, stderr } = await runSpecflow(
+      ["init", "demo", "--no-git", "--ai", "claude", "--backlog", "local"],
+      { cwd: dir },
+    );
+    assertEquals(code, 0, `init failed: ${stderr}`);
+    const claudeMd = await Deno.readTextFile(
+      join(dir, "demo/.claude/CLAUDE.md"),
+    );
+    assertStringIncludes(claudeMd, "Multi-session dispatch");
+    assertStringIncludes(claudeMd, "claude agents");
+    assertStringIncludes(claudeMd, "code.claude.com/docs/fr/agent-view");
+    assertStringIncludes(claudeMd, ".claude/worktrees/");
+  });
+});

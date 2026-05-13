@@ -30,6 +30,20 @@ team's needs.
   `/loop` (see `.claude/loop.md`) instead. See
   https://code.claude.com/docs/fr/goal.
 
+- **Multi-session dispatch (`claude agents`)** — opens a terminal UI
+  that lists every background Claude session, dispatches new ones,
+  and lets you peek / reply / attach without losing context. Specflow's
+  scaffolded subagents in `.claude/agents/` appear in the dispatch
+  picker automatically — start one with the agent name as the first
+  word, e.g. `developer fix the lint errors in src/cli/`, `@qa-tester
+  run a sandbox smoke pass`, or `@product-owner groom the backlog`.
+  Skills are dispatchable too: `/specflow specify "<feature>"` launches
+  a session running the full spec-plan-tasks chain. File edits are
+  isolated under `.claude/worktrees/` (git worktrees), so several
+  Specflow agents can work in parallel without stepping on each
+  other. Requires Claude Code v2.1.139+. See
+  https://code.claude.com/docs/fr/agent-view.
+
 - **Async notifications** — install one of the channel plugins (Telegram,
   Discord, iMessage) so Claude can ping you when a long-running task or
   agent dispatch finishes. See
