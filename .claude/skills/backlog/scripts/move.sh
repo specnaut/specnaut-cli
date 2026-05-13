@@ -1,5 +1,15 @@
 #!/usr/bin/env bash
 # Move a backlog issue to a Status column on Project #4.
+#
+# The item-ID lookup uses a small, targeted GraphQL query (one issue,
+# projectItems(first:5)) — query complexity ~5 nodes, negligible quota cost.
+# `gh project item-list` was considered as a replacement but would paginate
+# through 200+ items (~5s, ~12x slower) just to find one. The bulky multi-
+# issue case lives in `list.sh` and uses the CLI directly.
+#
+# The actual field mutation (`updateProjectV2ItemFieldValue`) is GraphQL-only
+# — `gh project item-edit` is the CLI wrapper, used below.
+#
 # Usage: move.sh <ISSUE_NUMBER> <STATUS>
 #   STATUS — Backlog | Ready | "In progress" | "In review" | Done
 set -euo pipefail

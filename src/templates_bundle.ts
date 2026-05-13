@@ -2182,8 +2182,8 @@ mutating anything.
 ### GitHub layout
 
 - Tasks live as Issues in the configured repo.
-- The PO uses \`gh issue\` and \`gh api\` to read and mutate them. Project board
-  status moves go through \`gh api graphql\`.
+- The PO uses \`gh issue\` + \`gh project item-edit\` (CLI) for reads/mutations;
+  raw \`gh api graphql\` only when no CLI path exists.
 
 ## Frontmatter schema (local Markdown — mandatory)
 
@@ -4577,6 +4577,12 @@ export REPO REPO_OWNER REPO_NAME PROJECT_NUMBER
     suffix: "list.sh",
     content: `#!/usr/bin/env bash
 # List items on the configured GitHub Project, with Status. Optional filter.
+#
+# Uses \`gh issue list --json projectItems\` — the gh CLI exposes the Project V2
+# Status field via its REST-ish JSON projection, costing ~1 GraphQL point per
+# call (vs ~20 for the bulky \`repository.issues[].projectItems[].fieldValues[]\`
+# query that lived here previously and was the main rate-limit offender).
+#
 # Usage: list.sh [Status]
 set -euo pipefail
 
@@ -4585,40 +4591,16 @@ set -euo pipefail
 
 FILTER="\${1:-}"
 
-JSON=\$(gh api graphql -f query='
-  query(\$owner:String!, \$name:String!) {
-    repository(owner:\$owner, name:\$name) {
-      issues(first:100, states:OPEN) {
-        nodes {
-          number title
-          projectItems(first:5) {
-            nodes {
-              project { number }
-              fieldValues(first:8) {
-                nodes {
-                  ... on ProjectV2ItemFieldSingleSelectValue {
-                    name
-                    field { ... on ProjectV2SingleSelectField { name } }
-                  }
-                }
-              }
-            }
-          }
-        }
-      }
-    }
-  }' \\
-  -f owner="\$REPO_OWNER" \\
-  -f name="\$REPO_NAME")
+JSON=\$(gh issue list --repo "\$REPO" --state open --limit 200 \\
+  --json number,title,projectItems)
 
-echo "\$JSON" | jq -r --argjson project "\$PROJECT_NUMBER" --arg filter "\$FILTER" '
-  .data.repository.issues.nodes[]
+echo "\$JSON" | jq -r --arg filter "\$FILTER" '
+  .[]
   | . as \$issue
-  | (.projectItems.nodes[] | select(.project.number == \$project)) as \$item
-  | ((\$item.fieldValues.nodes[]
-       | select(.field.name == "Status") | .name) // "—") as \$status
+  | (.projectItems[0].status.name // "—") as \$status
+  | select(\$issue.projectItems | length > 0)
   | select(\$filter == "" or \$status == \$filter)
-  | "  #\\(.number)  \\(\$status)  \\(.title)"
+  | "  #\\(\$issue.number)  \\(\$status)  \\(\$issue.title)"
 '
 `,
     executable: true,
@@ -4732,6 +4714,12 @@ fi
     suffix: "move.sh",
     content: `#!/usr/bin/env bash
 # Move an issue's Project Status to <Status>.
+#
+# The item-ID lookup uses a small, targeted GraphQL query (one issue,
+# projectItems(first:5)) — negligible quota cost (~2 points). The actual
+# field mutation (\`updateProjectV2ItemFieldValue\`) is GraphQL-only —
+# \`gh project item-edit\` is the CLI wrapper, used below.
+#
 # Usage: move.sh <number> <Status>
 set -euo pipefail
 
@@ -4757,18 +4745,17 @@ if [ -z "\$OPTION_ID" ] || [ "\$OPTION_ID" = "null" ]; then
   exit 1
 fi
 
-ISSUE_NODE_ID=\$(gh issue view "\$NUM" --repo "\$REPO" --json id --jq '.id')
-
-# Find the project item ID for this issue
+# Targeted lookup by issue number — much cheaper than fetching the whole
+# project item list (a single issue ~2 GraphQL points, vs paginated list).
 ITEM_ID=\$(gh api graphql -f query='
-  query(\$issue:ID!) {
-    node(id:\$issue) {
-      ... on Issue {
-        projectItems(first:10) { nodes { id project { id } } }
+  query(\$owner:String!, \$name:String!, \$num:Int!) {
+    repository(owner:\$owner, name:\$name) {
+      issue(number:\$num) {
+        projectItems(first:5) { nodes { id project { id } } }
       }
     }
-  }' -f issue="\$ISSUE_NODE_ID" \\
-  | jq -r --arg p "\$PROJECT_NODE_ID" '.data.node.projectItems.nodes[] | select(.project.id==\$p) | .id' | head -1)
+  }' -f owner="\$REPO_OWNER" -f name="\$REPO_NAME" -F num="\$NUM" \\
+  | jq -r --arg p "\$PROJECT_NODE_ID" '.data.repository.issue.projectItems.nodes[] | select(.project.id==\$p) | .id' | head -1)
 
 if [ -z "\$ITEM_ID" ]; then
   echo "issue #\$NUM is not on Project #\$PROJECT_NUMBER" >&2
@@ -4860,6 +4847,12 @@ echo "PROJECT_NODE_ID=\$(gh project view "\$PROJECT_NUMBER" --owner "\$REPO_OWNE
     suffix: "set-field.sh",
     content: `#!/usr/bin/env bash
 # Set a native Project V2 single-select field value (Priority or Size) on an issue.
+#
+# The item-ID lookup uses a small, targeted GraphQL query (one issue,
+# projectItems(first:5)) — negligible quota cost (~2 points). The actual
+# field mutation (\`updateProjectV2ItemFieldValue\`) is GraphQL-only —
+# \`gh project item-edit\` is the CLI wrapper, used below.
+#
 # Usage: set-field.sh <issue-number> <Priority|Size> <value>
 #   Examples:
 #     set-field.sh 42 Priority P1
@@ -4912,17 +4905,17 @@ if [ -z "\$OPT_ID" ]; then
   exit 11
 fi
 
-ISSUE_NODE_ID=\$(gh issue view "\$NUM" --repo "\$REPO" --json id --jq '.id')
-
+# Targeted lookup by issue number — much cheaper than fetching the whole
+# project item list (a single issue ~2 GraphQL points, vs paginated list).
 ITEM_ID=\$(gh api graphql -f query='
-  query(\$issue:ID!) {
-    node(id:\$issue) {
-      ... on Issue {
-        projectItems(first:10) { nodes { id project { id } } }
+  query(\$owner:String!, \$name:String!, \$num:Int!) {
+    repository(owner:\$owner, name:\$name) {
+      issue(number:\$num) {
+        projectItems(first:5) { nodes { id project { id } } }
       }
     }
-  }' -f issue="\$ISSUE_NODE_ID" \\
-  | jq -r --arg p "\$PROJECT_NODE_ID" '.data.node.projectItems.nodes[] | select(.project.id==\$p) | .id' | head -1)
+  }' -f owner="\$REPO_OWNER" -f name="\$REPO_NAME" -F num="\$NUM" \\
+  | jq -r --arg p "\$PROJECT_NODE_ID" '.data.repository.issue.projectItems.nodes[] | select(.project.id==\$p) | .id' | head -1)
 
 if [ -z "\$ITEM_ID" ]; then
   echo "issue #\$NUM is not on Project #\$PROJECT_NUMBER" >&2

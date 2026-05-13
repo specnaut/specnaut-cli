@@ -1,5 +1,11 @@
 #!/usr/bin/env bash
 # List items on the configured GitHub Project, with Status. Optional filter.
+#
+# Uses `gh issue list --json projectItems` — the gh CLI exposes the Project V2
+# Status field via its REST-ish JSON projection, costing ~1 GraphQL point per
+# call (vs ~20 for the bulky `repository.issues[].projectItems[].fieldValues[]`
+# query that lived here previously and was the main rate-limit offender).
+#
 # Usage: list.sh [Status]
 set -euo pipefail
 
@@ -8,38 +14,14 @@ set -euo pipefail
 
 FILTER="${1:-}"
 
-JSON=$(gh api graphql -f query='
-  query($owner:String!, $name:String!) {
-    repository(owner:$owner, name:$name) {
-      issues(first:100, states:OPEN) {
-        nodes {
-          number title
-          projectItems(first:5) {
-            nodes {
-              project { number }
-              fieldValues(first:8) {
-                nodes {
-                  ... on ProjectV2ItemFieldSingleSelectValue {
-                    name
-                    field { ... on ProjectV2SingleSelectField { name } }
-                  }
-                }
-              }
-            }
-          }
-        }
-      }
-    }
-  }' \
-  -f owner="$REPO_OWNER" \
-  -f name="$REPO_NAME")
+JSON=$(gh issue list --repo "$REPO" --state open --limit 200 \
+  --json number,title,projectItems)
 
-echo "$JSON" | jq -r --argjson project "$PROJECT_NUMBER" --arg filter "$FILTER" '
-  .data.repository.issues.nodes[]
+echo "$JSON" | jq -r --arg filter "$FILTER" '
+  .[]
   | . as $issue
-  | (.projectItems.nodes[] | select(.project.number == $project)) as $item
-  | (($item.fieldValues.nodes[]
-       | select(.field.name == "Status") | .name) // "—") as $status
+  | (.projectItems[0].status.name // "—") as $status
+  | select($issue.projectItems | length > 0)
   | select($filter == "" or $status == $filter)
-  | "  #\(.number)  \($status)  \(.title)"
+  | "  #\($issue.number)  \($status)  \($issue.title)"
 '

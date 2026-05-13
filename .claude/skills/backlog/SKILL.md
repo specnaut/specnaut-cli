@@ -50,9 +50,11 @@ gh issue reopen <num> --repo mkrlabs/specflow
 gh issue edit   <num> --repo mkrlabs/specflow --title "…" --body "…" --add-label "…" --remove-label "…"
 ```
 
-## Why we don't use `gh project item-list`
+## API quota — prefer REST/CLI over raw GraphQL
 
-`gh project item-list 4 --owner mkrlabs` and the equivalent `viewer.projectV2(4).items` GraphQL field can return 0 items in some account/permission contexts even when items genuinely exist (verified via direct node queries). The `list.sh` and `move.sh` scripts work around it by querying via `repository.issues[].projectItems[]` filtered by `project.number == 4`. Same data, reverse path through the graph.
+GitHub's GraphQL and REST APIs share the same 5,000-points-per-hour authenticated quota, but complex GraphQL queries score much higher per call than REST/CLI equivalents. Past versions of these scripts ran hand-rolled `repository.issues[].projectItems[].fieldValues[]` queries that were the main rate-limit offender; the current scripts use `gh issue list/view --json projectItems` (the gh CLI's REST-ish JSON projection, ~1–2 points per call) for read paths and reserve raw `gh api graphql` only for surfaces with no CLI equivalent (`updateProjectV2ItemFieldValue` mutations, exposed via `gh project item-edit`, and the small targeted item-ID lookup in `move.sh` / `set-field.sh`).
+
+Order of preference for any new backlog tool: `gh issue` / `gh project item-edit` CLI → `mcp__github__*` REST tools (agent context) → small targeted `gh api graphql` only when no CLI/MCP equivalent exists.
 
 ## Conventions
 

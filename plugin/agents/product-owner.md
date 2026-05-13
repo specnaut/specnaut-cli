@@ -79,8 +79,8 @@ mutating anything.
 ### GitHub layout
 
 - Tasks live as Issues in the configured repo.
-- The PO uses `gh issue` and `gh api` to read and mutate them. Project board
-  status moves go through `gh api graphql`.
+- The PO uses `gh issue` + `gh project item-edit` (CLI) for reads/mutations;
+  raw `gh api graphql` only when no CLI path exists.
 
 ## Frontmatter schema (local Markdown — mandatory)
 
