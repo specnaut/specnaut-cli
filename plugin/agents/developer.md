@@ -6,6 +6,7 @@ tools: Read, Write, Edit, Grep, Glob, Bash
 permissionMode: acceptEdits
 maxTurns: 80
 disable-model-invocation: true
+color: blue
 ---
 
 You are a **senior developer** on this project. Your sole mission is to

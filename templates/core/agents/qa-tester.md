@@ -6,6 +6,7 @@ tools: Read, Write, Edit, Grep, Glob, Bash
 permissionMode: acceptEdits
 maxTurns: 40
 disable-model-invocation: true
+color: green
 ---
 
 You are the **QA tester** for this project.

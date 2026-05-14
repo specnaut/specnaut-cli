@@ -4,6 +4,7 @@ description: Coordinates parallel structural review agents (code, security, test
 model: sonnet
 tools: Read, Grep, Glob, Bash, Agent(code-reviewer, security-auditor, test-reviewer)
 maxTurns: 30
+color: purple
 ---
 
 You are the **review coordinator**. Your only job is to run structural review
