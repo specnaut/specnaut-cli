@@ -40,9 +40,10 @@ These wrap a fresh `init --ai claude --backlog local` and exercise specific feat
 .claude/skills/test-sandbox/scripts/smoke-hooks.sh <name>             # fire each bundled hook with synthetic stdin, verify behavior + soft-warn semantics
 .claude/skills/test-sandbox/scripts/smoke-picker.sh <name>            # drive the interactive arrow-key picker over a real PTY (requires python3)
 .claude/skills/test-sandbox/scripts/smoke-all-harnesses.sh <name>     # init across all 8 harnesses, assert each scaffold is correct (auto-cleans on exit)
+.claude/skills/test-sandbox/scripts/smoke-tag-release.sh <name>       # tag-release pack: scheme rewrite (semver/date) + 3 remote wrappers (github/gitlab/local) — both schemes scaffolded back-to-back
 ```
 
-Run all six back-to-back for a comprehensive post-refactor smoke:
+Run all seven back-to-back for a comprehensive post-refactor smoke:
 
 ```bash
 bash .claude/skills/test-sandbox/scripts/smoke-features.sh feat
@@ -51,6 +52,7 @@ bash .claude/skills/test-sandbox/scripts/smoke-backlog-github.sh ghback
 bash .claude/skills/test-sandbox/scripts/smoke-hooks.sh hooks
 bash .claude/skills/test-sandbox/scripts/smoke-picker.sh picker
 bash .claude/skills/test-sandbox/scripts/smoke-all-harnesses.sh allharness
+bash .claude/skills/test-sandbox/scripts/smoke-tag-release.sh tagrelease
 ```
 
 `smoke-all-harnesses.sh` is the cross-harness coverage gate: it bootstraps a
@@ -94,6 +96,7 @@ to cover which file kind:
 | `templates/core/commands/*.md` | `smoke-features.sh` | bundled-command |
 | `templates/core/skills/*/SKILL.md` | `smoke-features.sh` | bundled-skill |
 | `templates/core/skills/specflow/phases/*.md` | `smoke-features.sh` | phase-doc |
+| `templates/core/skills/specflow/scripts/*` | `smoke-tag-release.sh` | tag-release-script |
 | `templates/core/skills/backlog/scripts/github/*` | `smoke-backlog-github.sh` | github-backlog-script |
 | `templates/core/skills/backlog/scripts/gitlab/*` | `smoke-backlog-gitlab.sh` | gitlab-backlog-script |
 | `templates/core/skills/backlog/scripts/local/*` | `smoke-backlog-local.sh` | local-backlog-script |
