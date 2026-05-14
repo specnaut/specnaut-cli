@@ -76,8 +76,9 @@ They never run `add.sh`, `move.sh`, `clarify-comment.sh`, or `gh issue
 You are typically dispatched with one of:
 
 - **"Add an issue for X"** — title (and optional body) provided. Decide
-  if the title is good as-is or needs sharpening, then `add.sh`. Return
-  the URL.
+  if the title is good as-is or needs sharpening, then `add.sh`. Then
+  **classify it** — Size + Priority + Issue Type + label — per
+  "Mandatory classification" below, in the same dispatch. Return the URL.
 - **"Clarify #N"** or **"process all current Backlog items"** — read the
   item, follow links, draft the body, decide the path (clarify
   autonomously / ask via comment / recommend archive).
@@ -169,12 +170,16 @@ For each mutation:
 
    Then:
    - `gh issue edit <num> --repo mkrlabs/specflow --body "<new body>"`
+   - **Classify it** — Size + Priority + Issue Type + label — per
+     "Mandatory classification" below. Not optional; do it before the
+     status move.
    - `.claude/skills/backlog/scripts/move.sh <num> Ready`
 
 6. **Final report.** When your dispatch ends, return a concise summary
    table with one row per item handled: number, title, action taken
    (`created` / `promoted` / `commented` / `moved-<status>` /
-   `closed-<reason>` / `recommended-archive`), and a one-line
+   `closed-<reason>` / `recommended-archive`), the classification
+   assigned (Size / Priority / Issue Type / label), and a one-line
    rationale. No walls of text.
 
    **When the dispatch was a "next" / "survey" / "what's next" call**
@@ -192,31 +197,52 @@ For each mutation:
    single-mutation dispatches (`add`, `move`, `close`) — there's no
    downstream phase to clean up for.
 
-## Sizing and priority — fields are the source of truth
+## Mandatory classification — every created or clarified item
 
-Project #4 has native single-select fields `Priority` (P0..P3) and
-`Size` (XS..XL). When you size or prioritise an item, write the value
-to the field via the helper below — **NEVER also apply a `priority:*`
-/ `size:*` label on an item that already has the native field**. The
-two are not peer signals; the label exists only as a fallback when the
-field cannot accept the value. Anything else is the dual-signal drift
-that prompted #194.
+Classifying an item is **part of grooming, not optional polish**. Every
+issue you create or clarify MUST exit with all four axes set before your
+final report. This is a **gate**: an unclassified item is not done.
+
+1. **Size** — `set-field.sh <num> Size <XS|S|M|L|XL>`.
+2. **Priority** — `set-field.sh <num> Priority <P0|P1|P2|P3>` (land the
+   value with the prioritisation framework — see your memory).
+3. **Issue Type** — `set-field.sh <num> IssueType <Task|Bug|Feature>`.
+   `Feature` = new capability; `Bug` = defect / regression; `Task` =
+   chore, docs, tooling, or pure refactor.
+4. **Label** — at least one, from the repo's available set (see your
+   `github-labels` memory — only the default GitHub labels exist).
+   `enhancement` for features, `bug` for defects, `documentation` for
+   docs-only work.
+
+Project #4 carries native single-select fields `Priority` (P0..P3) and
+`Size` (XS..XL); the `mkrlabs` org carries native Issue Types. The
+`set-field.sh` helper writes all three. **NEVER also apply a
+`priority:*` / `size:*` / `type:*` label on an item that already has the
+native field or type** — the two are not peer signals; the label is a
+fallback only. That dual-signal drift is what #194 fixed.
 
 ```
-set-field.sh <issue> Priority P1     # writes the field
+set-field.sh <issue> Priority P1      # writes the native field
 set-field.sh <issue> Size M
+set-field.sh <issue> IssueType Feature
 ```
 
 Helper at `.claude/skills/backlog/scripts/set-field.sh`. Exit codes:
-- `0` → field updated, no label needed (the only happy path).
-- `10` → no such field on Project #4 (shouldn't happen — but if it
-  does, fall back to `priority:*` / `size:*` labels and surface the
-  drift in the report).
-- `11` → field present but option missing on Project #4. Add the
-  option to the field (Project settings → field → "+" Add option, or
-  the `updateProjectV2Field` GraphQL mutation) and re-run rather than
-  silently falling back to a label.
-- `12` → issue not on Project #4. Resolve the attachment first.
+- `0` → field / type set, no label needed (the only happy path).
+- `10` → no such field / type on the project / org → fall back to the
+  matching label and surface the drift in the report.
+- `11` → field / type present but the value is unrecognised. For
+  Priority/Size, add the option to the field (Project settings → field
+  → "+" Add option, or the `updateProjectV2Field` mutation) and re-run;
+  for IssueType, you passed something other than Task/Bug/Feature — fix
+  the call.
+- `12` → issue not on Project #4 / not in the repo. Resolve the
+  attachment first.
+
+If any of the four axes cannot be persisted (auth, rate-limit, scope),
+the item does **not** silently ship under-classified — surface it under
+a `⚠ classification incomplete` line in your final report. A silent
+skip is a contract violation.
 
 The legacy `priority:*` / `size:*` labels were swept off the open
 issues by `.claude/skills/backlog/scripts/migrate-labels-to-fields.sh`

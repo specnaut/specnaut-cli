@@ -2961,37 +2961,41 @@ missing or empty, flag it to the user — the project is under-documented.
 4. **Business briefs** — provide context to other agents before they build.
 5. **Priority justification** — explain every priority change.
 
-## Mandatory sizing + priority contract (GitHub / GitLab backends)
+## Mandatory classification contract — every created or clarified item
 
-Every backlog item you touch MUST exit with both a size
-(\`XS\`..\`XL\`) and a priority (\`P0\`..\`P3\`) persisted. **Gate**, not polish.
+Classifying an item is part of grooming, not optional polish. Every
+backlog item you touch MUST exit with **all four axes** persisted before
+your final report — a **gate**, not polish:
 
-**GitHub — fields are the source of truth; labels are a STRICT
-fallback.** When the project has native single-select fields \`Priority\`
-and/or \`Size\`, write the value to the field and **NEVER** also apply
-a \`priority:*\` / \`size:*\` label on the same item — that's the dual-
-signal drift \`set-field.sh\` exists to prevent. Labels are reserved for
-projects whose board has no such field. Bundled scripts at
-\`.specflow/scripts/backlog/\`:
+1. **Size** — \`XS\`..\`XL\`
+2. **Priority** — \`P0\`..\`P3\`
+3. **Issue Type** — \`Task\` (chore / docs / tooling / refactor), \`Bug\`
+   (defect / regression), or \`Feature\` (new capability)
+4. **Label** — at least one classifying label (\`enhancement\`, \`bug\`,
+   \`documentation\`, …)
 
-- \`detect-fields.sh\` — env lines with field/option IDs (case-insensitive
-  match). Run once per groom run.
-- \`set-field.sh <issue> <Priority|Size> <value>\` — exit codes:
-  - \`0\` → wrote field, no label (preferred path).
-  - \`10\` → field absent on this project → apply matching label.
-  - \`11\` → field present but option missing → apply matching label.
-  - \`12\` → not on project → surface under \`⚠ size / priority missing\`.
+Persistence depends on the backend:
 
-If the fallback label is missing, \`gh label create\` / \`glab label
-create\` it (colors in the groom phase template), then \`gh issue edit
---add-label\` / \`glab issue update --label\`. Persistence failures
-(auth, rate-limit) MUST land under \`⚠ size / priority missing\` —
-silent skip is a contract violation. Full routing + migration details
-in \`/specflow groom\`'s phase template.
+- **GitHub** — when the project has native \`Priority\` / \`Size\` fields
+  and the org has native Issue Types, write through \`set-field.sh
+  <issue> <Priority|Size|IssueType> <value>\` and **NEVER** also apply a
+  \`priority:*\` / \`size:*\` / \`type:*\` label on the same item (the
+  dual-signal drift the helper exists to prevent). Exit codes: \`0\` wrote
+  field/type · \`10\` field/type absent · \`11\` value unrecognised · \`12\`
+  issue not on project/repo. On \`10\`/\`11\`, fall back to the matching
+  label (\`gh label create\` it first if missing). Run \`detect-fields.sh\`
+  once per groom to discover field/option IDs.
+- **GitLab** — no \`set-field.sh\`; all four axes are scoped labels via
+  \`glab\` (\`priority::P1\`, \`size::M\`, \`type::feature\`, plus a plain
+  label). Create scoped labels on first use if absent.
+- **Local Markdown** — classification lives in the task file's
+  frontmatter: \`priority:\` and \`complexity:\` (size) are already
+  mandatory schema keys; record the Issue Type in \`category:\`
+  (\`feature\` / \`bug\` / \`task\`). No labels.
 
-**GitLab** has no \`set-field.sh\` analogue yet; falls straight to
-scoped labels via \`glab\`. **Local Markdown** uses frontmatter
-(\`priority:\` / \`complexity:\` keys) instead of fields or labels.
+Persistence failures on any backend (auth, rate-limit, missing scope)
+MUST land under \`⚠ classification incomplete\` in your report — a silent
+skip is a contract violation.
 
 ## Backlog backend
 
@@ -3035,17 +3039,14 @@ created: YYYY-MM-DD
 ---
 \`\`\`
 
-\`parent: "#NNN"\` is the local-Markdown sub-task convention (since Markdown
-backlogs have no native parent/child link). It is **grep-friendly** — running
-\`grep -l 'parent: "#042"' .specflow/backlog/*.md\` lists every child of epic
-042. An issue with \`parent: null\` (or no \`parent:\` key) is either a top-level
-task or itself an epic.
+\`parent: "#NNN"\` is the local-Markdown sub-task convention — grep-friendly
+(\`grep -l 'parent: "#042"' .specflow/backlog/*.md\` lists every child of
+#042). A missing or \`null\` \`parent:\` means a top-level task or an epic.
 
 ## Epic concept
 
-An **epic** is a backlog item that owns one or more **sub-tasks**. The PO must
-be able to create them, reference them as a unit, and close the parent only
-when every child is closed.
+An **epic** owns one or more **sub-tasks**: the PO creates them, tracks them
+as a unit, and closes the parent only when every child is closed.
 
 ### Creating sub-tasks (all backends)
 
@@ -3076,13 +3077,12 @@ Fails fast (exit 3) if the parent doesn't exist.
   --reason {completed|not_planned}\`. Skipping the move leaves the item
   stuck in \`In progress\` / \`In review\` indefinitely. Local Markdown is
   one step (flip \`status: done\` in frontmatter).
-- **Board hygiene sweep**: when asked to "clean the board" / "sweep stale
-  items", list every column via \`gh project item-list <N> --owner <owner>
-  --format json\` (the wrappers filter to \`states:OPEN\` and miss closed
-  items still attached). For items in \`In progress\` / \`In review\` whose
-  issue is \`CLOSED\`, or \`OPEN\` with a merged PR linked → \`move.sh <num>
-  Done\`. Mirror for \`Done\` items whose issue is REOPENED. Idempotent;
-  safe after every release or via \`/loop 1d\`.
+- **Board hygiene sweep**: on "clean the board" / "sweep stale items",
+  list every column via \`gh project item-list <N> --owner <owner>
+  --format json\` (the wrappers filter to \`states:OPEN\`, missing closed
+  items). Items in \`In progress\` / \`In review\` that are \`CLOSED\` (or
+  \`OPEN\` with a merged PR) → \`move.sh <num> Done\`; mirror \`Done\` items
+  REOPENED. Idempotent; safe after every release.
 
 ### Epic detection heuristic
 
@@ -3137,17 +3137,15 @@ Total > 7 → critical, 5–7 → high, 3–5 → medium, < 3 → low.
 
 ### \`/backlog\` or \`/backlog list\`
 
-Display the current backlog overview. On the local backend, render
-\`.specflow/backlog.md\` (or recompose it from the task files if the index
-drifted). On GitHub, list issues in the configured repo, grouped by priority
-label / project status.
+Display the backlog overview. Local: render \`.specflow/backlog.md\`
+(recompose from the task files if the index drifted). GitHub: list issues
+in the configured repo, grouped by priority / project status.
 
 ### \`/backlog next\`
 
-Recommend the top 3 tasks. For each: business justification, domain context,
-workflow recommendation (spec vs direct), quick-win indicator (≤3 pts), and
-the exact command to start. Skip sub-tasks whose parent epic is not yet
-ready.
+Recommend the top 3 tasks. For each: business justification, domain
+context, workflow recommendation (spec vs direct), quick-win indicator
+(≤3 pts), exact start command. Skip sub-tasks whose parent epic isn't ready.
 
 ### \`/backlog add <title>\`
 
@@ -3159,15 +3157,15 @@ request as a sub-task ("add X as a child of #042" / "subtask of the auth
 epic"), set the parent link as soon as the child exists (frontmatter
 \`parent: "#042"\` locally, sub-issue API call on GitHub).
 
-All persisted backlog artifacts MUST be written in English:
+Every created task MUST exit fully classified — Size, Priority, Issue
+Type, and at least one label — per the "Mandatory classification
+contract" above. Classification is part of the same dispatch, not a
+follow-up.
 
-- task titles
-- frontmatter values
-- task descriptions, scope, notes, acceptance criteria
-- backlog index entries
-- GitHub issue titles and bodies
-
-You may reply in chat in the user's conversation language.
+All persisted backlog artifacts — titles, frontmatter values, descriptions,
+scope, notes, acceptance criteria, index entries, GitHub issue titles and
+bodies — MUST be written in English. You may reply in chat in the user's
+conversation language.
 
 ### \`/backlog update <id>\`
 
@@ -3188,20 +3186,20 @@ number of open epics with at least one open child.
 
 Full grooming session — review priorities, re-estimate, flag blockers, audit
 epic / sub-task hygiene (orphaned children, parents that should be closed,
-sub-tasks that escaped a closed epic).
+sub-tasks that escaped a closed epic). Any item still missing a Size,
+Priority, Issue Type, or label gets classified on the spot — the
+"Mandatory classification contract" applies retroactively during a groom.
 
 ### \`/backlog brief <id>\`
 
 Generate a PO business brief for a developer: feature purpose, business
-rules, user stories, gotchas, acceptance criteria. If the task is part of an
-epic, include a one-line summary of the parent and the sibling sub-tasks for
-context.
+rules, user stories, gotchas, acceptance criteria. If the task is in an
+epic, add a one-line summary of the parent and sibling sub-tasks.
 
 ### \`/backlog epic <id>\`
 
-Show an epic with all its sub-tasks (status, complexity, who's working on
-what). Useful before estimating overall epic completion or when reporting
-progress to stakeholders.
+Show an epic with all its sub-tasks (status, complexity, owner). Useful
+before estimating epic completion or reporting progress.
 
 ## Rules
 
@@ -3213,13 +3211,8 @@ progress to stakeholders.
 - Respect epic semantics — never close a parent while children remain open.
 - Write in user's conversation language in chat, but always write persisted
   artifacts in English.
-
-## Compatibility note
-
-Epic / sub-task awareness is available from this version of the scaffolded
-PO onward. Older projects that pre-date this template will not have the
-\`parent:\` frontmatter key on existing tasks; that's fine — the PO treats a
-missing key as \`parent: null\`.
+- Projects pre-dating the epic feature have no \`parent:\` key on old tasks —
+  that's fine; a missing key is treated as \`parent: null\`.
 `,
     executable: false,
     backend: null,
@@ -4823,7 +4816,7 @@ project\` calls and read configuration from \`backlog-config.yml\`.
 .specflow/scripts/backlog/move.sh <number> <Status>   # sets Project Status field
 .specflow/scripts/backlog/clarify-comment.sh <num> "<question>"
 .specflow/scripts/backlog/detect-fields.sh                                 # discover native Priority/Size single-select fields → env lines
-.specflow/scripts/backlog/set-field.sh <num> <Priority|Size> <value>       # set the native Project V2 field; exit codes 10/11/12 signal label fallback
+.specflow/scripts/backlog/set-field.sh <num> <Priority|Size|IssueType> <value>  # set the native Project V2 field / org Issue Type; exit codes 10/11/12 signal label fallback
 .specflow/scripts/backlog/ensure-labels.sh                                 # idempotently bootstrap the 7 Specflow semantic labels (security/refactor/docs/tech-debt/dx/performance/dependency)
 \`\`\`
 
@@ -4851,18 +4844,20 @@ Specflow change — the skill is path-aware.
 - **Closing** — close the issue (don't just move to Done). The repo's
   issue history is the audit trail.
 - **Drafts** are not used. Every task is a real issue.
-- **Priority / Size — fields are the source of truth.** When the
-  project has native single-select \`Priority\` and/or \`Size\` fields,
-  always write through \`set-field.sh\` and **NEVER also apply a
-  matching \`priority:*\` / \`size:*\` label on the same item** — that
-  dual-signal drift is exactly what the helper exists to prevent.
-  Labels are reserved as a strict fallback for projects whose board
-  has no such field. Non-zero exit codes tell the caller which
-  fallback applies: \`10\` = field absent on the project (use the
-  label), \`11\` = field present but the value option is missing
-  (add the option to the field, then re-run; only fall back to a
-  label if you can't add the option), \`12\` = issue not on the
-  project.
+- **Classification is mandatory — every created or clarified item
+  exits with Size, Priority, Issue Type, and at least one label.**
+  \`Priority\` / \`Size\` are native Project V2 single-select fields;
+  \`Issue Type\` (\`Task\` / \`Bug\` / \`Feature\`) is a native org-level
+  concept. Write all three through \`set-field.sh\` and **NEVER also
+  apply a matching \`priority:*\` / \`size:*\` / \`type:*\` label on an item
+  that already carries the native field or type** — that dual-signal
+  drift is exactly what the helper exists to prevent. Labels are
+  reserved as a strict fallback for projects / orgs without the native
+  field or type. Non-zero exit codes tell the caller which fallback
+  applies: \`10\` = field / type absent (use the label), \`11\` = present
+  but the value is unrecognised (for Priority/Size, add the option to
+  the field then re-run; for Issue Type, fix the call), \`12\` = issue
+  not on the project / not in the repo.
 
 ### Prerequisites
 
@@ -5688,23 +5683,33 @@ echo "PROJECT_NODE_ID=\$(gh project view "\$PROJECT_NUMBER" --owner "\$REPO_OWNE
     name: "set-field",
     suffix: "set-field.sh",
     content: `#!/usr/bin/env bash
-# Set a native Project V2 single-select field value (Priority or Size) on an issue.
+# Set a native classification value on an issue: the Project V2 single-select
+# fields Priority / Size, or the org-level native Issue Type (Task / Bug /
+# Feature).
 #
 # The item-ID lookup uses a small, targeted GraphQL query (one issue,
-# projectItems(first:5)) — negligible quota cost (~2 points). The actual
+# projectItems(first:5)) — negligible quota cost (~2 points). The Project V2
 # field mutation (\`updateProjectV2ItemFieldValue\`) is GraphQL-only —
-# \`gh project item-edit\` is the CLI wrapper, used below.
+# \`gh project item-edit\` is the CLI wrapper, used below. The Issue Type is
+# set via the REST issues API (\`PATCH .../issues/N\` with \`type\`) — a single
+# call that takes the type name directly, cheaper than the GraphQL
+# \`updateIssue\` path and with no node-ID resolution.
 #
-# Usage: set-field.sh <issue-number> <Priority|Size> <value>
+# Usage: set-field.sh <issue-number> <Priority|Size|IssueType> <value>
 #   Examples:
 #     set-field.sh 42 Priority P1
 #     set-field.sh 42 Size M
+#     set-field.sh 42 IssueType Feature
+#
+# Issue Types are an org-level GitHub feature. On user-owned repos (no org)
+# the org query returns nothing and the script exits 10 so the caller falls
+# back to a \`type:*\` label.
 #
 # Exit codes:
-#   0   field updated
-#   10  no such field on the project (caller should fall back to a label)
-#   11  field exists but has no option matching <value> (caller should fall back to a label)
-#   12  issue is not on the project
+#   0   field / type updated
+#   10  no such field / type on the project / org (caller should fall back to a label)
+#   11  field / type present but the value is unrecognised (caller should fall back to a label)
+#   12  issue is not on the project / not in the repo
 #   1   usage / unexpected error
 set -euo pipefail
 
@@ -5712,7 +5717,7 @@ set -euo pipefail
 . "\$(dirname "\$0")/_config.sh"
 
 if [ "\$#" -lt 3 ]; then
-  echo 'usage: set-field.sh <issue-number> <Priority|Size> <value>' >&2
+  echo 'usage: set-field.sh <issue-number> <Priority|Size|IssueType> <value>' >&2
   exit 1
 fi
 NUM="\$1"
@@ -5721,11 +5726,46 @@ VALUE="\$3"
 
 # Normalize field name to one of the canonical labels we support.
 FIELD_LOWER=\$(echo "\$FIELD_NAME" | tr '[:upper:]' '[:lower:]')
+
+# Issue Type is an org-level native concept, not a Project V2 field — it has
+# its own mutation path and exits before the Priority/Size project-field code.
+if [ "\$FIELD_LOWER" = "issuetype" ] || [ "\$FIELD_LOWER" = "type" ]; then
+  case "\$VALUE" in
+    Task | Bug | Feature) ;;
+    *)
+      echo "unknown IssueType value '\$VALUE' (Task|Bug|Feature)" >&2
+      exit 11
+      ;;
+  esac
+  # Single REST PATCH — takes the type name directly. A 422 means the
+  # repo/org has no such native type (fall back to a label); a 404 means
+  # the issue doesn't exist.
+  if ! RESULT=\$(gh api -X PATCH "repos/\$REPO_OWNER/\$REPO_NAME/issues/\$NUM" \\
+    -f type="\$VALUE" --jq '.type.name' 2>&1); then
+    case "\$RESULT" in
+      *"Validation Failed"* | *422*)
+        echo "\$REPO_OWNER/\$REPO_NAME has no native issue type '\$VALUE' — fall back to a label" >&2
+        exit 10
+        ;;
+      *"Not Found"* | *404*)
+        echo "issue #\$NUM not found in \$REPO_OWNER/\$REPO_NAME" >&2
+        exit 12
+        ;;
+      *)
+        echo "set IssueType failed: \$RESULT" >&2
+        exit 1
+        ;;
+    esac
+  fi
+  echo "✓ #\$NUM IssueType → \$RESULT"
+  exit 0
+fi
+
 case "\$FIELD_LOWER" in
   priority) PREFIX="PRIORITY" CANONICAL="Priority" ;;
   size)     PREFIX="SIZE"     CANONICAL="Size" ;;
   *)
-    echo "error: unsupported field '\$FIELD_NAME' (Priority|Size)" >&2
+    echo "error: unsupported field '\$FIELD_NAME' (Priority|Size|IssueType)" >&2
     exit 1
     ;;
 esac

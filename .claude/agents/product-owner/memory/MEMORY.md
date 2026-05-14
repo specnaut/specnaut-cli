@@ -17,3 +17,5 @@ treatment is now part of normal conventions).
 - [GitHub labels](github-labels.md) — only the 9 default GitHub labels exist; do not use ux/docs/friction slugs
 - [Plugin distribution](plugin-distribution.md) — install command, slash-command namespace, 21 assets, 3 install paths, upgrade migration, check --project gap warn
 - [Size and priority — native fields are source of truth](size-priority-labels.md) — Priority/Size are native Project fields; labels are strict fallback only; Project #4 option IDs pinned post #194 (PR #196); re-fetch IDs after any updateProjectV2Field call
+- [Issue Type classification](issue-type-classification.md) — set native Task/Bug/Feature via `set-field.sh <num> IssueType <…>` (REST PATCH under the hood); mandatory checklist: Size + Priority + IssueType + label + Ready before final report
+- [Prefer REST over GraphQL](rest-over-graphql.md) — GraphQL burns the shared quota far faster and exhausts independently; use raw `gh api graphql` only when no REST/CLI/MCP path exists

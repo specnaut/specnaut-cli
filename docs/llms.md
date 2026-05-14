@@ -439,15 +439,19 @@ repo. Idempotent; never edits or deletes existing labels. The GitHub default `bu
 but never re-created. The full reference lives in `.specflow/LABELS.md` next to the install —
 including a guidance note for local backend users on tagging via task-file frontmatter.
 
-**Priority and Size — native fields are the source of truth.** When a GitHub project ships native
-`Priority` and/or `Size` single-select fields on Project V2, the bundled
-`.specflow/scripts/backlog/set-field.sh` writes the value to the field — and the PO **never** also
-applies a `priority:*` / `size:*` label on the same item. Labels are reserved as a strict fallback
-for projects whose board has no such field; they are not a peer signal. `set-field.sh` exit codes
-tell the caller which path applies: `0` = field updated, `10` = field absent (fall back to label),
-`11` = field present but option missing (add the option, then re-run; only fall back to a label if
-you can't add it), `12` = issue not on the project. `detect-fields.sh` (run once per groom) emits
-the field/option IDs into env vars for case-insensitive matching.
+**Mandatory classification — every groomed item is sized, prioritised, typed, and labelled.** The PO
+classifies every item it creates or clarifies along four axes — Size, Priority, Issue Type (`Task` /
+`Bug` / `Feature`), and at least one label — before the item is done; classification is a gate, not
+optional polish. On a GitHub project with native `Priority` / `Size` single-select fields and native
+Issue Types, the bundled
+`.specflow/scripts/backlog/set-field.sh <issue> <Priority|Size|IssueType> <value>` writes each to
+its native field or type — and the PO **never** also applies a `priority:*` / `size:*` / `type:*`
+label on an item that already carries the native value. Labels are a strict fallback for projects or
+orgs without the native field/type; they are not a peer signal. `set-field.sh` exit codes tell the
+caller which path applies: `0` = set, `10` = field/type absent (fall back to label), `11` = value
+unrecognised, `12` = issue not on the project / not in the repo. `detect-fields.sh` (run once per
+groom) emits the field/option IDs into env vars for case-insensitive matching. On GitLab the four
+axes are scoped labels via `glab`; on the local Markdown backend they live in task-file frontmatter.
 
 **Epics & sub-tasks.** Big work that needs decomposition lives as a parent **epic** with one or more
 **sub-tasks**. The link mechanism differs per backend, but the contract is the same: parents cannot

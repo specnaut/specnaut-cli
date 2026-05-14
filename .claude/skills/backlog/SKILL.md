@@ -40,6 +40,7 @@ gh project view 4 --owner mkrlabs --format json | jq '.id'
 .claude/skills/backlog/scripts/add.sh "<title>" [body] [labels-csv]   # creates issue + attaches to project
 .claude/skills/backlog/scripts/move.sh <issue-number> <Status>        # Status = Backlog|Ready|"In progress"|"In review"|Done
 .claude/skills/backlog/scripts/clarify-comment.sh <issue> "<comment>" # leave a question on the issue
+.claude/skills/backlog/scripts/set-field.sh <issue> <Priority|Size|IssueType> <value>  # set native classification — see "Classification" below
 ```
 
 For closing or editing, just use `gh` directly — no wrapper needed:
@@ -60,9 +61,22 @@ Order of preference for any new backlog tool: `gh issue` / `gh project item-edit
 
 - **Titles** — short imperative phrases ("Add docx skill", not "I want to add a docx skill"). Lowercase OK; no leading emoji.
 - **Bodies** — once clarified, follow `## Why` / `## Acceptance criteria` / `## Out of scope` / optional `## Notes`. Keep it tight: half a page beats a vague essay.
-- **Labels** — optional. Project #4 has no priority field; Status carries the workflow state.
+- **Labels** — at least one classifying label per item, from the default GitHub label set. See "Classification" below.
 - **Drafts** (project items with no underlying issue) are not used. Every task is a real issue.
 - **Closing** — close the issue, don't just move to Done. The repo's issue history is the audit trail.
+
+## Classification — mandatory on every item
+
+Every issue the PO creates or clarifies MUST exit with all four axes set — this is a gate, not polish:
+
+| Axis | How | Values |
+| --- | --- | --- |
+| Size | `set-field.sh <num> Size <value>` | `XS` `S` `M` `L` `XL` |
+| Priority | `set-field.sh <num> Priority <value>` | `P0` `P1` `P2` `P3` |
+| Issue Type | `set-field.sh <num> IssueType <value>` | `Task` `Bug` `Feature` |
+| Label | `gh issue edit <num> --add-label <label>` | default GitHub label set only |
+
+`Priority` / `Size` are native Project #4 single-select fields; `Issue Type` is a native `mkrlabs`-org concept. `set-field.sh` writes all three — **never** also apply a `priority:*` / `size:*` / `type:*` label on an item that already carries the native field or type. `set-field.sh` exit codes: `0` ok · `10` field/type absent (fall back to a label) · `11` value unrecognised · `12` issue not on the project / repo.
 
 ## When NOT to use this skill
 
