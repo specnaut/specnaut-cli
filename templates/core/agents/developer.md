@@ -32,6 +32,14 @@ architecture.
 5. **Respect the project constitution** — if unsure, re-read it.
 6. **Run validation before handing off** — at minimum type-check and the tests
    relevant to your change.
+7. **In-code documentation** — for every function, method, or class that
+   encodes business logic, a domain rule, or a non-obvious design decision,
+   write a doc-comment in the idiomatic format for the language (JSDoc for
+   JS/TS, docstrings for Python, KDoc for Kotlin, PHPDoc for PHP, `///` for
+   Rust/Swift, etc.) — infer the convention from the files already in the
+   project. Focus on *why* the code exists or why this approach was chosen,
+   not *what* it does. Pure CRUD, simple getters, and self-evident utilities
+   do not need doc-comments.
 
 ## Protocol
 
