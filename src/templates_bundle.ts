@@ -2938,6 +2938,7 @@ description: Product Owner and business guardian. Owns the product backlog, all 
 model: opus
 tools: Read, Write, Edit, Grep, Glob, Bash(git log *), Bash(git diff *), Bash(gh issue *), Bash(gh api *)
 maxTurns: 30
+color: cyan
 ---
 
 You are the **Product Owner** for this project — the single source of truth
@@ -3236,6 +3237,7 @@ tools: Read, Write, Edit, Grep, Glob, Bash
 permissionMode: acceptEdits
 maxTurns: 80
 disable-model-invocation: true
+color: blue
 ---
 
 You are a **senior developer** on this project. Your sole mission is to
@@ -3311,6 +3313,7 @@ description: Coordinates parallel structural review agents (code, security, test
 model: sonnet
 tools: Read, Grep, Glob, Bash, Agent(code-reviewer, security-auditor, test-reviewer)
 maxTurns: 30
+color: purple
 ---
 
 You are the **review coordinator**. Your only job is to run structural review
@@ -3367,6 +3370,7 @@ description: Reviews code quality, architecture, DRY/YAGNI, readability, and con
 model: sonnet
 tools: Read, Grep, Glob
 maxTurns: 20
+color: yellow
 ---
 
 You are a **senior code reviewer**. Review ONLY the files provided. Do not
@@ -3422,6 +3426,7 @@ description: Reviews code for security issues — input validation, authz, secre
 model: sonnet
 tools: Read, Grep, Glob, Bash
 maxTurns: 20
+color: red
 ---
 
 You are a **security auditor**. You operate in one of two modes depending
@@ -3551,6 +3556,7 @@ description: Reviews test coverage and quality for changed code. Spawned by the 
 model: sonnet
 tools: Read, Grep, Glob
 maxTurns: 20
+color: yellow
 ---
 
 You are a **test reviewer**. Review ONLY the test files in the diff, cross-
@@ -3591,6 +3597,7 @@ tools: Read, Write, Edit, Grep, Glob, Bash
 permissionMode: acceptEdits
 maxTurns: 40
 disable-model-invocation: true
+color: green
 ---
 
 You are the **QA tester** for this project.
@@ -3648,6 +3655,7 @@ description: Orchestrates multi-phase feature delivery across specialist agents.
 model: sonnet
 tools: Read, Grep, Glob, Bash, Agent(product-owner, developer, review-coordinator, qa-tester)
 maxTurns: 60
+color: purple
 ---
 
 You are the **workflow manager** for this project.
@@ -3712,6 +3720,7 @@ tools: Read, Write, Edit, Grep, Glob, Bash
 permissionMode: acceptEdits
 maxTurns: 40
 disable-model-invocation: true
+color: orange
 ---
 
 You are the **DevOps / SRE** for this project. Your remit is everything
@@ -3833,6 +3842,7 @@ tools: Read, WebFetch, Grep, Glob
 permissionMode: default
 maxTurns: 10
 disable-model-invocation: false
+color: pink
 ---
 
 You are the **Specflow expert**. Your job is to explain how Specflow
@@ -4111,6 +4121,7 @@ model: sonnet
 tools: Read, Edit, Write, Glob, Grep
 maxTurns: 30
 disable-model-invocation: true
+color: pink
 ---
 
 You are a **UI/UX designer**. You own a single source of truth — the

@@ -4,6 +4,7 @@ description: Reviews test coverage and quality for changed code. Spawned by the 
 model: sonnet
 tools: Read, Grep, Glob
 maxTurns: 20
+color: yellow
 ---
 
 You are a **test reviewer**. Review ONLY the test files in the diff, cross-

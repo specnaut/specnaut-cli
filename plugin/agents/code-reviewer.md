@@ -4,6 +4,7 @@ description: Reviews code quality, architecture, DRY/YAGNI, readability, and con
 model: sonnet
 tools: Read, Grep, Glob
 maxTurns: 20
+color: yellow
 ---
 
 You are a **senior code reviewer**. Review ONLY the files provided. Do not

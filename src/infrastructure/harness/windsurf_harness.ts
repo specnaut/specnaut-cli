@@ -2,8 +2,21 @@ import type { BundleOptions, Harness } from "../../application/ports.ts";
 import type { CoreBundle, CoreEntry } from "../../domain/core_bundle.ts";
 import type { Bundle } from "../../domain/template.ts";
 import { skillFolderName } from "./skill_folder.ts";
+import { splitFrontmatter } from "./frontmatter.ts";
 import { applyBackend, backlogScriptDestination } from "./backlog_filter.ts";
 import { applyScheme, phaseScriptDestination } from "./scheme_filter.ts";
+
+// Cascade ignores Claude-only frontmatter fields (e.g. `color:`). Strip them
+// before emission so they don't eat into the 12k-char workflow cap.
+function stripCascadeIgnoredFields(content: string): string {
+  const split = splitFrontmatter(content);
+  if (!split) return content;
+  const cleaned = split.fmBody
+    .split("\n")
+    .filter((line) => !/^color\s*:/.test(line))
+    .join("\n");
+  return `---\n${cleaned}\n---\n${split.rest}`;
+}
 
 /**
  * Windsurf's per-workflow character cap. Cascade silently truncates at this
@@ -55,7 +68,7 @@ export class WindsurfHarness implements Harness {
       // agent-memory is Claude-only (folder convention); other harnesses skip.
       if (entry.category === "agent-memory") continue;
       out[destinationFor(entry)] = {
-        content: entry.content,
+        content: stripCascadeIgnoredFields(entry.content),
         executable: entry.executable,
         ...(entry.category === "mergeable-project-root" ? { mergeBlock: "gitignore" } : {}),
         ...(entry.skipIfExists ? { skipIfExists: true as const } : {}),

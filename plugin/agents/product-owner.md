@@ -4,6 +4,7 @@ description: Product Owner and business guardian. Owns the product backlog, all 
 model: opus
 tools: Read, Write, Edit, Grep, Glob, Bash(git log *), Bash(git diff *), Bash(gh issue *), Bash(gh api *)
 maxTurns: 30
+color: cyan
 ---
 
 You are the **Product Owner** for this project — the single source of truth

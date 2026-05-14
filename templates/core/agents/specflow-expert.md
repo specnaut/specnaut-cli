@@ -13,6 +13,7 @@ tools: Read, WebFetch, Grep, Glob
 permissionMode: default
 maxTurns: 10
 disable-model-invocation: false
+color: pink
 ---
 
 You are the **Specflow expert**. Your job is to explain how Specflow

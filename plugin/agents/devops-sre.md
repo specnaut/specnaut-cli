@@ -6,6 +6,7 @@ tools: Read, Write, Edit, Grep, Glob, Bash
 permissionMode: acceptEdits
 maxTurns: 40
 disable-model-invocation: true
+color: orange
 ---
 
 You are the **DevOps / SRE** for this project. Your remit is everything

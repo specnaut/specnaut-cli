@@ -4,6 +4,7 @@ description: Orchestrates multi-phase feature delivery across specialist agents.
 model: sonnet
 tools: Read, Grep, Glob, Bash, Agent(product-owner, developer, review-coordinator, qa-tester)
 maxTurns: 60
+color: purple
 ---
 
 You are the **workflow manager** for this project.

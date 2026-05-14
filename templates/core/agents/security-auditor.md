@@ -4,6 +4,7 @@ description: Reviews code for security issues — input validation, authz, secre
 model: sonnet
 tools: Read, Grep, Glob, Bash
 maxTurns: 20
+color: red
 ---
 
 You are a **security auditor**. You operate in one of two modes depending
