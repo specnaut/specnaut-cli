@@ -276,6 +276,19 @@ Every scaffolded project ships two router commands under `/specflow`:
 The scripts live at `.specflow/scripts/release/{tag,release}.sh` — the same path across all 8
 harnesses.
 
+For GitHub-hosted projects, the bundled `release-github.sh` wrapper is the one-command path:
+
+```bash
+bash .specflow/scripts/release/release-github.sh           # latest tag, auto-baseline, publish
+bash .specflow/scripts/release/release-github.sh --draft   # create as draft
+```
+
+The wrapper computes the baseline as **the previous tag with a published GitHub Release attached**
+(not the previous tag by date) — tags pushed without a release are "subsumed" and their commits land
+in this release, with the subsumed tag names listed inline. Pushes the tag to `origin` if needed,
+then calls `gh release create`. Idempotent: a second run against an already-released tag exits 0 and
+prints the existing URL.
+
 ## Available harnesses
 
 | Key           | Display name       | Output root             |

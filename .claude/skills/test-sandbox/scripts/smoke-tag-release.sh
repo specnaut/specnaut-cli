@@ -57,6 +57,14 @@ check "tag.sh does NOT keep BEGIN/END scheme markers (rewrite stripped them)" \
   '! grep -qE "^\s*#\s*(BEGIN|END):\s*scheme=" .specflow/scripts/release/tag.sh'
 check "release.sh contains 10-bucket classifier" \
   'grep -q "Features" .specflow/scripts/release/release.sh && grep -q "Bug Fixes" .specflow/scripts/release/release.sh && grep -q "Build & CI" .specflow/scripts/release/release.sh'
+check "#228 release-github.sh present + executable" \
+  '[ -x .specflow/scripts/release/release-github.sh ]'
+check "#228 release-github.sh wraps gh release create" \
+  'grep -q "gh release create" .specflow/scripts/release/release-github.sh'
+check "#228 release-github.sh detects previous DEPLOYED tag (not by date)" \
+  'grep -q "previous DEPLOYED tag" .specflow/scripts/release/release-github.sh && grep -q "gh release list" .specflow/scripts/release/release-github.sh'
+check "#228 release-github.sh is idempotent (re-run on existing release exits 0)" \
+  'grep -q "already exists" .specflow/scripts/release/release-github.sh'
 check "lock records version_scheme: semver" \
   'grep -q "version_scheme: semver" .specflow/installed.lock'
 check "specflow SKILL.md references tag-version" \
