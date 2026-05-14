@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
-# Set a native Project V2 single-select field value (Priority or Size) on an
-# issue on Specflow's own Project #4. Hardcoded mirror of the templated helper
+# Set a native classification value on an issue on Specflow's own Project #4:
+# the Project V2 single-select fields Priority / Size, or the org-level native
+# Issue Type (Task / Bug / Feature). Hardcoded mirror of the templated helper
 # at templates/core/skills/backlog/scripts/github/set-field.sh.
 #
 # The item-ID lookup uses a small, targeted GraphQL query (one issue,
@@ -8,21 +9,27 @@
 # considered as a replacement but would paginate through 200+ items just to
 # find one (~12x slower). The bulky multi-issue case is in `list.sh`.
 #
-# The actual field mutation (`updateProjectV2ItemFieldValue`) is GraphQL-only
-# — `gh project item-edit` is the CLI wrapper, used below.
+# The Project V2 field mutation (`updateProjectV2ItemFieldValue`) is
+# GraphQL-only — `gh project item-edit` is the CLI wrapper, used below.
+# The Issue Type mutation (`updateIssue` with `issueTypeId`) is also
+# GraphQL-only; `gh issue edit --type` is not available in the pinned gh
+# version, so the raw mutation is used.
 #
-# Usage: set-field.sh <issue-number> <Priority|Size> <value>
+# Usage: set-field.sh <issue-number> <Priority|Size|IssueType> <value>
+#   Priority  → P0 | P1 | P2 | P3
+#   Size      → XS | S | M | L | XL
+#   IssueType → Task | Bug | Feature
 #
 # Exit codes:
-#   0   field updated
-#   10  no such field on the project (caller should fall back to a label)
-#   11  field exists but has no option matching <value> (caller should fall back to a label)
-#   12  issue is not on Project #4
+#   0   field / type updated
+#   10  no such field / type on the project / org (caller should fall back to a label)
+#   11  field / type present but the value is unrecognised (caller should fall back to a label)
+#   12  issue is not on Project #4 / not in the repo
 #   1   usage / unexpected error
 set -euo pipefail
 
 if [ "$#" -lt 3 ]; then
-  echo 'usage: set-field.sh <issue-number> <Priority|Size> <value>' >&2
+  echo 'usage: set-field.sh <issue-number> <Priority|Size|IssueType> <value>' >&2
   exit 1
 fi
 ISSUE="$1"
@@ -30,6 +37,53 @@ FIELD_NAME="$2"
 VALUE="$3"
 
 PROJECT_ID="PVT_kwDOBv46cs4BV4Gz"
+
+# Issue Type is an org-level native concept, not a Project V2 field — it has
+# its own mutation path and exits before the Priority/Size project-field code.
+case "$(echo "$FIELD_NAME" | tr '[:upper:]' '[:lower:]')" in
+  issuetype | type)
+    case "$VALUE" in
+      Task | Bug | Feature) ;;
+      *)
+        echo "unknown IssueType value '$VALUE' (Task|Bug|Feature)" >&2
+        exit 11
+        ;;
+    esac
+    # Resolve the org issue-type ID dynamically — IDs are org-scoped and
+    # stable, but a query keeps the script correct if the org is ever
+    # reconfigured.
+    TYPE_ID=$(gh api graphql -f query='
+      query($owner: String!) {
+        organization(login: $owner) {
+          issueTypes(first: 20) { nodes { id name } }
+        }
+      }' -f owner="mkrlabs" \
+      | jq -r --arg v "$VALUE" '.data.organization.issueTypes.nodes[]? | select(.name == $v) | .id')
+    if [ -z "$TYPE_ID" ] || [ "$TYPE_ID" = "null" ]; then
+      echo "org 'mkrlabs' has no issue type '$VALUE' — fall back to a label" >&2
+      exit 10
+    fi
+    ISSUE_NODE_ID=$(gh api graphql -f query='
+      query($num: Int!) {
+        repository(owner:"mkrlabs", name:"specflow") {
+          issue(number: $num) { id }
+        }
+      }' -F num="$ISSUE" \
+      | jq -r '.data.repository.issue.id')
+    if [ -z "$ISSUE_NODE_ID" ] || [ "$ISSUE_NODE_ID" = "null" ]; then
+      echo "issue #$ISSUE not found in mkrlabs/specflow" >&2
+      exit 12
+    fi
+    gh api graphql -f query='
+      mutation($id: ID!, $typeId: ID!) {
+        updateIssue(input: { id: $id, issueTypeId: $typeId }) {
+          issue { issueType { name } }
+        }
+      }' -f id="$ISSUE_NODE_ID" -f typeId="$TYPE_ID" >/dev/null
+    echo "✓ #$ISSUE IssueType → $VALUE"
+    exit 0
+    ;;
+esac
 
 case "$(echo "$FIELD_NAME" | tr '[:upper:]' '[:lower:]')" in
   priority)
@@ -62,7 +116,7 @@ case "$(echo "$FIELD_NAME" | tr '[:upper:]' '[:lower:]')" in
     esac
     ;;
   *)
-    echo "error: unsupported field '$FIELD_NAME' (Priority|Size)" >&2
+    echo "error: unsupported field '$FIELD_NAME' (Priority|Size|IssueType)" >&2
     exit 1
     ;;
 esac

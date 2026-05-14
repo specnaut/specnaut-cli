@@ -128,7 +128,7 @@ project` calls and read configuration from `backlog-config.yml`.
 .specflow/scripts/backlog/move.sh <number> <Status>   # sets Project Status field
 .specflow/scripts/backlog/clarify-comment.sh <num> "<question>"
 .specflow/scripts/backlog/detect-fields.sh                                 # discover native Priority/Size single-select fields → env lines
-.specflow/scripts/backlog/set-field.sh <num> <Priority|Size> <value>       # set the native Project V2 field; exit codes 10/11/12 signal label fallback
+.specflow/scripts/backlog/set-field.sh <num> <Priority|Size|IssueType> <value>  # set the native Project V2 field / org Issue Type; exit codes 10/11/12 signal label fallback
 .specflow/scripts/backlog/ensure-labels.sh                                 # idempotently bootstrap the 7 Specflow semantic labels (security/refactor/docs/tech-debt/dx/performance/dependency)
 ```
 
@@ -156,18 +156,20 @@ Specflow change — the skill is path-aware.
 - **Closing** — close the issue (don't just move to Done). The repo's
   issue history is the audit trail.
 - **Drafts** are not used. Every task is a real issue.
-- **Priority / Size — fields are the source of truth.** When the
-  project has native single-select `Priority` and/or `Size` fields,
-  always write through `set-field.sh` and **NEVER also apply a
-  matching `priority:*` / `size:*` label on the same item** — that
-  dual-signal drift is exactly what the helper exists to prevent.
-  Labels are reserved as a strict fallback for projects whose board
-  has no such field. Non-zero exit codes tell the caller which
-  fallback applies: `10` = field absent on the project (use the
-  label), `11` = field present but the value option is missing
-  (add the option to the field, then re-run; only fall back to a
-  label if you can't add the option), `12` = issue not on the
-  project.
+- **Classification is mandatory — every created or clarified item
+  exits with Size, Priority, Issue Type, and at least one label.**
+  `Priority` / `Size` are native Project V2 single-select fields;
+  `Issue Type` (`Task` / `Bug` / `Feature`) is a native org-level
+  concept. Write all three through `set-field.sh` and **NEVER also
+  apply a matching `priority:*` / `size:*` / `type:*` label on an item
+  that already carries the native field or type** — that dual-signal
+  drift is exactly what the helper exists to prevent. Labels are
+  reserved as a strict fallback for projects / orgs without the native
+  field or type. Non-zero exit codes tell the caller which fallback
+  applies: `10` = field / type absent (use the label), `11` = present
+  but the value is unrecognised (for Priority/Size, add the option to
+  the field then re-run; for Issue Type, fix the call), `12` = issue
+  not on the project / not in the repo.
 
 ### Prerequisites
 
