@@ -65,6 +65,14 @@ check "#228 release-github.sh detects previous DEPLOYED tag (not by date)" \
   'grep -q "previous DEPLOYED tag" .specflow/scripts/release/release-github.sh && grep -q "gh release list" .specflow/scripts/release/release-github.sh'
 check "#228 release-github.sh is idempotent (re-run on existing release exits 0)" \
   'grep -q "already exists" .specflow/scripts/release/release-github.sh'
+check "#229 release-gitlab.sh present + executable" \
+  '[ -x .specflow/scripts/release/release-gitlab.sh ]'
+check "#229 release-gitlab.sh wraps glab release create" \
+  'grep -q "glab release create" .specflow/scripts/release/release-gitlab.sh'
+check "#229 release-gitlab.sh queries projects/:id/releases for baseline detection" \
+  'grep -q "projects/:id/releases" .specflow/scripts/release/release-gitlab.sh'
+check "#229 release-gitlab.sh is idempotent (re-run on existing release exits 0)" \
+  'grep -q "already exists" .specflow/scripts/release/release-gitlab.sh'
 check "lock records version_scheme: semver" \
   'grep -q "version_scheme: semver" .specflow/installed.lock'
 check "specflow SKILL.md references tag-version" \

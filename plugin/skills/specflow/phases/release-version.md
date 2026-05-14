@@ -78,12 +78,29 @@ What the wrapper does on top of `release.sh`:
 Idempotent — re-running against a tag that already has a release
 prints the existing URL and exits 0.
 
-### Other backends (no wrapper installed)
+### GitLab remote — prefer the bundled wrapper
 
-- **GitLab remote** — pipe `release.sh` output into
-  `glab release create <tag> --notes "$(bash .specflow/scripts/release/release.sh <tag>)"`.
+If the project ships releases on GitLab, the bundled `release-gitlab.sh`
+wrapper mirrors the GitHub one:
+
+```bash
+bash .specflow/scripts/release/release-gitlab.sh           # latest tag
+bash .specflow/scripts/release/release-gitlab.sh v1.2.3    # specific tag
+bash .specflow/scripts/release/release-gitlab.sh \
+  --baseline v1.0.0 v1.2.3                                 # override baseline
+```
+
+Same contract as `release-github.sh`: previous-DEPLOYED-tag baseline
+(via `glab api projects/:id/releases`), subsumed-tag listing, tag
+auto-push, idempotency. Requires `glab` CLI installed + authenticated
+(`glab auth login`).
+
+### Local-only / other backends (no wrapper)
+
 - **Local-only** — copy `release.sh` output somewhere readable; there
   is no remote release object to create.
+- **Custom CI / other remote** — capture `release.sh` output and feed it
+  into whatever your pipeline expects.
 
 ## Important — release-notes contract
 

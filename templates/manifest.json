@@ -18,6 +18,7 @@
     { "category": "phase-script", "name": "tag", "suffix": "tag.sh", "source": "core/skills/specflow/scripts/tag.sh", "executable": true },
     { "category": "phase-script", "name": "release", "suffix": "release.sh", "source": "core/skills/specflow/scripts/release.sh", "executable": true },
     { "category": "phase-script", "name": "release-github", "suffix": "release-github.sh", "source": "core/skills/specflow/scripts/release-github.sh", "executable": true },
+    { "category": "phase-script", "name": "release-gitlab", "suffix": "release-gitlab.sh", "source": "core/skills/specflow/scripts/release-gitlab.sh", "executable": true },
     { "category": "skill", "name": "specflow-review", "source": "core/skills/specflow-review/SKILL.md" },
     { "category": "backlog-cmd", "name": "backlog", "source": "core/commands/backlog.md" },
 
