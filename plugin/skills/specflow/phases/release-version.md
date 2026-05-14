@@ -46,17 +46,44 @@ Each commit appears as `- <short-sha> <subject>` under its bucket.
 ## After the script runs
 
 The script writes the release body to **stdout**. What you do with it
-depends on how this project publishes releases:
+depends on how this project publishes releases.
 
-- **GitHub remote** — pipe it into `gh release create <tag>
-  --notes-file -` (or `--notes "$(...)"`).
-- **GitLab remote** — pipe it into `glab release create <tag>
-  --notes "..."`.
-- **Local-only** — copy the output somewhere readable (or echo it to
-  the user); there is no remote release to create.
+### GitHub remote — prefer the bundled wrapper
 
-The per-backend wrapper scripts ship as separate Specflow features —
-when one is installed, prefer it to manually piping into `gh` / `glab`.
+If the project ships releases on GitHub, the bundled
+`release-github.sh` wrapper is the one-command path:
+
+```bash
+bash .specflow/scripts/release/release-github.sh           # latest tag
+bash .specflow/scripts/release/release-github.sh v1.2.3    # specific tag
+bash .specflow/scripts/release/release-github.sh --draft   # create as draft
+bash .specflow/scripts/release/release-github.sh \
+  --baseline v1.0.0 v1.2.3                                 # override baseline
+```
+
+What the wrapper does on top of `release.sh`:
+
+1. Verifies `gh` CLI is installed + authenticated.
+2. **Computes the baseline = previous DEPLOYED tag** (the most recent
+   tag with a published GitHub Release attached, NOT the previous
+   tag by date). Tags pushed without a release are "subsumed" —
+   their commits land in this release and the subsumed tag names
+   are listed inline.
+3. Pushes the tag to `origin` if not already there (the GitHub
+   Releases API needs the tag on the remote).
+4. Generates the body via `release.sh` with the computed baseline.
+5. Calls `gh release create <tag> --notes-file -` to publish.
+6. Prints the published release URL.
+
+Idempotent — re-running against a tag that already has a release
+prints the existing URL and exits 0.
+
+### Other backends (no wrapper installed)
+
+- **GitLab remote** — pipe `release.sh` output into
+  `glab release create <tag> --notes "$(bash .specflow/scripts/release/release.sh <tag>)"`.
+- **Local-only** — copy `release.sh` output somewhere readable; there
+  is no remote release object to create.
 
 ## Important — release-notes contract
 
