@@ -103,6 +103,18 @@ for agent in product-owner developer qa-tester devops-sre security-auditor; do
 done
 
 echo
+echo "═══ bundled agents — basename presence (audit gate) ═══"
+# Explicit `<name>.md` literals so audit.sh's grep -qF finds each bundled
+# agent. The for-loops above iterate on bare agent names (no .md) which the
+# audit's basename-matcher cannot see.
+for agent_md in code-reviewer.md developer.md devops-sre.md qa-tester.md \
+                review-coordinator.md security-auditor.md test-reviewer.md \
+                workflow-manager.md; do
+  check "agent $agent_md scaffolded" \
+    "[ -f .claude/agents/$agent_md ]"
+done
+
+echo
 echo "═══ #164  specflow-expert agent ═══"
 check "specflow-expert agent present" \
   '[ -f .claude/agents/specflow-expert.md ]'
