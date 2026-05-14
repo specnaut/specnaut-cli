@@ -58,10 +58,17 @@ check ".claude/commands/specflow.md present (slash-command shim, post-F3)" \
   '[ -f .claude/commands/specflow.md ]'
 check "router .claude/skills/specflow/SKILL.md present" \
   '[ -f .claude/skills/specflow/SKILL.md ]'
-for phase in specify constitution clarify plan tasks analyze implement merge review checklist groom; do
+for phase in specify constitution clarify plan tasks analyze implement merge review checklist groom tag-version release-version; do
   check ".claude/skills/specflow/phases/$phase.md present" \
     "[ -f .claude/skills/specflow/phases/$phase.md ]"
 done
+# Explicit literal-name assertions for the audit's basename-substring
+# coverage scan — the interpolated loop above hides $phase.md from
+# `grep -qF`, so each phase needs its filename rendered in the source.
+check "phase doc tag-version.md scaffolded (epic #226)" \
+  '[ -f .claude/skills/specflow/phases/tag-version.md ]'
+check "phase doc release-version.md scaffolded (epic #226)" \
+  '[ -f .claude/skills/specflow/phases/release-version.md ]'
 check "name: specflow on the router SKILL.md" \
   'head -3 .claude/skills/specflow/SKILL.md | grep -q "name: specflow"'
 check "disable-model-invocation NOT set on the router (Skill-tool chaining must work)" \
