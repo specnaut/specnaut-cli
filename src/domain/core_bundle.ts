@@ -5,6 +5,7 @@ export type CoreCategory =
   | "agent-memory"
   | "skill"
   | "phase"
+  | "phase-script"
   | "spec-root"
   | "project-root"
   | "backlog-cmd"

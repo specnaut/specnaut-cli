@@ -8,8 +8,14 @@ import {
   pickBacklogBackendInteractive,
   promptKanbanURL,
 } from "../backlog_picker.ts";
+import {
+  DEFAULT_VERSION_SCHEME,
+  pickVersionScheme,
+  pickVersionSchemeInteractive,
+} from "../scheme_picker.ts";
 import { makeStdinSelectIO } from "../select.ts";
-import type { BacklogBackend } from "../../domain/installed_lock.ts";
+import type { BacklogBackend, VersionScheme } from "../../domain/installed_lock.ts";
+import { detectVersionScheme } from "../../domain/project_detection.ts";
 import { findBacklogStrategy } from "../../domain/backlog_strategies/registry.ts";
 import {
   type ParsedKanbanURL,
@@ -33,6 +39,8 @@ export type InitIntent = {
   backlogUrl: string | null;
   /** Optional `--backlog-repo` override for the GitHub `repo` field. */
   backlogRepo: string | null;
+  /** Explicit `--scheme` value (`semver` | `date`). Null = ask/detect. */
+  scheme: VersionScheme | null;
   force: boolean;
 };
 
@@ -67,6 +75,59 @@ async function resolveBacklogBackend(
     });
   }
   const picked = await pickBacklogBackendInteractive(makeStdinSelectIO());
+  if (picked === null) {
+    console.error(red("aborted."));
+    Deno.exit(130);
+  }
+  return picked;
+}
+
+/**
+ * Detects whether the user's project looks like a library by probing
+ * common manifest files at `targetDir`. The result is a soft suggestion
+ * pre-positioning the picker cursor — the user always has the final
+ * say via the prompt.
+ */
+function detectSchemeSuggestion(targetDir: string): VersionScheme {
+  const result = detectVersionScheme({
+    exists(rel) {
+      try {
+        Deno.statSync(`${targetDir}/${rel}`);
+        return true;
+      } catch {
+        return false;
+      }
+    },
+    readText(rel) {
+      try {
+        return Deno.readTextFileSync(`${targetDir}/${rel}`);
+      } catch {
+        return null;
+      }
+    },
+  });
+  return result.suggestedScheme;
+}
+
+async function resolveVersionScheme(
+  explicit: VersionScheme | null,
+  suggestion: VersionScheme,
+): Promise<VersionScheme> {
+  if (explicit !== null) return explicit;
+  if (!Deno.stdin.isTerminal()) {
+    return pickVersionScheme(
+      {
+        readLine: () => prompt("Choose [1-2]:"),
+        log: (s) => console.log(s),
+        errLog: (s) => console.error(red(s)),
+      },
+      suggestion,
+    );
+  }
+  const picked = await pickVersionSchemeInteractive(
+    makeStdinSelectIO(),
+    suggestion,
+  );
   if (picked === null) {
     console.error(red("aborted."));
     Deno.exit(130);
@@ -270,6 +331,7 @@ export async function runInit(intent: InitIntent): Promise<number> {
     const lockStore = new FsLockStore();
     const probeBundle = harness.mapBundle(CORE_BUNDLE, {
       backlogBackend: "local",
+      versionScheme: DEFAULT_VERSION_SCHEME,
     });
     const conflicts = await writer.detectConflicts(probeBundle, targetDir);
     if (conflicts.length > 0) {
@@ -281,6 +343,11 @@ export async function runInit(intent: InitIntent): Promise<number> {
   }
 
   const backlogBackend = await resolveBacklogBackend(intent.backlog);
+  const schemeSuggestion = detectSchemeSuggestion(targetDir);
+  const versionScheme = await resolveVersionScheme(
+    intent.scheme,
+    schemeSuggestion,
+  );
 
   // Capture the Kanban URL up front (interactive prompt or --backlog-url
   // flag) so the populated config lands at init time and the PO never
@@ -315,6 +382,7 @@ export async function runInit(intent: InitIntent): Promise<number> {
     lockStore: new FsLockStore(),
     harness,
     backlogBackend,
+    versionScheme,
     core: CORE_BUNDLE,
     ensureDir: (path) => Deno.mkdir(path, { recursive: true }),
   });
@@ -345,7 +413,10 @@ export async function runInit(intent: InitIntent): Promise<number> {
     // backlog backend chosen here may differ from the probe's "local"
     // default, but the managed count is invariant — backlog-script
     // entries are present regardless of backend.
-    const probeBundle = harness.mapBundle(CORE_BUNDLE, { backlogBackend });
+    const probeBundle = harness.mapBundle(CORE_BUNDLE, {
+      backlogBackend,
+      versionScheme,
+    });
     const totalManaged = countManagedFiles(probeBundle);
     printConflictsError(result.conflicts, result.lockExists, totalManaged);
     return 3;

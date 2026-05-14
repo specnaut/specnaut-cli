@@ -76,7 +76,10 @@ export class UpgradeProjectUseCase {
     if (!harness) {
       throw new Error(`unknown harness in lock: ${lock.harness}`);
     }
-    const fullBundle = harness.mapBundle(core, { backlogBackend: lock.backlogBackend });
+    const fullBundle = harness.mapBundle(core, {
+      backlogBackend: lock.backlogBackend,
+      versionScheme: lock.versionScheme,
+    });
 
     // JSON-merged files (e.g. `.claude/settings.json`) are user-owned: we
     // never overwrite them, only graft our entries in. They live outside
@@ -251,6 +254,7 @@ export class UpgradeProjectUseCase {
       version: 2,
       harness: lock.harness,
       backlogBackend: lock.backlogBackend,
+      versionScheme: lock.versionScheme,
       templatesVersion,
       entries: updatedEntries,
     };

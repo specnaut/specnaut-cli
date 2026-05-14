@@ -104,7 +104,7 @@ export interface PluginDetector {
 }
 
 import type { CoreBundle } from "../domain/core_bundle.ts";
-import type { BacklogBackend } from "../domain/installed_lock.ts";
+import type { BacklogBackend, VersionScheme } from "../domain/installed_lock.ts";
 
 export type BundleOptions = {
   /**
@@ -113,6 +113,12 @@ export type BundleOptions = {
    * the bundled SKILL.md is rendered with the matching markers stripped.
    */
   readonly backlogBackend: BacklogBackend;
+  /**
+   * Which versioning scheme the tag-release pack should compile down to.
+   * `phase-script` entries with `# BEGIN: scheme=X` markers are rendered
+   * against this value at bundle time.
+   */
+  readonly versionScheme: VersionScheme;
 };
 
 export interface Harness {

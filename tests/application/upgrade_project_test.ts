@@ -129,6 +129,7 @@ Deno.test("UpgradeProjectUseCase returns up-to-date when disk + lock + bundle al
     version: 2,
     harness: "claude",
     backlogBackend: "local",
+    versionScheme: "semver",
     templatesVersion: "0.3.0",
     entries: new Map([["a.md", {
       sha256: sha,
@@ -156,6 +157,7 @@ Deno.test("UpgradeProjectUseCase returns planned (no writes) in dry-run", async 
     version: 2,
     harness: "claude",
     backlogBackend: "local",
+    versionScheme: "semver",
     templatesVersion: "0.2.0",
     entries: new Map([["a.md", {
       sha256: oldSha,
@@ -186,6 +188,7 @@ Deno.test("UpgradeProjectUseCase applies auto-update and skips preserve", async 
     version: 2,
     harness: "claude",
     backlogBackend: "local",
+    versionScheme: "semver",
     templatesVersion: "0.2.0",
     entries: new Map([
       ["clean.md", {
@@ -226,6 +229,7 @@ Deno.test("UpgradeProjectUseCase with --force overwrites preserve actions with b
     version: 2,
     harness: "claude",
     backlogBackend: "local",
+    versionScheme: "semver",
     templatesVersion: "0.2.0",
     entries: new Map([["a.md", {
       sha256: await sha256Hex("ORIGINAL"),
@@ -255,6 +259,7 @@ Deno.test("UpgradeProjectUseCase deletes clean orphans (lock entry + on disk + m
     version: 2,
     harness: "claude",
     backlogBackend: "local",
+    versionScheme: "semver",
     templatesVersion: "0.6.1",
     entries: new Map([
       ["a.md", {
@@ -289,6 +294,7 @@ Deno.test("UpgradeProjectUseCase preserves customized orphan without --force, dr
     version: 2,
     harness: "claude",
     backlogBackend: "local",
+    versionScheme: "semver",
     templatesVersion: "0.6.1",
     entries: new Map([
       ["a.md", {
@@ -327,6 +333,7 @@ Deno.test("UpgradeProjectUseCase with --force deletes customized orphan with bac
     version: 2,
     harness: "claude",
     backlogBackend: "local",
+    versionScheme: "semver",
     templatesVersion: "0.6.1",
     entries: new Map([
       ["orphan.md", {
@@ -365,6 +372,7 @@ Deno.test("UpgradeProjectUseCase: vanilla on-disk + plugin installed → backed 
     version: 2,
     harness: "claude",
     backlogBackend: "local",
+    versionScheme: "semver",
     templatesVersion: "0.7.0",
     entries: new Map([[
       PLUGIN_DEST,
@@ -400,6 +408,7 @@ Deno.test("UpgradeProjectUseCase: customized on-disk + plugin installed → pres
     version: 2,
     harness: "claude",
     backlogBackend: "local",
+    versionScheme: "semver",
     templatesVersion: "0.7.0",
     entries: new Map([[
       PLUGIN_DEST,
@@ -444,6 +453,7 @@ Deno.test("UpgradeProjectUseCase: missing on-disk + plugin installed → deferre
     version: 2,
     harness: "claude",
     backlogBackend: "local",
+    versionScheme: "semver",
     templatesVersion: "0.7.0",
     entries: new Map([[
       PLUGIN_DEST,
@@ -481,6 +491,7 @@ Deno.test("UpgradeProjectUseCase: vanilla on-disk + plugin NOT installed → exi
     version: 2,
     harness: "claude",
     backlogBackend: "local",
+    versionScheme: "semver",
     templatesVersion: "0.7.0",
     entries: new Map([[
       PLUGIN_DEST,

@@ -4,6 +4,7 @@ import type { Bundle } from "../../domain/template.ts";
 import { skillFolderName } from "./skill_folder.ts";
 import { splitFrontmatter } from "./frontmatter.ts";
 import { applyBackend, backlogScriptDestination } from "./backlog_filter.ts";
+import { applyScheme, phaseScriptDestination } from "./scheme_filter.ts";
 
 function toCopilotInstructionMarkdown(entry: CoreEntry): string {
   const split = splitFrontmatter(entry.content);
@@ -22,6 +23,8 @@ function destinationFor(entry: CoreEntry): string {
       // Copilot is flat — phase docs become sibling instruction files.
       if (!entry.suffix) throw new Error(`phase needs suffix: ${entry.name}`);
       return `.github/instructions/specflow-${entry.suffix.replace(/\.md$/, "")}.instructions.md`;
+    case "phase-script":
+      return phaseScriptDestination(entry);
     case "backlog-script":
       return backlogScriptDestination(entry);
     case "agent-memory":
@@ -43,8 +46,9 @@ export class CopilotHarness implements Harness {
   mapBundle(core: CoreBundle, opts: BundleOptions): Bundle {
     const out: Bundle = {};
     for (const raw of core) {
-      const entry = applyBackend(raw, opts);
-      if (entry === null) continue;
+      const backendApplied = applyBackend(raw, opts);
+      if (backendApplied === null) continue;
+      const entry = applyScheme(backendApplied, opts);
       // agent-memory is Claude-only (folder convention); other harnesses skip.
       if (entry.category === "agent-memory") continue;
       const dest = destinationFor(entry);

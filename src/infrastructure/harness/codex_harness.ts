@@ -6,6 +6,7 @@ import { HARNESS_STATIC } from "../../templates_bundle.ts";
 import { ensureSkillFrontmatter, skillFolderName } from "./skill_folder.ts";
 import { frontmatterField, splitFrontmatter } from "./frontmatter.ts";
 import { applyBackend, backlogScriptDestination } from "./backlog_filter.ts";
+import { applyScheme, phaseScriptDestination } from "./scheme_filter.ts";
 
 function parseAgentFrontmatter(content: string): { description: string; body: string } {
   const split = splitFrontmatter(content);
@@ -32,8 +33,9 @@ export class CodexHarness implements Harness {
   mapBundle(core: CoreBundle, opts: BundleOptions): Bundle {
     const out: Bundle = {};
     for (const raw of core) {
-      const entry = applyBackend(raw, opts);
-      if (entry === null) continue;
+      const backendApplied = applyBackend(raw, opts);
+      if (backendApplied === null) continue;
+      const entry = applyScheme(backendApplied, opts);
       // agent-memory is Claude-only (folder convention); other harnesses skip.
       if (entry.category === "agent-memory") continue;
       switch (entry.category) {
@@ -61,6 +63,12 @@ export class CodexHarness implements Harness {
           };
           break;
         }
+        case "phase-script":
+          out[phaseScriptDestination(entry)] = {
+            content: entry.content,
+            executable: entry.executable,
+          };
+          break;
         case "backlog-script":
           out[backlogScriptDestination(entry)] = {
             content: entry.content,

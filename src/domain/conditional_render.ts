@@ -1,5 +1,5 @@
-import type { BacklogBackend } from "./installed_lock.ts";
-import { KNOWN_BACKLOG_BACKENDS } from "./installed_lock.ts";
+import type { BacklogBackend, VersionScheme } from "./installed_lock.ts";
+import { KNOWN_BACKLOG_BACKENDS, KNOWN_VERSION_SCHEMES } from "./installed_lock.ts";
 
 const BEGIN_RE = /^\s*<!--\s*BEGIN:\s*backend=([a-zA-Z0-9_-]+)\s*-->\s*$/;
 const END_RE = /^\s*<!--\s*END:\s*backend=([a-zA-Z0-9_-]+)\s*-->\s*$/;
@@ -90,6 +90,90 @@ export function assertKnownBackend(s: string): asserts s is BacklogBackend {
   if (!KNOWN_BACKLOG_BACKENDS.includes(s as BacklogBackend)) {
     throw new Error(
       `unknown backlog backend '${s}' — known: ${KNOWN_BACKLOG_BACKENDS.join(", ")}`,
+    );
+  }
+}
+
+const SH_SCHEME_BEGIN_RE = /^\s*#\s*BEGIN:\s*scheme=([a-zA-Z0-9_-]+)\s*$/;
+const SH_SCHEME_END_RE = /^\s*#\s*END:\s*scheme=([a-zA-Z0-9_-]+)\s*$/;
+
+/**
+ * Strip scheme-conditional sections from a shell source.
+ *
+ * Markers are shell comments on their own line:
+ *   # BEGIN: scheme=date
+ *   ...content kept when scheme === "date"...
+ *   # END: scheme=date
+ *
+ * For the `active` scheme, the content is preserved and only the
+ * surrounding marker lines are removed. For any other scheme, the
+ * markers AND the content between them are removed.
+ *
+ * No fenced-code-block guard — shell sources don't have triple-backtick
+ * fences that would confuse marker scanning.
+ *
+ * Throws on unmatched markers (BEGIN without END, END without BEGIN)
+ * and on nested markers.
+ */
+export function renderScheme(source: string, active: VersionScheme): string {
+  const lines = source.split("\n");
+  const out: string[] = [];
+  let openScheme: string | null = null;
+  let openLine = -1;
+  let keepBlock = false;
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+
+    const beginMatch = line.match(SH_SCHEME_BEGIN_RE);
+    if (beginMatch) {
+      if (openScheme !== null) {
+        throw new Error(
+          `nested scheme marker at line ${i + 1}: BEGIN ${beginMatch[1]} ` +
+            `inside open block ${openScheme} (started at line ${openLine + 1})`,
+        );
+      }
+      openScheme = beginMatch[1];
+      openLine = i;
+      keepBlock = openScheme === active;
+      continue;
+    }
+
+    const endMatch = line.match(SH_SCHEME_END_RE);
+    if (endMatch) {
+      if (openScheme === null) {
+        throw new Error(
+          `unmatched END marker at line ${i + 1}: scheme=${endMatch[1]}`,
+        );
+      }
+      if (endMatch[1] !== openScheme) {
+        throw new Error(
+          `mismatched END marker at line ${i + 1}: expected scheme=${openScheme} ` +
+            `(opened at line ${openLine + 1}), got scheme=${endMatch[1]}`,
+        );
+      }
+      openScheme = null;
+      keepBlock = false;
+      continue;
+    }
+
+    if (openScheme === null || keepBlock) out.push(line);
+  }
+
+  if (openScheme !== null) {
+    throw new Error(
+      `unmatched BEGIN marker at line ${openLine + 1}: scheme=${openScheme}`,
+    );
+  }
+
+  return out.join("\n");
+}
+
+/** Throws if `s` is not a known version scheme. */
+export function assertKnownScheme(s: string): asserts s is VersionScheme {
+  if (!KNOWN_VERSION_SCHEMES.includes(s as VersionScheme)) {
+    throw new Error(
+      `unknown version scheme '${s}' — known: ${KNOWN_VERSION_SCHEMES.join(", ")}`,
     );
   }
 }

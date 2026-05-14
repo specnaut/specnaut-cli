@@ -3,6 +3,7 @@ import type { CoreBundle, CoreEntry } from "../../domain/core_bundle.ts";
 import type { Bundle } from "../../domain/template.ts";
 import { skillFolderName } from "./skill_folder.ts";
 import { applyBackend, backlogScriptDestination } from "./backlog_filter.ts";
+import { applyScheme, phaseScriptDestination } from "./scheme_filter.ts";
 
 /**
  * Windsurf's per-workflow character cap. Cascade silently truncates at this
@@ -25,6 +26,8 @@ function destinationFor(entry: CoreEntry): string {
       // becomes a sibling workflow file the router references by name.
       if (!entry.suffix) throw new Error(`phase needs suffix: ${entry.name}`);
       return `.windsurf/workflows/specflow-${entry.suffix.replace(/\.md$/, "")}.md`;
+    case "phase-script":
+      return phaseScriptDestination(entry);
     case "backlog-script":
       return backlogScriptDestination(entry);
     case "agent-memory":
@@ -46,8 +49,9 @@ export class WindsurfHarness implements Harness {
   mapBundle(core: CoreBundle, opts: BundleOptions): Bundle {
     const out: Bundle = {};
     for (const raw of core) {
-      const entry = applyBackend(raw, opts);
-      if (entry === null) continue;
+      const backendApplied = applyBackend(raw, opts);
+      if (backendApplied === null) continue;
+      const entry = applyScheme(backendApplied, opts);
       // agent-memory is Claude-only (folder convention); other harnesses skip.
       if (entry.category === "agent-memory") continue;
       out[destinationFor(entry)] = {

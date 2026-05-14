@@ -44,6 +44,7 @@ Deno.test("serializeLock round-trips", () => {
     version: 2,
     harness: "claude",
     backlogBackend: "local",
+    versionScheme: "semver",
     templatesVersion: "0.3.0",
     entries: new Map<string, LockEntry>([
       ["CLAUDE.md", {
@@ -105,6 +106,7 @@ Deno.test("serializeLock writes version 2 with harness field", () => {
     version: 2,
     harness: "cursor",
     backlogBackend: "local",
+    versionScheme: "semver",
     templatesVersion: "0.3.0",
     entries: new Map(),
   };

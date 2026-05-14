@@ -222,6 +222,26 @@ specflow init --here --no-git --ai cursor --backlog gitlab \
 Without those flags, `specflow init` shows an arrow-key picker (↑/↓ to move, space/enter to select)
 when stdin is a TTY, and falls back to a numeric prompt — or the defaults — when stdin is piped.
 
+### Pick a versioning scheme
+
+`specflow init` asks which scheme to use for the bundled `/specflow tag-version` and
+`/specflow release-version` commands. Two options:
+
+- **SemVer** (`v1.2.3`) — recommended for libraries / SDKs whose consumers reason about breaking
+  changes by version number.
+- **Date-based** (`vYY.M.Da`) — recommended for apps / SaaS / deployed products where the version
+  number is just a release identifier. No major/minor/patch guesswork; the letter suffix handles
+  same-day re-tags.
+
+Specflow detects whether the project looks like a library (`package.json` `exports` /
+`pyproject.toml` `[project]` / `Cargo.toml` `[lib]` / `composer.json` `type=library`) and
+pre-selects a sensible default — the user can always override at the picker. The choice is persisted
+by **rewriting the scaffolded skill** itself (the unchosen scheme's blocks are stripped at scaffold
+time), so the on-disk `.specflow/scripts/release/tag.sh` only contains the chosen scheme's logic. To
+switch schemes later, re-run `specflow init` and pick the other option.
+
+Pass `--scheme semver|date` to bypass the picker in non-TTY mode.
+
 ### Other commands
 
 ```bash
@@ -238,6 +258,23 @@ specflow self-update --check      # only report whether an update is available
 specflow --version                # print version
 specflow --help                   # full usage
 ```
+
+### Bundled tag + release commands
+
+Every scaffolded project ships two router commands under `/specflow`:
+
+- **`/specflow tag-version`** — creates an annotated git tag using the project's versioning scheme.
+  Bumps automatically (latest tag → next). For SemVer, `--bump major|minor|patch` controls the
+  direction (default `patch`); for date-based, the letter suffix increments. Pushes to `origin` if a
+  remote is configured, else stays local. Pass `--no-push` to skip.
+- **`/specflow release-version`** — generates **categorized release notes** for a tag (default:
+  latest) covering every commit since the previous tag. The output is the release-body Markdown, one
+  section per non-empty Conventional Commits bucket (Features / Bug Fixes / Performance / Refactors
+  / Documentation / Tests / Build & CI / Chores / Style / Other). Pipe the output into
+  `gh release create` / `glab release create` to publish.
+
+The scripts live at `.specflow/scripts/release/{tag,release}.sh` — the same path across all 8
+harnesses.
 
 ## Available harnesses
 

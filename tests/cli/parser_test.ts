@@ -22,6 +22,7 @@ Deno.test("parseArgs returns init intent with a project name", () => {
     backlog: null,
     backlogUrl: null,
     backlogRepo: null,
+    scheme: null,
     force: false,
   });
 });
@@ -36,6 +37,7 @@ Deno.test("parseArgs returns init intent with --here", () => {
     backlog: null,
     backlogUrl: null,
     backlogRepo: null,
+    scheme: null,
     force: false,
   });
 });
@@ -50,6 +52,7 @@ Deno.test("parseArgs returns init intent with --no-git", () => {
     backlog: null,
     backlogUrl: null,
     backlogRepo: null,
+    scheme: null,
     force: false,
   });
 });
@@ -90,6 +93,7 @@ Deno.test("parseArgs init with --force", () => {
     backlog: null,
     backlogUrl: null,
     backlogRepo: null,
+    scheme: null,
     force: true,
   });
 });

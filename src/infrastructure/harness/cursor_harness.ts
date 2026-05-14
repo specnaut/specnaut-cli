@@ -4,6 +4,7 @@ import type { Bundle, TemplateFile } from "../../domain/template.ts";
 import { HARNESS_STATIC } from "../../templates_bundle.ts";
 import { ensureSkillFrontmatter, skillFolderName } from "./skill_folder.ts";
 import { applyBackend, backlogScriptDestination } from "./backlog_filter.ts";
+import { applyScheme, phaseScriptDestination } from "./scheme_filter.ts";
 
 function destinationFor(entry: CoreEntry): string {
   switch (entry.category) {
@@ -15,6 +16,8 @@ function destinationFor(entry: CoreEntry): string {
     case "phase":
       if (!entry.suffix) throw new Error(`phase needs suffix: ${entry.name}`);
       return `.cursor/skills/specflow/phases/${entry.suffix}`;
+    case "phase-script":
+      return phaseScriptDestination(entry);
     case "backlog-script":
       return backlogScriptDestination(entry);
     case "agent-memory":
@@ -36,8 +39,9 @@ export class CursorHarness implements Harness {
   mapBundle(core: CoreBundle, opts: BundleOptions): Bundle {
     const out: Bundle = {};
     for (const raw of core) {
-      const entry = applyBackend(raw, opts);
-      if (entry === null) continue;
+      const backendApplied = applyBackend(raw, opts);
+      if (backendApplied === null) continue;
+      const entry = applyScheme(backendApplied, opts);
       // agent-memory is Claude-only (folder convention); other harnesses skip.
       if (entry.category === "agent-memory") continue;
       const dest = destinationFor(entry);
