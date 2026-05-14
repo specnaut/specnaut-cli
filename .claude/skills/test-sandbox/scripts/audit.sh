@@ -83,6 +83,7 @@ SURFACES=(
   'templates/core/commands/*.md|smoke-features.sh|bundled-command'
   'templates/core/skills/*/SKILL.md|smoke-features.sh|bundled-skill'
   'templates/core/skills/specflow/phases/*.md|smoke-features.sh|phase-doc'
+  'templates/core/skills/specflow/scripts/*|smoke-tag-release.sh|tag-release-script'
   'templates/core/skills/backlog/scripts/github/*|smoke-backlog-github.sh|github-backlog-script'
   'templates/core/skills/backlog/scripts/gitlab/*|smoke-backlog-gitlab.sh|gitlab-backlog-script'
   'templates/core/skills/backlog/scripts/local/*|smoke-backlog-local.sh|local-backlog-script'
