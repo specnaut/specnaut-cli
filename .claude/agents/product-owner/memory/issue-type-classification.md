@@ -1,6 +1,6 @@
 ---
 name: issue-type-classification
-description: How to set native GitHub Issue Types (Task/Bug/Feature) on mkrlabs/specflow issues — gh issue edit --type is not supported; use GraphQL updateIssue mutation
+description: How to set native GitHub Issue Types (Task/Bug/Feature) on mkrlabs/specflow issues — use set-field.sh, which PATCHes the REST issues API
 type: reference
 ---
 
@@ -11,29 +11,19 @@ Setting Issue Type is mandatory on every created or clarified issue, alongside S
 ## Mechanism
 
 **Use `set-field.sh <num> IssueType <Task|Bug|Feature>`** — as of epic #241 the
-helper wraps the whole flow (resolves the org type ID, resolves the issue node
-ID, runs the mutation). Same exit-code contract as Priority/Size: `0` ok,
-`10` org has no such type, `11` value unrecognised, `12` issue not found.
+helper handles it in one call. Same exit-code contract as Priority/Size:
+`0` ok, `10` repo/org has no such native type, `11` value unrecognised,
+`12` issue not found.
 
-Under the hood it runs the `updateIssue` GraphQL mutation, since
-`gh issue edit --type` is not supported in the pinned CLI version:
+Under the hood it does a single REST PATCH (`gh issue edit --type` is not in
+the pinned CLI version). REST takes the type **name** directly — no org/issue
+node-ID resolution, ~1 quota point vs the GraphQL `updateIssue` path:
 
 ```bash
-gh api graphql -f query='
-mutation($issueId: ID!, $issueTypeId: ID!) {
-  updateIssue(input: {id: $issueId, issueTypeId: $issueTypeId}) {
-    issue { number issueType { name } }
-  }
-}' -f issueId="<node-id>" -f issueTypeId="<type-node-id>"
+gh api -X PATCH repos/mkrlabs/specflow/issues/<N> -f type=Feature --jq '.type.name'
+# read the current type:
+gh api repos/mkrlabs/specflow/issues/<N> --jq '.type.name'
 ```
-
-## mkrlabs org issue type IDs (verified 2026-05-14)
-
-| Type    | ID                    |
-|---------|-----------------------|
-| Task    | `IT_kwDOBv46cs4BE7za` |
-| Bug     | `IT_kwDOBv46cs4BE7zd` |
-| Feature | `IT_kwDOBv46cs4BE7ze` |
 
 ## Classification heuristics
 

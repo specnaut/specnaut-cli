@@ -6,9 +6,10 @@
 # The item-ID lookup uses a small, targeted GraphQL query (one issue,
 # projectItems(first:5)) — negligible quota cost (~2 points). The Project V2
 # field mutation (`updateProjectV2ItemFieldValue`) is GraphQL-only —
-# `gh project item-edit` is the CLI wrapper, used below. The Issue Type
-# mutation (`updateIssue` with `issueTypeId`) is also GraphQL-only and is
-# called raw, since `gh issue edit --type` is not available everywhere.
+# `gh project item-edit` is the CLI wrapper, used below. The Issue Type is
+# set via the REST issues API (`PATCH .../issues/N` with `type`) — a single
+# call that takes the type name directly, cheaper than the GraphQL
+# `updateIssue` path and with no node-ID resolution.
 #
 # Usage: set-field.sh <issue-number> <Priority|Size|IssueType> <value>
 #   Examples:
@@ -52,37 +53,27 @@ if [ "$FIELD_LOWER" = "issuetype" ] || [ "$FIELD_LOWER" = "type" ]; then
       exit 11
       ;;
   esac
-  # Resolve the org issue-type ID dynamically — IDs are org-scoped and worth
-  # nothing hard-coded in a template.
-  TYPE_ID=$(gh api graphql -f query='
-    query($owner: String!) {
-      organization(login: $owner) {
-        issueTypes(first: 20) { nodes { id name } }
-      }
-    }' -f owner="$REPO_OWNER" \
-    | jq -r --arg v "$VALUE" '.data.organization.issueTypes.nodes[]? | select(.name == $v) | .id')
-  if [ -z "$TYPE_ID" ] || [ "$TYPE_ID" = "null" ]; then
-    echo "owner '$REPO_OWNER' has no native issue type '$VALUE' — fall back to a label" >&2
-    exit 10
+  # Single REST PATCH — takes the type name directly. A 422 means the
+  # repo/org has no such native type (fall back to a label); a 404 means
+  # the issue doesn't exist.
+  if ! RESULT=$(gh api -X PATCH "repos/$REPO_OWNER/$REPO_NAME/issues/$NUM" \
+    -f type="$VALUE" --jq '.type.name' 2>&1); then
+    case "$RESULT" in
+      *"Validation Failed"* | *422*)
+        echo "$REPO_OWNER/$REPO_NAME has no native issue type '$VALUE' — fall back to a label" >&2
+        exit 10
+        ;;
+      *"Not Found"* | *404*)
+        echo "issue #$NUM not found in $REPO_OWNER/$REPO_NAME" >&2
+        exit 12
+        ;;
+      *)
+        echo "set IssueType failed: $RESULT" >&2
+        exit 1
+        ;;
+    esac
   fi
-  ISSUE_NODE_ID=$(gh api graphql -f query='
-    query($owner: String!, $name: String!, $num: Int!) {
-      repository(owner: $owner, name: $name) {
-        issue(number: $num) { id }
-      }
-    }' -f owner="$REPO_OWNER" -f name="$REPO_NAME" -F num="$NUM" \
-    | jq -r '.data.repository.issue.id')
-  if [ -z "$ISSUE_NODE_ID" ] || [ "$ISSUE_NODE_ID" = "null" ]; then
-    echo "issue #$NUM not found in $REPO_OWNER/$REPO_NAME" >&2
-    exit 12
-  fi
-  gh api graphql -f query='
-    mutation($id: ID!, $typeId: ID!) {
-      updateIssue(input: { id: $id, issueTypeId: $typeId }) {
-        issue { issueType { name } }
-      }
-    }' -f id="$ISSUE_NODE_ID" -f typeId="$TYPE_ID" >/dev/null
-  echo "✓ #$NUM IssueType → $VALUE"
+  echo "✓ #$NUM IssueType → $RESULT"
   exit 0
 fi
 

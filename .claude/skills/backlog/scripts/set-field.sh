@@ -11,9 +11,9 @@
 #
 # The Project V2 field mutation (`updateProjectV2ItemFieldValue`) is
 # GraphQL-only — `gh project item-edit` is the CLI wrapper, used below.
-# The Issue Type mutation (`updateIssue` with `issueTypeId`) is also
-# GraphQL-only; `gh issue edit --type` is not available in the pinned gh
-# version, so the raw mutation is used.
+# The Issue Type is set via the REST issues API (`PATCH .../issues/N` with
+# `type`) — a single call that takes the type name directly, cheaper than
+# the GraphQL `updateIssue` path and with no node-ID resolution.
 #
 # Usage: set-field.sh <issue-number> <Priority|Size|IssueType> <value>
 #   Priority  → P0 | P1 | P2 | P3
@@ -49,38 +49,27 @@ case "$(echo "$FIELD_NAME" | tr '[:upper:]' '[:lower:]')" in
         exit 11
         ;;
     esac
-    # Resolve the org issue-type ID dynamically — IDs are org-scoped and
-    # stable, but a query keeps the script correct if the org is ever
-    # reconfigured.
-    TYPE_ID=$(gh api graphql -f query='
-      query($owner: String!) {
-        organization(login: $owner) {
-          issueTypes(first: 20) { nodes { id name } }
-        }
-      }' -f owner="mkrlabs" \
-      | jq -r --arg v "$VALUE" '.data.organization.issueTypes.nodes[]? | select(.name == $v) | .id')
-    if [ -z "$TYPE_ID" ] || [ "$TYPE_ID" = "null" ]; then
-      echo "org 'mkrlabs' has no issue type '$VALUE' — fall back to a label" >&2
-      exit 10
+    # Single REST PATCH — takes the type name directly. A 422 means the
+    # repo/org has no such native type (fall back to a label); a 404 means
+    # the issue doesn't exist.
+    if ! RESULT=$(gh api -X PATCH "repos/mkrlabs/specflow/issues/$ISSUE" \
+      -f type="$VALUE" --jq '.type.name' 2>&1); then
+      case "$RESULT" in
+        *"Validation Failed"* | *422*)
+          echo "repo has no native issue type '$VALUE' — fall back to a label" >&2
+          exit 10
+          ;;
+        *"Not Found"* | *404*)
+          echo "issue #$ISSUE not found in mkrlabs/specflow" >&2
+          exit 12
+          ;;
+        *)
+          echo "set IssueType failed: $RESULT" >&2
+          exit 1
+          ;;
+      esac
     fi
-    ISSUE_NODE_ID=$(gh api graphql -f query='
-      query($num: Int!) {
-        repository(owner:"mkrlabs", name:"specflow") {
-          issue(number: $num) { id }
-        }
-      }' -F num="$ISSUE" \
-      | jq -r '.data.repository.issue.id')
-    if [ -z "$ISSUE_NODE_ID" ] || [ "$ISSUE_NODE_ID" = "null" ]; then
-      echo "issue #$ISSUE not found in mkrlabs/specflow" >&2
-      exit 12
-    fi
-    gh api graphql -f query='
-      mutation($id: ID!, $typeId: ID!) {
-        updateIssue(input: { id: $id, issueTypeId: $typeId }) {
-          issue { issueType { name } }
-        }
-      }' -f id="$ISSUE_NODE_ID" -f typeId="$TYPE_ID" >/dev/null
-    echo "✓ #$ISSUE IssueType → $VALUE"
+    echo "✓ #$ISSUE IssueType → $RESULT"
     exit 0
     ;;
 esac
