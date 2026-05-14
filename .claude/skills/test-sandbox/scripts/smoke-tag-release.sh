@@ -73,6 +73,14 @@ check "#229 release-gitlab.sh queries projects/:id/releases for baseline detecti
   'grep -q "projects/:id/releases" .specflow/scripts/release/release-gitlab.sh'
 check "#229 release-gitlab.sh is idempotent (re-run on existing release exits 0)" \
   'grep -q "already exists" .specflow/scripts/release/release-gitlab.sh'
+check "#230 release-local.sh present + executable" \
+  '[ -x .specflow/scripts/release/release-local.sh ]'
+check "#230 release-local.sh writes RELEASE_NOTES_<tag>.md by default" \
+  'grep -q "RELEASE_NOTES_" .specflow/scripts/release/release-local.sh'
+check "#230 release-local.sh accepts --out flag" \
+  'grep -q -- "--out" .specflow/scripts/release/release-local.sh'
+check "#230 release-local.sh makes NO remote API calls" \
+  '! grep -E "(gh|glab) (api|release create)" .specflow/scripts/release/release-local.sh'
 check "lock records version_scheme: semver" \
   'grep -q "version_scheme: semver" .specflow/installed.lock'
 check "specflow SKILL.md references tag-version" \

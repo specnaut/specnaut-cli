@@ -296,6 +296,17 @@ this release, with the subsumed tag names listed inline. They push the tag to `o
 then call `gh release create` / `glab release create`. Idempotent: a second run against an
 already-released tag exits 0 with an explanatory message.
 
+For **local-only** projects (no remote, or you just want a Markdown artifact), the bundled
+`release-local.sh` wrapper writes the categorized body to a file:
+
+```bash
+bash .specflow/scripts/release/release-local.sh             # latest tag → RELEASE_NOTES_<tag>.md
+bash .specflow/scripts/release/release-local.sh --out NOTES.md v1.2.3
+```
+
+No remote API calls, no auth — paste the output into any release UI, attach to a deploy email, or
+pipe to a custom publisher.
+
 ## Available harnesses
 
 | Key           | Display name       | Output root             |
