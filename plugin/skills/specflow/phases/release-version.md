@@ -95,12 +95,32 @@ Same contract as `release-github.sh`: previous-DEPLOYED-tag baseline
 auto-push, idempotency. Requires `glab` CLI installed + authenticated
 (`glab auth login`).
 
-### Local-only / other backends (no wrapper)
+### Local-only — use the `release-local.sh` wrapper
 
-- **Local-only** — copy `release.sh` output somewhere readable; there
-  is no remote release object to create.
-- **Custom CI / other remote** — capture `release.sh` output and feed it
-  into whatever your pipeline expects.
+If the project has no remote (or you just want a Markdown artifact to
+paste into any release UI), the bundled `release-local.sh` wrapper
+writes the categorized body to a file in the current directory:
+
+```bash
+bash .specflow/scripts/release/release-local.sh             # latest tag → RELEASE_NOTES_<tag>.md
+bash .specflow/scripts/release/release-local.sh v1.2.3      # specific tag
+bash .specflow/scripts/release/release-local.sh --out NOTES.md v1.2.3
+```
+
+No remote API calls, no auth, no tag pushing. The output file is the
+release-body Markdown — paste it into any release UI, attach it to a
+deploy email, or pipe it to a custom publisher. Default output path:
+`RELEASE_NOTES_<tag>.md`.
+
+### Custom CI / other remote
+
+Capture `release.sh` output and feed it into whatever your pipeline
+expects:
+
+```bash
+BODY=$(bash .specflow/scripts/release/release.sh v1.2.3)
+# … hand `$BODY` to your custom publisher
+```
 
 ## Important — release-notes contract
 
