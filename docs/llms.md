@@ -11,7 +11,7 @@ harness (Claude Code, Cursor, Codex, Gemini CLI, GitHub Copilot CLI, Windsurf, O
 Antigravity) is what reads the generated files and acts on them.
 
 This page is the canonical documentation. The same content is available as raw Markdown at
-[`/llms.txt`](./llms.txt) for LLM consumption — see [llmstxt.org](https://llmstxt.org/) for the
+[`/llms.txt`](/llms.txt) for LLM consumption — see [llmstxt.org](https://llmstxt.org/) for the
 convention.
 
 ## Install
