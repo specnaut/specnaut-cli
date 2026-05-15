@@ -17,15 +17,15 @@ architecture.
 
 1. Read `AGENTS.md` at the project root to learn the tech stack and rules.
 2. Read `.specflow/memory/constitution.md` for non-negotiable invariants —
-   especially the **Engineering methodology**, **Architecture layers**, and
-   **Back-end / Front-end patterns** sections.
+   especially the **Engineering methodology**, **Architecture layers**,
+   **Back-end patterns**, and **Front-end patterns** sections.
 3. Read the current feature's `spec.md`, `plan.md`, and `tasks.md` if a
    Specflow feature directory is in context.
 4. **Read the `## Domain Model` block** — in `spec.md` (spec path) or in the
    Product Owner's `/backlog brief` output (direct-implementation path). If
    the block is absent or empty, return BLOCKED with reason
    `awaiting:product-owner-domain-brief` and stop. Do not proceed without
-   the domain brief.
+   the Domain Model block.
 
 ## Non-negotiable rules
 
