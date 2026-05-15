@@ -30,38 +30,25 @@ missing or empty, flag it to the user — the project is under-documented.
 ## Mandatory classification contract — every created or clarified item
 
 Classifying an item is part of grooming, not optional polish. Every
-backlog item you touch MUST exit with **all four axes** persisted before
-your final report — a **gate**, not polish:
+backlog item you touch MUST exit with **four hard axes + one soft**
+(see #5) persisted before your final report — a **gate**, not polish:
 
 1. **Size** — `XS`..`XL`
 2. **Priority** — `P0`..`P3`
-3. **Issue Type** — `Task` (chore / docs / tooling / refactor), `Bug`
-   (defect / regression), or `Feature` (new capability)
-4. **Label** — at least one classifying label (`enhancement`, `bug`,
-   `documentation`, …)
+3. **Issue Type** — `Task` / `Bug` / `Feature`
+4. **Label** — at least one classifying label (`enhancement`, `bug`, `documentation`, …)
+5. **Bounded context** (soft) — `domain:<context>` label (e.g. `domain:checkout`).
+   Optional on mono-domain projects, but the `## Domain Model` block in every
+   brief MUST carry a `Bounded context:` field. Tickets touching ≥ 2 contexts →
+   apply the "Epic detection heuristic" with reason "cross-bounded-context".
 
-Persistence depends on the backend:
+Persistence per backend:
 
-- **GitHub** — when the project has native `Priority` / `Size` fields
-  and the org has native Issue Types, write through `set-field.sh
-  <issue> <Priority|Size|IssueType> <value>` and **NEVER** also apply a
-  `priority:*` / `size:*` / `type:*` label on the same item (the
-  dual-signal drift the helper exists to prevent). Exit codes: `0` wrote
-  field/type · `10` field/type absent · `11` value unrecognised · `12`
-  issue not on project/repo. On `10`/`11`, fall back to the matching
-  label (`gh label create` it first if missing). Run `detect-fields.sh`
-  once per groom to discover field/option IDs.
-- **GitLab** — no `set-field.sh`; all four axes are scoped labels via
-  `glab` (`priority::P1`, `size::M`, `type::feature`, plus a plain
-  label). Create scoped labels on first use if absent.
-- **Local Markdown** — classification lives in the task file's
-  frontmatter: `priority:` and `complexity:` (size) are already
-  mandatory schema keys; record the Issue Type in `category:`
-  (`feature` / `bug` / `task`). No labels.
+- **GitHub** — use `set-field.sh <issue> <Priority|Size|IssueType> <value>`; exit `0` OK, `10`/`11` fall back to a label, `12` = issue not on project. Run `detect-fields.sh` once per groom. Never dual-write field + matching label.
+- **GitLab** — scoped labels via `glab` (`priority::P1`, `size::M`, `type::feature`). Create on first use.
+- **Local Markdown** — `priority:` / `complexity:` / `category:` frontmatter. No labels.
 
-Persistence failures on any backend (auth, rate-limit, missing scope)
-MUST land under `⚠ classification incomplete` in your report — a silent
-skip is a contract violation.
+Persistence failures MUST appear as `⚠ classification incomplete` — a silent skip is a contract violation.
 
 ## Backlog backend
 
@@ -116,39 +103,17 @@ as a unit, and closes the parent only when every child is closed.
 
 ### Creating sub-tasks (all backends)
 
-Use `add.sh --parent <num>` — it does the right thing per backend:
-
-- **github**: creates the child + POSTs to `/issues/<parent>/sub_issues`
-  (native beta API). Project V2 renders children under the parent's
-  `Sub-issues progress` field automatically.
-- **gitlab**: tags the child with a `parent::#NNN` scoped label.
-  Native Epics are Premium-only; the scoped label works on every tier.
-- **local**: writes `parent: "#NNN"` into the child's frontmatter and
-  cross-links under a `## Sub-tasks` section in the parent file.
-
+Use `add.sh --parent <num>` — handles per-backend linking automatically:
+GitHub POSTs to `/issues/<parent>/sub_issues`; GitLab applies a
+`parent::#NNN` label; local writes `parent: "#NNN"` in frontmatter.
 Fails fast (exit 3) if the parent doesn't exist.
 
 ### Closing rules (all three backends)
 
-- **Sub-task**: close directly. No cascade to siblings or parent.
-- **Parent / epic**: every child must close first. Run
-  `cascade-check.sh <num>` (github + gitlab) before `gh issue close` /
-  `glab issue close` — exit 11 means open children block close, 0 means
-  safe. On local, `grep -l 'parent: "#NNN"' .specflow/backlog/*.md` is
-  the equivalent check.
-- **Cancel epic**: close parent + every child as `not_planned` in one batch.
-- **Two-step close on GitHub / GitLab**: `gh issue close` (and `glab issue
-  close`) do NOT update the Project V2 Status field / GitLab scoped Status
-  label. Always run `move.sh <num> Done` BEFORE `gh issue close <num>
-  --reason {completed|not_planned}`. Skipping the move leaves the item
-  stuck in `In progress` / `In review` indefinitely. Local Markdown is
-  one step (flip `status: done` in frontmatter).
-- **Board hygiene sweep**: on "clean the board" / "sweep stale items",
-  list every column via `gh project item-list <N> --owner <owner>
-  --format json` (the wrappers filter to `states:OPEN`, missing closed
-  items). Items in `In progress` / `In review` that are `CLOSED` (or
-  `OPEN` with a merged PR) → `move.sh <num> Done`; mirror `Done` items
-  REOPENED. Idempotent; safe after every release.
+- **Sub-task**: close directly.
+- **Epic / parent**: `cascade-check.sh <num>` first (exit 11 = blocked; 0 = safe). Cancel: close parent + all children as `not_planned`.
+- **GitHub / GitLab two-step**: always `move.sh <num> Done` BEFORE `gh issue close <num> --reason {completed|not_planned}` — skipping leaves the item stuck in-progress. Local Markdown: flip `status: done` in frontmatter (one step).
+- **Board hygiene sweep**: `move.sh <num> Done` for CLOSED issues stuck in `In progress`/`In review`; reopen mislabelled `Done` items.
 
 ### Epic detection heuristic
 
@@ -262,6 +227,22 @@ Generate a PO business brief for a developer: feature purpose, business
 rules, user stories, gotchas, acceptance criteria. If the task is in an
 epic, add a one-line summary of the parent and sibling sub-tasks.
 
+Every brief MUST include a `## Domain Model` block — the contract with
+the developer (who refuses to start without it):
+
+- **Bounded context:** `<name>`
+- **Vocabulary:** `Term — definition`
+- **Entities:** `Name [aggregate root?] — responsibility`
+- **Value objects:** `Name(fields) — invariant`
+- **Invariants:** `rule — why`
+- **Out of scope:** `context — interaction`
+
+If a spec.md is attached, write this block into the spec too (the spec
+template carries the section). Otherwise it lives in the issue / task file.
+
+**Gate:** a brief without a Domain Model is incomplete. If you lack the
+information to populate it, clarify with the user first.
+
 ### `/backlog epic <id>`
 
 Show an epic with all its sub-tasks (status, complexity, owner). Useful
@@ -279,3 +260,15 @@ before estimating epic completion or reporting progress.
   artifacts in English.
 - Projects pre-dating the epic feature have no `parent:` key on old tasks —
   that's fine; a missing key is treated as `parent: null`.
+
+## Tech-debt intake protocol
+
+Triggered automatically when a developer completion report contains a
+`Tech debt surfaced` block (no slash-command entry point).
+
+Each line format: `<one-liner> @ <path>:<line> — <reason it was out of scope>`.
+
+1. **Parse** each line from the block.
+2. **Dedupe** — search existing tickets (`gh issue list --search` / `grep .specflow/backlog/`). Skip duplicates; list them in the report.
+3. **Create** non-duplicates with: Issue Type `Task`, label `tech-debt` (+ `domain:<context>` if obvious), Size `XS`/`S`, Priority `P3` (bump to `P2` for correctness/security risk). Body: `Surfaced by #<id>.\n\n> <one-liner>\n\nLocation: \`<path>:<line>\`\nDeferred because: <reason>`. Apply full classification contract.
+4. **Report** created ticket numbers/URLs or "all items already covered by #X, #Y".

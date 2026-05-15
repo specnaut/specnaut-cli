@@ -80,7 +80,7 @@ Given that feature description, do this:
     4. Fill User Scenarios & Testing; if no clear user flow: ERROR "Cannot determine user scenarios"
     5. Generate Functional Requirements — each must be testable
     6. Define Success Criteria — measurable, technology-agnostic, verifiable
-    7. Identify Key Entities (if data involved)
+    7. **Populate the `## Domain Model` block (mandatory)** — Bounded context, Vocabulary (Ubiquitous language), Entities (have identity), Value objects, Invariants, Out of scope. Use `[NEEDS CLARIFICATION: <question>]` markers for fields the input does not let you fill — `/specflow clarify` resolves them. The developer refuses to proceed if this block is absent or contains unresolved placeholders.
     8. Return: SUCCESS (spec ready for planning)
 
 6. Write the specification to `SPEC_FILE` using the template structure, replacing placeholders with concrete details while preserving section order and headings.

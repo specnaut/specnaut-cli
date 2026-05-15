@@ -111,8 +111,20 @@ where you'll run the rest.
 `/specflow constitution` is the expected first action after `specflow init`. It scaffolds your
 project's guiding principles (architecture, quality gates, ways of working) into
 `.specflow/memory/constitution.md` so the rest of the pipeline (`/specflow specify`,
-`/specflow plan`, `/specflow tasks`, `/specflow implement`) has something to anchor on. Refine the
-generated constitution and the root `AGENTS.md` for your stack, then move on to
+`/specflow plan`, `/specflow tasks`, `/specflow implement`) has something to anchor on.
+
+The generated constitution comes pre-populated with four opinionated baseline blocks (all
+user-tunable): **Engineering methodology** (TDD / DDD / SOLID-DRY-KISS-YAGNI /
+Boy-Scout-escalation), **Architecture layers** (hexagonal default: `domain/` / `application/` /
+`infrastructure/` / `presentation/`), **Back-end patterns** (Repository, service objects, DI through
+constructors, thin controllers, errors as domain types, pure domain), and **Front-end patterns**
+(view/logic separation, no business rules in templates, smart vs dumb components, single source of
+truth for state, typed API client, accessibility mandatory). New projects via `specflow init`
+inherit all four blocks automatically. `specflow upgrade` delivers updated agents and skills but
+does **not** rewrite an existing constitution — to adopt the new baselines in an existing project,
+rebase your constitution manually.
+
+Refine the generated constitution and the root `AGENTS.md` for your stack, then move on to
 `/specflow specify "<feature description>"` for your first feature.
 
 ### Add Specflow to an existing project
@@ -335,7 +347,7 @@ Some harnesses also ship harness-specific helper files alongside the core scaffo
 
 ## What makes Specflow different from upstream Spec Kit
 
-Specflow is a fork of the official `specify` CLI with four additions:
+Specflow is a fork of the official `specify` CLI with the following additions:
 
 ### 1. Auto-chained pipeline
 
@@ -407,7 +419,45 @@ After `implement`, the generated workflow runs a dedicated `review` phase that c
 coverage) and the quality gates (format, lint, typecheck, tests). If `review` flags something, the
 loop is `implement → review → fix → re-review` — also automatic.
 
-### 3. Backlog as product source of truth
+### 3. Developer agent doctrine
+
+Every scaffold ships a `developer` agent that implements tasks from `tasks.md`. The agent operates
+under a strict doctrine that applies to every task, regardless of project stack:
+
+**Domain Model gate (NON-NEGOTIABLE)** — before writing a single line of code, the developer reads
+the `## Domain Model` block in `spec.md` (spec path) or in the Product Owner's `/backlog brief`
+output (direct-implementation path). If the block is absent, empty, or still contains template
+placeholders, the agent halts and returns `BLOCKED` with reason
+`awaiting:product-owner-domain-brief`. The `implement` phase skill enforces the same gate — it reads
+the section at step 3 and surfaces the same BLOCKED report with a recommendation to run
+`/specflow clarify` first. The `clarify` phase cannot advance while the Domain Model is incomplete,
+and `specify` step 5.7 is responsible for populating the full block (Bounded context, Vocabulary,
+Entities, Value objects, Invariants, Out of scope) rather than just listing key entities.
+
+**Test-Driven Development (NON-NEGOTIABLE)** — red → green → refactor on every implementation. No
+business logic ships untested. If the project has no test infrastructure, the developer bootstraps
+the language-idiomatic test runner (Vitest for TS/JS, Pytest for Python, JUnit for Java, `go test`
+for Go, `cargo test` for Rust, PHPUnit for PHP, RSpec for Ruby, etc.) as part of the task and
+records it explicitly in the `Decisions` block of the completion report.
+
+**Domain-Driven Design (NON-NEGOTIABLE)** — every change respects the project's domain boundaries.
+Domain layer stays pure (no I/O, no framework). Application layer holds use cases and ports.
+Infrastructure layer holds adapters. Presentation talks only to use cases. Cross-bounded-context
+bleed-through is forbidden — split or use an anti-corruption layer.
+
+**Boy Scout Rule with escalation** — small in-scope cleanups (≤ 1 file, ~15 lines of diff, no public
+API change) are done in the same PR and noted in `Decisions`. Larger out-of-scope cleanups are
+logged in a `Tech debt surfaced` block of the completion report rather than ballooning the PR. The
+Product Owner reads that block and opens a classified tech-debt ticket (`tech-debt` label, default
+Size XS/S, Priority P3, bumped to P2 on correctness/security risk) for each item.
+
+**SOLID / DRY / KISS / YAGNI** — explicitly required. Framework-specific patterns (Repository, DI,
+React hooks, MVC controllers) come from the constitution's Back-end and Front-end pattern blocks.
+**No silent catches** — every `catch` either logs at ERROR/WARN or re-throws. **In-code
+documentation** — doc-comments on every function, method, or class encoding a business rule or
+non-obvious design decision, in the idiomatic format for the language.
+
+### 4. Backlog as product source of truth
 
 A Product Owner agent gates every mutation, and supports three backends:
 
@@ -453,6 +503,22 @@ unrecognised, `12` = issue not on the project / not in the repo. `detect-fields.
 groom) emits the field/option IDs into env vars for case-insensitive matching. On GitLab the four
 axes are scoped labels via `glab`; on the local Markdown backend they live in task-file frontmatter.
 
+**Bounded context (soft fifth axis)** — a `domain:<context>` label (e.g. `domain:checkout`) is
+optional on mono-domain projects but the `## Domain Model` block in every `/backlog brief` output is
+always mandatory. Items touching ≥ 2 bounded contexts automatically trigger the epic detection
+heuristic with reason "cross-bounded-context".
+
+**`/backlog brief` — Domain Model is mandatory.** Every brief the PO generates for a developer MUST
+include a `## Domain Model` block with: Bounded context, Vocabulary (ubiquitous language), Entities
+(with aggregate root flag), Value objects, Invariants, and Out of scope. A brief without this block
+is incomplete — the PO clarifies with the user before issuing it. If a `spec.md` is attached, the
+block is written into the spec too (the spec template carries the section).
+
+**Tech-debt intake protocol.** When a developer's completion report carries a `Tech debt surfaced`
+block, the PO parses it, deduplicates against the current backlog, and opens one classified ticket
+per surfaced item: `tech-debt` label, default Size XS or S, Priority P3 (bumped to P2 when the item
+involves correctness or security risk). This is automatically triggered — no manual step required.
+
 **Epics & sub-tasks.** Big work that needs decomposition lives as a parent **epic** with one or more
 **sub-tasks**. The link mechanism differs per backend, but the contract is the same: parents cannot
 close while any child is still open.
@@ -482,7 +548,7 @@ carries trigger phrases like "break down", "phased", "rewrite", "end-to-end". Ob
 auto-created; ambiguous ones get a concrete sub-task list back as a question. You don't have to ask
 for the breakdown — the PO surfaces it on its own.
 
-### 4. Claude Code plugin distribution
+### 5. Claude Code plugin distribution
 
 Specflow ships a first-class Claude Code plugin (`specflow-plugin`) available via the Claude Code
 marketplace:
@@ -502,7 +568,7 @@ auto-migrates vanilla on-disk agents and command files (backed up, then deleted 
 them going forward). `specflow check --project` warns when covered files are missing and the plugin
 is not installed, with a recovery hint.
 
-### 5. Bundled `specflow-expert` agent
+### 6. Bundled `specflow-expert` agent
 
 Every scaffold ships a `specflow-expert` agent that knows Specflow itself — its commands, harnesses,
 backlog backends, and what changed between releases. It auto-triggers on Specflow-related questions
@@ -520,7 +586,7 @@ it pre-fills a structured GitHub issue against `mkrlabs/specflow` with a 6-secti
 `https://github.com/mkrlabs/specflow/issues/new?…` URL to review and submit. The agent never
 auto-submits — you always see the body before clicking.
 
-### 6. Bundled `security-auditor` agent — two modes
+### 7. Bundled `security-auditor` agent — two modes
 
 Every scaffold also ships a `security-auditor` agent with two dispatch shapes:
 
@@ -536,7 +602,7 @@ The triage mode is release-time only and uses a tightly-constrained `Bash` grant
 `gh api` alert-dismissal endpoints are permitted. End users never trigger this mode; PR review
 remains the user-facing path.
 
-### 7. Bundled `ui-ux-designer` agent
+### 8. Bundled `ui-ux-designer` agent
 
 Every scaffold also ships a `ui-ux-designer` agent that owns a single source of truth — the
 project's `DESIGN.md` — that every other agent consults to keep generated UI on-brand. Three modes

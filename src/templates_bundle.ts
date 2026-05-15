@@ -195,7 +195,7 @@ Given that feature description, do this:
     4. Fill User Scenarios & Testing; if no clear user flow: ERROR "Cannot determine user scenarios"
     5. Generate Functional Requirements — each must be testable
     6. Define Success Criteria — measurable, technology-agnostic, verifiable
-    7. Identify Key Entities (if data involved)
+    7. **Populate the \`## Domain Model\` block (mandatory)** — Bounded context, Vocabulary (Ubiquitous language), Entities (have identity), Value objects, Invariants, Out of scope. Use \`[NEEDS CLARIFICATION: <question>]\` markers for fields the input does not let you fill — \`/specflow clarify\` resolves them. The developer refuses to proceed if this block is absent or contains unresolved placeholders.
     8. Return: SUCCESS (spec ready for planning)
 
 6. Write the specification to \`SPEC_FILE\` using the template structure, replacing placeholders with concrete details while preserving section order and headings.
@@ -438,6 +438,7 @@ Execution steps:
    - No contradictory earlier statement remains.
    - Markdown structure valid; only allowed new headings: \`## Clarifications\`, \`### Session YYYY-MM-DD\`.
    - Terminology consistency: same canonical term used across all updated sections.
+   - **Domain Model exit gate (NON-NEGOTIABLE)**: the spec's \`## Domain Model\` section MUST be fully populated — Bounded context, Vocabulary, Entities, Value objects, Invariants, and Out of scope all filled, with no \`[NEEDS CLARIFICATION]\` markers and no template placeholders remaining. If unfilled fields remain at the end of the clarify session, do not advance — surface them as Outstanding and recommend running \`/specflow clarify\` again. The downstream \`/specflow implement\` step will refuse to proceed without this section.
 
 7. Write the updated spec back to \`FEATURE_SPEC\`.
 
@@ -1162,6 +1163,7 @@ You **MUST** consider the user input before proceeding (if not empty).
 3. Load and analyze the implementation context:
    - **REQUIRED**: Read tasks.md for the complete task list and execution plan
    - **REQUIRED**: Read plan.md for tech stack, architecture, and file structure
+   - **REQUIRED**: Read the \`## Domain Model\` section in spec.md. If the section is absent, empty, or still contains \`[NEEDS CLARIFICATION]\` markers / template placeholders → halt and report BLOCKED with reason \`awaiting:product-owner-domain-brief\`. The developer agent refuses to write code without this brief — its "First action" checklist (step 4) reads the block and returns the same BLOCKED reason. Recommend running \`/specflow clarify\` to fill the section before re-attempting \`/specflow implement\`.
    - **IF EXISTS**: Read data-model.md for entities and relationships
    - **IF EXISTS**: Read contracts/ for API specifications and test requirements
    - **IF EXISTS**: Read research.md for technical decisions and constraints
@@ -2964,38 +2966,25 @@ missing or empty, flag it to the user — the project is under-documented.
 ## Mandatory classification contract — every created or clarified item
 
 Classifying an item is part of grooming, not optional polish. Every
-backlog item you touch MUST exit with **all four axes** persisted before
-your final report — a **gate**, not polish:
+backlog item you touch MUST exit with **four hard axes + one soft**
+(see #5) persisted before your final report — a **gate**, not polish:
 
 1. **Size** — \`XS\`..\`XL\`
 2. **Priority** — \`P0\`..\`P3\`
-3. **Issue Type** — \`Task\` (chore / docs / tooling / refactor), \`Bug\`
-   (defect / regression), or \`Feature\` (new capability)
-4. **Label** — at least one classifying label (\`enhancement\`, \`bug\`,
-   \`documentation\`, …)
+3. **Issue Type** — \`Task\` / \`Bug\` / \`Feature\`
+4. **Label** — at least one classifying label (\`enhancement\`, \`bug\`, \`documentation\`, …)
+5. **Bounded context** (soft) — \`domain:<context>\` label (e.g. \`domain:checkout\`).
+   Optional on mono-domain projects, but the \`## Domain Model\` block in every
+   brief MUST carry a \`Bounded context:\` field. Tickets touching ≥ 2 contexts →
+   apply the "Epic detection heuristic" with reason "cross-bounded-context".
 
-Persistence depends on the backend:
+Persistence per backend:
 
-- **GitHub** — when the project has native \`Priority\` / \`Size\` fields
-  and the org has native Issue Types, write through \`set-field.sh
-  <issue> <Priority|Size|IssueType> <value>\` and **NEVER** also apply a
-  \`priority:*\` / \`size:*\` / \`type:*\` label on the same item (the
-  dual-signal drift the helper exists to prevent). Exit codes: \`0\` wrote
-  field/type · \`10\` field/type absent · \`11\` value unrecognised · \`12\`
-  issue not on project/repo. On \`10\`/\`11\`, fall back to the matching
-  label (\`gh label create\` it first if missing). Run \`detect-fields.sh\`
-  once per groom to discover field/option IDs.
-- **GitLab** — no \`set-field.sh\`; all four axes are scoped labels via
-  \`glab\` (\`priority::P1\`, \`size::M\`, \`type::feature\`, plus a plain
-  label). Create scoped labels on first use if absent.
-- **Local Markdown** — classification lives in the task file's
-  frontmatter: \`priority:\` and \`complexity:\` (size) are already
-  mandatory schema keys; record the Issue Type in \`category:\`
-  (\`feature\` / \`bug\` / \`task\`). No labels.
+- **GitHub** — use \`set-field.sh <issue> <Priority|Size|IssueType> <value>\`; exit \`0\` OK, \`10\`/\`11\` fall back to a label, \`12\` = issue not on project. Run \`detect-fields.sh\` once per groom. Never dual-write field + matching label.
+- **GitLab** — scoped labels via \`glab\` (\`priority::P1\`, \`size::M\`, \`type::feature\`). Create on first use.
+- **Local Markdown** — \`priority:\` / \`complexity:\` / \`category:\` frontmatter. No labels.
 
-Persistence failures on any backend (auth, rate-limit, missing scope)
-MUST land under \`⚠ classification incomplete\` in your report — a silent
-skip is a contract violation.
+Persistence failures MUST appear as \`⚠ classification incomplete\` — a silent skip is a contract violation.
 
 ## Backlog backend
 
@@ -3050,39 +3039,17 @@ as a unit, and closes the parent only when every child is closed.
 
 ### Creating sub-tasks (all backends)
 
-Use \`add.sh --parent <num>\` — it does the right thing per backend:
-
-- **github**: creates the child + POSTs to \`/issues/<parent>/sub_issues\`
-  (native beta API). Project V2 renders children under the parent's
-  \`Sub-issues progress\` field automatically.
-- **gitlab**: tags the child with a \`parent::#NNN\` scoped label.
-  Native Epics are Premium-only; the scoped label works on every tier.
-- **local**: writes \`parent: "#NNN"\` into the child's frontmatter and
-  cross-links under a \`## Sub-tasks\` section in the parent file.
-
+Use \`add.sh --parent <num>\` — handles per-backend linking automatically:
+GitHub POSTs to \`/issues/<parent>/sub_issues\`; GitLab applies a
+\`parent::#NNN\` label; local writes \`parent: "#NNN"\` in frontmatter.
 Fails fast (exit 3) if the parent doesn't exist.
 
 ### Closing rules (all three backends)
 
-- **Sub-task**: close directly. No cascade to siblings or parent.
-- **Parent / epic**: every child must close first. Run
-  \`cascade-check.sh <num>\` (github + gitlab) before \`gh issue close\` /
-  \`glab issue close\` — exit 11 means open children block close, 0 means
-  safe. On local, \`grep -l 'parent: "#NNN"' .specflow/backlog/*.md\` is
-  the equivalent check.
-- **Cancel epic**: close parent + every child as \`not_planned\` in one batch.
-- **Two-step close on GitHub / GitLab**: \`gh issue close\` (and \`glab issue
-  close\`) do NOT update the Project V2 Status field / GitLab scoped Status
-  label. Always run \`move.sh <num> Done\` BEFORE \`gh issue close <num>
-  --reason {completed|not_planned}\`. Skipping the move leaves the item
-  stuck in \`In progress\` / \`In review\` indefinitely. Local Markdown is
-  one step (flip \`status: done\` in frontmatter).
-- **Board hygiene sweep**: on "clean the board" / "sweep stale items",
-  list every column via \`gh project item-list <N> --owner <owner>
-  --format json\` (the wrappers filter to \`states:OPEN\`, missing closed
-  items). Items in \`In progress\` / \`In review\` that are \`CLOSED\` (or
-  \`OPEN\` with a merged PR) → \`move.sh <num> Done\`; mirror \`Done\` items
-  REOPENED. Idempotent; safe after every release.
+- **Sub-task**: close directly.
+- **Epic / parent**: \`cascade-check.sh <num>\` first (exit 11 = blocked; 0 = safe). Cancel: close parent + all children as \`not_planned\`.
+- **GitHub / GitLab two-step**: always \`move.sh <num> Done\` BEFORE \`gh issue close <num> --reason {completed|not_planned}\` — skipping leaves the item stuck in-progress. Local Markdown: flip \`status: done\` in frontmatter (one step).
+- **Board hygiene sweep**: \`move.sh <num> Done\` for CLOSED issues stuck in \`In progress\`/\`In review\`; reopen mislabelled \`Done\` items.
 
 ### Epic detection heuristic
 
@@ -3196,6 +3163,22 @@ Generate a PO business brief for a developer: feature purpose, business
 rules, user stories, gotchas, acceptance criteria. If the task is in an
 epic, add a one-line summary of the parent and sibling sub-tasks.
 
+Every brief MUST include a \`## Domain Model\` block — the contract with
+the developer (who refuses to start without it):
+
+- **Bounded context:** \`<name>\`
+- **Vocabulary:** \`Term — definition\`
+- **Entities:** \`Name [aggregate root?] — responsibility\`
+- **Value objects:** \`Name(fields) — invariant\`
+- **Invariants:** \`rule — why\`
+- **Out of scope:** \`context — interaction\`
+
+If a spec.md is attached, write this block into the spec too (the spec
+template carries the section). Otherwise it lives in the issue / task file.
+
+**Gate:** a brief without a Domain Model is incomplete. If you lack the
+information to populate it, clarify with the user first.
+
 ### \`/backlog epic <id>\`
 
 Show an epic with all its sub-tasks (status, complexity, owner). Useful
@@ -3213,6 +3196,18 @@ before estimating epic completion or reporting progress.
   artifacts in English.
 - Projects pre-dating the epic feature have no \`parent:\` key on old tasks —
   that's fine; a missing key is treated as \`parent: null\`.
+
+## Tech-debt intake protocol
+
+Triggered automatically when a developer completion report contains a
+\`Tech debt surfaced\` block (no slash-command entry point).
+
+Each line format: \`<one-liner> @ <path>:<line> — <reason it was out of scope>\`.
+
+1. **Parse** each line from the block.
+2. **Dedupe** — search existing tickets (\`gh issue list --search\` / \`grep .specflow/backlog/\`). Skip duplicates; list them in the report.
+3. **Create** non-duplicates with: Issue Type \`Task\`, label \`tech-debt\` (+ \`domain:<context>\` if obvious), Size \`XS\`/\`S\`, Priority \`P3\` (bump to \`P2\` for correctness/security risk). Body: \`Surfaced by #<id>.\\n\\n> <one-liner>\\n\\nLocation: \\\`<path>:<line>\\\`\\nDeferred because: <reason>\`. Apply full classification contract.
+4. **Report** created ticket numbers/URLs or "all items already covered by #X, #Y".
 `,
     executable: false,
     backend: null,
@@ -3240,38 +3235,80 @@ architecture.
 ## First action in every session
 
 1. Read \`AGENTS.md\` at the project root to learn the tech stack and rules.
-2. Read \`.specflow/memory/constitution.md\` for non-negotiable invariants.
+2. Read \`.specflow/memory/constitution.md\` for non-negotiable invariants —
+   especially the **Engineering methodology**, **Architecture layers**,
+   **Back-end patterns**, and **Front-end patterns** sections.
 3. Read the current feature's \`spec.md\`, \`plan.md\`, and \`tasks.md\` if a
    Specflow feature directory is in context.
+4. **Read the \`## Domain Model\` block** — in \`spec.md\` (spec path) or in the
+   Product Owner's \`/backlog brief\` output (direct-implementation path). If
+   the block is absent or empty, return BLOCKED with reason
+   \`awaiting:product-owner-domain-brief\` and stop. Do not proceed without
+   the Domain Model block.
 
 ## Non-negotiable rules
 
-1. **TDD when test infra exists** — write the failing test first, then the
-   minimal implementation that makes it pass.
-2. **Smallest correct change** — no speculative abstractions, no features the
-   current task does not require.
-3. **Boy Scout Rule** — leave touched files cleaner than you found them.
-4. **No silent catches** — every \`catch\` block either logs at ERROR/WARN level
-   or re-throws. Empty / comment-only catches are forbidden.
-5. **Respect the project constitution** — if unsure, re-read it.
-6. **Run validation before handing off** — at minimum type-check and the tests
-   relevant to your change.
-7. **In-code documentation** — for every function, method, or class that
+1. **Test-Driven Development (NON-NEGOTIABLE)** — write the failing test
+   first, then the minimal implementation that makes it pass. If the project
+   has no test infrastructure, bootstrap the language-idiomatic test runner
+   (Vitest for TS/JS, Pytest for Python, JUnit for Java, \`go test\` for Go,
+   \`cargo test\` for Rust, PHPUnit for PHP, RSpec for Ruby, etc.) as part of
+   the task, and record it explicitly in the \`Decisions\` block of the
+   completion report. Never ship business logic untested.
+
+2. **Domain-Driven Design (NON-NEGOTIABLE)** — every change respects the
+   project's domain boundaries. Domain layer stays pure (no I/O, no
+   framework). Application layer holds use cases and ports. Infrastructure
+   layer holds adapters (DB, HTTP, queues, filesystem, SDKs). Presentation
+   talks only to use cases. Specific layout comes from the constitution.
+   Cross-bounded-context bleed-through is forbidden — split or use an
+   anti-corruption layer.
+
+3. **Smallest correct change** — no speculative abstractions, no features
+   the current task does not require.
+
+4. **Boy Scout Rule with escalation** — leave touched files cleaner than
+   you found them.
+   - *Small in-scope cleanup* (≤ 1 file, ~15 lines of diff, no public API
+     change, no test churn): do it in the same PR, mention it in
+     \`Decisions\`.
+   - *Larger out-of-scope cleanup* (cross-cutting, needs its own design,
+     would balloon the PR): log it under the \`Tech debt surfaced\` block of
+     the completion report. The Product Owner opens a tech-debt ticket
+     from that list.
+
+5. **SOLID / DRY / KISS / YAGNI** — apply SOLID (SRP, OCP, LSP, ISP, DIP).
+   DRY only when duplication is *semantic*, not accidental similarity.
+   KISS: smallest correct design. YAGNI: nothing the task does not need.
+   Specific framework patterns (Repository, dependency injection, React
+   hooks, MVC controllers, etc.) come from the constitution's \`Back-end
+   patterns\` and \`Front-end patterns\` blocks.
+
+6. **No silent catches** — every \`catch\` block either logs at ERROR/WARN
+   level or re-throws. Empty / comment-only catches are forbidden.
+
+7. **Respect the project constitution** — if unsure, re-read it.
+
+8. **Run validation before handing off** — at minimum type-check and the
+   tests relevant to your change.
+
+9. **In-code documentation** — for every function, method, or class that
    encodes business logic, a domain rule, or a non-obvious design decision,
    write a doc-comment in the idiomatic format for the language (JSDoc for
    JS/TS, docstrings for Python, KDoc for Kotlin, PHPDoc for PHP, \`///\` for
    Rust/Swift, etc.) — infer the convention from the files already in the
    project. Focus on *why* the code exists or why this approach was chosen,
-   not *what* it does. Pure CRUD, simple getters, and self-evident utilities
-   do not need doc-comments.
+   not *what* it does. Pure CRUD, simple getters, and self-evident
+   utilities do not need doc-comments.
 
 ## Protocol
 
 For each task assigned:
 
 1. Confirm the task's exit criteria.
-2. Implement with TDD where applicable.
-3. Apply the Boy Scout Rule in any file you touch.
+2. Implement with TDD (bootstrap test infra if missing — rule 1).
+3. Apply the Boy Scout Rule in any file you touch — small fixes inline,
+   larger ones into \`Tech debt surfaced\`.
 4. Run targeted validation.
 5. End with a structured completion report.
 
@@ -3286,15 +3323,21 @@ Files changed
 
 Decisions
   - <why X over Y>
+  - (if applicable) Bootstrapped <test runner> because the project had
+    no test infra
 
 Validation run
   - <command>: <result>
+
+Tech debt surfaced (Boy Scout — too big to fix in scope)
+  - <one-liner> @ <path>:<line> — reason it's too big
+  - (omit section entirely if empty)
 
 Risks / follow-ups
   - <…>
 
 Next owner
-  - <reviewer | qa | user>
+  - <reviewer | qa | user | product-owner (if tech-debt items present)>
 \`\`\`
 
 Never report done if a validation failed. If blocked, say what you tried, what
@@ -6548,10 +6591,40 @@ above so projects that later migrate to a remote backend keep continuity.
 - **FR-006**: System MUST authenticate users via [NEEDS CLARIFICATION: auth method not specified - email/password, SSO, OAuth?]
 - **FR-007**: System MUST retain user data for [NEEDS CLARIFICATION: retention period not specified]
 
-### Key Entities *(include if feature involves data)*
+### Key Entities *(see Domain Model section below for full structure)*
 
-- **[Entity 1]**: [What it represents, key attributes without implementation]
-- **[Entity 2]**: [What it represents, relationships to other entities]
+- **[Entity 1]**: [What it represents, business-level attributes only]
+- **[Entity 2]**: [What it represents, relationships]
+
+## Domain Model *(mandatory)*
+
+<!--
+  ACTION REQUIRED: Populated by the Product Owner during /specflow clarify.
+  The developer refuses to proceed without this section.
+  Format mirrors the PO's /backlog brief output — same shape everywhere.
+-->
+
+**Bounded context:** <name of the business context, e.g. Checkout, Auth>
+
+**Vocabulary (Ubiquitous language):**
+
+- **<Term>** — <one-line definition in the project's words>
+
+**Entities (have identity):**
+
+- **<Name>** [aggregate root?] — <responsibility, key relationships>
+
+**Value objects (no identity, immutable):**
+
+- **<Name>(<fields>)** — <invariant rule it enforces>
+
+**Invariants (rules the domain must never break):**
+
+- <rule> — <why>
+
+**Out of scope (other bounded contexts touched but not owned here):**
+
+- **<other context>** — <how this feature interacts with it>
 
 ## Success Criteria *(mandatory)*
 
@@ -7012,6 +7085,93 @@ With multiple developers:
     suffix: "templates/constitution-template.md",
     content: `# [PROJECT_NAME] Constitution
 <!-- Example: Spec Constitution, TaskFlow Constitution, etc. -->
+
+## Engineering methodology (Specflow baseline)
+
+> Specflow ships these as opinionated defaults. Amend, soften, or remove
+> per principle — but a project that overrides them MUST document why.
+
+### Test-Driven Development (NON-NEGOTIABLE)
+
+Red → Green → Refactor on every implementation. No business logic ships
+untested. If no test infra exists, the developer bootstraps it as part
+of the task (Vitest for TS/JS, Pytest for Python, JUnit for Java,
+\`go test\` for Go, \`cargo test\` for Rust, PHPUnit for PHP, etc.) and
+notes it in the completion report.
+
+### Domain-Driven Design (NON-NEGOTIABLE)
+
+- Every business concept lives in its own bounded-context folder.
+- Domain layer is pure: no I/O, no framework, no DB.
+- Application layer orchestrates use cases via ports.
+- Infrastructure layer holds adapters (DB, HTTP, queues, filesystem, SDKs).
+- Presentation layer (CLI, web UI, controllers) talks only to use cases.
+- Cross-bounded-context leakage is forbidden — split or use an
+  anti-corruption layer.
+
+### SOLID / DRY / KISS / YAGNI
+
+- Single Responsibility, Open/Closed, Liskov, Interface Segregation,
+  Dependency Inversion.
+- DRY only when duplication is *semantic*, not accidental similarity.
+- KISS: ship the smallest correct design.
+- YAGNI: build what the task requires, nothing more.
+
+### Boy Scout Rule (with escalation)
+
+- Always leave touched files cleaner than you found them.
+- In-scope small cleanups (≤ 1 file, ~15 lines diff, no API change):
+  do them.
+- Out-of-scope larger cleanups: log under \`Tech debt surfaced\` in the
+  completion report — the Product Owner opens a tech-debt ticket.
+
+## Architecture layers
+
+> Default is hexagonal / DDD. Customize for your project's idiom.
+
+- \`domain/\` — pure business types, entities, value objects, domain services
+- \`application/\` — use cases, ports (interfaces), orchestration
+- \`infrastructure/\` — adapters (DB, HTTP clients, queues, filesystem, SDKs)
+- \`presentation/\` — CLI commands, web routes, API controllers, UI shells
+
+Each bounded context gets its own subtree: \`domain/<context>/\`,
+\`application/<context>/\`, \`infrastructure/<context>/\`.
+
+## Back-end patterns
+
+> Tune to your stack. Remove what doesn't apply.
+
+- **Repository pattern** for data access — one repository port per
+  aggregate root in \`application/\`, with the adapter in
+  \`infrastructure/\`. Domain never imports a DB driver.
+- **Service objects / use cases** — one class per use case in
+  \`application/\`. Verb-named (\`PlaceOrder\`, \`RefundPayment\`).
+- **Dependency injection through constructors** — no service locators,
+  no module-level globals, no hidden singletons.
+- **Controllers stay thin** — translate transport ↔ use case. No
+  business logic in controllers.
+- **Errors are domain types** — return typed results or throw domain
+  errors; never let an HTTP/SQL error reach the domain layer.
+- **Pure domain** — no logging, no metrics, no clocks inside \`domain/\`;
+  pass them as ports from \`application/\`.
+
+## Front-end patterns
+
+> Defaults assume a component-based UI framework (React, Vue, Svelte,
+> Solid…). Tune accordingly.
+
+- **Separation of view and logic** — components render markup;
+  business logic lives in hooks / composables / services / view-models.
+- **No business rules in templates** — derive in hooks/composables, then
+  render the result. Templates only branch on view state.
+- **Smart vs dumb components** — presentational components stay pure
+  and prop-driven; container components / hooks hold state and effects.
+- **Single source of truth for cross-cutting state** — typed store
+  (Redux, Pinia, Zustand…) or context, not deep prop-drilling.
+- **API access through a typed client** — never call \`fetch\` directly
+  from a component; route it through a service / repository layer.
+- **Accessibility is non-optional** — semantic HTML, keyboard paths,
+  visible focus, ARIA only when semantic HTML doesn't suffice.
 
 ## Core Principles
 
