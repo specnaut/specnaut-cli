@@ -95,10 +95,41 @@
 - **FR-006**: System MUST authenticate users via [NEEDS CLARIFICATION: auth method not specified - email/password, SSO, OAuth?]
 - **FR-007**: System MUST retain user data for [NEEDS CLARIFICATION: retention period not specified]
 
-### Key Entities *(include if feature involves data)*
+### Key Entities *(see Domain Model section below for full structure)*
 
-- **[Entity 1]**: [What it represents, key attributes without implementation]
-- **[Entity 2]**: [What it represents, relationships to other entities]
+- **[Entity 1]**: [What it represents, business-level attributes only]
+- **[Entity 2]**: [What it represents, relationships]
+
+## Domain Model *(mandatory)*
+
+<!--
+  ACTION REQUIRED: Populated by the Product Owner during /specflow clarify.
+  The developer refuses to proceed without this section.
+  Format mirrors the PO's /backlog brief output — same shape everywhere.
+-->
+
+**Bounded context:** [name of the business context, e.g. Checkout, Authentication]
+
+**Vocabulary (Ubiquitous language):**
+
+- **[Term]** — [one-line definition in the project's words]
+- **[Term]** — [one-line definition]
+
+**Entities (have identity):**
+
+- **[Name]** [aggregate root?] — [responsibility, key relationships]
+
+**Value objects (no identity, immutable):**
+
+- **[Name](field1, field2)** — [invariant rule it enforces]
+
+**Invariants (rules the domain must never break):**
+
+- [Rule] — [why it exists]
+
+**Out of scope (other bounded contexts touched but not owned here):**
+
+- **[Other context]** — [how this feature interacts with it]
 
 ## Success Criteria *(mandatory)*
 
