@@ -30,52 +30,25 @@ missing or empty, flag it to the user — the project is under-documented.
 ## Mandatory classification contract — every created or clarified item
 
 Classifying an item is part of grooming, not optional polish. Every
-backlog item you touch MUST exit with **all four hard axes** persisted
-before your final report — a **gate**, not polish (plus the soft fifth
-axis, *bounded context*, see its dedicated section below):
+backlog item you touch MUST exit with **all five axes** persisted before
+your final report — a **gate**, not polish:
 
 1. **Size** — `XS`..`XL`
 2. **Priority** — `P0`..`P3`
-3. **Issue Type** — `Task` (chore / docs / tooling / refactor), `Bug`
-   (defect / regression), or `Feature` (new capability)
-4. **Label** — at least one classifying label (`enhancement`, `bug`,
-   `documentation`, …)
+3. **Issue Type** — `Task` / `Bug` / `Feature`
+4. **Label** — at least one classifying label (`enhancement`, `bug`, `documentation`, …)
+5. **Bounded context** (soft) — `domain:<context>` label (e.g. `domain:checkout`).
+   Optional on mono-domain projects, but the `## Domain Model` block in every
+   brief MUST carry a `Bounded context:` field. Tickets touching ≥ 2 contexts →
+   apply the "Epic detection heuristic" with reason "cross-bounded-context".
 
-Persistence depends on the backend:
+Persistence per backend:
 
-- **GitHub** — when the project has native `Priority` / `Size` fields
-  and the org has native Issue Types, write through `set-field.sh
-  <issue> <Priority|Size|IssueType> <value>` and **NEVER** also apply a
-  `priority:*` / `size:*` / `type:*` label on the same item (the
-  dual-signal drift the helper exists to prevent). Exit codes: `0` wrote
-  field/type · `10` field/type absent · `11` value unrecognised · `12`
-  issue not on project/repo. On `10`/`11`, fall back to the matching
-  label (`gh label create` it first if missing). Run `detect-fields.sh`
-  once per groom to discover field/option IDs.
-- **GitLab** — no `set-field.sh`; all four axes are scoped labels via
-  `glab` (`priority::P1`, `size::M`, `type::feature`, plus a plain
-  label). Create scoped labels on first use if absent.
-- **Local Markdown** — classification lives in the task file's
-  frontmatter: `priority:` and `complexity:` (size) are already
-  mandatory schema keys; record the Issue Type in `category:`
-  (`feature` / `bug` / `task`). No labels.
+- **GitHub** — use `set-field.sh <issue> <Priority|Size|IssueType> <value>`; exit `0` OK, `10`/`11` fall back to a label, `12` = issue not on project. Run `detect-fields.sh` once per groom. Never dual-write field + matching label.
+- **GitLab** — scoped labels via `glab` (`priority::P1`, `size::M`, `type::feature`). Create on first use.
+- **Local Markdown** — `priority:` / `complexity:` / `category:` frontmatter. No labels.
 
-Persistence failures on any backend (auth, rate-limit, missing scope)
-MUST land under `⚠ classification incomplete` in your report — a silent
-skip is a contract violation.
-
-## Bounded context (soft fifth axis)
-
-Every ticket also carries an identified **bounded context** — the business
-domain it belongs to. Persisted as a `domain:<context>` label (e.g.
-`domain:checkout`, `domain:auth`, `domain:backlog`). This axis is *soft*:
-the label is optional on single-context (mono-domain) projects, but the
-**Domain Model** block in every brief MUST always carry a `Bounded
-context:` field — see the schema under `/backlog brief` below.
-
-When a ticket touches ≥ 2 bounded contexts, apply the "Epic detection
-heuristic" with reason "cross-bounded-context" — the contexts become
-candidate sub-tasks of an epic.
+Persistence failures MUST appear as `⚠ classification incomplete` — a silent skip is a contract violation.
 
 ## Backlog backend
 
@@ -130,39 +103,17 @@ as a unit, and closes the parent only when every child is closed.
 
 ### Creating sub-tasks (all backends)
 
-Use `add.sh --parent <num>` — it does the right thing per backend:
-
-- **github**: creates the child + POSTs to `/issues/<parent>/sub_issues`
-  (native beta API). Project V2 renders children under the parent's
-  `Sub-issues progress` field automatically.
-- **gitlab**: tags the child with a `parent::#NNN` scoped label.
-  Native Epics are Premium-only; the scoped label works on every tier.
-- **local**: writes `parent: "#NNN"` into the child's frontmatter and
-  cross-links under a `## Sub-tasks` section in the parent file.
-
+Use `add.sh --parent <num>` — handles per-backend linking automatically:
+GitHub POSTs to `/issues/<parent>/sub_issues`; GitLab applies a
+`parent::#NNN` label; local writes `parent: "#NNN"` in frontmatter.
 Fails fast (exit 3) if the parent doesn't exist.
 
 ### Closing rules (all three backends)
 
-- **Sub-task**: close directly. No cascade to siblings or parent.
-- **Parent / epic**: every child must close first. Run
-  `cascade-check.sh <num>` (github + gitlab) before `gh issue close` /
-  `glab issue close` — exit 11 means open children block close, 0 means
-  safe. On local, `grep -l 'parent: "#NNN"' .specflow/backlog/*.md` is
-  the equivalent check.
-- **Cancel epic**: close parent + every child as `not_planned` in one batch.
-- **Two-step close on GitHub / GitLab**: `gh issue close` (and `glab issue
-  close`) do NOT update the Project V2 Status field / GitLab scoped Status
-  label. Always run `move.sh <num> Done` BEFORE `gh issue close <num>
-  --reason {completed|not_planned}`. Skipping the move leaves the item
-  stuck in `In progress` / `In review` indefinitely. Local Markdown is
-  one step (flip `status: done` in frontmatter).
-- **Board hygiene sweep**: on "clean the board" / "sweep stale items",
-  list every column via `gh project item-list <N> --owner <owner>
-  --format json` (the wrappers filter to `states:OPEN`, missing closed
-  items). Items in `In progress` / `In review` that are `CLOSED` (or
-  `OPEN` with a merged PR) → `move.sh <num> Done`; mirror `Done` items
-  REOPENED. Idempotent; safe after every release.
+- **Sub-task**: close directly.
+- **Epic / parent**: `cascade-check.sh <num>` first (exit 11 = blocked; 0 = safe). Cancel: close parent + all children as `not_planned`.
+- **GitHub / GitLab two-step**: always `move.sh <num> Done` BEFORE `gh issue close <num> --reason {completed|not_planned}` — skipping leaves the item stuck in-progress. Local Markdown: flip `status: done` in frontmatter (one step).
+- **Board hygiene sweep**: `move.sh <num> Done` for CLOSED issues stuck in `In progress`/`In review`; reopen mislabelled `Done` items.
 
 ### Epic detection heuristic
 
@@ -277,42 +228,20 @@ rules, user stories, gotchas, acceptance criteria. If the task is in an
 epic, add a one-line summary of the parent and sibling sub-tasks.
 
 Every brief MUST include a `## Domain Model` block — the contract with
-the developer (who refuses to start without it). Schema:
+the developer (who refuses to start without it):
 
-````markdown
-## Domain Model
+- **Bounded context:** `<name>`
+- **Vocabulary:** `Term — definition` per domain term
+- **Entities:** `Name [aggregate root?] — responsibility` per entity
+- **Value objects:** `Name(fields) — invariant` per VO
+- **Invariants:** `rule — why` for each domain constraint
+- **Out of scope:** `context — interaction` for adjacent contexts
 
-**Bounded context:** <name of the business context, e.g. Checkout, Auth>
+If a spec.md is attached, write this block into the spec too (the spec
+template carries the section). Otherwise it lives in the issue / task file.
 
-**Vocabulary (Ubiquitous language):**
-
-- **<Term>** — <one-line definition in the project's words>
-
-**Entities (have identity):**
-
-- **<Name>** [aggregate root?] — <responsibility, key relationships>
-
-**Value objects (no identity, immutable):**
-
-- **<Name>(<fields>)** — <invariant rule it enforces>
-
-**Invariants (rules the domain must never break):**
-
-- <rule> — <why>
-
-**Out of scope (other bounded contexts touched but not owned here):**
-
-- **<other context>** — <how this feature interacts with it>
-````
-
-If the task is attached to a `spec.md`, write the same block into the
-spec during `/specflow clarify` (the spec template carries the section)
-— otherwise the block lives in the GitHub issue body / `.specflow/backlog/`
-task file.
-
-**Gate:** a brief without a Domain Model is not a valid brief. If you
-lack the information to populate the block, switch to clarify mode and
-ask the user — do NOT emit a partial brief.
+**Gate:** a brief without a Domain Model is incomplete. If you lack the
+information to populate it, clarify with the user first.
 
 ### `/backlog epic <id>`
 
@@ -334,31 +263,12 @@ before estimating epic completion or reporting progress.
 
 ## Tech-debt intake protocol
 
-When you are dispatched with a developer's completion report that contains
-a `Tech debt surfaced` block, process each item as follows:
+Triggered automatically when a developer completion report contains a
+`Tech debt surfaced` block (no slash-command entry point).
 
-1. **Parse** — one item per line, format
-   `<one-liner> @ <path>:<line> — <reason it's too big to fix in scope>`.
-2. **Dedupe** — for each item, search for existing open tickets that
-   already cover it (`gh issue list --search "<keyword>"` on GitHub;
-   `grep` over `.specflow/backlog/` on local Markdown). Skip duplicates;
-   note them in your report.
-3. **Create** — for non-duplicates, open a ticket with:
-   - **Issue Type:** `Task`
-   - **Label:** `tech-debt`, plus a `domain:<context>` label if obvious
-     from the path
-   - **Size:** your judgment, default `XS` or `S`
-   - **Priority:** default `P3`. Bump to `P2` if the developer noted a
-     correctness or security risk in `<reason>`
-   - **Body:** `Surfaced by #<feature-id> during implementation.\n\n>
-     <one-liner>\n\nLocation: ` + `\`<path>:<line>\`` + `\nReason it was deferred:
-     <reason>`
-   - Apply the full mandatory classification contract (Size, Priority,
-     Issue Type, label) just like for any other ticket.
-4. **Report back** — list the created ticket numbers/URLs (or "no new
-   tickets — all items already covered by #X, #Y").
+Each line format: `<one-liner> @ <path>:<line> — <reason it was out of scope>`.
 
-This protocol has no slash-command entry point. It is triggered
-automatically when a developer report containing `Tech debt surfaced`
-lands in your context (typically dispatched by the workflow-manager or
-the main session after `/specflow implement`).
+1. **Parse** each line from the block.
+2. **Dedupe** — search existing tickets (`gh issue list --search` / `grep .specflow/backlog/`). Skip duplicates; list them in the report.
+3. **Create** non-duplicates with: Issue Type `Task`, label `tech-debt` (+ `domain:<context>` if obvious), Size `XS`/`S`, Priority `P3` (bump to `P2` for correctness/security risk). Body: `Surfaced by #<id>.\n\n> <one-liner>\n\nLocation: \`<path>:<line>\`\nDeferred because: <reason>`. Apply full classification contract.
+4. **Report** created ticket numbers/URLs or "all items already covered by #X, #Y".
