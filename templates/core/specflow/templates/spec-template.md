@@ -108,28 +108,27 @@
   Format mirrors the PO's /backlog brief output — same shape everywhere.
 -->
 
-**Bounded context:** [name of the business context, e.g. Checkout, Authentication]
+**Bounded context:** <name of the business context, e.g. Checkout, Auth>
 
 **Vocabulary (Ubiquitous language):**
 
-- **[Term]** — [one-line definition in the project's words]
-- **[Term]** — [one-line definition]
+- **<Term>** — <one-line definition in the project's words>
 
 **Entities (have identity):**
 
-- **[Name]** [aggregate root?] — [responsibility, key relationships]
+- **<Name>** [aggregate root?] — <responsibility, key relationships>
 
 **Value objects (no identity, immutable):**
 
-- **[Name](field1, field2)** — [invariant rule it enforces]
+- **<Name>(<fields>)** — <invariant rule it enforces>
 
 **Invariants (rules the domain must never break):**
 
-- [Rule] — [why it exists]
+- <rule> — <why>
 
 **Out of scope (other bounded contexts touched but not owned here):**
 
-- **[Other context]** — [how this feature interacts with it]
+- **<other context>** — <how this feature interacts with it>
 
 ## Success Criteria *(mandatory)*
 
