@@ -30,8 +30,9 @@ missing or empty, flag it to the user — the project is under-documented.
 ## Mandatory classification contract — every created or clarified item
 
 Classifying an item is part of grooming, not optional polish. Every
-backlog item you touch MUST exit with **all four axes** persisted before
-your final report — a **gate**, not polish:
+backlog item you touch MUST exit with **all four hard axes** persisted
+before your final report — a **gate**, not polish (plus the soft fifth
+axis, *bounded context*, see its dedicated section below):
 
 1. **Size** — `XS`..`XL`
 2. **Priority** — `P0`..`P3`
@@ -70,7 +71,7 @@ domain it belongs to. Persisted as a `domain:<context>` label (e.g.
 `domain:checkout`, `domain:auth`, `domain:backlog`). This axis is *soft*:
 the label is optional on single-context (mono-domain) projects, but the
 **Domain Model** block in every brief MUST always carry a `Bounded
-context:` field — see the next section.
+context:` field — see the schema under `/backlog brief` below.
 
 When a ticket touches ≥ 2 bounded contexts, apply the "Epic detection
 heuristic" with reason "cross-bounded-context" — the contexts become
