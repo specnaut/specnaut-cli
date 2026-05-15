@@ -222,6 +222,13 @@ check "merge.md dispatches the PO for the close comment" \
   'grep -q "product-owner" .claude/skills/specflow/phases/merge.md'
 
 echo
+echo "═══ Developer agent doctrine — Domain Model gate (PR #249) ═══"
+check "clarify.md enforces the Domain Model exit gate" \
+  'grep -q "Domain Model exit gate" .claude/skills/specflow/phases/clarify.md'
+check "implement.md halts BLOCKED when the Domain Model is absent" \
+  'grep -q "awaiting:product-owner-domain-brief" .claude/skills/specflow/phases/implement.md'
+
+echo
 if [ "$fails" -eq 0 ]; then
   echo "═══ ALL CHECKS PASSED ═══"
   exit 0
