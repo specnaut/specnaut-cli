@@ -118,6 +118,7 @@ Execution steps:
    - No contradictory earlier statement remains.
    - Markdown structure valid; only allowed new headings: `## Clarifications`, `### Session YYYY-MM-DD`.
    - Terminology consistency: same canonical term used across all updated sections.
+   - **Domain Model exit gate (NON-NEGOTIABLE)**: the spec's `## Domain Model` section MUST be fully populated — Bounded context, Vocabulary, Entities, Value Objects, Invariants, and Out of scope all filled, with no `[NEEDS CLARIFICATION]` markers and no template placeholders remaining. If unfilled fields remain at the end of the clarify session, do not advance — surface them as Outstanding and recommend running `/specflow clarify` again. The downstream `/specflow implement` step will refuse to proceed without this section.
 
 7. Write the updated spec back to `FEATURE_SPEC`.
 

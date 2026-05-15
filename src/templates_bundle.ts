@@ -195,7 +195,7 @@ Given that feature description, do this:
     4. Fill User Scenarios & Testing; if no clear user flow: ERROR "Cannot determine user scenarios"
     5. Generate Functional Requirements — each must be testable
     6. Define Success Criteria — measurable, technology-agnostic, verifiable
-    7. Identify Key Entities (if data involved)
+    7. **Populate the \`## Domain Model\` block (mandatory)** — Bounded context, Vocabulary (Ubiquitous language), Entities (with aggregate-root marker), Value Objects, Invariants, Out of scope. Use \`[NEEDS CLARIFICATION: <question>]\` markers for fields the input does not let you fill — \`/specflow clarify\` resolves them. The developer refuses to proceed if this block is absent or contains unresolved placeholders.
     8. Return: SUCCESS (spec ready for planning)
 
 6. Write the specification to \`SPEC_FILE\` using the template structure, replacing placeholders with concrete details while preserving section order and headings.
@@ -438,6 +438,7 @@ Execution steps:
    - No contradictory earlier statement remains.
    - Markdown structure valid; only allowed new headings: \`## Clarifications\`, \`### Session YYYY-MM-DD\`.
    - Terminology consistency: same canonical term used across all updated sections.
+   - **Domain Model exit gate (NON-NEGOTIABLE)**: the spec's \`## Domain Model\` section MUST be fully populated — Bounded context, Vocabulary, Entities, Value Objects, Invariants, and Out of scope all filled, with no \`[NEEDS CLARIFICATION]\` markers and no template placeholders remaining. If unfilled fields remain at the end of the clarify session, do not advance — surface them as Outstanding and recommend running \`/specflow clarify\` again. The downstream \`/specflow implement\` step will refuse to proceed without this section.
 
 7. Write the updated spec back to \`FEATURE_SPEC\`.
 
@@ -1162,6 +1163,7 @@ You **MUST** consider the user input before proceeding (if not empty).
 3. Load and analyze the implementation context:
    - **REQUIRED**: Read tasks.md for the complete task list and execution plan
    - **REQUIRED**: Read plan.md for tech stack, architecture, and file structure
+   - **REQUIRED**: Read the \`## Domain Model\` section in spec.md. If the section is absent, empty, or still contains \`[NEEDS CLARIFICATION]\` markers / template placeholders → halt and report BLOCKED with reason \`awaiting:product-owner-domain-brief\`. The developer agent refuses to write code without this brief (see \`developer.md\` doctrine rule "Domain brief required before any code"). Recommend running \`/specflow clarify\` to fill the section before re-attempting \`/specflow implement\`.
    - **IF EXISTS**: Read data-model.md for entities and relationships
    - **IF EXISTS**: Read contracts/ for API specifications and test requirements
    - **IF EXISTS**: Read research.md for technical decisions and constraints
