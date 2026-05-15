@@ -79,7 +79,7 @@ You **MUST** consider the user input before proceeding (if not empty).
 3. Load and analyze the implementation context:
    - **REQUIRED**: Read tasks.md for the complete task list and execution plan
    - **REQUIRED**: Read plan.md for tech stack, architecture, and file structure
-   - **REQUIRED**: Read the `## Domain Model` section in spec.md. If the section is absent, empty, or still contains `[NEEDS CLARIFICATION]` markers / template placeholders → halt and report BLOCKED with reason `awaiting:product-owner-domain-brief`. The developer agent refuses to write code without this brief (see `developer.md` doctrine rule "Domain brief required before any code"). Recommend running `/specflow clarify` to fill the section before re-attempting `/specflow implement`.
+   - **REQUIRED**: Read the `## Domain Model` section in spec.md. If the section is absent, empty, or still contains `[NEEDS CLARIFICATION]` markers / template placeholders → halt and report BLOCKED with reason `awaiting:product-owner-domain-brief`. The developer agent refuses to write code without this brief — its "First action" checklist (step 4) reads the block and returns the same BLOCKED reason. Recommend running `/specflow clarify` to fill the section before re-attempting `/specflow implement`.
    - **IF EXISTS**: Read data-model.md for entities and relationships
    - **IF EXISTS**: Read contracts/ for API specifications and test requirements
    - **IF EXISTS**: Read research.md for technical decisions and constraints
