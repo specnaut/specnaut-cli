@@ -30,8 +30,8 @@ missing or empty, flag it to the user — the project is under-documented.
 ## Mandatory classification contract — every created or clarified item
 
 Classifying an item is part of grooming, not optional polish. Every
-backlog item you touch MUST exit with **all five axes** persisted before
-your final report — a **gate**, not polish:
+backlog item you touch MUST exit with **four hard axes + one soft**
+(see #5) persisted before your final report — a **gate**, not polish:
 
 1. **Size** — `XS`..`XL`
 2. **Priority** — `P0`..`P3`
@@ -231,11 +231,11 @@ Every brief MUST include a `## Domain Model` block — the contract with
 the developer (who refuses to start without it):
 
 - **Bounded context:** `<name>`
-- **Vocabulary:** `Term — definition` per domain term
-- **Entities:** `Name [aggregate root?] — responsibility` per entity
-- **Value objects:** `Name(fields) — invariant` per VO
-- **Invariants:** `rule — why` for each domain constraint
-- **Out of scope:** `context — interaction` for adjacent contexts
+- **Vocabulary:** `Term — definition`
+- **Entities:** `Name [aggregate root?] — responsibility`
+- **Value objects:** `Name(fields) — invariant`
+- **Invariants:** `rule — why`
+- **Out of scope:** `context — interaction`
 
 If a spec.md is attached, write this block into the spec too (the spec
 template carries the section). Otherwise it lives in the issue / task file.
