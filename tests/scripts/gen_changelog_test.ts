@@ -202,3 +202,12 @@ Deno.test("formatChangelog: omits Adoption guide when entries empty", () => {
   });
   if (md.includes("### Adoption guide")) throw new Error("should not include Adoption guide");
 });
+
+Deno.test("extractAdoption: strips nested/malformed HTML comments completely", () => {
+  const body =
+    "## Agent adoption\n\n<!-- outer <!-- inner --> still outer -->\n\nreal prose\n\n```prompt\np\n```\n";
+  const got = extractAdoption(body);
+  // After the loop, no <!-- substring should remain.
+  if (got === null) throw new Error("expected non-null");
+  if (got.includes("<!--")) throw new Error(`residual <!--: ${got}`);
+});

@@ -16,7 +16,7 @@ export class FsStagingStore implements StagingStore {
     }
     const out: string[] = [];
     for await (const entry of walk(stagingDir, { includeDirs: false, includeFiles: true })) {
-      out.push(relative(stagingDir, entry.path));
+      out.push(relative(stagingDir, entry.path).replaceAll("\\", "/"));
     }
     return out;
   }

@@ -68,6 +68,21 @@ const HTML_COMMENT_RE = /<!--[\s\S]*?-->/g;
 const PROMPT_FENCE_RE = /^```prompt\s*$/m;
 
 /**
+ * Strip HTML comments from a string, looping until idempotent so that
+ * nested or malformed patterns like `<!-- foo <!-- bar -->` leave no residue.
+ */
+function stripHtmlComments(s: string): string {
+  // Repeated pass to catch overlapping / nested patterns.
+  let prev: string;
+  let current = s;
+  do {
+    prev = current;
+    current = current.replace(HTML_COMMENT_RE, "");
+  } while (current !== prev);
+  return current;
+}
+
+/**
  * Extract the body of the `## Agent adoption` section from a PR body.
  *
  * - Returns the content between `## Agent adoption` and the next `## ` heading
@@ -87,7 +102,7 @@ export function extractAdoption(body: string): string | null {
   const nextH2 = tail.match(NEXT_H2_RE);
   const section = nextH2 ? tail.slice(0, nextH2.index ?? tail.length) : tail;
 
-  const cleaned = section.replace(HTML_COMMENT_RE, "").trim();
+  const cleaned = stripHtmlComments(section).trim();
   if (!PROMPT_FENCE_RE.test(cleaned)) return null;
   return cleaned;
 }
