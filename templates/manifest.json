@@ -51,6 +51,7 @@
     { "category": "backlog-script", "name": "move", "suffix": "move.sh", "source": "core/skills/backlog/scripts/local/move.sh", "executable": true, "backend": "local" },
     { "category": "backlog-script", "name": "clarify-comment", "suffix": "clarify-comment.sh", "source": "core/skills/backlog/scripts/local/clarify-comment.sh", "executable": true, "backend": "local" },
     { "category": "backlog-script", "name": "render-index", "suffix": "render-index.sh", "source": "core/skills/backlog/scripts/local/render-index.sh", "executable": true, "backend": "local" },
+    { "category": "backlog-script", "name": "propagate-parent-status", "suffix": "propagate-parent-status.sh", "source": "core/skills/backlog/scripts/local/propagate-parent-status.sh", "executable": true, "backend": "local" },
     { "category": "backlog-script", "name": "_config", "suffix": "_config.sh", "source": "core/skills/backlog/scripts/github/_config.sh", "executable": true, "backend": "github" },
     { "category": "backlog-script", "name": "list", "suffix": "list.sh", "source": "core/skills/backlog/scripts/github/list.sh", "executable": true, "backend": "github" },
     { "category": "backlog-script", "name": "view", "suffix": "view.sh", "source": "core/skills/backlog/scripts/github/view.sh", "executable": true, "backend": "github" },

@@ -45,3 +45,11 @@ awk -v new="$STATUS" '
 bash "$RENDER" "$ROOT"
 
 echo "✓ #$NUM → $STATUS"
+
+# Post-move hook: promote the parent Epic if this was a sub-task
+# leaving Backlog. Best-effort — never blocks on failure. See
+# propagate-parent-status.sh for the full state machine.
+PROPAGATE="$(dirname "$0")/propagate-parent-status.sh"
+if [ -x "$PROPAGATE" ]; then
+  "$PROPAGATE" "$NUM" "$STATUS" || true
+fi
