@@ -263,10 +263,30 @@ async function main() {
     .map(classifyCommit)
     .filter((c) => c.category !== "skip");
 
+  const adoptionEntries: AdoptionEntry[] = [];
+  for (const c of classified) {
+    if (c.category !== "feat") continue;
+    const prNum = extractPrNumber(c.subject);
+    if (prNum === null) continue;
+    const prBody = await fetchPrBody(prNum);
+    if (prBody === "") continue;
+    const adoption = extractAdoption(prBody);
+    if (adoption === null) {
+      console.warn(
+        `gen-changelog: feat commit ${c.hash} (#${prNum}) has no Agent adoption section — skipping`,
+      );
+      continue;
+    }
+    // Title = the cleaned subject without the trailing PR ref.
+    const title = c.cleanedSubject.replace(/\s\(#\d+\)\s*$/, "");
+    adoptionEntries.push({ prNum, title, body: adoption });
+  }
+
   const md = formatChangelog(classified, {
     fromTag: from,
     toTag: to,
     repoUrl: REPO_URL,
+    adoptionEntries,
   });
 
   await ensureDir(out);
