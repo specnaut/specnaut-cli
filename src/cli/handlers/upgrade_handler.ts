@@ -1,5 +1,7 @@
 import { resolve } from "@std/path";
 import { bold, cyan, dim, green, red, yellow } from "@std/fmt/colors";
+import { FsUpgradeMarkerStore } from "../../infrastructure/fs_upgrade_marker_store.ts";
+import { mergeMarker } from "../../domain/upgrade_marker.ts";
 import { UpgradeProjectUseCase } from "../../application/upgrade_project.ts";
 import { findHarness } from "../harnesses.ts";
 import { DenoFsReader } from "../../infrastructure/fs_reader.ts";
@@ -299,6 +301,27 @@ export async function runUpgrade(intent: UpgradeIntent): Promise<number> {
     }
   }
   console.log();
-  console.log(green(`✓ upgraded to templates ${result.toVersion}`));
+  console.log(green(`✓ upgraded to templates ${result.fromVersion} → ${result.toVersion}`));
+
+  // Write the upgrade-pending marker (preserves original `from` if a
+  // marker already exists from a previous unreconciled upgrade).
+  const markerStore = new FsUpgradeMarkerStore();
+  const existing = await markerStore.read(projectDir);
+  const merged = mergeMarker(existing, {
+    from: result.fromVersion,
+    to: result.toVersion,
+    at: new Date().toISOString(),
+  });
+  await markerStore.write(projectDir, merged);
+
+  // Handoff: tell the user how to invoke the agent-assisted review.
+  console.log();
+  console.log("→ Walk through what's new with your AI:");
+  console.log("  `@specflow-expert review-upgrade`");
+  console.log();
+  console.log(dim(
+    "  (proposes a review branch, plays adoption prompts for each new\n" +
+      "   feature, and helps you reconcile any customized files)",
+  ));
   return 0;
 }
