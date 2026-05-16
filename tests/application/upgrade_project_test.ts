@@ -8,7 +8,7 @@ import type {
   LockStore,
 } from "../../src/application/ports.ts";
 import { sha256Hex } from "../../src/domain/sha256.ts";
-import type { InstalledLock } from "../../src/domain/installed_lock.ts";
+import type { InstalledLock, LockEntry } from "../../src/domain/installed_lock.ts";
 import type { CoreBundle } from "../../src/domain/core_bundle.ts";
 
 function fakeWriter(): FsWriter & {
@@ -515,4 +515,94 @@ Deno.test("UpgradeProjectUseCase: vanilla on-disk + plugin NOT installed → exi
   // Auto-update: file written with new content, NOT deleted
   assertEquals(writer.written.get(PLUGIN_DEST), "upstream update");
   assertEquals(writer.deleted.includes(PLUGIN_DEST), false);
+});
+
+Deno.test("UpgradeProjectUseCase: writes upstream content to .specflow/upgrade-staging/ for preserves", async () => {
+  // One bundle file, customized on disk (preserve case).
+  const lockEntries = new Map<string, LockEntry>();
+  lockEntries.set(".claude/agents/developer.md", {
+    sha256: "lock-sha-original",
+    installedAt: "2026-01-01T00:00:00.000Z",
+    templatesVersion: "1.4.0",
+  });
+  const lock: InstalledLock = {
+    version: 2,
+    harness: "claude",
+    backlogBackend: "local",
+    versionScheme: "semver",
+    templatesVersion: "1.4.0",
+    entries: lockEntries,
+  };
+
+  const reader = fakeReader({
+    ".claude/agents/developer.md": "USER LOCAL VERSION\n",
+  });
+  const writer = fakeWriter();
+  const lockStore = fakeLockStore(lock);
+
+  const core = coreFromBundle({
+    ".claude/agents/developer.md": { content: "NEW UPSTREAM VERSION\n", executable: false },
+  });
+
+  const uc = new UpgradeProjectUseCase({
+    reader,
+    writer,
+    lockStore,
+    core,
+    templatesVersion: "1.5.0",
+    findHarness: findFakeHarness,
+  });
+
+  await uc.execute({ projectDir: "/tmp/proj", dryRun: false, force: false });
+
+  const staged = writer.written.get(
+    ".specflow/upgrade-staging/.claude/agents/developer.md",
+  );
+  if (staged !== "NEW UPSTREAM VERSION\n") {
+    throw new Error(`staging content mismatch: ${staged}`);
+  }
+  // The project file itself is NOT in writer.written (preserve action skips it).
+  if (writer.written.has(".claude/agents/developer.md")) {
+    throw new Error("preserve case should not overwrite the project file");
+  }
+});
+
+Deno.test("UpgradeProjectUseCase: does NOT write staging for auto-update files", async () => {
+  // Bundle file matches lock SHA on disk → auto-update case (no preserve).
+  const lockEntries = new Map<string, LockEntry>();
+  lockEntries.set(".claude/agents/developer.md", {
+    // Set to the sha256 of "OLD CONTENT\n" so disk matches lock → auto-update.
+    sha256: await sha256Hex("OLD CONTENT\n"),
+    installedAt: "2026-01-01T00:00:00.000Z",
+    templatesVersion: "1.4.0",
+  });
+  const lock: InstalledLock = {
+    version: 2,
+    harness: "claude",
+    backlogBackend: "local",
+    versionScheme: "semver",
+    templatesVersion: "1.4.0",
+    entries: lockEntries,
+  };
+
+  const reader = fakeReader({ ".claude/agents/developer.md": "OLD CONTENT\n" });
+  const writer = fakeWriter();
+  const lockStore = fakeLockStore(lock);
+  const core = coreFromBundle({
+    ".claude/agents/developer.md": { content: "NEW CONTENT\n", executable: false },
+  });
+
+  const uc = new UpgradeProjectUseCase({
+    reader,
+    writer,
+    lockStore,
+    core,
+    templatesVersion: "1.5.0",
+    findHarness: findFakeHarness,
+  });
+  await uc.execute({ projectDir: "/tmp/proj", dryRun: false, force: false });
+
+  if (writer.written.has(".specflow/upgrade-staging/.claude/agents/developer.md")) {
+    throw new Error("auto-update should not stage upstream content");
+  }
 });
