@@ -467,8 +467,18 @@ main > section {
 }
 
 .btn-icon {
-  font-size: 14px;
-  line-height: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  /* Sized to match the 15px button label, with a touch of optical weight on
+     top. The icon is an inline SVG using `currentColor`, so it inherits the
+     button's foreground colour automatically (white on primary, brand on
+     ghost). */
+}
+
+.btn-icon svg {
+  width: 16px;
+  height: 16px;
 }
 
 /* ---------------------------------------------------------------
