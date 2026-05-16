@@ -193,6 +193,15 @@ check "PO doc covers GitLab backend epic story (parent::# scoped label)" \
   'grep -q "parent::#" .claude/agents/product-owner.md'
 
 echo
+echo "═══ #258  PO Bash allowlist + memory-home directive ═══"
+check "PO agent has full Bash allowlist" \
+  'grep -q "^tools: Read, Write, Edit, Grep, Glob, Bash$" .claude/agents/product-owner.md'
+check "PO agent documents memory home path" \
+  'grep -q ".claude/agents/product-owner/memory/MEMORY.md" .claude/agents/product-owner.md'
+check "PO agent forbids legacy agent-memory path" \
+  'grep -q ".claude/agent-memory/" .claude/agents/product-owner.md && grep -qE "unused|never|not used" .claude/agents/product-owner.md'
+
+echo
 echo "═══ #180  SKILL.md — Epics & sub-tasks section ═══"
 check "SKILL.md gains an Epics & sub-tasks section" \
   'grep -q "Epics & sub-tasks" .claude/skills/backlog/SKILL.md'
