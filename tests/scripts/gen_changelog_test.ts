@@ -171,3 +171,34 @@ Deno.test("extractPrNumber: ignores mid-subject mentions", () => {
   // "(#X)" only counted when it's at end of subject, after whitespace.
   assertEquals(extractPrNumber("Fixed (#bug) bug (#99)"), 99);
 });
+
+Deno.test("formatChangelog: emits Adoption guide section when entries present", () => {
+  const commits = [
+    {
+      hash: "abc1234",
+      subject: "Add the thing (#252)",
+      category: "feat" as const,
+      cleanedSubject: "Add the thing (#252)",
+    },
+  ];
+  const md = formatChangelog(commits, {
+    fromTag: "v1.4.0",
+    toTag: "v1.5.0",
+    adoptionEntries: [
+      { prNum: 252, title: "Add the thing", body: "Do X.\n\n```prompt\nrun X\n```" },
+    ],
+  });
+  // Adoption guide section present, with PR header and body.
+  if (!md.includes("### Adoption guide")) throw new Error("missing Adoption guide");
+  if (!md.includes("**#252 — Add the thing**")) throw new Error("missing PR header");
+  if (!md.includes("```prompt\nrun X\n```")) throw new Error("missing prompt block");
+});
+
+Deno.test("formatChangelog: omits Adoption guide when entries empty", () => {
+  const md = formatChangelog([], {
+    fromTag: "v1.4.0",
+    toTag: "v1.5.0",
+    adoptionEntries: [],
+  });
+  if (md.includes("### Adoption guide")) throw new Error("should not include Adoption guide");
+});

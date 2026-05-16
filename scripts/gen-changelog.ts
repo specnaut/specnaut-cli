@@ -131,10 +131,17 @@ export async function fetchPrBody(num: number): Promise<string> {
   return body;
 }
 
+export type AdoptionEntry = {
+  prNum: number;
+  title: string;
+  body: string;
+};
+
 export type FormatOpts = {
   fromTag: string | null;
   toTag: string;
   repoUrl?: string;
+  adoptionEntries?: AdoptionEntry[];
 };
 
 export function formatChangelog(commits: Classified[], opts: FormatOpts): string {
@@ -154,6 +161,15 @@ export function formatChangelog(commits: Classified[], opts: FormatOpts): string
   }
   if (fixes.length > 0) {
     sections.push("### Bug fixes\n\n" + fixes.map(formatBullet).join("\n"));
+  }
+  const adoption = opts.adoptionEntries ?? [];
+  if (adoption.length > 0) {
+    const intro =
+      "These prompts help your AI agent adopt the new features in an existing project. " +
+      "Copy them into your harness, or run `@specflow-expert review-upgrade` to be walked " +
+      "through automatically.";
+    const items = adoption.map((a) => `**#${a.prNum} — ${a.title}**\n\n${a.body}`).join("\n\n");
+    sections.push(`### Adoption guide\n\n${intro}\n\n${items}`);
   }
   if (chores.length > 0) {
     const summary = `${chores.length} internal change${chores.length === 1 ? "" : "s"}`;
