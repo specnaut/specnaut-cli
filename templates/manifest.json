@@ -62,6 +62,7 @@
     { "category": "backlog-script", "name": "set-field", "suffix": "set-field.sh", "source": "core/skills/backlog/scripts/github/set-field.sh", "executable": true, "backend": "github" },
     { "category": "backlog-script", "name": "ensure-labels", "suffix": "ensure-labels.sh", "source": "core/skills/backlog/scripts/github/ensure-labels.sh", "executable": true, "backend": "github" },
     { "category": "backlog-script", "name": "cascade-check", "suffix": "cascade-check.sh", "source": "core/skills/backlog/scripts/github/cascade-check.sh", "executable": true, "backend": "github" },
+    { "category": "backlog-script", "name": "propagate-parent-status", "suffix": "propagate-parent-status.sh", "source": "core/skills/backlog/scripts/github/propagate-parent-status.sh", "executable": true, "backend": "github" },
     { "category": "backlog-script", "name": "_config", "suffix": "_config.sh", "source": "core/skills/backlog/scripts/gitlab/_config.sh", "executable": true, "backend": "gitlab" },
     { "category": "backlog-script", "name": "list", "suffix": "list.sh", "source": "core/skills/backlog/scripts/gitlab/list.sh", "executable": true, "backend": "gitlab" },
     { "category": "backlog-script", "name": "view", "suffix": "view.sh", "source": "core/skills/backlog/scripts/gitlab/view.sh", "executable": true, "backend": "gitlab" },
