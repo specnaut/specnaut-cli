@@ -84,6 +84,27 @@ coexist with project-local copies from `specflow init`.
 
 Most teams use both. See [the docs](https://specflow.makerlabs.dev) for the full boundary table.
 
+## Project-specific skill overlays
+
+Need to override an upstream Specflow skill in one project — e.g. a monorepo `tag-version` that has
+to `cd` into an inner repo first? SKILL.md frontmatter accepts two optional fields:
+
+```yaml
+---
+name: tag-version
+alias_of: specflow.tag-version
+overlays:
+  - when: before
+    path: ./scripts/cd-inner-repo.sh
+---
+```
+
+Run `/specflow list-skills` to see which aliases and overlays are active in your project. The
+Specflow binary scaffolds and ships the convention; the harness (Claude Code, Cursor, …) honours it
+at dispatch time. See `docs/llms.md` for the full contract and
+[`templates/core/skills/alias-example/SKILL.md`](templates/core/skills/alias-example/SKILL.md) for a
+copy-pasteable starting point.
+
 ## Upgrading an existing project
 
 When you update the `specflow` binary (via `specflow self-update` or Homebrew), the bundled

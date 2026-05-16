@@ -16,6 +16,7 @@
     { "category": "phase", "name": "tag-version", "suffix": "tag-version.md", "source": "core/skills/specflow/phases/tag-version.md" },
     { "category": "phase", "name": "release-version", "suffix": "release-version.md", "source": "core/skills/specflow/phases/release-version.md" },
     { "category": "phase", "name": "auto-chain", "suffix": "auto-chain.md", "source": "core/skills/specflow/phases/auto-chain.md" },
+    { "category": "phase", "name": "list-skills", "suffix": "list-skills.md", "source": "core/skills/specflow/phases/list-skills.md" },
     { "category": "phase-script", "name": "tag", "suffix": "tag.sh", "source": "core/skills/specflow/scripts/tag.sh", "executable": true },
     { "category": "phase-script", "name": "release", "suffix": "release.sh", "source": "core/skills/specflow/scripts/release.sh", "executable": true },
     { "category": "phase-script", "name": "release-github", "suffix": "release-github.sh", "source": "core/skills/specflow/scripts/release-github.sh", "executable": true },
