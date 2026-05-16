@@ -683,6 +683,48 @@ If a `feat:` PR is merged without `## Agent adoption`, `gen-changelog.ts` emits 
 during the release workflow. The release still ships; the missing entry can be amended manually in
 the GitHub Release body.
 
+## Upgrades & adoption
+
+`specflow upgrade` updates templates in place and prints a handoff line inviting the user to review
+what changed via the `specflow-expert` agent.
+
+### Files written
+
+- `.specflow/upgrade-pending.json` — a marker recording the upgrade range:
+
+```json
+{
+  "from": "1.4.0",
+  "to": "1.6.0",
+  "at": "2026-05-16T14:33:00.000Z"
+}
+```
+
+Written on every successful apply. On chained upgrades, the existing marker's `from` is preserved.
+Consumed by `specflow-expert review-upgrade` and by `specflow reconcile`. Deleted by the agent at
+the end of a successful review.
+
+- `.specflow/upgrade-staging/<path>` — for every file the upgrade preserved (i.e., on-disk version
+  was customized vs. lock SHA), the upstream (bundled-template) version is written here under the
+  same relative path. The on-disk project file is untouched. The staging directory is the source for
+  `specflow reconcile` (see below).
+
+Both are gitignored (`templates/core/root/.gitignore` ships the lines).
+
+### Handoff line
+
+`specflow upgrade` ends with:
+
+```
+✓ upgraded to templates 1.4.0 → 1.6.0
+
+→ Walk through what's new with your AI:
+`@specflow-expert review-upgrade`
+```
+
+An AI agent that sees `.specflow/upgrade-pending.json` in a project should proactively suggest
+running `@specflow-expert review-upgrade`.
+
 ## Repository
 
 Source, releases, and issue tracker:
