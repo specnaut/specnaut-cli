@@ -11,6 +11,7 @@ description: >
   this repo. The main session must NOT call the `backlog` skill scripts
   directly — it dispatches the PO instead.
 model: sonnet
+color: red
 tools: Read, Grep, Glob, Bash, WebFetch
 ---
 

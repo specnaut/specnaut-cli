@@ -8,6 +8,7 @@ description: >
   (`specflow.makerlabs.dev`), cross-platform build (`scripts/build.ts`),
   or repo-level secrets / tokens.
 model: sonnet
+color: orange
 tools: Read, Grep, Glob, Bash(git log *), Bash(git diff *), Bash(git show *), Bash(gh *)
 maxTurns: 30
 ---

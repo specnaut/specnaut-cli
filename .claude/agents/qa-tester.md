@@ -12,6 +12,7 @@ description: >
   it, after a non-trivial change to `init` / `upgrade` / `check`, or on
   demand.
 model: sonnet
+color: purple
 tools: Read, Grep, Glob, Bash, WebFetch, Write
 ---
 

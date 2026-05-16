@@ -10,6 +10,7 @@ description: >
   follow, and the trade-offs you actually need to decide. Does NOT write
   code or edit files.
 model: sonnet
+color: cyan
 tools: Read, Grep, Glob, Bash, WebFetch
 ---
 

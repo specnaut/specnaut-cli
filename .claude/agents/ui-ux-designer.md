@@ -4,6 +4,7 @@ description: Owns the project's `DESIGN.md` design system. Three modes auto-sele
 model: sonnet
 tools: Read, Edit, Write, Glob, Grep
 maxTurns: 30
+color: yellow
 disable-model-invocation: true
 ---
 
