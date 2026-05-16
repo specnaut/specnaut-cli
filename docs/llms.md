@@ -60,15 +60,15 @@ projects** without running `specflow init`, install the Claude Code plugin:
 ```
 
 The plugin ships the same 23 assets the binary scaffolds — the consolidated `specflow` router skill
-(with 11 phase docs), the `specflow-review` auto-invoke alias, the `specflow-auto` skill, and 9
-sub-agents — but at user scope, versioned, and auto-updated via `/plugin update`. Because the
-plugin's slash-commands are namespaced and the consolidated router itself is named `specflow`,
-you'll see a double-prefix at the call site:
+(with 11 phase docs, the `specflow-review` auto-invoke alias, and the deprecated `specflow-auto`
+skill), and 9 sub-agents — but at user scope, versioned, and auto-updated via `/plugin update`.
+Because the plugin's slash-commands are namespaced and the consolidated router itself is named
+`specflow`, you'll see a double-prefix at the call site:
 
 ```
 /specflow-plugin:specflow specify "<feature description>"
 /specflow-plugin:specflow plan
-/specflow-plugin:specflow-auto specify "<feature description>"
+/specflow-plugin:specflow specify "<feature description>"
 ```
 
 Slightly verbose, but unambiguous. If you scaffold project-local with `specflow init`, you get the
@@ -355,10 +355,10 @@ The generated `specify` skill chains `clarify → plan → tasks → analyze →
 in a single session. Upstream stops at every step and asks the human to invoke the next one.
 Specflow only stops twice: when clarification is genuinely required, and once before merging.
 
-The chain is invoked through the bundled `/specflow-auto` skill:
+The chain is invoked through the bundled `/specflow` skill:
 
 ```
-/specflow-auto specify "<feature description>"
+/specflow specify "<feature description>"
 ```
 
 Two checkpoints inside the chain:
@@ -391,26 +391,29 @@ with the merged commit range and `gh issue close --reason completed`. The board 
 To opt out of the chain entirely (run only `specify` and stop):
 
 ```
-/specflow-auto specify --manual "<feature description>"
+/specflow specify --manual "<feature description>"
 ```
 
 #### Mid-chain re-entry
 
-Any phase other than `specify` can also enter the chain when invoked through `/specflow-auto` —
-useful for two real workflows:
+Any phase other than `specify` can also enter the chain when invoked mid-flow — useful for two real
+workflows:
 
 - **Manual review between early phases** — read `spec.md` after `specify` lands, then
-  `/specflow-auto clarify N` resumes the chain through `plan → tasks → … → STOP #2`.
+  `/specflow clarify N` resumes the chain through `plan → tasks → … → STOP #2`.
 - **Context-budget recovery** — open a fresh session after compaction and run
-  `/specflow-auto implement N` to pick up the tail (`→ review → STOP #2`).
+  `/specflow implement N` to pick up the tail (`→ review → STOP #2`).
 
 The default is **context-aware**: if downstream artefacts under `.specflow/specs/<feature>/` are
 missing, the chain fires; if they exist, the invocation is treated as a single-phase re-run (so
 regenerating `plan.md` doesn't accidentally cascade through the rest). Two explicit overrides when
 the default guesses wrong:
 
-- `/specflow-auto <phase> N --continue` — force the chain regardless of artefact state.
-- `/specflow-auto <phase> N --once` — force one-shot regardless.
+- `/specflow <phase> N --continue` — force the chain regardless of artefact state.
+- `/specflow <phase> N --once` — force one-shot regardless.
+
+The `/specflow-auto` slash command is kept for one release as a deprecation alias and will be
+removed in the next major version.
 
 ### 2. `review` phase post-implement
 
@@ -559,8 +562,8 @@ marketplace:
 
 The plugin gives any Claude Code user instant access to the full Specflow slash-command suite and
 sub-agents — no binary, no `specflow init` required. The 24 plugin assets (the consolidated
-`specflow` router skill with 11 phase docs, the `specflow-review` auto-invoke alias, the
-`specflow-auto` skill, and 10 sub-agents) are namespaced under `/specflow-plugin:*` so they coexist
+`specflow` router skill with 11 phase docs, the `specflow-review` auto-invoke alias, the deprecated
+`specflow-auto` alias, and 10 sub-agents) are namespaced under `/specflow-plugin:*` so they coexist
 with project-local copies without collision.
 
 When both the plugin and the binary are in use, `specflow upgrade` detects the plugin and
