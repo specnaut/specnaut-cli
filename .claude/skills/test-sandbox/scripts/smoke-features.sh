@@ -251,6 +251,30 @@ check "review.md surfaces STOP #2 from phases/auto-chain.md" \
   'grep -q "STOP #2 summary block defined in" .claude/skills/specflow/phases/review.md'
 
 echo
+echo "═══ specflow-expert review-upgrade protocol ═══"
+
+check "review-upgrade protocol section present in core agent" \
+  'grep -q "^## Review-upgrade protocol" .claude/agents/specflow-expert.md'
+
+check "review-upgrade protocol section present in plugin mirror" \
+  "grep -q '^## Review-upgrade protocol' '$ROOT/plugin/agents/specflow-expert.md'"
+
+check "specflow-expert tools include Bash and Agent" \
+  "bash -c \"grep -E '^tools:' '$DIR/.claude/agents/specflow-expert.md' | grep -q Bash && grep -E '^tools:' '$DIR/.claude/agents/specflow-expert.md' | grep -q Agent\""
+
+check "core and plugin specflow-expert byte-identical" \
+  "cmp -s '$DIR/.claude/agents/specflow-expert.md' '$ROOT/plugin/agents/specflow-expert.md'"
+
+check "vendored snapshot mentions upgrade-pending.json" \
+  'grep -q "upgrade-pending.json" .claude/agents/specflow-expert.md'
+
+check "vendored snapshot mentions upgrade-staging" \
+  'grep -q "upgrade-staging" .claude/agents/specflow-expert.md'
+
+check "vendored snapshot mentions specflow reconcile" \
+  'grep -q "specflow reconcile" .claude/agents/specflow-expert.md'
+
+echo
 if [ "$fails" -eq 0 ]; then
   echo "═══ ALL CHECKS PASSED ═══"
   exit 0
