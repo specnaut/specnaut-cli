@@ -4257,11 +4257,11 @@ layout and frontmatter conventions.
 
 ### What makes Specflow different from upstream Spec Kit
 
-1. **Auto-chained pipeline** — \`/specflow-auto\` chains \`clarify →
-   plan → tasks → analyze → implement → review → merge\` in one
-   session. Upstream stops at every step and asks the human; Specflow
-   stops only when clarification is genuinely required and once
-   before the merge.
+1. **Auto-chained pipeline** — \`/specflow specify "<feature>"\` chains
+   \`specify → clarify → plan → tasks → analyze → implement → review\`
+   in one session, pausing only on real clarification and once before
+   merge. \`/specflow-auto\` is kept for one release as a deprecation
+   alias.
 
 2. **Dedicated \`review\` phase** — after \`implement\`, a \`review\` step
    checks architecture, error handling, test coverage, and quality
