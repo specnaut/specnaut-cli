@@ -1875,6 +1875,14 @@ The PO will:
      - \`P1\` — must-have for the next sprint or release
      - \`P2\` — important but deferrable; standard work
      - \`P3\` — nice-to-have / long horizon; pick up when slack appears
+  3a. **Set Roadmap dates (soft).** GitHub backend only — Roadmap view inputs:
+     - **Target date** when promoting Backlog → Ready (\`set-field.sh <num> TargetDate <YYYY-MM-DD>\`).
+       Use a best-estimate planned-delivery date; revise when scope shifts.
+     - **Start date** when moving Ready → In Progress (\`set-field.sh <num> StartDate <YYYY-MM-DD>\`).
+       Today's date when picking up the work.
+     - **Estimate** (optional) story-point or day count (\`set-field.sh <num> Estimate <N>\`).
+     Missing dates do NOT block; they emit a warn-only line in the final
+     report (see "⚠ Roadmap dates missing" below).
   4. **Decide the outcome:**
      - **Promote to \`Ready\`** when the body is clear, both labels are
        applied, AND no scope decisions remain.
@@ -1897,6 +1905,12 @@ The PO will:
   the PO MUST capture the failure reason and surface it under "⚠ size /
   priority missing" in the final report — silent skip is a contract
   violation.
+
+  Step 3a (Roadmap dates) is **soft** — never blocking. When the PO
+  promotes Backlog → Ready or moves Ready → In Progress, it SHOULD set
+  the appropriate date; when it doesn't (because the date is genuinely
+  unknown), it surfaces a \`⚠ no target date set\` or \`⚠ no start date set\`
+  line in the final report and moves on.
 
 The PO must respect the standard backlog skill — do not bypass its
 scripts.
@@ -2018,6 +2032,12 @@ Per-ticket:
   ↳ #<num> "<short title>" — <reason: e.g. gh label create failed (rate-limited)>
   ↳ ...
   (omit this whole section when K == 0)
+
+⚠ Roadmap dates missing (GitHub backend, soft):
+  ↳ #<num> "<short title>" — Ready since <date>, no target date set
+  ↳ #<num> "<short title>" — In progress, no start date set
+  ↳ ...
+  (omit this whole section when no dates are missing)
 
 Stale PRs:  <S> open PRs idle > 48h
 Orphan specs: <O> spec directories missing the next artefact
@@ -3215,11 +3235,10 @@ for business context and backlog management.
 
 Run these in order, every time before answering:
 
-1. \`git branch --show-current\` + \`git log --oneline -5\` — locate yourself.
-2. Read \`AGENTS.md\` + \`.specflow/memory/constitution.md\` for context.
-3. Read \`.claude/agents/product-owner/memory/MEMORY.md\` — your persistent
+1. Locate yourself (\`git branch --show-current\` + \`git log --oneline -5\`) and read \`AGENTS.md\` + \`.specflow/memory/constitution.md\` for context.
+2. Read \`.claude/agents/product-owner/memory/MEMORY.md\` — your persistent
    memory home. **Never** write to \`.claude/agent-memory/\`; that path is unused.
-4. Query the live backlog (\`gh issue list\` / \`list.sh\`) before answering
+3. Query the live backlog (\`gh issue list\` / \`list.sh\`) before answering
    "what's next?" — never infer from local files or memory alone.
 
 Flag any missing context file — the project is under-documented.
@@ -3237,8 +3256,8 @@ Flag any missing context file — the project is under-documented.
 ## Mandatory classification contract — every created or clarified item
 
 Classifying an item is part of grooming, not optional polish. Every
-backlog item you touch MUST exit with **four hard axes + one soft**
-(see #5) persisted before your final report — a **gate**, not polish:
+backlog item you touch MUST exit with **four hard axes + three soft**
+(see #5–#7) persisted before your final report — a **gate**, not polish:
 
 1. **Size** — \`XS\`..\`XL\`
 2. **Priority** — \`P0\`..\`P3\`
@@ -3248,26 +3267,35 @@ backlog item you touch MUST exit with **four hard axes + one soft**
    Optional on mono-domain projects, but the \`## Domain Model\` block in every
    brief MUST carry a \`Bounded context:\` field. Tickets touching ≥ 2 contexts →
    apply the "Epic detection heuristic" with reason "cross-bounded-context".
+6. **Target date** (soft, GitHub only) — set when promoting Backlog → Ready
+   so the Roadmap view shows a planned end. ISO 8601 (\`YYYY-MM-DD\`). Missing
+   on a Ready / In progress item → \`⚠ no target date set\` in the final
+   report, never a block.
+7. **Start date** (soft, GitHub only) — set when moving Ready → In Progress.
+   ISO 8601. Missing on an In progress item → \`⚠ no start date set\` warning,
+   never a block.
+
+**Estimate** (story points or days; numeric Project V2 field) stays fully
+optional — set it if the team uses point-based velocity, otherwise skip;
+no warning emitted on miss.
 
 Persistence per backend:
 
-- **GitHub** — use \`set-field.sh <issue> <Priority|Size|IssueType> <value>\`; exit \`0\` OK, \`10\`/\`11\` fall back to a label, \`12\` = issue not on project. Run \`detect-fields.sh\` once per groom. Never dual-write field + matching label.
-- **GitLab** — scoped labels via \`glab\` (\`priority::P1\`, \`size::M\`, \`type::feature\`). Create on first use.
-- **Local Markdown** — \`priority:\` / \`complexity:\` / \`category:\` frontmatter. No labels.
+- **GitHub** — use \`set-field.sh <issue> <Priority|Size|IssueType|StartDate|TargetDate|Estimate> <value>\`; exit \`0\` OK, \`10\`/\`11\` fall back to a label (Priority/Size only; date/Estimate failures skip silently and emit the soft warning where applicable), \`12\` = issue not on project. Run \`detect-fields.sh\` once per groom. Never dual-write field + matching label.
+- **GitLab** — scoped labels via \`glab\` (\`priority::P1\`, \`size::M\`, \`type::feature\`). Date / Estimate axes are GitHub-only (Roadmap view); GitLab has no equivalent in this scope.
+- **Local Markdown** — \`priority:\` / \`complexity:\` / \`category:\` frontmatter. No labels. Date / Estimate are not tracked on local backends (no Roadmap view to feed).
 
-Persistence failures MUST appear as \`⚠ classification incomplete\` — a silent skip is a contract violation.
+Persistence failures on hard axes MUST appear as \`⚠ classification incomplete\` — a silent skip is a contract violation. Date axes are warn-only.
 
 ## Backlog backend
 
-A project uses exactly one of these two backends. Detect which one at the
-start of every session:
+A project uses exactly one backend. Detect at session start:
 
-- If the project has a \`.specflow/backlog.md\` index file → **local Markdown**.
-- If the project ships its backlog on GitHub Issues + Projects (no
-  \`.specflow/backlog.md\`, but \`gh auth status\` is healthy and a remote tracker
-  is referenced in \`AGENTS.md\`) → **GitHub**.
+- \`.specflow/backlog.md\` index file exists → **local Markdown**.
+- No \`.specflow/backlog.md\`, but \`gh auth status\` healthy + remote tracker
+  in \`AGENTS.md\` → **GitHub**.
 
-If both signals are present, ask the user which one is canonical before
+If both signals are present, ask the user which is canonical before
 mutating anything.
 
 ### Local Markdown layout
@@ -3278,8 +3306,8 @@ mutating anything.
 ### GitHub layout
 
 - Tasks live as Issues in the configured repo.
-- The PO uses \`gh issue\` + \`gh project item-edit\` (CLI) for reads/mutations;
-  raw \`gh api graphql\` only when no CLI path exists.
+- Use \`gh issue\` + \`gh project item-edit\` (CLI); raw \`gh api graphql\` only
+  when no CLI path exists.
 
 ## Frontmatter schema (local Markdown — mandatory)
 
@@ -3299,21 +3327,19 @@ created: YYYY-MM-DD
 ---
 \`\`\`
 
-\`parent: "#NNN"\` is the local-Markdown sub-task convention — grep-friendly
-(\`grep -l 'parent: "#042"' .specflow/backlog/*.md\` lists every child of
-#042). A missing or \`null\` \`parent:\` means a top-level task or an epic.
+\`parent: "#NNN"\` is the local-Markdown sub-task convention — grep-friendly.
+A missing or \`null\` \`parent:\` means a top-level task or an epic.
 
 ## Epic concept
 
-An **epic** owns one or more **sub-tasks**: the PO creates them, tracks them
-as a unit, and closes the parent only when every child is closed.
+An **epic** owns one or more **sub-tasks**: tracked as a unit; parent
+closes only when every child is closed.
 
 ### Creating sub-tasks (all backends)
 
-Use \`add.sh --parent <num>\` — handles per-backend linking automatically:
-GitHub POSTs to \`/issues/<parent>/sub_issues\`; GitLab applies a
-\`parent::#NNN\` label; local writes \`parent: "#NNN"\` in frontmatter.
-Fails fast (exit 3) if the parent doesn't exist.
+Use \`add.sh --parent <num>\` — handles per-backend linking: GitHub native
+sub_issues API; GitLab \`parent::#NNN\` label; local \`parent: "#NNN"\`
+frontmatter. Exit 3 = parent doesn't exist.
 
 ### Closing rules (all three backends)
 
@@ -3324,9 +3350,9 @@ Fails fast (exit 3) if the parent doesn't exist.
 
 ### Epic detection heuristic
 
-Propose epic decomposition on every \`/backlog add\` and during grooming.
+Propose decomposition on every \`/backlog add\` and during grooming.
 
-**Triggers:** phrases like "break down", "phased", "rewrite",
+**Triggers:** phrases like "break down" / "phased" / "rewrite" /
 "end-to-end"; >5 AC bullets; scope crosses ≥2 subsystems; size L/XL.
 
 **Behavior:**
@@ -3375,35 +3401,29 @@ Total > 7 → critical, 5–7 → high, 3–5 → medium, < 3 → low.
 
 ### \`/backlog\` or \`/backlog list\`
 
-Display the backlog overview. Local: render \`.specflow/backlog.md\`
-(recompose from the task files if the index drifted). GitHub: list issues
-in the configured repo, grouped by priority / project status.
+Display the backlog. Local: render \`.specflow/backlog.md\` (recompose
+from task files if the index drifted). GitHub: list issues grouped by
+priority / project status.
 
 ### \`/backlog next\`
 
 Recommend the top 3 tasks. For each: business justification, domain
-context, workflow recommendation (spec vs direct), quick-win indicator
-(≤3 pts), exact start command. Skip sub-tasks whose parent epic isn't ready.
+context, workflow recommendation (spec vs direct), quick-win flag (≤3
+pts), exact start command. Skip sub-tasks whose parent epic isn't ready.
 
 ### \`/backlog add <title>\`
 
-Create a new task. On the local backend: write \`.specflow/backlog/NNN-slug.md\`
-with the full frontmatter and update \`.specflow/backlog.md\`. On GitHub:
-\`gh issue create\` with the appropriate labels and project assignment. Ask
-clarifying questions as needed to fill the schema. If the user phrases the
-request as a sub-task ("add X as a child of #042" / "subtask of the auth
-epic"), set the parent link as soon as the child exists (frontmatter
-\`parent: "#042"\` locally, sub-issue API call on GitHub).
+Create a new task. Local: write \`.specflow/backlog/NNN-slug.md\` with full
+frontmatter and update \`.specflow/backlog.md\`. GitHub: \`gh issue create\`
+with labels + project assignment. Ask clarifying questions as needed.
+Sub-task phrasing ("child of #042" / "subtask of …"): set the parent link
+on creation (frontmatter \`parent: "#042"\` locally, sub-issue API on GitHub).
 
-Every created task MUST exit fully classified — Size, Priority, Issue
-Type, and at least one label — per the "Mandatory classification
-contract" above. Classification is part of the same dispatch, not a
-follow-up.
+Every created task MUST exit fully classified per the "Mandatory
+classification contract" above — same dispatch, not a follow-up.
 
-All persisted backlog artifacts — titles, frontmatter values, descriptions,
-scope, notes, acceptance criteria, index entries, GitHub issue titles and
-bodies — MUST be written in English. You may reply in chat in the user's
-conversation language.
+All persisted backlog artifacts MUST be written in English. Chat replies
+may use the user's conversation language.
 
 ### \`/backlog update <id>\`
 
@@ -3417,22 +3437,21 @@ Detailed complexity estimate. If the work exceeds one task, apply the
 
 ### \`/backlog status\`
 
-Dashboard summary with counts, total points, velocity estimates, and the
-number of open epics with at least one open child.
+Dashboard: counts, total points, velocity, open epics with ≥1 open child.
 
 ### \`/backlog groom\`
 
-Full grooming session — review priorities, re-estimate, flag blockers, audit
-epic / sub-task hygiene (orphaned children, parents that should be closed,
-sub-tasks that escaped a closed epic). Any item still missing a Size,
-Priority, Issue Type, or label gets classified on the spot — the
-"Mandatory classification contract" applies retroactively during a groom.
+Full grooming session — review priorities, re-estimate, flag blockers,
+audit epic / sub-task hygiene (orphaned children, parents that should be
+closed, sub-tasks that escaped a closed epic). Items missing any hard
+axis get classified on the spot — the "Mandatory classification
+contract" applies retroactively.
 
 ### \`/backlog brief <id>\`
 
-Generate a PO business brief for a developer: feature purpose, business
-rules, user stories, gotchas, acceptance criteria. If the task is in an
-epic, add a one-line summary of the parent and sibling sub-tasks.
+Generate a PO business brief for a developer: purpose, business rules,
+user stories, gotchas, acceptance criteria. If the task is in an epic,
+add a one-line summary of the parent and siblings.
 
 Every brief MUST include a \`## Domain Model\` block — the contract with
 the developer (who refuses to start without it):
@@ -3444,10 +3463,10 @@ the developer (who refuses to start without it):
 - **Invariants:** \`rule — why\`
 - **Out of scope:** \`context — interaction\`
 
-If a spec.md is attached, write this block into the spec too (the spec
-template carries the section). Otherwise it lives in the issue / task file.
+If a spec.md is attached, write this block into the spec too; otherwise
+it lives in the issue / task file.
 
-**Gate:** a brief without a Domain Model is incomplete. If you lack the
+**Gate:** a brief without a Domain Model is incomplete. If you lack
 information to populate it, clarify with the user first.
 
 ### \`/backlog epic <id>\`
@@ -3457,16 +3476,14 @@ before estimating epic completion or reporting progress.
 
 ## Rules
 
-- Always update \`.specflow/backlog.md\` after any change to local task files.
+- Always update \`.specflow/backlog.md\` after any local task-file change.
 - Never delete task files — change status to \`done\` or \`deferred\`.
 - Use Fibonacci for complexity (1, 2, 3, 5, 8, 13, 21 only).
 - Justify every priority change.
 - Respect dependencies — don't recommend blocked tasks.
 - Respect epic semantics — never close a parent while children remain open.
-- Write in user's conversation language in chat, but always write persisted
-  artifacts in English.
-- Projects pre-dating the epic feature have no \`parent:\` key on old tasks —
-  that's fine; a missing key is treated as \`parent: null\`.
+- Persisted artifacts in English; chat replies in the user's language.
+- Missing \`parent:\` on legacy tasks is treated as \`parent: null\`.
 
 ## Tech-debt intake protocol
 
@@ -3474,9 +3491,9 @@ Triggered when a developer report has a \`Tech debt surfaced\` block.
 Line format: \`<one-liner> @ <path>:<line> — <reason out of scope>\`.
 
 1. **Parse** each line.
-2. **Dedupe** — search existing tickets (\`gh issue list --search\` / \`grep .specflow/backlog/\`); skip dupes, list them.
-3. **Create** non-dupes: Issue Type \`Task\`, label \`tech-debt\` (+ \`domain:<ctx>\` if obvious), Size \`XS\`/\`S\`, Priority \`P3\` (bump to \`P2\` for correctness/security). Body: \`Surfaced by #<id>.\\n\\n> <one-liner>\\n\\nLocation: \\\`<path>:<line>\\\`\\nDeferred because: <reason>\`. Apply classification contract.
-4. **Report** created ticket numbers/URLs or "all items already covered by #X, #Y".
+2. **Dedupe** existing tickets; skip dupes, list them.
+3. **Create** non-dupes: Type \`Task\`, label \`tech-debt\`, Size \`XS\`/\`S\`, Priority \`P3\` (\`P2\` for correctness/security). Body: \`Surfaced by #<id>.\\n\\n> <one-liner>\\n\\nLocation: \\\`<path>:<line>\\\`\\nDeferred because: <reason>\`. Apply classification contract.
+4. **Report** created ticket numbers or "all covered by #X, #Y".
 `,
     executable: false,
     backend: null,
@@ -6017,6 +6034,29 @@ emit() {
 emit Priority PRIORITY
 emit Size SIZE
 
+# Date + number fields used by the Roadmap view (#264). They are
+# regular ProjectV2Field nodes, not single-select — emit just the
+# field ID; the writer routes by axis name to --date or --number.
+emit_simple() {
+  local field="\$1" prefix="\$2"
+  local field_id
+  field_id=\$(echo "\$FIELDS_JSON" | jq -r --arg n "\$field" '
+    .fields[]
+    | select(.type == "ProjectV2Field")
+    | select((.name | ascii_downcase) == (\$n | ascii_downcase))
+    | .id
+  ')
+  if [ -z "\$field_id" ]; then
+    echo "\${prefix}_FIELD_ID="
+    return
+  fi
+  echo "\${prefix}_FIELD_ID=\$field_id"
+}
+
+emit_simple "Start date"  STARTDATE
+emit_simple "Target date" TARGETDATE
+emit_simple "Estimate"    ESTIMATE
+
 # Project node ID — handy for callers that also want to write field values.
 echo "PROJECT_NODE_ID=\$(gh project view "\$PROJECT_NUMBER" --owner "\$REPO_OWNER" --format json | jq -r '.id')"
 `,
@@ -6041,11 +6081,19 @@ echo "PROJECT_NODE_ID=\$(gh project view "\$PROJECT_NUMBER" --owner "\$REPO_OWNE
 # call that takes the type name directly, cheaper than the GraphQL
 # \`updateIssue\` path and with no node-ID resolution.
 #
-# Usage: set-field.sh <issue-number> <Priority|Size|IssueType> <value>
+# Usage: set-field.sh <issue-number> <Priority|Size|IssueType|StartDate|TargetDate|Estimate> <value>
 #   Examples:
-#     set-field.sh 42 Priority P1
-#     set-field.sh 42 Size M
-#     set-field.sh 42 IssueType Feature
+#     set-field.sh 42 Priority    P1
+#     set-field.sh 42 Size        M
+#     set-field.sh 42 IssueType   Feature
+#     set-field.sh 42 StartDate   2026-05-16
+#     set-field.sh 42 TargetDate  2026-06-30
+#     set-field.sh 42 Estimate    3
+#
+# Date axes accept ISO 8601 (YYYY-MM-DD). Estimate is a numeric value
+# (story points or days, project's choice). Date / Estimate fields are
+# part of the Project V2 board (#264); they're what the Roadmap view
+# plots along its timeline.
 #
 # Issue Types are an org-level GitHub feature. On user-owned repos (no org)
 # the org query returns nothing and the script exits 10 so the caller falls
@@ -6054,7 +6102,7 @@ echo "PROJECT_NODE_ID=\$(gh project view "\$PROJECT_NUMBER" --owner "\$REPO_OWNE
 # Exit codes:
 #   0   field / type updated
 #   10  no such field / type on the project / org (caller should fall back to a label)
-#   11  field / type present but the value is unrecognised (caller should fall back to a label)
+#   11  field / type present but the value is unrecognised (Priority/Size/IssueType only — date/number axes defer to gh for value validation)
 #   12  issue is not on the project / not in the repo
 #   1   usage / unexpected error
 set -euo pipefail
@@ -6063,7 +6111,7 @@ set -euo pipefail
 . "\$(dirname "\$0")/_config.sh"
 
 if [ "\$#" -lt 3 ]; then
-  echo 'usage: set-field.sh <issue-number> <Priority|Size|IssueType> <value>' >&2
+  echo 'usage: set-field.sh <issue-number> <Priority|Size|IssueType|StartDate|TargetDate|Estimate> <value>' >&2
   exit 1
 fi
 NUM="\$1"
@@ -6107,11 +6155,69 @@ if [ "\$FIELD_LOWER" = "issuetype" ] || [ "\$FIELD_LOWER" = "type" ]; then
   exit 0
 fi
 
+# Date / number Project V2 fields (#264 — Roadmap inputs). They don't
+# have option IDs — \`gh project item-edit\` takes the raw value via
+# --date (ISO 8601) or --number. The field discovery still runs through
+# detect-fields.sh; missing field → exit 10 (caller surfaces "field
+# absent on project" warning, same contract as Priority/Size).
+case "\$FIELD_LOWER" in
+  startdate | targetdate | estimate)
+    case "\$FIELD_LOWER" in
+      startdate)  PREFIX="STARTDATE"  CANONICAL="Start date"  KIND="date" ;;
+      targetdate) PREFIX="TARGETDATE" CANONICAL="Target date" KIND="date" ;;
+      estimate)   PREFIX="ESTIMATE"   CANONICAL="Estimate"    KIND="number" ;;
+    esac
+
+    eval "\$("\$(dirname "\$0")/detect-fields.sh")"
+
+    FIELD_ID_VAR="\${PREFIX}_FIELD_ID"
+    FIELD_ID="\${!FIELD_ID_VAR-}"
+    if [ -z "\$FIELD_ID" ]; then
+      echo "no native '\$CANONICAL' field on Project #\$PROJECT_NUMBER — fall back to label or skip" >&2
+      exit 10
+    fi
+
+    # Targeted item-ID lookup, same shape as the Priority/Size path
+    # below — one issue, projectItems(first:5), filter on PROJECT_NODE_ID.
+    ITEM_ID=\$(gh api graphql -f query='
+      query(\$owner:String!, \$name:String!, \$num:Int!) {
+        repository(owner:\$owner, name:\$name) {
+          issue(number:\$num) {
+            projectItems(first:5) { nodes { id project { id } } }
+          }
+        }
+      }' -f owner="\$REPO_OWNER" -f name="\$REPO_NAME" -F num="\$NUM" \\
+      | jq -r --arg p "\$PROJECT_NODE_ID" '.data.repository.issue.projectItems.nodes[] | select(.project.id==\$p) | .id' | head -1)
+
+    if [ -z "\$ITEM_ID" ]; then
+      echo "issue #\$NUM is not on Project #\$PROJECT_NUMBER" >&2
+      exit 12
+    fi
+
+    if [ "\$KIND" = "date" ]; then
+      gh project item-edit \\
+        --id "\$ITEM_ID" \\
+        --project-id "\$PROJECT_NODE_ID" \\
+        --field-id "\$FIELD_ID" \\
+        --date "\$VALUE" >/dev/null
+    else
+      gh project item-edit \\
+        --id "\$ITEM_ID" \\
+        --project-id "\$PROJECT_NODE_ID" \\
+        --field-id "\$FIELD_ID" \\
+        --number "\$VALUE" >/dev/null
+    fi
+
+    echo "✓ #\$NUM \$CANONICAL → \$VALUE"
+    exit 0
+    ;;
+esac
+
 case "\$FIELD_LOWER" in
   priority) PREFIX="PRIORITY" CANONICAL="Priority" ;;
   size)     PREFIX="SIZE"     CANONICAL="Size" ;;
   *)
-    echo "error: unsupported field '\$FIELD_NAME' (Priority|Size|IssueType)" >&2
+    echo "error: unsupported field '\$FIELD_NAME' (Priority|Size|IssueType|StartDate|TargetDate|Estimate)" >&2
     exit 1
     ;;
 esac

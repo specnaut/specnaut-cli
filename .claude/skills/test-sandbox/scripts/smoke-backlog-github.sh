@@ -67,6 +67,37 @@ check "SKILL.md documents set-field exit code 11 fallback contract" \
   'grep -q "10/11/12" .claude/skills/backlog/SKILL.md'
 
 echo
+echo "═══ #264  Roadmap dates + Estimate (set-field/detect-fields) ═══"
+check "set-field.sh usage advertises StartDate axis (#264)" \
+  'grep -q "StartDate" .specflow/scripts/backlog/set-field.sh'
+check "set-field.sh usage advertises TargetDate axis (#264)" \
+  'grep -q "TargetDate" .specflow/scripts/backlog/set-field.sh'
+check "set-field.sh usage advertises Estimate axis (#264)" \
+  'grep -q "Estimate" .specflow/scripts/backlog/set-field.sh'
+check "set-field.sh dispatches startdate/targetdate/estimate via case (#264)" \
+  'grep -qE "startdate \| targetdate \| estimate" .specflow/scripts/backlog/set-field.sh'
+check "set-field.sh wires --date for date axes (#264)" \
+  'grep -qE "^[[:space:]]*--date " .specflow/scripts/backlog/set-field.sh'
+check "set-field.sh wires --number for Estimate (#264)" \
+  'grep -qE "^[[:space:]]*--number " .specflow/scripts/backlog/set-field.sh'
+check "detect-fields.sh discovers StartDate field via emit_simple (#264)" \
+  'grep -qE "^emit_simple \"Start date\"[[:space:]]+STARTDATE$" .specflow/scripts/backlog/detect-fields.sh'
+check "detect-fields.sh discovers TargetDate field via emit_simple (#264)" \
+  'grep -qE "^emit_simple \"Target date\"[[:space:]]+TARGETDATE$" .specflow/scripts/backlog/detect-fields.sh'
+check "detect-fields.sh discovers Estimate field via emit_simple (#264)" \
+  'grep -qE "^emit_simple \"Estimate\"[[:space:]]+ESTIMATE$" .specflow/scripts/backlog/detect-fields.sh'
+check "detect-fields.sh queries ProjectV2Field for date/number fields (#264)" \
+  'grep -q "ProjectV2Field" .specflow/scripts/backlog/detect-fields.sh'
+check "PO agent advertises Target date soft axis (#264)" \
+  'grep -qE "\*\*Target date\*\* \(soft" .claude/agents/product-owner.md'
+check "PO agent advertises Start date soft axis (#264)" \
+  'grep -qE "\*\*Start date\*\* \(soft" .claude/agents/product-owner.md'
+check "groom phase mentions Roadmap dates step (#264)" \
+  'grep -q "Roadmap dates" .claude/skills/specflow/phases/groom.md'
+check "groom phase report surfaces Roadmap-dates-missing warning (#264)" \
+  'grep -qE "no target date set|no start date set" .claude/skills/specflow/phases/groom.md'
+
+echo
 echo "═══ #158  semantic labels bootstrap (ensure-labels.sh) ═══"
 check "ensure-labels.sh present + executable" \
   '[ -x .specflow/scripts/backlog/ensure-labels.sh ]'

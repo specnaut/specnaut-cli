@@ -31,5 +31,28 @@ emit() {
 emit Priority PRIORITY
 emit Size SIZE
 
+# Date + number fields used by the Roadmap view (#264). They are
+# regular ProjectV2Field nodes, not single-select — emit just the
+# field ID; the writer routes by axis name to --date or --number.
+emit_simple() {
+  local field="$1" prefix="$2"
+  local field_id
+  field_id=$(echo "$FIELDS_JSON" | jq -r --arg n "$field" '
+    .fields[]
+    | select(.type == "ProjectV2Field")
+    | select((.name | ascii_downcase) == ($n | ascii_downcase))
+    | .id
+  ')
+  if [ -z "$field_id" ]; then
+    echo "${prefix}_FIELD_ID="
+    return
+  fi
+  echo "${prefix}_FIELD_ID=$field_id"
+}
+
+emit_simple "Start date"  STARTDATE
+emit_simple "Target date" TARGETDATE
+emit_simple "Estimate"    ESTIMATE
+
 # Project node ID — handy for callers that also want to write field values.
 echo "PROJECT_NODE_ID=$(gh project view "$PROJECT_NUMBER" --owner "$REPO_OWNER" --format json | jq -r '.id')"
