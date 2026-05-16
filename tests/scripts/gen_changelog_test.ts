@@ -121,3 +121,38 @@ Deno.test("formatChangelog omits compare URL when fromTag is null", () => {
   });
   assertEquals(md.includes("Full changelog"), false);
 });
+
+import { extractAdoption } from "../../scripts/gen-changelog.ts";
+
+Deno.test("extractAdoption: returns null when no section present", () => {
+  const body = "## Summary\n\nfoo\n\n## Tests\n\nbar\n";
+  assertEquals(extractAdoption(body), null);
+});
+
+Deno.test("extractAdoption: extracts section content up to next H2", () => {
+  const body =
+    "## Summary\n\nfoo\n\n## Agent adoption\n\nprose here\n\n```prompt\nrun this\n```\n\n## Tests\n\nbar\n";
+  const got = extractAdoption(body);
+  assertEquals(
+    got,
+    "prose here\n\n```prompt\nrun this\n```",
+  );
+});
+
+Deno.test("extractAdoption: extracts trailing section to EOF", () => {
+  const body = "## Summary\n\nfoo\n\n## Agent adoption\n\nprose\n\n```prompt\nx\n```\n";
+  const got = extractAdoption(body);
+  assertEquals(got, "prose\n\n```prompt\nx\n```");
+});
+
+Deno.test("extractAdoption: strips html comments inside section", () => {
+  const body =
+    "## Agent adoption\n\n<!-- Required for feat -->\n\nreal prose\n\n```prompt\np\n```\n";
+  const got = extractAdoption(body);
+  assertEquals(got, "real prose\n\n```prompt\np\n```");
+});
+
+Deno.test("extractAdoption: returns null when section has no prompt block", () => {
+  const body = "## Agent adoption\n\njust prose, no fenced block\n\n## Tests\n";
+  assertEquals(extractAdoption(body), null);
+});

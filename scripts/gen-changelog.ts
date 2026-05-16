@@ -62,6 +62,36 @@ function capitalize(s: string): string {
   return s.charAt(0).toUpperCase() + s.slice(1);
 }
 
+const ADOPTION_HEADER_RE = /^## Agent adoption\b/m;
+const NEXT_H2_RE = /^## /m;
+const HTML_COMMENT_RE = /<!--[\s\S]*?-->/g;
+const PROMPT_FENCE_RE = /^```prompt\s*$/m;
+
+/**
+ * Extract the body of the `## Agent adoption` section from a PR body.
+ *
+ * - Returns the content between `## Agent adoption` and the next `## ` heading
+ *   (or EOF), trimmed.
+ * - Returns `null` when the section is absent OR when it has no ` ```prompt `
+ *   fenced block (a section without a prompt is treated as "incomplete" and
+ *   not included in the changelog).
+ * - Strips HTML comments — the PR template ships placeholders inside `<!-- -->`
+ *   that should never reach the release body.
+ */
+export function extractAdoption(body: string): string | null {
+  const headerMatch = body.match(ADOPTION_HEADER_RE);
+  if (!headerMatch) return null;
+  const start = (headerMatch.index ?? 0) + headerMatch[0].length;
+
+  const tail = body.slice(start);
+  const nextH2 = tail.match(NEXT_H2_RE);
+  const section = nextH2 ? tail.slice(0, nextH2.index ?? tail.length) : tail;
+
+  const cleaned = section.replace(HTML_COMMENT_RE, "").trim();
+  if (!PROMPT_FENCE_RE.test(cleaned)) return null;
+  return cleaned;
+}
+
 export type FormatOpts = {
   fromTag: string | null;
   toTag: string;
