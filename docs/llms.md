@@ -265,6 +265,9 @@ specflow upgrade                  # update templates to the binary's version
                                   #    vanilla agent/command files are auto-migrated to the plugin)
 specflow upgrade --dry-run        # preview the upgrade plan
 specflow upgrade --force          # apply destructive changes (backs up customizations)
+specflow reconcile --status       # list files pending post-upgrade reconciliation (JSON)
+specflow reconcile <path> --accept-upstream  # take new template version (backs up local)
+specflow reconcile <path> --accept-current   # keep local version (re-stamps lock SHA)
 specflow self-update              # upgrade the binary itself
 specflow self-update --check      # only report whether an update is available
 specflow --version                # print version
@@ -724,6 +727,36 @@ Both are gitignored (`templates/core/root/.gitignore` ships the lines).
 
 An AI agent that sees `.specflow/upgrade-pending.json` in a project should proactively suggest
 running `@specflow-expert review-upgrade`.
+
+### `specflow reconcile`
+
+Per-file post-upgrade reconciliation. Run after `specflow upgrade` for each file that was preserved
+(customized locally — see the `Upgrades & adoption` section for context).
+
+```
+specflow reconcile --status
+Print JSON listing files currently pending reconciliation. Reads
+`.specflow/upgrade-staging/`. Output:
+{
+  "pending": [".claude/agents/developer.md", ...],
+  "stagingDir": ".specflow/upgrade-staging" | null
+}
+
+specflow reconcile <path> --accept-upstream
+Take the new template version for <path>. Backs up the local file to
+`<path>.specflow.bak`, copies upstream content from
+`.specflow/upgrade-staging/<path>` into place, and updates the lock
+SHA. Removes the staging entry.
+
+specflow reconcile <path> --accept-current
+Keep the local customized version. Re-stamps the lock SHA to match
+on-disk content, so the next upgrade does not re-flag this file as
+preserved. Removes the staging entry.
+```
+
+`specflow-expert review-upgrade` is the recommended way to walk through reconciliation interactively
+— it surfaces a `keep / take / merge / view / skip` choice per file and dispatches the `developer`
+subagent for intelligent merges.
 
 ## Repository
 

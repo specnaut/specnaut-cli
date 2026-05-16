@@ -104,29 +104,17 @@ When the user asks to file a bug ("report this", "open an issue",
 `check: failed`), offer a pre-filled GitHub issue. **Never
 auto-submit.** Always show the body; user clicks the link.
 
-**Body**: 6 sections — `## Summary` / `## Reproduction` /
-`## Observed` / `## Expected` / `## Environment` / `## Logs`.
-Auto-fill Environment from `.specflow/installed.lock`
-(`templates_version`, `harness`, `backlog_backend`),
-`specflow --version`, and `uname -srm` (or `cmd /c ver`).
+**Body**: 6 sections — `## Summary` / `## Reproduction` / `## Observed` / `## Expected` /
+`## Environment` / `## Logs`. Auto-fill Environment from `.specflow/installed.lock`
+(`templates_version`, `harness`, `backlog_backend`), `specflow --version`, `uname -srm`.
 
-If WebFetch on
-`https://raw.githubusercontent.com/mkrlabs/specflow/main/.github/ISSUE_TEMPLATE/bug.md`
-succeeds, prefer that template; fall back to the 6 sections above.
+If WebFetch on the repo's `bug.md` issue template succeeds, prefer it; fall back to the 6
+sections above.
 
-**Scrubbing — mandatory before showing the body.** Replace matches
-with `[REDACTED]`:
-
-```
-ghp_[A-Za-z0-9_]{36,}        github_pat_[A-Za-z0-9_]{82,}
-gho_[A-Za-z0-9_]{36,}        glpat-[A-Za-z0-9_-]{20,}
-ghu_/ghs_/ghr_ same shape    sk-ant-api\d{2}-[A-Za-z0-9_-]{93,}
-sk-[A-Za-z0-9]{48,}          AKIA[0-9A-Z]{16}
-```
-
-Soft-redact paths under `~/.ssh/`, `~/.aws/`, `~/.config/gh/`.
-Email addresses NOT scrubbed (false-positive prone) — tell the user
-to review.
+**Scrubbing — mandatory before showing the body.** Replace with `[REDACTED]`: GitHub tokens
+(`ghp_`, `gho_`, `github_pat_`, `ghu_`, `ghs_`, `ghr_`), GitLab tokens (`glpat-`), Anthropic keys
+(`sk-ant-api`), OpenAI keys (`sk-`), AWS keys (`AKIA`). Soft-redact `~/.ssh/`, `~/.aws/`,
+`~/.config/gh/`. Email addresses NOT scrubbed — tell the user to review.
 
 **Surface**: generate
 `https://github.com/mkrlabs/specflow/issues/new?title=…&body=…&labels=bug,from%3Aspecflow-expert`
@@ -191,6 +179,10 @@ Manual download: pick the binary from
   (`.specflow/upgrade-staging/<path>`, consumed by `specflow reconcile`);
   both are removed after a successful `review-upgrade` walk.
   Prints `@specflow-expert review-upgrade` handoff.
+- `specflow reconcile --status` — list files pending post-upgrade reconciliation as JSON.
+- `specflow reconcile <path> --accept-upstream` — take the new template version (backs up local,
+  updates lock).
+- `specflow reconcile <path> --accept-current` — keep local version (re-stamps lock SHA only).
 - `specflow check [--project]` — verify scaffold integrity. With
   `--project`, also flags missing plugin-covered files.
 - `specflow self-update` — replace the local binary with the latest
@@ -211,9 +203,8 @@ Manual download: pick the binary from
 | `opencode`    | OpenCode           | `.opencode/`            |
 | `antigravity` | Antigravity        | `.agent/`               |
 
-All eight share the same source-of-truth content in `templates/core/`.
-The per-harness adapter maps that bundle to the harness's expected
-layout and frontmatter conventions.
+All eight share the same source-of-truth content in `templates/core/`; the per-harness adapter
+maps that bundle to the harness's expected layout and frontmatter conventions.
 
 ### What makes Specflow different from upstream Spec Kit
 
@@ -245,24 +236,20 @@ layout and frontmatter conventions.
 
 ### Bundled sub-agents
 
-Every scaffold ships ten agents: `product-owner`, `developer`,
-`review-coordinator`, `code-reviewer`, `security-auditor`,
-`test-reviewer`, `qa-tester`, `workflow-manager`, `devops-sre`, and
-`specflow-expert` (this agent). See each agent's file under
-`.claude/agents/` (or harness equivalent) for its remit.
+Every scaffold ships ten agents: `product-owner`, `developer`, `review-coordinator`,
+`code-reviewer`, `security-auditor`, `test-reviewer`, `qa-tester`, `workflow-manager`,
+`devops-sre`, and `specflow-expert` (this agent). See each agent's file under `.claude/agents/`
+(or harness equivalent) for its remit.
 
 ### Backlog conventions (GitHub backend)
 
-- `Priority` (P0–P2) and `Size` (XS–XL) via Project V2 native fields
-  (`set-field.sh`); fall back to labels when the field is absent.
-- Two-step close: `move.sh <num> Done` then `gh issue close --reason
-  completed`. `/specflow groom` catches items that bypassed the move.
+`Priority` (P0–P2) and `Size` (XS–XL) via Project V2 native fields (`set-field.sh`). Two-step
+close: `move.sh <num> Done` then `gh issue close --reason completed`.
 
 ### Design principles
 
-Agnostic of language / LLM / harness / backlog backend. Single binary
-via `deno compile` for macOS, Linux, Windows. No Python or extra
-runtimes.
+Agnostic of language / LLM / harness / backlog backend. Single binary via `deno compile` for
+macOS, Linux, Windows. No Python or extra runtimes.
 
 ## Style
 
