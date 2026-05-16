@@ -187,7 +187,9 @@ Manual download: pick the binary from
   — scaffold the project. `--here` operates in the current dir;
   `--ai` picks the harness; `--backlog` picks the backend.
 - `specflow upgrade` — refresh templates in an existing project to
-  the binary's bundled version.
+  the binary's bundled version. On apply: writes
+  `.specflow/upgrade-pending.json` (`{from,to,at}`) + staging dir.
+  Prints `@specflow-expert review-upgrade` handoff.
 - `specflow check [--project]` — verify scaffold integrity. With
   `--project`, also flags missing plugin-covered files.
 - `specflow self-update` — replace the local binary with the latest
@@ -250,16 +252,10 @@ Every scaffold ships ten agents: `product-owner`, `developer`,
 
 ### Backlog conventions (GitHub backend)
 
-- Project V2 native single-select fields `Priority` (P0..P2) and
-  `Size` (XS..XL) when present; PO writes via `set-field.sh`.
-- Fallback to `priority:*` / `size:*` labels when the field doesn't
-  exist or the option is missing (`priority:P3` is the only known
-  option-missing case today, kept as label-only).
-- Two-step close: `move.sh <num> Done` first, then `gh issue close
-  <num> --reason completed`. Skipping the move leaves the item stuck
-  in `In progress` / `In review` on the board.
-- Board hygiene sweep (`/specflow groom` or PO dispatch) catches items
-  closed via paths that bypassed the move step.
+- `Priority` (P0–P2) and `Size` (XS–XL) via Project V2 native fields
+  (`set-field.sh`); fall back to labels when the field is absent.
+- Two-step close: `move.sh <num> Done` then `gh issue close --reason
+  completed`. `/specflow groom` catches items that bypassed the move.
 
 ### Design principles
 
