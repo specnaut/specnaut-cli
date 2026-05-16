@@ -357,6 +357,37 @@ Some harnesses also ship harness-specific helper files alongside the core scaffo
   Codex's experimental one-shot long-horizon feature; enable via `goals = true` under `[features]`
   in `config.toml`).
 
+## Project-specific skill overlays
+
+Specflow's skill folders are plain markdown — anything you put under your harness's `skills/`
+directory (e.g. `.claude/skills/<name>/`, `.cursor/skills/<name>/`) is a skill, full stop. To make
+the common "override an upstream skill" pattern discoverable, Specflow recognises two optional
+fields in `SKILL.md` frontmatter:
+
+| Field                    | Meaning                                                                                                                                                 |
+| ------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `alias_of: <skill-name>` | This skill is a thin wrapper that delegates to the named upstream skill. Dotted notation (e.g. `specflow.tag-version`) makes the distribution explicit. |
+| `overlays:`              | A list of pre/post hooks. Each entry carries `when: before \| after` and `path: ./scripts/<file>.sh` relative to the SKILL.md.                          |
+
+The Specflow binary itself **never resolves or dispatches** aliases / overlays — the harness (Claude
+Code, Cursor, Codex, …) is responsible for honouring the frontmatter at invocation time. Specflow's
+role is to standardise the contract.
+
+To see what's installed and which aliases / overlays are active:
+
+```bash
+/specflow list-skills
+```
+
+The phase walks your harness's skills directory, parses every SKILL.md frontmatter, and renders a
+`NAME · KIND · ALIAS OF · OVERLAYS · DESCRIPTION` table. Skills without `alias_of` show
+`KIND = skill`; aliases show `KIND = alias` and the target.
+
+A reference example lives at
+[`templates/core/skills/alias-example/SKILL.md`](https://github.com/mkrlabs/specflow/blob/main/templates/core/skills/alias-example/SKILL.md)
+in the Specflow source tree. It is **not** installed by `specflow init` — copy it manually when you
+want to introduce your first alias.
+
 ## What makes Specflow different from upstream Spec Kit
 
 Specflow is a fork of the official `specify` CLI with the following additions:
