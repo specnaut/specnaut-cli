@@ -121,3 +121,93 @@ Deno.test("formatChangelog omits compare URL when fromTag is null", () => {
   });
   assertEquals(md.includes("Full changelog"), false);
 });
+
+import { extractAdoption } from "../../scripts/gen-changelog.ts";
+
+Deno.test("extractAdoption: returns null when no section present", () => {
+  const body = "## Summary\n\nfoo\n\n## Tests\n\nbar\n";
+  assertEquals(extractAdoption(body), null);
+});
+
+Deno.test("extractAdoption: extracts section content up to next H2", () => {
+  const body =
+    "## Summary\n\nfoo\n\n## Agent adoption\n\nprose here\n\n```prompt\nrun this\n```\n\n## Tests\n\nbar\n";
+  const got = extractAdoption(body);
+  assertEquals(
+    got,
+    "prose here\n\n```prompt\nrun this\n```",
+  );
+});
+
+Deno.test("extractAdoption: extracts trailing section to EOF", () => {
+  const body = "## Summary\n\nfoo\n\n## Agent adoption\n\nprose\n\n```prompt\nx\n```\n";
+  const got = extractAdoption(body);
+  assertEquals(got, "prose\n\n```prompt\nx\n```");
+});
+
+Deno.test("extractAdoption: strips html comments inside section", () => {
+  const body =
+    "## Agent adoption\n\n<!-- Required for feat -->\n\nreal prose\n\n```prompt\np\n```\n";
+  const got = extractAdoption(body);
+  assertEquals(got, "real prose\n\n```prompt\np\n```");
+});
+
+Deno.test("extractAdoption: returns null when section has no prompt block", () => {
+  const body = "## Agent adoption\n\njust prose, no fenced block\n\n## Tests\n";
+  assertEquals(extractAdoption(body), null);
+});
+
+import { extractPrNumber } from "../../scripts/gen-changelog.ts";
+
+Deno.test("extractPrNumber: parses trailing (#NNN)", () => {
+  assertEquals(extractPrNumber("Add foo (#252)"), 252);
+});
+
+Deno.test("extractPrNumber: returns null when no PR ref", () => {
+  assertEquals(extractPrNumber("Add foo"), null);
+});
+
+Deno.test("extractPrNumber: ignores mid-subject mentions", () => {
+  // "(#X)" only counted when it's at end of subject, after whitespace.
+  assertEquals(extractPrNumber("Fixed (#bug) bug (#99)"), 99);
+});
+
+Deno.test("formatChangelog: emits Adoption guide section when entries present", () => {
+  const commits = [
+    {
+      hash: "abc1234",
+      subject: "Add the thing (#252)",
+      category: "feat" as const,
+      cleanedSubject: "Add the thing (#252)",
+    },
+  ];
+  const md = formatChangelog(commits, {
+    fromTag: "v1.4.0",
+    toTag: "v1.5.0",
+    adoptionEntries: [
+      { prNum: 252, title: "Add the thing", body: "Do X.\n\n```prompt\nrun X\n```" },
+    ],
+  });
+  // Adoption guide section present, with PR header and body.
+  if (!md.includes("### Adoption guide")) throw new Error("missing Adoption guide");
+  if (!md.includes("**#252 — Add the thing**")) throw new Error("missing PR header");
+  if (!md.includes("```prompt\nrun X\n```")) throw new Error("missing prompt block");
+});
+
+Deno.test("formatChangelog: omits Adoption guide when entries empty", () => {
+  const md = formatChangelog([], {
+    fromTag: "v1.4.0",
+    toTag: "v1.5.0",
+    adoptionEntries: [],
+  });
+  if (md.includes("### Adoption guide")) throw new Error("should not include Adoption guide");
+});
+
+Deno.test("extractAdoption: strips nested/malformed HTML comments completely", () => {
+  const body =
+    "## Agent adoption\n\n<!-- outer <!-- inner --> still outer -->\n\nreal prose\n\n```prompt\np\n```\n";
+  const got = extractAdoption(body);
+  // After the loop, no <!-- substring should remain.
+  if (got === null) throw new Error("expected non-null");
+  if (got.includes("<!--")) throw new Error(`residual <!--: ${got}`);
+});

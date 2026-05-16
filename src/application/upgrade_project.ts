@@ -148,6 +148,23 @@ export class UpgradeProjectUseCase {
       return { status: "up-to-date", currentVersion: lock.templatesVersion };
     }
 
+    // Stage upstream content for preserved (customized) files so that
+    // `specflow reconcile` can act on them later. We stage in dry-run too,
+    // so the agent can preview the reconciliation plan.
+    const stagingWrites: Bundle = {};
+    for (const action of plan) {
+      if (action.kind !== "preserve") continue;
+      const file = bundle[action.dest];
+      if (!file) continue;
+      stagingWrites[`.specflow/upgrade-staging/${action.dest}`] = file;
+    }
+    if (Object.keys(stagingWrites).length > 0) {
+      await writer.writeBundle(stagingWrites, input.projectDir, {
+        overwrite: true,
+        backupExisting: false,
+      });
+    }
+
     if (input.dryRun) {
       return {
         status: "planned",

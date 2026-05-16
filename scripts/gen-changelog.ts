@@ -62,10 +62,113 @@ function capitalize(s: string): string {
   return s.charAt(0).toUpperCase() + s.slice(1);
 }
 
+const ADOPTION_HEADER_RE = /^## Agent adoption\b/m;
+const NEXT_H2_RE = /^## /m;
+const HTML_COMMENT_RE = /<!--[\s\S]*?-->/g;
+const PROMPT_FENCE_RE = /^```prompt\s*$/m;
+
+/**
+ * Strip HTML comments from a string, looping until idempotent so that
+ * nested or malformed patterns like `<!-- foo <!-- bar -->` leave no residue.
+ */
+function stripHtmlComments(s: string): string {
+  // Repeated pass to catch overlapping / nested patterns.
+  let prev: string;
+  let current = s;
+  do {
+    prev = current;
+    current = current.replace(HTML_COMMENT_RE, "");
+  } while (current !== prev);
+  return current;
+}
+
+/**
+ * Extract the body of the `## Agent adoption` section from a PR body.
+ *
+ * - Returns the content between `## Agent adoption` and the next `## ` heading
+ *   (or EOF), trimmed.
+ * - Returns `null` when the section is absent OR when it has no ` ```prompt `
+ *   fenced block (a section without a prompt is treated as "incomplete" and
+ *   not included in the changelog).
+ * - Strips HTML comments — the PR template ships placeholders inside `<!-- -->`
+ *   that should never reach the release body.
+ */
+export function extractAdoption(body: string): string | null {
+  const headerMatch = body.match(ADOPTION_HEADER_RE);
+  if (!headerMatch) return null;
+  const start = (headerMatch.index ?? 0) + headerMatch[0].length;
+
+  const tail = body.slice(start);
+  const nextH2 = tail.match(NEXT_H2_RE);
+  const section = nextH2 ? tail.slice(0, nextH2.index ?? tail.length) : tail;
+
+  const cleaned = stripHtmlComments(section).trim();
+  if (!PROMPT_FENCE_RE.test(cleaned)) return null;
+  return cleaned;
+}
+
+const PR_NUMBER_RE = /\s\(#(\d+)\)\s*$/;
+
+/**
+ * Extract the trailing PR number from a commit subject formatted as
+ * `... (#NNN)`. Returns `null` when no match.
+ */
+export function extractPrNumber(subject: string): number | null {
+  const m = subject.match(PR_NUMBER_RE);
+  if (!m) return null;
+  return parseInt(m[1], 10);
+}
+
+const PR_BODY_CACHE = new Map<number, string>();
+
+/**
+ * Fetch a PR body via `gh pr view <num> --json body --jq .body`.
+ * Cached per process. Returns `""` on any failure (the caller treats empty
+ * as "no adoption section"). Cache miss / fetch errors emit a stderr warning
+ * but never fail the build — CI lint (Component 1) is the gate.
+ */
+export async function fetchPrBody(num: number): Promise<string> {
+  const cached = PR_BODY_CACHE.get(num);
+  if (cached !== undefined) return cached;
+  const cmd = new Deno.Command("gh", {
+    args: ["pr", "view", String(num), "--json", "body", "--jq", ".body"],
+    stdout: "piped",
+    stderr: "piped",
+  });
+  let stdout: Uint8Array;
+  let success: boolean;
+  try {
+    const out = await cmd.output();
+    stdout = out.stdout;
+    success = out.success;
+  } catch (err) {
+    // `gh` binary missing or spawn failure — degrade gracefully.
+    const msg = err instanceof Error ? err.message : String(err);
+    console.warn(`gen-changelog: cannot run gh CLI (${msg}) — skipping adoption for #${num}`);
+    PR_BODY_CACHE.set(num, "");
+    return "";
+  }
+  if (!success) {
+    console.warn(`gen-changelog: failed to fetch PR #${num} body — skipping adoption`);
+    PR_BODY_CACHE.set(num, "");
+    return "";
+  }
+  const body = new TextDecoder().decode(stdout);
+  PR_BODY_CACHE.set(num, body);
+  return body;
+}
+
+export type AdoptionEntry = {
+  prNum: number;
+  title: string;
+  body: string;
+};
+
 export type FormatOpts = {
   fromTag: string | null;
   toTag: string;
   repoUrl?: string;
+  adoptionEntries?: AdoptionEntry[];
 };
 
 export function formatChangelog(commits: Classified[], opts: FormatOpts): string {
@@ -85,6 +188,15 @@ export function formatChangelog(commits: Classified[], opts: FormatOpts): string
   }
   if (fixes.length > 0) {
     sections.push("### Bug fixes\n\n" + fixes.map(formatBullet).join("\n"));
+  }
+  const adoption = opts.adoptionEntries ?? [];
+  if (adoption.length > 0) {
+    const intro =
+      "These prompts help your AI agent adopt the new features in an existing project. " +
+      "Copy them into your harness, or run `@specflow-expert review-upgrade` to be walked " +
+      "through automatically.";
+    const items = adoption.map((a) => `**#${a.prNum} — ${a.title}**\n\n${a.body}`).join("\n\n");
+    sections.push(`### Adoption guide\n\n${intro}\n\n${items}`);
   }
   if (chores.length > 0) {
     const summary = `${chores.length} internal change${chores.length === 1 ? "" : "s"}`;
@@ -178,10 +290,30 @@ async function main() {
     .map(classifyCommit)
     .filter((c) => c.category !== "skip");
 
+  const adoptionEntries: AdoptionEntry[] = [];
+  for (const c of classified) {
+    if (c.category !== "feat") continue;
+    const prNum = extractPrNumber(c.subject);
+    if (prNum === null) continue;
+    const prBody = await fetchPrBody(prNum);
+    if (prBody === "") continue;
+    const adoption = extractAdoption(prBody);
+    if (adoption === null) {
+      console.warn(
+        `gen-changelog: feat commit ${c.hash} (#${prNum}) has no Agent adoption section — skipping`,
+      );
+      continue;
+    }
+    // Title = the cleaned subject without the trailing PR ref.
+    const title = c.cleanedSubject.replace(/\s\(#\d+\)\s*$/, "");
+    adoptionEntries.push({ prNum, title, body: adoption });
+  }
+
   const md = formatChangelog(classified, {
     fromTag: from,
     toTag: to,
     repoUrl: REPO_URL,
+    adoptionEntries,
   });
 
   await ensureDir(out);
