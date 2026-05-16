@@ -120,7 +120,19 @@ export async function fetchPrBody(num: number): Promise<string> {
     stdout: "piped",
     stderr: "piped",
   });
-  const { stdout, success } = await cmd.output();
+  let stdout: Uint8Array;
+  let success: boolean;
+  try {
+    const out = await cmd.output();
+    stdout = out.stdout;
+    success = out.success;
+  } catch (err) {
+    // `gh` binary missing or spawn failure — degrade gracefully.
+    const msg = err instanceof Error ? err.message : String(err);
+    console.warn(`gen-changelog: cannot run gh CLI (${msg}) — skipping adoption for #${num}`);
+    PR_BODY_CACHE.set(num, "");
+    return "";
+  }
   if (!success) {
     console.warn(`gen-changelog: failed to fetch PR #${num} body — skipping adoption`);
     PR_BODY_CACHE.set(num, "");
