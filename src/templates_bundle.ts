@@ -5533,9 +5533,19 @@ HEADER
     name: "propagate-parent-status",
     suffix: "propagate-parent-status.sh",
     content: `#!/usr/bin/env bash
-# Post-move hook: when a sub-task moves OUT of Backlog, auto-advance
-# its parent Epic to In Progress — but only if the Epic is currently
-# in Backlog or Ready. Manual In Review / Done states are preserved.
+# Post-move hook with two propagation rules:
+#
+#   - #260: when a sub-task moves OUT of Backlog, auto-advance its
+#     parent Epic to In Progress (only if the Epic is currently in
+#     Backlog or Ready). Manual In Review / Done states are preserved.
+#
+#   - #263: when the LAST open direct child of an Epic reaches Done,
+#     auto-advance the parent Epic to Done (only if it is currently
+#     in Ready, In Progress, or In Review). Idempotent on already-Done
+#     parents; manual Backlog parents are left alone.
+#
+# Both rules respect AC(d): DIRECT children only — the recursion guard
+# \`SPECFLOW_INTERNAL_PROPAGATION=1\` blocks the grandparent walk.
 #
 # Local backend: parent link lives in \`parent: "#NNN"\` frontmatter;
 # status lives in \`status:\` frontmatter. Pure shell, no API calls.
@@ -5608,26 +5618,78 @@ PARENT_FILE="\${parent_matches[0]}"
 # Read parent's current status from frontmatter.
 PARENT_STATUS=\$(awk '/^---\$/{n++; next} n==1 && /^status:/{sub(/^status:[[:space:]]*/, ""); print; exit}' "\$PARENT_FILE")
 
-# Only promote if parent is in Backlog or Ready.
-case "\$PARENT_STATUS" in
-  "Backlog"|"Ready")
-    if [ -x "\$SCRIPT_DIR/move.sh" ]; then
-      # Use the sibling move.sh so the frontmatter rewrite + index
-      # refresh stay consistent with every other status move. The
-      # recursion guard env var prevents this re-entry from walking
-      # any further up (AC(d): one-level only).
-      if SPECFLOW_INTERNAL_PROPAGATION=1 "\$SCRIPT_DIR/move.sh" "\$PARENT_PADDED" "In progress" >/dev/null 2>&1; then
-        echo "↑ promoted parent #\${PARENT_PADDED} (\${PARENT_STATUS} → In progress) due to child #\${CHILD_PADDED} move"
-      else
-        echo "::warning::propagate-parent-status: move.sh failed to promote #\${PARENT_PADDED}" >&2
+# Dispatch on the child's new status:
+#   - Done: AC(a) of #263 — if the parent's other DIRECT children are
+#           all Done, advance the parent from Ready/In progress/In review
+#           to Done. Idempotent (parent already Done is a no-op via the
+#           default case below).
+#   - any other non-Backlog status: existing #260 behaviour — promote a
+#           Backlog/Ready parent to In progress.
+case "\$NEW_STATUS" in
+  "Done")
+    # Are all DIRECT children of \$PARENT_NUM at status Done?
+    # Glob every backlog file, filter by \`parent: "#<padded>"\`
+    # frontmatter, and check the status. The just-moved child file
+    # itself is included — move.sh has already rewritten its status
+    # to Done at the point we run, so a single-child Epic completes
+    # naturally in one pass.
+    all_done=true
+    for sibling in "\$BACKLOG_DIR"/*.md; do
+      [ -f "\$sibling" ] || continue
+      sibling_parent=\$(awk '/^---\$/{n++; next} n==1 && /^parent:/{print; exit}' "\$sibling" \\
+        | sed -nE 's/^parent:[[:space:]]*"?#0*([0-9]+)"?[[:space:]]*\$/\\1/p')
+      [ "\$sibling_parent" = "\$PARENT_NUM" ] || continue
+      sibling_status=\$(awk '/^---\$/{n++; next} n==1 && /^status:/{sub(/^status:[[:space:]]*/, ""); print; exit}' "\$sibling")
+      if [ "\$sibling_status" != "Done" ]; then
+        all_done=false
+        break
       fi
-    else
-      echo "::warning::propagate-parent-status: \$SCRIPT_DIR/move.sh not found — cannot promote #\${PARENT_PADDED}" >&2
+    done
+
+    if [ "\$all_done" = "true" ]; then
+      case "\$PARENT_STATUS" in
+        "Ready"|"In progress"|"In review")
+          if [ -x "\$SCRIPT_DIR/move.sh" ]; then
+            if SPECFLOW_INTERNAL_PROPAGATION=1 "\$SCRIPT_DIR/move.sh" "\$PARENT_PADDED" "Done" >/dev/null 2>&1; then
+              echo "↑ promoted parent #\${PARENT_PADDED} (\${PARENT_STATUS} → Done) — all direct children Done"
+            else
+              echo "::warning::propagate-parent-status: move.sh failed to advance #\${PARENT_PADDED} to Done" >&2
+            fi
+          else
+            echo "::warning::propagate-parent-status: \$SCRIPT_DIR/move.sh not found — cannot advance #\${PARENT_PADDED}" >&2
+          fi
+          ;;
+        *)
+          # Parent at Backlog (weird but harmless) / Done (idempotent) /
+          # unknown — no-op. AC(b) + AC(c).
+          ;;
+      esac
     fi
     ;;
   *)
-    # Already at In progress / In review / Done / unknown — no-op.
-    # Idempotency + regression guard branch.
+    # Existing #260 behaviour: child moved out of Backlog into Ready /
+    # In progress / In review — promote a stalled parent.
+    case "\$PARENT_STATUS" in
+      "Backlog"|"Ready")
+        if [ -x "\$SCRIPT_DIR/move.sh" ]; then
+          # Use the sibling move.sh so the frontmatter rewrite + index
+          # refresh stay consistent with every other status move. The
+          # recursion guard env var prevents this re-entry from walking
+          # any further up (AC(d): one-level only).
+          if SPECFLOW_INTERNAL_PROPAGATION=1 "\$SCRIPT_DIR/move.sh" "\$PARENT_PADDED" "In progress" >/dev/null 2>&1; then
+            echo "↑ promoted parent #\${PARENT_PADDED} (\${PARENT_STATUS} → In progress) due to child #\${CHILD_PADDED} move"
+          else
+            echo "::warning::propagate-parent-status: move.sh failed to promote #\${PARENT_PADDED}" >&2
+          fi
+        else
+          echo "::warning::propagate-parent-status: \$SCRIPT_DIR/move.sh not found — cannot promote #\${PARENT_PADDED}" >&2
+        fi
+        ;;
+      *)
+        # Already at In progress / In review / Done / unknown — no-op.
+        # Idempotency + regression guard branch.
+        ;;
+    esac
     ;;
 esac
 
