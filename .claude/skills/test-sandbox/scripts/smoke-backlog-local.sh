@@ -133,6 +133,15 @@ grep -q "propagate-parent-status.sh" .specflow/scripts/backlog/move.sh \
   && pass "move.sh invokes propagate-parent-status.sh as tail hook" \
   || fail "move.sh tail hook missing" "$(tail -10 .specflow/scripts/backlog/move.sh)"
 
+# #263 setup: create a second sibling child of #001 so the original
+# #260 single-child assertions below stay meaningful (otherwise child
+# #003 → Done would itself complete the set and trigger #263's
+# all-children-Done promotion).
+bash .specflow/scripts/backlog/add.sh "Second sibling of 1" "" --parent 1 >/dev/null
+[ -f .specflow/backlog/004-second-sibling-of-1.md ] \
+  && pass "second sibling child #004 created for #263 multi-child smoke" \
+  || fail "second sibling #004 not created" "$(ls .specflow/backlog/)"
+
 # Baseline: parent #001 back to Backlog, child #003 (sub-task) back to Backlog.
 bash .specflow/scripts/backlog/move.sh 1 Backlog >/dev/null
 bash .specflow/scripts/backlog/move.sh 3 Backlog >/dev/null
@@ -144,13 +153,78 @@ parent_status=$(awk '/^---$/{n++; next} n==1 && /^status:/{sub(/^status:[[:space
   && pass "parent auto-promoted from Backlog to In progress on child sub-task move" \
   || fail "parent auto-promotion broken" "expected 'In progress', got '$parent_status'"
 
-# Regression guard: manually advance parent to In review, move another child.
+# #260 regression guard: parent at 'In review' must stay there when a
+# child moves to Done WHILE other open siblings still exist. With #263
+# in main, this only holds because we created #004 in Backlog above —
+# otherwise child #003 → Done would itself complete the set.
 bash .specflow/scripts/backlog/move.sh 1 "In review" >/dev/null
 bash .specflow/scripts/backlog/move.sh 3 "Done" >/dev/null
 parent_status=$(awk '/^---$/{n++; next} n==1 && /^status:/{sub(/^status:[[:space:]]*/, ""); print; exit}' .specflow/backlog/001-first-item.md)
 [ "$parent_status" = "In review" ] \
-  && pass "parent in 'In review' is NOT pulled back to 'In progress' on child move" \
-  || fail "regression guard broken" "expected 'In review', got '$parent_status'"
+  && pass "parent in 'In review' stays there while #004 still open (AC c regression guard)" \
+  || fail "#260 regression guard broken" "expected 'In review', got '$parent_status'"
+
+echo
+echo "═══ #263  Auto-Done propagation when all Epic children Done ═══"
+# Static-grep: the Done branch exists in the propagator source.
+grep -qE '^[[:space:]]*"Done"\)' .specflow/scripts/backlog/propagate-parent-status.sh \
+  && pass "propagate-parent-status.sh has a NEW_STATUS=Done branch (#263)" \
+  || fail "Done branch missing in local propagator" "$(grep -n 'case' .specflow/scripts/backlog/propagate-parent-status.sh)"
+grep -q 'all_done=true' .specflow/scripts/backlog/propagate-parent-status.sh \
+  && pass "propagator computes all_done from sibling frontmatter" \
+  || fail "all_done variable missing in local propagator" "$(grep -n 'all_done' .specflow/scripts/backlog/propagate-parent-status.sh)"
+
+# Behaviour: move the remaining open child #004 to Done.
+# State before: #001=In review, #003=Done, #004=Backlog.
+# Expected after: #001=Done (auto-promoted), #003=Done, #004=Done.
+bash .specflow/scripts/backlog/move.sh 4 "Done" >/dev/null
+parent_status=$(awk '/^---$/{n++; next} n==1 && /^status:/{sub(/^status:[[:space:]]*/, ""); print; exit}' .specflow/backlog/001-first-item.md)
+[ "$parent_status" = "Done" ] \
+  && pass "parent auto-advances In review → Done when last open child reaches Done (AC a)" \
+  || fail "#263 AC(a) broken" "expected 'Done', got '$parent_status'"
+
+# AC(b) idempotency: moving a Done child to Done again, with parent already Done,
+# must NOT corrupt the parent's status (no-op via *) case in PARENT_STATUS).
+bash .specflow/scripts/backlog/move.sh 4 "Done" >/dev/null
+parent_status=$(awk '/^---$/{n++; next} n==1 && /^status:/{sub(/^status:[[:space:]]*/, ""); print; exit}' .specflow/backlog/001-first-item.md)
+[ "$parent_status" = "Done" ] \
+  && pass "re-moving a Done child to Done is idempotent on a Done parent (AC b)" \
+  || fail "#263 AC(b) idempotency broken" "expected 'Done', got '$parent_status'"
+
+# AC(c) regression guard: parent manually moved back from Done. The
+# propagator must NOT re-promote unless a fresh child→Done transition
+# happens AFTER the demotion. The current state has #001=Done,
+# #003=Done, #004=Done. Demote #001 to In review, then nudge a child
+# through a non-Done state and back to Done; verify the parent state
+# at each step.
+bash .specflow/scripts/backlog/move.sh 1 "In review" >/dev/null
+# Step 1: parent is at In review with all children at Done. The
+# propagator only fires on child moves, so a `move.sh 1 "In review"`
+# call should not re-trigger Done propagation by itself.
+parent_status=$(awk '/^---$/{n++; next} n==1 && /^status:/{sub(/^status:[[:space:]]*/, ""); print; exit}' .specflow/backlog/001-first-item.md)
+[ "$parent_status" = "In review" ] \
+  && pass "manually demoting parent from Done to In review lands (no auto-reversal at rest, AC c)" \
+  || fail "#263 AC(c) — manual demotion not respected" "expected 'In review', got '$parent_status'"
+
+# Step 2: move a Done child OUT of Done (Backlog), then to a non-Done
+# state. The propagator only fires on out-of-Backlog and Done transitions;
+# moving #004 to Backlog then to In progress exercises the #260 path
+# (parent should stay at In review since In review is not in Backlog/Ready).
+bash .specflow/scripts/backlog/move.sh 4 "Backlog" >/dev/null
+bash .specflow/scripts/backlog/move.sh 4 "In progress" >/dev/null
+parent_status=$(awk '/^---$/{n++; next} n==1 && /^status:/{sub(/^status:[[:space:]]*/, ""); print; exit}' .specflow/backlog/001-first-item.md)
+[ "$parent_status" = "In review" ] \
+  && pass "parent at In review (manually demoted from Done) is not re-promoted on a non-Done child move (AC c)" \
+  || fail "#263 AC(c) — child→In progress re-triggers Done propagation" "expected 'In review', got '$parent_status'"
+
+# Parent at Backlog branch — moving a Done child to Done must not promote a
+# Backlog parent (AC a explicitly excludes Backlog). Demote parent, re-run.
+bash .specflow/scripts/backlog/move.sh 1 "Backlog" >/dev/null
+bash .specflow/scripts/backlog/move.sh 4 "Done" >/dev/null
+parent_status=$(awk '/^---$/{n++; next} n==1 && /^status:/{sub(/^status:[[:space:]]*/, ""); print; exit}' .specflow/backlog/001-first-item.md)
+[ "$parent_status" = "Backlog" ] \
+  && pass "Backlog parent is not auto-advanced even when all children Done (AC a exclusion)" \
+  || fail "#263 Backlog parent exclusion broken" "expected 'Backlog', got '$parent_status'"
 
 echo
 if [ "$fails" -eq 0 ]; then
