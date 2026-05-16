@@ -16,3 +16,4 @@ obsolete once they are encoded in `AGENTS.md`).
 - [Claude plugin backwards compat](claude-plugin-compat.md) — state table + detection method for v0.x inline agents when plugin is installed
 - [Router skill consolidation](router-skill-consolidation.md) — decisions for collapsing 11 specflow-* phase skills into a single /specflow router + phases/ subdirectory
 - [Auto-chain disable-model-invocation fix](auto-chain-disable-model-invocation.md) — lift the flag from the router to unblock Skill-tool chaining by specflow-auto
+- [Specflow-auto merge into router](specflow-auto-merge-into-router.md) — decisions for collapsing /specflow-auto chain logic into the /specflow router with --manual opt-out; deprecation alias + removal plan
