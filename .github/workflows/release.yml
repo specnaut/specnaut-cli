@@ -142,6 +142,13 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
+      # `scripts/gen-changelog.ts` calls `gh pr view <num> --json body`
+      # to extract the `## Agent adoption` section from each feat: PR.
+      # Without `pull-requests: read`, those calls return empty and the
+      # release body silently ships without the `### Adoption guide`
+      # block (v1.6.0 was published this way — body was amended manually
+      # post-release).
+      pull-requests: read
     steps:
       - uses: actions/checkout@v4
         with:
