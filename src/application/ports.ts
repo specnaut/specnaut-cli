@@ -141,3 +141,19 @@ export interface UpgradeMarkerStore {
   write(projectDir: string, marker: UpgradeMarker): Promise<void>;
   delete(projectDir: string): Promise<void>;
 }
+
+/**
+ * Filesystem-backed access to `.specflow/upgrade-staging/`. The staging
+ * directory holds upstream versions of files that the upgrade preserved
+ * (customized locally). `specflow reconcile` consumes the directory.
+ */
+export interface StagingStore {
+  /** Project-relative paths currently in the staging directory. */
+  list(projectDir: string): Promise<string[]>;
+  /** Read upstream content for a project-relative path. `null` if absent. */
+  read(projectDir: string, relPath: string): Promise<string | null>;
+  /** Remove the staging entry for a path. Idempotent. */
+  delete(projectDir: string, relPath: string): Promise<void>;
+  /** If the staging dir is empty, remove it. Returns whether it was removed. */
+  cleanupIfEmpty(projectDir: string): Promise<boolean>;
+}
