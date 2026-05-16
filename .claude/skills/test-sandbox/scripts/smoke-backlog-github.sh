@@ -125,6 +125,19 @@ check "move.sh mutation uses gh project item-edit (CLI wrapper)" \
   'grep -q "gh project item-edit" .specflow/scripts/backlog/move.sh'
 
 echo
+echo "═══ #260  Auto-propagate parent Epic on child move (github) ═══"
+check "propagate-parent-status.sh present + executable" \
+  '[ -x .specflow/scripts/backlog/propagate-parent-status.sh ]'
+check "move.sh invokes propagate-parent-status.sh as tail hook" \
+  'grep -q "propagate-parent-status.sh" .specflow/scripts/backlog/move.sh'
+check "propagator resolves parent via GraphQL Issue.parent" \
+  'grep -q "parent { number }" .specflow/scripts/backlog/propagate-parent-status.sh'
+check "propagator promotes only Backlog/Ready parents" \
+  'grep -qE "\"Backlog\"\|\"Ready\"" .specflow/scripts/backlog/propagate-parent-status.sh'
+check "propagator carries the SPECFLOW_INTERNAL_PROPAGATION recursion guard" \
+  'grep -q "SPECFLOW_INTERNAL_PROPAGATION" .specflow/scripts/backlog/propagate-parent-status.sh'
+
+echo
 if [ "$fails" -eq 0 ]; then
   echo "═══ ALL GITHUB BACKLOG CHECKS PASSED ═══"
   exit 0

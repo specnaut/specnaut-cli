@@ -125,6 +125,34 @@ else
 fi
 
 echo
+echo "═══ #260  Auto-propagate parent Epic on child move (local) ═══"
+[ -x .specflow/scripts/backlog/propagate-parent-status.sh ] \
+  && pass "propagate-parent-status.sh scaffolded executable" \
+  || fail "propagate-parent-status.sh missing or not executable" "$(ls -l .specflow/scripts/backlog/ 2>/dev/null)"
+grep -q "propagate-parent-status.sh" .specflow/scripts/backlog/move.sh \
+  && pass "move.sh invokes propagate-parent-status.sh as tail hook" \
+  || fail "move.sh tail hook missing" "$(tail -10 .specflow/scripts/backlog/move.sh)"
+
+# Baseline: parent #001 back to Backlog, child #003 (sub-task) back to Backlog.
+bash .specflow/scripts/backlog/move.sh 1 Backlog >/dev/null
+bash .specflow/scripts/backlog/move.sh 3 Backlog >/dev/null
+
+# Move child OUT of Backlog → parent should auto-promote to In progress.
+bash .specflow/scripts/backlog/move.sh 3 "In progress" >/dev/null
+parent_status=$(awk '/^---$/{n++; next} n==1 && /^status:/{sub(/^status:[[:space:]]*/, ""); print; exit}' .specflow/backlog/001-first-item.md)
+[ "$parent_status" = "In progress" ] \
+  && pass "parent auto-promoted from Backlog to In progress on child sub-task move" \
+  || fail "parent auto-promotion broken" "expected 'In progress', got '$parent_status'"
+
+# Regression guard: manually advance parent to In review, move another child.
+bash .specflow/scripts/backlog/move.sh 1 "In review" >/dev/null
+bash .specflow/scripts/backlog/move.sh 3 "Done" >/dev/null
+parent_status=$(awk '/^---$/{n++; next} n==1 && /^status:/{sub(/^status:[[:space:]]*/, ""); print; exit}' .specflow/backlog/001-first-item.md)
+[ "$parent_status" = "In review" ] \
+  && pass "parent in 'In review' is NOT pulled back to 'In progress' on child move" \
+  || fail "regression guard broken" "expected 'In review', got '$parent_status'"
+
+echo
 if [ "$fails" -eq 0 ]; then
   echo "═══ ALL BACKLOG CHECKS PASSED ═══"
   exit 0
