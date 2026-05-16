@@ -57,6 +57,14 @@ The PO will:
      - `P1` — must-have for the next sprint or release
      - `P2` — important but deferrable; standard work
      - `P3` — nice-to-have / long horizon; pick up when slack appears
+  3a. **Set Roadmap dates (soft).** GitHub backend only — Roadmap view inputs:
+     - **Target date** when promoting Backlog → Ready (`set-field.sh <num> TargetDate <YYYY-MM-DD>`).
+       Use a best-estimate planned-delivery date; revise when scope shifts.
+     - **Start date** when moving Ready → In Progress (`set-field.sh <num> StartDate <YYYY-MM-DD>`).
+       Today's date when picking up the work.
+     - **Estimate** (optional) story-point or day count (`set-field.sh <num> Estimate <N>`).
+     Missing dates do NOT block; they emit a warn-only line in the final
+     report (see "⚠ Roadmap dates missing" below).
   4. **Decide the outcome:**
      - **Promote to `Ready`** when the body is clear, both labels are
        applied, AND no scope decisions remain.
@@ -79,6 +87,12 @@ The PO will:
   the PO MUST capture the failure reason and surface it under "⚠ size /
   priority missing" in the final report — silent skip is a contract
   violation.
+
+  Step 3a (Roadmap dates) is **soft** — never blocking. When the PO
+  promotes Backlog → Ready or moves Ready → In Progress, it SHOULD set
+  the appropriate date; when it doesn't (because the date is genuinely
+  unknown), it surfaces a `⚠ no target date set` or `⚠ no start date set`
+  line in the final report and moves on.
 
 The PO must respect the standard backlog skill — do not bypass its
 scripts.
@@ -200,6 +214,12 @@ Per-ticket:
   ↳ #<num> "<short title>" — <reason: e.g. gh label create failed (rate-limited)>
   ↳ ...
   (omit this whole section when K == 0)
+
+⚠ Roadmap dates missing (GitHub backend, soft):
+  ↳ #<num> "<short title>" — Ready since <date>, no target date set
+  ↳ #<num> "<short title>" — In progress, no start date set
+  ↳ ...
+  (omit this whole section when no dates are missing)
 
 Stale PRs:  <S> open PRs idle > 48h
 Orphan specs: <O> spec directories missing the next artefact
