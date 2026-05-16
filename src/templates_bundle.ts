@@ -10032,7 +10032,7 @@ Invoke the **specflow** skill (at \`.claude/skills/specflow/SKILL.md\`) using th
 
 Empty \`\$ARGUMENTS\` → the skill prints the workflow overview and stops.
 
-This command is a thin slash-command shim so users can type \`/specflow specify "..."\` directly. The skill itself has \`disable-model-invocation: true\`; this command makes the explicit \`/\` form available alongside the \`specflow-review\` auto-invoke alias.
+This command is a thin slash-command shim so users can type \`/specflow specify "..."\` directly. The router auto-chains the rest of the workflow by default; pass \`--manual\` to opt out, or \`--once\` / \`--continue\` to override the mid-chain artefact-detection heuristic.
 `,
       executable: false,
     },
@@ -10497,7 +10497,7 @@ clarifications needed) STOP #2 (pre-merge validation)
 - \`/specflow review\` — architecture + quality gates
 - \`/specflow merge\` — merge the feature branch to main
 - \`/specflow-backlog\` — manage the product backlog (via the PO agent)
-- \`/specflow-auto\` — auto-chain dispatcher invoked by \`/specflow specify\`
+- \`/specflow-auto\` — deprecated alias of \`/specflow\`; will be removed in the next major release
 
 ## Agent roles (invocable manually as skills)
 
