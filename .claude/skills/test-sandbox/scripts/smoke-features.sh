@@ -217,13 +217,11 @@ check "router SKILL.md no longer recommends /specflow-auto for end-to-end runs" 
   '! grep -q "use \`/specflow-auto specify" .claude/skills/specflow/SKILL.md'
 
 echo
-echo "═══ #182  specflow-auto — mid-chain re-entry ═══"
-check "specflow-auto SKILL.md documents mid-chain re-entry" \
-  'grep -q "Mid-chain re-entry" .claude/skills/specflow-auto/SKILL.md'
-check "specflow-auto SKILL.md describes the --continue flag" \
-  'grep -q -- "--continue" .claude/skills/specflow-auto/SKILL.md'
-check "specflow-auto SKILL.md describes the --once flag" \
-  'grep -q -- "--once" .claude/skills/specflow-auto/SKILL.md'
+echo "═══ #182  specflow-auto — deprecation alias ═══"
+check "specflow-auto SKILL.md carries the deprecation notice" \
+  'grep -q "DEPRECATED" .claude/skills/specflow-auto/SKILL.md'
+check "specflow-auto SKILL.md tells users to use /specflow instead" \
+  'grep -q "auto-chains by default" .claude/skills/specflow-auto/SKILL.md'
 
 echo
 echo "═══ #188  /specflow merge auto-closes the linked backlog issue ═══"
