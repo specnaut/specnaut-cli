@@ -1,0 +1,48 @@
+name: PR adoption lint
+
+on:
+  pull_request:
+    types: [opened, edited, synchronize, reopened]
+
+permissions:
+  contents: read
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - name: "Check Agent adoption section on feat: PRs"
+        env:
+          PR_TITLE: ${{ github.event.pull_request.title }}
+          PR_BODY: ${{ github.event.pull_request.body }}
+        run: |
+          set -eu
+
+          # Only enforce on feat: and feat(scope): titles.
+          case "$PR_TITLE" in
+            feat:*|"feat("*)
+              ;;
+            *)
+              echo "Title is not feat: — section optional. Skipping check."
+              exit 0
+              ;;
+          esac
+
+          body_file="$(mktemp)"
+          printf '%s' "$PR_BODY" > "$body_file"
+
+          if ! grep -qE '^## Agent adoption\b' "$body_file"; then
+            echo "::error::feat: PR is missing the '## Agent adoption' section in its body."
+            echo "::error::See docs/contributing.md#agent-adoption for the convention."
+            exit 1
+          fi
+
+          # Require at least one ```prompt fenced block somewhere after the heading.
+          # awk extracts everything from the heading onwards; grep looks for the fence.
+          if ! awk '/^## Agent adoption/{p=1} p' "$body_file" | grep -qE '^```prompt[[:space:]]*$'; then
+            echo "::error::feat: PR has '## Agent adoption' but no \`\`\`prompt fenced block under it."
+            echo "::error::See docs/contributing.md#agent-adoption for the format."
+            exit 1
+          fi
+
+          echo "Agent adoption section present ✓"
