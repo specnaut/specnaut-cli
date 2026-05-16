@@ -202,6 +202,15 @@ check "SKILL.md describes the cascade-check close gate" \
   'grep -q "cascade-check.sh" .claude/skills/backlog/SKILL.md'
 
 echo
+echo "═══ #251  auto-chain — chain mechanics file present ═══"
+check "phases/auto-chain.md is bundled into the project" \
+  'test -f .claude/skills/specflow/phases/auto-chain.md'
+check "auto-chain.md documents STOP #1 and STOP #2" \
+  'grep -q "STOP #1" .claude/skills/specflow/phases/auto-chain.md && grep -q "STOP #2" .claude/skills/specflow/phases/auto-chain.md'
+check "auto-chain.md documents mid-chain re-entry" \
+  'grep -q "Mid-chain re-entry" .claude/skills/specflow/phases/auto-chain.md'
+
+echo
 echo "═══ #182  specflow-auto — mid-chain re-entry ═══"
 check "specflow-auto SKILL.md documents mid-chain re-entry" \
   'grep -q "Mid-chain re-entry" .claude/skills/specflow-auto/SKILL.md'
