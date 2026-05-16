@@ -58,7 +58,7 @@ check ".claude/commands/specflow.md present (slash-command shim, post-F3)" \
   '[ -f .claude/commands/specflow.md ]'
 check "router .claude/skills/specflow/SKILL.md present" \
   '[ -f .claude/skills/specflow/SKILL.md ]'
-for phase in specify constitution clarify plan tasks analyze implement merge review checklist groom tag-version release-version; do
+for phase in specify constitution clarify plan tasks analyze implement merge review checklist groom tag-version release-version list-skills; do
   check ".claude/skills/specflow/phases/$phase.md present" \
     "[ -f .claude/skills/specflow/phases/$phase.md ]"
 done
@@ -69,6 +69,8 @@ check "phase doc tag-version.md scaffolded (epic #226)" \
   '[ -f .claude/skills/specflow/phases/tag-version.md ]'
 check "phase doc release-version.md scaffolded (epic #226)" \
   '[ -f .claude/skills/specflow/phases/release-version.md ]'
+check "phase doc list-skills.md scaffolded (#265)" \
+  '[ -f .claude/skills/specflow/phases/list-skills.md ]'
 check "name: specflow on the router SKILL.md" \
   'head -3 .claude/skills/specflow/SKILL.md | grep -q "name: specflow"'
 check "disable-model-invocation NOT set on the router (Skill-tool chaining must work)" \
