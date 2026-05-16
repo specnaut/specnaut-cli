@@ -245,12 +245,21 @@ when stdin is a TTY, and falls back to a numeric prompt — or the defaults — 
   number is just a release identifier. No major/minor/patch guesswork; the letter suffix handles
   same-day re-tags.
 
-Specflow detects whether the project looks like a library (`package.json` `exports` /
-`pyproject.toml` `[project]` / `Cargo.toml` `[lib]` / `composer.json` `type=library`) and
-pre-selects a sensible default — the user can always override at the picker. The choice is persisted
-by **rewriting the scaffolded skill** itself (the unchosen scheme's blocks are stripped at scaffold
-time), so the on-disk `.specflow/scripts/release/tag.sh` only contains the chosen scheme's logic. To
-switch schemes later, re-run `specflow init` and pick the other option.
+Specflow pre-selects a sensible default by scanning the project for SemVer signals:
+
+- **Library publishing markers** — `package.json` `exports`, `pyproject.toml` `[project]` /
+  `[tool.poetry]`, `Cargo.toml` `[lib]`, `composer.json` `type=library`.
+- **Semver-shaped git tags** — any local tag matching `v?MAJOR.MINOR.PATCH` (with optional
+  pre-release / build suffix), e.g. `v1.2.3`, `1.0.0-rc.1`, `v2.0.0+build.5`. Date-shaped tags like
+  `v25.5.16a` are explicitly excluded so brownfield repos already on date scheme don't get
+  mis-suggested.
+- **CHANGELOG.md** — Keep-a-Changelog style headers (`## [1.2.0]`, `## v1.2.0`, `## 1.2.0`).
+
+Any one signal flips the suggestion to SemVer. When zero signals are found, Specflow suggests
+date-based. The user can always override at the picker. The choice is persisted by **rewriting the
+scaffolded skill** itself (the unchosen scheme's blocks are stripped at scaffold time), so the
+on-disk `.specflow/scripts/release/tag.sh` only contains the chosen scheme's logic. To switch
+schemes later, re-run `specflow init` and pick the other option.
 
 Pass `--scheme semver|date` to bypass the picker in non-TTY mode.
 

@@ -25,6 +25,11 @@ ${bold("Flags (for init):")}
   --backlog-url <url> Kanban / project URL (e.g. https://github.com/orgs/<org>/projects/<N>)
                       Required for github/gitlab in non-interactive mode; pre-fills .specflow/backlog-config.yml
   --backlog-repo <r>  GitHub repo override <owner>/<name>; falls back to "git remote get-url origin"
+  --scheme <name>     Versioning scheme for the release scripts: semver | date
+                      Auto-detected from library markers (package.json exports, pyproject.toml,
+                      Cargo.toml [lib], composer.json type=library), semver-shaped git tags
+                      (v1.2.3), or a CHANGELOG.md with Keep-a-Changelog headers. Falls back to
+                      "date" when no signal is found.
 
 ${bold("Flags (for upgrade):")}
   --dry-run           Show the plan without writing
