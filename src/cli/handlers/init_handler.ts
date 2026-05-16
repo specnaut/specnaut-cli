@@ -105,6 +105,12 @@ function detectSchemeSuggestion(targetDir: string): VersionScheme {
         return null;
       }
     },
+    listTags() {
+      // Stub: filled in by the follow-up commit that wires `git tag -l`
+      // into the detection. Keeping the port contract satisfied here so
+      // the rename commit type-checks on its own.
+      return [];
+    },
   });
   return result.suggestedScheme;
 }

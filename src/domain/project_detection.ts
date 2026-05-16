@@ -1,18 +1,25 @@
 import type { VersionScheme } from "./installed_lock.ts";
 
 /**
- * Tiny synchronous filesystem facade — just what `detectVersionScheme`
- * needs. Implementations: a `Deno.statSync` / `Deno.readTextFileSync`
- * adapter in production, a fake map in tests.
+ * Tiny synchronous project-state facade — just what `detectVersionScheme`
+ * needs. Implementations: a `Deno.statSync` / `Deno.readTextFileSync` +
+ * `git tag -l` adapter in production, a fake map in tests.
  *
  * Synchronous on purpose: the detection runs once at init time, the
- * total work is reading a handful of small manifest files, and
- * threading async through every helper just to satisfy Deno globals
- * here would muddy the domain port.
+ * total work is reading a handful of small manifest files plus one
+ * `git tag` invocation, and threading async through every helper just
+ * to satisfy Deno globals here would muddy the domain port.
  */
-export type FsSnapshot = {
+export type ProjectSnapshot = {
   exists(rel: string): boolean;
   readText(rel: string): string | null;
+  /**
+   * Returns the list of local git tag names (`git tag -l` output, one
+   * per line, no `refs/tags/` prefix). Returns `[]` when the project is
+   * not a git repo, `git` is unavailable, or the subprocess fails — the
+   * caller treats absence as "no signal", not as an error.
+   */
+  listTags(): readonly string[];
 };
 
 export type DetectionResult = {
@@ -33,14 +40,14 @@ export type DetectionResult = {
  * The user always sees the suggestion as a pre-selected default they
  * can override — this is a UX shortcut, not a contract.
  */
-export function detectVersionScheme(fs: FsSnapshot): DetectionResult {
+export function detectVersionScheme(snap: ProjectSnapshot): DetectionResult {
   const evidence: string[] = [];
 
   // npm: a `package.json` with an `exports` or `main` field is a
   // strong library signal. A bare `package.json` (Vite app, Next app,
   // Express service) typically has neither.
-  if (fs.exists("package.json")) {
-    const raw = fs.readText("package.json");
+  if (snap.exists("package.json")) {
+    const raw = snap.readText("package.json");
     if (raw !== null) {
       try {
         const pkg = JSON.parse(raw) as Record<string, unknown>;
@@ -61,8 +68,8 @@ export function detectVersionScheme(fs: FsSnapshot): DetectionResult {
   }
 
   // Python: `pyproject.toml` with `[project]` or `[tool.poetry]` block.
-  if (fs.exists("pyproject.toml")) {
-    const raw = fs.readText("pyproject.toml");
+  if (snap.exists("pyproject.toml")) {
+    const raw = snap.readText("pyproject.toml");
     if (raw !== null) {
       if (/^\s*\[project\]\s*$/m.test(raw)) {
         evidence.push("pyproject.toml [project] block");
@@ -73,8 +80,8 @@ export function detectVersionScheme(fs: FsSnapshot): DetectionResult {
   }
 
   // Rust: `Cargo.toml` with `[lib]`. Apps have `[[bin]]` instead.
-  if (fs.exists("Cargo.toml")) {
-    const raw = fs.readText("Cargo.toml");
+  if (snap.exists("Cargo.toml")) {
+    const raw = snap.readText("Cargo.toml");
     if (raw !== null) {
       if (/^\s*\[lib\]\s*$/m.test(raw)) {
         evidence.push("Cargo.toml [lib] section");
@@ -83,8 +90,8 @@ export function detectVersionScheme(fs: FsSnapshot): DetectionResult {
   }
 
   // PHP: `composer.json` with `"type": "library"`.
-  if (fs.exists("composer.json")) {
-    const raw = fs.readText("composer.json");
+  if (snap.exists("composer.json")) {
+    const raw = snap.readText("composer.json");
     if (raw !== null) {
       try {
         const pkg = JSON.parse(raw) as Record<string, unknown>;
