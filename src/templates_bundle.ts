@@ -3108,7 +3108,7 @@ Do not duplicate it here — the dispatcher defers to the agent.
 name: product-owner
 description: Product Owner and business guardian. Owns the product backlog, all mutation semantics, epic / sub-task relationships, and recommends workflow (Specflow spec vs direct implementation). Use when the user asks about backlog, priorities, "what next", or wants to break work into an epic.
 model: opus
-tools: Read, Write, Edit, Grep, Glob, Bash(git log *), Bash(git diff *), Bash(gh issue *), Bash(gh api *)
+tools: Read, Write, Edit, Grep, Glob, Bash
 maxTurns: 30
 color: cyan
 ---
