@@ -60,7 +60,7 @@ projects** without running `specflow init`, install the Claude Code plugin:
 ```
 
 The plugin ships the same 23 assets the binary scaffolds — the consolidated `specflow` router skill
-(with 11 phase docs, the `specflow-review` auto-invoke alias, and the deprecated `specflow-auto`
+(with 14 phase docs, the `specflow-review` auto-invoke alias, and the deprecated `specflow-auto`
 skill), and 9 sub-agents — but at user scope, versioned, and auto-updated via `/plugin update`.
 Because the plugin's slash-commands are namespaced and the consolidated router itself is named
 `specflow`, you'll see a double-prefix at the call site:
@@ -562,7 +562,7 @@ marketplace:
 
 The plugin gives any Claude Code user instant access to the full Specflow slash-command suite and
 sub-agents — no binary, no `specflow init` required. The 24 plugin assets (the consolidated
-`specflow` router skill with 11 phase docs, the `specflow-review` auto-invoke alias, the deprecated
+`specflow` router skill with 14 phase docs, the `specflow-review` auto-invoke alias, the deprecated
 `specflow-auto` alias, and 10 sub-agents) are namespaced under `/specflow-plugin:*` so they coexist
 with project-local copies without collision.
 
