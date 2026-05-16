@@ -138,3 +138,36 @@ Deno.test("detectVersionScheme stacks evidence: lib marker + semver tags", () =>
   // Both signals recorded for transparency.
   assertEquals(r.evidence.length >= 2, true);
 });
+
+Deno.test("detectVersionScheme suggests semver when CHANGELOG.md has Keep-a-Changelog headers", () => {
+  const changelog = [
+    "# Changelog",
+    "",
+    "## [Unreleased]",
+    "",
+    "## [1.2.0] - 2026-01-15",
+    "### Added",
+    "- thing",
+    "",
+    "## [1.1.0] - 2025-12-01",
+  ].join("\n");
+  const r = detectVersionScheme(fakeSnapshot({ "CHANGELOG.md": changelog }));
+  assertEquals(r.suggestedScheme, "semver");
+});
+
+Deno.test("detectVersionScheme suggests semver for plain `## v1.2.0` headers", () => {
+  const changelog = "# Changelog\n\n## v1.2.0\n\n## v1.1.0\n";
+  const r = detectVersionScheme(fakeSnapshot({ "CHANGELOG.md": changelog }));
+  assertEquals(r.suggestedScheme, "semver");
+});
+
+Deno.test("detectVersionScheme ignores CHANGELOG.md with no semver headings", () => {
+  const changelog = "# Changelog\n\n## [Unreleased]\n\n## Recent changes\n";
+  const r = detectVersionScheme(fakeSnapshot({ "CHANGELOG.md": changelog }));
+  assertEquals(r.suggestedScheme, "date");
+});
+
+Deno.test("detectVersionScheme tolerates a missing CHANGELOG.md", () => {
+  const r = detectVersionScheme(fakeSnapshot({}));
+  assertEquals(r.suggestedScheme, "date");
+});

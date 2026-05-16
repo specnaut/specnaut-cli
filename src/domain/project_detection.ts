@@ -129,6 +129,21 @@ export function detectVersionScheme(snap: ProjectSnapshot): DetectionResult {
     );
   }
 
+  // CHANGELOG.md with Keep-a-Changelog style version headers — another
+  // hard signal that the team thinks in terms of MAJOR.MINOR.PATCH
+  // releases. We accept both bracketed (`## [1.2.0]`) and bare
+  // (`## v1.2.0` / `## 1.2.0`) header forms; date-suffix shapes are
+  // rejected via the same trailing-letter guard as git tags.
+  if (snap.exists("CHANGELOG.md")) {
+    const raw = snap.readText("CHANGELOG.md");
+    if (raw !== null) {
+      const SEMVER_HEADING_RE = /^##\s+\[?v?\d+\.\d+\.\d+(?:[+-][0-9A-Za-z.-]+)?\]?\b/m;
+      if (SEMVER_HEADING_RE.test(raw)) {
+        evidence.push("CHANGELOG.md semver headings");
+      }
+    }
+  }
+
   // Ruby: any `*.gemspec` at the repo root is a library marker.
   // The FS snapshot doesn't enumerate; the caller passes a `*.gemspec`
   // hint as a synthetic path. Implementation: convention — caller probes
