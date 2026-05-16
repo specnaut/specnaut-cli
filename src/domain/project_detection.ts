@@ -104,6 +104,31 @@ export function detectVersionScheme(snap: ProjectSnapshot): DetectionResult {
     }
   }
 
+  // Git tags: a repo that has already shipped one or more semver-shaped
+  // tags is the strongest possible "this team uses SemVer" signal. We
+  // intentionally exclude Specflow's own date-tag shape (`vYY.M.Da`,
+  // identifiable by the trailing lowercase letter) so brownfield repos
+  // that adopted Specflow earlier with date-tags don't get mis-suggested.
+  //
+  // Accepted shapes (case-insensitive, optional `v` prefix):
+  //   v?MAJOR.MINOR.PATCH                      v1.2.3
+  //   v?MAJOR.MINOR.PATCH-<pre-release>         v1.2.3-rc.1
+  //   v?MAJOR.MINOR.PATCH+<build>               v1.2.3+build.5
+  //
+  // Rejected (treated as not-semver):
+  //   anything with a trailing letter        v25.5.16a, v1.2.3foo
+  //   anything missing the third component   v1.2, v1
+  //   anything with a fourth component       v1.2.3.4
+  const SEMVER_TAG_RE = /^v?\d+\.\d+\.\d+(?:[+-][0-9A-Za-z.-]+)?$/;
+  const semverTags = snap.listTags().filter((t) => SEMVER_TAG_RE.test(t));
+  if (semverTags.length > 0) {
+    evidence.push(
+      semverTags.length === 1
+        ? `git tag ${semverTags[0]}`
+        : `${semverTags.length} semver-shaped git tags (e.g. ${semverTags[0]})`,
+    );
+  }
+
   // Ruby: any `*.gemspec` at the repo root is a library marker.
   // The FS snapshot doesn't enumerate; the caller passes a `*.gemspec`
   // hint as a synthetic path. Implementation: convention — caller probes

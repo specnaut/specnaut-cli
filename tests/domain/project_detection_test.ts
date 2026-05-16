@@ -99,3 +99,42 @@ Deno.test("detectVersionScheme collects multiple evidence lines when several mar
   assertEquals(r.suggestedScheme, "semver");
   assertEquals(r.evidence.length, 2);
 });
+
+Deno.test("detectVersionScheme suggests semver when a v-prefixed semver git tag exists", () => {
+  const r = detectVersionScheme(fakeSnapshot({}, ["v1.2.3"]));
+  assertEquals(r.suggestedScheme, "semver");
+  assertEquals(r.evidence.length, 1);
+});
+
+Deno.test("detectVersionScheme suggests semver when a bare semver git tag exists", () => {
+  const r = detectVersionScheme(fakeSnapshot({}, ["1.0.0"]));
+  assertEquals(r.suggestedScheme, "semver");
+});
+
+Deno.test("detectVersionScheme suggests semver for semver tags with pre-release / build suffix", () => {
+  const r = detectVersionScheme(fakeSnapshot({}, ["v1.2.3-rc.1", "v1.2.3+build.5"]));
+  assertEquals(r.suggestedScheme, "semver");
+});
+
+Deno.test("detectVersionScheme ignores Specflow-style date tags (letter-suffix shape)", () => {
+  // vYY.M.Da — Specflow's own date scheme. Shape-overlapping with
+  // semver MAJOR.MINOR.PATCH but disambiguated by the trailing letter.
+  const r = detectVersionScheme(fakeSnapshot({}, ["v25.5.16a", "v26.1.3b"]));
+  assertEquals(r.suggestedScheme, "date");
+  assertEquals(r.evidence, []);
+});
+
+Deno.test("detectVersionScheme ignores non-version tags", () => {
+  const r = detectVersionScheme(fakeSnapshot({}, ["release-1", "draft", "wip"]));
+  assertEquals(r.suggestedScheme, "date");
+});
+
+Deno.test("detectVersionScheme stacks evidence: lib marker + semver tags", () => {
+  const r = detectVersionScheme(fakeSnapshot(
+    { "package.json": JSON.stringify({ exports: { ".": "./i.js" } }) },
+    ["v0.1.0", "v0.2.0"],
+  ));
+  assertEquals(r.suggestedScheme, "semver");
+  // Both signals recorded for transparency.
+  assertEquals(r.evidence.length >= 2, true);
+});
