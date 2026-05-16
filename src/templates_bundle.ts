@@ -32,12 +32,25 @@ when_to_use: |
 
 # Specflow router
 
-\`\$ARGUMENTS\` carries the user's input. Parse it as \`<phase> [rest]\`:
+\`\$ARGUMENTS\` carries the user's input. Parse it as \`[<flag>...] <phase> [rest]\`:
 
-- The first token is the phase name.
-- Everything after the first whitespace is the argument string for that phase.
+1. **Chain mode parsing** — scan the tokens for at most one of
+   \`--manual\`, \`--once\`, \`--continue\`. They are mutually exclusive; if
+   more than one is present, report \`error: --manual, --once, and --continue are mutually exclusive\` and stop.
+   - \`--manual\` → CHAIN_MODE = \`off\`
+   - \`--once\`   → CHAIN_MODE = \`once\`
+   - \`--continue\` → CHAIN_MODE = \`continue\`
+   - none      → CHAIN_MODE = \`auto\` (the default)
 
-If \`\$ARGUMENTS\` is empty, render the **Workflow overview** below and stop. Do not pick a phase yourself.
+   Strip the matched flag from the token list before going further.
+
+2. **Phase extraction** — the first remaining token is the phase name.
+   Everything after the first whitespace is the argument string for
+   that phase.
+
+3. **Empty arguments** — if no tokens remain after flag parsing (or
+   \`\$ARGUMENTS\` was empty to start with), render the **Workflow overview**
+   below and stop. Do not pick a phase yourself.
 
 ## Phase index
 
@@ -57,13 +70,35 @@ If \`\$ARGUMENTS\` is empty, render the **Workflow overview** below and stop. Do
 | \`tag-version\` | \`phases/tag-version.md\` | Bump + create an annotated git tag using the project's versioning scheme. |
 | \`release-version\` | \`phases/release-version.md\` | Generate categorized release notes for a tag (default: latest). |
 
+Chainable phases are: \`specify\`, \`clarify\`, \`plan\`, \`tasks\`, \`analyze\`,
+\`implement\`, \`review\`. The others (\`merge\`, \`constitution\`,
+\`checklist\`, \`groom\`, \`tag-version\`, \`release-version\`) are one-shot
+regardless of chain mode.
+
 ## Routing
 
 1. **Read** the phase reference file (\`phases/<phase>.md\`) for the requested phase using the \`Read\` tool.
-2. **Substitute** the remainder of \`\$ARGUMENTS\` for the phase's input.
+2. **Substitute** the stripped phase arguments for the phase's input.
 3. **Execute** the procedure in the reference file end-to-end.
+4. **Decide whether to chain** (see "Chain decision" below).
 
-Unknown phase → print the index above and stop.
+Unknown phase → print the phase index and stop.
+
+## Chain decision
+
+After the phase procedure completes successfully:
+
+- \`CHAIN_MODE == off\` (the user passed \`--manual\`) → stop. Report the
+  phase outcome and leave the next step to the user.
+- Phase is not in the chainable list (e.g. \`constitution\`, \`checklist\`,
+  \`groom\`, \`tag-version\`, \`release-version\`) → stop.
+- \`CHAIN_MODE == once\` → stop.
+- \`CHAIN_MODE == continue\` → read \`phases/auto-chain.md\` and chain
+  through the remaining phases regardless of downstream-artefact state.
+- \`CHAIN_MODE == auto\` (the default) → read \`phases/auto-chain.md\`. For
+  \`specify\`, the chain always continues. For any other chainable phase,
+  apply the artefact-detection table in that file — chain if downstream
+  artefacts are absent, one-shot if present.
 
 ## Workflow overview
 
@@ -73,37 +108,40 @@ specify → clarify → plan → tasks → analyze → implement → review → 
                                                           STOP for pre-merge validation
 \`\`\`
 
+Default behavior: \`/specflow specify "..."\` runs the entire chain in one
+session, pausing only at STOP #1 (if clarifications are needed) and
+STOP #2 (pre-merge confirmation). See \`phases/auto-chain.md\` for the
+chain mechanics.
+
 \`constitution\`, \`checklist\`, \`groom\`, \`tag-version\`, and \`release-version\` are out-of-band utilities, not part of the linear flow.
 
 ## Typical flow
 
 \`\`\`
 /specflow specify "Add OAuth2 login"
-  → spec drafted in .specflow/specs/<NNN>-add-oauth2-login/spec.md
-
-/specflow clarify
-  → resolves any [NEEDS CLARIFICATION] markers
-
-/specflow plan
-  → research, data-model, contracts, quickstart written
-
-/specflow tasks
-  → tasks.md generated
-
-/specflow analyze
-  → cross-artifact consistency check
-
-/specflow implement
-  → developer → review-coordinator → qa-tester pipeline
-
-/specflow review
-  → final quality scan
-
-/specflow merge
-  → pre-merge validation + merge
+  → drafts the spec, then auto-chains:
+    → /specflow clarify  (STOP #1 only if [NEEDS CLARIFICATION] markers remain)
+    → /specflow plan
+    → /specflow tasks
+    → /specflow analyze
+    → /specflow implement
+    → /specflow review
+    → STOP #2 — summary + "Ready to merge?" confirmation
+    → /specflow merge  (on "yes")
 \`\`\`
 
-For an end-to-end run that auto-chains the silent gates, use \`/specflow-auto specify "<feature>"\`.
+To run a single phase only (no chain), pass \`--manual\`:
+
+\`\`\`
+/specflow specify --manual "Add OAuth2 login"
+\`\`\`
+
+To force or skip the chain mid-flow:
+
+\`\`\`
+/specflow plan 042 --once       # regenerate plan.md only, do not cascade
+/specflow plan 042 --continue   # regenerate plan.md AND cascade tasks → review
+\`\`\`
 `,
     executable: false,
     backend: null,

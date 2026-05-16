@@ -209,6 +209,12 @@ check "auto-chain.md documents STOP #1 and STOP #2" \
   'grep -q "STOP #1" .claude/skills/specflow/phases/auto-chain.md && grep -q "STOP #2" .claude/skills/specflow/phases/auto-chain.md'
 check "auto-chain.md documents mid-chain re-entry" \
   'grep -q "Mid-chain re-entry" .claude/skills/specflow/phases/auto-chain.md'
+check "router SKILL.md parses --manual flag" \
+  'grep -q -- "--manual" .claude/skills/specflow/SKILL.md'
+check "router SKILL.md routes to phases/auto-chain.md when chain mode is on" \
+  'grep -q "phases/auto-chain.md" .claude/skills/specflow/SKILL.md'
+check "router SKILL.md no longer recommends /specflow-auto for end-to-end runs" \
+  '! grep -q "use \`/specflow-auto specify" .claude/skills/specflow/SKILL.md'
 
 echo
 echo "═══ #182  specflow-auto — mid-chain re-entry ═══"
