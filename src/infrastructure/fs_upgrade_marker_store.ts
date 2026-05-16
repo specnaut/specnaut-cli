@@ -7,18 +7,23 @@ const MARKER_REL = ".specflow/upgrade-pending.json";
 export class FsUpgradeMarkerStore implements UpgradeMarkerStore {
   async read(projectDir: string): Promise<UpgradeMarker | null> {
     const path = resolve(projectDir, MARKER_REL);
+    let raw: string;
     try {
-      const raw = await Deno.readTextFile(path);
+      raw = await Deno.readTextFile(path);
+    } catch (err) {
+      if (err instanceof Deno.errors.NotFound) return null;
+      // Other I/O errors (permission, EMFILE, etc.) propagate.
+      throw err;
+    }
+    try {
       const parsed = JSON.parse(raw) as UpgradeMarker;
       // Minimal shape validation — anything malformed is treated as absent.
       if (typeof parsed.from !== "string") return null;
       if (typeof parsed.to !== "string") return null;
       if (typeof parsed.at !== "string") return null;
       return { from: parsed.from, to: parsed.to, at: parsed.at };
-    } catch (err) {
-      if (err instanceof Deno.errors.NotFound) return null;
-      // Corrupt JSON / unreadable: treat as absent rather than crashing
-      // the upgrade. The user will see a fresh marker next time.
+    } catch (_err) {
+      // Corrupt JSON: treat as absent. The user will get a fresh marker next upgrade.
       return null;
     }
   }

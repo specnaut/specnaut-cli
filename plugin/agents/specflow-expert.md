@@ -186,9 +186,10 @@ Manual download: pick the binary from
 - `specflow init [--here] [--ai <harness>] [--backlog <backend>] [--backlog-url <url>]`
   — scaffold the project. `--here` operates in the current dir;
   `--ai` picks the harness; `--backlog` picks the backend.
-- `specflow upgrade` — refresh templates in an existing project to
-  the binary's bundled version. On apply: writes
-  `.specflow/upgrade-pending.json` (`{from,to,at}`) + staging dir.
+- `specflow upgrade` — refresh templates. On apply writes
+  `.specflow/upgrade-pending.json` (`{from,to,at}`) + staging dir
+  (`.specflow/upgrade-staging/<path>`, consumed by `specflow reconcile`);
+  both are removed after a successful `review-upgrade` walk.
   Prints `@specflow-expert review-upgrade` handoff.
 - `specflow check [--project]` — verify scaffold integrity. With
   `--project`, also flags missing plugin-covered files.

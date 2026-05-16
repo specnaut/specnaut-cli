@@ -1,4 +1,5 @@
 import { assertEquals } from "@std/assert";
+import { resolve } from "@std/path";
 import { FsUpgradeMarkerStore } from "../../src/infrastructure/fs_upgrade_marker_store.ts";
 
 async function withTempDir<T>(fn: (dir: string) => Promise<T>): Promise<T> {
@@ -40,5 +41,29 @@ Deno.test("FsUpgradeMarkerStore: delete is idempotent (no-op when absent)", asyn
     const store = new FsUpgradeMarkerStore();
     // Should not throw.
     await store.delete(dir);
+  });
+});
+
+Deno.test("FsUpgradeMarkerStore: read treats corrupt JSON as absent", async () => {
+  await withTempDir(async (dir) => {
+    await Deno.mkdir(resolve(dir, ".specflow"), { recursive: true });
+    await Deno.writeTextFile(
+      resolve(dir, ".specflow/upgrade-pending.json"),
+      "{this is not valid json",
+    );
+    const store = new FsUpgradeMarkerStore();
+    assertEquals(await store.read(dir), null);
+  });
+});
+
+Deno.test("FsUpgradeMarkerStore: read treats missing fields as absent", async () => {
+  await withTempDir(async (dir) => {
+    await Deno.mkdir(resolve(dir, ".specflow"), { recursive: true });
+    await Deno.writeTextFile(
+      resolve(dir, ".specflow/upgrade-pending.json"),
+      JSON.stringify({ from: "1.0.0" }),
+    );
+    const store = new FsUpgradeMarkerStore();
+    assertEquals(await store.read(dir), null);
   });
 });
