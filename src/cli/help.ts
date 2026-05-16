@@ -11,6 +11,9 @@ ${bold("Usage:")}
   specflow check [--project]          Diagnose the environment (and optionally the project)
   specflow upgrade [--dry-run] [--force] [--backlog <name>] [--reset-baseline]
                                       Update project templates to the binary's version
+  specflow reconcile --status         List files pending post-upgrade reconciliation
+  specflow reconcile <path> --accept-upstream | --accept-current
+                                      Resolve a preserved file after upgrade
   specflow --version, -v              Print version
   specflow --help, -h                 Show this help
 
@@ -40,4 +43,28 @@ export function renderVersionLine(
   templatesVersion: string,
 ): string {
   return `specflow ${version} ${dim(`(templates ${templatesVersion})`)}`;
+}
+
+export function printReconcileHelp(): void {
+  console.log(`specflow reconcile — post-upgrade reconciliation
+
+USAGE:
+specflow reconcile --status
+   Print a JSON object listing files pending reconciliation.
+
+specflow reconcile <path> --accept-upstream
+   Take the new template version. Backs up the local file to
+   <path>.specflow.bak, copies upstream content into place, and
+   updates .specflow/installed.lock.
+
+specflow reconcile <path> --accept-current
+   Keep the local customized version. Re-stamps the lock SHA to
+   match on-disk content (the next upgrade will not re-flag the file
+   as preserved).
+
+EXAMPLES:
+specflow reconcile --status
+specflow reconcile .claude/agents/developer.md --accept-upstream
+specflow reconcile .claude/agents/developer.md --accept-current
+`);
 }

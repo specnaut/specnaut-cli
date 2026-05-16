@@ -98,7 +98,13 @@ export type Intent =
      */
     resetBaseline: boolean;
   }
-  | { kind: "unknown"; received: string };
+  | { kind: "unknown"; received: string }
+  | { kind: "reconcile-status" }
+  | {
+    kind: "reconcile-path";
+    path: string;
+    mode: "accept-upstream" | "accept-current";
+  };
 
 export function parseArgs(argv: string[]): Intent {
   if (argv.length === 0) return { kind: "help" };
@@ -114,6 +120,9 @@ export function parseArgs(argv: string[]): Intent {
       "dry-run",
       "project",
       "reset-baseline",
+      "status",
+      "accept-upstream",
+      "accept-current",
     ],
     string: ["ai", "backlog", "backlog-url", "backlog-repo", "scheme"],
     alias: { v: "version", h: "help" },
@@ -192,6 +201,46 @@ export function parseArgs(argv: string[]): Intent {
       force: Boolean(parsed.force),
       backlog: backlogResult.value,
       resetBaseline: Boolean(parsed["reset-baseline"]),
+    };
+  }
+
+  if (command === "reconcile") {
+    const status = Boolean(parsed["status"]);
+    const acceptUpstream = Boolean(parsed["accept-upstream"]);
+    const acceptCurrent = Boolean(parsed["accept-current"]);
+    // positional args after the "reconcile" command
+    const positional = rest;
+
+    if (status) {
+      if (acceptUpstream || acceptCurrent || positional.length > 0) {
+        return { kind: "unknown", received: "reconcile --status takes no other arguments" };
+      }
+      return { kind: "reconcile-status" };
+    }
+
+    if (acceptUpstream && acceptCurrent) {
+      return {
+        kind: "unknown",
+        received: "reconcile --accept-upstream and --accept-current are mutually exclusive",
+      };
+    }
+    if (!acceptUpstream && !acceptCurrent) {
+      return {
+        kind: "unknown",
+        received:
+          "specflow reconcile requires --status, or <path> with --accept-upstream / --accept-current",
+      };
+    }
+    if (positional.length !== 1) {
+      return {
+        kind: "unknown",
+        received: "specflow reconcile <path> requires exactly one path",
+      };
+    }
+    return {
+      kind: "reconcile-path",
+      path: positional[0],
+      mode: acceptUpstream ? "accept-upstream" : "accept-current",
     };
   }
 

@@ -31,6 +31,11 @@ export async function run(argv: string[]): Promise<number> {
       const { runUpgrade } = await import("./cli/handlers/upgrade_handler.ts");
       return await runUpgrade(intent);
     }
+    case "reconcile-status":
+    case "reconcile-path": {
+      const { runReconcile } = await import("./cli/handlers/reconcile_handler.ts");
+      return await runReconcile(intent);
+    }
     case "unknown":
       console.error(red(`Unknown command: "${intent.received}"`));
       console.error(HELP);
