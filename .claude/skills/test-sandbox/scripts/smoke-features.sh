@@ -202,13 +202,26 @@ check "SKILL.md describes the cascade-check close gate" \
   'grep -q "cascade-check.sh" .claude/skills/backlog/SKILL.md'
 
 echo
-echo "═══ #182  specflow-auto — mid-chain re-entry ═══"
-check "specflow-auto SKILL.md documents mid-chain re-entry" \
-  'grep -q "Mid-chain re-entry" .claude/skills/specflow-auto/SKILL.md'
-check "specflow-auto SKILL.md describes the --continue flag" \
-  'grep -q -- "--continue" .claude/skills/specflow-auto/SKILL.md'
-check "specflow-auto SKILL.md describes the --once flag" \
-  'grep -q -- "--once" .claude/skills/specflow-auto/SKILL.md'
+echo "═══ #251  auto-chain — chain mechanics file present ═══"
+check "phases/auto-chain.md is bundled into the project" \
+  'test -f .claude/skills/specflow/phases/auto-chain.md'
+check "auto-chain.md documents STOP #1 and STOP #2" \
+  'grep -q "STOP #1" .claude/skills/specflow/phases/auto-chain.md && grep -q "STOP #2" .claude/skills/specflow/phases/auto-chain.md'
+check "auto-chain.md documents mid-chain re-entry" \
+  'grep -q "Mid-chain re-entry" .claude/skills/specflow/phases/auto-chain.md'
+check "router SKILL.md parses --manual flag" \
+  'grep -q -- "--manual" .claude/skills/specflow/SKILL.md'
+check "router SKILL.md routes to phases/auto-chain.md when chain mode is on" \
+  'grep -q "phases/auto-chain.md" .claude/skills/specflow/SKILL.md'
+check "router SKILL.md no longer recommends /specflow-auto for end-to-end runs" \
+  '! grep -q "use \`/specflow-auto specify" .claude/skills/specflow/SKILL.md'
+
+echo
+echo "═══ #182  specflow-auto — deprecation alias ═══"
+check "specflow-auto SKILL.md carries the deprecation notice" \
+  'grep -q "DEPRECATED" .claude/skills/specflow-auto/SKILL.md'
+check "specflow-auto SKILL.md tells users to use /specflow instead" \
+  'grep -q "auto-chains by default" .claude/skills/specflow-auto/SKILL.md'
 
 echo
 echo "═══ #188  /specflow merge auto-closes the linked backlog issue ═══"
@@ -227,6 +240,15 @@ check "clarify.md enforces the Domain Model exit gate" \
   'grep -q "Domain Model exit gate" .claude/skills/specflow/phases/clarify.md'
 check "implement.md halts BLOCKED when the Domain Model is absent" \
   'grep -q "awaiting:product-owner-domain-brief" .claude/skills/specflow/phases/implement.md'
+
+echo
+echo "═══ Phase-doc drift fixes — auto-chain default ═══"
+check "analyze.md re-run hint mentions --once for one-shot regen" \
+  'grep -q "Run /specflow plan --once to regenerate" .claude/skills/specflow/phases/analyze.md'
+check "review.md owns STOP #2 (no /specflow-auto handoff)" \
+  '! grep -q "hand back to \`/specflow-auto\`" .claude/skills/specflow/phases/review.md'
+check "review.md surfaces STOP #2 from phases/auto-chain.md" \
+  'grep -q "STOP #2 summary block defined in" .claude/skills/specflow/phases/review.md'
 
 echo
 if [ "$fails" -eq 0 ]; then

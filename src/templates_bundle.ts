@@ -32,12 +32,25 @@ when_to_use: |
 
 # Specflow router
 
-\`\$ARGUMENTS\` carries the user's input. Parse it as \`<phase> [rest]\`:
+\`\$ARGUMENTS\` carries the user's input. Parse it as \`[<flag>...] <phase> [rest]\`:
 
-- The first token is the phase name.
-- Everything after the first whitespace is the argument string for that phase.
+1. **Chain mode parsing** — scan the tokens for at most one of
+   \`--manual\`, \`--once\`, \`--continue\`. They are mutually exclusive; if
+   more than one is present, report \`error: --manual, --once, and --continue are mutually exclusive\` and stop.
+   - \`--manual\` → CHAIN_MODE = \`off\`
+   - \`--once\`   → CHAIN_MODE = \`once\`
+   - \`--continue\` → CHAIN_MODE = \`continue\`
+   - none      → CHAIN_MODE = \`auto\` (the default)
 
-If \`\$ARGUMENTS\` is empty, render the **Workflow overview** below and stop. Do not pick a phase yourself.
+   Strip the matched flag from the token list before going further.
+
+2. **Phase extraction** — the first remaining token is the phase name.
+   Everything after the first whitespace is the argument string for
+   that phase.
+
+3. **Empty arguments** — if no tokens remain after flag parsing (or
+   \`\$ARGUMENTS\` was empty to start with), render the **Workflow overview**
+   below and stop. Do not pick a phase yourself.
 
 ## Phase index
 
@@ -57,13 +70,35 @@ If \`\$ARGUMENTS\` is empty, render the **Workflow overview** below and stop. Do
 | \`tag-version\` | \`phases/tag-version.md\` | Bump + create an annotated git tag using the project's versioning scheme. |
 | \`release-version\` | \`phases/release-version.md\` | Generate categorized release notes for a tag (default: latest). |
 
+Chainable phases are: \`specify\`, \`clarify\`, \`plan\`, \`tasks\`, \`analyze\`,
+\`implement\`, \`review\`. The others (\`merge\`, \`constitution\`,
+\`checklist\`, \`groom\`, \`tag-version\`, \`release-version\`) are one-shot
+regardless of chain mode.
+
 ## Routing
 
 1. **Read** the phase reference file (\`phases/<phase>.md\`) for the requested phase using the \`Read\` tool.
-2. **Substitute** the remainder of \`\$ARGUMENTS\` for the phase's input.
+2. **Substitute** the stripped phase arguments for the phase's input.
 3. **Execute** the procedure in the reference file end-to-end.
+4. **Decide whether to chain** (see "Chain decision" below).
 
-Unknown phase → print the index above and stop.
+Unknown phase → print the phase index and stop.
+
+## Chain decision
+
+After the phase procedure completes successfully:
+
+- \`CHAIN_MODE == off\` (the user passed \`--manual\`) → stop. Report the
+  phase outcome and leave the next step to the user.
+- Phase is not in the chainable list (e.g. \`constitution\`, \`checklist\`,
+  \`groom\`, \`tag-version\`, \`release-version\`) → stop.
+- \`CHAIN_MODE == once\` → stop.
+- \`CHAIN_MODE == continue\` → read \`phases/auto-chain.md\` and chain
+  through the remaining phases regardless of downstream-artefact state.
+- \`CHAIN_MODE == auto\` (the default) → read \`phases/auto-chain.md\`. For
+  \`specify\`, the chain always continues. For any other chainable phase,
+  apply the artefact-detection table in that file — chain if downstream
+  artefacts are absent, one-shot if present.
 
 ## Workflow overview
 
@@ -73,37 +108,40 @@ specify → clarify → plan → tasks → analyze → implement → review → 
                                                           STOP for pre-merge validation
 \`\`\`
 
+Default behavior: \`/specflow specify "..."\` runs the entire chain in one
+session, pausing only at STOP #1 (if clarifications are needed) and
+STOP #2 (pre-merge confirmation). See \`phases/auto-chain.md\` for the
+chain mechanics.
+
 \`constitution\`, \`checklist\`, \`groom\`, \`tag-version\`, and \`release-version\` are out-of-band utilities, not part of the linear flow.
 
 ## Typical flow
 
 \`\`\`
 /specflow specify "Add OAuth2 login"
-  → spec drafted in .specflow/specs/<NNN>-add-oauth2-login/spec.md
-
-/specflow clarify
-  → resolves any [NEEDS CLARIFICATION] markers
-
-/specflow plan
-  → research, data-model, contracts, quickstart written
-
-/specflow tasks
-  → tasks.md generated
-
-/specflow analyze
-  → cross-artifact consistency check
-
-/specflow implement
-  → developer → review-coordinator → qa-tester pipeline
-
-/specflow review
-  → final quality scan
-
-/specflow merge
-  → pre-merge validation + merge
+  → drafts the spec, then auto-chains:
+    → /specflow clarify  (STOP #1 only if [NEEDS CLARIFICATION] markers remain)
+    → /specflow plan
+    → /specflow tasks
+    → /specflow analyze
+    → /specflow implement
+    → /specflow review
+    → STOP #2 — summary + "Ready to merge?" confirmation
+    → /specflow merge  (on "yes")
 \`\`\`
 
-For an end-to-end run that auto-chains the silent gates, use \`/specflow-auto specify "<feature>"\`.
+To run a single phase only (no chain), pass \`--manual\`:
+
+\`\`\`
+/specflow specify --manual "Add OAuth2 login"
+\`\`\`
+
+To force or skip the chain mid-flow:
+
+\`\`\`
+/specflow plan 042 --once       # regenerate plan.md only, do not cascade
+/specflow plan 042 --continue   # regenerate plan.md AND cascade tasks → review
+\`\`\`
 `,
     executable: false,
     backend: null,
@@ -1016,7 +1054,7 @@ At end of report, output a concise Next Actions block:
 
 - If CRITICAL issues exist: Recommend resolving before \`/specflow implement\`
 - If only LOW/MEDIUM: User may proceed, but provide improvement suggestions
-- Provide explicit command suggestions: e.g., "Run /specflow specify with refinement", "Run /specflow plan to adjust architecture", "Manually edit tasks.md to add coverage for 'performance-metrics'"
+- Provide explicit command suggestions: e.g., "Run /specflow specify --manual to refine the spec without re-cascading", "Run /specflow plan --once to regenerate the plan only, or /specflow plan to cascade through tasks → review", "Manually edit tasks.md to add coverage for 'performance-metrics'"
 
 ### 8. Offer Remediation
 
@@ -1370,8 +1408,9 @@ Remaining findings (MEDIUM/LOW, non-blocking)
 Overall: PASS | FAIL
 \`\`\`
 
-If Overall = PASS, invoke \`/specflow merge\` (or hand back to \`/specflow-auto\`
-for STOP #2). If FAIL, stop and report to the user.
+If Overall = PASS, surface the STOP #2 summary block defined in
+\`phases/auto-chain.md\` and ask for merge confirmation, then invoke
+\`/specflow merge\` on "yes". If FAIL, stop and report to the user.
 `,
     executable: false,
     backend: null,
@@ -2221,6 +2260,137 @@ The script emits the body verbatim. Do NOT:
 /specflow release-version         → categorized release notes (stdout)
 ↳ pipe to gh/glab release create  → release published
 \`\`\`
+`,
+    executable: false,
+    backend: null,
+    skipIfExists: false,
+  },
+  {
+    category: "phase",
+    name: "auto-chain",
+    suffix: "auto-chain.md",
+    content: `# Auto-chain control
+
+This file carries the chain mechanics that the \`/specflow\` router follows
+when chain mode is engaged. The router reads it after a chainable phase
+(\`specify\`, \`clarify\`, \`plan\`, \`tasks\`, \`analyze\`, \`implement\`, \`review\`)
+completes — unless \`--manual\` or \`--once\` was passed, or downstream
+artefacts indicate one-shot intent.
+
+## Default flow
+
+\`\`\`
+specify → clarify → plan → tasks → analyze → implement → review → merge
+          ▲                                                        ▲
+          STOP #1 (only if clarifications needed)                  STOP #2 (pre-merge validation)
+\`\`\`
+
+## Per-phase behavior
+
+After each phase completes successfully, immediately invoke the next phase via
+the \`Skill\` tool (or the platform equivalent). Do not emit a user-facing "ready
+for next step?" prompt. A one-line \`✓ <phase> complete — proceeding to <next>\`
+log is sufficient.
+
+## STOP #1 — Clarification checkpoint
+
+After \`/specflow clarify\` finishes:
+
+- If zero \`[NEEDS CLARIFICATION]\` markers remain in \`spec.md\`, continue silently
+  to \`/specflow plan\`.
+- If markers remain, present the top 3 questions to the user (per the
+  \`/specflow clarify\` format) and wait for answers. Once the spec is updated,
+  resume the chain automatically.
+
+## Silent gates
+
+These phases run without user interruption unless they fail hard or surface
+CRITICAL findings:
+
+- \`/specflow plan\` — generates plan + research + data-model + contracts + quickstart.
+- \`/specflow tasks\` — generates tasks.md.
+- \`/specflow analyze\` — cross-artifact consistency check. On LOW/MEDIUM findings,
+  log a summary and continue. On CRITICAL findings, stop and surface them.
+- \`/specflow implement\` — runs the developer → review-coordinator → qa-tester
+  pipeline. Has its own internal fix loop for review findings; do not intercept.
+- \`/specflow review\` — final quality scan.
+
+## STOP #2 — Pre-merge validation
+
+After \`/specflow review\` passes, ALWAYS stop and present a compact summary
+before invoking \`/specflow merge\`. The summary must include:
+
+- Feature name and branch
+- Files created / modified (count + key paths)
+- Tests added and full-suite status
+- Known deviations from tasks.md and rationale
+- Open risks / deferred items
+- One-line business outcome
+
+Then ask explicitly: "Ready to merge? (yes to run /specflow merge, no to stay on
+the branch)". Wait for explicit confirmation. On "yes", invoke
+\`/specflow merge\`. After merge, the chain ends.
+
+## Mid-chain re-entry
+
+When the user invokes any phase other than \`specify\` directly (e.g.
+\`/specflow plan 042\`, \`/specflow implement 042\`), apply this
+context-aware default:
+
+- **Downstream artefacts missing** → chain. The user is resuming an
+  interrupted flow (long session, fresh shell after compaction, manual
+  review between early phases). Continue through the remaining phases →
+  STOP #2 with the same checkpoints as the entry-point flow.
+- **Downstream artefacts present** → one-shot. The user is re-running a
+  single phase (regenerate \`plan.md\` after a tweak, re-analyse after a
+  spec edit). Do NOT cascade.
+
+"Downstream artefacts" means files under \`.specflow/specs/<feature>/\`
+produced by phases AFTER the one being invoked:
+
+| Invoked phase | Downstream artefacts to check |
+|---|---|
+| \`clarify\`   | \`plan.md\`, \`tasks.md\` |
+| \`plan\`      | \`tasks.md\`, \`data-model.md\`, \`contracts/\`, \`quickstart.md\` |
+| \`tasks\`     | \`tasks.md\` markings beyond the initial generation, or any task marked done |
+| \`analyze\`   | nothing (analyze is a read-only gate; treat as one-shot unless \`--continue\`) |
+| \`implement\` | a merged PR, a \`review.md\`, or task completion past 50% |
+| \`review\`    | nothing past review (chain-tail is just \`merge\`); treat as one-shot unless \`--continue\` |
+
+If any listed artefact is present, infer one-shot intent. If all are
+absent, chain.
+
+### Explicit overrides
+
+The router-level flags \`--continue\` and \`--once\` override the
+artefact-detection default. They are mutually exclusive with each other
+and with \`--manual\`:
+
+- \`--continue\` — force the chain regardless of artefact state. Useful
+  when you want to regenerate a phase AND cascade downstream work
+  afterwards (e.g. tweak \`plan.md\`, then re-run \`tasks → analyze →
+  implement → review\` from scratch).
+- \`--once\` — force one-shot regardless. Useful when downstream
+  artefacts haven't been generated yet but you only want to run this
+  single phase right now (e.g. inspect the spec before authorising
+  the rest of the chain).
+
+## Failure handling
+
+- Hard failure in a silent gate (plan/tasks/analyze/implement/review): stop,
+  surface the error, ask the user how to proceed. Do not silently retry.
+- Task-level blockers reported by the developer agent during \`implement\`: the
+  implement workflow has its own fix loop; do not intercept.
+- \`clarify\` producing more than 5 questions: present the top 3 per the
+  \`/specflow clarify\` quota; the rest can be asked later.
+
+## Context budget
+
+Long features (≥13 story points or ≥30 tasks) may exhaust context during
+\`/specflow implement\`. If compaction occurs mid-chain, inform the user and
+let them resume from a fresh session — the artefact-detection default
+above will pick up where the previous run stopped, or they can pass
+\`--continue\` explicitly.
 `,
     executable: false,
     backend: null,
@@ -4087,11 +4257,11 @@ layout and frontmatter conventions.
 
 ### What makes Specflow different from upstream Spec Kit
 
-1. **Auto-chained pipeline** — \`/specflow-auto\` chains \`clarify →
-   plan → tasks → analyze → implement → review → merge\` in one
-   session. Upstream stops at every step and asks the human; Specflow
-   stops only when clarification is genuinely required and once
-   before the merge.
+1. **Auto-chained pipeline** — \`/specflow specify "<feature>"\` chains
+   \`specify → clarify → plan → tasks → analyze → implement → review\`
+   in one session, pausing only on real clarification and once before
+   merge. \`/specflow-auto\` is kept for one release as a deprecation
+   alias.
 
 2. **Dedicated \`review\` phase** — after \`implement\`, a \`review\` step
    checks architecture, error handling, test coverage, and quality
@@ -4599,135 +4769,31 @@ should survive across sessions and isn't captured elsewhere:
     suffix: null,
     content: `---
 name: specflow-auto
-description: Auto-chain Specflow workflow — when the user runs /specflow-auto specify, chain clarify → plan → tasks → analyze → implement → review → merge, stopping only for required clarifications and final pre-merge validation.
+description: DEPRECATED — /specflow now auto-chains by default since v1.5.0. This skill is kept as an alias for one release and will be removed in the next major version.
 ---
 
-# Specflow Auto-Chain
+# /specflow-auto is deprecated
 
-This skill turns the Specflow workflow into a single-command operation. When the
-user invokes \`/specflow-auto specify "<feature description>"\`, you MUST chain every
-Specflow phase in the same session without asking the user between phases,
-EXCEPT at the two checkpoints defined below.
+Auto-chain is now the default behavior of \`/specflow\`. Use:
 
-## Default flow
+- \`/specflow specify "<feature>"\` — runs the full chain automatically
+  (specify → clarify → plan → tasks → analyze → implement → review →
+  STOP #2 for merge confirmation).
+- \`/specflow specify --manual "<feature>"\` — runs \`specify\` only, no
+  chain.
+- \`/specflow <phase> <args>\` — mid-chain re-entry with artefact
+  detection (chain if downstream artefacts are absent, one-shot if
+  present). Override with \`--once\` (force one-shot) or \`--continue\`
+  (force chain).
 
-\`\`\`
-specify → clarify → plan → tasks → analyze → implement → review → merge
-          ▲                                                        ▲
-          STOP #1 (only if clarifications needed)                  STOP #2 (pre-merge validation)
-\`\`\`
+See \`phases/auto-chain.md\` (in the \`specflow\` skill) for the full chain
+mechanics, including STOP #1 (clarification checkpoint) and STOP #2
+(pre-merge confirmation).
 
-## Per-phase behavior
-
-After each phase completes successfully, immediately invoke the next phase via
-the \`Skill\` tool (or the platform equivalent). Do not emit a user-facing "ready
-for next step?" prompt. A one-line \`✓ <phase> complete — proceeding to <next>\`
-log is sufficient.
-
-## STOP #1 — Clarification checkpoint
-
-After \`/specflow clarify\` finishes:
-
-- If zero \`[NEEDS CLARIFICATION]\` markers remain in \`spec.md\`, continue silently
-  to \`/specflow plan\`.
-- If markers remain, present the top 3 questions to the user (per the
-  \`/specflow clarify\` format) and wait for answers. Once the spec is updated,
-  resume the chain automatically.
-
-## Silent gates
-
-These phases run without user interruption unless they fail hard or surface
-CRITICAL findings:
-
-- \`/specflow plan\` — generates plan + research + data-model + contracts + quickstart.
-- \`/specflow tasks\` — generates tasks.md.
-- \`/specflow analyze\` — cross-artifact consistency check. On LOW/MEDIUM findings,
-  log a summary and continue. On CRITICAL findings, stop and surface them.
-- \`/specflow implement\` — runs the developer → review-coordinator → qa-tester
-  pipeline. Has its own internal fix loop for review findings; do not intercept.
-- \`/specflow review\` — final quality scan.
-
-## STOP #2 — Pre-merge validation
-
-After \`/specflow review\` passes, ALWAYS stop and present a compact summary
-before invoking \`/specflow merge\`. The summary must include:
-
-- Feature name and branch
-- Files created / modified (count + key paths)
-- Tests added and full-suite status
-- Known deviations from tasks.md and rationale
-- Open risks / deferred items
-- One-line business outcome
-
-Then ask explicitly: "Ready to merge? (yes to run /specflow merge, no to stay on
-the branch)". Wait for explicit confirmation. On "yes", invoke
-\`/specflow merge\`. After merge, the chain ends.
-
-## Opt-out
-
-If the user invokes \`/specflow-auto specify --manual "<description>"\`, run
-\`/specflow specify\` only and stop. Do not auto-chain. Each subsequent phase must
-be invoked manually by the user.
-
-## Mid-chain re-entry
-
-When the user invokes any phase other than \`specify\` directly (e.g.
-\`/specflow-auto plan 042\`, \`/specflow-auto implement 042\`), apply this
-context-aware default:
-
-- **Downstream artefacts missing** → chain. The user is resuming an
-  interrupted flow (long session, fresh shell after compaction, manual
-  review between early phases). Continue through the remaining phases →
-  STOP #2 with the same checkpoints as the entry-point flow.
-- **Downstream artefacts present** → one-shot. The user is re-running a
-  single phase (regenerate \`plan.md\` after a tweak, re-analyse after a
-  spec edit). Do NOT cascade.
-
-"Downstream artefacts" means files under \`.specflow/specs/<feature>/\`
-produced by phases AFTER the one being invoked:
-
-| Invoked phase | Downstream artefacts to check |
-|---|---|
-| \`clarify\`   | \`plan.md\`, \`tasks.md\` |
-| \`plan\`      | \`tasks.md\`, \`data-model.md\`, \`contracts/\`, \`quickstart.md\` |
-| \`tasks\`     | \`tasks.md\` markings beyond the initial generation, or any task marked done |
-| \`analyze\`   | nothing (analyze is a read-only gate; treat as one-shot unless \`--continue\`) |
-| \`implement\` | a merged PR, a \`review.md\`, or task completion past 50% |
-| \`review\`    | nothing past review (chain-tail is just \`merge\`); treat as one-shot unless \`--continue\` |
-
-If any listed artefact is present, infer one-shot intent. If all are
-absent, chain.
-
-### Explicit overrides
-
-- \`/specflow-auto <phase> N --continue\` — force the chain regardless of
-  artefact state. Useful when you want to regenerate a phase AND cascade
-  downstream work afterwards (e.g. tweak \`plan.md\`, then re-run
-  \`tasks → analyze → implement → review\` from scratch).
-- \`/specflow-auto <phase> N --once\` — force one-shot regardless. Useful
-  when downstream artefacts haven't been generated yet but you only
-  want to run this single phase right now (e.g. inspect the spec
-  before authorising the rest of the chain).
-
-The flags are mutually exclusive; the explicit form always wins over
-the artefact-detection default.
-
-## Failure handling
-
-- Hard failure in a silent gate (plan/tasks/analyze/implement/review): stop,
-  surface the error, ask the user how to proceed. Do not silently retry.
-- Task-level blockers reported by the developer agent during \`implement\`: the
-  implement workflow has its own fix loop; do not intercept.
-- \`clarify\` producing more than 5 questions: present the top 3 per the
-  \`/specflow clarify\` quota; the rest can be asked later.
-
-## Context budget
-
-Long features (≥13 story points or ≥30 tasks) may exhaust context during
-\`/specflow implement\`. If compaction occurs mid-chain, inform the user and
-let them resume from a fresh session — the artefact-detection default in
-"Mid-chain re-entry" above will pick up where the previous run stopped, or
-they can pass \`--continue\` explicitly.
+This skill will be removed in the next major release. If you see this
+file in your project after running \`specflow upgrade\`, it means
+muscle-memory invocations of \`/specflow-auto\` keep working — but you
+should switch to the new entry point.
 `,
     executable: false,
     backend: null,
@@ -9966,7 +10032,7 @@ Invoke the **specflow** skill (at \`.claude/skills/specflow/SKILL.md\`) using th
 
 Empty \`\$ARGUMENTS\` → the skill prints the workflow overview and stops.
 
-This command is a thin slash-command shim so users can type \`/specflow specify "..."\` directly. The skill itself has \`disable-model-invocation: true\`; this command makes the explicit \`/\` form available alongside the \`specflow-review\` auto-invoke alias.
+This command is a thin slash-command shim so users can type \`/specflow specify "..."\` directly. The router auto-chains the rest of the workflow by default; pass \`--manual\` to opt out, or \`--once\` / \`--continue\` to override the mid-chain artefact-detection heuristic.
 `,
       executable: false,
     },
@@ -10431,7 +10497,7 @@ clarifications needed) STOP #2 (pre-merge validation)
 - \`/specflow review\` — architecture + quality gates
 - \`/specflow merge\` — merge the feature branch to main
 - \`/specflow-backlog\` — manage the product backlog (via the PO agent)
-- \`/specflow-auto\` — auto-chain dispatcher invoked by \`/specflow specify\`
+- \`/specflow-auto\` — deprecated alias of \`/specflow\`; will be removed in the next major release
 
 ## Agent roles (invocable manually as skills)
 

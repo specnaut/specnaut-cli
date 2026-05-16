@@ -1,6 +1,6 @@
 {
   "name": "specflow-plugin",
-  "description": "Specflow's specflow-auto skill, slash commands, and sub-agents for Claude Code — the same content the binary scaffolds, available as a versioned plugin.",
+  "description": "Specflow's auto-chained spec-driven workflow, slash commands, and sub-agents for Claude Code — the same content the binary scaffolds, available as a versioned plugin.",
   "version": "1.4.0",
   "author": {
     "name": "MakerLabs"
