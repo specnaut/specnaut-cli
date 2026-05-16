@@ -758,6 +758,29 @@ preserved. Removes the staging entry.
 — it surfaces a `keep / take / merge / view / skip` choice per file and dispatches the `developer`
 subagent for intelligent merges.
 
+### `specflow-expert review-upgrade`
+
+Dispatching `@specflow-expert review-upgrade` triggers a 7-step guided workflow inside the
+`specflow-expert` agent:
+
+1. **Read marker** — reads `.specflow/upgrade-pending.json`; exits with instructions if absent.
+2. **Fetch releases** — fetches GitHub Release bodies for every tag in `(from, to]` and parses each
+   `### Adoption guide` section into structured adoption prompts. Falls back to the vendored
+   snapshot if the GitHub API is unreachable.
+3. **Present plan** — shows releases in range, adoption prompts count, and files pending
+   reconciliation (`specflow reconcile --status`). Offers to create a branch
+   `specflow-upgrade-v{to}` for review-as-PR.
+4. **Walk adoption prompts** — presents each prompt one by one with four options: `[a]` run it
+   (dispatches `developer` agent), `[s]` skip, `[c]` show raw prompt, `[q]` quit.
+5. **Reconcile customized files** — for each file pending reconciliation, shows a diff summary and
+   offers `[k]` keep local, `[t]` take upstream, `[m]` intelligent merge (dispatches `developer`),
+   `[v]` view full diff, `[s]` skip.
+6. **Cleanup** — when both walks complete with nothing skipped, deletes the marker and (if on the
+   review branch) commits a summary. Skipped items are left on disk for the next `review-upgrade`
+   run.
+
+Trigger keyword: `review-upgrade` in the dispatch message.
+
 ## Repository
 
 Source, releases, and issue tracker:
