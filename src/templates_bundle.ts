@@ -4052,7 +4052,7 @@ description: >
   invocations (\`specflow init\`, \`specflow upgrade\`, \`/specflow specify\`,
   \`/backlog ...\`) — those are command runs, not questions.
 model: sonnet
-tools: Read, WebFetch, Grep, Glob
+tools: Read, WebFetch, Grep, Glob, Bash, Agent
 permissionMode: default
 maxTurns: 10
 disable-model-invocation: false
@@ -4168,131 +4168,90 @@ user to paste it into a fresh \`issues/new\` form.
 \`gh issue create\` is **not** supported in V1 — keep the user in the
 loop on every report. If asked, decline and offer the URL pre-fill.
 
+## Review-upgrade protocol
+
+Trigger: dispatch message contains the keyword \`review-upgrade\`.
+
+### 1. Read marker
+
+Read \`.specflow/upgrade-pending.json\`. If absent, respond:
+
+> No recent upgrade marker. Run \`specflow upgrade\` first, then dispatch me again with
+> \`review-upgrade\`.
+
+…and exit. Marker fields: \`from\`, \`to\`, \`at\` (ISO-8601).
+
+### 2. Fetch release bodies
+
+For each tag in \`(marker.from, marker.to]\`: \`WebFetch https://api.github.com/repos/mkrlabs/specflow/releases/tags/v<TAG>\`, extract \`body\`, parse the \`### Adoption guide\` section (entries: \`**#NUM — Title**\` / prose / \` \`\`\`prompt \` block). Build \`adoption = [{version, prNum, title, prose, prompt}]\`.
+
+API failure fallback: use vendored snapshot for high-level guidance; warn "Couldn't fetch release notes; high-level adoption guidance only."
+
+### 3. Present plan
+
+Show: versions in range, adoption prompt count + titles, \`specflow reconcile --status\` pending list, offer branch \`specflow-upgrade-v{to}\` [Y/n].
+
+### 4. Branch (optional)
+
+If Y: run \`git status --porcelain\`. If upgrade-related changes present → \`git checkout -b specflow-upgrade-v{to} && git add -A && git commit -m "chore: specflow upgrade v{from} → v{to}"\`. If clean, continue on current branch. If unrelated changes, refuse and ask user to stash/commit first. If n, continue on current branch.
+
+### 5. Walk adoption prompts
+
+For each entry present: \`─── {i}/{N} ─── v{version} #{prNum} — {title}\` + prose + prompt + options \`[a] [s] [c] [q]\`.
+
+- \`a\`: dispatch \`developer\` agent (Agent tool) with prompt + context. After return: \`git diff --quiet\`; if dirty, commit \`feat(adoption): #{prNum} {title}\` on review branch.
+- \`s\`: skip (session-only note).
+- \`c\`: print raw prompt verbatim, re-prompt with a/s/q.
+- \`q\`: quit walk early; marker + staging stay on disk for resume.
+
+### 6. Reconcile customized files
+
+Run \`specflow reconcile --status\`, parse JSON. For each pending path: show diff summary + options \`[k] [t] [m] [v] [s]\`.
+
+- \`k\`: \`specflow reconcile <path> --accept-current\`; commit \`chore(reconcile): keep local <path>\`.
+- \`t\`: \`specflow reconcile <path> --accept-upstream\`; commit \`chore(reconcile): take upstream <path>\`.
+- \`m\`: dispatch \`developer\` to merge local + \`.specflow/upgrade-staging/<path>\`; then \`specflow reconcile <path> --accept-current\`; commit \`chore(reconcile): merge upstream into <path>\`.
+- \`v\`: \`diff -u <path> .specflow/upgrade-staging/<path>\`, re-prompt with k/t/m/s.
+- \`s\`: leave untouched; resurfaces next \`review-upgrade\`.
+
+### 7. Cleanup
+
+Both walks complete with nothing skipped: delete \`.specflow/upgrade-pending.json\`; if on review branch, final commit \`chore: complete specflow upgrade review v{from} → v{to}\`. Tell user to open a PR. If anything was skipped, leave marker + staging and tell user to resume with \`review-upgrade\`.
+
 ## Vendored knowledge snapshot
 
-This snapshot is frozen at scaffold time. It reflects the version of
-Specflow that ran \`specflow init\` / \`specflow upgrade\` on this
-project. Run the live fetch protocol if the user asks about anything
-newer.
+Frozen at scaffold time. Run the live fetch protocol for anything newer.
 
 ### What Specflow is
 
-Specflow is an enhanced fork of the [\`specify\` CLI from GitHub Spec
-Kit](https://github.com/github/spec-kit), distributed as a single
-native binary (no Python prerequisites). It scaffolds the files an
-AI coding harness consumes — SpecKit slash-commands, spec / plan /
-tasks templates, a constitution, sub-agents, and a backlog system —
-directly into an existing project, in one command.
+Enhanced fork of [\`specify\` CLI](https://github.com/github/spec-kit), distributed as a single native binary. Scaffolds AI harness files — SpecKit slash-commands, spec/plan/tasks templates, a constitution, sub-agents, and a backlog system — into an existing project in one command. Does **not** call any LLM; the user's AI harness reads the generated files. Docs: <https://specflow.makerlabs.dev/llms.txt>. Source: <https://github.com/mkrlabs/specflow>.
 
-Specflow does **not** call any LLM and does **not** orchestrate any
-agent at runtime. The user's AI harness (Claude Code, Cursor, Codex
-CLI, Gemini CLI, GitHub Copilot CLI, Windsurf, OpenCode, Antigravity)
-is what reads the generated files and acts on them. Specflow is a
-file-emitting CLI, not a runtime.
+**Install:** \`curl -fsSL https://raw.githubusercontent.com/mkrlabs/specflow/main/install.sh | bash\` or \`brew tap mkrlabs/tap && brew install specflow\`.
 
-Canonical docs: <https://specflow.makerlabs.dev/llms.txt>.
-Source: <https://github.com/mkrlabs/specflow>.
+**Harnesses:** claude, cursor, codex, gemini, windsurf, copilot, opencode, antigravity — all share \`templates/core/\` content, mapped per-harness by an adapter.
 
-### Install
+**Different from upstream Spec Kit:** auto-chained pipeline (\`/specflow specify\` chains all phases); dedicated \`review\` phase after implement; backlog as product source of truth via \`product-owner\` agent (backends: local, github, gitlab); Claude Code plugin distribution (\`specflow-plugin\` marketplace).
 
-Fastest path on macOS or Linux:
-
-\`\`\`bash
-curl -fsSL https://raw.githubusercontent.com/mkrlabs/specflow/main/install.sh | bash
-\`\`\`
-
-Or via Homebrew:
-
-\`\`\`bash
-brew tap mkrlabs/tap && brew install specflow
-\`\`\`
-
-Manual download: pick the binary from
-[GitHub Releases](https://github.com/mkrlabs/specflow/releases),
-\`chmod +x\`, place on \`\$PATH\`. On macOS, clear quarantine with
-\`xattr -d com.apple.quarantine\`.
+**Bundled agents:** product-owner, developer, review-coordinator, code-reviewer, security-auditor, test-reviewer, qa-tester, workflow-manager, devops-sre, specflow-expert.
 
 ### Commands
 
-- \`specflow init [--here] [--ai <harness>] [--backlog <backend>] [--backlog-url <url>]\`
-  — scaffold the project. \`--here\` operates in the current dir;
-  \`--ai\` picks the harness; \`--backlog\` picks the backend.
-- \`specflow upgrade\` — refresh templates. On apply writes
-  \`.specflow/upgrade-pending.json\` (\`{from,to,at}\`) + staging dir
-  (\`.specflow/upgrade-staging/<path>\`, consumed by \`specflow reconcile\`);
-  both are removed after a successful \`review-upgrade\` walk.
-  Prints \`@specflow-expert review-upgrade\` handoff.
+- \`specflow init [--here] [--ai <harness>] [--backlog <backend>] [--backlog-url <url>]\` — scaffold the project.
+- \`specflow upgrade\` — refresh templates. On apply writes \`.specflow/upgrade-pending.json\` (\`{from,to,at}\`) + staging dir (\`.specflow/upgrade-staging/<path>\`, consumed by \`specflow reconcile\`); both removed after successful \`review-upgrade\` walk. Prints \`@specflow-expert review-upgrade\` handoff.
 - \`specflow reconcile --status\` — list files pending post-upgrade reconciliation as JSON.
-- \`specflow reconcile <path> --accept-upstream\` — take the new template version (backs up local,
-  updates lock).
+- \`specflow reconcile <path> --accept-upstream\` — take the new template version (backs up local, updates lock).
 - \`specflow reconcile <path> --accept-current\` — keep local version (re-stamps lock SHA only).
-- \`specflow check [--project]\` — verify scaffold integrity. With
-  \`--project\`, also flags missing plugin-covered files.
-- \`specflow self-update\` — replace the local binary with the latest
-  release, verifying the SHA256.
-- \`specflow --version\` — print the binary version and the bundled
-  templates version (they should match after \`self-update\`).
-
-### Available harnesses
-
-| Key           | Display name       | Output root             |
-| ------------- | ------------------ | ----------------------- |
-| \`claude\`      | Claude Code        | \`.claude/\`              |
-| \`cursor\`      | Cursor             | \`.cursor/\`              |
-| \`codex\`       | Codex CLI          | \`.codex/\` + \`.agents/\`  |
-| \`gemini\`      | Gemini CLI         | \`.gemini/\`              |
-| \`windsurf\`    | Windsurf           | \`.windsurf/\`            |
-| \`copilot\`     | GitHub Copilot CLI | \`.github/instructions/\` |
-| \`opencode\`    | OpenCode           | \`.opencode/\`            |
-| \`antigravity\` | Antigravity        | \`.agent/\`               |
-
-All eight share the same source-of-truth content in \`templates/core/\`; the per-harness adapter
-maps that bundle to the harness's expected layout and frontmatter conventions.
-
-### What makes Specflow different from upstream Spec Kit
-
-1. **Auto-chained pipeline** — \`/specflow specify "<feature>"\` chains
-   \`specify → clarify → plan → tasks → analyze → implement → review\`
-   in one session, pausing only on real clarification and once before
-   merge. \`/specflow-auto\` is kept for one release as a deprecation
-   alias.
-
-2. **Dedicated \`review\` phase** — after \`implement\`, a \`review\` step
-   checks architecture, error handling, test coverage, and quality
-   gates (format, lint, typecheck, tests). If something flags, the
-   loop is \`implement → review → fix → re-review\`, automatic.
-
-3. **Backlog as product source of truth** — a Product Owner agent
-   (\`product-owner\`) gates every mutation. Three backends:
-   - \`local\` (default) — index at \`.specflow/backlog.md\`, task files
-     at \`.specflow/backlog/NNN-slug.md\` with typed frontmatter.
-   - \`github\` — issues on the configured GitHub repo + a Project V2
-     board (\`gh\` CLI). Native sub-issues API for epics. No local
-     mirror; the remote is the source of truth.
-   - \`gitlab\` — issues + scoped \`Status::*\` labels (\`glab\` CLI).
-
-4. **Claude Code plugin distribution** — \`specflow-plugin\` is on the
-   Claude Code marketplace; \`/plugin install mkrlabs/specflow-plugin\`
-   gives any Claude user the full skills + sub-agents without a
-   binary. \`specflow upgrade\` auto-detects the plugin and migrates
-   on-disk copies to plugin-served ones.
-
-### Bundled sub-agents
-
-Every scaffold ships ten agents: \`product-owner\`, \`developer\`, \`review-coordinator\`,
-\`code-reviewer\`, \`security-auditor\`, \`test-reviewer\`, \`qa-tester\`, \`workflow-manager\`,
-\`devops-sre\`, and \`specflow-expert\` (this agent). See each agent's file under \`.claude/agents/\`
-(or harness equivalent) for its remit.
+- \`specflow check [--project]\` — verify scaffold integrity.
+- \`specflow self-update\` — replace binary with latest release, verifying SHA256.
+- \`specflow --version\` — print binary + bundled templates version.
 
 ### Backlog conventions (GitHub backend)
 
-\`Priority\` (P0–P2) and \`Size\` (XS–XL) via Project V2 native fields (\`set-field.sh\`). Two-step
-close: \`move.sh <num> Done\` then \`gh issue close --reason completed\`.
+\`Priority\` (P0–P2) and \`Size\` (XS–XL) via Project V2 native fields (\`set-field.sh\`); fall back to \`priority:*\`/\`size:*\` labels when the native field is absent. Two-step close: \`move.sh <num> Done\` then \`gh issue close --reason completed\`. \`/specflow groom\` catches items closed via paths that bypassed the move step.
 
 ### Design principles
 
-Agnostic of language / LLM / harness / backlog backend. Single binary via \`deno compile\` for
-macOS, Linux, Windows. No Python or extra runtimes.
+Agnostic of language / LLM / harness / backlog backend. Single binary via \`deno compile\` for macOS, Linux, Windows. No Python or extra runtimes.
 
 ## Style
 
