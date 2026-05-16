@@ -1,7 +1,7 @@
 ---
 name: specflow
-description: Specflow workflow router — entry point for the spec-driven pipeline. `/specflow <phase> [args]` dispatches to a single phase (specify, clarify, plan, tasks, analyze, implement, review, merge, constitution, checklist, groom, tag-version, release-version). `/specflow` with no args prints the workflow overview.
-argument-hint: <specify|clarify|plan|tasks|analyze|implement|review|merge|constitution|checklist|groom|tag-version|release-version> [args]
+description: Specflow workflow router — entry point for the spec-driven pipeline. `/specflow <phase> [args]` dispatches to a single phase (specify, clarify, plan, tasks, analyze, implement, review, merge, constitution, checklist, groom, tag-version, release-version, list-skills). `/specflow` with no args prints the workflow overview.
+argument-hint: <specify|clarify|plan|tasks|analyze|implement|review|merge|constitution|checklist|groom|tag-version|release-version|list-skills> [args]
 when_to_use: |
   Trigger phrases that should route here:
   - specify: "spec out a feature", "write a spec", "create a specification"
@@ -17,6 +17,7 @@ when_to_use: |
   - groom: "groom the backlog", "run a hygiene pass"
   - tag-version: "tag a version", "create a release tag", "bump the version"
   - release-version: "release", "publish a release", "create release notes"
+  - list-skills: "list installed skills", "show skill aliases", "what overlays are active"
 ---
 
 # Specflow router
@@ -58,11 +59,12 @@ when_to_use: |
 | `groom` | `phases/groom.md` | Backlog hygiene pass via the product-owner agent. |
 | `tag-version` | `phases/tag-version.md` | Bump + create an annotated git tag using the project's versioning scheme. |
 | `release-version` | `phases/release-version.md` | Generate categorized release notes for a tag (default: latest). |
+| `list-skills` | `phases/list-skills.md` | List installed skills, flagging aliases and overlay hooks. |
 
 Chainable phases are: `specify`, `clarify`, `plan`, `tasks`, `analyze`,
 `implement`, `review`. The others (`merge`, `constitution`,
-`checklist`, `groom`, `tag-version`, `release-version`) are one-shot
-regardless of chain mode.
+`checklist`, `groom`, `tag-version`, `release-version`, `list-skills`)
+are one-shot regardless of chain mode.
 
 ## Routing
 
@@ -102,7 +104,7 @@ session, pausing only at STOP #1 (if clarifications are needed) and
 STOP #2 (pre-merge confirmation). See `phases/auto-chain.md` for the
 chain mechanics.
 
-`constitution`, `checklist`, `groom`, `tag-version`, and `release-version` are out-of-band utilities, not part of the linear flow.
+`constitution`, `checklist`, `groom`, `tag-version`, `release-version`, and `list-skills` are out-of-band utilities, not part of the linear flow.
 
 ## Typical flow
 
