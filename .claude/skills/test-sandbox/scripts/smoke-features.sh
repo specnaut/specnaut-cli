@@ -202,6 +202,17 @@ check "PO agent forbids legacy agent-memory path" \
   'grep -q ".claude/agent-memory/" .claude/agents/product-owner.md && grep -qE "unused|never|not used" .claude/agents/product-owner.md'
 
 echo
+echo "═══ #260  Auto-propagate parent Epic status (local backend scaffold) ═══"
+check "propagate-parent-status.sh scaffolded into local backend" \
+  '[ -x .specflow/scripts/backlog/propagate-parent-status.sh ]'
+check "local move.sh invokes the propagator as a tail hook" \
+  'grep -q "propagate-parent-status.sh" .specflow/scripts/backlog/move.sh'
+check "propagator promotes only Backlog/Ready parents (regression guard)" \
+  'grep -qE "\"Backlog\"\|\"Ready\"" .specflow/scripts/backlog/propagate-parent-status.sh'
+check "propagator carries the SPECFLOW_INTERNAL_PROPAGATION recursion guard" \
+  'grep -q "SPECFLOW_INTERNAL_PROPAGATION" .specflow/scripts/backlog/propagate-parent-status.sh'
+
+echo
 echo "═══ #180  SKILL.md — Epics & sub-tasks section ═══"
 check "SKILL.md gains an Epics & sub-tasks section" \
   'grep -q "Epics & sub-tasks" .claude/skills/backlog/SKILL.md'

@@ -126,6 +126,13 @@ fi
 
 echo
 echo "═══ #260  Auto-propagate parent Epic on child move (local) ═══"
+[ -x .specflow/scripts/backlog/propagate-parent-status.sh ] \
+  && pass "propagate-parent-status.sh scaffolded executable" \
+  || fail "propagate-parent-status.sh missing or not executable" "$(ls -l .specflow/scripts/backlog/ 2>/dev/null)"
+grep -q "propagate-parent-status.sh" .specflow/scripts/backlog/move.sh \
+  && pass "move.sh invokes propagate-parent-status.sh as tail hook" \
+  || fail "move.sh tail hook missing" "$(tail -10 .specflow/scripts/backlog/move.sh)"
+
 # Baseline: parent #001 back to Backlog, child #003 (sub-task) back to Backlog.
 bash .specflow/scripts/backlog/move.sh 1 Backlog >/dev/null
 bash .specflow/scripts/backlog/move.sh 3 Backlog >/dev/null
