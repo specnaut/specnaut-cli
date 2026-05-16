@@ -643,6 +643,18 @@ they never read.
 - **Single binary** — distributed via `deno compile` for macOS arm64/x64, Linux arm64/x64, and
   Windows x64. No Python, no `pip`, no extra runtimes on the user's machine.
 
+## Contributing
+
+### Agent adoption
+
+Every `feat:` PR body must include an `## Agent adoption` section with a `` ```prompt `` fenced
+block. The release pipeline extracts these into a structured `### Adoption guide` block on the
+GitHub Release; `specflow-expert review-upgrade` plays them back in the user's project after
+`specflow upgrade`.
+
+See `docs/contributing.md#agent-adoption` for the convention and examples. The CI workflow
+`.github/workflows/pr_adoption_lint.yml` enforces presence.
+
 ## Repository
 
 Source, releases, and issue tracker:
