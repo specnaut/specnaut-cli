@@ -1054,7 +1054,7 @@ At end of report, output a concise Next Actions block:
 
 - If CRITICAL issues exist: Recommend resolving before \`/specflow implement\`
 - If only LOW/MEDIUM: User may proceed, but provide improvement suggestions
-- Provide explicit command suggestions: e.g., "Run /specflow specify with refinement", "Run /specflow plan to adjust architecture", "Manually edit tasks.md to add coverage for 'performance-metrics'"
+- Provide explicit command suggestions: e.g., "Run /specflow specify --manual to refine the spec without re-cascading", "Run /specflow plan --once to regenerate the plan only, or /specflow plan to cascade through tasks → review", "Manually edit tasks.md to add coverage for 'performance-metrics'"
 
 ### 8. Offer Remediation
 
@@ -1408,8 +1408,9 @@ Remaining findings (MEDIUM/LOW, non-blocking)
 Overall: PASS | FAIL
 \`\`\`
 
-If Overall = PASS, invoke \`/specflow merge\` (or hand back to \`/specflow-auto\`
-for STOP #2). If FAIL, stop and report to the user.
+If Overall = PASS, surface the STOP #2 summary block defined in
+\`phases/auto-chain.md\` and ask for merge confirmation, then invoke
+\`/specflow merge\` on "yes". If FAIL, stop and report to the user.
 `,
     executable: false,
     backend: null,

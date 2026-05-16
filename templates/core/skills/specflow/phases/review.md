@@ -81,5 +81,6 @@ Remaining findings (MEDIUM/LOW, non-blocking)
 Overall: PASS | FAIL
 ```
 
-If Overall = PASS, invoke `/specflow merge` (or hand back to `/specflow-auto`
-for STOP #2). If FAIL, stop and report to the user.
+If Overall = PASS, surface the STOP #2 summary block defined in
+`phases/auto-chain.md` and ask for merge confirmation, then invoke
+`/specflow merge` on "yes". If FAIL, stop and report to the user.
