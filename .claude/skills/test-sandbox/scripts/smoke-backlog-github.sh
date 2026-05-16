@@ -138,6 +138,24 @@ check "propagator carries the SPECFLOW_INTERNAL_PROPAGATION recursion guard" \
   'grep -q "SPECFLOW_INTERNAL_PROPAGATION" .specflow/scripts/backlog/propagate-parent-status.sh'
 
 echo
+echo "═══ #263  Auto-Done propagation in github propagator (static-grep) ═══"
+grep -qE '^[[:space:]]*"Done"\)' .specflow/scripts/backlog/propagate-parent-status.sh \
+  && pass "github propagator has a NEW_STATUS=Done branch (#263)" \
+  || fail "Done branch missing in github propagator" "$(grep -n 'case' .specflow/scripts/backlog/propagate-parent-status.sh)"
+grep -q 'subIssues(first: 100)' .specflow/scripts/backlog/propagate-parent-status.sh \
+  && pass "github propagator queries Issue.subIssues for all-Done check" \
+  || fail "subIssues query missing in github propagator" "$(grep -n 'subIssues' .specflow/scripts/backlog/propagate-parent-status.sh)"
+grep -q 'fieldValueByName(name: "Status")' .specflow/scripts/backlog/propagate-parent-status.sh \
+  && pass "github propagator reads each child's Status via fieldValueByName" \
+  || fail "Status fieldValueByName missing in github propagator" "$(grep -n 'fieldValueByName' .specflow/scripts/backlog/propagate-parent-status.sh)"
+grep -q 'all_done=true' .specflow/scripts/backlog/propagate-parent-status.sh \
+  && pass "github propagator computes all_done from project Status array" \
+  || fail "all_done variable missing in github propagator" "$(grep -n 'all_done' .specflow/scripts/backlog/propagate-parent-status.sh)"
+grep -q '"Ready"|"In progress"|"In review"' .specflow/scripts/backlog/propagate-parent-status.sh \
+  && pass "github propagator only auto-advances parents at Ready/In progress/In review (AC a)" \
+  || fail "github propagator parent-status guard missing" "$(grep -n 'PARENT_STATUS' .specflow/scripts/backlog/propagate-parent-status.sh)"
+
+echo
 if [ "$fails" -eq 0 ]; then
   echo "═══ ALL GITHUB BACKLOG CHECKS PASSED ═══"
   exit 0
