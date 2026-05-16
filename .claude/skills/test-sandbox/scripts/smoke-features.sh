@@ -242,6 +242,15 @@ check "implement.md halts BLOCKED when the Domain Model is absent" \
   'grep -q "awaiting:product-owner-domain-brief" .claude/skills/specflow/phases/implement.md'
 
 echo
+echo "═══ Phase-doc drift fixes — auto-chain default ═══"
+check "analyze.md re-run hint mentions --once for one-shot regen" \
+  'grep -q "Run /specflow plan --once to regenerate" .claude/skills/specflow/phases/analyze.md'
+check "review.md owns STOP #2 (no /specflow-auto handoff)" \
+  '! grep -q "hand back to \`/specflow-auto\`" .claude/skills/specflow/phases/review.md'
+check "review.md surfaces STOP #2 from phases/auto-chain.md" \
+  'grep -q "STOP #2 summary block defined in" .claude/skills/specflow/phases/review.md'
+
+echo
 if [ "$fails" -eq 0 ]; then
   echo "═══ ALL CHECKS PASSED ═══"
   exit 0
