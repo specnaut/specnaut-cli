@@ -92,6 +92,45 @@ export function extractAdoption(body: string): string | null {
   return cleaned;
 }
 
+const PR_NUMBER_RE = /\s\(#(\d+)\)\s*$/;
+
+/**
+ * Extract the trailing PR number from a commit subject formatted as
+ * `... (#NNN)`. Returns `null` when no match.
+ */
+export function extractPrNumber(subject: string): number | null {
+  const m = subject.match(PR_NUMBER_RE);
+  if (!m) return null;
+  return parseInt(m[1], 10);
+}
+
+const PR_BODY_CACHE = new Map<number, string>();
+
+/**
+ * Fetch a PR body via `gh pr view <num> --json body --jq .body`.
+ * Cached per process. Returns `""` on any failure (the caller treats empty
+ * as "no adoption section"). Cache miss / fetch errors emit a stderr warning
+ * but never fail the build — CI lint (Component 1) is the gate.
+ */
+export async function fetchPrBody(num: number): Promise<string> {
+  const cached = PR_BODY_CACHE.get(num);
+  if (cached !== undefined) return cached;
+  const cmd = new Deno.Command("gh", {
+    args: ["pr", "view", String(num), "--json", "body", "--jq", ".body"],
+    stdout: "piped",
+    stderr: "piped",
+  });
+  const { stdout, success } = await cmd.output();
+  if (!success) {
+    console.warn(`gen-changelog: failed to fetch PR #${num} body — skipping adoption`);
+    PR_BODY_CACHE.set(num, "");
+    return "";
+  }
+  const body = new TextDecoder().decode(stdout);
+  PR_BODY_CACHE.set(num, body);
+  return body;
+}
+
 export type FormatOpts = {
   fromTag: string | null;
   toTag: string;

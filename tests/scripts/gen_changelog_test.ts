@@ -156,3 +156,18 @@ Deno.test("extractAdoption: returns null when section has no prompt block", () =
   const body = "## Agent adoption\n\njust prose, no fenced block\n\n## Tests\n";
   assertEquals(extractAdoption(body), null);
 });
+
+import { extractPrNumber } from "../../scripts/gen-changelog.ts";
+
+Deno.test("extractPrNumber: parses trailing (#NNN)", () => {
+  assertEquals(extractPrNumber("Add foo (#252)"), 252);
+});
+
+Deno.test("extractPrNumber: returns null when no PR ref", () => {
+  assertEquals(extractPrNumber("Add foo"), null);
+});
+
+Deno.test("extractPrNumber: ignores mid-subject mentions", () => {
+  // "(#X)" only counted when it's at end of subject, after whitespace.
+  assertEquals(extractPrNumber("Fixed (#bug) bug (#99)"), 99);
+});
