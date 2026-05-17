@@ -111,6 +111,27 @@ check "requesting-code-review credits obra/superpowers attribution" \
   'grep -q "obra/superpowers" .claude/skills/requesting-code-review/SKILL.md'
 
 echo
+echo "═══ #282  using-specflow bootstrap skill (Epic #270 / B6) ═══"
+check "using-specflow skill scaffolded" \
+  '[ -f .claude/skills/using-specflow/SKILL.md ]'
+check "using-specflow frontmatter declares name" \
+  'head -5 .claude/skills/using-specflow/SKILL.md | grep -q "name: using-specflow"'
+check "using-specflow describes SessionStart auto-injection" \
+  'head -10 .claude/skills/using-specflow/SKILL.md | grep -q "SessionStart hook"'
+check "using-specflow lists writing-plans skill in registry" \
+  'grep -q "writing-plans" .claude/skills/using-specflow/SKILL.md'
+check "using-specflow lists requesting-code-review skill in registry" \
+  'grep -q "requesting-code-review" .claude/skills/using-specflow/SKILL.md'
+check "using-specflow lists product-owner agent + backlog mutation rule" \
+  'grep -q "product-owner" .claude/skills/using-specflow/SKILL.md'
+check "using-specflow lists devops-sre agent + release advisory rule" \
+  'grep -q "devops-sre" .claude/skills/using-specflow/SKILL.md'
+check "using-specflow points at per-harness tool-mapping references" \
+  'grep -q "references/claude-tools.md\|references/codex-tools.md" .claude/skills/using-specflow/SKILL.md'
+check "using-specflow credits obra/superpowers attribution" \
+  'grep -q "obra/superpowers" .claude/skills/using-specflow/SKILL.md'
+
+echo
 echo "═══ #75  loop.md + groom phase ═══"
 check ".claude/loop.md scaffolded" '[ -f .claude/loop.md ]'
 check "groom phase doc present" \
