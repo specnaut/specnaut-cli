@@ -132,6 +132,25 @@ check "using-specflow credits obra/superpowers attribution" \
   'grep -q "obra/superpowers" .claude/skills/using-specflow/SKILL.md'
 
 echo
+echo "═══ #272  subagent-driven-development skill (Epic #270 / A2) ═══"
+check "subagent-driven-development skill scaffolded" \
+  '[ -f .claude/skills/subagent-driven-development/SKILL.md ]'
+check "subagent-driven-development frontmatter declares name" \
+  'head -5 .claude/skills/subagent-driven-development/SKILL.md | grep -q "name: subagent-driven-development"'
+check "subagent-driven-development describes two-stage review pattern" \
+  'grep -q "two-stage review\|Two-stage review" .claude/skills/subagent-driven-development/SKILL.md'
+check "subagent-driven-development documents developer agent dispatch" \
+  'grep -q "subagent_type: \"developer\"" .claude/skills/subagent-driven-development/SKILL.md'
+check "subagent-driven-development documents code-reviewer agent dispatch" \
+  'grep -q "subagent_type: \"code-reviewer\"" .claude/skills/subagent-driven-development/SKILL.md'
+check "subagent-driven-development handles all 4 status codes" \
+  'grep -q "DONE_WITH_CONCERNS" .claude/skills/subagent-driven-development/SKILL.md && grep -q "NEEDS_CONTEXT" .claude/skills/subagent-driven-development/SKILL.md && grep -q "BLOCKED" .claude/skills/subagent-driven-development/SKILL.md'
+check "subagent-driven-development covers model selection guidance" \
+  'grep -q "Model selection" .claude/skills/subagent-driven-development/SKILL.md'
+check "subagent-driven-development credits obra/superpowers attribution" \
+  'grep -q "obra/superpowers" .claude/skills/subagent-driven-development/SKILL.md'
+
+echo
 echo "═══ #75  loop.md + groom phase ═══"
 check ".claude/loop.md scaffolded" '[ -f .claude/loop.md ]'
 check "groom phase doc present" \

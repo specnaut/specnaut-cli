@@ -39,6 +39,7 @@ not re-read the file with `Read`.
 | `specflow` (router) | User typed `/specflow <phase>` or asked for the spec-kit pipeline (`/specflow specify → plan → tasks → analyze → implement → review → merge`). Greenfield features with formal specs. |
 | `writing-plans` | User wants to plan an issue or a feature without the spec-kit ceremony. Trigger phrases: "plan this", "write a plan for X", "give me an implementation plan". |
 | `requesting-code-review` | Work is complete enough to need an independent eye. Dispatch the bundled `code-reviewer` agent with the canonical prompt template. |
+| `subagent-driven-development` | Execute a plan task-by-task with mandatory two-stage review (spec compliance + code quality) per task. Consumes plans produced by `writing-plans`. |
 | `backlog` | User asked about a backlog item, the board, an issue. Read-only access; mutations go through the `product-owner` agent. |
 | `specflow-auto` | Auto-chain orchestration (legacy entry point — most users invoke `/specflow specify` instead). |
 | `specflow-review` | Auto-invoke alias preserved for the `/specflow review` phase. |
