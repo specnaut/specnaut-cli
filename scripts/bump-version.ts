@@ -50,6 +50,7 @@ export const VERSIONED_FILES = [
   "src/domain/version.ts",
   "plugin/.claude-plugin/plugin.json",
   "templates/manifest.json",
+  ".codex-plugin/plugin.json",
 ] as const;
 
 async function readCurrentVersion(baseDir: string): Promise<string> {
@@ -100,6 +101,17 @@ export async function writeVersions(
     `"version": "${next}"`,
   );
   await Deno.writeTextFile(templatesManifestPath, updatedTemplates);
+
+  // Lockstep the Codex plugin manifest (Epic #270 / B1 #277). The
+  // release workflow's pre-flight step compares deno.json `version`
+  // against this file's `version` too — drift here blocks the build.
+  const codexManifestPath = `${baseDir}/.codex-plugin/plugin.json`;
+  const codexRaw = await Deno.readTextFile(codexManifestPath);
+  const updatedCodex = codexRaw.replace(
+    /"version":\s*"[^"]+"/,
+    `"version": "${next}"`,
+  );
+  await Deno.writeTextFile(codexManifestPath, updatedCodex);
 }
 
 async function main() {

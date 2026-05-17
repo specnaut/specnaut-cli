@@ -1,0 +1,44 @@
+{
+  "name": "specflow",
+  "version": "1.8.0",
+  "description": "Spec-driven workflow, slash commands, and sub-agents for AI coding harnesses — Specflow's bundled skill library, agents, and the SessionStart bootstrap that makes the agent skill-aware on every turn.",
+  "author": {
+    "name": "MakerLabs",
+    "email": "noreply@anthropic.com",
+    "url": "https://github.com/mkrlabs"
+  },
+  "homepage": "https://specflow.makerlabs.dev",
+  "repository": "https://github.com/mkrlabs/specflow",
+  "license": "MIT",
+  "keywords": [
+    "skills",
+    "spec-driven",
+    "tdd",
+    "backlog",
+    "workflows",
+    "agents",
+    "best-practices"
+  ],
+  "skills": "./plugin/skills/",
+  "interface": {
+    "displayName": "Specflow",
+    "shortDescription": "Spec-driven planning, TDD, review, and delivery workflows for coding agents",
+    "longDescription": "Specflow turns vague ideas into shipped features through a disciplined pipeline: brainstorming → writing-plans → subagent-driven-development (or executing-plans inline) → requesting-code-review → verification-before-completion. The bundled router skill (/specflow) orchestrates the spec-kit greenfield flow (specify → plan → tasks → analyze → implement → review → merge) and 11 specialised sub-agents handle backlog ops, security, QA, DevOps, and more. Inspired by obra/superpowers (MIT) with explicit Specflow-native integration with backlogs (GitHub/GitLab/local), constitutional governance, and a Claude/Cursor/Codex/Gemini/OpenCode/Copilot multi-harness distribution.",
+    "developerName": "MakerLabs",
+    "category": "Coding",
+    "capabilities": ["Interactive", "Read", "Write"],
+    "defaultPrompt": [
+      "Plan how to implement this issue: <paste GitHub issue URL>",
+      "Let's design a new feature.",
+      "Review the changes I just made.",
+      "Run a backlog grooming pass."
+    ],
+    "websiteURL": "https://specflow.makerlabs.dev",
+    "brandColor": "#0d6efd",
+    "composerIcon": "./assets/composer-icon.svg",
+    "logo": "./assets/logo.svg",
+    "screenshots": []
+  },
+  "privacyPolicyURL": "https://docs.github.com/en/site-policy/privacy-policies/github-general-privacy-statement",
+  "termsOfServiceURL": "https://docs.github.com/en/site-policy/github-terms/github-terms-of-service"
+}

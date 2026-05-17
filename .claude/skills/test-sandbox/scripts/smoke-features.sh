@@ -203,6 +203,16 @@ check "brainstorming credits obra/superpowers attribution" \
 
 echo
 echo "═══ #75  loop.md + groom phase ═══"
+
+# NOTE: #277 (Codex plugin adapter / Epic #270 B1) wires
+# .codex-plugin/plugin.json + scripts/sync-to-codex-plugin.sh in the
+# Specflow repo itself, NOT in scaffolded user projects. The smoke
+# below runs against a scaffolded sandbox where those files don't
+# land — so no init-time smoke assertion is appropriate. The unit
+# tests in tests/scripts/bump_version_test.ts cover the version
+# lockstep for .codex-plugin/plugin.json. Static-grep verification
+# of the adapter files lives directly in CI's release.yml pre-flight
+# (Plugin pre-flight step).
 check ".claude/loop.md scaffolded" '[ -f .claude/loop.md ]'
 check "groom phase doc present" \
   '[ -f .claude/skills/specflow/phases/groom.md ]'
