@@ -33,6 +33,9 @@ PROJECT_DIR = os.environ["PROJECT_DIR"]
 MAIN_TS = os.environ["MAIN_TS"]
 ARGS = ["deno", "run", "--allow-all", MAIN_TS, "init", "--here", "--no-git"]
 # 2× down + enter (codex harness), 1× down + enter (github backend),
+# enter to accept the scheme picker default (added in #257 — SemVer/date
+# detection now runs after the backend selection, before the URL prompt;
+# accepting the suggested default works for an empty bootstrap fixture),
 # enter to skip the kanban URL prompt (added in #147).
 SCRIPT = [
     (0.5, b"\x1b[B"),
@@ -40,6 +43,7 @@ SCRIPT = [
     (0.3, b"\r"),
     (0.5, b"\x1b[B"),
     (0.3, b"\r"),
+    (0.5, b"\r"),
     (0.5, b"\r"),
 ]
 

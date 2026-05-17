@@ -113,8 +113,8 @@ check "ensure-labels.sh verifies the GitHub default '"'"'bug'"'"' label" \
   'grep -qF "bug" .specflow/scripts/backlog/ensure-labels.sh'
 check "SKILL.md mentions ensure-labels.sh (#158)" \
   'grep -q "ensure-labels.sh" .claude/skills/backlog/SKILL.md'
-check "SKILL.md states fields are the source of truth (#194)" \
-  'grep -q "fields are the source of truth" .claude/skills/backlog/SKILL.md'
+check "SKILL.md states fields take priority over labels (#194)" \
+  'grep -q "reserved as a strict fallback" .claude/skills/backlog/SKILL.md'
 
 echo
 echo "═══ #157  Priority/Size native fields documented in SKILL.md ═══"
