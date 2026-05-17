@@ -87,11 +87,12 @@ Deno.test("specflow init --ai codex scaffolds a Codex layout", async () => {
     assertEquals(codexGoalMd.includes("/specflow groom"), true);
 
     // Top-level skill folders post-consolidation: specflow router +
-    // specflow-auto + specflow-review alias + specflow-backlog = 4.
+    // specflow-auto + specflow-review alias + specflow-backlog +
+    // writing-plans (Epic #270 / A1) = 5.
     const agentsSkillsCount = (await Array.fromAsync(
       Deno.readDir(join(root, ".agents/skills")),
     )).length;
-    assertEquals(agentsSkillsCount, 4);
+    assertEquals(agentsSkillsCount, 5);
     const codexAgentsCount = (await Array.fromAsync(
       Deno.readDir(join(root, ".codex/agents")),
     )).length;
