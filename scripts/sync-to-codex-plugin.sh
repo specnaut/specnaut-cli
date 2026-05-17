@@ -1,0 +1,171 @@
+#!/usr/bin/env bash
+# Sync Specflow → mkrlabs/openai-codex-plugins fork.
+#
+# Triggered from .github/workflows/release.yml on every `v*` tag push,
+# after the binary build + Homebrew tap bump. Mirrors the upstream
+# pattern from obra/superpowers (scripts/sync-to-codex-plugin.sh,
+# MIT-licensed) — deterministic rsync into a fork, then `gh pr create`
+# against that fork's main. A human (Kevin) later merges that fork
+# into the upstream openai-codex-plugins marketplace.
+#
+# Required environment:
+#   GH_TOKEN     — fine-grained PAT with Contents:write + Pull
+#                  requests:write on mkrlabs/openai-codex-plugins.
+#                  Set via the CODEX_SYNC_TOKEN repo secret in
+#                  release.yml (parallel to HOMEBREW_TAP_TOKEN).
+#
+# Optional environment:
+#   SPECFLOW_VERSION — defaults to deno.json `version`. CI passes the
+#                      tag-derived version explicitly.
+#   DRY_RUN          — set to any non-empty value to print actions
+#                      without pushing or opening a PR.
+#
+# Exit codes:
+#   0   success (or "no changes — sync skipped" — the script bails
+#       early if rsync produces an empty diff in the destination)
+#   2   missing GH_TOKEN — emit ::warning:: and exit 0 in release.yml
+#       (mirrors the HOMEBREW_TAP_TOKEN-missing pattern)
+#   1   unexpected error
+set -euo pipefail
+
+# Configuration — change FORK / DEST_REL if the marketplace topology shifts.
+FORK="mkrlabs/openai-codex-plugins"
+UPSTREAM="openai/openai-codex-plugins"
+DEST_REL="plugins/specflow"
+BRANCH_PREFIX="specflow-sync"
+
+# Resolve the version to ship.
+REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+VERSION="${SPECFLOW_VERSION:-$(jq -r '.version' "$REPO_ROOT/deno.json")}"
+
+if [ -z "${GH_TOKEN:-}" ] && [ -z "${DRY_RUN:-}" ]; then
+  echo "::warning::CODEX_SYNC_TOKEN (GH_TOKEN) not set — skipping Codex marketplace sync" >&2
+  exit 2
+fi
+
+echo "specflow → codex plugin sync (v$VERSION)"
+echo "  fork:     $FORK"
+echo "  dest:     $DEST_REL"
+echo "  upstream: $UPSTREAM"
+
+# Working dir — never commit to the source tree.
+WORK_DIR="$(mktemp -d -t specflow-codex-sync-XXXXXX)"
+trap 'rm -rf "$WORK_DIR"' EXIT
+
+if [ -n "${DRY_RUN:-}" ]; then
+  echo "DRY_RUN: would clone $FORK into $WORK_DIR/fork"
+  CLONE_TARGET="$WORK_DIR/fork"
+  mkdir -p "$CLONE_TARGET/$DEST_REL"
+  ( cd "$CLONE_TARGET" && git init -q )
+else
+  echo "Cloning $FORK..."
+  gh repo clone "$FORK" "$WORK_DIR/fork" -- --depth 1
+  CLONE_TARGET="$WORK_DIR/fork"
+fi
+
+cd "$CLONE_TARGET"
+
+# Git identity for the commit (runner has none by default).
+git config user.email "specflow-bot@mkrlabs.dev"
+git config user.name "Specflow Codex Sync Bot"
+
+# rsync EXCLUDES — what NOT to ship into the Codex marketplace.
+# Inspired by superpowers' EXCLUDES array. We ship:
+#   - .codex-plugin/plugin.json
+#   - assets/                  (icons referenced by the manifest)
+#   - plugin/skills/           (the bundled skill library)
+# We DON'T ship:
+#   - .claude-plugin/          (Claude Code-specific)
+#   - .cursor-plugin/          (when it lands — Cursor-specific)
+#   - .opencode/               (OpenCode-specific)
+#   - .git/, .github/, docs/, tests/, src/, scripts/, etc.
+EXCLUDES=(
+  --exclude='/.git/'
+  --exclude='/.github/'
+  --exclude='/.claude-plugin/'
+  --exclude='/.cursor-plugin/'
+  --exclude='/.opencode/'
+  --exclude='/.specflow/'
+  --exclude='/docs/'
+  --exclude='/tests/'
+  --exclude='/src/'
+  --exclude='/scripts/'
+  --exclude='/templates/'
+  --exclude='/dist/'
+  --exclude='/.claude/'
+  --exclude='/.cursor/'
+  --exclude='/.codex/'
+  --exclude='/.gemini/'
+  --exclude='/.windsurf/'
+  --exclude='/.agents/'
+  --exclude='/.opencode/'
+  --exclude='/.gitignore'
+  --exclude='/deno.json'
+  --exclude='/deno.lock'
+  --exclude='/install.sh'
+  --exclude='/AGENTS.md'
+  --exclude='/CLAUDE.md'
+  --exclude='/GEMINI.md'
+  --exclude='/CHANGELOG.md'
+  --exclude='/CONTRIBUTING.md'
+  --exclude='/SECURITY.md'
+  --exclude='/CODE_OF_CONDUCT.md'
+  --exclude='/LICENSE'
+  --exclude='/README.md'
+  --exclude='/RELEASE-NOTES.md'
+  --exclude='/package.json'
+  --exclude='/Cargo.toml'
+  --exclude='/gemini-extension.json'
+  --exclude='**/.DS_Store'
+  --exclude='**/node_modules/'
+  --exclude='**/__pycache__/'
+)
+
+# Sync source → fork/plugins/specflow/.
+mkdir -p "$CLONE_TARGET/$DEST_REL"
+echo "Syncing $REPO_ROOT → $CLONE_TARGET/$DEST_REL ..."
+rsync -av --delete "${EXCLUDES[@]}" \
+  "$REPO_ROOT/" "$CLONE_TARGET/$DEST_REL/"
+
+# Detect "no changes" early — superpowers' pattern, avoids opening
+# empty PRs on no-op releases.
+if [ -z "$(git status --porcelain)" ]; then
+  echo "No changes to sync — $FORK is already in sync with v$VERSION."
+  exit 0
+fi
+
+BRANCH="$BRANCH_PREFIX/v$VERSION"
+TITLE="chore(specflow): sync to v$VERSION"
+BODY=$(cat <<EOF
+Automated sync from \`mkrlabs/specflow\` v$VERSION.
+
+This PR mirrors the latest Specflow plugin content into
+\`plugins/specflow/\` of this marketplace fork. A human reviewer
+should rebase + merge this PR into upstream \`$UPSTREAM\` after
+sanity-checking the diff.
+
+Generated by \`scripts/sync-to-codex-plugin.sh\` in
+[mkrlabs/specflow](https://github.com/mkrlabs/specflow).
+EOF
+)
+
+if [ -n "${DRY_RUN:-}" ]; then
+  echo "DRY_RUN: would create branch $BRANCH"
+  echo "DRY_RUN: would commit + push to $FORK"
+  echo "DRY_RUN: would open PR with title: $TITLE"
+  exit 0
+fi
+
+git checkout -b "$BRANCH"
+git add -A
+git commit -m "$TITLE"
+git push -u origin "$BRANCH"
+
+# Open the PR. If one with the same head already exists, `gh pr create`
+# fails — fall back to listing + reusing.
+if ! gh pr create --repo "$FORK" --base main --head "$BRANCH" \
+  --title "$TITLE" --body "$BODY" 2>/dev/null; then
+  echo "PR already exists for $BRANCH; skipping create."
+fi
+
+echo "✓ Specflow synced to $FORK:$BRANCH (v$VERSION)"

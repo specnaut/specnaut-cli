@@ -36,6 +36,7 @@ Deno.test("VERSIONED_FILES covers every file the release workflow gates on", () 
       "src/domain/version.ts",
       "plugin/.claude-plugin/plugin.json",
       "templates/manifest.json",
+      ".codex-plugin/plugin.json",
     ] as const,
   );
 });
@@ -62,6 +63,11 @@ Deno.test("writeVersions bumps every versioned file in lockstep", async () => {
     await Deno.writeTextFile(
       join(tmp, "templates/manifest.json"),
       `{\n  "version": "1.2.3",\n  "core": []\n}\n`,
+    );
+    await Deno.mkdir(join(tmp, ".codex-plugin"), { recursive: true });
+    await Deno.writeTextFile(
+      join(tmp, ".codex-plugin/plugin.json"),
+      `{\n  "name": "specflow",\n  "version": "1.2.3"\n}\n`,
     );
 
     await writeVersions("1.2.4", tmp);

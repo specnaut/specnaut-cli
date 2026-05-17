@@ -185,7 +185,15 @@ jobs:
             echo "::error::templates/manifest.json version ($MANIFEST_VERSION) does not match deno.json version ($BIN_VERSION). Re-run scripts/bump-version.ts."
             exit 1
           fi
-          echo "✓ plugin manifest valid, scaffold present, versions $PLUGIN_VERSION/$MANIFEST_VERSION match binary"
+          # 5. Hard fail if .codex-plugin/plugin.json version drifts.
+          # The Codex marketplace fork is bumped lockstep with every
+          # tag; drift here would publish a stale marketplace listing.
+          CODEX_VERSION=$(jq -r .version .codex-plugin/plugin.json)
+          if [ "$BIN_VERSION" != "$CODEX_VERSION" ]; then
+            echo "::error::.codex-plugin/plugin.json version ($CODEX_VERSION) does not match deno.json version ($BIN_VERSION). Re-run scripts/bump-version.ts."
+            exit 1
+          fi
+          echo "✓ plugin manifests valid, scaffold present, versions $PLUGIN_VERSION/$MANIFEST_VERSION/$CODEX_VERSION match binary"
       - name: Cross-compile all targets
         run: deno run --allow-read --allow-write --allow-run --allow-env scripts/build.ts
       - name: Compute checksums
@@ -217,3 +225,24 @@ jobs:
         run: |
           deno run --allow-read --allow-write --allow-run --allow-env \
             scripts/bump-tap-formula.ts
+      - name: Sync to Codex marketplace fork (#277 / B1)
+        # Mirrors the Specflow plugin content into
+        # `mkrlabs/openai-codex-plugins:plugins/specflow/`. A human
+        # rebases that fork's PR into upstream `openai/openai-codex-plugins`
+        # for the actual marketplace publish. If CODEX_SYNC_TOKEN is
+        # unset, the script emits a workflow ::warning and exits 0 —
+        # the release itself ships unaffected (same pattern as
+        # HOMEBREW_TAP_TOKEN and WIKI_SSH_KEY).
+        env:
+          GH_TOKEN: ${{ secrets.CODEX_SYNC_TOKEN }}
+          SPECFLOW_VERSION: ${{ github.ref_name }}
+        run: |
+          # Strip leading "v" from the tag ref for the version arg.
+          export SPECFLOW_VERSION="${SPECFLOW_VERSION#v}"
+          bash scripts/sync-to-codex-plugin.sh || rc=$?
+          # Treat exit 2 (no token) as a non-blocking skip, same as
+          # the Homebrew bump's behaviour.
+          if [ "${rc:-0}" = "2" ]; then
+            exit 0
+          fi
+          exit "${rc:-0}"
