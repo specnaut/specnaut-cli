@@ -151,6 +151,23 @@ check "subagent-driven-development credits obra/superpowers attribution" \
   'grep -q "obra/superpowers" .claude/skills/subagent-driven-development/SKILL.md'
 
 echo
+echo "═══ #274  executing-plans skill (Epic #270 / A4) ═══"
+check "executing-plans skill scaffolded" \
+  '[ -f .claude/skills/executing-plans/SKILL.md ]'
+check "executing-plans frontmatter declares name" \
+  'head -5 .claude/skills/executing-plans/SKILL.md | grep -q "name: executing-plans"'
+check "executing-plans describes checkpoint pauses between tasks" \
+  'grep -q "checkpoint" .claude/skills/executing-plans/SKILL.md'
+check "executing-plans cross-references subagent-driven-development alternative" \
+  'grep -q "subagent-driven-development" .claude/skills/executing-plans/SKILL.md'
+check "executing-plans documents self-review at task boundaries" \
+  'grep -q "self-review\|Self-review" .claude/skills/executing-plans/SKILL.md'
+check "executing-plans references pre-commit gate awareness" \
+  'grep -q "pre-commit\|Pre-commit" .claude/skills/executing-plans/SKILL.md'
+check "executing-plans credits obra/superpowers attribution" \
+  'grep -q "obra/superpowers" .claude/skills/executing-plans/SKILL.md'
+
+echo
 echo "═══ #75  loop.md + groom phase ═══"
 check ".claude/loop.md scaffolded" '[ -f .claude/loop.md ]'
 check "groom phase doc present" \
