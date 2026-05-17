@@ -193,7 +193,16 @@ jobs:
             echo "::error::.codex-plugin/plugin.json version ($CODEX_VERSION) does not match deno.json version ($BIN_VERSION). Re-run scripts/bump-version.ts."
             exit 1
           fi
-          echo "✓ plugin manifests valid, scaffold present, versions $PLUGIN_VERSION/$MANIFEST_VERSION/$CODEX_VERSION match binary"
+          # 6. Hard fail if .cursor-plugin/plugin.json version drifts.
+          # Cursor users install directly from the repo; the manifest's
+          # version must match the binary or the install would advertise
+          # a stale version.
+          CURSOR_VERSION=$(jq -r .version .cursor-plugin/plugin.json)
+          if [ "$BIN_VERSION" != "$CURSOR_VERSION" ]; then
+            echo "::error::.cursor-plugin/plugin.json version ($CURSOR_VERSION) does not match deno.json version ($BIN_VERSION). Re-run scripts/bump-version.ts."
+            exit 1
+          fi
+          echo "✓ plugin manifests valid, scaffold present, versions $PLUGIN_VERSION/$MANIFEST_VERSION/$CODEX_VERSION/$CURSOR_VERSION match binary"
       - name: Cross-compile all targets
         run: deno run --allow-read --allow-write --allow-run --allow-env scripts/build.ts
       - name: Compute checksums
