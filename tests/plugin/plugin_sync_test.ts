@@ -93,6 +93,13 @@ const SYNC_PAIRS: ReadonlyArray<{ plugin: string; source: string }> = [
     plugin: "plugin/skills/verification-before-completion/SKILL.md",
     source: "templates/core/skills/verification-before-completion/SKILL.md",
   },
+  // brainstorming — spec-discovery entry point. One question at a
+  // time, propose 2-3 approaches, present design for approval, hand
+  // off to writing-plans (Epic #270, A6 #276).
+  {
+    plugin: "plugin/skills/brainstorming/SKILL.md",
+    source: "templates/core/skills/brainstorming/SKILL.md",
+  },
   ...[
     "claude",
     "codex",

@@ -185,6 +185,23 @@ check "verification-before-completion credits obra/superpowers attribution" \
   'grep -q "obra/superpowers" .claude/skills/verification-before-completion/SKILL.md'
 
 echo
+echo "═══ #276  brainstorming skill (Epic #270 / A6) ═══"
+check "brainstorming skill scaffolded" \
+  '[ -f .claude/skills/brainstorming/SKILL.md ]'
+check "brainstorming frontmatter declares name" \
+  'head -5 .claude/skills/brainstorming/SKILL.md | grep -q "name: brainstorming"'
+check "brainstorming mandates one-question-at-a-time" \
+  'grep -q "one at a time\|ONE at a time" .claude/skills/brainstorming/SKILL.md'
+check "brainstorming hands off to writing-plans" \
+  'grep -q "hand off to .writing-plans.\|writing-plans" .claude/skills/brainstorming/SKILL.md'
+check "brainstorming documents coexistence with /specflow specify" \
+  'grep -q "/specflow specify" .claude/skills/brainstorming/SKILL.md'
+check "brainstorming enforces the no-implementation-before-design rule" \
+  'grep -q "No implementation, no plan\|approval before handing off" .claude/skills/brainstorming/SKILL.md'
+check "brainstorming credits obra/superpowers attribution" \
+  'grep -q "obra/superpowers" .claude/skills/brainstorming/SKILL.md'
+
+echo
 echo "═══ #75  loop.md + groom phase ═══"
 check ".claude/loop.md scaffolded" '[ -f .claude/loop.md ]'
 check "groom phase doc present" \

@@ -29,6 +29,7 @@
     { "category": "skill", "name": "subagent-driven-development", "source": "core/skills/subagent-driven-development/SKILL.md" },
     { "category": "skill", "name": "executing-plans", "source": "core/skills/executing-plans/SKILL.md" },
     { "category": "skill", "name": "verification-before-completion", "source": "core/skills/verification-before-completion/SKILL.md" },
+    { "category": "skill", "name": "brainstorming", "source": "core/skills/brainstorming/SKILL.md" },
     { "category": "backlog-cmd", "name": "backlog", "source": "core/commands/backlog.md" },
 
     { "category": "agent", "name": "product-owner", "source": "core/agents/product-owner.md" },
