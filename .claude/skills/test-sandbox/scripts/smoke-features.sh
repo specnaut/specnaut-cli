@@ -79,6 +79,21 @@ check "specflow-review auto-invoke alias present" \
   '[ -f .claude/skills/specflow-review/SKILL.md ]'
 
 echo
+echo "═══ #271  writing-plans skill (Epic #270 / A1) ═══"
+check "writing-plans skill scaffolded" \
+  '[ -f .claude/skills/writing-plans/SKILL.md ]'
+check "writing-plans frontmatter declares name: writing-plans" \
+  'head -5 .claude/skills/writing-plans/SKILL.md | grep -q "name: writing-plans"'
+check "writing-plans description targets plan-related trigger phrases" \
+  'head -10 .claude/skills/writing-plans/SKILL.md | grep -q "plan this"'
+check "writing-plans save path documented as docs/specflow/plans/" \
+  'grep -q "docs/specflow/plans" .claude/skills/writing-plans/SKILL.md'
+check "writing-plans enforces zero-placeholder discipline" \
+  'grep -qF "No placeholders" .claude/skills/writing-plans/SKILL.md'
+check "writing-plans credits obra/superpowers attribution" \
+  'grep -q "obra/superpowers" .claude/skills/writing-plans/SKILL.md'
+
+echo
 echo "═══ #75  loop.md + groom phase ═══"
 check ".claude/loop.md scaffolded" '[ -f .claude/loop.md ]'
 check "groom phase doc present" \

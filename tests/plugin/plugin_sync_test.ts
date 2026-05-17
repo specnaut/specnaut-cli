@@ -47,6 +47,13 @@ const SYNC_PAIRS: ReadonlyArray<{ plugin: string; source: string }> = [
     plugin: "plugin/skills/specflow-review/SKILL.md",
     source: "templates/core/skills/specflow-review/SKILL.md",
   },
+  // writing-plans skill — Specflow's native equivalent of obra/superpowers
+  // writing-plans, used for issue-driven planning where the spec-kit
+  // /specflow plan ceremony would be overkill (Epic #270, A1 #271).
+  {
+    plugin: "plugin/skills/writing-plans/SKILL.md",
+    source: "templates/core/skills/writing-plans/SKILL.md",
+  },
   // Dual-copy agents: 10 sub-agent definitions, each landing as
   // `plugin/agents/<name>.md`. Claude Code resolves agents by file
   // basename in plugin scope; no namespacing needed for invocation
