@@ -1,7 +1,7 @@
 ---
 name: specflow
-description: Specflow workflow router — entry point for the spec-driven pipeline. `/specflow <phase> [args]` dispatches to a single phase (specify, clarify, plan, tasks, analyze, implement, review, merge, constitution, checklist, groom, tag-version, release-version, list-skills). `/specflow` with no args prints the workflow overview.
-argument-hint: <specify|clarify|plan|tasks|analyze|implement|review|merge|constitution|checklist|groom|tag-version|release-version|list-skills> [args]
+description: Specflow workflow router — entry point for the spec-driven pipeline. `/specflow <phase> [args]` dispatches to a single phase (specify, clarify, plan, tasks, analyze, implement, review, merge, constitution, checklist, groom, tag-version, release-version, list-skills, audit). `/specflow` with no args prints the workflow overview.
+argument-hint: <specify|clarify|plan|tasks|analyze|implement|review|merge|constitution|checklist|groom|tag-version|release-version|list-skills|audit> [args]
 when_to_use: |
   Trigger phrases that should route here:
   - specify: "spec out a feature", "write a spec", "create a specification"
@@ -18,6 +18,7 @@ when_to_use: |
   - tag-version: "tag a version", "create a release tag", "bump the version"
   - release-version: "release", "publish a release", "create release notes"
   - list-skills: "list installed skills", "show skill aliases", "what overlays are active"
+  - audit: "audit security / performance / accessibility", "scan the codebase for X issues"
 ---
 
 # Specflow router
@@ -37,6 +38,15 @@ when_to_use: |
 2. **Phase extraction** — the first remaining token is the phase name.
    Everything after the first whitespace is the argument string for
    that phase.
+
+   **Compound `audit` phase exception** — when the first token is exactly
+   `audit` AND the next token is one of `security`, `performance`, or
+   `accessibility`, treat the pair as a single hyphenated phase name
+   `audit-<axis>` (matching the file `phases/audit-<axis>.md`). The
+   remaining tokens after the axis become the argument string. Examples:
+   `audit security` → phase `audit-security`, args ``; `audit security --severity medium` → phase `audit-security`, args `--severity medium`.
+   Users may also invoke the hyphenated form directly
+   (`/specflow audit-security`); both forms route to the same phase doc.
 
 3. **Empty arguments** — if no tokens remain after flag parsing (or
    `$ARGUMENTS` was empty to start with), render the **Workflow overview**
@@ -60,11 +70,19 @@ when_to_use: |
 | `tag-version` | `phases/tag-version.md` | Bump + create an annotated git tag using the project's versioning scheme. |
 | `release-version` | `phases/release-version.md` | Generate categorized release notes for a tag (default: latest). |
 | `list-skills` | `phases/list-skills.md` | List installed skills, flagging aliases and overlay hooks. |
+| `audit security` | `phases/audit-security.md` | Read-only project-wide security sweep; emits a findings report. |
 
 Chainable phases are: `specify`, `clarify`, `plan`, `tasks`, `analyze`,
 `implement`, `review`. The others (`merge`, `constitution`,
-`checklist`, `groom`, `tag-version`, `release-version`, `list-skills`)
+`checklist`, `groom`, `tag-version`, `release-version`, `list-skills`,
+`audit security`)
 are one-shot regardless of chain mode.
+
+`audit <axis>` is dispatched as a two-token phase: the router reads
+`phases/audit-<axis>.md` (e.g. `phases/audit-security.md`). Today only
+`security` is wired; `performance` and `accessibility` land in #304 / #305.
+Until then, `/specflow audit performance` and `/specflow audit accessibility`
+fall through to the unknown-phase branch.
 
 ## Routing
 
@@ -104,7 +122,7 @@ session, pausing only at STOP #1 (if clarifications are needed) and
 STOP #2 (pre-merge confirmation). See `phases/auto-chain.md` for the
 chain mechanics.
 
-`constitution`, `checklist`, `groom`, `tag-version`, `release-version`, and `list-skills` are out-of-band utilities, not part of the linear flow.
+`constitution`, `checklist`, `groom`, `tag-version`, `release-version`, `list-skills`, and `audit <axis>` are out-of-band utilities, not part of the linear flow.
 
 ## Typical flow
 

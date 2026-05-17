@@ -71,6 +71,16 @@ check "phase doc release-version.md scaffolded (epic #226)" \
   '[ -f .claude/skills/specflow/phases/release-version.md ]'
 check "phase doc list-skills.md scaffolded (#265)" \
   '[ -f .claude/skills/specflow/phases/list-skills.md ]'
+check "phase doc audit-security.md scaffolded (Epic #302, #303)" \
+  '[ -f .claude/skills/specflow/phases/audit-security.md ]'
+check "audit-security phase doc declares read-only contract" \
+  'grep -q "Read-only contract" .claude/skills/specflow/phases/audit-security.md'
+check "audit-security phase doc dispatches the security-auditor agent" \
+  'grep -q "security-auditor" .claude/skills/specflow/phases/audit-security.md'
+check "audit-security phase doc parses --severity flag" \
+  'grep -q "\-\-severity" .claude/skills/specflow/phases/audit-security.md'
+check "router phase index lists audit security" \
+  'grep -q "audit security" .claude/skills/specflow/SKILL.md'
 check "name: specflow on the router SKILL.md" \
   'head -3 .claude/skills/specflow/SKILL.md | grep -q "name: specflow"'
 check "disable-model-invocation NOT set on the router (Skill-tool chaining must work)" \

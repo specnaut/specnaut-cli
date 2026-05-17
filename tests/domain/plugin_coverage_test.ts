@@ -67,6 +67,28 @@ Deno.test("isPluginCoveredPath: claude + .claude/skills/specflow/phases/<phase>.
   }
 });
 
+// Hyphenated phase names — the previous `[a-z]+` regex silently failed
+// for these. Locked in by Epic #302 / #303 (which added audit-security).
+Deno.test("isPluginCoveredPath: claude + hyphenated phase names are covered", () => {
+  for (
+    const name of [
+      "tag-version",
+      "release-version",
+      "list-skills",
+      "audit-security",
+    ]
+  ) {
+    assertEquals(
+      isPluginCoveredPath(
+        "claude",
+        `.claude/skills/specflow/phases/${name}.md`,
+      ),
+      true,
+      `hyphenated phase ${name} should be plugin-covered`,
+    );
+  }
+});
+
 Deno.test("isPluginCoveredPath: claude + specflow-auto skill is covered", () => {
   assertEquals(
     isPluginCoveredPath("claude", ".claude/skills/specflow-auto/SKILL.md"),

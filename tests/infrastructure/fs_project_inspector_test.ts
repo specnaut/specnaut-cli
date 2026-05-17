@@ -837,9 +837,12 @@ Deno.test("inspect: plugin gap check warns for each missing covered path when pl
         o.name === ".claude/skills/specflow-auto/SKILL.md") &&
       o.status === "warn"
     );
-    // 10 agents + 1 router skill + 11 phase docs + specflow-review alias +
-    // specflow-auto = 24 covered paths, all missing.
-    assertEquals(gapOutcomes.length, 24);
+    // 10 agents + 1 router skill + 15 phase docs (the 11 original +
+    // tag-version + release-version + list-skills + audit-security
+    // #303 — the previous `[a-z]+` regex silently dropped the four
+    // hyphenated phases; fixed in #303) + specflow-review alias +
+    // specflow-auto = 28 covered paths, all missing.
+    assertEquals(gapOutcomes.length, 28);
     for (const o of gapOutcomes) {
       assertEquals(o.message.includes("missing"), true);
       assertEquals(o.message.includes("specflow upgrade"), true);

@@ -25,7 +25,9 @@ import type { KnownHarness } from "./installed_lock.ts";
  *   - `.claude/agents/<name>.md` (excluding `architect.md` — that's a
  *     contributor-only agent, not bundled into user projects)
  *   - `.claude/skills/specflow/SKILL.md` — the consolidated router skill
- *   - `.claude/skills/specflow/phases/<phase>.md` — the 11 phase docs
+ *   - `.claude/skills/specflow/phases/<phase>.md` — phase reference docs.
+ *     Hyphenated names are valid (`tag-version`, `release-version`,
+ *     `list-skills`, `audit-security`, …).
  *   - `.claude/skills/specflow-review/SKILL.md` — auto-invoke alias
  *   - `.claude/skills/specflow-auto/SKILL.md`
  *
@@ -43,7 +45,13 @@ export function isPluginCoveredPath(
   if (agentMatch !== null) return agentMatch[1] !== "architect";
 
   if (dest === ".claude/skills/specflow/SKILL.md") return true;
-  if (/^\.claude\/skills\/specflow\/phases\/[a-z]+\.md$/.test(dest)) return true;
+  // Hyphenated phase names are valid (`tag-version`, `release-version`,
+  // `audit-security`, …). The earlier `[a-z]+` regex silently failed for
+  // any phase containing a hyphen; the corrected pattern accepts one or
+  // more lowercase alpha tokens separated by single hyphens.
+  if (/^\.claude\/skills\/specflow\/phases\/[a-z]+(?:-[a-z]+)*\.md$/.test(dest)) {
+    return true;
+  }
   if (dest === ".claude/skills/specflow-review/SKILL.md") return true;
   if (dest === ".claude/skills/specflow-auto/SKILL.md") return true;
 
@@ -59,9 +67,15 @@ export function isPluginCoveredPath(
  * (either re-install the plugin or run `specflow upgrade` to restore
  * the bundled snapshot).
  *
- * Kept in sync with `isPluginCoveredPath` above. Total: 24 paths
- * (10 agents excluding architect + 1 router skill + 11 phase docs +
+ * Kept in sync with `isPluginCoveredPath` above. Total: 28 paths
+ * (10 agents excluding architect + 1 router skill + 15 phase docs +
  * specflow-review alias + specflow-auto).
+ *
+ * The phase docs array now includes hyphenated phases that the previous
+ * `[a-z]+` regex silently rejected (`tag-version`, `release-version`,
+ * `list-skills`) plus the new `audit-security` phase (Epic #302, #303).
+ * Upcoming `audit-performance` / `audit-accessibility` siblings land in
+ * #304 / #305 and will join this list there.
  */
 export const PLUGIN_COVERED_PATHS_CLAUDE: ReadonlyArray<string> = [
   ...[
@@ -89,6 +103,10 @@ export const PLUGIN_COVERED_PATHS_CLAUDE: ReadonlyArray<string> = [
     "constitution",
     "checklist",
     "groom",
+    "tag-version",
+    "release-version",
+    "list-skills",
+    "audit-security",
   ].map((name) => `.claude/skills/specflow/phases/${name}.md`),
   ".claude/skills/specflow-review/SKILL.md",
   ".claude/skills/specflow-auto/SKILL.md",
