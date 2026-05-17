@@ -79,6 +79,13 @@ const SYNC_PAIRS: ReadonlyArray<{ plugin: string; source: string }> = [
     plugin: "plugin/skills/subagent-driven-development/SKILL.md",
     source: "templates/core/skills/subagent-driven-development/SKILL.md",
   },
+  // executing-plans — inline alternative to subagent-driven-development
+  // for trivial plans where dispatch overhead exceeds the catch rate
+  // (Epic #270, A4 #274).
+  {
+    plugin: "plugin/skills/executing-plans/SKILL.md",
+    source: "templates/core/skills/executing-plans/SKILL.md",
+  },
   ...[
     "claude",
     "codex",

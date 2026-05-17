@@ -27,6 +27,7 @@
     { "category": "skill", "name": "requesting-code-review", "source": "core/skills/requesting-code-review/SKILL.md" },
     { "category": "skill", "name": "using-specflow", "source": "core/skills/using-specflow/SKILL.md" },
     { "category": "skill", "name": "subagent-driven-development", "source": "core/skills/subagent-driven-development/SKILL.md" },
+    { "category": "skill", "name": "executing-plans", "source": "core/skills/executing-plans/SKILL.md" },
     { "category": "backlog-cmd", "name": "backlog", "source": "core/commands/backlog.md" },
 
     { "category": "agent", "name": "product-owner", "source": "core/agents/product-owner.md" },

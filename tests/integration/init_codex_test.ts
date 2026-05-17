@@ -89,11 +89,12 @@ Deno.test("specflow init --ai codex scaffolds a Codex layout", async () => {
     // Top-level skill folders post-consolidation: specflow router +
     // specflow-auto + specflow-review alias + specflow-backlog +
     // writing-plans (A1) + requesting-code-review (A3) +
-    // using-specflow bootstrap (B6) + subagent-driven-development (A2) = 8.
+    // using-specflow bootstrap (B6) + subagent-driven-development (A2) +
+    // executing-plans (A4) = 9.
     const agentsSkillsCount = (await Array.fromAsync(
       Deno.readDir(join(root, ".agents/skills")),
     )).length;
-    assertEquals(agentsSkillsCount, 8);
+    assertEquals(agentsSkillsCount, 9);
     const codexAgentsCount = (await Array.fromAsync(
       Deno.readDir(join(root, ".codex/agents")),
     )).length;

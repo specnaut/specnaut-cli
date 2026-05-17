@@ -13,7 +13,7 @@ another human) can follow step-by-step without re-reading the spec.
 > (MIT) — `skills/writing-plans/SKILL.md`. Re-implemented for Specflow
 > with `docs/specflow/plans/` as the canonical save path and explicit
 > handoff to Specflow's `subagent-driven-development` / `executing-plans`
-> skill (`subagent-driven-development`) and issue #274 (executing-plans).
+> skills (`subagent-driven-development` and `executing-plans`).
 
 ## When to use this skill
 
@@ -95,8 +95,8 @@ Every plan **MUST** start with this header:
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use
 > `specflow:subagent-driven-development` (recommended) or
-> `specflow:executing-plans` (#274 once shipped) to implement this
-> plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> `specflow:executing-plans` to implement this plan task-by-task.
+> Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** [One sentence describing what this builds]
 
@@ -232,10 +232,8 @@ After saving the plan, offer the user a choice of execution strategy:
 
 **If inline chosen:**
 
-- **REQUIRED SUB-SKILL:** Use `specflow:executing-plans` (issue #274
-  once shipped — otherwise execute tasks in-session with manual
-  checkpoint pauses)
-- Batch execution with explicit checkpoints
+- **REQUIRED SUB-SKILL:** Use `specflow:executing-plans`
+- Sequential in-session execution with checkpoint pauses between tasks
 
 ## Key principles
 
