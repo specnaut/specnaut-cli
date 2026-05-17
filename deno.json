@@ -41,6 +41,7 @@
     ".claude/",
     "packaging/",
     "plugin/skills/",
-    "plugin/agents/"
+    "plugin/agents/",
+    "GEMINI.md"
   ]
 }

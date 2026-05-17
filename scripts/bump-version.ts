@@ -52,6 +52,7 @@ export const VERSIONED_FILES = [
   "templates/manifest.json",
   ".codex-plugin/plugin.json",
   ".cursor-plugin/plugin.json",
+  "gemini-extension.json",
 ] as const;
 
 async function readCurrentVersion(baseDir: string): Promise<string> {
@@ -124,6 +125,18 @@ export async function writeVersions(
     `"version": "${next}"`,
   );
   await Deno.writeTextFile(cursorManifestPath, updatedCursor);
+
+  // Lockstep the Gemini CLI extension manifest (Epic #270 / B3 #279).
+  // Gemini users install via `gemini extensions install <repo-url>`;
+  // the extension manifest version is what `gemini extensions list`
+  // surfaces, so drift would mislabel the installed version.
+  const geminiManifestPath = `${baseDir}/gemini-extension.json`;
+  const geminiRaw = await Deno.readTextFile(geminiManifestPath);
+  const updatedGemini = geminiRaw.replace(
+    /"version":\s*"[^"]+"/,
+    `"version": "${next}"`,
+  );
+  await Deno.writeTextFile(geminiManifestPath, updatedGemini);
 }
 
 async function main() {
