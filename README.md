@@ -64,25 +64,32 @@ On macOS, you may need to clear the quarantine attribute after download:
 xattr -d com.apple.quarantine /path/to/specflow
 ```
 
-## Claude Code plugin
+## Install as a plugin / extension (six harnesses)
 
-If you use Claude Code, you can also install Specflow as a user-scope plugin — no binary required,
-available across all your projects:
+If you'd rather skip `specflow init` and have Specflow available across **all your projects**,
+install it as a plugin / extension in your harness — same skill content across all six targets:
 
-```
-/plugin install mkrlabs/specflow-plugin
-```
+| Harness                | Install command                                                                                                           |
+| ---------------------- | ------------------------------------------------------------------------------------------------------------------------- |
+| **Claude Code**        | `/plugin install mkrlabs/specflow-plugin`                                                                                 |
+| **Codex CLI / App**    | `/plugins` → search "specflow" → install¹                                                                                 |
+| **Cursor**             | `/add-plugin mkrlabs/specflow`                                                                                            |
+| **Gemini CLI**         | `gemini extensions install https://github.com/mkrlabs/specflow`                                                           |
+| **OpenCode**           | Add to `opencode.json`: `"plugin": ["specflow@git+https://github.com/mkrlabs/specflow.git"]`                              |
+| **GitHub Copilot CLI** | `copilot plugin marketplace add mkrlabs/specflow-marketplace`<br/>`copilot plugin install specflow@specflow-marketplace`¹ |
 
-The plugin ships 10 slash-command skills, 1 auto-chain skill, 1 groom skill, and 9 sub-agents.
-Slash-commands are namespaced (`/specflow-plugin:specify`, `/specflow-plugin:plan`, etc.) and
-coexist with project-local copies from `specflow init`.
+¹ Codex CLI and the shared marketplace listing land once their one-time prereqs are provisioned —
+see [the docs](https://specflow.makerlabs.dev/llms.txt) for current status. The sync workflows ship
+inert (skip with a warning) until then.
 
 **When to use the plugin vs the binary:**
 
-- Plugin: cross-project, always up-to-date, no `specflow init` needed, namespaced commands.
+- Plugin: cross-project, always up-to-date, no `specflow init` needed, auto-activates skills on
+  session start via the `using-specflow` bootstrap.
 - Binary: project-local customization, short slash-commands (`/specify`), backlog + hooks support.
 
-Most teams use both. See [the docs](https://specflow.makerlabs.dev) for the full boundary table.
+Most teams use both. See [the docs](https://specflow.makerlabs.dev) for the full boundary table and
+per-harness tool-mapping references.
 
 ## Project-specific skill overlays
 
