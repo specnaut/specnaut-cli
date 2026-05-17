@@ -1,6 +1,6 @@
 {
   "name": "specflow",
-  "version": "1.8.0",
+  "version": "1.9.0",
   "description": "Spec-driven workflow, slash commands, and sub-agents for AI coding harnesses — Specflow's bundled skill library, agents, and the SessionStart bootstrap that makes the agent skill-aware on every turn.",
   "author": {
     "name": "MakerLabs",
