@@ -42,6 +42,7 @@
     "packaging/",
     "plugin/skills/",
     "plugin/agents/",
-    "GEMINI.md"
+    "GEMINI.md",
+    ".opencode/"
   ]
 }
