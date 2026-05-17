@@ -67,15 +67,16 @@ export function isPluginCoveredPath(
  * (either re-install the plugin or run `specflow upgrade` to restore
  * the bundled snapshot).
  *
- * Kept in sync with `isPluginCoveredPath` above. Total: 28 paths
- * (10 agents excluding architect + 1 router skill + 15 phase docs +
+ * Kept in sync with `isPluginCoveredPath` above. Total: 30 paths
+ * (11 agents excluding architect + 1 router skill + 16 phase docs +
  * specflow-review alias + specflow-auto).
  *
- * The phase docs array now includes hyphenated phases that the previous
- * `[a-z]+` regex silently rejected (`tag-version`, `release-version`,
- * `list-skills`) plus the new `audit-security` phase (Epic #302, #303).
- * Upcoming `audit-performance` / `audit-accessibility` siblings land in
- * #304 / #305 and will join this list there.
+ * Phase docs include hyphenated names — the regex was widened in #303
+ * after silently dropping `tag-version`, `release-version`, and
+ * `list-skills`. The new `audit-security` (#303) and `audit-performance`
+ * (#304) phases joined the list; `audit-accessibility` lands in #305.
+ * `performance-auditor` (#304) is the eleventh bundled agent;
+ * `a11y-auditor` lands in #305.
  */
 export const PLUGIN_COVERED_PATHS_CLAUDE: ReadonlyArray<string> = [
   ...[
@@ -89,6 +90,7 @@ export const PLUGIN_COVERED_PATHS_CLAUDE: ReadonlyArray<string> = [
     "specflow-expert",
     "test-reviewer",
     "workflow-manager",
+    "performance-auditor",
   ].map((name) => `.claude/agents/${name}.md`),
   ".claude/skills/specflow/SKILL.md",
   ...[
@@ -107,6 +109,7 @@ export const PLUGIN_COVERED_PATHS_CLAUDE: ReadonlyArray<string> = [
     "release-version",
     "list-skills",
     "audit-security",
+    "audit-performance",
   ].map((name) => `.claude/skills/specflow/phases/${name}.md`),
   ".claude/skills/specflow-review/SKILL.md",
   ".claude/skills/specflow-auto/SKILL.md",
