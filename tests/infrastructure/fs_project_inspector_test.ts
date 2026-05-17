@@ -837,12 +837,13 @@ Deno.test("inspect: plugin gap check warns for each missing covered path when pl
         o.name === ".claude/skills/specflow-auto/SKILL.md") &&
       o.status === "warn"
     );
-    // 11 agents (10 original + performance-auditor #304) + 1 router skill +
-    // 16 phase docs (the 11 original + tag-version + release-version +
-    // list-skills + audit-security #303 + audit-performance #304 —
-    // hyphenated phases unblocked by the #303 regex fix) +
-    // specflow-review alias + specflow-auto = 30 covered paths.
-    assertEquals(gapOutcomes.length, 30);
+    // 12 agents (10 original + performance-auditor #304 + a11y-auditor #305)
+    // + 1 router skill + 17 phase docs (the 11 original + tag-version +
+    // release-version + list-skills + audit-security #303 +
+    // audit-performance #304 + audit-accessibility #305 — hyphenated
+    // phases unblocked by the #303 regex fix) + specflow-review alias +
+    // specflow-auto = 32 covered paths.
+    assertEquals(gapOutcomes.length, 32);
     for (const o of gapOutcomes) {
       assertEquals(o.message.includes("missing"), true);
       assertEquals(o.message.includes("specflow upgrade"), true);
@@ -885,7 +886,7 @@ Deno.test("inspect: plugin gap check warns ONLY for the agents the user actually
       await Deno.mkdir(join(dir, ".claude/agents"), { recursive: true });
       // Scaffold every covered agent EXCEPT product-owner (simulating
       // that one alone got deleted post-migration). The set tracks
-      // PLUGIN_COVERED_PATHS_CLAUDE — 11 agents minus product-owner = 10.
+      // PLUGIN_COVERED_PATHS_CLAUDE — 12 agents minus product-owner = 11.
       for (
         const name of [
           "code-reviewer",
@@ -898,6 +899,7 @@ Deno.test("inspect: plugin gap check warns ONLY for the agents the user actually
           "test-reviewer",
           "workflow-manager",
           "performance-auditor",
+          "a11y-auditor",
         ]
       ) {
         await Deno.writeTextFile(join(dir, `.claude/agents/${name}.md`), "stub");
