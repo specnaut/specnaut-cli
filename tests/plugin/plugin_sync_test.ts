@@ -86,6 +86,13 @@ const SYNC_PAIRS: ReadonlyArray<{ plugin: string; source: string }> = [
     plugin: "plugin/skills/executing-plans/SKILL.md",
     source: "templates/core/skills/executing-plans/SKILL.md",
   },
+  // verification-before-completion — discipline checklist that
+  // implementing agents MUST run before claiming DONE (Epic #270,
+  // A5 #275).
+  {
+    plugin: "plugin/skills/verification-before-completion/SKILL.md",
+    source: "templates/core/skills/verification-before-completion/SKILL.md",
+  },
   ...[
     "claude",
     "codex",

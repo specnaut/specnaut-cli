@@ -41,6 +41,7 @@ not re-read the file with `Read`.
 | `requesting-code-review` | Work is complete enough to need an independent eye. Dispatch the bundled `code-reviewer` agent with the canonical prompt template. |
 | `subagent-driven-development` | Execute a plan task-by-task with mandatory two-stage review (spec compliance + code quality) per task. Consumes plans produced by `writing-plans`. |
 | `executing-plans` | Inline alternative to subagent-driven — execute a plan task-by-task in-session with checkpoint pauses. Faster for trivial plans. |
+| `verification-before-completion` | Discipline checklist that any agent MUST run before reporting DONE. Tests green / pre-commit clean / plan boxes ticked / smoke audit / plugin sync / Windsurf cap / requirements addressed. |
 | `backlog` | User asked about a backlog item, the board, an issue. Read-only access; mutations go through the `product-owner` agent. |
 | `specflow-auto` | Auto-chain orchestration (legacy entry point — most users invoke `/specflow specify` instead). |
 | `specflow-review` | Auto-invoke alias preserved for the `/specflow review` phase. |

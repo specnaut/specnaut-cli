@@ -168,6 +168,23 @@ check "executing-plans credits obra/superpowers attribution" \
   'grep -q "obra/superpowers" .claude/skills/executing-plans/SKILL.md'
 
 echo
+echo "═══ #275  verification-before-completion skill (Epic #270 / A5) ═══"
+check "verification-before-completion skill scaffolded" \
+  '[ -f .claude/skills/verification-before-completion/SKILL.md ]'
+check "verification-before-completion frontmatter declares name" \
+  'head -5 .claude/skills/verification-before-completion/SKILL.md | grep -q "name: verification-before-completion"'
+check "verification-before-completion enumerates the 8-item checklist" \
+  'grep -q "deno task test" .claude/skills/verification-before-completion/SKILL.md && grep -q "deno fmt --check" .claude/skills/verification-before-completion/SKILL.md && grep -q "audit.sh" .claude/skills/verification-before-completion/SKILL.md'
+check "verification-before-completion references plugin sync test" \
+  'grep -q "plugin_sync_test" .claude/skills/verification-before-completion/SKILL.md'
+check "verification-before-completion references Windsurf cap" \
+  'grep -q "windsurf_harness_test\|Windsurf 12000-char" .claude/skills/verification-before-completion/SKILL.md'
+check "verification-before-completion documents report shape with evidence" \
+  'grep -q "Verification:" .claude/skills/verification-before-completion/SKILL.md'
+check "verification-before-completion credits obra/superpowers attribution" \
+  'grep -q "obra/superpowers" .claude/skills/verification-before-completion/SKILL.md'
+
+echo
 echo "═══ #75  loop.md + groom phase ═══"
 check ".claude/loop.md scaffolded" '[ -f .claude/loop.md ]'
 check "groom phase doc present" \
