@@ -17,7 +17,9 @@ const SYNC_PAIRS: ReadonlyArray<{ plugin: string; source: string }> = [
     plugin: "plugin/skills/specflow/SKILL.md",
     source: "templates/core/skills/specflow/SKILL.md",
   },
-  // 13 phase reference docs, loaded by the router on demand.
+  // 15 phase reference docs, loaded by the router on demand. The
+  // `audit-security` phase (Epic #302 / #303) joined the family alongside
+  // the upcoming `audit-performance` / `audit-accessibility` siblings.
   ...[
     "specify",
     "clarify",
@@ -33,6 +35,7 @@ const SYNC_PAIRS: ReadonlyArray<{ plugin: string; source: string }> = [
     "tag-version",
     "release-version",
     "list-skills",
+    "audit-security",
   ].map((name) => ({
     plugin: `plugin/skills/specflow/phases/${name}.md`,
     source: `templates/core/skills/specflow/phases/${name}.md`,
