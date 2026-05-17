@@ -62,6 +62,26 @@ const SYNC_PAIRS: ReadonlyArray<{ plugin: string; source: string }> = [
     plugin: "plugin/skills/requesting-code-review/SKILL.md",
     source: "templates/core/skills/requesting-code-review/SKILL.md",
   },
+  // using-specflow bootstrap skill + 6 tool-mapping references — loaded
+  // by the SessionStart hook (plugin/hooks/) to make the agent
+  // skill-aware on every turn. Per-harness references already shipped
+  // in #283; mirror covers them all for the plugin distribution
+  // (Epic #270, B6 #282).
+  {
+    plugin: "plugin/skills/using-specflow/SKILL.md",
+    source: "templates/core/skills/using-specflow/SKILL.md",
+  },
+  ...[
+    "claude",
+    "codex",
+    "cursor",
+    "gemini",
+    "opencode",
+    "copilot",
+  ].map((name) => ({
+    plugin: `plugin/skills/using-specflow/references/${name}-tools.md`,
+    source: `templates/core/skills/using-specflow/references/${name}-tools.md`,
+  })),
   // Dual-copy agents: 10 sub-agent definitions, each landing as
   // `plugin/agents/<name>.md`. Claude Code resolves agents by file
   // basename in plugin scope; no namespacing needed for invocation

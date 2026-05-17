@@ -1,0 +1,69 @@
+#!/usr/bin/env bash
+# SessionStart hook — Claude Code plugin entry point.
+#
+# Reads the `using-specflow` bootstrap skill from the plugin tree and
+# injects it into the new session as `additionalContext`. Effect: the
+# agent starts every session already knowing Specflow's skill registry,
+# agent registry, and routing principles — no explicit `/specflow` or
+# Skill-tool invocation needed to discover what's available.
+#
+# Output format (Claude Code SessionStart hook contract):
+#   {
+#     "hookSpecificOutput": {
+#       "hookEventName": "SessionStart",
+#       "additionalContext": "<bootstrap skill content>"
+#     }
+#   }
+#
+# Matchers in hooks.json: startup | clear | compact — the bootstrap
+# reloads every time the session context resets, not just at first
+# launch.
+#
+# Inspired by obra/superpowers v5.1.0 (MIT) — hooks/session-start.
+# Re-implemented for Specflow.
+
+set -uo pipefail
+
+# CLAUDE_PLUGIN_ROOT is set by Claude Code's plugin loader before the
+# hook runs. If absent (e.g. running this script standalone for
+# testing), fall back to the script's own parent directory.
+PLUGIN_ROOT="${CLAUDE_PLUGIN_ROOT:-$(cd "$(dirname "$0")/.." && pwd)}"
+SKILL_PATH="$PLUGIN_ROOT/skills/using-specflow/SKILL.md"
+
+if [ ! -f "$SKILL_PATH" ]; then
+  # Skill missing — emit empty hook output so Claude Code proceeds
+  # without bootstrap context. Never fail the session start.
+  echo '{"hookSpecificOutput":{"hookEventName":"SessionStart","additionalContext":""}}'
+  exit 0
+fi
+
+# Strip the YAML frontmatter (everything between the first two `---`
+# lines) so the agent receives only the body content. The frontmatter
+# is metadata for the harness's skill discovery, not for the agent.
+BODY=$(awk '
+  BEGIN { in_fm = 0; saw_fm = 0 }
+  /^---$/ {
+    if (!saw_fm) { in_fm = 1; saw_fm = 1; next }
+    if (in_fm) { in_fm = 0; next }
+  }
+  !in_fm && saw_fm { print }
+' "$SKILL_PATH")
+
+# JSON-escape the body. `jq -Rs .` reads stdin as a raw string and
+# emits a properly-quoted JSON string (handles \", \n, \\, control
+# chars, unicode). If jq isn't available, fall back to a basic
+# escape (less robust but adequate for ASCII-only content).
+if command -v jq >/dev/null 2>&1; then
+  ESCAPED=$(printf '%s' "$BODY" | jq -Rs .)
+else
+  # Minimal fallback: escape backslashes, double-quotes, and newlines.
+  ESCAPED=$(printf '%s' "$BODY" \
+    | sed -e 's/\\/\\\\/g' -e 's/"/\\"/g' \
+    | awk 'BEGIN{ORS=""} {gsub(/\n/, "\\n"); print}')
+  ESCAPED="\"$ESCAPED\""
+fi
+
+# Emit the SessionStart hook output. `additionalContext` is the
+# documented field name Claude Code reads to inject text into the
+# agent's session context.
+printf '{"hookSpecificOutput":{"hookEventName":"SessionStart","additionalContext":%s}}\n' "$ESCAPED"

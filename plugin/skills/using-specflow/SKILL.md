@@ -1,0 +1,159 @@
+---
+name: using-specflow
+description: Bootstrap skill loaded at session start. Teaches the agent how to discover and invoke Specflow's bundled skills, agents, and slash commands. Auto-injected by the SessionStart hook on harnesses that support hooks (Claude Code, Cursor); on other harnesses, read this file once per session before answering Specflow-related questions.
+---
+
+# Using Specflow
+
+This is the bootstrap skill that makes the agent **Specflow-aware** on
+every turn. It does not do any work itself — it points the agent at the
+right Specflow skill / agent / slash command for the user's intent.
+
+> Inspired by [obra/superpowers v5.1.0](https://github.com/obra/superpowers)
+> (MIT) — `skills/using-superpowers/SKILL.md`. Re-implemented for
+> Specflow's skill ecosystem.
+
+## The rule
+
+**If you think there is even a 1% chance a Specflow skill applies to
+what the user is asking, invoke it.** Skills override default behaviour
+where they apply.
+
+User instructions in `CLAUDE.md`, `AGENTS.md`, `GEMINI.md`, or direct
+requests always take precedence over a skill's defaults. If the user
+says "skip TDD" and a skill says "always TDD", follow the user.
+
+## How to invoke a Specflow skill
+
+Use the harness's `Skill` tool (Claude Code) or the equivalent
+(`activate_skill` on Gemini, `skill` on Codex/OpenCode/Copilot — see
+`references/<harness>-tools.md` for your harness).
+
+The skill content is loaded into your context. Follow it directly — do
+not re-read the file with `Read`.
+
+## Specflow skill registry
+
+| Skill | When to invoke |
+|---|---|
+| `specflow` (router) | User typed `/specflow <phase>` or asked for the spec-kit pipeline (`/specflow specify → plan → tasks → analyze → implement → review → merge`). Greenfield features with formal specs. |
+| `writing-plans` | User wants to plan an issue or a feature without the spec-kit ceremony. Trigger phrases: "plan this", "write a plan for X", "give me an implementation plan". |
+| `requesting-code-review` | Work is complete enough to need an independent eye. Dispatch the bundled `code-reviewer` agent with the canonical prompt template. |
+| `backlog` | User asked about a backlog item, the board, an issue. Read-only access; mutations go through the `product-owner` agent. |
+| `specflow-auto` | Auto-chain orchestration (legacy entry point — most users invoke `/specflow specify` instead). |
+| `specflow-review` | Auto-invoke alias preserved for the `/specflow review` phase. |
+
+## Specflow agent registry
+
+Dispatch these via `Task({ subagent_type: "<name>", ... })` (or your
+harness's equivalent — see `references/<harness>-tools.md`).
+
+| Agent | When to dispatch |
+|---|---|
+| `developer` | Implementing tasks from a plan (TDD, frequent commits, in-code documentation). |
+| `code-reviewer` | Reviewing diffs against a plan or requirements. Use the prompt template from `requesting-code-review` skill. |
+| `security-auditor` | Security review or alert triage on Specflow-shipped code. |
+| `test-reviewer` | Test-quality-only review (no architecture). |
+| `product-owner` | **Every** backlog mutation goes through this agent — no exceptions. Read-only inspection (`list.sh`, `view.sh`) can be done directly. |
+| `qa-tester` | Run the QA scenario catalogue against the released binary. |
+| `devops-sre` | Advisory pass before editing `.github/workflows/`, `install.sh`, `scripts/build.ts`, the homebrew tap, or running `/release`. |
+| `architect` | Architecture-aware research before non-trivial cross-subsystem changes. |
+| `specflow-expert` | Specflow-specific consulting on the binary, plugin, or scaffolded project state. |
+| `review-coordinator` | Orchestrates the implement → review → fix loop for `/specflow implement`. |
+| `workflow-manager` | High-level workflow orchestration across phases. |
+
+## Routing principles
+
+1. **`/specflow plan` vs `writing-plans`** — both produce plans, but for
+   different inputs:
+   - `/specflow plan` follows the spec-kit flow (consumes `spec.md`,
+     produces `research.md` + `data-model.md` + `contracts/` +
+     `quickstart.md`). Use for greenfield features with formal contracts.
+   - `writing-plans` (skill) takes a free-form issue or requirement and
+     produces a single executable plan file with bite-sized TDD tasks.
+     Use for issue-driven and ad-hoc work.
+
+2. **Backlog mutations → `product-owner`** — never call `add.sh`,
+   `move.sh`, `set-field.sh`, or `gh issue {create,close,edit}`
+   directly. Dispatch the PO. The PO knows about classification gates,
+   sub-issue links, soft date axes, and reporting conventions.
+
+3. **Releases & pipelines → `devops-sre` first** — before editing CI
+   workflows, `install.sh`, build scripts, or running `/release`,
+   dispatch `devops-sre` for an advisory pass. The agent is read-only;
+   the main session executes after the advisory.
+
+4. **Architecture-level work → `architect` first** — non-trivial
+   changes that cross subsystems (new CLI command, new application
+   use case, new port, new infrastructure adapter, new harness target,
+   changes to bundling / install / release flow, changes to the
+   lock-file or backlog-sync contract). The architect returns a design
+   proposal grounded in the current code; main session implements.
+
+## Skill discovery on different harnesses
+
+This file may run on any of Specflow's plugin-distribution targets:
+Claude Code, Codex CLI, Codex App, Cursor, Gemini CLI, OpenCode,
+GitHub Copilot CLI. Each harness uses different tool names —
+`Read` vs `read_file`, `Task` vs `spawn_agent`, etc.
+
+Before invoking any tool, consult the right reference:
+
+- Claude Code (baseline) → `references/claude-tools.md`
+- Codex → `references/codex-tools.md`
+- Cursor → `references/cursor-tools.md`
+- Gemini CLI → `references/gemini-tools.md`
+- OpenCode → `references/opencode-tools.md`
+- Copilot CLI → `references/copilot-tools.md`
+
+Auto-detect the running harness by looking for env hints
+(`CLAUDE_PLUGIN_ROOT`, `CURSOR_*`, `CODEX_*`, etc.) or by inspecting
+the available tool list in your current context.
+
+## Red flags — these thoughts mean "stop and check for a skill"
+
+| Thought | Reality |
+|---|---|
+| "This is just a simple question" | Questions are tasks. Check for skills. |
+| "I need more context first" | Skill check comes BEFORE clarifying questions. |
+| "Let me explore the codebase first" | Skills tell you HOW to explore. Check first. |
+| "I'll just do this one thing first" | Check BEFORE doing anything. |
+| "This doesn't need a formal skill" | If a skill exists, use it. |
+| "I remember this skill" | Skills evolve. Read the current version. |
+| "The skill is overkill" | Simple things become complex. Use it. |
+| "Kevin asked me to do X, just go" | Kevin's order is honored; the skill tells you HOW to honor it. |
+
+## When NOT to invoke any Specflow skill
+
+- Pure conversation (greetings, clarifying chat, "thanks").
+- Questions about another repo / project unrelated to Specflow.
+- Single-keystroke / single-word user inputs that need clarification
+  before action (ask the user, then re-evaluate).
+
+## Skill priority
+
+When multiple Specflow skills could apply, use this order:
+
+1. **Process skills first** — `writing-plans` before any implementation;
+   `requesting-code-review` after every task in a subagent-driven flow.
+2. **Domain skills second** — `backlog` for backlog inquiries,
+   `specflow` (router) for spec-kit phases.
+
+"Let's build X" → `writing-plans` first, then implementation skills.
+"Fix this bug" → diagnose first (read the code), then `writing-plans`
+if the fix needs more than 2 changes, otherwise just fix.
+
+## Out of scope
+
+This bootstrap skill is loaded by the SessionStart hook to make the
+agent skill-aware. It does not:
+
+- Execute any backlog / git / build commands itself
+- Replace the per-skill SKILL.md files (read those when invoking a
+  specific skill)
+- Override `CLAUDE.md` / `AGENTS.md` / `GEMINI.md` project directives
+
+For per-harness adapter details, see the manifest at
+`plugin/.claude-plugin/plugin.json`, `.cursor-plugin/plugin.json`,
+`.codex-plugin/plugin.json`, `gemini-extension.json`, or the
+`.opencode/plugins/specflow.js` adapter (issues #277–#280).
