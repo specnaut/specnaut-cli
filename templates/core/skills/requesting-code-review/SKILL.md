@@ -23,7 +23,7 @@ work.
 
 **Mandatory:**
 
-- After each task in a subagent-driven plan (#272, once shipped)
+- After each task in a `subagent-driven-development` plan
 - After completing a major feature
 - Before merging to main
 
@@ -77,7 +77,7 @@ prompt template (see below). Use the `Task` tool with
 Paste this verbatim into a `Task({subagent_type: "code-reviewer", ...})`
 dispatch, substituting the four placeholders. The format is mandatory —
 Specflow's two-stage review pattern (spec compliance, then code
-quality; see #272 once shipped) depends on the reviewer returning the
+quality; see `subagent-driven-development` skill) depends on the reviewer returning the
 exact sections below.
 
 ````
@@ -197,8 +197,8 @@ For each issue:
 
 ## Two-stage review pattern (subagent-driven only)
 
-Specflow's `subagent-driven-development` skill (#272, once shipped)
-runs **two reviews per task**, in this order:
+Specflow's `subagent-driven-development` skill runs **two reviews per
+task**, in this order:
 
 1. **Spec-compliance review** — verifies the implementation matches the
    plan task verbatim. Nothing more, nothing less. Catches scope creep

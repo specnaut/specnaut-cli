@@ -71,6 +71,14 @@ const SYNC_PAIRS: ReadonlyArray<{ plugin: string; source: string }> = [
     plugin: "plugin/skills/using-specflow/SKILL.md",
     source: "templates/core/skills/using-specflow/SKILL.md",
   },
+  // subagent-driven-development — per-task two-stage review loop
+  // (spec compliance then code quality) that consumes plans produced
+  // by writing-plans and the canonical reviewer prompt template from
+  // requesting-code-review (Epic #270, A2 #272).
+  {
+    plugin: "plugin/skills/subagent-driven-development/SKILL.md",
+    source: "templates/core/skills/subagent-driven-development/SKILL.md",
+  },
   ...[
     "claude",
     "codex",
