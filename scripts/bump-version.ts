@@ -51,6 +51,7 @@ export const VERSIONED_FILES = [
   "plugin/.claude-plugin/plugin.json",
   "templates/manifest.json",
   ".codex-plugin/plugin.json",
+  ".cursor-plugin/plugin.json",
 ] as const;
 
 async function readCurrentVersion(baseDir: string): Promise<string> {
@@ -112,6 +113,17 @@ export async function writeVersions(
     `"version": "${next}"`,
   );
   await Deno.writeTextFile(codexManifestPath, updatedCodex);
+
+  // Lockstep the Cursor plugin manifest (Epic #270 / B2 #278). Same
+  // pre-flight drift gate as the Codex manifest; Cursor users install
+  // directly from the repo so the manifest's version must match.
+  const cursorManifestPath = `${baseDir}/.cursor-plugin/plugin.json`;
+  const cursorRaw = await Deno.readTextFile(cursorManifestPath);
+  const updatedCursor = cursorRaw.replace(
+    /"version":\s*"[^"]+"/,
+    `"version": "${next}"`,
+  );
+  await Deno.writeTextFile(cursorManifestPath, updatedCursor);
 }
 
 async function main() {
