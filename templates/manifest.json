@@ -18,6 +18,7 @@
     { "category": "phase", "name": "auto-chain", "suffix": "auto-chain.md", "source": "core/skills/specflow/phases/auto-chain.md" },
     { "category": "phase", "name": "list-skills", "suffix": "list-skills.md", "source": "core/skills/specflow/phases/list-skills.md" },
     { "category": "phase", "name": "audit-security", "suffix": "audit-security.md", "source": "core/skills/specflow/phases/audit-security.md" },
+    { "category": "phase", "name": "audit-performance", "suffix": "audit-performance.md", "source": "core/skills/specflow/phases/audit-performance.md" },
     { "category": "phase-script", "name": "tag", "suffix": "tag.sh", "source": "core/skills/specflow/scripts/tag.sh", "executable": true },
     { "category": "phase-script", "name": "release", "suffix": "release.sh", "source": "core/skills/specflow/scripts/release.sh", "executable": true },
     { "category": "phase-script", "name": "release-github", "suffix": "release-github.sh", "source": "core/skills/specflow/scripts/release-github.sh", "executable": true },
@@ -44,6 +45,7 @@
     { "category": "agent", "name": "devops-sre", "source": "core/agents/devops-sre.md" },
     { "category": "agent", "name": "specflow-expert", "source": "core/agents/specflow-expert.md" },
     { "category": "agent", "name": "ui-ux-designer", "source": "core/agents/ui-ux-designer.md" },
+    { "category": "agent", "name": "performance-auditor", "source": "core/agents/performance-auditor.md" },
 
     { "category": "agent-memory", "name": "product-owner", "suffix": "MEMORY.md", "source": "core/agents/product-owner/memory/MEMORY.md" },
     { "category": "agent-memory", "name": "developer", "suffix": "MEMORY.md", "source": "core/agents/developer/memory/MEMORY.md" },

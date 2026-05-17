@@ -71,18 +71,19 @@ when_to_use: |
 | `release-version` | `phases/release-version.md` | Generate categorized release notes for a tag (default: latest). |
 | `list-skills` | `phases/list-skills.md` | List installed skills, flagging aliases and overlay hooks. |
 | `audit security` | `phases/audit-security.md` | Read-only project-wide security sweep; emits a findings report. |
+| `audit performance` | `phases/audit-performance.md` | Read-only project-wide performance sweep; emits a findings report. |
 
 Chainable phases are: `specify`, `clarify`, `plan`, `tasks`, `analyze`,
 `implement`, `review`. The others (`merge`, `constitution`,
 `checklist`, `groom`, `tag-version`, `release-version`, `list-skills`,
-`audit security`)
+`audit security`, `audit performance`)
 are one-shot regardless of chain mode.
 
 `audit <axis>` is dispatched as a two-token phase: the router reads
-`phases/audit-<axis>.md` (e.g. `phases/audit-security.md`). Today only
-`security` is wired; `performance` and `accessibility` land in #304 / #305.
-Until then, `/specflow audit performance` and `/specflow audit accessibility`
-fall through to the unknown-phase branch.
+`phases/audit-<axis>.md` (e.g. `phases/audit-security.md`). `security`
+and `performance` are wired today; `accessibility` lands in #305. Until
+then, `/specflow audit accessibility` falls through to the unknown-phase
+branch.
 
 ## Routing
 

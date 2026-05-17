@@ -36,6 +36,7 @@ const SYNC_PAIRS: ReadonlyArray<{ plugin: string; source: string }> = [
     "release-version",
     "list-skills",
     "audit-security",
+    "audit-performance",
   ].map((name) => ({
     plugin: `plugin/skills/specflow/phases/${name}.md`,
     source: `templates/core/skills/specflow/phases/${name}.md`,
@@ -129,6 +130,7 @@ const SYNC_PAIRS: ReadonlyArray<{ plugin: string; source: string }> = [
     "specflow-expert",
     "test-reviewer",
     "workflow-manager",
+    "performance-auditor",
   ].map((name) => ({
     plugin: `plugin/agents/${name}.md`,
     source: `templates/core/agents/${name}.md`,

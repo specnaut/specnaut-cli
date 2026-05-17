@@ -99,7 +99,8 @@ Deno.test("specflow init --ai gemini scaffolds a Gemini layout", async () => {
     const agentsCount = (await Array.fromAsync(
       Deno.readDir(join(root, ".gemini/agents")),
     )).length;
-    assertEquals(agentsCount, 11);
+    // 11 original + performance-auditor (#304) = 12.
+    assertEquals(agentsCount, 12);
 
     // Shared (cross-harness)
     assertEquals(await exists(join(root, ".specflow/memory/constitution.md")), true);

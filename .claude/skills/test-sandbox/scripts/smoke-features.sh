@@ -81,6 +81,22 @@ check "audit-security phase doc parses --severity flag" \
   'grep -q "\-\-severity" .claude/skills/specflow/phases/audit-security.md'
 check "router phase index lists audit security" \
   'grep -q "audit security" .claude/skills/specflow/SKILL.md'
+check "phase doc audit-performance.md scaffolded (Epic #302, #304)" \
+  '[ -f .claude/skills/specflow/phases/audit-performance.md ]'
+check "audit-performance phase doc dispatches the performance-auditor agent" \
+  'grep -q "performance-auditor" .claude/skills/specflow/phases/audit-performance.md'
+check "audit-performance phase doc declares read-only contract" \
+  'grep -q "Read-only contract" .claude/skills/specflow/phases/audit-performance.md'
+check "performance-auditor agent bundled (Epic #302, #304)" \
+  '[ -f .claude/agents/performance-auditor.md ]'
+check "performance-auditor agent declares disable-model-invocation" \
+  'grep -q "disable-model-invocation: true" .claude/agents/performance-auditor.md'
+check "performance-auditor agent covers N+1 axis" \
+  'grep -q "N+1" .claude/agents/performance-auditor.md'
+check "performance-auditor agent enforces read-only Bash allow-list" \
+  'grep -q "Read-only contract" .claude/agents/performance-auditor.md'
+check "router phase index lists audit performance" \
+  'grep -q "audit performance" .claude/skills/specflow/SKILL.md'
 check "name: specflow on the router SKILL.md" \
   'head -3 .claude/skills/specflow/SKILL.md | grep -q "name: specflow"'
 check "disable-model-invocation NOT set on the router (Skill-tool chaining must work)" \

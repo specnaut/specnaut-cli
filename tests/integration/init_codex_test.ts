@@ -100,7 +100,8 @@ Deno.test("specflow init --ai codex scaffolds a Codex layout", async () => {
     const codexAgentsCount = (await Array.fromAsync(
       Deno.readDir(join(root, ".codex/agents")),
     )).length;
-    assertEquals(codexAgentsCount, 11);
+    // 11 original + performance-auditor (#304) = 12.
+    assertEquals(codexAgentsCount, 12);
 
     // Shared (cross-harness)
     assertEquals(await exists(join(root, ".specflow/memory/constitution.md")), true);

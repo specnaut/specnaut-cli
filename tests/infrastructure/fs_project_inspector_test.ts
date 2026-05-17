@@ -837,12 +837,12 @@ Deno.test("inspect: plugin gap check warns for each missing covered path when pl
         o.name === ".claude/skills/specflow-auto/SKILL.md") &&
       o.status === "warn"
     );
-    // 10 agents + 1 router skill + 15 phase docs (the 11 original +
-    // tag-version + release-version + list-skills + audit-security
-    // #303 — the previous `[a-z]+` regex silently dropped the four
-    // hyphenated phases; fixed in #303) + specflow-review alias +
-    // specflow-auto = 28 covered paths, all missing.
-    assertEquals(gapOutcomes.length, 28);
+    // 11 agents (10 original + performance-auditor #304) + 1 router skill +
+    // 16 phase docs (the 11 original + tag-version + release-version +
+    // list-skills + audit-security #303 + audit-performance #304 —
+    // hyphenated phases unblocked by the #303 regex fix) +
+    // specflow-review alias + specflow-auto = 30 covered paths.
+    assertEquals(gapOutcomes.length, 30);
     for (const o of gapOutcomes) {
       assertEquals(o.message.includes("missing"), true);
       assertEquals(o.message.includes("specflow upgrade"), true);
@@ -883,8 +883,9 @@ Deno.test("inspect: plugin gap check warns ONLY for the agents the user actually
     async (dir) => {
       await filledProject(dir);
       await Deno.mkdir(join(dir, ".claude/agents"), { recursive: true });
-      // Scaffold all 10 agents EXCEPT product-owner (simulating that
-      // one alone got deleted post-migration).
+      // Scaffold every covered agent EXCEPT product-owner (simulating
+      // that one alone got deleted post-migration). The set tracks
+      // PLUGIN_COVERED_PATHS_CLAUDE — 11 agents minus product-owner = 10.
       for (
         const name of [
           "code-reviewer",
@@ -896,6 +897,7 @@ Deno.test("inspect: plugin gap check warns ONLY for the agents the user actually
           "specflow-expert",
           "test-reviewer",
           "workflow-manager",
+          "performance-auditor",
         ]
       ) {
         await Deno.writeTextFile(join(dir, `.claude/agents/${name}.md`), "stub");
