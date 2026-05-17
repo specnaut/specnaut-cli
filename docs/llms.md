@@ -50,35 +50,68 @@ Manual download: pick the binary for your OS/arch from
 `$PATH`. On macOS clear the quarantine attribute with
 `xattr -d com.apple.quarantine /path/to/specflow`.
 
-### Install the Claude Code plugin
+### Install as a plugin / extension (six harnesses)
 
-If you use Claude Code and want Specflow's slash-commands and sub-agents available across **all your
-projects** without running `specflow init`, install the Claude Code plugin:
+If you want Specflow's skills and sub-agents available across **all your projects** without running
+`specflow init`, install Specflow as a plugin / extension in your harness. Specflow ships adapters
+for six harnesses with the same skill content across all of them — the bundled router skill, the
+phase docs, the bootstrap skill, the sub-agents, and the SessionStart hook (where supported).
 
-```
-/plugin install mkrlabs/specflow-plugin
-```
+| Harness                | Install command                                                                                                          |
+| ---------------------- | ------------------------------------------------------------------------------------------------------------------------ |
+| **Claude Code**        | `/plugin install mkrlabs/specflow-plugin`                                                                                |
+| **Codex CLI / App**    | `/plugins` → search "specflow" → install (once the marketplace listing lands; see Notes)                                 |
+| **Cursor**             | `/add-plugin mkrlabs/specflow`                                                                                           |
+| **Gemini CLI**         | `gemini extensions install https://github.com/mkrlabs/specflow`                                                          |
+| **OpenCode**           | Add `"plugin": ["specflow@git+https://github.com/mkrlabs/specflow.git"]` to `opencode.json`                              |
+| **GitHub Copilot CLI** | `copilot plugin marketplace add mkrlabs/specflow-marketplace`<br/>`copilot plugin install specflow@specflow-marketplace` |
 
-The plugin ships the same 23 assets the binary scaffolds — the consolidated `specflow` router skill
-(with 14 phase docs, the `specflow-review` auto-invoke alias, and the deprecated `specflow-auto`
-skill), and 9 sub-agents — but at user scope, versioned, and auto-updated via `/plugin update`.
-Because the plugin's slash-commands are namespaced and the consolidated router itself is named
-`specflow`, you'll see a double-prefix at the call site:
+The skill content is identical across harnesses; only the surface conventions differ (slash-command
+prefix, auto-activation mechanism, tool naming). See the per-harness tool-mapping references at
+`plugin/skills/using-specflow/references/<harness>-tools.md` for the equivalent of every Claude Code
+tool on each harness.
+
+#### Claude Code — slash-command prefix
 
 ```
 /specflow-plugin:specflow specify "<feature description>"
 /specflow-plugin:specflow plan
-/specflow-plugin:specflow specify "<feature description>"
 ```
 
-Slightly verbose, but unambiguous. If you scaffold project-local with `specflow init`, you get the
-shorter `/specflow specify "..."` form.
+Slightly verbose, but unambiguous (the plugin's slash-commands are namespaced and the consolidated
+router itself is named `specflow`). If you scaffold project-local with `specflow init` instead, you
+get the shorter `/specflow specify "..."` form.
 
 To test a local checkout of the plugin without publishing:
 
 ```bash
 claude --plugin-dir /path/to/specflow/plugin
 ```
+
+#### Auto-activation across harnesses
+
+Specflow ships a `using-specflow` bootstrap skill loaded automatically at session start on every
+harness that supports it (via plugin/hooks/hooks.json on Claude Code, plugin/hooks/hooks-cursor.json
+on Cursor, `gemini-extension.json` → GEMINI.md on Gemini CLI, the
+`experimental.chat.messages.transform` hook in `.opencode/plugins/specflow.js` on OpenCode). The
+bootstrap skill teaches the agent Specflow's skill registry, agent registry, and routing principles
+so you don't need to invoke `/specflow` explicitly — typing "plan this issue" or "review my work" is
+enough for the right skill to fire.
+
+#### Notes on Codex CLI and the shared marketplace
+
+Codex CLI and Copilot CLI distribute plugins through marketplaces. Specflow has two adapter targets
+that need a one-time human setup before the marketplace listings are live:
+
+- **Codex CLI** — `.codex-plugin/plugin.json` ships in this repo; the
+  `scripts/sync-to-codex-plugin.sh` script (fires on every release tag) mirrors the Specflow plugin
+  content into a fork of `openai/openai-codex-plugins`. Until that fork + the `CODEX_SYNC_TOKEN` PAT
+  are provisioned (see issues #298–#300), the sync emits a workflow warning and skips — same
+  fail-safe pattern as the Homebrew tap bump.
+- **Copilot CLI + shared marketplace** — `.claude-plugin/marketplace.json` lives in
+  `mkrlabs/specflow-marketplace` (a separate repo). `scripts/sync-to-marketplace.sh` bumps the
+  version on every release. Until the marketplace repo + `MARKETPLACE_SYNC_TOKEN` are provisioned
+  (see issues #309–#310), the sync skips with a warning.
 
 **Plugin vs `specflow init`** — they complement each other:
 
