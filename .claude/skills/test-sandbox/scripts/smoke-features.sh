@@ -94,6 +94,23 @@ check "writing-plans credits obra/superpowers attribution" \
   'grep -q "obra/superpowers" .claude/skills/writing-plans/SKILL.md'
 
 echo
+echo "═══ #273  requesting-code-review skill (Epic #270 / A3) ═══"
+check "requesting-code-review skill scaffolded" \
+  '[ -f .claude/skills/requesting-code-review/SKILL.md ]'
+check "requesting-code-review frontmatter declares name" \
+  'head -5 .claude/skills/requesting-code-review/SKILL.md | grep -q "name: requesting-code-review"'
+check "requesting-code-review description targets review-related triggers" \
+  'head -10 .claude/skills/requesting-code-review/SKILL.md | grep -q "review this"'
+check "requesting-code-review documents code-reviewer agent dispatch" \
+  'grep -q "subagent_type: code-reviewer\|subagent_type=\"code-reviewer\"" .claude/skills/requesting-code-review/SKILL.md'
+check "requesting-code-review embeds canonical reviewer prompt template" \
+  'grep -qF "Critical (Must Fix)" .claude/skills/requesting-code-review/SKILL.md'
+check "requesting-code-review documents two-stage review pattern" \
+  'grep -q "Two-stage review\|two-stage review" .claude/skills/requesting-code-review/SKILL.md'
+check "requesting-code-review credits obra/superpowers attribution" \
+  'grep -q "obra/superpowers" .claude/skills/requesting-code-review/SKILL.md'
+
+echo
 echo "═══ #75  loop.md + groom phase ═══"
 check ".claude/loop.md scaffolded" '[ -f .claude/loop.md ]'
 check "groom phase doc present" \

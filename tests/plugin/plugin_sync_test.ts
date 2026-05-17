@@ -54,6 +54,14 @@ const SYNC_PAIRS: ReadonlyArray<{ plugin: string; source: string }> = [
     plugin: "plugin/skills/writing-plans/SKILL.md",
     source: "templates/core/skills/writing-plans/SKILL.md",
   },
+  // requesting-code-review skill — canonical reviewer prompt template +
+  // dispatch guide for Specflow's bundled code-reviewer agent. Foundation
+  // for the two-stage review pattern used by subagent-driven-development
+  // (Epic #270, A3 #273).
+  {
+    plugin: "plugin/skills/requesting-code-review/SKILL.md",
+    source: "templates/core/skills/requesting-code-review/SKILL.md",
+  },
   // Dual-copy agents: 10 sub-agent definitions, each landing as
   // `plugin/agents/<name>.md`. Claude Code resolves agents by file
   // basename in plugin scope; no namespacing needed for invocation
