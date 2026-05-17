@@ -36,6 +36,11 @@
 #   1   unexpected error
 set -euo pipefail
 
+# Shared helpers — token check, mktemp workdir, git bot identity,
+# idempotent PR creation. See scripts/lib/sync-helpers.sh.
+# shellcheck source=./lib/sync-helpers.sh
+. "$(dirname "$0")/lib/sync-helpers.sh"
+
 # Configuration.
 MARKETPLACE="mkrlabs/specflow-marketplace"
 BRANCH_PREFIX="specflow-sync"
@@ -44,17 +49,12 @@ BRANCH_PREFIX="specflow-sync"
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 VERSION="${SPECFLOW_VERSION:-$(jq -r '.version' "$REPO_ROOT/deno.json")}"
 
-if [ -z "${GH_TOKEN:-}" ] && [ -z "${DRY_RUN:-}" ]; then
-  echo "::warning::MARKETPLACE_SYNC_TOKEN (GH_TOKEN) not set — skipping marketplace sync" >&2
-  exit 2
-fi
+require_gh_token "MARKETPLACE_SYNC_TOKEN"
 
 echo "specflow → marketplace sync (v$VERSION)"
 echo "  marketplace: $MARKETPLACE"
 
-# Working dir — never commit to the source tree.
-WORK_DIR="$(mktemp -d -t specflow-marketplace-sync-XXXXXX)"
-trap 'rm -rf "$WORK_DIR"' EXIT
+WORK_DIR="$(mktemp_workdir specflow-marketplace-sync)"
 
 if [ -n "${DRY_RUN:-}" ]; then
   echo "DRY_RUN: would clone $MARKETPLACE into $WORK_DIR/marketplace"
@@ -83,9 +83,7 @@ fi
 
 cd "$CLONE_TARGET"
 
-# Git identity for the commit.
-git config user.email "specflow-bot@mkrlabs.dev"
-git config user.name "Specflow Marketplace Sync Bot"
+git_bot_identity
 
 # Update the specflow entry's version in the catalog. The catalog
 # JSON shape is canonical Claude Code marketplace format
@@ -140,9 +138,6 @@ git add "$CATALOG"
 git commit -m "$TITLE"
 git push -u origin "$BRANCH"
 
-if ! gh pr create --repo "$MARKETPLACE" --base main --head "$BRANCH" \
-  --title "$TITLE" --body "$BODY" 2>/dev/null; then
-  echo "PR already exists for $BRANCH; skipping create."
-fi
+create_pr_idempotent "$MARKETPLACE" "$BRANCH" "$TITLE" "$BODY"
 
 echo "✓ Specflow synced to $MARKETPLACE:$BRANCH (v$VERSION)"

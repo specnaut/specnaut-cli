@@ -28,6 +28,12 @@
 #   1   unexpected error
 set -euo pipefail
 
+# Shared helpers — token check, mktemp workdir, git bot identity,
+# idempotent PR creation. See scripts/lib/sync-helpers.sh for the
+# sync-script convention.
+# shellcheck source=./lib/sync-helpers.sh
+. "$(dirname "$0")/lib/sync-helpers.sh"
+
 # Configuration — change FORK / DEST_REL if the marketplace topology shifts.
 FORK="mkrlabs/openai-codex-plugins"
 UPSTREAM="openai/openai-codex-plugins"
@@ -38,19 +44,14 @@ BRANCH_PREFIX="specflow-sync"
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 VERSION="${SPECFLOW_VERSION:-$(jq -r '.version' "$REPO_ROOT/deno.json")}"
 
-if [ -z "${GH_TOKEN:-}" ] && [ -z "${DRY_RUN:-}" ]; then
-  echo "::warning::CODEX_SYNC_TOKEN (GH_TOKEN) not set — skipping Codex marketplace sync" >&2
-  exit 2
-fi
+require_gh_token "CODEX_SYNC_TOKEN"
 
 echo "specflow → codex plugin sync (v$VERSION)"
 echo "  fork:     $FORK"
 echo "  dest:     $DEST_REL"
 echo "  upstream: $UPSTREAM"
 
-# Working dir — never commit to the source tree.
-WORK_DIR="$(mktemp -d -t specflow-codex-sync-XXXXXX)"
-trap 'rm -rf "$WORK_DIR"' EXIT
+WORK_DIR="$(mktemp_workdir specflow-codex-sync)"
 
 if [ -n "${DRY_RUN:-}" ]; then
   echo "DRY_RUN: would clone $FORK into $WORK_DIR/fork"
@@ -65,9 +66,7 @@ fi
 
 cd "$CLONE_TARGET"
 
-# Git identity for the commit (runner has none by default).
-git config user.email "specflow-bot@mkrlabs.dev"
-git config user.name "Specflow Codex Sync Bot"
+git_bot_identity
 
 # rsync EXCLUDES — what NOT to ship into the Codex marketplace.
 # Inspired by superpowers' EXCLUDES array. We ship:
@@ -161,11 +160,6 @@ git add -A
 git commit -m "$TITLE"
 git push -u origin "$BRANCH"
 
-# Open the PR. If one with the same head already exists, `gh pr create`
-# fails — fall back to listing + reusing.
-if ! gh pr create --repo "$FORK" --base main --head "$BRANCH" \
-  --title "$TITLE" --body "$BODY" 2>/dev/null; then
-  echo "PR already exists for $BRANCH; skipping create."
-fi
+create_pr_idempotent "$FORK" "$BRANCH" "$TITLE" "$BODY"
 
 echo "✓ Specflow synced to $FORK:$BRANCH (v$VERSION)"
