@@ -24,6 +24,7 @@
     { "category": "phase-script", "name": "release-local", "suffix": "release-local.sh", "source": "core/skills/specflow/scripts/release-local.sh", "executable": true },
     { "category": "skill", "name": "specflow-review", "source": "core/skills/specflow-review/SKILL.md" },
     { "category": "skill", "name": "writing-plans", "source": "core/skills/writing-plans/SKILL.md" },
+    { "category": "skill", "name": "requesting-code-review", "source": "core/skills/requesting-code-review/SKILL.md" },
     { "category": "backlog-cmd", "name": "backlog", "source": "core/commands/backlog.md" },
 
     { "category": "agent", "name": "product-owner", "source": "core/agents/product-owner.md" },
