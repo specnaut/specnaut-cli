@@ -264,3 +264,20 @@ jobs:
             exit 0
           fi
           exit "${rc:-0}"
+      - name: Sync to Specflow marketplace catalog (#281 / B5)
+        # Bumps `.claude-plugin/marketplace.json` in
+        # `mkrlabs/specflow-marketplace` (the shared marketplace
+        # catalog serving both Claude Code AND Copilot CLI users via
+        # `/plugin install specflow@specflow-marketplace` and
+        # `copilot plugin install specflow@specflow-marketplace`).
+        # Same skip-if-no-secret fail-safe as the Codex step.
+        env:
+          GH_TOKEN: ${{ secrets.MARKETPLACE_SYNC_TOKEN }}
+          SPECFLOW_VERSION: ${{ github.ref_name }}
+        run: |
+          export SPECFLOW_VERSION="${SPECFLOW_VERSION#v}"
+          bash scripts/sync-to-marketplace.sh || rc=$?
+          if [ "${rc:-0}" = "2" ]; then
+            exit 0
+          fi
+          exit "${rc:-0}"
