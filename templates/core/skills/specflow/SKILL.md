@@ -44,9 +44,13 @@ when_to_use: |
    `accessibility`, treat the pair as a single hyphenated phase name
    `audit-<axis>` (matching the file `phases/audit-<axis>.md`). The
    remaining tokens after the axis become the argument string. Examples:
-   `audit security` → phase `audit-security`, args ``; `audit security --severity medium` → phase `audit-security`, args `--severity medium`.
+   `audit security` → phase `audit-security`, args ``;
+   `audit performance --severity medium` → phase `audit-performance`, args `--severity medium`;
+   `audit accessibility` → phase `audit-accessibility`, args ``.
    Users may also invoke the hyphenated form directly
-   (`/specflow audit-security`); both forms route to the same phase doc.
+   (`/specflow audit-security`, `/specflow audit-performance`,
+   `/specflow audit-accessibility`); both forms route to the same
+   phase doc.
 
 3. **Empty arguments** — if no tokens remain after flag parsing (or
    `$ARGUMENTS` was empty to start with), render the **Workflow overview**
@@ -72,18 +76,19 @@ when_to_use: |
 | `list-skills` | `phases/list-skills.md` | List installed skills, flagging aliases and overlay hooks. |
 | `audit security` | `phases/audit-security.md` | Read-only project-wide security sweep; emits a findings report. |
 | `audit performance` | `phases/audit-performance.md` | Read-only project-wide performance sweep; emits a findings report. |
+| `audit accessibility` | `phases/audit-accessibility.md` | Read-only project-wide WCAG 2.1 AA sweep; skips when no FE surface is detected. |
 
 Chainable phases are: `specify`, `clarify`, `plan`, `tasks`, `analyze`,
 `implement`, `review`. The others (`merge`, `constitution`,
 `checklist`, `groom`, `tag-version`, `release-version`, `list-skills`,
-`audit security`, `audit performance`)
+`audit security`, `audit performance`, `audit accessibility`)
 are one-shot regardless of chain mode.
 
 `audit <axis>` is dispatched as a two-token phase: the router reads
-`phases/audit-<axis>.md` (e.g. `phases/audit-security.md`). `security`
-and `performance` are wired today; `accessibility` lands in #305. Until
-then, `/specflow audit accessibility` falls through to the unknown-phase
-branch.
+`phases/audit-<axis>.md`. All three axes (`security`, `performance`,
+`accessibility`) are wired. The accessibility phase is FE-gated —
+projects without front-end source receive a one-line "skipped — no
+FE surface" response instead of an empty report.
 
 ## Routing
 

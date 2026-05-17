@@ -637,10 +637,12 @@ marketplace:
 ```
 
 The plugin gives any Claude Code user instant access to the full Specflow slash-command suite and
-sub-agents — no binary, no `specflow init` required. The 24 plugin assets (the consolidated
-`specflow` router skill with 14 phase docs, the `specflow-review` auto-invoke alias, the deprecated
-`specflow-auto` alias, and 10 sub-agents) are namespaced under `/specflow-plugin:*` so they coexist
-with project-local copies without collision.
+sub-agents — no binary, no `specflow init` required. The plugin assets (the consolidated `specflow`
+router skill with 17 phase docs including the three `audit-*` axes shipped in Epic #302, the
+`specflow-review` auto-invoke alias, the deprecated `specflow-auto` alias, and 12 sub-agents
+including the manual-only `performance-auditor` and `a11y-auditor` introduced with the audit family)
+are namespaced under `/specflow-plugin:*` so they coexist with project-local copies without
+collision.
 
 When both the plugin and the binary are in use, `specflow upgrade` detects the plugin and
 auto-migrates vanilla on-disk agents and command files (backed up, then deleted — the plugin serves
