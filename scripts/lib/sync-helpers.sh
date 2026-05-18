@@ -87,7 +87,7 @@ git_bot_identity() {
 # (an earlier run already pushed the same content; nothing to do).
 #
 # Arguments:
-#   $1 — repo (e.g. mkrlabs/openai-codex-plugins)
+#   $1 — repo (e.g. mkrlabs/plugins)
 #   $2 — branch (e.g. specflow-sync/v1.8.0)
 #   $3 — PR title
 #   $4 — PR body (multi-line OK)

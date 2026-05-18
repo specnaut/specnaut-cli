@@ -245,12 +245,12 @@ jobs:
             scripts/bump-tap-formula.ts
       - name: Sync to Codex marketplace fork (#277 / B1)
         # Mirrors the Specflow plugin content into
-        # `mkrlabs/openai-codex-plugins:plugins/specflow/`. A human
-        # rebases that fork's PR into upstream `openai/openai-codex-plugins`
-        # for the actual marketplace publish. If CODEX_SYNC_TOKEN is
-        # unset, the script emits a workflow ::warning and exits 0 —
-        # the release itself ships unaffected (same pattern as
-        # HOMEBREW_TAP_TOKEN and WIKI_SSH_KEY).
+        # `mkrlabs/plugins:plugins/specflow/`. A human rebases that
+        # fork's PR into upstream `openai/plugins` for the actual
+        # marketplace publish. If CODEX_SYNC_TOKEN is unset, the
+        # script emits a workflow ::warning and exits 0 — the release
+        # itself ships unaffected (same pattern as HOMEBREW_TAP_TOKEN
+        # and WIKI_SSH_KEY).
         env:
           GH_TOKEN: ${{ secrets.CODEX_SYNC_TOKEN }}
           SPECFLOW_VERSION: ${{ github.ref_name }}

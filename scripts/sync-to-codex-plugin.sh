@@ -1,16 +1,16 @@
 #!/usr/bin/env bash
-# Sync Specflow → mkrlabs/openai-codex-plugins fork.
+# Sync Specflow → mkrlabs/plugins fork (of openai/plugins).
 #
 # Triggered from .github/workflows/release.yml on every `v*` tag push,
 # after the binary build + Homebrew tap bump. Mirrors the upstream
 # pattern from obra/superpowers (scripts/sync-to-codex-plugin.sh,
 # MIT-licensed) — deterministic rsync into a fork, then `gh pr create`
 # against that fork's main. A human (Kevin) later merges that fork
-# into the upstream openai-codex-plugins marketplace.
+# into the upstream openai/plugins marketplace.
 #
 # Required environment:
 #   GH_TOKEN     — fine-grained PAT with Contents:write + Pull
-#                  requests:write on mkrlabs/openai-codex-plugins.
+#                  requests:write on mkrlabs/plugins.
 #                  Set via the CODEX_SYNC_TOKEN repo secret in
 #                  release.yml (parallel to HOMEBREW_TAP_TOKEN).
 #
@@ -35,8 +35,8 @@ set -euo pipefail
 . "$(dirname "$0")/lib/sync-helpers.sh"
 
 # Configuration — change FORK / DEST_REL if the marketplace topology shifts.
-FORK="mkrlabs/openai-codex-plugins"
-UPSTREAM="openai/openai-codex-plugins"
+FORK="mkrlabs/plugins"
+UPSTREAM="openai/plugins"
 DEST_REL="plugins/specflow"
 BRANCH_PREFIX="specflow-sync"
 
