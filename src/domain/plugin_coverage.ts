@@ -67,19 +67,19 @@ export function isPluginCoveredPath(
  * (either re-install the plugin or run `specflow upgrade` to restore
  * the bundled snapshot).
  *
- * Kept in sync with `isPluginCoveredPath` above. Total: 35 paths
- * (14 agents excluding architect + 1 router skill + 18 phase docs +
+ * Kept in sync with `isPluginCoveredPath` above. Total: 37 paths
+ * (15 agents excluding architect + 1 router skill + 19 phase docs +
  * specflow-review alias + specflow-auto).
  *
  * Phase docs include hyphenated names — the regex was widened in #303
  * after silently dropping `tag-version`, `release-version`, and
  * `list-skills`. The phase-1 audit family (`audit-security` #303,
  * `audit-performance` #304, `audit-accessibility` #305) shipped in
- * v1.9.0; the phase-2 family adds `audit-architecture` (#321) here and
- * will add `audit-dependencies` in the sibling #322. `ui-ux-designer`
- * was missing from this array pre-#321 even though it ships in the
- * Claude scaffold — added here alongside `architecture-auditor` to
- * close a long-standing drift bug.
+ * v1.9.0; the phase-2 family added `audit-architecture` (#321) and
+ * now `audit-dependencies` (#322) closes Epic #320.
+ * `ui-ux-designer` was added alongside `architecture-auditor` in #321
+ * to close a long-standing drift bug; this array continues to mirror
+ * the bundled Claude scaffold exactly.
  */
 export const PLUGIN_COVERED_PATHS_CLAUDE: ReadonlyArray<string> = [
   ...[
@@ -97,6 +97,7 @@ export const PLUGIN_COVERED_PATHS_CLAUDE: ReadonlyArray<string> = [
     "performance-auditor",
     "a11y-auditor",
     "architecture-auditor",
+    "dependency-auditor",
   ].map((name) => `.claude/agents/${name}.md`),
   ".claude/skills/specflow/SKILL.md",
   ...[
@@ -118,6 +119,7 @@ export const PLUGIN_COVERED_PATHS_CLAUDE: ReadonlyArray<string> = [
     "audit-performance",
     "audit-accessibility",
     "audit-architecture",
+    "audit-dependencies",
   ].map((name) => `.claude/skills/specflow/phases/${name}.md`),
   ".claude/skills/specflow-review/SKILL.md",
   ".claude/skills/specflow-auto/SKILL.md",

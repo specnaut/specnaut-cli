@@ -837,13 +837,14 @@ Deno.test("inspect: plugin gap check warns for each missing covered path when pl
         o.name === ".claude/skills/specflow-auto/SKILL.md") &&
       o.status === "warn"
     );
-    // 14 agents (10 original + ui-ux-designer drift fix #321 +
+    // 15 agents (10 original + ui-ux-designer drift fix #321 +
     // performance-auditor #304 + a11y-auditor #305 + architecture-auditor
-    // #321) + 1 router skill + 18 phase docs (the 11 original +
-    // tag-version + release-version + list-skills + audit-security #303 +
-    // audit-performance #304 + audit-accessibility #305 + audit-architecture
-    // #321) + specflow-review alias + specflow-auto = 35 covered paths.
-    assertEquals(gapOutcomes.length, 35);
+    // #321 + dependency-auditor #322) + 1 router skill + 19 phase docs
+    // (the 11 original + tag-version + release-version + list-skills +
+    // audit-security #303 + audit-performance #304 + audit-accessibility
+    // #305 + audit-architecture #321 + audit-dependencies #322) +
+    // specflow-review alias + specflow-auto = 37 covered paths.
+    assertEquals(gapOutcomes.length, 37);
     for (const o of gapOutcomes) {
       assertEquals(o.message.includes("missing"), true);
       assertEquals(o.message.includes("specflow upgrade"), true);
@@ -886,7 +887,7 @@ Deno.test("inspect: plugin gap check warns ONLY for the agents the user actually
       await Deno.mkdir(join(dir, ".claude/agents"), { recursive: true });
       // Scaffold every covered agent EXCEPT product-owner (simulating
       // that one alone got deleted post-migration). The set tracks
-      // PLUGIN_COVERED_PATHS_CLAUDE — 14 agents minus product-owner = 13.
+      // PLUGIN_COVERED_PATHS_CLAUDE — 15 agents minus product-owner = 14.
       for (
         const name of [
           "code-reviewer",
@@ -902,6 +903,7 @@ Deno.test("inspect: plugin gap check warns ONLY for the agents the user actually
           "performance-auditor",
           "a11y-auditor",
           "architecture-auditor",
+          "dependency-auditor",
         ]
       ) {
         await Deno.writeTextFile(join(dir, `.claude/agents/${name}.md`), "stub");
