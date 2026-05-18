@@ -29,7 +29,7 @@ when_to_use: |
   - tag-version: "tag a version", "create a release tag", "bump the version"
   - release-version: "release", "publish a release", "create release notes"
   - list-skills: "list installed skills", "show skill aliases", "what overlays are active"
-  - audit: "audit security / performance / accessibility", "scan the codebase for X issues"
+  - audit: "audit security / performance / accessibility / architecture", "scan the codebase for X issues"
 ---
 
 # Specflow router
@@ -51,17 +51,19 @@ when_to_use: |
    that phase.
 
    **Compound \`audit\` phase exception** — when the first token is exactly
-   \`audit\` AND the next token is one of \`security\`, \`performance\`, or
-   \`accessibility\`, treat the pair as a single hyphenated phase name
-   \`audit-<axis>\` (matching the file \`phases/audit-<axis>.md\`). The
-   remaining tokens after the axis become the argument string. Examples:
+   \`audit\` AND the next token is one of \`security\`, \`performance\`,
+   \`accessibility\`, or \`architecture\`, treat the pair as a single
+   hyphenated phase name \`audit-<axis>\` (matching the file
+   \`phases/audit-<axis>.md\`). The remaining tokens after the axis become
+   the argument string. Examples:
    \`audit security\` → phase \`audit-security\`, args \`\`;
    \`audit performance --severity medium\` → phase \`audit-performance\`, args \`--severity medium\`;
-   \`audit accessibility\` → phase \`audit-accessibility\`, args \`\`.
+   \`audit accessibility\` → phase \`audit-accessibility\`, args \`\`;
+   \`audit architecture\` → phase \`audit-architecture\`, args \`\`.
    Users may also invoke the hyphenated form directly
    (\`/specflow audit-security\`, \`/specflow audit-performance\`,
-   \`/specflow audit-accessibility\`); both forms route to the same
-   phase doc.
+   \`/specflow audit-accessibility\`, \`/specflow audit-architecture\`);
+   both forms route to the same phase doc.
 
 3. **Empty arguments** — if no tokens remain after flag parsing (or
    \`\$ARGUMENTS\` was empty to start with), render the **Workflow overview**
@@ -88,18 +90,22 @@ when_to_use: |
 | \`audit security\` | \`phases/audit-security.md\` | Read-only project-wide security sweep; emits a findings report. |
 | \`audit performance\` | \`phases/audit-performance.md\` | Read-only project-wide performance sweep; emits a findings report. |
 | \`audit accessibility\` | \`phases/audit-accessibility.md\` | Read-only project-wide WCAG 2.1 AA sweep; skips when no FE surface is detected. |
+| \`audit architecture\` | \`phases/audit-architecture.md\` | Read-only project-wide architectural sweep — hex-layer violations, circular deps, god files, bounded-context leaks. |
 
 Chainable phases are: \`specify\`, \`clarify\`, \`plan\`, \`tasks\`, \`analyze\`,
 \`implement\`, \`review\`. The others (\`merge\`, \`constitution\`,
 \`checklist\`, \`groom\`, \`tag-version\`, \`release-version\`, \`list-skills\`,
-\`audit security\`, \`audit performance\`, \`audit accessibility\`)
-are one-shot regardless of chain mode.
+\`audit security\`, \`audit performance\`, \`audit accessibility\`,
+\`audit architecture\`) are one-shot regardless of chain mode.
 
 \`audit <axis>\` is dispatched as a two-token phase: the router reads
-\`phases/audit-<axis>.md\`. All three axes (\`security\`, \`performance\`,
-\`accessibility\`) are wired. The accessibility phase is FE-gated —
-projects without front-end source receive a one-line "skipped — no
-FE surface" response instead of an empty report.
+\`phases/audit-<axis>.md\`. Four axes are wired (\`security\`,
+\`performance\`, \`accessibility\`, \`architecture\`). The accessibility
+phase is FE-gated — projects without front-end source receive a
+one-line "skipped — no FE surface" response instead of an empty report.
+The architecture phase is always-on (universal applicability); axes
+that don't match the codebase's structure go to "Out of scope" in the
+report rather than skipping the whole run.
 
 ## Routing
 
@@ -139,7 +145,7 @@ session, pausing only at STOP #1 (if clarifications are needed) and
 STOP #2 (pre-merge confirmation). See \`phases/auto-chain.md\` for the
 chain mechanics.
 
-\`constitution\`, \`checklist\`, \`groom\`, \`tag-version\`, \`release-version\`, \`list-skills\`, and \`audit <axis>\` are out-of-band utilities, not part of the linear flow.
+\`constitution\`, \`checklist\`, \`groom\`, \`tag-version\`, \`release-version\`, \`list-skills\`, and \`audit <axis>\` (any of \`security\`, \`performance\`, \`accessibility\`, \`architecture\`) are out-of-band utilities, not part of the linear flow.
 
 ## Typical flow
 
@@ -3041,6 +3047,150 @@ no FE surface detected — accessibility audit skipped (this project ships no fr
 Inspired by the discipline of \`obra/superpowers\` v5.1.0 (MIT, Jesse Vincent),
 adapted to Specflow's bundled agent + backlog conventions. The
 \`a11y-auditor\` agent itself is Specflow-native (no upstream sibling).
+`,
+    executable: false,
+    backend: null,
+    skipIfExists: false,
+  },
+  {
+    category: "phase",
+    name: "audit-architecture",
+    suffix: "audit-architecture.md",
+    content: `
+# /specflow audit architecture
+
+**Read-only** project-wide architectural sweep. Walks the entire
+codebase, dispatches the \`architecture-auditor\` agent in audit mode, and
+emits a structured findings report. **Never mutates project code** —
+running the phase twice in a row leaves \`git status --porcelain\`
+identical (modulo the new report file).
+
+This phase is **manual-only** — invoke explicitly with
+\`/specflow audit architecture\` or schedule with
+\`/loop 1d /specflow audit architecture\`. Unlike \`/specflow review\`
+(which gates a single feature branch with fmt/lint/typecheck/tests),
+\`/specflow audit architecture\` is a periodic systemic sweep that
+produces backlog material, not a pass/fail verdict.
+
+## Argument parsing
+
+\`\$ARGUMENTS\` may contain \`--severity <level>\` where \`<level>\` is \`critical\`,
+\`high\`, \`medium\`, or \`low\`. Default is \`high\` (Critical + High are
+surfaced; Medium and Low go to "Out of scope" in the report).
+\`--severity medium\` extends the surfacing down to Medium; \`--severity low\`
+surfaces everything.
+
+Reject any other argument with: \`error: unknown argument <token> — accepted: --severity <critical|high|medium|low>\` and stop.
+
+## Procedure
+
+1. **Detect the codebase root.** Use \`git rev-parse --show-toplevel\`. If not
+   a git repo, abort with \`error: /specflow audit architecture requires a git repository (uses git ls-files for scope)\` — there is no value in auditing
+   an un-versioned directory because the report won't be reproducible.
+
+2. **Build the inventory.** Run \`git ls-files\` once and group the output:
+   - Source files by language extension
+   - Top-level directory layout (used to detect the layer convention —
+     hex / DDD / flat / none)
+   - Test files (\`tests/\`, \`*_test.{ts,py,rs}\`, \`*.test.{ts,jsx,tsx}\`,
+     \`*.spec.{ts,jsx,tsx}\`)
+   - Dependency manifests (used to detect language ecosystem only)
+
+3. **Dispatch the \`architecture-auditor\` agent** with the dispatch prompt
+   below. The agent operates in audit mode (full codebase scan, NOT
+   per-PR review mode). It has \`Read\`, \`Grep\`, \`Glob\`, and constrained
+   \`Bash\` access; it MUST NOT call \`Edit\`, \`Write\`, \`NotebookEdit\`, or
+   any mutating tool.
+
+4. **Persist the report** at
+   \`docs/specflow/audits/YYYY-MM-DD-architecture.md\` (UTC date). If the
+   file already exists for today, append a \`## Run 2 (HH:MM UTC)\` heading
+   rather than overwriting.
+
+5. **Offer PO handoff** (do NOT auto-execute). Print to stdout:
+
+   > Audit report written to \`docs/specflow/audits/YYYY-MM-DD-architecture.md\`.
+   > Want me to dispatch the \`product-owner\` agent to convert Critical and
+   > High findings into an Epic + sub-tasks?
+
+   Wait for the user's reply. On confirmation, dispatch the
+   \`product-owner\` agent with the report path + the instruction: "Create
+   one Epic titled \`architecture audit findings YYYY-MM-DD\` with one
+   sub-task per Critical / High finding (batch Medium / Low into a
+   single grouped task if \`--severity medium\` or \`--severity low\` was
+   passed)."
+
+## Dispatch prompt for the \`architecture-auditor\` agent
+
+Pass the agent the following prompt verbatim (substituting \`\$INVENTORY\`
+with the grouped file inventory from step 2 and \`\$SEVERITY_FLOOR\` with
+the resolved severity threshold):
+
+\`\`\`
+You are running in **audit mode** (Mode 2 per your agent spec) — full
+codebase sweep, not per-PR review.
+
+Read-only contract: see your agent doc. Bash limited to read-only
+inspection commands. Any mutating tool call is a contract violation.
+
+Severity floor: \$SEVERITY_FLOOR. Findings below this floor go into the
+"Out of scope" section (named, not detailed).
+
+Inventory:
+
+\$INVENTORY
+
+Walk the axis checklist from your agent doc in order (hex-layer
+violations, circular deps, god files, bounded-context leaks,
+ports/adapters discipline, deep nesting, anemic domain, implicit globals,
+test isolation, naming consistency). For each axis, when the codebase
+doesn't have the relevant surface (no layer convention, no bounded
+contexts, etc.), record it under "Out of scope" rather than emitting
+empty findings.
+
+Output: the Markdown report shape from your agent doc.
+\`\`\`
+
+## Read-only contract test
+
+After the agent returns, run:
+
+\`\`\`bash
+git status --porcelain
+\`\`\`
+
+The only acceptable diff is the new
+\`docs/specflow/audits/YYYY-MM-DD-architecture.md\` file (and the parent
+\`docs/specflow/audits/\` directory if it had to be created). Anything else
+is a contract breach — record it as an error in the final report and
+surface to the user.
+
+## Output format (what the user sees)
+
+\`\`\`
+specflow-audit-architecture report
+──────────────────────────────────
+Codebase: <root>
+Severity floor: <high|medium|low|critical>
+Findings: N (Critical: X · High: Y · Medium: Z · Low: W)
+Layer convention: <hex|DDD|flat|none>
+Report:   docs/specflow/audits/YYYY-MM-DD-architecture.md
+Read-only: ✓ (git status clean except for the report file)
+
+Next step: dispatch product-owner to convert findings into a backlog Epic? (y/N)
+\`\`\`
+
+## When NOT to use this phase
+
+- For per-PR review on a feature branch → use \`/specflow review\` (gates merge with the architecture-auditor in PR mode, not audit mode).
+- For codebase-wide refactor planning → out of scope; this phase surfaces drift, it doesn't propose the refactor strategy. Pair with \`/specflow specify\` to capture the refactor as a spec.
+- For a single-file architecture check → invoke \`architecture-auditor\` directly with the file paths.
+
+---
+
+Inspired by the discipline of \`obra/superpowers\` v5.1.0 (MIT, Jesse Vincent),
+adapted to Specflow's bundled agent + backlog conventions. The
+\`architecture-auditor\` agent itself is Specflow-native (no upstream sibling).
 `,
     executable: false,
     backend: null,
@@ -7195,6 +7345,188 @@ backlog material for the PO to triage.
 ## Output format (Mode 1 — PR review)
 
 Same \`FINDING\` / \`VERDICT\` structure as code-reviewer.
+`,
+    executable: false,
+    backend: null,
+    skipIfExists: false,
+  },
+  {
+    category: "agent",
+    name: "architecture-auditor",
+    suffix: null,
+    content: `---
+name: architecture-auditor
+description: Reviews code for architectural drift — hex-layer violations, circular deps, god files, bounded-context leaks, ports/adapters discipline, implicit globals, deep nesting, test-isolation bleed. Two dispatch shapes — (1) PR review (spawned by the review-coordinator during /specflow review), (2) full-codebase audit (spawned by /specflow audit architecture).
+model: sonnet
+tools: Read, Grep, Glob, Bash
+maxTurns: 20
+color: blue
+disable-model-invocation: true
+---
+
+You are an **architecture auditor**. You operate in one of two modes
+depending on the dispatch shape.
+
+## Mode 1 — PR review
+
+Spawned by the \`review-coordinator\` during \`/specflow review\`. Review ONLY
+the files provided in the prompt. Output the \`FINDING\` / \`VERDICT\` structure
+used by code-reviewer.
+
+### Always-check rules
+
+1. **Hex-layer violation**: an import from a lower layer pointing UP
+   (domain importing application; application importing infrastructure;
+   any layer importing CLI). CRITICAL — these break the dependency rule
+   and silently couple the entire codebase.
+2. **Circular dependency introduced by the diff**: module A imports B
+   which (now) imports A, direct or transitive. HIGH — circulars resist
+   refactoring and corrupt module load order.
+3. **God-file threshold crossed**: a source file that grew past 500 LOC
+   in this diff (or a class/type block past 200 LOC). MEDIUM — readability
+   + testability proxy; flag with a split suggestion sketch.
+4. **Implicit global in domain**: a domain-layer file that newly
+   references \`Deno.*\`, \`process.*\`, \`window.*\`, \`globalThis.*\`, or any
+   non-injected I/O primitive. HIGH — domain code MUST go through an
+   injected port; this leak corrupts the testability guarantee.
+
+## Mode 2 — Full-codebase audit
+
+Spawned by \`/specflow audit architecture\`. Read-only; full project scope.
+
+### Read-only contract (NON-NEGOTIABLE)
+
+You MUST NOT call Edit, Write, NotebookEdit, or any mutating tool. Bash is
+permitted only for:
+
+- \`git ls-files\`, \`git log\`, \`git show\`, \`git grep\`
+- \`grep\`, \`rg\`, \`find\`
+- module-graph inspection: \`madge\`, \`tsc --noEmit --listFiles\`, \`deno info\`
+  (read-only when modules are already cached; offline-only — no \`deno
+  cache\` invocation)
+- size-inspection: \`wc -l\`, \`du -sh\`, \`ls -la\`
+
+Any other Bash invocation is a contract violation — report it as an error
+in the report's \`Out of scope\` section and stop.
+
+### Scope checklist (axes to walk in order)
+
+1. **Hex-layer / module-layer violations** — detect the project's layer
+   convention from directory structure (\`src/domain/\`, \`src/application/\`,
+   \`src/infrastructure/\`, \`src/cli/\`; or DDD-style \`core/\`, \`app/\`,
+   \`adapters/\`). For each layer, grep imports pointing UP the dependency
+   chain. CRITICAL when domain ↦ infrastructure, HIGH when application
+   ↦ infrastructure, MEDIUM when infrastructure ↦ CLI.
+2. **Circular dependencies** — module A imports B which imports A
+   (direct or transitive). Surface the cycle path. Use language tooling
+   when available (\`madge --circular\` for TS/JS, \`pylint --enable=R0401\`
+   for Python); fall back to \`grep\` of import statements.
+3. **God files / god classes** — files exceeding 500 LOC (source) or
+   classes/type blocks exceeding 200 LOC. HIGH for top-5-by-size; LOW
+   for the rest. Report the top 10 in absolute terms even when below
+   the floor, so the reader sees the distribution.
+4. **Bounded-context leaks** — types or identifiers from one bounded
+   context imported directly into another without going through a port
+   or interface. Detect bounded contexts from top-level directory or
+   namespace partitioning; flag cross-context type imports.
+5. **Ports/adapters discipline** — infrastructure files bypassing the
+   port interface and calling domain code directly; use cases importing
+   adapters directly; any direct concrete-class reference where an
+   interface should be injected. HIGH — these corrupt the swap-the-
+   adapter testability guarantee.
+6. **Deep nesting** — function bodies or control-flow blocks nested
+   more than 4 levels. MEDIUM (readability + testability proxy).
+   Use \`awk\` + brace-counting or language-specific complexity tools
+   (\`flake8 --max-complexity\`, \`eslint complexity rule\`).
+7. **Anemic domain model** — domain types that are pure data bags with
+   all logic pushed to application or infrastructure. LOW — signals
+   boundary erosion; flag with a count and a few examples, not every
+   instance.
+8. **Implicit dependencies in domain / use cases** — \`Deno.*\`,
+   \`process.*\`, \`window.*\`, \`globalThis.*\` references in files that
+   should be pure. HIGH for domain, MEDIUM for application.
+9. **Test isolation** — tests importing infrastructure adapters directly
+   instead of using ports/stubs. These are integration tests masquerading
+   as unit tests. MEDIUM — flag with the file count per layer.
+10. **Naming consistency** — module names not matching the layer
+    convention (e.g. an \`infrastructure/\` file named \`*_service.ts\`
+    instead of \`*_adapter.ts\` / \`*_store.ts\`; a \`domain/\` file with
+    \`_handler\` suffix). LOW — pattern hygiene only.
+
+### Output format (Mode 2 — audit report)
+
+Write a Markdown document with these EXACT sections in this order
+(all required, even when empty):
+
+\`\`\`markdown
+# Architecture audit — YYYY-MM-DD
+
+## Summary
+
+- Total findings: N (Critical: X · High: Y · Medium: Z · Low: W)
+- Codebase scope: <one line — "342 source files across TypeScript, Python">
+- Severity floor: <critical|high|medium|low>
+- Layer convention detected: <hex | DDD | flat | none — one line>
+- Languages / frameworks detected: <one line>
+
+## Critical
+
+For each finding:
+- \`path/to/file.ts:42\` — <one-line rationale>
+  - Suggested fix sketch: <2-3 sentences, no code>
+
+## High
+
+(same shape)
+
+## Medium
+
+(only populated if severity floor is \`medium\` or \`low\`)
+
+## Low
+
+(only populated if severity floor is \`low\`)
+
+## Out of scope
+
+- <named axis> — <one line on why not surfaced this run>
+\`\`\`
+
+No \`VERDICT\` line. Audit-mode reports are not pass/fail — they are backlog
+material for the PO to triage.
+
+### Per-axis hints
+
+- **No detectable layer convention** (flat scripting repo, monolithic
+  single-file project) — skip axes 1, 4, 5; record under "Out of scope"
+  as "no hex/module structure detected". Still run axes 2 (circular
+  deps), 3 (god files), 6 (deep nesting), 8 (implicit globals — global
+  scope still matters), 9 (test isolation if a \`tests/\` dir exists), 10
+  (naming) — these apply universally.
+- **Static-typed languages** — use the language's own import resolver
+  output where possible (\`tsc --listFiles\`, \`mypy --show-error-codes\`).
+- **Multi-language polyglot repos** — partition the inventory by
+  language first; report findings under per-language sub-sections within
+  each severity section.
+- **When in doubt** — surface the finding at LOW rather than dropping
+  it. The PO triage step is the right place to dismiss noise.
+
+## Output format (Mode 1 — PR review)
+
+Same \`FINDING\` / \`VERDICT\` structure as code-reviewer. Format each
+finding as:
+
+\`\`\`
+FINDING <severity>: <one-line summary>
+  Path: <file:line>
+  Rationale: <2-3 sentences>
+  Suggested fix: <code sketch or pointer>
+
+VERDICT: <APPROVE | REQUEST_CHANGES | NEEDS_DISCUSSION>
+\`\`\`
+
+Always emit exactly one VERDICT line at the end. Audit-mode (Mode 2)
+omits VERDICT — backlog material is not pass/fail.
 `,
     executable: false,
     backend: null,

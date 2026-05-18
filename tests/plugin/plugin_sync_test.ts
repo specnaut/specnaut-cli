@@ -17,9 +17,11 @@ const SYNC_PAIRS: ReadonlyArray<{ plugin: string; source: string }> = [
     plugin: "plugin/skills/specflow/SKILL.md",
     source: "templates/core/skills/specflow/SKILL.md",
   },
-  // 15 phase reference docs, loaded by the router on demand. The
-  // `audit-security` phase (Epic #302 / #303) joined the family alongside
-  // the upcoming `audit-performance` / `audit-accessibility` siblings.
+  // 18 phase reference docs, loaded by the router on demand. The
+  // phase-1 audit trio (`audit-security` #303, `audit-performance` #304,
+  // `audit-accessibility` #305) shipped in v1.9.0; `audit-architecture`
+  // (#321) is the first of the phase-2 family (Epic #320). The
+  // upcoming `audit-dependencies` will join via #322.
   ...[
     "specify",
     "clarify",
@@ -38,6 +40,7 @@ const SYNC_PAIRS: ReadonlyArray<{ plugin: string; source: string }> = [
     "audit-security",
     "audit-performance",
     "audit-accessibility",
+    "audit-architecture",
   ].map((name) => ({
     plugin: `plugin/skills/specflow/phases/${name}.md`,
     source: `templates/core/skills/specflow/phases/${name}.md`,
@@ -116,10 +119,13 @@ const SYNC_PAIRS: ReadonlyArray<{ plugin: string; source: string }> = [
     plugin: `plugin/skills/using-specflow/references/${name}-tools.md`,
     source: `templates/core/skills/using-specflow/references/${name}-tools.md`,
   })),
-  // Dual-copy agents: 10 sub-agent definitions, each landing as
+  // Dual-copy agents: 14 sub-agent definitions, each landing as
   // `plugin/agents/<name>.md`. Claude Code resolves agents by file
   // basename in plugin scope; no namespacing needed for invocation
   // (agents are not user-invokable like slash commands).
+  // Counts: 10 original + ui-ux-designer (#198, sync-test drift fix in
+  // #321) + performance-auditor (#304) + a11y-auditor (#305) +
+  // architecture-auditor (#321) = 14.
   ...[
     "code-reviewer",
     "developer",
@@ -131,8 +137,10 @@ const SYNC_PAIRS: ReadonlyArray<{ plugin: string; source: string }> = [
     "specflow-expert",
     "test-reviewer",
     "workflow-manager",
+    "ui-ux-designer",
     "performance-auditor",
     "a11y-auditor",
+    "architecture-auditor",
   ].map((name) => ({
     plugin: `plugin/agents/${name}.md`,
     source: `templates/core/agents/${name}.md`,

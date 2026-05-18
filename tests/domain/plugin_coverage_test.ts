@@ -16,8 +16,10 @@ Deno.test("isPluginCoveredPath: claude + .claude/agents/<name>.md (non-architect
       "specflow-expert",
       "test-reviewer",
       "workflow-manager",
+      "ui-ux-designer",
       "performance-auditor",
       "a11y-auditor",
+      "architecture-auditor",
     ]
   ) {
     assertEquals(
@@ -80,6 +82,7 @@ Deno.test("isPluginCoveredPath: claude + hyphenated phase names are covered", ()
       "audit-security",
       "audit-performance",
       "audit-accessibility",
+      "audit-architecture",
     ]
   ) {
     assertEquals(

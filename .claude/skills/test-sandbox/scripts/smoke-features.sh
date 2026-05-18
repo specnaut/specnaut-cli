@@ -113,6 +113,22 @@ check "a11y-auditor agent implements FE-surface gate" \
   'grep -q "Front-end surface detection" .claude/agents/a11y-auditor.md'
 check "router phase index lists audit accessibility" \
   'grep -q "audit accessibility" .claude/skills/specflow/SKILL.md'
+check "phase doc audit-architecture.md scaffolded (Epic #320, #321)" \
+  '[ -f .claude/skills/specflow/phases/audit-architecture.md ]'
+check "audit-architecture phase doc dispatches the architecture-auditor agent" \
+  'grep -q "architecture-auditor" .claude/skills/specflow/phases/audit-architecture.md'
+check "audit-architecture phase doc declares read-only contract" \
+  'grep -q "Read-only contract" .claude/skills/specflow/phases/audit-architecture.md'
+check "architecture-auditor agent bundled (Epic #320, #321)" \
+  '[ -f .claude/agents/architecture-auditor.md ]'
+check "architecture-auditor agent declares disable-model-invocation" \
+  'grep -q "disable-model-invocation: true" .claude/agents/architecture-auditor.md'
+check "architecture-auditor agent covers hex-layer violations axis" \
+  'grep -q "[Hh]ex-layer" .claude/agents/architecture-auditor.md'
+check "architecture-auditor agent enforces read-only Bash allow-list" \
+  'grep -q "Read-only contract" .claude/agents/architecture-auditor.md'
+check "router phase index lists audit architecture" \
+  'grep -q "audit architecture" .claude/skills/specflow/SKILL.md'
 check "name: specflow on the router SKILL.md" \
   'head -3 .claude/skills/specflow/SKILL.md | grep -q "name: specflow"'
 check "disable-model-invocation NOT set on the router (Skill-tool chaining must work)" \
