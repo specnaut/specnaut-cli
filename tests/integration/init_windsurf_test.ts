@@ -74,18 +74,19 @@ Deno.test("specflow init --ai windsurf scaffolds a Windsurf layout", async () =>
       true,
     );
 
-    // Router + 18 phases (11 original + tag-version + release-version +
+    // Router + 19 phases (11 original + tag-version + release-version +
     // auto-chain + list-skills + audit-security #303 + audit-performance
-    // #304 + audit-accessibility #305) + specflow-auto + specflow-review
-    // alias + writing-plans (#271) + requesting-code-review (#273) +
-    // using-specflow (#282) + subagent-driven-development (#272) +
-    // executing-plans (#274) + verification-before-completion (#275) +
-    // brainstorming (#276) + backlog + 13 agent workflows (11 original +
-    // performance-auditor #304 + a11y-auditor #305) = 41.
+    // #304 + audit-accessibility #305 + audit-architecture #321) +
+    // specflow-auto + specflow-review alias + writing-plans (#271) +
+    // requesting-code-review (#273) + using-specflow (#282) +
+    // subagent-driven-development (#272) + executing-plans (#274) +
+    // verification-before-completion (#275) + brainstorming (#276) +
+    // backlog + 14 agent workflows (11 original + performance-auditor
+    // #304 + a11y-auditor #305 + architecture-auditor #321) = 43.
     const workflowsCount = (await Array.fromAsync(
       Deno.readDir(join(root, ".windsurf/workflows")),
     )).length;
-    assertEquals(workflowsCount, 41);
+    assertEquals(workflowsCount, 43);
 
     // Shared (cross-harness)
     assertEquals(await exists(join(root, ".specflow/memory/constitution.md")), true);
