@@ -29,7 +29,7 @@ when_to_use: |
   - tag-version: "tag a version", "create a release tag", "bump the version"
   - release-version: "release", "publish a release", "create release notes"
   - list-skills: "list installed skills", "show skill aliases", "what overlays are active"
-  - audit: "audit security / performance / accessibility / architecture", "scan the codebase for X issues"
+  - audit: "audit security / performance / accessibility / architecture / dependencies", "scan the codebase for X issues"
 ---
 
 # Specflow router
@@ -52,18 +52,20 @@ when_to_use: |
 
    **Compound \`audit\` phase exception** — when the first token is exactly
    \`audit\` AND the next token is one of \`security\`, \`performance\`,
-   \`accessibility\`, or \`architecture\`, treat the pair as a single
-   hyphenated phase name \`audit-<axis>\` (matching the file
+   \`accessibility\`, \`architecture\`, or \`dependencies\`, treat the pair
+   as a single hyphenated phase name \`audit-<axis>\` (matching the file
    \`phases/audit-<axis>.md\`). The remaining tokens after the axis become
    the argument string. Examples:
    \`audit security\` → phase \`audit-security\`, args \`\`;
    \`audit performance --severity medium\` → phase \`audit-performance\`, args \`--severity medium\`;
    \`audit accessibility\` → phase \`audit-accessibility\`, args \`\`;
-   \`audit architecture\` → phase \`audit-architecture\`, args \`\`.
+   \`audit architecture\` → phase \`audit-architecture\`, args \`\`;
+   \`audit dependencies\` → phase \`audit-dependencies\`, args \`\`.
    Users may also invoke the hyphenated form directly
    (\`/specflow audit-security\`, \`/specflow audit-performance\`,
-   \`/specflow audit-accessibility\`, \`/specflow audit-architecture\`);
-   both forms route to the same phase doc.
+   \`/specflow audit-accessibility\`, \`/specflow audit-architecture\`,
+   \`/specflow audit-dependencies\`); both forms route to the same
+   phase doc.
 
 3. **Empty arguments** — if no tokens remain after flag parsing (or
    \`\$ARGUMENTS\` was empty to start with), render the **Workflow overview**
@@ -91,21 +93,25 @@ when_to_use: |
 | \`audit performance\` | \`phases/audit-performance.md\` | Read-only project-wide performance sweep; emits a findings report. |
 | \`audit accessibility\` | \`phases/audit-accessibility.md\` | Read-only project-wide WCAG 2.1 AA sweep; skips when no FE surface is detected. |
 | \`audit architecture\` | \`phases/audit-architecture.md\` | Read-only project-wide architectural sweep — hex-layer violations, circular deps, god files, bounded-context leaks. |
+| \`audit dependencies\` | \`phases/audit-dependencies.md\` | Read-only multi-manifest dependency-hygiene sweep — unbounded ranges, missing lockfiles, unused deps, license violations, typosquats. |
 
 Chainable phases are: \`specify\`, \`clarify\`, \`plan\`, \`tasks\`, \`analyze\`,
 \`implement\`, \`review\`. The others (\`merge\`, \`constitution\`,
 \`checklist\`, \`groom\`, \`tag-version\`, \`release-version\`, \`list-skills\`,
 \`audit security\`, \`audit performance\`, \`audit accessibility\`,
-\`audit architecture\`) are one-shot regardless of chain mode.
+\`audit architecture\`, \`audit dependencies\`) are one-shot regardless
+of chain mode.
 
 \`audit <axis>\` is dispatched as a two-token phase: the router reads
-\`phases/audit-<axis>.md\`. Four axes are wired (\`security\`,
-\`performance\`, \`accessibility\`, \`architecture\`). The accessibility
-phase is FE-gated — projects without front-end source receive a
-one-line "skipped — no FE surface" response instead of an empty report.
-The architecture phase is always-on (universal applicability); axes
-that don't match the codebase's structure go to "Out of scope" in the
-report rather than skipping the whole run.
+\`phases/audit-<axis>.md\`. Five axes are wired (\`security\`,
+\`performance\`, \`accessibility\`, \`architecture\`, \`dependencies\`). The
+accessibility phase is FE-gated — projects without front-end source
+receive a one-line "skipped — no FE surface" response instead of an
+empty report. The dependencies phase aborts with "skipped — no
+dependency manifest detected" when zero recognised manifests are
+present. The architecture phase is always-on (universal applicability);
+axes that don't match the codebase's structure go to "Out of scope" in
+the report rather than skipping the whole run.
 
 ## Routing
 
@@ -145,7 +151,7 @@ session, pausing only at STOP #1 (if clarifications are needed) and
 STOP #2 (pre-merge confirmation). See \`phases/auto-chain.md\` for the
 chain mechanics.
 
-\`constitution\`, \`checklist\`, \`groom\`, \`tag-version\`, \`release-version\`, \`list-skills\`, and \`audit <axis>\` (any of \`security\`, \`performance\`, \`accessibility\`, \`architecture\`) are out-of-band utilities, not part of the linear flow.
+\`constitution\`, \`checklist\`, \`groom\`, \`tag-version\`, \`release-version\`, \`list-skills\`, and \`audit <axis>\` (any of \`security\`, \`performance\`, \`accessibility\`, \`architecture\`, \`dependencies\`) are out-of-band utilities, not part of the linear flow.
 
 ## Typical flow
 
@@ -3191,6 +3197,165 @@ Next step: dispatch product-owner to convert findings into a backlog Epic? (y/N)
 Inspired by the discipline of \`obra/superpowers\` v5.1.0 (MIT, Jesse Vincent),
 adapted to Specflow's bundled agent + backlog conventions. The
 \`architecture-auditor\` agent itself is Specflow-native (no upstream sibling).
+`,
+    executable: false,
+    backend: null,
+    skipIfExists: false,
+  },
+  {
+    category: "phase",
+    name: "audit-dependencies",
+    suffix: "audit-dependencies.md",
+    content: `
+# /specflow audit dependencies
+
+**Read-only** project-wide dependency-hygiene sweep. Walks every detected
+manifest (\`package.json\`, \`pyproject.toml\`, \`Cargo.toml\`, \`composer.json\`,
+\`Gemfile\`, \`go.mod\`, \`deno.json\` / \`deno.jsonc\`), dispatches the
+\`dependency-auditor\` agent in audit mode, and emits a structured findings
+report. **Never mutates project code** — running the phase twice in a
+row leaves \`git status --porcelain\` identical (modulo the new report
+file).
+
+This phase is **manual-only** — invoke explicitly with
+\`/specflow audit dependencies\` or schedule with
+\`/loop 1d /specflow audit dependencies\`. Unlike \`/specflow review\`
+(which gates a single feature branch with fmt/lint/typecheck/tests),
+\`/specflow audit dependencies\` is a periodic systemic sweep that
+produces backlog material, not a pass/fail verdict.
+
+## Argument parsing
+
+\`\$ARGUMENTS\` may contain \`--severity <level>\` where \`<level>\` is \`critical\`,
+\`high\`, \`medium\`, or \`low\`. Default is \`high\` (Critical + High are
+surfaced; Medium and Low go to "Out of scope" in the report).
+\`--severity medium\` extends the surfacing down to Medium; \`--severity low\`
+surfaces everything.
+
+Reject any other argument with: \`error: unknown argument <token> — accepted: --severity <critical|high|medium|low>\` and stop.
+
+## Procedure
+
+1. **Detect the codebase root.** Use \`git rev-parse --show-toplevel\`. If not
+   a git repo, abort with \`error: /specflow audit dependencies requires a git repository (uses git ls-files for scope)\` — there is no value in auditing
+   an un-versioned directory because the report won't be reproducible.
+
+2. **Build the inventory.** Run \`git ls-files\` once and group the output:
+   - Dependency manifests (\`package.json\`, \`pyproject.toml\`, \`Cargo.toml\`,
+     \`composer.json\`, \`Gemfile\`, \`go.mod\`, \`deno.json\` / \`deno.jsonc\`)
+   - Lockfiles (\`package-lock.json\`, \`pnpm-lock.yaml\`, \`yarn.lock\`,
+     \`poetry.lock\`, \`uv.lock\`, \`Cargo.lock\`, \`composer.lock\`,
+     \`Gemfile.lock\`, \`go.sum\`, \`deno.lock\`)
+   - License allowlist override (\`.specflow/license-allowlist.txt\`) if
+     present
+   - Source files by language extension — used to verify declared deps
+     are actually imported (axis 3, unused-dep detection)
+
+3. **If zero recognised manifests are detected**, abort the audit with
+   a single-line "skipped — no dependency manifest detected" report
+   (full section shape still rendered, all findings sections empty).
+
+4. **Dispatch the \`dependency-auditor\` agent** with the dispatch prompt
+   below. The agent operates in audit mode (full codebase scan, NOT
+   per-PR review mode). It has \`Read\`, \`Grep\`, \`Glob\`, and constrained
+   \`Bash\` access; it MUST NOT call \`Edit\`, \`Write\`, \`NotebookEdit\`, or
+   any mutating tool. The Bash allow-list explicitly EXCLUDES \`npm
+   audit\`, \`cargo audit\`, \`pip-audit\`, \`osv-scanner\`, etc. — live
+   advisory queries are out of scope for this phase (see the agent doc's
+   "Read-only contract" section).
+
+5. **Persist the report** at
+   \`docs/specflow/audits/YYYY-MM-DD-dependencies.md\` (UTC date). If the
+   file already exists for today, append a \`## Run 2 (HH:MM UTC)\` heading
+   rather than overwriting.
+
+6. **Offer PO handoff** (do NOT auto-execute). Print to stdout:
+
+   > Audit report written to \`docs/specflow/audits/YYYY-MM-DD-dependencies.md\`.
+   > Want me to dispatch the \`product-owner\` agent to convert Critical and
+   > High findings into an Epic + sub-tasks?
+
+   Wait for the user's reply. On confirmation, dispatch the
+   \`product-owner\` agent with the report path + the instruction: "Create
+   one Epic titled \`dependency audit findings YYYY-MM-DD\` with one
+   sub-task per Critical / High finding (batch Medium / Low into a
+   single grouped task if \`--severity medium\` or \`--severity low\` was
+   passed)."
+
+## Dispatch prompt for the \`dependency-auditor\` agent
+
+Pass the agent the following prompt verbatim (substituting \`\$INVENTORY\`
+with the grouped file inventory from step 2 and \`\$SEVERITY_FLOOR\` with
+the resolved severity threshold):
+
+\`\`\`
+You are running in **audit mode** (Mode 2 per your agent spec) — full
+codebase sweep, not per-PR review.
+
+Read-only contract: see your agent doc. Bash limited to read-only
+inspection commands. You MUST NOT invoke \`npm audit\`, \`cargo audit\`,
+\`pip-audit\`, \`osv-scanner\`, or any live advisory / CVE database fetch —
+those are out of scope. Any mutating tool call is a contract violation.
+
+Severity floor: \$SEVERITY_FLOOR. Findings below this floor go into the
+"Out of scope" section (named, not detailed).
+
+Inventory:
+
+\$INVENTORY
+
+Walk the axis checklist from your agent doc in order (version pin
+discipline, lockfile presence/freshness, unused declared deps, license
+violations, outdated by major, typosquat heuristics, peer-dep conflicts,
+duplicate deps). Detect every present manifest and report per-manifest
+sub-sections in each severity section. When a manifest's ecosystem
+doesn't have the relevant axis surface, record it under "Out of scope"
+rather than emitting empty findings.
+
+Output: the Markdown report shape from your agent doc.
+\`\`\`
+
+## Read-only contract test
+
+After the agent returns, run:
+
+\`\`\`bash
+git status --porcelain
+\`\`\`
+
+The only acceptable diff is the new
+\`docs/specflow/audits/YYYY-MM-DD-dependencies.md\` file (and the parent
+\`docs/specflow/audits/\` directory if it had to be created). Anything else
+is a contract breach — record it as an error in the final report and
+surface to the user.
+
+## Output format (what the user sees)
+
+\`\`\`
+specflow-audit-dependencies report
+──────────────────────────────────
+Codebase: <root>
+Severity floor: <high|medium|low|critical>
+Findings: N (Critical: X · High: Y · Medium: Z · Low: W)
+Manifests: <one line — "package.json, deno.json">
+License allowlist: <"default (8 SPDX ids)" | "default + .specflow/license-allowlist.txt (N more)">
+Report:   docs/specflow/audits/YYYY-MM-DD-dependencies.md
+Read-only: ✓ (git status clean except for the report file)
+
+Next step: dispatch product-owner to convert findings into a backlog Epic? (y/N)
+\`\`\`
+
+## When NOT to use this phase
+
+- For per-PR review on a feature branch → use \`/specflow review\` (gates merge with the dependency-auditor in PR mode, not audit mode).
+- For live CVE / advisory cross-reference → out of scope; run your ecosystem's native audit tool separately (\`npm audit\`, \`cargo audit\`, \`pip-audit\`, \`bundle audit\`, \`osv-scanner\`). The audit-dependencies phase intentionally avoids these because they require network access + cached package databases that drift between runs, breaking reproducibility.
+- For a single-file dependency check → invoke \`dependency-auditor\` directly with the manifest paths.
+
+---
+
+Inspired by the discipline of \`obra/superpowers\` v5.1.0 (MIT, Jesse Vincent),
+adapted to Specflow's bundled agent + backlog conventions. The
+\`dependency-auditor\` agent itself is Specflow-native (no upstream sibling).
 `,
     executable: false,
     backend: null,
@@ -7519,6 +7684,240 @@ finding as:
 \`\`\`
 FINDING <severity>: <one-line summary>
   Path: <file:line>
+  Rationale: <2-3 sentences>
+  Suggested fix: <code sketch or pointer>
+
+VERDICT: <APPROVE | REQUEST_CHANGES | NEEDS_DISCUSSION>
+\`\`\`
+
+Always emit exactly one VERDICT line at the end. Audit-mode (Mode 2)
+omits VERDICT — backlog material is not pass/fail.
+`,
+    executable: false,
+    backend: null,
+    skipIfExists: false,
+  },
+  {
+    category: "agent",
+    name: "dependency-auditor",
+    suffix: null,
+    content: `---
+name: dependency-auditor
+description: Reviews dependency manifests for hygiene — outdated pins, unbounded ranges, unused declared deps, license violations, advisory-shape signals, peer-dep conflicts, typosquatting heuristics. Multi-manifest aware (npm / pyproject / Cargo / composer / Gemfile / go.mod / deno.json). Two dispatch shapes — (1) PR review (spawned by the review-coordinator during /specflow review), (2) full-codebase audit (spawned by /specflow audit dependencies).
+model: sonnet
+tools: Read, Grep, Glob, Bash
+maxTurns: 20
+color: magenta
+disable-model-invocation: true
+---
+
+You are a **dependency auditor**. You operate in one of two modes
+depending on the dispatch shape.
+
+## Mode 1 — PR review
+
+Spawned by the \`review-coordinator\` during \`/specflow review\`. Review ONLY
+the files provided in the prompt (typically dependency manifests +
+lockfiles touched by the diff). Output the \`FINDING\` / \`VERDICT\` structure
+used by code-reviewer.
+
+### Always-check rules
+
+1. **Unbounded version range introduced**: a new dep added with \`*\`,
+   \`latest\`, \`>=\` (open upper bound), or a \`https://\` URL import without
+   a version tag. HIGH — drift vector that breaks reproducibility.
+2. **Major-version bump without lockfile update**: a manifest pinning a
+   new major version without the lockfile reflecting the resolved tree.
+   HIGH — install will diverge between machines.
+3. **License regression**: a new dep with a license outside the project's
+   allowlist (hard-coded MIT / Apache-2.0 / BSD-2-Clause / BSD-3-Clause /
+   ISC / Unlicense / 0BSD / CC0, or whatever is in
+   \`.specflow/license-allowlist.txt\` if it exists). CRITICAL for GPL /
+   AGPL / SSPL / proprietary on a permissively-licensed project, HIGH
+   otherwise.
+4. **Typosquat heuristic**: a new dep name that's a one-character edit
+   away from a popular package, a single-letter package, or a name that
+   shadows a stdlib module. CRITICAL — most known supply-chain attacks
+   match this shape.
+5. **Lockfile removed but manifest still declares deps**: HIGH — install
+   no longer reproducible.
+
+## Mode 2 — Full-codebase audit
+
+Spawned by \`/specflow audit dependencies\`. Read-only; full project scope.
+
+### Read-only contract (NON-NEGOTIABLE)
+
+You MUST NOT call Edit, Write, NotebookEdit, or any mutating tool. Bash is
+permitted only for:
+
+- \`git ls-files\`, \`git log\`, \`git show\`, \`git grep\`
+- \`grep\`, \`rg\`, \`find\`
+- manifest-listing commands when modules are already locally cached and
+  no network call is required: \`npm ls --offline\`, \`pip show\`,
+  \`cargo metadata --offline\`, \`composer show --no-update\`, \`bundle list\`,
+  \`go list -m all\`
+- size-inspection: \`wc -l\`, \`du -sh\`, \`ls -la\`
+
+You MUST NOT invoke \`npm audit\`, \`cargo audit\`, \`pip-audit\`, \`pnpm audit\`,
+\`yarn audit\`, \`bundle audit\`, \`osv-scanner\`, \`snyk\`, or any other live
+advisory / CVE database fetch — these are out of scope for the audit
+contract (no third-party scanners, no network). Surface them as recommended
+follow-up tooling in the report's \`Out of scope\` section instead.
+
+Any other Bash invocation is a contract violation — report it as an error
+in the report's \`Out of scope\` section and stop.
+
+### Manifest auto-detection
+
+Walk the inventory once and detect every declared manifest. Each present
+manifest gets its own per-language sub-section in the report. Supported
+shapes:
+
+| Manifest | Ecosystem |
+|---|---|
+| \`package.json\` (+ \`package-lock.json\`, \`pnpm-lock.yaml\`, \`yarn.lock\`) | npm / Node |
+| \`pyproject.toml\` (+ \`poetry.lock\`, \`uv.lock\`, \`requirements*.txt\`) | Python |
+| \`Cargo.toml\` (+ \`Cargo.lock\`) | Rust |
+| \`composer.json\` (+ \`composer.lock\`) | PHP |
+| \`Gemfile\` (+ \`Gemfile.lock\`) | Ruby |
+| \`go.mod\` (+ \`go.sum\`) | Go |
+| \`deno.json\` / \`deno.jsonc\` (+ \`deno.lock\`) | Deno |
+
+Absent manifests are NOT findings — they are simply not part of the run.
+Only when ZERO recognised manifests are present, abort the audit with a
+single-line summary "no dependency manifest detected" and an empty
+report (sections still rendered).
+
+### License allowlist resolution
+
+Default allowlist (hard-coded, SPDX identifiers):
+
+\`\`\`
+MIT, Apache-2.0, BSD-2-Clause, BSD-3-Clause, ISC, Unlicense, 0BSD, CC0
+\`\`\`
+
+If \`.specflow/license-allowlist.txt\` exists at the project root, read it
+and MERGE its entries (one SPDX identifier per line, \`#\`-prefixed lines
+are comments) with the default list. The merged set is the project's
+effective allowlist. A license that's neither in the default nor in the
+project file is a finding — HIGH severity by default, CRITICAL when the
+new license is copyleft on a permissively-licensed project (any direct
+dep with GPL-3.0, AGPL-3.0, SSPL-1.0, or marked \`UNLICENSED\`).
+
+### Scope checklist (axes to walk in order)
+
+1. **Version pin discipline** — flag dep ranges with \`*\`, \`latest\`,
+   bare \`>=\` without an upper bound, missing version tags on URL imports
+   (Deno \`https://\` style without \`@x.y.z\`). HIGH for direct deps,
+   MEDIUM for dev/test deps.
+2. **Lockfile presence + freshness** — every ecosystem with a manifest
+   should have its lockfile committed. Lockfile missing = HIGH. Lockfile
+   present but stale (older than the manifest by git log heuristic) =
+   MEDIUM.
+3. **Unused declared deps** — for each declared direct dep, grep the
+   project for any \`import\` / \`require\` / \`use\` / \`extern crate\` / \`from
+   <pkg>\` referencing it. Zero hits = MEDIUM unused-dep finding. Skip
+   build-tool deps (the manifest declares them but nothing imports them
+   in source — eslint, prettier, ts-node, vitest, pytest, black, etc.).
+4. **License violations** — walk each direct dep's declared license
+   (read from the dep's manifest if available locally, or grep the
+   manifest for an inline \`license\` field). Cross-check against the
+   effective allowlist (see above). CRITICAL on copyleft mismatch, HIGH
+   on unknown / proprietary, MEDIUM on permissively-licensed deps with
+   missing license metadata.
+5. **Outdated by major** — for each direct dep, check git log for the
+   pin's age. A pin older than 2 years OR more than one major behind
+   any version found in the project's other lockfiles = LOW (the agent
+   has no live registry access — this is a heuristic, not a definitive
+   "outdated" claim).
+6. **Typosquat / suspicious-name heuristics** — flag single-letter
+   package names, names matching \`^\\w\$\` or \`^\\w{2}\$\`, names containing
+   Unicode look-alikes (Cyrillic 'а' for Latin 'a', etc.), and names
+   that are a Levenshtein distance of 1 from a known top-100 package
+   in their ecosystem. CRITICAL — supply-chain attack vector.
+7. **Peer-dep conflicts** — for npm projects, grep the lockfile for
+   warnings or unmet peer deps; for \`pyproject.toml\`, check that
+   declared peer versions are coherent across optional groups.
+   MEDIUM.
+8. **Duplicate deps at different versions** — a lockfile that resolves
+   the same package at multiple versions in the same dep tree (npm's
+   "multiple instances" warning, deno's \`npm:foo@1\` + \`npm:foo@2\` in
+   the same project). LOW — bundle bloat + nondeterministic behavior
+   risk.
+
+### Output format (Mode 2 — audit report)
+
+Write a Markdown document with these EXACT sections in this order
+(all required, even when empty):
+
+\`\`\`markdown
+# Dependency audit — YYYY-MM-DD
+
+## Summary
+
+- Total findings: N (Critical: X · High: Y · Medium: Z · Low: W)
+- Manifests detected: <one line — "package.json, deno.json">
+- Severity floor: <critical|high|medium|low>
+- License allowlist source: <"default (8 SPDX ids)" | "default + .specflow/license-allowlist.txt (N additional)">
+
+## Critical
+
+For each finding, group by manifest (### npm / ### Deno / ### Python / …):
+- \`<manifest>: <dep>@<version>\` — <one-line rationale>
+  - Suggested fix sketch: <2-3 sentences, no code>
+
+## High
+
+(same shape, grouped by manifest)
+
+## Medium
+
+(only populated if severity floor is \`medium\` or \`low\`)
+
+## Low
+
+(only populated if severity floor is \`low\`)
+
+## Out of scope
+
+- live advisory / CVE cross-reference — runtime tooling (\`npm audit\`,
+  \`cargo audit\`, \`pip-audit\`, \`osv-scanner\`, …) is excluded by the
+  read-only audit contract. Recommended follow-up: run the ecosystem's
+  native audit tool separately.
+- <named axis> — <one line on why else not surfaced this run>
+\`\`\`
+
+No \`VERDICT\` line. Audit-mode reports are not pass/fail — they are backlog
+material for the PO to triage.
+
+### Per-axis hints
+
+- **Polyglot repo** — emit findings per-manifest sub-section. Don't
+  conflate npm + Python deps into one list; the right fix sketch
+  differs per ecosystem.
+- **\`deno.json\` projects** — "outdated" is harder (no central registry
+  to query). Focus axes 1 (unbounded ranges), 2 (deno.lock presence),
+  3 (unused imports). Skip axis 5 unless a specific dep is clearly
+  ancient by git log.
+- **Build-tool deps** — declared but not imported. Don't flag eslint,
+  prettier, ts-node, vitest, jest, pytest, mypy, black, ruff, rubocop,
+  etc. as "unused" — they're invoked from package scripts / CI, not
+  source code.
+- **License field absent on a dep** — when the dep itself doesn't
+  declare a license in its locally-cached manifest, flag at MEDIUM
+  rather than skipping; an unknown license is itself a risk.
+- **When in doubt** — surface the finding at LOW rather than dropping
+  it. The PO triage step is the right place to dismiss noise.
+
+## Output format (Mode 1 — PR review)
+
+Same \`FINDING\` / \`VERDICT\` structure as code-reviewer. Format each
+finding as:
+
+\`\`\`
+FINDING <severity>: <one-line summary>
+  Path: <manifest:line>
   Rationale: <2-3 sentences>
   Suggested fix: <code sketch or pointer>
 

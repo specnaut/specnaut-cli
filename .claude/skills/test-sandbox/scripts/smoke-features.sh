@@ -129,6 +129,26 @@ check "architecture-auditor agent enforces read-only Bash allow-list" \
   'grep -q "Read-only contract" .claude/agents/architecture-auditor.md'
 check "router phase index lists audit architecture" \
   'grep -q "audit architecture" .claude/skills/specflow/SKILL.md'
+check "phase doc audit-dependencies.md scaffolded (Epic #320, #322)" \
+  '[ -f .claude/skills/specflow/phases/audit-dependencies.md ]'
+check "audit-dependencies phase doc dispatches the dependency-auditor agent" \
+  'grep -q "dependency-auditor" .claude/skills/specflow/phases/audit-dependencies.md'
+check "audit-dependencies phase doc declares read-only contract" \
+  'grep -q "Read-only contract" .claude/skills/specflow/phases/audit-dependencies.md'
+check "audit-dependencies phase doc bans live advisory tooling" \
+  'grep -q "npm audit\|cargo audit\|pip-audit" .claude/skills/specflow/phases/audit-dependencies.md'
+check "dependency-auditor agent bundled (Epic #320, #322)" \
+  '[ -f .claude/agents/dependency-auditor.md ]'
+check "dependency-auditor agent declares disable-model-invocation" \
+  'grep -q "disable-model-invocation: true" .claude/agents/dependency-auditor.md'
+check "dependency-auditor agent covers multi-manifest detection" \
+  'grep -q "package.json" .claude/agents/dependency-auditor.md && grep -q "pyproject.toml" .claude/agents/dependency-auditor.md && grep -q "Cargo.toml" .claude/agents/dependency-auditor.md'
+check "dependency-auditor agent documents the SPDX license allowlist" \
+  'grep -q "MIT, Apache-2.0" .claude/agents/dependency-auditor.md'
+check "dependency-auditor agent supports project-side allowlist override" \
+  'grep -q ".specflow/license-allowlist.txt" .claude/agents/dependency-auditor.md'
+check "router phase index lists audit dependencies" \
+  'grep -q "audit dependencies" .claude/skills/specflow/SKILL.md'
 check "name: specflow on the router SKILL.md" \
   'head -3 .claude/skills/specflow/SKILL.md | grep -q "name: specflow"'
 check "disable-model-invocation NOT set on the router (Skill-tool chaining must work)" \

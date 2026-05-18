@@ -17,11 +17,11 @@ const SYNC_PAIRS: ReadonlyArray<{ plugin: string; source: string }> = [
     plugin: "plugin/skills/specflow/SKILL.md",
     source: "templates/core/skills/specflow/SKILL.md",
   },
-  // 18 phase reference docs, loaded by the router on demand. The
+  // 19 phase reference docs, loaded by the router on demand. The
   // phase-1 audit trio (`audit-security` #303, `audit-performance` #304,
-  // `audit-accessibility` #305) shipped in v1.9.0; `audit-architecture`
-  // (#321) is the first of the phase-2 family (Epic #320). The
-  // upcoming `audit-dependencies` will join via #322.
+  // `audit-accessibility` #305) shipped in v1.9.0; the phase-2 pair
+  // (`audit-architecture` #321 + `audit-dependencies` #322) closes
+  // Epic #320.
   ...[
     "specify",
     "clarify",
@@ -41,6 +41,7 @@ const SYNC_PAIRS: ReadonlyArray<{ plugin: string; source: string }> = [
     "audit-performance",
     "audit-accessibility",
     "audit-architecture",
+    "audit-dependencies",
   ].map((name) => ({
     plugin: `plugin/skills/specflow/phases/${name}.md`,
     source: `templates/core/skills/specflow/phases/${name}.md`,
@@ -119,13 +120,13 @@ const SYNC_PAIRS: ReadonlyArray<{ plugin: string; source: string }> = [
     plugin: `plugin/skills/using-specflow/references/${name}-tools.md`,
     source: `templates/core/skills/using-specflow/references/${name}-tools.md`,
   })),
-  // Dual-copy agents: 14 sub-agent definitions, each landing as
+  // Dual-copy agents: 15 sub-agent definitions, each landing as
   // `plugin/agents/<name>.md`. Claude Code resolves agents by file
   // basename in plugin scope; no namespacing needed for invocation
   // (agents are not user-invokable like slash commands).
   // Counts: 10 original + ui-ux-designer (#198, sync-test drift fix in
   // #321) + performance-auditor (#304) + a11y-auditor (#305) +
-  // architecture-auditor (#321) = 14.
+  // architecture-auditor (#321) + dependency-auditor (#322) = 15.
   ...[
     "code-reviewer",
     "developer",
@@ -141,6 +142,7 @@ const SYNC_PAIRS: ReadonlyArray<{ plugin: string; source: string }> = [
     "performance-auditor",
     "a11y-auditor",
     "architecture-auditor",
+    "dependency-auditor",
   ].map((name) => ({
     plugin: `plugin/agents/${name}.md`,
     source: `templates/core/agents/${name}.md`,

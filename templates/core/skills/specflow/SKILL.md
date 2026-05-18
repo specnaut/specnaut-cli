@@ -18,7 +18,7 @@ when_to_use: |
   - tag-version: "tag a version", "create a release tag", "bump the version"
   - release-version: "release", "publish a release", "create release notes"
   - list-skills: "list installed skills", "show skill aliases", "what overlays are active"
-  - audit: "audit security / performance / accessibility / architecture", "scan the codebase for X issues"
+  - audit: "audit security / performance / accessibility / architecture / dependencies", "scan the codebase for X issues"
 ---
 
 # Specflow router
@@ -41,18 +41,20 @@ when_to_use: |
 
    **Compound `audit` phase exception** — when the first token is exactly
    `audit` AND the next token is one of `security`, `performance`,
-   `accessibility`, or `architecture`, treat the pair as a single
-   hyphenated phase name `audit-<axis>` (matching the file
+   `accessibility`, `architecture`, or `dependencies`, treat the pair
+   as a single hyphenated phase name `audit-<axis>` (matching the file
    `phases/audit-<axis>.md`). The remaining tokens after the axis become
    the argument string. Examples:
    `audit security` → phase `audit-security`, args ``;
    `audit performance --severity medium` → phase `audit-performance`, args `--severity medium`;
    `audit accessibility` → phase `audit-accessibility`, args ``;
-   `audit architecture` → phase `audit-architecture`, args ``.
+   `audit architecture` → phase `audit-architecture`, args ``;
+   `audit dependencies` → phase `audit-dependencies`, args ``.
    Users may also invoke the hyphenated form directly
    (`/specflow audit-security`, `/specflow audit-performance`,
-   `/specflow audit-accessibility`, `/specflow audit-architecture`);
-   both forms route to the same phase doc.
+   `/specflow audit-accessibility`, `/specflow audit-architecture`,
+   `/specflow audit-dependencies`); both forms route to the same
+   phase doc.
 
 3. **Empty arguments** — if no tokens remain after flag parsing (or
    `$ARGUMENTS` was empty to start with), render the **Workflow overview**
@@ -80,21 +82,25 @@ when_to_use: |
 | `audit performance` | `phases/audit-performance.md` | Read-only project-wide performance sweep; emits a findings report. |
 | `audit accessibility` | `phases/audit-accessibility.md` | Read-only project-wide WCAG 2.1 AA sweep; skips when no FE surface is detected. |
 | `audit architecture` | `phases/audit-architecture.md` | Read-only project-wide architectural sweep — hex-layer violations, circular deps, god files, bounded-context leaks. |
+| `audit dependencies` | `phases/audit-dependencies.md` | Read-only multi-manifest dependency-hygiene sweep — unbounded ranges, missing lockfiles, unused deps, license violations, typosquats. |
 
 Chainable phases are: `specify`, `clarify`, `plan`, `tasks`, `analyze`,
 `implement`, `review`. The others (`merge`, `constitution`,
 `checklist`, `groom`, `tag-version`, `release-version`, `list-skills`,
 `audit security`, `audit performance`, `audit accessibility`,
-`audit architecture`) are one-shot regardless of chain mode.
+`audit architecture`, `audit dependencies`) are one-shot regardless
+of chain mode.
 
 `audit <axis>` is dispatched as a two-token phase: the router reads
-`phases/audit-<axis>.md`. Four axes are wired (`security`,
-`performance`, `accessibility`, `architecture`). The accessibility
-phase is FE-gated — projects without front-end source receive a
-one-line "skipped — no FE surface" response instead of an empty report.
-The architecture phase is always-on (universal applicability); axes
-that don't match the codebase's structure go to "Out of scope" in the
-report rather than skipping the whole run.
+`phases/audit-<axis>.md`. Five axes are wired (`security`,
+`performance`, `accessibility`, `architecture`, `dependencies`). The
+accessibility phase is FE-gated — projects without front-end source
+receive a one-line "skipped — no FE surface" response instead of an
+empty report. The dependencies phase aborts with "skipped — no
+dependency manifest detected" when zero recognised manifests are
+present. The architecture phase is always-on (universal applicability);
+axes that don't match the codebase's structure go to "Out of scope" in
+the report rather than skipping the whole run.
 
 ## Routing
 
@@ -134,7 +140,7 @@ session, pausing only at STOP #1 (if clarifications are needed) and
 STOP #2 (pre-merge confirmation). See `phases/auto-chain.md` for the
 chain mechanics.
 
-`constitution`, `checklist`, `groom`, `tag-version`, `release-version`, `list-skills`, and `audit <axis>` (any of `security`, `performance`, `accessibility`, `architecture`) are out-of-band utilities, not part of the linear flow.
+`constitution`, `checklist`, `groom`, `tag-version`, `release-version`, `list-skills`, and `audit <axis>` (any of `security`, `performance`, `accessibility`, `architecture`, `dependencies`) are out-of-band utilities, not part of the linear flow.
 
 ## Typical flow
 
