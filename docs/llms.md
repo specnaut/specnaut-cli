@@ -105,9 +105,9 @@ that need a one-time human setup before the marketplace listings are live:
 
 - **Codex CLI** — `.codex-plugin/plugin.json` ships in this repo; the
   `scripts/sync-to-codex-plugin.sh` script (fires on every release tag) mirrors the Specflow plugin
-  content into a fork of `openai/openai-codex-plugins`. Until that fork + the `CODEX_SYNC_TOKEN` PAT
-  are provisioned (see issues #298–#300), the sync emits a workflow warning and skips — same
-  fail-safe pattern as the Homebrew tap bump.
+  content into `mkrlabs/plugins` (a fork of `openai/plugins`). Until that fork is rebased into
+  upstream and the `CODEX_SYNC_TOKEN` PAT is provisioned (see issues #298–#300), the sync emits a
+  workflow warning and skips — same fail-safe pattern as the Homebrew tap bump.
 - **Copilot CLI + shared marketplace** — `.claude-plugin/marketplace.json` lives in
   `mkrlabs/specflow-marketplace` (a separate repo). `scripts/sync-to-marketplace.sh` bumps the
   version on every release. Until the marketplace repo + `MARKETPLACE_SYNC_TOKEN` are provisioned
