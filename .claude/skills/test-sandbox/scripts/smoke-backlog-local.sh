@@ -146,7 +146,16 @@ bash .specflow/scripts/backlog/add.sh "Second sibling of 1" "" --parent 1 >/dev/
 bash .specflow/scripts/backlog/move.sh 1 Backlog >/dev/null
 bash .specflow/scripts/backlog/move.sh 3 Backlog >/dev/null
 
-# Move child OUT of Backlog → parent should auto-promote to In progress.
+# Move child to Ready → parent must stay in Backlog (#260 AC a tightened: Ready
+# means "groomed, waiting", not "active work" — only In progress / In review
+# / Done promote the parent).
+bash .specflow/scripts/backlog/move.sh 3 "Ready" >/dev/null
+parent_status=$(awk '/^---$/{n++; next} n==1 && /^status:/{sub(/^status:[[:space:]]*/, ""); print; exit}' .specflow/backlog/001-first-item.md)
+[ "$parent_status" = "Backlog" ] \
+  && pass "parent stays Backlog when child moves to Ready (AC a fidelity)" \
+  || fail "parent unexpectedly promoted on child→Ready" "expected 'Backlog', got '$parent_status'"
+
+# Move child to In progress → parent should auto-promote.
 bash .specflow/scripts/backlog/move.sh 3 "In progress" >/dev/null
 parent_status=$(awk '/^---$/{n++; next} n==1 && /^status:/{sub(/^status:[[:space:]]*/, ""); print; exit}' .specflow/backlog/001-first-item.md)
 [ "$parent_status" = "In progress" ] \
