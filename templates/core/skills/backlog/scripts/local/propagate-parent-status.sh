@@ -1,9 +1,15 @@
 #!/usr/bin/env bash
 # Post-move hook with two propagation rules:
 #
-#   - #260: when a sub-task moves OUT of Backlog, auto-advance its
-#     parent Epic to In Progress (only if the Epic is currently in
-#     Backlog or Ready). Manual In Review / Done states are preserved.
+#   - #260: when a sub-task moves to In Progress or In Review,
+#     auto-advance its parent Epic to In Progress (only if the Epic is
+#     currently in Backlog or Ready). Manual In Review / Done states
+#     are preserved. A child moving to **Ready** does NOT trigger
+#     promotion — Ready means "groomed and waiting", not "active work";
+#     the parent stays put until a child actually starts. This matches
+#     #260 AC(a) which enumerates only "In Progress, In Review, or
+#     Done" as the promoting transitions — the prior `*)` glob
+#     accidentally also matched Ready.
 #
 #   - #263: when the LAST open direct child of an Epic reaches Done,
 #     auto-advance the parent Epic to Done (only if it is currently
@@ -132,9 +138,12 @@ case "$NEW_STATUS" in
       esac
     fi
     ;;
-  *)
-    # Existing #260 behaviour: child moved out of Backlog into Ready /
-    # In progress / In review — promote a stalled parent.
+  "In progress"|"In review")
+    # #260 AC(a) (tightened): child moved into In progress or In review
+    # — promote a stalled parent. Done is handled by its own arm above
+    # (all-children-Done rollup). Moves to Ready are explicitly NOT
+    # promoting — see header. Moves into Backlog were already filtered
+    # at the top of this script.
     case "$PARENT_STATUS" in
       "Backlog"|"Ready")
         if [ -x "$SCRIPT_DIR/move.sh" ]; then
@@ -156,6 +165,11 @@ case "$NEW_STATUS" in
         # Idempotency + regression guard branch.
         ;;
     esac
+    ;;
+  *)
+    # Ready (or any unknown / future status) — explicit no-op. Ready
+    # means the child is groomed and waiting for a developer to pick
+    # it up; that's not active work and should not promote the parent.
     ;;
 esac
 

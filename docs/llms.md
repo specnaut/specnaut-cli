@@ -621,6 +621,12 @@ callers don't issue a redundant `close` and 422, exits 3 when the parent doesn't
 all children are closed. The PO runs it before `gh issue close` / `glab issue close`. The local
 backend uses an inline `grep` equivalent.
 
+A companion `propagate-parent-status.sh` keeps the parent's board column honest as children move: a
+child entering **In progress** or **In review** promotes a stalled parent (Backlog or Ready → In
+progress), and once every child reaches **Done** the parent rolls up to Done. A child moving to
+**Ready** is deliberately a no-op — Ready means groomed-and-waiting, not active work, so it must not
+promote the parent.
+
 The Product Owner agent **proactively** proposes epic decomposition during `/backlog add` and during
 grooming whenever a request crosses ≥2 subsystems, has more than 5 acceptance-criteria bullets, or
 carries trigger phrases like "break down", "phased", "rewrite", "end-to-end". Obvious splits get

@@ -167,6 +167,8 @@ check "propagator promotes only Backlog/Ready parents" \
   'grep -qE "\"Backlog\"\|\"Ready\"" .specflow/scripts/backlog/propagate-parent-status.sh'
 check "propagator carries the SPECFLOW_INTERNAL_PROPAGATION recursion guard" \
   'grep -q "SPECFLOW_INTERNAL_PROPAGATION" .specflow/scripts/backlog/propagate-parent-status.sh'
+check "propagator triggers on In-progress/In-review only, not Ready (AC a fidelity)" \
+  'grep -qE "\"In progress\"\|\"In review\"\)" .specflow/scripts/backlog/propagate-parent-status.sh'
 
 echo
 echo "═══ #263  Auto-Done propagation in github propagator (static-grep) ═══"
