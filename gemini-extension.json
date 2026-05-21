@@ -1,6 +1,6 @@
 {
   "name": "specflow",
   "description": "Spec-driven planning, TDD, review, and delivery workflows for coding agents — bundled skills, sub-agents, and a SessionStart-equivalent bootstrap via Gemini's context file mechanism.",
-  "version": "1.10.0",
+  "version": "1.11.0",
   "contextFileName": "GEMINI.md"
 }
