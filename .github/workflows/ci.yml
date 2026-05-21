@@ -20,6 +20,21 @@ jobs:
         run: deno task lint
       - name: Bundle templates
         run: deno task bundle
+      - name: Verify bundle is in sync with templates/
+        # deno task bundle (above) regenerates src/templates_bundle.ts.
+        # If the committed copy was stale, the regeneration leaves a
+        # diff — fail the build so the drift can't land on main. CI
+        # otherwise silently masks this: it always re-bundles before
+        # testing, so a stale committed bundle never trips a test.
+        run: |
+          if ! git diff --quiet -- src/templates_bundle.ts; then
+            echo "::error::src/templates_bundle.ts is stale — it does not match templates/."
+            echo "Run 'deno task bundle' locally and commit the regenerated src/templates_bundle.ts."
+            echo "If this keeps happening, install the pre-commit hook: deno task setup"
+            git diff --stat -- src/templates_bundle.ts
+            exit 1
+          fi
+          echo "Bundle is in sync with templates/."
       - name: Type check
         run: deno task check
       - name: Test
