@@ -84,6 +84,7 @@ fi
 cd "$CLONE_TARGET"
 
 git_bot_identity
+wire_gh_token_to_remote
 
 # Update the specflow entry's version in the catalog. The catalog
 # JSON shape is canonical Claude Code marketplace format
