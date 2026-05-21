@@ -80,6 +80,28 @@ git_bot_identity() {
   git config user.name "Specflow Sync Bot"
 }
 
+# wire_gh_token_to_remote
+#
+# Rewrite the `origin` remote URL to embed GH_TOKEN as a URL credential
+# so a bare `git push` works on a headless CI runner. `gh repo clone`
+# authenticates the clone itself but writes a plain
+# `https://github.com/...` remote, so the subsequent `git push` has no
+# credentials and fails with exit 128 ("could not read Username for
+# 'https://github.com'"). Call from inside the destination clone, after
+# `git_bot_identity` and before any `git push`. No-op in DRY_RUN and
+# when the remote already carries credentials (re-run, or a non-HTTPS
+# remote) so the helper is safe to call unconditionally.
+wire_gh_token_to_remote() {
+  [ -n "${DRY_RUN:-}" ] && return 0
+  local current_url
+  current_url="$(git remote get-url origin)"
+  if [[ "$current_url" == *"@github.com"* ]]; then
+    return 0
+  fi
+  git remote set-url origin \
+    "${current_url/https:\/\/github.com/https:\/\/x-access-token:${GH_TOKEN}@github.com}"
+}
+
 # create_pr_idempotent <repo> <branch> <title> <body>
 #
 # Open a PR on <repo> from <branch> against main. If a PR with the

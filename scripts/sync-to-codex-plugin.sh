@@ -67,6 +67,7 @@ fi
 cd "$CLONE_TARGET"
 
 git_bot_identity
+wire_gh_token_to_remote
 
 # rsync EXCLUDES — what NOT to ship into the Codex marketplace.
 # Inspired by superpowers' EXCLUDES array. We ship:
