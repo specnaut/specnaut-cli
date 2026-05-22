@@ -7,13 +7,16 @@
 #   add.sh "<title>" [body] [labels-csv] [--parent <num>]
 set -euo pipefail
 
-# shellcheck source=./_config.sh
-. "$(dirname "$0")/_config.sh"
-
+# Parse arguments before sourcing _config.sh so `--help` and unknown-flag
+# handling work regardless of whether the backlog backend is configured.
 PARENT=""
 ARGS=()
 while [ $# -gt 0 ]; do
   case "$1" in
+    -h|--help)
+      echo 'usage: add.sh "<title>" [body] [labels-csv] [--parent <num>]'
+      exit 0
+      ;;
     --parent)
       if [ $# -lt 2 ]; then
         echo 'usage: add.sh "<title>" [body] [labels-csv] [--parent <num>]' >&2
@@ -21,6 +24,11 @@ while [ $# -gt 0 ]; do
       fi
       PARENT="$2"
       shift 2
+      ;;
+    --*)
+      echo "add.sh: unknown flag '$1'" >&2
+      echo 'usage: add.sh "<title>" [body] [labels-csv] [--parent <num>]' >&2
+      exit 2
       ;;
     *)
       ARGS+=("$1")
@@ -36,6 +44,9 @@ fi
 TITLE="${ARGS[0]}"
 BODY="${ARGS[1]:-}"
 LABELS="${ARGS[2]:-}"
+
+# shellcheck source=./_config.sh
+. "$(dirname "$0")/_config.sh"
 
 # When --parent is set, fail fast if the parent issue doesn't exist —
 # GitHub's sub_issues POST returns a confusing 404 otherwise.
