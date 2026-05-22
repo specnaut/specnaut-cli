@@ -2,7 +2,7 @@
   "name": "specflow",
   "displayName": "Specflow",
   "description": "Spec-driven planning, TDD, review, and delivery workflows for coding agents — bundled skills, sub-agents, and a SessionStart bootstrap that makes the agent skill-aware on every turn.",
-  "version": "1.11.0",
+  "version": "1.11.1",
   "author": {
     "name": "MakerLabs",
     "url": "https://github.com/mkrlabs"
