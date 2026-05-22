@@ -12,6 +12,10 @@ PARENT=""
 ARGS=()
 while [ $# -gt 0 ]; do
   case "$1" in
+    -h|--help)
+      echo 'usage: add.sh "<title>" [body] [labels] [--parent <num>]'
+      exit 0
+      ;;
     --parent)
       if [ $# -lt 2 ]; then
         echo 'usage: add.sh "<title>" [body] [labels] [--parent <num>]' >&2
@@ -19,6 +23,11 @@ while [ $# -gt 0 ]; do
       fi
       PARENT="$2"
       shift 2
+      ;;
+    --*)
+      echo "add.sh: unknown flag '$1'" >&2
+      echo 'usage: add.sh "<title>" [body] [labels] [--parent <num>]' >&2
+      exit 2
       ;;
     *)
       ARGS+=("$1")

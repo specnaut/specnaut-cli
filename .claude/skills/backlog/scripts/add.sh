@@ -6,6 +6,19 @@
 #   add.sh "<title>" "<body>" "<label1,label2,...>"
 set -euo pipefail
 
+# Guard --help / unknown flags before they reach `gh issue create` as a
+# positional title (#333) — otherwise `add.sh --help` creates a junk issue.
+case "${1:-}" in
+  -h|--help)
+    echo 'usage: add.sh "<title>" [<body>] [<labels-csv>]'
+    exit 0
+    ;;
+  --*)
+    echo "add.sh: unknown flag '$1'" >&2
+    exit 2
+    ;;
+esac
+
 TITLE="${1:?usage: add.sh \"<title>\" [<body>] [<labels-csv>]}"
 BODY="${2:-}"
 LABELS="${3:-}"
