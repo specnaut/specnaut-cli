@@ -160,20 +160,12 @@ the artefacts. The agent-file template is repopulated on every feature to give c
 - No "mega-spec": ship via an **incremental roadmap**, each brick has its own spec → plan →
   implementation cycle.
 
-## Repository state (v0.1.0-alpha.1 shipped)
+## Repository state
 
-First public alpha released as `v0.1.0-alpha.1` with the full CLI surface:
-
-- `specflow init [<name>] [--here] [--no-git] [--force]` — scaffold a Claude Code project
-- `specflow check [--project]` — env + project diagnostic
-- `specflow upgrade [--dry-run] [--force]` — update templates in an existing project
-- `specflow self-update [--check]` — update the binary itself
-- `specflow backlog configure` + `specflow backlog sync [--id NNN] [--dry-run] [--allow-secrets]`
-- `specflow --version` / `--help`
-
-Five binaries published on GitHub Releases (macOS arm64/x64, Linux arm64/x64, Windows x64) +
-`.sha256` checksums. 196 tests green. Install via `curl -fsSL … | bash`, Homebrew tap, or manual
-download.
+Shipping public releases via the Homebrew tap, the `install.sh` one-liner, and GitHub Releases. For
+the current CLI surface, run `specflow --help` or read `src/cli/help.ts`; for the current version
+and what changed, see `gh release list -R mkrlabs/specflow` or `CHANGELOG.md`. The cross-platform
+build matrix lives in `.github/workflows/release.yml`; each binary ships with a `.sha256` checksum.
 
 ## Conventions for AI agents working on this repo
 
