@@ -8,13 +8,23 @@
 # label is preserved and the migration is reported as "label-only" for that
 # dimension.
 #
-# Usage: migrate-labels-to-fields.sh [--dry-run]
+# Usage: migrate-labels-to-fields.sh [--repo <short>] [--dry-run]
+#   <short> ∈ specflow | specflow-cloud | specflow-monorepo (default: specflow)
 set -euo pipefail
 
 DRY_RUN=0
-if [ "${1:-}" = "--dry-run" ]; then
-  DRY_RUN=1
-fi
+ARGS=()
+for a in "$@"; do
+  if [ "$a" = "--dry-run" ]; then
+    DRY_RUN=1
+  else
+    ARGS+=("$a")
+  fi
+done
+
+. "$(dirname "$0")/_repo.sh"
+resolve_repo ${ARGS[@]+"${ARGS[@]}"}
+set -- ${REPO_REMAINING_ARGS[@]+"${REPO_REMAINING_ARGS[@]}"}
 
 ROOT="$(cd "$(dirname "$0")" && pwd)"
 SET_FIELD="$ROOT/set-field.sh"
@@ -24,9 +34,11 @@ if [ ! -x "$SET_FIELD" ]; then
   exit 1
 fi
 
+REPO_SHORT="${REPO#mkrlabs/}"
+
 # Pull every open issue with at least one priority:* or size:* label.
 ISSUES=$(gh issue list \
-  --repo mkrlabs/specflow \
+  --repo "$REPO" \
   --state open \
   --limit 200 \
   --json number,labels \
@@ -39,7 +51,7 @@ ISSUES=$(gh issue list \
   ')
 
 if [ -z "$ISSUES" ]; then
-  echo "no issues with priority:*/size:* labels — nothing to migrate"
+  echo "no issues with priority:*/size:* labels in $REPO — nothing to migrate"
   exit 0
 fi
 
@@ -55,8 +67,8 @@ while IFS= read -r row; do
   size=""
   while IFS= read -r lbl; do
     case "$lbl" in
-      priority:P0|priority:P1|priority:P2|priority:P3) prio="${lbl#priority:}" ;;
-      size:XS|size:S|size:M|size:L|size:XL)            size="${lbl#size:}" ;;
+      priority:P0 | priority:P1 | priority:P2 | priority:P3) prio="${lbl#priority:}" ;;
+      size:XS | size:S | size:M | size:L | size:XL) size="${lbl#size:}" ;;
     esac
   done <<<"$labels"
 
@@ -64,19 +76,19 @@ while IFS= read -r row; do
     continue
   fi
 
-  echo "#$num: priority=${prio:-—}, size=${size:-—}"
+  echo "$REPO#$num: priority=${prio:-—}, size=${size:-—}"
 
   if [ -n "$prio" ]; then
     if [ "$DRY_RUN" = "1" ]; then
       echo "  (dry-run) would set Priority=$prio"
     else
       set +e
-      "$SET_FIELD" "$num" Priority "$prio" 1>/dev/null
+      "$SET_FIELD" --repo "$REPO_SHORT" "$num" Priority "$prio" 1>/dev/null
       rc=$?
       set -e
       case $rc in
         0)
-          gh issue edit "$num" --repo mkrlabs/specflow --remove-label "priority:$prio" >/dev/null
+          gh issue edit "$num" --repo "$REPO" --remove-label "priority:$prio" >/dev/null
           echo "  ✓ Priority=$prio (label stripped)"
           migrated=$((migrated + 1))
           ;;
@@ -97,12 +109,12 @@ while IFS= read -r row; do
       echo "  (dry-run) would set Size=$size"
     else
       set +e
-      "$SET_FIELD" "$num" Size "$size" 1>/dev/null
+      "$SET_FIELD" --repo "$REPO_SHORT" "$num" Size "$size" 1>/dev/null
       rc=$?
       set -e
       case $rc in
         0)
-          gh issue edit "$num" --repo mkrlabs/specflow --remove-label "size:$size" >/dev/null
+          gh issue edit "$num" --repo "$REPO" --remove-label "size:$size" >/dev/null
           echo "  ✓ Size=$size (label stripped)"
           migrated=$((migrated + 1))
           ;;
