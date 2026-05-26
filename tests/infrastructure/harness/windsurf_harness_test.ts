@@ -108,7 +108,7 @@ Deno.test("WindsurfHarness emits content byte-identical to entry.content (no fro
   assertEquals(phase.content, SAMPLE[1].content);
 });
 
-Deno.test("WindsurfHarness emits no Claude/Cursor/Codex/Gemini artefacts", () => {
+Deno.test("WindsurfHarness emits no Claude/Cursor/Codex artefacts", () => {
   const h = new WindsurfHarness();
   const mapped = h.mapBundle(SAMPLE, { backlogBackend: "local", versionScheme: "semver" });
   const keys = Object.keys(mapped);
@@ -116,7 +116,6 @@ Deno.test("WindsurfHarness emits no Claude/Cursor/Codex/Gemini artefacts", () =>
   assert(!keys.some((k) => k.startsWith(".cursor/")), "no .cursor/");
   assert(!keys.some((k) => k.startsWith(".agents/")), "no .agents/");
   assert(!keys.some((k) => k.startsWith(".codex/")), "no .codex/");
-  assert(!keys.some((k) => k.startsWith(".gemini/")), "no .gemini/");
   assert(!keys.includes("CLAUDE.md"), "no CLAUDE.md");
 });
 

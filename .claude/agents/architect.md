@@ -85,8 +85,8 @@ referenced to the actual code.
   `cli/harnesses.ts`, (c) optional harness-specific templates under
   `templates/harness-specific/<name>/`, (d) integration test under
   `tests/integration/init_<name>_test.ts`. The seven existing harnesses
-  (`claude`, `cursor`, `codex`, `copilot`, `gemini`, `windsurf`,
-  `opencode`) are the reference implementations.
+  (`claude`, `cursor`, `codex`, `copilot`, `windsurf`, `opencode`,
+  `antigravity`) are the reference implementations.
 - **Templates are bundled at build time.** Source of truth is
   `templates/{core,harness-specific}/` + `templates/manifest.json`.
   `scripts/bundle-templates.ts` produces `src/templates_bundle.ts`.

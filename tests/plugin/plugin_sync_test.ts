@@ -113,7 +113,6 @@ const SYNC_PAIRS: ReadonlyArray<{ plugin: string; source: string }> = [
     "claude",
     "codex",
     "cursor",
-    "gemini",
     "opencode",
     "copilot",
   ].map((name) => ({

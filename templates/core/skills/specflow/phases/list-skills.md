@@ -15,8 +15,8 @@ phases, and never auto-chains.
 1. **Locate the harness skills directory.** Try, in order:
    - `.claude/skills/` (Claude Code)
    - `.cursor/skills/` (Cursor)
-   - `.windsurf/skills/`, `.gemini/skills/`, `.opencode/skills/`,
-     `.agent/skills/` (other supported harnesses)
+   - `.windsurf/skills/`, `.opencode/skills/`, `.agent/skills/` (other
+     supported harnesses)
    - Use whichever directory exists in the current working tree. If
      none exist, report `no skills installed` and stop.
 

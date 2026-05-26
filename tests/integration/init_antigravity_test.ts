@@ -96,14 +96,10 @@ Deno.test("specflow init --ai antigravity scaffolds an Antigravity layout", asyn
     // No other harnesses' output trees.
     assertEquals(await exists(join(root, ".claude/")), false);
     assertEquals(await exists(join(root, ".cursor/")), false);
-    assertEquals(await exists(join(root, ".gemini/")), false);
     assertEquals(await exists(join(root, ".codex/")), false);
     assertEquals(await exists(join(root, ".opencode/")), false);
     assertEquals(await exists(join(root, ".agents/")), false); // OpenCode (plural)
     assertEquals(await exists(join(root, "CLAUDE.md")), false);
-
-    // Specflow must NOT touch the user's behavior rules file.
-    assertEquals(await exists(join(root, ".agent/rules/GEMINI.md")), false);
 
     // Lock reflects antigravity.
     const lock = await Deno.readTextFile(join(root, ".specflow/installed.lock"));

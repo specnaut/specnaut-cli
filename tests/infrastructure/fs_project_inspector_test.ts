@@ -251,52 +251,6 @@ entries: {}
   );
 });
 
-Deno.test("inspect surfaces harness=gemini when lock says gemini and .gemini/ exists", async () => {
-  await withProjectDir(
-    async (dir) => {
-      await Deno.mkdir(join(dir, ".gemini/commands"), { recursive: true });
-      await Deno.mkdir(join(dir, ".specflow"), { recursive: true });
-      await Deno.writeTextFile(
-        join(dir, ".specflow/installed.lock"),
-        `version: 2
-harness: gemini
-templates_version: 0.5.0
-entries: {}
-`,
-      );
-    },
-    async (dir) => {
-      const inspector = new FsProjectInspector();
-      const outcomes = await inspector.inspect(dir, "0.5.0");
-      const h = outcomes.find((o) => o.name === "harness");
-      assertEquals(h?.status, "pass");
-      assertEquals(h?.message.includes("gemini"), true);
-    },
-  );
-});
-
-Deno.test("inspect reports fail for gemini lock when .gemini/ missing", async () => {
-  await withProjectDir(
-    async (dir) => {
-      await Deno.mkdir(join(dir, ".specflow"), { recursive: true });
-      await Deno.writeTextFile(
-        join(dir, ".specflow/installed.lock"),
-        `version: 2
-harness: gemini
-templates_version: 0.5.0
-entries: {}
-`,
-      );
-    },
-    async (dir) => {
-      const inspector = new FsProjectInspector();
-      const outcomes = await inspector.inspect(dir, "0.5.0");
-      const h = outcomes.find((o) => o.name === "harness");
-      assertEquals(h?.status, "fail");
-    },
-  );
-});
-
 Deno.test("inspect surfaces harness=windsurf when lock says windsurf and .windsurf/ exists", async () => {
   await withProjectDir(
     async (dir) => {

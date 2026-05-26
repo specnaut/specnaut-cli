@@ -318,7 +318,6 @@ export class FsProjectInspector implements ProjectInspector {
         claude: ".claude/",
         cursor: ".cursor/",
         codex: ".agents/",
-        gemini: ".gemini/",
         windsurf: ".windsurf/",
         copilot: ".github/instructions/",
         opencode: ".opencode/",

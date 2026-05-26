@@ -2,7 +2,7 @@
 
 Specflow skills are authored using **Claude Code tool names** as the lingua
 franca. This file documents the canonical Claude Code tool set that other
-harness adapters (`codex-tools.md`, `cursor-tools.md`, `gemini-tools.md`,
+harness adapters (`codex-tools.md`, `cursor-tools.md`,
 `opencode-tools.md`, `copilot-tools.md`) translate.
 
 > Inspired by [obra/superpowers v5.1.0](https://github.com/obra/superpowers)
@@ -43,7 +43,6 @@ harness adapters (`codex-tools.md`, `cursor-tools.md`, `gemini-tools.md`,
 You are on Claude Code only. If you are running in:
 - Codex CLI / App → see `codex-tools.md`
 - Cursor → see `cursor-tools.md`
-- Gemini CLI → see `gemini-tools.md`
 - OpenCode → see `opencode-tools.md`
 - GitHub Copilot CLI → see `copilot-tools.md`
 

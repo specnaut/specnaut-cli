@@ -38,7 +38,6 @@ Deno.test("VERSIONED_FILES covers every file the release workflow gates on", () 
       "templates/manifest.json",
       ".codex-plugin/plugin.json",
       ".cursor-plugin/plugin.json",
-      "gemini-extension.json",
     ] as const,
   );
 });
@@ -75,10 +74,6 @@ Deno.test("writeVersions bumps every versioned file in lockstep", async () => {
     await Deno.writeTextFile(
       join(tmp, ".cursor-plugin/plugin.json"),
       `{\n  "name": "specflow",\n  "version": "1.2.3"\n}\n`,
-    );
-    await Deno.writeTextFile(
-      join(tmp, "gemini-extension.json"),
-      `{\n  "name": "specflow",\n  "version": "1.2.3",\n  "contextFileName": "GEMINI.md"\n}\n`,
     );
 
     await writeVersions("1.2.4", tmp);

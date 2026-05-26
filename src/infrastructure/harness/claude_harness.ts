@@ -54,7 +54,7 @@ export class ClaudeHarness implements Harness {
       // Skill-folder categories ship as `.claude/skills/<name>/SKILL.md`.
       // Claude Code derives the skill name from the folder, but we inject
       // an explicit `name:` (matching the folder) for parity with how
-      // cursor / codex / gemini emit their skill folders.
+      // cursor / codex emit their skill folders.
       let content = entry.content;
       if (entry.category === "skill" || entry.category === "backlog-skill") {
         content = ensureSkillFrontmatter(content, entry.name);

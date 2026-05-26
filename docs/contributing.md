@@ -41,7 +41,7 @@ your project has agent rules or documentation pointing users at `/specflow-auto`
 Audit my project for any reference to `/specflow-auto` in:
   - `.claude/agents/*.md`
   - `.cursor/rules/*.mdc`
-  - `AGENTS.md`, `CLAUDE.md`, `GEMINI.md`
+  - `AGENTS.md`, `CLAUDE.md`
 
 Replace each with `/specflow specify "<…>"`. Add a brief note explaining
 `--manual` is the per-phase opt-out. Open a PR with the changes.

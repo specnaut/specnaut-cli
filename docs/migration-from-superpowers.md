@@ -45,9 +45,9 @@ The discipline is the same. The integration is what changes.
   equivalent ceremony.
 
 - **Multi-harness plugin distribution** — same source tree ships to Claude Code, Codex, Cursor,
-  Gemini CLI, OpenCode, Copilot CLI. Each harness has the right adapter manifest + SessionStart
-  hook. Superpowers ships the same harness coverage; Specflow adds it on top of the `specflow init`
-  binary scaffold so users get both options.
+  OpenCode, Copilot CLI. Each harness has the right adapter manifest + SessionStart hook.
+  Superpowers ships the same harness coverage; Specflow adds it on top of the `specflow init` binary
+  scaffold so users get both options.
 
 - **Native binary** — `specflow init` writes the files directly into a project (`.claude/`,
   `.specflow/`, `AGENTS.md`, etc.). No reliance on Python or Node toolchains. Superpowers requires
@@ -72,7 +72,7 @@ Most teams use both: plugin for the always-there skill library, binary for the p
 ### 1. Install Specflow
 
 Pick your harness from the install matrix in
-[`docs/llms.md`](./llms.md#install-as-a-plugin--extension-six-harnesses). For Claude Code (most
+[`docs/llms.md`](./llms.md#install-as-a-plugin--extension-five-harnesses). For Claude Code (most
 common):
 
 ```

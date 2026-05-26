@@ -20,7 +20,7 @@ ${bold("Usage:")}
 ${bold("Flags (for init):")}
   --here              Scaffold into the current directory instead of creating a new one
   --no-git            Skip "git init" detection and prompt
-  --ai <name>         Target AI harness: claude (default) | cursor | codex | gemini | windsurf | copilot | opencode | antigravity
+  --ai <name>         Target AI harness: claude (default) | cursor | codex | windsurf | copilot | opencode | antigravity
   --backlog <name>    Backlog backend: local (default) | github | gitlab
   --backlog-url <url> Kanban / project URL (e.g. https://github.com/orgs/<org>/projects/<N>)
                       Required for github/gitlab in non-interactive mode; pre-fills .specflow/backlog-config.yml

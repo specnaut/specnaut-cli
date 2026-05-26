@@ -7,8 +7,8 @@
 > system — directly into an existing project, in one command.
 
 Specflow does **not** call any LLM and does **not** orchestrate any agent at runtime. Your AI
-harness (Claude Code, Cursor, Codex, Gemini CLI, GitHub Copilot CLI, Windsurf, OpenCode,
-Antigravity) is what reads the generated files and acts on them.
+harness (Claude Code, Cursor, Codex, GitHub Copilot CLI, Windsurf, OpenCode, Antigravity) is what
+reads the generated files and acts on them.
 
 This page is the canonical documentation. The same content is available as raw Markdown at
 [`/llms.txt`](/llms.txt) for LLM consumption — see [llmstxt.org](https://llmstxt.org/) for the
@@ -50,11 +50,11 @@ Manual download: pick the binary for your OS/arch from
 `$PATH`. On macOS clear the quarantine attribute with
 `xattr -d com.apple.quarantine /path/to/specflow`.
 
-### Install as a plugin / extension (six harnesses)
+### Install as a plugin / extension (five harnesses)
 
 If you want Specflow's skills and sub-agents available across **all your projects** without running
 `specflow init`, install Specflow as a plugin / extension in your harness. Specflow ships adapters
-for six harnesses with the same skill content across all of them — the bundled router skill, the
+for five harnesses with the same skill content across all of them — the bundled router skill, the
 phase docs, the bootstrap skill, the sub-agents, and the SessionStart hook (where supported).
 
 | Harness                | Install command                                                                                                          |
@@ -62,7 +62,6 @@ phase docs, the bootstrap skill, the sub-agents, and the SessionStart hook (wher
 | **Claude Code**        | `/plugin install mkrlabs/specflow-plugin`                                                                                |
 | **Codex CLI / App**    | `/plugins` → search "specflow" → install (once the marketplace listing lands; see Notes)                                 |
 | **Cursor**             | `/add-plugin mkrlabs/specflow`                                                                                           |
-| **Gemini CLI**         | `gemini extensions install https://github.com/mkrlabs/specflow`                                                          |
 | **OpenCode**           | Add `"plugin": ["specflow@git+https://github.com/mkrlabs/specflow.git"]` to `opencode.json`                              |
 | **GitHub Copilot CLI** | `copilot plugin marketplace add mkrlabs/specflow-marketplace`<br/>`copilot plugin install specflow@specflow-marketplace` |
 
@@ -92,11 +91,10 @@ claude --plugin-dir /path/to/specflow/plugin
 
 Specflow ships a `using-specflow` bootstrap skill loaded automatically at session start on every
 harness that supports it (via plugin/hooks/hooks.json on Claude Code, plugin/hooks/hooks-cursor.json
-on Cursor, `gemini-extension.json` → GEMINI.md on Gemini CLI, the
-`experimental.chat.messages.transform` hook in `.opencode/plugins/specflow.js` on OpenCode). The
-bootstrap skill teaches the agent Specflow's skill registry, agent registry, and routing principles
-so you don't need to invoke `/specflow` explicitly — typing "plan this issue" or "review my work" is
-enough for the right skill to fire.
+on Cursor, the `experimental.chat.messages.transform` hook in `.opencode/plugins/specflow.js` on
+OpenCode). The bootstrap skill teaches the agent Specflow's skill registry, agent registry, and
+routing principles so you don't need to invoke `/specflow` explicitly — typing "plan this issue" or
+"review my work" is enough for the right skill to fire.
 
 #### Notes on Codex CLI and the shared marketplace
 
@@ -190,12 +188,12 @@ cannot do their real job — `specflow upgrade` will refuse and ask you to re-ru
 ```bash
 specflow init my-project --ai cursor
 specflow init my-project --ai antigravity
-specflow init my-project --ai gemini
+specflow init my-project --ai codex
 # … etc.
 ```
 
-Eight harness targets are supported: `claude` (default), `cursor`, `codex`, `gemini`, `windsurf`,
-`copilot`, `opencode`, `antigravity`. Each emits files in the convention that harness expects.
+Seven harness targets are supported: `claude` (default), `cursor`, `codex`, `windsurf`, `copilot`,
+`opencode`, `antigravity`. Each emits files in the convention that harness expects.
 
 ### Pick a backlog backend
 
@@ -371,7 +369,6 @@ pipe to a custom publisher.
 | `claude`      | Claude Code        | `.claude/`              |
 | `cursor`      | Cursor             | `.cursor/`              |
 | `codex`       | Codex CLI          | `.codex/`, `.agents/`   |
-| `gemini`      | Gemini CLI         | `.gemini/`              |
 | `windsurf`    | Windsurf           | `.windsurf/`            |
 | `copilot`     | GitHub Copilot CLI | `.github/instructions/` |
 | `opencode`    | OpenCode           | `.opencode/`            |

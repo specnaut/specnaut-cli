@@ -8,7 +8,6 @@
 //                                            metadata)
 //   - .codex-plugin/plugin.json           — Codex CLI / Codex App
 //   - .cursor-plugin/plugin.json          — Cursor
-//   - gemini-extension.json               — Gemini CLI
 //   - .opencode/plugins/specflow.js       — OpenCode (JS adapter,
 //                                            no manifest version
 //                                            field — runtime read)
@@ -26,7 +25,6 @@
 //      by `release.yml` pre-flight; re-asserted here so the test
 //      suite catches drift locally without waiting for CI)
 //   5. Path references resolve to existing files / directories
-//   6. `GEMINI.md` @-references resolve to existing files
 //
 // If any harness adapter ships fields that are required by that
 // harness's plugin loader but missing here, add a new test below —
@@ -70,7 +68,6 @@ Deno.test("harness adapter — every manifest parses as JSON", async () => {
       "plugin/.claude-plugin/plugin.json",
       ".codex-plugin/plugin.json",
       ".cursor-plugin/plugin.json",
-      "gemini-extension.json",
     ]
   ) {
     const raw = await Deno.readTextFile(abs(path));
@@ -92,7 +89,6 @@ Deno.test("harness adapter — name is 'specflow' or 'specflow-plugin' everywher
     const path of [
       ".codex-plugin/plugin.json",
       ".cursor-plugin/plugin.json",
-      "gemini-extension.json",
     ]
   ) {
     const m = await readJson<{ name: string }>(path);
@@ -107,7 +103,6 @@ Deno.test("harness adapter — version matches deno.json across all manifests", 
       "plugin/.claude-plugin/plugin.json",
       ".codex-plugin/plugin.json",
       ".cursor-plugin/plugin.json",
-      "gemini-extension.json",
     ]
   ) {
     const m = await readJson<{ version: string }>(path);
@@ -125,7 +120,6 @@ Deno.test("harness adapter — required fields present in every manifest", async
       "plugin/.claude-plugin/plugin.json",
       ".codex-plugin/plugin.json",
       ".cursor-plugin/plugin.json",
-      "gemini-extension.json",
     ]
   ) {
     const m = await readJson<Record<string, unknown>>(path);
@@ -209,17 +203,6 @@ Deno.test("harness adapter — Cursor manifest has required path refs", async ()
   assert(typeof m.hooks === "string", "Cursor manifest missing hooks path");
 });
 
-Deno.test("harness adapter — Gemini extension uses GEMINI.md as contextFileName", async () => {
-  const m = await readJson<{ contextFileName?: string }>(
-    "gemini-extension.json",
-  );
-  assertEquals(
-    m.contextFileName,
-    "GEMINI.md",
-    "Gemini extension must point at GEMINI.md (the convention is repo-root; changing this breaks the canonical install path)",
-  );
-});
-
 Deno.test("harness adapter — path references resolve to existing files", async () => {
   // Codex: skills + assets
   const codex = await readJson<{
@@ -257,32 +240,6 @@ Deno.test("harness adapter — path references resolve to existing files", async
     await pathExists(cursor.hooks.replace(/^\.\//, "")),
     `Cursor hooks file ${cursor.hooks} does not exist`,
   );
-
-  // Gemini: contextFileName at repo root
-  assert(
-    await pathExists("GEMINI.md"),
-    "GEMINI.md required at repo root for the Gemini extension contextFileName contract",
-  );
-});
-
-Deno.test("harness adapter — GEMINI.md @-references resolve to existing files", async () => {
-  const raw = await Deno.readTextFile(abs("GEMINI.md"));
-  // Each non-empty line should be an @-reference to a relative path
-  // that exists. Gemini's context-file mechanism resolves @./ paths
-  // relative to the GEMINI.md location (repo root in our case).
-  const lines = raw.split("\n").map((l) => l.trim()).filter((l) => l.length > 0);
-  assert(lines.length > 0, "GEMINI.md must not be empty");
-  for (const line of lines) {
-    assert(
-      line.startsWith("@./") || line.startsWith("@/"),
-      `GEMINI.md line ${JSON.stringify(line)} is not an @-reference (expected '@./...' or '@/...')`,
-    );
-    const ref = line.slice(1).replace(/^\.\//, "");
-    assert(
-      await pathExists(ref),
-      `GEMINI.md references ${line} which does not resolve to an existing file`,
-    );
-  }
 });
 
 Deno.test("harness adapter — OpenCode JS adapter exports SpecflowPlugin", async () => {

@@ -100,7 +100,6 @@ Deno.test("specflow init --ai windsurf scaffolds a Windsurf layout", async () =>
     assertEquals(await exists(join(root, ".cursor/")), false);
     assertEquals(await exists(join(root, ".agents/")), false);
     assertEquals(await exists(join(root, ".codex/")), false);
-    assertEquals(await exists(join(root, ".gemini/")), false);
     assertEquals(await exists(join(root, "CLAUDE.md")), false);
 
     // Lock reflects windsurf
