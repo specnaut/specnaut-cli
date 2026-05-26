@@ -18,7 +18,7 @@ jobs:
   docs-drift:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           # actions/checkout's default shallow clone (depth 1) doesn't
           # include the PR base commit, so `git diff <base>...<head>`
