@@ -97,7 +97,6 @@ Deno.test("specflow init --ai opencode scaffolds a complete OpenCode project lay
     assertEquals(await exists(join(root, ".cursor/")), false);
     assertEquals(await exists(join(root, ".agents/")), false);
     assertEquals(await exists(join(root, ".codex/")), false);
-    assertEquals(await exists(join(root, ".gemini/")), false);
     assertEquals(await exists(join(root, ".windsurf/")), false);
     assertEquals(await exists(join(root, ".github/")), false);
     assertEquals(await exists(join(root, "CLAUDE.md")), false);

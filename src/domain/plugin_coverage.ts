@@ -17,7 +17,7 @@ import type { KnownHarness } from "./installed_lock.ts";
  * upgrade behavior is unchanged.
  *
  * Coverage is **Claude-harness only**. The plugin is Claude-specific;
- * Cursor/Codex/Gemini/etc. projects keep their on-disk files binary-
+ * Cursor/Codex/etc. projects keep their on-disk files binary-
  * owned regardless of plugin install state on the host machine.
  *
  * Coverage map (post-consolidation, v1.0.0):

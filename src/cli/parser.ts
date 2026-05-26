@@ -48,7 +48,6 @@ export type Intent =
       | "claude"
       | "cursor"
       | "codex"
-      | "gemini"
       | "windsurf"
       | "copilot"
       | "opencode"
@@ -140,7 +139,6 @@ export function parseArgs(argv: string[]): Intent {
       aiRaw !== "claude" &&
       aiRaw !== "cursor" &&
       aiRaw !== "codex" &&
-      aiRaw !== "gemini" &&
       aiRaw !== "windsurf" &&
       aiRaw !== "copilot" &&
       aiRaw !== "opencode" &&

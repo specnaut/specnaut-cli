@@ -3,7 +3,7 @@
 An enhanced fork of the [GitHub Spec Kit](https://github.com/github/spec-kit) `specify` CLI,
 distributed as a **native binary** (no Python prerequisites).
 
-Specflow scaffolds the files your AI harness (Claude Code, Cursor, Copilot, Codex, Gemini CLI…) uses
+Specflow scaffolds the files your AI harness (Claude Code, Cursor, Copilot, Codex, Windsurf…) uses
 to drive a spec-driven workflow inside your project. It adds three things upstream doesn't:
 
 - **Auto mode** — chains `specify → clarify → plan → tasks → analyze → implement → review → merge`
@@ -27,7 +27,6 @@ Specflow scaffolds for one AI harness per invocation:
 | `--ai claude` (default) | Claude Code        |
 | `--ai cursor`           | Cursor             |
 | `--ai codex`            | Codex CLI          |
-| `--ai gemini`           | Gemini CLI         |
 | `--ai windsurf`         | Windsurf           |
 | `--ai copilot`          | GitHub Copilot CLI |
 | `--ai opencode`         | OpenCode           |
@@ -64,17 +63,16 @@ On macOS, you may need to clear the quarantine attribute after download:
 xattr -d com.apple.quarantine /path/to/specflow
 ```
 
-## Install as a plugin / extension (six harnesses)
+## Install as a plugin / extension (five harnesses)
 
 If you'd rather skip `specflow init` and have Specflow available across **all your projects**,
-install it as a plugin / extension in your harness — same skill content across all six targets:
+install it as a plugin / extension in your harness — same skill content across all five targets:
 
 | Harness                | Install command                                                                                                           |
 | ---------------------- | ------------------------------------------------------------------------------------------------------------------------- |
 | **Claude Code**        | `/plugin install mkrlabs/specflow-plugin`                                                                                 |
 | **Codex CLI / App**    | `/plugins` → search "specflow" → install¹                                                                                 |
 | **Cursor**             | `/add-plugin mkrlabs/specflow`                                                                                            |
-| **Gemini CLI**         | `gemini extensions install https://github.com/mkrlabs/specflow`                                                           |
 | **OpenCode**           | Add to `opencode.json`: `"plugin": ["specflow@git+https://github.com/mkrlabs/specflow.git"]`                              |
 | **GitHub Copilot CLI** | `copilot plugin marketplace add mkrlabs/specflow-marketplace`<br/>`copilot plugin install specflow@specflow-marketplace`¹ |
 

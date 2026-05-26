@@ -108,7 +108,6 @@ Deno.test("specflow init --ai copilot scaffolds a Copilot layout", async () => {
     assertEquals(await exists(join(root, ".cursor/")), false);
     assertEquals(await exists(join(root, ".agents/")), false);
     assertEquals(await exists(join(root, ".codex/")), false);
-    assertEquals(await exists(join(root, ".gemini/")), false);
     assertEquals(await exists(join(root, ".windsurf/")), false);
     assertEquals(await exists(join(root, "CLAUDE.md")), false);
 

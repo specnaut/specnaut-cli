@@ -169,7 +169,6 @@ Deno.test("isPluginCoveredPath: non-claude harnesses are never covered (plugin i
     const harness of [
       "cursor",
       "codex",
-      "gemini",
       "windsurf",
       "copilot",
       "opencode",

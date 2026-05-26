@@ -135,7 +135,7 @@ Deno.test("no scaffolded file references the legacy tasks/backlog path", async (
   // Several harness-static templates kept hardcoded `tasks/backlog.md`
   // strings on the v0.9.0 release; this test ensures every harness's
   // scaffolded output stays consistent on any future template edit.
-  for (const harness of ["claude", "cursor", "codex", "gemini"] as const) {
+  for (const harness of ["claude", "cursor", "codex"] as const) {
     await withTempDir(async (parent) => {
       const { code } = await runSpecflow(
         ["init", "demo", "--no-git", "--ai", harness],

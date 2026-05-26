@@ -27,7 +27,7 @@ Each script bootstraps a controlled scenario inside `sandbox/<name>/` (the `sand
 .claude/skills/test-sandbox/scripts/clean.sh [<name>]             # wipe one scenario or the whole sandbox/ tree
 ```
 
-`<harness>` ∈ `claude` (default) | `cursor` | `codex` | `gemini` | `windsurf` | `copilot` | `opencode` | `antigravity`.
+`<harness>` ∈ `claude` (default) | `cursor` | `codex` | `windsurf` | `copilot` | `opencode` | `antigravity`.
 
 ### Smoke tests for bundled features
 

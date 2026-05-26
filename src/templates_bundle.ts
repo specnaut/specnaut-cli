@@ -2475,8 +2475,8 @@ phases, and never auto-chains.
 1. **Locate the harness skills directory.** Try, in order:
    - \`.claude/skills/\` (Claude Code)
    - \`.cursor/skills/\` (Cursor)
-   - \`.windsurf/skills/\`, \`.gemini/skills/\`, \`.opencode/skills/\`,
-     \`.agent/skills/\` (other supported harnesses)
+   - \`.windsurf/skills/\`, \`.opencode/skills/\`, \`.agent/skills/\` (other
+     supported harnesses)
    - Use whichever directory exists in the current working tree. If
      none exist, report \`no skills installed\` and stop.
 
@@ -4591,14 +4591,14 @@ right Specflow skill / agent / slash command for the user's intent.
 what the user is asking, invoke it.** Skills override default behaviour
 where they apply.
 
-User instructions in \`CLAUDE.md\`, \`AGENTS.md\`, \`GEMINI.md\`, or direct
-requests always take precedence over a skill's defaults. If the user
-says "skip TDD" and a skill says "always TDD", follow the user.
+User instructions in \`CLAUDE.md\`, \`AGENTS.md\`, or direct requests
+always take precedence over a skill's defaults. If the user says
+"skip TDD" and a skill says "always TDD", follow the user.
 
 ## How to invoke a Specflow skill
 
 Use the harness's \`Skill\` tool (Claude Code) or the equivalent
-(\`activate_skill\` on Gemini, \`skill\` on Codex/OpenCode/Copilot — see
+(\`skill\` on Codex/OpenCode/Copilot — see
 \`references/<harness>-tools.md\` for your harness).
 
 The skill content is loaded into your context. Follow it directly — do
@@ -4669,16 +4669,15 @@ harness's equivalent — see \`references/<harness>-tools.md\`).
 ## Skill discovery on different harnesses
 
 This file may run on any of Specflow's plugin-distribution targets:
-Claude Code, Codex CLI, Codex App, Cursor, Gemini CLI, OpenCode,
-GitHub Copilot CLI. Each harness uses different tool names —
-\`Read\` vs \`read_file\`, \`Task\` vs \`spawn_agent\`, etc.
+Claude Code, Codex CLI, Codex App, Cursor, OpenCode, GitHub Copilot
+CLI. Each harness uses different tool names — \`Read\` vs \`read_file\`,
+\`Task\` vs \`spawn_agent\`, etc.
 
 Before invoking any tool, consult the right reference:
 
 - Claude Code (baseline) → \`references/claude-tools.md\`
 - Codex → \`references/codex-tools.md\`
 - Cursor → \`references/cursor-tools.md\`
-- Gemini CLI → \`references/gemini-tools.md\`
 - OpenCode → \`references/opencode-tools.md\`
 - Copilot CLI → \`references/copilot-tools.md\`
 
@@ -4727,12 +4726,12 @@ agent skill-aware. It does not:
 - Execute any backlog / git / build commands itself
 - Replace the per-skill SKILL.md files (read those when invoking a
   specific skill)
-- Override \`CLAUDE.md\` / \`AGENTS.md\` / \`GEMINI.md\` project directives
+- Override \`CLAUDE.md\` / \`AGENTS.md\` project directives
 
 For per-harness adapter details, see the manifest at
 \`plugin/.claude-plugin/plugin.json\`, \`.cursor-plugin/plugin.json\`,
-\`.codex-plugin/plugin.json\`, \`gemini-extension.json\`, or the
-\`.opencode/plugins/specflow.js\` adapter (issues #277–#280).
+\`.codex-plugin/plugin.json\`, or the \`.opencode/plugins/specflow.js\`
+adapter (issues #277–#280).
 `,
     executable: false,
     backend: null,
@@ -6913,7 +6912,7 @@ Enhanced fork of [\`specify\` CLI](https://github.com/github/spec-kit), distribu
 
 **Install:** \`curl -fsSL https://raw.githubusercontent.com/mkrlabs/specflow/main/install.sh | bash\` or \`brew tap mkrlabs/tap && brew install specflow\`.
 
-**Harnesses:** claude, cursor, codex, gemini, windsurf, copilot, opencode, antigravity — all share \`templates/core/\` content, mapped per-harness by an adapter.
+**Harnesses:** claude, cursor, codex, windsurf, copilot, opencode, antigravity — all share \`templates/core/\` content, mapped per-harness by an adapter.
 
 **Different from upstream Spec Kit:** auto-chained pipeline (\`/specflow specify\` chains all phases); dedicated \`review\` phase after implement; backlog as product source of truth via \`product-owner\` agent (backends: local, github, gitlab); Claude Code plugin distribution (\`specflow-plugin\` marketplace).
 

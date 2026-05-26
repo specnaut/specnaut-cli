@@ -185,7 +185,7 @@ Enhanced fork of [`specify` CLI](https://github.com/github/spec-kit), distribute
 
 **Install:** `curl -fsSL https://raw.githubusercontent.com/mkrlabs/specflow/main/install.sh | bash` or `brew tap mkrlabs/tap && brew install specflow`.
 
-**Harnesses:** claude, cursor, codex, gemini, windsurf, copilot, opencode, antigravity — all share `templates/core/` content, mapped per-harness by an adapter.
+**Harnesses:** claude, cursor, codex, windsurf, copilot, opencode, antigravity — all share `templates/core/` content, mapped per-harness by an adapter.
 
 **Different from upstream Spec Kit:** auto-chained pipeline (`/specflow specify` chains all phases); dedicated `review` phase after implement; backlog as product source of truth via `product-owner` agent (backends: local, github, gitlab); Claude Code plugin distribution (`specflow-plugin` marketplace).
 

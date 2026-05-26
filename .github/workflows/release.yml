@@ -202,16 +202,7 @@ jobs:
             echo "::error::.cursor-plugin/plugin.json version ($CURSOR_VERSION) does not match deno.json version ($BIN_VERSION). Re-run scripts/bump-version.ts."
             exit 1
           fi
-          # 7. Hard fail if gemini-extension.json version drifts. Gemini
-          # users install via `gemini extensions install <repo-url>`;
-          # `gemini extensions list` surfaces this version, so drift
-          # would mislabel the installed extension.
-          GEMINI_VERSION=$(jq -r .version gemini-extension.json)
-          if [ "$BIN_VERSION" != "$GEMINI_VERSION" ]; then
-            echo "::error::gemini-extension.json version ($GEMINI_VERSION) does not match deno.json version ($BIN_VERSION). Re-run scripts/bump-version.ts."
-            exit 1
-          fi
-          echo "✓ plugin manifests valid, scaffold present, versions $PLUGIN_VERSION/$MANIFEST_VERSION/$CODEX_VERSION/$CURSOR_VERSION/$GEMINI_VERSION match binary"
+          echo "✓ plugin manifests valid, scaffold present, versions $PLUGIN_VERSION/$MANIFEST_VERSION/$CODEX_VERSION/$CURSOR_VERSION match binary"
       - name: Cross-compile all targets
         run: deno run --allow-read --allow-write --allow-run --allow-env scripts/build.ts
       - name: Compute checksums

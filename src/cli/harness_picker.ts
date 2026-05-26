@@ -5,7 +5,6 @@ export type HarnessKey =
   | "claude"
   | "cursor"
   | "codex"
-  | "gemini"
   | "windsurf"
   | "copilot"
   | "opencode"

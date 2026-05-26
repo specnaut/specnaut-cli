@@ -9,10 +9,10 @@ Specflow is an **enhanced fork of the `specify` CLI** from
 prerequisites on the user side).
 
 Specflow's role is **exactly** that of upstream `specify init`: scaffold, inside an existing
-project, the files consumed by the user's AI harness (Claude Code, Cursor, Copilot, Codex, Gemini
-CLI, …) — SpecKit commands, spec/plan/tasks templates, constitution, utility scripts. **Specflow
-does not talk to any LLM. Specflow does not orchestrate any agent. It is the user's harness that
-consumes the generated files.**
+project, the files consumed by the user's AI harness (Claude Code, Cursor, Copilot, Codex, Windsurf,
+…) — SpecKit commands, spec/plan/tasks templates, constitution, utility scripts. **Specflow does not
+talk to any LLM. Specflow does not orchestrate any agent. It is the user's harness that consumes the
+generated files.**
 
 ### The 3 differences from upstream
 
@@ -63,7 +63,7 @@ installation/distribution concern, not a runtime one.
     Product Owner agent
 - **Backlog storage**: local Markdown files (index + one file per task) + one-way sync script to
   GitHub Issues/Project V2 via `gh`. GitLab/Bitbucket in v2+.
-- **Additional harnesses** (Codex, Copilot, Gemini, Windsurf, …): v0.3+.
+- **Additional harnesses** (Codex, Copilot, Windsurf, OpenCode, Antigravity, …): v0.3+.
 
 ## Methodology observed in `examples/` (reference, not to copy verbatim)
 
