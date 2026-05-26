@@ -1,12 +1,12 @@
 ---
 name: backlog
-description: Manage Specflow's product backlog directly on GitHub Project #4 ("Specflow", org mkrlabs). Use when the user asks to "list the backlog", "add to the backlog", "what's next", "move task X to in-progress / done", "open an issue for Y", or any backlog/project management on this repo. Source of truth is GitHub — there is no local markdown copy.
+description: Manage Specflow's product backlog directly on GitHub Project #4 ("Specflow", org mkrlabs). Spans three repos — `specflow`, `specflow-cloud`, `specflow-monorepo` — that all feed the same board. Use when the user asks to "list the backlog", "add to the backlog", "what's next", "move task X to in-progress / done", "open an issue for Y", or any backlog/project management on these repos. Source of truth is GitHub — there is no local markdown copy.
 allowed-tools: Bash(gh *) Bash(${CLAUDE_SKILL_DIR}/scripts/*.sh) Bash(jq *) Bash(column *) Bash(sort *)
 ---
 
 # Backlog skill — Specflow (GitHub Project #4)
 
-The backlog lives on **GitHub Project #4 "Specflow"** (org-owned by `mkrlabs`), backed by issues in **`mkrlabs/specflow`**. There is no local markdown mirror. Everything goes through `gh` CLI — wrappers in `scripts/` cover the common cases; raw `gh api graphql` is documented below for one-offs.
+The backlog lives on **GitHub Project #4 "Specflow"** (org-owned by `mkrlabs`), backed by issues in **three linked repos: `mkrlabs/specflow`, `mkrlabs/specflow-cloud`, `mkrlabs/specflow-monorepo`**. All three feed the same board with the same Status / Priority / Size / IssueType fields. There is no local markdown mirror. Everything goes through `gh` CLI — wrappers in `scripts/` cover the common cases; raw `gh api graphql` is documented below for one-offs.
 
 ## All mutations go through the Product Owner agent
 
@@ -18,7 +18,7 @@ This skill's scripts are the **toolbox** the PO uses. The main session may call 
 
 | Thing           | Value                                                                                                   |
 | --------------- | ------------------------------------------------------------------------------------------------------- |
-| Repo            | `mkrlabs/specflow`                                                                                      |
+| Linked repos    | `mkrlabs/specflow` · `mkrlabs/specflow-cloud` · `mkrlabs/specflow-monorepo`                             |
 | Project number  | `4` (owner: `mkrlabs`, org-owned)                                                                       |
 | Project node ID | `PVT_kwDOBv46cs4BV4Gz`                                                                                  |
 | Status field ID | `PVTSSF_lADOBv46cs4BV4GzzhRQrX8`                                                                        |
@@ -33,22 +33,25 @@ gh project view 4 --owner mkrlabs --format json | jq '.id'
 
 ## Scripts (preferred path)
 
+Every script accepts an optional `--repo <short>` flag where `<short>` is one of `specflow` (default), `specflow-cloud`, `specflow-monorepo`. Owner is always `mkrlabs`. `list.sh` is the exception — it queries all three repos by default and `--repo` filters down to one.
+
 ```bash
-.claude/skills/backlog/scripts/list.sh                    # all items, with Status
-.claude/skills/backlog/scripts/list.sh Backlog            # filter by Status
-.claude/skills/backlog/scripts/view.sh <issue-number>     # one item + comments
-.claude/skills/backlog/scripts/add.sh "<title>" [body] [labels-csv]   # creates issue + attaches to project
-.claude/skills/backlog/scripts/move.sh <issue-number> <Status>        # Status = Backlog|Ready|"In progress"|"In review"|Done
-.claude/skills/backlog/scripts/clarify-comment.sh <issue> "<comment>" # leave a question on the issue
-.claude/skills/backlog/scripts/set-field.sh <issue> <Priority|Size|IssueType> <value>  # set native classification — see "Classification" below
+.claude/skills/backlog/scripts/list.sh                                              # all repos, every open item not in Done
+.claude/skills/backlog/scripts/list.sh Backlog                                      # all repos, filter by Status
+.claude/skills/backlog/scripts/list.sh --repo specflow-cloud Ready                  # one repo, filter by Status
+.claude/skills/backlog/scripts/view.sh [--repo <short>] <issue-number>              # one item + comments
+.claude/skills/backlog/scripts/add.sh [--repo <short>] "<title>" [body] [labels]    # creates issue + attaches to project
+.claude/skills/backlog/scripts/move.sh [--repo <short>] <issue-number> <Status>     # Status = Backlog|Ready|"In progress"|"In review"|Done
+.claude/skills/backlog/scripts/clarify-comment.sh [--repo <short>] <issue> "<msg>"  # leave a question on the issue
+.claude/skills/backlog/scripts/set-field.sh [--repo <short>] <issue> <Priority|Size|IssueType> <value>  # set native classification — see "Classification" below
 ```
 
 For closing or editing, just use `gh` directly — no wrapper needed:
 
 ```bash
-gh issue close  <num> --repo mkrlabs/specflow --reason completed     # or not_planned
-gh issue reopen <num> --repo mkrlabs/specflow
-gh issue edit   <num> --repo mkrlabs/specflow --title "…" --body "…" --add-label "…" --remove-label "…"
+gh issue close  <num> --repo mkrlabs/<short> --reason completed     # or not_planned
+gh issue reopen <num> --repo mkrlabs/<short>
+gh issue edit   <num> --repo mkrlabs/<short> --title "…" --body "…" --add-label "…" --remove-label "…"
 ```
 
 ## API quota — prefer REST/CLI over raw GraphQL
@@ -81,7 +84,7 @@ Every issue the PO creates or clarifies MUST exit with all four axes set — thi
 ## When NOT to use this skill
 
 - The user is implementing a backlog item — that's normal coding work; only return here when they want to update the item's status afterwards.
-- The user asks about another repo's backlog — this skill is hard-wired to `mkrlabs/specflow` and Project #4.
+- The user asks about a backlog outside the three `mkrlabs/specflow*` repos — this skill is hard-wired to Project #4.
 
 ## Troubleshooting
 

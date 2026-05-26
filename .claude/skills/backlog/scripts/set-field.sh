@@ -1,8 +1,10 @@
 #!/usr/bin/env bash
-# Set a native classification value on an issue on Specflow's own Project #4:
+# Set a native classification value on an issue on Specflow's Project #4:
 # the Project V2 single-select fields Priority / Size, or the org-level native
-# Issue Type (Task / Bug / Feature). Hardcoded mirror of the templated helper
-# at templates/core/skills/backlog/scripts/github/set-field.sh.
+# Issue Type (Task / Bug / Feature). Works across all three repos linked to
+# the project (`specflow`, `specflow-cloud`, `specflow-monorepo`).
+# Hardcoded mirror of the templated helper at
+# templates/core/skills/backlog/scripts/github/set-field.sh.
 #
 # The item-ID lookup uses a small, targeted GraphQL query (one issue,
 # projectItems(first:5)) — negligible quota cost. `gh project item-list` was
@@ -15,7 +17,8 @@
 # `type`) — a single call that takes the type name directly, cheaper than
 # the GraphQL `updateIssue` path and with no node-ID resolution.
 #
-# Usage: set-field.sh <issue-number> <Priority|Size|IssueType> <value>
+# Usage: set-field.sh [--repo <short>] <issue-number> <Priority|Size|IssueType> <value>
+#   <short>   ∈ specflow | specflow-cloud | specflow-monorepo (default: specflow)
 #   Priority  → P0 | P1 | P2 | P3
 #   Size      → XS | S | M | L | XL
 #   IssueType → Task | Bug | Feature
@@ -28,8 +31,12 @@
 #   1   usage / unexpected error
 set -euo pipefail
 
+. "$(dirname "$0")/_repo.sh"
+resolve_repo "$@"
+set -- ${REPO_REMAINING_ARGS[@]+"${REPO_REMAINING_ARGS[@]}"}
+
 if [ "$#" -lt 3 ]; then
-  echo 'usage: set-field.sh <issue-number> <Priority|Size|IssueType> <value>' >&2
+  echo 'usage: set-field.sh [--repo <short>] <issue-number> <Priority|Size|IssueType> <value>' >&2
   exit 1
 fi
 ISSUE="$1"
@@ -37,6 +44,7 @@ FIELD_NAME="$2"
 VALUE="$3"
 
 PROJECT_ID="PVT_kwDOBv46cs4BV4Gz"
+REPO_NAME="${REPO#mkrlabs/}"
 
 # Issue Type is an org-level native concept, not a Project V2 field — it has
 # its own mutation path and exits before the Priority/Size project-field code.
@@ -52,15 +60,15 @@ case "$(echo "$FIELD_NAME" | tr '[:upper:]' '[:lower:]')" in
     # Single REST PATCH — takes the type name directly. A 422 means the
     # repo/org has no such native type (fall back to a label); a 404 means
     # the issue doesn't exist.
-    if ! RESULT=$(gh api -X PATCH "repos/mkrlabs/specflow/issues/$ISSUE" \
+    if ! RESULT=$(gh api -X PATCH "repos/$REPO/issues/$ISSUE" \
       -f type="$VALUE" --jq '.type.name' 2>&1); then
       case "$RESULT" in
         *"Validation Failed"* | *422*)
-          echo "repo has no native issue type '$VALUE' — fall back to a label" >&2
+          echo "$REPO has no native issue type '$VALUE' — fall back to a label" >&2
           exit 10
           ;;
         *"Not Found"* | *404*)
-          echo "issue #$ISSUE not found in mkrlabs/specflow" >&2
+          echo "issue #$ISSUE not found in $REPO" >&2
           exit 12
           ;;
         *)
@@ -69,7 +77,7 @@ case "$(echo "$FIELD_NAME" | tr '[:upper:]' '[:lower:]')" in
           ;;
       esac
     fi
-    echo "✓ #$ISSUE IssueType → $RESULT"
+    echo "✓ $REPO#$ISSUE IssueType → $RESULT"
     exit 0
     ;;
 esac
@@ -94,9 +102,9 @@ case "$(echo "$FIELD_NAME" | tr '[:upper:]' '[:lower:]')" in
     CANONICAL="Size"
     case "$VALUE" in
       XS) OPT="6c6483d2" ;;
-      S)  OPT="f784b110" ;;
-      M)  OPT="7515a9f1" ;;
-      L)  OPT="817d0097" ;;
+      S) OPT="f784b110" ;;
+      M) OPT="7515a9f1" ;;
+      L) OPT="817d0097" ;;
       XL) OPT="db339eb2" ;;
       *)
         echo "unknown Size value '$VALUE' (XS|S|M|L|XL)" >&2
@@ -111,19 +119,19 @@ case "$(echo "$FIELD_NAME" | tr '[:upper:]' '[:lower:]')" in
 esac
 
 ITEM_ID=$(gh api graphql -f query='
-  query($num: Int!) {
-    repository(owner:"mkrlabs", name:"specflow") {
+  query($owner: String!, $name: String!, $num: Int!) {
+    repository(owner: $owner, name: $name) {
       issue(number: $num) {
         projectItems(first: 5) {
           nodes { id project { number } }
         }
       }
     }
-  }' -F num="$ISSUE" \
+  }' -f owner="mkrlabs" -f name="$REPO_NAME" -F num="$ISSUE" \
   | jq -r '.data.repository.issue.projectItems.nodes[] | select(.project.number == 4) | .id')
 
 if [ -z "$ITEM_ID" ]; then
-  echo "issue #$ISSUE is not on Project #4" >&2
+  echo "issue $REPO#$ISSUE is not on Project #4" >&2
   exit 12
 fi
 
@@ -133,4 +141,4 @@ gh project item-edit \
   --field-id "$FIELD_ID" \
   --single-select-option-id "$OPT" >/dev/null
 
-echo "✓ #$ISSUE $CANONICAL → $VALUE"
+echo "✓ $REPO#$ISSUE $CANONICAL → $VALUE"
