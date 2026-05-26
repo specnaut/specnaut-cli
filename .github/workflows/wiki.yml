@@ -48,7 +48,7 @@ jobs:
             exit 0
           fi
 
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Set up SSH agent with the wiki deploy key
         env:
