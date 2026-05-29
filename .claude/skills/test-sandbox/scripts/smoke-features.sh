@@ -58,7 +58,7 @@ check ".claude/commands/specflow.md present (slash-command shim, post-F3)" \
   '[ -f .claude/commands/specflow.md ]'
 check "router .claude/skills/specflow/SKILL.md present" \
   '[ -f .claude/skills/specflow/SKILL.md ]'
-for phase in specify constitution clarify plan tasks analyze implement merge review checklist groom tag-version release-version list-skills; do
+for phase in specify constitution clarify plan tasks analyze implement merge review checklist groom tag-version release-version list-skills lite-heuristic; do
   check ".claude/skills/specflow/phases/$phase.md present" \
     "[ -f .claude/skills/specflow/phases/$phase.md ]"
 done
@@ -336,7 +336,7 @@ check "specflow-expert is auto-triggerable (no disable-model-invocation: true)" 
 check "specflow-expert grants WebFetch" \
   'grep -q "WebFetch" .claude/agents/specflow-expert.md'
 check "specflow-expert agent body fits Windsurf 12000-char Cascade cap" \
-  'deno eval "const s = await Deno.readTextFile(\".claude/agents/specflow-expert.md\"); Deno.exit(s.length <= 12000 ? 0 : 1);"'
+  'deno eval --no-config "const s = await Deno.readTextFile(\".claude/agents/specflow-expert.md\"); Deno.exit(s.length <= 12000 ? 0 : 1);"'
 check "vendored knowledge snapshot present" \
   'grep -q "## Vendored knowledge snapshot" .claude/agents/specflow-expert.md'
 
@@ -351,7 +351,7 @@ check "ui-ux-designer declares the three modes" \
 check "ui-ux-designer ships the canonical DESIGN.md template" \
   'grep -q "Canonical DESIGN.md template" .claude/agents/ui-ux-designer.md && grep -q "Brand identity" .claude/agents/ui-ux-designer.md && grep -q "Color palette" .claude/agents/ui-ux-designer.md'
 check "ui-ux-designer fits the Windsurf 12000-char Cascade cap" \
-  'deno eval "const s = await Deno.readTextFile(\".claude/agents/ui-ux-designer.md\"); Deno.exit(s.length <= 12000 ? 0 : 1);"'
+  'deno eval --no-config "const s = await Deno.readTextFile(\".claude/agents/ui-ux-designer.md\"); Deno.exit(s.length <= 12000 ? 0 : 1);"'
 check "live fetch protocol present" \
   'grep -q "## Live fetch protocol" .claude/agents/specflow-expert.md'
 
@@ -506,6 +506,37 @@ check "vendored snapshot mentions upgrade-staging" \
 
 check "vendored snapshot mentions specflow reconcile" \
   'grep -q "specflow reconcile" .claude/agents/specflow-expert.md'
+
+echo
+echo "═══ #346  lite chain (skip clarify + tasks for small features) ═══"
+check "phase doc lite-heuristic.md scaffolded" \
+  '[ -f .claude/skills/specflow/phases/lite-heuristic.md ]'
+check "router SKILL.md parses --lite flag" \
+  'grep -q -- "--lite" .claude/skills/specflow/SKILL.md'
+check "router SKILL.md parses --full flag" \
+  'grep -q -- "--full" .claude/skills/specflow/SKILL.md'
+check "router SKILL.md mentions CHAIN_SHAPE state" \
+  'grep -q "CHAIN_SHAPE" .claude/skills/specflow/SKILL.md'
+check "router SKILL.md notes --lite/--full compose with pace flags" \
+  'grep -q "compose" .claude/skills/specflow/SKILL.md'
+check "auto-chain.md has the ## Lite chain section" \
+  'grep -q "^## Lite chain" .claude/skills/specflow/phases/auto-chain.md'
+check "auto-chain.md documents next-phase decision via workflow_shape" \
+  'grep -q "workflow_shape" .claude/skills/specflow/phases/auto-chain.md'
+check "auto-chain.md notes STOP #1 is n/a in lite mode" \
+  'grep -q "n/a in lite mode\|Lite mode does not run" .claude/skills/specflow/phases/auto-chain.md'
+check "specify.md has the Chain shape selection section" \
+  'grep -q "Chain shape selection" .claude/skills/specflow/phases/specify.md'
+check "specify.md persists workflow_shape into feature.json" \
+  'grep -q "workflow_shape" .claude/skills/specflow/phases/specify.md'
+check "specify.md references lite-heuristic.md as the scoring source" \
+  'grep -q "lite-heuristic" .claude/skills/specflow/phases/specify.md'
+check "lite-heuristic.md lists signal categories" \
+  'grep -q "Signal lists\|Signal categories\|File-path hints\|Verb hints" .claude/skills/specflow/phases/lite-heuristic.md'
+check "lite-heuristic.md lists suppressors" \
+  'grep -qi "suppressor" .claude/skills/specflow/phases/lite-heuristic.md'
+check "lite-heuristic.md lists canonical smoke inputs" \
+  'grep -q "smoke inputs\|Canonical smoke" .claude/skills/specflow/phases/lite-heuristic.md'
 
 echo
 if [ "$fails" -eq 0 ]; then
