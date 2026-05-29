@@ -22,6 +22,7 @@
     { "category": "phase", "name": "audit-accessibility", "suffix": "audit-accessibility.md", "source": "core/skills/specflow/phases/audit-accessibility.md" },
     { "category": "phase", "name": "audit-architecture", "suffix": "audit-architecture.md", "source": "core/skills/specflow/phases/audit-architecture.md" },
     { "category": "phase", "name": "audit-dependencies", "suffix": "audit-dependencies.md", "source": "core/skills/specflow/phases/audit-dependencies.md" },
+    { "category": "phase", "name": "lite-heuristic", "suffix": "lite-heuristic.md", "source": "core/skills/specflow/phases/lite-heuristic.md" },
     { "category": "phase-script", "name": "tag", "suffix": "tag.sh", "source": "core/skills/specflow/scripts/tag.sh", "executable": true },
     { "category": "phase-script", "name": "release", "suffix": "release.sh", "source": "core/skills/specflow/scripts/release.sh", "executable": true },
     { "category": "phase-script", "name": "release-github", "suffix": "release-github.sh", "source": "core/skills/specflow/scripts/release-github.sh", "executable": true },

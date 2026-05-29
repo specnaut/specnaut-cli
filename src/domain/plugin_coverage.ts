@@ -67,8 +67,8 @@ export function isPluginCoveredPath(
  * (either re-install the plugin or run `specflow upgrade` to restore
  * the bundled snapshot).
  *
- * Kept in sync with `isPluginCoveredPath` above. Total: 37 paths
- * (15 agents excluding architect + 1 router skill + 19 phase docs +
+ * Kept in sync with `isPluginCoveredPath` above. Total: 38 paths
+ * (15 agents excluding architect + 1 router skill + 20 phase docs +
  * specflow-review alias + specflow-auto).
  *
  * Phase docs include hyphenated names — the regex was widened in #303
@@ -76,7 +76,10 @@ export function isPluginCoveredPath(
  * `list-skills`. The phase-1 audit family (`audit-security` #303,
  * `audit-performance` #304, `audit-accessibility` #305) shipped in
  * v1.9.0; the phase-2 family added `audit-architecture` (#321) and
- * now `audit-dependencies` (#322) closes Epic #320.
+ * `audit-dependencies` (#322) closing Epic #320. The lite-chain
+ * heuristic (`lite-heuristic`, #346) ships under the same
+ * `phases/` directory because it's bundled and synced through the
+ * same channel, even though it's a contract doc rather than a phase.
  * `ui-ux-designer` was added alongside `architecture-auditor` in #321
  * to close a long-standing drift bug; this array continues to mirror
  * the bundled Claude scaffold exactly.
@@ -120,6 +123,7 @@ export const PLUGIN_COVERED_PATHS_CLAUDE: ReadonlyArray<string> = [
     "audit-accessibility",
     "audit-architecture",
     "audit-dependencies",
+    "lite-heuristic",
   ].map((name) => `.claude/skills/specflow/phases/${name}.md`),
   ".claude/skills/specflow-review/SKILL.md",
   ".claude/skills/specflow-auto/SKILL.md",

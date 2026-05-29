@@ -14,6 +14,38 @@ specify → clarify → plan → tasks → analyze → implement → review → 
           STOP #1 (only if clarifications needed)                  STOP #2 (pre-merge validation)
 ```
 
+## Lite chain
+
+For small, single-file features (markdown documentation, agent
+definitions, README/AGENTS/CLAUDE/CHANGELOG tweaks), the chain runs in
+a lighter shape that skips `clarify` and `tasks`:
+
+```
+specify → plan → analyze → implement → review → merge
+                                                  ▲
+                                                  STOP #2 (pre-merge validation)
+```
+
+STOP #1 (clarification checkpoint) is **n/a in lite mode** — no
+`clarify` phase runs, so there are no `[NEEDS CLARIFICATION]` markers
+to resolve mid-chain. The `phases/specify.md` procedure makes informed
+guesses for ambiguities and notes them in the spec's Assumptions
+section rather than blocking on user questions. STOP #2 behaves
+identically to the full chain.
+
+**Shape selection** happens once, in `phases/specify.md`:
+- The router's `--lite` / `--full` flag (parsed in `SKILL.md` step 1)
+  forces the shape and skips any heuristic / prompt.
+- Otherwise, `phases/specify.md` scores the brief against
+  `phases/lite-heuristic.md`. If the score crosses the threshold, the
+  user is prompted once; if not, full chain runs silently.
+- The chosen shape is persisted to `.specflow/feature.json` as
+  `workflow_shape: "lite" | "full"`.
+
+At every chain transition below, read `workflow_shape` from
+`.specflow/feature.json`. When the field is absent (legacy
+`feature.json`), treat as `"full"`.
+
 ## Per-phase behavior
 
 After each phase completes successfully, immediately invoke the next phase via
@@ -21,7 +53,25 @@ the `Skill` tool (or the platform equivalent). Do not emit a user-facing "ready
 for next step?" prompt. A one-line `✓ <phase> complete — proceeding to <next>`
 log is sufficient.
 
+The **next phase** depends on the chain shape recorded in
+`.specflow/feature.json` (`workflow_shape`):
+
+| Current phase | Next (full) | Next (lite) |
+|---|---|---|
+| `specify`   | `clarify`   | `plan`      |
+| `clarify`   | `plan`      | n/a (lite never runs clarify) |
+| `plan`      | `tasks`     | `analyze`   |
+| `tasks`     | `analyze`   | n/a (lite never runs tasks)   |
+| `analyze`   | `implement` | `implement` |
+| `implement` | `review`    | `review`    |
+| `review`    | STOP #2 → `merge` | STOP #2 → `merge` |
+
+When `workflow_shape` is absent from `feature.json`, treat as `"full"`.
+
 ## STOP #1 — Clarification checkpoint
+
+Applies only when `workflow_shape == "full"`. Lite mode does not run
+`clarify`, so there is no STOP #1 in lite chains.
 
 After `/specflow clarify` finishes:
 

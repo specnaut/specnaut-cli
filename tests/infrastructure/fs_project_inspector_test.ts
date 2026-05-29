@@ -839,12 +839,13 @@ Deno.test("inspect: plugin gap check warns for each missing covered path when pl
     );
     // 15 agents (10 original + ui-ux-designer drift fix #321 +
     // performance-auditor #304 + a11y-auditor #305 + architecture-auditor
-    // #321 + dependency-auditor #322) + 1 router skill + 19 phase docs
+    // #321 + dependency-auditor #322) + 1 router skill + 20 phase docs
     // (the 11 original + tag-version + release-version + list-skills +
     // audit-security #303 + audit-performance #304 + audit-accessibility
-    // #305 + audit-architecture #321 + audit-dependencies #322) +
-    // specflow-review alias + specflow-auto = 37 covered paths.
-    assertEquals(gapOutcomes.length, 37);
+    // #305 + audit-architecture #321 + audit-dependencies #322 +
+    // lite-heuristic #346) + specflow-review alias + specflow-auto = 38
+    // covered paths.
+    assertEquals(gapOutcomes.length, 38);
     for (const o of gapOutcomes) {
       assertEquals(o.message.includes("missing"), true);
       assertEquals(o.message.includes("specflow upgrade"), true);
