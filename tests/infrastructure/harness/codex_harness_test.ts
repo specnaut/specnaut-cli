@@ -99,9 +99,52 @@ Deno.test("CodexHarness maps agent to .codex/agents/<name>.toml with valid TOML"
     (parsed.developer_instructions as string).includes("You are the PO"),
     "agent body should end up in developer_instructions",
   );
-  // Claude-only frontmatter fields must be stripped.
+  // The Claude `model` tier is translated to Codex `model_reasoning_effort`,
+  // never copied verbatim; `tools` is dropped entirely.
   assertEquals("model" in parsed, false);
+  assertEquals(parsed.model_reasoning_effort, "high"); // opus → high
   assertEquals("tools" in parsed, false);
+});
+
+Deno.test("CodexHarness maps agent model tiers to model_reasoning_effort", () => {
+  const agent = (name: string, model: string | null): CoreBundle[number] => ({
+    category: "agent",
+    name,
+    suffix: null,
+    content: `---\nname: ${name}\ndescription: ${name} role\n${
+      model === null ? "" : `model: ${model}\n`
+    }tools: Read\n---\n\n# Body\n`,
+    executable: false,
+  });
+  const core: CoreBundle = [
+    agent("heavy", "opus"), // → high
+    agent("mid", "sonnet"), // → medium
+    agent("light", "haiku"), // → low
+    agent("none", null), // → omitted (inherit session default)
+    agent("inherit", "inherit"), // → omitted
+    agent("weird", "gpt-9-ultra"), // → omitted (unrecognised, no guess)
+  ];
+  const h = new CodexHarness();
+  const mapped = h.mapBundle(core, { backlogBackend: "local", versionScheme: "semver" });
+
+  const effortOf = (name: string) => {
+    const file = mapped[`.codex/agents/${name}.toml`];
+    assert(file, `${name} TOML not emitted`);
+    return parseToml(file.content).model_reasoning_effort;
+  };
+
+  assertEquals(effortOf("heavy"), "high");
+  assertEquals(effortOf("mid"), "medium");
+  assertEquals(effortOf("light"), "low");
+  // A higher tier and a mid tier emit distinct signals (SC-002).
+  assert(effortOf("heavy") !== effortOf("mid"));
+  // Absent / inherit / unrecognised tiers omit the field so Codex inherits
+  // the parent session default (FR-003) — and the file stays valid TOML.
+  for (const name of ["none", "inherit", "weird"]) {
+    const parsed = parseToml(mapped[`.codex/agents/${name}.toml`]!.content);
+    assertEquals("model_reasoning_effort" in parsed, false, `${name} should omit effort`);
+    assertEquals(parsed.name, name); // file is still valid & discoverable
+  }
 });
 
 Deno.test("CodexHarness maps spec-root to .specflow/<suffix> and project-root to <suffix>", () => {
