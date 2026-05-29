@@ -488,6 +488,35 @@ the default guesses wrong:
 - `/specflow <phase> N --continue` — force the chain regardless of artefact state.
 - `/specflow <phase> N --once` — force one-shot regardless.
 
+#### Lite chain (small-feature shortcut)
+
+For small, single-file features (markdown documentation, agent definitions, README / AGENTS / CLAUDE
+/ CHANGELOG tweaks), the chain runs in a lighter shape that skips `clarify` and `tasks`:
+
+```
+specify → plan → analyze → implement → review → merge
+```
+
+Selection happens once, in `phases/specify.md`:
+
+- The router's `--lite` / `--full` flag forces the shape and skips the heuristic.
+- Otherwise the brief is scored against `phases/lite-heuristic.md` (file-path hints like `.md` /
+  `AGENTS.md`, verb hints like `write` / `document`, subject hints like `doc` / `paragraph`, brief
+  length, suppressors like `API` / `migration` / `auth`). On a positive score the user is prompted
+  once: `This brief looks small — run the lite chain? [Y/n]`.
+- The chosen shape persists to `.specflow/feature.json` as `workflow_shape: "lite" | "full"`.
+  Downstream phases consult it at every chain transition. Backward-compat: absent field treated as
+  `"full"`.
+
+In lite mode STOP #1 is n/a (no `clarify` phase runs) — `specify` makes informed guesses for
+ambiguities and records them in the spec's Assumptions section. STOP #2 (pre-merge) behaves
+identically to the full chain.
+
+```
+/specflow specify --lite "Document the OSS/proprio boundary in AGENTS.md"
+/specflow specify --full "Add OAuth2 login"   # opt out of auto-detected lite
+```
+
 The `/specflow-auto` slash command is kept for one release as a deprecation alias and will be
 removed in the next major version.
 
