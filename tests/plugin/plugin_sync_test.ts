@@ -17,11 +17,13 @@ const SYNC_PAIRS: ReadonlyArray<{ plugin: string; source: string }> = [
     plugin: "plugin/skills/specflow/SKILL.md",
     source: "templates/core/skills/specflow/SKILL.md",
   },
-  // 19 phase reference docs, loaded by the router on demand. The
+  // 20 phase reference docs, loaded by the router on demand. The
   // phase-1 audit trio (`audit-security` #303, `audit-performance` #304,
   // `audit-accessibility` #305) shipped in v1.9.0; the phase-2 pair
   // (`audit-architecture` #321 + `audit-dependencies` #322) closes
-  // Epic #320.
+  // Epic #320. `lite-heuristic` (#346) is a contract doc consulted by
+  // `phases/specify.md` when CHAIN_SHAPE == auto — not a phase itself,
+  // but synced through the same byte-identical channel.
   ...[
     "specify",
     "clarify",
@@ -42,6 +44,7 @@ const SYNC_PAIRS: ReadonlyArray<{ plugin: string; source: string }> = [
     "audit-accessibility",
     "audit-architecture",
     "audit-dependencies",
+    "lite-heuristic",
   ].map((name) => ({
     plugin: `plugin/skills/specflow/phases/${name}.md`,
     source: `templates/core/skills/specflow/phases/${name}.md`,

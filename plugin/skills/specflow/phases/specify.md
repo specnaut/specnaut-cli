@@ -20,6 +20,43 @@ Skip silently if the file is absent or unparseable. For each enabled entry
 
 Hooks with non-empty `condition` are deferred to the HookExecutor.
 
+## Chain shape selection
+
+Before running the outline below, determine the **chain shape** that
+will apply to this `/specflow specify` invocation (and the rest of
+the chain after it):
+
+1. **Read `CHAIN_SHAPE` from the router context** (set by `SKILL.md`
+   step 1 chain-shape parsing).
+   - `CHAIN_SHAPE == lite` → use lite, no prompt. Skip step 2.
+   - `CHAIN_SHAPE == full` → use full, no prompt. Skip step 2.
+   - `CHAIN_SHAPE == auto` → proceed to step 2.
+
+2. **Apply the lite heuristic.** Read `phases/lite-heuristic.md`,
+   score the feature brief (the original user input from
+   `/specflow specify`, before flag stripping is irrelevant — use the
+   substantive brief), and:
+   - If `score < 2`: silently set `CHAIN_SHAPE = full`. No prompt.
+   - If `score ≥ 2`: emit the prompt from `phases/lite-heuristic.md`
+     ("This brief looks small — run the lite chain? [Y/n]") **exactly
+     once**, wait for the user's answer:
+     - `Y` / `yes` / empty (default-Y if you treated the prompt as a
+       Y/n with capital Y) → `CHAIN_SHAPE = lite`.
+     - `n` / `no` / anything else interpreted as no → `CHAIN_SHAPE =
+       full`.
+
+3. **Persist the chosen shape** to `.specflow/feature.json` (when
+   step 3 of the Outline below writes that file, include
+   `"workflow_shape": "lite"` or `"workflow_shape": "full"` alongside
+   `feature_directory` and `linked_issue`).
+
+4. **Log line on phase transition** (used by the chain when invoking
+   the next phase): emit `✓ specify (lite) complete — proceeding to
+   plan` when `CHAIN_SHAPE == lite`, or the unchanged `✓ specify
+   complete — proceeding to clarify` when `CHAIN_SHAPE == full`.
+   `phases/auto-chain.md` reads `workflow_shape` from `feature.json`
+   to decide which phase to chain to next.
+
 ## Outline
 
 The text the user typed after `/specflow specify` is the feature description. Do not ask the user to repeat it unless they provided an empty command.
@@ -55,7 +92,7 @@ Given that feature description, do this:
    - Set `SPEC_FILE` to `SPECIFY_FEATURE_DIRECTORY/spec.md`
    - Persist to `.specflow/feature.json`:
      ```json
-     { "feature_directory": "<resolved feature dir>", "linked_issue": <N or null> }
+     { "feature_directory": "<resolved feature dir>", "linked_issue": <N or null>, "workflow_shape": "<lite|full>" }
      ```
      Write the actual resolved path (e.g., `.specflow/specs/003-user-auth`), not the literal string.
      This lets downstream commands (`/specflow plan`, `/specflow tasks`, etc.) locate the feature directory.
@@ -65,6 +102,11 @@ Given that feature description, do this:
      Otherwise persist `null`. The merge phase reads this field to auto-close the linked
      backlog item on the project board after a successful fast-forward + push. Backward-compat
      with existing `feature.json` files: absent or null is a no-op everywhere downstream.
+
+     **`workflow_shape`**: the chain shape chosen during "Chain shape selection" above —
+     `"lite"` or `"full"`. `phases/auto-chain.md` reads this field at every chain transition
+     to decide which phase comes next (lite skips `clarify` and `tasks`). Backward-compat
+     with existing `feature.json` files: absent → treat as `"full"` everywhere downstream.
 
    **IMPORTANT**:
    - Create only one feature per `/specflow specify` invocation.

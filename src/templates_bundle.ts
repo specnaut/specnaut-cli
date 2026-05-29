@@ -46,6 +46,22 @@ when_to_use: |
 
    Strip the matched flag from the token list before going further.
 
+   **Chain shape parsing** — additionally scan the tokens for at most
+   one of \`--lite\`, \`--full\`. They are mutually exclusive with each
+   other; if both are present, report \`error: --lite and --full are mutually exclusive\`
+   and stop. They **compose** with the pace flags above (e.g. \`--once --lite\`
+   is valid).
+   - \`--lite\` → CHAIN_SHAPE = \`lite\` (force the lite chain — \`specify
+     → plan → analyze → implement → review\`, skipping \`clarify\` and
+     \`tasks\`; see \`phases/lite-heuristic.md\` and the "Lite chain"
+     section in \`phases/auto-chain.md\`)
+   - \`--full\` → CHAIN_SHAPE = \`full\` (force the full chain even when
+     the specify-phase heuristic would otherwise propose lite)
+   - none → CHAIN_SHAPE = \`auto\` (the default; \`phases/specify.md\`
+     applies the heuristic and may prompt the user once)
+
+   Strip the matched flag from the token list before going further.
+
 2. **Phase extraction** — the first remaining token is the phase name.
    Everything after the first whitespace is the argument string for
    that phase.
@@ -180,6 +196,20 @@ To force or skip the chain mid-flow:
 /specflow plan 042 --once       # regenerate plan.md only, do not cascade
 /specflow plan 042 --continue   # regenerate plan.md AND cascade tasks → review
 \`\`\`
+
+To opt in or out of the **lite chain** (skip \`clarify\` and \`tasks\` —
+calibrated for small single-file features like markdown docs, README
+tweaks, agent definitions):
+
+\`\`\`
+/specflow specify --lite "Document the OSS/proprio boundary in AGENTS.md"
+/specflow specify --full "Add OAuth2 login"   # opt out of auto-detected lite
+\`\`\`
+
+Without an explicit flag, \`phases/specify.md\` scores the brief
+against \`phases/lite-heuristic.md\` and either prompts the user once or
+commits to a shape silently. See \`phases/auto-chain.md\` for how the
+chain sequence adapts to the chosen shape.
 `,
     executable: false,
     backend: null,
@@ -210,6 +240,43 @@ Skip silently if the file is absent or unparseable. For each enabled entry
   \`EXECUTE_COMMAND: {command}\`, and wait for the result before proceeding.
 
 Hooks with non-empty \`condition\` are deferred to the HookExecutor.
+
+## Chain shape selection
+
+Before running the outline below, determine the **chain shape** that
+will apply to this \`/specflow specify\` invocation (and the rest of
+the chain after it):
+
+1. **Read \`CHAIN_SHAPE\` from the router context** (set by \`SKILL.md\`
+   step 1 chain-shape parsing).
+   - \`CHAIN_SHAPE == lite\` → use lite, no prompt. Skip step 2.
+   - \`CHAIN_SHAPE == full\` → use full, no prompt. Skip step 2.
+   - \`CHAIN_SHAPE == auto\` → proceed to step 2.
+
+2. **Apply the lite heuristic.** Read \`phases/lite-heuristic.md\`,
+   score the feature brief (the original user input from
+   \`/specflow specify\`, before flag stripping is irrelevant — use the
+   substantive brief), and:
+   - If \`score < 2\`: silently set \`CHAIN_SHAPE = full\`. No prompt.
+   - If \`score ≥ 2\`: emit the prompt from \`phases/lite-heuristic.md\`
+     ("This brief looks small — run the lite chain? [Y/n]") **exactly
+     once**, wait for the user's answer:
+     - \`Y\` / \`yes\` / empty (default-Y if you treated the prompt as a
+       Y/n with capital Y) → \`CHAIN_SHAPE = lite\`.
+     - \`n\` / \`no\` / anything else interpreted as no → \`CHAIN_SHAPE =
+       full\`.
+
+3. **Persist the chosen shape** to \`.specflow/feature.json\` (when
+   step 3 of the Outline below writes that file, include
+   \`"workflow_shape": "lite"\` or \`"workflow_shape": "full"\` alongside
+   \`feature_directory\` and \`linked_issue\`).
+
+4. **Log line on phase transition** (used by the chain when invoking
+   the next phase): emit \`✓ specify (lite) complete — proceeding to
+   plan\` when \`CHAIN_SHAPE == lite\`, or the unchanged \`✓ specify
+   complete — proceeding to clarify\` when \`CHAIN_SHAPE == full\`.
+   \`phases/auto-chain.md\` reads \`workflow_shape\` from \`feature.json\`
+   to decide which phase to chain to next.
 
 ## Outline
 
@@ -246,7 +313,7 @@ Given that feature description, do this:
    - Set \`SPEC_FILE\` to \`SPECIFY_FEATURE_DIRECTORY/spec.md\`
    - Persist to \`.specflow/feature.json\`:
      \`\`\`json
-     { "feature_directory": "<resolved feature dir>", "linked_issue": <N or null> }
+     { "feature_directory": "<resolved feature dir>", "linked_issue": <N or null>, "workflow_shape": "<lite|full>" }
      \`\`\`
      Write the actual resolved path (e.g., \`.specflow/specs/003-user-auth\`), not the literal string.
      This lets downstream commands (\`/specflow plan\`, \`/specflow tasks\`, etc.) locate the feature directory.
@@ -256,6 +323,11 @@ Given that feature description, do this:
      Otherwise persist \`null\`. The merge phase reads this field to auto-close the linked
      backlog item on the project board after a successful fast-forward + push. Backward-compat
      with existing \`feature.json\` files: absent or null is a no-op everywhere downstream.
+
+     **\`workflow_shape\`**: the chain shape chosen during "Chain shape selection" above —
+     \`"lite"\` or \`"full"\`. \`phases/auto-chain.md\` reads this field at every chain transition
+     to decide which phase comes next (lite skips \`clarify\` and \`tasks\`). Backward-compat
+     with existing \`feature.json\` files: absent → treat as \`"full"\` everywhere downstream.
 
    **IMPORTANT**:
    - Create only one feature per \`/specflow specify\` invocation.
@@ -2343,6 +2415,38 @@ specify → clarify → plan → tasks → analyze → implement → review → 
           STOP #1 (only if clarifications needed)                  STOP #2 (pre-merge validation)
 \`\`\`
 
+## Lite chain
+
+For small, single-file features (markdown documentation, agent
+definitions, README/AGENTS/CLAUDE/CHANGELOG tweaks), the chain runs in
+a lighter shape that skips \`clarify\` and \`tasks\`:
+
+\`\`\`
+specify → plan → analyze → implement → review → merge
+                                                  ▲
+                                                  STOP #2 (pre-merge validation)
+\`\`\`
+
+STOP #1 (clarification checkpoint) is **n/a in lite mode** — no
+\`clarify\` phase runs, so there are no \`[NEEDS CLARIFICATION]\` markers
+to resolve mid-chain. The \`phases/specify.md\` procedure makes informed
+guesses for ambiguities and notes them in the spec's Assumptions
+section rather than blocking on user questions. STOP #2 behaves
+identically to the full chain.
+
+**Shape selection** happens once, in \`phases/specify.md\`:
+- The router's \`--lite\` / \`--full\` flag (parsed in \`SKILL.md\` step 1)
+  forces the shape and skips any heuristic / prompt.
+- Otherwise, \`phases/specify.md\` scores the brief against
+  \`phases/lite-heuristic.md\`. If the score crosses the threshold, the
+  user is prompted once; if not, full chain runs silently.
+- The chosen shape is persisted to \`.specflow/feature.json\` as
+  \`workflow_shape: "lite" | "full"\`.
+
+At every chain transition below, read \`workflow_shape\` from
+\`.specflow/feature.json\`. When the field is absent (legacy
+\`feature.json\`), treat as \`"full"\`.
+
 ## Per-phase behavior
 
 After each phase completes successfully, immediately invoke the next phase via
@@ -2350,7 +2454,25 @@ the \`Skill\` tool (or the platform equivalent). Do not emit a user-facing "read
 for next step?" prompt. A one-line \`✓ <phase> complete — proceeding to <next>\`
 log is sufficient.
 
+The **next phase** depends on the chain shape recorded in
+\`.specflow/feature.json\` (\`workflow_shape\`):
+
+| Current phase | Next (full) | Next (lite) |
+|---|---|---|
+| \`specify\`   | \`clarify\`   | \`plan\`      |
+| \`clarify\`   | \`plan\`      | n/a (lite never runs clarify) |
+| \`plan\`      | \`tasks\`     | \`analyze\`   |
+| \`tasks\`     | \`analyze\`   | n/a (lite never runs tasks)   |
+| \`analyze\`   | \`implement\` | \`implement\` |
+| \`implement\` | \`review\`    | \`review\`    |
+| \`review\`    | STOP #2 → \`merge\` | STOP #2 → \`merge\` |
+
+When \`workflow_shape\` is absent from \`feature.json\`, treat as \`"full"\`.
+
 ## STOP #1 — Clarification checkpoint
+
+Applies only when \`workflow_shape == "full"\`. Lite mode does not run
+\`clarify\`, so there is no STOP #1 in lite chains.
 
 After \`/specflow clarify\` finishes:
 
@@ -3356,6 +3478,130 @@ Next step: dispatch product-owner to convert findings into a backlog Epic? (y/N)
 Inspired by the discipline of \`obra/superpowers\` v5.1.0 (MIT, Jesse Vincent),
 adapted to Specflow's bundled agent + backlog conventions. The
 \`dependency-auditor\` agent itself is Specflow-native (no upstream sibling).
+`,
+    executable: false,
+    backend: null,
+    skipIfExists: false,
+  },
+  {
+    category: "phase",
+    name: "lite-heuristic",
+    suffix: "lite-heuristic.md",
+    content: `# Lite-chain heuristic
+
+The lite chain (\`specify → plan → analyze → implement → review\`, skipping
+\`clarify\` and \`tasks\`) is calibrated for **small, single-file features**:
+markdown documentation, agent definitions, README tweaks, AGENTS.md edits,
+CLAUDE.md updates, changelog notes. For these, the full chain's spec /
+clarify / tasks / analyze / implement / review ceremony produces a
+doc/code ratio that's wildly off (concrete prior signal: ~1500 lines of
+spec+plan+research+data-model+contracts+quickstart+tasks for ~155 lines
+of agent markdown — roughly 10:1).
+
+This file is the **pattern bag** consulted by \`phases/specify.md\` when
+\`CHAIN_SHAPE == auto\`. Edit the signal lists below to tune detection
+without touching \`specify.md\` logic.
+
+## Scoring
+
+The heuristic runs against the user's feature brief — the text typed
+after \`/specflow specify\` (after flag-stripping by the router). It
+produces a score:
+
+\`\`\`
+score = (signal hits) − (suppressor hits × 2)
+\`\`\`
+
+- **score ≥ 2** → propose the lite chain to the user via the prompt
+  below. The user's answer (Y/n) decides.
+- **score < 2** → silently keep the full chain.
+
+Suppressors weigh **double** because a single private/system keyword is
+strong evidence the work is non-trivial regardless of how the brief is
+worded.
+
+## User prompt (when heuristic fires)
+
+\`\`\`
+This brief looks small — run the lite chain?
+  Lite chain = specify → plan → analyze → implement → review
+               (skips clarify and tasks)
+  Full chain = specify → clarify → plan → tasks → analyze → implement → review
+
+Proceed in lite mode? [Y/n]
+\`\`\`
+
+Default to **full** chain on an empty or unclear answer. The prompt
+appears exactly **once** per \`/specflow specify\` invocation — there is
+no re-prompting mid-chain.
+
+## Signal lists
+
+Each match (substring, case-insensitive) contributes **+1** to the
+score.
+
+### File-path hints (strongest individual signal — single match = score 1)
+
+- \`AGENTS.md\`, \`README.md\`, \`CLAUDE.md\`, \`CHANGELOG.md\`
+- Any \`.md\` path token
+- \`docs/...\`, \`docs/\`
+- \`.specflow/...\` (the workspace docs surface)
+
+### Verb hints
+
+- \`write\`, \`document\`, \`draft\`, \`note down\`, \`add a note\`
+- \`rephrase\`, \`tweak\`, \`polish\`, \`clarify wording\`
+- \`rename\`, \`update wording\`, \`fix wording\`
+- \`clean up\`, \`tidy\`, \`format\`
+
+### Subject hints
+
+- \`doc\`, \`documentation\`, \`docs\`, \`guide\`
+- \`section\`, \`paragraph\`, \`wording\`, \`phrasing\`
+- \`comment\`, \`comments\` (when the brief is about comment text, not
+  code-level comment cleanup)
+- \`agent definition\`, \`agent markdown\`, \`agent file\`
+- \`prompt\`, \`system prompt\`, \`instruction\`
+
+### Length hint
+
+- Brief length ≤ 150 characters → **+1** (weak signal — small briefs
+  often describe small work).
+
+## Suppressors (each hit subtracts 2)
+
+These keywords reliably indicate non-trivial scope. A single suppressor
+is usually enough to keep the full chain.
+
+- \`system\`, \`service\`, \`subsystem\`
+- \`API\`, \`endpoint\`, \`HTTP\`, \`webhook\`, \`RPC\`
+- \`schema\`, \`migration\`, \`database\`, \`data model\`
+- \`test suite\`, \`test harness\`, \`integration test\`
+- \`feature flag\`, \`feature toggle\`, \`experiment\`
+- \`auth\`, \`authentication\`, \`authorization\`, \`OAuth\`, \`OIDC\`, \`SSO\`
+- \`pipeline\`, \`CI\`, \`release pipeline\`, \`Homebrew\`, \`binary\`
+- \`agent\` *(when paired with \`pipeline\` / \`orchestrator\` / \`multi-agent\`
+  — a single "agent definition" mention is a subject hint, not a
+  suppressor)*
+
+## Canonical smoke inputs
+
+Used by \`tests/plugin/plugin_sync_test.ts\` and any future smoke
+validation. The expected routing for each:
+
+| Brief | Expected | Why |
+|---|---|---|
+| \`document the OSS/proprio boundary in AGENTS.md\` | **lite** | path hint (\`AGENTS.md\`), verb (\`document\`), subject (\`boundary\` neutral); score ≥ 2 |
+| \`write a new agent definition for orchestrating backlog routing\` | **lite** | verb (\`write\`), subject (\`agent definition\`); score ≥ 2, "orchestrating" is not a suppressor in isolation |
+| \`add OAuth2 login with GitHub and Google providers\` | **full** | suppressor \`OAuth\` (×2) overwhelms any positive signal; score < 2 |
+
+## Explicit overrides
+
+The router's \`--lite\` and \`--full\` flags force the shape directly and
+**skip this heuristic entirely**. See \`SKILL.md\` step 1 "Chain shape
+parsing". When forced, no prompt is emitted; the chosen shape is
+persisted to \`.specflow/feature.json\` (\`workflow_shape\`) and the
+spec.md frontmatter (\`workflow:\`).
 `,
     executable: false,
     backend: null,

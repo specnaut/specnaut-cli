@@ -82,20 +82,20 @@ Deno.test("specflow init --ai copilot scaffolds a Copilot layout", async () => {
     assertEquals(cmdContent.includes("model: opus"), false);
     assertEquals(cmdContent.includes("tools:"), false);
 
-    // Router + 20 phases (11 original + tag-version + release-version +
+    // Router + 21 phases (11 original + tag-version + release-version +
     // auto-chain + list-skills + audit-security #303 + audit-performance
     // #304 + audit-accessibility #305 + audit-architecture #321 +
-    // audit-dependencies #322) + specflow-auto + specflow-review +
-    // writing-plans (#271) + requesting-code-review (#273) +
-    // using-specflow (#282) + subagent-driven-development (#272) +
-    // executing-plans (#274) + verification-before-completion (#275) +
+    // audit-dependencies #322 + lite-heuristic #346) + specflow-auto +
+    // specflow-review + writing-plans (#271) + requesting-code-review
+    // (#273) + using-specflow (#282) + subagent-driven-development (#272)
+    // + executing-plans (#274) + verification-before-completion (#275) +
     // brainstorming (#276) + backlog + 15 agents (11 original +
     // performance-auditor #304 + a11y-auditor #305 + architecture-auditor
-    // #321 + dependency-auditor #322) = 45.
+    // #321 + dependency-auditor #322) = 46.
     const instructionsCount = (await Array.fromAsync(
       Deno.readDir(join(root, ".github/instructions")),
     )).length;
-    assertEquals(instructionsCount, 45);
+    assertEquals(instructionsCount, 46);
 
     // Shared (cross-harness)
     assertEquals(await exists(join(root, ".specflow/memory/constitution.md")), true);

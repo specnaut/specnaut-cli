@@ -35,6 +35,22 @@ when_to_use: |
 
    Strip the matched flag from the token list before going further.
 
+   **Chain shape parsing** — additionally scan the tokens for at most
+   one of `--lite`, `--full`. They are mutually exclusive with each
+   other; if both are present, report `error: --lite and --full are mutually exclusive`
+   and stop. They **compose** with the pace flags above (e.g. `--once --lite`
+   is valid).
+   - `--lite` → CHAIN_SHAPE = `lite` (force the lite chain — `specify
+     → plan → analyze → implement → review`, skipping `clarify` and
+     `tasks`; see `phases/lite-heuristic.md` and the "Lite chain"
+     section in `phases/auto-chain.md`)
+   - `--full` → CHAIN_SHAPE = `full` (force the full chain even when
+     the specify-phase heuristic would otherwise propose lite)
+   - none → CHAIN_SHAPE = `auto` (the default; `phases/specify.md`
+     applies the heuristic and may prompt the user once)
+
+   Strip the matched flag from the token list before going further.
+
 2. **Phase extraction** — the first remaining token is the phase name.
    Everything after the first whitespace is the argument string for
    that phase.
@@ -169,3 +185,17 @@ To force or skip the chain mid-flow:
 /specflow plan 042 --once       # regenerate plan.md only, do not cascade
 /specflow plan 042 --continue   # regenerate plan.md AND cascade tasks → review
 ```
+
+To opt in or out of the **lite chain** (skip `clarify` and `tasks` —
+calibrated for small single-file features like markdown docs, README
+tweaks, agent definitions):
+
+```
+/specflow specify --lite "Document the OSS/proprio boundary in AGENTS.md"
+/specflow specify --full "Add OAuth2 login"   # opt out of auto-detected lite
+```
+
+Without an explicit flag, `phases/specify.md` scores the brief
+against `phases/lite-heuristic.md` and either prompts the user once or
+commits to a shape silently. See `phases/auto-chain.md` for how the
+chain sequence adapts to the chosen shape.
