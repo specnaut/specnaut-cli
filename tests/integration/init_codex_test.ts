@@ -73,6 +73,9 @@ Deno.test("specflow init --ai codex scaffolds a Codex layout", async () => {
     assertEquals(parsed.name, "product-owner");
     assertEquals(typeof parsed.description, "string");
     assertEquals(typeof parsed.developer_instructions, "string");
+    // The bundled product-owner declares `model: opus`, which maps to the
+    // Codex reasoning-effort tier "high" (not a copied vendor model id).
+    assertEquals(parsed.model_reasoning_effort, "high");
 
     // Codex harness reference doc + /goal prompt template
     assertEquals(await exists(join(root, ".codex/AGENTS.md")), true);

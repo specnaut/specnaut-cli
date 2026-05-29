@@ -8,20 +8,46 @@ import { frontmatterField, splitFrontmatter } from "./frontmatter.ts";
 import { applyBackend, backlogScriptDestination } from "./backlog_filter.ts";
 import { applyScheme, phaseScriptDestination } from "./scheme_filter.ts";
 
-function parseAgentFrontmatter(content: string): { description: string; body: string } {
+function parseAgentFrontmatter(
+  content: string,
+): { description: string; model: string | null; body: string } {
   const split = splitFrontmatter(content);
-  if (!split) return { description: "", body: content };
+  if (!split) return { description: "", model: null, body: content };
   return {
     description: frontmatterField(split.fmBody, "description") ?? "",
+    model: frontmatterField(split.fmBody, "model"),
     body: split.rest.replace(/^\n+/, ""),
   };
 }
 
+/**
+ * Translates a Specflow agent's declared capability tier (a Claude model name)
+ * into a Codex `model_reasoning_effort` level. Codex models are OpenAI-specific,
+ * so we map the *tier* rather than copy the vendor model id — keeping the
+ * mapping stable across OpenAI model releases. An absent, empty, or
+ * unrecognised tier (including `inherit`) returns null so the sub-agent
+ * inherits the parent Codex session default instead of getting a guessed value.
+ */
+function tierToReasoningEffort(model: string | null): string | null {
+  switch (model?.trim().toLowerCase()) {
+    case "opus":
+      return "high";
+    case "sonnet":
+      return "medium";
+    case "haiku":
+      return "low";
+    default:
+      return null;
+  }
+}
+
 function toCodexSubagentToml(entry: CoreEntry): string {
-  const { description, body } = parseAgentFrontmatter(entry.content);
+  const { description, model, body } = parseAgentFrontmatter(entry.content);
+  const effort = tierToReasoningEffort(model);
   return stringifyToml({
     name: entry.name,
     description: description || `Specflow ${entry.name} agent`,
+    ...(effort ? { model_reasoning_effort: effort } : {}),
     developer_instructions: body,
   });
 }
