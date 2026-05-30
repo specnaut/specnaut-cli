@@ -2,17 +2,22 @@
 
 This file carries the chain mechanics that the `/specflow` router follows
 when chain mode is engaged. The router reads it after a chainable phase
-(`specify`, `clarify`, `plan`, `tasks`, `analyze`, `implement`, `review`)
-completes — unless `--manual` or `--once` was passed, or downstream
+(`brainstorm`, `specify`, `clarify`, `plan`, `tasks`, `analyze`, `implement`,
+`review`) completes — unless `--manual` or `--once` was passed, or downstream
 artefacts indicate one-shot intent.
 
 ## Default flow
 
 ```
-specify → clarify → plan → tasks → analyze → implement → review → merge
-          ▲                                                        ▲
-          STOP #1 (only if clarifications needed)                  STOP #2 (pre-merge validation)
+(brainstorm) → specify → clarify → plan → tasks → analyze → implement → review → merge
+                         ▲                                                        ▲
+                         STOP #1 (only if clarifications needed)                  STOP #2 (pre-merge validation)
 ```
+
+`brainstorm` is the optional step 0 (see `phases/brainstorm.md`). It runs
+only when the user invokes `/specflow brainstorm` because the idea is still
+fuzzy; on design approval it always chains into `specify`, which then drives
+the rest of the flow. Entering at `specify` skips it.
 
 ## Lite chain
 
@@ -58,6 +63,7 @@ The **next phase** depends on the chain shape recorded in
 
 | Current phase | Next (full) | Next (lite) |
 |---|---|---|
+| `brainstorm` | `specify`   | `specify`   |
 | `specify`   | `clarify`   | `plan`      |
 | `clarify`   | `plan`      | n/a (lite never runs clarify) |
 | `plan`      | `tasks`     | `analyze`   |

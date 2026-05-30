@@ -434,6 +434,18 @@ The chain is invoked through the bundled `/specflow` skill:
 /specflow specify "<feature description>"
 ```
 
+When the idea is still fuzzy and you can't yet write that one-line description, start one phase
+earlier with the optional **step 0**:
+
+```
+/specflow brainstorm "<rough idea>"
+```
+
+`brainstorm` runs a discovery dialogue (one question at a time, 2–3 approaches, design approval),
+then chains into `specify` with the agreed brief — so `brainstorm → specify → clarify → …` flows in
+one session. It reuses the bundled `brainstorming` skill for the dialogue; when your brief is
+already clear, skip it and start at `specify`.
+
 Two checkpoints inside the chain:
 
 - **STOP #1 — clarify** runs after `clarify`. If `spec.md` still has `[NEEDS CLARIFICATION]`

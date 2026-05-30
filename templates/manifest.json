@@ -2,6 +2,7 @@
   "version": "1.12.0",
   "core": [
     { "category": "skill", "name": "specflow", "source": "core/skills/specflow/SKILL.md" },
+    { "category": "phase", "name": "brainstorm", "suffix": "brainstorm.md", "source": "core/skills/specflow/phases/brainstorm.md" },
     { "category": "phase", "name": "specify", "suffix": "specify.md", "source": "core/skills/specflow/phases/specify.md" },
     { "category": "phase", "name": "clarify", "suffix": "clarify.md", "source": "core/skills/specflow/phases/clarify.md" },
     { "category": "phase", "name": "plan", "suffix": "plan.md", "source": "core/skills/specflow/phases/plan.md" },

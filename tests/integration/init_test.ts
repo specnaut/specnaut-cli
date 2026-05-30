@@ -437,6 +437,7 @@ Deno.test("specflow init scaffolds the consolidated router skill + 11 phase docs
     );
     for (
       const name of [
+        "brainstorm",
         "specify",
         "plan",
         "tasks",

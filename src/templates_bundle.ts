@@ -11,10 +11,11 @@ export const CORE_BUNDLE: CoreBundle = [
     suffix: null,
     content: `---
 name: specflow
-description: Specflow workflow router — entry point for the spec-driven pipeline. \`/specflow <phase> [args]\` dispatches to a single phase (specify, clarify, plan, tasks, analyze, implement, review, merge, constitution, checklist, groom, tag-version, release-version, list-skills, audit). \`/specflow\` with no args prints the workflow overview.
-argument-hint: <specify|clarify|plan|tasks|analyze|implement|review|merge|constitution|checklist|groom|tag-version|release-version|list-skills|audit> [args]
+description: Specflow workflow router — entry point for the spec-driven pipeline. \`/specflow <phase> [args]\` dispatches to a single phase (brainstorm, specify, clarify, plan, tasks, analyze, implement, review, merge, constitution, checklist, groom, tag-version, release-version, list-skills, audit). \`/specflow\` with no args prints the workflow overview.
+argument-hint: <brainstorm|specify|clarify|plan|tasks|analyze|implement|review|merge|constitution|checklist|groom|tag-version|release-version|list-skills|audit> [args]
 when_to_use: |
   Trigger phrases that should route here:
+  - brainstorm: "I have a rough idea", "help me figure out what to build", "let's brainstorm a feature", "I don't know exactly what I want yet"
   - specify: "spec out a feature", "write a spec", "create a specification"
   - clarify: "clarify requirements", "fill in gaps in the spec"
   - plan: "plan a feature", "build a technical plan"
@@ -91,6 +92,7 @@ when_to_use: |
 
 | Phase | Reference | One-liner |
 |-------|-----------|-----------|
+| \`brainstorm\` | \`phases/brainstorm.md\` | Optional step 0 — discover a fuzzy idea through dialogue, then hand the agreed brief to \`specify\`. |
 | \`specify\` | \`phases/specify.md\` | Create or update the feature spec from a natural-language description. |
 | \`clarify\` | \`phases/clarify.md\` | Resolve ambiguities in the spec via structured questioning. |
 | \`plan\` | \`phases/plan.md\` | Generate the technical plan, research, data model, contracts, quickstart. |
@@ -111,8 +113,8 @@ when_to_use: |
 | \`audit architecture\` | \`phases/audit-architecture.md\` | Read-only project-wide architectural sweep — hex-layer violations, circular deps, god files, bounded-context leaks. |
 | \`audit dependencies\` | \`phases/audit-dependencies.md\` | Read-only multi-manifest dependency-hygiene sweep — unbounded ranges, missing lockfiles, unused deps, license violations, typosquats. |
 
-Chainable phases are: \`specify\`, \`clarify\`, \`plan\`, \`tasks\`, \`analyze\`,
-\`implement\`, \`review\`. The others (\`merge\`, \`constitution\`,
+Chainable phases are: \`brainstorm\`, \`specify\`, \`clarify\`, \`plan\`, \`tasks\`,
+\`analyze\`, \`implement\`, \`review\`. The others (\`merge\`, \`constitution\`,
 \`checklist\`, \`groom\`, \`tag-version\`, \`release-version\`, \`list-skills\`,
 \`audit security\`, \`audit performance\`, \`audit accessibility\`,
 \`audit architecture\`, \`audit dependencies\`) are one-shot regardless
@@ -150,16 +152,16 @@ After the phase procedure completes successfully:
 - \`CHAIN_MODE == continue\` → read \`phases/auto-chain.md\` and chain
   through the remaining phases regardless of downstream-artefact state.
 - \`CHAIN_MODE == auto\` (the default) → read \`phases/auto-chain.md\`. For
-  \`specify\`, the chain always continues. For any other chainable phase,
-  apply the artefact-detection table in that file — chain if downstream
-  artefacts are absent, one-shot if present.
+  \`brainstorm\` and \`specify\`, the chain always continues. For any other
+  chainable phase, apply the artefact-detection table in that file — chain
+  if downstream artefacts are absent, one-shot if present.
 
 ## Workflow overview
 
 \`\`\`
-specify → clarify → plan → tasks → analyze → implement → review → merge
-                                                                    ▲
-                                                          STOP for pre-merge validation
+(brainstorm) → specify → clarify → plan → tasks → analyze → implement → review → merge
+    ▲                                                                              ▲
+    optional step 0 — only when the idea is still fuzzy            STOP for pre-merge validation
 \`\`\`
 
 Default behavior: \`/specflow specify "..."\` runs the entire chain in one
@@ -167,9 +169,25 @@ session, pausing only at STOP #1 (if clarifications are needed) and
 STOP #2 (pre-merge confirmation). See \`phases/auto-chain.md\` for the
 chain mechanics.
 
+\`brainstorm\` is an **optional front-end**: when the user doesn't yet have a
+clear enough idea to spec, \`/specflow brainstorm "<rough idea>"\` runs a
+discovery dialogue (one question at a time, 2–3 approaches, design approval)
+and then chains into \`specify\` with the agreed brief. When the brief is
+already clear, start at \`/specflow specify\` and skip it.
+
 \`constitution\`, \`checklist\`, \`groom\`, \`tag-version\`, \`release-version\`, \`list-skills\`, and \`audit <axis>\` (any of \`security\`, \`performance\`, \`accessibility\`, \`architecture\`, \`dependencies\`) are out-of-band utilities, not part of the linear flow.
 
 ## Typical flow
+
+When the idea is still fuzzy, start one phase earlier:
+
+\`\`\`
+/specflow brainstorm "let users monitor agent runs from their phone"
+  → discovery dialogue (one question at a time, 2–3 approaches, design approval)
+  → on approval, auto-chains into /specflow specify with the agreed brief
+\`\`\`
+
+When the brief is already clear, start at \`specify\`:
 
 \`\`\`
 /specflow specify "Add OAuth2 login"
@@ -210,6 +228,100 @@ Without an explicit flag, \`phases/specify.md\` scores the brief
 against \`phases/lite-heuristic.md\` and either prompts the user once or
 commits to a shape silently. See \`phases/auto-chain.md\` for how the
 chain sequence adapts to the chosen shape.
+`,
+    executable: false,
+    backend: null,
+    skipIfExists: false,
+  },
+  {
+    category: "phase",
+    name: "brainstorm",
+    suffix: "brainstorm.md",
+    content: `## User Input
+
+\`\`\`text
+\$ARGUMENTS
+\`\`\`
+
+\`\$ARGUMENTS\` is the rough idea to brainstorm. It may be vague ("something to
+let users monitor agent runs from their phone"), a bare issue title, or
+**empty** — if empty, open with a single question: "What do you want to
+build? Describe it in a sentence or two, even roughly." Do not pick a topic
+yourself.
+
+## Purpose
+
+\`brainstorm\` is the optional **step 0** of the spec-driven pipeline: the
+entry point for when the user does NOT yet have a clear enough idea to write
+a spec. It runs a collaborative discovery dialogue, turns the fuzzy idea into
+an approved design brief, then hands that brief to \`/specflow specify\` — which
+owns writing the formal \`.specflow/specs/<feature>/spec.md\`.
+
+Use this phase when the idea needs *discovery* before it can be specified.
+When the user already has a clear brief, they invoke \`/specflow specify\`
+directly and skip this phase.
+
+## Procedure
+
+The discovery dialogue is already defined, in full, by the bundled
+**\`brainstorming\` skill**. Do not duplicate it here.
+
+1. **Run the \`brainstorming\` skill's discovery process.** Read the
+   \`brainstorming\` skill (via the \`Skill\` tool, or read its \`SKILL.md\` if the
+   platform cannot invoke it) and follow its **Steps 1–6**:
+   - Step 1 — explore project context (\`git log\`, \`AGENTS.md\`,
+     \`.specflow/memory/constitution.md\`, the relevant directory structure).
+   - Step 2 — assess scope; if the idea spans multiple independent
+     subsystems, propose splitting it into one brainstorm per subsystem
+     (a multi-subsystem idea is an Epic, not one feature).
+   - Step 3 — ask clarifying questions **one at a time**, multiple-choice
+     where possible (purpose, success criteria, constraints, out of scope).
+   - Step 4 — propose 2–3 approaches with trade-offs; lead with a
+     recommendation.
+   - Step 5 — present the design section by section, confirming each.
+   - Step 6 — design for isolation and clarity.
+
+2. **Get explicit design approval.** Honour the skill's hard rule: no
+   handoff until the user has approved the design. The design may be short
+   for small ideas, but it MUST be presented and approved.
+
+## Terminal handoff — overridden for the spec-kit chain
+
+The standalone \`brainstorming\` skill ends (its Steps 7–10) by writing its own
+markdown design doc and forking to \`writing-plans\` **or** \`/specflow specify\`.
+Inside the \`/specflow\` router this phase **overrides that ending**:
+
+- **Do NOT** write a separate design doc and do **NOT** hand off to
+  \`writing-plans\`. \`/specflow specify\` is the next phase and it owns writing
+  \`.specflow/specs/<feature>/spec.md\`, so a brainstorm-authored doc would only
+  double up.
+- Instead, distill the approved design into a concise **feature brief**
+  (2–6 sentences capturing goal, the chosen approach, key constraints, and
+  explicit out-of-scope items) and carry it forward as the input to
+  \`/specflow specify\`.
+
+## Chain decision
+
+\`brainstorm\` is a **chainable** phase. Its next phase is always \`specify\`
+(in both the full and lite chain shapes).
+
+- \`CHAIN_MODE == auto\` (default) or \`continue\` → after design approval,
+  immediately invoke \`/specflow specify\` with the distilled feature brief as
+  its \`\$ARGUMENTS\`. Emit \`✓ brainstorm complete — proceeding to specify\`.
+  The chain then continues normally from \`specify\` (which applies its own
+  lite/full shape heuristic).
+- \`CHAIN_MODE == off\` (\`--manual\`) or \`once\` → stop after design approval.
+  Print the approved feature brief and tell the user they can run
+  \`/specflow specify "<brief>"\` when ready. Do not auto-invoke \`specify\`.
+
+## Notes
+
+- This phase is design-only: it asks questions and produces a brief. It
+  writes no spec, no plan, and no code — those belong to \`specify\` and the
+  phases after it.
+- Backlog mutations (e.g. refining a vague issue body into the agreed brief)
+  go through the \`product-owner\` agent, never inline — consistent with the
+  rest of the pipeline.
 `,
     executable: false,
     backend: null,
@@ -2403,17 +2515,22 @@ The script emits the body verbatim. Do NOT:
 
 This file carries the chain mechanics that the \`/specflow\` router follows
 when chain mode is engaged. The router reads it after a chainable phase
-(\`specify\`, \`clarify\`, \`plan\`, \`tasks\`, \`analyze\`, \`implement\`, \`review\`)
-completes — unless \`--manual\` or \`--once\` was passed, or downstream
+(\`brainstorm\`, \`specify\`, \`clarify\`, \`plan\`, \`tasks\`, \`analyze\`, \`implement\`,
+\`review\`) completes — unless \`--manual\` or \`--once\` was passed, or downstream
 artefacts indicate one-shot intent.
 
 ## Default flow
 
 \`\`\`
-specify → clarify → plan → tasks → analyze → implement → review → merge
-          ▲                                                        ▲
-          STOP #1 (only if clarifications needed)                  STOP #2 (pre-merge validation)
+(brainstorm) → specify → clarify → plan → tasks → analyze → implement → review → merge
+                         ▲                                                        ▲
+                         STOP #1 (only if clarifications needed)                  STOP #2 (pre-merge validation)
 \`\`\`
+
+\`brainstorm\` is the optional step 0 (see \`phases/brainstorm.md\`). It runs
+only when the user invokes \`/specflow brainstorm\` because the idea is still
+fuzzy; on design approval it always chains into \`specify\`, which then drives
+the rest of the flow. Entering at \`specify\` skips it.
 
 ## Lite chain
 
@@ -2459,6 +2576,7 @@ The **next phase** depends on the chain shape recorded in
 
 | Current phase | Next (full) | Next (lite) |
 |---|---|---|
+| \`brainstorm\` | \`specify\`   | \`specify\`   |
 | \`specify\`   | \`clarify\`   | \`plan\`      |
 | \`clarify\`   | \`plan\`      | n/a (lite never runs clarify) |
 | \`plan\`      | \`tasks\`     | \`analyze\`   |
