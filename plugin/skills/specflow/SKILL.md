@@ -1,9 +1,10 @@
 ---
 name: specflow
-description: Specflow workflow router — entry point for the spec-driven pipeline. `/specflow <phase> [args]` dispatches to a single phase (specify, clarify, plan, tasks, analyze, implement, review, merge, constitution, checklist, groom, tag-version, release-version, list-skills, audit). `/specflow` with no args prints the workflow overview.
-argument-hint: <specify|clarify|plan|tasks|analyze|implement|review|merge|constitution|checklist|groom|tag-version|release-version|list-skills|audit> [args]
+description: Specflow workflow router — entry point for the spec-driven pipeline. `/specflow <phase> [args]` dispatches to a single phase (brainstorm, specify, clarify, plan, tasks, analyze, implement, review, merge, constitution, checklist, groom, tag-version, release-version, list-skills, audit). `/specflow` with no args prints the workflow overview.
+argument-hint: <brainstorm|specify|clarify|plan|tasks|analyze|implement|review|merge|constitution|checklist|groom|tag-version|release-version|list-skills|audit> [args]
 when_to_use: |
   Trigger phrases that should route here:
+  - brainstorm: "I have a rough idea", "help me figure out what to build", "let's brainstorm a feature", "I don't know exactly what I want yet"
   - specify: "spec out a feature", "write a spec", "create a specification"
   - clarify: "clarify requirements", "fill in gaps in the spec"
   - plan: "plan a feature", "build a technical plan"
@@ -80,6 +81,7 @@ when_to_use: |
 
 | Phase | Reference | One-liner |
 |-------|-----------|-----------|
+| `brainstorm` | `phases/brainstorm.md` | Optional step 0 — discover a fuzzy idea through dialogue, then hand the agreed brief to `specify`. |
 | `specify` | `phases/specify.md` | Create or update the feature spec from a natural-language description. |
 | `clarify` | `phases/clarify.md` | Resolve ambiguities in the spec via structured questioning. |
 | `plan` | `phases/plan.md` | Generate the technical plan, research, data model, contracts, quickstart. |
@@ -100,8 +102,8 @@ when_to_use: |
 | `audit architecture` | `phases/audit-architecture.md` | Read-only project-wide architectural sweep — hex-layer violations, circular deps, god files, bounded-context leaks. |
 | `audit dependencies` | `phases/audit-dependencies.md` | Read-only multi-manifest dependency-hygiene sweep — unbounded ranges, missing lockfiles, unused deps, license violations, typosquats. |
 
-Chainable phases are: `specify`, `clarify`, `plan`, `tasks`, `analyze`,
-`implement`, `review`. The others (`merge`, `constitution`,
+Chainable phases are: `brainstorm`, `specify`, `clarify`, `plan`, `tasks`,
+`analyze`, `implement`, `review`. The others (`merge`, `constitution`,
 `checklist`, `groom`, `tag-version`, `release-version`, `list-skills`,
 `audit security`, `audit performance`, `audit accessibility`,
 `audit architecture`, `audit dependencies`) are one-shot regardless
@@ -139,16 +141,16 @@ After the phase procedure completes successfully:
 - `CHAIN_MODE == continue` → read `phases/auto-chain.md` and chain
   through the remaining phases regardless of downstream-artefact state.
 - `CHAIN_MODE == auto` (the default) → read `phases/auto-chain.md`. For
-  `specify`, the chain always continues. For any other chainable phase,
-  apply the artefact-detection table in that file — chain if downstream
-  artefacts are absent, one-shot if present.
+  `brainstorm` and `specify`, the chain always continues. For any other
+  chainable phase, apply the artefact-detection table in that file — chain
+  if downstream artefacts are absent, one-shot if present.
 
 ## Workflow overview
 
 ```
-specify → clarify → plan → tasks → analyze → implement → review → merge
-                                                                    ▲
-                                                          STOP for pre-merge validation
+(brainstorm) → specify → clarify → plan → tasks → analyze → implement → review → merge
+    ▲                                                                              ▲
+    optional step 0 — only when the idea is still fuzzy            STOP for pre-merge validation
 ```
 
 Default behavior: `/specflow specify "..."` runs the entire chain in one
@@ -156,9 +158,25 @@ session, pausing only at STOP #1 (if clarifications are needed) and
 STOP #2 (pre-merge confirmation). See `phases/auto-chain.md` for the
 chain mechanics.
 
+`brainstorm` is an **optional front-end**: when the user doesn't yet have a
+clear enough idea to spec, `/specflow brainstorm "<rough idea>"` runs a
+discovery dialogue (one question at a time, 2–3 approaches, design approval)
+and then chains into `specify` with the agreed brief. When the brief is
+already clear, start at `/specflow specify` and skip it.
+
 `constitution`, `checklist`, `groom`, `tag-version`, `release-version`, `list-skills`, and `audit <axis>` (any of `security`, `performance`, `accessibility`, `architecture`, `dependencies`) are out-of-band utilities, not part of the linear flow.
 
 ## Typical flow
+
+When the idea is still fuzzy, start one phase earlier:
+
+```
+/specflow brainstorm "let users monitor agent runs from their phone"
+  → discovery dialogue (one question at a time, 2–3 approaches, design approval)
+  → on approval, auto-chains into /specflow specify with the agreed brief
+```
+
+When the brief is already clear, start at `specify`:
 
 ```
 /specflow specify "Add OAuth2 login"
