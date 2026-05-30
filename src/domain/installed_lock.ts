@@ -16,11 +16,12 @@ export const KNOWN_HARNESSES: ReadonlyArray<KnownHarness> = [
   "opencode",
 ];
 
-export type BacklogBackend = "local" | "github" | "gitlab";
+export type BacklogBackend = "local" | "github" | "gitlab" | "cloud";
 export const KNOWN_BACKLOG_BACKENDS: ReadonlyArray<BacklogBackend> = [
   "local",
   "github",
   "gitlab",
+  "cloud",
 ];
 
 export type VersionScheme = "semver" | "date";

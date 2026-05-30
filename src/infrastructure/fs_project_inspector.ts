@@ -181,9 +181,10 @@ export class FsProjectInspector implements ProjectInspector {
       };
     }
 
-    const requiredFields: Record<"github" | "gitlab", string[]> = {
+    const requiredFields: Record<"github" | "gitlab" | "cloud", string[]> = {
       github: ["repo", "project_number"],
       gitlab: ["project_id"],
+      cloud: ["api_url", "api_token", "project_key"],
     };
 
     const missing: string[] = [];

@@ -2,6 +2,7 @@ import { assertEquals, assertThrows } from "@std/assert";
 import { LocalBacklogStrategy } from "../../src/domain/backlog_strategies/local.ts";
 import { GithubBacklogStrategy } from "../../src/domain/backlog_strategies/github.ts";
 import { GitlabBacklogStrategy } from "../../src/domain/backlog_strategies/gitlab.ts";
+import { CloudBacklogStrategy } from "../../src/domain/backlog_strategies/cloud.ts";
 import {
   BACKLOG_STRATEGIES,
   findBacklogStrategy,
@@ -81,6 +82,35 @@ Deno.test("GitlabBacklogStrategy.initConfigMessages mentions glab CLI prerequisi
   const joined = msgs.join("\n");
   assertEquals(joined.includes("backlog-config.yml"), true);
   assertEquals(joined.includes("glab"), true);
+});
+
+// ── CloudBacklogStrategy ────────────────────────────────────────────────────
+
+Deno.test("CloudBacklogStrategy exposes key 'cloud'", () => {
+  assertEquals(new CloudBacklogStrategy().key, "cloud");
+});
+
+Deno.test("CloudBacklogStrategy displayName mentions Specflow Cloud + token", () => {
+  const dn = new CloudBacklogStrategy().displayName;
+  assertEquals(dn.includes("Specflow Cloud"), true);
+  assertEquals(dn.includes("token"), true);
+});
+
+Deno.test("CloudBacklogStrategy.initConfigStub contains api_url + api_token + project_key keys", () => {
+  const stub = new CloudBacklogStrategy().initConfigStub();
+  assertEquals(typeof stub, "string");
+  if (typeof stub !== "string") return;
+  assertEquals(stub.includes("api_url:"), true);
+  assertEquals(stub.includes("api_token:"), true);
+  assertEquals(stub.includes("project_key:"), true);
+});
+
+Deno.test("CloudBacklogStrategy.initConfigMessages mentions backlog-config.yml + token", () => {
+  const msgs = new CloudBacklogStrategy().initConfigMessages();
+  assertEquals(msgs.length >= 2, true);
+  const joined = msgs.join("\n");
+  assertEquals(joined.includes("backlog-config.yml"), true);
+  assertEquals(joined.includes("token"), true);
 });
 
 // ── Stub population from Kanban URL (#147) ─────────────────────────────────
@@ -200,6 +230,10 @@ Deno.test("findBacklogStrategy returns the github strategy for 'github'", () => 
 
 Deno.test("findBacklogStrategy returns the gitlab strategy for 'gitlab'", () => {
   assertEquals(findBacklogStrategy("gitlab").key, "gitlab");
+});
+
+Deno.test("findBacklogStrategy returns the cloud strategy for 'cloud'", () => {
+  assertEquals(findBacklogStrategy("cloud").key, "cloud");
 });
 
 Deno.test("findBacklogStrategy throws on an unknown backend", () => {

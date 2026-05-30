@@ -135,6 +135,53 @@ Deno.test("init --backlog github renders the github skill + writes config stub",
   });
 });
 
+Deno.test("init --backlog cloud renders the cloud skill + writes config stub (no URL needed)", async () => {
+  await withTempDir(async (parent) => {
+    const r = await runSpecflow(
+      ["init", "demo", "--no-git", "--ai", "claude", "--backlog", "cloud"],
+      { cwd: parent },
+    );
+    assertEquals(r.code, 0, r.stderr);
+
+    const skill = await Deno.readTextFile(
+      join(parent, "demo/.claude/skills/backlog/SKILL.md"),
+    );
+    assertStringIncludes(skill, "Backend: Specflow Cloud");
+    assertEquals(skill.includes("Backend: local Markdown"), false);
+    assertEquals(skill.includes("Backend: GitHub"), false);
+
+    // Cloud-flavored scripts present; add.sh hits the HTTP API, not gh/glab
+    assertEquals(
+      await exists(join(parent, "demo/.specflow/scripts/backlog/_config.sh")),
+      true,
+    );
+    const addScript = await Deno.readTextFile(
+      join(parent, "demo/.specflow/scripts/backlog/add.sh"),
+    );
+    assertStringIncludes(addScript, "Authorization: Bearer");
+    assertStringIncludes(addScript, "$API_BASE/tasks");
+    assertEquals(addScript.includes("gh issue create"), false);
+    // The /api/v1 base lives in _config.sh
+    const configScript = await Deno.readTextFile(
+      join(parent, "demo/.specflow/scripts/backlog/_config.sh"),
+    );
+    assertStringIncludes(configScript, "/api/v1");
+
+    // Config stub written with the three cloud fields
+    const config = await Deno.readTextFile(
+      join(parent, "demo/.specflow/backlog-config.yml"),
+    );
+    assertStringIncludes(config, "api_url:");
+    assertStringIncludes(config, "api_token:");
+    assertStringIncludes(config, "project_key:");
+
+    const lock = await Deno.readTextFile(
+      join(parent, "demo/.specflow/installed.lock"),
+    );
+    assertStringIncludes(lock, "backlog_backend: cloud");
+  });
+});
+
 Deno.test("init --backlog gitlab renders the gitlab skill + writes config stub", async () => {
   await withTempDir(async (parent) => {
     const r = await runSpecflow(

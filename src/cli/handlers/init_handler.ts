@@ -288,6 +288,9 @@ function resolveKanbanURL(
   rawUrlFlag: string | null,
 ): { ok: true; url: ParsedKanbanURL | null } | { ok: false; reason: string } {
   if (backend === "local") return { ok: true, url: null };
+  // Cloud is configured by API endpoint + token (filled into backlog-config.yml
+  // post-init), not a Kanban URL — so there's no URL to resolve or prompt for.
+  if (backend === "cloud") return { ok: true, url: null };
   if (rawUrlFlag !== null) {
     const parsed = parseKanbanURL(rawUrlFlag);
     if (parsed === null) {

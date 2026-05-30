@@ -58,7 +58,7 @@ export type Intent =
      * resolution semantics as `ai`: interactive prompt when stdin is a TTY,
      * default fallback otherwise.
      */
-    backlog: "local" | "github" | "gitlab" | null;
+    backlog: BacklogBackend | null;
     /**
      * Raw Kanban / project URL passed via `--backlog-url`. The init handler
      * parses it via `parseKanbanURL` and writes the populated config stub.
@@ -90,7 +90,7 @@ export type Intent =
      * bundled backlog skill and updates the lock. `null` keeps the lock's
      * current backend.
      */
-    backlog: "local" | "github" | "gitlab" | null;
+    backlog: BacklogBackend | null;
     /**
      * `--reset-baseline`. Heals stale lock SHAs by trusting the on-disk
      * content as the new baseline. See `UpgradeProjectInput.resetBaseline`.

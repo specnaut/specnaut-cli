@@ -242,6 +242,47 @@ The first time the PO runs against this project, it will create the 5
 `In progress`, `In review`, `Done`).
 <!-- END: backend=gitlab -->
 
+<!-- BEGIN: backend=cloud -->
+## Backend: Specflow Cloud
+
+This project's backlog lives on **Specflow Cloud** — a hosted, real-time Kanban
+board reached over a small HTTP API. No `gh`/`glab` CLI and no GitHub/GitLab
+rate limits. Configuration is read from `.specflow/backlog-config.yml` at
+runtime.
+
+### Configuration file
+
+```yaml
+# .specflow/backlog-config.yml
+api_url: https://your-deployment.convex.site   # Specflow Cloud API base
+api_token: ""                                   # API token (sfc_…) — keep secret
+project_key: CLOUD                              # the project's short key
+```
+
+### Scripts
+
+```bash
+.specflow/scripts/backlog/list.sh [Status]            # all tasks (status = column), optional filter
+.specflow/scripts/backlog/view.sh <number>            # one task (status, priority, size, body)
+.specflow/scripts/backlog/add.sh "<title>" [body]     # create a task → returns KEY-N
+.specflow/scripts/backlog/move.sh <number> <Status>   # Backlog|Ready|"In Progress"|"In Review"|Done
+```
+
+The scripts authenticate with `Authorization: Bearer <api_token>` and talk to
+`<api_url>/api/v1/` (`/tasks`, `/columns`). `move.sh` passes a **status name**
+(the column name); the API resolves it to the column server-side.
+
+### Prerequisites
+
+- `curl` and `jq` on PATH.
+- A Specflow Cloud project + API token pasted into `backlog-config.yml`.
+
+### Not yet on the Cloud backend
+
+- Epics / sub-tasks and label management are not exposed over the API yet —
+  use the board UI for those for now.
+<!-- END: backend=cloud -->
+
 ## Epics & sub-tasks
 
 Big work that needs decomposition lives as a parent **epic** with one or

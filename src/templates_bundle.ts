@@ -8797,6 +8797,47 @@ The first time the PO runs against this project, it will create the 5
 \`In progress\`, \`In review\`, \`Done\`).
 <!-- END: backend=gitlab -->
 
+<!-- BEGIN: backend=cloud -->
+## Backend: Specflow Cloud
+
+This project's backlog lives on **Specflow Cloud** — a hosted, real-time Kanban
+board reached over a small HTTP API. No \`gh\`/\`glab\` CLI and no GitHub/GitLab
+rate limits. Configuration is read from \`.specflow/backlog-config.yml\` at
+runtime.
+
+### Configuration file
+
+\`\`\`yaml
+# .specflow/backlog-config.yml
+api_url: https://your-deployment.convex.site   # Specflow Cloud API base
+api_token: ""                                   # API token (sfc_…) — keep secret
+project_key: CLOUD                              # the project's short key
+\`\`\`
+
+### Scripts
+
+\`\`\`bash
+.specflow/scripts/backlog/list.sh [Status]            # all tasks (status = column), optional filter
+.specflow/scripts/backlog/view.sh <number>            # one task (status, priority, size, body)
+.specflow/scripts/backlog/add.sh "<title>" [body]     # create a task → returns KEY-N
+.specflow/scripts/backlog/move.sh <number> <Status>   # Backlog|Ready|"In Progress"|"In Review"|Done
+\`\`\`
+
+The scripts authenticate with \`Authorization: Bearer <api_token>\` and talk to
+\`<api_url>/api/v1/\` (\`/tasks\`, \`/columns\`). \`move.sh\` passes a **status name**
+(the column name); the API resolves it to the column server-side.
+
+### Prerequisites
+
+- \`curl\` and \`jq\` on PATH.
+- A Specflow Cloud project + API token pasted into \`backlog-config.yml\`.
+
+### Not yet on the Cloud backend
+
+- Epics / sub-tasks and label management are not exposed over the API yet —
+  use the board UI for those for now.
+<!-- END: backend=cloud -->
+
 ## Epics & sub-tasks
 
 Big work that needs decomposition lives as a parent **epic** with one or
@@ -10714,6 +10755,212 @@ exit 0
 `,
     executable: true,
     backend: "gitlab",
+    skipIfExists: false,
+  },
+  {
+    category: "backlog-script",
+    name: "_config",
+    suffix: "_config.sh",
+    content: `#!/usr/bin/env bash
+# Helper: read api_url + api_token + project_key from .specflow/backlog-config.yml.
+# Sourced by the other cloud-backend scripts. Exports API_BASE (…/api/v1).
+set -euo pipefail
+
+ROOT="\$(cd "\$(dirname "\$0")/../../.." && pwd)"
+CONFIG="\$ROOT/.specflow/backlog-config.yml"
+
+if [ ! -f "\$CONFIG" ]; then
+  echo "error: \$CONFIG not found. Fill in api_url + api_token + project_key first." >&2
+  exit 2
+fi
+
+# Extract YAML scalars. Strip surrounding quotes.
+extract() {
+  awk -v key="\$1" '
+    \$0 ~ "^"key":" {
+      sub("^"key":[[:space:]]*", "")
+      gsub(/^["'"'"']|["'"'"']\$/, "")
+      print
+      exit
+    }
+  ' "\$CONFIG"
+}
+
+API_URL=\$(extract api_url)
+API_TOKEN=\$(extract api_token)
+PROJECT_KEY=\$(extract project_key)
+
+if [ -z "\$API_URL" ] || [ -z "\$API_TOKEN" ] || [ -z "\$PROJECT_KEY" ]; then
+  echo "error: backlog-config.yml is missing api_url, api_token, or project_key." >&2
+  echo "Edit \$CONFIG before running this command." >&2
+  exit 2
+fi
+
+API_BASE="\${API_URL%/}/api/v1"
+
+export API_URL API_TOKEN PROJECT_KEY API_BASE
+`,
+    executable: true,
+    backend: "cloud",
+    skipIfExists: false,
+  },
+  {
+    category: "backlog-script",
+    name: "list",
+    suffix: "list.sh",
+    content: `#!/usr/bin/env bash
+# List tasks on the Specflow Cloud board, with their status (column name).
+# Optional Status filter.
+#
+# Usage: list.sh [Status]
+set -euo pipefail
+
+# shellcheck source=./_config.sh
+. "\$(dirname "\$0")/_config.sh"
+
+FILTER="\${1:-}"
+AUTH=(-H "Authorization: Bearer \$API_TOKEN")
+
+COLS=\$(curl -fsS "\$API_BASE/columns?projectKey=\$PROJECT_KEY" "\${AUTH[@]}")
+TASKS=\$(curl -fsS "\$API_BASE/tasks?projectKey=\$PROJECT_KEY" "\${AUTH[@]}")
+
+echo "\$TASKS" | jq -r --argjson cols "\$COLS" --arg filter "\$FILTER" '
+  (\$cols.columns | map({ (.id): .name }) | add) as \$names
+  | .tasks
+  | sort_by(.number)[]
+  | (\$names[.columnId] // "—") as \$status
+  | select(\$filter == "" or \$status == \$filter)
+  | "  #\\(.number)  \\(\$status)  \\(.title)"
+'
+`,
+    executable: true,
+    backend: "cloud",
+    skipIfExists: false,
+  },
+  {
+    category: "backlog-script",
+    name: "view",
+    suffix: "view.sh",
+    content: `#!/usr/bin/env bash
+# Show one Specflow Cloud task (status, priority, size, body).
+# Usage: view.sh <number>
+set -euo pipefail
+
+# shellcheck source=./_config.sh
+. "\$(dirname "\$0")/_config.sh"
+
+if [ "\$#" -lt 1 ]; then
+  echo "usage: \$0 <number>" >&2
+  exit 2
+fi
+NUM="\$1"
+AUTH=(-H "Authorization: Bearer \$API_TOKEN")
+
+COLS=\$(curl -fsS "\$API_BASE/columns?projectKey=\$PROJECT_KEY" "\${AUTH[@]}")
+RESP=\$(curl -fsS "\$API_BASE/tasks?projectKey=\$PROJECT_KEY&number=\$NUM" "\${AUTH[@]}")
+
+echo "\$RESP" | jq -r --argjson cols "\$COLS" '
+  (\$cols.columns | map({ (.id): .name }) | add) as \$names
+  | .task
+  | "#\\(.number)  \\(.title)",
+    "status:   \\(\$names[.columnId] // "—")",
+    "priority: \\(.priority // "—")    size: \\(.size // "—")",
+    "",
+    (.body // "(no description)")
+'
+`,
+    executable: true,
+    backend: "cloud",
+    skipIfExists: false,
+  },
+  {
+    category: "backlog-script",
+    name: "add",
+    suffix: "add.sh",
+    content: `#!/usr/bin/env bash
+# Create a task on the Specflow Cloud board.
+# Usage: add.sh "<title>" [body]
+set -euo pipefail
+
+while [ \$# -gt 0 ]; do
+  case "\$1" in
+    -h | --help)
+      echo 'usage: add.sh "<title>" [body]'
+      exit 0
+      ;;
+    *) break ;;
+  esac
+done
+
+if [ "\$#" -lt 1 ]; then
+  echo 'usage: add.sh "<title>" [body]' >&2
+  exit 2
+fi
+TITLE="\$1"
+BODY="\${2:-}"
+
+# shellcheck source=./_config.sh
+. "\$(dirname "\$0")/_config.sh"
+
+PAYLOAD=\$(jq -n --arg k "\$PROJECT_KEY" --arg t "\$TITLE" --arg b "\$BODY" \\
+  '{ projectKey: \$k, title: \$t } + (if \$b == "" then {} else { body: \$b } end)')
+
+RESP=\$(curl -fsS -X POST "\$API_BASE/tasks" \\
+  -H "Authorization: Bearer \$API_TOKEN" \\
+  -H "Content-Type: application/json" \\
+  -d "\$PAYLOAD")
+
+KEY=\$(echo "\$RESP" | jq -r '.task.key // empty')
+if [ -n "\$KEY" ]; then
+  echo "✓ created: \$KEY"
+else
+  echo "✗ create failed: \$RESP" >&2
+  exit 1
+fi
+`,
+    executable: true,
+    backend: "cloud",
+    skipIfExists: false,
+  },
+  {
+    category: "backlog-script",
+    name: "move",
+    suffix: "move.sh",
+    content: `#!/usr/bin/env bash
+# Move a task to <Status> (a column name, e.g. "In Progress"). The Cloud API
+# resolves the column name → columnId server-side.
+#
+# Usage: move.sh <number> <Status>
+set -euo pipefail
+
+# shellcheck source=./_config.sh
+. "\$(dirname "\$0")/_config.sh"
+
+if [ "\$#" -lt 2 ]; then
+  echo 'usage: move.sh <number> <Status>' >&2
+  echo '  Status one of: Backlog, Ready, "In Progress", "In Review", Done' >&2
+  exit 2
+fi
+NUM="\$1"
+STATUS="\$2"
+
+PAYLOAD=\$(jq -n --arg k "\$PROJECT_KEY" --argjson n "\$NUM" --arg s "\$STATUS" \\
+  '{ projectKey: \$k, number: \$n, status: \$s }')
+
+RESP=\$(curl -fsS -X PATCH "\$API_BASE/tasks" \\
+  -H "Authorization: Bearer \$API_TOKEN" \\
+  -H "Content-Type: application/json" \\
+  -d "\$PAYLOAD")
+
+if echo "\$RESP" | jq -e '.ok' >/dev/null 2>&1; then
+  echo "✓ #\$NUM → \$STATUS"
+else
+  echo "✗ move failed: \$RESP" >&2
+  exit 1
+fi
+`,
+    executable: true,
+    backend: "cloud",
     skipIfExists: false,
   },
   {
