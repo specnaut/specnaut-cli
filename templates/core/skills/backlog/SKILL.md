@@ -266,6 +266,7 @@ project_key: CLOUD                              # the project's short key
 .specflow/scripts/backlog/view.sh <number>            # one task (status, priority, size, body)
 .specflow/scripts/backlog/add.sh "<title>" [body]     # create a task → returns KEY-N
 .specflow/scripts/backlog/move.sh <number> <Status>   # Backlog|Ready|"In Progress"|"In Review"|Done
+.specflow/scripts/backlog/clarify-comment.sh <number> "<question>"
 ```
 
 The scripts authenticate with `Authorization: Bearer <api_token>` and talk to

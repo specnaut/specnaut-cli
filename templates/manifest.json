@@ -95,6 +95,7 @@
     { "category": "backlog-script", "name": "view", "suffix": "view.sh", "source": "core/skills/backlog/scripts/cloud/view.sh", "executable": true, "backend": "cloud" },
     { "category": "backlog-script", "name": "add", "suffix": "add.sh", "source": "core/skills/backlog/scripts/cloud/add.sh", "executable": true, "backend": "cloud" },
     { "category": "backlog-script", "name": "move", "suffix": "move.sh", "source": "core/skills/backlog/scripts/cloud/move.sh", "executable": true, "backend": "cloud" },
+    { "category": "backlog-script", "name": "clarify-comment", "suffix": "clarify-comment.sh", "source": "core/skills/backlog/scripts/cloud/clarify-comment.sh", "executable": true, "backend": "cloud" },
 
     { "category": "spec-root", "name": "specify", "suffix": "memory/constitution.md", "source": "core/specflow/memory/constitution.md", "skipIfExists": true },
     { "category": "spec-root", "name": "specify", "suffix": "backlog.md", "source": "core/specflow/backlog.md" },
