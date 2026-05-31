@@ -45,6 +45,10 @@ What the script does:
 - It does **not** create a GitHub / GitLab release — pushing a tag
   alone does not publish a release. Run `/specflow release-version`
   after this to publish the categorized release notes.
+- It does **not** deploy anything. A tag push never ships to
+  production — in the recommended model, deploys are triggered by a
+  *published release*, not by tags or branch pushes. See
+  `/specflow release-version` → "From release to production (CD)".
 - It does **not** edit version fields in `package.json` / `Cargo.toml`
   / `pyproject.toml` / etc. The git tag **is** the version — single
   source of truth.

@@ -2331,6 +2331,10 @@ What the script does:
 - It does **not** create a GitHub / GitLab release — pushing a tag
   alone does not publish a release. Run \`/specflow release-version\`
   after this to publish the categorized release notes.
+- It does **not** deploy anything. A tag push never ships to
+  production — in the recommended model, deploys are triggered by a
+  *published release*, not by tags or branch pushes. See
+  \`/specflow release-version\` → "From release to production (CD)".
 - It does **not** edit version fields in \`package.json\` / \`Cargo.toml\`
   / \`pyproject.toml\` / etc. The git tag **is** the version — single
   source of truth.
@@ -2481,6 +2485,114 @@ BODY=\$(bash .specflow/scripts/release/release.sh v1.2.3)
 # … hand \`\$BODY\` to your custom publisher
 \`\`\`
 
+## From release to production — the deploy model (CD)
+
+Publishing a release and *deploying* are two separate steps. Specflow owns
+the first (tag → notes → publish); this section is the opinionated model
+for wiring the second, so that publishing a release **is** what ships
+production.
+
+**The rule: production deploys are triggered ONLY by a published release —
+never by a push to your default branch.** A push to \`main\` should at most
+run a CI gate (lint / test / build); it must not deploy. A deploy ships the
+exact commits bundled between two versions, with the release notes above as
+the audit trail. This keeps "what's in production" equal to "the latest
+published release", always — no surprise deploy from a stray merge.
+
+### Reference workflow (GitHub Actions)
+
+Stack-agnostic skeleton — fill the \`TODO\`s with your own install / build /
+deploy commands (any target: a PaaS, a container registry, an SSH rsync, a
+serverless CLI). The **shape** is the opinionated part, not the tooling:
+
+\`\`\`yaml
+# .github/workflows/deploy-prod.yml
+name: deploy-prod
+on:
+  release:
+    types: [published]   # ONLY a published release deploys. No \`push:\` trigger.
+
+# Least privilege: the deploy authenticates to your provider via secrets,
+# not the GITHUB_TOKEN. Grant nothing it doesn't need.
+permissions:
+  contents: read
+
+# Never run two prod deploys at once; queue the newer one, don't cancel a
+# half-applied deploy mid-flight.
+concurrency:
+  group: deploy-prod
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    if: github.repository == 'OWNER/REPO'   # a fork that copied this can't deploy your prod
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with: { persist-credentials: false }
+      - uses: actions/setup-node@v4          # or your toolchain's setup
+        with: { node-version: 22, cache: npm }
+      - run: <install>                       # TODO e.g. npm ci
+      - name: Build
+        run: <build>                         # TODO produce the production artifact
+      - name: Gate — assert the prod artifact
+        run: |
+          # Optional but recommended: fail if a dev/staging endpoint leaked
+          # into the build before it ships. Example:
+          #   ! grep -rq 'staging.internal' dist/ || { echo 'dev URL in bundle'; exit 1; }
+          true
+      - name: Deploy
+        env:
+          DEPLOY_TOKEN: \${{ secrets.DEPLOY_TOKEN }}   # secrets only on the step that needs them
+        run: <deploy>                        # TODO ship it
+\`\`\`
+
+### Companion CI gate (separate file)
+
+Keep the lint/build/test gate in its own workflow on \`push\` /
+\`pull_request\`. It runs on every change but **never deploys**:
+
+\`\`\`yaml
+# .github/workflows/ci.yml
+name: ci
+on:
+  push: { branches: [main] }
+  pull_request: { branches: [main] }
+permissions:
+  contents: read
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: npm }
+      - run: <install> && <lint> && <build>   # TODO your gate commands
+\`\`\`
+
+### Why this shape
+
+- **Release-only trigger** — "what's deployed" is exactly "the latest
+  published release". No deploy fires from a branch push.
+- **Least-privilege \`permissions: contents: read\`** — a compromised step
+  can't rewrite the repo.
+- **\`concurrency\` (no cancel-in-progress)** — back-to-back releases deploy
+  in order; an in-flight deploy is never cut off half-applied.
+- **Per-step secrets** — credentials never enter steps that don't need them.
+- **Build/output gate** — catch a dev/staging endpoint before it ships.
+- **\`if: github.repository == …\`** — a fork can't run your production deploy.
+
+**Break-glass** (re-deploy without cutting a new tag): re-run the last
+release's deploy run from the Actions UI — it redeploys the same ref. There
+is deliberately no manual \`workflow_dispatch\` in the model above, so prod is
+only ever reached through a release.
+
+> GitLab CI mirrors this: a \`release\` rule (\`if: \$CI_COMMIT_TAG\` gated to a
+> protected tag + a \`release:\` job) instead of \`on: release\`, a
+> \`resource_group\` instead of \`concurrency\`, and masked/protected CI
+> variables instead of \`secrets\`.
+
 ## Important — release-notes contract
 
 The script emits the body verbatim. Do NOT:
@@ -2501,6 +2613,8 @@ The script emits the body verbatim. Do NOT:
 /specflow tag-version             → annotated tag created + pushed
 /specflow release-version         → categorized release notes (stdout)
 ↳ pipe to gh/glab release create  → release published
+   └─ (optional CD) a \`release: published\` job deploys production —
+      see "From release to production" above
 \`\`\`
 `,
     executable: false,
@@ -8821,6 +8935,7 @@ project_key: CLOUD                              # the project's short key
 .specflow/scripts/backlog/view.sh <number>            # one task (status, priority, size, body)
 .specflow/scripts/backlog/add.sh "<title>" [body]     # create a task → returns KEY-N
 .specflow/scripts/backlog/move.sh <number> <Status>   # Backlog|Ready|"In Progress"|"In Review"|Done
+.specflow/scripts/backlog/clarify-comment.sh <number> "<question>"
 \`\`\`
 
 The scripts authenticate with \`Authorization: Bearer <api_token>\` and talk to
@@ -10956,6 +11071,44 @@ if echo "\$RESP" | jq -e '.ok' >/dev/null 2>&1; then
   echo "✓ #\$NUM → \$STATUS"
 else
   echo "✗ move failed: \$RESP" >&2
+  exit 1
+fi
+`,
+    executable: true,
+    backend: "cloud",
+    skipIfExists: false,
+  },
+  {
+    category: "backlog-script",
+    name: "clarify-comment",
+    suffix: "clarify-comment.sh",
+    content: `#!/usr/bin/env bash
+# Post a clarification comment on a task.
+# Usage: clarify-comment.sh <number> "<question>"
+set -euo pipefail
+
+# shellcheck source=./_config.sh
+. "\$(dirname "\$0")/_config.sh"
+
+if [ "\$#" -lt 2 ]; then
+  echo 'usage: clarify-comment.sh <number> "<question>"' >&2
+  exit 2
+fi
+NUM="\$1"
+QUESTION="\$2"
+
+PAYLOAD=\$(jq -n --arg k "\$PROJECT_KEY" --argjson n "\$NUM" --arg b "\$QUESTION" \\
+  '{ projectKey: \$k, number: \$n, body: \$b }')
+
+RESP=\$(curl -fsS -X POST "\$API_BASE/comments" \\
+  -H "Authorization: Bearer \$API_TOKEN" \\
+  -H "Content-Type: application/json" \\
+  -d "\$PAYLOAD")
+
+if echo "\$RESP" | jq -e '.ok' >/dev/null 2>&1; then
+  echo "✓ commented on #\$NUM"
+else
+  echo "✗ comment failed: \$RESP" >&2
   exit 1
 fi
 `,
