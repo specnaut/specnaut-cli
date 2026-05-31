@@ -1,5 +1,5 @@
 {
-  "feature_directory": ".specflow/specs/002-po-cloud-stages",
-  "linked_issue": 354,
+  "feature_directory": ".specflow/specs/003-init-backlog-cloud",
+  "linked_issue": 353,
   "workflow_shape": "full"
 }
