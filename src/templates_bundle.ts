@@ -6472,9 +6472,6 @@ on creation (frontmatter \`parent: "#042"\` locally, sub-issue API on GitHub).
 Every created task MUST exit fully classified per the "Mandatory
 classification contract" above — same dispatch, not a follow-up.
 
-All persisted backlog artifacts MUST be written in English. Chat replies
-may use the user's conversation language.
-
 ### \`/backlog update <id>\`
 
 Update an existing task (status, priority, complexity, notes, parent link).
@@ -6491,11 +6488,10 @@ Dashboard: counts, total points, velocity, open epics with ≥1 open child.
 
 ### \`/backlog groom\`
 
-Full grooming session — review priorities, re-estimate, flag blockers,
-audit epic / sub-task hygiene (orphaned children, parents that should be
-closed, sub-tasks that escaped a closed epic). Items missing any hard
-axis get classified on the spot — the "Mandatory classification
-contract" applies retroactively.
+Full grooming — review priorities, re-estimate, flag blockers, audit
+epic / sub-task hygiene (orphaned children, parents due to close,
+sub-tasks that escaped a closed epic). Items missing a hard axis get
+classified on the spot (the classification contract applies retroactively).
 
 ### \`/backlog brief <id>\`
 
@@ -6504,17 +6500,10 @@ user stories, gotchas, acceptance criteria. If the task is in an epic,
 add a one-line summary of the parent and siblings.
 
 Every brief MUST include a \`## Domain Model\` block — the contract with
-the developer (who refuses to start without it):
-
-- **Bounded context:** \`<name>\`
-- **Vocabulary:** \`Term — definition\`
-- **Entities:** \`Name [aggregate root?] — responsibility\`
-- **Value objects:** \`Name(fields) — invariant\`
-- **Invariants:** \`rule — why\`
-- **Out of scope:** \`context — interaction\`
-
-If a spec.md is attached, write this block into the spec too; otherwise
-it lives in the issue / task file.
+the developer (who refuses to start without it) — same shape as the spec
+template: Bounded context, Vocabulary, Entities, Value objects,
+Invariants, Out of scope. If a spec.md is attached, write it there too;
+otherwise it lives in the issue / task file.
 
 **Gate:** a brief without a Domain Model is incomplete. If you lack
 information to populate it, clarify with the user first.
@@ -6526,6 +6515,10 @@ before estimating epic completion or reporting progress.
 
 ## Rules
 
+- **Batch platform mutations; native fields over labels.** Bulk creates /
+  moves / closes / field-sets in the fewest requests (one multi-alias
+  \`gh api graphql\` / REST batch), never call-by-call; native field/type
+  over a duplicate \`priority:*\`/\`size:*\` label. Detail: \`/backlog\` skill.
 - Always update \`.specflow/backlog.md\` after any local task-file change.
 - Never delete task files — change status to \`done\` or \`deferred\`.
 - Use Fibonacci for complexity (1, 2, 3, 5, 8, 13, 21 only).
@@ -8829,6 +8822,14 @@ Specflow change — the skill is path-aware.
 - **Closing** — close the issue (don't just move to Done). The repo's
   issue history is the audit trail.
 - **Drafts** are not used. Every task is a real issue.
+- **Batch every mutation — fewest requests possible.** Creating /
+  moving / closing / field-setting **multiple** items goes in **one
+  batched \`gh api graphql\` multi-alias mutation** (\`m1:\`, \`m2:\`, …), or
+  the REST batch equivalent — **never call-by-call**. Gather all node /
+  field / option ids in one query, then emit a single mutation. N items
+  → 1–2 requests, not N. This is the default (not an optimization): it
+  is what keeps grooming inside GitHub's REST + GraphQL rate limits.
+  Loop the per-item scripts only for a single item.
 - **Classification is mandatory — every created or clarified item
   exits with Size, Priority, Issue Type, and at least one label.**
   \`Priority\` / \`Size\` are native Project V2 single-select fields;
@@ -8838,7 +8839,10 @@ Specflow change — the skill is path-aware.
   that already carries the native field or type** — that dual-signal
   drift is exactly what the helper exists to prevent. Labels are
   reserved as a strict fallback for projects / orgs without the native
-  field or type. Non-zero exit codes tell the caller which fallback
+  field or type — or *temporarily* when the platform is rate-limiting and
+  a native write cannot land; the native field is always the goal, so
+  reconcile a label fallback back to it once unblocked. Non-zero exit
+  codes tell the caller which fallback
   applies: \`10\` = field / type absent (use the label), \`11\` = present
   but the value is unrecognised (for Priority/Size, add the option to
   the field then re-run; for Issue Type, fix the call), \`12\` = issue

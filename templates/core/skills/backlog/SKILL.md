@@ -156,6 +156,14 @@ Specflow change — the skill is path-aware.
 - **Closing** — close the issue (don't just move to Done). The repo's
   issue history is the audit trail.
 - **Drafts** are not used. Every task is a real issue.
+- **Batch every mutation — fewest requests possible.** Creating /
+  moving / closing / field-setting **multiple** items goes in **one
+  batched `gh api graphql` multi-alias mutation** (`m1:`, `m2:`, …), or
+  the REST batch equivalent — **never call-by-call**. Gather all node /
+  field / option ids in one query, then emit a single mutation. N items
+  → 1–2 requests, not N. This is the default (not an optimization): it
+  is what keeps grooming inside GitHub's REST + GraphQL rate limits.
+  Loop the per-item scripts only for a single item.
 - **Classification is mandatory — every created or clarified item
   exits with Size, Priority, Issue Type, and at least one label.**
   `Priority` / `Size` are native Project V2 single-select fields;
@@ -165,7 +173,10 @@ Specflow change — the skill is path-aware.
   that already carries the native field or type** — that dual-signal
   drift is exactly what the helper exists to prevent. Labels are
   reserved as a strict fallback for projects / orgs without the native
-  field or type. Non-zero exit codes tell the caller which fallback
+  field or type — or *temporarily* when the platform is rate-limiting and
+  a native write cannot land; the native field is always the goal, so
+  reconcile a label fallback back to it once unblocked. Non-zero exit
+  codes tell the caller which fallback
   applies: `10` = field / type absent (use the label), `11` = present
   but the value is unrecognised (for Priority/Size, add the option to
   the field then re-run; for Issue Type, fix the call), `12` = issue
