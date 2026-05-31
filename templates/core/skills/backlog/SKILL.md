@@ -267,16 +267,49 @@ project_key: CLOUD                              # the project's short key
 .specflow/scripts/backlog/add.sh "<title>" [body]     # create a task → returns KEY-N
 .specflow/scripts/backlog/move.sh <number> <Status>   # Backlog|Ready|"In Progress"|"In Review"|Done
 .specflow/scripts/backlog/clarify-comment.sh <number> "<question>"
+.specflow/scripts/backlog/columns.sh                  # live board column layout (order + name)
+.specflow/scripts/backlog/reconcile.sh [--reset|--seek-end] [--limit N]  # drain stage transitions
 ```
 
 The scripts authenticate with `Authorization: Bearer <api_token>` and talk to
-`<api_url>/api/v1/` (`/tasks`, `/columns`). `move.sh` passes a **status name**
-(the column name); the API resolves it to the column server-side.
+`<api_url>/api/v1/` (`/tasks`, `/columns`, `/activity`). `move.sh` passes a
+**status name** (the column name); the API resolves it to the column
+server-side. `columns.sh` reads the board's real columns (renames/reorders are
+reflected with no code change). `reconcile.sh` is the **poll/reconcile** feed:
+it asks `/activity` for every stage transition newer than a stored per-project
+cursor (`.specflow/.cloud-cursor-<KEY>`), prints one line per transition, and
+advances the cursor — the product-owner consumes those lines and runs the
+matching stage hook (see `product-owner.md` → "Cloud stage reconcile").
 
 ### Prerequisites
 
 - `curl` and `jq` on PATH.
 - A Specflow Cloud project + API token pasted into `backlog-config.yml`.
+
+### Stage reconcile (poll model)
+
+The product-owner reacts to board moves by **polling**, not a webhook — the CLI
+has no daemon. Run `reconcile.sh` by hand or on a `/loop` cadence from
+`.claude/loop.md`; it drains stage transitions since the cursor and prints one
+line each (`CREATED <n> -> <stage>` / `MOVED <n> <from> -> <to>`). For each
+line the PO resolves the destination against `columns.sh` (canonical names,
+case-insensitive) and runs the mapped hook — parity with a GitHub Projects
+board, just poll-triggered:
+
+| Destination stage | Hook |
+|---|---|
+| **Backlog / Ready** (incl. `CREATED`) | **Classify** — ensure priority/size/type per the mandatory classification contract; skip if already set. |
+| **In Review** | *(opt-in, off by default)* post a review-readiness checklist comment. |
+| **Done** | *(opt-in, off by default)* post a closing-summary comment; run the board-hygiene check. |
+| **In Progress** / any unmapped column | **No-op** — never invent behaviour for an unmapped stage. |
+
+Rules: **idempotent** (delivery is at-least-once — read `view.sh` before
+writing, never double-post or re-classify); **comments are opt-in** (if the
+board posts its own stage comments, leave In Review / Done off to avoid
+duplicates — classification is the always-on parity behaviour); **public API
+only** (act through the `*.sh` wrappers; reference only column names + task
+numbers). First run replays history — `reconcile.sh --seek-end` fast-forwards
+an existing board to "from now".
 
 ### Not yet on the Cloud backend
 

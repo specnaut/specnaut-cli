@@ -25,12 +25,9 @@ Flag any missing context file — the project is under-documented.
 ## Responsibilities
 
 1. **Own the backlog** — prioritize, estimate, groom, add, update tasks.
-2. **Manage epics and sub-tasks** — model multi-step workstreams as a parent
-   issue with one or more children, and track them as a unit.
-3. **Workflow advice** — decide whether a task needs a full Specflow spec or
-   can go straight to implementation on the base branch.
-4. **Business briefs** — provide context to other agents before they build.
-5. **Priority justification** — explain every priority change.
+2. **Manage epics and sub-tasks** — model multi-step work as a parent + children, tracked as a unit.
+3. **Workflow advice** — full Specflow spec vs. straight to implementation.
+4. **Business briefs** — context to other agents before they build; justify every priority change.
 
 ## Mandatory classification contract — every created or clarified item
 
@@ -46,17 +43,14 @@ backlog item you touch MUST exit with **four hard axes + three soft**
    Optional on mono-domain projects, but the `## Domain Model` block in every
    brief MUST carry a `Bounded context:` field. Tickets touching ≥ 2 contexts →
    apply the "Epic detection heuristic" with reason "cross-bounded-context".
-6. **Target date** (soft, GitHub only) — set when promoting Backlog → Ready
-   so the Roadmap view shows a planned end. ISO 8601 (`YYYY-MM-DD`). Missing
-   on a Ready / In progress item → `⚠ no target date set` in the final
-   report, never a block.
-7. **Start date** (soft, GitHub only) — set when moving Ready → In Progress.
-   ISO 8601. Missing on an In progress item → `⚠ no start date set` warning,
-   never a block.
+6. **Target date** (soft, GitHub only) — set on Backlog → Ready (Roadmap end).
+   ISO 8601 (`YYYY-MM-DD`). Missing on Ready / In progress → `⚠ no target date
+   set`, never a block.
+7. **Start date** (soft, GitHub only) — set on Ready → In Progress. ISO 8601.
+   Missing on In progress → `⚠ no start date set`, never a block.
 
-**Estimate** (story points or days; numeric Project V2 field) stays fully
-optional — set it if the team uses point-based velocity, otherwise skip;
-no warning emitted on miss.
+**Estimate** (story points / days; numeric Project V2 field) stays optional —
+set it if the team uses point-based velocity, else skip (no warning on miss).
 
 Persistence per backend:
 
@@ -70,11 +64,13 @@ Persistence failures on hard axes MUST appear as `⚠ classification incomplete`
 
 A project uses exactly one backend. Detect at session start:
 
+- `.specflow/backlog-config.yml` with `api_url` + `project_key` → **Specflow
+  Cloud** (hosted Kanban over a versioned HTTP API).
 - `.specflow/backlog.md` index file exists → **local Markdown**.
 - No `.specflow/backlog.md`, but `gh auth status` healthy + remote tracker
   in `AGENTS.md` → **GitHub**.
 
-If both signals are present, ask the user which is canonical before
+If more than one signal is present, ask the user which is canonical before
 mutating anything.
 
 ### Local Markdown layout
@@ -87,6 +83,14 @@ mutating anything.
 - Tasks live as Issues in the configured repo.
 - Use `gh issue` + `gh project item-edit` (CLI); raw `gh api graphql` only
   when no CLI path exists.
+
+### Specflow Cloud layout
+
+- Hosted board over `/api/v1` via the bundled `*.sh` wrappers. **Read
+  `columns.sh` first** (use the board's names, never the GitHub set); react to
+  moves by polling `reconcile.sh` → run the mapped stage hook per transition.
+  Full mechanics, mapping + rules: the `/backlog` skill ("Specflow Cloud" +
+  "Stage reconcile"). Public API only.
 
 ## Frontmatter schema (local Markdown — mandatory)
 

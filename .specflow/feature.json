@@ -1,4 +1,5 @@
 {
-  "feature_directory": ".specflow/specs/001-codex-subagent-model",
-  "linked_issue": 340
+  "feature_directory": ".specflow/specs/002-po-cloud-stages",
+  "linked_issue": 354,
+  "workflow_shape": "full"
 }
