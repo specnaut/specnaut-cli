@@ -103,6 +103,14 @@ export type Intent =
     kind: "reconcile-path";
     path: string;
     mode: "accept-upstream" | "accept-current";
+  }
+  | {
+    kind: "cloud";
+    /** Subcommand: `login` (interactive device auth), `token` (print a fresh
+     *  access token for the scripts), `logout` (clear stored credentials). */
+    sub: "login" | "token" | "logout";
+    /** `--api-url` override; null = read from backlog-config.yml / prompt. */
+    apiUrl: string | null;
   };
 
 export function parseArgs(argv: string[]): Intent {
@@ -123,7 +131,7 @@ export function parseArgs(argv: string[]): Intent {
       "accept-upstream",
       "accept-current",
     ],
-    string: ["ai", "backlog", "backlog-url", "backlog-repo", "scheme"],
+    string: ["ai", "backlog", "backlog-url", "backlog-repo", "scheme", "api-url"],
     alias: { v: "version", h: "help" },
   });
 
@@ -240,6 +248,15 @@ export function parseArgs(argv: string[]): Intent {
       path: positional[0],
       mode: acceptUpstream ? "accept-upstream" : "accept-current",
     };
+  }
+
+  if (command === "cloud") {
+    const sub = rest[0];
+    const apiUrl = typeof parsed["api-url"] === "string" ? parsed["api-url"] : null;
+    if (sub === "login" || sub === "token" || sub === "logout") {
+      return { kind: "cloud", sub, apiUrl };
+    }
+    return { kind: "unknown", received: `cloud ${sub ?? ""}`.trim() };
   }
 
   return { kind: "unknown", received: command ?? "" };

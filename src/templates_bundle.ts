@@ -8931,10 +8931,16 @@ runtime.
 
 \`\`\`yaml
 # .specflow/backlog-config.yml
+backend: cloud
 api_url: https://your-deployment.convex.site   # Specflow Cloud API base
-api_token: ""                                   # API token (sfc_…) — keep secret
 project_key: CLOUD                              # the project's short key
 \`\`\`
+
+**No token is stored here.** Credentials are obtained by \`specflow cloud login\`
+(an interactive browser device-authorization flow) and kept in the OS keychain
+(or a \`0600\` file under \`~/.specflow\`). They refresh transparently. For CI /
+headless runs, set \`SPECFLOW_CLOUD_TOKEN\` to a Cloud API token instead of
+logging in.
 
 ### Scripts
 
@@ -8948,8 +8954,9 @@ project_key: CLOUD                              # the project's short key
 .specflow/scripts/backlog/reconcile.sh [--reset|--seek-end] [--limit N]  # drain stage transitions
 \`\`\`
 
-The scripts authenticate with \`Authorization: Bearer <api_token>\` and talk to
-\`<api_url>/api/v1/\` (\`/tasks\`, \`/columns\`, \`/activity\`). \`move.sh\` passes a
+The scripts get a fresh access token from \`specflow cloud token\` (which refreshes
+it transparently) and authenticate with \`Authorization: Bearer <token>\`, talking
+to \`<api_url>/api/v1/\` (\`/tasks\`, \`/columns\`, \`/activity\`). \`move.sh\` passes a
 **status name** (the column name); the API resolves it to the column
 server-side. \`columns.sh\` reads the board's real columns (renames/reorders are
 reflected with no code change). \`reconcile.sh\` is the **poll/reconcile** feed:
@@ -8960,8 +8967,10 @@ matching stage hook (see \`product-owner.md\` → "Cloud stage reconcile").
 
 ### Prerequisites
 
-- \`curl\` and \`jq\` on PATH.
-- A Specflow Cloud project + API token pasted into \`backlog-config.yml\`.
+- \`curl\` and \`jq\` on PATH, and the \`specflow\` CLI on PATH (the scripts call
+  \`specflow cloud token\`).
+- Authenticated once via \`specflow cloud login\` (or \`SPECFLOW_CLOUD_TOKEN\` set
+  for headless / CI).
 
 ### Stage reconcile (poll model)
 
@@ -10918,15 +10927,20 @@ exit 0
     name: "_config",
     suffix: "_config.sh",
     content: `#!/usr/bin/env bash
-# Helper: read api_url + api_token + project_key from .specflow/backlog-config.yml.
-# Sourced by the other cloud-backend scripts. Exports API_BASE (…/api/v1).
+# Helper: read api_url + project_key from .specflow/backlog-config.yml and get a
+# fresh access token from \`specflow cloud token\`. Sourced by the other
+# cloud-backend scripts. Exports API_BASE (…/api/v1) + API_TOKEN.
+#
+# Credentials are NOT stored in backlog-config.yml — they live in the OS keychain
+# (or ~/.specflow/credentials.json). Run \`specflow cloud login\` once to
+# authenticate. For CI / headless, set SPECFLOW_CLOUD_TOKEN instead.
 set -euo pipefail
 
 ROOT="\$(cd "\$(dirname "\$0")/../../.." && pwd)"
 CONFIG="\$ROOT/.specflow/backlog-config.yml"
 
 if [ ! -f "\$CONFIG" ]; then
-  echo "error: \$CONFIG not found. Fill in api_url + api_token + project_key first." >&2
+  echo "error: \$CONFIG not found. Run \\\`specflow init --backlog cloud\\\` first." >&2
   exit 2
 fi
 
@@ -10943,12 +10957,19 @@ extract() {
 }
 
 API_URL=\$(extract api_url)
-API_TOKEN=\$(extract api_token)
 PROJECT_KEY=\$(extract project_key)
 
-if [ -z "\$API_URL" ] || [ -z "\$API_TOKEN" ] || [ -z "\$PROJECT_KEY" ]; then
-  echo "error: backlog-config.yml is missing api_url, api_token, or project_key." >&2
-  echo "Edit \$CONFIG before running this command." >&2
+if [ -z "\$API_URL" ] || [ -z "\$PROJECT_KEY" ]; then
+  echo "error: backlog-config.yml is missing api_url or project_key." >&2
+  echo "Run \\\`specflow cloud login\\\` to authenticate and link a project." >&2
+  exit 2
+fi
+
+# Resolve a fresh access token (refreshes transparently; honors
+# SPECFLOW_CLOUD_TOKEN for headless / CI).
+if ! API_TOKEN=\$(specflow cloud token --api-url "\$API_URL"); then
+  echo "error: not authenticated with Specflow Cloud." >&2
+  echo "Run \\\`specflow cloud login\\\` (or set SPECFLOW_CLOUD_TOKEN)." >&2
   exit 2
 fi
 

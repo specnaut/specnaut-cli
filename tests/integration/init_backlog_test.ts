@@ -161,19 +161,24 @@ Deno.test("init --backlog cloud renders the cloud skill + writes config stub (no
     assertStringIncludes(addScript, "Authorization: Bearer");
     assertStringIncludes(addScript, "$API_BASE/tasks");
     assertEquals(addScript.includes("gh issue create"), false);
-    // The /api/v1 base lives in _config.sh
+    // The /api/v1 base lives in _config.sh, which now sources a fresh token
+    // from `specflow cloud token` (credentials live in the keychain, not the yml).
     const configScript = await Deno.readTextFile(
       join(parent, "demo/.specflow/scripts/backlog/_config.sh"),
     );
     assertStringIncludes(configScript, "/api/v1");
+    assertStringIncludes(configScript, "specflow cloud token");
+    assertEquals(configScript.includes("extract api_token"), false);
 
-    // Config stub written with the three cloud fields
+    // Config stub: backend + non-secret coordinates only. No api_token field —
+    // the secret is obtained via `specflow cloud login` and stored securely.
     const config = await Deno.readTextFile(
       join(parent, "demo/.specflow/backlog-config.yml"),
     );
+    assertStringIncludes(config, "backend: cloud");
     assertStringIncludes(config, "api_url:");
-    assertStringIncludes(config, "api_token:");
     assertStringIncludes(config, "project_key:");
+    assertEquals(config.includes("api_token:"), false);
 
     const lock = await Deno.readTextFile(
       join(parent, "demo/.specflow/installed.lock"),

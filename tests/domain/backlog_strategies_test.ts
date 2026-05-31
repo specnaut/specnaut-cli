@@ -90,27 +90,28 @@ Deno.test("CloudBacklogStrategy exposes key 'cloud'", () => {
   assertEquals(new CloudBacklogStrategy().key, "cloud");
 });
 
-Deno.test("CloudBacklogStrategy displayName mentions Specflow Cloud + token", () => {
+Deno.test("CloudBacklogStrategy displayName mentions Specflow Cloud", () => {
   const dn = new CloudBacklogStrategy().displayName;
   assertEquals(dn.includes("Specflow Cloud"), true);
-  assertEquals(dn.includes("token"), true);
 });
 
-Deno.test("CloudBacklogStrategy.initConfigStub contains api_url + api_token + project_key keys", () => {
+Deno.test("CloudBacklogStrategy.initConfigStub has backend + api_url + project_key, no secret", () => {
   const stub = new CloudBacklogStrategy().initConfigStub();
   assertEquals(typeof stub, "string");
   if (typeof stub !== "string") return;
+  assertEquals(stub.includes("backend: cloud"), true);
   assertEquals(stub.includes("api_url:"), true);
-  assertEquals(stub.includes("api_token:"), true);
   assertEquals(stub.includes("project_key:"), true);
+  // The token is never written to the config — it lives in the credential store.
+  assertEquals(stub.includes("api_token:"), false);
 });
 
-Deno.test("CloudBacklogStrategy.initConfigMessages mentions backlog-config.yml + token", () => {
+Deno.test("CloudBacklogStrategy.initConfigMessages points to `cloud login`", () => {
   const msgs = new CloudBacklogStrategy().initConfigMessages();
   assertEquals(msgs.length >= 2, true);
   const joined = msgs.join("\n");
   assertEquals(joined.includes("backlog-config.yml"), true);
-  assertEquals(joined.includes("token"), true);
+  assertEquals(joined.includes("cloud login"), true);
 });
 
 // ── Stub population from Kanban URL (#147) ─────────────────────────────────

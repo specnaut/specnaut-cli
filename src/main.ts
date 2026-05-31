@@ -36,6 +36,10 @@ export async function run(argv: string[]): Promise<number> {
       const { runReconcile } = await import("./cli/handlers/reconcile_handler.ts");
       return await runReconcile(intent);
     }
+    case "cloud": {
+      const { runCloud } = await import("./cli/handlers/cloud_handler.ts");
+      return await runCloud(intent);
+    }
     case "unknown":
       console.error(red(`Unknown command: "${intent.received}"`));
       console.error(HELP);

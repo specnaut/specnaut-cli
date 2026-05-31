@@ -14,6 +14,10 @@ ${bold("Usage:")}
   specflow reconcile --status         List files pending post-upgrade reconciliation
   specflow reconcile <path> --accept-upstream | --accept-current
                                       Resolve a preserved file after upgrade
+  specflow cloud login [--api-url <url>]
+                                      Authenticate with Specflow Cloud (browser device flow) and link a project
+  specflow cloud logout [--api-url <url>]
+                                      Remove stored Specflow Cloud credentials
   specflow --version, -v              Print version
   specflow --help, -h                 Show this help
 
@@ -21,7 +25,8 @@ ${bold("Flags (for init):")}
   --here              Scaffold into the current directory instead of creating a new one
   --no-git            Skip "git init" detection and prompt
   --ai <name>         Target AI harness: claude (default) | cursor | codex | windsurf | copilot | opencode | antigravity
-  --backlog <name>    Backlog backend: local (default) | github | gitlab
+  --backlog <name>    Backlog backend: local (default) | github | gitlab | cloud
+                      (cloud: run "specflow cloud login" after init to authenticate + link a project)
   --backlog-url <url> Kanban / project URL (e.g. https://github.com/orgs/<org>/projects/<N>)
                       Required for github/gitlab in non-interactive mode; pre-fills .specflow/backlog-config.yml
   --backlog-repo <r>  GitHub repo override <owner>/<name>; falls back to "git remote get-url origin"

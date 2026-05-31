@@ -265,10 +265,16 @@ runtime.
 
 ```yaml
 # .specflow/backlog-config.yml
+backend: cloud
 api_url: https://your-deployment.convex.site   # Specflow Cloud API base
-api_token: ""                                   # API token (sfc_…) — keep secret
 project_key: CLOUD                              # the project's short key
 ```
+
+**No token is stored here.** Credentials are obtained by `specflow cloud login`
+(an interactive browser device-authorization flow) and kept in the OS keychain
+(or a `0600` file under `~/.specflow`). They refresh transparently. For CI /
+headless runs, set `SPECFLOW_CLOUD_TOKEN` to a Cloud API token instead of
+logging in.
 
 ### Scripts
 
@@ -282,8 +288,9 @@ project_key: CLOUD                              # the project's short key
 .specflow/scripts/backlog/reconcile.sh [--reset|--seek-end] [--limit N]  # drain stage transitions
 ```
 
-The scripts authenticate with `Authorization: Bearer <api_token>` and talk to
-`<api_url>/api/v1/` (`/tasks`, `/columns`, `/activity`). `move.sh` passes a
+The scripts get a fresh access token from `specflow cloud token` (which refreshes
+it transparently) and authenticate with `Authorization: Bearer <token>`, talking
+to `<api_url>/api/v1/` (`/tasks`, `/columns`, `/activity`). `move.sh` passes a
 **status name** (the column name); the API resolves it to the column
 server-side. `columns.sh` reads the board's real columns (renames/reorders are
 reflected with no code change). `reconcile.sh` is the **poll/reconcile** feed:
@@ -294,8 +301,10 @@ matching stage hook (see `product-owner.md` → "Cloud stage reconcile").
 
 ### Prerequisites
 
-- `curl` and `jq` on PATH.
-- A Specflow Cloud project + API token pasted into `backlog-config.yml`.
+- `curl` and `jq` on PATH, and the `specflow` CLI on PATH (the scripts call
+  `specflow cloud token`).
+- Authenticated once via `specflow cloud login` (or `SPECFLOW_CLOUD_TOKEN` set
+  for headless / CI).
 
 ### Stage reconcile (poll model)
 
