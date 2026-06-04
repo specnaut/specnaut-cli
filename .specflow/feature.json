@@ -1,5 +1,5 @@
 {
-  "feature_directory": ".specflow/specs/004-gate-wire-format",
-  "linked_issue": 356,
+  "feature_directory": ".specflow/specs/005-cli-gate-client",
+  "linked_issue": 357,
   "workflow_shape": "full"
 }

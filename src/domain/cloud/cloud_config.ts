@@ -3,10 +3,14 @@
 // Credentials live in the credential store, never here.
 
 import { parse as parseYaml } from "@std/yaml";
+import type { RemoteConfig } from "./remote_mode.ts";
 
 export type CloudConfig = {
   apiUrl: string;
   projectKey: string;
+  // Optional remote-gate settings (#357). Absent ⇒ remote mode off (the default),
+  // fully backward compatible with configs written before gates existed.
+  remote?: RemoteConfig;
 };
 
 /** Render the Cloud `backlog-config.yml` body (no secret). */
@@ -20,6 +24,14 @@ export function renderCloudConfig(apiUrl = "", projectKey = ""): string {
       JSON.stringify(apiUrl)
     }        # Specflow Cloud API base, e.g. https://your-deployment.convex.site`,
     `project_key: ${JSON.stringify(projectKey)}    # the project's short key, e.g. CLOUD`,
+    "",
+    "# Remote-control gates (#357) — opt-in. When enabled, a headless agent raises",
+    "# blocking decisions as gates you resolve from anywhere (e.g. your phone)",
+    "# instead of prompting at the terminal. Override per-run with SPECFLOW_REMOTE=1.",
+    "# remote:",
+    "#   enabled: false",
+    "#   await_timeout_s: 1800   # overall wait bound (default 1800)",
+    "#   poll_interval_s: 5      # base poll cadence (default 5)",
     "",
   ].join("\n");
 }
@@ -36,13 +48,30 @@ export async function readCloudConfig(projectDir: string): Promise<CloudConfig |
   try {
     const parsed = parseYaml(text) as Record<string, unknown> | null;
     if (!parsed || typeof parsed !== "object") return null;
+    const remote = parseRemote(parsed.remote);
     return {
       apiUrl: typeof parsed.api_url === "string" ? parsed.api_url : "",
       projectKey: typeof parsed.project_key === "string" ? parsed.project_key : "",
+      // Only present when the config actually carries a `remote:` block, so a
+      // pre-gates config round-trips to the exact same shape (backward compatible).
+      ...(remote ? { remote } : {}),
     };
   } catch {
     return null;
   }
+}
+
+/** Project the optional `remote:` YAML block into a RemoteConfig (snake → camel). */
+function parseRemote(raw: unknown): CloudConfig["remote"] {
+  if (typeof raw !== "object" || raw === null) return undefined;
+  const o = raw as Record<string, unknown>;
+  const num = (v: unknown): number | undefined =>
+    typeof v === "number" && Number.isFinite(v) ? v : undefined;
+  return {
+    enabled: o.enabled === true,
+    awaitTimeoutS: num(o.await_timeout_s),
+    pollIntervalS: num(o.poll_interval_s),
+  };
 }
 
 /** Write the Cloud config (api_url + project_key) into a project dir. */

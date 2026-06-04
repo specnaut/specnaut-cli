@@ -1,0 +1,97 @@
+# Implementation Plan: CLI remote mode + gate client
+
+**Feature**: `005-cli-gate-client` | **Spec**: [spec.md](./spec.md) | **Issue**:
+mkrlabs/specflow#357
+
+## Summary
+
+Add the **agent-side** gate client to the CLI: a composable unit that opens a gate over the public
+`/api/v1` contract, awaits a human resolution by polling, applies the answer (idempotent), and can
+cancel. Gate raising is governed by a **remote-mode switch** (config + env override) that defaults
+off, preserving today's behaviour. The client extends the existing `CloudClient` /
+`freshAccessToken` patterns and injects all IO so it is unit-testable without network. No phase
+wiring (that is #5/#6), no push delivery (#18).
+
+## Technical Context
+
+- **Language/runtime**: TypeScript on Deno (matches the existing CLI).
+- **Architecture**: Hexagonal — domain logic in `src/domain/cloud/`, IO behind injected ports, thin
+  CLI handlers. Mirrors `cloud_client.ts` / `auth_flow.ts` / `cloud_config.ts`.
+- **HTTP**: reuse the injectable `FetchFn` pattern; the gate client is a sibling of `CloudClient`
+  (or extends it) speaking the same `{base}/api/v1` surface with `Authorization: Bearer`.
+- **Auth**: reuse `freshAccessToken(...)` (transparent refresh) + `CredentialStore`.
+- **Config**: extend `CloudConfig` / `backlog-config.yml` with a `remote` block; add an env override
+  (`SPECFLOW_REMOTE`) for headless/CI, consistent with the existing `SPECFLOW_CLOUD_TOKEN` escape
+  hatch.
+- **Clock/sleep**: injected (`now()`, `sleep(ms)`) exactly as `auth_flow.ts` does, so await loops
+  are deterministic in tests.
+- **Testing**: Deno `deno task test`; stub `FetchFn` + fake clock; no real network.
+
+## Constitution Check
+
+- **§ I (OSS/proprietary boundary)** — the client speaks ONLY the versioned public wire format from
+  `docs/api/gates.md`. No Cloud-internal identifier, table, function, or error string is read,
+  stored, or asserted on. Error mapping is by HTTP status → typed CLI outcome, never by backend
+  message text. **PASS** (and is the central design constraint).
+- **§ II (single bridge is the HTTP contract)** — the only coupling is `/api/v1/gates*` + the shared
+  `/api/v1/activity` feed. **PASS**.
+- **§ VIII (no transient version pins in long-lived prose)** — plan/spec avoid pinned versions.
+  **PASS**.
+- No new external dependency; no new credential store; remote-mode defaults off (no behavioural
+  regression). **No gate violations.**
+
+## Project Structure
+
+### Documentation (this feature)
+
+```
+.specflow/specs/005-cli-gate-client/
+├── spec.md
+├── plan.md            # this file
+├── research.md        # D1–D6 decisions
+├── data-model.md      # client-side types + state
+├── quickstart.md      # how to exercise the client / smoke it
+├── contracts/README.md# pointer to the frozen wire contract (docs/api/gates.md)
+├── checklists/requirements.md
+└── tasks.md
+```
+
+### Source Code (repository root)
+
+```
+src/domain/cloud/
+├── gate_contract.ts   # NEW — wire types + parse/guards for the gate object & events (pure)
+├── gate_client.ts     # NEW — open / list / apply / cancel against /api/v1/gates (uses FetchFn)
+├── gate_session.ts    # NEW — open→await→apply orchestration + cancel (injected clock/sleep)
+├── remote_mode.ts     # NEW — resolve the remote switch (config + SPECFLOW_REMOTE override)
+├── cloud_client.ts    # (existing) reused for base URL / bearer conventions
+├── auth_flow.ts       # (existing) freshAccessToken reused by gate_session
+└── cloud_config.ts    # EXTEND — add optional `remote` to CloudConfig + render/read
+
+tests/
+└── gate_client_test.ts, gate_session_test.ts, remote_mode_test.ts   # NEW unit tests
+```
+
+Rationale for the split: `gate_contract.ts` (pure types/guards) ↔ `gate_client.ts` (HTTP verbs) ↔
+`gate_session.ts` (the open→await→apply loop with clock/sleep) keeps each unit small and
+independently testable, matching how `cloud_client.ts` (verbs) and `auth_flow.ts` (orchestration)
+are already split.
+
+## Phase 0 — Research
+
+See [research.md](./research.md). Decisions: resolution-detection mechanism (poll list/get vs
+activity cursor), remote-mode resolution precedence, await timeout/backoff policy, error→outcome
+mapping, idempotent apply semantics, config surface.
+
+## Phase 1 — Design & Contracts
+
+- [data-model.md](./data-model.md) — `Gate`, `GateRequest`, `ResolutionOutcome`, `RemoteMode`,
+  client/session interfaces, and the gate state machine as the client observes it.
+- [contracts/README.md](./contracts/README.md) — the client implements `docs/api/gates.md` verbatim;
+  no new contract is defined here.
+- [quickstart.md](./quickstart.md) — exercising open→await→apply and cancel against a stub, plus a
+  live smoke against the Cloud dev deployment.
+
+## Phase 2 — Tasks
+
+See [tasks.md](./tasks.md) (generated by `/specflow tasks`).
