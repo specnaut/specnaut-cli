@@ -62,7 +62,10 @@ Execution steps:
     - Favor clarifications that reduce downstream rework risk or prevent misaligned acceptance tests.
     - If more than 5 categories remain unresolved, select the top 5 by (Impact * Uncertainty) heuristic.
 
-4. Sequential questioning loop (interactive):
+3a. Remote-mode check (#358): run `specflow gate status` once. Exit 0 ⇒ ON, use step 4R (gates).
+    Non-zero ⇒ OFF/not-linked (default), use step 4 verbatim. Caps/rules identical in both modes.
+
+4. Sequential questioning loop (interactive — used when remote mode is OFF):
     - Present EXACTLY ONE question at a time.
     - For multiple‑choice questions:
        - **Analyze all options** and determine the **most suitable option** based on best practices, common patterns, risk reduction, and alignment with project goals.
@@ -92,6 +95,15 @@ Execution steps:
        - You reach 5 asked questions.
     - Never reveal future queued questions in advance.
     - If no valid questions exist at start, immediately report no critical ambiguities.
+
+4R. Remote questioning loop (step 3a found remote mode ON). Same queue/caps; per question raise a
+    gate via `specflow gate raise --type <t> --title "<question>" --payload '<json>'`. Multiple-choice
+    → `decision` (`{question,options:[{id,label,description?}],context?}`); short-answer →
+    `clarification` (`{question,context?}`); add `--task <n>` if task-scoped. Branch on exit code
+    (answer JSON on stdout): **0** → parse (`decision`→`choiceId`, `clarification`→`text`), accept,
+    integrate via step 5. **3/4** (timeout/cancelled) → stop, list Outstanding, recommend re-run;
+    never invent an answer. **5** → `specflow cloud login` needed, fall back to step 4. **1** → report
+    and stop. Idempotent: skip questions already in `## Clarifications`; apply each answer once.
 
 5. Integration after EACH accepted answer (incremental update approach):
     - Maintain in-memory representation of the spec (loaded once at start) plus the raw file contents.

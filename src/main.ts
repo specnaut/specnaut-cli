@@ -40,6 +40,10 @@ export async function run(argv: string[]): Promise<number> {
       const { runCloud } = await import("./cli/handlers/cloud_handler.ts");
       return await runCloud(intent);
     }
+    case "gate": {
+      const { runGate } = await import("./cli/handlers/gate_handler.ts");
+      return await runGate(intent);
+    }
     case "unknown":
       console.error(red(`Unknown command: "${intent.received}"`));
       console.error(HELP);

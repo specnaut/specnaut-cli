@@ -111,6 +111,18 @@ export type Intent =
     sub: "login" | "token" | "logout";
     /** `--api-url` override; null = read from backlog-config.yml / prompt. */
     apiUrl: string | null;
+  }
+  | {
+    /** `specflow gate <status|raise|cancel>` (#358) — the non-interactive bridge
+     *  a skill phase uses to raise a remote-control gate. See gate_handler.ts. */
+    kind: "gate";
+    sub: "status" | "raise" | "cancel";
+    apiUrl: string | null;
+    type: string | null;
+    title: string | null;
+    payload: string | null;
+    task: number | null;
+    id: string | null;
   };
 
 export function parseArgs(argv: string[]): Intent {
@@ -131,7 +143,18 @@ export function parseArgs(argv: string[]): Intent {
       "accept-upstream",
       "accept-current",
     ],
-    string: ["ai", "backlog", "backlog-url", "backlog-repo", "scheme", "api-url"],
+    string: [
+      "ai",
+      "backlog",
+      "backlog-url",
+      "backlog-repo",
+      "scheme",
+      "api-url",
+      "type",
+      "title",
+      "payload",
+      "task",
+    ],
     alias: { v: "version", h: "help" },
   });
 
@@ -257,6 +280,28 @@ export function parseArgs(argv: string[]): Intent {
       return { kind: "cloud", sub, apiUrl };
     }
     return { kind: "unknown", received: `cloud ${sub ?? ""}`.trim() };
+  }
+
+  if (command === "gate") {
+    const sub = rest[0];
+    if (sub !== "status" && sub !== "raise" && sub !== "cancel") {
+      return { kind: "unknown", received: `gate ${sub ?? ""}`.trim() };
+    }
+    const str = (
+      k: string,
+    ): string | null => (typeof parsed[k] === "string" ? parsed[k] as string : null);
+    const taskRaw = str("task");
+    const taskNum = taskRaw !== null && /^\d+$/.test(taskRaw) ? Number(taskRaw) : null;
+    return {
+      kind: "gate",
+      sub,
+      apiUrl: str("api-url"),
+      type: str("type"),
+      title: str("title"),
+      payload: str("payload"),
+      task: taskNum,
+      id: rest[1] ?? null, // `gate cancel <id>`
+    };
   }
 
   return { kind: "unknown", received: command ?? "" };
