@@ -33,6 +33,14 @@ Two design choices were decided in-spec (no blocking clarification needed):
 2. **Answer shape** → typed per gate type (free-text for `clarification`; approve/reject + note for
    the approvals; chosen option for `decision`; acknowledgement for `agent_unblock`). (FR-004.)
 
-The `answered → applied` transition's exact mechanics (client-action vs implicit, idempotency) are
-flagged as a contract detail to nail during `plan`, not a spec ambiguity. Boundary (§I) is a
-first-class invariant — this is the OSS↔Cloud coupling point. Ready for `/specflow plan`.
+Three contract design choices were resolved with the user (2026-06-04):
+
+3. **`applied` mechanics** → explicit `POST /gates/{id}/apply` (idempotent, agent-only); the server
+   tracks all states. (FR-014.)
+4. **Validation** → strict, typed per gate type; resolve rejects a mismatched answer (422).
+   (FR-004/007.)
+5. **Stale gates** → a `cancelled` terminal state + `POST /gates/{id}/cancel` ship in v1. (FR-015.)
+
+Final state machine: `open → answered → applied`, plus `open → cancelled`. Five endpoints
+(open/list/resolve/apply/cancel) and four activity event kinds. Boundary (§I) is a first-class
+invariant — this is the OSS↔Cloud coupling point. Ready for `/specflow plan`.

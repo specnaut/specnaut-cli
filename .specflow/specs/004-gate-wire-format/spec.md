@@ -109,9 +109,9 @@ gate `answered` each emit a documented activity event carrying the gate `id`, `t
   resolvable state).
 - **Resolve of a non-existent / wrong-project gate id** → documented not-found (no cross-project
   leak).
-- **`applied` transition** → the contract defines that moving `answered → applied` is the consumer
-  (agent) acknowledging it has used the answer; it specifies whether that transition is a client
-  action or implicit, and its idempotency.
+- **`apply` of a non-`answered` gate** → documented conflict; `apply` only moves
+  `answered → applied` and is idempotent on an already-`applied` gate.
+- **`cancel` of a non-`open` gate** → documented conflict; `cancel` only moves `open → cancelled`.
 - **Optional `taskNumber`** → a gate may be project-scoped (no task) or task-scoped; the contract
   specifies the meaning of its presence/absence.
 - **Versioning** → the contract states how a future field is added without breaking existing
@@ -127,8 +127,11 @@ gate `answered` each emit a documented activity event carrying the gate `id`, `t
   (optional), `createdBy`, `resolvedBy` (optional), `createdAt`, `resolvedAt` (optional).
 - **FR-002**: The contract MUST enumerate exactly five gate `type` values — `clarification`,
   `plan_approval`, `merge_approval`, `agent_unblock`, `decision` — and define what each means.
-- **FR-003**: The contract MUST define the state machine `open → answered → applied` as the only
-  legal transitions, with every other transition specified as illegal.
+- **FR-003**: The contract MUST define the state machine with these — and only these — legal
+  transitions: `open → answered` (a human resolves), `answered → applied` (the agent applies the
+  answer), and `open → cancelled` (the opener cancels). `answered` and `applied` are reached only
+  from the prior state; `cancelled` and `applied` are terminal. Every other transition is specified
+  as illegal. (Decided 2026-06-04: explicit `apply`/`cancel`, and a `cancelled` terminal state.)
 - **FR-004**: The contract MUST define the **answer** shape per gate type (e.g. free-text response
   for `clarification`; approve/reject + optional note for `plan_approval` / `merge_approval`; a
   chosen option for `decision`; an unblock acknowledgement for `agent_unblock`), and require the
@@ -140,11 +143,20 @@ gate `answered` each emit a documented activity event carrying the gate `id`, `t
   cursor-paginated, project-filtered, optionally state-filtered list, using the **same opaque-cursor
   pagination as `GET /api/v1/activity`** (not a timestamp watermark).
 - **FR-007**: The contract MUST specify `POST /api/v1/gates/{id}/resolve` — request (a typed answer)
-  and response (the gate now `answered`, with `answer`, `resolvedBy`, `resolvedAt`), including the
-  single-shot conflict behaviour on an already-resolved gate.
+  and response (the gate now `answered`, with `answer`, `resolvedBy`, `resolvedAt`). Only an `open`
+  gate is resolvable; resolving any other state is a documented conflict. The submitted answer MUST
+  match the gate's `type` or the contract specifies a documented validation error (per FR-004).
 - **FR-008**: The contract MUST specify how gate lifecycle events appear in `GET /api/v1/activity` —
-  the event kind(s), the fields carried (gate `id`, `type`, new `state`), and that they share the
-  feed's existing ordering + opaque-cursor semantics.
+  one documented event kind per transition (`gate_opened`, `gate_answered`, `gate_applied`,
+  `gate_cancelled`), the fields carried (gate `id`, `type`, new `state`, optional `taskNumber`), and
+  that they share the feed's existing ordering + opaque-cursor semantics.
+- **FR-014**: The contract MUST specify `POST /api/v1/gates/{id}/apply` — the agent acknowledging it
+  has consumed the answer; moves `answered → applied`. It MUST be **idempotent** (re-applying an
+  already-`applied` gate is a success no-op) and is agent-only. Applying a gate not in `answered` is
+  a documented conflict.
+- **FR-015**: The contract MUST specify `POST /api/v1/gates/{id}/cancel` — the opener withdrawing a
+  gate that is no longer relevant; moves `open → cancelled` (terminal). Cancelling a gate not in
+  `open` is a documented conflict.
 - **FR-009**: The contract MUST specify the documented error responses (validation, not-found,
   conflict, unauthorized) as stable, public response codes/shapes — no implementation-defined
   errors.
@@ -197,16 +209,21 @@ Cloud backend (store/serve side); the document is the only coupling.
 
 - **GateType(`clarification`|`plan_approval`|`merge_approval`|`agent_unblock`|`decision`)** — closed
   set.
-- **GateState(`open`|`answered`|`applied`)** — closed set; transitions only forward.
+- **GateState(`open`|`answered`|`applied`|`cancelled`)** — closed set; transitions only forward
+  (`open→answered→applied`) or `open→cancelled`; `applied` and `cancelled` are terminal.
 - **Answer(typed-by-GateType)** — the response shape; valid only for its gate's type.
 - **GateId(string)** — opaque, stable, globally unique within the contract.
 
 **Invariants (rules the domain must never break):**
 
-- State advances only `open → answered → applied`; never backwards, never skipping.
+- State advances only `open → answered → applied`, or `open → cancelled`; never backwards, never
+  skipping. `applied` and `cancelled` are terminal.
 - `answer`, `resolvedBy`, `resolvedAt` are absent while `open`, and present from `answered` onward.
-- Resolution is single-shot: only an `open` gate is resolvable.
-- An answer's shape MUST match its gate's `type`.
+- Resolution is single-shot: only an `open` gate is resolvable. Only `answered` gates apply; only
+  `open` gates cancel.
+- `apply` is idempotent (re-applying an `applied` gate is a success no-op); `resolve` and `cancel`
+  are not.
+- An answer's shape MUST match its gate's `type` (validated; mismatch is rejected).
 - Only the public wire format crosses the boundary — no private-half identifier appears
   (constitution § I).
 - Gate `id`s and lists are project-scoped; no cross-project disclosure.
