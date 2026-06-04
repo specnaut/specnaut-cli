@@ -1,5 +1,5 @@
 {
-  "feature_directory": ".specflow/specs/003-init-backlog-cloud",
-  "linked_issue": 353,
+  "feature_directory": ".specflow/specs/004-gate-wire-format",
+  "linked_issue": 356,
   "workflow_shape": "full"
 }
