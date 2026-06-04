@@ -1,5 +1,5 @@
 {
-  "feature_directory": ".specflow/specs/006-gate-aware-clarify",
-  "linked_issue": 358,
+  "feature_directory": ".specflow/specs/007-gate-aware-approvals",
+  "linked_issue": 359,
   "workflow_shape": "full"
 }

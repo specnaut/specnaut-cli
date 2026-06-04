@@ -813,7 +813,7 @@ You **MUST** consider the user input before proceeding (if not empty).
    - Phase 1: Update agent context by running the agent script
    - Re-evaluate Constitution Check post-design
 
-4. **Stop and report**: Command ends after Phase 2 planning. Report branch, IMPL_PLAN path, and generated artifacts.
+4. **Stop and report**: Command ends after Phase 2 planning. Report branch, IMPL_PLAN path, and generated artifacts. (In remote mode the chain raises a \`plan_approval\` gate before \`tasks\` — see \`phases/auto-chain.md\` "Plan approval checkpoint".)
 
 5. **Check for extension hooks**: After reporting, check if \`.specflow/extensions.yml\` exists in the project root.
    - If it exists, read it and look for entries under the \`hooks.after_plan\` key
@@ -2739,6 +2739,22 @@ CRITICAL findings:
   pipeline. Has its own internal fix loop for review findings; do not intercept.
 - \`/specflow review\` — final quality scan.
 
+## Plan approval checkpoint (remote mode only)
+
+After \`/specflow plan\` completes and **before** chaining into \`/specflow tasks\`, check remote mode
+(\`specflow gate status\`):
+
+- **Exit 0** (remote on) — raise a plan-approval gate and suspend:
+  \`specflow gate raise --type plan_approval --title "Approve the plan for <feature>" --payload '{"summary":"<plan summary>","planRef":"<plan.md path>","context":"<short>"}'\`.
+  exit 0 + \`{"approved":true}\` → resume into \`/specflow tasks\`; exit 0 +
+  \`{"approved":false}\` → halt and report the rejection + any \`note\` (revise);
+  exit 3/4/1 → halt cleanly with the reason; exit 5 → report \`specflow cloud login\`
+  is needed and fall back to the default below. **Never proceed to \`tasks\` without
+  an explicit approval.**
+- **Non-zero** (remote off / not Cloud-linked — the default) — \`plan\` stays a
+  silent gate: continue straight to \`/specflow tasks\` exactly as today (no gate,
+  no prompt, no behavioural change).
+
 ## STOP #2 — Pre-merge validation
 
 After \`/specflow review\` passes, ALWAYS stop and present a compact summary
@@ -2751,9 +2767,21 @@ before invoking \`/specflow merge\`. The summary must include:
 - Open risks / deferred items
 - One-line business outcome
 
-Then ask explicitly: "Ready to merge? (yes to run /specflow merge, no to stay on
-the branch)". Wait for explicit confirmation. On "yes", invoke
-\`/specflow merge\`. After merge, the chain ends.
+Then resolve the approval:
+
+- **Remote mode** (run \`specflow gate status\`; exit 0 ⇒ on) — raise a
+  \`merge_approval\` gate instead of a terminal prompt:
+  \`specflow gate raise --type merge_approval --title "Approve merge of <feature>" --payload '{"summary":"<change summary>","prUrl":"<pr/diff ref>","context":"<short>"}'\`.
+  Branch on the result: exit 0 + \`{"approved":true}\` → invoke \`/specflow merge\`;
+  exit 0 + \`{"approved":false}\` → halt on the branch and report the rejection +
+  any \`note\` (comment-and-revise); exit 3/4 (timeout/cancelled) or 1 → halt
+  cleanly with the reason; exit 5 → report \`specflow cloud login\` is needed and
+  fall back to the local prompt below. **Never merge without an explicit approval.**
+- **Local mode** (default, gate status non-zero) — ask explicitly:
+  "Ready to merge? (yes to run /specflow merge, no to stay on the branch)". Wait for
+  explicit confirmation. On "yes", invoke \`/specflow merge\`.
+
+After merge, the chain ends.
 
 ## Mid-chain re-entry
 

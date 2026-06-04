@@ -56,7 +56,7 @@ You **MUST** consider the user input before proceeding (if not empty).
    - Phase 1: Update agent context by running the agent script
    - Re-evaluate Constitution Check post-design
 
-4. **Stop and report**: Command ends after Phase 2 planning. Report branch, IMPL_PLAN path, and generated artifacts.
+4. **Stop and report**: Command ends after Phase 2 planning. Report branch, IMPL_PLAN path, and generated artifacts. (In remote mode the chain raises a `plan_approval` gate before `tasks` — see `phases/auto-chain.md` "Plan approval checkpoint".)
 
 5. **Check for extension hooks**: After reporting, check if `.specflow/extensions.yml` exists in the project root.
    - If it exists, read it and look for entries under the `hooks.after_plan` key
