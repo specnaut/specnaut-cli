@@ -12,7 +12,7 @@
 # Run manually with: bash scripts/triage-pr-local.sh
 set -euo pipefail
 
-cd "$(dirname "$0")/.."
+cd "$(dirname "$0")/../../.."
 REPO_ROOT="$(pwd)"
 
 LOG_DIR="$HOME/Library/Logs/specflow"

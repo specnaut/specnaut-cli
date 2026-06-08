@@ -12,7 +12,7 @@
 # Run manually with: bash scripts/groom-backlog-local.sh
 set -euo pipefail
 
-cd "$(dirname "$0")/.."
+cd "$(dirname "$0")/../../.."
 REPO_ROOT="$(pwd)"
 
 # Make sure logs dir exists when invoked outside launchd's StandardOutPath.
@@ -25,8 +25,8 @@ export PATH="/opt/homebrew/bin:/usr/local/bin:/Applications/cmux.app/Contents/Re
 PROMPT='You are running as a scheduled grooming routine for the Specflow project. Your job: clarify any items currently in the Backlog column of GitHub Project #4 (mkrlabs/specflow), following the Product Owner contract defined at .claude/agents/product-owner.md.
 
 Steps:
-1. Run `.claude/skills/backlog/scripts/list.sh Backlog` to list current Backlog items.
-2. For each item, run `.claude/skills/backlog/scripts/view.sh <num>` to read the issue body and existing comments.
+1. Run `.claude/skills/backlog/scripts/list.sh --repo specflow Backlog` to list current Backlog items.
+2. For each item, run `.claude/skills/backlog/scripts/view.sh --repo specflow <num>` to read the issue body and existing comments.
 3. **Skip rule**: if any existing comment starts with the marker `🤖 specflow-groom-backlog clarification:`, skip the item — it was already processed in a prior run.
 4. Otherwise dispatch the `product-owner` subagent to clarify the item. It will either promote to Ready (with a clean Why/AC/Out-of-scope body), leave a 1–3 question clarification comment with the marker, or recommend triage.
 
