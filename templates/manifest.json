@@ -1,5 +1,5 @@
 {
-  "version": "1.13.0",
+  "version": "1.13.1",
   "core": [
     { "category": "skill", "name": "specflow", "source": "core/skills/specflow/SKILL.md" },
     { "category": "phase", "name": "brainstorm", "suffix": "brainstorm.md", "source": "core/skills/specflow/phases/brainstorm.md" },
