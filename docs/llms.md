@@ -169,6 +169,10 @@ Specflow merges its `.gitignore` block into your existing file (non-destructivel
 `# --- Specflow: gitignore ---` markers). Other specflow-managed files use upgrade-aware semantics:
 if you customize a generated file, `specflow upgrade` will preserve it unless you pass `--force`.
 
+Pass `--dry-run` to preview the plan without touching disk — combined with `--force` it shows which
+files would be overwritten and which would be merged, but writes nothing. `--dry-run` is the trump
+card: it wins over `--force`.
+
 ### What's in `.specflow/installed.lock` and should I commit it?
 
 `specflow init` writes a small YAML file at `.specflow/installed.lock`. It records the harness you
