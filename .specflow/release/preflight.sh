@@ -18,11 +18,19 @@ git fetch origin main --quiet
 
 echo "▶ CI green on HEAD"
 sha="$(git rev-parse HEAD)"
-# The headSha filter is critical — a bare `--limit 1` would happily return the
-# previous commit's green run while the current commit's CI is still pending.
-# Search up to 20 recent runs to handle PRs landing rapidly back-to-back.
-conclusion="$(gh run list --workflow ci --branch main --limit 20 --json headSha,conclusion,status --jq "[.[] | select(.headSha == \"$sha\" and .status == \"completed\")] | .[0].conclusion")"
-[ "$conclusion" = "success" ] || { echo "❌ CI not green on $sha (got: ${conclusion:-no-completed-run})"; exit 1; }
+# The headSha filter avoids racing on the previous commit's green run. The
+# polling loop tolerates a fresh push where CI hasn't completed yet —
+# symmetric to postflight's release.yml polling. 10 × 30s = up to 5 min;
+# the preflight's `deno task test` runs for ~10-25 s on its own so this
+# rarely fires.
+conclusion=""
+for i in 1 2 3 4 5 6 7 8 9 10; do
+  conclusion="$(gh run list --workflow ci --branch main --limit 20 --json headSha,conclusion,status --jq "[.[] | select(.headSha == \"$sha\" and .status == \"completed\")] | .[0].conclusion")"
+  [ -n "$conclusion" ] && [ "$conclusion" != "null" ] && break
+  echo "  waiting for ci run on $sha to complete ($i/10)…"
+  sleep 30
+done
+[ "$conclusion" = "success" ] || { echo "❌ CI not green on $sha (got: ${conclusion:-no-completed-run-after-5min})"; exit 1; }
 
 echo "▶ smoke audit"
 # audit.sh prints `0 coverage gap(s)` / `0 stale assertion(s)` but does NOT exit
