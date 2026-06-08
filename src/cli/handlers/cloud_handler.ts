@@ -104,6 +104,13 @@ async function runLogin(intent: CloudIntent): Promise<number> {
     return 1;
   }
   console.log(green("✓ authenticated with Specflow Cloud"));
+  console.log(
+    dim(
+      store.kind === "keychain"
+        ? "  credentials stored in the OS keychain"
+        : "  credentials stored in ~/.specflow/credentials.json (0600 — no OS keychain available)",
+    ),
+  );
 
   // Bind the project: list, then select or create.
   const token = await freshAccessToken({ apiUrl, client, store, now: () => Date.now() });

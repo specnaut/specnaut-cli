@@ -20,6 +20,10 @@ const creds = (over: Partial<CloudCredentials> = {}): CloudCredentials => ({
   ...over,
 });
 
+Deno.test("FileCredentialStore: kind is 'file'", () => {
+  assertEquals(new FileCredentialStore().kind, "file");
+});
+
 Deno.test("FileCredentialStore: save → load round-trips", async () => {
   await withTempFile(async (path) => {
     const store = new FileCredentialStore(path);

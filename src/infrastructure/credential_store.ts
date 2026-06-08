@@ -4,18 +4,23 @@
 // secrets and must never land in a tracked file (the project's
 // `.specflow/backlog-config.yml` holds only `backend`, `api_url`, `project_key`).
 //
-// Storage: a JSON file under the user's home dir, created `0600` inside a `0700`
-// directory, written atomically (temp + rename) so a secret is never visible
-// through a looser-permission window. Credentials are keyed by the Cloud
-// deployment's API base URL, so one machine can hold tokens for several
-// deployments.
+// Storage: two backends behind one interface.
+//   - OS-native keychain (macOS Keychain / libsecret / Windows Credential
+//     Manager), reached via Deno FFI — the preferred at-rest store when a
+//     keyring is reachable (#360).
+//   - `0600` home-dir JSON file, created inside a `0700` directory and written
+//     atomically (temp + rename) so a secret is never visible through a
+//     looser-permission window — the fallback for headless / CI / no-`--allow-ffi`.
+// `defaultCredentialStore()` selects between them per invocation (see
+// `keychain/select.ts`). Credentials are keyed by the Cloud deployment's API
+// base URL, so one machine can hold tokens for several deployments.
 //
-// NOTE: OS-native keychain integration (macOS Keychain / libsecret / Windows
-// Credential Manager) is a planned enhancement. It is intentionally NOT done via
-// the `security` CLI, whose `add-generic-password -w <secret>` form would expose
-// the secret in process argv (readable by same-user `ps`). A future version will
-// use the platform keychain APIs directly; until then the `0600` home file is
-// the store on every platform.
+// The keychain is NEVER reached via the `security` / `secret-tool` / `cmdkey`
+// CLIs, whose secret-on-argv forms (`-w <secret>`, `store <value>`, `/pass:`)
+// would expose the token to same-user `ps`; only the native in-process API is
+// used.
+
+import { resolveCredentialStore } from "./keychain/select.ts";
 
 export type CloudCredentials = {
   /** Bearer access token sent on every `/api/v1` request. Short-lived. */
@@ -27,6 +32,9 @@ export type CloudCredentials = {
 };
 
 export interface CredentialStore {
+  /** Which backend secured the credentials — surfaced at login so the at-rest
+   *  posture is never silently weaker than expected (#360). */
+  readonly kind: "keychain" | "file";
   /** Load the credentials for a deployment, or null if none are stored. */
   load(apiUrl: string): Promise<CloudCredentials | null>;
   /** Persist (overwrite) the credentials for a deployment. */
@@ -42,8 +50,9 @@ function homeDir(): string {
   return home;
 }
 
-/** Normalize an API URL into a stable key (no trailing slash). */
-function keyFor(apiUrl: string): string {
+/** Normalize an API URL into a stable key (no trailing slash). Shared by the
+ *  file and keychain stores so a credential is addressable identically in both. */
+export function keyFor(apiUrl: string): string {
   return apiUrl.replace(/\/+$/, "");
 }
 
@@ -52,6 +61,7 @@ function keyFor(apiUrl: string): string {
  * `~/.specflow/credentials.json`, dir `0700`, file `0600`, written atomically.
  */
 export class FileCredentialStore implements CredentialStore {
+  readonly kind = "file" as const;
   private readonly path: string;
 
   constructor(path?: string) {
@@ -117,9 +127,12 @@ function hash(s: string): number {
 }
 
 /**
- * The credential store for the current platform. Today: the `0600` home file on
- * every platform (see the module note on keychain integration).
+ * The credential store for the current platform and invocation: the OS-native
+ * keychain when a keyring is reachable, else the `0600` home file (headless /
+ * CI / no `--allow-ffi`). Selection happens per call — see
+ * `keychain/select.ts`. The keychain `dlopen`/probe is synchronous, so this
+ * stays a synchronous factory (call sites are unchanged from #353).
  */
 export function defaultCredentialStore(): CredentialStore {
-  return new FileCredentialStore();
+  return resolveCredentialStore();
 }

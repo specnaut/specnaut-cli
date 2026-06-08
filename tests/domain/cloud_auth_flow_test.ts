@@ -9,6 +9,7 @@ import type {
 const API = "https://dep.convex.site";
 
 class MemStore implements CredentialStore {
+  readonly kind = "file" as const;
   m = new Map<string, CloudCredentials>();
   load(u: string) {
     return Promise.resolve(this.m.get(u) ?? null);

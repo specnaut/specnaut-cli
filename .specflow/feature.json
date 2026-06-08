@@ -1,5 +1,5 @@
 {
-  "feature_directory": ".specflow/specs/007-gate-aware-approvals",
-  "linked_issue": 359,
+  "feature_directory": ".specflow/specs/008-cloud-keychain",
+  "linked_issue": 360,
   "workflow_shape": "full"
 }

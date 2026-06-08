@@ -29,6 +29,10 @@ const PERMISSIONS = [
   "--allow-run",
   "--allow-env",
   "--allow-net=api.github.com,github.com,release-assets.githubusercontent.com,objects.githubusercontent.com,codeload.github.com",
+  // OS-native keychain for Cloud credentials (#360) reaches the platform secret
+  // store via Deno FFI. If withheld, the keychain backends throw
+  // PermissionDenied and credential storage degrades to the 0600 file fallback.
+  "--allow-ffi",
 ];
 
 async function ensureOutDir(): Promise<void> {
