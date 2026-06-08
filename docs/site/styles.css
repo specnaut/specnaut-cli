@@ -975,3 +975,57 @@ main > section {
 .doc-header a:hover {
   color: var(--color-neutral-900);
 }
+
+/* -- Specflow Cloud funnel band (growth CTA) ----------------------------- */
+.nav-cloud {
+  font-weight: 600;
+  color: var(--color-btn-primary-bg);
+}
+
+.cloud {
+  padding: var(--space-16) var(--space-5);
+  background: color-mix(in oklab, var(--color-brand-primary) 8%, var(--color-neutral-50));
+  border-top: 1px solid var(--color-neutral-300);
+  border-bottom: 1px solid var(--color-neutral-300);
+}
+
+.cloud-inner {
+  max-width: 760px;
+  margin: 0 auto;
+  text-align: center;
+}
+
+.cloud-lede {
+  font-size: 18px;
+  line-height: 1.6;
+  color: var(--color-neutral-700);
+  margin: 0 auto var(--space-8);
+  max-width: 64ch;
+}
+
+.cloud-points {
+  list-style: none;
+  margin: 0 auto var(--space-8);
+  padding: 0;
+  display: grid;
+  gap: var(--space-3);
+  text-align: left;
+  max-width: 60ch;
+}
+
+.cloud-points li {
+  position: relative;
+  padding-left: var(--space-6);
+  line-height: 1.5;
+}
+
+.cloud-points li::before {
+  content: "✦";
+  position: absolute;
+  left: 0;
+  color: var(--color-brand-primary);
+}
+
+.cloud-cta {
+  justify-content: center;
+}

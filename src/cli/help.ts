@@ -46,6 +46,9 @@ ${bold("Flags (for upgrade):")}
                       with --dry-run to preview what would change.
 
 ${bold("Docs:")}    ${cyan("https://specflow.makerlabs.dev")}
+${bold("Cloud:")}   ${cyan("https://specflow.makerlabs.app")} ${
+  dim("— run headless, answer your agent from your phone")
+}
 ${bold("Source:")}  ${cyan("https://github.com/mkrlabs/specflow")}`;
 
 export function renderVersionLine(

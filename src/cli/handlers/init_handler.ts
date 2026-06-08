@@ -1,5 +1,5 @@
 import { resolve } from "@std/path";
-import { bold, dim, green, red, yellow } from "@std/fmt/colors";
+import { bold, cyan, dim, green, red, yellow } from "@std/fmt/colors";
 import { InitProjectUseCase } from "../../application/init_project.ts";
 import { findHarness } from "../harnesses.ts";
 import { type HarnessKey, pickHarness, pickHarnessInteractive } from "../harness_picker.ts";
@@ -470,5 +470,21 @@ export async function runInit(intent: InitIntent): Promise<number> {
     `  3. Run ${bold('/specflow specify "<feature description>"')} to scaffold your first feature`,
   );
   console.log(`  4. Use ${bold('/backlog add "<task title>"')} for follow-up work`);
+
+  // Specflow Cloud funnel: point CLI users at the hosted product once they've
+  // scaffolded — run headless + remote-control the agent's checkpoints.
+  console.log(
+    `\n${cyan("✦ Specflow Cloud")} — run Specflow headless and answer your agent from your phone:`,
+  );
+  console.log(
+    dim(
+      "     approve plans, answer clarifications & sign off merges remotely · hosted backlog + team roles.",
+    ),
+  );
+  console.log(
+    `     Start free: ${bold("specflow cloud login")} ${dim("·")} ${
+      cyan("https://specflow.makerlabs.app")
+    }`,
+  );
   return 0;
 }
