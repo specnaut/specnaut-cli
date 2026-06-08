@@ -502,34 +502,21 @@ Given that feature description, do this:
         1. List failing items and issues; update spec; re-run (max 3 iterations).
         2. After 3 iterations, document remaining issues and warn user.
 
-      - **[NEEDS CLARIFICATION] markers remain**:
-        1. Keep only the 3 most critical; make informed guesses for the rest
-           and document the guesses in the Assumptions section.
-        2. **Do NOT prompt the user inline during specify.** The remaining
-           markers are handed off to \`/specflow clarify\` (the next phase
-           in \`full\` chain shape), which is the phase responsible for
-           interactive resolution. In \`lite\` chain shape, \`clarify\` is
-           skipped — the markers are converted to Assumptions with the
-           informed-guess defaults and the chain continues.
-        3. Leave the surviving markers in the spec verbatim so \`clarify\`
-           can find them. Never strip a marker silently.
+      - **[NEEDS CLARIFICATION] markers remain**: keep ≤3 most critical,
+        document informed-guess defaults in Assumptions, leave the
+        surviving markers verbatim for \`/specflow clarify\` to resolve.
+        **Do NOT prompt inline.** In \`lite\` shape, markers become
+        Assumptions and the chain continues.
 
    d. **Update Checklist** after each validation iteration.
 
-8. **Report completion and proceed**:
-   - Report \`SPECIFY_FEATURE_DIRECTORY\` and \`SPEC_FILE\` and the checklist
-     results summary in one short block.
-   - **Do not ask the user whether to continue.** The router's
-     chain-decision step takes over from here — specify is in the
-     chainable set and "the chain always continues" for \`specify\`
-     (see \`SKILL.md\` § "Chain decision"). The only legitimate stops
-     after specify are: \`CHAIN_MODE == off\` (the user passed \`--manual\`),
-     or \`CHAIN_MODE == once\` (the user passed \`--once\`). In every other
-     case proceed to the next phase WITHOUT a permission ask:
-       - \`CHAIN_SHAPE == full\` → next phase is \`/specflow clarify\`
-       - \`CHAIN_SHAPE == lite\` → next phase is \`/specflow plan\`
-     Phrase the transition as a one-liner (\`✓ specify complete —
-     proceeding to <next>\`), NOT as a question.
+8. **Report completion and proceed (no permission ask)**:
+   - Report \`SPECIFY_FEATURE_DIRECTORY\`, \`SPEC_FILE\`, and checklist
+     summary in one short block.
+   - Chain unconditionally to the next phase: \`full\` → \`/specflow clarify\`,
+     \`lite\` → \`/specflow plan\`. Pause only on \`--manual\` or \`--once\`.
+     Transition wording is a statement (\`✓ specify complete — proceeding
+     to <next>\`), never a question.
 
 9. **Check extension hooks (\`hooks.after_specify\` in \`.specflow/extensions.yml\`)**:
    Same rules as Pre-Execution Checks. For each executable hook emit:
