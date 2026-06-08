@@ -78,6 +78,12 @@ export type Intent =
      */
     scheme: "semver" | "date" | null;
     force: boolean;
+    /**
+     * `--dry-run`. Compute the plan (conflicts + would-write counts) and
+     * print it without touching disk. Trumps `--force` — when both are
+     * set, no writes happen. See issue #366.
+     */
+    dryRun: boolean;
   }
   | { kind: "self-update"; checkOnly: boolean }
   | { kind: "check"; projectMode: boolean }
@@ -206,6 +212,7 @@ export function parseArgs(argv: string[]): Intent {
       backlogRepo: backlogRepoRaw,
       scheme: schemeResult.value,
       force: Boolean(parsed.force),
+      dryRun: Boolean(parsed["dry-run"]),
     };
   }
 

@@ -42,6 +42,11 @@ export type InitIntent = {
   /** Explicit `--scheme` value (`semver` | `date`). Null = ask/detect. */
   scheme: VersionScheme | null;
   force: boolean;
+  /**
+   * `--dry-run`. Compute the plan and print it without writing anywhere
+   * on disk — trumps `--force` (no overwrites, no backups, no lock).
+   */
+  dryRun: boolean;
 };
 
 async function resolveHarnessKey(
@@ -418,6 +423,7 @@ export async function runInit(intent: InitIntent): Promise<number> {
       targetDir,
       initGit: !intent.noGit,
       force: intent.force,
+      dryRun: intent.dryRun,
     });
   } catch (err) {
     // Surface the actionable first-line message for known structured
@@ -452,6 +458,13 @@ export async function runInit(intent: InitIntent): Promise<number> {
   const mergedSuffix = result.filesMerged.length > 0
     ? ` (+ merged: ${result.filesMerged.join(", ")})`
     : "";
+  if (intent.dryRun) {
+    console.log(
+      green(`✓ would write ${result.filesWritten} files${mergedSuffix}`),
+    );
+    console.log(dim("(dry-run — no files written)"));
+    return 0;
+  }
   console.log(green(`✓ wrote ${result.filesWritten} files${mergedSuffix}`));
 
   await writeBacklogConfigStub(targetDir, backlogBackend, kanbanUrl, githubRepo);

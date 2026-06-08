@@ -90,6 +90,7 @@ Deno.test("InitProjectUseCase writes the bundle to the target dir (happy path)",
     targetDir: "/tmp/demo",
     initGit: true,
     force: false,
+    dryRun: false,
   });
   assertEquals(result.status, "initialized");
   if (result.status === "initialized") {
@@ -114,6 +115,7 @@ Deno.test("InitProjectUseCase fails with 'conflicts' when target already has spe
     targetDir: "/tmp/demo",
     initGit: true,
     force: false,
+    dryRun: false,
   });
   assertEquals(result.status, "conflicts");
   if (result.status === "conflicts") {
@@ -146,6 +148,7 @@ Deno.test("InitProjectUseCase reports lockExists=true when conflicts hit a previ
     targetDir: "/tmp/demo",
     initGit: true,
     force: false,
+    dryRun: false,
   });
   assertEquals(result.status, "conflicts");
   if (result.status === "conflicts") {
@@ -165,7 +168,7 @@ Deno.test("InitProjectUseCase calls git.init when repo not initialized and initG
     core: SAMPLE_CORE,
     ensureDir: () => Promise.resolve(),
   });
-  await useCase.execute({ targetDir: "/tmp/demo", initGit: true, force: false });
+  await useCase.execute({ targetDir: "/tmp/demo", initGit: true, force: false, dryRun: false });
   assert(initCalled.value, "git.init should have been called");
 });
 
@@ -181,7 +184,7 @@ Deno.test("InitProjectUseCase skips git.init when initGit=false", async () => {
     core: SAMPLE_CORE,
     ensureDir: () => Promise.resolve(),
   });
-  await useCase.execute({ targetDir: "/tmp/demo", initGit: false, force: false });
+  await useCase.execute({ targetDir: "/tmp/demo", initGit: false, force: false, dryRun: false });
   assertEquals(initCalled.value, false);
 });
 
@@ -197,7 +200,12 @@ Deno.test("InitProjectUseCase skips git.init when git not available", async () =
     core: SAMPLE_CORE,
     ensureDir: () => Promise.resolve(),
   });
-  const result = await useCase.execute({ targetDir: "/tmp/demo", initGit: true, force: false });
+  const result = await useCase.execute({
+    targetDir: "/tmp/demo",
+    initGit: true,
+    force: false,
+    dryRun: false,
+  });
   assertEquals(initCalled.value, false);
   assertEquals(result.status, "initialized");
   // Warning about missing git should be in warnings
@@ -218,7 +226,7 @@ Deno.test("InitProjectUseCase skips git.init when repo already initialized", asy
     core: SAMPLE_CORE,
     ensureDir: () => Promise.resolve(),
   });
-  await useCase.execute({ targetDir: "/tmp/demo", initGit: true, force: false });
+  await useCase.execute({ targetDir: "/tmp/demo", initGit: true, force: false, dryRun: false });
   assertEquals(initCalled.value, false);
 });
 
@@ -248,6 +256,7 @@ Deno.test("InitProjectUseCase with force=true skips conflict detection and reque
     targetDir: "/tmp/demo",
     initGit: false,
     force: true,
+    dryRun: false,
   });
   assertEquals(result.status, "initialized");
   assertEquals(passedBackupExisting, true);
@@ -279,6 +288,7 @@ Deno.test("InitProjectUseCase returns backups array from writer report", async (
     targetDir: "/tmp/demo",
     initGit: false,
     force: true,
+    dryRun: false,
   });
   if (result.status === "initialized") {
     assertEquals(result.backups, [".claude/x.md"]);
@@ -317,6 +327,7 @@ Deno.test("InitProjectUseCase persists an installed.lock with SHA256 of every fi
     targetDir: "/tmp/demo",
     initGit: false,
     force: false,
+    dryRun: false,
   });
   const written = lockStore.lastWritten;
   assert(written !== null, "lock not written");
@@ -339,7 +350,7 @@ Deno.test("InitProjectUseCase records harness.key in the installed lock", async 
     core: SAMPLE_CORE,
     ensureDir: () => Promise.resolve(),
   });
-  await uc.execute({ targetDir: "/tmp/demo", initGit: false, force: false });
+  await uc.execute({ targetDir: "/tmp/demo", initGit: false, force: false, dryRun: false });
   assertEquals(lockStore.lastWritten?.harness, "claude");
 });
 
@@ -355,7 +366,7 @@ Deno.test("InitProjectUseCase uses harness.mapBundle output as the file tree", a
     core: SAMPLE_CORE,
     ensureDir: () => Promise.resolve(),
   });
-  await uc.execute({ targetDir: "/tmp/demo", initGit: false, force: false });
+  await uc.execute({ targetDir: "/tmp/demo", initGit: false, force: false, dryRun: false });
   // The fake harness maps project-root suffix → flat dest.
   assert(writer.written.includes("/tmp/demo:CLAUDE.md"));
 });
