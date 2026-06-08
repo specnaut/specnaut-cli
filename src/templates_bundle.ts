@@ -502,36 +502,21 @@ Given that feature description, do this:
         1. List failing items and issues; update spec; re-run (max 3 iterations).
         2. After 3 iterations, document remaining issues and warn user.
 
-      - **[NEEDS CLARIFICATION] markers remain**:
-        1. Keep only the 3 most critical; make informed guesses for the rest.
-        2. For each (max 3), present to user:
-
-           \`\`\`markdown
-           ## Question [N]: [Topic]
-
-           **Context**: [Quote relevant spec section]
-           **What we need to know**: [Specific question]
-
-           **Suggested Answers**:
-
-           | Option | Answer | Implications |
-           |--------|--------|--------------|
-           | A      | [First answer] | [Implications] |
-           | B      | [Second answer] | [Implications] |
-           | Custom | Provide your own | — |
-
-           **Your choice**: _[Wait for user response]_
-           \`\`\`
-
-        3. Number questions Q1–Q3; present all before waiting for responses.
-        4. Update spec with user's answers; re-run validation.
+      - **[NEEDS CLARIFICATION] markers remain**: keep ≤3 most critical,
+        document informed-guess defaults in Assumptions, leave the
+        surviving markers verbatim for \`/specflow clarify\` to resolve.
+        **Do NOT prompt inline.** In \`lite\` shape, markers become
+        Assumptions and the chain continues.
 
    d. **Update Checklist** after each validation iteration.
 
-8. **Report completion** with:
-   - \`SPECIFY_FEATURE_DIRECTORY\` and \`SPEC_FILE\`
-   - Checklist results summary
-   - Readiness for next phase (\`/specflow clarify\` or \`/specflow plan\`)
+8. **Report completion and proceed (no permission ask)**:
+   - Report \`SPECIFY_FEATURE_DIRECTORY\`, \`SPEC_FILE\`, and checklist
+     summary in one short block.
+   - Chain unconditionally to the next phase: \`full\` → \`/specflow clarify\`,
+     \`lite\` → \`/specflow plan\`. Pause only on \`--manual\` or \`--once\`.
+     Transition wording is a statement (\`✓ specify complete — proceeding
+     to <next>\`), never a question.
 
 9. **Check extension hooks (\`hooks.after_specify\` in \`.specflow/extensions.yml\`)**:
    Same rules as Pre-Execution Checks. For each executable hook emit:
