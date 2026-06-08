@@ -24,6 +24,7 @@ Deno.test("parseArgs returns init intent with a project name", () => {
     backlogRepo: null,
     scheme: null,
     force: false,
+    dryRun: false,
   });
 });
 
@@ -39,6 +40,7 @@ Deno.test("parseArgs returns init intent with --here", () => {
     backlogRepo: null,
     scheme: null,
     force: false,
+    dryRun: false,
   });
 });
 
@@ -54,6 +56,7 @@ Deno.test("parseArgs returns init intent with --no-git", () => {
     backlogRepo: null,
     scheme: null,
     force: false,
+    dryRun: false,
   });
 });
 
@@ -95,7 +98,32 @@ Deno.test("parseArgs init with --force", () => {
     backlogRepo: null,
     scheme: null,
     force: true,
+    dryRun: false,
   });
+});
+
+Deno.test("parseArgs init with --dry-run", () => {
+  assertEquals(parseArgs(["init", "demo", "--dry-run"]), {
+    kind: "init",
+    projectName: "demo",
+    here: false,
+    noGit: false,
+    ai: null,
+    backlog: null,
+    backlogUrl: null,
+    backlogRepo: null,
+    scheme: null,
+    force: false,
+    dryRun: true,
+  });
+});
+
+Deno.test("parseArgs init with --force --dry-run captures both flags", () => {
+  const r = parseArgs(["init", "--here", "--force", "--dry-run"]);
+  if (r.kind === "init") {
+    assertEquals(r.force, true);
+    assertEquals(r.dryRun, true);
+  }
 });
 
 Deno.test("parseArgs init without --force defaults to false", () => {

@@ -35,6 +35,8 @@ ${bold("Flags (for init):")}
                       Cargo.toml [lib], composer.json type=library), semver-shaped git tags
                       (v1.2.3), or a CHANGELOG.md with Keep-a-Changelog headers. Falls back to
                       "date" when no signal is found.
+  --force             Overwrite locally-customized files (existing content backed up to *.specflow.bak)
+  --dry-run           Show the plan without writing — trumps --force
 
 ${bold("Flags (for upgrade):")}
   --dry-run           Show the plan without writing

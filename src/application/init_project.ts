@@ -50,6 +50,12 @@ export type InitProjectInput = {
   targetDir: string;
   initGit: boolean;
   force: boolean;
+  /**
+   * When true, compute the plan and return a synthetic "initialized"
+   * result without touching disk. Trumps `force`: no overwrites, no
+   * backups, no lock written, no git init. Used by `--dry-run`.
+   */
+  dryRun: boolean;
 };
 
 export class InitProjectUseCase {
@@ -68,7 +74,12 @@ export class InitProjectUseCase {
     } = this.deps;
     const warnings: string[] = [];
 
-    await ensureDir(input.targetDir);
+    // `--dry-run` skips creating the target dir entirely (no side
+    // effects). Everything else below is a no-op for dry-run except
+    // the read-only conflict detection.
+    if (!input.dryRun) {
+      await ensureDir(input.targetDir);
+    }
 
     const bundle = harness.mapBundle(core, { backlogBackend, versionScheme });
 
@@ -82,6 +93,29 @@ export class InitProjectUseCase {
           lockExists: existingLock !== null,
         };
       }
+    }
+
+    // Dry-run short-circuit: no writes, no lock, no git init. Synthesize
+    // an InitResult from the bundle so the caller can print the same
+    // "would write N files" summary as a real run.
+    if (input.dryRun) {
+      const mergedPaths: string[] = [];
+      let writtenCount = 0;
+      for (const [dest, file] of Object.entries(bundle)) {
+        if (file.mergeBlock !== undefined || file.mergeJson !== undefined) {
+          mergedPaths.push(dest);
+        } else {
+          writtenCount++;
+        }
+      }
+      return {
+        status: "initialized",
+        filesWritten: writtenCount,
+        filesMerged: mergedPaths,
+        warnings,
+        backups: [],
+        lockWritten: false,
+      };
     }
 
     const report = await writer.writeBundle(bundle, input.targetDir, {
