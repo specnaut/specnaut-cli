@@ -1,6 +1,6 @@
 import { assertEquals, assertThrows } from "@std/assert";
-import { parsePromoteArgs } from "../../.claude/skills/gh-issues/scripts/promote.ts";
-import { parseRejectArgs } from "../../.claude/skills/gh-issues/scripts/reject.ts";
+import { parsePromoteArgs } from "../../scripts/gh-issues/promote.ts";
+import { parseRejectArgs } from "../../scripts/gh-issues/reject.ts";
 
 Deno.test("parsePromoteArgs defaults to P3/M", () => {
   const a = parsePromoteArgs(["42"]);
