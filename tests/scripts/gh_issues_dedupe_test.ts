@@ -4,7 +4,7 @@ import {
   findCandidates,
   jaccard,
   tokenize,
-} from "../../.claude/skills/gh-issues/scripts/_dedupe_heuristic.ts";
+} from "../../scripts/gh-issues/_dedupe_heuristic.ts";
 
 Deno.test("tokenize lowercases, splits on punctuation, drops stopwords", () => {
   const toks = tokenize("The init crashes on Windows!");

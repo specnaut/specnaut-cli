@@ -88,15 +88,11 @@ if (import.meta.main) {
       topN: 2,
     }).filter((c) => c.bucket !== "unrelated");
 
-    const dupeCol = candidates.length === 0
-      ? "—"
-      : candidates
-        .map((c) => `#${c.number} (${c.score.toFixed(2)} ${c.bucket})`)
-        .join("<br>");
+    const dupeCol = candidates.length === 0 ? "—" : candidates
+      .map((c) => `#${c.number} (${c.score.toFixed(2)} ${c.bucket})`)
+      .join("<br>");
     const likely = candidates.find((c) => c.bucket === "likely-dupe");
-    const action = likely
-      ? `mark-dupe of #${likely.number}?`
-      : "promote (P3/M)";
+    const action = likely ? `mark-dupe of #${likely.number}?` : "promote (P3/M)";
     const day = issue.createdAt.slice(0, 10);
     const title = trim(issue.title.replace(/\|/g, "\\|"), 60);
     console.log(`| ${issue.number} | ${title} | ${day} | ${dupeCol} | ${action} |`);
