@@ -58,13 +58,17 @@ check ".claude/commands/specflow.md present (slash-command shim, post-F3)" \
   '[ -f .claude/commands/specflow.md ]'
 check "router .claude/skills/specflow/SKILL.md present" \
   '[ -f .claude/skills/specflow/SKILL.md ]'
-for phase in specify constitution clarify plan tasks analyze implement merge review checklist groom tag-version release-version list-skills lite-heuristic; do
+for phase in brainstorm specify constitution clarify plan tasks analyze implement merge review checklist groom tag-version release-version list-skills lite-heuristic; do
   check ".claude/skills/specflow/phases/$phase.md present" \
     "[ -f .claude/skills/specflow/phases/$phase.md ]"
 done
 # Explicit literal-name assertions for the audit's basename-substring
 # coverage scan — the interpolated loop above hides $phase.md from
 # `grep -qF`, so each phase needs its filename rendered in the source.
+check "phase doc brainstorm.md scaffolded" \
+  '[ -f .claude/skills/specflow/phases/brainstorm.md ]'
+check "phase doc plan.md scaffolded" \
+  '[ -f .claude/skills/specflow/phases/plan.md ]'
 check "phase doc tag-version.md scaffolded (epic #226)" \
   '[ -f .claude/skills/specflow/phases/tag-version.md ]'
 check "phase doc release-version.md scaffolded (epic #226)" \
