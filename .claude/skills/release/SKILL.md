@@ -27,7 +27,12 @@ This skill enforces a fixed pipeline. Each step is convention-pathed; if a scrip
                 (preview ONLY — catches bad commit messages before they freeze
                  into the GitHub Release body. Skim it. If a subject reads
                  badly, amend the source commit BEFORE step 7.)
-6. commit     : git add … && git commit -m "chore: release v<NEXT>"
+6. commit     : git add deno.json src/domain/version.ts src/templates_bundle.ts \
+                  plugin/.claude-plugin/plugin.json templates/manifest.json \
+                  .codex-plugin/plugin.json .cursor-plugin/plugin.json
+                git commit -m "chore: release v<NEXT>"
+                (7 paths total — the 6 version files from step 2 + the bundle
+                 regenerated in step 3)
 7. tag        : git tag -a "v<NEXT>" -m "Release v<NEXT>"
                 (inline, NOT via bundled tag.sh — the bundled script expects
                  specflow-init to have stripped one of the two scheme blocks,
@@ -38,6 +43,25 @@ This skill enforces a fixed pipeline. Each step is convention-pathed; if a scrip
 ```
 
 The dogfood ambition of the spec ("use the bundled tag.sh") is **partial** for the CLI repo: the SKILL.md performs the same logical operations the bundled script defines, but inlined, because `tag.sh`'s scheme stripping happens at `specflow init` time and the CLI repo never runs init on itself. Cloud (which DOES run init) gets the full dogfood path via `/specflow tag-version`.
+
+## Recovery between commit / tag / push
+
+If `git push origin main` succeeds but `git push origin v<NEXT>` fails
+(network blip, push protection on the tag): re-run **only** the failed push
+— do NOT delete and re-tag.
+
+```bash
+git push origin v<NEXT>
+```
+
+If `git push origin main` fails: do NOT push the tag. A tag pointing at a
+commit not on `origin` will be rejected by `release.yml` lookups. Resolve
+the `main` push first (`git pull --rebase` if origin diverged, then re-push),
+then push the tag.
+
+If `git tag -a v<NEXT>` was created but the bump commit (step 6) had a
+problem: delete the local tag (`git tag -d v<NEXT>`), amend or re-commit
+the fix, re-tag, then push.
 
 ## Asking Kevin which bump
 
@@ -68,7 +92,21 @@ The skill does NOT run `gh release create` — the workflow does that. (Cloud's 
 1. `git push origin :refs/tags/v<BAD>`
 2. `git tag -d v<BAD>`
 3. Delete the GitHub Release via the web UI (tag deletion doesn't auto-delete it).
-4. Revert the homebrew-tap bump if it landed (push a force-revert on `mkrlabs/homebrew-tap:main`, or land a corrected patch).
+4. Revert the homebrew-tap bump if it landed. The tap is a normal repo, so
+   either:
+   ```bash
+   # Option A — revert via git, then push to tap main
+   gh repo clone mkrlabs/homebrew-tap /tmp/homebrew-tap-revert
+   cd /tmp/homebrew-tap-revert
+   git revert --no-edit HEAD
+   git push origin main
+   cd - && rm -rf /tmp/homebrew-tap-revert
+   ```
+   ```bash
+   # Option B — land the bad version's checksums on a new corrected patch
+   # release; the next bump overwrites Formula/specflow.rb wholesale.
+   ```
+   Prefer A for fast recovery, B if you have a patch ready to ship.
 5. Fix, bump patch, re-release.
 
 ### Security preflight blocked the release (re-run, do NOT rollback)
@@ -78,7 +116,11 @@ When `security-preflight` in `release.yml` blocks on a critical / secret-scannin
 1. Open the failed run via the Actions URL.
 2. Read the `## Security alert preflight` table in the job summary.
 3. Resolve each alert.
-4. Re-run the failed jobs from the Actions UI.
+4. Re-run the failed jobs without re-cutting the tag:
+   ```bash
+   run_id="$(gh run list --workflow release.yml --limit 5 --json databaseId,headBranch --jq ".[] | select(.headBranch == \"v<NEXT>\") | .databaseId" | head -1)"
+   gh run rerun "$run_id" --failed
+   ```
 
 If a real fix is needed, that fix lands on `main` as a normal PR; the resulting new commit obsoletes the old tag — then follow bad-build rollback.
 
