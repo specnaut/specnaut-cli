@@ -1,5 +1,5 @@
 {
-  "feature_directory": ".specflow/specs/010-release-adoption-parity",
-  "linked_issue": 363,
+  "feature_directory": ".specflow/specs/011-preserve-customisations",
+  "linked_issue": 367,
   "workflow_shape": "full"
 }

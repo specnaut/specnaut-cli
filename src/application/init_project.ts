@@ -23,6 +23,13 @@ export type InitResult =
     warnings: string[];
     backups: string[];
     lockWritten: boolean;
+    /**
+     * Destination paths skipped from the WRITE set because they were declared
+     * preserved (`.specflow/preserve.yml`, spec 011 / issue #367). Reported so
+     * the handler can emit one per-file notice (FR-004). These paths remain
+     * lock-tracked (FR-012) — only the write was skipped.
+     */
+    preserved: ReadonlyArray<string>;
   }
   | {
     status: "conflicts";
@@ -67,6 +74,16 @@ export type InitProjectInput = {
    * Absent ⇒ treated as `false` (standalone, full provisioning).
    */
   parentManaged?: boolean;
+  /**
+   * Destination paths to leave untouched on a forced refresh — the
+   * maintainer's preserve declarations (`.specflow/preserve.yml`, spec 011 /
+   * issue #367). These are removed from the WRITE set only; they STAY
+   * lock-tracked (FR-012) so `specflow diff` and future upgrades still
+   * compare them. Absent/empty ⇒ today's behaviour (FR-011). The handler
+   * resolves the set (and validates membership / `--reset-preserved`); the
+   * use case never reads the manifest or any CLI flag.
+   */
+  preservedPaths?: ReadonlySet<string>;
 };
 
 export class InitProjectUseCase {
@@ -115,13 +132,32 @@ export class InitProjectUseCase {
       }
     }
 
+    // Preserve filter (spec 011 / issue #367): declared paths are removed from
+    // the WRITE set so a forced refresh never clobbers them, but they stay in
+    // `bundle` for lock-entry construction below — preserved files MUST remain
+    // lock-tracked (FR-012). Only dests that are actually in the bundle count
+    // as preserved (a declared path outside the bundle is a handler-side warn).
+    // Computed before the dry-run short-circuit so the previewed
+    // "would write N files" count excludes preserved paths too.
+    const preservedSet = input.preservedPaths ?? new Set<string>();
+    const preserved: string[] = [];
+    const bundleToWrite: Bundle = {};
+    for (const [dest, file] of Object.entries(bundle)) {
+      if (preservedSet.has(dest)) {
+        preserved.push(dest);
+        continue;
+      }
+      bundleToWrite[dest] = file;
+    }
+
     // Dry-run short-circuit: no writes, no lock, no git init. Synthesize
-    // an InitResult from the bundle so the caller can print the same
-    // "would write N files" summary as a real run.
+    // an InitResult from `bundleToWrite` (the post-preserve-filter set) so the
+    // caller prints the same "would write N files" summary as a real run —
+    // excluding the preserved paths it would skip.
     if (input.dryRun) {
       const mergedPaths: string[] = [];
       let writtenCount = 0;
-      for (const [dest, file] of Object.entries(bundle)) {
+      for (const [dest, file] of Object.entries(bundleToWrite)) {
         if (file.mergeBlock !== undefined || file.mergeJson !== undefined) {
           mergedPaths.push(dest);
         } else {
@@ -135,10 +171,11 @@ export class InitProjectUseCase {
         warnings,
         backups: [],
         lockWritten: false,
+        preserved,
       };
     }
 
-    const report = await writer.writeBundle(bundle, input.targetDir, {
+    const report = await writer.writeBundle(bundleToWrite, input.targetDir, {
       overwrite: input.force,
       backupExisting: input.force,
     });
@@ -199,9 +236,12 @@ export class InitProjectUseCase {
       }
     }
 
+    // Count from `bundleToWrite` (the post-preserve-filter set), NOT the full
+    // `bundle`: preserved paths were skipped on disk, so "wrote N files" must
+    // not count files this run never touched (spec 011 / issue #367).
     const mergedPaths: string[] = [];
     let writtenCount = 0;
-    for (const [dest, file] of Object.entries(bundle)) {
+    for (const [dest, file] of Object.entries(bundleToWrite)) {
       if (file.mergeBlock !== undefined || file.mergeJson !== undefined) {
         mergedPaths.push(dest);
       } else {
@@ -216,6 +256,7 @@ export class InitProjectUseCase {
       warnings,
       backups: report.backups.map((b) => b.dest),
       lockWritten: true,
+      preserved,
     };
   }
 }

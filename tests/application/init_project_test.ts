@@ -459,3 +459,223 @@ Deno.test("InitProjectUseCase uses harness.mapBundle output as the file tree", a
   // The fake harness maps project-root suffix → flat dest.
   assert(writer.written.includes("/tmp/demo:CLAUDE.md"));
 });
+
+// ---------------------------------------------------------------------------
+// 011-preserve-customisations: preservedPaths filter (issue #367)
+// ---------------------------------------------------------------------------
+
+const PRESERVE_CORE: CoreBundle = [
+  ".claude/agents/product-owner.md",
+  ".claude/agents/developer.md",
+  "AGENTS.md",
+].map((dest) => ({
+  category: "project-root" as const,
+  name: "root",
+  suffix: dest,
+  content: `# ${dest}\n`,
+  executable: false,
+})) as CoreBundle;
+
+Deno.test("InitProjectUseCase: preservedPaths are absent from the write set and reported", async () => {
+  const writer = fakeFsWriter();
+  const uc = new InitProjectUseCase({
+    writer,
+    git: fakeGit(),
+    lockStore: fakeLockStore(),
+    harness: fakeClaudeHarness(),
+    backlogBackend: "local",
+    versionScheme: "semver",
+    core: PRESERVE_CORE,
+    ensureDir: () => Promise.resolve(),
+  });
+  const result = await uc.execute({
+    targetDir: "/tmp/demo",
+    initGit: false,
+    force: true,
+    dryRun: false,
+    preservedPaths: new Set([".claude/agents/product-owner.md"]),
+  });
+  // The preserved path is NOT written.
+  assertEquals(writer.written.includes("/tmp/demo:.claude/agents/product-owner.md"), false);
+  // Other managed files ARE written.
+  assert(writer.written.includes("/tmp/demo:.claude/agents/developer.md"));
+  assert(writer.written.includes("/tmp/demo:AGENTS.md"));
+  // The result reports the preserved path.
+  assertEquals(result.status, "initialized");
+  if (result.status === "initialized") {
+    assertEquals(result.preserved, [".claude/agents/product-owner.md"]);
+  }
+});
+
+// MED-1: filesWritten must reflect the post-preserve-filter write set, NOT
+// the full bundle — otherwise a refresh reports writing files it skipped.
+Deno.test("InitProjectUseCase: filesWritten excludes preserved paths", async () => {
+  const uc = new InitProjectUseCase({
+    writer: fakeFsWriter(),
+    git: fakeGit(),
+    lockStore: fakeLockStore(),
+    harness: fakeClaudeHarness(),
+    backlogBackend: "local",
+    versionScheme: "semver",
+    core: PRESERVE_CORE, // 3 non-mergeable files
+    ensureDir: () => Promise.resolve(),
+  });
+  const result = await uc.execute({
+    targetDir: "/tmp/demo",
+    initGit: false,
+    force: true,
+    dryRun: false,
+    preservedPaths: new Set([".claude/agents/product-owner.md"]),
+  });
+  assertEquals(result.status, "initialized");
+  if (result.status === "initialized") {
+    // 3 files in the bundle, 1 preserved ⇒ exactly 2 actually written.
+    assertEquals(result.filesWritten, 2);
+    assertEquals(result.preserved, [".claude/agents/product-owner.md"]);
+  }
+});
+
+// MED-1 (dry-run): the previewed "would write N" count must also exclude
+// preserved paths, and the dry-run result must report them as preserved.
+Deno.test("InitProjectUseCase: dry-run filesWritten excludes preserved paths", async () => {
+  const uc = new InitProjectUseCase({
+    writer: fakeFsWriter(),
+    git: fakeGit(),
+    lockStore: fakeLockStore(),
+    harness: fakeClaudeHarness(),
+    backlogBackend: "local",
+    versionScheme: "semver",
+    core: PRESERVE_CORE,
+    ensureDir: () => Promise.resolve(),
+  });
+  const result = await uc.execute({
+    targetDir: "/tmp/demo",
+    initGit: false,
+    force: true,
+    dryRun: true,
+    preservedPaths: new Set([".claude/agents/product-owner.md"]),
+  });
+  assertEquals(result.status, "initialized");
+  if (result.status === "initialized") {
+    assertEquals(result.filesWritten, 2);
+    assertEquals(result.preserved, [".claude/agents/product-owner.md"]);
+  }
+});
+
+// F1 (HARD): a preserved file must stay lock-tracked (FR-012) so diff and
+// future upgrades still see it — skipping the WRITE must NOT drop the lock entry.
+Deno.test("InitProjectUseCase: preserved file remains in the installed.lock (FR-012)", async () => {
+  const lockStore = fakeLockStore();
+  const uc = new InitProjectUseCase({
+    writer: fakeFsWriter(),
+    git: fakeGit(),
+    lockStore,
+    harness: fakeClaudeHarness(),
+    backlogBackend: "local",
+    versionScheme: "semver",
+    core: PRESERVE_CORE,
+    ensureDir: () => Promise.resolve(),
+  });
+  await uc.execute({
+    targetDir: "/tmp/demo",
+    initGit: false,
+    force: true,
+    dryRun: false,
+    preservedPaths: new Set([".claude/agents/product-owner.md"]),
+  });
+  const lock = lockStore.lastWritten!;
+  assert(lock.entries.has(".claude/agents/product-owner.md"));
+  assert(lock.entries.has(".claude/agents/developer.md"));
+});
+
+// F2: a brand-new bundle path is still written even when preserves are set —
+// the preserve list governs existing files only (FR-010).
+Deno.test("InitProjectUseCase: new bundle path still written when preserves are set (FR-010)", async () => {
+  const writer = fakeFsWriter();
+  const uc = new InitProjectUseCase({
+    writer,
+    git: fakeGit(),
+    lockStore: fakeLockStore(),
+    harness: fakeClaudeHarness(),
+    backlogBackend: "local",
+    versionScheme: "semver",
+    core: PRESERVE_CORE,
+    ensureDir: () => Promise.resolve(),
+  });
+  await uc.execute({
+    targetDir: "/tmp/demo",
+    initGit: false,
+    force: true,
+    dryRun: false,
+    // a path NOT in the bundle is inert; the real bundle path is written.
+    preservedPaths: new Set([".claude/agents/product-owner.md"]),
+  });
+  assert(writer.written.includes("/tmp/demo:AGENTS.md"));
+  assert(writer.written.includes("/tmp/demo:.claude/agents/developer.md"));
+});
+
+// T019 / D8 (C7): a declared agentic path in a parent-managed sub-repo is a
+// clean no-op. Agentic dests are filtered out of the bundle BEFORE the preserve
+// filter runs, so the predicate is never consulted for them — the path is
+// neither written nor reported as preserved (it was never a bundle dest here).
+Deno.test("InitProjectUseCase: declared agentic path in a parent-managed sub-repo is a no-op (D8)", async () => {
+  const writer = fakeFsWriter();
+  const lockStore = fakeLockStore();
+  const uc = new InitProjectUseCase({
+    writer,
+    git: fakeGit(),
+    lockStore,
+    harness: fakeClaudeHarness(),
+    backlogBackend: "local",
+    versionScheme: "semver",
+    core: MIXED_CORE,
+    ensureDir: () => Promise.resolve(),
+  });
+  const agenticDest = ".claude/agents/developer.md";
+  const result = await uc.execute({
+    targetDir: "/tmp/demo",
+    initGit: false,
+    force: true,
+    dryRun: false,
+    parentManaged: true,
+    // Declare an agentic path preserved — in a parent-managed run it is already
+    // filtered from the bundle, so this declaration is inert.
+    preservedPaths: new Set([agenticDest]),
+  });
+  const writtenDests = writer.written.map((w) => w.replace("/tmp/demo:", ""));
+  // The agentic path is absent from writes (suppressed by parent-managed).
+  assertEquals(writtenDests.includes(agenticDest), false);
+  // It is NOT reported as preserved — it was never a bundle dest for this run.
+  assertEquals(result.status, "initialized");
+  if (result.status === "initialized") {
+    assertEquals(result.preserved.includes(agenticDest), false);
+  }
+  // Non-agentic dests are still provisioned (the run is otherwise normal).
+  assert(writtenDests.includes("AGENTS.md"));
+});
+
+// Absent / empty preservedPaths ⇒ today's behaviour: full bundle written,
+// empty preserved report.
+Deno.test("InitProjectUseCase: absent preservedPaths writes the full bundle (FR-011)", async () => {
+  const writer = fakeFsWriter();
+  const uc = new InitProjectUseCase({
+    writer,
+    git: fakeGit(),
+    lockStore: fakeLockStore(),
+    harness: fakeClaudeHarness(),
+    backlogBackend: "local",
+    versionScheme: "semver",
+    core: PRESERVE_CORE,
+    ensureDir: () => Promise.resolve(),
+  });
+  const result = await uc.execute({
+    targetDir: "/tmp/demo",
+    initGit: false,
+    force: true,
+    dryRun: false,
+  });
+  assert(writer.written.includes("/tmp/demo:.claude/agents/product-owner.md"));
+  if (result.status === "initialized") {
+    assertEquals(result.preserved, []);
+  }
+});

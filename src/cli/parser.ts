@@ -84,6 +84,12 @@ export type Intent =
      * set, no writes happen. See issue #366.
      */
     dryRun: boolean;
+    /**
+     * `--reset-preserved`. Explicit opt-out (spec 011 / issue #367): override
+     * preserve declarations for this forced refresh, restoring the bundled
+     * versions. Never the default; reported per overridden file.
+     */
+    resetPreserved: boolean;
   }
   | { kind: "self-update"; checkOnly: boolean }
   | { kind: "check"; projectMode: boolean }
@@ -102,6 +108,22 @@ export type Intent =
      * content as the new baseline. See `UpgradeProjectInput.resetBaseline`.
      */
     resetBaseline: boolean;
+    /**
+     * `--reset-preserved`. Explicit opt-out (spec 011 / issue #367): ignore
+     * preserve declarations for this upgrade so declared files are overwritten
+     * with the bundle. Never the default; reported per overridden file.
+     */
+    resetPreserved: boolean;
+  }
+  | {
+    /**
+     * `specflow diff` (spec 011 / issue #367, US2) — read-only divergence view:
+     * show how each managed file on disk differs from the bundled original for
+     * the installed templates version. Mutates nothing.
+     */
+    kind: "diff";
+    /** `--only-customised`: restrict to paths whose disk SHA ≠ lock SHA. */
+    onlyCustomised: boolean;
   }
   | { kind: "unknown"; received: string }
   | { kind: "reconcile-status" }
@@ -145,6 +167,8 @@ export function parseArgs(argv: string[]): Intent {
       "dry-run",
       "project",
       "reset-baseline",
+      "reset-preserved",
+      "only-customised",
       "status",
       "accept-upstream",
       "accept-current",
@@ -213,6 +237,7 @@ export function parseArgs(argv: string[]): Intent {
       scheme: schemeResult.value,
       force: Boolean(parsed.force),
       dryRun: Boolean(parsed["dry-run"]),
+      resetPreserved: Boolean(parsed["reset-preserved"]),
     };
   }
 
@@ -237,7 +262,12 @@ export function parseArgs(argv: string[]): Intent {
       force: Boolean(parsed.force),
       backlog: backlogResult.value,
       resetBaseline: Boolean(parsed["reset-baseline"]),
+      resetPreserved: Boolean(parsed["reset-preserved"]),
     };
+  }
+
+  if (command === "diff") {
+    return { kind: "diff", onlyCustomised: Boolean(parsed["only-customised"]) };
   }
 
   if (command === "reconcile") {

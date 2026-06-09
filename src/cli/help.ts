@@ -11,6 +11,7 @@ ${bold("Usage:")}
   specflow check [--project]          Diagnose the environment (and optionally the project)
   specflow upgrade [--dry-run] [--force] [--backlog <name>] [--reset-baseline]
                                       Update project templates to the binary's version
+  specflow diff [--only-customised]   Show how managed files diverge from the bundled originals (read-only)
   specflow reconcile --status         List files pending post-upgrade reconciliation
   specflow reconcile <path> --accept-upstream | --accept-current
                                       Resolve a preserved file after upgrade
@@ -36,6 +37,8 @@ ${bold("Flags (for init):")}
                       (v1.2.3), or a CHANGELOG.md with Keep-a-Changelog headers. Falls back to
                       "date" when no signal is found.
   --force             Overwrite locally-customized files (existing content backed up to *.specflow.bak)
+  --reset-preserved   Ignore .specflow/preserve.yml for this run so declared files are refreshed too
+                      (never the default; reported per overridden file)
   --dry-run           Show the plan without writing — trumps --force
 
 ${bold("Flags (for upgrade):")}
@@ -46,6 +49,12 @@ ${bold("Flags (for upgrade):")}
   --reset-baseline    Trust the on-disk content as the new SHA baseline. Use when files are flagged
                       "customized locally" but you never edited them (heals stale lock SHAs). Combine
                       with --dry-run to preview what would change.
+  --reset-preserved   Ignore .specflow/preserve.yml for this run so declared files follow normal
+                      upgrade rules (never the default; reported per overridden file).
+
+${bold("Flags (for diff):")}
+  --only-customised   Restrict the output to files whose on-disk content diverges from the recorded
+                      lock baseline — i.e. files you actually customized (skips unchanged managed files).
 
 ${bold("Docs:")}    ${cyan("https://specflow.makerlabs.dev")}
 ${bold("Cloud:")}   ${cyan("https://specflow.makerlabs.app")} ${

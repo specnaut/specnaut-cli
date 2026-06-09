@@ -5,7 +5,16 @@ export type UpgradeAction =
   | {
     kind: "preserve";
     dest: string;
-    reason: "customized";
+    /**
+     * Why the file is preserved:
+     *   - `"customized"`: the on-disk SHA diverges from the lock (the
+     *     maintainer edited it) — the existing implicit auto-preserve.
+     *   - `"declared"`: the maintainer listed the path in
+     *     `.specflow/preserve.yml` (spec 011 / issue #367). A declared
+     *     file is preserved regardless of its SHA and wins over
+     *     auto-update, plugin-migration, and removal.
+     */
+    reason: "customized" | "declared";
     /**
      * True when the `specflow-plugin` plugin owns this path AND the
      * plugin is installed on the host. The handler surfaces an extra
@@ -94,6 +103,15 @@ export type UpgradePlanOptions = {
    * customised a file loses their edit signal. Document accordingly.
    */
   resetBaseline?: boolean;
+  /**
+   * True when the maintainer declared `dest` preserved in
+   * `.specflow/preserve.yml` (spec 011 / issue #367). A declared path is
+   * promoted to `preserve / reason:"declared"` as the FIRST branch of the
+   * plan — it wins over unchanged, auto-update, plugin-migration, AND
+   * removal (a declared path dropped upstream is kept on disk, FR-009).
+   * Injected by the upgrade handler; the domain never reads the manifest.
+   */
+  isDeclaredPreserved?: (dest: string) => boolean;
 };
 
 export function computeUpgradePlan(
@@ -112,6 +130,7 @@ export function computeUpgradePlan(
   const isPluginCoveredFn = opts.isPluginCovered ?? (() => false);
   const isSkipIfExists = opts.isSkipIfExists ?? (() => false);
   const resetBaseline = opts.resetBaseline ?? false;
+  const isDeclaredPreserved = opts.isDeclaredPreserved ?? (() => false);
   const actions: UpgradeAction[] = [];
   const sortedDests = [...newShas.keys()].sort();
 
@@ -119,6 +138,21 @@ export function computeUpgradePlan(
     const newSha = newShas.get(dest)!;
     const diskSha = diskShas.get(dest);
     let lockSha = lock.entries.get(dest)?.sha256;
+
+    // Declared-preserve wins over everything (spec 011 / issue #367): a path
+    // the maintainer listed in .specflow/preserve.yml is kept regardless of
+    // its SHA — before the unchanged, auto-update, and plugin-migration
+    // branches. The file is only present here (in newShas) so `pluginAvailable`
+    // is reported from coverage for the handler's reconcile hint.
+    if (isDeclaredPreserved(dest)) {
+      actions.push({
+        kind: "preserve",
+        dest,
+        reason: "declared",
+        pluginAvailable: pluginInstalled && isPluginCoveredFn(dest),
+      });
+      continue;
+    }
 
     // Reset-baseline: if the on-disk content disagrees with the lock SHA,
     // trust the disk. This heals stale locks left by pre-v1.0 binaries
@@ -190,6 +224,17 @@ export function computeUpgradePlan(
   for (const dest of orphanDests) {
     const diskSha = diskShas.get(dest);
     if (diskSha === undefined) continue;
+    // FR-009: a declared path the bundle dropped is kept on disk
+    // (preservation wins over removal), surfaced as preserve/declared.
+    if (isDeclaredPreserved(dest)) {
+      actions.push({
+        kind: "preserve",
+        dest,
+        reason: "declared",
+        pluginAvailable: pluginInstalled && isPluginCoveredFn(dest),
+      });
+      continue;
+    }
     const lockSha = lock.entries.get(dest)!.sha256;
     actions.push({
       kind: "remove",

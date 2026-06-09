@@ -26,7 +26,9 @@ import { DenoFsWriter } from "../../infrastructure/deno_fs_writer.ts";
 import { DenoGit } from "../../infrastructure/deno_git.ts";
 import { FsLockStore } from "../../infrastructure/fs_lock_store.ts";
 import { FsParentWorkspaceReader } from "../../infrastructure/fs_parent_workspace_reader.ts";
-import { isParentManaged } from "../../domain/parent_managed.ts";
+import { FsPreserveStore } from "../../infrastructure/fs_preserve_store.ts";
+import { isAgenticPath, isParentManaged } from "../../domain/parent_managed.ts";
+import { resolvePreserveDeclarations } from "./preserve_resolution.ts";
 import { CORE_BUNDLE } from "../../templates_bundle.ts";
 import type { Bundle } from "../../domain/template.ts";
 
@@ -49,6 +51,13 @@ export type InitIntent = {
    * on disk — trumps `--force` (no overwrites, no backups, no lock).
    */
   dryRun: boolean;
+  /**
+   * `--reset-preserved`. Explicit, non-default opt-out (spec 011 / issue
+   * #367): override every preserve declaration for THIS run, restoring the
+   * bundled versions. The handler passes an empty preserved set and emits a
+   * per-file override warning (FR-005). Never the default.
+   */
+  resetPreserved: boolean;
 };
 
 async function resolveHarnessKey(
@@ -422,6 +431,31 @@ export async function runInit(intent: InitIntent): Promise<number> {
     );
   }
 
+  // Preserve declarations (spec 011 / issue #367). Resolve the manifest
+  // against the actual bundle dests for this run so we can (a) warn on
+  // ineffective declarations (FR-008), (b) drop preserved paths from the
+  // write set, and (c) emit one notice per preserved/overridden file
+  // (FR-004/FR-005). The bundle is mapped exactly as the use case maps it,
+  // including the parent-managed agentic filter so a declared agentic path in
+  // a parent-managed sub-repo is a clean no-op (D8 — it is simply not a dest).
+  const mappedForPreserve = harness.mapBundle(CORE_BUNDLE, { backlogBackend, versionScheme });
+  const bundleDests = parentManaged
+    ? Object.keys(mappedForPreserve).filter((d) => !isAgenticPath(d))
+    : Object.keys(mappedForPreserve);
+  const preserveCfg = await new FsPreserveStore().read(targetDir);
+  const { known: declaredKnown, unknown: declaredUnknown } = resolvePreserveDeclarations(
+    preserveCfg,
+    bundleDests,
+  );
+  for (const path of declaredUnknown) {
+    console.error(
+      yellow(`warn: ${path} — declared preserved but not a managed file (ignored)`),
+    );
+  }
+  // `--reset-preserved` overrides the declarations for this run: pass an empty
+  // set and surface each override (FR-005). Otherwise honour the declarations.
+  const preservedPaths = intent.resetPreserved ? new Set<string>() : new Set(declaredKnown);
+
   const useCase = new InitProjectUseCase({
     writer: new DenoFsWriter(),
     git: new DenoGit(),
@@ -441,6 +475,7 @@ export async function runInit(intent: InitIntent): Promise<number> {
       force: intent.force,
       dryRun: intent.dryRun,
       parentManaged,
+      preservedPaths,
     });
   } catch (err) {
     // Surface the actionable first-line message for known structured
@@ -471,6 +506,20 @@ export async function runInit(intent: InitIntent): Promise<number> {
   }
 
   for (const w of result.warnings) console.error(yellow(`warn: ${w}`));
+  // Preserve notices (FR-004) / reset overrides (FR-005) — never silent.
+  if (intent.resetPreserved) {
+    for (const path of declaredKnown) {
+      console.log(
+        yellow(`override ${path} — --reset-preserved overrode the declaration`),
+      );
+    }
+  } else {
+    for (const path of result.preserved) {
+      console.log(
+        cyan(`preserved ${path} — declared in .specflow/preserve.yml`),
+      );
+    }
+  }
   for (const b of result.backups) console.log(dim(`↳ backed up ${b} → ${b}.specflow.bak`));
   const mergedSuffix = result.filesMerged.length > 0
     ? ` (+ merged: ${result.filesMerged.join(", ")})`

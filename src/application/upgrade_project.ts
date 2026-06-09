@@ -3,7 +3,11 @@ import type { Bundle, TemplateFile } from "../domain/template.ts";
 import { sha256Hex } from "../domain/sha256.ts";
 import type { InstalledLock, LockEntry } from "../domain/installed_lock.ts";
 import type { CoreBundle } from "../domain/core_bundle.ts";
-import { computeUpgradePlan, type UpgradePlan } from "../domain/upgrade_plan.ts";
+import {
+  computeUpgradePlan,
+  type UpgradeAction,
+  type UpgradePlan,
+} from "../domain/upgrade_plan.ts";
 import { canonicalBlockBody, extractBlock } from "../domain/merge_block.ts";
 import { isPluginCoveredPath } from "../domain/plugin_coverage.ts";
 import { isAgenticPath } from "../domain/parent_managed.ts";
@@ -33,6 +37,16 @@ export type UpgradeProjectInput = {
    * `false`.
    */
   parentManagedOverride?: boolean;
+  /**
+   * Declared-preserve predicate (spec 011 / issue #367). Returns true for any
+   * dest the maintainer listed in `.specflow/preserve.yml`. Threaded straight
+   * into `computeUpgradePlan` so declared files become `preserve/"declared"`
+   * (winning over auto-update, plugin-migration, and removal). Built by the
+   * handler from the manifest (and flipped off when `--reset-preserved` is
+   * passed); the use case never reads the manifest or any CLI flag. Absent ⇒
+   * no declared preserves (today's behaviour).
+   */
+  isDeclaredPreserved?: (dest: string) => boolean;
 };
 
 export type UpgradeProjectResult =
@@ -155,15 +169,23 @@ export class UpgradeProjectUseCase {
         isPluginCovered: (dest) => isPluginCoveredPath(lock.harness, dest),
         isSkipIfExists: (dest) => bundle[dest]?.skipIfExists === true,
         resetBaseline: input.resetBaseline ?? false,
+        isDeclaredPreserved: input.isDeclaredPreserved ?? (() => false),
       },
     );
+
+    // A declared-preserve (spec 011 / issue #367) is immune to `--force`: the
+    // maintainer overrides it only via `--reset-preserved` (which flips the
+    // predicate off, so the file never reaches here as reason:"declared").
+    // Only a `customized` preserve is overwritten by `--force`.
+    const isForceWritablePreserve = (a: UpgradeAction): boolean =>
+      a.kind === "preserve" && a.reason === "customized" && input.force;
 
     const hasActualWork = plan.some((a) =>
       a.kind === "auto-update" ||
       a.kind === "add-new" ||
       a.kind === "migrate-to-plugin" ||
       a.kind === "defer-to-plugin" ||
-      (a.kind === "preserve" && input.force) ||
+      isForceWritablePreserve(a) ||
       (a.kind === "remove" && (!a.wasCustomized || input.force))
     );
     if (!hasActualWork && plan.every((a) => a.kind === "unchanged")) {
@@ -195,7 +217,9 @@ export class UpgradeProjectUseCase {
     // so the agent can preview the reconciliation plan.
     const stagingWrites: Bundle = {};
     for (const action of plan) {
-      if (action.kind !== "preserve") continue;
+      // Stage only `customized` preserves for reconcile; a declared-preserve is
+      // a deliberate freeze, not a pending reconciliation.
+      if (action.kind !== "preserve" || action.reason !== "customized") continue;
       const file = bundle[action.dest];
       if (!file) continue;
       stagingWrites[`.specflow/upgrade-staging/${action.dest}`] = file;
@@ -221,7 +245,7 @@ export class UpgradeProjectUseCase {
       if (
         action.kind === "auto-update" ||
         action.kind === "add-new" ||
-        (action.kind === "preserve" && input.force)
+        isForceWritablePreserve(action)
       ) {
         const file = bundle[action.dest];
         if (file) toWrite[action.dest] = file;
