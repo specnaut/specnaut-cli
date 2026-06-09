@@ -43,6 +43,15 @@ export type InstalledLock = {
   readonly versionScheme: VersionScheme;
   readonly templatesVersion: string;
   readonly entries: ReadonlyMap<string, LockEntry>;
+  /**
+   * Caches the parent-managed decision (009-parent-managed-init). When `true`,
+   * the target is a member of a providing Specflow workspace and agentic files
+   * (`.claude/skills|agents|commands`) were intentionally suppressed — `entries`
+   * therefore contains no agentic keys (FR-012). Serialized as `parent_managed:
+   * true` and emitted only when set; a legacy lock without the key parses to
+   * `undefined`, prompting upgrade to re-derive it once via the reader.
+   */
+  readonly parentManaged?: true;
 };
 
 function asObject(v: unknown, name: string): Record<string, unknown> {
@@ -113,6 +122,10 @@ export function parseLock(yaml: string): InstalledLock {
     }
     entries.set(path, { sha256, installedAt, templatesVersion: ver });
   }
+  // `parent_managed` only ever stores the truthy decision; any other value
+  // (absent, false, garbage) means "not parent-managed" ⇒ undefined.
+  const parentManaged = root.parent_managed === true ? true : undefined;
+
   return {
     version: 2,
     harness,
@@ -120,6 +133,7 @@ export function parseLock(yaml: string): InstalledLock {
     versionScheme,
     templatesVersion,
     entries,
+    ...(parentManaged ? { parentManaged } : {}),
   };
 }
 
@@ -139,6 +153,9 @@ export function serializeLock(lock: InstalledLock): string {
     harness: lock.harness,
     backlog_backend: lock.backlogBackend,
     version_scheme: lock.versionScheme,
+    // Emit `parent_managed` only when set so legacy/standalone locks stay
+    // byte-for-byte identical to before this feature.
+    ...(lock.parentManaged ? { parent_managed: true } : {}),
     templates_version: lock.templatesVersion,
     entries: entriesObj,
   });

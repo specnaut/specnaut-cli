@@ -25,6 +25,8 @@ import { ClaudeSettingsParseError } from "../../domain/claude_settings_merge.ts"
 import { DenoFsWriter } from "../../infrastructure/deno_fs_writer.ts";
 import { DenoGit } from "../../infrastructure/deno_git.ts";
 import { FsLockStore } from "../../infrastructure/fs_lock_store.ts";
+import { FsParentWorkspaceReader } from "../../infrastructure/fs_parent_workspace_reader.ts";
+import { isParentManaged } from "../../domain/parent_managed.ts";
 import { CORE_BUNDLE } from "../../templates_bundle.ts";
 import type { Bundle } from "../../domain/template.ts";
 
@@ -406,6 +408,20 @@ export async function runInit(intent: InitIntent): Promise<number> {
 
   console.log(`Initializing into ${bold(targetDir)}`);
 
+  // Parent-managed detection (009-parent-managed-init): when the target is a
+  // member of a providing Specflow workspace, agentic files are inherited from
+  // the parent and suppressed locally. A `standalone.yml` override forces the
+  // full standalone path. The use case applies the bundle filter.
+  const parentReader = new FsParentWorkspaceReader();
+  const standaloneOverride = await parentReader.hasStandaloneOverride(targetDir);
+  const providingAncestor = await parentReader.findProvidingAncestor(targetDir);
+  const parentManaged = isParentManaged(providingAncestor, standaloneOverride);
+  if (parentManaged) {
+    console.log(
+      dim("parent-managed workspace detected — skills/agents inherited from parent"),
+    );
+  }
+
   const useCase = new InitProjectUseCase({
     writer: new DenoFsWriter(),
     git: new DenoGit(),
@@ -424,6 +440,7 @@ export async function runInit(intent: InitIntent): Promise<number> {
       initGit: !intent.noGit,
       force: intent.force,
       dryRun: intent.dryRun,
+      parentManaged,
     });
   } catch (err) {
     // Surface the actionable first-line message for known structured

@@ -8,8 +8,10 @@ import type {
   VersionScheme,
 } from "../domain/installed_lock.ts";
 import type { CoreBundle } from "../domain/core_bundle.ts";
+import type { Bundle } from "../domain/template.ts";
 import { TEMPLATES_VERSION } from "../templates_bundle.ts";
 import { canonicalBlockBody } from "../domain/merge_block.ts";
+import { isAgenticPath } from "../domain/parent_managed.ts";
 
 export type InitResult =
   | {
@@ -56,6 +58,15 @@ export type InitProjectInput = {
    * backups, no lock written, no git init. Used by `--dry-run`.
    */
   dryRun: boolean;
+  /**
+   * When true, the target is a member of a providing Specflow workspace
+   * (009-parent-managed-init): the toolkit (`.specflow/`) is still provisioned
+   * but agentic files (`.claude/skills|agents|commands`) are suppressed — they
+   * are inherited from the parent. The decision is resolved handler-side via
+   * the `ParentWorkspaceReader`; the use case only applies the bundle filter.
+   * Absent ⇒ treated as `false` (standalone, full provisioning).
+   */
+  parentManaged?: boolean;
 };
 
 export class InitProjectUseCase {
@@ -81,7 +92,16 @@ export class InitProjectUseCase {
       await ensureDir(input.targetDir);
     }
 
-    const bundle = harness.mapBundle(core, { backlogBackend, versionScheme });
+    const mappedBundle = harness.mapBundle(core, { backlogBackend, versionScheme });
+    // Parent-managed targets inherit agentic files from the providing
+    // workspace: filter them out of the bundle here — after harness mapping,
+    // before BOTH writeBundle and lock-entry construction — so suppressed
+    // paths are never written and never enter the lock (FR-005 / FR-012).
+    const bundle: Bundle = input.parentManaged
+      ? Object.fromEntries(
+        Object.entries(mappedBundle).filter(([dest]) => !isAgenticPath(dest)),
+      )
+      : mappedBundle;
 
     if (!input.force) {
       const conflicts = await writer.detectConflicts(bundle, input.targetDir);
@@ -156,6 +176,9 @@ export class InitProjectUseCase {
       versionScheme,
       templatesVersion: TEMPLATES_VERSION,
       entries: lockEntries,
+      // Cache the decision so a later upgrade suppresses agentic files
+      // deterministically without re-walking the filesystem.
+      ...(input.parentManaged ? { parentManaged: true as const } : {}),
     };
     await lockStore.write(input.targetDir, lock);
 

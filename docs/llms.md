@@ -173,6 +173,13 @@ Pass `--dry-run` to preview the plan without touching disk — combined with `--
 files would be overwritten and which would be merged, but writes nothing. `--dry-run` is the trump
 card: it wins over `--force`.
 
+**Inside a monorepo workspace?** When the target sits inside an enclosing Specflow workspace (an
+ancestor with `.specflow/` whose `deno.json` `workspace` list declares the target as a member),
+`specflow init` and `specflow upgrade` provision `.specflow/` as usual but skip the agentic files
+(`.claude/skills`, `.claude/agents`, `.claude/commands`) — those are inherited from the parent, so
+no copy is scattered into the sub-repo. To force full provisioning anyway, drop an empty
+`.specflow/standalone.yml` marker in the target.
+
 ### What's in `.specflow/installed.lock` and should I commit it?
 
 `specflow init` writes a small YAML file at `.specflow/installed.lock`. It records the harness you
