@@ -2,6 +2,7 @@ import type { Bundle } from "../domain/template.ts";
 import type { Release } from "../domain/release.ts";
 import type { CheckOutcome } from "../domain/check_result.ts";
 import type { InstalledLock } from "../domain/installed_lock.ts";
+import type { PreserveConfig } from "../domain/preserve_config.ts";
 
 export interface FsWriter {
   detectConflicts(bundle: Bundle, targetDir: string): Promise<string[]>;
@@ -85,6 +86,20 @@ export interface LockStore {
 
 export interface FsReader {
   readText(projectDir: string, rel: string): Promise<string | null>;
+}
+
+/**
+ * Filesystem-backed store for `.specflow/preserve.yml` — the maintainer's
+ * preserve declarations (spec 011 / issue #367).
+ *
+ * Mirrors {@link LockStore}: an absent manifest reads as
+ * `EMPTY_PRESERVE_CONFIG` (the feature is inert when no file exists, FR-011),
+ * and a malformed manifest degrades to empty rather than aborting a refresh —
+ * the handler surfaces the warning.
+ */
+export interface PreserveStore {
+  read(projectDir: string): Promise<PreserveConfig>;
+  write(projectDir: string, cfg: PreserveConfig): Promise<void>;
 }
 
 /**

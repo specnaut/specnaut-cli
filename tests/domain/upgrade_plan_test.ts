@@ -347,3 +347,101 @@ Deno.test("computeUpgradePlan: stale lock without resetBaseline → preserve cus
   assertEquals(plan.length, 1);
   assertEquals(plan[0].kind, "preserve");
 });
+
+// ---------------------------------------------------------------------------
+// 011-preserve-customisations: declared-preserve (issue #367)
+// ---------------------------------------------------------------------------
+
+// A declared path is preserved even when its on-disk SHA matches the bundle
+// (FR-007: a declaration for a vanilla file is honoured, not an error).
+Deno.test("computeUpgradePlan: declared path is preserve/declared even when SHA matches bundle", () => {
+  const path = ".claude/agents/product-owner.md";
+  const plan = computeUpgradePlan(
+    new Map([[path, "same-sha"]]),
+    lockWith(path, "same-sha"),
+    new Map([[path, "same-sha"]]),
+    { isDeclaredPreserved: (d) => d === path },
+  );
+  assertEquals(plan.length, 1);
+  assertEquals(plan[0].kind, "preserve");
+  if (plan[0].kind === "preserve") {
+    assertEquals(plan[0].reason, "declared");
+  }
+});
+
+// The declared check precedes the plugin-migration branch: a declared,
+// plugin-covered, vanilla file is preserved (declared), NOT migrated.
+Deno.test("computeUpgradePlan: declared check wins over plugin migration", () => {
+  const path = ".claude/agents/developer.md";
+  const plan = computeUpgradePlan(
+    new Map([[path, "vanilla-sha"]]),
+    lockWith(path, "vanilla-sha"),
+    new Map([[path, "new-sha"]]),
+    {
+      pluginInstalled: true,
+      isPluginCovered: () => true,
+      isDeclaredPreserved: (d) => d === path,
+    },
+  );
+  assertEquals(plan.length, 1);
+  assertEquals(plan[0].kind, "preserve");
+  if (plan[0].kind === "preserve") assertEquals(plan[0].reason, "declared");
+});
+
+// The declared check wins over auto-update (disk==lock, differs from bundle).
+Deno.test("computeUpgradePlan: declared check wins over auto-update", () => {
+  const path = ".claude/agents/po.md";
+  const plan = computeUpgradePlan(
+    new Map([[path, "old-sha"]]),
+    lockWith(path, "old-sha"),
+    new Map([[path, "new-sha"]]),
+    { isDeclaredPreserved: (d) => d === path },
+  );
+  assertEquals(plan.length, 1);
+  assertEquals(plan[0].kind, "preserve");
+  if (plan[0].kind === "preserve") assertEquals(plan[0].reason, "declared");
+});
+
+// F3: a declared path that is absent from the NEW bundle but tracked in the
+// lock and present on disk yields preserve/declared, NOT remove (FR-009 —
+// preservation wins over removal).
+Deno.test("computeUpgradePlan: declared path absent from newShas → preserve/declared not remove", () => {
+  const path = ".claude/agents/old-agent.md";
+  const plan = computeUpgradePlan(
+    new Map([[path, "disk-sha"]]),
+    lockWith(path, "disk-sha"),
+    new Map(), // dropped upstream
+    { isDeclaredPreserved: (d) => d === path },
+  );
+  assertEquals(plan.length, 1);
+  assertEquals(plan[0].kind, "preserve");
+  if (plan[0].kind === "preserve") assertEquals(plan[0].reason, "declared");
+});
+
+// A non-declared path is unaffected by the predicate (control case).
+Deno.test("computeUpgradePlan: non-declared path unaffected by isDeclaredPreserved", () => {
+  const path = "CLAUDE.md";
+  const plan = computeUpgradePlan(
+    new Map([[path, "old-sha"]]),
+    lockWith(path, "old-sha"),
+    new Map([[path, "new-sha"]]),
+    { isDeclaredPreserved: (d) => d === ".claude/agents/po.md" },
+  );
+  assertEquals(plan[0].kind, "auto-update");
+});
+
+// D8: a declared agentic path that is absent from the bundle AND not on disk
+// (e.g. suppressed in a parent-managed sub-repo) produces no spurious action —
+// the predicate only fires for dests present in newShas or tracked+on-disk.
+Deno.test("computeUpgradePlan: declared path neither in bundle nor on disk → no action", () => {
+  const path = ".claude/agents/inherited.md";
+  const plan = computeUpgradePlan(
+    new Map(), // not on disk
+    lockWith("CLAUDE.md", "x"), // unrelated lock entry
+    new Map([["CLAUDE.md", "x"]]),
+    { isDeclaredPreserved: (d) => d === path },
+  );
+  // Only the unrelated CLAUDE.md is considered; the declared inherited path
+  // is never resurrected.
+  assertEquals(plan.some((a) => a.dest === path), false);
+});

@@ -31,6 +31,10 @@ export async function run(argv: string[]): Promise<number> {
       const { runUpgrade } = await import("./cli/handlers/upgrade_handler.ts");
       return await runUpgrade(intent);
     }
+    case "diff": {
+      const { runDiff } = await import("./cli/handlers/diff_handler.ts");
+      return await runDiff(intent);
+    }
     case "reconcile-status":
     case "reconcile-path": {
       const { runReconcile } = await import("./cli/handlers/reconcile_handler.ts");

@@ -169,6 +169,24 @@ Specflow merges its `.gitignore` block into your existing file (non-destructivel
 `# --- Specflow: gitignore ---` markers). Other specflow-managed files use upgrade-aware semantics:
 if you customize a generated file, `specflow upgrade` will preserve it unless you pass `--force`.
 
+**Declaring a file preserved across a forced refresh.** `specflow upgrade` auto-preserves a file
+whose hash diverged, but `specflow init --force` would otherwise overwrite every managed file. To
+keep a customized file (e.g. a tailored `.claude/agents/product-owner.md`) even through a forced
+refresh, list it in a version-controllable `.specflow/preserve.yml` manifest:
+
+```yaml
+preserved:
+  - .claude/agents/product-owner.md
+```
+
+Both `init --force` and `upgrade` then leave that file untouched and print one notice per preserved
+path — never a silent skip. The file stays lock-tracked, so `specflow diff` keeps showing how it has
+drifted from the evolving bundle. A project with no `preserve.yml` behaves exactly as before. To
+deliberately discard a customization and restore the bundled version for one run, add
+`--reset-preserved` (it overrides every declaration for that run and reports each override; it is
+never the default). A declared path that is not a managed bundle file is reported as an ineffective
+declaration (a warning) rather than silently honored.
+
 Pass `--dry-run` to preview the plan without touching disk — combined with `--force` it shows which
 files would be overwritten and which would be merged, but writes nothing. `--dry-run` is the trump
 card: it wins over `--force`.
@@ -316,6 +334,10 @@ specflow upgrade                  # update templates to the binary's version
                                   #    vanilla agent/command files are auto-migrated to the plugin)
 specflow upgrade --dry-run        # preview the upgrade plan
 specflow upgrade --force          # apply destructive changes (backs up customizations)
+specflow upgrade --reset-preserved  # ignore .specflow/preserve.yml for this run (reports each override)
+specflow diff                     # show how managed files diverge from the bundle (read-only)
+specflow diff --only-customised   # restrict the diff to files you actually changed
+specflow init --here --force --reset-preserved  # forced refresh that overrides preserve declarations
 specflow reconcile --status       # list files pending post-upgrade reconciliation (JSON)
 specflow reconcile <path> --accept-upstream  # take new template version (backs up local)
 specflow reconcile <path> --accept-current   # keep local version (re-stamps lock SHA)

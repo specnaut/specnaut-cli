@@ -25,6 +25,7 @@ Deno.test("parseArgs returns init intent with a project name", () => {
     scheme: null,
     force: false,
     dryRun: false,
+    resetPreserved: false,
   });
 });
 
@@ -41,6 +42,7 @@ Deno.test("parseArgs returns init intent with --here", () => {
     scheme: null,
     force: false,
     dryRun: false,
+    resetPreserved: false,
   });
 });
 
@@ -57,6 +59,7 @@ Deno.test("parseArgs returns init intent with --no-git", () => {
     scheme: null,
     force: false,
     dryRun: false,
+    resetPreserved: false,
   });
 });
 
@@ -99,6 +102,7 @@ Deno.test("parseArgs init with --force", () => {
     scheme: null,
     force: true,
     dryRun: false,
+    resetPreserved: false,
   });
 });
 
@@ -115,6 +119,7 @@ Deno.test("parseArgs init with --dry-run", () => {
     scheme: null,
     force: false,
     dryRun: true,
+    resetPreserved: false,
   });
 });
 
@@ -138,6 +143,7 @@ Deno.test("parseArgs returns upgrade intent", () => {
     force: false,
     backlog: null,
     resetBaseline: false,
+    resetPreserved: false,
   });
 });
 
@@ -148,6 +154,7 @@ Deno.test("parseArgs returns upgrade intent with --dry-run --force", () => {
     force: true,
     backlog: null,
     resetBaseline: false,
+    resetPreserved: false,
   });
 });
 
@@ -158,6 +165,18 @@ Deno.test("parseArgs returns upgrade intent with --reset-baseline", () => {
     force: false,
     backlog: null,
     resetBaseline: true,
+    resetPreserved: false,
+  });
+});
+
+Deno.test("parseArgs returns diff intent (default onlyCustomised false)", () => {
+  assertEquals(parseArgs(["diff"]), { kind: "diff", onlyCustomised: false });
+});
+
+Deno.test("parseArgs returns diff intent with --only-customised", () => {
+  assertEquals(parseArgs(["diff", "--only-customised"]), {
+    kind: "diff",
+    onlyCustomised: true,
   });
 });
 
