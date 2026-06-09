@@ -534,12 +534,15 @@ Deno.test({
       assertEquals(code !== 0, true, "strict run with retrieval failures must exit non-zero");
       // The output file must NOT have been written (exit happens before write).
       assertEquals(await fileExists(outFile), false, "no partial release notes may be written");
-      // The per-failure report (`#<prNum>: <reason>`) must name our feat PR.
+      // Guard against a silent pass (empty range ⇒ exit for the wrong reason):
+      // the strict per-failure report must name our feat PR, and the strict
+      // refusal summary must be present — together they prove the non-zero exit
+      // came from the strict path. Cross-platform: the temp repo has no remote,
+      // so `gh pr view 999` fails on every OS regardless of the PATH shim (the
+      // shim is only resolved on POSIX; Windows falls back to the real `gh`,
+      // which fails too — both are the retrieval failure under test).
       assertStringIncludes(stderrText, "#999");
-      // Guard against a silent pass: the shim's reason MUST propagate into the
-      // strict report, proving `gh` was actually invoked and the non-zero exit
-      // came from the strict path — not from an empty range / missing tag.
-      assertStringIncludes(stderrText, "forced gh failure");
+      assertStringIncludes(stderrText, "under --strict");
     } finally {
       await Deno.remove(tmp, { recursive: true });
     }
