@@ -87,7 +87,8 @@ inert (skip with a warning) until then.
 - Binary: project-local customization, short slash-commands (`/specify`), backlog + hooks support.
 
 Most teams use both. See [the docs](https://specflow.makerlabs.dev) for the full boundary table and
-per-harness tool-mapping references.
+per-harness tool-mapping references. The website and documentation source live in their own repo,
+[`mkrlabs/specflow-web`](https://github.com/mkrlabs/specflow-web) — this repo is the CLI only.
 
 ## Project-specific skill overlays
 
@@ -106,7 +107,7 @@ overlays:
 
 Run `/specflow list-skills` to see which aliases and overlays are active in your project. The
 Specflow binary scaffolds and ships the convention; the harness (Claude Code, Cursor, …) honours it
-at dispatch time. See `docs/llms.md` for the full contract and
+at dispatch time. See [the docs](https://specflow.makerlabs.dev/llms.txt) for the full contract and
 [`templates/core/skills/alias-example/SKILL.md`](templates/core/skills/alias-example/SKILL.md) for a
 copy-pasteable starting point.
 

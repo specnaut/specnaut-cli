@@ -9,7 +9,7 @@ Required for feat: PRs. Delete this entire section for fix:/chore:/refactor:/doc
 PRs unless they change user-visible behavior.
 
 The CI workflow `.github/workflows/pr_adoption_lint.yml` enforces presence on feat: PRs.
-See docs/contributing.md#agent-adoption for the full convention.
+See CONTRIBUTING.md#agent-adoption for the full convention.
 -->
 
 <!-- Prose: what existing projects need to know to take advantage of this change. -->
