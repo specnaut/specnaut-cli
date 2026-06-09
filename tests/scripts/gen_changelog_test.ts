@@ -454,15 +454,46 @@ Deno.test({
   permissions: { run: true, read: true, write: true, env: true },
   fn: async () => {
     const scriptDir = new URL("../../scripts/gen-changelog.ts", import.meta.url).pathname;
-    const repoRoot = new URL("../../", import.meta.url).pathname;
 
-    // A throwaway dir holding a `gh` shim that always exits non-zero, plus the
-    // output path the run must NOT create.
+    // A throwaway dir holding (a) a `gh` shim that always fails and (b) a
+    // self-contained git repo with one known `feat: … (#999)` commit. Building
+    // our own repo keeps the test hermetic — it must NOT depend on the outer
+    // repo's tags/history (CI checkouts are shallow and lack old tags, which
+    // would make `git log <tag>..HEAD` throw before the strict path runs).
     const tmp = await Deno.makeTempDir({ prefix: "genchangelog_strict_" });
     try {
       const ghShim = `${tmp}/gh`;
       await Deno.writeTextFile(ghShim, "#!/bin/sh\necho 'forced gh failure' >&2\nexit 1\n");
       await Deno.chmod(ghShim, 0o755);
+
+      const repo = `${tmp}/repo`;
+      await Deno.mkdir(repo);
+      const git = async (...args: string[]) => {
+        const { success, stderr } = await new Deno.Command("git", {
+          args,
+          cwd: repo,
+          env: { GIT_CONFIG_GLOBAL: "/dev/null", GIT_CONFIG_SYSTEM: "/dev/null" },
+          clearEnv: false,
+          stdout: "null",
+          stderr: "piped",
+        }).output();
+        if (!success) throw new Error(`git ${args[0]} failed: ${new TextDecoder().decode(stderr)}`);
+      };
+      await git("init", "-q");
+      await git("config", "user.email", "t@t.test");
+      await git("config", "user.name", "t");
+      await Deno.writeTextFile(`${repo}/a`, "1");
+      await git("add", "-A");
+      await git("commit", "-q", "-m", "chore: base");
+      const baseSha = new TextDecoder()
+        .decode(
+          (await new Deno.Command("git", { args: ["rev-parse", "HEAD"], cwd: repo }).output())
+            .stdout,
+        )
+        .trim();
+      await Deno.writeTextFile(`${repo}/a`, "2");
+      await git("add", "-A");
+      await git("commit", "-q", "-m", "feat: a thing (#999)");
 
       const outFile = `${tmp}/release-notes.md`;
 
@@ -480,17 +511,17 @@ Deno.test({
           "--allow-run",
           "--allow-env",
           scriptDir,
-          // v1.12.0..HEAD reliably contains feat commits with (#NNN) refs, so
-          // the shimmed `gh` is invoked and every fetch becomes a `failed`.
+          // baseSha..HEAD contains exactly one `feat: … (#999)` commit, so the
+          // shimmed `gh` is invoked and that fetch becomes a `failed` outcome.
           "--from",
-          "v1.12.0",
+          baseSha,
           "--to",
           "v9.9.9-test",
           "--out",
           outFile,
           "--strict",
         ],
-        cwd: repoRoot,
+        cwd: repo,
         env,
         clearEnv: false,
         stdout: "piped",
@@ -503,8 +534,8 @@ Deno.test({
       assertEquals(code !== 0, true, "strict run with retrieval failures must exit non-zero");
       // The output file must NOT have been written (exit happens before write).
       assertEquals(await fileExists(outFile), false, "no partial release notes may be written");
-      // The per-failure report (`#<prNum>: <reason>`) must be on stderr.
-      assertStringIncludes(stderrText, "#");
+      // The per-failure report (`#<prNum>: <reason>`) must name our feat PR.
+      assertStringIncludes(stderrText, "#999");
       // Guard against a silent pass: the shim's reason MUST propagate into the
       // strict report, proving `gh` was actually invoked and the non-zero exit
       // came from the strict path — not from an empty range / missing tag.
