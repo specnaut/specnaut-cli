@@ -8,6 +8,8 @@ import { DenoFsReader } from "../../infrastructure/fs_reader.ts";
 import { DenoFsWriter } from "../../infrastructure/deno_fs_writer.ts";
 import { FsLockStore } from "../../infrastructure/fs_lock_store.ts";
 import { FsPluginDetector } from "../../infrastructure/fs_plugin_detector.ts";
+import { FsParentWorkspaceReader } from "../../infrastructure/fs_parent_workspace_reader.ts";
+import { isAgenticPath, isParentManaged } from "../../domain/parent_managed.ts";
 import { CORE_BUNDLE, TEMPLATES_VERSION } from "../../templates_bundle.ts";
 import { renderUnifiedDiff } from "../../domain/diff.ts";
 import type { UpgradePlan } from "../../domain/upgrade_plan.ts";
@@ -46,14 +48,23 @@ export async function switchBacklogBackend(
   const harness = findHarness(lock.harness);
   if (!harness) throw new Error(`unknown harness in lock: ${lock.harness}`);
 
-  const newBundle = harness.mapBundle(CORE_BUNDLE, {
+  // A parent-managed target inherits agentic files (incl. the backlog skill)
+  // from the providing workspace — they were never written locally (FR-012).
+  // Drop agentic dests from both bundles so a backend switch neither writes
+  // nor re-tracks them in the lock. Mirrors UpgradeProjectUseCase's filtering.
+  const dropAgentic = (b: Record<string, { content: string; executable: boolean }>) =>
+    lock.parentManaged
+      ? Object.fromEntries(Object.entries(b).filter(([dest]) => !isAgenticPath(dest)))
+      : b;
+
+  const newBundle = dropAgentic(harness.mapBundle(CORE_BUNDLE, {
     backlogBackend: newBackend,
     versionScheme: lock.versionScheme,
-  });
-  const oldBundle = harness.mapBundle(CORE_BUNDLE, {
+  }));
+  const oldBundle = dropAgentic(harness.mapBundle(CORE_BUNDLE, {
     backlogBackend: from,
     versionScheme: lock.versionScheme,
-  });
+  }));
 
   const writer = new DenoFsWriter();
   const reader = new DenoFsReader();
@@ -119,6 +130,11 @@ export async function switchBacklogBackend(
     versionScheme: lock.versionScheme,
     templatesVersion: lock.templatesVersion,
     entries: updatedEntries,
+    // Preserve the parent-managed decision across a backend switch — dropping
+    // it would silently re-enable agentic provisioning on the next upgrade
+    // (009-parent-managed-init / FR-012). Mirrors upgrade_project.ts:301 and
+    // init_project.ts:181.
+    ...(lock.parentManaged ? { parentManaged: true as const } : {}),
   };
   await lockStore.write(projectDir, newLock);
   void report;
@@ -222,6 +238,20 @@ export async function runUpgrade(intent: UpgradeIntent): Promise<number> {
     }
   }
 
+  // Parent-managed decision for the upgrade path. The use case reads
+  // `lock.parentManaged` directly; only when the lock predates the field (a
+  // legacy lock) do we re-derive once via the reader and pass an override so
+  // suppression is deterministic — and the use case persists it into the
+  // rewritten lock (009-parent-managed-init / FR-007).
+  let parentManagedOverride: boolean | undefined;
+  const lockForDetection = await new FsLockStore().read(projectDir);
+  if (lockForDetection !== null && lockForDetection.parentManaged === undefined) {
+    const parentReader = new FsParentWorkspaceReader();
+    const standaloneOverride = await parentReader.hasStandaloneOverride(projectDir);
+    const providingAncestor = await parentReader.findProvidingAncestor(projectDir);
+    parentManagedOverride = isParentManaged(providingAncestor, standaloneOverride);
+  }
+
   const useCase = new UpgradeProjectUseCase({
     reader: new DenoFsReader(),
     writer: new DenoFsWriter(),
@@ -239,6 +269,7 @@ export async function runUpgrade(intent: UpgradeIntent): Promise<number> {
       dryRun: intent.dryRun,
       force: intent.force,
       resetBaseline: intent.resetBaseline,
+      ...(parentManagedOverride !== undefined ? { parentManagedOverride } : {}),
     });
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);

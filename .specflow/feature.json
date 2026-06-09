@@ -1,5 +1,5 @@
 {
-  "feature_directory": ".specflow/specs/008-cloud-keychain",
-  "linked_issue": 360,
+  "feature_directory": ".specflow/specs/009-parent-managed-init",
+  "linked_issue": 371,
   "workflow_shape": "full"
 }

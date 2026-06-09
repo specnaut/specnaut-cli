@@ -64,6 +64,23 @@ function fakeClaudeHarness(): Harness {
   };
 }
 
+// A core bundle whose mapped dests mix agentic (.claude/skills|agents|commands)
+// and non-agentic (.specflow, AGENTS.md, .claude/settings.json) paths.
+const MIXED_CORE: CoreBundle = [
+  ".specflow/memory/constitution.md",
+  "AGENTS.md",
+  ".claude/settings.json",
+  ".claude/skills/specflow/SKILL.md",
+  ".claude/agents/developer.md",
+  ".claude/commands/specflow.md",
+].map((dest) => ({
+  category: "project-root" as const,
+  name: "root",
+  suffix: dest,
+  content: `# ${dest}\n`,
+  executable: false,
+})) as CoreBundle;
+
 const SAMPLE_CORE: CoreBundle = [
   {
     category: "project-root",
@@ -352,6 +369,78 @@ Deno.test("InitProjectUseCase records harness.key in the installed lock", async 
   });
   await uc.execute({ targetDir: "/tmp/demo", initGit: false, force: false, dryRun: false });
   assertEquals(lockStore.lastWritten?.harness, "claude");
+});
+
+Deno.test("InitProjectUseCase suppresses agentic dests from writes AND lock when parentManaged=true", async () => {
+  const writer = fakeFsWriter();
+  const lockStore = fakeLockStore();
+  const uc = new InitProjectUseCase({
+    writer,
+    git: fakeGit(),
+    lockStore,
+    harness: fakeClaudeHarness(),
+    backlogBackend: "local",
+    versionScheme: "semver",
+    core: MIXED_CORE,
+    ensureDir: () => Promise.resolve(),
+  });
+  await uc.execute({
+    targetDir: "/tmp/demo",
+    initGit: false,
+    force: false,
+    dryRun: false,
+    parentManaged: true,
+  });
+
+  const writtenDests = writer.written.map((w) => w.replace("/tmp/demo:", ""));
+  // Agentic dests are filtered out of the written set.
+  assert(!writtenDests.includes(".claude/skills/specflow/SKILL.md"));
+  assert(!writtenDests.includes(".claude/agents/developer.md"));
+  assert(!writtenDests.includes(".claude/commands/specflow.md"));
+  // Non-agentic dests still provisioned.
+  assert(writtenDests.includes(".specflow/memory/constitution.md"));
+  assert(writtenDests.includes("AGENTS.md"));
+  assert(writtenDests.includes(".claude/settings.json"));
+
+  // FR-012: the lock excludes agentic entries and records parentManaged.
+  const lock = lockStore.lastWritten!;
+  assert(!lock.entries.has(".claude/skills/specflow/SKILL.md"));
+  assert(!lock.entries.has(".claude/agents/developer.md"));
+  assert(!lock.entries.has(".claude/commands/specflow.md"));
+  assert(lock.entries.has(".specflow/memory/constitution.md"));
+  assert(lock.entries.has("AGENTS.md"));
+  assertEquals(lock.parentManaged, true);
+});
+
+Deno.test("InitProjectUseCase writes all dests and sets no parentManaged when not parent-managed", async () => {
+  const writer = fakeFsWriter();
+  const lockStore = fakeLockStore();
+  const uc = new InitProjectUseCase({
+    writer,
+    git: fakeGit(),
+    lockStore,
+    harness: fakeClaudeHarness(),
+    backlogBackend: "local",
+    versionScheme: "semver",
+    core: MIXED_CORE,
+    ensureDir: () => Promise.resolve(),
+  });
+  await uc.execute({
+    targetDir: "/tmp/demo",
+    initGit: false,
+    force: false,
+    dryRun: false,
+    parentManaged: false,
+  });
+
+  const writtenDests = writer.written.map((w) => w.replace("/tmp/demo:", ""));
+  assert(writtenDests.includes(".claude/skills/specflow/SKILL.md"));
+  assert(writtenDests.includes(".claude/agents/developer.md"));
+  assert(writtenDests.includes(".claude/commands/specflow.md"));
+
+  const lock = lockStore.lastWritten!;
+  assert(lock.entries.has(".claude/skills/specflow/SKILL.md"));
+  assertEquals(lock.parentManaged, undefined);
 });
 
 Deno.test("InitProjectUseCase uses harness.mapBundle output as the file tree", async () => {

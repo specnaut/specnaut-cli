@@ -6,6 +6,7 @@ import type { CoreBundle } from "../domain/core_bundle.ts";
 import { computeUpgradePlan, type UpgradePlan } from "../domain/upgrade_plan.ts";
 import { canonicalBlockBody, extractBlock } from "../domain/merge_block.ts";
 import { isPluginCoveredPath } from "../domain/plugin_coverage.ts";
+import { isAgenticPath } from "../domain/parent_managed.ts";
 
 /** The plugin name used for both the install probe and the cache directory. */
 export const PLUGIN_NAME = "specflow-plugin";
@@ -23,6 +24,15 @@ export type UpgradeProjectInput = {
    * never edited the affected files.
    */
   resetBaseline?: boolean;
+  /**
+   * Parent-managed decision re-derived by the handler when the lock predates
+   * the `parent_managed` field (009-parent-managed-init). When provided it
+   * takes precedence over `lock.parentManaged`, and the value is persisted into
+   * the rewritten lock so subsequent upgrades read it directly. Absent ⇒ the
+   * decision is read from `lock.parentManaged` (already cached) or treated as
+   * `false`.
+   */
+  parentManagedOverride?: boolean;
 };
 
 export type UpgradeProjectResult =
@@ -76,10 +86,22 @@ export class UpgradeProjectUseCase {
     if (!harness) {
       throw new Error(`unknown harness in lock: ${lock.harness}`);
     }
-    const fullBundle = harness.mapBundle(core, {
+    const mappedBundle = harness.mapBundle(core, {
       backlogBackend: lock.backlogBackend,
       versionScheme: lock.versionScheme,
     });
+
+    // Parent-managed targets inherit agentic files from the providing
+    // workspace. Drop agentic dests from the full bundle *before* the plan is
+    // computed so suppressed paths are never planned, written, or "restored"
+    // (FR-007). The decision comes from the handler's re-derivation override
+    // (legacy lock) or the cached `lock.parentManaged`.
+    const parentManaged = input.parentManagedOverride ?? lock.parentManaged ?? false;
+    const fullBundle: Bundle = parentManaged
+      ? Object.fromEntries(
+        Object.entries(mappedBundle).filter(([dest]) => !isAgenticPath(dest)),
+      )
+      : mappedBundle;
 
     // JSON-merged files (e.g. `.claude/settings.json`) are user-owned: we
     // never overwrite them, only graft our entries in. They live outside
@@ -145,6 +167,26 @@ export class UpgradeProjectUseCase {
       (a.kind === "remove" && (!a.wasCustomized || input.force))
     );
     if (!hasActualWork && plan.every((a) => a.kind === "unchanged")) {
+      // No file work to do. But a legacy lock (or any lock whose recorded
+      // `parent_managed` differs from the decision we just computed) still
+      // needs the corrected field persisted — otherwise a handler-derived
+      // override never reaches disk until an unrelated file change triggers
+      // a rewrite (009-parent-managed-init / FR-007). This is a metadata-only
+      // write: no file operations, just the lock. The common case (lock
+      // already carries the right value) keeps the no-op fast path.
+      const lockParentManaged = lock.parentManaged ?? false;
+      if (parentManaged !== lockParentManaged) {
+        const correctedLock: InstalledLock = {
+          version: 2,
+          harness: lock.harness,
+          backlogBackend: lock.backlogBackend,
+          versionScheme: lock.versionScheme,
+          templatesVersion: lock.templatesVersion,
+          entries: lock.entries,
+          ...(parentManaged ? { parentManaged: true as const } : {}),
+        };
+        await lockStore.write(input.projectDir, correctedLock);
+      }
       return { status: "up-to-date", currentVersion: lock.templatesVersion };
     }
 
@@ -274,6 +316,9 @@ export class UpgradeProjectUseCase {
       versionScheme: lock.versionScheme,
       templatesVersion,
       entries: updatedEntries,
+      // Persist the (possibly re-derived) decision so future upgrades read it
+      // directly without re-walking the filesystem.
+      ...(parentManaged ? { parentManaged: true as const } : {}),
     };
     await lockStore.write(input.projectDir, newLock);
 

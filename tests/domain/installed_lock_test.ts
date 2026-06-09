@@ -206,6 +206,56 @@ entries:
   assertEquals(lock.harness, "copilot");
 });
 
+Deno.test("serializeLock emits parent_managed: true when set, round-trips through parseLock", () => {
+  const lock: InstalledLock = {
+    version: 2,
+    harness: "claude",
+    backlogBackend: "local",
+    versionScheme: "semver",
+    templatesVersion: "1.0.0",
+    entries: new Map(),
+    parentManaged: true,
+  };
+  const yaml = serializeLock(lock);
+  assertEquals(yaml.includes("parent_managed: true"), true);
+  const roundtrip = parseLock(yaml);
+  assertEquals(roundtrip.parentManaged, true);
+});
+
+Deno.test("serializeLock omits parent_managed when not set", () => {
+  const lock: InstalledLock = {
+    version: 2,
+    harness: "claude",
+    backlogBackend: "local",
+    versionScheme: "semver",
+    templatesVersion: "1.0.0",
+    entries: new Map(),
+  };
+  const yaml = serializeLock(lock);
+  assertEquals(yaml.includes("parent_managed"), false);
+});
+
+Deno.test("parseLock defaults parentManaged to undefined when key absent (legacy lock)", () => {
+  const v2 = `version: 2
+harness: claude
+templates_version: 0.7.0
+entries: {}
+`;
+  const lock = parseLock(v2);
+  assertEquals(lock.parentManaged, undefined);
+});
+
+Deno.test("parseLock reads parent_managed: true", () => {
+  const v2 = `version: 2
+harness: claude
+parent_managed: true
+templates_version: 0.7.0
+entries: {}
+`;
+  const lock = parseLock(v2);
+  assertEquals(lock.parentManaged, true);
+});
+
 Deno.test("parseLock accepts v2 lock with harness=opencode", () => {
   const v2 = `version: 2
 harness: opencode

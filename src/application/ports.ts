@@ -88,6 +88,32 @@ export interface FsReader {
 }
 
 /**
+ * Resolves the enclosing-workspace facts that drive parent-managed
+ * detection. The **only** abstraction that touches the filesystem for
+ * detection — keeps the use cases pure and unit-testable with fakes.
+ *
+ * See `docs`/the 009-parent-managed-init spec: a *providing Specflow
+ * workspace* is an ancestor that owns the centralised skills/agents and
+ * declares the target as a workspace member.
+ */
+export interface ParentWorkspaceReader {
+  /**
+   * Walks `dirname(targetDir)` upward to the filesystem root and returns the
+   * canonical path of the **first** ancestor `A` such that `A/.specflow/`
+   * exists AND `A/deno.json` declares a `workspace` member that, resolved
+   * relative to `A` and canonicalised, equals the canonicalised `targetDir`.
+   * Returns `null` if no such ancestor exists or the root is reached.
+   */
+  findProvidingAncestor(targetDir: string): Promise<string | null>;
+
+  /**
+   * True iff `targetDir/.specflow/standalone.yml` exists. Contents ignored —
+   * the marker's mere presence forces the full standalone provisioning path.
+   */
+  hasStandaloneOverride(targetDir: string): Promise<boolean>;
+}
+
+/**
  * Detects whether a Claude Code plugin is currently installed.
  *
  * The default implementation probes
