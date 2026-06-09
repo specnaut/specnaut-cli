@@ -138,7 +138,6 @@ export interface ParentWorkspaceReader {
  * Used by the upgrade use case to drive the binary → plugin migration
  * table: when the plugin is installed, vanilla on-disk agent files are
  * auto-migrated; customized files are preserved with a warning.
- * See `docs/superpowers/specs/2026-05-08-claude-plugin-design.md`.
  */
 export interface PluginDetector {
   isPluginInstalled(name: string): Promise<boolean>;

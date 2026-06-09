@@ -10,7 +10,6 @@
     "fmt": "deno fmt",
     "fmt:check": "deno fmt --check",
     "build": "deno task bundle && deno run --allow-read --allow-write --allow-run scripts/build.ts",
-    "docs:build": "deno run --allow-read --allow-write --allow-env --allow-net scripts/build-docs.ts",
     "setup": "deno run --allow-read --allow-write --allow-run scripts/install-hooks.ts"
   },
   "imports": {

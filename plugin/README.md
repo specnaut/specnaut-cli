@@ -41,9 +41,6 @@ discoverability layer, not the polished workflow. Handoff rewriting is a known f
 - Backlog skill, hooks, and `.specflow/` files stay binary-owned because they read project-state at
   runtime.
 
-See [the design doc](../docs/superpowers/specs/2026-05-08-claude-plugin-design.md) for the full
-plugin / binary boundary and the v0.x → plugin migration logic.
-
 ## Install
 
 ```bash

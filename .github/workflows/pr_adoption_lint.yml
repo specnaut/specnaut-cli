@@ -33,7 +33,7 @@ jobs:
 
           if ! grep -qE '^## Agent adoption\b' "$body_file"; then
             echo "::error::feat: PR is missing the '## Agent adoption' section in its body."
-            echo "::error::See docs/contributing.md#agent-adoption for the convention."
+            echo "::error::See CONTRIBUTING.md#agent-adoption for the convention."
             exit 1
           fi
 
@@ -41,7 +41,7 @@ jobs:
           # awk extracts everything from the heading onwards; grep looks for the fence.
           if ! awk '/^## Agent adoption/{p=1} p' "$body_file" | grep -qE '^```prompt[[:space:]]*$'; then
             echo "::error::feat: PR has '## Agent adoption' but no \`\`\`prompt fenced block under it."
-            echo "::error::See docs/contributing.md#agent-adoption for the format."
+            echo "::error::See CONTRIBUTING.md#agent-adoption for the format."
             exit 1
           fi
 

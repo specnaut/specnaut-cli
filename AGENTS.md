@@ -171,8 +171,8 @@ build matrix lives in `.github/workflows/release.yml`; each binary ships with a 
 
 - Use the DDD/hexagonal layering under `src/`: `domain/` (pure), `application/` (use cases + ports),
   `infrastructure/` (adapters), `cli/` (presentation). Tests mirror `src/`.
-- Every brick follows the same cycle: brainstorming spec (`docs/superpowers/specs/`) → plan
-  (`docs/superpowers/plans/`) → subagent-driven-development execution.
+- Every brick follows the same cycle: brainstorming spec → plan → subagent-driven-development
+  execution (managed via the Specflow workflow).
 - Templates live in `templates/` and are bundled into the binary at build time via
   `scripts/bundle-templates.ts`. Never hand-edit `src/templates_bundle.ts`.
 - Pre-commit hook runs `deno fmt --check + lint + bundle + check` — must be green before every

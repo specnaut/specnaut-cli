@@ -73,8 +73,8 @@ In scope:
 - The Claude Code plugin (`plugin/**`).
 - Release / install / upgrade pipelines (`install.sh`, `.github/workflows/release.yml`, the
   homebrew-tap formula).
-- The `specflow.makerlabs.dev` docs site (Pages-deployed from `docs/llms.md` via
-  `.github/workflows/static.yml`).
+- The `specflow.makerlabs.dev` docs site now lives in its own repo,
+  [`mkrlabs/specflow-web`](https://github.com/mkrlabs/specflow-web) — report site issues there.
 
 Out of scope:
 
