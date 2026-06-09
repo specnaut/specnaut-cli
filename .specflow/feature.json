@@ -1,5 +1,5 @@
 {
-  "feature_directory": ".specflow/specs/009-parent-managed-init",
-  "linked_issue": 371,
+  "feature_directory": ".specflow/specs/010-release-adoption-parity",
+  "linked_issue": 363,
   "workflow_shape": "full"
 }

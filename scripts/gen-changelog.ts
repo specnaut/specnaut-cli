@@ -119,15 +119,51 @@ export function extractPrNumber(subject: string): number | null {
   return parseInt(m[1], 10);
 }
 
-const PR_BODY_CACHE = new Map<number, string>();
+/**
+ * The three-way result of attempting to fetch a PR body (#363).
+ *
+ * Replaces the previous `""`-on-everything sentinel, which fused "this PR
+ * legitimately has no adoption block" with "we could not fetch the PR at all".
+ * That conflation is the root of the silent-failure bug: in CI an
+ * unauthenticated `gh pr view` failed for every PR and was indistinguishable
+ * from a genuine absence, so the whole Adoption guide vanished without a trace.
+ *
+ * - `retrieved` — `gh` returned a non-empty body; still subject to
+ *   `extractAdoption` (a retrieved body with no valid block is a legitimate,
+ *   quiet skip — an *adoption-content* absence, not a retrieval failure).
+ * - `absent` — `gh` succeeded but returned empty / literal-`null` stdout.
+ * - `failed` — the process could not run or exited non-zero; `reason` feeds the
+ *   strict-mode operator report.
+ *
+ * Invariant: a `failed` outcome MUST NOT be coerced into `absent` (FR-004).
+ */
+export type PrBodyOutcome =
+  | { kind: "retrieved"; body: string }
+  | { kind: "absent" }
+  | { kind: "failed"; reason: string };
 
 /**
- * Fetch a PR body via `gh pr view <num> --json body --jq .body`.
- * Cached per process. Returns `""` on any failure (the caller treats empty
- * as "no adoption section"). Cache miss / fetch errors emit a stderr warning
- * but never fail the build — CI lint (Component 1) is the gate.
+ * The injection seam for PR-body retrieval. The real implementation is the
+ * `gh`-backed {@link fetchPrBody}; tests pass a fake backed by a
+ * `Map<number, PrBodyOutcome>` so the assembly logic is exercised hermetically
+ * (no live `gh`, no network).
  */
-export async function fetchPrBody(num: number): Promise<string> {
+export type PrBodyFetcher = (prNum: number) => Promise<PrBodyOutcome>;
+
+const PR_BODY_CACHE = new Map<number, PrBodyOutcome>();
+
+/**
+ * Fetch a PR body via `gh pr view <num> --json body --jq .body`, returning a
+ * typed {@link PrBodyOutcome}. Cached per process (failures cached too, so a
+ * rate-limited API is not hammered within one run; the cache resets per
+ * process, so a workflow re-run retries cleanly).
+ *
+ * Spawn error / non-zero exit ⇒ `failed`; empty or literal-`null` stdout ⇒
+ * `absent`; non-empty body ⇒ `retrieved`. A stderr warning is still emitted on
+ * failure (alongside the typed outcome) — but, unlike before, the failure is no
+ * longer silently collapsed into "no adoption section".
+ */
+export async function fetchPrBody(num: number): Promise<PrBodyOutcome> {
   const cached = PR_BODY_CACHE.get(num);
   if (cached !== undefined) return cached;
   const cmd = new Deno.Command("gh", {
@@ -136,26 +172,37 @@ export async function fetchPrBody(num: number): Promise<string> {
     stderr: "piped",
   });
   let stdout: Uint8Array;
+  let stderr: Uint8Array;
   let success: boolean;
   try {
     const out = await cmd.output();
     stdout = out.stdout;
+    stderr = out.stderr;
     success = out.success;
   } catch (err) {
-    // `gh` binary missing or spawn failure — degrade gracefully.
-    const msg = err instanceof Error ? err.message : String(err);
-    console.warn(`gen-changelog: cannot run gh CLI (${msg}) — skipping adoption for #${num}`);
-    PR_BODY_CACHE.set(num, "");
-    return "";
+    // `gh` binary missing or spawn failure — surfaced as a typed failure.
+    const reason = err instanceof Error ? err.message : String(err);
+    console.warn(
+      `gen-changelog: cannot run gh CLI (${reason}) — adoption fetch failed for #${num}`,
+    );
+    const outcome: PrBodyOutcome = { kind: "failed", reason };
+    PR_BODY_CACHE.set(num, outcome);
+    return outcome;
   }
   if (!success) {
-    console.warn(`gen-changelog: failed to fetch PR #${num} body — skipping adoption`);
-    PR_BODY_CACHE.set(num, "");
-    return "";
+    const reason = new TextDecoder().decode(stderr).trim() || `gh pr view #${num} exited non-zero`;
+    console.warn(`gen-changelog: failed to fetch PR #${num} body — ${reason}`);
+    const outcome: PrBodyOutcome = { kind: "failed", reason };
+    PR_BODY_CACHE.set(num, outcome);
+    return outcome;
   }
-  const body = new TextDecoder().decode(stdout);
-  PR_BODY_CACHE.set(num, body);
-  return body;
+  const decoded = new TextDecoder().decode(stdout);
+  // `gh --jq .body` prints the literal string `null` when the PR body is empty.
+  const outcome: PrBodyOutcome = decoded.trim() === "" || decoded.trim() === "null"
+    ? { kind: "absent" }
+    : { kind: "retrieved", body: decoded };
+  PR_BODY_CACHE.set(num, outcome);
+  return outcome;
 }
 
 export type AdoptionEntry = {
@@ -163,6 +210,67 @@ export type AdoptionEntry = {
   title: string;
   body: string;
 };
+
+/** Result of {@link assembleAdoptionEntries}: the guide entries plus any retrieval failures. */
+export type AdoptionAssembly = {
+  entries: AdoptionEntry[];
+  failures: { prNum: number; reason: string }[];
+};
+
+const TRAILING_PR_REF_RE = /\s\(#\d+\)\s*$/;
+
+/**
+ * Walk the `feat` commits, resolve each PR number, fetch its body via the
+ * injected {@link PrBodyFetcher}, and build the Adoption guide entries —
+ * keeping retrieval *failures* strictly separate from legitimate *absences*
+ * (#363, FR-004). This is the unit-testable seam extracted from `main()`:
+ *
+ * - non-`feat` commit, or `feat` with no trailing `(#NNN)` ⇒ no entry, no
+ *   failure (identical behaviour local and in CI).
+ * - `retrieved` ⇒ run `extractAdoption`; a valid block yields an entry, an
+ *   invalid/missing block is a quiet informational skip.
+ * - `absent` ⇒ quiet informational skip.
+ * - `failed` ⇒ recorded in `failures` (drives strict mode); never an entry.
+ *
+ * Pure of process exit — the caller decides whether `failures` aborts the run.
+ */
+export async function assembleAdoptionEntries(
+  classified: Classified[],
+  fetch: PrBodyFetcher,
+): Promise<AdoptionAssembly> {
+  const entries: AdoptionEntry[] = [];
+  const failures: { prNum: number; reason: string }[] = [];
+
+  for (const c of classified) {
+    if (c.category !== "feat") continue;
+    const prNum = extractPrNumber(c.subject);
+    if (prNum === null) continue;
+
+    const outcome = await fetch(prNum);
+    if (outcome.kind === "failed") {
+      failures.push({ prNum, reason: outcome.reason });
+      continue;
+    }
+    if (outcome.kind === "absent") {
+      console.warn(
+        `gen-changelog: feat commit ${c.hash} (#${prNum}) has no PR body — skipping adoption`,
+      );
+      continue;
+    }
+    const adoption = extractAdoption(outcome.body);
+    if (adoption === null) {
+      console.warn(
+        `gen-changelog: feat commit ${c.hash} (#${prNum}) has no Agent adoption section — skipping`,
+      );
+      continue;
+    }
+    // Title = the cleaned subject without the trailing PR ref.
+    const title = c.cleanedSubject.replace(TRAILING_PR_REF_RE, "");
+    entries.push({ prNum, title, body: adoption });
+  }
+
+  return { entries, failures };
+}
 
 export type FormatOpts = {
   fromTag: string | null;
@@ -280,6 +388,11 @@ async function main() {
   const fromArg = parseFlag(args, "--from");
   const toArg = parseFlag(args, "--to");
   const outArg = parseFlag(args, "--out");
+  // CI-only parity guard: in `--strict` mode any *retrieval failure* aborts the
+  // run before the body is written, so the pipeline can never publish a body
+  // that is silently missing an Adoption guide the local path would produce
+  // (#363, FR-005). The local preview deliberately stays non-strict (D6).
+  const strict = args.includes("--strict");
 
   const from = fromArg ?? (await detectPrevTag());
   const to = toArg ?? (await detectCurrentTag());
@@ -290,23 +403,21 @@ async function main() {
     .map(classifyCommit)
     .filter((c) => c.category !== "skip");
 
-  const adoptionEntries: AdoptionEntry[] = [];
-  for (const c of classified) {
-    if (c.category !== "feat") continue;
-    const prNum = extractPrNumber(c.subject);
-    if (prNum === null) continue;
-    const prBody = await fetchPrBody(prNum);
-    if (prBody === "") continue;
-    const adoption = extractAdoption(prBody);
-    if (adoption === null) {
-      console.warn(
-        `gen-changelog: feat commit ${c.hash} (#${prNum}) has no Agent adoption section — skipping`,
-      );
-      continue;
+  const { entries: adoptionEntries, failures } = await assembleAdoptionEntries(
+    classified,
+    fetchPrBody,
+  );
+
+  if (failures.length > 0) {
+    for (const f of failures) {
+      console.error(`#${f.prNum}: ${f.reason}`);
     }
-    // Title = the cleaned subject without the trailing PR ref.
-    const title = c.cleanedSubject.replace(/\s\(#\d+\)\s*$/, "");
-    adoptionEntries.push({ prNum, title, body: adoption });
+    if (strict) {
+      console.error(
+        `gen-changelog: ${failures.length} PR-body retrieval failure(s) under --strict — refusing to write a partial Adoption guide.`,
+      );
+      Deno.exit(1);
+    }
   }
 
   const md = formatChangelog(classified, {

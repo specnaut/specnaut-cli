@@ -144,10 +144,17 @@ jobs:
       contents: write
       # `scripts/gen-changelog.ts` calls `gh pr view <num> --json body`
       # to extract the `## Agent adoption` section from each feat: PR.
-      # Without `pull-requests: read`, those calls return empty and the
-      # release body silently ships without the `### Adoption guide`
-      # block (v1.6.0 was published this way — body was amended manually
-      # post-release).
+      # Two things are required for those calls to succeed in CI, and both
+      # are now in place (#363):
+      #   1. `pull-requests: read` below grants the token the scope.
+      #   2. `env: GH_TOKEN: ${{ github.token }}` on the "Generate release
+      #      notes" step actually places the token in the step env so `gh`
+      #      is authenticated — a permission scope alone does NOT do this.
+      # Earlier only (1) was applied, so `gh` ran unauthenticated and every
+      # adoption fetch failed silently, shipping a body with no
+      # `### Adoption guide` block (e.g. v1.6.0 / v1.13.0, amended manually
+      # post-release). The step now also runs `--strict`, which fails the
+      # build on any retrieval failure rather than publishing a partial guide.
       pull-requests: read
     steps:
       - uses: actions/checkout@v6
@@ -212,7 +219,17 @@ jobs:
             shasum -a 256 "$f" > "$f.sha256"
           done
       - name: Generate release notes
-        run: deno run --allow-read --allow-write --allow-run scripts/gen-changelog.ts
+        env:
+          # Authenticate `gh pr view` so each feat PR's `## Agent adoption`
+          # block is retrievable in CI — the root-cause fix for #363. Without
+          # this the token's `pull-requests: read` scope is never placed in the
+          # step env, so `gh` runs unauthenticated and every fetch fails.
+          GH_TOKEN: ${{ github.token }}
+        # `--strict` fails the build on any PR-body retrieval failure, before
+        # the "Create release" step publishes — so an incomplete Adoption guide
+        # can never ship silently. `--allow-env` is added for explicitness
+        # (the token reaches `gh` via subprocess env inheritance regardless).
+        run: deno run --allow-read --allow-write --allow-run --allow-env scripts/gen-changelog.ts --strict
       - name: Create release
         uses: softprops/action-gh-release@v3
         with:
