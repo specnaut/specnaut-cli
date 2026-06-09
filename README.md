@@ -119,10 +119,28 @@ templates may have changed. To pull those changes into a project you previously 
 specflow upgrade --dry-run    # preview what would change
 specflow upgrade              # apply safely — files you customized are preserved
 specflow upgrade --force      # overwrite customized files (backed up to .specflow.bak)
+specflow diff                 # show how your customized files diverge from the bundled originals
 ```
 
 Specflow tracks the SHA256 of each template in `.specflow/installed.lock` so it can detect your
 local edits and avoid overwriting them. Commit this lock file alongside your project.
+
+`specflow upgrade` detects edits automatically, but a `specflow init --here --force` refresh
+overwrites every bundled file unconditionally. To protect a customized file even from a forced
+refresh, declare it in a `.specflow/preserve.yml` manifest — a top-level `preserved:` list of
+project-relative paths:
+
+```yaml
+preserved:
+  - .claude/agents/product-owner.md
+  - .claude/agents/developer.md
+```
+
+Declared files are then kept by both `specflow upgrade` and `specflow init --force`, each with a
+per-file `preserved …` notice. Use `specflow diff` to see how a preserved file has drifted from the
+evolving bundle so you can fold in upstream changes by hand, and pass `--reset-preserved` to a
+refresh to deliberately discard your customizations and take the bundled version back. Commit
+`preserve.yml` alongside the lock file.
 
 When the `specflow-plugin` Claude Code plugin is installed and the project harness is `claude`,
 `specflow upgrade` auto-migrates vanilla agent and command files to the plugin (backs them up, then
