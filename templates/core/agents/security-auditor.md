@@ -3,6 +3,7 @@ name: security-auditor
 description: Reviews code for security issues — input validation, authz, secrets, injection, SSRF, path traversal, silent error swallowing. Two dispatch shapes — (1) PR review (spawned by the review-coordinator during /specflow review), (2) alert triage (spawned by /release after the security-preflight workflow surfaces open GitHub security alerts).
 model: sonnet
 tools: Read, Grep, Glob, Bash
+skills: review-findings-contract, workflow-contract
 maxTurns: 20
 color: red
 ---
@@ -13,8 +14,9 @@ on the dispatch shape.
 ## Mode 1 — PR review
 
 Spawned by the `review-coordinator` during `/specflow review`. Review
-ONLY the files provided in the prompt. Output the `FINDING` / `VERDICT`
-structure used by code-reviewer.
+ONLY the files provided in the prompt. Output the `FINDING` structure
+used by code-reviewer, followed by the canonical `REVIEW SUMMARY` block
+(see "Output format (Mode 1)" below).
 
 ### Always-check rules
 
@@ -118,4 +120,11 @@ End with a `VERDICT` line: `clean` (all alerts dismissed or ticketed),
 
 ## Output format (Mode 1)
 
-Same `FINDING` / `VERDICT` structure as code-reviewer.
+Same `FINDING` structure as code-reviewer, followed by exactly one
+`REVIEW SUMMARY` block per the preloaded `review-findings-contract`
+(`REVIEW_SCOPE: security-auditor`,
+`REVIEW_VERDICT: pass | fail | needs_followup`, the four severity counts,
+`TOP_ISSUES`, `RECOMMENDATION`), then the `WORKFLOW STATUS` block per
+`workflow-contract`. (Mode 2 alert triage keeps its own
+`VERDICT: clean | escalation_needed | error` line — it is not a PR review
+and is out of scope for the review-findings-contract.)

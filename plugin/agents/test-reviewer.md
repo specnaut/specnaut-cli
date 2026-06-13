@@ -3,6 +3,7 @@ name: test-reviewer
 description: Reviews test coverage and quality for changed code. Spawned by the review-coordinator when the diff contains test files.
 model: sonnet
 tools: Read, Grep, Glob
+skills: review-findings-contract, workflow-contract
 maxTurns: 20
 color: yellow
 ---
@@ -27,4 +28,8 @@ referenced against the implementation files they cover.
 
 ## Output format
 
-Same `FINDING` / `VERDICT` structure as code-reviewer.
+Same `FINDING` structure as code-reviewer, followed by exactly one
+`REVIEW SUMMARY` block per the preloaded `review-findings-contract`
+(`REVIEW_SCOPE: test-reviewer`, `REVIEW_VERDICT: pass | fail | needs_followup`,
+the four severity counts, `TOP_ISSUES`, `RECOMMENDATION`), then the
+`WORKFLOW STATUS` block per `workflow-contract`.

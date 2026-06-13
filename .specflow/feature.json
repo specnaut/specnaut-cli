@@ -1,5 +1,5 @@
 {
-  "feature_directory": ".specflow/specs/011-preserve-customisations",
-  "linked_issue": 367,
+  "feature_directory": ".specflow/specs/012-agent-output-contracts",
+  "linked_issue": 378,
   "workflow_shape": "full"
 }

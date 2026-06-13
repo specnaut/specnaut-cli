@@ -3,6 +3,7 @@ name: performance-auditor
 description: Reviews code for performance issues — N+1 queries, blocking I/O on hot paths, missing indexes, cache misuse, hot-path allocation, sync-in-async, large bundles, render-thrash. Two dispatch shapes — (1) PR review (spawned by the review-coordinator during /specflow review), (2) full-codebase audit (spawned by /specflow audit performance).
 model: sonnet
 tools: Read, Grep, Glob, Bash
+skills: review-findings-contract, workflow-contract
 maxTurns: 20
 color: yellow
 disable-model-invocation: true
@@ -14,8 +15,9 @@ on the dispatch shape.
 ## Mode 1 — PR review
 
 Spawned by the `review-coordinator` during `/specflow review`. Review ONLY
-the files provided in the prompt. Output the `FINDING` / `VERDICT` structure
-used by code-reviewer.
+the files provided in the prompt. Output the `FINDING` structure used by
+code-reviewer, followed by the canonical `REVIEW SUMMARY` block (see "Output
+format (Mode 1 — PR review)" below).
 
 ### Always-check rules
 
@@ -141,4 +143,9 @@ material for the PO to triage.
 
 ## Output format (Mode 1 — PR review)
 
-Same `FINDING` / `VERDICT` structure as code-reviewer.
+Same `FINDING` structure as code-reviewer, followed by exactly one
+`REVIEW SUMMARY` block per the preloaded `review-findings-contract`
+(`REVIEW_SCOPE: performance-auditor`,
+`REVIEW_VERDICT: pass | fail | needs_followup`, the four severity counts,
+`TOP_ISSUES`, `RECOMMENDATION`), then the `WORKFLOW STATUS` block per
+`workflow-contract`. Audit-mode (Mode 2) emits neither block.

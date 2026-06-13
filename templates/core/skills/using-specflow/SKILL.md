@@ -47,6 +47,13 @@ not re-read the file with `Read`.
 | `specflow-auto` | Auto-chain orchestration (legacy entry point — most users invoke `/specflow specify` instead). |
 | `specflow-review` | Auto-invoke alias preserved for the `/specflow review` phase. |
 
+**Preloaded output-contract skills** (`user-invocable: false` — never invoke
+directly): `workflow-contract`, `handoff-protocol`, `review-findings-contract`,
+`qa-report-contract`. These define the machine-readable `WORKFLOW STATUS` /
+`HANDOFF` / `REVIEW SUMMARY` / `QA SUMMARY` blocks. They are loaded into an
+agent's context via the agent's `skills:` frontmatter (see the agent registry
+below) and never appear as user commands.
+
 ## Specflow agent registry
 
 Dispatch these via `Task({ subagent_type: "<name>", ... })` (or your
