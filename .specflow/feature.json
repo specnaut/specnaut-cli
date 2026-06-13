@@ -1,5 +1,5 @@
 {
-  "feature_directory": ".specflow/specs/016-agent-effort-rubric",
-  "linked_issue": 382,
+  "feature_directory": ".specflow/specs/017-hook-payload-fix",
+  "linked_issue": 388,
   "workflow_shape": "full"
 }

@@ -2,12 +2,24 @@ import { assert, assertEquals } from "@std/assert";
 import { fromFileUrl } from "@std/path";
 
 /**
- * Hermetic test for the enriched `log-subagent.sh` hook (#381, mechanism C).
+ * Hermetic test for the enriched `log-subagent.sh` hook (#381 mechanism C,
+ * re-anchored in #388 to the empirically-captured real Claude Code payload).
  *
- * The hook is the deterministic data foundation of the status ledger: it parses
- * the OPTIONAL contract fields (`state`, `done_criteria_met`, `handoff_target`,
- * `review_verdict`, `qa_verdict`) out of the subagent's output text and appends
- * them as JSONL keys beside the always-present `{ts, event, session, agent}`.
+ * The hook is the deterministic data foundation of the status ledger. The real
+ * `SubagentStop` payload (captured live, see research.md) names the agent under
+ * `agent_type` and carries the agent's end-of-turn contract blocks under
+ * `last_assistant_message` — NOT the `agent_name`/`output` keys the original
+ * #381 hook (and its test) assumed. That mismatch is why the ledger shipped
+ * inert (`agent:"unknown"`, zero contract fields). These cases are therefore
+ * anchored to the REAL shape; the legacy keys are kept only as explicit
+ * fallback cases.
+ *
+ * The hook parses the OPTIONAL contract fields (`state`, `done_criteria_met`,
+ * `handoff_target`, `review_verdict`, `qa_verdict`) plus the optional
+ * `agent_id`/`effort` context out of the payload and appends them as JSONL keys
+ * beside the always-present `{ts, event, session, agent}`. The contract blocks
+ * use canonical UPPERCASE field names (`STATE:` / `REVIEW_VERDICT:` …) per the
+ * #378 contract; the hook matches them case-insensitively.
  *
  * Each case pipes a synthetic stop-event payload into the hook against a temp
  * cwd (so the hook writes `<temp>/.specflow/logs/agents.jsonl`) and asserts the
@@ -73,22 +85,31 @@ const CONTRACT_KEYS = [
   "qa_verdict",
 ] as const;
 
-Deno.test("stop payload with WORKFLOW STATUS + REVIEW SUMMARY → enriched line", async () => {
-  const output = [
+Deno.test("REAL SubagentStop payload (agent_type + last_assistant_message + UPPERCASE block) → fully enriched line", async () => {
+  // Mirrors the empirically-captured shape: name under `agent_type`, contract
+  // blocks under `last_assistant_message`, canonical UPPERCASE field names.
+  const lastAssistantMessage = [
     "Done with the security pass.",
     "",
-    "WORKFLOW STATUS",
-    "state: awaiting_review",
-    "done_criteria_met: yes",
-    "handoff_target: review-coordinator",
-    "",
     "REVIEW SUMMARY",
-    "verdict: fail",
+    "REVIEW_VERDICT: fail",
+    "",
+    "WORKFLOW STATUS",
+    "STATE: awaiting_review",
+    "DONE_CRITERIA_MET: yes",
+    "HANDOFF_TARGET: review-coordinator",
   ].join("\n");
   const payload = JSON.stringify({
     session_id: "sess-123",
-    agent_name: "security-auditor",
-    output,
+    agent_id: "abf05f10d169e18fa",
+    agent_type: "security-auditor",
+    effort: { level: "high" },
+    permission_mode: "bypassPermissions",
+    hook_event_name: "SubagentStop",
+    stop_hook_active: false,
+    last_assistant_message: lastAssistantMessage,
+    background_tasks: [],
+    session_crons: [],
   });
 
   const { code, line } = await runHook("stop", payload);
@@ -96,7 +117,12 @@ Deno.test("stop payload with WORKFLOW STATUS + REVIEW SUMMARY → enriched line"
   assert(line, "expected an appended JSONL line");
   assertEquals(line.event, "stop");
   assertEquals(line.session, "sess-123");
+  // Name resolved from `agent_type` (not the absent `agent_name`).
   assertEquals(line.agent, "security-auditor");
+  // Optional context fields populated from the real payload.
+  assertEquals(line.agent_id, "abf05f10d169e18fa");
+  assertEquals(line.effort, "high");
+  // Contract fields parsed from `last_assistant_message`, UPPERCASE names.
   assertEquals(line.state, "awaiting_review");
   assertEquals(line.done_criteria_met, "yes");
   assertEquals(line.handoff_target, "review-coordinator");
@@ -109,8 +135,49 @@ Deno.test("stop payload with WORKFLOW STATUS + REVIEW SUMMARY → enriched line"
   assertEquals(typeof line.ts, "string");
 });
 
-Deno.test("stop payload with QA SUMMARY → qa_verdict captured", async () => {
+Deno.test("agent_id / effort omitted when absent from the payload", async () => {
+  const payload = JSON.stringify({
+    session_id: "sess-no-ctx",
+    agent_type: "developer",
+    last_assistant_message: "Just prose, no contract block.",
+  });
+
+  const { code, line } = await runHook("stop", payload);
+  assertEquals(code, 0);
+  assert(line);
+  assertEquals(line.agent, "developer");
+  assert(!("agent_id" in line), "agent_id must be omitted when absent");
+  assert(!("effort" in line), "effort must be omitted when absent");
+});
+
+Deno.test("legacy `.output` key + `agent_name` still probed (version-drift fallback)", async () => {
+  // Older/alternate payload shapes used `agent_name` + `output`. The hook keeps
+  // these as fallbacks behind the real `agent_type` / `last_assistant_message`.
   const output = [
+    "WORKFLOW STATUS",
+    "STATE: blocked",
+    "DONE_CRITERIA_MET: no",
+    "HANDOFF_TARGET: none",
+  ].join("\n");
+  const payload = JSON.stringify({
+    session_id: "sess-legacy",
+    agent_name: "developer",
+    output,
+  });
+
+  const { code, line } = await runHook("stop", payload);
+  assertEquals(code, 0);
+  assert(line);
+  assertEquals(line.agent, "developer");
+  assertEquals(line.state, "blocked");
+  assertEquals(line.done_criteria_met, "no");
+  assertEquals(line.handoff_target, "none");
+});
+
+Deno.test("lowercase contract field names are still captured (case-insensitive match)", async () => {
+  // Defensive: even if an agent emits lowercase field names, the hook's
+  // case-insensitive grep must still populate the ledger.
+  const lastAssistantMessage = [
     "Ran the smoke pass.",
     "",
     "WORKFLOW STATUS",
@@ -119,45 +186,48 @@ Deno.test("stop payload with QA SUMMARY → qa_verdict captured", async () => {
     "handoff_target: none",
     "",
     "QA SUMMARY",
-    "verdict: pass",
+    "qa_verdict: pass",
   ].join("\n");
   const payload = JSON.stringify({
-    session_id: "sess-qa",
-    agent_name: "qa-tester",
-    output,
+    session_id: "sess-lower",
+    agent_type: "qa-tester",
+    last_assistant_message: lastAssistantMessage,
   });
 
   const { code, line } = await runHook("stop", payload);
   assertEquals(code, 0);
   assert(line);
+  assertEquals(line.agent, "qa-tester");
   assertEquals(line.state, "done");
+  assertEquals(line.done_criteria_met, "yes");
   assertEquals(line.handoff_target, "none");
   assertEquals(line.qa_verdict, "pass");
   assert(!("review_verdict" in line), "review_verdict must be omitted");
 });
 
-Deno.test("stop payload with BOTH REVIEW SUMMARY (fail) + QA SUMMARY (pass) → each verdict bound to its own block", async () => {
+Deno.test("dual block REVIEW_VERDICT:fail + QA_VERDICT:pass → each verdict bound to its own block", async () => {
   // Dual-block payload: the review block fails, the QA block passes. The hook
-  // must SEGMENT the output per block so each `verdict:` is read only within
-  // its own block — never cross-contaminated by the other block's verdict.
-  const output = [
+  // must SEGMENT the output per block so each verdict is read only within its
+  // own block — never cross-contaminated. With distinct UPPERCASE names
+  // (REVIEW_VERDICT vs QA_VERDICT) the segmentation is belt-and-suspenders.
+  const lastAssistantMessage = [
     "Wrapping up.",
     "",
-    "WORKFLOW STATUS",
-    "state: awaiting_review",
-    "done_criteria_met: no",
-    "handoff_target: review-coordinator",
-    "",
     "REVIEW SUMMARY",
-    "verdict: fail",
+    "REVIEW_VERDICT: fail",
     "",
     "QA SUMMARY",
-    "verdict: pass",
+    "QA_VERDICT: pass",
+    "",
+    "WORKFLOW STATUS",
+    "STATE: awaiting_review",
+    "DONE_CRITERIA_MET: no",
+    "HANDOFF_TARGET: review-coordinator",
   ].join("\n");
   const payload = JSON.stringify({
     session_id: "sess-dual",
-    agent_name: "review-coordinator",
-    output,
+    agent_type: "review-coordinator",
+    last_assistant_message: lastAssistantMessage,
   });
 
   const { code, line } = await runHook("stop", payload);
@@ -174,8 +244,8 @@ Deno.test("JSON injection via session_id is neutralised → valid JSON, no injec
   const hostile = 'sess","injected":"x';
   const payload = JSON.stringify({
     session_id: hostile,
-    agent_name: "developer",
-    output: "Just prose, no contract block.",
+    agent_type: "developer",
+    last_assistant_message: "Just prose, no contract block.",
   });
 
   const { code, line } = await runHook("stop", payload);
@@ -191,8 +261,8 @@ Deno.test("JSON injection via session_id is neutralised → valid JSON, no injec
 Deno.test("stop payload with no contract block → base four-field line only", async () => {
   const payload = JSON.stringify({
     session_id: "sess-plain",
-    agent_name: "developer",
-    output: "Just some prose with no WORKFLOW STATUS block at all.",
+    agent_type: "developer",
+    last_assistant_message: "Just some prose with no WORKFLOW STATUS block.",
   });
 
   const { code, line } = await runHook("stop", payload);
@@ -205,21 +275,24 @@ Deno.test("stop payload with no contract block → base four-field line only", a
   for (const k of CONTRACT_KEYS) {
     assert(!(k in line), `${k} must be omitted when no block is present`);
   }
-  // Exactly the four base keys.
+  // Exactly the four base keys (agent_id/effort absent here too).
   assertEquals(Object.keys(line).sort(), ["agent", "event", "session", "ts"]);
 });
 
 Deno.test("start event → base line, never enriched", async () => {
+  // SubagentStart carries no last_assistant_message/effort; never enriched.
   const payload = JSON.stringify({
     session_id: "sess-start",
-    agent_name: "developer",
-    output: "WORKFLOW STATUS\nstate: in_progress\ndone_criteria_met: no\nhandoff_target: none",
+    agent_id: "abf05f10d169e18fa",
+    agent_type: "general-purpose",
+    hook_event_name: "SubagentStart",
   });
 
   const { code, line } = await runHook("start", payload);
   assertEquals(code, 0);
   assert(line);
   assertEquals(line.event, "start");
+  assertEquals(line.agent, "general-purpose");
   for (const k of CONTRACT_KEYS) {
     assert(!(k in line), `${k} must be omitted on start events`);
   }
@@ -242,24 +315,4 @@ Deno.test("malformed/non-JSON payload → never aborts, exit 0, valid base line"
   assert(line, "even a malformed payload must produce a valid base line");
   assertEquals(line.event, "stop");
   assertEquals(typeof line.ts, "string");
-});
-
-Deno.test("output under the .result key is also probed", async () => {
-  const output = [
-    "WORKFLOW STATUS",
-    "state: blocked",
-    "done_criteria_met: no",
-    "handoff_target: none",
-  ].join("\n");
-  const payload = JSON.stringify({
-    session_id: "sess-result",
-    agent_name: "developer",
-    result: output,
-  });
-
-  const { code, line } = await runHook("stop", payload);
-  assertEquals(code, 0);
-  assert(line);
-  assertEquals(line.state, "blocked");
-  assertEquals(line.done_criteria_met, "no");
 });
