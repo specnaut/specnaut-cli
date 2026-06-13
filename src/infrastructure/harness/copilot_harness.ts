@@ -29,6 +29,8 @@ function destinationFor(entry: CoreEntry): string {
       return backlogScriptDestination(entry);
     case "agent-memory":
       throw new Error("agent-memory entries should be filtered before destinationFor");
+    case "agent-doc":
+      throw new Error("agent-doc entries should be filtered before destinationFor");
     case "spec-root":
       if (!entry.suffix) throw new Error(`spec-root needs suffix`);
       return `.specflow/${entry.suffix}`;
@@ -49,8 +51,9 @@ export class CopilotHarness implements Harness {
       const backendApplied = applyBackend(raw, opts);
       if (backendApplied === null) continue;
       const entry = applyScheme(backendApplied, opts);
-      // agent-memory is Claude-only (folder convention); other harnesses skip.
-      if (entry.category === "agent-memory") continue;
+      // agent-memory and the agent-fleet README are Claude-only conventions;
+      // other harnesses skip them.
+      if (entry.category === "agent-memory" || entry.category === "agent-doc") continue;
       const dest = destinationFor(entry);
       const isInstruction = entry.category === "backlog-cmd" ||
         entry.category === "agent" ||

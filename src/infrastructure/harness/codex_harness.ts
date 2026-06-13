@@ -62,8 +62,9 @@ export class CodexHarness implements Harness {
       const backendApplied = applyBackend(raw, opts);
       if (backendApplied === null) continue;
       const entry = applyScheme(backendApplied, opts);
-      // agent-memory is Claude-only (folder convention); other harnesses skip.
-      if (entry.category === "agent-memory") continue;
+      // agent-memory and the agent-fleet README are Claude-only conventions;
+      // other harnesses skip them.
+      if (entry.category === "agent-memory" || entry.category === "agent-doc") continue;
       switch (entry.category) {
         case "agent":
           out[`.codex/agents/${entry.name}.toml`] = {

@@ -3,6 +3,7 @@ import type { BacklogBackend } from "./installed_lock.ts";
 export type CoreCategory =
   | "agent"
   | "agent-memory"
+  | "agent-doc"
   | "skill"
   | "phase"
   | "phase-script"

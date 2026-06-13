@@ -1,5 +1,5 @@
 {
-  "feature_directory": ".specflow/specs/015-status-ledger",
-  "linked_issue": 381,
+  "feature_directory": ".specflow/specs/016-agent-effort-rubric",
+  "linked_issue": 382,
   "workflow_shape": "full"
 }

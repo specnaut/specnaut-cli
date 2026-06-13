@@ -102,10 +102,20 @@ Deno.test("specflow init <name> writes a complete tree", async () => {
     const agentDirEntries = await Array.fromAsync(
       Deno.readDir(join(root, ".claude/agents")),
     );
-    const agentMdCount = agentDirEntries.filter((e) => e.isFile && e.name.endsWith(".md")).length;
+    // 15 agent definitions; the agent-fleet README (#382) is a sibling
+    // doc, not an agent, so it's excluded from this count and asserted
+    // separately below.
+    const agentMdCount = agentDirEntries.filter(
+      (e) => e.isFile && e.name.endsWith(".md") && e.name !== "README.md",
+    ).length;
     assertEquals(agentMdCount, 15);
     const memoryDirCount = agentDirEntries.filter((e) => e.isDirectory).length;
     assertEquals(memoryDirCount, 5);
+    // The effort-rubric README ships beside the agents (#382).
+    assertEquals(
+      await exists(join(root, ".claude/agents/README.md")),
+      true,
+    );
     // Spot-check one memory file
     assertEquals(
       await exists(join(root, ".claude/agents/product-owner/memory/MEMORY.md")),

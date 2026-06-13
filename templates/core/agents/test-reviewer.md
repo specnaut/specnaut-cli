@@ -2,6 +2,7 @@
 name: test-reviewer
 description: Reviews test coverage and quality for changed code. Spawned by the review-coordinator when the diff contains test files.
 model: sonnet
+effort: medium
 tools: Read, Grep, Glob
 skills: review-findings-contract, workflow-contract
 maxTurns: 20

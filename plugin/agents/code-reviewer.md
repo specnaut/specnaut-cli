@@ -2,6 +2,7 @@
 name: code-reviewer
 description: Reviews code quality, architecture, DRY/YAGNI, readability, and conformance to the project constitution. Spawned by the review-coordinator during /specflow review.
 model: sonnet
+effort: medium
 tools: Read, Grep, Glob
 skills: review-findings-contract, workflow-contract
 maxTurns: 20

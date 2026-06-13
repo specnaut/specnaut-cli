@@ -2,6 +2,7 @@
 name: developer
 description: Senior developer that implements tasks from tasks.md, fixes review feedback, and ships features. Manual-only — invoke explicitly when you have a tasks.md to execute or a review note to address.
 model: opus
+effort: xhigh
 tools: Read, Write, Edit, Grep, Glob, Bash
 skills: workflow-contract, handoff-protocol
 permissionMode: acceptEdits

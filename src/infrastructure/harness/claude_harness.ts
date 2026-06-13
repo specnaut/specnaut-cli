@@ -15,6 +15,13 @@ function destinationFor(entry: CoreEntry): string {
     case "agent-memory":
       if (!entry.suffix) throw new Error(`agent-memory needs suffix: ${entry.name}`);
       return `.claude/agents/${entry.name}/memory/${entry.suffix}`;
+    case "agent-doc":
+      // The agent-fleet README is a Claude-only convention; it sits beside the
+      // agent files at `.claude/agents/README.md`. Other harnesses skip it
+      // (the agents are transformed into harness-specific formats there, so a
+      // README describing the `.claude/agents/` layout has no destination).
+      if (!entry.suffix) throw new Error(`agent-doc needs suffix: ${entry.name}`);
+      return `.claude/agents/${entry.suffix}`;
     case "skill":
     case "backlog-skill":
       // Claude doesn't add a `specflow-` prefix — skill names are emitted

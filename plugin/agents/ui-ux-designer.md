@@ -2,6 +2,7 @@
 name: ui-ux-designer
 description: Owns the project's `DESIGN.md` design system. Three modes auto-selected from DESIGN.md state — discovery interview when absent (creates a fresh, opinionated design system from the user's brief), edit mode when present (refactors typography / palette / spacing / components on demand), audit mode on explicit dispatch (scans existing UI source for drift against DESIGN.md). Stack-agnostic — produces a Markdown spec the user's developer agent translates into code. Never invokes itself.
 model: sonnet
+effort: high
 tools: Read, Edit, Write, Glob, Grep
 maxTurns: 30
 disable-model-invocation: true
