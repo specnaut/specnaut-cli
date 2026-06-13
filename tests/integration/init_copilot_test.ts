@@ -92,14 +92,16 @@ Deno.test("specflow init --ai copilot scaffolds a Copilot layout", async () => {
     // verification-before-completion (#275) + brainstorming (#276) +
     // 4 output-contract skills (#378: workflow-contract, handoff-protocol,
     // review-findings-contract, qa-report-contract) + code-audit (#379) +
+    // 5 per-axis audit skills (#380: arch-audit, sec-audit, perf-audit,
+    // dep-audit, a11y-audit) +
     // backlog + 15 agents (11 original + performance-auditor #304 +
     // a11y-auditor #305 + architecture-auditor #321 + dependency-auditor
-    // #322) = 52. code-audit's scope script ships under
+    // #322) = 57. code-audit's scope script ships under
     // .specflow/scripts/code-audit/, not as a flattened instruction file.
     const instructionsCount = (await Array.fromAsync(
       Deno.readDir(join(root, ".github/instructions")),
     )).length;
-    assertEquals(instructionsCount, 52);
+    assertEquals(instructionsCount, 57);
 
     // Shared (cross-harness)
     assertEquals(await exists(join(root, ".specflow/memory/constitution.md")), true);
