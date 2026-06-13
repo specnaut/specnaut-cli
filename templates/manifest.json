@@ -110,6 +110,10 @@
     { "category": "skill", "name": "dep-audit", "source": "core/skills/dep-audit/SKILL.md" },
     { "category": "skill", "name": "a11y-audit", "source": "core/skills/a11y-audit/SKILL.md" },
 
+    { "category": "skill", "name": "status-audit", "source": "core/skills/status-audit/SKILL.md" },
+
+    { "category": "spec-root", "name": "specify", "suffix": "logs/README.md", "source": "core/specflow/logs/README.md" },
+
     { "category": "spec-root", "name": "specify", "suffix": "memory/constitution.md", "source": "core/specflow/memory/constitution.md", "skipIfExists": true },
     { "category": "spec-root", "name": "specify", "suffix": "backlog.md", "source": "core/specflow/backlog.md" },
     { "category": "spec-root", "name": "specify", "suffix": "LABELS.md", "source": "core/specflow/LABELS.md" },

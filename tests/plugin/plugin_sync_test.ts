@@ -152,6 +152,14 @@ const SYNC_PAIRS: ReadonlyArray<{ plugin: string; source: string }> = [
     plugin: `plugin/skills/${name}/SKILL.md`,
     source: `templates/core/skills/${name}/SKILL.md`,
   })),
+  // status-audit (#381). Markdown-only read-only skill — reads the
+  // `.specflow/logs/agents.jsonl` status ledger and reports seven session-health
+  // views; pairs with `/loop 5m /status-audit` for headless supervision. Mirrors
+  // through the same byte-identical channel as the other markdown-only skills.
+  {
+    plugin: "plugin/skills/status-audit/SKILL.md",
+    source: "templates/core/skills/status-audit/SKILL.md",
+  },
   // Dual-copy agents: 15 sub-agent definitions, each landing as
   // `plugin/agents/<name>.md`. Claude Code resolves agents by file
   // basename in plugin scope; no namespacing needed for invocation
