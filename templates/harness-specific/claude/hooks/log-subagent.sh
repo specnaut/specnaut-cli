@@ -19,11 +19,23 @@ TS=$(date -u +%Y-%m-%dT%H:%M:%SZ)
 
 # Best-effort field extraction — the exact payload shape varies by
 # Claude Code version; defaults to "unknown" when fields are absent.
+#
+# The agent name lives under `.agent_type` in the real Claude Code
+# SubagentStart/Stop payload (empirically captured, #388); the earlier
+# `.agent_name`/`.subagent_name`/`.tool_name` probes matched nothing and the
+# ledger recorded `agent:"unknown"` for every event. We prefer `.agent_type`
+# and keep the historical keys as version-drift fallbacks.
 HAVE_JQ=0
+AGENT_ID=""
+EFFORT=""
 if command -v jq >/dev/null 2>&1 && [ -n "$INPUT" ]; then
   HAVE_JQ=1
   SESSION=$(printf '%s' "$INPUT" | jq -r '.session_id // "unknown"' 2>/dev/null || echo "unknown")
-  AGENT=$(printf '%s' "$INPUT" | jq -r '.agent_name // .subagent_name // .tool_name // "unknown"' 2>/dev/null || echo "unknown")
+  AGENT=$(printf '%s' "$INPUT" | jq -r '.agent_type // .agent_name // .subagent_name // .tool_name // "unknown"' 2>/dev/null || echo "unknown")
+  # Optional context (omit-if-absent): `agent_id` disambiguates two concurrent
+  # agents of the same type in `/status-audit`; `effort.level` is cheap context.
+  AGENT_ID=$(printf '%s' "$INPUT" | jq -r '.agent_id // ""' 2>/dev/null || echo "")
+  EFFORT=$(printf '%s' "$INPUT" | jq -r '.effort.level // ""' 2>/dev/null || echo "")
 else
   SESSION="unknown"
   AGENT="unknown"
@@ -41,11 +53,14 @@ HANDOFF=""
 REVIEW=""
 QA=""
 if [ "$HAVE_JQ" = "1" ] && [ "$EVENT" = "stop" ]; then
-  # The key holding the agent's output text is Claude-Code-version-dependent;
-  # probe the likely candidates and fall back to the raw payload. The first
-  # candidate that yields a non-empty string wins.
+  # The agent's final message — where the end-of-turn contract blocks live — is
+  # carried under `.last_assistant_message` in the real SubagentStop payload
+  # (#388). The earlier `.output`/`.result`/… probes matched nothing, so the
+  # ledger captured zero contract fields. Prefer `.last_assistant_message`,
+  # keep the historical keys as version-drift fallbacks, then fall back to the
+  # raw payload. The first candidate that yields a non-empty string wins.
   OUTPUT=$(printf '%s' "$INPUT" | jq -r \
-    '(.output // .result // .response // .tool_response // .message // "") | if type=="string" then . else tojson end' \
+    '(.last_assistant_message // .output // .result // .response // .tool_response // .message // "") | if type=="string" then . else tojson end' \
     2>/dev/null || echo "")
   if [ -z "$OUTPUT" ]; then
     OUTPUT="$INPUT"
@@ -72,16 +87,33 @@ if [ "$HAVE_JQ" = "1" ] && [ "$EVENT" = "stop" ]; then
   REVIEW_SEG=$(segment "REVIEW SUMMARY")
   QA_SEG=$(segment "QA SUMMARY")
 
-  # WORKFLOW STATUS fields — extracted only from the WORKFLOW STATUS segment.
-  STATE=$(printf '%s' "$WORKFLOW_SEG" | grep -oE 'state:[[:space:]]*[a-z_]+' | head -1 | sed -E 's/^state:[[:space:]]*//' || true)
-  DONE_MET=$(printf '%s' "$WORKFLOW_SEG" | grep -oE 'done_criteria_met:[[:space:]]*(yes|no)' | head -1 | sed -E 's/^done_criteria_met:[[:space:]]*//' || true)
-  HANDOFF=$(printf '%s' "$WORKFLOW_SEG" | grep -oE 'handoff_target:[[:space:]]*[A-Za-z0-9_-]+' | head -1 | sed -E 's/^handoff_target:[[:space:]]*//' || true)
+  # The #378 contract blocks use canonical UPPERCASE field names
+  # (`STATE:` / `DONE_CRITERIA_MET:` / `HANDOFF_TARGET:` / `REVIEW_VERDICT:` /
+  # `QA_VERDICT:`). The earlier lowercase `state:`/`verdict:` greps never
+  # matched a real contract block. We grep the canonical names
+  # CASE-INSENSITIVELY (`-i`) for robustness, then strip the `FIELD:` prefix.
+  # `field_value` lowercases the whole matched token before stripping the prefix
+  # so the case-insensitive sed needs no per-letter alternation; the values
+  # (state names, yes/no, verdicts, agent names) are themselves lowercase.
+  field_value() {
+    # $1 = segment text; $2 = canonical field name; $3 = value charclass/alt.
+    printf '%s' "$1" |
+      grep -ioE "$2:[[:space:]]*$3" |
+      head -1 |
+      tr '[:upper:]' '[:lower:]' |
+      sed -E "s/^[a-z_]+:[[:space:]]*//" || true
+  }
 
-  # `verdict:` appears under both REVIEW SUMMARY and QA SUMMARY; extracting it
-  # from each block's OWN segment is what keeps the two verdicts distinct even
-  # when both blocks (and overlapping value sets like pass/fail) are present.
-  REVIEW=$(printf '%s' "$REVIEW_SEG" | grep -oE 'verdict:[[:space:]]*(pass|fail|needs_followup)' | head -1 | sed -E 's/^verdict:[[:space:]]*//' || true)
-  QA=$(printf '%s' "$QA_SEG" | grep -oE 'verdict:[[:space:]]*(pass|fail|blocked)' | head -1 | sed -E 's/^verdict:[[:space:]]*//' || true)
+  # WORKFLOW STATUS fields — extracted only from the WORKFLOW STATUS segment.
+  STATE=$(field_value "$WORKFLOW_SEG" "STATE" "[a-z_]+")
+  DONE_MET=$(field_value "$WORKFLOW_SEG" "DONE_CRITERIA_MET" "(yes|no)")
+  HANDOFF=$(field_value "$WORKFLOW_SEG" "HANDOFF_TARGET" "[A-Za-z0-9_-]+")
+
+  # `REVIEW_VERDICT` and `QA_VERDICT` are DISTINCT canonical names. Extracting
+  # each from its OWN block segment is belt-and-suspenders — even a stray match
+  # of the other name in the wrong block can't cross-contaminate.
+  REVIEW=$(field_value "$REVIEW_SEG" "REVIEW_VERDICT" "(pass|fail|needs_followup)")
+  QA=$(field_value "$QA_SEG" "QA_VERDICT" "(pass|fail|blocked)")
 fi
 
 # Compose the line with jq so every field is quoted/escaped correctly and a
@@ -96,6 +128,8 @@ if [ "$HAVE_JQ" = "1" ]; then
   # shellcheck disable=SC2016
   {
     JQ_FILTER='{ts: $ts, event: $event, session: $session, agent: $agent}'
+    [ -n "$AGENT_ID" ] && { JQ_ARGS+=(--arg agent_id "$AGENT_ID"); JQ_FILTER+=' + {agent_id: $agent_id}'; }
+    [ -n "$EFFORT" ] && { JQ_ARGS+=(--arg effort "$EFFORT"); JQ_FILTER+=' + {effort: $effort}'; }
     [ -n "$STATE" ] && { JQ_ARGS+=(--arg state "$STATE"); JQ_FILTER+=' + {state: $state}'; }
     [ -n "$DONE_MET" ] && { JQ_ARGS+=(--arg done_criteria_met "$DONE_MET"); JQ_FILTER+=' + {done_criteria_met: $done_criteria_met}'; }
     [ -n "$HANDOFF" ] && { JQ_ARGS+=(--arg handoff_target "$HANDOFF"); JQ_FILTER+=' + {handoff_target: $handoff_target}'; }
