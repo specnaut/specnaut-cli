@@ -238,6 +238,71 @@ Deno.test("dual block REVIEW_VERDICT:fail + QA_VERDICT:pass → each verdict bou
   assertEquals(line.state, "awaiting_review");
 });
 
+Deno.test("segmentation is load-bearing: a QA_VERDICT line inside the REVIEW block (no QA SUMMARY header) is NOT captured", async () => {
+  // This case fails if per-block segmentation is removed. A stray `QA_VERDICT:`
+  // line sits INSIDE the REVIEW SUMMARY block and there is NO `QA SUMMARY`
+  // header at all. Correct behaviour: the QA segment is empty, so `qa_verdict`
+  // is omitted; `review_verdict` is still read from its own block. A naive
+  // whole-output grep would wrongly capture `qa_verdict: blocked` here — so this
+  // proves the segmentation, not just the distinct field names, is doing work.
+  const lastAssistantMessage = [
+    "Review only — no QA was run.",
+    "",
+    "REVIEW SUMMARY",
+    "REVIEW_VERDICT: fail",
+    "QA_VERDICT: blocked", // stray, inside the REVIEW block, no QA SUMMARY header
+    "",
+    "WORKFLOW STATUS",
+    "STATE: awaiting_review",
+    "DONE_CRITERIA_MET: no",
+    "HANDOFF_TARGET: developer",
+  ].join("\n");
+  const payload = JSON.stringify({
+    session_id: "sess-seg",
+    agent_type: "code-reviewer",
+    last_assistant_message: lastAssistantMessage,
+  });
+
+  const { code, line } = await runHook("stop", payload);
+  assertEquals(code, 0);
+  assert(line);
+  assertEquals(line.review_verdict, "fail");
+  // No QA SUMMARY block → qa_verdict MUST be absent (omit-if-absent), NOT "blocked".
+  assertEquals(line.qa_verdict, undefined);
+  assertEquals(line.state, "awaiting_review");
+});
+
+Deno.test("contract block under the legacy `.result` key is still parsed (output-source fallback rung)", async () => {
+  // Older Claude Code versions carried the agent's output under `.result`
+  // instead of `.last_assistant_message`. With `last_assistant_message` absent,
+  // the hook must fall through the chain (.last_assistant_message → .output →
+  // .result → …) and still extract the block from `.result`.
+  const resultText = [
+    "Audit complete.",
+    "",
+    "REVIEW SUMMARY",
+    "REVIEW_VERDICT: needs_followup",
+    "",
+    "WORKFLOW STATUS",
+    "STATE: awaiting_qa",
+    "DONE_CRITERIA_MET: yes",
+    "HANDOFF_TARGET: qa-tester",
+  ].join("\n");
+  const payload = JSON.stringify({
+    session_id: "sess-result",
+    agent_type: "architecture-auditor",
+    result: resultText, // no last_assistant_message / output
+  });
+
+  const { code, line } = await runHook("stop", payload);
+  assertEquals(code, 0);
+  assert(line);
+  assertEquals(line.agent, "architecture-auditor");
+  assertEquals(line.review_verdict, "needs_followup");
+  assertEquals(line.state, "awaiting_qa");
+  assertEquals(line.handoff_target, "qa-tester");
+});
+
 Deno.test("JSON injection via session_id is neutralised → valid JSON, no injected key", async () => {
   // A hostile session_id carrying JSON-special characters (`"` and `:`) must
   // not break the JSONL line or inject extra keys — jq --arg must quote it.
