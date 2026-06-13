@@ -25,6 +25,9 @@ LAST_N=20
 
 usage() {
   echo "usage: collect-audit-scope.sh [--path <subtree> | --range <a>..<b>] [--last <n>]" >&2
+  # Known limitation: the --range allowlist excludes '{' '}', so stash refs of
+  # the form 'stash@{N}' are not accepted as range endpoints.
+  echo "note: stash refs (stash@{N}) are not valid --range endpoints" >&2
 }
 
 while [ $# -gt 0 ]; do
@@ -36,6 +39,17 @@ while [ $# -gt 0 ]; do
         usage
         exit 2
       fi
+      # Reject anything that escapes the repo root before any git call: an
+      # absolute path (leading '/') or any '..' path segment lets the caller
+      # point the scope outside the working tree. Only relative, in-tree
+      # subtrees are valid scope arguments.
+      case "$PATH_ARG" in
+        /* | ../* | */../* | */.. | ..)
+          echo "error: --path must be a relative path inside the repo (got: $PATH_ARG)" >&2
+          usage
+          exit 2
+          ;;
+      esac
       shift 2
       ;;
     --range)
@@ -45,23 +59,19 @@ while [ $# -gt 0 ]; do
         usage
         exit 2
       fi
-      # Validate the range shape (<a>..<b>, no dots inside either ref) before
-      # handing it to git — a malformed range must error, not silently fall
-      # through to auto-scope.
-      case "$RANGE_ARG" in
-        *..*)
-          if ! printf '%s' "$RANGE_ARG" | grep -Eq '^[^.]+\.\.[^.]+$'; then
-            echo "error: --range must match <a>..<b> (got: $RANGE_ARG)" >&2
-            usage
-            exit 2
-          fi
-          ;;
-        *)
-          echo "error: --range must match <a>..<b> (got: $RANGE_ARG)" >&2
-          usage
-          exit 2
-          ;;
-      esac
+      # Validate the range shape before handing it to git — a malformed range
+      # must error, not silently fall through to auto-scope. Two endpoints,
+      # each restricted to a git-ref-name allowlist ([A-Za-z0-9._/@^~-]), around
+      # a single two-dot '..'. This rejects three-dot ranges, shell
+      # metacharacters, and whitespace (so a value can never become a shell
+      # injection or a misleading empty scope). The '.' is allowed inside a ref
+      # (tags like v1.0) but the '..' separator must be exactly two dots.
+      if ! printf '%s' "$RANGE_ARG" | grep -Eq '^[A-Za-z0-9._/@^~-]+\.\.[A-Za-z0-9._/@^~-]+$' ||
+        printf '%s' "$RANGE_ARG" | grep -Eq '\.\.\.'; then
+        echo "error: --range must match <a>..<b> with ref-name-shaped endpoints (got: $RANGE_ARG)" >&2
+        usage
+        exit 2
+      fi
       shift 2
       ;;
     --last)
@@ -93,32 +103,62 @@ SCOPE_LABEL=""
 COMMITS=""
 FILES=""
 
-# Counts a newline-separated file list against a glob, printing the integer.
-# Tolerates an empty list (prints 0). Matching is case-insensitive on the
-# basename / path so heuristic globs stay "good enough to pick seats".
-count_matches() {
-  local list="$1"
+# Classifies a newline-separated file list into the four CATEGORY SIGNAL
+# counters in a SINGLE pass over the list. Each file is tested against every
+# category's glob set independently (a file can count toward more than one
+# category, e.g. a frontend test file). Sets FRONTEND_COUNT / TEST_COUNT /
+# DEP_COUNT / INFRA_COUNT. The globs are heuristic (research.md Decision 1):
+# good enough to pick which auditor seats run. Walking the list once instead of
+# four times is purely a perf optimization — the per-category counts are
+# identical to testing each category in its own pass.
+#
+# matches_any <file> <glob...> — 0 if the file matches any of the globs.
+matches_any() {
+  local f="$1"
   shift
-  local n=0
+  local pat
+  for pat in "$@"; do
+    # shellcheck disable=SC2254
+    case "$f" in
+      $pat) return 0 ;;
+    esac
+  done
+  return 1
+}
+
+classify_files() {
+  local list="$1"
+  FRONTEND_COUNT=0
+  TEST_COUNT=0
+  DEP_COUNT=0
+  INFRA_COUNT=0
   local f
   while IFS= read -r f; do
     [ -z "$f" ] && continue
-    local matched=0
-    local pat
-    for pat in "$@"; do
-      # shellcheck disable=SC2254
-      case "$f" in
-        $pat)
-          matched=1
-          break
-          ;;
-      esac
-    done
-    [ "$matched" -eq 1 ] && n=$((n + 1))
+    # `matches_any … && COUNT=$((…))` relies on `set -e` NOT aborting on a
+    # failed `&&` compound list (a non-match is expected, not an error). This is
+    # bash semantics; a future shebang switch to /bin/sh would need an explicit
+    # `if matches_any …; then COUNT=…; fi` rewrite to stay safe.
+    matches_any "$f" \
+      '*.tsx' '*.jsx' '*.vue' '*.svelte' '*.css' '*.scss' '*inertia*' '*frontend*' '*components*' &&
+      FRONTEND_COUNT=$((FRONTEND_COUNT + 1))
+    matches_any "$f" \
+      '*_test.*' '*.test.*' '*.spec.*' 'tests/*' '*/tests/*' '*/test/*' '*__tests__*' &&
+      TEST_COUNT=$((TEST_COUNT + 1))
+    matches_any "$f" \
+      'package.json' '*/package.json' 'deno.json' '*/deno.json' 'deno.jsonc' '*.lock' \
+      'Cargo.toml' 'pyproject.toml' 'go.mod' 'composer.json' 'Gemfile' 'requirements.txt' &&
+      DEP_COUNT=$((DEP_COUNT + 1))
+    matches_any "$f" \
+      'Dockerfile' '*/Dockerfile' '*.tf' '*.pulumi.*' 'k8s/*' '*/k8s/*' \
+      '.github/workflows/*' '*.yaml' '*.yml' &&
+      INFRA_COUNT=$((INFRA_COUNT + 1))
   done <<EOF
 $list
 EOF
-  printf '%s' "$n"
+  # A trailing non-match leaves $? non-zero; return 0 so `set -e` doesn't abort
+  # (the function's job is to set the four counters, not to report a status).
+  return 0
 }
 
 if [ -n "$PATH_ARG" ]; then
@@ -133,12 +173,15 @@ if [ -n "$PATH_ARG" ]; then
 elif [ -n "$RANGE_ARG" ]; then
   SCOPE="range"
   SCOPE_LABEL="$RANGE_ARG"
-  FILES="$(git diff --name-only "$RANGE_ARG" 2>/dev/null || true)"
-  COMMITS="$(git log --oneline "$RANGE_ARG" 2>/dev/null || true)"
+  # Trailing `--` ends option/revision parsing so a ref-shaped value can never
+  # be mistaken for a pathspec (matches the `git ls-files --` call above).
+  FILES="$(git diff --name-only "$RANGE_ARG" -- 2>/dev/null || true)"
+  COMMITS="$(git log --oneline "$RANGE_ARG" -- 2>/dev/null || true)"
 elif git rev-parse --verify --quiet origin/main >/dev/null 2>&1 &&
-  [ "$(git rev-list --count origin/main..HEAD 2>/dev/null || echo 0)" -gt 0 ]; then
+  local_count="$(git rev-list --count origin/main..HEAD 2>/dev/null || echo 0)" &&
+  [ "$local_count" -gt 0 ]; then
+  # Reuse the count captured in the guard rather than running rev-list twice.
   SCOPE="unpushed"
-  local_count="$(git rev-list --count origin/main..HEAD)"
   SCOPE_LABEL="origin/main..HEAD (${local_count} commits)"
   FILES="$(git diff --name-only origin/main..HEAD 2>/dev/null || true)"
   COMMITS="$(git log --oneline origin/main..HEAD 2>/dev/null || true)"
@@ -176,16 +219,11 @@ else
 fi
 
 # CATEGORY SIGNALS — heuristic path/extension globs (research.md Decision 1).
-FRONTEND_COUNT="$(count_matches "$FILES" \
-  '*.tsx' '*.jsx' '*.vue' '*.svelte' '*.css' '*.scss' '*inertia*' '*frontend*' '*components*')"
-TEST_COUNT="$(count_matches "$FILES" \
-  '*_test.*' '*.test.*' '*.spec.*' 'tests/*' '*/tests/*' '*/test/*' '*__tests__*')"
-DEP_COUNT="$(count_matches "$FILES" \
-  'package.json' '*/package.json' 'deno.json' '*/deno.json' 'deno.jsonc' '*.lock' \
-  'Cargo.toml' 'pyproject.toml' 'go.mod' 'composer.json' 'Gemfile' 'requirements.txt')"
-INFRA_COUNT="$(count_matches "$FILES" \
-  'Dockerfile' '*/Dockerfile' '*.tf' '*.pulumi.*' 'k8s/*' '*/k8s/*' \
-  '.github/workflows/*' '*.yaml' '*.yml')"
+# Signal intent (contract: contracts/scope-signals.md): FRONTEND_COUNT and
+# DEP_COUNT are GATING (they decide whether the accessibility and dependency
+# seats run); TEST_COUNT and INFRA_COUNT are INFORMATIONAL only (no seat
+# consumes them) — all four are always emitted per the #379 contract.
+classify_files "$FILES"
 
 # Emit the fixed block.
 echo "CODE-AUDIT SCOPE"

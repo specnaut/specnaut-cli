@@ -307,3 +307,104 @@ Deno.test("collect-audit-scope rejects a malformed --range with exit 2", async (
     await Deno.remove(dir, { recursive: true });
   }
 });
+
+Deno.test("collect-audit-scope rejects an absolute --path with exit 2 (no git call)", async () => {
+  const dir = await fixtureRepo();
+  try {
+    const r = await scope(dir, ["--path", "/etc"]);
+    assertEquals(r.code, 2);
+    assertStringIncludes(r.stderr, "relative path inside the repo");
+    assert(!r.stdout.includes("CODE-AUDIT SCOPE"), "no block on the validation-error path");
+  } finally {
+    await Deno.remove(dir, { recursive: true });
+  }
+});
+
+Deno.test("collect-audit-scope rejects a --path with a .. segment (traversal) with exit 2", async () => {
+  const dir = await fixtureRepo();
+  try {
+    const r = await scope(dir, ["--path", "../x"]);
+    assertEquals(r.code, 2);
+    assertStringIncludes(r.stderr, "relative path inside the repo");
+    assert(!r.stdout.includes("CODE-AUDIT SCOPE"), "no block on the validation-error path");
+  } finally {
+    await Deno.remove(dir, { recursive: true });
+  }
+});
+
+Deno.test("collect-audit-scope rejects a --path with a middle .. segment (traversal) with exit 2", async () => {
+  const dir = await fixtureRepo();
+  try {
+    // `foo/../etc` exercises the `*/../*` guard arm — the actual security guard
+    // against mid-path traversal, distinct from the leading-`..` case above.
+    const r = await scope(dir, ["--path", "foo/../etc"]);
+    assertEquals(r.code, 2);
+    assertStringIncludes(r.stderr, "relative path inside the repo");
+    assert(!r.stdout.includes("CODE-AUDIT SCOPE"), "no block on the validation-error path");
+  } finally {
+    await Deno.remove(dir, { recursive: true });
+  }
+});
+
+Deno.test("collect-audit-scope rejects a --range with shell metacharacters with exit 2", async () => {
+  const dir = await fixtureRepo();
+  try {
+    const r = await scope(dir, ["--range", "a b;rm"]);
+    assertEquals(r.code, 2);
+    // Assert the SPECIFIC range-rejection message so the test can't pass on an
+    // unrelated exit-2 path (e.g. an arg-parse error).
+    assertStringIncludes(r.stderr, "--range must match <a>..<b>");
+    assert(!r.stdout.includes("CODE-AUDIT SCOPE"), "no block on the validation-error path");
+  } finally {
+    await Deno.remove(dir, { recursive: true });
+  }
+});
+
+Deno.test("collect-audit-scope rejects a three-dot --range (a...b) with exit 2", async () => {
+  const dir = await fixtureRepo();
+  try {
+    const r = await scope(dir, ["--range", "a...b"]);
+    assertEquals(r.code, 2);
+    // Assert the SPECIFIC range-rejection message — without this the test would
+    // pass if the script exited 2 for any other reason (HIGH review finding).
+    assertStringIncludes(r.stderr, "--range must match <a>..<b>");
+    assert(!r.stdout.includes("CODE-AUDIT SCOPE"), "no block on the validation-error path");
+  } finally {
+    await Deno.remove(dir, { recursive: true });
+  }
+});
+
+Deno.test("collect-audit-scope: a valid relative --path does NOT trip the traversal guard", async () => {
+  const dir = await fixtureRepo();
+  try {
+    // Resolution itself is covered by "scopes to a subtree"; this test asserts
+    // the NEGATIVE — a legitimate relative subtree never hits the path guard.
+    const r = await scope(dir, ["--path", "src"]);
+    assertEquals(r.code, 0, r.stderr);
+    assert(
+      !r.stderr.includes("relative path inside the repo"),
+      "the traversal guard must not fire on a valid relative subtree",
+    );
+  } finally {
+    await Deno.remove(dir, { recursive: true });
+  }
+});
+
+Deno.test("collect-audit-scope: a valid two-dot --range does NOT trip the range guard", async () => {
+  const dir = await fixtureRepo();
+  try {
+    await Deno.writeTextFile(`${dir}/src/added.ts`, "export const added = 1;\n");
+    await git(["add", "."], dir);
+    await git(["commit", "-m", "feat: added"], dir);
+    // Resolution itself is covered by "scopes to an explicit commit range"; this
+    // test asserts the NEGATIVE — a well-formed two-dot range clears the guard.
+    const r = await scope(dir, ["--range", "HEAD~1..HEAD"]);
+    assertEquals(r.code, 0, r.stderr);
+    assert(
+      !r.stderr.includes("--range must match <a>..<b>"),
+      "the range guard must not fire on a valid two-dot range",
+    );
+  } finally {
+    await Deno.remove(dir, { recursive: true });
+  }
+});
