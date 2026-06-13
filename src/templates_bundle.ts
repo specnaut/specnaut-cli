@@ -5120,6 +5120,7 @@ not re-read the file with \`Read\`.
 | \`brainstorming\` | Spec-discovery entry point when the idea is vague — one question at a time, propose 2-3 approaches, present design, hand off to \`writing-plans\`. |
 | \`code-audit\` | User wants a broad, multi-seat health-check ("audit the codebase", "code audit", "audit the last N commits"). Resolves a scope, dispatches the applicable auditor seats (architecture / security / performance / a11y / dependency) in parallel, synthesizes one report. Read-only. Complementary to \`/specflow audit <axis>\`, which runs a single axis. |
 | \`arch-audit\` / \`sec-audit\` / \`perf-audit\` / \`dep-audit\` / \`a11y-audit\` | Per-axis audit family — user wants **one** lens over a scope ("arch audit", "security audit \`--path src/\`", "perf audit \`--diff\`"). Each resolves a uniform scope (\`--path\` / \`--range\` / \`--diff\` / whole) and dispatches its **single** bound auditor (architecture / security / performance / dependency / a11y), returning findings **inline**. Read-only, writes no report. Complements \`/specflow audit <axis>\` (which persists a dated report) and \`/code-audit\` (the multi-seat team). |
+| \`status-audit\` | User wants a health check of a running multi-agent session ("status audit", "audit the session", "what's blocked", "session health"). Reads the \`.specflow/logs/agents.jsonl\` status ledger and reports seven views (state counts / per-agent latest / blocked / stale ≥15m / done-vs-criteria contradictions / missing handoffs / verdict summary). Read-only. Pair with \`/loop 5m /status-audit\` to supervise long headless work. |
 | \`backlog\` | User asked about a backlog item, the board, an issue. Read-only access; mutations go through the \`product-owner\` agent. |
 | \`specflow-auto\` | Auto-chain orchestration (legacy entry point — most users invoke \`/specflow specify\` instead). |
 | \`specflow-review\` | Auto-invoke alias preserved for the \`/specflow review\` phase. |
@@ -12277,6 +12278,191 @@ file.**
     skipIfExists: false,
   },
   {
+    category: "skill",
+    name: "status-audit",
+    suffix: null,
+    content: `---
+name: status-audit
+description: Read-only health audit of a multi-agent session from the status ledger. Use when the user says "status audit", "audit the session", "how are the agents doing", "what's blocked", "session health", or when supervising long headless work with /loop. Reads .specflow/logs/agents.jsonl, derives each agent's current state from its latest entry, and reports seven health views. Writes nothing.
+argument-hint: "[latest|<agent>|<session>]"
+---
+
+# Status Audit — read-only session health report
+
+A **thin, read-only** audit of a running (or finished) multi-agent session. It
+reads the append-only status ledger at \`.specflow/logs/agents.jsonl\`, derives
+each agent's **current state** (its latest entry by \`ts\`), and reports seven
+health views. It writes **nothing** and mutates **no tracked files** —
+\`git status\` is unchanged after a run.
+
+The ledger is produced by the \`log-subagent.sh\` hook on every subagent
+start/stop. Each line is a JSON object; the schema lives at
+\`.specflow/logs/README.md\`.
+
+## Step 1 — Read the ledger
+
+Read \`.specflow/logs/agents.jsonl\`.
+
+- **Absent** (file does not exist, or no entries) → report **"no ledger yet —
+  no subagents have run in this project, or the \`log-subagent.sh\` hook is not
+  wired."** Stop. This is **not** an error.
+- **Present** → parse each line as JSON.
+  - A **malformed line** (not parseable JSON) is **skipped with a note**
+    (\`skipped N malformed line(s)\`); every valid line is still processed.
+  - An **absent optional field** on an otherwise-valid line is reported as
+    **"unknown"** — never an error.
+
+Each line carries the four base fields \`ts\` / \`event\` / \`session\` / \`agent\` and
+the OPTIONAL contract fields \`state\`, \`done_criteria_met\`, \`handoff_target\`,
+\`review_verdict\`, \`qa_verdict\` (omit-if-absent). Allowed values are in
+\`.specflow/logs/README.md\`.
+
+## Step 2 — Derive current state
+
+The **current state of an agent is its latest entry by \`ts\`.** Group entries by
+\`agent\`; within each group keep the entry with the maximum \`ts\`. Optional scope:
+
+- \`/status-audit\` or \`/status-audit latest\` — the whole ledger.
+- \`/status-audit <agent>\` — restrict to one agent name.
+- \`/status-audit <session>\` — restrict to one \`session\` id.
+
+## Step 3 — Report the seven views
+
+Report **all seven** views, in order. Use "unknown" for any absent field.
+
+1. **Health** — a count of agents per \`state\` (e.g. \`in_progress: 3,
+   awaiting_review: 1, blocked: 1, done: 2\`). This is the at-a-glance summary.
+2. **Per-agent** — one row per agent: its latest \`state\`, its verdict
+   (\`review_verdict\` / \`qa_verdict\` if any), and its last-update \`ts\`.
+3. **Blocked** — agents whose latest \`state\` is \`blocked\`. **Call these out as
+   urgent** — they need a human or a dispatch to unblock.
+4. **Stale** — non-terminal agents (latest \`state\` not \`done\` / \`failed\`) with
+   **no entry for ≥ 15 minutes** (compare the latest \`ts\` to now). A stale
+   non-terminal agent is a likely stall.
+5. **Contradictions** — agents whose latest entry has \`state: done\` **but**
+   \`done_criteria_met: no\`. A "done" that did not meet its criteria is a
+   false-completion signal to surface.
+6. **Missing handoffs** — agents whose latest entry has \`handoff_target\` ≠
+   \`none\` (and not "unknown") **but** the ledger has **no later entry for that
+   target agent** in the same session. The promised next agent never started —
+   a dropped baton.
+7. **Verdict summary** — counts of \`review_verdict\` (\`pass\` / \`fail\` /
+   \`needs_followup\`) and \`qa_verdict\` (\`pass\` / \`fail\` / \`blocked\`) across the
+   scope. The session's quality signal at a glance.
+
+## Step 4 — Read-only guarantee
+
+Do **not** write, move, or delete any file. Do **not** append to the ledger. Do
+**not** run \`git\` mutations. The only output is the report in your reply. After
+a run, \`git status\` is unchanged.
+
+## Supervision pattern — \`/loop 5m /status-audit\`
+
+This skill is designed to be the periodic health ping for **long headless
+work**. Pair it with \`/loop\`:
+
+\`\`\`text
+/loop 5m /status-audit      # health ping every 5 minutes during long headless work
+\`\`\`
+
+Every 5 minutes the loop re-reads the ledger and re-reports the seven views, so
+a supervising human (or a watching session) sees \`blocked\` agents, stalls
+(stale ≥ 15 min), false completions (contradictions), and dropped batons
+(missing handoffs) as they emerge — without interrupting the agents at work.
+Tune the interval to the cadence of the work (\`/loop 1m\` for tight loops,
+\`/loop 15m\` for slow long-runs). See \`.claude/loop.md\` for the loop mechanism.
+
+## Out of scope
+
+- This skill **does not fix** anything — it reports. Unblocking, re-dispatching,
+  or correcting a false completion is a follow-up action the lead decides on.
+- It does **not** parse agent prose — only the structured ledger fields the
+  hook already captured. The determinism lives in the hook (\`log-subagent.sh\`);
+  the report is a read-and-reason task.
+`,
+    executable: false,
+    backend: null,
+    skipIfExists: false,
+  },
+  {
+    category: "spec-root",
+    name: "specify",
+    suffix: "logs/README.md",
+    content: `# Status ledger — \`.specflow/logs/agents.jsonl\`
+
+This directory holds the **append-only status ledger** written by the
+\`log-subagent.sh\` hook on every subagent start/stop. Each subagent event
+appends **one JSON object per line** (JSONL) to \`agents.jsonl\`. The
+\`/status-audit\` skill reads this file to report session health.
+
+The ledger is **append-only** and the hook **always exits 0** — logging never
+breaks a dispatch. A line is never rewritten; an agent's *current* state is its
+**latest entry by \`ts\`**.
+
+## Line schema
+
+### Base fields (always present)
+
+| Field     | Type                | Notes                                         |
+| --------- | ------------------- | --------------------------------------------- |
+| \`ts\`      | string (ISO-8601)   | UTC timestamp, e.g. \`2026-06-13T11:00:00Z\`.   |
+| \`event\`   | string              | \`start\` or \`stop\`.                            |
+| \`session\` | string              | Session id, or \`unknown\` if absent.           |
+| \`agent\`   | string              | Subagent name, or \`unknown\` if absent.        |
+
+### Contract fields (optional — omit-if-absent)
+
+Parsed from the subagent's output text on **\`stop\`** events when it carries the
+machine-readable contract blocks (\`WORKFLOW STATUS\` / \`REVIEW SUMMARY\` /
+\`QA SUMMARY\`). Each key is present **only** when parsed — never emitted empty,
+never with a garbage value. An absent key means the field was not present in the
+output.
+
+| Field               | Type   | Source block      | Allowed values                                                                  |
+| ------------------- | ------ | ----------------- | ------------------------------------------------------------------------------- |
+| \`state\`             | string | \`WORKFLOW STATUS\` | \`in_progress\` · \`blocked\` · \`awaiting_review\` · \`awaiting_qa\` · \`awaiting_user\` · \`done\` · \`failed\` |
+| \`done_criteria_met\` | string | \`WORKFLOW STATUS\` | \`yes\` · \`no\`                                                                    |
+| \`handoff_target\`    | string | \`WORKFLOW STATUS\` | an agent name, or \`none\`                                                        |
+| \`review_verdict\`    | string | \`REVIEW SUMMARY\`  | \`pass\` · \`fail\` · \`needs_followup\`                                              |
+| \`qa_verdict\`        | string | \`QA SUMMARY\`      | \`pass\` · \`fail\` · \`blocked\`                                                     |
+
+## Examples
+
+Base line (no contract block parsed, or a \`start\` event):
+
+\`\`\`json
+{"ts":"2026-06-13T11:00:00Z","event":"start","session":"sess-123","agent":"developer"}
+\`\`\`
+
+Enriched \`stop\` line (contract block parsed from the output):
+
+\`\`\`json
+{"ts":"2026-06-13T11:42:00Z","event":"stop","session":"sess-123","agent":"security-auditor","state":"awaiting_review","done_criteria_met":"yes","handoff_target":"review-coordinator","review_verdict":"fail"}
+\`\`\`
+
+## Invariants
+
+- Append-only; the hook always exits 0 (never breaks a dispatch).
+- The four base fields are always present and original four-field lines stay
+  valid JSON.
+- Optional contract fields are omit-if-absent — never emitted empty.
+- An agent's current state is its latest entry by \`ts\`.
+- The \`/status-audit\` skill is read-only and degrades gracefully: an absent
+  ledger reports "no ledger yet", a malformed line is skipped with a note, and
+  an absent optional field reads as "unknown" — never an error.
+
+## Reading the ledger
+
+Run \`/status-audit\` for a seven-view session-health report (state counts,
+per-agent latest, blocked, stale ≥ 15 min, \`done\`-vs-\`done_criteria_met\`
+contradictions, missing handoffs, and a review/QA verdict summary). For
+continuous supervision of long headless work, use \`/loop 5m /status-audit\`.
+`,
+    executable: false,
+    backend: null,
+    skipIfExists: false,
+  },
+  {
     category: "spec-root",
     name: "specify",
     suffix: "memory/constitution.md",
@@ -16185,7 +16371,9 @@ TS=\$(date -u +%Y-%m-%dT%H:%M:%SZ)
 
 # Best-effort field extraction — the exact payload shape varies by
 # Claude Code version; defaults to "unknown" when fields are absent.
+HAVE_JQ=0
 if command -v jq >/dev/null 2>&1 && [ -n "\$INPUT" ]; then
+  HAVE_JQ=1
   SESSION=\$(printf '%s' "\$INPUT" | jq -r '.session_id // "unknown"' 2>/dev/null || echo "unknown")
   AGENT=\$(printf '%s' "\$INPUT" | jq -r '.agent_name // .subagent_name // .tool_name // "unknown"' 2>/dev/null || echo "unknown")
 else
@@ -16193,8 +16381,87 @@ else
   AGENT="unknown"
 fi
 
-printf '{"ts":"%s","event":"%s","session":"%s","agent":"%s"}\\n' \\
-  "\$TS" "\$EVENT" "\$SESSION" "\$AGENT" >> "\$LOG_FILE"
+# Optional contract-field enrichment (#381). On a \`stop\` event the subagent's
+# final message may carry the machine-readable contract blocks (WORKFLOW STATUS
+# / REVIEW SUMMARY / QA SUMMARY) defined by mechanism A (#378). We parse those
+# values out of the output text and append them as OPTIONAL JSONL keys beside
+# the four base fields. Every extraction is guarded so a parse miss can never
+# abort the hook — a missing field is simply omitted (never emitted empty).
+STATE=""
+DONE_MET=""
+HANDOFF=""
+REVIEW=""
+QA=""
+if [ "\$HAVE_JQ" = "1" ] && [ "\$EVENT" = "stop" ]; then
+  # The key holding the agent's output text is Claude-Code-version-dependent;
+  # probe the likely candidates and fall back to the raw payload. The first
+  # candidate that yields a non-empty string wins.
+  OUTPUT=\$(printf '%s' "\$INPUT" | jq -r \\
+    '(.output // .result // .response // .tool_response // .message // "") | if type=="string" then . else tojson end' \\
+    2>/dev/null || echo "")
+  if [ -z "\$OUTPUT" ]; then
+    OUTPUT="\$INPUT"
+  fi
+
+  # SEGMENT the output per contract block before extracting any field, so a
+  # value is read only from inside its own block. A naive whole-output grep
+  # would let the FIRST block's \`verdict:\` satisfy BOTH review_verdict and
+  # qa_verdict when both blocks are present (cross-contamination). \`awk\`
+  # captures the text from a header line up to (but excluding) the next
+  # all-caps block header — the headers being WORKFLOW STATUS / REVIEW SUMMARY
+  # / QA SUMMARY.
+  segment() {
+    # \$1 = header to capture from. Emits the block body (header included) up to
+    # the next recognised block header.
+    printf '%s' "\$OUTPUT" | awk -v hdr="\$1" '
+      \$0 ~ ("^[[:space:]]*" hdr "[[:space:]]*\$") { capture=1; print; next }
+      capture && /^[[:space:]]*(WORKFLOW STATUS|REVIEW SUMMARY|QA SUMMARY)[[:space:]]*\$/ { capture=0 }
+      capture { print }
+    '
+  }
+
+  WORKFLOW_SEG=\$(segment "WORKFLOW STATUS")
+  REVIEW_SEG=\$(segment "REVIEW SUMMARY")
+  QA_SEG=\$(segment "QA SUMMARY")
+
+  # WORKFLOW STATUS fields — extracted only from the WORKFLOW STATUS segment.
+  STATE=\$(printf '%s' "\$WORKFLOW_SEG" | grep -oE 'state:[[:space:]]*[a-z_]+' | head -1 | sed -E 's/^state:[[:space:]]*//' || true)
+  DONE_MET=\$(printf '%s' "\$WORKFLOW_SEG" | grep -oE 'done_criteria_met:[[:space:]]*(yes|no)' | head -1 | sed -E 's/^done_criteria_met:[[:space:]]*//' || true)
+  HANDOFF=\$(printf '%s' "\$WORKFLOW_SEG" | grep -oE 'handoff_target:[[:space:]]*[A-Za-z0-9_-]+' | head -1 | sed -E 's/^handoff_target:[[:space:]]*//' || true)
+
+  # \`verdict:\` appears under both REVIEW SUMMARY and QA SUMMARY; extracting it
+  # from each block's OWN segment is what keeps the two verdicts distinct even
+  # when both blocks (and overlapping value sets like pass/fail) are present.
+  REVIEW=\$(printf '%s' "\$REVIEW_SEG" | grep -oE 'verdict:[[:space:]]*(pass|fail|needs_followup)' | head -1 | sed -E 's/^verdict:[[:space:]]*//' || true)
+  QA=\$(printf '%s' "\$QA_SEG" | grep -oE 'verdict:[[:space:]]*(pass|fail|blocked)' | head -1 | sed -E 's/^verdict:[[:space:]]*//' || true)
+fi
+
+# Compose the line with jq so every field is quoted/escaped correctly and a
+# hostile session_id/agent_name (e.g. one containing \`"\` or \`:\`) can never
+# break the JSON or inject a key. Optional contract keys are merged in only
+# when their shell var is non-empty (omit-if-absent), via the args list.
+if [ "\$HAVE_JQ" = "1" ]; then
+  JQ_ARGS=(--arg ts "\$TS" --arg event "\$EVENT" --arg session "\$SESSION" --arg agent "\$AGENT")
+  # The \`\$ts\`/\`\$state\`/… tokens below are jq variables (bound via --arg), NOT
+  # shell variables — single quotes are deliberate so the shell leaves them for
+  # jq to resolve.
+  # shellcheck disable=SC2016
+  {
+    JQ_FILTER='{ts: \$ts, event: \$event, session: \$session, agent: \$agent}'
+    [ -n "\$STATE" ] && { JQ_ARGS+=(--arg state "\$STATE"); JQ_FILTER+=' + {state: \$state}'; }
+    [ -n "\$DONE_MET" ] && { JQ_ARGS+=(--arg done_criteria_met "\$DONE_MET"); JQ_FILTER+=' + {done_criteria_met: \$done_criteria_met}'; }
+    [ -n "\$HANDOFF" ] && { JQ_ARGS+=(--arg handoff_target "\$HANDOFF"); JQ_FILTER+=' + {handoff_target: \$handoff_target}'; }
+    [ -n "\$REVIEW" ] && { JQ_ARGS+=(--arg review_verdict "\$REVIEW"); JQ_FILTER+=' + {review_verdict: \$review_verdict}'; }
+    [ -n "\$QA" ] && { JQ_ARGS+=(--arg qa_verdict "\$QA"); JQ_FILTER+=' + {qa_verdict: \$qa_verdict}'; }
+  }
+  jq -nc "\${JQ_ARGS[@]}" "\$JQ_FILTER" >> "\$LOG_FILE"
+else
+  # No-jq fallback: emit only the four base fields. SESSION/AGENT are "unknown"
+  # in this path (contract parsing requires jq), so no untrusted interpolation
+  # reaches this printf.
+  printf '{"ts":"%s","event":"%s","session":"%s","agent":"%s"}\\n' \\
+    "\$TS" "\$EVENT" "\$SESSION" "\$AGENT" >> "\$LOG_FILE"
+fi
 
 exit 0
 `,

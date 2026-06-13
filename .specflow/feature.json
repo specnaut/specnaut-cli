@@ -1,5 +1,5 @@
 {
-  "feature_directory": ".specflow/specs/014-per-axis-audit-skills",
-  "linked_issue": 380,
+  "feature_directory": ".specflow/specs/015-status-ledger",
+  "linked_issue": 381,
   "workflow_shape": "full"
 }
