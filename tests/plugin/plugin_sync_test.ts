@@ -137,6 +137,21 @@ const SYNC_PAIRS: ReadonlyArray<{ plugin: string; source: string }> = [
     plugin: `plugin/skills/using-specflow/references/${name}-tools.md`,
     source: `templates/core/skills/using-specflow/references/${name}-tools.md`,
   })),
+  // Five per-axis audit-dispatch skills (#380). Markdown-only thin
+  // dispatchers (no scripts/) — unlike the script-backed `code-audit`
+  // (#379) which the plugin omits — so they mirror through the same
+  // byte-identical channel. Each binds one axis to its existing auditor
+  // agent and returns findings inline.
+  ...[
+    "arch-audit",
+    "sec-audit",
+    "perf-audit",
+    "dep-audit",
+    "a11y-audit",
+  ].map((name) => ({
+    plugin: `plugin/skills/${name}/SKILL.md`,
+    source: `templates/core/skills/${name}/SKILL.md`,
+  })),
   // Dual-copy agents: 15 sub-agent definitions, each landing as
   // `plugin/agents/<name>.md`. Claude Code resolves agents by file
   // basename in plugin scope; no namespacing needed for invocation

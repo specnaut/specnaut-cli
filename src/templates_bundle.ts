@@ -5119,6 +5119,7 @@ not re-read the file with \`Read\`.
 | \`verification-before-completion\` | Discipline checklist that any agent MUST run before reporting DONE. Tests green / pre-commit clean / plan boxes ticked / smoke audit / plugin sync / Windsurf cap / requirements addressed. |
 | \`brainstorming\` | Spec-discovery entry point when the idea is vague — one question at a time, propose 2-3 approaches, present design, hand off to \`writing-plans\`. |
 | \`code-audit\` | User wants a broad, multi-seat health-check ("audit the codebase", "code audit", "audit the last N commits"). Resolves a scope, dispatches the applicable auditor seats (architecture / security / performance / a11y / dependency) in parallel, synthesizes one report. Read-only. Complementary to \`/specflow audit <axis>\`, which runs a single axis. |
+| \`arch-audit\` / \`sec-audit\` / \`perf-audit\` / \`dep-audit\` / \`a11y-audit\` | Per-axis audit family — user wants **one** lens over a scope ("arch audit", "security audit \`--path src/\`", "perf audit \`--diff\`"). Each resolves a uniform scope (\`--path\` / \`--range\` / \`--diff\` / whole) and dispatches its **single** bound auditor (architecture / security / performance / dependency / a11y), returning findings **inline**. Read-only, writes no report. Complements \`/specflow audit <axis>\` (which persists a dated report) and \`/code-audit\` (the multi-seat team). |
 | \`backlog\` | User asked about a backlog item, the board, an issue. Read-only access; mutations go through the \`product-owner\` agent. |
 | \`specflow-auto\` | Auto-chain orchestration (legacy entry point — most users invoke \`/specflow specify\` instead). |
 | \`specflow-review\` | Auto-invoke alias preserved for the \`/specflow review\` phase. |
@@ -11852,6 +11853,426 @@ echo "DEP_COUNT: \${DEP_COUNT}"
 echo "INFRA_COUNT: \${INFRA_COUNT}"
 `,
     executable: true,
+    backend: null,
+    skipIfExists: false,
+  },
+  {
+    category: "skill",
+    name: "arch-audit",
+    suffix: null,
+    content: `---
+name: arch-audit
+description: Single-axis architecture audit of a scope. Use when the user says "arch audit", "audit the architecture", "check for architectural drift", "audit layering", or "review the architecture of <path>". Dispatches ONLY the architecture-auditor over a resolved scope (layering / DDD / SOLID / DRY) and returns its findings inline. Read-only — writes no report file.
+argument-hint: "[--path <subtree> | --range <a>..<b> | --diff]"
+---
+
+# Architecture Audit — single-axis dispatch
+
+A **thin, read-only** audit of one axis: architecture. This skill resolves a
+scope, dispatches the **single** \`architecture-auditor\` agent over it, and
+returns that agent's findings **inline**. It writes **no file** and mutates
+**no tracked files** — \`git status\` is unchanged after a run.
+
+It judges the *shape* of the code on its axis — layering / DDD boundaries /
+SOLID / DRY — not line-by-line PR nitpicks.
+
+## Step 1 — Parse the scope argument
+
+Accept exactly one optional scope argument. The accepted forms are:
+
+\`\`\`text
+/arch-audit                      # whole repo
+/arch-audit --path <subtree>     # files under a subtree
+/arch-audit --range <a>..<b>     # files changed in a commit range
+/arch-audit --diff               # files changed on current branch vs main
+\`\`\`
+
+If the argument is **unrecognized**, print the four accepted forms above and
+**STOP**. Never silently fall back to a whole-repo audit.
+
+## Step 2 — Resolve the scope file list
+
+Run the matching git command for the parsed shape:
+
+| Shape | Command |
+|---|---|
+| \`--path <subtree>\` | \`git ls-files <subtree>\` |
+| \`--range <a>..<b>\` | \`git diff --name-only <a>..<b>\` |
+| \`--diff\` | \`git diff --name-only main...HEAD\` |
+| whole (no arg) | \`git ls-files\` |
+
+If \`--range\`/\`--diff\` is used outside a git repository, surface the git error
+and **STOP**. If the resolved list is **empty**, emit exactly one line and
+**STOP** — no dispatch, no REVIEW SUMMARY:
+
+\`\`\`text
+Nothing in scope. Widen it with --path <subtree>, --range <a>..<b>, or --diff.
+\`\`\`
+
+## Step 3 — Dispatch ONLY the architecture-auditor
+
+Dispatch the **single** \`architecture-auditor\` agent — never a team, never
+another axis. Give it the resolved file list and an **audit framing**: judge
+the architectural shape of the scoped code (hex-layer violations, circular
+deps, god files, bounded-context leaks, ports/adapters discipline, SOLID/DRY)
+— not a per-line review.
+
+## Step 4 — Return findings inline
+
+Return the agent's findings inline. The \`architecture-auditor\` ends with the
+canonical \`REVIEW SUMMARY\` block (verdict + severity counts, per the
+review-findings-contract, #378) — surface it verbatim. **Write no report
+file.**
+
+## How this differs — disambiguation
+
+- **\`/arch-audit\`** (this skill) — dispatches the **one** \`architecture-auditor\`
+  over a scope and returns findings **inline**. No report file.
+- **\`/specflow audit architecture\`** — the report-writing single-axis audit:
+  runs the same auditor but **persists a dated report** under
+  \`docs/specflow/audits/\`. Use it when you want a durable artifact.
+- **\`/code-audit\`** — the **multi-seat** team audit: dispatches every
+  applicable auditor (architecture / security / performance / a11y /
+  dependency) in parallel and synthesizes one combined report. Use it for a
+  broad health-check, not a single axis.
+`,
+    executable: false,
+    backend: null,
+    skipIfExists: false,
+  },
+  {
+    category: "skill",
+    name: "sec-audit",
+    suffix: null,
+    content: `---
+name: sec-audit
+description: Single-axis security audit of a scope. Use when the user says "sec audit", "security audit", "audit for security issues", "check for vulnerabilities", or "review the security of <path>". Dispatches ONLY the security-auditor over a resolved scope (authz / inputs / secrets / injection) and returns its findings inline. Read-only — writes no report file.
+argument-hint: "[--path <subtree> | --range <a>..<b> | --diff]"
+---
+
+# Security Audit — single-axis dispatch
+
+A **thin, read-only** audit of one axis: security. This skill resolves a
+scope, dispatches the **single** \`security-auditor\` agent over it, and
+returns that agent's findings **inline**. It writes **no file** and mutates
+**no tracked files** — \`git status\` is unchanged after a run.
+
+It judges the *shape* of the code on its axis — authz / input validation /
+secrets / injection — not line-by-line PR nitpicks.
+
+## Step 1 — Parse the scope argument
+
+Accept exactly one optional scope argument. The accepted forms are:
+
+\`\`\`text
+/sec-audit                      # whole repo
+/sec-audit --path <subtree>     # files under a subtree
+/sec-audit --range <a>..<b>     # files changed in a commit range
+/sec-audit --diff               # files changed on current branch vs main
+\`\`\`
+
+If the argument is **unrecognized**, print the four accepted forms above and
+**STOP**. Never silently fall back to a whole-repo audit.
+
+## Step 2 — Resolve the scope file list
+
+Run the matching git command for the parsed shape:
+
+| Shape | Command |
+|---|---|
+| \`--path <subtree>\` | \`git ls-files <subtree>\` |
+| \`--range <a>..<b>\` | \`git diff --name-only <a>..<b>\` |
+| \`--diff\` | \`git diff --name-only main...HEAD\` |
+| whole (no arg) | \`git ls-files\` |
+
+If \`--range\`/\`--diff\` is used outside a git repository, surface the git error
+and **STOP**. If the resolved list is **empty**, emit exactly one line and
+**STOP** — no dispatch, no REVIEW SUMMARY:
+
+\`\`\`text
+Nothing in scope. Widen it with --path <subtree>, --range <a>..<b>, or --diff.
+\`\`\`
+
+## Step 3 — Dispatch ONLY the security-auditor
+
+Dispatch the **single** \`security-auditor\` agent — never a team, never
+another axis. Give it the resolved file list and an **audit framing**: judge
+the security shape of the scoped code (input validation, authz, secrets,
+injection, SSRF, path traversal, silent error swallowing) — not a per-line
+review.
+
+## Step 4 — Return findings inline
+
+Return the agent's findings inline. The \`security-auditor\` ends with the
+canonical \`REVIEW SUMMARY\` block (verdict + severity counts, per the
+review-findings-contract, #378) — surface it verbatim. **Write no report
+file.**
+
+## How this differs — disambiguation
+
+- **\`/sec-audit\`** (this skill) — dispatches the **one** \`security-auditor\`
+  over a scope and returns findings **inline**. No report file.
+- **\`/specflow audit security\`** — the report-writing single-axis audit:
+  runs the same auditor but **persists a dated report** under
+  \`docs/specflow/audits/\`. Use it when you want a durable artifact.
+- **\`/code-audit\`** — the **multi-seat** team audit: dispatches every
+  applicable auditor (architecture / security / performance / a11y /
+  dependency) in parallel and synthesizes one combined report. Use it for a
+  broad health-check, not a single axis.
+`,
+    executable: false,
+    backend: null,
+    skipIfExists: false,
+  },
+  {
+    category: "skill",
+    name: "perf-audit",
+    suffix: null,
+    content: `---
+name: perf-audit
+description: Single-axis performance audit of a scope. Use when the user says "perf audit", "performance audit", "audit for performance issues", "check for N+1 queries", or "review the performance of <path>". Dispatches ONLY the performance-auditor over a resolved scope (N+1 / hot paths / re-renders / caching) and returns its findings inline. Read-only — writes no report file.
+argument-hint: "[--path <subtree> | --range <a>..<b> | --diff]"
+---
+
+# Performance Audit — single-axis dispatch
+
+A **thin, read-only** audit of one axis: performance. This skill resolves a
+scope, dispatches the **single** \`performance-auditor\` agent over it, and
+returns that agent's findings **inline**. It writes **no file** and mutates
+**no tracked files** — \`git status\` is unchanged after a run.
+
+It judges the *shape* of the code on its axis — N+1 queries / hot paths /
+re-renders / caching — not line-by-line PR nitpicks.
+
+## Step 1 — Parse the scope argument
+
+Accept exactly one optional scope argument. The accepted forms are:
+
+\`\`\`text
+/perf-audit                      # whole repo
+/perf-audit --path <subtree>     # files under a subtree
+/perf-audit --range <a>..<b>     # files changed in a commit range
+/perf-audit --diff               # files changed on current branch vs main
+\`\`\`
+
+If the argument is **unrecognized**, print the four accepted forms above and
+**STOP**. Never silently fall back to a whole-repo audit.
+
+## Step 2 — Resolve the scope file list
+
+Run the matching git command for the parsed shape:
+
+| Shape | Command |
+|---|---|
+| \`--path <subtree>\` | \`git ls-files <subtree>\` |
+| \`--range <a>..<b>\` | \`git diff --name-only <a>..<b>\` |
+| \`--diff\` | \`git diff --name-only main...HEAD\` |
+| whole (no arg) | \`git ls-files\` |
+
+If \`--range\`/\`--diff\` is used outside a git repository, surface the git error
+and **STOP**. If the resolved list is **empty**, emit exactly one line and
+**STOP** — no dispatch, no REVIEW SUMMARY:
+
+\`\`\`text
+Nothing in scope. Widen it with --path <subtree>, --range <a>..<b>, or --diff.
+\`\`\`
+
+## Step 3 — Dispatch ONLY the performance-auditor
+
+Dispatch the **single** \`performance-auditor\` agent — never a team, never
+another axis. Give it the resolved file list and an **audit framing**: judge
+the performance shape of the scoped code (N+1 queries, blocking I/O on hot
+paths, missing indexes, cache misuse, hot-path allocation, sync-in-async,
+large bundles, render-thrash) — not a per-line review.
+
+## Step 4 — Return findings inline
+
+Return the agent's findings inline. The \`performance-auditor\` ends with the
+canonical \`REVIEW SUMMARY\` block (verdict + severity counts, per the
+review-findings-contract, #378) — surface it verbatim. **Write no report
+file.**
+
+## How this differs — disambiguation
+
+- **\`/perf-audit\`** (this skill) — dispatches the **one** \`performance-auditor\`
+  over a scope and returns findings **inline**. No report file.
+- **\`/specflow audit performance\`** — the report-writing single-axis audit:
+  runs the same auditor but **persists a dated report** under
+  \`docs/specflow/audits/\`. Use it when you want a durable artifact.
+- **\`/code-audit\`** — the **multi-seat** team audit: dispatches every
+  applicable auditor (architecture / security / performance / a11y /
+  dependency) in parallel and synthesizes one combined report. Use it for a
+  broad health-check, not a single axis.
+`,
+    executable: false,
+    backend: null,
+    skipIfExists: false,
+  },
+  {
+    category: "skill",
+    name: "dep-audit",
+    suffix: null,
+    content: `---
+name: dep-audit
+description: Single-axis dependency audit of a scope. Use when the user says "dep audit", "dependency audit", "audit the dependencies", "check the lockfile", or "review the dependencies of <path>". Dispatches ONLY the dependency-auditor over a resolved scope (ranges / lockfiles / unused / licenses / typosquats) and returns its findings inline. Read-only — writes no report file.
+argument-hint: "[--path <subtree> | --range <a>..<b> | --diff]"
+---
+
+# Dependency Audit — single-axis dispatch
+
+A **thin, read-only** audit of one axis: dependencies. This skill resolves a
+scope, dispatches the **single** \`dependency-auditor\` agent over it, and
+returns that agent's findings **inline**. It writes **no file** and mutates
+**no tracked files** — \`git status\` is unchanged after a run.
+
+It judges the *shape* of the code on its axis — version ranges / lockfiles /
+unused declarations / licenses / typosquats — not line-by-line PR nitpicks.
+
+## Step 1 — Parse the scope argument
+
+Accept exactly one optional scope argument. The accepted forms are:
+
+\`\`\`text
+/dep-audit                      # whole repo
+/dep-audit --path <subtree>     # files under a subtree
+/dep-audit --range <a>..<b>     # files changed in a commit range
+/dep-audit --diff               # files changed on current branch vs main
+\`\`\`
+
+If the argument is **unrecognized**, print the four accepted forms above and
+**STOP**. Never silently fall back to a whole-repo audit.
+
+## Step 2 — Resolve the scope file list
+
+Run the matching git command for the parsed shape:
+
+| Shape | Command |
+|---|---|
+| \`--path <subtree>\` | \`git ls-files <subtree>\` |
+| \`--range <a>..<b>\` | \`git diff --name-only <a>..<b>\` |
+| \`--diff\` | \`git diff --name-only main...HEAD\` |
+| whole (no arg) | \`git ls-files\` |
+
+If \`--range\`/\`--diff\` is used outside a git repository, surface the git error
+and **STOP**. If the resolved list is **empty**, emit exactly one line and
+**STOP** — no dispatch, no REVIEW SUMMARY:
+
+\`\`\`text
+Nothing in scope. Widen it with --path <subtree>, --range <a>..<b>, or --diff.
+\`\`\`
+
+## Step 3 — Dispatch ONLY the dependency-auditor
+
+Dispatch the **single** \`dependency-auditor\` agent — never a team, never
+another axis. Give it the resolved file list and an **audit framing**: judge
+the dependency hygiene of the scoped manifests (outdated pins, unbounded
+ranges, unused declared deps, license violations, advisory-shape signals,
+peer-dep conflicts, typosquatting heuristics) — not a per-line review.
+
+## Step 4 — Return findings inline
+
+Return the agent's findings inline. The \`dependency-auditor\` ends with the
+canonical \`REVIEW SUMMARY\` block (verdict + severity counts, per the
+review-findings-contract, #378) — surface it verbatim. **Write no report
+file.**
+
+## How this differs — disambiguation
+
+- **\`/dep-audit\`** (this skill) — dispatches the **one** \`dependency-auditor\`
+  over a scope and returns findings **inline**. No report file.
+- **\`/specflow audit dependencies\`** — the report-writing single-axis audit:
+  runs the same auditor but **persists a dated report** under
+  \`docs/specflow/audits/\`. Use it when you want a durable artifact.
+- **\`/code-audit\`** — the **multi-seat** team audit: dispatches every
+  applicable auditor (architecture / security / performance / a11y /
+  dependency) in parallel and synthesizes one combined report. Use it for a
+  broad health-check, not a single axis.
+`,
+    executable: false,
+    backend: null,
+    skipIfExists: false,
+  },
+  {
+    category: "skill",
+    name: "a11y-audit",
+    suffix: null,
+    content: `---
+name: a11y-audit
+description: Single-axis accessibility audit of a scope. Use when the user says "a11y audit", "accessibility audit", "audit for accessibility", "check WCAG compliance", or "review the accessibility of <path>". Dispatches ONLY the a11y-auditor over a resolved scope (WCAG 2.1 AA over front-end source) and returns its findings inline. Read-only — writes no report file.
+argument-hint: "[--path <subtree> | --range <a>..<b> | --diff]"
+---
+
+# Accessibility Audit — single-axis dispatch
+
+A **thin, read-only** audit of one axis: accessibility. This skill resolves a
+scope, dispatches the **single** \`a11y-auditor\` agent over it, and returns
+that agent's findings **inline**. It writes **no file** and mutates **no
+tracked files** — \`git status\` is unchanged after a run.
+
+It judges the *shape* of the code on its axis — WCAG 2.1 AA over front-end
+source — not line-by-line PR nitpicks.
+
+## Step 1 — Parse the scope argument
+
+Accept exactly one optional scope argument. The accepted forms are:
+
+\`\`\`text
+/a11y-audit                      # whole repo
+/a11y-audit --path <subtree>     # files under a subtree
+/a11y-audit --range <a>..<b>     # files changed in a commit range
+/a11y-audit --diff               # files changed on current branch vs main
+\`\`\`
+
+If the argument is **unrecognized**, print the four accepted forms above and
+**STOP**. Never silently fall back to a whole-repo audit.
+
+## Step 2 — Resolve the scope file list
+
+Run the matching git command for the parsed shape:
+
+| Shape | Command |
+|---|---|
+| \`--path <subtree>\` | \`git ls-files <subtree>\` |
+| \`--range <a>..<b>\` | \`git diff --name-only <a>..<b>\` |
+| \`--diff\` | \`git diff --name-only main...HEAD\` |
+| whole (no arg) | \`git ls-files\` |
+
+If \`--range\`/\`--diff\` is used outside a git repository, surface the git error
+and **STOP**. If the resolved list is **empty**, emit exactly one line and
+**STOP** — no dispatch, no REVIEW SUMMARY:
+
+\`\`\`text
+Nothing in scope. Widen it with --path <subtree>, --range <a>..<b>, or --diff.
+\`\`\`
+
+## Step 3 — Dispatch ONLY the a11y-auditor
+
+Dispatch the **single** \`a11y-auditor\` agent — never a team, never another
+axis. Give it the resolved file list and an **audit framing**: judge the
+accessibility shape of the scoped front-end source (semantic HTML, heading
+hierarchy, alt text, form labels, keyboard nav, focus indicators, ARIA
+correctness, color contrast where computable) — not a per-line review.
+
+## Step 4 — Return findings inline
+
+Return the agent's findings inline. The \`a11y-auditor\` ends with the
+canonical \`REVIEW SUMMARY\` block (verdict + severity counts, per the
+review-findings-contract, #378) — surface it verbatim. **Write no report
+file.**
+
+## How this differs — disambiguation
+
+- **\`/a11y-audit\`** (this skill) — dispatches the **one** \`a11y-auditor\`
+  over a scope and returns findings **inline**. No report file.
+- **\`/specflow audit accessibility\`** — the report-writing single-axis audit:
+  runs the same auditor but **persists a dated report** under
+  \`docs/specflow/audits/\`. Use it when you want a durable artifact.
+- **\`/code-audit\`** — the **multi-seat** team audit: dispatches every
+  applicable auditor (architecture / security / performance / a11y /
+  dependency) in parallel and synthesizes one combined report. Use it for a
+  broad health-check, not a single axis.
+`,
+    executable: false,
     backend: null,
     skipIfExists: false,
   },
