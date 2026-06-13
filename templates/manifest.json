@@ -59,6 +59,8 @@
     { "category": "agent", "name": "architecture-auditor", "source": "core/agents/architecture-auditor.md" },
     { "category": "agent", "name": "dependency-auditor", "source": "core/agents/dependency-auditor.md" },
 
+    { "category": "agent-doc", "name": "agents-readme", "suffix": "README.md", "source": "core/agents/README.md" },
+
     { "category": "agent-memory", "name": "product-owner", "suffix": "MEMORY.md", "source": "core/agents/product-owner/memory/MEMORY.md" },
     { "category": "agent-memory", "name": "developer", "suffix": "MEMORY.md", "source": "core/agents/developer/memory/MEMORY.md" },
     { "category": "agent-memory", "name": "qa-tester", "suffix": "MEMORY.md", "source": "core/agents/qa-tester/memory/MEMORY.md" },

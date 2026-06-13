@@ -9,6 +9,7 @@ description: >
   invocations (`specflow init`, `specflow upgrade`, `/specflow specify`,
   `/backlog ...`) — those are command runs, not questions.
 model: sonnet
+effort: medium
 tools: Read, WebFetch, Grep, Glob, Bash, Agent
 permissionMode: default
 maxTurns: 10

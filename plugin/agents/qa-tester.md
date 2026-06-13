@@ -2,6 +2,7 @@
 name: qa-tester
 description: Audits test coverage, writes missing tests, and runs the full suite. Manual-only — spawned by /specflow implement after the review gate passes; do not auto-invoke for casual "run tests" mentions.
 model: opus
+effort: xhigh
 tools: Read, Write, Edit, Grep, Glob, Bash
 skills: qa-report-contract, workflow-contract
 permissionMode: acceptEdits

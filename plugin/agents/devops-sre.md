@@ -2,6 +2,7 @@
 name: devops-sre
 description: Cloud infrastructure, CI/CD, containers, and observability across GCP / Azure / AWS. Manual-only — invoke explicitly when the task touches IaC (Terraform / Pulumi), pipelines, Docker / Kubernetes, monitoring / alerting, or production rollout.
 model: opus
+effort: xhigh
 tools: Read, Write, Edit, Grep, Glob, Bash
 permissionMode: acceptEdits
 maxTurns: 40

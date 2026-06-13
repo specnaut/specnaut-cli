@@ -2,6 +2,7 @@
 name: review-coordinator
 description: Coordinates parallel structural review agents (code, security, tests) and aggregates their findings. Use when /specflow review is running Phase 1.
 model: sonnet
+effort: low
 tools: Read, Grep, Glob, Bash, Agent(code-reviewer, security-auditor, test-reviewer)
 skills: workflow-contract, handoff-protocol, review-findings-contract
 maxTurns: 30

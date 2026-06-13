@@ -6493,6 +6493,7 @@ Do not duplicate it here — the dispatcher defers to the agent.
 name: product-owner
 description: Product Owner and business guardian. Owns the product backlog, all mutation semantics, epic / sub-task relationships, and recommends workflow (Specflow spec vs direct implementation). Use when the user asks about backlog, priorities, "what next", or wants to break work into an epic.
 model: opus
+effort: medium
 tools: Read, Write, Edit, Grep, Glob, Bash
 maxTurns: 30
 color: cyan
@@ -6774,6 +6775,7 @@ Line format: \`<one-liner> @ <path>:<line> — <reason out of scope>\`.
 name: developer
 description: Senior developer that implements tasks from tasks.md, fixes review feedback, and ships features. Manual-only — invoke explicitly when you have a tasks.md to execute or a review note to address.
 model: opus
+effort: xhigh
 tools: Read, Write, Edit, Grep, Glob, Bash
 skills: workflow-contract, handoff-protocol
 permissionMode: acceptEdits
@@ -6911,6 +6913,7 @@ needs to make in the prose and the \`BLOCKERS\` field.
 name: review-coordinator
 description: Coordinates parallel structural review agents (code, security, tests) and aggregates their findings. Use when /specflow review is running Phase 1.
 model: sonnet
+effort: low
 tools: Read, Grep, Glob, Bash, Agent(code-reviewer, security-auditor, test-reviewer)
 skills: workflow-contract, handoff-protocol, review-findings-contract
 maxTurns: 30
@@ -6998,6 +7001,7 @@ and, when handing the gate result back, the \`HANDOFF\` block per
 name: code-reviewer
 description: Reviews code quality, architecture, DRY/YAGNI, readability, and conformance to the project constitution. Spawned by the review-coordinator during /specflow review.
 model: sonnet
+effort: medium
 tools: Read, Grep, Glob
 skills: review-findings-contract, workflow-contract
 maxTurns: 20
@@ -7066,6 +7070,7 @@ emit the \`WORKFLOW STATUS\` block per \`workflow-contract\`.
 name: security-auditor
 description: Reviews code for security issues — input validation, authz, secrets, injection, SSRF, path traversal, silent error swallowing. Two dispatch shapes — (1) PR review (spawned by the review-coordinator during /specflow review), (2) alert triage (spawned by /release after the security-preflight workflow surfaces open GitHub security alerts).
 model: sonnet
+effort: medium
 tools: Read, Grep, Glob, Bash
 skills: review-findings-contract, workflow-contract
 maxTurns: 20
@@ -7205,6 +7210,7 @@ and is out of scope for the review-findings-contract.)
 name: test-reviewer
 description: Reviews test coverage and quality for changed code. Spawned by the review-coordinator when the diff contains test files.
 model: sonnet
+effort: medium
 tools: Read, Grep, Glob
 skills: review-findings-contract, workflow-contract
 maxTurns: 20
@@ -7249,6 +7255,7 @@ the four severity counts, \`TOP_ISSUES\`, \`RECOMMENDATION\`), then the
 name: qa-tester
 description: Audits test coverage, writes missing tests, and runs the full suite. Manual-only — spawned by /specflow implement after the review gate passes; do not auto-invoke for casual "run tests" mentions.
 model: opus
+effort: xhigh
 tools: Read, Write, Edit, Grep, Glob, Bash
 skills: qa-report-contract, workflow-contract
 permissionMode: acceptEdits
@@ -7300,6 +7307,7 @@ preloaded \`qa-report-contract\` skill (it is the single authoritative schema:
 name: workflow-manager
 description: Orchestrates multi-phase feature delivery across specialist agents. Use as the lead session agent for long-running implementations.
 model: sonnet
+effort: low
 tools: Read, Grep, Glob, Bash, Agent(product-owner, developer, review-coordinator, qa-tester)
 skills: workflow-contract, handoff-protocol
 maxTurns: 60
@@ -7374,6 +7382,7 @@ before advancing.
 name: devops-sre
 description: Cloud infrastructure, CI/CD, containers, and observability across GCP / Azure / AWS. Manual-only — invoke explicitly when the task touches IaC (Terraform / Pulumi), pipelines, Docker / Kubernetes, monitoring / alerting, or production rollout.
 model: opus
+effort: xhigh
 tools: Read, Write, Edit, Grep, Glob, Bash
 permissionMode: acceptEdits
 maxTurns: 40
@@ -7496,6 +7505,7 @@ description: >
   invocations (\`specflow init\`, \`specflow upgrade\`, \`/specflow specify\`,
   \`/backlog ...\`) — those are command runs, not questions.
 model: sonnet
+effort: medium
 tools: Read, WebFetch, Grep, Glob, Bash, Agent
 permissionMode: default
 maxTurns: 10
@@ -7719,6 +7729,7 @@ Agnostic of language / LLM / harness / backlog backend. Single binary via \`deno
 name: ui-ux-designer
 description: Owns the project's \`DESIGN.md\` design system. Three modes auto-selected from DESIGN.md state — discovery interview when absent (creates a fresh, opinionated design system from the user's brief), edit mode when present (refactors typography / palette / spacing / components on demand), audit mode on explicit dispatch (scans existing UI source for drift against DESIGN.md). Stack-agnostic — produces a Markdown spec the user's developer agent translates into code. Never invokes itself.
 model: sonnet
+effort: high
 tools: Read, Edit, Write, Glob, Grep
 maxTurns: 30
 disable-model-invocation: true
@@ -7939,6 +7950,7 @@ or other agents. Design decisions are not cheap and must be intentional
 name: performance-auditor
 description: Reviews code for performance issues — N+1 queries, blocking I/O on hot paths, missing indexes, cache misuse, hot-path allocation, sync-in-async, large bundles, render-thrash. Two dispatch shapes — (1) PR review (spawned by the review-coordinator during /specflow review), (2) full-codebase audit (spawned by /specflow audit performance).
 model: sonnet
+effort: medium
 tools: Read, Grep, Glob, Bash
 skills: review-findings-contract, workflow-contract
 maxTurns: 20
@@ -8099,6 +8111,7 @@ Same \`FINDING\` structure as code-reviewer, followed by exactly one
 name: a11y-auditor
 description: Reviews front-end code for WCAG 2.1 AA accessibility issues — semantic HTML, heading hierarchy, alt text, form labels, keyboard nav, focus indicators, ARIA correctness, color contrast (where computable from source). Two dispatch shapes — (1) PR review (spawned by the review-coordinator during /specflow review), (2) full-codebase audit (spawned by /specflow audit accessibility).
 model: sonnet
+effort: medium
 tools: Read, Grep, Glob, Bash
 skills: review-findings-contract, workflow-contract
 maxTurns: 20
@@ -8296,6 +8309,7 @@ Same \`FINDING\` structure as code-reviewer, followed by exactly one
 name: architecture-auditor
 description: Reviews code for architectural drift — hex-layer violations, circular deps, god files, bounded-context leaks, ports/adapters discipline, implicit globals, deep nesting, test-isolation bleed. Two dispatch shapes — (1) PR review (spawned by the review-coordinator during /specflow review), (2) full-codebase audit (spawned by /specflow audit architecture).
 model: sonnet
+effort: medium
 tools: Read, Grep, Glob, Bash
 skills: review-findings-contract, workflow-contract
 maxTurns: 20
@@ -8494,6 +8508,7 @@ emits neither block — backlog material is not pass/fail.
 name: dependency-auditor
 description: Reviews dependency manifests for hygiene — outdated pins, unbounded ranges, unused declared deps, license violations, advisory-shape signals, peer-dep conflicts, typosquatting heuristics. Multi-manifest aware (npm / pyproject / Cargo / composer / Gemfile / go.mod / deno.json). Two dispatch shapes — (1) PR review (spawned by the review-coordinator during /specflow review), (2) full-codebase audit (spawned by /specflow audit dependencies).
 model: sonnet
+effort: medium
 tools: Read, Grep, Glob, Bash
 skills: review-findings-contract, workflow-contract
 maxTurns: 20
@@ -8731,6 +8746,73 @@ RECOMMENDATION: <one sentence — what the next actor should do>
 \`fail\` when either is > 0; \`needs_followup\` when only Medium/Low remain. Then
 emit the \`WORKFLOW STATUS\` block per \`workflow-contract\`. Audit-mode (Mode 2)
 emits neither block — backlog material is not pass/fail.
+`,
+    executable: false,
+    backend: null,
+    skipIfExists: false,
+  },
+  {
+    category: "agent-doc",
+    name: "agents-readme",
+    suffix: "README.md",
+    content: `# Agent effort rubric
+
+Every bundled agent declares an \`effort:\` field in its frontmatter. \`effort\`
+is a reasoning-budget hint the harness reads when it dispatches the agent: it
+trades **token spend** against **reasoning depth**. A higher tier thinks
+harder (and costs more); a lower tier returns faster and cheaper.
+
+Effort is assigned by **role class**, not by how important an agent feels. The
+goal is *legible, intentional spend*: when a coordinator fans out several
+agents in parallel, fire-and-forget dispatchers must not burn a coding-agent's
+budget, and a code-writer must not be starved of the depth it needs.
+
+## The four tiers
+
+| Tier     | Role class                                                     | Agents |
+| -------- | -------------------------------------------------------------- | ------ |
+| \`low\`    | Pure orchestrators — route and dispatch only, no deep reasoning | \`review-coordinator\`, \`workflow-manager\` |
+| \`medium\` | Read-only auditors, structured reviewers, the Q&A explainer, and the backlog owner | \`a11y-auditor\`, \`architecture-auditor\`, \`dependency-auditor\`, \`performance-auditor\`, \`security-auditor\`, \`code-reviewer\`, \`test-reviewer\`, \`specflow-expert\`, \`product-owner\` |
+| \`high\`   | Design / higher-order reasoning                                | \`ui-ux-designer\` |
+| \`xhigh\`  | Coding / agentic work — writes multi-file changes, runs suites, operates infra | \`developer\`, \`qa-tester\`, \`devops-sre\` |
+
+Tally: 2 \`low\` · 9 \`medium\` · 1 \`high\` · 3 \`xhigh\` = 15 agents.
+
+## Rationale — the compound cost/quality tradeoff
+
+Effort compounds. A coordinator that itself spawns N sub-agents pays its own
+reasoning budget *plus* every child's. So the budget belongs where the
+thinking actually happens:
+
+- **\`low\` for pure orchestrators.** \`review-coordinator\` and
+  \`workflow-manager\` don't reason about the work — they decide *who* runs and
+  aggregate what comes back. Spending deep-reasoning tokens on a dispatcher is
+  pure waste, multiplied across every fan-out.
+- **\`medium\` for auditors, reviewers, the explainer, and the PO.** These read
+  code (or backlog) and emit structured findings. They need genuine analysis
+  but not the open-ended exploration of writing a feature. \`medium\` buys
+  enough depth to spot real issues without over-provisioning a read-only pass.
+- **\`high\` for design.** \`ui-ux-designer\` does higher-order, open-ended
+  reasoning (synthesising a coherent design system from a brief), which
+  rewards more budget than a structured audit — but it isn't writing and
+  running multi-file code.
+- **\`xhigh\` for coding/agentic agents.** \`developer\`, \`qa-tester\`, and
+  \`devops-sre\` write multi-file changes, run suites, and operate
+  infrastructure. Under-provisioning them is the expensive failure mode: a
+  shallow coding pass ships bugs that cost far more than the saved tokens.
+  This is the one tier where spending *more* is the economical choice.
+
+## Caveat — \`xhigh\` is Opus-only
+
+\`xhigh\` is only valid on an agent pinned to an Opus \`model:\`. A Sonnet-pinned
+agent that declares \`effort: xhigh\` is rejected by the harness (it would 400
+on dispatch). The three \`xhigh\` agents above (\`developer\`, \`qa-tester\`,
+\`devops-sre\`) are all \`model: opus\`, which is why the tier is valid for them.
+
+When adding a new agent: pick its tier by role class from the table above, and
+**never** set \`xhigh\` unless the agent is also \`model: opus\`. Every bundled
+agent must carry exactly one \`effort:\` value from {\`low\`, \`medium\`, \`high\`,
+\`xhigh\`}.
 `,
     executable: false,
     backend: null,

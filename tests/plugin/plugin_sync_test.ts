@@ -187,6 +187,13 @@ const SYNC_PAIRS: ReadonlyArray<{ plugin: string; source: string }> = [
     plugin: `plugin/agents/${name}.md`,
     source: `templates/core/agents/${name}.md`,
   })),
+  // Agent-fleet README documenting the per-agent `effort` rubric (#382).
+  // Ships beside the agent files at `.claude/agents/README.md`; mirrored
+  // into the plugin through the same byte-identical channel.
+  {
+    plugin: "plugin/agents/README.md",
+    source: "templates/core/agents/README.md",
+  },
 ];
 
 function abs(rel: string): string {

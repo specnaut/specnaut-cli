@@ -2,6 +2,7 @@
 name: dependency-auditor
 description: Reviews dependency manifests for hygiene — outdated pins, unbounded ranges, unused declared deps, license violations, advisory-shape signals, peer-dep conflicts, typosquatting heuristics. Multi-manifest aware (npm / pyproject / Cargo / composer / Gemfile / go.mod / deno.json). Two dispatch shapes — (1) PR review (spawned by the review-coordinator during /specflow review), (2) full-codebase audit (spawned by /specflow audit dependencies).
 model: sonnet
+effort: medium
 tools: Read, Grep, Glob, Bash
 skills: review-findings-contract, workflow-contract
 maxTurns: 20
