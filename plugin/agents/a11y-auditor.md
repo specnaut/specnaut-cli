@@ -3,6 +3,7 @@ name: a11y-auditor
 description: Reviews front-end code for WCAG 2.1 AA accessibility issues — semantic HTML, heading hierarchy, alt text, form labels, keyboard nav, focus indicators, ARIA correctness, color contrast (where computable from source). Two dispatch shapes — (1) PR review (spawned by the review-coordinator during /specflow review), (2) full-codebase audit (spawned by /specflow audit accessibility).
 model: sonnet
 tools: Read, Grep, Glob, Bash
+skills: review-findings-contract, workflow-contract
 maxTurns: 20
 color: cyan
 disable-model-invocation: true
@@ -40,8 +41,9 @@ CLI-only project is a no-op by design.
 
 Spawned by the `review-coordinator` during `/specflow review`. Review
 ONLY the files provided in the prompt (and only if they include FE
-source — otherwise skip per the gate above). Output the
-`FINDING` / `VERDICT` structure used by code-reviewer.
+source — otherwise skip per the gate above). Output the `FINDING`
+structure used by code-reviewer, followed by the canonical
+`REVIEW SUMMARY` block (see "Output format (Mode 1 — PR review)" below).
 
 ### Always-check rules
 
@@ -178,4 +180,9 @@ backlog material for the PO to triage.
 
 ## Output format (Mode 1 — PR review)
 
-Same `FINDING` / `VERDICT` structure as code-reviewer.
+Same `FINDING` structure as code-reviewer, followed by exactly one
+`REVIEW SUMMARY` block per the preloaded `review-findings-contract`
+(`REVIEW_SCOPE: a11y-auditor`,
+`REVIEW_VERDICT: pass | fail | needs_followup`, the four severity counts,
+`TOP_ISSUES`, `RECOMMENDATION`), then the `WORKFLOW STATUS` block per
+`workflow-contract`. Audit-mode (Mode 2) emits neither block.

@@ -5122,6 +5122,13 @@ not re-read the file with \`Read\`.
 | \`specflow-auto\` | Auto-chain orchestration (legacy entry point — most users invoke \`/specflow specify\` instead). |
 | \`specflow-review\` | Auto-invoke alias preserved for the \`/specflow review\` phase. |
 
+**Preloaded output-contract skills** (\`user-invocable: false\` — never invoke
+directly): \`workflow-contract\`, \`handoff-protocol\`, \`review-findings-contract\`,
+\`qa-report-contract\`. These define the machine-readable \`WORKFLOW STATUS\` /
+\`HANDOFF\` / \`REVIEW SUMMARY\` / \`QA SUMMARY\` blocks. They are loaded into an
+agent's context via the agent's \`skills:\` frontmatter (see the agent registry
+below) and never appear as user commands.
+
 ## Specflow agent registry
 
 Dispatch these via \`Task({ subagent_type: "<name>", ... })\` (or your
@@ -6211,6 +6218,195 @@ This skill does not:
     skipIfExists: false,
   },
   {
+    category: "skill",
+    name: "workflow-contract",
+    suffix: null,
+    content: `---
+name: workflow-contract
+description: Defines the machine-readable WORKFLOW STATUS block every workflow-shaped agent emits once at end of turn. Preloaded, not user-invocable.
+user-invocable: false
+---
+
+# workflow-contract
+
+This skill defines the **WORKFLOW STATUS** block. Agents that preload it
+(\`developer\`, \`review-coordinator\`, \`workflow-manager\`, \`qa-tester\`, and all
+five auditors + both reviewers via this contract) emit exactly one such block at
+the **end of their turn, after the prose**. The block is additive — it never replaces the prose narrative; it
+appends a normalized, fenced, machine-readable summary that downstream tooling
+(audit synthesis, the status ledger, \`/status-audit\`) can parse without
+re-reading the prose.
+
+## Format
+
+\`\`\`text
+WORKFLOW STATUS
+STATE: in_progress | blocked | awaiting_review | awaiting_qa | awaiting_user | done | failed
+DONE_CRITERIA_MET: yes | no
+SUMMARY: <one sentence — outcome, not effort>
+ARTIFACTS: <comma list | none>
+FILES_CHANGED: <comma list | none>
+VALIDATION: <comma list of "command (result)" | none>
+BLOCKERS: <one sentence | none>
+NEXT_ACTION: <one sentence>
+HANDOFF_TARGET: developer | review-coordinator | qa-tester | product-owner | workflow-manager | user | none
+\`\`\`
+
+## Rules
+
+- Exactly one block per turn; never replaces prose (additive).
+- \`STATE: done\` only when assigned exit criteria are met; otherwise use \`awaiting_review\` /
+  \`awaiting_qa\` / \`blocked\`. Never \`done\` with \`DONE_CRITERIA_MET: no\`.
+- \`FILES_CHANGED: none\` for read-only agents (auditors/reviewers).
+- \`VALIDATION\` is explicit, e.g. \`deno task test (pass)\`.
+- \`HANDOFF_TARGET: none\` when work terminates here.
+`,
+    executable: false,
+    backend: null,
+    skipIfExists: false,
+  },
+  {
+    category: "skill",
+    name: "handoff-protocol",
+    suffix: null,
+    content: `---
+name: handoff-protocol
+description: Defines the machine-readable HANDOFF block emitted right after WORKFLOW STATUS whenever an agent hands work to another actor. Preloaded, not user-invocable.
+user-invocable: false
+---
+
+# handoff-protocol
+
+This skill defines the **HANDOFF** block. Agents that preload it (\`developer\`,
+\`review-coordinator\`, \`workflow-manager\`) emit it **immediately after the
+WORKFLOW STATUS block, and only when** that block's \`HANDOFF_TARGET\` is not
+\`none\`. It gives the next actor a precise, executable instruction plus the
+concrete payload they need, so the handoff requires no re-derivation of intent.
+The block is additive — it appends to the prose, never replaces it.
+
+Agents that hand off but do NOT preload this contract (e.g. \`qa-tester\`, which
+routes bugs to the developer) signal the target through the WORKFLOW STATUS
+\`HANDOFF_TARGET\` field rather than emitting a full HANDOFF block — they carry
+\`workflow-contract\` but not \`handoff-protocol\` by design.
+
+## Format
+
+\`\`\`text
+HANDOFF
+TARGET: developer | review-coordinator | qa-tester | product-owner | workflow-manager | user
+REASON: <one sentence>
+REQUESTED_ACTION: <one imperative sentence — executable without reinterpretation>
+PAYLOAD: <concrete filenames, ids, findings, spec ids the next actor needs>
+OPEN_RISKS: <comma list | none>
+\`\`\`
+
+## Rules
+
+- Block exists **iff** \`HANDOFF_TARGET ≠ none\`; if there is no real handoff, omit it entirely.
+- \`TARGET\` must equal the WORKFLOW STATUS \`HANDOFF_TARGET\`.
+- \`REQUESTED_ACTION\` is precise enough to execute without re-deriving intent.
+- \`PAYLOAD\` names concrete artifacts, never vague references.
+`,
+    executable: false,
+    backend: null,
+    skipIfExists: false,
+  },
+  {
+    category: "skill",
+    name: "review-findings-contract",
+    suffix: null,
+    content: `---
+name: review-findings-contract
+description: Defines the machine-readable REVIEW SUMMARY block every auditor/reviewer emits once after its prose, with severity counts and a verdict. Preloaded, not user-invocable.
+user-invocable: false
+---
+
+# review-findings-contract
+
+This skill defines the **REVIEW SUMMARY** block. Agents that preload it
+(\`architecture-auditor\`, \`performance-auditor\`, \`security-auditor\`,
+\`a11y-auditor\`, \`dependency-auditor\`, \`code-reviewer\`, \`test-reviewer\`, and the
+\`review-coordinator\`) emit exactly one such block **after their prose** (and
+before the WORKFLOW STATUS block when the agent also carries \`workflow-contract\`).
+It normalizes the review's severity counts and verdict so a coordinator can
+synthesize multiple seats' findings without re-reading each prose report. The
+\`review-coordinator\` emits the same block with the **aggregated** counts summed
+across every seat. The block is additive — it appends to the prose, never
+replaces it.
+
+## Format
+
+\`\`\`text
+REVIEW SUMMARY
+REVIEW_SCOPE: <reviewer name or gate scope>
+REVIEW_VERDICT: pass | fail | needs_followup
+CRITICAL_COUNT: <integer>
+HIGH_COUNT: <integer>
+MEDIUM_COUNT: <integer>
+LOW_COUNT: <integer>
+TOP_ISSUES: <one sentence, or up to 5 lines | none>
+RECOMMENDATION: <one sentence — what the next actor should do>
+\`\`\`
+
+## Rules
+
+- \`REVIEW_VERDICT: pass\` only when \`CRITICAL_COUNT == 0\` **and** \`HIGH_COUNT == 0\`.
+- \`REVIEW_VERDICT: fail\` when \`CRITICAL_COUNT > 0\` **or** \`HIGH_COUNT > 0\`.
+- \`REVIEW_VERDICT: needs_followup\` when only Medium/Low findings remain.
+- Every count is an explicit integer, including \`0\`.
+- Verdict and counts must never contradict.
+`,
+    executable: false,
+    backend: null,
+    skipIfExists: false,
+  },
+  {
+    category: "skill",
+    name: "qa-report-contract",
+    suffix: null,
+    content: `---
+name: qa-report-contract
+description: Defines the machine-readable QA SUMMARY block the qa-tester emits once after its prose, with test counts and a verdict. Preloaded, not user-invocable.
+user-invocable: false
+---
+
+# qa-report-contract
+
+This skill defines the **QA SUMMARY** block. The agent that preloads it
+(\`qa-tester\`) emits exactly one such block **after its prose** (and before the
+WORKFLOW STATUS block, since \`qa-tester\` also carries \`workflow-contract\`). It
+normalizes the QA pass's test counts, bug count, and verdict so downstream
+tooling can gate on QA results without parsing the prose. The block is additive
+— it appends to the prose, never replaces it.
+
+## Format
+
+\`\`\`text
+QA SUMMARY
+QA_SCOPE: <one sentence>
+QA_VERDICT: pass | fail | blocked
+NEW_UNIT_TESTS: <integer>
+NEW_FUNCTIONAL_TESTS: <integer>
+NEW_BROWSER_TESTS: <integer>
+TOTAL_PASS_COUNT: <integer>
+TOTAL_FAIL_COUNT: <integer>
+BUGS_FOUND: <integer>
+QA_RECOMMENDATION: <one sentence>
+\`\`\`
+
+## Rules
+
+- \`QA_VERDICT: pass\` only when the requested QA scope is complete **and** \`TOTAL_FAIL_COUNT == 0\`.
+- \`QA_VERDICT: fail\` when tests exposed real product bugs or failing automation.
+- \`QA_VERDICT: blocked\` when QA could not run (missing environment/prereqs) — distinct from \`fail\`.
+- Every numeric field is an explicit integer, including \`0\`.
+- \`BUGS_FOUND\` counts product issues / failing flows, not stylistic concerns.
+`,
+    executable: false,
+    backend: null,
+    skipIfExists: false,
+  },
+  {
     category: "backlog-cmd",
     name: "backlog",
     suffix: null,
@@ -6576,6 +6772,7 @@ name: developer
 description: Senior developer that implements tasks from tasks.md, fixes review feedback, and ships features. Manual-only — invoke explicitly when you have a tasks.md to execute or a review note to address.
 model: opus
 tools: Read, Write, Edit, Grep, Glob, Bash
+skills: workflow-contract, handoff-protocol
 permissionMode: acceptEdits
 maxTurns: 80
 disable-model-invocation: true
@@ -6668,20 +6865,17 @@ For each task assigned:
 
 ## Completion report format
 
+End your turn with a human-facing summary, then the machine-readable status
+block. The human-facing summary captures the reasoning the status block does
+not:
+
 \`\`\`
 TASK <id or name>
-Status: DONE | BLOCKED
-
-Files changed
-  - <path>:<lines or new>
 
 Decisions
   - <why X over Y>
   - (if applicable) Bootstrapped <test runner> because the project had
     no test infra
-
-Validation run
-  - <command>: <result>
 
 Tech debt surfaced (Boy Scout — too big to fix in scope)
   - <one-liner> @ <path>:<line> — reason it's too big
@@ -6689,13 +6883,18 @@ Tech debt surfaced (Boy Scout — too big to fix in scope)
 
 Risks / follow-ups
   - <…>
-
-Next owner
-  - <reviewer | qa | user | product-owner (if tech-debt items present)>
 \`\`\`
 
-Never report done if a validation failed. If blocked, say what you tried, what
-failed, and what decision the next owner needs to make.
+Do NOT define a separate status block here. The authoritative machine-readable
+status is the \`WORKFLOW STATUS\` block from the preloaded \`workflow-contract\`
+(it carries \`STATE\`, \`DONE_CRITERIA_MET\`, \`FILES_CHANGED\`, \`VALIDATION\`,
+\`BLOCKERS\`, \`NEXT_ACTION\`, \`HANDOFF_TARGET\`) — emit exactly one such block
+after the summary above, and a \`HANDOFF\` block per \`handoff-protocol\` whenever
+\`HANDOFF_TARGET ≠ none\`.
+
+Never report \`STATE: done\` if a validation failed (use \`blocked\` / \`failed\`).
+If blocked, say what you tried, what failed, and what decision the next owner
+needs to make in the prose and the \`BLOCKERS\` field.
 `,
     executable: false,
     backend: null,
@@ -6710,6 +6909,7 @@ name: review-coordinator
 description: Coordinates parallel structural review agents (code, security, tests) and aggregates their findings. Use when /specflow review is running Phase 1.
 model: sonnet
 tools: Read, Grep, Glob, Bash, Agent(code-reviewer, security-auditor, test-reviewer)
+skills: workflow-contract, handoff-protocol, review-findings-contract
 maxTurns: 30
 color: purple
 ---
@@ -6731,11 +6931,15 @@ in parallel and aggregate results.
 3. Wait for all three (or two) to complete.
 4. Aggregate findings by severity. Collapse duplicates (same file:line from two
    agents = one finding with both attributions).
-5. Produce the report using this exact block:
+5. Produce the report in two parts: a human-facing per-seat roll-up, then the
+   single canonical \`REVIEW SUMMARY\` block carrying the AGGREGATED counts across
+   all seats.
+
+### Per-seat roll-up (human-facing)
 
 \`\`\`
-REVIEW SUMMARY
-  code-reviewer      : <PASS | N CRIT, M HIGH, K MED, L LOW>
+PER-SEAT ROLL-UP
+  code-reviewer      : <pass | N CRIT, M HIGH, K MED, L LOW>
   security-auditor   : <…>
   test-reviewer      : <… | SKIPPED>
 
@@ -6749,9 +6953,34 @@ HIGH findings:
 MEDIUM / LOW findings: <N>, list suppressed — see per-agent reports for details.
 \`\`\`
 
+### Aggregated REVIEW SUMMARY block (canonical)
+
+Emit exactly one \`REVIEW SUMMARY\` block per the preloaded
+\`review-findings-contract\`. Its counts are the SUM of every seat's findings
+(after de-duplication); its verdict is derived from those aggregated counts:
+
+\`\`\`
+REVIEW SUMMARY
+REVIEW_SCOPE: review gate (aggregated across code-reviewer, security-auditor, test-reviewer)
+REVIEW_VERDICT: pass | fail | needs_followup
+CRITICAL_COUNT: <integer — summed across seats>
+HIGH_COUNT: <integer — summed across seats>
+MEDIUM_COUNT: <integer — summed across seats>
+LOW_COUNT: <integer — summed across seats>
+TOP_ISSUES: <up to 5 lines — the highest-severity findings | none>
+RECOMMENDATION: <one sentence — what the next actor should do>
+\`\`\`
+
+\`REVIEW_VERDICT: pass\` only when aggregated \`CRITICAL_COUNT == 0\` and
+\`HIGH_COUNT == 0\`; \`fail\` when either is > 0; \`needs_followup\` when only
+Medium/Low remain. Then emit the \`WORKFLOW STATUS\` block per \`workflow-contract\`
+and, when handing the gate result back, the \`HANDOFF\` block per
+\`handoff-protocol\`.
+
 ## Rules
 
-- Never emit freeform prose outside the structured block.
+- The roll-up and the \`REVIEW SUMMARY\` block are the only structured output;
+  keep any prose minimal.
 - Never edit files yourself — you coordinate, you do not fix.
 `,
     executable: false,
@@ -6767,6 +6996,7 @@ name: code-reviewer
 description: Reviews code quality, architecture, DRY/YAGNI, readability, and conformance to the project constitution. Spawned by the review-coordinator during /specflow review.
 model: sonnet
 tools: Read, Grep, Glob
+skills: review-findings-contract, workflow-contract
 maxTurns: 20
 color: yellow
 ---
@@ -6802,13 +7032,24 @@ FINDING
   suggestion: <one sentence, actionable>
 \`\`\`
 
-End with a single-line verdict:
+After the findings, emit exactly one \`REVIEW SUMMARY\` block per the preloaded
+\`review-findings-contract\`:
 
 \`\`\`
-VERDICT: PASS | FAIL (<N> CRITICAL, <M> HIGH)
+REVIEW SUMMARY
+REVIEW_SCOPE: code-reviewer
+REVIEW_VERDICT: pass | fail | needs_followup
+CRITICAL_COUNT: <integer>
+HIGH_COUNT: <integer>
+MEDIUM_COUNT: <integer>
+LOW_COUNT: <integer>
+TOP_ISSUES: <one sentence, or up to 5 lines | none>
+RECOMMENDATION: <one sentence — what the next actor should do>
 \`\`\`
 
-PASS if zero CRITICAL and zero HIGH findings. Otherwise FAIL.
+\`REVIEW_VERDICT: pass\` only when \`CRITICAL_COUNT == 0\` and \`HIGH_COUNT == 0\`;
+\`fail\` when either is > 0; \`needs_followup\` when only Medium/Low remain. Then
+emit the \`WORKFLOW STATUS\` block per \`workflow-contract\`.
 `,
     executable: false,
     backend: null,
@@ -6823,6 +7064,7 @@ name: security-auditor
 description: Reviews code for security issues — input validation, authz, secrets, injection, SSRF, path traversal, silent error swallowing. Two dispatch shapes — (1) PR review (spawned by the review-coordinator during /specflow review), (2) alert triage (spawned by /release after the security-preflight workflow surfaces open GitHub security alerts).
 model: sonnet
 tools: Read, Grep, Glob, Bash
+skills: review-findings-contract, workflow-contract
 maxTurns: 20
 color: red
 ---
@@ -6833,8 +7075,9 @@ on the dispatch shape.
 ## Mode 1 — PR review
 
 Spawned by the \`review-coordinator\` during \`/specflow review\`. Review
-ONLY the files provided in the prompt. Output the \`FINDING\` / \`VERDICT\`
-structure used by code-reviewer.
+ONLY the files provided in the prompt. Output the \`FINDING\` structure
+used by code-reviewer, followed by the canonical \`REVIEW SUMMARY\` block
+(see "Output format (Mode 1)" below).
 
 ### Always-check rules
 
@@ -6938,7 +7181,14 @@ End with a \`VERDICT\` line: \`clean\` (all alerts dismissed or ticketed),
 
 ## Output format (Mode 1)
 
-Same \`FINDING\` / \`VERDICT\` structure as code-reviewer.
+Same \`FINDING\` structure as code-reviewer, followed by exactly one
+\`REVIEW SUMMARY\` block per the preloaded \`review-findings-contract\`
+(\`REVIEW_SCOPE: security-auditor\`,
+\`REVIEW_VERDICT: pass | fail | needs_followup\`, the four severity counts,
+\`TOP_ISSUES\`, \`RECOMMENDATION\`), then the \`WORKFLOW STATUS\` block per
+\`workflow-contract\`. (Mode 2 alert triage keeps its own
+\`VERDICT: clean | escalation_needed | error\` line — it is not a PR review
+and is out of scope for the review-findings-contract.)
 `,
     executable: false,
     backend: null,
@@ -6953,6 +7203,7 @@ name: test-reviewer
 description: Reviews test coverage and quality for changed code. Spawned by the review-coordinator when the diff contains test files.
 model: sonnet
 tools: Read, Grep, Glob
+skills: review-findings-contract, workflow-contract
 maxTurns: 20
 color: yellow
 ---
@@ -6977,7 +7228,11 @@ referenced against the implementation files they cover.
 
 ## Output format
 
-Same \`FINDING\` / \`VERDICT\` structure as code-reviewer.
+Same \`FINDING\` structure as code-reviewer, followed by exactly one
+\`REVIEW SUMMARY\` block per the preloaded \`review-findings-contract\`
+(\`REVIEW_SCOPE: test-reviewer\`, \`REVIEW_VERDICT: pass | fail | needs_followup\`,
+the four severity counts, \`TOP_ISSUES\`, \`RECOMMENDATION\`), then the
+\`WORKFLOW STATUS\` block per \`workflow-contract\`.
 `,
     executable: false,
     backend: null,
@@ -6992,6 +7247,7 @@ name: qa-tester
 description: Audits test coverage, writes missing tests, and runs the full suite. Manual-only — spawned by /specflow implement after the review gate passes; do not auto-invoke for casual "run tests" mentions.
 model: opus
 tools: Read, Write, Edit, Grep, Glob, Bash
+skills: qa-report-contract, workflow-contract
 permissionMode: acceptEdits
 maxTurns: 40
 disable-model-invocation: true
@@ -7022,22 +7278,12 @@ P2. Unit tests for services, domain logic, and validators.
 
 ## Required report
 
-\`\`\`
-QA SUMMARY
-  Tests added: <count>
-  Tests modified: <count>
-
-  Coverage deltas
-    - <area>: <before → after>
-
-  Suite result
-    passed: <N>
-    failed: <M>
-    skipped: <K>
-
-  Bugs found (route to developer)
-    - <…>
-\`\`\`
+After your prose, emit exactly one \`QA SUMMARY\` block as defined by the
+preloaded \`qa-report-contract\` skill (it is the single authoritative schema:
+\`QA_SCOPE\`, \`QA_VERDICT: pass | fail | blocked\`, the test counts, \`BUGS_FOUND\`,
+\`QA_RECOMMENDATION\`). Then emit the \`WORKFLOW STATUS\` block per
+\`workflow-contract\`. Route any bug found to the developer via the
+\`HANDOFF_TARGET\`/\`NEXT_ACTION\` fields of the workflow block.
 `,
     executable: false,
     backend: null,
@@ -7052,6 +7298,7 @@ name: workflow-manager
 description: Orchestrates multi-phase feature delivery across specialist agents. Use as the lead session agent for long-running implementations.
 model: sonnet
 tools: Read, Grep, Glob, Bash, Agent(product-owner, developer, review-coordinator, qa-tester)
+skills: workflow-contract, handoff-protocol
 maxTurns: 60
 color: purple
 ---
@@ -7101,6 +7348,16 @@ Every delegated phase must end with a structured report. If an agent claims
 
 Blocked? Report owner, blocker, impact, and the exact decision needed. If
 review or QA fails twice on the same issue family, stop and escalate.
+
+## Output format
+
+You are the primary HANDOFF orchestrator. When you delegate a phase or
+escalate, end your turn with exactly one \`WORKFLOW STATUS\` block per the
+preloaded \`workflow-contract\` (set \`HANDOFF_TARGET\` to the specialist you are
+delegating to, or \`user\` when escalating), followed by a \`HANDOFF\` block per
+\`handoff-protocol\` whenever \`HANDOFF_TARGET ≠ none\`. Read the structured
+blocks delegated agents return and reconcile them against the phase gate
+before advancing.
 `,
     executable: false,
     backend: null,
@@ -7680,6 +7937,7 @@ name: performance-auditor
 description: Reviews code for performance issues — N+1 queries, blocking I/O on hot paths, missing indexes, cache misuse, hot-path allocation, sync-in-async, large bundles, render-thrash. Two dispatch shapes — (1) PR review (spawned by the review-coordinator during /specflow review), (2) full-codebase audit (spawned by /specflow audit performance).
 model: sonnet
 tools: Read, Grep, Glob, Bash
+skills: review-findings-contract, workflow-contract
 maxTurns: 20
 color: yellow
 disable-model-invocation: true
@@ -7691,8 +7949,9 @@ on the dispatch shape.
 ## Mode 1 — PR review
 
 Spawned by the \`review-coordinator\` during \`/specflow review\`. Review ONLY
-the files provided in the prompt. Output the \`FINDING\` / \`VERDICT\` structure
-used by code-reviewer.
+the files provided in the prompt. Output the \`FINDING\` structure used by
+code-reviewer, followed by the canonical \`REVIEW SUMMARY\` block (see "Output
+format (Mode 1 — PR review)" below).
 
 ### Always-check rules
 
@@ -7818,7 +8077,12 @@ material for the PO to triage.
 
 ## Output format (Mode 1 — PR review)
 
-Same \`FINDING\` / \`VERDICT\` structure as code-reviewer.
+Same \`FINDING\` structure as code-reviewer, followed by exactly one
+\`REVIEW SUMMARY\` block per the preloaded \`review-findings-contract\`
+(\`REVIEW_SCOPE: performance-auditor\`,
+\`REVIEW_VERDICT: pass | fail | needs_followup\`, the four severity counts,
+\`TOP_ISSUES\`, \`RECOMMENDATION\`), then the \`WORKFLOW STATUS\` block per
+\`workflow-contract\`. Audit-mode (Mode 2) emits neither block.
 `,
     executable: false,
     backend: null,
@@ -7833,6 +8097,7 @@ name: a11y-auditor
 description: Reviews front-end code for WCAG 2.1 AA accessibility issues — semantic HTML, heading hierarchy, alt text, form labels, keyboard nav, focus indicators, ARIA correctness, color contrast (where computable from source). Two dispatch shapes — (1) PR review (spawned by the review-coordinator during /specflow review), (2) full-codebase audit (spawned by /specflow audit accessibility).
 model: sonnet
 tools: Read, Grep, Glob, Bash
+skills: review-findings-contract, workflow-contract
 maxTurns: 20
 color: cyan
 disable-model-invocation: true
@@ -7870,8 +8135,9 @@ CLI-only project is a no-op by design.
 
 Spawned by the \`review-coordinator\` during \`/specflow review\`. Review
 ONLY the files provided in the prompt (and only if they include FE
-source — otherwise skip per the gate above). Output the
-\`FINDING\` / \`VERDICT\` structure used by code-reviewer.
+source — otherwise skip per the gate above). Output the \`FINDING\`
+structure used by code-reviewer, followed by the canonical
+\`REVIEW SUMMARY\` block (see "Output format (Mode 1 — PR review)" below).
 
 ### Always-check rules
 
@@ -8008,7 +8274,12 @@ backlog material for the PO to triage.
 
 ## Output format (Mode 1 — PR review)
 
-Same \`FINDING\` / \`VERDICT\` structure as code-reviewer.
+Same \`FINDING\` structure as code-reviewer, followed by exactly one
+\`REVIEW SUMMARY\` block per the preloaded \`review-findings-contract\`
+(\`REVIEW_SCOPE: a11y-auditor\`,
+\`REVIEW_VERDICT: pass | fail | needs_followup\`, the four severity counts,
+\`TOP_ISSUES\`, \`RECOMMENDATION\`), then the \`WORKFLOW STATUS\` block per
+\`workflow-contract\`. Audit-mode (Mode 2) emits neither block.
 `,
     executable: false,
     backend: null,
@@ -8023,6 +8294,7 @@ name: architecture-auditor
 description: Reviews code for architectural drift — hex-layer violations, circular deps, god files, bounded-context leaks, ports/adapters discipline, implicit globals, deep nesting, test-isolation bleed. Two dispatch shapes — (1) PR review (spawned by the review-coordinator during /specflow review), (2) full-codebase audit (spawned by /specflow audit architecture).
 model: sonnet
 tools: Read, Grep, Glob, Bash
+skills: review-findings-contract, workflow-contract
 maxTurns: 20
 color: blue
 disable-model-invocation: true
@@ -8034,8 +8306,9 @@ depending on the dispatch shape.
 ## Mode 1 — PR review
 
 Spawned by the \`review-coordinator\` during \`/specflow review\`. Review ONLY
-the files provided in the prompt. Output the \`FINDING\` / \`VERDICT\` structure
-used by code-reviewer.
+the files provided in the prompt. Output the \`FINDING\` structure used by
+code-reviewer, followed by the canonical \`REVIEW SUMMARY\` block (see "Output
+format (Mode 1 — PR review)" below).
 
 ### Always-check rules
 
@@ -8177,20 +8450,34 @@ material for the PO to triage.
 
 ## Output format (Mode 1 — PR review)
 
-Same \`FINDING\` / \`VERDICT\` structure as code-reviewer. Format each
-finding as:
+Same \`FINDING\` structure as code-reviewer. Format each finding as:
 
 \`\`\`
 FINDING <severity>: <one-line summary>
   Path: <file:line>
   Rationale: <2-3 sentences>
   Suggested fix: <code sketch or pointer>
-
-VERDICT: <APPROVE | REQUEST_CHANGES | NEEDS_DISCUSSION>
 \`\`\`
 
-Always emit exactly one VERDICT line at the end. Audit-mode (Mode 2)
-omits VERDICT — backlog material is not pass/fail.
+After the findings, emit exactly one \`REVIEW SUMMARY\` block per the preloaded
+\`review-findings-contract\`:
+
+\`\`\`
+REVIEW SUMMARY
+REVIEW_SCOPE: architecture-auditor
+REVIEW_VERDICT: pass | fail | needs_followup
+CRITICAL_COUNT: <integer>
+HIGH_COUNT: <integer>
+MEDIUM_COUNT: <integer>
+LOW_COUNT: <integer>
+TOP_ISSUES: <one sentence, or up to 5 lines | none>
+RECOMMENDATION: <one sentence — what the next actor should do>
+\`\`\`
+
+\`REVIEW_VERDICT: pass\` only when \`CRITICAL_COUNT == 0\` and \`HIGH_COUNT == 0\`;
+\`fail\` when either is > 0; \`needs_followup\` when only Medium/Low remain. Then
+emit the \`WORKFLOW STATUS\` block per \`workflow-contract\`. Audit-mode (Mode 2)
+emits neither block — backlog material is not pass/fail.
 `,
     executable: false,
     backend: null,
@@ -8205,6 +8492,7 @@ name: dependency-auditor
 description: Reviews dependency manifests for hygiene — outdated pins, unbounded ranges, unused declared deps, license violations, advisory-shape signals, peer-dep conflicts, typosquatting heuristics. Multi-manifest aware (npm / pyproject / Cargo / composer / Gemfile / go.mod / deno.json). Two dispatch shapes — (1) PR review (spawned by the review-coordinator during /specflow review), (2) full-codebase audit (spawned by /specflow audit dependencies).
 model: sonnet
 tools: Read, Grep, Glob, Bash
+skills: review-findings-contract, workflow-contract
 maxTurns: 20
 color: magenta
 disable-model-invocation: true
@@ -8217,8 +8505,9 @@ depending on the dispatch shape.
 
 Spawned by the \`review-coordinator\` during \`/specflow review\`. Review ONLY
 the files provided in the prompt (typically dependency manifests +
-lockfiles touched by the diff). Output the \`FINDING\` / \`VERDICT\` structure
-used by code-reviewer.
+lockfiles touched by the diff). Output the \`FINDING\` structure used by
+code-reviewer, followed by the canonical \`REVIEW SUMMARY\` block (see "Output
+format (Mode 1 — PR review)" below).
 
 ### Always-check rules
 
@@ -8411,20 +8700,34 @@ material for the PO to triage.
 
 ## Output format (Mode 1 — PR review)
 
-Same \`FINDING\` / \`VERDICT\` structure as code-reviewer. Format each
-finding as:
+Same \`FINDING\` structure as code-reviewer. Format each finding as:
 
 \`\`\`
 FINDING <severity>: <one-line summary>
   Path: <manifest:line>
   Rationale: <2-3 sentences>
   Suggested fix: <code sketch or pointer>
-
-VERDICT: <APPROVE | REQUEST_CHANGES | NEEDS_DISCUSSION>
 \`\`\`
 
-Always emit exactly one VERDICT line at the end. Audit-mode (Mode 2)
-omits VERDICT — backlog material is not pass/fail.
+After the findings, emit exactly one \`REVIEW SUMMARY\` block per the preloaded
+\`review-findings-contract\`:
+
+\`\`\`
+REVIEW SUMMARY
+REVIEW_SCOPE: dependency-auditor
+REVIEW_VERDICT: pass | fail | needs_followup
+CRITICAL_COUNT: <integer>
+HIGH_COUNT: <integer>
+MEDIUM_COUNT: <integer>
+LOW_COUNT: <integer>
+TOP_ISSUES: <one sentence, or up to 5 lines | none>
+RECOMMENDATION: <one sentence — what the next actor should do>
+\`\`\`
+
+\`REVIEW_VERDICT: pass\` only when \`CRITICAL_COUNT == 0\` and \`HIGH_COUNT == 0\`;
+\`fail\` when either is > 0; \`needs_followup\` when only Medium/Low remain. Then
+emit the \`WORKFLOW STATUS\` block per \`workflow-contract\`. Audit-mode (Mode 2)
+emits neither block — backlog material is not pass/fail.
 `,
     executable: false,
     backend: null,

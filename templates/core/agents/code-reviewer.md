@@ -3,6 +3,7 @@ name: code-reviewer
 description: Reviews code quality, architecture, DRY/YAGNI, readability, and conformance to the project constitution. Spawned by the review-coordinator during /specflow review.
 model: sonnet
 tools: Read, Grep, Glob
+skills: review-findings-contract, workflow-contract
 maxTurns: 20
 color: yellow
 ---
@@ -38,10 +39,21 @@ FINDING
   suggestion: <one sentence, actionable>
 ```
 
-End with a single-line verdict:
+After the findings, emit exactly one `REVIEW SUMMARY` block per the preloaded
+`review-findings-contract`:
 
 ```
-VERDICT: PASS | FAIL (<N> CRITICAL, <M> HIGH)
+REVIEW SUMMARY
+REVIEW_SCOPE: code-reviewer
+REVIEW_VERDICT: pass | fail | needs_followup
+CRITICAL_COUNT: <integer>
+HIGH_COUNT: <integer>
+MEDIUM_COUNT: <integer>
+LOW_COUNT: <integer>
+TOP_ISSUES: <one sentence, or up to 5 lines | none>
+RECOMMENDATION: <one sentence — what the next actor should do>
 ```
 
-PASS if zero CRITICAL and zero HIGH findings. Otherwise FAIL.
+`REVIEW_VERDICT: pass` only when `CRITICAL_COUNT == 0` and `HIGH_COUNT == 0`;
+`fail` when either is > 0; `needs_followup` when only Medium/Low remain. Then
+emit the `WORKFLOW STATUS` block per `workflow-contract`.

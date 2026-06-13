@@ -3,6 +3,7 @@ name: architecture-auditor
 description: Reviews code for architectural drift — hex-layer violations, circular deps, god files, bounded-context leaks, ports/adapters discipline, implicit globals, deep nesting, test-isolation bleed. Two dispatch shapes — (1) PR review (spawned by the review-coordinator during /specflow review), (2) full-codebase audit (spawned by /specflow audit architecture).
 model: sonnet
 tools: Read, Grep, Glob, Bash
+skills: review-findings-contract, workflow-contract
 maxTurns: 20
 color: blue
 disable-model-invocation: true
@@ -14,8 +15,9 @@ depending on the dispatch shape.
 ## Mode 1 — PR review
 
 Spawned by the `review-coordinator` during `/specflow review`. Review ONLY
-the files provided in the prompt. Output the `FINDING` / `VERDICT` structure
-used by code-reviewer.
+the files provided in the prompt. Output the `FINDING` structure used by
+code-reviewer, followed by the canonical `REVIEW SUMMARY` block (see "Output
+format (Mode 1 — PR review)" below).
 
 ### Always-check rules
 
@@ -157,17 +159,31 @@ material for the PO to triage.
 
 ## Output format (Mode 1 — PR review)
 
-Same `FINDING` / `VERDICT` structure as code-reviewer. Format each
-finding as:
+Same `FINDING` structure as code-reviewer. Format each finding as:
 
 ```
 FINDING <severity>: <one-line summary>
   Path: <file:line>
   Rationale: <2-3 sentences>
   Suggested fix: <code sketch or pointer>
-
-VERDICT: <APPROVE | REQUEST_CHANGES | NEEDS_DISCUSSION>
 ```
 
-Always emit exactly one VERDICT line at the end. Audit-mode (Mode 2)
-omits VERDICT — backlog material is not pass/fail.
+After the findings, emit exactly one `REVIEW SUMMARY` block per the preloaded
+`review-findings-contract`:
+
+```
+REVIEW SUMMARY
+REVIEW_SCOPE: architecture-auditor
+REVIEW_VERDICT: pass | fail | needs_followup
+CRITICAL_COUNT: <integer>
+HIGH_COUNT: <integer>
+MEDIUM_COUNT: <integer>
+LOW_COUNT: <integer>
+TOP_ISSUES: <one sentence, or up to 5 lines | none>
+RECOMMENDATION: <one sentence — what the next actor should do>
+```
+
+`REVIEW_VERDICT: pass` only when `CRITICAL_COUNT == 0` and `HIGH_COUNT == 0`;
+`fail` when either is > 0; `needs_followup` when only Medium/Low remain. Then
+emit the `WORKFLOW STATUS` block per `workflow-contract`. Audit-mode (Mode 2)
+emits neither block — backlog material is not pass/fail.

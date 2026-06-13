@@ -114,6 +114,19 @@ const SYNC_PAIRS: ReadonlyArray<{ plugin: string; source: string }> = [
     plugin: "plugin/skills/brainstorming/SKILL.md",
     source: "templates/core/skills/brainstorming/SKILL.md",
   },
+  // Four machine-readable output-contract skills (#378). `user-invocable:
+  // false` — never user-invoked; preloaded into agent context via the
+  // `skills:` frontmatter to normalize the WORKFLOW STATUS / HANDOFF /
+  // REVIEW SUMMARY / QA SUMMARY blocks agents emit after their prose.
+  ...[
+    "workflow-contract",
+    "handoff-protocol",
+    "review-findings-contract",
+    "qa-report-contract",
+  ].map((name) => ({
+    plugin: `plugin/skills/${name}/SKILL.md`,
+    source: `templates/core/skills/${name}/SKILL.md`,
+  })),
   ...[
     "claude",
     "codex",

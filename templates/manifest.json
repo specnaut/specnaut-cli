@@ -37,6 +37,10 @@
     { "category": "skill", "name": "executing-plans", "source": "core/skills/executing-plans/SKILL.md" },
     { "category": "skill", "name": "verification-before-completion", "source": "core/skills/verification-before-completion/SKILL.md" },
     { "category": "skill", "name": "brainstorming", "source": "core/skills/brainstorming/SKILL.md" },
+    { "category": "skill", "name": "workflow-contract", "source": "core/skills/workflow-contract/SKILL.md" },
+    { "category": "skill", "name": "handoff-protocol", "source": "core/skills/handoff-protocol/SKILL.md" },
+    { "category": "skill", "name": "review-findings-contract", "source": "core/skills/review-findings-contract/SKILL.md" },
+    { "category": "skill", "name": "qa-report-contract", "source": "core/skills/qa-report-contract/SKILL.md" },
     { "category": "backlog-cmd", "name": "backlog", "source": "core/commands/backlog.md" },
 
     { "category": "agent", "name": "product-owner", "source": "core/agents/product-owner.md" },

@@ -3,6 +3,7 @@ name: qa-tester
 description: Audits test coverage, writes missing tests, and runs the full suite. Manual-only — spawned by /specflow implement after the review gate passes; do not auto-invoke for casual "run tests" mentions.
 model: opus
 tools: Read, Write, Edit, Grep, Glob, Bash
+skills: qa-report-contract, workflow-contract
 permissionMode: acceptEdits
 maxTurns: 40
 disable-model-invocation: true
@@ -33,19 +34,9 @@ P2. Unit tests for services, domain logic, and validators.
 
 ## Required report
 
-```
-QA SUMMARY
-  Tests added: <count>
-  Tests modified: <count>
-
-  Coverage deltas
-    - <area>: <before → after>
-
-  Suite result
-    passed: <N>
-    failed: <M>
-    skipped: <K>
-
-  Bugs found (route to developer)
-    - <…>
-```
+After your prose, emit exactly one `QA SUMMARY` block as defined by the
+preloaded `qa-report-contract` skill (it is the single authoritative schema:
+`QA_SCOPE`, `QA_VERDICT: pass | fail | blocked`, the test counts, `BUGS_FOUND`,
+`QA_RECOMMENDATION`). Then emit the `WORKFLOW STATUS` block per
+`workflow-contract`. Route any bug found to the developer via the
+`HANDOFF_TARGET`/`NEXT_ACTION` fields of the workflow block.
