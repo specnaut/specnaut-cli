@@ -1,5 +1,5 @@
 {
-  "feature_directory": ".specflow/specs/017-hook-payload-fix",
-  "linked_issue": 388,
+  "feature_directory": ".specflow/specs/018-scope-script-hardening",
+  "linked_issue": 389,
   "workflow_shape": "full"
 }

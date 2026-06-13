@@ -53,10 +53,18 @@ zero, and record the skip with its reason in the report's `### Scope` line.
 | Architecture  | architecture-auditor  | scope non-empty (always)               |
 | Security      | security-auditor      | scope non-empty (always)               |
 | Performance   | performance-auditor   | scope non-empty (always)               |
-| Accessibility | a11y-auditor          | `FRONTEND_COUNT > 0`                    |
-| Dependency    | dependency-auditor    | `DEP_COUNT > 0`                         |
+| Accessibility | a11y-auditor          | `FRONTEND_COUNT > 0` (gating signal)   |
+| Dependency    | dependency-auditor    | `DEP_COUNT > 0` (gating signal)        |
 
 These are the **existing** auditor agents — this skill defines no new agents.
+
+**Gating vs informational signals.** Only `FRONTEND_COUNT` and `DEP_COUNT`
+**gate** a seat (accessibility and dependency, respectively). `TEST_COUNT` and
+`INFRA_COUNT` are **informational context only** — no seat consumes them, and
+there is intentionally no test/coverage or infra seat (no such auditor agent
+exists). All four counts are always emitted (the scope-signals contract requires
+it); the two informational ones simply describe the scope, they do not select
+seats.
 
 ## Step 4 — Dispatch all selected seats IN PARALLEL (one message)
 
