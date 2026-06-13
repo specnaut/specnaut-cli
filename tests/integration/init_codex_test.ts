@@ -96,12 +96,14 @@ Deno.test("specflow init --ai codex scaffolds a Codex layout", async () => {
     // executing-plans (A4) + verification-before-completion (A5) +
     // brainstorming (A6) + 4 output-contract skills (#378:
     // workflow-contract, handoff-protocol, review-findings-contract,
-    // qa-report-contract) = 15. The audit-security phase (#303) lands
-    // under specflow/phases/, not as a top-level skill — no bump here.
+    // qa-report-contract) + code-audit (#379) = 16. The audit-security
+    // phase (#303) lands under specflow/phases/, not as a top-level skill —
+    // no bump there. code-audit's scope script ships under
+    // .specflow/scripts/code-audit/, not as a skill folder.
     const agentsSkillsCount = (await Array.fromAsync(
       Deno.readDir(join(root, ".agents/skills")),
     )).length;
-    assertEquals(agentsSkillsCount, 15);
+    assertEquals(agentsSkillsCount, 16);
     const codexAgentsCount = (await Array.fromAsync(
       Deno.readDir(join(root, ".codex/agents")),
     )).length;

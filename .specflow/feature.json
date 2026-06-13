@@ -1,5 +1,5 @@
 {
-  "feature_directory": ".specflow/specs/012-agent-output-contracts",
-  "linked_issue": 378,
+  "feature_directory": ".specflow/specs/013-code-audit",
+  "linked_issue": 379,
   "workflow_shape": "full"
 }
