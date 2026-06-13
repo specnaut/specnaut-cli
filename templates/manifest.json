@@ -101,6 +101,9 @@
     { "category": "backlog-script", "name": "move", "suffix": "move.sh", "source": "core/skills/backlog/scripts/cloud/move.sh", "executable": true, "backend": "cloud" },
     { "category": "backlog-script", "name": "clarify-comment", "suffix": "clarify-comment.sh", "source": "core/skills/backlog/scripts/cloud/clarify-comment.sh", "executable": true, "backend": "cloud" },
 
+    { "category": "skill", "name": "code-audit", "source": "core/skills/code-audit/SKILL.md" },
+    { "category": "spec-root", "name": "specify", "suffix": "scripts/code-audit/collect-audit-scope.sh", "source": "core/skills/code-audit/scripts/collect-audit-scope.sh", "executable": true },
+
     { "category": "spec-root", "name": "specify", "suffix": "memory/constitution.md", "source": "core/specflow/memory/constitution.md", "skipIfExists": true },
     { "category": "spec-root", "name": "specify", "suffix": "backlog.md", "source": "core/specflow/backlog.md" },
     { "category": "spec-root", "name": "specify", "suffix": "LABELS.md", "source": "core/specflow/LABELS.md" },

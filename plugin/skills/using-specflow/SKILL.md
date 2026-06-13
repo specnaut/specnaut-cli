@@ -43,6 +43,7 @@ not re-read the file with `Read`.
 | `executing-plans` | Inline alternative to subagent-driven — execute a plan task-by-task in-session with checkpoint pauses. Faster for trivial plans. |
 | `verification-before-completion` | Discipline checklist that any agent MUST run before reporting DONE. Tests green / pre-commit clean / plan boxes ticked / smoke audit / plugin sync / Windsurf cap / requirements addressed. |
 | `brainstorming` | Spec-discovery entry point when the idea is vague — one question at a time, propose 2-3 approaches, present design, hand off to `writing-plans`. |
+| `code-audit` | User wants a broad, multi-seat health-check ("audit the codebase", "code audit", "audit the last N commits"). Resolves a scope, dispatches the applicable auditor seats (architecture / security / performance / a11y / dependency) in parallel, synthesizes one report. Read-only. Complementary to `/specflow audit <axis>`, which runs a single axis. |
 | `backlog` | User asked about a backlog item, the board, an issue. Read-only access; mutations go through the `product-owner` agent. |
 | `specflow-auto` | Auto-chain orchestration (legacy entry point — most users invoke `/specflow specify` instead). |
 | `specflow-review` | Auto-invoke alias preserved for the `/specflow review` phase. |
