@@ -1,6 +1,7 @@
-import { red } from "@std/fmt/colors";
+import { red, yellow } from "@std/fmt/colors";
 import { HELP, renderVersionLine } from "./cli/help.ts";
 import { parseArgs } from "./cli/parser.ts";
+import { isLegacyInvocation, LEGACY_INVOCATION_WARNING } from "./domain/deprecation.ts";
 import { VERSION } from "./domain/version.ts";
 import { TEMPLATES_VERSION } from "./templates_bundle.ts";
 
@@ -56,5 +57,9 @@ export async function run(argv: string[]): Promise<number> {
 }
 
 if (import.meta.main) {
+  // Deprecated-alias notice: warn (don't block) when invoked as `specflow`.
+  if (isLegacyInvocation(Deno.execPath())) {
+    console.error(yellow(LEGACY_INVOCATION_WARNING));
+  }
   Deno.exit(await run(Deno.args));
 }
