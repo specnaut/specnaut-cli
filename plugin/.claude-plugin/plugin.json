@@ -1,11 +1,11 @@
 {
-  "name": "specflow-plugin",
-  "description": "Specflow's auto-chained spec-driven workflow, slash commands, and sub-agents for Claude Code — the same content the binary scaffolds, available as a versioned plugin.",
+  "name": "specnaut-plugin",
+  "description": "Specnaut's auto-chained spec-driven workflow, slash commands, and sub-agents for Claude Code — the same content the binary scaffolds, available as a versioned plugin.",
   "version": "1.13.1",
   "author": {
     "name": "MakerLabs"
   },
-  "homepage": "https://specflow.makerlabs.dev",
-  "repository": "https://github.com/mkrlabs/specflow",
+  "homepage": "https://specnaut.makerlabs.dev",
+  "repository": "https://github.com/mkrlabs/specnaut",
   "license": "MIT"
 }

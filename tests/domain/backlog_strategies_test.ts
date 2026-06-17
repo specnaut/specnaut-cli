@@ -126,10 +126,10 @@ Deno.test(
         ownerType: "org",
         projectNumber: 6,
       },
-      repo: "mkrlabs/specflow",
+      repo: "specnaut/specnaut-cli",
     });
     assertEquals(typeof stub, "string");
-    assertEquals(stub.includes(`repo: "mkrlabs/specflow"`), true);
+    assertEquals(stub.includes(`repo: "specnaut/specnaut-cli"`), true);
     assertEquals(stub.includes(`project_number: "6"`), true);
     // No "Fill in" reminder when the populated stub is rendered
     assertEquals(stub.includes("Fill in"), false);
@@ -179,11 +179,11 @@ Deno.test(
         ownerType: "org",
         projectNumber: 6,
       },
-      repo: "mkrlabs/specflow",
+      repo: "specnaut/specnaut-cli",
     });
     const joined = msgs.join("\n");
     assertEquals(joined.includes("ready to run /backlog"), true);
-    assertEquals(joined.includes("mkrlabs/specflow"), true);
+    assertEquals(joined.includes("specnaut/specnaut-cli"), true);
     assertEquals(joined.includes("project #6"), true);
     assertEquals(joined.includes("fill in"), false);
   },

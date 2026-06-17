@@ -172,8 +172,8 @@ import type { UpgradeMarker } from "../domain/upgrade_marker.ts";
 /**
  * Filesystem-backed store for `.specflow/upgrade-pending.json`.
  *
- * Written by `specflow upgrade` on every applied upgrade.
- * Read by `specflow-expert review-upgrade` and by `specflow reconcile`.
+ * Written by `specnaut upgrade` on every applied upgrade.
+ * Read by `specnaut-expert review-upgrade` and by `specnaut reconcile`.
  * Deleted at the end of a successful review.
  */
 export interface UpgradeMarkerStore {
@@ -185,7 +185,7 @@ export interface UpgradeMarkerStore {
 /**
  * Filesystem-backed access to `.specflow/upgrade-staging/`. The staging
  * directory holds upstream versions of files that the upgrade preserved
- * (customized locally). `specflow reconcile` consumes the directory.
+ * (customized locally). `specnaut reconcile` consumes the directory.
  */
 export interface StagingStore {
   /** Project-relative paths currently in the staging directory. */

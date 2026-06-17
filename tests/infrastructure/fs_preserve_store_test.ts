@@ -3,7 +3,7 @@ import { FsPreserveStore } from "../../src/infrastructure/fs_preserve_store.ts";
 import { EMPTY_PRESERVE_CONFIG } from "../../src/domain/preserve_config.ts";
 
 async function withTempDir(fn: (dir: string) => Promise<void>) {
-  const dir = await Deno.makeTempDir({ prefix: "specflow-preserve-store-" });
+  const dir = await Deno.makeTempDir({ prefix: "specnaut-preserve-store-" });
   try {
     await fn(dir);
   } finally {

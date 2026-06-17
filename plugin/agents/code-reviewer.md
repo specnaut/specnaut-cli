@@ -1,6 +1,6 @@
 ---
 name: code-reviewer
-description: Reviews code quality, architecture, DRY/YAGNI, readability, and conformance to the project constitution. Spawned by the review-coordinator during /specflow review.
+description: Reviews code quality, architecture, DRY/YAGNI, readability, and conformance to the project constitution. Spawned by the review-coordinator during /specnaut review.
 model: sonnet
 effort: medium
 tools: Read, Grep, Glob

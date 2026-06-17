@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Poll Specflow Cloud for board stage transitions since the last run and emit
+# Poll Specnaut Cloud for board stage transitions since the last run and emit
 # them for the product-owner to act on — the CLI half of the poll/reconcile
 # model (no webhook, no daemon).
 #

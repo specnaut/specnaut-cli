@@ -1,7 +1,7 @@
 import type { KnownHarness } from "./installed_lock.ts";
 
 /**
- * Pure predicate: does the `specflow-plugin` plugin own a copy of the
+ * Pure predicate: does the `specnaut-plugin` plugin own a copy of the
  * file at `dest` (relative to the project root)?
  *
  * Used by the upgrade use case to decide whether to apply the binary →
@@ -24,12 +24,12 @@ import type { KnownHarness } from "./installed_lock.ts";
  *
  *   - `.claude/agents/<name>.md` (excluding `architect.md` — that's a
  *     contributor-only agent, not bundled into user projects)
- *   - `.claude/skills/specflow/SKILL.md` — the consolidated router skill
- *   - `.claude/skills/specflow/phases/<phase>.md` — phase reference docs.
+ *   - `.claude/skills/specnaut/SKILL.md` — the consolidated router skill
+ *   - `.claude/skills/specnaut/phases/<phase>.md` — phase reference docs.
  *     Hyphenated names are valid (`tag-version`, `release-version`,
  *     `list-skills`, `audit-security`, …).
- *   - `.claude/skills/specflow-review/SKILL.md` — auto-invoke alias
- *   - `.claude/skills/specflow-auto/SKILL.md`
+ *   - `.claude/skills/specnaut-review/SKILL.md` — auto-invoke alias
+ *   - `.claude/skills/specnaut-auto/SKILL.md`
  *
  * Everything else (project-stateful files in `.specflow/`, harness-
  * static files like `.claude/settings.json`, hooks, `CLAUDE.md`,
@@ -44,32 +44,32 @@ export function isPluginCoveredPath(
   const agentMatch = dest.match(/^\.claude\/agents\/([^/]+)\.md$/);
   if (agentMatch !== null) return agentMatch[1] !== "architect";
 
-  if (dest === ".claude/skills/specflow/SKILL.md") return true;
+  if (dest === ".claude/skills/specnaut/SKILL.md") return true;
   // Hyphenated phase names are valid (`tag-version`, `release-version`,
   // `audit-security`, …). The earlier `[a-z]+` regex silently failed for
   // any phase containing a hyphen; the corrected pattern accepts one or
   // more lowercase alpha tokens separated by single hyphens.
-  if (/^\.claude\/skills\/specflow\/phases\/[a-z]+(?:-[a-z]+)*\.md$/.test(dest)) {
+  if (/^\.claude\/skills\/specnaut\/phases\/[a-z]+(?:-[a-z]+)*\.md$/.test(dest)) {
     return true;
   }
-  if (dest === ".claude/skills/specflow-review/SKILL.md") return true;
-  if (dest === ".claude/skills/specflow-auto/SKILL.md") return true;
+  if (dest === ".claude/skills/specnaut-review/SKILL.md") return true;
+  if (dest === ".claude/skills/specnaut-auto/SKILL.md") return true;
 
   return false;
 }
 
 /**
  * The canonical list of project-relative paths the binary scaffolds for
- * the Claude harness AND the `specflow-plugin` plugin owns. Used by
+ * the Claude harness AND the `specnaut-plugin` plugin owns. Used by
  * `check --project` to detect the "plugin uninstalled after migration"
  * gap: each path that is missing on disk AND for which the plugin is
  * not installed is a recoverable hole the user should know about
- * (either re-install the plugin or run `specflow upgrade` to restore
+ * (either re-install the plugin or run `specnaut upgrade` to restore
  * the bundled snapshot).
  *
  * Kept in sync with `isPluginCoveredPath` above. Total: 38 paths
  * (15 agents excluding architect + 1 router skill + 20 phase docs +
- * specflow-review alias + specflow-auto).
+ * specnaut-review alias + specnaut-auto).
  *
  * Phase docs include hyphenated names — the regex was widened in #303
  * after silently dropping `tag-version`, `release-version`, and
@@ -93,7 +93,7 @@ export const PLUGIN_COVERED_PATHS_CLAUDE: ReadonlyArray<string> = [
     "qa-tester",
     "review-coordinator",
     "security-auditor",
-    "specflow-expert",
+    "specnaut-expert",
     "test-reviewer",
     "workflow-manager",
     "ui-ux-designer",
@@ -102,7 +102,7 @@ export const PLUGIN_COVERED_PATHS_CLAUDE: ReadonlyArray<string> = [
     "architecture-auditor",
     "dependency-auditor",
   ].map((name) => `.claude/agents/${name}.md`),
-  ".claude/skills/specflow/SKILL.md",
+  ".claude/skills/specnaut/SKILL.md",
   ...[
     "specify",
     "clarify",
@@ -124,7 +124,7 @@ export const PLUGIN_COVERED_PATHS_CLAUDE: ReadonlyArray<string> = [
     "audit-architecture",
     "audit-dependencies",
     "lite-heuristic",
-  ].map((name) => `.claude/skills/specflow/phases/${name}.md`),
-  ".claude/skills/specflow-review/SKILL.md",
-  ".claude/skills/specflow-auto/SKILL.md",
+  ].map((name) => `.claude/skills/specnaut/phases/${name}.md`),
+  ".claude/skills/specnaut-review/SKILL.md",
+  ".claude/skills/specnaut-auto/SKILL.md",
 ];

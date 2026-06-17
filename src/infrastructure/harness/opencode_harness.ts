@@ -101,13 +101,13 @@ function destinationFor(entry: CoreEntry): string {
     case "backlog-cmd":
       return `.opencode/commands/${entry.name}.md`;
     case "agent":
-      return `.opencode/agents/specflow-${entry.name}.md`;
+      return `.opencode/agents/specnaut-${entry.name}.md`;
     case "skill":
     case "backlog-skill":
       return `.opencode/skills/${skillFolderName(entry)}/SKILL.md`;
     case "phase":
       if (!entry.suffix) throw new Error(`phase needs suffix: ${entry.name}`);
-      return `.opencode/skills/specflow/phases/${entry.suffix}`;
+      return `.opencode/skills/specnaut/phases/${entry.suffix}`;
     case "phase-script":
       return phaseScriptDestination(entry);
     case "backlog-script":

@@ -65,7 +65,7 @@ emit_section() {
 The 5 status columns mirror the GitHub Projects "kanban" model:
 
 - **Backlog** — needs more info, sizing, or prioritisation. The PO
-  works these on `/specflow groom` until they're ready.
+  works these on `/specnaut groom` until they're ready.
 - **Ready** — clarified, sized, prioritised. The PO proposes these
   for development when asked "what's next".
 - **In progress** — actively being worked on (a branch is open).
@@ -87,7 +87,7 @@ created: ...
 ---
 ```
 
-The PO assigns size + priority during the `/specflow groom` pass.
+The PO assigns size + priority during the `/specnaut groom` pass.
 
 ---
 

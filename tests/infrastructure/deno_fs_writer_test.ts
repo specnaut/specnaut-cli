@@ -11,7 +11,7 @@ const sampleBundle: Bundle = {
 };
 
 async function withTempDir(fn: (dir: string) => Promise<void>) {
-  const dir = await Deno.makeTempDir({ prefix: "specflow-fs-test-" });
+  const dir = await Deno.makeTempDir({ prefix: "specnaut-fs-test-" });
   try {
     await fn(dir);
   } finally {
@@ -176,7 +176,7 @@ Deno.test("writeBundle returns empty backups for fresh installs", async () => {
 });
 
 Deno.test("DenoFsWriter.deletePaths deletes specified files; missing files silently skipped", async () => {
-  const dir = await Deno.makeTempDir({ prefix: "specflow-fswriter-delete-" });
+  const dir = await Deno.makeTempDir({ prefix: "specnaut-fswriter-delete-" });
   try {
     await Deno.mkdir(join(dir, "sub"), { recursive: true });
     await Deno.writeTextFile(join(dir, "a.md"), "a");
@@ -198,7 +198,7 @@ Deno.test("DenoFsWriter.deletePaths deletes specified files; missing files silen
 });
 
 Deno.test("DenoFsWriter.deletePaths with backupExisting renames to .specflow.bak before delete", async () => {
-  const dir = await Deno.makeTempDir({ prefix: "specflow-fswriter-delete-bak-" });
+  const dir = await Deno.makeTempDir({ prefix: "specnaut-fswriter-delete-bak-" });
   try {
     await Deno.writeTextFile(join(dir, "a.md"), "alpha");
 

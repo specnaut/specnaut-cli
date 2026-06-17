@@ -99,7 +99,7 @@ Deno.test("parseKanbanURL rejects malformed GitHub project URL (missing /project
 
 Deno.test("parseKanbanURL rejects bare GitHub repo URL (not a project board)", () => {
   // /orgs/ or /users/ prefix is required for github.com
-  assertEquals(parseKanbanURL("https://github.com/mkrlabs/specflow"), null);
+  assertEquals(parseKanbanURL("https://github.com/specnaut/specnaut-cli"), null);
 });
 
 Deno.test("parseKanbanURL rejects non-numeric project number", () => {

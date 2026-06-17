@@ -10,9 +10,9 @@ Turn a feature request, an issue URL, or a free-form requirement into a
 another human) can follow step-by-step without re-reading the spec.
 
 > Inspired by [obra/superpowers v5.1.0](https://github.com/obra/superpowers)
-> (MIT) — `skills/writing-plans/SKILL.md`. Re-implemented for Specflow
-> with `docs/specflow/plans/` as the canonical save path and explicit
-> handoff to Specflow's `subagent-driven-development` / `executing-plans`
+> (MIT) — `skills/writing-plans/SKILL.md`. Re-implemented for Specnaut
+> with `docs/specnaut/plans/` as the canonical save path and explicit
+> handoff to Specnaut's `subagent-driven-development` / `executing-plans`
 > skills (`subagent-driven-development` and `executing-plans`).
 
 ## When to use this skill
@@ -23,15 +23,15 @@ Use when:
 - The user describes a feature and says "write a plan"
 - You hit a non-trivial change mid-task and need to step back before
   coding
-- A `/specflow groom` pass surfaces a Ready item that needs design before
+- A `/specnaut groom` pass surfaces a Ready item that needs design before
   implementation
 
 Do **not** use when:
 
 - The change is genuinely trivial (one-line typo, single-config bump) —
   just do it
-- The user explicitly asked for the spec-kit flow (`/specflow specify` →
-  `/specflow plan` produces design artefacts: research.md, data-model.md,
+- The user explicitly asked for the spec-kit flow (`/specnaut specify` →
+  `/specnaut plan` produces design artefacts: research.md, data-model.md,
   contracts/, quickstart.md — that's a different beast for greenfield
   features with formal specs)
 
@@ -41,7 +41,7 @@ Do **not** use when:
 
 ## Save plans to
 
-`docs/specflow/plans/YYYY-MM-DD-<feature-name>.md`
+`docs/specnaut/plans/YYYY-MM-DD-<feature-name>.md`
 
 User preference overrides this default (some teams prefer `.specflow/plans/`
 or `docs/plans/` — honor what they ask for). The date prefix gives plans
@@ -67,7 +67,7 @@ decomposition decisions get locked in.
   reason best about code you can hold in context at once.
 - Files that change together should live together. Split by
   responsibility, not by technical layer.
-- In existing Specflow code, follow established patterns. The hexagonal
+- In existing Specnaut code, follow established patterns. The hexagonal
   layout (`src/domain/`, `src/application/`, `src/infrastructure/`,
   `src/cli/`) is the house style — don't unilaterally restructure.
 
@@ -94,15 +94,15 @@ Every plan **MUST** start with this header:
 # [Feature Name] Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use
-> `specflow:subagent-driven-development` (recommended) or
-> `specflow:executing-plans` to implement this plan task-by-task.
+> `specnaut:subagent-driven-development` (recommended) or
+> `specnaut:executing-plans` to implement this plan task-by-task.
 > Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** [One sentence describing what this builds]
 
 **Architecture:** [2–3 sentences about approach — what changes, what stays]
 
-**Tech Stack:** [Deno + TypeScript, specific Specflow modules touched]
+**Tech Stack:** [Deno + TypeScript, specific Specnaut modules touched]
 
 > Issue: [URL if applicable]
 
@@ -198,7 +198,7 @@ checklist yourself — it is not a subagent dispatch.**
    tasks? A function called `clearLayers()` in Task 3 but
    `clearFullLayers()` in Task 7 is a bug.
 
-4. **Specflow conventions** — do file paths follow the hexagonal
+4. **Specnaut conventions** — do file paths follow the hexagonal
    layout? Do you respect the byte-identity plugin-sync contract
    (`templates/core/...` plus `plugin/...` twin) for any new template
    files? Are manifest entries added if you scaffold new files?
@@ -214,7 +214,7 @@ Fix issues inline. No need to re-review — just fix and move on.
 
 After saving the plan, offer the user a choice of execution strategy:
 
-> "Plan complete and saved to `docs/specflow/plans/<filename>.md`. Two
+> "Plan complete and saved to `docs/specnaut/plans/<filename>.md`. Two
 > execution options:
 >
 > 1. **Subagent-Driven** (recommended) — I dispatch a fresh subagent per
@@ -227,12 +227,12 @@ After saving the plan, offer the user a choice of execution strategy:
 
 **If subagent-driven chosen:**
 
-- **REQUIRED SUB-SKILL:** Use `specflow:subagent-driven-development`
+- **REQUIRED SUB-SKILL:** Use `specnaut:subagent-driven-development`
 - Fresh subagent per task + spec compliance + code quality review loop
 
 **If inline chosen:**
 
-- **REQUIRED SUB-SKILL:** Use `specflow:executing-plans`
+- **REQUIRED SUB-SKILL:** Use `specnaut:executing-plans`
 - Sequential in-session execution with checkpoint pauses between tasks
 
 ## Key principles
@@ -258,10 +258,10 @@ they prefer to drive manually). It does not:
 - Mutate the backlog (the `product-owner` agent owns those mutations)
 - Trigger releases (that's `/release` / `devops-sre`)
 
-## Integration with `/specflow plan`
+## Integration with `/specnaut plan`
 
-This skill is **distinct from** the `/specflow plan` phase of the
-spec-kit pipeline. The spec-kit `/specflow plan` produces design
+This skill is **distinct from** the `/specnaut plan` phase of the
+spec-kit pipeline. The spec-kit `/specnaut plan` produces design
 artefacts (research.md, data-model.md, contracts/, quickstart.md) for
 greenfield features starting from a `spec.md`. This `writing-plans`
 skill produces a **single executable plan file** for issue-driven or
@@ -269,8 +269,8 @@ ad-hoc work where the spec-kit ceremony would be overkill.
 
 A user can use both:
 
-- `/specflow specify` → `/specflow plan` for a new multi-month feature
+- `/specnaut specify` → `/specnaut plan` for a new multi-month feature
   with formal contracts
 - `writing-plans` (auto-invoked) for "plan how to fix this backlog issue"
 
-Specflow ships both because real teams have both flows.
+Specnaut ships both because real teams have both flows.

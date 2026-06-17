@@ -7,11 +7,11 @@ export const TEMPLATES_VERSION = "1.13.1";
 export const CORE_BUNDLE: CoreBundle = [
   {
     category: "skill",
-    name: "specflow",
+    name: "specnaut",
     suffix: null,
     content: `---
-name: specflow
-description: Specflow workflow router — entry point for the spec-driven pipeline. \`/specflow <phase> [args]\` dispatches to a single phase (brainstorm, specify, clarify, plan, tasks, analyze, implement, review, merge, constitution, checklist, groom, tag-version, release-version, list-skills, audit). \`/specflow\` with no args prints the workflow overview.
+name: specnaut
+description: Specnaut workflow router — entry point for the spec-driven pipeline. \`/specnaut <phase> [args]\` dispatches to a single phase (brainstorm, specify, clarify, plan, tasks, analyze, implement, review, merge, constitution, checklist, groom, tag-version, release-version, list-skills, audit). \`/specnaut\` with no args prints the workflow overview.
 argument-hint: <brainstorm|specify|clarify|plan|tasks|analyze|implement|review|merge|constitution|checklist|groom|tag-version|release-version|list-skills|audit> [args]
 when_to_use: |
   Trigger phrases that should route here:
@@ -33,7 +33,7 @@ when_to_use: |
   - audit: "audit security / performance / accessibility / architecture / dependencies", "scan the codebase for X issues"
 ---
 
-# Specflow router
+# Specnaut router
 
 \`\$ARGUMENTS\` carries the user's input. Parse it as \`[<flag>...] <phase> [rest]\`:
 
@@ -79,9 +79,9 @@ when_to_use: |
    \`audit architecture\` → phase \`audit-architecture\`, args \`\`;
    \`audit dependencies\` → phase \`audit-dependencies\`, args \`\`.
    Users may also invoke the hyphenated form directly
-   (\`/specflow audit-security\`, \`/specflow audit-performance\`,
-   \`/specflow audit-accessibility\`, \`/specflow audit-architecture\`,
-   \`/specflow audit-dependencies\`); both forms route to the same
+   (\`/specnaut audit-security\`, \`/specnaut audit-performance\`,
+   \`/specnaut audit-accessibility\`, \`/specnaut audit-architecture\`,
+   \`/specnaut audit-dependencies\`); both forms route to the same
    phase doc.
 
 3. **Empty arguments** — if no tokens remain after flag parsing (or
@@ -164,16 +164,16 @@ After the phase procedure completes successfully:
     optional step 0 — only when the idea is still fuzzy            STOP for pre-merge validation
 \`\`\`
 
-Default behavior: \`/specflow specify "..."\` runs the entire chain in one
+Default behavior: \`/specnaut specify "..."\` runs the entire chain in one
 session, pausing only at STOP #1 (if clarifications are needed) and
 STOP #2 (pre-merge confirmation). See \`phases/auto-chain.md\` for the
 chain mechanics.
 
 \`brainstorm\` is an **optional front-end**: when the user doesn't yet have a
-clear enough idea to spec, \`/specflow brainstorm "<rough idea>"\` runs a
+clear enough idea to spec, \`/specnaut brainstorm "<rough idea>"\` runs a
 discovery dialogue (one question at a time, 2–3 approaches, design approval)
 and then chains into \`specify\` with the agreed brief. When the brief is
-already clear, start at \`/specflow specify\` and skip it.
+already clear, start at \`/specnaut specify\` and skip it.
 
 \`constitution\`, \`checklist\`, \`groom\`, \`tag-version\`, \`release-version\`, \`list-skills\`, and \`audit <axis>\` (any of \`security\`, \`performance\`, \`accessibility\`, \`architecture\`, \`dependencies\`) are out-of-band utilities, not part of the linear flow.
 
@@ -182,37 +182,37 @@ already clear, start at \`/specflow specify\` and skip it.
 When the idea is still fuzzy, start one phase earlier:
 
 \`\`\`
-/specflow brainstorm "let users monitor agent runs from their phone"
+/specnaut brainstorm "let users monitor agent runs from their phone"
   → discovery dialogue (one question at a time, 2–3 approaches, design approval)
-  → on approval, auto-chains into /specflow specify with the agreed brief
+  → on approval, auto-chains into /specnaut specify with the agreed brief
 \`\`\`
 
 When the brief is already clear, start at \`specify\`:
 
 \`\`\`
-/specflow specify "Add OAuth2 login"
+/specnaut specify "Add OAuth2 login"
   → drafts the spec, then auto-chains:
-    → /specflow clarify  (STOP #1 only if [NEEDS CLARIFICATION] markers remain)
-    → /specflow plan
-    → /specflow tasks
-    → /specflow analyze
-    → /specflow implement
-    → /specflow review
+    → /specnaut clarify  (STOP #1 only if [NEEDS CLARIFICATION] markers remain)
+    → /specnaut plan
+    → /specnaut tasks
+    → /specnaut analyze
+    → /specnaut implement
+    → /specnaut review
     → STOP #2 — summary + "Ready to merge?" confirmation
-    → /specflow merge  (on "yes")
+    → /specnaut merge  (on "yes")
 \`\`\`
 
 To run a single phase only (no chain), pass \`--manual\`:
 
 \`\`\`
-/specflow specify --manual "Add OAuth2 login"
+/specnaut specify --manual "Add OAuth2 login"
 \`\`\`
 
 To force or skip the chain mid-flow:
 
 \`\`\`
-/specflow plan 042 --once       # regenerate plan.md only, do not cascade
-/specflow plan 042 --continue   # regenerate plan.md AND cascade tasks → review
+/specnaut plan 042 --once       # regenerate plan.md only, do not cascade
+/specnaut plan 042 --continue   # regenerate plan.md AND cascade tasks → review
 \`\`\`
 
 To opt in or out of the **lite chain** (skip \`clarify\` and \`tasks\` —
@@ -220,8 +220,8 @@ calibrated for small single-file features like markdown docs, README
 tweaks, agent definitions):
 
 \`\`\`
-/specflow specify --lite "Document the OSS/proprio boundary in AGENTS.md"
-/specflow specify --full "Add OAuth2 login"   # opt out of auto-detected lite
+/specnaut specify --lite "Document the OSS/proprio boundary in AGENTS.md"
+/specnaut specify --full "Add OAuth2 login"   # opt out of auto-detected lite
 \`\`\`
 
 Without an explicit flag, \`phases/specify.md\` scores the brief
@@ -254,11 +254,11 @@ yourself.
 \`brainstorm\` is the optional **step 0** of the spec-driven pipeline: the
 entry point for when the user does NOT yet have a clear enough idea to write
 a spec. It runs a collaborative discovery dialogue, turns the fuzzy idea into
-an approved design brief, then hands that brief to \`/specflow specify\` — which
+an approved design brief, then hands that brief to \`/specnaut specify\` — which
 owns writing the formal \`.specflow/specs/<feature>/spec.md\`.
 
 Use this phase when the idea needs *discovery* before it can be specified.
-When the user already has a clear brief, they invoke \`/specflow specify\`
+When the user already has a clear brief, they invoke \`/specnaut specify\`
 directly and skip this phase.
 
 ## Procedure
@@ -288,17 +288,17 @@ The discovery dialogue is already defined, in full, by the bundled
 ## Terminal handoff — overridden for the spec-kit chain
 
 The standalone \`brainstorming\` skill ends (its Steps 7–10) by writing its own
-markdown design doc and forking to \`writing-plans\` **or** \`/specflow specify\`.
-Inside the \`/specflow\` router this phase **overrides that ending**:
+markdown design doc and forking to \`writing-plans\` **or** \`/specnaut specify\`.
+Inside the \`/specnaut\` router this phase **overrides that ending**:
 
 - **Do NOT** write a separate design doc and do **NOT** hand off to
-  \`writing-plans\`. \`/specflow specify\` is the next phase and it owns writing
+  \`writing-plans\`. \`/specnaut specify\` is the next phase and it owns writing
   \`.specflow/specs/<feature>/spec.md\`, so a brainstorm-authored doc would only
   double up.
 - Instead, distill the approved design into a concise **feature brief**
   (2–6 sentences capturing goal, the chosen approach, key constraints, and
   explicit out-of-scope items) and carry it forward as the input to
-  \`/specflow specify\`.
+  \`/specnaut specify\`.
 
 ## Chain decision
 
@@ -306,13 +306,13 @@ Inside the \`/specflow\` router this phase **overrides that ending**:
 (in both the full and lite chain shapes).
 
 - \`CHAIN_MODE == auto\` (default) or \`continue\` → after design approval,
-  immediately invoke \`/specflow specify\` with the distilled feature brief as
+  immediately invoke \`/specnaut specify\` with the distilled feature brief as
   its \`\$ARGUMENTS\`. Emit \`✓ brainstorm complete — proceeding to specify\`.
   The chain then continues normally from \`specify\` (which applies its own
   lite/full shape heuristic).
 - \`CHAIN_MODE == off\` (\`--manual\`) or \`once\` → stop after design approval.
   Print the approved feature brief and tell the user they can run
-  \`/specflow specify "<brief>"\` when ready. Do not auto-invoke \`specify\`.
+  \`/specnaut specify "<brief>"\` when ready. Do not auto-invoke \`specify\`.
 
 ## Notes
 
@@ -356,7 +356,7 @@ Hooks with non-empty \`condition\` are deferred to the HookExecutor.
 ## Chain shape selection
 
 Before running the outline below, determine the **chain shape** that
-will apply to this \`/specflow specify\` invocation (and the rest of
+will apply to this \`/specnaut specify\` invocation (and the rest of
 the chain after it):
 
 1. **Read \`CHAIN_SHAPE\` from the router context** (set by \`SKILL.md\`
@@ -367,7 +367,7 @@ the chain after it):
 
 2. **Apply the lite heuristic.** Read \`phases/lite-heuristic.md\`,
    score the feature brief (the original user input from
-   \`/specflow specify\`, before flag stripping is irrelevant — use the
+   \`/specnaut specify\`, before flag stripping is irrelevant — use the
    substantive brief), and:
    - If \`score < 2\`: silently set \`CHAIN_SHAPE = full\`. No prompt.
    - If \`score ≥ 2\`: emit the prompt from \`phases/lite-heuristic.md\`
@@ -392,7 +392,7 @@ the chain after it):
 
 ## Outline
 
-The text the user typed after \`/specflow specify\` is the feature description. Do not ask the user to repeat it unless they provided an empty command.
+The text the user typed after \`/specnaut specify\` is the feature description. Do not ask the user to repeat it unless they provided an empty command.
 
 Given that feature description, do this:
 
@@ -428,9 +428,9 @@ Given that feature description, do this:
      { "feature_directory": "<resolved feature dir>", "linked_issue": <N or null>, "workflow_shape": "<lite|full>" }
      \`\`\`
      Write the actual resolved path (e.g., \`.specflow/specs/003-user-auth\`), not the literal string.
-     This lets downstream commands (\`/specflow plan\`, \`/specflow tasks\`, etc.) locate the feature directory.
+     This lets downstream commands (\`/specnaut plan\`, \`/specnaut tasks\`, etc.) locate the feature directory.
 
-     **\`linked_issue\`**: when the user invokes \`/specflow specify\` with \`--issue <id>\` (or the
+     **\`linked_issue\`**: when the user invokes \`/specnaut specify\` with \`--issue <id>\` (or the
      hook's JSON output includes a non-null \`LINKED_ISSUE\`), persist it as a JSON integer here.
      Otherwise persist \`null\`. The merge phase reads this field to auto-close the linked
      backlog item on the project board after a successful fast-forward + push. Backward-compat
@@ -442,7 +442,7 @@ Given that feature description, do this:
      with existing \`feature.json\` files: absent → treat as \`"full"\` everywhere downstream.
 
    **IMPORTANT**:
-   - Create only one feature per \`/specflow specify\` invocation.
+   - Create only one feature per \`/specnaut specify\` invocation.
    - The spec directory name and git branch name are independent.
    - The spec directory and file are always created by this command, never by the hook.
 
@@ -455,7 +455,7 @@ Given that feature description, do this:
     4. Fill User Scenarios & Testing; if no clear user flow: ERROR "Cannot determine user scenarios"
     5. Generate Functional Requirements — each must be testable
     6. Define Success Criteria — measurable, technology-agnostic, verifiable
-    7. **Populate the \`## Domain Model\` block (mandatory)** — Bounded context, Vocabulary (Ubiquitous language), Entities (have identity), Value objects, Invariants, Out of scope. Use \`[NEEDS CLARIFICATION: <question>]\` markers for fields the input does not let you fill — \`/specflow clarify\` resolves them. The developer refuses to proceed if this block is absent or contains unresolved placeholders.
+    7. **Populate the \`## Domain Model\` block (mandatory)** — Bounded context, Vocabulary (Ubiquitous language), Entities (have identity), Value objects, Invariants, Out of scope. Use \`[NEEDS CLARIFICATION: <question>]\` markers for fields the input does not let you fill — \`/specnaut clarify\` resolves them. The developer refuses to proceed if this block is absent or contains unresolved placeholders.
     8. Return: SUCCESS (spec ready for planning)
 
 6. Write the specification to \`SPEC_FILE\` using the template structure, replacing placeholders with concrete details while preserving section order and headings.
@@ -489,7 +489,7 @@ Given that feature description, do this:
       - [ ] No implementation details in specification
 
       ## Notes
-      Items marked incomplete require spec updates before \`/specflow clarify\` or \`/specflow plan\`
+      Items marked incomplete require spec updates before \`/specnaut clarify\` or \`/specnaut plan\`
       \`\`\`
 
    b. **Run Validation**: Review spec against each checklist item; document specific failures.
@@ -504,7 +504,7 @@ Given that feature description, do this:
 
       - **[NEEDS CLARIFICATION] markers remain**: keep ≤3 most critical,
         document informed-guess defaults in Assumptions, leave the
-        surviving markers verbatim for \`/specflow clarify\` to resolve.
+        surviving markers verbatim for \`/specnaut clarify\` to resolve.
         **Do NOT prompt inline.** In \`lite\` shape, markers become
         Assumptions and the chain continues.
 
@@ -513,8 +513,8 @@ Given that feature description, do this:
 8. **Report completion and proceed (no permission ask)**:
    - Report \`SPECIFY_FEATURE_DIRECTORY\`, \`SPEC_FILE\`, and checklist
      summary in one short block.
-   - Chain unconditionally to the next phase: \`full\` → \`/specflow clarify\`,
-     \`lite\` → \`/specflow plan\`. Pause only on \`--manual\` or \`--once\`.
+   - Chain unconditionally to the next phase: \`full\` → \`/specnaut clarify\`,
+     \`lite\` → \`/specnaut plan\`. Pause only on \`--manual\` or \`--once\`.
      Transition wording is a statement (\`✓ specify complete — proceeding
      to <next>\`), never a question.
 
@@ -589,7 +589,7 @@ Hooks with non-empty \`condition\` are deferred to the HookExecutor.
 
 Goal: Detect and reduce ambiguity or missing decision points in the active feature specification and record the clarifications directly in the spec file.
 
-Note: This clarification workflow is expected to run (and be completed) BEFORE invoking \`/specflow plan\`. If the user explicitly states they are skipping clarification (e.g., exploratory spike), you may proceed, but must warn that downstream rework risk increases.
+Note: This clarification workflow is expected to run (and be completed) BEFORE invoking \`/specnaut plan\`. If the user explicitly states they are skipping clarification (e.g., exploratory spike), you may proceed, but must warn that downstream rework risk increases.
 
 Execution steps:
 
@@ -597,7 +597,7 @@ Execution steps:
    - \`FEATURE_DIR\`
    - \`FEATURE_SPEC\`
    - (Optionally capture \`IMPL_PLAN\`, \`TASKS\` for future chained flows.)
-   - If JSON parsing fails, abort and instruct user to re-run \`/specflow specify\` or verify feature branch environment.
+   - If JSON parsing fails, abort and instruct user to re-run \`/specnaut specify\` or verify feature branch environment.
    - For single quotes in args like "I'm Groot", use escape syntax: e.g 'I'\\''m Groot' (or double-quote if possible: "I'm Groot").
 
 2. Load the current spec file. Perform a structured ambiguity & coverage scan. For each category mark status: Clear / Partial / Missing (internal map only; do not output unless no questions will be asked).
@@ -627,7 +627,7 @@ Execution steps:
     - Favor clarifications that reduce downstream rework risk or prevent misaligned acceptance tests.
     - If more than 5 categories remain unresolved, select the top 5 by (Impact * Uncertainty) heuristic.
 
-3a. Remote-mode check (#358): run \`specflow gate status\` once. Exit 0 ⇒ ON, use step 4R (gates).
+3a. Remote-mode check (#358): run \`specnaut gate status\` once. Exit 0 ⇒ ON, use step 4R (gates).
     Non-zero ⇒ OFF/not-linked (default), use step 4 verbatim. Caps/rules identical in both modes.
 
 4. Sequential questioning loop (interactive — used when remote mode is OFF):
@@ -662,12 +662,12 @@ Execution steps:
     - If no valid questions exist at start, immediately report no critical ambiguities.
 
 4R. Remote questioning loop (step 3a found remote mode ON). Same queue/caps; per question raise a
-    gate via \`specflow gate raise --type <t> --title "<question>" --payload '<json>'\`. Multiple-choice
+    gate via \`specnaut gate raise --type <t> --title "<question>" --payload '<json>'\`. Multiple-choice
     → \`decision\` (\`{question,options:[{id,label,description?}],context?}\`); short-answer →
     \`clarification\` (\`{question,context?}\`); add \`--task <n>\` if task-scoped. Branch on exit code
     (answer JSON on stdout): **0** → parse (\`decision\`→\`choiceId\`, \`clarification\`→\`text\`), accept,
     integrate via step 5. **3/4** (timeout/cancelled) → stop, list Outstanding, recommend re-run;
-    never invent an answer. **5** → \`specflow cloud login\` needed, fall back to step 4. **1** → report
+    never invent an answer. **5** → \`specnaut cloud login\` needed, fall back to step 4. **1** → report
     and stop. Idempotent: skip questions already in \`## Clarifications\`; apply each answer once.
 
 5. Integration after EACH accepted answer (incremental update approach):
@@ -695,7 +695,7 @@ Execution steps:
    - No contradictory earlier statement remains.
    - Markdown structure valid; only allowed new headings: \`## Clarifications\`, \`### Session YYYY-MM-DD\`.
    - Terminology consistency: same canonical term used across all updated sections.
-   - **Domain Model exit gate (NON-NEGOTIABLE)**: the spec's \`## Domain Model\` section MUST be fully populated — Bounded context, Vocabulary, Entities, Value objects, Invariants, and Out of scope all filled, with no \`[NEEDS CLARIFICATION]\` markers and no template placeholders remaining. If unfilled fields remain at the end of the clarify session, do not advance — surface them as Outstanding and recommend running \`/specflow clarify\` again. The downstream \`/specflow implement\` step will refuse to proceed without this section.
+   - **Domain Model exit gate (NON-NEGOTIABLE)**: the spec's \`## Domain Model\` section MUST be fully populated — Bounded context, Vocabulary, Entities, Value objects, Invariants, and Out of scope all filled, with no \`[NEEDS CLARIFICATION]\` markers and no template placeholders remaining. If unfilled fields remain at the end of the clarify session, do not advance — surface them as Outstanding and recommend running \`/specnaut clarify\` again. The downstream \`/specnaut implement\` step will refuse to proceed without this section.
 
 7. Write the updated spec back to \`FEATURE_SPEC\`.
 
@@ -704,13 +704,13 @@ Execution steps:
    - Path to updated spec.
    - Sections touched (list names).
    - Coverage summary table: each taxonomy category with Status: Resolved / Deferred / Clear / Outstanding.
-   - If any Outstanding or Deferred remain, recommend whether to proceed to \`/specflow plan\` or run \`/specflow clarify\` again.
+   - If any Outstanding or Deferred remain, recommend whether to proceed to \`/specnaut plan\` or run \`/specnaut clarify\` again.
    - Suggested next command.
 
 Behavior rules:
 
 - If no meaningful ambiguities found, respond: "No critical ambiguities detected worth formal clarification." and suggest proceeding.
-- If spec file missing, instruct user to run \`/specflow specify\` first (do not create a new spec here).
+- If spec file missing, instruct user to run \`/specnaut specify\` first (do not create a new spec here).
 - Never exceed 5 total asked questions (clarification retries for a single question do not count as new questions).
 - Avoid speculative tech stack questions unless the absence blocks functional clarity.
 - Respect user early termination signals ("stop", "done", "proceed").
@@ -870,7 +870,7 @@ You **MUST** consider the user input before proceeding (if not empty).
    - Skip if project is purely internal (build scripts, one-off tools, etc.)
 
 3. **Agent context update**:
-   - Update the plan reference between the \`<!-- SPECFLOW START -->\` and \`<!-- SPECFLOW END -->\` markers in \`__CONTEXT_FILE__\` to point to the plan file created in step 1 (the IMPL_PLAN path)
+   - Update the plan reference between the \`<!-- SPECNAUT START -->\` and \`<!-- SPECNAUT END -->\` markers in \`__CONTEXT_FILE__\` to point to the plan file created in step 1 (the IMPL_PLAN path)
 
 **Output**: data-model.md, /contracts/*, quickstart.md, updated agent context file
 
@@ -1129,13 +1129,13 @@ You **MUST** consider the user input before proceeding (if not empty).
 
 ## Goal
 
-Identify inconsistencies, duplications, ambiguities, and underspecified items across the three core artifacts (\`spec.md\`, \`plan.md\`, \`tasks.md\`) before implementation. This command MUST run only after \`/specflow tasks\` has successfully produced a complete \`tasks.md\`.
+Identify inconsistencies, duplications, ambiguities, and underspecified items across the three core artifacts (\`spec.md\`, \`plan.md\`, \`tasks.md\`) before implementation. This command MUST run only after \`/specnaut tasks\` has successfully produced a complete \`tasks.md\`.
 
 ## Operating Constraints
 
 **STRICTLY READ-ONLY**: Do **not** modify any files. Output a structured analysis report. Offer an optional remediation plan (user must explicitly approve before any follow-up editing commands would be invoked manually).
 
-**Constitution Authority**: The project constitution (\`/memory/constitution.md\`) is **non-negotiable** within this analysis scope. Constitution conflicts are automatically CRITICAL and require adjustment of the spec, plan, or tasks—not dilution, reinterpretation, or silent ignoring of the principle. If a principle itself needs to change, that must occur in a separate, explicit constitution update outside \`/specflow analyze\`.
+**Constitution Authority**: The project constitution (\`/memory/constitution.md\`) is **non-negotiable** within this analysis scope. Constitution conflicts are automatically CRITICAL and require adjustment of the spec, plan, or tasks—not dilution, reinterpretation, or silent ignoring of the principle. If a principle itself needs to change, that must occur in a separate, explicit constitution update outside \`/specnaut analyze\`.
 
 ## Execution Steps
 
@@ -1271,9 +1271,9 @@ Output a Markdown report (no file writes) with the following structure:
 
 At end of report, output a concise Next Actions block:
 
-- If CRITICAL issues exist: Recommend resolving before \`/specflow implement\`
+- If CRITICAL issues exist: Recommend resolving before \`/specnaut implement\`
 - If only LOW/MEDIUM: User may proceed, but provide improvement suggestions
-- Provide explicit command suggestions: e.g., "Run /specflow specify --manual to refine the spec without re-cascading", "Run /specflow plan --once to regenerate the plan only, or /specflow plan to cascade through tasks → review", "Manually edit tasks.md to add coverage for 'performance-metrics'"
+- Provide explicit command suggestions: e.g., "Run /specnaut specify --manual to refine the spec without re-cascading", "Run /specnaut plan --once to regenerate the plan only, or /specnaut plan to cascade through tasks → review", "Manually edit tasks.md to add coverage for 'performance-metrics'"
 
 ### 8. Offer Remediation
 
@@ -1420,7 +1420,7 @@ You **MUST** consider the user input before proceeding (if not empty).
 3. Load and analyze the implementation context:
    - **REQUIRED**: Read tasks.md for the complete task list and execution plan
    - **REQUIRED**: Read plan.md for tech stack, architecture, and file structure
-   - **REQUIRED**: Read the \`## Domain Model\` section in spec.md. If the section is absent, empty, or still contains \`[NEEDS CLARIFICATION]\` markers / template placeholders → halt and report BLOCKED with reason \`awaiting:product-owner-domain-brief\`. The developer agent refuses to write code without this brief — its "First action" checklist (step 4) reads the block and returns the same BLOCKED reason. Recommend running \`/specflow clarify\` to fill the section before re-attempting \`/specflow implement\`.
+   - **REQUIRED**: Read the \`## Domain Model\` section in spec.md. If the section is absent, empty, or still contains \`[NEEDS CLARIFICATION]\` markers / template placeholders → halt and report BLOCKED with reason \`awaiting:product-owner-domain-brief\`. The developer agent refuses to write code without this brief — its "First action" checklist (step 4) reads the block and returns the same BLOCKED reason. Recommend running \`/specnaut clarify\` to fill the section before re-attempting \`/specnaut implement\`.
    - **IF EXISTS**: Read data-model.md for entities and relationships
    - **IF EXISTS**: Read contracts/ for API specifications and test requirements
    - **IF EXISTS**: Read research.md for technical decisions and constraints
@@ -1505,7 +1505,7 @@ You **MUST** consider the user input before proceeding (if not empty).
    - Confirm the implementation follows the technical plan
    - Report final status with summary of completed work
 
-Note: This command assumes a complete task breakdown exists in tasks.md. If tasks are incomplete or missing, suggest running \`/specflow tasks\` first to regenerate the task list.
+Note: This command assumes a complete task breakdown exists in tasks.md. If tasks are incomplete or missing, suggest running \`/specnaut tasks\` first to regenerate the task list.
 
 10. **Check for extension hooks**: After completion validation, check if \`.specflow/extensions.yml\` exists in the project root.
     - If it exists, read it and look for entries under the \`hooks.after_implement\` key
@@ -1629,7 +1629,7 @@ Overall: PASS | FAIL
 
 If Overall = PASS, surface the STOP #2 summary block defined in
 \`phases/auto-chain.md\` and ask for merge confirmation, then invoke
-\`/specflow merge\` on "yes". If FAIL, stop and report to the user.
+\`/specnaut merge\` on "yes". If FAIL, stop and report to the user.
 `,
     executable: false,
     backend: null,
@@ -1649,7 +1649,7 @@ If Overall = PASS, surface the STOP #2 summary block defined in
 ## Preconditions
 
 - The feature branch must be checked out.
-- All Specflow phases must have completed successfully (clarify, plan, tasks, analyze, implement,
+- All Specnaut phases must have completed successfully (clarify, plan, tasks, analyze, implement,
   review).
 - \`\$ARGUMENTS\` is optional. If empty, the base branch is \`main\`. Otherwise it is the first token of
   \`\$ARGUMENTS\`.
@@ -1693,7 +1693,7 @@ If Overall = PASS, surface the STOP #2 summary block defined in
 
    Backward-compat: feature trees without \`linked_issue\` (created before this field existed)
    skip step 8 silently. Multi-PR features (final PR not yet merged) — the user answers \`no\`
-   in step 8.4 and re-runs \`/specflow merge\` on the last PR.
+   in step 8.4 and re-runs \`/specnaut merge\` on the last PR.
 
 ## Output
 
@@ -1965,7 +1965,7 @@ Hooks with non-empty \`condition\` are deferred to the HookExecutor.
 
 7. **Report**: Output full path to checklist file, item count, and summarize whether the run created a new file or appended to an existing one. Summarize focus areas selected, depth level, actor/timing, and any explicit user-specified must-have items incorporated.
 
-**Important**: Each \`/specflow checklist\` command invocation uses a short, descriptive checklist filename and either creates a new file or appends to an existing one — allowing multiple checklists of different types (e.g., \`ux.md\`, \`test.md\`, \`security.md\`). Use descriptive types and clean up obsolete checklists when done.
+**Important**: Each \`/specnaut checklist\` command invocation uses a short, descriptive checklist filename and either creates a new file or appends to an existing one — allowing multiple checklists of different types (e.g., \`ux.md\`, \`test.md\`, \`security.md\`). Use descriptive types and clean up obsolete checklists when done.
 
 ## Example Checklist Types & Sample Items
 
@@ -2034,7 +2034,7 @@ Hooks with non-empty \`condition\` are deferred to the HookExecutor.
     name: "groom",
     suffix: "groom.md",
     content: `
-# /specflow groom
+# /specnaut groom
 
 A maintenance pass that keeps the project's backlog and review pipeline
 flowing without human intervention. Designed to be invoked manually or
@@ -2042,8 +2042,8 @@ on a timer via \`/loop\`.
 
 This skill is **manual-only** (\`disable-model-invocation: true\`) — it
 should not auto-trigger on casual user prompts. The user invokes it
-explicitly with \`/specflow groom\` or schedules it with
-\`/loop 1h /specflow groom\`.
+explicitly with \`/specnaut groom\` or schedules it with
+\`/loop 1h /specnaut groom\`.
 
 ## What this skill does
 
@@ -2064,7 +2064,7 @@ The PO will:
 
 - Read each item's body and existing comments.
 - **Skip** items it has already commented on in a previous run (look for
-  the marker \`🤖 specflow-groom\` at the start of any comment).
+  the marker \`🤖 specnaut-groom\` at the start of any comment).
 - **Process tickets one at a time, end-to-end** — body → size → priority
   → promote/comment, fully complete on ticket N before moving to N+1.
   Do NOT batch-clarify-then-batch-label across all tickets; the
@@ -2103,7 +2103,7 @@ The PO will:
   4. **Decide the outcome:**
      - **Promote to \`Ready\`** when the body is clear, both labels are
        applied, AND no scope decisions remain.
-     - **Leave a clarification comment** marked with the \`🤖 specflow-groom\`
+     - **Leave a clarification comment** marked with the \`🤖 specnaut-groom\`
        prefix when 1–3 scope decisions still need Kevin's input. Steps 2
        and 3 are still mandatory — apply best-estimate labels from
        available context; the item stays in \`Backlog\` until Kevin
@@ -2138,7 +2138,7 @@ Size and priority are conceptually two single-select dimensions. They
 can live on a ticket in two surfaces:
 
 1. **Native Project V2 single-select fields** named \`Priority\` and
-   \`Size\`. Every Specflow project ships with these as the canonical
+   \`Size\`. Every Specnaut project ships with these as the canonical
    surface — they group on the project board, query cleanly via
    GraphQL, and don't pollute the label namespace.
 2. **GitHub / GitLab labels** (\`priority:P0..P3\`, \`size:XS..XL\`). Used
@@ -2209,10 +2209,10 @@ This step is read-only; do not mutate PRs.
 Walk \`.specflow/specs/\` (if present) and surface any feature directory
 that is missing the next expected artefact:
 
-- Has \`spec.md\` but no \`plan.md\` → flag as "needs \`/specflow plan\`".
-- Has \`plan.md\` but no \`tasks.md\` → flag as "needs \`/specflow tasks\`".
+- Has \`spec.md\` but no \`plan.md\` → flag as "needs \`/specnaut plan\`".
+- Has \`plan.md\` but no \`tasks.md\` → flag as "needs \`/specnaut tasks\`".
 - Has \`tasks.md\` but no \`installed\` markers in commits → flag as
-  "needs \`/specflow implement\`".
+  "needs \`/specnaut implement\`".
 
 This is also read-only; never delete or modify spec files.
 
@@ -2230,7 +2230,7 @@ match a 3-level field. This makes the field-vs-label routing visible
 in the report.
 
 \`\`\`
-specflow-groom report
+specnaut-groom report
 ─────────────────────
 ⚠  groom completed with <K> un-sized/un-prioritised tickets — re-run or fix manually
     (only emitted when K > 0, at the very top of the summary)
@@ -2271,7 +2271,7 @@ to be a **no-op when the project is healthy**.
   subagent directly with the item number.
 - For PR review on a specific PR → invoke \`code-reviewer\` /
   \`security-auditor\` directly.
-- For implementing a spec → invoke \`/specflow implement\` directly.
+- For implementing a spec → invoke \`/specnaut implement\` directly.
 `,
     executable: false,
     backend: null,
@@ -2291,16 +2291,16 @@ to be a **no-op when the project is healthy**.
 You **MUST** consider the user input before proceeding (if not empty).
 Common natural-language requests:
 
-- \`/specflow tag-version\` — tag HEAD with the next version
-- \`/specflow tag-version <sha>\` — tag a specific commit
-- \`/specflow tag-version --bump minor\` — SemVer projects only: bump
+- \`/specnaut tag-version\` — tag HEAD with the next version
+- \`/specnaut tag-version <sha>\` — tag a specific commit
+- \`/specnaut tag-version --bump minor\` — SemVer projects only: bump
   minor instead of patch (also \`--bump major\` / \`--bump patch\`)
-- \`/specflow tag-version --no-push\` — skip pushing to \`origin\`
+- \`/specnaut tag-version --no-push\` — skip pushing to \`origin\`
 
 ## What this command does
 
 Creates an annotated git tag using the **versioning scheme baked into
-this project at \`specflow init\`** (one of SemVer \`v1.2.3\` or date-based
+this project at \`specnaut init\`** (one of SemVer \`v1.2.3\` or date-based
 \`vYY.M.Da\`).
 
 The bundled script does all the work:
@@ -2326,18 +2326,18 @@ What the script does:
 ## What this command does NOT do
 
 - It does **not** create a GitHub / GitLab release — pushing a tag
-  alone does not publish a release. Run \`/specflow release-version\`
+  alone does not publish a release. Run \`/specnaut release-version\`
   after this to publish the categorized release notes.
 - It does **not** deploy anything. A tag push never ships to
   production — in the recommended model, deploys are triggered by a
   *published release*, not by tags or branch pushes. See
-  \`/specflow release-version\` → "From release to production (CD)".
+  \`/specnaut release-version\` → "From release to production (CD)".
 - It does **not** edit version fields in \`package.json\` / \`Cargo.toml\`
   / \`pyproject.toml\` / etc. The git tag **is** the version — single
   source of truth.
 - It does **not** run tests, lint, or any quality gate. Run those
   yourself before tagging if your project needs them — the contract
-  there is project-specific and lives outside Specflow's tag/release
+  there is project-specific and lives outside Specnaut's tag/release
   flow.
 
 ## After running
@@ -2346,7 +2346,7 @@ If the script exits non-zero, read the stderr message — it says
 exactly what failed (validation regex, missing remote, exhausted
 letter suffix, missing tag).
 
-On success, suggest \`/specflow release-version\` as the natural next
+On success, suggest \`/specnaut release-version\` as the natural next
 step. Do NOT run it automatically — releasing is an explicit,
 deliberate user action.
 `,
@@ -2368,9 +2368,9 @@ deliberate user action.
 You **MUST** consider the user input before proceeding (if not empty).
 Common natural-language requests:
 
-- \`/specflow release-version\` — generate notes for the latest tag
-- \`/specflow release-version v1.2.3\` — generate notes for a specific tag
-- \`/specflow release-version --baseline v1.2.0\` — override the baseline
+- \`/specnaut release-version\` — generate notes for the latest tag
+- \`/specnaut release-version v1.2.3\` — generate notes for a specific tag
+- \`/specnaut release-version --baseline v1.2.0\` — override the baseline
   (use when the previous tag was never released and you want to skip
   past it; default baseline is the previous tag chronologically)
 
@@ -2484,7 +2484,7 @@ BODY=\$(bash .specflow/scripts/release/release.sh v1.2.3)
 
 ## From release to production — the deploy model (CD)
 
-Publishing a release and *deploying* are two separate steps. Specflow owns
+Publishing a release and *deploying* are two separate steps. Specnaut owns
 the first (tag → notes → publish); this section is the opinionated model
 for wiring the second, so that publishing a release **is** what ships
 production.
@@ -2607,8 +2607,8 @@ The script emits the body verbatim. Do NOT:
 ## Workflow
 
 \`\`\`
-/specflow tag-version             → annotated tag created + pushed
-/specflow release-version         → categorized release notes (stdout)
+/specnaut tag-version             → annotated tag created + pushed
+/specnaut release-version         → categorized release notes (stdout)
 ↳ pipe to gh/glab release create  → release published
    └─ (optional CD) a \`release: published\` job deploys production —
       see "From release to production" above
@@ -2624,7 +2624,7 @@ The script emits the body verbatim. Do NOT:
     suffix: "auto-chain.md",
     content: `# Auto-chain control
 
-This file carries the chain mechanics that the \`/specflow\` router follows
+This file carries the chain mechanics that the \`/specnaut\` router follows
 when chain mode is engaged. The router reads it after a chainable phase
 (\`brainstorm\`, \`specify\`, \`clarify\`, \`plan\`, \`tasks\`, \`analyze\`, \`implement\`,
 \`review\`) completes — unless \`--manual\` or \`--once\` was passed, or downstream
@@ -2639,7 +2639,7 @@ artefacts indicate one-shot intent.
 \`\`\`
 
 \`brainstorm\` is the optional step 0 (see \`phases/brainstorm.md\`). It runs
-only when the user invokes \`/specflow brainstorm\` because the idea is still
+only when the user invokes \`/specnaut brainstorm\` because the idea is still
 fuzzy; on design approval it always chains into \`specify\`, which then drives
 the rest of the flow. Entering at \`specify\` skips it.
 
@@ -2703,12 +2703,12 @@ When \`workflow_shape\` is absent from \`feature.json\`, treat as \`"full"\`.
 Applies only when \`workflow_shape == "full"\`. Lite mode does not run
 \`clarify\`, so there is no STOP #1 in lite chains.
 
-After \`/specflow clarify\` finishes:
+After \`/specnaut clarify\` finishes:
 
 - If zero \`[NEEDS CLARIFICATION]\` markers remain in \`spec.md\`, continue silently
-  to \`/specflow plan\`.
+  to \`/specnaut plan\`.
 - If markers remain, present the top 3 questions to the user (per the
-  \`/specflow clarify\` format) and wait for answers. Once the spec is updated,
+  \`/specnaut clarify\` format) and wait for answers. Once the spec is updated,
   resume the chain automatically.
 
 ## Silent gates
@@ -2716,34 +2716,34 @@ After \`/specflow clarify\` finishes:
 These phases run without user interruption unless they fail hard or surface
 CRITICAL findings:
 
-- \`/specflow plan\` — generates plan + research + data-model + contracts + quickstart.
-- \`/specflow tasks\` — generates tasks.md.
-- \`/specflow analyze\` — cross-artifact consistency check. On LOW/MEDIUM findings,
+- \`/specnaut plan\` — generates plan + research + data-model + contracts + quickstart.
+- \`/specnaut tasks\` — generates tasks.md.
+- \`/specnaut analyze\` — cross-artifact consistency check. On LOW/MEDIUM findings,
   log a summary and continue. On CRITICAL findings, stop and surface them.
-- \`/specflow implement\` — runs the developer → review-coordinator → qa-tester
+- \`/specnaut implement\` — runs the developer → review-coordinator → qa-tester
   pipeline. Has its own internal fix loop for review findings; do not intercept.
-- \`/specflow review\` — final quality scan.
+- \`/specnaut review\` — final quality scan.
 
 ## Plan approval checkpoint (remote mode only)
 
-After \`/specflow plan\` completes and **before** chaining into \`/specflow tasks\`, check remote mode
-(\`specflow gate status\`):
+After \`/specnaut plan\` completes and **before** chaining into \`/specnaut tasks\`, check remote mode
+(\`specnaut gate status\`):
 
 - **Exit 0** (remote on) — raise a plan-approval gate and suspend:
-  \`specflow gate raise --type plan_approval --title "Approve the plan for <feature>" --payload '{"summary":"<plan summary>","planRef":"<plan.md path>","context":"<short>"}'\`.
-  exit 0 + \`{"approved":true}\` → resume into \`/specflow tasks\`; exit 0 +
+  \`specnaut gate raise --type plan_approval --title "Approve the plan for <feature>" --payload '{"summary":"<plan summary>","planRef":"<plan.md path>","context":"<short>"}'\`.
+  exit 0 + \`{"approved":true}\` → resume into \`/specnaut tasks\`; exit 0 +
   \`{"approved":false}\` → halt and report the rejection + any \`note\` (revise);
-  exit 3/4/1 → halt cleanly with the reason; exit 5 → report \`specflow cloud login\`
+  exit 3/4/1 → halt cleanly with the reason; exit 5 → report \`specnaut cloud login\`
   is needed and fall back to the default below. **Never proceed to \`tasks\` without
   an explicit approval.**
 - **Non-zero** (remote off / not Cloud-linked — the default) — \`plan\` stays a
-  silent gate: continue straight to \`/specflow tasks\` exactly as today (no gate,
+  silent gate: continue straight to \`/specnaut tasks\` exactly as today (no gate,
   no prompt, no behavioural change).
 
 ## STOP #2 — Pre-merge validation
 
-After \`/specflow review\` passes, ALWAYS stop and present a compact summary
-before invoking \`/specflow merge\`. The summary must include:
+After \`/specnaut review\` passes, ALWAYS stop and present a compact summary
+before invoking \`/specnaut merge\`. The summary must include:
 
 - Feature name and branch
 - Files created / modified (count + key paths)
@@ -2754,24 +2754,24 @@ before invoking \`/specflow merge\`. The summary must include:
 
 Then resolve the approval:
 
-- **Remote mode** (run \`specflow gate status\`; exit 0 ⇒ on) — raise a
+- **Remote mode** (run \`specnaut gate status\`; exit 0 ⇒ on) — raise a
   \`merge_approval\` gate instead of a terminal prompt:
-  \`specflow gate raise --type merge_approval --title "Approve merge of <feature>" --payload '{"summary":"<change summary>","prUrl":"<pr/diff ref>","context":"<short>"}'\`.
-  Branch on the result: exit 0 + \`{"approved":true}\` → invoke \`/specflow merge\`;
+  \`specnaut gate raise --type merge_approval --title "Approve merge of <feature>" --payload '{"summary":"<change summary>","prUrl":"<pr/diff ref>","context":"<short>"}'\`.
+  Branch on the result: exit 0 + \`{"approved":true}\` → invoke \`/specnaut merge\`;
   exit 0 + \`{"approved":false}\` → halt on the branch and report the rejection +
   any \`note\` (comment-and-revise); exit 3/4 (timeout/cancelled) or 1 → halt
-  cleanly with the reason; exit 5 → report \`specflow cloud login\` is needed and
+  cleanly with the reason; exit 5 → report \`specnaut cloud login\` is needed and
   fall back to the local prompt below. **Never merge without an explicit approval.**
 - **Local mode** (default, gate status non-zero) — ask explicitly:
-  "Ready to merge? (yes to run /specflow merge, no to stay on the branch)". Wait for
-  explicit confirmation. On "yes", invoke \`/specflow merge\`.
+  "Ready to merge? (yes to run /specnaut merge, no to stay on the branch)". Wait for
+  explicit confirmation. On "yes", invoke \`/specnaut merge\`.
 
 After merge, the chain ends.
 
 ## Mid-chain re-entry
 
 When the user invokes any phase other than \`specify\` directly (e.g.
-\`/specflow plan 042\`, \`/specflow implement 042\`), apply this
+\`/specnaut plan 042\`, \`/specnaut implement 042\`), apply this
 context-aware default:
 
 - **Downstream artefacts missing** → chain. The user is resuming an
@@ -2819,12 +2819,12 @@ and with \`--manual\`:
 - Task-level blockers reported by the developer agent during \`implement\`: the
   implement workflow has its own fix loop; do not intercept.
 - \`clarify\` producing more than 5 questions: present the top 3 per the
-  \`/specflow clarify\` quota; the rest can be asked later.
+  \`/specnaut clarify\` quota; the rest can be asked later.
 
 ## Context budget
 
 Long features (≥13 story points or ≥30 tasks) may exhaust context during
-\`/specflow implement\`. If compaction occurs mid-chain, inform the user and
+\`/specnaut implement\`. If compaction occurs mid-chain, inform the user and
 let them resume from a fresh session — the artefact-detection default
 above will pick up where the previous run stopped, or they can pass
 \`--continue\` explicitly.
@@ -2838,13 +2838,13 @@ above will pick up where the previous run stopped, or they can pass
     name: "list-skills",
     suffix: "list-skills.md",
     content: `
-# /specflow list-skills
+# /specnaut list-skills
 
 A one-shot inspection phase. List every skill installed for this project,
 flag which ones are aliases of upstream skills, and surface their pre/post
 hook overlays. The point is to make the *shadowing* relationships visible —
 without this, you have to read each script to know that a local
-\`tag-version/\` actually delegates to \`specflow.tag-version\`.
+\`tag-version/\` actually delegates to \`specnaut.tag-version\`.
 
 This phase is **read-only** — it never mutates files, never invokes other
 phases, and never auto-chains.
@@ -2869,7 +2869,7 @@ phases, and never auto-chains.
    - \`description:\` — short blurb (required).
    - \`alias_of:\` — when present, the skill is an alias that delegates
      to the named upstream skill. Convention is dotted notation, e.g.
-     \`alias_of: specflow.tag-version\`.
+     \`alias_of: specnaut.tag-version\`.
    - \`overlays:\` — when present, a list of pre/post hooks. Each item
      carries \`when: before | after\` and \`path: <relative-script>\`.
 
@@ -2898,9 +2898,9 @@ SKILLS — 4 installed (.claude/skills/)
 | NAME           | KIND   | ALIAS OF              | OVERLAYS                 | DESCRIPTION                                     |
 |----------------|--------|-----------------------|--------------------------|-------------------------------------------------|
 | backlog        | skill  | —                     | —                        | GitHub Project #4 backed backlog with classific…|
-| release-version| alias  | specflow.release-vers…| poll-cloud-build.sh (befo| Monorepo wrapper: poll Cloud Build then delegat…|
-| specflow       | skill  | —                     | —                        | Specflow workflow router — entry point for the …|
-| tag-version    | alias  | specflow.tag-version  | quality-gate.sh (before) | Monorepo wrapper: cd into inner repo then deleg…|
+| release-version| alias  | specnaut.release-vers…| poll-cloud-build.sh (befo| Monorepo wrapper: poll Cloud Build then delegat…|
+| specnaut       | skill  | —                     | —                        | Specnaut workflow router — entry point for the …|
+| tag-version    | alias  | specnaut.tag-version  | quality-gate.sh (before) | Monorepo wrapper: cd into inner repo then deleg…|
 \`\`\`
 
 ## Failure modes
@@ -2931,17 +2931,17 @@ SKILLS — 4 installed (.claude/skills/)
     name: "audit-security",
     suffix: "audit-security.md",
     content: `
-# /specflow audit security
+# /specnaut audit security
 
 **Read-only** project-wide security sweep. Walks the entire codebase, dispatches
 the \`security-auditor\` agent in audit mode, and emits a structured findings
 report. **Never mutates project code** — running the phase twice in a row leaves
 \`git status --porcelain\` identical.
 
-This phase is **manual-only** — invoke explicitly with \`/specflow audit security\`
-or schedule with \`/loop 1d /specflow audit security\`. Unlike \`/specflow review\`
+This phase is **manual-only** — invoke explicitly with \`/specnaut audit security\`
+or schedule with \`/loop 1d /specnaut audit security\`. Unlike \`/specnaut review\`
 (which gates a single feature branch with fmt/lint/typecheck/tests),
-\`/specflow audit security\` is a periodic systemic sweep that produces backlog
+\`/specnaut audit security\` is a periodic systemic sweep that produces backlog
 material, not a pass/fail verdict.
 
 ## Argument parsing
@@ -2956,7 +2956,7 @@ Reject any other argument with: \`error: unknown argument <token> — accepted: 
 ## Procedure
 
 1. **Detect the codebase root.** Use \`git rev-parse --show-toplevel\`. If not a
-   git repo, abort with \`error: /specflow audit security requires a git repository (uses git ls-files for scope)\` — there is no value in auditing an
+   git repo, abort with \`error: /specnaut audit security requires a git repository (uses git ls-files for scope)\` — there is no value in auditing an
    un-versioned directory because the report won't be reproducible.
 
 2. **Build the inventory.** Run \`git ls-files\` once and group the output:
@@ -2971,13 +2971,13 @@ Reject any other argument with: \`error: unknown argument <token> — accepted: 
    MUST NOT call \`Edit\`, \`Write\`, \`NotebookEdit\`, or any mutating tool.
 
 4. **Persist the report** at
-   \`docs/specflow/audits/YYYY-MM-DD-security.md\` (UTC date). If the file
+   \`docs/specnaut/audits/YYYY-MM-DD-security.md\` (UTC date). If the file
    already exists for today, append a \`## Run 2 (HH:MM UTC)\` heading rather
    than overwriting.
 
 5. **Offer PO handoff** (do NOT auto-execute). Print to stdout:
 
-   > Audit report written to \`docs/specflow/audits/YYYY-MM-DD-security.md\`.
+   > Audit report written to \`docs/specnaut/audits/YYYY-MM-DD-security.md\`.
    > Want me to dispatch the \`product-owner\` agent to convert Critical and High
    > findings into an Epic + sub-tasks?
 
@@ -3080,20 +3080,20 @@ After the agent returns, run:
 git status --porcelain
 \`\`\`
 
-The only acceptable diff is the new \`docs/specflow/audits/YYYY-MM-DD-security.md\`
-file (and the parent \`docs/specflow/audits/\` directory if it had to be created).
+The only acceptable diff is the new \`docs/specnaut/audits/YYYY-MM-DD-security.md\`
+file (and the parent \`docs/specnaut/audits/\` directory if it had to be created).
 Anything else in the porcelain output is a contract breach — record it as an
 error in the final report and surface to the user.
 
 ## Output format (what the user sees)
 
 \`\`\`
-specflow-audit-security report
+specnaut-audit-security report
 ──────────────────────────────
 Codebase: <root>
 Severity floor: <high|medium|low|critical>
 Findings: N (Critical: X · High: Y · Medium: Z · Low: W)
-Report:   docs/specflow/audits/YYYY-MM-DD-security.md
+Report:   docs/specnaut/audits/YYYY-MM-DD-security.md
 Read-only: ✓ (git status clean except for the report file)
 
 Next step: dispatch product-owner to convert findings into a backlog Epic? (y/N)
@@ -3101,14 +3101,14 @@ Next step: dispatch product-owner to convert findings into a backlog Epic? (y/N)
 
 ## When NOT to use this phase
 
-- For per-PR review on a feature branch → use \`/specflow review\` (gates merge with the security-auditor in PR mode, not audit mode).
+- For per-PR review on a feature branch → use \`/specnaut review\` (gates merge with the security-auditor in PR mode, not audit mode).
 - For triaging GitHub security alerts after a release preflight → the \`/release\` flow already dispatches \`security-auditor\` in alert-triage mode (Mode 2 in the agent's prompt).
 - For a single-file security check → invoke \`security-auditor\` directly with the file paths.
 
 ---
 
 Inspired by the discipline of \`obra/superpowers\` v5.1.0 (MIT, Jesse Vincent),
-adapted to Specflow's bundled agent + backlog conventions.
+adapted to Specnaut's bundled agent + backlog conventions.
 `,
     executable: false,
     backend: null,
@@ -3119,7 +3119,7 @@ adapted to Specflow's bundled agent + backlog conventions.
     name: "audit-performance",
     suffix: "audit-performance.md",
     content: `
-# /specflow audit performance
+# /specnaut audit performance
 
 **Read-only** project-wide performance sweep. Walks the entire codebase,
 dispatches the \`performance-auditor\` agent in audit mode, and emits a
@@ -3128,10 +3128,10 @@ phase twice in a row leaves \`git status --porcelain\` identical (modulo
 the new report file).
 
 This phase is **manual-only** — invoke explicitly with
-\`/specflow audit performance\` or schedule with
-\`/loop 1d /specflow audit performance\`. Unlike \`/specflow review\` (which
+\`/specnaut audit performance\` or schedule with
+\`/loop 1d /specnaut audit performance\`. Unlike \`/specnaut review\` (which
 gates a single feature branch with fmt/lint/typecheck/tests),
-\`/specflow audit performance\` is a periodic systemic sweep that produces
+\`/specnaut audit performance\` is a periodic systemic sweep that produces
 backlog material, not a pass/fail verdict.
 
 ## Argument parsing
@@ -3147,7 +3147,7 @@ Reject any other argument with: \`error: unknown argument <token> — accepted: 
 ## Procedure
 
 1. **Detect the codebase root.** Use \`git rev-parse --show-toplevel\`. If not
-   a git repo, abort with \`error: /specflow audit performance requires a git repository (uses git ls-files for scope)\` — there is no value in auditing
+   a git repo, abort with \`error: /specnaut audit performance requires a git repository (uses git ls-files for scope)\` — there is no value in auditing
    an un-versioned directory because the report won't be reproducible.
 
 2. **Build the inventory.** Run \`git ls-files\` once and group the output:
@@ -3163,13 +3163,13 @@ Reject any other argument with: \`error: unknown argument <token> — accepted: 
    any mutating tool.
 
 4. **Persist the report** at
-   \`docs/specflow/audits/YYYY-MM-DD-performance.md\` (UTC date). If the
+   \`docs/specnaut/audits/YYYY-MM-DD-performance.md\` (UTC date). If the
    file already exists for today, append a \`## Run 2 (HH:MM UTC)\` heading
    rather than overwriting.
 
 5. **Offer PO handoff** (do NOT auto-execute). Print to stdout:
 
-   > Audit report written to \`docs/specflow/audits/YYYY-MM-DD-performance.md\`.
+   > Audit report written to \`docs/specnaut/audits/YYYY-MM-DD-performance.md\`.
    > Want me to dispatch the \`product-owner\` agent to convert Critical and
    > High findings into an Epic + sub-tasks?
 
@@ -3219,20 +3219,20 @@ git status --porcelain
 \`\`\`
 
 The only acceptable diff is the new
-\`docs/specflow/audits/YYYY-MM-DD-performance.md\` file (and the parent
-\`docs/specflow/audits/\` directory if it had to be created). Anything else
+\`docs/specnaut/audits/YYYY-MM-DD-performance.md\` file (and the parent
+\`docs/specnaut/audits/\` directory if it had to be created). Anything else
 is a contract breach — record it as an error in the final report and
 surface to the user.
 
 ## Output format (what the user sees)
 
 \`\`\`
-specflow-audit-performance report
+specnaut-audit-performance report
 ─────────────────────────────────
 Codebase: <root>
 Severity floor: <high|medium|low|critical>
 Findings: N (Critical: X · High: Y · Medium: Z · Low: W)
-Report:   docs/specflow/audits/YYYY-MM-DD-performance.md
+Report:   docs/specnaut/audits/YYYY-MM-DD-performance.md
 Read-only: ✓ (git status clean except for the report file)
 
 Next step: dispatch product-owner to convert findings into a backlog Epic? (y/N)
@@ -3240,15 +3240,15 @@ Next step: dispatch product-owner to convert findings into a backlog Epic? (y/N)
 
 ## When NOT to use this phase
 
-- For per-PR review on a feature branch → use \`/specflow review\` (gates merge with the performance-auditor in PR mode, not audit mode).
+- For per-PR review on a feature branch → use \`/specnaut review\` (gates merge with the performance-auditor in PR mode, not audit mode).
 - For benchmark / profiler-backed perf work → out of scope; this phase reads code, not runtime traces.
 - For a single-file performance check → invoke \`performance-auditor\` directly with the file paths.
 
 ---
 
 Inspired by the discipline of \`obra/superpowers\` v5.1.0 (MIT, Jesse Vincent),
-adapted to Specflow's bundled agent + backlog conventions. The
-\`performance-auditor\` agent itself is Specflow-native (no upstream sibling).
+adapted to Specnaut's bundled agent + backlog conventions. The
+\`performance-auditor\` agent itself is Specnaut-native (no upstream sibling).
 `,
     executable: false,
     backend: null,
@@ -3259,7 +3259,7 @@ adapted to Specflow's bundled agent + backlog conventions. The
     name: "audit-accessibility",
     suffix: "audit-accessibility.md",
     content: `
-# /specflow audit accessibility
+# /specnaut audit accessibility
 
 **Read-only** project-wide WCAG 2.1 AA accessibility sweep. Walks the
 front-end surface of the codebase, dispatches the \`a11y-auditor\` agent
@@ -3268,10 +3268,10 @@ project code** — running the phase twice in a row leaves
 \`git status --porcelain\` identical (modulo the new report file).
 
 This phase is **manual-only** — invoke explicitly with
-\`/specflow audit accessibility\` or schedule with
-\`/loop 1d /specflow audit accessibility\`. Unlike \`/specflow review\`
+\`/specnaut audit accessibility\` or schedule with
+\`/loop 1d /specnaut audit accessibility\`. Unlike \`/specnaut review\`
 (which gates a single feature branch with fmt/lint/typecheck/tests),
-\`/specflow audit accessibility\` is a periodic systemic sweep that
+\`/specnaut audit accessibility\` is a periodic systemic sweep that
 produces backlog material, not a pass/fail verdict.
 
 ## FE-surface gate
@@ -3283,7 +3283,7 @@ a FE framework dep). If none present, the agent emits:
 
 > no FE surface detected — accessibility audit skipped (this project ships no front-end source the auditor can read).
 
-…and stops. This is by design — \`/specflow audit accessibility\` on a
+…and stops. This is by design — \`/specnaut audit accessibility\` on a
 CLI-only project is a no-op. The audit reports nothing; do not invent
 findings.
 
@@ -3300,7 +3300,7 @@ Reject any other argument with: \`error: unknown argument <token> — accepted: 
 ## Procedure
 
 1. **Detect the codebase root.** Use \`git rev-parse --show-toplevel\`.
-   If not a git repo, abort with \`error: /specflow audit accessibility requires a git repository (uses git ls-files for scope)\` — there is no value in auditing an un-versioned directory because the report won't
+   If not a git repo, abort with \`error: /specnaut audit accessibility requires a git repository (uses git ls-files for scope)\` — there is no value in auditing an un-versioned directory because the report won't
    be reproducible.
 
 2. **Build the inventory.** Run \`git ls-files\` once and group the
@@ -3319,7 +3319,7 @@ Reject any other argument with: \`error: unknown argument <token> — accepted: 
    writing a report.
 
 4. **Persist the report** at
-   \`docs/specflow/audits/YYYY-MM-DD-accessibility.md\` (UTC date), but
+   \`docs/specnaut/audits/YYYY-MM-DD-accessibility.md\` (UTC date), but
    ONLY if the agent returned actual findings. If the agent skipped
    due to no FE surface, print the skip-line to stdout and exit
    without creating a report file.
@@ -3330,7 +3330,7 @@ Reject any other argument with: \`error: unknown argument <token> — accepted: 
 5. **Offer PO handoff** (do NOT auto-execute) — only if a report was
    written. Print to stdout:
 
-   > Audit report written to \`docs/specflow/audits/YYYY-MM-DD-accessibility.md\`.
+   > Audit report written to \`docs/specnaut/audits/YYYY-MM-DD-accessibility.md\`.
    > Want me to dispatch the \`product-owner\` agent to convert Critical
    > and High findings into an Epic + sub-tasks?
 
@@ -3387,8 +3387,8 @@ git status --porcelain
 \`\`\`
 
 The only acceptable diff is the new
-\`docs/specflow/audits/YYYY-MM-DD-accessibility.md\` file (and the
-parent \`docs/specflow/audits/\` directory if it had to be created).
+\`docs/specnaut/audits/YYYY-MM-DD-accessibility.md\` file (and the
+parent \`docs/specnaut/audits/\` directory if it had to be created).
 Anything else is a contract breach — record it as an error and surface
 to the user.
 
@@ -3400,13 +3400,13 @@ empty.
 ### With a FE surface
 
 \`\`\`
-specflow-audit-accessibility report
+specnaut-audit-accessibility report
 ───────────────────────────────────
 Codebase: <root>
 FE surface: <one-line summary>
 Severity floor: <high|medium|low|critical>
 Findings: N (Critical: X · High: Y · Medium: Z · Low: W)
-Report:   docs/specflow/audits/YYYY-MM-DD-accessibility.md
+Report:   docs/specnaut/audits/YYYY-MM-DD-accessibility.md
 Read-only: ✓ (git status clean except for the report file)
 
 Next step: dispatch product-owner to convert findings into a backlog Epic? (y/N)
@@ -3415,14 +3415,14 @@ Next step: dispatch product-owner to convert findings into a backlog Epic? (y/N)
 ### Without a FE surface
 
 \`\`\`
-specflow-audit-accessibility — skipped
+specnaut-audit-accessibility — skipped
 ──────────────────────────────────────
 no FE surface detected — accessibility audit skipped (this project ships no front-end source the auditor can read).
 \`\`\`
 
 ## When NOT to use this phase
 
-- For per-PR review on a feature branch → use \`/specflow review\` (gates merge with the a11y-auditor in PR mode, not audit mode).
+- For per-PR review on a feature branch → use \`/specnaut review\` (gates merge with the a11y-auditor in PR mode, not audit mode).
 - For runtime browser-based accessibility testing (axe-core, Lighthouse, screen reader walkthroughs) → out of scope; this phase reads source, not runtime traces.
 - For mobile-native accessibility (iOS VoiceOver, Android TalkBack) → out of scope; web FE only.
 - For a single-component a11y check → invoke \`a11y-auditor\` directly with the file paths.
@@ -3430,8 +3430,8 @@ no FE surface detected — accessibility audit skipped (this project ships no fr
 ---
 
 Inspired by the discipline of \`obra/superpowers\` v5.1.0 (MIT, Jesse Vincent),
-adapted to Specflow's bundled agent + backlog conventions. The
-\`a11y-auditor\` agent itself is Specflow-native (no upstream sibling).
+adapted to Specnaut's bundled agent + backlog conventions. The
+\`a11y-auditor\` agent itself is Specnaut-native (no upstream sibling).
 `,
     executable: false,
     backend: null,
@@ -3442,7 +3442,7 @@ adapted to Specflow's bundled agent + backlog conventions. The
     name: "audit-architecture",
     suffix: "audit-architecture.md",
     content: `
-# /specflow audit architecture
+# /specnaut audit architecture
 
 **Read-only** project-wide architectural sweep. Walks the entire
 codebase, dispatches the \`architecture-auditor\` agent in audit mode, and
@@ -3451,10 +3451,10 @@ running the phase twice in a row leaves \`git status --porcelain\`
 identical (modulo the new report file).
 
 This phase is **manual-only** — invoke explicitly with
-\`/specflow audit architecture\` or schedule with
-\`/loop 1d /specflow audit architecture\`. Unlike \`/specflow review\`
+\`/specnaut audit architecture\` or schedule with
+\`/loop 1d /specnaut audit architecture\`. Unlike \`/specnaut review\`
 (which gates a single feature branch with fmt/lint/typecheck/tests),
-\`/specflow audit architecture\` is a periodic systemic sweep that
+\`/specnaut audit architecture\` is a periodic systemic sweep that
 produces backlog material, not a pass/fail verdict.
 
 ## Argument parsing
@@ -3470,7 +3470,7 @@ Reject any other argument with: \`error: unknown argument <token> — accepted: 
 ## Procedure
 
 1. **Detect the codebase root.** Use \`git rev-parse --show-toplevel\`. If not
-   a git repo, abort with \`error: /specflow audit architecture requires a git repository (uses git ls-files for scope)\` — there is no value in auditing
+   a git repo, abort with \`error: /specnaut audit architecture requires a git repository (uses git ls-files for scope)\` — there is no value in auditing
    an un-versioned directory because the report won't be reproducible.
 
 2. **Build the inventory.** Run \`git ls-files\` once and group the output:
@@ -3488,13 +3488,13 @@ Reject any other argument with: \`error: unknown argument <token> — accepted: 
    any mutating tool.
 
 4. **Persist the report** at
-   \`docs/specflow/audits/YYYY-MM-DD-architecture.md\` (UTC date). If the
+   \`docs/specnaut/audits/YYYY-MM-DD-architecture.md\` (UTC date). If the
    file already exists for today, append a \`## Run 2 (HH:MM UTC)\` heading
    rather than overwriting.
 
 5. **Offer PO handoff** (do NOT auto-execute). Print to stdout:
 
-   > Audit report written to \`docs/specflow/audits/YYYY-MM-DD-architecture.md\`.
+   > Audit report written to \`docs/specnaut/audits/YYYY-MM-DD-architecture.md\`.
    > Want me to dispatch the \`product-owner\` agent to convert Critical and
    > High findings into an Epic + sub-tasks?
 
@@ -3545,21 +3545,21 @@ git status --porcelain
 \`\`\`
 
 The only acceptable diff is the new
-\`docs/specflow/audits/YYYY-MM-DD-architecture.md\` file (and the parent
-\`docs/specflow/audits/\` directory if it had to be created). Anything else
+\`docs/specnaut/audits/YYYY-MM-DD-architecture.md\` file (and the parent
+\`docs/specnaut/audits/\` directory if it had to be created). Anything else
 is a contract breach — record it as an error in the final report and
 surface to the user.
 
 ## Output format (what the user sees)
 
 \`\`\`
-specflow-audit-architecture report
+specnaut-audit-architecture report
 ──────────────────────────────────
 Codebase: <root>
 Severity floor: <high|medium|low|critical>
 Findings: N (Critical: X · High: Y · Medium: Z · Low: W)
 Layer convention: <hex|DDD|flat|none>
-Report:   docs/specflow/audits/YYYY-MM-DD-architecture.md
+Report:   docs/specnaut/audits/YYYY-MM-DD-architecture.md
 Read-only: ✓ (git status clean except for the report file)
 
 Next step: dispatch product-owner to convert findings into a backlog Epic? (y/N)
@@ -3567,15 +3567,15 @@ Next step: dispatch product-owner to convert findings into a backlog Epic? (y/N)
 
 ## When NOT to use this phase
 
-- For per-PR review on a feature branch → use \`/specflow review\` (gates merge with the architecture-auditor in PR mode, not audit mode).
-- For codebase-wide refactor planning → out of scope; this phase surfaces drift, it doesn't propose the refactor strategy. Pair with \`/specflow specify\` to capture the refactor as a spec.
+- For per-PR review on a feature branch → use \`/specnaut review\` (gates merge with the architecture-auditor in PR mode, not audit mode).
+- For codebase-wide refactor planning → out of scope; this phase surfaces drift, it doesn't propose the refactor strategy. Pair with \`/specnaut specify\` to capture the refactor as a spec.
 - For a single-file architecture check → invoke \`architecture-auditor\` directly with the file paths.
 
 ---
 
 Inspired by the discipline of \`obra/superpowers\` v5.1.0 (MIT, Jesse Vincent),
-adapted to Specflow's bundled agent + backlog conventions. The
-\`architecture-auditor\` agent itself is Specflow-native (no upstream sibling).
+adapted to Specnaut's bundled agent + backlog conventions. The
+\`architecture-auditor\` agent itself is Specnaut-native (no upstream sibling).
 `,
     executable: false,
     backend: null,
@@ -3586,7 +3586,7 @@ adapted to Specflow's bundled agent + backlog conventions. The
     name: "audit-dependencies",
     suffix: "audit-dependencies.md",
     content: `
-# /specflow audit dependencies
+# /specnaut audit dependencies
 
 **Read-only** project-wide dependency-hygiene sweep. Walks every detected
 manifest (\`package.json\`, \`pyproject.toml\`, \`Cargo.toml\`, \`composer.json\`,
@@ -3597,10 +3597,10 @@ row leaves \`git status --porcelain\` identical (modulo the new report
 file).
 
 This phase is **manual-only** — invoke explicitly with
-\`/specflow audit dependencies\` or schedule with
-\`/loop 1d /specflow audit dependencies\`. Unlike \`/specflow review\`
+\`/specnaut audit dependencies\` or schedule with
+\`/loop 1d /specnaut audit dependencies\`. Unlike \`/specnaut review\`
 (which gates a single feature branch with fmt/lint/typecheck/tests),
-\`/specflow audit dependencies\` is a periodic systemic sweep that
+\`/specnaut audit dependencies\` is a periodic systemic sweep that
 produces backlog material, not a pass/fail verdict.
 
 ## Argument parsing
@@ -3616,7 +3616,7 @@ Reject any other argument with: \`error: unknown argument <token> — accepted: 
 ## Procedure
 
 1. **Detect the codebase root.** Use \`git rev-parse --show-toplevel\`. If not
-   a git repo, abort with \`error: /specflow audit dependencies requires a git repository (uses git ls-files for scope)\` — there is no value in auditing
+   a git repo, abort with \`error: /specnaut audit dependencies requires a git repository (uses git ls-files for scope)\` — there is no value in auditing
    an un-versioned directory because the report won't be reproducible.
 
 2. **Build the inventory.** Run \`git ls-files\` once and group the output:
@@ -3644,13 +3644,13 @@ Reject any other argument with: \`error: unknown argument <token> — accepted: 
    "Read-only contract" section).
 
 5. **Persist the report** at
-   \`docs/specflow/audits/YYYY-MM-DD-dependencies.md\` (UTC date). If the
+   \`docs/specnaut/audits/YYYY-MM-DD-dependencies.md\` (UTC date). If the
    file already exists for today, append a \`## Run 2 (HH:MM UTC)\` heading
    rather than overwriting.
 
 6. **Offer PO handoff** (do NOT auto-execute). Print to stdout:
 
-   > Audit report written to \`docs/specflow/audits/YYYY-MM-DD-dependencies.md\`.
+   > Audit report written to \`docs/specnaut/audits/YYYY-MM-DD-dependencies.md\`.
    > Want me to dispatch the \`product-owner\` agent to convert Critical and
    > High findings into an Epic + sub-tasks?
 
@@ -3703,22 +3703,22 @@ git status --porcelain
 \`\`\`
 
 The only acceptable diff is the new
-\`docs/specflow/audits/YYYY-MM-DD-dependencies.md\` file (and the parent
-\`docs/specflow/audits/\` directory if it had to be created). Anything else
+\`docs/specnaut/audits/YYYY-MM-DD-dependencies.md\` file (and the parent
+\`docs/specnaut/audits/\` directory if it had to be created). Anything else
 is a contract breach — record it as an error in the final report and
 surface to the user.
 
 ## Output format (what the user sees)
 
 \`\`\`
-specflow-audit-dependencies report
+specnaut-audit-dependencies report
 ──────────────────────────────────
 Codebase: <root>
 Severity floor: <high|medium|low|critical>
 Findings: N (Critical: X · High: Y · Medium: Z · Low: W)
 Manifests: <one line — "package.json, deno.json">
 License allowlist: <"default (8 SPDX ids)" | "default + .specflow/license-allowlist.txt (N more)">
-Report:   docs/specflow/audits/YYYY-MM-DD-dependencies.md
+Report:   docs/specnaut/audits/YYYY-MM-DD-dependencies.md
 Read-only: ✓ (git status clean except for the report file)
 
 Next step: dispatch product-owner to convert findings into a backlog Epic? (y/N)
@@ -3726,15 +3726,15 @@ Next step: dispatch product-owner to convert findings into a backlog Epic? (y/N)
 
 ## When NOT to use this phase
 
-- For per-PR review on a feature branch → use \`/specflow review\` (gates merge with the dependency-auditor in PR mode, not audit mode).
+- For per-PR review on a feature branch → use \`/specnaut review\` (gates merge with the dependency-auditor in PR mode, not audit mode).
 - For live CVE / advisory cross-reference → out of scope; run your ecosystem's native audit tool separately (\`npm audit\`, \`cargo audit\`, \`pip-audit\`, \`bundle audit\`, \`osv-scanner\`). The audit-dependencies phase intentionally avoids these because they require network access + cached package databases that drift between runs, breaking reproducibility.
 - For a single-file dependency check → invoke \`dependency-auditor\` directly with the manifest paths.
 
 ---
 
 Inspired by the discipline of \`obra/superpowers\` v5.1.0 (MIT, Jesse Vincent),
-adapted to Specflow's bundled agent + backlog conventions. The
-\`dependency-auditor\` agent itself is Specflow-native (no upstream sibling).
+adapted to Specnaut's bundled agent + backlog conventions. The
+\`dependency-auditor\` agent itself is Specnaut-native (no upstream sibling).
 `,
     executable: false,
     backend: null,
@@ -3762,7 +3762,7 @@ without touching \`specify.md\` logic.
 ## Scoring
 
 The heuristic runs against the user's feature brief — the text typed
-after \`/specflow specify\` (after flag-stripping by the router). It
+after \`/specnaut specify\` (after flag-stripping by the router). It
 produces a score:
 
 \`\`\`
@@ -3789,7 +3789,7 @@ Proceed in lite mode? [Y/n]
 \`\`\`
 
 Default to **full** chain on an empty or unclear answer. The prompt
-appears exactly **once** per \`/specflow specify\` invocation — there is
+appears exactly **once** per \`/specnaut specify\` invocation — there is
 no re-prompting mid-chain.
 
 ## Signal lists
@@ -3872,9 +3872,9 @@ spec.md frontmatter (\`workflow:\`).
 # Create an annotated git tag using the project's versioning scheme.
 #
 # The scheme is baked at scaffold time — the \`# BEGIN: scheme=X\` blocks
-# below are stripped by the Specflow bundler so only the chosen scheme's
+# below are stripped by the Specnaut bundler so only the chosen scheme's
 # logic ships on disk. To change schemes after init, re-run
-# \`specflow init\` and pick the other option.
+# \`specnaut init\` and pick the other option.
 #
 # Usage: tag.sh [--no-push] [--bump <major|minor|patch>] [<commit-sha>]
 set -euo pipefail
@@ -4466,10 +4466,10 @@ echo "  or pipe to a custom publisher"
   },
   {
     category: "skill",
-    name: "specflow-review",
+    name: "specnaut-review",
     suffix: null,
     content: `---
-name: specflow-review
+name: specnaut-review
 description: Review the implementation against spec, plan, and tasks before merge — runs the quality gates (functional acceptance, test coverage, constitution checks). Auto-invokable when the user signals readiness to merge or asks for a final review pass.
 argument-hint: [feature-path-or-PR-number]
 when_to_use: |
@@ -4480,11 +4480,11 @@ when_to_use: |
   - "is this ready to ship?"
 ---
 
-# Specflow review (auto-invoke alias)
+# Specnaut review (auto-invoke alias)
 
-This is a thin alias that exists solely so Claude Code can auto-invoke the review phase from natural-language prompts (the main \`specflow\` skill is \`disable-model-invocation: true\`).
+This is a thin alias that exists solely so Claude Code can auto-invoke the review phase from natural-language prompts (the main \`specnaut\` skill is \`disable-model-invocation: true\`).
 
-When this skill fires, dispatch immediately to the router by reading and executing the procedure in \`.claude/skills/specflow/phases/review.md\`. Pass any \`\$ARGUMENTS\` through unchanged.
+When this skill fires, dispatch immediately to the router by reading and executing the procedure in \`.claude/skills/specnaut/phases/review.md\`. Pass any \`\$ARGUMENTS\` through unchanged.
 
 Do not duplicate the review procedure here — it lives in \`phases/review.md\` and is the single source of truth.
 `,
@@ -4508,9 +4508,9 @@ Turn a feature request, an issue URL, or a free-form requirement into a
 another human) can follow step-by-step without re-reading the spec.
 
 > Inspired by [obra/superpowers v5.1.0](https://github.com/obra/superpowers)
-> (MIT) — \`skills/writing-plans/SKILL.md\`. Re-implemented for Specflow
-> with \`docs/specflow/plans/\` as the canonical save path and explicit
-> handoff to Specflow's \`subagent-driven-development\` / \`executing-plans\`
+> (MIT) — \`skills/writing-plans/SKILL.md\`. Re-implemented for Specnaut
+> with \`docs/specnaut/plans/\` as the canonical save path and explicit
+> handoff to Specnaut's \`subagent-driven-development\` / \`executing-plans\`
 > skills (\`subagent-driven-development\` and \`executing-plans\`).
 
 ## When to use this skill
@@ -4521,15 +4521,15 @@ Use when:
 - The user describes a feature and says "write a plan"
 - You hit a non-trivial change mid-task and need to step back before
   coding
-- A \`/specflow groom\` pass surfaces a Ready item that needs design before
+- A \`/specnaut groom\` pass surfaces a Ready item that needs design before
   implementation
 
 Do **not** use when:
 
 - The change is genuinely trivial (one-line typo, single-config bump) —
   just do it
-- The user explicitly asked for the spec-kit flow (\`/specflow specify\` →
-  \`/specflow plan\` produces design artefacts: research.md, data-model.md,
+- The user explicitly asked for the spec-kit flow (\`/specnaut specify\` →
+  \`/specnaut plan\` produces design artefacts: research.md, data-model.md,
   contracts/, quickstart.md — that's a different beast for greenfield
   features with formal specs)
 
@@ -4539,7 +4539,7 @@ Do **not** use when:
 
 ## Save plans to
 
-\`docs/specflow/plans/YYYY-MM-DD-<feature-name>.md\`
+\`docs/specnaut/plans/YYYY-MM-DD-<feature-name>.md\`
 
 User preference overrides this default (some teams prefer \`.specflow/plans/\`
 or \`docs/plans/\` — honor what they ask for). The date prefix gives plans
@@ -4565,7 +4565,7 @@ decomposition decisions get locked in.
   reason best about code you can hold in context at once.
 - Files that change together should live together. Split by
   responsibility, not by technical layer.
-- In existing Specflow code, follow established patterns. The hexagonal
+- In existing Specnaut code, follow established patterns. The hexagonal
   layout (\`src/domain/\`, \`src/application/\`, \`src/infrastructure/\`,
   \`src/cli/\`) is the house style — don't unilaterally restructure.
 
@@ -4592,15 +4592,15 @@ Every plan **MUST** start with this header:
 # [Feature Name] Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use
-> \`specflow:subagent-driven-development\` (recommended) or
-> \`specflow:executing-plans\` to implement this plan task-by-task.
+> \`specnaut:subagent-driven-development\` (recommended) or
+> \`specnaut:executing-plans\` to implement this plan task-by-task.
 > Steps use checkbox (\`- [ ]\`) syntax for tracking.
 
 **Goal:** [One sentence describing what this builds]
 
 **Architecture:** [2–3 sentences about approach — what changes, what stays]
 
-**Tech Stack:** [Deno + TypeScript, specific Specflow modules touched]
+**Tech Stack:** [Deno + TypeScript, specific Specnaut modules touched]
 
 > Issue: [URL if applicable]
 
@@ -4696,7 +4696,7 @@ checklist yourself — it is not a subagent dispatch.**
    tasks? A function called \`clearLayers()\` in Task 3 but
    \`clearFullLayers()\` in Task 7 is a bug.
 
-4. **Specflow conventions** — do file paths follow the hexagonal
+4. **Specnaut conventions** — do file paths follow the hexagonal
    layout? Do you respect the byte-identity plugin-sync contract
    (\`templates/core/...\` plus \`plugin/...\` twin) for any new template
    files? Are manifest entries added if you scaffold new files?
@@ -4712,7 +4712,7 @@ Fix issues inline. No need to re-review — just fix and move on.
 
 After saving the plan, offer the user a choice of execution strategy:
 
-> "Plan complete and saved to \`docs/specflow/plans/<filename>.md\`. Two
+> "Plan complete and saved to \`docs/specnaut/plans/<filename>.md\`. Two
 > execution options:
 >
 > 1. **Subagent-Driven** (recommended) — I dispatch a fresh subagent per
@@ -4725,12 +4725,12 @@ After saving the plan, offer the user a choice of execution strategy:
 
 **If subagent-driven chosen:**
 
-- **REQUIRED SUB-SKILL:** Use \`specflow:subagent-driven-development\`
+- **REQUIRED SUB-SKILL:** Use \`specnaut:subagent-driven-development\`
 - Fresh subagent per task + spec compliance + code quality review loop
 
 **If inline chosen:**
 
-- **REQUIRED SUB-SKILL:** Use \`specflow:executing-plans\`
+- **REQUIRED SUB-SKILL:** Use \`specnaut:executing-plans\`
 - Sequential in-session execution with checkpoint pauses between tasks
 
 ## Key principles
@@ -4756,10 +4756,10 @@ they prefer to drive manually). It does not:
 - Mutate the backlog (the \`product-owner\` agent owns those mutations)
 - Trigger releases (that's \`/release\` / \`devops-sre\`)
 
-## Integration with \`/specflow plan\`
+## Integration with \`/specnaut plan\`
 
-This skill is **distinct from** the \`/specflow plan\` phase of the
-spec-kit pipeline. The spec-kit \`/specflow plan\` produces design
+This skill is **distinct from** the \`/specnaut plan\` phase of the
+spec-kit pipeline. The spec-kit \`/specnaut plan\` produces design
 artefacts (research.md, data-model.md, contracts/, quickstart.md) for
 greenfield features starting from a \`spec.md\`. This \`writing-plans\`
 skill produces a **single executable plan file** for issue-driven or
@@ -4767,11 +4767,11 @@ ad-hoc work where the spec-kit ceremony would be overkill.
 
 A user can use both:
 
-- \`/specflow specify\` → \`/specflow plan\` for a new multi-month feature
+- \`/specnaut specify\` → \`/specnaut plan\` for a new multi-month feature
   with formal contracts
 - \`writing-plans\` (auto-invoked) for "plan how to fix this backlog issue"
 
-Specflow ships both because real teams have both flows.
+Specnaut ships both because real teams have both flows.
 `,
     executable: false,
     backend: null,
@@ -4796,9 +4796,9 @@ work.
 
 > Inspired by [obra/superpowers v5.1.0](https://github.com/obra/superpowers)
 > (MIT) — \`skills/requesting-code-review/SKILL.md\` + the
-> \`code-reviewer.md\` prompt template. Re-implemented for Specflow with
+> \`code-reviewer.md\` prompt template. Re-implemented for Specnaut with
 > the prompt template inlined here (single file) and integrated with
-> Specflow's bundled \`code-reviewer\` agent.
+> Specnaut's bundled \`code-reviewer\` agent.
 
 **Core principle:** Review early, review often.
 
@@ -4816,11 +4816,11 @@ work.
 - Before refactoring (baseline check)
 - After fixing a complex bug
 
-## Specflow integration
+## Specnaut integration
 
-Specflow ships a bundled **\`code-reviewer\` agent**
+Specnaut ships a bundled **\`code-reviewer\` agent**
 (\`templates/core/agents/code-reviewer.md\`) that this skill dispatches.
-The agent's system prompt covers Specflow conventions (hexagonal
+The agent's system prompt covers Specnaut conventions (hexagonal
 layers, byte-identity plugin-sync contract, smoke audit, Windsurf cap,
 backlog-script conventions, …). Use it instead of \`general-purpose\`
 when reviewing changes inside this repo.
@@ -4859,7 +4859,7 @@ prompt template (see below). Use the \`Task\` tool with
 
 Paste this verbatim into a \`Task({subagent_type: "code-reviewer", ...})\`
 dispatch, substituting the four placeholders. The format is mandatory —
-Specflow's two-stage review pattern (spec compliance, then code
+Specnaut's two-stage review pattern (spec compliance, then code
 quality; see \`subagent-driven-development\` skill) depends on the reviewer returning the
 exact sections below.
 
@@ -4980,7 +4980,7 @@ For each issue:
 
 ## Two-stage review pattern (subagent-driven only)
 
-Specflow's \`subagent-driven-development\` skill runs **two reviews per
+Specnaut's \`subagent-driven-development\` skill runs **two reviews per
 task**, in this order:
 
 1. **Spec-compliance review** — verifies the implementation matches the
@@ -5060,7 +5060,7 @@ Task({
 ## When NOT to use this skill
 
 - For the final pre-merge check on a feature branch — that's
-  \`/specflow review\`, which has broader scope (architecture, quality
+  \`/specnaut review\`, which has broader scope (architecture, quality
   gates, fmt/lint/typecheck/tests).
 - For security-specific concerns — dispatch \`security-auditor\` instead.
 - For test-quality concerns specifically — dispatch \`test-reviewer\`.
@@ -5071,26 +5071,26 @@ Task({
   },
   {
     category: "skill",
-    name: "using-specflow",
+    name: "using-specnaut",
     suffix: null,
     content: `---
-name: using-specflow
-description: Bootstrap skill loaded at session start. Teaches the agent how to discover and invoke Specflow's bundled skills, agents, and slash commands. Auto-injected by the SessionStart hook on harnesses that support hooks (Claude Code, Cursor); on other harnesses, read this file once per session before answering Specflow-related questions.
+name: using-specnaut
+description: Bootstrap skill loaded at session start. Teaches the agent how to discover and invoke Specnaut's bundled skills, agents, and slash commands. Auto-injected by the SessionStart hook on harnesses that support hooks (Claude Code, Cursor); on other harnesses, read this file once per session before answering Specnaut-related questions.
 ---
 
-# Using Specflow
+# Using Specnaut
 
-This is the bootstrap skill that makes the agent **Specflow-aware** on
+This is the bootstrap skill that makes the agent **Specnaut-aware** on
 every turn. It does not do any work itself — it points the agent at the
-right Specflow skill / agent / slash command for the user's intent.
+right Specnaut skill / agent / slash command for the user's intent.
 
 > Inspired by [obra/superpowers v5.1.0](https://github.com/obra/superpowers)
 > (MIT) — \`skills/using-superpowers/SKILL.md\`. Re-implemented for
-> Specflow's skill ecosystem.
+> Specnaut's skill ecosystem.
 
 ## The rule
 
-**If you think there is even a 1% chance a Specflow skill applies to
+**If you think there is even a 1% chance a Specnaut skill applies to
 what the user is asking, invoke it.** Skills override default behaviour
 where they apply.
 
@@ -5098,7 +5098,7 @@ User instructions in \`CLAUDE.md\`, \`AGENTS.md\`, or direct requests
 always take precedence over a skill's defaults. If the user says
 "skip TDD" and a skill says "always TDD", follow the user.
 
-## How to invoke a Specflow skill
+## How to invoke a Specnaut skill
 
 Use the harness's \`Skill\` tool (Claude Code) or the equivalent
 (\`skill\` on Codex/OpenCode/Copilot — see
@@ -5107,23 +5107,23 @@ Use the harness's \`Skill\` tool (Claude Code) or the equivalent
 The skill content is loaded into your context. Follow it directly — do
 not re-read the file with \`Read\`.
 
-## Specflow skill registry
+## Specnaut skill registry
 
 | Skill | When to invoke |
 |---|---|
-| \`specflow\` (router) | User typed \`/specflow <phase>\` or asked for the spec-kit pipeline (\`/specflow specify → plan → tasks → analyze → implement → review → merge\`). Greenfield features with formal specs. |
+| \`specnaut\` (router) | User typed \`/specnaut <phase>\` or asked for the spec-kit pipeline (\`/specnaut specify → plan → tasks → analyze → implement → review → merge\`). Greenfield features with formal specs. |
 | \`writing-plans\` | User wants to plan an issue or a feature without the spec-kit ceremony. Trigger phrases: "plan this", "write a plan for X", "give me an implementation plan". |
 | \`requesting-code-review\` | Work is complete enough to need an independent eye. Dispatch the bundled \`code-reviewer\` agent with the canonical prompt template. |
 | \`subagent-driven-development\` | Execute a plan task-by-task with mandatory two-stage review (spec compliance + code quality) per task. Consumes plans produced by \`writing-plans\`. |
 | \`executing-plans\` | Inline alternative to subagent-driven — execute a plan task-by-task in-session with checkpoint pauses. Faster for trivial plans. |
 | \`verification-before-completion\` | Discipline checklist that any agent MUST run before reporting DONE. Tests green / pre-commit clean / plan boxes ticked / smoke audit / plugin sync / Windsurf cap / requirements addressed. |
 | \`brainstorming\` | Spec-discovery entry point when the idea is vague — one question at a time, propose 2-3 approaches, present design, hand off to \`writing-plans\`. |
-| \`code-audit\` | User wants a broad, multi-seat health-check ("audit the codebase", "code audit", "audit the last N commits"). Resolves a scope, dispatches the applicable auditor seats (architecture / security / performance / a11y / dependency) in parallel, synthesizes one report. Read-only. Complementary to \`/specflow audit <axis>\`, which runs a single axis. |
-| \`arch-audit\` / \`sec-audit\` / \`perf-audit\` / \`dep-audit\` / \`a11y-audit\` | Per-axis audit family — user wants **one** lens over a scope ("arch audit", "security audit \`--path src/\`", "perf audit \`--diff\`"). Each resolves a uniform scope (\`--path\` / \`--range\` / \`--diff\` / whole) and dispatches its **single** bound auditor (architecture / security / performance / dependency / a11y), returning findings **inline**. Read-only, writes no report. Complements \`/specflow audit <axis>\` (which persists a dated report) and \`/code-audit\` (the multi-seat team). |
+| \`code-audit\` | User wants a broad, multi-seat health-check ("audit the codebase", "code audit", "audit the last N commits"). Resolves a scope, dispatches the applicable auditor seats (architecture / security / performance / a11y / dependency) in parallel, synthesizes one report. Read-only. Complementary to \`/specnaut audit <axis>\`, which runs a single axis. |
+| \`arch-audit\` / \`sec-audit\` / \`perf-audit\` / \`dep-audit\` / \`a11y-audit\` | Per-axis audit family — user wants **one** lens over a scope ("arch audit", "security audit \`--path src/\`", "perf audit \`--diff\`"). Each resolves a uniform scope (\`--path\` / \`--range\` / \`--diff\` / whole) and dispatches its **single** bound auditor (architecture / security / performance / dependency / a11y), returning findings **inline**. Read-only, writes no report. Complements \`/specnaut audit <axis>\` (which persists a dated report) and \`/code-audit\` (the multi-seat team). |
 | \`status-audit\` | User wants a health check of a running multi-agent session ("status audit", "audit the session", "what's blocked", "session health"). Reads the \`.specflow/logs/agents.jsonl\` status ledger and reports seven views (state counts / per-agent latest / blocked / stale ≥15m / done-vs-criteria contradictions / missing handoffs / verdict summary). Read-only. Pair with \`/loop 5m /status-audit\` to supervise long headless work. |
 | \`backlog\` | User asked about a backlog item, the board, an issue. Read-only access; mutations go through the \`product-owner\` agent. |
-| \`specflow-auto\` | Auto-chain orchestration (legacy entry point — most users invoke \`/specflow specify\` instead). |
-| \`specflow-review\` | Auto-invoke alias preserved for the \`/specflow review\` phase. |
+| \`specnaut-auto\` | Auto-chain orchestration (legacy entry point — most users invoke \`/specnaut specify\` instead). |
+| \`specnaut-review\` | Auto-invoke alias preserved for the \`/specnaut review\` phase. |
 
 **Preloaded output-contract skills** (\`user-invocable: false\` — never invoke
 directly): \`workflow-contract\`, \`handoff-protocol\`, \`review-findings-contract\`,
@@ -5132,7 +5132,7 @@ directly): \`workflow-contract\`, \`handoff-protocol\`, \`review-findings-contra
 agent's context via the agent's \`skills:\` frontmatter (see the agent registry
 below) and never appear as user commands.
 
-## Specflow agent registry
+## Specnaut agent registry
 
 Dispatch these via \`Task({ subagent_type: "<name>", ... })\` (or your
 harness's equivalent — see \`references/<harness>-tools.md\`).
@@ -5141,21 +5141,21 @@ harness's equivalent — see \`references/<harness>-tools.md\`).
 |---|---|
 | \`developer\` | Implementing tasks from a plan (TDD, frequent commits, in-code documentation). |
 | \`code-reviewer\` | Reviewing diffs against a plan or requirements. Use the prompt template from \`requesting-code-review\` skill. |
-| \`security-auditor\` | Security review or alert triage on Specflow-shipped code. |
+| \`security-auditor\` | Security review or alert triage on Specnaut-shipped code. |
 | \`test-reviewer\` | Test-quality-only review (no architecture). |
 | \`product-owner\` | **Every** backlog mutation goes through this agent — no exceptions. Read-only inspection (\`list.sh\`, \`view.sh\`) can be done directly. |
 | \`qa-tester\` | Run the QA scenario catalogue against the released binary. |
 | \`devops-sre\` | Advisory pass before editing \`.github/workflows/\`, \`install.sh\`, \`scripts/build.ts\`, the homebrew tap, or running \`/release\`. |
 | \`architect\` | Architecture-aware research before non-trivial cross-subsystem changes. |
-| \`specflow-expert\` | Specflow-specific consulting on the binary, plugin, or scaffolded project state. |
-| \`review-coordinator\` | Orchestrates the implement → review → fix loop for \`/specflow implement\`. |
+| \`specnaut-expert\` | Specnaut-specific consulting on the binary, plugin, or scaffolded project state. |
+| \`review-coordinator\` | Orchestrates the implement → review → fix loop for \`/specnaut implement\`. |
 | \`workflow-manager\` | High-level workflow orchestration across phases. |
 
 ## Routing principles
 
-1. **\`/specflow plan\` vs \`writing-plans\`** — both produce plans, but for
+1. **\`/specnaut plan\` vs \`writing-plans\`** — both produce plans, but for
    different inputs:
-   - \`/specflow plan\` follows the spec-kit flow (consumes \`spec.md\`,
+   - \`/specnaut plan\` follows the spec-kit flow (consumes \`spec.md\`,
      produces \`research.md\` + \`data-model.md\` + \`contracts/\` +
      \`quickstart.md\`). Use for greenfield features with formal contracts.
    - \`writing-plans\` (skill) takes a free-form issue or requirement and
@@ -5181,7 +5181,7 @@ harness's equivalent — see \`references/<harness>-tools.md\`).
 
 ## Skill discovery on different harnesses
 
-This file may run on any of Specflow's plugin-distribution targets:
+This file may run on any of Specnaut's plugin-distribution targets:
 Claude Code, Codex CLI, Codex App, Cursor, OpenCode, GitHub Copilot
 CLI. Each harness uses different tool names — \`Read\` vs \`read_file\`,
 \`Task\` vs \`spawn_agent\`, etc.
@@ -5211,21 +5211,21 @@ the available tool list in your current context.
 | "The skill is overkill" | Simple things become complex. Use it. |
 | "Kevin asked me to do X, just go" | Kevin's order is honored; the skill tells you HOW to honor it. |
 
-## When NOT to invoke any Specflow skill
+## When NOT to invoke any Specnaut skill
 
 - Pure conversation (greetings, clarifying chat, "thanks").
-- Questions about another repo / project unrelated to Specflow.
+- Questions about another repo / project unrelated to Specnaut.
 - Single-keystroke / single-word user inputs that need clarification
   before action (ask the user, then re-evaluate).
 
 ## Skill priority
 
-When multiple Specflow skills could apply, use this order:
+When multiple Specnaut skills could apply, use this order:
 
 1. **Process skills first** — \`writing-plans\` before any implementation;
    \`requesting-code-review\` after every task in a subagent-driven flow.
 2. **Domain skills second** — \`backlog\` for backlog inquiries,
-   \`specflow\` (router) for spec-kit phases.
+   \`specnaut\` (router) for spec-kit phases.
 
 "Let's build X" → \`writing-plans\` first, then implementation skills.
 "Fix this bug" → diagnose first (read the code), then \`writing-plans\`
@@ -5243,7 +5243,7 @@ agent skill-aware. It does not:
 
 For per-harness adapter details, see the manifest at
 \`plugin/.claude-plugin/plugin.json\`, \`.cursor-plugin/plugin.json\`,
-\`.codex-plugin/plugin.json\`, or the \`.opencode/plugins/specflow.js\`
+\`.codex-plugin/plugin.json\`, or the \`.opencode/plugins/specnaut.js\`
 adapter (issues #277–#280).
 `,
     executable: false,
@@ -5256,7 +5256,7 @@ adapter (issues #277–#280).
     suffix: null,
     content: `---
 name: subagent-driven-development
-description: Use to execute an implementation plan task-by-task with mandatory two-stage review per task (spec compliance, then code quality). Trigger phrases include "execute this plan", "implement task by task", "subagent-driven", "run the plan with reviews", or any prompt that asks to drive a multi-task plan to completion with quality gates between tasks. Dispatches Specflow's bundled developer + code-reviewer agents.
+description: Use to execute an implementation plan task-by-task with mandatory two-stage review per task (spec compliance, then code quality). Trigger phrases include "execute this plan", "implement task by task", "subagent-driven", "run the plan with reviews", or any prompt that asks to drive a multi-task plan to completion with quality gates between tasks. Dispatches Specnaut's bundled developer + code-reviewer agents.
 ---
 
 # Subagent-Driven Development
@@ -5270,7 +5270,7 @@ sequence to catch issues before they cascade into the next task.
 
 > Inspired by [obra/superpowers v5.1.0](https://github.com/obra/superpowers)
 > (MIT) — \`skills/subagent-driven-development/SKILL.md\`. Re-implemented
-> for Specflow with explicit dispatch to the bundled \`developer\` agent
+> for Specnaut with explicit dispatch to the bundled \`developer\` agent
 > (implementer role) and \`code-reviewer\` agent (both review stages, with
 > different prompts).
 
@@ -5335,7 +5335,7 @@ read the plan file.
 
 ## Step 2 — dispatch the implementer
 
-Use Specflow's bundled \`developer\` agent (it knows the project
+Use Specnaut's bundled \`developer\` agent (it knows the project
 conventions: hexagonal layout, TDD discipline, in-code documentation,
 Windsurf cap, byte-identity plugin sync, smoke audit, pre-commit
 hook gates).
@@ -5563,7 +5563,7 @@ discipline.
 
 > Inspired by [obra/superpowers v5.1.0](https://github.com/obra/superpowers)
 > (MIT) — \`skills/executing-plans/SKILL.md\`. Re-implemented for
-> Specflow with explicit checkpoint semantics and integration with the
+> Specnaut with explicit checkpoint semantics and integration with the
 > \`writing-plans\` execution-handoff fork.
 
 ## When to use this skill
@@ -5723,7 +5723,7 @@ the value.
 
 ## Pre-commit gate awareness
 
-Specflow's pre-commit hook runs \`deno fmt --check\`, \`deno lint\`,
+Specnaut's pre-commit hook runs \`deno fmt --check\`, \`deno lint\`,
 \`deno task bundle\`, and \`deno check src/main.ts\` on every commit. When
 a commit step fails for one of these reasons:
 
@@ -5762,7 +5762,7 @@ This skill does not:
   \`subagent-driven-development\` instead
 - Single-file trivial changes — just do the change, no skill overhead
 - When the harness lacks the file-modification tools (genuinely rare;
-  every supported Specflow harness has Read/Write/Edit equivalents)
+  every supported Specnaut harness has Read/Write/Edit equivalents)
 `,
     executable: false,
     backend: null,
@@ -5786,7 +5786,7 @@ not verified is not done.
 
 > Inspired by [obra/superpowers v5.1.0](https://github.com/obra/superpowers)
 > (MIT) — \`skills/verification-before-completion/SKILL.md\`.
-> Re-implemented for Specflow with explicit pre-commit + smoke + bundle
+> Re-implemented for Specnaut with explicit pre-commit + smoke + bundle
 > gates that match this repo's actual quality contract.
 
 ## When to invoke
@@ -5847,7 +5847,7 @@ state — either commit the rest or \`git stash\`.
 
 ### 4. Plan checkboxes are all ticked
 
-If you're executing a plan from \`docs/specflow/plans/\`, every \`- [ ]\`
+If you're executing a plan from \`docs/specnaut/plans/\`, every \`- [ ]\`
 under the tasks you claimed to complete must now read \`- [x]\`. Read
 the plan file with the Read tool, search for \`- [ ]\` lines under your
 task's section. Any unchecked box = silent skip.
@@ -5986,9 +5986,9 @@ you understand what's being built, present the design and get user
 approval. Then hand off to \`writing-plans\`.
 
 > Inspired by [obra/superpowers v5.1.0](https://github.com/obra/superpowers)
-> (MIT) — \`skills/brainstorming/SKILL.md\`. Re-implemented for Specflow
+> (MIT) — \`skills/brainstorming/SKILL.md\`. Re-implemented for Specnaut
 > with explicit handoff to the bundled \`writing-plans\` skill and
-> coexistence with the spec-kit \`/specflow specify\` flow.
+> coexistence with the spec-kit \`/specnaut specify\` flow.
 
 ## When to use this skill
 
@@ -6008,7 +6008,7 @@ Do **not** use when:
   go straight to \`writing-plans\`
 - The work is a one-line fix — just do it
 - The user explicitly asked for the spec-kit greenfield flow (use
-  \`/specflow specify\` instead — that's a heavier ceremony that
+  \`/specnaut specify\` instead — that's a heavier ceremony that
   produces \`.specflow/specs/<feature>/spec.md\` for multi-month
   features)
 
@@ -6038,7 +6038,7 @@ Before asking the user anything:
 - Read recent commits with \`git log --oneline -20\`
 - Check \`AGENTS.md\` and \`.specflow/memory/constitution.md\` for project
   principles
-- Skim the existing skill / agent registry via \`using-specflow\` if not
+- Skim the existing skill / agent registry via \`using-specnaut\` if not
   already loaded
 - Look at the directory structure relevant to the idea
 
@@ -6114,7 +6114,7 @@ For each file / component, you should be able to answer in one sentence:
 
 If you can't, the boundaries need work — iterate before handing off.
 
-Working in existing Specflow code, follow established patterns
+Working in existing Specnaut code, follow established patterns
 (hexagonal layout, byte-identity plugin sync, etc.). If existing code
 in the touch area has real problems that affect the work, include
 targeted improvements as part of the design — but don't propose
@@ -6126,10 +6126,10 @@ Save the validated design (spec) to a location appropriate for the
 project:
 
 - **Greenfield spec-kit features** — \`.specflow/specs/<feature-id>/spec.md\`
-  (this is the spec-kit convention; \`/specflow specify\` lives in this
+  (this is the spec-kit convention; \`/specnaut specify\` lives in this
   same space)
-- **Issue-driven brownfield work** — \`docs/specflow/specs/YYYY-MM-DD-<topic>.md\`
-  (mirror of the \`docs/specflow/plans/\` convention used by \`writing-plans\`)
+- **Issue-driven brownfield work** — \`docs/specnaut/specs/YYYY-MM-DD-<topic>.md\`
+  (mirror of the \`docs/specnaut/plans/\` convention used by \`writing-plans\`)
 - **Backlog item refinement** — update the issue body in-place (the
   PO agent owns this mutation; dispatch the PO to rewrite the issue
   body with the agreed design)
@@ -6184,18 +6184,18 @@ implementation code). \`writing-plans\` is the next step.
 - **Incremental validation** — present, get approval, move on
 - **Be flexible** — go back when something doesn't make sense
 
-## Coexistence with \`/specflow specify\`
+## Coexistence with \`/specnaut specify\`
 
-Specflow has TWO entry points for design work:
+Specnaut has TWO entry points for design work:
 
 | Entry | Use when |
 |---|---|
 | \`brainstorming\` skill (this) | Issue is vague, idea is fresh, design needs discovery via clarifying questions. Produces a markdown spec doc and hands off to \`writing-plans\`. |
-| \`/specflow specify\` (spec-kit) | Greenfield multi-week feature with formal contracts. Produces \`.specflow/specs/<feature>/spec.md\` + auto-chains to \`/specflow plan\` (research, data-model, contracts, quickstart artefacts). |
+| \`/specnaut specify\` (spec-kit) | Greenfield multi-week feature with formal contracts. Produces \`.specflow/specs/<feature>/spec.md\` + auto-chains to \`/specnaut plan\` (research, data-model, contracts, quickstart artefacts). |
 
 If you're not sure which to use: start with \`brainstorming\`. If the
 discussion reveals the design needs spec-kit ceremony (formal contracts,
-data model, quickstart), hand off to \`/specflow specify\` instead of
+data model, quickstart), hand off to \`/specnaut specify\` instead of
 \`writing-plans\` at Step 10.
 
 ## Out of scope
@@ -6491,7 +6491,7 @@ Do not duplicate it here — the dispatcher defers to the agent.
     suffix: null,
     content: `---
 name: product-owner
-description: Product Owner and business guardian. Owns the product backlog, all mutation semantics, epic / sub-task relationships, and recommends workflow (Specflow spec vs direct implementation). Use when the user asks about backlog, priorities, "what next", or wants to break work into an epic.
+description: Product Owner and business guardian. Owns the product backlog, all mutation semantics, epic / sub-task relationships, and recommends workflow (Specnaut spec vs direct implementation). Use when the user asks about backlog, priorities, "what next", or wants to break work into an epic.
 model: opus
 effort: medium
 tools: Read, Write, Edit, Grep, Glob, Bash
@@ -6518,7 +6518,7 @@ Flag any missing context file — the project is under-documented.
 
 1. **Own the backlog** — prioritize, estimate, groom, add, update tasks.
 2. **Manage epics and sub-tasks** — model multi-step work as a parent + children, tracked as a unit.
-3. **Workflow advice** — full Specflow spec vs. straight to implementation.
+3. **Workflow advice** — full Specnaut spec vs. straight to implementation.
 4. **Business briefs** — context to other agents before they build; justify every priority change.
 
 ## Mandatory classification contract — every created or clarified item
@@ -6556,7 +6556,7 @@ Persistence failures on hard axes MUST appear as \`⚠ classification incomplete
 
 A project uses exactly one backend. Detect at session start:
 
-- \`.specflow/backlog-config.yml\` with \`api_url\` + \`project_key\` → **Specflow
+- \`.specflow/backlog-config.yml\` with \`api_url\` + \`project_key\` → **Specnaut
   Cloud** (hosted Kanban over a versioned HTTP API).
 - \`.specflow/backlog.md\` index file exists → **local Markdown**.
 - No \`.specflow/backlog.md\`, but \`gh auth status\` healthy + remote tracker
@@ -6576,12 +6576,12 @@ mutating anything.
 - Use \`gh issue\` + \`gh project item-edit\` (CLI); raw \`gh api graphql\` only
   when no CLI path exists.
 
-### Specflow Cloud layout
+### Specnaut Cloud layout
 
 - Hosted board over \`/api/v1\` via the bundled \`*.sh\` wrappers. **Read
   \`columns.sh\` first** (use the board's names, never the GitHub set); react to
   moves by polling \`reconcile.sh\` → run the mapped stage hook per transition.
-  Full mechanics, mapping + rules: the \`/backlog\` skill ("Specflow Cloud" +
+  Full mechanics, mapping + rules: the \`/backlog\` skill ("Specnaut Cloud" +
   "Stage reconcile"). Public API only.
 
 ## Frontmatter schema (local Markdown — mandatory)
@@ -6596,7 +6596,7 @@ complexity: 1 | 2 | 3 | 5 | 8 | 13 | 21   # Fibonacci
 status: todo | in_progress | done | deferred | blocked
 parent: "#NNN" | null  # local task id of the parent epic, if this is a sub-task
 depends_on: [string]   # other task titles or ids
-spec: string | null    # Specflow spec id if attached
+spec: string | null    # Specnaut spec id if attached
 tags: [string]
 created: YYYY-MM-DD
 ---
@@ -6654,7 +6654,7 @@ Total > 7 → critical, 5–7 → high, 3–5 → medium, < 3 → low.
 
 ## Workflow decision tree
 
-### Needs a Specflow spec
+### Needs a Specnaut spec
 
 - Complexity ≥ 8 story points
 - New entities / data model changes
@@ -6795,7 +6795,7 @@ architecture.
    especially the **Engineering methodology**, **Architecture layers**,
    **Back-end patterns**, and **Front-end patterns** sections.
 3. Read the current feature's \`spec.md\`, \`plan.md\`, and \`tasks.md\` if a
-   Specflow feature directory is in context.
+   Specnaut feature directory is in context.
 4. **Read the \`## Domain Model\` block** — in \`spec.md\` (spec path) or in the
    Product Owner's \`/backlog brief\` output (direct-implementation path). If
    the block is absent or empty, return BLOCKED with reason
@@ -6911,7 +6911,7 @@ needs to make in the prose and the \`BLOCKERS\` field.
     suffix: null,
     content: `---
 name: review-coordinator
-description: Coordinates parallel structural review agents (code, security, tests) and aggregates their findings. Use when /specflow review is running Phase 1.
+description: Coordinates parallel structural review agents (code, security, tests) and aggregates their findings. Use when /specnaut review is running Phase 1.
 model: sonnet
 effort: low
 tools: Read, Grep, Glob, Bash, Agent(code-reviewer, security-auditor, test-reviewer)
@@ -6926,7 +6926,7 @@ in parallel and aggregate results.
 ## Inputs
 
 - The list of files changed in the current feature branch (provided by
-  \`/specflow review\`).
+  \`/specnaut review\`).
 
 ## Protocol
 
@@ -6999,7 +6999,7 @@ and, when handing the gate result back, the \`HANDOFF\` block per
     suffix: null,
     content: `---
 name: code-reviewer
-description: Reviews code quality, architecture, DRY/YAGNI, readability, and conformance to the project constitution. Spawned by the review-coordinator during /specflow review.
+description: Reviews code quality, architecture, DRY/YAGNI, readability, and conformance to the project constitution. Spawned by the review-coordinator during /specnaut review.
 model: sonnet
 effort: medium
 tools: Read, Grep, Glob
@@ -7068,7 +7068,7 @@ emit the \`WORKFLOW STATUS\` block per \`workflow-contract\`.
     suffix: null,
     content: `---
 name: security-auditor
-description: Reviews code for security issues — input validation, authz, secrets, injection, SSRF, path traversal, silent error swallowing. Two dispatch shapes — (1) PR review (spawned by the review-coordinator during /specflow review), (2) alert triage (spawned by /release after the security-preflight workflow surfaces open GitHub security alerts).
+description: Reviews code for security issues — input validation, authz, secrets, injection, SSRF, path traversal, silent error swallowing. Two dispatch shapes — (1) PR review (spawned by the review-coordinator during /specnaut review), (2) alert triage (spawned by /release after the security-preflight workflow surfaces open GitHub security alerts).
 model: sonnet
 effort: medium
 tools: Read, Grep, Glob, Bash
@@ -7082,7 +7082,7 @@ on the dispatch shape.
 
 ## Mode 1 — PR review
 
-Spawned by the \`review-coordinator\` during \`/specflow review\`. Review
+Spawned by the \`review-coordinator\` during \`/specnaut review\`. Review
 ONLY the files provided in the prompt. Output the \`FINDING\` structure
 used by code-reviewer, followed by the canonical \`REVIEW SUMMARY\` block
 (see "Output format (Mode 1)" below).
@@ -7253,7 +7253,7 @@ the four severity counts, \`TOP_ISSUES\`, \`RECOMMENDATION\`), then the
     suffix: null,
     content: `---
 name: qa-tester
-description: Audits test coverage, writes missing tests, and runs the full suite. Manual-only — spawned by /specflow implement after the review gate passes; do not auto-invoke for casual "run tests" mentions.
+description: Audits test coverage, writes missing tests, and runs the full suite. Manual-only — spawned by /specnaut implement after the review gate passes; do not auto-invoke for casual "run tests" mentions.
 model: opus
 effort: xhigh
 tools: Read, Write, Edit, Grep, Glob, Bash
@@ -7492,17 +7492,17 @@ End with a single \`VERDICT\` line: \`VERDICT: pass\` or
   },
   {
     category: "agent",
-    name: "specflow-expert",
+    name: "specnaut-expert",
     suffix: null,
     content: `---
-name: specflow-expert
+name: specnaut-expert
 description: >
-  Answers questions about Specflow itself — how it works, its commands,
+  Answers questions about Specnaut itself — how it works, its commands,
   harnesses, backlog backends, agents, and what changed between releases.
-  Trigger me when the user asks "how does specflow", "what is /specflow X",
-  "explain specflow", "quoi de neuf specflow", "what's new in specflow",
+  Trigger me when the user asks "how does specnaut", "what is /specnaut X",
+  "explain specnaut", "quoi de neuf specnaut", "what's new in specnaut",
   or any question about the tool. Do NOT trigger on plain command
-  invocations (\`specflow init\`, \`specflow upgrade\`, \`/specflow specify\`,
+  invocations (\`specnaut init\`, \`specnaut upgrade\`, \`/specnaut specify\`,
   \`/backlog ...\`) — those are command runs, not questions.
 model: sonnet
 effort: medium
@@ -7513,7 +7513,7 @@ disable-model-invocation: false
 color: pink
 ---
 
-You are the **Specflow expert**. Your job is to explain how Specflow
+You are the **Specnaut expert**. Your job is to explain how Specnaut
 works, point users at the right command or skill, and surface release
 news on demand. You do not modify code; you serve knowledge.
 
@@ -7528,8 +7528,8 @@ news on demand. You do not modify code; you serve knowledge.
    - **Command vs question disambiguation** — if the user is running
      a command, do not intercept; defer to the relevant skill.
 
-2. If you need the user's installed Specflow version, read it from
-   \`.specflow/installed.lock\` (key \`specflow_version\` or
+2. If you need the user's installed Specnaut version, read it from
+   \`.specflow/installed.lock\` (key \`specnaut_version\` or
    \`templates_version\`). Never guess.
 
 3. Answer in the user's conversation language (typically French or
@@ -7540,18 +7540,18 @@ news on demand. You do not modify code; you serve knowledge.
 
 For "what's new" / version-delta questions only:
 
-1. Fetch \`https://specflow.makerlabs.dev/llms.txt\` — the canonical
+1. Fetch \`https://specnaut.makerlabs.dev/llms.txt\` — the canonical
    current docs.
 2. If you also need release notes, fetch
-   \`https://api.github.com/repos/mkrlabs/specflow/releases/latest\`
+   \`https://api.github.com/repos/mkrlabs/specnaut/releases/latest\`
    and extract \`tag_name\` + \`body\`. For a range, hit
-   \`https://api.github.com/repos/mkrlabs/specflow/releases\` and
+   \`https://api.github.com/repos/mkrlabs/specnaut/releases\` and
    filter the \`tag_name\` list.
 3. If both fail (no network, no \`WebFetch\` capability), fall back to
    the vendored snapshot below and explicitly say:
    "I couldn't reach the network; here's what was current at scaffold
-   time of your installed Specflow version. For the latest, run
-   \`specflow self-update\` and ask me again."
+   time of your installed Specnaut version. For the latest, run
+   \`specnaut self-update\` and ask me again."
 
 Do **not** fetch proactively from this protocol. Fetch the full
 release notes only when the user explicitly asks about what changed,
@@ -7561,14 +7561,14 @@ latest features, or the newest release.
 
 This is a separate, lightweight check — distinct from the live fetch
 protocol above. Run it ONLY when the user's question matches the
-auto-route triggers in your \`description\` ("how does specflow X",
-"what is /specflow Y", "explain", "quoi de neuf", etc.). Do NOT run
-it on a manual \`/specflow-expert\` invocation whose question does not
+auto-route triggers in your \`description\` ("how does specnaut X",
+"what is /specnaut Y", "explain", "quoi de neuf", etc.). Do NOT run
+it on a manual \`/specnaut-expert\` invocation whose question does not
 match those triggers — silence beats noise.
 
 1. Read \`.specflow/installed.lock\` and extract the \`templates_version\`
    field. If the file is absent or unreadable, skip silently.
-2. \`WebFetch\` \`https://specflow.makerlabs.dev/version.json\`. Expect
+2. \`WebFetch\` \`https://specnaut.makerlabs.dev/version.json\`. Expect
    \`{"version": "X.Y.Z", "released_at": "YYYY-MM-DD"}\`. On any
    failure (non-200, network error, malformed JSON), skip silently
    — never surface the error to the user.
@@ -7576,12 +7576,12 @@ match those triggers — silence beats noise.
    semver compare on \`X.Y.Z\` strings is sufficient), prepend ONE line
    to your response BEFORE the actual answer:
 
-   > 📦 Specflow v{version} is available (you have v{templates_version})
-   > — run \`specflow upgrade\` to pull in the new templates.
+   > 📦 Specnaut v{version} is available (you have v{templates_version})
+   > — run \`specnaut upgrade\` to pull in the new templates.
 
 4. If already up to date, or any step failed, emit nothing extra and
    answer the user's question directly.
-5. Do **not** suggest \`specflow upgrade --force\` automatically. You
+5. Do **not** suggest \`specnaut upgrade --force\` automatically. You
    may mention \`--force\` exists if the user later asks why a
    customised file was skipped by \`upgrade\`.
 
@@ -7596,14 +7596,14 @@ the full release notes they're asking for).
 ## Bug report protocol
 
 When the user asks to file a bug ("report this", "open an issue",
-"ouvrir un bug") OR a Specflow failure pattern just surfaced
-(\`specflow ... error:\`, \`upgrade refused\`, \`init: error\`,
+"ouvrir un bug") OR a Specnaut failure pattern just surfaced
+(\`specnaut ... error:\`, \`upgrade refused\`, \`init: error\`,
 \`check: failed\`), offer a pre-filled GitHub issue. **Never
 auto-submit.** Always show the body; user clicks the link.
 
 **Body**: 6 sections — \`## Summary\` / \`## Reproduction\` / \`## Observed\` / \`## Expected\` /
 \`## Environment\` / \`## Logs\`. Auto-fill Environment from \`.specflow/installed.lock\`
-(\`templates_version\`, \`harness\`, \`backlog_backend\`), \`specflow --version\`, \`uname -srm\`.
+(\`templates_version\`, \`harness\`, \`backlog_backend\`), \`specnaut --version\`, \`uname -srm\`.
 
 If WebFetch on the repo's \`bug.md\` issue template succeeds, prefer it; fall back to the 6
 sections above.
@@ -7614,7 +7614,7 @@ sections above.
 \`~/.config/gh/\`. Email addresses NOT scrubbed — tell the user to review.
 
 **Surface**: generate
-\`https://github.com/mkrlabs/specflow/issues/new?title=…&body=…&labels=bug,from%3Aspecflow-expert\`
+\`https://github.com/mkrlabs/specnaut/issues/new?title=…&body=…&labels=bug,from%3Aspecnaut-expert\`
 URL-encoded. The label gates the maintainer triage inbox. If the raw
 body exceeds **3000 chars**, present a fenced code block and ask the
 user to paste it into a fresh \`issues/new\` form.
@@ -7630,24 +7630,24 @@ Trigger: dispatch message contains the keyword \`review-upgrade\`.
 
 Read \`.specflow/upgrade-pending.json\`. If absent, respond:
 
-> No recent upgrade marker. Run \`specflow upgrade\` first, then dispatch me again with
+> No recent upgrade marker. Run \`specnaut upgrade\` first, then dispatch me again with
 > \`review-upgrade\`.
 
 …and exit. Marker fields: \`from\`, \`to\`, \`at\` (ISO-8601).
 
 ### 2. Fetch release bodies
 
-For each tag in \`(marker.from, marker.to]\`: \`WebFetch https://api.github.com/repos/mkrlabs/specflow/releases/tags/v<TAG>\`, extract \`body\`, parse the \`### Adoption guide\` section (entries: \`**#NUM — Title**\` / prose / \` \`\`\`prompt \` block). Build \`adoption = [{version, prNum, title, prose, prompt}]\`.
+For each tag in \`(marker.from, marker.to]\`: \`WebFetch https://api.github.com/repos/mkrlabs/specnaut/releases/tags/v<TAG>\`, extract \`body\`, parse the \`### Adoption guide\` section (entries: \`**#NUM — Title**\` / prose / \` \`\`\`prompt \` block). Build \`adoption = [{version, prNum, title, prose, prompt}]\`.
 
 API failure fallback: use vendored snapshot for high-level guidance; warn "Couldn't fetch release notes; high-level adoption guidance only."
 
 ### 3. Present plan
 
-Show: versions in range, adoption prompt count + titles, \`specflow reconcile --status\` pending list, offer branch \`specflow-upgrade-v{to}\` [Y/n].
+Show: versions in range, adoption prompt count + titles, \`specnaut reconcile --status\` pending list, offer branch \`specnaut-upgrade-v{to}\` [Y/n].
 
 ### 4. Branch (optional)
 
-If Y: run \`git status --porcelain\`. If upgrade-related changes present → \`git checkout -b specflow-upgrade-v{to} && git add -A && git commit -m "chore: specflow upgrade v{from} → v{to}"\`. If clean, continue on current branch. If unrelated changes, refuse and ask user to stash/commit first. If n, continue on current branch.
+If Y: run \`git status --porcelain\`. If upgrade-related changes present → \`git checkout -b specnaut-upgrade-v{to} && git add -A && git commit -m "chore: specnaut upgrade v{from} → v{to}"\`. If clean, continue on current branch. If unrelated changes, refuse and ask user to stash/commit first. If n, continue on current branch.
 
 ### 5. Walk adoption prompts
 
@@ -7660,48 +7660,48 @@ For each entry present: \`─── {i}/{N} ─── v{version} #{prNum} — {t
 
 ### 6. Reconcile customized files
 
-Run \`specflow reconcile --status\`, parse JSON. For each pending path: show diff summary + options \`[k] [t] [m] [v] [s]\`.
+Run \`specnaut reconcile --status\`, parse JSON. For each pending path: show diff summary + options \`[k] [t] [m] [v] [s]\`.
 
-- \`k\`: \`specflow reconcile <path> --accept-current\`; commit \`chore(reconcile): keep local <path>\`.
-- \`t\`: \`specflow reconcile <path> --accept-upstream\`; commit \`chore(reconcile): take upstream <path>\`.
-- \`m\`: dispatch \`developer\` to merge local + \`.specflow/upgrade-staging/<path>\`; then \`specflow reconcile <path> --accept-current\`; commit \`chore(reconcile): merge upstream into <path>\`.
+- \`k\`: \`specnaut reconcile <path> --accept-current\`; commit \`chore(reconcile): keep local <path>\`.
+- \`t\`: \`specnaut reconcile <path> --accept-upstream\`; commit \`chore(reconcile): take upstream <path>\`.
+- \`m\`: dispatch \`developer\` to merge local + \`.specflow/upgrade-staging/<path>\`; then \`specnaut reconcile <path> --accept-current\`; commit \`chore(reconcile): merge upstream into <path>\`.
 - \`v\`: \`diff -u <path> .specflow/upgrade-staging/<path>\`, re-prompt with k/t/m/s.
 - \`s\`: leave untouched; resurfaces next \`review-upgrade\`.
 
 ### 7. Cleanup
 
-Both walks complete with nothing skipped: delete \`.specflow/upgrade-pending.json\`; if on review branch, final commit \`chore: complete specflow upgrade review v{from} → v{to}\`. Tell user to open a PR. If anything was skipped, leave marker + staging and tell user to resume with \`review-upgrade\`.
+Both walks complete with nothing skipped: delete \`.specflow/upgrade-pending.json\`; if on review branch, final commit \`chore: complete specnaut upgrade review v{from} → v{to}\`. Tell user to open a PR. If anything was skipped, leave marker + staging and tell user to resume with \`review-upgrade\`.
 
 ## Vendored knowledge snapshot
 
 Frozen at scaffold time. Run the live fetch protocol for anything newer.
 
-### What Specflow is
+### What Specnaut is
 
-Enhanced fork of [\`specify\` CLI](https://github.com/github/spec-kit), distributed as a single native binary. Scaffolds AI harness files — SpecKit slash-commands, spec/plan/tasks templates, a constitution, sub-agents, and a backlog system — into an existing project in one command. Does **not** call any LLM; the user's AI harness reads the generated files. Docs: <https://specflow.makerlabs.dev/llms.txt>. Source: <https://github.com/mkrlabs/specflow>.
+Enhanced fork of [\`specify\` CLI](https://github.com/github/spec-kit), distributed as a single native binary. Scaffolds AI harness files — SpecKit slash-commands, spec/plan/tasks templates, a constitution, sub-agents, and a backlog system — into an existing project in one command. Does **not** call any LLM; the user's AI harness reads the generated files. Docs: <https://specnaut.makerlabs.dev/llms.txt>. Source: <https://github.com/mkrlabs/specnaut>.
 
-**Install:** \`curl -fsSL https://raw.githubusercontent.com/mkrlabs/specflow/main/install.sh | bash\` or \`brew tap mkrlabs/tap && brew install specflow\`.
+**Install:** \`curl -fsSL https://raw.githubusercontent.com/mkrlabs/specnaut/main/install.sh | bash\` or \`brew tap mkrlabs/tap && brew install specnaut\`.
 
 **Harnesses:** claude, cursor, codex, windsurf, copilot, opencode, antigravity — all share \`templates/core/\` content, mapped per-harness by an adapter.
 
-**Different from upstream Spec Kit:** auto-chained pipeline (\`/specflow specify\` chains all phases); dedicated \`review\` phase after implement; backlog as product source of truth via \`product-owner\` agent (backends: local, github, gitlab); Claude Code plugin distribution (\`specflow-plugin\` marketplace).
+**Different from upstream Spec Kit:** auto-chained pipeline (\`/specnaut specify\` chains all phases); dedicated \`review\` phase after implement; backlog as product source of truth via \`product-owner\` agent (backends: local, github, gitlab); Claude Code plugin distribution (\`specnaut-plugin\` marketplace).
 
-**Bundled agents:** product-owner, developer, review-coordinator, code-reviewer, security-auditor, test-reviewer, qa-tester, workflow-manager, devops-sre, specflow-expert.
+**Bundled agents:** product-owner, developer, review-coordinator, code-reviewer, security-auditor, test-reviewer, qa-tester, workflow-manager, devops-sre, specnaut-expert.
 
 ### Commands
 
-- \`specflow init [--here] [--ai <harness>] [--backlog <backend>] [--backlog-url <url>]\` — scaffold the project.
-- \`specflow upgrade\` — refresh templates. On apply writes \`.specflow/upgrade-pending.json\` (\`{from,to,at}\`) + staging dir (\`.specflow/upgrade-staging/<path>\`, consumed by \`specflow reconcile\`); both removed after successful \`review-upgrade\` walk. Prints \`@specflow-expert review-upgrade\` handoff.
-- \`specflow reconcile --status\` — list files pending post-upgrade reconciliation as JSON.
-- \`specflow reconcile <path> --accept-upstream\` — take the new template version (backs up local, updates lock).
-- \`specflow reconcile <path> --accept-current\` — keep local version (re-stamps lock SHA only).
-- \`specflow check [--project]\` — verify scaffold integrity.
-- \`specflow self-update\` — replace binary with latest release, verifying SHA256.
-- \`specflow --version\` — print binary + bundled templates version.
+- \`specnaut init [--here] [--ai <harness>] [--backlog <backend>] [--backlog-url <url>]\` — scaffold the project.
+- \`specnaut upgrade\` — refresh templates. On apply writes \`.specflow/upgrade-pending.json\` (\`{from,to,at}\`) + staging dir (\`.specflow/upgrade-staging/<path>\`, consumed by \`specnaut reconcile\`); both removed after successful \`review-upgrade\` walk. Prints \`@specnaut-expert review-upgrade\` handoff.
+- \`specnaut reconcile --status\` — list files pending post-upgrade reconciliation as JSON.
+- \`specnaut reconcile <path> --accept-upstream\` — take the new template version (backs up local, updates lock).
+- \`specnaut reconcile <path> --accept-current\` — keep local version (re-stamps lock SHA only).
+- \`specnaut check [--project]\` — verify scaffold integrity.
+- \`specnaut self-update\` — replace binary with latest release, verifying SHA256.
+- \`specnaut --version\` — print binary + bundled templates version.
 
 ### Backlog conventions (GitHub backend)
 
-\`Priority\` (P0–P2) and \`Size\` (XS–XL) via Project V2 native fields (\`set-field.sh\`); fall back to \`priority:*\`/\`size:*\` labels when the native field is absent. Two-step close: \`move.sh <num> Done\` then \`gh issue close --reason completed\`. \`/specflow groom\` catches items closed via paths that bypassed the move step.
+\`Priority\` (P0–P2) and \`Size\` (XS–XL) via Project V2 native fields (\`set-field.sh\`); fall back to \`priority:*\`/\`size:*\` labels when the native field is absent. Two-step close: \`move.sh <num> Done\` then \`gh issue close --reason completed\`. \`/specnaut groom\` catches items closed via paths that bypassed the move step.
 
 ### Design principles
 
@@ -7948,7 +7948,7 @@ or other agents. Design decisions are not cheap and must be intentional
     suffix: null,
     content: `---
 name: performance-auditor
-description: Reviews code for performance issues — N+1 queries, blocking I/O on hot paths, missing indexes, cache misuse, hot-path allocation, sync-in-async, large bundles, render-thrash. Two dispatch shapes — (1) PR review (spawned by the review-coordinator during /specflow review), (2) full-codebase audit (spawned by /specflow audit performance).
+description: Reviews code for performance issues — N+1 queries, blocking I/O on hot paths, missing indexes, cache misuse, hot-path allocation, sync-in-async, large bundles, render-thrash. Two dispatch shapes — (1) PR review (spawned by the review-coordinator during /specnaut review), (2) full-codebase audit (spawned by /specnaut audit performance).
 model: sonnet
 effort: medium
 tools: Read, Grep, Glob, Bash
@@ -7963,7 +7963,7 @@ on the dispatch shape.
 
 ## Mode 1 — PR review
 
-Spawned by the \`review-coordinator\` during \`/specflow review\`. Review ONLY
+Spawned by the \`review-coordinator\` during \`/specnaut review\`. Review ONLY
 the files provided in the prompt. Output the \`FINDING\` structure used by
 code-reviewer, followed by the canonical \`REVIEW SUMMARY\` block (see "Output
 format (Mode 1 — PR review)" below).
@@ -7995,7 +7995,7 @@ format (Mode 1 — PR review)" below).
 
 ## Mode 2 — Full-codebase audit
 
-Spawned by \`/specflow audit performance\`. Read-only; full project scope.
+Spawned by \`/specnaut audit performance\`. Read-only; full project scope.
 
 ### Read-only contract (NON-NEGOTIABLE)
 
@@ -8109,7 +8109,7 @@ Same \`FINDING\` structure as code-reviewer, followed by exactly one
     suffix: null,
     content: `---
 name: a11y-auditor
-description: Reviews front-end code for WCAG 2.1 AA accessibility issues — semantic HTML, heading hierarchy, alt text, form labels, keyboard nav, focus indicators, ARIA correctness, color contrast (where computable from source). Two dispatch shapes — (1) PR review (spawned by the review-coordinator during /specflow review), (2) full-codebase audit (spawned by /specflow audit accessibility).
+description: Reviews front-end code for WCAG 2.1 AA accessibility issues — semantic HTML, heading hierarchy, alt text, form labels, keyboard nav, focus indicators, ARIA correctness, color contrast (where computable from source). Two dispatch shapes — (1) PR review (spawned by the review-coordinator during /specnaut review), (2) full-codebase audit (spawned by /specnaut audit accessibility).
 model: sonnet
 effort: medium
 tools: Read, Grep, Glob, Bash
@@ -8144,12 +8144,12 @@ no FE surface detected — accessibility audit skipped (this project ships no fr
 \`\`\`
 
 Do NOT continue with axes 1–10. Do NOT emit an empty report. The
-gating signal is the contract — \`/specflow audit accessibility\` on a
+gating signal is the contract — \`/specnaut audit accessibility\` on a
 CLI-only project is a no-op by design.
 
 ## Mode 1 — PR review
 
-Spawned by the \`review-coordinator\` during \`/specflow review\`. Review
+Spawned by the \`review-coordinator\` during \`/specnaut review\`. Review
 ONLY the files provided in the prompt (and only if they include FE
 source — otherwise skip per the gate above). Output the \`FINDING\`
 structure used by code-reviewer, followed by the canonical
@@ -8191,7 +8191,7 @@ structure used by code-reviewer, followed by the canonical
 
 ## Mode 2 — Full-codebase audit
 
-Spawned by \`/specflow audit accessibility\`. Read-only; full project
+Spawned by \`/specnaut audit accessibility\`. Read-only; full project
 scope; **subject to the FE-surface gate above**.
 
 ### Read-only contract (NON-NEGOTIABLE)
@@ -8307,7 +8307,7 @@ Same \`FINDING\` structure as code-reviewer, followed by exactly one
     suffix: null,
     content: `---
 name: architecture-auditor
-description: Reviews code for architectural drift — hex-layer violations, circular deps, god files, bounded-context leaks, ports/adapters discipline, implicit globals, deep nesting, test-isolation bleed. Two dispatch shapes — (1) PR review (spawned by the review-coordinator during /specflow review), (2) full-codebase audit (spawned by /specflow audit architecture).
+description: Reviews code for architectural drift — hex-layer violations, circular deps, god files, bounded-context leaks, ports/adapters discipline, implicit globals, deep nesting, test-isolation bleed. Two dispatch shapes — (1) PR review (spawned by the review-coordinator during /specnaut review), (2) full-codebase audit (spawned by /specnaut audit architecture).
 model: sonnet
 effort: medium
 tools: Read, Grep, Glob, Bash
@@ -8322,7 +8322,7 @@ depending on the dispatch shape.
 
 ## Mode 1 — PR review
 
-Spawned by the \`review-coordinator\` during \`/specflow review\`. Review ONLY
+Spawned by the \`review-coordinator\` during \`/specnaut review\`. Review ONLY
 the files provided in the prompt. Output the \`FINDING\` structure used by
 code-reviewer, followed by the canonical \`REVIEW SUMMARY\` block (see "Output
 format (Mode 1 — PR review)" below).
@@ -8346,7 +8346,7 @@ format (Mode 1 — PR review)" below).
 
 ## Mode 2 — Full-codebase audit
 
-Spawned by \`/specflow audit architecture\`. Read-only; full project scope.
+Spawned by \`/specnaut audit architecture\`. Read-only; full project scope.
 
 ### Read-only contract (NON-NEGOTIABLE)
 
@@ -8506,7 +8506,7 @@ emits neither block — backlog material is not pass/fail.
     suffix: null,
     content: `---
 name: dependency-auditor
-description: Reviews dependency manifests for hygiene — outdated pins, unbounded ranges, unused declared deps, license violations, advisory-shape signals, peer-dep conflicts, typosquatting heuristics. Multi-manifest aware (npm / pyproject / Cargo / composer / Gemfile / go.mod / deno.json). Two dispatch shapes — (1) PR review (spawned by the review-coordinator during /specflow review), (2) full-codebase audit (spawned by /specflow audit dependencies).
+description: Reviews dependency manifests for hygiene — outdated pins, unbounded ranges, unused declared deps, license violations, advisory-shape signals, peer-dep conflicts, typosquatting heuristics. Multi-manifest aware (npm / pyproject / Cargo / composer / Gemfile / go.mod / deno.json). Two dispatch shapes — (1) PR review (spawned by the review-coordinator during /specnaut review), (2) full-codebase audit (spawned by /specnaut audit dependencies).
 model: sonnet
 effort: medium
 tools: Read, Grep, Glob, Bash
@@ -8521,7 +8521,7 @@ depending on the dispatch shape.
 
 ## Mode 1 — PR review
 
-Spawned by the \`review-coordinator\` during \`/specflow review\`. Review ONLY
+Spawned by the \`review-coordinator\` during \`/specnaut review\`. Review ONLY
 the files provided in the prompt (typically dependency manifests +
 lockfiles touched by the diff). Output the \`FINDING\` structure used by
 code-reviewer, followed by the canonical \`REVIEW SUMMARY\` block (see "Output
@@ -8550,7 +8550,7 @@ format (Mode 1 — PR review)" below).
 
 ## Mode 2 — Full-codebase audit
 
-Spawned by \`/specflow audit dependencies\`. Read-only; full project scope.
+Spawned by \`/specnaut audit dependencies\`. Read-only; full project scope.
 
 ### Read-only contract (NON-NEGOTIABLE)
 
@@ -8772,7 +8772,7 @@ budget, and a code-writer must not be starved of the depth it needs.
 | Tier     | Role class                                                     | Agents |
 | -------- | -------------------------------------------------------------- | ------ |
 | \`low\`    | Pure orchestrators — route and dispatch only, no deep reasoning | \`review-coordinator\`, \`workflow-manager\` |
-| \`medium\` | Read-only auditors, structured reviewers, the Q&A explainer, and the backlog owner | \`a11y-auditor\`, \`architecture-auditor\`, \`dependency-auditor\`, \`performance-auditor\`, \`security-auditor\`, \`code-reviewer\`, \`test-reviewer\`, \`specflow-expert\`, \`product-owner\` |
+| \`medium\` | Read-only auditors, structured reviewers, the Q&A explainer, and the backlog owner | \`a11y-auditor\`, \`architecture-auditor\`, \`dependency-auditor\`, \`performance-auditor\`, \`security-auditor\`, \`code-reviewer\`, \`test-reviewer\`, \`specnaut-expert\`, \`product-owner\` |
 | \`high\`   | Design / higher-order reasoning                                | \`ui-ux-designer\` |
 | \`xhigh\`  | Coding / agentic work — writes multi-file changes, runs suites, operates infra | \`developer\`, \`qa-tester\`, \`devops-sre\` |
 
@@ -9039,34 +9039,34 @@ should survive across sessions and isn't captured elsewhere:
   },
   {
     category: "skill",
-    name: "specflow-auto",
+    name: "specnaut-auto",
     suffix: null,
     content: `---
-name: specflow-auto
-description: DEPRECATED — /specflow now auto-chains by default since v1.5.0. This skill is kept as an alias for one release and will be removed in the next major version.
+name: specnaut-auto
+description: DEPRECATED — /specnaut now auto-chains by default since v1.5.0. This skill is kept as an alias for one release and will be removed in the next major version.
 ---
 
-# /specflow-auto is deprecated
+# /specnaut-auto is deprecated
 
-Auto-chain is now the default behavior of \`/specflow\`. Use:
+Auto-chain is now the default behavior of \`/specnaut\`. Use:
 
-- \`/specflow specify "<feature>"\` — runs the full chain automatically
+- \`/specnaut specify "<feature>"\` — runs the full chain automatically
   (specify → clarify → plan → tasks → analyze → implement → review →
   STOP #2 for merge confirmation).
-- \`/specflow specify --manual "<feature>"\` — runs \`specify\` only, no
+- \`/specnaut specify --manual "<feature>"\` — runs \`specify\` only, no
   chain.
-- \`/specflow <phase> <args>\` — mid-chain re-entry with artefact
+- \`/specnaut <phase> <args>\` — mid-chain re-entry with artefact
   detection (chain if downstream artefacts are absent, one-shot if
   present). Override with \`--once\` (force one-shot) or \`--continue\`
   (force chain).
 
-See \`phases/auto-chain.md\` (in the \`specflow\` skill) for the full chain
+See \`phases/auto-chain.md\` (in the \`specnaut\` skill) for the full chain
 mechanics, including STOP #1 (clarification checkpoint) and STOP #2
 (pre-merge confirmation).
 
 This skill will be removed in the next major release. If you see this
-file in your project after running \`specflow upgrade\`, it means
-muscle-memory invocations of \`/specflow-auto\` keep working — but you
+file in your project after running \`specnaut upgrade\`, it means
+muscle-memory invocations of \`/specnaut-auto\` keep working — but you
 should switch to the new entry point.
 `,
     executable: false,
@@ -9079,7 +9079,7 @@ should switch to the new entry point.
     suffix: null,
     content: `---
 name: backlog
-description: Manage this project's backlog — add, list, view, move, and clarify items. The backend is fixed at init time and recorded in \`.specflow/installed.lock\`. Run \`specflow upgrade --backlog <new>\` to switch.
+description: Manage this project's backlog — add, list, view, move, and clarify items. The backend is fixed at init time and recorded in \`.specflow/installed.lock\`. Run \`specnaut upgrade --backlog <new>\` to switch.
 argument-hint: [list|next|add|update|estimate|status|groom|brief] [args]
 ---
 
@@ -9087,8 +9087,8 @@ argument-hint: [list|next|add|update|estimate|status|groom|brief] [args]
 
 Use this skill when the user says "add to backlog", "list backlog", "what's
 next?", "move task X to in-progress", or any backlog mutation. The exact
-flow depends on the backend chosen at \`specflow init\` (or the most recent
-\`specflow upgrade --backlog <name>\`).
+flow depends on the backend chosen at \`specnaut init\` (or the most recent
+\`specnaut upgrade --backlog <name>\`).
 
 ## All mutations go through the Product Owner agent
 
@@ -9176,7 +9176,7 @@ Two ways to enable the GitHub MCP:
    in your Claude Code account.
 
 2. **Self-hosted MCP** — add the official server to the project's
-   \`.mcp.json\` (creates the file if absent). Specflow does NOT scaffold
+   \`.mcp.json\` (creates the file if absent). Specnaut does NOT scaffold
    this for you because it requires Node + a GitHub token; do it
    manually:
 
@@ -9208,7 +9208,7 @@ project\` calls and read configuration from \`backlog-config.yml\`.
 .specflow/scripts/backlog/clarify-comment.sh <num> "<question>"
 .specflow/scripts/backlog/detect-fields.sh                                 # discover native Priority/Size single-select fields → env lines
 .specflow/scripts/backlog/set-field.sh <num> <Priority|Size|IssueType> <value>  # set the native Project V2 field / org Issue Type; exit codes 10/11/12 signal label fallback
-.specflow/scripts/backlog/ensure-labels.sh                                 # idempotently bootstrap the 7 Specflow semantic labels (security/refactor/docs/tech-debt/dx/performance/dependency)
+.specflow/scripts/backlog/ensure-labels.sh                                 # idempotently bootstrap the 7 Specnaut semantic labels (security/refactor/docs/tech-debt/dx/performance/dependency)
 \`\`\`
 
 For closing or editing, use \`gh\` directly:
@@ -9226,7 +9226,7 @@ When dispatched, the PO checks tool availability at runtime:
 2. Otherwise fall back to the shell scripts.
 
 This means a project can switch from shell to MCP (or back) without any
-Specflow change — the skill is path-aware.
+Specnaut change — the skill is path-aware.
 
 ### Conventions
 
@@ -9333,9 +9333,9 @@ The first time the PO runs against this project, it will create the 5
 <!-- END: backend=gitlab -->
 
 <!-- BEGIN: backend=cloud -->
-## Backend: Specflow Cloud
+## Backend: Specnaut Cloud
 
-This project's backlog lives on **Specflow Cloud** — a hosted, real-time Kanban
+This project's backlog lives on **Specnaut Cloud** — a hosted, real-time Kanban
 board reached over a small HTTP API. No \`gh\`/\`glab\` CLI and no GitHub/GitLab
 rate limits. Configuration is read from \`.specflow/backlog-config.yml\` at
 runtime.
@@ -9345,14 +9345,14 @@ runtime.
 \`\`\`yaml
 # .specflow/backlog-config.yml
 backend: cloud
-api_url: https://your-deployment.convex.site   # Specflow Cloud API base
+api_url: https://your-deployment.convex.site   # Specnaut Cloud API base
 project_key: CLOUD                              # the project's short key
 \`\`\`
 
-**No token is stored here.** Credentials are obtained by \`specflow cloud login\`
+**No token is stored here.** Credentials are obtained by \`specnaut cloud login\`
 (an interactive browser device-authorization flow) and kept in the OS keychain
 (or a \`0600\` file under \`~/.specflow\`). They refresh transparently. For CI /
-headless runs, set \`SPECFLOW_CLOUD_TOKEN\` to a Cloud API token instead of
+headless runs, set \`SPECNAUT_CLOUD_TOKEN\` to a Cloud API token instead of
 logging in.
 
 ### Scripts
@@ -9367,7 +9367,7 @@ logging in.
 .specflow/scripts/backlog/reconcile.sh [--reset|--seek-end] [--limit N]  # drain stage transitions
 \`\`\`
 
-The scripts get a fresh access token from \`specflow cloud token\` (which refreshes
+The scripts get a fresh access token from \`specnaut cloud token\` (which refreshes
 it transparently) and authenticate with \`Authorization: Bearer <token>\`, talking
 to \`<api_url>/api/v1/\` (\`/tasks\`, \`/columns\`, \`/activity\`). \`move.sh\` passes a
 **status name** (the column name); the API resolves it to the column
@@ -9380,9 +9380,9 @@ matching stage hook (see \`product-owner.md\` → "Cloud stage reconcile").
 
 ### Prerequisites
 
-- \`curl\` and \`jq\` on PATH, and the \`specflow\` CLI on PATH (the scripts call
-  \`specflow cloud token\`).
-- Authenticated once via \`specflow cloud login\` (or \`SPECFLOW_CLOUD_TOKEN\` set
+- \`curl\` and \`jq\` on PATH, and the \`specnaut\` CLI on PATH (the scripts call
+  \`specnaut cloud token\`).
+- Authenticated once via \`specnaut cloud login\` (or \`SPECNAUT_CLOUD_TOKEN\` set
   for headless / CI).
 
 ### Stage reconcile (poll model)
@@ -9826,7 +9826,7 @@ emit_section() {
 The 5 status columns mirror the GitHub Projects "kanban" model:
 
 - **Backlog** — needs more info, sizing, or prioritisation. The PO
-  works these on \`/specflow groom\` until they're ready.
+  works these on \`/specnaut groom\` until they're ready.
 - **Ready** — clarified, sized, prioritised. The PO proposes these
   for development when asked "what's next".
 - **In progress** — actively being worked on (a branch is open).
@@ -9848,7 +9848,7 @@ created: ...
 ---
 \`\`\`
 
-The PO assigns size + priority during the \`/specflow groom\` pass.
+The PO assigns size + priority during the \`/specnaut groom\` pass.
 
 ---
 
@@ -9887,7 +9887,7 @@ HEADER
 #     parents; manual Backlog parents are left alone.
 #
 # Both rules respect AC(d): DIRECT children only — the recursion guard
-# \`SPECFLOW_INTERNAL_PROPAGATION=1\` blocks the grandparent walk.
+# \`SPECNAUT_INTERNAL_PROPAGATION=1\` blocks the grandparent walk.
 #
 # Local backend: parent link lives in \`parent: "#NNN"\` frontmatter;
 # status lives in \`status:\` frontmatter. Pure shell, no API calls.
@@ -9902,7 +9902,7 @@ HEADER
 #
 # Recursion guard (AC(d)): the hook walks AT MOST one level up. When
 # this script calls back into \`move.sh\` to promote the parent, it sets
-# \`SPECFLOW_INTERNAL_PROPAGATION=1\`; on re-entry the hook sees the env
+# \`SPECNAUT_INTERNAL_PROPAGATION=1\`; on re-entry the hook sees the env
 # var and exits 0 immediately so the grandparent is never touched.
 
 set -uo pipefail
@@ -9911,7 +9911,7 @@ CHILD="\${1:?usage: propagate-parent-status.sh <child-num> <new-status>}"
 NEW_STATUS="\${2:?usage: propagate-parent-status.sh <child-num> <new-status>}"
 
 # Recursion guard — see header.
-if [ -n "\${SPECFLOW_INTERNAL_PROPAGATION:-}" ]; then
+if [ -n "\${SPECNAUT_INTERNAL_PROPAGATION:-}" ]; then
   exit 0
 fi
 
@@ -9992,7 +9992,7 @@ case "\$NEW_STATUS" in
       case "\$PARENT_STATUS" in
         "Ready"|"In progress"|"In review")
           if [ -x "\$SCRIPT_DIR/move.sh" ]; then
-            if SPECFLOW_INTERNAL_PROPAGATION=1 "\$SCRIPT_DIR/move.sh" "\$PARENT_PADDED" "Done" >/dev/null 2>&1; then
+            if SPECNAUT_INTERNAL_PROPAGATION=1 "\$SCRIPT_DIR/move.sh" "\$PARENT_PADDED" "Done" >/dev/null 2>&1; then
               echo "↑ promoted parent #\${PARENT_PADDED} (\${PARENT_STATUS} → Done) — all direct children Done"
             else
               echo "::warning::propagate-parent-status: move.sh failed to advance #\${PARENT_PADDED} to Done" >&2
@@ -10021,7 +10021,7 @@ case "\$NEW_STATUS" in
           # refresh stay consistent with every other status move. The
           # recursion guard env var prevents this re-entry from walking
           # any further up (AC(d): one-level only).
-          if SPECFLOW_INTERNAL_PROPAGATION=1 "\$SCRIPT_DIR/move.sh" "\$PARENT_PADDED" "In progress" >/dev/null 2>&1; then
+          if SPECNAUT_INTERNAL_PROPAGATION=1 "\$SCRIPT_DIR/move.sh" "\$PARENT_PADDED" "In progress" >/dev/null 2>&1; then
             echo "↑ promoted parent #\${PARENT_PADDED} (\${PARENT_STATUS} → In progress) due to child #\${CHILD_PADDED} move"
           else
             echo "::warning::propagate-parent-status: move.sh failed to promote #\${PARENT_PADDED}" >&2
@@ -10617,7 +10617,7 @@ echo "✓ #\$NUM \$CANONICAL → \$VALUE"
     name: "ensure-labels",
     suffix: "ensure-labels.sh",
     content: `#!/usr/bin/env bash
-# Bootstrap the Specflow semantic label set on the configured GitHub repo.
+# Bootstrap the Specnaut semantic label set on the configured GitHub repo.
 # Idempotent: creates only missing labels; never edits or deletes existing
 # ones (preserves user customisation of color / description).
 #
@@ -10646,7 +10646,7 @@ ensure_label() {
   fi
 }
 
-echo "Bootstrapping Specflow semantic labels on \$REPO …"
+echo "Bootstrapping Specnaut semantic labels on \$REPO …"
 ensure_label "security"    "b60205" "Security-sensitive work (auth, secrets, RCE, supply chain)"
 ensure_label "refactor"    "0e8a16" "Internal cleanup with no behavior change"
 ensure_label "docs"        "0075ca" "Documentation-only change"
@@ -10752,7 +10752,7 @@ exit 0
 #     parents; manual Backlog parents are left alone.
 #
 # Both rules respect AC(d): DIRECT children only — the recursion guard
-# \`SPECFLOW_INTERNAL_PROPAGATION=1\` blocks the grandparent walk.
+# \`SPECNAUT_INTERNAL_PROPAGATION=1\` blocks the grandparent walk.
 #
 # GitHub backend: parent link comes from the native sub-issues GA,
 # read via GraphQL Issue.parent { number }. Parent's current Status
@@ -10768,7 +10768,7 @@ exit 0
 # move per #260 AC(e).
 #
 # Recursion guard (AC(d)): when this script triggers move.sh on the
-# parent, SPECFLOW_INTERNAL_PROPAGATION=1 is exported. On re-entry
+# parent, SPECNAUT_INTERNAL_PROPAGATION=1 is exported. On re-entry
 # the script sees the env var and exits 0 immediately so the
 # grandparent is never touched. AC(d) bars multi-level propagation.
 
@@ -10778,7 +10778,7 @@ CHILD="\${1:?usage: propagate-parent-status.sh <child-num> <new-status>}"
 NEW_STATUS="\${2:?usage: propagate-parent-status.sh <child-num> <new-status>}"
 
 # Recursion guard — see header.
-if [ -n "\${SPECFLOW_INTERNAL_PROPAGATION:-}" ]; then
+if [ -n "\${SPECNAUT_INTERNAL_PROPAGATION:-}" ]; then
   exit 0
 fi
 
@@ -10909,7 +10909,7 @@ case "\$NEW_STATUS" in
       case "\$PARENT_STATUS" in
         "Ready"|"In progress"|"In review")
           if [ -x "\$SCRIPT_DIR/move.sh" ]; then
-            if SPECFLOW_INTERNAL_PROPAGATION=1 "\$SCRIPT_DIR/move.sh" "\$PARENT_NUM" "Done" >/dev/null 2>&1; then
+            if SPECNAUT_INTERNAL_PROPAGATION=1 "\$SCRIPT_DIR/move.sh" "\$PARENT_NUM" "Done" >/dev/null 2>&1; then
               echo "↑ promoted parent #\${PARENT_NUM} (\${PARENT_STATUS} → Done) — all direct children Done"
             else
               echo "::warning::propagate-parent-status: move.sh failed to advance #\${PARENT_NUM} to Done" >&2
@@ -10937,7 +10937,7 @@ case "\$NEW_STATUS" in
           # Use the sibling move.sh so the Status field mutation stays
           # consistent with every other move. The recursion guard env var
           # prevents this re-entry from walking further up (AC(d)).
-          if SPECFLOW_INTERNAL_PROPAGATION=1 "\$SCRIPT_DIR/move.sh" "\$PARENT_NUM" "In progress" >/dev/null 2>&1; then
+          if SPECNAUT_INTERNAL_PROPAGATION=1 "\$SCRIPT_DIR/move.sh" "\$PARENT_NUM" "In progress" >/dev/null 2>&1; then
             echo "↑ promoted parent #\${PARENT_NUM} (\${PARENT_STATUS} → In progress) due to child #\${CHILD} move"
           else
             echo "::warning::propagate-parent-status: move.sh failed to promote #\${PARENT_NUM}" >&2
@@ -11224,7 +11224,7 @@ glab issue note "\$1" --repo "\$PROJECT_ID" --message "\$2"
     name: "ensure-labels",
     suffix: "ensure-labels.sh",
     content: `#!/usr/bin/env bash
-# Bootstrap the Specflow semantic label set on the configured GitLab project.
+# Bootstrap the Specnaut semantic label set on the configured GitLab project.
 # Idempotent: creates only missing labels; never edits or deletes existing
 # ones (preserves user customisation of color / description).
 #
@@ -11260,7 +11260,7 @@ ensure_label() {
   fi
 }
 
-echo "Bootstrapping Specflow semantic labels on \$PROJECT_ID …"
+echo "Bootstrapping Specnaut semantic labels on \$PROJECT_ID …"
 ensure_label "security"    "b60205" "Security-sensitive work (auth, secrets, RCE, supply chain)"
 ensure_label "refactor"    "0e8a16" "Internal cleanup with no behavior change"
 ensure_label "docs"        "0075ca" "Documentation-only change"
@@ -11341,19 +11341,19 @@ exit 0
     suffix: "_config.sh",
     content: `#!/usr/bin/env bash
 # Helper: read api_url + project_key from .specflow/backlog-config.yml and get a
-# fresh access token from \`specflow cloud token\`. Sourced by the other
+# fresh access token from \`specnaut cloud token\`. Sourced by the other
 # cloud-backend scripts. Exports API_BASE (…/api/v1) + API_TOKEN.
 #
 # Credentials are NOT stored in backlog-config.yml — they live in the OS keychain
-# (or ~/.specflow/credentials.json). Run \`specflow cloud login\` once to
-# authenticate. For CI / headless, set SPECFLOW_CLOUD_TOKEN instead.
+# (or ~/.specflow/credentials.json). Run \`specnaut cloud login\` once to
+# authenticate. For CI / headless, set SPECNAUT_CLOUD_TOKEN instead.
 set -euo pipefail
 
 ROOT="\$(cd "\$(dirname "\$0")/../../.." && pwd)"
 CONFIG="\$ROOT/.specflow/backlog-config.yml"
 
 if [ ! -f "\$CONFIG" ]; then
-  echo "error: \$CONFIG not found. Run \\\`specflow init --backlog cloud\\\` first." >&2
+  echo "error: \$CONFIG not found. Run \\\`specnaut init --backlog cloud\\\` first." >&2
   exit 2
 fi
 
@@ -11374,15 +11374,15 @@ PROJECT_KEY=\$(extract project_key)
 
 if [ -z "\$API_URL" ] || [ -z "\$PROJECT_KEY" ]; then
   echo "error: backlog-config.yml is missing api_url or project_key." >&2
-  echo "Run \\\`specflow cloud login\\\` to authenticate and link a project." >&2
+  echo "Run \\\`specnaut cloud login\\\` to authenticate and link a project." >&2
   exit 2
 fi
 
 # Resolve a fresh access token (refreshes transparently; honors
-# SPECFLOW_CLOUD_TOKEN for headless / CI).
-if ! API_TOKEN=\$(specflow cloud token --api-url "\$API_URL"); then
-  echo "error: not authenticated with Specflow Cloud." >&2
-  echo "Run \\\`specflow cloud login\\\` (or set SPECFLOW_CLOUD_TOKEN)." >&2
+# SPECNAUT_CLOUD_TOKEN for headless / CI).
+if ! API_TOKEN=\$(specnaut cloud token --api-url "\$API_URL"); then
+  echo "error: not authenticated with Specnaut Cloud." >&2
+  echo "Run \\\`specnaut cloud login\\\` (or set SPECNAUT_CLOUD_TOKEN)." >&2
   exit 2
 fi
 
@@ -11399,7 +11399,7 @@ export API_URL API_TOKEN PROJECT_KEY API_BASE
     name: "list",
     suffix: "list.sh",
     content: `#!/usr/bin/env bash
-# List tasks on the Specflow Cloud board, with their status (column name).
+# List tasks on the Specnaut Cloud board, with their status (column name).
 # Optional Status filter.
 #
 # Usage: list.sh [Status]
@@ -11432,7 +11432,7 @@ echo "\$TASKS" | jq -r --argjson cols "\$COLS" --arg filter "\$FILTER" '
     name: "view",
     suffix: "view.sh",
     content: `#!/usr/bin/env bash
-# Show one Specflow Cloud task (status, priority, size, body).
+# Show one Specnaut Cloud task (status, priority, size, body).
 # Usage: view.sh <number>
 set -euo pipefail
 
@@ -11468,7 +11468,7 @@ echo "\$RESP" | jq -r --argjson cols "\$COLS" '
     name: "add",
     suffix: "add.sh",
     content: `#!/usr/bin/env bash
-# Create a task on the Specflow Cloud board.
+# Create a task on the Specnaut Cloud board.
 # Usage: add.sh "<title>" [body]
 set -euo pipefail
 
@@ -11597,7 +11597,7 @@ fi
     suffix: null,
     content: `---
 name: code-audit
-description: High-altitude, multi-seat parallel code audit of a scope on main. Use when the user says "audit the codebase", "code audit", "audit recent changes", "do a full audit", "health-check this code", or "audit the last N commits". Resolves a scope, dispatches the applicable auditor seats (architecture / security / performance / accessibility / dependency) IN PARALLEL, and synthesizes one deduplicated, severity-ranked report. Read-only. Complementary to \`/specflow audit <axis>\` (single-axis).
+description: High-altitude, multi-seat parallel code audit of a scope on main. Use when the user says "audit the codebase", "code audit", "audit recent changes", "do a full audit", "health-check this code", or "audit the last N commits". Resolves a scope, dispatches the applicable auditor seats (architecture / security / performance / accessibility / dependency) IN PARALLEL, and synthesizes one deduplicated, severity-ranked report. Read-only. Complementary to \`/specnaut audit <axis>\` (single-axis).
 argument-hint: "[--path <subtree> | --range <a>..<b>] [--last <n>]"
 ---
 
@@ -11609,8 +11609,8 @@ deploys the applicable auditor seats **in parallel**, and merges their output
 into one report.
 
 It is **read-only**: running it mutates **no tracked files**. It dispatches the
-same auditor agents \`/specflow audit <axis>\` uses; the difference is breadth —
-\`/specflow audit <axis>\` runs one axis, \`/code-audit\` runs all applicable seats
+same auditor agents \`/specnaut audit <axis>\` uses; the difference is breadth —
+\`/specnaut audit <axis>\` runs one axis, \`/code-audit\` runs all applicable seats
 in a single parallel batch and synthesizes one verdict. The two are
 **complementary**.
 
@@ -11728,7 +11728,7 @@ seat reported \`fail\`; else \`needs_followup\` if **any** seat reported
 sums**.
 
 You may optionally persist the report at
-\`docs/specflow/audits/YYYY-MM-DD-code-audit.md\` — that doc dir is the only write
+\`docs/specnaut/audits/YYYY-MM-DD-code-audit.md\` — that doc dir is the only write
 this skill ever makes; the audited code is never touched.
 `,
     executable: false,
@@ -11744,7 +11744,7 @@ this skill ever makes; the audited code is never touched.
 # CODE-AUDIT SCOPE block + CATEGORY SIGNALS the orchestrator skill parses.
 #
 # Read-only: it never mutates the tree. Pure bash + git, no extra deps, so it
-# runs unmodified in any scaffolded project (the Specflow binary need not be on
+# runs unmodified in any scaffolded project (the Specnaut binary need not be on
 # PATH at audit time).
 #
 # Resolution priority (first match wins):
@@ -12057,9 +12057,9 @@ file.**
 
 - **\`/arch-audit\`** (this skill) — dispatches the **one** \`architecture-auditor\`
   over a scope and returns findings **inline**. No report file.
-- **\`/specflow audit architecture\`** — the report-writing single-axis audit:
+- **\`/specnaut audit architecture\`** — the report-writing single-axis audit:
   runs the same auditor but **persists a dated report** under
-  \`docs/specflow/audits/\`. Use it when you want a durable artifact.
+  \`docs/specnaut/audits/\`. Use it when you want a durable artifact.
 - **\`/code-audit\`** — the **multi-seat** team audit: dispatches every
   applicable auditor (architecture / security / performance / a11y /
   dependency) in parallel and synthesizes one combined report. Use it for a
@@ -12141,9 +12141,9 @@ file.**
 
 - **\`/sec-audit\`** (this skill) — dispatches the **one** \`security-auditor\`
   over a scope and returns findings **inline**. No report file.
-- **\`/specflow audit security\`** — the report-writing single-axis audit:
+- **\`/specnaut audit security\`** — the report-writing single-axis audit:
   runs the same auditor but **persists a dated report** under
-  \`docs/specflow/audits/\`. Use it when you want a durable artifact.
+  \`docs/specnaut/audits/\`. Use it when you want a durable artifact.
 - **\`/code-audit\`** — the **multi-seat** team audit: dispatches every
   applicable auditor (architecture / security / performance / a11y /
   dependency) in parallel and synthesizes one combined report. Use it for a
@@ -12225,9 +12225,9 @@ file.**
 
 - **\`/perf-audit\`** (this skill) — dispatches the **one** \`performance-auditor\`
   over a scope and returns findings **inline**. No report file.
-- **\`/specflow audit performance\`** — the report-writing single-axis audit:
+- **\`/specnaut audit performance\`** — the report-writing single-axis audit:
   runs the same auditor but **persists a dated report** under
-  \`docs/specflow/audits/\`. Use it when you want a durable artifact.
+  \`docs/specnaut/audits/\`. Use it when you want a durable artifact.
 - **\`/code-audit\`** — the **multi-seat** team audit: dispatches every
   applicable auditor (architecture / security / performance / a11y /
   dependency) in parallel and synthesizes one combined report. Use it for a
@@ -12309,9 +12309,9 @@ file.**
 
 - **\`/dep-audit\`** (this skill) — dispatches the **one** \`dependency-auditor\`
   over a scope and returns findings **inline**. No report file.
-- **\`/specflow audit dependencies\`** — the report-writing single-axis audit:
+- **\`/specnaut audit dependencies\`** — the report-writing single-axis audit:
   runs the same auditor but **persists a dated report** under
-  \`docs/specflow/audits/\`. Use it when you want a durable artifact.
+  \`docs/specnaut/audits/\`. Use it when you want a durable artifact.
 - **\`/code-audit\`** — the **multi-seat** team audit: dispatches every
   applicable auditor (architecture / security / performance / a11y /
   dependency) in parallel and synthesizes one combined report. Use it for a
@@ -12393,9 +12393,9 @@ file.**
 
 - **\`/a11y-audit\`** (this skill) — dispatches the **one** \`a11y-auditor\`
   over a scope and returns findings **inline**. No report file.
-- **\`/specflow audit accessibility\`** — the report-writing single-axis audit:
+- **\`/specnaut audit accessibility\`** — the report-writing single-axis audit:
   runs the same auditor but **persists a dated report** under
-  \`docs/specflow/audits/\`. Use it when you want a durable artifact.
+  \`docs/specnaut/audits/\`. Use it when you want a durable artifact.
 - **\`/code-audit\`** — the **multi-seat** team audit: dispatches every
   applicable auditor (architecture / security / performance / a11y /
   dependency) in parallel and synthesizes one combined report. Use it for a
@@ -16120,7 +16120,7 @@ _(Sharp edges new contributors must know.)_
 
 ---
 
-Generated by Specflow. Edit freely.
+Generated by Specnaut. Edit freely.
 `,
     executable: false,
     backend: null,
@@ -16149,27 +16149,27 @@ export const HARNESS_STATIC: Record<string, Record<string, TemplateFile>> = {
 - **Project documentation and rules**: the primary reference is \`AGENTS.md\` at
   the project root. Read it first.
 - **Skills**: installed skills live in \`.claude/skills/\`.
-- **Specflow commands**: custom Specflow commands live in \`.claude/commands/\`.
+- **Specnaut commands**: custom Specnaut commands live in \`.claude/commands/\`.
 - **Agents**: specialized agents live in \`.claude/agents/\`.
 - **Backlog**: managed via \`/backlog\` — when the project uses the local
   Markdown backend, see \`.specflow/backlog.md\`.
 
 ## Optional integrations
 
-These are Claude Code features Specflow does NOT configure by default, but
+These are Claude Code features Specnaut does NOT configure by default, but
 that pair well with the scaffolded workflow. Set them up if they fit your
 team's needs.
 
 - **Periodic maintenance** — \`/loop 1h\` runs the prompt in
   \`.claude/loop.md\` every hour. The bundled default delegates to the
-  \`/specflow groom\` skill (groom backlog, surface stale PRs, list orphan
+  \`/specnaut groom\` skill (groom backlog, surface stale PRs, list orphan
   specs); edit \`loop.md\` freely to add project-specific checks. See
   https://code.claude.com/docs/fr/scheduled-tasks.
 
 - **Goal-directed sessions** — \`/goal <condition>\` keeps Claude taking
   turns until a fast model judges the condition met. Best conditions
   state one measurable end state and a turn cap, e.g. \`/goal the Ready
-  column on the Specflow Project is empty and deno task test exits 0,
+  column on the Specnaut Project is empty and deno task test exits 0,
   or stop after 20 turns\`. Run headless with \`claude -p "/goal …"\`.
   Check status with \`/goal\`; cancel with \`/goal clear\` (aliases:
   \`stop\`/\`off\`/\`reset\`/\`cancel\`). For recurring periodic checks use
@@ -16178,15 +16178,15 @@ team's needs.
 
 - **Multi-session dispatch (\`claude agents\`)** — opens a terminal UI
   that lists every background Claude session, dispatches new ones,
-  and lets you peek / reply / attach without losing context. Specflow's
+  and lets you peek / reply / attach without losing context. Specnaut's
   scaffolded subagents in \`.claude/agents/\` appear in the dispatch
   picker automatically — start one with the agent name as the first
   word, e.g. \`developer fix the lint errors in src/cli/\`, \`@qa-tester
   run a sandbox smoke pass\`, or \`@product-owner groom the backlog\`.
-  Skills are dispatchable too: \`/specflow specify "<feature>"\` launches
+  Skills are dispatchable too: \`/specnaut specify "<feature>"\` launches
   a session running the full spec-plan-tasks chain. File edits are
   isolated under \`.claude/worktrees/\` (git worktrees), so several
-  Specflow agents can work in parallel without stepping on each
+  Specnaut agents can work in parallel without stepping on each
   other. Requires Claude Code v2.1.139+. See
   https://code.claude.com/docs/fr/agent-view.
 
@@ -16197,7 +16197,7 @@ team's needs.
 
 - **Headless / CI invocation** — \`claude -p "<prompt>"\` runs Claude Code
   non-interactively, useful for CI gates, pre-commit hooks, and cron jobs
-  that dispatch a specific agent. Specflow ships a wrapper at
+  that dispatch a specific agent. Specnaut ships a wrapper at
   \`.claude/scripts/dispatch-agent.sh <agent-name> "<prompt>"\` that auto-
   derives the right \`--allowedTools\` from the agent's frontmatter. See
   https://code.claude.com/docs/fr/headless.
@@ -16212,9 +16212,9 @@ team's needs.
 `,
       executable: false,
     },
-    ".claude/commands/specflow.md": {
+    ".claude/commands/specnaut.md": {
       content: `---
-description: Specflow workflow router — dispatches to the specflow skill (router phases live at .claude/skills/specflow/phases/<phase>.md). \`/specflow <phase> [args]\` runs a single phase.
+description: Specnaut workflow router — dispatches to the specnaut skill (router phases live at .claude/skills/specnaut/phases/<phase>.md). \`/specnaut <phase> [args]\` runs a single phase.
 argument-hint: <specify|clarify|plan|tasks|analyze|implement|review|merge|constitution|checklist|groom> [args]
 ---
 
@@ -16226,11 +16226,11 @@ argument-hint: <specify|clarify|plan|tasks|analyze|implement|review|merge|consti
 
 ## Dispatch
 
-Invoke the **specflow** skill (at \`.claude/skills/specflow/SKILL.md\`) using the \`Skill\` tool, passing \`\$ARGUMENTS\` through verbatim. The skill's body parses the first token as the phase name (\`specify\`, \`clarify\`, \`plan\`, \`tasks\`, \`analyze\`, \`implement\`, \`review\`, \`merge\`, \`constitution\`, \`checklist\`, \`groom\`) and reads the corresponding \`phases/<phase>.md\` to execute the procedure.
+Invoke the **specnaut** skill (at \`.claude/skills/specnaut/SKILL.md\`) using the \`Skill\` tool, passing \`\$ARGUMENTS\` through verbatim. The skill's body parses the first token as the phase name (\`specify\`, \`clarify\`, \`plan\`, \`tasks\`, \`analyze\`, \`implement\`, \`review\`, \`merge\`, \`constitution\`, \`checklist\`, \`groom\`) and reads the corresponding \`phases/<phase>.md\` to execute the procedure.
 
 Empty \`\$ARGUMENTS\` → the skill prints the workflow overview and stops.
 
-This command is a thin slash-command shim so users can type \`/specflow specify "..."\` directly. The router auto-chains the rest of the workflow by default; pass \`--manual\` to opt out, or \`--once\` / \`--continue\` to override the mid-chain artefact-detection heuristic.
+This command is a thin slash-command shim so users can type \`/specnaut specify "..."\` directly. The router auto-chains the rest of the workflow by default; pass \`--manual\` to opt out, or \`--once\` / \`--continue\` to override the mid-chain artefact-detection heuristic.
 `,
       executable: false,
     },
@@ -16366,14 +16366,14 @@ exec claude "\${ARGS[@]}"
       content: `# Project loop prompt
 
 This file customizes what \`/loop\` does when invoked without an explicit
-prompt. Specflow ships a sensible default below — edit freely to match
+prompt. Specnaut ships a sensible default below — edit freely to match
 this project's hygiene needs.
 
 ## Default prompt
 
-Run a hygiene pass on this Specflow project:
+Run a hygiene pass on this Specnaut project:
 
-1. Invoke the \`/specflow groom\` skill — it grooms the backlog, surfaces
+1. Invoke the \`/specnaut groom\` skill — it grooms the backlog, surfaces
    stale PRs, and flags orphan specs.
 2. If anything actionable came out of the pass, summarize it concisely
    so the human reading the loop output can decide what to do.
@@ -16384,7 +16384,7 @@ Run a hygiene pass on this Specflow project:
 
 - **Active development**: \`/loop 1h\` — frequent grooming during a sprint.
 - **Quiet projects**: \`/loop 12h\` or \`/loop 24h\` — daily cadence.
-- **One-off check**: just \`/specflow groom\` (no loop) — runs once and exits.
+- **One-off check**: just \`/specnaut groom\` (no loop) — runs once and exits.
 
 ## Customizing further
 
@@ -16457,12 +16457,12 @@ prompts cost more tokens and drift out of relevance.
     },
     ".claude/hooks/protect-generated.sh": {
       content: `#!/usr/bin/env bash
-# Soft-warn on edits to Specflow-generated files.
+# Soft-warn on edits to Specnaut-generated files.
 #
 # Reads a JSON event from stdin (Claude Code's PreToolUse payload), prints
 # a stderr warning if the target is a managed file, then exits 0 — does
 # NOT block. The point is to nudge users who attempt to hand-edit files
-# that get regenerated by \`specflow upgrade\`, not to enforce.
+# that get regenerated by \`specnaut upgrade\`, not to enforce.
 set -euo pipefail
 
 INPUT=\$(cat || true)
@@ -16480,10 +16480,10 @@ fi
 case "\$FILE" in
   *.specflow/installed.lock|*/.specflow/installed.lock)
     cat >&2 <<'WARN'
-warn: .specflow/installed.lock is generated by \`specflow init\` / \`specflow
+warn: .specflow/installed.lock is generated by \`specnaut init\` / \`specnaut
       upgrade\`. Manual edits will be overwritten by the next upgrade. If
       you need to change the recorded harness or backend, re-run
-      \`specflow upgrade\` instead.
+      \`specnaut upgrade\` instead.
 WARN
     ;;
 esac
@@ -16712,12 +16712,12 @@ exit 0
 - **Skills**: installed skills live in \`.agents/skills/\`.
 - **Subagents**: Codex subagent definitions live in \`.codex/agents/\`
   (TOML format).
-- **Backlog**: managed via the \`/specflow groom\` workflow — when the
+- **Backlog**: managed via the \`/specnaut groom\` workflow — when the
   project uses the local Markdown backend, see \`.specflow/backlog.md\`.
 
 ## Optional integrations
 
-These are Codex CLI features Specflow does NOT configure by default, but
+These are Codex CLI features Specnaut does NOT configure by default, but
 that pair well with the scaffolded workflow.
 
 - **Periodic maintenance** — \`/goal\` runs the prompt in \`.codex/goal.md\`
@@ -16739,14 +16739,14 @@ that pair well with the scaffolded workflow.
       content: `# Project goal prompt
 
 This file customizes what \`/goal\` runs when invoked without an explicit
-objective. Specflow ships a sensible default below — edit freely to match
+objective. Specnaut ships a sensible default below — edit freely to match
 this project's hygiene needs.
 
 ## Default goal prompt
 
-Run a hygiene pass on this Specflow project:
+Run a hygiene pass on this Specnaut project:
 
-1. Invoke the \`/specflow groom\` skill — it grooms the backlog, surfaces
+1. Invoke the \`/specnaut groom\` skill — it grooms the backlog, surfaces
    stale PRs, and flags orphan specs.
 2. If anything actionable came out of the pass, summarize it concisely
    so the human reading the result can decide what to do.
@@ -16780,14 +16780,14 @@ Each \`/goal\` run loads the full prompt, so keep it focused.
   "cursor": {
     ".cursor/rules/specify-rules.mdc": {
       content: `---
-description: Specflow workflow for this project — spec-driven development with auto-chained phases, structured review, and product backlog.
+description: Specnaut workflow for this project — spec-driven development with auto-chained phases, structured review, and product backlog.
 globs:
 alwaysApply: true
 ---
 
-# Specflow workflow rules
+# Specnaut workflow rules
 
-This project uses Specflow — an enhanced Spec Kit fork — to drive feature development through a
+This project uses Specnaut — an enhanced Spec Kit fork — to drive feature development through a
 spec-driven workflow. When working with the user, consult the skills below.
 
 ## Workflow overview
@@ -16801,28 +16801,28 @@ clarifications needed) STOP #2 (pre-merge validation)
 
 ## Skills available
 
-- \`/specflow specify\` — scaffold a new feature spec from a description
-- \`/specflow clarify\` — resolve outstanding questions in \`spec.md\`
-- \`/specflow plan\` — produce the implementation plan
-- \`/specflow tasks\` — break the plan into tasks
-- \`/specflow analyze\` — cross-artefact consistency check
-- \`/specflow implement\` — run the developer → review-coordinator → qa-tester pipeline
-- \`/specflow review\` — architecture + quality gates
-- \`/specflow merge\` — merge the feature branch to main
-- \`/specflow-backlog\` — manage the product backlog (via the PO agent)
-- \`/specflow-auto\` — deprecated alias of \`/specflow\`; will be removed in the next major release
+- \`/specnaut specify\` — scaffold a new feature spec from a description
+- \`/specnaut clarify\` — resolve outstanding questions in \`spec.md\`
+- \`/specnaut plan\` — produce the implementation plan
+- \`/specnaut tasks\` — break the plan into tasks
+- \`/specnaut analyze\` — cross-artefact consistency check
+- \`/specnaut implement\` — run the developer → review-coordinator → qa-tester pipeline
+- \`/specnaut review\` — architecture + quality gates
+- \`/specnaut merge\` — merge the feature branch to main
+- \`/specnaut-backlog\` — manage the product backlog (via the PO agent)
+- \`/specnaut-auto\` — deprecated alias of \`/specnaut\`; will be removed in the next major release
 
 ## Agent roles (invocable manually as skills)
 
-- \`/specflow-agent-product-owner\` — business guardian, backlog management
-- \`/specflow-agent-developer\` — implementation work
-- \`/specflow-agent-review-coordinator\` — parallel review orchestration
-- \`/specflow-agent-code-reviewer\` — code quality review
-- \`/specflow-agent-security-auditor\` — security review
-- \`/specflow-agent-test-reviewer\` — test coverage review
-- \`/specflow-agent-qa-tester\` — QA + test writing
-- \`/specflow-agent-workflow-manager\` — long-running orchestration
-- \`/specflow-agent-devops-sre\` — cloud infrastructure, CI/CD, observability
+- \`/specnaut-agent-product-owner\` — business guardian, backlog management
+- \`/specnaut-agent-developer\` — implementation work
+- \`/specnaut-agent-review-coordinator\` — parallel review orchestration
+- \`/specnaut-agent-code-reviewer\` — code quality review
+- \`/specnaut-agent-security-auditor\` — security review
+- \`/specnaut-agent-test-reviewer\` — test coverage review
+- \`/specnaut-agent-qa-tester\` — QA + test writing
+- \`/specnaut-agent-workflow-manager\` — long-running orchestration
+- \`/specnaut-agent-devops-sre\` — cloud infrastructure, CI/CD, observability
 
 ## Project context
 

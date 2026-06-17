@@ -43,7 +43,7 @@ interface HookRun {
 
 /** Run the hook with `event` and `payload` on stdin against a fresh temp cwd. */
 async function runHook(event: string, payload: string): Promise<HookRun> {
-  const cwd = await Deno.makeTempDir({ prefix: "specflow-log-subagent-" });
+  const cwd = await Deno.makeTempDir({ prefix: "specnaut-log-subagent-" });
   try {
     const p = new Deno.Command("bash", {
       args: [HOOK, event],

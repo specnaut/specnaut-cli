@@ -3,7 +3,7 @@ import { resolve } from "@std/path";
 import { FsUpgradeMarkerStore } from "../../src/infrastructure/fs_upgrade_marker_store.ts";
 
 async function withTempDir<T>(fn: (dir: string) => Promise<T>): Promise<T> {
-  const dir = await Deno.makeTempDir({ prefix: "specflow-marker-test-" });
+  const dir = await Deno.makeTempDir({ prefix: "specnaut-marker-test-" });
   try {
     return await fn(dir);
   } finally {

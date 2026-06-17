@@ -4,7 +4,7 @@ import { fromFileUrl, join } from "@std/path";
 
 const MAIN = fromFileUrl(new URL("../../src/main.ts", import.meta.url));
 
-async function runSpecflow(
+async function runSpecnaut(
   args: string[],
   opts: { cwd?: string } = {},
 ): Promise<{ code: number; stdout: string; stderr: string }> {
@@ -31,7 +31,7 @@ async function runSpecflow(
 }
 
 async function withTempDir(fn: (dir: string) => Promise<void>) {
-  const dir = await Deno.makeTempDir({ prefix: "specflow-init-copilot-" });
+  const dir = await Deno.makeTempDir({ prefix: "specnaut-init-copilot-" });
   try {
     await fn(dir);
   } finally {
@@ -39,9 +39,9 @@ async function withTempDir(fn: (dir: string) => Promise<void>) {
   }
 }
 
-Deno.test("specflow init --ai copilot scaffolds a Copilot layout", async () => {
+Deno.test("specnaut init --ai copilot scaffolds a Copilot layout", async () => {
   await withTempDir(async (parent) => {
-    const { code, stderr } = await runSpecflow(
+    const { code, stderr } = await runSpecnaut(
       ["init", "demo", "--no-git", "--ai", "copilot"],
       { cwd: parent },
     );
@@ -49,34 +49,34 @@ Deno.test("specflow init --ai copilot scaffolds a Copilot layout", async () => {
 
     const root = join(parent, "demo");
 
-    // v1.0.0: router instruction + 11 phase instructions + specflow-auto +
-    // specflow-review + backlog + 9 agent instructions.
+    // v1.0.0: router instruction + 11 phase instructions + specnaut-auto +
+    // specnaut-review + backlog + 9 agent instructions.
     assertEquals(
-      await exists(join(root, ".github/instructions/specflow.instructions.md")),
+      await exists(join(root, ".github/instructions/specnaut.instructions.md")),
       true,
     );
     assertEquals(
-      await exists(join(root, ".github/instructions/specflow-specify.instructions.md")),
+      await exists(join(root, ".github/instructions/specnaut-specify.instructions.md")),
       true,
     );
     assertEquals(
-      await exists(join(root, ".github/instructions/specflow-backlog.instructions.md")),
+      await exists(join(root, ".github/instructions/specnaut-backlog.instructions.md")),
       true,
     );
     assertEquals(
-      await exists(join(root, ".github/instructions/specflow-auto.instructions.md")),
+      await exists(join(root, ".github/instructions/specnaut-auto.instructions.md")),
       true,
     );
     assertEquals(
       await exists(
-        join(root, ".github/instructions/specflow-agent-product-owner.instructions.md"),
+        join(root, ".github/instructions/specnaut-agent-product-owner.instructions.md"),
       ),
       true,
     );
 
     // Frontmatter rewritten — applyTo: "**" present, Claude fields stripped
     const cmdContent = await Deno.readTextFile(
-      join(root, ".github/instructions/specflow.instructions.md"),
+      join(root, ".github/instructions/specnaut.instructions.md"),
     );
     assertEquals(cmdContent.includes('applyTo: "**"'), true);
     assertEquals(cmdContent.includes("model: opus"), false);
@@ -86,8 +86,8 @@ Deno.test("specflow init --ai copilot scaffolds a Copilot layout", async () => {
     // auto-chain + list-skills + audit-security #303 + audit-performance
     // #304 + audit-accessibility #305 + audit-architecture #321 +
     // audit-dependencies #322 + lite-heuristic #346 + brainstorm #351) +
-    // specflow-auto + specflow-review + writing-plans (#271) +
-    // requesting-code-review (#273) + using-specflow (#282) +
+    // specnaut-auto + specnaut-review + writing-plans (#271) +
+    // requesting-code-review (#273) + using-specnaut (#282) +
     // subagent-driven-development (#272) + executing-plans (#274) +
     // verification-before-completion (#275) + brainstorming (#276) +
     // 4 output-contract skills (#378: workflow-contract, handoff-protocol,

@@ -1,6 +1,6 @@
 ---
 name: dependency-auditor
-description: Reviews dependency manifests for hygiene — outdated pins, unbounded ranges, unused declared deps, license violations, advisory-shape signals, peer-dep conflicts, typosquatting heuristics. Multi-manifest aware (npm / pyproject / Cargo / composer / Gemfile / go.mod / deno.json). Two dispatch shapes — (1) PR review (spawned by the review-coordinator during /specflow review), (2) full-codebase audit (spawned by /specflow audit dependencies).
+description: Reviews dependency manifests for hygiene — outdated pins, unbounded ranges, unused declared deps, license violations, advisory-shape signals, peer-dep conflicts, typosquatting heuristics. Multi-manifest aware (npm / pyproject / Cargo / composer / Gemfile / go.mod / deno.json). Two dispatch shapes — (1) PR review (spawned by the review-coordinator during /specnaut review), (2) full-codebase audit (spawned by /specnaut audit dependencies).
 model: sonnet
 effort: medium
 tools: Read, Grep, Glob, Bash
@@ -15,7 +15,7 @@ depending on the dispatch shape.
 
 ## Mode 1 — PR review
 
-Spawned by the `review-coordinator` during `/specflow review`. Review ONLY
+Spawned by the `review-coordinator` during `/specnaut review`. Review ONLY
 the files provided in the prompt (typically dependency manifests +
 lockfiles touched by the diff). Output the `FINDING` structure used by
 code-reviewer, followed by the canonical `REVIEW SUMMARY` block (see "Output
@@ -44,7 +44,7 @@ format (Mode 1 — PR review)" below).
 
 ## Mode 2 — Full-codebase audit
 
-Spawned by `/specflow audit dependencies`. Read-only; full project scope.
+Spawned by `/specnaut audit dependencies`. Read-only; full project scope.
 
 ### Read-only contract (NON-NEGOTIABLE)
 

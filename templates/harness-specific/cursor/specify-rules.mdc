@@ -1,12 +1,12 @@
 ---
-description: Specflow workflow for this project — spec-driven development with auto-chained phases, structured review, and product backlog.
+description: Specnaut workflow for this project — spec-driven development with auto-chained phases, structured review, and product backlog.
 globs:
 alwaysApply: true
 ---
 
-# Specflow workflow rules
+# Specnaut workflow rules
 
-This project uses Specflow — an enhanced Spec Kit fork — to drive feature development through a
+This project uses Specnaut — an enhanced Spec Kit fork — to drive feature development through a
 spec-driven workflow. When working with the user, consult the skills below.
 
 ## Workflow overview
@@ -20,28 +20,28 @@ clarifications needed) STOP #2 (pre-merge validation)
 
 ## Skills available
 
-- `/specflow specify` — scaffold a new feature spec from a description
-- `/specflow clarify` — resolve outstanding questions in `spec.md`
-- `/specflow plan` — produce the implementation plan
-- `/specflow tasks` — break the plan into tasks
-- `/specflow analyze` — cross-artefact consistency check
-- `/specflow implement` — run the developer → review-coordinator → qa-tester pipeline
-- `/specflow review` — architecture + quality gates
-- `/specflow merge` — merge the feature branch to main
-- `/specflow-backlog` — manage the product backlog (via the PO agent)
-- `/specflow-auto` — deprecated alias of `/specflow`; will be removed in the next major release
+- `/specnaut specify` — scaffold a new feature spec from a description
+- `/specnaut clarify` — resolve outstanding questions in `spec.md`
+- `/specnaut plan` — produce the implementation plan
+- `/specnaut tasks` — break the plan into tasks
+- `/specnaut analyze` — cross-artefact consistency check
+- `/specnaut implement` — run the developer → review-coordinator → qa-tester pipeline
+- `/specnaut review` — architecture + quality gates
+- `/specnaut merge` — merge the feature branch to main
+- `/specnaut-backlog` — manage the product backlog (via the PO agent)
+- `/specnaut-auto` — deprecated alias of `/specnaut`; will be removed in the next major release
 
 ## Agent roles (invocable manually as skills)
 
-- `/specflow-agent-product-owner` — business guardian, backlog management
-- `/specflow-agent-developer` — implementation work
-- `/specflow-agent-review-coordinator` — parallel review orchestration
-- `/specflow-agent-code-reviewer` — code quality review
-- `/specflow-agent-security-auditor` — security review
-- `/specflow-agent-test-reviewer` — test coverage review
-- `/specflow-agent-qa-tester` — QA + test writing
-- `/specflow-agent-workflow-manager` — long-running orchestration
-- `/specflow-agent-devops-sre` — cloud infrastructure, CI/CD, observability
+- `/specnaut-agent-product-owner` — business guardian, backlog management
+- `/specnaut-agent-developer` — implementation work
+- `/specnaut-agent-review-coordinator` — parallel review orchestration
+- `/specnaut-agent-code-reviewer` — code quality review
+- `/specnaut-agent-security-auditor` — security review
+- `/specnaut-agent-test-reviewer` — test coverage review
+- `/specnaut-agent-qa-tester` — QA + test writing
+- `/specnaut-agent-workflow-manager` — long-running orchestration
+- `/specnaut-agent-devops-sre` — cloud infrastructure, CI/CD, observability
 
 ## Project context
 

@@ -1,9 +1,9 @@
 /**
- * The `.specflow/upgrade-pending.json` marker. Written by `specflow upgrade`
- * on successful apply; consumed by `specflow-expert review-upgrade`.
+ * The `.specflow/upgrade-pending.json` marker. Written by `specnaut upgrade`
+ * on successful apply; consumed by `specnaut-expert review-upgrade`.
  *
  * The marker is intentionally minimal. The list of preserved files is NOT
- * carried here — `specflow reconcile --status` inspects the staging directory
+ * carried here — `specnaut reconcile --status` inspects the staging directory
  * (`.specflow/upgrade-staging/`) directly, which is the live source of truth.
  */
 export type UpgradeMarker = {

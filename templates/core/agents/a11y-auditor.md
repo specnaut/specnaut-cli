@@ -1,6 +1,6 @@
 ---
 name: a11y-auditor
-description: Reviews front-end code for WCAG 2.1 AA accessibility issues — semantic HTML, heading hierarchy, alt text, form labels, keyboard nav, focus indicators, ARIA correctness, color contrast (where computable from source). Two dispatch shapes — (1) PR review (spawned by the review-coordinator during /specflow review), (2) full-codebase audit (spawned by /specflow audit accessibility).
+description: Reviews front-end code for WCAG 2.1 AA accessibility issues — semantic HTML, heading hierarchy, alt text, form labels, keyboard nav, focus indicators, ARIA correctness, color contrast (where computable from source). Two dispatch shapes — (1) PR review (spawned by the review-coordinator during /specnaut review), (2) full-codebase audit (spawned by /specnaut audit accessibility).
 model: sonnet
 effort: medium
 tools: Read, Grep, Glob, Bash
@@ -35,12 +35,12 @@ no FE surface detected — accessibility audit skipped (this project ships no fr
 ```
 
 Do NOT continue with axes 1–10. Do NOT emit an empty report. The
-gating signal is the contract — `/specflow audit accessibility` on a
+gating signal is the contract — `/specnaut audit accessibility` on a
 CLI-only project is a no-op by design.
 
 ## Mode 1 — PR review
 
-Spawned by the `review-coordinator` during `/specflow review`. Review
+Spawned by the `review-coordinator` during `/specnaut review`. Review
 ONLY the files provided in the prompt (and only if they include FE
 source — otherwise skip per the gate above). Output the `FINDING`
 structure used by code-reviewer, followed by the canonical
@@ -82,7 +82,7 @@ structure used by code-reviewer, followed by the canonical
 
 ## Mode 2 — Full-codebase audit
 
-Spawned by `/specflow audit accessibility`. Read-only; full project
+Spawned by `/specnaut audit accessibility`. Read-only; full project
 scope; **subject to the FE-surface gate above**.
 
 ### Read-only contract (NON-NEGOTIABLE)

@@ -302,7 +302,7 @@ Deno.test("computeUpgradePlan: skipIfExists file not in lock → silently omitte
   const diskSha = await sha256Hex("# user's pre-existing AGENTS.md\n");
   // No entry for AGENTS.md in the lock — typical of a brownfield init
   // where the file already existed and was therefore not written by
-  // specflow (and not recorded).
+  // specnaut (and not recorded).
   const plan = computeUpgradePlan(
     new Map([[path, diskSha]]),
     emptyLock,
@@ -317,7 +317,7 @@ Deno.test("computeUpgradePlan: skipIfExists file not in lock → silently omitte
 // trusting the on-disk content as the new baseline. The plan then
 // auto-updates against the bundle.
 Deno.test("computeUpgradePlan: resetBaseline aligns stale lock with disk → auto-update", async () => {
-  const path = ".claude/skills/specflow/SKILL.md";
+  const path = ".claude/skills/specnaut/SKILL.md";
   const diskSha = await sha256Hex("router skill — current on disk\n");
   const newSha = await sha256Hex("router skill — new bundle content\n");
   const lock = lockWith(path, "stale-sha-from-an-old-binary");
@@ -335,7 +335,7 @@ Deno.test("computeUpgradePlan: resetBaseline aligns stale lock with disk → aut
 
 // Same scenario WITHOUT --reset-baseline → preserved as "customized".
 Deno.test("computeUpgradePlan: stale lock without resetBaseline → preserve customized", async () => {
-  const path = ".claude/skills/specflow/SKILL.md";
+  const path = ".claude/skills/specnaut/SKILL.md";
   const diskSha = await sha256Hex("router skill — current on disk\n");
   const newSha = await sha256Hex("router skill — new bundle content\n");
   const lock = lockWith(path, "stale-sha-from-an-old-binary");

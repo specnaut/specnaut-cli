@@ -3,7 +3,7 @@ import { resolve } from "@std/path";
 import { runReconcile } from "../../src/cli/handlers/reconcile_handler.ts";
 
 async function withProject<T>(fn: (dir: string) => Promise<T>): Promise<T> {
-  const dir = await Deno.makeTempDir({ prefix: "specflow-reconcile-int-" });
+  const dir = await Deno.makeTempDir({ prefix: "specnaut-reconcile-int-" });
   try {
     return await fn(dir);
   } finally {

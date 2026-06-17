@@ -5,7 +5,7 @@ import { fromFileUrl, join } from "@std/path";
 
 const MAIN = fromFileUrl(new URL("../../src/main.ts", import.meta.url));
 
-async function runSpecflow(
+async function runSpecnaut(
   args: string[],
   opts: { cwd?: string } = {},
 ): Promise<{ code: number; stdout: string; stderr: string }> {
@@ -32,7 +32,7 @@ async function runSpecflow(
 }
 
 async function withTempDir(fn: (dir: string) => Promise<void>) {
-  const dir = await Deno.makeTempDir({ prefix: "specflow-init-codex-" });
+  const dir = await Deno.makeTempDir({ prefix: "specnaut-init-codex-" });
   try {
     await fn(dir);
   } finally {
@@ -40,9 +40,9 @@ async function withTempDir(fn: (dir: string) => Promise<void>) {
   }
 }
 
-Deno.test("specflow init --ai codex scaffolds a Codex layout", async () => {
+Deno.test("specnaut init --ai codex scaffolds a Codex layout", async () => {
   await withTempDir(async (parent) => {
-    const { code, stderr } = await runSpecflow(
+    const { code, stderr } = await runSpecnaut(
       ["init", "demo", "--no-git", "--ai", "codex"],
       { cwd: parent },
     );
@@ -51,16 +51,16 @@ Deno.test("specflow init --ai codex scaffolds a Codex layout", async () => {
     const root = join(parent, "demo");
 
     // Codex team-shared skills (v1.0.0 consolidated layout)
-    assertEquals(await exists(join(root, ".agents/skills/specflow/SKILL.md")), true);
+    assertEquals(await exists(join(root, ".agents/skills/specnaut/SKILL.md")), true);
     assertEquals(
-      await exists(join(root, ".agents/skills/specflow/phases/specify.md")),
+      await exists(join(root, ".agents/skills/specnaut/phases/specify.md")),
       true,
     );
-    assertEquals(await exists(join(root, ".agents/skills/specflow-backlog/SKILL.md")), true);
-    assertEquals(await exists(join(root, ".agents/skills/specflow-auto/SKILL.md")), true);
+    assertEquals(await exists(join(root, ".agents/skills/specnaut-backlog/SKILL.md")), true);
+    assertEquals(await exists(join(root, ".agents/skills/specnaut-auto/SKILL.md")), true);
     // Old per-phase folders are gone post-consolidation.
     assertEquals(
-      await exists(join(root, ".agents/skills/specflow-specify/SKILL.md")),
+      await exists(join(root, ".agents/skills/specnaut-specify/SKILL.md")),
       false,
     );
 
@@ -87,19 +87,19 @@ Deno.test("specflow init --ai codex scaffolds a Codex layout", async () => {
     const codexGoalMd = await Deno.readTextFile(join(root, ".codex/goal.md"));
     assertEquals(codexGoalMd.includes("# Project goal prompt"), true);
     assertEquals(codexGoalMd.includes("## Default goal prompt"), true);
-    assertEquals(codexGoalMd.includes("/specflow groom"), true);
+    assertEquals(codexGoalMd.includes("/specnaut groom"), true);
 
-    // Top-level skill folders post-consolidation: specflow router +
-    // specflow-auto + specflow-review alias + specflow-backlog +
+    // Top-level skill folders post-consolidation: specnaut router +
+    // specnaut-auto + specnaut-review alias + specnaut-backlog +
     // writing-plans (A1) + requesting-code-review (A3) +
-    // using-specflow bootstrap (B6) + subagent-driven-development (A2) +
+    // using-specnaut bootstrap (B6) + subagent-driven-development (A2) +
     // executing-plans (A4) + verification-before-completion (A5) +
     // brainstorming (A6) + 4 output-contract skills (#378:
     // workflow-contract, handoff-protocol, review-findings-contract,
     // qa-report-contract) + code-audit (#379) + 5 per-axis audit skills
     // (#380: arch-audit, sec-audit, perf-audit, dep-audit, a11y-audit) +
     // status-audit (#381) = 22.
-    // The audit-security phase (#303) lands under specflow/phases/, not as a
+    // The audit-security phase (#303) lands under specnaut/phases/, not as a
     // top-level skill — no bump there. code-audit's scope script ships under
     // .specflow/scripts/code-audit/, not as a skill folder; status-audit's
     // schema doc ships to .specflow/logs/README.md, also not a skill folder.

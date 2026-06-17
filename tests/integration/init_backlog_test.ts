@@ -4,7 +4,7 @@ import { fromFileUrl, join } from "@std/path";
 
 const MAIN = fromFileUrl(new URL("../../src/main.ts", import.meta.url));
 
-async function runSpecflow(
+async function runSpecnaut(
   args: string[],
   opts: { cwd: string },
 ): Promise<{ code: number; stdout: string; stderr: string }> {
@@ -31,7 +31,7 @@ async function runSpecflow(
 }
 
 async function withTempDir(fn: (dir: string) => Promise<void>) {
-  const dir = await Deno.makeTempDir({ prefix: "specflow-backlog-" });
+  const dir = await Deno.makeTempDir({ prefix: "specnaut-backlog-" });
   try {
     await fn(dir);
   } finally {
@@ -41,7 +41,7 @@ async function withTempDir(fn: (dir: string) => Promise<void>) {
 
 Deno.test("init --backlog local renders the local backlog skill", async () => {
   await withTempDir(async (parent) => {
-    const r = await runSpecflow(
+    const r = await runSpecnaut(
       ["init", "demo", "--no-git", "--ai", "claude", "--backlog", "local"],
       { cwd: parent },
     );
@@ -80,7 +80,7 @@ Deno.test("init --backlog local renders the local backlog skill", async () => {
 
 Deno.test("init --backlog github renders the github skill + writes config stub", async () => {
   await withTempDir(async (parent) => {
-    const r = await runSpecflow(
+    const r = await runSpecnaut(
       [
         "init",
         "demo",
@@ -137,7 +137,7 @@ Deno.test("init --backlog github renders the github skill + writes config stub",
 
 Deno.test("init --backlog cloud renders the cloud skill + writes config stub (no URL needed)", async () => {
   await withTempDir(async (parent) => {
-    const r = await runSpecflow(
+    const r = await runSpecnaut(
       ["init", "demo", "--no-git", "--ai", "claude", "--backlog", "cloud"],
       { cwd: parent },
     );
@@ -146,7 +146,7 @@ Deno.test("init --backlog cloud renders the cloud skill + writes config stub (no
     const skill = await Deno.readTextFile(
       join(parent, "demo/.claude/skills/backlog/SKILL.md"),
     );
-    assertStringIncludes(skill, "Backend: Specflow Cloud");
+    assertStringIncludes(skill, "Backend: Specnaut Cloud");
     assertEquals(skill.includes("Backend: local Markdown"), false);
     assertEquals(skill.includes("Backend: GitHub"), false);
 
@@ -162,16 +162,16 @@ Deno.test("init --backlog cloud renders the cloud skill + writes config stub (no
     assertStringIncludes(addScript, "$API_BASE/tasks");
     assertEquals(addScript.includes("gh issue create"), false);
     // The /api/v1 base lives in _config.sh, which now sources a fresh token
-    // from `specflow cloud token` (credentials live in the keychain, not the yml).
+    // from `specnaut cloud token` (credentials live in the keychain, not the yml).
     const configScript = await Deno.readTextFile(
       join(parent, "demo/.specflow/scripts/backlog/_config.sh"),
     );
     assertStringIncludes(configScript, "/api/v1");
-    assertStringIncludes(configScript, "specflow cloud token");
+    assertStringIncludes(configScript, "specnaut cloud token");
     assertEquals(configScript.includes("extract api_token"), false);
 
     // Config stub: backend + non-secret coordinates only. No api_token field —
-    // the secret is obtained via `specflow cloud login` and stored securely.
+    // the secret is obtained via `specnaut cloud login` and stored securely.
     const config = await Deno.readTextFile(
       join(parent, "demo/.specflow/backlog-config.yml"),
     );
@@ -189,7 +189,7 @@ Deno.test("init --backlog cloud renders the cloud skill + writes config stub (no
 
 Deno.test("init --backlog gitlab renders the gitlab skill + writes config stub", async () => {
   await withTempDir(async (parent) => {
-    const r = await runSpecflow(
+    const r = await runSpecnaut(
       [
         "init",
         "demo",
@@ -243,7 +243,7 @@ Deno.test(
   "init --backlog github without --backlog-url fails fast in non-TTY",
   async () => {
     await withTempDir(async (parent) => {
-      const r = await runSpecflow(
+      const r = await runSpecnaut(
         ["init", "demo", "--no-git", "--ai", "claude", "--backlog", "github"],
         { cwd: parent },
       );
@@ -260,7 +260,7 @@ Deno.test(
   "init --backlog github with malformed --backlog-url fails with clear message",
   async () => {
     await withTempDir(async (parent) => {
-      const r = await runSpecflow(
+      const r = await runSpecnaut(
         [
           "init",
           "demo",
@@ -282,7 +282,7 @@ Deno.test(
 
 Deno.test("upgrade --backlog github switches a local project to github", async () => {
   await withTempDir(async (parent) => {
-    const init = await runSpecflow(
+    const init = await runSpecnaut(
       ["init", "demo", "--no-git", "--ai", "claude", "--backlog", "local"],
       { cwd: parent },
     );
@@ -290,7 +290,7 @@ Deno.test("upgrade --backlog github switches a local project to github", async (
 
     const projectDir = join(parent, "demo");
 
-    const upgrade = await runSpecflow(
+    const upgrade = await runSpecnaut(
       ["upgrade", "--backlog", "github"],
       { cwd: projectDir },
     );
@@ -320,14 +320,14 @@ Deno.test("upgrade --backlog github switches a local project to github", async (
 
 Deno.test("upgrade --backlog <same> is a no-op", async () => {
   await withTempDir(async (parent) => {
-    const init = await runSpecflow(
+    const init = await runSpecnaut(
       ["init", "demo", "--no-git", "--ai", "claude", "--backlog", "local"],
       { cwd: parent },
     );
     assertEquals(init.code, 0, init.stderr);
 
     const projectDir = join(parent, "demo");
-    const upgrade = await runSpecflow(
+    const upgrade = await runSpecnaut(
       ["upgrade", "--backlog", "local"],
       { cwd: projectDir },
     );

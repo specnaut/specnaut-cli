@@ -22,7 +22,7 @@ dist-ssr
 *.suo
 `;
 
-async function runSpecflow(
+async function runSpecnaut(
   args: string[],
   opts: { cwd?: string } = {},
 ): Promise<{ code: number; stdout: string; stderr: string }> {
@@ -49,7 +49,7 @@ async function runSpecflow(
 }
 
 async function withTempDir(fn: (dir: string) => Promise<void>) {
-  const dir = await Deno.makeTempDir({ prefix: "specflow-init-brownfield-" });
+  const dir = await Deno.makeTempDir({ prefix: "specnaut-init-brownfield-" });
   try {
     await fn(dir);
   } finally {
@@ -65,7 +65,7 @@ Deno.test("init --here on a Vite-style project preserves the user .gitignore via
     // Plausible Vite scaffold so the test reflects the brownfield case.
     await Deno.writeTextFile(join(root, "package.json"), `{"name":"vite-demo"}`);
 
-    const { code, stderr } = await runSpecflow(
+    const { code, stderr } = await runSpecnaut(
       ["init", "--here", "--no-git"],
       { cwd: root },
     );
@@ -76,7 +76,7 @@ Deno.test("init --here on a Vite-style project preserves the user .gitignore via
     assertStringIncludes(merged, "node_modules");
     assertStringIncludes(merged, "dist-ssr");
     assertStringIncludes(merged, ".DS_Store");
-    // Specflow block is fenced and at the end.
+    // Specnaut block is fenced and at the end.
     assertStringIncludes(merged, "# --- Specflow: gitignore ---");
     assertStringIncludes(merged, "*.specflow.bak");
     assertStringIncludes(merged, "# --- End Specflow: gitignore ---");
@@ -91,15 +91,15 @@ Deno.test("init --here twice does not duplicate the merge block (idempotency)", 
     await Deno.mkdir(root, { recursive: true });
     await Deno.writeTextFile(join(root, ".gitignore"), VITE_GITIGNORE);
 
-    const first = await runSpecflow(["init", "--here", "--no-git"], { cwd: root });
+    const first = await runSpecnaut(["init", "--here", "--no-git"], { cwd: root });
     assertEquals(first.code, 0, `first init failed: ${first.stderr}`);
 
-    const second = await runSpecflow(["init", "--here", "--no-git", "--force"], { cwd: root });
+    const second = await runSpecnaut(["init", "--here", "--no-git", "--force"], { cwd: root });
     assertEquals(second.code, 0, `second init failed: ${second.stderr}`);
 
     const merged = await Deno.readTextFile(join(root, ".gitignore"));
     const fenceCount = (merged.match(/# --- Specflow: gitignore ---/g) ?? []).length;
-    assertEquals(fenceCount, 1, "specflow block must appear exactly once");
+    assertEquals(fenceCount, 1, "specnaut block must appear exactly once");
     // User content still present.
     assertStringIncludes(merged, "node_modules");
   });
@@ -109,7 +109,7 @@ Deno.test("init --here greenfield writes the .gitignore wrapped in fence markers
   await withTempDir(async (parent) => {
     const root = join(parent, "demo");
     // No pre-existing .gitignore; test the greenfield merge shape.
-    const { code, stderr } = await runSpecflow(
+    const { code, stderr } = await runSpecnaut(
       ["init", "demo", "--no-git"],
       { cwd: parent },
     );

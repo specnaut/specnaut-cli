@@ -2,7 +2,7 @@ import { assertEquals, assertStringIncludes } from "@std/assert";
 
 // Canonical scrubbing patterns, mirrored from the
 // `## Bug report protocol` section of
-// `templates/core/agents/specflow-expert.md`. Keeping this list and
+// `templates/core/agents/specnaut-expert.md`. Keeping this list and
 // the agent prompt in lockstep is critical — the LLM uses the prompt
 // as its rule set, and this test exercises the same rules to catch
 // regressions in the canonical list.

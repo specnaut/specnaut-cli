@@ -22,7 +22,7 @@ architecture.
    especially the **Engineering methodology**, **Architecture layers**,
    **Back-end patterns**, and **Front-end patterns** sections.
 3. Read the current feature's `spec.md`, `plan.md`, and `tasks.md` if a
-   Specflow feature directory is in context.
+   Specnaut feature directory is in context.
 4. **Read the `## Domain Model` block** — in `spec.md` (spec path) or in the
    Product Owner's `/backlog brief` output (direct-implementation path). If
    the block is absent or empty, return BLOCKED with reason

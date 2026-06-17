@@ -4,7 +4,7 @@ import { fromFileUrl, join } from "@std/path";
 
 const MAIN = fromFileUrl(new URL("../../src/main.ts", import.meta.url));
 
-async function runSpecflow(
+async function runSpecnaut(
   args: string[],
   opts: { cwd?: string } = {},
 ): Promise<{ code: number; stdout: string; stderr: string }> {
@@ -31,7 +31,7 @@ async function runSpecflow(
 }
 
 async function withTempDir(fn: (dir: string) => Promise<void>) {
-  const dir = await Deno.makeTempDir({ prefix: "specflow-init-cursor-" });
+  const dir = await Deno.makeTempDir({ prefix: "specnaut-init-cursor-" });
   try {
     await fn(dir);
   } finally {
@@ -39,9 +39,9 @@ async function withTempDir(fn: (dir: string) => Promise<void>) {
   }
 }
 
-Deno.test("specflow init --ai cursor scaffolds a Cursor layout", async () => {
+Deno.test("specnaut init --ai cursor scaffolds a Cursor layout", async () => {
   await withTempDir(async (parent) => {
-    const { code, stderr } = await runSpecflow(
+    const { code, stderr } = await runSpecnaut(
       ["init", "demo", "--no-git", "--ai", "cursor"],
       { cwd: parent },
     );
@@ -49,20 +49,20 @@ Deno.test("specflow init --ai cursor scaffolds a Cursor layout", async () => {
 
     const root = join(parent, "demo");
     // Cursor-specific (v1.0.0 consolidated layout)
-    assertEquals(await exists(join(root, ".cursor/skills/specflow/SKILL.md")), true);
+    assertEquals(await exists(join(root, ".cursor/skills/specnaut/SKILL.md")), true);
     assertEquals(
-      await exists(join(root, ".cursor/skills/specflow/phases/specify.md")),
+      await exists(join(root, ".cursor/skills/specnaut/phases/specify.md")),
       true,
     );
     assertEquals(
-      await exists(join(root, ".cursor/skills/specflow-agent-product-owner/SKILL.md")),
+      await exists(join(root, ".cursor/skills/specnaut-agent-product-owner/SKILL.md")),
       true,
     );
-    assertEquals(await exists(join(root, ".cursor/skills/specflow-auto/SKILL.md")), true);
+    assertEquals(await exists(join(root, ".cursor/skills/specnaut-auto/SKILL.md")), true);
     assertEquals(await exists(join(root, ".cursor/rules/specify-rules.mdc")), true);
     // Old per-phase folders are gone post-consolidation.
     assertEquals(
-      await exists(join(root, ".cursor/skills/specflow-specify/SKILL.md")),
+      await exists(join(root, ".cursor/skills/specnaut-specify/SKILL.md")),
       false,
     );
 
@@ -81,12 +81,12 @@ Deno.test("specflow init --ai cursor scaffolds a Cursor layout", async () => {
   });
 });
 
-Deno.test("specflow init (no --ai) defaults to Claude in non-TTY environments", async () => {
+Deno.test("specnaut init (no --ai) defaults to Claude in non-TTY environments", async () => {
   // Deno.Command pipes stdin, so Deno.stdin.isTerminal() is false here.
   // The init handler must therefore skip the interactive harness picker
   // and fall through to the default — preserving CI / scripted usage.
   await withTempDir(async (parent) => {
-    const { code } = await runSpecflow(["init", "demo", "--no-git"], { cwd: parent });
+    const { code } = await runSpecnaut(["init", "demo", "--no-git"], { cwd: parent });
     assertEquals(code, 0);
     const root = join(parent, "demo");
     assertEquals(await exists(join(root, ".claude/")), true);

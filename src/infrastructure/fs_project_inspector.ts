@@ -5,7 +5,7 @@ import type { CheckOutcome } from "../domain/check_result.ts";
 import { type BacklogBackend, type KnownHarness, parseLock } from "../domain/installed_lock.ts";
 import { PLUGIN_COVERED_PATHS_CLAUDE } from "../domain/plugin_coverage.ts";
 
-const PLUGIN_NAME = "specflow-plugin";
+const PLUGIN_NAME = "specnaut-plugin";
 
 async function exists(path: string): Promise<boolean> {
   try {
@@ -85,7 +85,7 @@ export class FsProjectInspector implements ProjectInspector {
   /**
    * Detects the "plugin uninstalled after migration" edge case (#73
    * slice 7): when `specnaut upgrade` previously migrated vanilla
-   * agent files to the `specflow-plugin` plugin (deleted from disk +
+   * agent files to the `specnaut-plugin` plugin (deleted from disk +
    * dropped from lock), and the user later uninstalled the plugin,
    * those files are now silently absent. This check warns once per
    * missing path so the user can recover via `specnaut upgrade` or
@@ -119,7 +119,7 @@ export class FsProjectInspector implements ProjectInspector {
         name: dest,
         status: "warn",
         message:
-          "missing — restore via `specnaut upgrade` or install the plugin (`/plugin install specflow-plugin`)",
+          "missing — restore via `specnaut upgrade` or install the plugin (`/plugin install specnaut-plugin`)",
       });
     }
     return outcomes;

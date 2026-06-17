@@ -6,7 +6,7 @@ import { fromFileUrl } from "@std/path";
  *
  * Each row maps a plugin asset to its bundled source. The plugin must be
  * a verbatim copy: any divergence breaks the user-visible UX guarantee
- * that `specflow init`-scaffolded commands and the plugin-installed
+ * that `specnaut init`-scaffolded commands and the plugin-installed
  * versions behave identically. `plugin/skills/` and `plugin/agents/` are
  * excluded from `deno fmt` (see deno.json) so this contract holds
  * against rewraps.
@@ -14,8 +14,8 @@ import { fromFileUrl } from "@std/path";
 const SYNC_PAIRS: ReadonlyArray<{ plugin: string; source: string }> = [
   // Consolidated router skill (v1.0.0).
   {
-    plugin: "plugin/skills/specflow/SKILL.md",
-    source: "templates/core/skills/specflow/SKILL.md",
+    plugin: "plugin/skills/specnaut/SKILL.md",
+    source: "templates/core/skills/specnaut/SKILL.md",
   },
   // 21 phase reference docs, loaded by the router on demand. The
   // phase-1 audit trio (`audit-security` #303, `audit-performance` #304,
@@ -48,42 +48,42 @@ const SYNC_PAIRS: ReadonlyArray<{ plugin: string; source: string }> = [
     "audit-dependencies",
     "lite-heuristic",
   ].map((name) => ({
-    plugin: `plugin/skills/specflow/phases/${name}.md`,
-    source: `templates/core/skills/specflow/phases/${name}.md`,
+    plugin: `plugin/skills/specnaut/phases/${name}.md`,
+    source: `templates/core/skills/specnaut/phases/${name}.md`,
   })),
   // Auto-chain stays as a separate skill (own slash-command identity).
   {
-    plugin: "plugin/skills/specflow-auto/SKILL.md",
-    source: "templates/core/skills/specflow-auto/SKILL.md",
+    plugin: "plugin/skills/specnaut-auto/SKILL.md",
+    source: "templates/core/skills/specnaut-auto/SKILL.md",
   },
   // Thin alias preserving auto-invocation for the review phase.
   {
-    plugin: "plugin/skills/specflow-review/SKILL.md",
-    source: "templates/core/skills/specflow-review/SKILL.md",
+    plugin: "plugin/skills/specnaut-review/SKILL.md",
+    source: "templates/core/skills/specnaut-review/SKILL.md",
   },
-  // writing-plans skill — Specflow's native equivalent of obra/superpowers
+  // writing-plans skill — Specnaut's native equivalent of obra/superpowers
   // writing-plans, used for issue-driven planning where the spec-kit
-  // /specflow plan ceremony would be overkill (Epic #270, A1 #271).
+  // /specnaut plan ceremony would be overkill (Epic #270, A1 #271).
   {
     plugin: "plugin/skills/writing-plans/SKILL.md",
     source: "templates/core/skills/writing-plans/SKILL.md",
   },
   // requesting-code-review skill — canonical reviewer prompt template +
-  // dispatch guide for Specflow's bundled code-reviewer agent. Foundation
+  // dispatch guide for Specnaut's bundled code-reviewer agent. Foundation
   // for the two-stage review pattern used by subagent-driven-development
   // (Epic #270, A3 #273).
   {
     plugin: "plugin/skills/requesting-code-review/SKILL.md",
     source: "templates/core/skills/requesting-code-review/SKILL.md",
   },
-  // using-specflow bootstrap skill + 6 tool-mapping references — loaded
+  // using-specnaut bootstrap skill + 6 tool-mapping references — loaded
   // by the SessionStart hook (plugin/hooks/) to make the agent
   // skill-aware on every turn. Per-harness references already shipped
   // in #283; mirror covers them all for the plugin distribution
   // (Epic #270, B6 #282).
   {
-    plugin: "plugin/skills/using-specflow/SKILL.md",
-    source: "templates/core/skills/using-specflow/SKILL.md",
+    plugin: "plugin/skills/using-specnaut/SKILL.md",
+    source: "templates/core/skills/using-specnaut/SKILL.md",
   },
   // subagent-driven-development — per-task two-stage review loop
   // (spec compliance then code quality) that consumes plans produced
@@ -134,8 +134,8 @@ const SYNC_PAIRS: ReadonlyArray<{ plugin: string; source: string }> = [
     "opencode",
     "copilot",
   ].map((name) => ({
-    plugin: `plugin/skills/using-specflow/references/${name}-tools.md`,
-    source: `templates/core/skills/using-specflow/references/${name}-tools.md`,
+    plugin: `plugin/skills/using-specnaut/references/${name}-tools.md`,
+    source: `templates/core/skills/using-specnaut/references/${name}-tools.md`,
   })),
   // Five per-axis audit-dispatch skills (#380). Markdown-only thin
   // dispatchers (no scripts/) — unlike the script-backed `code-audit`
@@ -175,7 +175,7 @@ const SYNC_PAIRS: ReadonlyArray<{ plugin: string; source: string }> = [
     "qa-tester",
     "review-coordinator",
     "security-auditor",
-    "specflow-expert",
+    "specnaut-expert",
     "test-reviewer",
     "workflow-manager",
     "ui-ux-designer",
@@ -217,12 +217,12 @@ for (const pair of SYNC_PAIRS) {
 }
 
 Deno.test(
-  "plugin/.claude-plugin/plugin.json declares name 'specflow-plugin'",
+  "plugin/.claude-plugin/plugin.json declares name 'specnaut-plugin'",
   async () => {
     const manifest = JSON.parse(
       await Deno.readTextFile(abs("plugin/.claude-plugin/plugin.json")),
     );
-    assertEquals(manifest.name, "specflow-plugin");
+    assertEquals(manifest.name, "specnaut-plugin");
     assertEquals(typeof manifest.description, "string");
     assertEquals(typeof manifest.version, "string");
   },

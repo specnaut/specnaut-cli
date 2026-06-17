@@ -4,7 +4,7 @@ import { fromFileUrl, join } from "@std/path";
 
 const MAIN = fromFileUrl(new URL("../../src/main.ts", import.meta.url));
 
-async function runSpecflow(
+async function runSpecnaut(
   args: string[],
   opts: { cwd?: string } = {},
 ): Promise<{ code: number; stdout: string; stderr: string }> {
@@ -31,7 +31,7 @@ async function runSpecflow(
 }
 
 async function withTempDir(fn: (dir: string) => Promise<void>) {
-  const dir = await Deno.makeTempDir({ prefix: "specflow-init-antigravity-" });
+  const dir = await Deno.makeTempDir({ prefix: "specnaut-init-antigravity-" });
   try {
     await fn(dir);
   } finally {
@@ -39,9 +39,9 @@ async function withTempDir(fn: (dir: string) => Promise<void>) {
   }
 }
 
-Deno.test("specflow init --ai antigravity scaffolds an Antigravity layout", async () => {
+Deno.test("specnaut init --ai antigravity scaffolds an Antigravity layout", async () => {
   await withTempDir(async (parent) => {
-    const { code, stderr } = await runSpecflow(
+    const { code, stderr } = await runSpecnaut(
       ["init", "demo", "--no-git", "--ai", "antigravity"],
       { cwd: parent },
     );
@@ -56,35 +56,35 @@ Deno.test("specflow init --ai antigravity scaffolds an Antigravity layout", asyn
     );
     // Per-phase command workflows are gone post-consolidation.
     assertEquals(
-      await exists(join(root, ".agent/workflows/specflow-specify.md")),
+      await exists(join(root, ".agent/workflows/specnaut-specify.md")),
       false,
     );
 
-    // Consolidated router skill + phase docs in .agent/skills/specflow/.
+    // Consolidated router skill + phase docs in .agent/skills/specnaut/.
     assertEquals(
-      await exists(join(root, ".agent/skills/specflow/SKILL.md")),
+      await exists(join(root, ".agent/skills/specnaut/SKILL.md")),
       true,
     );
     assertEquals(
-      await exists(join(root, ".agent/skills/specflow/phases/specify.md")),
+      await exists(join(root, ".agent/skills/specnaut/phases/specify.md")),
       true,
     );
     // Auto-chain still ships as its own skill folder.
     assertEquals(
-      await exists(join(root, ".agent/skills/specflow-auto/SKILL.md")),
+      await exists(join(root, ".agent/skills/specnaut-auto/SKILL.md")),
       true,
     );
 
-    // Agents are flat .md files with the specflow- prefix; passthrough
+    // Agents are flat .md files with the specnaut- prefix; passthrough
     // frontmatter (no permission-map translation).
     assertEquals(
-      await exists(join(root, ".agent/agents/specflow-product-owner.md")),
+      await exists(join(root, ".agent/agents/specnaut-product-owner.md")),
       true,
     );
     const agentContent = await Deno.readTextFile(
-      join(root, ".agent/agents/specflow-product-owner.md"),
+      join(root, ".agent/agents/specnaut-product-owner.md"),
     );
-    assertEquals(agentContent.includes("name: specflow-product-owner"), true);
+    assertEquals(agentContent.includes("name: specnaut-product-owner"), true);
     assertEquals(agentContent.includes("description:"), true);
 
     // Shared (cross-harness) project metadata still emitted.

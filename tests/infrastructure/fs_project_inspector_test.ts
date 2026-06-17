@@ -22,7 +22,7 @@ async function withProjectDir(
   fill: (dir: string) => Promise<void>,
   fn: (dir: string) => Promise<void>,
 ) {
-  const dir = await Deno.makeTempDir({ prefix: "specflow-inspect-" });
+  const dir = await Deno.makeTempDir({ prefix: "specnaut-inspect-" });
   try {
     await fill(dir);
     await fn(dir);
@@ -773,7 +773,7 @@ Deno.test("inspect: plugin gap check emits no warnings when plugin IS installed"
     const outcomes = await inspector.inspect(dir, "0.2.0");
     const gapOutcomes = outcomes.filter((o) =>
       o.name.startsWith(".claude/agents/") ||
-      o.name.startsWith(".claude/skills/specflow-")
+      o.name.startsWith(".claude/skills/specnaut-")
     );
     assertEquals(gapOutcomes.length, 0);
   });
@@ -785,10 +785,10 @@ Deno.test("inspect: plugin gap check warns for each missing covered path when pl
     const outcomes = await inspector.inspect(dir, "0.2.0");
     const gapOutcomes = outcomes.filter((o) =>
       (o.name.startsWith(".claude/agents/") ||
-        o.name.startsWith(".claude/skills/specflow/") ||
-        o.name === ".claude/skills/specflow/SKILL.md" ||
-        o.name === ".claude/skills/specflow-review/SKILL.md" ||
-        o.name === ".claude/skills/specflow-auto/SKILL.md") &&
+        o.name.startsWith(".claude/skills/specnaut/") ||
+        o.name === ".claude/skills/specnaut/SKILL.md" ||
+        o.name === ".claude/skills/specnaut-review/SKILL.md" ||
+        o.name === ".claude/skills/specnaut-auto/SKILL.md") &&
       o.status === "warn"
     );
     // 15 agents (10 original + ui-ux-designer drift fix #321 +
@@ -797,13 +797,13 @@ Deno.test("inspect: plugin gap check warns for each missing covered path when pl
     // (the 11 original + tag-version + release-version + list-skills +
     // audit-security #303 + audit-performance #304 + audit-accessibility
     // #305 + audit-architecture #321 + audit-dependencies #322 +
-    // lite-heuristic #346) + specflow-review alias + specflow-auto = 38
+    // lite-heuristic #346) + specnaut-review alias + specnaut-auto = 38
     // covered paths.
     assertEquals(gapOutcomes.length, 38);
     for (const o of gapOutcomes) {
       assertEquals(o.message.includes("missing"), true);
       assertEquals(o.message.includes("specnaut upgrade"), true);
-      assertEquals(o.message.includes("/plugin install specflow-plugin"), true);
+      assertEquals(o.message.includes("/plugin install specnaut-plugin"), true);
     }
   });
 });
@@ -851,7 +851,7 @@ Deno.test("inspect: plugin gap check warns ONLY for the agents the user actually
           "qa-tester",
           "review-coordinator",
           "security-auditor",
-          "specflow-expert",
+          "specnaut-expert",
           "test-reviewer",
           "workflow-manager",
           "ui-ux-designer",
@@ -864,11 +864,11 @@ Deno.test("inspect: plugin gap check warns ONLY for the agents the user actually
         await Deno.writeTextFile(join(dir, `.claude/agents/${name}.md`), "stub");
       }
       // Scaffold all skills + commands too (only the agent gap should warn)
-      await Deno.mkdir(join(dir, ".claude/skills/specflow-auto"), { recursive: true });
-      await Deno.writeTextFile(join(dir, ".claude/skills/specflow-auto/SKILL.md"), "stub");
-      await Deno.mkdir(join(dir, ".claude/skills/specflow-groom"), { recursive: true });
+      await Deno.mkdir(join(dir, ".claude/skills/specnaut-auto"), { recursive: true });
+      await Deno.writeTextFile(join(dir, ".claude/skills/specnaut-auto/SKILL.md"), "stub");
+      await Deno.mkdir(join(dir, ".claude/skills/specnaut-groom"), { recursive: true });
       await Deno.writeTextFile(
-        join(dir, ".claude/skills/specflow-groom/SKILL.md"),
+        join(dir, ".claude/skills/specnaut-groom/SKILL.md"),
         "stub",
       );
       for (
@@ -885,11 +885,11 @@ Deno.test("inspect: plugin gap check warns ONLY for the agents the user actually
           "tasks",
         ]
       ) {
-        await Deno.mkdir(join(dir, `.claude/skills/specflow-${name}`), {
+        await Deno.mkdir(join(dir, `.claude/skills/specnaut-${name}`), {
           recursive: true,
         });
         await Deno.writeTextFile(
-          join(dir, `.claude/skills/specflow-${name}/SKILL.md`),
+          join(dir, `.claude/skills/specnaut-${name}/SKILL.md`),
           "stub",
         );
       }

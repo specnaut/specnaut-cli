@@ -627,9 +627,9 @@ Deno.test("UpgradeProjectUseCase: lock.parentManaged=true filters agentic dests 
     lockStore,
     core: coreFromBundle({
       ".specflow/memory/constitution.md": { content: "toolkit\n", executable: false },
-      ".claude/skills/specflow/SKILL.md": { content: "skill\n", executable: false },
+      ".claude/skills/specnaut/SKILL.md": { content: "skill\n", executable: false },
       ".claude/agents/developer.md": { content: "agent\n", executable: false },
-      ".claude/commands/specflow.md": { content: "cmd\n", executable: false },
+      ".claude/commands/specnaut.md": { content: "cmd\n", executable: false },
     }),
     templatesVersion: "0.8.0",
     findHarness: findFakeHarness,
@@ -649,12 +649,12 @@ Deno.test("UpgradeProjectUseCase: lock.parentManaged=true filters agentic dests 
   }
   // Toolkit file added; agentic files never written / resurrected.
   assertEquals(writer.written.get(".specflow/memory/constitution.md"), "toolkit\n");
-  assertEquals(writer.written.has(".claude/skills/specflow/SKILL.md"), false);
+  assertEquals(writer.written.has(".claude/skills/specnaut/SKILL.md"), false);
   assertEquals(writer.written.has(".claude/agents/developer.md"), false);
-  assertEquals(writer.written.has(".claude/commands/specflow.md"), false);
+  assertEquals(writer.written.has(".claude/commands/specnaut.md"), false);
   // Lock keeps parentManaged and no agentic entries (FR-012).
   assertEquals(lockStore.last?.parentManaged, true);
-  assertEquals(lockStore.last?.entries.has(".claude/skills/specflow/SKILL.md"), false);
+  assertEquals(lockStore.last?.entries.has(".claude/skills/specnaut/SKILL.md"), false);
 });
 
 Deno.test("UpgradeProjectUseCase: parentManagedOverride re-derives + persists on a legacy lock without the field", async () => {

@@ -5,7 +5,7 @@ import {
 } from "../../src/infrastructure/credential_store.ts";
 
 async function withTempFile(fn: (path: string) => Promise<void>) {
-  const dir = await Deno.makeTempDir({ prefix: "specflow-cred-" });
+  const dir = await Deno.makeTempDir({ prefix: "specnaut-cred-" });
   try {
     await fn(`${dir}/credentials.json`);
   } finally {

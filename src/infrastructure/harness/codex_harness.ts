@@ -84,7 +84,7 @@ export class CodexHarness implements Harness {
         }
         case "phase": {
           if (!entry.suffix) throw new Error(`phase needs suffix: ${entry.name}`);
-          out[`.agents/skills/specflow/phases/${entry.suffix}`] = {
+          out[`.agents/skills/specnaut/phases/${entry.suffix}`] = {
             content: entry.content,
             executable: entry.executable,
           };

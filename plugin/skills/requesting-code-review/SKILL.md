@@ -13,9 +13,9 @@ work.
 
 > Inspired by [obra/superpowers v5.1.0](https://github.com/obra/superpowers)
 > (MIT) — `skills/requesting-code-review/SKILL.md` + the
-> `code-reviewer.md` prompt template. Re-implemented for Specflow with
+> `code-reviewer.md` prompt template. Re-implemented for Specnaut with
 > the prompt template inlined here (single file) and integrated with
-> Specflow's bundled `code-reviewer` agent.
+> Specnaut's bundled `code-reviewer` agent.
 
 **Core principle:** Review early, review often.
 
@@ -33,11 +33,11 @@ work.
 - Before refactoring (baseline check)
 - After fixing a complex bug
 
-## Specflow integration
+## Specnaut integration
 
-Specflow ships a bundled **`code-reviewer` agent**
+Specnaut ships a bundled **`code-reviewer` agent**
 (`templates/core/agents/code-reviewer.md`) that this skill dispatches.
-The agent's system prompt covers Specflow conventions (hexagonal
+The agent's system prompt covers Specnaut conventions (hexagonal
 layers, byte-identity plugin-sync contract, smoke audit, Windsurf cap,
 backlog-script conventions, …). Use it instead of `general-purpose`
 when reviewing changes inside this repo.
@@ -76,7 +76,7 @@ prompt template (see below). Use the `Task` tool with
 
 Paste this verbatim into a `Task({subagent_type: "code-reviewer", ...})`
 dispatch, substituting the four placeholders. The format is mandatory —
-Specflow's two-stage review pattern (spec compliance, then code
+Specnaut's two-stage review pattern (spec compliance, then code
 quality; see `subagent-driven-development` skill) depends on the reviewer returning the
 exact sections below.
 
@@ -197,7 +197,7 @@ For each issue:
 
 ## Two-stage review pattern (subagent-driven only)
 
-Specflow's `subagent-driven-development` skill runs **two reviews per
+Specnaut's `subagent-driven-development` skill runs **two reviews per
 task**, in this order:
 
 1. **Spec-compliance review** — verifies the implementation matches the
@@ -277,7 +277,7 @@ Task({
 ## When NOT to use this skill
 
 - For the final pre-merge check on a feature branch — that's
-  `/specflow review`, which has broader scope (architecture, quality
+  `/specnaut review`, which has broader scope (architecture, quality
   gates, fmt/lint/typecheck/tests).
 - For security-specific concerns — dispatch `security-auditor` instead.
 - For test-quality concerns specifically — dispatch `test-reviewer`.

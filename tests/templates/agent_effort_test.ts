@@ -31,7 +31,7 @@ const EFFORT_MAP: Record<string, Effort> = {
   "security-auditor": "medium",
   "code-reviewer": "medium",
   "test-reviewer": "medium",
-  "specflow-expert": "medium",
+  "specnaut-expert": "medium",
   "product-owner": "medium",
   "ui-ux-designer": "high",
   "developer": "xhigh",

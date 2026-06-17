@@ -4,7 +4,7 @@ import { FsLockStore } from "../../src/infrastructure/fs_lock_store.ts";
 import type { InstalledLock } from "../../src/domain/installed_lock.ts";
 
 async function withProjectDir(fn: (dir: string) => Promise<void>) {
-  const dir = await Deno.makeTempDir({ prefix: "specflow-lockstore-" });
+  const dir = await Deno.makeTempDir({ prefix: "specnaut-lockstore-" });
   try {
     await fn(dir);
   } finally {

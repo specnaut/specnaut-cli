@@ -12,9 +12,9 @@ you understand what's being built, present the design and get user
 approval. Then hand off to `writing-plans`.
 
 > Inspired by [obra/superpowers v5.1.0](https://github.com/obra/superpowers)
-> (MIT) — `skills/brainstorming/SKILL.md`. Re-implemented for Specflow
+> (MIT) — `skills/brainstorming/SKILL.md`. Re-implemented for Specnaut
 > with explicit handoff to the bundled `writing-plans` skill and
-> coexistence with the spec-kit `/specflow specify` flow.
+> coexistence with the spec-kit `/specnaut specify` flow.
 
 ## When to use this skill
 
@@ -34,7 +34,7 @@ Do **not** use when:
   go straight to `writing-plans`
 - The work is a one-line fix — just do it
 - The user explicitly asked for the spec-kit greenfield flow (use
-  `/specflow specify` instead — that's a heavier ceremony that
+  `/specnaut specify` instead — that's a heavier ceremony that
   produces `.specflow/specs/<feature>/spec.md` for multi-month
   features)
 
@@ -64,7 +64,7 @@ Before asking the user anything:
 - Read recent commits with `git log --oneline -20`
 - Check `AGENTS.md` and `.specflow/memory/constitution.md` for project
   principles
-- Skim the existing skill / agent registry via `using-specflow` if not
+- Skim the existing skill / agent registry via `using-specnaut` if not
   already loaded
 - Look at the directory structure relevant to the idea
 
@@ -140,7 +140,7 @@ For each file / component, you should be able to answer in one sentence:
 
 If you can't, the boundaries need work — iterate before handing off.
 
-Working in existing Specflow code, follow established patterns
+Working in existing Specnaut code, follow established patterns
 (hexagonal layout, byte-identity plugin sync, etc.). If existing code
 in the touch area has real problems that affect the work, include
 targeted improvements as part of the design — but don't propose
@@ -152,10 +152,10 @@ Save the validated design (spec) to a location appropriate for the
 project:
 
 - **Greenfield spec-kit features** — `.specflow/specs/<feature-id>/spec.md`
-  (this is the spec-kit convention; `/specflow specify` lives in this
+  (this is the spec-kit convention; `/specnaut specify` lives in this
   same space)
-- **Issue-driven brownfield work** — `docs/specflow/specs/YYYY-MM-DD-<topic>.md`
-  (mirror of the `docs/specflow/plans/` convention used by `writing-plans`)
+- **Issue-driven brownfield work** — `docs/specnaut/specs/YYYY-MM-DD-<topic>.md`
+  (mirror of the `docs/specnaut/plans/` convention used by `writing-plans`)
 - **Backlog item refinement** — update the issue body in-place (the
   PO agent owns this mutation; dispatch the PO to rewrite the issue
   body with the agreed design)
@@ -210,18 +210,18 @@ implementation code). `writing-plans` is the next step.
 - **Incremental validation** — present, get approval, move on
 - **Be flexible** — go back when something doesn't make sense
 
-## Coexistence with `/specflow specify`
+## Coexistence with `/specnaut specify`
 
-Specflow has TWO entry points for design work:
+Specnaut has TWO entry points for design work:
 
 | Entry | Use when |
 |---|---|
 | `brainstorming` skill (this) | Issue is vague, idea is fresh, design needs discovery via clarifying questions. Produces a markdown spec doc and hands off to `writing-plans`. |
-| `/specflow specify` (spec-kit) | Greenfield multi-week feature with formal contracts. Produces `.specflow/specs/<feature>/spec.md` + auto-chains to `/specflow plan` (research, data-model, contracts, quickstart artefacts). |
+| `/specnaut specify` (spec-kit) | Greenfield multi-week feature with formal contracts. Produces `.specflow/specs/<feature>/spec.md` + auto-chains to `/specnaut plan` (research, data-model, contracts, quickstart artefacts). |
 
 If you're not sure which to use: start with `brainstorming`. If the
 discussion reveals the design needs spec-kit ceremony (formal contracts,
-data model, quickstart), hand off to `/specflow specify` instead of
+data model, quickstart), hand off to `/specnaut specify` instead of
 `writing-plans` at Step 10.
 
 ## Out of scope

@@ -1,4 +1,4 @@
-// Regression test for #335: `deno task setup` must work when Specflow
+// Regression test for #335: `deno task setup` must work when Specnaut
 // is checked out as a git submodule (where `.git` is a *gitdir file*
 // pointing at the parent repo's `.git/modules/<name>/`, not a directory).
 //

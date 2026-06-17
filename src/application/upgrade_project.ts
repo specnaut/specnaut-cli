@@ -13,7 +13,7 @@ import { isPluginCoveredPath } from "../domain/plugin_coverage.ts";
 import { isAgenticPath } from "../domain/parent_managed.ts";
 
 /** The plugin name used for both the install probe and the cache directory. */
-export const PLUGIN_NAME = "specflow-plugin";
+export const PLUGIN_NAME = "specnaut-plugin";
 
 export type UpgradeProjectInput = {
   projectDir: string;
@@ -93,7 +93,7 @@ export class UpgradeProjectUseCase {
     const lock = await lockStore.read(input.projectDir);
     if (lock === null) {
       throw new Error(
-        "no .specflow/installed.lock found. Run `specflow init --here --force` to enable upgrades.",
+        "no .specflow/installed.lock found. Run `specnaut init --here --force` to enable upgrades.",
       );
     }
     const harness = findHarness(lock.harness);
@@ -213,7 +213,7 @@ export class UpgradeProjectUseCase {
     }
 
     // Stage upstream content for preserved (customized) files so that
-    // `specflow reconcile` can act on them later. We stage in dry-run too,
+    // `specnaut reconcile` can act on them later. We stage in dry-run too,
     // so the agent can preview the reconciliation plan.
     const stagingWrites: Bundle = {};
     for (const action of plan) {

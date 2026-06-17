@@ -22,7 +22,7 @@ function destinationFor(entry: CoreEntry): string {
     case "phase":
       // Copilot is flat — phase docs become sibling instruction files.
       if (!entry.suffix) throw new Error(`phase needs suffix: ${entry.name}`);
-      return `.github/instructions/specflow-${entry.suffix.replace(/\.md$/, "")}.instructions.md`;
+      return `.github/instructions/specnaut-${entry.suffix.replace(/\.md$/, "")}.instructions.md`;
     case "phase-script":
       return phaseScriptDestination(entry);
     case "backlog-script":

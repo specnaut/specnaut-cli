@@ -7,9 +7,9 @@ import { WINDSURF_WORKFLOW_MAX_CHARS } from "../../../src/infrastructure/harness
 const SAMPLE: CoreBundle = [
   {
     category: "skill",
-    name: "specflow",
+    name: "specnaut",
     suffix: null,
-    content: "---\nname: specflow\ndescription: Specflow router\n---\n\n# Body\n",
+    content: "---\nname: specnaut\ndescription: Specnaut router\n---\n\n# Body\n",
     executable: false,
   },
   {
@@ -28,7 +28,7 @@ const SAMPLE: CoreBundle = [
   },
   {
     category: "skill",
-    name: "specflow-auto",
+    name: "specnaut-auto",
     suffix: null,
     content: "---\ndescription: Auto-chain dispatcher\n---\n\n# body\n",
     executable: false,
@@ -62,34 +62,34 @@ Deno.test("WindsurfHarness.key and displayName", () => {
   assertEquals(h.displayName, "Windsurf");
 });
 
-Deno.test("WindsurfHarness maps router skill to .windsurf/workflows/specflow.md", () => {
+Deno.test("WindsurfHarness maps router skill to .windsurf/workflows/specnaut.md", () => {
   const h = new WindsurfHarness();
   const mapped = h.mapBundle(SAMPLE, { backlogBackend: "local", versionScheme: "semver" });
-  assert(".windsurf/workflows/specflow.md" in mapped);
+  assert(".windsurf/workflows/specnaut.md" in mapped);
 });
 
-Deno.test("WindsurfHarness maps phase docs to sibling specflow-<phase>.md files", () => {
+Deno.test("WindsurfHarness maps phase docs to sibling specnaut-<phase>.md files", () => {
   const h = new WindsurfHarness();
   const mapped = h.mapBundle(SAMPLE, { backlogBackend: "local", versionScheme: "semver" });
-  assert(".windsurf/workflows/specflow-specify.md" in mapped);
+  assert(".windsurf/workflows/specnaut-specify.md" in mapped);
 });
 
-Deno.test("WindsurfHarness maps backlog-cmd to .windsurf/workflows/specflow-backlog.md", () => {
+Deno.test("WindsurfHarness maps backlog-cmd to .windsurf/workflows/specnaut-backlog.md", () => {
   const h = new WindsurfHarness();
   const mapped = h.mapBundle(SAMPLE, { backlogBackend: "local", versionScheme: "semver" });
-  assert(".windsurf/workflows/specflow-backlog.md" in mapped);
+  assert(".windsurf/workflows/specnaut-backlog.md" in mapped);
 });
 
-Deno.test("WindsurfHarness maps skill to .windsurf/workflows/specflow-<name>.md", () => {
+Deno.test("WindsurfHarness maps skill to .windsurf/workflows/specnaut-<name>.md", () => {
   const h = new WindsurfHarness();
   const mapped = h.mapBundle(SAMPLE, { backlogBackend: "local", versionScheme: "semver" });
-  assert(".windsurf/workflows/specflow-auto.md" in mapped);
+  assert(".windsurf/workflows/specnaut-auto.md" in mapped);
 });
 
-Deno.test("WindsurfHarness maps agents to .windsurf/workflows/specflow-agent-<name>.md", () => {
+Deno.test("WindsurfHarness maps agents to .windsurf/workflows/specnaut-agent-<name>.md", () => {
   const h = new WindsurfHarness();
   const mapped = h.mapBundle(SAMPLE, { backlogBackend: "local", versionScheme: "semver" });
-  assert(".windsurf/workflows/specflow-agent-product-owner.md" in mapped);
+  assert(".windsurf/workflows/specnaut-agent-product-owner.md" in mapped);
 });
 
 Deno.test("WindsurfHarness maps spec-root to .specflow/<suffix> and project-root to <suffix>", () => {
@@ -102,9 +102,9 @@ Deno.test("WindsurfHarness maps spec-root to .specflow/<suffix> and project-root
 Deno.test("WindsurfHarness emits content byte-identical to entry.content (no frontmatter rewrite)", () => {
   const h = new WindsurfHarness();
   const mapped = h.mapBundle(SAMPLE, { backlogBackend: "local", versionScheme: "semver" });
-  const router = mapped[".windsurf/workflows/specflow.md"];
+  const router = mapped[".windsurf/workflows/specnaut.md"];
   assertEquals(router.content, SAMPLE[0].content);
-  const phase = mapped[".windsurf/workflows/specflow-specify.md"];
+  const phase = mapped[".windsurf/workflows/specnaut-specify.md"];
   assertEquals(phase.content, SAMPLE[1].content);
 });
 

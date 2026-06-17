@@ -1,6 +1,6 @@
 ---
 name: performance-auditor
-description: Reviews code for performance issues — N+1 queries, blocking I/O on hot paths, missing indexes, cache misuse, hot-path allocation, sync-in-async, large bundles, render-thrash. Two dispatch shapes — (1) PR review (spawned by the review-coordinator during /specflow review), (2) full-codebase audit (spawned by /specflow audit performance).
+description: Reviews code for performance issues — N+1 queries, blocking I/O on hot paths, missing indexes, cache misuse, hot-path allocation, sync-in-async, large bundles, render-thrash. Two dispatch shapes — (1) PR review (spawned by the review-coordinator during /specnaut review), (2) full-codebase audit (spawned by /specnaut audit performance).
 model: sonnet
 effort: medium
 tools: Read, Grep, Glob, Bash
@@ -15,7 +15,7 @@ on the dispatch shape.
 
 ## Mode 1 — PR review
 
-Spawned by the `review-coordinator` during `/specflow review`. Review ONLY
+Spawned by the `review-coordinator` during `/specnaut review`. Review ONLY
 the files provided in the prompt. Output the `FINDING` structure used by
 code-reviewer, followed by the canonical `REVIEW SUMMARY` block (see "Output
 format (Mode 1 — PR review)" below).
@@ -47,7 +47,7 @@ format (Mode 1 — PR review)" below).
 
 ## Mode 2 — Full-codebase audit
 
-Spawned by `/specflow audit performance`. Read-only; full project scope.
+Spawned by `/specnaut audit performance`. Read-only; full project scope.
 
 ### Read-only contract (NON-NEGOTIABLE)
 

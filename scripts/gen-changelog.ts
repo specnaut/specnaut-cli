@@ -301,7 +301,7 @@ export function formatChangelog(commits: Classified[], opts: FormatOpts): string
   if (adoption.length > 0) {
     const intro =
       "These prompts help your AI agent adopt the new features in an existing project. " +
-      "Copy them into your harness, or run `@specflow-expert review-upgrade` to be walked " +
+      "Copy them into your harness, or run `@specnaut-expert review-upgrade` to be walked " +
       "through automatically.";
     const items = adoption.map((a) => `**#${a.prNum} — ${a.title}**\n\n${a.body}`).join("\n\n");
     sections.push(`### Adoption guide\n\n${intro}\n\n${items}`);
@@ -328,7 +328,7 @@ function formatBullet(c: Classified): string {
 
 // ---------- I/O (only runs when invoked as main) ----------
 
-const REPO_URL = "https://github.com/mkrlabs/specflow";
+const REPO_URL = "https://github.com/mkrlabs/specnaut";
 const DEFAULT_OUT = "dist/release-notes.md";
 
 async function getCommits(from: string | null, to: string): Promise<Commit[]> {

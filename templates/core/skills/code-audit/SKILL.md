@@ -1,6 +1,6 @@
 ---
 name: code-audit
-description: High-altitude, multi-seat parallel code audit of a scope on main. Use when the user says "audit the codebase", "code audit", "audit recent changes", "do a full audit", "health-check this code", or "audit the last N commits". Resolves a scope, dispatches the applicable auditor seats (architecture / security / performance / accessibility / dependency) IN PARALLEL, and synthesizes one deduplicated, severity-ranked report. Read-only. Complementary to `/specflow audit <axis>` (single-axis).
+description: High-altitude, multi-seat parallel code audit of a scope on main. Use when the user says "audit the codebase", "code audit", "audit recent changes", "do a full audit", "health-check this code", or "audit the last N commits". Resolves a scope, dispatches the applicable auditor seats (architecture / security / performance / accessibility / dependency) IN PARALLEL, and synthesizes one deduplicated, severity-ranked report. Read-only. Complementary to `/specnaut audit <axis>` (single-axis).
 argument-hint: "[--path <subtree> | --range <a>..<b>] [--last <n>]"
 ---
 
@@ -12,8 +12,8 @@ deploys the applicable auditor seats **in parallel**, and merges their output
 into one report.
 
 It is **read-only**: running it mutates **no tracked files**. It dispatches the
-same auditor agents `/specflow audit <axis>` uses; the difference is breadth —
-`/specflow audit <axis>` runs one axis, `/code-audit` runs all applicable seats
+same auditor agents `/specnaut audit <axis>` uses; the difference is breadth —
+`/specnaut audit <axis>` runs one axis, `/code-audit` runs all applicable seats
 in a single parallel batch and synthesizes one verdict. The two are
 **complementary**.
 
@@ -131,5 +131,5 @@ seat reported `fail`; else `needs_followup` if **any** seat reported
 sums**.
 
 You may optionally persist the report at
-`docs/specflow/audits/YYYY-MM-DD-code-audit.md` — that doc dir is the only write
+`docs/specnaut/audits/YYYY-MM-DD-code-audit.md` — that doc dir is the only write
 this skill ever makes; the audited code is never touched.

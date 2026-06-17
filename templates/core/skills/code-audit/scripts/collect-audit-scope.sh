@@ -3,7 +3,7 @@
 # CODE-AUDIT SCOPE block + CATEGORY SIGNALS the orchestrator skill parses.
 #
 # Read-only: it never mutates the tree. Pure bash + git, no extra deps, so it
-# runs unmodified in any scaffolded project (the Specflow binary need not be on
+# runs unmodified in any scaffolded project (the Specnaut binary need not be on
 # PATH at audit time).
 #
 # Resolution priority (first match wins):

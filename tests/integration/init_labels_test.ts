@@ -4,7 +4,7 @@ import { fromFileUrl, join } from "@std/path";
 
 const MAIN = fromFileUrl(new URL("../../src/main.ts", import.meta.url));
 
-async function runSpecflow(
+async function runSpecnaut(
   args: string[],
   opts: { cwd: string },
 ): Promise<{ code: number; stdout: string; stderr: string }> {
@@ -31,7 +31,7 @@ async function runSpecflow(
 }
 
 async function withTempDir(fn: (dir: string) => Promise<void>) {
-  const dir = await Deno.makeTempDir({ prefix: "specflow-labels-" });
+  const dir = await Deno.makeTempDir({ prefix: "specnaut-labels-" });
   try {
     await fn(dir);
   } finally {
@@ -41,7 +41,7 @@ async function withTempDir(fn: (dir: string) => Promise<void>) {
 
 Deno.test("init --backlog github scaffolds ensure-labels.sh", async () => {
   await withTempDir(async (parent) => {
-    const r = await runSpecflow(
+    const r = await runSpecnaut(
       [
         "init",
         "demo",
@@ -96,7 +96,7 @@ Deno.test("init --backlog github scaffolds ensure-labels.sh", async () => {
 
 Deno.test("init --backlog gitlab scaffolds ensure-labels.sh (glab path)", async () => {
   await withTempDir(async (parent) => {
-    const r = await runSpecflow(
+    const r = await runSpecnaut(
       [
         "init",
         "demo",
@@ -128,7 +128,7 @@ Deno.test("init --backlog gitlab scaffolds ensure-labels.sh (glab path)", async 
 
 Deno.test("init --backlog local does NOT scaffold ensure-labels.sh", async () => {
   await withTempDir(async (parent) => {
-    const r = await runSpecflow(
+    const r = await runSpecnaut(
       ["init", "demo", "--no-git", "--ai", "claude", "--backlog", "local"],
       { cwd: parent },
     );

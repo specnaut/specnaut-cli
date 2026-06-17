@@ -16,7 +16,7 @@ export type UpgradeAction =
      */
     reason: "customized" | "declared";
     /**
-     * True when the `specflow-plugin` plugin owns this path AND the
+     * True when the `specnaut-plugin` plugin owns this path AND the
      * plugin is installed on the host. The handler surfaces an extra
      * warn line in this case ("plugin version is also available;
      * reconcile manually or pass --force"); the file content stays
@@ -52,7 +52,7 @@ export type UpgradePlan = ReadonlyArray<UpgradeAction>;
  *   - `newShas`  : SHA of each file in the binary's embedded templates
  *
  * Plus two parameters that drive the binary → plugin migration table:
- *   - `pluginInstalled`  : whether the `specflow-plugin` plugin is on
+ *   - `pluginInstalled`  : whether the `specnaut-plugin` plugin is on
  *                          the host (probed at use-case entry by the
  *                          `PluginDetector` port).
  *   - `isPluginCovered`  : predicate `(dest) => boolean` returning true
@@ -91,7 +91,7 @@ export type UpgradePlanOptions = {
    * predicate, upgrade saw `diskSha defined + lockSha undefined` and
    * misclassified the user-owned file as "customized locally". With
    * the predicate, those files are silently omitted from the plan —
-   * they were never specflow-managed.
+   * they were never specnaut-managed.
    */
   isSkipIfExists?: (dest: string) => boolean;
   /**
@@ -191,7 +191,7 @@ export function computeUpgradePlan(
     if (lockSha === undefined) {
       // skipIfExists files (AGENTS.md, .specflow/memory/constitution.md, …)
       // that the user already had at init time were deliberately not
-      // tracked by the lock. They were never specflow-managed; do not
+      // tracked by the lock. They were never specnaut-managed; do not
       // emit any action — silent skip prevents the false-positive
       // "customized locally" report (#163).
       if (isSkipIfExists(dest)) {

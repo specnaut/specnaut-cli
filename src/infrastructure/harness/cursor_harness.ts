@@ -15,7 +15,7 @@ function destinationFor(entry: CoreEntry): string {
       return `.cursor/skills/${skillFolderName(entry)}/SKILL.md`;
     case "phase":
       if (!entry.suffix) throw new Error(`phase needs suffix: ${entry.name}`);
-      return `.cursor/skills/specflow/phases/${entry.suffix}`;
+      return `.cursor/skills/specnaut/phases/${entry.suffix}`;
     case "phase-script":
       return phaseScriptDestination(entry);
     case "backlog-script":

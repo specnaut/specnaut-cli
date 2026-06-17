@@ -196,12 +196,12 @@ function renderSummary(plan: UpgradePlan, from: string, to: string) {
     console.log();
   }
   if (groups.migrated.length > 0) {
-    console.log(bold("  migrated to specflow-plugin plugin (backed up + removed)"));
+    console.log(bold("  migrated to specnaut-plugin plugin (backed up + removed)"));
     for (const a of groups.migrated) console.log(cyan(`    → ${a.dest}`));
     console.log();
   }
   if (groups.deferred.length > 0) {
-    console.log(bold("  deferred to specflow-plugin plugin (was missing on disk)"));
+    console.log(bold("  deferred to specnaut-plugin plugin (was missing on disk)"));
     for (const a of groups.deferred) console.log(dim(`    · ${a.dest}`));
     console.log();
   }
@@ -402,7 +402,7 @@ export async function runUpgrade(intent: UpgradeIntent): Promise<number> {
   // Handoff: tell the user how to invoke the agent-assisted review.
   console.log();
   console.log("→ Walk through what's new with your AI:");
-  console.log("  `@specflow-expert review-upgrade`");
+  console.log("  `@specnaut-expert review-upgrade`");
   console.log();
   console.log(dim(
     "  (proposes a review branch, plays adoption prompts for each new\n" +

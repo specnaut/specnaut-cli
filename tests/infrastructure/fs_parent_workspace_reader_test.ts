@@ -11,18 +11,18 @@ import { FsParentWorkspaceReader } from "../../src/infrastructure/fs_parent_work
  */
 async function fixture(
   opts: {
-    parentHasSpecflow?: boolean;
+    parentHasSpecnaut?: boolean;
     member?: string | null; // value placed in the parent deno.json workspace array
     denoJson?: string; // raw override (e.g. malformed)
     childStandalone?: boolean;
   },
 ): Promise<{ root: string; parent: string; child: string }> {
-  const root = await Deno.makeTempDir({ prefix: "specflow-pwr-" });
+  const root = await Deno.makeTempDir({ prefix: "specnaut-pwr-" });
   const parent = join(root, "parent");
   const child = join(parent, "child");
   await Deno.mkdir(child, { recursive: true });
 
-  if (opts.parentHasSpecflow ?? true) {
+  if (opts.parentHasSpecnaut ?? true) {
     await Deno.mkdir(join(parent, ".specflow"), { recursive: true });
   }
   if (opts.denoJson !== undefined) {
@@ -64,7 +64,7 @@ Deno.test("findProvidingAncestor: ancestor with .specflow but non-matching membe
 });
 
 Deno.test("findProvidingAncestor: matching member but no .specflow ⇒ null", async () => {
-  const { root, child } = await fixture({ parentHasSpecflow: false, member: "./child" });
+  const { root, child } = await fixture({ parentHasSpecnaut: false, member: "./child" });
   try {
     const reader = new FsParentWorkspaceReader();
     assertEquals(await reader.findProvidingAncestor(child), null);
@@ -88,7 +88,7 @@ Deno.test("findProvidingAncestor: symlinked workspace member is canonicalised (F
   // The member is declared as a symlink that points at the real child dir.
   // Detection must canonicalise the member path (`tryRealPath(memberPath)`)
   // so the symlinked spelling still resolves to the target.
-  const root = await Deno.makeTempDir({ prefix: "specflow-pwr-symlink-" });
+  const root = await Deno.makeTempDir({ prefix: "specnaut-pwr-symlink-" });
   const parent = join(root, "parent");
   const realChildDir = join(parent, "child");
   await Deno.mkdir(realChildDir, { recursive: true });
@@ -130,7 +130,7 @@ Deno.test("findProvidingAncestor: missing deno.json ⇒ null", async () => {
 
 Deno.test("findProvidingAncestor: walk to filesystem root with no provider ⇒ null", async () => {
   // A lone temp dir with no enclosing provider.
-  const dir = await Deno.makeTempDir({ prefix: "specflow-pwr-solo-" });
+  const dir = await Deno.makeTempDir({ prefix: "specnaut-pwr-solo-" });
   try {
     const reader = new FsParentWorkspaceReader();
     assertEquals(await reader.findProvidingAncestor(await Deno.realPath(dir)), null);

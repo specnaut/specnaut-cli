@@ -4,7 +4,7 @@ import { fromFileUrl, join } from "@std/path";
 
 const MAIN = fromFileUrl(new URL("../../src/main.ts", import.meta.url));
 
-async function runSpecflow(
+async function runSpecnaut(
   args: string[],
   opts: { cwd?: string } = {},
 ): Promise<{ code: number; stdout: string; stderr: string }> {
@@ -31,7 +31,7 @@ async function runSpecflow(
 }
 
 async function withTempDir(fn: (dir: string) => Promise<void>) {
-  const dir = await Deno.makeTempDir({ prefix: "specflow-init-dry-run-" });
+  const dir = await Deno.makeTempDir({ prefix: "specnaut-init-dry-run-" });
   try {
     await fn(dir);
   } finally {
@@ -43,7 +43,7 @@ Deno.test(
   "init --dry-run on a fresh dir exits 0 without writing anything",
   async () => {
     await withTempDir(async (dir) => {
-      const result = await runSpecflow(
+      const result = await runSpecnaut(
         ["init", "demo", "--no-git", "--dry-run"],
         { cwd: dir },
       );
@@ -64,8 +64,8 @@ Deno.test(
     await withTempDir(async (dir) => {
       // Pre-seed a project: real init landed a router skill, the user
       // customised it.
-      const skillPath = join(dir, "demo/.claude/skills/specflow/SKILL.md");
-      await Deno.mkdir(join(dir, "demo/.claude/skills/specflow"), {
+      const skillPath = join(dir, "demo/.claude/skills/specnaut/SKILL.md");
+      await Deno.mkdir(join(dir, "demo/.claude/skills/specnaut"), {
         recursive: true,
       });
       const ORIGINAL = "CUSTOM CONTENT FROM USER";
@@ -73,7 +73,7 @@ Deno.test(
 
       // Dry-run + force must NOT touch the file, NOT create a .specflow.bak,
       // and NOT write the lock.
-      const result = await runSpecflow(
+      const result = await runSpecnaut(
         ["init", "demo", "--no-git", "--force", "--dry-run"],
         { cwd: dir },
       );
@@ -106,7 +106,7 @@ Deno.test(
       const ORIGINAL_AGENTS = "# Project AGENTS\n\nProject-specific notes.\n";
       await Deno.writeTextFile(agentsPath, ORIGINAL_AGENTS);
 
-      const result = await runSpecflow(
+      const result = await runSpecnaut(
         [
           "init",
           "--here",

@@ -166,7 +166,7 @@ Deno.test("parseLock accepts v2 lock with harness=codex", () => {
 harness: codex
 templates_version: 0.4.0
 entries:
-  .agents/skills/specflow-specify/SKILL.md:
+  .agents/skills/specnaut-specify/SKILL.md:
     sha256: ccc
     installed_at: "2026-04-25T00:00:00Z"
     templates_version: "0.4.0"
@@ -181,7 +181,7 @@ Deno.test("parseLock accepts v2 lock with harness=windsurf", () => {
 harness: windsurf
 templates_version: 0.6.0
 entries:
-  .windsurf/workflows/specflow-specify.md:
+  .windsurf/workflows/specnaut-specify.md:
     sha256: eee
     installed_at: "2026-04-25T00:00:00Z"
     templates_version: "0.6.0"
@@ -196,7 +196,7 @@ Deno.test("parseLock accepts v2 lock with harness=copilot", () => {
 harness: copilot
 templates_version: 0.7.0
 entries:
-  .github/instructions/specflow-specify.instructions.md:
+  .github/instructions/specnaut-specify.instructions.md:
     sha256: fff
     installed_at: "2026-04-25T00:00:00Z"
     templates_version: "0.7.0"
@@ -261,7 +261,7 @@ Deno.test("parseLock accepts v2 lock with harness=opencode", () => {
 harness: opencode
 templates_version: 0.7.0
 entries:
-  .opencode/commands/specflow-specify.md:
+  .opencode/commands/specnaut-specify.md:
     sha256: ggg
     installed_at: "2026-04-25T00:00:00Z"
     templates_version: "0.7.0"

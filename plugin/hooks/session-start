@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
 # SessionStart hook — Claude Code plugin entry point.
 #
-# Reads the `using-specflow` bootstrap skill from the plugin tree and
+# Reads the `using-specnaut` bootstrap skill from the plugin tree and
 # injects it into the new session as `additionalContext`. Effect: the
-# agent starts every session already knowing Specflow's skill registry,
-# agent registry, and routing principles — no explicit `/specflow` or
+# agent starts every session already knowing Specnaut's skill registry,
+# agent registry, and routing principles — no explicit `/specnaut` or
 # Skill-tool invocation needed to discover what's available.
 #
 # Output format (Claude Code SessionStart hook contract):
@@ -20,7 +20,7 @@
 # launch.
 #
 # Inspired by obra/superpowers v5.1.0 (MIT) — hooks/session-start.
-# Re-implemented for Specflow.
+# Re-implemented for Specnaut.
 
 set -uo pipefail
 
@@ -28,7 +28,7 @@ set -uo pipefail
 # hook runs. If absent (e.g. running this script standalone for
 # testing), fall back to the script's own parent directory.
 PLUGIN_ROOT="${CLAUDE_PLUGIN_ROOT:-$(cd "$(dirname "$0")/.." && pwd)}"
-SKILL_PATH="$PLUGIN_ROOT/skills/using-specflow/SKILL.md"
+SKILL_PATH="$PLUGIN_ROOT/skills/using-specnaut/SKILL.md"
 
 if [ ! -f "$SKILL_PATH" ]; then
   # Skill missing — emit empty hook output so Claude Code proceeds

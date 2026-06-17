@@ -18,7 +18,7 @@ Deno.test("isParentManaged: override wins even when ancestor is null", () => {
 });
 
 Deno.test("isAgenticPath: .claude/skills/ paths are agentic", () => {
-  assertEquals(isAgenticPath(".claude/skills/specflow/SKILL.md"), true);
+  assertEquals(isAgenticPath(".claude/skills/specnaut/SKILL.md"), true);
 });
 
 Deno.test("isAgenticPath: .claude/agents/ paths are agentic", () => {
@@ -26,7 +26,7 @@ Deno.test("isAgenticPath: .claude/agents/ paths are agentic", () => {
 });
 
 Deno.test("isAgenticPath: .claude/commands/ paths are agentic", () => {
-  assertEquals(isAgenticPath(".claude/commands/specflow.md"), true);
+  assertEquals(isAgenticPath(".claude/commands/specnaut.md"), true);
 });
 
 Deno.test("isAgenticPath: .specflow/ paths are not agentic", () => {

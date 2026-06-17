@@ -1,6 +1,6 @@
 ---
 name: backlog
-description: Manage this project's backlog — add, list, view, move, and clarify items. The backend is fixed at init time and recorded in `.specflow/installed.lock`. Run `specflow upgrade --backlog <new>` to switch.
+description: Manage this project's backlog — add, list, view, move, and clarify items. The backend is fixed at init time and recorded in `.specflow/installed.lock`. Run `specnaut upgrade --backlog <new>` to switch.
 argument-hint: [list|next|add|update|estimate|status|groom|brief] [args]
 ---
 
@@ -8,8 +8,8 @@ argument-hint: [list|next|add|update|estimate|status|groom|brief] [args]
 
 Use this skill when the user says "add to backlog", "list backlog", "what's
 next?", "move task X to in-progress", or any backlog mutation. The exact
-flow depends on the backend chosen at `specflow init` (or the most recent
-`specflow upgrade --backlog <name>`).
+flow depends on the backend chosen at `specnaut init` (or the most recent
+`specnaut upgrade --backlog <name>`).
 
 ## All mutations go through the Product Owner agent
 
@@ -97,7 +97,7 @@ Two ways to enable the GitHub MCP:
    in your Claude Code account.
 
 2. **Self-hosted MCP** — add the official server to the project's
-   `.mcp.json` (creates the file if absent). Specflow does NOT scaffold
+   `.mcp.json` (creates the file if absent). Specnaut does NOT scaffold
    this for you because it requires Node + a GitHub token; do it
    manually:
 
@@ -129,7 +129,7 @@ project` calls and read configuration from `backlog-config.yml`.
 .specflow/scripts/backlog/clarify-comment.sh <num> "<question>"
 .specflow/scripts/backlog/detect-fields.sh                                 # discover native Priority/Size single-select fields → env lines
 .specflow/scripts/backlog/set-field.sh <num> <Priority|Size|IssueType> <value>  # set the native Project V2 field / org Issue Type; exit codes 10/11/12 signal label fallback
-.specflow/scripts/backlog/ensure-labels.sh                                 # idempotently bootstrap the 7 Specflow semantic labels (security/refactor/docs/tech-debt/dx/performance/dependency)
+.specflow/scripts/backlog/ensure-labels.sh                                 # idempotently bootstrap the 7 Specnaut semantic labels (security/refactor/docs/tech-debt/dx/performance/dependency)
 ```
 
 For closing or editing, use `gh` directly:
@@ -147,7 +147,7 @@ When dispatched, the PO checks tool availability at runtime:
 2. Otherwise fall back to the shell scripts.
 
 This means a project can switch from shell to MCP (or back) without any
-Specflow change — the skill is path-aware.
+Specnaut change — the skill is path-aware.
 
 ### Conventions
 
@@ -254,9 +254,9 @@ The first time the PO runs against this project, it will create the 5
 <!-- END: backend=gitlab -->
 
 <!-- BEGIN: backend=cloud -->
-## Backend: Specflow Cloud
+## Backend: Specnaut Cloud
 
-This project's backlog lives on **Specflow Cloud** — a hosted, real-time Kanban
+This project's backlog lives on **Specnaut Cloud** — a hosted, real-time Kanban
 board reached over a small HTTP API. No `gh`/`glab` CLI and no GitHub/GitLab
 rate limits. Configuration is read from `.specflow/backlog-config.yml` at
 runtime.
@@ -266,14 +266,14 @@ runtime.
 ```yaml
 # .specflow/backlog-config.yml
 backend: cloud
-api_url: https://your-deployment.convex.site   # Specflow Cloud API base
+api_url: https://your-deployment.convex.site   # Specnaut Cloud API base
 project_key: CLOUD                              # the project's short key
 ```
 
-**No token is stored here.** Credentials are obtained by `specflow cloud login`
+**No token is stored here.** Credentials are obtained by `specnaut cloud login`
 (an interactive browser device-authorization flow) and kept in the OS keychain
 (or a `0600` file under `~/.specflow`). They refresh transparently. For CI /
-headless runs, set `SPECFLOW_CLOUD_TOKEN` to a Cloud API token instead of
+headless runs, set `SPECNAUT_CLOUD_TOKEN` to a Cloud API token instead of
 logging in.
 
 ### Scripts
@@ -288,7 +288,7 @@ logging in.
 .specflow/scripts/backlog/reconcile.sh [--reset|--seek-end] [--limit N]  # drain stage transitions
 ```
 
-The scripts get a fresh access token from `specflow cloud token` (which refreshes
+The scripts get a fresh access token from `specnaut cloud token` (which refreshes
 it transparently) and authenticate with `Authorization: Bearer <token>`, talking
 to `<api_url>/api/v1/` (`/tasks`, `/columns`, `/activity`). `move.sh` passes a
 **status name** (the column name); the API resolves it to the column
@@ -301,9 +301,9 @@ matching stage hook (see `product-owner.md` → "Cloud stage reconcile").
 
 ### Prerequisites
 
-- `curl` and `jq` on PATH, and the `specflow` CLI on PATH (the scripts call
-  `specflow cloud token`).
-- Authenticated once via `specflow cloud login` (or `SPECFLOW_CLOUD_TOKEN` set
+- `curl` and `jq` on PATH, and the `specnaut` CLI on PATH (the scripts call
+  `specnaut cloud token`).
+- Authenticated once via `specnaut cloud login` (or `SPECNAUT_CLOUD_TOKEN` set
   for headless / CI).
 
 ### Stage reconcile (poll model)

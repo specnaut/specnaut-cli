@@ -17,9 +17,9 @@ function phaseEntry(name: string, body = "Body content"): CoreBundle[number] {
 function routerSkillEntry(): CoreBundle[number] {
   return {
     category: "skill",
-    name: "specflow",
+    name: "specnaut",
     suffix: null,
-    content: `---\nname: specflow\ndescription: Specflow router\n---\n\nRouter body`,
+    content: `---\nname: specnaut\ndescription: Specnaut router\n---\n\nRouter body`,
     executable: false,
   };
 }
@@ -47,22 +47,22 @@ function skillEntry(name: string): CoreBundle[number] {
   };
 }
 
-Deno.test("router skill emits to .opencode/skills/specflow/SKILL.md", () => {
+Deno.test("router skill emits to .opencode/skills/specnaut/SKILL.md", () => {
   const bundle = harness.mapBundle([routerSkillEntry()], {
     backlogBackend: "local",
     versionScheme: "semver",
   });
-  const dest = ".opencode/skills/specflow/SKILL.md";
+  const dest = ".opencode/skills/specnaut/SKILL.md";
   assertEquals(Object.keys(bundle), [dest]);
-  assertStringIncludes(bundle[dest].content, "name: specflow");
+  assertStringIncludes(bundle[dest].content, "name: specnaut");
 });
 
-Deno.test("phase emits to .opencode/skills/specflow/phases/<name>.md", () => {
+Deno.test("phase emits to .opencode/skills/specnaut/phases/<name>.md", () => {
   const bundle = harness.mapBundle([phaseEntry("specify")], {
     backlogBackend: "local",
     versionScheme: "semver",
   });
-  const dest = ".opencode/skills/specflow/phases/specify.md";
+  const dest = ".opencode/skills/specnaut/phases/specify.md";
   assertEquals(Object.keys(bundle), [dest]);
   assertStringIncludes(bundle[dest].content, "Body content");
 });
@@ -79,11 +79,11 @@ Deno.test("backlog-cmd emits to .opencode/commands/backlog.md", () => {
   assertEquals(Object.keys(bundle), [".opencode/commands/backlog.md"]);
 });
 
-Deno.test("agent emits to .opencode/agents/specflow-<name>.md with mode: subagent", () => {
+Deno.test("agent emits to .opencode/agents/specnaut-<name>.md with mode: subagent", () => {
   const bundle = harness.mapBundle([
     agentEntry("developer", "Read, Write, Edit, Grep, Glob, Bash"),
   ], { backlogBackend: "local", versionScheme: "semver" });
-  const dest = ".opencode/agents/specflow-developer.md";
+  const dest = ".opencode/agents/specnaut-developer.md";
   assertEquals(Object.keys(bundle), [dest]);
   assertStringIncludes(bundle[dest].content, "description: developer agent");
   assertStringIncludes(bundle[dest].content, "mode: subagent");
@@ -96,7 +96,7 @@ Deno.test("agent translates Read+Write+Edit+Bash to permission block", () => {
     backlogBackend: "local",
     versionScheme: "semver",
   });
-  const content = bundle[".opencode/agents/specflow-dev.md"].content;
+  const content = bundle[".opencode/agents/specnaut-dev.md"].content;
   assertStringIncludes(content, "read: allow");
   assertStringIncludes(content, "write: allow");
   assertStringIncludes(content, "edit: allow");
@@ -109,7 +109,7 @@ Deno.test("agent de-dups Edit+MultiEdit into single edit permission", () => {
     backlogBackend: "local",
     versionScheme: "semver",
   });
-  const content = bundle[".opencode/agents/specflow-dev.md"].content;
+  const content = bundle[".opencode/agents/specnaut-dev.md"].content;
   assertEquals(content.match(/edit: allow/g)?.length, 1);
 });
 
@@ -117,7 +117,7 @@ Deno.test("agent omits Grep/Glob/Task/TodoWrite/NotebookEdit and unknowns", () =
   const bundle = harness.mapBundle([
     agentEntry("dev", "Grep, Glob, Task, TodoWrite, NotebookEdit, Mystery"),
   ], { backlogBackend: "local", versionScheme: "semver" });
-  const content = bundle[".opencode/agents/specflow-dev.md"].content;
+  const content = bundle[".opencode/agents/specnaut-dev.md"].content;
   assertEquals(content.includes("permission:"), false);
 });
 
@@ -126,7 +126,7 @@ Deno.test("agent strips Bash(git log *) parenthesized variants to Bash", () => {
     backlogBackend: "local",
     versionScheme: "semver",
   });
-  const content = bundle[".opencode/agents/specflow-po.md"].content;
+  const content = bundle[".opencode/agents/specnaut-po.md"].content;
   assertStringIncludes(content, "read: allow");
   assertStringIncludes(content, "bash:");
   // De-duped: only one bash block
@@ -137,7 +137,7 @@ Deno.test("agent strips Agent(...) entries (subagent dispatch is native)", () =>
   const bundle = harness.mapBundle([
     agentEntry("wf", "Read, Bash, Agent(code-reviewer, security-auditor)"),
   ], { backlogBackend: "local", versionScheme: "semver" });
-  const content = bundle[".opencode/agents/specflow-wf.md"].content;
+  const content = bundle[".opencode/agents/specnaut-wf.md"].content;
   assertEquals(content.includes("agent:"), false);
 });
 
@@ -146,27 +146,27 @@ Deno.test("agent with no tools field emits no permission block", () => {
     backlogBackend: "local",
     versionScheme: "semver",
   });
-  const content = bundle[".opencode/agents/specflow-dev.md"].content;
+  const content = bundle[".opencode/agents/specnaut-dev.md"].content;
   assertEquals(content.includes("permission:"), false);
 });
 
-Deno.test("skill emits to .opencode/skills/specflow-<name>/SKILL.md with name+description", () => {
-  const bundle = harness.mapBundle([skillEntry("specflow-auto")], {
+Deno.test("skill emits to .opencode/skills/specnaut-<name>/SKILL.md with name+description", () => {
+  const bundle = harness.mapBundle([skillEntry("specnaut-auto")], {
     backlogBackend: "local",
     versionScheme: "semver",
   });
-  const dest = ".opencode/skills/specflow-auto/SKILL.md";
+  const dest = ".opencode/skills/specnaut-auto/SKILL.md";
   assertEquals(Object.keys(bundle), [dest]);
-  assertStringIncludes(bundle[dest].content, "name: specflow-auto");
-  assertStringIncludes(bundle[dest].content, "description: specflow-auto skill");
+  assertStringIncludes(bundle[dest].content, "name: specnaut-auto");
+  assertStringIncludes(bundle[dest].content, "description: specnaut-auto skill");
 });
 
-Deno.test("router skill named 'specflow' is not double-prefixed", () => {
+Deno.test("router skill named 'specnaut' is not double-prefixed", () => {
   const bundle = harness.mapBundle([routerSkillEntry()], {
     backlogBackend: "local",
     versionScheme: "semver",
   });
-  assertEquals(Object.keys(bundle), [".opencode/skills/specflow/SKILL.md"]);
+  assertEquals(Object.keys(bundle), [".opencode/skills/specnaut/SKILL.md"]);
 });
 
 Deno.test("spec-root and project-root pass through unchanged", () => {

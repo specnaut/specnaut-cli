@@ -7,8 +7,8 @@
 
 import { findCandidates, type IssueRef } from "./_dedupe_heuristic.ts";
 
-const REPO = "mkrlabs/specflow";
-const INBOUND_LABEL = "from:specflow-expert";
+const REPO = "mkrlabs/specnaut";
+const INBOUND_LABEL = "from:specnaut-expert";
 
 type GhIssue = IssueRef & { createdAt: string };
 
@@ -74,7 +74,7 @@ if (import.meta.main) {
   const [inbox, pool] = await Promise.all([fetchInbox(), fetchPool()]);
 
   if (inbox.length === 0) {
-    console.log("✓ inbox empty (no open issues with label `from:specflow-expert`)");
+    console.log("✓ inbox empty (no open issues with label `from:specnaut-expert`)");
     Deno.exit(0);
   }
 

@@ -85,7 +85,7 @@ Deno.test("mergeClaudeSettings: user hook with same command path is NOT duplicat
   });
   const merged = mergeClaudeSettings(userExisting, BUNDLED, DEST);
   const parsed = JSON.parse(merged);
-  // Specflow's protect-generated hook is already there → not duplicated.
+  // Specnaut's protect-generated hook is already there → not duplicated.
   assertEquals(parsed.hooks.PreToolUse[0].hooks.length, 1);
   assertEquals(parsed.hooks.PreToolUse[0].hooks[0].command, ".claude/hooks/protect-generated.sh");
   // The other 3 events get added because they were absent.
@@ -116,7 +116,7 @@ Deno.test("mergeClaudeSettings: user matcher group with different matcher coexis
   // User's Bash group untouched.
   const userGroup = parsed.hooks.PreToolUse.find((g: { matcher?: string }) => g.matcher === "Bash");
   assertEquals(userGroup.hooks[0].command, "/usr/local/bin/audit-bash.sh");
-  // Specflow's Edit|Write group grafted in.
+  // Specnaut's Edit|Write group grafted in.
   const sfGroup = parsed.hooks.PreToolUse.find(
     (g: { matcher?: string }) => g.matcher === "Edit|Write",
   );

@@ -8,7 +8,7 @@
 //                                            metadata)
 //   - .codex-plugin/plugin.json           — Codex CLI / Codex App
 //   - .cursor-plugin/plugin.json          — Cursor
-//   - .opencode/plugins/specflow.js       — OpenCode (JS adapter,
+//   - .opencode/plugins/specnaut.js       — OpenCode (JS adapter,
 //                                            no manifest version
 //                                            field — runtime read)
 //
@@ -20,7 +20,7 @@
 //
 //   1. Every manifest parses as valid JSON
 //   2. Required fields present (name, version, description, …)
-//   3. `name` is "specflow" everywhere
+//   3. `name` is "specnaut" everywhere
 //   4. `version` matches `deno.json` (already gated at release time
 //      by `release.yml` pre-flight; re-asserted here so the test
 //      suite catches drift locally without waiting for CI)
@@ -75,15 +75,15 @@ Deno.test("harness adapter — every manifest parses as JSON", async () => {
   }
 });
 
-Deno.test("harness adapter — name is 'specflow' or 'specflow-plugin' everywhere", async () => {
+Deno.test("harness adapter — name is 'specnaut' or 'specnaut-plugin' everywhere", async () => {
   const claude = await readJson<{ name: string }>(
     "plugin/.claude-plugin/plugin.json",
   );
   // Historical naming: the Claude Code plugin is published as
-  // `specflow-plugin` (matches the marketplace listing). All other
-  // adapters use the unprefixed `specflow` — they install via their
-  // harness's `plugin install specflow` command shape.
-  assertEquals(claude.name, "specflow-plugin");
+  // `specnaut-plugin` (matches the marketplace listing). All other
+  // adapters use the unprefixed `specnaut` — they install via their
+  // harness's `plugin install specnaut` command shape.
+  assertEquals(claude.name, "specnaut-plugin");
 
   for (
     const path of [
@@ -92,7 +92,7 @@ Deno.test("harness adapter — name is 'specflow' or 'specflow-plugin' everywher
     ]
   ) {
     const m = await readJson<{ name: string }>(path);
-    assertEquals(m.name, "specflow", `${path} name must be 'specflow'`);
+    assertEquals(m.name, "specnaut", `${path} name must be 'specnaut'`);
   }
 });
 
@@ -242,23 +242,23 @@ Deno.test("harness adapter — path references resolve to existing files", async
   );
 });
 
-Deno.test("harness adapter — OpenCode JS adapter exports SpecflowPlugin", async () => {
-  const raw = await Deno.readTextFile(abs(".opencode/plugins/specflow.js"));
+Deno.test("harness adapter — OpenCode JS adapter exports SpecnautPlugin", async () => {
+  const raw = await Deno.readTextFile(abs(".opencode/plugins/specnaut.js"));
   // Static-check: the adapter exports the expected named function.
   // We don't dynamically import (the file uses Node ESM with `fs` /
   // `path` / `url` imports that won't resolve under Deno).
   assert(
-    /export\s+const\s+SpecflowPlugin\s*=/.test(raw),
-    ".opencode/plugins/specflow.js must export `SpecflowPlugin`",
+    /export\s+const\s+SpecnautPlugin\s*=/.test(raw),
+    ".opencode/plugins/specnaut.js must export `SpecnautPlugin`",
   );
-  // Sanity: must reference the using-specflow bootstrap skill.
+  // Sanity: must reference the using-specnaut bootstrap skill.
   assert(
-    raw.includes("using-specflow"),
-    ".opencode/plugins/specflow.js must reference the using-specflow bootstrap skill",
+    raw.includes("using-specnaut"),
+    ".opencode/plugins/specnaut.js must reference the using-specnaut bootstrap skill",
   );
   // Sanity: must register skills path into config.skills.paths.
   assert(
     raw.includes("config.skills.paths"),
-    ".opencode/plugins/specflow.js must register skills path into config.skills.paths",
+    ".opencode/plugins/specnaut.js must register skills path into config.skills.paths",
   );
 });

@@ -3,7 +3,7 @@ import { fromFileUrl, join } from "@std/path";
 
 const MAIN = fromFileUrl(new URL("../../src/main.ts", import.meta.url));
 
-async function runSpecflow(
+async function runSpecnaut(
   args: string[],
   opts: { cwd: string },
 ): Promise<{ code: number; stdout: string; stderr: string }> {
@@ -30,7 +30,7 @@ async function runSpecflow(
 }
 
 async function withTempDir(fn: (dir: string) => Promise<void>) {
-  const dir = await Deno.makeTempDir({ prefix: "specflow-preserve-integ-" });
+  const dir = await Deno.makeTempDir({ prefix: "specnaut-preserve-integ-" });
   try {
     await fn(dir);
   } finally {
@@ -51,7 +51,7 @@ const CUSTOM_MARK = "\n# my project-specific PO config — DO NOT CLOBBER\n";
 async function initWithDeclaredCustomisation(
   parent: string,
 ): Promise<{ projectDir: string; customised: string }> {
-  const init = await runSpecflow(["init", "demo", "--no-git"], { cwd: parent });
+  const init = await runSpecnaut(["init", "demo", "--no-git"], { cwd: parent });
   assertEquals(init.code, 0, `init precondition failed: ${init.stderr}`);
   const projectDir = join(parent, "demo");
 
@@ -78,7 +78,7 @@ Deno.test("init --force preserves a declared file byte-identical and emits a not
     const refreshedPath = join(projectDir, REFRESHED);
     await Deno.writeTextFile(refreshedPath, "# clobbered locally\n");
 
-    const refresh = await runSpecflow(["init", "--here", "--force", "--no-git"], {
+    const refresh = await runSpecnaut(["init", "--here", "--force", "--no-git"], {
       cwd: projectDir,
     });
     assertEquals(refresh.code, 0, refresh.stderr);
@@ -108,7 +108,7 @@ Deno.test("init --force --reset-preserved overwrites the declared file and warns
     const { projectDir, customised } = await initWithDeclaredCustomisation(parent);
 
     // Control: without --reset-preserved the customisation survives.
-    const keep = await runSpecflow(["init", "--here", "--force", "--no-git"], {
+    const keep = await runSpecnaut(["init", "--here", "--force", "--no-git"], {
       cwd: projectDir,
     });
     assertEquals(keep.code, 0, keep.stderr);
@@ -119,7 +119,7 @@ Deno.test("init --force --reset-preserved overwrites the declared file and warns
     );
 
     // With --reset-preserved the bundled version is restored and the override warned.
-    const reset = await runSpecflow(
+    const reset = await runSpecnaut(
       ["init", "--here", "--force", "--reset-preserved", "--no-git"],
       { cwd: projectDir },
     );
@@ -138,14 +138,14 @@ Deno.test("init --force --reset-preserved overwrites the declared file and warns
 // behaviour: the customised file is clobbered by --force (no preserve notice).
 Deno.test("init --force without a preserve.yml clobbers a customised file (FR-011 control)", async () => {
   await withTempDir(async (parent) => {
-    const init = await runSpecflow(["init", "demo", "--no-git"], { cwd: parent });
+    const init = await runSpecnaut(["init", "demo", "--no-git"], { cwd: parent });
     assertEquals(init.code, 0, init.stderr);
     const projectDir = join(parent, "demo");
 
     const poPath = join(projectDir, PRESERVED);
     await Deno.writeTextFile(poPath, (await Deno.readTextFile(poPath)) + CUSTOM_MARK);
 
-    const refresh = await runSpecflow(["init", "--here", "--force", "--no-git"], {
+    const refresh = await runSpecnaut(["init", "--here", "--force", "--no-git"], {
       cwd: projectDir,
     });
     assertEquals(refresh.code, 0, refresh.stderr);

@@ -17,7 +17,7 @@ function gate(over: Record<string, unknown> = {}): Record<string, unknown> {
     payload: { question: "q" },
     state: "open",
     answer: null,
-    createdBy: "agent:specflow-cli",
+    createdBy: "agent:specnaut-cli",
     resolvedBy: null,
     createdAt: "2026-06-04T10:00:00Z",
     resolvedAt: null,

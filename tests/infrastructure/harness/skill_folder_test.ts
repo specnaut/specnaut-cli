@@ -9,24 +9,24 @@ function entry(category: CoreEntry["category"], name: string): CoreEntry {
   return { category, name, suffix: null, content: "", executable: false };
 }
 
-Deno.test("skillFolderName: backlog-cmd → specflow-<name>", () => {
-  assertEquals(skillFolderName(entry("backlog-cmd", "backlog")), "specflow-backlog");
+Deno.test("skillFolderName: backlog-cmd → specnaut-<name>", () => {
+  assertEquals(skillFolderName(entry("backlog-cmd", "backlog")), "specnaut-backlog");
 });
 
-Deno.test("skillFolderName: skill → specflow-<name>", () => {
-  assertEquals(skillFolderName(entry("skill", "specflow-auto")), "specflow-auto");
+Deno.test("skillFolderName: skill → specnaut-<name>", () => {
+  assertEquals(skillFolderName(entry("skill", "specnaut-auto")), "specnaut-auto");
 });
 
-Deno.test("skillFolderName: skill named 'specflow' is not double-prefixed", () => {
-  assertEquals(skillFolderName(entry("skill", "specflow")), "specflow");
+Deno.test("skillFolderName: skill named 'specnaut' is not double-prefixed", () => {
+  assertEquals(skillFolderName(entry("skill", "specnaut")), "specnaut");
 });
 
-Deno.test("skillFolderName: skill already starting with 'specflow-' is kept as-is", () => {
-  assertEquals(skillFolderName(entry("skill", "specflow-review")), "specflow-review");
+Deno.test("skillFolderName: skill already starting with 'specnaut-' is kept as-is", () => {
+  assertEquals(skillFolderName(entry("skill", "specnaut-review")), "specnaut-review");
 });
 
-Deno.test("skillFolderName: agent → specflow-agent-<name>", () => {
-  assertEquals(skillFolderName(entry("agent", "product-owner")), "specflow-agent-product-owner");
+Deno.test("skillFolderName: agent → specnaut-agent-<name>", () => {
+  assertEquals(skillFolderName(entry("agent", "product-owner")), "specnaut-agent-product-owner");
 });
 
 Deno.test("skillFolderName: throws for spec-root and project-root", () => {

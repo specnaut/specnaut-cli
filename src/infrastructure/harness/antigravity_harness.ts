@@ -24,7 +24,7 @@ function toAntigravityAgentMarkdown(entry: CoreEntry): string {
   const model = frontmatterField(fmBody, "model");
   const skills = frontmatterField(fmBody, "skills");
   const lines: string[] = [
-    `name: specflow-${entry.name}`,
+    `name: specnaut-${entry.name}`,
     `description: ${description}`,
   ];
   if (tools !== null) lines.push(`tools: ${tools}`);
@@ -38,13 +38,13 @@ function destinationFor(entry: CoreEntry): string {
     case "backlog-cmd":
       return `.agent/workflows/${entry.name}.md`;
     case "agent":
-      return `.agent/agents/specflow-${entry.name}.md`;
+      return `.agent/agents/specnaut-${entry.name}.md`;
     case "skill":
     case "backlog-skill":
       return `.agent/skills/${skillFolderName(entry)}/SKILL.md`;
     case "phase":
       if (!entry.suffix) throw new Error(`phase needs suffix: ${entry.name}`);
-      return `.agent/skills/specflow/phases/${entry.suffix}`;
+      return `.agent/skills/specnaut/phases/${entry.suffix}`;
     case "phase-script":
       return phaseScriptDestination(entry);
     case "backlog-script":

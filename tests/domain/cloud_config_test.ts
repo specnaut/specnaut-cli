@@ -6,7 +6,7 @@ import {
 } from "../../src/domain/cloud/cloud_config.ts";
 
 async function withTempDir(fn: (dir: string) => Promise<void>) {
-  const dir = await Deno.makeTempDir({ prefix: "specflow-cloudcfg-" });
+  const dir = await Deno.makeTempDir({ prefix: "specnaut-cloudcfg-" });
   try {
     await fn(dir);
   } finally {

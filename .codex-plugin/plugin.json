@@ -1,14 +1,14 @@
 {
-  "name": "specflow",
+  "name": "specnaut",
   "version": "1.13.1",
-  "description": "Spec-driven workflow, slash commands, and sub-agents for AI coding harnesses — Specflow's bundled skill library, agents, and the SessionStart bootstrap that makes the agent skill-aware on every turn.",
+  "description": "Spec-driven workflow, slash commands, and sub-agents for AI coding harnesses — Specnaut's bundled skill library, agents, and the SessionStart bootstrap that makes the agent skill-aware on every turn.",
   "author": {
     "name": "MakerLabs",
     "email": "noreply@anthropic.com",
     "url": "https://github.com/mkrlabs"
   },
-  "homepage": "https://specflow.makerlabs.dev",
-  "repository": "https://github.com/mkrlabs/specflow",
+  "homepage": "https://specnaut.makerlabs.dev",
+  "repository": "https://github.com/mkrlabs/specnaut",
   "license": "MIT",
   "keywords": [
     "skills",
@@ -21,9 +21,9 @@
   ],
   "skills": "./plugin/skills/",
   "interface": {
-    "displayName": "Specflow",
+    "displayName": "Specnaut",
     "shortDescription": "Spec-driven planning, TDD, review, and delivery workflows for coding agents",
-    "longDescription": "Specflow turns vague ideas into shipped features through a disciplined pipeline: brainstorming → writing-plans → subagent-driven-development (or executing-plans inline) → requesting-code-review → verification-before-completion. The bundled router skill (/specflow) orchestrates the spec-kit greenfield flow (specify → plan → tasks → analyze → implement → review → merge) and 11 specialised sub-agents handle backlog ops, security, QA, DevOps, and more. Inspired by obra/superpowers (MIT) with explicit Specflow-native integration with backlogs (GitHub/GitLab/local), constitutional governance, and a Claude/Cursor/Codex/Gemini/OpenCode/Copilot multi-harness distribution.",
+    "longDescription": "Specnaut turns vague ideas into shipped features through a disciplined pipeline: brainstorming → writing-plans → subagent-driven-development (or executing-plans inline) → requesting-code-review → verification-before-completion. The bundled router skill (/specnaut) orchestrates the spec-kit greenfield flow (specify → plan → tasks → analyze → implement → review → merge) and 11 specialised sub-agents handle backlog ops, security, QA, DevOps, and more. Inspired by obra/superpowers (MIT) with explicit Specnaut-native integration with backlogs (GitHub/GitLab/local), constitutional governance, and a Claude/Cursor/Codex/Gemini/OpenCode/Copilot multi-harness distribution.",
     "developerName": "MakerLabs",
     "category": "Coding",
     "capabilities": ["Interactive", "Read", "Write"],
@@ -33,7 +33,7 @@
       "Review the changes I just made.",
       "Run a backlog grooming pass."
     ],
-    "websiteURL": "https://specflow.makerlabs.dev",
+    "websiteURL": "https://specnaut.makerlabs.dev",
     "brandColor": "#0d6efd",
     "composerIcon": "./assets/composer-icon.svg",
     "logo": "./assets/logo.svg",

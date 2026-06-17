@@ -1,14 +1,14 @@
 {
-  "name": "specflow",
-  "displayName": "Specflow",
+  "name": "specnaut",
+  "displayName": "Specnaut",
   "description": "Spec-driven planning, TDD, review, and delivery workflows for coding agents — bundled skills, sub-agents, and a SessionStart bootstrap that makes the agent skill-aware on every turn.",
   "version": "1.13.1",
   "author": {
     "name": "MakerLabs",
     "url": "https://github.com/mkrlabs"
   },
-  "homepage": "https://specflow.makerlabs.dev",
-  "repository": "https://github.com/mkrlabs/specflow",
+  "homepage": "https://specnaut.makerlabs.dev",
+  "repository": "https://github.com/mkrlabs/specnaut",
   "license": "MIT",
   "keywords": [
     "skills",
