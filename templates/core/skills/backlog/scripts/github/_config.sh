@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
-# Helper: read repo + project_number from .specflow/backlog-config.yml.
+# Helper: read repo + project_number from .specnaut/backlog-config.yml.
 # Sourced by the other github-backend scripts.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/../../.." && pwd)"
-CONFIG="$ROOT/.specflow/backlog-config.yml"
+CONFIG="$ROOT/.specnaut/backlog-config.yml"
 
 if [ ! -f "$CONFIG" ]; then
   echo "error: $CONFIG not found. Fill in repo + project_number first." >&2

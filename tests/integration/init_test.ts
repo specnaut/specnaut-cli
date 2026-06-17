@@ -49,9 +49,9 @@ Deno.test("specnaut init <name> writes a complete tree", async () => {
     assertEquals(await exists(join(root, "CLAUDE.md")), false);
     assertEquals(await exists(join(root, "AGENTS.md")), true);
     assertEquals(await exists(join(root, "tasks/backlog.md")), false);
-    assertEquals(await exists(join(root, ".specflow/backlog.md")), true);
-    assertEquals(await exists(join(root, ".specflow/memory/constitution.md")), true);
-    assertEquals(await exists(join(root, ".specflow/templates/spec-template.md")), true);
+    assertEquals(await exists(join(root, ".specnaut/backlog.md")), true);
+    assertEquals(await exists(join(root, ".specnaut/memory/constitution.md")), true);
+    assertEquals(await exists(join(root, ".specnaut/templates/spec-template.md")), true);
     // v1.0.0: 11 phases consolidated into the specnaut router skill.
     assertEquals(
       await exists(join(root, ".claude/skills/specnaut/SKILL.md")),
@@ -141,7 +141,7 @@ async function* walkFiles(root: string): AsyncIterable<string> {
 }
 
 Deno.test("no scaffolded file references the legacy tasks/backlog path", async () => {
-  // Drift guard: PR #45 moved the local Markdown backlog under .specflow/.
+  // Drift guard: PR #45 moved the local Markdown backlog under .specnaut/.
   // Several harness-static templates kept hardcoded `tasks/backlog.md`
   // strings on the v0.9.0 release; this test ensures every harness's
   // scaffolded output stays consistent on any future template edit.
@@ -156,7 +156,7 @@ Deno.test("no scaffolded file references the legacy tasks/backlog path", async (
       for await (const path of walkFiles(root)) {
         // The lock file legitimately tracks paths; only flag content drift
         // in user-facing prompt / rule / workflow files.
-        if (path.endsWith(".specflow/installed.lock")) continue;
+        if (path.endsWith(".specnaut/installed.lock")) continue;
         const content = await Deno.readTextFile(path);
         assertEquals(
           content.includes("tasks/backlog"),
@@ -180,7 +180,7 @@ Deno.test("scaffolded product-owner agent documents epic / sub-task support", as
     assertStringIncludes(po, "sub_issues"); // GitHub native sub-issues API
     assertStringIncludes(po, 'parent: "#NNN"'); // local Markdown convention
     // Path move from #45 carried through here too.
-    assertStringIncludes(po, ".specflow/backlog.md");
+    assertStringIncludes(po, ".specnaut/backlog.md");
     // The dead sync flow is fully scrubbed from the scaffolded agent.
     assertEquals(po.includes("specnaut backlog sync"), false);
   });
@@ -273,9 +273,9 @@ Deno.test("specnaut init on a previously-initialised project recommends upgrade 
       "custom",
     );
     // Drop a stub lock so the conflict path treats this as a re-init.
-    await Deno.mkdir(join(dir, "demo/.specflow"), { recursive: true });
+    await Deno.mkdir(join(dir, "demo/.specnaut"), { recursive: true });
     await Deno.writeTextFile(
-      join(dir, "demo/.specflow/installed.lock"),
+      join(dir, "demo/.specnaut/installed.lock"),
       [
         "version: 2",
         "harness: claude",
@@ -370,11 +370,11 @@ Deno.test("specnaut init --here on a project with existing AGENTS.md does NOT er
 
     // Init succeeded → other Specnaut files installed
     assertEquals(await exists(join(target, ".claude/CLAUDE.md")), true);
-    assertEquals(await exists(join(target, ".specflow/installed.lock")), true);
+    assertEquals(await exists(join(target, ".specnaut/installed.lock")), true);
 
     // Lock should NOT track AGENTS.md (it's user-owned)
     const lock = await Deno.readTextFile(
-      join(target, ".specflow/installed.lock"),
+      join(target, ".specnaut/installed.lock"),
     );
     assertEquals(
       lock.includes("AGENTS.md"),
@@ -397,7 +397,7 @@ Deno.test("specnaut init on a fresh project writes AGENTS.md normally and tracks
     assertStringIncludes(agents, "AGENTS.md — Project Context");
 
     const lock = await Deno.readTextFile(
-      join(target, ".specflow/installed.lock"),
+      join(target, ".specnaut/installed.lock"),
     );
     assertStringIncludes(
       lock,
@@ -410,10 +410,10 @@ Deno.test("specnaut init on a fresh project writes AGENTS.md normally and tracks
 Deno.test("specnaut init --here on a project with existing constitution.md leaves it untouched", async () => {
   await withTempDir(async (dir) => {
     const target = join(dir, "demo");
-    await Deno.mkdir(join(target, ".specflow/memory"), { recursive: true });
+    await Deno.mkdir(join(target, ".specnaut/memory"), { recursive: true });
     const userConstitution = "# My Project Constitution\n\nMy own principles.\n";
     await Deno.writeTextFile(
-      join(target, ".specflow/memory/constitution.md"),
+      join(target, ".specnaut/memory/constitution.md"),
       userConstitution,
     );
 
@@ -424,7 +424,7 @@ Deno.test("specnaut init --here on a project with existing constitution.md leave
     assertEquals(code, 0);
 
     const after = await Deno.readTextFile(
-      join(target, ".specflow/memory/constitution.md"),
+      join(target, ".specnaut/memory/constitution.md"),
     );
     assertEquals(after, userConstitution);
   });
@@ -535,4 +535,39 @@ Deno.test("scaffolded .claude/CLAUDE.md documents `claude agents`", async () => 
     assertStringIncludes(claudeMd, "code.claude.com/docs/fr/agent-view");
     assertStringIncludes(claudeMd, ".claude/worktrees/");
   });
+});
+
+Deno.test("specnaut init --here migrates a legacy .specflow/ tree to .specnaut/", async () => {
+  const dir = await Deno.makeTempDir({ prefix: "specnaut-migrate-integ-" });
+  try {
+    // Pre-rebrand project: a user-authored spec lives under the legacy dir.
+    await Deno.mkdir(join(dir, ".specflow/specs/001-foo"), { recursive: true });
+    await Deno.writeTextFile(join(dir, ".specflow/specs/001-foo/spec.md"), "user spec");
+
+    const { code } = await runSpecnaut(["init", "--here", "--no-git", "--force"], { cwd: dir });
+    assertEquals(code, 0);
+    // Migration ran: legacy dir gone, user content preserved under the new dir.
+    assertEquals(await exists(join(dir, ".specflow")), false);
+    assertEquals(
+      await Deno.readTextFile(join(dir, ".specnaut/specs/001-foo/spec.md")),
+      "user spec",
+    );
+  } finally {
+    await Deno.remove(dir, { recursive: true });
+  }
+});
+
+Deno.test("specnaut init aborts when BOTH .specflow/ and .specnaut/ exist (migration conflict)", async () => {
+  const dir = await Deno.makeTempDir({ prefix: "specnaut-migrate-conflict-" });
+  try {
+    await Deno.mkdir(join(dir, ".specflow"), { recursive: true });
+    await Deno.mkdir(join(dir, ".specnaut"), { recursive: true });
+    const { code, stderr } = await runSpecnaut(["init", "--here", "--no-git", "--force"], {
+      cwd: dir,
+    });
+    assertEquals(code, 2);
+    assertStringIncludes(stderr, "both .specflow/ (legacy) and .specnaut/ exist");
+  } finally {
+    await Deno.remove(dir, { recursive: true });
+  }
 });

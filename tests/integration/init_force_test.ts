@@ -40,7 +40,7 @@ async function withTempDir(fn: (dir: string) => Promise<void>) {
 }
 
 Deno.test(
-  "init --force overwrites a pre-existing .claude/ and creates .specflow.bak files",
+  "init --force overwrites a pre-existing .claude/ and creates .specnaut.bak files",
   async () => {
     await withTempDir(async (dir) => {
       // Pre-seed the consolidated router skill so init conflicts without --force.
@@ -67,7 +67,7 @@ Deno.test(
 
       const bakPath = join(
         dir,
-        "demo/.claude/skills/specnaut/SKILL.md.specflow.bak",
+        "demo/.claude/skills/specnaut/SKILL.md.specnaut.bak",
       );
       const bakContent = await Deno.readTextFile(bakPath);
       assertEquals(bakContent, "CUSTOM CONTENT FROM USER");
@@ -79,7 +79,7 @@ Deno.test(
 
       assertEquals(await exists(join(dir, "demo/AGENTS.md")), true);
       assertEquals(
-        await exists(join(dir, "demo/.specflow/memory/constitution.md")),
+        await exists(join(dir, "demo/.specnaut/memory/constitution.md")),
         true,
       );
     });

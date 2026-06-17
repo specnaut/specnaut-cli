@@ -51,9 +51,9 @@ if [ "$NEW_STATUS" = "Backlog" ]; then
 fi
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-# Deployed layout: <root>/.specflow/scripts/backlog/<this>.sh — up 3.
+# Deployed layout: <root>/.specnaut/scripts/backlog/<this>.sh — up 3.
 ROOT="$(cd "$SCRIPT_DIR/../../.." && pwd)"
-BACKLOG_DIR="$ROOT/.specflow/backlog"
+BACKLOG_DIR="$ROOT/.specnaut/backlog"
 
 if [ ! -d "$BACKLOG_DIR" ]; then
   echo "::warning::propagate-parent-status: backlog dir not found at $BACKLOG_DIR — skipping" >&2

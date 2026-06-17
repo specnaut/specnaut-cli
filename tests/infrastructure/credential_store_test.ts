@@ -24,6 +24,32 @@ Deno.test("FileCredentialStore: kind is 'file'", () => {
   assertEquals(new FileCredentialStore().kind, "file");
 });
 
+Deno.test("FileCredentialStore: reads legacy ~/.specflow when ~/.specnaut is absent", async () => {
+  const home = await Deno.makeTempDir({ prefix: "specnaut-home-" });
+  const prevHome = Deno.env.get("HOME");
+  const prevUserProfile = Deno.env.get("USERPROFILE");
+  try {
+    Deno.env.set("HOME", home);
+    Deno.env.set("USERPROFILE", home);
+    // Pre-rebrand login: only the legacy dir exists.
+    await Deno.mkdir(`${home}/.specflow`, { recursive: true });
+    await Deno.writeTextFile(
+      `${home}/.specflow/credentials.json`,
+      JSON.stringify({ "https://dep.convex.site": creds() }),
+    );
+
+    const store = new FileCredentialStore(); // default home path + legacy fallback
+    const loaded = await store.load("https://dep.convex.site");
+    assertEquals(loaded?.accessToken, "sfc_access");
+  } finally {
+    if (prevHome === undefined) Deno.env.delete("HOME");
+    else Deno.env.set("HOME", prevHome);
+    if (prevUserProfile === undefined) Deno.env.delete("USERPROFILE");
+    else Deno.env.set("USERPROFILE", prevUserProfile);
+    await Deno.remove(home, { recursive: true });
+  }
+});
+
 Deno.test("FileCredentialStore: save → load round-trips", async () => {
   await withTempFile(async (path) => {
     const store = new FileCredentialStore(path);

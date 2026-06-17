@@ -57,7 +57,7 @@ Deno.test("init --backlog github scaffolds ensure-labels.sh", async () => {
     );
     assertEquals(r.code, 0, r.stderr);
 
-    const script = join(parent, "demo/.specflow/scripts/backlog/ensure-labels.sh");
+    const script = join(parent, "demo/.specnaut/scripts/backlog/ensure-labels.sh");
     assertEquals(await exists(script), true);
 
     const body = await Deno.readTextFile(script);
@@ -82,7 +82,7 @@ Deno.test("init --backlog github scaffolds ensure-labels.sh", async () => {
 
     // The shared LABELS.md reference doc lands alongside the install.
     assertEquals(
-      await exists(join(parent, "demo/.specflow/LABELS.md")),
+      await exists(join(parent, "demo/.specnaut/LABELS.md")),
       true,
     );
 
@@ -112,7 +112,7 @@ Deno.test("init --backlog gitlab scaffolds ensure-labels.sh (glab path)", async 
     );
     assertEquals(r.code, 0, r.stderr);
 
-    const script = join(parent, "demo/.specflow/scripts/backlog/ensure-labels.sh");
+    const script = join(parent, "demo/.specnaut/scripts/backlog/ensure-labels.sh");
     assertEquals(await exists(script), true);
 
     const body = await Deno.readTextFile(script);
@@ -120,7 +120,7 @@ Deno.test("init --backlog gitlab scaffolds ensure-labels.sh (glab path)", async 
     assertStringIncludes(body, "glab label list");
 
     assertEquals(
-      await exists(join(parent, "demo/.specflow/LABELS.md")),
+      await exists(join(parent, "demo/.specnaut/LABELS.md")),
       true,
     );
   });
@@ -136,13 +136,13 @@ Deno.test("init --backlog local does NOT scaffold ensure-labels.sh", async () =>
 
     // No labels script for the local backend — there are no labels.
     assertEquals(
-      await exists(join(parent, "demo/.specflow/scripts/backlog/ensure-labels.sh")),
+      await exists(join(parent, "demo/.specnaut/scripts/backlog/ensure-labels.sh")),
       false,
     );
 
     // LABELS.md still ships as a reference (mentions the local-tagging convention).
     assertEquals(
-      await exists(join(parent, "demo/.specflow/LABELS.md")),
+      await exists(join(parent, "demo/.specnaut/LABELS.md")),
       true,
     );
   });

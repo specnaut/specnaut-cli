@@ -119,16 +119,16 @@ templates may have changed. To pull those changes into a project you previously 
 ```bash
 specnaut upgrade --dry-run    # preview what would change
 specnaut upgrade              # apply safely — files you customized are preserved
-specnaut upgrade --force      # overwrite customized files (backed up to .specflow.bak)
+specnaut upgrade --force      # overwrite customized files (backed up to .specnaut.bak)
 specnaut diff                 # show how your customized files diverge from the bundled originals
 ```
 
-Specnaut tracks the SHA256 of each template in `.specflow/installed.lock` so it can detect your
+Specnaut tracks the SHA256 of each template in `.specnaut/installed.lock` so it can detect your
 local edits and avoid overwriting them. Commit this lock file alongside your project.
 
 `specnaut upgrade` detects edits automatically, but a `specnaut init --here --force` refresh
 overwrites every bundled file unconditionally. To protect a customized file even from a forced
-refresh, declare it in a `.specflow/preserve.yml` manifest — a top-level `preserved:` list of
+refresh, declare it in a `.specnaut/preserve.yml` manifest — a top-level `preserved:` list of
 project-relative paths:
 
 ```yaml

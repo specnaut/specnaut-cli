@@ -52,7 +52,7 @@ Deno.test(
 
       // Nothing should have been written to disk.
       assertEquals(await exists(join(dir, "demo/.claude")), false);
-      assertEquals(await exists(join(dir, "demo/.specflow")), false);
+      assertEquals(await exists(join(dir, "demo/.specnaut")), false);
       assertEquals(await exists(join(dir, "demo/AGENTS.md")), false);
     });
   },
@@ -71,7 +71,7 @@ Deno.test(
       const ORIGINAL = "CUSTOM CONTENT FROM USER";
       await Deno.writeTextFile(skillPath, ORIGINAL);
 
-      // Dry-run + force must NOT touch the file, NOT create a .specflow.bak,
+      // Dry-run + force must NOT touch the file, NOT create a .specnaut.bak,
       // and NOT write the lock.
       const result = await runSpecnaut(
         ["init", "demo", "--no-git", "--force", "--dry-run"],
@@ -85,11 +85,11 @@ Deno.test(
       assertEquals(content, ORIGINAL);
 
       // No backup created.
-      assertEquals(await exists(`${skillPath}.specflow.bak`), false);
+      assertEquals(await exists(`${skillPath}.specnaut.bak`), false);
 
       // No lock file written.
       assertEquals(
-        await exists(join(dir, "demo/.specflow/installed.lock")),
+        await exists(join(dir, "demo/.specnaut/installed.lock")),
         false,
       );
     });
@@ -126,12 +126,12 @@ Deno.test(
       const content = await Deno.readTextFile(agentsPath);
       assertEquals(content, ORIGINAL_AGENTS);
 
-      // No .specflow.bak siblings.
-      assertEquals(await exists(`${agentsPath}.specflow.bak`), false);
+      // No .specnaut.bak siblings.
+      assertEquals(await exists(`${agentsPath}.specnaut.bak`), false);
 
       // No managed dirs created.
       assertEquals(await exists(join(dir, ".claude")), false);
-      assertEquals(await exists(join(dir, ".specflow")), false);
+      assertEquals(await exists(join(dir, ".specnaut")), false);
     });
   },
 );

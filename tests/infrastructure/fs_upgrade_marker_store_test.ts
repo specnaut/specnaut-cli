@@ -46,9 +46,9 @@ Deno.test("FsUpgradeMarkerStore: delete is idempotent (no-op when absent)", asyn
 
 Deno.test("FsUpgradeMarkerStore: read treats corrupt JSON as absent", async () => {
   await withTempDir(async (dir) => {
-    await Deno.mkdir(resolve(dir, ".specflow"), { recursive: true });
+    await Deno.mkdir(resolve(dir, ".specnaut"), { recursive: true });
     await Deno.writeTextFile(
-      resolve(dir, ".specflow/upgrade-pending.json"),
+      resolve(dir, ".specnaut/upgrade-pending.json"),
       "{this is not valid json",
     );
     const store = new FsUpgradeMarkerStore();
@@ -58,9 +58,9 @@ Deno.test("FsUpgradeMarkerStore: read treats corrupt JSON as absent", async () =
 
 Deno.test("FsUpgradeMarkerStore: read treats missing fields as absent", async () => {
   await withTempDir(async (dir) => {
-    await Deno.mkdir(resolve(dir, ".specflow"), { recursive: true });
+    await Deno.mkdir(resolve(dir, ".specnaut"), { recursive: true });
     await Deno.writeTextFile(
-      resolve(dir, ".specflow/upgrade-pending.json"),
+      resolve(dir, ".specnaut/upgrade-pending.json"),
       JSON.stringify({ from: "1.0.0" }),
     );
     const store = new FsUpgradeMarkerStore();

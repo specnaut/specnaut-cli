@@ -6,7 +6,7 @@
 - **Subagents**: Codex subagent definitions live in `.codex/agents/`
   (TOML format).
 - **Backlog**: managed via the `/specnaut groom` workflow — when the
-  project uses the local Markdown backend, see `.specflow/backlog.md`.
+  project uses the local Markdown backend, see `.specnaut/backlog.md`.
 
 ## Optional integrations
 

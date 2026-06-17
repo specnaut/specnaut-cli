@@ -16,7 +16,7 @@ export async function runReconcile(intent: ReconcileIntent): Promise<number> {
   if (intent.kind === "reconcile-status") {
     const staging = new FsStagingStore();
     const pending = await staging.list(projectDir);
-    const stagingDir = pending.length > 0 ? ".specflow/upgrade-staging" : null;
+    const stagingDir = pending.length > 0 ? ".specnaut/upgrade-staging" : null;
     console.log(JSON.stringify({ pending, stagingDir }, null, 2));
     return 0;
   }
@@ -40,7 +40,7 @@ export async function runReconcile(intent: ReconcileIntent): Promise<number> {
       return 0;
     }
     case "no-marker":
-      console.error(red(`error: no .specflow/installed.lock — run \`specnaut init\` first`));
+      console.error(red(`error: no .specnaut/installed.lock — run \`specnaut init\` first`));
       return 2;
     case "no-staging":
       console.error(red(`error: no pending reconciliation for ${intent.path}`));

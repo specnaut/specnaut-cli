@@ -16,8 +16,8 @@ schema doc.
 ## Technical Context
 
 **Language/Version**: bash + jq (hook); Deno/TS (test + bundle) **Primary Dependencies**: none new
-**Storage**: `.specflow/logs/agents.jsonl` (entry shape gains agent_id/effort + now-populated
-fields); `.specflow/logs/README.md` doc **Testing**: hermetic hook test fed a REAL-shaped
+**Storage**: `.specnaut/logs/agents.jsonl` (entry shape gains agent_id/effort + now-populated
+fields); `.specnaut/logs/README.md` doc **Testing**: hermetic hook test fed a REAL-shaped
 SubagentStop payload (agent_type + last_assistant_message + UPPERCASE block) + legacy-key +
 lowercase-field + start/no-block/jq-absent cases **Project Type**: cli (no src/ code)
 **Constraints**: preserve all prior invariants (jq -n JSON-safety, per-block segmentation,

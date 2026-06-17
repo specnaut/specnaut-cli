@@ -39,7 +39,7 @@ export type UpgradeProjectInput = {
   parentManagedOverride?: boolean;
   /**
    * Declared-preserve predicate (spec 011 / issue #367). Returns true for any
-   * dest the maintainer listed in `.specflow/preserve.yml`. Threaded straight
+   * dest the maintainer listed in `.specnaut/preserve.yml`. Threaded straight
    * into `computeUpgradePlan` so declared files become `preserve/"declared"`
    * (winning over auto-update, plugin-migration, and removal). Built by the
    * handler from the manifest (and flipped off when `--reset-preserved` is
@@ -93,7 +93,7 @@ export class UpgradeProjectUseCase {
     const lock = await lockStore.read(input.projectDir);
     if (lock === null) {
       throw new Error(
-        "no .specflow/installed.lock found. Run `specnaut init --here --force` to enable upgrades.",
+        "no .specnaut/installed.lock found. Run `specnaut init --here --force` to enable upgrades.",
       );
     }
     const harness = findHarness(lock.harness);
@@ -222,7 +222,7 @@ export class UpgradeProjectUseCase {
       if (action.kind !== "preserve" || action.reason !== "customized") continue;
       const file = bundle[action.dest];
       if (!file) continue;
-      stagingWrites[`.specflow/upgrade-staging/${action.dest}`] = file;
+      stagingWrites[`.specnaut/upgrade-staging/${action.dest}`] = file;
     }
     if (Object.keys(stagingWrites).length > 0) {
       await writer.writeBundle(stagingWrites, input.projectDir, {

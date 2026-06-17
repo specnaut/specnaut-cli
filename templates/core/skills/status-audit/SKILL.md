@@ -1,24 +1,24 @@
 ---
 name: status-audit
-description: Read-only health audit of a multi-agent session from the status ledger. Use when the user says "status audit", "audit the session", "how are the agents doing", "what's blocked", "session health", or when supervising long headless work with /loop. Reads .specflow/logs/agents.jsonl, derives each agent's current state from its latest entry, and reports seven health views. Writes nothing.
+description: Read-only health audit of a multi-agent session from the status ledger. Use when the user says "status audit", "audit the session", "how are the agents doing", "what's blocked", "session health", or when supervising long headless work with /loop. Reads .specnaut/logs/agents.jsonl, derives each agent's current state from its latest entry, and reports seven health views. Writes nothing.
 argument-hint: "[latest|<agent>|<session>]"
 ---
 
 # Status Audit — read-only session health report
 
 A **thin, read-only** audit of a running (or finished) multi-agent session. It
-reads the append-only status ledger at `.specflow/logs/agents.jsonl`, derives
+reads the append-only status ledger at `.specnaut/logs/agents.jsonl`, derives
 each agent's **current state** (its latest entry by `ts`), and reports seven
 health views. It writes **nothing** and mutates **no tracked files** —
 `git status` is unchanged after a run.
 
 The ledger is produced by the `log-subagent.sh` hook on every subagent
 start/stop. Each line is a JSON object; the schema lives at
-`.specflow/logs/README.md`.
+`.specnaut/logs/README.md`.
 
 ## Step 1 — Read the ledger
 
-Read `.specflow/logs/agents.jsonl`.
+Read `.specnaut/logs/agents.jsonl`.
 
 - **Absent** (file does not exist, or no entries) → report **"no ledger yet —
   no subagents have run in this project, or the `log-subagent.sh` hook is not
@@ -32,7 +32,7 @@ Read `.specflow/logs/agents.jsonl`.
 Each line carries the four base fields `ts` / `event` / `session` / `agent` and
 the OPTIONAL contract fields `state`, `done_criteria_met`, `handoff_target`,
 `review_verdict`, `qa_verdict` (omit-if-absent). Allowed values are in
-`.specflow/logs/README.md`.
+`.specnaut/logs/README.md`.
 
 ## Step 2 — Derive current state
 

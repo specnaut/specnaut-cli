@@ -5,7 +5,7 @@
 # yet, and fires `claude -p` headless to review the diff against project
 # conventions. The review is posted as a PR comment, not a blocking review.
 #
-# Wired up via ~/Library/LaunchAgents/com.specflow.triage-pr.plist
+# Wired up via ~/Library/LaunchAgents/com.specnaut.triage-pr.plist
 # (StartInterval = 1800s = every 30 min). Logs land in
 # ~/Library/Logs/specnaut/triage-pr.log.
 #

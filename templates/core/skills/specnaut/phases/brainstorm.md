@@ -16,7 +16,7 @@ yourself.
 entry point for when the user does NOT yet have a clear enough idea to write
 a spec. It runs a collaborative discovery dialogue, turns the fuzzy idea into
 an approved design brief, then hands that brief to `/specnaut specify` — which
-owns writing the formal `.specflow/specs/<feature>/spec.md`.
+owns writing the formal `.specnaut/specs/<feature>/spec.md`.
 
 Use this phase when the idea needs *discovery* before it can be specified.
 When the user already has a clear brief, they invoke `/specnaut specify`
@@ -31,7 +31,7 @@ The discovery dialogue is already defined, in full, by the bundled
    `brainstorming` skill (via the `Skill` tool, or read its `SKILL.md` if the
    platform cannot invoke it) and follow its **Steps 1–6**:
    - Step 1 — explore project context (`git log`, `AGENTS.md`,
-     `.specflow/memory/constitution.md`, the relevant directory structure).
+     `.specnaut/memory/constitution.md`, the relevant directory structure).
    - Step 2 — assess scope; if the idea spans multiple independent
      subsystems, propose splitting it into one brainstorm per subsystem
      (a multi-subsystem idea is an Epic, not one feature).
@@ -54,7 +54,7 @@ Inside the `/specnaut` router this phase **overrides that ending**:
 
 - **Do NOT** write a separate design doc and do **NOT** hand off to
   `writing-plans`. `/specnaut specify` is the next phase and it owns writing
-  `.specflow/specs/<feature>/spec.md`, so a brainstorm-authored doc would only
+  `.specnaut/specs/<feature>/spec.md`, so a brainstorm-authored doc would only
   double up.
 - Instead, distill the approved design into a concise **feature brief**
   (2–6 sentences capturing goal, the chosen approach, key constraints, and

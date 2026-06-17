@@ -255,7 +255,7 @@ yourself.
 entry point for when the user does NOT yet have a clear enough idea to write
 a spec. It runs a collaborative discovery dialogue, turns the fuzzy idea into
 an approved design brief, then hands that brief to \`/specnaut specify\` — which
-owns writing the formal \`.specflow/specs/<feature>/spec.md\`.
+owns writing the formal \`.specnaut/specs/<feature>/spec.md\`.
 
 Use this phase when the idea needs *discovery* before it can be specified.
 When the user already has a clear brief, they invoke \`/specnaut specify\`
@@ -270,7 +270,7 @@ The discovery dialogue is already defined, in full, by the bundled
    \`brainstorming\` skill (via the \`Skill\` tool, or read its \`SKILL.md\` if the
    platform cannot invoke it) and follow its **Steps 1–6**:
    - Step 1 — explore project context (\`git log\`, \`AGENTS.md\`,
-     \`.specflow/memory/constitution.md\`, the relevant directory structure).
+     \`.specnaut/memory/constitution.md\`, the relevant directory structure).
    - Step 2 — assess scope; if the idea spans multiple independent
      subsystems, propose splitting it into one brainstorm per subsystem
      (a multi-subsystem idea is an Epic, not one feature).
@@ -293,7 +293,7 @@ Inside the \`/specnaut\` router this phase **overrides that ending**:
 
 - **Do NOT** write a separate design doc and do **NOT** hand off to
   \`writing-plans\`. \`/specnaut specify\` is the next phase and it owns writing
-  \`.specflow/specs/<feature>/spec.md\`, so a brainstorm-authored doc would only
+  \`.specnaut/specs/<feature>/spec.md\`, so a brainstorm-authored doc would only
   double up.
 - Instead, distill the approved design into a concise **feature brief**
   (2–6 sentences capturing goal, the chosen approach, key constraints, and
@@ -342,7 +342,7 @@ You **MUST** consider the user input before proceeding (if not empty).
 
 ## Pre-Execution Checks
 
-**Check extension hooks (\`hooks.before_specify\` in \`.specflow/extensions.yml\`)**:
+**Check extension hooks (\`hooks.before_specify\` in \`.specnaut/extensions.yml\`)**:
 Skip silently if the file is absent or unparseable. For each enabled entry
 (treat missing \`enabled\` as \`true\`) without a non-empty \`condition\`, emit:
 
@@ -378,7 +378,7 @@ the chain after it):
      - \`n\` / \`no\` / anything else interpreted as no → \`CHAIN_SHAPE =
        full\`.
 
-3. **Persist the chosen shape** to \`.specflow/feature.json\` (when
+3. **Persist the chosen shape** to \`.specnaut/feature.json\` (when
    step 3 of the Outline below writes that file, include
    \`"workflow_shape": "lite"\` or \`"workflow_shape": "full"\` alongside
    \`feature_directory\` and \`linked_issue\`).
@@ -408,26 +408,26 @@ Given that feature description, do this:
 
 3. **Create the spec feature directory**:
 
-   Specs live under \`.specflow/specs/\` unless the user provides \`SPECIFY_FEATURE_DIRECTORY\`.
+   Specs live under \`.specnaut/specs/\` unless the user provides \`SPECIFY_FEATURE_DIRECTORY\`.
 
    **Resolution order for \`SPECIFY_FEATURE_DIRECTORY\`**:
    1. If the user explicitly provided it, use as-is.
-   2. Otherwise auto-generate under \`.specflow/specs/\`:
-      - Check \`.specflow/init-options.json\` for \`branch_numbering\`
+   2. Otherwise auto-generate under \`.specnaut/specs/\`:
+      - Check \`.specnaut/init-options.json\` for \`branch_numbering\`
       - \`"timestamp"\`: prefix is \`YYYYMMDD-HHMMSS\`
       - \`"sequential"\` or absent: prefix is \`NNN\` (next available 3-digit number)
       - Construct: \`<prefix>-<short-name>\` (e.g., \`003-user-auth\`)
-      - Set \`SPECIFY_FEATURE_DIRECTORY\` to \`.specflow/specs/<directory-name>\`
+      - Set \`SPECIFY_FEATURE_DIRECTORY\` to \`.specnaut/specs/<directory-name>\`
 
    **Create the directory and spec file**:
    - \`mkdir -p SPECIFY_FEATURE_DIRECTORY\`
    - Copy \`templates/spec-template.md\` to \`SPECIFY_FEATURE_DIRECTORY/spec.md\`
    - Set \`SPEC_FILE\` to \`SPECIFY_FEATURE_DIRECTORY/spec.md\`
-   - Persist to \`.specflow/feature.json\`:
+   - Persist to \`.specnaut/feature.json\`:
      \`\`\`json
      { "feature_directory": "<resolved feature dir>", "linked_issue": <N or null>, "workflow_shape": "<lite|full>" }
      \`\`\`
-     Write the actual resolved path (e.g., \`.specflow/specs/003-user-auth\`), not the literal string.
+     Write the actual resolved path (e.g., \`.specnaut/specs/003-user-auth\`), not the literal string.
      This lets downstream commands (\`/specnaut plan\`, \`/specnaut tasks\`, etc.) locate the feature directory.
 
      **\`linked_issue\`**: when the user invokes \`/specnaut specify\` with \`--issue <id>\` (or the
@@ -518,7 +518,7 @@ Given that feature description, do this:
      Transition wording is a statement (\`✓ specify complete — proceeding
      to <next>\`), never a question.
 
-9. **Check extension hooks (\`hooks.after_specify\` in \`.specflow/extensions.yml\`)**:
+9. **Check extension hooks (\`hooks.after_specify\` in \`.specnaut/extensions.yml\`)**:
    Same rules as Pre-Execution Checks. For each executable hook emit:
 
    - \`optional: true\` → \`## Extension Hooks\` block with \`**Optional Hook**: {extension}\`, command, description, prompt.
@@ -574,7 +574,7 @@ You **MUST** consider the user input before proceeding (if not empty).
 
 ## Pre-Execution Checks
 
-**Check extension hooks (\`hooks.before_clarify\` in \`.specflow/extensions.yml\`)**:
+**Check extension hooks (\`hooks.before_clarify\` in \`.specnaut/extensions.yml\`)**:
 Skip silently if the file is absent or unparseable. For each enabled entry
 (treat missing \`enabled\` as \`true\`) without a non-empty \`condition\`, emit:
 
@@ -721,7 +721,7 @@ Context for prioritization: {ARGS}
 
 ## Post-Execution Checks
 
-**Check extension hooks (\`hooks.after_clarify\` in \`.specflow/extensions.yml\`)**:
+**Check extension hooks (\`hooks.after_clarify\` in \`.specnaut/extensions.yml\`)**:
 Skip silently if the file is absent or unparseable. For each enabled entry
 (treat missing \`enabled\` as \`true\`) without a non-empty \`condition\`, emit:
 
@@ -752,7 +752,7 @@ You **MUST** consider the user input before proceeding (if not empty).
 ## Pre-Execution Checks
 
 **Check for extension hooks (before planning)**:
-- Check if \`.specflow/extensions.yml\` exists in the project root.
+- Check if \`.specnaut/extensions.yml\` exists in the project root.
 - If it exists, read it and look for entries under the \`hooks.before_plan\` key
 - If the YAML cannot be parsed or is invalid, skip hook checking silently and continue normally
 - Filter out hooks where \`enabled\` is explicitly \`false\`. Treat hooks without an \`enabled\` field as enabled by default.
@@ -781,7 +781,7 @@ You **MUST** consider the user input before proceeding (if not empty).
 
     Wait for the result of the hook command before proceeding to the Outline.
     \`\`\`
-- If no hooks are registered or \`.specflow/extensions.yml\` does not exist, skip silently
+- If no hooks are registered or \`.specnaut/extensions.yml\` does not exist, skip silently
 
 ## Outline
 
@@ -800,7 +800,7 @@ You **MUST** consider the user input before proceeding (if not empty).
 
 4. **Stop and report**: Command ends after Phase 2 planning. Report branch, IMPL_PLAN path, and generated artifacts. (In remote mode the chain raises a \`plan_approval\` gate before \`tasks\` — see \`phases/auto-chain.md\` "Plan approval checkpoint".)
 
-5. **Check for extension hooks**: After reporting, check if \`.specflow/extensions.yml\` exists in the project root.
+5. **Check for extension hooks**: After reporting, check if \`.specnaut/extensions.yml\` exists in the project root.
    - If it exists, read it and look for entries under the \`hooks.after_plan\` key
    - If the YAML cannot be parsed or is invalid, skip hook checking silently and continue normally
    - Filter out hooks where \`enabled\` is explicitly \`false\`. Treat hooks without an \`enabled\` field as enabled by default.
@@ -827,7 +827,7 @@ You **MUST** consider the user input before proceeding (if not empty).
        Executing: \`/{command}\`
        EXECUTE_COMMAND: {command}
        \`\`\`
-   - If no hooks are registered or \`.specflow/extensions.yml\` does not exist, skip silently
+   - If no hooks are registered or \`.specnaut/extensions.yml\` does not exist, skip silently
 
 ## Phases
 
@@ -899,7 +899,7 @@ You **MUST** consider the user input before proceeding (if not empty).
 ## Pre-Execution Checks
 
 **Check for extension hooks (before tasks generation)**:
-- Check if \`.specflow/extensions.yml\` exists in the project root.
+- Check if \`.specnaut/extensions.yml\` exists in the project root.
 - If it exists, read it and look for entries under the \`hooks.before_tasks\` key
 - If the YAML cannot be parsed or is invalid, skip hook checking silently and continue normally
 - Filter out hooks where \`enabled\` is explicitly \`false\`. Treat hooks without an \`enabled\` field as enabled by default.
@@ -928,7 +928,7 @@ You **MUST** consider the user input before proceeding (if not empty).
     
     Wait for the result of the hook command before proceeding to the Outline.
     \`\`\`
-- If no hooks are registered or \`.specflow/extensions.yml\` does not exist, skip silently
+- If no hooks are registered or \`.specnaut/extensions.yml\` does not exist, skip silently
 
 ## Outline
 
@@ -971,7 +971,7 @@ You **MUST** consider the user input before proceeding (if not empty).
    - Suggested MVP scope (typically just User Story 1)
    - Format validation: Confirm ALL tasks follow the checklist format (checkbox, ID, labels, file paths)
 
-6. **Check for extension hooks**: After tasks.md is generated, check if \`.specflow/extensions.yml\` exists in the project root.
+6. **Check for extension hooks**: After tasks.md is generated, check if \`.specnaut/extensions.yml\` exists in the project root.
    - If it exists, read it and look for entries under the \`hooks.after_tasks\` key
    - If the YAML cannot be parsed or is invalid, skip hook checking silently and continue normally
    - Filter out hooks where \`enabled\` is explicitly \`false\`. Treat hooks without an \`enabled\` field as enabled by default.
@@ -998,7 +998,7 @@ You **MUST** consider the user input before proceeding (if not empty).
        Executing: \`/{command}\`
        EXECUTE_COMMAND: {command}
        \`\`\`
-   - If no hooks are registered or \`.specflow/extensions.yml\` does not exist, skip silently
+   - If no hooks are registered or \`.specnaut/extensions.yml\` does not exist, skip silently
 
 Context for task generation: {ARGS}
 
@@ -1096,7 +1096,7 @@ You **MUST** consider the user input before proceeding (if not empty).
 ## Pre-Execution Checks
 
 **Check for extension hooks (before analysis)**:
-- Check if \`.specflow/extensions.yml\` exists in the project root.
+- Check if \`.specnaut/extensions.yml\` exists in the project root.
 - If it exists, read it and look for entries under the \`hooks.before_analyze\` key
 - If the YAML cannot be parsed or is invalid, skip hook checking silently and continue normally
 - Filter out hooks where \`enabled\` is explicitly \`false\`. Treat hooks without an \`enabled\` field as enabled by default.
@@ -1125,7 +1125,7 @@ You **MUST** consider the user input before proceeding (if not empty).
 
     Wait for the result of the hook command before proceeding to the Goal.
     \`\`\`
-- If no hooks are registered or \`.specflow/extensions.yml\` does not exist, skip silently
+- If no hooks are registered or \`.specnaut/extensions.yml\` does not exist, skip silently
 
 ## Goal
 
@@ -1281,7 +1281,7 @@ Ask the user: "Would you like me to suggest concrete remediation edits for the t
 
 ### 9. Check for extension hooks
 
-After reporting, check if \`.specflow/extensions.yml\` exists in the project root.
+After reporting, check if \`.specnaut/extensions.yml\` exists in the project root.
 - If it exists, read it and look for entries under the \`hooks.after_analyze\` key
 - If the YAML cannot be parsed or is invalid, skip hook checking silently and continue normally
 - Filter out hooks where \`enabled\` is explicitly \`false\`. Treat hooks without an \`enabled\` field as enabled by default.
@@ -1308,7 +1308,7 @@ After reporting, check if \`.specflow/extensions.yml\` exists in the project roo
     Executing: \`/{command}\`
     EXECUTE_COMMAND: {command}
     \`\`\`
-- If no hooks are registered or \`.specflow/extensions.yml\` does not exist, skip silently
+- If no hooks are registered or \`.specnaut/extensions.yml\` does not exist, skip silently
 
 ## Operating Principles
 
@@ -1351,7 +1351,7 @@ You **MUST** consider the user input before proceeding (if not empty).
 ## Pre-Execution Checks
 
 **Check for extension hooks (before implementation)**:
-- Check if \`.specflow/extensions.yml\` exists in the project root.
+- Check if \`.specnaut/extensions.yml\` exists in the project root.
 - If it exists, read it and look for entries under the \`hooks.before_implement\` key
 - If the YAML cannot be parsed or is invalid, skip hook checking silently and continue normally
 - Filter out hooks where \`enabled\` is explicitly \`false\`. Treat hooks without an \`enabled\` field as enabled by default.
@@ -1380,7 +1380,7 @@ You **MUST** consider the user input before proceeding (if not empty).
     
     Wait for the result of the hook command before proceeding to the Outline.
     \`\`\`
-- If no hooks are registered or \`.specflow/extensions.yml\` does not exist, skip silently
+- If no hooks are registered or \`.specnaut/extensions.yml\` does not exist, skip silently
 
 ## Outline
 
@@ -1507,7 +1507,7 @@ You **MUST** consider the user input before proceeding (if not empty).
 
 Note: This command assumes a complete task breakdown exists in tasks.md. If tasks are incomplete or missing, suggest running \`/specnaut tasks\` first to regenerate the task list.
 
-10. **Check for extension hooks**: After completion validation, check if \`.specflow/extensions.yml\` exists in the project root.
+10. **Check for extension hooks**: After completion validation, check if \`.specnaut/extensions.yml\` exists in the project root.
     - If it exists, read it and look for entries under the \`hooks.after_implement\` key
     - If the YAML cannot be parsed or is invalid, skip hook checking silently and continue normally
     - Filter out hooks where \`enabled\` is explicitly \`false\`. Treat hooks without an \`enabled\` field as enabled by default.
@@ -1534,7 +1534,7 @@ Note: This command assumes a complete task breakdown exists in tasks.md. If task
         Executing: \`/{command}\`
         EXECUTE_COMMAND: {command}
         \`\`\`
-    - If no hooks are registered or \`.specflow/extensions.yml\` does not exist, skip silently
+    - If no hooks are registered or \`.specnaut/extensions.yml\` does not exist, skip silently
 `,
     executable: false,
     backend: null,
@@ -1566,7 +1566,7 @@ Spawn the \`review-coordinator\` agent with the list of changed files. It in tur
 spawns:
 
 - \`code-reviewer\` (always) — architecture, DRY, YAGNI, readability, alignment
-  with \`.specflow/memory/constitution.md\`.
+  with \`.specnaut/memory/constitution.md\`.
 - \`security-auditor\` (always) — input validation, auth/authz, secret handling,
   SQL/command injection, path traversal, silent catches that swallow errors.
 - \`test-reviewer\` (if test files are in the diff) — adequacy of coverage, test
@@ -1666,18 +1666,18 @@ If Overall = PASS, surface the STOP #2 summary block defined in
 6. Print the merge summary (files changed, commits merged).
 7. Ask the user: "Push to origin <base>? (yes/no)". Do NOT auto-push.
 8. **Close the linked backlog issue** (only if push happened and \`feature.json.linked_issue\` is set):
-   1. Read \`.specflow/feature.json\`. Extract \`linked_issue\` (\`jq -r '.linked_issue // empty'\`).
+   1. Read \`.specnaut/feature.json\`. Extract \`linked_issue\` (\`jq -r '.linked_issue // empty'\`).
       If absent / null / empty, skip the rest of step 8 silently — no backlog backend wiring
       to act on.
-   2. Detect the backend by checking \`.specflow/installed.lock\` (\`backlog_backend: <local|github|gitlab>\`)
-      or, equivalently, the presence of \`.specflow/backlog-config.yml\` (github/gitlab) vs
-      \`.specflow/backlog.md\` (local).
-   3. **github + gitlab only** — run \`bash .specflow/scripts/backlog/cascade-check.sh <linked_issue>\`.
+   2. Detect the backend by checking \`.specnaut/installed.lock\` (\`backlog_backend: <local|github|gitlab>\`)
+      or, equivalently, the presence of \`.specnaut/backlog-config.yml\` (github/gitlab) vs
+      \`.specnaut/backlog.md\` (local).
+   3. **github + gitlab only** — run \`bash .specnaut/scripts/backlog/cascade-check.sh <linked_issue>\`.
       Exit 11 means the parent has open sub-issues; do NOT close. Report the open children to the
       user and stop (the issue stays in \`In progress\` / \`Ready\` until the children are closed).
    4. Ask the user: "Close issue #<linked_issue> on the board now? (yes/no)". On \`no\`, skip the
       rest of step 8 — leave the column flip to a future run or to a manual \`move.sh\`.
-   5. On \`yes\`, run \`bash .specflow/scripts/backlog/move.sh <linked_issue> Done\`. This is the
+   5. On \`yes\`, run \`bash .specnaut/scripts/backlog/move.sh <linked_issue> Done\`. This is the
       mechanical column flip — \`move.sh\` is idempotent and the working contract permits the merge
       phase to call it directly (the PO retains exclusive ownership of the close + comment, not
       the column move).
@@ -1721,7 +1721,7 @@ You **MUST** consider the user input before proceeding (if not empty).
 ## Pre-Execution Checks
 
 **Check for extension hooks (before constitution update)**:
-- Check if \`.specflow/extensions.yml\` exists in the project root.
+- Check if \`.specnaut/extensions.yml\` exists in the project root.
 - If it exists, read it and look for entries under the \`hooks.before_constitution\` key
 - If the YAML cannot be parsed or is invalid, skip hook checking silently and continue normally
 - Filter out hooks where \`enabled\` is explicitly \`false\`. Treat hooks without an \`enabled\` field as enabled by default.
@@ -1750,17 +1750,17 @@ You **MUST** consider the user input before proceeding (if not empty).
 
     Wait for the result of the hook command before proceeding to the Outline.
     \`\`\`
-- If no hooks are registered or \`.specflow/extensions.yml\` does not exist, skip silently
+- If no hooks are registered or \`.specnaut/extensions.yml\` does not exist, skip silently
 
 ## Outline
 
-You are updating the project constitution at \`.specflow/memory/constitution.md\`. This file is a TEMPLATE containing placeholder tokens in square brackets (e.g. \`[PROJECT_NAME]\`, \`[PRINCIPLE_1_NAME]\`). Your job is to (a) collect/derive concrete values, (b) fill the template precisely, and (c) propagate any amendments across dependent artifacts.
+You are updating the project constitution at \`.specnaut/memory/constitution.md\`. This file is a TEMPLATE containing placeholder tokens in square brackets (e.g. \`[PROJECT_NAME]\`, \`[PRINCIPLE_1_NAME]\`). Your job is to (a) collect/derive concrete values, (b) fill the template precisely, and (c) propagate any amendments across dependent artifacts.
 
-**Note**: If \`.specflow/memory/constitution.md\` does not exist yet, it should have been initialized from \`.specflow/templates/constitution-template.md\` during project setup. If it's missing, copy the template first.
+**Note**: If \`.specnaut/memory/constitution.md\` does not exist yet, it should have been initialized from \`.specnaut/templates/constitution-template.md\` during project setup. If it's missing, copy the template first.
 
 Follow this execution flow:
 
-1. Load the existing constitution at \`.specflow/memory/constitution.md\`.
+1. Load the existing constitution at \`.specnaut/memory/constitution.md\`.
    - Identify every placeholder token of the form \`[ALL_CAPS_IDENTIFIER]\`.
    **IMPORTANT**: The user might require less or more principles than the ones used in the template. If a number is specified, respect that - follow the general template. You will update the doc accordingly.
 
@@ -1781,10 +1781,10 @@ Follow this execution flow:
    - Ensure Governance section lists amendment procedure, versioning policy, and compliance review expectations.
 
 4. Consistency propagation checklist (convert prior checklist into active validations):
-   - Read \`.specflow/templates/plan-template.md\` and ensure any "Constitution Check" or rules align with updated principles.
-   - Read \`.specflow/templates/spec-template.md\` for scope/requirements alignment—update if constitution adds/removes mandatory sections or constraints.
-   - Read \`.specflow/templates/tasks-template.md\` and ensure task categorization reflects new or removed principle-driven task types (e.g., observability, versioning, testing discipline).
-   - Read each command file in \`.specflow/templates/commands/*.md\` (including this one) to verify no outdated references (agent-specific names like CLAUDE only) remain when generic guidance is required.
+   - Read \`.specnaut/templates/plan-template.md\` and ensure any "Constitution Check" or rules align with updated principles.
+   - Read \`.specnaut/templates/spec-template.md\` for scope/requirements alignment—update if constitution adds/removes mandatory sections or constraints.
+   - Read \`.specnaut/templates/tasks-template.md\` and ensure task categorization reflects new or removed principle-driven task types (e.g., observability, versioning, testing discipline).
+   - Read each command file in \`.specnaut/templates/commands/*.md\` (including this one) to verify no outdated references (agent-specific names like CLAUDE only) remain when generic guidance is required.
    - Read any runtime guidance docs (e.g., \`README.md\`, \`docs/quickstart.md\`, or agent-specific guidance files if present). Update references to principles changed.
 
 5. Produce a Sync Impact Report (prepend as an HTML comment at top of the constitution file after update):
@@ -1801,7 +1801,7 @@ Follow this execution flow:
    - Dates ISO format YYYY-MM-DD.
    - Principles are declarative, testable, and free of vague language ("should" → replace with MUST/SHOULD rationale where appropriate).
 
-7. Write the completed constitution back to \`.specflow/memory/constitution.md\` (overwrite).
+7. Write the completed constitution back to \`.specnaut/memory/constitution.md\` (overwrite).
 
 8. Output a final summary to the user with:
    - New version and bump rationale.
@@ -1819,12 +1819,12 @@ If the user supplies partial updates (e.g., only one principle revision), still 
 
 If critical info missing (e.g., ratification date truly unknown), insert \`TODO(<FIELD_NAME>): explanation\` and include in the Sync Impact Report under deferred items.
 
-Do not create a new template; always operate on the existing \`.specflow/memory/constitution.md\` file.
+Do not create a new template; always operate on the existing \`.specnaut/memory/constitution.md\` file.
 
 ## Post-Execution Checks
 
 **Check for extension hooks (after constitution update)**:
-Check if \`.specflow/extensions.yml\` exists in the project root.
+Check if \`.specnaut/extensions.yml\` exists in the project root.
 - If it exists, read it and look for entries under the \`hooks.after_constitution\` key
 - If the YAML cannot be parsed or is invalid, skip hook checking silently and continue normally
 - Filter out hooks where \`enabled\` is explicitly \`false\`. Treat hooks without an \`enabled\` field as enabled by default.
@@ -1851,7 +1851,7 @@ Check if \`.specflow/extensions.yml\` exists in the project root.
     Executing: \`/{command}\`
     EXECUTE_COMMAND: {command}
     \`\`\`
-- If no hooks are registered or \`.specflow/extensions.yml\` does not exist, skip silently
+- If no hooks are registered or \`.specnaut/extensions.yml\` does not exist, skip silently
 `,
     executable: false,
     backend: null,
@@ -1883,7 +1883,7 @@ You **MUST** consider the user input before proceeding (if not empty).
 
 ## Pre-Execution Checks
 
-**Check extension hooks (\`hooks.before_checklist\` in \`.specflow/extensions.yml\`)**:
+**Check extension hooks (\`hooks.before_checklist\` in \`.specnaut/extensions.yml\`)**:
 Skip silently if the file is absent or unparseable. For each enabled entry
 (treat missing \`enabled\` as \`true\`) without a non-empty \`condition\`, emit:
 
@@ -2014,7 +2014,7 @@ Key differences: Wrong tests if the system *works*; Correct tests if requirement
 
 ## Post-Execution Checks
 
-**Check extension hooks (\`hooks.after_checklist\` in \`.specflow/extensions.yml\`)**:
+**Check extension hooks (\`hooks.after_checklist\` in \`.specnaut/extensions.yml\`)**:
 Skip silently if the file is absent or unparseable. For each enabled entry
 (treat missing \`enabled\` as \`true\`) without a non-empty \`condition\`, emit:
 
@@ -2152,7 +2152,7 @@ the field. Do NOT also apply the label — double-writing creates drift.
 
 ##### GitHub backend
 
-Use the bundled scripts at \`.specflow/scripts/backlog/\`:
+Use the bundled scripts at \`.specnaut/scripts/backlog/\`:
 
 - \`detect-fields.sh\` — emits eval-friendly env lines listing the
   \`Priority\` / \`Size\` field IDs and option IDs (case-insensitive name
@@ -2206,7 +2206,7 @@ This step is read-only; do not mutate PRs.
 
 ### 3. Orphan spec detection
 
-Walk \`.specflow/specs/\` (if present) and surface any feature directory
+Walk \`.specnaut/specs/\` (if present) and surface any feature directory
 that is missing the next expected artefact:
 
 - Has \`spec.md\` but no \`plan.md\` → flag as "needs \`/specnaut plan\`".
@@ -2306,7 +2306,7 @@ this project at \`specnaut init\`** (one of SemVer \`v1.2.3\` or date-based
 The bundled script does all the work:
 
 \`\`\`bash
-bash .specflow/scripts/release/tag.sh "\$@"
+bash .specnaut/scripts/release/tag.sh "\$@"
 \`\`\`
 
 What the script does:
@@ -2385,7 +2385,7 @@ release-body Markdown to stdout, with one section per non-empty
 Conventional-Commits bucket. Run it like this:
 
 \`\`\`bash
-bash .specflow/scripts/release/release.sh "\$@"
+bash .specnaut/scripts/release/release.sh "\$@"
 \`\`\`
 
 ## Buckets (fixed order, empty buckets omitted)
@@ -2414,10 +2414,10 @@ If the project ships releases on GitHub, the bundled
 \`release-github.sh\` wrapper is the one-command path:
 
 \`\`\`bash
-bash .specflow/scripts/release/release-github.sh           # latest tag
-bash .specflow/scripts/release/release-github.sh v1.2.3    # specific tag
-bash .specflow/scripts/release/release-github.sh --draft   # create as draft
-bash .specflow/scripts/release/release-github.sh \\
+bash .specnaut/scripts/release/release-github.sh           # latest tag
+bash .specnaut/scripts/release/release-github.sh v1.2.3    # specific tag
+bash .specnaut/scripts/release/release-github.sh --draft   # create as draft
+bash .specnaut/scripts/release/release-github.sh \\
   --baseline v1.0.0 v1.2.3                                 # override baseline
 \`\`\`
 
@@ -2444,9 +2444,9 @@ If the project ships releases on GitLab, the bundled \`release-gitlab.sh\`
 wrapper mirrors the GitHub one:
 
 \`\`\`bash
-bash .specflow/scripts/release/release-gitlab.sh           # latest tag
-bash .specflow/scripts/release/release-gitlab.sh v1.2.3    # specific tag
-bash .specflow/scripts/release/release-gitlab.sh \\
+bash .specnaut/scripts/release/release-gitlab.sh           # latest tag
+bash .specnaut/scripts/release/release-gitlab.sh v1.2.3    # specific tag
+bash .specnaut/scripts/release/release-gitlab.sh \\
   --baseline v1.0.0 v1.2.3                                 # override baseline
 \`\`\`
 
@@ -2462,9 +2462,9 @@ paste into any release UI), the bundled \`release-local.sh\` wrapper
 writes the categorized body to a file in the current directory:
 
 \`\`\`bash
-bash .specflow/scripts/release/release-local.sh             # latest tag → RELEASE_NOTES_<tag>.md
-bash .specflow/scripts/release/release-local.sh v1.2.3      # specific tag
-bash .specflow/scripts/release/release-local.sh --out NOTES.md v1.2.3
+bash .specnaut/scripts/release/release-local.sh             # latest tag → RELEASE_NOTES_<tag>.md
+bash .specnaut/scripts/release/release-local.sh v1.2.3      # specific tag
+bash .specnaut/scripts/release/release-local.sh --out NOTES.md v1.2.3
 \`\`\`
 
 No remote API calls, no auth, no tag pushing. The output file is the
@@ -2478,7 +2478,7 @@ Capture \`release.sh\` output and feed it into whatever your pipeline
 expects:
 
 \`\`\`bash
-BODY=\$(bash .specflow/scripts/release/release.sh v1.2.3)
+BODY=\$(bash .specnaut/scripts/release/release.sh v1.2.3)
 # … hand \`\$BODY\` to your custom publisher
 \`\`\`
 
@@ -2668,11 +2668,11 @@ identically to the full chain.
 - Otherwise, \`phases/specify.md\` scores the brief against
   \`phases/lite-heuristic.md\`. If the score crosses the threshold, the
   user is prompted once; if not, full chain runs silently.
-- The chosen shape is persisted to \`.specflow/feature.json\` as
+- The chosen shape is persisted to \`.specnaut/feature.json\` as
   \`workflow_shape: "lite" | "full"\`.
 
 At every chain transition below, read \`workflow_shape\` from
-\`.specflow/feature.json\`. When the field is absent (legacy
+\`.specnaut/feature.json\`. When the field is absent (legacy
 \`feature.json\`), treat as \`"full"\`.
 
 ## Per-phase behavior
@@ -2683,7 +2683,7 @@ for next step?" prompt. A one-line \`✓ <phase> complete — proceeding to <nex
 log is sufficient.
 
 The **next phase** depends on the chain shape recorded in
-\`.specflow/feature.json\` (\`workflow_shape\`):
+\`.specnaut/feature.json\` (\`workflow_shape\`):
 
 | Current phase | Next (full) | Next (lite) |
 |---|---|---|
@@ -2782,7 +2782,7 @@ context-aware default:
   single phase (regenerate \`plan.md\` after a tweak, re-analyse after a
   spec edit). Do NOT cascade.
 
-"Downstream artefacts" means files under \`.specflow/specs/<feature>/\`
+"Downstream artefacts" means files under \`.specnaut/specs/<feature>/\`
 produced by phases AFTER the one being invoked:
 
 | Invoked phase | Downstream artefacts to check |
@@ -3625,7 +3625,7 @@ Reject any other argument with: \`error: unknown argument <token> — accepted: 
    - Lockfiles (\`package-lock.json\`, \`pnpm-lock.yaml\`, \`yarn.lock\`,
      \`poetry.lock\`, \`uv.lock\`, \`Cargo.lock\`, \`composer.lock\`,
      \`Gemfile.lock\`, \`go.sum\`, \`deno.lock\`)
-   - License allowlist override (\`.specflow/license-allowlist.txt\`) if
+   - License allowlist override (\`.specnaut/license-allowlist.txt\`) if
      present
    - Source files by language extension — used to verify declared deps
      are actually imported (axis 3, unused-dep detection)
@@ -3717,7 +3717,7 @@ Codebase: <root>
 Severity floor: <high|medium|low|critical>
 Findings: N (Critical: X · High: Y · Medium: Z · Low: W)
 Manifests: <one line — "package.json, deno.json">
-License allowlist: <"default (8 SPDX ids)" | "default + .specflow/license-allowlist.txt (N more)">
+License allowlist: <"default (8 SPDX ids)" | "default + .specnaut/license-allowlist.txt (N more)">
 Report:   docs/specnaut/audits/YYYY-MM-DD-dependencies.md
 Read-only: ✓ (git status clean except for the report file)
 
@@ -3802,7 +3802,7 @@ score.
 - \`AGENTS.md\`, \`README.md\`, \`CLAUDE.md\`, \`CHANGELOG.md\`
 - Any \`.md\` path token
 - \`docs/...\`, \`docs/\`
-- \`.specflow/...\` (the workspace docs surface)
+- \`.specnaut/...\` (the workspace docs surface)
 
 ### Verb hints
 
@@ -3857,7 +3857,7 @@ validation. The expected routing for each:
 The router's \`--lite\` and \`--full\` flags force the shape directly and
 **skip this heuristic entirely**. See \`SKILL.md\` step 1 "Chain shape
 parsing". When forced, no prompt is emitted; the chosen shape is
-persisted to \`.specflow/feature.json\` (\`workflow_shape\`) and the
+persisted to \`.specnaut/feature.json\` (\`workflow_shape\`) and the
 spec.md frontmatter (\`workflow:\`).
 `,
     executable: false,
@@ -4541,7 +4541,7 @@ Do **not** use when:
 
 \`docs/specnaut/plans/YYYY-MM-DD-<feature-name>.md\`
 
-User preference overrides this default (some teams prefer \`.specflow/plans/\`
+User preference overrides this default (some teams prefer \`.specnaut/plans/\`
 or \`docs/plans/\` — honor what they ask for). The date prefix gives plans
 a natural chronological order in the directory listing.
 
@@ -5120,7 +5120,7 @@ not re-read the file with \`Read\`.
 | \`brainstorming\` | Spec-discovery entry point when the idea is vague — one question at a time, propose 2-3 approaches, present design, hand off to \`writing-plans\`. |
 | \`code-audit\` | User wants a broad, multi-seat health-check ("audit the codebase", "code audit", "audit the last N commits"). Resolves a scope, dispatches the applicable auditor seats (architecture / security / performance / a11y / dependency) in parallel, synthesizes one report. Read-only. Complementary to \`/specnaut audit <axis>\`, which runs a single axis. |
 | \`arch-audit\` / \`sec-audit\` / \`perf-audit\` / \`dep-audit\` / \`a11y-audit\` | Per-axis audit family — user wants **one** lens over a scope ("arch audit", "security audit \`--path src/\`", "perf audit \`--diff\`"). Each resolves a uniform scope (\`--path\` / \`--range\` / \`--diff\` / whole) and dispatches its **single** bound auditor (architecture / security / performance / dependency / a11y), returning findings **inline**. Read-only, writes no report. Complements \`/specnaut audit <axis>\` (which persists a dated report) and \`/code-audit\` (the multi-seat team). |
-| \`status-audit\` | User wants a health check of a running multi-agent session ("status audit", "audit the session", "what's blocked", "session health"). Reads the \`.specflow/logs/agents.jsonl\` status ledger and reports seven views (state counts / per-agent latest / blocked / stale ≥15m / done-vs-criteria contradictions / missing handoffs / verdict summary). Read-only. Pair with \`/loop 5m /status-audit\` to supervise long headless work. |
+| \`status-audit\` | User wants a health check of a running multi-agent session ("status audit", "audit the session", "what's blocked", "session health"). Reads the \`.specnaut/logs/agents.jsonl\` status ledger and reports seven views (state counts / per-agent latest / blocked / stale ≥15m / done-vs-criteria contradictions / missing handoffs / verdict summary). Read-only. Pair with \`/loop 5m /status-audit\` to supervise long headless work. |
 | \`backlog\` | User asked about a backlog item, the board, an issue. Read-only access; mutations go through the \`product-owner\` agent. |
 | \`specnaut-auto\` | Auto-chain orchestration (legacy entry point — most users invoke \`/specnaut specify\` instead). |
 | \`specnaut-review\` | Auto-invoke alias preserved for the \`/specnaut review\` phase. |
@@ -6009,7 +6009,7 @@ Do **not** use when:
 - The work is a one-line fix — just do it
 - The user explicitly asked for the spec-kit greenfield flow (use
   \`/specnaut specify\` instead — that's a heavier ceremony that
-  produces \`.specflow/specs/<feature>/spec.md\` for multi-month
+  produces \`.specnaut/specs/<feature>/spec.md\` for multi-month
   features)
 
 ## Announce at start
@@ -6036,7 +6036,7 @@ discipline.
 Before asking the user anything:
 
 - Read recent commits with \`git log --oneline -20\`
-- Check \`AGENTS.md\` and \`.specflow/memory/constitution.md\` for project
+- Check \`AGENTS.md\` and \`.specnaut/memory/constitution.md\` for project
   principles
 - Skim the existing skill / agent registry via \`using-specnaut\` if not
   already loaded
@@ -6125,7 +6125,7 @@ unrelated refactoring.
 Save the validated design (spec) to a location appropriate for the
 project:
 
-- **Greenfield spec-kit features** — \`.specflow/specs/<feature-id>/spec.md\`
+- **Greenfield spec-kit features** — \`.specnaut/specs/<feature-id>/spec.md\`
   (this is the spec-kit convention; \`/specnaut specify\` lives in this
   same space)
 - **Issue-driven brownfield work** — \`docs/specnaut/specs/YYYY-MM-DD-<topic>.md\`
@@ -6191,7 +6191,7 @@ Specnaut has TWO entry points for design work:
 | Entry | Use when |
 |---|---|
 | \`brainstorming\` skill (this) | Issue is vague, idea is fresh, design needs discovery via clarifying questions. Produces a markdown spec doc and hands off to \`writing-plans\`. |
-| \`/specnaut specify\` (spec-kit) | Greenfield multi-week feature with formal contracts. Produces \`.specflow/specs/<feature>/spec.md\` + auto-chains to \`/specnaut plan\` (research, data-model, contracts, quickstart artefacts). |
+| \`/specnaut specify\` (spec-kit) | Greenfield multi-week feature with formal contracts. Produces \`.specnaut/specs/<feature>/spec.md\` + auto-chains to \`/specnaut plan\` (research, data-model, contracts, quickstart artefacts). |
 
 If you're not sure which to use: start with \`brainstorming\`. If the
 discussion reveals the design needs spec-kit ceremony (formal contracts,
@@ -6454,8 +6454,8 @@ argument-hint: [list|next|add|update|estimate|status|groom|brief] [args]
 The product-owner agent reads and writes the backlog directly to whichever
 backend the project uses. When the backend is local Markdown:
 
-- Index: \`.specflow/backlog.md\`
-- Task files: \`.specflow/backlog/NNN-slug.md\`
+- Index: \`.specnaut/backlog.md\`
+- Task files: \`.specnaut/backlog/NNN-slug.md\`
 
 When the backend is remote (GitHub Issues + Project V2, GitLab, etc.) the
 agent talks to that backend directly — the CLI does not push or pull on
@@ -6506,7 +6506,7 @@ for business context and backlog management.
 
 Run these in order, every time before answering:
 
-1. Locate yourself (\`git branch --show-current\` + \`git log --oneline -5\`) and read \`AGENTS.md\` + \`.specflow/memory/constitution.md\` for context.
+1. Locate yourself (\`git branch --show-current\` + \`git log --oneline -5\`) and read \`AGENTS.md\` + \`.specnaut/memory/constitution.md\` for context.
 2. Read \`.claude/agents/product-owner/memory/MEMORY.md\` — your persistent
    memory home. **Never** write to \`.claude/agent-memory/\`; that path is unused.
 3. Query the live backlog (\`gh issue list\` / \`list.sh\`) before answering
@@ -6556,10 +6556,10 @@ Persistence failures on hard axes MUST appear as \`⚠ classification incomplete
 
 A project uses exactly one backend. Detect at session start:
 
-- \`.specflow/backlog-config.yml\` with \`api_url\` + \`project_key\` → **Specnaut
+- \`.specnaut/backlog-config.yml\` with \`api_url\` + \`project_key\` → **Specnaut
   Cloud** (hosted Kanban over a versioned HTTP API).
-- \`.specflow/backlog.md\` index file exists → **local Markdown**.
-- No \`.specflow/backlog.md\`, but \`gh auth status\` healthy + remote tracker
+- \`.specnaut/backlog.md\` index file exists → **local Markdown**.
+- No \`.specnaut/backlog.md\`, but \`gh auth status\` healthy + remote tracker
   in \`AGENTS.md\` → **GitHub**.
 
 If more than one signal is present, ask the user which is canonical before
@@ -6567,8 +6567,8 @@ mutating anything.
 
 ### Local Markdown layout
 
-- Index: \`.specflow/backlog.md\` (checklist, grouped by priority)
-- Task files: \`.specflow/backlog/NNN-slug.md\`
+- Index: \`.specnaut/backlog.md\` (checklist, grouped by priority)
+- Task files: \`.specnaut/backlog/NNN-slug.md\`
 
 ### GitHub layout
 
@@ -6676,7 +6676,7 @@ Total > 7 → critical, 5–7 → high, 3–5 → medium, < 3 → low.
 
 ### \`/backlog\` or \`/backlog list\`
 
-Display the backlog. Local: render \`.specflow/backlog.md\` (recompose
+Display the backlog. Local: render \`.specnaut/backlog.md\` (recompose
 from task files if the index drifted). GitHub: list issues grouped by
 priority / project status.
 
@@ -6688,8 +6688,8 @@ pts), exact start command. Skip sub-tasks whose parent epic isn't ready.
 
 ### \`/backlog add <title>\`
 
-Create a new task. Local: write \`.specflow/backlog/NNN-slug.md\` with full
-frontmatter and update \`.specflow/backlog.md\`. GitHub: \`gh issue create\`
+Create a new task. Local: write \`.specnaut/backlog/NNN-slug.md\` with full
+frontmatter and update \`.specnaut/backlog.md\`. GitHub: \`gh issue create\`
 with labels + project assignment. Ask clarifying questions as needed.
 Sub-task phrasing ("child of #042" / "subtask of …"): set the parent link
 on creation (frontmatter \`parent: "#042"\` locally, sub-issue API on GitHub).
@@ -6744,7 +6744,7 @@ before estimating epic completion or reporting progress.
   moves / closes / field-sets in the fewest requests (one multi-alias
   \`gh api graphql\` / REST batch), never call-by-call; native field/type
   over a duplicate \`priority:*\`/\`size:*\` label. Detail: \`/backlog\` skill.
-- Always update \`.specflow/backlog.md\` after any local task-file change.
+- Always update \`.specnaut/backlog.md\` after any local task-file change.
 - Never delete task files — change status to \`done\` or \`deferred\`.
 - Use Fibonacci for complexity (1, 2, 3, 5, 8, 13, 21 only).
 - Justify every priority change.
@@ -6791,7 +6791,7 @@ architecture.
 ## First action in every session
 
 1. Read \`AGENTS.md\` at the project root to learn the tech stack and rules.
-2. Read \`.specflow/memory/constitution.md\` for non-negotiable invariants —
+2. Read \`.specnaut/memory/constitution.md\` for non-negotiable invariants —
    especially the **Engineering methodology**, **Architecture layers**,
    **Back-end patterns**, and **Front-end patterns** sections.
 3. Read the current feature's \`spec.md\`, \`plan.md\`, and \`tasks.md\` if a
@@ -7013,7 +7013,7 @@ explore the rest of the codebase unless strictly necessary for context.
 
 ## Always-check rules
 
-1. **Constitution compliance**: read \`.specflow/memory/constitution.md\` first.
+1. **Constitution compliance**: read \`.specnaut/memory/constitution.md\` first.
    Any violation is at least HIGH severity.
 2. **Silent error handling**: any \`catch\` block that swallows the error (empty
    body, comment-only, or discards the error object) is CRITICAL.
@@ -7396,7 +7396,7 @@ between "the code compiles" and "the user sees a green dashboard at 3 a.m."
 ## First action in every session
 
 1. Read \`AGENTS.md\` at the project root for tech stack and constraints.
-2. Read \`.specflow/memory/constitution.md\` for non-negotiable invariants
+2. Read \`.specnaut/memory/constitution.md\` for non-negotiable invariants
    (often where SLOs, error budgets, and security posture live).
 3. Identify which cloud(s) the project targets (GCP, Azure, AWS, multi-cloud)
    and which IaC tool is canonical (Terraform, Pulumi, OpenTofu, CDK).
@@ -7529,7 +7529,7 @@ news on demand. You do not modify code; you serve knowledge.
      a command, do not intercept; defer to the relevant skill.
 
 2. If you need the user's installed Specnaut version, read it from
-   \`.specflow/installed.lock\` (key \`specnaut_version\` or
+   \`.specnaut/installed.lock\` (key \`specnaut_version\` or
    \`templates_version\`). Never guess.
 
 3. Answer in the user's conversation language (typically French or
@@ -7566,7 +7566,7 @@ auto-route triggers in your \`description\` ("how does specnaut X",
 it on a manual \`/specnaut-expert\` invocation whose question does not
 match those triggers — silence beats noise.
 
-1. Read \`.specflow/installed.lock\` and extract the \`templates_version\`
+1. Read \`.specnaut/installed.lock\` and extract the \`templates_version\`
    field. If the file is absent or unreadable, skip silently.
 2. \`WebFetch\` \`https://specnaut.makerlabs.dev/version.json\`. Expect
    \`{"version": "X.Y.Z", "released_at": "YYYY-MM-DD"}\`. On any
@@ -7602,7 +7602,7 @@ When the user asks to file a bug ("report this", "open an issue",
 auto-submit.** Always show the body; user clicks the link.
 
 **Body**: 6 sections — \`## Summary\` / \`## Reproduction\` / \`## Observed\` / \`## Expected\` /
-\`## Environment\` / \`## Logs\`. Auto-fill Environment from \`.specflow/installed.lock\`
+\`## Environment\` / \`## Logs\`. Auto-fill Environment from \`.specnaut/installed.lock\`
 (\`templates_version\`, \`harness\`, \`backlog_backend\`), \`specnaut --version\`, \`uname -srm\`.
 
 If WebFetch on the repo's \`bug.md\` issue template succeeds, prefer it; fall back to the 6
@@ -7628,7 +7628,7 @@ Trigger: dispatch message contains the keyword \`review-upgrade\`.
 
 ### 1. Read marker
 
-Read \`.specflow/upgrade-pending.json\`. If absent, respond:
+Read \`.specnaut/upgrade-pending.json\`. If absent, respond:
 
 > No recent upgrade marker. Run \`specnaut upgrade\` first, then dispatch me again with
 > \`review-upgrade\`.
@@ -7664,13 +7664,13 @@ Run \`specnaut reconcile --status\`, parse JSON. For each pending path: show dif
 
 - \`k\`: \`specnaut reconcile <path> --accept-current\`; commit \`chore(reconcile): keep local <path>\`.
 - \`t\`: \`specnaut reconcile <path> --accept-upstream\`; commit \`chore(reconcile): take upstream <path>\`.
-- \`m\`: dispatch \`developer\` to merge local + \`.specflow/upgrade-staging/<path>\`; then \`specnaut reconcile <path> --accept-current\`; commit \`chore(reconcile): merge upstream into <path>\`.
-- \`v\`: \`diff -u <path> .specflow/upgrade-staging/<path>\`, re-prompt with k/t/m/s.
+- \`m\`: dispatch \`developer\` to merge local + \`.specnaut/upgrade-staging/<path>\`; then \`specnaut reconcile <path> --accept-current\`; commit \`chore(reconcile): merge upstream into <path>\`.
+- \`v\`: \`diff -u <path> .specnaut/upgrade-staging/<path>\`, re-prompt with k/t/m/s.
 - \`s\`: leave untouched; resurfaces next \`review-upgrade\`.
 
 ### 7. Cleanup
 
-Both walks complete with nothing skipped: delete \`.specflow/upgrade-pending.json\`; if on review branch, final commit \`chore: complete specnaut upgrade review v{from} → v{to}\`. Tell user to open a PR. If anything was skipped, leave marker + staging and tell user to resume with \`review-upgrade\`.
+Both walks complete with nothing skipped: delete \`.specnaut/upgrade-pending.json\`; if on review branch, final commit \`chore: complete specnaut upgrade review v{from} → v{to}\`. Tell user to open a PR. If anything was skipped, leave marker + staging and tell user to resume with \`review-upgrade\`.
 
 ## Vendored knowledge snapshot
 
@@ -7691,7 +7691,7 @@ Enhanced fork of [\`specify\` CLI](https://github.com/github/spec-kit), distribu
 ### Commands
 
 - \`specnaut init [--here] [--ai <harness>] [--backlog <backend>] [--backlog-url <url>]\` — scaffold the project.
-- \`specnaut upgrade\` — refresh templates. On apply writes \`.specflow/upgrade-pending.json\` (\`{from,to,at}\`) + staging dir (\`.specflow/upgrade-staging/<path>\`, consumed by \`specnaut reconcile\`); both removed after successful \`review-upgrade\` walk. Prints \`@specnaut-expert review-upgrade\` handoff.
+- \`specnaut upgrade\` — refresh templates. On apply writes \`.specnaut/upgrade-pending.json\` (\`{from,to,at}\`) + staging dir (\`.specnaut/upgrade-staging/<path>\`, consumed by \`specnaut reconcile\`); both removed after successful \`review-upgrade\` walk. Prints \`@specnaut-expert review-upgrade\` handoff.
 - \`specnaut reconcile --status\` — list files pending post-upgrade reconciliation as JSON.
 - \`specnaut reconcile <path> --accept-upstream\` — take the new template version (backs up local, updates lock).
 - \`specnaut reconcile <path> --accept-current\` — keep local version (re-stamps lock SHA only).
@@ -8538,7 +8538,7 @@ format (Mode 1 — PR review)" below).
 3. **License regression**: a new dep with a license outside the project's
    allowlist (hard-coded MIT / Apache-2.0 / BSD-2-Clause / BSD-3-Clause /
    ISC / Unlicense / 0BSD / CC0, or whatever is in
-   \`.specflow/license-allowlist.txt\` if it exists). CRITICAL for GPL /
+   \`.specnaut/license-allowlist.txt\` if it exists). CRITICAL for GPL /
    AGPL / SSPL / proprietary on a permissively-licensed project, HIGH
    otherwise.
 4. **Typosquat heuristic**: a new dep name that's a one-character edit
@@ -8603,7 +8603,7 @@ Default allowlist (hard-coded, SPDX identifiers):
 MIT, Apache-2.0, BSD-2-Clause, BSD-3-Clause, ISC, Unlicense, 0BSD, CC0
 \`\`\`
 
-If \`.specflow/license-allowlist.txt\` exists at the project root, read it
+If \`.specnaut/license-allowlist.txt\` exists at the project root, read it
 and MERGE its entries (one SPDX identifier per line, \`#\`-prefixed lines
 are comments) with the default list. The merged set is the project's
 effective allowlist. A license that's neither in the default nor in the
@@ -8665,7 +8665,7 @@ Write a Markdown document with these EXACT sections in this order
 - Total findings: N (Critical: X · High: Y · Medium: Z · Low: W)
 - Manifests detected: <one line — "package.json, deno.json">
 - Severity floor: <critical|high|medium|low>
-- License allowlist source: <"default (8 SPDX ids)" | "default + .specflow/license-allowlist.txt (N additional)">
+- License allowlist source: <"default (8 SPDX ids)" | "default + .specnaut/license-allowlist.txt (N additional)">
 
 ## Critical
 
@@ -8890,7 +8890,7 @@ survive across sessions and isn't captured elsewhere:
 
 ## When NOT to add an entry
 
-- Architecture decisions → those go in \`AGENTS.md\` or \`.specflow/memory/constitution.md\`.
+- Architecture decisions → those go in \`AGENTS.md\` or \`.specnaut/memory/constitution.md\`.
 - One-off bug fixes that are captured in the commit message → no memory
   needed.
 - Anything the developer can re-derive by reading the current code.
@@ -8980,7 +8980,7 @@ should survive across sessions and isn't captured elsewhere:
 
 - IaC / pipeline definitions → those live in the actual config files.
 - Architecture choices → those go in \`AGENTS.md\` or
-  \`.specflow/memory/constitution.md\`.
+  \`.specnaut/memory/constitution.md\`.
 - One-off incidents that are fully resolved with no recurring risk → no
   memory needed.
 
@@ -9079,7 +9079,7 @@ should switch to the new entry point.
     suffix: null,
     content: `---
 name: backlog
-description: Manage this project's backlog — add, list, view, move, and clarify items. The backend is fixed at init time and recorded in \`.specflow/installed.lock\`. Run \`specnaut upgrade --backlog <new>\` to switch.
+description: Manage this project's backlog — add, list, view, move, and clarify items. The backend is fixed at init time and recorded in \`.specnaut/installed.lock\`. Run \`specnaut upgrade --backlog <new>\` to switch.
 argument-hint: [list|next|add|update|estimate|status|groom|brief] [args]
 ---
 
@@ -9097,29 +9097,29 @@ The main session does **not** run the scripts directly. Dispatch the
 bodies, moving status, closing. The PO is the single owner of the backlog
 lifecycle (see \`.claude/agents/product-owner.md\`).
 
-The scripts under \`.specflow/scripts/backlog/\` are the toolbox the PO
+The scripts under \`.specnaut/scripts/backlog/\` are the toolbox the PO
 uses. The main session may call the read-only ones (\`list.sh\`, \`view.sh\`)
 to inspect state, but every write goes through the PO.
 
 <!-- BEGIN: backend=local -->
 ## Backend: local Markdown files
 
-This project's backlog lives entirely on disk under \`.specflow/\`. No remote
+This project's backlog lives entirely on disk under \`.specnaut/\`. No remote
 service required.
 
 | Path | Purpose |
 |---|---|
-| \`.specflow/backlog.md\` | Top-level index — one line per item with status |
-| \`.specflow/backlog/<NNN>-<slug>.md\` | One file per item (frontmatter + body) |
+| \`.specnaut/backlog.md\` | Top-level index — one line per item with status |
+| \`.specnaut/backlog/<NNN>-<slug>.md\` | One file per item (frontmatter + body) |
 
 ### Scripts (preferred path)
 
 \`\`\`bash
-.specflow/scripts/backlog/list.sh [Status]            # all items, optional Status filter
-.specflow/scripts/backlog/view.sh <number>            # one item + body
-.specflow/scripts/backlog/add.sh "<title>" [body]     # create new item, auto-numbered
-.specflow/scripts/backlog/move.sh <number> <Status>   # Backlog|Ready|In progress|In review|Done
-.specflow/scripts/backlog/clarify-comment.sh <num> "<question>"
+.specnaut/scripts/backlog/list.sh [Status]            # all items, optional Status filter
+.specnaut/scripts/backlog/view.sh <number>            # one item + body
+.specnaut/scripts/backlog/add.sh "<title>" [body]     # create new item, auto-numbered
+.specnaut/scripts/backlog/move.sh <number> <Status>   # Backlog|Ready|In progress|In review|Done
+.specnaut/scripts/backlog/clarify-comment.sh <num> "<question>"
 \`\`\`
 
 ### Conventions
@@ -9138,14 +9138,14 @@ service required.
 ## Backend: GitHub Issues + Project
 
 This project's backlog lives on a GitHub Project linked to issues in the
-configured repo. Configuration is read from \`.specflow/backlog-config.yml\`
+configured repo. Configuration is read from \`.specnaut/backlog-config.yml\`
 at runtime — fill in \`repo\` and \`project_number\` before running any
 mutation.
 
 ### Configuration file
 
 \`\`\`yaml
-# .specflow/backlog-config.yml
+# .specnaut/backlog-config.yml
 repo: myorg/myproject              # GitHub repo (owner/name)
 project_number: 4                   # GitHub Project V2 number
 project_node_id: ""                 # cached on first run
@@ -9196,19 +9196,19 @@ Two ways to enable the GitHub MCP:
 
 #### B. Shell scripts — always available
 
-The \`gh\` CLI scripts under \`.specflow/scripts/backlog/\` are scaffolded
+The \`gh\` CLI scripts under \`.specnaut/scripts/backlog/\` are scaffolded
 unconditionally and work without MCP. They wrap \`gh issue\` / \`gh
 project\` calls and read configuration from \`backlog-config.yml\`.
 
 \`\`\`bash
-.specflow/scripts/backlog/list.sh [Status]            # all items, optional Status filter
-.specflow/scripts/backlog/view.sh <number>            # one issue + comments
-.specflow/scripts/backlog/add.sh "<title>" [body] [labels-csv]
-.specflow/scripts/backlog/move.sh <number> <Status>   # sets Project Status field
-.specflow/scripts/backlog/clarify-comment.sh <num> "<question>"
-.specflow/scripts/backlog/detect-fields.sh                                 # discover native Priority/Size single-select fields → env lines
-.specflow/scripts/backlog/set-field.sh <num> <Priority|Size|IssueType> <value>  # set the native Project V2 field / org Issue Type; exit codes 10/11/12 signal label fallback
-.specflow/scripts/backlog/ensure-labels.sh                                 # idempotently bootstrap the 7 Specnaut semantic labels (security/refactor/docs/tech-debt/dx/performance/dependency)
+.specnaut/scripts/backlog/list.sh [Status]            # all items, optional Status filter
+.specnaut/scripts/backlog/view.sh <number>            # one issue + comments
+.specnaut/scripts/backlog/add.sh "<title>" [body] [labels-csv]
+.specnaut/scripts/backlog/move.sh <number> <Status>   # sets Project Status field
+.specnaut/scripts/backlog/clarify-comment.sh <num> "<question>"
+.specnaut/scripts/backlog/detect-fields.sh                                 # discover native Priority/Size single-select fields → env lines
+.specnaut/scripts/backlog/set-field.sh <num> <Priority|Size|IssueType> <value>  # set the native Project V2 field / org Issue Type; exit codes 10/11/12 signal label fallback
+.specnaut/scripts/backlog/ensure-labels.sh                                 # idempotently bootstrap the 7 Specnaut semantic labels (security/refactor/docs/tech-debt/dx/performance/dependency)
 \`\`\`
 
 For closing or editing, use \`gh\` directly:
@@ -9280,13 +9280,13 @@ GitLab doesn't have a Project Status field equivalent to GitHub's
 Projects V2 — scoped labels are the canonical way to model kanban-
 style state on GitLab.
 
-Configuration is read from \`.specflow/backlog-config.yml\` at runtime —
+Configuration is read from \`.specnaut/backlog-config.yml\` at runtime —
 fill in \`host\` and \`project_id\` before running any mutation.
 
 ### Configuration file
 
 \`\`\`yaml
-# .specflow/backlog-config.yml
+# .specnaut/backlog-config.yml
 host: gitlab.com         # or your self-hosted instance
 project_id: ""           # numeric id (e.g. "12345") or path "group/project"
 \`\`\`
@@ -9294,11 +9294,11 @@ project_id: ""           # numeric id (e.g. "12345") or path "group/project"
 ### Scripts (preferred path)
 
 \`\`\`bash
-.specflow/scripts/backlog/list.sh [Status]            # all issues, optional Status:: filter
-.specflow/scripts/backlog/view.sh <number>            # one issue + comments
-.specflow/scripts/backlog/add.sh "<title>" [body] [labels-csv]
-.specflow/scripts/backlog/move.sh <number> <Status>   # swaps the Status:: label
-.specflow/scripts/backlog/clarify-comment.sh <num> "<question>"
+.specnaut/scripts/backlog/list.sh [Status]            # all issues, optional Status:: filter
+.specnaut/scripts/backlog/view.sh <number>            # one issue + comments
+.specnaut/scripts/backlog/add.sh "<title>" [body] [labels-csv]
+.specnaut/scripts/backlog/move.sh <number> <Status>   # swaps the Status:: label
+.specnaut/scripts/backlog/clarify-comment.sh <num> "<question>"
 \`\`\`
 
 For closing or editing, use \`glab\` directly:
@@ -9337,13 +9337,13 @@ The first time the PO runs against this project, it will create the 5
 
 This project's backlog lives on **Specnaut Cloud** — a hosted, real-time Kanban
 board reached over a small HTTP API. No \`gh\`/\`glab\` CLI and no GitHub/GitLab
-rate limits. Configuration is read from \`.specflow/backlog-config.yml\` at
+rate limits. Configuration is read from \`.specnaut/backlog-config.yml\` at
 runtime.
 
 ### Configuration file
 
 \`\`\`yaml
-# .specflow/backlog-config.yml
+# .specnaut/backlog-config.yml
 backend: cloud
 api_url: https://your-deployment.convex.site   # Specnaut Cloud API base
 project_key: CLOUD                              # the project's short key
@@ -9351,20 +9351,20 @@ project_key: CLOUD                              # the project's short key
 
 **No token is stored here.** Credentials are obtained by \`specnaut cloud login\`
 (an interactive browser device-authorization flow) and kept in the OS keychain
-(or a \`0600\` file under \`~/.specflow\`). They refresh transparently. For CI /
+(or a \`0600\` file under \`~/.specnaut\`). They refresh transparently. For CI /
 headless runs, set \`SPECNAUT_CLOUD_TOKEN\` to a Cloud API token instead of
 logging in.
 
 ### Scripts
 
 \`\`\`bash
-.specflow/scripts/backlog/list.sh [Status]            # all tasks (status = column), optional filter
-.specflow/scripts/backlog/view.sh <number>            # one task (status, priority, size, body)
-.specflow/scripts/backlog/add.sh "<title>" [body]     # create a task → returns KEY-N
-.specflow/scripts/backlog/move.sh <number> <Status>   # Backlog|Ready|"In Progress"|"In Review"|Done
-.specflow/scripts/backlog/clarify-comment.sh <number> "<question>"
-.specflow/scripts/backlog/columns.sh                  # live board column layout (order + name)
-.specflow/scripts/backlog/reconcile.sh [--reset|--seek-end] [--limit N]  # drain stage transitions
+.specnaut/scripts/backlog/list.sh [Status]            # all tasks (status = column), optional filter
+.specnaut/scripts/backlog/view.sh <number>            # one task (status, priority, size, body)
+.specnaut/scripts/backlog/add.sh "<title>" [body]     # create a task → returns KEY-N
+.specnaut/scripts/backlog/move.sh <number> <Status>   # Backlog|Ready|"In Progress"|"In Review"|Done
+.specnaut/scripts/backlog/clarify-comment.sh <number> "<question>"
+.specnaut/scripts/backlog/columns.sh                  # live board column layout (order + name)
+.specnaut/scripts/backlog/reconcile.sh [--reset|--seek-end] [--limit N]  # drain stage transitions
 \`\`\`
 
 The scripts get a fresh access token from \`specnaut cloud token\` (which refreshes
@@ -9374,7 +9374,7 @@ to \`<api_url>/api/v1/\` (\`/tasks\`, \`/columns\`, \`/activity\`). \`move.sh\` 
 server-side. \`columns.sh\` reads the board's real columns (renames/reorders are
 reflected with no code change). \`reconcile.sh\` is the **poll/reconcile** feed:
 it asks \`/activity\` for every stage transition newer than a stored per-project
-cursor (\`.specflow/.cloud-cursor-<KEY>\`), prints one line per transition, and
+cursor (\`.specnaut/.cloud-cursor-<KEY>\`), prints one line per transition, and
 advances the cursor — the product-owner consumes those lines and runs the
 matching stage hook (see \`product-owner.md\` → "Cloud stage reconcile").
 
@@ -9424,7 +9424,7 @@ contract is the same: parents cannot close while any child is open.
 
 | Backend | Parent → child link | Discoverability |
 |---|---|---|
-| local | \`parent: "#NNN"\` in the child's frontmatter, plus a \`## Sub-tasks\` cross-link added to the parent file's body | \`grep -l 'parent: "#042"' .specflow/backlog/*.md\` lists every child of #042 |
+| local | \`parent: "#NNN"\` in the child's frontmatter, plus a \`## Sub-tasks\` cross-link added to the parent file's body | \`grep -l 'parent: "#042"' .specnaut/backlog/*.md\` lists every child of #042 |
 | github | Native sub-issues API (\`gh api -X POST .../issues/<parent>/sub_issues\`) | Project V2 boards render the children automatically under the parent's \`Sub-issues progress\` field |
 | gitlab | Scoped label \`parent::#NNN\` on the child (Free-tier compatible; native Epics are Premium-only) | \`glab issue list --label "parent::#042" --opened\` lists every child of #042 |
 
@@ -9461,11 +9461,11 @@ epic") and either auto-decomposes or proposes a concrete sub-task list
     name: "list",
     suffix: "list.sh",
     content: `#!/usr/bin/env bash
-# List backlog items from .specflow/backlog/. Optional Status filter.
+# List backlog items from .specnaut/backlog/. Optional Status filter.
 set -euo pipefail
 
 ROOT="\$(cd "\$(dirname "\$0")/../../.." && pwd)"
-BACKLOG_DIR="\$ROOT/.specflow/backlog"
+BACKLOG_DIR="\$ROOT/.specnaut/backlog"
 FILTER="\${1:-}"
 
 if [ ! -d "\$BACKLOG_DIR" ]; then
@@ -9501,7 +9501,7 @@ if [ "\$#" -lt 1 ]; then
 fi
 NUM=\$(printf "%03d" "\$1" 2>/dev/null || echo "\$1")
 ROOT="\$(cd "\$(dirname "\$0")/../../.." && pwd)"
-BACKLOG_DIR="\$ROOT/.specflow/backlog"
+BACKLOG_DIR="\$ROOT/.specnaut/backlog"
 
 shopt -s nullglob
 matches=("\$BACKLOG_DIR/\$NUM-"*.md)
@@ -9565,8 +9565,8 @@ TITLE="\${ARGS[0]}"
 BODY="\${ARGS[1]:-}"
 
 ROOT="\$(cd "\$(dirname "\$0")/../../.." && pwd)"
-BACKLOG_DIR="\$ROOT/.specflow/backlog"
-INDEX="\$ROOT/.specflow/backlog.md"
+BACKLOG_DIR="\$ROOT/.specnaut/backlog"
+INDEX="\$ROOT/.specnaut/backlog.md"
 RENDER="\$(dirname "\$0")/render-index.sh"
 mkdir -p "\$BACKLOG_DIR"
 
@@ -9677,7 +9677,7 @@ case "\$STATUS" in
 esac
 
 ROOT="\$(cd "\$(dirname "\$0")/../../.." && pwd)"
-BACKLOG_DIR="\$ROOT/.specflow/backlog"
+BACKLOG_DIR="\$ROOT/.specnaut/backlog"
 RENDER="\$(dirname "\$0")/render-index.sh"
 
 shopt -s nullglob
@@ -9731,7 +9731,7 @@ NUM=\$(printf "%03d" "\$1" 2>/dev/null || echo "\$1")
 QUESTION="\$2"
 
 ROOT="\$(cd "\$(dirname "\$0")/../../.." && pwd)"
-BACKLOG_DIR="\$ROOT/.specflow/backlog"
+BACKLOG_DIR="\$ROOT/.specnaut/backlog"
 
 shopt -s nullglob
 matches=("\$BACKLOG_DIR/\$NUM-"*.md)
@@ -9760,15 +9760,15 @@ echo "✓ added clarification on #\$NUM"
     name: "render-index",
     suffix: "render-index.sh",
     content: `#!/usr/bin/env bash
-# Regenerate .specflow/backlog.md from the per-item files in
-# .specflow/backlog/. Items are grouped by their \`status:\` frontmatter
+# Regenerate .specnaut/backlog.md from the per-item files in
+# .specnaut/backlog/. Items are grouped by their \`status:\` frontmatter
 # field into the 5 standard columns.
 # Usage: render-index.sh [<project-root>]
 set -euo pipefail
 
 ROOT="\${1:-\$(cd "\$(dirname "\$0")/../../.." && pwd)}"
-BACKLOG_DIR="\$ROOT/.specflow/backlog"
-INDEX="\$ROOT/.specflow/backlog.md"
+BACKLOG_DIR="\$ROOT/.specnaut/backlog"
+INDEX="\$ROOT/.specnaut/backlog.md"
 
 # Collect (status \\t line) pairs by reading each item's frontmatter.
 # Sort by item number within each status by relying on filename order.
@@ -9820,7 +9820,7 @@ emit_section() {
 # Backlog
 
 > Managed by the Product Owner agent (\`/backlog\`). Each task is one
-> file under \`.specflow/backlog/NNN-slug.md\` with frontmatter; this
+> file under \`.specnaut/backlog/NNN-slug.md\` with frontmatter; this
 > index lists items grouped by status column.
 
 The 5 status columns mirror the GitHub Projects "kanban" model:
@@ -9835,7 +9835,7 @@ The 5 status columns mirror the GitHub Projects "kanban" model:
   prune as needed).
 
 Size and priority live in each item's frontmatter (see
-\`.specflow/backlog/NNN-*.md\`):
+\`.specnaut/backlog/NNN-*.md\`):
 
 \`\`\`yaml
 ---
@@ -9921,9 +9921,9 @@ if [ "\$NEW_STATUS" = "Backlog" ]; then
 fi
 
 SCRIPT_DIR="\$(cd "\$(dirname "\$0")" && pwd)"
-# Deployed layout: <root>/.specflow/scripts/backlog/<this>.sh — up 3.
+# Deployed layout: <root>/.specnaut/scripts/backlog/<this>.sh — up 3.
 ROOT="\$(cd "\$SCRIPT_DIR/../../.." && pwd)"
-BACKLOG_DIR="\$ROOT/.specflow/backlog"
+BACKLOG_DIR="\$ROOT/.specnaut/backlog"
 
 if [ ! -d "\$BACKLOG_DIR" ]; then
   echo "::warning::propagate-parent-status: backlog dir not found at \$BACKLOG_DIR — skipping" >&2
@@ -10054,12 +10054,12 @@ exit 0
     name: "_config",
     suffix: "_config.sh",
     content: `#!/usr/bin/env bash
-# Helper: read repo + project_number from .specflow/backlog-config.yml.
+# Helper: read repo + project_number from .specnaut/backlog-config.yml.
 # Sourced by the other github-backend scripts.
 set -euo pipefail
 
 ROOT="\$(cd "\$(dirname "\$0")/../../.." && pwd)"
-CONFIG="\$ROOT/.specflow/backlog-config.yml"
+CONFIG="\$ROOT/.specnaut/backlog-config.yml"
 
 if [ ! -f "\$CONFIG" ]; then
   echo "error: \$CONFIG not found. Fill in repo + project_number first." >&2
@@ -10970,12 +10970,12 @@ exit 0
     name: "_config",
     suffix: "_config.sh",
     content: `#!/usr/bin/env bash
-# Helper: read host + project_id from .specflow/backlog-config.yml.
+# Helper: read host + project_id from .specnaut/backlog-config.yml.
 # Sourced by the other gitlab-backend scripts.
 set -euo pipefail
 
 ROOT="\$(cd "\$(dirname "\$0")/../../.." && pwd)"
-CONFIG="\$ROOT/.specflow/backlog-config.yml"
+CONFIG="\$ROOT/.specnaut/backlog-config.yml"
 
 if [ ! -f "\$CONFIG" ]; then
   echo "error: \$CONFIG not found. Fill in host + project_id first." >&2
@@ -11340,17 +11340,17 @@ exit 0
     name: "_config",
     suffix: "_config.sh",
     content: `#!/usr/bin/env bash
-# Helper: read api_url + project_key from .specflow/backlog-config.yml and get a
+# Helper: read api_url + project_key from .specnaut/backlog-config.yml and get a
 # fresh access token from \`specnaut cloud token\`. Sourced by the other
 # cloud-backend scripts. Exports API_BASE (…/api/v1) + API_TOKEN.
 #
 # Credentials are NOT stored in backlog-config.yml — they live in the OS keychain
-# (or ~/.specflow/credentials.json). Run \`specnaut cloud login\` once to
+# (or ~/.specnaut/credentials.json). Run \`specnaut cloud login\` once to
 # authenticate. For CI / headless, set SPECNAUT_CLOUD_TOKEN instead.
 set -euo pipefail
 
 ROOT="\$(cd "\$(dirname "\$0")/../../.." && pwd)"
-CONFIG="\$ROOT/.specflow/backlog-config.yml"
+CONFIG="\$ROOT/.specnaut/backlog-config.yml"
 
 if [ ! -f "\$CONFIG" ]; then
   echo "error: \$CONFIG not found. Run \\\`specnaut init --backlog cloud\\\` first." >&2
@@ -11619,7 +11619,7 @@ in a single parallel batch and synthesizes one verdict. The two are
 Run the bundled scope resolver and read its block:
 
 \`\`\`bash
-.specflow/scripts/code-audit/collect-audit-scope.sh [--path <subtree> | --range <a>..<b>] [--last <n>]
+.specnaut/scripts/code-audit/collect-audit-scope.sh [--path <subtree> | --range <a>..<b>] [--last <n>]
 \`\`\`
 
 Pass through whatever \`\$ARGUMENTS\` the user gave. With no arguments the script
@@ -11757,7 +11757,7 @@ this skill ever makes; the audited code is never touched.
 #   5. last-N               → HEAD~<N>..HEAD, N default 20, --last <n> overrides
 #                             (SCOPE: last-N)
 #
-# Contract: .specflow/specs/013-code-audit/contracts/scope-signals.md
+# Contract: .specnaut/specs/013-code-audit/contracts/scope-signals.md
 set -euo pipefail
 
 PATH_ARG=""
@@ -12411,25 +12411,25 @@ file.**
     suffix: null,
     content: `---
 name: status-audit
-description: Read-only health audit of a multi-agent session from the status ledger. Use when the user says "status audit", "audit the session", "how are the agents doing", "what's blocked", "session health", or when supervising long headless work with /loop. Reads .specflow/logs/agents.jsonl, derives each agent's current state from its latest entry, and reports seven health views. Writes nothing.
+description: Read-only health audit of a multi-agent session from the status ledger. Use when the user says "status audit", "audit the session", "how are the agents doing", "what's blocked", "session health", or when supervising long headless work with /loop. Reads .specnaut/logs/agents.jsonl, derives each agent's current state from its latest entry, and reports seven health views. Writes nothing.
 argument-hint: "[latest|<agent>|<session>]"
 ---
 
 # Status Audit — read-only session health report
 
 A **thin, read-only** audit of a running (or finished) multi-agent session. It
-reads the append-only status ledger at \`.specflow/logs/agents.jsonl\`, derives
+reads the append-only status ledger at \`.specnaut/logs/agents.jsonl\`, derives
 each agent's **current state** (its latest entry by \`ts\`), and reports seven
 health views. It writes **nothing** and mutates **no tracked files** —
 \`git status\` is unchanged after a run.
 
 The ledger is produced by the \`log-subagent.sh\` hook on every subagent
 start/stop. Each line is a JSON object; the schema lives at
-\`.specflow/logs/README.md\`.
+\`.specnaut/logs/README.md\`.
 
 ## Step 1 — Read the ledger
 
-Read \`.specflow/logs/agents.jsonl\`.
+Read \`.specnaut/logs/agents.jsonl\`.
 
 - **Absent** (file does not exist, or no entries) → report **"no ledger yet —
   no subagents have run in this project, or the \`log-subagent.sh\` hook is not
@@ -12443,7 +12443,7 @@ Read \`.specflow/logs/agents.jsonl\`.
 Each line carries the four base fields \`ts\` / \`event\` / \`session\` / \`agent\` and
 the OPTIONAL contract fields \`state\`, \`done_criteria_met\`, \`handoff_target\`,
 \`review_verdict\`, \`qa_verdict\` (omit-if-absent). Allowed values are in
-\`.specflow/logs/README.md\`.
+\`.specnaut/logs/README.md\`.
 
 ## Step 2 — Derive current state
 
@@ -12516,7 +12516,7 @@ Tune the interval to the cadence of the work (\`/loop 1m\` for tight loops,
     category: "spec-root",
     name: "specify",
     suffix: "logs/README.md",
-    content: `# Status ledger — \`.specflow/logs/agents.jsonl\`
+    content: `# Status ledger — \`.specnaut/logs/agents.jsonl\`
 
 This directory holds the **append-only status ledger** written by the
 \`log-subagent.sh\` hook on every subagent start/stop. Each subagent event
@@ -12615,7 +12615,7 @@ continuous supervision of long headless work, use \`/loop 5m /status-audit\`.
 > non-negotiable policies. Specflow commands and review agents read it at every step.
 >
 > Replace this placeholder with your own constitution. Use
-> \`.specflow/templates/constitution-template.md\` as a starting point.
+> \`.specnaut/templates/constitution-template.md\` as a starting point.
 
 ## Principles
 
@@ -12632,7 +12632,7 @@ continuous supervision of long headless work, use \`/loop 5m /status-audit\`.
     content: `# Backlog
 
 > Managed by the Product Owner agent (\`/backlog\`). Each task is one
-> file under \`.specflow/backlog/NNN-slug.md\` with frontmatter; this
+> file under \`.specnaut/backlog/NNN-slug.md\` with frontmatter; this
 > index lists items grouped by status column.
 
 The 5 status columns mirror the GitHub Projects "kanban" model:
@@ -12647,7 +12647,7 @@ The 5 status columns mirror the GitHub Projects "kanban" model:
   prune as needed).
 
 Size and priority live in each item's frontmatter (see
-\`.specflow/backlog/NNN-*.md\`):
+\`.specnaut/backlog/NNN-*.md\`):
 
 \`\`\`yaml
 ---
@@ -12715,7 +12715,7 @@ on top of this baseline if you need them.
 ### GitHub backend
 
 \`\`\`bash
-.specflow/scripts/backlog/ensure-labels.sh
+.specnaut/scripts/backlog/ensure-labels.sh
 \`\`\`
 
 Idempotent — creates only missing labels, never edits or deletes
@@ -12726,7 +12726,7 @@ to bring an existing repo into alignment).
 ### GitLab backend
 
 \`\`\`bash
-.specflow/scripts/backlog/ensure-labels.sh
+.specnaut/scripts/backlog/ensure-labels.sh
 \`\`\`
 
 Same shape as the GitHub helper. Uses \`glab label create\`.
@@ -12926,9 +12926,9 @@ above so projects that later migrate to a remote backend keep continuity.
     content: `# Implementation Plan: [FEATURE]
 
 **Branch**: \`[###-feature-name]\` | **Date**: [DATE] | **Spec**: [link]
-**Input**: Feature specification from \`/.specflow/specs/[###-feature-name]/spec.md\`
+**Input**: Feature specification from \`/.specnaut/specs/[###-feature-name]/spec.md\`
 
-**Note**: This template is filled in by the \`__SPECFLOW_COMMAND_PLAN__\` command. See \`.specflow/templates/plan-template.md\` for the execution workflow.
+**Note**: This template is filled in by the \`__SPECFLOW_COMMAND_PLAN__\` command. See \`.specnaut/templates/plan-template.md\` for the execution workflow.
 
 ## Summary
 
@@ -12963,7 +12963,7 @@ above so projects that later migrate to a remote backend keep continuity.
 ### Documentation (this feature)
 
 \`\`\`text
-.specflow/specs/[###-feature]/
+.specnaut/specs/[###-feature]/
 ├── plan.md              # This file (__SPECFLOW_COMMAND_PLAN__ command output)
 ├── research.md          # Phase 0 output (__SPECFLOW_COMMAND_PLAN__ command)
 ├── data-model.md        # Phase 1 output (__SPECFLOW_COMMAND_PLAN__ command)
@@ -13043,7 +13043,7 @@ description: "Task list template for feature implementation"
 
 # Tasks: [FEATURE NAME]
 
-**Input**: Design documents from \`/.specflow/specs/[###-feature-name]/\`
+**Input**: Design documents from \`/.specnaut/specs/[###-feature-name]/\`
 **Prerequisites**: plan.md (required), spec.md (required for user stories), research.md, data-model.md, contracts/
 
 **Tests**: The examples below include test tasks. Tests are OPTIONAL - only include them if explicitly requested in the feature specification.
@@ -13790,7 +13790,7 @@ get_current_branch() {
     fi
 
     # For non-git repos, try to find the latest feature directory
-    local specs_dir="\$repo_root/.specflow/specs"
+    local specs_dir="\$repo_root/.specnaut/specs"
 
     if [[ -d "\$specs_dir" ]]; then
         local latest_feature=""
@@ -13888,7 +13888,7 @@ find_feature_dir_by_prefix() {
     local repo_root="\$1"
     local branch_name
     branch_name=\$(spec_kit_effective_branch_name "\$2")
-    local specs_dir="\$repo_root/.specflow/specs"
+    local specs_dir="\$repo_root/.specnaut/specs"
 
     # Extract prefix from branch (e.g., "004" from "004-whatever" or "20260319-143022" from timestamp branches)
     local prefix=""
@@ -13902,7 +13902,7 @@ find_feature_dir_by_prefix() {
         return
     fi
 
-    # Search for directories in .specflow/specs/ that start with this prefix
+    # Search for directories in .specnaut/specs/ that start with this prefix
     local matches=()
     if [[ -d "\$specs_dir" ]]; then
         for dir in "\$specs_dir"/"\$prefix"-*; do
@@ -13938,23 +13938,23 @@ get_feature_paths() {
 
     # Resolve feature directory.  Priority:
     #   1. SPECIFY_FEATURE_DIRECTORY env var (explicit override)
-    #   2. .specflow/feature.json "feature_directory" key (persisted by /specflow specify)
+    #   2. .specnaut/feature.json "feature_directory" key (persisted by /specflow specify)
     #   3. Branch-name-based prefix lookup (legacy fallback)
     local feature_dir
     if [[ -n "\${SPECIFY_FEATURE_DIRECTORY:-}" ]]; then
         feature_dir="\$SPECIFY_FEATURE_DIRECTORY"
         # Normalize relative paths to absolute under repo root
         [[ "\$feature_dir" != /* ]] && feature_dir="\$repo_root/\$feature_dir"
-    elif [[ -f "\$repo_root/.specflow/feature.json" ]]; then
+    elif [[ -f "\$repo_root/.specnaut/feature.json" ]]; then
         local _fd
         if command -v jq >/dev/null 2>&1; then
-            _fd=\$(jq -r '.feature_directory // empty' "\$repo_root/.specflow/feature.json" 2>/dev/null)
+            _fd=\$(jq -r '.feature_directory // empty' "\$repo_root/.specnaut/feature.json" 2>/dev/null)
         elif command -v python3 >/dev/null 2>&1; then
             # Fallback: use Python to parse JSON so pretty-printed/multi-line files work
-            _fd=\$(python3 -c "import json,sys; d=json.load(open(sys.argv[1])); print(d.get('feature_directory',''))" "\$repo_root/.specflow/feature.json" 2>/dev/null)
+            _fd=\$(python3 -c "import json,sys; d=json.load(open(sys.argv[1])); print(d.get('feature_directory',''))" "\$repo_root/.specnaut/feature.json" 2>/dev/null)
         else
             # Last resort: single-line grep fallback (won't work on multi-line JSON)
-            _fd=\$(grep -o '"feature_directory"[[:space:]]*:[[:space:]]*"[^"]*"' "\$repo_root/.specflow/feature.json" 2>/dev/null | sed 's/.*"\\([^"]*\\)"\$/\\1/')
+            _fd=\$(grep -o '"feature_directory"[[:space:]]*:[[:space:]]*"[^"]*"' "\$repo_root/.specnaut/feature.json" 2>/dev/null | sed 's/.*"\\([^"]*\\)"\$/\\1/')
         fi
         if [[ -n "\$_fd" ]]; then
             feature_dir="\$_fd"
@@ -14021,21 +14021,21 @@ check_file() { [[ -f "\$1" ]] && echo "  ✓ \$2" || echo "  ✗ \$2"; }
 check_dir() { [[ -d "\$1" && -n \$(ls -A "\$1" 2>/dev/null) ]] && echo "  ✓ \$2" || echo "  ✗ \$2"; }
 
 # Resolve a template name to a file path using the priority stack:
-#   1. .specflow/templates/overrides/
-#   2. .specflow/presets/<preset-id>/templates/ (sorted by priority from .registry)
-#   3. .specflow/extensions/<ext-id>/templates/
-#   4. .specflow/templates/ (core)
+#   1. .specnaut/templates/overrides/
+#   2. .specnaut/presets/<preset-id>/templates/ (sorted by priority from .registry)
+#   3. .specnaut/extensions/<ext-id>/templates/
+#   4. .specnaut/templates/ (core)
 resolve_template() {
     local template_name="\$1"
     local repo_root="\$2"
-    local base="\$repo_root/.specflow/templates"
+    local base="\$repo_root/.specnaut/templates"
 
     # Priority 1: Project overrides
     local override="\$base/overrides/\${template_name}.md"
     [ -f "\$override" ] && echo "\$override" && return 0
 
     # Priority 2: Installed presets (sorted by priority from .registry)
-    local presets_dir="\$repo_root/.specflow/presets"
+    local presets_dir="\$repo_root/.specnaut/presets"
     if [ -d "\$presets_dir" ]; then
         local registry_file="\$presets_dir/.registry"
         if [ -f "\$registry_file" ] && command -v python3 >/dev/null 2>&1; then
@@ -14082,7 +14082,7 @@ except Exception:
     fi
 
     # Priority 3: Extension-provided templates
-    local ext_dir="\$repo_root/.specflow/extensions"
+    local ext_dir="\$repo_root/.specnaut/extensions"
     if [ -d "\$ext_dir" ]; then
         for ext in "\$ext_dir"/*/; do
             [ -d "\$ext" ] || continue
@@ -14112,7 +14112,7 @@ except Exception:
 resolve_template_content() {
     local template_name="\$1"
     local repo_root="\$2"
-    local base="\$repo_root/.specflow/templates"
+    local base="\$repo_root/.specnaut/templates"
 
     # Collect all layers (highest priority first)
     local -a layer_paths=()
@@ -14126,7 +14126,7 @@ resolve_template_content() {
     fi
 
     # Priority 2: Installed presets (sorted by priority from .registry)
-    local presets_dir="\$repo_root/.specflow/presets"
+    local presets_dir="\$repo_root/.specnaut/presets"
     if [ -d "\$presets_dir" ]; then
         local registry_file="\$presets_dir/.registry"
         local sorted_presets=""
@@ -14232,7 +14232,7 @@ except Exception:
     fi
 
     # Priority 3: Extension-provided templates (always "replace")
-    local ext_dir="\$repo_root/.specflow/extensions"
+    local ext_dir="\$repo_root/.specnaut/extensions"
     if [ -d "\$ext_dir" ]; then
         for ext in "\$ext_dir"/*/; do
             [ -d "\$ext" ] || continue
@@ -14417,7 +14417,7 @@ while [ \$i -le \$# ]; do
             echo "  --number N          Specify branch number manually (overrides auto-detection)"
             echo "  --timestamp         Use timestamp prefix (YYYYMMDD-HHMMSS) instead of sequential numbering"
             echo "  --issue <id>        Link this feature to a backlog issue (id is a positive integer);"
-            echo "                      surfaces in JSON output and is persisted to .specflow/feature.json"
+            echo "                      surfaces in JSON output and is persisted to .specnaut/feature.json"
             echo "                      so /specflow merge can close the loop on the project board."
             echo "  --help, -h          Show this help message"
             echo ""
@@ -14561,7 +14561,7 @@ fi
 
 cd "\$REPO_ROOT"
 
-SPECS_DIR="\$REPO_ROOT/.specflow/specs"
+SPECS_DIR="\$REPO_ROOT/.specnaut/specs"
 if [ "\$DRY_RUN" != true ]; then
     mkdir -p "\$SPECS_DIR"
 fi
@@ -15099,7 +15099,7 @@ function Get-CurrentBranch {
     }
 
     # For non-git repos, try to find the latest feature directory
-    \$specsDir = Join-Path \$repoRoot ".specflow" "specs"
+    \$specsDir = Join-Path \$repoRoot ".specnaut" "specs"
     
     if (Test-Path \$specsDir) {
         \$latestFeature = ""
@@ -15195,13 +15195,13 @@ function Test-FeatureBranch {
     return \$true
 }
 
-# Resolve .specflow/specs/<feature-dir> by numeric/timestamp prefix (mirrors scripts/bash/common.sh find_feature_dir_by_prefix).
+# Resolve .specnaut/specs/<feature-dir> by numeric/timestamp prefix (mirrors scripts/bash/common.sh find_feature_dir_by_prefix).
 function Find-FeatureDirByPrefix {
     param(
         [Parameter(Mandatory = \$true)][string]\$RepoRoot,
         [Parameter(Mandatory = \$true)][string]\$Branch
     )
-    \$specsDir = Join-Path \$RepoRoot '.specflow' 'specs'
+    \$specsDir = Join-Path \$RepoRoot '.specnaut' 'specs'
     \$branchName = Get-SpecflowEffectiveBranchName \$Branch
 
     \$prefix = \$null
@@ -15251,9 +15251,9 @@ function Get-FeaturePathsEnv {
 
     # Resolve feature directory.  Priority:
     #   1. SPECIFY_FEATURE_DIRECTORY env var (explicit override)
-    #   2. .specflow/feature.json "feature_directory" key (persisted by /specflow.specify)
+    #   2. .specnaut/feature.json "feature_directory" key (persisted by /specflow.specify)
     #   3. Branch-name-based prefix lookup (same as scripts/bash/common.sh)
-    \$featureJson = Join-Path \$repoRoot '.specflow/feature.json'
+    \$featureJson = Join-Path \$repoRoot '.specnaut/feature.json'
     if (\$env:SPECIFY_FEATURE_DIRECTORY) {
         \$featureDir = \$env:SPECIFY_FEATURE_DIRECTORY
         # Normalize relative paths to absolute under repo root
@@ -15265,7 +15265,7 @@ function Get-FeaturePathsEnv {
         try {
             \$featureConfig = \$featureJsonRaw | ConvertFrom-Json
         } catch {
-            [Console]::Error.WriteLine("ERROR: Failed to parse .specflow/feature.json: \$_")
+            [Console]::Error.WriteLine("ERROR: Failed to parse .specnaut/feature.json: \$_")
             exit 1
         }
         if (\$featureConfig.feature_directory) {
@@ -15334,24 +15334,24 @@ function Get-Python3Command {
 }
 
 # Resolve a template name to a file path using the priority stack:
-#   1. .specflow/templates/overrides/
-#   2. .specflow/presets/<preset-id>/templates/ (sorted by priority from .registry)
-#   3. .specflow/extensions/<ext-id>/templates/
-#   4. .specflow/templates/ (core)
+#   1. .specnaut/templates/overrides/
+#   2. .specnaut/presets/<preset-id>/templates/ (sorted by priority from .registry)
+#   3. .specnaut/extensions/<ext-id>/templates/
+#   4. .specnaut/templates/ (core)
 function Resolve-Template {
     param(
         [Parameter(Mandatory=\$true)][string]\$TemplateName,
         [Parameter(Mandatory=\$true)][string]\$RepoRoot
     )
 
-    \$base = Join-Path \$RepoRoot '.specflow/templates'
+    \$base = Join-Path \$RepoRoot '.specnaut/templates'
 
     # Priority 1: Project overrides
     \$override = Join-Path \$base "overrides/\$TemplateName.md"
     if (Test-Path \$override) { return \$override }
 
     # Priority 2: Installed presets (sorted by priority from .registry)
-    \$presetsDir = Join-Path \$RepoRoot '.specflow/presets'
+    \$presetsDir = Join-Path \$RepoRoot '.specnaut/presets'
     if (Test-Path \$presetsDir) {
         \$registryFile = Join-Path \$presetsDir '.registry'
         \$sortedPresets = @()
@@ -15386,7 +15386,7 @@ function Resolve-Template {
     }
 
     # Priority 3: Extension-provided templates
-    \$extDir = Join-Path \$RepoRoot '.specflow/extensions'
+    \$extDir = Join-Path \$RepoRoot '.specnaut/extensions'
     if (Test-Path \$extDir) {
         foreach (\$ext in Get-ChildItem -Path \$extDir -Directory -ErrorAction SilentlyContinue | Where-Object { \$_.Name -notlike '.*' } | Sort-Object Name) {
             \$candidate = Join-Path \$ext.FullName "templates/\$TemplateName.md"
@@ -15410,7 +15410,7 @@ function Resolve-TemplateContent {
         [Parameter(Mandatory=\$true)][string]\$RepoRoot
     )
 
-    \$base = Join-Path \$RepoRoot '.specflow/templates'
+    \$base = Join-Path \$RepoRoot '.specnaut/templates'
 
     # Collect all layers (highest priority first)
     \$layerPaths = @()
@@ -15424,7 +15424,7 @@ function Resolve-TemplateContent {
     }
 
     # Priority 2: Installed presets (sorted by priority from .registry)
-    \$presetsDir = Join-Path \$RepoRoot '.specflow/presets'
+    \$presetsDir = Join-Path \$RepoRoot '.specnaut/presets'
     if (Test-Path \$presetsDir) {
         \$registryFile = Join-Path \$presetsDir '.registry'
         \$sortedPresets = @()
@@ -15534,7 +15534,7 @@ except Exception:
     }
 
     # Priority 3: Extension-provided templates (always "replace")
-    \$extDir = Join-Path \$RepoRoot '.specflow/extensions'
+    \$extDir = Join-Path \$RepoRoot '.specnaut/extensions'
     if (Test-Path \$extDir) {
         foreach (\$ext in Get-ChildItem -Path \$extDir -Directory -ErrorAction SilentlyContinue | Where-Object { \$_.Name -notlike '.*' } | Sort-Object Name) {
             \$candidate = Join-Path \$ext.FullName "templates/\$TemplateName.md"
@@ -15643,7 +15643,7 @@ if (\$Help) {
     Write-Host "  -Number N           Specify branch number manually (overrides auto-detection)"
     Write-Host "  -Timestamp          Use timestamp prefix (YYYYMMDD-HHMMSS) instead of sequential numbering"
     Write-Host "  -Issue <id>         Link this feature to a backlog issue (positive integer);"
-    Write-Host "                      surfaces in JSON output and is persisted to .specflow/feature.json"
+    Write-Host "                      surfaces in JSON output and is persisted to .specnaut/feature.json"
     Write-Host "                      so /specflow merge can close the loop on the project board."
     Write-Host "  -Help               Show this help message"
     Write-Host ""
@@ -15800,7 +15800,7 @@ function ConvertTo-CleanBranchName {
 
 Set-Location \$repoRoot
 
-\$specsDir = Join-Path \$repoRoot '.specflow' 'specs'
+\$specsDir = Join-Path \$repoRoot '.specnaut' 'specs'
 if (-not \$DryRun) {
     New-Item -ItemType Directory -Path \$specsDir -Force | Out-Null
 }
@@ -16130,10 +16130,10 @@ Generated by Specnaut. Edit freely.
     category: "mergeable-project-root",
     name: "root",
     suffix: ".gitignore",
-    content: `*.specflow.bak
-.specflow/logs/
-.specflow/upgrade-pending.json
-.specflow/upgrade-staging/
+    content: `*.specnaut.bak
+.specnaut/logs/
+.specnaut/upgrade-pending.json
+.specnaut/upgrade-staging/
 `,
     executable: false,
     backend: null,
@@ -16152,7 +16152,7 @@ export const HARNESS_STATIC: Record<string, Record<string, TemplateFile>> = {
 - **Specnaut commands**: custom Specnaut commands live in \`.claude/commands/\`.
 - **Agents**: specialized agents live in \`.claude/agents/\`.
 - **Backlog**: managed via \`/backlog\` — when the project uses the local
-  Markdown backend, see \`.specflow/backlog.md\`.
+  Markdown backend, see \`.specnaut/backlog.md\`.
 
 ## Optional integrations
 
@@ -16478,9 +16478,9 @@ if [ -z "\$FILE" ]; then
 fi
 
 case "\$FILE" in
-  *.specflow/installed.lock|*/.specflow/installed.lock)
+  *.specnaut/installed.lock|*/.specnaut/installed.lock)
     cat >&2 <<'WARN'
-warn: .specflow/installed.lock is generated by \`specnaut init\` / \`specnaut
+warn: .specnaut/installed.lock is generated by \`specnaut init\` / \`specnaut
       upgrade\`. Manual edits will be overwritten by the next upgrade. If
       you need to change the recorded harness or backend, re-run
       \`specnaut upgrade\` instead.
@@ -16494,7 +16494,7 @@ exit 0
     },
     ".claude/hooks/log-subagent.sh": {
       content: `#!/usr/bin/env bash
-# Append a structured JSON line to .specflow/logs/agents.jsonl per
+# Append a structured JSON line to .specnaut/logs/agents.jsonl per
 # subagent start/stop event so workflow audits can read who-dispatched-
 # whom-when after the fact.
 #
@@ -16505,7 +16505,7 @@ set -euo pipefail
 EVENT="\${1:-unknown}"
 
 ROOT="\$(pwd)"
-LOG_DIR="\$ROOT/.specflow/logs"
+LOG_DIR="\$ROOT/.specnaut/logs"
 LOG_FILE="\$LOG_DIR/agents.jsonl"
 mkdir -p "\$LOG_DIR"
 
@@ -16646,7 +16646,7 @@ exit 0
     },
     ".claude/hooks/check-backlog-prereqs.sh": {
       content: `#!/usr/bin/env bash
-# Self-gates on .specflow/installed.lock: if the project's backlog
+# Self-gates on .specnaut/installed.lock: if the project's backlog
 # backend is \`github\` or \`gitlab\`, checks the corresponding CLI is
 # installed and authenticated. Prints a stderr warning at SessionStart
 # so the user knows before they try to run a backlog command.
@@ -16654,7 +16654,7 @@ exit 0
 # Always exits 0 — this is informational, not blocking.
 set -euo pipefail
 
-LOCK="\$(pwd)/.specflow/installed.lock"
+LOCK="\$(pwd)/.specnaut/installed.lock"
 [ -f "\$LOCK" ] || exit 0
 
 BACKEND=\$(awk '/^backlog_backend:/ {gsub(/[\\047"]/, "", \$2); print \$2; exit}' "\$LOCK")
@@ -16713,7 +16713,7 @@ exit 0
 - **Subagents**: Codex subagent definitions live in \`.codex/agents/\`
   (TOML format).
 - **Backlog**: managed via the \`/specnaut groom\` workflow — when the
-  project uses the local Markdown backend, see \`.specflow/backlog.md\`.
+  project uses the local Markdown backend, see \`.specnaut/backlog.md\`.
 
 ## Optional integrations
 
@@ -16826,9 +16826,9 @@ clarifications needed) STOP #2 (pre-merge validation)
 
 ## Project context
 
-- Constitution lives at \`.specflow/memory/constitution.md\` — treat as non-negotiable rules.
-- Product backlog (when local Markdown backend): index at \`.specflow/backlog.md\`,
-  task files at \`.specflow/backlog/NNN-*.md\`.
+- Constitution lives at \`.specnaut/memory/constitution.md\` — treat as non-negotiable rules.
+- Product backlog (when local Markdown backend): index at \`.specnaut/backlog.md\`,
+  task files at \`.specnaut/backlog/NNN-*.md\`.
 - Project conventions: \`AGENTS.md\` at project root.
 
 Read the constitution and AGENTS.md before starting any significant work.

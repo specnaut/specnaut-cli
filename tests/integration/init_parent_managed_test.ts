@@ -32,7 +32,7 @@ async function runSpecnaut(
 }
 
 /**
- * Builds a providing-workspace fixture: a parent dir with `.specflow/` and a
+ * Builds a providing-workspace fixture: a parent dir with `.specnaut/` and a
  * `deno.json` declaring `workspace: ["./child"]`, plus an (empty) child dir.
  * Returns canonical paths (macOS temp dirs symlink `/var`).
  */
@@ -42,15 +42,15 @@ async function providingFixture(
   const root = await Deno.makeTempDir({ prefix: "specnaut-pm-" });
   const parent = join(root, "parent");
   const child = join(parent, "child");
-  await Deno.mkdir(join(parent, ".specflow"), { recursive: true });
+  await Deno.mkdir(join(parent, ".specnaut"), { recursive: true });
   await Deno.mkdir(child, { recursive: true });
   await Deno.writeTextFile(
     join(parent, "deno.json"),
     JSON.stringify({ workspace: ["./child"] }, null, 2),
   );
   if (opts.childStandalone) {
-    await Deno.mkdir(join(child, ".specflow"), { recursive: true });
-    await Deno.writeTextFile(join(child, ".specflow", "standalone.yml"), "");
+    await Deno.mkdir(join(child, ".specnaut"), { recursive: true });
+    await Deno.writeTextFile(join(child, ".specnaut", "standalone.yml"), "");
   }
   return { root, parent, child };
 }
@@ -73,7 +73,7 @@ Deno.test("parent-managed suppresses agentic", async () => {
     assertEquals(await exists(join(child, ".claude/commands")), false);
 
     // Toolkit still provisioned.
-    assertEquals(await exists(join(child, ".specflow/memory/constitution.md")), true);
+    assertEquals(await exists(join(child, ".specnaut/memory/constitution.md")), true);
     assertEquals(await exists(join(child, "AGENTS.md")), true);
 
     // Notice printed exactly once.
@@ -82,7 +82,7 @@ Deno.test("parent-managed suppresses agentic", async () => {
 
     // Lock records the parent-managed decision and carries zero agentic
     // entries (FR-012) — close the invariant at the init integration layer.
-    const lock = parseLock(await Deno.readTextFile(join(child, ".specflow/installed.lock")));
+    const lock = parseLock(await Deno.readTextFile(join(child, ".specnaut/installed.lock")));
     assertEquals(lock.parentManaged, true);
     for (const dest of lock.entries.keys()) {
       assert(
@@ -111,7 +111,7 @@ Deno.test("standalone provisions normally", async () => {
     assertEquals(await exists(join(dir, ".claude/skills/specnaut/SKILL.md")), true);
     assertEquals(await exists(join(dir, ".claude/agents/developer.md")), true);
     assertEquals(await exists(join(dir, ".claude/commands/specnaut.md")), true);
-    assertEquals(await exists(join(dir, ".specflow/memory/constitution.md")), true);
+    assertEquals(await exists(join(dir, ".specnaut/memory/constitution.md")), true);
 
     // No notice on the standalone path.
     assert(!stdout.includes(NOTICE), "standalone init must not print the notice");
@@ -121,13 +121,13 @@ Deno.test("standalone provisions normally", async () => {
 });
 
 // C2 variant — enclosing Deno workspace that is NOT a providing Specnaut
-// workspace (no .specflow/ at the ancestor) ⇒ detection negative.
+// workspace (no .specnaut/ at the ancestor) ⇒ detection negative.
 Deno.test("non-providing ancestor", async () => {
   const root = await Deno.makeTempDir({ prefix: "specnaut-pm-nonprov-" });
   const parent = join(root, "parent");
   const child = join(parent, "child");
   await Deno.mkdir(child, { recursive: true });
-  // Parent declares the member but has NO .specflow/ → not a provider.
+  // Parent declares the member but has NO .specnaut/ → not a provider.
   await Deno.writeTextFile(
     join(parent, "deno.json"),
     JSON.stringify({ workspace: ["./child"] }, null, 2),

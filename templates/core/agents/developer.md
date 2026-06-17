@@ -18,7 +18,7 @@ architecture.
 ## First action in every session
 
 1. Read `AGENTS.md` at the project root to learn the tech stack and rules.
-2. Read `.specflow/memory/constitution.md` for non-negotiable invariants —
+2. Read `.specnaut/memory/constitution.md` for non-negotiable invariants —
    especially the **Engineering methodology**, **Architecture layers**,
    **Back-end patterns**, and **Front-end patterns** sections.
 3. Read the current feature's `spec.md`, `plan.md`, and `tasks.md` if a

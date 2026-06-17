@@ -5,7 +5,7 @@ node_modules/
 /tmp/
 spec-kit/
 .claude/scheduled_tasks.lock
-.specflow/logs/
+.specnaut/logs/
 sandbox/
 docs-dist/
 .env

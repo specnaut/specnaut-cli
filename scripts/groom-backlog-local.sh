@@ -5,7 +5,7 @@
 # can clarify any current Backlog items on GitHub Project #4 without a
 # human in the loop.
 #
-# Wired up via ~/Library/LaunchAgents/com.specflow-groom-backlog.plist
+# Wired up via ~/Library/LaunchAgents/com.specnaut-groom-backlog.plist
 # (StartInterval = 1800s = every 30 min). Logs land in
 # ~/Library/Logs/specnaut/groom-backlog.log.
 #

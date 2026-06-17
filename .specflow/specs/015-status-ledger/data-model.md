@@ -4,7 +4,7 @@ No DB. The model is the JSONL entry schema and the derived health view.
 
 ## Entity: Ledger entry (append-only)
 
-Identity = `(session, agent, ts, event)`. One JSON object per line in `.specflow/logs/agents.jsonl`.
+Identity = `(session, agent, ts, event)`. One JSON object per line in `.specnaut/logs/agents.jsonl`.
 
 Required (existing, unchanged):
 

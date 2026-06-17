@@ -36,14 +36,14 @@ export class GithubBacklogStrategy implements BacklogBackendStrategy {
     const populated = ctx?.url?.kind === "github" && ctx?.repo && ctx.repo.length > 0;
     if (populated) {
       return [
-        `↳ wrote .specflow/backlog-config.yml (${ctx!.repo} → project #${
+        `↳ wrote .specnaut/backlog-config.yml (${ctx!.repo} → project #${
           (ctx!.url as { kind: "github"; projectNumber: number }).projectNumber
         }) — ready to run /backlog`,
         "  tip: for a richer experience, enable the GitHub MCP connector via `/mcp` in Claude Code",
       ];
     }
     return [
-      "↳ wrote .specflow/backlog-config.yml — fill in repo + project_number before running /backlog",
+      "↳ wrote .specnaut/backlog-config.yml — fill in repo + project_number before running /backlog",
       "  tip: for a richer experience, enable the GitHub MCP connector via `/mcp` in Claude Code",
     ];
   }

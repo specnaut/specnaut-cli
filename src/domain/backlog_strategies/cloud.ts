@@ -15,7 +15,7 @@ export class CloudBacklogStrategy implements BacklogBackendStrategy {
 
   initConfigMessages(): readonly string[] {
     return [
-      "↳ wrote .specflow/backlog-config.yml (backend: cloud)",
+      "↳ wrote .specnaut/backlog-config.yml (backend: cloud)",
       "  next: run `specnaut cloud login` to authenticate and link a Cloud project",
     ];
   }

@@ -29,9 +29,9 @@ Deno.test("isAgenticPath: .claude/commands/ paths are agentic", () => {
   assertEquals(isAgenticPath(".claude/commands/specnaut.md"), true);
 });
 
-Deno.test("isAgenticPath: .specflow/ paths are not agentic", () => {
-  assertEquals(isAgenticPath(".specflow/memory/constitution.md"), false);
-  assertEquals(isAgenticPath(".specflow/templates/spec-template.md"), false);
+Deno.test("isAgenticPath: .specnaut/ paths are not agentic", () => {
+  assertEquals(isAgenticPath(".specnaut/memory/constitution.md"), false);
+  assertEquals(isAgenticPath(".specnaut/templates/spec-template.md"), false);
 });
 
 Deno.test("isAgenticPath: AGENTS.md is not agentic", () => {

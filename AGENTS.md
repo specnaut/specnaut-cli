@@ -55,8 +55,8 @@ installation/distribution concern, not a runtime one.
 - **Language**: **Deno** (TypeScript, native compile via `deno compile`, zero-deps standard library,
   official `denoland/skills` for dev velocity).
 - **v0.2 scope — multi-harness ready**:
-  - Two target harnesses: **Claude Code** (default, `.claude/` + `.specflow/`) and **Cursor**
-    (`.cursor/skills/` + `.cursor/rules/` + `.specflow/`) — single harness per invocation, selected
+  - Two target harnesses: **Claude Code** (default, `.claude/` + `.specnaut/`) and **Cursor**
+    (`.cursor/skills/` + `.cursor/rules/` + `.specnaut/`) — single harness per invocation, selected
     via `--ai claude|cursor`
   - CLI surface and behaviour equivalent to upstream `specify init`
   - The **3 differentiating features embedded by default**: auto-chain, `review` phase, backlog +
@@ -128,9 +128,9 @@ work universally — the flag only restricts auto-spawn under Claude Code.
 
 ### 4. Constitution + spec templates
 
-A `.specflow/memory/constitution.md` file codifies project invariants (non-negotiable architecture,
+A `.specnaut/memory/constitution.md` file codifies project invariants (non-negotiable architecture,
 conventions, policies). Spec Kit loads
-`.specflow/templates/{spec,plan,tasks,checklist,constitution,agent-file}-template.md` to generate
+`.specnaut/templates/{spec,plan,tasks,checklist,constitution,agent-file}-template.md` to generate
 the artefacts. The agent-file template is repopulated on every feature to give context to AI agents.
 
 ### 5. Cross-cutting skills

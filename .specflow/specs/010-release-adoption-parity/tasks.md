@@ -4,7 +4,7 @@ description: "Task list for reliable Adoption guide in CI-generated release note
 
 # Tasks: Reliable Adoption guide in CI-generated release notes
 
-**Input**: Design documents from `.specflow/specs/010-release-adoption-parity/` **Prerequisites**:
+**Input**: Design documents from `.specnaut/specs/010-release-adoption-parity/` **Prerequisites**:
 plan.md, spec.md, research.md, data-model.md, contracts/adoption-parity.md **Linked issue**:
 mkrlabs/specflow#363
 

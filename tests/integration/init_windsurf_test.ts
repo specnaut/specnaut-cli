@@ -89,8 +89,8 @@ Deno.test("specnaut init --ai windsurf scaffolds a Windsurf layout", async () =>
     // backlog + 15 agent workflows (11 original + performance-auditor #304
     // + a11y-auditor #305 + architecture-auditor #321 + dependency-auditor
     // #322) = 58. code-audit's scope script ships under
-    // .specflow/scripts/code-audit/, not as a flattened workflow file;
-    // status-audit's schema doc ships to .specflow/logs/README.md, also not
+    // .specnaut/scripts/code-audit/, not as a flattened workflow file;
+    // status-audit's schema doc ships to .specnaut/logs/README.md, also not
     // flattened here.
     const workflowsCount = (await Array.fromAsync(
       Deno.readDir(join(root, ".windsurf/workflows")),
@@ -98,10 +98,10 @@ Deno.test("specnaut init --ai windsurf scaffolds a Windsurf layout", async () =>
     assertEquals(workflowsCount, 58);
 
     // Shared (cross-harness)
-    assertEquals(await exists(join(root, ".specflow/memory/constitution.md")), true);
+    assertEquals(await exists(join(root, ".specnaut/memory/constitution.md")), true);
     assertEquals(await exists(join(root, "AGENTS.md")), true);
     assertEquals(await exists(join(root, "tasks/backlog.md")), false);
-    assertEquals(await exists(join(root, ".specflow/backlog.md")), true);
+    assertEquals(await exists(join(root, ".specnaut/backlog.md")), true);
 
     // NOT emitted for windsurf
     assertEquals(await exists(join(root, ".claude/")), false);
@@ -111,7 +111,7 @@ Deno.test("specnaut init --ai windsurf scaffolds a Windsurf layout", async () =>
     assertEquals(await exists(join(root, "CLAUDE.md")), false);
 
     // Lock reflects windsurf
-    const lock = await Deno.readTextFile(join(root, ".specflow/installed.lock"));
+    const lock = await Deno.readTextFile(join(root, ".specnaut/installed.lock"));
     assertEquals(lock.includes("harness: windsurf"), true);
   });
 });

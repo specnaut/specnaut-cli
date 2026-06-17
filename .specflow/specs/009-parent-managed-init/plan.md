@@ -1,15 +1,15 @@
 # Implementation Plan: Parent-managed detection for init/upgrade
 
 **Branch**: `009-parent-managed-init` | **Date**: 2026-06-09 | **Spec**: [spec.md](./spec.md)
-**Input**: Feature specification from `.specflow/specs/009-parent-managed-init/spec.md`
+**Input**: Feature specification from `.specnaut/specs/009-parent-managed-init/spec.md`
 
 ## Summary
 
 Add a `isParentManaged(targetDir) → boolean` detection to `specflow init` and `specflow upgrade`.
-When the target sits inside a **providing Specflow workspace** (an ancestor with `.specflow/` whose
-`deno.json` `workspace` list resolves to the target), provision the `.specflow/` toolkit as normal
+When the target sits inside a **providing Specflow workspace** (an ancestor with `.specnaut/` whose
+`deno.json` `workspace` list resolves to the target), provision the `.specnaut/` toolkit as normal
 but write **zero** agentic files (`.claude/skills/`, `.claude/agents/`, `.claude/commands/`). A
-`target/.specflow/standalone.yml` marker overrides detection to force full provisioning. The CLI is
+`target/.specnaut/standalone.yml` marker overrides detection to force full provisioning. The CLI is
 never special-cased; standalone clones are unchanged.
 
 **Technical approach** (grounded in the current hexagonal code, per architect pass):
@@ -30,7 +30,7 @@ never special-cased; standalone clones are unchanged.
 
 **Language/Version**: Deno / TypeScript (per `apps/specflow/deno.json`, currently v1.13.1)\
 **Primary Dependencies**: Deno std (`@std/path`), no new third-party deps\
-**Storage**: filesystem; `.specflow/installed.lock` (YAML) is the install manifest\
+**Storage**: filesystem; `.specnaut/installed.lock` (YAML) is the install manifest\
 **Testing**: `deno task test` — unit (in-memory port fakes) + integration (`Deno.makeTempDir` +
 `runSpecflow`)\
 **Target Platform**: cross-platform CLI binary (macOS / Linux / Windows)\
@@ -46,7 +46,7 @@ groups
 
 _GATE: Must pass before Phase 0 research. Re-check after Phase 1 design._
 
-The CLI repo has no runtime `.specflow/memory/constitution.md`; the binding principles are in
+The CLI repo has no runtime `.specnaut/memory/constitution.md`; the binding principles are in
 `apps/specflow/AGENTS.md` § "Design principles" (l.172-173) and the monorepo constitution § I
 (OSS/private boundary). Gates evaluated:
 
@@ -66,7 +66,7 @@ No violations. No complexity-tracking entries required.
 ### Documentation (this feature)
 
 ```text
-.specflow/specs/009-parent-managed-init/
+.specnaut/specs/009-parent-managed-init/
 ├── spec.md              # /specflow specify output (done)
 ├── plan.md              # this file
 ├── research.md          # Phase 0 output

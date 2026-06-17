@@ -56,7 +56,7 @@ score.
 - `AGENTS.md`, `README.md`, `CLAUDE.md`, `CHANGELOG.md`
 - Any `.md` path token
 - `docs/...`, `docs/`
-- `.specflow/...` (the workspace docs surface)
+- `.specnaut/...` (the workspace docs surface)
 
 ### Verb hints
 
@@ -111,5 +111,5 @@ validation. The expected routing for each:
 The router's `--lite` and `--full` flags force the shape directly and
 **skip this heuristic entirely**. See `SKILL.md` step 1 "Chain shape
 parsing". When forced, no prompt is emitted; the chosen shape is
-persisted to `.specflow/feature.json` (`workflow_shape`) and the
+persisted to `.specnaut/feature.json` (`workflow_shape`) and the
 spec.md frontmatter (`workflow:`).

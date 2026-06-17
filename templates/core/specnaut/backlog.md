@@ -1,7 +1,7 @@
 # Backlog
 
 > Managed by the Product Owner agent (`/backlog`). Each task is one
-> file under `.specflow/backlog/NNN-slug.md` with frontmatter; this
+> file under `.specnaut/backlog/NNN-slug.md` with frontmatter; this
 > index lists items grouped by status column.
 
 The 5 status columns mirror the GitHub Projects "kanban" model:
@@ -16,7 +16,7 @@ The 5 status columns mirror the GitHub Projects "kanban" model:
   prune as needed).
 
 Size and priority live in each item's frontmatter (see
-`.specflow/backlog/NNN-*.md`):
+`.specnaut/backlog/NNN-*.md`):
 
 ```yaml
 ---

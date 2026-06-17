@@ -104,7 +104,7 @@ export class CodexHarness implements Harness {
           break;
         case "spec-root":
           if (!entry.suffix) throw new Error(`spec-root needs suffix`);
-          out[`.specflow/${entry.suffix}`] = {
+          out[`.specnaut/${entry.suffix}`] = {
             content: entry.content,
             executable: entry.executable,
             ...(entry.skipIfExists ? { skipIfExists: true as const } : {}),

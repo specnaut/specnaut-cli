@@ -6,7 +6,7 @@
 - **Specnaut commands**: custom Specnaut commands live in `.claude/commands/`.
 - **Agents**: specialized agents live in `.claude/agents/`.
 - **Backlog**: managed via `/backlog` — when the project uses the local
-  Markdown backend, see `.specflow/backlog.md`.
+  Markdown backend, see `.specnaut/backlog.md`.
 
 ## Optional integrations
 

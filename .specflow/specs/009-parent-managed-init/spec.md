@@ -12,7 +12,7 @@
 
 A maintainer working inside a Specflow workspace (a parent repo that declares its sub-repos as
 workspace members and centralises all skills/agents at its own root) runs `specflow init` inside one
-of those sub-repos. They expect the spec-driven toolkit (`.specflow/`) to be provisioned so the
+of those sub-repos. They expect the spec-driven toolkit (`.specnaut/`) to be provisioned so the
 sub-repo can run the workflow, but they do **not** want a `.claude/skills/` or `.claude/agents/`
 directory written into the sub-repo — those are owned by the parent and any local copy is drift that
 the workspace deliberately eliminated.
@@ -23,13 +23,13 @@ agentic files across sub-repos. It is the reason the issue was filed.
 
 **Independent Test**: In a fixture where the target directory is a declared workspace member of an
 enclosing Specflow workspace, run `init` and assert that zero files are written under
-`target/.claude/skills/` and `target/.claude/agents/`, while `.specflow/` is still fully provisioned
+`target/.claude/skills/` and `target/.claude/agents/`, while `.specnaut/` is still fully provisioned
 and a one-line notice is shown.
 
 **Acceptance Scenarios**:
 
 1. **Given** a target directory that is a workspace member of an enclosing providing Specflow
-   workspace, **When** `specflow init` runs in that directory, **Then** `.specflow/` is provisioned
+   workspace, **When** `specflow init` runs in that directory, **Then** `.specnaut/` is provisioned
    normally and **zero** files are written under `.claude/skills/` or `.claude/agents/`.
 2. **Given** the same parent-managed target, **When** `init` completes, **Then** a single notice
    line is shown: "parent-managed workspace detected — skills/agents inherited from parent".
@@ -56,7 +56,7 @@ are provisioned exactly as in the current behaviour.
    `specflow init` runs, **Then** provisioning is unchanged — skills and agents are written as
    today.
 2. **Given** a target nested inside an enclosing Deno workspace that is **not** a providing Specflow
-   workspace (no `.specflow/` at the ancestor), **When** `init` runs, **Then** detection returns
+   workspace (no `.specnaut/` at the ancestor), **When** `init` runs, **Then** detection returns
    negative and provisioning is unchanged.
 
 ---
@@ -65,29 +65,29 @@ are provisioned exactly as in the current behaviour.
 
 A user keeps their standalone Specflow project inside a parent Deno workspace for unrelated reasons
 (e.g. a personal monorepo of Deno projects) and genuinely wants the full local toolkit. They place a
-`standalone.yml` marker in the target's `.specflow/` to force full provisioning regardless of any
+`standalone.yml` marker in the target's `.specnaut/` to force full provisioning regardless of any
 enclosing workspace.
 
 **Why this priority**: An escape hatch that prevents the detection from silently surprising users
 whose directory layout coincidentally resembles a managed workspace. Important for trust, but
 secondary to the two P1 default behaviours.
 
-**Independent Test**: In a parent-managed fixture, add `target/.specflow/standalone.yml`, run
+**Independent Test**: In a parent-managed fixture, add `target/.specnaut/standalone.yml`, run
 `init`, and assert full provisioning occurs despite the enclosing workspace.
 
 **Acceptance Scenarios**:
 
 1. **Given** a target that would otherwise be detected as parent-managed, **When**
-   `target/.specflow/standalone.yml` is present and `init` runs, **Then** the toolkit is fully
+   `target/.specnaut/standalone.yml` is present and `init` runs, **Then** the toolkit is fully
    provisioned including `.claude/skills/` and `.claude/agents/`.
 
 ---
 
 ### User Story 4 - Upgrade never resurrects deleted agentic files (Priority: P1)
 
-A maintainer runs `specflow upgrade` inside a parent-managed sub-repo to refresh the `.specflow/`
+A maintainer runs `specflow upgrade` inside a parent-managed sub-repo to refresh the `.specnaut/`
 toolkit to a newer CLI version. The sub-repo has no `.claude/` (it was deliberately removed). They
-expect the upgrade to update `.specflow/` only and to **not** recreate any `.claude/skills/` or
+expect the upgrade to update `.specnaut/` only and to **not** recreate any `.claude/skills/` or
 `.claude/agents/` — the deletion must survive the upgrade.
 
 **Why this priority**: Upgrade runs far more often than init over a repo's life. If upgrade
@@ -95,13 +95,13 @@ re-creates agentic files, the regression returns on the next routine version bum
 correct init — so this is as critical as US1.
 
 **Independent Test**: In a parent-managed fixture with no `.claude/`, run `upgrade` and assert
-`.specflow/` is updated while zero agentic files are (re)created and no `.claude/` directory is
+`.specnaut/` is updated while zero agentic files are (re)created and no `.claude/` directory is
 resurrected.
 
 **Acceptance Scenarios**:
 
 1. **Given** a parent-managed target with no `.claude/`, **When** `specflow upgrade` runs, **Then**
-   `.specflow/` toolkit files are updated and **no** `.claude/` skills/agents are created.
+   `.specnaut/` toolkit files are updated and **no** `.claude/` skills/agents are created.
 2. **Given** a standalone target, **When** `upgrade` runs, **Then** behaviour is unchanged from
    today.
 
@@ -111,10 +111,10 @@ resurrected.
 
 - **Detection stops at the first providing ancestor**: walking upward, the first ancestor that is a
   providing Specflow workspace decides the result; ancestors above it are not consulted.
-- **Ancestor has `.specflow/` but does not list the target as a member**: detection returns negative
+- **Ancestor has `.specnaut/` but does not list the target as a member**: detection returns negative
   — proximity alone is not enough; the target must be a declared workspace member that resolves to
   the target path.
-- **Ancestor lists members but has no `.specflow/`**: not a _providing_ workspace → detection
+- **Ancestor lists members but has no `.specnaut/`**: not a _providing_ workspace → detection
   returns negative.
 - **Symlinked or relative member paths in the ancestor manifest**: member paths are resolved to
   absolute, canonical paths before comparison so that an equivalent-but-differently-spelled path
@@ -134,7 +134,7 @@ resurrected.
   _parent-managed_ — i.e. nested inside an enclosing **providing Specflow workspace** that declares
   the target as one of its members.
 - **FR-002**: A _providing Specflow workspace_ MUST be defined as an ancestor directory that BOTH
-  contains a `.specflow/` toolkit AND declares a workspace member list in which at least one member
+  contains a `.specnaut/` toolkit AND declares a workspace member list in which at least one member
   resolves to the target directory's path.
 - **FR-003**: Detection MUST walk parent directories upward from the target to the filesystem root
   and resolve on the **first** ancestor that satisfies FR-002; if none is found, detection MUST
@@ -142,16 +142,16 @@ resurrected.
 - **FR-004**: Member-path comparison MUST resolve both the declared member path and the target path
   to absolute canonical paths before comparing, so equivalent paths expressed differently still
   match.
-- **FR-005**: When the target is parent-managed, `specflow init` MUST provision the `.specflow/`
+- **FR-005**: When the target is parent-managed, `specflow init` MUST provision the `.specnaut/`
   toolkit as normal AND MUST write **zero** files under the target's `.claude/skills/`,
   `.claude/agents/`, or any orchestration `.claude/` agentic files.
 - **FR-006**: When the target is parent-managed, `specflow init` MUST emit exactly one
   human-readable notice indicating that a parent-managed workspace was detected and skills/agents
   are inherited from the parent.
-- **FR-007**: When the target is parent-managed, `specflow upgrade` MUST update the `.specflow/`
+- **FR-007**: When the target is parent-managed, `specflow upgrade` MUST update the `.specnaut/`
   toolkit only and MUST NOT create or resurrect any `.claude/` skills/agents, even if the target
   currently has no `.claude/` directory.
-- **FR-008**: A `standalone.yml` marker file in the target's `.specflow/` MUST override detection
+- **FR-008**: A `standalone.yml` marker file in the target's `.specnaut/` MUST override detection
   and force full provisioning (the standalone path) regardless of any enclosing workspace.
 - **FR-009**: When the target is NOT parent-managed (and no override applies), both `init` and
   `upgrade` MUST behave exactly as today, with no change to the files written.
@@ -183,13 +183,13 @@ Specflow toolkit into a target repository).
 **Vocabulary (Ubiquitous language):**
 
 - **Target repository** — the directory the provisioning command operates on.
-- **Providing Specflow workspace** — an ancestor that contains `.specflow/` and declares the target
+- **Providing Specflow workspace** — an ancestor that contains `.specnaut/` and declares the target
   as a workspace member; it owns the centralised skills/agents the target would otherwise duplicate.
 - **Parent-managed** — the state of a target that sits inside a providing workspace; in this state
   agentic files are inherited, not written locally.
 - **Agentic files** — files under `.claude/skills/` and `.claude/agents/` (plus orchestration
   `.claude/` files) that make a repo independently drive the workflow.
-- **Toolkit (`.specflow/`)** — the spec-driven assets (templates, memory, scripts) that are
+- **Toolkit (`.specnaut/`)** — the spec-driven assets (templates, memory, scripts) that are
   provisioned regardless of parent-managed state.
 - **Standalone override** — an explicit marker in the target that forces full provisioning even
   under a providing workspace.
@@ -218,7 +218,7 @@ Specflow toolkit into a target repository).
   of a coincidental layout without surprise.
 - Detection never reads or depends on the identity of the target repo (e.g. "is this the CLI") —
   why: FR-010, the CLI must not be special-cased.
-- The toolkit (`.specflow/`) is always provisioned regardless of the decision — why: a
+- The toolkit (`.specnaut/`) is always provisioned regardless of the decision — why: a
   parent-managed sub-repo still needs to run the workflow.
 - The install manifest reflects exactly what was written — why: upgrade/check must reconcile against
   reality, not an assumed full set.
@@ -244,7 +244,7 @@ Specflow toolkit into a target repository).
   against the pre-feature baseline. (maps C2, FR-010)
 - **SC-003**: In a parent-managed fixture with no `.claude/`, `specflow upgrade` re-creates **0**
   agentic files and resurrects no `.claude/` directory. (maps C3)
-- **SC-004**: With `target/.specflow/standalone.yml` present under an enclosing workspace,
+- **SC-004**: With `target/.specnaut/standalone.yml` present under an enclosing workspace,
   `specflow init` performs full provisioning (skills and agents written). (maps C4)
 - **SC-005**: For a parent-managed target, the install manifest records **0** `.claude/skills` and
   **0** `.claude/agents` entries. (maps C5)
@@ -259,7 +259,7 @@ Specflow toolkit into a target repository).
 - "Orchestration `.claude/` files" means agentic provisioning under `.claude/` (skills, agents, and
   any command/loop scaffolding the CLI writes); non-agentic, user-authored `.claude/` content the
   CLI never manages is irrelevant because the CLI does not touch it.
-- The override marker lives at `target/.specflow/standalone.yml`; its mere presence is the signal —
+- The override marker lives at `target/.specnaut/standalone.yml`; its mere presence is the signal —
   no schema is required for this feature.
 - The existing install-manifest mechanism already records provisioned paths, so suppression is
   reflected simply by not recording the suppressed entries.

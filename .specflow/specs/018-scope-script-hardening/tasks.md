@@ -37,7 +37,7 @@ rejections); the perf changes are regression-guarded by the existing count asser
 - [ ] T005 Keep emitting all four signals (contract). Document gating-vs-informational in three
       places: (a) `templates/core/skills/code-audit/SKILL.md` seat table — note
       FRONTEND_COUNT→accessibility, DEP_COUNT→dependency gate; TEST_COUNT/INFRA_COUNT informational
-      (no seat); (b) `.specflow/specs/013-code-audit/contracts/scope-signals.md` — label each
+      (no seat); (b) `.specnaut/specs/013-code-audit/contracts/scope-signals.md` — label each
       signal; (c) a one-line comment in the script above the CATEGORY SIGNALS emission.
 
 ## Phase 4: distribution + validate

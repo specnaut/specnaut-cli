@@ -1,7 +1,7 @@
 /**
  * Lowercase hex SHA-256 of the UTF-8 encoding of `input`.
  * Shared helper — used by self-update (binary checksum) and upgrade (file
- * integrity tracking in .specflow/installed.lock).
+ * integrity tracking in .specnaut/installed.lock).
  */
 export async function sha256Hex(input: string): Promise<string> {
   const bytes = new TextEncoder().encode(input);

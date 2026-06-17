@@ -16,7 +16,7 @@
 #   5. last-N               → HEAD~<N>..HEAD, N default 20, --last <n> overrides
 #                             (SCOPE: last-N)
 #
-# Contract: .specflow/specs/013-code-audit/contracts/scope-signals.md
+# Contract: .specnaut/specs/013-code-audit/contracts/scope-signals.md
 set -euo pipefail
 
 PATH_ARG=""

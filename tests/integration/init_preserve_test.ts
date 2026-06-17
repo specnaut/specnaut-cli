@@ -61,7 +61,7 @@ async function initWithDeclaredCustomisation(
   await Deno.writeTextFile(poPath, customised);
 
   await Deno.writeTextFile(
-    join(projectDir, ".specflow/preserve.yml"),
+    join(projectDir, ".specnaut/preserve.yml"),
     `preserved:\n  - ${PRESERVED}\n`,
   );
   return { projectDir, customised };

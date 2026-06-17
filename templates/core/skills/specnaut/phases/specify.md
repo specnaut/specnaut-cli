@@ -9,7 +9,7 @@ You **MUST** consider the user input before proceeding (if not empty).
 
 ## Pre-Execution Checks
 
-**Check extension hooks (`hooks.before_specify` in `.specflow/extensions.yml`)**:
+**Check extension hooks (`hooks.before_specify` in `.specnaut/extensions.yml`)**:
 Skip silently if the file is absent or unparseable. For each enabled entry
 (treat missing `enabled` as `true`) without a non-empty `condition`, emit:
 
@@ -45,7 +45,7 @@ the chain after it):
      - `n` / `no` / anything else interpreted as no → `CHAIN_SHAPE =
        full`.
 
-3. **Persist the chosen shape** to `.specflow/feature.json` (when
+3. **Persist the chosen shape** to `.specnaut/feature.json` (when
    step 3 of the Outline below writes that file, include
    `"workflow_shape": "lite"` or `"workflow_shape": "full"` alongside
    `feature_directory` and `linked_issue`).
@@ -75,26 +75,26 @@ Given that feature description, do this:
 
 3. **Create the spec feature directory**:
 
-   Specs live under `.specflow/specs/` unless the user provides `SPECIFY_FEATURE_DIRECTORY`.
+   Specs live under `.specnaut/specs/` unless the user provides `SPECIFY_FEATURE_DIRECTORY`.
 
    **Resolution order for `SPECIFY_FEATURE_DIRECTORY`**:
    1. If the user explicitly provided it, use as-is.
-   2. Otherwise auto-generate under `.specflow/specs/`:
-      - Check `.specflow/init-options.json` for `branch_numbering`
+   2. Otherwise auto-generate under `.specnaut/specs/`:
+      - Check `.specnaut/init-options.json` for `branch_numbering`
       - `"timestamp"`: prefix is `YYYYMMDD-HHMMSS`
       - `"sequential"` or absent: prefix is `NNN` (next available 3-digit number)
       - Construct: `<prefix>-<short-name>` (e.g., `003-user-auth`)
-      - Set `SPECIFY_FEATURE_DIRECTORY` to `.specflow/specs/<directory-name>`
+      - Set `SPECIFY_FEATURE_DIRECTORY` to `.specnaut/specs/<directory-name>`
 
    **Create the directory and spec file**:
    - `mkdir -p SPECIFY_FEATURE_DIRECTORY`
    - Copy `templates/spec-template.md` to `SPECIFY_FEATURE_DIRECTORY/spec.md`
    - Set `SPEC_FILE` to `SPECIFY_FEATURE_DIRECTORY/spec.md`
-   - Persist to `.specflow/feature.json`:
+   - Persist to `.specnaut/feature.json`:
      ```json
      { "feature_directory": "<resolved feature dir>", "linked_issue": <N or null>, "workflow_shape": "<lite|full>" }
      ```
-     Write the actual resolved path (e.g., `.specflow/specs/003-user-auth`), not the literal string.
+     Write the actual resolved path (e.g., `.specnaut/specs/003-user-auth`), not the literal string.
      This lets downstream commands (`/specnaut plan`, `/specnaut tasks`, etc.) locate the feature directory.
 
      **`linked_issue`**: when the user invokes `/specnaut specify` with `--issue <id>` (or the
@@ -185,7 +185,7 @@ Given that feature description, do this:
      Transition wording is a statement (`✓ specify complete — proceeding
      to <next>`), never a question.
 
-9. **Check extension hooks (`hooks.after_specify` in `.specflow/extensions.yml`)**:
+9. **Check extension hooks (`hooks.after_specify` in `.specnaut/extensions.yml`)**:
    Same rules as Pre-Execution Checks. For each executable hook emit:
 
    - `optional: true` → `## Extension Hooks` block with `**Optional Hook**: {extension}`, command, description, prompt.

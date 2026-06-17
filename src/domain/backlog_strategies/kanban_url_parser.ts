@@ -1,6 +1,6 @@
 /**
  * Parses a Kanban / project board URL into a structured payload usable
- * by the per-backend strategies to pre-fill `.specflow/backlog-config.yml`.
+ * by the per-backend strategies to pre-fill `.specnaut/backlog-config.yml`.
  *
  * Three formats supported:
  *

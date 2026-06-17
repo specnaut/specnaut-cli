@@ -153,7 +153,7 @@ const SYNC_PAIRS: ReadonlyArray<{ plugin: string; source: string }> = [
     source: `templates/core/skills/${name}/SKILL.md`,
   })),
   // status-audit (#381). Markdown-only read-only skill — reads the
-  // `.specflow/logs/agents.jsonl` status ledger and reports seven session-health
+  // `.specnaut/logs/agents.jsonl` status ledger and reports seven session-health
   // views; pairs with `/loop 5m /status-audit` for headless supervision. Mirrors
   // through the same byte-identical channel as the other markdown-only skills.
   {

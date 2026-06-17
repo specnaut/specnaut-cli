@@ -2,7 +2,7 @@ import { relative, resolve } from "@std/path";
 import { walk } from "@std/fs/walk";
 import type { StagingStore } from "../application/ports.ts";
 
-const STAGING_REL = ".specflow/upgrade-staging";
+const STAGING_REL = ".specnaut/upgrade-staging";
 
 export class FsStagingStore implements StagingStore {
   async list(projectDir: string): Promise<string[]> {

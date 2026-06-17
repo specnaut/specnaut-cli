@@ -67,7 +67,7 @@ function fakeLockStore(initial: InstalledLock | null): LockStore & { last: Insta
       last = lock;
       return Promise.resolve();
     },
-    lockPath: (d) => `${d}/.specflow/installed.lock`,
+    lockPath: (d) => `${d}/.specnaut/installed.lock`,
   };
 }
 
@@ -517,7 +517,7 @@ Deno.test("UpgradeProjectUseCase: vanilla on-disk + plugin NOT installed → exi
   assertEquals(writer.deleted.includes(PLUGIN_DEST), false);
 });
 
-Deno.test("UpgradeProjectUseCase: writes upstream content to .specflow/upgrade-staging/ for preserves", async () => {
+Deno.test("UpgradeProjectUseCase: writes upstream content to .specnaut/upgrade-staging/ for preserves", async () => {
   // One bundle file, customized on disk (preserve case).
   const lockEntries = new Map<string, LockEntry>();
   lockEntries.set(".claude/agents/developer.md", {
@@ -556,7 +556,7 @@ Deno.test("UpgradeProjectUseCase: writes upstream content to .specflow/upgrade-s
   await uc.execute({ projectDir: "/tmp/proj", dryRun: false, force: false });
 
   const staged = writer.written.get(
-    ".specflow/upgrade-staging/.claude/agents/developer.md",
+    ".specnaut/upgrade-staging/.claude/agents/developer.md",
   );
   if (staged !== "NEW UPSTREAM VERSION\n") {
     throw new Error(`staging content mismatch: ${staged}`);
@@ -602,7 +602,7 @@ Deno.test("UpgradeProjectUseCase: does NOT write staging for auto-update files",
   });
   await uc.execute({ projectDir: "/tmp/proj", dryRun: false, force: false });
 
-  if (writer.written.has(".specflow/upgrade-staging/.claude/agents/developer.md")) {
+  if (writer.written.has(".specnaut/upgrade-staging/.claude/agents/developer.md")) {
     throw new Error("auto-update should not stage upstream content");
   }
 });
@@ -626,7 +626,7 @@ Deno.test("UpgradeProjectUseCase: lock.parentManaged=true filters agentic dests 
     writer,
     lockStore,
     core: coreFromBundle({
-      ".specflow/memory/constitution.md": { content: "toolkit\n", executable: false },
+      ".specnaut/memory/constitution.md": { content: "toolkit\n", executable: false },
       ".claude/skills/specnaut/SKILL.md": { content: "skill\n", executable: false },
       ".claude/agents/developer.md": { content: "agent\n", executable: false },
       ".claude/commands/specnaut.md": { content: "cmd\n", executable: false },
@@ -648,7 +648,7 @@ Deno.test("UpgradeProjectUseCase: lock.parentManaged=true filters agentic dests 
     }
   }
   // Toolkit file added; agentic files never written / resurrected.
-  assertEquals(writer.written.get(".specflow/memory/constitution.md"), "toolkit\n");
+  assertEquals(writer.written.get(".specnaut/memory/constitution.md"), "toolkit\n");
   assertEquals(writer.written.has(".claude/skills/specnaut/SKILL.md"), false);
   assertEquals(writer.written.has(".claude/agents/developer.md"), false);
   assertEquals(writer.written.has(".claude/commands/specnaut.md"), false);
@@ -675,7 +675,7 @@ Deno.test("UpgradeProjectUseCase: parentManagedOverride re-derives + persists on
     writer,
     lockStore,
     core: coreFromBundle({
-      ".specflow/memory/constitution.md": { content: "toolkit\n", executable: false },
+      ".specnaut/memory/constitution.md": { content: "toolkit\n", executable: false },
       ".claude/agents/developer.md": { content: "agent\n", executable: false },
     }),
     templatesVersion: "0.8.0",
@@ -689,7 +689,7 @@ Deno.test("UpgradeProjectUseCase: parentManagedOverride re-derives + persists on
   });
   assertEquals(result.status, "applied");
   assertEquals(writer.written.has(".claude/agents/developer.md"), false);
-  assertEquals(writer.written.get(".specflow/memory/constitution.md"), "toolkit\n");
+  assertEquals(writer.written.get(".specnaut/memory/constitution.md"), "toolkit\n");
   // The re-derived decision is persisted into the rewritten lock.
   assertEquals(lockStore.last?.parentManaged, true);
 });
@@ -710,7 +710,7 @@ Deno.test("UpgradeProjectUseCase: legacy lock + parentManagedOverride persists p
     templatesVersion: "0.8.0",
     // Only a non-agentic toolkit entry; agentic dests are suppressed by the
     // override so they never enter the plan.
-    entries: new Map([[".specflow/memory/constitution.md", {
+    entries: new Map([[".specnaut/memory/constitution.md", {
       sha256: sha,
       installedAt: "2026-05-01T00:00:00Z",
       templatesVersion: "0.8.0",
@@ -719,11 +719,11 @@ Deno.test("UpgradeProjectUseCase: legacy lock + parentManagedOverride persists p
   const writer = fakeWriter();
   const lockStore = fakeLockStore(lock);
   const uc = new UpgradeProjectUseCase({
-    reader: fakeReader({ ".specflow/memory/constitution.md": content }),
+    reader: fakeReader({ ".specnaut/memory/constitution.md": content }),
     writer,
     lockStore,
     core: coreFromBundle({
-      ".specflow/memory/constitution.md": { content, executable: false },
+      ".specnaut/memory/constitution.md": { content, executable: false },
       ".claude/agents/developer.md": { content: "agent\n", executable: false },
     }),
     templatesVersion: "0.8.0",

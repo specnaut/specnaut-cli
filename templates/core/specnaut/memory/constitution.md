@@ -4,7 +4,7 @@
 > non-negotiable policies. Specflow commands and review agents read it at every step.
 >
 > Replace this placeholder with your own constitution. Use
-> `.specflow/templates/constitution-template.md` as a starting point.
+> `.specnaut/templates/constitution-template.md` as a starting point.
 
 ## Principles
 

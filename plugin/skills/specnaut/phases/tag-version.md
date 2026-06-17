@@ -23,7 +23,7 @@ this project at `specnaut init`** (one of SemVer `v1.2.3` or date-based
 The bundled script does all the work:
 
 ```bash
-bash .specflow/scripts/release/tag.sh "$@"
+bash .specnaut/scripts/release/tag.sh "$@"
 ```
 
 What the script does:

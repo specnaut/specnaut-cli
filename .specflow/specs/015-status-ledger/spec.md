@@ -3,7 +3,7 @@
 **Feature Branch**: `015-status-ledger` **Created**: 2026-06-13 **Status**: Draft **Input**: User
 description: "Mechanism C of the miximodel audit-team port (epic mkrlabs/specflow-monorepo#12).
 Enrich the log-subagent hook to capture the machine-readable contract-block fields (from #378) into
-.specflow/logs/agents.jsonl, add a /status-audit skill that reads the ledger and reports session
+.specnaut/logs/agents.jsonl, add a /status-audit skill that reads the ledger and reports session
 health (blocked / stale / done-but-criteria-unmet / missing-handoffs / verdict summary), document
 the ledger schema, and document the /loop 5m /status-audit supervision pattern for long-running
 headless work."
@@ -84,7 +84,7 @@ pattern.
 
 ### Edge Cases
 
-- **No ledger file** (`.specflow/logs/agents.jsonl` absent) → `/status-audit` reports "no ledger
+- **No ledger file** (`.specnaut/logs/agents.jsonl` absent) → `/status-audit` reports "no ledger
   yet" rather than erroring.
 - **Malformed JSONL line** → skipped with a note; the audit still processes the valid lines.
 - **Agent emitted a block the hook couldn't locate in the payload** → the line simply omits those
@@ -108,7 +108,7 @@ pattern.
   empty strings or garbage. New fields are omit-if-absent.
 - **FR-003**: The hook MUST never break the dispatch: missing `jq`, absent payload, or unparseable
   output all degrade gracefully and exit 0.
-- **FR-004**: A `/status-audit` skill MUST read `.specflow/logs/agents.jsonl` and report: overall
+- **FR-004**: A `/status-audit` skill MUST read `.specnaut/logs/agents.jsonl` and report: overall
   health (counts by state); per-agent latest state, verdict, and last-update timestamp; blocked
   agents; stale agents (no entry for ≥15 minutes while non-terminal); the
   `done`-with-`DONE_CRITERIA_MET: no` contradiction; missing handoffs (`handoff_target` ≠ none with
@@ -119,7 +119,7 @@ pattern.
 - **FR-007**: The `/status-audit` SKILL.md MUST document the `/loop 5m /status-audit` supervision
   pattern for long-running headless work.
 - **FR-008**: The enriched ledger schema MUST be documented (field names, types, omit-if-absent
-  behaviour) in `.specflow/logs/README.md` (or an equivalent bundled doc).
+  behaviour) in `.specnaut/logs/README.md` (or an equivalent bundled doc).
 - **FR-009**: The hook change, the `/status-audit` skill, and the schema doc MUST ship through the
   bundle (`init`/`upgrade`) per the existing conventions (hook = harness-specific claude entry;
   skill = `templates/core/skills/`).
@@ -136,7 +136,7 @@ the mechanism-A contract blocks (recorded by the hook); produces a health report
 
 **Vocabulary (Ubiquitous language):**
 
-- **Ledger** — `.specflow/logs/agents.jsonl`, append-only, one JSON object per subagent start/stop
+- **Ledger** — `.specnaut/logs/agents.jsonl`, append-only, one JSON object per subagent start/stop
   event.
 - **Ledger entry** — one line: `{ts, event, session, agent}` + optional
   `{state, done_criteria_met,
@@ -202,4 +202,4 @@ the mechanism-A contract blocks (recorded by the hook); produces a health report
   hook (which is unit-tested), the _report_ is the skill's job.
 - The hook is bundled as the existing harness-specific claude entry; the skill + schema doc follow
   the established bundle/manifest conventions; the schema doc is a markdown file delivered under
-  `.specflow/logs/`.
+  `.specnaut/logs/`.

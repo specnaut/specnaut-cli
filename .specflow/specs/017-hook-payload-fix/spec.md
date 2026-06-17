@@ -13,7 +13,7 @@ using the REAL shape."
 ### User Story 1 - The ledger actually records who ran and what they concluded (Priority: P1)
 
 When a subagent finishes, the `log-subagent` hook records its real agent identity and — when the
-agent emitted contract blocks — its state and verdict, into `.specflow/logs/agents.jsonl`. A
+agent emitted contract blocks — its state and verdict, into `.specnaut/logs/agents.jsonl`. A
 `/status-audit` over that ledger then reports real agent names and verdicts instead of a wall of
 `unknown`.
 
@@ -93,7 +93,7 @@ re-introduce brittleness against a slightly different shape or against case-vary
 - **FR-007**: The hook's enrichment test MUST use a fixture shaped like the REAL `SubagentStop`
   payload (`agent_type` + `last_assistant_message` with UPPERCASE block fields), plus a legacy-key
   fallback case and a case-insensitivity case.
-- **FR-008**: The ledger schema doc (`.specflow/logs/README.md`) MUST document the new
+- **FR-008**: The ledger schema doc (`.specnaut/logs/README.md`) MUST document the new
   `agent_id`/`effort` fields and that `agent` comes from `agent_type` and the block source is
   `last_assistant_message`.
 - **FR-009**: The change ships through the bundle (`init`/`upgrade`); the hook is the existing

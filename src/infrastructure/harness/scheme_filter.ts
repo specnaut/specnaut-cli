@@ -33,5 +33,5 @@ export function phaseScriptDestination(entry: CoreEntry): string {
   if (!entry.suffix) {
     throw new Error(`phase-script needs suffix: ${entry.name}`);
   }
-  return `.specflow/scripts/release/${entry.suffix}`;
+  return `.specnaut/scripts/release/${entry.suffix}`;
 }

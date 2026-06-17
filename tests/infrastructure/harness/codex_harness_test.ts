@@ -147,10 +147,10 @@ Deno.test("CodexHarness maps agent model tiers to model_reasoning_effort", () =>
   }
 });
 
-Deno.test("CodexHarness maps spec-root to .specflow/<suffix> and project-root to <suffix>", () => {
+Deno.test("CodexHarness maps spec-root to .specnaut/<suffix> and project-root to <suffix>", () => {
   const h = new CodexHarness();
   const mapped = h.mapBundle(SAMPLE, { backlogBackend: "local", versionScheme: "semver" });
-  assert(".specflow/memory/constitution.md" in mapped);
+  assert(".specnaut/memory/constitution.md" in mapped);
   assert("AGENTS.md" in mapped);
 });
 

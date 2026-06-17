@@ -92,10 +92,10 @@ Deno.test("WindsurfHarness maps agents to .windsurf/workflows/specnaut-agent-<na
   assert(".windsurf/workflows/specnaut-agent-product-owner.md" in mapped);
 });
 
-Deno.test("WindsurfHarness maps spec-root to .specflow/<suffix> and project-root to <suffix>", () => {
+Deno.test("WindsurfHarness maps spec-root to .specnaut/<suffix> and project-root to <suffix>", () => {
   const h = new WindsurfHarness();
   const mapped = h.mapBundle(SAMPLE, { backlogBackend: "local", versionScheme: "semver" });
-  assert(".specflow/memory/constitution.md" in mapped);
+  assert(".specnaut/memory/constitution.md" in mapped);
   assert("AGENTS.md" in mapped);
 });
 

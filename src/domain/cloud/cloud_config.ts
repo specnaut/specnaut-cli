@@ -1,4 +1,4 @@
-// Read/write the project's `.specflow/backlog-config.yml` for the Cloud backend
+// Read/write the project's `.specnaut/backlog-config.yml` for the Cloud backend
 // (#353). Holds only non-secret coordinates — backend, api_url, project_key.
 // Credentials live in the credential store, never here.
 
@@ -18,7 +18,7 @@ export function renderCloudConfig(apiUrl = "", projectKey = ""): string {
   return [
     "# backlog-config.yml — Specnaut Cloud backend",
     "# Credentials are NOT stored here. They live in your OS keychain (or a",
-    "# 0600 file under ~/.specflow). Run `specnaut cloud login` to authenticate.",
+    "# 0600 file under ~/.specnaut). Run `specnaut cloud login` to authenticate.",
     "backend: cloud",
     `api_url: ${
       JSON.stringify(apiUrl)
@@ -38,7 +38,7 @@ export function renderCloudConfig(apiUrl = "", projectKey = ""): string {
 
 /** Read the Cloud config from a project dir, or null if absent/unreadable. */
 export async function readCloudConfig(projectDir: string): Promise<CloudConfig | null> {
-  const path = `${projectDir}/.specflow/backlog-config.yml`;
+  const path = `${projectDir}/.specnaut/backlog-config.yml`;
   let text: string;
   try {
     text = await Deno.readTextFile(path);
@@ -80,9 +80,9 @@ export async function writeCloudConfig(
   apiUrl: string,
   projectKey: string,
 ): Promise<void> {
-  await Deno.mkdir(`${projectDir}/.specflow`, { recursive: true });
+  await Deno.mkdir(`${projectDir}/.specnaut`, { recursive: true });
   await Deno.writeTextFile(
-    `${projectDir}/.specflow/backlog-config.yml`,
+    `${projectDir}/.specnaut/backlog-config.yml`,
     renderCloudConfig(apiUrl, projectKey),
   );
 }

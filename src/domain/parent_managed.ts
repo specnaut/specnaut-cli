@@ -3,7 +3,7 @@
  *
  * A *parent-managed* target is a sub-repo nested inside a providing Specnaut
  * workspace (an ancestor that owns the centralised skills/agents and declares
- * the target as a workspace member). In that state the toolkit (`.specflow/`)
+ * the target as a workspace member). In that state the toolkit (`.specnaut/`)
  * is still provisioned, but the agentic files (`.claude/skills|agents|commands`)
  * are inherited from the parent rather than written locally — any local copy is
  * the drift the centralised workspace deliberately eliminated.
@@ -49,7 +49,7 @@ export function isParentManaged(
  * (`.cursor/`, `.codex/`, `.opencode/`, …) — those are out of scope here and a
  * future reader should not assume they are suppressed. Within `.claude/`,
  * notably `.claude/settings.json`, `.claude/CLAUDE.md`, `AGENTS.md`,
- * `.gitignore`, and every `.specflow/**` path are NOT agentic and are always
+ * `.gitignore`, and every `.specnaut/**` path are NOT agentic and are always
  * provisioned.
  */
 export function isAgenticPath(dest: string): boolean {

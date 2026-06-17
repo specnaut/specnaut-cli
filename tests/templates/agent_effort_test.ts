@@ -18,7 +18,7 @@ type Effort = (typeof VALID_EFFORTS)[number];
 
 /**
  * Authoritative agent → effort assignment, mirroring
- * `.specflow/specs/016-agent-effort-rubric/contracts/effort-map.md`.
+ * `.specnaut/specs/016-agent-effort-rubric/contracts/effort-map.md`.
  * 2 low · 9 medium · 1 high · 3 xhigh = 15.
  */
 const EFFORT_MAP: Record<string, Effort> = {

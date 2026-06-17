@@ -29,27 +29,27 @@ ${bold("Flags (for init):")}
   --backlog <name>    Backlog backend: local (default) | github | gitlab | cloud
                       (cloud: run "specnaut cloud login" after init to authenticate + link a project)
   --backlog-url <url> Kanban / project URL (e.g. https://github.com/orgs/<org>/projects/<N>)
-                      Required for github/gitlab in non-interactive mode; pre-fills .specflow/backlog-config.yml
+                      Required for github/gitlab in non-interactive mode; pre-fills .specnaut/backlog-config.yml
   --backlog-repo <r>  GitHub repo override <owner>/<name>; falls back to "git remote get-url origin"
   --scheme <name>     Versioning scheme for the release scripts: semver | date
                       Auto-detected from library markers (package.json exports, pyproject.toml,
                       Cargo.toml [lib], composer.json type=library), semver-shaped git tags
                       (v1.2.3), or a CHANGELOG.md with Keep-a-Changelog headers. Falls back to
                       "date" when no signal is found.
-  --force             Overwrite locally-customized files (existing content backed up to *.specflow.bak)
-  --reset-preserved   Ignore .specflow/preserve.yml for this run so declared files are refreshed too
+  --force             Overwrite locally-customized files (existing content backed up to *.specnaut.bak)
+  --reset-preserved   Ignore .specnaut/preserve.yml for this run so declared files are refreshed too
                       (never the default; reported per overridden file)
   --dry-run           Show the plan without writing — trumps --force
 
 ${bold("Flags (for upgrade):")}
   --dry-run           Show the plan without writing
-  --force             Overwrite locally-customized files (existing content backed up to *.specflow.bak)
+  --force             Overwrite locally-customized files (existing content backed up to *.specnaut.bak)
   --backlog <name>    Switch the backlog backend (local | github | gitlab). Re-renders the backlog skill;
                       existing data in the previous backend is NOT migrated.
   --reset-baseline    Trust the on-disk content as the new SHA baseline. Use when files are flagged
                       "customized locally" but you never edited them (heals stale lock SHAs). Combine
                       with --dry-run to preview what would change.
-  --reset-preserved   Ignore .specflow/preserve.yml for this run so declared files follow normal
+  --reset-preserved   Ignore .specnaut/preserve.yml for this run so declared files follow normal
                       upgrade rules (never the default; reported per overridden file).
 
 ${bold("Flags (for diff):")}
@@ -78,8 +78,8 @@ specnaut reconcile --status
 
 specnaut reconcile <path> --accept-upstream
    Take the new template version. Backs up the local file to
-   <path>.specflow.bak, copies upstream content into place, and
-   updates .specflow/installed.lock.
+   <path>.specnaut.bak, copies upstream content into place, and
+   updates .specnaut/installed.lock.
 
 specnaut reconcile <path> --accept-current
    Keep the local customized version. Re-stamps the lock SHA to

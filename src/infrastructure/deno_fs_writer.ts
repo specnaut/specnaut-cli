@@ -4,7 +4,7 @@ import { mergeIntoFile } from "../domain/merge_block.ts";
 import { mergeClaudeSettings } from "../domain/claude_settings_merge.ts";
 import type { BackupReport, FsWriter } from "../application/ports.ts";
 
-const BACKUP_SUFFIX = ".specflow.bak";
+const BACKUP_SUFFIX = ".specnaut.bak";
 
 async function fileExists(path: string): Promise<boolean> {
   try {

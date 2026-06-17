@@ -188,6 +188,6 @@ Deno.test("spec-root and project-root pass through unchanged", () => {
     backlogBackend: "local",
     versionScheme: "semver",
   });
-  assertEquals(bundle[".specflow/memory/constitution.md"].content, "raw constitution");
+  assertEquals(bundle[".specnaut/memory/constitution.md"].content, "raw constitution");
   assertEquals(bundle["AGENTS.md"].content, "raw AGENTS");
 });

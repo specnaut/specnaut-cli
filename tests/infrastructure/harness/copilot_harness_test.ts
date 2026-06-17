@@ -105,10 +105,10 @@ Deno.test('CopilotHarness rewrites instruction frontmatter to applyTo: "**" and 
   assert(cmd.content.includes("Do the thing"), "body should be preserved");
 });
 
-Deno.test("CopilotHarness maps spec-root to .specflow/<suffix> and project-root to <suffix>", () => {
+Deno.test("CopilotHarness maps spec-root to .specnaut/<suffix> and project-root to <suffix>", () => {
   const h = new CopilotHarness();
   const mapped = h.mapBundle(SAMPLE, { backlogBackend: "local", versionScheme: "semver" });
-  assert(".specflow/memory/constitution.md" in mapped);
+  assert(".specnaut/memory/constitution.md" in mapped);
   assert("AGENTS.md" in mapped);
 });
 

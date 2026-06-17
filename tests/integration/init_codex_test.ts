@@ -101,8 +101,8 @@ Deno.test("specnaut init --ai codex scaffolds a Codex layout", async () => {
     // status-audit (#381) = 22.
     // The audit-security phase (#303) lands under specnaut/phases/, not as a
     // top-level skill — no bump there. code-audit's scope script ships under
-    // .specflow/scripts/code-audit/, not as a skill folder; status-audit's
-    // schema doc ships to .specflow/logs/README.md, also not a skill folder.
+    // .specnaut/scripts/code-audit/, not as a skill folder; status-audit's
+    // schema doc ships to .specnaut/logs/README.md, also not a skill folder.
     const agentsSkillsCount = (await Array.fromAsync(
       Deno.readDir(join(root, ".agents/skills")),
     )).length;
@@ -115,10 +115,10 @@ Deno.test("specnaut init --ai codex scaffolds a Codex layout", async () => {
     assertEquals(codexAgentsCount, 15);
 
     // Shared (cross-harness)
-    assertEquals(await exists(join(root, ".specflow/memory/constitution.md")), true);
+    assertEquals(await exists(join(root, ".specnaut/memory/constitution.md")), true);
     assertEquals(await exists(join(root, "AGENTS.md")), true);
     assertEquals(await exists(join(root, "tasks/backlog.md")), false);
-    assertEquals(await exists(join(root, ".specflow/backlog.md")), true);
+    assertEquals(await exists(join(root, ".specnaut/backlog.md")), true);
 
     // NOT emitted for codex
     assertEquals(await exists(join(root, ".claude/")), false);
@@ -126,7 +126,7 @@ Deno.test("specnaut init --ai codex scaffolds a Codex layout", async () => {
     assertEquals(await exists(join(root, "CLAUDE.md")), false);
 
     // Lock reflects codex
-    const lock = await Deno.readTextFile(join(root, ".specflow/installed.lock"));
+    const lock = await Deno.readTextFile(join(root, ".specnaut/installed.lock"));
     assertEquals(lock.includes("harness: codex"), true);
   });
 });

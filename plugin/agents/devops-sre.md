@@ -16,7 +16,7 @@ between "the code compiles" and "the user sees a green dashboard at 3 a.m."
 ## First action in every session
 
 1. Read `AGENTS.md` at the project root for tech stack and constraints.
-2. Read `.specflow/memory/constitution.md` for non-negotiable invariants
+2. Read `.specnaut/memory/constitution.md` for non-negotiable invariants
    (often where SLOs, error budgets, and security posture live).
 3. Identify which cloud(s) the project targets (GCP, Azure, AWS, multi-cloud)
    and which IaC tool is canonical (Terraform, Pulumi, OpenTofu, CDK).

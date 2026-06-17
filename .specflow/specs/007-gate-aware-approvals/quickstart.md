@@ -5,7 +5,7 @@
 ```bash
 # Plan checkpoint
 specflow gate raise --type plan_approval --title "Approve the plan for 005-cli-gate-client" \
-  --payload '{"summary":"3 modules + remote switch","planRef":".specflow/specs/005-…/plan.md"}'
+  --payload '{"summary":"3 modules + remote switch","planRef":".specnaut/specs/005-…/plan.md"}'
 # → {"approved":true}            exit 0 → chain resumes into /specflow tasks
 # → {"approved":false,"note":"…"} exit 0 → chain halts, reports the revision note
 # → exit 3/4/5                    → chain halts cleanly (never auto-approves)

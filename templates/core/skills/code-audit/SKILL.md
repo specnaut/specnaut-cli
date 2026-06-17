@@ -22,7 +22,7 @@ in a single parallel batch and synthesizes one verdict. The two are
 Run the bundled scope resolver and read its block:
 
 ```bash
-.specflow/scripts/code-audit/collect-audit-scope.sh [--path <subtree> | --range <a>..<b>] [--last <n>]
+.specnaut/scripts/code-audit/collect-audit-scope.sh [--path <subtree> | --range <a>..<b>] [--last <n>]
 ```
 
 Pass through whatever `$ARGUMENTS` the user gave. With no arguments the script

@@ -117,11 +117,11 @@ Deno.test("isPluginCoveredPath: claude + specnaut-review alias is covered", () =
 Deno.test("isPluginCoveredPath: claude + project-stateful paths NOT covered", () => {
   for (
     const dest of [
-      ".specflow/installed.lock",
-      ".specflow/memory/constitution.md",
-      ".specflow/backlog.md",
-      ".specflow/backlog-config.yml",
-      ".specflow/scripts/backlog/add.sh",
+      ".specnaut/installed.lock",
+      ".specnaut/memory/constitution.md",
+      ".specnaut/backlog.md",
+      ".specnaut/backlog-config.yml",
+      ".specnaut/scripts/backlog/add.sh",
       "AGENTS.md",
       "CLAUDE.md",
       ".gitignore",

@@ -23,7 +23,7 @@ async function fixture(
   await Deno.mkdir(child, { recursive: true });
 
   if (opts.parentHasSpecnaut ?? true) {
-    await Deno.mkdir(join(parent, ".specflow"), { recursive: true });
+    await Deno.mkdir(join(parent, ".specnaut"), { recursive: true });
   }
   if (opts.denoJson !== undefined) {
     await Deno.writeTextFile(join(parent, "deno.json"), opts.denoJson);
@@ -34,8 +34,8 @@ async function fixture(
     );
   }
   if (opts.childStandalone) {
-    await Deno.mkdir(join(child, ".specflow"), { recursive: true });
-    await Deno.writeTextFile(join(child, ".specflow", "standalone.yml"), "");
+    await Deno.mkdir(join(child, ".specnaut"), { recursive: true });
+    await Deno.writeTextFile(join(child, ".specnaut", "standalone.yml"), "");
   }
 
   const realParent = await Deno.realPath(parent);
@@ -43,7 +43,7 @@ async function fixture(
   return { root, parent: realParent, child: realChild };
 }
 
-Deno.test("findProvidingAncestor: matches a providing ancestor (.specflow + member resolves to target)", async () => {
+Deno.test("findProvidingAncestor: matches a providing ancestor (.specnaut + member resolves to target)", async () => {
   const { root, parent, child } = await fixture({ member: "./child" });
   try {
     const reader = new FsParentWorkspaceReader();
@@ -53,7 +53,7 @@ Deno.test("findProvidingAncestor: matches a providing ancestor (.specflow + memb
   }
 });
 
-Deno.test("findProvidingAncestor: ancestor with .specflow but non-matching member ⇒ null", async () => {
+Deno.test("findProvidingAncestor: ancestor with .specnaut but non-matching member ⇒ null", async () => {
   const { root, child } = await fixture({ member: "./other" });
   try {
     const reader = new FsParentWorkspaceReader();
@@ -63,7 +63,7 @@ Deno.test("findProvidingAncestor: ancestor with .specflow but non-matching membe
   }
 });
 
-Deno.test("findProvidingAncestor: matching member but no .specflow ⇒ null", async () => {
+Deno.test("findProvidingAncestor: matching member but no .specnaut ⇒ null", async () => {
   const { root, child } = await fixture({ parentHasSpecnaut: false, member: "./child" });
   try {
     const reader = new FsParentWorkspaceReader();
@@ -92,7 +92,7 @@ Deno.test("findProvidingAncestor: symlinked workspace member is canonicalised (F
   const parent = join(root, "parent");
   const realChildDir = join(parent, "child");
   await Deno.mkdir(realChildDir, { recursive: true });
-  await Deno.mkdir(join(parent, ".specflow"), { recursive: true });
+  await Deno.mkdir(join(parent, ".specnaut"), { recursive: true });
   await Deno.symlink(realChildDir, join(parent, "link"));
   await Deno.writeTextFile(
     join(parent, "deno.json"),

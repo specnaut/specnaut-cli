@@ -29,7 +29,7 @@ if ($Help) {
     Write-Host "  -Number N           Specify branch number manually (overrides auto-detection)"
     Write-Host "  -Timestamp          Use timestamp prefix (YYYYMMDD-HHMMSS) instead of sequential numbering"
     Write-Host "  -Issue <id>         Link this feature to a backlog issue (positive integer);"
-    Write-Host "                      surfaces in JSON output and is persisted to .specflow/feature.json"
+    Write-Host "                      surfaces in JSON output and is persisted to .specnaut/feature.json"
     Write-Host "                      so /specflow merge can close the loop on the project board."
     Write-Host "  -Help               Show this help message"
     Write-Host ""
@@ -186,7 +186,7 @@ $hasGit = Test-HasGit
 
 Set-Location $repoRoot
 
-$specsDir = Join-Path $repoRoot '.specflow' 'specs'
+$specsDir = Join-Path $repoRoot '.specnaut' 'specs'
 if (-not $DryRun) {
     New-Item -ItemType Directory -Path $specsDir -Force | Out-Null
 }

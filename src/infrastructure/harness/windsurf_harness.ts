@@ -49,7 +49,7 @@ function destinationFor(entry: CoreEntry): string {
       throw new Error("agent-doc entries should be filtered before destinationFor");
     case "spec-root":
       if (!entry.suffix) throw new Error(`spec-root needs suffix`);
-      return `.specflow/${entry.suffix}`;
+      return `.specnaut/${entry.suffix}`;
     case "project-root":
     case "mergeable-project-root":
       if (!entry.suffix) throw new Error(`${entry.category} needs suffix`);

@@ -27,7 +27,7 @@
 
 Spec is derived from issue #371, which carries a complete pre-authored behavioural contract (C1–C5)
 and the source contract file at
-`mkrlabs/specflow-monorepo:.specflow/specs/002-centralize-skills-agents/contracts/parent-managed-detection.md`.
+`mkrlabs/specflow-monorepo:.specnaut/specs/002-centralize-skills-agents/contracts/parent-managed-detection.md`.
 That removed the usual ambiguity — no `[NEEDS CLARIFICATION]` markers were needed. Every FR maps to
 an acceptance scenario and at least one SC; every SC maps back to a contract item (C1–C5) or FR.
 Ready for `/specflow plan`.

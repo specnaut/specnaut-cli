@@ -3,7 +3,7 @@
 ## What ships
 
 An enriched `log-subagent.sh` hook (captures contract fields into the JSONL ledger), a read-only
-`/status-audit` skill (reports session health from the ledger), and a `.specflow/logs/README.md`
+`/status-audit` skill (reports session health from the ledger), and a `.specnaut/logs/README.md`
 schema doc. Plus the `/loop 5m /status-audit` supervision pattern.
 
 ## Build & test
@@ -20,15 +20,15 @@ deno task test     # bundle + hook-enrichment hermetic test + status-audit conte
 # hook enriches when a contract block is present
 printf '{"session_id":"s1","agent_name":"security-auditor","output":"...\nREVIEW SUMMARY\nREVIEW_VERDICT: fail\nWORKFLOW STATUS\nSTATE: awaiting_review\nHANDOFF_TARGET: review-coordinator\n"}' \
   | bash templates/harness-specific/claude/hooks/log-subagent.sh stop
-tail -1 .specflow/logs/agents.jsonl   # → carries state/handoff_target/review_verdict
+tail -1 .specnaut/logs/agents.jsonl   # → carries state/handoff_target/review_verdict
 
 # backward-compatible when no block
 printf '{"session_id":"s1","agent_name":"x"}' | bash …/log-subagent.sh stop
-tail -1 .specflow/logs/agents.jsonl   # → base four fields only, valid JSON
+tail -1 .specnaut/logs/agents.jsonl   # → base four fields only, valid JSON
 
 # skill + doc present
 grep -q "/loop 5m /status-audit" templates/core/skills/status-audit/SKILL.md
-test -f <bundled .specflow/logs/README.md source>
+test -f <bundled .specnaut/logs/README.md source>
 ```
 
 ## End-to-end

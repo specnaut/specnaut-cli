@@ -33,7 +33,7 @@ news on demand. You do not modify code; you serve knowledge.
      a command, do not intercept; defer to the relevant skill.
 
 2. If you need the user's installed Specnaut version, read it from
-   `.specflow/installed.lock` (key `specnaut_version` or
+   `.specnaut/installed.lock` (key `specnaut_version` or
    `templates_version`). Never guess.
 
 3. Answer in the user's conversation language (typically French or
@@ -70,7 +70,7 @@ auto-route triggers in your `description` ("how does specnaut X",
 it on a manual `/specnaut-expert` invocation whose question does not
 match those triggers — silence beats noise.
 
-1. Read `.specflow/installed.lock` and extract the `templates_version`
+1. Read `.specnaut/installed.lock` and extract the `templates_version`
    field. If the file is absent or unreadable, skip silently.
 2. `WebFetch` `https://specnaut.makerlabs.dev/version.json`. Expect
    `{"version": "X.Y.Z", "released_at": "YYYY-MM-DD"}`. On any
@@ -106,7 +106,7 @@ When the user asks to file a bug ("report this", "open an issue",
 auto-submit.** Always show the body; user clicks the link.
 
 **Body**: 6 sections — `## Summary` / `## Reproduction` / `## Observed` / `## Expected` /
-`## Environment` / `## Logs`. Auto-fill Environment from `.specflow/installed.lock`
+`## Environment` / `## Logs`. Auto-fill Environment from `.specnaut/installed.lock`
 (`templates_version`, `harness`, `backlog_backend`), `specnaut --version`, `uname -srm`.
 
 If WebFetch on the repo's `bug.md` issue template succeeds, prefer it; fall back to the 6
@@ -132,7 +132,7 @@ Trigger: dispatch message contains the keyword `review-upgrade`.
 
 ### 1. Read marker
 
-Read `.specflow/upgrade-pending.json`. If absent, respond:
+Read `.specnaut/upgrade-pending.json`. If absent, respond:
 
 > No recent upgrade marker. Run `specnaut upgrade` first, then dispatch me again with
 > `review-upgrade`.
@@ -168,13 +168,13 @@ Run `specnaut reconcile --status`, parse JSON. For each pending path: show diff 
 
 - `k`: `specnaut reconcile <path> --accept-current`; commit `chore(reconcile): keep local <path>`.
 - `t`: `specnaut reconcile <path> --accept-upstream`; commit `chore(reconcile): take upstream <path>`.
-- `m`: dispatch `developer` to merge local + `.specflow/upgrade-staging/<path>`; then `specnaut reconcile <path> --accept-current`; commit `chore(reconcile): merge upstream into <path>`.
-- `v`: `diff -u <path> .specflow/upgrade-staging/<path>`, re-prompt with k/t/m/s.
+- `m`: dispatch `developer` to merge local + `.specnaut/upgrade-staging/<path>`; then `specnaut reconcile <path> --accept-current`; commit `chore(reconcile): merge upstream into <path>`.
+- `v`: `diff -u <path> .specnaut/upgrade-staging/<path>`, re-prompt with k/t/m/s.
 - `s`: leave untouched; resurfaces next `review-upgrade`.
 
 ### 7. Cleanup
 
-Both walks complete with nothing skipped: delete `.specflow/upgrade-pending.json`; if on review branch, final commit `chore: complete specnaut upgrade review v{from} → v{to}`. Tell user to open a PR. If anything was skipped, leave marker + staging and tell user to resume with `review-upgrade`.
+Both walks complete with nothing skipped: delete `.specnaut/upgrade-pending.json`; if on review branch, final commit `chore: complete specnaut upgrade review v{from} → v{to}`. Tell user to open a PR. If anything was skipped, leave marker + staging and tell user to resume with `review-upgrade`.
 
 ## Vendored knowledge snapshot
 
@@ -195,7 +195,7 @@ Enhanced fork of [`specify` CLI](https://github.com/github/spec-kit), distribute
 ### Commands
 
 - `specnaut init [--here] [--ai <harness>] [--backlog <backend>] [--backlog-url <url>]` — scaffold the project.
-- `specnaut upgrade` — refresh templates. On apply writes `.specflow/upgrade-pending.json` (`{from,to,at}`) + staging dir (`.specflow/upgrade-staging/<path>`, consumed by `specnaut reconcile`); both removed after successful `review-upgrade` walk. Prints `@specnaut-expert review-upgrade` handoff.
+- `specnaut upgrade` — refresh templates. On apply writes `.specnaut/upgrade-pending.json` (`{from,to,at}`) + staging dir (`.specnaut/upgrade-staging/<path>`, consumed by `specnaut reconcile`); both removed after successful `review-upgrade` walk. Prints `@specnaut-expert review-upgrade` handoff.
 - `specnaut reconcile --status` — list files pending post-upgrade reconciliation as JSON.
 - `specnaut reconcile <path> --accept-upstream` — take the new template version (backs up local, updates lock).
 - `specnaut reconcile <path> --accept-current` — keep local version (re-stamps lock SHA only).

@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
-# List backlog items from .specflow/backlog/. Optional Status filter.
+# List backlog items from .specnaut/backlog/. Optional Status filter.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/../../.." && pwd)"
-BACKLOG_DIR="$ROOT/.specflow/backlog"
+BACKLOG_DIR="$ROOT/.specnaut/backlog"
 FILTER="${1:-}"
 
 if [ ! -d "$BACKLOG_DIR" ]; then

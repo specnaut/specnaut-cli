@@ -45,7 +45,7 @@ wiring (that is #5/#6), no push delivery (#18).
 ### Documentation (this feature)
 
 ```
-.specflow/specs/005-cli-gate-client/
+.specnaut/specs/005-cli-gate-client/
 ├── spec.md
 ├── plan.md            # this file
 ├── research.md        # D1–D6 decisions

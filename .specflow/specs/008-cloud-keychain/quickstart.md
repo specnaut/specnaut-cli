@@ -9,7 +9,7 @@ platform.
 1. `specflow cloud login` → expect the success line to name **keychain**.
 2. Inspect: `security find-generic-password -s specflow-cloud` shows an item for the API URL account
    (the value is NOT printed without `-w`; we never store via `-w`).
-3. Confirm no token file: `~/.specflow/credentials.json` absent (or contains no entry for this URL).
+3. Confirm no token file: `~/.specnaut/credentials.json` absent (or contains no entry for this URL).
 4. Run any authenticated command (e.g. `specflow gate list`) → succeeds, token loaded from keychain.
 5. `specflow cloud logout` → keychain item gone (`security find-generic-password -s specflow-cloud`
    returns "could not be found").
@@ -43,7 +43,7 @@ and review the keychain backends: no `Deno.Command` / `Deno.run`, no `security -
 ## Headless / no-keyring fallback (all platforms)
 
 1. Run in an environment with no reachable keyring (CI, `--allow-ffi` withheld, locked keyring):
-   `specflow cloud login` → names **file**, writes `~/.specflow/credentials.json` `0600`, succeeds
+   `specflow cloud login` → names **file**, writes `~/.specnaut/credentials.json` `0600`, succeeds
    with no prompt/hang.
 2. Authenticated command loads from the file store and succeeds.
 

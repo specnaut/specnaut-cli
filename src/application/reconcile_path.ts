@@ -64,7 +64,7 @@ export class ReconcilePathUseCase {
     // Backup + write to project path (only on accept-upstream).
     const toWrite: Record<string, { content: string; executable: boolean }> = {};
     if (recomputed.backupFromContent !== null) {
-      toWrite[`${input.path}.specflow.bak`] = {
+      toWrite[`${input.path}.specnaut.bak`] = {
         content: recomputed.backupFromContent,
         executable: false,
       };

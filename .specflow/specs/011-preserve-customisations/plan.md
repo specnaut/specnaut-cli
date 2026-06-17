@@ -1,7 +1,7 @@
 # Implementation Plan: Preserve per-project customisations across template refreshes
 
 **Branch**: `011-preserve-customisations` | **Date**: 2026-06-09 | **Spec**: [spec.md](./spec.md)
-**Input**: Feature specification from `.specflow/specs/011-preserve-customisations/spec.md` (issue
+**Input**: Feature specification from `.specnaut/specs/011-preserve-customisations/spec.md` (issue
 mkrlabs/specflow#367)
 
 ## Summary
@@ -16,7 +16,7 @@ generic on 2026-06-08.
 The fix adds an **explicit, force-surviving preserve declaration** plus a **read-only divergence
 view** and an explicit **reset opt-out**:
 
-1. A project-level `.specflow/preserve.yml` manifest (a flat list of project-relative paths)
+1. A project-level `.specnaut/preserve.yml` manifest (a flat list of project-relative paths)
    declares which managed files are the maintainer's. A new pure domain type (`preserve_config.ts`),
    a `PreserveStore` port, and an `FsPreserveStore` adapter (mirroring `FsLockStore`) read it.
 2. `init --force` filters preserved paths out of the write set in `InitProjectUseCase`; `upgrade`
@@ -36,8 +36,8 @@ visible divergence, US3 provides the deliberate escape hatch.
 **Language/Version**: TypeScript on Deno v2.x **Primary Dependencies**: Deno std (`@std/yaml` for
 the manifest, `@std/assert` for tests); existing in-repo `renderUnifiedDiff` (`src/domain/diff.ts`),
 `CORE_BUNDLE` (`src/.../templates_bundle.ts`), hexagonal ports in `src/application/ports.ts`
-**Storage**: a new `.specflow/preserve.yml` (flat YAML list); state of record stays in the existing
-`.specflow/installed.lock` **Testing**: `deno task test` (Deno.test); hermetic fakes for every port
+**Storage**: a new `.specnaut/preserve.yml` (flat YAML list); state of record stays in the existing
+`.specnaut/installed.lock` **Testing**: `deno task test` (Deno.test); hermetic fakes for every port
 (`FsReader`, `FsWriter`, `LockStore`, new `PreserveStore`) — no network, no real binary **Target
 Platform**: GitHub-hosted runners + local engineer machine; the CLI binary itself **Project Type**:
 Single-project CLI repo, hexagonal (domain / application / infrastructure / cli) **Performance
@@ -78,7 +78,7 @@ No violations → Complexity Tracking is empty.
 ### Documentation (this feature)
 
 ```text
-.specflow/specs/011-preserve-customisations/
+.specnaut/specs/011-preserve-customisations/
 ├── plan.md              # This file
 ├── research.md          # Phase 0 — decisions D1..D8
 ├── data-model.md        # Phase 1 — PreserveConfig, PreserveStore, DivergenceResult, RefreshMode
@@ -103,7 +103,7 @@ src/application/
 └── diff_project.ts           # NEW — DiffProjectUseCase (read-only): lock → bundle → disk → DivergenceResult[]
 
 src/infrastructure/
-└── fs_preserve_store.ts      # NEW — reads/writes .specflow/preserve.yml; mirrors FsLockStore (absent ⇒ EMPTY)
+└── fs_preserve_store.ts      # NEW — reads/writes .specnaut/preserve.yml; mirrors FsLockStore (absent ⇒ EMPTY)
 
 src/cli/
 ├── parser.ts                 # EDIT — `diff` intent; --reset-preserved on init & upgrade
@@ -135,8 +135,8 @@ the existing `isPluginCoveredPath` predicate.
 See [research.md](./research.md). All unknowns resolved (architect design pass, agent
 `a337df927febff143`); no NEEDS CLARIFICATION remains. Key decisions:
 
-- **D1** Declaration mechanism = a single `.specflow/preserve.yml` manifest (flat path list).
-  Rejected per-file frontmatter (unworkable for non-markdown bundle files) and `.specflow-override`
+- **D1** Declaration mechanism = a single `.specnaut/preserve.yml` manifest (flat path list).
+  Rejected per-file frontmatter (unworkable for non-markdown bundle files) and `.specnaut-override`
   sidecars (file-count blow-up, invisible to review sweeps).
 - **D2** Preserve intent lives in its OWN file, not embedded in `installed.lock` — the lock is a
   state record; the manifest is user intent. (`parentManaged` embeds a derived _fact_; preserve is

@@ -36,7 +36,7 @@ export interface BacklogBackendStrategy {
   readonly displayName: string;
 
   /**
-   * Returns the contents of `.specflow/backlog-config.yml` to write
+   * Returns the contents of `.specnaut/backlog-config.yml` to write
    * at init time, or `null` if no config file is needed for this
    * backend (e.g. `local` is zero-config).
    *

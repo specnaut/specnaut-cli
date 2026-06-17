@@ -39,7 +39,7 @@ function destinationFor(entry: CoreEntry): string {
       return backlogScriptDestination(entry);
     case "spec-root":
       if (!entry.suffix) throw new Error(`spec-root entry needs suffix: ${entry.name}`);
-      return `.specflow/${entry.suffix}`;
+      return `.specnaut/${entry.suffix}`;
     case "project-root":
     case "mergeable-project-root":
       if (!entry.suffix) throw new Error(`${entry.category} needs suffix: ${entry.name}`);

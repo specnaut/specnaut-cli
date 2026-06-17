@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
-# Helper: read host + project_id from .specflow/backlog-config.yml.
+# Helper: read host + project_id from .specnaut/backlog-config.yml.
 # Sourced by the other gitlab-backend scripts.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/../../.." && pwd)"
-CONFIG="$ROOT/.specflow/backlog-config.yml"
+CONFIG="$ROOT/.specnaut/backlog-config.yml"
 
 if [ ! -f "$CONFIG" ]; then
   echo "error: $CONFIG not found. Fill in host + project_id first." >&2

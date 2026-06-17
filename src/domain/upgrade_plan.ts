@@ -10,7 +10,7 @@ export type UpgradeAction =
      *   - `"customized"`: the on-disk SHA diverges from the lock (the
      *     maintainer edited it) — the existing implicit auto-preserve.
      *   - `"declared"`: the maintainer listed the path in
-     *     `.specflow/preserve.yml` (spec 011 / issue #367). A declared
+     *     `.specnaut/preserve.yml` (spec 011 / issue #367). A declared
      *     file is preserved regardless of its SHA and wins over
      *     auto-update, plugin-migration, and removal.
      */
@@ -48,7 +48,7 @@ export type UpgradePlan = ReadonlyArray<UpgradeAction>;
 /**
  * Compute the upgrade plan from three SHA256 snapshots:
  *   - `diskShas` : current content SHA of each file (absent = not on disk)
- *   - `lock`     : the .specflow/installed.lock
+ *   - `lock`     : the .specnaut/installed.lock
  *   - `newShas`  : SHA of each file in the binary's embedded templates
  *
  * Plus two parameters that drive the binary → plugin migration table:
@@ -85,7 +85,7 @@ export type UpgradePlanOptions = {
   isPluginCovered?: (dest: string) => boolean;
   /**
    * Predicate identifying `skipIfExists` bundle entries. Such files
-   * (e.g. `AGENTS.md`, `.specflow/memory/constitution.md`) may exist on
+   * (e.g. `AGENTS.md`, `.specnaut/memory/constitution.md`) may exist on
    * disk before init touches them — in which case init deliberately
    * skips writing AND skips recording them in the lock. Without this
    * predicate, upgrade saw `diskSha defined + lockSha undefined` and
@@ -105,7 +105,7 @@ export type UpgradePlanOptions = {
   resetBaseline?: boolean;
   /**
    * True when the maintainer declared `dest` preserved in
-   * `.specflow/preserve.yml` (spec 011 / issue #367). A declared path is
+   * `.specnaut/preserve.yml` (spec 011 / issue #367). A declared path is
    * promoted to `preserve / reason:"declared"` as the FIRST branch of the
    * plan — it wins over unchanged, auto-update, plugin-migration, AND
    * removal (a declared path dropped upstream is kept on disk, FR-009).
@@ -140,7 +140,7 @@ export function computeUpgradePlan(
     let lockSha = lock.entries.get(dest)?.sha256;
 
     // Declared-preserve wins over everything (spec 011 / issue #367): a path
-    // the maintainer listed in .specflow/preserve.yml is kept regardless of
+    // the maintainer listed in .specnaut/preserve.yml is kept regardless of
     // its SHA — before the unchanged, auto-update, and plugin-migration
     // branches. The file is only present here (in newShas) so `pluginAvailable`
     // is reported from coverage for the handler's reconcile hint.
@@ -189,7 +189,7 @@ export function computeUpgradePlan(
       continue;
     }
     if (lockSha === undefined) {
-      // skipIfExists files (AGENTS.md, .specflow/memory/constitution.md, …)
+      // skipIfExists files (AGENTS.md, .specnaut/memory/constitution.md, …)
       // that the user already had at init time were deliberately not
       // tracked by the lock. They were never specnaut-managed; do not
       // emit any action — silent skip prevents the false-positive

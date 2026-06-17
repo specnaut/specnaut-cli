@@ -43,7 +43,7 @@ Do **not** use when:
 
 `docs/specnaut/plans/YYYY-MM-DD-<feature-name>.md`
 
-User preference overrides this default (some teams prefer `.specflow/plans/`
+User preference overrides this default (some teams prefer `.specnaut/plans/`
 or `docs/plans/` — honor what they ask for). The date prefix gives plans
 a natural chronological order in the directory listing.
 

@@ -14,7 +14,7 @@ async function withProject<T>(fn: (dir: string) => Promise<T>): Promise<T> {
 Deno.test("integration: reconcile --status lists staged paths", async () => {
   await withProject(async (dir) => {
     // Seed a fake staging entry directly:
-    const stagingFile = resolve(dir, ".specflow/upgrade-staging/.claude/agents/developer.md");
+    const stagingFile = resolve(dir, ".specnaut/upgrade-staging/.claude/agents/developer.md");
     await Deno.mkdir(resolve(stagingFile, ".."), { recursive: true });
     await Deno.writeTextFile(stagingFile, "UPSTREAM\n");
 

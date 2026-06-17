@@ -39,7 +39,7 @@ async function initializedParentManagedChild(): Promise<{ root: string; child: s
   const root = await Deno.makeTempDir({ prefix: "specnaut-switch-pm-" });
   const parent = join(root, "parent");
   const child = join(parent, "child");
-  await Deno.mkdir(join(parent, ".specflow"), { recursive: true });
+  await Deno.mkdir(join(parent, ".specnaut"), { recursive: true });
   await Deno.mkdir(child, { recursive: true });
   await Deno.writeTextFile(
     join(parent, "deno.json"),
@@ -56,7 +56,7 @@ async function initializedParentManagedChild(): Promise<{ root: string; child: s
 Deno.test("switchBacklogBackend preserves parent_managed and excludes agentic entries", async () => {
   const { root, child } = await initializedParentManagedChild();
   try {
-    const lockPath = join(child, ".specflow/installed.lock");
+    const lockPath = join(child, ".specnaut/installed.lock");
     const before = parseLock(await Deno.readTextFile(lockPath));
     assertEquals(before.parentManaged, true, "precondition: lock must be parent-managed");
     assertEquals(before.backlogBackend, "local", "precondition: starts on local backend");

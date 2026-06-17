@@ -35,8 +35,8 @@ Deno.test("write → read round-trips api_url + project_key", async () => {
 
 Deno.test("empty stub parses to empty coordinates (pre-login state)", async () => {
   await withTempDir(async (dir) => {
-    await Deno.mkdir(`${dir}/.specflow`, { recursive: true });
-    await Deno.writeTextFile(`${dir}/.specflow/backlog-config.yml`, renderCloudConfig());
+    await Deno.mkdir(`${dir}/.specnaut`, { recursive: true });
+    await Deno.writeTextFile(`${dir}/.specnaut/backlog-config.yml`, renderCloudConfig());
     // The rendered stub's `remote:` block is commented out, so it round-trips to
     // exactly the prior shape — no `remote` key (backward compatible, #357).
     assertEquals(await readCloudConfig(dir), { apiUrl: "", projectKey: "" });
@@ -45,9 +45,9 @@ Deno.test("empty stub parses to empty coordinates (pre-login state)", async () =
 
 Deno.test("an explicit remote: block parses into the config (#357)", async () => {
   await withTempDir(async (dir) => {
-    await Deno.mkdir(`${dir}/.specflow`, { recursive: true });
+    await Deno.mkdir(`${dir}/.specnaut`, { recursive: true });
     await Deno.writeTextFile(
-      `${dir}/.specflow/backlog-config.yml`,
+      `${dir}/.specnaut/backlog-config.yml`,
       [
         "backend: cloud",
         'api_url: "https://dep.convex.site"',

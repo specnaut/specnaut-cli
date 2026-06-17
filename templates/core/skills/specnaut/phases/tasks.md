@@ -10,7 +10,7 @@ You **MUST** consider the user input before proceeding (if not empty).
 ## Pre-Execution Checks
 
 **Check for extension hooks (before tasks generation)**:
-- Check if `.specflow/extensions.yml` exists in the project root.
+- Check if `.specnaut/extensions.yml` exists in the project root.
 - If it exists, read it and look for entries under the `hooks.before_tasks` key
 - If the YAML cannot be parsed or is invalid, skip hook checking silently and continue normally
 - Filter out hooks where `enabled` is explicitly `false`. Treat hooks without an `enabled` field as enabled by default.
@@ -39,7 +39,7 @@ You **MUST** consider the user input before proceeding (if not empty).
     
     Wait for the result of the hook command before proceeding to the Outline.
     ```
-- If no hooks are registered or `.specflow/extensions.yml` does not exist, skip silently
+- If no hooks are registered or `.specnaut/extensions.yml` does not exist, skip silently
 
 ## Outline
 
@@ -82,7 +82,7 @@ You **MUST** consider the user input before proceeding (if not empty).
    - Suggested MVP scope (typically just User Story 1)
    - Format validation: Confirm ALL tasks follow the checklist format (checkbox, ID, labels, file paths)
 
-6. **Check for extension hooks**: After tasks.md is generated, check if `.specflow/extensions.yml` exists in the project root.
+6. **Check for extension hooks**: After tasks.md is generated, check if `.specnaut/extensions.yml` exists in the project root.
    - If it exists, read it and look for entries under the `hooks.after_tasks` key
    - If the YAML cannot be parsed or is invalid, skip hook checking silently and continue normally
    - Filter out hooks where `enabled` is explicitly `false`. Treat hooks without an `enabled` field as enabled by default.
@@ -109,7 +109,7 @@ You **MUST** consider the user input before proceeding (if not empty).
        Executing: `/{command}`
        EXECUTE_COMMAND: {command}
        ```
-   - If no hooks are registered or `.specflow/extensions.yml` does not exist, skip silently
+   - If no hooks are registered or `.specnaut/extensions.yml` does not exist, skip silently
 
 Context for task generation: {ARGS}
 

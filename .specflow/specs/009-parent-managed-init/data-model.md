@@ -32,7 +32,7 @@ isAgenticPath(dest: string): boolean
 ```
 
 - Operates on **harness-mapped destination strings**, not `CoreCategory`.
-- Non-matches (always provisioned): every `.specflow/**` path, `AGENTS.md`, `.gitignore`,
+- Non-matches (always provisioned): every `.specnaut/**` path, `AGENTS.md`, `.gitignore`,
   `.claude/settings.json`, and any non-`.claude` harness target.
 - **Invariant**: the predicate never depends on repo identity (FR-010/FR-011).
 
@@ -43,11 +43,11 @@ isAgenticPath(dest: string): boolean
 ```
 interface ParentWorkspaceReader {
   // Walk parents of targetDir to filesystem root; return the canonical path of
-  // the first ancestor that has .specflow/ AND a deno.json whose `workspace`
+  // the first ancestor that has .specnaut/ AND a deno.json whose `workspace`
   // member list resolves (canonically) to targetDir. null if none.
   findProvidingAncestor(targetDir: string): Promise<string | null>;
 
-  // True iff targetDir/.specflow/standalone.yml exists.
+  // True iff targetDir/.specnaut/standalone.yml exists.
   hasStandaloneOverride(targetDir: string): Promise<boolean>;
 }
 ```
@@ -92,5 +92,5 @@ upgrade:
 
 - Member-path comparison uses canonical absolute paths on both sides (FR-004).
 - Detection resolves on the **first** providing ancestor; ancestors above are not consulted.
-- An ancestor with `.specflow/` but no matching member, or with a matching member but no
-  `.specflow/`, does **not** qualify.
+- An ancestor with `.specnaut/` but no matching member, or with a matching member but no
+  `.specnaut/`, does **not** qualify.

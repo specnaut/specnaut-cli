@@ -14,7 +14,7 @@ export type PreserveConfig = {
 
 export const EMPTY_PRESERVE_CONFIG: PreserveConfig = { preserved: [] };
 
-/** Parse `.specflow/preserve.yml`. Unparseable / empty ⇒ EMPTY_PRESERVE_CONFIG (never throws). */
+/** Parse `.specnaut/preserve.yml`. Unparseable / empty ⇒ EMPTY_PRESERVE_CONFIG (never throws). */
 export function parsePreserveConfig(yaml: string): PreserveConfig;
 
 /** Serialize to canonical YAML (stable key order, trailing newline). */
@@ -30,7 +30,7 @@ bundle's destination paths are exact. A non-list / malformed document degrades t
 
 ```ts
 export interface PreserveStore {
-  /** Reads `.specflow/preserve.yml`; absent file ⇒ EMPTY_PRESERVE_CONFIG. */
+  /** Reads `.specnaut/preserve.yml`; absent file ⇒ EMPTY_PRESERVE_CONFIG. */
   read(projectDir: string): Promise<PreserveConfig>;
   write(projectDir: string, cfg: PreserveConfig): Promise<void>;
 }
@@ -53,7 +53,7 @@ try/catch `Deno.errors.NotFound` → `EMPTY_PRESERVE_CONFIG`. Tests use an in-me
 ```ts
 export type UpgradePlanOptions = {
   // ...existing fields (pluginInstalled, isPluginCovered, ...)
-  /** True when the maintainer declared `dest` preserved in .specflow/preserve.yml. */
+  /** True when the maintainer declared `dest` preserved in .specnaut/preserve.yml. */
   readonly isDeclaredPreserved?: (dest: string) => boolean;
 };
 ```

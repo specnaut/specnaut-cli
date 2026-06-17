@@ -34,18 +34,18 @@ Deno.test("FsPreserveStore write-then-read round-trips", async () => {
 
 Deno.test("FsPreserveStore.read degrades a malformed manifest to empty (no throw)", async () => {
   await withTempDir(async (dir) => {
-    await Deno.mkdir(`${dir}/.specflow`, { recursive: true });
-    await Deno.writeTextFile(`${dir}/.specflow/preserve.yml`, "preserved:\n  - [unterminated\n");
+    await Deno.mkdir(`${dir}/.specnaut`, { recursive: true });
+    await Deno.writeTextFile(`${dir}/.specnaut/preserve.yml`, "preserved:\n  - [unterminated\n");
     const store = new FsPreserveStore();
     assertEquals(await store.read(dir), EMPTY_PRESERVE_CONFIG);
   });
 });
 
-Deno.test("FsPreserveStore.write creates the .specflow directory if missing", async () => {
+Deno.test("FsPreserveStore.write creates the .specnaut directory if missing", async () => {
   await withTempDir(async (dir) => {
     const store = new FsPreserveStore();
     await store.write(dir, { preserved: ["a.md"] });
-    const raw = await Deno.readTextFile(`${dir}/.specflow/preserve.yml`);
+    const raw = await Deno.readTextFile(`${dir}/.specnaut/preserve.yml`);
     assertEquals(raw.includes("a.md"), true);
   });
 });

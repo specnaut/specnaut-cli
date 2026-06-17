@@ -1,4 +1,4 @@
-# Status ledger — `.specflow/logs/agents.jsonl`
+# Status ledger — `.specnaut/logs/agents.jsonl`
 
 This directory holds the **append-only status ledger** written by the
 `log-subagent.sh` hook on every subagent start/stop. Each subagent event

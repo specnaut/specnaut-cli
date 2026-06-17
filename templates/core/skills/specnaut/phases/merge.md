@@ -25,18 +25,18 @@ $ARGUMENTS
 6. Print the merge summary (files changed, commits merged).
 7. Ask the user: "Push to origin <base>? (yes/no)". Do NOT auto-push.
 8. **Close the linked backlog issue** (only if push happened and `feature.json.linked_issue` is set):
-   1. Read `.specflow/feature.json`. Extract `linked_issue` (`jq -r '.linked_issue // empty'`).
+   1. Read `.specnaut/feature.json`. Extract `linked_issue` (`jq -r '.linked_issue // empty'`).
       If absent / null / empty, skip the rest of step 8 silently — no backlog backend wiring
       to act on.
-   2. Detect the backend by checking `.specflow/installed.lock` (`backlog_backend: <local|github|gitlab>`)
-      or, equivalently, the presence of `.specflow/backlog-config.yml` (github/gitlab) vs
-      `.specflow/backlog.md` (local).
-   3. **github + gitlab only** — run `bash .specflow/scripts/backlog/cascade-check.sh <linked_issue>`.
+   2. Detect the backend by checking `.specnaut/installed.lock` (`backlog_backend: <local|github|gitlab>`)
+      or, equivalently, the presence of `.specnaut/backlog-config.yml` (github/gitlab) vs
+      `.specnaut/backlog.md` (local).
+   3. **github + gitlab only** — run `bash .specnaut/scripts/backlog/cascade-check.sh <linked_issue>`.
       Exit 11 means the parent has open sub-issues; do NOT close. Report the open children to the
       user and stop (the issue stays in `In progress` / `Ready` until the children are closed).
    4. Ask the user: "Close issue #<linked_issue> on the board now? (yes/no)". On `no`, skip the
       rest of step 8 — leave the column flip to a future run or to a manual `move.sh`.
-   5. On `yes`, run `bash .specflow/scripts/backlog/move.sh <linked_issue> Done`. This is the
+   5. On `yes`, run `bash .specnaut/scripts/backlog/move.sh <linked_issue> Done`. This is the
       mechanical column flip — `move.sh` is idempotent and the working contract permits the merge
       phase to call it directly (the PO retains exclusive ownership of the close + comment, not
       the column move).

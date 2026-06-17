@@ -35,7 +35,7 @@ Do **not** use when:
 - The work is a one-line fix — just do it
 - The user explicitly asked for the spec-kit greenfield flow (use
   `/specnaut specify` instead — that's a heavier ceremony that
-  produces `.specflow/specs/<feature>/spec.md` for multi-month
+  produces `.specnaut/specs/<feature>/spec.md` for multi-month
   features)
 
 ## Announce at start
@@ -62,7 +62,7 @@ discipline.
 Before asking the user anything:
 
 - Read recent commits with `git log --oneline -20`
-- Check `AGENTS.md` and `.specflow/memory/constitution.md` for project
+- Check `AGENTS.md` and `.specnaut/memory/constitution.md` for project
   principles
 - Skim the existing skill / agent registry via `using-specnaut` if not
   already loaded
@@ -151,7 +151,7 @@ unrelated refactoring.
 Save the validated design (spec) to a location appropriate for the
 project:
 
-- **Greenfield spec-kit features** — `.specflow/specs/<feature-id>/spec.md`
+- **Greenfield spec-kit features** — `.specnaut/specs/<feature-id>/spec.md`
   (this is the spec-kit convention; `/specnaut specify` lives in this
   same space)
 - **Issue-driven brownfield work** — `docs/specnaut/specs/YYYY-MM-DD-<topic>.md`
@@ -217,7 +217,7 @@ Specnaut has TWO entry points for design work:
 | Entry | Use when |
 |---|---|
 | `brainstorming` skill (this) | Issue is vague, idea is fresh, design needs discovery via clarifying questions. Produces a markdown spec doc and hands off to `writing-plans`. |
-| `/specnaut specify` (spec-kit) | Greenfield multi-week feature with formal contracts. Produces `.specflow/specs/<feature>/spec.md` + auto-chains to `/specnaut plan` (research, data-model, contracts, quickstart artefacts). |
+| `/specnaut specify` (spec-kit) | Greenfield multi-week feature with formal contracts. Produces `.specnaut/specs/<feature>/spec.md` + auto-chains to `/specnaut plan` (research, data-model, contracts, quickstart artefacts). |
 
 If you're not sure which to use: start with `brainstorming`. If the
 discussion reveals the design needs spec-kit ceremony (formal contracts,

@@ -89,7 +89,7 @@ export interface FsReader {
 }
 
 /**
- * Filesystem-backed store for `.specflow/preserve.yml` — the maintainer's
+ * Filesystem-backed store for `.specnaut/preserve.yml` — the maintainer's
  * preserve declarations (spec 011 / issue #367).
  *
  * Mirrors {@link LockStore}: an absent manifest reads as
@@ -114,7 +114,7 @@ export interface PreserveStore {
 export interface ParentWorkspaceReader {
   /**
    * Walks `dirname(targetDir)` upward to the filesystem root and returns the
-   * canonical path of the **first** ancestor `A` such that `A/.specflow/`
+   * canonical path of the **first** ancestor `A` such that `A/.specnaut/`
    * exists AND `A/deno.json` declares a `workspace` member that, resolved
    * relative to `A` and canonicalised, equals the canonicalised `targetDir`.
    * Returns `null` if no such ancestor exists or the root is reached.
@@ -122,7 +122,7 @@ export interface ParentWorkspaceReader {
   findProvidingAncestor(targetDir: string): Promise<string | null>;
 
   /**
-   * True iff `targetDir/.specflow/standalone.yml` exists. Contents ignored —
+   * True iff `targetDir/.specnaut/standalone.yml` exists. Contents ignored —
    * the marker's mere presence forces the full standalone provisioning path.
    */
   hasStandaloneOverride(targetDir: string): Promise<boolean>;
@@ -170,7 +170,7 @@ export interface Harness {
 import type { UpgradeMarker } from "../domain/upgrade_marker.ts";
 
 /**
- * Filesystem-backed store for `.specflow/upgrade-pending.json`.
+ * Filesystem-backed store for `.specnaut/upgrade-pending.json`.
  *
  * Written by `specnaut upgrade` on every applied upgrade.
  * Read by `specnaut-expert review-upgrade` and by `specnaut reconcile`.
@@ -183,7 +183,7 @@ export interface UpgradeMarkerStore {
 }
 
 /**
- * Filesystem-backed access to `.specflow/upgrade-staging/`. The staging
+ * Filesystem-backed access to `.specnaut/upgrade-staging/`. The staging
  * directory holds upstream versions of files that the upgrade preserved
  * (customized locally). `specnaut reconcile` consumes the directory.
  */

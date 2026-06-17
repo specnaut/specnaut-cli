@@ -117,7 +117,7 @@ the field. Do NOT also apply the label — double-writing creates drift.
 
 ##### GitHub backend
 
-Use the bundled scripts at `.specflow/scripts/backlog/`:
+Use the bundled scripts at `.specnaut/scripts/backlog/`:
 
 - `detect-fields.sh` — emits eval-friendly env lines listing the
   `Priority` / `Size` field IDs and option IDs (case-insensitive name
@@ -171,7 +171,7 @@ This step is read-only; do not mutate PRs.
 
 ### 3. Orphan spec detection
 
-Walk `.specflow/specs/` (if present) and surface any feature directory
+Walk `.specnaut/specs/` (if present) and surface any feature directory
 that is missing the next expected artefact:
 
 - Has `spec.md` but no `plan.md` → flag as "needs `/specnaut plan`".

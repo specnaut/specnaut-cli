@@ -31,7 +31,7 @@ import type { KnownHarness } from "./installed_lock.ts";
  *   - `.claude/skills/specnaut-review/SKILL.md` — auto-invoke alias
  *   - `.claude/skills/specnaut-auto/SKILL.md`
  *
- * Everything else (project-stateful files in `.specflow/`, harness-
+ * Everything else (project-stateful files in `.specnaut/`, harness-
  * static files like `.claude/settings.json`, hooks, `CLAUDE.md`,
  * backlog scripts) stays binary-owned and is NOT covered.
  */

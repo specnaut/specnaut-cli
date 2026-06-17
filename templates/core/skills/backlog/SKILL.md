@@ -1,6 +1,6 @@
 ---
 name: backlog
-description: Manage this project's backlog — add, list, view, move, and clarify items. The backend is fixed at init time and recorded in `.specflow/installed.lock`. Run `specnaut upgrade --backlog <new>` to switch.
+description: Manage this project's backlog — add, list, view, move, and clarify items. The backend is fixed at init time and recorded in `.specnaut/installed.lock`. Run `specnaut upgrade --backlog <new>` to switch.
 argument-hint: [list|next|add|update|estimate|status|groom|brief] [args]
 ---
 
@@ -18,29 +18,29 @@ The main session does **not** run the scripts directly. Dispatch the
 bodies, moving status, closing. The PO is the single owner of the backlog
 lifecycle (see `.claude/agents/product-owner.md`).
 
-The scripts under `.specflow/scripts/backlog/` are the toolbox the PO
+The scripts under `.specnaut/scripts/backlog/` are the toolbox the PO
 uses. The main session may call the read-only ones (`list.sh`, `view.sh`)
 to inspect state, but every write goes through the PO.
 
 <!-- BEGIN: backend=local -->
 ## Backend: local Markdown files
 
-This project's backlog lives entirely on disk under `.specflow/`. No remote
+This project's backlog lives entirely on disk under `.specnaut/`. No remote
 service required.
 
 | Path | Purpose |
 |---|---|
-| `.specflow/backlog.md` | Top-level index — one line per item with status |
-| `.specflow/backlog/<NNN>-<slug>.md` | One file per item (frontmatter + body) |
+| `.specnaut/backlog.md` | Top-level index — one line per item with status |
+| `.specnaut/backlog/<NNN>-<slug>.md` | One file per item (frontmatter + body) |
 
 ### Scripts (preferred path)
 
 ```bash
-.specflow/scripts/backlog/list.sh [Status]            # all items, optional Status filter
-.specflow/scripts/backlog/view.sh <number>            # one item + body
-.specflow/scripts/backlog/add.sh "<title>" [body]     # create new item, auto-numbered
-.specflow/scripts/backlog/move.sh <number> <Status>   # Backlog|Ready|In progress|In review|Done
-.specflow/scripts/backlog/clarify-comment.sh <num> "<question>"
+.specnaut/scripts/backlog/list.sh [Status]            # all items, optional Status filter
+.specnaut/scripts/backlog/view.sh <number>            # one item + body
+.specnaut/scripts/backlog/add.sh "<title>" [body]     # create new item, auto-numbered
+.specnaut/scripts/backlog/move.sh <number> <Status>   # Backlog|Ready|In progress|In review|Done
+.specnaut/scripts/backlog/clarify-comment.sh <num> "<question>"
 ```
 
 ### Conventions
@@ -59,14 +59,14 @@ service required.
 ## Backend: GitHub Issues + Project
 
 This project's backlog lives on a GitHub Project linked to issues in the
-configured repo. Configuration is read from `.specflow/backlog-config.yml`
+configured repo. Configuration is read from `.specnaut/backlog-config.yml`
 at runtime — fill in `repo` and `project_number` before running any
 mutation.
 
 ### Configuration file
 
 ```yaml
-# .specflow/backlog-config.yml
+# .specnaut/backlog-config.yml
 repo: myorg/myproject              # GitHub repo (owner/name)
 project_number: 4                   # GitHub Project V2 number
 project_node_id: ""                 # cached on first run
@@ -117,19 +117,19 @@ Two ways to enable the GitHub MCP:
 
 #### B. Shell scripts — always available
 
-The `gh` CLI scripts under `.specflow/scripts/backlog/` are scaffolded
+The `gh` CLI scripts under `.specnaut/scripts/backlog/` are scaffolded
 unconditionally and work without MCP. They wrap `gh issue` / `gh
 project` calls and read configuration from `backlog-config.yml`.
 
 ```bash
-.specflow/scripts/backlog/list.sh [Status]            # all items, optional Status filter
-.specflow/scripts/backlog/view.sh <number>            # one issue + comments
-.specflow/scripts/backlog/add.sh "<title>" [body] [labels-csv]
-.specflow/scripts/backlog/move.sh <number> <Status>   # sets Project Status field
-.specflow/scripts/backlog/clarify-comment.sh <num> "<question>"
-.specflow/scripts/backlog/detect-fields.sh                                 # discover native Priority/Size single-select fields → env lines
-.specflow/scripts/backlog/set-field.sh <num> <Priority|Size|IssueType> <value>  # set the native Project V2 field / org Issue Type; exit codes 10/11/12 signal label fallback
-.specflow/scripts/backlog/ensure-labels.sh                                 # idempotently bootstrap the 7 Specnaut semantic labels (security/refactor/docs/tech-debt/dx/performance/dependency)
+.specnaut/scripts/backlog/list.sh [Status]            # all items, optional Status filter
+.specnaut/scripts/backlog/view.sh <number>            # one issue + comments
+.specnaut/scripts/backlog/add.sh "<title>" [body] [labels-csv]
+.specnaut/scripts/backlog/move.sh <number> <Status>   # sets Project Status field
+.specnaut/scripts/backlog/clarify-comment.sh <num> "<question>"
+.specnaut/scripts/backlog/detect-fields.sh                                 # discover native Priority/Size single-select fields → env lines
+.specnaut/scripts/backlog/set-field.sh <num> <Priority|Size|IssueType> <value>  # set the native Project V2 field / org Issue Type; exit codes 10/11/12 signal label fallback
+.specnaut/scripts/backlog/ensure-labels.sh                                 # idempotently bootstrap the 7 Specnaut semantic labels (security/refactor/docs/tech-debt/dx/performance/dependency)
 ```
 
 For closing or editing, use `gh` directly:
@@ -201,13 +201,13 @@ GitLab doesn't have a Project Status field equivalent to GitHub's
 Projects V2 — scoped labels are the canonical way to model kanban-
 style state on GitLab.
 
-Configuration is read from `.specflow/backlog-config.yml` at runtime —
+Configuration is read from `.specnaut/backlog-config.yml` at runtime —
 fill in `host` and `project_id` before running any mutation.
 
 ### Configuration file
 
 ```yaml
-# .specflow/backlog-config.yml
+# .specnaut/backlog-config.yml
 host: gitlab.com         # or your self-hosted instance
 project_id: ""           # numeric id (e.g. "12345") or path "group/project"
 ```
@@ -215,11 +215,11 @@ project_id: ""           # numeric id (e.g. "12345") or path "group/project"
 ### Scripts (preferred path)
 
 ```bash
-.specflow/scripts/backlog/list.sh [Status]            # all issues, optional Status:: filter
-.specflow/scripts/backlog/view.sh <number>            # one issue + comments
-.specflow/scripts/backlog/add.sh "<title>" [body] [labels-csv]
-.specflow/scripts/backlog/move.sh <number> <Status>   # swaps the Status:: label
-.specflow/scripts/backlog/clarify-comment.sh <num> "<question>"
+.specnaut/scripts/backlog/list.sh [Status]            # all issues, optional Status:: filter
+.specnaut/scripts/backlog/view.sh <number>            # one issue + comments
+.specnaut/scripts/backlog/add.sh "<title>" [body] [labels-csv]
+.specnaut/scripts/backlog/move.sh <number> <Status>   # swaps the Status:: label
+.specnaut/scripts/backlog/clarify-comment.sh <num> "<question>"
 ```
 
 For closing or editing, use `glab` directly:
@@ -258,13 +258,13 @@ The first time the PO runs against this project, it will create the 5
 
 This project's backlog lives on **Specnaut Cloud** — a hosted, real-time Kanban
 board reached over a small HTTP API. No `gh`/`glab` CLI and no GitHub/GitLab
-rate limits. Configuration is read from `.specflow/backlog-config.yml` at
+rate limits. Configuration is read from `.specnaut/backlog-config.yml` at
 runtime.
 
 ### Configuration file
 
 ```yaml
-# .specflow/backlog-config.yml
+# .specnaut/backlog-config.yml
 backend: cloud
 api_url: https://your-deployment.convex.site   # Specnaut Cloud API base
 project_key: CLOUD                              # the project's short key
@@ -272,20 +272,20 @@ project_key: CLOUD                              # the project's short key
 
 **No token is stored here.** Credentials are obtained by `specnaut cloud login`
 (an interactive browser device-authorization flow) and kept in the OS keychain
-(or a `0600` file under `~/.specflow`). They refresh transparently. For CI /
+(or a `0600` file under `~/.specnaut`). They refresh transparently. For CI /
 headless runs, set `SPECNAUT_CLOUD_TOKEN` to a Cloud API token instead of
 logging in.
 
 ### Scripts
 
 ```bash
-.specflow/scripts/backlog/list.sh [Status]            # all tasks (status = column), optional filter
-.specflow/scripts/backlog/view.sh <number>            # one task (status, priority, size, body)
-.specflow/scripts/backlog/add.sh "<title>" [body]     # create a task → returns KEY-N
-.specflow/scripts/backlog/move.sh <number> <Status>   # Backlog|Ready|"In Progress"|"In Review"|Done
-.specflow/scripts/backlog/clarify-comment.sh <number> "<question>"
-.specflow/scripts/backlog/columns.sh                  # live board column layout (order + name)
-.specflow/scripts/backlog/reconcile.sh [--reset|--seek-end] [--limit N]  # drain stage transitions
+.specnaut/scripts/backlog/list.sh [Status]            # all tasks (status = column), optional filter
+.specnaut/scripts/backlog/view.sh <number>            # one task (status, priority, size, body)
+.specnaut/scripts/backlog/add.sh "<title>" [body]     # create a task → returns KEY-N
+.specnaut/scripts/backlog/move.sh <number> <Status>   # Backlog|Ready|"In Progress"|"In Review"|Done
+.specnaut/scripts/backlog/clarify-comment.sh <number> "<question>"
+.specnaut/scripts/backlog/columns.sh                  # live board column layout (order + name)
+.specnaut/scripts/backlog/reconcile.sh [--reset|--seek-end] [--limit N]  # drain stage transitions
 ```
 
 The scripts get a fresh access token from `specnaut cloud token` (which refreshes
@@ -295,7 +295,7 @@ to `<api_url>/api/v1/` (`/tasks`, `/columns`, `/activity`). `move.sh` passes a
 server-side. `columns.sh` reads the board's real columns (renames/reorders are
 reflected with no code change). `reconcile.sh` is the **poll/reconcile** feed:
 it asks `/activity` for every stage transition newer than a stored per-project
-cursor (`.specflow/.cloud-cursor-<KEY>`), prints one line per transition, and
+cursor (`.specnaut/.cloud-cursor-<KEY>`), prints one line per transition, and
 advances the cursor — the product-owner consumes those lines and runs the
 matching stage hook (see `product-owner.md` → "Cloud stage reconcile").
 
@@ -345,7 +345,7 @@ contract is the same: parents cannot close while any child is open.
 
 | Backend | Parent → child link | Discoverability |
 |---|---|---|
-| local | `parent: "#NNN"` in the child's frontmatter, plus a `## Sub-tasks` cross-link added to the parent file's body | `grep -l 'parent: "#042"' .specflow/backlog/*.md` lists every child of #042 |
+| local | `parent: "#NNN"` in the child's frontmatter, plus a `## Sub-tasks` cross-link added to the parent file's body | `grep -l 'parent: "#042"' .specnaut/backlog/*.md` lists every child of #042 |
 | github | Native sub-issues API (`gh api -X POST .../issues/<parent>/sub_issues`) | Project V2 boards render the children automatically under the parent's `Sub-issues progress` field |
 | gitlab | Scoped label `parent::#NNN` on the child (Free-tier compatible; native Epics are Premium-only) | `glab issue list --label "parent::#042" --opened` lists every child of #042 |
 

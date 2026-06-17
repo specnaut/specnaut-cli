@@ -33,12 +33,12 @@ export class GitlabBacklogStrategy implements BacklogBackendStrategy {
     const url = ctx?.url;
     if (url && url.kind === "gitlab") {
       return [
-        `↳ wrote .specflow/backlog-config.yml (${url.host}/${url.projectPath}) — ready to run /backlog`,
+        `↳ wrote .specnaut/backlog-config.yml (${url.host}/${url.projectPath}) — ready to run /backlog`,
         "  prerequisite: install glab CLI (https://gitlab.com/gitlab-org/cli) and run `glab auth login`",
       ];
     }
     return [
-      "↳ wrote .specflow/backlog-config.yml — fill in host + project_id before running /backlog",
+      "↳ wrote .specnaut/backlog-config.yml — fill in host + project_id before running /backlog",
       "  prerequisite: install glab CLI (https://gitlab.com/gitlab-org/cli) and run `glab auth login`",
     ];
   }

@@ -13,12 +13,12 @@ deno task test     # bundle + log_subagent_enrichment_test (real-shape fixture)
 ```bash
 printf '{"session_id":"s1","agent_id":"a1","agent_type":"security-auditor","effort":{"level":"high"},"last_assistant_message":"...\nREVIEW SUMMARY\nREVIEW_VERDICT: fail\n"}' \
   | bash templates/harness-specific/claude/hooks/log-subagent.sh stop
-tail -1 .specflow/logs/agents.jsonl
+tail -1 .specnaut/logs/agents.jsonl
 #   → agent:"security-auditor", agent_id:"a1", effort:"high", review_verdict:"fail"
 
 # legacy/no-block still valid
 printf '{"session_id":"s1","agent_type":"developer"}' | bash …/log-subagent.sh stop
-tail -1 .specflow/logs/agents.jsonl   # → base + agent:"developer", valid JSON, exit 0
+tail -1 .specnaut/logs/agents.jsonl   # → base + agent:"developer", valid JSON, exit 0
 ```
 
 ## Success signals

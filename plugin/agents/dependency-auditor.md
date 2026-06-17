@@ -32,7 +32,7 @@ format (Mode 1 — PR review)" below).
 3. **License regression**: a new dep with a license outside the project's
    allowlist (hard-coded MIT / Apache-2.0 / BSD-2-Clause / BSD-3-Clause /
    ISC / Unlicense / 0BSD / CC0, or whatever is in
-   `.specflow/license-allowlist.txt` if it exists). CRITICAL for GPL /
+   `.specnaut/license-allowlist.txt` if it exists). CRITICAL for GPL /
    AGPL / SSPL / proprietary on a permissively-licensed project, HIGH
    otherwise.
 4. **Typosquat heuristic**: a new dep name that's a one-character edit
@@ -97,7 +97,7 @@ Default allowlist (hard-coded, SPDX identifiers):
 MIT, Apache-2.0, BSD-2-Clause, BSD-3-Clause, ISC, Unlicense, 0BSD, CC0
 ```
 
-If `.specflow/license-allowlist.txt` exists at the project root, read it
+If `.specnaut/license-allowlist.txt` exists at the project root, read it
 and MERGE its entries (one SPDX identifier per line, `#`-prefixed lines
 are comments) with the default list. The merged set is the project's
 effective allowlist. A license that's neither in the default nor in the
@@ -159,7 +159,7 @@ Write a Markdown document with these EXACT sections in this order
 - Total findings: N (Critical: X · High: Y · Medium: Z · Low: W)
 - Manifests detected: <one line — "package.json, deno.json">
 - Severity floor: <critical|high|medium|low>
-- License allowlist source: <"default (8 SPDX ids)" | "default + .specflow/license-allowlist.txt (N additional)">
+- License allowlist source: <"default (8 SPDX ids)" | "default + .specnaut/license-allowlist.txt (N additional)">
 
 ## Critical
 

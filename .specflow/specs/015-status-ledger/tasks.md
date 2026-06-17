@@ -31,7 +31,7 @@ skill (content-tested). Distribution under `deno task test`.
 
 - [ ] T003 Author `templates/core/skills/status-audit/SKILL.md` (frontmatter `name: status-audit`,
       trigger-phrase `description`, `argument-hint: "[latest|<agent>|<session>]"`). Body per
-      contracts/status-report.md: read `.specflow/logs/agents.jsonl`, latest-by-ts per agent, report
+      contracts/status-report.md: read `.specnaut/logs/agents.jsonl`, latest-by-ts per agent, report
       the seven views (health counts / per-agent / blocked / stale ≥15m / done-vs-criteria
       contradiction / missing handoffs / verdict summary); graceful degradation (absent ledger /
       malformed line / absent fields). Document `/loop 5m /status-audit`. Read-only. (FR-004..007)
@@ -42,9 +42,9 @@ skill (content-tested). Distribution under `deno task test`.
 ## Phase 3: Schema doc
 
 - [ ] T005 [P] Author the ledger schema doc (a bundled file delivered to
-      `.specflow/logs/README.md`): field names, types, the optional/omit-if-absent contract fields,
+      `.specnaut/logs/README.md`): field names, types, the optional/omit-if-absent contract fields,
       allowed values (data-model.md). Determine the template-tree source path + manifest entry shape
-      from existing `.specflow/`-target manifest entries. (FR-008)
+      from existing `.specnaut/`-target manifest entries. (FR-008)
 
 ## Phase 4: Distribution
 
@@ -53,8 +53,8 @@ skill (content-tested). Distribution under `deno task test`.
       confirm the skill, the doc, and the enriched hook are in `src/templates_bundle.ts`.
 - [ ] T007 Mirror `status-audit` to `plugin/skills/status-audit/` (markdown-only) + extend
       `tests/plugin/plugin_sync_test.ts`. Bump codex/copilot/windsurf `init_*_test.ts` counts for
-      the new skill (+1 skill folder) and the new `.specflow/logs/README.md` if those harness counts
-      include `.specflow/` files (verify per test).
+      the new skill (+1 skill folder) and the new `.specnaut/logs/README.md` if those harness counts
+      include `.specnaut/` files (verify per test).
 
 ## Phase 5: Validate
 

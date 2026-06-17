@@ -20,7 +20,7 @@ You **MUST** consider the user input before proceeding (if not empty).
 
 ## Pre-Execution Checks
 
-**Check extension hooks (`hooks.before_checklist` in `.specflow/extensions.yml`)**:
+**Check extension hooks (`hooks.before_checklist` in `.specnaut/extensions.yml`)**:
 Skip silently if the file is absent or unparseable. For each enabled entry
 (treat missing `enabled` as `true`) without a non-empty `condition`, emit:
 
@@ -151,7 +151,7 @@ Key differences: Wrong tests if the system *works*; Correct tests if requirement
 
 ## Post-Execution Checks
 
-**Check extension hooks (`hooks.after_checklist` in `.specflow/extensions.yml`)**:
+**Check extension hooks (`hooks.after_checklist` in `.specnaut/extensions.yml`)**:
 Skip silently if the file is absent or unparseable. For each enabled entry
 (treat missing `enabled` as `true`) without a non-empty `condition`, emit:
 

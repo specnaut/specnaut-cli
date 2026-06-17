@@ -12,7 +12,7 @@ export class FsParentWorkspaceReader implements ParentWorkspaceReader {
   /**
    * Walks ancestors of `targetDir` upward to the filesystem root and returns
    * the canonical path of the first *providing* Specnaut workspace — an
-   * ancestor with `.specflow/` AND a `deno.json` whose `workspace` array has a
+   * ancestor with `.specnaut/` AND a `deno.json` whose `workspace` array has a
    * member resolving (canonically) to `targetDir`.
    *
    * Member paths and the target are both canonicalised via `Deno.realPath` so
@@ -43,14 +43,14 @@ export class FsParentWorkspaceReader implements ParentWorkspaceReader {
   }
 
   /**
-   * True iff `ancestor/.specflow/` exists AND `ancestor/deno.json` declares a
+   * True iff `ancestor/.specnaut/` exists AND `ancestor/deno.json` declares a
    * workspace member canonically equal to `canonicalTarget`.
    */
   private async isProvidingWorkspace(
     ancestor: string,
     canonicalTarget: string,
   ): Promise<boolean> {
-    if (!(await isDir(join(ancestor, ".specflow")))) return false;
+    if (!(await isDir(join(ancestor, ".specnaut")))) return false;
 
     const members = await readWorkspaceMembers(join(ancestor, "deno.json"));
     if (members === null) return false;
@@ -66,7 +66,7 @@ export class FsParentWorkspaceReader implements ParentWorkspaceReader {
   }
 
   async hasStandaloneOverride(targetDir: string): Promise<boolean> {
-    return await fileExists(join(targetDir, ".specflow", "standalone.yml"));
+    return await fileExists(join(targetDir, ".specnaut", "standalone.yml"));
   }
 }
 

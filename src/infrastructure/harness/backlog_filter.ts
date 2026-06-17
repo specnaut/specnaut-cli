@@ -42,5 +42,5 @@ export function backlogScriptDestination(entry: CoreEntry): string {
   if (!entry.suffix) {
     throw new Error(`backlog-script needs suffix: ${entry.name}`);
   }
-  return `.specflow/scripts/backlog/${entry.suffix}`;
+  return `.specnaut/scripts/backlog/${entry.suffix}`;
 }

@@ -39,8 +39,8 @@ $ARGUMENTS
 The product-owner agent reads and writes the backlog directly to whichever
 backend the project uses. When the backend is local Markdown:
 
-- Index: `.specflow/backlog.md`
-- Task files: `.specflow/backlog/NNN-slug.md`
+- Index: `.specnaut/backlog.md`
+- Task files: `.specnaut/backlog/NNN-slug.md`
 
 When the backend is remote (GitHub Issues + Project V2, GitLab, etc.) the
 agent talks to that backend directly — the CLI does not push or pull on

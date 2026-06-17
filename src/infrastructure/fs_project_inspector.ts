@@ -71,7 +71,7 @@ export class FsProjectInspector implements ProjectInspector {
   async inspect(projectDir: string, templatesVersion: string): Promise<CheckOutcome[]> {
     const outcomes: CheckOutcome[] = [];
 
-    outcomes.push(await this.checkDir(projectDir, ".specflow/"));
+    outcomes.push(await this.checkDir(projectDir, ".specnaut/"));
     outcomes.push(await this.checkHarness(projectDir));
     outcomes.push(await this.checkConstitution(projectDir));
     outcomes.push(await this.checkTemplatesVersion(projectDir, templatesVersion));
@@ -98,7 +98,7 @@ export class FsProjectInspector implements ProjectInspector {
   private async checkPluginGap(projectDir: string): Promise<CheckOutcome[]> {
     if (this.pluginDetector === null) return [];
 
-    const lockPath = join(projectDir, ".specflow/installed.lock");
+    const lockPath = join(projectDir, ".specnaut/installed.lock");
     if (!(await exists(lockPath))) return [];
     let harness: KnownHarness;
     try {
@@ -134,7 +134,7 @@ export class FsProjectInspector implements ProjectInspector {
    * Local backend is zero-config: a single `pass` line, no file lookup.
    */
   private async checkBacklogConfig(projectDir: string): Promise<CheckOutcome> {
-    const lockPath = join(projectDir, ".specflow/installed.lock");
+    const lockPath = join(projectDir, ".specnaut/installed.lock");
     if (!(await exists(lockPath))) {
       return {
         name: "backlog backend",
@@ -158,7 +158,7 @@ export class FsProjectInspector implements ProjectInspector {
       };
     }
 
-    const cfgPath = join(projectDir, ".specflow/backlog-config.yml");
+    const cfgPath = join(projectDir, ".specnaut/backlog-config.yml");
     if (!(await exists(cfgPath))) {
       return {
         name: "backlog backend",
@@ -221,7 +221,7 @@ export class FsProjectInspector implements ProjectInspector {
    * config files exist.
    */
   private async checkClaudeConfig(projectDir: string): Promise<CheckOutcome[]> {
-    const lockPath = join(projectDir, ".specflow/installed.lock");
+    const lockPath = join(projectDir, ".specnaut/installed.lock");
     if (!(await exists(lockPath))) return [];
     let lock;
     try {
@@ -304,7 +304,7 @@ export class FsProjectInspector implements ProjectInspector {
   }
 
   private async checkHarness(projectDir: string): Promise<CheckOutcome> {
-    const path = join(projectDir, ".specflow/installed.lock");
+    const path = join(projectDir, ".specnaut/installed.lock");
     if (!(await exists(path))) {
       return {
         name: "harness",
@@ -347,13 +347,13 @@ export class FsProjectInspector implements ProjectInspector {
     projectDir: string,
     bundledTemplatesVersion: string,
   ): Promise<CheckOutcome> {
-    const path = join(projectDir, ".specflow/installed.lock");
+    const path = join(projectDir, ".specnaut/installed.lock");
     if (!(await exists(path))) {
       return {
         name: "templates version",
         status: "warn",
         message:
-          "no .specflow/installed.lock — re-init with 'specnaut init --here --force' to enable upgrade tracking",
+          "no .specnaut/installed.lock — re-init with 'specnaut init --here --force' to enable upgrade tracking",
       };
     }
     try {
@@ -386,12 +386,12 @@ export class FsProjectInspector implements ProjectInspector {
   }
 
   private async checkConstitution(projectDir: string): Promise<CheckOutcome> {
-    const path = join(projectDir, ".specflow/memory/constitution.md");
+    const path = join(projectDir, ".specnaut/memory/constitution.md");
     if (!(await exists(path))) {
       return {
         name: "constitution",
         status: "fail",
-        message: "missing .specflow/memory/constitution.md",
+        message: "missing .specnaut/memory/constitution.md",
       };
     }
     const text = await Deno.readTextFile(path);
@@ -399,7 +399,7 @@ export class FsProjectInspector implements ProjectInspector {
       return {
         name: "constitution",
         status: "warn",
-        message: "placeholder — edit .specflow/memory/constitution.md",
+        message: "placeholder — edit .specnaut/memory/constitution.md",
       };
     }
     return { name: "constitution", status: "pass", message: "populated" };

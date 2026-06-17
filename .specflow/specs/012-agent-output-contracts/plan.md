@@ -1,7 +1,7 @@
 # Implementation Plan: Machine-readable agent output contracts
 
 **Branch**: `012-agent-output-contracts` | **Date**: 2026-06-12 | **Spec**: [spec.md](./spec.md)
-**Input**: Feature specification from `.specflow/specs/012-agent-output-contracts/spec.md` (issue
+**Input**: Feature specification from `.specnaut/specs/012-agent-output-contracts/spec.md` (issue
 mkrlabs/specflow#378, epic mkrlabs/specflow-monorepo#12)
 
 ## Summary
@@ -58,7 +58,7 @@ Result: **PASS** (no violations; Complexity Tracking not required).
 ### Documentation (this feature)
 
 ```text
-.specflow/specs/012-agent-output-contracts/
+.specnaut/specs/012-agent-output-contracts/
 ├── plan.md              # This file
 ├── research.md          # Phase 0 — the two resolved decisions
 ├── data-model.md        # Phase 1 — contracts as domain entities

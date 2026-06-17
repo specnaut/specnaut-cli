@@ -8,7 +8,7 @@ How to verify #371 by hand and where the automated coverage lives.
 # 1. Build a providing workspace fixture
 mkdir -p /tmp/ws/child
 printf '{ "workspace": ["./child"] }\n' > /tmp/ws/deno.json
-mkdir -p /tmp/ws/.specflow            # makes /tmp/ws a *providing* workspace
+mkdir -p /tmp/ws/.specnaut            # makes /tmp/ws a *providing* workspace
 
 # 2. Init inside the member
 cd /tmp/ws/child
@@ -16,7 +16,7 @@ specflow init --harness claude --yes
 
 # Expect:
 #  • notice: "parent-managed workspace detected — skills/agents inherited from parent"
-#  • /tmp/ws/child/.specflow/        present (toolkit provisioned)
+#  • /tmp/ws/child/.specnaut/        present (toolkit provisioned)
 #  • /tmp/ws/child/.claude/skills/   ABSENT
 #  • /tmp/ws/child/.claude/agents/   ABSENT
 find /tmp/ws/child/.claude -type d 2>/dev/null   # → no skills/ or agents/
@@ -33,8 +33,8 @@ specflow init --harness claude --yes
 ## Override case (→ C4)
 
 ```bash
-mkdir -p /tmp/ws/child2 && mkdir -p /tmp/ws/child2/.specflow
-: > /tmp/ws/child2/.specflow/standalone.yml      # force full provisioning
+mkdir -p /tmp/ws/child2 && mkdir -p /tmp/ws/child2/.specnaut
+: > /tmp/ws/child2/.specnaut/standalone.yml      # force full provisioning
 # (add ./child2 to /tmp/ws/deno.json workspace list)
 cd /tmp/ws/child2 && specflow init --harness claude --yes
 # Expect: full provisioning despite the enclosing workspace.
@@ -46,10 +46,10 @@ cd /tmp/ws/child2 && specflow init --harness claude --yes
 cd /tmp/ws/child                 # parent-managed, already inited, no .claude/skills
 specflow upgrade --yes
 # Expect:
-#  • .specflow/ toolkit refreshed
+#  • .specnaut/ toolkit refreshed
 #  • .claude/skills/ and .claude/agents/ still ABSENT (not resurrected)
-grep -c 'claude/skills\|claude/agents' .specflow/installed.lock   # → 0
-grep -c 'parent_managed: true' .specflow/installed.lock           # → 1
+grep -c 'claude/skills\|claude/agents' .specnaut/installed.lock   # → 0
+grep -c 'parent_managed: true' .specnaut/installed.lock           # → 1
 ```
 
 ## Automated coverage

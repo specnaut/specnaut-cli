@@ -44,11 +44,11 @@ identically to the full chain.
 - Otherwise, `phases/specify.md` scores the brief against
   `phases/lite-heuristic.md`. If the score crosses the threshold, the
   user is prompted once; if not, full chain runs silently.
-- The chosen shape is persisted to `.specflow/feature.json` as
+- The chosen shape is persisted to `.specnaut/feature.json` as
   `workflow_shape: "lite" | "full"`.
 
 At every chain transition below, read `workflow_shape` from
-`.specflow/feature.json`. When the field is absent (legacy
+`.specnaut/feature.json`. When the field is absent (legacy
 `feature.json`), treat as `"full"`.
 
 ## Per-phase behavior
@@ -59,7 +59,7 @@ for next step?" prompt. A one-line `✓ <phase> complete — proceeding to <next
 log is sufficient.
 
 The **next phase** depends on the chain shape recorded in
-`.specflow/feature.json` (`workflow_shape`):
+`.specnaut/feature.json` (`workflow_shape`):
 
 | Current phase | Next (full) | Next (lite) |
 |---|---|---|
@@ -158,7 +158,7 @@ context-aware default:
   single phase (regenerate `plan.md` after a tweak, re-analyse after a
   spec edit). Do NOT cascade.
 
-"Downstream artefacts" means files under `.specflow/specs/<feature>/`
+"Downstream artefacts" means files under `.specnaut/specs/<feature>/`
 produced by phases AFTER the one being invoked:
 
 | Invoked phase | Downstream artefacts to check |

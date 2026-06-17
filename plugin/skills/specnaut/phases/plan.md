@@ -10,7 +10,7 @@ You **MUST** consider the user input before proceeding (if not empty).
 ## Pre-Execution Checks
 
 **Check for extension hooks (before planning)**:
-- Check if `.specflow/extensions.yml` exists in the project root.
+- Check if `.specnaut/extensions.yml` exists in the project root.
 - If it exists, read it and look for entries under the `hooks.before_plan` key
 - If the YAML cannot be parsed or is invalid, skip hook checking silently and continue normally
 - Filter out hooks where `enabled` is explicitly `false`. Treat hooks without an `enabled` field as enabled by default.
@@ -39,7 +39,7 @@ You **MUST** consider the user input before proceeding (if not empty).
 
     Wait for the result of the hook command before proceeding to the Outline.
     ```
-- If no hooks are registered or `.specflow/extensions.yml` does not exist, skip silently
+- If no hooks are registered or `.specnaut/extensions.yml` does not exist, skip silently
 
 ## Outline
 
@@ -58,7 +58,7 @@ You **MUST** consider the user input before proceeding (if not empty).
 
 4. **Stop and report**: Command ends after Phase 2 planning. Report branch, IMPL_PLAN path, and generated artifacts. (In remote mode the chain raises a `plan_approval` gate before `tasks` — see `phases/auto-chain.md` "Plan approval checkpoint".)
 
-5. **Check for extension hooks**: After reporting, check if `.specflow/extensions.yml` exists in the project root.
+5. **Check for extension hooks**: After reporting, check if `.specnaut/extensions.yml` exists in the project root.
    - If it exists, read it and look for entries under the `hooks.after_plan` key
    - If the YAML cannot be parsed or is invalid, skip hook checking silently and continue normally
    - Filter out hooks where `enabled` is explicitly `false`. Treat hooks without an `enabled` field as enabled by default.
@@ -85,7 +85,7 @@ You **MUST** consider the user input before proceeding (if not empty).
        Executing: `/{command}`
        EXECUTE_COMMAND: {command}
        ```
-   - If no hooks are registered or `.specflow/extensions.yml` does not exist, skip silently
+   - If no hooks are registered or `.specnaut/extensions.yml` does not exist, skip silently
 
 ## Phases
 

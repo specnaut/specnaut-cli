@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Self-gates on .specflow/installed.lock: if the project's backlog
+# Self-gates on .specnaut/installed.lock: if the project's backlog
 # backend is `github` or `gitlab`, checks the corresponding CLI is
 # installed and authenticated. Prints a stderr warning at SessionStart
 # so the user knows before they try to run a backlog command.
@@ -7,7 +7,7 @@
 # Always exits 0 — this is informational, not blocking.
 set -euo pipefail
 
-LOCK="$(pwd)/.specflow/installed.lock"
+LOCK="$(pwd)/.specnaut/installed.lock"
 [ -f "$LOCK" ] || exit 0
 
 BACKEND=$(awk '/^backlog_backend:/ {gsub(/[\047"]/, "", $2); print $2; exit}' "$LOCK")

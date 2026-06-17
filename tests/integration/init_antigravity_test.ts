@@ -88,10 +88,10 @@ Deno.test("specnaut init --ai antigravity scaffolds an Antigravity layout", asyn
     assertEquals(agentContent.includes("description:"), true);
 
     // Shared (cross-harness) project metadata still emitted.
-    assertEquals(await exists(join(root, ".specflow/memory/constitution.md")), true);
+    assertEquals(await exists(join(root, ".specnaut/memory/constitution.md")), true);
     assertEquals(await exists(join(root, "AGENTS.md")), true);
     assertEquals(await exists(join(root, "tasks/backlog.md")), false);
-    assertEquals(await exists(join(root, ".specflow/backlog.md")), true);
+    assertEquals(await exists(join(root, ".specnaut/backlog.md")), true);
 
     // No other harnesses' output trees.
     assertEquals(await exists(join(root, ".claude/")), false);
@@ -102,7 +102,7 @@ Deno.test("specnaut init --ai antigravity scaffolds an Antigravity layout", asyn
     assertEquals(await exists(join(root, "CLAUDE.md")), false);
 
     // Lock reflects antigravity.
-    const lock = await Deno.readTextFile(join(root, ".specflow/installed.lock"));
+    const lock = await Deno.readTextFile(join(root, ".specnaut/installed.lock"));
     assertEquals(lock.includes("harness: antigravity"), true);
   });
 });

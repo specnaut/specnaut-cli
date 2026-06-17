@@ -85,12 +85,12 @@ Deno.test("specnaut init --ai opencode scaffolds a complete OpenCode project lay
     assertStringIncludes(autoChainSkill, "name: specnaut-auto");
 
     // Shared (cross-harness)
-    assertEquals(await exists(join(root, ".specflow/memory/constitution.md")), true);
+    assertEquals(await exists(join(root, ".specnaut/memory/constitution.md")), true);
     assertEquals(await exists(join(root, "AGENTS.md")), true);
     const agentsRoot = await Deno.readTextFile(join(root, "AGENTS.md"));
     assertEquals(agentsRoot.length > 0, true);
     assertEquals(await exists(join(root, "tasks/backlog.md")), false);
-    assertEquals(await exists(join(root, ".specflow/backlog.md")), true);
+    assertEquals(await exists(join(root, ".specnaut/backlog.md")), true);
 
     // NOT emitted for opencode
     assertEquals(await exists(join(root, ".claude/")), false);
@@ -102,7 +102,7 @@ Deno.test("specnaut init --ai opencode scaffolds a complete OpenCode project lay
     assertEquals(await exists(join(root, "CLAUDE.md")), false);
 
     // Lock reflects opencode
-    const lock = await Deno.readTextFile(join(root, ".specflow/installed.lock"));
+    const lock = await Deno.readTextFile(join(root, ".specnaut/installed.lock"));
     assertStringIncludes(lock, "harness: opencode");
   });
 });

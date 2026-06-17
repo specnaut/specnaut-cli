@@ -32,14 +32,14 @@ async function withProjectDir(
 }
 
 async function filledProject(dir: string) {
-  await Deno.mkdir(join(dir, ".specflow/memory"), { recursive: true });
+  await Deno.mkdir(join(dir, ".specnaut/memory"), { recursive: true });
   await Deno.mkdir(join(dir, ".claude/commands"), { recursive: true });
   await Deno.writeTextFile(
-    join(dir, ".specflow/memory/constitution.md"),
+    join(dir, ".specnaut/memory/constitution.md"),
     CONSTITUTION_FILLED,
   );
   await Deno.writeTextFile(
-    join(dir, ".specflow/installed.lock"),
+    join(dir, ".specnaut/installed.lock"),
     `version: 2
 harness: claude
 templates_version: 0.2.0
@@ -59,7 +59,7 @@ Deno.test("inspect returns all-pass for well-formed project", async () => {
         `${o.name} should be pass/warn`,
       );
     }
-    const specify = outcomes.find((o) => o.name === ".specflow/");
+    const specify = outcomes.find((o) => o.name === ".specnaut/");
     assertEquals(specify?.status, "pass");
     const harness = outcomes.find((o) => o.name === "harness");
     assertEquals(harness?.status, "pass");
@@ -67,7 +67,7 @@ Deno.test("inspect returns all-pass for well-formed project", async () => {
   });
 });
 
-Deno.test("inspect reports fail when .specflow missing", async () => {
+Deno.test("inspect reports fail when .specnaut missing", async () => {
   await withProjectDir(
     async (dir) => {
       await Deno.mkdir(join(dir, ".claude"), { recursive: true });
@@ -75,7 +75,7 @@ Deno.test("inspect reports fail when .specflow missing", async () => {
     async (dir) => {
       const inspector = new FsProjectInspector();
       const outcomes = await inspector.inspect(dir, "0.2.0");
-      const specify = outcomes.find((o) => o.name === ".specflow/");
+      const specify = outcomes.find((o) => o.name === ".specnaut/");
       assertEquals(specify?.status, "fail");
     },
   );
@@ -84,10 +84,10 @@ Deno.test("inspect reports fail when .specflow missing", async () => {
 Deno.test("inspect reports warn for empty placeholder constitution", async () => {
   await withProjectDir(
     async (dir) => {
-      await Deno.mkdir(join(dir, ".specflow/memory"), { recursive: true });
+      await Deno.mkdir(join(dir, ".specnaut/memory"), { recursive: true });
       await Deno.mkdir(join(dir, ".claude"), { recursive: true });
       await Deno.writeTextFile(
-        join(dir, ".specflow/memory/constitution.md"),
+        join(dir, ".specnaut/memory/constitution.md"),
         CONSTITUTION_EMPTY_PLACEHOLDER,
       );
     },
@@ -103,9 +103,9 @@ Deno.test("inspect reports warn for empty placeholder constitution", async () =>
 Deno.test("inspect passes when lock templates_version matches bundled", async () => {
   await withProjectDir(
     async (dir) => {
-      await Deno.mkdir(join(dir, ".specflow"), { recursive: true });
+      await Deno.mkdir(join(dir, ".specnaut"), { recursive: true });
       await Deno.writeTextFile(
-        join(dir, ".specflow/installed.lock"),
+        join(dir, ".specnaut/installed.lock"),
         `version: 1
 templates_version: 0.2.0
 entries: {}
@@ -124,9 +124,9 @@ entries: {}
 Deno.test("inspect warns when lock templates_version differs from bundled", async () => {
   await withProjectDir(
     async (dir) => {
-      await Deno.mkdir(join(dir, ".specflow"), { recursive: true });
+      await Deno.mkdir(join(dir, ".specnaut"), { recursive: true });
       await Deno.writeTextFile(
-        join(dir, ".specflow/installed.lock"),
+        join(dir, ".specnaut/installed.lock"),
         `version: 1
 templates_version: 0.1.0
 entries: {}
@@ -160,9 +160,9 @@ Deno.test("inspect surfaces harness=claude when lock says claude and .claude/ ex
   await withProjectDir(
     async (dir) => {
       await Deno.mkdir(join(dir, ".claude"), { recursive: true });
-      await Deno.mkdir(join(dir, ".specflow"), { recursive: true });
+      await Deno.mkdir(join(dir, ".specnaut"), { recursive: true });
       await Deno.writeTextFile(
-        join(dir, ".specflow/installed.lock"),
+        join(dir, ".specnaut/installed.lock"),
         `version: 2
 harness: claude
 templates_version: 0.3.0
@@ -185,9 +185,9 @@ Deno.test("inspect reports fail when lock harness does not match folder on disk"
     async (dir) => {
       // lock says cursor but only .claude/ is present
       await Deno.mkdir(join(dir, ".claude"), { recursive: true });
-      await Deno.mkdir(join(dir, ".specflow"), { recursive: true });
+      await Deno.mkdir(join(dir, ".specnaut"), { recursive: true });
       await Deno.writeTextFile(
-        join(dir, ".specflow/installed.lock"),
+        join(dir, ".specnaut/installed.lock"),
         `version: 2
 harness: cursor
 templates_version: 0.3.0
@@ -208,9 +208,9 @@ Deno.test("inspect surfaces harness=codex when lock says codex and .agents/ exis
   await withProjectDir(
     async (dir) => {
       await Deno.mkdir(join(dir, ".agents/skills"), { recursive: true });
-      await Deno.mkdir(join(dir, ".specflow"), { recursive: true });
+      await Deno.mkdir(join(dir, ".specnaut"), { recursive: true });
       await Deno.writeTextFile(
-        join(dir, ".specflow/installed.lock"),
+        join(dir, ".specnaut/installed.lock"),
         `version: 2
 harness: codex
 templates_version: 0.4.0
@@ -232,9 +232,9 @@ Deno.test("inspect reports fail for codex lock when .agents/ missing", async () 
   await withProjectDir(
     async (dir) => {
       // Lock says codex but no .agents/ directory on disk.
-      await Deno.mkdir(join(dir, ".specflow"), { recursive: true });
+      await Deno.mkdir(join(dir, ".specnaut"), { recursive: true });
       await Deno.writeTextFile(
-        join(dir, ".specflow/installed.lock"),
+        join(dir, ".specnaut/installed.lock"),
         `version: 2
 harness: codex
 templates_version: 0.4.0
@@ -255,9 +255,9 @@ Deno.test("inspect surfaces harness=windsurf when lock says windsurf and .windsu
   await withProjectDir(
     async (dir) => {
       await Deno.mkdir(join(dir, ".windsurf/workflows"), { recursive: true });
-      await Deno.mkdir(join(dir, ".specflow"), { recursive: true });
+      await Deno.mkdir(join(dir, ".specnaut"), { recursive: true });
       await Deno.writeTextFile(
-        join(dir, ".specflow/installed.lock"),
+        join(dir, ".specnaut/installed.lock"),
         `version: 2
 harness: windsurf
 templates_version: 0.6.0
@@ -278,9 +278,9 @@ entries: {}
 Deno.test("inspect reports fail for windsurf lock when .windsurf/ missing", async () => {
   await withProjectDir(
     async (dir) => {
-      await Deno.mkdir(join(dir, ".specflow"), { recursive: true });
+      await Deno.mkdir(join(dir, ".specnaut"), { recursive: true });
       await Deno.writeTextFile(
-        join(dir, ".specflow/installed.lock"),
+        join(dir, ".specnaut/installed.lock"),
         `version: 2
 harness: windsurf
 templates_version: 0.6.0
@@ -301,9 +301,9 @@ Deno.test("inspect surfaces harness=copilot when lock says copilot and .github/i
   await withProjectDir(
     async (dir) => {
       await Deno.mkdir(join(dir, ".github/instructions"), { recursive: true });
-      await Deno.mkdir(join(dir, ".specflow"), { recursive: true });
+      await Deno.mkdir(join(dir, ".specnaut"), { recursive: true });
       await Deno.writeTextFile(
-        join(dir, ".specflow/installed.lock"),
+        join(dir, ".specnaut/installed.lock"),
         `version: 2
 harness: copilot
 templates_version: 0.7.0
@@ -324,9 +324,9 @@ entries: {}
 Deno.test("inspect reports fail for copilot lock when .github/instructions/ missing", async () => {
   await withProjectDir(
     async (dir) => {
-      await Deno.mkdir(join(dir, ".specflow"), { recursive: true });
+      await Deno.mkdir(join(dir, ".specnaut"), { recursive: true });
       await Deno.writeTextFile(
-        join(dir, ".specflow/installed.lock"),
+        join(dir, ".specnaut/installed.lock"),
         `version: 2
 harness: copilot
 templates_version: 0.7.0
@@ -345,9 +345,9 @@ entries: {}
 
 // Helper: write a Claude-harness lock so checkClaudeConfig kicks in.
 async function writeClaudeLock(dir: string) {
-  await Deno.mkdir(join(dir, ".specflow"), { recursive: true });
+  await Deno.mkdir(join(dir, ".specnaut"), { recursive: true });
   await Deno.writeTextFile(
-    join(dir, ".specflow/installed.lock"),
+    join(dir, ".specnaut/installed.lock"),
     `version: 2
 harness: claude
 templates_version: 0.7.0
@@ -360,9 +360,9 @@ Deno.test("inspect skips Claude-config checks for non-Claude harnesses", async (
   await withProjectDir(
     async (dir) => {
       await Deno.mkdir(join(dir, ".cursor"), { recursive: true });
-      await Deno.mkdir(join(dir, ".specflow"), { recursive: true });
+      await Deno.mkdir(join(dir, ".specnaut"), { recursive: true });
       await Deno.writeTextFile(
-        join(dir, ".specflow/installed.lock"),
+        join(dir, ".specnaut/installed.lock"),
         `version: 2
 harness: cursor
 templates_version: 0.7.0
@@ -545,10 +545,10 @@ Deno.test("inspect fails on invalid JSON in .mcp.json", async () => {
 Deno.test("inspect reports pass when opencode harness is set and .opencode/ exists", async () => {
   await withProjectDir(
     async (dir) => {
-      await Deno.mkdir(join(dir, ".specflow"), { recursive: true });
+      await Deno.mkdir(join(dir, ".specnaut"), { recursive: true });
       await Deno.mkdir(join(dir, ".opencode/agents"), { recursive: true });
       await Deno.writeTextFile(
-        join(dir, ".specflow/installed.lock"),
+        join(dir, ".specnaut/installed.lock"),
         `version: 2
 harness: opencode
 templates_version: 0.7.0
@@ -573,14 +573,14 @@ async function backlogProject(
   backend: "local" | "github" | "gitlab",
   configYml?: string,
 ): Promise<void> {
-  await Deno.mkdir(join(dir, ".specflow/memory"), { recursive: true });
+  await Deno.mkdir(join(dir, ".specnaut/memory"), { recursive: true });
   await Deno.mkdir(join(dir, ".claude"), { recursive: true });
   await Deno.writeTextFile(
-    join(dir, ".specflow/memory/constitution.md"),
+    join(dir, ".specnaut/memory/constitution.md"),
     CONSTITUTION_FILLED,
   );
   await Deno.writeTextFile(
-    join(dir, ".specflow/installed.lock"),
+    join(dir, ".specnaut/installed.lock"),
     `version: 2
 harness: claude
 backlog_backend: ${backend}
@@ -590,7 +590,7 @@ entries: {}
   );
   if (configYml !== undefined) {
     await Deno.writeTextFile(
-      join(dir, ".specflow/backlog-config.yml"),
+      join(dir, ".specnaut/backlog-config.yml"),
       configYml,
     );
   }
@@ -811,14 +811,14 @@ Deno.test("inspect: plugin gap check warns for each missing covered path when pl
 Deno.test("inspect: plugin gap check skipped on non-claude harnesses", async () => {
   await withProjectDir(
     async (dir) => {
-      await Deno.mkdir(join(dir, ".specflow/memory"), { recursive: true });
+      await Deno.mkdir(join(dir, ".specnaut/memory"), { recursive: true });
       await Deno.mkdir(join(dir, ".cursor"), { recursive: true });
       await Deno.writeTextFile(
-        join(dir, ".specflow/memory/constitution.md"),
+        join(dir, ".specnaut/memory/constitution.md"),
         CONSTITUTION_FILLED,
       );
       await Deno.writeTextFile(
-        join(dir, ".specflow/installed.lock"),
+        join(dir, ".specnaut/installed.lock"),
         `version: 2
 harness: cursor
 templates_version: 0.7.0

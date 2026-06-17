@@ -81,7 +81,7 @@ while [ $i -le $# ]; do
             echo "  --number N          Specify branch number manually (overrides auto-detection)"
             echo "  --timestamp         Use timestamp prefix (YYYYMMDD-HHMMSS) instead of sequential numbering"
             echo "  --issue <id>        Link this feature to a backlog issue (id is a positive integer);"
-            echo "                      surfaces in JSON output and is persisted to .specflow/feature.json"
+            echo "                      surfaces in JSON output and is persisted to .specnaut/feature.json"
             echo "                      so /specflow merge can close the loop on the project board."
             echo "  --help, -h          Show this help message"
             echo ""
@@ -225,7 +225,7 @@ fi
 
 cd "$REPO_ROOT"
 
-SPECS_DIR="$REPO_ROOT/.specflow/specs"
+SPECS_DIR="$REPO_ROOT/.specnaut/specs"
 if [ "$DRY_RUN" != true ]; then
     mkdir -p "$SPECS_DIR"
 fi

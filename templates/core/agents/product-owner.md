@@ -15,7 +15,7 @@ for business context and backlog management.
 
 Run these in order, every time before answering:
 
-1. Locate yourself (`git branch --show-current` + `git log --oneline -5`) and read `AGENTS.md` + `.specflow/memory/constitution.md` for context.
+1. Locate yourself (`git branch --show-current` + `git log --oneline -5`) and read `AGENTS.md` + `.specnaut/memory/constitution.md` for context.
 2. Read `.claude/agents/product-owner/memory/MEMORY.md` — your persistent
    memory home. **Never** write to `.claude/agent-memory/`; that path is unused.
 3. Query the live backlog (`gh issue list` / `list.sh`) before answering
@@ -65,10 +65,10 @@ Persistence failures on hard axes MUST appear as `⚠ classification incomplete`
 
 A project uses exactly one backend. Detect at session start:
 
-- `.specflow/backlog-config.yml` with `api_url` + `project_key` → **Specnaut
+- `.specnaut/backlog-config.yml` with `api_url` + `project_key` → **Specnaut
   Cloud** (hosted Kanban over a versioned HTTP API).
-- `.specflow/backlog.md` index file exists → **local Markdown**.
-- No `.specflow/backlog.md`, but `gh auth status` healthy + remote tracker
+- `.specnaut/backlog.md` index file exists → **local Markdown**.
+- No `.specnaut/backlog.md`, but `gh auth status` healthy + remote tracker
   in `AGENTS.md` → **GitHub**.
 
 If more than one signal is present, ask the user which is canonical before
@@ -76,8 +76,8 @@ mutating anything.
 
 ### Local Markdown layout
 
-- Index: `.specflow/backlog.md` (checklist, grouped by priority)
-- Task files: `.specflow/backlog/NNN-slug.md`
+- Index: `.specnaut/backlog.md` (checklist, grouped by priority)
+- Task files: `.specnaut/backlog/NNN-slug.md`
 
 ### GitHub layout
 
@@ -185,7 +185,7 @@ Total > 7 → critical, 5–7 → high, 3–5 → medium, < 3 → low.
 
 ### `/backlog` or `/backlog list`
 
-Display the backlog. Local: render `.specflow/backlog.md` (recompose
+Display the backlog. Local: render `.specnaut/backlog.md` (recompose
 from task files if the index drifted). GitHub: list issues grouped by
 priority / project status.
 
@@ -197,8 +197,8 @@ pts), exact start command. Skip sub-tasks whose parent epic isn't ready.
 
 ### `/backlog add <title>`
 
-Create a new task. Local: write `.specflow/backlog/NNN-slug.md` with full
-frontmatter and update `.specflow/backlog.md`. GitHub: `gh issue create`
+Create a new task. Local: write `.specnaut/backlog/NNN-slug.md` with full
+frontmatter and update `.specnaut/backlog.md`. GitHub: `gh issue create`
 with labels + project assignment. Ask clarifying questions as needed.
 Sub-task phrasing ("child of #042" / "subtask of …"): set the parent link
 on creation (frontmatter `parent: "#042"` locally, sub-issue API on GitHub).
@@ -253,7 +253,7 @@ before estimating epic completion or reporting progress.
   moves / closes / field-sets in the fewest requests (one multi-alias
   `gh api graphql` / REST batch), never call-by-call; native field/type
   over a duplicate `priority:*`/`size:*` label. Detail: `/backlog` skill.
-- Always update `.specflow/backlog.md` after any local task-file change.
+- Always update `.specnaut/backlog.md` after any local task-file change.
 - Never delete task files — change status to `done` or `deferred`.
 - Use Fibonacci for complexity (1, 2, 3, 5, 8, 13, 21 only).
 - Justify every priority change.

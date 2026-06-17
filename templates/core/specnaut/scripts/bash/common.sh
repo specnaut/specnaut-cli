@@ -61,7 +61,7 @@ get_current_branch() {
     fi
 
     # For non-git repos, try to find the latest feature directory
-    local specs_dir="$repo_root/.specflow/specs"
+    local specs_dir="$repo_root/.specnaut/specs"
 
     if [[ -d "$specs_dir" ]]; then
         local latest_feature=""
@@ -159,7 +159,7 @@ find_feature_dir_by_prefix() {
     local repo_root="$1"
     local branch_name
     branch_name=$(spec_kit_effective_branch_name "$2")
-    local specs_dir="$repo_root/.specflow/specs"
+    local specs_dir="$repo_root/.specnaut/specs"
 
     # Extract prefix from branch (e.g., "004" from "004-whatever" or "20260319-143022" from timestamp branches)
     local prefix=""
@@ -173,7 +173,7 @@ find_feature_dir_by_prefix() {
         return
     fi
 
-    # Search for directories in .specflow/specs/ that start with this prefix
+    # Search for directories in .specnaut/specs/ that start with this prefix
     local matches=()
     if [[ -d "$specs_dir" ]]; then
         for dir in "$specs_dir"/"$prefix"-*; do
@@ -209,23 +209,23 @@ get_feature_paths() {
 
     # Resolve feature directory.  Priority:
     #   1. SPECIFY_FEATURE_DIRECTORY env var (explicit override)
-    #   2. .specflow/feature.json "feature_directory" key (persisted by /specflow specify)
+    #   2. .specnaut/feature.json "feature_directory" key (persisted by /specflow specify)
     #   3. Branch-name-based prefix lookup (legacy fallback)
     local feature_dir
     if [[ -n "${SPECIFY_FEATURE_DIRECTORY:-}" ]]; then
         feature_dir="$SPECIFY_FEATURE_DIRECTORY"
         # Normalize relative paths to absolute under repo root
         [[ "$feature_dir" != /* ]] && feature_dir="$repo_root/$feature_dir"
-    elif [[ -f "$repo_root/.specflow/feature.json" ]]; then
+    elif [[ -f "$repo_root/.specnaut/feature.json" ]]; then
         local _fd
         if command -v jq >/dev/null 2>&1; then
-            _fd=$(jq -r '.feature_directory // empty' "$repo_root/.specflow/feature.json" 2>/dev/null)
+            _fd=$(jq -r '.feature_directory // empty' "$repo_root/.specnaut/feature.json" 2>/dev/null)
         elif command -v python3 >/dev/null 2>&1; then
             # Fallback: use Python to parse JSON so pretty-printed/multi-line files work
-            _fd=$(python3 -c "import json,sys; d=json.load(open(sys.argv[1])); print(d.get('feature_directory',''))" "$repo_root/.specflow/feature.json" 2>/dev/null)
+            _fd=$(python3 -c "import json,sys; d=json.load(open(sys.argv[1])); print(d.get('feature_directory',''))" "$repo_root/.specnaut/feature.json" 2>/dev/null)
         else
             # Last resort: single-line grep fallback (won't work on multi-line JSON)
-            _fd=$(grep -o '"feature_directory"[[:space:]]*:[[:space:]]*"[^"]*"' "$repo_root/.specflow/feature.json" 2>/dev/null | sed 's/.*"\([^"]*\)"$/\1/')
+            _fd=$(grep -o '"feature_directory"[[:space:]]*:[[:space:]]*"[^"]*"' "$repo_root/.specnaut/feature.json" 2>/dev/null | sed 's/.*"\([^"]*\)"$/\1/')
         fi
         if [[ -n "$_fd" ]]; then
             feature_dir="$_fd"
@@ -292,21 +292,21 @@ check_file() { [[ -f "$1" ]] && echo "  ✓ $2" || echo "  ✗ $2"; }
 check_dir() { [[ -d "$1" && -n $(ls -A "$1" 2>/dev/null) ]] && echo "  ✓ $2" || echo "  ✗ $2"; }
 
 # Resolve a template name to a file path using the priority stack:
-#   1. .specflow/templates/overrides/
-#   2. .specflow/presets/<preset-id>/templates/ (sorted by priority from .registry)
-#   3. .specflow/extensions/<ext-id>/templates/
-#   4. .specflow/templates/ (core)
+#   1. .specnaut/templates/overrides/
+#   2. .specnaut/presets/<preset-id>/templates/ (sorted by priority from .registry)
+#   3. .specnaut/extensions/<ext-id>/templates/
+#   4. .specnaut/templates/ (core)
 resolve_template() {
     local template_name="$1"
     local repo_root="$2"
-    local base="$repo_root/.specflow/templates"
+    local base="$repo_root/.specnaut/templates"
 
     # Priority 1: Project overrides
     local override="$base/overrides/${template_name}.md"
     [ -f "$override" ] && echo "$override" && return 0
 
     # Priority 2: Installed presets (sorted by priority from .registry)
-    local presets_dir="$repo_root/.specflow/presets"
+    local presets_dir="$repo_root/.specnaut/presets"
     if [ -d "$presets_dir" ]; then
         local registry_file="$presets_dir/.registry"
         if [ -f "$registry_file" ] && command -v python3 >/dev/null 2>&1; then
@@ -353,7 +353,7 @@ except Exception:
     fi
 
     # Priority 3: Extension-provided templates
-    local ext_dir="$repo_root/.specflow/extensions"
+    local ext_dir="$repo_root/.specnaut/extensions"
     if [ -d "$ext_dir" ]; then
         for ext in "$ext_dir"/*/; do
             [ -d "$ext" ] || continue
@@ -383,7 +383,7 @@ except Exception:
 resolve_template_content() {
     local template_name="$1"
     local repo_root="$2"
-    local base="$repo_root/.specflow/templates"
+    local base="$repo_root/.specnaut/templates"
 
     # Collect all layers (highest priority first)
     local -a layer_paths=()
@@ -397,7 +397,7 @@ resolve_template_content() {
     fi
 
     # Priority 2: Installed presets (sorted by priority from .registry)
-    local presets_dir="$repo_root/.specflow/presets"
+    local presets_dir="$repo_root/.specnaut/presets"
     if [ -d "$presets_dir" ]; then
         local registry_file="$presets_dir/.registry"
         local sorted_presets=""
@@ -503,7 +503,7 @@ except Exception:
     fi
 
     # Priority 3: Extension-provided templates (always "replace")
-    local ext_dir="$repo_root/.specflow/extensions"
+    local ext_dir="$repo_root/.specnaut/extensions"
     if [ -d "$ext_dir" ]; then
         for ext in "$ext_dir"/*/; do
             [ -d "$ext" ] || continue

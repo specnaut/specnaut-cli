@@ -1,4 +1,4 @@
-# Contract: enriched ledger entry (`.specflow/logs/agents.jsonl`)
+# Contract: enriched ledger entry (`.specnaut/logs/agents.jsonl`)
 
 One JSON object per line, appended by `log-subagent.sh` on each subagent start/stop.
 

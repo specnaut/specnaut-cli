@@ -1,6 +1,6 @@
 # Contract: `/status-audit` report
 
-Read-only. Reads `.specflow/logs/agents.jsonl`; writes nothing.
+Read-only. Reads `.specnaut/logs/agents.jsonl`; writes nothing.
 
 ## Required report sections
 

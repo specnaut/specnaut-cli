@@ -3,7 +3,7 @@
 //
 //   login   device-authorization browser flow → stores credentials securely,
 //           then binds the project to a Cloud project (select or create) and
-//           writes .specflow/backlog-config.yml.
+//           writes .specnaut/backlog-config.yml.
 //   token   prints a fresh access token to stdout (refreshing transparently);
 //           used by the bundled cloud/*.sh scripts. Honors SPECNAUT_CLOUD_TOKEN
 //           (legacy SPECFLOW_CLOUD_TOKEN as a fallback) as a headless / CI
@@ -109,7 +109,7 @@ async function runLogin(intent: CloudIntent): Promise<number> {
     dim(
       store.kind === "keychain"
         ? "  credentials stored in the OS keychain"
-        : "  credentials stored in ~/.specflow/credentials.json (0600 — no OS keychain available)",
+        : "  credentials stored in ~/.specnaut/credentials.json (0600 — no OS keychain available)",
     ),
   );
 
@@ -135,7 +135,7 @@ async function runLogin(intent: CloudIntent): Promise<number> {
   await writeCloudConfig(Deno.cwd(), apiUrl, projectKey);
   console.log(green(`✓ linked to project ${bold(projectKey)}`));
   console.log(
-    dim("  wrote .specflow/backlog-config.yml — /backlog now runs against Specnaut Cloud"),
+    dim("  wrote .specnaut/backlog-config.yml — /backlog now runs against Specnaut Cloud"),
   );
   return 0;
 }

@@ -45,9 +45,9 @@ clarifications needed) STOP #2 (pre-merge validation)
 
 ## Project context
 
-- Constitution lives at `.specflow/memory/constitution.md` — treat as non-negotiable rules.
-- Product backlog (when local Markdown backend): index at `.specflow/backlog.md`,
-  task files at `.specflow/backlog/NNN-*.md`.
+- Constitution lives at `.specnaut/memory/constitution.md` — treat as non-negotiable rules.
+- Product backlog (when local Markdown backend): index at `.specnaut/backlog.md`,
+  task files at `.specnaut/backlog/NNN-*.md`.
 - Project conventions: `AGENTS.md` at project root.
 
 Read the constitution and AGENTS.md before starting any significant work.

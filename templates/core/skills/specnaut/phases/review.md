@@ -20,7 +20,7 @@ Spawn the `review-coordinator` agent with the list of changed files. It in turn
 spawns:
 
 - `code-reviewer` (always) — architecture, DRY, YAGNI, readability, alignment
-  with `.specflow/memory/constitution.md`.
+  with `.specnaut/memory/constitution.md`.
 - `security-auditor` (always) — input validation, auth/authz, secret handling,
   SQL/command injection, path traversal, silent catches that swallow errors.
 - `test-reviewer` (if test files are in the diff) — adequacy of coverage, test

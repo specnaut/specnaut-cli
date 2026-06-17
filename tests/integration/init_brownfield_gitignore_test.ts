@@ -77,11 +77,11 @@ Deno.test("init --here on a Vite-style project preserves the user .gitignore via
     assertStringIncludes(merged, "dist-ssr");
     assertStringIncludes(merged, ".DS_Store");
     // Specnaut block is fenced and at the end.
-    assertStringIncludes(merged, "# --- Specflow: gitignore ---");
-    assertStringIncludes(merged, "*.specflow.bak");
-    assertStringIncludes(merged, "# --- End Specflow: gitignore ---");
+    assertStringIncludes(merged, "# --- Specnaut: gitignore ---");
+    assertStringIncludes(merged, "*.specnaut.bak");
+    assertStringIncludes(merged, "# --- End Specnaut: gitignore ---");
     // No backup created — merge is non-destructive.
-    assertEquals(await exists(join(root, ".gitignore.specflow.bak")), false);
+    assertEquals(await exists(join(root, ".gitignore.specnaut.bak")), false);
   });
 });
 
@@ -98,7 +98,7 @@ Deno.test("init --here twice does not duplicate the merge block (idempotency)", 
     assertEquals(second.code, 0, `second init failed: ${second.stderr}`);
 
     const merged = await Deno.readTextFile(join(root, ".gitignore"));
-    const fenceCount = (merged.match(/# --- Specflow: gitignore ---/g) ?? []).length;
+    const fenceCount = (merged.match(/# --- Specnaut: gitignore ---/g) ?? []).length;
     assertEquals(fenceCount, 1, "specnaut block must appear exactly once");
     // User content still present.
     assertStringIncludes(merged, "node_modules");
@@ -116,8 +116,8 @@ Deno.test("init --here greenfield writes the .gitignore wrapped in fence markers
     assertEquals(code, 0, `init failed: ${stderr}`);
 
     const content = await Deno.readTextFile(join(root, ".gitignore"));
-    assertStringIncludes(content, "# --- Specflow: gitignore ---");
-    assertStringIncludes(content, "*.specflow.bak");
-    assertStringIncludes(content, "# --- End Specflow: gitignore ---");
+    assertStringIncludes(content, "# --- Specnaut: gitignore ---");
+    assertStringIncludes(content, "*.specnaut.bak");
+    assertStringIncludes(content, "# --- End Specnaut: gitignore ---");
   });
 });

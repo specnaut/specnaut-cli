@@ -9,10 +9,43 @@
  * Pure — no IO, no Deno globals. Safe to import from domain or application.
  */
 
-const FENCE_PREFIX = "# --- Specflow: ";
+const FENCE_PREFIX = "# --- Specnaut: ";
 const FENCE_SUFFIX = " ---";
-const END_PREFIX = "# --- End Specflow: ";
+const END_PREFIX = "# --- End Specnaut: ";
 const END_SUFFIX = " ---";
+
+// Back-compat: blocks written by pre-rebrand (Specflow) versions are still
+// recognised so an upgrade REPLACES the legacy block in place — migrating its
+// fence to the Specnaut label — rather than appending a duplicate.
+const LEGACY_FENCE_PREFIX = "# --- Specflow: ";
+const LEGACY_END_PREFIX = "# --- End Specflow: ";
+
+/**
+ * Locate a previously-written block for `label`, matching the current
+ * (Specnaut) fence first and the legacy (Specflow) fence second. Returns the
+ * fence offsets, or `null` if no complete block is present.
+ */
+function locateBlock(
+  content: string,
+  label: string,
+): { startIdx: number; afterStart: number; endIdx: number; afterEnd: number } | null {
+  for (
+    const [sp, ep] of [
+      [FENCE_PREFIX, END_PREFIX],
+      [LEGACY_FENCE_PREFIX, LEGACY_END_PREFIX],
+    ] as const
+  ) {
+    const start = `${sp}${label}${FENCE_SUFFIX}`;
+    const end = `${ep}${label}${END_SUFFIX}`;
+    const startIdx = content.indexOf(start);
+    if (startIdx === -1) continue;
+    const afterStart = startIdx + start.length;
+    const endIdx = content.indexOf(end, afterStart);
+    if (endIdx === -1) continue;
+    return { startIdx, afterStart, endIdx, afterEnd: endIdx + end.length };
+  }
+  return null;
+}
 
 /**
  * Normalize a block body to its canonical form (no leading or trailing
@@ -44,14 +77,9 @@ export function wrapInBlock(body: string, label: string): string {
  * the fence markers and without trailing newlines.
  */
 export function extractBlock(content: string, label: string): string | null {
-  const start = startFence(label);
-  const end = endFence(label);
-  const startIdx = content.indexOf(start);
-  if (startIdx === -1) return null;
-  const afterStart = startIdx + start.length;
-  const endIdx = content.indexOf(end, afterStart);
-  if (endIdx === -1) return null;
-  const between = content.slice(afterStart, endIdx);
+  const loc = locateBlock(content, label);
+  if (!loc) return null;
+  const between = content.slice(loc.afterStart, loc.endIdx);
   return between.replace(/^\n+/, "").replace(/\n+$/, "");
 }
 
@@ -70,22 +98,19 @@ export function mergeIntoFile(
   const block = wrapInBlock(body, label);
   if (existing === null || existing.length === 0) return `${block}\n`;
 
-  const start = startFence(label);
-  const end = endFence(label);
-  const startIdx = existing.indexOf(start);
-  if (startIdx !== -1) {
-    const endIdx = existing.indexOf(end, startIdx + start.length);
-    if (endIdx !== -1) {
-      const before = existing.slice(0, startIdx).replace(/\n+$/, "");
-      const afterBlockEnd = endIdx + end.length;
-      // Skip the newline that follows the end fence, if any.
-      const restStart = existing[afterBlockEnd] === "\n" ? afterBlockEnd + 1 : afterBlockEnd;
-      const after = existing.slice(restStart);
-      const middle = before.length > 0 ? `${before}\n\n${block}` : block;
-      const trailingNewline = after.length === 0 || after.endsWith("\n") ? "" : "\n";
-      const tail = after.length > 0 ? `\n${after.replace(/^\n+/, "")}${trailingNewline}` : "\n";
-      return `${middle}${tail}`;
-    }
+  // Replace an existing block in place (current OR legacy fence) — the
+  // rewritten block always carries the current Specnaut fence.
+  const loc = locateBlock(existing, label);
+  if (loc) {
+    const before = existing.slice(0, loc.startIdx).replace(/\n+$/, "");
+    const afterBlockEnd = loc.afterEnd;
+    // Skip the newline that follows the end fence, if any.
+    const restStart = existing[afterBlockEnd] === "\n" ? afterBlockEnd + 1 : afterBlockEnd;
+    const after = existing.slice(restStart);
+    const middle = before.length > 0 ? `${before}\n\n${block}` : block;
+    const trailingNewline = after.length === 0 || after.endsWith("\n") ? "" : "\n";
+    const tail = after.length > 0 ? `\n${after.replace(/^\n+/, "")}${trailingNewline}` : "\n";
+    return `${middle}${tail}`;
   }
 
   // No existing block: append to the end.

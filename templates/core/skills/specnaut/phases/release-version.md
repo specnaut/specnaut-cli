@@ -25,7 +25,7 @@ release-body Markdown to stdout, with one section per non-empty
 Conventional-Commits bucket. Run it like this:
 
 ```bash
-bash .specflow/scripts/release/release.sh "$@"
+bash .specnaut/scripts/release/release.sh "$@"
 ```
 
 ## Buckets (fixed order, empty buckets omitted)
@@ -54,10 +54,10 @@ If the project ships releases on GitHub, the bundled
 `release-github.sh` wrapper is the one-command path:
 
 ```bash
-bash .specflow/scripts/release/release-github.sh           # latest tag
-bash .specflow/scripts/release/release-github.sh v1.2.3    # specific tag
-bash .specflow/scripts/release/release-github.sh --draft   # create as draft
-bash .specflow/scripts/release/release-github.sh \
+bash .specnaut/scripts/release/release-github.sh           # latest tag
+bash .specnaut/scripts/release/release-github.sh v1.2.3    # specific tag
+bash .specnaut/scripts/release/release-github.sh --draft   # create as draft
+bash .specnaut/scripts/release/release-github.sh \
   --baseline v1.0.0 v1.2.3                                 # override baseline
 ```
 
@@ -84,9 +84,9 @@ If the project ships releases on GitLab, the bundled `release-gitlab.sh`
 wrapper mirrors the GitHub one:
 
 ```bash
-bash .specflow/scripts/release/release-gitlab.sh           # latest tag
-bash .specflow/scripts/release/release-gitlab.sh v1.2.3    # specific tag
-bash .specflow/scripts/release/release-gitlab.sh \
+bash .specnaut/scripts/release/release-gitlab.sh           # latest tag
+bash .specnaut/scripts/release/release-gitlab.sh v1.2.3    # specific tag
+bash .specnaut/scripts/release/release-gitlab.sh \
   --baseline v1.0.0 v1.2.3                                 # override baseline
 ```
 
@@ -102,9 +102,9 @@ paste into any release UI), the bundled `release-local.sh` wrapper
 writes the categorized body to a file in the current directory:
 
 ```bash
-bash .specflow/scripts/release/release-local.sh             # latest tag → RELEASE_NOTES_<tag>.md
-bash .specflow/scripts/release/release-local.sh v1.2.3      # specific tag
-bash .specflow/scripts/release/release-local.sh --out NOTES.md v1.2.3
+bash .specnaut/scripts/release/release-local.sh             # latest tag → RELEASE_NOTES_<tag>.md
+bash .specnaut/scripts/release/release-local.sh v1.2.3      # specific tag
+bash .specnaut/scripts/release/release-local.sh --out NOTES.md v1.2.3
 ```
 
 No remote API calls, no auth, no tag pushing. The output file is the
@@ -118,7 +118,7 @@ Capture `release.sh` output and feed it into whatever your pipeline
 expects:
 
 ```bash
-BODY=$(bash .specflow/scripts/release/release.sh v1.2.3)
+BODY=$(bash .specnaut/scripts/release/release.sh v1.2.3)
 # … hand `$BODY` to your custom publisher
 ```
 

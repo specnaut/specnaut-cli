@@ -40,7 +40,7 @@ async function initializedParentManagedChild(): Promise<{ root: string; child: s
   const root = await Deno.makeTempDir({ prefix: "specnaut-up-pm-" });
   const parent = join(root, "parent");
   const child = join(parent, "child");
-  await Deno.mkdir(join(parent, ".specflow"), { recursive: true });
+  await Deno.mkdir(join(parent, ".specnaut"), { recursive: true });
   await Deno.mkdir(child, { recursive: true });
   await Deno.writeTextFile(
     join(parent, "deno.json"),
@@ -61,7 +61,7 @@ Deno.test("no agentic resurrection", async () => {
     assertEquals(code, 0, `upgrade failed: ${stderr}`);
 
     // Upgrade refreshed the toolkit but resurrected nothing under .claude/.
-    assertEquals(await exists(join(child, ".specflow/installed.lock")), true);
+    assertEquals(await exists(join(child, ".specnaut/installed.lock")), true);
     assertEquals(await exists(join(child, ".claude/skills")), false);
     assertEquals(await exists(join(child, ".claude/agents")), false);
     assertEquals(await exists(join(child, ".claude/commands")), false);
@@ -77,7 +77,7 @@ Deno.test("lock has no agentic entries", async () => {
     const { code, stderr } = await runSpecnaut(["upgrade"], { cwd: child });
     assertEquals(code, 0, `upgrade failed: ${stderr}`);
 
-    const lockYaml = await Deno.readTextFile(join(child, ".specflow/installed.lock"));
+    const lockYaml = await Deno.readTextFile(join(child, ".specnaut/installed.lock"));
     const lock = parseLock(lockYaml);
     assertEquals(lock.parentManaged, true);
     for (const dest of lock.entries.keys()) {

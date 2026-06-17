@@ -28,7 +28,7 @@ over-engineered; the extraction is a few `grep -oE` lines.
 ## Decision 2 — `/status-audit` as a read+reason skill (no new runtime)
 
 **Decision**: `/status-audit` is a markdown orchestrator skill. Its body instructs the lead to read
-`.specflow/logs/agents.jsonl`, group entries by agent (latest by `ts` = current state), and report
+`.specnaut/logs/agents.jsonl`, group entries by agent (latest by `ts` = current state), and report
 the seven views (state counts; per-agent latest state/verdict/last-update; blocked; stale ≥15m;
 `done`+`done_criteria_met:no` contradiction; missing handoffs; review/QA verdict summary). Absent
 ledger → "no ledger yet"; malformed line → skip with note; absent fields → "unknown".
@@ -45,13 +45,13 @@ be a program.)
 
 ## Decision 3 — Schema doc + distribution
 
-**Decision**: Author `.specflow/logs/README.md` (ledger schema: field names, types, omit-if-absent)
-and register it in the manifest alongside the existing `.specflow/`-destined entries.
+**Decision**: Author `.specnaut/logs/README.md` (ledger schema: field names, types, omit-if-absent)
+and register it in the manifest alongside the existing `.specnaut/`-destined entries.
 `/status-audit` is markdown-only → mirror to `plugin/`. The hook already has a manifest entry
 (edit-in-place, no new registration).
 
 **Rationale**: FR-008 wants the schema documented where the ledger lives; the manifest already ships
-`.specflow/`-target files, so follow that shape.
+`.specnaut/`-target files, so follow that shape.
 
 ## Open implementation detail (for the developer, not a blocker)
 

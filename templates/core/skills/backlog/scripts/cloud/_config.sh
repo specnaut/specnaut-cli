@@ -1,15 +1,15 @@
 #!/usr/bin/env bash
-# Helper: read api_url + project_key from .specflow/backlog-config.yml and get a
+# Helper: read api_url + project_key from .specnaut/backlog-config.yml and get a
 # fresh access token from `specnaut cloud token`. Sourced by the other
 # cloud-backend scripts. Exports API_BASE (…/api/v1) + API_TOKEN.
 #
 # Credentials are NOT stored in backlog-config.yml — they live in the OS keychain
-# (or ~/.specflow/credentials.json). Run `specnaut cloud login` once to
+# (or ~/.specnaut/credentials.json). Run `specnaut cloud login` once to
 # authenticate. For CI / headless, set SPECNAUT_CLOUD_TOKEN instead.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/../../.." && pwd)"
-CONFIG="$ROOT/.specflow/backlog-config.yml"
+CONFIG="$ROOT/.specnaut/backlog-config.yml"
 
 if [ ! -f "$CONFIG" ]; then
   echo "error: $CONFIG not found. Run \`specnaut init --backlog cloud\` first." >&2

@@ -38,7 +38,7 @@ Reject any other argument with: `error: unknown argument <token> — accepted: -
    - Lockfiles (`package-lock.json`, `pnpm-lock.yaml`, `yarn.lock`,
      `poetry.lock`, `uv.lock`, `Cargo.lock`, `composer.lock`,
      `Gemfile.lock`, `go.sum`, `deno.lock`)
-   - License allowlist override (`.specflow/license-allowlist.txt`) if
+   - License allowlist override (`.specnaut/license-allowlist.txt`) if
      present
    - Source files by language extension — used to verify declared deps
      are actually imported (axis 3, unused-dep detection)
@@ -130,7 +130,7 @@ Codebase: <root>
 Severity floor: <high|medium|low|critical>
 Findings: N (Critical: X · High: Y · Medium: Z · Low: W)
 Manifests: <one line — "package.json, deno.json">
-License allowlist: <"default (8 SPDX ids)" | "default + .specflow/license-allowlist.txt (N more)">
+License allowlist: <"default (8 SPDX ids)" | "default + .specnaut/license-allowlist.txt (N more)">
 Report:   docs/specnaut/audits/YYYY-MM-DD-dependencies.md
 Read-only: ✓ (git status clean except for the report file)
 

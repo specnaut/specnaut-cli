@@ -38,7 +38,7 @@ discoverability layer, not the polished workflow. Handoff rewriting is a known f
 - The binary's `specnaut init` scaffolds **project-scope** copies — you can customize them
   per-project, and they ship with shorter slash-command names (e.g. `/specify` instead of
   `/specnaut-plugin:specify`).
-- Backlog skill, hooks, and `.specflow/` files stay binary-owned because they read project-state at
+- Backlog skill, hooks, and `.specnaut/` files stay binary-owned because they read project-state at
   runtime.
 
 ## Install

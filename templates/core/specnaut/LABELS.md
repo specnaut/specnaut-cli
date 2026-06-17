@@ -21,7 +21,7 @@ on top of this baseline if you need them.
 ### GitHub backend
 
 ```bash
-.specflow/scripts/backlog/ensure-labels.sh
+.specnaut/scripts/backlog/ensure-labels.sh
 ```
 
 Idempotent — creates only missing labels, never edits or deletes
@@ -32,7 +32,7 @@ to bring an existing repo into alignment).
 ### GitLab backend
 
 ```bash
-.specflow/scripts/backlog/ensure-labels.sh
+.specnaut/scripts/backlog/ensure-labels.sh
 ```
 
 Same shape as the GitHub helper. Uses `glab label create`.

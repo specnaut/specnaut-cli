@@ -62,7 +62,7 @@ async function restampLockSha(
   dest: string,
   newSha: string,
 ): Promise<void> {
-  const lockPath = join(projectDir, ".specflow/installed.lock");
+  const lockPath = join(projectDir, ".specnaut/installed.lock");
   const yaml = await Deno.readTextFile(lockPath);
   // Match the entry block for `dest` (YAML key) and replace its sha256 line.
   const escaped = dest.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
@@ -91,7 +91,7 @@ const CUSTOM_MARK = "\n# my project-specific config — DO NOT CLOBBER\n";
  * Fixture: an installed project where a customised+declared file looks vanilla
  * vs its lock but diverges from the bundle (the bundle effectively ships a
  * newer version). Expectation: `specnaut upgrade` leaves the declared file
- * byte-identical AND prints the "preserved … declared in .specflow/preserve.yml"
+ * byte-identical AND prints the "preserved … declared in .specnaut/preserve.yml"
  * notice, while a non-declared customised file follows normal upgrade rules.
  */
 Deno.test("upgrade honours a declared preserve end-to-end: declared file untouched, notice emitted", async () => {
@@ -115,7 +115,7 @@ Deno.test("upgrade honours a declared preserve end-to-end: declared file untouch
 
     // Declare ONLY the first file preserved.
     await Deno.writeTextFile(
-      join(projectDir, ".specflow/preserve.yml"),
+      join(projectDir, ".specnaut/preserve.yml"),
       `preserved:\n  - ${DECLARED}\n`,
     );
 
@@ -131,7 +131,7 @@ Deno.test("upgrade honours a declared preserve end-to-end: declared file untouch
     // The declared-preserve notice names the path and the manifest.
     assertStringIncludes(
       upgrade.stdout,
-      `preserved ${DECLARED} — declared in .specflow/preserve.yml`,
+      `preserved ${DECLARED} — declared in .specnaut/preserve.yml`,
     );
 
     // The non-declared file follows normal upgrade behaviour: vanilla vs lock
@@ -161,7 +161,7 @@ Deno.test("upgrade --reset-preserved overrides a declaration and refreshes the f
     await restampLockSha(projectDir, DECLARED, await sha256Hex(declaredContent));
 
     await Deno.writeTextFile(
-      join(projectDir, ".specflow/preserve.yml"),
+      join(projectDir, ".specnaut/preserve.yml"),
       `preserved:\n  - ${DECLARED}\n`,
     );
 

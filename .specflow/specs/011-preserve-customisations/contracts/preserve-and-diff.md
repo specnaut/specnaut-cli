@@ -4,7 +4,7 @@ Phase 1 contracts for issue #367. Each contract is paired with the test(s) that 
 acceptance criteria (SC-/FR-) it satisfies. The C-id ⇄ test ⇄ SC/FR map is the analyze gate's
 checklist.
 
-## 1. Manifest contract — `.specflow/preserve.yml`
+## 1. Manifest contract — `.specnaut/preserve.yml`
 
 - The file is a YAML document with a single `preserved:` key holding a list of project-relative,
   forward-slash destination paths.

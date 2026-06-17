@@ -53,7 +53,7 @@ Deno.test("upgrade on freshly-init'd project is up-to-date", async () => {
 
 // Regression guard for #163: a fresh init followed by `upgrade --dry-run`
 // MUST report "already up to date". Before the fix, AGENTS.md and
-// .specflow/memory/constitution.md (skipIfExists files) were classified
+// .specnaut/memory/constitution.md (skipIfExists files) were classified
 // as "customized locally" because they had no lock entry. The guard
 // catches any future regression that re-introduces a similar
 // false-positive on a never-edited project.
@@ -130,10 +130,10 @@ Deno.test("upgrade --force overwrites a customized file with backup", async () =
     const upgrade = await runSpecnaut(["upgrade", "--force"], { cwd: projectDir });
     assertEquals(upgrade.code, 0);
 
-    const backupExists = await exists(`${agentsPath}.specflow.bak`);
+    const backupExists = await exists(`${agentsPath}.specnaut.bak`);
     assertEquals(backupExists, true);
 
-    const bak = await Deno.readTextFile(`${agentsPath}.specflow.bak`);
+    const bak = await Deno.readTextFile(`${agentsPath}.specnaut.bak`);
     assertEquals(bak.includes("# User customization"), true);
 
     const after = await Deno.readTextFile(agentsPath);
@@ -159,7 +159,7 @@ Deno.test("integration: applied upgrade writes marker and prints handoff", async
     // If r.code === 0 AND the binary printed "upgraded to templates":
     if (r.stdout.includes("upgraded to templates")) {
       // Marker present:
-      const raw = await Deno.readTextFile(`${dir}/.specflow/upgrade-pending.json`);
+      const raw = await Deno.readTextFile(`${dir}/.specnaut/upgrade-pending.json`);
       const marker = JSON.parse(raw);
       if (typeof marker.from !== "string") throw new Error("marker.from missing");
       if (typeof marker.to !== "string") throw new Error("marker.to missing");
@@ -183,7 +183,7 @@ Deno.test("integration: dry-run does NOT write marker", async () => {
     await runSpecnaut(["upgrade", "--dry-run"], { cwd: dir });
     let exists = false;
     try {
-      await Deno.stat(`${dir}/.specflow/upgrade-pending.json`);
+      await Deno.stat(`${dir}/.specnaut/upgrade-pending.json`);
       exists = true;
     } catch (_err) { /* expected */ }
     if (exists) throw new Error("marker should not exist after dry-run");
@@ -197,12 +197,12 @@ Deno.test("integration: up-to-date does NOT write marker", async () => {
     await runSpecnaut(["upgrade"], { cwd: dir });
     // Delete any marker the first run wrote (it might have applied something).
     try {
-      await Deno.remove(`${dir}/.specflow/upgrade-pending.json`);
+      await Deno.remove(`${dir}/.specnaut/upgrade-pending.json`);
     } catch (_err) { /* ok */ }
     await runSpecnaut(["upgrade"], { cwd: dir });
     let exists = false;
     try {
-      await Deno.stat(`${dir}/.specflow/upgrade-pending.json`);
+      await Deno.stat(`${dir}/.specnaut/upgrade-pending.json`);
       exists = true;
     } catch (_err) { /* expected */ }
     if (exists) throw new Error("marker should not exist when up-to-date");
@@ -228,7 +228,7 @@ Deno.test("upgrade auto-deletes a clean orphan and drops it from the lock", asyn
       .join("");
 
     // Inject a fake orphan entry into the existing installed.lock.
-    const lockPath = join(projectDir, ".specflow/installed.lock");
+    const lockPath = join(projectDir, ".specnaut/installed.lock");
     const lockYaml = await Deno.readTextFile(lockPath);
     const injected = lockYaml.replace(
       /(entries:\s*\n)/,
