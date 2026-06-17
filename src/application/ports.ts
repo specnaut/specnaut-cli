@@ -25,7 +25,7 @@ export type BackupReport = {
    * bundle entry had `skipIfExists: true` (placeholder semantics — the
    * user's existing content always wins). Always present; empty when no
    * placeholder skipping happened. The init use case omits these dests
-   * from the lock since they aren't Specflow-managed.
+   * from the lock since they aren't Specnaut-managed.
    */
   readonly skippedSkipIfExists: ReadonlyArray<string>;
 };
@@ -107,7 +107,7 @@ export interface PreserveStore {
  * detection. The **only** abstraction that touches the filesystem for
  * detection — keeps the use cases pure and unit-testable with fakes.
  *
- * See `docs`/the 009-parent-managed-init spec: a *providing Specflow
+ * See `docs`/the 009-parent-managed-init spec: a *providing Specnaut
  * workspace* is an ancestor that owns the centralised skills/agents and
  * declares the target as a workspace member.
  */

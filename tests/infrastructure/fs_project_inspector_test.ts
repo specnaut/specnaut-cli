@@ -138,7 +138,7 @@ entries: {}
       const outcomes = await inspector.inspect(dir, "0.2.0");
       const tv = outcomes.find((o) => o.name === "templates version");
       assertEquals(tv?.status, "warn");
-      assertEquals(tv?.message.includes("specflow upgrade"), true);
+      assertEquals(tv?.message.includes("specnaut upgrade"), true);
     },
   );
 });
@@ -723,7 +723,7 @@ Deno.test("inspect warns when github backend lock is set but backlog-config.yml 
       const o = outcomes.find((x) => x.name === "backlog backend");
       assertEquals(o?.status, "warn");
       assertEquals(o?.message.includes("backlog-config.yml missing"), true);
-      assertEquals(o?.message.includes("specflow upgrade --backlog github"), true);
+      assertEquals(o?.message.includes("specnaut upgrade --backlog github"), true);
     },
   );
 });
@@ -802,7 +802,7 @@ Deno.test("inspect: plugin gap check warns for each missing covered path when pl
     assertEquals(gapOutcomes.length, 38);
     for (const o of gapOutcomes) {
       assertEquals(o.message.includes("missing"), true);
-      assertEquals(o.message.includes("specflow upgrade"), true);
+      assertEquals(o.message.includes("specnaut upgrade"), true);
       assertEquals(o.message.includes("/plugin install specflow-plugin"), true);
     }
   });

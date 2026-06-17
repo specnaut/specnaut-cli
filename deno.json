@@ -1,5 +1,5 @@
 {
-  "name": "@mkrlabs/specflow",
+  "name": "@specnaut/cli",
   "version": "1.13.1",
   "tasks": {
     "bundle": "deno run --allow-read --allow-write scripts/bundle-templates.ts",

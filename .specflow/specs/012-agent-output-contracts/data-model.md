@@ -7,31 +7,32 @@ wiring relation between agents and contracts. These are documentation entities, 
 
 A bundled `user-invocable: false` skill defining one output block's schema.
 
-| Field | Value |
-|---|---|
-| name | `workflow-contract` \| `handoff-protocol` \| `review-findings-contract` \| `qa-report-contract` |
-| user-invocable | always `false` |
-| defines block | `WORKFLOW STATUS` \| `HANDOFF` \| `REVIEW SUMMARY` \| `QA SUMMARY` |
-| location | `templates/core/skills/<name>/SKILL.md` |
+| Field          | Value                                                                                           |
+| -------------- | ----------------------------------------------------------------------------------------------- |
+| name           | `workflow-contract` \| `handoff-protocol` \| `review-findings-contract` \| `qa-report-contract` |
+| user-invocable | always `false`                                                                                  |
+| defines block  | `WORKFLOW STATUS` \| `HANDOFF` \| `REVIEW SUMMARY` \| `QA SUMMARY`                              |
+| location       | `templates/core/skills/<name>/SKILL.md`                                                         |
 
-Identity = `name`. Immutable schema once shipped (changing a block's fields is a new contract version,
-out of scope here).
+Identity = `name`. Immutable schema once shipped (changing a block's fields is a new contract
+version, out of scope here).
 
 ## Entity: Wired agent
 
 An existing bundled agent that preloads ≥1 contract.
 
-| Field | Value |
-|---|---|
-| name | agent file stem under `templates/core/agents/` |
-| skills | YAML array of contract names in frontmatter |
+| Field      | Value                                               |
+| ---------- | --------------------------------------------------- |
+| name       | agent file stem under `templates/core/agents/`      |
+| skills     | YAML array of contract names in frontmatter         |
 | obligation | emit each preloaded contract's block at end of turn |
 
 ## Value object: WORKFLOW STATUS block
 
 Emitted by `workflow-contract` preloaders. Fields (all present each emission):
 
-- `STATE` ∈ {`in_progress`, `blocked`, `awaiting_review`, `awaiting_qa`, `awaiting_user`, `done`, `failed`}
+- `STATE` ∈ {`in_progress`, `blocked`, `awaiting_review`, `awaiting_qa`, `awaiting_user`, `done`,
+  `failed`}
 - `DONE_CRITERIA_MET` ∈ {`yes`, `no`}
 - `SUMMARY` — one sentence (outcome, not effort)
 - `ARTIFACTS` — comma list or `none`
@@ -39,7 +40,8 @@ Emitted by `workflow-contract` preloaders. Fields (all present each emission):
 - `VALIDATION` — comma list of command(results) or `none`
 - `BLOCKERS` — one sentence or `none`
 - `NEXT_ACTION` — one sentence
-- `HANDOFF_TARGET` ∈ {`developer`, `review-coordinator`, `qa-tester`, `product-owner`, `workflow-manager`, `user`, `none`}
+- `HANDOFF_TARGET` ∈ {`developer`, `review-coordinator`, `qa-tester`, `product-owner`,
+  `workflow-manager`, `user`, `none`}
 
 Invariant: `STATE: done` ⇒ `DONE_CRITERIA_MET: yes`.
 
@@ -75,7 +77,8 @@ Emitted by `qa-report-contract` preloaders.
 
 - `QA_SCOPE` — one sentence
 - `QA_VERDICT` ∈ {`pass`, `fail`, `blocked`}
-- `NEW_UNIT_TESTS`, `NEW_FUNCTIONAL_TESTS`, `NEW_BROWSER_TESTS`, `TOTAL_PASS_COUNT`, `TOTAL_FAIL_COUNT`, `BUGS_FOUND` — explicit integers ≥ 0
+- `NEW_UNIT_TESTS`, `NEW_FUNCTIONAL_TESTS`, `NEW_BROWSER_TESTS`, `TOTAL_PASS_COUNT`,
+  `TOTAL_FAIL_COUNT`, `BUGS_FOUND` — explicit integers ≥ 0
 - `QA_RECOMMENDATION` — one sentence
 
 Invariants: `pass` ⟺ scope complete ∧ `TOTAL_FAIL_COUNT == 0`; `blocked` = could not run
@@ -83,10 +86,10 @@ Invariants: `pass` ⟺ scope complete ∧ `TOTAL_FAIL_COUNT == 0`; `blocked` = c
 
 ## Relation
 
-`Wired agent —preloads→ Contract` (many-to-many). The wiring table in research.md is the authoritative
-mapping; tests assert it holds in the bundled output. The wired set is: the five auditors
-(architecture, performance, security, a11y, dependency) and two reviewers (code, test) →
-`review-findings-contract` + `workflow-contract`; `review-coordinator` →
-`workflow-contract` + `handoff-protocol` + `review-findings-contract` (its aggregated REVIEW SUMMARY
-conforms to the same schema); `developer` and `workflow-manager` → `workflow-contract` +
-`handoff-protocol`; `qa-tester` → `qa-report-contract` + `workflow-contract`.
+`Wired agent —preloads→ Contract` (many-to-many). The wiring table in research.md is the
+authoritative mapping; tests assert it holds in the bundled output. The wired set is: the five
+auditors (architecture, performance, security, a11y, dependency) and two reviewers (code, test) →
+`review-findings-contract` + `workflow-contract`; `review-coordinator` → `workflow-contract` +
+`handoff-protocol` + `review-findings-contract` (its aggregated REVIEW SUMMARY conforms to the same
+schema); `developer` and `workflow-manager` → `workflow-contract` + `handoff-protocol`; `qa-tester`
+→ `qa-report-contract` + `workflow-contract`.

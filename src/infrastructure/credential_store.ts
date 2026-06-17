@@ -1,4 +1,4 @@
-// Secure storage for Specflow Cloud CLI credentials (#353).
+// Secure storage for Specnaut Cloud CLI credentials (#353).
 //
 // The access token is short-lived and the refresh token is long-lived; both are
 // secrets and must never land in a tracked file (the project's

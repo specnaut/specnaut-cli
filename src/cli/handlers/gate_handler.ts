@@ -1,4 +1,4 @@
-// `specflow gate <status|raise|cancel>` (#358) — the non-interactive bridge a
+// `specnaut gate <status|raise|cancel>` (#358) — the non-interactive bridge a
 // skill phase uses to raise a remote-control gate and block for a human's answer.
 // It wraps the agent-side gate session (#357); skill phases (clarify here,
 // plan/merge approval in #359) shell out to it instead of re-implementing HTTP.
@@ -74,11 +74,11 @@ export async function runGate(
 async function runStatus(deps: GateDeps): Promise<number> {
   const session = await deps.buildSession();
   if (!session) {
-    deps.err(red("error: project is not Cloud-linked (run `specflow cloud login`)."));
+    deps.err(red("error: project is not Cloud-linked (run `specnaut cloud login`)."));
     return 5;
   }
   if (!session.remote.enabled) {
-    deps.err(yellow("remote mode is off (set `remote.enabled` or SPECFLOW_REMOTE=1)."));
+    deps.err(yellow("remote mode is off (set `remote.enabled` or SPECNAUT_REMOTE=1)."));
     return 2;
   }
   deps.out(JSON.stringify({ enabled: true, remote: true }));
@@ -107,7 +107,7 @@ async function runRaise(intent: GateIntent, deps: GateDeps): Promise<number> {
 
   const session = await deps.buildSession();
   if (!session) {
-    deps.err(red("error: project is not Cloud-linked (run `specflow cloud login`)."));
+    deps.err(red("error: project is not Cloud-linked (run `specnaut cloud login`)."));
     return 5;
   }
 
@@ -139,7 +139,7 @@ async function runRaise(intent: GateIntent, deps: GateDeps): Promise<number> {
       return 4;
     case "error":
       if (outcome.reason === "no_remote") {
-        deps.err(red("error: remote mode requires a Cloud login (`specflow cloud login`)."));
+        deps.err(red("error: remote mode requires a Cloud login (`specnaut cloud login`)."));
         return 5;
       }
       deps.err(red(`error: gate could not be resolved (${outcome.reason}).`));
@@ -151,12 +151,12 @@ async function runRaise(intent: GateIntent, deps: GateDeps): Promise<number> {
 
 async function runCancel(intent: GateIntent, deps: GateDeps): Promise<number> {
   if (!intent.id) {
-    deps.err(red("error: `specflow gate cancel` requires a gate id."));
+    deps.err(red("error: `specnaut gate cancel` requires a gate id."));
     return 1;
   }
   const session = await deps.buildSession();
   if (!session) {
-    deps.err(red("error: project is not Cloud-linked (run `specflow cloud login`)."));
+    deps.err(red("error: project is not Cloud-linked (run `specnaut cloud login`)."));
     return 5;
   }
   const outcome = await session.cancel(intent.id);

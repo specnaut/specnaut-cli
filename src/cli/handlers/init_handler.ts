@@ -199,18 +199,18 @@ function printConflictsError(
   console.error("");
   if (lockExists) {
     console.error(
-      `This project was previously initialised by Specflow — run ${
-        bold("specflow upgrade")
+      `This project was previously initialised by Specnaut — run ${
+        bold("specnaut upgrade")
       } to update the managed files in place,`,
     );
     console.error(
       `or re-run with ${
-        bold("specflow init --here --force")
+        bold("specnaut init --here --force")
       } to overwrite (existing files are backed up to *.specflow.bak).`,
     );
   } else {
     console.error(
-      `Re-run with ${bold("specflow init --here --force")} to overwrite ` +
+      `Re-run with ${bold("specnaut init --here --force")} to overwrite ` +
         "(existing files are backed up to *.specflow.bak).",
     );
   }
@@ -348,7 +348,7 @@ export async function runInit(intent: InitIntent): Promise<number> {
   } else if (intent.projectName) {
     targetDir = resolve(cwd, intent.projectName);
   } else {
-    console.error(red("error: `specflow init` requires a project name or --here"));
+    console.error(red("error: `specnaut init` requires a project name or --here"));
     return 2;
   }
 
@@ -418,7 +418,7 @@ export async function runInit(intent: InitIntent): Promise<number> {
   console.log(`Initializing into ${bold(targetDir)}`);
 
   // Parent-managed detection (009-parent-managed-init): when the target is a
-  // member of a providing Specflow workspace, agentic files are inherited from
+  // member of a providing Specnaut workspace, agentic files are inherited from
   // the parent and suppressed locally. A `standalone.yml` override forces the
   // full standalone path. The use case applies the bundle filter.
   const parentReader = new FsParentWorkspaceReader();
@@ -550,10 +550,10 @@ export async function runInit(intent: InitIntent): Promise<number> {
   );
   console.log(`  4. Use ${bold('/backlog add "<task title>"')} for follow-up work`);
 
-  // Specflow Cloud funnel: point CLI users at the hosted product once they've
+  // Specnaut Cloud funnel: point CLI users at the hosted product once they've
   // scaffolded — run headless + remote-control the agent's checkpoints.
   console.log(
-    `\n${cyan("✦ Specflow Cloud")} — run Specflow headless and answer your agent from your phone:`,
+    `\n${cyan("✦ Specnaut Cloud")} — run Specnaut headless and answer your agent from your phone:`,
   );
   console.log(
     dim(
@@ -561,9 +561,7 @@ export async function runInit(intent: InitIntent): Promise<number> {
     ),
   );
   console.log(
-    `     Start free: ${bold("specflow cloud login")} ${dim("·")} ${
-      cyan("https://specflow.makerlabs.app")
-    }`,
+    `     Start free: ${bold("specnaut cloud login")} ${dim("·")} ${cyan("https://specnaut.com")}`,
   );
   return 0;
 }

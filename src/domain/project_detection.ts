@@ -106,9 +106,9 @@ export function detectVersionScheme(snap: ProjectSnapshot): DetectionResult {
 
   // Git tags: a repo that has already shipped one or more semver-shaped
   // tags is the strongest possible "this team uses SemVer" signal. We
-  // intentionally exclude Specflow's own date-tag shape (`vYY.M.Da`,
+  // intentionally exclude Specnaut's own date-tag shape (`vYY.M.Da`,
   // identifiable by the trailing lowercase letter) so brownfield repos
-  // that adopted Specflow earlier with date-tags don't get mis-suggested.
+  // that adopted Specnaut earlier with date-tags don't get mis-suggested.
   //
   // Accepted shapes (case-insensitive, optional `v` prefix):
   //   v?MAJOR.MINOR.PATCH                      v1.2.3

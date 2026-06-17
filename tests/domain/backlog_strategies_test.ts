@@ -90,9 +90,9 @@ Deno.test("CloudBacklogStrategy exposes key 'cloud'", () => {
   assertEquals(new CloudBacklogStrategy().key, "cloud");
 });
 
-Deno.test("CloudBacklogStrategy displayName mentions Specflow Cloud", () => {
+Deno.test("CloudBacklogStrategy displayName mentions Specnaut Cloud", () => {
   const dn = new CloudBacklogStrategy().displayName;
-  assertEquals(dn.includes("Specflow Cloud"), true);
+  assertEquals(dn.includes("Specnaut Cloud"), true);
 });
 
 Deno.test("CloudBacklogStrategy.initConfigStub has backend + api_url + project_key, no secret", () => {

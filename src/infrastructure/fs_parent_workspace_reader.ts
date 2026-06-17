@@ -11,7 +11,7 @@ import type { ParentWorkspaceReader } from "../application/ports.ts";
 export class FsParentWorkspaceReader implements ParentWorkspaceReader {
   /**
    * Walks ancestors of `targetDir` upward to the filesystem root and returns
-   * the canonical path of the first *providing* Specflow workspace — an
+   * the canonical path of the first *providing* Specnaut workspace — an
    * ancestor with `.specflow/` AND a `deno.json` whose `workspace` array has a
    * member resolving (canonically) to `targetDir`.
    *

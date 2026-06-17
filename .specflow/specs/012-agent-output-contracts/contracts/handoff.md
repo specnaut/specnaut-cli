@@ -1,7 +1,7 @@
 # Contract: HANDOFF block
 
-Defined by skill `handoff-protocol`. Preloaded by: developer, review-coordinator. Emitted immediately
-after the WORKFLOW STATUS block, **only when** `HANDOFF_TARGET ≠ none`.
+Defined by skill `handoff-protocol`. Preloaded by: developer, review-coordinator. Emitted
+immediately after the WORKFLOW STATUS block, **only when** `HANDOFF_TARGET ≠ none`.
 
 ## Format
 

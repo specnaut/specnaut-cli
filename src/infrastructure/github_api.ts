@@ -1,7 +1,7 @@
 import type { Downloader, ReleaseChecker } from "../application/ports.ts";
 import { type Asset, Release, SemVer } from "../domain/release.ts";
 
-const DEFAULT_REPO = "mkrlabs/specflow";
+const DEFAULT_REPO = "specnaut/specnaut-cli";
 
 type RawAsset = { name: string; browser_download_url: string };
 type RawRelease = { tag_name: string; assets: RawAsset[] };
@@ -48,7 +48,7 @@ export async function replaceRunningBinary(
   await Deno.writeFile(tmp, bytes, { mode: 0o755 });
   if (Deno.build.os === "windows") {
     throw new Error(
-      `Downloaded new binary to ${tmp}. On Windows, exit specflow and run:\n` +
+      `Downloaded new binary to ${tmp}. On Windows, exit specnaut and run:\n` +
         `  move /Y "${tmp}" "${currentPath}"`,
     );
   }

@@ -47,7 +47,7 @@ export async function switchBacklogBackend(
   const lock = await lockStore.read(projectDir);
   if (lock === null) {
     throw new Error(
-      "no .specflow/installed.lock found. Run `specflow init --here --force` first.",
+      "no .specflow/installed.lock found. Run `specnaut init --here --force` first.",
     );
   }
   const from = lock.backlogBackend;
@@ -108,7 +108,7 @@ export async function switchBacklogBackend(
     throw new Error(
       `refusing to switch backlog backend: the following files were customized locally:\n` +
         customized.map((c) => `  - ${c}`).join("\n") +
-        `\n\nReview the diffs, then re-run \`specflow upgrade --backlog ${newBackend} --force\` ` +
+        `\n\nReview the diffs, then re-run \`specnaut upgrade --backlog ${newBackend} --force\` ` +
         `to overwrite them (existing files are backed up to *.specflow.bak).`,
     );
   }
@@ -162,7 +162,7 @@ function renderSummary(plan: UpgradePlan, from: string, to: string) {
   };
 
   console.log(
-    `\n${bold("specflow upgrade")} — templates ${dim(from)} → ${cyan(to)}\n`,
+    `\n${bold("specnaut upgrade")} — templates ${dim(from)} → ${cyan(to)}\n`,
   );
 
   if (groups.auto.length > 0) {
@@ -345,7 +345,7 @@ export async function runUpgrade(intent: UpgradeIntent): Promise<number> {
         "\nFor customized files, review the diff below and merge manually if desired.\n" +
           "Re-run with --force to overwrite them (edits will be backed up to .specflow.bak).\n" +
           "If you never edited these files, the lock baseline is stale — re-run with\n" +
-          "`specflow upgrade --reset-baseline` to trust the on-disk content as the new\n" +
+          "`specnaut upgrade --reset-baseline` to trust the on-disk content as the new\n" +
           "baseline and apply the upstream updates cleanly.\n",
       ),
     );

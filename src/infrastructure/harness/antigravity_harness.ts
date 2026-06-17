@@ -19,7 +19,7 @@ function toAntigravityAgentMarkdown(entry: CoreEntry): string {
   const fmBody = split?.fmBody ?? "";
   const body = split ? split.rest.replace(/^\n+/, "") : entry.content;
   const description = frontmatterField(fmBody, "description") ??
-    `Specflow ${entry.name} agent`;
+    `Specnaut ${entry.name} agent`;
   const tools = frontmatterField(fmBody, "tools");
   const model = frontmatterField(fmBody, "model");
   const skills = frontmatterField(fmBody, "skills");

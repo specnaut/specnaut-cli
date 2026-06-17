@@ -3,11 +3,12 @@
 // to today's local handling. PURE — the environment is injected.
 //
 // Precedence (most to least specific):
-//   1. SPECFLOW_REMOTE env override  — for headless / CI without editing files
+//   1. SPECNAUT_REMOTE env override  — for headless / CI without editing files
+//      (legacy SPECFLOW_REMOTE is still honored as a fallback at the read site)
 //   2. `remote.enabled` in backlog-config.yml
 //   3. default: OFF (byte-for-byte current behaviour — FR-010)
 //
-// This mirrors the existing SPECFLOW_CLOUD_TOKEN headless escape hatch.
+// This mirrors the existing SPECNAUT_CLOUD_TOKEN headless escape hatch.
 
 /** The optional `remote:` block of CloudConfig (all fields optional). */
 export type RemoteConfig = {
@@ -50,7 +51,7 @@ function clamp(n: number | undefined, def: number, lo: number, hi: number): numb
 }
 
 /**
- * Resolve the effective remote mode from config + the SPECFLOW_REMOTE env value.
+ * Resolve the effective remote mode from config + the SPECNAUT_REMOTE env value.
  * `envValue` is the raw string (or undefined) — injected so this stays pure.
  */
 export function resolveRemoteMode(

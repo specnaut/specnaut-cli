@@ -37,7 +37,7 @@ export type InitResult =
     /**
      * True when a `.specflow/installed.lock` already exists at the target —
      * lets the CLI suggest `specflow upgrade` instead of `--force` for
-     * projects that were previously initialised by Specflow.
+     * projects that were previously initialised by Specnaut.
      */
     lockExists: boolean;
   };
@@ -66,7 +66,7 @@ export type InitProjectInput = {
    */
   dryRun: boolean;
   /**
-   * When true, the target is a member of a providing Specflow workspace
+   * When true, the target is a member of a providing Specnaut workspace
    * (009-parent-managed-init): the toolkit (`.specflow/`) is still provisioned
    * but agentic files (`.claude/skills|agents|commands`) are suppressed — they
    * are inherited from the parent. The decision is resolved handler-side via
@@ -182,7 +182,7 @@ export class InitProjectUseCase {
 
     const now = (this.deps.now ?? (() => new Date()))().toISOString();
     // Skip-if-exists files that pre-existed are user-owned, not
-    // Specflow-managed — keep them out of the lock so future upgrades
+    // Specnaut-managed — keep them out of the lock so future upgrades
     // don't try to reconcile them against the placeholder content.
     const skippedSet = new Set(report.skippedSkipIfExists);
     const lockEntries = new Map<string, LockEntry>();

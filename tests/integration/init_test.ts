@@ -226,9 +226,9 @@ Deno.test("specflow init on a fresh project recommends --force (no lock present)
     assertEquals(code, 3);
     assertStringIncludes(stderr, ".claude/skills/specflow/SKILL.md");
     assertStringIncludes(stderr, "would be overwritten");
-    assertStringIncludes(stderr, "specflow init --here --force");
+    assertStringIncludes(stderr, "specnaut init --here --force");
     assertEquals(
-      stderr.includes("specflow upgrade"),
+      stderr.includes("specnaut upgrade"),
       false,
       "must not suggest upgrade when no lock is present",
     );
@@ -288,17 +288,17 @@ Deno.test("specflow init on a previously-initialised project recommends upgrade 
     const { code, stderr } = await runSpecflow(["init", "demo", "--no-git"], { cwd: dir });
     assertEquals(code, 3);
     assertStringIncludes(stderr, "would be overwritten");
-    assertStringIncludes(stderr, "specflow upgrade");
+    assertStringIncludes(stderr, "specnaut upgrade");
     // Post-#129/F4: --force is also offered as an escape hatch (e.g. for
     // switching harness or backlog backend). Both options surface.
-    assertStringIncludes(stderr, "specflow init --here --force");
+    assertStringIncludes(stderr, "specnaut init --here --force");
   });
 });
 
 Deno.test("specflow --version prints semver line", async () => {
   const { code, stdout } = await runSpecflow(["--version"]);
   assertEquals(code, 0);
-  assertStringIncludes(stdout, "specflow ");
+  assertStringIncludes(stdout, "specnaut ");
   assertStringIncludes(stdout, "templates ");
 });
 
@@ -313,7 +313,7 @@ Deno.test("specflow --help prints usage", async () => {
   const { code, stdout } = await runSpecflow(["--help"]);
   assertEquals(code, 0);
   assertStringIncludes(stdout, "Usage:");
-  assertStringIncludes(stdout, "specflow init");
+  assertStringIncludes(stdout, "specnaut init");
 });
 
 Deno.test("specflow -h matches --help", async () => {

@@ -1,16 +1,16 @@
 #!/usr/bin/env bash
-# specflow installer — downloads the latest (or pinned) release binary,
+# specnaut installer — downloads the latest (or pinned) release binary,
 # verifies SHA256, and places it in $PREFIX (default /usr/local/bin).
 #
 # Usage:
-#   curl -fsSL https://raw.githubusercontent.com/mkrlabs/specflow/main/install.sh | bash
+#   curl -fsSL https://raw.githubusercontent.com/specnaut/specnaut-cli/main/install.sh | bash
 #   curl -fsSL https://.../install.sh | VERSION=v0.1.0-alpha.1 bash
 #   curl -fsSL https://.../install.sh | PREFIX=$HOME/.local/bin bash
 #   curl -fsSL https://.../install.sh | DRY_RUN=1 bash
 #
 set -euo pipefail
 
-REPO="${REPO:-mkrlabs/specflow}"
+REPO="${REPO:-specnaut/specnaut-cli}"
 PREFIX_EXPLICIT="${PREFIX+1}"
 PREFIX="${PREFIX:-/usr/local/bin}"
 VERSION="${VERSION:-}"
@@ -47,7 +47,7 @@ detect_target() {
     arm64|aarch64) arch="arm64" ;;
     *) abort "unsupported arch: $arch" ;;
   esac
-  printf "specflow-%s-%s" "$os" "$arch"
+  printf "specnaut-%s-%s" "$os" "$arch"
 }
 
 latest_version() {
@@ -91,7 +91,7 @@ install_binary() {
   fi
   local fallback_dir="$HOME/.local/bin"
   mkdir -p "$fallback_dir"
-  local fallback_dest="$fallback_dir/specflow"
+  local fallback_dest="$fallback_dir/specnaut"
   mv -f "$src" "$fallback_dest"
   chmod 755 "$fallback_dest"
   warn "installed to ${fallback_dir} instead of ${dest_dir}."
@@ -121,14 +121,14 @@ main() {
   bin_url="https://github.com/${REPO}/releases/download/${version}/${target}"
   sha_url="${bin_url}.sha256"
 
-  step "specflow ${BOLD}${version}${RESET} ${DIM}(${target})${RESET}"
+  step "specnaut ${BOLD}${version}${RESET} ${DIM}(${target})${RESET}"
   info "${DIM}prefix:${RESET} ${PREFIX}"
 
   if [[ -n "$DRY_RUN" ]]; then
     info "DRY_RUN=1 — would download:"
     info "  $bin_url"
     info "  $sha_url"
-    info "  and install to ${PREFIX}/specflow"
+    info "  and install to ${PREFIX}/specnaut"
     exit 0
   fi
 
@@ -136,21 +136,21 @@ main() {
   trap "rm -rf '$tmp'" EXIT
 
   info "downloading binary..."
-  curl -fsSL "$bin_url" -o "$tmp/specflow"
+  curl -fsSL "$bin_url" -o "$tmp/specnaut"
   info "downloading checksum..."
-  curl -fsSL "$sha_url" -o "$tmp/specflow.sha256"
+  curl -fsSL "$sha_url" -o "$tmp/specnaut.sha256"
 
-  expected_sha="$(awk '{print $1}' < "$tmp/specflow.sha256")"
-  actual_sha="$(cd "$tmp" && $SHA_CMD specflow | awk '{print $1}')"
+  expected_sha="$(awk '{print $1}' < "$tmp/specnaut.sha256")"
+  actual_sha="$(cd "$tmp" && $SHA_CMD specnaut | awk '{print $1}')"
   if [[ "$expected_sha" != "$actual_sha" ]]; then
     abort "checksum mismatch: expected $expected_sha, got $actual_sha"
   fi
   ok "checksum verified"
 
-  chmod 755 "$tmp/specflow"
-  dest="${PREFIX}/specflow"
+  chmod 755 "$tmp/specnaut"
+  dest="${PREFIX}/specnaut"
 
-  install_binary "$tmp/specflow" "$dest"
+  install_binary "$tmp/specnaut" "$dest"
   dest="$FINAL_DEST"
 
   echo

@@ -16,18 +16,18 @@ export type CloudConfig = {
 /** Render the Cloud `backlog-config.yml` body (no secret). */
 export function renderCloudConfig(apiUrl = "", projectKey = ""): string {
   return [
-    "# backlog-config.yml — Specflow Cloud backend",
+    "# backlog-config.yml — Specnaut Cloud backend",
     "# Credentials are NOT stored here. They live in your OS keychain (or a",
-    "# 0600 file under ~/.specflow). Run `specflow cloud login` to authenticate.",
+    "# 0600 file under ~/.specflow). Run `specnaut cloud login` to authenticate.",
     "backend: cloud",
     `api_url: ${
       JSON.stringify(apiUrl)
-    }        # Specflow Cloud API base, e.g. https://your-deployment.convex.site`,
+    }        # Specnaut Cloud API base, e.g. https://your-deployment.convex.site`,
     `project_key: ${JSON.stringify(projectKey)}    # the project's short key, e.g. CLOUD`,
     "",
     "# Remote-control gates (#357) — opt-in. When enabled, a headless agent raises",
     "# blocking decisions as gates you resolve from anywhere (e.g. your phone)",
-    "# instead of prompting at the terminal. Override per-run with SPECFLOW_REMOTE=1.",
+    "# instead of prompting at the terminal. Override per-run with SPECNAUT_REMOTE=1.",
     "# remote:",
     "#   enabled: false",
     "#   await_timeout_s: 1800   # overall wait bound (default 1800)",

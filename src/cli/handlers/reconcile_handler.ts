@@ -40,16 +40,16 @@ export async function runReconcile(intent: ReconcileIntent): Promise<number> {
       return 0;
     }
     case "no-marker":
-      console.error(red(`error: no .specflow/installed.lock — run \`specflow init\` first`));
+      console.error(red(`error: no .specflow/installed.lock — run \`specnaut init\` first`));
       return 2;
     case "no-staging":
       console.error(red(`error: no pending reconciliation for ${intent.path}`));
       console.error(
-        yellow(`(run \`specflow reconcile --status\` to see pending paths)`),
+        yellow(`(run \`specnaut reconcile --status\` to see pending paths)`),
       );
       return 2;
     case "no-lock-entry":
-      console.error(red(`error: ${intent.path} is not tracked by Specflow`));
+      console.error(red(`error: ${intent.path} is not tracked by Specnaut`));
       return 2;
     case "no-project-file":
       console.error(red(`error: project file ${intent.path} does not exist on disk`));

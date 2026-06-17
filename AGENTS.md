@@ -1,17 +1,17 @@
-# AGENTS.md — Specflow
+# AGENTS.md — Specnaut
 
 > Context document for every future session (Claude Code, Codex, etc.). Read this first.
 
 ## Vision
 
-Specflow is an **enhanced fork of the `specify` CLI** from
+Specnaut is an **enhanced fork of the `specify` CLI** from
 [GitHub Spec Kit](https://github.com/github/spec-kit), distributed as a **native binary** (no Python
 prerequisites on the user side).
 
-Specflow's role is **exactly** that of upstream `specify init`: scaffold, inside an existing
+Specnaut's role is **exactly** that of upstream `specify init`: scaffold, inside an existing
 project, the files consumed by the user's AI harness (Claude Code, Cursor, Copilot, Codex, Windsurf,
-…) — SpecKit commands, spec/plan/tasks templates, constitution, utility scripts. **Specflow does not
-talk to any LLM. Specflow does not orchestrate any agent. It is the user's harness that consumes the
+…) — SpecKit commands, spec/plan/tasks templates, constitution, utility scripts. **Specnaut does not
+talk to any LLM. Specnaut does not orchestrate any agent. It is the user's harness that consumes the
 generated files.**
 
 ### The 3 differences from upstream
@@ -31,7 +31,7 @@ generated files.**
    templates, with a sync script to a remote backend (GitHub Issues + Project V2 in v1; GitLab /
    Bitbucket planned). Upstream has no notion of a product backlog.
 
-## What Specflow is not
+## What Specnaut is not
 
 - Not an AI harness
 - Not a multi-LLM orchestrator
@@ -39,7 +39,7 @@ generated files.**
 - Not an executable specification engine
 - Not a Claude Code rewrite
 
-If the question is "can Specflow run without the user having an AI harness?" → **no**. Specflow
+If the question is "can Specnaut run without the user having an AI harness?" → **no**. Specnaut
 writes files that Claude Code (or Cursor, etc.) reads to operate. The binary's language is an
 installation/distribution concern, not a runtime one.
 
@@ -110,7 +110,7 @@ Every agent declares: `model`, `tools`, `skills`, `memory`, `maxTurns`, `permiss
 
 #### Manual-only vs auto-triggerable
 
-Specflow's bundled agents distinguish two invocation modes via the `disable-model-invocation`
+Specnaut's bundled agents distinguish two invocation modes via the `disable-model-invocation`
 frontmatter flag (Claude Code feature):
 
 - **Auto-triggerable** (flag absent or `false`) — Claude may spawn the agent when the user's request
@@ -150,7 +150,7 @@ the artefacts. The agent-file template is repopulated on every feature to give c
 - Python/Bash scripts for GitHub sync.
 - The single integration target (Claude Code `.claude/`).
 
-## Design principles for Specflow
+## Design principles for Specnaut
 
 - **Agnostic of the user project's language** (Python / TS / Go / PHP / Rust…).
 - **Agnostic of the LLM** (Claude / OpenAI / Gemini / local).
@@ -163,16 +163,17 @@ the artefacts. The agent-file template is repopulated on every feature to give c
 ## Repository state
 
 Shipping public releases via the Homebrew tap, the `install.sh` one-liner, and GitHub Releases. For
-the current CLI surface, run `specflow --help` or read `src/cli/help.ts`; for the current version
-and what changed, see `gh release list -R mkrlabs/specflow` or `CHANGELOG.md`. The cross-platform
-build matrix lives in `.github/workflows/release.yml`; each binary ships with a `.sha256` checksum.
+the current CLI surface, run `specnaut --help` or read `src/cli/help.ts`; for the current version
+and what changed, see `gh release list -R specnaut/specnaut-cli` or `CHANGELOG.md`. The
+cross-platform build matrix lives in `.github/workflows/release.yml`; each binary ships with a
+`.sha256` checksum.
 
 ## Conventions for AI agents working on this repo
 
 - Use the DDD/hexagonal layering under `src/`: `domain/` (pure), `application/` (use cases + ports),
   `infrastructure/` (adapters), `cli/` (presentation). Tests mirror `src/`.
 - Every brick follows the same cycle: brainstorming spec → plan → subagent-driven-development
-  execution (managed via the Specflow workflow).
+  execution (managed via the Specnaut workflow).
 - Templates live in `templates/` and are bundled into the binary at build time via
   `scripts/bundle-templates.ts`. Never hand-edit `src/templates_bundle.ts`.
 - Pre-commit hook runs `deno fmt --check + lint + bundle + check` — must be green before every

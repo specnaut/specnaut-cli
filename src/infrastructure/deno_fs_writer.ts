@@ -61,7 +61,7 @@ export class DenoFsWriter implements FsWriter {
       const conflicts = await this.detectConflicts(bundle, resolved);
       if (conflicts.length > 0) {
         throw new Error(
-          `Target directory already contains ${conflicts.length} file(s) specflow manages:\n` +
+          `Target directory already contains ${conflicts.length} file(s) specnaut manages:\n` +
             conflicts.map((c) => `  - ${c}`).join("\n"),
         );
       }

@@ -23,7 +23,7 @@
 #              release.yml.
 #
 # Optional environment:
-#   SPECFLOW_VERSION — defaults to deno.json `version`. CI passes the
+#   SPECNAUT_VERSION — defaults to deno.json `version`. CI passes the
 #                      tag-derived version explicitly.
 #   DRY_RUN          — set to any non-empty value to print actions
 #                      without pushing or opening a PR.
@@ -47,7 +47,7 @@ BRANCH_PREFIX="specflow-sync"
 
 # Resolve the version to ship.
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-VERSION="${SPECFLOW_VERSION:-$(jq -r '.version' "$REPO_ROOT/deno.json")}"
+VERSION="${SPECNAUT_VERSION:-$(jq -r '.version' "$REPO_ROOT/deno.json")}"
 
 require_gh_token "MARKETPLACE_SYNC_TOKEN"
 

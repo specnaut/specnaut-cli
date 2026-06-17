@@ -1,7 +1,8 @@
 # Contract: WORKFLOW STATUS block
 
-Defined by skill `workflow-contract`. Preloaded by: developer, review-coordinator, qa-tester, and all
-auditors/reviewers (via workflow-contract). Emitted once, at end of turn, after the agent's prose.
+Defined by skill `workflow-contract`. Preloaded by: developer, review-coordinator, qa-tester, and
+all auditors/reviewers (via workflow-contract). Emitted once, at end of turn, after the agent's
+prose.
 
 ## Format
 

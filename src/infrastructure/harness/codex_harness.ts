@@ -21,7 +21,7 @@ function parseAgentFrontmatter(
 }
 
 /**
- * Translates a Specflow agent's declared capability tier (a Claude model name)
+ * Translates a Specnaut agent's declared capability tier (a Claude model name)
  * into a Codex `model_reasoning_effort` level. Codex models are OpenAI-specific,
  * so we map the *tier* rather than copy the vendor model id — keeping the
  * mapping stable across OpenAI model releases. An absent, empty, or
@@ -46,7 +46,7 @@ function toCodexSubagentToml(entry: CoreEntry): string {
   const effort = tierToReasoningEffort(model);
   return stringifyToml({
     name: entry.name,
-    description: description || `Specflow ${entry.name} agent`,
+    description: description || `Specnaut ${entry.name} agent`,
     ...(effort ? { model_reasoning_effort: effort } : {}),
     developer_instructions: body,
   });

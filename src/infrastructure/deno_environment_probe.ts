@@ -46,7 +46,7 @@ export class DenoEnvironmentProbe implements EnvironmentProbe {
       return {
         name: "deno",
         status: "warn",
-        message: "deno not found in PATH (optional — only needed for Specflow development)",
+        message: "deno not found in PATH (optional — only needed for Specnaut development)",
       };
     }
     const v = extractVersion(res.stdout) ?? "unknown";

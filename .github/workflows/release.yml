@@ -215,7 +215,7 @@ jobs:
       - name: Compute checksums
         run: |
           cd dist
-          for f in specflow-*; do
+          for f in specnaut-*; do
             shasum -a 256 "$f" > "$f.sha256"
           done
       - name: Generate release notes
@@ -234,16 +234,16 @@ jobs:
         uses: softprops/action-gh-release@v3
         with:
           files: |
-            dist/specflow-macos-x64
-            dist/specflow-macos-x64.sha256
-            dist/specflow-macos-arm64
-            dist/specflow-macos-arm64.sha256
-            dist/specflow-linux-x64
-            dist/specflow-linux-x64.sha256
-            dist/specflow-linux-arm64
-            dist/specflow-linux-arm64.sha256
-            dist/specflow-windows-x64.exe
-            dist/specflow-windows-x64.exe.sha256
+            dist/specnaut-macos-x64
+            dist/specnaut-macos-x64.sha256
+            dist/specnaut-macos-arm64
+            dist/specnaut-macos-arm64.sha256
+            dist/specnaut-linux-x64
+            dist/specnaut-linux-x64.sha256
+            dist/specnaut-linux-arm64
+            dist/specnaut-linux-arm64.sha256
+            dist/specnaut-windows-x64.exe
+            dist/specnaut-windows-x64.exe.sha256
           body_path: dist/release-notes.md
       - name: Bump mkrlabs/homebrew-tap formula
         env:
@@ -252,7 +252,7 @@ jobs:
           deno run --allow-read --allow-write --allow-run --allow-env \
             scripts/bump-tap-formula.ts
       - name: Sync to Codex marketplace fork (#277 / B1)
-        # Mirrors the Specflow plugin content into
+        # Mirrors the Specnaut plugin content into
         # `mkrlabs/plugins:plugins/specflow/`. A human rebases that
         # fork's PR into upstream `openai/plugins` for the actual
         # marketplace publish. If CODEX_SYNC_TOKEN is unset, the
@@ -260,10 +260,10 @@ jobs:
         # itself ships unaffected (same pattern as HOMEBREW_TAP_TOKEN).
         env:
           GH_TOKEN: ${{ secrets.CODEX_SYNC_TOKEN }}
-          SPECFLOW_VERSION: ${{ github.ref_name }}
+          SPECNAUT_VERSION: ${{ github.ref_name }}
         run: |
           # Strip leading "v" from the tag ref for the version arg.
-          export SPECFLOW_VERSION="${SPECFLOW_VERSION#v}"
+          export SPECNAUT_VERSION="${SPECNAUT_VERSION#v}"
           bash scripts/sync-to-codex-plugin.sh || rc=$?
           # Treat exit 2 (no token) as a non-blocking skip, same as
           # the Homebrew bump's behaviour.
@@ -271,18 +271,18 @@ jobs:
             exit 0
           fi
           exit "${rc:-0}"
-      - name: Sync to Specflow marketplace catalog (#281 / B5)
+      - name: Sync to Specnaut marketplace catalog (#281 / B5)
         # Bumps `.claude-plugin/marketplace.json` in
-        # `mkrlabs/specflow-marketplace` (the shared marketplace
+        # `specnaut/specnaut-marketplace` (the shared marketplace
         # catalog serving both Claude Code AND Copilot CLI users via
         # `/plugin install specflow@specflow-marketplace` and
         # `copilot plugin install specflow@specflow-marketplace`).
         # Same skip-if-no-secret fail-safe as the Codex step.
         env:
           GH_TOKEN: ${{ secrets.MARKETPLACE_SYNC_TOKEN }}
-          SPECFLOW_VERSION: ${{ github.ref_name }}
+          SPECNAUT_VERSION: ${{ github.ref_name }}
         run: |
-          export SPECFLOW_VERSION="${SPECFLOW_VERSION#v}"
+          export SPECNAUT_VERSION="${SPECNAUT_VERSION#v}"
           bash scripts/sync-to-marketplace.sh || rc=$?
           if [ "${rc:-0}" = "2" ]; then
             exit 0

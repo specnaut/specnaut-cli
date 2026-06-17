@@ -144,7 +144,7 @@ export class GateSession {
 /**
  * One-call factory a skill phase uses to obtain a ready GateSession from the
  * project's Cloud config + credentials (FR-012). It resolves remote mode (config
- * + SPECFLOW_REMOTE), builds the gate client, and wires a token provider that
+ * + SPECNAUT_REMOTE), builds the gate client, and wires a token provider that
  * refreshes transparently via the existing device-auth flow. `fetchFn`, `now`,
  * `sleep`, and `env` are injectable so callers/tests can substitute them.
  *
@@ -169,13 +169,19 @@ export function makeGateSession(deps: {
   const sleep = deps.sleep ?? ((ms) => new Promise<void>((r) => setTimeout(r, ms)));
   const fetchFn = deps.fetchFn ?? fetch;
 
-  const remote = resolveRemoteMode(config.remote, env("SPECFLOW_REMOTE"));
+  // Read the new SPECNAUT_* names, falling back to the legacy SPECFLOW_*
+  // names so existing users' headless setups keep working post-rebrand.
+  const remote = resolveRemoteMode(
+    config.remote,
+    env("SPECNAUT_REMOTE") ?? env("SPECFLOW_REMOTE"),
+  );
   const cloudClient = new CloudClient(config.apiUrl, fetchFn);
   const gateClient = new GateClient(config.apiUrl, fetchFn);
 
-  // Headless escape hatch: an explicit SPECFLOW_CLOUD_TOKEN short-circuits the
-  // stored-credential refresh path, mirroring `specflow cloud token`.
-  const headlessToken = env("SPECFLOW_CLOUD_TOKEN");
+  // Headless escape hatch: an explicit SPECNAUT_CLOUD_TOKEN short-circuits the
+  // stored-credential refresh path, mirroring `specnaut cloud token`. The legacy
+  // SPECFLOW_CLOUD_TOKEN name is still honored as a fallback.
+  const headlessToken = env("SPECNAUT_CLOUD_TOKEN") ?? env("SPECFLOW_CLOUD_TOKEN");
   const token: TokenProvider = headlessToken && headlessToken.trim() !== ""
     ? () => Promise.resolve(headlessToken)
     : () => freshAccessToken({ apiUrl: config.apiUrl, client: cloudClient, store, now });

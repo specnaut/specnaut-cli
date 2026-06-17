@@ -1,7 +1,7 @@
 /**
  * Pure domain predicates for parent-managed detection.
  *
- * A *parent-managed* target is a sub-repo nested inside a providing Specflow
+ * A *parent-managed* target is a sub-repo nested inside a providing Specnaut
  * workspace (an ancestor that owns the centralised skills/agents and declares
  * the target as a workspace member). In that state the toolkit (`.specflow/`)
  * is still provisioned, but the agentic files (`.claude/skills|agents|commands`)

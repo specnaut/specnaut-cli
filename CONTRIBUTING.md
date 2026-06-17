@@ -1,4 +1,4 @@
-# Contributing to Specflow
+# Contributing to Specnaut
 
 ## Agent adoption {#agent-adoption}
 
@@ -7,7 +7,7 @@ body. The section is the contract between the PR author and the release pipeline
 
 1. `scripts/gen-changelog.ts` extracts the section at release time.
 2. It lands in the GitHub Release body under `### Adoption guide`.
-3. After `specflow upgrade`, the `specflow-expert` agent reads the release body and plays each
+3. After `specnaut upgrade`, the `specflow-expert` agent reads the release body and plays each
    adoption prompt one at a time in the user's project.
 
 ### Format
@@ -53,12 +53,12 @@ Replace each with `/specflow specify "<…>"`. Add a brief note explaining
 ````markdown
 ## Agent adoption
 
-`specflow reconcile` is a new subcommand for per-file post-upgrade reconciliation. Projects with
+`specnaut reconcile` is a new subcommand for per-file post-upgrade reconciliation. Projects with
 `.claude/agents/` or harness rules that document the upgrade flow should mention it.
 
 ```prompt
 Add a short note to my project's `.claude/agents/specflow-expert.md` (and any
-equivalent agent files for other harnesses) that `specflow reconcile --status`
+equivalent agent files for other harnesses) that `specnaut reconcile --status`
 lists pending post-upgrade reconciliation. Open a PR.
 ```
 ````

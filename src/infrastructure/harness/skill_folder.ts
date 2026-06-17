@@ -36,7 +36,7 @@ export function skillFolderName(entry: CoreEntry): string {
 export function ensureSkillFrontmatter(content: string, skillName: string): string {
   const split = splitFrontmatter(content);
   if (!split) {
-    return `---\nname: ${skillName}\ndescription: Specflow skill: ${skillName}\n---\n\n${content}`;
+    return `---\nname: ${skillName}\ndescription: Specnaut skill: ${skillName}\n---\n\n${content}`;
   }
   const fmBody = split.fmBody;
   const rest = split.rest;
@@ -45,7 +45,7 @@ export function ensureSkillFrontmatter(content: string, skillName: string): stri
   let newFm = fmBody;
   if (!hasName) newFm = `name: ${skillName}\n${newFm}`;
   if (!hasDescription) {
-    newFm = `${newFm}\ndescription: Specflow skill: ${skillName}`;
+    newFm = `${newFm}\ndescription: Specnaut skill: ${skillName}`;
   }
   return `---\n${newFm}\n---\n${rest}`;
 }

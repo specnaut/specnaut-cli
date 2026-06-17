@@ -8,13 +8,13 @@ skill-content + bundle-inclusion tests.
 Identity = skill name. Binds one axis to exactly one auditor agent. Read-only; output = the agent's
 inline findings.
 
-| name | dispatches |
-|---|---|
+| name       | dispatches           |
+| ---------- | -------------------- |
 | arch-audit | architecture-auditor |
-| sec-audit | security-auditor |
-| perf-audit | performance-auditor |
-| dep-audit | dependency-auditor |
-| a11y-audit | a11y-auditor |
+| sec-audit  | security-auditor     |
+| perf-audit | performance-auditor  |
+| dep-audit  | dependency-auditor   |
+| a11y-audit | a11y-auditor         |
 
 ## Value object: Scope(shape, selector)
 

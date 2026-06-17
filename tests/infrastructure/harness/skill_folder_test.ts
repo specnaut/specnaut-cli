@@ -60,7 +60,7 @@ Deno.test("ensureSkillFrontmatter: synthesizes frontmatter when absent", () => {
   const out = ensureSkillFrontmatter("# body\n", "my-skill");
   assert(out.startsWith("---\n"));
   assert(out.includes("name: my-skill"));
-  assert(out.includes("description: Specflow skill: my-skill"));
+  assert(out.includes("description: Specnaut skill: my-skill"));
   assert(out.endsWith("# body\n"));
 });
 

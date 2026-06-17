@@ -41,7 +41,7 @@ export type TemplateFile = {
    * empty placeholder we ship.
    *
    * Skip-if-exists files that pre-existed are NOT recorded in
-   * `installed.lock` — they are user-owned, not Specflow-managed.
+   * `installed.lock` — they are user-owned, not Specnaut-managed.
    */
   skipIfExists?: true;
 };

@@ -84,11 +84,11 @@ export class FsProjectInspector implements ProjectInspector {
 
   /**
    * Detects the "plugin uninstalled after migration" edge case (#73
-   * slice 7): when `specflow upgrade` previously migrated vanilla
+   * slice 7): when `specnaut upgrade` previously migrated vanilla
    * agent files to the `specflow-plugin` plugin (deleted from disk +
    * dropped from lock), and the user later uninstalled the plugin,
    * those files are now silently absent. This check warns once per
-   * missing path so the user can recover via `specflow upgrade` or
+   * missing path so the user can recover via `specnaut upgrade` or
    * by re-installing the plugin.
    *
    * Returns an empty list when no `pluginDetector` is configured, the
@@ -119,7 +119,7 @@ export class FsProjectInspector implements ProjectInspector {
         name: dest,
         status: "warn",
         message:
-          "missing — restore via `specflow upgrade` or install the plugin (`/plugin install specflow-plugin`)",
+          "missing — restore via `specnaut upgrade` or install the plugin (`/plugin install specflow-plugin`)",
       });
     }
     return outcomes;
@@ -164,7 +164,7 @@ export class FsProjectInspector implements ProjectInspector {
         name: "backlog backend",
         status: "warn",
         message:
-          `${backend} — backlog-config.yml missing (run \`specflow upgrade --backlog ${backend}\` to scaffold)`,
+          `${backend} — backlog-config.yml missing (run \`specnaut upgrade --backlog ${backend}\` to scaffold)`,
       };
     }
 
@@ -353,7 +353,7 @@ export class FsProjectInspector implements ProjectInspector {
         name: "templates version",
         status: "warn",
         message:
-          "no .specflow/installed.lock — re-init with 'specflow init --here --force' to enable upgrade tracking",
+          "no .specflow/installed.lock — re-init with 'specnaut init --here --force' to enable upgrade tracking",
       };
     }
     try {
@@ -370,7 +370,7 @@ export class FsProjectInspector implements ProjectInspector {
         name: "templates version",
         status: "warn",
         message:
-          `project on ${lock.templatesVersion}, bundled on ${bundledTemplatesVersion} — run 'specflow upgrade'`,
+          `project on ${lock.templatesVersion}, bundled on ${bundledTemplatesVersion} — run 'specnaut upgrade'`,
       };
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
@@ -382,7 +382,7 @@ export class FsProjectInspector implements ProjectInspector {
     const path = join(projectDir, rel);
     return (await exists(path))
       ? { name: rel, status: "pass", message: "present" }
-      : { name: rel, status: "fail", message: `missing — run 'specflow init --here'` };
+      : { name: rel, status: "fail", message: `missing — run 'specnaut init --here'` };
   }
 
   private async checkConstitution(projectDir: string): Promise<CheckOutcome> {
