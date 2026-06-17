@@ -9,7 +9,7 @@ import { fromFileUrl } from "@std/path";
  * state — the script must run unmodified in any scaffolded project.
  *
  * Contract: contracts/scope-signals.md. The script lives under the skill's own
- * `scripts/` dir (source); it ships to `.specflow/scripts/code-audit/` in a
+ * `scripts/` dir (source); it ships to `.specnaut/scripts/code-audit/` in a
  * scaffolded project, but the test exercises the source copy directly.
  */
 

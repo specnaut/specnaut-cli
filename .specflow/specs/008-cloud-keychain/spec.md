@@ -13,7 +13,7 @@ native OS API directly. The `SPECFLOW_CLOUD_TOKEN` env escape hatch is unchanged
 ## Overview
 
 `specflow cloud login` (#353) stores the Cloud access + refresh tokens in a `0600` JSON file under
-`~/.specflow` — the same default `aws`, `gcloud`, and headless `gh` use. This feature adds an
+`~/.specnaut` — the same default `aws`, `gcloud`, and headless `gh` use. This feature adds an
 **OS-native keychain** as the preferred at-rest store, protecting the secret from other same-user
 processes better than a file can, and **falls back to the existing `0600` file** wherever no keyring
 is reachable (CI, headless servers, SSH sessions without a unlocked keyring) — mirroring `gh`'s
@@ -37,7 +37,7 @@ into the OS-guarded store on the machines where one is available.
 
 1. **Given** a reachable keyring, **When** `specflow cloud login` completes, **Then** the
    credentials are stored via the native keychain API and no token is written to
-   `~/.specflow/credentials.json`.
+   `~/.specnaut/credentials.json`.
 2. **Given** credentials stored in the keychain, **When** any authenticated command runs, **Then**
    the token is loaded from the keychain and the request succeeds.
 3. **Given** credentials stored in the keychain, **When** `specflow cloud logout` runs, **Then** the
@@ -106,7 +106,7 @@ and the file store exactly as before — no keychain read is attempted.
 - **Partial write** (keychain accepts access token but errors on refresh token): the operation is
   atomic per deployment key — a failed write leaves the prior entry intact and surfaces the error,
   never a half-updated credential.
-- **Migration**: a user upgrading with credentials already in `~/.specflow/credentials.json` is not
+- **Migration**: a user upgrading with credentials already in `~/.specnaut/credentials.json` is not
   auto-migrated; the next `specflow cloud login` re-stores into the keychain. A one-time re-login is
   acceptable and documented.
 - **Multiple deployments**: keychain entries are keyed by Cloud API base URL exactly like the file
@@ -160,7 +160,7 @@ only supplies the token those consume.
 
 - **Keychain backend** — native OS secret store reached via FFI (Keychain Services / libsecret /
   Credential Manager).
-- **File fallback** — the existing `0600` JSON store under `~/.specflow`.
+- **File fallback** — the existing `0600` JSON store under `~/.specnaut`.
 - **Reachable keyring** — a keychain that can be opened and read/written this invocation.
 - **Store selection** — per-invocation choice of keychain vs file fallback.
 
@@ -188,7 +188,7 @@ from #353, stored by value under the API-URL key.
 ## Success Criteria _(mandatory)_
 
 - **SC-001**: On a desktop with an unlocked keyring, `specflow cloud login` stores the credentials
-  in the OS keychain and writes no token to `~/.specflow/credentials.json`; an authenticated command
+  in the OS keychain and writes no token to `~/.specnaut/credentials.json`; an authenticated command
   then succeeds loading from the keychain — verified on macOS.
 - **SC-002**: On a headless host with no keyring, `specflow cloud login` succeeds via the file
   fallback and every authenticated command works — with zero prompts or hangs.

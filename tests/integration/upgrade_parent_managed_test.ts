@@ -5,7 +5,7 @@ import { parseLock } from "../../src/domain/installed_lock.ts";
 
 const MAIN = fromFileUrl(new URL("../../src/main.ts", import.meta.url));
 
-async function runSpecflow(
+async function runSpecnaut(
   args: string[],
   opts: { cwd?: string } = {},
 ): Promise<{ code: number; stdout: string; stderr: string }> {
@@ -37,16 +37,16 @@ async function runSpecflow(
  * the realistic precondition for an upgrade.
  */
 async function initializedParentManagedChild(): Promise<{ root: string; child: string }> {
-  const root = await Deno.makeTempDir({ prefix: "specflow-up-pm-" });
+  const root = await Deno.makeTempDir({ prefix: "specnaut-up-pm-" });
   const parent = join(root, "parent");
   const child = join(parent, "child");
-  await Deno.mkdir(join(parent, ".specflow"), { recursive: true });
+  await Deno.mkdir(join(parent, ".specnaut"), { recursive: true });
   await Deno.mkdir(child, { recursive: true });
   await Deno.writeTextFile(
     join(parent, "deno.json"),
     JSON.stringify({ workspace: ["./child"] }, null, 2),
   );
-  const { code, stderr } = await runSpecflow(["init", "--here", "--no-git"], { cwd: child });
+  const { code, stderr } = await runSpecnaut(["init", "--here", "--no-git"], { cwd: child });
   assertEquals(code, 0, `init precondition failed: ${stderr}`);
   // Sanity: init left no agentic files and a parent-managed lock.
   assertEquals(await exists(join(child, ".claude/skills")), false);
@@ -57,11 +57,11 @@ async function initializedParentManagedChild(): Promise<{ root: string; child: s
 Deno.test("no agentic resurrection", async () => {
   const { root, child } = await initializedParentManagedChild();
   try {
-    const { code, stderr } = await runSpecflow(["upgrade"], { cwd: child });
+    const { code, stderr } = await runSpecnaut(["upgrade"], { cwd: child });
     assertEquals(code, 0, `upgrade failed: ${stderr}`);
 
     // Upgrade refreshed the toolkit but resurrected nothing under .claude/.
-    assertEquals(await exists(join(child, ".specflow/installed.lock")), true);
+    assertEquals(await exists(join(child, ".specnaut/installed.lock")), true);
     assertEquals(await exists(join(child, ".claude/skills")), false);
     assertEquals(await exists(join(child, ".claude/agents")), false);
     assertEquals(await exists(join(child, ".claude/commands")), false);
@@ -74,10 +74,10 @@ Deno.test("no agentic resurrection", async () => {
 Deno.test("lock has no agentic entries", async () => {
   const { root, child } = await initializedParentManagedChild();
   try {
-    const { code, stderr } = await runSpecflow(["upgrade"], { cwd: child });
+    const { code, stderr } = await runSpecnaut(["upgrade"], { cwd: child });
     assertEquals(code, 0, `upgrade failed: ${stderr}`);
 
-    const lockYaml = await Deno.readTextFile(join(child, ".specflow/installed.lock"));
+    const lockYaml = await Deno.readTextFile(join(child, ".specnaut/installed.lock"));
     const lock = parseLock(lockYaml);
     assertEquals(lock.parentManaged, true);
     for (const dest of lock.entries.keys()) {

@@ -6,9 +6,9 @@ against the real code: `src/domain/upgrade_plan.ts`,
 `src/cli/handlers/{init_handler,upgrade_handler}.ts`,
 `src/domain/{installed_lock,merge_block,diff}.ts`, `src/infrastructure/fs_lock_store.ts`.
 
-## D1 — Declaration mechanism: a single `.specflow/preserve.yml` manifest
+## D1 — Declaration mechanism: a single `.specnaut/preserve.yml` manifest
 
-**Decision**: A flat YAML list of project-relative paths at `.specflow/preserve.yml`:
+**Decision**: A flat YAML list of project-relative paths at `.specnaut/preserve.yml`:
 
 ```yaml
 preserved:
@@ -21,12 +21,12 @@ invisible to harnesses. It is pure intent — no SHA, no timestamp (those live i
 
 **Alternatives considered**: (a) per-file frontmatter (`specflow_preserve: true`) — rejected: the
 managed bundle contains non-markdown files (`.gitignore`, shell scripts, JSON stubs) that have no
-frontmatter, forcing a special-case scheme; (b) per-file `.specflow-override` sidecars — rejected:
+frontmatter, forcing a special-case scheme; (b) per-file `.specnaut-override` sidecars — rejected:
 doubles the file count and the declaration is invisible to a reviewer scanning the file it protects.
 
 ## D2 — Preserve intent lives in its own file, not in `installed.lock`
 
-**Decision**: Keep declarations in `.specflow/preserve.yml`; do NOT embed them in `InstalledLock`.
+**Decision**: Keep declarations in `.specnaut/preserve.yml`; do NOT embed them in `InstalledLock`.
 
 **Rationale**: The lock is a **state record** (SHAs, installed-at, templates version); the manifest
 is a **user-intent record**. A maintainer editing preserves must not have to understand or hand-edit

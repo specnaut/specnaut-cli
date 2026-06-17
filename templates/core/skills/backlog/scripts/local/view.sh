@@ -8,7 +8,7 @@ if [ "$#" -lt 1 ]; then
 fi
 NUM=$(printf "%03d" "$1" 2>/dev/null || echo "$1")
 ROOT="$(cd "$(dirname "$0")/../../.." && pwd)"
-BACKLOG_DIR="$ROOT/.specflow/backlog"
+BACKLOG_DIR="$ROOT/.specnaut/backlog"
 
 shopt -s nullglob
 matches=("$BACKLOG_DIR/$NUM-"*.md)

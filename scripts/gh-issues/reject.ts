@@ -6,7 +6,7 @@
 // Hard contract: this script never closes anything. Closure goes
 // through Kevin's explicit approval.
 
-const REPO = "mkrlabs/specflow";
+const REPO = "mkrlabs/specnaut";
 
 export type RejectArgs = { num: number; reason: string };
 
@@ -53,7 +53,7 @@ if (import.meta.main) {
   }
 
   const publicBody =
-    `Closing this report — it goes against Specflow's current methodology / vision.\n\n` +
+    `Closing this report — it goes against Specnaut's current methodology / vision.\n\n` +
     `**Reason:** ${args.reason}\n\n` +
     `Thanks for taking the time to file the issue. If you think this decision is wrong, ` +
     `feel free to comment with additional context and we'll re-evaluate.`;

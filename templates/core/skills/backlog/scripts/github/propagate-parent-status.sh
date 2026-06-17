@@ -17,7 +17,7 @@
 #     parents; manual Backlog parents are left alone.
 #
 # Both rules respect AC(d): DIRECT children only — the recursion guard
-# `SPECFLOW_INTERNAL_PROPAGATION=1` blocks the grandparent walk.
+# `SPECNAUT_INTERNAL_PROPAGATION=1` blocks the grandparent walk.
 #
 # GitHub backend: parent link comes from the native sub-issues GA,
 # read via GraphQL Issue.parent { number }. Parent's current Status
@@ -33,7 +33,7 @@
 # move per #260 AC(e).
 #
 # Recursion guard (AC(d)): when this script triggers move.sh on the
-# parent, SPECFLOW_INTERNAL_PROPAGATION=1 is exported. On re-entry
+# parent, SPECNAUT_INTERNAL_PROPAGATION=1 is exported. On re-entry
 # the script sees the env var and exits 0 immediately so the
 # grandparent is never touched. AC(d) bars multi-level propagation.
 
@@ -43,7 +43,7 @@ CHILD="${1:?usage: propagate-parent-status.sh <child-num> <new-status>}"
 NEW_STATUS="${2:?usage: propagate-parent-status.sh <child-num> <new-status>}"
 
 # Recursion guard — see header.
-if [ -n "${SPECFLOW_INTERNAL_PROPAGATION:-}" ]; then
+if [ -n "${SPECNAUT_INTERNAL_PROPAGATION:-}" ]; then
   exit 0
 fi
 
@@ -174,7 +174,7 @@ case "$NEW_STATUS" in
       case "$PARENT_STATUS" in
         "Ready"|"In progress"|"In review")
           if [ -x "$SCRIPT_DIR/move.sh" ]; then
-            if SPECFLOW_INTERNAL_PROPAGATION=1 "$SCRIPT_DIR/move.sh" "$PARENT_NUM" "Done" >/dev/null 2>&1; then
+            if SPECNAUT_INTERNAL_PROPAGATION=1 "$SCRIPT_DIR/move.sh" "$PARENT_NUM" "Done" >/dev/null 2>&1; then
               echo "↑ promoted parent #${PARENT_NUM} (${PARENT_STATUS} → Done) — all direct children Done"
             else
               echo "::warning::propagate-parent-status: move.sh failed to advance #${PARENT_NUM} to Done" >&2
@@ -202,7 +202,7 @@ case "$NEW_STATUS" in
           # Use the sibling move.sh so the Status field mutation stays
           # consistent with every other move. The recursion guard env var
           # prevents this re-entry from walking further up (AC(d)).
-          if SPECFLOW_INTERNAL_PROPAGATION=1 "$SCRIPT_DIR/move.sh" "$PARENT_NUM" "In progress" >/dev/null 2>&1; then
+          if SPECNAUT_INTERNAL_PROPAGATION=1 "$SCRIPT_DIR/move.sh" "$PARENT_NUM" "In progress" >/dev/null 2>&1; then
             echo "↑ promoted parent #${PARENT_NUM} (${PARENT_STATUS} → In progress) due to child #${CHILD} move"
           else
             echo "::warning::propagate-parent-status: move.sh failed to promote #${PARENT_NUM}" >&2

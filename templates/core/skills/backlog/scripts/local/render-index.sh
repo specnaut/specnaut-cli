@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
-# Regenerate .specflow/backlog.md from the per-item files in
-# .specflow/backlog/. Items are grouped by their `status:` frontmatter
+# Regenerate .specnaut/backlog.md from the per-item files in
+# .specnaut/backlog/. Items are grouped by their `status:` frontmatter
 # field into the 5 standard columns.
 # Usage: render-index.sh [<project-root>]
 set -euo pipefail
 
 ROOT="${1:-$(cd "$(dirname "$0")/../../.." && pwd)}"
-BACKLOG_DIR="$ROOT/.specflow/backlog"
-INDEX="$ROOT/.specflow/backlog.md"
+BACKLOG_DIR="$ROOT/.specnaut/backlog"
+INDEX="$ROOT/.specnaut/backlog.md"
 
 # Collect (status \t line) pairs by reading each item's frontmatter.
 # Sort by item number within each status by relying on filename order.
@@ -59,13 +59,13 @@ emit_section() {
 # Backlog
 
 > Managed by the Product Owner agent (`/backlog`). Each task is one
-> file under `.specflow/backlog/NNN-slug.md` with frontmatter; this
+> file under `.specnaut/backlog/NNN-slug.md` with frontmatter; this
 > index lists items grouped by status column.
 
 The 5 status columns mirror the GitHub Projects "kanban" model:
 
 - **Backlog** — needs more info, sizing, or prioritisation. The PO
-  works these on `/specflow groom` until they're ready.
+  works these on `/specnaut groom` until they're ready.
 - **Ready** — clarified, sized, prioritised. The PO proposes these
   for development when asked "what's next".
 - **In progress** — actively being worked on (a branch is open).
@@ -74,7 +74,7 @@ The 5 status columns mirror the GitHub Projects "kanban" model:
   prune as needed).
 
 Size and priority live in each item's frontmatter (see
-`.specflow/backlog/NNN-*.md`):
+`.specnaut/backlog/NNN-*.md`):
 
 ```yaml
 ---
@@ -87,7 +87,7 @@ created: ...
 ---
 ```
 
-The PO assigns size + priority during the `/specflow groom` pass.
+The PO assigns size + priority during the `/specnaut groom` pass.
 
 ---
 

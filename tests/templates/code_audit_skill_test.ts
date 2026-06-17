@@ -92,8 +92,8 @@ Deno.test("code-audit SKILL body states it is read-only and stops on empty scope
   assertStringIncludes(body, "Nothing to audit");
 });
 
-Deno.test("code-audit SKILL body notes it is complementary to /specflow audit <axis>", () => {
+Deno.test("code-audit SKILL body notes it is complementary to /specnaut audit <axis>", () => {
   assert(SKILL);
-  assertStringIncludes(SKILL.content, "/specflow audit <axis>");
+  assertStringIncludes(SKILL.content, "/specnaut audit <axis>");
   assertStringIncludes(SKILL.content, "complementary");
 });

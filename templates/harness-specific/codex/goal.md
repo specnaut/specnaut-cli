@@ -1,14 +1,14 @@
 # Project goal prompt
 
 This file customizes what `/goal` runs when invoked without an explicit
-objective. Specflow ships a sensible default below — edit freely to match
+objective. Specnaut ships a sensible default below — edit freely to match
 this project's hygiene needs.
 
 ## Default goal prompt
 
-Run a hygiene pass on this Specflow project:
+Run a hygiene pass on this Specnaut project:
 
-1. Invoke the `/specflow groom` skill — it grooms the backlog, surfaces
+1. Invoke the `/specnaut groom` skill — it grooms the backlog, surfaces
    stale PRs, and flags orphan specs.
 2. If anything actionable came out of the pass, summarize it concisely
    so the human reading the result can decide what to do.

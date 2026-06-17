@@ -4,7 +4,7 @@ import { fromFileUrl, join } from "@std/path";
 
 const MAIN = fromFileUrl(new URL("../../src/main.ts", import.meta.url));
 
-async function runSpecflow(
+async function runSpecnaut(
   args: string[],
   opts: { cwd?: string } = {},
 ): Promise<{ code: number; stdout: string; stderr: string }> {
@@ -31,7 +31,7 @@ async function runSpecflow(
 }
 
 async function withTempDir(fn: (dir: string) => Promise<void>) {
-  const dir = await Deno.makeTempDir({ prefix: "specflow-init-opencode-" });
+  const dir = await Deno.makeTempDir({ prefix: "specnaut-init-opencode-" });
   try {
     await fn(dir);
   } finally {
@@ -39,9 +39,9 @@ async function withTempDir(fn: (dir: string) => Promise<void>) {
   }
 }
 
-Deno.test("specflow init --ai opencode scaffolds a complete OpenCode project layout", async () => {
+Deno.test("specnaut init --ai opencode scaffolds a complete OpenCode project layout", async () => {
   await withTempDir(async (parent) => {
-    const { code, stderr } = await runSpecflow(
+    const { code, stderr } = await runSpecnaut(
       ["init", "demo", "--no-git", "--ai", "opencode"],
       { cwd: parent },
     );
@@ -51,11 +51,11 @@ Deno.test("specflow init --ai opencode scaffolds a complete OpenCode project lay
 
     // v1.0.0 consolidated layout: router + phase docs.
     assertEquals(
-      await exists(join(root, ".opencode/skills/specflow/SKILL.md")),
+      await exists(join(root, ".opencode/skills/specnaut/SKILL.md")),
       true,
     );
     assertEquals(
-      await exists(join(root, ".opencode/skills/specflow/phases/specify.md")),
+      await exists(join(root, ".opencode/skills/specnaut/phases/specify.md")),
       true,
     );
     // /backlog command stays as a flat command file.
@@ -65,12 +65,12 @@ Deno.test("specflow init --ai opencode scaffolds a complete OpenCode project lay
     );
     // Old per-phase command files are gone post-consolidation.
     assertEquals(
-      await exists(join(root, ".opencode/commands/specflow-specify.md")),
+      await exists(join(root, ".opencode/commands/specnaut-specify.md")),
       false,
     );
 
     // Agents in .opencode/agents/ with mode: subagent + permission block
-    const developerPath = join(root, ".opencode/agents/specflow-developer.md");
+    const developerPath = join(root, ".opencode/agents/specnaut-developer.md");
     assertEquals(await exists(developerPath), true);
     const developer = await Deno.readTextFile(developerPath);
     assertStringIncludes(developer, "mode: subagent");
@@ -80,17 +80,17 @@ Deno.test("specflow init --ai opencode scaffolds a complete OpenCode project lay
 
     // Auto-chain still ships as its own skill folder.
     const autoChainSkill = await Deno.readTextFile(
-      join(root, ".opencode/skills/specflow-auto/SKILL.md"),
+      join(root, ".opencode/skills/specnaut-auto/SKILL.md"),
     );
-    assertStringIncludes(autoChainSkill, "name: specflow-auto");
+    assertStringIncludes(autoChainSkill, "name: specnaut-auto");
 
     // Shared (cross-harness)
-    assertEquals(await exists(join(root, ".specflow/memory/constitution.md")), true);
+    assertEquals(await exists(join(root, ".specnaut/memory/constitution.md")), true);
     assertEquals(await exists(join(root, "AGENTS.md")), true);
     const agentsRoot = await Deno.readTextFile(join(root, "AGENTS.md"));
     assertEquals(agentsRoot.length > 0, true);
     assertEquals(await exists(join(root, "tasks/backlog.md")), false);
-    assertEquals(await exists(join(root, ".specflow/backlog.md")), true);
+    assertEquals(await exists(join(root, ".specnaut/backlog.md")), true);
 
     // NOT emitted for opencode
     assertEquals(await exists(join(root, ".claude/")), false);
@@ -102,7 +102,7 @@ Deno.test("specflow init --ai opencode scaffolds a complete OpenCode project lay
     assertEquals(await exists(join(root, "CLAUDE.md")), false);
 
     // Lock reflects opencode
-    const lock = await Deno.readTextFile(join(root, ".specflow/installed.lock"));
+    const lock = await Deno.readTextFile(join(root, ".specnaut/installed.lock"));
     assertStringIncludes(lock, "harness: opencode");
   });
 });

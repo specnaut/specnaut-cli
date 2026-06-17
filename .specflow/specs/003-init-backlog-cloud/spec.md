@@ -32,7 +32,7 @@ user who completes only this story already has a working Cloud-backed backlog.
 
 **Independent Test**: Run `specflow init --backlog cloud` against a reachable Cloud deployment,
 complete the auth + project-selection prompts, and confirm the resulting
-`.specflow/backlog-config.yml` has `backend: cloud` plus a usable endpoint + project binding — and
+`.specnaut/backlog-config.yml` has `backend: cloud` plus a usable endpoint + project binding — and
 that a follow-up `/backlog list` returns the board's items.
 
 **Acceptance Scenarios**:
@@ -43,7 +43,7 @@ that a follow-up `/backlog list` returns the board's items.
    the CLI lists their projects and lets them select one; **and When** they have none (or choose
    to), **Then** the CLI lets them create a new project inline.
 3. **Given** a selected/created project, **When** init completes, **Then**
-   `.specflow/backlog-config.yml` records `backend: cloud`, the public API base URL, and the project
+   `.specnaut/backlog-config.yml` records `backend: cloud`, the public API base URL, and the project
    key — and contains no secret in plaintext (see User Story 3).
 4. **Given** the user cancels or fails authentication, **When** the flow aborts, **Then** init exits
    with a clear, actionable message and leaves no half-written Cloud config behind.
@@ -162,12 +162,12 @@ message.
   their accessible projects, or create a new one inline.
 - **FR-005**: The flow MUST persist the obtained credential in the **OS-native secret store** (macOS
   Keychain / Linux libsecret / Windows Credential Manager) when one is available, falling back to a
-  `0600`-permission file under the user's home directory (e.g. `~/.specflow/credentials`) on
+  `0600`-permission file under the user's home directory (e.g. `~/.specnaut/credentials`) on
   machines without one (CI / headless). The secret MUST stay out of every version-controlled file
   and out of plaintext in any tracked config. This establishes the Specflow credential-store pattern
   (none existed before). (Resolved 2026-05-31.)
 - **FR-006**: On success, the flow MUST record `backend: cloud` plus the public API base URL and the
-  selected project key in `.specflow/backlog-config.yml`, with no secret written in plaintext there.
+  selected project key in `.specnaut/backlog-config.yml`, with no secret written in plaintext there.
 - **FR-007**: After initialisation, every backlog operation (`add`, `move`, `list`, `view`,
   `clarify`, stage reconcile) MUST route through the public Specflow Cloud HTTP API and MUST NOT
   invoke the GitHub (`gh`) path.
@@ -218,7 +218,7 @@ public HTTP API contract.
 
 **Entities (have identity):**
 
-- **BacklogConfig** [aggregate root] — the persisted `.specflow/backlog-config.yml`; identity is the
+- **BacklogConfig** [aggregate root] — the persisted `.specnaut/backlog-config.yml`; identity is the
   project it lives in. Owns the backend selection, API base URL, and project key. Never holds a
   plaintext secret.
 - **CloudProjectBinding** — the link from this local project to one Cloud project; identity is the
@@ -281,7 +281,7 @@ public HTTP API contract.
 - The existing `cloud` backlog scripts (`add` / `move` / `list` / `view` / `columns` / `reconcile` /
   `clarify-comment`) already consume `api_url` + `api_token` + `project_key` as a `Bearer` token;
   this feature reuses that read contract and only changes how those values are obtained and stored.
-- `.specflow/backlog-config.yml` is the canonical per-project backend record; downstream skills and
+- `.specnaut/backlog-config.yml` is the canonical per-project backend record; downstream skills and
   the Product Owner agent detect `backend: cloud` from it.
 - Users run init on a machine with interactive terminal access for the default flow; the
   non-interactive path (User Story 4) covers CI/headless.

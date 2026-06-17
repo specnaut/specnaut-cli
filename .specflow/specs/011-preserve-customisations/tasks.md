@@ -31,7 +31,7 @@ in-repo `CORE_BUNDLE`, temp dirs. No network, no real binary, no live `gh`.
       `tests/infrastructure/fs_preserve_store_test.ts`: read absent file ⇒ `EMPTY_PRESERVE_CONFIG`;
       write then read round-trips; malformed file degrades to empty. (C2)
 - [x] T005 Add the `PreserveStore` port to `src/application/ports.ts` and implement
-      `src/infrastructure/fs_preserve_store.ts` (reads/writes `.specflow/preserve.yml`, mirrors
+      `src/infrastructure/fs_preserve_store.ts` (reads/writes `.specnaut/preserve.yml`, mirrors
       `FsLockStore`'s `Deno.errors.NotFound` handling), making T004 pass.
 
 ## Phase 3: User Story 1 — declare a file so a forced refresh never clobbers it (P1) 🎯 MVP
@@ -115,7 +115,7 @@ preserved.
 - [x] T020 Run `deno task test` (full suite green, incl. unchanged init/upgrade suites — SC-004),
       `deno fmt --check`, `deno lint`, and a typecheck. Fix any fallout.
 - [x] T021 Update `CHANGELOG.md` (Unreleased) with the preserve manifest, `specflow diff`, and
-      `--reset-preserved`; add a short `docs/` note on `.specflow/preserve.yml` if a managed-files
+      `--reset-preserved`; add a short `docs/` note on `.specnaut/preserve.yml` if a managed-files
       doc exists.
 
 ---

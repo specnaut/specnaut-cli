@@ -1,12 +1,13 @@
-// `specflow cloud <login|token|logout>` (#353) — the CLI side of the Specflow
+// `specnaut cloud <login|token|logout>` (#353) — the CLI side of the Specnaut
 // Cloud backlog backend's interactive auth.
 //
 //   login   device-authorization browser flow → stores credentials securely,
 //           then binds the project to a Cloud project (select or create) and
-//           writes .specflow/backlog-config.yml.
+//           writes .specnaut/backlog-config.yml.
 //   token   prints a fresh access token to stdout (refreshing transparently);
-//           used by the bundled cloud/*.sh scripts. Honors SPECFLOW_CLOUD_TOKEN
-//           as a headless / CI escape hatch.
+//           used by the bundled cloud/*.sh scripts. Honors SPECNAUT_CLOUD_TOKEN
+//           (legacy SPECFLOW_CLOUD_TOKEN as a fallback) as a headless / CI
+//           escape hatch.
 //   logout  removes the stored credentials for the deployment.
 
 import { bold, dim, green, red, yellow } from "@std/fmt/colors";
@@ -46,7 +47,7 @@ async function resolveApiUrl(
   const cfg = await readCloudConfig(Deno.cwd());
   if (cfg?.apiUrl) return normalizeApiUrl(cfg.apiUrl);
   if (allowPrompt && Deno.stdin.isTerminal()) {
-    const v = prompt("Specflow Cloud API URL (e.g. https://your-deployment.convex.site):");
+    const v = prompt("Specnaut Cloud API URL (e.g. https://your-deployment.convex.site):");
     if (v && v.trim()) return normalizeApiUrl(v);
   }
   return null;
@@ -66,17 +67,17 @@ export async function runCloud(intent: CloudIntent): Promise<number> {
 async function runLogin(intent: CloudIntent): Promise<number> {
   if (!Deno.stdin.isTerminal()) {
     console.error(
-      red("error: `specflow cloud login` needs an interactive terminal."),
+      red("error: `specnaut cloud login` needs an interactive terminal."),
     );
     console.error(
-      dim("  For CI / headless use, set SPECFLOW_CLOUD_TOKEN to a Cloud API token instead."),
+      dim("  For CI / headless use, set SPECNAUT_CLOUD_TOKEN to a Cloud API token instead."),
     );
     return 2;
   }
 
   const apiUrl = await resolveApiUrl(intent.apiUrl, true);
   if (!apiUrl) {
-    console.error(red("error: no Specflow Cloud API URL (pass --api-url <url>)."));
+    console.error(red("error: no Specnaut Cloud API URL (pass --api-url <url>)."));
     return 2;
   }
 
@@ -100,15 +101,15 @@ async function runLogin(intent: CloudIntent): Promise<number> {
       timeout: "timed out waiting for approval.",
       invalid: "the authorization request was invalid.",
     }[result.reason];
-    console.error(red(`error: ${reason} Run \`specflow cloud login\` to try again.`));
+    console.error(red(`error: ${reason} Run \`specnaut cloud login\` to try again.`));
     return 1;
   }
-  console.log(green("✓ authenticated with Specflow Cloud"));
+  console.log(green("✓ authenticated with Specnaut Cloud"));
   console.log(
     dim(
       store.kind === "keychain"
         ? "  credentials stored in the OS keychain"
-        : "  credentials stored in ~/.specflow/credentials.json (0600 — no OS keychain available)",
+        : "  credentials stored in ~/.specnaut/credentials.json (0600 — no OS keychain available)",
     ),
   );
 
@@ -134,7 +135,7 @@ async function runLogin(intent: CloudIntent): Promise<number> {
   await writeCloudConfig(Deno.cwd(), apiUrl, projectKey);
   console.log(green(`✓ linked to project ${bold(projectKey)}`));
   console.log(
-    dim("  wrote .specflow/backlog-config.yml — /backlog now runs against Specflow Cloud"),
+    dim("  wrote .specnaut/backlog-config.yml — /backlog now runs against Specnaut Cloud"),
   );
   return 0;
 }
@@ -174,7 +175,8 @@ async function chooseProject(
 
 async function runToken(intent: CloudIntent): Promise<number> {
   // Headless / CI escape hatch: an explicit token wins, no store needed.
-  const envToken = Deno.env.get("SPECFLOW_CLOUD_TOKEN");
+  // Honor the new SPECNAUT_CLOUD_TOKEN, falling back to the legacy name.
+  const envToken = Deno.env.get("SPECNAUT_CLOUD_TOKEN") ?? Deno.env.get("SPECFLOW_CLOUD_TOKEN");
   if (envToken && envToken.trim()) {
     console.log(envToken.trim());
     return 0;
@@ -184,7 +186,7 @@ async function runToken(intent: CloudIntent): Promise<number> {
   if (!apiUrl) {
     console.error(
       red(
-        "error: no Specflow Cloud API URL (pass --api-url or set api_url in backlog-config.yml).",
+        "error: no Specnaut Cloud API URL (pass --api-url or set api_url in backlog-config.yml).",
       ),
     );
     return 1;
@@ -194,8 +196,8 @@ async function runToken(intent: CloudIntent): Promise<number> {
   const store = defaultCredentialStore();
   const token = await freshAccessToken({ apiUrl, client, store, now: () => Date.now() });
   if (!token) {
-    console.error(red("error: not authenticated with Specflow Cloud."));
-    console.error(dim("  run `specflow cloud login` (or set SPECFLOW_CLOUD_TOKEN)."));
+    console.error(red("error: not authenticated with Specnaut Cloud."));
+    console.error(dim("  run `specnaut cloud login` (or set SPECNAUT_CLOUD_TOKEN)."));
     return 1;
   }
   console.log(token);
@@ -205,7 +207,7 @@ async function runToken(intent: CloudIntent): Promise<number> {
 async function runLogout(intent: CloudIntent): Promise<number> {
   const apiUrl = await resolveApiUrl(intent.apiUrl, false);
   if (!apiUrl) {
-    console.error(red("error: no Specflow Cloud API URL to log out of."));
+    console.error(red("error: no Specnaut Cloud API URL to log out of."));
     return 1;
   }
   await defaultCredentialStore().delete(apiUrl);

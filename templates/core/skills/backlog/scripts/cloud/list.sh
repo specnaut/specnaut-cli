@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# List tasks on the Specflow Cloud board, with their status (column name).
+# List tasks on the Specnaut Cloud board, with their status (column name).
 # Optional Status filter.
 #
 # Usage: list.sh [Status]

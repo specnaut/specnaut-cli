@@ -44,8 +44,8 @@ TITLE="${ARGS[0]}"
 BODY="${ARGS[1]:-}"
 
 ROOT="$(cd "$(dirname "$0")/../../.." && pwd)"
-BACKLOG_DIR="$ROOT/.specflow/backlog"
-INDEX="$ROOT/.specflow/backlog.md"
+BACKLOG_DIR="$ROOT/.specnaut/backlog"
+INDEX="$ROOT/.specnaut/backlog.md"
 RENDER="$(dirname "$0")/render-index.sh"
 mkdir -p "$BACKLOG_DIR"
 

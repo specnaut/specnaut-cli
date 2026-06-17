@@ -1,6 +1,6 @@
 ---
 name: security-auditor
-description: Reviews code for security issues — input validation, authz, secrets, injection, SSRF, path traversal, silent error swallowing. Two dispatch shapes — (1) PR review (spawned by the review-coordinator during /specflow review), (2) alert triage (spawned by /release after the security-preflight workflow surfaces open GitHub security alerts).
+description: Reviews code for security issues — input validation, authz, secrets, injection, SSRF, path traversal, silent error swallowing. Two dispatch shapes — (1) PR review (spawned by the review-coordinator during /specnaut review), (2) alert triage (spawned by /release after the security-preflight workflow surfaces open GitHub security alerts).
 model: sonnet
 effort: medium
 tools: Read, Grep, Glob, Bash
@@ -14,7 +14,7 @@ on the dispatch shape.
 
 ## Mode 1 — PR review
 
-Spawned by the `review-coordinator` during `/specflow review`. Review
+Spawned by the `review-coordinator` during `/specnaut review`. Review
 ONLY the files provided in the prompt. Output the `FINDING` structure
 used by code-reviewer, followed by the canonical `REVIEW SUMMARY` block
 (see "Output format (Mode 1)" below).

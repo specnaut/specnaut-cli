@@ -20,15 +20,15 @@ const ZERO_SHA = "6e340b9cffb37a989ca544e6bb780a2c78901d3fb33738768511a30617afa0
 
 Deno.test("SelfUpdateUseCase reports 'up-to-date' when current >= latest", async () => {
   const release = new Release(SemVer.parse("0.1.0"), [
-    { name: "specflow-macos-arm64", url: "https://x/bin" },
-    { name: "specflow-macos-arm64.sha256", url: "https://x/sha" },
+    { name: "specnaut-macos-arm64", url: "https://x/bin" },
+    { name: "specnaut-macos-arm64.sha256", url: "https://x/sha" },
   ]);
   const uc = new SelfUpdateUseCase({
     checker: fakeChecker(release),
     downloader: fakeDownloader(ZERO_BYTE, ZERO_SHA),
     currentVersion: "0.1.0",
     currentPlatform: "macos-arm64",
-    currentBinaryPath: "/tmp/specflow",
+    currentBinaryPath: "/tmp/specnaut",
     replaceBinary: () => Promise.resolve(),
   });
   const result = await uc.execute({ checkOnly: false });
@@ -37,8 +37,8 @@ Deno.test("SelfUpdateUseCase reports 'up-to-date' when current >= latest", async
 
 Deno.test("SelfUpdateUseCase downloads, verifies, and replaces when newer", async () => {
   const release = new Release(SemVer.parse("0.2.0"), [
-    { name: "specflow-macos-arm64", url: "https://x/bin" },
-    { name: "specflow-macos-arm64.sha256", url: "https://x/sha" },
+    { name: "specnaut-macos-arm64", url: "https://x/bin" },
+    { name: "specnaut-macos-arm64.sha256", url: "https://x/sha" },
   ]);
   let replaced = false;
   const uc = new SelfUpdateUseCase({
@@ -46,7 +46,7 @@ Deno.test("SelfUpdateUseCase downloads, verifies, and replaces when newer", asyn
     downloader: fakeDownloader(ZERO_BYTE, ZERO_SHA),
     currentVersion: "0.1.0",
     currentPlatform: "macos-arm64",
-    currentBinaryPath: "/tmp/specflow",
+    currentBinaryPath: "/tmp/specnaut",
     replaceBinary: (bytes) => {
       assertEquals(bytes, ZERO_BYTE);
       replaced = true;
@@ -60,8 +60,8 @@ Deno.test("SelfUpdateUseCase downloads, verifies, and replaces when newer", asyn
 
 Deno.test("SelfUpdateUseCase 'available' in check-only mode without downloading", async () => {
   const release = new Release(SemVer.parse("0.2.0"), [
-    { name: "specflow-macos-arm64", url: "https://x/bin" },
-    { name: "specflow-macos-arm64.sha256", url: "https://x/sha" },
+    { name: "specnaut-macos-arm64", url: "https://x/bin" },
+    { name: "specnaut-macos-arm64.sha256", url: "https://x/sha" },
   ]);
   let downloadCalled = false;
   const uc = new SelfUpdateUseCase({
@@ -75,7 +75,7 @@ Deno.test("SelfUpdateUseCase 'available' in check-only mode without downloading"
     },
     currentVersion: "0.1.0",
     currentPlatform: "macos-arm64",
-    currentBinaryPath: "/tmp/specflow",
+    currentBinaryPath: "/tmp/specnaut",
     replaceBinary: () => Promise.resolve(),
   });
   const result = await uc.execute({ checkOnly: true });
@@ -85,15 +85,15 @@ Deno.test("SelfUpdateUseCase 'available' in check-only mode without downloading"
 
 Deno.test("SelfUpdateUseCase rejects when SHA256 mismatches", async () => {
   const release = new Release(SemVer.parse("0.2.0"), [
-    { name: "specflow-macos-arm64", url: "https://x/bin" },
-    { name: "specflow-macos-arm64.sha256", url: "https://x/sha" },
+    { name: "specnaut-macos-arm64", url: "https://x/bin" },
+    { name: "specnaut-macos-arm64.sha256", url: "https://x/sha" },
   ]);
   const uc = new SelfUpdateUseCase({
     checker: fakeChecker(release),
     downloader: fakeDownloader(ZERO_BYTE, "deadbeef".padEnd(64, "0")),
     currentVersion: "0.1.0",
     currentPlatform: "macos-arm64",
-    currentBinaryPath: "/tmp/specflow",
+    currentBinaryPath: "/tmp/specnaut",
     replaceBinary: () => Promise.resolve(),
   });
   await assertRejects(() => uc.execute({ checkOnly: false }), Error, "checksum");
@@ -101,14 +101,14 @@ Deno.test("SelfUpdateUseCase rejects when SHA256 mismatches", async () => {
 
 Deno.test("SelfUpdateUseCase rejects when no asset matches the platform", async () => {
   const release = new Release(SemVer.parse("0.2.0"), [
-    { name: "specflow-other-platform", url: "https://x" },
+    { name: "specnaut-other-platform", url: "https://x" },
   ]);
   const uc = new SelfUpdateUseCase({
     checker: fakeChecker(release),
     downloader: fakeDownloader(ZERO_BYTE, ZERO_SHA),
     currentVersion: "0.1.0",
     currentPlatform: "macos-arm64",
-    currentBinaryPath: "/tmp/specflow",
+    currentBinaryPath: "/tmp/specnaut",
     replaceBinary: () => Promise.resolve(),
   });
   await assertRejects(() => uc.execute({ checkOnly: false }), Error, "platform");

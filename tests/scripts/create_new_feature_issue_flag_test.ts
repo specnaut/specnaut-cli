@@ -9,7 +9,7 @@ import { fromFileUrl } from "@std/path";
 
 const SCRIPT_PATH = fromFileUrl(
   new URL(
-    "../../templates/core/specflow/scripts/bash/create-new-feature.sh",
+    "../../templates/core/specnaut/scripts/bash/create-new-feature.sh",
     import.meta.url,
   ),
 );

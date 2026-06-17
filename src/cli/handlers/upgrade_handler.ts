@@ -7,6 +7,7 @@ import { findHarness } from "../harnesses.ts";
 import { DenoFsReader } from "../../infrastructure/fs_reader.ts";
 import { DenoFsWriter } from "../../infrastructure/deno_fs_writer.ts";
 import { FsLockStore } from "../../infrastructure/fs_lock_store.ts";
+import { migrateLegacyConfigDir } from "../../infrastructure/fs_legacy_migrator.ts";
 import { FsPluginDetector } from "../../infrastructure/fs_plugin_detector.ts";
 import { FsParentWorkspaceReader } from "../../infrastructure/fs_parent_workspace_reader.ts";
 import { FsPreserveStore } from "../../infrastructure/fs_preserve_store.ts";
@@ -47,7 +48,7 @@ export async function switchBacklogBackend(
   const lock = await lockStore.read(projectDir);
   if (lock === null) {
     throw new Error(
-      "no .specflow/installed.lock found. Run `specflow init --here --force` first.",
+      "no .specnaut/installed.lock found. Run `specnaut init --here --force` first.",
     );
   }
   const from = lock.backlogBackend;
@@ -108,8 +109,8 @@ export async function switchBacklogBackend(
     throw new Error(
       `refusing to switch backlog backend: the following files were customized locally:\n` +
         customized.map((c) => `  - ${c}`).join("\n") +
-        `\n\nReview the diffs, then re-run \`specflow upgrade --backlog ${newBackend} --force\` ` +
-        `to overwrite them (existing files are backed up to *.specflow.bak).`,
+        `\n\nReview the diffs, then re-run \`specnaut upgrade --backlog ${newBackend} --force\` ` +
+        `to overwrite them (existing files are backed up to *.specnaut.bak).`,
     );
   }
 
@@ -162,7 +163,7 @@ function renderSummary(plan: UpgradePlan, from: string, to: string) {
   };
 
   console.log(
-    `\n${bold("specflow upgrade")} — templates ${dim(from)} → ${cyan(to)}\n`,
+    `\n${bold("specnaut upgrade")} — templates ${dim(from)} → ${cyan(to)}\n`,
   );
 
   if (groups.auto.length > 0) {
@@ -196,12 +197,12 @@ function renderSummary(plan: UpgradePlan, from: string, to: string) {
     console.log();
   }
   if (groups.migrated.length > 0) {
-    console.log(bold("  migrated to specflow-plugin plugin (backed up + removed)"));
+    console.log(bold("  migrated to specnaut-plugin plugin (backed up + removed)"));
     for (const a of groups.migrated) console.log(cyan(`    → ${a.dest}`));
     console.log();
   }
   if (groups.deferred.length > 0) {
-    console.log(bold("  deferred to specflow-plugin plugin (was missing on disk)"));
+    console.log(bold("  deferred to specnaut-plugin plugin (was missing on disk)"));
     for (const a of groups.deferred) console.log(dim(`    · ${a.dest}`));
     console.log();
   }
@@ -218,6 +219,19 @@ function renderSummary(plan: UpgradePlan, from: string, to: string) {
 
 export async function runUpgrade(intent: UpgradeIntent): Promise<number> {
   const projectDir = resolve(Deno.cwd());
+
+  // Rebrand migration: move a legacy `.specflow/` tree to `.specnaut/` before
+  // the lock is read, so existing projects upgrade transparently.
+  const migration = await migrateLegacyConfigDir(projectDir);
+  if (migration.kind === "conflict") {
+    console.error(
+      red("error: both .specflow/ (legacy) and .specnaut/ exist — remove one before continuing"),
+    );
+    return 2;
+  }
+  if (migration.kind === "migrated") {
+    console.log(dim("↳ migrated .specflow/ → .specnaut/ (legacy config dir)"));
+  }
 
   if (!intent.dryRun) {
     if (intent.backlog !== null) {
@@ -329,7 +343,7 @@ export async function runUpgrade(intent: UpgradeIntent): Promise<number> {
     (a) => a.kind === "preserve" && a.reason === "declared",
   );
   for (const a of declaredPreserves) {
-    console.log(cyan(`preserved ${a.dest} — declared in .specflow/preserve.yml`));
+    console.log(cyan(`preserved ${a.dest} — declared in .specnaut/preserve.yml`));
   }
   // `--reset-preserved` overrides (FR-005) — one line per declaration ignored.
   if (intent.resetPreserved) {
@@ -343,9 +357,9 @@ export async function runUpgrade(intent: UpgradeIntent): Promise<number> {
     console.log(
       dim(
         "\nFor customized files, review the diff below and merge manually if desired.\n" +
-          "Re-run with --force to overwrite them (edits will be backed up to .specflow.bak).\n" +
+          "Re-run with --force to overwrite them (edits will be backed up to .specnaut.bak).\n" +
           "If you never edited these files, the lock baseline is stale — re-run with\n" +
-          "`specflow upgrade --reset-baseline` to trust the on-disk content as the new\n" +
+          "`specnaut upgrade --reset-baseline` to trust the on-disk content as the new\n" +
           "baseline and apply the upstream updates cleanly.\n",
       ),
     );
@@ -382,7 +396,7 @@ export async function runUpgrade(intent: UpgradeIntent): Promise<number> {
   if (result.backups.length > 0) {
     console.log();
     for (const b of result.backups) {
-      console.log(dim(`↳ backed up ${b} → ${b}.specflow.bak`));
+      console.log(dim(`↳ backed up ${b} → ${b}.specnaut.bak`));
     }
   }
   console.log();
@@ -402,7 +416,7 @@ export async function runUpgrade(intent: UpgradeIntent): Promise<number> {
   // Handoff: tell the user how to invoke the agent-assisted review.
   console.log();
   console.log("→ Walk through what's new with your AI:");
-  console.log("  `@specflow-expert review-upgrade`");
+  console.log("  `@specnaut-expert review-upgrade`");
   console.log();
   console.log(dim(
     "  (proposes a review branch, plays adoption prompts for each new\n" +

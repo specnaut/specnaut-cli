@@ -115,7 +115,7 @@ Deno.test(
 
     // Backed up local:
     assertEquals(
-      writer.written[".claude/agents/developer.md.specflow.bak"],
+      writer.written[".claude/agents/developer.md.specnaut.bak"],
       "LOCAL\n",
     );
 

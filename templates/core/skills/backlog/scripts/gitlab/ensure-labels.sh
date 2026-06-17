@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Bootstrap the Specflow semantic label set on the configured GitLab project.
+# Bootstrap the Specnaut semantic label set on the configured GitLab project.
 # Idempotent: creates only missing labels; never edits or deletes existing
 # ones (preserves user customisation of color / description).
 #
@@ -35,7 +35,7 @@ ensure_label() {
   fi
 }
 
-echo "Bootstrapping Specflow semantic labels on $PROJECT_ID …"
+echo "Bootstrapping Specnaut semantic labels on $PROJECT_ID …"
 ensure_label "security"    "b60205" "Security-sensitive work (auth, secrets, RCE, supply chain)"
 ensure_label "refactor"    "0e8a16" "Internal cleanup with no behavior change"
 ensure_label "docs"        "0075ca" "Documentation-only change"

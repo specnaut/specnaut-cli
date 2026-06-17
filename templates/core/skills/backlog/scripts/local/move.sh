@@ -21,7 +21,7 @@ case "$STATUS" in
 esac
 
 ROOT="$(cd "$(dirname "$0")/../../.." && pwd)"
-BACKLOG_DIR="$ROOT/.specflow/backlog"
+BACKLOG_DIR="$ROOT/.specnaut/backlog"
 RENDER="$(dirname "$0")/render-index.sh"
 
 shopt -s nullglob

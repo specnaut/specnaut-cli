@@ -17,7 +17,7 @@ function fakeLockStore(
       state.lastWritten = lock;
       return Promise.resolve();
     },
-    lockPath: (d) => `${d}/.specflow/installed.lock`,
+    lockPath: (d) => `${d}/.specnaut/installed.lock`,
   };
 }
 
@@ -65,14 +65,14 @@ function fakeClaudeHarness(): Harness {
 }
 
 // A core bundle whose mapped dests mix agentic (.claude/skills|agents|commands)
-// and non-agentic (.specflow, AGENTS.md, .claude/settings.json) paths.
+// and non-agentic (.specnaut, AGENTS.md, .claude/settings.json) paths.
 const MIXED_CORE: CoreBundle = [
-  ".specflow/memory/constitution.md",
+  ".specnaut/memory/constitution.md",
   "AGENTS.md",
   ".claude/settings.json",
-  ".claude/skills/specflow/SKILL.md",
+  ".claude/skills/specnaut/SKILL.md",
   ".claude/agents/developer.md",
-  ".claude/commands/specflow.md",
+  ".claude/commands/specnaut.md",
 ].map((dest) => ({
   category: "project-root" as const,
   name: "root",
@@ -116,7 +116,7 @@ Deno.test("InitProjectUseCase writes the bundle to the target dir (happy path)",
   assertEquals(writer.written, ["/tmp/demo:CLAUDE.md"]);
 });
 
-Deno.test("InitProjectUseCase fails with 'conflicts' when target already has specflow files", async () => {
+Deno.test("InitProjectUseCase fails with 'conflicts' when target already has specnaut files", async () => {
   const writer = fakeFsWriter(["CLAUDE.md"]);
   const useCase = new InitProjectUseCase({
     writer,
@@ -285,7 +285,7 @@ Deno.test("InitProjectUseCase returns backups array from writer report", async (
     writeBundle: () =>
       Promise.resolve({
         backups: [
-          { dest: ".claude/x.md", backupPath: ".claude/x.md.specflow.bak" },
+          { dest: ".claude/x.md", backupPath: ".claude/x.md.specnaut.bak" },
         ],
         skippedSkipIfExists: [],
       }),
@@ -394,20 +394,20 @@ Deno.test("InitProjectUseCase suppresses agentic dests from writes AND lock when
 
   const writtenDests = writer.written.map((w) => w.replace("/tmp/demo:", ""));
   // Agentic dests are filtered out of the written set.
-  assert(!writtenDests.includes(".claude/skills/specflow/SKILL.md"));
+  assert(!writtenDests.includes(".claude/skills/specnaut/SKILL.md"));
   assert(!writtenDests.includes(".claude/agents/developer.md"));
-  assert(!writtenDests.includes(".claude/commands/specflow.md"));
+  assert(!writtenDests.includes(".claude/commands/specnaut.md"));
   // Non-agentic dests still provisioned.
-  assert(writtenDests.includes(".specflow/memory/constitution.md"));
+  assert(writtenDests.includes(".specnaut/memory/constitution.md"));
   assert(writtenDests.includes("AGENTS.md"));
   assert(writtenDests.includes(".claude/settings.json"));
 
   // FR-012: the lock excludes agentic entries and records parentManaged.
   const lock = lockStore.lastWritten!;
-  assert(!lock.entries.has(".claude/skills/specflow/SKILL.md"));
+  assert(!lock.entries.has(".claude/skills/specnaut/SKILL.md"));
   assert(!lock.entries.has(".claude/agents/developer.md"));
-  assert(!lock.entries.has(".claude/commands/specflow.md"));
-  assert(lock.entries.has(".specflow/memory/constitution.md"));
+  assert(!lock.entries.has(".claude/commands/specnaut.md"));
+  assert(lock.entries.has(".specnaut/memory/constitution.md"));
   assert(lock.entries.has("AGENTS.md"));
   assertEquals(lock.parentManaged, true);
 });
@@ -434,12 +434,12 @@ Deno.test("InitProjectUseCase writes all dests and sets no parentManaged when no
   });
 
   const writtenDests = writer.written.map((w) => w.replace("/tmp/demo:", ""));
-  assert(writtenDests.includes(".claude/skills/specflow/SKILL.md"));
+  assert(writtenDests.includes(".claude/skills/specnaut/SKILL.md"));
   assert(writtenDests.includes(".claude/agents/developer.md"));
-  assert(writtenDests.includes(".claude/commands/specflow.md"));
+  assert(writtenDests.includes(".claude/commands/specnaut.md"));
 
   const lock = lockStore.lastWritten!;
-  assert(lock.entries.has(".claude/skills/specflow/SKILL.md"));
+  assert(lock.entries.has(".claude/skills/specnaut/SKILL.md"));
   assertEquals(lock.parentManaged, undefined);
 });
 

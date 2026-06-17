@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Create a task on the Specflow Cloud board.
+# Create a task on the Specnaut Cloud board.
 # Usage: add.sh "<title>" [body]
 set -euo pipefail
 

@@ -16,7 +16,7 @@ export type ReconcileOutput = {
    */
   readonly projectWrite: string | null;
   /**
-   * Content of the on-disk file to back up to `<path>.specflow.bak` before
+   * Content of the on-disk file to back up to `<path>.specnaut.bak` before
    * overwriting, or `null` for no backup. Only `acceptUpstream` triggers a
    * backup (the file is being replaced).
    */

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Show one Specflow Cloud task (status, priority, size, body).
+# Show one Specnaut Cloud task (status, priority, size, body).
 # Usage: view.sh <number>
 set -euo pipefail
 

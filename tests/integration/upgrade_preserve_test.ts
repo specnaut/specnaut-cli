@@ -3,7 +3,7 @@ import { fromFileUrl, join } from "@std/path";
 
 const MAIN = fromFileUrl(new URL("../../src/main.ts", import.meta.url));
 
-async function runSpecflow(
+async function runSpecnaut(
   args: string[],
   opts: { cwd: string },
 ): Promise<{ code: number; stdout: string; stderr: string }> {
@@ -30,7 +30,7 @@ async function runSpecflow(
 }
 
 async function withTempDir(fn: (dir: string) => Promise<void>) {
-  const dir = await Deno.makeTempDir({ prefix: "specflow-upgrade-preserve-integ-" });
+  const dir = await Deno.makeTempDir({ prefix: "specnaut-upgrade-preserve-integ-" });
   try {
     await fn(dir);
   } finally {
@@ -62,7 +62,7 @@ async function restampLockSha(
   dest: string,
   newSha: string,
 ): Promise<void> {
-  const lockPath = join(projectDir, ".specflow/installed.lock");
+  const lockPath = join(projectDir, ".specnaut/installed.lock");
   const yaml = await Deno.readTextFile(lockPath);
   // Match the entry block for `dest` (YAML key) and replace its sha256 line.
   const escaped = dest.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
@@ -90,13 +90,13 @@ const CUSTOM_MARK = "\n# my project-specific config — DO NOT CLOBBER\n";
  *
  * Fixture: an installed project where a customised+declared file looks vanilla
  * vs its lock but diverges from the bundle (the bundle effectively ships a
- * newer version). Expectation: `specflow upgrade` leaves the declared file
- * byte-identical AND prints the "preserved … declared in .specflow/preserve.yml"
+ * newer version). Expectation: `specnaut upgrade` leaves the declared file
+ * byte-identical AND prints the "preserved … declared in .specnaut/preserve.yml"
  * notice, while a non-declared customised file follows normal upgrade rules.
  */
 Deno.test("upgrade honours a declared preserve end-to-end: declared file untouched, notice emitted", async () => {
   await withTempDir(async (parent) => {
-    const init = await runSpecflow(["init", "demo", "--no-git"], { cwd: parent });
+    const init = await runSpecnaut(["init", "demo", "--no-git"], { cwd: parent });
     assertEquals(init.code, 0, `init precondition failed: ${init.stderr}`);
     const projectDir = join(parent, "demo");
 
@@ -115,11 +115,11 @@ Deno.test("upgrade honours a declared preserve end-to-end: declared file untouch
 
     // Declare ONLY the first file preserved.
     await Deno.writeTextFile(
-      join(projectDir, ".specflow/preserve.yml"),
+      join(projectDir, ".specnaut/preserve.yml"),
       `preserved:\n  - ${DECLARED}\n`,
     );
 
-    const upgrade = await runSpecflow(["upgrade"], { cwd: projectDir });
+    const upgrade = await runSpecnaut(["upgrade"], { cwd: projectDir });
     assertEquals(upgrade.code, 0, upgrade.stderr);
 
     // The declared file is left byte-identical to its customised content.
@@ -131,7 +131,7 @@ Deno.test("upgrade honours a declared preserve end-to-end: declared file untouch
     // The declared-preserve notice names the path and the manifest.
     assertStringIncludes(
       upgrade.stdout,
-      `preserved ${DECLARED} — declared in .specflow/preserve.yml`,
+      `preserved ${DECLARED} — declared in .specnaut/preserve.yml`,
     );
 
     // The non-declared file follows normal upgrade behaviour: vanilla vs lock
@@ -151,7 +151,7 @@ Deno.test("upgrade honours a declared preserve end-to-end: declared file untouch
  */
 Deno.test("upgrade --reset-preserved overrides a declaration and refreshes the file", async () => {
   await withTempDir(async (parent) => {
-    const init = await runSpecflow(["init", "demo", "--no-git"], { cwd: parent });
+    const init = await runSpecnaut(["init", "demo", "--no-git"], { cwd: parent });
     assertEquals(init.code, 0, `init precondition failed: ${init.stderr}`);
     const projectDir = join(parent, "demo");
 
@@ -161,11 +161,11 @@ Deno.test("upgrade --reset-preserved overrides a declaration and refreshes the f
     await restampLockSha(projectDir, DECLARED, await sha256Hex(declaredContent));
 
     await Deno.writeTextFile(
-      join(projectDir, ".specflow/preserve.yml"),
+      join(projectDir, ".specnaut/preserve.yml"),
       `preserved:\n  - ${DECLARED}\n`,
     );
 
-    const upgrade = await runSpecflow(["upgrade", "--reset-preserved"], {
+    const upgrade = await runSpecnaut(["upgrade", "--reset-preserved"], {
       cwd: projectDir,
     });
     assertEquals(upgrade.code, 0, upgrade.stderr);

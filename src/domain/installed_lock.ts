@@ -45,7 +45,7 @@ export type InstalledLock = {
   readonly entries: ReadonlyMap<string, LockEntry>;
   /**
    * Caches the parent-managed decision (009-parent-managed-init). When `true`,
-   * the target is a member of a providing Specflow workspace and agentic files
+   * the target is a member of a providing Specnaut workspace and agentic files
    * (`.claude/skills|agents|commands`) were intentionally suppressed — `entries`
    * therefore contains no agentic keys (FR-012). Serialized as `parent_managed:
    * true` and emitted only when set; a legacy lock without the key parses to

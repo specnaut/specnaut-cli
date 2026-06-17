@@ -1,15 +1,15 @@
 // gh-issues promote <num> [--priority P0|P1|P2|P3] [--size XS|S|M|L|XL]
-// — convert an inbound user-filed issue into a Specflow backlog ticket.
+// — convert an inbound user-filed issue into a Specnaut backlog ticket.
 // Defaults: P3 / M (Kevin reviews and lifts before final apply).
 //
 // Pipeline:
-//   1. Verify the issue carries `from:specflow-expert` (refuses otherwise).
+//   1. Verify the issue carries `from:specnaut-expert` (refuses otherwise).
 //   2. move.sh <num> Ready
 //   3. set-field.sh <num> Priority <P>  (exit 11 → fall back to label)
 //   4. set-field.sh <num> Size <S>      (same fallback contract)
 //   5. Public thank-you comment on the issue.
 
-const REPO = "mkrlabs/specflow";
+const REPO = "mkrlabs/specnaut";
 const BACKLOG_DIR = ".claude/skills/backlog/scripts";
 
 const PRIORITIES = new Set(["P0", "P1", "P2", "P3"]);
@@ -17,9 +17,9 @@ const SIZES = new Set(["XS", "S", "M", "L", "XL"]);
 
 const THANK_YOU = `Thanks for the report! 🙏
 
-I've added this to the Specflow backlog (Status: \`Ready\`). I'll keep this issue updated as the work progresses — no action needed on your end.
+I've added this to the Specnaut backlog (Status: \`Ready\`). I'll keep this issue updated as the work progresses — no action needed on your end.
 
-If you spot anything else, the bundled \`specflow-expert\` agent in your project (run \`/specflow-expert <question>\` or just ask "report this as a bug" when something breaks) can pre-fill structured reports for future fixes.`;
+If you spot anything else, the bundled \`specnaut-expert\` agent in your project (run \`/specnaut-expert <question>\` or just ask "report this as a bug" when something breaks) can pre-fill structured reports for future fixes.`;
 
 export type PromoteArgs = {
   num: number;
@@ -124,9 +124,9 @@ if (import.meta.main) {
   }
 
   const labels = await fetchLabels(args.num);
-  if (!labels.includes("from:specflow-expert")) {
+  if (!labels.includes("from:specnaut-expert")) {
     console.error(
-      `error: #${args.num} is not labelled \`from:specflow-expert\` — ` +
+      `error: #${args.num} is not labelled \`from:specnaut-expert\` — ` +
         `triage promote is for inbound user-filed issues only.`,
     );
     Deno.exit(2);

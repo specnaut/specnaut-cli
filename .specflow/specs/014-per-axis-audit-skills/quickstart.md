@@ -2,9 +2,9 @@
 
 ## What ships
 
-Five thin read-only skills — `/arch-audit`, `/sec-audit`, `/perf-audit`, `/dep-audit`, `/a11y-audit` —
-each dispatching its one auditor agent over an optional scope (`--path`/`--range`/`--diff`/whole), no
-report file.
+Five thin read-only skills — `/arch-audit`, `/sec-audit`, `/perf-audit`, `/dep-audit`, `/a11y-audit`
+— each dispatching its one auditor agent over an optional scope (`--path`/`--range`/`--diff`/whole),
+no report file.
 
 ## Build & test
 

@@ -6,7 +6,7 @@ import type { CoreEntry } from "../../src/domain/core_bundle.ts";
  * Locks the per-axis audit-dispatch family (#380) into the bundle so the five
  * thin skills can't drift apart. Each `/{axis}-audit` skill binds exactly one
  * axis to its existing auditor agent, documents the uniform scope args, carries
- * the 3-way disambiguation note (vs `/specflow audit <axis>` report-writing, vs
+ * the 3-way disambiguation note (vs `/specnaut audit <axis>` report-writing, vs
  * `/code-audit` multi-seat team), and states it is read-only / writes no report.
  *
  * The five share one body template — looping the same invariants over all of
@@ -60,8 +60,8 @@ for (const { skill, agent } of AXIS_SKILLS) {
     // Must reference both sibling surfaces so a reader can tell them apart.
     assertStringIncludes(
       content,
-      "/specflow audit",
-      `${skill} must disambiguate from the report-writing /specflow audit <axis>`,
+      "/specnaut audit",
+      `${skill} must disambiguate from the report-writing /specnaut audit <axis>`,
     );
     assertStringIncludes(
       content,

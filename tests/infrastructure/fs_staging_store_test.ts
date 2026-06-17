@@ -3,7 +3,7 @@ import { resolve } from "@std/path";
 import { FsStagingStore } from "../../src/infrastructure/fs_staging_store.ts";
 
 async function withTempDir<T>(fn: (dir: string) => Promise<T>): Promise<T> {
-  const dir = await Deno.makeTempDir({ prefix: "specflow-staging-test-" });
+  const dir = await Deno.makeTempDir({ prefix: "specnaut-staging-test-" });
   try {
     return await fn(dir);
   } finally {
@@ -12,7 +12,7 @@ async function withTempDir<T>(fn: (dir: string) => Promise<T>): Promise<T> {
 }
 
 async function seed(projectDir: string, relPath: string, content: string) {
-  const full = resolve(projectDir, ".specflow/upgrade-staging", relPath);
+  const full = resolve(projectDir, ".specnaut/upgrade-staging", relPath);
   await Deno.mkdir(resolve(full, ".."), { recursive: true });
   await Deno.writeTextFile(full, content);
 }
@@ -27,12 +27,12 @@ Deno.test("FsStagingStore.list: empty when no staging dir", async () => {
 Deno.test("FsStagingStore.list: returns project-relative paths", async () => {
   await withTempDir(async (dir) => {
     await seed(dir, ".claude/agents/developer.md", "UP\n");
-    await seed(dir, ".claude/skills/specflow/SKILL.md", "UP2\n");
+    await seed(dir, ".claude/skills/specnaut/SKILL.md", "UP2\n");
     const s = new FsStagingStore();
     const got = (await s.list(dir)).sort();
     assertEquals(got, [
       ".claude/agents/developer.md",
-      ".claude/skills/specflow/SKILL.md",
+      ".claude/skills/specnaut/SKILL.md",
     ]);
   });
 });
@@ -59,7 +59,7 @@ Deno.test("FsStagingStore.delete: removes file, idempotent", async () => {
 
 Deno.test("FsStagingStore.cleanupIfEmpty: removes empty dir, returns true", async () => {
   await withTempDir(async (dir) => {
-    await Deno.mkdir(resolve(dir, ".specflow/upgrade-staging"), { recursive: true });
+    await Deno.mkdir(resolve(dir, ".specnaut/upgrade-staging"), { recursive: true });
     const s = new FsStagingStore();
     assertEquals(await s.cleanupIfEmpty(dir), true);
   });

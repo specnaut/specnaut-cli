@@ -4,7 +4,7 @@ import { fromFileUrl, join } from "@std/path";
 
 const MAIN = fromFileUrl(new URL("../../src/main.ts", import.meta.url));
 
-async function runSpecflow(
+async function runSpecnaut(
   args: string[],
   opts: { cwd?: string } = {},
 ): Promise<{ code: number; stdout: string; stderr: string }> {
@@ -31,7 +31,7 @@ async function runSpecflow(
 }
 
 async function withTempDir(fn: (dir: string) => Promise<void>) {
-  const dir = await Deno.makeTempDir({ prefix: "specflow-init-windsurf-" });
+  const dir = await Deno.makeTempDir({ prefix: "specnaut-init-windsurf-" });
   try {
     await fn(dir);
   } finally {
@@ -39,9 +39,9 @@ async function withTempDir(fn: (dir: string) => Promise<void>) {
   }
 }
 
-Deno.test("specflow init --ai windsurf scaffolds a Windsurf layout", async () => {
+Deno.test("specnaut init --ai windsurf scaffolds a Windsurf layout", async () => {
   await withTempDir(async (parent) => {
-    const { code, stderr } = await runSpecflow(
+    const { code, stderr } = await runSpecnaut(
       ["init", "demo", "--no-git", "--ai", "windsurf"],
       { cwd: parent },
     );
@@ -49,27 +49,27 @@ Deno.test("specflow init --ai windsurf scaffolds a Windsurf layout", async () =>
 
     const root = join(parent, "demo");
 
-    // v1.0.0: router workflow + 11 sibling phase workflows + specflow-auto +
-    // specflow-review alias + backlog + 9 agent workflows.
+    // v1.0.0: router workflow + 11 sibling phase workflows + specnaut-auto +
+    // specnaut-review alias + backlog + 9 agent workflows.
     assertEquals(
-      await exists(join(root, ".windsurf/workflows/specflow.md")),
+      await exists(join(root, ".windsurf/workflows/specnaut.md")),
       true,
     );
     assertEquals(
-      await exists(join(root, ".windsurf/workflows/specflow-specify.md")),
+      await exists(join(root, ".windsurf/workflows/specnaut-specify.md")),
       true,
     );
     assertEquals(
-      await exists(join(root, ".windsurf/workflows/specflow-backlog.md")),
+      await exists(join(root, ".windsurf/workflows/specnaut-backlog.md")),
       true,
     );
     assertEquals(
-      await exists(join(root, ".windsurf/workflows/specflow-auto.md")),
+      await exists(join(root, ".windsurf/workflows/specnaut-auto.md")),
       true,
     );
     assertEquals(
       await exists(
-        join(root, ".windsurf/workflows/specflow-agent-product-owner.md"),
+        join(root, ".windsurf/workflows/specnaut-agent-product-owner.md"),
       ),
       true,
     );
@@ -78,8 +78,8 @@ Deno.test("specflow init --ai windsurf scaffolds a Windsurf layout", async () =>
     // auto-chain + list-skills + audit-security #303 + audit-performance
     // #304 + audit-accessibility #305 + audit-architecture #321 +
     // audit-dependencies #322 + lite-heuristic #346 + brainstorm #351) +
-    // specflow-auto + specflow-review alias + writing-plans (#271) +
-    // requesting-code-review (#273) + using-specflow (#282) +
+    // specnaut-auto + specnaut-review alias + writing-plans (#271) +
+    // requesting-code-review (#273) + using-specnaut (#282) +
     // subagent-driven-development (#272) + executing-plans (#274) +
     // verification-before-completion (#275) + brainstorming (#276) +
     // 4 output-contract skills (#378: workflow-contract, handoff-protocol,
@@ -89,8 +89,8 @@ Deno.test("specflow init --ai windsurf scaffolds a Windsurf layout", async () =>
     // backlog + 15 agent workflows (11 original + performance-auditor #304
     // + a11y-auditor #305 + architecture-auditor #321 + dependency-auditor
     // #322) = 58. code-audit's scope script ships under
-    // .specflow/scripts/code-audit/, not as a flattened workflow file;
-    // status-audit's schema doc ships to .specflow/logs/README.md, also not
+    // .specnaut/scripts/code-audit/, not as a flattened workflow file;
+    // status-audit's schema doc ships to .specnaut/logs/README.md, also not
     // flattened here.
     const workflowsCount = (await Array.fromAsync(
       Deno.readDir(join(root, ".windsurf/workflows")),
@@ -98,10 +98,10 @@ Deno.test("specflow init --ai windsurf scaffolds a Windsurf layout", async () =>
     assertEquals(workflowsCount, 58);
 
     // Shared (cross-harness)
-    assertEquals(await exists(join(root, ".specflow/memory/constitution.md")), true);
+    assertEquals(await exists(join(root, ".specnaut/memory/constitution.md")), true);
     assertEquals(await exists(join(root, "AGENTS.md")), true);
     assertEquals(await exists(join(root, "tasks/backlog.md")), false);
-    assertEquals(await exists(join(root, ".specflow/backlog.md")), true);
+    assertEquals(await exists(join(root, ".specnaut/backlog.md")), true);
 
     // NOT emitted for windsurf
     assertEquals(await exists(join(root, ".claude/")), false);
@@ -111,7 +111,7 @@ Deno.test("specflow init --ai windsurf scaffolds a Windsurf layout", async () =>
     assertEquals(await exists(join(root, "CLAUDE.md")), false);
 
     // Lock reflects windsurf
-    const lock = await Deno.readTextFile(join(root, ".specflow/installed.lock"));
+    const lock = await Deno.readTextFile(join(root, ".specnaut/installed.lock"));
     assertEquals(lock.includes("harness: windsurf"), true);
   });
 });

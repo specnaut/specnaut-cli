@@ -5,7 +5,7 @@ import type { CheckOutcome } from "../domain/check_result.ts";
 import { type BacklogBackend, type KnownHarness, parseLock } from "../domain/installed_lock.ts";
 import { PLUGIN_COVERED_PATHS_CLAUDE } from "../domain/plugin_coverage.ts";
 
-const PLUGIN_NAME = "specflow-plugin";
+const PLUGIN_NAME = "specnaut-plugin";
 
 async function exists(path: string): Promise<boolean> {
   try {
@@ -71,7 +71,7 @@ export class FsProjectInspector implements ProjectInspector {
   async inspect(projectDir: string, templatesVersion: string): Promise<CheckOutcome[]> {
     const outcomes: CheckOutcome[] = [];
 
-    outcomes.push(await this.checkDir(projectDir, ".specflow/"));
+    outcomes.push(await this.checkDir(projectDir, ".specnaut/"));
     outcomes.push(await this.checkHarness(projectDir));
     outcomes.push(await this.checkConstitution(projectDir));
     outcomes.push(await this.checkTemplatesVersion(projectDir, templatesVersion));
@@ -84,11 +84,11 @@ export class FsProjectInspector implements ProjectInspector {
 
   /**
    * Detects the "plugin uninstalled after migration" edge case (#73
-   * slice 7): when `specflow upgrade` previously migrated vanilla
-   * agent files to the `specflow-plugin` plugin (deleted from disk +
+   * slice 7): when `specnaut upgrade` previously migrated vanilla
+   * agent files to the `specnaut-plugin` plugin (deleted from disk +
    * dropped from lock), and the user later uninstalled the plugin,
    * those files are now silently absent. This check warns once per
-   * missing path so the user can recover via `specflow upgrade` or
+   * missing path so the user can recover via `specnaut upgrade` or
    * by re-installing the plugin.
    *
    * Returns an empty list when no `pluginDetector` is configured, the
@@ -98,7 +98,7 @@ export class FsProjectInspector implements ProjectInspector {
   private async checkPluginGap(projectDir: string): Promise<CheckOutcome[]> {
     if (this.pluginDetector === null) return [];
 
-    const lockPath = join(projectDir, ".specflow/installed.lock");
+    const lockPath = join(projectDir, ".specnaut/installed.lock");
     if (!(await exists(lockPath))) return [];
     let harness: KnownHarness;
     try {
@@ -119,7 +119,7 @@ export class FsProjectInspector implements ProjectInspector {
         name: dest,
         status: "warn",
         message:
-          "missing — restore via `specflow upgrade` or install the plugin (`/plugin install specflow-plugin`)",
+          "missing — restore via `specnaut upgrade` or install the plugin (`/plugin install specnaut-plugin`)",
       });
     }
     return outcomes;
@@ -134,7 +134,7 @@ export class FsProjectInspector implements ProjectInspector {
    * Local backend is zero-config: a single `pass` line, no file lookup.
    */
   private async checkBacklogConfig(projectDir: string): Promise<CheckOutcome> {
-    const lockPath = join(projectDir, ".specflow/installed.lock");
+    const lockPath = join(projectDir, ".specnaut/installed.lock");
     if (!(await exists(lockPath))) {
       return {
         name: "backlog backend",
@@ -158,13 +158,13 @@ export class FsProjectInspector implements ProjectInspector {
       };
     }
 
-    const cfgPath = join(projectDir, ".specflow/backlog-config.yml");
+    const cfgPath = join(projectDir, ".specnaut/backlog-config.yml");
     if (!(await exists(cfgPath))) {
       return {
         name: "backlog backend",
         status: "warn",
         message:
-          `${backend} — backlog-config.yml missing (run \`specflow upgrade --backlog ${backend}\` to scaffold)`,
+          `${backend} — backlog-config.yml missing (run \`specnaut upgrade --backlog ${backend}\` to scaffold)`,
       };
     }
 
@@ -221,7 +221,7 @@ export class FsProjectInspector implements ProjectInspector {
    * config files exist.
    */
   private async checkClaudeConfig(projectDir: string): Promise<CheckOutcome[]> {
-    const lockPath = join(projectDir, ".specflow/installed.lock");
+    const lockPath = join(projectDir, ".specnaut/installed.lock");
     if (!(await exists(lockPath))) return [];
     let lock;
     try {
@@ -304,7 +304,7 @@ export class FsProjectInspector implements ProjectInspector {
   }
 
   private async checkHarness(projectDir: string): Promise<CheckOutcome> {
-    const path = join(projectDir, ".specflow/installed.lock");
+    const path = join(projectDir, ".specnaut/installed.lock");
     if (!(await exists(path))) {
       return {
         name: "harness",
@@ -347,13 +347,13 @@ export class FsProjectInspector implements ProjectInspector {
     projectDir: string,
     bundledTemplatesVersion: string,
   ): Promise<CheckOutcome> {
-    const path = join(projectDir, ".specflow/installed.lock");
+    const path = join(projectDir, ".specnaut/installed.lock");
     if (!(await exists(path))) {
       return {
         name: "templates version",
         status: "warn",
         message:
-          "no .specflow/installed.lock — re-init with 'specflow init --here --force' to enable upgrade tracking",
+          "no .specnaut/installed.lock — re-init with 'specnaut init --here --force' to enable upgrade tracking",
       };
     }
     try {
@@ -370,7 +370,7 @@ export class FsProjectInspector implements ProjectInspector {
         name: "templates version",
         status: "warn",
         message:
-          `project on ${lock.templatesVersion}, bundled on ${bundledTemplatesVersion} — run 'specflow upgrade'`,
+          `project on ${lock.templatesVersion}, bundled on ${bundledTemplatesVersion} — run 'specnaut upgrade'`,
       };
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
@@ -382,16 +382,16 @@ export class FsProjectInspector implements ProjectInspector {
     const path = join(projectDir, rel);
     return (await exists(path))
       ? { name: rel, status: "pass", message: "present" }
-      : { name: rel, status: "fail", message: `missing — run 'specflow init --here'` };
+      : { name: rel, status: "fail", message: `missing — run 'specnaut init --here'` };
   }
 
   private async checkConstitution(projectDir: string): Promise<CheckOutcome> {
-    const path = join(projectDir, ".specflow/memory/constitution.md");
+    const path = join(projectDir, ".specnaut/memory/constitution.md");
     if (!(await exists(path))) {
       return {
         name: "constitution",
         status: "fail",
-        message: "missing .specflow/memory/constitution.md",
+        message: "missing .specnaut/memory/constitution.md",
       };
     }
     const text = await Deno.readTextFile(path);
@@ -399,7 +399,7 @@ export class FsProjectInspector implements ProjectInspector {
       return {
         name: "constitution",
         status: "warn",
-        message: "placeholder — edit .specflow/memory/constitution.md",
+        message: "placeholder — edit .specnaut/memory/constitution.md",
       };
     }
     return { name: "constitution", status: "pass", message: "populated" };

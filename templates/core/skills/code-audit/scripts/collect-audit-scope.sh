@@ -3,7 +3,7 @@
 # CODE-AUDIT SCOPE block + CATEGORY SIGNALS the orchestrator skill parses.
 #
 # Read-only: it never mutates the tree. Pure bash + git, no extra deps, so it
-# runs unmodified in any scaffolded project (the Specflow binary need not be on
+# runs unmodified in any scaffolded project (the Specnaut binary need not be on
 # PATH at audit time).
 #
 # Resolution priority (first match wins):
@@ -16,7 +16,7 @@
 #   5. last-N               → HEAD~<N>..HEAD, N default 20, --last <n> overrides
 #                             (SCOPE: last-N)
 #
-# Contract: .specflow/specs/013-code-audit/contracts/scope-signals.md
+# Contract: .specnaut/specs/013-code-audit/contracts/scope-signals.md
 set -euo pipefail
 
 PATH_ARG=""

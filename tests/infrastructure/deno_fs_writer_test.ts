@@ -11,7 +11,7 @@ const sampleBundle: Bundle = {
 };
 
 async function withTempDir(fn: (dir: string) => Promise<void>) {
-  const dir = await Deno.makeTempDir({ prefix: "specflow-fs-test-" });
+  const dir = await Deno.makeTempDir({ prefix: "specnaut-fs-test-" });
   try {
     await fn(dir);
   } finally {
@@ -96,7 +96,7 @@ Deno.test("DenoFsWriter.writeBundle rejects destinations that escape the target"
   });
 });
 
-Deno.test("writeBundle with backupExisting renames existing file to .specflow.bak", async () => {
+Deno.test("writeBundle with backupExisting renames existing file to .specnaut.bak", async () => {
   await withTempDir(async (dir) => {
     await Deno.mkdir(join(dir, ".claude/commands"), { recursive: true });
     const destRel = ".claude/commands/hello.md";
@@ -110,22 +110,22 @@ Deno.test("writeBundle with backupExisting renames existing file to .specflow.ba
     );
 
     const newContent = await Deno.readTextFile(join(dir, destRel));
-    const bakContent = await Deno.readTextFile(join(dir, `${destRel}.specflow.bak`));
+    const bakContent = await Deno.readTextFile(join(dir, `${destRel}.specnaut.bak`));
     assertEquals(newContent.trim(), "NEW CONTENT");
     assertEquals(bakContent, "OLD CONTENT");
 
     assertEquals(report.backups.length, 1);
     assertEquals(report.backups[0].dest, destRel);
-    assertEquals(report.backups[0].backupPath, `${destRel}.specflow.bak`);
+    assertEquals(report.backups[0].backupPath, `${destRel}.specnaut.bak`);
   });
 });
 
-Deno.test("writeBundle with backupExisting overwrites a pre-existing .specflow.bak", async () => {
+Deno.test("writeBundle with backupExisting overwrites a pre-existing .specnaut.bak", async () => {
   await withTempDir(async (dir) => {
     await Deno.mkdir(join(dir, ".claude"), { recursive: true });
     const destRel = ".claude/x.md";
     await Deno.writeTextFile(join(dir, destRel), "CURRENT");
-    await Deno.writeTextFile(join(dir, `${destRel}.specflow.bak`), "ANCIENT");
+    await Deno.writeTextFile(join(dir, `${destRel}.specnaut.bak`), "ANCIENT");
 
     const writer = new DenoFsWriter();
     await writer.writeBundle(
@@ -134,7 +134,7 @@ Deno.test("writeBundle with backupExisting overwrites a pre-existing .specflow.b
       { overwrite: true, backupExisting: true },
     );
 
-    const bakContent = await Deno.readTextFile(join(dir, `${destRel}.specflow.bak`));
+    const bakContent = await Deno.readTextFile(join(dir, `${destRel}.specnaut.bak`));
     assertEquals(bakContent, "CURRENT");
   });
 });
@@ -155,7 +155,7 @@ Deno.test("writeBundle without backupExisting does not create .bak files", async
     assertEquals(report.backups.length, 0);
     let bakExists = true;
     try {
-      await Deno.stat(join(dir, `${destRel}.specflow.bak`));
+      await Deno.stat(join(dir, `${destRel}.specnaut.bak`));
     } catch {
       bakExists = false;
     }
@@ -176,7 +176,7 @@ Deno.test("writeBundle returns empty backups for fresh installs", async () => {
 });
 
 Deno.test("DenoFsWriter.deletePaths deletes specified files; missing files silently skipped", async () => {
-  const dir = await Deno.makeTempDir({ prefix: "specflow-fswriter-delete-" });
+  const dir = await Deno.makeTempDir({ prefix: "specnaut-fswriter-delete-" });
   try {
     await Deno.mkdir(join(dir, "sub"), { recursive: true });
     await Deno.writeTextFile(join(dir, "a.md"), "a");
@@ -197,8 +197,8 @@ Deno.test("DenoFsWriter.deletePaths deletes specified files; missing files silen
   }
 });
 
-Deno.test("DenoFsWriter.deletePaths with backupExisting renames to .specflow.bak before delete", async () => {
-  const dir = await Deno.makeTempDir({ prefix: "specflow-fswriter-delete-bak-" });
+Deno.test("DenoFsWriter.deletePaths with backupExisting renames to .specnaut.bak before delete", async () => {
+  const dir = await Deno.makeTempDir({ prefix: "specnaut-fswriter-delete-bak-" });
   try {
     await Deno.writeTextFile(join(dir, "a.md"), "alpha");
 
@@ -211,10 +211,10 @@ Deno.test("DenoFsWriter.deletePaths with backupExisting renames to .specflow.bak
 
     assertEquals(report.backups.length, 1);
     assertEquals(report.backups[0].dest, "a.md");
-    assertEquals(report.backups[0].backupPath, "a.md.specflow.bak");
+    assertEquals(report.backups[0].backupPath, "a.md.specnaut.bak");
     assertEquals(await exists(join(dir, "a.md")), false);
-    assertEquals(await exists(join(dir, "a.md.specflow.bak")), true);
-    const bakContent = await Deno.readTextFile(join(dir, "a.md.specflow.bak"));
+    assertEquals(await exists(join(dir, "a.md.specnaut.bak")), true);
+    const bakContent = await Deno.readTextFile(join(dir, "a.md.specnaut.bak"));
     assertEquals(bakContent, "alpha");
   } finally {
     await Deno.remove(dir, { recursive: true });

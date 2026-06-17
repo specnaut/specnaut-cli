@@ -66,9 +66,9 @@ file.**
 
 - **`/perf-audit`** (this skill) — dispatches the **one** `performance-auditor`
   over a scope and returns findings **inline**. No report file.
-- **`/specflow audit performance`** — the report-writing single-axis audit:
+- **`/specnaut audit performance`** — the report-writing single-axis audit:
   runs the same auditor but **persists a dated report** under
-  `docs/specflow/audits/`. Use it when you want a durable artifact.
+  `docs/specnaut/audits/`. Use it when you want a durable artifact.
 - **`/code-audit`** — the **multi-seat** team audit: dispatches every
   applicable auditor (architecture / security / performance / a11y /
   dependency) in parallel and synthesizes one combined report. Use it for a

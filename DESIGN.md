@@ -1,4 +1,4 @@
-# DESIGN.md — Specflow design system
+# DESIGN.md — Specnaut design system
 
 > **Source of truth.** All UI work consults this file. Tokens here are non-negotiable defaults;
 > deviations need an explicit reason.
@@ -227,7 +227,7 @@ entirely per WCAG 2.3.3 intent.
 
 Append-only. Every change to the tokens above lands a one-liner with the date and the rationale.
 
-- 2026-05-10 — Initial system drafted from "Specflow public landing page redesign for issue #187".
+- 2026-05-10 — Initial system drafted from "Specnaut public landing page redesign for issue #187".
   Chose DM Sans (rounded, friendly, pairs well with pixel sprites) over Inter. Chose slate-indigo
   primary + warm peach accent so sprites carry colour interest while chrome stays neutral.
   Floating-sprite bob rule added at 3 s / 8 px per brief requirement.

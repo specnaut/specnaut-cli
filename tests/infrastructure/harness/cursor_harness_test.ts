@@ -5,9 +5,9 @@ import type { CoreBundle } from "../../../src/domain/core_bundle.ts";
 const SAMPLE: CoreBundle = [
   {
     category: "skill",
-    name: "specflow",
+    name: "specnaut",
     suffix: null,
-    content: "---\nname: specflow\ndescription: Specflow router\n---\n\n# body\n",
+    content: "---\nname: specnaut\ndescription: Specnaut router\n---\n\n# body\n",
     executable: false,
   },
   {
@@ -33,7 +33,7 @@ const SAMPLE: CoreBundle = [
   },
   {
     category: "skill",
-    name: "specflow-auto",
+    name: "specnaut-auto",
     suffix: null,
     content: "---\ndescription: Auto-chain dispatcher\n---\n\n# body\n",
     executable: false,
@@ -60,40 +60,40 @@ Deno.test("CursorHarness.key and displayName", () => {
   assertEquals(h.displayName, "Cursor");
 });
 
-Deno.test("CursorHarness maps router skill to .cursor/skills/specflow/SKILL.md", () => {
+Deno.test("CursorHarness maps router skill to .cursor/skills/specnaut/SKILL.md", () => {
   const h = new CursorHarness();
   const mapped = h.mapBundle(SAMPLE, { backlogBackend: "local", versionScheme: "semver" });
-  assert(".cursor/skills/specflow/SKILL.md" in mapped);
+  assert(".cursor/skills/specnaut/SKILL.md" in mapped);
 });
 
-Deno.test("CursorHarness maps phase docs under .cursor/skills/specflow/phases/", () => {
+Deno.test("CursorHarness maps phase docs under .cursor/skills/specnaut/phases/", () => {
   const h = new CursorHarness();
   const mapped = h.mapBundle(SAMPLE, { backlogBackend: "local", versionScheme: "semver" });
-  assert(".cursor/skills/specflow/phases/specify.md" in mapped);
+  assert(".cursor/skills/specnaut/phases/specify.md" in mapped);
 });
 
-Deno.test("CursorHarness maps the backlog command to .cursor/skills/specflow-backlog/SKILL.md", () => {
+Deno.test("CursorHarness maps the backlog command to .cursor/skills/specnaut-backlog/SKILL.md", () => {
   const h = new CursorHarness();
   const mapped = h.mapBundle(SAMPLE, { backlogBackend: "local", versionScheme: "semver" });
-  assert(".cursor/skills/specflow-backlog/SKILL.md" in mapped);
+  assert(".cursor/skills/specnaut-backlog/SKILL.md" in mapped);
 });
 
-Deno.test("CursorHarness maps agents to .cursor/skills/specflow-agent-<name>/SKILL.md", () => {
+Deno.test("CursorHarness maps agents to .cursor/skills/specnaut-agent-<name>/SKILL.md", () => {
   const h = new CursorHarness();
   const mapped = h.mapBundle(SAMPLE, { backlogBackend: "local", versionScheme: "semver" });
-  assert(".cursor/skills/specflow-agent-product-owner/SKILL.md" in mapped);
+  assert(".cursor/skills/specnaut-agent-product-owner/SKILL.md" in mapped);
 });
 
-Deno.test("CursorHarness maps skills to .cursor/skills/specflow-<name>/SKILL.md", () => {
+Deno.test("CursorHarness maps skills to .cursor/skills/specnaut-<name>/SKILL.md", () => {
   const h = new CursorHarness();
   const mapped = h.mapBundle(SAMPLE, { backlogBackend: "local", versionScheme: "semver" });
-  assert(".cursor/skills/specflow-auto/SKILL.md" in mapped);
+  assert(".cursor/skills/specnaut-auto/SKILL.md" in mapped);
 });
 
-Deno.test("CursorHarness maps spec-root to .specflow/ and project-root unchanged", () => {
+Deno.test("CursorHarness maps spec-root to .specnaut/ and project-root unchanged", () => {
   const h = new CursorHarness();
   const mapped = h.mapBundle(SAMPLE, { backlogBackend: "local", versionScheme: "semver" });
-  assert(".specflow/memory/constitution.md" in mapped);
+  assert(".specnaut/memory/constitution.md" in mapped);
   assert("AGENTS.md" in mapped);
 });
 

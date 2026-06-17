@@ -4,7 +4,9 @@
 
 **Decision**: Map each bundled agent to one tier by role class (authoritative table in
 contracts/effort-map.md):
-- **low** (pure orchestrators — route + dispatch, no generation): review-coordinator, workflow-manager.
+
+- **low** (pure orchestrators — route + dispatch, no generation): review-coordinator,
+  workflow-manager.
 - **medium** (read-only structured-findings producers + Q&A + backlog): a11y-auditor,
   architecture-auditor, dependency-auditor, performance-auditor, security-auditor, code-reviewer,
   test-reviewer, specflow-expert, product-owner.
@@ -23,14 +25,14 @@ the agent. code-reviewer/test-reviewer as low — they generate review findings,
 ## Decision 2 — Model compatibility (xhigh is Opus-only)
 
 **Decision**: Verified current pins — developer=opus, devops-sre=opus, qa-tester=opus,
-product-owner=opus; all others=sonnet. The `xhigh` set (developer, qa-tester, devops-sre) is therefore
-Opus-pinned and valid. All other tiers (low/medium/high) are model-agnostic. The README documents the
-caveat; a test asserts no sonnet-pinned agent carries xhigh.
+product-owner=opus; all others=sonnet. The `xhigh` set (developer, qa-tester, devops-sre) is
+therefore Opus-pinned and valid. All other tiers (low/medium/high) are model-agnostic. The README
+documents the caveat; a test asserts no sonnet-pinned agent carries xhigh.
 
 **Rationale**: `xhigh` on Sonnet 400s. Locking this with a test prevents a future regression when an
 agent's model is changed without revisiting its effort.
 
 ## Decision 3 — README + distribution
 
-**Decision**: Ship `templates/core/agents/README.md` (→ `.claude/agents/README.md`) with the tier table,
-rationale, and caveat; register it in the manifest; mirror agents + README to `plugin/`.
+**Decision**: Ship `templates/core/agents/README.md` (→ `.claude/agents/README.md`) with the tier
+table, rationale, and caveat; register it in the manifest; mirror agents + README to `plugin/`.

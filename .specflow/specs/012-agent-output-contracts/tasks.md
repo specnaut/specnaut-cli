@@ -1,7 +1,9 @@
 # Tasks: Machine-readable agent output contracts
 
-**Feature**: `012-agent-output-contracts` | **Branch**: `012-agent-output-contracts` | **Issue**: mkrlabs/specflow#378 (epic mkrlabs/specflow-monorepo#12)
-**Inputs**: [plan.md](./plan.md) · [spec.md](./spec.md) · [data-model.md](./data-model.md) · [research.md](./research.md) · contracts/{workflow-status,handoff,review-summary,qa-summary}.md
+**Feature**: `012-agent-output-contracts` | **Branch**: `012-agent-output-contracts` | **Issue**:
+mkrlabs/specflow#378 (epic mkrlabs/specflow-monorepo#12) **Inputs**: [plan.md](./plan.md) ·
+[spec.md](./spec.md) · [data-model.md](./data-model.md) · [research.md](./research.md) ·
+contracts/{workflow-status,handoff,review-summary,qa-summary}.md
 
 Content-first feature: the four `contracts/*.md` files in this spec dir are the canonical block
 schemas — each SKILL.md embeds its block format verbatim from there. Distribution is asserted by
@@ -13,9 +15,10 @@ All assertions hermetic — read the in-repo `templates/core/` tree and `CORE_BU
 ## Phase 1: Setup / verify the bundle is glob-driven
 
 - [ ] T001 Confirm the bundle generator picks up net-new skill dirs automatically: add a throwaway
-      `templates/core/skills/_probe/SKILL.md`, run `deno task bundle`, grep `src/templates_bundle.ts`
-      for `_probe`, then delete the probe + re-bundle. Record the result in research.md Decision 2. If
-      NOT glob-driven, note the manual-registration point in `scripts/bundle-templates.ts` for T010.
+      `templates/core/skills/_probe/SKILL.md`, run `deno task bundle`, grep
+      `src/templates_bundle.ts` for `_probe`, then delete the probe + re-bundle. Record the result
+      in research.md Decision 2. If NOT glob-driven, note the manual-registration point in
+      `scripts/bundle-templates.ts` for T010.
 
 ## Phase 2: Foundational — author the four contracts (blocking; everything else preloads these)
 
@@ -35,29 +38,32 @@ All assertions hermetic — read the in-repo `templates/core/` tree and `CORE_BU
 Each task adds a `skills:` array to the agent's existing YAML frontmatter; no other frontmatter or
 body change. Additive only (FR-008, FR-009). All `[P]` — distinct files.
 
-- [ ] T006 [P] [US1] `templates/core/agents/architecture-auditor.md` → `skills: [review-findings-contract, workflow-contract]`
+- [ ] T006 [P] [US1] `templates/core/agents/architecture-auditor.md` →
+      `skills: [review-findings-contract, workflow-contract]`
 - [ ] T007 [P] [US1] `templates/core/agents/performance-auditor.md` → same pair
 - [ ] T008 [P] [US1] `templates/core/agents/security-auditor.md` → same pair
 - [ ] T009 [P] [US1] `templates/core/agents/a11y-auditor.md` → same pair
 - [ ] T010 [P] [US1] `templates/core/agents/dependency-auditor.md` → same pair
 - [ ] T011 [P] [US1] `templates/core/agents/code-reviewer.md` → same pair
 - [ ] T012 [P] [US1] `templates/core/agents/test-reviewer.md` → same pair
-- [ ] T013 [P] [US2] `templates/core/agents/review-coordinator.md` → `skills: [workflow-contract, handoff-protocol]`
-- [ ] T014 [P] [US2] `templates/core/agents/developer.md` → `skills: [workflow-contract, handoff-protocol]`
-- [ ] T015 [P] [US3] `templates/core/agents/qa-tester.md` → `skills: [qa-report-contract, workflow-contract]`
+- [ ] T013 [P] [US2] `templates/core/agents/review-coordinator.md` →
+      `skills: [workflow-contract, handoff-protocol]`
+- [ ] T014 [P] [US2] `templates/core/agents/developer.md` →
+      `skills: [workflow-contract, handoff-protocol]`
+- [ ] T015 [P] [US3] `templates/core/agents/qa-tester.md` →
+      `skills: [qa-report-contract, workflow-contract]`
 
 ## Phase 4: Distribution — regenerate the bundle
 
 - [ ] T016 Run `deno task bundle`; confirm `src/templates_bundle.ts` now contains the four contract
-      paths and the updated agent contents. (If T001 found the generator is not glob-driven, register
-      the four skill dirs first.)
+      paths and the updated agent contents. (If T001 found the generator is not glob-driven,
+      register the four skill dirs first.)
 
 ## Phase 5: Tests — lock the two halves together (US1–US4)
 
-- [ ] T017 [P] Add `tests/templates/agent_output_contracts_test.ts`:
-      (a) the four contracts are in `CORE_BUNDLE` and each carries `user-invocable: false`;
-      (b) each wired agent's bundled content carries the expected `skills:` entries (table from
-      research.md). Backs SC-001, SC-004.
+- [ ] T017 [P] Add `tests/templates/agent_output_contracts_test.ts`: (a) the four contracts are in
+      `CORE_BUNDLE` and each carries `user-invocable: false`; (b) each wired agent's bundled content
+      carries the expected `skills:` entries (table from research.md). Backs SC-001, SC-004.
 - [ ] T018 [P] Add a schema-self-consistency assertion: each contract SKILL.md body contains its
       fenced block header (`WORKFLOW STATUS` / `HANDOFF` / `REVIEW SUMMARY` / `QA SUMMARY`) and the
       verdict-rule lines, so the schema text can't silently drift from the spec contracts (FR-002).
@@ -85,6 +91,6 @@ body change. Additive only (FR-008, FR-009). All `[P]` — distinct files.
 
 ## MVP / increment boundary
 
-US1 (REVIEW SUMMARY on auditors/reviewers) alone is a shippable increment: T002+T004, T006–T012, T016,
-T017, T019. US2/US3 layer on the workflow/handoff/QA shapes. US4 (distribution) is satisfied by the
-bundle regen + tests covering init/upgrade inclusion.
+US1 (REVIEW SUMMARY on auditors/reviewers) alone is a shippable increment: T002+T004, T006–T012,
+T016, T017, T019. US2/US3 layer on the workflow/handoff/QA shapes. US4 (distribution) is satisfied
+by the bundle regen + tests covering init/upgrade inclusion.

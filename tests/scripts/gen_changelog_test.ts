@@ -367,7 +367,7 @@ Deno.test("C2/SC-002: adoption section is byte-identical to golden AND strict-in
   // Byte-exact golden of the Adoption guide section.
   const golden = "### Adoption guide\n\n" +
     "These prompts help your AI agent adopt the new features in an existing project. " +
-    "Copy them into your harness, or run `@specflow-expert review-upgrade` to be walked " +
+    "Copy them into your harness, or run `@specnaut-expert review-upgrade` to be walked " +
     "through automatically.\n\n" +
     "**#252 — Add the thing**\n\n" +
     "prose\n\n```prompt\nrun X\n```";
@@ -390,13 +390,13 @@ Deno.test("C4/SC-004: v1.13.0 range fixture ⇒ expected adoption entry count", 
   //  - #350 is retrieved but carries NO adoption block ⇒ quiet skip;
   //  - the `add cloud backend` feat has NO (#NNN) ⇒ quiet skip.
   const commits: Classified[] = [
-    featCommit("Specflow Cloud funnel — landing CTA + CLI nudges (#361)"),
+    featCommit("Specnaut Cloud funnel — landing CTA + CLI nudges (#361)"),
     featCommit("Native OS keychain for CLI credentials via Deno FFI (#360)"),
-    featCommit("Gate-aware clarify phase + `specflow gate` command (#358)"),
-    featCommit("Interactive Specflow Cloud auth — `specflow cloud login` (#353)"),
-    featCommit("Add /specflow brainstorm phase — optional step-0 spec discovery (#352)"),
+    featCommit("Gate-aware clarify phase + `specnaut gate` command (#358)"),
+    featCommit("Interactive Specnaut Cloud auth — `specnaut cloud login` (#353)"),
+    featCommit("Add /specnaut brainstorm phase — optional step-0 spec discovery (#352)"),
     featCommit("Carry agent model tier into sub-agent TOML reasoning effort (#350)"),
-    featCommit("Add `cloud` backend — drive a Specflow Cloud board from the CLI"),
+    featCommit("Add `cloud` backend — drive a Specnaut Cloud board from the CLI"),
   ];
   const map = new Map<number, PrBodyOutcome>([
     [361, { kind: "retrieved", body: adoptionBody("adopt funnel") }],

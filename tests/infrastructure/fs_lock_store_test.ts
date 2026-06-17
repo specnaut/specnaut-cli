@@ -4,7 +4,7 @@ import { FsLockStore } from "../../src/infrastructure/fs_lock_store.ts";
 import type { InstalledLock } from "../../src/domain/installed_lock.ts";
 
 async function withProjectDir(fn: (dir: string) => Promise<void>) {
-  const dir = await Deno.makeTempDir({ prefix: "specflow-lockstore-" });
+  const dir = await Deno.makeTempDir({ prefix: "specnaut-lockstore-" });
   try {
     await fn(dir);
   } finally {
@@ -44,16 +44,16 @@ Deno.test("FsLockStore.write then read round-trips", async () => {
   });
 });
 
-Deno.test("FsLockStore.write creates .specflow dir if absent", async () => {
+Deno.test("FsLockStore.write creates .specnaut dir if absent", async () => {
   await withProjectDir(async (dir) => {
     const store = new FsLockStore();
     await store.write(dir, SAMPLE);
-    const stat = await Deno.stat(join(dir, ".specflow/installed.lock"));
+    const stat = await Deno.stat(join(dir, ".specnaut/installed.lock"));
     assertEquals(stat.isFile, true);
   });
 });
 
 Deno.test("FsLockStore.lockPath returns canonical location", () => {
   const store = new FsLockStore();
-  assertEquals(store.lockPath("/proj"), join("/proj", ".specflow/installed.lock"));
+  assertEquals(store.lockPath("/proj"), join("/proj", ".specnaut/installed.lock"));
 });

@@ -31,7 +31,7 @@ labels: "bug,from:specflow-expert"
 Run these and paste the output:
 
   specflow --version
-  cat .specflow/installed.lock | head -10
+  cat .specnaut/installed.lock | head -10
   uname -srm   # or `cmd /c ver` on Windows
 -->
 

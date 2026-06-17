@@ -7,7 +7,7 @@ import type { CoreEntry } from "../../src/domain/core_bundle.ts";
  * contain its fenced block header AND the verdict/state rule lines that define
  * the block's invariants. This keeps the bundled schema text from silently
  * drifting away from the canonical contracts in
- * `.specflow/specs/012-agent-output-contracts/contracts/*.md` — if a header or
+ * `.specnaut/specs/012-agent-output-contracts/contracts/*.md` — if a header or
  * a load-bearing rule line is dropped from a SKILL.md, the matching assertion
  * goes red.
  */

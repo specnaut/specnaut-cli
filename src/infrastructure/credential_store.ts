@@ -1,8 +1,8 @@
-// Secure storage for Specflow Cloud CLI credentials (#353).
+// Secure storage for Specnaut Cloud CLI credentials (#353).
 //
 // The access token is short-lived and the refresh token is long-lived; both are
 // secrets and must never land in a tracked file (the project's
-// `.specflow/backlog-config.yml` holds only `backend`, `api_url`, `project_key`).
+// `.specnaut/backlog-config.yml` holds only `backend`, `api_url`, `project_key`).
 //
 // Storage: two backends behind one interface.
 //   - OS-native keychain (macOS Keychain / libsecret / Windows Credential
@@ -58,14 +58,19 @@ export function keyFor(apiUrl: string): string {
 
 /**
  * File-backed store: a single JSON object `{ [apiUrl]: creds }` at
- * `~/.specflow/credentials.json`, dir `0700`, file `0600`, written atomically.
+ * `~/.specnaut/credentials.json`, dir `0700`, file `0600`, written atomically.
  */
 export class FileCredentialStore implements CredentialStore {
   readonly kind = "file" as const;
   private readonly path: string;
+  /** Pre-rebrand location. Read-only fallback so existing logins survive the
+   *  ~/.specflow → ~/.specnaut rename; the next save() rewrites to `path`. Only
+   *  set for the real home default (never when a path is injected, e.g. tests). */
+  private readonly legacyPath: string | null;
 
   constructor(path?: string) {
-    this.path = path ?? `${homeDir()}/.specflow/credentials.json`;
+    this.path = path ?? `${homeDir()}/.specnaut/credentials.json`;
+    this.legacyPath = path ? null : `${homeDir()}/.specflow/credentials.json`;
   }
 
   private get dir(): string {
@@ -73,16 +78,21 @@ export class FileCredentialStore implements CredentialStore {
   }
 
   private async readAll(): Promise<Record<string, CloudCredentials>> {
-    try {
-      const text = await Deno.readTextFile(this.path);
-      const parsed = JSON.parse(text) as Record<string, CloudCredentials>;
-      return parsed && typeof parsed === "object" ? parsed : {};
-    } catch (e) {
-      if (e instanceof Deno.errors.NotFound) return {};
-      // A corrupt file shouldn't wedge auth — treat it as empty.
-      if (e instanceof SyntaxError) return {};
-      throw e;
+    // Current location first, then the legacy ~/.specflow fallback (read-only).
+    for (const p of [this.path, this.legacyPath]) {
+      if (!p) continue;
+      try {
+        const text = await Deno.readTextFile(p);
+        const parsed = JSON.parse(text) as Record<string, CloudCredentials>;
+        return parsed && typeof parsed === "object" ? parsed : {};
+      } catch (e) {
+        if (e instanceof Deno.errors.NotFound) continue; // try the next path
+        // A corrupt file shouldn't wedge auth — treat it as empty.
+        if (e instanceof SyntaxError) return {};
+        throw e;
+      }
     }
+    return {};
   }
 
   private async writeAll(all: Record<string, CloudCredentials>): Promise<void> {

@@ -1,49 +1,54 @@
 # Implementation Plan: Machine-readable agent output contracts
 
 **Branch**: `012-agent-output-contracts` | **Date**: 2026-06-12 | **Spec**: [spec.md](./spec.md)
-**Input**: Feature specification from `.specflow/specs/012-agent-output-contracts/spec.md` (issue mkrlabs/specflow#378, epic mkrlabs/specflow-monorepo#12)
+**Input**: Feature specification from `.specnaut/specs/012-agent-output-contracts/spec.md` (issue
+mkrlabs/specflow#378, epic mkrlabs/specflow-monorepo#12)
 
 ## Summary
 
 Add four `user-invocable: false` **contract skills** to the bundled template set and wire the
-relevant bundled agents to preload them, so agent output carries normalized, fenced, machine-readable
-blocks (`WORKFLOW STATUS`, `HANDOFF`, `REVIEW SUMMARY`, `QA SUMMARY`) appended after the existing
-prose. This is pure additive content shipped through the existing `init`/`upgrade` bundle — no
-runtime/domain code changes. It is the foundation that the multi-seat audit synthesis (#379) and the
-status ledger / `/status-audit` parser (#381) consume.
+relevant bundled agents to preload them, so agent output carries normalized, fenced,
+machine-readable blocks (`WORKFLOW STATUS`, `HANDOFF`, `REVIEW SUMMARY`, `QA SUMMARY`) appended
+after the existing prose. This is pure additive content shipped through the existing
+`init`/`upgrade` bundle — no runtime/domain code changes. It is the foundation that the multi-seat
+audit synthesis (#379) and the status ledger / `/status-audit` parser (#381) consume.
 
 The work has two surfaces:
 
 1. **Content** — author 4 new `templates/core/skills/<name>/SKILL.md` files; add a `skills:`
    frontmatter array to the relevant `templates/core/agents/*.md` files.
-2. **Distribution** — regenerate the embedded bundle (`deno task bundle` → `src/templates_bundle.ts`)
-   so `specflow init`/`upgrade` ship the new files; add tests asserting the bundle carries the four
-   contracts and the agents carry the preload frontmatter.
+2. **Distribution** — regenerate the embedded bundle (`deno task bundle` →
+   `src/templates_bundle.ts`) so `specflow init`/`upgrade` ship the new files; add tests asserting
+   the bundle carries the four contracts and the agents carry the preload frontmatter.
 
 ## Technical Context
 
-**Language/Version**: TypeScript on Deno v2.x
-**Primary Dependencies**: none new — uses the existing template-bundle pipeline (`scripts/bundle-templates.ts`, `src/templates_bundle.ts`, `src/domain/core_bundle.ts`) and `@std/assert` for tests
-**Storage**: bundled template files under `templates/core/{skills,agents}/`; embedded into `src/templates_bundle.ts` at build time
-**Testing**: `deno task test` (which runs `deno task bundle` first); hermetic — no network
-**Target Platform**: the Specflow CLI binary; the artifacts land in any project's `.claude/` via `init`/`upgrade`
-**Project Type**: cli (single project, hexagonal)
-**Performance Goals**: N/A — static content; the only runtime cost is bundle size (4 small markdown files + a frontmatter line per agent)
-**Constraints**: additive only; no existing agent prose behaviour regresses; upgrade must respect the spec-011 customisation-preservation path
-**Scale/Scope**: 4 new skill files, ~6–8 agent frontmatter edits, 1 bundle regen, 1–2 test files
+**Language/Version**: TypeScript on Deno v2.x **Primary Dependencies**: none new — uses the existing
+template-bundle pipeline (`scripts/bundle-templates.ts`, `src/templates_bundle.ts`,
+`src/domain/core_bundle.ts`) and `@std/assert` for tests **Storage**: bundled template files under
+`templates/core/{skills,agents}/`; embedded into `src/templates_bundle.ts` at build time
+**Testing**: `deno task test` (which runs `deno task bundle` first); hermetic — no network **Target
+Platform**: the Specflow CLI binary; the artifacts land in any project's `.claude/` via
+`init`/`upgrade` **Project Type**: cli (single project, hexagonal) **Performance Goals**: N/A —
+static content; the only runtime cost is bundle size (4 small markdown files + a frontmatter line
+per agent) **Constraints**: additive only; no existing agent prose behaviour regresses; upgrade must
+respect the spec-011 customisation-preservation path **Scale/Scope**: 4 new skill files, ~6–8 agent
+frontmatter edits, 1 bundle regen, 1–2 test files
 
 ## Constitution Check
 
-*GATE: Must pass before Phase 0 research. Re-check after Phase 1 design.*
+_GATE: Must pass before Phase 0 research. Re-check after Phase 1 design._
 
-The bundled `constitution.md` is the placeholder default (no project-specific principles defined), so
-no explicit constitutional gate applies. The de-facto invariants observed in this codebase still hold
-and are honoured by this plan:
+The bundled `constitution.md` is the placeholder default (no project-specific principles defined),
+so no explicit constitutional gate applies. The de-facto invariants observed in this codebase still
+hold and are honoured by this plan:
 
 - **Hexagonal discipline** — N/A: this feature adds no domain/application/infrastructure code; it is
   template content + the existing bundle generator. No new ports/adapters, no layer crossings.
-- **Additive, non-breaking** — contracts append output; no agent's existing behaviour is replaced (FR-009).
-- **Test the contract** — bundle-inclusion and frontmatter-wiring are asserted by tests (Phase 1 contracts).
+- **Additive, non-breaking** — contracts append output; no agent's existing behaviour is replaced
+  (FR-009).
+- **Test the contract** — bundle-inclusion and frontmatter-wiring are asserted by tests (Phase 1
+  contracts).
 - **Ship through the one bundle path** — no bespoke install logic; reuses `init`/`upgrade` (FR-011).
 
 Result: **PASS** (no violations; Complexity Tracking not required).
@@ -53,7 +58,7 @@ Result: **PASS** (no violations; Complexity Tracking not required).
 ### Documentation (this feature)
 
 ```text
-.specflow/specs/012-agent-output-contracts/
+.specnaut/specs/012-agent-output-contracts/
 ├── plan.md              # This file
 ├── research.md          # Phase 0 — the two resolved decisions
 ├── data-model.md        # Phase 1 — contracts as domain entities
@@ -89,13 +94,13 @@ src/templates_bundle.ts           # REGENERATED by `deno task bundle`
 tests/                            # NEW/UPDATED: bundle-inclusion + frontmatter-wiring assertions
 ```
 
-**Structure Decision**: No new source directories. The feature is template content under the existing
-`templates/core/` tree plus the build-time-regenerated `src/templates_bundle.ts`. Tests live beside
-the existing template/bundle tests under `tests/`. The exact bundled-auditor set is whatever is
-present in `templates/core/agents/` at implementation time (Phase 0 confirms `architecture-auditor`,
-`performance-auditor`, `security-auditor`, `code-reviewer`, `test-reviewer`, `review-coordinator`,
-`qa-tester`, `developer` are bundled; `a11y-auditor` / `dependency-auditor` are wired only if also
-present in the bundle).
+**Structure Decision**: No new source directories. The feature is template content under the
+existing `templates/core/` tree plus the build-time-regenerated `src/templates_bundle.ts`. Tests
+live beside the existing template/bundle tests under `tests/`. The exact bundled-auditor set is
+whatever is present in `templates/core/agents/` at implementation time (Phase 0 confirms
+`architecture-auditor`, `performance-auditor`, `security-auditor`, `code-reviewer`, `test-reviewer`,
+`review-coordinator`, `qa-tester`, `developer` are bundled; `a11y-auditor` / `dependency-auditor`
+are wired only if also present in the bundle).
 
 ## Complexity Tracking
 

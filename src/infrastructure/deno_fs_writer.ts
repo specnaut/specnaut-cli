@@ -4,7 +4,7 @@ import { mergeIntoFile } from "../domain/merge_block.ts";
 import { mergeClaudeSettings } from "../domain/claude_settings_merge.ts";
 import type { BackupReport, FsWriter } from "../application/ports.ts";
 
-const BACKUP_SUFFIX = ".specflow.bak";
+const BACKUP_SUFFIX = ".specnaut.bak";
 
 async function fileExists(path: string): Promise<boolean> {
   try {
@@ -61,7 +61,7 @@ export class DenoFsWriter implements FsWriter {
       const conflicts = await this.detectConflicts(bundle, resolved);
       if (conflicts.length > 0) {
         throw new Error(
-          `Target directory already contains ${conflicts.length} file(s) specflow manages:\n` +
+          `Target directory already contains ${conflicts.length} file(s) specnaut manages:\n` +
             conflicts.map((c) => `  - ${c}`).join("\n"),
         );
       }

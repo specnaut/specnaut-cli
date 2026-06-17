@@ -22,7 +22,7 @@ import { fromFileUrl } from "@std/path";
  * #378 contract; the hook matches them case-insensitively.
  *
  * Each case pipes a synthetic stop-event payload into the hook against a temp
- * cwd (so the hook writes `<temp>/.specflow/logs/agents.jsonl`) and asserts the
+ * cwd (so the hook writes `<temp>/.specnaut/logs/agents.jsonl`) and asserts the
  * shape of the appended line. The hook MUST stay backward-compatible
  * (omit-if-absent — never emit an empty contract key) and MUST always exit 0.
  */
@@ -43,7 +43,7 @@ interface HookRun {
 
 /** Run the hook with `event` and `payload` on stdin against a fresh temp cwd. */
 async function runHook(event: string, payload: string): Promise<HookRun> {
-  const cwd = await Deno.makeTempDir({ prefix: "specflow-log-subagent-" });
+  const cwd = await Deno.makeTempDir({ prefix: "specnaut-log-subagent-" });
   try {
     const p = new Deno.Command("bash", {
       args: [HOOK, event],
@@ -60,7 +60,7 @@ async function runHook(event: string, payload: string): Promise<HookRun> {
 
     let rawLines: string[] = [];
     try {
-      const log = await Deno.readTextFile(`${cwd}/.specflow/logs/agents.jsonl`);
+      const log = await Deno.readTextFile(`${cwd}/.specnaut/logs/agents.jsonl`);
       rawLines = log.split("\n").filter((l) => l.trim().length > 0);
     } catch {
       // No log file written — leave rawLines empty; assertions handle it.

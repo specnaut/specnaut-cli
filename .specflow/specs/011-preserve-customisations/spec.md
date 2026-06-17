@@ -248,7 +248,7 @@ forced refresh **without** the opt-out and assert the file is preserved.
 
 ## Assumptions
 
-- The **declaration mechanism** (a project-level manifest such as `.specflow/preserve.yml`, a
+- The **declaration mechanism** (a project-level manifest such as `.specnaut/preserve.yml`, a
   per-file frontmatter flag, or a per-file sidecar) is a design decision for the plan phase; the
   spec stays mechanism-agnostic and only requires that the declaration be project-level and
   version-controllable. The issue lists all three as candidates.
@@ -260,7 +260,7 @@ forced refresh **without** the opt-out and assert the file is preserved.
 - The divergence view compares on-disk content against the binary's embedded bundle for the
   currently-installed templates version (the same source `upgrade` already reads), so no network or
   external fetch is required.
-- Preserve declarations are committed to the project's version control alongside `.specflow/`, so
+- Preserve declarations are committed to the project's version control alongside `.specnaut/`, so
   they travel with the repo and are reviewable.
 - The feature targets the public CLI half (`apps/specflow/`) only; no private-half code, names, or
   secrets are involved.

@@ -6,7 +6,7 @@ async function withFakeHome(
   fill: (home: string) => Promise<void>,
   fn: (home: string) => Promise<void>,
 ) {
-  const home = await Deno.makeTempDir({ prefix: "specflow-plugindet-" });
+  const home = await Deno.makeTempDir({ prefix: "specnaut-plugindet-" });
   try {
     await fill(home);
     await fn(home);
@@ -19,13 +19,13 @@ Deno.test("FsPluginDetector returns true when ~/.claude/plugins/cache/<name>/ ex
   await withFakeHome(
     async (home) => {
       await Deno.mkdir(
-        join(home, ".claude/plugins/cache/specflow-plugin"),
+        join(home, ".claude/plugins/cache/specnaut-plugin"),
         { recursive: true },
       );
     },
     async (home) => {
       const det = new FsPluginDetector(home);
-      assertEquals(await det.isPluginInstalled("specflow-plugin"), true);
+      assertEquals(await det.isPluginInstalled("specnaut-plugin"), true);
     },
   );
 });
@@ -35,7 +35,7 @@ Deno.test("FsPluginDetector returns false when the cache dir is missing", async 
     async (_home) => {/* empty home */},
     async (home) => {
       const det = new FsPluginDetector(home);
-      assertEquals(await det.isPluginInstalled("specflow-plugin"), false);
+      assertEquals(await det.isPluginInstalled("specnaut-plugin"), false);
     },
   );
 });
@@ -50,7 +50,7 @@ Deno.test("FsPluginDetector returns false when a sibling plugin is installed but
     },
     async (home) => {
       const det = new FsPluginDetector(home);
-      assertEquals(await det.isPluginInstalled("specflow-plugin"), false);
+      assertEquals(await det.isPluginInstalled("specnaut-plugin"), false);
     },
   );
 });
@@ -60,20 +60,20 @@ Deno.test("FsPluginDetector returns false when the cache path exists but is a fi
     async (home) => {
       await Deno.mkdir(join(home, ".claude/plugins/cache"), { recursive: true });
       await Deno.writeTextFile(
-        join(home, ".claude/plugins/cache/specflow-plugin"),
+        join(home, ".claude/plugins/cache/specnaut-plugin"),
         "oops",
       );
     },
     async (home) => {
       const det = new FsPluginDetector(home);
-      assertEquals(await det.isPluginInstalled("specflow-plugin"), false);
+      assertEquals(await det.isPluginInstalled("specnaut-plugin"), false);
     },
   );
 });
 
 Deno.test("FsPluginDetector returns false when HOME is not resolvable (null)", async () => {
   const det = new FsPluginDetector(null);
-  assertEquals(await det.isPluginInstalled("specflow-plugin"), false);
+  assertEquals(await det.isPluginInstalled("specnaut-plugin"), false);
 });
 
 Deno.test("FsPluginDetector default constructor reads HOME from the environment", () => {

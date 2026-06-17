@@ -12,7 +12,7 @@ not verified is not done.
 
 > Inspired by [obra/superpowers v5.1.0](https://github.com/obra/superpowers)
 > (MIT) — `skills/verification-before-completion/SKILL.md`.
-> Re-implemented for Specflow with explicit pre-commit + smoke + bundle
+> Re-implemented for Specnaut with explicit pre-commit + smoke + bundle
 > gates that match this repo's actual quality contract.
 
 ## When to invoke
@@ -73,7 +73,7 @@ state — either commit the rest or `git stash`.
 
 ### 4. Plan checkboxes are all ticked
 
-If you're executing a plan from `docs/specflow/plans/`, every `- [ ]`
+If you're executing a plan from `docs/specnaut/plans/`, every `- [ ]`
 under the tasks you claimed to complete must now read `- [x]`. Read
 the plan file with the Read tool, search for `- [ ]` lines under your
 task's section. Any unchecked box = silent skip.

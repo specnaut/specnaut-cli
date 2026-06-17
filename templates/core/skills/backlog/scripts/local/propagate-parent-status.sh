@@ -17,7 +17,7 @@
 #     parents; manual Backlog parents are left alone.
 #
 # Both rules respect AC(d): DIRECT children only — the recursion guard
-# `SPECFLOW_INTERNAL_PROPAGATION=1` blocks the grandparent walk.
+# `SPECNAUT_INTERNAL_PROPAGATION=1` blocks the grandparent walk.
 #
 # Local backend: parent link lives in `parent: "#NNN"` frontmatter;
 # status lives in `status:` frontmatter. Pure shell, no API calls.
@@ -32,7 +32,7 @@
 #
 # Recursion guard (AC(d)): the hook walks AT MOST one level up. When
 # this script calls back into `move.sh` to promote the parent, it sets
-# `SPECFLOW_INTERNAL_PROPAGATION=1`; on re-entry the hook sees the env
+# `SPECNAUT_INTERNAL_PROPAGATION=1`; on re-entry the hook sees the env
 # var and exits 0 immediately so the grandparent is never touched.
 
 set -uo pipefail
@@ -41,7 +41,7 @@ CHILD="${1:?usage: propagate-parent-status.sh <child-num> <new-status>}"
 NEW_STATUS="${2:?usage: propagate-parent-status.sh <child-num> <new-status>}"
 
 # Recursion guard — see header.
-if [ -n "${SPECFLOW_INTERNAL_PROPAGATION:-}" ]; then
+if [ -n "${SPECNAUT_INTERNAL_PROPAGATION:-}" ]; then
   exit 0
 fi
 
@@ -51,9 +51,9 @@ if [ "$NEW_STATUS" = "Backlog" ]; then
 fi
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-# Deployed layout: <root>/.specflow/scripts/backlog/<this>.sh — up 3.
+# Deployed layout: <root>/.specnaut/scripts/backlog/<this>.sh — up 3.
 ROOT="$(cd "$SCRIPT_DIR/../../.." && pwd)"
-BACKLOG_DIR="$ROOT/.specflow/backlog"
+BACKLOG_DIR="$ROOT/.specnaut/backlog"
 
 if [ ! -d "$BACKLOG_DIR" ]; then
   echo "::warning::propagate-parent-status: backlog dir not found at $BACKLOG_DIR — skipping" >&2
@@ -122,7 +122,7 @@ case "$NEW_STATUS" in
       case "$PARENT_STATUS" in
         "Ready"|"In progress"|"In review")
           if [ -x "$SCRIPT_DIR/move.sh" ]; then
-            if SPECFLOW_INTERNAL_PROPAGATION=1 "$SCRIPT_DIR/move.sh" "$PARENT_PADDED" "Done" >/dev/null 2>&1; then
+            if SPECNAUT_INTERNAL_PROPAGATION=1 "$SCRIPT_DIR/move.sh" "$PARENT_PADDED" "Done" >/dev/null 2>&1; then
               echo "↑ promoted parent #${PARENT_PADDED} (${PARENT_STATUS} → Done) — all direct children Done"
             else
               echo "::warning::propagate-parent-status: move.sh failed to advance #${PARENT_PADDED} to Done" >&2
@@ -151,7 +151,7 @@ case "$NEW_STATUS" in
           # refresh stay consistent with every other status move. The
           # recursion guard env var prevents this re-entry from walking
           # any further up (AC(d): one-level only).
-          if SPECFLOW_INTERNAL_PROPAGATION=1 "$SCRIPT_DIR/move.sh" "$PARENT_PADDED" "In progress" >/dev/null 2>&1; then
+          if SPECNAUT_INTERNAL_PROPAGATION=1 "$SCRIPT_DIR/move.sh" "$PARENT_PADDED" "In progress" >/dev/null 2>&1; then
             echo "↑ promoted parent #${PARENT_PADDED} (${PARENT_STATUS} → In progress) due to child #${CHILD_PADDED} move"
           else
             echo "::warning::propagate-parent-status: move.sh failed to promote #${PARENT_PADDED}" >&2

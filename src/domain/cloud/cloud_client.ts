@@ -1,4 +1,4 @@
-// Thin client for the Specflow Cloud public HTTP API (#353). Consumes only the
+// Thin client for the Specnaut Cloud public HTTP API (#353). Consumes only the
 // documented, versioned `/api/v1` wire format — the sole OSS↔Cloud coupling.
 // `fetch` is injectable for tests.
 

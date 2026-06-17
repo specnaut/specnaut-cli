@@ -1,4 +1,4 @@
-// Read/write the project's `.specflow/backlog-config.yml` for the Cloud backend
+// Read/write the project's `.specnaut/backlog-config.yml` for the Cloud backend
 // (#353). Holds only non-secret coordinates — backend, api_url, project_key.
 // Credentials live in the credential store, never here.
 
@@ -16,18 +16,18 @@ export type CloudConfig = {
 /** Render the Cloud `backlog-config.yml` body (no secret). */
 export function renderCloudConfig(apiUrl = "", projectKey = ""): string {
   return [
-    "# backlog-config.yml — Specflow Cloud backend",
+    "# backlog-config.yml — Specnaut Cloud backend",
     "# Credentials are NOT stored here. They live in your OS keychain (or a",
-    "# 0600 file under ~/.specflow). Run `specflow cloud login` to authenticate.",
+    "# 0600 file under ~/.specnaut). Run `specnaut cloud login` to authenticate.",
     "backend: cloud",
     `api_url: ${
       JSON.stringify(apiUrl)
-    }        # Specflow Cloud API base, e.g. https://your-deployment.convex.site`,
+    }        # Specnaut Cloud API base, e.g. https://your-deployment.convex.site`,
     `project_key: ${JSON.stringify(projectKey)}    # the project's short key, e.g. CLOUD`,
     "",
     "# Remote-control gates (#357) — opt-in. When enabled, a headless agent raises",
     "# blocking decisions as gates you resolve from anywhere (e.g. your phone)",
-    "# instead of prompting at the terminal. Override per-run with SPECFLOW_REMOTE=1.",
+    "# instead of prompting at the terminal. Override per-run with SPECNAUT_REMOTE=1.",
     "# remote:",
     "#   enabled: false",
     "#   await_timeout_s: 1800   # overall wait bound (default 1800)",
@@ -38,7 +38,7 @@ export function renderCloudConfig(apiUrl = "", projectKey = ""): string {
 
 /** Read the Cloud config from a project dir, or null if absent/unreadable. */
 export async function readCloudConfig(projectDir: string): Promise<CloudConfig | null> {
-  const path = `${projectDir}/.specflow/backlog-config.yml`;
+  const path = `${projectDir}/.specnaut/backlog-config.yml`;
   let text: string;
   try {
     text = await Deno.readTextFile(path);
@@ -80,9 +80,9 @@ export async function writeCloudConfig(
   apiUrl: string,
   projectKey: string,
 ): Promise<void> {
-  await Deno.mkdir(`${projectDir}/.specflow`, { recursive: true });
+  await Deno.mkdir(`${projectDir}/.specnaut`, { recursive: true });
   await Deno.writeTextFile(
-    `${projectDir}/.specflow/backlog-config.yml`,
+    `${projectDir}/.specnaut/backlog-config.yml`,
     renderCloudConfig(apiUrl, projectKey),
   );
 }

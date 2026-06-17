@@ -1,9 +1,9 @@
 /**
  * Structured JSON merge for `.claude/settings.json` (the Claude Code
- * settings file Specflow tags with `mergeJson: "claude-settings"`).
+ * settings file Specnaut tags with `mergeJson: "claude-settings"`).
  *
  * Why: `.claude/settings.json` is user-owned (theme, permissions, env,
- * attribution, plugins, MCP, …) but Specflow needs to register four
+ * attribution, plugins, MCP, …) but Specnaut needs to register four
  * hooks there for the bundled hook scripts to fire (#139). A fenced
  * text block — the trick we use for `.gitignore` — doesn't compose
  * with structured JSON. So we splice our hook entries into the user's
@@ -20,7 +20,7 @@
  *   - User-side groups with different matchers are NEVER touched.
  *   - All non-`hooks` user fields are passed through verbatim.
  *
- * Removal-on-unbundle (e.g. Specflow drops a hook in a future
+ * Removal-on-unbundle (e.g. Specnaut drops a hook in a future
  * release) is intentionally NOT handled here — once written, the
  * user's settings.json keeps the orphan entry. Tracked separately
  * if we ever need it.
@@ -66,13 +66,13 @@ export class ClaudeSettingsParseError extends Error {
 }
 
 /**
- * Merge Specflow's bundled hook entries into the user's existing
+ * Merge Specnaut's bundled hook entries into the user's existing
  * `.claude/settings.json` content. Returns the merged JSON as a
  * pretty-printed string (2-space indent, trailing newline).
  *
  *   - `existing`: on-disk content, or `null` when no file is present
  *     (greenfield — the bundled content is written verbatim).
- *   - `bundled`: Specflow's bundled `settings.json` content.
+ *   - `bundled`: Specnaut's bundled `settings.json` content.
  *   - `destPath`: the destination relative path (used only for the
  *     error message when the existing file is malformed JSON).
  */
@@ -103,7 +103,7 @@ export function mergeClaudeSettings(
   const mergedHooks: Record<string, MatcherGroup[]> = {};
 
   // 1. Carry every user event group through unchanged as the starting
-  //    point — we will graft Specflow entries onto these.
+  //    point — we will graft Specnaut entries onto these.
   for (const [event, groups] of Object.entries(userHooks)) {
     mergedHooks[event] = groups.map((g) => ({
       ...(g.matcher !== undefined ? { matcher: g.matcher } : {}),

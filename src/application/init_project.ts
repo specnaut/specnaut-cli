@@ -25,7 +25,7 @@ export type InitResult =
     lockWritten: boolean;
     /**
      * Destination paths skipped from the WRITE set because they were declared
-     * preserved (`.specflow/preserve.yml`, spec 011 / issue #367). Reported so
+     * preserved (`.specnaut/preserve.yml`, spec 011 / issue #367). Reported so
      * the handler can emit one per-file notice (FR-004). These paths remain
      * lock-tracked (FR-012) — only the write was skipped.
      */
@@ -35,9 +35,9 @@ export type InitResult =
     status: "conflicts";
     conflicts: string[];
     /**
-     * True when a `.specflow/installed.lock` already exists at the target —
+     * True when a `.specnaut/installed.lock` already exists at the target —
      * lets the CLI suggest `specflow upgrade` instead of `--force` for
-     * projects that were previously initialised by Specflow.
+     * projects that were previously initialised by Specnaut.
      */
     lockExists: boolean;
   };
@@ -66,8 +66,8 @@ export type InitProjectInput = {
    */
   dryRun: boolean;
   /**
-   * When true, the target is a member of a providing Specflow workspace
-   * (009-parent-managed-init): the toolkit (`.specflow/`) is still provisioned
+   * When true, the target is a member of a providing Specnaut workspace
+   * (009-parent-managed-init): the toolkit (`.specnaut/`) is still provisioned
    * but agentic files (`.claude/skills|agents|commands`) are suppressed — they
    * are inherited from the parent. The decision is resolved handler-side via
    * the `ParentWorkspaceReader`; the use case only applies the bundle filter.
@@ -76,7 +76,7 @@ export type InitProjectInput = {
   parentManaged?: boolean;
   /**
    * Destination paths to leave untouched on a forced refresh — the
-   * maintainer's preserve declarations (`.specflow/preserve.yml`, spec 011 /
+   * maintainer's preserve declarations (`.specnaut/preserve.yml`, spec 011 /
    * issue #367). These are removed from the WRITE set only; they STAY
    * lock-tracked (FR-012) so `specflow diff` and future upgrades still
    * compare them. Absent/empty ⇒ today's behaviour (FR-011). The handler
@@ -182,7 +182,7 @@ export class InitProjectUseCase {
 
     const now = (this.deps.now ?? (() => new Date()))().toISOString();
     // Skip-if-exists files that pre-existed are user-owned, not
-    // Specflow-managed — keep them out of the lock so future upgrades
+    // Specnaut-managed — keep them out of the lock so future upgrades
     // don't try to reconcile them against the placeholder content.
     const skippedSet = new Set(report.skippedSkipIfExists);
     const lockEntries = new Map<string, LockEntry>();

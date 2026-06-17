@@ -1,4 +1,4 @@
-// Compiles specflow for the five supported targets into dist/.
+// Compiles specnaut for the five supported targets into dist/.
 // Requires: deno task bundle to have been run first (deno task build does both).
 
 const ROOT = new URL("..", import.meta.url);
@@ -8,15 +8,15 @@ const ENTRY = new URL("src/main.ts", ROOT).pathname;
 type Target = { triple: string; outName: string };
 
 const TARGETS: Target[] = [
-  { triple: "x86_64-apple-darwin", outName: "specflow-macos-x64" },
-  { triple: "aarch64-apple-darwin", outName: "specflow-macos-arm64" },
-  { triple: "x86_64-unknown-linux-gnu", outName: "specflow-linux-x64" },
-  { triple: "aarch64-unknown-linux-gnu", outName: "specflow-linux-arm64" },
-  { triple: "x86_64-pc-windows-msvc", outName: "specflow-windows-x64.exe" },
+  { triple: "x86_64-apple-darwin", outName: "specnaut-macos-x64" },
+  { triple: "aarch64-apple-darwin", outName: "specnaut-macos-arm64" },
+  { triple: "x86_64-unknown-linux-gnu", outName: "specnaut-linux-x64" },
+  { triple: "aarch64-unknown-linux-gnu", outName: "specnaut-linux-arm64" },
+  { triple: "x86_64-pc-windows-msvc", outName: "specnaut-windows-x64.exe" },
 ];
 
 // Permissions baked into the binary. `--allow-net` is required by
-// `specflow self-update` to reach api.github.com (release lookup) and the
+// `specnaut self-update` to reach api.github.com (release lookup) and the
 // release download hosts. github.com 302-redirects release-asset downloads
 // to release-assets.githubusercontent.com — both must be in the allowlist
 // or Deno prompts the user at runtime, defeating the point of a compiled

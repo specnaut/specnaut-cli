@@ -1,4 +1,4 @@
-*.specflow.bak
-.specflow/logs/
-.specflow/upgrade-pending.json
-.specflow/upgrade-staging/
+*.specnaut.bak
+.specnaut/logs/
+.specnaut/upgrade-pending.json
+.specnaut/upgrade-staging/

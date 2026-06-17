@@ -2,7 +2,7 @@ import { parse as parseYaml, stringify as stringifyYaml } from "@std/yaml";
 
 /**
  * The maintainer's project-level preserve declarations, parsed from
- * `.specflow/preserve.yml`.
+ * `.specnaut/preserve.yml`.
  *
  * A **preserve declaration** is deliberate intent — "this managed file is
  * mine, keep it even on a forced refresh" — and lives in its own manifest
@@ -47,7 +47,7 @@ function hasParentTraversal(p: string): boolean {
 }
 
 /**
- * Parse `.specflow/preserve.yml` into a {@link PreserveConfig}.
+ * Parse `.specnaut/preserve.yml` into a {@link PreserveConfig}.
  *
  * Pure and total: it NEVER throws and NEVER judges bundle membership
  * (unknown-path validation is a run-time handler concern, D7). Any

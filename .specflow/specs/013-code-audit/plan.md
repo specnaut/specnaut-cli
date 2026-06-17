@@ -1,7 +1,7 @@
 # Implementation Plan: High-altitude multi-seat parallel audit (`/code-audit`)
 
 **Branch**: `013-code-audit` | **Date**: 2026-06-13 | **Spec**: [spec.md](./spec.md) **Input**:
-Feature specification from `.specflow/specs/013-code-audit/spec.md` (issue mkrlabs/specflow#379,
+Feature specification from `.specnaut/specs/013-code-audit/spec.md` (issue mkrlabs/specflow#379,
 epic mkrlabs/specflow-monorepo#12)
 
 ## Summary
@@ -56,7 +56,7 @@ Result: **PASS** (no violations; Complexity Tracking empty).
 ### Documentation (this feature)
 
 ```text
-.specflow/specs/013-code-audit/
+.specnaut/specs/013-code-audit/
 ├── plan.md · research.md · data-model.md · quickstart.md · spec.md · tasks.md
 └── contracts/
     ├── scope-signals.md     # collect-audit-scope.sh output contract (scope label + CATEGORY SIGNALS)

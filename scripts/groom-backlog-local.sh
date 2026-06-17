@@ -5,9 +5,9 @@
 # can clarify any current Backlog items on GitHub Project #4 without a
 # human in the loop.
 #
-# Wired up via ~/Library/LaunchAgents/com.specflow-groom-backlog.plist
+# Wired up via ~/Library/LaunchAgents/com.specnaut-groom-backlog.plist
 # (StartInterval = 1800s = every 30 min). Logs land in
-# ~/Library/Logs/specflow/groom-backlog.log.
+# ~/Library/Logs/specnaut/groom-backlog.log.
 #
 # Run manually with: bash scripts/groom-backlog-local.sh
 set -euo pipefail
@@ -16,18 +16,18 @@ cd "$(dirname "$0")/../../.."
 REPO_ROOT="$(pwd)"
 
 # Make sure logs dir exists when invoked outside launchd's StandardOutPath.
-LOG_DIR="$HOME/Library/Logs/specflow"
+LOG_DIR="$HOME/Library/Logs/specnaut"
 mkdir -p "$LOG_DIR"
 
 # Make sure gh + claude are on PATH when launched from a non-login shell.
 export PATH="/opt/homebrew/bin:/usr/local/bin:/Applications/cmux.app/Contents/Resources/bin:$PATH"
 
-PROMPT='You are running as a scheduled grooming routine for the Specflow project. Your job: clarify any items currently in the Backlog column of GitHub Project #4 (mkrlabs/specflow), following the Product Owner contract defined at .claude/agents/product-owner.md.
+PROMPT='You are running as a scheduled grooming routine for the Specnaut project. Your job: clarify any items currently in the Backlog column of GitHub Project #4 (mkrlabs/specnaut), following the Product Owner contract defined at .claude/agents/product-owner.md.
 
 Steps:
-1. Run `.claude/skills/backlog/scripts/list.sh --repo specflow Backlog` to list current Backlog items.
-2. For each item, run `.claude/skills/backlog/scripts/view.sh --repo specflow <num>` to read the issue body and existing comments.
-3. **Skip rule**: if any existing comment starts with the marker `🤖 specflow-groom-backlog clarification:`, skip the item — it was already processed in a prior run.
+1. Run `.claude/skills/backlog/scripts/list.sh --repo specnaut Backlog` to list current Backlog items.
+2. For each item, run `.claude/skills/backlog/scripts/view.sh --repo specnaut <num>` to read the issue body and existing comments.
+3. **Skip rule**: if any existing comment starts with the marker `🤖 specnaut-groom-backlog clarification:`, skip the item — it was already processed in a prior run.
 4. Otherwise dispatch the `product-owner` subagent to clarify the item. It will either promote to Ready (with a clean Why/AC/Out-of-scope body), leave a 1–3 question clarification comment with the marker, or recommend triage.
 
 Hard constraints (from .claude/agents/product-owner.md):
@@ -41,6 +41,6 @@ End with a single-line final report:
 
 If Backlog is empty, report: `Backlog is empty — nothing to do.`'
 
-echo "=== specflow-groom-backlog START $(date -Iseconds) (cwd=$REPO_ROOT) ==="
+echo "=== specnaut-groom-backlog START $(date -Iseconds) (cwd=$REPO_ROOT) ==="
 echo "" | claude -p "$PROMPT" --model claude-sonnet-4-6 2>&1 || echo "ERROR claude -p exit code $?"
-echo "=== specflow-groom-backlog END $(date -Iseconds) ==="
+echo "=== specnaut-groom-backlog END $(date -Iseconds) ==="

@@ -5,10 +5,10 @@ import type { CoreBundle } from "../../../src/domain/core_bundle.ts";
 const SAMPLE: CoreBundle = [
   {
     category: "skill",
-    name: "specflow",
+    name: "specnaut",
     suffix: null,
     content:
-      "---\nname: specflow\ndescription: Specflow router\nmodel: opus\ntools: Read, Write\nmaxTurns: 30\n---\n\n# Body\n\nDo the thing.\n",
+      "---\nname: specnaut\ndescription: Specnaut router\nmodel: opus\ntools: Read, Write\nmaxTurns: 30\n---\n\n# Body\n\nDo the thing.\n",
     executable: false,
   },
   {
@@ -27,7 +27,7 @@ const SAMPLE: CoreBundle = [
   },
   {
     category: "skill",
-    name: "specflow-auto",
+    name: "specnaut-auto",
     suffix: null,
     content: "---\ndescription: Auto-chain dispatcher\n---\n\n# body\n",
     executable: false,
@@ -62,40 +62,40 @@ Deno.test("CopilotHarness.key and displayName", () => {
   assertEquals(h.displayName, "GitHub Copilot CLI");
 });
 
-Deno.test("CopilotHarness maps router skill to .github/instructions/specflow.instructions.md", () => {
+Deno.test("CopilotHarness maps router skill to .github/instructions/specnaut.instructions.md", () => {
   const h = new CopilotHarness();
   const mapped = h.mapBundle(SAMPLE, { backlogBackend: "local", versionScheme: "semver" });
-  assert(".github/instructions/specflow.instructions.md" in mapped);
+  assert(".github/instructions/specnaut.instructions.md" in mapped);
 });
 
-Deno.test("CopilotHarness maps phase docs to .github/instructions/specflow-<phase>.instructions.md", () => {
+Deno.test("CopilotHarness maps phase docs to .github/instructions/specnaut-<phase>.instructions.md", () => {
   const h = new CopilotHarness();
   const mapped = h.mapBundle(SAMPLE, { backlogBackend: "local", versionScheme: "semver" });
-  assert(".github/instructions/specflow-specify.instructions.md" in mapped);
+  assert(".github/instructions/specnaut-specify.instructions.md" in mapped);
 });
 
-Deno.test("CopilotHarness maps backlog-cmd to .github/instructions/specflow-backlog.instructions.md", () => {
+Deno.test("CopilotHarness maps backlog-cmd to .github/instructions/specnaut-backlog.instructions.md", () => {
   const h = new CopilotHarness();
   const mapped = h.mapBundle(SAMPLE, { backlogBackend: "local", versionScheme: "semver" });
-  assert(".github/instructions/specflow-backlog.instructions.md" in mapped);
+  assert(".github/instructions/specnaut-backlog.instructions.md" in mapped);
 });
 
-Deno.test("CopilotHarness maps skill to .github/instructions/specflow-<name>.instructions.md", () => {
+Deno.test("CopilotHarness maps skill to .github/instructions/specnaut-<name>.instructions.md", () => {
   const h = new CopilotHarness();
   const mapped = h.mapBundle(SAMPLE, { backlogBackend: "local", versionScheme: "semver" });
-  assert(".github/instructions/specflow-auto.instructions.md" in mapped);
+  assert(".github/instructions/specnaut-auto.instructions.md" in mapped);
 });
 
-Deno.test("CopilotHarness maps agents to .github/instructions/specflow-agent-<name>.instructions.md", () => {
+Deno.test("CopilotHarness maps agents to .github/instructions/specnaut-agent-<name>.instructions.md", () => {
   const h = new CopilotHarness();
   const mapped = h.mapBundle(SAMPLE, { backlogBackend: "local", versionScheme: "semver" });
-  assert(".github/instructions/specflow-agent-product-owner.instructions.md" in mapped);
+  assert(".github/instructions/specnaut-agent-product-owner.instructions.md" in mapped);
 });
 
 Deno.test('CopilotHarness rewrites instruction frontmatter to applyTo: "**" and strips Claude fields', () => {
   const h = new CopilotHarness();
   const mapped = h.mapBundle(SAMPLE, { backlogBackend: "local", versionScheme: "semver" });
-  const cmd = mapped[".github/instructions/specflow.instructions.md"];
+  const cmd = mapped[".github/instructions/specnaut.instructions.md"];
   assert(cmd, "instruction file not emitted");
   assert(cmd.content.startsWith("---\n"));
   assert(cmd.content.includes('applyTo: "**"'));
@@ -105,10 +105,10 @@ Deno.test('CopilotHarness rewrites instruction frontmatter to applyTo: "**" and 
   assert(cmd.content.includes("Do the thing"), "body should be preserved");
 });
 
-Deno.test("CopilotHarness maps spec-root to .specflow/<suffix> and project-root to <suffix>", () => {
+Deno.test("CopilotHarness maps spec-root to .specnaut/<suffix> and project-root to <suffix>", () => {
   const h = new CopilotHarness();
   const mapped = h.mapBundle(SAMPLE, { backlogBackend: "local", versionScheme: "semver" });
-  assert(".specflow/memory/constitution.md" in mapped);
+  assert(".specnaut/memory/constitution.md" in mapped);
   assert("AGENTS.md" in mapped);
 });
 

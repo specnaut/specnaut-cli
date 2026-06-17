@@ -1,12 +1,12 @@
 // gh-issues list — enumerate inbound issues filed by users via the
-// specflow-expert bug-report protocol. Filtered by the
-// `from:specflow-expert` label so it doesn't catch maintainer-filed
+// specnaut-expert bug-report protocol. Filtered by the
+// `from:specnaut-expert` label so it doesn't catch maintainer-filed
 // items.
 //
 // Usage: deno run --allow-run list.ts
 
-const REPO = "mkrlabs/specflow";
-const LABEL = "from:specflow-expert";
+const REPO = "mkrlabs/specnaut";
+const LABEL = "from:specnaut-expert";
 
 type GhIssue = {
   number: number;
@@ -45,7 +45,7 @@ async function ghList(): Promise<GhIssue[]> {
 if (import.meta.main) {
   const issues = await ghList();
   if (issues.length === 0) {
-    console.log("✓ inbox empty (no open issues with label `from:specflow-expert`)");
+    console.log("✓ inbox empty (no open issues with label `from:specnaut-expert`)");
     Deno.exit(0);
   }
 

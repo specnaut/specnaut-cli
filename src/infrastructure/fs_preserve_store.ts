@@ -9,14 +9,14 @@ import type { PreserveStore } from "../application/ports.ts";
 
 /**
  * Reads / writes the project-level preserve manifest at
- * `.specflow/preserve.yml`. Mirrors `FsLockStore`: an absent file reads as
+ * `.specnaut/preserve.yml`. Mirrors `FsLockStore`: an absent file reads as
  * `EMPTY_PRESERVE_CONFIG`, and a malformed file degrades to empty via the
  * pure `parsePreserveConfig` (which never throws) — a broken manifest must
  * surface a warning at the handler, never abort init/upgrade.
  */
 export class FsPreserveStore implements PreserveStore {
   preservePath(projectDir: string): string {
-    return join(projectDir, ".specflow/preserve.yml");
+    return join(projectDir, ".specnaut/preserve.yml");
   }
 
   async read(projectDir: string): Promise<PreserveConfig> {

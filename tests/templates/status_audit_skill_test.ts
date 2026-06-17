@@ -5,7 +5,7 @@ import type { CoreEntry } from "../../src/domain/core_bundle.ts";
 /**
  * Locks the `/status-audit` skill contract into the bundled SKILL.md so it
  * can't drift silently (#381). The skill is read-only and reports the SEVEN
- * health views over `.specflow/logs/agents.jsonl`; the load-bearing
+ * health views over `.specnaut/logs/agents.jsonl`; the load-bearing
  * instructions — the seven views, the `/loop 5m /status-audit` supervision
  * pattern, the read-only guarantee, and the graceful-degradation rules — must
  * survive every edit.
@@ -24,7 +24,7 @@ Deno.test("status-audit SKILL.md is bundled in CORE_BUNDLE", () => {
 Deno.test("status-audit SKILL reads the ledger and is read-only", () => {
   assert(SKILL);
   const body = SKILL.content;
-  assertStringIncludes(body, ".specflow/logs/agents.jsonl");
+  assertStringIncludes(body, ".specnaut/logs/agents.jsonl");
   assertStringIncludes(body, "read-only");
   assertStringIncludes(body, "git status` is unchanged");
 });

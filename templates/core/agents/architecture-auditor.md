@@ -1,6 +1,6 @@
 ---
 name: architecture-auditor
-description: Reviews code for architectural drift — hex-layer violations, circular deps, god files, bounded-context leaks, ports/adapters discipline, implicit globals, deep nesting, test-isolation bleed. Two dispatch shapes — (1) PR review (spawned by the review-coordinator during /specflow review), (2) full-codebase audit (spawned by /specflow audit architecture).
+description: Reviews code for architectural drift — hex-layer violations, circular deps, god files, bounded-context leaks, ports/adapters discipline, implicit globals, deep nesting, test-isolation bleed. Two dispatch shapes — (1) PR review (spawned by the review-coordinator during /specnaut review), (2) full-codebase audit (spawned by /specnaut audit architecture).
 model: sonnet
 effort: medium
 tools: Read, Grep, Glob, Bash
@@ -15,7 +15,7 @@ depending on the dispatch shape.
 
 ## Mode 1 — PR review
 
-Spawned by the `review-coordinator` during `/specflow review`. Review ONLY
+Spawned by the `review-coordinator` during `/specnaut review`. Review ONLY
 the files provided in the prompt. Output the `FINDING` structure used by
 code-reviewer, followed by the canonical `REVIEW SUMMARY` block (see "Output
 format (Mode 1 — PR review)" below).
@@ -39,7 +39,7 @@ format (Mode 1 — PR review)" below).
 
 ## Mode 2 — Full-codebase audit
 
-Spawned by `/specflow audit architecture`. Read-only; full project scope.
+Spawned by `/specnaut audit architecture`. Read-only; full project scope.
 
 ### Read-only contract (NON-NEGOTIABLE)
 

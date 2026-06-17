@@ -23,7 +23,7 @@ survive across sessions and isn't captured elsewhere:
 
 ## When NOT to add an entry
 
-- Architecture decisions → those go in `AGENTS.md` or `.specflow/memory/constitution.md`.
+- Architecture decisions → those go in `AGENTS.md` or `.specnaut/memory/constitution.md`.
 - One-off bug fixes that are captured in the commit message → no memory
   needed.
 - Anything the developer can re-derive by reading the current code.

@@ -38,7 +38,7 @@ function destinationFor(entry: CoreEntry): string {
       // Windsurf is flat — no nested skill folders. Each phase doc
       // becomes a sibling workflow file the router references by name.
       if (!entry.suffix) throw new Error(`phase needs suffix: ${entry.name}`);
-      return `.windsurf/workflows/specflow-${entry.suffix.replace(/\.md$/, "")}.md`;
+      return `.windsurf/workflows/specnaut-${entry.suffix.replace(/\.md$/, "")}.md`;
     case "phase-script":
       return phaseScriptDestination(entry);
     case "backlog-script":
@@ -49,7 +49,7 @@ function destinationFor(entry: CoreEntry): string {
       throw new Error("agent-doc entries should be filtered before destinationFor");
     case "spec-root":
       if (!entry.suffix) throw new Error(`spec-root needs suffix`);
-      return `.specflow/${entry.suffix}`;
+      return `.specnaut/${entry.suffix}`;
     case "project-root":
     case "mergeable-project-root":
       if (!entry.suffix) throw new Error(`${entry.category} needs suffix`);

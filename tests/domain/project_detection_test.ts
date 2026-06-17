@@ -116,8 +116,8 @@ Deno.test("detectVersionScheme suggests semver for semver tags with pre-release 
   assertEquals(r.suggestedScheme, "semver");
 });
 
-Deno.test("detectVersionScheme ignores Specflow-style date tags (letter-suffix shape)", () => {
-  // vYY.M.Da — Specflow's own date scheme. Shape-overlapping with
+Deno.test("detectVersionScheme ignores Specnaut-style date tags (letter-suffix shape)", () => {
+  // vYY.M.Da — Specnaut's own date scheme. Shape-overlapping with
   // semver MAJOR.MINOR.PATCH but disambiguated by the trailing letter.
   const r = detectVersionScheme(fakeSnapshot({}, ["v25.5.16a", "v26.1.3b"]));
   assertEquals(r.suggestedScheme, "date");

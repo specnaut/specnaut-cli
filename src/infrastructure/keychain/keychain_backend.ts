@@ -12,7 +12,10 @@
 import { type CloudCredentials, type CredentialStore, keyFor } from "../credential_store.ts";
 
 /** All keychain items are filed under this service name; the account is the
- *  normalised Cloud API URL, so one machine holds tokens for several deployments. */
+ *  normalised Cloud API URL, so one machine holds tokens for several deployments.
+ *  Intentionally kept as `specflow-cloud` through the specnaut rebrand: it is an
+ *  internal at-rest identifier never shown to users, and renaming it would orphan
+ *  every existing login's stored secret for no user-visible benefit. */
 export const KEYCHAIN_SERVICE = "specflow-cloud";
 
 /** Result of a single native keychain operation. `unavailable` is a value, not

@@ -38,7 +38,7 @@ export async function runCheck(intent: CheckIntent): Promise<number> {
   const uc = new RunChecksUseCase({ env, inspector });
   const result = await uc.execute({ projectDir, templatesVersion: TEMPLATES_VERSION });
 
-  console.log(`${bold("specflow check")}`);
+  console.log(`${bold("specnaut check")}`);
   renderSection("environment", result.environment);
   if (result.project.length > 0) {
     renderSection(`project (${projectDir})`, result.project);

@@ -4,7 +4,7 @@ description: "Task list for parent-managed detection (init/upgrade)"
 
 # Tasks: Parent-managed detection for init/upgrade
 
-**Input**: Design documents from `.specflow/specs/009-parent-managed-init/` **Prerequisites**:
+**Input**: Design documents from `.specnaut/specs/009-parent-managed-init/` **Prerequisites**:
 plan.md, spec.md, research.md, data-model.md, contracts/parent-managed-detection.md **Linked
 issue**: mkrlabs/specflow#371
 
@@ -41,7 +41,7 @@ Single project: `src/` and `tests/` at `apps/specflow/` root, hexagonal layers `
 - [x] T002 [P] Write failing unit tests for the domain predicates in
       `tests/domain/parent_managed_test.ts`: `isParentManaged` truth table (standaloneOverride=true
       ⇒ false; ancestor=null ⇒ false; ancestor set & no override ⇒ true) and `isAgenticPath` prefix
-      matrix (`.claude/skills/…`, `.claude/agents/…`, `.claude/commands/…` ⇒ true; `.specflow/…`,
+      matrix (`.claude/skills/…`, `.claude/agents/…`, `.claude/commands/…` ⇒ true; `.specnaut/…`,
       `AGENTS.md`, `.claude/settings.json` ⇒ false).
 - [x] T003 Implement `src/domain/parent_managed.ts` with pure
       `isParentManaged(providingAncestor, standaloneOverride)` and `isAgenticPath(dest)` until T002
@@ -50,13 +50,13 @@ Single project: `src/` and `tests/` at `apps/specflow/` root, hexagonal layers `
       (`findProvidingAncestor(targetDir): Promise<string|null>`,
       `hasStandaloneOverride(targetDir): Promise<boolean>`) per contracts §1.
 - [x] T005 Write failing adapter tests in `tests/infrastructure/fs_parent_workspace_reader_test.ts`
-      using `Deno.makeTempDir`: providing ancestor matched (has `.specflow/` + `deno.json` workspace
-      member resolving to target); ancestor with `.specflow/` but non-matching member ⇒ null;
-      ancestor with matching member but no `.specflow/` ⇒ null; relative/symlinked member path
+      using `Deno.makeTempDir`: providing ancestor matched (has `.specnaut/` + `deno.json` workspace
+      member resolving to target); ancestor with `.specnaut/` but non-matching member ⇒ null;
+      ancestor with matching member but no `.specnaut/` ⇒ null; relative/symlinked member path
       canonicalised (FR-004); `standalone.yml` present ⇒ `hasStandaloneOverride` true; walk stops at
       filesystem root ⇒ null.
 - [x] T006 Implement `src/infrastructure/fs_parent_workspace_reader.ts` (`FsParentWorkspaceReader`)
-      — upward `dirname` walk, per-ancestor `.specflow/` stat + `deno.json` parse, `@std/path`
+      — upward `dirname` walk, per-ancestor `.specnaut/` stat + `deno.json` parse, `@std/path`
       resolve + `Deno.realPath` canonicalisation, tolerate missing/unparseable `deno.json` — until
       T005 passes.
 - [x] T007 [P] Extend `tests/domain/installed_lock_test.ts`: `parent_managed: true` round-trips
@@ -70,11 +70,11 @@ Single project: `src/` and `tests/` at `apps/specflow/` root, hexagonal layers `
 
 ## Phase 3: US1 — Suppress agentic files on init (Priority: P1) 🎯 MVP
 
-**Goal**: `specflow init` inside a providing-workspace member provisions `.specflow/` but writes
+**Goal**: `specflow init` inside a providing-workspace member provisions `.specnaut/` but writes
 zero `.claude/skills|agents|commands` files, and prints the notice once.
 
-**Independent test**: integration fixture with a parent dir (`.specflow/` + `deno.json`
-`workspace:["./child"]`) → `init` in child → assert 0 agentic files, `.specflow/` present, notice
+**Independent test**: integration fixture with a parent dir (`.specnaut/` + `deno.json`
+`workspace:["./child"]`) → `init` in child → assert 0 agentic files, `.specnaut/` present, notice
 shown.
 
 - [x] T009 [US1] Write failing unit cases in `tests/application/init_project_test.ts` with a fake
@@ -87,7 +87,7 @@ shown.
 - [x] T011 [US1] Write failing integration test
       `tests/integration/init_parent_managed_test.ts::parent-managed suppresses agentic` (C1): build
       temp providing-workspace fixture, run `init` in the member, assert 0 files under
-      `target/.claude/skills` & `target/.claude/agents`, `.specflow/` provisioned, notice line
+      `target/.claude/skills` & `target/.claude/agents`, `.specnaut/` provisioned, notice line
       emitted.
 - [x] T012 [US1] Wire detection into `cli/handlers/init_handler.ts` `runInit`: call
       `hasStandaloneOverride` + `findProvidingAncestor`, compute `isParentManaged`, pass
@@ -108,7 +108,7 @@ byte-for-byte unchanged; CLI never special-cased.
 
 - [x] T013 [US2] Add integration cases to `tests/integration/init_parent_managed_test.ts`:
       `standalone provisions normally` (C2 — no enclosing workspace ⇒ agentic files written, no
-      notice) and `non-providing ancestor` (enclosing Deno workspace with no `.specflow/` ⇒
+      notice) and `non-providing ancestor` (enclosing Deno workspace with no `.specnaut/` ⇒
       detection false). Assert parity against the standalone baseline file set.
 - [x] T014 [US2] Verify (and adjust handler/use-case only if a test fails) that the
       not-parent-managed path is unchanged — no new branches taken, no notice, full bundle written.
@@ -120,11 +120,11 @@ byte-for-byte unchanged; CLI never special-cased.
 
 ## Phase 5: US4 — Upgrade never resurrects agentic files (Priority: P1)
 
-**Goal**: `specflow upgrade` on a parent-managed target updates `.specflow/` only; never recreates
+**Goal**: `specflow upgrade` on a parent-managed target updates `.specnaut/` only; never recreates
 `.claude/`; lock keeps zero agentic entries.
 
 **Independent test**: parent-managed fixture with no `.claude/` → `upgrade` → assert 0 agentic
-files, `.specflow/` refreshed, lock has `parent_managed: true` and no agentic entries.
+files, `.specnaut/` refreshed, lock has `parent_managed: true` and no agentic entries.
 
 - [x] T015 [US4] Write failing unit cases in `tests/application/upgrade_project_test.ts`:
       `lock.parentManaged=true` ⇒ `fullBundle` filtered (no agentic dests in plan/`writer.written`);
@@ -137,7 +137,7 @@ files, `.specflow/` refreshed, lock has `parent_managed: true` and no agentic en
       migration case in T015 passes.
 - [x] T018 [US4] Write failing integration tests `tests/integration/upgrade_parent_managed_test.ts`:
       `no agentic resurrection` (C3 — upgrade on parent-managed target leaves
-      `.claude/skills|agents` absent, `.specflow/` updated) and `lock has no agentic entries` (C5 —
+      `.claude/skills|agents` absent, `.specnaut/` updated) and `lock has no agentic entries` (C5 —
       `installed.lock` excludes agentic keys and carries `parent_managed: true`).
 
 **Checkpoint**: routine upgrades can no longer reintroduce the drift. SC-003, SC-005 green.
@@ -146,13 +146,13 @@ files, `.specflow/` refreshed, lock has `parent_managed: true` and no agentic en
 
 ## Phase 6: US3 — Explicit standalone override (Priority: P2)
 
-**Goal**: `target/.specflow/standalone.yml` forces full provisioning under a providing workspace.
+**Goal**: `target/.specnaut/standalone.yml` forces full provisioning under a providing workspace.
 
 **Independent test**: parent-managed fixture + `standalone.yml` → `init` → skills/agents written.
 
 - [x] T019 [US3] Add integration case `override forces full` (C4) to
       `tests/integration/init_parent_managed_test.ts`: providing-workspace member with
-      `target/.specflow/standalone.yml` present ⇒ `init` writes skills/agents fully, no suppression,
+      `target/.specnaut/standalone.yml` present ⇒ `init` writes skills/agents fully, no suppression,
       no notice.
 - [x] T020 [US3] Confirm the override short-circuit is honoured end-to-end (handler passes
       `hasStandaloneOverride` into the decision; `isParentManaged` returns false when override true)

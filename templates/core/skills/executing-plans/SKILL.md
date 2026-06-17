@@ -13,7 +13,7 @@ discipline.
 
 > Inspired by [obra/superpowers v5.1.0](https://github.com/obra/superpowers)
 > (MIT) — `skills/executing-plans/SKILL.md`. Re-implemented for
-> Specflow with explicit checkpoint semantics and integration with the
+> Specnaut with explicit checkpoint semantics and integration with the
 > `writing-plans` execution-handoff fork.
 
 ## When to use this skill
@@ -173,7 +173,7 @@ the value.
 
 ## Pre-commit gate awareness
 
-Specflow's pre-commit hook runs `deno fmt --check`, `deno lint`,
+Specnaut's pre-commit hook runs `deno fmt --check`, `deno lint`,
 `deno task bundle`, and `deno check src/main.ts` on every commit. When
 a commit step fails for one of these reasons:
 
@@ -212,4 +212,4 @@ This skill does not:
   `subagent-driven-development` instead
 - Single-file trivial changes — just do the change, no skill overhead
 - When the harness lacks the file-modification tools (genuinely rare;
-  every supported Specflow harness has Read/Write/Edit equivalents)
+  every supported Specnaut harness has Read/Write/Edit equivalents)

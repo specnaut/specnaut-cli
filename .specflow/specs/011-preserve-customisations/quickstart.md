@@ -15,21 +15,21 @@ $ specflow init --here --force                                                  
 
 ```bash
 # 1. Declare the file preserved:
-$ cat .specflow/preserve.yml
+$ cat .specnaut/preserve.yml
 preserved:
   - .claude/agents/product-owner.md
 
 # 2. A forced refresh now keeps it, and says so:
 $ specflow init --here --force
 …
-preserved .claude/agents/product-owner.md — declared in .specflow/preserve.yml
+preserved .claude/agents/product-owner.md — declared in .specnaut/preserve.yml
 …
 # ⇒ the customised file is byte-identical to before the refresh.
 
 # 3. upgrade honours the same declaration:
 $ specflow upgrade
 …
-preserved .claude/agents/product-owner.md — declared in .specflow/preserve.yml
+preserved .claude/agents/product-owner.md — declared in .specnaut/preserve.yml
 
 # 4. See how the preserved file has drifted from the evolving bundle (read-only):
 $ specflow diff
@@ -50,7 +50,7 @@ override .claude/agents/product-owner.md — --reset-preserved overrode the decl
 
 ```bash
 # Declared path that isn't a managed file ⇒ ineffective, warned, not fatal:
-$ printf 'preserved:\n  - not/a/bundled/file.md\n' > .specflow/preserve.yml
+$ printf 'preserved:\n  - not/a/bundled/file.md\n' > .specnaut/preserve.yml
 $ specflow init --here --force
 warn: not/a/bundled/file.md — declared preserved but not a managed file (ignored)
 

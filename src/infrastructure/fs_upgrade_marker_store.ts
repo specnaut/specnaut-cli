@@ -2,7 +2,7 @@ import { resolve } from "@std/path";
 import type { UpgradeMarkerStore } from "../application/ports.ts";
 import type { UpgradeMarker } from "../domain/upgrade_marker.ts";
 
-const MARKER_REL = ".specflow/upgrade-pending.json";
+const MARKER_REL = ".specnaut/upgrade-pending.json";
 
 export class FsUpgradeMarkerStore implements UpgradeMarkerStore {
   async read(projectDir: string): Promise<UpgradeMarker | null> {
@@ -30,7 +30,7 @@ export class FsUpgradeMarkerStore implements UpgradeMarkerStore {
 
   async write(projectDir: string, marker: UpgradeMarker): Promise<void> {
     const path = resolve(projectDir, MARKER_REL);
-    await Deno.mkdir(resolve(projectDir, ".specflow"), { recursive: true });
+    await Deno.mkdir(resolve(projectDir, ".specnaut"), { recursive: true });
     await Deno.writeTextFile(path, JSON.stringify(marker, null, 2) + "\n");
   }
 

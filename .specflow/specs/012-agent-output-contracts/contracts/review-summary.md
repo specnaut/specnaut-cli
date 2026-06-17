@@ -1,8 +1,9 @@
 # Contract: REVIEW SUMMARY block
 
-Defined by skill `review-findings-contract`. Preloaded by: architecture-auditor, performance-auditor,
-security-auditor, a11y-auditor, dependency-auditor, code-reviewer, test-reviewer. Emitted once, after
-the prose (and before the WORKFLOW STATUS block when the agent also carries workflow-contract).
+Defined by skill `review-findings-contract`. Preloaded by: architecture-auditor,
+performance-auditor, security-auditor, a11y-auditor, dependency-auditor, code-reviewer,
+test-reviewer. Emitted once, after the prose (and before the WORKFLOW STATUS block when the agent
+also carries workflow-contract).
 
 ## Format
 

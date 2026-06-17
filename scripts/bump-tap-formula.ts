@@ -1,4 +1,4 @@
-// Regenerate `Formula/specflow.rb` in `mkrlabs/homebrew-tap` with the
+// Regenerate `Formula/specnaut.rb` in `specnaut/homebrew-tap` with the
 // version + SHA-256 checksums from the just-built `dist/`. Commit + push.
 //
 // Designed to run as a step in `.github/workflows/release.yml`, after
@@ -8,7 +8,7 @@
 // Required env:
 //   GITHUB_REF_NAME      e.g. "v0.9.3" (the tag that triggered the release)
 //   HOMEBREW_TAP_TOKEN   fine-grained PAT with Contents: write on
-//                        mkrlabs/homebrew-tap. If unset, the script logs
+//                        specnaut/homebrew-tap. If unset, the script logs
 //                        a workflow warning and exits 0 — a one-off
 //                        release with the secret missing should not fail
 //                        the pipeline.
@@ -18,8 +18,8 @@
 
 import { join } from "@std/path";
 
-const REPO = "mkrlabs/homebrew-tap";
-const FORMULA_PATH = "Formula/specflow.rb";
+const REPO = "specnaut/homebrew-tap";
+const FORMULA_PATH = "Formula/specnaut.rb";
 
 type RenderInput = {
   tag: string;
@@ -31,48 +31,48 @@ type RenderInput = {
 };
 
 export function renderFormula(opts: RenderInput): string {
-  const baseUrl = `https://github.com/mkrlabs/specflow/releases/download/${opts.tag}`;
-  return `class Specflow < Formula
+  const baseUrl = `https://github.com/specnaut/specnaut-cli/releases/download/${opts.tag}`;
+  return `class Specnaut < Formula
   desc "AI project scaffolding CLI with auto-chained workflow, review, and backlog"
-  homepage "https://specflow.makerlabs.dev"
+  homepage "https://specnaut.com"
   version "${opts.version}"
   license "MIT"
 
   on_macos do
     on_arm do
-      url "${baseUrl}/specflow-macos-arm64"
+      url "${baseUrl}/specnaut-macos-arm64"
       sha256 "${opts.shaMacOsArm}"
     end
     on_intel do
-      url "${baseUrl}/specflow-macos-x64"
+      url "${baseUrl}/specnaut-macos-x64"
       sha256 "${opts.shaMacOsX64}"
     end
   end
 
   on_linux do
     on_arm do
-      url "${baseUrl}/specflow-linux-arm64"
+      url "${baseUrl}/specnaut-linux-arm64"
       sha256 "${opts.shaLinuxArm}"
     end
     on_intel do
-      url "${baseUrl}/specflow-linux-x64"
+      url "${baseUrl}/specnaut-linux-x64"
       sha256 "${opts.shaLinuxX64}"
     end
   end
 
   def install
-    bin.install Dir["specflow-*"].first => "specflow"
+    bin.install Dir["specnaut-*"].first => "specnaut"
   end
 
   test do
-    assert_match(/^specflow #{version}/, shell_output("#{bin}/specflow --version"))
+    assert_match(/^specnaut #{version}/, shell_output("#{bin}/specnaut --version"))
   end
 end
 `;
 }
 
 async function readSha(distDir: string, asset: string): Promise<string> {
-  const raw = await Deno.readTextFile(join(distDir, `specflow-${asset}.sha256`));
+  const raw = await Deno.readTextFile(join(distDir, `specnaut-${asset}.sha256`));
   // shasum format: "<sha>  <filename>" — first whitespace-separated token.
   return raw.trim().split(/\s+/)[0];
 }
@@ -154,7 +154,7 @@ async function main(): Promise<number> {
       workdir,
     );
     await run(["git", "add", FORMULA_PATH], workdir);
-    await run(["git", "commit", "-m", `chore: bump specflow to ${version}`], workdir);
+    await run(["git", "commit", "-m", `chore: bump specnaut to ${version}`], workdir);
     await run(["git", "push", "origin", "HEAD:main"], workdir);
     console.log(`✓ pushed bump to ${version} on ${REPO}`);
     return 0;

@@ -22,16 +22,16 @@ INFRA_COUNT: <integer>      # INFORMATIONAL — context only, no seat consumes i
 
 ## Signal intent — gating vs informational
 
-The four CATEGORY SIGNALS split into two roles. All four are **always emitted**;
-the distinction is whether a seat reads them:
+The four CATEGORY SIGNALS split into two roles. All four are **always emitted**; the distinction is
+whether a seat reads them:
 
 - **Gating signals** select an auditor seat:
   - `FRONTEND_COUNT > 0` → deploy the **accessibility** seat (`a11y-auditor`).
   - `DEP_COUNT > 0` → deploy the **dependency** seat (`dependency-auditor`).
 - **Informational signals** describe the scope but gate nothing:
-  - `TEST_COUNT` and `INFRA_COUNT` are context only — there is no test/coverage
-    or infra auditor seat, by design. They are not orphaned bugs; they round out
-    the scope picture for the maintainer reading the block.
+  - `TEST_COUNT` and `INFRA_COUNT` are context only — there is no test/coverage or infra auditor
+    seat, by design. They are not orphaned bugs; they round out the scope picture for the maintainer
+    reading the block.
 
 ## Rules
 
@@ -39,9 +39,9 @@ the distinction is whether a seat reads them:
   (default 20; `--last <n>` overrides).
 - Argument validation (exit 2 with a clear `error:` on stderr, no block, before any git call):
   - `--last <n>` MUST be a positive integer (`^[0-9]+$` and ≥ 1).
-  - `--range <a>..<b>` MUST match `^[A-Za-z0-9._/@^~-]+\.\.[A-Za-z0-9._/@^~-]+$`
-    (each endpoint restricted to a git-ref-name allowlist around a single two-dot
-    `..`; three-dot ranges, shell metacharacters, and whitespace are rejected).
+  - `--range <a>..<b>` MUST match `^[A-Za-z0-9._/@^~-]+\.\.[A-Za-z0-9._/@^~-]+$` (each endpoint
+    restricted to a git-ref-name allowlist around a single two-dot `..`; three-dot ranges, shell
+    metacharacters, and whitespace are rejected).
   - `--path` / `--range` present with an empty argument is an error (no silent fall-through to
     auto-scope).
 - `--path` resolving to zero tracked files emits a `warning:` on stderr (the scope is still produced

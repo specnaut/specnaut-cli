@@ -27,7 +27,7 @@ should survive across sessions and isn't captured elsewhere:
 
 - IaC / pipeline definitions → those live in the actual config files.
 - Architecture choices → those go in `AGENTS.md` or
-  `.specflow/memory/constitution.md`.
+  `.specnaut/memory/constitution.md`.
 - One-off incidents that are fully resolved with no recurring risk → no
   memory needed.
 

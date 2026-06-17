@@ -48,7 +48,7 @@ Deno.test("writeVersions bumps every versioned file in lockstep", async () => {
     // Lay out fixtures matching the real repo paths, all at version 1.2.3.
     await Deno.writeTextFile(
       join(tmp, "deno.json"),
-      `{\n  "name": "@mkrlabs/specflow",\n  "version": "1.2.3"\n}\n`,
+      `{\n  "name": "@specnaut/specnaut-cli",\n  "version": "1.2.3"\n}\n`,
     );
     await Deno.mkdir(join(tmp, "src/domain"), { recursive: true });
     await Deno.writeTextFile(
@@ -58,7 +58,7 @@ Deno.test("writeVersions bumps every versioned file in lockstep", async () => {
     await Deno.mkdir(join(tmp, "plugin/.claude-plugin"), { recursive: true });
     await Deno.writeTextFile(
       join(tmp, "plugin/.claude-plugin/plugin.json"),
-      `{\n  "name": "specflow-plugin",\n  "version": "1.2.3"\n}\n`,
+      `{\n  "name": "specnaut-plugin",\n  "version": "1.2.3"\n}\n`,
     );
     await Deno.mkdir(join(tmp, "templates"), { recursive: true });
     await Deno.writeTextFile(
@@ -68,12 +68,12 @@ Deno.test("writeVersions bumps every versioned file in lockstep", async () => {
     await Deno.mkdir(join(tmp, ".codex-plugin"), { recursive: true });
     await Deno.writeTextFile(
       join(tmp, ".codex-plugin/plugin.json"),
-      `{\n  "name": "specflow",\n  "version": "1.2.3"\n}\n`,
+      `{\n  "name": "specnaut",\n  "version": "1.2.3"\n}\n`,
     );
     await Deno.mkdir(join(tmp, ".cursor-plugin"), { recursive: true });
     await Deno.writeTextFile(
       join(tmp, ".cursor-plugin/plugin.json"),
-      `{\n  "name": "specflow",\n  "version": "1.2.3"\n}\n`,
+      `{\n  "name": "specnaut",\n  "version": "1.2.3"\n}\n`,
     );
 
     await writeVersions("1.2.4", tmp);

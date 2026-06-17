@@ -15,7 +15,7 @@ budget, and a code-writer must not be starved of the depth it needs.
 | Tier     | Role class                                                     | Agents |
 | -------- | -------------------------------------------------------------- | ------ |
 | `low`    | Pure orchestrators — route and dispatch only, no deep reasoning | `review-coordinator`, `workflow-manager` |
-| `medium` | Read-only auditors, structured reviewers, the Q&A explainer, and the backlog owner | `a11y-auditor`, `architecture-auditor`, `dependency-auditor`, `performance-auditor`, `security-auditor`, `code-reviewer`, `test-reviewer`, `specflow-expert`, `product-owner` |
+| `medium` | Read-only auditors, structured reviewers, the Q&A explainer, and the backlog owner | `a11y-auditor`, `architecture-auditor`, `dependency-auditor`, `performance-auditor`, `security-auditor`, `code-reviewer`, `test-reviewer`, `specnaut-expert`, `product-owner` |
 | `high`   | Design / higher-order reasoning                                | `ui-ux-designer` |
 | `xhigh`  | Coding / agentic work — writes multi-file changes, runs suites, operates infra | `developer`, `qa-tester`, `devops-sre` |
 

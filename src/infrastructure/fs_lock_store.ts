@@ -4,7 +4,7 @@ import type { LockStore } from "../application/ports.ts";
 
 export class FsLockStore implements LockStore {
   lockPath(projectDir: string): string {
-    return join(projectDir, ".specflow/installed.lock");
+    return join(projectDir, ".specnaut/installed.lock");
   }
 
   async read(projectDir: string): Promise<InstalledLock | null> {

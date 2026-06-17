@@ -42,12 +42,12 @@ All unknowns were resolved by an `architect`-agent pass over the current `apps/s
   predicates over the `.claude/` space.
 - **Alternatives considered**: Filtering on `CoreCategory` before mapping — rejected: leaks
   harness-mapping knowledge into the filter and would wrongly suppress non-`.claude` harness
-  targets. Note `.claude/settings.json`, `AGENTS.md`, `.gitignore`, all `.specflow/` paths do
+  targets. Note `.claude/settings.json`, `AGENTS.md`, `.gitignore`, all `.specnaut/` paths do
   **not** match → always provisioned.
 
 ## D4 — Install manifest shape & FR-012
 
-- **Decision**: `.specflow/installed.lock` (YAML), type `InstalledLock` in
+- **Decision**: `.specnaut/installed.lock` (YAML), type `InstalledLock` in
   `src/domain/installed_lock.ts` (`parseLock`/`serializeLock`;
   `entries: dest → {sha256, installedAt, templatesVersion}`). Add `readonly parentManaged?: true`,
   serialized as `parent_managed: true`, key omitted when false/absent.
@@ -60,7 +60,7 @@ All unknowns were resolved by an `architect`-agent pass over the current `apps/s
 ## D5 — Reading `deno.json` workspace members & the upward walk
 
 - **Decision**: New `ParentWorkspaceReader` port; adapter walks `dirname` upward to root, and at
-  each ancestor checks `.specflow/` exists AND `deno.json` `workspace: string[]` has a member that,
+  each ancestor checks `.specnaut/` exists AND `deno.json` `workspace: string[]` has a member that,
   resolved relative to the ancestor and `Deno.realPath`-canonicalised, equals the canonicalised
   `targetDir`.
 - **Rationale**: No existing code parses workspace members or walks parents for this purpose (the
@@ -73,7 +73,7 @@ All unknowns were resolved by an `architect`-agent pass over the current `apps/s
 
 ## D6 — Override marker semantics
 
-- **Decision**: Presence of `target/.specflow/standalone.yml` short-circuits detection to `false`
+- **Decision**: Presence of `target/.specnaut/standalone.yml` short-circuits detection to `false`
   (full provisioning). Contents are irrelevant.
 - **Rationale**: Spec FR-008 + edge case: a mere marker is the signal; requiring a schema would add
   friction for an escape hatch. The port exposes `hasStandaloneOverride()` so the domain decision
@@ -84,7 +84,7 @@ All unknowns were resolved by an `architect`-agent pass over the current `apps/s
 - **Decision**: Pure predicates → `tests/domain/parent_managed_test.ts`. Use-case suppression →
   extend `tests/application/{init,upgrade}_project_test.ts` with a fake reader / lock field. C1–C5 →
   `tests/integration/{init,upgrade}_parent_managed_test.ts` building parent fixtures
-  programmatically in `Deno.makeTempDir` (a parent dir with `.specflow/` + `deno.json`
+  programmatically in `Deno.makeTempDir` (a parent dir with `.specnaut/` + `deno.json`
   `workspace: ["./child"]`), per the existing `init_test.ts` / `upgrade_test.ts` precedent.
 - **Rationale**: Mirrors the established two-tier test pattern (in-memory fakes for units, temp
   dirs + `runSpecflow` for integration). Fixtures are built in-test, not stored statically — matches

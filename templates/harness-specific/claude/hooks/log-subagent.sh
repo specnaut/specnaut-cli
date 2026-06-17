@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Append a structured JSON line to .specflow/logs/agents.jsonl per
+# Append a structured JSON line to .specnaut/logs/agents.jsonl per
 # subagent start/stop event so workflow audits can read who-dispatched-
 # whom-when after the fact.
 #
@@ -10,7 +10,7 @@ set -euo pipefail
 EVENT="${1:-unknown}"
 
 ROOT="$(pwd)"
-LOG_DIR="$ROOT/.specflow/logs"
+LOG_DIR="$ROOT/.specnaut/logs"
 LOG_FILE="$LOG_DIR/agents.jsonl"
 mkdir -p "$LOG_DIR"
 

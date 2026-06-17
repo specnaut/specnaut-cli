@@ -1,6 +1,6 @@
 ---
 name: subagent-driven-development
-description: Use to execute an implementation plan task-by-task with mandatory two-stage review per task (spec compliance, then code quality). Trigger phrases include "execute this plan", "implement task by task", "subagent-driven", "run the plan with reviews", or any prompt that asks to drive a multi-task plan to completion with quality gates between tasks. Dispatches Specflow's bundled developer + code-reviewer agents.
+description: Use to execute an implementation plan task-by-task with mandatory two-stage review per task (spec compliance, then code quality). Trigger phrases include "execute this plan", "implement task by task", "subagent-driven", "run the plan with reviews", or any prompt that asks to drive a multi-task plan to completion with quality gates between tasks. Dispatches Specnaut's bundled developer + code-reviewer agents.
 ---
 
 # Subagent-Driven Development
@@ -14,7 +14,7 @@ sequence to catch issues before they cascade into the next task.
 
 > Inspired by [obra/superpowers v5.1.0](https://github.com/obra/superpowers)
 > (MIT) — `skills/subagent-driven-development/SKILL.md`. Re-implemented
-> for Specflow with explicit dispatch to the bundled `developer` agent
+> for Specnaut with explicit dispatch to the bundled `developer` agent
 > (implementer role) and `code-reviewer` agent (both review stages, with
 > different prompts).
 
@@ -79,7 +79,7 @@ read the plan file.
 
 ## Step 2 — dispatch the implementer
 
-Use Specflow's bundled `developer` agent (it knows the project
+Use Specnaut's bundled `developer` agent (it knows the project
 conventions: hexagonal layout, TDD discipline, in-code documentation,
 Windsurf cap, byte-identity plugin sync, smoke audit, pre-commit
 hook gates).

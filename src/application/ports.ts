@@ -25,7 +25,7 @@ export type BackupReport = {
    * bundle entry had `skipIfExists: true` (placeholder semantics — the
    * user's existing content always wins). Always present; empty when no
    * placeholder skipping happened. The init use case omits these dests
-   * from the lock since they aren't Specflow-managed.
+   * from the lock since they aren't Specnaut-managed.
    */
   readonly skippedSkipIfExists: ReadonlyArray<string>;
 };
@@ -89,7 +89,7 @@ export interface FsReader {
 }
 
 /**
- * Filesystem-backed store for `.specflow/preserve.yml` — the maintainer's
+ * Filesystem-backed store for `.specnaut/preserve.yml` — the maintainer's
  * preserve declarations (spec 011 / issue #367).
  *
  * Mirrors {@link LockStore}: an absent manifest reads as
@@ -107,14 +107,14 @@ export interface PreserveStore {
  * detection. The **only** abstraction that touches the filesystem for
  * detection — keeps the use cases pure and unit-testable with fakes.
  *
- * See `docs`/the 009-parent-managed-init spec: a *providing Specflow
+ * See `docs`/the 009-parent-managed-init spec: a *providing Specnaut
  * workspace* is an ancestor that owns the centralised skills/agents and
  * declares the target as a workspace member.
  */
 export interface ParentWorkspaceReader {
   /**
    * Walks `dirname(targetDir)` upward to the filesystem root and returns the
-   * canonical path of the **first** ancestor `A` such that `A/.specflow/`
+   * canonical path of the **first** ancestor `A` such that `A/.specnaut/`
    * exists AND `A/deno.json` declares a `workspace` member that, resolved
    * relative to `A` and canonicalised, equals the canonicalised `targetDir`.
    * Returns `null` if no such ancestor exists or the root is reached.
@@ -122,7 +122,7 @@ export interface ParentWorkspaceReader {
   findProvidingAncestor(targetDir: string): Promise<string | null>;
 
   /**
-   * True iff `targetDir/.specflow/standalone.yml` exists. Contents ignored —
+   * True iff `targetDir/.specnaut/standalone.yml` exists. Contents ignored —
    * the marker's mere presence forces the full standalone provisioning path.
    */
   hasStandaloneOverride(targetDir: string): Promise<boolean>;
@@ -170,10 +170,10 @@ export interface Harness {
 import type { UpgradeMarker } from "../domain/upgrade_marker.ts";
 
 /**
- * Filesystem-backed store for `.specflow/upgrade-pending.json`.
+ * Filesystem-backed store for `.specnaut/upgrade-pending.json`.
  *
- * Written by `specflow upgrade` on every applied upgrade.
- * Read by `specflow-expert review-upgrade` and by `specflow reconcile`.
+ * Written by `specnaut upgrade` on every applied upgrade.
+ * Read by `specnaut-expert review-upgrade` and by `specnaut reconcile`.
  * Deleted at the end of a successful review.
  */
 export interface UpgradeMarkerStore {
@@ -183,9 +183,9 @@ export interface UpgradeMarkerStore {
 }
 
 /**
- * Filesystem-backed access to `.specflow/upgrade-staging/`. The staging
+ * Filesystem-backed access to `.specnaut/upgrade-staging/`. The staging
  * directory holds upstream versions of files that the upgrade preserved
- * (customized locally). `specflow reconcile` consumes the directory.
+ * (customized locally). `specnaut reconcile` consumes the directory.
  */
 export interface StagingStore {
   /** Project-relative paths currently in the staging directory. */

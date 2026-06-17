@@ -1,7 +1,7 @@
 # Implementation Plan: Reliable Adoption guide in CI-generated release notes
 
 **Branch**: `010-release-adoption-parity` | **Date**: 2026-06-09 | **Spec**: [spec.md](./spec.md)
-**Input**: Feature specification from `.specflow/specs/010-release-adoption-parity/spec.md` (issue
+**Input**: Feature specification from `.specnaut/specs/010-release-adoption-parity/spec.md` (issue
 mkrlabs/specflow#363)
 
 ## Summary
@@ -63,7 +63,7 @@ No violations → Complexity Tracking is empty.
 ### Documentation (this feature)
 
 ```text
-.specflow/specs/010-release-adoption-parity/
+.specnaut/specs/010-release-adoption-parity/
 ├── plan.md              # This file
 ├── research.md          # Phase 0 — decisions D1..D7
 ├── data-model.md        # Phase 1 — PrBodyOutcome, PrBodyFetcher, AdoptionAssembly

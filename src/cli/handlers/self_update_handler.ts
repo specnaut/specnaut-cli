@@ -33,7 +33,7 @@ export async function handleSelfUpdate(intent: SelfUpdateIntent): Promise<number
     replaceBinary: (bytes) => replaceRunningBinary(Deno.execPath(), bytes),
   });
 
-  console.log(`${bold("specflow")} self-update ${dim(`(current ${VERSION})`)}`);
+  console.log(`${bold("specnaut")} self-update ${dim(`(current ${VERSION})`)}`);
   try {
     const result = await useCase.execute({ checkOnly: intent.checkOnly });
     switch (result.status) {
@@ -50,15 +50,15 @@ export async function handleSelfUpdate(intent: SelfUpdateIntent): Promise<number
             `↑ update available: ${result.latestVersion} (current ${result.currentVersion})`,
           ),
         );
-        console.log("Run `specflow self-update` to install.");
+        console.log("Run `specnaut self-update` to install.");
         return 0;
       case "updated":
         console.log(green(`✓ updated ${result.previousVersion} → ${result.newVersion}`));
         console.log();
         console.log(
           dim(
-            "Don't forget to run `specflow upgrade` in each project that was\n" +
-              "previously scaffolded with `specflow init` to pull in new templates.",
+            "Don't forget to run `specnaut upgrade` in each project that was\n" +
+              "previously scaffolded with `specnaut init` to pull in new templates.",
           ),
         );
         return 0;

@@ -33,8 +33,8 @@ grep -A0 "skills:" templates/core/agents/qa-tester.md          # qa-report-contr
 
 In a project scaffolded from this bundle, dispatch a wired agent (e.g. the security-auditor over a
 small diff). Confirm its output ends with a `REVIEW SUMMARY` block whose verdict and four counts are
-explicit integers, and that the human-readable prose above it is unchanged in character. Dispatch the
-developer on a trivial change and confirm a `WORKFLOW STATUS` block (and a `HANDOFF` block iff
+explicit integers, and that the human-readable prose above it is unchanged in character. Dispatch
+the developer on a trivial change and confirm a `WORKFLOW STATUS` block (and a `HANDOFF` block iff
 `HANDOFF_TARGET ≠ none`).
 
 ## Success signals

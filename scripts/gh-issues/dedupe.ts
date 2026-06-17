@@ -5,7 +5,7 @@
 
 import { findCandidates, type IssueRef } from "./_dedupe_heuristic.ts";
 
-const REPO = "mkrlabs/specflow";
+const REPO = "mkrlabs/specnaut";
 
 async function ghJson<T>(args: string[]): Promise<T> {
   const cmd = new Deno.Command("gh", { args, stdout: "piped", stderr: "piped" });

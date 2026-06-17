@@ -5,12 +5,12 @@
 - **Skills**: installed skills live in `.agents/skills/`.
 - **Subagents**: Codex subagent definitions live in `.codex/agents/`
   (TOML format).
-- **Backlog**: managed via the `/specflow groom` workflow — when the
-  project uses the local Markdown backend, see `.specflow/backlog.md`.
+- **Backlog**: managed via the `/specnaut groom` workflow — when the
+  project uses the local Markdown backend, see `.specnaut/backlog.md`.
 
 ## Optional integrations
 
-These are Codex CLI features Specflow does NOT configure by default, but
+These are Codex CLI features Specnaut does NOT configure by default, but
 that pair well with the scaffolded workflow.
 
 - **Periodic maintenance** — `/goal` runs the prompt in `.codex/goal.md`

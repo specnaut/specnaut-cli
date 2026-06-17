@@ -1,4 +1,4 @@
-# `.specflow/release/` — Release contract
+# `.specnaut/release/` — Release contract
 
 Two scripts compose the Specflow CLI release pipeline alongside the bundled tag + notes scripts. See
 the design spec at

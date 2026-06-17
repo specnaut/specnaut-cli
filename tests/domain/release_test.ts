@@ -44,11 +44,11 @@ Deno.test("Release.assetFor returns the matching asset by platform triple", () =
   const release = new Release(
     SemVer.parse("0.1.0"),
     [
-      { name: "specflow-macos-arm64", url: "https://x/macos-arm64" },
-      { name: "specflow-linux-x64", url: "https://x/linux-x64" },
+      { name: "specnaut-macos-arm64", url: "https://x/macos-arm64" },
+      { name: "specnaut-linux-x64", url: "https://x/linux-x64" },
     ],
   );
-  assertEquals(release.assetFor("macos-arm64")?.name, "specflow-macos-arm64");
-  assertEquals(release.assetFor("linux-x64")?.name, "specflow-linux-x64");
+  assertEquals(release.assetFor("macos-arm64")?.name, "specnaut-macos-arm64");
+  assertEquals(release.assetFor("linux-x64")?.name, "specnaut-linux-x64");
   assertEquals(release.assetFor("bogus"), null);
 });

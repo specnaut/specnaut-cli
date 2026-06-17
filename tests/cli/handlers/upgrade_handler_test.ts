@@ -5,7 +5,7 @@ import { parseLock } from "../../../src/domain/installed_lock.ts";
 
 const MAIN = fromFileUrl(new URL("../../../src/main.ts", import.meta.url));
 
-async function runSpecflow(
+async function runSpecnaut(
   args: string[],
   opts: { cwd?: string } = {},
 ): Promise<{ code: number; stdout: string; stderr: string }> {
@@ -36,16 +36,16 @@ async function runSpecflow(
  * no agentic entries — the realistic precondition for a backend switch.
  */
 async function initializedParentManagedChild(): Promise<{ root: string; child: string }> {
-  const root = await Deno.makeTempDir({ prefix: "specflow-switch-pm-" });
+  const root = await Deno.makeTempDir({ prefix: "specnaut-switch-pm-" });
   const parent = join(root, "parent");
   const child = join(parent, "child");
-  await Deno.mkdir(join(parent, ".specflow"), { recursive: true });
+  await Deno.mkdir(join(parent, ".specnaut"), { recursive: true });
   await Deno.mkdir(child, { recursive: true });
   await Deno.writeTextFile(
     join(parent, "deno.json"),
     JSON.stringify({ workspace: ["./child"] }, null, 2),
   );
-  const { code, stderr } = await runSpecflow(["init", "--here", "--no-git"], { cwd: child });
+  const { code, stderr } = await runSpecnaut(["init", "--here", "--no-git"], { cwd: child });
   assertEquals(code, 0, `init precondition failed: ${stderr}`);
   return { root, child };
 }
@@ -56,7 +56,7 @@ async function initializedParentManagedChild(): Promise<{ root: string; child: s
 Deno.test("switchBacklogBackend preserves parent_managed and excludes agentic entries", async () => {
   const { root, child } = await initializedParentManagedChild();
   try {
-    const lockPath = join(child, ".specflow/installed.lock");
+    const lockPath = join(child, ".specnaut/installed.lock");
     const before = parseLock(await Deno.readTextFile(lockPath));
     assertEquals(before.parentManaged, true, "precondition: lock must be parent-managed");
     assertEquals(before.backlogBackend, "local", "precondition: starts on local backend");

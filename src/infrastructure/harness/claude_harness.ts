@@ -24,22 +24,22 @@ function destinationFor(entry: CoreEntry): string {
       return `.claude/agents/${entry.suffix}`;
     case "skill":
     case "backlog-skill":
-      // Claude doesn't add a `specflow-` prefix — skill names are emitted
-      // verbatim as the folder name (`specflow`, `specflow-auto`, `backlog`,
-      // `specflow-review`, …).
+      // Claude doesn't add a `specnaut-` prefix — skill names are emitted
+      // verbatim as the folder name (`specnaut`, `specnaut-auto`, `backlog`,
+      // `specnaut-review`, …).
       return `.claude/skills/${entry.name}/SKILL.md`;
     case "phase":
       // Phase reference docs sit beside the router skill so the router
       // can load them via `phases/<phase>.md` from its own directory.
       if (!entry.suffix) throw new Error(`phase needs suffix: ${entry.name}`);
-      return `.claude/skills/specflow/phases/${entry.suffix}`;
+      return `.claude/skills/specnaut/phases/${entry.suffix}`;
     case "phase-script":
       return phaseScriptDestination(entry);
     case "backlog-script":
       return backlogScriptDestination(entry);
     case "spec-root":
       if (!entry.suffix) throw new Error(`spec-root entry needs suffix: ${entry.name}`);
-      return `.specflow/${entry.suffix}`;
+      return `.specnaut/${entry.suffix}`;
     case "project-root":
     case "mergeable-project-root":
       if (!entry.suffix) throw new Error(`${entry.category} needs suffix: ${entry.name}`);

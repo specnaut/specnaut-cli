@@ -21,7 +21,7 @@ function parseAgentFrontmatter(
 }
 
 /**
- * Translates a Specflow agent's declared capability tier (a Claude model name)
+ * Translates a Specnaut agent's declared capability tier (a Claude model name)
  * into a Codex `model_reasoning_effort` level. Codex models are OpenAI-specific,
  * so we map the *tier* rather than copy the vendor model id — keeping the
  * mapping stable across OpenAI model releases. An absent, empty, or
@@ -46,7 +46,7 @@ function toCodexSubagentToml(entry: CoreEntry): string {
   const effort = tierToReasoningEffort(model);
   return stringifyToml({
     name: entry.name,
-    description: description || `Specflow ${entry.name} agent`,
+    description: description || `Specnaut ${entry.name} agent`,
     ...(effort ? { model_reasoning_effort: effort } : {}),
     developer_instructions: body,
   });
@@ -84,7 +84,7 @@ export class CodexHarness implements Harness {
         }
         case "phase": {
           if (!entry.suffix) throw new Error(`phase needs suffix: ${entry.name}`);
-          out[`.agents/skills/specflow/phases/${entry.suffix}`] = {
+          out[`.agents/skills/specnaut/phases/${entry.suffix}`] = {
             content: entry.content,
             executable: entry.executable,
           };
@@ -104,7 +104,7 @@ export class CodexHarness implements Harness {
           break;
         case "spec-root":
           if (!entry.suffix) throw new Error(`spec-root needs suffix`);
-          out[`.specflow/${entry.suffix}`] = {
+          out[`.specnaut/${entry.suffix}`] = {
             content: entry.content,
             executable: entry.executable,
             ...(entry.skipIfExists ? { skipIfExists: true as const } : {}),

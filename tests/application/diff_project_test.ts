@@ -40,7 +40,7 @@ function fakeLockStore(lock: InstalledLock | null): LockStore {
   return {
     read: () => Promise.resolve(lock),
     write: () => Promise.resolve(),
-    lockPath: (d) => `${d}/.specflow/installed.lock`,
+    lockPath: (d) => `${d}/.specnaut/installed.lock`,
   };
 }
 

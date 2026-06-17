@@ -1,6 +1,6 @@
 ---
 name: code-reviewer
-description: Reviews code quality, architecture, DRY/YAGNI, readability, and conformance to the project constitution. Spawned by the review-coordinator during /specflow review.
+description: Reviews code quality, architecture, DRY/YAGNI, readability, and conformance to the project constitution. Spawned by the review-coordinator during /specnaut review.
 model: sonnet
 effort: medium
 tools: Read, Grep, Glob
@@ -14,7 +14,7 @@ explore the rest of the codebase unless strictly necessary for context.
 
 ## Always-check rules
 
-1. **Constitution compliance**: read `.specflow/memory/constitution.md` first.
+1. **Constitution compliance**: read `.specnaut/memory/constitution.md` first.
    Any violation is at least HIGH severity.
 2. **Silent error handling**: any `catch` block that swallows the error (empty
    body, comment-only, or discards the error object) is CRITICAL.

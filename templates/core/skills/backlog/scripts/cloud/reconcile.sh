@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
-# Poll Specflow Cloud for board stage transitions since the last run and emit
+# Poll Specnaut Cloud for board stage transitions since the last run and emit
 # them for the product-owner to act on — the CLI half of the poll/reconcile
 # model (no webhook, no daemon).
 #
-# A per-project cursor is stored at `.specflow/.cloud-cursor-<KEY>`. Each call
+# A per-project cursor is stored at `.specnaut/.cloud-cursor-<KEY>`. Each call
 # drains every transition newer than the cursor (following `hasMore`) and
 # advances it. Output is one machine-readable line per transition:
 #
@@ -34,7 +34,7 @@ while [ "$#" -gt 0 ]; do
   esac
 done
 
-STATE="$ROOT/.specflow/.cloud-cursor-$PROJECT_KEY"
+STATE="$ROOT/.specnaut/.cloud-cursor-$PROJECT_KEY"
 AUTH=(-H "Authorization: Bearer $API_TOKEN")
 
 [ "$RESET" = "1" ] && rm -f "$STATE"
