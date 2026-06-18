@@ -1,8 +1,8 @@
 ---
 name: Bug report
-about: Report a Specflow problem you hit while running the CLI or using the bundled agents.
+about: Report a Specnaut problem you hit while running the CLI or using the bundled agents.
 title: ""
-labels: "bug,from:specflow-expert"
+labels: "bug,from:specnaut-expert"
 ---
 
 ## Summary
@@ -30,13 +30,13 @@ labels: "bug,from:specflow-expert"
 <!--
 Run these and paste the output:
 
-  specflow --version
+  specnaut --version
   cat .specnaut/installed.lock | head -10
   uname -srm   # or `cmd /c ver` on Windows
 -->
 
 ```
-specflow --version: <output>
+specnaut --version: <output>
 templates_version : <from installed.lock>
 harness           : <from installed.lock>
 backlog_backend   : <from installed.lock>
@@ -55,7 +55,7 @@ Before submitting, scrub any of:
   - AWS access keys (AKIA…)
   - Paths inside ~/.ssh/, ~/.aws/, ~/.config/gh/
 
-The bundled `specflow-expert` agent can do this scrubbing for you —
+The bundled `specnaut-expert` agent can do this scrubbing for you —
 ask it "report this as a bug" and it will pre-fill an issue with the
 above sections, scrub the listed token shapes, and hand you a link
 to review and submit.

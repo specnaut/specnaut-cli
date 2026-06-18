@@ -294,13 +294,13 @@ export function parseArgs(argv: string[]): Intent {
       return {
         kind: "unknown",
         received:
-          "specflow reconcile requires --status, or <path> with --accept-upstream / --accept-current",
+          "specnaut reconcile requires --status, or <path> with --accept-upstream / --accept-current",
       };
     }
     if (positional.length !== 1) {
       return {
         kind: "unknown",
-        received: "specflow reconcile <path> requires exactly one path",
+        received: "specnaut reconcile <path> requires exactly one path",
       };
     }
     return {

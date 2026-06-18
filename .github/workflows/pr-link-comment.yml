@@ -17,7 +17,7 @@ jobs:
   comment-on-linked-issues:
     # Skip fork PRs entirely. On a `pull_request` event from a fork,
     # `GITHUB_TOKEN` is read-only and `gh api -X POST .../comments` would
-    # return 403, turning a green PR into a misleading red one. Specflow
+    # return 403, turning a green PR into a misleading red one. Specnaut
     # is single-maintainer; this guard fails-open on the rare community
     # fork rather than silently suppressing the error.
     if: github.event.pull_request.head.repo.full_name == github.repository

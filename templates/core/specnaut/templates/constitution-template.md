@@ -1,9 +1,9 @@
 # [PROJECT_NAME] Constitution
 <!-- Example: Spec Constitution, TaskFlow Constitution, etc. -->
 
-## Engineering methodology (Specflow baseline)
+## Engineering methodology (Specnaut baseline)
 
-> Specflow ships these as opinionated defaults. Amend, soften, or remove
+> Specnaut ships these as opinionated defaults. Amend, soften, or remove
 > per principle — but a project that overrides them MUST document why.
 
 ### Test-Driven Development (NON-NEGOTIABLE)

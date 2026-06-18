@@ -79,7 +79,7 @@ export async function writeVersions(
   );
   await Deno.writeTextFile(verPath, updatedVer);
 
-  // Lockstep the specflow-plugin plugin manifest (#73 slice 8). The
+  // Lockstep the specnaut-plugin plugin manifest (#73 slice 8). The
   // release workflow's pre-flight step compares deno.json `version`
   // against this file's `version` and fails fast on drift.
   const pluginManifestPath = `${baseDir}/plugin/.claude-plugin/plugin.json`;
@@ -93,7 +93,7 @@ export async function writeVersions(
   // Lockstep the templates manifest. `TEMPLATES_VERSION` in
   // `src/templates_bundle.ts` is regenerated from this file by
   // `deno task bundle`, and it's what the binary surfaces under
-  // `specflow --version` (the "templates X.Y.Z" suffix). Skipping
+  // `specnaut --version` (the "templates X.Y.Z" suffix). Skipping
   // this bump leaves a cosmetic drift visible to every user.
   const templatesManifestPath = `${baseDir}/templates/manifest.json`;
   const templatesRaw = await Deno.readTextFile(templatesManifestPath);

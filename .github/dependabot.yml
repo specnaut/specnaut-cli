@@ -1,5 +1,5 @@
 # Dependabot config — keeps the GitHub Actions used in
-# .github/workflows/ up to date. Specflow is a Deno project, but
+# .github/workflows/ up to date. Specnaut is a Deno project, but
 # Dependabot doesn't currently support the Deno / JSR ecosystem
 # directly; opening Deno-side dep PRs is a manual concern (handled
 # by `deno task check` + `deno task test` after `deno cache --reload`).

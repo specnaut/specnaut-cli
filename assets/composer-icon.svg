@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!--
-  Specflow composer icon for the Codex marketplace listing.
+  Specnaut composer icon for the Codex marketplace listing.
   Shown next to the plugin name in the Codex composer UI.
 
   Mark: three horizontal bars forming a structured outline (the spec
@@ -8,7 +8,7 @@
   a peach accent dot trailing the most-detailed line — the active /
   next step in the flow. Color tokens follow DESIGN.md: brand-primary
   #5B6AF0 (indigo), brand-accent #F59E6C (warm peach). Square at 256
-  with `rx=56` to match the Specflow brand surface treatment.
+  with `rx=56` to match the Specnaut brand surface treatment.
 
   Transitional placeholder. Replace with final brand artwork before
   the first Codex marketplace submission. The composition stays
@@ -21,7 +21,7 @@
   width="256"
   height="256"
   role="img"
-  aria-label="Specflow"
+  aria-label="Specnaut"
 >
   <rect width="256" height="256" rx="56" fill="#5B6AF0" />
   <rect x="64" y="80" width="80" height="20" rx="10" fill="#ffffff" />

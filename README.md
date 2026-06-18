@@ -60,7 +60,7 @@ your `$PATH`.
 On macOS, you may need to clear the quarantine attribute after download:
 
 ```bash
-xattr -d com.apple.quarantine /path/to/specflow
+xattr -d com.apple.quarantine /path/to/specnaut
 ```
 
 ## Install as a plugin / extension (five harnesses)
@@ -71,10 +71,10 @@ install it as a plugin / extension in your harness — same skill content across
 | Harness                | Install command                                                                                                            |
 | ---------------------- | -------------------------------------------------------------------------------------------------------------------------- |
 | **Claude Code**        | `/plugin install specnaut/specnaut-cli-plugin`                                                                             |
-| **Codex CLI / App**    | `/plugins` → search "specflow" → install¹                                                                                  |
+| **Codex CLI / App**    | `/plugins` → search "specnaut" → install¹                                                                                  |
 | **Cursor**             | `/add-plugin specnaut/specnaut-cli`                                                                                        |
-| **OpenCode**           | Add to `opencode.json`: `"plugin": ["specflow@git+https://github.com/specnaut/specnaut-cli.git"]`                          |
-| **GitHub Copilot CLI** | `copilot plugin marketplace add specnaut/specnaut-marketplace`<br/>`copilot plugin install specflow@specflow-marketplace`¹ |
+| **OpenCode**           | Add to `opencode.json`: `"plugin": ["specnaut@git+https://github.com/specnaut/specnaut-cli.git"]`                          |
+| **GitHub Copilot CLI** | `copilot plugin marketplace add specnaut/specnaut-marketplace`<br/>`copilot plugin install specnaut@specnaut-marketplace`¹ |
 
 ¹ Codex CLI and the shared marketplace listing land once their one-time prereqs are provisioned —
 see [the docs](https://specnaut.com/llms.txt) for current status. The sync workflows ship inert
@@ -83,7 +83,7 @@ see [the docs](https://specnaut.com/llms.txt) for current status. The sync workf
 **When to use the plugin vs the binary:**
 
 - Plugin: cross-project, always up-to-date, no `specnaut init` needed, auto-activates skills on
-  session start via the `using-specflow` bootstrap.
+  session start via the `using-specnaut` bootstrap.
 - Binary: project-local customization, short slash-commands (`/specify`), backlog + hooks support.
 
 Most teams use both. See [the docs](https://specnaut.com) for the full boundary table and
@@ -98,14 +98,14 @@ to `cd` into an inner repo first? SKILL.md frontmatter accepts two optional fiel
 ```yaml
 ---
 name: tag-version
-alias_of: specflow.tag-version
+alias_of: specnaut.tag-version
 overlays:
   - when: before
     path: ./scripts/cd-inner-repo.sh
 ---
 ```
 
-Run `/specflow list-skills` to see which aliases and overlays are active in your project. The
+Run `/specnaut list-skills` to see which aliases and overlays are active in your project. The
 Specnaut binary scaffolds and ships the convention; the harness (Claude Code, Cursor, …) honours it
 at dispatch time. See [the docs](https://specnaut.com/llms.txt) for the full contract and
 [`templates/core/skills/alias-example/SKILL.md`](templates/core/skills/alias-example/SKILL.md) for a
@@ -113,7 +113,7 @@ copy-pasteable starting point.
 
 ## Upgrading an existing project
 
-When you update the `specflow` binary (via `specnaut self-update` or Homebrew), the bundled
+When you update the `specnaut` binary (via `specnaut self-update` or Homebrew), the bundled
 templates may have changed. To pull those changes into a project you previously `init`'d:
 
 ```bash
@@ -143,7 +143,7 @@ evolving bundle so you can fold in upstream changes by hand, and pass `--reset-p
 refresh to deliberately discard your customizations and take the bundled version back. Commit
 `preserve.yml` alongside the lock file.
 
-When the `specflow-plugin` Claude Code plugin is installed and the project harness is `claude`,
+When the `specnaut-plugin` Claude Code plugin is installed and the project harness is `claude`,
 `specnaut upgrade` auto-migrates vanilla agent and command files to the plugin (backs them up, then
 removes them from disk — the plugin serves them going forward). Customized files are preserved with
 a warning. If you later uninstall the plugin, `specnaut check --project` will warn about any covered
@@ -153,7 +153,7 @@ files that are now missing and tell you how to recover them.
 
 ```bash
 git clone https://github.com/specnaut/specnaut-cli.git
-cd specflow
+cd specnaut-cli
 deno task setup          # installs the pre-commit hook
 deno task test           # sanity check — all green
 ```

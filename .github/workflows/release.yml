@@ -19,7 +19,7 @@ jobs:
   # The release tag is already pushed at this point; failing here is the
   # safest possible failure mode — no GitHub Release object is created,
   # so users on the previous version stay on the previous version (no
-  # broken binary reaches them via `specflow self-update` or the install
+  # broken binary reaches them via `specnaut self-update` or the install
   # script). Re-run the workflow after dismissing the alert; the same tag
   # rebuilds cleanly because the commit is unchanged.
   security-preflight:
@@ -172,9 +172,9 @@ jobs:
           set -euo pipefail
           # 1. plugin.json must be parseable JSON
           jq -e . plugin/.claude-plugin/plugin.json > /dev/null
-          # 2. Plugin scaffold must contain at minimum the specflow-auto skill
+          # 2. Plugin scaffold must contain at minimum the specnaut-auto skill
           # (catches an accidentally truncated plugin/ directory).
-          test -f plugin/skills/specflow-auto/SKILL.md
+          test -f plugin/skills/specnaut-auto/SKILL.md
           # 3. Hard fail if plugin.json version drifts from deno.json version.
           # The two are kept in lockstep by scripts/bump-version.ts.
           BIN_VERSION=$(jq -r .version deno.json)
@@ -253,7 +253,7 @@ jobs:
             scripts/bump-tap-formula.ts
       - name: Sync to Codex marketplace fork (#277 / B1)
         # Mirrors the Specnaut plugin content into
-        # `mkrlabs/plugins:plugins/specflow/`. A human rebases that
+        # `mkrlabs/plugins:plugins/specnaut/`. A human rebases that
         # fork's PR into upstream `openai/plugins` for the actual
         # marketplace publish. If CODEX_SYNC_TOKEN is unset, the
         # script emits a workflow ::warning and exits 0 — the release
@@ -275,8 +275,8 @@ jobs:
         # Bumps `.claude-plugin/marketplace.json` in
         # `specnaut/specnaut-marketplace` (the shared marketplace
         # catalog serving both Claude Code AND Copilot CLI users via
-        # `/plugin install specflow@specflow-marketplace` and
-        # `copilot plugin install specflow@specflow-marketplace`).
+        # `/plugin install specnaut@specnaut-marketplace` and
+        # `copilot plugin install specnaut@specnaut-marketplace`).
         # Same skip-if-no-secret fail-safe as the Codex step.
         env:
           GH_TOKEN: ${{ secrets.MARKETPLACE_SYNC_TOKEN }}

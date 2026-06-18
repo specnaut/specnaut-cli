@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# specflow pre-commit hook — format check, lint, type check.
+# specnaut pre-commit hook — format check, lint, type check.
 # Installed via `deno task setup`.
 set -euo pipefail
 

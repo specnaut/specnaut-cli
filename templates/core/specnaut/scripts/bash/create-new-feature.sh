@@ -82,7 +82,7 @@ while [ $i -le $# ]; do
             echo "  --timestamp         Use timestamp prefix (YYYYMMDD-HHMMSS) instead of sequential numbering"
             echo "  --issue <id>        Link this feature to a backlog issue (id is a positive integer);"
             echo "                      surfaces in JSON output and is persisted to .specnaut/feature.json"
-            echo "                      so /specflow merge can close the loop on the project board."
+            echo "                      so /specnaut merge can close the loop on the project board."
             echo "  --help, -h          Show this help message"
             echo ""
             echo "Examples:"

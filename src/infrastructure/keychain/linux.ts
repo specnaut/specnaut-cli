@@ -53,6 +53,10 @@ class LibsecretBackend implements KeychainBackend {
     const put = (off: number, ptr: Deno.PointerValue) =>
       view.setBigUint64(off, BigInt(Deno.UnsafePointer.value(ptr)), true);
 
+    // `org.specflow.cloud` is intentionally kept through the specnaut rebrand:
+    // it is the libsecret/D-Bus schema name, an internal at-rest identifier —
+    // renaming it orphans every existing keyring entry. Mirrors KEYCHAIN_SERVICE
+    // in keychain_backend.ts.
     const name = cstr("org.specflow.cloud");
     const aService = cstr("service");
     const aAccount = cstr("account");

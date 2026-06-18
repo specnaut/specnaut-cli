@@ -1,4 +1,4 @@
-# Shared helpers for `scripts/sync-to-*.sh` — Specflow's marketplace
+# Shared helpers for `scripts/sync-to-*.sh` — Specnaut's marketplace
 # / fork sync scripts.
 #
 # Source from a sync script with:
@@ -57,12 +57,12 @@ require_gh_token() {
 # Make a temp directory and set up a trap to clean it up on script
 # exit. Prints the directory path so the caller can capture it:
 #
-#   WORK_DIR=$(mktemp_workdir specflow-codex-sync)
+#   WORK_DIR=$(mktemp_workdir specnaut-codex-sync)
 #
 # Arguments:
 #   $1 — label (for the mktemp -t prefix)
 mktemp_workdir() {
-  local label="${1:-specflow-sync}"
+  local label="${1:-specnaut-sync}"
   local dir
   dir="$(mktemp -d -t "${label}-XXXXXX")"
   # shellcheck disable=SC2064 # we want $dir expanded NOW, not at trap time
@@ -72,12 +72,12 @@ mktemp_workdir() {
 
 # git_bot_identity
 #
-# Set the local git user.email and user.name to the Specflow sync
+# Set the local git user.email and user.name to the Specnaut sync
 # bot identity. Must be called from inside the destination clone
 # (after `cd` into it).
 git_bot_identity() {
-  git config user.email "specflow-bot@mkrlabs.dev"
-  git config user.name "Specflow Sync Bot"
+  git config user.email "specnaut-bot@mkrlabs.dev"
+  git config user.name "Specnaut Sync Bot"
 }
 
 # wire_gh_token_to_remote
@@ -110,7 +110,7 @@ wire_gh_token_to_remote() {
 #
 # Arguments:
 #   $1 — repo (e.g. mkrlabs/plugins)
-#   $2 — branch (e.g. specflow-sync/v1.8.0)
+#   $2 — branch (e.g. specnaut-sync/v1.8.0)
 #   $3 — PR title
 #   $4 — PR body (multi-line OK)
 create_pr_idempotent() {

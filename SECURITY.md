@@ -16,8 +16,8 @@ fixed before public disclosure.
 ## Supported versions
 
 Specnaut is shipped as a rolling binary on a single channel. We support **only the latest released
-version**. Always upgrade via `specflow
-self-update` (or `brew upgrade specflow`) before reporting
+version**. Always upgrade via `specnaut
+self-update` (or `brew upgrade specnaut`) before reporting
 an issue — many fixes ship within hours and may already cover what you found.
 
 | Version      | Supported          |
@@ -39,7 +39,7 @@ Use one of these private channels in order of preference:
    <https://github.com/specnaut/specnaut-cli/security/advisories/new>. This goes directly to the
    maintainers, lets us collaborate on a fix in a private fork, and produces a CVE + GitHub Security
    Advisory when the fix ships.
-2. **Email fallback**: `kevin.raimbaud@gmail.com` with subject prefix `[specflow security]`. Use
+2. **Email fallback**: `kevin.raimbaud@gmail.com` with subject prefix `[specnaut security]`. Use
    this if you can't access the GitHub UI or want to share material that doesn't fit a GitHub form.
 
 Please include as much of the following as you can:

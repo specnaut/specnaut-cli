@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Specflow CLI release preflight. Exit ≠ 0 ⇒ release aborts.
+# Specnaut CLI release preflight. Exit ≠ 0 ⇒ release aborts.
 set -euo pipefail
 
 REPO_ROOT="$(git rev-parse --show-toplevel)"
