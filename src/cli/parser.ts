@@ -117,7 +117,7 @@ export type Intent =
   }
   | {
     /**
-     * `specflow diff` (spec 011 / issue #367, US2) — read-only divergence view:
+     * `specnaut diff` (spec 011 / issue #367, US2) — read-only divergence view:
      * show how each managed file on disk differs from the bundled original for
      * the installed templates version. Mutates nothing.
      */
@@ -141,7 +141,7 @@ export type Intent =
     apiUrl: string | null;
   }
   | {
-    /** `specflow gate <status|raise|cancel>` (#358) — the non-interactive bridge
+    /** `specnaut gate <status|raise|cancel>` (#358) — the non-interactive bridge
      *  a skill phase uses to raise a remote-control gate. See gate_handler.ts. */
     kind: "gate";
     sub: "status" | "raise" | "cancel";

@@ -2,7 +2,7 @@
  * Append-block helpers for `mergeable-project-root` files (e.g. `.gitignore`).
  *
  * A merge block is a labeled section in an otherwise user-owned file that
- * Specflow can write, replace, or read back without touching surrounding
+ * Specnaut can write, replace, or read back without touching surrounding
  * lines. The fence markers are stable so future runs (init re-run, upgrade)
  * can find and replace the block in place.
  *
