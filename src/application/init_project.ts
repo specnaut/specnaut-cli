@@ -36,7 +36,7 @@ export type InitResult =
     conflicts: string[];
     /**
      * True when a `.specnaut/installed.lock` already exists at the target —
-     * lets the CLI suggest `specflow upgrade` instead of `--force` for
+     * lets the CLI suggest `specnaut upgrade` instead of `--force` for
      * projects that were previously initialised by Specnaut.
      */
     lockExists: boolean;
@@ -78,7 +78,7 @@ export type InitProjectInput = {
    * Destination paths to leave untouched on a forced refresh — the
    * maintainer's preserve declarations (`.specnaut/preserve.yml`, spec 011 /
    * issue #367). These are removed from the WRITE set only; they STAY
-   * lock-tracked (FR-012) so `specflow diff` and future upgrades still
+   * lock-tracked (FR-012) so `specnaut diff` and future upgrades still
    * compare them. Absent/empty ⇒ today's behaviour (FR-011). The handler
    * resolves the set (and validates membership / `--reset-preserved`); the
    * use case never reads the manifest or any CLI flag.

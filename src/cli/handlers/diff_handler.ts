@@ -14,7 +14,7 @@ export type DiffIntent = {
 };
 
 /**
- * `specflow diff` (spec 011 / issue #367, US2) — render, read-only, how each
+ * `specnaut diff` (spec 011 / issue #367, US2) — render, read-only, how each
  * managed file on disk diverges from the bundled original for the installed
  * templates version (FR-006).
  *
