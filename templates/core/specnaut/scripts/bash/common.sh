@@ -209,7 +209,7 @@ get_feature_paths() {
 
     # Resolve feature directory.  Priority:
     #   1. SPECIFY_FEATURE_DIRECTORY env var (explicit override)
-    #   2. .specnaut/feature.json "feature_directory" key (persisted by /specflow specify)
+    #   2. .specnaut/feature.json "feature_directory" key (persisted by /specnaut specify)
     #   3. Branch-name-based prefix lookup (legacy fallback)
     local feature_dir
     if [[ -n "${SPECIFY_FEATURE_DIRECTORY:-}" ]]; then
@@ -314,10 +314,10 @@ resolve_template() {
             # The python3 call is wrapped in an if-condition so that set -e does not
             # abort the function when python3 exits non-zero (e.g. invalid JSON).
             local sorted_presets=""
-            if sorted_presets=$(SPECFLOW_REGISTRY="$registry_file" python3 -c "
+            if sorted_presets=$(SPECNAUT_REGISTRY="$registry_file" python3 -c "
 import json, sys, os
 try:
-    with open(os.environ['SPECFLOW_REGISTRY']) as f:
+    with open(os.environ['SPECNAUT_REGISTRY']) as f:
         data = json.load(f)
     presets = data.get('presets', {})
     for pid, meta in sorted(presets.items(), key=lambda x: x[1].get('priority', 10) if isinstance(x[1], dict) else 10):
@@ -402,10 +402,10 @@ resolve_template_content() {
         local registry_file="$presets_dir/.registry"
         local sorted_presets=""
         if [ -f "$registry_file" ] && command -v python3 >/dev/null 2>&1; then
-            if sorted_presets=$(SPECFLOW_REGISTRY="$registry_file" python3 -c "
+            if sorted_presets=$(SPECNAUT_REGISTRY="$registry_file" python3 -c "
 import json, sys, os
 try:
-    with open(os.environ['SPECFLOW_REGISTRY']) as f:
+    with open(os.environ['SPECNAUT_REGISTRY']) as f:
         data = json.load(f)
     presets = data.get('presets', {})
     for pid, meta in sorted(presets.items(), key=lambda x: x[1].get('priority', 10) if isinstance(x[1], dict) else 10):
@@ -426,7 +426,7 @@ except Exception:
                             local result
                             local py_stderr
                             py_stderr=$(mktemp)
-                            result=$(SPECFLOW_MANIFEST="$manifest" SPECFLOW_TMPL="$template_name" python3 -c "
+                            result=$(SPECNAUT_MANIFEST="$manifest" SPECNAUT_TMPL="$template_name" python3 -c "
 import sys, os
 try:
     import yaml
@@ -435,10 +435,10 @@ except ImportError:
     print('replace\t')
     sys.exit(0)
 try:
-    with open(os.environ['SPECFLOW_MANIFEST']) as f:
+    with open(os.environ['SPECNAUT_MANIFEST']) as f:
         data = yaml.safe_load(f)
     for t in data.get('provides', {}).get('templates', []):
-        if t.get('name') == os.environ['SPECFLOW_TMPL'] and t.get('type', 'template') == 'template':
+        if t.get('name') == os.environ['SPECNAUT_TMPL'] and t.get('type', 'template') == 'template':
             print(t.get('strategy', 'replace') + '\t' + t.get('file', ''))
             sys.exit(0)
     print('replace\t')

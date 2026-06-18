@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
-# Specflow CLI release postflight. Verifies the GitHub Release shipped end-to-end.
+# Specnaut CLI release postflight. Verifies the GitHub Release shipped end-to-end.
 # Invoked AFTER the tag has been pushed and release.yml has been triggered.
 # Usage: postflight.sh <tag>
 set -euo pipefail
 
 TAG="${1:?usage: postflight.sh <tag>}"
-REPO="mkrlabs/specflow"
+REPO="specnaut/specnaut-cli"
 
 echo "▶ finding release.yml run for $TAG"
 # release.yml is push-tag-triggered; the GitHub Actions API can take 5-30s to
@@ -39,15 +39,15 @@ echo "▶ verifying Homebrew tap formula bumped to ${TAG#v}"
 # status differentiates "all green" from "release shipped but tap unverified".
 homebrew_warned=0
 formula_msg="$(gh api repos/mkrlabs/homebrew-tap/commits/main --jq '.commit.message' | head -1)"
-expected_prefix="chore: bump specflow to ${TAG#v}"
+expected_prefix="chore: bump specnaut to ${TAG#v}"
 if [[ "$formula_msg" != "$expected_prefix"* ]]; then
   echo "⚠ Homebrew formula tip message != '$expected_prefix*': '$formula_msg'"
   homebrew_warned=1
 fi
 
 echo "▶ refreshing local binary"
-specflow self-update
-local_version="$(specflow --version | awk '{print $2}')"
+specnaut self-update
+local_version="$(specnaut --version | awk '{print $2}')"
 [ "v$local_version" = "$TAG" ] || { echo "❌ local binary at v$local_version, expected $TAG"; exit 1; }
 
 if [ "$homebrew_warned" -eq 1 ]; then

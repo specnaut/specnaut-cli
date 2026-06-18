@@ -59,6 +59,9 @@ export class CloudClient {
     return { status: res.status, json: await readJson(res) };
   }
 
+  // `specflow-cli` is the frozen OAuth device-client id the Cloud backend
+  // matches on — intentionally NOT renamed in the specflow→specnaut rebrand
+  // (renaming it breaks the device-grant flow for already-released CLI builds).
   async startDevice(client = "specflow-cli"): Promise<DeviceStart> {
     const { status, json } = await this.postJson("/auth/device", { client });
     if (status !== 200) {

@@ -59,7 +59,7 @@ export class ClaudeSettingsParseError extends Error {
   constructor(public readonly destPath: string, override readonly cause: Error) {
     super(
       `${destPath} is not valid JSON: ${cause.message}\n` +
-        `Fix the file (or back it up and re-run with --force) before re-running specflow.`,
+        `Fix the file (or back it up and re-run with --force) before re-running specnaut.`,
     );
     this.name = "ClaudeSettingsParseError";
   }

@@ -129,7 +129,7 @@ function Test-HasGit {
 
 # Strip a single optional path segment (e.g. gitflow "feat/004-name" -> "004-name").
 # Only when the full name is exactly two slash-free segments; otherwise returns the raw name.
-function Get-SpecflowEffectiveBranchName {
+function Get-SpecnautEffectiveBranchName {
     param([string]$Branch)
     if ($Branch -match '^([^/]+)/([^/]+)$') {
         return $Matches[2]
@@ -150,7 +150,7 @@ function Test-FeatureBranch {
     }
 
     $raw = $Branch
-    $Branch = Get-SpecflowEffectiveBranchName $raw
+    $Branch = Get-SpecnautEffectiveBranchName $raw
     
     # Accept sequential prefix (3+ digits) but exclude malformed timestamps
     # Malformed: 7-or-8 digit date + 6-digit time with no trailing slug (e.g. "2026031-143022" or "20260319-143022")
@@ -171,7 +171,7 @@ function Find-FeatureDirByPrefix {
         [Parameter(Mandatory = $true)][string]$Branch
     )
     $specsDir = Join-Path $RepoRoot '.specnaut' 'specs'
-    $branchName = Get-SpecflowEffectiveBranchName $Branch
+    $branchName = Get-SpecnautEffectiveBranchName $Branch
 
     $prefix = $null
     if ($branchName -match '^(\d{8}-\d{6})-') {
@@ -220,7 +220,7 @@ function Get-FeaturePathsEnv {
 
     # Resolve feature directory.  Priority:
     #   1. SPECIFY_FEATURE_DIRECTORY env var (explicit override)
-    #   2. .specnaut/feature.json "feature_directory" key (persisted by /specflow.specify)
+    #   2. .specnaut/feature.json "feature_directory" key (persisted by /specnaut.specify)
     #   3. Branch-name-based prefix lookup (same as scripts/bash/common.sh)
     $featureJson = Join-Path $repoRoot '.specnaut/feature.json'
     if ($env:SPECIFY_FEATURE_DIRECTORY) {

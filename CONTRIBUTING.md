@@ -7,7 +7,7 @@ body. The section is the contract between the PR author and the release pipeline
 
 1. `scripts/gen-changelog.ts` extracts the section at release time.
 2. It lands in the GitHub Release body under `### Adoption guide`.
-3. After `specnaut upgrade`, the `specflow-expert` agent reads the release body and plays each
+3. After `specnaut upgrade`, the `specnaut-expert` agent reads the release body and plays each
    adoption prompt one at a time in the user's project.
 
 ### Format
@@ -33,17 +33,17 @@ body. The section is the contract between the PR author and the release pipeline
 ````markdown
 ## Agent adoption
 
-`/specflow specify "<feature>"` now chains every phase through to `review` in a single session. If
-your project has agent rules or documentation pointing users at `/specflow-auto`, update them to
-`/specflow specify`. `--manual` is the per-phase opt-out.
+`/specnaut specify "<feature>"` now chains every phase through to `review` in a single session. If
+your project has agent rules or documentation pointing users at `/specnaut-auto`, update them to
+`/specnaut specify`. `--manual` is the per-phase opt-out.
 
 ```prompt
-Audit my project for any reference to `/specflow-auto` in:
+Audit my project for any reference to `/specnaut-auto` in:
   - `.claude/agents/*.md`
   - `.cursor/rules/*.mdc`
   - `AGENTS.md`, `CLAUDE.md`
 
-Replace each with `/specflow specify "<…>"`. Add a brief note explaining
+Replace each with `/specnaut specify "<…>"`. Add a brief note explaining
 `--manual` is the per-phase opt-out. Open a PR with the changes.
 ```
 ````
@@ -57,7 +57,7 @@ Replace each with `/specflow specify "<…>"`. Add a brief note explaining
 `.claude/agents/` or harness rules that document the upgrade flow should mention it.
 
 ```prompt
-Add a short note to my project's `.claude/agents/specflow-expert.md` (and any
+Add a short note to my project's `.claude/agents/specnaut-expert.md` (and any
 equivalent agent files for other harnesses) that `specnaut reconcile --status`
 lists pending post-upgrade reconciliation. Open a PR.
 ```

@@ -12612,7 +12612,7 @@ continuous supervision of long headless work, use \`/loop 5m /status-audit\`.
     content: `# Project Constitution
 
 > This file holds the invariants of your project: architecture rules, conventions, and
-> non-negotiable policies. Specflow commands and review agents read it at every step.
+> non-negotiable policies. Specnaut commands and review agents read it at every step.
 >
 > Replace this placeholder with your own constitution. Use
 > \`.specnaut/templates/constitution-template.md\` as a starting point.
@@ -12638,7 +12638,7 @@ continuous supervision of long headless work, use \`/loop 5m /status-audit\`.
 The 5 status columns mirror the GitHub Projects "kanban" model:
 
 - **Backlog** — needs more info, sizing, or prioritisation. The PO
-  works these on \`/specflow groom\` until they're ready.
+  works these on \`/specnaut groom\` until they're ready.
 - **Ready** — clarified, sized, prioritised. The PO proposes these
   for development when asked "what's next".
 - **In progress** — actively being worked on (a branch is open).
@@ -12660,7 +12660,7 @@ created: ...
 ---
 \`\`\`
 
-The PO assigns size + priority during the \`/specflow groom\` pass.
+The PO assigns size + priority during the \`/specnaut groom\` pass.
 
 ---
 
@@ -12692,9 +12692,9 @@ _No tasks yet._
     category: "spec-root",
     name: "specify",
     suffix: "LABELS.md",
-    content: `# Specflow semantic labels
+    content: `# Specnaut semantic labels
 
-Specflow ships a canonical set of generic, semantic labels that every
+Specnaut ships a canonical set of generic, semantic labels that every
 project should agree on. They are deliberately stack-agnostic — no
 \`frontend\`, \`backend\`, \`ios\`, etc. Pick those per project and add them
 on top of this baseline if you need them.
@@ -12720,7 +12720,7 @@ on top of this baseline if you need them.
 
 Idempotent — creates only missing labels, never edits or deletes
 existing ones. Verifies that GitHub's default \`bug\` label is present and
-warns if it is not. Run once after \`specflow init\` (or any time you want
+warns if it is not. Run once after \`specnaut init\` (or any time you want
 to bring an existing repo into alignment).
 
 ### GitLab backend
@@ -12739,11 +12739,11 @@ above so projects that later migrate to a remote backend keep continuity.
 
 ## Conventions
 
-- **Don't rename Specflow's labels.** The \`product-owner\` agent
+- **Don't rename Specnaut's labels.** The \`product-owner\` agent
   recognises them by name when grooming.
 - **Add domain labels in addition** — \`frontend\`, \`auth\`, \`billing\` —
   but keep this base set stable.
-- **\`priority:*\` and \`size:*\` labels are deprecated.** Specflow now
+- **\`priority:*\` and \`size:*\` labels are deprecated.** Specnaut now
   writes those to native Project V2 fields (\`Priority\` / \`Size\`) when
   available — see \`set-field.sh\`. Existing label-only projects still
   work via the same fallback path.
@@ -12861,7 +12861,7 @@ above so projects that later migrate to a remote backend keep continuity.
 ## Domain Model *(mandatory)*
 
 <!--
-  ACTION REQUIRED: Populated by the Product Owner during /specflow clarify.
+  ACTION REQUIRED: Populated by the Product Owner during /specnaut clarify.
   The developer refuses to proceed without this section.
   Format mirrors the PO's /backlog brief output — same shape everywhere.
 -->
@@ -12928,7 +12928,7 @@ above so projects that later migrate to a remote backend keep continuity.
 **Branch**: \`[###-feature-name]\` | **Date**: [DATE] | **Spec**: [link]
 **Input**: Feature specification from \`/.specnaut/specs/[###-feature-name]/spec.md\`
 
-**Note**: This template is filled in by the \`__SPECFLOW_COMMAND_PLAN__\` command. See \`.specnaut/templates/plan-template.md\` for the execution workflow.
+**Note**: This template is filled in by the \`__SPECNAUT_COMMAND_PLAN__\` command. See \`.specnaut/templates/plan-template.md\` for the execution workflow.
 
 ## Summary
 
@@ -12964,12 +12964,12 @@ above so projects that later migrate to a remote backend keep continuity.
 
 \`\`\`text
 .specnaut/specs/[###-feature]/
-├── plan.md              # This file (__SPECFLOW_COMMAND_PLAN__ command output)
-├── research.md          # Phase 0 output (__SPECFLOW_COMMAND_PLAN__ command)
-├── data-model.md        # Phase 1 output (__SPECFLOW_COMMAND_PLAN__ command)
-├── quickstart.md        # Phase 1 output (__SPECFLOW_COMMAND_PLAN__ command)
-├── contracts/           # Phase 1 output (__SPECFLOW_COMMAND_PLAN__ command)
-└── tasks.md             # Phase 2 output (__SPECFLOW_COMMAND_TASKS__ command - NOT created by __SPECFLOW_COMMAND_PLAN__)
+├── plan.md              # This file (__SPECNAUT_COMMAND_PLAN__ command output)
+├── research.md          # Phase 0 output (__SPECNAUT_COMMAND_PLAN__ command)
+├── data-model.md        # Phase 1 output (__SPECNAUT_COMMAND_PLAN__ command)
+├── quickstart.md        # Phase 1 output (__SPECNAUT_COMMAND_PLAN__ command)
+├── contracts/           # Phase 1 output (__SPECNAUT_COMMAND_PLAN__ command)
+└── tasks.md             # Phase 2 output (__SPECNAUT_COMMAND_TASKS__ command - NOT created by __SPECNAUT_COMMAND_PLAN__)
 \`\`\`
 
 ### Source Code (repository root)
@@ -13067,7 +13067,7 @@ description: "Task list template for feature implementation"
   ============================================================================
   IMPORTANT: The tasks below are SAMPLE TASKS for illustration purposes only.
   
-  The __SPECFLOW_COMMAND_TASKS__ command MUST replace these with actual tasks based on:
+  The __SPECNAUT_COMMAND_TASKS__ command MUST replace these with actual tasks based on:
   - User stories from spec.md (with their priorities P1, P2, P3...)
   - Feature requirements from plan.md
   - Entities from data-model.md
@@ -13302,13 +13302,13 @@ With multiple developers:
 **Created**: [DATE]
 **Feature**: [Link to spec.md or relevant documentation]
 
-**Note**: This checklist is generated by the \`__SPECFLOW_COMMAND_CHECKLIST__\` command based on feature context and requirements.
+**Note**: This checklist is generated by the \`__SPECNAUT_COMMAND_CHECKLIST__\` command based on feature context and requirements.
 
 <!-- 
   ============================================================================
   IMPORTANT: The checklist items below are SAMPLE ITEMS for illustration only.
   
-  The __SPECFLOW_COMMAND_CHECKLIST__ command MUST replace these with actual items based on:
+  The __SPECNAUT_COMMAND_CHECKLIST__ command MUST replace these with actual items based on:
   - User's specific checklist request
   - Feature requirements from spec.md
   - Technical context from plan.md
@@ -13348,9 +13348,9 @@ With multiple developers:
     content: `# [PROJECT_NAME] Constitution
 <!-- Example: Spec Constitution, TaskFlow Constitution, etc. -->
 
-## Engineering methodology (Specflow baseline)
+## Engineering methodology (Specnaut baseline)
 
-> Specflow ships these as opinionated defaults. Amend, soften, or remove
+> Specnaut ships these as opinionated defaults. Amend, soften, or remove
 > per principle — but a project that overrides them MUST document why.
 
 ### Test-Driven Development (NON-NEGOTIABLE)
@@ -13645,20 +13645,20 @@ fi
 # Validate required directories and files
 if [[ ! -d "\$FEATURE_DIR" ]]; then
     echo "ERROR: Feature directory not found: \$FEATURE_DIR" >&2
-    echo "Run /specflow specify first to create the feature structure." >&2
+    echo "Run /specnaut specify first to create the feature structure." >&2
     exit 1
 fi
 
 if [[ ! -f "\$IMPL_PLAN" ]]; then
     echo "ERROR: plan.md not found in \$FEATURE_DIR" >&2
-    echo "Run /specflow plan first to create the implementation plan." >&2
+    echo "Run /specnaut plan first to create the implementation plan." >&2
     exit 1
 fi
 
 # Check for tasks.md if required
 if \$REQUIRE_TASKS && [[ ! -f "\$TASKS" ]]; then
     echo "ERROR: tasks.md not found in \$FEATURE_DIR" >&2
-    echo "Run /specflow tasks first to create the task list." >&2
+    echo "Run /specnaut tasks first to create the task list." >&2
     exit 1
 fi
 
@@ -13938,7 +13938,7 @@ get_feature_paths() {
 
     # Resolve feature directory.  Priority:
     #   1. SPECIFY_FEATURE_DIRECTORY env var (explicit override)
-    #   2. .specnaut/feature.json "feature_directory" key (persisted by /specflow specify)
+    #   2. .specnaut/feature.json "feature_directory" key (persisted by /specnaut specify)
     #   3. Branch-name-based prefix lookup (legacy fallback)
     local feature_dir
     if [[ -n "\${SPECIFY_FEATURE_DIRECTORY:-}" ]]; then
@@ -14043,10 +14043,10 @@ resolve_template() {
             # The python3 call is wrapped in an if-condition so that set -e does not
             # abort the function when python3 exits non-zero (e.g. invalid JSON).
             local sorted_presets=""
-            if sorted_presets=\$(SPECFLOW_REGISTRY="\$registry_file" python3 -c "
+            if sorted_presets=\$(SPECNAUT_REGISTRY="\$registry_file" python3 -c "
 import json, sys, os
 try:
-    with open(os.environ['SPECFLOW_REGISTRY']) as f:
+    with open(os.environ['SPECNAUT_REGISTRY']) as f:
         data = json.load(f)
     presets = data.get('presets', {})
     for pid, meta in sorted(presets.items(), key=lambda x: x[1].get('priority', 10) if isinstance(x[1], dict) else 10):
@@ -14131,10 +14131,10 @@ resolve_template_content() {
         local registry_file="\$presets_dir/.registry"
         local sorted_presets=""
         if [ -f "\$registry_file" ] && command -v python3 >/dev/null 2>&1; then
-            if sorted_presets=\$(SPECFLOW_REGISTRY="\$registry_file" python3 -c "
+            if sorted_presets=\$(SPECNAUT_REGISTRY="\$registry_file" python3 -c "
 import json, sys, os
 try:
-    with open(os.environ['SPECFLOW_REGISTRY']) as f:
+    with open(os.environ['SPECNAUT_REGISTRY']) as f:
         data = json.load(f)
     presets = data.get('presets', {})
     for pid, meta in sorted(presets.items(), key=lambda x: x[1].get('priority', 10) if isinstance(x[1], dict) else 10):
@@ -14155,7 +14155,7 @@ except Exception:
                             local result
                             local py_stderr
                             py_stderr=\$(mktemp)
-                            result=\$(SPECFLOW_MANIFEST="\$manifest" SPECFLOW_TMPL="\$template_name" python3 -c "
+                            result=\$(SPECNAUT_MANIFEST="\$manifest" SPECNAUT_TMPL="\$template_name" python3 -c "
 import sys, os
 try:
     import yaml
@@ -14164,10 +14164,10 @@ except ImportError:
     print('replace\\t')
     sys.exit(0)
 try:
-    with open(os.environ['SPECFLOW_MANIFEST']) as f:
+    with open(os.environ['SPECNAUT_MANIFEST']) as f:
         data = yaml.safe_load(f)
     for t in data.get('provides', {}).get('templates', []):
-        if t.get('name') == os.environ['SPECFLOW_TMPL'] and t.get('type', 'template') == 'template':
+        if t.get('name') == os.environ['SPECNAUT_TMPL'] and t.get('type', 'template') == 'template':
             print(t.get('strategy', 'replace') + '\\t' + t.get('file', ''))
             sys.exit(0)
     print('replace\\t')
@@ -14418,7 +14418,7 @@ while [ \$i -le \$# ]; do
             echo "  --timestamp         Use timestamp prefix (YYYYMMDD-HHMMSS) instead of sequential numbering"
             echo "  --issue <id>        Link this feature to a backlog issue (id is a positive integer);"
             echo "                      surfaces in JSON output and is persisted to .specnaut/feature.json"
-            echo "                      so /specflow merge can close the loop on the project board."
+            echo "                      so /specnaut merge can close the loop on the project board."
             echo "  --help, -h          Show this help message"
             echo ""
             echo "Examples:"
@@ -14962,20 +14962,20 @@ if (\$PathsOnly) {
 # Validate required directories and files
 if (-not (Test-Path \$paths.FEATURE_DIR -PathType Container)) {
     Write-Output "ERROR: Feature directory not found: \$(\$paths.FEATURE_DIR)"
-    Write-Output "Run /specflow.specify first to create the feature structure."
+    Write-Output "Run /specnaut.specify first to create the feature structure."
     exit 1
 }
 
 if (-not (Test-Path \$paths.IMPL_PLAN -PathType Leaf)) {
     Write-Output "ERROR: plan.md not found in \$(\$paths.FEATURE_DIR)"
-    Write-Output "Run /specflow.plan first to create the implementation plan."
+    Write-Output "Run /specnaut.plan first to create the implementation plan."
     exit 1
 }
 
 # Check for tasks.md if required
 if (\$RequireTasks -and -not (Test-Path \$paths.TASKS -PathType Leaf)) {
     Write-Output "ERROR: tasks.md not found in \$(\$paths.FEATURE_DIR)"
-    Write-Output "Run /specflow.tasks first to create the task list."
+    Write-Output "Run /specnaut.tasks first to create the task list."
     exit 1
 }
 
@@ -15160,7 +15160,7 @@ function Test-HasGit {
 
 # Strip a single optional path segment (e.g. gitflow "feat/004-name" -> "004-name").
 # Only when the full name is exactly two slash-free segments; otherwise returns the raw name.
-function Get-SpecflowEffectiveBranchName {
+function Get-SpecnautEffectiveBranchName {
     param([string]\$Branch)
     if (\$Branch -match '^([^/]+)/([^/]+)\$') {
         return \$Matches[2]
@@ -15181,7 +15181,7 @@ function Test-FeatureBranch {
     }
 
     \$raw = \$Branch
-    \$Branch = Get-SpecflowEffectiveBranchName \$raw
+    \$Branch = Get-SpecnautEffectiveBranchName \$raw
     
     # Accept sequential prefix (3+ digits) but exclude malformed timestamps
     # Malformed: 7-or-8 digit date + 6-digit time with no trailing slug (e.g. "2026031-143022" or "20260319-143022")
@@ -15202,7 +15202,7 @@ function Find-FeatureDirByPrefix {
         [Parameter(Mandatory = \$true)][string]\$Branch
     )
     \$specsDir = Join-Path \$RepoRoot '.specnaut' 'specs'
-    \$branchName = Get-SpecflowEffectiveBranchName \$Branch
+    \$branchName = Get-SpecnautEffectiveBranchName \$Branch
 
     \$prefix = \$null
     if (\$branchName -match '^(\\d{8}-\\d{6})-') {
@@ -15251,7 +15251,7 @@ function Get-FeaturePathsEnv {
 
     # Resolve feature directory.  Priority:
     #   1. SPECIFY_FEATURE_DIRECTORY env var (explicit override)
-    #   2. .specnaut/feature.json "feature_directory" key (persisted by /specflow.specify)
+    #   2. .specnaut/feature.json "feature_directory" key (persisted by /specnaut.specify)
     #   3. Branch-name-based prefix lookup (same as scripts/bash/common.sh)
     \$featureJson = Join-Path \$repoRoot '.specnaut/feature.json'
     if (\$env:SPECIFY_FEATURE_DIRECTORY) {
@@ -15644,7 +15644,7 @@ if (\$Help) {
     Write-Host "  -Timestamp          Use timestamp prefix (YYYYMMDD-HHMMSS) instead of sequential numbering"
     Write-Host "  -Issue <id>         Link this feature to a backlog issue (positive integer);"
     Write-Host "                      surfaces in JSON output and is persisted to .specnaut/feature.json"
-    Write-Host "                      so /specflow merge can close the loop on the project board."
+    Write-Host "                      so /specnaut merge can close the loop on the project board."
     Write-Host "  -Help               Show this help message"
     Write-Host ""
     Write-Host "Examples:"
