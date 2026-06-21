@@ -41,19 +41,60 @@ function normalizeApiUrl(raw: string): string | null {
   }
 }
 
-/** Resolve the deployment URL: flag → existing config → (login only) prompt. */
+/** Where a resolved deployment URL came from — drives the login trust
+ *  disclosure (#400). `flag`/`prompt` are explicit user acts; `config` is a
+ *  project file the user may not have authored. */
+type ApiUrlSource = "flag" | "config" | "prompt";
+
+type ResolvedApiUrl = { url: string; source: ApiUrlSource };
+
+/** Resolve the deployment URL: flag → existing config → (login only) prompt,
+ *  tagging the source so `runLogin` can disclose it before authenticating. */
 async function resolveApiUrl(
   explicit: string | null,
   allowPrompt: boolean,
-): Promise<string | null> {
-  if (explicit) return normalizeApiUrl(explicit);
+): Promise<ResolvedApiUrl | null> {
+  if (explicit) {
+    const url = normalizeApiUrl(explicit);
+    return url ? { url, source: "flag" } : null;
+  }
   const cfg = await readCloudConfig(Deno.cwd());
-  if (cfg?.apiUrl) return normalizeApiUrl(cfg.apiUrl);
+  if (cfg?.apiUrl) {
+    const url = normalizeApiUrl(cfg.apiUrl);
+    return url ? { url, source: "config" } : null;
+  }
   if (allowPrompt && Deno.stdin.isTerminal()) {
     const v = prompt("Specnaut Cloud API URL (e.g. https://your-deployment.convex.site):");
-    if (v && v.trim()) return normalizeApiUrl(v);
+    if (v && v.trim()) {
+      const url = normalizeApiUrl(v);
+      return url ? { url, source: "prompt" } : null;
+    }
   }
   return null;
+}
+
+const URL_SOURCE_LABEL: Record<ApiUrlSource, string> = {
+  flag: "--api-url flag",
+  config: "project config (.specnaut/backlog-config.yml)",
+  prompt: "entered at prompt",
+};
+
+/** Human label for where a deployment URL came from (login disclosure, #400). */
+export function urlSourceLabel(source: ApiUrlSource): string {
+  return URL_SOURCE_LABEL[source];
+}
+
+/** Whether `login` must confirm before authenticating: only when the URL came
+ *  from a project config file AND the user has never authenticated against it.
+ *  That is the precise phishing window — a committed `backlog-config.yml`
+ *  redirecting login at an attacker host — while an explicit `--api-url`, an
+ *  interactively-typed URL, or re-login to a known deployment stay
+ *  friction-free (#400). */
+export function loginNeedsTrustConfirm(
+  source: ApiUrlSource,
+  hasExistingCreds: boolean,
+): boolean {
+  return source === "config" && !hasExistingCreds;
 }
 
 export async function runCloud(intent: CloudIntent): Promise<number> {
@@ -77,8 +118,8 @@ export async function runCloud(intent: CloudIntent): Promise<number> {
 async function authedSession(
   intent: CloudIntent,
 ): Promise<{ client: CloudClient; token: string } | number> {
-  const apiUrl = await resolveApiUrl(intent.apiUrl, false);
-  if (!apiUrl) {
+  const resolved = await resolveApiUrl(intent.apiUrl, false);
+  if (!resolved) {
     console.error(
       red(
         "error: no Specnaut Cloud API URL (pass --api-url or set api_url in backlog-config.yml).",
@@ -86,6 +127,7 @@ async function authedSession(
     );
     return 1;
   }
+  const apiUrl = resolved.url;
   const client = new CloudClient(apiUrl);
   const store = defaultCredentialStore();
   const token = await freshAccessToken({ apiUrl, client, store, now: () => Date.now() });
@@ -191,14 +233,42 @@ async function runLogin(intent: CloudIntent): Promise<number> {
     return 2;
   }
 
-  const apiUrl = await resolveApiUrl(intent.apiUrl, true);
-  if (!apiUrl) {
+  const resolved = await resolveApiUrl(intent.apiUrl, true);
+  if (!resolved) {
     console.error(red("error: no Specnaut Cloud API URL (pass --api-url <url>)."));
     return 2;
   }
+  const apiUrl = resolved.url;
+
+  // Disclose the target server + where the URL came from BEFORE opening the
+  // browser, so a config-supplied (potentially attacker-controlled) api_url is
+  // visible and interceptable rather than silently authenticated against (#400).
+  console.log("");
+  console.log(`  Connecting to:  ${bold(apiUrl)}`);
+  console.log(dim(`  Source:         ${urlSourceLabel(resolved.source)}`));
 
   const client = new CloudClient(apiUrl);
   const store = defaultCredentialStore();
+
+  // First-ever auth against a URL a project config chose is the phishing window
+  // — require an explicit confirmation there (and only there). An --api-url
+  // flag, a typed URL, or re-login to a known deployment proceed unprompted.
+  const existing = await store.load(apiUrl);
+  if (loginNeedsTrustConfirm(resolved.source, existing !== null)) {
+    console.log(
+      yellow(
+        "  ⚠ this URL comes from the project config, not from you, and you have",
+      ),
+    );
+    console.log(yellow("    never logged in here before."));
+    const answer = (prompt("  Authenticate against this server? [y/N]") ?? "")
+      .trim()
+      .toLowerCase();
+    if (answer !== "y" && answer !== "yes") {
+      console.error(red("aborted — login cancelled."));
+      return 1;
+    }
+  }
 
   const result = await login({
     apiUrl,
@@ -298,8 +368,8 @@ async function runToken(intent: CloudIntent): Promise<number> {
     return 0;
   }
 
-  const apiUrl = await resolveApiUrl(intent.apiUrl, false);
-  if (!apiUrl) {
+  const resolved = await resolveApiUrl(intent.apiUrl, false);
+  if (!resolved) {
     console.error(
       red(
         "error: no Specnaut Cloud API URL (pass --api-url or set api_url in backlog-config.yml).",
@@ -307,6 +377,7 @@ async function runToken(intent: CloudIntent): Promise<number> {
     );
     return 1;
   }
+  const apiUrl = resolved.url;
 
   const client = new CloudClient(apiUrl);
   const store = defaultCredentialStore();
@@ -321,11 +392,12 @@ async function runToken(intent: CloudIntent): Promise<number> {
 }
 
 async function runLogout(intent: CloudIntent): Promise<number> {
-  const apiUrl = await resolveApiUrl(intent.apiUrl, false);
-  if (!apiUrl) {
+  const resolved = await resolveApiUrl(intent.apiUrl, false);
+  if (!resolved) {
     console.error(red("error: no Specnaut Cloud API URL to log out of."));
     return 1;
   }
+  const apiUrl = resolved.url;
   await defaultCredentialStore().delete(apiUrl);
   console.log(green(`✓ logged out of ${apiUrl}`));
   return 0;
