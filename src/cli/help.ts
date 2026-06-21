@@ -15,10 +15,15 @@ ${bold("Usage:")}
   specnaut reconcile --status         List files pending post-upgrade reconciliation
   specnaut reconcile <path> --accept-upstream | --accept-current
                                       Resolve a preserved file after upgrade
+  specnaut login [--api-url <url>]    Authenticate with Specnaut Cloud (alias for "cloud login")
   specnaut cloud login [--api-url <url>]
                                       Authenticate with Specnaut Cloud (browser device flow) and link a project
   specnaut cloud logout [--api-url <url>]
                                       Remove stored Specnaut Cloud credentials
+  specnaut cloud orgs [--api-url <url>]
+                                      List the organizations your account belongs to
+  specnaut cloud board [--api-url <url>]
+                                      Show the linked project's board (tasks grouped by column)
   specnaut --version, -v              Print version
   specnaut --help, -h                 Show this help
 

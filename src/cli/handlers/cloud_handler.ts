@@ -1,17 +1,20 @@
-// `specnaut cloud <login|token|logout>` (#353) — the CLI side of the Specnaut
-// Cloud backlog backend's interactive auth.
+// `specnaut cloud <login|token|logout|orgs|board>` (#353, #398) — the CLI side
+// of the Specnaut Cloud backlog backend's interactive auth + read commands.
 //
 //   login   device-authorization browser flow → stores credentials securely,
 //           then binds the project to a Cloud project (select or create) and
-//           writes .specnaut/backlog-config.yml.
+//           writes .specnaut/backlog-config.yml. Also reachable as the
+//           top-level `specnaut login` alias.
 //   token   prints a fresh access token to stdout (refreshing transparently);
 //           used by the bundled cloud/*.sh scripts. Honors SPECNAUT_CLOUD_TOKEN
 //           (legacy SPECFLOW_CLOUD_TOKEN as a fallback) as a headless / CI
 //           escape hatch.
 //   logout  removes the stored credentials for the deployment.
+//   orgs    lists the account's organizations (active one flagged).
+//   board   shows the linked project's board, tasks grouped by column.
 
 import { bold, dim, green, red, yellow } from "@std/fmt/colors";
-import { CloudClient } from "../../domain/cloud/cloud_client.ts";
+import { CloudClient, type CloudColumn, type CloudTask } from "../../domain/cloud/cloud_client.ts";
 import { freshAccessToken, login } from "../../domain/cloud/auth_flow.ts";
 import { readCloudConfig, writeCloudConfig } from "../../domain/cloud/cloud_config.ts";
 import { defaultCredentialStore } from "../../infrastructure/credential_store.ts";
@@ -19,7 +22,7 @@ import { openInBrowser } from "../../infrastructure/browser_opener.ts";
 
 export type CloudIntent = {
   kind: "cloud";
-  sub: "login" | "token" | "logout";
+  sub: "login" | "token" | "logout" | "orgs" | "board";
   apiUrl: string | null;
 };
 
@@ -61,6 +64,119 @@ export async function runCloud(intent: CloudIntent): Promise<number> {
       return await runToken(intent);
     case "logout":
       return await runLogout(intent);
+    case "orgs":
+      return await runOrgs(intent);
+    case "board":
+      return await runBoard(intent);
+  }
+}
+
+/** Resolve the deployment URL (no prompt) + a fresh access token for the
+ *  read commands, or print guidance and return a non-zero exit code. The token
+ *  is obtained via the keychain-backed refresh flow and never printed. */
+async function authedSession(
+  intent: CloudIntent,
+): Promise<{ client: CloudClient; token: string } | number> {
+  const apiUrl = await resolveApiUrl(intent.apiUrl, false);
+  if (!apiUrl) {
+    console.error(
+      red(
+        "error: no Specnaut Cloud API URL (pass --api-url or set api_url in backlog-config.yml).",
+      ),
+    );
+    return 1;
+  }
+  const client = new CloudClient(apiUrl);
+  const store = defaultCredentialStore();
+  const token = await freshAccessToken({ apiUrl, client, store, now: () => Date.now() });
+  if (!token) {
+    console.error(red("error: not authenticated with Specnaut Cloud."));
+    console.error(dim("  run `specnaut login` (or set SPECNAUT_CLOUD_TOKEN)."));
+    return 1;
+  }
+  return { client, token };
+}
+
+async function runOrgs(intent: CloudIntent): Promise<number> {
+  const session = await authedSession(intent);
+  if (typeof session === "number") return session;
+
+  let orgs;
+  try {
+    orgs = await session.client.listOrgs(session.token);
+  } catch (e) {
+    console.error(red(`error: ${e instanceof Error ? e.message : String(e)}`));
+    return 1;
+  }
+
+  if (orgs.length === 0) {
+    console.log(dim("No organizations."));
+    return 0;
+  }
+  console.log(bold("Your organizations:"));
+  for (const o of orgs) {
+    const marker = o.isActive ? green("●") : dim("○");
+    const active = o.isActive ? green(" (active)") : "";
+    console.log(`  ${marker} ${bold(o.name)} ${dim(o.slug)} — ${o.role}${active}`);
+  }
+  return 0;
+}
+
+async function runBoard(intent: CloudIntent): Promise<number> {
+  const cfg = await readCloudConfig(Deno.cwd());
+  const projectKey = cfg?.projectKey;
+  if (!projectKey) {
+    console.error(red("error: no project linked here."));
+    console.error(
+      dim("  run `specnaut login` to select a project, or `cd` into a linked project."),
+    );
+    return 1;
+  }
+
+  const session = await authedSession(intent);
+  if (typeof session === "number") return session;
+
+  let columns: CloudColumn[];
+  let tasks: CloudTask[];
+  try {
+    [columns, tasks] = await Promise.all([
+      session.client.listColumns(session.token, projectKey),
+      session.client.listTasks(session.token, projectKey),
+    ]);
+  } catch (e) {
+    console.error(red(`error: ${e instanceof Error ? e.message : String(e)}`));
+    return 1;
+  }
+
+  renderBoard(projectKey, columns, tasks);
+  return 0;
+}
+
+/** Print the board: columns in order, each followed by its tasks. */
+function renderBoard(
+  projectKey: string,
+  columns: CloudColumn[],
+  tasks: CloudTask[],
+): void {
+  const byColumn = new Map<string, CloudTask[]>();
+  for (const t of tasks) {
+    const list = byColumn.get(t.columnId) ?? [];
+    list.push(t);
+    byColumn.set(t.columnId, list);
+  }
+
+  console.log(bold(`Board — ${projectKey}`));
+  for (const col of [...columns].sort((a, b) => a.order - b.order)) {
+    const colTasks = byColumn.get(col.id) ?? [];
+    console.log(`\n${bold(col.name)} ${dim(`(${colTasks.length})`)}`);
+    if (colTasks.length === 0) {
+      console.log(dim("  —"));
+      continue;
+    }
+    for (const t of colTasks) {
+      const meta = [t.priority, t.size].filter(Boolean).join(" ");
+      console.log(`  ${dim(`#${t.number}`)} ${t.title}${meta ? dim(`  [${meta}]`) : ""}`);
+    }
   }
 }
 

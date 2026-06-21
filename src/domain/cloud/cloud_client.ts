@@ -26,6 +26,26 @@ export type RefreshResult =
 
 export type CloudProject = { key: string; name: string; role: string };
 
+/** An org the authenticated account belongs to (`GET /api/v1/orgs`, #398).
+ *  Identified by its public `slug`; `isActive` marks the org the current
+ *  session/token is bound to. */
+export type CloudOrg = {
+  slug: string;
+  name: string;
+  role: string;
+  isActive: boolean;
+};
+
+export type CloudColumn = { id: string; name: string; order: number };
+
+export type CloudTask = {
+  number: number;
+  title: string;
+  columnId: string;
+  priority: string | null;
+  size: string | null;
+};
+
 export type FetchFn = typeof fetch;
 
 export class CloudApiError extends Error {
@@ -57,6 +77,24 @@ export class CloudClient {
       body: JSON.stringify(body ?? {}),
     });
     return { status: res.status, json: await readJson(res) };
+  }
+
+  /** Authenticated GET → parsed body, throwing CloudApiError on non-200. The
+   *  bearer token only ever travels in the Authorization header (never logged,
+   *  never in the URL/querystring). */
+  private async getJson(
+    path: string,
+    accessToken: string,
+    failMsg: string,
+  ): Promise<Record<string, unknown>> {
+    const res = await this.fetchFn(`${this.base}${path}`, {
+      headers: { Authorization: `Bearer ${accessToken}` },
+    });
+    const json = await readJson(res);
+    if (res.status !== 200) {
+      throw new CloudApiError(res.status, strField(json, "error") ?? failMsg);
+    }
+    return json;
   }
 
   // `specflow-cli` is the frozen OAuth device-client id the Cloud backend
@@ -115,17 +153,60 @@ export class CloudClient {
   }
 
   async listProjects(accessToken: string): Promise<CloudProject[]> {
-    const res = await this.fetchFn(`${this.base}/projects`, {
-      headers: { Authorization: `Bearer ${accessToken}` },
-    });
-    const json = await readJson(res);
-    if (res.status !== 200) {
-      throw new CloudApiError(res.status, strField(json, "error") ?? "list projects failed");
-    }
+    const json = await this.getJson("/projects", accessToken, "list projects failed");
     const raw = Array.isArray(json.projects) ? json.projects : [];
     return raw.map((p) => {
       const o = p as Record<string, unknown>;
       return { key: String(o.key), name: String(o.name), role: String(o.role ?? "") };
+    });
+  }
+
+  /** The orgs the authenticated account belongs to (`specnaut cloud orgs`). */
+  async listOrgs(accessToken: string): Promise<CloudOrg[]> {
+    const json = await this.getJson("/orgs", accessToken, "list orgs failed");
+    const raw = Array.isArray(json.orgs) ? json.orgs : [];
+    return raw.map((o) => {
+      const r = o as Record<string, unknown>;
+      return {
+        slug: cleanText(r.slug),
+        name: cleanText(r.name),
+        role: cleanText(r.role),
+        isActive: Boolean(r.isActive),
+      };
+    });
+  }
+
+  /** The board's columns for a project (`specnaut cloud board`). */
+  async listColumns(accessToken: string, projectKey: string): Promise<CloudColumn[]> {
+    const json = await this.getJson(
+      `/columns?projectKey=${encodeURIComponent(projectKey)}`,
+      accessToken,
+      "list columns failed",
+    );
+    const raw = Array.isArray(json.columns) ? json.columns : [];
+    return raw.map((c) => {
+      const o = c as Record<string, unknown>;
+      return { id: String(o.id), name: cleanText(o.name), order: Number(o.order ?? 0) };
+    });
+  }
+
+  /** The project's tasks (`specnaut cloud board`). */
+  async listTasks(accessToken: string, projectKey: string): Promise<CloudTask[]> {
+    const json = await this.getJson(
+      `/tasks?projectKey=${encodeURIComponent(projectKey)}`,
+      accessToken,
+      "list tasks failed",
+    );
+    const raw = Array.isArray(json.tasks) ? json.tasks : [];
+    return raw.map((t) => {
+      const o = t as Record<string, unknown>;
+      return {
+        number: Number(o.number ?? 0),
+        title: cleanText(o.title),
+        columnId: String(o.columnId ?? ""),
+        priority: typeof o.priority === "string" ? o.priority : null,
+        size: typeof o.size === "string" ? o.size : null,
+      };
     });
   }
 
@@ -154,6 +235,15 @@ async function readJson(res: Response): Promise<Record<string, unknown>> {
 function strField(json: Record<string, unknown>, key: string): string | null {
   const v = json[key];
   return typeof v === "string" ? v : null;
+}
+
+/** Coerce a server value to a string with control / non-printable characters
+ *  stripped, so hostile or misconfigured API output can't inject terminal
+ *  escape sequences (ANSI / OSC) when the CLI prints org names, board column
+ *  names, or task titles (#398 hardening). */
+function cleanText(v: unknown): string {
+  // deno-lint-ignore no-control-regex
+  return String(v ?? "").replace(/[\x00-\x1f\x7f]/g, "");
 }
 
 /** Clamp a (possibly NaN) number into [lo, hi], falling back to lo. */

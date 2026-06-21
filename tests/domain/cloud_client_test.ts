@@ -118,3 +118,69 @@ Deno.test("createProject surfaces a conflict as CloudApiError", async () => {
     "already exists",
   );
 });
+
+Deno.test("listOrgs sends the bearer token and parses the array (#398)", async () => {
+  const { fn, calls } = fakeFetch(200, {
+    ok: true,
+    orgs: [
+      { slug: "acme", name: "Acme", role: "owner", isActive: true },
+      { slug: "beta", name: "Beta", role: "member", isActive: false },
+    ],
+  });
+  const out = await new CloudClient(API, fn).listOrgs("AT");
+  assertEquals(calls[0].url, `${API}/api/v1/orgs`);
+  assertEquals(calls[0].method, "GET");
+  assertEquals(calls[0].auth, "Bearer AT");
+  assertEquals(out, [
+    { slug: "acme", name: "Acme", role: "owner", isActive: true },
+    { slug: "beta", name: "Beta", role: "member", isActive: false },
+  ]);
+});
+
+Deno.test("listOrgs surfaces a 401 as CloudApiError (#398)", async () => {
+  const { fn } = fakeFetch(401, { error: "unauthorized" });
+  await assertRejects(
+    () => new CloudClient(API, fn).listOrgs("BAD"),
+    CloudApiError,
+    "unauthorized",
+  );
+});
+
+Deno.test("list* strips terminal control characters from server strings (#398 hardening)", async () => {
+  const { fn } = fakeFetch(200, {
+    ok: true,
+    // A hostile/misconfigured API returns ANSI escape + BEL in the org name.
+    orgs: [{ slug: "ok", name: "Acme\x1b[31m\x07", role: "owner", isActive: true }],
+  });
+  const out = await new CloudClient(API, fn).listOrgs("AT");
+  // ESC (\x1b) and BEL (\x07) stripped; printable chars preserved.
+  assertEquals(out[0].name, "Acme[31m");
+});
+
+Deno.test("listColumns passes projectKey in the querystring (#398)", async () => {
+  const { fn, calls } = fakeFetch(200, {
+    ok: true,
+    columns: [{ id: "c1", name: "Todo", order: 1 }],
+  });
+  const out = await new CloudClient(API, fn).listColumns("AT", "CLOUD");
+  assertEquals(calls[0].url, `${API}/api/v1/columns?projectKey=CLOUD`);
+  assertEquals(calls[0].auth, "Bearer AT");
+  assertEquals(out, [{ id: "c1", name: "Todo", order: 1 }]);
+});
+
+Deno.test("listTasks parses tasks and tolerates missing priority/size (#398)", async () => {
+  const { fn, calls } = fakeFetch(200, {
+    ok: true,
+    tasks: [
+      { number: 12, title: "Ship it", columnId: "c1", priority: "p1", size: "m" },
+      { number: 13, title: "No meta", columnId: "c2" },
+    ],
+  });
+  const out = await new CloudClient(API, fn).listTasks("AT", "CLOUD");
+  assertEquals(calls[0].url, `${API}/api/v1/tasks?projectKey=CLOUD`);
+  assertEquals(calls[0].auth, "Bearer AT");
+  assertEquals(out, [
+    { number: 12, title: "Ship it", columnId: "c1", priority: "p1", size: "m" },
+    { number: 13, title: "No meta", columnId: "c2", priority: null, size: null },
+  ]);
+});

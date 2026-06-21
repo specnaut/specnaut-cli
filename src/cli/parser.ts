@@ -135,8 +135,10 @@ export type Intent =
   | {
     kind: "cloud";
     /** Subcommand: `login` (interactive device auth), `token` (print a fresh
-     *  access token for the scripts), `logout` (clear stored credentials). */
-    sub: "login" | "token" | "logout";
+     *  access token for the scripts), `logout` (clear stored credentials),
+     *  `orgs` (list the account's organizations), `board` (show the linked
+     *  project's board). */
+    sub: "login" | "token" | "logout" | "orgs" | "board";
     /** `--api-url` override; null = read from backlog-config.yml / prompt. */
     apiUrl: string | null;
   }
@@ -310,10 +312,23 @@ export function parseArgs(argv: string[]): Intent {
     };
   }
 
+  // `specnaut login` — top-level alias for `specnaut cloud login` (#398), the
+  // verb users reach for first (à la `gh auth login`).
+  if (command === "login") {
+    const apiUrl = typeof parsed["api-url"] === "string" ? parsed["api-url"] : null;
+    return { kind: "cloud", sub: "login", apiUrl };
+  }
+
   if (command === "cloud") {
     const sub = rest[0];
     const apiUrl = typeof parsed["api-url"] === "string" ? parsed["api-url"] : null;
-    if (sub === "login" || sub === "token" || sub === "logout") {
+    if (
+      sub === "login" ||
+      sub === "token" ||
+      sub === "logout" ||
+      sub === "orgs" ||
+      sub === "board"
+    ) {
       return { kind: "cloud", sub, apiUrl };
     }
     return { kind: "unknown", received: `cloud ${sub ?? ""}`.trim() };
