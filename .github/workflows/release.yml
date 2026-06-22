@@ -231,6 +231,7 @@ jobs:
         # (the token reaches `gh` via subprocess env inheritance regardless).
         run: deno run --allow-read --allow-write --allow-run --allow-env scripts/gen-changelog.ts --strict
       - name: Create release
+        id: release
         uses: softprops/action-gh-release@v3
         with:
           files: |
@@ -245,13 +246,22 @@ jobs:
             dist/specnaut-windows-x64.exe
             dist/specnaut-windows-x64.exe.sha256
           body_path: dist/release-notes.md
-      - name: Bump mkrlabs/homebrew-tap formula
+      # The three publish steps below (tap / Codex / marketplace) each run
+      # INDEPENDENTLY: gated only on the release having been created, never on
+      # each other. A failure in one (e.g. an expired HOMEBREW_TAP_TOKEN) no
+      # longer skips the others — the job still ends red so the failure is
+      # noticed and fixed, but every distribution channel that *can* publish
+      # does. (Hardening after v1.14.0, where a tap-token 403 skipped both
+      # syncs — see specnaut-cli#402.)
+      - name: Bump specnaut/homebrew-tap formula
+        if: ${{ !cancelled() && steps.release.outcome == 'success' }}
         env:
           HOMEBREW_TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
         run: |
           deno run --allow-read --allow-write --allow-run --allow-env \
             scripts/bump-tap-formula.ts
       - name: Sync to Codex marketplace fork (#277 / B1)
+        if: ${{ !cancelled() && steps.release.outcome == 'success' }}
         # Mirrors the Specnaut plugin content into
         # `mkrlabs/plugins:plugins/specnaut/`. A human rebases that
         # fork's PR into upstream `openai/plugins` for the actual
@@ -272,6 +282,7 @@ jobs:
           fi
           exit "${rc:-0}"
       - name: Sync to Specnaut marketplace catalog (#281 / B5)
+        if: ${{ !cancelled() && steps.release.outcome == 'success' }}
         # Bumps `.claude-plugin/marketplace.json` in
         # `specnaut/specnaut-marketplace` (the shared marketplace
         # catalog serving both Claude Code AND Copilot CLI users via
