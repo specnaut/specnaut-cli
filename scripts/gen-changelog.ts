@@ -328,7 +328,7 @@ function formatBullet(c: Classified): string {
 
 // ---------- I/O (only runs when invoked as main) ----------
 
-const REPO_URL = "https://github.com/mkrlabs/specnaut";
+const REPO_URL = "https://github.com/specnaut/specnaut-cli";
 const DEFAULT_OUT = "dist/release-notes.md";
 
 async function getCommits(from: string | null, to: string): Promise<Commit[]> {
