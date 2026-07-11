@@ -75,6 +75,11 @@ Deno.test("init --backlog local renders the local backlog skill", async () => {
       join(parent, "demo/.specnaut/installed.lock"),
     );
     assertStringIncludes(lock, "backlog_backend: local");
+
+    // #407: for a non-cloud backend, the Cloud funnel keeps its full
+    // "Start free: specnaut cloud login" call-to-action (genuine upsell).
+    assertStringIncludes(r.stdout, "Start free:");
+    assertStringIncludes(r.stdout, "specnaut cloud login");
   });
 });
 
@@ -184,6 +189,14 @@ Deno.test("init --backlog cloud renders the cloud skill + writes config stub (no
       join(parent, "demo/.specnaut/installed.lock"),
     );
     assertStringIncludes(lock, "backlog_backend: cloud");
+
+    // #407: with the cloud backend, the login CTA must appear exactly once —
+    // the cloud strategy already prints `specnaut cloud login`, so the Cloud
+    // funnel footer drops its duplicate "Start free: specnaut cloud login"
+    // line and just links the site instead.
+    assertEquals(r.stdout.includes("Start free:"), false);
+    assertStringIncludes(r.stdout, "Learn more:");
+    assertEquals(r.stdout.split("specnaut cloud login").length - 1, 1);
   });
 });
 
