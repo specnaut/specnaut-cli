@@ -45,7 +45,7 @@ Pin a version: `VERSION=v0.1.0-alpha.1`. Change install directory: `PREFIX=$HOME
 ### Homebrew
 
 ```bash
-brew tap mkrlabs/tap
+brew tap specnaut/tap
 brew install specnaut
 ```
 

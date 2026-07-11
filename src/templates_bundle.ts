@@ -7679,7 +7679,7 @@ Frozen at scaffold time. Run the live fetch protocol for anything newer.
 
 Enhanced fork of [\`specify\` CLI](https://github.com/github/spec-kit), distributed as a single native binary. Scaffolds AI harness files — SpecKit slash-commands, spec/plan/tasks templates, a constitution, sub-agents, and a backlog system — into an existing project in one command. Does **not** call any LLM; the user's AI harness reads the generated files. Docs: <https://specnaut.com/llms.txt>. Source: <https://github.com/specnaut/specnaut-cli>.
 
-**Install:** \`curl -fsSL https://raw.githubusercontent.com/specnaut/specnaut-cli/main/install.sh | bash\` or \`brew tap mkrlabs/tap && brew install specnaut\`.
+**Install:** \`curl -fsSL https://raw.githubusercontent.com/specnaut/specnaut-cli/main/install.sh | bash\` or \`brew tap specnaut/tap && brew install specnaut\`.
 
 **Harnesses:** claude, cursor, codex, windsurf, copilot, opencode, antigravity — all share \`templates/core/\` content, mapped per-harness by an adapter.
 

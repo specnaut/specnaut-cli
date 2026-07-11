@@ -172,9 +172,9 @@ jobs:
           set -euo pipefail
           # 1. plugin.json must be parseable JSON
           jq -e . plugin/.claude-plugin/plugin.json > /dev/null
-          # 2. Plugin scaffold must contain at minimum the specnaut-auto skill
+          # 2. Plugin scaffold must contain at minimum the specnaut router skill
           # (catches an accidentally truncated plugin/ directory).
-          test -f plugin/skills/specnaut-auto/SKILL.md
+          test -f plugin/skills/specnaut/SKILL.md
           # 3. Hard fail if plugin.json version drifts from deno.json version.
           # The two are kept in lockstep by scripts/bump-version.ts.
           BIN_VERSION=$(jq -r .version deno.json)
