@@ -16,7 +16,10 @@ import {
 import { makeStdinSelectIO } from "../select.ts";
 import type { BacklogBackend, VersionScheme } from "../../domain/installed_lock.ts";
 import { detectVersionScheme } from "../../domain/project_detection.ts";
-import { findBacklogStrategy } from "../../domain/backlog_strategies/registry.ts";
+import {
+  BACKLOG_STRATEGIES,
+  findBacklogStrategy,
+} from "../../domain/backlog_strategies/registry.ts";
 import {
   type ParsedKanbanURL,
   parseKanbanURL,
@@ -86,7 +89,7 @@ async function resolveBacklogBackend(
   if (explicit !== null) return explicit;
   if (!Deno.stdin.isTerminal()) {
     return pickBacklogBackend({
-      readLine: () => prompt("Choose [1-3]:"),
+      readLine: () => prompt(`Choose [1-${BACKLOG_STRATEGIES.length}]:`),
       log: (s) => console.log(s),
       errLog: (s) => console.error(red(s)),
     });

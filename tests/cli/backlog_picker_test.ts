@@ -34,53 +34,57 @@ function fakeIO(answers: ReadonlyArray<string | null>) {
   };
 }
 
-Deno.test("pickBacklogBackend defaults to local on empty input", () => {
+Deno.test("pickBacklogBackend defaults to cloud on empty input", () => {
   const { io, log } = fakeIO([""]);
-  assertEquals(pickBacklogBackend(io), "local");
-  assertEquals(DEFAULT_BACKLOG_BACKEND, "local");
-  // Lists both backends
+  assertEquals(pickBacklogBackend(io), "cloud");
+  assertEquals(DEFAULT_BACKLOG_BACKEND, "cloud");
   const all = log.join("\n");
+  // Cloud is listed first, marked recommended (default), with a benefit note;
+  // the other backends remain listed.
+  assertEquals(all.includes("Specnaut Cloud"), true);
+  assertEquals(all.includes("recommended (default)"), true);
+  assertEquals(all.includes("hosted online Kanban"), true);
   assertEquals(all.includes("Local Markdown"), true);
   assertEquals(all.includes("GitHub"), true);
 });
 
-Deno.test("pickBacklogBackend picks 1 for local", () => {
+Deno.test("pickBacklogBackend picks 1 for cloud (listed first)", () => {
   const { io } = fakeIO(["1"]);
+  assertEquals(pickBacklogBackend(io), "cloud");
+});
+
+Deno.test("pickBacklogBackend picks 2 for local", () => {
+  const { io } = fakeIO(["2"]);
   assertEquals(pickBacklogBackend(io), "local");
 });
 
-Deno.test("pickBacklogBackend picks 2 for github", () => {
-  const { io } = fakeIO(["2"]);
+Deno.test("pickBacklogBackend picks 3 for github", () => {
+  const { io } = fakeIO(["3"]);
   assertEquals(pickBacklogBackend(io), "github");
 });
 
-Deno.test("pickBacklogBackend picks 3 for gitlab", () => {
-  const { io } = fakeIO(["3"]);
-  assertEquals(pickBacklogBackend(io), "gitlab");
-});
-
-Deno.test("pickBacklogBackend picks 4 for cloud", () => {
+Deno.test("pickBacklogBackend picks 4 for gitlab", () => {
   const { io } = fakeIO(["4"]);
-  assertEquals(pickBacklogBackend(io), "cloud");
+  assertEquals(pickBacklogBackend(io), "gitlab");
 });
 
 Deno.test("pickBacklogBackend re-prompts on invalid input", () => {
   const { io, errLog } = fakeIO(["999", "bad", "1"]);
-  assertEquals(pickBacklogBackend(io), "local");
+  assertEquals(pickBacklogBackend(io), "cloud");
   assertEquals(errLog.length, 2);
 });
 
-Deno.test("pickBacklogBackendInteractive returns 'local' on Enter (default)", async () => {
+Deno.test("pickBacklogBackendInteractive returns 'cloud' on Enter (default)", async () => {
   const io = scriptedIO([new Uint8Array([0x0d])]);
-  assertEquals(await pickBacklogBackendInteractive(io), "local");
+  assertEquals(await pickBacklogBackendInteractive(io), "cloud");
 });
 
-Deno.test("pickBacklogBackendInteractive returns 'github' after one arrow-down + space", async () => {
+Deno.test("pickBacklogBackendInteractive returns 'local' after one arrow-down + space", async () => {
   const io = scriptedIO([
     new Uint8Array([0x1b, 0x5b, 0x42]),
     new Uint8Array([0x20]),
   ]);
-  assertEquals(await pickBacklogBackendInteractive(io), "github");
+  assertEquals(await pickBacklogBackendInteractive(io), "local");
 });
 
 Deno.test("pickBacklogBackendInteractive returns null on Ctrl-C cancel", async () => {
