@@ -1,7 +1,7 @@
 {
   "name": "specnaut-plugin",
   "description": "Specnaut's auto-chained spec-driven workflow, slash commands, and sub-agents for Claude Code — the same content the binary scaffolds, available as a versioned plugin.",
-  "version": "1.14.1",
+  "version": "1.15.0",
   "author": {
     "name": "MakerLabs"
   },
