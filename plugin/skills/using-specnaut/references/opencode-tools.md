@@ -56,7 +56,7 @@ Add to the user's `opencode.json`:
 ```json
 {
   "plugin": [
-    "specnaut@git+https://github.com/mkrlabs/specnaut.git"
+    "specnaut@git+https://github.com/specnaut/specnaut-cli.git"
   ]
 }
 ```

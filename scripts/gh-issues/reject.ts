@@ -6,7 +6,7 @@
 // Hard contract: this script never closes anything. Closure goes
 // through Kevin's explicit approval.
 
-const REPO = "mkrlabs/specnaut";
+const REPO = "specnaut/specnaut-cli";
 
 export type RejectArgs = { num: number; reason: string };
 

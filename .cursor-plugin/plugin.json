@@ -7,8 +7,8 @@
     "name": "MakerLabs",
     "url": "https://github.com/mkrlabs"
   },
-  "homepage": "https://specnaut.makerlabs.dev",
-  "repository": "https://github.com/mkrlabs/specnaut",
+  "homepage": "https://specnaut.com",
+  "repository": "https://github.com/specnaut/specnaut-cli",
   "license": "MIT",
   "keywords": [
     "skills",

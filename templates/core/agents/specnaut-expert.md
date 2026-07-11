@@ -44,12 +44,12 @@ news on demand. You do not modify code; you serve knowledge.
 
 For "what's new" / version-delta questions only:
 
-1. Fetch `https://specnaut.makerlabs.dev/llms.txt` — the canonical
+1. Fetch `https://specnaut.com/llms.txt` — the canonical
    current docs.
 2. If you also need release notes, fetch
-   `https://api.github.com/repos/mkrlabs/specnaut/releases/latest`
+   `https://api.github.com/repos/specnaut/specnaut-cli/releases/latest`
    and extract `tag_name` + `body`. For a range, hit
-   `https://api.github.com/repos/mkrlabs/specnaut/releases` and
+   `https://api.github.com/repos/specnaut/specnaut-cli/releases` and
    filter the `tag_name` list.
 3. If both fail (no network, no `WebFetch` capability), fall back to
    the vendored snapshot below and explicitly say:
@@ -72,7 +72,7 @@ match those triggers — silence beats noise.
 
 1. Read `.specnaut/installed.lock` and extract the `templates_version`
    field. If the file is absent or unreadable, skip silently.
-2. `WebFetch` `https://specnaut.makerlabs.dev/version.json`. Expect
+2. `WebFetch` `https://specnaut.com/version.json`. Expect
    `{"version": "X.Y.Z", "released_at": "YYYY-MM-DD"}`. On any
    failure (non-200, network error, malformed JSON), skip silently
    — never surface the error to the user.
@@ -118,7 +118,7 @@ sections above.
 `~/.config/gh/`. Email addresses NOT scrubbed — tell the user to review.
 
 **Surface**: generate
-`https://github.com/mkrlabs/specnaut/issues/new?title=…&body=…&labels=bug,from%3Aspecnaut-expert`
+`https://github.com/specnaut/specnaut-cli/issues/new?title=…&body=…&labels=bug,from%3Aspecnaut-expert`
 URL-encoded. The label gates the maintainer triage inbox. If the raw
 body exceeds **3000 chars**, present a fenced code block and ask the
 user to paste it into a fresh `issues/new` form.
@@ -141,7 +141,7 @@ Read `.specnaut/upgrade-pending.json`. If absent, respond:
 
 ### 2. Fetch release bodies
 
-For each tag in `(marker.from, marker.to]`: `WebFetch https://api.github.com/repos/mkrlabs/specnaut/releases/tags/v<TAG>`, extract `body`, parse the `### Adoption guide` section (entries: `**#NUM — Title**` / prose / ` ```prompt ` block). Build `adoption = [{version, prNum, title, prose, prompt}]`.
+For each tag in `(marker.from, marker.to]`: `WebFetch https://api.github.com/repos/specnaut/specnaut-cli/releases/tags/v<TAG>`, extract `body`, parse the `### Adoption guide` section (entries: `**#NUM — Title**` / prose / ` ```prompt ` block). Build `adoption = [{version, prNum, title, prose, prompt}]`.
 
 API failure fallback: use vendored snapshot for high-level guidance; warn "Couldn't fetch release notes; high-level adoption guidance only."
 
@@ -182,9 +182,9 @@ Frozen at scaffold time. Run the live fetch protocol for anything newer.
 
 ### What Specnaut is
 
-Enhanced fork of [`specify` CLI](https://github.com/github/spec-kit), distributed as a single native binary. Scaffolds AI harness files — SpecKit slash-commands, spec/plan/tasks templates, a constitution, sub-agents, and a backlog system — into an existing project in one command. Does **not** call any LLM; the user's AI harness reads the generated files. Docs: <https://specnaut.makerlabs.dev/llms.txt>. Source: <https://github.com/mkrlabs/specnaut>.
+Enhanced fork of [`specify` CLI](https://github.com/github/spec-kit), distributed as a single native binary. Scaffolds AI harness files — SpecKit slash-commands, spec/plan/tasks templates, a constitution, sub-agents, and a backlog system — into an existing project in one command. Does **not** call any LLM; the user's AI harness reads the generated files. Docs: <https://specnaut.com/llms.txt>. Source: <https://github.com/specnaut/specnaut-cli>.
 
-**Install:** `curl -fsSL https://raw.githubusercontent.com/mkrlabs/specnaut/main/install.sh | bash` or `brew tap mkrlabs/tap && brew install specnaut`.
+**Install:** `curl -fsSL https://raw.githubusercontent.com/specnaut/specnaut-cli/main/install.sh | bash` or `brew tap mkrlabs/tap && brew install specnaut`.
 
 **Harnesses:** claude, cursor, codex, windsurf, copilot, opencode, antigravity — all share `templates/core/` content, mapped per-harness by an adapter.
 

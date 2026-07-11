@@ -1,6 +1,6 @@
 # specnaut-plugin — Claude Code plugin for Specnaut
 
-This is the Claude Code plugin distribution of [Specnaut](https://specnaut.makerlabs.dev). It ships
+This is the Claude Code plugin distribution of [Specnaut](https://specnaut.com). It ships
 the same slash-commands and sub-agents that the `specnaut` binary scaffolds into projects — just as
 a user-scope plugin instead. `/specnaut specify "<feature>"` auto-chains the full workflow by
 default; pass `--manual` to opt out.
@@ -15,7 +15,7 @@ default; pass `--manual` to opt out.
 | `skills/groom/SKILL.md`                                                                                                                     | Groom skill — `/specnaut-plugin:groom`                                        |
 
 The full plugin migration shipped in v0.12.x (issue
-[#73](https://github.com/mkrlabs/specnaut/issues/73)). When the plugin is installed and the project
+[#73](https://github.com/specnaut/specnaut-cli/issues/73)). When the plugin is installed and the project
 harness is `claude`, `specnaut upgrade` auto-migrates vanilla on-disk agents to the plugin (backs
 them up, then removes them — the plugin serves them going forward). `specnaut check
 --project` warns
@@ -43,7 +43,7 @@ discoverability layer, not the polished workflow. Handoff rewriting is a known f
 ## Install
 
 ```bash
-/plugin install mkrlabs/specnaut-plugin
+/plugin install specnaut/specnaut-cli-plugin
 ```
 
 ## Local development
