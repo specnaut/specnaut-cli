@@ -5,7 +5,7 @@
   "author": {
     "name": "MakerLabs"
   },
-  "homepage": "https://specnaut.makerlabs.dev",
-  "repository": "https://github.com/mkrlabs/specnaut",
+  "homepage": "https://specnaut.com",
+  "repository": "https://github.com/specnaut/specnaut-cli",
   "license": "MIT"
 }

@@ -5,7 +5,7 @@
 //
 // Usage: deno run --allow-run list.ts
 
-const REPO = "mkrlabs/specnaut";
+const REPO = "specnaut/specnaut-cli";
 const LABEL = "from:specnaut-expert";
 
 type GhIssue = {

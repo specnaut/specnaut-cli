@@ -7,7 +7,7 @@
 
 import { findCandidates, type IssueRef } from "./_dedupe_heuristic.ts";
 
-const REPO = "mkrlabs/specnaut";
+const REPO = "specnaut/specnaut-cli";
 const INBOUND_LABEL = "from:specnaut-expert";
 
 type GhIssue = IssueRef & { createdAt: string };

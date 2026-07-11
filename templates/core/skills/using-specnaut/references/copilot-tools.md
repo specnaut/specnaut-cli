@@ -28,13 +28,13 @@ maps each Claude Code tool to its GitHub Copilot CLI equivalent.
 Copilot CLI distributes plugins through a **marketplace repository** — a
 separate GitHub repo registered with `copilot plugin marketplace add`.
 The Specnaut marketplace (see issue #281) lives at
-`mkrlabs/specnaut-marketplace` (planned) and registers Specnaut as
+`specnaut/specnaut-cli-marketplace` (planned) and registers Specnaut as
 `specnaut@specnaut-marketplace`.
 
 Install flow for end users:
 
 ```bash
-copilot plugin marketplace add mkrlabs/specnaut-marketplace
+copilot plugin marketplace add specnaut/specnaut-cli-marketplace
 copilot plugin install specnaut@specnaut-marketplace
 ```
 

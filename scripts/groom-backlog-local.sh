@@ -22,7 +22,7 @@ mkdir -p "$LOG_DIR"
 # Make sure gh + claude are on PATH when launched from a non-login shell.
 export PATH="/opt/homebrew/bin:/usr/local/bin:/Applications/cmux.app/Contents/Resources/bin:$PATH"
 
-PROMPT='You are running as a scheduled grooming routine for the Specnaut project. Your job: clarify any items currently in the Backlog column of GitHub Project #4 (mkrlabs/specnaut), following the Product Owner contract defined at .claude/agents/product-owner.md.
+PROMPT='You are running as a scheduled grooming routine for the Specnaut project. Your job: clarify any items currently in the Backlog column of GitHub Project #4 (specnaut/specnaut-cli), following the Product Owner contract defined at .claude/agents/product-owner.md.
 
 Steps:
 1. Run `.claude/skills/backlog/scripts/list.sh --repo specnaut Backlog` to list current Backlog items.

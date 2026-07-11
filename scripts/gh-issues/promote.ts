@@ -9,7 +9,7 @@
 //   4. set-field.sh <num> Size <S>      (same fallback contract)
 //   5. Public thank-you comment on the issue.
 
-const REPO = "mkrlabs/specnaut";
+const REPO = "specnaut/specnaut-cli";
 const BACKLOG_DIR = ".claude/skills/backlog/scripts";
 
 const PRIORITIES = new Set(["P0", "P1", "P2", "P3"]);
