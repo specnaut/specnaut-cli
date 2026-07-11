@@ -38,7 +38,7 @@ echo "▶ verifying Homebrew tap formula bumped to ${TAG#v}"
 # after the release.yml run completes. We track the soft-warn so the final
 # status differentiates "all green" from "release shipped but tap unverified".
 homebrew_warned=0
-formula_msg="$(gh api repos/mkrlabs/homebrew-tap/commits/main --jq '.commit.message' | head -1)"
+formula_msg="$(gh api repos/specnaut/homebrew-tap/commits/main --jq '.commit.message' | head -1)"
 expected_prefix="chore: bump specnaut to ${TAG#v}"
 if [[ "$formula_msg" != "$expected_prefix"* ]]; then
   echo "⚠ Homebrew formula tip message != '$expected_prefix*': '$formula_msg'"
