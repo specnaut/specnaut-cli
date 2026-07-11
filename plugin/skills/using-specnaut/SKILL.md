@@ -47,7 +47,6 @@ not re-read the file with `Read`.
 | `arch-audit` / `sec-audit` / `perf-audit` / `dep-audit` / `a11y-audit` | Per-axis audit family — user wants **one** lens over a scope ("arch audit", "security audit `--path src/`", "perf audit `--diff`"). Each resolves a uniform scope (`--path` / `--range` / `--diff` / whole) and dispatches its **single** bound auditor (architecture / security / performance / dependency / a11y), returning findings **inline**. Read-only, writes no report. Complements `/specnaut audit <axis>` (which persists a dated report) and `/code-audit` (the multi-seat team). |
 | `status-audit` | User wants a health check of a running multi-agent session ("status audit", "audit the session", "what's blocked", "session health"). Reads the `.specnaut/logs/agents.jsonl` status ledger and reports seven views (state counts / per-agent latest / blocked / stale ≥15m / done-vs-criteria contradictions / missing handoffs / verdict summary). Read-only. Pair with `/loop 5m /status-audit` to supervise long headless work. |
 | `backlog` | User asked about a backlog item, the board, an issue. Read-only access; mutations go through the `product-owner` agent. |
-| `specnaut-auto` | Auto-chain orchestration (legacy entry point — most users invoke `/specnaut specify` instead). |
 | `specnaut-review` | Auto-invoke alias preserved for the `/specnaut review` phase. |
 
 **Preloaded output-contract skills** (`user-invocable: false` — never invoke

@@ -58,7 +58,8 @@ Deno.test("specnaut init --ai cursor scaffolds a Cursor layout", async () => {
       await exists(join(root, ".cursor/skills/specnaut-agent-product-owner/SKILL.md")),
       true,
     );
-    assertEquals(await exists(join(root, ".cursor/skills/specnaut-auto/SKILL.md")), true);
+    // #409: the deprecated specnaut-auto alias no longer scaffolds.
+    assertEquals(await exists(join(root, ".cursor/skills/specnaut-auto/SKILL.md")), false);
     assertEquals(await exists(join(root, ".cursor/rules/specify-rules.mdc")), true);
     // Old per-phase folders are gone post-consolidation.
     assertEquals(

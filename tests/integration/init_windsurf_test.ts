@@ -49,7 +49,7 @@ Deno.test("specnaut init --ai windsurf scaffolds a Windsurf layout", async () =>
 
     const root = join(parent, "demo");
 
-    // v1.0.0: router workflow + 11 sibling phase workflows + specnaut-auto +
+    // v1.0.0: router workflow + 11 sibling phase workflows +
     // specnaut-review alias + backlog + 9 agent workflows.
     assertEquals(
       await exists(join(root, ".windsurf/workflows/specnaut.md")),
@@ -63,9 +63,10 @@ Deno.test("specnaut init --ai windsurf scaffolds a Windsurf layout", async () =>
       await exists(join(root, ".windsurf/workflows/specnaut-backlog.md")),
       true,
     );
+    // #409: the deprecated specnaut-auto alias no longer scaffolds.
     assertEquals(
       await exists(join(root, ".windsurf/workflows/specnaut-auto.md")),
-      true,
+      false,
     );
     assertEquals(
       await exists(
@@ -78,7 +79,7 @@ Deno.test("specnaut init --ai windsurf scaffolds a Windsurf layout", async () =>
     // auto-chain + list-skills + audit-security #303 + audit-performance
     // #304 + audit-accessibility #305 + audit-architecture #321 +
     // audit-dependencies #322 + lite-heuristic #346 + brainstorm #351) +
-    // specnaut-auto + specnaut-review alias + writing-plans (#271) +
+    // specnaut-review alias + writing-plans (#271) +
     // requesting-code-review (#273) + using-specnaut (#282) +
     // subagent-driven-development (#272) + executing-plans (#274) +
     // verification-before-completion (#275) + brainstorming (#276) +
@@ -88,14 +89,14 @@ Deno.test("specnaut init --ai windsurf scaffolds a Windsurf layout", async () =>
     // dep-audit, a11y-audit) + status-audit (#381) +
     // backlog + 15 agent workflows (11 original + performance-auditor #304
     // + a11y-auditor #305 + architecture-auditor #321 + dependency-auditor
-    // #322) = 58. code-audit's scope script ships under
-    // .specnaut/scripts/code-audit/, not as a flattened workflow file;
+    // #322) = 57 (specnaut-auto removed in #409). code-audit's scope script
+    // ships under .specnaut/scripts/code-audit/, not as a flattened workflow file;
     // status-audit's schema doc ships to .specnaut/logs/README.md, also not
     // flattened here.
     const workflowsCount = (await Array.fromAsync(
       Deno.readDir(join(root, ".windsurf/workflows")),
     )).length;
-    assertEquals(workflowsCount, 58);
+    assertEquals(workflowsCount, 57);
 
     // Shared (cross-harness)
     assertEquals(await exists(join(root, ".specnaut/memory/constitution.md")), true);

@@ -98,10 +98,11 @@ Deno.test("isPluginCoveredPath: claude + hyphenated phase names are covered", ()
   }
 });
 
-Deno.test("isPluginCoveredPath: claude + specnaut-auto skill is covered", () => {
+Deno.test("isPluginCoveredPath: claude + deprecated specnaut-auto skill is NOT covered", () => {
+  // specnaut-auto was removed (#409) — it must no longer count as a covered path.
   assertEquals(
     isPluginCoveredPath("claude", ".claude/skills/specnaut-auto/SKILL.md"),
-    true,
+    false,
   );
 });
 

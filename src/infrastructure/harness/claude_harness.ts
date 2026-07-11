@@ -25,7 +25,7 @@ function destinationFor(entry: CoreEntry): string {
     case "skill":
     case "backlog-skill":
       // Claude doesn't add a `specnaut-` prefix — skill names are emitted
-      // verbatim as the folder name (`specnaut`, `specnaut-auto`, `backlog`,
+      // verbatim as the folder name (`specnaut`, `backlog`,
       // `specnaut-review`, …).
       return `.claude/skills/${entry.name}/SKILL.md`;
     case "phase":

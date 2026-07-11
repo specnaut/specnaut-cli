@@ -29,7 +29,6 @@ clarifications needed) STOP #2 (pre-merge validation)
 - `/specnaut review` — architecture + quality gates
 - `/specnaut merge` — merge the feature branch to main
 - `/specnaut-backlog` — manage the product backlog (via the PO agent)
-- `/specnaut-auto` — deprecated alias of `/specnaut`; will be removed in the next major release
 
 ## Agent roles (invocable manually as skills)
 
