@@ -36,11 +36,21 @@ echo "▶ smoke audit"
 # audit.sh prints `0 coverage gap(s)` / `0 stale assertion(s)` but does NOT exit
 # non-zero on failures (verified 2026-05-26). Capture output and parse — the
 # preflight is the gate that gives the audit its teeth.
-audit_out="$(bash .claude/skills/test-sandbox/scripts/audit.sh)"
-echo "$audit_out"
-gaps="$(echo "$audit_out" | grep -oE '[0-9]+ coverage gap' | grep -oE '^[0-9]+' || echo "0")"
-stale="$(echo "$audit_out" | grep -oE '[0-9]+ stale assertion' | grep -oE '^[0-9]+' || echo "0")"
-[ "$gaps" -eq 0 ] && [ "$stale" -eq 0 ] || { echo "❌ smoke audit found $gaps gap(s) + $stale stale assertion(s) — fix before releasing"; exit 1; }
+#
+# Since specnaut-monorepo#7 the test-sandbox skill lives in the monorepo-root
+# `.claude/` (submodules carry none), i.e. two levels up from this repo. Resolve
+# it there; skip gracefully from a standalone clone (e.g. a bare CI checkout of
+# specnaut-cli) where the monorepo `.claude/` isn't present.
+audit_sh="../../.claude/skills/test-sandbox/scripts/audit.sh"
+if [ ! -f "$audit_sh" ]; then
+  echo "  ↳ skipped (test-sandbox skill not present — standalone clone, not the monorepo)"
+else
+  audit_out="$(bash "$audit_sh")"
+  echo "$audit_out"
+  gaps="$(echo "$audit_out" | grep -oE '[0-9]+ coverage gap' | grep -oE '^[0-9]+' || echo "0")"
+  stale="$(echo "$audit_out" | grep -oE '[0-9]+ stale assertion' | grep -oE '^[0-9]+' || echo "0")"
+  [ "$gaps" -eq 0 ] && [ "$stale" -eq 0 ] || { echo "❌ smoke audit found $gaps gap(s) + $stale stale assertion(s) — fix before releasing"; exit 1; }
+fi
 
 echo "▶ deno task bundle (re-sync)"
 deno task bundle
