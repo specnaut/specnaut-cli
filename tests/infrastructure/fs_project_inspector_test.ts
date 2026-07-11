@@ -787,8 +787,7 @@ Deno.test("inspect: plugin gap check warns for each missing covered path when pl
       (o.name.startsWith(".claude/agents/") ||
         o.name.startsWith(".claude/skills/specnaut/") ||
         o.name === ".claude/skills/specnaut/SKILL.md" ||
-        o.name === ".claude/skills/specnaut-review/SKILL.md" ||
-        o.name === ".claude/skills/specnaut-auto/SKILL.md") &&
+        o.name === ".claude/skills/specnaut-review/SKILL.md") &&
       o.status === "warn"
     );
     // 15 agents (10 original + ui-ux-designer drift fix #321 +
@@ -797,9 +796,9 @@ Deno.test("inspect: plugin gap check warns for each missing covered path when pl
     // (the 11 original + tag-version + release-version + list-skills +
     // audit-security #303 + audit-performance #304 + audit-accessibility
     // #305 + audit-architecture #321 + audit-dependencies #322 +
-    // lite-heuristic #346) + specnaut-review alias + specnaut-auto = 38
-    // covered paths.
-    assertEquals(gapOutcomes.length, 38);
+    // lite-heuristic #346) + specnaut-review alias = 37 covered paths
+    // (specnaut-auto removed in #409).
+    assertEquals(gapOutcomes.length, 37);
     for (const o of gapOutcomes) {
       assertEquals(o.message.includes("missing"), true);
       assertEquals(o.message.includes("specnaut upgrade"), true);
@@ -864,8 +863,6 @@ Deno.test("inspect: plugin gap check warns ONLY for the agents the user actually
         await Deno.writeTextFile(join(dir, `.claude/agents/${name}.md`), "stub");
       }
       // Scaffold all skills + commands too (only the agent gap should warn)
-      await Deno.mkdir(join(dir, ".claude/skills/specnaut-auto"), { recursive: true });
-      await Deno.writeTextFile(join(dir, ".claude/skills/specnaut-auto/SKILL.md"), "stub");
       await Deno.mkdir(join(dir, ".claude/skills/specnaut-groom"), { recursive: true });
       await Deno.writeTextFile(
         join(dir, ".claude/skills/specnaut-groom/SKILL.md"),

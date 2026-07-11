@@ -51,11 +51,6 @@ const SYNC_PAIRS: ReadonlyArray<{ plugin: string; source: string }> = [
     plugin: `plugin/skills/specnaut/phases/${name}.md`,
     source: `templates/core/skills/specnaut/phases/${name}.md`,
   })),
-  // Auto-chain stays as a separate skill (own slash-command identity).
-  {
-    plugin: "plugin/skills/specnaut-auto/SKILL.md",
-    source: "templates/core/skills/specnaut-auto/SKILL.md",
-  },
   // Thin alias preserving auto-invocation for the review phase.
   {
     plugin: "plugin/skills/specnaut-review/SKILL.md",

@@ -57,7 +57,8 @@ Deno.test("specnaut init --ai codex scaffolds a Codex layout", async () => {
       true,
     );
     assertEquals(await exists(join(root, ".agents/skills/specnaut-backlog/SKILL.md")), true);
-    assertEquals(await exists(join(root, ".agents/skills/specnaut-auto/SKILL.md")), true);
+    // #409: the deprecated specnaut-auto alias no longer scaffolds.
+    assertEquals(await exists(join(root, ".agents/skills/specnaut-auto/SKILL.md")), false);
     // Old per-phase folders are gone post-consolidation.
     assertEquals(
       await exists(join(root, ".agents/skills/specnaut-specify/SKILL.md")),
@@ -90,7 +91,7 @@ Deno.test("specnaut init --ai codex scaffolds a Codex layout", async () => {
     assertEquals(codexGoalMd.includes("/specnaut groom"), true);
 
     // Top-level skill folders post-consolidation: specnaut router +
-    // specnaut-auto + specnaut-review alias + specnaut-backlog +
+    // specnaut-review alias + specnaut-backlog +
     // writing-plans (A1) + requesting-code-review (A3) +
     // using-specnaut bootstrap (B6) + subagent-driven-development (A2) +
     // executing-plans (A4) + verification-before-completion (A5) +
@@ -98,7 +99,7 @@ Deno.test("specnaut init --ai codex scaffolds a Codex layout", async () => {
     // workflow-contract, handoff-protocol, review-findings-contract,
     // qa-report-contract) + code-audit (#379) + 5 per-axis audit skills
     // (#380: arch-audit, sec-audit, perf-audit, dep-audit, a11y-audit) +
-    // status-audit (#381) = 22.
+    // status-audit (#381) = 21 (specnaut-auto removed in #409).
     // The audit-security phase (#303) lands under specnaut/phases/, not as a
     // top-level skill — no bump there. code-audit's scope script ships under
     // .specnaut/scripts/code-audit/, not as a skill folder; status-audit's
@@ -106,7 +107,7 @@ Deno.test("specnaut init --ai codex scaffolds a Codex layout", async () => {
     const agentsSkillsCount = (await Array.fromAsync(
       Deno.readDir(join(root, ".agents/skills")),
     )).length;
-    assertEquals(agentsSkillsCount, 22);
+    assertEquals(agentsSkillsCount, 21);
     const codexAgentsCount = (await Array.fromAsync(
       Deno.readDir(join(root, ".codex/agents")),
     )).length;

@@ -29,7 +29,6 @@ import type { KnownHarness } from "./installed_lock.ts";
  *     Hyphenated names are valid (`tag-version`, `release-version`,
  *     `list-skills`, `audit-security`, …).
  *   - `.claude/skills/specnaut-review/SKILL.md` — auto-invoke alias
- *   - `.claude/skills/specnaut-auto/SKILL.md`
  *
  * Everything else (project-stateful files in `.specnaut/`, harness-
  * static files like `.claude/settings.json`, hooks, `CLAUDE.md`,
@@ -53,7 +52,6 @@ export function isPluginCoveredPath(
     return true;
   }
   if (dest === ".claude/skills/specnaut-review/SKILL.md") return true;
-  if (dest === ".claude/skills/specnaut-auto/SKILL.md") return true;
 
   return false;
 }
@@ -67,9 +65,9 @@ export function isPluginCoveredPath(
  * (either re-install the plugin or run `specnaut upgrade` to restore
  * the bundled snapshot).
  *
- * Kept in sync with `isPluginCoveredPath` above. Total: 38 paths
+ * Kept in sync with `isPluginCoveredPath` above. Total: 37 paths
  * (15 agents excluding architect + 1 router skill + 20 phase docs +
- * specnaut-review alias + specnaut-auto).
+ * specnaut-review alias).
  *
  * Phase docs include hyphenated names — the regex was widened in #303
  * after silently dropping `tag-version`, `release-version`, and
@@ -126,5 +124,4 @@ export const PLUGIN_COVERED_PATHS_CLAUDE: ReadonlyArray<string> = [
     "lite-heuristic",
   ].map((name) => `.claude/skills/specnaut/phases/${name}.md`),
   ".claude/skills/specnaut-review/SKILL.md",
-  ".claude/skills/specnaut-auto/SKILL.md",
 ];

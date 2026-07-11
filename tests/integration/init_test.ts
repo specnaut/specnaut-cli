@@ -86,7 +86,8 @@ Deno.test("specnaut init <name> writes a complete tree", async () => {
     assertEquals(await exists(join(root, ".claude/commands/specnaut.md")), true);
     assertEquals(await exists(join(root, ".claude/agents/product-owner.md")), true);
     assertEquals(await exists(join(root, ".claude/agents/devops-sre.md")), true);
-    assertEquals(await exists(join(root, ".claude/skills/specnaut-auto/SKILL.md")), true);
+    // #409: the deprecated specnaut-auto alias no longer scaffolds.
+    assertEquals(await exists(join(root, ".claude/skills/specnaut-auto/SKILL.md")), false);
 
     // Two commands ship at the moment: backlog + specnaut router.
     const commandsCount = (await Array.fromAsync(
@@ -493,7 +494,7 @@ Deno.test("specnaut init scaffolds the consolidated router skill + 11 phase docs
     );
     assertStringIncludes(routerContent, "name: specnaut");
     // The router must NOT carry `disable-model-invocation: true` —
-    // /specnaut-auto chains phases via `Skill(specnaut, "<phase>")`,
+    // /specnaut auto-chains phases via `Skill(specnaut, "<phase>")`,
     // and that flag would block the chain on Claude Code (#166).
     assertEquals(
       routerContent.includes("disable-model-invocation: true"),

@@ -5122,7 +5122,6 @@ not re-read the file with \`Read\`.
 | \`arch-audit\` / \`sec-audit\` / \`perf-audit\` / \`dep-audit\` / \`a11y-audit\` | Per-axis audit family — user wants **one** lens over a scope ("arch audit", "security audit \`--path src/\`", "perf audit \`--diff\`"). Each resolves a uniform scope (\`--path\` / \`--range\` / \`--diff\` / whole) and dispatches its **single** bound auditor (architecture / security / performance / dependency / a11y), returning findings **inline**. Read-only, writes no report. Complements \`/specnaut audit <axis>\` (which persists a dated report) and \`/code-audit\` (the multi-seat team). |
 | \`status-audit\` | User wants a health check of a running multi-agent session ("status audit", "audit the session", "what's blocked", "session health"). Reads the \`.specnaut/logs/agents.jsonl\` status ledger and reports seven views (state counts / per-agent latest / blocked / stale ≥15m / done-vs-criteria contradictions / missing handoffs / verdict summary). Read-only. Pair with \`/loop 5m /status-audit\` to supervise long headless work. |
 | \`backlog\` | User asked about a backlog item, the board, an issue. Read-only access; mutations go through the \`product-owner\` agent. |
-| \`specnaut-auto\` | Auto-chain orchestration (legacy entry point — most users invoke \`/specnaut specify\` instead). |
 | \`specnaut-review\` | Auto-invoke alias preserved for the \`/specnaut review\` phase. |
 
 **Preloaded output-contract skills** (\`user-invocable: false\` — never invoke
@@ -9032,42 +9031,6 @@ should survive across sessions and isn't captured elsewhere:
 ## Entries
 
 <!-- (this stub starts empty — the security auditor populates it as it learns) -->
-`,
-    executable: false,
-    backend: null,
-    skipIfExists: false,
-  },
-  {
-    category: "skill",
-    name: "specnaut-auto",
-    suffix: null,
-    content: `---
-name: specnaut-auto
-description: DEPRECATED — /specnaut now auto-chains by default since v1.5.0. This skill is kept as an alias for one release and will be removed in the next major version.
----
-
-# /specnaut-auto is deprecated
-
-Auto-chain is now the default behavior of \`/specnaut\`. Use:
-
-- \`/specnaut specify "<feature>"\` — runs the full chain automatically
-  (specify → clarify → plan → tasks → analyze → implement → review →
-  STOP #2 for merge confirmation).
-- \`/specnaut specify --manual "<feature>"\` — runs \`specify\` only, no
-  chain.
-- \`/specnaut <phase> <args>\` — mid-chain re-entry with artefact
-  detection (chain if downstream artefacts are absent, one-shot if
-  present). Override with \`--once\` (force one-shot) or \`--continue\`
-  (force chain).
-
-See \`phases/auto-chain.md\` (in the \`specnaut\` skill) for the full chain
-mechanics, including STOP #1 (clarification checkpoint) and STOP #2
-(pre-merge confirmation).
-
-This skill will be removed in the next major release. If you see this
-file in your project after running \`specnaut upgrade\`, it means
-muscle-memory invocations of \`/specnaut-auto\` keep working — but you
-should switch to the new entry point.
 `,
     executable: false,
     backend: null,
@@ -16810,7 +16773,6 @@ clarifications needed) STOP #2 (pre-merge validation)
 - \`/specnaut review\` — architecture + quality gates
 - \`/specnaut merge\` — merge the feature branch to main
 - \`/specnaut-backlog\` — manage the product backlog (via the PO agent)
-- \`/specnaut-auto\` — deprecated alias of \`/specnaut\`; will be removed in the next major release
 
 ## Agent roles (invocable manually as skills)
 

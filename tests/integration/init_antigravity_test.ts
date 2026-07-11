@@ -69,10 +69,10 @@ Deno.test("specnaut init --ai antigravity scaffolds an Antigravity layout", asyn
       await exists(join(root, ".agent/skills/specnaut/phases/specify.md")),
       true,
     );
-    // Auto-chain still ships as its own skill folder.
+    // #409: the deprecated specnaut-auto alias no longer scaffolds.
     assertEquals(
       await exists(join(root, ".agent/skills/specnaut-auto/SKILL.md")),
-      true,
+      false,
     );
 
     // Agents are flat .md files with the specnaut- prefix; passthrough

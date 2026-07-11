@@ -78,11 +78,11 @@ Deno.test("specnaut init --ai opencode scaffolds a complete OpenCode project lay
     assertStringIncludes(developer, "read: allow");
     assertStringIncludes(developer, "bash:");
 
-    // Auto-chain still ships as its own skill folder.
-    const autoChainSkill = await Deno.readTextFile(
-      join(root, ".opencode/skills/specnaut-auto/SKILL.md"),
+    // #409: the deprecated specnaut-auto alias no longer scaffolds.
+    assertEquals(
+      await exists(join(root, ".opencode/skills/specnaut-auto/SKILL.md")),
+      false,
     );
-    assertStringIncludes(autoChainSkill, "name: specnaut-auto");
 
     // Shared (cross-harness)
     assertEquals(await exists(join(root, ".specnaut/memory/constitution.md")), true);
