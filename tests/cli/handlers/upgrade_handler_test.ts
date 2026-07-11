@@ -45,7 +45,12 @@ async function initializedParentManagedChild(): Promise<{ root: string; child: s
     join(parent, "deno.json"),
     JSON.stringify({ workspace: ["./child"] }, null, 2),
   );
-  const { code, stderr } = await runSpecnaut(["init", "--here", "--no-git"], { cwd: child });
+  // Pin the starting backend explicitly so this switch scenario (local → github)
+  // is independent of the picker's default (which is `cloud`).
+  const { code, stderr } = await runSpecnaut(
+    ["init", "--here", "--no-git", "--backlog", "local"],
+    { cwd: child },
+  );
   assertEquals(code, 0, `init precondition failed: ${stderr}`);
   return { root, child };
 }
