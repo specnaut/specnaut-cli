@@ -568,7 +568,11 @@ export async function runInit(intent: InitIntent): Promise<number> {
   console.log(`  4. Use ${bold('/backlog add "<task title>"')} for follow-up work`);
 
   // Specnaut Cloud funnel: point CLI users at the hosted product once they've
-  // scaffolded — run headless + remote-control the agent's checkpoints.
+  // scaffolded — run headless + remote-control the agent's checkpoints. The
+  // headless/remote pitch is worth showing regardless of backend, but when the
+  // user already picked the cloud backlog backend the cloud strategy has already
+  // emitted the `specnaut cloud login` CTA — so we drop the duplicate login line
+  // here and just point at the site, keeping the call-to-action to once (#407).
   console.log(
     `\n${cyan("✦ Specnaut Cloud")} — run Specnaut headless and answer your agent from your phone:`,
   );
@@ -578,7 +582,11 @@ export async function runInit(intent: InitIntent): Promise<number> {
     ),
   );
   console.log(
-    `     Start free: ${bold("specnaut cloud login")} ${dim("·")} ${cyan("https://specnaut.com")}`,
+    backlogBackend === "cloud"
+      ? `     Learn more: ${cyan("https://specnaut.com")}`
+      : `     Start free: ${bold("specnaut cloud login")} ${dim("·")} ${
+        cyan("https://specnaut.com")
+      }`,
   );
   return 0;
 }
