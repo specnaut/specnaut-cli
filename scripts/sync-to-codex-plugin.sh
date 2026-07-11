@@ -23,8 +23,9 @@
 # Exit codes:
 #   0   success (or "no changes — sync skipped" — the script bails
 #       early if rsync produces an empty diff in the destination)
-#   2   missing GH_TOKEN — emit ::warning:: and exit 0 in release.yml
-#       (mirrors the HOMEBREW_TAP_TOKEN-missing pattern)
+#   2   non-blocking skip — missing GH_TOKEN, OR the push was denied (token
+#       lacks write access / fork not provisioned). Emits ::warning:: and is
+#       mapped to exit 0 in release.yml (mirrors the HOMEBREW_TAP_TOKEN pattern)
 #   1   unexpected error
 set -euo pipefail
 
@@ -156,7 +157,15 @@ fi
 git checkout -b "$BRANCH"
 git add -A
 git commit -m "$TITLE"
-git push -u origin "$BRANCH"
+# The push can be denied (HTTP 403) when the sync token lacks write access to
+# the fork, or the fork isn't provisioned yet (see specnaut-cli#298–#300). That
+# is an external-provisioning gap, not a release defect — treat it as a
+# non-blocking skip (exit 2 → the release.yml wrapper maps it to exit 0) rather
+# than letting `set -e` red the whole release build.
+if ! git push -u origin "$BRANCH"; then
+  echo "::warning::Codex sync: push to $FORK was denied — the sync token lacks write access, or the fork isn't provisioned yet (specnaut-cli#298–#300). The release itself is unaffected; skipping this best-effort publish." >&2
+  exit 2
+fi
 
 create_pr_idempotent "$FORK" "$BRANCH" "$TITLE" "$BODY"
 
