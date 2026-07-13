@@ -78,7 +78,12 @@ export async function selectInteractive<T>(
   if (items.length === 0) return null;
   let current = Math.max(0, Math.min(defaultIndex, items.length - 1));
   const labels = items.map((i) => i.label);
-  const totalLines = labels.length + 1;
+  // Rewind by the frame's ACTUAL physical height, not an assumed
+  // `labels.length + 1`. A header that itself spans multiple lines (embedded
+  // "\n") would otherwise leave the cursor-up count short, so each redraw
+  // drifts downward and the menu "scrolls" instead of updating in place. The
+  // height is constant across redraws (only the ❯ position moves).
+  const totalLines = formatMenu(labels, current, header).split("\n").length;
 
   try {
     io.write(formatMenu(labels, current, header) + "\n");

@@ -358,10 +358,13 @@ async function chooseProject(
   token: string,
 ): Promise<string | null> {
   const projects = await client.listProjects(token);
+  // Header is single-line (no embedded "\n") so the picker's redraw height
+  // stays exact; the blank spacer line above stays put across redraws.
   const header = projects.length > 0
-    ? "\nSelect a Cloud project or create one (↑/↓ to move, enter to select):"
-    : "\nNo Cloud projects yet — press enter to create your first:";
+    ? "Select a Cloud project or create one (↑/↓ to move, enter to select):"
+    : "No Cloud projects yet — press enter to create your first:";
 
+  console.log("");
   const picked = await selectInteractive(
     buildProjectChoices(projects),
     0,
