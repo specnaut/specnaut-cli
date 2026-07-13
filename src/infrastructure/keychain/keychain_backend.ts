@@ -13,10 +13,16 @@ import { type CloudCredentials, type CredentialStore, keyFor } from "../credenti
 
 /** All keychain items are filed under this service name; the account is the
  *  normalised Cloud API URL, so one machine holds tokens for several deployments.
- *  Intentionally kept as `specflow-cloud` through the specnaut rebrand: it is an
- *  internal at-rest identifier never shown to users, and renaming it would orphan
- *  every existing login's stored secret for no user-visible benefit. */
-export const KEYCHAIN_SERVICE = "specflow-cloud";
+ *  The service name IS user-visible — the macOS Keychain access dialog shows it
+ *  ("… gardées dans « specnaut-cloud »"), so it must carry the current brand.
+ *  Pre-rebrand logins stored under `LEGACY_KEYCHAIN_SERVICE` are migrated
+ *  forward on the next `load()` (see `KeychainCredentialStore`). */
+export const KEYCHAIN_SERVICE = "specnaut-cloud";
+
+/** The pre-rebrand service name. Read-through only: `load()` copies a hit here
+ *  into `KEYCHAIN_SERVICE` and removes it, so a user who logged in before the
+ *  rename keeps their session without re-authenticating. */
+export const LEGACY_KEYCHAIN_SERVICE = "specflow-cloud";
 
 /** Result of a single native keychain operation. `unavailable` is a value, not
  *  an exception — the normal "no reachable keyring" case must never throw. */
@@ -78,10 +84,22 @@ export class KeychainCredentialStore implements CredentialStore {
   // throw), honouring the `CredentialStore` contract — the sync FFI result is
   // wrapped in Promise.resolve/reject.
   load(apiUrl: string): Promise<CloudCredentials | null> {
-    const out = this.backend.get(KEYCHAIN_SERVICE, keyFor(apiUrl));
+    const account = keyFor(apiUrl);
+    const out = this.backend.get(KEYCHAIN_SERVICE, account);
     if (out.kind === "unavailable") return Promise.reject(new KeychainUnavailableError("load"));
-    if (out.kind === "miss") return Promise.resolve(null);
-    return Promise.resolve(parseCredentials(out.value));
+    if (out.kind === "ok") return Promise.resolve(parseCredentials(out.value));
+
+    // miss under the current brand → one-time migration from the pre-rebrand
+    // `specflow-cloud` item, if one exists: copy it forward, best-effort drop
+    // the old one, and return it. `unavailable`/`miss` here → just null.
+    const legacy = this.backend.get(LEGACY_KEYCHAIN_SERVICE, account);
+    if (legacy.kind !== "ok") return Promise.resolve(null);
+    const creds = parseCredentials(legacy.value);
+    if (creds) {
+      this.backend.set(KEYCHAIN_SERVICE, account, legacy.value);
+      this.backend.remove(LEGACY_KEYCHAIN_SERVICE, account);
+    }
+    return Promise.resolve(creds);
   }
 
   save(apiUrl: string, creds: CloudCredentials): Promise<void> {
@@ -91,7 +109,11 @@ export class KeychainCredentialStore implements CredentialStore {
   }
 
   delete(apiUrl: string): Promise<void> {
-    const out = this.backend.remove(KEYCHAIN_SERVICE, keyFor(apiUrl));
+    const account = keyFor(apiUrl);
+    const out = this.backend.remove(KEYCHAIN_SERVICE, account);
+    // Clear any lingering pre-rebrand item too, so logout leaves nothing behind
+    // (best-effort — a legacy miss/unavailable must not fail the logout).
+    this.backend.remove(LEGACY_KEYCHAIN_SERVICE, account);
     if (out.kind === "unavailable") return Promise.reject(new KeychainUnavailableError("delete"));
     return Promise.resolve();
   }

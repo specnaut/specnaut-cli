@@ -188,6 +188,38 @@ Deno.test("selectInteractive writes a redraw frame on every input event", async 
   assertEquals(frames.length >= 2, true);
 });
 
+Deno.test("selectInteractive rewinds by a single-line header's true height", async () => {
+  const { io, written } = fakeIO([
+    new Uint8Array([0x6a]), // j → down (triggers one redraw)
+    new Uint8Array([0x0d]), // enter
+  ]);
+  await selectInteractive(
+    [{ key: "a", label: "Alpha" }, { key: "b", label: "Beta" }],
+    0,
+    io,
+    "Pick:", // 1-line header + 2 items = 3 physical lines
+  );
+  const rewind = written.find((s) => s.includes("A\x1b[J"));
+  assertEquals(rewind, "\x1b[3A\x1b[J");
+});
+
+Deno.test("selectInteractive rewinds by a multi-line header's true height (scroll-drift regression)", async () => {
+  // A header spanning two physical lines must count as two — else the cursor-up
+  // is short by one and the menu drifts downward on every keypress.
+  const { io, written } = fakeIO([
+    new Uint8Array([0x6a]), // j → down
+    new Uint8Array([0x0d]), // enter
+  ]);
+  await selectInteractive(
+    [{ key: "a", label: "Alpha" }, { key: "b", label: "Beta" }],
+    0,
+    io,
+    "line1\nline2", // 2-line header + 2 items = 4 physical lines
+  );
+  const rewind = written.find((s) => s.includes("A\x1b[J"));
+  assertEquals(rewind, "\x1b[4A\x1b[J");
+});
+
 Deno.test("selectInteractive calls teardown exactly once on normal selection", async () => {
   const fake = fakeIO([new Uint8Array([0x0d])]);
   await selectInteractive(
