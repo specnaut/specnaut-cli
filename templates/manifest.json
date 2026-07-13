@@ -1,5 +1,5 @@
 {
-  "version": "1.16.0",
+  "version": "1.16.1",
   "core": [
     { "category": "skill", "name": "specnaut", "source": "core/skills/specnaut/SKILL.md" },
     { "category": "phase", "name": "brainstorm", "suffix": "brainstorm.md", "source": "core/skills/specnaut/phases/brainstorm.md" },
