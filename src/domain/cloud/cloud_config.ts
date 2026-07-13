@@ -5,6 +5,12 @@
 import { parse as parseYaml } from "@std/yaml";
 import type { RemoteConfig } from "./remote_mode.ts";
 
+/** The canonical Specnaut Cloud API endpoint. Specnaut Cloud is a single hosted
+ *  service, so the CLI defaults here — `specnaut cloud login` needs no URL and
+ *  no user ever sees the underlying deployment host. `--api-url` (or an
+ *  `api_url` in `backlog-config.yml`) overrides it for dev / self-hosted use. */
+export const DEFAULT_CLOUD_API_URL = "https://api.specnaut.com";
+
 export type CloudConfig = {
   apiUrl: string;
   projectKey: string;
@@ -22,7 +28,7 @@ export function renderCloudConfig(apiUrl = "", projectKey = ""): string {
     "backend: cloud",
     `api_url: ${
       JSON.stringify(apiUrl)
-    }        # Specnaut Cloud API base, e.g. https://your-deployment.convex.site`,
+    }        # Specnaut Cloud API base (optional; defaults to ${DEFAULT_CLOUD_API_URL})`,
     `project_key: ${JSON.stringify(projectKey)}    # the project's short key, e.g. CLOUD`,
     "",
     "# Remote-control gates (#357) — opt-in. When enabled, a headless agent raises",

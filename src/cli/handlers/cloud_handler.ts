@@ -16,7 +16,11 @@
 import { bold, dim, green, red, yellow } from "@std/fmt/colors";
 import { CloudClient, type CloudColumn, type CloudTask } from "../../domain/cloud/cloud_client.ts";
 import { freshAccessToken, login } from "../../domain/cloud/auth_flow.ts";
-import { readCloudConfig, writeCloudConfig } from "../../domain/cloud/cloud_config.ts";
+import {
+  DEFAULT_CLOUD_API_URL,
+  readCloudConfig,
+  writeCloudConfig,
+} from "../../domain/cloud/cloud_config.ts";
 import { defaultCredentialStore } from "../../infrastructure/credential_store.ts";
 import { openInBrowser } from "../../infrastructure/browser_opener.ts";
 
@@ -42,17 +46,19 @@ function normalizeApiUrl(raw: string): string | null {
 }
 
 /** Where a resolved deployment URL came from — drives the login trust
- *  disclosure (#400). `flag`/`prompt` are explicit user acts; `config` is a
- *  project file the user may not have authored. */
-type ApiUrlSource = "flag" | "config" | "prompt";
+ *  disclosure (#400). `flag` is an explicit user act; `default` is the
+ *  CLI-shipped canonical endpoint; `config` is a project file the user may not
+ *  have authored (the only phishing-relevant source). */
+type ApiUrlSource = "flag" | "config" | "default";
 
 type ResolvedApiUrl = { url: string; source: ApiUrlSource };
 
-/** Resolve the deployment URL: flag → existing config → (login only) prompt,
- *  tagging the source so `runLogin` can disclose it before authenticating. */
+/** Resolve the deployment URL: flag → existing config → the canonical default,
+ *  tagging the source so `runLogin` can disclose it before authenticating.
+ *  Since Specnaut Cloud is a single hosted service, there is always a valid
+ *  target — the only null is a malformed explicit `--api-url` / `api_url`. */
 async function resolveApiUrl(
   explicit: string | null,
-  allowPrompt: boolean,
 ): Promise<ResolvedApiUrl | null> {
   if (explicit) {
     const url = normalizeApiUrl(explicit);
@@ -63,20 +69,13 @@ async function resolveApiUrl(
     const url = normalizeApiUrl(cfg.apiUrl);
     return url ? { url, source: "config" } : null;
   }
-  if (allowPrompt && Deno.stdin.isTerminal()) {
-    const v = prompt("Specnaut Cloud API URL (e.g. https://your-deployment.convex.site):");
-    if (v && v.trim()) {
-      const url = normalizeApiUrl(v);
-      return url ? { url, source: "prompt" } : null;
-    }
-  }
-  return null;
+  return { url: DEFAULT_CLOUD_API_URL, source: "default" };
 }
 
 const URL_SOURCE_LABEL: Record<ApiUrlSource, string> = {
   flag: "--api-url flag",
   config: "project config (.specnaut/backlog-config.yml)",
-  prompt: "entered at prompt",
+  default: "Specnaut Cloud (default)",
 };
 
 /** Human label for where a deployment URL came from (login disclosure, #400). */
@@ -87,8 +86,8 @@ export function urlSourceLabel(source: ApiUrlSource): string {
 /** Whether `login` must confirm before authenticating: only when the URL came
  *  from a project config file AND the user has never authenticated against it.
  *  That is the precise phishing window — a committed `backlog-config.yml`
- *  redirecting login at an attacker host — while an explicit `--api-url`, an
- *  interactively-typed URL, or re-login to a known deployment stay
+ *  redirecting login at an attacker host — while an explicit `--api-url`, the
+ *  CLI-shipped default endpoint, or re-login to a known deployment stay
  *  friction-free (#400). */
 export function loginNeedsTrustConfirm(
   source: ApiUrlSource,
@@ -118,13 +117,9 @@ export async function runCloud(intent: CloudIntent): Promise<number> {
 async function authedSession(
   intent: CloudIntent,
 ): Promise<{ client: CloudClient; token: string } | number> {
-  const resolved = await resolveApiUrl(intent.apiUrl, false);
+  const resolved = await resolveApiUrl(intent.apiUrl);
   if (!resolved) {
-    console.error(
-      red(
-        "error: no Specnaut Cloud API URL (pass --api-url or set api_url in backlog-config.yml).",
-      ),
-    );
+    console.error(red("error: invalid Specnaut Cloud API URL — check --api-url / api_url."));
     return 1;
   }
   const apiUrl = resolved.url;
@@ -233,9 +228,9 @@ async function runLogin(intent: CloudIntent): Promise<number> {
     return 2;
   }
 
-  const resolved = await resolveApiUrl(intent.apiUrl, true);
+  const resolved = await resolveApiUrl(intent.apiUrl);
   if (!resolved) {
-    console.error(red("error: no Specnaut Cloud API URL (pass --api-url <url>)."));
+    console.error(red("error: invalid --api-url — must be a well-formed http(s) URL."));
     return 2;
   }
   const apiUrl = resolved.url;
@@ -368,13 +363,9 @@ async function runToken(intent: CloudIntent): Promise<number> {
     return 0;
   }
 
-  const resolved = await resolveApiUrl(intent.apiUrl, false);
+  const resolved = await resolveApiUrl(intent.apiUrl);
   if (!resolved) {
-    console.error(
-      red(
-        "error: no Specnaut Cloud API URL (pass --api-url or set api_url in backlog-config.yml).",
-      ),
-    );
+    console.error(red("error: invalid Specnaut Cloud API URL — check --api-url / api_url."));
     return 1;
   }
   const apiUrl = resolved.url;
@@ -392,9 +383,9 @@ async function runToken(intent: CloudIntent): Promise<number> {
 }
 
 async function runLogout(intent: CloudIntent): Promise<number> {
-  const resolved = await resolveApiUrl(intent.apiUrl, false);
+  const resolved = await resolveApiUrl(intent.apiUrl);
   if (!resolved) {
-    console.error(red("error: no Specnaut Cloud API URL to log out of."));
+    console.error(red("error: invalid Specnaut Cloud API URL — check --api-url / api_url."));
     return 1;
   }
   const apiUrl = resolved.url;
