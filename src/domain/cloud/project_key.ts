@@ -20,7 +20,7 @@ const FALLBACK_BASE = "PROJECT";
  */
 export function slugifyKeyBase(name: string): string {
   let base = name.toUpperCase().replace(/[^A-Z0-9]/g, "").replace(/^[0-9]+/, "");
-  if (base.length < MIN_KEY_LEN) base = (base + FALLBACK_BASE);
+  if (base.length < MIN_KEY_LEN) base = base + FALLBACK_BASE;
   return base.slice(0, MAX_KEY_LEN);
 }
 

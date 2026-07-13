@@ -28,7 +28,7 @@ import {
 } from "../../domain/cloud/cloud_config.ts";
 import { defaultCredentialStore } from "../../infrastructure/credential_store.ts";
 import { openInBrowser } from "../../infrastructure/browser_opener.ts";
-import { makeStdinSelectIO, type SelectItem, selectInteractive } from "../select.ts";
+import { makeStdinSelectIO, selectInteractive, type SelectItem } from "../select.ts";
 import { generateProjectKey } from "../../domain/cloud/project_key.ts";
 
 export type CloudIntent = {
