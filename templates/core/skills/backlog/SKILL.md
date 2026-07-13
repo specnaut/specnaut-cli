@@ -266,7 +266,7 @@ runtime.
 ```yaml
 # .specnaut/backlog-config.yml
 backend: cloud
-api_url: https://your-deployment.convex.site   # Specnaut Cloud API base
+api_url: https://api.specnaut.com               # optional — defaults to Specnaut Cloud
 project_key: CLOUD                              # the project's short key
 ```
 

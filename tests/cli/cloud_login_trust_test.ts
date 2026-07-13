@@ -7,7 +7,7 @@ Deno.test("urlSourceLabel maps each source to a human label (#400)", () => {
     urlSourceLabel("config"),
     "project config (.specnaut/backlog-config.yml)",
   );
-  assertEquals(urlSourceLabel("prompt"), "entered at prompt");
+  assertEquals(urlSourceLabel("default"), "Specnaut Cloud (default)");
 });
 
 Deno.test("loginNeedsTrustConfirm fires only for a config URL with no existing creds (#400)", () => {
@@ -15,9 +15,11 @@ Deno.test("loginNeedsTrustConfirm fires only for a config URL with no existing c
   assertEquals(loginNeedsTrustConfirm("config", false), true);
   // Already authenticated here before → trusted, no prompt.
   assertEquals(loginNeedsTrustConfirm("config", true), false);
-  // Explicit user acts (typed flag / typed at prompt) are always trusted.
+  // Explicit user act (typed flag) is always trusted.
   assertEquals(loginNeedsTrustConfirm("flag", false), false);
   assertEquals(loginNeedsTrustConfirm("flag", true), false);
-  assertEquals(loginNeedsTrustConfirm("prompt", false), false);
-  assertEquals(loginNeedsTrustConfirm("prompt", true), false);
+  // The CLI-shipped default endpoint is baked into the signed binary, not
+  // attacker-controlled — always trusted, no confirmation.
+  assertEquals(loginNeedsTrustConfirm("default", false), false);
+  assertEquals(loginNeedsTrustConfirm("default", true), false);
 });
