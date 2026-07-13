@@ -15,20 +15,23 @@ const TARGETS: Target[] = [
   { triple: "x86_64-pc-windows-msvc", outName: "specnaut-windows-x64.exe" },
 ];
 
-// Permissions baked into the binary. `--allow-net` is required by
-// `specnaut self-update` to reach api.github.com (release lookup) and the
-// release download hosts. github.com 302-redirects release-asset downloads
-// to release-assets.githubusercontent.com — both must be in the allowlist
-// or Deno prompts the user at runtime, defeating the point of a compiled
-// binary. objects.githubusercontent.com / codeload.github.com are kept as
-// belt-and-braces for any redirect path GitHub may use historically or in
-// the future.
+// Permissions baked into the binary. `--allow-net` is unscoped (no host
+// allowlist) on purpose: the Cloud backend (`specnaut cloud login`, backlog
+// sync) talks to a USER-CONFIGURABLE API host — the `api.specnaut.com`
+// default, an `--api-url` flag for dev / self-hosted, or an `api_url` in
+// `.specnaut/backlog-config.yml`. A compile-time host allowlist cannot know
+// those, so any scoped list makes Deno prompt at runtime for every non-listed
+// host (the exact UX we're removing). Scoping also buys almost nothing here:
+// the binary already ships `--allow-run` + `--allow-ffi` + full read/write, so
+// a tampered binary could exfiltrate via a subprocess regardless — the net
+// allowlist was never a real trust boundary. self-update (api.github.com +
+// the release-asset redirect hosts) is covered by the same open grant.
 const PERMISSIONS = [
   "--allow-read",
   "--allow-write",
   "--allow-run",
   "--allow-env",
-  "--allow-net=api.github.com,github.com,release-assets.githubusercontent.com,objects.githubusercontent.com,codeload.github.com",
+  "--allow-net",
   // OS-native keychain for Cloud credentials (#360) reaches the platform secret
   // store via Deno FFI. If withheld, the keychain backends throw
   // PermissionDenied and credential storage degrades to the 0600 file fallback.
