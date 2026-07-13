@@ -14,7 +14,12 @@
 //   board   shows the linked project's board, tasks grouped by column.
 
 import { bold, dim, green, red, yellow } from "@std/fmt/colors";
-import { CloudClient, type CloudColumn, type CloudTask } from "../../domain/cloud/cloud_client.ts";
+import {
+  CloudClient,
+  type CloudColumn,
+  type CloudProject,
+  type CloudTask,
+} from "../../domain/cloud/cloud_client.ts";
 import { freshAccessToken, login } from "../../domain/cloud/auth_flow.ts";
 import {
   DEFAULT_CLOUD_API_URL,
@@ -23,6 +28,8 @@ import {
 } from "../../domain/cloud/cloud_config.ts";
 import { defaultCredentialStore } from "../../infrastructure/credential_store.ts";
 import { openInBrowser } from "../../infrastructure/browser_opener.ts";
+import { makeStdinSelectIO, selectInteractive, type SelectItem } from "../select.ts";
+import { generateProjectKey } from "../../domain/cloud/project_key.ts";
 
 export type CloudIntent = {
   kind: "cloud";
@@ -321,37 +328,85 @@ async function runLogin(intent: CloudIntent): Promise<number> {
   return 0;
 }
 
-/** Interactive project selection or inline creation. Returns the chosen key. */
+/** One entry in the project picker: an existing project, or "create new". */
+export type ProjectChoice = { kind: "pick"; key: string } | { kind: "create" };
+
+/**
+ * Build the unified picker list — every accessible project followed by a
+ * "create a new project" row — as `SelectItem`s. Pure (no I/O) so the label
+ * shape and ordering are unit-testable.
+ */
+export function buildProjectChoices(
+  projects: ReadonlyArray<CloudProject>,
+): SelectItem<ProjectChoice>[] {
+  const items: SelectItem<ProjectChoice>[] = projects.map((p) => ({
+    key: { kind: "pick", key: p.key },
+    label: `${bold(p.key)} — ${p.name}${p.role ? dim(` (${p.role})`) : ""}`,
+  }));
+  items.push({ key: { kind: "create" }, label: green("+ Create a new project") });
+  return items;
+}
+
+/**
+ * Bind the project after login: one arrow-key list of the account's projects
+ * plus a "create new" row (↑/↓ + enter). Picking a project returns its key;
+ * picking "create" asks only for a NAME and derives the key automatically.
+ * Returns the chosen key, or null if the user cancelled (Ctrl-C / ESC).
+ */
 async function chooseProject(
   client: CloudClient,
   token: string,
 ): Promise<string | null> {
   const projects = await client.listProjects(token);
+  const header = projects.length > 0
+    ? "\nSelect a Cloud project or create one (↑/↓ to move, enter to select):"
+    : "\nNo Cloud projects yet — press enter to create your first:";
 
-  if (projects.length > 0) {
-    console.log("\nYour Cloud projects:");
-    projects.forEach((p, i) => {
-      console.log(`  ${i + 1}) ${bold(p.key)} — ${p.name}${p.role ? dim(` (${p.role})`) : ""}`);
-    });
-    console.log(`  n) create a new project`);
-    const choice = (prompt("Select [1-" + projects.length + "] or 'n':") ?? "").trim();
-    if (choice && choice !== "n" && choice !== "N") {
-      const idx = Number(choice) - 1;
-      if (Number.isInteger(idx) && idx >= 0 && idx < projects.length) {
-        return projects[idx].key;
+  const picked = await selectInteractive(
+    buildProjectChoices(projects),
+    0,
+    makeStdinSelectIO(),
+    header,
+  );
+  if (picked === null) return null; // cancelled — caller reports "aborted"
+  if (picked.kind === "pick") return picked.key;
+
+  return await createProjectFromName(client, token, projects.map((p) => p.key));
+}
+
+/**
+ * Create a project from a human name alone: derive a valid key via
+ * {@link generateProjectKey}, deduping against the keys we already know. If a
+ * concurrent create stole the key between our list and our write, the server
+ * rejects it with "already exists" — we add it to the taken set and retry with
+ * the next suffix. Returns the created key, or null if the user gave no name.
+ */
+async function createProjectFromName(
+  client: CloudClient,
+  token: string,
+  existingKeys: ReadonlyArray<string>,
+): Promise<string | null> {
+  const name = (prompt("Project name:") ?? "").trim();
+  if (!name) return null;
+
+  const taken = new Set(existingKeys);
+  for (let attempt = 0; attempt < 5; attempt++) {
+    const key = generateProjectKey(name, taken);
+    try {
+      const created = await client.createProject(token, key, name);
+      console.log(green(`✓ created project ${bold(created.name)} ${dim(`(key ${created.key})`)}`));
+      return created.key;
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      if (/already exists/i.test(msg)) {
+        taken.add(key); // race: someone took this key — bump the suffix and retry
+        continue;
       }
-      console.error(yellow("  not a valid choice — creating a new project instead."));
+      throw e;
     }
-  } else {
-    console.log(dim("\nNo Cloud projects yet — let's create one."));
   }
-
-  const key = (prompt("New project key (2–10 uppercase, e.g. CLOUD):") ?? "").trim();
-  if (!key) return null;
-  const name = (prompt("Project name:") ?? "").trim() || key;
-  const created = await client.createProject(token, key, name);
-  console.log(green(`✓ created project ${bold(created.key)}`));
-  return created.key;
+  console.error(red("error: couldn't find a free project key — please retry."));
+  return null;
 }
 
 async function runToken(intent: CloudIntent): Promise<number> {
