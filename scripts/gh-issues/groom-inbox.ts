@@ -70,6 +70,14 @@ function trim(s: string, n: number): string {
   return s.length <= n ? s : s.slice(0, n - 1) + "…";
 }
 
+/** Escape a value for a GitHub-flavoured Markdown table cell. Escape `\` FIRST,
+ *  then `|` — escaping `|` alone is incomplete (a backslash in the input would
+ *  otherwise consume the escape and let a `|` break the column). Always trim the
+ *  RAW string before escaping so truncation can't split an escape sequence. */
+function escapeMdCell(s: string): string {
+  return s.replace(/\\/g, "\\\\").replace(/\|/g, "\\|");
+}
+
 if (import.meta.main) {
   const [inbox, pool] = await Promise.all([fetchInbox(), fetchPool()]);
 
@@ -94,7 +102,7 @@ if (import.meta.main) {
     const likely = candidates.find((c) => c.bucket === "likely-dupe");
     const action = likely ? `mark-dupe of #${likely.number}?` : "promote (P3/M)";
     const day = issue.createdAt.slice(0, 10);
-    const title = trim(issue.title.replace(/\|/g, "\\|"), 60);
+    const title = escapeMdCell(trim(issue.title, 60));
     console.log(`| ${issue.number} | ${title} | ${day} | ${dupeCol} | ${action} |`);
   }
 
