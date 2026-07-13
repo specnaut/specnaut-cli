@@ -15,6 +15,12 @@
 name: codeql
 
 on:
+  # Analyse the default branch on every merge so the Security tab reflects
+  # main's true state and fixed alerts auto-close (without a push trigger,
+  # CodeQL never re-scans main on merge and stale alerts linger until the
+  # weekly schedule — GitHub warns about exactly this).
+  push:
+    branches: [main]
   pull_request:
     branches: [main]
   schedule:
