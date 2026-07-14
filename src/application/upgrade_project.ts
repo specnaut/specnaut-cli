@@ -103,6 +103,7 @@ export class UpgradeProjectUseCase {
     const mappedBundle = harness.mapBundle(core, {
       backlogBackend: lock.backlogBackend,
       versionScheme: lock.versionScheme,
+      specBackend: lock.specBackend,
     });
 
     // Parent-managed targets inherit agentic files from the providing
@@ -203,6 +204,7 @@ export class UpgradeProjectUseCase {
           harness: lock.harness,
           backlogBackend: lock.backlogBackend,
           versionScheme: lock.versionScheme,
+          specBackend: lock.specBackend,
           templatesVersion: lock.templatesVersion,
           entries: lock.entries,
           ...(parentManaged ? { parentManaged: true as const } : {}),
@@ -338,6 +340,7 @@ export class UpgradeProjectUseCase {
       harness: lock.harness,
       backlogBackend: lock.backlogBackend,
       versionScheme: lock.versionScheme,
+      specBackend: lock.specBackend,
       templatesVersion,
       entries: updatedEntries,
       // Persist the (possibly re-derived) decision so future upgrades read it

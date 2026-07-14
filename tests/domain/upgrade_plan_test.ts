@@ -8,6 +8,7 @@ const emptyLock: InstalledLock = {
   harness: "claude",
   backlogBackend: "local",
   versionScheme: "semver",
+  specBackend: "local",
   templatesVersion: "0.1.0",
   entries: new Map(),
 };
@@ -18,6 +19,7 @@ function lockWith(path: string, sha: string): InstalledLock {
     harness: "claude",
     backlogBackend: "local",
     versionScheme: "semver",
+    specBackend: "local",
     templatesVersion: "0.1.0",
     entries: new Map([[
       path,
@@ -121,6 +123,7 @@ Deno.test("computeUpgradePlan emits remove for clean orphan (lock + on disk + ma
     harness: "claude",
     backlogBackend: "local",
     versionScheme: "semver",
+    specBackend: "local",
     templatesVersion: "0.6.1",
     entries: new Map([
       ["a.md", {
@@ -155,6 +158,7 @@ Deno.test("computeUpgradePlan emits remove with wasCustomized=true when disk div
     harness: "claude",
     backlogBackend: "local",
     versionScheme: "semver",
+    specBackend: "local",
     templatesVersion: "0.6.1",
     entries: new Map([
       ["orphan.md", {
@@ -182,6 +186,7 @@ Deno.test("computeUpgradePlan emits no action for orphan-not-on-disk (user alrea
     harness: "claude",
     backlogBackend: "local",
     versionScheme: "semver",
+    specBackend: "local",
     templatesVersion: "0.6.1",
     entries: new Map([
       ["orphan.md", {

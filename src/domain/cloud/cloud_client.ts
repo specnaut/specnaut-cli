@@ -222,6 +222,33 @@ export class CloudClient {
     const p = (json.project ?? {}) as Record<string, unknown>;
     return { key: String(p.key ?? key), name: String(p.name ?? name), role: "owner" };
   }
+
+  /**
+   * Create a backlog task on a project's board (`POST /api/v1/tasks`, the
+   * shipped endpoint the `add.sh` script also uses). Returns the new task's
+   * public number — used by cloud-mode `specify` to auto-create + link a task
+   * when the authoring flow runs with none linked (spec 020, FR-011). Kept as a
+   * typed compiled call (not the backend-gated bash `add.sh`) so auto-creation
+   * is independent of which backlog backend is configured.
+   */
+  async createTask(
+    accessToken: string,
+    projectKey: string,
+    title: string,
+  ): Promise<CloudTask> {
+    const { status, json } = await this.postJson("/tasks", { projectKey, title }, accessToken);
+    if (status !== 201 && status !== 200) {
+      throw new CloudApiError(status, strField(json, "error") ?? "create task failed");
+    }
+    const t = (json.task ?? {}) as Record<string, unknown>;
+    return {
+      number: Number(t.number ?? 0),
+      title: cleanText(t.title ?? title),
+      columnId: String(t.columnId ?? ""),
+      priority: typeof t.priority === "string" ? t.priority : null,
+      size: typeof t.size === "string" ? t.size : null,
+    };
+  }
 }
 
 async function readJson(res: Response): Promise<Record<string, unknown>> {

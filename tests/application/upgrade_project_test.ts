@@ -130,6 +130,7 @@ Deno.test("UpgradeProjectUseCase returns up-to-date when disk + lock + bundle al
     harness: "claude",
     backlogBackend: "local",
     versionScheme: "semver",
+    specBackend: "local",
     templatesVersion: "0.3.0",
     entries: new Map([["a.md", {
       sha256: sha,
@@ -158,6 +159,7 @@ Deno.test("UpgradeProjectUseCase returns planned (no writes) in dry-run", async 
     harness: "claude",
     backlogBackend: "local",
     versionScheme: "semver",
+    specBackend: "local",
     templatesVersion: "0.2.0",
     entries: new Map([["a.md", {
       sha256: oldSha,
@@ -189,6 +191,7 @@ Deno.test("UpgradeProjectUseCase applies auto-update and skips preserve", async 
     harness: "claude",
     backlogBackend: "local",
     versionScheme: "semver",
+    specBackend: "local",
     templatesVersion: "0.2.0",
     entries: new Map([
       ["clean.md", {
@@ -230,6 +233,7 @@ Deno.test("UpgradeProjectUseCase with --force overwrites preserve actions with b
     harness: "claude",
     backlogBackend: "local",
     versionScheme: "semver",
+    specBackend: "local",
     templatesVersion: "0.2.0",
     entries: new Map([["a.md", {
       sha256: await sha256Hex("ORIGINAL"),
@@ -260,6 +264,7 @@ Deno.test("UpgradeProjectUseCase deletes clean orphans (lock entry + on disk + m
     harness: "claude",
     backlogBackend: "local",
     versionScheme: "semver",
+    specBackend: "local",
     templatesVersion: "0.6.1",
     entries: new Map([
       ["a.md", {
@@ -295,6 +300,7 @@ Deno.test("UpgradeProjectUseCase preserves customized orphan without --force, dr
     harness: "claude",
     backlogBackend: "local",
     versionScheme: "semver",
+    specBackend: "local",
     templatesVersion: "0.6.1",
     entries: new Map([
       ["a.md", {
@@ -334,6 +340,7 @@ Deno.test("UpgradeProjectUseCase with --force deletes customized orphan with bac
     harness: "claude",
     backlogBackend: "local",
     versionScheme: "semver",
+    specBackend: "local",
     templatesVersion: "0.6.1",
     entries: new Map([
       ["orphan.md", {
@@ -373,6 +380,7 @@ Deno.test("UpgradeProjectUseCase: vanilla on-disk + plugin installed → backed 
     harness: "claude",
     backlogBackend: "local",
     versionScheme: "semver",
+    specBackend: "local",
     templatesVersion: "0.7.0",
     entries: new Map([[
       PLUGIN_DEST,
@@ -409,6 +417,7 @@ Deno.test("UpgradeProjectUseCase: customized on-disk + plugin installed → pres
     harness: "claude",
     backlogBackend: "local",
     versionScheme: "semver",
+    specBackend: "local",
     templatesVersion: "0.7.0",
     entries: new Map([[
       PLUGIN_DEST,
@@ -454,6 +463,7 @@ Deno.test("UpgradeProjectUseCase: missing on-disk + plugin installed → deferre
     harness: "claude",
     backlogBackend: "local",
     versionScheme: "semver",
+    specBackend: "local",
     templatesVersion: "0.7.0",
     entries: new Map([[
       PLUGIN_DEST,
@@ -492,6 +502,7 @@ Deno.test("UpgradeProjectUseCase: vanilla on-disk + plugin NOT installed → exi
     harness: "claude",
     backlogBackend: "local",
     versionScheme: "semver",
+    specBackend: "local",
     templatesVersion: "0.7.0",
     entries: new Map([[
       PLUGIN_DEST,
@@ -530,6 +541,7 @@ Deno.test("UpgradeProjectUseCase: writes upstream content to .specnaut/upgrade-s
     harness: "claude",
     backlogBackend: "local",
     versionScheme: "semver",
+    specBackend: "local",
     templatesVersion: "1.4.0",
     entries: lockEntries,
   };
@@ -581,6 +593,7 @@ Deno.test("UpgradeProjectUseCase: does NOT write staging for auto-update files",
     harness: "claude",
     backlogBackend: "local",
     versionScheme: "semver",
+    specBackend: "local",
     templatesVersion: "1.4.0",
     entries: lockEntries,
   };
@@ -615,6 +628,7 @@ Deno.test("UpgradeProjectUseCase: lock.parentManaged=true filters agentic dests 
     harness: "claude",
     backlogBackend: "local",
     versionScheme: "semver",
+    specBackend: "local",
     templatesVersion: "0.7.0",
     entries: new Map(), // parent-managed lock never had agentic entries (FR-012)
     parentManaged: true,
@@ -665,6 +679,7 @@ Deno.test("UpgradeProjectUseCase: parentManagedOverride re-derives + persists on
     harness: "claude",
     backlogBackend: "local",
     versionScheme: "semver",
+    specBackend: "local",
     templatesVersion: "0.7.0",
     entries: new Map(),
   };
@@ -707,6 +722,7 @@ Deno.test("UpgradeProjectUseCase: legacy lock + parentManagedOverride persists p
     harness: "claude",
     backlogBackend: "local",
     versionScheme: "semver",
+    specBackend: "local",
     templatesVersion: "0.8.0",
     // Only a non-agentic toolkit entry; agentic dests are suppressed by the
     // override so they never enter the plan.

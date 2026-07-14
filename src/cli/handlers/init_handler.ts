@@ -13,8 +13,10 @@ import {
   pickVersionScheme,
   pickVersionSchemeInteractive,
 } from "../scheme_picker.ts";
+import { pickSpecBackend, pickSpecBackendInteractive } from "../spec_picker.ts";
 import { makeStdinSelectIO } from "../select.ts";
-import type { BacklogBackend, VersionScheme } from "../../domain/installed_lock.ts";
+import type { BacklogBackend, SpecBackend, VersionScheme } from "../../domain/installed_lock.ts";
+import { SPEC_STRATEGIES } from "../../domain/spec_strategies/registry.ts";
 import { detectVersionScheme } from "../../domain/project_detection.ts";
 import {
   BACKLOG_STRATEGIES,
@@ -49,6 +51,11 @@ export type InitIntent = {
   backlogRepo: string | null;
   /** Explicit `--scheme` value (`semver` | `date`). Null = ask/detect. */
   scheme: VersionScheme | null;
+  /**
+   * Explicit `--spec-backend` value (`local` | `cloud`). Null triggers the
+   * interactive picker (TTY) or the recommended default (non-TTY). Spec 020.
+   */
+  specBackend: SpecBackend | null;
   force: boolean;
   /**
    * `--dry-run`. Compute the plan and print it without writing anywhere
@@ -95,6 +102,30 @@ async function resolveBacklogBackend(
     });
   }
   const picked = await pickBacklogBackendInteractive(makeStdinSelectIO());
+  if (picked === null) {
+    console.error(red("aborted."));
+    Deno.exit(130);
+  }
+  return picked;
+}
+
+/**
+ * Resolves the spec backend: explicit `--spec-backend` flag wins; otherwise the
+ * interactive picker (TTY) or the non-TTY numeric prompt fall back to the
+ * recommended default (spec 020, FR-001). Mirrors {@link resolveBacklogBackend}.
+ */
+async function resolveSpecBackend(
+  explicit: SpecBackend | null,
+): Promise<SpecBackend> {
+  if (explicit !== null) return explicit;
+  if (!Deno.stdin.isTerminal()) {
+    return pickSpecBackend({
+      readLine: () => prompt(`Choose [1-${SPEC_STRATEGIES.length}]:`),
+      log: (s) => console.log(s),
+      errLog: (s) => console.error(red(s)),
+    });
+  }
+  const picked = await pickSpecBackendInteractive(makeStdinSelectIO());
   if (picked === null) {
     console.error(red("aborted."));
     Deno.exit(130);
@@ -390,6 +421,7 @@ export async function runInit(intent: InitIntent): Promise<number> {
     const probeBundle = harness.mapBundle(CORE_BUNDLE, {
       backlogBackend: "local",
       versionScheme: DEFAULT_VERSION_SCHEME,
+      specBackend: "local",
     });
     const conflicts = await writer.detectConflicts(probeBundle, targetDir);
     if (conflicts.length > 0) {
@@ -406,6 +438,7 @@ export async function runInit(intent: InitIntent): Promise<number> {
     intent.scheme,
     schemeSuggestion,
   );
+  const specBackend = await resolveSpecBackend(intent.specBackend);
 
   // Capture the Kanban URL up front (interactive prompt or --backlog-url
   // flag) so the populated config lands at init time and the PO never
@@ -455,7 +488,11 @@ export async function runInit(intent: InitIntent): Promise<number> {
   // (FR-004/FR-005). The bundle is mapped exactly as the use case maps it,
   // including the parent-managed agentic filter so a declared agentic path in
   // a parent-managed sub-repo is a clean no-op (D8 — it is simply not a dest).
-  const mappedForPreserve = harness.mapBundle(CORE_BUNDLE, { backlogBackend, versionScheme });
+  const mappedForPreserve = harness.mapBundle(CORE_BUNDLE, {
+    backlogBackend,
+    versionScheme,
+    specBackend,
+  });
   const bundleDests = parentManaged
     ? Object.keys(mappedForPreserve).filter((d) => !isAgenticPath(d))
     : Object.keys(mappedForPreserve);
@@ -480,6 +517,7 @@ export async function runInit(intent: InitIntent): Promise<number> {
     harness,
     backlogBackend,
     versionScheme,
+    specBackend,
     core: CORE_BUNDLE,
     ensureDir: (path) => Deno.mkdir(path, { recursive: true }),
   });
@@ -516,6 +554,7 @@ export async function runInit(intent: InitIntent): Promise<number> {
     const probeBundle = harness.mapBundle(CORE_BUNDLE, {
       backlogBackend,
       versionScheme,
+      specBackend,
     });
     const totalManaged = countManagedFiles(probeBundle);
     printConflictsError(result.conflicts, result.lockExists, totalManaged);

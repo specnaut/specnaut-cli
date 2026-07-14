@@ -67,6 +67,7 @@ async function lockWith(
     harness: "claude",
     backlogBackend: "local",
     versionScheme: "semver",
+    specBackend: "local",
     templatesVersion: "1.2.3",
     entries: map,
   };

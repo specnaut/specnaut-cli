@@ -51,6 +51,7 @@ Deno.test("router skill emits to .opencode/skills/specnaut/SKILL.md", () => {
   const bundle = harness.mapBundle([routerSkillEntry()], {
     backlogBackend: "local",
     versionScheme: "semver",
+    specBackend: "local",
   });
   const dest = ".opencode/skills/specnaut/SKILL.md";
   assertEquals(Object.keys(bundle), [dest]);
@@ -61,6 +62,7 @@ Deno.test("phase emits to .opencode/skills/specnaut/phases/<name>.md", () => {
   const bundle = harness.mapBundle([phaseEntry("specify")], {
     backlogBackend: "local",
     versionScheme: "semver",
+    specBackend: "local",
   });
   const dest = ".opencode/skills/specnaut/phases/specify.md";
   assertEquals(Object.keys(bundle), [dest]);
@@ -75,14 +77,18 @@ Deno.test("backlog-cmd emits to .opencode/commands/backlog.md", () => {
     content: `---\ndescription: Backlog\n---\nBody`,
     executable: false,
   };
-  const bundle = harness.mapBundle([entry], { backlogBackend: "local", versionScheme: "semver" });
+  const bundle = harness.mapBundle([entry], {
+    backlogBackend: "local",
+    versionScheme: "semver",
+    specBackend: "local",
+  });
   assertEquals(Object.keys(bundle), [".opencode/commands/backlog.md"]);
 });
 
 Deno.test("agent emits to .opencode/agents/specnaut-<name>.md with mode: subagent", () => {
   const bundle = harness.mapBundle([
     agentEntry("developer", "Read, Write, Edit, Grep, Glob, Bash"),
-  ], { backlogBackend: "local", versionScheme: "semver" });
+  ], { backlogBackend: "local", versionScheme: "semver", specBackend: "local" });
   const dest = ".opencode/agents/specnaut-developer.md";
   assertEquals(Object.keys(bundle), [dest]);
   assertStringIncludes(bundle[dest].content, "description: developer agent");
@@ -95,6 +101,7 @@ Deno.test("agent translates Read+Write+Edit+Bash to permission block", () => {
   const bundle = harness.mapBundle([agentEntry("dev", "Read, Write, Edit, Bash")], {
     backlogBackend: "local",
     versionScheme: "semver",
+    specBackend: "local",
   });
   const content = bundle[".opencode/agents/specnaut-dev.md"].content;
   assertStringIncludes(content, "read: allow");
@@ -108,6 +115,7 @@ Deno.test("agent de-dups Edit+MultiEdit into single edit permission", () => {
   const bundle = harness.mapBundle([agentEntry("dev", "Edit, MultiEdit")], {
     backlogBackend: "local",
     versionScheme: "semver",
+    specBackend: "local",
   });
   const content = bundle[".opencode/agents/specnaut-dev.md"].content;
   assertEquals(content.match(/edit: allow/g)?.length, 1);
@@ -116,7 +124,7 @@ Deno.test("agent de-dups Edit+MultiEdit into single edit permission", () => {
 Deno.test("agent omits Grep/Glob/Task/TodoWrite/NotebookEdit and unknowns", () => {
   const bundle = harness.mapBundle([
     agentEntry("dev", "Grep, Glob, Task, TodoWrite, NotebookEdit, Mystery"),
-  ], { backlogBackend: "local", versionScheme: "semver" });
+  ], { backlogBackend: "local", versionScheme: "semver", specBackend: "local" });
   const content = bundle[".opencode/agents/specnaut-dev.md"].content;
   assertEquals(content.includes("permission:"), false);
 });
@@ -125,6 +133,7 @@ Deno.test("agent strips Bash(git log *) parenthesized variants to Bash", () => {
   const bundle = harness.mapBundle([agentEntry("po", "Read, Bash(git log *), Bash(git diff *)")], {
     backlogBackend: "local",
     versionScheme: "semver",
+    specBackend: "local",
   });
   const content = bundle[".opencode/agents/specnaut-po.md"].content;
   assertStringIncludes(content, "read: allow");
@@ -136,7 +145,7 @@ Deno.test("agent strips Bash(git log *) parenthesized variants to Bash", () => {
 Deno.test("agent strips Agent(...) entries (subagent dispatch is native)", () => {
   const bundle = harness.mapBundle([
     agentEntry("wf", "Read, Bash, Agent(code-reviewer, security-auditor)"),
-  ], { backlogBackend: "local", versionScheme: "semver" });
+  ], { backlogBackend: "local", versionScheme: "semver", specBackend: "local" });
   const content = bundle[".opencode/agents/specnaut-wf.md"].content;
   assertEquals(content.includes("agent:"), false);
 });
@@ -145,6 +154,7 @@ Deno.test("agent with no tools field emits no permission block", () => {
   const bundle = harness.mapBundle([agentEntry("dev", null)], {
     backlogBackend: "local",
     versionScheme: "semver",
+    specBackend: "local",
   });
   const content = bundle[".opencode/agents/specnaut-dev.md"].content;
   assertEquals(content.includes("permission:"), false);
@@ -154,6 +164,7 @@ Deno.test("skill emits to .opencode/skills/specnaut-<name>/SKILL.md with name+de
   const bundle = harness.mapBundle([skillEntry("specnaut-auto")], {
     backlogBackend: "local",
     versionScheme: "semver",
+    specBackend: "local",
   });
   const dest = ".opencode/skills/specnaut-auto/SKILL.md";
   assertEquals(Object.keys(bundle), [dest]);
@@ -165,6 +176,7 @@ Deno.test("router skill named 'specnaut' is not double-prefixed", () => {
   const bundle = harness.mapBundle([routerSkillEntry()], {
     backlogBackend: "local",
     versionScheme: "semver",
+    specBackend: "local",
   });
   assertEquals(Object.keys(bundle), [".opencode/skills/specnaut/SKILL.md"]);
 });
@@ -187,6 +199,7 @@ Deno.test("spec-root and project-root pass through unchanged", () => {
   const bundle = harness.mapBundle([specRoot, projectRoot], {
     backlogBackend: "local",
     versionScheme: "semver",
+    specBackend: "local",
   });
   assertEquals(bundle[".specnaut/memory/constitution.md"].content, "raw constitution");
   assertEquals(bundle["AGENTS.md"].content, "raw AGENTS");

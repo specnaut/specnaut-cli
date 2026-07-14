@@ -2,7 +2,9 @@ import { parseArgs as stdParseArgs } from "@std/cli/parse-args";
 import {
   type BacklogBackend,
   KNOWN_BACKLOG_BACKENDS,
+  KNOWN_SPEC_BACKENDS,
   KNOWN_VERSION_SCHEMES,
+  type SpecBackend,
   type VersionScheme,
 } from "../domain/installed_lock.ts";
 
@@ -26,6 +28,18 @@ function validateSchemeArg(
   if (raw === null) return { ok: true, value: null };
   if ((KNOWN_VERSION_SCHEMES as ReadonlyArray<string>).includes(raw)) {
     return { ok: true, value: raw as VersionScheme };
+  }
+  return { ok: false };
+}
+
+function validateSpecBackendArg(
+  raw: string | null,
+):
+  | { ok: true; value: SpecBackend | null }
+  | { ok: false } {
+  if (raw === null) return { ok: true, value: null };
+  if ((KNOWN_SPEC_BACKENDS as ReadonlyArray<string>).includes(raw)) {
+    return { ok: true, value: raw as SpecBackend };
   }
   return { ok: false };
 }
@@ -77,6 +91,11 @@ export type Intent =
      * (TTY) or the auto-detection default (non-TTY).
      */
     scheme: "semver" | "date" | null;
+    /**
+     * Explicit `--spec-backend` value (`local` | `cloud`). `null` triggers the
+     * interactive picker (TTY) or the recommended default (non-TTY). Spec 020.
+     */
+    specBackend: SpecBackend | null;
     force: boolean;
     /**
      * `--dry-run`. Compute the plan (conflicts + would-write counts) and
@@ -153,6 +172,14 @@ export type Intent =
     payload: string | null;
     task: number | null;
     id: string | null;
+  }
+  | {
+    /** `specnaut spec <push|pull> <task>` (spec 020) — sync a task's spec with
+     *  SpecNaut Cloud. Cloud-backend only; see spec_handler.ts. */
+    kind: "spec";
+    sub: "push" | "pull";
+    task: number | null;
+    apiUrl: string | null;
   };
 
 export function parseArgs(argv: string[]): Intent {
@@ -181,6 +208,7 @@ export function parseArgs(argv: string[]): Intent {
       "backlog-url",
       "backlog-repo",
       "scheme",
+      "spec-backend",
       "api-url",
       "type",
       "title",
@@ -227,6 +255,13 @@ export function parseArgs(argv: string[]): Intent {
     if (!schemeResult.ok) {
       return { kind: "unknown", received: `init --scheme ${schemeRaw}` };
     }
+    const specBackendRaw = typeof parsed["spec-backend"] === "string"
+      ? (parsed["spec-backend"] as string)
+      : null;
+    const specBackendResult = validateSpecBackendArg(specBackendRaw);
+    if (!specBackendResult.ok) {
+      return { kind: "unknown", received: `init --spec-backend ${specBackendRaw}` };
+    }
     return {
       kind: "init",
       projectName: rest[0] ?? null,
@@ -237,6 +272,7 @@ export function parseArgs(argv: string[]): Intent {
       backlogUrl: backlogUrlRaw,
       backlogRepo: backlogRepoRaw,
       scheme: schemeResult.value,
+      specBackend: specBackendResult.value,
       force: Boolean(parsed.force),
       dryRun: Boolean(parsed["dry-run"]),
       resetPreserved: Boolean(parsed["reset-preserved"]),
@@ -354,6 +390,18 @@ export function parseArgs(argv: string[]): Intent {
       task: taskNum,
       id: rest[1] ?? null, // `gate cancel <id>`
     };
+  }
+
+  if (command === "spec") {
+    const sub = rest[0];
+    if (sub !== "push" && sub !== "pull") {
+      return { kind: "unknown", received: `spec ${sub ?? ""}`.trim() };
+    }
+    // `spec <push|pull> <task>` — the task number is a positional after the sub.
+    const taskRaw = rest[1] ?? null;
+    const task = taskRaw !== null && /^\d+$/.test(taskRaw) ? Number(taskRaw) : null;
+    const apiUrl = typeof parsed["api-url"] === "string" ? parsed["api-url"] : null;
+    return { kind: "spec", sub, task, apiUrl };
   }
 
   return { kind: "unknown", received: command ?? "" };

@@ -43,6 +43,18 @@ You **MUST** consider the user input before proceeding (if not empty).
 
 ## Outline
 
+<!-- BEGIN: spec-backend=cloud -->
+0. **Cloud spec setup** (spec backend = cloud): the spec lives on SpecNaut Cloud
+   and `/specnaut specify` created NO git branch. Before anything else:
+   - **Create the feature branch now** — this is the decoupling point. Run
+     `.specnaut/scripts/bash/create-new-feature.sh --branch-only "<feature description>"`
+     (the `--branch-only` flag creates only the branch — no `.specnaut/specs/` dir).
+   - **Materialise the spec** so the steps below read plain files:
+     `specnaut spec pull <task>` writes `.specnaut/specs/.cache/<task>/`.
+   - Read the spec, plan, tasks, and the mandatory Domain Model block from that
+     cache directory instead of `.specnaut/specs/<n>/`.
+
+<!-- END: spec-backend=cloud -->
 1. Run `{SCRIPT}` from repo root and parse FEATURE_DIR and AVAILABLE_DOCS list. All paths must be absolute. For single quotes in args like "I'm Groot", use escape syntax: e.g 'I'\''m Groot' (or double-quote if possible: "I'm Groot").
 
 2. **Check checklists status** (if FEATURE_DIR/checklists/ exists):

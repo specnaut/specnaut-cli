@@ -37,6 +37,7 @@
     "spec-kit/",
     "examples/",
     "templates/",
+    "tests/fixtures/",
     ".claude/",
     "packaging/",
     "plugin/skills/",
