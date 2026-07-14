@@ -61,10 +61,13 @@ Deno.test("pre-feature lock → upgrade → spec_backend: local, specify.md unch
     assertEquals(after.specBackend, "local");
 
     // 5. ...and the rendered specify.md is byte-identical to the pre-feature output.
-    const onDisk = await Deno.readTextFile(
-      join(dir, ".claude/skills/specnaut/phases/specify.md"),
+    // EOL-agnostic: content parity is the FR-003 guarantee (Windows writes CRLF
+    // natively; released binaries embed LF from the committed bundle).
+    const lf = (s: string) => s.replaceAll("\r\n", "\n");
+    const onDisk = lf(
+      await Deno.readTextFile(join(dir, ".claude/skills/specnaut/phases/specify.md")),
     );
-    assertEquals(onDisk, await Deno.readTextFile(GOLDEN));
+    assertEquals(onDisk, lf(await Deno.readTextFile(GOLDEN)));
   } finally {
     await Deno.remove(dir, { recursive: true });
   }

@@ -25,8 +25,13 @@ function phaseEntry(name: string): CoreEntry {
 
 for (const name of ["specify", "implement"]) {
   Deno.test(`${name}.md rendered for spec-backend=local is byte-identical to the pre-feature bundle`, async () => {
-    const golden = await Deno.readTextFile(abs(`fixtures/${name}_local_golden.md`));
-    const rendered = renderSpecBackend(phaseEntry(name).content, "local");
+    // EOL-agnostic: a released binary always embeds LF (the bundle is compiled
+    // from committed LF source), but Windows CI regenerates the bundle from a
+    // CRLF checkout. Content parity — not the OS line-ending — is the FR-003
+    // guarantee, so compare line-ending-agnostically.
+    const lf = (s: string) => s.replaceAll("\r\n", "\n");
+    const golden = lf(await Deno.readTextFile(abs(`fixtures/${name}_local_golden.md`)));
+    const rendered = lf(renderSpecBackend(phaseEntry(name).content, "local"));
     assertEquals(
       rendered,
       golden,
