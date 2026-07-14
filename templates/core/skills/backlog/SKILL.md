@@ -366,6 +366,27 @@ epic") and either auto-decomposes or proposes a concrete sub-task list
 — see the "Epic detection heuristic" section in
 `.claude/agents/product-owner.md`.
 
+<!-- BEGIN: spec-autogen=on -->
+## Auto-generate a task's spec at creation (cloud, opt-in)
+
+This project has `spec_autogen: true` in `.specnaut/installed.lock` and stores its specs on
+SpecNaut Cloud. So, immediately **after** creating a task, ALSO generate its spec: run the
+cloud `specify` flow for the new task (branch-free — no git branch, no local
+`.specnaut/specs/` files), so the spec is already written when the task is later picked for
+implementation. No waiting, no blocking pre-step.
+
+- Trigger it once per newly created task, right after the create succeeds — for a single
+  `add.sh` or for every task in a batch.
+- **Never fatal to task creation** — if spec generation fails (offline, auth, model error),
+  report it and continue; the task stays created and the spec-gen is retryable later by
+  running the cloud `specify` for that task by hand.
+- **Prepare many at once** — because cloud `specify` is branch-free, specs for several freshly
+  created tasks can be generated concurrently with no git-branch collision.
+
+When `spec_autogen` is absent/false, or the spec backend is not cloud, this step does not
+apply and task creation is unchanged.
+<!-- END: spec-autogen=on -->
+
 ## When NOT to use this skill
 
 - The user is implementing a backlog item — that's normal coding work;

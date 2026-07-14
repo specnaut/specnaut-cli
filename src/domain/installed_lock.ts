@@ -58,6 +58,17 @@ export type InstalledLock = {
    * `"local"` (FR-010, backward compatible). Sibling of `backlogBackend`.
    */
   readonly specBackend: SpecBackend;
+  /**
+   * Opt-in toggle (spec 021 / cli#425). When `true`, cloud-mode task creation
+   * ALSO auto-generates the new task's spec via the branch-free cloud `specify`
+   * path, so the spec is ready before implementation starts (FR-005). Absent in
+   * a pre-feature lock ⇒ `false` (default off — task creation is never surprised
+   * by heavy spec-gen). Mirrors `specBackend`'s default-on-absent; serialised
+   * only when enabled so existing locks stay byte-identical (cf. `parentManaged`).
+   * Read by the rendered task-creation guidance, which gates on
+   * `specAutogen && specBackend === "cloud"`.
+   */
+  readonly specAutogen?: boolean;
   readonly templatesVersion: string;
   readonly entries: ReadonlyMap<string, LockEntry>;
   /**
@@ -128,6 +139,11 @@ export function parseLock(yaml: string): InstalledLock {
     ? (rawSpecBackend as SpecBackend)
     : "local";
 
+  // Opt-in auto-generation toggle (spec 021 / FR-005). Absent ⇒ false (default
+  // off, mirroring the `spec_backend` default-on-absent). Only the literal
+  // `true` enables it; any other value (absent, false, garbage) ⇒ false.
+  const specAutogen = root.spec_autogen === true;
+
   const templatesVersion = root.templates_version;
   if (typeof templatesVersion !== "string") {
     throw new Error("missing top-level templates_version");
@@ -158,6 +174,7 @@ export function parseLock(yaml: string): InstalledLock {
     backlogBackend,
     versionScheme,
     specBackend,
+    specAutogen,
     templatesVersion,
     entries,
     ...(parentManaged ? { parentManaged } : {}),
@@ -181,6 +198,10 @@ export function serializeLock(lock: InstalledLock): string {
     backlog_backend: lock.backlogBackend,
     version_scheme: lock.versionScheme,
     spec_backend: lock.specBackend,
+    // Emit `spec_autogen` only when enabled (opt-in, spec 021), so a project
+    // that never turned it on keeps a byte-identical lock. Absent ⇒ false on
+    // read (mirrors `parent_managed`'s emit-when-set).
+    ...(lock.specAutogen ? { spec_autogen: true } : {}),
     // Emit `parent_managed` only when set so legacy/standalone locks stay
     // byte-for-byte identical to before this feature.
     ...(lock.parentManaged ? { parent_managed: true } : {}),

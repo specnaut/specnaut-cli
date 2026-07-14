@@ -472,6 +472,12 @@ Given that feature description, do this:
    4. Persist the resolved task number to \`.specnaut/feature.json\`
       (\`{ "linked_issue": <N>, "workflow_shape": "<lite|full>" }\`) so downstream
       phases locate the spec. No \`feature_directory\` is written in cloud mode.
+
+   **Parallel authoring (cloud):** because cloud \`specify\` creates NO git branch and writes
+   NO shared \`.specnaut/specs/\` state, several task specs can be authored concurrently — drive
+   one \`specify\` per task in parallel (a user, or an agent fleet) with no git-branch collision
+   and no shared-state clash. Each spec is pushed to its own task independently (last write
+   wins per task, Lot 1 upsert).
 <!-- END: spec-backend=cloud -->
 
 4. Load \`templates/spec-template.md\` to understand required sections.
@@ -965,6 +971,13 @@ You **MUST** consider the user input before proceeding (if not empty).
 
 ## Outline
 
+<!-- BEGIN: spec-backend=cloud -->
+**Materialise the spec (cloud backend):** run \`specnaut spec pull <task>\` ONCE now, before
+loading any design document. It writes the spec's tabs to the gitignored
+\`.specnaut/specs/.cache/<task>/\`; read the spec from there as files. If the pull fails
+(offline/auth), stop with its message — do not proceed against an empty spec.
+
+<!-- END: spec-backend=cloud -->
 1. **Setup**: Run \`{SCRIPT}\` from repo root and parse FEATURE_DIR and AVAILABLE_DOCS list. All paths must be absolute. For single quotes in args like "I'm Groot", use escape syntax: e.g 'I'\\''m Groot' (or double-quote if possible: "I'm Groot").
 
 2. **Load design documents**: Read from FEATURE_DIR:
@@ -1172,6 +1185,13 @@ Identify inconsistencies, duplications, ambiguities, and underspecified items ac
 
 ## Execution Steps
 
+<!-- BEGIN: spec-backend=cloud -->
+**Materialise the spec (cloud backend):** run \`specnaut spec pull <task>\` ONCE now, before
+loading any artifact. It writes the spec's tabs to the gitignored
+\`.specnaut/specs/.cache/<task>/\`; read the spec from there as files. If the pull fails
+(offline/auth), stop with its message — do not proceed against an empty spec.
+
+<!-- END: spec-backend=cloud -->
 ### 1. Initialize Analysis Context
 
 Run \`{SCRIPT}\` once from repo root and parse JSON for FEATURE_DIR and AVAILABLE_DOCS. Derive absolute paths:
@@ -1419,14 +1439,15 @@ You **MUST** consider the user input before proceeding (if not empty).
 
 <!-- BEGIN: spec-backend=cloud -->
 0. **Cloud spec setup** (spec backend = cloud): the spec lives on SpecNaut Cloud
-   and \`/specnaut specify\` created NO git branch. Before anything else:
+   and \`/specnaut specify\` created NO git branch. Before anything else, in this order:
+   - **Materialise the spec (pull-on-entry)** — run \`specnaut spec pull <task>\` ONCE
+     now; it writes the spec's tabs to the gitignored \`.specnaut/specs/.cache/<task>/\`.
+     Read the spec, plan, tasks, and the mandatory Domain Model block from that cache
+     directory instead of \`.specnaut/specs/<n>/\`. If the pull fails (offline/auth),
+     stop with its message — do not proceed against an empty spec.
    - **Create the feature branch now** — this is the decoupling point. Run
      \`.specnaut/scripts/bash/create-new-feature.sh --branch-only "<feature description>"\`
      (the \`--branch-only\` flag creates only the branch — no \`.specnaut/specs/\` dir).
-   - **Materialise the spec** so the steps below read plain files:
-     \`specnaut spec pull <task>\` writes \`.specnaut/specs/.cache/<task>/\`.
-   - Read the spec, plan, tasks, and the mandatory Domain Model block from that
-     cache directory instead of \`.specnaut/specs/<n>/\`.
 
 <!-- END: spec-backend=cloud -->
 1. Run \`{SCRIPT}\` from repo root and parse FEATURE_DIR and AVAILABLE_DOCS list. All paths must be absolute. For single quotes in args like "I'm Groot", use escape syntax: e.g 'I'\\''m Groot' (or double-quote if possible: "I'm Groot").
@@ -1598,6 +1619,13 @@ Note: This command assumes a complete task breakdown exists in tasks.md. If task
 
 ## Outline
 
+<!-- BEGIN: spec-backend=cloud -->
+**Materialise the spec (cloud backend):** run \`specnaut spec pull <task>\` ONCE now. It
+writes the spec's tabs to the gitignored \`.specnaut/specs/.cache/<task>/\`; read the spec
+from there as files. If the pull fails (offline/auth), stop with its message — do not
+proceed against an empty spec.
+
+<!-- END: spec-backend=cloud -->
 1. Identify files modified in the current feature branch:
    \`git diff --name-only \$(git merge-base HEAD main)\`
 2. Delegate structural review to parallel sub-agents via the \`review-coordinator\`.
@@ -9452,6 +9480,27 @@ subsystems, trigger phrases like "break down" / "phased" / "as an
 epic") and either auto-decomposes or proposes a concrete sub-task list
 — see the "Epic detection heuristic" section in
 \`.claude/agents/product-owner.md\`.
+
+<!-- BEGIN: spec-autogen=on -->
+## Auto-generate a task's spec at creation (cloud, opt-in)
+
+This project has \`spec_autogen: true\` in \`.specnaut/installed.lock\` and stores its specs on
+SpecNaut Cloud. So, immediately **after** creating a task, ALSO generate its spec: run the
+cloud \`specify\` flow for the new task (branch-free — no git branch, no local
+\`.specnaut/specs/\` files), so the spec is already written when the task is later picked for
+implementation. No waiting, no blocking pre-step.
+
+- Trigger it once per newly created task, right after the create succeeds — for a single
+  \`add.sh\` or for every task in a batch.
+- **Never fatal to task creation** — if spec generation fails (offline, auth, model error),
+  report it and continue; the task stays created and the spec-gen is retryable later by
+  running the cloud \`specify\` for that task by hand.
+- **Prepare many at once** — because cloud \`specify\` is branch-free, specs for several freshly
+  created tasks can be generated concurrently with no git-branch collision.
+
+When \`spec_autogen\` is absent/false, or the spec backend is not cloud, this step does not
+apply and task creation is unchanged.
+<!-- END: spec-autogen=on -->
 
 ## When NOT to use this skill
 

@@ -78,6 +78,7 @@ export class DiffProjectUseCase {
       backlogBackend: lock.backlogBackend,
       versionScheme: lock.versionScheme,
       specBackend: lock.specBackend,
+      specAutogen: lock.specAutogen,
     });
 
     const results: DivergenceResult[] = [];

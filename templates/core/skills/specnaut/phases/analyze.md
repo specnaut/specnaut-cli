@@ -53,6 +53,13 @@ Identify inconsistencies, duplications, ambiguities, and underspecified items ac
 
 ## Execution Steps
 
+<!-- BEGIN: spec-backend=cloud -->
+**Materialise the spec (cloud backend):** run `specnaut spec pull <task>` ONCE now, before
+loading any artifact. It writes the spec's tabs to the gitignored
+`.specnaut/specs/.cache/<task>/`; read the spec from there as files. If the pull fails
+(offline/auth), stop with its message — do not proceed against an empty spec.
+
+<!-- END: spec-backend=cloud -->
 ### 1. Initialize Analysis Context
 
 Run `{SCRIPT}` once from repo root and parse JSON for FEATURE_DIR and AVAILABLE_DOCS. Derive absolute paths:

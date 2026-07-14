@@ -139,6 +139,12 @@ Given that feature description, do this:
    4. Persist the resolved task number to `.specnaut/feature.json`
       (`{ "linked_issue": <N>, "workflow_shape": "<lite|full>" }`) so downstream
       phases locate the spec. No `feature_directory` is written in cloud mode.
+
+   **Parallel authoring (cloud):** because cloud `specify` creates NO git branch and writes
+   NO shared `.specnaut/specs/` state, several task specs can be authored concurrently — drive
+   one `specify` per task in parallel (a user, or an agent fleet) with no git-branch collision
+   and no shared-state clash. Each spec is pushed to its own task independently (last write
+   wins per task, Lot 1 upsert).
 <!-- END: spec-backend=cloud -->
 
 4. Load `templates/spec-template.md` to understand required sections.

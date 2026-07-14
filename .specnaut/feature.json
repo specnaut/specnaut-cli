@@ -1,5 +1,5 @@
 {
-  "feature_directory": ".specnaut/specs/020-cli-spec-backend",
-  "linked_issue": 424,
+  "feature_directory": ".specnaut/specs/021-cli-phase-wiring",
+  "linked_issue": 425,
   "workflow_shape": "full"
 }

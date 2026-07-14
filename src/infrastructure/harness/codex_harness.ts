@@ -8,6 +8,7 @@ import { frontmatterField, splitFrontmatter } from "./frontmatter.ts";
 import { applyBackend, backlogScriptDestination } from "./backlog_filter.ts";
 import { applyScheme, phaseScriptDestination } from "./scheme_filter.ts";
 import { applySpecBackend } from "./spec_backend_filter.ts";
+import { applySpecAutogen } from "./spec_autogen_filter.ts";
 
 function parseAgentFrontmatter(
   content: string,
@@ -62,7 +63,10 @@ export class CodexHarness implements Harness {
     for (const raw of core) {
       const backendApplied = applyBackend(raw, opts);
       if (backendApplied === null) continue;
-      const entry = applySpecBackend(applyScheme(backendApplied, opts), opts);
+      const entry = applySpecAutogen(
+        applySpecBackend(applyScheme(backendApplied, opts), opts),
+        opts,
+      );
       // agent-memory and the agent-fleet README are Claude-only conventions;
       // other harnesses skip them.
       if (entry.category === "agent-memory" || entry.category === "agent-doc") continue;
