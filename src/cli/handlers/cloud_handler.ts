@@ -255,7 +255,13 @@ async function runLogin(intent: CloudIntent): Promise<number> {
   // First-ever auth against a URL a project config chose is the phishing window
   // — require an explicit confirmation there (and only there). An --api-url
   // flag, a typed URL, or re-login to a known deployment proceed unprompted.
-  const existing = await store.load(apiUrl);
+  //
+  // Only a `config` source can EVER require the gate, so read credentials only
+  // then. For the default endpoint / an explicit flag the answer is always "no
+  // confirm" — reading here would just pop a keychain prompt (and, mid-rebrand,
+  // a legacy-item migration read) to compute a value we'd discard. Login writes
+  // fresh credentials regardless, so it never needs the existing ones.
+  const existing = resolved.source === "config" ? await store.load(apiUrl) : null;
   if (loginNeedsTrustConfirm(resolved.source, existing !== null)) {
     console.log(
       yellow(
