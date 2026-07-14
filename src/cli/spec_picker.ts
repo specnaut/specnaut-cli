@@ -65,9 +65,7 @@ export async function pickSpecBackendInteractive(
   );
   const items = SPEC_STRATEGIES.map((s) => ({
     key: s.key,
-    label: s.key === DEFAULT_SPEC_BACKEND
-      ? `${s.displayName}${RECOMMENDED_MARKER}`
-      : s.displayName,
+    label: s.key === DEFAULT_SPEC_BACKEND ? `${s.displayName}${RECOMMENDED_MARKER}` : s.displayName,
   }));
   // Printed once above the menu; the picker's redraw only rewinds over the
   // menu frame, so this benefit line stays put.

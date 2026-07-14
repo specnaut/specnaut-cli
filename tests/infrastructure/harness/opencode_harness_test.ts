@@ -77,7 +77,11 @@ Deno.test("backlog-cmd emits to .opencode/commands/backlog.md", () => {
     content: `---\ndescription: Backlog\n---\nBody`,
     executable: false,
   };
-  const bundle = harness.mapBundle([entry], { backlogBackend: "local", versionScheme: "semver", specBackend: "local" });
+  const bundle = harness.mapBundle([entry], {
+    backlogBackend: "local",
+    versionScheme: "semver",
+    specBackend: "local",
+  });
   assertEquals(Object.keys(bundle), [".opencode/commands/backlog.md"]);
 });
 

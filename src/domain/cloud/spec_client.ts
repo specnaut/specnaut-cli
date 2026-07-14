@@ -71,7 +71,12 @@ export class SpecClient {
    * POST /api/v1/specs — ensure a spec exists for a task and attach it,
    * idempotently. Returns the (possibly newly-created) spec.
    */
-  async ensure(token: string, projectKey: string, taskNumber: number, title?: string): Promise<SpecWire> {
+  async ensure(
+    token: string,
+    projectKey: string,
+    taskNumber: number,
+    title?: string,
+  ): Promise<SpecWire> {
     const { status, json } = await this.send("POST", "/specs", token, {
       projectKey,
       taskNumber,

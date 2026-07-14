@@ -62,43 +62,71 @@ Deno.test("CursorHarness.key and displayName", () => {
 
 Deno.test("CursorHarness maps router skill to .cursor/skills/specnaut/SKILL.md", () => {
   const h = new CursorHarness();
-  const mapped = h.mapBundle(SAMPLE, { backlogBackend: "local", versionScheme: "semver", specBackend: "local" });
+  const mapped = h.mapBundle(SAMPLE, {
+    backlogBackend: "local",
+    versionScheme: "semver",
+    specBackend: "local",
+  });
   assert(".cursor/skills/specnaut/SKILL.md" in mapped);
 });
 
 Deno.test("CursorHarness maps phase docs under .cursor/skills/specnaut/phases/", () => {
   const h = new CursorHarness();
-  const mapped = h.mapBundle(SAMPLE, { backlogBackend: "local", versionScheme: "semver", specBackend: "local" });
+  const mapped = h.mapBundle(SAMPLE, {
+    backlogBackend: "local",
+    versionScheme: "semver",
+    specBackend: "local",
+  });
   assert(".cursor/skills/specnaut/phases/specify.md" in mapped);
 });
 
 Deno.test("CursorHarness maps the backlog command to .cursor/skills/specnaut-backlog/SKILL.md", () => {
   const h = new CursorHarness();
-  const mapped = h.mapBundle(SAMPLE, { backlogBackend: "local", versionScheme: "semver", specBackend: "local" });
+  const mapped = h.mapBundle(SAMPLE, {
+    backlogBackend: "local",
+    versionScheme: "semver",
+    specBackend: "local",
+  });
   assert(".cursor/skills/specnaut-backlog/SKILL.md" in mapped);
 });
 
 Deno.test("CursorHarness maps agents to .cursor/skills/specnaut-agent-<name>/SKILL.md", () => {
   const h = new CursorHarness();
-  const mapped = h.mapBundle(SAMPLE, { backlogBackend: "local", versionScheme: "semver", specBackend: "local" });
+  const mapped = h.mapBundle(SAMPLE, {
+    backlogBackend: "local",
+    versionScheme: "semver",
+    specBackend: "local",
+  });
   assert(".cursor/skills/specnaut-agent-product-owner/SKILL.md" in mapped);
 });
 
 Deno.test("CursorHarness maps skills to .cursor/skills/specnaut-<name>/SKILL.md", () => {
   const h = new CursorHarness();
-  const mapped = h.mapBundle(SAMPLE, { backlogBackend: "local", versionScheme: "semver", specBackend: "local" });
+  const mapped = h.mapBundle(SAMPLE, {
+    backlogBackend: "local",
+    versionScheme: "semver",
+    specBackend: "local",
+  });
   assert(".cursor/skills/specnaut-auto/SKILL.md" in mapped);
 });
 
 Deno.test("CursorHarness maps spec-root to .specnaut/ and project-root unchanged", () => {
   const h = new CursorHarness();
-  const mapped = h.mapBundle(SAMPLE, { backlogBackend: "local", versionScheme: "semver", specBackend: "local" });
+  const mapped = h.mapBundle(SAMPLE, {
+    backlogBackend: "local",
+    versionScheme: "semver",
+    specBackend: "local",
+  });
   assert(".specnaut/memory/constitution.md" in mapped);
   assert("AGENTS.md" in mapped);
 });
 
 Deno.test("CursorHarness includes .cursor/rules/specify-rules.mdc from HARNESS_STATIC", () => {
   const h = new CursorHarness();
-  const mapped = h.mapBundle(SAMPLE, { backlogBackend: "local", versionScheme: "semver", specBackend: "local" });
+  const mapped = h.mapBundle(SAMPLE, {
+    backlogBackend: "local",
+    versionScheme: "semver",
+    specBackend: "local",
+  });
   assert(".cursor/rules/specify-rules.mdc" in mapped);
 });

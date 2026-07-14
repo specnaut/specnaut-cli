@@ -58,7 +58,12 @@ Deno.test("reasonForStatus maps statuses; everything else is transient", () => {
 
 Deno.test("ensure() posts projectKey/taskNumber and returns the parsed spec", async () => {
   const { fetchFn, calls } = scripted([
-    { method: "POST", test: (u) => u.endsWith("/api/v1/specs"), status: 201, body: { spec: specJson() } },
+    {
+      method: "POST",
+      test: (u) => u.endsWith("/api/v1/specs"),
+      status: 201,
+      body: { spec: specJson() },
+    },
   ]);
   const spec = await new SpecClient(API, fetchFn).ensure("tok", "CLOUD", 154, "Cloud-hosted specs");
   assertEquals(spec.taskNumber, 154);
@@ -117,7 +122,12 @@ Deno.test("putSteps() sends only key/name/order/body per step (§ I opaque shape
 
 Deno.test("a 422 maps to an invalid SpecApiError and never leaks the backend error string (§ I)", async () => {
   const { fetchFn } = scripted([
-    { method: "PUT", test: (u) => u.includes("/specs/steps"), status: 422, body: { error: "internal-only-string" } },
+    {
+      method: "PUT",
+      test: (u) => u.includes("/specs/steps"),
+      status: 422,
+      body: { error: "internal-only-string" },
+    },
   ]);
   const err = await assertRejects(
     () => new SpecClient(API, fetchFn).putSteps("tok", "CLOUD", 1, []),

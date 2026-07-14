@@ -112,7 +112,9 @@ async function runPull(task: number, deps: SpecDeps): Promise<number> {
     if (cached && cached.length > 0) {
       deps.err(
         yellow(
-          `warning: could not reach Cloud (${reasonOf(e)}); reusing the existing cache for task ${task}.`,
+          `warning: could not reach Cloud (${
+            reasonOf(e)
+          }); reusing the existing cache for task ${task}.`,
         ),
       );
       deps.out(dim(`↳ ${cached.length} cached step(s) under .specnaut/specs/.cache/${task}/`));

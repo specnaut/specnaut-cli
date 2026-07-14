@@ -59,8 +59,18 @@ const STEPS: SpecStep[] = [
 
 Deno.test("cloud specify with NO linked task auto-creates + links one, then pushes (FR-011)", async () => {
   const { fetchFn, calls } = scripted([
-    { method: "POST", match: (u) => u.endsWith("/tasks"), status: 201, body: { task: { number: 207 } } },
-    { method: "POST", match: (u) => u.endsWith("/specs"), status: 201, body: { spec: { taskNumber: 207, title: "Feature X", steps: [] } } },
+    {
+      method: "POST",
+      match: (u) => u.endsWith("/tasks"),
+      status: 201,
+      body: { task: { number: 207 } },
+    },
+    {
+      method: "POST",
+      match: (u) => u.endsWith("/specs"),
+      status: 201,
+      body: { spec: { taskNumber: 207, title: "Feature X", steps: [] } },
+    },
     { method: "PUT", match: (u) => u.endsWith("/specs/steps"), status: 200, body: {} },
   ]);
   const result = await sessionWith(fetchFn).author(null, "Feature X", STEPS);
@@ -81,7 +91,12 @@ Deno.test("cloud specify with NO linked task auto-creates + links one, then push
 
 Deno.test("cloud specify with an explicit task attaches to it (no auto-create)", async () => {
   const { fetchFn, calls } = scripted([
-    { method: "POST", match: (u) => u.endsWith("/specs"), status: 200, body: { spec: { taskNumber: 154, title: "t", steps: [] } } },
+    {
+      method: "POST",
+      match: (u) => u.endsWith("/specs"),
+      status: 200,
+      body: { spec: { taskNumber: 154, title: "t", steps: [] } },
+    },
     { method: "PUT", match: (u) => u.endsWith("/specs/steps"), status: 200, body: {} },
   ]);
   const result = await sessionWith(fetchFn).author(154, "t", STEPS);
@@ -95,8 +110,18 @@ Deno.test("cloud specify writes ZERO .specnaut/specs files and creates ZERO bran
   try {
     await Deno.mkdir(`${tmp}/.specnaut`, { recursive: true });
     const { fetchFn } = scripted([
-      { method: "POST", match: (u) => u.endsWith("/tasks"), status: 201, body: { task: { number: 5 } } },
-      { method: "POST", match: (u) => u.endsWith("/specs"), status: 201, body: { spec: { taskNumber: 5, title: "t", steps: [] } } },
+      {
+        method: "POST",
+        match: (u) => u.endsWith("/tasks"),
+        status: 201,
+        body: { task: { number: 5 } },
+      },
+      {
+        method: "POST",
+        match: (u) => u.endsWith("/specs"),
+        status: 201,
+        body: { spec: { taskNumber: 5, title: "t", steps: [] } },
+      },
       { method: "PUT", match: (u) => u.endsWith("/specs/steps"), status: 200, body: {} },
     ]);
     await sessionWith(fetchFn).author(null, "t", STEPS);

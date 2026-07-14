@@ -1,7 +1,7 @@
 # Quickstart — CLI spec backend, exercised locally
 
-Runs against the working-tree CLI (`deno run --allow-all src/main.ts …`) using the
-test-sandbox skill, no compiled binary needed.
+Runs against the working-tree CLI (`deno run --allow-all src/main.ts …`) using the test-sandbox
+skill, no compiled binary needed.
 
 ## 1. Local backend — zero behaviour change
 

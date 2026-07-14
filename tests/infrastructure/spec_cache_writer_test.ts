@@ -24,26 +24,37 @@ async function withTmp(fn: (dir: string) => Promise<void>) {
 
 Deno.test("write lays out one ordered file per step and returns their paths", async () => {
   await withTmp(async (dir) => {
-    const written = await writer.write(dir, 154, steps(
-      ["specify", "Specify", 1, "# spec"],
-      ["plan", "Plan", 2, "# plan"],
-    ));
+    const written = await writer.write(
+      dir,
+      154,
+      steps(
+        ["specify", "Specify", 1, "# spec"],
+        ["plan", "Plan", 2, "# plan"],
+      ),
+    );
     assertEquals(written, [
       ".specnaut/specs/.cache/154/1-specify.md",
       ".specnaut/specs/.cache/154/2-plan.md",
     ]);
-    assertEquals(await Deno.readTextFile(`${dir}/.specnaut/specs/.cache/154/1-specify.md`), "# spec");
+    assertEquals(
+      await Deno.readTextFile(`${dir}/.specnaut/specs/.cache/154/1-specify.md`),
+      "# spec",
+    );
     assertEquals(await Deno.readTextFile(`${dir}/.specnaut/specs/.cache/154/2-plan.md`), "# plan");
   });
 });
 
 Deno.test("write clears stale files on re-pull (US3 AC2 reconciliation)", async () => {
   await withTmp(async (dir) => {
-    await writer.write(dir, 154, steps(
-      ["specify", "Specify", 1, "a"],
-      ["plan", "Plan", 2, "b"],
-      ["tasks", "Tasks", 3, "c"],
-    ));
+    await writer.write(
+      dir,
+      154,
+      steps(
+        ["specify", "Specify", 1, "a"],
+        ["plan", "Plan", 2, "b"],
+        ["tasks", "Tasks", 3, "c"],
+      ),
+    );
     // A shorter re-pull must not leave the removed step's file behind.
     await writer.write(dir, 154, steps(["specify", "Specify", 1, "a2"]));
     const names: string[] = [];
@@ -56,10 +67,14 @@ Deno.test("write clears stale files on re-pull (US3 AC2 reconciliation)", async 
 
 Deno.test("read round-trips written steps and reflects an edit to a cached tab", async () => {
   await withTmp(async (dir) => {
-    await writer.write(dir, 154, steps(
-      ["specify", "Specify", 1, "orig"],
-      ["plan", "Plan", 2, "planbody"],
-    ));
+    await writer.write(
+      dir,
+      154,
+      steps(
+        ["specify", "Specify", 1, "orig"],
+        ["plan", "Plan", 2, "planbody"],
+      ),
+    );
     // Simulate a user editing a materialised tab, then reading it back to push.
     await Deno.writeTextFile(`${dir}/.specnaut/specs/.cache/154/1-specify.md`, "edited");
     const read = await writer.read(dir, 154);

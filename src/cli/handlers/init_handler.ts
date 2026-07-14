@@ -13,10 +13,7 @@ import {
   pickVersionScheme,
   pickVersionSchemeInteractive,
 } from "../scheme_picker.ts";
-import {
-  pickSpecBackend,
-  pickSpecBackendInteractive,
-} from "../spec_picker.ts";
+import { pickSpecBackend, pickSpecBackendInteractive } from "../spec_picker.ts";
 import { makeStdinSelectIO } from "../select.ts";
 import type { BacklogBackend, SpecBackend, VersionScheme } from "../../domain/installed_lock.ts";
 import { SPEC_STRATEGIES } from "../../domain/spec_strategies/registry.ts";

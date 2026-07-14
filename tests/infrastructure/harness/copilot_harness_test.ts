@@ -64,37 +64,61 @@ Deno.test("CopilotHarness.key and displayName", () => {
 
 Deno.test("CopilotHarness maps router skill to .github/instructions/specnaut.instructions.md", () => {
   const h = new CopilotHarness();
-  const mapped = h.mapBundle(SAMPLE, { backlogBackend: "local", versionScheme: "semver", specBackend: "local" });
+  const mapped = h.mapBundle(SAMPLE, {
+    backlogBackend: "local",
+    versionScheme: "semver",
+    specBackend: "local",
+  });
   assert(".github/instructions/specnaut.instructions.md" in mapped);
 });
 
 Deno.test("CopilotHarness maps phase docs to .github/instructions/specnaut-<phase>.instructions.md", () => {
   const h = new CopilotHarness();
-  const mapped = h.mapBundle(SAMPLE, { backlogBackend: "local", versionScheme: "semver", specBackend: "local" });
+  const mapped = h.mapBundle(SAMPLE, {
+    backlogBackend: "local",
+    versionScheme: "semver",
+    specBackend: "local",
+  });
   assert(".github/instructions/specnaut-specify.instructions.md" in mapped);
 });
 
 Deno.test("CopilotHarness maps backlog-cmd to .github/instructions/specnaut-backlog.instructions.md", () => {
   const h = new CopilotHarness();
-  const mapped = h.mapBundle(SAMPLE, { backlogBackend: "local", versionScheme: "semver", specBackend: "local" });
+  const mapped = h.mapBundle(SAMPLE, {
+    backlogBackend: "local",
+    versionScheme: "semver",
+    specBackend: "local",
+  });
   assert(".github/instructions/specnaut-backlog.instructions.md" in mapped);
 });
 
 Deno.test("CopilotHarness maps skill to .github/instructions/specnaut-<name>.instructions.md", () => {
   const h = new CopilotHarness();
-  const mapped = h.mapBundle(SAMPLE, { backlogBackend: "local", versionScheme: "semver", specBackend: "local" });
+  const mapped = h.mapBundle(SAMPLE, {
+    backlogBackend: "local",
+    versionScheme: "semver",
+    specBackend: "local",
+  });
   assert(".github/instructions/specnaut-auto.instructions.md" in mapped);
 });
 
 Deno.test("CopilotHarness maps agents to .github/instructions/specnaut-agent-<name>.instructions.md", () => {
   const h = new CopilotHarness();
-  const mapped = h.mapBundle(SAMPLE, { backlogBackend: "local", versionScheme: "semver", specBackend: "local" });
+  const mapped = h.mapBundle(SAMPLE, {
+    backlogBackend: "local",
+    versionScheme: "semver",
+    specBackend: "local",
+  });
   assert(".github/instructions/specnaut-agent-product-owner.instructions.md" in mapped);
 });
 
 Deno.test('CopilotHarness rewrites instruction frontmatter to applyTo: "**" and strips Claude fields', () => {
   const h = new CopilotHarness();
-  const mapped = h.mapBundle(SAMPLE, { backlogBackend: "local", versionScheme: "semver", specBackend: "local" });
+  const mapped = h.mapBundle(SAMPLE, {
+    backlogBackend: "local",
+    versionScheme: "semver",
+    specBackend: "local",
+  });
   const cmd = mapped[".github/instructions/specnaut.instructions.md"];
   assert(cmd, "instruction file not emitted");
   assert(cmd.content.startsWith("---\n"));
@@ -107,14 +131,22 @@ Deno.test('CopilotHarness rewrites instruction frontmatter to applyTo: "**" and 
 
 Deno.test("CopilotHarness maps spec-root to .specnaut/<suffix> and project-root to <suffix>", () => {
   const h = new CopilotHarness();
-  const mapped = h.mapBundle(SAMPLE, { backlogBackend: "local", versionScheme: "semver", specBackend: "local" });
+  const mapped = h.mapBundle(SAMPLE, {
+    backlogBackend: "local",
+    versionScheme: "semver",
+    specBackend: "local",
+  });
   assert(".specnaut/memory/constitution.md" in mapped);
   assert("AGENTS.md" in mapped);
 });
 
 Deno.test("CopilotHarness emits no Claude/Cursor/Codex/Windsurf artefacts", () => {
   const h = new CopilotHarness();
-  const mapped = h.mapBundle(SAMPLE, { backlogBackend: "local", versionScheme: "semver", specBackend: "local" });
+  const mapped = h.mapBundle(SAMPLE, {
+    backlogBackend: "local",
+    versionScheme: "semver",
+    specBackend: "local",
+  });
   const keys = Object.keys(mapped);
   assert(!keys.some((k) => k.startsWith(".claude/")), "no .claude/");
   assert(!keys.some((k) => k.startsWith(".cursor/")), "no .cursor/");

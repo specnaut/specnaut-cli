@@ -28,7 +28,17 @@ Deno.test("pre-feature lock → upgrade → spec_backend: local, specify.md unch
   try {
     // 1. Init a real claude project on the local backend.
     const init = await runSpecnaut(
-      ["init", "--here", "--no-git", "--ai", "claude", "--backlog", "local", "--spec-backend", "local"],
+      [
+        "init",
+        "--here",
+        "--no-git",
+        "--ai",
+        "claude",
+        "--backlog",
+        "local",
+        "--spec-backend",
+        "local",
+      ],
       dir,
     );
     assertEquals(init.code, 0, `init failed: ${init.stderr}`);
