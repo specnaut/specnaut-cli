@@ -1,5 +1,5 @@
 {
-  "feature_directory": ".specnaut/specs/018-scope-script-hardening",
-  "linked_issue": 389,
+  "feature_directory": ".specnaut/specs/020-cli-spec-backend",
+  "linked_issue": 424,
   "workflow_shape": "full"
 }
