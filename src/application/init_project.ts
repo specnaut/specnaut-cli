@@ -5,6 +5,7 @@ import type {
   InstalledLock,
   KnownHarness,
   LockEntry,
+  SpecBackend,
   VersionScheme,
 } from "../domain/installed_lock.ts";
 import type { CoreBundle } from "../domain/core_bundle.ts";
@@ -49,6 +50,8 @@ export type InitProjectDeps = {
   harness: Harness;
   backlogBackend: BacklogBackend;
   versionScheme: VersionScheme;
+  /** Which spec backend to persist + render the phase docs against (spec 020). */
+  specBackend: SpecBackend;
   core: CoreBundle;
   /** Creates the target directory if it does not exist (idempotent). */
   ensureDir(path: string): Promise<void>;
@@ -97,6 +100,7 @@ export class InitProjectUseCase {
       harness,
       backlogBackend,
       versionScheme,
+      specBackend,
       core,
       ensureDir,
     } = this.deps;
@@ -109,7 +113,7 @@ export class InitProjectUseCase {
       await ensureDir(input.targetDir);
     }
 
-    const mappedBundle = harness.mapBundle(core, { backlogBackend, versionScheme });
+    const mappedBundle = harness.mapBundle(core, { backlogBackend, versionScheme, specBackend });
     // Parent-managed targets inherit agentic files from the providing
     // workspace: filter them out of the bundle here — after harness mapping,
     // before BOTH writeBundle and lock-entry construction — so suppressed
@@ -211,6 +215,7 @@ export class InitProjectUseCase {
       harness: harness.key as KnownHarness,
       backlogBackend,
       versionScheme,
+      specBackend,
       templatesVersion: TEMPLATES_VERSION,
       entries: lockEntries,
       // Cache the decision so a later upgrade suppresses agentic files

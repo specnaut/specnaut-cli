@@ -10,7 +10,7 @@ Deno.test("ClaudeHarness.key and displayName", () => {
 
 Deno.test("ClaudeHarness.mapBundle emits the Claude tree", () => {
   const h = new ClaudeHarness();
-  const mapped = h.mapBundle(CORE_BUNDLE, { backlogBackend: "local", versionScheme: "semver" });
+  const mapped = h.mapBundle(CORE_BUNDLE, { backlogBackend: "local", versionScheme: "semver", specBackend: "local" });
   // Router skill + 11 phase docs + specnaut-review alias +
   // backlog skill + 1 backlog cmd + 9 agents + 5 agent-memory stubs +
   // 16 spec-root entries + AGENTS.md + .gitignore + 5 backlog scripts +
@@ -46,7 +46,7 @@ Deno.test("ClaudeHarness.mapBundle emits the Claude tree", () => {
 
 Deno.test("ClaudeHarness includes HARNESS_STATIC claude files (.claude/CLAUDE.md)", () => {
   const h = new ClaudeHarness();
-  const mapped = h.mapBundle(CORE_BUNDLE, { backlogBackend: "local", versionScheme: "semver" });
+  const mapped = h.mapBundle(CORE_BUNDLE, { backlogBackend: "local", versionScheme: "semver", specBackend: "local" });
   const claudeMd = mapped[".claude/CLAUDE.md"];
   const staticClaude = HARNESS_STATIC.claude[".claude/CLAUDE.md"];
   assertEquals(claudeMd?.content, staticClaude?.content);

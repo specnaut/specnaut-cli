@@ -2,3 +2,4 @@
 .specnaut/logs/
 .specnaut/upgrade-pending.json
 .specnaut/upgrade-staging/
+.specnaut/specs/.cache/

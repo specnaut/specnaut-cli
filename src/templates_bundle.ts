@@ -400,6 +400,7 @@ Given that feature description, do this:
    - Use action-noun format when possible (e.g., "add-user-auth", "fix-payment-bug")
    - Preserve technical terms and acronyms (OAuth2, API, JWT, etc.)
 
+<!-- BEGIN: spec-backend=local -->
 2. **Branch creation** (optional, via hook):
 
    If a \`before_specify\` hook ran, it will have created/switched to a git branch and output JSON with \`BRANCH_NAME\` and \`FEATURE_NUM\`. Note these for reference; the branch name does **not** dictate the spec directory name.
@@ -445,6 +446,33 @@ Given that feature description, do this:
    - Create only one feature per \`/specnaut specify\` invocation.
    - The spec directory name and git branch name are independent.
    - The spec directory and file are always created by this command, never by the hook.
+<!-- END: spec-backend=local -->
+<!-- BEGIN: spec-backend=cloud -->
+2. **Cloud spec authoring** (spec backend = cloud — NO git branch, NO local files):
+
+   This project stores specifications on SpecNaut Cloud, not in \`.specnaut/specs/\`.
+   Do **NOT** create a git branch and do **NOT** write any \`.specnaut/specs/<n>/\`
+   files. The branch is created later, at \`/specnaut implement\`. The spec is
+   authored directly to the linked backlog task and read back on demand with
+   \`specnaut spec pull <task>\`.
+
+3. **Resolve the linked task and author the spec to Cloud**:
+
+   1. Determine the task number:
+      - If the user passed \`--issue <N>\`, use it.
+      - Otherwise \`specnaut spec push\` auto-creates a backlog task named from the
+        feature and links it — the task and its spec are created together (no
+        manual pre-step).
+   2. Generate the spec body using \`templates/spec-template.md\` for structure,
+      exactly as you would locally (same sections, same mandatory Domain Model
+      block).
+   3. Write the generated spec to the gitignored cache as the \`specify\` step:
+      \`.specnaut/specs/.cache/<task>/1-specify.md\`, then push it:
+      \`specnaut spec push <task>\` (upsert-only; it never deletes other tabs).
+   4. Persist the resolved task number to \`.specnaut/feature.json\`
+      (\`{ "linked_issue": <N>, "workflow_shape": "<lite|full>" }\`) so downstream
+      phases locate the spec. No \`feature_directory\` is written in cloud mode.
+<!-- END: spec-backend=cloud -->
 
 4. Load \`templates/spec-template.md\` to understand required sections.
 
@@ -524,7 +552,12 @@ Given that feature description, do this:
    - \`optional: true\` → \`## Extension Hooks\` block with \`**Optional Hook**: {extension}\`, command, description, prompt.
    - \`optional: false\` → \`## Extension Hooks\` block with \`**Automatic Hook**: {extension}\`, \`EXECUTE_COMMAND: {command}\`.
 
+<!-- BEGIN: spec-backend=local -->
 **NOTE:** Branch creation is handled by the \`before_specify\` hook. Spec directory and file creation are always handled by this core command.
+<!-- END: spec-backend=local -->
+<!-- BEGIN: spec-backend=cloud -->
+**NOTE:** In cloud spec mode no git branch and no \`.specnaut/specs/\` files are created here — the spec is pushed to SpecNaut Cloud and the branch is created later at \`/specnaut implement\`.
+<!-- END: spec-backend=cloud -->
 
 ## Quick Guidelines
 
@@ -1384,6 +1417,18 @@ You **MUST** consider the user input before proceeding (if not empty).
 
 ## Outline
 
+<!-- BEGIN: spec-backend=cloud -->
+0. **Cloud spec setup** (spec backend = cloud): the spec lives on SpecNaut Cloud
+   and \`/specnaut specify\` created NO git branch. Before anything else:
+   - **Create the feature branch now** — this is the decoupling point. Run
+     \`.specnaut/scripts/bash/create-new-feature.sh --branch-only "<feature description>"\`
+     (the \`--branch-only\` flag creates only the branch — no \`.specnaut/specs/\` dir).
+   - **Materialise the spec** so the steps below read plain files:
+     \`specnaut spec pull <task>\` writes \`.specnaut/specs/.cache/<task>/\`.
+   - Read the spec, plan, tasks, and the mandatory Domain Model block from that
+     cache directory instead of \`.specnaut/specs/<n>/\`.
+
+<!-- END: spec-backend=cloud -->
 1. Run \`{SCRIPT}\` from repo root and parse FEATURE_DIR and AVAILABLE_DOCS list. All paths must be absolute. For single quotes in args like "I'm Groot", use escape syntax: e.g 'I'\\''m Groot' (or double-quote if possible: "I'm Groot").
 
 2. **Check checklists status** (if FEATURE_DIR/checklists/ exists):
@@ -14304,6 +14349,7 @@ set -e
 JSON_MODE=false
 DRY_RUN=false
 ALLOW_EXISTING=false
+BRANCH_ONLY=false
 SHORT_NAME=""
 BRANCH_NUMBER=""
 USE_TIMESTAMP=false
@@ -14318,6 +14364,9 @@ while [ \$i -le \$# ]; do
             ;;
         --dry-run)
             DRY_RUN=true
+            ;;
+        --branch-only)
+            BRANCH_ONLY=true
             ;;
         --allow-existing-branch)
             ALLOW_EXISTING=true
@@ -14370,11 +14419,14 @@ while [ \$i -le \$# ]; do
             LINKED_ISSUE="\$next_arg"
             ;;
         --help|-h)
-            echo "Usage: \$0 [--json] [--dry-run] [--allow-existing-branch] [--short-name <name>] [--number N] [--timestamp] [--issue <id>] <feature_description>"
+            echo "Usage: \$0 [--json] [--dry-run] [--branch-only] [--allow-existing-branch] [--short-name <name>] [--number N] [--timestamp] [--issue <id>] <feature_description>"
             echo ""
             echo "Options:"
             echo "  --json              Output in JSON format"
             echo "  --dry-run           Compute branch name and paths without creating branches, directories, or files"
+            echo "  --branch-only       Create ONLY the git branch — skip the spec directory + spec file."
+            echo "                      Used by cloud-mode /specnaut implement, where the spec lives on"
+            echo "                      SpecNaut Cloud and the branch is created at implement (not specify)."
             echo "  --allow-existing-branch  Switch to branch if it already exists instead of failing"
             echo "  --short-name <name> Provide a custom short name (2-4 words) for the branch"
             echo "  --number N          Specify branch number manually (overrides auto-detection)"
@@ -14686,15 +14738,20 @@ if [ "\$DRY_RUN" != true ]; then
         >&2 echo "[specify] Warning: Git repository not detected; skipped branch creation for \$BRANCH_NAME"
     fi
 
-    mkdir -p "\$FEATURE_DIR"
+    # --branch-only: create the branch above but skip the spec directory + file.
+    # In cloud spec mode the spec lives on SpecNaut Cloud, so /specnaut implement
+    # only needs the branch (the decoupling point — no local .specnaut/specs/ dir).
+    if [ "\$BRANCH_ONLY" != true ]; then
+        mkdir -p "\$FEATURE_DIR"
 
-    if [ ! -f "\$SPEC_FILE" ]; then
-        TEMPLATE=\$(resolve_template "spec-template" "\$REPO_ROOT") || true
-        if [ -n "\$TEMPLATE" ] && [ -f "\$TEMPLATE" ]; then
-            cp "\$TEMPLATE" "\$SPEC_FILE"
-        else
-            echo "Warning: Spec template not found; created empty spec file" >&2
-            touch "\$SPEC_FILE"
+        if [ ! -f "\$SPEC_FILE" ]; then
+            TEMPLATE=\$(resolve_template "spec-template" "\$REPO_ROOT") || true
+            if [ -n "\$TEMPLATE" ] && [ -f "\$TEMPLATE" ]; then
+                cp "\$TEMPLATE" "\$SPEC_FILE"
+            else
+                echo "Warning: Spec template not found; created empty spec file" >&2
+                touch "\$SPEC_FILE"
+            fi
         fi
     fi
 
@@ -16097,6 +16154,7 @@ Generated by Specnaut. Edit freely.
 .specnaut/logs/
 .specnaut/upgrade-pending.json
 .specnaut/upgrade-staging/
+.specnaut/specs/.cache/
 `,
     executable: false,
     backend: null,

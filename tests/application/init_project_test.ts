@@ -100,6 +100,7 @@ Deno.test("InitProjectUseCase writes the bundle to the target dir (happy path)",
     harness: fakeClaudeHarness(),
     backlogBackend: "local",
     versionScheme: "semver",
+    specBackend: "local",
     core: SAMPLE_CORE,
     ensureDir: () => Promise.resolve(),
   });
@@ -125,6 +126,7 @@ Deno.test("InitProjectUseCase fails with 'conflicts' when target already has spe
     harness: fakeClaudeHarness(),
     backlogBackend: "local",
     versionScheme: "semver",
+    specBackend: "local",
     core: SAMPLE_CORE,
     ensureDir: () => Promise.resolve(),
   });
@@ -148,6 +150,7 @@ Deno.test("InitProjectUseCase reports lockExists=true when conflicts hit a previ
     harness: "claude",
     backlogBackend: "local",
     versionScheme: "semver",
+    specBackend: "local",
     templatesVersion: "0.0.0",
     entries: new Map(),
   };
@@ -158,6 +161,7 @@ Deno.test("InitProjectUseCase reports lockExists=true when conflicts hit a previ
     harness: fakeClaudeHarness(),
     backlogBackend: "local",
     versionScheme: "semver",
+    specBackend: "local",
     core: SAMPLE_CORE,
     ensureDir: () => Promise.resolve(),
   });
@@ -182,6 +186,7 @@ Deno.test("InitProjectUseCase calls git.init when repo not initialized and initG
     harness: fakeClaudeHarness(),
     backlogBackend: "local",
     versionScheme: "semver",
+    specBackend: "local",
     core: SAMPLE_CORE,
     ensureDir: () => Promise.resolve(),
   });
@@ -198,6 +203,7 @@ Deno.test("InitProjectUseCase skips git.init when initGit=false", async () => {
     harness: fakeClaudeHarness(),
     backlogBackend: "local",
     versionScheme: "semver",
+    specBackend: "local",
     core: SAMPLE_CORE,
     ensureDir: () => Promise.resolve(),
   });
@@ -214,6 +220,7 @@ Deno.test("InitProjectUseCase skips git.init when git not available", async () =
     harness: fakeClaudeHarness(),
     backlogBackend: "local",
     versionScheme: "semver",
+    specBackend: "local",
     core: SAMPLE_CORE,
     ensureDir: () => Promise.resolve(),
   });
@@ -240,6 +247,7 @@ Deno.test("InitProjectUseCase skips git.init when repo already initialized", asy
     harness: fakeClaudeHarness(),
     backlogBackend: "local",
     versionScheme: "semver",
+    specBackend: "local",
     core: SAMPLE_CORE,
     ensureDir: () => Promise.resolve(),
   });
@@ -266,6 +274,7 @@ Deno.test("InitProjectUseCase with force=true skips conflict detection and reque
     harness: fakeClaudeHarness(),
     backlogBackend: "local",
     versionScheme: "semver",
+    specBackend: "local",
     core: SAMPLE_CORE,
     ensureDir: () => Promise.resolve(),
   });
@@ -298,6 +307,7 @@ Deno.test("InitProjectUseCase returns backups array from writer report", async (
     harness: fakeClaudeHarness(),
     backlogBackend: "local",
     versionScheme: "semver",
+    specBackend: "local",
     core: SAMPLE_CORE,
     ensureDir: () => Promise.resolve(),
   });
@@ -321,6 +331,7 @@ Deno.test("InitProjectUseCase persists an installed.lock with SHA256 of every fi
     harness: fakeClaudeHarness(),
     backlogBackend: "local",
     versionScheme: "semver",
+    specBackend: "local",
     core: [
       {
         category: "project-root",
@@ -364,6 +375,7 @@ Deno.test("InitProjectUseCase records harness.key in the installed lock", async 
     harness: fakeClaudeHarness(),
     backlogBackend: "local",
     versionScheme: "semver",
+    specBackend: "local",
     core: SAMPLE_CORE,
     ensureDir: () => Promise.resolve(),
   });
@@ -381,6 +393,7 @@ Deno.test("InitProjectUseCase suppresses agentic dests from writes AND lock when
     harness: fakeClaudeHarness(),
     backlogBackend: "local",
     versionScheme: "semver",
+    specBackend: "local",
     core: MIXED_CORE,
     ensureDir: () => Promise.resolve(),
   });
@@ -422,6 +435,7 @@ Deno.test("InitProjectUseCase writes all dests and sets no parentManaged when no
     harness: fakeClaudeHarness(),
     backlogBackend: "local",
     versionScheme: "semver",
+    specBackend: "local",
     core: MIXED_CORE,
     ensureDir: () => Promise.resolve(),
   });
@@ -452,6 +466,7 @@ Deno.test("InitProjectUseCase uses harness.mapBundle output as the file tree", a
     harness: fakeClaudeHarness(),
     backlogBackend: "local",
     versionScheme: "semver",
+    specBackend: "local",
     core: SAMPLE_CORE,
     ensureDir: () => Promise.resolve(),
   });
@@ -485,6 +500,7 @@ Deno.test("InitProjectUseCase: preservedPaths are absent from the write set and 
     harness: fakeClaudeHarness(),
     backlogBackend: "local",
     versionScheme: "semver",
+    specBackend: "local",
     core: PRESERVE_CORE,
     ensureDir: () => Promise.resolve(),
   });
@@ -517,6 +533,7 @@ Deno.test("InitProjectUseCase: filesWritten excludes preserved paths", async () 
     harness: fakeClaudeHarness(),
     backlogBackend: "local",
     versionScheme: "semver",
+    specBackend: "local",
     core: PRESERVE_CORE, // 3 non-mergeable files
     ensureDir: () => Promise.resolve(),
   });
@@ -545,6 +562,7 @@ Deno.test("InitProjectUseCase: dry-run filesWritten excludes preserved paths", a
     harness: fakeClaudeHarness(),
     backlogBackend: "local",
     versionScheme: "semver",
+    specBackend: "local",
     core: PRESERVE_CORE,
     ensureDir: () => Promise.resolve(),
   });
@@ -573,6 +591,7 @@ Deno.test("InitProjectUseCase: preserved file remains in the installed.lock (FR-
     harness: fakeClaudeHarness(),
     backlogBackend: "local",
     versionScheme: "semver",
+    specBackend: "local",
     core: PRESERVE_CORE,
     ensureDir: () => Promise.resolve(),
   });
@@ -599,6 +618,7 @@ Deno.test("InitProjectUseCase: new bundle path still written when preserves are 
     harness: fakeClaudeHarness(),
     backlogBackend: "local",
     versionScheme: "semver",
+    specBackend: "local",
     core: PRESERVE_CORE,
     ensureDir: () => Promise.resolve(),
   });
@@ -628,6 +648,7 @@ Deno.test("InitProjectUseCase: declared agentic path in a parent-managed sub-rep
     harness: fakeClaudeHarness(),
     backlogBackend: "local",
     versionScheme: "semver",
+    specBackend: "local",
     core: MIXED_CORE,
     ensureDir: () => Promise.resolve(),
   });
@@ -665,6 +686,7 @@ Deno.test("InitProjectUseCase: absent preservedPaths writes the full bundle (FR-
     harness: fakeClaudeHarness(),
     backlogBackend: "local",
     versionScheme: "semver",
+    specBackend: "local",
     core: PRESERVE_CORE,
     ensureDir: () => Promise.resolve(),
   });

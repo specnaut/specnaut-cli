@@ -67,6 +67,7 @@ Given that feature description, do this:
    - Use action-noun format when possible (e.g., "add-user-auth", "fix-payment-bug")
    - Preserve technical terms and acronyms (OAuth2, API, JWT, etc.)
 
+<!-- BEGIN: spec-backend=local -->
 2. **Branch creation** (optional, via hook):
 
    If a `before_specify` hook ran, it will have created/switched to a git branch and output JSON with `BRANCH_NAME` and `FEATURE_NUM`. Note these for reference; the branch name does **not** dictate the spec directory name.
@@ -112,6 +113,33 @@ Given that feature description, do this:
    - Create only one feature per `/specnaut specify` invocation.
    - The spec directory name and git branch name are independent.
    - The spec directory and file are always created by this command, never by the hook.
+<!-- END: spec-backend=local -->
+<!-- BEGIN: spec-backend=cloud -->
+2. **Cloud spec authoring** (spec backend = cloud — NO git branch, NO local files):
+
+   This project stores specifications on SpecNaut Cloud, not in `.specnaut/specs/`.
+   Do **NOT** create a git branch and do **NOT** write any `.specnaut/specs/<n>/`
+   files. The branch is created later, at `/specnaut implement`. The spec is
+   authored directly to the linked backlog task and read back on demand with
+   `specnaut spec pull <task>`.
+
+3. **Resolve the linked task and author the spec to Cloud**:
+
+   1. Determine the task number:
+      - If the user passed `--issue <N>`, use it.
+      - Otherwise `specnaut spec push` auto-creates a backlog task named from the
+        feature and links it — the task and its spec are created together (no
+        manual pre-step).
+   2. Generate the spec body using `templates/spec-template.md` for structure,
+      exactly as you would locally (same sections, same mandatory Domain Model
+      block).
+   3. Write the generated spec to the gitignored cache as the `specify` step:
+      `.specnaut/specs/.cache/<task>/1-specify.md`, then push it:
+      `specnaut spec push <task>` (upsert-only; it never deletes other tabs).
+   4. Persist the resolved task number to `.specnaut/feature.json`
+      (`{ "linked_issue": <N>, "workflow_shape": "<lite|full>" }`) so downstream
+      phases locate the spec. No `feature_directory` is written in cloud mode.
+<!-- END: spec-backend=cloud -->
 
 4. Load `templates/spec-template.md` to understand required sections.
 
@@ -191,7 +219,12 @@ Given that feature description, do this:
    - `optional: true` → `## Extension Hooks` block with `**Optional Hook**: {extension}`, command, description, prompt.
    - `optional: false` → `## Extension Hooks` block with `**Automatic Hook**: {extension}`, `EXECUTE_COMMAND: {command}`.
 
+<!-- BEGIN: spec-backend=local -->
 **NOTE:** Branch creation is handled by the `before_specify` hook. Spec directory and file creation are always handled by this core command.
+<!-- END: spec-backend=local -->
+<!-- BEGIN: spec-backend=cloud -->
+**NOTE:** In cloud spec mode no git branch and no `.specnaut/specs/` files are created here — the spec is pushed to SpecNaut Cloud and the branch is created later at `/specnaut implement`.
+<!-- END: spec-backend=cloud -->
 
 ## Quick Guidelines
 

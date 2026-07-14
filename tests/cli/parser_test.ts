@@ -23,6 +23,7 @@ Deno.test("parseArgs returns init intent with a project name", () => {
     backlogUrl: null,
     backlogRepo: null,
     scheme: null,
+    specBackend: null,
     force: false,
     dryRun: false,
     resetPreserved: false,
@@ -40,6 +41,7 @@ Deno.test("parseArgs returns init intent with --here", () => {
     backlogUrl: null,
     backlogRepo: null,
     scheme: null,
+    specBackend: null,
     force: false,
     dryRun: false,
     resetPreserved: false,
@@ -57,6 +59,7 @@ Deno.test("parseArgs returns init intent with --no-git", () => {
     backlogUrl: null,
     backlogRepo: null,
     scheme: null,
+    specBackend: null,
     force: false,
     dryRun: false,
     resetPreserved: false,
@@ -100,6 +103,7 @@ Deno.test("parseArgs init with --force", () => {
     backlogUrl: null,
     backlogRepo: null,
     scheme: null,
+    specBackend: null,
     force: true,
     dryRun: false,
     resetPreserved: false,
@@ -117,6 +121,7 @@ Deno.test("parseArgs init with --dry-run", () => {
     backlogUrl: null,
     backlogRepo: null,
     scheme: null,
+    specBackend: null,
     force: false,
     dryRun: true,
     resetPreserved: false,
@@ -134,6 +139,46 @@ Deno.test("parseArgs init with --force --dry-run captures both flags", () => {
 Deno.test("parseArgs init without --force defaults to false", () => {
   const result = parseArgs(["init", "demo"]);
   if (result.kind === "init") assertEquals(result.force, false);
+});
+
+Deno.test("parseArgs init --spec-backend cloud|local is captured; absent → null", () => {
+  const cloud = parseArgs(["init", "demo", "--spec-backend", "cloud"]);
+  if (cloud.kind === "init") assertEquals(cloud.specBackend, "cloud");
+  const local = parseArgs(["init", "demo", "--spec-backend", "local"]);
+  if (local.kind === "init") assertEquals(local.specBackend, "local");
+  const none = parseArgs(["init", "demo"]);
+  if (none.kind === "init") assertEquals(none.specBackend, null);
+});
+
+Deno.test("parseArgs init rejects an invalid --spec-backend value", () => {
+  assertEquals(parseArgs(["init", "demo", "--spec-backend", "nope"]), {
+    kind: "unknown",
+    received: "init --spec-backend nope",
+  });
+});
+
+Deno.test("parseArgs returns spec pull/push intents with a task number", () => {
+  assertEquals(parseArgs(["spec", "pull", "154"]), {
+    kind: "spec",
+    sub: "pull",
+    task: 154,
+    apiUrl: null,
+  });
+  assertEquals(parseArgs(["spec", "push", "7"]), {
+    kind: "spec",
+    sub: "push",
+    task: 7,
+    apiUrl: null,
+  });
+});
+
+Deno.test("parseArgs spec with a non-numeric task yields task null", () => {
+  const r = parseArgs(["spec", "pull", "abc"]);
+  if (r.kind === "spec") assertEquals(r.task, null);
+});
+
+Deno.test("parseArgs rejects an unknown spec subcommand", () => {
+  assertEquals(parseArgs(["spec", "bogus"]), { kind: "unknown", received: "spec bogus" });
 });
 
 Deno.test("parseArgs returns upgrade intent", () => {

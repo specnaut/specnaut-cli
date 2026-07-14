@@ -49,6 +49,10 @@ export async function run(argv: string[]): Promise<number> {
       const { runGate } = await import("./cli/handlers/gate_handler.ts");
       return await runGate(intent);
     }
+    case "spec": {
+      const { runSpec } = await import("./cli/handlers/spec_handler.ts");
+      return await runSpec(intent);
+    }
     case "unknown":
       console.error(red(`Unknown command: "${intent.received}"`));
       console.error(HELP);

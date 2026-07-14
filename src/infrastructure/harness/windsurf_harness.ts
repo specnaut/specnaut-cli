@@ -5,6 +5,7 @@ import { skillFolderName } from "./skill_folder.ts";
 import { splitFrontmatter } from "./frontmatter.ts";
 import { applyBackend, backlogScriptDestination } from "./backlog_filter.ts";
 import { applyScheme, phaseScriptDestination } from "./scheme_filter.ts";
+import { applySpecBackend } from "./spec_backend_filter.ts";
 
 // Cascade ignores Claude-only frontmatter fields (e.g. `color:`). Strip them
 // before emission so they don't eat into the 12k-char workflow cap.
@@ -66,7 +67,7 @@ export class WindsurfHarness implements Harness {
     for (const raw of core) {
       const backendApplied = applyBackend(raw, opts);
       if (backendApplied === null) continue;
-      const entry = applyScheme(backendApplied, opts);
+      const entry = applySpecBackend(applyScheme(backendApplied, opts), opts);
       // agent-memory and the agent-fleet README are Claude-only conventions;
       // other harnesses skip them.
       if (entry.category === "agent-memory" || entry.category === "agent-doc") continue;

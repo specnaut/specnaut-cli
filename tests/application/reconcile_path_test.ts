@@ -23,6 +23,7 @@ function mockLock(): InstalledLock {
     harness: "claude",
     backlogBackend: "local",
     versionScheme: "semver",
+    specBackend: "local",
     templatesVersion: "1.6.0",
     entries,
   };

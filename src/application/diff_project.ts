@@ -77,6 +77,7 @@ export class DiffProjectUseCase {
     const bundle = harness.mapBundle(core, {
       backlogBackend: lock.backlogBackend,
       versionScheme: lock.versionScheme,
+      specBackend: lock.specBackend,
     });
 
     const results: DivergenceResult[] = [];

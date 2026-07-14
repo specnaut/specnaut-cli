@@ -69,10 +69,12 @@ export async function switchBacklogBackend(
   const newBundle = dropAgentic(harness.mapBundle(CORE_BUNDLE, {
     backlogBackend: newBackend,
     versionScheme: lock.versionScheme,
+    specBackend: lock.specBackend,
   }));
   const oldBundle = dropAgentic(harness.mapBundle(CORE_BUNDLE, {
     backlogBackend: from,
     versionScheme: lock.versionScheme,
+    specBackend: lock.specBackend,
   }));
 
   const writer = new DenoFsWriter();
@@ -137,6 +139,7 @@ export async function switchBacklogBackend(
     harness: lock.harness,
     backlogBackend: newBackend,
     versionScheme: lock.versionScheme,
+    specBackend: lock.specBackend,
     templatesVersion: lock.templatesVersion,
     entries: updatedEntries,
     // Preserve the parent-managed decision across a backend switch — dropping
@@ -287,6 +290,7 @@ export async function runUpgrade(intent: UpgradeIntent): Promise<number> {
       const mapped = harnessForPreserve.mapBundle(CORE_BUNDLE, {
         backlogBackend: lockForDetection.backlogBackend,
         versionScheme: lockForDetection.versionScheme,
+        specBackend: lockForDetection.specBackend,
       });
       const parentManaged = (parentManagedOverride ?? lockForDetection.parentManaged) ?? false;
       const bundleDests = parentManaged
@@ -371,6 +375,7 @@ export async function runUpgrade(intent: UpgradeIntent): Promise<number> {
       ? harness.mapBundle(CORE_BUNDLE, {
         backlogBackend: lock.backlogBackend,
         versionScheme: lock.versionScheme,
+        specBackend: lock.specBackend,
       })
       : {};
     for (const action of preserves) {

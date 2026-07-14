@@ -144,7 +144,8 @@ export interface PluginDetector {
 }
 
 import type { CoreBundle } from "../domain/core_bundle.ts";
-import type { BacklogBackend, VersionScheme } from "../domain/installed_lock.ts";
+import type { BacklogBackend, SpecBackend, VersionScheme } from "../domain/installed_lock.ts";
+import type { SpecStep } from "../domain/spec/spec_step.ts";
 
 export type BundleOptions = {
   /**
@@ -159,7 +160,53 @@ export type BundleOptions = {
    * against this value at bundle time.
    */
   readonly versionScheme: VersionScheme;
+  /**
+   * Which spec backend's conditional sections the phase docs should keep
+   * (spec 020). `specify.md` / `implement.md` carry `spec-backend=local|cloud`
+   * marker blocks rendered against this value at bundle time. `local` yields
+   * output byte-identical to the pre-feature CLI (FR-003).
+   */
+  readonly specBackend: SpecBackend;
 };
+
+/**
+ * Backend abstraction over a project's spec storage (spec 020, data-model.md).
+ * Scoped to the cloud-only verbs: the `local` adapter rejects both with a clear
+ * "cloud-only" message, and the local authoring flow bypasses this port entirely
+ * so its behaviour stays byte-identical to the pre-feature CLI (FR-003, D1).
+ */
+export interface SpecStore {
+  readonly key: SpecBackend;
+  /**
+   * Fetch a task's spec steps. `null` when the task has no spec yet (not an
+   * error). Cloud adapter delegates to a `SpecSession`; local adapter rejects.
+   */
+  pull(taskNumber: number): Promise<readonly SpecStep[] | null>;
+  /**
+   * Upsert-only push of a task's steps — never deletes an omitted step
+   * (Lot 1 FR-011). Cloud adapter delegates to a `SpecSession`; local rejects.
+   */
+  push(taskNumber: number, steps: readonly SpecStep[]): Promise<void>;
+}
+
+/**
+ * Gitignored materialisation cache for a cloud spec (spec 020) — the on-disk
+ * mirror agents read as ordinary files, under `.specnaut/specs/.cache/<task>/`.
+ * Disposable and never the source of truth; the cloud (or local files) is
+ * authoritative. Adapter: `infrastructure/spec/spec_cache_writer.ts`.
+ */
+export interface SpecCacheStore {
+  /**
+   * Clear the task's cache dir, then write one ordered markdown file per step.
+   * Returns the project-relative paths written (US3 AC2 — stale files are
+   * reconciled by the clear-first write).
+   */
+  write(projectDir: string, taskNumber: number, steps: readonly SpecStep[]): Promise<string[]>;
+  /** Read the task's cached steps back (for `spec push`), or `null` if absent. */
+  read(projectDir: string, taskNumber: number): Promise<readonly SpecStep[] | null>;
+  /** Remove the task's cache dir. Idempotent. */
+  clear(projectDir: string, taskNumber: number): Promise<void>;
+}
 
 export interface Harness {
   readonly key: string;

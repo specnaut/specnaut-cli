@@ -45,6 +45,7 @@ Deno.test("serializeLock round-trips", () => {
     harness: "claude",
     backlogBackend: "local",
     versionScheme: "semver",
+    specBackend: "local",
     templatesVersion: "0.3.0",
     entries: new Map<string, LockEntry>([
       ["CLAUDE.md", {
@@ -107,6 +108,7 @@ Deno.test("serializeLock writes version 2 with harness field", () => {
     harness: "cursor",
     backlogBackend: "local",
     versionScheme: "semver",
+    specBackend: "local",
     templatesVersion: "0.3.0",
     entries: new Map(),
   };
@@ -212,6 +214,7 @@ Deno.test("serializeLock emits parent_managed: true when set, round-trips throug
     harness: "claude",
     backlogBackend: "local",
     versionScheme: "semver",
+    specBackend: "local",
     templatesVersion: "1.0.0",
     entries: new Map(),
     parentManaged: true,
@@ -228,6 +231,7 @@ Deno.test("serializeLock omits parent_managed when not set", () => {
     harness: "claude",
     backlogBackend: "local",
     versionScheme: "semver",
+    specBackend: "local",
     templatesVersion: "1.0.0",
     entries: new Map(),
   };

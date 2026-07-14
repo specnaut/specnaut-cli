@@ -4,6 +4,7 @@ import type { Bundle } from "../../domain/template.ts";
 import { HARNESS_STATIC } from "../../templates_bundle.ts";
 import { applyBackend, backlogScriptDestination } from "./backlog_filter.ts";
 import { applyScheme, phaseScriptDestination } from "./scheme_filter.ts";
+import { applySpecBackend } from "./spec_backend_filter.ts";
 import { ensureSkillFrontmatter } from "./skill_folder.ts";
 
 function destinationFor(entry: CoreEntry): string {
@@ -56,7 +57,7 @@ export class ClaudeHarness implements Harness {
     for (const raw of core) {
       const backendApplied = applyBackend(raw, opts);
       if (backendApplied === null) continue;
-      const entry = applyScheme(backendApplied, opts);
+      const entry = applySpecBackend(applyScheme(backendApplied, opts), opts);
 
       // Skill-folder categories ship as `.claude/skills/<name>/SKILL.md`.
       // Claude Code derives the skill name from the folder, but we inject

@@ -5,6 +5,7 @@ import { HARNESS_STATIC } from "../../templates_bundle.ts";
 import { ensureSkillFrontmatter, skillFolderName } from "./skill_folder.ts";
 import { applyBackend, backlogScriptDestination } from "./backlog_filter.ts";
 import { applyScheme, phaseScriptDestination } from "./scheme_filter.ts";
+import { applySpecBackend } from "./spec_backend_filter.ts";
 
 function destinationFor(entry: CoreEntry): string {
   switch (entry.category) {
@@ -43,7 +44,7 @@ export class CursorHarness implements Harness {
     for (const raw of core) {
       const backendApplied = applyBackend(raw, opts);
       if (backendApplied === null) continue;
-      const entry = applyScheme(backendApplied, opts);
+      const entry = applySpecBackend(applyScheme(backendApplied, opts), opts);
       // agent-memory and the agent-fleet README are Claude-only conventions;
       // other harnesses skip them.
       if (entry.category === "agent-memory" || entry.category === "agent-doc") continue;

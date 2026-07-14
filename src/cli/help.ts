@@ -15,6 +15,8 @@ ${bold("Usage:")}
   specnaut reconcile --status         List files pending post-upgrade reconciliation
   specnaut reconcile <path> --accept-upstream | --accept-current
                                       Resolve a preserved file after upgrade
+  specnaut spec pull <task>           Materialise a task's cloud-hosted spec into .specnaut/specs/.cache/<task>/
+  specnaut spec push <task>           Upsert local spec content for <task> to Specnaut Cloud (cloud backend)
   specnaut login [--api-url <url>]    Authenticate with Specnaut Cloud (alias for "cloud login")
   specnaut cloud login [--api-url <url>]
                                       Authenticate with Specnaut Cloud (browser device flow) and link a project
@@ -41,6 +43,9 @@ ${bold("Flags (for init):")}
                       Cargo.toml [lib], composer.json type=library), semver-shaped git tags
                       (v1.2.3), or a CHANGELOG.md with Keep-a-Changelog headers. Falls back to
                       "date" when no signal is found.
+  --spec-backend <n>  Where specs are stored: cloud (default, recommended) | local
+                      (cloud: hosted specs via Specnaut Cloud — run "specnaut cloud login" after init;
+                       local: markdown files in .specnaut/specs/, unchanged from before)
   --force             Overwrite locally-customized files (existing content backed up to *.specnaut.bak)
   --reset-preserved   Ignore .specnaut/preserve.yml for this run so declared files are refreshed too
                       (never the default; reported per overridden file)

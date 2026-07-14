@@ -30,6 +30,18 @@ export const KNOWN_VERSION_SCHEMES: ReadonlyArray<VersionScheme> = [
   "date",
 ];
 
+/**
+ * Where a project's specifications are stored (spec 020 / cli#424).
+ * `local` = `.specnaut/specs/` markdown files (the pre-feature behaviour, first-
+ * class default); `cloud` = hosted on SpecNaut Cloud via the versioned
+ * `/api/v1/specs*` contract. Sibling of {@link BacklogBackend}.
+ */
+export type SpecBackend = "local" | "cloud";
+export const KNOWN_SPEC_BACKENDS: ReadonlyArray<SpecBackend> = [
+  "local",
+  "cloud",
+];
+
 export type LockEntry = {
   readonly sha256: string;
   readonly installedAt: string;
@@ -41,6 +53,11 @@ export type InstalledLock = {
   readonly harness: KnownHarness;
   readonly backlogBackend: BacklogBackend;
   readonly versionScheme: VersionScheme;
+  /**
+   * Where this project's specs live (spec 020). Absent in a pre-feature lock →
+   * `"local"` (FR-010, backward compatible). Sibling of `backlogBackend`.
+   */
+  readonly specBackend: SpecBackend;
   readonly templatesVersion: string;
   readonly entries: ReadonlyMap<string, LockEntry>;
   /**
@@ -102,6 +119,15 @@ export function parseLock(yaml: string): InstalledLock {
     ? (rawScheme as VersionScheme)
     : "semver";
 
+  // Default to "local" when absent: existing locks pre-date the spec-backend
+  // selection feature, and the local-md flow is what was implicitly active
+  // (FR-010 — backward-compatible upgrade path). Mirrors `backlog_backend`.
+  const rawSpecBackend = root.spec_backend;
+  const specBackend: SpecBackend = typeof rawSpecBackend === "string" &&
+      KNOWN_SPEC_BACKENDS.includes(rawSpecBackend as SpecBackend)
+    ? (rawSpecBackend as SpecBackend)
+    : "local";
+
   const templatesVersion = root.templates_version;
   if (typeof templatesVersion !== "string") {
     throw new Error("missing top-level templates_version");
@@ -131,6 +157,7 @@ export function parseLock(yaml: string): InstalledLock {
     harness,
     backlogBackend,
     versionScheme,
+    specBackend,
     templatesVersion,
     entries,
     ...(parentManaged ? { parentManaged } : {}),
@@ -153,6 +180,7 @@ export function serializeLock(lock: InstalledLock): string {
     harness: lock.harness,
     backlog_backend: lock.backlogBackend,
     version_scheme: lock.versionScheme,
+    spec_backend: lock.specBackend,
     // Emit `parent_managed` only when set so legacy/standalone locks stay
     // byte-for-byte identical to before this feature.
     ...(lock.parentManaged ? { parent_managed: true } : {}),

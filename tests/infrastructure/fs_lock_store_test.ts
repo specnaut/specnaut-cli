@@ -17,6 +17,7 @@ const SAMPLE: InstalledLock = {
   harness: "claude",
   backlogBackend: "local",
   versionScheme: "semver",
+  specBackend: "local",
   templatesVersion: "0.3.0",
   entries: new Map([
     ["CLAUDE.md", {
