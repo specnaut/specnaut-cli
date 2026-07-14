@@ -162,11 +162,19 @@ export type BundleOptions = {
   readonly versionScheme: VersionScheme;
   /**
    * Which spec backend's conditional sections the phase docs should keep
-   * (spec 020). `specify.md` / `implement.md` carry `spec-backend=local|cloud`
-   * marker blocks rendered against this value at bundle time. `local` yields
-   * output byte-identical to the pre-feature CLI (FR-003).
+   * (spec 020). The consuming phase docs (`specify` / `implement` / `review` /
+   * `analyze` / `tasks`) carry `spec-backend=local|cloud` marker blocks rendered
+   * against this value at bundle time. `local` yields output byte-identical to
+   * the pre-feature CLI (FR-003).
    */
   readonly specBackend: SpecBackend;
+  /**
+   * Whether cloud-mode task creation should also auto-generate the task's spec
+   * (spec 021 / FR-005). Governs the `spec-autogen=on` guidance block in the
+   * backlog skill. Absent ⇒ `false` (opt-in, default off); the guidance only
+   * renders when `specAutogen && specBackend === "cloud"`.
+   */
+  readonly specAutogen?: boolean;
 };
 
 /**

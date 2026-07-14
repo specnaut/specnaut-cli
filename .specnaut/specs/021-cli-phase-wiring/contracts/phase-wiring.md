@@ -2,8 +2,8 @@
 
 ## A. Pull-on-entry (consuming phase docs, `spec-backend=cloud` block)
 
-For each of `implement.md`, `review.md`, `analyze.md`, `tasks.md`, the cloud block prepends a
-single materialisation step before any spec-reading:
+For each of `implement.md`, `review.md`, `analyze.md`, `tasks.md`, the cloud block prepends a single
+materialisation step before any spec-reading:
 
 ```
 <!-- BEGIN: spec-backend=cloud -->
@@ -16,7 +16,8 @@ If the pull fails (offline/auth), stop with its message — do not proceed again
 <!-- END: spec-backend=local -->
 ```
 
-- `implement.md`: the pull precedes the existing Lot 2 cloud step (`create-new-feature.sh --branch-only`).
+- `implement.md`: the pull precedes the existing Lot 2 cloud step
+  (`create-new-feature.sh --branch-only`).
 - Local block: byte-identical to the pre-feature doc (golden test guards this).
 
 ## B. Auto-generation (task-creation guidance)
@@ -33,14 +34,16 @@ Default (`spec_autogen` absent/false) or local backend: no auto-generation; task
 
 ## C. Parallel authoring (guidance)
 
-A note in the relevant skill/phase doc: cloud `specify` creates no branch, so several task specs
-can be authored concurrently (by a user or an agent fleet) with no git-branch collision — drive
-one `specify` per task in parallel.
+A note in the relevant skill/phase doc: cloud `specify` creates no branch, so several task specs can
+be authored concurrently (by a user or an agent fleet) with no git-branch collision — drive one
+`specify` per task in parallel.
 
 ## D. Lock field
 
-`installed.lock` gains `spec_autogen: <bool>` (absent → `false`). Read by the rendered guidance;
-set at init or by editing the lock. No new command required.
+`installed.lock` gains `spec_autogen: <bool>` (absent → `false`). Read by the rendered guidance; set
+at init or by editing the lock. No new command required.
 
 ## Non-goals
-The `spec pull`/`push` commands + cloud `specify` (Lot 2); the Cloud store/API (Lot 1); Web UI (Lot 3).
+
+The `spec pull`/`push` commands + cloud `specify` (Lot 2); the Cloud store/API (Lot 1); Web UI (Lot
+3).

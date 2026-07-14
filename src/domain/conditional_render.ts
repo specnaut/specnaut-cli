@@ -190,6 +190,91 @@ export function assertKnownSpecBackend(s: string): asserts s is SpecBackend {
   }
 }
 
+const SPEC_AUTOGEN_BEGIN_RE = /^\s*<!--\s*BEGIN:\s*spec-autogen=([a-zA-Z0-9_-]+)\s*-->\s*$/;
+const SPEC_AUTOGEN_END_RE = /^\s*<!--\s*END:\s*spec-autogen=([a-zA-Z0-9_-]+)\s*-->\s*$/;
+
+/**
+ * Strip spec-autogen-conditional sections from a Markdown source (spec 021).
+ *
+ * A third marker family, deliberately distinct from `backend=` (backlog) and
+ * `spec-backend=` (spec 020) so none of the three collide:
+ *   <!-- BEGIN: spec-autogen=on -->
+ *   ...guidance kept only when auto-generation is enabled...
+ *   <!-- END: spec-autogen=on -->
+ *
+ * `enabled` maps to the active token `"on"` (true) / `"off"` (false): the block
+ * whose token matches is preserved (markers stripped), the other is removed
+ * entirely. This gates the opt-in auto-gen guidance (FR-005) — `enabled` is the
+ * caller's `specAutogen && specBackend === "cloud"` decision, so `off` renders
+ * are byte-identical to a doc that never carried the block. A source with no
+ * `spec-autogen=` markers passes through unchanged.
+ *
+ * Throws on unmatched (BEGIN without END, END without BEGIN) or nested markers.
+ */
+export function renderSpecAutogen(source: string, enabled: boolean): string {
+  const active = enabled ? "on" : "off";
+  const lines = source.split("\n");
+  const out: string[] = [];
+  let insideFence = false;
+  let openToken: string | null = null;
+  let openLine = -1;
+  let keepBlock = false;
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+
+    if (FENCE_RE.test(line)) {
+      insideFence = !insideFence;
+      if (openToken === null || keepBlock) out.push(line);
+      continue;
+    }
+
+    if (!insideFence) {
+      const beginMatch = line.match(SPEC_AUTOGEN_BEGIN_RE);
+      if (beginMatch) {
+        if (openToken !== null) {
+          throw new Error(
+            `nested spec-autogen marker at line ${i + 1}: BEGIN ${beginMatch[1]} ` +
+              `inside open block ${openToken} (started at line ${openLine + 1})`,
+          );
+        }
+        openToken = beginMatch[1];
+        openLine = i;
+        keepBlock = openToken === active;
+        continue;
+      }
+
+      const endMatch = line.match(SPEC_AUTOGEN_END_RE);
+      if (endMatch) {
+        if (openToken === null) {
+          throw new Error(
+            `unmatched END marker at line ${i + 1}: spec-autogen=${endMatch[1]}`,
+          );
+        }
+        if (endMatch[1] !== openToken) {
+          throw new Error(
+            `mismatched END marker at line ${i + 1}: expected spec-autogen=${openToken} ` +
+              `(opened at line ${openLine + 1}), got spec-autogen=${endMatch[1]}`,
+          );
+        }
+        openToken = null;
+        keepBlock = false;
+        continue;
+      }
+    }
+
+    if (openToken === null || keepBlock) out.push(line);
+  }
+
+  if (openToken !== null) {
+    throw new Error(
+      `unmatched BEGIN marker at line ${openLine + 1}: spec-autogen=${openToken}`,
+    );
+  }
+
+  return out.join("\n");
+}
+
 const SH_SCHEME_BEGIN_RE = /^\s*#\s*BEGIN:\s*scheme=([a-zA-Z0-9_-]+)\s*$/;
 const SH_SCHEME_END_RE = /^\s*#\s*END:\s*scheme=([a-zA-Z0-9_-]+)\s*$/;
 

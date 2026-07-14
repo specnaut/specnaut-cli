@@ -3,6 +3,7 @@
 Against the working-tree CLI (`deno run --allow-all src/main.ts …`).
 
 ## 1. Local mode — nothing changes
+
 ```bash
 deno run --allow-all src/main.ts init --here --ai claude --spec-backend local
 # The rendered implement.md / review.md / analyze.md / tasks.md are byte-identical to
@@ -10,6 +11,7 @@ deno run --allow-all src/main.ts init --here --ai claude --spec-backend local
 ```
 
 ## 2. Cloud mode — pull-on-entry
+
 ```bash
 deno run --allow-all src/main.ts init --here --ai claude --spec-backend cloud
 # The rendered implement.md (and review/analyze/tasks) now open with a single
@@ -17,6 +19,7 @@ deno run --allow-all src/main.ts init --here --ai claude --spec-backend cloud
 ```
 
 ## 3. Auto-generation toggle
+
 ```bash
 # enable in the lock:
 #   spec_autogen: true
@@ -26,18 +29,21 @@ deno run --allow-all src/main.ts init --here --ai claude --spec-backend cloud
 ```
 
 ## 4. Parallel authoring
+
 ```bash
 # In cloud mode, author specs for 3 tasks at once — each cloud specify is branch-free,
 # so no collision; each pushes to its own task. [SC-005]
 ```
 
 ## 5. Boundary
+
 ```bash
 # grep the touched phase docs: the only Cloud touch is `specnaut spec pull` / cloud specify —
 # no private-half identifier. [SC-006, § I]
 ```
 
 ## Automated coverage
+
 `deno task test` — golden local-parity tests on implement/review/analyze/tasks (EOL-agnostic);
-`installed_lock` round-trip of `spec_autogen` (absent→false); integration: cloud-mode rendered
-docs contain the pull step, local docs don't.
+`installed_lock` round-trip of `spec_autogen` (absent→false); integration: cloud-mode rendered docs
+contain the pull step, local docs don't.

@@ -7,13 +7,6 @@ $ARGUMENTS
 
 ## Outline
 
-<!-- BEGIN: spec-backend=cloud -->
-**Materialise the spec (cloud backend):** run `specnaut spec pull <task>` ONCE now. It
-writes the spec's tabs to the gitignored `.specnaut/specs/.cache/<task>/`; read the spec
-from there as files. If the pull fails (offline/auth), stop with its message — do not
-proceed against an empty spec.
-
-<!-- END: spec-backend=cloud -->
 1. Identify files modified in the current feature branch:
    `git diff --name-only $(git merge-base HEAD main)`
 2. Delegate structural review to parallel sub-agents via the `review-coordinator`.

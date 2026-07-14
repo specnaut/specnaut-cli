@@ -18,7 +18,8 @@ Add `spec_autogen: boolean` ↔ `specAutogen` field. `parseLock` defaults to `fa
 - **Pull-on-entry** (consuming phases): the `spec-backend=cloud` block prepends
   `EXECUTE: specnaut spec pull <task>` (single pull) before the phase's spec-reading steps; the
   `spec-backend=local` block is the unchanged pre-feature content.
-- **Auto-generation** (task-creation guidance): `if specAutogen && cloud → after creating a
+- **Auto-generation** (task-creation guidance):
+  `if specAutogen && cloud → after creating a
   task, run cloud specify for it (branch-free); a failure is reported, the task stays created.`
 - **Parallel authoring** (guidance): a note that cloud specify is branch-free ⇒ N specs can be
   authored concurrently.
