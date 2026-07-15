@@ -39,11 +39,10 @@ Deno.test("pickBacklogBackend defaults to cloud on empty input", () => {
   assertEquals(pickBacklogBackend(io), "cloud");
   assertEquals(DEFAULT_BACKLOG_BACKEND, "cloud");
   const all = log.join("\n");
-  // Cloud is listed first, marked recommended (default), with a benefit note;
-  // the other backends remain listed.
+  // Cloud is listed first, marked recommended (default); the other backends
+  // remain listed. No extra benefit note — the marker carries the recommendation.
   assertEquals(all.includes("Specnaut Cloud"), true);
   assertEquals(all.includes("recommended (default)"), true);
-  assertEquals(all.includes("hosted online Kanban"), true);
   assertEquals(all.includes("Local Markdown"), true);
   assertEquals(all.includes("GitHub"), true);
 });
