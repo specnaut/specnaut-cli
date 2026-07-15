@@ -1,6 +1,6 @@
 {
   "name": "specnaut",
-  "version": "1.18.0",
+  "version": "1.18.1",
   "description": "Spec-driven workflow, slash commands, and sub-agents for AI coding harnesses — Specnaut's bundled skill library, agents, and the SessionStart bootstrap that makes the agent skill-aware on every turn.",
   "author": {
     "name": "MakerLabs",
