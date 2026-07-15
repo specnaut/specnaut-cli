@@ -41,8 +41,8 @@ Deno.test("pickSpecBackend defaults to cloud on empty input", () => {
   assertEquals(pickSpecBackend(io), "cloud");
   assertEquals(DEFAULT_SPEC_BACKEND, "cloud");
   const all = log.join("\n");
-  // Cloud is listed first, marked recommended (default), with a benefit note;
-  // local remains a first-class listed choice.
+  // Cloud is listed first, marked recommended (default); local remains a
+  // first-class listed choice. No extra benefit note.
   assertEquals(all.includes("SpecNaut Cloud"), true);
   assertEquals(all.includes("recommended (default)"), true);
   assertEquals(all.includes("Local Markdown"), true);
