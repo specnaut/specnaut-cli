@@ -203,6 +203,12 @@ Given that feature description, do this:
 
 - **Mandatory sections**: complete for every feature.
 - **Optional sections**: include only when relevant; remove inapplicable sections entirely (don't leave "N/A").
+- **Front-end / UX-UI features**: when the project has a front-end surface,
+  keep the optional `## Visual Prototyping with Claude Artifacts` section
+  (detect the surface with the SAME signals the accessibility gate uses — the
+  `a11y-auditor` FE-surface list; don't invent a new heuristic). No front-end
+  surface → remove that section: a back-end/CLI-only spec must not mention
+  artifacts.
 
 ### For AI Generation
 
