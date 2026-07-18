@@ -156,3 +156,33 @@
 - [Assumption about scope boundaries, e.g., "Mobile support is out of scope for v1"]
 - [Assumption about data/environment, e.g., "Existing authentication system will be reused"]
 - [Dependency on existing system/service, e.g., "Requires access to the existing user profile API"]
+
+## Visual Prototyping with Claude Artifacts *(optional — front-end / UX-UI features only)*
+
+<!--
+  ACTION REQUIRED — CONDITIONAL SECTION.
+  Keep this section ONLY when the project has a front-end / UX-UI surface.
+  Detect that surface with the SAME signal list the accessibility gate uses
+  (see the `a11y-auditor` agent — do NOT invent a new heuristic). Any of:
+    - `.html` / `.htm` files
+    - `.jsx` / `.tsx` files
+    - `.vue` / `.svelte` / `.astro` files
+    - a `public/`, `src/app/`, `src/pages/`, `src/routes/`, or `pages/`
+      directory containing markup
+    - a `package.json` listing a front-end framework dep (react, vue, svelte,
+      solid-js, preact, lit, astro, @angular/core, qwik)
+  If NONE of those signals are present, REMOVE this entire section — a
+  back-end / CLI-only spec must not mention artifacts (mirror the
+  "remove inapplicable sections entirely" rule for optional sections).
+-->
+
+For the user-facing flows above, you can use **Claude Artifacts** to make the
+proposed UX tangible before any code is written — rendered mockups, interactive
+prototypes, state/flow diagrams, and side-by-side layout comparisons a
+stakeholder can react to directly.
+
+- Turn a User Story's acceptance scenarios into an interactive artifact (a
+  clickable mockup or a diagram of the flow) to validate the intended
+  experience early, then fold the feedback back into this spec.
+- What artifacts are and how to use them: <https://support.claude.com/en/articles/9487310-what-are-artifacts-and-how-to-use-them>
+- Artifacts in Claude Code: <https://code.claude.com/docs/en/artifacts>
