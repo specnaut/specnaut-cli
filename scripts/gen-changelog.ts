@@ -43,7 +43,7 @@ export function classifyCommit(commit: Commit): Classified {
     return { ...commit, category: "chore", cleanedSubject: capitalize(subject) };
   }
   const type = m[1].toLowerCase();
-  const rest = m[3];
+  const rest = collapseTrailingIssueRefs(m[3]);
   const cleanedSubject = capitalize(rest);
   if (FEATURE_PREFIXES.has(type)) {
     return { ...commit, category: "feat", cleanedSubject };
@@ -60,6 +60,16 @@ export function classifyCommit(commit: Commit): Classified {
 function capitalize(s: string): string {
   if (!s) return s;
   return s.charAt(0).toUpperCase() + s.slice(1);
+}
+
+// GitHub's squash-merge appends the PR number `(#pr)` to a subject whose PR
+// title already carried the linked issue `(#issue)`, producing a redundant
+// `... (#issue) (#pr)` tail. Collapse a run of 2+ adjacent trailing refs down
+// to the last one — the PR number, matching `extractPrNumber` — so release
+// notes read with a single clean link. A lone trailing `(#N)` is left as-is.
+const TRAILING_DOUBLE_REF_RE = /(?:\s*\(#\d+\))+(\s\(#\d+\))\s*$/;
+export function collapseTrailingIssueRefs(subject: string): string {
+  return subject.replace(TRAILING_DOUBLE_REF_RE, "$1");
 }
 
 const ADOPTION_HEADER_RE = /^## Agent adoption\b/m;
