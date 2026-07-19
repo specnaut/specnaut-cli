@@ -1,5 +1,10 @@
 import { assertEquals, assertStringIncludes } from "@std/assert";
-import { type Classified, classifyCommit, formatChangelog } from "../../scripts/gen-changelog.ts";
+import {
+  type Classified,
+  classifyCommit,
+  collapseTrailingIssueRefs,
+  formatChangelog,
+} from "../../scripts/gen-changelog.ts";
 
 Deno.test("classifyCommit categorises feat:", () => {
   const r = classifyCommit({ hash: "abc", subject: "feat: add antigravity harness" });
@@ -29,6 +34,41 @@ Deno.test("classifyCommit handles breaking-change marker (feat!:)", () => {
   const r = classifyCommit({ hash: "abc", subject: "feat!: rewire ports" });
   assertEquals(r.category, "feat");
   assertEquals(r.cleanedSubject, "Rewire ports");
+});
+
+Deno.test("collapseTrailingIssueRefs collapses a double PR reference to the last one", () => {
+  // The exact v1.19.0 case: PR title carried the issue (#431), squash appended (#432).
+  assertEquals(
+    collapseTrailingIssueRefs("surface Claude Artifacts (#431) (#432)"),
+    "surface Claude Artifacts (#432)",
+  );
+});
+
+Deno.test("collapseTrailingIssueRefs collapses a triple reference to the last one", () => {
+  assertEquals(
+    collapseTrailingIssueRefs("do a thing (#1) (#2) (#3)"),
+    "do a thing (#3)",
+  );
+});
+
+Deno.test("collapseTrailingIssueRefs leaves a single trailing reference untouched", () => {
+  assertEquals(
+    collapseTrailingIssueRefs("do a thing (#432)"),
+    "do a thing (#432)",
+  );
+});
+
+Deno.test("collapseTrailingIssueRefs leaves a subject with no reference untouched", () => {
+  assertEquals(collapseTrailingIssueRefs("do a thing"), "do a thing");
+});
+
+Deno.test("classifyCommit collapses the double PR reference in cleanedSubject", () => {
+  const r = classifyCommit({
+    hash: "abc",
+    subject: "feat(specify): surface Claude Artifacts (#431) (#432)",
+  });
+  assertEquals(r.category, "feat");
+  assertEquals(r.cleanedSubject, "Surface Claude Artifacts (#432)");
 });
 
 Deno.test("classifyCommit buckets refactor/docs/test/ci/style/perf/build as chore", () => {
