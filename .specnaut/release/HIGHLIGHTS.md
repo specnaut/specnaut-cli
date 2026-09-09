@@ -1,28 +1,32 @@
-**A shipped feature's spec directory is now deleted when its issue closes at merge.**
+**The epic close-gate now tells you which thing went wrong.**
 
-If you use `/specnaut merge`, this changes what your working tree looks like after a feature lands:
-`.specnaut/specs/<feature-dir>/` goes away, in its own commit, alongside `.specnaut/feature.json`.
+`cascade-check.sh` — the gate `/specnaut merge` runs before closing a linked issue or a parent epic
+— reported three different events with one sentence and one exit code. A typo in the argument, an
+issue number that does not exist, and a genuinely unreadable API all produced
+`✗ could not read the children of #N — refusing to answer`, exit 3. That is the code the merge phase
+teaches you to read as "a token, scope or network problem" — so a mistyped argument looked like a
+broken token, and a merge could stall on a diagnosis that was never true.
 
-It is not a loss. `/specnaut plan` commits the spec directory at plan time, before any code exists,
-so it is already in git history when the close happens — `git log --all -- .specnaut/specs/<dir>/`
-brings it back verbatim. The removal is refused outright if git has never seen the directory, which
-is the case that would have destroyed the only copy. The same `yes` that authorises the close
-authorises the removal; there is no second prompt, and a refused close leaves everything alone.
+Two causes, and fixing either alone left a case standing. The usage check only tested whether an
+argument was present, so any non-empty string became an issue number and went out to the API. And
+the "issue not found" branch could never run: `gh` writes the API's error body to standard output on
+a 404, so the check for empty output was false even for an issue that does not exist. That message
+was unreachable code, and the failure of the _next_ call spoke in its place.
 
-The reasoning is that a plan is consumed once the code ships. The code is the authority afterwards,
-and the intent survives on the backlog item you just closed.
+A non-numeric argument now exits 2 and names what you typed. A missing issue says it is missing. An
+unreadable API still says so, distinctly. The github and gitlab backends gained the numeric check
+the local and cloud ones already had.
 
-**Two ordering defects in the same file, both found by shipping the first change.**
+Nothing about the gate's safety changed, and nothing was ever unsafe here: every non-zero exit meant
+"do not close" before this release and still does. The gate refused correctly and explained wrongly.
 
-`merge-close.md` gave two contradictory orderings for the same pair of operations. Its epic path
-closed the issue and then moved the card, explaining at length that the reverse manufactures the
-exact `REOPENED` drift `sweep-closed.sh` exists to report. Its standalone path did the reverse. A
-single item merged through Specnaut therefore opened that window every time, and the smoke check
-named "the issue closes BEFORE the card moves" passed on it — it grepped for the rule sentence,
-which lives in the path that obeys it. The rule now lives in one place above both paths, and the
-check reads the order rather than the prose.
+**A guard against a limit you would otherwise meet as a broken install.**
 
-The second was found while applying the new deletion by hand: removing the directory left
-`.specnaut/feature.json` still naming it, and `common.sh` never verifies that the name still
-resolves. Callers got a path to a directory that no longer existed, exit 0, no warning. The removal
-now takes that file with it.
+Windsurf caps a workflow file at 12,000 characters, and Specnaut emits 65 of them. A test has
+enforced a per-file budget for some time, but a ceiling is satisfied by trimming whichever file
+touched it — which has happened twice in a single day. Eight workflows now sit within 300 characters
+of the budget.
+
+This release adds a second gate on the _number_ of files crowding the limit, not on the largest one.
+It cannot be satisfied by shortening a single file. Nothing you run changes; it is a promise that
+the next thing added to Specnaut cannot quietly push a Windsurf install over the vendor's limit.
