@@ -12292,12 +12292,16 @@ echo "done."
 # Exit:    0  parent has no open children — safe to close
 #          11 at least one child is still open — close blocked
 #          12 parent is already closed — nothing to gate (short-circuit)
-#          3  the parent does not exist, OR its children could not be read
-#          2  usage error
+#          3  the parent does not exist, OR it could not be read, OR its
+#             children could not be read — three messages, one code, all
+#             meaning "the gate could not answer"
+#          2  usage error — no argument, or an argument that is not a number
 #
-# EVERY non-zero exit means "do not close". Exit 3 now also covers a failed
-# child enumeration: this script answers a safety question, and a question it
-# could not answer must never read as a yes.
+# EVERY non-zero exit means "do not close". Exit 3 covers a failed
+# enumeration: this script answers a safety question, and a question it could
+# not answer must never read as a yes. It does NOT cover being called wrong —
+# a misuse is the caller's bug, not the world being unreadable, and the two
+# used to be indistinguishable.
 set -euo pipefail
 
 # shellcheck source=./_config.sh
@@ -12308,13 +12312,33 @@ if [ "\$#" -lt 1 ]; then
   exit 2
 fi
 NUM="\$1"
+# A bad ARGUMENT is a usage error, and it used to reach the API as if it were
+# an issue number — where the failed lookup rendered it as exit 3, the code
+# that tells a caller the world was unreadable. Misuse and unreadability are
+# not the same event and must not share a code.
+case "\$NUM" in
+  '' | *[!0-9]*) echo "not an issue number: '\$NUM'" >&2; exit 2 ;;
+esac
 
-# One API call covers existence + state. Empty stdout = the issue is not
-# reachable (404 or transient) — same exit-3 contract as the previous
-# two-call shape, one fewer round trip.
-PARENT_STATE=\$(gh api "repos/\$REPO_OWNER/\$REPO_NAME/issues/\$NUM" --jq '.state' 2>/dev/null || true)
-if [ -z "\$PARENT_STATE" ]; then
-  echo "✗ issue #\$NUM not found in \$REPO_OWNER/\$REPO_NAME" >&2
+# One API call covers existence + state, and the read is judged by its EXIT
+# CODE. \`gh api\` writes the API's error body to STDOUT on a 404 — a
+# ~116-character JSON blob — so testing the output for emptiness could never
+# be true for a missing issue: the not-found branch below was unreachable,
+# control fell through to the child enumeration, and that call's own failure
+# reported a parent that does not exist as "could not read the children".
+rc=0
+PARENT_STATE=\$(gh api "repos/\$REPO_OWNER/\$REPO_NAME/issues/\$NUM" --jq '.state' 2>/dev/null) || rc=\$?
+if [ "\$rc" -ne 0 ] || [ -z "\$PARENT_STATE" ]; then
+  # That same error body is the only thing on hand that tells "this issue does
+  # not exist" from "the gate could not see" — a 403, a revoked scope, a
+  # secondary rate limit. Both exit 3 and both mean do not close; only one of
+  # them is a fact about the issue.
+  if printf '%s' "\$PARENT_STATE" | grep -q '"status": *"404"'; then
+    echo "✗ issue #\$NUM not found in \$REPO_OWNER/\$REPO_NAME" >&2
+  else
+    echo "✗ could not read issue #\$NUM — refusing to answer" >&2
+    echo "  This is not a verdict: the gate could not see the parent." >&2
+  fi
   exit 3
 fi
 
@@ -13234,12 +13258,14 @@ echo "done."
 # Exit:    0  parent has no open children — safe to close
 #          11 at least one child is still open — close blocked
 #          12 parent is already closed — nothing to gate (short-circuit)
-#          3  the parent does not exist, OR its children could not be read
-#          2  usage error
+#          3  the parent could not be read, OR its children could not be read
+#          2  usage error — no argument, or an argument that is not a number
 #
-# EVERY non-zero exit means "do not close". Exit 3 now also covers a failed
-# child enumeration: this script answers a safety question, and a question it
-# could not answer must never read as a yes.
+# EVERY non-zero exit means "do not close". Exit 3 covers a failed
+# enumeration: this script answers a safety question, and a question it could
+# not answer must never read as a yes. It does NOT cover being called wrong —
+# a misuse is the caller's bug, not the world being unreadable, and the two
+# used to be indistinguishable.
 set -euo pipefail
 
 # shellcheck source=./_config.sh
@@ -13250,14 +13276,38 @@ if [ "\$#" -lt 1 ]; then
   exit 2
 fi
 NUM="\$1"
+# A bad ARGUMENT is a usage error, and it used to reach the API as if it were
+# an issue number — where the failed lookup rendered it as exit 3, the code
+# that tells a caller the world was unreadable. Misuse and unreadability are
+# not the same event and must not share a code.
+case "\$NUM" in
+  '' | *[!0-9]*) echo "not an issue number: '\$NUM'" >&2; exit 2 ;;
+esac
 
-# Existence + state in one glab call. Mirrors the GitHub backend so both
-# variants share the exit-code contract (3 = missing, 12 = already closed,
-# 11 = open children, 0 = safe). GitLab issue states are \`opened\`/\`closed\`.
-PARENT_STATE=\$(glab issue view "\$NUM" --repo "\$PROJECT_ID" --output json 2>/dev/null \\
-  | jq -r '.state // empty' 2>/dev/null || true)
+# Existence + state in one glab call, judged by its EXIT CODE. Mirrors the
+# GitHub backend so both variants share the exit-code contract (3 = unreadable,
+# 12 = already closed, 11 = open children, 0 = safe). GitLab issue states are
+# \`opened\`/\`closed\`.
+#
+# The previous shape ended \`| jq -r '.state // empty' 2>/dev/null || true\` and
+# tested the result with \`-z\`. That happened to survive an error payload —
+# \`jq\` yields nothing for one — but it decided on the SHAPE of the output
+# rather than on whether the call succeeded, and it could not tell a missing
+# issue from a revoked token. The github twin's identical \`-z\` test did not
+# survive: \`gh\` writes its error body to stdout, so the branch was dead.
+rc=0
+PARENT_JSON=\$(glab issue view "\$NUM" --repo "\$PROJECT_ID" --output json 2>/dev/null) || rc=\$?
+if [ "\$rc" -ne 0 ] || [ -z "\$PARENT_JSON" ]; then
+  # \`glab\` does not hand back a distinguishable status here, so this says only
+  # what it knows. Claiming "not found" over an auth failure is the same class
+  # of invented certainty this script exists to refuse.
+  echo "✗ could not read issue #\$NUM in \$PROJECT_ID — it may not exist" >&2
+  echo "  This is not a verdict: the gate could not see the parent." >&2
+  exit 3
+fi
+PARENT_STATE=\$(printf '%s' "\$PARENT_JSON" | jq -r '.state // empty' 2>/dev/null || true)
 if [ -z "\$PARENT_STATE" ]; then
-  echo "✗ issue #\$NUM not found in \$PROJECT_ID" >&2
+  echo "✗ the state of #\$NUM was not readable JSON — refusing to answer" >&2
   exit 3
 fi
 

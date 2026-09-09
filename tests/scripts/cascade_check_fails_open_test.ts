@@ -42,6 +42,7 @@ async function runCheck(
   bin: string,
   stub: string,
   config: string,
+  arg = "42",
 ): Promise<Result> {
   const dir = await Deno.makeTempDir({ prefix: `cascade-${backend}-` });
   try {
@@ -67,7 +68,7 @@ async function runCheck(
     await Deno.writeTextFile(join(dir, ".specnaut", "backlog-config.yml"), config);
 
     const { code, stdout, stderr } = await new Deno.Command("bash", {
-      args: [join(scripts, "cascade-check.sh"), "42"],
+      args: [join(scripts, "cascade-check.sh"), arg],
       env: { PATH: `${binDir}:${Deno.env.get("PATH")}`, HOME: dir },
       clearEnv: true,
       stdout: "piped",
@@ -270,4 +271,93 @@ Deno.test("cascade-check: the API backends ask for a complete enumeration", asyn
     !/wc -l/.test(gl),
     "the gitlab count is still a line count of a discarded-stderr pipe",
   );
+});
+
+// ───────── misuse is not unreadability, and absence is not either ─────────
+//
+// Exit 3 is the code `phases/merge-close.md` teaches callers to read as "the
+// gate could not see — a token, scope or network problem, not a verdict". It
+// was also what you got for a typo and for an issue that does not exist. Three
+// different events, one code, one sentence.
+//
+// The second one is the interesting one. `gh api` writes the API's error body
+// to STDOUT on a 404, so the not-found branch — which tested the output for
+// emptiness — could not fire, and control fell through to the child
+// enumeration, whose failure spoke for a parent that was never there.
+
+/** A `gh` stub whose parent lookup fails the way the real one does on a 404. */
+const GH_PARENT_404 = `
+case "$*" in
+  *"/issues/42/sub_issues"*) echo 'HTTP 404: Not Found' >&2; exit 1 ;;
+  *"/issues/42"*)            printf '%s' '{"message":"Not Found","documentation_url":"https://docs.github.com/rest","status":"404"}'; exit 1 ;;
+  *)                         exit 0 ;;
+esac`;
+
+/** A `gh` stub whose parent lookup fails for a reason that is NOT absence. */
+const GH_PARENT_403 = `
+case "$*" in
+  *"/issues/42/sub_issues"*) echo 'HTTP 403' >&2; exit 1 ;;
+  *"/issues/42"*)            echo 'HTTP 403: rate limit exceeded' >&2; exit 1 ;;
+  *)                         exit 0 ;;
+esac`;
+
+Deno.test("cascade-check [github]: a non-numeric argument is a usage error, not a refusal", async () => {
+  const r = await runCheck("github", "gh", ghStub(`printf ''; exit 0`), GH_CFG, "banana");
+  assertEquals(r.code, 2, `a malformed argument did not exit 2:\n${r.out}${r.err}`);
+  assertStringIncludes(r.err, "banana");
+  assert(
+    !r.err.includes("could not read the children"),
+    `a caller's own typo was reported as an unreadable world:\n${r.err}`,
+  );
+});
+
+Deno.test("cascade-check [gitlab]: a non-numeric argument is a usage error, not a refusal", async () => {
+  const r = await runCheck("gitlab", "glab", `exit 0`, GL_CFG, "--repo");
+  assertEquals(r.code, 2, `a malformed argument did not exit 2:\n${r.out}${r.err}`);
+  assertStringIncludes(r.err, "--repo");
+  assert(
+    !r.err.includes("could not read the children"),
+    `a caller's own typo was reported as an unreadable world:\n${r.err}`,
+  );
+});
+
+Deno.test("cascade-check [github]: a missing issue says so, and does not blame the children", async () => {
+  const r = await runCheck("github", "gh", GH_PARENT_404, GH_CFG);
+  assertEquals(r.code, 3, `${r.out}${r.err}`);
+  assertStringIncludes(r.err, "not found");
+  assert(
+    !r.err.includes("could not read the children"),
+    `an issue that does not exist was reported as an unreadable child list:\n${r.err}`,
+  );
+});
+
+Deno.test("cascade-check [github]: a parent read that fails for another reason does not claim absence", async () => {
+  // The mirror of the test above, and the reason the fix reads the 404 body
+  // rather than simply treating every failed parent read as "not found":
+  // asserting the issue does not exist over a revoked token is the same
+  // invented certainty, pointed the other way.
+  const r = await runCheck("github", "gh", GH_PARENT_403, GH_CFG);
+  assertEquals(r.code, 3, `${r.out}${r.err}`);
+  assertStringIncludes(r.err, "could not read issue");
+  assert(
+    !r.err.includes("not found"),
+    `a rate limit was reported as a missing issue:\n${r.err}`,
+  );
+});
+
+Deno.test("cascade-check: every backend rejects a non-number before it reaches its backend", async () => {
+  // `local` and `cloud` already carried this guard; the two API-backed ones did
+  // not, which is the asymmetry that let an argument become a lookup. Asserted
+  // over all four so a future backend inherits the requirement rather than the
+  // omission.
+  const backends = ["github", "gitlab", "local", "cloud"];
+  const missing: string[] = [];
+  for (const b of backends) {
+    const src = await Deno.readTextFile(join(SCRIPTS, b, "cascade-check.sh"));
+    const code = src.split("\n").filter((l) => !l.trimStart().startsWith("#")).join("\n");
+    if (!/case "\$NUM" in[\s\S]{0,120}\*\[!0-9\]\*\)[\s\S]{0,120}exit 2/.test(code)) {
+      missing.push(b);
+    }
+  }
+  assertEquals(missing, [], `backends accepting a non-number as an issue id: ${missing}`);
 });
