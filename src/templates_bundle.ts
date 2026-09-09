@@ -7675,6 +7675,15 @@ Before writing a single finding:
    guess. A clean verdict is worth exactly what it covered, so say what it
    covered.
 
+8. **Name any class in scope that this base does not cover, and label it
+   *not assessed*.** The routing table is the list of what the base can
+   ground a finding in. A class present in what you were given and absent
+   from that table — the agentic surface is the one that bites today — gets
+   one line saying it was not examined, and why. Step 0 forbids reviewing
+   from memory, so silence on such a class is not a clean verdict, and
+   nothing in the report lets a reader tell the two apart unless you say
+   which it was.
+
 Do not read all of them by reflex — the routing table exists so you load
 two or three, not twelve. But never skip step 1.
 
@@ -15189,13 +15198,40 @@ advance on risk.
 - **Dependency CVE triage** is only sketched in \`06\`. The dedicated
   \`dependency-expert\` agent owns manifests, advisories, and licences —
   hand off rather than duplicating its work.
-- **The AI/agentic attack surface** (OWASP LLM Top 10, Agentic Top 10:
-  prompt injection, tool misuse, memory poisoning, excessive agency) is
-  **not covered here**. Add it if this project builds or embeds LLM
-  features.
 - **Runtime and infrastructure security** (container escape, network
   segmentation, host hardening) is out of scope: this base is for
   reviewing *source code*.
+- **The AI/agentic attack surface** (OWASP LLM Top 10, Agentic Top 10:
+  prompt injection, tool misuse, memory poisoning, excessive agency) is
+  **in scope and not yet written** — a gap being closed, not a boundary.
+
+  The source-code frame above cuts this class in two, and the halves land
+  on opposite sides. Instruction files, tool and permission declarations,
+  MCP configuration, hook scripts and skill definitions are **checked-in
+  source**, and reviewing them is exactly what this base is for. Judging
+  what an agent did at run time — its live tool calls, its accumulated
+  memory, the text a model returned — is not source review and sits with
+  the runtime gap above.
+
+  This entry used to say *"add it if this project builds or embeds LLM
+  features"*. That discriminator is withdrawn: it keys on whether the
+  application calls a model, while the exposure runs the other way —
+  whether this repository holds instructions an agent reads and acts on.
+  Most projects are the second and not the first, so the condition was
+  false in exactly the population that needed it. **If an agent acts on
+  anything in this repository, this class applies to you.**
+
+  Closing it is one change, not two. \`00-triage.md\` § 1 enumerates
+  attacker-controlled entry points and none of them is agentic, and its
+  ruling that "trusted internal config is **not** an injection source"
+  dismisses the main vector outright — an instruction file *is* internal
+  config, and to an agent it is precisely an injection source. A chapter
+  behind that gate would be inert; a widened gate with no chapter would
+  produce pattern matches with nowhere to confirm them.
+
+  Until the chapter exists, **a review that reports nothing on this class
+  has not cleared it.** \`security-expert\` is required to say so (its Step
+  0), so the silence reads as *not assessed* rather than as clean.
 
 ## Keeping it honest
 

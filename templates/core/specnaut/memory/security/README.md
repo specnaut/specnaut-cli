@@ -93,13 +93,40 @@ advance on risk.
 - **Dependency CVE triage** is only sketched in `06`. The dedicated
   `dependency-expert` agent owns manifests, advisories, and licences —
   hand off rather than duplicating its work.
-- **The AI/agentic attack surface** (OWASP LLM Top 10, Agentic Top 10:
-  prompt injection, tool misuse, memory poisoning, excessive agency) is
-  **not covered here**. Add it if this project builds or embeds LLM
-  features.
 - **Runtime and infrastructure security** (container escape, network
   segmentation, host hardening) is out of scope: this base is for
   reviewing *source code*.
+- **The AI/agentic attack surface** (OWASP LLM Top 10, Agentic Top 10:
+  prompt injection, tool misuse, memory poisoning, excessive agency) is
+  **in scope and not yet written** — a gap being closed, not a boundary.
+
+  The source-code frame above cuts this class in two, and the halves land
+  on opposite sides. Instruction files, tool and permission declarations,
+  MCP configuration, hook scripts and skill definitions are **checked-in
+  source**, and reviewing them is exactly what this base is for. Judging
+  what an agent did at run time — its live tool calls, its accumulated
+  memory, the text a model returned — is not source review and sits with
+  the runtime gap above.
+
+  This entry used to say *"add it if this project builds or embeds LLM
+  features"*. That discriminator is withdrawn: it keys on whether the
+  application calls a model, while the exposure runs the other way —
+  whether this repository holds instructions an agent reads and acts on.
+  Most projects are the second and not the first, so the condition was
+  false in exactly the population that needed it. **If an agent acts on
+  anything in this repository, this class applies to you.**
+
+  Closing it is one change, not two. `00-triage.md` § 1 enumerates
+  attacker-controlled entry points and none of them is agentic, and its
+  ruling that "trusted internal config is **not** an injection source"
+  dismisses the main vector outright — an instruction file *is* internal
+  config, and to an agent it is precisely an injection source. A chapter
+  behind that gate would be inert; a widened gate with no chapter would
+  produce pattern matches with nowhere to confirm them.
+
+  Until the chapter exists, **a review that reports nothing on this class
+  has not cleared it.** `security-expert` is required to say so (its Step
+  0), so the silence reads as *not assessed* rather than as clean.
 
 ## Keeping it honest
 
