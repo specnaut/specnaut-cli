@@ -1,3 +1,11 @@
+/**
+ * The repository every release artefact and every signature is expected to come
+ * from. One home: the updater resolves assets from it and the signature check
+ * pins an identity built from it, and a second spelling would let those two
+ * disagree silently.
+ */
+export const RELEASE_REPO = "specnaut/specnaut-cli";
+
 export type Asset = {
   name: string;
   url: string;
@@ -57,6 +65,11 @@ export class Release {
       (a) => a.name.includes(triple) && !a.name.endsWith(".sha256"),
     );
     return match ?? null;
+  }
+
+  /** An asset by exact name — the attestation bundle is one file for every platform. */
+  assetNamed(name: string): Asset | null {
+    return this.assets.find((a) => a.name === name) ?? null;
   }
 
   checksumAssetFor(triple: string): Asset | null {

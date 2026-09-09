@@ -16745,8 +16745,17 @@ The application fetches and executes code at runtime — an update, a plugin,
 a remote configuration that drives behaviour — without verifying a
 signature.
 
-*Confirm* — signature verification against a pinned public key before
-loading, plus an allowlist of sources.
+*Confirm* — signature verification against a pinned public key or a pinned
+certificate authority, before loading, plus an allowlist of sources. Keyless
+signing over a workload identity (Sigstore and equivalents) satisfies this
+without a stored private key: the verifier pins the issuing authority and the
+identity permitted to sign rather than a key file.
+
+*Confirm the anchor is not the artefact.* A checksum published beside the file
+it describes is a transport check, not a signature — whoever can replace one
+replaces both. Ask where the verifying material comes from, and count the
+control only when the answer is somewhere the attacker would have to compromise
+separately.
 
 *Severity* — CRITICAL.
 

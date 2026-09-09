@@ -63,6 +63,41 @@ Please include as much of the following as you can:
 This is a personal-time project; SLAs are best-effort, not contractual. We'll keep you in the loop
 throughout the process.
 
+## How releases are signed, and what `self-update` checks
+
+Every release binary is signed at build time with [Sigstore](https://www.sigstore.dev/) keyless
+signing. The release workflow exchanges its GitHub OIDC identity for a short-lived certificate from
+the public-good Fulcio certificate authority and attests each artefact; the resulting bundle is
+published as the release asset `specnaut.attestation.sigstore.json`.
+
+`specnaut self-update` verifies that signature **before** it replaces the running binary. It checks
+that the signing certificate was issued by the Fulcio intermediate pinned inside the binary, that it
+names this repository's `release.yml` **at the exact tag being installed**, that its OIDC issuer is
+GitHub Actions, and that the signed statement covers the SHA-256 of the bytes just downloaded.
+Anything else — a missing bundle, a foreign authority, another release's identity, a different
+digest — aborts the update and leaves the installed binary untouched.
+
+What this replaces: the previous control compared a `.sha256` published on the same release as the
+binary it described. That defends against a corrupted transfer, not against substitution at the
+source, because anyone able to amend a release replaces both files. The signature's trust anchor is
+compiled into the binary instead.
+
+What it does **not** claim. Inclusion in Sigstore's transparency log is not verified, so a pass
+means "signed by the pinned identity under the pinned authority", not "publicly logged". There is no
+revocation check.
+
+**The transition, in both directions.** Releases made before signing was added carry no bundle;
+`self-update` installs those with a checksum only and says so on the console. From **v4.3.0** onward
+a missing bundle is refused outright. A bundle that is present but does not verify is refused at any
+version — publishing one is a claim, and a claim that fails to check is worse evidence than none. In
+the other direction, a binary older than this change ignores the new asset entirely and keeps
+verifying the checksum alone; it is not broken by a signed release, it simply gains nothing until it
+updates once.
+
+If Sigstore ever rotates its certificate authority, `self-update` will refuse rather than fall back
+to the checksum — falling back would hand an attacker the weaker control on request — and the fix is
+to reinstall from <https://specnaut.com>.
+
 ## Scope
 
 In scope:

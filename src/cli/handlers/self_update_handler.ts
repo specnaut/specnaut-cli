@@ -54,6 +54,15 @@ export async function handleSelfUpdate(intent: SelfUpdateIntent): Promise<number
         return 0;
       case "updated":
         console.log(green(`✓ updated ${result.previousVersion} → ${result.newVersion}`));
+        // Say which control actually cleared the bytes. A silent success reads
+        // the same whether the release was signed or merely checksummed, and
+        // the difference is the whole point of the check.
+        console.log(
+          result.provenance === "signed"
+            ? dim("  provenance: signature verified against the pinned release identity")
+            : yellow("  provenance: checksum only — this release carries no signature"),
+        );
+        for (const warning of result.warnings) console.log(yellow(`  ! ${warning}`));
         console.log();
         console.log(
           dim(

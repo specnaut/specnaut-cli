@@ -285,6 +285,21 @@ jobs:
       # post-release). The step now also runs `--strict`, which fails the
       # build on any retrieval failure rather than publishing a partial guide.
       pull-requests: read
+      # Keyless signing (#577). `id-token: write` mints the OIDC token Fulcio
+      # exchanges for a short-lived signing certificate; `attestations: write`
+      # persists the result. Neither is a stored secret, which is what makes
+      # this shape the only one available here — a signing key would have to
+      # live as an Actions secret, and this repository holds none by policy
+      # (`tests/scripts/no_secrets_in_public_repo_test.ts`).
+      #
+      # `artifact-metadata: write` is deliberately ABSENT. The action's setup
+      # prose lists it, its own provenance example does not, and it is only
+      # consumed when pushing a storage record to a registry — which the step
+      # below switches off. An invalid permissions key fails the workflow parse
+      # outright (see the `repository-advisories` note above), and on a
+      # tag-triggered run a parse failure means no release object at all.
+      id-token: write
+      attestations: write
     steps:
       - uses: actions/checkout@v6
         with:
@@ -344,12 +359,34 @@ jobs:
           echo "✓ plugin manifests valid, scaffold present, versions $PLUGIN_VERSION/$MANIFEST_VERSION/$CODEX_VERSION/$CURSOR_VERSION match binary"
       - name: Cross-compile all targets
         run: deno run --allow-read --allow-write --allow-run --allow-env scripts/build.ts
+      - name: Attest build provenance
+        id: attest
+        uses: actions/attest@v4
+        with:
+          # Enumerated by the pipeline, not by a list. This step runs BEFORE
+          # checksums are computed, so `dist/` holds exactly the binaries
+          # `scripts/build.ts` produced and nothing else — the glob cannot fall
+          # behind the target list the way the `files:` block below can.
+          subject-path: dist/specnaut-*
+          # No registry push, so no storage record — and therefore no need for
+          # the permission key the comment above declines to add.
+          create-storage-record: false
       - name: Compute checksums
         run: |
           cd dist
           for f in specnaut-*; do
             shasum -a 256 "$f" > "$f.sha256"
           done
+      - name: Stage the attestation bundle for upload
+        # AFTER the checksum loop, and named with a dot rather than a hyphen,
+        # for the same reason twice: `for f in specnaut-*` would otherwise match
+        # the bundle, emit a `.sha256` for it, and quietly add a twelfth asset
+        # to a release the gates expect to hold eleven.
+        #
+        # `bundle-path` is absolute and outside the workspace, so it is copied
+        # in rather than referenced from `files:` directly. One bundle covers
+        # every subject — the in-toto statement lists all five binaries.
+        run: cp "${{ steps.attest.outputs.bundle-path }}" dist/specnaut.attestation.sigstore.json
       - name: Generate release notes
         env:
           # Authenticate `gh pr view` so each feat PR's `## Agent adoption`
@@ -389,6 +426,7 @@ jobs:
             dist/specnaut-linux-arm64.sha256
             dist/specnaut-windows-x64.exe
             dist/specnaut-windows-x64.exe.sha256
+            dist/specnaut.attestation.sigstore.json
           body_path: dist/release-notes.md
           # Without this the action defaults to false: nine of the ten files
           # present means it uploads nine, creates the release, and reports
