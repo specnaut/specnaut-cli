@@ -234,6 +234,13 @@ check "the removal is its own commit, not folded into the merge (#587 AC4)" \
 # same directory N times and strand the children still to be closed.
 check "an epic removes one directory once, never per child (#587 AC5)" \
   'grep -qF "Never per child" .claude/skills/specnaut/phases/merge-close.md'
+# feature.json NAMES the removed directory, and common.sh never checks that
+# the name still resolves: get_feature_paths returns the deleted path with
+# exit 0 and no warning, its branch-contradiction guard skipped off a feature
+# branch. Measured, not reasoned. The removal must take it along.
+check "the removal takes feature.json with it, not just the directory (#587)" \
+  'grep -qF "git rm -r --quiet \"<feature_directory>\" .specnaut/feature.json" \
+     .claude/skills/specnaut/phases/merge-close.md'
 check "a skip is reported, never silent (#587 AC6)" \
   'grep -qF "Report the removal, or the reason there wasn" .claude/skills/specnaut/phases/merge-close.md'
 # auto-chain.md walks the same directories and must NOT delete. Its read-only

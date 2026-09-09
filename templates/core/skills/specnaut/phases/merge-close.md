@@ -10,10 +10,10 @@ one you are on.
 
 ## Order matters, and it is derived rather than chosen
 
-**For every item: close the issue first, then move the card.** Both paths
-below obey this. It is stated here once, above both, because a rule written out
-separately in each place will eventually be written two ways — which is how the
-standalone path came to do the opposite of it.
+**For every item: close the issue first, then move the card.** Both paths below
+obey this. Stated here once, above both: a rule written out separately in each
+place will eventually be written two ways — which is how the standalone path came
+to do the opposite of it.
 
 `sweep-closed.sh` reports a card in `Done` whose issue is still **open** as
 `REOPENED` drift. Moving the card first therefore manufactures exactly the
@@ -48,8 +48,8 @@ which shell cannot offer, but never resting in the state that lies.
 
        Name **both** consequences in that one question: the issue is closed and its card moved,
        **and** the spec directory is removed in its own commit (step 8). One `yes` authorises
-       both — the removal follows from the close, and a second prompt would only invite the
-       state where the item is closed and its consumed artefact still sits in the tree.
+       both — a second prompt would only invite the state where the item is closed and its
+       consumed artefact still sits in the tree.
 
        On `no`, skip the rest of this section — leave the column flip to a future run or to a
        manual `move.sh`, and leave the directory alone.
@@ -75,12 +75,12 @@ which shell cannot offer, but never resting in the state that lies.
        is the authority, and the intent survives on the item just closed. After the close
        landed, before step 12.
 
-       Five conditions, **all** required. Any one failing is a skip that changes nothing else
-       in this phase — but a skip is reported (see below), never silent:
+       Five conditions, **all** required. Any one failing is a skip — reported (see below),
+       never silent — that changes nothing else here:
 
        - the push happened — the entry condition for this file;
        - **the close succeeded** — a refused `cascade-check.sh` gate, a non-zero exit or a `no`
-         at step 4 leaves the directory alone, because nobody authorised a removal;
+         at step 4 leaves the directory alone: nobody authorised a removal;
        - `.specnaut/feature.json` carries a non-empty `feature_directory`
          (`jq -r '.feature_directory // empty' .specnaut/feature.json`) — absent in
          `spec-backend=cloud` trees, where the spec never lived on disk, and in older trees;
@@ -90,26 +90,27 @@ which shell cannot offer, but never resting in the state that lies.
          it is not a formality: `phases/plan.md` commits the directory at plan time, so one with
          no history never got that commit, and deleting it destroys the only copy.
 
-       Then, on the base branch step 10 left you on:
+       Then, on the base branch step 10 left you on — its own commit, since the merge was
+       pushed several steps ago and there is nothing left to fold into:
 
        ```
-       git rm -r --quiet "<feature_directory>"
+       git rm -r --quiet "<feature_directory>" .specnaut/feature.json
        git commit -m "chore(<id>): remove the spec directory for the shipped feature"
        git push
        ```
 
-       Its **own** commit: the merge was made and pushed several steps ago, so there is
-       nothing left to fold this into.
+       `feature.json` goes with it: it names the directory and nothing verifies the name
+       still resolves, so `get_feature_paths` hands callers a path to nothing — exit 0, no
+       warning, its branch guard skipped off a feature branch.
 
        A feature with no `linked_issue` reaches none of this: step 1 skipped the section, so
-       nobody was asked. Intended — the removal's authorisation is the `yes` that authorised the
-       close, and there was none.
+       nobody was asked, and that `yes` is the authorisation. Intended.
 
     **Report the removal, or the reason there wasn't one.** One line naming the removed path
     and how to get it back (`git log --all -- <dir>`), or one line naming the unmet condition.
     The epic report's rule — anything the merge could not finish is stated — is not a property
-    of epics: a removal that silently did not happen is how a report comes to agree with a tree
-    it does not describe.
+    of epics: a silent non-removal is how a report comes to agree with a tree it does not
+    describe.
 
     Backward-compat: feature trees without `linked_issue` (created before this field existed)
     skip the close silently. A feature delivered across several branches — the last one has not
@@ -171,10 +172,9 @@ further. This is where they become Done.
    commands as the standalone path's step 8, after step 3's close. Not repeated here: a second
    copy is a second thing to keep in step with the first.
 
-   **Never per child.** `/specnaut plan` creates one directory per invocation, and an epic is
+   **Never per child.** `/specnaut plan` creates one directory per invocation and an epic is
    one branch over one tree carrying N child commits — a per-child removal would aim at the same
-   directory N times, and the first would take the plan out from under every child still to be
-   closed.
+   directory N times, the first taking the plan out from under every child still to be closed.
 
 5. **Then reconcile, once, over everything the merge touched.** The sweep in
    the standalone section covers the whole board, so it already sees all N+1
