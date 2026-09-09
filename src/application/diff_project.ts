@@ -26,12 +26,36 @@ export type DiffProjectInput = {
    * (false) reports every lock-tracked managed path.
    */
   readonly onlyCustomised: boolean;
+  /**
+   * Restrict the view to a single managed path (project-relative, normalised by
+   * the caller). `null` reports every lock-tracked path.
+   *
+   * A path the lock does not track is NOT silently reported as "no divergence":
+   * it comes back as `pathProblem`, because a whole-project answer to a
+   * question about one file reads as that file being clean.
+   */
+  readonly path: string | null;
 };
+
+/**
+ * Why a scoped request produced nothing, so the caller can say which it was.
+ *
+ *  - `not-managed`    — the path is not in the lock. A typo, or a file Specnaut
+ *    never wrote; either way there is no bundled original to compare against.
+ *  - `absent-on-disk` — lock-tracked, but the file is gone. There is a bundled
+ *    original and nothing to compare it with.
+ */
+export type DiffPathProblem = "not-managed" | "absent-on-disk";
 
 export type DiffProjectResult = {
   readonly results: ReadonlyArray<DivergenceResult>;
   /** Installed templates version the bundle was mapped for (lock version). */
   readonly fromVersion: string;
+  /**
+   * Set only when `input.path` was given and could not be answered. `null` on
+   * every whole-project run, and on a scoped run that produced a real verdict.
+   */
+  readonly pathProblem: DiffPathProblem | null;
 };
 
 /**
@@ -67,7 +91,22 @@ export class DiffProjectUseCase {
     // No lock ⇒ nothing is tracked, so there is nothing to compare. Surface an
     // empty result with an empty version rather than throwing — `diff` is a
     // read-only audit, not a precondition-gated mutation.
-    if (lock === null) return { results: [], fromVersion: "" };
+    if (lock === null) {
+      return { results: [], fromVersion: "", pathProblem: null };
+    }
+
+    // Resolve a scoped request against the lock BEFORE reading anything. A path
+    // the lock does not track has no bundled original, so the only honest
+    // answer is to name it — running the whole-project view instead is what
+    // makes a typo indistinguishable from a clean file.
+    const wanted = input.path;
+    if (wanted !== null && !lock.entries.has(wanted)) {
+      return {
+        results: [],
+        fromVersion: lock.templatesVersion,
+        pathProblem: "not-managed",
+      };
+    }
 
     const harness = findHarness(lock.harness);
     if (!harness) {
@@ -82,12 +121,19 @@ export class DiffProjectUseCase {
     });
 
     const results: DivergenceResult[] = [];
+    let scopedAbsent = false;
     for (const [dest, entry] of lock.entries) {
+      if (wanted !== null && dest !== wanted) continue;
+
       const diskContent = await reader.readText(input.projectDir, dest);
       // A lock entry whose file is gone from disk is outside this view's remit
       // (the divergence is between disk and bundle); skip it rather than invent
-      // a result.
-      if (diskContent === null) continue;
+      // a result. When it is the ONE path that was asked about, silence would
+      // be read as "clean", so record it and let the caller say so.
+      if (diskContent === null) {
+        if (wanted !== null) scopedAbsent = true;
+        continue;
+      }
 
       const diskSha = await sha256Hex(diskContent);
       const isCustomised = diskSha !== entry.sha256;
@@ -111,6 +157,10 @@ export class DiffProjectUseCase {
       }
     }
 
-    return { results, fromVersion: lock.templatesVersion };
+    return {
+      results,
+      fromVersion: lock.templatesVersion,
+      pathProblem: scopedAbsent ? "absent-on-disk" : null,
+    };
   }
 }

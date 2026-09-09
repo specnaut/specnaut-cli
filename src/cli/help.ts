@@ -11,7 +11,9 @@ ${bold("Usage:")}
   specnaut check [--project]          Diagnose the environment (and optionally the project)
   specnaut upgrade [--dry-run] [--force] [--backlog <name>] [--reset-baseline]
                                       Update project templates to the binary's version
-  specnaut diff [--only-customised]   Show how managed files diverge from the bundled originals (read-only)
+  specnaut diff [<path>] [--only-customised]
+                                      Show how managed files diverge from the bundled originals (read-only).
+                                      With <path>, scope to that one managed file.
   specnaut reconcile --status         List files pending post-upgrade reconciliation
   specnaut reconcile <path> --accept-upstream | --accept-current
                                       Resolve a preserved file after upgrade
@@ -67,6 +69,10 @@ ${bold("Flags (for upgrade):")}
                       upgrade rules (never the default; reported per overridden file).
 
 ${bold("Flags (for diff):")}
+  <path>              Optional project-relative path of ONE managed file (e.g.
+                      .specnaut/scripts/backlog/_config.sh). Scopes the view to it, which is what a
+                      preserve.yml maintenance walk needs. A path the lock does not track is an
+                      error, not a silent fall-back to the whole-project view.
   --only-customised   Restrict the output to files whose on-disk content diverges from the recorded
                       lock baseline — i.e. files you actually customized (skips unchanged managed files).
 

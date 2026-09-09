@@ -64,3 +64,15 @@ export function renderUnifiedDiff(
 
   return out.join("\n") + "\n";
 }
+
+/**
+ * Normalises a user-supplied path to the shape the lock records: project-
+ * relative, forward slashes, no `./` prefix, no trailing slash.
+ */
+export function normaliseDiffPath(raw: string): string {
+  return raw
+    .trim()
+    .replaceAll("\\", "/")
+    .replace(/^\.\//, "")
+    .replace(/\/+$/, "");
+}

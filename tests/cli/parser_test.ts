@@ -215,13 +215,47 @@ Deno.test("parseArgs returns upgrade intent with --reset-baseline", () => {
 });
 
 Deno.test("parseArgs returns diff intent (default onlyCustomised false)", () => {
-  assertEquals(parseArgs(["diff"]), { kind: "diff", onlyCustomised: false });
+  assertEquals(parseArgs(["diff"]), { kind: "diff", onlyCustomised: false, path: null });
 });
 
 Deno.test("parseArgs returns diff intent with --only-customised", () => {
   assertEquals(parseArgs(["diff", "--only-customised"]), {
     kind: "diff",
     onlyCustomised: true,
+    path: null,
+  });
+});
+
+// ---- the positional the parser used to drop on the floor (#594) ------------
+
+Deno.test("parseArgs carries a diff path positional", () => {
+  assertEquals(parseArgs(["diff", ".specnaut/scripts/backlog/_config.sh"]), {
+    kind: "diff",
+    onlyCustomised: false,
+    path: ".specnaut/scripts/backlog/_config.sh",
+  });
+});
+
+Deno.test("parseArgs normalises a ./-prefixed diff path to the lock's shape", () => {
+  assertEquals(parseArgs(["diff", "./.claude/CLAUDE.md"]), {
+    kind: "diff",
+    onlyCustomised: false,
+    path: ".claude/CLAUDE.md",
+  });
+});
+
+Deno.test("parseArgs composes a diff path with --only-customised", () => {
+  assertEquals(parseArgs(["diff", ".claude/CLAUDE.md", "--only-customised"]), {
+    kind: "diff",
+    onlyCustomised: true,
+    path: ".claude/CLAUDE.md",
+  });
+});
+
+Deno.test("parseArgs rejects more than one diff path rather than using the first", () => {
+  assertEquals(parseArgs(["diff", "a.md", "b.md"]), {
+    kind: "unknown",
+    received: "diff takes at most one path",
   });
 });
 

@@ -1,4 +1,5 @@
 import { parseArgs as stdParseArgs } from "@std/cli/parse-args";
+import { normaliseDiffPath } from "../domain/diff.ts";
 import {
   type BacklogBackend,
   KNOWN_BACKLOG_BACKENDS,
@@ -143,6 +144,12 @@ export type Intent =
     kind: "diff";
     /** `--only-customised`: restrict to paths whose disk SHA ≠ lock SHA. */
     onlyCustomised: boolean;
+    /**
+     * Optional positional: restrict the view to one managed path. `null` is the
+     * whole-project view. An unrecognised path is an error, not a silent
+     * fallback to the whole project (#594).
+     */
+    path: string | null;
   }
   | { kind: "unknown"; received: string }
   | { kind: "reconcile-status" }
@@ -305,7 +312,17 @@ export function parseArgs(argv: string[]): Intent {
   }
 
   if (command === "diff") {
-    return { kind: "diff", onlyCustomised: Boolean(parsed["only-customised"]) };
+    // One path at a time. Accepting several and diffing only the first is the
+    // same silent-success shape the positional used to have when it was
+    // dropped entirely.
+    if (rest.length > 1) {
+      return { kind: "unknown", received: "diff takes at most one path" };
+    }
+    return {
+      kind: "diff",
+      onlyCustomised: Boolean(parsed["only-customised"]),
+      path: rest.length === 1 ? normaliseDiffPath(rest[0]) : null,
+    };
   }
 
   if (command === "reconcile") {

@@ -101,6 +101,7 @@ Deno.test("DiffProjectUseCase: a customised file is reported as 'differs' with b
   const { results, fromVersion } = await uc.execute({
     projectDir: "/tmp/p",
     onlyCustomised: false,
+    path: null,
   });
   assertEquals(fromVersion, "1.2.3");
   assertEquals(results.length, 1);
@@ -122,7 +123,7 @@ Deno.test("DiffProjectUseCase: a vanilla file is reported as 'matches'", async (
     disk: { [dest]: content },
     core: [bundleEntry(dest, content)],
   });
-  const { results } = await uc.execute({ projectDir: "/tmp/p", onlyCustomised: false });
+  const { results } = await uc.execute({ projectDir: "/tmp/p", onlyCustomised: false, path: null });
   assertEquals(results.length, 1);
   assertEquals(results[0].kind, "matches");
   assertEquals(results[0].dest, dest);
@@ -139,7 +140,7 @@ Deno.test("DiffProjectUseCase: a lock-tracked path absent from the new bundle is
     disk: { [dropped]: "# old (edited)\n", [kept]: content },
     core: [bundleEntry(kept, content)],
   });
-  const { results } = await uc.execute({ projectDir: "/tmp/p", onlyCustomised: false });
+  const { results } = await uc.execute({ projectDir: "/tmp/p", onlyCustomised: false, path: null });
   const missing = results.find((r) => r.dest === dropped);
   assert(missing !== undefined, "dropped path should appear in results");
   assertEquals(missing!.kind, "missing");
@@ -148,7 +149,7 @@ Deno.test("DiffProjectUseCase: a lock-tracked path absent from the new bundle is
 Deno.test("DiffProjectUseCase: empty project yields empty results", async () => {
   const lock = await lockWith({});
   const uc = makeUseCase({ lock, disk: {}, core: [] });
-  const { results } = await uc.execute({ projectDir: "/tmp/p", onlyCustomised: false });
+  const { results } = await uc.execute({ projectDir: "/tmp/p", onlyCustomised: false, path: null });
   assertEquals(results.length, 0);
 });
 
@@ -157,6 +158,7 @@ Deno.test("DiffProjectUseCase: no lock yields empty results (nothing tracked)", 
   const { results, fromVersion } = await uc.execute({
     projectDir: "/tmp/p",
     onlyCustomised: false,
+    path: null,
   });
   assertEquals(results.length, 0);
   assertEquals(fromVersion, "");
@@ -176,7 +178,7 @@ Deno.test("DiffProjectUseCase: onlyCustomised restricts to paths whose disk SHA 
     },
     core: [bundleEntry(customised, bundledPo), bundleEntry(vanilla, vanillaContent)],
   });
-  const { results } = await uc.execute({ projectDir: "/tmp/p", onlyCustomised: true });
+  const { results } = await uc.execute({ projectDir: "/tmp/p", onlyCustomised: true, path: null });
   assertEquals(results.length, 1);
   assertEquals(results[0].dest, customised);
 });
@@ -207,6 +209,124 @@ Deno.test("DiffProjectUseCase: deps carry no FsWriter (read-only invariant)", as
     }
   }
   const uc = new DiffProjectUseCase(deps);
-  const { results } = await uc.execute({ projectDir: "/tmp/p", onlyCustomised: false });
+  const { results } = await uc.execute({ projectDir: "/tmp/p", onlyCustomised: false, path: null });
   assertEquals(results[0].kind, "matches");
+});
+
+// ---- scoping to one managed path (#594) ------------------------------------
+//
+// The defect these cover: `diff` dropped its positional argument entirely, so a
+// typo'd path, a path outside the bundle, and a correct path all produced the
+// same whole-project diff and exit 0. The command could not fail, which is what
+// let a preserve.yml maintenance walk read a buried answer as "no drift".
+
+Deno.test("DiffProjectUseCase: a path scopes the view to that one entry", async () => {
+  const wanted = ".specnaut/scripts/backlog/_config.sh";
+  const other = ".claude/CLAUDE.md";
+  const lock = await lockWith({ [wanted]: "old\n", [other]: "doc\n" });
+  const uc = makeUseCase({
+    lock,
+    disk: { [wanted]: "old\n", [other]: "doc EDITED\n" },
+    core: [bundleEntry(wanted, "new\n"), bundleEntry(other, "doc\n")],
+  });
+
+  const { results, pathProblem } = await uc.execute({
+    projectDir: "/tmp/p",
+    onlyCustomised: false,
+    path: wanted,
+  });
+
+  assertEquals(pathProblem, null);
+  assertEquals(results.length, 1);
+  assertEquals(results[0].dest, wanted);
+  assertEquals(results[0].kind, "differs");
+});
+
+Deno.test("DiffProjectUseCase: a path the lock does not track reports 'not-managed', not silence", async () => {
+  const tracked = ".claude/CLAUDE.md";
+  const lock = await lockWith({ [tracked]: "doc\n" });
+  const uc = makeUseCase({
+    lock,
+    disk: { [tracked]: "doc EDITED\n" },
+    core: [bundleEntry(tracked, "doc\n")],
+  });
+
+  const { results, pathProblem, fromVersion } = await uc.execute({
+    projectDir: "/tmp/p",
+    onlyCustomised: false,
+    path: ".specnaut/scripts/backlog/does-not-exist.sh",
+  });
+
+  // The whole-project view MUST NOT run as a fallback: the tracked file
+  // diverges, so leaking into it would have produced a confident diff for a
+  // question about a file that is not managed at all.
+  assertEquals(pathProblem, "not-managed");
+  assertEquals(results.length, 0);
+  assertEquals(fromVersion, "1.2.3");
+});
+
+Deno.test("DiffProjectUseCase: a tracked path absent from disk is distinguished from an unknown one", async () => {
+  const dest = ".claude/agents/developer.md";
+  const lock = await lockWith({ [dest]: "agent\n" });
+  const uc = makeUseCase({
+    lock,
+    disk: {}, // tracked by the lock, deleted on disk
+    core: [bundleEntry(dest, "agent\n")],
+  });
+
+  const { results, pathProblem } = await uc.execute({
+    projectDir: "/tmp/p",
+    onlyCustomised: false,
+    path: dest,
+  });
+
+  assertEquals(pathProblem, "absent-on-disk");
+  assertEquals(results.length, 0);
+});
+
+Deno.test("DiffProjectUseCase: a scoped path that matches the bundle is clean, not a problem", async () => {
+  const dest = ".claude/CLAUDE.md";
+  // A second, DIVERGING entry is what makes this assertion mean anything: with
+  // a one-entry lock the result is identical whether or not scoping ran.
+  const noisy = ".claude/agents/developer.md";
+  const lock = await lockWith({ [dest]: "doc\n", [noisy]: "agent\n" });
+  const uc = makeUseCase({
+    lock,
+    disk: { [dest]: "doc\n", [noisy]: "agent EDITED\n" },
+    core: [bundleEntry(dest, "doc\n"), bundleEntry(noisy, "agent\n")],
+  });
+
+  const { results, pathProblem } = await uc.execute({
+    projectDir: "/tmp/p",
+    onlyCustomised: false,
+    path: dest,
+  });
+
+  assertEquals(pathProblem, null);
+  assertEquals(results.length, 1);
+  assertEquals(results[0].kind, "matches");
+});
+
+Deno.test("DiffProjectUseCase: --only-customised composes with a scoped path", async () => {
+  const dest = ".claude/CLAUDE.md";
+  // On disk == lock SHA ⇒ not customised, so --only-customised filters it out
+  // even though the bundle has moved on underneath it. The second entry IS
+  // customised, so an empty result proves the scope held rather than the filter
+  // having simply emptied a one-entry lock.
+  const noisy = ".claude/agents/developer.md";
+  const lock = await lockWith({ [dest]: "doc\n", [noisy]: "agent\n" });
+  const uc = makeUseCase({
+    lock,
+    disk: { [dest]: "doc\n", [noisy]: "agent EDITED\n" },
+    core: [bundleEntry(dest, "doc UPSTREAM\n"), bundleEntry(noisy, "agent\n")],
+  });
+
+  const { results, pathProblem } = await uc.execute({
+    projectDir: "/tmp/p",
+    onlyCustomised: true,
+    path: dest,
+  });
+
+  assertEquals(pathProblem, null);
+  assertEquals(results.length, 0);
 });

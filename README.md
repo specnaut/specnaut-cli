@@ -127,6 +127,7 @@ specnaut upgrade --dry-run    # preview what would change
 specnaut upgrade              # apply safely — files you customized are preserved
 specnaut upgrade --force      # overwrite customized files (backed up to .specnaut.bak)
 specnaut diff                 # show how your customized files diverge from the bundled originals
+specnaut diff <path>          # scope that to one managed file
 ```
 
 Specnaut tracks the SHA256 of each template in `.specnaut/installed.lock` so it can detect your
@@ -154,10 +155,11 @@ invalid YAML — declares nothing; `upgrade` warns and continues, so check the w
 assuming your files are held.
 
 Declared files are then kept by both `specnaut upgrade` and `specnaut init --force`, each with a
-per-file `preserved …` notice. Use `specnaut diff` to see how a preserved file has drifted from the
-evolving bundle so you can fold in upstream changes by hand, and pass `--reset-preserved` to a
-refresh to deliberately discard your customizations and take the bundled version back. Commit
-`preserve.yml` alongside the lock file.
+per-file `preserved …` notice. Use `specnaut diff <path>` to see how one preserved file has drifted
+from the evolving bundle so you can fold in upstream changes by hand — that per-file check is the
+maintenance duty a preserve declaration creates, and `specnaut diff` with no path answers it for
+every managed file at once, and pass `--reset-preserved` to a refresh to deliberately discard your
+customizations and take the bundled version back. Commit `preserve.yml` alongside the lock file.
 
 When the `specnaut-plugin` Claude Code plugin is installed and the project harness is `claude`,
 `specnaut upgrade` auto-migrates vanilla agent and command files to the plugin (backs them up, then
