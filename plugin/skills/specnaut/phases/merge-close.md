@@ -60,7 +60,7 @@ which shell cannot offer, but never resting in the state that lies.
        `<first-sha>..<last-sha>` (from step 8's summary), then
        `gh issue close <linked_issue> --reason completed`. Leave the card alone — the merge phase
        moves it next. Confirm with a one-line report." This keeps the audit comment under PO
-       ownership and surfaces the `docs audit` line from the PO's close-step contract.
+       ownership.
 
        The order is not this step's to argue — see "Order matters" above, which governs both.
     6. **Then** run `bash .specnaut/scripts/backlog/move.sh <linked_issue> Done`. This is the
