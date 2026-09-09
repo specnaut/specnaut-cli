@@ -8,7 +8,7 @@
 // `git rev-parse --git-path hooks`, which returns the correct path in
 // both layouts. This test pins the contract by exercising both.
 
-import { assert, assertEquals } from "@std/assert";
+import { assert, assertEquals, assertStringIncludes } from "@std/assert";
 import { resolveHooksDir } from "../../scripts/install-hooks.ts";
 
 Deno.test("resolveHooksDir: plain checkout (.git is a directory)", async () => {
@@ -54,5 +54,231 @@ Deno.test("resolveHooksDir: submodule checkout (.git is a gitdir file)", async (
     assertEquals(got, want);
   } finally {
     await Deno.remove(host, { recursive: true });
+  }
+});
+
+// ─────────────────────────────── #591 ───────────────────────────────
+//
+// The hook was installed as an ABSOLUTE symlink, so the link text was the path
+// the checkout occupied at install time. Rename the directory and it dangles —
+// and git `stat()`s through a symlink, so a dangling hook reads as no hook.
+// Commits kept succeeding with none of the four gates run, and nothing said so.
+//
+// Then `main()` refused to repair the state it had created: a link pointing at
+// nothing was treated exactly like a hand-written hook that must not be
+// clobbered.
+
+import { classifyHook, installPreCommitHook, SHIM_MARKER } from "../../scripts/install-hooks.ts";
+
+/** A git repo with a `hooks/pre-commit` that leaves a marker only it can leave. */
+async function fakeRepo(
+  opts: { hook?: string | null } = {},
+): Promise<{ dir: string; marker: string }> {
+  const dir = await Deno.makeTempDir({ prefix: "install-hooks-591-" });
+  const init = await new Deno.Command("git", { args: ["init", "-q"], cwd: dir }).output();
+  assert(init.success, "git init failed");
+  const marker = "HOOK-RAN";
+  if (opts.hook !== null) {
+    await Deno.mkdir(`${dir}/hooks`, { recursive: true });
+    // The marker is written next to the repo, not inside it, so moving the
+    // checkout does not carry an old marker along and make a dead hook look
+    // alive. A negative assertion satisfied by the wrong thing is the failure
+    // this whole ticket is about.
+    await Deno.writeTextFile(
+      `${dir}/hooks/pre-commit`,
+      opts.hook ??
+        `#!/usr/bin/env bash\nprintf '%s' "${marker}" > "$(git rev-parse --show-toplevel)/../ran.txt"\n`,
+    );
+    await Deno.chmod(`${dir}/hooks/pre-commit`, 0o755);
+  }
+  return { dir, marker };
+}
+
+async function commit(cwd: string, msg: string): Promise<{ code: number; err: string }> {
+  await Deno.writeTextFile(`${cwd}/file-${crypto.randomUUID()}.txt`, "x\n");
+  await new Deno.Command("git", { args: ["add", "-A"], cwd }).output();
+  const out = await new Deno.Command("git", {
+    args: [
+      "-c",
+      "user.email=t@example.com",
+      "-c",
+      "user.name=T",
+      "commit",
+      "-q",
+      "-m",
+      msg,
+    ],
+    cwd,
+    stdout: "piped",
+    stderr: "piped",
+  }).output();
+  return { code: out.code, err: new TextDecoder().decode(out.stderr) };
+}
+
+Deno.test("install: a dangling symlink is repaired, not reported as a foreign hook", async () => {
+  const { dir } = await fakeRepo();
+  try {
+    await Deno.symlink(`${dir}/gone/pre-commit`, `${dir}/.git/hooks/pre-commit`);
+
+    const state = await classifyHook(
+      `${dir}/.git/hooks/pre-commit`,
+      `${dir}/hooks/pre-commit`,
+    );
+    assertEquals(state.kind, "legacy-symlink", `classified as ${state.kind}`);
+
+    const r = await installPreCommitHook(dir);
+    assert(r.ok, `a dangling link was refused:\n${r.lines.join("\n")}`);
+    const said = r.lines.join("\n");
+    assert(
+      !said.includes("was not installed by this script"),
+      `a link pointing at nothing was treated as someone else's hook:\n${said}`,
+    );
+    assertStringIncludes(said, "dangling");
+    // It must name what failed to resolve — "repaired something" is not a report.
+    assertStringIncludes(said, `${dir}/gone/pre-commit`);
+    assertStringIncludes(await Deno.readTextFile(`${dir}/.git/hooks/pre-commit`), SHIM_MARKER);
+  } finally {
+    await Deno.remove(dir, { recursive: true });
+  }
+});
+
+Deno.test("install: a hand-written hook is still refused", async () => {
+  const { dir } = await fakeRepo();
+  try {
+    await Deno.writeTextFile(`${dir}/.git/hooks/pre-commit`, "#!/bin/sh\necho mine\n");
+    const r = await installPreCommitHook(dir);
+    assert(!r.ok, "someone else's hook was overwritten");
+    assertEquals(r.code, 2);
+    assertStringIncludes(r.lines.join("\n"), "Back it up and re-run");
+    assertEquals(await Deno.readTextFile(`${dir}/.git/hooks/pre-commit`), "#!/bin/sh\necho mine\n");
+  } finally {
+    await Deno.remove(dir, { recursive: true });
+  }
+});
+
+Deno.test("install: a foreign symlink that RESOLVES is still refused", async () => {
+  // The repair above keys on the link pointing at nothing. A working symlink to
+  // somebody else's hook is a deliberate setup and stays untouched — otherwise
+  // "repair dangling links" would have quietly become "take over the hook".
+  const { dir } = await fakeRepo();
+  try {
+    await Deno.writeTextFile(`${dir}/theirs.sh`, "#!/bin/sh\nexit 0\n");
+    await Deno.symlink(`${dir}/theirs.sh`, `${dir}/.git/hooks/pre-commit`);
+    const r = await installPreCommitHook(dir);
+    assert(!r.ok, "a working third-party hook was replaced");
+    assertEquals(r.code, 2);
+  } finally {
+    await Deno.remove(dir, { recursive: true });
+  }
+});
+
+Deno.test("install: the old absolute symlink is upgraded in place", async () => {
+  const { dir } = await fakeRepo();
+  try {
+    await Deno.symlink(`${dir}/hooks/pre-commit`, `${dir}/.git/hooks/pre-commit`);
+    const r = await installPreCommitHook(dir);
+    assert(r.ok, r.lines.join("\n"));
+    assertStringIncludes(r.lines.join("\n"), "old absolute symlink");
+    const info = await Deno.lstat(`${dir}/.git/hooks/pre-commit`);
+    assert(!info.isSymlink, "it is still a symlink, so it still dies on a move");
+  } finally {
+    await Deno.remove(dir, { recursive: true });
+  }
+});
+
+Deno.test("install: a repo with no hook to run is a failure, not a checkmark", async () => {
+  // The condition #591 is about, stated as an assertion: the script must report
+  // what is true after it runs, not that it finished writing a file.
+  const { dir } = await fakeRepo({ hook: null });
+  try {
+    const r = await installPreCommitHook(dir);
+    assert(!r.ok, `an unrunnable install reported success:\n${r.lines.join("\n")}`);
+    assertStringIncludes(r.lines.join("\n"), "missing");
+  } finally {
+    await Deno.remove(dir, { recursive: true });
+  }
+});
+
+Deno.test("install: the hook survives a move of the checkout", async () => {
+  // The acceptance criterion, and the reason the mechanism changed at all.
+  const { dir, marker } = await fakeRepo();
+  const moved = `${dir}-moved`;
+  try {
+    const r = await installPreCommitHook(dir);
+    assert(r.ok, r.lines.join("\n"));
+
+    const before = await commit(dir, "before the move");
+    assertEquals(before.code, 0, before.err);
+    assertEquals(await Deno.readTextFile(`${dir}/../ran.txt`), marker);
+    await Deno.remove(`${dir}/../ran.txt`);
+
+    await Deno.rename(dir, moved);
+
+    // No second `deno task setup`. That is the whole point.
+    const after = await commit(moved, "after the move");
+    assertEquals(after.code, 0, after.err);
+    assertEquals(
+      await Deno.readTextFile(`${moved}/../ran.txt`),
+      marker,
+      "the hook did not run after the checkout moved",
+    );
+  } finally {
+    for (const d of [dir, moved]) {
+      await Deno.remove(d, { recursive: true }).catch(() => {});
+    }
+    await Deno.remove(`${dir}/../ran.txt`).catch(() => {});
+  }
+});
+
+Deno.test("install: the mechanism it replaced does NOT survive a move", async () => {
+  // The control. Without it, the test above passes for any mechanism at all and
+  // proves nothing about the one that failed — including the possibility that
+  // git was running no hook in either case.
+  const { dir, marker } = await fakeRepo();
+  const moved = `${dir}-oldmoved`;
+  try {
+    await Deno.symlink(`${dir}/hooks/pre-commit`, `${dir}/.git/hooks/pre-commit`);
+
+    const before = await commit(dir, "before the move");
+    assertEquals(before.code, 0, before.err);
+    assertEquals(
+      await Deno.readTextFile(`${dir}/../ran.txt`),
+      marker,
+      "the absolute symlink did not fire even before moving — the probe is dead",
+    );
+    await Deno.remove(`${dir}/../ran.txt`);
+
+    await Deno.rename(dir, moved);
+
+    const after = await commit(moved, "after the move");
+    assertEquals(after.code, 0, `${after.err}`);
+    let ran = false;
+    try {
+      await Deno.stat(`${moved}/../ran.txt`);
+      ran = true;
+    } catch { /* the hook was skipped, which is the defect */ }
+    assert(!ran, "the absolute symlink survived a move — #591's premise is wrong");
+  } finally {
+    for (const d of [dir, moved]) {
+      await Deno.remove(d, { recursive: true }).catch(() => {});
+    }
+    await Deno.remove(`${dir}/../ran.txt`).catch(() => {});
+  }
+});
+
+Deno.test("install: the shim fails closed when the hook disappears", async () => {
+  // A shim that exec'd nothing and exited 0 would reproduce the defect one
+  // layer in: the commit passes because no check ran.
+  const { dir } = await fakeRepo();
+  try {
+    const r = await installPreCommitHook(dir);
+    assert(r.ok, r.lines.join("\n"));
+    await Deno.remove(`${dir}/hooks/pre-commit`);
+
+    const c = await commit(dir, "with the hook body gone");
+    assert(c.code !== 0, "a commit passed with no hook body to run");
+    assertStringIncludes(c.err, "broken install, not a pass");
+  } finally {
+    await Deno.remove(dir, { recursive: true }).catch(() => {});
   }
 });
