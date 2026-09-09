@@ -231,3 +231,77 @@ Deno.test("workflowLength counts characters, not UTF-16 code units", () => {
   assertEquals(workflowLength("—"), 1);
   assertEquals(new TextEncoder().encode("—").length, 3);
 });
+
+/**
+ * The count of emitted workflows whose worst-case slack is under the reserve's
+ * own width. Pinned, not computed — the point is that it may not GROW.
+ *
+ * Lower it whenever the population drops; the assertion below is an equality
+ * and will tell you to. Never raise it.
+ */
+const WINDSURF_CLUSTERED_WORKFLOWS = 8;
+
+Deno.test("the cluster of workflows crowding the Cascade budget does not grow", () => {
+  // The per-file assertion above is a ceiling, and a ceiling is satisfied by
+  // trimming whichever file touched it. That is what happened: a 300-character
+  // reserve was introduced BECAUSE six workflows sat within 100 characters of
+  // the cap and two had to be trimmed in emergencies on one day (#561, #562).
+  // The reserve moved the line. The cluster re-formed against the new line —
+  // eight workflows now sit inside the reserve's own width — because nothing
+  // measures the population, only the maximum.
+  //
+  // So this gates the POPULATION. A count cannot be satisfied by trimming one
+  // file, which is precisely the move that produced the cluster twice.
+  //
+  // The threshold is derived, never written down: it is the reserve's own
+  // width, `MAX - BUDGET`. Widening the reserve to make this pass therefore
+  // widens the threshold too, admitting MORE files — and lowers the budget
+  // under the four workflows nearest it, so the per-file assertion fails first.
+  // Both exits are closed by construction rather than by a comment asking
+  // nobody to take them.
+  const h = new WindsurfHarness();
+  const reserve = WINDSURF_WORKFLOW_MAX_CHARS - WINDSURF_WORKFLOW_BUDGET_CHARS;
+
+  // Worst case PER PATH, across every combination — a workflow's length varies
+  // with the install options, and the tightest one is the one that binds.
+  const worstPerPath = new Map<string, number>();
+  for (const opts of everyBundleOption()) {
+    for (const [path, file] of Object.entries(h.mapBundle(CORE_BUNDLE, opts))) {
+      if (!path.startsWith(".windsurf/workflows/")) continue;
+      const chars = workflowLength(file.content);
+      worstPerPath.set(path, Math.max(worstPerPath.get(path) ?? -1, chars));
+    }
+  }
+
+  const clustered = [...worstPerPath]
+    .map(([path, chars]) => ({ path, chars, slack: WINDSURF_WORKFLOW_BUDGET_CHARS - chars }))
+    .filter((w) => w.slack < reserve)
+    .sort((a, b) => a.slack - b.slack);
+
+  const roster = clustered.map((w) => `${w.path} (${w.slack} left)`).join("\n    ");
+  assertEquals(
+    clustered.length,
+    WINDSURF_CLUSTERED_WORKFLOWS,
+    clustered.length > WINDSURF_CLUSTERED_WORKFLOWS
+      ? `${clustered.length} workflows now sit within ${reserve} characters of the ` +
+        `${WINDSURF_WORKFLOW_BUDGET_CHARS} budget, up from ${WINDSURF_CLUSTERED_WORKFLOWS}. ` +
+        `Trimming the largest one will NOT satisfy this — the count is the subject. ` +
+        `Shorten or split what you added, and do not raise the reserve.\n    ${roster}`
+      : `only ${clustered.length} workflows are still within ${reserve} characters of ` +
+        `the budget, down from ${WINDSURF_CLUSTERED_WORKFLOWS}. Lower ` +
+        `WINDSURF_CLUSTERED_WORKFLOWS to ${clustered.length} — the pin ratchets down ` +
+        `and never up.\n    ${roster}`,
+  );
+
+  // Non-vacuity, in the same shape as the set assertion above: an empty or
+  // near-empty universe would satisfy a population count trivially.
+  assert(
+    worstPerPath.size > 50,
+    `only ${worstPerPath.size} workflows were measured — the population was read off nothing`,
+  );
+
+  console.log(
+    `  windsurf cluster: ${clustered.length} of ${worstPerPath.size} workflows within ` +
+      `${reserve} chars of the budget (pin ${WINDSURF_CLUSTERED_WORKFLOWS})`,
+  );
+});
