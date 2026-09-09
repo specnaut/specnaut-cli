@@ -8,6 +8,25 @@ corroborate a board that says it is done.
 Two paths, the same as the merge itself. `merge.md` has already decided which
 one you are on.
 
+## Order matters, and it is derived rather than chosen
+
+**For every item: close the issue first, then move the card.** Both paths
+below obey this. It is stated here, once, above both of them — a rule written
+out separately in each place is a rule that will eventually be written two
+ways, which is exactly how the standalone path came to do the opposite of what
+this section says.
+
+`sweep-closed.sh` reports a card in `Done` whose issue is still **open** as
+`REOPENED` drift. Moving the card first therefore manufactures exactly the
+state an existing tool is built to flag — for every item, for as long as the
+close takes. Closing first leaves the opposite transient (a closed issue whose
+card is not yet Done), which the same sweep reports as `DRIFTED` and which the
+reconcile below resolves anyway.
+
+That is what an item's card and its issue changing **together** means: not
+simultaneity, which shell cannot offer, but never resting in the state that
+lies.
+
 ## Standalone — one item, one card
 
 11. **Close the linked backlog issue** (only if push happened and `feature.json.linked_issue` is set):
@@ -29,19 +48,27 @@ one you are on.
        skill — number, title, and a resolved link, never a bare number. The user is being
        asked to authorise an action on an item they must be able to identify. On `no`, skip the
        rest of this section — leave the column flip to a future run or to a manual `move.sh`.
-    5. On `yes`, run `bash .specnaut/scripts/backlog/move.sh <linked_issue> Done`. This is the
+    5. On `yes`, **github + gitlab only** — close the issue, before touching the card. Dispatch
+       the `product-owner` subagent with the prompt:
+       "The branch for issue #<linked_issue> just landed on `main`. Please run the close half of
+       the two-step close: post a close comment on the issue referencing the merged commit range
+       `<first-sha>..<last-sha>` (from step 8's summary), then
+       `gh issue close <linked_issue> --reason completed`. Leave the card alone — the merge phase
+       moves it next. Confirm with a one-line report." This keeps the audit comment under PO
+       ownership and surfaces the `docs audit` line from the PO's close-step contract.
+
+       The order is not this step's to argue — see "Order matters, and it is derived rather than
+       chosen" above, which governs both paths.
+    6. **Then** run `bash .specnaut/scripts/backlog/move.sh <linked_issue> Done`. This is the
        mechanical column flip — `move.sh` is idempotent and the working contract permits the merge
        phase to call it directly (the PO retains exclusive ownership of the close + comment, not
-       the column move).
-    6. **github + gitlab only** — dispatch the `product-owner` subagent with the prompt:
-       "The branch for issue #<linked_issue> just landed on `main`. The mechanical move to Done has
-       already been done via `move.sh`. Please run the second half of the two-step close: post
-       a close comment on the issue referencing the merged commit range `<first-sha>..<last-sha>`
-       (from step 8's summary), then `gh issue close <linked_issue> --reason completed`. Confirm
-       with a one-line report." This keeps the audit comment under PO ownership and surfaces the
-       `docs audit` line from the PO's close-step contract.
-    7. **local backend only** — `move.sh <id> Done` already flipped the frontmatter; no second
-       step needed. The local backlog has no separate "issue" object beyond the file itself.
+       the column move). If step 5 reported that the close did not land, **report it and leave the
+       card where it is**: moving it then produces the one state the order above exists to avoid,
+       and step 12's reconcile cannot tell that state from a real one.
+    7. **local backend only** — step 5 does not apply, and the ordering above is a two-object
+       problem this backend does not have: there is no "issue" object beyond the task file itself,
+       so `move.sh <id> Done` in step 6 flips the frontmatter and *is* the close, in one write.
+       Nothing precedes it and nothing follows it.
 
     Backward-compat: feature trees without `linked_issue` (created before this field existed)
     skip the close silently. A feature delivered across several branches — the last one has not
@@ -72,21 +99,6 @@ An epic merge closes N children **and** the epic, and moves N+1 cards. Under
 D17 the children's cards arrive here sitting in **In review**: the loop put
 them there as each commit was written, and deliberately did not take them
 further. This is where they become Done.
-
-### Order matters, and it is derived rather than chosen
-
-**For each child: close the issue first, then move the card.**
-
-`sweep-closed.sh` reports a card in `Done` whose issue is still **open** as
-`REOPENED` drift. Moving the card first therefore manufactures exactly the
-state an existing tool is built to flag — for every child, for as long as the
-close takes. Closing first leaves the opposite transient (a closed issue whose
-card is not yet Done), which the same sweep reports as `DRIFTED` and which the
-reconcile below resolves anyway.
-
-That is what AC 4 means by a child's card and its issue changing **together**:
-not simultaneity, which shell cannot offer, but never resting in the state that
-lies.
 
 ### The procedure
 

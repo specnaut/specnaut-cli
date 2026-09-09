@@ -173,10 +173,35 @@ check "merge.md routes to it after a push (#560)" \
   'grep -qF "phases/merge-close.md" .claude/skills/specnaut/phases/merge.md'
 check "the epic path closes every child AND the epic (#560 AC1)" \
   'grep -qF "N children" .claude/skills/specnaut/phases/merge-close.md'
-check "the issue closes BEFORE the card moves, and says why (#560 AC4)" \
+# The three checks below were one check, and it certified a file that broke
+# the rule it is named for. It flattened merge-close.md and grepped for the
+# rule sentence plus "REOPENED" — both of which live in the ordering section.
+# The standalone path moved the card and only then closed the issue, a few
+# dozen lines away, and this check passed on it for as long as it existed
+# (#588). Presence of a rule is not conformance to it, and a check that reads
+# only prose cannot tell the two apart. So: one check that the rule is stated
+# and argued, and one per path that the two operations appear in that order.
+check "the ordering rule is stated once, and says why (#560 AC4)" \
   'flat="$(tr "\n" " " < .claude/skills/specnaut/phases/merge-close.md)";
    grep -qF "close the issue first, then move the card" <<<"$flat" &&
    grep -qF "REOPENED" <<<"$flat"'
+# The standalone path names both operations as commands, so its order is
+# readable structurally: the line that closes must precede the line that moves,
+# within that section only. `!c` / `!m` keep the FIRST of each, so a later
+# mention in prose cannot rescue a wrong order. A missing marker fails too — a
+# renamed command must re-state its order, not silently stop being checked.
+check "the STANDALONE path closes before it moves, in that order (#588 AC4)" \
+  'awk "/^## Standalone/{s=1} /^## An epic/{s=0}
+        s && /gh issue close <linked_issue>/ && !c {c=NR}
+        s && /move\.sh <linked_issue> Done/ && !m {m=NR}
+        END{exit !(c && m && c < m)}" \
+     .claude/skills/specnaut/phases/merge-close.md'
+# The epic path issues no literal commands — it states the order in prose, so
+# the order IS the sentence. Reversing the procedure means rewriting this
+# phrase, which is what makes a phrase match binding here and not elsewhere.
+check "the EPIC path closes before it moves, in that order (#588 AC4)" \
+  'grep -qF "close the issue with a reason, then move its card" \
+     <<<"$(tr "\n" " " < .claude/skills/specnaut/phases/merge-close.md)"'
 check "cascade-check still gates the parent close (#560 AC2)" \
   'grep -qF "cascade-check.sh <epic>" .claude/skills/specnaut/phases/merge-close.md'
 check "children are enumerated from the branch, not from memory (#560)" \
