@@ -4,8 +4,10 @@
 # directly; opening Deno-side dep PRs is a manual concern (handled
 # by `deno task check` + `deno task test` after `deno cache --reload`).
 #
-# This config covers the actions/* and denoland/setup-deno@v2 pins
-# across ci.yml, release.yml, static.yml, docs-check.yml, wiki.yml.
+# This config covers the actions/* and denoland/setup-deno@v2 pins across
+# every workflow in .github/workflows/. It used to enumerate them, and three
+# of the five it named — static.yml, docs-check.yml, wiki.yml — did not exist;
+# an enumeration in a comment goes stale silently, so it does not carry one.
 version: 2
 updates:
   - package-ecosystem: "github-actions"
