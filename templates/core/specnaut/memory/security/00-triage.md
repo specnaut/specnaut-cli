@@ -16,9 +16,24 @@ reader to skim the report.
 Trace it back to a real entry point — a request parameter, header, cookie,
 uploaded file, webhook body, queue message, or third-party API response.
 
+**When the consumer is an AI agent, the entry points are different ones**: a
+tool result, a fetched page, a file the agent reads, an issue or pull-request
+body, a repository the agent was pointed at, and the model's own response
+where something downstream acts on it. Each is text an agent may read as
+instruction. See `11-ai-and-agentic-surface.md`.
+
 A value that only ever comes from a constant, an enum, a database column
 the user cannot write, or trusted internal config is **not** an injection
 source. Say so and move on.
+
+That last case has one exception, and only one. **Internal configuration is
+an injection source when an agent reads it as instruction and somebody
+outside the trusted set can write it** — an instruction file, an agent or
+skill definition, a rules file. Both halves are required: the content must
+be loaded as instruction rather than parsed as data, and there must be a
+writer the project does not trust. Neither alone makes a finding, and a
+config file consumed by a program is still not an injection source no
+matter what an agent could hypothetically do with it.
 
 ### 2. Is the sink reachable with that input?
 
@@ -79,7 +94,7 @@ FINDING <n> — <one-line title>
   Severity  : CRITICAL | HIGH | MEDIUM | LOW | INFO
   Kind      : exploitable | defence-in-depth | undetermined
   Location  : <path>:<line>
-  Standard  : <OWASP A0X:2025 / ASVS V<n>.<n>.<n> / CWE-nnn>
+  Standard  : <OWASP A0X:2025 / LLM0X:2025 / ASVS V<n>.<n>.<n> / CWE-nnn>
   Path      : <entry point> -> <intermediate> -> <sink>
   Impact    : <what the attacker gets, concretely>
   Fix       : <the change to make, specific to this code>

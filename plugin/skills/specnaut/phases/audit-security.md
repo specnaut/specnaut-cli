@@ -104,6 +104,12 @@ Scope: walk the inventory below and surface findings for each of these axes:
    applicable to the framework).
 10. **Silent error swallowing** — `catch` / `except` blocks that hide errors
     without logging, especially in security-relevant code paths.
+11. **AI/agentic artefacts** — instruction files an agent auto-loads, tool
+    and permission grants wider than the seat's stated job, confirmation
+    disabled in a committed setting, unpinned MCP servers or plugins,
+    credentials in agent configuration, hooks that execute untrusted input,
+    and untrusted event text interpolated into a headless agent's prompt.
+    Checked-in artefacts only — run-time agent behaviour is out of scope.
 
 Severity floor for surfacing: $SEVERITY_FLOOR. Findings below this floor go
 into the "Out of scope" section of the report (named, not detailed).

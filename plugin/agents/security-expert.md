@@ -53,14 +53,13 @@ Before writing a single finding:
 8. **Name any class in scope that this base does not cover, and label it
    *not assessed*.** The routing table is the list of what the base can
    ground a finding in. A class present in what you were given and absent
-   from that table — the agentic surface is the one that bites today — gets
-   one line saying it was not examined, and why. Step 0 forbids reviewing
-   from memory, so silence on such a class is not a clean verdict, and
-   nothing in the report lets a reader tell the two apart unless you say
-   which it was.
+   from that table gets one line saying it was not examined, and why.
+   Step 0 forbids reviewing from memory, so silence on such a class is not
+   a clean verdict, and nothing in the report lets a reader tell the two
+   apart unless you say which it was.
 
 Do not read all of them by reflex — the routing table exists so you load
-two or three, not twelve. But never skip step 1.
+two or three, not thirteen. But never skip step 1.
 
 ### Step 0 has a budget, and a scoped dispatch discharges most of it
 

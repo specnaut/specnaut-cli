@@ -868,6 +868,12 @@
     {
       "category": "spec-root",
       "name": "specify",
+      "suffix": "memory/security/11-ai-and-agentic-surface.md",
+      "source": "core/specnaut/memory/security/11-ai-and-agentic-surface.md"
+    },
+    {
+      "category": "spec-root",
+      "name": "specify",
       "suffix": "memory/a11y/README.md",
       "source": "core/specnaut/memory/a11y/README.md"
     },

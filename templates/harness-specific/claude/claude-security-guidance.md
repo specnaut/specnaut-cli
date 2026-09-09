@@ -31,6 +31,7 @@ surface:
 | `catch` blocks, error responses, logging | `08-logging-and-error-handling.md` |
 | rate limits, flows, races, pricing | `09-design-and-business-logic.md` |
 | language-specific sinks | `10-language-footguns.md` |
+| agent instructions, tool grants, MCP config, hooks | `11-ai-and-agentic-surface.md` |
 
 `.specnaut/memory/security/00-triage.md` defines the severity rubric and
 the finding format. Use them rather than inventing your own.

@@ -29,6 +29,7 @@ const DOMAIN_FILES: readonly string[] = [
   "08-logging-and-error-handling.md",
   "09-design-and-business-logic.md",
   "10-language-footguns.md",
+  "11-ai-and-agentic-surface.md",
 ];
 
 function securityEntries(): CoreEntry[] {
