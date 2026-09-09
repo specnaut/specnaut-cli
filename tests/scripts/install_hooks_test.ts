@@ -132,7 +132,14 @@ const SPAWNS_HOOKS = Deno.build.os !== "windows";
 Deno.test("install: a dangling symlink is repaired, not reported as a foreign hook", async () => {
   const { dir } = await fakeRepo();
   try {
-    await Deno.symlink(`${dir}/gone/pre-commit`, `${dir}/.git/hooks/pre-commit`);
+    // `type` is required on Windows when the target does not exist: NTFS decides
+    // file-vs-directory at creation time and cannot infer it from a path that
+    // resolves to nothing. Ignored on POSIX. Without it this test — the one
+    // about a link pointing at nothing — was the only thing that could not
+    // create a link pointing at nothing.
+    await Deno.symlink(`${dir}/gone/pre-commit`, `${dir}/.git/hooks/pre-commit`, {
+      type: "file",
+    });
 
     const state = await classifyHook(
       `${dir}/.git/hooks/pre-commit`,
