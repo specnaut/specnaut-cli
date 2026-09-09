@@ -200,11 +200,16 @@ that is missing the next expected artefact.
 
   **3.x writes no `spec.md`.** The artefact was removed in 2.0.0 and no phase
   produces one, so this rule can only ever match a feature directory left
-  behind by a 1.x project. It stays because projects are told to keep
-  `.specnaut/specs/**` as historical records, and a pre-migration spec that
-  never got a plan is exactly the thing worth surfacing. Do not read it as
+  behind by a 1.x project — one that never shipped, so no merge ever removed
+  it. It stays because a pre-migration spec that never got a plan is exactly
+  the thing worth surfacing. Do not read it as
   evidence that the current pipeline emits `spec.md`, and do not delete it as
   dead code — `tests/templates/removed_artefacts_test.ts` carries a matching
   allowlist entry recording the same decision.
 
-This is also read-only; never delete or modify spec files.
+This is also read-only; never delete or modify spec files. A shipped feature's
+directory IS removed — by `phases/merge-close.md` step 8, at the merge, under
+the same `yes` that closed the issue and with the plan already in git history.
+Different actor, different moment, and it holds the authorisation this pass
+does not have. A reporter that edits what it walks has no way to be trusted
+about what it found.

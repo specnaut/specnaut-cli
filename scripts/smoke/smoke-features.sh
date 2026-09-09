@@ -213,6 +213,42 @@ check "the report names every item, not a count (#560 AC5)" \
 check "nothing closes when the merge did not push (#560 AC6)" \
   'grep -qF "only when the push" .claude/skills/specnaut/phases/merge-close.md'
 
+# #587 — a shipped feature's spec directory is removed at the merge. The code
+# is the authority afterwards; the plan is already in git history, which is
+# what makes the removal lossless. Each check below guards a condition whose
+# loss turns a cleanup into data destruction or into a silent no-op.
+check "the standalone path removes the spec directory (#587 AC1)" \
+  'flat="$(tr "\n" " " < .claude/skills/specnaut/phases/merge-close.md)";
+   grep -qF "Remove the feature'"'"'s spec directory" <<<"$flat" &&
+   grep -qF "feature_directory" <<<"$flat"'
+# The load-bearing one. Without the history check the step deletes the only
+# copy of a plan that never got its plan-time commit.
+check "the removal refuses a directory git has never seen (#587 AC2)" \
+  'grep -qF "git log --all --oneline" .claude/skills/specnaut/phases/merge-close.md'
+check "one yes authorises the close AND the removal, with no second prompt (#587 AC3)" \
+  'grep -qF "One \`yes\` authorises" \
+     <<<"$(tr "\n" " " < .claude/skills/specnaut/phases/merge-close.md)"'
+check "the removal is its own commit, not folded into the merge (#587 AC4)" \
+  'grep -qF "remove the spec directory for the shipped feature" .claude/skills/specnaut/phases/merge-close.md'
+# An epic is one branch over one tree: a per-child removal would aim at the
+# same directory N times and strand the children still to be closed.
+check "an epic removes one directory once, never per child (#587 AC5)" \
+  'grep -qF "Never per child" .claude/skills/specnaut/phases/merge-close.md'
+check "a skip is reported, never silent (#587 AC6)" \
+  'grep -qF "Report the removal, or the reason there wasn" .claude/skills/specnaut/phases/merge-close.md'
+# auto-chain.md walks the same directories and must NOT delete. Its read-only
+# line survives verbatim; what it gained is why it does not contradict the
+# phase that does delete — without that, the next reader reads one of the two
+# as a bug.
+check "orphan detection stays read-only, and says why that is not a contradiction (#587 AC8)" \
+  'flat="$(tr "\n" " " < .claude/skills/specnaut/phases/auto-chain.md)";
+   grep -qF "never delete or modify spec files" <<<"$flat" &&
+   grep -qF "merge-close.md\` step 8" <<<"$flat"'
+check "the false retention claim is gone from auto-chain.md (#587 AC7)" \
+  '! grep -qF "historical records" .claude/skills/specnaut/phases/auto-chain.md'
+check "the legacy spec.md rule survives the reword (#587 AC9)" \
+  'grep -qF "Has \`spec.md\` but no \`plan.md\`" .claude/skills/specnaut/phases/auto-chain.md'
+
 # #559 — a fixup folds into ITS OWN child, and the fold is verified here
 # rather than borrowed from squash-by-scope, which governs the other path and
 # since #558 lives in another file entirely. AC 7 is the load-bearing one.

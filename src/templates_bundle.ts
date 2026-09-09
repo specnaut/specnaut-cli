@@ -1242,10 +1242,9 @@ one you are on.
 ## Order matters, and it is derived rather than chosen
 
 **For every item: close the issue first, then move the card.** Both paths
-below obey this. It is stated here, once, above both of them — a rule written
-out separately in each place is a rule that will eventually be written two
-ways, which is exactly how the standalone path came to do the opposite of what
-this section says.
+below obey this. It is stated here once, above both, because a rule written out
+separately in each place will eventually be written two ways — which is how the
+standalone path came to do the opposite of it.
 
 \`sweep-closed.sh\` reports a card in \`Done\` whose issue is still **open** as
 \`REOPENED\` drift. Moving the card first therefore manufactures exactly the
@@ -1254,9 +1253,8 @@ close takes. Closing first leaves the opposite transient (a closed issue whose
 card is not yet Done), which the same sweep reports as \`DRIFTED\` and which the
 reconcile below resolves anyway.
 
-That is what an item's card and its issue changing **together** means: not
-simultaneity, which shell cannot offer, but never resting in the state that
-lies.
+An item's card and its issue thus change **together**: not simultaneously,
+which shell cannot offer, but never resting in the state that lies.
 
 ## Standalone — one item, one card
 
@@ -1277,8 +1275,15 @@ lies.
        is nothing to do.
     4. Ask the user to confirm, naming the item per the \`backlog-reference-contract\`
        skill — number, title, and a resolved link, never a bare number. The user is being
-       asked to authorise an action on an item they must be able to identify. On \`no\`, skip the
-       rest of this section — leave the column flip to a future run or to a manual \`move.sh\`.
+       asked to authorise an action on an item they must be able to identify.
+
+       Name **both** consequences in that one question: the issue is closed and its card moved,
+       **and** the spec directory is removed in its own commit (step 8). One \`yes\` authorises
+       both — the removal follows from the close, and a second prompt would only invite the
+       state where the item is closed and its consumed artefact still sits in the tree.
+
+       On \`no\`, skip the rest of this section — leave the column flip to a future run or to a
+       manual \`move.sh\`, and leave the directory alone.
     5. On \`yes\`, **github + gitlab only** — close the issue, before touching the card. Dispatch
        the \`product-owner\` subagent with the prompt:
        "The branch for issue #<linked_issue> just landed on \`main\`. Please run the close half of
@@ -1288,18 +1293,54 @@ lies.
        moves it next. Confirm with a one-line report." This keeps the audit comment under PO
        ownership and surfaces the \`docs audit\` line from the PO's close-step contract.
 
-       The order is not this step's to argue — see "Order matters, and it is derived rather than
-       chosen" above, which governs both paths.
+       The order is not this step's to argue — see "Order matters" above, which governs both.
     6. **Then** run \`bash .specnaut/scripts/backlog/move.sh <linked_issue> Done\`. This is the
        mechanical column flip — \`move.sh\` is idempotent and the working contract permits the merge
        phase to call it directly (the PO retains exclusive ownership of the close + comment, not
-       the column move). If step 5 reported that the close did not land, **report it and leave the
-       card where it is**: moving it then produces the one state the order above exists to avoid,
-       and step 12's reconcile cannot tell that state from a real one.
-    7. **local backend only** — step 5 does not apply, and the ordering above is a two-object
-       problem this backend does not have: there is no "issue" object beyond the task file itself,
-       so \`move.sh <id> Done\` in step 6 flips the frontmatter and *is* the close, in one write.
-       Nothing precedes it and nothing follows it.
+       the column move). If step 5 reported the close did not land, **report it and leave the
+       card alone**: moving it produces the one state the order above exists to avoid.
+    7. **local backend only** — step 5 does not apply. The ordering above is a two-object
+       problem this backend does not have: there is no "issue" beyond the task file, so step 6's
+       \`move.sh <id> Done\` flips the frontmatter and *is* the close, in one write.
+    8. **Remove the feature's spec directory** — the planning artefact is consumed, the code
+       is the authority, and the intent survives on the item just closed. After the close
+       landed, before step 12.
+
+       Five conditions, **all** required. Any one failing is a skip that changes nothing else
+       in this phase — but a skip is reported (see below), never silent:
+
+       - the push happened — the entry condition for this file;
+       - **the close succeeded** — a refused \`cascade-check.sh\` gate, a non-zero exit or a \`no\`
+         at step 4 leaves the directory alone, because nobody authorised a removal;
+       - \`.specnaut/feature.json\` carries a non-empty \`feature_directory\`
+         (\`jq -r '.feature_directory // empty' .specnaut/feature.json\`) — absent in
+         \`spec-backend=cloud\` trees, where the spec never lived on disk, and in older trees;
+       - the directory exists on disk;
+       - **the directory is in git history** — \`git log --all --oneline -- "<dir>"\` returns at
+         least one commit. This is what makes the removal lossless rather than destructive, and
+         it is not a formality: \`phases/plan.md\` commits the directory at plan time, so one with
+         no history never got that commit, and deleting it destroys the only copy.
+
+       Then, on the base branch step 10 left you on:
+
+       \`\`\`
+       git rm -r --quiet "<feature_directory>"
+       git commit -m "chore(<id>): remove the spec directory for the shipped feature"
+       git push
+       \`\`\`
+
+       Its **own** commit: the merge was made and pushed several steps ago, so there is
+       nothing left to fold this into.
+
+       A feature with no \`linked_issue\` reaches none of this: step 1 skipped the section, so
+       nobody was asked. Intended — the removal's authorisation is the \`yes\` that authorised the
+       close, and there was none.
+
+    **Report the removal, or the reason there wasn't one.** One line naming the removed path
+    and how to get it back (\`git log --all -- <dir>\`), or one line naming the unmet condition.
+    The epic report's rule — anything the merge could not finish is stated — is not a property
+    of epics: a removal that silently did not happen is how a report comes to agree with a tree
+    it does not describe.
 
     Backward-compat: feature trees without \`linked_issue\` (created before this field existed)
     skip the close silently. A feature delivered across several branches — the last one has not
@@ -1357,7 +1398,16 @@ further. This is where they become Done.
    that is not a clean bill of health, and closing on it is the failure the
    gate exists to prevent.
 
-4. **Then reconcile, once, over everything the merge touched.** The sweep in
+4. **Then remove the spec directory — once, for the whole epic.** Same five conditions and
+   commands as the standalone path's step 8, after step 3's close. Not repeated here: a second
+   copy is a second thing to keep in step with the first.
+
+   **Never per child.** \`/specnaut plan\` creates one directory per invocation, and an epic is
+   one branch over one tree carrying N child commits — a per-child removal would aim at the same
+   directory N times, and the first would take the plan out from under every child still to be
+   closed.
+
+5. **Then reconcile, once, over everything the merge touched.** The sweep in
    the standalone section covers the whole board, so it already sees all N+1
    cards; the only change is that the batch move may now carry N+1 numbers
    rather than one. Quote the script's summary line, not your own count.
@@ -2927,14 +2977,19 @@ that is missing the next expected artefact.
 
   **3.x writes no \`spec.md\`.** The artefact was removed in 2.0.0 and no phase
   produces one, so this rule can only ever match a feature directory left
-  behind by a 1.x project. It stays because projects are told to keep
-  \`.specnaut/specs/**\` as historical records, and a pre-migration spec that
-  never got a plan is exactly the thing worth surfacing. Do not read it as
+  behind by a 1.x project — one that never shipped, so no merge ever removed
+  it. It stays because a pre-migration spec that never got a plan is exactly
+  the thing worth surfacing. Do not read it as
   evidence that the current pipeline emits \`spec.md\`, and do not delete it as
   dead code — \`tests/templates/removed_artefacts_test.ts\` carries a matching
   allowlist entry recording the same decision.
 
-This is also read-only; never delete or modify spec files.
+This is also read-only; never delete or modify spec files. A shipped feature's
+directory IS removed — by \`phases/merge-close.md\` step 8, at the merge, under
+the same \`yes\` that closed the issue and with the plan already in git history.
+Different actor, different moment, and it holds the authorisation this pass
+does not have. A reporter that edits what it walks has no way to be trusted
+about what it found.
 `,
     executable: false,
     backend: null,
