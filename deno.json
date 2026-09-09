@@ -1,6 +1,6 @@
 {
   "name": "@specnaut/cli",
-  "version": "4.2.6",
+  "version": "4.3.0",
   "tasks": {
     "bundle": "deno run --allow-read --allow-write scripts/bundle-templates.ts",
     "dev": "deno run --allow-read --allow-write --allow-run --allow-env src/main.ts",
