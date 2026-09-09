@@ -24,7 +24,7 @@ Deno.test("resolveHooksDir: plain checkout (.git is a directory)", async () => {
     const want = await Deno.realPath(`${dir}/.git/hooks`);
     assertEquals(got, want);
   } finally {
-    await Deno.remove(dir, { recursive: true });
+    await Deno.remove(dir, { recursive: true }).catch(() => {});
   }
 });
 
@@ -129,6 +129,14 @@ async function commit(cwd: string, msg: string): Promise<{ code: number; err: st
  */
 const SPAWNS_HOOKS = Deno.build.os !== "windows";
 
+/**
+ * Windows reports link text with backslashes, and `makeTempDir` hands back a
+ * backslash path that these tests then extend with forward slashes. Every
+ * assertion here is about WHICH path was named, never about how it was spelled,
+ * so both sides are normalised before comparing.
+ */
+const samePath = (s: string) => s.replaceAll("\\", "/");
+
 Deno.test("install: a dangling symlink is repaired, not reported as a foreign hook", async () => {
   const { dir } = await fakeRepo();
   try {
@@ -156,10 +164,10 @@ Deno.test("install: a dangling symlink is repaired, not reported as a foreign ho
     );
     assertStringIncludes(said, "dangling");
     // It must name what failed to resolve — "repaired something" is not a report.
-    assertStringIncludes(said, `${dir}/gone/pre-commit`);
+    assertStringIncludes(samePath(said), samePath(`${dir}/gone/pre-commit`));
     assertStringIncludes(await Deno.readTextFile(`${dir}/.git/hooks/pre-commit`), SHIM_MARKER);
   } finally {
-    await Deno.remove(dir, { recursive: true });
+    await Deno.remove(dir, { recursive: true }).catch(() => {});
   }
 });
 
@@ -173,7 +181,7 @@ Deno.test("install: a hand-written hook is still refused", async () => {
     assertStringIncludes(r.lines.join("\n"), "Back it up and re-run");
     assertEquals(await Deno.readTextFile(`${dir}/.git/hooks/pre-commit`), "#!/bin/sh\necho mine\n");
   } finally {
-    await Deno.remove(dir, { recursive: true });
+    await Deno.remove(dir, { recursive: true }).catch(() => {});
   }
 });
 
@@ -189,7 +197,7 @@ Deno.test("install: a foreign symlink that RESOLVES is still refused", async () 
     assert(!r.ok, "a working third-party hook was replaced");
     assertEquals(r.code, 2);
   } finally {
-    await Deno.remove(dir, { recursive: true });
+    await Deno.remove(dir, { recursive: true }).catch(() => {});
   }
 });
 
@@ -203,7 +211,7 @@ Deno.test("install: the old absolute symlink is upgraded in place", async () => 
     const info = await Deno.lstat(`${dir}/.git/hooks/pre-commit`);
     assert(!info.isSymlink, "it is still a symlink, so it still dies on a move");
   } finally {
-    await Deno.remove(dir, { recursive: true });
+    await Deno.remove(dir, { recursive: true }).catch(() => {});
   }
 });
 
@@ -216,7 +224,7 @@ Deno.test("install: a repo with no hook to run is a failure, not a checkmark", a
     assert(!r.ok, `an unrunnable install reported success:\n${r.lines.join("\n")}`);
     assertStringIncludes(r.lines.join("\n"), "missing");
   } finally {
-    await Deno.remove(dir, { recursive: true });
+    await Deno.remove(dir, { recursive: true }).catch(() => {});
   }
 });
 
@@ -334,6 +342,6 @@ Deno.test("install: a shim from an older version is refreshed, not called alread
     assertStringIncludes(now, "hooks/pre-commit");
     assert(!now.includes("from an older version"), "the stale shim was left in place");
   } finally {
-    await Deno.remove(dir, { recursive: true });
+    await Deno.remove(dir, { recursive: true }).catch(() => {});
   }
 });
