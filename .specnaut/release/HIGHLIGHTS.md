@@ -1,35 +1,13 @@
-**An epic whose last child finishes now moves to In review, not Done.**
+**A shipped feature's spec directory is now deleted when its issue closes at merge.**
 
-If you use epics on a GitHub board, this is a visible change and the only one in this release.
+If you use `/specnaut merge`, this changes what your working tree looks like after a feature lands: `.specnaut/specs/<feature-dir>/` goes away, in its own commit, alongside `.specnaut/feature.json`.
 
-`propagate-parent-status.sh` advanced a parent to **Done** the moment its last open child reached
-Done. It calls the move script and closes nothing, so the parent's _card_ read Done while the parent
-_issue_ was still open — which the board's own drift detector names in its header as
-`REOPENED — open, but sitting
-in Done`, one of the three states it exists to report. One shipped
-component manufactured, on purpose, the state another reports as a defect. The previous release made
-that detector honest about what it had and had not read, which only made the contradiction easier to
-see.
+It is not a loss. `/specnaut plan` commits the spec directory at plan time, before any code exists, so it is already in git history when the close happens — `git log --all -- .specnaut/specs/<dir>/` brings it back verbatim. The removal is refused outright if git has never seen the directory, which is the case that would have destroyed the only copy. The same `yes` that authorises the close authorises the removal; there is no second prompt, and a refused close leaves everything alone.
 
-The window was never a race. The promotion fires at the _child's_ move, which necessarily precedes
-any close of the parent, and nothing obliges a caller to close the parent at all. The merge phase
-closes an epic itself, under the cascade gate, and never calls this hook — so the only path where
-the promotion decided anything was the one where nobody closes the parent.
+The reasoning is that a plan is consumed once the code ships. The code is the authority afterwards, and the intent survives on the backlog item you just closed.
 
-What it asserted is the point. `Done` means the work is finished, and "every child is Done" is not
-that: an epic can carry residual work of its own, and nothing had checked — `cascade-check.sh`
-exists to gate exactly that judgement, and this hook deliberately does not consult it.
+**Two ordering defects in the same file, both found by shipping the first change.**
 
-Two other repairs were considered and rejected. Having the hook close the issue bypasses the gate
-and makes a status hook do something much larger than advancing a column. Teaching the detector to
-tolerate the state weakens a detector to accommodate a hook, and an exception carved into a drift
-report is how a report stops meaning anything.
+`merge-close.md` gave two contradictory orderings for the same pair of operations. Its epic path closed the issue and then moved the card, explaining at length that the reverse manufactures the exact `REOPENED` drift `sweep-closed.sh` exists to report. Its standalone path did the reverse. A single item merged through Specnaut therefore opened that window every time, and the smoke check named "the issue closes BEFORE the card moves" passed on it — it grepped for the rule sentence, which lives in the path that obeys it. The rule now lives in one place above both paths, and the check reads the order rather than the prose.
 
-So: **`In review`** — the column that means "everything below is finished, awaiting this item's own
-closure" — while the issue is open, and **`Done`** once it is closed, where the card is merely
-lagging a fact already established. A parent already sitting in the target column is left alone
-rather than re-moved, because printing a promotion for a transition that did not happen is a smaller
-version of the same lie.
-
-The local Markdown backend is deliberately untouched, and its header now says why: it keeps one
-field, so a card reading Done over an open item is not a state it can represent.
+The second was found while applying the new deletion by hand: removing the directory left `.specnaut/feature.json` still naming it, and `common.sh` never verifies that the name still resolves. Callers got a path to a directory that no longer existed, exit 0, no warning. The removal now takes that file with it.
