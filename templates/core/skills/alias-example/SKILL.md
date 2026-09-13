@@ -57,8 +57,3 @@ will never scaffold it into your project. To use the pattern:
    (or in the overlay scripts).
 4. Confirm the harness picks up the new alias and overlay — how it
    reports that is harness-specific.
-
-## Prior art
-
-- komence/komence-monorepo commits `5fbae6ea` and `39691ae3` —
-  manually-implemented Option 2 wrappers that this convention codifies.
