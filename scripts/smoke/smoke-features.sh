@@ -67,7 +67,7 @@ check ".claude/commands/ is not created at all (#533)" \
   '[ ! -e .claude/commands ]'
 check "router .claude/skills/specnaut/SKILL.md present" \
   '[ -f .claude/skills/specnaut/SKILL.md ]'
-for phase in plan plan-audits tasks implement review merge merge-squash epic-commits quality-gates epic-fixups merge-close epic-loop constitution tag-version release-version; do
+for phase in plan plan-audits tasks implement review merge merge-squash epic-commits quality-gates epic-fixups merge-close epic-loop constitution; do
   check ".claude/skills/specnaut/phases/$phase.md present" \
     "[ -f .claude/skills/specnaut/phases/$phase.md ]"
 done
@@ -340,10 +340,18 @@ check "removed phases do NOT scaffold (#455)" \
   '! ls .claude/skills/specnaut/phases/ | grep -qE "^(brainstorm|specify|clarify|analyze|checklist|list-skills|lite-heuristic)\.md$"'
 check "phase doc tasks.md scaffolded" \
   '[ -f .claude/skills/specnaut/phases/tasks.md ]'
-check "phase doc tag-version.md scaffolded (epic #226)" \
-  '[ -f .claude/skills/specnaut/phases/tag-version.md ]'
-check "phase doc release-version.md scaffolded (epic #226)" \
-  '[ -f .claude/skills/specnaut/phases/release-version.md ]'
+# Spec 033 moved these two out of /specnaut and into /ship. The assertions
+# follow the documents rather than the router: they are still scaffolded, at a
+# different owner's address, and a check left pointing at the old path would
+# report a correct migration as a regression.
+check "/ship skill scaffolded" \
+  '[ -f .claude/skills/ship/SKILL.md ]'
+check "ship doc tag.md scaffolded (was specnaut/phases/tag-version.md)" \
+  '[ -f .claude/skills/ship/phases/tag.md ]'
+check "ship doc release.md scaffolded (was specnaut/phases/release-version.md)" \
+  '[ -f .claude/skills/ship/phases/release.md ]'
+check "the retired addresses are gone, not duplicated" \
+  '[ ! -f .claude/skills/specnaut/phases/tag-version.md ] && [ ! -f .claude/skills/specnaut/phases/release-version.md ]'
 check "phase doc audit-security.md scaffolded (Epic #302, #303)" \
   '[ -f .claude/skills/specnaut/phases/audit-security.md ]'
 check "audit-security phase doc declares read-only contract" \

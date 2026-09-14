@@ -81,8 +81,16 @@ check "lock records version_scheme: semver" \
 # REFERENCES tag-version and release-version. It must now reference neither:
 # release concerns moved to /ship, and a router still advertising a phase it no
 # longer owns is the defect this migration exists to remove.
-check "specnaut SKILL.md carries no release concern" \
-  '! grep -qE "tag-version|release-version" .claude/skills/specnaut/SKILL.md'
+# Precise on purpose. The router MUST still name the retired phases — that is
+# FR-004, the retirement notice, and whoever arrives typing them is following an
+# instruction written before the split. What it must no longer do is ADVERTISE
+# them: no phase-index row, no argument-hint, no trigger phrase. An earlier
+# version of this check grepped for the bare names and so contradicted the
+# requirement it was meant to protect.
+check "specnaut SKILL.md no longer advertises the retired phases" \
+  '! grep -qE "^\| .(tag-version|release-version). \|" .claude/skills/specnaut/SKILL.md && ! grep -q "argument-hint:.*tag-version" .claude/skills/specnaut/SKILL.md'
+check "specnaut SKILL.md retires them explicitly rather than dropping them" \
+  'grep -q "RETIRED, not unknown" .claude/skills/specnaut/SKILL.md'
 check "specnaut SKILL.md names /ship as the new address" \
   'grep -q "/ship" .claude/skills/specnaut/SKILL.md'
 check "ship SKILL.md offers the three paths" \
