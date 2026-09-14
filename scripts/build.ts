@@ -7,7 +7,15 @@ const ENTRY = new URL("src/main.ts", ROOT).pathname;
 
 type Target = { triple: string; outName: string };
 
-const TARGETS: Target[] = [
+/**
+ * Exported so `verify-release.ts` checks exactly the set this compiler emits,
+ * rather than re-deriving it by pattern-matching this file (cli#595). Safe to
+ * import: `main()` is guarded by `import.meta.main` at the bottom.
+ *
+ * Deliberately phrased without quoting the field-and-quote pattern the release
+ * gate greps for — spelling it here makes this comment match as a sixth target.
+ */
+export const TARGETS: Target[] = [
   { triple: "x86_64-apple-darwin", outName: "specnaut-macos-x64" },
   { triple: "aarch64-apple-darwin", outName: "specnaut-macos-arm64" },
   { triple: "x86_64-unknown-linux-gnu", outName: "specnaut-linux-x64" },

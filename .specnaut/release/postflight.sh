@@ -208,74 +208,52 @@ else
   selfupdate_warned=1
 fi
 
-# The attestation bundle is the one asset whose CONTENT decides whether users
-# can update at all. `asset_count` above proves it was uploaded; it passes just
-# as happily on an empty file or on a bundle carrying another tag's identity —
-# and every installed binary would then refuse this release, discovered by users
-# rather than here. So read the published bundle back and check the identity it
-# actually carries, the same way `self-update` will.
+# The attestation is the one asset whose CONTENT decides whether users can
+# update at all. `asset_count` above proves it was uploaded; it passes just as
+# happily on an empty file, on a bundle carrying another tag's identity, or on
+# one whose signature does not check.
 #
-# Soft-warn, like every other check below the publish line: the release already
-# exists by now, and the operator's next move is a patch either way.
-attestation_warned=0
-bundle_tmp="$(mktemp -d)"
-if gh release download "$TAG" --repo "$REPO" \
-     --pattern "specnaut.attestation.sigstore.json" --dir "$bundle_tmp" >/dev/null 2>&1; then
-  bundle_san="$(
-    jq -r '.verificationMaterial.certificate.rawBytes // empty' \
-      "$bundle_tmp/specnaut.attestation.sigstore.json" 2>/dev/null |
-      base64 -d 2>/dev/null |
-      openssl x509 -inform DER -noout -text 2>/dev/null |
-      grep -o 'URI:[^ ,]*' || true
-  )"
-  # One bundle covers every platform, so "it exists" is not the question — the
-  # question is whether the statement lists all of them. A glob that silently
-  # matched fewer files would still publish a valid, correctly-signed bundle,
-  # and the platforms it omitted would fail to update with an honest
-  # `digest-mismatch` nobody could explain from here.
-  bundle_subjects="$(
-    jq -r '.dsseEnvelope.payload // empty' \
-      "$bundle_tmp/specnaut.attestation.sigstore.json" 2>/dev/null |
-      base64 -d 2>/dev/null |
-      jq '.subject | length' 2>/dev/null || true
-  )"
-  # Derived from the compiler's own target list rather than written down again.
-  # This script already carries the asset floor as a literal; a second hard-coded
-  # count of the same thing is a second place for it to go stale.
-  # `outName: "` with the quote, not `outName:` — the bare form also matches the
-  # `type Target` declaration on line 8 and reports one target more than exist.
-  # Same pattern `release_assets_gate_test.ts` uses to read this list.
-  expected_subjects="$(grep -c 'outName: "' scripts/build.ts 2>/dev/null || true)"
-  if [ -z "$expected_subjects" ] || [ "$expected_subjects" = "0" ]; then
-    echo "⚠ could not read the target list from scripts/build.ts — attestation coverage NOT checked"
-    attestation_warned=1
-  else
-    case "$bundle_subjects" in
-      "$expected_subjects") : ;;
-      "") echo "⚠ attestation bundle's signed statement could not be read"; attestation_warned=1 ;;
-      *)  echo "⚠ attestation covers $bundle_subjects artefact(s), expected $expected_subjects"
-          attestation_warned=1 ;;
-    esac
-  fi
-
-  case "$bundle_san" in
-    *"@refs/tags/$TAG")
-      echo "✓ attestation bundle names $TAG and covers $bundle_subjects/$expected_subjects artefacts"
-      ;;
-    "")
-      echo "⚠ attestation bundle published but its signing identity could not be read"
-      attestation_warned=1
-      ;;
-    *)
-      echo "⚠ attestation bundle names '$bundle_san', not @refs/tags/$TAG"
-      attestation_warned=1
-      ;;
-  esac
-else
-  echo "⚠ no attestation bundle published for $TAG — self-update will refuse this release"
-  attestation_warned=1
+# So verify the published release with the verifier USERS RUN (cli#595).
+#
+# What this replaced: a jq read of the certificate SAN plus a count of the
+# signed statement's subjects. Those caught a wrong-tag bundle and a short glob
+# and touched none of the legs whose failure is fatal — the issuer chain, the
+# DSSE signature, the artefact digests. Checking each binary's digest against
+# the signed statement is strictly stronger than counting subjects (a bundle
+# omitting a platform fails that platform), and `expectedSanUri` is the identity
+# check the SAN grep approximated, so nothing was lost by deleting both. It also
+# retires the jq expression's single-bundle-shape assumption, which
+# `src/domain/sigstore/bundle.ts` deliberately does not share (cli#596).
+#
+# Why it had to be the shipped verifier and not more shell: the question is not
+# "is this bundle valid by some standard" but "will the code in users' hands
+# accept it". A re-implementation answers a different question.
+#
+# **This one is a HARD failure, unlike every other check below the publish
+# line.** Those soft-warn on the deliberate ground that the release already
+# shipped and the operator's next move is a patch either way. That ground does
+# not reach here: a release whose signature does not verify is not a release
+# with a warning on it — every installed client refuses it — and the operator's
+# next action depends on being told plainly.
+#
+# The cost is a full download of every published asset. That is deliberate: the
+# thing being checked is what users receive, and checking one platform would
+# leave the other four exactly as unverified as before.
+echo "▶ verifying published artefacts against the attestation"
+verify_tmp="$(mktemp -d)"
+if ! gh release download "$TAG" --repo "$REPO" --dir "$verify_tmp" --clobber >/dev/null 2>&1; then
+  rm -rf "$verify_tmp"
+  echo "❌ could not download the published assets for $TAG — the release could NOT be verified"
+  exit 1
 fi
-rm -rf "$bundle_tmp"
+if deno run --allow-read scripts/verify-release.ts --tag "$TAG" --dir "$verify_tmp"; then
+  rm -rf "$verify_tmp"
+else
+  rm -rf "$verify_tmp"
+  echo "❌ $TAG does not verify. Installed clients run this same check and will"
+  echo "   refuse this release. Publish a patch, or unpublish."
+  exit 1
+fi
 
 # `|| true` is load-bearing: under `set -e` a bare `[ … ] && arr+=(…)` is exempt
 # only while it is not the final command of the script. That makes the block
@@ -286,7 +264,6 @@ warnings=()
 [ "$docs_warned" -eq 1 ] && warnings+=("docs site stale, specnaut.com/version.json not updated") || true
 [ "$marketplace_warned" -eq 1 ] && warnings+=("marketplace catalog stale, that channel is behind") || true
 [ "$selfupdate_warned" -eq 1 ] && warnings+=("local binary not refreshed (does not affect the release)") || true
-[ "$attestation_warned" -eq 1 ] && warnings+=("attestation bundle missing or unreadable — self-update will refuse this release") || true
 
 # A red job is not a warning-flavoured success. The verifications above still
 # ran and their results are worth printing, but the exit code has to say no.
