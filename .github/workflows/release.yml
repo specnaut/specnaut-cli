@@ -292,12 +292,25 @@ jobs:
       # live as an Actions secret, and this repository holds none by policy
       # (`tests/scripts/no_secrets_in_public_repo_test.ts`).
       #
-      # `artifact-metadata: write` is deliberately ABSENT. The action's setup
-      # prose lists it, its own provenance example does not, and it is only
-      # consumed when pushing a storage record to a registry — which the step
-      # below switches off. An invalid permissions key fails the workflow parse
-      # outright (see the `repository-advisories` note above), and on a
-      # tag-triggered run a parse failure means no release object at all.
+      # `artifact-metadata: write` is deliberately ABSENT — because it buys
+      # nothing here, NOT because it is risky. It is a perfectly valid
+      # permissions key: `actions/attest`'s README uses it, and uses it in
+      # exactly one place, the container-image example, which is the example
+      # that pushes to a registry.
+      #
+      # That is the whole reason. The permission is consumed only when a storage
+      # record is written, the action gates all storage-record work behind
+      # `push-to-registry`, and the step below sets `create-storage-record:
+      # false` and pushes to no registry. Granting it would widen the token for
+      # a code path this workflow never reaches.
+      #
+      # An earlier version of this comment closed on a parse-failure risk,
+      # having already conceded in its previous clause that the action's prose
+      # lists the key — it contradicted itself, and the half that was wrong is
+      # the half that read as the reason. A correct constraint defended by a
+      # checkable false premise is one somebody deletes the moment they check
+      # (cli#597). The `repository-advisories` note above makes the
+      # parse-failure argument correctly, about a genuinely invalid key.
       id-token: write
       attestations: write
     steps:

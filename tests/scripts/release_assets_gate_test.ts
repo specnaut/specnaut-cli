@@ -116,12 +116,22 @@ Deno.test("the release is attested by a workflow-identity signature, with no sto
   // Keyless signing needs exactly these two beyond what the job already held.
   assertEquals(build.permissions?.["id-token"], "write");
   assertEquals(build.permissions?.["attestations"], "write");
-  // An invalid permissions key fails the workflow parse on a tag push, which
-  // would mean no release at all. This one is unconfirmed as a valid key and
-  // buys nothing without a registry push.
+  // `artifact-metadata: write` is a VALID permissions key — `actions/attest`'s
+  // README uses it, in its container-image example, the one that pushes to a
+  // registry. It is absent here because it buys nothing: the permission is
+  // consumed only when a storage record is written, the action gates that
+  // behind `push-to-registry`, and the step sets `create-storage-record: false`
+  // and pushes to no registry.
+  //
+  // This comment used to question whether the key was valid at all, and rest
+  // the constraint on that. It was checkable, and wrong. A correct constraint
+  // defended by a false premise is one the next reader deletes the moment they
+  // check it — so the reason above is the one that actually holds (cli#597).
   assert(
     !("artifact-metadata" in (build.permissions ?? {})),
-    "artifact-metadata is not needed here and risks a workflow parse failure",
+    "artifact-metadata grants a permission this workflow never uses — it is " +
+      "consumed only when pushing a storage record to a registry, which this " +
+      "job does not do",
   );
 
   const steps = build.steps ?? [];
