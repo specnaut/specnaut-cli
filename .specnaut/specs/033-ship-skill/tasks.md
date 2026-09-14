@@ -153,6 +153,24 @@ today and the guard is safe to add rather than a behaviour change.
 content. **Independent test:** scaffold a fresh project for each harness and confirm `/ship` and its
 sub-documents are present and within limits.
 
+**These two open Phase 3, before anything else.** An architecture review of the Phase 2 commit found
+them; both need a signature or a semantics decision rather than a correction, and both stop being
+cheap the moment a non-`specnaut` document exists.
+
+- [ ] T022a [US1] `harness_commands.ts` hardcodes `/specnaut ${name}` in `NESTED_PHASES` /
+      `FLAT_PHASES`, and `HarnessCommands.phase` has signature `(name: string) => string` — **no
+      parameter can carry an owner**. Change it to take the owner, thread `entry.name` through the
+      call site in `init_handler.ts`, and cover the flat case: on Windsurf the current code would
+      emit `/specnaut-release-version` for a file written at `specnaut-ship-release-version.md`,
+      which is a broken command string rather than a wrong label.
+- [ ] T022b [US1] `plugin_coverage_parity_test.ts` compares document names against
+      `coveredNames(".claude/skills/specnaut/phases/")` — a list hardcoded to one owner. The moment
+      `/ship` owns a document the test goes red, and the obvious way to green it is to add a
+      `specnaut/phases/<ship-doc>.md` path that is never scaffolded — which is bug #455 exactly, the
+      bug that file's docstring exists to prevent. Compare `(owner, document)` pairs, or derive the
+      covered set through the adapter the way `phase_wiring_test.ts` already does. **Settle this
+      before T023**, or the wrong entry is already in the list.
+
 - [ ] T023 [US1] Create `templates/core/skills/ship/SKILL.md` — the router. It carries the
       frontmatter (`name`, `description`, `argument-hint`, `when_to_use` with the tag/release
       trigger phrases moved off `/specnaut`), the three operational paths (tag only · tag and
