@@ -153,12 +153,52 @@ if [ -z "$FIELD_ID" ]; then
   exit 10
 fi
 
-VALUE_KEY=$(echo "$VALUE" | tr '[:lower:]' '[:upper:]')
+VALUE_KEY=$(echo "$VALUE" | tr '[:lower:]' '[:upper:]' | tr -c 'A-Z0-9\n' '_')
 OPT_VAR="${PREFIX}_OPT_${VALUE_KEY}"
 OPT_ID="${!OPT_VAR-}"
 if [ -z "$OPT_ID" ]; then
+  # Matched by NAME, never mapped. A projected organization field may use a
+  # different vocabulary than the project-local one of the same name — on this
+  # org, project-local `Priority` is P0..P3 while the organization's `Priority`
+  # is Urgent/High/Medium/Low. Translating between them would be a silent
+  # mis-write dressed as helpfulness; exit 11 hands the value to a label, which
+  # is visibly approximate and already the documented contract.
   echo "field '$CANONICAL' has no option '$VALUE' — fall back to label" >&2
   exit 11
+fi
+
+# A PROJECTED organization field is not written through the project.
+#
+# `updateProjectV2ItemFieldValue` addresses a project ITEM; a projected field's
+# value lives on the ISSUE, on the organization's field. Writing it needs
+# `setIssueFieldValue` — chosen over `updateIssueFieldValue` / `createIssueFieldValue`
+# because those require the value to already exist / not exist respectively, so
+# either one forces a read-before-write to decide which to call, with a race in
+# the gap. `set` is the idempotent upsert and takes a list.
+FORM_VAR="${PREFIX}_FIELD_FORM"
+FORM="${!FORM_VAR-local}"
+if [ "$FORM" = "projected" ]; then
+  ORG_FIELD_VAR="${PREFIX}_ORG_FIELD_ID"
+  ORG_FIELD_ID="${!ORG_FIELD_VAR-}"
+  if [ -z "$ORG_FIELD_ID" ]; then
+    echo "'$CANONICAL' is projected but its organization field id is unknown — fall back to label" >&2
+    exit 10
+  fi
+  ISSUE_ID=$(gh issue view "$NUM" --repo "$REPO" --json id --jq '.id' 2>/dev/null || true)
+  if [ -z "$ISSUE_ID" ]; then
+    echo "issue #$NUM not found in $REPO" >&2
+    exit 12
+  fi
+  gh api graphql -f query='
+    mutation($issue: ID!, $field: ID!, $opt: ID!) {
+      setIssueFieldValue(input: {
+        issueId: $issue,
+        issueFields: [{ fieldId: $field, singleSelectOptionId: $opt }]
+      }) { clientMutationId }
+    }' -f issue="$ISSUE_ID" -f field="$ORG_FIELD_ID" -f opt="$OPT_ID" >/dev/null
+
+  echo "✓ #$NUM $CANONICAL → $VALUE (organization field)"
+  exit 0
 fi
 
 # Targeted lookup by issue number — `_config.sh` owns the query (#603).

@@ -12263,6 +12263,37 @@ require_project   # a project that does not resolve fails here, not mid-write
 
 FIELDS_JSON=\$(gh project field-list "\$PROJECT_NUMBER" --owner "\$REPO_OWNER" --format json)
 
+# Organization issue fields, fetched at most once per run.
+#
+# A single-select projected into a project from the organization is reported by
+# \`gh project field-list\` with \`options\` null: the field is the project's, the
+# OPTIONS belong to the org. Resolving them needs a second query, and
+# \`Organization.issueFields\` returns a connection whose nodes are the union
+# \`IssueFields\` — so the inline fragment is required, not stylistic.
+#
+# Cached because \`emit\` is called once per axis and the answer cannot change
+# inside a run. Never fails: an org that has no issue fields, a token without
+# the scope, or an outright error all yield an empty document, and every caller
+# below treats that as "no projected field" and degrades to the label fallback.
+ORG_FIELDS_JSON=""
+org_fields() {
+  if [ -z "\$ORG_FIELDS_JSON" ]; then
+    ORG_FIELDS_JSON=\$(gh api graphql -f query='
+      query(\$org: String!) {
+        organization(login: \$org) {
+          issueFields(first: 50) {
+            nodes {
+              __typename
+              ... on IssueFieldSingleSelect { id name options { id name } }
+            }
+          }
+        }
+      }' -f org="\$REPO_OWNER" 2>/dev/null || echo '{}')
+    [ -n "\$ORG_FIELDS_JSON" ] || ORG_FIELDS_JSON='{}'
+  fi
+  printf '%s' "\$ORG_FIELDS_JSON"
+}
+
 emit() {
   local field="\$1" prefix="\$2"
   local field_block
@@ -12273,38 +12304,46 @@ emit() {
   ')
   if [ -z "\$field_block" ]; then
     echo "\${prefix}_FIELD_ID="
+    echo "\${prefix}_FIELD_FORM="
     return
   fi
+
+  # Options come from the project when the project has them, and from the
+  # organization when it does not. \`form\` is emitted so the WRITER can route
+  # without asking again: the two forms take different mutations, and a writer
+  # that re-derived the answer would be a second place for the rule to live.
+  local opts form org_field_id=""
+  opts=\$(echo "\$field_block" | jq -c '(.options // [])')
+  form=local
+  if [ "\$opts" = "[]" ]; then
+    local org_block
+    org_block=\$(org_fields | jq -c --arg n "\$field" '
+      [ .data.organization.issueFields.nodes[]?
+        | select(.__typename == "IssueFieldSingleSelect")
+        | select((.name | ascii_downcase) == (\$n | ascii_downcase)) ][0] // empty
+    ' 2>/dev/null || true)
+    if [ -n "\$org_block" ]; then
+      form=projected
+      org_field_id=\$(echo "\$org_block" | jq -r '.id // ""')
+      opts=\$(echo "\$org_block" | jq -c '(.options // [])')
+    fi
+  fi
+
   echo "\${prefix}_FIELD_ID=\$(echo "\$field_block" | jq -r '.id')"
-  # \`.options\` is NOT guaranteed present on a single-select field.
-  #
-  # An organization-level issue field projected into a Project V2 is reported
-  # with \`type: "ProjectV2SingleSelectField"\` and \`options\` null or absent — its
-  # options live on the organization, not on the project. Iterating null is a
-  # jq error (exit 5), and under \`set -euo pipefail\` that kills the script
-  # part-way through the fields: the caller's \`eval\` then succeeds on a
-  # half-written block, holding the fields emitted before the projected one and
-  # silently missing every field after it.
-  #
-  # So every read goes through \`(.options // [])\`. An optionless field is
-  # reported as present-but-optionless — all three variables set, all three
-  # agreeing — which routes the caller to the label fallback. That is a
-  # deliberate stopgap, not the end state: a native field exists and a label
-  # beside it is dual-signal drift. Reading it natively is #601. It is accepted
-  # here because an abort blocks every axis while the fallback blocks none.
-  #
-  # Option names are not identifiers either: "In progress" would emit
+  echo "\${prefix}_FIELD_FORM=\$form"
+  echo "\${prefix}_ORG_FIELD_ID=\$org_field_id"
+  # Option names are not identifiers: "In progress" would emit
   # \`STATUS_OPT_IN PROGRESS=…\`, which breaks the caller's \`eval\`. Fold every
   # non-alphanumeric character to \`_\` so the name is always assignable.
-  echo "\$field_block" | jq -r --arg p "\$prefix" '
-    (.options // [])[]
+  echo "\$opts" | jq -r --arg p "\$prefix" '
+    .[]
     | "\\(\$p)_OPT_\\(.name | ascii_upcase | gsub("[^A-Z0-9]"; "_"))=\\(.id)"
   '
-  echo "\$field_block" | jq -r --arg p "\$prefix" '
-    "\\(\$p)_OPT_NAMES=\\"\\([(.options // [])[].name] | join(", "))\\""
+  echo "\$opts" | jq -r --arg p "\$prefix" '
+    "\\(\$p)_OPT_NAMES=\\"\\([.[].name] | join(", "))\\""
   '
-  echo "\$field_block" | jq -r --arg p "\$prefix" '
-    "\\(\$p)_FIRST_OPT_ID=\\((.options // [])[0].id // "")"
+  echo "\$opts" | jq -r --arg p "\$prefix" '
+    "\\(\$p)_FIRST_OPT_ID=\\(.[0].id // "")"
   '
 }
 
@@ -12501,12 +12540,52 @@ if [ -z "\$FIELD_ID" ]; then
   exit 10
 fi
 
-VALUE_KEY=\$(echo "\$VALUE" | tr '[:lower:]' '[:upper:]')
+VALUE_KEY=\$(echo "\$VALUE" | tr '[:lower:]' '[:upper:]' | tr -c 'A-Z0-9\\n' '_')
 OPT_VAR="\${PREFIX}_OPT_\${VALUE_KEY}"
 OPT_ID="\${!OPT_VAR-}"
 if [ -z "\$OPT_ID" ]; then
+  # Matched by NAME, never mapped. A projected organization field may use a
+  # different vocabulary than the project-local one of the same name — on this
+  # org, project-local \`Priority\` is P0..P3 while the organization's \`Priority\`
+  # is Urgent/High/Medium/Low. Translating between them would be a silent
+  # mis-write dressed as helpfulness; exit 11 hands the value to a label, which
+  # is visibly approximate and already the documented contract.
   echo "field '\$CANONICAL' has no option '\$VALUE' — fall back to label" >&2
   exit 11
+fi
+
+# A PROJECTED organization field is not written through the project.
+#
+# \`updateProjectV2ItemFieldValue\` addresses a project ITEM; a projected field's
+# value lives on the ISSUE, on the organization's field. Writing it needs
+# \`setIssueFieldValue\` — chosen over \`updateIssueFieldValue\` / \`createIssueFieldValue\`
+# because those require the value to already exist / not exist respectively, so
+# either one forces a read-before-write to decide which to call, with a race in
+# the gap. \`set\` is the idempotent upsert and takes a list.
+FORM_VAR="\${PREFIX}_FIELD_FORM"
+FORM="\${!FORM_VAR-local}"
+if [ "\$FORM" = "projected" ]; then
+  ORG_FIELD_VAR="\${PREFIX}_ORG_FIELD_ID"
+  ORG_FIELD_ID="\${!ORG_FIELD_VAR-}"
+  if [ -z "\$ORG_FIELD_ID" ]; then
+    echo "'\$CANONICAL' is projected but its organization field id is unknown — fall back to label" >&2
+    exit 10
+  fi
+  ISSUE_ID=\$(gh issue view "\$NUM" --repo "\$REPO" --json id --jq '.id' 2>/dev/null || true)
+  if [ -z "\$ISSUE_ID" ]; then
+    echo "issue #\$NUM not found in \$REPO" >&2
+    exit 12
+  fi
+  gh api graphql -f query='
+    mutation(\$issue: ID!, \$field: ID!, \$opt: ID!) {
+      setIssueFieldValue(input: {
+        issueId: \$issue,
+        issueFields: [{ fieldId: \$field, singleSelectOptionId: \$opt }]
+      }) { clientMutationId }
+    }' -f issue="\$ISSUE_ID" -f field="\$ORG_FIELD_ID" -f opt="\$OPT_ID" >/dev/null
+
+  echo "✓ #\$NUM \$CANONICAL → \$VALUE (organization field)"
+  exit 0
 fi
 
 # Targeted lookup by issue number — \`_config.sh\` owns the query (#603).
