@@ -27,14 +27,14 @@ The architecture audit flagged these as unconfirmed rather than asserting them. 
 are independent, and each can change a later task's shape — so they run first and their answers are
 written into `plan.md` §10.
 
-- [ ] T001 [P] Determine whether CI re-runs `deno task bundle` and fails on a dirty committed
+- [x] T001 [P] Determine whether CI re-runs `deno task bundle` and fails on a dirty committed
       `src/templates_bundle.ts`; record the answer in `.specnaut/specs/033-ship-skill/plan.md` §10
       under "Unverified". Check `.github/workflows/ci.yml` and any sibling workflow.
-- [ ] T002 [P] Determine whether the Antigravity and Copilot distribution manifests enumerate skills
+- [x] T002 [P] Determine whether the Antigravity and Copilot distribution manifests enumerate skills
       individually or point at a directory; record in `.specnaut/specs/033-ship-skill/plan.md` §10.
       Check `plugin/.claude-plugin/plugin.json`, `.codex-plugin/plugin.json`,
       `.cursor-plugin/plugin.json` and any Antigravity/Copilot equivalent.
-- [ ] T003 [P] Determine whether `tests/plugin/mirror-exclusions.txt` and
+- [x] T003 [P] Determine whether `tests/plugin/mirror-exclusions.txt` and
       `tests/plugin/source-exclusions.txt` need a `/ship` entry for the sync gate to pass; record in
       `.specnaut/specs/033-ship-skill/plan.md` §10.
 
@@ -49,55 +49,55 @@ byte-identical before and after this phase.
 
 ### The safety net comes first
 
-- [ ] T004 Capture a destination baseline: write a throwaway script that maps `CORE_BUNDLE` through
+- [x] T004 Capture a destination baseline: write a throwaway script that maps `CORE_BUNDLE` through
       every harness adapter and dumps `<harness> <destination>` sorted, saving it to
       `/tmp/dest-baseline.txt`. This is the oracle for T015 — do not skip it, and do not commit it.
 
 ### The shape change
 
-- [ ] T005 In `src/domain/core_bundle.ts`, define the converged sub-document contract: `name` holds
+- [x] T005 In `src/domain/core_bundle.ts`, define the converged sub-document contract: `name` holds
       the **owning skill**, `suffix` holds the document, and the subdirectory is a property of the
       category. Update the `CoreCategory` doc comment so the convention is stated where the type is,
       not in seven adapters.
-- [ ] T006 Add `skillDocDestination(entry, opts)` in `src/infrastructure/harness/skill_folder.ts` —
+- [x] T006 Add `skillDocDestination(entry, opts)` in `src/infrastructure/harness/skill_folder.ts` —
       the **single home** for "where a skill sub-document lands for a harness" (`plan.md` §5). It
       takes the nested-vs-flat shape and the optional subdirectory, and it is the only function
       composing a `skills/<owner>/…` path.
-- [ ] T007 Rewrite the 21 `phase` entries in `templates/manifest.json` to the converged shape:
+- [x] T007 Rewrite the 21 `phase` entries in `templates/manifest.json` to the converged shape:
       `name` becomes `specnaut`, `suffix` keeps the document filename. Verify the count is 21 and
       that no `phase` entry retains a document name in `name`.
 
 ### Collapse the adapters — each is independent
 
-- [ ] T008 [P] In `src/infrastructure/harness/claude_harness.ts`, collapse `case "phase"` and
+- [x] T008 [P] In `src/infrastructure/harness/claude_harness.ts`, collapse `case "phase"` and
       `case "backlog-doc"` into one branch calling `skillDocDestination`. Delete the comment that
       says the two branches are "the same shape" — it is no longer describing a duplication, it is
       describing the code.
-- [ ] T009 [P] Same collapse in `src/infrastructure/harness/codex_harness.ts` (note: this adapter
+- [x] T009 [P] Same collapse in `src/infrastructure/harness/codex_harness.ts` (note: this adapter
       builds `out[dest]` inline in `mapBundle` rather than via a `destinationFor`).
-- [ ] T010 [P] Same collapse in `src/infrastructure/harness/cursor_harness.ts`.
-- [ ] T011 [P] Same collapse in `src/infrastructure/harness/opencode_harness.ts`.
-- [ ] T012 [P] Same collapse in `src/infrastructure/harness/antigravity_harness.ts`.
-- [ ] T013 [P] Same collapse in `src/infrastructure/harness/windsurf_harness.ts` — the flat case.
+- [x] T010 [P] Same collapse in `src/infrastructure/harness/cursor_harness.ts`.
+- [x] T011 [P] Same collapse in `src/infrastructure/harness/opencode_harness.ts`.
+- [x] T012 [P] Same collapse in `src/infrastructure/harness/antigravity_harness.ts`.
+- [x] T013 [P] Same collapse in `src/infrastructure/harness/windsurf_harness.ts` — the flat case.
       Its `case "phase"` currently inlines `` `specnaut-${suffix}` ``; that prefix rule moves into
       `skillDocDestination` so the flat naming has one home too (`plan.md` §5).
-- [ ] T014 [P] Same collapse in `src/infrastructure/harness/copilot_harness.ts` — the other flat
+- [x] T014 [P] Same collapse in `src/infrastructure/harness/copilot_harness.ts` — the other flat
       case, `instructions/specnaut-<suffix>.instructions.md`.
 
 ### Prove the collapse changed nothing
 
-- [ ] T015 Re-run the T004 baseline script and `diff` against `/tmp/dest-baseline.txt`. **It must be
+- [x] T015 Re-run the T004 baseline script and `diff` against `/tmp/dest-baseline.txt`. **It must be
       empty.** A non-empty diff at this point means the convergence moved a scaffolded file, which
       this phase exists not to do.
 
 ### Delete the third mirror rather than gate it
 
-- [ ] T016 In `src/domain/plugin_coverage.ts`, derive `PLUGIN_COVERED_PATHS_CLAUDE` from
+- [x] T016 In `src/domain/plugin_coverage.ts`, derive `PLUGIN_COVERED_PATHS_CLAUDE` from
       `CORE_BUNDLE` through `ClaudeHarness`'s own destination function, and reduce
       `isPluginCoveredPath` to membership in that derived set (FR-013). Delete the hand-maintained
       name list and the two composed path literals — they are what `plan.md` §5 names as the
       duplication to eliminate.
-- [ ] T017 Update `tests/domain/plugin_coverage_parity_test.ts`: the phase assertion currently
+- [x] T017 Update `tests/domain/plugin_coverage_parity_test.ts`: the phase assertion currently
       compares `coveredNames(".claude/skills/specnaut/phases/")` against `bundleNames("phase")`, an
       invariant that dies with the category shape. Replace it with an assertion that the derivation
       and the bundle agree **without restating any prefix**. Removing this test is not an option —
@@ -109,19 +109,41 @@ byte-identical before and after this phase.
 
 ### Close the two gate defects the audit found
 
-- [ ] T019 Add a duplicate-destination guard at the adapters' shared write site so `out[dest] = …`
+- [x] T019 Add a duplicate-destination guard at the adapters' shared write site so `out[dest] = …`
       refuses a second write to the same key (FR-006). This is the **home** of the invariant; a test
       alone is the detector, not the home (`plan.md` §5).
-- [ ] T020 Add `tests/infrastructure/harness/destination_uniqueness_test.ts`: for every harness, map
+- [x] T020 Add `tests/infrastructure/harness/destination_uniqueness_test.ts`: for every harness, map
       the full `CORE_BUNDLE` and assert no destination collides. Prove it red by temporarily giving
       two entries the same destination.
-- [ ] T021 In `tests/integration/phase_wiring_test.ts`, replace the hardcoded
+- [x] T021 In `tests/integration/phase_wiring_test.ts`, replace the hardcoded
       `.claude/skills/specnaut/phases/` prefix in `phaseDest` and in T012's `dest.startsWith` filter
       with a derivation from the bundle through the adapter (§10 A-6). A gate whose coverage can
       shrink without failing is worse than one that goes red.
 - [ ] T022 Run `deno task test`. Then commit Phase 2 alone:
       `git commit -m "refactor: converge phase and backlog-doc onto one sub-document shape"`. The
       body must record that no scaffolded destination changed, citing the T015 diff.
+
+### What Phase 2 actually cost, recorded against what it predicted
+
+Three things the breakdown did not foresee, all found by building it:
+
+- **The convergence breaks every lookup-by-phase-name.** `name` is the owner now, so
+  `CORE_BUNDLE.find((e) => e.category === "phase" && e.name === "merge")` silently matches nothing.
+  Ten test files did exactly that, and the fix is not ten suffix-stripping expressions — that is the
+  duplication §5 forbids — but one accessor: `skillDocName` / `findSkillDoc` in `core_bundle.ts`.
+  Added as part of T005 rather than as its own task, because a shape change that leaves callers no
+  way to address the thing is not finished.
+- **Written-reason allow-lists are keyed on the old name.** `removed_artefacts` and
+  `response_style_contract` record exemptions as `tasks|tasks.md` and `phase/plan/plan.md`. Their
+  keys had to follow the shape; their _entries_ did not change, and none was deleted.
+- **T004's oracle cannot see a collision.** It reads `Object.keys()` of the finished bundle, so a
+  duplicate destination has already been absorbed by the time it looks. That is precisely why
+  FR-006's home is the write site and not a test — and it was only visible once the oracle existed.
+
+The sweep with `addUnique` live across all 32×7 combinations throws nowhere, so no collision exists
+today and the guard is safe to add rather than a behaviour change.
+
+---
 
 ---
 
@@ -148,6 +170,11 @@ sub-documents are present and within limits.
 - [ ] T027 [US1] `git mv` the five release scripts from `templates/core/skills/specnaut/scripts/` to
       `templates/core/skills/ship/scripts/`. Confirm with the T004 baseline technique that their
       **destinations** are unchanged — only the source directory moves.
+- [ ] T027a [US1] Move the `core/skills/specnaut/scripts/` entry in
+      `tests/plugin/source-exclusions.txt` to `core/skills/ship/scripts/` and rewrite its reason —
+      it currently names `/specnaut tag-version` and `/release-version`, which T033 retires. Found
+      by T003: that file reports an entry naming a path that no longer exists as stale, so leaving
+      it behind turns the plugin sync gate red for the wrong reason.
 - [ ] T028 [US1] Mirror the new skill into `plugin/skills/ship/` (FR-009) and add the pair to
       `SYNC_PAIRS` in `tests/plugin/plugin_sync_test.ts`.
 - [ ] T029 [US1] Add a Windsurf size assertion for every `/ship` document, measured with

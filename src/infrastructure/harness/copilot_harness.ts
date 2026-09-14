@@ -3,12 +3,13 @@ import type { BundleOptions, Harness } from "../../application/ports.ts";
 import { HARNESS_STATIC } from "../../templates_bundle.ts";
 import type { CoreBundle, CoreEntry } from "../../domain/core_bundle.ts";
 import type { Bundle } from "../../domain/template.ts";
-import { skillFolderName } from "./skill_folder.ts";
+import { skillDocDestination, skillFolderName } from "./skill_folder.ts";
 import { splitFrontmatter } from "./frontmatter.ts";
 import { applyBackend, backlogScriptDestination } from "./backlog_filter.ts";
 import { applyScheme, phaseScriptDestination } from "./scheme_filter.ts";
 import { applySpecBackend } from "./spec_backend_filter.ts";
 import { applySpecAutogen } from "./spec_autogen_filter.ts";
+import { addUnique } from "./bundle_writer.ts";
 
 function toCopilotInstructionMarkdown(entry: CoreEntry): string {
   const split = splitFrontmatter(entry.content);
@@ -23,15 +24,13 @@ function destinationFor(entry: CoreEntry): string {
     case "backlog-skill":
       return `.github/instructions/${skillFolderName(entry)}.instructions.md`;
     case "backlog-doc":
-      // Copilot is flat too — a sibling instruction file.
-      if (!entry.suffix) throw new Error(`backlog-doc needs suffix: ${entry.name}`);
-      return `.github/instructions/${skillFolderName({ ...entry, category: "backlog-skill" })}-${
-        entry.suffix.replace(/\.md$/, "")
-      }.instructions.md`;
     case "phase":
-      // Copilot is flat — phase docs become sibling instruction files.
-      if (!entry.suffix) throw new Error(`phase needs suffix: ${entry.name}`);
-      return `.github/instructions/specnaut-${entry.suffix.replace(/\.md$/, "")}.instructions.md`;
+      // Copilot is flat too — a sibling instruction file, owner-prefixed.
+      return skillDocDestination(entry, {
+        kind: "flat",
+        dir: ".github/instructions",
+        ext: ".instructions.md",
+      });
     case "phase-script":
       return phaseScriptDestination(entry);
     case "backlog-script":
@@ -71,13 +70,13 @@ export class CopilotHarness implements Harness {
         entry.category === "skill" ||
         entry.category === "backlog-skill" ||
         entry.category === "phase";
-      out[dest] = {
+      addUnique(out, dest, {
         content: isInstruction ? toCopilotInstructionMarkdown(entry) : entry.content,
         executable: entry.executable,
         ...(entry.category === "mergeable-project-root" ? { mergeBlock: "gitignore" } : {}),
         ...(entry.skipIfExists ? { skipIfExists: true as const } : {}),
         ...managedSectionField(entry),
-      };
+      }, this.key);
     }
     // Layer the harness's own static files last, so a harness-specific file
     // wins over anything the core bundle mapped to the same destination.

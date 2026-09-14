@@ -1,13 +1,14 @@
 import { managedSectionField } from "./harness_managed.ts";
 import type { BundleOptions, Harness } from "../../application/ports.ts";
 import type { CoreBundle, CoreEntry } from "../../domain/core_bundle.ts";
-import type { Bundle, TemplateFile } from "../../domain/template.ts";
+import type { Bundle } from "../../domain/template.ts";
 import { HARNESS_STATIC } from "../../templates_bundle.ts";
-import { ensureSkillFrontmatter, skillFolderName } from "./skill_folder.ts";
+import { ensureSkillFrontmatter, skillDocDestination, skillFolderName } from "./skill_folder.ts";
 import { applyBackend, backlogScriptDestination } from "./backlog_filter.ts";
 import { applyScheme, phaseScriptDestination } from "./scheme_filter.ts";
 import { applySpecBackend } from "./spec_backend_filter.ts";
 import { applySpecAutogen } from "./spec_autogen_filter.ts";
+import { addUnique } from "./bundle_writer.ts";
 
 function destinationFor(entry: CoreEntry): string {
   switch (entry.category) {
@@ -16,13 +17,13 @@ function destinationFor(entry: CoreEntry): string {
     case "backlog-skill":
       return `.cursor/skills/${skillFolderName(entry)}/SKILL.md`;
     case "backlog-doc":
-      if (!entry.suffix) throw new Error(`backlog-doc needs suffix: ${entry.name}`);
-      return `.cursor/skills/${
-        skillFolderName({ ...entry, category: "backlog-skill" })
-      }/${entry.suffix}`;
     case "phase":
-      if (!entry.suffix) throw new Error(`phase needs suffix: ${entry.name}`);
-      return `.cursor/skills/specnaut/phases/${entry.suffix}`;
+      // One shape: a document beside its skill, in that skill's own folder.
+      return skillDocDestination(entry, {
+        kind: "nested",
+        root: ".cursor/skills",
+        namespaced: true,
+      });
     case "phase-script":
       return phaseScriptDestination(entry);
     case "backlog-script":
@@ -65,13 +66,13 @@ export class CursorHarness implements Harness {
       if (isSkillFile) {
         content = ensureSkillFrontmatter(content, skillFolderName(entry));
       }
-      out[dest] = {
+      addUnique(out, dest, {
         content,
         executable: entry.executable,
         ...(entry.category === "mergeable-project-root" ? { mergeBlock: "gitignore" } : {}),
         ...(entry.skipIfExists ? { skipIfExists: true as const } : {}),
         ...managedSectionField(entry),
-      } satisfies TemplateFile;
+      }, this.key);
     }
     const staticFiles = HARNESS_STATIC[this.key] ?? {};
     for (const [dest, file] of Object.entries(staticFiles)) {

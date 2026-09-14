@@ -1,4 +1,4 @@
-import type { CoreEntry } from "../../domain/core_bundle.ts";
+import type { CoreCategory, CoreEntry } from "../../domain/core_bundle.ts";
 import { splitFrontmatter } from "./frontmatter.ts";
 
 /**
@@ -23,6 +23,89 @@ export function skillFolderName(entry: CoreEntry): string {
         `skillFolderName not applicable for category: ${entry.category}`,
       );
   }
+}
+
+/**
+ * The subdirectory a skill sub-document sits in, **as a property of the
+ * category** rather than of its owner.
+ *
+ * `phase` and `backlog-doc` are the same thing — a document beside a skill,
+ * loaded by that skill — and after the convergence they carry the same fields:
+ * the owning skill in `name`, the document in `suffix`. The only thing that
+ * ever distinguished them is this: a phase doc lives under `phases/`, a backlog
+ * doc sits directly beside its `SKILL.md`.
+ *
+ * A category absent from this map has no subdirectory. Adding a sub-document
+ * category means adding a row here, not a branch in seven adapters.
+ */
+const SKILL_DOC_SUBDIR: Partial<Record<CoreCategory, string>> = {
+  phase: "phases",
+};
+
+/** Is this category a sub-document of a skill? */
+export function isSkillDoc(category: CoreCategory): boolean {
+  return category === "phase" || category === "backlog-doc";
+}
+
+/**
+ * How a harness lays out a skill's sub-documents.
+ *
+ * `nested` harnesses give a skill its own folder, so the document goes inside
+ * it. `flat` harnesses have one directory of files, so the document becomes a
+ * sibling whose name carries its owner as a prefix.
+ */
+export type SkillDocShape =
+  | {
+    readonly kind: "nested";
+    /** The skills root, e.g. `.claude/skills` — no trailing slash. */
+    readonly root: string;
+    /**
+     * Whether the owner folder takes the `specnaut-` namespacing prefix.
+     * Claude emits skill names verbatim; every other nested harness namespaces
+     * them to avoid clashes in a global registry.
+     */
+    readonly namespaced: boolean;
+  }
+  | {
+    readonly kind: "flat";
+    /** The workflow/instruction directory, e.g. `.windsurf/workflows`. */
+    readonly dir: string;
+    /** Everything after the base name, e.g. `.md` or `.instructions.md`. */
+    readonly ext: string;
+  };
+
+/**
+ * **The single home for where a skill sub-document lands** (spec 033 §5).
+ *
+ * Nothing else may compose a `skills/<owner>/…` path. Before this existed the
+ * rule was spelled fourteen times — a `phase` branch and a `backlog-doc` branch
+ * in each of seven adapters — and the `phase` half hardcoded `specnaut` as the
+ * owner, which is what made a second top-level skill with documents impossible
+ * without touching all seven.
+ */
+export function skillDocDestination(entry: CoreEntry, shape: SkillDocShape): string {
+  if (!isSkillDoc(entry.category)) {
+    throw new Error(
+      `skillDocDestination called on non-sub-document category: ${entry.category}`,
+    );
+  }
+  if (!entry.suffix) {
+    throw new Error(`${entry.category} needs suffix: ${entry.name}`);
+  }
+  const subdir = SKILL_DOC_SUBDIR[entry.category];
+
+  if (shape.kind === "flat") {
+    // Flat harnesses have no folders, so the subdirectory cannot be expressed
+    // and is deliberately dropped: the owner prefix is what disambiguates.
+    const owner = skillFolderName({ ...entry, category: "backlog-skill" });
+    const base = entry.suffix.replace(/\.md$/, "");
+    return `${shape.dir}/${owner}-${base}${shape.ext}`;
+  }
+
+  const owner = shape.namespaced
+    ? skillFolderName({ ...entry, category: "backlog-skill" })
+    : entry.name;
+  return [shape.root, owner, subdir, entry.suffix].filter(Boolean).join("/");
 }
 
 /**

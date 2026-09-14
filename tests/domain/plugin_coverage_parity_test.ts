@@ -29,8 +29,26 @@ function coveredNames(prefix: string): string[] {
     .sort();
 }
 
+/**
+ * The bundle's identity for a category, as it appears in a destination.
+ *
+ * For most categories that is `name`. For the two **sub-document** categories
+ * — `phase` and `backlog-doc` — `name` is the OWNING SKILL and the document is
+ * in `suffix` (spec 033; see `CoreEntry`). Reading `name` there would return
+ * the owner twenty-one times over and compare it against twenty-one distinct
+ * filenames, which is a false red rather than a real disagreement.
+ *
+ * This function is deliberately not "the destination": composing one here
+ * would re-state the adapter's rule, which is exactly the duplication spec 033
+ * §5 forbids. It compares identities, and the prefix the caller passes is what
+ * ties them to a location.
+ */
 function bundleNames(category: string): string[] {
-  return CORE_BUNDLE.filter((e) => e.category === category).map((e) => e.name).sort();
+  const isSubDoc = category === "phase" || category === "backlog-doc";
+  return CORE_BUNDLE
+    .filter((e) => e.category === category)
+    .map((e) => isSubDoc ? (e.suffix ?? "").replace(/\.md$/, "") : e.name)
+    .sort();
 }
 
 Deno.test("every phase the bundle ships is covered, and nothing else is", () => {

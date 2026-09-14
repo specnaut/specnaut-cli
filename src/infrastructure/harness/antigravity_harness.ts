@@ -3,13 +3,14 @@ import type { BundleOptions, Harness } from "../../application/ports.ts";
 import { HARNESS_STATIC } from "../../templates_bundle.ts";
 import type { CoreBundle, CoreEntry } from "../../domain/core_bundle.ts";
 import type { Bundle } from "../../domain/template.ts";
-import { ensureSkillFrontmatter, skillFolderName } from "./skill_folder.ts";
+import { ensureSkillFrontmatter, skillDocDestination, skillFolderName } from "./skill_folder.ts";
 import { frontmatterField, splitFrontmatter } from "./frontmatter.ts";
 import { tierToAntigravityModel } from "../../domain/antigravity_models.ts";
 import { applyBackend, backlogScriptDestination } from "./backlog_filter.ts";
 import { applyScheme, phaseScriptDestination } from "./scheme_filter.ts";
 import { applySpecBackend } from "./spec_backend_filter.ts";
 import { applySpecAutogen } from "./spec_autogen_filter.ts";
+import { addUnique } from "./bundle_writer.ts";
 
 function toAntigravityAgentMarkdown(entry: CoreEntry): string {
   const split = splitFrontmatter(entry.content);
@@ -43,13 +44,13 @@ function destinationFor(entry: CoreEntry): string {
     case "backlog-skill":
       return `.agents/skills/${skillFolderName(entry)}/SKILL.md`;
     case "backlog-doc":
-      if (!entry.suffix) throw new Error(`backlog-doc needs suffix: ${entry.name}`);
-      return `.agents/skills/${
-        skillFolderName({ ...entry, category: "backlog-skill" })
-      }/${entry.suffix}`;
     case "phase":
-      if (!entry.suffix) throw new Error(`phase needs suffix: ${entry.name}`);
-      return `.agents/skills/specnaut/phases/${entry.suffix}`;
+      // One shape: a document beside its skill, in that skill's own folder.
+      return skillDocDestination(entry, {
+        kind: "nested",
+        root: ".agents/skills",
+        namespaced: true,
+      });
     case "phase-script":
       return phaseScriptDestination(entry);
     case "backlog-script":
@@ -97,13 +98,13 @@ export class AntigravityHarness implements Harness {
         default:
           content = entry.content;
       }
-      out[dest] = {
+      addUnique(out, dest, {
         content,
         executable: entry.executable,
         ...(entry.category === "mergeable-project-root" ? { mergeBlock: "gitignore" } : {}),
         ...(entry.skipIfExists ? { skipIfExists: true as const } : {}),
         ...managedSectionField(entry),
-      };
+      }, this.key);
     }
     // Layer the harness's own static files last, so a harness-specific file
     // wins over anything the core bundle mapped to the same destination.

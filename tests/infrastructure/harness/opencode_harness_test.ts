@@ -7,7 +7,8 @@ const harness = new OpenCodeHarness();
 function phaseEntry(name: string, body = "Body content"): CoreBundle[number] {
   return {
     category: "phase",
-    name,
+    // `name` is the OWNING SKILL since spec 033; the document is the suffix.
+    name: "specnaut",
     suffix: `${name}.md`,
     content: body,
     executable: false,

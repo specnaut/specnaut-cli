@@ -48,7 +48,7 @@ Deno.test("applySpecAutogen keeps the guidance only when specAutogen && cloud", 
 Deno.test("applySpecAutogen only transforms `backlog-skill` entries; other categories pass through", () => {
   const phase: CoreEntry = {
     category: "phase",
-    name: "tasks",
+    name: "specnaut",
     suffix: "tasks.md",
     content: skillContent,
     executable: false,

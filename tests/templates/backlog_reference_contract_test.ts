@@ -1,6 +1,7 @@
 import { assert, assertEquals, assertStringIncludes } from "@std/assert";
 import { CORE_BUNDLE, HARNESS_STATIC } from "../../src/templates_bundle.ts";
 import { fromFileUrl } from "@std/path";
+import { skillDocName } from "../../src/domain/core_bundle.ts";
 
 /**
  * Locks the backlog-reference rule to a single canonical home.
@@ -54,7 +55,16 @@ const CHANNEL_B_STATIC: ReadonlyArray<{ harness: string; dest: string }> = [
 ];
 
 function entry(category: string, name: string) {
-  return CORE_BUNDLE.find((e) => e.category === category && e.name === name);
+  // `phase` changed shape in spec 033: `name` is now the owning skill and the
+  // document is the suffix, so a phase is addressed by its document name.
+  // `backlog-doc` did NOT change — its rows above address it by owner (`board`),
+  // which resolves to that skill's first doc, and that is the behaviour they
+  // have always had. Applying the phase rule to both would silently stop
+  // matching `board`.
+  return CORE_BUNDLE.find((e) =>
+    e.category === category &&
+    (category === "phase" ? skillDocName(e) === name : e.name === name)
+  );
 }
 
 Deno.test("the contract ships as a preloaded, non-invocable skill", () => {

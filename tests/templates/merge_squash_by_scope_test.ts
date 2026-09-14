@@ -1,6 +1,7 @@
 import { assertStringIncludes } from "@std/assert";
 import { CORE_BUNDLE } from "../../src/templates_bundle.ts";
 import type { CoreEntry } from "../../src/domain/core_bundle.ts";
+import { skillDocName } from "../../src/domain/core_bundle.ts";
 
 /**
  * #459 — squash BY SCOPE at merge, not one commit per branch.
@@ -29,13 +30,13 @@ import type { CoreEntry } from "../../src/domain/core_bundle.ts";
  * "no behaviour change" refactor stops being one.
  */
 function squashDoc(): CoreEntry {
-  const e = CORE_BUNDLE.find((x) => x.category === "phase" && x.name === "merge-squash");
+  const e = CORE_BUNDLE.find((x) => x.category === "phase" && skillDocName(x) === "merge-squash");
   if (!e) throw new Error("missing merge-squash phase entry");
   return e;
 }
 
 function mergePhase(): CoreEntry {
-  const e = CORE_BUNDLE.find((x) => x.category === "phase" && x.name === "merge");
+  const e = CORE_BUNDLE.find((x) => x.category === "phase" && skillDocName(x) === "merge");
   if (!e) throw new Error("missing merge phase entry");
   return e;
 }
@@ -107,7 +108,7 @@ Deno.test("a merge ends on the base branch, verified rather than assumed", () =>
 });
 
 function closeDoc(): CoreEntry {
-  const e = CORE_BUNDLE.find((x) => x.category === "phase" && x.name === "merge-close");
+  const e = CORE_BUNDLE.find((x) => x.category === "phase" && skillDocName(x) === "merge-close");
   if (!e) throw new Error("missing merge-close phase entry");
   return e;
 }

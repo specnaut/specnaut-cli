@@ -8,79 +8,79 @@
     },
     {
       "category": "phase",
-      "name": "plan",
+      "name": "specnaut",
       "suffix": "plan.md",
       "source": "core/skills/specnaut/phases/plan.md"
     },
     {
       "category": "phase",
-      "name": "plan-audits",
+      "name": "specnaut",
       "suffix": "plan-audits.md",
       "source": "core/skills/specnaut/phases/plan-audits.md"
     },
     {
       "category": "phase",
-      "name": "tasks",
+      "name": "specnaut",
       "suffix": "tasks.md",
       "source": "core/skills/specnaut/phases/tasks.md"
     },
     {
       "category": "phase",
-      "name": "implement",
+      "name": "specnaut",
       "suffix": "implement.md",
       "source": "core/skills/specnaut/phases/implement.md"
     },
     {
       "category": "phase",
-      "name": "epic-commits",
+      "name": "specnaut",
       "suffix": "epic-commits.md",
       "source": "core/skills/specnaut/phases/epic-commits.md"
     },
     {
       "category": "phase",
-      "name": "quality-gates",
+      "name": "specnaut",
       "suffix": "quality-gates.md",
       "source": "core/skills/specnaut/phases/quality-gates.md"
     },
     {
       "category": "phase",
-      "name": "epic-fixups",
+      "name": "specnaut",
       "suffix": "epic-fixups.md",
       "source": "core/skills/specnaut/phases/epic-fixups.md"
     },
     {
       "category": "phase",
-      "name": "merge-close",
+      "name": "specnaut",
       "suffix": "merge-close.md",
       "source": "core/skills/specnaut/phases/merge-close.md"
     },
     {
       "category": "phase",
-      "name": "epic-loop",
+      "name": "specnaut",
       "suffix": "epic-loop.md",
       "source": "core/skills/specnaut/phases/epic-loop.md"
     },
     {
       "category": "phase",
-      "name": "review",
+      "name": "specnaut",
       "suffix": "review.md",
       "source": "core/skills/specnaut/phases/review.md"
     },
     {
       "category": "phase",
-      "name": "merge",
+      "name": "specnaut",
       "suffix": "merge.md",
       "source": "core/skills/specnaut/phases/merge.md"
     },
     {
       "category": "phase",
-      "name": "merge-squash",
+      "name": "specnaut",
       "suffix": "merge-squash.md",
       "source": "core/skills/specnaut/phases/merge-squash.md"
     },
     {
       "category": "phase",
-      "name": "constitution",
+      "name": "specnaut",
       "suffix": "constitution.md",
       "source": "core/skills/specnaut/phases/constitution.md"
     },
@@ -104,49 +104,49 @@
     },
     {
       "category": "phase",
-      "name": "tag-version",
+      "name": "specnaut",
       "suffix": "tag-version.md",
       "source": "core/skills/specnaut/phases/tag-version.md"
     },
     {
       "category": "phase",
-      "name": "release-version",
+      "name": "specnaut",
       "suffix": "release-version.md",
       "source": "core/skills/specnaut/phases/release-version.md"
     },
     {
       "category": "phase",
-      "name": "auto-chain",
+      "name": "specnaut",
       "suffix": "auto-chain.md",
       "source": "core/skills/specnaut/phases/auto-chain.md"
     },
     {
       "category": "phase",
-      "name": "audit-security",
+      "name": "specnaut",
       "suffix": "audit-security.md",
       "source": "core/skills/specnaut/phases/audit-security.md"
     },
     {
       "category": "phase",
-      "name": "audit-performance",
+      "name": "specnaut",
       "suffix": "audit-performance.md",
       "source": "core/skills/specnaut/phases/audit-performance.md"
     },
     {
       "category": "phase",
-      "name": "audit-accessibility",
+      "name": "specnaut",
       "suffix": "audit-accessibility.md",
       "source": "core/skills/specnaut/phases/audit-accessibility.md"
     },
     {
       "category": "phase",
-      "name": "audit-architecture",
+      "name": "specnaut",
       "suffix": "audit-architecture.md",
       "source": "core/skills/specnaut/phases/audit-architecture.md"
     },
     {
       "category": "phase",
-      "name": "audit-dependencies",
+      "name": "specnaut",
       "suffix": "audit-dependencies.md",
       "source": "core/skills/specnaut/phases/audit-dependencies.md"
     },

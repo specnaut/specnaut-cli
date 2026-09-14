@@ -16,6 +16,18 @@ export type CoreCategory =
 
 export type CoreEntry = {
   readonly category: CoreCategory;
+  /**
+   * What `name` means depends on the category, and for the two **sub-document**
+   * categories — `phase` and `backlog-doc` — it is **the owning skill**, not
+   * the document. The document is in `suffix`.
+   *
+   * That convention used to hold for `backlog-doc` only. `phase` put the
+   * document in both fields and had no owner at all, so every harness adapter
+   * hardcoded `specnaut` into the destination it composed — which made a second
+   * top-level skill with its own documents impossible without editing all
+   * seven. Converging the two categories is what `/ship` needed (spec 033), and
+   * `skillDocDestination` is now the only place that composes such a path.
+   */
   readonly name: string;
   readonly suffix: string | null;
   readonly content: string;
@@ -45,3 +57,40 @@ export type CoreEntry = {
 };
 
 export type CoreBundle = ReadonlyArray<CoreEntry>;
+
+/**
+ * The document's own name for a sub-document entry — `merge-squash` for
+ * `merge-squash.md`.
+ *
+ * Before the convergence (spec 033) a `phase` entry carried this in `name`, and
+ * callers addressed a phase as `e.category === "phase" && e.name === "merge"`.
+ * `name` is now the OWNING SKILL, so that comparison silently matches nothing —
+ * or, worse for a `.find()`, matches the wrong entry.
+ *
+ * This exists so the `.md`-stripping lives in one place. Ten callers each
+ * spelling `suffix.replace(/\.md$/, "")` would be ten statements of one rule,
+ * which is the duplication spec 033 §5 forbids.
+ */
+export function skillDocName(entry: CoreEntry): string {
+  return (entry.suffix ?? "").replace(/\.md$/, "");
+}
+
+/**
+ * Find one sub-document by the skill that owns it and its own name.
+ *
+ * `findSkillDoc(CORE_BUNDLE, "specnaut", "merge")` — the pair is what
+ * identifies a sub-document now, and a lookup that names only one half is
+ * ambiguous the moment a second skill owns documents, which is the whole point
+ * of the convergence.
+ */
+export function findSkillDoc(
+  bundle: CoreBundle,
+  owner: string,
+  docName: string,
+): CoreEntry | undefined {
+  return bundle.find((e) =>
+    (e.category === "phase" || e.category === "backlog-doc") &&
+    e.name === owner &&
+    skillDocName(e) === docName
+  );
+}

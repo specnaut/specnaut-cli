@@ -1,6 +1,7 @@
 import { assert, assertStringIncludes } from "@std/assert";
 import { CORE_BUNDLE } from "../../src/templates_bundle.ts";
 import type { CoreEntry } from "../../src/domain/core_bundle.ts";
+import { skillDocName } from "../../src/domain/core_bundle.ts";
 
 /**
  * #431 — Surface Claude Artifacts in generated specs for UX/UI projects.
@@ -32,7 +33,7 @@ function planTemplate(): CoreEntry | undefined {
 }
 
 function planPhase(): CoreEntry | undefined {
-  return CORE_BUNDLE.find((e) => e.category === "phase" && e.name === "plan");
+  return CORE_BUNDLE.find((e) => e.category === "phase" && skillDocName(e) === "plan");
 }
 
 Deno.test("plan-template ships the Claude Artifacts section with public docs links", () => {

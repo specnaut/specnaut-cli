@@ -2,6 +2,7 @@ import { assert, assertEquals, assertStringIncludes } from "@std/assert";
 import { CORE_BUNDLE } from "../../src/templates_bundle.ts";
 import type { CoreEntry } from "../../src/domain/core_bundle.ts";
 import { HARNESSES } from "../../src/cli/harnesses.ts";
+import { skillDocName } from "../../src/domain/core_bundle.ts";
 
 /**
  * Locks the offline accessibility catalogue into the bundle.
@@ -244,7 +245,7 @@ Deno.test("both a11y dispatch surfaces name the catalogue", () => {
   assertStringIncludes(skill.content, `${DIR}00-triage.md`);
 
   const phase = CORE_BUNDLE.find(
-    (e) => e.category === "phase" && e.name === "audit-accessibility",
+    (e) => e.category === "phase" && skillDocName(e) === "audit-accessibility",
   );
   assert(phase, "audit-accessibility phase is missing from the bundle");
   assertStringIncludes(phase.content, `${DIR}00-triage.md`);

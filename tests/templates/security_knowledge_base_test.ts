@@ -2,6 +2,7 @@ import { assert, assertEquals, assertStringIncludes } from "@std/assert";
 import { CORE_BUNDLE, HARNESS_STATIC } from "../../src/templates_bundle.ts";
 import type { CoreEntry } from "../../src/domain/core_bundle.ts";
 import { HARNESSES } from "../../src/cli/harnesses.ts";
+import { skillDocName } from "../../src/domain/core_bundle.ts";
 
 /**
  * Locks the offline security knowledge base into the bundle.
@@ -189,7 +190,9 @@ Deno.test("sec-audit and audit-security dispatch prompts name the knowledge base
   assert(skill, "sec-audit skill missing from the bundle");
   assertStringIncludes(skill.content, ".specnaut/memory/security/00-triage.md");
 
-  const phase = CORE_BUNDLE.find((e) => e.category === "phase" && e.name === "audit-security");
+  const phase = CORE_BUNDLE.find((e) =>
+    e.category === "phase" && skillDocName(e) === "audit-security"
+  );
   assert(phase, "audit-security phase missing from the bundle");
   assertStringIncludes(phase.content, ".specnaut/memory/security/");
 });

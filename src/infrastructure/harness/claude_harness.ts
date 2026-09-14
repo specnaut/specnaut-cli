@@ -7,7 +7,8 @@ import { applyBackend, backlogScriptDestination } from "./backlog_filter.ts";
 import { applyScheme, phaseScriptDestination } from "./scheme_filter.ts";
 import { applySpecBackend } from "./spec_backend_filter.ts";
 import { applySpecAutogen } from "./spec_autogen_filter.ts";
-import { ensureSkillFrontmatter } from "./skill_folder.ts";
+import { ensureSkillFrontmatter, skillDocDestination } from "./skill_folder.ts";
+import { addUnique } from "./bundle_writer.ts";
 
 function destinationFor(entry: CoreEntry): string {
   switch (entry.category) {
@@ -30,15 +31,15 @@ function destinationFor(entry: CoreEntry): string {
       // `specnaut-review`, …).
       return `.claude/skills/${entry.name}/SKILL.md`;
     case "backlog-doc":
-      // A skill doc sitting beside its SKILL.md, loaded by name from the
-      // skill's own directory — the same shape as the router's phases/.
-      if (!entry.suffix) throw new Error(`backlog-doc needs suffix: ${entry.name}`);
-      return `.claude/skills/${entry.name}/${entry.suffix}`;
     case "phase":
-      // Phase reference docs sit beside the router skill so the router
-      // can load them via `phases/<phase>.md` from its own directory.
-      if (!entry.suffix) throw new Error(`phase needs suffix: ${entry.name}`);
-      return `.claude/skills/specnaut/phases/${entry.suffix}`;
+      // One shape: a document beside its skill, loaded by that skill from its
+      // own directory. Claude emits skill names verbatim, so the owner folder
+      // takes no namespacing prefix.
+      return skillDocDestination(entry, {
+        kind: "nested",
+        root: ".claude/skills",
+        namespaced: false,
+      });
     case "phase-script":
       return phaseScriptDestination(entry);
     case "backlog-script":
@@ -76,13 +77,13 @@ export class ClaudeHarness implements Harness {
         content = ensureSkillFrontmatter(content, entry.name);
       }
 
-      out[destinationFor(entry)] = {
+      addUnique(out, destinationFor(entry), {
         content,
         executable: entry.executable,
         ...(entry.category === "mergeable-project-root" ? { mergeBlock: "gitignore" } : {}),
         ...(entry.skipIfExists ? { skipIfExists: true as const } : {}),
         ...managedSectionField(entry),
-      };
+      }, this.key);
     }
     const staticFiles = HARNESS_STATIC[this.key] ?? {};
     for (const [dest, file] of Object.entries(staticFiles)) {

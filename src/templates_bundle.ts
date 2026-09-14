@@ -185,7 +185,7 @@ To run a single phase only:
   },
   {
     category: "phase",
-    name: "plan",
+    name: "specnaut",
     suffix: "plan.md",
     content: `## User Input
 
@@ -424,7 +424,7 @@ it. Answered means go. Pause only when the run was started with \`--manual\`.
   },
   {
     category: "phase",
-    name: "plan-audits",
+    name: "specnaut",
     suffix: "plan-audits.md",
     content: `# Plan audits — architecture and security, against the plan
 
@@ -480,7 +480,7 @@ questions, in this order:
   },
   {
     category: "phase",
-    name: "tasks",
+    name: "specnaut",
     suffix: "tasks.md",
     content: `
 ## User Input
@@ -712,7 +712,7 @@ Pause only when the run was started with \`--manual\`.
   },
   {
     category: "phase",
-    name: "implement",
+    name: "specnaut",
     suffix: "implement.md",
     content: `
 ## User Input
@@ -919,7 +919,7 @@ Pause only when the run was started with \`--manual\`.
   },
   {
     category: "phase",
-    name: "epic-commits",
+    name: "specnaut",
     suffix: "epic-commits.md",
     content: `# Epic commits — one commit per child, placeable from \`git log\` alone
 
@@ -1024,7 +1024,7 @@ this file. Stop and say so rather than picking one.
   },
   {
     category: "phase",
-    name: "quality-gates",
+    name: "specnaut",
     suffix: "quality-gates.md",
     content: `# Quality gates — two tiers, declared by the project
 
@@ -1121,7 +1121,7 @@ them by hand. The tiers are an epic mechanism.
   },
   {
     category: "phase",
-    name: "epic-fixups",
+    name: "specnaut",
     suffix: "epic-fixups.md",
     content: `# Folding an epic's fixups — one commit per child, still
 
@@ -1227,7 +1227,7 @@ back to the board, which is the whole thing #552 exists to produce.
   },
   {
     category: "phase",
-    name: "merge-close",
+    name: "specnaut",
     suffix: "merge-close.md",
     content: `# Closing and reconciling after a merge
 
@@ -1429,7 +1429,7 @@ a repository drift apart while both look healthy.
   },
   {
     category: "phase",
-    name: "epic-loop",
+    name: "specnaut",
     suffix: "epic-loop.md",
     content: `# The epic loop — one branch, one commit per child, one merge
 
@@ -1537,7 +1537,7 @@ parse.
   },
   {
     category: "phase",
-    name: "review",
+    name: "specnaut",
     suffix: "review.md",
     content: `
 ## User Input
@@ -1720,7 +1720,7 @@ If Overall = PASS, surface the STOP #2 summary block defined in
   },
   {
     category: "phase",
-    name: "merge",
+    name: "specnaut",
     suffix: "merge.md",
     content: `
 ## User Input
@@ -1884,7 +1884,7 @@ like a completed merge when a PR is merely open is the failure this phase is mos
   },
   {
     category: "phase",
-    name: "merge-squash",
+    name: "specnaut",
     suffix: "merge-squash.md",
     content: `# Squash by scope — one commit per scope, never "exactly one commit"
 
@@ -1957,7 +1957,7 @@ rejected. That is precisely what \`--pr\` is for; it is not a reason for this ph
   },
   {
     category: "phase",
-    name: "constitution",
+    name: "specnaut",
     suffix: "constitution.md",
     content: `
 ## User Input
@@ -2432,7 +2432,7 @@ pre-step.
   },
   {
     category: "phase",
-    name: "tag-version",
+    name: "specnaut",
     suffix: "tag-version.md",
     content: `
 ## User Input
@@ -2509,7 +2509,7 @@ deliberate user action.
   },
   {
     category: "phase",
-    name: "release-version",
+    name: "specnaut",
     suffix: "release-version.md",
     content: `
 ## User Input
@@ -2773,7 +2773,7 @@ The script emits the body verbatim. Do NOT:
   },
   {
     category: "phase",
-    name: "auto-chain",
+    name: "specnaut",
     suffix: "auto-chain.md",
     content: `# Auto-chain control
 
@@ -2997,7 +2997,7 @@ about what it found.
   },
   {
     category: "phase",
-    name: "audit-security",
+    name: "specnaut",
     suffix: "audit-security.md",
     content: `
 # /specnaut audit security
@@ -3200,7 +3200,7 @@ adapted to Specnaut's bundled agent + backlog conventions.
   },
   {
     category: "phase",
-    name: "audit-performance",
+    name: "specnaut",
     suffix: "audit-performance.md",
     content: `
 # /specnaut audit performance
@@ -3340,7 +3340,7 @@ adapted to Specnaut's bundled agent + backlog conventions. The
   },
   {
     category: "phase",
-    name: "audit-accessibility",
+    name: "specnaut",
     suffix: "audit-accessibility.md",
     content: `
 # /specnaut audit accessibility
@@ -3532,7 +3532,7 @@ adapted to Specnaut's bundled agent + backlog conventions. The
   },
   {
     category: "phase",
-    name: "audit-architecture",
+    name: "specnaut",
     suffix: "audit-architecture.md",
     content: `
 # /specnaut audit architecture
@@ -3676,7 +3676,7 @@ adapted to Specnaut's bundled agent + backlog conventions. The
   },
   {
     category: "phase",
-    name: "audit-dependencies",
+    name: "specnaut",
     suffix: "audit-dependencies.md",
     content: `
 # /specnaut audit dependencies

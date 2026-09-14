@@ -12,7 +12,7 @@ const SAMPLE: CoreBundle = [
   },
   {
     category: "phase",
-    name: "specify",
+    name: "specnaut",
     suffix: "specify.md",
     content: "# Specify phase\n",
     executable: false,

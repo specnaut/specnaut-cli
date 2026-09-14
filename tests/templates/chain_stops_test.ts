@@ -1,6 +1,7 @@
 import { assert, assertStringIncludes } from "@std/assert";
 import { CORE_BUNDLE } from "../../src/templates_bundle.ts";
 import type { CoreEntry } from "../../src/domain/core_bundle.ts";
+import { skillDocName } from "../../src/domain/core_bundle.ts";
 
 /**
  * #458 — the chain has exactly two stops, and it must not stall between phases.
@@ -17,7 +18,7 @@ import type { CoreEntry } from "../../src/domain/core_bundle.ts";
  */
 
 function phase(name: string): CoreEntry {
-  const e = CORE_BUNDLE.find((x) => x.category === "phase" && x.name === name);
+  const e = CORE_BUNDLE.find((x) => x.category === "phase" && skillDocName(x) === name);
   if (!e) throw new Error(`missing phase entry: ${name}`);
   return e;
 }

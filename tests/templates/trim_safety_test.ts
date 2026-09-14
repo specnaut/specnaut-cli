@@ -79,7 +79,7 @@ const MUST_SURVIVE: ReadonlyArray<
   },
   {
     label: "implement.md",
-    body: () => entry("phase", "implement", "implement.md"),
+    body: () => entry("phase", "specnaut", "implement.md"),
     sentences: [
       // An eval-refusal rule on a contributor-writable file, on a path that
       // terminates in EXECUTE_COMMAND. It is stated twice, and collapsing the

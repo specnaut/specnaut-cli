@@ -342,6 +342,34 @@ literal). A binding table that contradicts itself cannot settle the review it ex
 `plugin_coverage` now stops composing paths and consumes the adapter's output; the mirror is
 **deleted rather than gated**.
 
+### A-5a — implementation finding: A-5's fix does not fit in the behaviour-neutral phase
+
+_Discovered while implementing T016, 2026-09-14. The remedy is right; its placement was wrong, and
+the plan is amended rather than the phase stretched._
+
+A-5 called for deriving `PLUGIN_COVERED_PATHS_CLAUDE` from `CORE_BUNDLE`, deleting the third mirror
+instead of gating it. Implementing it exposed why that cannot land inside Phase 2, whose whole
+contract is **zero behaviour change**:
+
+- `PLUGIN_COVERED_PATHS_CLAUDE` is consumed by `fs_project_inspector.ts`, which is what
+  `specnaut check --project` reads to report recoverable gaps, and it feeds `isPluginCoveredPath`'s
+  branch deciding whether `upgrade` migrates a file to plugin ownership.
+- The list names **one** skill (`specnaut`). `plugin/skills/` ships **26**.
+- So a faithful derivation would widen the covered set by 25 skills, changing what `check --project`
+  reports and what `upgrade` migrates. That is a behaviour change wearing a refactor's clothes —
+  exactly the braiding the plan stop's sequencing decision exists to prevent.
+
+Whether that 25-skill gap is a latent defect or a deliberate narrowing is **not established**, and
+guessing inside a refactor is how a silent behaviour change ships. The doc comment dates the
+coverage map to "post-consolidation, v1.0.0", which predates the plugin gaining `board` and the rest
+— the same staleness class as the incident `tests/plugin/source-exclusions.txt` records.
+
+**Disposition.** T016 is narrowed to the behaviour-neutral half: the parity test's `bundleNames` now
+reads the _document_ identity for sub-document categories rather than `name`, which restores the
+assertion's meaning under the converged shape without touching coverage. Verified load-bearing by
+probe — with the discriminator forced to `false`, the phase assertion fails. The full derivation,
+and the 25-skill question it raises, need their own item.
+
 ### A-6 — MEDIUM — a gate that narrows silently instead of failing
 
 _Accepted; added to §8._ `tests/integration/phase_wiring_test.ts` sweeps destinations under a
@@ -370,13 +398,27 @@ Source-tree layout for `/ship` (determined by the mirror, so stated rather than 
 paths are **recorded in §8 as pre-existing known duplicates outside this feature's scope**, so the
 next reviewer does not file them as new.
 
-### Unverified by the audit, carried forward as open risk
+### Unverified by the audit — ✅ all three resolved by tasks T001–T003
 
-Three surfaces the seat flagged rather than confirmed: whether `deno task
-bundle` is gated in CI
-against a dirty committed bundle; whether the Antigravity and Copilot distribution manifests
-enumerate skills individually; and whether `tests/plugin/{mirror,source}-exclusions.txt` need a
-`/ship` entry. These become `tasks` items, not assumptions.
+The seat flagged three surfaces rather than asserting them. Answers, measured:
+
+- **CI does gate the bundle.** `.github/workflows/ci.yml` runs `deno task bundle` and then fails on
+  a dirty tree with "Run `deno task bundle` locally and commit the regenerated
+  `src/templates_bundle.ts`". A stale committed bundle cannot ship. **No work needed.**
+- **No distribution manifest enumerates skills.** `.codex-plugin/plugin.json` and
+  `.cursor-plugin/plugin.json` both point at a _directory_ (`"skills": "./plugin/skills/"`), and
+  `plugin/.claude-plugin/plugin.json` carries no skills key at all. A new top-level skill needs **no
+  manifest edit** on any of the three. **No work needed.**
+- **`tests/plugin/source-exclusions.txt` carries an entry this feature invalidates — the finding
+  T003 existed to catch.** It excuses `core/skills/specnaut/scripts/` from the plugin mirror, with
+  the reason "5 release scripts; driven from the project's installed `.specnaut/scripts/`". T027
+  moves those scripts to `core/skills/ship/scripts/`, which leaves the excluded path naming a
+  directory that no longer exists — and that file's own header says a stale entry is reported as
+  stale. The exclusion must move with the scripts, and its prose (which names
+  `/specnaut tag-version` and `/release-version`) must be rewritten. `mirror-exclusions.txt` needs
+  nothing. **Added as T027a.**
+
+None of the three changed the architecture; the third added one task.
 
 ## 11. Security audit
 

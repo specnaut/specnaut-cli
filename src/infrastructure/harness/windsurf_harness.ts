@@ -3,12 +3,13 @@ import type { BundleOptions, Harness } from "../../application/ports.ts";
 import { HARNESS_STATIC } from "../../templates_bundle.ts";
 import type { CoreBundle, CoreEntry } from "../../domain/core_bundle.ts";
 import type { Bundle } from "../../domain/template.ts";
-import { skillFolderName } from "./skill_folder.ts";
+import { skillDocDestination, skillFolderName } from "./skill_folder.ts";
 import { splitFrontmatter } from "./frontmatter.ts";
 import { applyBackend, backlogScriptDestination } from "./backlog_filter.ts";
 import { applyScheme, phaseScriptDestination } from "./scheme_filter.ts";
 import { applySpecBackend } from "./spec_backend_filter.ts";
 import { applySpecAutogen } from "./spec_autogen_filter.ts";
+import { addUnique } from "./bundle_writer.ts";
 
 // Cascade ignores Claude-only frontmatter fields (e.g. `color:`). Strip them
 // before emission so they don't eat into the 12k-char workflow cap.
@@ -121,16 +122,15 @@ function destinationFor(entry: CoreEntry): string {
     case "backlog-skill":
       return `.windsurf/workflows/${skillFolderName(entry)}.md`;
     case "backlog-doc":
-      // Windsurf is flat: the doc becomes a sibling workflow, not a child file.
-      if (!entry.suffix) throw new Error(`backlog-doc needs suffix: ${entry.name}`);
-      return `.windsurf/workflows/${skillFolderName({ ...entry, category: "backlog-skill" })}-${
-        entry.suffix.replace(/\.md$/, "")
-      }.md`;
     case "phase":
-      // Windsurf is flat — no nested skill folders. Each phase doc
-      // becomes a sibling workflow file the router references by name.
-      if (!entry.suffix) throw new Error(`phase needs suffix: ${entry.name}`);
-      return `.windsurf/workflows/specnaut-${entry.suffix.replace(/\.md$/, "")}.md`;
+      // Windsurf is flat — no nested skill folders. A sub-document becomes a
+      // sibling workflow whose name carries its owner as the prefix, which is
+      // the only thing disambiguating two skills' documents here.
+      return skillDocDestination(entry, {
+        kind: "flat",
+        dir: ".windsurf/workflows",
+        ext: ".md",
+      });
     case "phase-script":
       return phaseScriptDestination(entry);
     case "backlog-script":
@@ -165,13 +165,13 @@ export class WindsurfHarness implements Harness {
       // agent-memory and the agent-fleet README are Claude-only conventions;
       // other harnesses skip them.
       if (entry.category === "agent-memory" || entry.category === "agent-doc") continue;
-      out[destinationFor(entry)] = {
+      addUnique(out, destinationFor(entry), {
         content: stripCascadeIgnoredFields(entry.content),
         executable: entry.executable,
         ...(entry.category === "mergeable-project-root" ? { mergeBlock: "gitignore" } : {}),
         ...(entry.skipIfExists ? { skipIfExists: true as const } : {}),
         ...managedSectionField(entry),
-      };
+      }, this.key);
     }
     // Layer the harness's own static files last, so a harness-specific file
     // wins over anything the core bundle mapped to the same destination.

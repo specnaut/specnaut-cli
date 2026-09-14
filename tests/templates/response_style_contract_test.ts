@@ -226,7 +226,7 @@ const POINTED_BY_DECISION: ReadonlyMap<string, string> = new Map([
     "owned the selection rule until #575; it now points at the owner instead of restating it",
   ],
   [
-    "phase/plan/plan.md",
+    "phase/specnaut/plan.md",
     "same — two restatements of the selection rule replaced by pointers",
   ],
 ]);

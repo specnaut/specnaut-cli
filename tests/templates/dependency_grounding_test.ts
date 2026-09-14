@@ -1,5 +1,6 @@
 import { assert, assertStringIncludes } from "@std/assert";
 import { CORE_BUNDLE } from "../../src/templates_bundle.ts";
+import { skillDocName } from "../../src/domain/core_bundle.ts";
 
 /**
  * Locks `dependency-expert` to the supply-chain domain file it used to
@@ -140,7 +141,7 @@ Deno.test("both dependency dispatch surfaces name the domain file", () => {
   assertStringIncludes(skill.content, `memory/security/${DOMAIN_FILE}`);
 
   const phase = CORE_BUNDLE.find(
-    (e) => e.category === "phase" && e.name === "audit-dependencies",
+    (e) => e.category === "phase" && skillDocName(e) === "audit-dependencies",
   );
   assert(phase, "audit-dependencies phase is missing from the bundle");
   assertStringIncludes(phase.content, `memory/security/${DOMAIN_FILE}`);

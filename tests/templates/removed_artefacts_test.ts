@@ -39,13 +39,13 @@ const ALLOWED = new Map<string, string>([
   // work at it. They are NOT pinned defects — anything added here needs the
   // same kind of justification.
   ["specify|templates/plan-template.md", "states that they do not exist"],
-  ["tasks|tasks.md", "states that they do not exist"],
+  ["specnaut|tasks.md", "states that they do not exist"],
   // Moved out of groom with the backlog//specnaut ownership split (#540): the
   // check reads spec artefacts and prescribes specnaut phases, so it lives
   // with the chain it inspects. The exemption travels with it unchanged.
-  ["auto-chain|auto-chain.md", "detects pre-2.0.0 spec dirs, which genuinely have one"],
+  ["specnaut|auto-chain.md", "detects pre-2.0.0 spec dirs, which genuinely have one"],
   ["developer|", "tolerates a pre-2.0.0 dir without ever requiring it"],
-  ["constitution|constitution.md", "a project's own docs/quickstart.md, not ours"],
+  ["specnaut|constitution.md", "a project's own docs/quickstart.md, not ours"],
   ["product-owner|", "a spec the user attaches; never generated, never required"],
   ["specify|scripts/code-audit/collect-audit-scope.sh", "the audit skill's own design records"],
 ]);

@@ -4,6 +4,7 @@ import { CORE_BUNDLE } from "../../../src/templates_bundle.ts";
 import { renderSpecBackend } from "../../../src/domain/conditional_render.ts";
 import { applySpecBackend } from "../../../src/infrastructure/harness/spec_backend_filter.ts";
 import type { CoreEntry } from "../../../src/domain/core_bundle.ts";
+import { skillDocName } from "../../../src/domain/core_bundle.ts";
 
 // Spec 020 + 021 / SC-002 / FR-003 — LOCAL PARITY. The golden fixtures under
 // tests/fixtures/*_local_golden.md pin the `local` render of every phase doc that
@@ -20,7 +21,7 @@ function abs(rel: string): string {
 }
 
 function phaseEntry(name: string): CoreEntry {
-  const e = CORE_BUNDLE.find((x) => x.category === "phase" && x.name === name);
+  const e = CORE_BUNDLE.find((x) => x.category === "phase" && skillDocName(x) === name);
   if (!e) throw new Error(`missing phase entry: ${name}`);
   return e;
 }
