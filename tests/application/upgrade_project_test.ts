@@ -391,8 +391,22 @@ Deno.test("UpgradeProjectUseCase with --force deletes customized orphan with bac
 
 const PLUGIN_DEST = ".claude/agents/product-owner.md";
 
-function fakePluginDetector(installed: boolean) {
-  return { isPluginInstalled: (_n: string) => Promise.resolve(installed) };
+/**
+ * `serves` models what the INSTALLED plugin actually carries (cli#606).
+ *
+ * It defaults to "everything it covers", which is what these tests assumed
+ * before the path-level probe existed — so their expectations are unchanged.
+ * Pass a narrower predicate to model a user on an older plugin release, where
+ * migrating a covered-but-unserved path would delete the project's only copy.
+ */
+function fakePluginDetector(
+  installed: boolean,
+  serves: (pluginRelPath: string) => boolean = () => true,
+) {
+  return {
+    isPluginInstalled: (_n: string) => Promise.resolve(installed),
+    pluginHasPath: (_n: string, p: string) => Promise.resolve(installed && serves(p)),
+  };
 }
 
 Deno.test("UpgradeProjectUseCase: vanilla on-disk + plugin installed → backed up + deleted + dropped from lock", async () => {
@@ -431,6 +445,71 @@ Deno.test("UpgradeProjectUseCase: vanilla on-disk + plugin installed → backed 
   assertEquals(lockStore.last?.entries.has(PLUGIN_DEST), false);
   // No write happened — the plugin owns the file now
   assertEquals(writer.written.has(PLUGIN_DEST), false);
+});
+
+/**
+ * cli#606 AC4 — the migration must ask the installed tree, not the list.
+ *
+ * `PLUGIN_COVERED_PATHS_CLAUDE` says what the plugin is EXPECTED to ship. A
+ * user on an older plugin release has covered paths their build has never heard
+ * of. Migrating one of those deletes the project's only copy and nothing takes
+ * over serving it — the file is simply gone from a working project until the
+ * user notices and runs `upgrade` again after uninstalling.
+ *
+ * That risk is what made the coverage widening in #605 worth gating. This is
+ * the assertion that the gate is real: same covered dest, same installed
+ * plugin, only the installed tree's contents differ.
+ */
+Deno.test("UpgradeProjectUseCase: covered dest the installed plugin does NOT serve is never migrated", async () => {
+  const sha = await sha256Hex("vanilla content");
+  const lock: InstalledLock = {
+    version: 2,
+    harness: "claude",
+    backlogBackend: "local",
+    versionScheme: "semver",
+    specBackend: "local",
+    templatesVersion: "0.7.0",
+    entries: new Map([[
+      PLUGIN_DEST,
+      { sha256: sha, installedAt: "2026-05-01T00:00:00Z", templatesVersion: "0.7.0" },
+    ]]),
+  };
+  const writer = fakeWriter();
+  const lockStore = fakeLockStore(lock);
+  const uc = new UpgradeProjectUseCase({
+    reader: fakeReader({ [PLUGIN_DEST]: "vanilla content" }),
+    writer,
+    lockStore,
+    core: coreFromBundle({
+      [PLUGIN_DEST]: { content: "upstream update", executable: false },
+    }),
+    templatesVersion: "0.7.1",
+    findHarness: findFakeHarness,
+    // Installed, but this build carries nothing.
+    pluginDetector: fakePluginDetector(true, () => false),
+  });
+  const result = await uc.execute({ projectDir: "/p", dryRun: false, force: false });
+  assertEquals(result.status, "applied");
+  // Scoped to the dest itself: the use case also deletes staging copies under
+  // `.specnaut/upgrade-staging/`, which is routine housekeeping and not what
+  // this test is about. An earlier version asserted `deleted` was empty and
+  // failed on that.
+  assertEquals(
+    writer.deleted.includes(PLUGIN_DEST),
+    false,
+    "a file the installed plugin does not serve was deleted from the project — " +
+      "nothing would have replaced it",
+  );
+  assertEquals(
+    lockStore.last?.entries.has(PLUGIN_DEST),
+    true,
+    "the lock entry was dropped, so the next upgrade cannot even see the file",
+  );
+  assertEquals(
+    writer.written.has(PLUGIN_DEST),
+    true,
+    "the binary should keep owning it and apply the upstream update as normal",
+  );
 });
 
 Deno.test("UpgradeProjectUseCase: customized on-disk + plugin installed → preserved with pluginAvailable=true (no delete)", async () => {

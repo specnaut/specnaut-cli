@@ -18,7 +18,7 @@ import {
   type UpgradePlan,
 } from "../domain/upgrade_plan.ts";
 import { canonicalBlockBody, extractBlock, mergeIntoFile } from "../domain/merge_block.ts";
-import { isPluginCoveredPath } from "../domain/plugin_coverage.ts";
+import { isPluginCoveredPath, pluginRelativePath } from "../domain/plugin_coverage.ts";
 import { isAgenticPath, pruneAgenticEntries } from "../domain/parent_managed.ts";
 
 /** The plugin name used for both the install probe and the cache directory. */
@@ -278,15 +278,40 @@ export class UpgradeProjectUseCase {
     }
 
     const isDeclaredPreserved = input.isDeclaredPreserved ?? (() => false);
-    const pluginInstalled = this.deps.pluginDetector !== undefined &&
-      await this.deps.pluginDetector.isPluginInstalled(PLUGIN_NAME);
+    const detector = this.deps.pluginDetector;
+    const pluginInstalled = detector !== undefined &&
+      await detector.isPluginInstalled(PLUGIN_NAME);
+
+    // Ask the INSTALLED plugin what it actually serves, rather than trusting
+    // the compile-time coverage list on its own (cli#606).
+    //
+    // `PLUGIN_COVERED_PATHS_CLAUDE` describes what the plugin is expected to
+    // ship. A user on an older plugin release has covered paths their build has
+    // never heard of — and migrating one deletes the project's only copy while
+    // nothing takes over serving it. The list says "the plugin owns this
+    // path"; only the tree can say "this install has it".
+    //
+    // Resolved here, not inside `computeUpgradePlan`, because the plan is a
+    // pure synchronous function and this question is a filesystem probe. The
+    // probe runs only when the plugin is installed: on every other run the
+    // answer cannot change the outcome, so it is not worth a single stat.
+    const servedByPlugin = new Set<string>();
+    if (pluginInstalled && detector !== undefined) {
+      for (const dest of newShas.keys()) {
+        if (!isPluginCoveredPath(lock.harness, dest)) continue;
+        const rel = pluginRelativePath(dest);
+        if (rel === null) continue;
+        if (await detector.pluginHasPath(PLUGIN_NAME, rel)) servedByPlugin.add(dest);
+      }
+    }
+
     const plan = computeUpgradePlan(
       diskShas,
       effectiveLock,
       newShas,
       {
         pluginInstalled,
-        isPluginCovered: (dest) => isPluginCoveredPath(lock.harness, dest),
+        isPluginCovered: (dest) => servedByPlugin.has(dest),
         isSkipIfExists: (dest) => bundle[dest]?.skipIfExists === true,
         resetBaseline: input.resetBaseline ?? false,
         isDeclaredPreserved,

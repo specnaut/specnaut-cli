@@ -147,18 +147,30 @@ export interface ParentWorkspaceReader {
 }
 
 /**
- * Detects whether a Claude Code plugin is currently installed.
+ * Detects whether a Claude Code plugin is installed, and what it serves.
  *
- * The default implementation probes
- * `~/.claude/plugins/cache/<name>/` (per the Claude Code
- * discover-plugins docs); test seams can stub this to return any value.
+ * The default implementation reads `~/.claude/plugins/installed_plugins.json`
+ * and falls back to walking `~/.claude/plugins/cache/<marketplace>/<plugin>/`;
+ * test seams can stub both methods.
  *
- * Used by the upgrade use case to drive the binary → plugin migration
- * table: when the plugin is installed, vanilla on-disk agent files are
- * auto-migrated; customized files are preserved with a warning.
+ * Used by the upgrade use case to drive the binary → plugin migration table:
+ * when the plugin is installed AND serves a given path, a vanilla on-disk copy
+ * is migrated away; a customized one is preserved with a warning.
  */
 export interface PluginDetector {
   isPluginInstalled(name: string): Promise<boolean>;
+
+  /**
+   * Does the installed plugin actually carry `pluginRelPath` (plugin-root
+   * relative, e.g. `skills/board/SKILL.md`)?
+   *
+   * Migration used to be decided by a compile-time list alone, which describes
+   * what the plugin is EXPECTED to ship rather than what the user's installed
+   * version does. A user on an older release would have files deleted that
+   * their plugin has never heard of, leaving no copy anywhere. This is the
+   * question that cannot be answered at compile time (cli#606).
+   */
+  pluginHasPath(name: string, pluginRelPath: string): Promise<boolean>;
 }
 
 import type { CoreBundle } from "../domain/core_bundle.ts";

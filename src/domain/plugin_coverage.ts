@@ -134,6 +134,24 @@ export function isPluginCoveredPath(
  * to close a long-standing drift bug; this array continues to mirror
  * the bundled Claude scaffold exactly.
  */
+/**
+ * The plugin-root-relative path a covered destination corresponds to, or null.
+ *
+ * Criterion 2 of the membership rule — "the plugin ships the same content at
+ * the same path with `.claude/` replaced by the plugin root" — expressed as a
+ * function, so the probe that checks it cannot use a different rule than the
+ * criterion that claims it.
+ *
+ * The mapping is 1:1 for exactly the two prefixes the criterion covers, which
+ * is itself a reason coverage stops there. `.specnaut/harness-tools.md`, for
+ * one, has five plugin sources and one destination — no path this could return
+ * would be right.
+ */
+export function pluginRelativePath(dest: string): string | null {
+  const PREFIX = ".claude/";
+  return dest.startsWith(PREFIX) ? dest.slice(PREFIX.length) : null;
+}
+
 export const PLUGIN_COVERED_PATHS_CLAUDE: ReadonlyArray<string> = [
   // The agents' own index. `isPluginCoveredPath`'s agent regex has always
   // matched it (`README` !== `architect`), so `upgrade` would migrate it while

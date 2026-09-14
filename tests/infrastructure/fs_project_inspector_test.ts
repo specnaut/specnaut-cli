@@ -2,6 +2,7 @@ import { assertEquals } from "@std/assert";
 import { join } from "@std/path";
 import { PLUGIN_COVERED_PATHS_CLAUDE } from "../../src/domain/plugin_coverage.ts";
 import { FsProjectInspector } from "../../src/infrastructure/fs_project_inspector.ts";
+import { FsPluginDetector } from "../../src/infrastructure/fs_plugin_detector.ts";
 
 const CONSTITUTION_FILLED = `# Project Constitution
 
@@ -758,7 +759,13 @@ project_number: 4
 import type { PluginDetector } from "../../src/application/ports.ts";
 
 function fakePluginDetector(installed: boolean): PluginDetector {
-  return { isPluginInstalled: (_n: string) => Promise.resolve(installed) };
+  return {
+    isPluginInstalled: (_n: string) => Promise.resolve(installed),
+    // An installed plugin serves everything it covers. `checkPluginGap` does
+    // not consult this, but the port requires it, and answering `installed`
+    // keeps the fake honest rather than quietly denying every path.
+    pluginHasPath: (_n: string, _p: string) => Promise.resolve(installed),
+  };
 }
 
 Deno.test("inspect: plugin gap check skipped when no pluginDetector is configured", async () => {
@@ -910,6 +917,96 @@ Deno.test("inspect: plugin gap check warns ONLY for the agents the user actually
       );
       assertEquals(gapOutcomes.length, 1);
       assertEquals(gapOutcomes[0].name, ".claude/agents/product-owner.md");
+    },
+  );
+});
+
+// ── The gap check against the REAL detector (cli#606 AC5) ─────────────────
+
+/**
+ * Every plugin-gap test above injects a boolean fake, so the real probe logic
+ * was exercised in exactly one place — its own unit test, whose fixture was
+ * built to match the implementation it was testing. That is how
+ * `FsPluginDetector` came to return `false` for every real installation while
+ * `check --project` told plugin users their files were missing, for the entire
+ * life of the feature, with a green suite.
+ *
+ * So this one wires the real detector to a real-shaped cache. It is the only
+ * test that can notice the two drifting apart again.
+ */
+async function withRealDetector(
+  installPlugin: boolean,
+  fn: (detector: FsPluginDetector) => Promise<void>,
+) {
+  const home = await Deno.makeTempDir({ prefix: "specnaut-inspect-home-" });
+  try {
+    if (installPlugin) {
+      const root = join(
+        home,
+        ".claude/plugins/cache/specnaut-marketplace/specnaut-plugin/4.3.0",
+      );
+      await Deno.mkdir(root, { recursive: true });
+      await Deno.mkdir(join(home, ".claude/plugins"), { recursive: true });
+      await Deno.writeTextFile(
+        join(home, ".claude/plugins/installed_plugins.json"),
+        JSON.stringify({
+          version: 2,
+          plugins: {
+            "specnaut-plugin@specnaut-marketplace": [
+              { scope: "user", installPath: root, version: "4.3.0" },
+            ],
+          },
+        }),
+      );
+    }
+    await fn(new FsPluginDetector(home));
+  } finally {
+    await Deno.remove(home, { recursive: true });
+  }
+}
+
+Deno.test("inspect: a genuinely installed plugin silences the gap check", async () => {
+  await withProjectDir(
+    async (dir) => {
+      await filledProject(dir);
+      // Every covered path absent — the post-migration state.
+    },
+    async (dir) => {
+      await withRealDetector(true, async (detector) => {
+        const outcomes = await new FsProjectInspector(detector).inspect(dir, "0.7.0");
+        const gaps = outcomes.filter((o) =>
+          o.status === "warn" && o.message.includes("install the plugin")
+        );
+        assertEquals(
+          gaps.length,
+          0,
+          "a plugin user was told their files are missing — the detector could " +
+            "not see an installation laid out the way Claude Code lays them out",
+        );
+      });
+    },
+  );
+});
+
+Deno.test("inspect: with no plugin installed the same project DOES report gaps", async () => {
+  // The discriminator. Without it the test above passes on a detector that
+  // reports "installed" for everything, which is the opposite defect.
+  await withProjectDir(
+    async (dir) => {
+      await filledProject(dir);
+    },
+    async (dir) => {
+      await withRealDetector(false, async (detector) => {
+        const outcomes = await new FsProjectInspector(detector).inspect(dir, "0.7.0");
+        const gaps = outcomes.filter((o) =>
+          o.status === "warn" && o.message.includes("install the plugin")
+        );
+        assertEquals(
+          gaps.length > 0,
+          true,
+          "no gap reported for a project missing every covered path with no plugin installed",
+        );
+      });
     },
   );
 });
