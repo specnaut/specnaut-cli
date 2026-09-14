@@ -11,6 +11,7 @@ import { managedSectionLabels } from "../domain/template.ts";
 import { sha256Hex } from "../domain/sha256.ts";
 import type { InstalledLock, LockEntry } from "../domain/installed_lock.ts";
 import type { CoreBundle } from "../domain/core_bundle.ts";
+import { renameEndpointEntry, SKILL_DOC_RENAMES } from "../domain/skill_doc_renames.ts";
 import {
   computeUpgradePlan,
   type UpgradeAction,
@@ -187,6 +188,87 @@ export class UpgradeProjectUseCase {
       }
     }
 
+    // --- Renamed documents carry their lock identity across the move ---------
+    //
+    // A sub-document that changed address is otherwise TWO unrelated events: an
+    // orphan at the old path and an add-new at the new one. The user's bytes
+    // survive — a customised orphan is removed only under `--force`, with a
+    // backup — but they stop being READ. The agent loads the vanilla document
+    // at the new address while the edit sits at the old one, behind a success
+    // message. A release guardrail that stops firing silently is worse than one
+    // that is deleted loudly.
+    //
+    // Moving the lock entry makes it ONE event, so the ordinary customized /
+    // vanilla logic below applies at the new address with no special case: a
+    // vanilla file updates, a customised one lands in the `customized` bucket
+    // where the summary names it.
+    const bundleOpts = {
+      backlogBackend: lock.backlogBackend,
+      versionScheme: lock.versionScheme,
+      specBackend: lock.specBackend,
+      specAutogen: lock.specAutogen,
+    };
+    /** Destinations this harness emits regardless of the bundle. */
+    const harnessOnlyDests = harness.mapBundle([], bundleOpts);
+    const destFor = (owner: string, doc: string): string | null => {
+      // Ask the HARNESS where it puts this document. Composing the path here
+      // would be a second statement of the adapter's rule (spec 033 §5) — and
+      // it is harness-specific, so any literal would be wrong on six of seven.
+      const mapped = harness.mapBundle([renameEndpointEntry(owner, doc)], bundleOpts);
+      return Object.keys(mapped).find((d) => !(d in harnessOnlyDests)) ?? null;
+    };
+
+    const applicable: Array<{ oldDest: string; newDest: string; reason: string }> = [];
+    for (const r of SKILL_DOC_RENAMES) {
+      const oldDest = destFor(r.from.owner, r.from.doc);
+      const newDest = destFor(r.to.owner, r.to.doc);
+      if (oldDest === null || newDest === null) continue;
+      // Only when the project is actually mid-migration: the old path is
+      // tracked AND present, the new document ships now, and nothing has
+      // already claimed the new path.
+      if (!lock.entries.has(oldDest)) continue;
+      if (!diskShas.has(oldDest)) continue;
+      if (!(newDest in bundle)) continue;
+      if (lock.entries.has(newDest)) continue;
+      applicable.push({ oldDest, newDest, reason: r.reason });
+    }
+
+    let effectiveLock = lock;
+    if (applicable.length > 0) {
+      const entries = new Map(lock.entries);
+      for (const { oldDest, newDest } of applicable) {
+        const entry = entries.get(oldDest)!;
+        entries.delete(oldDest);
+        entries.set(newDest, entry);
+        const sha = diskShas.get(oldDest)!;
+        diskShas.set(newDest, sha);
+        diskShas.delete(oldDest);
+      }
+      effectiveLock = { ...lock, entries };
+
+      // The maps above are enough for `--dry-run` to report the move
+      // faithfully; the bytes only travel on a real run.
+      if (!input.dryRun) {
+        const moved: Bundle = {};
+        for (const { oldDest, newDest } of applicable) {
+          const content = await reader.readText(input.projectDir, oldDest);
+          if (content === null) continue;
+          moved[newDest] = { content, executable: false };
+        }
+        if (Object.keys(moved).length > 0) {
+          await writer.writeBundle(moved, input.projectDir, { overwrite: true });
+          await writer.deletePaths(
+            applicable.map((a) => a.oldDest),
+            input.projectDir,
+            // No backup: the bytes were moved, not discarded. A backup here
+            // would leave a `.specnaut.bak` beside every renamed file on an
+            // upgrade that lost nothing.
+            { backupExisting: false },
+          );
+        }
+      }
+    }
+
     const newShas = new Map<string, string>();
     for (const [dest, file] of Object.entries(bundle)) {
       const shaInput = file.mergeBlock !== undefined
@@ -200,7 +282,7 @@ export class UpgradeProjectUseCase {
       await this.deps.pluginDetector.isPluginInstalled(PLUGIN_NAME);
     const plan = computeUpgradePlan(
       diskShas,
-      lock,
+      effectiveLock,
       newShas,
       {
         pluginInstalled,
@@ -267,12 +349,12 @@ export class UpgradeProjectUseCase {
       // along.
       // Every dest here is `unchanged`, so the entry set is fully derivable:
       // sha and version come from the bundle, `installedAt` is kept when known.
-      // Built from `newShas`, NOT from `lock.entries`, so an orphan row the
+      // Built from `newShas`, NOT from `effectiveLock.entries`, so an orphan row the
       // bundle no longer contains is dropped — the prune the rebuild loop gets
       // for free by iterating the same map, which this branch used to skip
       // because it copied the lock verbatim.
       const upToDateEntries = deriveUnchangedEntries(
-        lock.entries,
+        effectiveLock.entries,
         newShas,
         bundle,
         templatesVersion,
@@ -284,13 +366,13 @@ export class UpgradeProjectUseCase {
       // `--reset-baseline` is bounded by exactly that predicate, so a genuine
       // user edit gets swept into an overwrite by a report that was wrong.
       const staleEntries = [...upToDateEntries].some(([dest, e]) => {
-        const prev = lock.entries.get(dest);
+        const prev = effectiveLock.entries.get(dest);
         return prev === undefined || prev.sha256 !== e.sha256 ||
           prev.templatesVersion !== e.templatesVersion;
-      }) || [...lock.entries.keys()].some((d) => !upToDateEntries.has(d));
+      }) || [...effectiveLock.entries.keys()].some((d) => !upToDateEntries.has(d));
       const staleVersion = lock.templatesVersion !== templatesVersion;
       const staleAgentic = parentManaged &&
-        [...lock.entries.keys()].some((dest) => isAgenticPath(dest));
+        [...effectiveLock.entries.keys()].some((dest) => isAgenticPath(dest));
       if (
         parentManaged !== lockParentManaged || staleAgentic ||
         staleEntries || staleVersion
@@ -350,7 +432,7 @@ export class UpgradeProjectUseCase {
       // `reconcile <path>` refuses — a pending item no command can clear.
       // Since #572 an unwritten preserve with no prior entry deliberately gets
       // no entry, which is exactly the population that would strand here.
-      if (!lock.entries.has(action.dest)) continue;
+      if (!effectiveLock.entries.has(action.dest)) continue;
       const file = bundle[action.dest];
       if (!file) continue;
       stagingWrites[`.specnaut/upgrade-staging/${action.dest}`] = file;
@@ -498,7 +580,7 @@ export class UpgradeProjectUseCase {
     const updatedEntries = new Map<string, LockEntry>();
     for (const [dest] of newShas) {
       if (droppedToPlugin.has(dest)) continue;
-      const existing = lock.entries.get(dest);
+      const existing = effectiveLock.entries.get(dest);
       const sha = await shaOfBundle(bundle[dest]);
       const wrote = toWrite[dest] !== undefined;
       // A `skipIfExists` file the user already had is theirs, and init

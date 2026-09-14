@@ -241,17 +241,17 @@ test:** invoke the retired names and read the output.
 release document survives the move. **Independent test:** scaffold at the previous version, upgrade,
 diff against a fresh scaffold.
 
-- [ ] T038 [US3] Implement rename-in-lock — settled at the plan stop (`plan.md` §12). A document
+- [x] T038 [US3] Implement rename-in-lock — settled at the plan stop (`plan.md` §12). A document
       whose address changed carries its lock identity to the new path so its customised bytes travel
       with it. Home: the lock's rename handling (`plan.md` §5).
-- [ ] T039 [US3] Extend `tests/integration/upgrade_removed_phases_test.ts` — the closest existing
+- [x] T039 [US3] Extend `tests/integration/upgrade_removed_phases_test.ts` — the closest existing
       analogue — rather than writing a new test: add the two `/ship` documents to `REMOVED_PHASES`
       and cover the **customised** case explicitly.
-- [ ] T040 [US3] Add an upgrade test for the FR-010 boundary: an **unmodified** orphan is removed, a
+- [x] T040 [US3] Add an upgrade test for the FR-010 boundary: an **unmodified** orphan is removed, a
       **customised** one is not (it keeps the `wasCustomized` treatment — deleted only under
       `--force`, with a backup). Prove the customised half red by making the code delete
       unconditionally.
-- [ ] T041 [US3] Add the test that closes §11 finding 1 end to end: scaffold, customise a release
+- [x] T041 [US3] Add the test that closes §11 finding 1 end to end: scaffold, customise a release
       document, upgrade, and assert the customisation is what the agent now reads at the new
       address. A test that only checks the file exists somewhere would pass against the exact defect
       this is for.
@@ -265,8 +265,8 @@ diff against a fresh scaffold.
 
 ## Phase 6 — Polish & cross-cutting
 
-- [ ] T043 [P] Update `README.md` so the three-skill model is what a reader meets first.
-- [ ] T044 [P] Update `src/domain/plugin_coverage.ts`'s module doc comment — it currently describes
+- [x] T043 [P] Update `README.md` so the three-skill model is what a reader meets first.
+- [x] T044 [P] Update `src/domain/plugin_coverage.ts`'s module doc comment — it currently describes
       the specnaut-only phase convention in prose that T016 makes false.
 - [ ] T045 Run the full smoke suite: `bash scripts/smoke/run-all.sh`.
 - [ ] T046 Run `deno task test` and
