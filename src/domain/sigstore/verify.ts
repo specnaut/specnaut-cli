@@ -20,6 +20,7 @@
 import { parseBundles, type SigstoreBundle } from "./bundle.ts";
 import { preAuthEncoding } from "./dsse.ts";
 import { parseSubjects } from "./in_toto.ts";
+import { decodeBase64 } from "@std/encoding/base64";
 import { derEcdsaToP1363 } from "./der.ts";
 import { hashForSignatureAlgorithm, parseCertificate, type X509Cert } from "./x509.ts";
 
@@ -30,8 +31,10 @@ export type VerificationFailure =
   | "malformed-bundle"
   /** The signing certificate was not issued by the pinned authority. */
   | "untrusted-issuer"
-  /** The signing certificate was not valid at the time of the check. */
+  /** The signing certificate was not valid when the signature was made. */
   | "certificate-expired"
+  /** No SIGNED statement of when the signature was made — so no time to judge it at. */
+  | "untrusted-timestamp"
   /** Signed by a real Fulcio certificate, but not by the identity we pin. */
   | "identity-mismatch"
   /** The DSSE signature does not verify under the certificate's key. */
@@ -56,6 +59,14 @@ export type TrustAnchor = {
   readonly expectedSanUri: string;
   /** The OIDC issuer Fulcio must have recorded. */
   readonly expectedOidcIssuer: string;
+  /**
+   * SPKI DER of the transparency log whose Signed Entry Timestamp establishes
+   * WHEN the signature was made.
+   *
+   * An anchor, not a constant, for the same reason the issuer is: a test must
+   * be able to mint its own log. Production passes the pinned public-good key.
+   */
+  readonly rekorPublicKeyDer: Uint8Array;
 };
 
 function fail(reason: VerificationFailure, detail: string): VerificationOutcome {
@@ -106,11 +117,72 @@ const PROGRESS: Record<VerificationFailure, number> = {
   "no-bundle": 0,
   "malformed-bundle": 1,
   "untrusted-issuer": 2,
-  "certificate-expired": 3,
-  "identity-mismatch": 4,
-  "signature-invalid": 5,
-  "digest-mismatch": 6,
+  "untrusted-timestamp": 3,
+  "certificate-expired": 4,
+  "identity-mismatch": 5,
+  "signature-invalid": 6,
+  "digest-mismatch": 7,
 };
+
+/**
+ * The instant the transparency log says it saw this signature, or `null`.
+ *
+ * `null` means "no TRUSTED time", never "no time": a bundle with no log entry
+ * and a bundle whose Signed Entry Timestamp does not verify are both states
+ * where the only available answer is one an attacker could have written.
+ *
+ * ## What the SET covers, and why the shape is exact
+ *
+ * Rekor signs the RFC 8785 canonical JSON of four fields — `body`,
+ * `integratedTime`, `logID`, `logIndex` — with its own key. Canonical means
+ * keys sorted and no whitespace, and `logID` is the HEX of the key id the
+ * bundle carries as base64. Every one of those details is load-bearing: a
+ * single byte out of place produces a valid-looking payload whose signature
+ * simply does not verify, which is indistinguishable from tampering.
+ *
+ * The pinned key is checkable rather than asserted: its SHA-256 is the `logId`
+ * every published bundle names, so anyone can confirm the pin against a real
+ * attestation.
+ */
+async function verifiedSigningTime(
+  bundle: SigstoreBundle,
+  anchor: TrustAnchor,
+): Promise<Date | null> {
+  const t = bundle.tlog;
+  if (t === undefined) return null;
+
+  const integrated = Number(t.integratedTime);
+  const index = Number(t.logIndex);
+  if (!Number.isSafeInteger(integrated) || integrated <= 0) return null;
+  if (!Number.isSafeInteger(index) || index < 0) return null;
+
+  let logIdHex: string;
+  try {
+    logIdHex = [...decodeBase64(t.logIdKeyId)]
+      .map((b) => b.toString(16).padStart(2, "0")).join("");
+  } catch {
+    return null;
+  }
+
+  // Key order is alphabetical because the canonical form demands it, not as a
+  // matter of taste. Written as a literal rather than sorted at runtime so the
+  // shape is reviewable against Rekor's own definition.
+  const canonical = JSON.stringify({
+    body: t.canonicalizedBody,
+    integratedTime: integrated,
+    logID: logIdHex,
+    logIndex: index,
+  });
+
+  const ok = await ecdsaVerify(
+    anchor.rekorPublicKeyDer,
+    { name: "P-256", coordBytes: 32 },
+    "SHA-256",
+    t.signedEntryTimestamp,
+    new TextEncoder().encode(canonical),
+  );
+  return ok ? new Date(integrated * 1000) : null;
+}
 
 async function verifyOne(
   bundle: SigstoreBundle,
@@ -145,11 +217,54 @@ async function verifyOne(
     return fail("untrusted-issuer", "signing certificate was not issued by the pinned authority");
   }
 
-  if (now < leaf.notBefore || now > leaf.notAfter) {
+  // WHEN was this signed? Not "what time is it now".
+  //
+  // A Fulcio signing certificate lives ten minutes. Judging its validity window
+  // by the wall clock therefore refuses every release older than ten minutes —
+  // which is what shipped, and it made `self-update` refuse every signed
+  // release deterministically, for every user, with a message blaming a
+  // certificate-authority rotation that had not happened.
+  //
+  // The signature's age is not the reader's business to guess. Rekor
+  // counter-signs each log entry with a Signed Entry Timestamp covering
+  // `integratedTime`, so a verified SET is a statement from the log, under its
+  // own key, about when it saw this signature. That is the instant the
+  // certificate window has to contain.
+  //
+  // `now` is still a parameter and still used — for the SET itself, below, and
+  // by callers that pin it in tests. It is simply no longer the thing a
+  // ten-minute certificate is measured against.
+  const signedAt = await verifiedSigningTime(bundle, anchor);
+  if (signedAt === null) {
+    return fail(
+      "untrusted-timestamp",
+      bundle.tlog === undefined
+        ? "bundle carries no transparency-log entry, so there is no signed " +
+          "statement of when it was signed"
+        : "the transparency log's signed entry timestamp did not verify against " +
+          "the pinned log key",
+    );
+  }
+
+  // Generously bounded, because the alternative failure is worse than the
+  // attack: a user whose clock is a few hours slow must not be told their
+  // release is forged. A day of tolerance cannot be reached by skew and still
+  // rejects a nonsense timestamp.
+  const SKEW_TOLERANCE_MS = 86_400_000;
+  if (signedAt.getTime() > now.getTime() + SKEW_TOLERANCE_MS) {
+    return fail(
+      "untrusted-timestamp",
+      `the log records a signing time in the future (${signedAt.toISOString()} ` +
+        `against ${now.toISOString()})`,
+    );
+  }
+
+  if (signedAt < leaf.notBefore || signedAt > leaf.notAfter) {
     return fail(
       "certificate-expired",
       `signing certificate is valid ${leaf.notBefore.toISOString()} to ` +
-        `${leaf.notAfter.toISOString()}, checked at ${now.toISOString()}`,
+        `${leaf.notAfter.toISOString()}, but the log recorded the signature at ` +
+        signedAt.toISOString(),
     );
   }
 

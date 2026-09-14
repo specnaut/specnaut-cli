@@ -23,7 +23,70 @@ export type SigstoreBundle = {
   readonly payload: Uint8Array;
   /** DER-encoded ECDSA signatures over the payload's PAE. */
   readonly signatures: readonly Uint8Array[];
+  /**
+   * The transparency-log entry, when the bundle carries one.
+   *
+   * This used to be discarded on the stated ground that inclusion is outside
+   * the guarantee — and inclusion IS outside it. But the entry carries the only
+   * SIGNED statement of when the signature was made, and without it the
+   * verifier had no time source but its own clock. Against a Fulcio
+   * certificate that lives ten minutes, that meant every release failed
+   * `certificate-expired` shortly after it was built.
+   *
+   * Reading it is not a promise that the entry is in the log. It is a promise
+   * that Rekor said, under its own signature, when it saw this entry.
+   */
+  readonly tlog?: TlogEntry;
 };
+
+/** The fields of a Rekor entry the Signed Entry Timestamp covers. */
+export type TlogEntry = {
+  readonly logIndex: string;
+  /** Base64 SHA-256 of the log's public key, as the bundle spells it. */
+  readonly logIdKeyId: string;
+  readonly integratedTime: string;
+  /** Base64 DER ECDSA signature over the canonicalized entry. */
+  readonly signedEntryTimestamp: Uint8Array;
+  /** Base64 of the log entry body — signed as the literal string. */
+  readonly canonicalizedBody: string;
+};
+
+/**
+ * Reads the first transparency-log entry, or `undefined`.
+ *
+ * Absent or malformed is not an error here: `verifyArtifact` decides what a
+ * missing timestamp means, and it has a named reason for it. A parser that
+ * threw would collapse "this bundle has no timestamp" into "this bundle is
+ * corrupt", which are different things a user would act on differently.
+ */
+function readTlog(vm: Record<string, unknown>): TlogEntry | undefined {
+  const entries = vm["tlogEntries"];
+  if (!Array.isArray(entries) || entries.length === 0) return undefined;
+  const e = entries[0] as Record<string, unknown>;
+  const logId = (e["logId"] ?? {}) as Record<string, unknown>;
+  const promise = (e["inclusionPromise"] ?? {}) as Record<string, unknown>;
+  const set = promise["signedEntryTimestamp"];
+  if (
+    typeof e["logIndex"] !== "string" || typeof e["integratedTime"] !== "string" ||
+    typeof e["canonicalizedBody"] !== "string" || typeof logId["keyId"] !== "string" ||
+    typeof set !== "string" || set.length === 0
+  ) {
+    return undefined;
+  }
+  let sig: Uint8Array;
+  try {
+    sig = decodeBase64(set);
+  } catch {
+    return undefined;
+  }
+  return {
+    logIndex: e["logIndex"],
+    logIdKeyId: logId["keyId"],
+    integratedTime: e["integratedTime"],
+    signedEntryTimestamp: sig,
+    canonicalizedBody: e["canonicalizedBody"],
+  };
+}
 
 export class BundleError extends Error {
   constructor(message: string) {
@@ -101,10 +164,12 @@ function parseOne(root: unknown, where: string): SigstoreBundle {
     throw new BundleError("dsseEnvelope has no payloadType");
   }
 
+  const tlog = readTlog(material);
   return {
     certDer: base64(leaf, "signing certificate"),
     payloadType,
     payload: base64(envelope.payload, "dsseEnvelope payload"),
     signatures: sigs.map((s, i) => base64((s as { sig?: unknown })?.sig, `signature ${i}`)),
+    ...(tlog === undefined ? {} : { tlog }),
   };
 }

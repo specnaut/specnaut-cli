@@ -1,6 +1,11 @@
 import { assert, assertEquals } from "@std/assert";
 import { fromFileUrl } from "@std/path";
-import { issueSigningCert, makeAuthority, makeBundle } from "../helpers/sigstore_fixture.ts";
+import {
+  issueSigningCert,
+  makeAuthority,
+  makeBundle,
+  testRekorPublicKeyDer,
+} from "../helpers/sigstore_fixture.ts";
 import { verifyReleaseDir } from "../../scripts/verify-release.ts";
 import { expectedSignerIdentity } from "../../src/domain/sigstore/trust_anchor.ts";
 import { ATTESTATION_ASSET_NAME } from "../../src/domain/sigstore/trust_anchor.ts";
@@ -85,11 +90,16 @@ async function publishedRelease(opts: {
   return dir;
 }
 
-function anchorOf(dir: string): Promise<{ issuerCertDer: Uint8Array; expectedOidcIssuer: string }> {
-  return Deno.readTextFile(`${dir}/.authority`).then((t) => ({
+async function anchorOf(dir: string) {
+  const t = await Deno.readTextFile(`${dir}/.authority`);
+  return {
     issuerCertDer: new Uint8Array(JSON.parse(t)),
     expectedOidcIssuer: OIDC,
-  }));
+    // The synthetic log, so a fixture bundle carries a signing time the
+    // verifier can trust. Without it there is no time to judge the
+    // certificate's ten-minute window at, and every fixture is refused.
+    rekorPublicKeyDer: await testRekorPublicKeyDer(),
+  };
 }
 
 async function run(dir: string, version = VERSION) {

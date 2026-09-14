@@ -27,3 +27,4 @@ templates/core/skills/board/scripts/cloud/move.sh  cloud backlog backend has no 
 templates/core/skills/board/scripts/cloud/reconcile.sh  cloud backlog backend has no smoke of its own yet; tracked as a follow-up
 templates/core/skills/board/scripts/cloud/view.sh  cloud backlog backend has no smoke of its own yet; tracked as a follow-up
 templates/core/root/README.md	maintainer note, not shipped — absent from templates/manifest.json, so no consumer receives it and no smoke can assert on it
+templates/core/skills/using-specnaut/references/codex-tools.md	harness-SELECTED: the five *-tools.md sources collapse into one .specnaut/harness-tools.md renamed to the init's harness, so a claude-only smoke cannot see the codex text and `references/codex-tools.md` is a destination for no harness. Asserted where a codex init happens — smoke-all-harnesses.sh checks .specnaut/harness-tools.md carries `agent_type=` on the codex render (cli#599).

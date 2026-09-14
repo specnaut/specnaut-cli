@@ -54,6 +54,31 @@ export const FULCIO_ROOT_DER: Uint8Array = decodeBase64(
     "/stJ5TfcLLeABLE4BNJOsQ4vnBHJ",
 );
 
+/**
+ * The public-good Rekor transparency log's signing key (SPKI DER, P-256).
+ *
+ * Pinned because it is the ONLY trusted source of *when* a signature was made.
+ * A Fulcio signing certificate lives ten minutes, so checking its validity
+ * window against the wall clock refuses every release older than that — which
+ * is precisely what shipped, and what made `self-update` refuse every signed
+ * release from the moment the build cooled off.
+ *
+ * Rekor counter-signs each log entry with a Signed Entry Timestamp, and that
+ * signature covers `integratedTime`. Verifying the SET against this key turns
+ * the bundle's own claim about when it was logged into something an attacker
+ * cannot choose: forging a timestamp would require this key.
+ *
+ * Provenance, so the next reader does not have to take it on faith: this is the
+ * key whose SHA-256 equals the `logId.keyId` carried in the attestations this
+ * project publishes. That is checkable against any published bundle — the
+ * bundle names the key that signed it, so the pin is verifiable rather than
+ * merely asserted.
+ */
+export const REKOR_PUBLIC_KEY_DER: Uint8Array = decodeBase64(
+  "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAE2G2Y+2tabdTV5BcGiBIx0a9fAFwrkBbmLSGt" +
+    "ks4L3qX6yYY0zufBnhC8Ur/iy55GhWP/9A/bY2LhC30M9+RYtw==",
+);
+
 /** `O=sigstore.dev, CN=sigstore-intermediate` — what issues signing certificates. */
 export const FULCIO_INTERMEDIATE_DER: Uint8Array = decodeBase64(
   "MIICGjCCAaGgAwIBAgIUALnViVfnU0brJasmRkHrn/UnfaQwCgYIKoZIzj0EAwMwKjEVMBMG" +

@@ -7,6 +7,7 @@ import {
   makeAuthority,
   makeBundle,
   type SigningCert,
+  testRekorPublicKeyDer,
 } from "../../helpers/sigstore_fixture.ts";
 
 /**
@@ -39,8 +40,13 @@ async function setup(): Promise<void> {
   });
 }
 
-function anchorFor(a: Authority, san = SAN, issuer = ISSUER): TrustAnchor {
-  return { issuerCertDer: a.certDer, expectedSanUri: san, expectedOidcIssuer: issuer };
+async function anchorFor(a: Authority, san = SAN, issuer = ISSUER): Promise<TrustAnchor> {
+  return {
+    issuerCertDer: a.certDer,
+    expectedSanUri: san,
+    expectedOidcIssuer: issuer,
+    rekorPublicKeyDer: await testRekorPublicKeyDer(),
+  };
 }
 
 async function happyBundle(): Promise<string> {
@@ -53,7 +59,7 @@ Deno.test("a bundle from the pinned identity over these bytes verifies", async (
     bundleJson: await happyBundle(),
     artifactSha256: DIGEST,
     now: NOW,
-    anchor: anchorFor(authority),
+    anchor: await anchorFor(authority),
   });
   // Report the detail on failure — a bare `assert(outcome.ok)` on a broken
   // parser says nothing about which of nine steps broke.
@@ -67,7 +73,7 @@ Deno.test("no bundle at all is 'no-bundle', not a pass", async () => {
       bundleJson,
       artifactSha256: DIGEST,
       now: NOW,
-      anchor: anchorFor(authority),
+      anchor: await anchorFor(authority),
     });
     assert(!outcome.ok && outcome.reason === "no-bundle", JSON.stringify(outcome));
   }
@@ -87,7 +93,7 @@ Deno.test("unreadable material is 'malformed-bundle'", async () => {
       bundleJson,
       artifactSha256: DIGEST,
       now: NOW,
-      anchor: anchorFor(authority),
+      anchor: await anchorFor(authority),
     });
     assert(
       !outcome.ok && outcome.reason === "malformed-bundle",
@@ -111,26 +117,69 @@ Deno.test("a real certificate from another authority is 'untrusted-issuer'", asy
     bundleJson: await makeBundle(foreignCert, { subjects: [{ name: "x", sha256: DIGEST }] }),
     artifactSha256: DIGEST,
     now: NOW,
-    anchor: anchorFor(authority),
+    anchor: await anchorFor(authority),
   });
   assert(!outcome.ok && outcome.reason === "untrusted-issuer", JSON.stringify(outcome));
 });
 
-Deno.test("a certificate outside its validity window is 'certificate-expired'", async () => {
+Deno.test("a signature made outside the certificate's window is 'certificate-expired'", async () => {
+  await setup();
+  // The question is when the SIGNATURE was made, not what time it is now. This
+  // test used to vary `now` and expect a refusal — which encoded the defect:
+  // a Fulcio certificate lives ten minutes, so judging it by the clock refused
+  // every genuine release minutes after it was built. It varies the LOGGED
+  // signing time instead, which is the thing the window actually constrains.
+  for (const signedAt of [new Date("2026-01-01T11:00:00Z"), new Date("2026-01-01T13:00:00Z")]) {
+    const outcome = await verifyArtifact({
+      bundleJson: await makeBundle(cert, {
+        subjects: [{ name: "x", sha256: DIGEST }],
+        signedAt,
+      }),
+      artifactSha256: DIGEST,
+      now: NOW,
+      anchor: await anchorFor(authority),
+    });
+    assert(
+      !outcome.ok && outcome.reason === "certificate-expired",
+      `${signedAt.toISOString()}: ${JSON.stringify(outcome)}`,
+    );
+  }
+});
+
+Deno.test("the wall clock does not decide — a good bundle verifies years later", async () => {
+  // The regression guard for the defect itself, and the one assertion the old
+  // suite could not make. A synthetic certificate with a SIX-YEAR window hid
+  // this; these windows are ten minutes, like Fulcio's, so a verifier that
+  // consulted the clock fails here immediately.
   await setup();
   const bundleJson = await happyBundle();
-  for (const now of [new Date("2026-01-01T11:00:00Z"), new Date("2026-01-01T13:00:00Z")]) {
+  for (const now of [NOW, new Date("2031-06-01T00:00:00Z"), new Date("2040-01-01T00:00:00Z")]) {
     const outcome = await verifyArtifact({
       bundleJson,
       artifactSha256: DIGEST,
       now,
-      anchor: anchorFor(authority),
+      anchor: await anchorFor(authority),
     });
     assert(
-      !outcome.ok && outcome.reason === "certificate-expired",
-      `${now.toISOString()}: ${JSON.stringify(outcome)}`,
+      outcome.ok,
+      `at ${now.toISOString()} a genuine bundle was refused: ${JSON.stringify(outcome)} — ` +
+        `this is self-update refusing every release once the certificate cools off`,
     );
   }
+});
+
+Deno.test("a bundle with no transparency-log entry has no trusted signing time", async () => {
+  await setup();
+  const outcome = await verifyArtifact({
+    bundleJson: await makeBundle(cert, {
+      subjects: [{ name: "x", sha256: DIGEST }],
+      noTlog: true,
+    }),
+    artifactSha256: DIGEST,
+    now: NOW,
+    anchor: await anchorFor(authority),
+  });
+  assert(!outcome.ok && outcome.reason === "untrusted-timestamp", JSON.stringify(outcome));
 });
 
 Deno.test("a valid signature from the wrong workflow is 'identity-mismatch'", async () => {
@@ -142,7 +191,7 @@ Deno.test("a valid signature from the wrong workflow is 'identity-mismatch'", as
     bundleJson,
     artifactSha256: DIGEST,
     now: NOW,
-    anchor: anchorFor(authority, otherWorkflow),
+    anchor: await anchorFor(authority, otherWorkflow),
   });
   assert(!outcome.ok && outcome.reason === "identity-mismatch", JSON.stringify(outcome));
 
@@ -150,7 +199,7 @@ Deno.test("a valid signature from the wrong workflow is 'identity-mismatch'", as
     bundleJson,
     artifactSha256: DIGEST,
     now: NOW,
-    anchor: anchorFor(authority, SAN, "https://accounts.example.com"),
+    anchor: await anchorFor(authority, SAN, "https://accounts.example.com"),
   });
   assert(
     !wrongIssuer.ok && wrongIssuer.reason === "identity-mismatch",
@@ -167,7 +216,7 @@ Deno.test("a corrupted signature is 'signature-invalid'", async () => {
     }),
     artifactSha256: DIGEST,
     now: NOW,
-    anchor: anchorFor(authority),
+    anchor: await anchorFor(authority),
   });
   assert(!outcome.ok && outcome.reason === "signature-invalid", JSON.stringify(outcome));
 });
@@ -180,7 +229,7 @@ Deno.test("an authentic signature over different bytes is 'digest-mismatch'", as
     bundleJson: await happyBundle(),
     artifactSha256: "b".repeat(64),
     now: NOW,
-    anchor: anchorFor(authority),
+    anchor: await anchorFor(authority),
   });
   assert(!outcome.ok && outcome.reason === "digest-mismatch", JSON.stringify(outcome));
 });
@@ -199,7 +248,7 @@ Deno.test("a statement covering several artefacts accepts any one of them", asyn
     }),
     artifactSha256: DIGEST,
     now: NOW,
-    anchor: anchorFor(authority),
+    anchor: await anchorFor(authority),
   });
   assert(outcome.ok, JSON.stringify(outcome));
 });
@@ -218,7 +267,7 @@ Deno.test("the payload type is bound into the signature", async () => {
     bundleJson: swapped,
     artifactSha256: DIGEST,
     now: NOW,
-    anchor: anchorFor(authority),
+    anchor: await anchorFor(authority),
   });
   assert(!outcome.ok && outcome.reason === "signature-invalid", JSON.stringify(outcome));
 });

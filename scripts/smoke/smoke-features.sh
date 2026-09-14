@@ -526,18 +526,14 @@ check "using-specnaut points at per-harness tool-mapping references" \
   'grep -q -- "-tools.md" .claude/skills/using-specnaut/SKILL.md'
 check "using-specnaut credits obra/superpowers attribution" \
   'grep -q "obra/superpowers" .claude/skills/using-specnaut/SKILL.md'
-# The reference the skill points AT is scaffolded too, and until cli#599 nothing
-# asserted it landed — the pointer was checked, the target was not.
-check "codex-tools reference scaffolded (#599)" \
-  '[ -f .claude/skills/using-specnaut/references/codex-tools.md ]'
-# Substance, not presence. A dispatch that names no role falls through Codex's
-# resolution chain to the parent session's model, so this file has to say to
-# pass `agent_type=`. Asserting only that the file exists would pass over a
-# reference that had lost the one instruction it is there to give.
-check "codex-tools tells the reader to spawn by role, not by description (#599)" \
-  'grep -q "agent_type=" .claude/skills/using-specnaut/references/codex-tools.md'
-check "codex-tools records the model resolution order (#599)" \
-  'grep -qi "parent session" .claude/skills/using-specnaut/references/codex-tools.md'
+# The tool-mapping reference is HARNESS-SELECTED: five `*-tools.md` sources
+# collapse into one `.specnaut/harness-tools.md`, renamed to the harness this
+# project was initialised with. So a claude init cannot see the codex variant,
+# and asserting a `references/codex-tools.md` path here fails — there is no such
+# destination for any harness. The codex content is asserted where a codex init
+# actually happens, in smoke-all-harnesses.sh.
+check "harness-tools reference scaffolded for this harness (#599)" \
+  '[ -f .specnaut/harness-tools.md ]'
 
 echo
 echo "═══ #272  subagent-driven-development skill (Epic #270 / A2) ═══"

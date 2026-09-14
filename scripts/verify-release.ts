@@ -57,7 +57,11 @@ async function sha256OfFile(path: string): Promise<string> {
 export async function verifyReleaseDir(opts: {
   readonly dir: string;
   readonly version: string;
-  readonly anchor: { readonly issuerCertDer: Uint8Array; readonly expectedOidcIssuer: string };
+  readonly anchor: {
+    readonly issuerCertDer: Uint8Array;
+    readonly expectedOidcIssuer: string;
+    readonly rekorPublicKeyDer: Uint8Array;
+  };
   readonly now?: Date;
   readonly targets?: readonly { readonly outName: string }[];
 }): Promise<ArtifactVerification[]> {

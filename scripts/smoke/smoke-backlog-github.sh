@@ -234,8 +234,19 @@ check "list.sh reads via gh issue list --json projectItems (REST-ish CLI)" \
   'grep -q "gh issue list" .specnaut/scripts/backlog/list.sh && grep -q "projectItems" .specnaut/scripts/backlog/list.sh'
 check "list.sh does NOT use bulky gh api graphql for the read path" \
   '! grep -q "gh api graphql" .specnaut/scripts/backlog/list.sh'
-check "move.sh keeps targeted gh api graphql for item-ID lookup" \
-  'grep -q "gh api graphql" .specnaut/scripts/backlog/move.sh && grep -q "projectItems(first:5)" .specnaut/scripts/backlog/move.sh'
+# The item-ID lookup converged into `_config.sh`'s `project_item_id()` in
+# cli#603 — it had three spellings across move.sh and set-field.sh. This
+# assertion used to name move.sh and went stale the moment the query moved,
+# which is how it sat red for ten commits. It follows the code now: the
+# question is "is the lookup still one targeted query", and the answer lives
+# where the query does.
+check "the item-ID lookup is a single targeted gh api graphql in _config.sh" \
+  'grep -q "gh api graphql" .specnaut/scripts/backlog/_config.sh && grep -q "projectItems(first:5)" .specnaut/scripts/backlog/_config.sh'
+# Negated on the QUERY, not on the string: move.sh's header comment still
+# describes the shared lookup by name, and a bare `! grep projectItems` fails on
+# that prose while the code is exactly right.
+check "move.sh calls the shared lookup rather than re-spelling it" \
+  'grep -q "project_item_id" .specnaut/scripts/backlog/move.sh && ! grep -q "gh api graphql" .specnaut/scripts/backlog/move.sh'
 check "move.sh mutation uses gh project item-edit (CLI wrapper)" \
   'grep -q "gh project item-edit" .specnaut/scripts/backlog/move.sh'
 

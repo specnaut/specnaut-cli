@@ -129,6 +129,14 @@ check_helper claude ".claude/loop.md"   "^# Project loop prompt"
 check_helper codex  ".codex/AGENTS.md"  "^# Codex Reference"
 check_helper codex  ".codex/goal.md"    "^# Project goal prompt"
 
+# cli#599. `spawn_agent` resolves a child's model as: explicit spawn value →
+# the `[agents]` default → the PARENT session's value. A dispatch that names no
+# role takes the last link, so this reference has to tell the reader to pass
+# `agent_type=`. Asserted on the codex render because the file is
+# harness-selected — `.specnaut/harness-tools.md` holds the claude mapping on a
+# claude init, and the codex text exists nowhere in that tree.
+check_helper codex  ".specnaut/harness-tools.md"  "agent_type="
+
 # The harness count stays COUNTED, not spelled: the literal once said 8
 # while the array held 7. finish() owns the banner shape (R4); the number
 # in the label is still computed from the array itself.

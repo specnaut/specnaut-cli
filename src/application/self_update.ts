@@ -7,6 +7,7 @@ import {
   FIRST_SIGNED_VERSION,
   FULCIO_INTERMEDIATE_DER,
   GITHUB_ACTIONS_OIDC_ISSUER,
+  REKOR_PUBLIC_KEY_DER,
 } from "../domain/sigstore/trust_anchor.ts";
 import { verifyArtifact } from "../domain/sigstore/verify.ts";
 
@@ -41,13 +42,24 @@ export type SelfUpdateDeps = {
    * from any flag or environment variable, and `self_update_test.ts` pins the
    * default to the real Fulcio intermediate so a swap fails the suite.
    */
-  trustAnchor?: { issuerCertDer: Uint8Array; expectedOidcIssuer: string };
+  trustAnchor?: {
+    issuerCertDer: Uint8Array;
+    expectedOidcIssuer: string;
+    /** Optional so a test can mint its own log; production uses the pinned key. */
+    rekorPublicKeyDer?: Uint8Array;
+  };
 };
 
 /** The anchor used when the caller supplies none — the shipped policy. */
 export const DEFAULT_TRUST_ANCHOR = {
   issuerCertDer: FULCIO_INTERMEDIATE_DER,
   expectedOidcIssuer: GITHUB_ACTIONS_OIDC_ISSUER,
+  // The log key is part of the anchor because the signing certificate's
+  // ten-minute window can only be judged against a SIGNED statement of when the
+  // signature was made. Without it there is no trusted time, and the verifier
+  // fell back to its own clock — which refused every release older than ten
+  // minutes.
+  rekorPublicKeyDer: REKOR_PUBLIC_KEY_DER,
 } as const;
 
 /**
@@ -158,6 +170,7 @@ export class SelfUpdateUseCase {
       artifactSha256,
       now: (this.deps.now ?? (() => new Date()))(),
       anchor: {
+        rekorPublicKeyDer: REKOR_PUBLIC_KEY_DER,
         ...(this.deps.trustAnchor ?? DEFAULT_TRUST_ANCHOR),
         expectedSanUri: expectedSignerIdentity(release.version.toString()),
       },

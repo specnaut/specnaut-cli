@@ -133,6 +133,7 @@ import {
   issueSigningCert,
   makeAuthority,
   makeBundle,
+  testRekorPublicKeyDer,
 } from "../helpers/sigstore_fixture.ts";
 
 const SIGNED = "9.9.9"; // comfortably at or above FIRST_SIGNED_VERSION
@@ -157,12 +158,14 @@ function routingDownloader(sha256: string, bundleJson: string | null): Downloade
 }
 
 let testAuthority: Authority;
+let testRekorKey: Uint8Array;
 async function bundleFor(
   version: string,
   digest: string,
   opts: { identityVersion?: string } = {},
 ): Promise<string> {
   testAuthority ??= await makeAuthority();
+  testRekorKey ??= await testRekorPublicKeyDer();
   const cert = await issueSigningCert(testAuthority, {
     sanUri: expectedSignerIdentity(opts.identityVersion ?? version),
     oidcIssuer: GITHUB_ACTIONS_OIDC_ISSUER,
@@ -188,6 +191,7 @@ function useCaseWith(
     trustAnchor: {
       issuerCertDer: testAuthority.certDer,
       expectedOidcIssuer: GITHUB_ACTIONS_OIDC_ISSUER,
+      rekorPublicKeyDer: testRekorKey,
     },
   });
 }

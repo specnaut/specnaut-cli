@@ -192,7 +192,13 @@ export async function makeAuthority(
   };
 }
 
-export type SigningCert = { certDer: Uint8Array; key: CryptoKeyPair };
+export type SigningCert = {
+  certDer: Uint8Array;
+  key: CryptoKeyPair;
+  /** The window the certificate was issued for — a bundle defaults its log time inside it. */
+  notBefore: Date;
+  notAfter: Date;
+};
 
 /** A short-lived signing certificate issued by `authority`, the way Fulcio issues one. */
 export async function issueSigningCert(authority: Authority, opts: {
@@ -226,15 +232,95 @@ export async function issueSigningCert(authority: Authority, opts: {
       sigAlgOid: SIG_ALG_OID[authority.curve],
     }),
     key,
+    notBefore: opts.notBefore,
+    notAfter: opts.notAfter,
   };
 }
 
 /** A DSSE-enveloped in-toto statement over `subjects`, signed by `cert`. */
+
+// ------------------------------------------------- synthetic transparency log
+
+/**
+ * A stand-in for Rekor, because the verifier now needs a SIGNED statement of
+ * when a signature was made.
+ *
+ * A Fulcio certificate lives ten minutes, so the verifier cannot judge its
+ * window by the wall clock — it reads `integratedTime` from the log entry and
+ * trusts it only because Rekor counter-signs it. A fixture with no log entry
+ * therefore has no trusted time and is refused, which is correct: every real
+ * bundle has one.
+ *
+ * One log per process, so a test can put its public key in an anchor without
+ * threading a handle through every helper.
+ */
+let LOG: { keys: CryptoKeyPair; spki: Uint8Array } | null = null;
+
+async function testLog(): Promise<{ keys: CryptoKeyPair; spki: Uint8Array }> {
+  if (LOG === null) {
+    const keys = await keyPair("P-256");
+    LOG = { keys, spki: await spkiOf(keys.publicKey) };
+  }
+  return LOG;
+}
+
+/** The synthetic log's public key, for a test anchor's `rekorPublicKeyDer`. */
+export async function testRekorPublicKeyDer(): Promise<Uint8Array> {
+  return (await testLog()).spki;
+}
+
+/**
+ * A transparency-log entry whose Signed Entry Timestamp verifies.
+ *
+ * The canonical form is Rekor's, not ours: RFC 8785 JSON over exactly
+ * `body`, `integratedTime`, `logID`, `logIndex`, keys sorted, no whitespace,
+ * `logID` as HEX of the key id. Production reconstructs the same bytes — if
+ * these two ever disagree the signature stops verifying, which is the point.
+ */
+async function makeTlogEntry(integratedTime: number): Promise<Record<string, unknown>> {
+  const log = await testLog();
+  const keyIdBytes = new Uint8Array(
+    await crypto.subtle.digest("SHA-256", log.spki as BufferSource),
+  );
+  const keyId = encodeBase64(keyIdBytes);
+  const logIdHex = [...keyIdBytes].map((b) => b.toString(16).padStart(2, "0")).join("");
+  const body = encodeBase64(new TextEncoder().encode('{"fixture":true}'));
+  const logIndex = 1;
+
+  const canonical = JSON.stringify({
+    body,
+    integratedTime,
+    logID: logIdHex,
+    logIndex,
+  });
+  const raw = new Uint8Array(
+    await crypto.subtle.sign(
+      { name: "ECDSA", hash: "SHA-256" },
+      log.keys.privateKey,
+      new TextEncoder().encode(canonical) as BufferSource,
+    ),
+  );
+  return {
+    logIndex: String(logIndex),
+    logId: { keyId },
+    integratedTime: String(integratedTime),
+    inclusionPromise: { signedEntryTimestamp: encodeBase64(p1363ToDer(raw)) },
+    canonicalizedBody: body,
+  };
+}
+
 export async function makeBundle(cert: SigningCert, opts: {
   subjects: { name: string; sha256: string }[];
   payloadType?: string;
   /** Corrupt the signature, to reach `signature-invalid` without touching anything else. */
   tamperSignature?: boolean;
+  /**
+   * When the log says it saw this signature. Defaults inside the synthetic
+   * certificate's window, which is what makes an untampered fixture verify.
+   */
+  signedAt?: Date;
+  /** Omit the log entry entirely, to reach `untrusted-timestamp`. */
+  noTlog?: boolean;
 }): Promise<string> {
   const payloadType = opts.payloadType ?? "application/vnd.in-toto+json";
   const payload = new TextEncoder().encode(JSON.stringify({
@@ -258,9 +344,22 @@ export async function makeBundle(cert: SigningCert, opts: {
   );
   if (opts.tamperSignature) raw[raw.length - 1] ^= 0xff;
 
+  // One second after issuance, which is what a real log does: the published
+  // v4.3.0 certificate was minted at 23:28:09 and Rekor recorded it at 23:28:10.
+  // Defaulting inside the certificate's OWN window keeps an untampered fixture
+  // verifying however short that window is — and the windows here are ten
+  // minutes precisely because that is what Fulcio issues.
+  const integrated = Math.floor(
+    (opts.signedAt ?? new Date(cert.notBefore.getTime() + 1000)).getTime() / 1000,
+  );
+  const tlog = opts.noTlog === true ? {} : { tlogEntries: [await makeTlogEntry(integrated)] };
+
   return JSON.stringify({
     mediaType: "application/vnd.dev.sigstore.bundle.v0.3+json",
-    verificationMaterial: { certificate: { rawBytes: encodeBase64(cert.certDer) } },
+    verificationMaterial: {
+      certificate: { rawBytes: encodeBase64(cert.certDer) },
+      ...tlog,
+    },
     dsseEnvelope: {
       payloadType,
       payload: encodeBase64(payload),
