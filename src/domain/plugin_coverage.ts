@@ -20,25 +20,44 @@ import type { KnownHarness } from "./installed_lock.ts";
  * Cursor/Codex/etc. projects keep their on-disk files binary-
  * owned regardless of plugin install state on the host machine.
  *
- * Coverage map:
+ * ## Membership criterion
  *
- *   - `.claude/agents/<name>.md` (excluding `architect.md` — that's a
- *     contributor-only agent, not bundled into user projects)
- *   - `.claude/skills/<owner>/SKILL.md` for the skills the list claims, and
- *     every sub-document those skills own. **Claiming a skill claims all of
- *     it**: a partially covered skill is the #455 shape with fewer paths, and
- *     `plugin_coverage_parity_test.ts` fails one.
+ * A destination is plugin-covered when three things hold:
  *
- * The list names **two** owners — `specnaut` and `ship` (spec 033, which moved
- * release concerns out of the router). It does NOT name every skill the plugin
- * ships; whether it should is specnaut-cli#605, deliberately unsettled, because
- * widening it changes what `check --project` reports and what `upgrade`
- * migrates. The parity test pins the owner set so neither can drift by
- * accident.
+ *   1. the Claude adapter scaffolds it under `.claude/agents/` or
+ *      `.claude/skills/`;
+ *   2. the plugin ships the same content at the same path, with `.claude/`
+ *      replaced by the plugin root;
+ *   3. its content is **project-independent** — every path it names resolves
+ *      from the project root rather than from the file's own location, nothing
+ *      is rendered per project, and no user is expected to edit it as
+ *      configuration.
  *
- * Everything else (project-stateful files in `.specnaut/`, harness-
- * static files like `.claude/settings.json`, hooks, `CLAUDE.md`,
- * backlog scripts) stays binary-owned and is NOT covered.
+ * Coverage is all-or-nothing per skill: **claiming a skill claims every
+ * document it owns.** A partially covered skill is the #455 shape with fewer
+ * paths, and `plugin_coverage_parity_test.ts` fails one.
+ *
+ * Everything else stays binary-owned: `.specnaut/**` project state — including
+ * `harness-tools.md`, which five harness-specific sources collapse into, so it
+ * has no 1:1 plugin counterpart — plus harness-static files like
+ * `.claude/settings.json`, hooks, `CLAUDE.md`, and the backlog scripts, which
+ * resolve paths relative to their own location and so fail criterion 3.
+ * `architect.md` is excluded as a contributor-only agent never bundled into
+ * user projects.
+ *
+ * ## Membership has two teeth
+ *
+ * `upgrade` DELETES the on-disk copy of anything covered here when the plugin
+ * is installed, and `check --project` reports it missing once the plugin is
+ * uninstalled. Both are safe **only while every entry is still in
+ * `CORE_BUNDLE`**: a covered path the bundle no longer ships cannot be restored
+ * by `add-new`, so it becomes a permanent warning whose advice — "restore via
+ * `specnaut upgrade`" — cannot be followed.
+ *
+ * **A phantom entry is the defect; breadth is not.** That distinction is what
+ * #455 lacked. Its cost came from six paths the bundle had stopped shipping,
+ * not from the list being wide, and conflating the two is what kept this list
+ * narrow for three releases after the plugin outgrew it (specnaut-cli#605).
  */
 export function isPluginCoveredPath(
   harness: KnownHarness,
@@ -65,6 +84,11 @@ export function isPluginCoveredPath(
   // hand-maintained is specnaut-cli#605, and it is deliberately unsettled:
   // the list names one skill while the plugin ships far more, so deriving it
   // would widen coverage as a side effect.
+  //
+  // Scoped to `specnaut` on purpose. These patterns accept paths the bundle
+  // does not ship, so widening them to every owner would re-admit the phantom
+  // entries the criterion above exists to keep out. Every other owner is
+  // covered by list membership, which is checked against `CORE_BUNDLE`.
   if (dest === ".claude/skills/specnaut/SKILL.md") return true;
   if (/^\.claude\/skills\/specnaut\/phases\/[a-z]+(?:-[a-z]+)*\.md$/.test(dest)) {
     return true;
@@ -82,7 +106,10 @@ export function isPluginCoveredPath(
  * (either re-install the plugin or run `specnaut upgrade` to restore
  * the bundled snapshot).
  *
- * Kept in sync with `isPluginCoveredPath` above. Total: 33 paths
+ * Kept in sync with `isPluginCoveredPath` above. **No count is written here.**
+ * The comment used to claim "Total: 33 paths" against an array that held 38 —
+ * a hand-maintained tally going stale inside the very comment documenting a
+ * hand-maintained list going stale. The parity test counts; prose does not.
  *
  * This array is hand-written, and it drifted: #455 removed six phases and
  * added two, and only the *other* hand-written mirror (`SYNC_PAIRS` in the
@@ -108,6 +135,11 @@ export function isPluginCoveredPath(
  * the bundled Claude scaffold exactly.
  */
 export const PLUGIN_COVERED_PATHS_CLAUDE: ReadonlyArray<string> = [
+  // The agents' own index. `isPluginCoveredPath`'s agent regex has always
+  // matched it (`README` !== `architect`), so `upgrade` would migrate it while
+  // this list left `check --project` blind to it — the two consumers disagreeing
+  // on a real file. Listing it makes them agree.
+  ".claude/agents/README.md",
   ...[
     "code-reviewer",
     "developer",
@@ -153,4 +185,45 @@ export const PLUGIN_COVERED_PATHS_CLAUDE: ReadonlyArray<string> = [
     "audit-architecture",
     "audit-dependencies",
   ].map((name) => `.claude/skills/specnaut/phases/${name}.md`),
+
+  // `board` and its documents. Its `scripts/` subtree is NOT here and must not
+  // be: those resolve paths relative to their own location, so they fail
+  // criterion 3 — and they are not emitted under `.claude/skills/` at all, they
+  // land in `.specnaut/scripts/backlog/`. The documents themselves name only
+  // project-root-relative paths and are plugin-servable like any other.
+  ".claude/skills/board/SKILL.md",
+  ".claude/skills/board/groom.md",
+  ".claude/skills/board/groom-report.md",
+  ".claude/skills/board/spec-autogen.md",
+
+  // Every remaining core skill, each owning exactly one document. They were
+  // uncovered not by decision but by omission: the list was written when
+  // `specnaut` was the only skill, and each of these joined the plugin without
+  // anyone revisiting it (specnaut-cli#605).
+  ...[
+    "a11y-audit",
+    "alert-triage-contract",
+    "arch-audit",
+    "backlog-frontmatter",
+    "backlog-reference-contract",
+    "brainstorming",
+    "code-audit",
+    "dep-audit",
+    "executing-plans",
+    "handoff-protocol",
+    "mobile-first-contract",
+    "perf-audit",
+    "qa-report-contract",
+    "requesting-code-review",
+    "response-style-contract",
+    "review-findings-contract",
+    "sec-audit",
+    "specnaut-facts",
+    "status-audit",
+    "subagent-driven-development",
+    "using-specnaut",
+    "verification-before-completion",
+    "workflow-contract",
+    "writing-plans",
+  ].map((name) => `.claude/skills/${name}/SKILL.md`),
 ];

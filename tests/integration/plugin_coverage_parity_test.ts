@@ -118,16 +118,57 @@ Deno.test("claiming a skill claims all of it — no silent partial coverage", ()
   );
 });
 
-Deno.test("coverage breadth is a pinned, deliberate number", () => {
-  // Two owners: `specnaut` and `ship` (spec 033). Widening further is the
-  // subject of #605 and must
-  // be an explicit edit here with a reason, never a side effect of adding a
-  // path to the list.
+/**
+ * #605's ruling, as an assertion.
+ *
+ * This replaces a pinned owner list (`["ship", "specnaut"]`) that existed to
+ * stop coverage drifting while the question was open. The question is settled:
+ * every skill destination the Claude adapter emits is plugin-covered, because
+ * all of them satisfy the membership criterion in `plugin_coverage.ts`.
+ *
+ * **Written after the ruling, deliberately.** Written before it, an assertion
+ * over this dimension could only have pinned the then-current one-skill value,
+ * which would have cemented the defect as the specification by construction —
+ * the ticket says so in as many words.
+ *
+ * It asserts the criterion, not a count: no number appears here, so a new skill
+ * joining the bundle takes this red until it is covered, rather than silently
+ * widening the gap the way the previous twenty-eight did.
+ */
+Deno.test("every skill destination the bundle ships is covered, and nothing else is", () => {
+  const bundled = [...SCAFFOLDED]
+    .filter(([d]) => d.startsWith(".claude/skills/"))
+    .map(([d]) => d)
+    .sort();
+  const claimed = PLUGIN_COVERED_PATHS_CLAUDE
+    .filter((p) => p.startsWith(".claude/skills/"))
+    .sort();
   assertEquals(
-    [...claimedOwners].sort(),
-    ["ship", "specnaut"],
-    "plugin coverage changed which skills it claims — see #605 before changing this",
+    claimed,
+    bundled,
+    "the coverage list and the skills the binary scaffolds disagree — a skill " +
+      "the plugin serves but the list omits is invisible to `check --project`, " +
+      "and one the list names but the bundle dropped is the #455 shape: a " +
+      "permanent warning whose advice cannot be followed",
   );
+  assert(bundled.length > 0, "the adapter emitted no skill destinations at all");
+});
+
+Deno.test("the categories behind those destinations are all three, not just phases", () => {
+  // Non-vacuity with teeth. The assertion above compares paths, so it would
+  // still pass if an entire CATEGORY stopped being emitted — both sides would
+  // shrink together. This names the categories that must be present, which is
+  // the dimension #605 found unguarded: `phase` and `agent` had parity
+  // assertions, `skill` / `backlog-skill` / `backlog-doc` had none, and the
+  // one-skill entry was the part nothing compared to anything.
+  const covered = new Set(PLUGIN_COVERED_PATHS_CLAUDE);
+  const seen = new Set<CoreCategory>();
+  for (const [dest, e] of SCAFFOLDED) {
+    if (covered.has(dest)) seen.add(e.category);
+  }
+  for (const c of ["skill", "backlog-skill", "backlog-doc", "phase", "agent"] as CoreCategory[]) {
+    assert(seen.has(c), `no covered destination has category "${c}" — the sweep went blind to it`);
+  }
 });
 
 Deno.test("every agent the bundle ships is covered, and nothing else is", () => {

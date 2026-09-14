@@ -159,11 +159,56 @@ Deno.test("isPluginCoveredPath: claude + harness-static paths NOT covered", () =
   }
 });
 
-Deno.test("isPluginCoveredPath: claude + backlog skill NOT covered (project-stateful)", () => {
-  assertEquals(
-    isPluginCoveredPath("claude", ".claude/skills/board/SKILL.md"),
-    false,
-  );
+/**
+ * This assertion used to read `board/SKILL.md` is NOT covered, "(project-
+ * stateful)". Flipped under specnaut-cli#605, because the reason was never true
+ * of the thing it governed.
+ *
+ * What is project-stateful about `board` is its `scripts/` subtree: those
+ * scripts resolve paths relative to their own location, so serving them from a
+ * plugin path breaks them. But the scripts are not emitted under
+ * `.claude/skills/` at all — they land in `.specnaut/scripts/backlog/` — so
+ * this assertion never governed them. It governed the DOCUMENTS, which name
+ * only project-root-relative paths and which the plugin has shipped since #571.
+ *
+ * The documents are covered; the scripts are excluded by the criterion and by
+ * `tests/plugin/source-exclusions.txt`, for their own separate reason. Both
+ * halves are asserted here so the distinction cannot quietly collapse again.
+ */
+Deno.test("isPluginCoveredPath: the board skill's documents are covered", () => {
+  for (
+    const dest of [
+      ".claude/skills/board/SKILL.md",
+      ".claude/skills/board/groom.md",
+      ".claude/skills/board/groom-report.md",
+      ".claude/skills/board/spec-autogen.md",
+    ]
+  ) {
+    assertEquals(
+      isPluginCoveredPath("claude", dest),
+      true,
+      `${dest} is a project-independent document the plugin ships`,
+    );
+  }
+});
+
+Deno.test("isPluginCoveredPath: the board skill's SCRIPTS are never covered", () => {
+  // The actual project-stateful half, and the reason the old assertion gave.
+  // These resolve paths relative to their own location, so a plugin-served copy
+  // would break — and they are not `.claude/skills/` destinations anyway.
+  for (
+    const dest of [
+      ".specnaut/scripts/backlog/add.sh",
+      ".specnaut/scripts/backlog/detect-fields.sh",
+      ".claude/skills/board/scripts/add.sh",
+    ]
+  ) {
+    assertEquals(
+      isPluginCoveredPath("claude", dest),
+      false,
+      `${dest} resolves paths relative to itself and must stay binary-owned`,
+    );
+  }
 });
 
 // ── Other harnesses — never covered ───────────────────────────────────────
