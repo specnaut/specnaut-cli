@@ -32,18 +32,35 @@ emit() {
     return
   fi
   echo "${prefix}_FIELD_ID=$(echo "$field_block" | jq -r '.id')"
-  # Option names are not identifiers: "In progress" would emit
+  # `.options` is NOT guaranteed present on a single-select field.
+  #
+  # An organization-level issue field projected into a Project V2 is reported
+  # with `type: "ProjectV2SingleSelectField"` and `options` null or absent — its
+  # options live on the organization, not on the project. Iterating null is a
+  # jq error (exit 5), and under `set -euo pipefail` that kills the script
+  # part-way through the fields: the caller's `eval` then succeeds on a
+  # half-written block, holding the fields emitted before the projected one and
+  # silently missing every field after it.
+  #
+  # So every read goes through `(.options // [])`. An optionless field is
+  # reported as present-but-optionless — all three variables set, all three
+  # agreeing — which routes the caller to the label fallback. That is a
+  # deliberate stopgap, not the end state: a native field exists and a label
+  # beside it is dual-signal drift. Reading it natively is #601. It is accepted
+  # here because an abort blocks every axis while the fallback blocks none.
+  #
+  # Option names are not identifiers either: "In progress" would emit
   # `STATUS_OPT_IN PROGRESS=…`, which breaks the caller's `eval`. Fold every
   # non-alphanumeric character to `_` so the name is always assignable.
   echo "$field_block" | jq -r --arg p "$prefix" '
-    .options[]
+    (.options // [])[]
     | "\($p)_OPT_\(.name | ascii_upcase | gsub("[^A-Z0-9]"; "_"))=\(.id)"
   '
   echo "$field_block" | jq -r --arg p "$prefix" '
-    "\($p)_OPT_NAMES=\"\([.options[].name] | join(", "))\""
+    "\($p)_OPT_NAMES=\"\([(.options // [])[].name] | join(", "))\""
   '
   echo "$field_block" | jq -r --arg p "$prefix" '
-    "\($p)_FIRST_OPT_ID=\(.options[0].id // "")"
+    "\($p)_FIRST_OPT_ID=\((.options // [])[0].id // "")"
   '
 }
 
