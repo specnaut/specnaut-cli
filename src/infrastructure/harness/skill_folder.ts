@@ -1,4 +1,4 @@
-import type { CoreCategory, CoreEntry } from "../../domain/core_bundle.ts";
+import { type CoreCategory, type CoreEntry, skillDocName } from "../../domain/core_bundle.ts";
 import { splitFrontmatter } from "./frontmatter.ts";
 
 /**
@@ -38,13 +38,25 @@ export function skillFolderName(entry: CoreEntry): string {
  * A category absent from this map has no subdirectory. Adding a sub-document
  * category means adding a row here, not a branch in seven adapters.
  */
-const SKILL_DOC_SUBDIR: Partial<Record<CoreCategory, string>> = {
+const SKILL_DOC_SUBDIR = {
   phase: "phases",
-};
+  "backlog-doc": null,
+} as const satisfies Partial<Record<CoreCategory, string | null>>;
 
-/** Is this category a sub-document of a skill? */
-export function isSkillDoc(category: CoreCategory): boolean {
-  return category === "phase" || category === "backlog-doc";
+/**
+ * Is this category a sub-document of a skill?
+ *
+ * Membership is **the map's key set**, deliberately — not a second list. An
+ * earlier version of this file spelled the membership twice, here and in the
+ * map, so adding a category to one and not the other gave either a throw or a
+ * silently missing subdirectory. That is the same two-spellings defect this
+ * whole module exists to remove, reproduced inside the remover; `null` is how a
+ * category says "beside the SKILL.md, no subdirectory" while still being a row.
+ */
+export function isSkillDoc(
+  category: CoreCategory,
+): category is keyof typeof SKILL_DOC_SUBDIR {
+  return category in SKILL_DOC_SUBDIR;
 }
 
 /**
@@ -90,16 +102,22 @@ export function skillDocDestination(entry: CoreEntry, shape: SkillDocShape): str
     );
   }
   if (!entry.suffix) {
-    throw new Error(`${entry.category} needs suffix: ${entry.name}`);
+    // `name` is the OWNER now, so it is "specnaut" for all 21 phase rows and
+    // names none of them. A diagnostic that cannot discriminate between its
+    // candidates is the identity loss the rename caused, showing up on the
+    // failure path after the happy path was updated.
+    throw new Error(
+      `${entry.category} owned by "${entry.name}" has no suffix, so it has no ` +
+        `document name — the manifest row is incomplete`,
+    );
   }
-  const subdir = SKILL_DOC_SUBDIR[entry.category];
+  const subdir = SKILL_DOC_SUBDIR[entry.category]; // null = beside the SKILL.md
 
   if (shape.kind === "flat") {
     // Flat harnesses have no folders, so the subdirectory cannot be expressed
     // and is deliberately dropped: the owner prefix is what disambiguates.
     const owner = skillFolderName({ ...entry, category: "backlog-skill" });
-    const base = entry.suffix.replace(/\.md$/, "");
-    return `${shape.dir}/${owner}-${base}${shape.ext}`;
+    return `${shape.dir}/${owner}-${skillDocName(entry)}${shape.ext}`;
   }
 
   const owner = shape.namespaced

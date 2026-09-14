@@ -1,6 +1,7 @@
 import { assertEquals } from "@std/assert";
 import { PLUGIN_COVERED_PATHS_CLAUDE } from "../../src/domain/plugin_coverage.ts";
 import { CORE_BUNDLE } from "../../src/templates_bundle.ts";
+import { skillDocName } from "../../src/domain/core_bundle.ts";
 
 /**
  * The coverage list must equal what actually ships.
@@ -47,7 +48,7 @@ function bundleNames(category: string): string[] {
   const isSubDoc = category === "phase" || category === "backlog-doc";
   return CORE_BUNDLE
     .filter((e) => e.category === category)
-    .map((e) => isSubDoc ? (e.suffix ?? "").replace(/\.md$/, "") : e.name)
+    .map((e) => isSubDoc ? skillDocName(e) : e.name)
     .sort();
 }
 

@@ -74,23 +74,3 @@ export type CoreBundle = ReadonlyArray<CoreEntry>;
 export function skillDocName(entry: CoreEntry): string {
   return (entry.suffix ?? "").replace(/\.md$/, "");
 }
-
-/**
- * Find one sub-document by the skill that owns it and its own name.
- *
- * `findSkillDoc(CORE_BUNDLE, "specnaut", "merge")` — the pair is what
- * identifies a sub-document now, and a lookup that names only one half is
- * ambiguous the moment a second skill owns documents, which is the whole point
- * of the convergence.
- */
-export function findSkillDoc(
-  bundle: CoreBundle,
-  owner: string,
-  docName: string,
-): CoreEntry | undefined {
-  return bundle.find((e) =>
-    (e.category === "phase" || e.category === "backlog-doc") &&
-    e.name === owner &&
-    skillDocName(e) === docName
-  );
-}
