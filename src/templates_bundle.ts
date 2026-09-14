@@ -2260,6 +2260,10 @@ Use the bundled scripts at \`.specnaut/scripts/backlog/\`:
   \`ESTIMATE_FIELD_ID\` — **empty when the board carries no such field**,
   which is the gate step 3a reads. Run **once per groom run**, not per
   ticket.
+
+  **This samples the board's capabilities once and assumes the tooling
+  does not change underneath the run.** Nothing can invalidate that sample.
+  \`groom-report.md\` says what it costs, and requires you to disclose it.
 - \`set-field.sh <issue> <Priority|Size> <value>\` — writes the field if
   present. Exit \`0\` wrote it (do NOT also label); \`10\` no such field and
   \`11\` no such option (only \`priority:P3\` today) — caller MUST apply the
@@ -2375,11 +2379,52 @@ has no \`Priority\` / \`Size\` field, or because \`priority:P3\` does not
 match a 3-level field. This makes the field-vs-label routing visible
 in the report.
 
+## The field-capabilities block, and why it is disclosed rather than fixed
+
+The **field capabilities** block is mandatory too, and **unconditional**:
+printed on a clean run exactly as on a failing one.
+
+\`groom.md\` runs \`detect-fields.sh\` **once per run** — the right call, since
+it is a GraphQL round-trip and a pass touches many tickets. But that makes
+the board's capabilities a *sample*, taken at the start, and every later
+\`skip\` / \`REQUIRED\` decision is taken against it. Step 3a gates on it
+directly: **empty → skip**. So a field that became available after the
+sample is skipped for every remaining ticket — and per the contract's own
+words, that skip is *correct behaviour given the sample*. The inverse is
+worse: a field sampled as present and since gone makes every later write a
+REQUIRED one that cannot land.
+
+**Why the sample is disclosed and not invalidated.** Recorded here so the
+mtime/hash-check direction is not re-proposed: there is no cache object to
+invalidate. \`groom.md\` is prose addressed to an agent, not code in a
+long-lived process. The values arrive through \`eval "\$(detect-fields.sh)"\`,
+and shell state does not survive between tool calls — each one is a fresh
+shell. So "run once per run" populates nothing on disk and nothing in a
+daemon; it means the agent carries the IDs in its own context. An mtime or
+hash check has nothing to attach to and no code path in which to run. The
+only real invalidation is re-running the script per ticket, which is the
+round-trip the once-per-run rule exists to avoid.
+
+So the remedy is to make the sample *visible*, which is what this block is.
+
+**And unconditionally.** Emitting it only when something went wrong would
+reproduce the exact silence it exists to remove: a run that skipped
+\`Estimate\` on every ticket because the board genuinely has no such field is
+indistinguishable, in its output, from one that skipped it because the
+sample was taken too early. Printing the sample is what lets a reader who
+was not there tell those apart.
+
 \`\`\`
 specnaut-groom report
 ─────────────────────
 ⚠  groom completed with <K> un-sized/un-prioritised tickets — re-run or fix manually
     (only emitted when K > 0, at the very top of the summary)
+
+Fields:     sampled once at the start of this run via detect-fields.sh
+            Priority=<present|absent>   Size=<present|absent>   Estimate=<present|absent>
+            StartDate=<present|absent>  TargetDate=<present|absent>
+            (ALWAYS emitted — including when every field is present and nothing
+             was skipped. Its absence would be the same silence it exists to remove.)
 
 Backlog:    <N> items reviewed, <P> promoted to Ready, <C> awaiting clarification
             <R> body rewrites, <S> sized, <Z> prioritised

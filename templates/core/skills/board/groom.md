@@ -132,6 +132,10 @@ Use the bundled scripts at `.specnaut/scripts/backlog/`:
   `ESTIMATE_FIELD_ID` — **empty when the board carries no such field**,
   which is the gate step 3a reads. Run **once per groom run**, not per
   ticket.
+
+  **This samples the board's capabilities once and assumes the tooling
+  does not change underneath the run.** Nothing can invalidate that sample.
+  `groom-report.md` says what it costs, and requires you to disclose it.
 - `set-field.sh <issue> <Priority|Size> <value>` — writes the field if
   present. Exit `0` wrote it (do NOT also label); `10` no such field and
   `11` no such option (only `priority:P3` today) — caller MUST apply the
