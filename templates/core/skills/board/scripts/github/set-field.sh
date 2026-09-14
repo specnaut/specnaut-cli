@@ -108,17 +108,8 @@ case "$FIELD_LOWER" in
       exit 10
     fi
 
-    # Targeted item-ID lookup, same shape as the Priority/Size path
-    # below — one issue, projectItems(first:5), filter on PROJECT_NODE_ID.
-    ITEM_ID=$(gh api graphql -f query='
-      query($owner:String!, $name:String!, $num:Int!) {
-        repository(owner:$owner, name:$name) {
-          issue(number:$num) {
-            projectItems(first:5) { nodes { id project { id } } }
-          }
-        }
-      }' -f owner="$REPO_OWNER" -f name="$REPO_NAME" -F num="$NUM" \
-      | jq -r --arg p "$PROJECT_NODE_ID" '.data.repository.issue.projectItems.nodes[] | select(.project.id==$p) | .id' | head -1)
+    # Targeted item-ID lookup — `_config.sh` owns the query (#603).
+    ITEM_ID=$(project_item_id "$NUM")
 
     if [ -z "$ITEM_ID" ]; then
       echo "issue #$NUM is not on Project #$PROJECT_NUMBER" >&2
@@ -170,17 +161,8 @@ if [ -z "$OPT_ID" ]; then
   exit 11
 fi
 
-# Targeted lookup by issue number — much cheaper than fetching the whole
-# project item list (a single issue ~2 GraphQL points, vs paginated list).
-ITEM_ID=$(gh api graphql -f query='
-  query($owner:String!, $name:String!, $num:Int!) {
-    repository(owner:$owner, name:$name) {
-      issue(number:$num) {
-        projectItems(first:5) { nodes { id project { id } } }
-      }
-    }
-  }' -f owner="$REPO_OWNER" -f name="$REPO_NAME" -F num="$NUM" \
-  | jq -r --arg p "$PROJECT_NODE_ID" '.data.repository.issue.projectItems.nodes[] | select(.project.id==$p) | .id' | head -1)
+# Targeted lookup by issue number — `_config.sh` owns the query (#603).
+ITEM_ID=$(project_item_id "$NUM")
 
 if [ -z "$ITEM_ID" ]; then
   echo "issue #$NUM is not on Project #$PROJECT_NUMBER" >&2

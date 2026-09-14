@@ -86,3 +86,40 @@ item_url() {
   [ -n "$REPO" ] || return 0
   echo "https://github.com/$REPO/issues/$1"
 }
+
+# The Project V2 item id for one issue on THIS project, or nothing.
+#
+# Targeted by issue number: a single issue costs ~2 GraphQL points against a
+# paginated walk of the whole board. This is the ONE home of the question
+# "which item on this project corresponds to issue #N" — `move.sh` asked it
+# inline, and `add.sh` needed to ask it too, which is how a rule ends up with
+# two spellings that drift.
+#
+# **Never fails, and that is load-bearing.** A caller must decide for itself
+# what "no id" means; `set -e` deciding for it is exactly how a script dies
+# between creating an issue and placing it, leaving a real issue nobody can see.
+project_item_id() {
+  local num="${1:-}"
+  [ -n "$num" ] || return 0
+  # Resolve the project's node id ourselves when the caller has not. `add.sh`
+  # only learns it from `detect-fields.sh`, which runs AFTER the attach — so a
+  # helper that required it as a precondition would silently answer "not
+  # attached" on the one path that needs the answer. A shared helper owns its
+  # own preconditions; anything else is a fourth thing to remember.
+  if [ -z "${PROJECT_NODE_ID:-}" ]; then
+    PROJECT_NODE_ID=$(gh project view "$PROJECT_NUMBER" --owner "$REPO_OWNER" \
+      --format json --jq '.id' 2>/dev/null) || PROJECT_NODE_ID=""
+    [ -n "$PROJECT_NODE_ID" ] || return 0
+  fi
+  gh api graphql -f query='
+    query($owner:String!, $name:String!, $num:Int!) {
+      repository(owner:$owner, name:$name) {
+        issue(number:$num) {
+          projectItems(first:5) { nodes { id project { id } } }
+        }
+      }
+    }' -f owner="$REPO_OWNER" -f name="$REPO_NAME" -F num="$num" 2>/dev/null |
+    jq -r --arg p "$PROJECT_NODE_ID" \
+      '.data.repository.issue.projectItems.nodes[]? | select(.project.id==$p) | .id' 2>/dev/null |
+    head -1 || true
+}

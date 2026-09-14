@@ -34,15 +34,10 @@ fi
 
 # Targeted lookup by issue number — much cheaper than fetching the whole
 # project item list (a single issue ~2 GraphQL points, vs paginated list).
-ITEM_ID=$(gh api graphql -f query='
-  query($owner:String!, $name:String!, $num:Int!) {
-    repository(owner:$owner, name:$name) {
-      issue(number:$num) {
-        projectItems(first:5) { nodes { id project { id } } }
-      }
-    }
-  }' -f owner="$REPO_OWNER" -f name="$REPO_NAME" -F num="$NUM" \
-  | jq -r --arg p "$PROJECT_NODE_ID" '.data.repository.issue.projectItems.nodes[] | select(.project.id==$p) | .id' | head -1)
+# The query lives in `_config.sh` because `add.sh` asks the same question when
+# a project workflow beats it to the attach (#603); two spellings of one lookup
+# is how they drift.
+ITEM_ID=$(project_item_id "$NUM")
 
 if [ -z "$ITEM_ID" ]; then
   echo "issue #$NUM is not on Project #$PROJECT_NUMBER" >&2

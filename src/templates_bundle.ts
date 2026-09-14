@@ -11502,6 +11502,43 @@ item_url() {
   [ -n "\$REPO" ] || return 0
   echo "https://github.com/\$REPO/issues/\$1"
 }
+
+# The Project V2 item id for one issue on THIS project, or nothing.
+#
+# Targeted by issue number: a single issue costs ~2 GraphQL points against a
+# paginated walk of the whole board. This is the ONE home of the question
+# "which item on this project corresponds to issue #N" — \`move.sh\` asked it
+# inline, and \`add.sh\` needed to ask it too, which is how a rule ends up with
+# two spellings that drift.
+#
+# **Never fails, and that is load-bearing.** A caller must decide for itself
+# what "no id" means; \`set -e\` deciding for it is exactly how a script dies
+# between creating an issue and placing it, leaving a real issue nobody can see.
+project_item_id() {
+  local num="\${1:-}"
+  [ -n "\$num" ] || return 0
+  # Resolve the project's node id ourselves when the caller has not. \`add.sh\`
+  # only learns it from \`detect-fields.sh\`, which runs AFTER the attach — so a
+  # helper that required it as a precondition would silently answer "not
+  # attached" on the one path that needs the answer. A shared helper owns its
+  # own preconditions; anything else is a fourth thing to remember.
+  if [ -z "\${PROJECT_NODE_ID:-}" ]; then
+    PROJECT_NODE_ID=\$(gh project view "\$PROJECT_NUMBER" --owner "\$REPO_OWNER" \\
+      --format json --jq '.id' 2>/dev/null) || PROJECT_NODE_ID=""
+    [ -n "\$PROJECT_NODE_ID" ] || return 0
+  fi
+  gh api graphql -f query='
+    query(\$owner:String!, \$name:String!, \$num:Int!) {
+      repository(owner:\$owner, name:\$name) {
+        issue(number:\$num) {
+          projectItems(first:5) { nodes { id project { id } } }
+        }
+      }
+    }' -f owner="\$REPO_OWNER" -f name="\$REPO_NAME" -F num="\$num" 2>/dev/null |
+    jq -r --arg p "\$PROJECT_NODE_ID" \\
+      '.data.repository.issue.projectItems.nodes[]? | select(.project.id==\$p) | .id' 2>/dev/null |
+    head -1 || true
+}
 `,
     executable: true,
     backend: "github",
@@ -11637,13 +11674,35 @@ if [ -n "\$LABELS" ]; then CREATE_ARGS+=("--label" "\$LABELS"); fi
 URL=\$(gh issue create "\${CREATE_ARGS[@]}")
 echo "✓ created: \$URL"
 
+# ─── FROM HERE ON, NOTHING MAY ABORT THIS SCRIPT ──────────────────────────
+# The issue exists now. A non-zero exit past this point leaves the caller
+# unsure whether anything was created, and a re-run duplicates it. The
+# placement step below already said exactly this; the attach did not, and
+# that omission is #603: under \`set -e\` a failed attach killed the script
+# after \`✓ created:\` had already printed a working URL.
+NUM="\${URL##*/}"
+
 # Attach to the project. \`item-add\` leaves Status *null* — it does not fall
 # back to the first column — so the item is invisible to every column-filtered
 # board view AND to any grooming sweep that enumerates the columns, because it
 # matches none of them. Place it explicitly, below.
-ITEM_ID=\$(gh project item-add "\$PROJECT_NUMBER" --owner "\$REPO_OWNER" \\
-  --url "\$URL" --format json --jq '.id')
-echo "✓ attached to Project #\$PROJECT_NUMBER"
+ITEM_ID=""
+if ITEM_ID=\$(gh project item-add "\$PROJECT_NUMBER" --owner "\$REPO_OWNER" \\
+  --url "\$URL" --format json --jq '.id' 2>/dev/null); then
+  echo "✓ attached to Project #\$PROJECT_NUMBER"
+else
+  # The commonest cause is not an error at all: GitHub's built-in "Auto-add to
+  # project" workflow races this call, wins, and the API then refuses a second
+  # insert. Ask the BOARD whether the item is there — the refusal's wording is
+  # not a contract and keying on it would break the day GitHub rephrases it.
+  ITEM_ID=\$(project_item_id "\$NUM")
+  if [ -n "\$ITEM_ID" ]; then
+    echo "✓ already on Project #\$PROJECT_NUMBER (a project workflow attached it first)"
+  else
+    echo "⚠ could not attach to Project #\$PROJECT_NUMBER — the issue exists at \$URL" >&2
+    echo "  attach it by hand, or it stays off the board" >&2
+  fi
+fi
 
 # Placing the item is best-effort and MUST NOT fail this script: the issue
 # already exists by now, so a non-zero exit would leave the caller unsure
@@ -11651,6 +11710,12 @@ echo "✓ attached to Project #\$PROJECT_NUMBER"
 # path below warns and returns 0.
 place_in_backlog() {
   local fields
+  if [ -z "\$ITEM_ID" ]; then
+    # Not attached, so there is no item to place. Said explicitly rather than
+    # letting \`item-edit\` fail on an empty --id and reporting the wrong cause.
+    echo "⚠ not on the project — nothing to place" >&2
+    return 0
+  fi
   if ! fields=\$("\$(dirname "\$0")/detect-fields.sh" 2>/dev/null); then
     echo "⚠ could not read the project's fields — item attached but not placed" >&2
     return 0
@@ -11749,15 +11814,10 @@ fi
 
 # Targeted lookup by issue number — much cheaper than fetching the whole
 # project item list (a single issue ~2 GraphQL points, vs paginated list).
-ITEM_ID=\$(gh api graphql -f query='
-  query(\$owner:String!, \$name:String!, \$num:Int!) {
-    repository(owner:\$owner, name:\$name) {
-      issue(number:\$num) {
-        projectItems(first:5) { nodes { id project { id } } }
-      }
-    }
-  }' -f owner="\$REPO_OWNER" -f name="\$REPO_NAME" -F num="\$NUM" \\
-  | jq -r --arg p "\$PROJECT_NODE_ID" '.data.repository.issue.projectItems.nodes[] | select(.project.id==\$p) | .id' | head -1)
+# The query lives in \`_config.sh\` because \`add.sh\` asks the same question when
+# a project workflow beats it to the attach (#603); two spellings of one lookup
+# is how they drift.
+ITEM_ID=\$(project_item_id "\$NUM")
 
 if [ -z "\$ITEM_ID" ]; then
   echo "issue #\$NUM is not on Project #\$PROJECT_NUMBER" >&2
@@ -12292,17 +12352,8 @@ case "\$FIELD_LOWER" in
       exit 10
     fi
 
-    # Targeted item-ID lookup, same shape as the Priority/Size path
-    # below — one issue, projectItems(first:5), filter on PROJECT_NODE_ID.
-    ITEM_ID=\$(gh api graphql -f query='
-      query(\$owner:String!, \$name:String!, \$num:Int!) {
-        repository(owner:\$owner, name:\$name) {
-          issue(number:\$num) {
-            projectItems(first:5) { nodes { id project { id } } }
-          }
-        }
-      }' -f owner="\$REPO_OWNER" -f name="\$REPO_NAME" -F num="\$NUM" \\
-      | jq -r --arg p "\$PROJECT_NODE_ID" '.data.repository.issue.projectItems.nodes[] | select(.project.id==\$p) | .id' | head -1)
+    # Targeted item-ID lookup — \`_config.sh\` owns the query (#603).
+    ITEM_ID=\$(project_item_id "\$NUM")
 
     if [ -z "\$ITEM_ID" ]; then
       echo "issue #\$NUM is not on Project #\$PROJECT_NUMBER" >&2
@@ -12354,17 +12405,8 @@ if [ -z "\$OPT_ID" ]; then
   exit 11
 fi
 
-# Targeted lookup by issue number — much cheaper than fetching the whole
-# project item list (a single issue ~2 GraphQL points, vs paginated list).
-ITEM_ID=\$(gh api graphql -f query='
-  query(\$owner:String!, \$name:String!, \$num:Int!) {
-    repository(owner:\$owner, name:\$name) {
-      issue(number:\$num) {
-        projectItems(first:5) { nodes { id project { id } } }
-      }
-    }
-  }' -f owner="\$REPO_OWNER" -f name="\$REPO_NAME" -F num="\$NUM" \\
-  | jq -r --arg p "\$PROJECT_NODE_ID" '.data.repository.issue.projectItems.nodes[] | select(.project.id==\$p) | .id' | head -1)
+# Targeted lookup by issue number — \`_config.sh\` owns the query (#603).
+ITEM_ID=\$(project_item_id "\$NUM")
 
 if [ -z "\$ITEM_ID" ]; then
   echo "issue #\$NUM is not on Project #\$PROJECT_NUMBER" >&2

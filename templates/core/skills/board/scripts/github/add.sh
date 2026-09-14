@@ -65,13 +65,35 @@ if [ -n "$LABELS" ]; then CREATE_ARGS+=("--label" "$LABELS"); fi
 URL=$(gh issue create "${CREATE_ARGS[@]}")
 echo "✓ created: $URL"
 
+# ─── FROM HERE ON, NOTHING MAY ABORT THIS SCRIPT ──────────────────────────
+# The issue exists now. A non-zero exit past this point leaves the caller
+# unsure whether anything was created, and a re-run duplicates it. The
+# placement step below already said exactly this; the attach did not, and
+# that omission is #603: under `set -e` a failed attach killed the script
+# after `✓ created:` had already printed a working URL.
+NUM="${URL##*/}"
+
 # Attach to the project. `item-add` leaves Status *null* — it does not fall
 # back to the first column — so the item is invisible to every column-filtered
 # board view AND to any grooming sweep that enumerates the columns, because it
 # matches none of them. Place it explicitly, below.
-ITEM_ID=$(gh project item-add "$PROJECT_NUMBER" --owner "$REPO_OWNER" \
-  --url "$URL" --format json --jq '.id')
-echo "✓ attached to Project #$PROJECT_NUMBER"
+ITEM_ID=""
+if ITEM_ID=$(gh project item-add "$PROJECT_NUMBER" --owner "$REPO_OWNER" \
+  --url "$URL" --format json --jq '.id' 2>/dev/null); then
+  echo "✓ attached to Project #$PROJECT_NUMBER"
+else
+  # The commonest cause is not an error at all: GitHub's built-in "Auto-add to
+  # project" workflow races this call, wins, and the API then refuses a second
+  # insert. Ask the BOARD whether the item is there — the refusal's wording is
+  # not a contract and keying on it would break the day GitHub rephrases it.
+  ITEM_ID=$(project_item_id "$NUM")
+  if [ -n "$ITEM_ID" ]; then
+    echo "✓ already on Project #$PROJECT_NUMBER (a project workflow attached it first)"
+  else
+    echo "⚠ could not attach to Project #$PROJECT_NUMBER — the issue exists at $URL" >&2
+    echo "  attach it by hand, or it stays off the board" >&2
+  fi
+fi
 
 # Placing the item is best-effort and MUST NOT fail this script: the issue
 # already exists by now, so a non-zero exit would leave the caller unsure
@@ -79,6 +101,12 @@ echo "✓ attached to Project #$PROJECT_NUMBER"
 # path below warns and returns 0.
 place_in_backlog() {
   local fields
+  if [ -z "$ITEM_ID" ]; then
+    # Not attached, so there is no item to place. Said explicitly rather than
+    # letting `item-edit` fail on an empty --id and reporting the wrong cause.
+    echo "⚠ not on the project — nothing to place" >&2
+    return 0
+  fi
   if ! fields=$("$(dirname "$0")/detect-fields.sh" 2>/dev/null); then
     echo "⚠ could not read the project's fields — item attached but not placed" >&2
     return 0
