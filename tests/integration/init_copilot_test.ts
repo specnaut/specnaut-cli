@@ -107,7 +107,9 @@ Deno.test("specnaut init --ai copilot scaffolds a Copilot layout", async () => {
     const instructionsCount = (await Array.fromAsync(
       Deno.readDir(join(root, ".github/instructions")),
     )).length;
-    assertEquals(instructionsCount, 65); // +response-style-contract (#575)
+    // 66 since spec 033: /ship adds three flat instruction files and retires
+    // two — net +1. See init_windsurf_test.ts for the same arithmetic.
+    assertEquals(instructionsCount, 66);
 
     // Shared (cross-harness)
     assertEquals(await exists(join(root, ".specnaut/memory/constitution.md")), true);

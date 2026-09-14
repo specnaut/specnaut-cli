@@ -103,16 +103,21 @@
       "source": "core/skills/board/spec-autogen.md"
     },
     {
-      "category": "phase",
-      "name": "specnaut",
-      "suffix": "tag-version.md",
-      "source": "core/skills/specnaut/phases/tag-version.md"
+      "category": "skill",
+      "name": "ship",
+      "source": "core/skills/ship/SKILL.md"
     },
     {
       "category": "phase",
-      "name": "specnaut",
-      "suffix": "release-version.md",
-      "source": "core/skills/specnaut/phases/release-version.md"
+      "name": "ship",
+      "suffix": "tag.md",
+      "source": "core/skills/ship/phases/tag.md"
+    },
+    {
+      "category": "phase",
+      "name": "ship",
+      "suffix": "release.md",
+      "source": "core/skills/ship/phases/release.md"
     },
     {
       "category": "phase",
@@ -154,35 +159,35 @@
       "category": "phase-script",
       "name": "tag",
       "suffix": "tag.sh",
-      "source": "core/skills/specnaut/scripts/tag.sh",
+      "source": "core/skills/ship/scripts/tag.sh",
       "executable": true
     },
     {
       "category": "phase-script",
       "name": "release",
       "suffix": "release.sh",
-      "source": "core/skills/specnaut/scripts/release.sh",
+      "source": "core/skills/ship/scripts/release.sh",
       "executable": true
     },
     {
       "category": "phase-script",
       "name": "release-github",
       "suffix": "release-github.sh",
-      "source": "core/skills/specnaut/scripts/release-github.sh",
+      "source": "core/skills/ship/scripts/release-github.sh",
       "executable": true
     },
     {
       "category": "phase-script",
       "name": "release-gitlab",
       "suffix": "release-gitlab.sh",
-      "source": "core/skills/specnaut/scripts/release-gitlab.sh",
+      "source": "core/skills/ship/scripts/release-gitlab.sh",
       "executable": true
     },
     {
       "category": "phase-script",
       "name": "release-local",
       "suffix": "release-local.sh",
-      "source": "core/skills/specnaut/scripts/release-local.sh",
+      "source": "core/skills/ship/scripts/release-local.sh",
       "executable": true
     },
     {

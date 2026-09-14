@@ -47,8 +47,11 @@ core/agents/qa-tester/memory/MEMORY.md  same
 core/agents/security-expert/memory/MEMORY.md  same
 
 # --- The release scripts: same ROOT-resolution rule as the board backends ---
-# `/specnaut tag-version` and `/release-version` drive these from the project's
-# installed `.specnaut/scripts/`, and the phase docs that call them already name
-# that path. Mirrored into the plugin they would resolve against the plugin's
-# own tree.
-core/skills/specnaut/scripts/  5 release scripts; driven from the project's installed .specnaut/scripts/, and the phase docs already reference that path
+# `/ship` drives these from the project's installed `.specnaut/scripts/`, and
+# the documents that call them already name that path. Mirrored into the plugin
+# they would resolve against the plugin's own tree.
+#
+# The path moved with the skill in spec 033 (release concerns left `/specnaut`
+# for `/ship`). Their DESTINATION is unchanged — `phaseScriptDestination` is
+# owner-independent by design — so only the source directory here moves.
+core/skills/ship/scripts/  5 release scripts; driven from the project's installed .specnaut/scripts/, and the documents that call them already reference that path

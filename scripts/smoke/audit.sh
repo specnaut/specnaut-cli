@@ -209,7 +209,9 @@ SURFACES=(
   'templates/core/commands/*.md|smoke-features.sh|bundled-command'
   'templates/core/skills/*/SKILL.md|smoke-features.sh|bundled-skill'
   'templates/core/skills/specnaut/phases/*.md|smoke-features.sh|phase-doc'
-  'templates/core/skills/specnaut/scripts/*|smoke-tag-release.sh|tag-release-script'
+  'templates/core/skills/ship/SKILL.md|smoke-tag-release.sh|bundled-skill'
+  'templates/core/skills/ship/phases/*.md|smoke-tag-release.sh|ship-doc'
+  'templates/core/skills/ship/scripts/*|smoke-tag-release.sh|tag-release-script'
   'templates/core/skills/board/scripts/github/*|smoke-backlog-github.sh|github-backlog-script'
   'templates/core/skills/board/scripts/gitlab/*|smoke-backlog-gitlab.sh|gitlab-backlog-script'
   'templates/core/skills/board/scripts/local/*|smoke-backlog-local.sh|local-backlog-script'
@@ -660,9 +662,12 @@ resolves() {
       hits="$(find "$SRC_ROOT/templates/harness-specific" -path "*/skills/$n/SKILL.md" 2>/dev/null || true)"
       [ -n "$hits" ]
       ;;
-    .claude/skills/specnaut/phases/*.md)
-      local n="${rt#.claude/skills/specnaut/phases/}"
-      [ -f "$SRC_ROOT/templates/core/skills/specnaut/phases/$n" ]
+    .claude/skills/*/phases/*.md)
+      # Owner-generic since spec 033: a phase document belongs to whichever
+      # skill owns it, not to `specnaut`. A pattern naming one owner reports
+      # every other skill's documents as stale assertions.
+      local rest="${rt#.claude/skills/}"
+      [ -f "$SRC_ROOT/templates/core/skills/$rest" ]
       ;;
     .claude/hooks/*)
       local n="${rt#.claude/hooks/}"

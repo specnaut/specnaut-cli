@@ -619,7 +619,7 @@ export async function runInit(intent: InitIntent): Promise<number> {
   // `/board add` everywhere, and both are wrong on most harnesses.
   const cmd = harnessCommands(aiKey);
   console.log("\nNext steps:");
-  if (cmd.board === null) {
+  if (!cmd.invocable) {
     // Copilot applies `.github/instructions/` by context; there is nothing to type.
     console.log(
       `  1. Open the project in ${harness.displayName} — Specnaut's instructions ` +
@@ -636,7 +636,7 @@ export async function runInit(intent: InitIntent): Promise<number> {
   } else {
     console.log(
       `  1. Open the project in ${harness.displayName}, then run ${
-        bold(cmd.phase("constitution"))
+        bold(cmd.skillDoc("specnaut", "constitution"))
       } to scaffold your project's guiding principles`,
     );
     console.log(
@@ -645,10 +645,12 @@ export async function runInit(intent: InitIntent): Promise<number> {
       } for your stack`,
     );
     console.log(
-      `  3. Run ${bold(`${cmd.phase("plan")} "<feature description>"`)} to plan your first feature`,
+      `  3. Run ${
+        bold(`${cmd.skillDoc("specnaut", "plan")} "<feature description>"`)
+      } to plan your first feature`,
     );
     console.log(
-      `  4. Use ${bold(`${cmd.board} add "<task title>"`)} for follow-up work`,
+      `  4. Use ${bold(`${cmd.skill("board")} add "<task title>"`)} for follow-up work`,
     );
   }
 

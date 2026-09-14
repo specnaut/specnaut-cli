@@ -1,7 +1,7 @@
 ---
 name: specnaut
-description: Specnaut workflow router — entry point for the spec-driven pipeline. `/specnaut <phase> [args]` dispatches to a single phase (plan, tasks, implement, review, merge, constitution, tag-version, release-version, audit). `/specnaut` with no args prints the workflow overview.
-argument-hint: <plan|tasks|implement|review|merge|constitution|tag-version|release-version|audit> [args]
+description: Specnaut workflow router — entry point for the spec-driven pipeline. `/specnaut <phase> [args]` dispatches to a single phase (plan, tasks, implement, review, merge, constitution, audit). `/specnaut` with no args prints the workflow overview.
+argument-hint: <plan|tasks|implement|review|merge|constitution|audit> [args]
 when_to_use: |
   Trigger phrases that should route here:
   - plan: "plan a feature", "spec out a feature", "write a spec", "build a technical plan", "I have a rough idea", "help me figure out what to build", "I don't know exactly what I want yet", "clarify requirements"
@@ -10,8 +10,6 @@ when_to_use: |
   - review: "review the implementation", "run quality gates"
   - merge: "merge the branch", "ship the feature"
   - constitution: "update the constitution", "edit project rules"
-  - tag-version: "tag a version", "create a release tag", "bump the version"
-  - release-version: "release", "publish a release", "create release notes"
   - audit: "audit security / performance / accessibility / architecture / dependencies", "scan the codebase for X issues"
 ---
 
@@ -49,8 +47,6 @@ when_to_use: |
 | `review` | `phases/review.md` | The quality battery on a frozen tree. Its verdict is the merge request. |
 | `merge` | `phases/merge.md` | Pre-merge validation and merge the feature branch. |
 | `constitution` | `phases/constitution.md` | Edit the project's `constitution.md` rules. |
-| `tag-version` | `phases/tag-version.md` | Bump + create an annotated git tag using the project's versioning scheme. |
-| `release-version` | `phases/release-version.md` | Generate categorized release notes for a tag (default: latest). |
 | `audit security` | `phases/audit-security.md` | Read-only project-wide security sweep; emits a findings report. |
 | `audit performance` | `phases/audit-performance.md` | Read-only project-wide performance sweep; emits a findings report. |
 | `audit accessibility` | `phases/audit-accessibility.md` | Read-only project-wide WCAG 2.1 AA sweep; skips when no FE surface is detected. |
@@ -59,9 +55,19 @@ when_to_use: |
 
 ## Which skill owns what
 
+Specnaut gives a project **three** skills, and they divide by what they own:
+
+| Skill | Owns |
+| :--- | :--- |
+| `/board` | the backlog — what we might do, and what we are doing |
+| `/specnaut` | the specification — what a thing is, and whether it is built right |
+| `/ship` | production — getting a built thing out the door |
+
 `/specnaut` owns the **specification** phases tied to the project, and code
-implementation, planning and review. `/board` owns **backlog management**.
-`/specnaut` does not own everything.
+implementation, planning and review. It does **not** own going to production:
+tagging a version and publishing a release are `/ship`. Shipping has a
+different cadence, a different risk profile — irreversible, outward-facing, it
+triggers live pipelines — and a different audience from writing a plan.
 
 The line decides where a new capability lands, not where a file happens to sit
 today. Grooming is backlog management, so it is reached only as `/board
@@ -78,7 +84,7 @@ after any push, `implement` loads the seventh on an epic, and the router loads t
 chains. Naming any of them as a phase prints the index and stops.
 
 Chainable phases are: `plan`, `tasks`, `implement`, `review`. The others (`merge`, `constitution`,
-`tag-version`, `release-version`, `audit <axis>`) are one-shot regardless of chain mode.
+`audit <axis>`) are one-shot regardless of chain mode.
 
 The accessibility phase is FE-gated — projects without front-end source receive a one-line "skipped
 — no FE surface" response instead of an empty report. The dependencies phase aborts with "skipped —
@@ -91,6 +97,16 @@ rather than skipping the whole run.
 `brainstorm`, `specify`, `clarify` and `analyze` **no longer exist**, and neither do `checklist` and
 `list-skills`. If the user names one, print this phase index and stop — do not improvise the old
 behaviour, and do not route it silently.
+
+**`tag-version` and `release-version` are RETIRED, not unknown — they moved to
+`/ship`.** If the user names either, say so and name the new address:
+
+> Release concerns moved out of `/specnaut` and into `/ship`.
+> `tag-version` → `/ship tag` · `release-version` → `/ship release`
+
+Then stop. Do not route it silently, and do not print a bare "unknown phase" —
+that reads as a bug to someone following an instruction written before the
+split, which is exactly who arrives here.
 
 | Gone | Where its work happens now |
 |------|----------------------------|
@@ -116,8 +132,7 @@ Unknown phase → print the phase index and stop.
 After the phase procedure completes successfully:
 
 - `CHAIN_MODE == off` (the user passed `--manual`) → stop. Report the phase outcome.
-- Phase is not chainable (`merge`, `constitution`, `tag-version`, `release-version`,
-  `audit <axis>`) → stop.
+- Phase is not chainable (`merge`, `constitution`, `audit <axis>`) → stop.
 - Otherwise → read `phases/auto-chain.md` and follow it.
 
 **Re-entry needs no flag.** Invoking a phase whose downstream artefacts already exist runs one-shot

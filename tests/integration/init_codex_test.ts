@@ -116,7 +116,9 @@ Deno.test("specnaut init --ai codex scaffolds a Codex layout", async () => {
     const agentsSkillsCount = (await Array.fromAsync(
       Deno.readDir(join(root, ".agents/skills")),
     )).length;
-    assertEquals(agentsSkillsCount, 26); // +response-style-contract (#575)
+    // 27 since spec 033: /ship is a new top-level skill folder. Its two
+    // documents live INSIDE that folder, so they do not add to this count.
+    assertEquals(agentsSkillsCount, 27);
     const codexAgentsCount = (await Array.fromAsync(
       Deno.readDir(join(root, ".codex/agents")),
     )).length;

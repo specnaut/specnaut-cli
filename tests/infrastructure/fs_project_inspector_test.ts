@@ -765,9 +765,8 @@ Deno.test("inspect: plugin gap check skipped when no pluginDetector is configure
   await withProjectDir(filledProject, async (dir) => {
     const inspector = new FsProjectInspector();
     const outcomes = await inspector.inspect(dir, "0.2.0");
-    const gapOutcomes = outcomes.filter((o) =>
-      o.name.startsWith(".claude/agents/") || o.name.startsWith(".claude/skills/")
-    );
+    const covered = new Set(PLUGIN_COVERED_PATHS_CLAUDE);
+    const gapOutcomes = outcomes.filter((o) => covered.has(o.name));
     assertEquals(gapOutcomes.length, 0);
   });
 });
@@ -776,10 +775,8 @@ Deno.test("inspect: plugin gap check emits no warnings when plugin IS installed"
   await withProjectDir(filledProject, async (dir) => {
     const inspector = new FsProjectInspector(fakePluginDetector(true));
     const outcomes = await inspector.inspect(dir, "0.2.0");
-    const gapOutcomes = outcomes.filter((o) =>
-      o.name.startsWith(".claude/agents/") ||
-      o.name.startsWith(".claude/skills/specnaut-")
-    );
+    const covered = new Set(PLUGIN_COVERED_PATHS_CLAUDE);
+    const gapOutcomes = outcomes.filter((o) => covered.has(o.name));
     assertEquals(gapOutcomes.length, 0);
   });
 });
@@ -788,13 +785,14 @@ Deno.test("inspect: plugin gap check warns for each missing covered path when pl
   await withProjectDir(filledProject, async (dir) => {
     const inspector = new FsProjectInspector(fakePluginDetector(false));
     const outcomes = await inspector.inspect(dir, "0.2.0");
-    const gapOutcomes = outcomes.filter((o) =>
-      (o.name.startsWith(".claude/agents/") ||
-        o.name.startsWith(".claude/skills/specnaut/") ||
-        o.name === ".claude/skills/specnaut/SKILL.md" ||
-        o.name === ".claude/skills/specnaut-review/SKILL.md") &&
-      o.status === "warn"
-    );
+    // Filter by MEMBERSHIP in the covered list, not by a `specnaut` path
+    // prefix. The prefix was the thing this filter was always trying to say,
+    // spelled as a guess about the paths — and it stops being true the moment a
+    // second skill is covered: the new paths drop out of the filter while
+    // `PLUGIN_COVERED_PATHS_CLAUDE.length` grows, so the assertion below goes
+    // red for a reason that has nothing to do with the inspector.
+    const covered = new Set(PLUGIN_COVERED_PATHS_CLAUDE);
+    const gapOutcomes = outcomes.filter((o) => covered.has(o.name) && o.status === "warn");
     // Derived, not hardcoded. This assertion used to read `37` under a comment
     // enumerating the covered set by hand — so when #455 removed six phases and
     // added two, the constant drifted and this test agreed with it. A magic

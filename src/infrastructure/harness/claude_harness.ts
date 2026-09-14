@@ -9,6 +9,7 @@ import { applySpecBackend } from "./spec_backend_filter.ts";
 import { applySpecAutogen } from "./spec_autogen_filter.ts";
 import { ensureSkillFrontmatter, skillDocDestination } from "./skill_folder.ts";
 import { addUnique } from "./bundle_writer.ts";
+import { SKILL_SURFACE } from "./skill_layout.ts";
 
 function destinationFor(entry: CoreEntry): string {
   switch (entry.category) {
@@ -35,11 +36,7 @@ function destinationFor(entry: CoreEntry): string {
       // One shape: a document beside its skill, loaded by that skill from its
       // own directory. Claude emits skill names verbatim, so the owner folder
       // takes no namespacing prefix.
-      return skillDocDestination(entry, {
-        kind: "nested",
-        root: ".claude/skills",
-        namespaced: false,
-      });
+      return skillDocDestination(entry, SKILL_SURFACE.claude.layout);
     case "phase-script":
       return phaseScriptDestination(entry);
     case "backlog-script":

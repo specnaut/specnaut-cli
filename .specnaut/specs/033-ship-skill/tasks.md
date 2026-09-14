@@ -119,7 +119,7 @@ byte-identical before and after this phase.
       `.claude/skills/specnaut/phases/` prefix in `phaseDest` and in T012's `dest.startsWith` filter
       with a derivation from the bundle through the adapter (§10 A-6). A gate whose coverage can
       shrink without failing is worse than one that goes red.
-- [ ] T022 Run `deno task test`. Then commit Phase 2 alone:
+- [x] T022 Run `deno task test`. Then commit Phase 2 alone:
       `git commit -m "refactor: converge phase and backlog-doc onto one sub-document shape"`. The
       body must record that no scaffolded destination changed, citing the T015 diff.
 
@@ -157,13 +157,13 @@ sub-documents are present and within limits.
 them; both need a signature or a semantics decision rather than a correction, and both stop being
 cheap the moment a non-`specnaut` document exists.
 
-- [ ] T022a [US1] `harness_commands.ts` hardcodes `/specnaut ${name}` in `NESTED_PHASES` /
+- [x] T022a [US1] `harness_commands.ts` hardcodes `/specnaut ${name}` in `NESTED_PHASES` /
       `FLAT_PHASES`, and `HarnessCommands.phase` has signature `(name: string) => string` — **no
       parameter can carry an owner**. Change it to take the owner, thread `entry.name` through the
       call site in `init_handler.ts`, and cover the flat case: on Windsurf the current code would
       emit `/specnaut-release-version` for a file written at `specnaut-ship-release-version.md`,
       which is a broken command string rather than a wrong label.
-- [ ] T022b [US1] `plugin_coverage_parity_test.ts` compares document names against
+- [x] T022b [US1] `plugin_coverage_parity_test.ts` compares document names against
       `coveredNames(".claude/skills/specnaut/phases/")` — a list hardcoded to one owner. The moment
       `/ship` owns a document the test goes red, and the obvious way to green it is to add a
       `specnaut/phases/<ship-doc>.md` path that is never scaffolded — which is bug #455 exactly, the
@@ -171,46 +171,46 @@ cheap the moment a non-`specnaut` document exists.
       covered set through the adapter the way `phase_wiring_test.ts` already does. **Settle this
       before T023**, or the wrong entry is already in the list.
 
-- [ ] T023 [US1] Create `templates/core/skills/ship/SKILL.md` — the router. It carries the
+- [x] T023 [US1] Create `templates/core/skills/ship/SKILL.md` — the router. It carries the
       frontmatter (`name`, `description`, `argument-hint`, `when_to_use` with the tag/release
       trigger phrases moved off `/specnaut`), the three operational paths (tag only · tag and
       release · release an existing tag) and the disambiguation prompt from #598.
-- [ ] T024 [US1] Move `templates/core/skills/specnaut/phases/tag-version.md` to
+- [x] T024 [US1] Move `templates/core/skills/specnaut/phases/tag-version.md` to
       `templates/core/skills/ship/phases/tag.md` with `git mv`, so the history follows the content.
       Rewrite its internal references from `/specnaut tag-version` to `/ship`.
-- [ ] T025 [US1] Move `templates/core/skills/specnaut/phases/release-version.md` to
+- [x] T025 [US1] Move `templates/core/skills/specnaut/phases/release-version.md` to
       `templates/core/skills/ship/phases/release.md` the same way, rewriting its self-references.
-- [ ] T026 [US1] Add the three `/ship` entries to `templates/manifest.json` — one `skill`
+- [x] T026 [US1] Add the three `/ship` entries to `templates/manifest.json` — one `skill`
       (`name: ship`) and two sub-documents (`name: ship`, `suffix: tag.md` / `release.md`) — plus
       repoint the five `phase-script` sources to `core/skills/ship/scripts/`. Per `plan.md` §5,
       `phaseScriptDestination` **must not** be touched: the scripts' runtime address is
       owner-independent by design.
-- [ ] T027 [US1] `git mv` the five release scripts from `templates/core/skills/specnaut/scripts/` to
+- [x] T027 [US1] `git mv` the five release scripts from `templates/core/skills/specnaut/scripts/` to
       `templates/core/skills/ship/scripts/`. Confirm with the T004 baseline technique that their
       **destinations** are unchanged — only the source directory moves.
-- [ ] T026a [US1] Add `skill/ship` to `POINTED_BY_DECISION` in
+- [x] T026a [US1] Add `skill/ship` to `POINTED_BY_DECISION` in
       `tests/templates/response_style_contract_test.ts` with a written reason. `/ship` points at the
       response-style contract, and that test fails any surface doing so without a recorded reason.
       The reason is not boilerplate: unlike `/board` — which is in `WITHHELD_BY_DECISION` because
       its worst-case Windsurf render leaves 38 characters and the pointer costs 98 — `/ship` has
       ~6,500 characters of headroom AND asks a genuine disambiguation question, so the contract's
       questions-as-selections rule is load-bearing for it rather than incidental.
-- [ ] T027a [US1] Move the `core/skills/specnaut/scripts/` entry in
+- [x] T027a [US1] Move the `core/skills/specnaut/scripts/` entry in
       `tests/plugin/source-exclusions.txt` to `core/skills/ship/scripts/` and rewrite its reason —
       it currently names `/specnaut tag-version` and `/release-version`, which T033 retires. Found
       by T003: that file reports an entry naming a path that no longer exists as stale, so leaving
       it behind turns the plugin sync gate red for the wrong reason.
-- [ ] T028 [US1] Mirror the new skill into `plugin/skills/ship/` (FR-009) and add the pair to
+- [x] T028 [US1] Mirror the new skill into `plugin/skills/ship/` (FR-009) and add the pair to
       `SYNC_PAIRS` in `tests/plugin/plugin_sync_test.ts`.
-- [ ] T029 [US1] Add a Windsurf size assertion for every `/ship` document, measured with
+- [x] T029 [US1] Add a Windsurf size assertion for every `/ship` document, measured with
       `workflowLength` and **not** `String.length` (FR-007, `plan.md` §5). The two documents are
       2,591 and 9,599 code points against a 12,000 cap — each passes alone, and the test exists to
       keep it that way.
-- [ ] T030 [US1] Run `deno task bundle`, then verify the generated `src/templates_bundle.ts` carries
+- [x] T030 [US1] Run `deno task bundle`, then verify the generated `src/templates_bundle.ts` carries
       `/ship` for all seven harnesses.
-- [ ] T031 [US1] Extend `scripts/smoke/smoke-tag-release.sh` to assert the scaffolded `/ship` paths
+- [x] T031 [US1] Extend `scripts/smoke/smoke-tag-release.sh` to assert the scaffolded `/ship` paths
       rather than the retired `/specnaut` phase paths, for both versioning schemes.
-- [ ] T032 [US1] Add `/ship` to the surface map in `scripts/smoke/audit.sh` so a future `/ship`
+- [x] T032 [US1] Add `/ship` to the surface map in `scripts/smoke/audit.sh` so a future `/ship`
       document with no smoke coverage is reported rather than shipped silently.
 
 ---
@@ -220,15 +220,15 @@ cheap the moment a non-`specnaut` document exists.
 **Goal:** nobody reaching for `/specnaut tag-version` gets a bare "unknown phase". **Independent
 test:** invoke the retired names and read the output.
 
-- [ ] T033 [US2] Strip every release concern from `templates/core/skills/specnaut/SKILL.md` — the
+- [x] T033 [US2] Strip every release concern from `templates/core/skills/specnaut/SKILL.md` — the
       two phase-index rows, the `tag-version`/`release-version` trigger phrases in `when_to_use`,
       the `description` and `argument-hint` (FR-003, SC-002).
-- [ ] T034 [US2] Add the retirement branch to the router's phase-extraction step: the two names are
+- [x] T034 [US2] Add the retirement branch to the router's phase-extraction step: the two names are
       **retired**, not unknown, and the message names `/ship` (FR-004). Per `plan.md` §5 this lives
       in the router's own step — not as a note repeated at each removed document's former location.
-- [ ] T035 [US2] Update `templates/core/skills/specnaut/phases/auto-chain.md` so the chain contract
-      carries no release phase.
-- [ ] T036 [US2] Sync `plugin/skills/specnaut/` to match (`SKILL.md`, the removed phase docs,
+- [x] T035 [US2] ~~Update `templates/core/skills/specnaut/phases/auto-chain.md` so the chain
+      contract carries no release phase.
+- [x] T036 [US2] Sync `plugin/skills/specnaut/` to match (`SKILL.md`, the removed phase docs,
       `auto-chain.md`).
 - [ ] T037 [US2] Add a test asserting both retired names produce a message naming `/ship`, and that
       neither routes silently.

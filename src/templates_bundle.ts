@@ -11,8 +11,8 @@ export const CORE_BUNDLE: CoreBundle = [
     suffix: null,
     content: `---
 name: specnaut
-description: Specnaut workflow router — entry point for the spec-driven pipeline. \`/specnaut <phase> [args]\` dispatches to a single phase (plan, tasks, implement, review, merge, constitution, tag-version, release-version, audit). \`/specnaut\` with no args prints the workflow overview.
-argument-hint: <plan|tasks|implement|review|merge|constitution|tag-version|release-version|audit> [args]
+description: Specnaut workflow router — entry point for the spec-driven pipeline. \`/specnaut <phase> [args]\` dispatches to a single phase (plan, tasks, implement, review, merge, constitution, audit). \`/specnaut\` with no args prints the workflow overview.
+argument-hint: <plan|tasks|implement|review|merge|constitution|audit> [args]
 when_to_use: |
   Trigger phrases that should route here:
   - plan: "plan a feature", "spec out a feature", "write a spec", "build a technical plan", "I have a rough idea", "help me figure out what to build", "I don't know exactly what I want yet", "clarify requirements"
@@ -21,8 +21,6 @@ when_to_use: |
   - review: "review the implementation", "run quality gates"
   - merge: "merge the branch", "ship the feature"
   - constitution: "update the constitution", "edit project rules"
-  - tag-version: "tag a version", "create a release tag", "bump the version"
-  - release-version: "release", "publish a release", "create release notes"
   - audit: "audit security / performance / accessibility / architecture / dependencies", "scan the codebase for X issues"
 ---
 
@@ -60,8 +58,6 @@ when_to_use: |
 | \`review\` | \`phases/review.md\` | The quality battery on a frozen tree. Its verdict is the merge request. |
 | \`merge\` | \`phases/merge.md\` | Pre-merge validation and merge the feature branch. |
 | \`constitution\` | \`phases/constitution.md\` | Edit the project's \`constitution.md\` rules. |
-| \`tag-version\` | \`phases/tag-version.md\` | Bump + create an annotated git tag using the project's versioning scheme. |
-| \`release-version\` | \`phases/release-version.md\` | Generate categorized release notes for a tag (default: latest). |
 | \`audit security\` | \`phases/audit-security.md\` | Read-only project-wide security sweep; emits a findings report. |
 | \`audit performance\` | \`phases/audit-performance.md\` | Read-only project-wide performance sweep; emits a findings report. |
 | \`audit accessibility\` | \`phases/audit-accessibility.md\` | Read-only project-wide WCAG 2.1 AA sweep; skips when no FE surface is detected. |
@@ -70,9 +66,19 @@ when_to_use: |
 
 ## Which skill owns what
 
+Specnaut gives a project **three** skills, and they divide by what they own:
+
+| Skill | Owns |
+| :--- | :--- |
+| \`/board\` | the backlog — what we might do, and what we are doing |
+| \`/specnaut\` | the specification — what a thing is, and whether it is built right |
+| \`/ship\` | production — getting a built thing out the door |
+
 \`/specnaut\` owns the **specification** phases tied to the project, and code
-implementation, planning and review. \`/board\` owns **backlog management**.
-\`/specnaut\` does not own everything.
+implementation, planning and review. It does **not** own going to production:
+tagging a version and publishing a release are \`/ship\`. Shipping has a
+different cadence, a different risk profile — irreversible, outward-facing, it
+triggers live pipelines — and a different audience from writing a plan.
 
 The line decides where a new capability lands, not where a file happens to sit
 today. Grooming is backlog management, so it is reached only as \`/board
@@ -89,7 +95,7 @@ after any push, \`implement\` loads the seventh on an epic, and the router loads
 chains. Naming any of them as a phase prints the index and stops.
 
 Chainable phases are: \`plan\`, \`tasks\`, \`implement\`, \`review\`. The others (\`merge\`, \`constitution\`,
-\`tag-version\`, \`release-version\`, \`audit <axis>\`) are one-shot regardless of chain mode.
+\`audit <axis>\`) are one-shot regardless of chain mode.
 
 The accessibility phase is FE-gated — projects without front-end source receive a one-line "skipped
 — no FE surface" response instead of an empty report. The dependencies phase aborts with "skipped —
@@ -102,6 +108,16 @@ rather than skipping the whole run.
 \`brainstorm\`, \`specify\`, \`clarify\` and \`analyze\` **no longer exist**, and neither do \`checklist\` and
 \`list-skills\`. If the user names one, print this phase index and stop — do not improvise the old
 behaviour, and do not route it silently.
+
+**\`tag-version\` and \`release-version\` are RETIRED, not unknown — they moved to
+\`/ship\`.** If the user names either, say so and name the new address:
+
+> Release concerns moved out of \`/specnaut\` and into \`/ship\`.
+> \`tag-version\` → \`/ship tag\` · \`release-version\` → \`/ship release\`
+
+Then stop. Do not route it silently, and do not print a bare "unknown phase" —
+that reads as a bug to someone following an instruction written before the
+split, which is exactly who arrives here.
 
 | Gone | Where its work happens now |
 |------|----------------------------|
@@ -127,8 +143,7 @@ Unknown phase → print the phase index and stop.
 After the phase procedure completes successfully:
 
 - \`CHAIN_MODE == off\` (the user passed \`--manual\`) → stop. Report the phase outcome.
-- Phase is not chainable (\`merge\`, \`constitution\`, \`tag-version\`, \`release-version\`,
-  \`audit <axis>\`) → stop.
+- Phase is not chainable (\`merge\`, \`constitution\`, \`audit <axis>\`) → stop.
 - Otherwise → read \`phases/auto-chain.md\` and follow it.
 
 **Re-entry needs no flag.** Invoking a phase whose downstream artefacts already exist runs one-shot
@@ -2431,9 +2446,140 @@ pre-step.
     skipIfExists: false,
   },
   {
+    category: "skill",
+    name: "ship",
+    suffix: null,
+    content: `---
+name: ship
+description: Take a built thing to production — compute and push a version tag, publish a release with categorized notes, or publish a release for a tag that already exists. Inspects repository state first and asks only when the intent is genuinely ambiguous. The versioning scheme is fixed at init time and recorded in \`.specnaut/installed.lock\`.
+argument-hint: [tag|release|<version>] [--bump major|minor|patch] [--no-push]
+when_to_use: |
+  Trigger phrases that should route here:
+  - "ship it", "ship this", "cut a release", "publish a release"
+  - "tag a version", "create a release tag", "bump the version"
+  - "release notes", "generate the changelog for the tag"
+  - "publish v1.2.0", "release the tag we pushed yesterday"
+  Do NOT route here for merging a feature branch — that is \`/specnaut merge\`.
+---
+
+# Ship skill
+
+**Response style** — brevity, visual order, questions as selections, badge colours — follows the \`response-style-contract\` skill; read it, never restate it here.
+
+Specnaut gives a project three skills, and they divide by what they own:
+
+| Skill | Owns |
+| :--- | :--- |
+| \`/board\` | the backlog — what we might do, and what we are doing |
+| \`/specnaut\` | the specification — what a thing is, and whether it is built right |
+| **\`/ship\`** | **production — getting a built thing out the door** |
+
+Shipping is not a specification concern. It has a different cadence, a
+different risk profile — irreversible, outward-facing, it triggers live
+pipelines — and a different audience. That is why it is its own verb rather
+than a phase of the router that writes plans.
+
+## The three paths
+
+| | Path | What happens |
+| :--- | :--- | :--- |
+| **A** | **Tag only** | Compute and push the next tag. No release is published. |
+| **B** | **Tag and release** | Tag, then generate notes and publish the release. |
+| **C** | **Release an existing tag** | Publish a release for a tag that has none. No new tag. |
+
+## Step 1 — inspect before acting
+
+Never ask a question the repository can answer. Run these first:
+
+\`\`\`bash
+git status --porcelain          # is the tree clean?
+git fetch --tags --quiet        # so tag computation sees origin
+git tag --list --sort=-v:refname | head -5
+git log --oneline -1
+\`\`\`
+
+Then determine, without asking:
+
+- **Is the tree dirty?** If so, say what is uncommitted and stop. Do not
+  stash, do not commit on the user's behalf, and do not tag a tree that does
+  not match what will be built.
+- **Does an unreleased tag exist?** A tag with no corresponding release is the
+  strongest signal for path C, and it is the case a user most often means when
+  they say "release" with no argument.
+
+## Step 2 — resolve the intent
+
+Resolve from the argument when it is unambiguous. Ask only when it is not.
+
+| Input | Path |
+| :--- | :--- |
+| \`/ship tag\` | A |
+| \`/ship release\` with an unreleased tag present | C, on that tag |
+| \`/ship release\` with no unreleased tag | B |
+| \`/ship <version>\` where the tag does not exist | B, at that version |
+| \`/ship <version>\` where the tag exists and has no release | C |
+| \`/ship\` with no argument | see below |
+
+**\`/ship\` with no argument, and an unreleased tag exists** → path C is the
+answer; state that you are publishing the release for that tag and proceed.
+Naming what you resolved is not the same as asking.
+
+**\`/ship\` with no argument and nothing to disambiguate it** → ask once, as a
+selection, per the response-style contract:
+
+> **What would you like to do?**
+> - **Tag only** — create and push a new tag, no release
+> - **Tag and release** — tag and publish the release immediately
+> - **Release an existing tag** — publish a release for a tag that has none
+
+## Step 3 — execute
+
+Read the phase document for the path and follow it end to end. Do not
+reimplement what the bundled scripts already do.
+
+| Path | Read | Drives |
+| :--- | :--- | :--- |
+| A | \`phases/tag.md\` | \`.specnaut/scripts/release/tag.sh\` |
+| B | \`phases/tag.md\`, then \`phases/release.md\` | \`tag.sh\`, then \`release.sh\` |
+| C | \`phases/release.md\` | \`release.sh\` |
+
+The scripts live at \`.specnaut/scripts/release/\` — a project-relative path that
+does not change with the harness. The versioning scheme (SemVer or date-based)
+is baked in at \`specnaut init\`; the scripts read it, you do not choose it.
+
+## Step 4 — confirm before the irreversible act
+
+**A tag push and a release publish are irreversible and outward-facing.**
+Pushing a tag can trigger a live pipeline; publishing a release can trigger a
+deploy. Before either:
+
+1. Show the computed tag, the target remote, and the commit subject.
+2. Ask once, as a concrete proposal — **"I'm about to push \`<tag>\` to
+   \`<remote>\` — OK?"** — never as an open question.
+3. On confirmation, proceed and print the resulting URL.
+
+\`--no-push\` creates the tag locally and skips the push, and needs no prompt.
+
+## What this skill does not do
+
+- **It does not deploy.** In the recommended model a deploy is triggered by a
+  *published release*, not by a tag push and not by a branch push. See
+  \`phases/release.md\` → "From release to production".
+- **It does not edit version fields** in \`package.json\`, \`Cargo.toml\`,
+  \`pyproject.toml\` or any manifest. The git tag **is** the version.
+- **It does not run tests or quality gates.** Run them before shipping; that
+  contract is project-specific and lives outside this skill.
+- **It does not merge anything.** Landing a feature branch is
+  \`/specnaut merge\`.
+`,
+    executable: false,
+    backend: null,
+    skipIfExists: false,
+  },
+  {
     category: "phase",
-    name: "specnaut",
-    suffix: "tag-version.md",
+    name: "ship",
+    suffix: "tag.md",
     content: `
 ## User Input
 
@@ -2444,11 +2590,11 @@ pre-step.
 You **MUST** consider the user input before proceeding (if not empty).
 Common natural-language requests:
 
-- \`/specnaut tag-version\` — tag HEAD with the next version
-- \`/specnaut tag-version <sha>\` — tag a specific commit
-- \`/specnaut tag-version --bump minor\` — SemVer projects only: bump
+- \`/ship tag\` — tag HEAD with the next version
+- \`/ship tag <sha>\` — tag a specific commit
+- \`/ship tag --bump minor\` — SemVer projects only: bump
   minor instead of patch (also \`--bump major\` / \`--bump patch\`)
-- \`/specnaut tag-version --no-push\` — skip pushing to \`origin\`
+- \`/ship tag --no-push\` — skip pushing to \`origin\`
 
 ## What this command does
 
@@ -2479,12 +2625,12 @@ What the script does:
 ## What this command does NOT do
 
 - It does **not** create a GitHub / GitLab release — pushing a tag
-  alone does not publish a release. Run \`/specnaut release-version\`
+  alone does not publish a release. Run \`/ship release\`
   after this to publish the categorized release notes.
 - It does **not** deploy anything. A tag push never ships to
   production — in the recommended model, deploys are triggered by a
   *published release*, not by tags or branch pushes. See
-  \`/specnaut release-version\` → "From release to production (CD)".
+  \`/ship release\` → "From release to production (CD)".
 - It does **not** edit version fields in \`package.json\` / \`Cargo.toml\`
   / \`pyproject.toml\` / etc. The git tag **is** the version — single
   source of truth.
@@ -2499,7 +2645,7 @@ If the script exits non-zero, read the stderr message — it says
 exactly what failed (validation regex, missing remote, exhausted
 letter suffix, missing tag).
 
-On success, suggest \`/specnaut release-version\` as the natural next
+On success, suggest \`/ship release\` as the natural next
 step. Do NOT run it automatically — releasing is an explicit,
 deliberate user action.
 `,
@@ -2509,8 +2655,8 @@ deliberate user action.
   },
   {
     category: "phase",
-    name: "specnaut",
-    suffix: "release-version.md",
+    name: "ship",
+    suffix: "release.md",
     content: `
 ## User Input
 
@@ -2521,9 +2667,9 @@ deliberate user action.
 You **MUST** consider the user input before proceeding (if not empty).
 Common natural-language requests:
 
-- \`/specnaut release-version\` — generate notes for the latest tag
-- \`/specnaut release-version v1.2.3\` — generate notes for a specific tag
-- \`/specnaut release-version --baseline v1.2.0\` — override the baseline
+- \`/ship release\` — generate notes for the latest tag
+- \`/ship release v1.2.3\` — generate notes for a specific tag
+- \`/ship release --baseline v1.2.0\` — override the baseline
   (use when the previous tag was never released and you want to skip
   past it; default baseline is the previous tag chronologically)
 
@@ -2760,8 +2906,8 @@ The script emits the body verbatim. Do NOT:
 ## Workflow
 
 \`\`\`
-/specnaut tag-version             → annotated tag created + pushed
-/specnaut release-version         → categorized release notes (stdout)
+/ship tag             → annotated tag created + pushed
+/ship release         → categorized release notes (stdout)
 ↳ pipe to gh/glab release create  → release published
    └─ (optional CD) a \`release: published\` job deploys production —
       see "From release to production" above

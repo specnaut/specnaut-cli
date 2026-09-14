@@ -8,9 +8,9 @@ $ARGUMENTS
 You **MUST** consider the user input before proceeding (if not empty).
 Common natural-language requests:
 
-- `/specnaut release-version` — generate notes for the latest tag
-- `/specnaut release-version v1.2.3` — generate notes for a specific tag
-- `/specnaut release-version --baseline v1.2.0` — override the baseline
+- `/ship release` — generate notes for the latest tag
+- `/ship release v1.2.3` — generate notes for a specific tag
+- `/ship release --baseline v1.2.0` — override the baseline
   (use when the previous tag was never released and you want to skip
   past it; default baseline is the previous tag chronologically)
 
@@ -247,8 +247,8 @@ The script emits the body verbatim. Do NOT:
 ## Workflow
 
 ```
-/specnaut tag-version             → annotated tag created + pushed
-/specnaut release-version         → categorized release notes (stdout)
+/ship tag             → annotated tag created + pushed
+/ship release         → categorized release notes (stdout)
 ↳ pipe to gh/glab release create  → release published
    └─ (optional CD) a `release: published` job deploys production —
       see "From release to production" above

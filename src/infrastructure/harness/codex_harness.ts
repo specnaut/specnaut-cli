@@ -12,6 +12,7 @@ import { applyScheme, phaseScriptDestination } from "./scheme_filter.ts";
 import { applySpecBackend } from "./spec_backend_filter.ts";
 import { applySpecAutogen } from "./spec_autogen_filter.ts";
 import { addUnique } from "./bundle_writer.ts";
+import { SKILL_SURFACE } from "./skill_layout.ts";
 
 function parseAgentFrontmatter(
   content: string,
@@ -74,11 +75,7 @@ export class CodexHarness implements Harness {
         case "backlog-doc":
         case "phase": {
           // One shape: a document beside its skill, in that skill's folder.
-          const dest = skillDocDestination(entry, {
-            kind: "nested",
-            root: ".agents/skills",
-            namespaced: true,
-          });
+          const dest = skillDocDestination(entry, SKILL_SURFACE.codex.layout);
           addUnique(out, dest, {
             content: entry.content,
             executable: entry.executable,

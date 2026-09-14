@@ -10,6 +10,7 @@ import { applyScheme, phaseScriptDestination } from "./scheme_filter.ts";
 import { applySpecBackend } from "./spec_backend_filter.ts";
 import { applySpecAutogen } from "./spec_autogen_filter.ts";
 import { addUnique } from "./bundle_writer.ts";
+import { SKILL_SURFACE } from "./skill_layout.ts";
 
 function toCopilotInstructionMarkdown(entry: CoreEntry): string {
   const split = splitFrontmatter(entry.content);
@@ -26,11 +27,7 @@ function destinationFor(entry: CoreEntry): string {
     case "backlog-doc":
     case "phase":
       // Copilot is flat too — a sibling instruction file, owner-prefixed.
-      return skillDocDestination(entry, {
-        kind: "flat",
-        dir: ".github/instructions",
-        ext: ".instructions.md",
-      });
+      return skillDocDestination(entry, SKILL_SURFACE.copilot.layout);
     case "phase-script":
       return phaseScriptDestination(entry);
     case "backlog-script":

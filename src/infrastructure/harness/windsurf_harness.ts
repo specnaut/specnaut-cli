@@ -10,6 +10,7 @@ import { applyScheme, phaseScriptDestination } from "./scheme_filter.ts";
 import { applySpecBackend } from "./spec_backend_filter.ts";
 import { applySpecAutogen } from "./spec_autogen_filter.ts";
 import { addUnique } from "./bundle_writer.ts";
+import { SKILL_SURFACE } from "./skill_layout.ts";
 
 // Cascade ignores Claude-only frontmatter fields (e.g. `color:`). Strip them
 // before emission so they don't eat into the 12k-char workflow cap.
@@ -126,11 +127,7 @@ function destinationFor(entry: CoreEntry): string {
       // Windsurf is flat — no nested skill folders. A sub-document becomes a
       // sibling workflow whose name carries its owner as the prefix, which is
       // the only thing disambiguating two skills' documents here.
-      return skillDocDestination(entry, {
-        kind: "flat",
-        dir: ".windsurf/workflows",
-        ext: ".md",
-      });
+      return skillDocDestination(entry, SKILL_SURFACE.windsurf.layout);
     case "phase-script":
       return phaseScriptDestination(entry);
     case "backlog-script":

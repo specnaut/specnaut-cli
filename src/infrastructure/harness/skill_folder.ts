@@ -5,17 +5,42 @@ import { splitFrontmatter } from "./frontmatter.ts";
  * Returns the folder name for a skill-emitting core entry, used by harnesses that
  * render commands/agents/skills as skill folders (Cursor, Codex).
  */
+/**
+ * The `specnaut-` namespacing rule, on a bare skill name.
+ *
+ * Names already beginning with `specnaut` are emitted as-is (the router itself
+ * is `specnaut`; the auto-invoke alias is `specnaut-review`). Everything else
+ * (`board`, `ship`, …) takes the prefix to avoid clashing inside a global
+ * skills registry.
+ *
+ * **This is the rule's single home.** It used to be spelled twice — here and in
+ * `harness_commands.ts`'s command table — and that second copy had no owner
+ * variable at all, so it emitted `/specnaut-<doc>` for a document owned by some
+ * other skill. A command string that names the wrong skill is not a mislabel on
+ * a flat harness; it is a command that does not resolve.
+ */
+export function namespacedSkillName(name: string): string {
+  return name === "specnaut" || name.startsWith("specnaut-") ? name : `specnaut-${name}`;
+}
+
+/**
+ * The name a skill goes by under a given layout — the folder a nested harness
+ * gives it, the prefix a flat harness puts on its documents, and exactly what
+ * the user types after the slash.
+ *
+ * One rule, three consumers. Claude emits skill names verbatim; every other
+ * harness namespaces them, and a flat harness always does because its filenames
+ * share one directory.
+ */
+export function skillNameFor(skill: string, shape: SkillDocShape): string {
+  return shape.kind === "flat" || shape.namespaced ? namespacedSkillName(skill) : skill;
+}
+
 export function skillFolderName(entry: CoreEntry): string {
   switch (entry.category) {
     case "skill":
     case "backlog-skill":
-      // Skill names that already begin with "specnaut" are emitted as-is
-      // (the router itself is "specnaut"; the auto-invoke alias is
-      // "specnaut-review"). Other skills (`board`, …) get the namespacing
-      // prefix to avoid clashes inside a global skills registry.
-      return entry.name === "specnaut" || entry.name.startsWith("specnaut-")
-        ? entry.name
-        : `specnaut-${entry.name}`;
+      return namespacedSkillName(entry.name);
     case "agent":
       return `specnaut-agent-${entry.name}`;
     default:
@@ -116,14 +141,12 @@ export function skillDocDestination(entry: CoreEntry, shape: SkillDocShape): str
   if (shape.kind === "flat") {
     // Flat harnesses have no folders, so the subdirectory cannot be expressed
     // and is deliberately dropped: the owner prefix is what disambiguates.
-    const owner = skillFolderName({ ...entry, category: "backlog-skill" });
-    return `${shape.dir}/${owner}-${skillDocName(entry)}${shape.ext}`;
+    return `${shape.dir}/${skillNameFor(entry.name, shape)}-${skillDocName(entry)}${shape.ext}`;
   }
 
-  const owner = shape.namespaced
-    ? skillFolderName({ ...entry, category: "backlog-skill" })
-    : entry.name;
-  return [shape.root, owner, subdir, entry.suffix].filter(Boolean).join("/");
+  return [shape.root, skillNameFor(entry.name, shape), subdir, entry.suffix]
+    .filter(Boolean)
+    .join("/");
 }
 
 /**

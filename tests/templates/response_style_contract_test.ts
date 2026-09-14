@@ -218,6 +218,10 @@ const POINTED_BY_DECISION: ReadonlyMap<string, string> = new Map([
     "the workflow router — #575 names it as an anchor; it has room and every phase it dispatches answers a person",
   ],
   [
+    "skill/ship",
+    "the production verb — it asks a disambiguation question when the repository cannot resolve the intent, so questions-as-selections is load-bearing rather than incidental; and unlike /board it has ~6,500 characters of Windsurf headroom, so the pointer costs nothing it needs",
+  ],
+  [
     "skill/using-specnaut",
     "the on-demand route for copilot and opencode, whose only static entry is .specnaut/harness-tools.md",
   ],

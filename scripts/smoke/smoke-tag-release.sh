@@ -33,10 +33,12 @@ echo "═══ #227  scheme=semver scaffold ═══"
 run_init "semver" "semver"
 cd "$(scenario_dir "${NAME}-semver")"
 
-check "phase doc tag-version.md scaffolded" \
-  '[ -f .claude/skills/specnaut/phases/tag-version.md ]'
-check "phase doc release-version.md scaffolded" \
-  '[ -f .claude/skills/specnaut/phases/release-version.md ]'
+check "/ship skill scaffolded" \
+  '[ -f .claude/skills/ship/SKILL.md ]'
+check "ship doc tag.md scaffolded" \
+  '[ -f .claude/skills/ship/phases/tag.md ]'
+check "ship doc release.md scaffolded" \
+  '[ -f .claude/skills/ship/phases/release.md ]'
 check "tag.sh present + executable" \
   '[ -x .specnaut/scripts/release/tag.sh ]'
 check "release.sh present + executable" \
@@ -75,10 +77,16 @@ check "#230 release-local.sh makes NO remote API calls" \
   '! grep -E "(gh|glab) (api|release create)" .specnaut/scripts/release/release-local.sh'
 check "lock records version_scheme: semver" \
   'grep -q "version_scheme: semver" .specnaut/installed.lock'
-check "specnaut SKILL.md references tag-version" \
-  'grep -q "tag-version" .claude/skills/specnaut/SKILL.md'
-check "specnaut SKILL.md references release-version" \
-  'grep -q "release-version" .claude/skills/specnaut/SKILL.md'
+# INVERTED by spec 033. These two used to assert that the /specnaut router
+# REFERENCES tag-version and release-version. It must now reference neither:
+# release concerns moved to /ship, and a router still advertising a phase it no
+# longer owns is the defect this migration exists to remove.
+check "specnaut SKILL.md carries no release concern" \
+  '! grep -qE "tag-version|release-version" .claude/skills/specnaut/SKILL.md'
+check "specnaut SKILL.md names /ship as the new address" \
+  'grep -q "/ship" .claude/skills/specnaut/SKILL.md'
+check "ship SKILL.md offers the three paths" \
+  'grep -q "Tag only" .claude/skills/ship/SKILL.md && grep -q "Release an existing tag" .claude/skills/ship/SKILL.md'
 
 cd "$CLI"
 

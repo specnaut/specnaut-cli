@@ -20,14 +20,21 @@ import type { KnownHarness } from "./installed_lock.ts";
  * Cursor/Codex/etc. projects keep their on-disk files binary-
  * owned regardless of plugin install state on the host machine.
  *
- * Coverage map (post-consolidation, v1.0.0):
+ * Coverage map:
  *
  *   - `.claude/agents/<name>.md` (excluding `architect.md` — that's a
  *     contributor-only agent, not bundled into user projects)
- *   - `.claude/skills/specnaut/SKILL.md` — the consolidated router skill
- *   - `.claude/skills/specnaut/phases/<phase>.md` — phase reference docs.
- *     Hyphenated names are valid (`tag-version`, `release-version`,
- *     `list-skills`, `audit-security`, …).
+ *   - `.claude/skills/<owner>/SKILL.md` for the skills the list claims, and
+ *     every sub-document those skills own. **Claiming a skill claims all of
+ *     it**: a partially covered skill is the #455 shape with fewer paths, and
+ *     `plugin_coverage_parity_test.ts` fails one.
+ *
+ * The list names **two** owners — `specnaut` and `ship` (spec 033, which moved
+ * release concerns out of the router). It does NOT name every skill the plugin
+ * ships; whether it should is specnaut-cli#605, deliberately unsettled, because
+ * widening it changes what `check --project` reports and what `upgrade`
+ * migrates. The parity test pins the owner set so neither can drift by
+ * accident.
  *
  * Everything else (project-stateful files in `.specnaut/`, harness-
  * static files like `.claude/settings.json`, hooks, `CLAUDE.md`,
@@ -42,11 +49,23 @@ export function isPluginCoveredPath(
   const agentMatch = dest.match(/^\.claude\/agents\/([^/]+)\.md$/);
   if (agentMatch !== null) return agentMatch[1] !== "architect";
 
+  // Membership in the coverage list is the primary answer, and it is the only
+  // branch that knows about owners other than `specnaut` — so it must come
+  // first. Spec 033 put `/ship` alongside `/specnaut`; nothing below can see it.
+  if (PLUGIN_COVERED_PATHS_CLAUDE.includes(dest)) return true;
+
+  // LEGACY TOLERANCE, deliberately kept. These patterns accept any well-formed
+  // `specnaut` path, including ones the bundle no longer ships — a stale lock
+  // entry for a removed phase (`lite-heuristic`, say) still resolves here and
+  // keeps its `migrate-to-plugin` treatment instead of becoming an orphan
+  // removal. Replacing them with pure list membership would flip that, which
+  // is a behaviour change wearing a cleanup's clothes.
+  //
+  // Whether the coverage list SHOULD be derived from the bundle rather than
+  // hand-maintained is specnaut-cli#605, and it is deliberately unsettled:
+  // the list names one skill while the plugin ships far more, so deriving it
+  // would widen coverage as a side effect.
   if (dest === ".claude/skills/specnaut/SKILL.md") return true;
-  // Hyphenated phase names are valid (`tag-version`, `release-version`,
-  // `audit-security`, …). The earlier `[a-z]+` regex silently failed for
-  // any phase containing a hyphen; the corrected pattern accepts one or
-  // more lowercase alpha tokens separated by single hyphens.
   if (/^\.claude\/skills\/specnaut\/phases\/[a-z]+(?:-[a-z]+)*\.md$/.test(dest)) {
     return true;
   }
@@ -76,9 +95,8 @@ export function isPluginCoveredPath(
  * `CORE_BUNDLE`. Editing the manifest without editing this list turns that
  * test red, which is the only reason a third mirror is tolerable at all.
  *
- * Phase docs include hyphenated names — the regex was widened in #303
- * after silently dropping `tag-version`, `release-version`, and
- * `list-skills`. The phase-1 audit family (`audit-security` #303,
+ * Sub-document names may be hyphenated — the legacy regex was widened in #303
+ * after it silently dropped three of them. The phase-1 audit family (`audit-security` #303,
  * `audit-performance` #304, `audit-accessibility` #305) shipped in
  * v1.9.0; the phase-2 family added `audit-architecture` (#321) and
  * `audit-dependencies` (#322) closing Epic #320. The lite-chain
@@ -108,6 +126,12 @@ export const PLUGIN_COVERED_PATHS_CLAUDE: ReadonlyArray<string> = [
     "dependency-expert",
   ].map((name) => `.claude/agents/${name}.md`),
   ".claude/skills/specnaut/SKILL.md",
+  // The /ship skill (spec 033) — release concerns left /specnaut. Claiming a
+  // skill means claiming all of its files: the parity test fails a skill that
+  // is covered only in part.
+  ".claude/skills/ship/SKILL.md",
+  ".claude/skills/ship/phases/tag.md",
+  ".claude/skills/ship/phases/release.md",
   ...[
     "plan",
     "plan-audits",
@@ -123,8 +147,6 @@ export const PLUGIN_COVERED_PATHS_CLAUDE: ReadonlyArray<string> = [
     "merge-squash",
     "auto-chain",
     "constitution",
-    "tag-version",
-    "release-version",
     "audit-security",
     "audit-performance",
     "audit-accessibility",

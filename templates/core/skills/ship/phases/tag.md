@@ -8,11 +8,11 @@ $ARGUMENTS
 You **MUST** consider the user input before proceeding (if not empty).
 Common natural-language requests:
 
-- `/specnaut tag-version` — tag HEAD with the next version
-- `/specnaut tag-version <sha>` — tag a specific commit
-- `/specnaut tag-version --bump minor` — SemVer projects only: bump
+- `/ship tag` — tag HEAD with the next version
+- `/ship tag <sha>` — tag a specific commit
+- `/ship tag --bump minor` — SemVer projects only: bump
   minor instead of patch (also `--bump major` / `--bump patch`)
-- `/specnaut tag-version --no-push` — skip pushing to `origin`
+- `/ship tag --no-push` — skip pushing to `origin`
 
 ## What this command does
 
@@ -43,12 +43,12 @@ What the script does:
 ## What this command does NOT do
 
 - It does **not** create a GitHub / GitLab release — pushing a tag
-  alone does not publish a release. Run `/specnaut release-version`
+  alone does not publish a release. Run `/ship release`
   after this to publish the categorized release notes.
 - It does **not** deploy anything. A tag push never ships to
   production — in the recommended model, deploys are triggered by a
   *published release*, not by tags or branch pushes. See
-  `/specnaut release-version` → "From release to production (CD)".
+  `/ship release` → "From release to production (CD)".
 - It does **not** edit version fields in `package.json` / `Cargo.toml`
   / `pyproject.toml` / etc. The git tag **is** the version — single
   source of truth.
@@ -63,6 +63,6 @@ If the script exits non-zero, read the stderr message — it says
 exactly what failed (validation regex, missing remote, exhausted
 letter suffix, missing tag).
 
-On success, suggest `/specnaut release-version` as the natural next
+On success, suggest `/ship release` as the natural next
 step. Do NOT run it automatically — releasing is an explicit,
 deliberate user action.

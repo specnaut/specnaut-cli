@@ -1,4 +1,6 @@
 import type { KnownHarness } from "../../domain/installed_lock.ts";
+import { SKILL_SURFACE } from "./skill_layout.ts";
+import { skillNameFor } from "./skill_folder.ts";
 
 /**
  * What a user actually types, per harness.
@@ -11,41 +13,54 @@ import type { KnownHarness } from "../../domain/installed_lock.ts";
  * named wrong in the one place a first-time user reads.
  *
  * The shapes are not a preference. They fall out of where each harness's
- * `destinationFor` puts a phase and a `backlog-skill`:
+ * `destinationFor` puts a skill and its documents:
  *
- *   - phases nested under the router's own folder → the router takes the phase
- *     as an argument, `/specnaut plan`
- *   - phases emitted as sibling files (Windsurf) → each is its own command,
- *     `/specnaut-plan`
+ *   - documents nested under their skill's own folder → the skill takes the
+ *     document as an argument, `/specnaut plan`, `/ship tag-version`
+ *   - documents emitted as sibling files (Windsurf) → each is its own command,
+ *     `/specnaut-plan`, `/specnaut-ship-tag-version`
  *   - Copilot writes `.github/instructions/*.instructions.md`, which the agent
  *     applies by context rather than by invocation — there is no command to
- *     name, and inventing one would be worse than saying so.
+ *     name, so it is `{ invocable: false }` and callers must narrow.
  *
- * `harness_commands_test.ts` cross-checks every row against the destinations
- * the harness really emits, so this table cannot drift from the code it
+ * **Derived from `SKILL_SURFACE`, not restated.** An earlier version of this
+ * file carried its own table with `/specnaut ${name}` and `/specnaut-${name}`
+ * written out, which meant the owner-prefix rule had two spellings and this one
+ * had **no owner variable at all**. It could only ever name `specnaut`. The
+ * moment a second skill owned documents it emitted, on a flat harness, a
+ * command for a file that does not exist — a broken command string, not a
+ * mislabel.
+ *
+ * The command shares its **inputs** with the destination, never its output: a
+ * destination cannot be parsed back into `(owner, document)`, because
+ * `specnaut-ship-release` splits as (`specnaut-ship`, `release`) or
+ * (`specnaut`, `ship-release`) with nothing to choose between them.
+ *
+ * `harness_commands_test.ts` cross-checks every harness against the
+ * destinations it really emits, so this cannot drift from the code it
  * describes without a red test.
  */
-export interface HarnessCommands {
-  /** How a router phase is invoked, e.g. `/specnaut plan`. */
-  readonly phase: (name: string) => string;
-  /** How the board skill is invoked, or `null` when the harness has no slash commands. */
-  readonly board: string | null;
-}
-
-const NESTED_PHASES = (name: string) => `/specnaut ${name}`;
-const FLAT_PHASES = (name: string) => `/specnaut-${name}`;
-
-const TABLE: Record<KnownHarness, HarnessCommands> = {
-  // Claude emits skill names verbatim — no `specnaut-` prefix.
-  claude: { phase: NESTED_PHASES, board: "/board" },
-  cursor: { phase: NESTED_PHASES, board: "/specnaut-board" },
-  codex: { phase: NESTED_PHASES, board: "/specnaut-board" },
-  opencode: { phase: NESTED_PHASES, board: "/specnaut-board" },
-  antigravity: { phase: NESTED_PHASES, board: "/specnaut-board" },
-  windsurf: { phase: FLAT_PHASES, board: "/specnaut-board" },
-  copilot: { phase: () => "", board: null },
-};
+export type HarnessCommands =
+  | { readonly invocable: false }
+  | {
+    readonly invocable: true;
+    /** How a top-level skill is invoked: `/board`, `/specnaut-board`, `/ship`. */
+    readonly skill: (name: string) => string;
+    /**
+     * How one of a skill's documents is invoked:
+     * `/specnaut plan`, `/ship tag-version`, `/specnaut-ship-tag-version`.
+     */
+    readonly skillDoc: (owner: string, doc: string) => string;
+  };
 
 export function harnessCommands(harness: KnownHarness): HarnessCommands {
-  return TABLE[harness];
+  const { layout, invocable } = SKILL_SURFACE[harness];
+  if (!invocable) return { invocable: false };
+  const token = (s: string) => skillNameFor(s, layout);
+  return {
+    invocable: true,
+    skill: (name) => `/${token(name)}`,
+    skillDoc: (owner, doc) =>
+      layout.kind === "flat" ? `/${token(owner)}-${doc}` : `/${token(owner)} ${doc}`,
+  };
 }

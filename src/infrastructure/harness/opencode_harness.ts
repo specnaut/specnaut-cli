@@ -10,6 +10,7 @@ import { applyScheme, phaseScriptDestination } from "./scheme_filter.ts";
 import { applySpecBackend } from "./spec_backend_filter.ts";
 import { applySpecAutogen } from "./spec_autogen_filter.ts";
 import { addUnique } from "./bundle_writer.ts";
+import { SKILL_SURFACE } from "./skill_layout.ts";
 
 type PermissionValue = "allow" | "ask" | "deny" | { "*": "ask" | "allow" | "deny" };
 type PermissionMap = Record<string, PermissionValue>;
@@ -103,11 +104,7 @@ function destinationFor(entry: CoreEntry): string {
     case "backlog-doc":
     case "phase":
       // One shape: a document beside its skill, in that skill's own folder.
-      return skillDocDestination(entry, {
-        kind: "nested",
-        root: ".opencode/skills",
-        namespaced: true,
-      });
+      return skillDocDestination(entry, SKILL_SURFACE.opencode.layout);
     case "phase-script":
       return phaseScriptDestination(entry);
     case "backlog-script":

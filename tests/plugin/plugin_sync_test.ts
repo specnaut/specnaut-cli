@@ -35,8 +35,6 @@ const SYNC_PAIRS: ReadonlyArray<{ plugin: string; source: string }> = [
     "review",
     "merge",
     "constitution",
-    "tag-version",
-    "release-version",
     "audit-security",
     "audit-performance",
     "audit-accessibility",
@@ -59,6 +57,17 @@ const SYNC_PAIRS: ReadonlyArray<{ plugin: string; source: string }> = [
   ].map((name) => ({
     plugin: `plugin/skills/specnaut/phases/${name}.md`,
     source: `templates/core/skills/specnaut/phases/${name}.md`,
+  })),
+  // The /ship skill — release concerns left /specnaut in spec 033. It owns its
+  // documents the way /board owns groom.md: the owner is the entry's `name`,
+  // the document its `suffix`.
+  {
+    plugin: "plugin/skills/ship/SKILL.md",
+    source: "templates/core/skills/ship/SKILL.md",
+  },
+  ...["tag", "release"].map((name) => ({
+    plugin: `plugin/skills/ship/phases/${name}.md`,
+    source: `templates/core/skills/ship/phases/${name}.md`,
   })),
   // writing-plans skill — Specnaut's native equivalent of obra/superpowers
   // writing-plans, used for issue-driven planning where the spec-kit

@@ -14,6 +14,23 @@ to drive a spec-driven workflow inside your project. It adds three things upstre
 - **Product backlog** — Markdown index + one file per task with structured frontmatter, a Product
   Owner agent for management, one-way sync to GitHub Issues/Project V2
 
+## Three skills, one project
+
+Specnaut gives your harness three skills, and they divide by what they own:
+
+| Skill       | Owns                                                               | Typical invocation                    |
+| :---------- | :----------------------------------------------------------------- | :------------------------------------ |
+| `/board`    | the backlog — what you might do, and what you are doing            | `/board add "…"`, `/board groom`      |
+| `/specnaut` | the specification — what a thing is, and whether it is built right | `/specnaut plan "…"`                  |
+| `/ship`     | production — getting a built thing out the door                    | `/ship`, `/ship tag`, `/ship release` |
+
+Shipping is deliberately not a specification concern. It has a different cadence, a different risk
+profile — irreversible, outward-facing, it triggers live pipelines — and a different audience from
+writing a plan.
+
+On harnesses that namespace their skills the names carry a prefix (`/specnaut-board`,
+`/specnaut-ship`); `specnaut init` prints the exact commands for the harness you chose.
+
 > **Upgrading an existing project?** Some releases rename or remove things `specnaut upgrade` cannot
 > fix inside files you wrote — your `AGENTS.md`, your own skills, your saved prompts. Check
 > [UPGRADING.md](UPGRADING.md) for the version you are moving to.
@@ -89,8 +106,8 @@ see [the docs](https://specnaut.com/llms.txt) for current status. The sync workf
 
 - Plugin: cross-project, always up-to-date, no `specnaut init` needed, auto-activates skills on
   session start via the `using-specnaut` bootstrap.
-- Binary: project-local customization, short slash-commands (`/specnaut plan`), backlog + hooks
-  support.
+- Binary: project-local customization, short slash-commands (`/specnaut plan`, `/ship`), backlog +
+  hooks support.
 
 Most teams use both. See [the docs](https://specnaut.com) for the full boundary table and
 per-harness tool-mapping references. The website and documentation source live in their own repo,

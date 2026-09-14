@@ -99,7 +99,10 @@ Deno.test("specnaut init --ai windsurf scaffolds a Windsurf layout", async () =>
     const workflowsCount = (await Array.fromAsync(
       Deno.readDir(join(root, ".windsurf/workflows")),
     )).length;
-    assertEquals(workflowsCount, 65); // +response-style-contract (#575)
+    // 66 since spec 033: /ship adds three flat workflows (the skill plus its
+    // two documents) and retires two (`specnaut-tag-version`,
+    // `specnaut-release-version`) — net +1.
+    assertEquals(workflowsCount, 66);
 
     // Shared (cross-harness)
     assertEquals(await exists(join(root, ".specnaut/memory/constitution.md")), true);
