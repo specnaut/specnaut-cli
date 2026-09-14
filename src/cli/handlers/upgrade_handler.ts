@@ -601,6 +601,12 @@ export async function runUpgrade(intent: UpgradeIntent): Promise<number> {
     return 2;
   }
 
+  // Before the up-to-date short-circuit: a run with nothing else to do is
+  // precisely where a refusal would otherwise vanish.
+  for (const refusal of result.refusals) {
+    console.log(yellow(`⚠ ${refusal}`));
+  }
+
   if (result.status === "up-to-date") {
     console.log(green(`✓ already up to date (templates ${result.currentVersion})`));
     return 0;

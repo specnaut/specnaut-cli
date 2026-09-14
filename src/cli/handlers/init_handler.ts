@@ -32,6 +32,7 @@ import { DenoFsWriter } from "../../infrastructure/deno_fs_writer.ts";
 import { DenoGit } from "../../infrastructure/deno_git.ts";
 import { FsLockStore } from "../../infrastructure/fs_lock_store.ts";
 import { migrateLegacyConfigDir } from "../../infrastructure/fs_legacy_migrator.ts";
+import { DenoFsReader } from "../../infrastructure/fs_reader.ts";
 import { FsParentWorkspaceReader } from "../../infrastructure/fs_parent_workspace_reader.ts";
 import { FsPreserveStore } from "../../infrastructure/fs_preserve_store.ts";
 import { isAgenticPath, isParentManaged } from "../../domain/parent_managed.ts";
@@ -528,6 +529,10 @@ export async function runInit(intent: InitIntent): Promise<number> {
 
   const useCase = new InitProjectUseCase({
     writer: new DenoFsWriter(),
+    // Only consulted for `mergeRefuseIf` guards — a brownfield init must not
+    // append a second `[agents]` table to a `.codex/config.toml` that already
+    // has one (cli#599).
+    reader: new DenoFsReader(),
     git: new DenoGit(),
     lockStore: new FsLockStore(),
     harness,

@@ -33,6 +33,21 @@ export type TemplateFile = {
    */
   mergeJson?: "claude-settings";
   /**
+   * Refuse the merge when the host file already contains this pattern OUTSIDE
+   * Specnaut's own block.
+   *
+   * A merge block is non-destructive by construction, but "non-destructive" is
+   * not the same as "always safe to add". A TOML file that already declares
+   * `[agents]` cannot receive a second `[agents]` header: the result does not
+   * parse, so a block appended in good faith would break the user's config to
+   * deliver a default. Declarative rather than a callback so it survives
+   * bundling, and checked in the application layer, which owns the warnings
+   * channel a refusal has to reach.
+   *
+   * `pattern` is compiled with the `m` flag by its consumers.
+   */
+  mergeRefuseIf?: { readonly pattern: string; readonly message: string };
+  /**
    * When set, the destination file is **user-owned** but carries exactly one
    * Specnaut-managed section, fenced inside the bundled `content` by Markdown
    * comment markers bearing this label.

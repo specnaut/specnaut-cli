@@ -58,8 +58,8 @@ below) and never appear as user commands.
 
 ## Specnaut agent registry
 
-Dispatch these via `Task({ subagent_type: "<name>", ... })` (or your
-harness's equivalent — see the tool reference described below).
+Dispatch via `Task({ subagent_type: "<name>" })`; on Codex
+`spawn_agent(agent_type="<name>")` — never by description alone.
 
 | Agent | When to dispatch |
 |---|---|

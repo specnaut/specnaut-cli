@@ -4,6 +4,11 @@ import type { BundleOptions, Harness } from "../../application/ports.ts";
 import type { CoreBundle, CoreEntry } from "../../domain/core_bundle.ts";
 import type { Bundle } from "../../domain/template.ts";
 import { HARNESS_STATIC } from "../../templates_bundle.ts";
+import {
+  CODEX_CONFIG_BLOCK_LABEL,
+  CODEX_CONFIG_REFUSAL,
+  codexAgentDefaultsBlock,
+} from "../../domain/codex_config.ts";
 import { ensureSkillFrontmatter, skillDocDestination, skillFolderName } from "./skill_folder.ts";
 import { frontmatterField, splitFrontmatter } from "./frontmatter.ts";
 import { effortToCodexReasoning, tierToCodexModel } from "../../domain/codex_models.ts";
@@ -126,6 +131,25 @@ export class CodexHarness implements Harness {
     for (const [dest, file] of Object.entries(staticFiles)) {
       out[dest] = file;
     }
+
+    // `[agents]` defaults for children spawned without a role (cli#599).
+    //
+    // Synthesised here rather than shipped as a static template because the
+    // model id must come from `codex_models.ts` — that file states it is the
+    // only place to edit when OpenAI renames a model, and a template carrying
+    // the literal would become the second, drifting on exactly the release
+    // that renamed it.
+    //
+    // A merge block, not `skipIfExists`: anyone who already keeps a
+    // `.codex/config.toml` is the normal case AND the population with this
+    // bug, so write-once-at-init would skip precisely the users who need it
+    // and `upgrade` could never deliver a correction afterwards.
+    out[".codex/config.toml"] = {
+      content: codexAgentDefaultsBlock(),
+      executable: false,
+      mergeBlock: CODEX_CONFIG_BLOCK_LABEL,
+      mergeRefuseIf: CODEX_CONFIG_REFUSAL,
+    };
     return out;
   }
 }

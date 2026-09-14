@@ -1,4 +1,4 @@
-import type { FsWriter, GitAdapter, Harness, LockStore } from "./ports.ts";
+import type { FsReader, FsWriter, GitAdapter, Harness, LockStore } from "./ports.ts";
 import { sha256Hex } from "../domain/sha256.ts";
 import type {
   BacklogBackend,
@@ -11,6 +11,7 @@ import type {
 import type { CoreBundle } from "../domain/core_bundle.ts";
 import type { Bundle } from "../domain/template.ts";
 import { TEMPLATES_VERSION } from "../templates_bundle.ts";
+import { mergeRefusal } from "../domain/merge_block.ts";
 import { canonicalBlockBody } from "../domain/merge_block.ts";
 import { isAgenticPath } from "../domain/parent_managed.ts";
 
@@ -47,6 +48,16 @@ export type InitResult =
 
 export type InitProjectDeps = {
   writer: FsWriter;
+  /**
+   * Optional, and only used to evaluate a file's `mergeRefuseIf` guard against
+   * what is already on disk (cli#599).
+   *
+   * Optional rather than required because a greenfield `init` has nothing to
+   * read and every existing caller would otherwise need a reader to construct
+   * the use case. Absent ⇒ no guard is evaluated, which is the pre-existing
+   * behaviour: this can only ever REFUSE a write, never cause one.
+   */
+  reader?: FsReader;
   git: GitAdapter;
   lockStore: LockStore;
   harness: Harness;
@@ -151,6 +162,26 @@ export class InitProjectUseCase {
     for (const [dest, file] of Object.entries(bundle)) {
       if (preservedSet.has(dest)) {
         preserved.push(dest);
+        continue;
+      }
+      // A merge block is non-destructive, but that is not the same as always
+      // safe to add: `.codex/config.toml` already carrying an `[agents]` table
+      // cannot take a second one without ceasing to parse. Refuse, and say
+      // which keys to add by hand — a silent skip would leave the user with the
+      // defect and no idea the fix had been withheld (cli#599).
+      //
+      // Checked before the dry-run branch so a preview reports the refusal too.
+      // `catch → null` because the target directory may not exist yet: on a
+      // greenfield `init` (and on `--dry-run`, which creates nothing at all)
+      // the reader resolves the project root through `realPath` and throws.
+      // "Nothing on disk" is the correct reading of a directory that is not
+      // there, and a guard that can only REFUSE must never be the thing that
+      // makes init fail.
+      const existing = this.deps.reader === undefined ? null : await this.deps.reader
+        .readText(input.targetDir, dest).catch(() => null);
+      const refusal = mergeRefusal(existing, file);
+      if (refusal !== null) {
+        warnings.push(refusal);
         continue;
       }
       bundleToWrite[dest] = file;

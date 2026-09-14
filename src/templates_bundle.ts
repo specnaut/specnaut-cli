@@ -4983,7 +4983,8 @@ HEAD is the current task's commit. For a whole feature, BASE is
 
 **Step 2: Dispatch the code-reviewer subagent** with the canonical
 prompt template (see below). Use the \`Task\` tool with
-\`subagent_type: code-reviewer\` and pass the four placeholders:
+\`subagent_type: code-reviewer\` — on Codex,
+\`spawn_agent(agent_type="code-reviewer", ...)\` — and pass the four placeholders:
 \`{DESCRIPTION}\`, \`{PLAN_OR_REQUIREMENTS}\`, \`{BASE_SHA}\`, \`{HEAD_SHA}\`.
 
 **Step 3: Act on the feedback.**
@@ -4997,6 +4998,7 @@ prompt template (see below). Use the \`Task\` tool with
 ## The canonical reviewer prompt template
 
 Paste this verbatim into a \`Task({subagent_type: "code-reviewer", ...})\`
+(Codex: \`spawn_agent(agent_type="code-reviewer", prompt=…)\`)
 dispatch, substituting the four placeholders. The format is mandatory —
 Specnaut's two-stage review pattern (spec compliance, then code
 quality; see \`subagent-driven-development\` skill) depends on the reviewer returning the
@@ -5203,6 +5205,13 @@ Task({
   gates, fmt/lint/typecheck/tests).
 - For security-specific concerns — dispatch \`security-expert\` instead.
 - For test-quality concerns specifically — dispatch \`test-reviewer\`.
+
+**On Codex, name the role — do not describe the task.** \`spawn_agent\` resolves a
+child's model as: explicit spawn value → the \`[agents]\` default in
+\`.codex/config.toml\` → **the parent session's value**. A child spawned by
+description alone selects no role, so it falls through to the last link and
+inherits your primary model. Always pass \`agent_type=\` (see
+\`references/codex-tools.md\`).
 `,
     executable: false,
     backend: null,
@@ -5272,8 +5281,8 @@ below) and never appear as user commands.
 
 ## Specnaut agent registry
 
-Dispatch these via \`Task({ subagent_type: "<name>", ... })\` (or your
-harness's equivalent — see the tool reference described below).
+Dispatch via \`Task({ subagent_type: "<name>" })\`; on Codex
+\`spawn_agent(agent_type="<name>")\` — never by description alone.
 
 | Agent | When to dispatch |
 |---|---|
@@ -5686,6 +5695,13 @@ This skill does not:
 - When dispatch isn't available on the current harness (rare; check
   \`references/<harness>-tools.md\`)
 - When the user explicitly asked for inline execution
+
+**On Codex, name the role — do not describe the task.** \`spawn_agent\` resolves a
+child's model as: explicit spawn value → the \`[agents]\` default in
+\`.codex/config.toml\` → **the parent session's value**. A child spawned by
+description alone selects no role, so it falls through to the last link and
+inherits your primary model. Always pass \`agent_type=\` (see
+\`references/codex-tools.md\`).
 `,
     executable: false,
     backend: null,
@@ -29872,6 +29888,37 @@ close_agent(id)
 
 If the wait times out, decide whether to retry or to surface the partial
 result to the user.
+
+## Always name the role — never dispatch by task description alone
+
+\`agent_type=\` is not decoration. Codex resolves a spawned child's model in
+three steps, and stops at the first that answers:
+
+1. the **explicit spawn value** — what \`agent_type=\` selects;
+2. the **\`[agents]\` default** in \`.codex/config.toml\`;
+3. **the parent session's value.**
+
+A child spawned by describing the task, with no \`agent_type=\`, selects no
+role. Step 1 is empty, so it falls through — and before Specnaut wrote step 2,
+step 3 was the only link left. Every such child silently ran on your primary
+model, and raising your primary model raised all of them with it, which is how
+a long orchestration escalates onto the most expensive model on your account
+with nothing to report it.
+
+Specnaut now scaffolds \`.codex/config.toml\` with \`[agents]\` defaults, so step 2
+answers and the floor is bounded. That is a safety net, not the fix: naming the
+role is what gets the work the model it was tiered for. Each bundled role pins
+its own \`model\` and \`model_reasoning_effort\` in \`.codex/agents/<name>.toml\`.
+
+**Role selection versus task naming.** \`agent_type=\` chooses *who* runs the
+work — a configured seat with a model, a reasoning budget and a prompt.
+\`prompt=\` describes *what* the work is. Putting the role name in the prompt
+does not select the role; only \`agent_type=\` does.
+
+**Context does not come with it.** A spawned child does not inherit the parent
+conversation. Everything it needs — file paths, the task, the acceptance
+criteria — has to be in \`prompt=\`. What it *can* inherit, when unspecified, is
+the model, which is exactly the inheritance this section is about.
 
 ## Idiom differences worth noting
 

@@ -17,7 +17,12 @@ import {
   type UpgradeAction,
   type UpgradePlan,
 } from "../domain/upgrade_plan.ts";
-import { canonicalBlockBody, extractBlock, mergeIntoFile } from "../domain/merge_block.ts";
+import {
+  canonicalBlockBody,
+  extractBlock,
+  mergeIntoFile,
+  mergeRefusal,
+} from "../domain/merge_block.ts";
 import { isPluginCoveredPath, pluginRelativePath } from "../domain/plugin_coverage.ts";
 import { isAgenticPath, pruneAgenticEntries } from "../domain/parent_managed.ts";
 
@@ -71,9 +76,27 @@ export type ManagedSectionOutcome = {
 };
 
 export type UpgradeProjectResult =
-  | { status: "up-to-date"; currentVersion: string }
+  | {
+    status: "up-to-date";
+    currentVersion: string;
+    /**
+     * Refusals still reach the user on the path where NOTHING else changed.
+     *
+     * That is not an edge case, it is the likely one: a project whose only
+     * outstanding difference is the refused file lands here, so a result type
+     * without this field dropped the message on exactly the run that needed it.
+     */
+    refusals: ReadonlyArray<string>;
+  }
   | {
     status: "planned";
+    /**
+     * Merges this run declined because the host file could not safely take the
+     * block — e.g. a `.codex/config.toml` already declaring `[agents]`
+     * (cli#599). Carried on the result rather than logged, because a refusal
+     * the user never sees is the same as the silent skip it replaced.
+     */
+    refusals: ReadonlyArray<string>;
     plan: UpgradePlan;
     fromVersion: string;
     toVersion: string;
@@ -81,6 +104,13 @@ export type UpgradeProjectResult =
   }
   | {
     status: "applied";
+    /**
+     * Merges this run declined because the host file could not safely take the
+     * block — e.g. a `.codex/config.toml` already declaring `[agents]`
+     * (cli#599). Carried on the result rather than logged, because a refusal
+     * the user never sees is the same as the silent skip it replaced.
+     */
+    refusals: ReadonlyArray<string>;
     plan: UpgradePlan;
     fromVersion: string;
     toVersion: string;
@@ -168,6 +198,22 @@ export class UpgradeProjectUseCase {
       }
     }
 
+    // Refuse a merge whose host file cannot safely take the block (cli#599).
+    //
+    // Dropped from the bundle BEFORE the plan is computed, so the refused path
+    // is never planned, written, or lock-tracked — an entry for a file we
+    // deliberately did not write would report as drift on every later run.
+    const refusals: string[] = [];
+    const refusedDests = new Set<string>();
+    for (const [dest, file] of Object.entries(bundle)) {
+      if (file.mergeRefuseIf === undefined) continue;
+      const refusal = mergeRefusal(await reader.readText(input.projectDir, dest), file);
+      if (refusal === null) continue;
+      refusals.push(refusal);
+      delete bundle[dest];
+      refusedDests.add(dest);
+    }
+
     const destPaths = new Set<string>([
       ...Object.keys(bundle),
       ...lock.entries.keys(),
@@ -233,9 +279,24 @@ export class UpgradeProjectUseCase {
       applicable.push({ oldDest, newDest, reason: r.reason });
     }
 
-    let effectiveLock = lock;
+    // A refused dest must leave the LOCK as well as the bundle.
+    //
+    // Dropping it from the bundle alone leaves its lock entry behind, and a
+    // dest that is in the lock but not in the bundle is an ORPHAN — so the very
+    // next plan removed the user's `.codex/config.toml` instead of leaving it
+    // alone. Refusing to write a file must never be a route to deleting it.
+    // Caught by the end-to-end test; the merge-level unit tests could not see
+    // it, because the deletion happens nowhere near the merge.
+    const lockForPlan = refusedDests.size === 0 ? lock : {
+      ...lock,
+      entries: new Map(
+        [...lock.entries].filter(([dest]) => !refusedDests.has(dest)),
+      ),
+    };
+
+    let effectiveLock = lockForPlan;
     if (applicable.length > 0) {
-      const entries = new Map(lock.entries);
+      const entries = new Map(lockForPlan.entries);
       for (const { oldDest, newDest } of applicable) {
         const entry = entries.get(oldDest)!;
         entries.delete(oldDest);
@@ -244,7 +305,7 @@ export class UpgradeProjectUseCase {
         diskShas.set(newDest, sha);
         diskShas.delete(oldDest);
       }
-      effectiveLock = { ...lock, entries };
+      effectiveLock = { ...lockForPlan, entries };
 
       // The maps above are enough for `--dry-run` to report the move
       // faithfully; the bytes only travel on a real run.
@@ -424,7 +485,7 @@ export class UpgradeProjectUseCase {
         }
       }
       // The version reported is the one now recorded, not the one that was.
-      return { status: "up-to-date", currentVersion: templatesVersion };
+      return { status: "up-to-date", currentVersion: templatesVersion, refusals };
     }
 
     // `--dry-run` returns here, BEFORE anything is written. It used to fall
@@ -437,6 +498,7 @@ export class UpgradeProjectUseCase {
     if (input.dryRun) {
       return {
         status: "planned",
+        refusals,
         plan,
         fromVersion: lock.templatesVersion,
         toVersion: templatesVersion,
@@ -682,6 +744,7 @@ export class UpgradeProjectUseCase {
 
     return {
       status: "applied",
+      refusals,
       plan,
       fromVersion: lock.templatesVersion,
       toVersion: templatesVersion,

@@ -179,3 +179,56 @@ export function mergeIntoFile(
   const trimmedExisting = existing.replace(/\n+$/, "");
   return `${trimmedExisting}\n\n${block}\n`;
 }
+
+/**
+ * The host file with Specnaut's own block removed.
+ *
+ * Needed by any check that asks "what does the USER's file contain" — our own
+ * block is not the user's content, and a guard that reads it would fire on the
+ * very text we wrote last run, turning an idempotent merge into a permanent
+ * refusal on the second upgrade.
+ */
+export function withoutBlock(
+  content: string,
+  label: string,
+  style: FenceStyle = "hash",
+): string {
+  const span = locateBlock(content, label, style);
+  if (span === null) return content;
+  return content.slice(0, span.startIdx) + content.slice(span.afterEnd);
+}
+
+/**
+ * Why a merge must not happen, or `null` when it may.
+ *
+ * A merge block is non-destructive, but that is not the same as always safe to
+ * add: appending a second `[agents]` header to a TOML file makes it
+ * unparseable, so the block would break the user's config in order to deliver a
+ * default. The guard is declared on the file (`mergeRefuseIf`) and evaluated
+ * here so both `init` and `upgrade` reach the same verdict.
+ *
+ * Fails CLOSED on a bad pattern: an un-compilable regex refuses the merge
+ * rather than allowing it. A guard that cannot run is not evidence that there
+ * is nothing to guard against.
+ */
+export function mergeRefusal(
+  existing: string | null,
+  file: {
+    readonly mergeBlock?: string;
+    readonly mergeRefuseIf?: { readonly pattern: string; readonly message: string };
+  },
+  style: FenceStyle = "hash",
+): string | null {
+  const guard = file.mergeRefuseIf;
+  if (guard === undefined || existing === null || existing === "") return null;
+  const userContent = file.mergeBlock === undefined
+    ? existing
+    : withoutBlock(existing, file.mergeBlock, style);
+  let re: RegExp;
+  try {
+    re = new RegExp(guard.pattern, "m");
+  } catch {
+    return guard.message;
+  }
+  return re.test(userContent) ? guard.message : null;
+}

@@ -282,3 +282,10 @@ This skill does not:
 - When dispatch isn't available on the current harness (rare; check
   `references/<harness>-tools.md`)
 - When the user explicitly asked for inline execution
+
+**On Codex, name the role — do not describe the task.** `spawn_agent` resolves a
+child's model as: explicit spawn value → the `[agents]` default in
+`.codex/config.toml` → **the parent session's value**. A child spawned by
+description alone selects no role, so it falls through to the last link and
+inherits your primary model. Always pass `agent_type=` (see
+`references/codex-tools.md`).

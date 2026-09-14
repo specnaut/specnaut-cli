@@ -39,6 +39,37 @@ close_agent(id)
 If the wait times out, decide whether to retry or to surface the partial
 result to the user.
 
+## Always name the role — never dispatch by task description alone
+
+`agent_type=` is not decoration. Codex resolves a spawned child's model in
+three steps, and stops at the first that answers:
+
+1. the **explicit spawn value** — what `agent_type=` selects;
+2. the **`[agents]` default** in `.codex/config.toml`;
+3. **the parent session's value.**
+
+A child spawned by describing the task, with no `agent_type=`, selects no
+role. Step 1 is empty, so it falls through — and before Specnaut wrote step 2,
+step 3 was the only link left. Every such child silently ran on your primary
+model, and raising your primary model raised all of them with it, which is how
+a long orchestration escalates onto the most expensive model on your account
+with nothing to report it.
+
+Specnaut now scaffolds `.codex/config.toml` with `[agents]` defaults, so step 2
+answers and the floor is bounded. That is a safety net, not the fix: naming the
+role is what gets the work the model it was tiered for. Each bundled role pins
+its own `model` and `model_reasoning_effort` in `.codex/agents/<name>.toml`.
+
+**Role selection versus task naming.** `agent_type=` chooses *who* runs the
+work — a configured seat with a model, a reasoning budget and a prompt.
+`prompt=` describes *what* the work is. Putting the role name in the prompt
+does not select the role; only `agent_type=` does.
+
+**Context does not come with it.** A spawned child does not inherit the parent
+conversation. Everything it needs — file paths, the task, the acceptance
+criteria — has to be in `prompt=`. What it *can* inherit, when unspecified, is
+the model, which is exactly the inheritance this section is about.
+
 ## Idiom differences worth noting
 
 - **Plan updates** are heavyweight on Codex — `update_plan` rewrites the
