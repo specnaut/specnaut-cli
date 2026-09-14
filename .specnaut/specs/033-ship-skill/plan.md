@@ -364,6 +364,25 @@ guessing inside a refactor is how a silent behaviour change ships. The doc comme
 coverage map to "post-consolidation, v1.0.0", which predates the plugin gaining `board` and the rest
 — the same staleness class as the incident `tests/plugin/source-exclusions.txt` records.
 
+**Corrected and filed as [#605](https://github.com/specnaut/specnaut-cli/issues/605).** Two figures
+in the paragraph above were wrong and the PO verified better ones: the uncovered population is
+**28**, not 25 — 24 `SKILL.md` plus `board`'s own `SKILL.md` and its three sub-documents — and the
+list holds **37** paths while its own doc comment claims 33. (`using-specnaut`'s five
+`references/*-tools.md` are plugin files whose binary destination is a single renamed
+`.specnaut/harness-tools.md`, so they are not `.claude/skills/` destinations and do not belong in
+the count.)
+
+Two findings that came with the filing, both load-bearing here:
+
+- `plugin_coverage_parity_test.ts` pins the list against `CORE_BUNDLE` for `phase` and `agent`
+  **only**. Nothing compares the `skill` / `backlog-skill` / `backlog-doc` dimension to the bundle —
+  which is exactly the axis this question is about. #455's lesson was discharged for two categories
+  out of three.
+- `plugin_coverage_test.ts` asserts `.claude/skills/board/SKILL.md` is _not_ covered, titled
+  "(project-stateful)" — but the plugin has shipped `plugin/skills/board/SKILL.md` and three
+  sub-documents since #571. The one artefact that looked like a record of deliberate narrowing rests
+  on a premise that is now false. That is evidence for #605, **not** an answer to it.
+
 **Disposition.** T016 is narrowed to the behaviour-neutral half: the parity test's `bundleNames` now
 reads the _document_ identity for sub-document categories rather than `name`, which restores the
 assertion's meaning under the converged shape without touching coverage. Verified load-bearing by

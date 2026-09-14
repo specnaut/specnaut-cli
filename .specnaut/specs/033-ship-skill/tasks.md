@@ -188,6 +188,13 @@ cheap the moment a non-`specnaut` document exists.
 - [ ] T027 [US1] `git mv` the five release scripts from `templates/core/skills/specnaut/scripts/` to
       `templates/core/skills/ship/scripts/`. Confirm with the T004 baseline technique that their
       **destinations** are unchanged — only the source directory moves.
+- [ ] T026a [US1] Add `skill/ship` to `POINTED_BY_DECISION` in
+      `tests/templates/response_style_contract_test.ts` with a written reason. `/ship` points at the
+      response-style contract, and that test fails any surface doing so without a recorded reason.
+      The reason is not boilerplate: unlike `/board` — which is in `WITHHELD_BY_DECISION` because
+      its worst-case Windsurf render leaves 38 characters and the pointer costs 98 — `/ship` has
+      ~6,500 characters of headroom AND asks a genuine disambiguation question, so the contract's
+      questions-as-selections rule is load-bearing for it rather than incidental.
 - [ ] T027a [US1] Move the `core/skills/specnaut/scripts/` entry in
       `tests/plugin/source-exclusions.txt` to `core/skills/ship/scripts/` and rewrite its reason —
       it currently names `/specnaut tag-version` and `/release-version`, which T033 retires. Found
