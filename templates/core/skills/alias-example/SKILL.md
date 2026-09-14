@@ -1,7 +1,7 @@
 ---
 name: alias-example
 description: Reference SKILL.md showing the `alias_of` + `overlays` frontmatter convention. Copy this folder to your project's harness skills dir (e.g. `.claude/skills/`) and edit. Specnaut itself never installs this file — it lives in the Specnaut repo as documentation.
-alias_of: specnaut.tag-version
+alias_of: ship.tag
 overlays:
   - when: before
     path: ./scripts/quality-gate.sh
@@ -17,7 +17,7 @@ Specnaut records in a skill's frontmatter:
 - **`alias_of: <skill-name>`** — declares that this skill is a wrapper
   around an upstream skill. Convention is dotted notation, with the
   plugin or distribution name as the prefix (e.g.
-  `alias_of: specnaut.tag-version`). The harness is responsible for
+  `alias_of: ship.tag`). The harness is responsible for
   resolving the alias at invocation time; Specnaut only records the
   relationship.
 
@@ -31,9 +31,9 @@ Specnaut records in a skill's frontmatter:
 ## Why a project would override an upstream skill
 
 A common pattern: a monorepo that uses Specnaut at the root but needs a
-slightly different `tag-version` because tags live inside a sub-repo.
-Rather than fork the canonical `specnaut.tag-version` script, the
-project ships a thin wrapper as `alias_of: specnaut.tag-version` plus
+slightly different `tag` document because tags live inside a sub-repo.
+Rather than fork the canonical `ship.tag` document, the
+project ships a thin wrapper as `alias_of: ship.tag` plus
 an overlay that runs `cd inner-repo` before delegating.
 
 The result is grep-able and self-documenting: the alias relationship

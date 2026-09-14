@@ -115,13 +115,13 @@ per-harness tool-mapping references. The website and documentation source live i
 
 ## Project-specific skill overlays
 
-Need to override an upstream Specnaut skill in one project — e.g. a monorepo `tag-version` that has
-to `cd` into an inner repo first? SKILL.md frontmatter accepts two optional fields:
+Need to override an upstream Specnaut skill in one project — e.g. a monorepo `/ship tag` that has to
+`cd` into an inner repo first? SKILL.md frontmatter accepts two optional fields:
 
 ```yaml
 ---
-name: tag-version
-alias_of: specnaut.tag-version
+name: ship-tag
+alias_of: ship.tag
 overlays:
   - when: before
     path: ./scripts/cd-inner-repo.sh
