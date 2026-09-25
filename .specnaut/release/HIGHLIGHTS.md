@@ -1,38 +1,56 @@
-**Releases are signed now, and `self-update` verifies before it replaces the binary.**
+**If you are on v4.3.0, `self-update` will not bring you here. Reinstall once from
+[specnaut.com](https://specnaut.com).**
 
-Until this release, `self-update` compared a `.sha256` against the binary it shipped beside. Both
-files live on the same release, so anyone able to publish or amend one publishes both and the check
-passes. That defends against a corrupted transfer, not against substitution at the source — and the
-distinction matters here more than usual, because the binary is the trust root for every instruction
-file Specnaut writes into a project.
+v4.3.0 shipped signature verification and a defect in it. A Sigstore signing certificate lives ten
+minutes; the verifier compared that window against the current time, so a release stopped verifying
+shortly after it was built. The effect was not intermittent — every `self-update` more than ten
+minutes after a release failed, for every user, with a message blaming a certificate-authority
+rotation that had not happened.
 
-Signing is keyless, because a key pair is structurally forbidden in this repository: a stored key
-would have to be an Actions secret, and this repository holds none by policy. The release workflow
-exchanges its OIDC identity for a short-lived certificate; the verifier pins the issuing authority
-and the exact identity permitted to sign — bound to the specific tag, so a bundle lifted from
-another release of this same repository fails on identity before the bytes are ever compared.
+The fix is in this release, which is exactly the problem: the binary doing the checking is the one
+with the defect. A v4.3.0 binary cannot install v4.4.0, and no release we publish can change that.
+Reinstalling from the website is a one-time step, and `install.sh` and Homebrew were never affected
+— both verify the checksum sidecar and contain no signature path at all.
 
-The anchor is compiled into the binary. It cannot be fetched from the release being verified, which
-is the flaw the checksum had.
+**What was actually wrong, since the guarantee is the point.** A certificate's validity window says
+when it could sign, so it has to be judged against when the signature was _made_, not when someone
+happens to look. That instant was in the bundle all along, in the transparency log's entry, and the
+verifier was throwing it away. It now reads it — and trusts it only because Rekor counter-signs it.
+Taken unverified, that timestamp is a number whoever writes the bundle chooses freely: a check that
+constrains nothing while looking like it constrains something. The log's key is pinned, and the pin
+is checkable rather than asserted — its SHA-256 is the log id printed in every attestation we
+publish.
 
-**v4.3.0 is the version where the gate closes.** Below it, a release without a signature installs
-with a checksum and a warning. From this release on, a missing signature is refused outright, and a
-signature that is present and does not verify is refused at any version — publishing one is a claim,
-and a claim that fails to check is worse evidence than none. There is deliberately no fallback path:
-an attacker who can amend a release can also serve a bundle from an authority we do not recognise,
-so a "fall back when verification fails" branch would hand them the old control back on request.
+No test could have caught it. Every signing test minted a certificate valid for six years and froze
+the clock, so the one leg that fails in reality was the one no fixture could reach. A real published
+bundle is now committed and verified at the real clock, and it must keep passing as that bundle
+ages.
 
-The practical consequence, stated rather than discovered: a failed update is now a result, not a
-bug. The console names which control cleared the bytes, and names the reason when none did. Read the
-reason before retrying. An older binary meeting a signed release ignores the new asset and keeps
-working.
+The release pipeline now checks this too. Postflight runs the shipped verifier over the published
+binaries, so a defect in a signature leg is caught while the release can still be corrected — not
+one version later, by users.
 
-What a pass means is written down where it can be read: signed by the pinned identity under the
-pinned authority, over these exact bytes. It is not transparency-log inclusion, and there is no
-revocation check. A verifier vague about its guarantee gets cited for one it never made.
+**`/ship` is a top-level skill.** A project now gets three skills, divided by what they own:
+`/board` the backlog, `/specnaut` the specification, `/ship` production. Tagging and releasing were
+phases of the router that writes plans; they are now `/ship tag` and `/ship release`. On upgrade the
+old phase documents move to their new address and carry their lock identity with them, so a file you
+customised stays customised and stays read — instead of sitting orphaned at the old path while the
+agent loads the vanilla copy at the new one.
 
-**Also in this release.** The agentic surface is in scope for review, bounded by the base's own
-frame, and the triage gate that routes reports can now actually reach the seat it names. The `diff`
-command takes a path, and a path it cannot resolve is now an error instead of a confident diff of an
-unrelated file. On Windows, a good install is no longer reported as broken, and the hook that a
-project move used to strand now survives it and can be repaired.
+**Codex subagents no longer inherit the primary model.** A child spawned by task description picks
+no role, and Specnaut emitted no `[agents]` defaults, so every such child ran on the parent
+session's model — raising the primary raised all of them, silently. The Codex scaffold now sets the
+defaults.
+
+**The plugin migration never ran, and now does.** The plugin detector looked for plugins one
+directory level above where Claude Code installs them, so it answered "not installed" for every real
+installation and the migrate-to-plugin path was dead code. It now finds them, and it covers every
+agent and skill the plugin serves rather than one. The first upgrade with the plugin installed moves
+the files the plugin now serves aside as `*.specnaut.bak`. They are backups: uninstall the plugin
+and the next upgrade restores the files from the bundle.
+
+**Backlog on GitHub Projects.** Single-select fields projected from the organization are read and
+written natively instead of falling back to a label beside a field that already holds the value.
+`list.sh Done` returns closed work instead of an empty column. `add.sh` no longer dies when the
+board's auto-add workflow attaches the issue first, which used to leave a real issue with no Status,
+out of sight of every column filter.
