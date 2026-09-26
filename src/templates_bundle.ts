@@ -257,10 +257,10 @@ re-entrant: run against an existing feature it switches to the existing branch. 
 \`.specnaut/specs/<prefix>-<short-name>/\`, the prefix following \`branch_numbering\` in
 \`.specnaut/init-options.json\`.
 
-Persist \`{ "feature_directory": "<resolved dir>", "linked_issue": <N or null> }\` to
-\`.specnaut/feature.json\` — the resolved path, not the literal string, since downstream phases locate
-the feature from it. \`linked_issue\` is the backlog item id when \`--issue <N>\` was passed (or a hook
-returned one); \`merge\` reads it to close the item, and its absence is a no-op downstream.
+Persist \`{ "feature_directory": "<dir>", "linked_issue": <N or null> }\` to
+\`.specnaut/feature.json\`: \`<dir>\` is the real \`.specnaut/specs/<prefix>-<name>\`, repo-relative.
+Never absolute: it is committed. \`linked_issue\` is the backlog item id when \`--issue <N>\` was passed
+(or a hook returned one); \`merge\` reads it to close the item, and its absence is a no-op downstream.
 
 **Persist it before the next command, not after.** Every script that resolves feature paths reads
 \`.specnaut/feature.json\` ahead of the branch name, so one left naming the previous feature sends the
