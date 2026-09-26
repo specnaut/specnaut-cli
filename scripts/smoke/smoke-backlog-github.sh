@@ -113,10 +113,17 @@ check "set-field.sh wires --date for date axes (#264)" \
   'grep -qE "^[[:space:]]*--date " .specnaut/scripts/backlog/set-field.sh'
 check "set-field.sh wires --number for Estimate (#264)" \
   'grep -qE "^[[:space:]]*--number " .specnaut/scripts/backlog/set-field.sh'
-check "detect-fields.sh discovers StartDate field via emit_simple (#264)" \
-  'grep -qE "^emit_simple \"Start date\"[[:space:]]+STARTDATE$" .specnaut/scripts/backlog/detect-fields.sh'
-check "detect-fields.sh discovers TargetDate field via emit_simple (#264)" \
-  'grep -qE "^emit_simple \"Target date\"[[:space:]]+TARGETDATE$" .specnaut/scripts/backlog/detect-fields.sh'
+check "detect-fields.sh discovers StartDate field via emit_date (#264, #614)" \
+  'grep -qE "^emit_date \"Start date\"[[:space:]]+STARTDATE$" .specnaut/scripts/backlog/detect-fields.sh'
+check "detect-fields.sh discovers TargetDate field via emit_date (#264, #614)" \
+  'grep -qE "^emit_date \"Target date\"[[:space:]]+TARGETDATE$" .specnaut/scripts/backlog/detect-fields.sh'
+# #614 — a date may exist only as an organization issue field. The project
+# mutation refuses its `IFD_…` id, so the date branch must carry the
+# issue-level route, and the organization lookup must ask for date fields.
+check "detect-fields.sh asks the organization for IssueFieldDate (#614)" \
+  'grep -q "on IssueFieldDate" .specnaut/scripts/backlog/detect-fields.sh'
+check "set-field.sh date branch writes an issue-level date via setIssueFieldValue + dateValue (#614)" \
+  'grep -qE "^[[:space:]]+set_issue_field .*dateValue" .specnaut/scripts/backlog/set-field.sh && grep -q "setIssueFieldValue" .specnaut/scripts/backlog/set-field.sh'
 check "detect-fields.sh discovers Estimate field via emit_simple (#264)" \
   'grep -qE "^emit_simple \"Estimate\"[[:space:]]+ESTIMATE$" .specnaut/scripts/backlog/detect-fields.sh'
 check "detect-fields.sh queries ProjectV2Field for date/number fields (#264)" \

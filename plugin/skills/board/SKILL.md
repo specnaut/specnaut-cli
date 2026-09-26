@@ -172,7 +172,7 @@ project` calls and read configuration from `backlog-config.yml`.
 .specnaut/scripts/backlog/add.sh "<title>" [body] [labels-csv]
 .specnaut/scripts/backlog/move.sh <number> <Status>   # sets Project Status field
 .specnaut/scripts/backlog/clarify-comment.sh <num> "<question>"
-.specnaut/scripts/backlog/detect-fields.sh                                 # discover native Priority/Size single-select fields → env lines
+.specnaut/scripts/backlog/detect-fields.sh                                 # discover native fields (Status/Priority/Size/dates) → env lines
 .specnaut/scripts/backlog/set-field.sh <num> <Priority|Size|IssueType> <value>  # set the native field / org Issue Type; exit codes 10/11/12 signal label fallback, 13 (discovery failed) never
 .specnaut/scripts/backlog/ensure-labels.sh                                 # idempotently bootstrap the 7 Specnaut semantic labels (security/refactor/docs/tech-debt/dx/performance/dependency)
 ```

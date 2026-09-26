@@ -22,8 +22,9 @@
 #
 # Date axes accept ISO 8601 (YYYY-MM-DD). Estimate is a numeric value
 # (story points or days, project's choice). Date / Estimate fields are
-# part of the Project V2 board (#264); they're what the Roadmap view
-# plots along its timeline.
+# what the Roadmap view plots along its timeline (#264). A date — like
+# Priority / Size — may be the project's own or an organization issue
+# field; each form takes its own mutation (see `set_issue_field`).
 #
 # Issue Types are an org-level GitHub feature. On user-owned repos (no org)
 # the org query returns nothing and the script exits 10 so the caller falls
@@ -70,6 +71,36 @@ load_fields() {
     exit 13
   fi
   eval "$fields"
+}
+
+# Write an ORGANIZATION issue field's value on the issue itself.
+#
+# `updateProjectV2ItemFieldValue` addresses a project ITEM; an issue-level
+# field's value lives on the ISSUE, against the organization's field, so the
+# issue need not be a project item at all — only an issue that does not exist
+# is exit 12. `setIssueFieldValue` rather than `updateIssueFieldValue` /
+# `createIssueFieldValue`: those require the value to already exist / not exist,
+# so either forces a read-before-write to choose, with a race in the gap. `set`
+# is the idempotent upsert. One write shape for every issue-level axis; they
+# differ only in the value slot of `IssueFieldCreateOrUpdateInput`.
+#
+# Usage: set_issue_field <org-field-id> <slot> <slot-graphql-type> <value>
+#   e.g. set_issue_field IFSS_x singleSelectOptionId ID!     <option-id>
+#        set_issue_field IFD_x  dateValue            String! 2026-06-30
+set_issue_field() {
+  local field="$1" slot="$2" type="$3" value="$4" issue_id
+  issue_id=$(gh issue view "$NUM" --repo "$REPO" --json id --jq '.id' 2>/dev/null || true)
+  if [ -z "$issue_id" ]; then
+    echo "issue #$NUM not found in $REPO" >&2
+    exit 12
+  fi
+  gh api graphql -f query="
+    mutation(\$issue: ID!, \$field: ID!, \$value: $type) {
+      setIssueFieldValue(input: {
+        issueId: \$issue,
+        issueFields: [{ fieldId: \$field, $slot: \$value }]
+      }) { clientMutationId }
+    }" -f issue="$issue_id" -f field="$field" -f value="$value" >/dev/null
 }
 
 # Normalize field name to one of the canonical labels we support.
@@ -132,6 +163,22 @@ case "$FIELD_LOWER" in
       exit 10
     fi
 
+    # An issue-level date: the project lists it, but its id (`IFD_…`) is not a
+    # project field and the project mutation refuses it. detect-fields.sh
+    # decided the form; this only follows it.
+    FORM_VAR="${PREFIX}_FIELD_FORM"
+    if [ "$KIND" = "date" ] && [ "${!FORM_VAR-local}" = "projected" ]; then
+      ORG_FIELD_VAR="${PREFIX}_ORG_FIELD_ID"
+      ORG_FIELD_ID="${!ORG_FIELD_VAR-}"
+      if [ -z "$ORG_FIELD_ID" ]; then
+        echo "'$CANONICAL' is an issue-level field but its organization field id is unknown — skip" >&2
+        exit 10
+      fi
+      set_issue_field "$ORG_FIELD_ID" dateValue 'String!' "$VALUE"
+      echo "✓ #$NUM $CANONICAL → $VALUE (organization field)"
+      exit 0
+    fi
+
     # Targeted item-ID lookup — `_config.sh` owns the query (#603).
     ITEM_ID=$(project_item_id "$NUM")
 
@@ -191,14 +238,8 @@ if [ -z "$OPT_ID" ]; then
   exit 11
 fi
 
-# A PROJECTED organization field is not written through the project.
-#
-# `updateProjectV2ItemFieldValue` addresses a project ITEM; a projected field's
-# value lives on the ISSUE, on the organization's field. Writing it needs
-# `setIssueFieldValue` — chosen over `updateIssueFieldValue` / `createIssueFieldValue`
-# because those require the value to already exist / not exist respectively, so
-# either one forces a read-before-write to decide which to call, with a race in
-# the gap. `set` is the idempotent upsert and takes a list.
+# A PROJECTED organization field is not written through the project — see
+# `set_issue_field` for the mutation and why it is that one.
 FORM_VAR="${PREFIX}_FIELD_FORM"
 FORM="${!FORM_VAR-local}"
 if [ "$FORM" = "projected" ]; then
@@ -208,19 +249,7 @@ if [ "$FORM" = "projected" ]; then
     echo "'$CANONICAL' is projected but its organization field id is unknown — fall back to label" >&2
     exit 10
   fi
-  ISSUE_ID=$(gh issue view "$NUM" --repo "$REPO" --json id --jq '.id' 2>/dev/null || true)
-  if [ -z "$ISSUE_ID" ]; then
-    echo "issue #$NUM not found in $REPO" >&2
-    exit 12
-  fi
-  gh api graphql -f query='
-    mutation($issue: ID!, $field: ID!, $opt: ID!) {
-      setIssueFieldValue(input: {
-        issueId: $issue,
-        issueFields: [{ fieldId: $field, singleSelectOptionId: $opt }]
-      }) { clientMutationId }
-    }' -f issue="$ISSUE_ID" -f field="$ORG_FIELD_ID" -f opt="$OPT_ID" >/dev/null
-
+  set_issue_field "$ORG_FIELD_ID" singleSelectOptionId 'ID!' "$OPT_ID"
   echo "✓ #$NUM $CANONICAL → $VALUE (organization field)"
   exit 0
 fi

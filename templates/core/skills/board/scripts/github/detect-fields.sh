@@ -1,8 +1,10 @@
 #!/usr/bin/env bash
-# Detect native Project V2 single-select fields for Status, Priority and Size.
+# Detect the board's native fields: the single-selects Status, Priority and
+# Size, the Roadmap dates Start date / Target date, and Estimate.
 # Outputs eval-friendly env lines on stdout. Empty *_FIELD_ID means the field
 # does not exist on the project — caller should fall back to labels.
-# Usage: eval "$(detect-fields.sh)"
+# Usage: fields=$(detect-fields.sh) || <discovery failed>; eval "$fields"
+# (not `eval "$(detect-fields.sh)"` — `eval` hides a failed run; see set-field.sh)
 #
 # For each single-select field <P> this emits:
 #   <P>_FIELD_ID       the field's node id
@@ -27,27 +29,45 @@ FIELDS_JSON=$(gh project field-list "$PROJECT_NUMBER" --owner "$REPO_OWNER" --fo
 # `Organization.issueFields` returns a connection whose nodes are the union
 # `IssueFields` — so the inline fragment is required, not stylistic.
 #
-# Cached because `emit` is called once per axis and the answer cannot change
-# inside a run. Never fails: an org that has no issue fields, a token without
-# the scope, or an outright error all yield an empty document, and every caller
-# below treats that as "no projected field" and degrades to the label fallback.
+# Cached because it is needed once per projected axis and the answer cannot
+# change inside a run. **Call it in the current shell, never inside `$( … )`**:
+# a command substitution is a subshell, the cache it fills dies with it, and the
+# next axis queries again — which is how this cache once held nothing at all.
+# Read the answer through `org_field`.
+#
+# Never fails: an org that has no issue fields, a token without the scope, or an
+# outright error all yield an empty document, and every caller below treats that
+# as "no projected field" and degrades to the label fallback. The degradation is
+# announced on stderr, not silent — it makes a projected field look absent.
 ORG_FIELDS_JSON=""
-org_fields() {
-  if [ -z "$ORG_FIELDS_JSON" ]; then
-    ORG_FIELDS_JSON=$(gh api graphql -f query='
-      query($org: String!) {
-        organization(login: $org) {
-          issueFields(first: 50) {
-            nodes {
-              __typename
-              ... on IssueFieldSingleSelect { id name options { id name } }
-            }
+load_org_fields() {
+  [ -z "$ORG_FIELDS_JSON" ] || return 0
+  ORG_FIELDS_JSON=$(gh api graphql -f query='
+    query($org: String!) {
+      organization(login: $org) {
+        issueFields(first: 50) {
+          nodes {
+            __typename
+            ... on IssueFieldSingleSelect { id name options { id name } }
+            ... on IssueFieldDate { id name }
           }
         }
-      }' -f org="$REPO_OWNER" 2>/dev/null || echo '{}')
-    [ -n "$ORG_FIELDS_JSON" ] || ORG_FIELDS_JSON='{}'
+      }
+    }' -f org="$REPO_OWNER" 2>/dev/null) || ORG_FIELDS_JSON=""
+  if ! printf '%s' "$ORG_FIELDS_JSON" | jq -e . >/dev/null 2>&1; then
+    echo "⚠ could not read $REPO_OWNER's organization issue fields — projected fields will read as absent" >&2
+    ORG_FIELDS_JSON='{}'
   fi
-  printf '%s' "$ORG_FIELDS_JSON"
+}
+
+# The first organization issue field of GraphQL type <typename> named <name>
+# (case-insensitive), as compact JSON — or nothing. Requires `load_org_fields`.
+org_field() {
+  printf '%s' "$ORG_FIELDS_JSON" | jq -c --arg t "$1" --arg n "$2" '
+    [ .data.organization.issueFields.nodes[]?
+      | select(.__typename == $t)
+      | select((.name | ascii_downcase) == ($n | ascii_downcase)) ][0] // empty
+  '
 }
 
 emit() {
@@ -73,11 +93,8 @@ emit() {
   form=local
   if [ "$opts" = "[]" ]; then
     local org_block
-    org_block=$(org_fields | jq -c --arg n "$field" '
-      [ .data.organization.issueFields.nodes[]?
-        | select(.__typename == "IssueFieldSingleSelect")
-        | select((.name | ascii_downcase) == ($n | ascii_downcase)) ][0] // empty
-    ' 2>/dev/null || true)
+    load_org_fields
+    org_block=$(org_field IssueFieldSingleSelect "$field")
     if [ -n "$org_block" ]; then
       form=projected
       org_field_id=$(echo "$org_block" | jq -r '.id // ""')
@@ -107,9 +124,50 @@ emit Status STATUS
 emit Priority PRIORITY
 emit Size SIZE
 
-# Date + number fields used by the Roadmap view (#264). They are
-# regular ProjectV2Field nodes, not single-select — emit just the
-# field ID; the writer routes by axis name to --date or --number.
+# Roadmap dates (#264), in either of their two forms (cli#614).
+#
+# A date the project owns is a `ProjectV2Field` with a `PVTF_…` id, written
+# through the project item. A date that exists only as an organization issue
+# field is listed by `gh project field-list` under the SAME type but with an
+# `IFD_…` id — an `IssueFieldDate` node, which the project mutation refuses to
+# resolve ("Could not resolve to ProjectV2Field … 'IFD_…'"). The prefix is the
+# cheap, query-free signal of the form; the organization lookup is the
+# authority for the id the writer uses. Same vocabulary as the single-selects
+# (`_FIELD_FORM` + `_ORG_FIELD_ID`): one routing rule, not two.
+#
+# Only a date the project LISTS is looked up. An organization date this board
+# does not carry stays absent — the gate `groom.md` reads is unchanged — and a
+# board with no date fields never pays for the organization query.
+emit_date() {
+  local field="$1" prefix="$2"
+  local field_id form=local org_field_id=""
+  field_id=$(echo "$FIELDS_JSON" | jq -r --arg n "$field" '
+    [ .fields[]
+      | select(.type == "ProjectV2Field")
+      | select((.name | ascii_downcase) == ($n | ascii_downcase)) ][0].id // ""
+  ')
+  if [ -z "$field_id" ]; then
+    echo "${prefix}_FIELD_ID="
+    echo "${prefix}_FIELD_FORM="
+    echo "${prefix}_ORG_FIELD_ID="
+    return
+  fi
+  if [[ "$field_id" == IFD_* ]]; then
+    form=projected
+    load_org_fields
+    org_field_id=$(org_field IssueFieldDate "$field" | jq -r '.id // ""')
+  fi
+  echo "${prefix}_FIELD_ID=$field_id"
+  echo "${prefix}_FIELD_FORM=$form"
+  echo "${prefix}_ORG_FIELD_ID=$org_field_id"
+}
+
+emit_date "Start date"  STARTDATE
+emit_date "Target date" TARGETDATE
+
+# Estimate (#264) is a regular ProjectV2Field number — emit just the field ID;
+# the writer routes it to --number. Its issue-level (`IssueFieldNumber`) form is
+# not routed yet.
 emit_simple() {
   local field="$1" prefix="$2"
   local field_id
@@ -126,8 +184,6 @@ emit_simple() {
   echo "${prefix}_FIELD_ID=$field_id"
 }
 
-emit_simple "Start date"  STARTDATE
-emit_simple "Target date" TARGETDATE
 emit_simple "Estimate"    ESTIMATE
 
 # Project node ID — handy for callers that also want to write field values.
