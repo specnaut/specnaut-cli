@@ -65,18 +65,22 @@ What the wrapper does on top of `release.sh`:
 
 1. Verifies `gh` CLI is installed + authenticated.
 2. **Computes the baseline = previous DEPLOYED tag** (the most recent
-   tag with a published GitHub Release attached, NOT the previous
-   tag by date). Tags pushed without a release are "subsumed" —
+   tag with a published GitHub Release attached — drafts do not
+   count — NOT the previous tag by date). Tags pushed without a release are "subsumed" —
    their commits land in this release and the subsumed tag names
    are listed inline.
 3. Pushes the tag to `origin` if not already there (the GitHub
    Releases API needs the tag on the remote).
 4. Generates the body via `release.sh` with the computed baseline.
 5. Calls `gh release create <tag> --notes-file -` to publish.
-6. Prints the published release URL.
+6. Reports the state GitHub holds, not the flag passed: a draft prints
+   `draft release created (not published)`. Last line, machine-readable:
+   `created draft=<bool> url=<url>`.
 
-Idempotent — re-running against a tag that already has a release
-prints the existing URL and exits 0.
+Idempotent — a re-run adopts an existing release and prints
+`exists draft=<bool> url=<url>`, exit 0. Read `exists` and `draft=` before
+touching the body: a published release is live. `--fail-if-exists` refuses
+to adopt (exit 3).
 
 ### GitLab remote — prefer the bundled wrapper
 
