@@ -59,7 +59,7 @@ set it if the team uses point-based velocity, else skip (no warning on miss).
 
 Persistence per backend:
 
-- **GitHub** — use `set-field.sh <issue> <Priority|Size|IssueType|StartDate|TargetDate|Estimate> <value>`; exit `0` OK, `10`/`11` fall back to a label (Priority/Size only; on a date/Estimate axis `10` = field absent → skip, warn nothing), `12` = issue not on project. Run `detect-fields.sh` once per groom. Never dual-write field + matching label.
+- **GitHub** — use `set-field.sh <issue> <Priority|Size|IssueType|StartDate|TargetDate|Estimate> <value>`; exit `0` OK, `10`/`11` fall back to a label (Priority/Size only; on a date/Estimate axis `10` = field absent → skip, warn nothing), `12` = issue not on project, `13` = discovery failed → never label, report it. Run `detect-fields.sh` once per groom. Never dual-write field + matching label.
 - **GitLab** — scoped labels via `glab` (`priority::P1`, `size::M`, `type::feature`). Date / Estimate axes are GitHub-only (Roadmap view); GitLab has no equivalent in this scope.
 - **Local Markdown** — `priority:` / `complexity:` / `category:` frontmatter. No labels. Date / Estimate are not tracked on local backends (no Roadmap view to feed).
 

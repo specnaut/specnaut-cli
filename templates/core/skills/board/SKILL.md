@@ -173,7 +173,7 @@ project` calls and read configuration from `backlog-config.yml`.
 .specnaut/scripts/backlog/move.sh <number> <Status>   # sets Project Status field
 .specnaut/scripts/backlog/clarify-comment.sh <num> "<question>"
 .specnaut/scripts/backlog/detect-fields.sh                                 # discover native Priority/Size single-select fields → env lines
-.specnaut/scripts/backlog/set-field.sh <num> <Priority|Size|IssueType> <value>  # set the native Project V2 field / org Issue Type; exit codes 10/11/12 signal label fallback
+.specnaut/scripts/backlog/set-field.sh <num> <Priority|Size|IssueType> <value>  # set the native field / org Issue Type; exit codes 10/11/12 signal label fallback, 13 (discovery failed) never
 .specnaut/scripts/backlog/ensure-labels.sh                                 # idempotently bootstrap the 7 Specnaut semantic labels (security/refactor/docs/tech-debt/dx/performance/dependency)
 ```
 
@@ -220,12 +220,11 @@ Specnaut change — the skill is path-aware.
   reserved as a strict fallback for projects / orgs without the native
   field or type — or *temporarily* when the platform is rate-limiting and
   a native write cannot land; the native field is always the goal, so
-  reconcile a label fallback back to it once unblocked. Non-zero exit
-  codes tell the caller which fallback
-  applies: `10` = field / type absent (use the label), `11` = present
-  but the value is unrecognised (for Priority/Size, add the option to
-  the field then re-run; for Issue Type, fix the call), `12` = issue
-  not on the project / not in the repo.
+  reconcile a label fallback back to it once unblocked. Exit codes:
+  `10` = field / type absent (use the label), `11` = value unrecognised
+  (Priority/Size: add the option, re-run; Issue Type: fix the call),
+  `12` = issue not on the project / not in the repo, `13` = discovery
+  failed — **not** a fallback signal: retry or report it.
 
 ### Prerequisites
 

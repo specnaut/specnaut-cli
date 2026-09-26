@@ -2269,7 +2269,8 @@ Use the bundled scripts at \`.specnaut/scripts/backlog/\`:
   \`11\` no such option (only \`priority:P3\` today) — caller MUST apply the
   matching label instead; \`12\` issue not on the project — caller MUST
   report it under "⚠ size / priority missing", since neither path can
-  persist the value.
+  persist the value; \`13\` field discovery failed — **never** label (the
+  field may exist): retry, else report it the same way.
 
 **Label fallback** (exit \`10\` / \`11\` only) — \`gh label list\`, then
 \`gh label create "<name>" --color <hex> --description "<desc>"\` if absent,
@@ -7288,7 +7289,7 @@ set it if the team uses point-based velocity, else skip (no warning on miss).
 
 Persistence per backend:
 
-- **GitHub** — use \`set-field.sh <issue> <Priority|Size|IssueType|StartDate|TargetDate|Estimate> <value>\`; exit \`0\` OK, \`10\`/\`11\` fall back to a label (Priority/Size only; on a date/Estimate axis \`10\` = field absent → skip, warn nothing), \`12\` = issue not on project. Run \`detect-fields.sh\` once per groom. Never dual-write field + matching label.
+- **GitHub** — use \`set-field.sh <issue> <Priority|Size|IssueType|StartDate|TargetDate|Estimate> <value>\`; exit \`0\` OK, \`10\`/\`11\` fall back to a label (Priority/Size only; on a date/Estimate axis \`10\` = field absent → skip, warn nothing), \`12\` = issue not on project, \`13\` = discovery failed → never label, report it. Run \`detect-fields.sh\` once per groom. Never dual-write field + matching label.
 - **GitLab** — scoped labels via \`glab\` (\`priority::P1\`, \`size::M\`, \`type::feature\`). Date / Estimate axes are GitHub-only (Roadmap view); GitLab has no equivalent in this scope.
 - **Local Markdown** — \`priority:\` / \`complexity:\` / \`category:\` frontmatter. No labels. Date / Estimate are not tracked on local backends (no Roadmap view to feed).
 
@@ -10420,7 +10421,7 @@ project\` calls and read configuration from \`backlog-config.yml\`.
 .specnaut/scripts/backlog/move.sh <number> <Status>   # sets Project Status field
 .specnaut/scripts/backlog/clarify-comment.sh <num> "<question>"
 .specnaut/scripts/backlog/detect-fields.sh                                 # discover native Priority/Size single-select fields → env lines
-.specnaut/scripts/backlog/set-field.sh <num> <Priority|Size|IssueType> <value>  # set the native Project V2 field / org Issue Type; exit codes 10/11/12 signal label fallback
+.specnaut/scripts/backlog/set-field.sh <num> <Priority|Size|IssueType> <value>  # set the native field / org Issue Type; exit codes 10/11/12 signal label fallback, 13 (discovery failed) never
 .specnaut/scripts/backlog/ensure-labels.sh                                 # idempotently bootstrap the 7 Specnaut semantic labels (security/refactor/docs/tech-debt/dx/performance/dependency)
 \`\`\`
 
@@ -10467,12 +10468,11 @@ Specnaut change — the skill is path-aware.
   reserved as a strict fallback for projects / orgs without the native
   field or type — or *temporarily* when the platform is rate-limiting and
   a native write cannot land; the native field is always the goal, so
-  reconcile a label fallback back to it once unblocked. Non-zero exit
-  codes tell the caller which fallback
-  applies: \`10\` = field / type absent (use the label), \`11\` = present
-  but the value is unrecognised (for Priority/Size, add the option to
-  the field then re-run; for Issue Type, fix the call), \`12\` = issue
-  not on the project / not in the repo.
+  reconcile a label fallback back to it once unblocked. Exit codes:
+  \`10\` = field / type absent (use the label), \`11\` = value unrecognised
+  (Priority/Size: add the option, re-run; Issue Type: fix the call),
+  \`12\` = issue not on the project / not in the repo, \`13\` = discovery
+  failed — **not** a fallback signal: retry or report it.
 
 ### Prerequisites
 
@@ -12418,7 +12418,13 @@ emit_simple "Target date" TARGETDATE
 emit_simple "Estimate"    ESTIMATE
 
 # Project node ID — handy for callers that also want to write field values.
-echo "PROJECT_NODE_ID=\$(gh project view "\$PROJECT_NUMBER" --owner "\$REPO_OWNER" --format json | jq -r '.id')"
+#
+# Assigned before it is printed: inside \`echo "…=\$(…)"\` a failed lookup is
+# invisible — \`echo\`'s status is the line's — and the detector exits 0 having
+# emitted an empty id as if it were an answer. As an assignment, \`set -e\` sees
+# the failure and the caller learns that discovery failed.
+PROJECT_NODE_ID=\$(gh project view "\$PROJECT_NUMBER" --owner "\$REPO_OWNER" --format json | jq -r '.id')
+echo "PROJECT_NODE_ID=\$PROJECT_NODE_ID"
 `,
     executable: true,
     backend: "github",
@@ -12464,6 +12470,10 @@ echo "PROJECT_NODE_ID=\$(gh project view "\$PROJECT_NUMBER" --owner "\$REPO_OWNE
 #   10  no such field / type on the project / org (caller should fall back to a label)
 #   11  field / type present but the value is unrecognised (Priority/Size/IssueType only — date/number axes defer to gh for value validation)
 #   12  issue is not on the project / not in the repo
+#   13  field discovery FAILED (rate limit, bad token, any gh error) — NOT a
+#       fallback signal: the field may well exist, so the caller must not apply
+#       a label; retry, or report the value as not persisted
+#   2   backlog-config.yml missing / incomplete, or its project does not resolve
 #   1   usage / unexpected error
 set -euo pipefail
 
@@ -12478,6 +12488,25 @@ fi
 NUM="\$1"
 FIELD_NAME="\$2"
 VALUE="\$3"
+
+# Run detect-fields.sh and load its answer — only a COMPLETE answer.
+#
+# Not \`eval "\$(detect-fields.sh)"\`: \`eval\` returns its own status, not the
+# substituted command's, and \`eval ""\` is 0, so \`set -e\` never fires. A detector
+# that died left every \`*_FIELD_ID\` unset, and the absent-field guard below then
+# answered exit 10 — "fall back to a label" — for a field that may well exist.
+# That is the dual-signal drift this script exists to prevent, caused by a
+# transient fault and reported as a normal outcome. Output and status are
+# therefore captured apart, and output from a failed run is discarded whole: a
+# detector that died after emitting some fields is not half-right.
+load_fields() {
+  local fields
+  if ! fields=\$("\$(dirname "\$0")/detect-fields.sh"); then
+    echo "field discovery failed on Project #\$PROJECT_NUMBER — the field may exist; do not fall back to a label (retry, or report '\$FIELD_NAME' as not persisted)" >&2
+    exit 13
+  fi
+  eval "\$fields"
+}
 
 # Normalize field name to one of the canonical labels we support.
 FIELD_LOWER=\$(echo "\$FIELD_NAME" | tr '[:upper:]' '[:lower:]')
@@ -12520,7 +12549,8 @@ fi
 # have option IDs — \`gh project item-edit\` takes the raw value via
 # --date (ISO 8601) or --number. The field discovery still runs through
 # detect-fields.sh; missing field → exit 10 (caller surfaces "field
-# absent on project" warning, same contract as Priority/Size).
+# absent on project" warning, same contract as Priority/Size); failed
+# discovery → exit 13.
 case "\$FIELD_LOWER" in
   startdate | targetdate | estimate)
     case "\$FIELD_LOWER" in
@@ -12529,7 +12559,7 @@ case "\$FIELD_LOWER" in
       estimate)   PREFIX="ESTIMATE"   CANONICAL="Estimate"    KIND="number" ;;
     esac
 
-    eval "\$("\$(dirname "\$0")/detect-fields.sh")"
+    load_fields
 
     FIELD_ID_VAR="\${PREFIX}_FIELD_ID"
     FIELD_ID="\${!FIELD_ID_VAR-}"
@@ -12574,7 +12604,7 @@ case "\$FIELD_LOWER" in
     ;;
 esac
 
-eval "\$("\$(dirname "\$0")/detect-fields.sh")"
+load_fields
 
 FIELD_ID_VAR="\${PREFIX}_FIELD_ID"
 FIELD_ID="\${!FIELD_ID_VAR-}"

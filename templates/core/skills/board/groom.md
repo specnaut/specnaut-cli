@@ -141,7 +141,8 @@ Use the bundled scripts at `.specnaut/scripts/backlog/`:
   `11` no such option (only `priority:P3` today) — caller MUST apply the
   matching label instead; `12` issue not on the project — caller MUST
   report it under "⚠ size / priority missing", since neither path can
-  persist the value.
+  persist the value; `13` field discovery failed — **never** label (the
+  field may exist): retry, else report it the same way.
 
 **Label fallback** (exit `10` / `11` only) — `gh label list`, then
 `gh label create "<name>" --color <hex> --description "<desc>"` if absent,

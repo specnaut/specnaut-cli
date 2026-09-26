@@ -131,4 +131,10 @@ emit_simple "Target date" TARGETDATE
 emit_simple "Estimate"    ESTIMATE
 
 # Project node ID — handy for callers that also want to write field values.
-echo "PROJECT_NODE_ID=$(gh project view "$PROJECT_NUMBER" --owner "$REPO_OWNER" --format json | jq -r '.id')"
+#
+# Assigned before it is printed: inside `echo "…=$(…)"` a failed lookup is
+# invisible — `echo`'s status is the line's — and the detector exits 0 having
+# emitted an empty id as if it were an answer. As an assignment, `set -e` sees
+# the failure and the caller learns that discovery failed.
+PROJECT_NODE_ID=$(gh project view "$PROJECT_NUMBER" --owner "$REPO_OWNER" --format json | jq -r '.id')
+echo "PROJECT_NODE_ID=$PROJECT_NODE_ID"
