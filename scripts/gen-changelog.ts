@@ -558,9 +558,9 @@ export function breakingGuardWarning(
 }
 
 export function formatChangelog(commits: Classified[], opts: FormatOpts): string {
-  const features = commits.filter((c) => c.category === "feat");
-  const fixes = commits.filter((c) => c.category === "fix");
-  const chores = commits.filter((c) => c.category === "chore");
+  const features = sectionOf(commits, "feat");
+  const fixes = sectionOf(commits, "fix");
+  const chores = sectionOf(commits, "chore");
 
   const sections: string[] = [];
   sections.push(`## What's changed in ${opts.toTag}`);
@@ -568,7 +568,7 @@ export function formatChangelog(commits: Classified[], opts: FormatOpts): string
   if (highlights) {
     sections.push(`### Highlights\n\n${highlights}`);
   }
-  const breaking = commits.filter((c) => c.category === "breaking");
+  const breaking = sectionOf(commits, "breaking");
   if (breaking.length > 0) {
     // First, and never inside a <details>. Someone skimming a major release
     // must hit this before anything else.
@@ -616,6 +616,31 @@ export function formatChangelog(commits: Classified[], opts: FormatOpts): string
 
 function formatBullet(c: Classified): string {
   return `- ${c.cleanedSubject}`;
+}
+
+/**
+ * The commits one bullet section renders, with identical bullets collapsed to
+ * the first occurrence.
+ *
+ * A commit can land carrying another commit's subject, and one bullet per
+ * commit then prints the same line twice under one heading — which a reader
+ * takes for two changes or a sloppy release. The key is what `formatBullet`
+ * prints, so bullets that differ in any rendered way (another PR reference
+ * included) all stay. Scoped to one category on purpose: the same subject
+ * under Features and Bug fixes is two different claims.
+ *
+ * The Adoption guide is not built from this list (`assembleAdoptionEntries`
+ * walks the raw commits), so collapsing here cannot drop an adoption entry.
+ */
+function sectionOf(commits: Classified[], category: Category): Classified[] {
+  const seen = new Set<string>();
+  return commits.filter((c) => {
+    if (c.category !== category) return false;
+    const bullet = formatBullet(c);
+    if (seen.has(bullet)) return false;
+    seen.add(bullet);
+    return true;
+  });
 }
 
 // ---------- I/O (only runs when invoked as main) ----------

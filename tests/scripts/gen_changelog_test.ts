@@ -1108,3 +1108,85 @@ Deno.test("parseCommitLog keeps a multi-line body attached to its own commit", (
   assertEquals(commits[1].hash, "bbb2");
   assertEquals(commits[1].subject, "fix: two");
 });
+
+// #621 — a commit that lands carrying another commit's subject used to be
+// printed twice, on consecutive lines, under the same heading. A reader takes
+// a repeated line for two changes or for a sloppy release; it is neither.
+
+/** How many lines of `md` are exactly `line` — a substring match would count prefixes. */
+function linesEqualTo(md: string, line: string): number {
+  return md.split("\n").filter((l) => l === line).length;
+}
+
+Deno.test("two commits with the same type and subject print one bullet", () => {
+  const commits = [
+    { hash: "a1", subject: "fix(store): keep the cache path relative" },
+    { hash: "a2", subject: "fix(store): keep the cache path relative" },
+  ].map(classifyCommit);
+  const md = formatChangelog(commits, { fromTag: "v1.0.0", toTag: "v1.0.1" });
+  assertEquals(linesEqualTo(md, "- Keep the cache path relative"), 1);
+});
+
+Deno.test("collapsing keeps the first occurrence where it was", () => {
+  const commits: Classified[] = [
+    classified("feat", "Alpha"),
+    classified("feat", "Beta"),
+    classified("feat", "Alpha"),
+    classified("feat", "Gamma"),
+  ];
+  const md = formatChangelog(commits, { fromTag: "v0", toTag: "v1" });
+  assertStringIncludes(md, "### Features\n\n- Alpha\n- Beta\n- Gamma\n");
+});
+
+Deno.test("every bullet section collapses, breaking changes included", () => {
+  const commits: Classified[] = [
+    classified("breaking", "Drop the legacy flag"),
+    classified("breaking", "Drop the legacy flag"),
+    classified("fix", "Trim the header"),
+    classified("fix", "Trim the header"),
+  ];
+  const md = formatChangelog(commits, { fromTag: "v1.9.0", toTag: "v2.0.0" });
+  assertEquals(linesEqualTo(md, "- Drop the legacy flag"), 1);
+  assertEquals(linesEqualTo(md, "- Trim the header"), 1);
+});
+
+Deno.test("the chores summary counts the bullets it labels, after collapsing", () => {
+  const commits: Classified[] = [
+    classified("chore", "Bump deps"),
+    classified("chore", "Bump deps"),
+    classified("chore", "Tidy the lint config"),
+  ];
+  const md = formatChangelog(commits, { fromTag: "v0", toTag: "v1" });
+  assertStringIncludes(md, "<summary>2 internal changes</summary>");
+  assertEquals(linesEqualTo(md, "- Bump deps"), 1);
+});
+
+Deno.test("bullets that render differently are all kept", () => {
+  const commits: Classified[] = [
+    // Same words, different PR reference: two distinct bullets.
+    classified("fix", "Trim the header (#10)"),
+    classified("fix", "Trim the header (#11)"),
+    // Same subject in two sections: two different claims, never merged.
+    classified("feat", "Export as CSV"),
+    classified("fix", "Export as CSV"),
+  ];
+  const md = formatChangelog(commits, { fromTag: "v0", toTag: "v1" });
+  assertEquals(linesEqualTo(md, "- Trim the header (#10)"), 1);
+  assertEquals(linesEqualTo(md, "- Trim the header (#11)"), 1);
+  assertEquals(linesEqualTo(md, "- Export as CSV"), 2);
+});
+
+Deno.test("collapsing bullets leaves the Adoption guide exactly as given", () => {
+  const commits: Classified[] = [
+    classified("feat", "Add the export"),
+    classified("feat", "Add the export"),
+  ];
+  const adoptionEntries = [
+    { prNum: 40, title: "Add the export", body: "First.\n\n```prompt\nrun A\n```" },
+    { prNum: 41, title: "Add the export", body: "Second.\n\n```prompt\nrun B\n```" },
+  ];
+  const md = formatChangelog(commits, { fromTag: "v0", toTag: "v1", adoptionEntries });
+  assertEquals(linesEqualTo(md, "- Add the export"), 1);
+  assertStringIncludes(md, "**#40 — Add the export**\n\nFirst.\n\n```prompt\nrun A\n```");
+  assertStringIncludes(md, "**#41 — Add the export**\n\nSecond.\n\n```prompt\nrun B\n```");
+});
