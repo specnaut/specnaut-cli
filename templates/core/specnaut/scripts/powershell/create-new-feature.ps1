@@ -80,7 +80,8 @@ function Get-HighestNumberFromSpecs {
 }
 
 # Extract the highest sequential feature number from a list of branch/ref names.
-# Shared by Get-HighestNumberFromBranches and Get-HighestNumberFromRemoteRefs.
+# Shared by Get-HighestNumberFromBranches, Get-HighestNumberFromRemoteRefs and
+# Get-HighestNumberFromHistory.
 function Get-HighestNumberFromNames {
     param([string[]]$Names)
 
@@ -108,7 +109,7 @@ function Get-HighestNumberFromBranches {
             return Get-HighestNumberFromNames -Names $cleanNames
         }
     } catch {
-        Write-Verbose "Could not check Git branches: $_"
+        [Console]::Error.WriteLine("# warning: could not list git branches for numbering: $_")
     }
     return 0
 }
@@ -132,9 +133,34 @@ function Get-HighestNumberFromRemoteRefs {
             }
         }
     } catch {
-        Write-Verbose "Could not query remote refs: $_"
+        [Console]::Error.WriteLine("# warning: could not query remote refs for numbering: $_")
     }
     return $highest
+}
+
+# Highest feature number any spec directory has EVER carried, per git history.
+# PowerShell twin of get_highest_from_history in the bash script, which carries
+# the full account of why history and not a stored counter, and of each flag.
+#
+# In short: merge-close removes a shipped feature's spec directory and the
+# branch is deleted after the merge, so only the commit that ADDED the
+# directory still holds its number. --no-renames keeps a template-identical
+# plan that replaced another one in a single commit from reading as a rename,
+# which --diff-filter=A would then drop.
+function Get-HighestNumberFromHistory {
+    try {
+        $paths = git -c core.quotePath=false log --all --no-renames --diff-filter=A `
+            --name-only --format= -- .specnaut/specs 2>$null
+        if ($paths) {
+            $dirNames = $paths | ForEach-Object {
+                if ($_ -match '^\.specnaut/specs/([^/]+)/') { $matches[1] }
+            } | Where-Object { $_ } | Sort-Object -Unique
+            return Get-HighestNumberFromNames -Names $dirNames
+        }
+    } catch {
+        [Console]::Error.WriteLine("# warning: could not read spec history for numbering: $_")
+    }
+    return 0
 }
 
 # Return next available branch number. When SkipFetch is true, queries remotes
@@ -155,7 +181,9 @@ function Get-NextBranchNumber {
         try {
             git fetch --all --prune 2>$null | Out-Null
         } catch {
-            # Ignore fetch errors
+            # Numbering still works from local refs and history; say so rather
+            # than letting a stale remote view pass unannounced.
+            [Console]::Error.WriteLine("# warning: git fetch failed; numbering from local refs only: $_")
         }
         $highestBranch = Get-HighestNumberFromBranches
     }
@@ -163,8 +191,13 @@ function Get-NextBranchNumber {
     # Get highest number from ALL specs (not just matching short name)
     $highestSpec = Get-HighestNumberFromSpecs -SpecsDir $SpecsDir
 
-    # Take the maximum of both
-    $maxNum = [Math]::Max($highestBranch, $highestSpec)
+    # ...and from every spec directory history has seen, including shipped
+    # ones whose directory and branch are both gone. Read after the fetch
+    # above, so freshly fetched remote history counts too.
+    $highestHistory = Get-HighestNumberFromHistory
+
+    # Take the maximum of all three
+    $maxNum = [Math]::Max([Math]::Max($highestBranch, $highestSpec), $highestHistory)
 
     # Return next number
     return $maxNum + 1
@@ -357,7 +390,12 @@ if ($epicIssue -and $hasGit) {
     foreach ($b in (& git for-each-ref --format='%(refname:short)' refs/heads 2>$null)) {
         $fj = & git show "${b}:.specnaut/feature.json" 2>$null
         if (-not $fj) { continue }
-        try { $li = ($fj | ConvertFrom-Json).linked_issue } catch { continue }
+        try {
+            $li = ($fj | ConvertFrom-Json).linked_issue
+        } catch {
+            [Console]::Error.WriteLine("# warning: branch '$b' has an unreadable .specnaut/feature.json - skipped for epic lookup: $_")
+            continue
+        }
         if ("$li" -eq $epicIssue) { $epicBranch = $b; break }
     }
     if ($epicBranch) {
@@ -393,7 +431,11 @@ if (-not $DryRun) {
 
         if (-not $branchCreated) {
             $currentBranch = ''
-            try { $currentBranch = (git rev-parse --abbrev-ref HEAD 2>$null).Trim() } catch {}
+            try {
+                $currentBranch = (git rev-parse --abbrev-ref HEAD 2>$null).Trim()
+            } catch {
+                [Console]::Error.WriteLine("# warning: could not read the current branch: $_")
+            }
             # Check if branch already exists
             $existingBranch = git branch --list $branchName 2>$null
             if ($existingBranch) {

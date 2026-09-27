@@ -148,7 +148,8 @@ get_highest_from_branches() {
 }
 
 # Extract the highest sequential feature number from a list of ref names (one per line).
-# Shared by get_highest_from_branches and get_highest_from_remote_refs.
+# Shared by get_highest_from_branches, get_highest_from_remote_refs and
+# get_highest_from_history.
 _extract_highest_number() {
     local highest=0
     while IFS= read -r name; do
@@ -179,6 +180,35 @@ get_highest_from_remote_refs() {
     echo "$highest"
 }
 
+# Highest feature number any spec directory has EVER carried, per git history.
+#
+# The merge-close phase removes a shipped feature's spec directory and the
+# post-merge cleanup deletes its branch, so neither the tree nor the refs still
+# hold that number — only the commit that added the directory does. Without
+# this, the next feature is handed the shipped number again and every citation
+# of it ("plan 041 FR-004") becomes ambiguous.
+#
+# History rather than a stored counter: it needs no extra committed file (which
+# two parallel feature branches would both bump, and conflict on), and a fresh
+# clone carries it. --all includes remote-tracking refs, so a clone that has
+# only `main` checked out still sees `origin/main`.
+#
+# Cost is one path-limited walk: git prunes each commit's diff to the specs
+# subtree, and uses changed-path Bloom filters when a commit-graph has them.
+#   --diff-filter=A  only the commit that introduced a file names it; the rest
+#                    of a plan's edits add nothing to read.
+#   --no-renames     plans start from one template, so dropping one and adding
+#                    another in a single commit is a "rename" to the default
+#                    diff — and the new directory never shows up as an addition.
+#   core.quotePath   a non-ASCII name would otherwise be quoted and not match.
+get_highest_from_history() {
+    git -c core.quotePath=false log --all --no-renames --diff-filter=A \
+        --name-only --format= -- .specnaut/specs 2>/dev/null \
+        | sed -n 's|^\.specnaut/specs/\([^/]*\)/.*|\1|p' \
+        | sort -u \
+        | _extract_highest_number
+}
+
 # Function to check existing branches (local and remote) and return next available number.
 # When skip_fetch is true, queries remotes via ls-remote (read-only) instead of fetching.
 check_existing_branches() {
@@ -201,10 +231,18 @@ check_existing_branches() {
     # Get highest number from ALL specs (not just matching short name)
     local highest_spec=$(get_highest_from_specs "$specs_dir")
 
-    # Take the maximum of both
+    # ...and from every spec directory history has seen, including shipped
+    # ones whose directory and branch are both gone. Read after the fetch
+    # above, so freshly fetched remote history counts too.
+    local highest_history=$(get_highest_from_history)
+
+    # Take the maximum of all three
     local max_num=$highest_branch
     if [ "$highest_spec" -gt "$max_num" ]; then
         max_num=$highest_spec
+    fi
+    if [ "$highest_history" -gt "$max_num" ]; then
+        max_num=$highest_history
     fi
 
     # Return next number
