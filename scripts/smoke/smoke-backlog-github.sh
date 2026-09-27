@@ -70,8 +70,11 @@ check "SKILL.md mentions detect-fields.sh (#161)" \
   'grep -q "detect-fields.sh" .claude/skills/board/SKILL.md'
 check "SKILL.md mentions set-field.sh (#161)" \
   'grep -q "set-field.sh" .claude/skills/board/SKILL.md'
-check "SKILL.md documents set-field exit code 11 fallback contract" \
-  'grep -q "10/11/12" .claude/skills/board/SKILL.md'
+# The exit-code contract, keyed on each code's definition rather than on one
+# phrasing of it (#623 reworded "10/11/12 signal label fallback" into a
+# per-code sentence, and a check pinned to the old string went red).
+check "SKILL.md documents set-field exit codes 10-13 and the preflight's 2" \
+  '(for c in 10 11 12 13 2; do grep -q "\`$c\` = " .claude/skills/board/SKILL.md || exit 1; done)'
 
 echo
 # --- #561  a warning must be gated on the field existing --------------------
