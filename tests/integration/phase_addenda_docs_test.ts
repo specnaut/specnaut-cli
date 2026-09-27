@@ -1,6 +1,6 @@
 import { assert, assertEquals, assertStringIncludes } from "@std/assert";
 import { fromFileUrl } from "@std/path";
-import { exists } from "@std/fs";
+import { auditAddendum } from "../../src/domain/addendum_audit.ts";
 
 /**
  * #611 — the addendum seam is documented where a project author looks: the
@@ -62,33 +62,16 @@ Deno.test("every concrete addendum path shown anywhere names a routable phase", 
     "templates/core/skills/specnaut/SKILL.md",
     "templates/core/skills/ship/SKILL.md",
   ];
-  const router = await read("templates/core/skills/specnaut/SKILL.md");
-  // The router names its own contract docs in one paragraph; that list is the
-  // authority on what is loaded rather than routed.
-  const contractPara = router.slice(
-    0,
-    router.indexOf("are **contract docs, not routable phases**"),
-  );
-  const contractDocs = new Set(
-    [...contractPara.slice(contractPara.lastIndexOf("\n\n")).matchAll(/`phases\/([a-z-]+)\.md`/g)]
-      .map((m) => m[1]),
-  );
-  assert(
-    contractDocs.has("plan-audits") && contractDocs.has("auto-chain"),
-    "contract doc list not found",
-  );
-
+  // `auditAddendum` is the one home of "does a router read this path" — the
+  // same rule `check --project` applies (#622), pinned against the bundled
+  // routers by tests/templates/routable_phases_test.ts.
   const seen: string[] = [];
   const bad: string[] = [];
   for (const rel of surfaces) {
-    for (const m of (await read(rel)).matchAll(/\.specnaut\/addenda\/([a-z-]+)\/([a-z-]+)\.md/g)) {
-      const [path, skill, phase] = m;
-      seen.push(path);
-      const doc = `templates/core/skills/${skill}/phases/${phase}.md`;
-      if (!(await exists(`${root}${doc}`))) bad.push(`${rel}: ${path} — no ${doc}`);
-      else if (skill === "specnaut" && contractDocs.has(phase)) {
-        bad.push(`${rel}: ${path} — a contract doc`);
-      }
+    for (const m of (await read(rel)).matchAll(/\.specnaut\/addenda\/([a-z-]+\/[a-z-]+\.md)/g)) {
+      seen.push(m[0]);
+      const finding = auditAddendum(m[1]);
+      if (finding) bad.push(`${rel}: ${m[0]} — ${finding.problem.kind}`);
     }
   }
   // Non-vacuity: the docs do show a worked path, or this sweep checked nothing.

@@ -1,6 +1,13 @@
 import { join } from "@std/path";
 import { parse as parseYaml } from "@std/yaml";
 import type { PluginDetector, ProjectInspector } from "../application/ports.ts";
+import {
+  ADDENDA_ROOT,
+  ADDENDUM_SKILLS,
+  type AddendumFinding,
+  addendumPath,
+  auditAddendum,
+} from "../domain/addendum_audit.ts";
 import type { CheckOutcome } from "../domain/check_result.ts";
 import { type BacklogBackend, type KnownHarness, parseLock } from "../domain/installed_lock.ts";
 import { PLUGIN_COVERED_PATHS_CLAUDE } from "../domain/plugin_coverage.ts";
@@ -14,6 +21,47 @@ async function exists(path: string): Promise<boolean> {
   } catch (err) {
     if (err instanceof Deno.errors.NotFound) return false;
     throw err;
+  }
+}
+
+/**
+ * Every non-directory entry under `root`, as `/`-separated paths relative to
+ * it. Symlinks count as files: a router reads through them. Which of these
+ * matter is the domain's call (`auditAddendum`), not the walker's.
+ */
+async function listFilesUnder(root: string, prefix = ""): Promise<string[]> {
+  const files: string[] = [];
+  for await (const entry of Deno.readDir(join(root, prefix))) {
+    const rel = prefix === "" ? entry.name : `${prefix}/${entry.name}`;
+    if (entry.isDirectory) files.push(...await listFilesUnder(root, rel));
+    else files.push(rel);
+  }
+  return files;
+}
+
+/** Why the router never reads this file, and where the text should live. */
+function describeAddendumFinding(f: AddendumFinding): string {
+  const hint = f.suggestion ? `; did you mean ${addendumPath(f.suggestion)}?` : "";
+  const unread = "never read";
+  switch (f.problem.kind) {
+    case "unknown-phase":
+      return `names no /${f.problem.skill} phase — ${unread}${hint}`;
+    case "renamed":
+      return `phase renamed (${f.problem.reason}) — ${unread}${
+        f.suggestion ? `; move it to ${addendumPath(f.suggestion)}` : ""
+      }`;
+    case "contract-doc":
+      return `contract doc, not a phase — no addendum is read for it; name its step in ${
+        f.problem.parents.map(addendumPath).join(" or ")
+      }`;
+    case "unknown-skill":
+      return `\`${f.problem.skill}\` is not a skill that reads addenda (${
+        ADDENDUM_SKILLS.join(", ")
+      }) — ${unread}${hint}`;
+    case "wrong-depth":
+      return `not at ${ADDENDA_ROOT}/<skill>/<phase>.md — ${unread}${hint}`;
+    case "not-markdown":
+      return `not a .md file — ${unread}${hint}`;
   }
 }
 
@@ -78,8 +126,45 @@ export class FsProjectInspector implements ProjectInspector {
     outcomes.push(await this.checkBacklogConfig(projectDir));
     outcomes.push(...await this.checkClaudeConfig(projectDir));
     outcomes.push(...await this.checkPluginGap(projectDir));
+    outcomes.push(...await this.checkAddenda(projectDir));
 
     return outcomes;
+  }
+
+  /**
+   * Lists every file under `.specnaut/addenda/` that no router will ever read
+   * (#622) — a mistyped phase, a phase renamed by an upgrade, a contract doc, a
+   * wrong directory. Each is a `warn`: the project still works, but an
+   * addendum written as a guardrail is silently off, and nothing else says so.
+   *
+   * Silent when the directory is absent or every addendum is valid — a
+   * project that never wrote one should not be told how many it has.
+   */
+  private async checkAddenda(projectDir: string): Promise<CheckOutcome[]> {
+    const root = join(projectDir, ADDENDA_ROOT);
+    let files: string[];
+    try {
+      files = await listFilesUnder(root);
+    } catch (err) {
+      if (err instanceof Deno.errors.NotFound) return [];
+      if (err instanceof Deno.errors.NotADirectory) {
+        return [{
+          name: `${ADDENDA_ROOT}/`,
+          status: "warn",
+          message: `not a directory — addenda are ${ADDENDA_ROOT}/<skill>/<phase>.md`,
+        }];
+      }
+      throw err;
+    }
+    return files
+      .sort()
+      .map(auditAddendum)
+      .filter((f): f is AddendumFinding => f !== null)
+      .map((f) => ({
+        name: `${ADDENDA_ROOT}/${f.path}`,
+        status: "warn" as const,
+        message: describeAddendumFinding(f),
+      }));
   }
 
   /**

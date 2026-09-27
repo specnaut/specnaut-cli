@@ -207,7 +207,8 @@ step stands and the assistant says so. No file is no addendum: nothing is printe
 scaffolded. Contract docs a phase loads (`plan-audits`, `merge-close`, …) take no addendum of their
 own; write it in the parent phase's addendum and name the step. Specnaut never writes, tracks or
 upgrades anything under `.specnaut/addenda/`, so `upgrade` keeps refreshing the phase doc beside it.
-Commit the directory.
+Commit the directory. `specnaut check --project` warns about any file there that no router reads — a
+mistyped or renamed phase, a contract doc, a wrong directory — and names the path it belongs at.
 
 Use an addendum when you are adding a step, a check, or a project fact to a phase. A full preserve
 is still warranted when you need a bundled step itself to be different — removed, reordered or
