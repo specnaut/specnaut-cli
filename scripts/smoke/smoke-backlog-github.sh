@@ -128,11 +128,17 @@ check "detect-fields.sh discovers StartDate field via emit_date (#264, #614)" \
   'grep -qE "^emit_date \"Start date\"[[:space:]]+STARTDATE$" .specnaut/scripts/backlog/detect-fields.sh'
 check "detect-fields.sh discovers TargetDate field via emit_date (#264, #614)" \
   'grep -qE "^emit_date \"Target date\"[[:space:]]+TARGETDATE$" .specnaut/scripts/backlog/detect-fields.sh'
-# #614 — a date may exist only as an organization issue field. The project
-# mutation refuses its `IFD_…` id, so the date branch must carry the
-# issue-level route, and the organization lookup must ask for date fields.
-check "detect-fields.sh asks the organization for IssueFieldDate (#614)" \
+# #614 — a date may be a projected organization issue field, whose value the
+# project mutation refuses, so the date branch must carry the issue-level route.
+# #619 — the listed id does not tell the forms apart (`IFD_…` on one board,
+# `PVTF_…` on another), so the form comes from the project's own `isIssueField`
+# and the date field it links to, not from the id or a name match.
+check "detect-fields.sh asks the project which fields are issue fields (#619)" \
+  'grep -q "isIssueField" .specnaut/scripts/backlog/detect-fields.sh'
+check "detect-fields.sh reads the linked IssueFieldDate (#614, #619)" \
   'grep -q "on IssueFieldDate" .specnaut/scripts/backlog/detect-fields.sh'
+check "detect-fields.sh resolves every listed date through the link (#619)" \
+  'awk "/^emit_date\\(\\)/{f=1} f&&/resolve_form/{ok=1} f&&/^}/{exit} END{exit !ok}" .specnaut/scripts/backlog/detect-fields.sh'
 check "set-field.sh date branch writes an issue-level date via setIssueFieldValue + dateValue (#614)" \
   'grep -qE "^[[:space:]]+set_issue_field .*dateValue" .specnaut/scripts/backlog/set-field.sh && grep -q "setIssueFieldValue" .specnaut/scripts/backlog/set-field.sh'
 check "detect-fields.sh discovers Estimate field via emit_simple (#264)" \

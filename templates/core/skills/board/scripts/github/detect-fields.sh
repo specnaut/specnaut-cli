@@ -21,53 +21,83 @@ require_project   # a project that does not resolve fails here, not mid-write
 
 FIELDS_JSON=$(gh project field-list "$PROJECT_NUMBER" --owner "$REPO_OWNER" --format json)
 
-# Organization issue fields, fetched at most once per run.
+# Resolved first, not last: the link query below addresses the project by it.
+# Assigned before it is printed: inside `echo "…=$(…)"` a failed lookup is
+# invisible — `echo`'s status is the line's — and the detector exits 0 having
+# emitted an empty id as if it were an answer. As an assignment, `set -e` sees
+# the failure and the caller learns that discovery failed.
+PROJECT_NODE_ID=$(gh project view "$PROJECT_NUMBER" --owner "$REPO_OWNER" --format json | jq -r '.id')
+
+# Which of the project's fields are organization issue fields, fetched at most
+# once per run (cli#619).
 #
-# A single-select projected into a project from the organization is reported by
-# `gh project field-list` with `options` null: the field is the project's, the
-# OPTIONS belong to the org. Resolving them needs a second query, and
-# `Organization.issueFields` returns a connection whose nodes are the union
-# `IssueFields` — so the inline fragment is required, not stylistic.
+# A field projected from the organization is listed by `gh project field-list`
+# like a field the project owns, and nothing in that listing decides which it
+# is. Two inferences were tried and both failed on a real board: an `IFD_…` id
+# prefix (a second board listed the same projected date with a `PVTF_…` id) and
+# a name match against the organization's fields (a board may own a field named
+# like the organization's without projecting it — the match then wrote a value
+# on a field the board does not show). The project's own `isIssueField`, and
+# the `issueField` it links to, are the answer: they decide the form and
+# supply the organization field's id and options. `issueField` is declared per
+# field type, not on the common interface, hence one fragment per type.
 #
-# Cached because it is needed once per projected axis and the answer cannot
-# change inside a run. **Call it in the current shell, never inside `$( … )`**:
-# a command substitution is a subshell, the cache it fills dies with it, and the
-# next axis queries again — which is how this cache once held nothing at all.
-# Read the answer through `org_field`.
+# Cached because every ambiguous axis needs it and the answer cannot change
+# inside a run. **Call it in the current shell, never inside `$( … )`**: a
+# command substitution is a subshell, the cache it fills dies with it, and the
+# next axis queries again. Read the answer through `resolve_form`.
 #
-# Never fails: an org that has no issue fields, a token without the scope, or an
-# outright error all yield an empty document, and every caller below treats that
-# as "no projected field" and degrades to the label fallback. The degradation is
-# announced on stderr, not silent — it makes a projected field look absent.
-ORG_FIELDS_JSON=""
-load_org_fields() {
-  [ -z "$ORG_FIELDS_JSON" ] || return 0
-  ORG_FIELDS_JSON=$(gh api graphql -f query='
-    query($org: String!) {
-      organization(login: $org) {
-        issueFields(first: 50) {
-          nodes {
-            __typename
-            ... on IssueFieldSingleSelect { id name options { id name } }
-            ... on IssueFieldDate { id name }
+# Never fails: a token without the scope, a server whose schema predates
+# `isIssueField`, or an outright error yield an empty document, and every field
+# then reads as the project's — the detector must keep working where the link
+# cannot be read. The degradation is announced on stderr, not silent.
+FIELD_LINKS_JSON=""
+load_field_links() {
+  [ -z "$FIELD_LINKS_JSON" ] || return 0
+  FIELD_LINKS_JSON=$(gh api graphql -f query='
+    query($project: ID!) {
+      node(id: $project) {
+        ... on ProjectV2 {
+          fields(first: 100) {
+            nodes {
+              ... on ProjectV2FieldCommon { id isIssueField }
+              ... on ProjectV2Field {
+                issueField { __typename ... on IssueFieldDate { id } }
+              }
+              ... on ProjectV2SingleSelectField {
+                issueField { __typename ... on IssueFieldSingleSelect { id options { id name } } }
+              }
+            }
           }
         }
       }
-    }' -f org="$REPO_OWNER" 2>/dev/null) || ORG_FIELDS_JSON=""
-  if ! printf '%s' "$ORG_FIELDS_JSON" | jq -e . >/dev/null 2>&1; then
-    echo "⚠ could not read $REPO_OWNER's organization issue fields — projected fields will read as absent" >&2
-    ORG_FIELDS_JSON='{}'
+    }' -f project="$PROJECT_NODE_ID" 2>/dev/null) || FIELD_LINKS_JSON=""
+  if ! printf '%s' "$FIELD_LINKS_JSON" | jq -e '.data.node.fields.nodes' >/dev/null 2>&1; then
+    echo "⚠ could not read which of Project #$PROJECT_NUMBER's fields are organization issue fields — they will read as the project's own" >&2
+    FIELD_LINKS_JSON='{}'
   fi
 }
 
-# The first organization issue field of GraphQL type <typename> named <name>
-# (case-insensitive), as compact JSON — or nothing. Requires `load_org_fields`.
-org_field() {
-  printf '%s' "$ORG_FIELDS_JSON" | jq -c --arg t "$1" --arg n "$2" '
-    [ .data.organization.issueFields.nodes[]?
-      | select(.__typename == $t)
-      | select((.name | ascii_downcase) == ($n | ascii_downcase)) ][0] // empty
-  '
+# Decide the form of the listed project field <field-id>, in the current shell:
+# sets FORM (local|projected), ORG_FIELD_ID and ORG_OPTIONS (JSON array).
+#
+# The project's link decides. One secondary signal survives it: an `IFD_…` id
+# is an organization date's own node, which the project mutation cannot resolve
+# whatever the link says, so it is never routed `local` — with the link
+# unreadable, its organization id stays unknown and the writer skips it (exit
+# 10) rather than sending it to a mutation certain to refuse it.
+resolve_form() {
+  local link
+  load_field_links
+  link=$(printf '%s' "$FIELD_LINKS_JSON" | jq -c --arg id "$1" '
+    [ .data.node.fields.nodes[]? | select(.id == $id) ][0] // {}
+  ')
+  FORM=local ORG_FIELD_ID="" ORG_OPTIONS='[]'
+  if [ "$(jq -r '.isIssueField == true' <<<"$link")" = true ] || [[ "$1" == IFD_* ]]; then
+    FORM=projected
+    ORG_FIELD_ID=$(jq -r '.issueField.id // ""' <<<"$link")
+    ORG_OPTIONS=$(jq -c '.issueField.options // []' <<<"$link")
+  fi
 }
 
 emit() {
@@ -81,28 +111,31 @@ emit() {
   if [ -z "$field_block" ]; then
     echo "${prefix}_FIELD_ID="
     echo "${prefix}_FIELD_FORM="
+    echo "${prefix}_ORG_FIELD_ID="
     return
   fi
 
-  # Options come from the project when the project has them, and from the
-  # organization when it does not. `form` is emitted so the WRITER can route
-  # without asking again: the two forms take different mutations, and a writer
-  # that re-derived the answer would be a second place for the rule to live.
-  local opts form org_field_id=""
+  # Options come from the project when the project has them. A listing with
+  # none is ambiguous — the shape of a projected field, and of a project field
+  # whose options were all deleted — so only then is the project asked, and the
+  # options of a projected field are its organization field's. A listing WITH
+  # options is taken as the project's without asking: no projected field has
+  # been seen listing any, and asking anyway would put a GraphQL call on every
+  # `add.sh`, which runs this detector for Status alone.
+  #
+  # `form` is emitted so the WRITER can route without asking again: the two
+  # forms take different mutations, and a writer that re-derived the answer
+  # would be a second place for the rule to live.
+  local opts form=local org_field_id="" field_id
+  field_id=$(echo "$field_block" | jq -r '.id')
   opts=$(echo "$field_block" | jq -c '(.options // [])')
-  form=local
   if [ "$opts" = "[]" ]; then
-    local org_block
-    load_org_fields
-    org_block=$(org_field IssueFieldSingleSelect "$field")
-    if [ -n "$org_block" ]; then
-      form=projected
-      org_field_id=$(echo "$org_block" | jq -r '.id // ""')
-      opts=$(echo "$org_block" | jq -c '(.options // [])')
-    fi
+    resolve_form "$field_id"
+    form=$FORM org_field_id=$ORG_FIELD_ID
+    [ "$form" = local ] || opts=$ORG_OPTIONS
   fi
 
-  echo "${prefix}_FIELD_ID=$(echo "$field_block" | jq -r '.id')"
+  echo "${prefix}_FIELD_ID=$field_id"
   echo "${prefix}_FIELD_FORM=$form"
   echo "${prefix}_ORG_FIELD_ID=$org_field_id"
   # Option names are not identifiers: "In progress" would emit
@@ -124,23 +157,22 @@ emit Status STATUS
 emit Priority PRIORITY
 emit Size SIZE
 
-# Roadmap dates (#264), in either of their two forms (cli#614).
+# Roadmap dates (#264), in either of their two forms (cli#614, cli#619).
 #
-# A date the project owns is a `ProjectV2Field` with a `PVTF_…` id, written
-# through the project item. A date that exists only as an organization issue
-# field is listed by `gh project field-list` under the SAME type but with an
-# `IFD_…` id — an `IssueFieldDate` node, which the project mutation refuses to
-# resolve ("Could not resolve to ProjectV2Field … 'IFD_…'"). The prefix is the
-# cheap, query-free signal of the form; the organization lookup is the
-# authority for the id the writer uses. Same vocabulary as the single-selects
-# (`_FIELD_FORM` + `_ORG_FIELD_ID`): one routing rule, not two.
+# A date the project owns is written through the project item; a projected
+# organization date is written on the issue. `gh project field-list` lists both
+# as `ProjectV2Field`, and its id does not tell them apart — one board listed a
+# projected date with an `IFD_…` id, another with a `PVTF_…` one — so every
+# listed date is resolved through the project's link (`resolve_form`). Same
+# vocabulary as the single-selects (`_FIELD_FORM` + `_ORG_FIELD_ID`): one
+# routing rule, not two.
 #
-# Only a date the project LISTS is looked up. An organization date this board
+# Only a date the project LISTS is resolved. An organization date this board
 # does not carry stays absent — the gate `groom.md` reads is unchanged — and a
-# board with no date fields never pays for the organization query.
+# board with no date fields never pays for the link query.
 emit_date() {
   local field="$1" prefix="$2"
-  local field_id form=local org_field_id=""
+  local field_id
   field_id=$(echo "$FIELDS_JSON" | jq -r --arg n "$field" '
     [ .fields[]
       | select(.type == "ProjectV2Field")
@@ -152,14 +184,10 @@ emit_date() {
     echo "${prefix}_ORG_FIELD_ID="
     return
   fi
-  if [[ "$field_id" == IFD_* ]]; then
-    form=projected
-    load_org_fields
-    org_field_id=$(org_field IssueFieldDate "$field" | jq -r '.id // ""')
-  fi
+  resolve_form "$field_id"
   echo "${prefix}_FIELD_ID=$field_id"
-  echo "${prefix}_FIELD_FORM=$form"
-  echo "${prefix}_ORG_FIELD_ID=$org_field_id"
+  echo "${prefix}_FIELD_FORM=$FORM"
+  echo "${prefix}_ORG_FIELD_ID=$ORG_FIELD_ID"
 }
 
 emit_date "Start date"  STARTDATE
@@ -187,10 +215,4 @@ emit_simple() {
 emit_simple "Estimate"    ESTIMATE
 
 # Project node ID — handy for callers that also want to write field values.
-#
-# Assigned before it is printed: inside `echo "…=$(…)"` a failed lookup is
-# invisible — `echo`'s status is the line's — and the detector exits 0 having
-# emitted an empty id as if it were an answer. As an assignment, `set -e` sees
-# the failure and the caller learns that discovery failed.
-PROJECT_NODE_ID=$(gh project view "$PROJECT_NUMBER" --owner "$REPO_OWNER" --format json | jq -r '.id')
 echo "PROJECT_NODE_ID=$PROJECT_NODE_ID"

@@ -163,9 +163,9 @@ case "$FIELD_LOWER" in
       exit 10
     fi
 
-    # An issue-level date: the project lists it, but its id (`IFD_…`) is not a
-    # project field and the project mutation refuses it. detect-fields.sh
-    # decided the form; this only follows it.
+    # An issue-level date: the project lists it, but its value lives on the
+    # issue and the project mutation refuses it, whatever id the listing
+    # showed. detect-fields.sh decided the form; this only follows it.
     FORM_VAR="${PREFIX}_FIELD_FORM"
     if [ "$KIND" = "date" ] && [ "${!FORM_VAR-local}" = "projected" ]; then
       ORG_FIELD_VAR="${PREFIX}_ORG_FIELD_ID"
