@@ -4,6 +4,7 @@ import type { BundleOptions, Harness } from "../../application/ports.ts";
 import type { CoreBundle, CoreEntry } from "../../domain/core_bundle.ts";
 import type { Bundle } from "../../domain/template.ts";
 import { HARNESS_STATIC } from "../../templates_bundle.ts";
+import { applyHarnessStatic } from "./harness_static.ts";
 import {
   CODEX_CONFIG_BLOCK_LABEL,
   CODEX_CONFIG_REFUSAL,
@@ -127,10 +128,7 @@ export class CodexHarness implements Harness {
           break;
       }
     }
-    const staticFiles = HARNESS_STATIC[this.key] ?? {};
-    for (const [dest, file] of Object.entries(staticFiles)) {
-      out[dest] = file;
-    }
+    applyHarnessStatic(out, HARNESS_STATIC[this.key] ?? {}, opts);
 
     // `[agents]` defaults for children spawned without a role (cli#599).
     //

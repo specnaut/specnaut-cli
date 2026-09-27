@@ -1,6 +1,7 @@
 import { assert, assertEquals } from "@std/assert";
 import { ClaudeHarness } from "../../../src/infrastructure/harness/claude_harness.ts";
 import { CORE_BUNDLE, HARNESS_STATIC } from "../../../src/templates_bundle.ts";
+import { renderBackend } from "../../../src/domain/conditional_render.ts";
 
 Deno.test("ClaudeHarness.key and displayName", () => {
   const h = new ClaudeHarness();
@@ -59,5 +60,6 @@ Deno.test("ClaudeHarness includes HARNESS_STATIC claude files (.claude/CLAUDE.md
   });
   const claudeMd = mapped[".claude/CLAUDE.md"];
   const staticClaude = HARNESS_STATIC.claude[".claude/CLAUDE.md"];
-  assertEquals(claudeMd?.content, staticClaude?.content);
+  // Rendered for the active backend (#612), otherwise the static source verbatim.
+  assertEquals(claudeMd?.content, renderBackend(staticClaude?.content ?? "", "local"));
 });

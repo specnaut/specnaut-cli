@@ -1,6 +1,7 @@
 import { managedSectionField } from "./harness_managed.ts";
 import type { BundleOptions, Harness } from "../../application/ports.ts";
 import { HARNESS_STATIC } from "../../templates_bundle.ts";
+import { applyHarnessStatic } from "./harness_static.ts";
 import type { CoreBundle, CoreEntry } from "../../domain/core_bundle.ts";
 import type { Bundle } from "../../domain/template.ts";
 import { skillDocDestination, skillFolderName } from "./skill_folder.ts";
@@ -77,10 +78,7 @@ export class CopilotHarness implements Harness {
     }
     // Layer the harness's own static files last, so a harness-specific file
     // wins over anything the core bundle mapped to the same destination.
-    const staticFiles = HARNESS_STATIC[this.key] ?? {};
-    for (const [dest, file] of Object.entries(staticFiles)) {
-      out[dest] = file;
-    }
+    applyHarnessStatic(out, HARNESS_STATIC[this.key] ?? {}, opts);
     return out;
   }
 }

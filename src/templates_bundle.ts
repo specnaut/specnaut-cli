@@ -29175,11 +29175,25 @@ export const HARNESS_STATIC: Record<string, Record<string, TemplateFile>> = {
 
 - **Project documentation and rules**: the primary reference is \`AGENTS.md\` at
   the project root. Read it first.
-- **Skills**: installed skills live in \`.claude/skills/\`.
-- **Specnaut commands**: custom Specnaut commands live in \`.claude/commands/\`.
+- **Skills**: installed skills live in \`.claude/skills/\` — including the
+  \`/specnaut\` and \`/board\` entry points.
 - **Agents**: specialized agents live in \`.claude/agents/\`.
-- **Backlog**: managed via \`/board\` — when the project uses the local
-  Markdown backend, see \`.specnaut/backlog.md\`.
+<!-- BEGIN: backend=local -->
+- **Backlog**: managed via \`/board\` — local Markdown backend, indexed in
+  \`.specnaut/backlog.md\`.
+<!-- END: backend=local -->
+<!-- BEGIN: backend=github -->
+- **Backlog**: managed via \`/board\` — GitHub Issues and a GitHub Project,
+  configured in \`.specnaut/backlog-config.yml\`.
+<!-- END: backend=github -->
+<!-- BEGIN: backend=gitlab -->
+- **Backlog**: managed via \`/board\` — GitLab Issues, configured in
+  \`.specnaut/backlog-config.yml\`.
+<!-- END: backend=gitlab -->
+<!-- BEGIN: backend=cloud -->
+- **Backlog**: managed via \`/board\` — Specnaut Cloud, configured in
+  \`.specnaut/backlog-config.yml\`.
+<!-- END: backend=cloud -->
 
 **Backlog references** follow the \`backlog-reference-contract\` skill — read it; never restate it here.
 
@@ -30053,8 +30067,22 @@ loads the right reference at session start.
 - **Skills**: installed skills live in \`.agents/skills/\`.
 - **Subagents**: Codex subagent definitions live in \`.codex/agents/\`
   (TOML format).
-- **Backlog**: managed via the \`/board groom\` workflow — when the
-  project uses the local Markdown backend, see \`.specnaut/backlog.md\`.
+<!-- BEGIN: backend=local -->
+- **Backlog**: managed via the \`/board groom\` workflow — local Markdown
+  backend, indexed in \`.specnaut/backlog.md\`.
+<!-- END: backend=local -->
+<!-- BEGIN: backend=github -->
+- **Backlog**: managed via the \`/board groom\` workflow — GitHub Issues and a
+  GitHub Project, configured in \`.specnaut/backlog-config.yml\`.
+<!-- END: backend=github -->
+<!-- BEGIN: backend=gitlab -->
+- **Backlog**: managed via the \`/board groom\` workflow — GitLab Issues,
+  configured in \`.specnaut/backlog-config.yml\`.
+<!-- END: backend=gitlab -->
+<!-- BEGIN: backend=cloud -->
+- **Backlog**: managed via the \`/board groom\` workflow — Specnaut Cloud,
+  configured in \`.specnaut/backlog-config.yml\`.
+<!-- END: backend=cloud -->
 
 **Backlog references** follow the \`backlog-reference-contract\` skill — read it; never restate it here.
 
@@ -30357,8 +30385,20 @@ clarifications needed) STOP #2 (pre-merge validation)
 ## Project context
 
 - Constitution lives at \`.specnaut/memory/constitution.md\` — treat as non-negotiable rules.
-- Product backlog (when local Markdown backend): index at \`.specnaut/backlog.md\`,
+<!-- BEGIN: backend=local -->
+- Product backlog (local Markdown backend): index at \`.specnaut/backlog.md\`,
   task files at \`.specnaut/backlog/NNN-*.md\`.
+<!-- END: backend=local -->
+<!-- BEGIN: backend=github -->
+- Product backlog: GitHub Issues and a GitHub Project, configured in
+  \`.specnaut/backlog-config.yml\`.
+<!-- END: backend=github -->
+<!-- BEGIN: backend=gitlab -->
+- Product backlog: GitLab Issues, configured in \`.specnaut/backlog-config.yml\`.
+<!-- END: backend=gitlab -->
+<!-- BEGIN: backend=cloud -->
+- Product backlog: Specnaut Cloud, configured in \`.specnaut/backlog-config.yml\`.
+<!-- END: backend=cloud -->
 - Project conventions: \`AGENTS.md\` at project root.
 
 Read the constitution and AGENTS.md before starting any significant work.

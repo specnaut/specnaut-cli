@@ -48,8 +48,20 @@ clarifications needed) STOP #2 (pre-merge validation)
 ## Project context
 
 - Constitution lives at `.specnaut/memory/constitution.md` — treat as non-negotiable rules.
-- Product backlog (when local Markdown backend): index at `.specnaut/backlog.md`,
+<!-- BEGIN: backend=local -->
+- Product backlog (local Markdown backend): index at `.specnaut/backlog.md`,
   task files at `.specnaut/backlog/NNN-*.md`.
+<!-- END: backend=local -->
+<!-- BEGIN: backend=github -->
+- Product backlog: GitHub Issues and a GitHub Project, configured in
+  `.specnaut/backlog-config.yml`.
+<!-- END: backend=github -->
+<!-- BEGIN: backend=gitlab -->
+- Product backlog: GitLab Issues, configured in `.specnaut/backlog-config.yml`.
+<!-- END: backend=gitlab -->
+<!-- BEGIN: backend=cloud -->
+- Product backlog: Specnaut Cloud, configured in `.specnaut/backlog-config.yml`.
+<!-- END: backend=cloud -->
 - Project conventions: `AGENTS.md` at project root.
 
 Read the constitution and AGENTS.md before starting any significant work.

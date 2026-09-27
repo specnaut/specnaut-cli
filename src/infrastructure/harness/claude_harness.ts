@@ -3,6 +3,7 @@ import type { BundleOptions, Harness } from "../../application/ports.ts";
 import type { CoreBundle, CoreEntry } from "../../domain/core_bundle.ts";
 import type { Bundle } from "../../domain/template.ts";
 import { HARNESS_STATIC } from "../../templates_bundle.ts";
+import { applyHarnessStatic } from "./harness_static.ts";
 import { applyBackend, backlogScriptDestination } from "./backlog_filter.ts";
 import { applyScheme, phaseScriptDestination } from "./scheme_filter.ts";
 import { applySpecBackend } from "./spec_backend_filter.ts";
@@ -82,10 +83,7 @@ export class ClaudeHarness implements Harness {
         ...managedSectionField(entry),
       }, this.key);
     }
-    const staticFiles = HARNESS_STATIC[this.key] ?? {};
-    for (const [dest, file] of Object.entries(staticFiles)) {
-      out[dest] = file;
-    }
+    applyHarnessStatic(out, HARNESS_STATIC[this.key] ?? {}, opts);
     return out;
   }
 }

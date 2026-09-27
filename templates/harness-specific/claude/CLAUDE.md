@@ -2,11 +2,25 @@
 
 - **Project documentation and rules**: the primary reference is `AGENTS.md` at
   the project root. Read it first.
-- **Skills**: installed skills live in `.claude/skills/`.
-- **Specnaut commands**: custom Specnaut commands live in `.claude/commands/`.
+- **Skills**: installed skills live in `.claude/skills/` — including the
+  `/specnaut` and `/board` entry points.
 - **Agents**: specialized agents live in `.claude/agents/`.
-- **Backlog**: managed via `/board` — when the project uses the local
-  Markdown backend, see `.specnaut/backlog.md`.
+<!-- BEGIN: backend=local -->
+- **Backlog**: managed via `/board` — local Markdown backend, indexed in
+  `.specnaut/backlog.md`.
+<!-- END: backend=local -->
+<!-- BEGIN: backend=github -->
+- **Backlog**: managed via `/board` — GitHub Issues and a GitHub Project,
+  configured in `.specnaut/backlog-config.yml`.
+<!-- END: backend=github -->
+<!-- BEGIN: backend=gitlab -->
+- **Backlog**: managed via `/board` — GitLab Issues, configured in
+  `.specnaut/backlog-config.yml`.
+<!-- END: backend=gitlab -->
+<!-- BEGIN: backend=cloud -->
+- **Backlog**: managed via `/board` — Specnaut Cloud, configured in
+  `.specnaut/backlog-config.yml`.
+<!-- END: backend=cloud -->
 
 **Backlog references** follow the `backlog-reference-contract` skill — read it; never restate it here.
 

@@ -939,6 +939,15 @@ check "and fires each rule once per file per session, not on every edit" \
   'grep -q "once per" .claude/security-patterns.yaml'
 
 echo
+echo "═══ #612  the context file points only at what was scaffolded ═══"
+check ".claude/CLAUDE.md points a local project at its backlog index" \
+  'grep -q "\.specnaut/backlog\.md" .claude/CLAUDE.md && [ -f .specnaut/backlog.md ]'
+check ".claude/CLAUDE.md does not cite the retired .claude/commands/" \
+  '! grep -q "\.claude/commands/" .claude/CLAUDE.md'
+check ".claude/CLAUDE.md carries no unrendered backend markers" \
+  '! grep -q "backend=" .claude/CLAUDE.md'
+
+echo
 echo "═══ #23  a silent review seat fails the gate ═══"
 # The not-run state has ONE representation and it is arithmetic: a prose note
 # beside an all-zero block reads as clean to whatever sums it. Every assertion

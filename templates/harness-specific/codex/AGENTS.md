@@ -5,8 +5,22 @@
 - **Skills**: installed skills live in `.agents/skills/`.
 - **Subagents**: Codex subagent definitions live in `.codex/agents/`
   (TOML format).
-- **Backlog**: managed via the `/board groom` workflow — when the
-  project uses the local Markdown backend, see `.specnaut/backlog.md`.
+<!-- BEGIN: backend=local -->
+- **Backlog**: managed via the `/board groom` workflow — local Markdown
+  backend, indexed in `.specnaut/backlog.md`.
+<!-- END: backend=local -->
+<!-- BEGIN: backend=github -->
+- **Backlog**: managed via the `/board groom` workflow — GitHub Issues and a
+  GitHub Project, configured in `.specnaut/backlog-config.yml`.
+<!-- END: backend=github -->
+<!-- BEGIN: backend=gitlab -->
+- **Backlog**: managed via the `/board groom` workflow — GitLab Issues,
+  configured in `.specnaut/backlog-config.yml`.
+<!-- END: backend=gitlab -->
+<!-- BEGIN: backend=cloud -->
+- **Backlog**: managed via the `/board groom` workflow — Specnaut Cloud,
+  configured in `.specnaut/backlog-config.yml`.
+<!-- END: backend=cloud -->
 
 **Backlog references** follow the `backlog-reference-contract` skill — read it; never restate it here.
 
