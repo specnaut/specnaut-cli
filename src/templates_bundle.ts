@@ -2787,6 +2787,11 @@ Idempotent — a re-run adopts an existing release and prints
 touching the body: a published release is live. \`--fail-if-exists\` refuses
 to adopt (exit 3).
 
+**Publishing always prompts.** On Claude Code the scaffolded settings carry
+\`ask\` rules for \`gh release create\`, \`gh release edit … --draft…\` and
+\`gh run rerun\`. \`ask\` beats \`allow\`, so a broad \`gh release *\` you add to
+run \`/ship\` unattended still stops at the one step you cannot take back.
+
 ### GitLab remote — prefer the bundled wrapper
 
 If the project ships releases on GitLab, the bundled \`release-gitlab.sh\`
@@ -29651,6 +29656,13 @@ patterns:
     ".claude/settings.json": {
       content: `{
   "\$schema": "https://json.schemastore.org/claude-code-settings.json",
+  "permissions": {
+    "ask": [
+      "Bash(gh release create *)",
+      "Bash(gh release edit *--draft*)",
+      "Bash(gh run rerun *)"
+    ]
+  },
   "hooks": {
     "PreToolUse": [
       {

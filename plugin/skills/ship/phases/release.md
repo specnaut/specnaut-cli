@@ -82,6 +82,11 @@ Idempotent — a re-run adopts an existing release and prints
 touching the body: a published release is live. `--fail-if-exists` refuses
 to adopt (exit 3).
 
+**Publishing always prompts.** On Claude Code the scaffolded settings carry
+`ask` rules for `gh release create`, `gh release edit … --draft…` and
+`gh run rerun`. `ask` beats `allow`, so a broad `gh release *` you add to
+run `/ship` unattended still stops at the one step you cannot take back.
+
 ### GitLab remote — prefer the bundled wrapper
 
 If the project ships releases on GitLab, the bundled `release-gitlab.sh`

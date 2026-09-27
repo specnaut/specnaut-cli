@@ -18,7 +18,13 @@
  *     present. The path-match makes re-runs idempotent.
  *   - If no matching matcher group exists, create one.
  *   - User-side groups with different matchers are NEVER touched.
- *   - All non-`hooks` user fields are passed through verbatim.
+ *   - `permissions.ask` is a set union: the user's rules first, in their
+ *     order, then each bundled rule not already present. Ask rules are how
+ *     Specnaut guarantees a prompt before a publish (#610) — Claude Code
+ *     evaluates `ask` before `allow`, so they hold against a broader allow
+ *     the user added. `allow` and `deny` are never touched: an ask rule
+ *     adds a prompt, it never grants or forbids anything.
+ *   - All other user fields are passed through verbatim.
  *
  * Removal-on-unbundle (e.g. Specnaut drops a hook in a future
  * release) is intentionally NOT handled here — once written, the
@@ -135,6 +141,16 @@ export function mergeClaudeSettings(
         if (!alreadyPresent) target.hooks.push(bundledHook);
       }
     }
+  }
+
+  // 3. Union the bundled ask rules into the user's, without reordering or
+  //    dropping anything of theirs.
+  const bundledAsk = bundledParsed.permissions?.ask ?? [];
+  if (bundledAsk.length > 0) {
+    const userPerms = userParsed.permissions ?? {};
+    const ask: string[] = [...(userPerms.ask ?? [])];
+    for (const rule of bundledAsk) if (!ask.includes(rule)) ask.push(rule);
+    result.permissions = { ...userPerms, ask };
   }
 
   // Preserve hooks key only if non-empty.

@@ -169,3 +169,49 @@ Deno.test("mergeClaudeSettings: preserves unrelated top-level keys verbatim", ()
   // Hooks were grafted in.
   assertEquals(Object.keys(parsed.hooks).length, 4);
 });
+
+// ---------------------------------------------------------------- #610
+//
+// Publishing a release is irreversible wherever a workflow listens for it. A
+// project that adds a broad `Bash(gh release *)` allow to make `/ship` run
+// smoothly also pre-authorises `gh release edit <tag> --draft=false` — a
+// publish with no prompt. Specnaut ships `permissions.ask` rules for the
+// publish-capable commands; Claude Code evaluates `ask` before `allow`, so they
+// hold against any broader allow. The merge must carry them into a
+// settings.json that already exists, without touching what the user wrote.
+
+const SHIPPED = Deno.readTextFileSync(
+  new URL("../../templates/harness-specific/claude/settings.json", import.meta.url),
+);
+const PUBLISH_ASK = [
+  "Bash(gh release create *)",
+  "Bash(gh release edit *--draft*)",
+  "Bash(gh run rerun *)",
+];
+
+Deno.test("claude settings: the shipped file asks before every publish-capable command (#610)", () => {
+  const ask: string[] = JSON.parse(SHIPPED).permissions?.ask ?? [];
+  for (const rule of PUBLISH_ASK) {
+    assertEquals(ask.includes(rule), true, `shipped settings.json lacks ask rule ${rule}`);
+  }
+  // A prompt, never a prohibition — and never a bare pre-authorisation.
+  const perms = JSON.parse(SHIPPED).permissions ?? {};
+  assertEquals(perms.deny, undefined);
+  assertEquals((perms.allow ?? []).some((r: string) => r.startsWith("Bash(gh release")), false);
+});
+
+Deno.test("mergeClaudeSettings: ask rules reach an existing settings.json beside a broad allow (#610)", () => {
+  const existing = JSON.stringify({
+    permissions: { allow: ["Bash(gh release *)"], ask: ["Bash(git push *)"] },
+  });
+  const merged = JSON.parse(mergeClaudeSettings(existing, SHIPPED, DEST));
+  assertEquals(merged.permissions.allow, ["Bash(gh release *)"], "the user's allow is theirs");
+  assertEquals(merged.permissions.ask, ["Bash(git push *)", ...PUBLISH_ASK]);
+});
+
+Deno.test("mergeClaudeSettings: ask rules are not duplicated on re-merge (#610)", () => {
+  const once = mergeClaudeSettings(JSON.stringify({ theme: "dark" }), SHIPPED, DEST);
+  const twice = mergeClaudeSettings(once, SHIPPED, DEST);
+  assertEquals(twice, once);
+  assertEquals(JSON.parse(twice).permissions.ask, PUBLISH_ASK);
+});
