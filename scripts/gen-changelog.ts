@@ -1,6 +1,6 @@
 // Generates a structured Markdown changelog from conventional-commit-style
 // messages between two refs. Writes to dist/release-notes.md by default —
-// suitable for `softprops/action-gh-release@v2`'s `body_path` input, which
+// suitable for `softprops/action-gh-release`'s `body_path` input, which
 // replaces the noisy auto-generated release notes with a feature-level
 // summary.
 //

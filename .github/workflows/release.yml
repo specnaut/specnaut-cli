@@ -314,12 +314,15 @@ jobs:
       id-token: write
       attestations: write
     steps:
-      - uses: actions/checkout@v6
+      # Every action in this file is pinned to a commit SHA, with the version
+      # it corresponds to in a trailing comment. The attest step says why;
+      # tests/scripts/release_actions_pinned_test.ts fails on a floating ref.
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
         with:
           # Full history + tags so `git describe` and `git log <prev>..HEAD`
           # can produce the changelog.
           fetch-depth: 0
-      - uses: denoland/setup-deno@v2
+      - uses: denoland/setup-deno@22d081ff2d3a40755e97629de92e3bcbfa7cf2ed # v2.0.5
         with:
           deno-version: v2.x
       - name: Bundle templates
@@ -374,7 +377,21 @@ jobs:
         run: deno run --allow-read --allow-write --allow-run --allow-env scripts/build.ts
       - name: Attest build provenance
         id: attest
-        uses: actions/attest@v4
+        # Pinned to a commit, and this is the pin that must not float. The
+        # bundle this action emits is a contract with binaries ALREADY
+        # installed: `self-update` accepts exactly one shape — a Sigstore
+        # bundle v0.3 whose tlog entry carries a Rekor v1 Signed Entry
+        # Timestamp under the pinned Rekor key (`verifiedSigningTime` in
+        # `src/domain/sigstore/verify.ts`). If a minor release of the action
+        # moved to Rekor v2 or an RFC 3161 timestamp, every installed binary
+        # would refuse the next release with `untrusted-timestamp`, and an
+        # update it refuses cannot fix it — only a manual reinstall can.
+        #
+        # So bumping this SHA is a deliberate act: check the new version's
+        # bundle against `verifiedSigningTime` before it lands. The price is
+        # that fixes, security ones included, no longer arrive on their own.
+        # Enforced by tests/scripts/release_actions_pinned_test.ts.
+        uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
         with:
           # Enumerated by the pipeline, not by a list. This step runs BEFORE
           # checksums are computed, so `dist/` holds exactly the binaries
@@ -426,7 +443,7 @@ jobs:
           fi
       - name: Create release
         id: release
-        uses: softprops/action-gh-release@v3
+        uses: softprops/action-gh-release@efb35369e0ad2afab669f228072c1b0d510eae64 # v3.0.3
         with:
           files: |
             dist/specnaut-macos-x64
