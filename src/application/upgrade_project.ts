@@ -5,6 +5,7 @@ import type {
   Harness,
   LockStore,
   PluginDetector,
+  StagingStore,
 } from "./ports.ts";
 import type { Bundle, TemplateFile } from "../domain/template.ts";
 import { managedSectionLabels } from "../domain/template.ts";
@@ -135,6 +136,12 @@ export type UpgradeProjectDeps = {
   reader: FsReader;
   writer: FsWriter;
   lockStore: LockStore;
+  /**
+   * `.specnaut/upgrade-staging/`. Required, not optional like the plugin probe:
+   * an upgrade that cannot see the staging tree cannot prune it, and a prune
+   * that silently does not happen is the #613 bug itself.
+   */
+  stagingStore: StagingStore;
   core: CoreBundle;
   templatesVersion: string;
   findHarness: (key: string) => Harness | null;
@@ -484,6 +491,10 @@ export class UpgradeProjectUseCase {
           await lockStore.write(input.projectDir, correctedLock);
         }
       }
+      // Every dest equals the bundle here, so no staged copy has anything left
+      // to reconcile — and a project already on the current release reaches
+      // its next upgrade through this branch, not the applied one (#613).
+      if (!input.dryRun) await this.pruneStaging(input.projectDir, new Set());
       // The version reported is the one now recorded, not the one that was.
       return { status: "up-to-date", currentVersion: templatesVersion, refusals };
     }
@@ -509,10 +520,14 @@ export class UpgradeProjectUseCase {
     // Stage upstream content for preserved (customized) files so that
     // `specnaut reconcile` can act on them later.
     const stagingWrites: Bundle = {};
+    const stagedDests = new Set<string>();
     for (const action of plan) {
       // Stage only `customized` preserves for reconcile; a declared-preserve is
       // a deliberate freeze, not a pending reconciliation.
       if (action.kind !== "preserve" || action.reason !== "customized") continue;
+      // Nor one `--force` is about to overwrite: its destination becomes the
+      // upstream a few lines down, so the copy would be stale on arrival (#477).
+      if (isForceWritablePreserve(action)) continue;
       // And only if the lock can speak for it. `ReconcilePathUseCase` answers
       // `no-lock-entry` for a dest the lock does not carry, so staging one
       // produces a path `reconcile --status` lists forever and
@@ -523,6 +538,7 @@ export class UpgradeProjectUseCase {
       const file = bundle[action.dest];
       if (!file) continue;
       stagingWrites[`.specnaut/upgrade-staging/${action.dest}`] = file;
+      stagedDests.add(action.dest);
     }
     if (Object.keys(stagingWrites).length > 0) {
       await writer.writeBundle(stagingWrites, input.projectDir, {
@@ -567,24 +583,9 @@ export class UpgradeProjectUseCase {
       });
     }
 
-    // Staged copies exist so `reconcile` can offer the upstream version of a
-    // file this run refused to touch. A file the run actually WROTE has nothing
-    // left to reconcile — its destination IS the upstream now — so its staged
-    // copy is stale the moment `--force` overwrites it.
-    //
-    // Left behind, it inflated `reconcile --status` permanently: on this
-    // workspace a forced upgrade reported 46 pending paths, of which 23 were
-    // byte-identical to their staged copy. Half the queue was noise, and the
-    // failure mode is an over-long list rather than an error, so nothing failed.
-    //
-    // Staging during a dry run stays exactly as it was — that is what lets an
-    // agent preview the reconciliation plan, and dry runs return before this.
-    const stagedForWritten = Object.keys(toWrite).map((dest) =>
-      `.specnaut/upgrade-staging/${dest}`
-    );
-    if (stagedForWritten.length > 0) {
-      await writer.deletePaths(stagedForWritten, input.projectDir, { backupExisting: false });
-    }
+    // What this run staged is the whole of what is pending. Everything else in
+    // the staging tree predates it — see `pruneStaging` (#477, #613).
+    await this.pruneStaging(input.projectDir, stagedDests);
 
     // Applied *after* the plan's writes: an `auto-update` may just have
     // rewritten the whole file from the bundle, in which case the section is
@@ -757,6 +758,41 @@ export class UpgradeProjectUseCase {
       managedSections: appliedSections,
       written: Object.keys(toWrite).sort(),
     };
+  }
+
+  /**
+   * Delete every staged copy except the ones this run just staged.
+   *
+   * Staging exists so `reconcile` can offer the upstream version of a file an
+   * upgrade refused to touch. After an applied upgrade the only such files are
+   * the ones THIS run preserved, and it has just restaged each of them with the
+   * current upstream. Any other copy in the tree is from an older release:
+   *
+   * - its dest was written by this run — the destination IS the upstream now,
+   *   so there is nothing to reconcile (#477: 23 of 46 pending paths were
+   *   byte-identical to their staged copy);
+   * - its dest already equals the bundle (`unchanged`) — `--accept-upstream`
+   *   would roll it back to the OLDER upstream;
+   * - its dest left the bundle (retired, handed to the plugin, `remove`d) or
+   *   was never tracked (`skipIfExists`) — `reconcile <path>` refuses it as
+   *   "not tracked by Specnaut", so it sat in `--status` forever and kept the
+   *   review marker from ever being retired (#613).
+   *
+   * Pruned without a backup, like #477's pruning before it: a staged copy is
+   * upstream content Specnaut wrote, never the user's. Every run already
+   * overwrites a restaged copy in place, and the review walk's merge option
+   * edits the DESTINATION, not the copy. The user's bytes live at the dest,
+   * which this never touches.
+   *
+   * Tree-driven rather than plan-driven on purpose: the paths that strand are
+   * precisely the ones no current plan, bundle or lock mentions any more.
+   */
+  private async pruneStaging(projectDir: string, keep: ReadonlySet<string>): Promise<void> {
+    const { stagingStore } = this.deps;
+    for (const rel of await stagingStore.list(projectDir)) {
+      if (!keep.has(rel)) await stagingStore.delete(projectDir, rel);
+    }
+    await stagingStore.cleanupIfEmpty(projectDir);
   }
 
   /**

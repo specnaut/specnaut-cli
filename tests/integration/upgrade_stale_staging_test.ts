@@ -113,3 +113,128 @@ Deno.test("an unforced upgrade keeps the staged copy it did not write", async ()
     await Deno.remove(dir, { recursive: true });
   }
 });
+
+/**
+ * #613 — staged copies an OLDER upgrade left behind.
+ *
+ * #477 cleared staging only for the dests the current run writes. A project
+ * that upgraded without reconciling, and then upgraded again across several
+ * releases, kept every staged copy the earlier runs had made: retired files the
+ * bundle no longer ships, `skipIfExists` files the lock deliberately does not
+ * track, files whose destination already equals the new upstream. `reconcile
+ * <path>` refuses the first two with "is not tracked by Specnaut", so the queue
+ * could never be emptied and the review marker could never be retired.
+ */
+const STALE = {
+  /** Retired upstream: neither in the bundle, nor in the lock, nor on disk. */
+  retired: ".claude/commands/retired-command.md",
+  /** On disk and user-owned (`skipIfExists`), so the lock carries no entry. */
+  untracked: "AGENTS.md",
+  /** Tracked, and its destination already IS the new upstream. */
+  unchanged: ".claude/skills/specnaut/phases/plan.md",
+};
+
+async function seedStaleStaging(dir: string): Promise<void> {
+  for (const rel of Object.values(STALE)) {
+    const abs = join(dir, ".specnaut/upgrade-staging", rel);
+    await Deno.mkdir(join(abs, ".."), { recursive: true });
+    await Deno.writeTextFile(abs, "UPSTREAM FROM AN OLDER RELEASE\n");
+  }
+}
+
+async function stagedOnDisk(dir: string, rel: string): Promise<boolean> {
+  try {
+    await Deno.stat(join(dir, ".specnaut/upgrade-staging", rel));
+    return true;
+  } catch (err) {
+    if (err instanceof Deno.errors.NotFound) return false;
+    throw err;
+  }
+}
+
+Deno.test("an applied upgrade clears the staged copies an older upgrade left behind", async () => {
+  const dir = await customizedProject();
+  try {
+    await seedStaleStaging(dir);
+
+    const up = await runSpecnaut(["upgrade"], dir);
+    assertEquals(up.code, 0, `upgrade failed: ${up.stderr}`);
+
+    // Asserted on the staging tree, not on `--status`: the listing filters
+    // unresolvable paths on its own, so it would pass without the prune.
+    for (const rel of Object.values(STALE)) {
+      assert(!(await stagedOnDisk(dir, rel)), `${rel} is stale and must be pruned by upgrade`);
+    }
+    for (const rel of CUSTOMIZED) {
+      assert(await stagedOnDisk(dir, rel), `${rel} was staged by this run and must stay`);
+    }
+    assertEquals((await pending(dir)).sort(), [...CUSTOMIZED].sort());
+  } finally {
+    await Deno.remove(dir, { recursive: true });
+  }
+});
+
+Deno.test("an up-to-date upgrade clears them too", async () => {
+  // The reporter's project was already on the current release, so its next
+  // `upgrade` takes the up-to-date early return — a prune only on the applied
+  // path would never reach it.
+  const dir = await Deno.makeTempDir({ prefix: "specnaut-stale-staging-" });
+  try {
+    assertEquals((await runSpecnaut(INIT, dir)).code, 0);
+    await seedStaleStaging(dir);
+
+    const up = await runSpecnaut(["upgrade"], dir);
+    assertEquals(up.code, 0, `upgrade failed: ${up.stderr}`);
+    assertStringIncludes(up.stdout, "already up to date");
+
+    for (const rel of Object.values(STALE)) {
+      assert(!(await stagedOnDisk(dir, rel)), `${rel} is stale and must be pruned by upgrade`);
+    }
+    assert(
+      !(await stagedOnDisk(dir, "")),
+      "an emptied staging directory is removed, like `reconcile` removes it",
+    );
+  } finally {
+    await Deno.remove(dir, { recursive: true });
+  }
+});
+
+Deno.test("a dry run prunes nothing either", async () => {
+  const dir = await Deno.makeTempDir({ prefix: "specnaut-stale-staging-" });
+  try {
+    assertEquals((await runSpecnaut(INIT, dir)).code, 0);
+    await seedStaleStaging(dir);
+
+    const dry = await runSpecnaut(["upgrade", "--dry-run"], dir);
+    assertEquals(dry.code, 0, `dry-run failed: ${dry.stderr}`);
+
+    for (const rel of Object.values(STALE)) {
+      assert(await stagedOnDisk(dir, rel), `a preview must not delete ${rel}`);
+    }
+  } finally {
+    await Deno.remove(dir, { recursive: true });
+  }
+});
+
+Deno.test("reconcile --status lists only paths reconcile <path> can resolve", async () => {
+  // No second upgrade here: this is the state the reporter was left in, and
+  // the listing has to be honest about it without asking them to run anything.
+  const dir = await customizedProject();
+  try {
+    assertEquals((await runSpecnaut(["upgrade"], dir)).code, 0);
+    await seedStaleStaging(dir);
+
+    const listed = await pending(dir);
+    assert(!listed.includes(STALE.retired), "a path with no lock entry cannot be reconciled");
+    assert(!listed.includes(STALE.untracked), "an untracked path cannot be reconciled");
+
+    // The property the listing owes its reader: every path it names resolves.
+    for (const rel of listed) {
+      const r = await runSpecnaut(["reconcile", rel, "--accept-current"], dir);
+      assertEquals(r.code, 0, `${rel} was listed but reconcile refused it: ${r.stderr}`);
+    }
+    assertEquals(await pending(dir), [], "the queue must be emptiable");
+  } finally {
+    await Deno.remove(dir, { recursive: true });
+  }
+});

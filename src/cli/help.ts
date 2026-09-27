@@ -94,7 +94,10 @@ export function printReconcileHelp(): void {
 
 USAGE:
 specnaut reconcile --status
-   Print a JSON object listing files pending reconciliation.
+   Print a JSON object listing files pending reconciliation. Every
+   path listed resolves with one of the two forms below; a staged copy
+   left by an older upgrade is not listed, and the next
+   \`specnaut upgrade\` deletes it.
 
 specnaut reconcile <path> --accept-upstream
    Take the new template version. Backs up the local file to

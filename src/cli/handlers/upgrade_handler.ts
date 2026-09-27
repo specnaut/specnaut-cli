@@ -12,6 +12,7 @@ import { findHarness } from "../harnesses.ts";
 import { DenoFsReader } from "../../infrastructure/fs_reader.ts";
 import { DenoFsWriter } from "../../infrastructure/deno_fs_writer.ts";
 import { FsLockStore } from "../../infrastructure/fs_lock_store.ts";
+import { FsStagingStore } from "../../infrastructure/fs_staging_store.ts";
 import {
   inspectLegacyConfigDir,
   migrateLegacyConfigDir,
@@ -579,6 +580,7 @@ export async function runUpgrade(intent: UpgradeIntent): Promise<number> {
     reader: new DenoFsReader(),
     writer: new DenoFsWriter(),
     lockStore: new FsLockStore(),
+    stagingStore: new FsStagingStore(),
     core: CORE_BUNDLE,
     templatesVersion: TEMPLATES_VERSION,
     findHarness,

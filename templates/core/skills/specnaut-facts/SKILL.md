@@ -31,8 +31,8 @@ Enhanced fork of [`specify` CLI](https://github.com/github/spec-kit), distribute
 ### Commands
 
 - `specnaut init [--here] [--ai <harness>] [--backlog <backend>] [--backlog-url <url>]` — scaffold the project.
-- `specnaut upgrade` — refresh templates. On apply writes `.specnaut/upgrade-pending.json` (`{from,to,at}`) + staging dir (`.specnaut/upgrade-staging/<path>`, consumed by `specnaut reconcile`); both removed after successful `review-upgrade` walk. Prints `@specnaut-guide review-upgrade` handoff.
-- `specnaut reconcile --status` — list files pending post-upgrade reconciliation as JSON.
+- `specnaut upgrade` — refresh templates. On apply writes `.specnaut/upgrade-pending.json` (`{from,to,at}`) + staging dir (`.specnaut/upgrade-staging/<path>`, consumed by `specnaut reconcile`; each apply leaves only the files that run preserved); both removed after successful `review-upgrade` walk. Prints `@specnaut-guide review-upgrade` handoff.
+- `specnaut reconcile --status` — list files pending post-upgrade reconciliation as JSON; only paths `reconcile <path>` can resolve.
 - `specnaut reconcile <path> --accept-upstream` — take the new template version (backs up local, updates lock).
 - `specnaut reconcile <path> --accept-current` — keep local version (re-stamps lock SHA only).
 - `specnaut check [--project]` — verify scaffold integrity.

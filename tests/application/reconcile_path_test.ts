@@ -1,5 +1,8 @@
 import { assertEquals } from "@std/assert";
-import { ReconcilePathUseCase } from "../../src/application/reconcile_path.ts";
+import {
+  ListPendingReconciliationsUseCase,
+  ReconcilePathUseCase,
+} from "../../src/application/reconcile_path.ts";
 import { sha256Hex } from "../../src/domain/sha256.ts";
 import type { InstalledLock, LockEntry } from "../../src/domain/installed_lock.ts";
 import type {
@@ -189,3 +192,35 @@ Deno.test("reconcile: errors when lock entry missing", async () => {
   });
   assertEquals(result.status, "no-lock-entry");
 });
+
+// ── #613: `reconcile --status` lists only what `reconcile <path>` resolves ───
+
+Deno.test(
+  "ListPendingReconciliationsUseCase hides a staged path reconcile would refuse",
+  async () => {
+    const uc = new ListPendingReconciliationsUseCase({
+      reader: new StubReader({ ".claude/agents/developer.md": "LOCAL\n", "AGENTS.md": "ours" }),
+      lockStore: new StubLockStore(mockLock()),
+      stagingStore: new StubStagingStore({
+        ".claude/agents/developer.md": "UPSTREAM\n",
+        // No lock entry, file on disk — `is not tracked by Specnaut`.
+        "AGENTS.md": "UPSTREAM\n",
+        // No lock entry, no file — a retired upstream path.
+        ".claude/commands/retired.md": "UPSTREAM\n",
+      }),
+    });
+    assertEquals(await uc.execute("/tmp/proj"), [".claude/agents/developer.md"]);
+  },
+);
+
+Deno.test(
+  "ListPendingReconciliationsUseCase hides a tracked path whose project file is gone",
+  async () => {
+    const uc = new ListPendingReconciliationsUseCase({
+      reader: new StubReader({}),
+      lockStore: new StubLockStore(mockLock()),
+      stagingStore: new StubStagingStore({ ".claude/agents/developer.md": "UPSTREAM\n" }),
+    });
+    assertEquals(await uc.execute("/tmp/proj"), []);
+  },
+);

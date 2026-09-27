@@ -6,6 +6,7 @@ import type {
   FsWriter,
   Harness,
   LockStore,
+  StagingStore,
 } from "../../src/application/ports.ts";
 import { sha256Hex } from "../../src/domain/sha256.ts";
 import type { InstalledLock, LockEntry } from "../../src/domain/installed_lock.ts";
@@ -47,6 +48,29 @@ function fakeWriter(): FsWriter & {
       for (const p of paths) deleted.push(p);
       return Promise.resolve({ backups: [], skippedSkipIfExists: [] } as BackupReport);
     },
+  };
+}
+
+/**
+ * An in-memory staging tree. `deleted` records every prune, so a test can tell
+ * "pruned" from "never there".
+ */
+function fakeStagingStore(
+  initial: string[] = [],
+): StagingStore & { staged: Set<string>; deleted: string[] } {
+  const staged = new Set(initial);
+  const deleted: string[] = [];
+  return {
+    staged,
+    deleted,
+    list: () => Promise.resolve([...staged]),
+    read: (_d, rel) => Promise.resolve(staged.has(rel) ? "STAGED" : null),
+    delete: (_d, rel) => {
+      staged.delete(rel);
+      deleted.push(rel);
+      return Promise.resolve();
+    },
+    cleanupIfEmpty: () => Promise.resolve(staged.size === 0),
   };
 }
 
@@ -126,6 +150,7 @@ function coreFromBundle(
 
 Deno.test("UpgradeProjectUseCase errors when lock is missing", async () => {
   const uc = new UpgradeProjectUseCase({
+    stagingStore: fakeStagingStore(),
     reader: fakeReader({}),
     writer: fakeWriter(),
     lockStore: fakeLockStore(null),
@@ -161,6 +186,7 @@ Deno.test("UpgradeProjectUseCase returns up-to-date when disk + lock + bundle al
     }]]),
   };
   const uc = new UpgradeProjectUseCase({
+    stagingStore: fakeStagingStore(),
     reader: fakeReader({ "a.md": content }),
     writer: fakeWriter(),
     lockStore: fakeLockStore(lock),
@@ -191,6 +217,7 @@ Deno.test("UpgradeProjectUseCase returns planned (no writes) in dry-run", async 
   };
   const writer = fakeWriter();
   const uc = new UpgradeProjectUseCase({
+    stagingStore: fakeStagingStore(),
     reader: fakeReader({ "a.md": oldContent }),
     writer,
     lockStore: fakeLockStore(lock),
@@ -230,6 +257,7 @@ Deno.test("UpgradeProjectUseCase applies auto-update and skips preserve", async 
   };
   const writer = fakeWriter();
   const uc = new UpgradeProjectUseCase({
+    stagingStore: fakeStagingStore(),
     reader: fakeReader({
       "clean.md": "OLD",
       "custom.md": "USER-EDITED",
@@ -265,6 +293,7 @@ Deno.test("UpgradeProjectUseCase with --force overwrites preserve actions with b
   };
   const writer = fakeWriter();
   const uc = new UpgradeProjectUseCase({
+    stagingStore: fakeStagingStore(),
     reader: fakeReader({ "a.md": "USER-EDITED" }),
     writer,
     lockStore: fakeLockStore(lock),
@@ -303,6 +332,7 @@ Deno.test("UpgradeProjectUseCase deletes clean orphans (lock entry + on disk + m
   };
   const writer = fakeWriter();
   const uc = new UpgradeProjectUseCase({
+    stagingStore: fakeStagingStore(),
     reader: fakeReader({ "a.md": "alpha", "orphan.md": orphanContent }),
     writer,
     lockStore: fakeLockStore(lock),
@@ -340,6 +370,7 @@ Deno.test("UpgradeProjectUseCase preserves customized orphan without --force, dr
   const writer = fakeWriter();
   const lockStore = fakeLockStore(lock);
   const uc = new UpgradeProjectUseCase({
+    stagingStore: fakeStagingStore(),
     reader: fakeReader({ "a.md": "alpha", "orphan.md": "user-edited" }),
     writer,
     lockStore,
@@ -374,6 +405,7 @@ Deno.test("UpgradeProjectUseCase with --force deletes customized orphan with bac
   };
   const writer = fakeWriter();
   const uc = new UpgradeProjectUseCase({
+    stagingStore: fakeStagingStore(),
     reader: fakeReader({ "orphan.md": "user-edited" }),
     writer,
     lockStore: fakeLockStore(lock),
@@ -426,6 +458,7 @@ Deno.test("UpgradeProjectUseCase: vanilla on-disk + plugin installed → backed 
   const writer = fakeWriter();
   const lockStore = fakeLockStore(lock);
   const uc = new UpgradeProjectUseCase({
+    stagingStore: fakeStagingStore(),
     reader: fakeReader({ [PLUGIN_DEST]: "vanilla content" }),
     writer,
     lockStore,
@@ -477,6 +510,7 @@ Deno.test("UpgradeProjectUseCase: covered dest the installed plugin does NOT ser
   const writer = fakeWriter();
   const lockStore = fakeLockStore(lock);
   const uc = new UpgradeProjectUseCase({
+    stagingStore: fakeStagingStore(),
     reader: fakeReader({ [PLUGIN_DEST]: "vanilla content" }),
     writer,
     lockStore,
@@ -532,6 +566,7 @@ Deno.test("UpgradeProjectUseCase: customized on-disk + plugin installed → pres
   const writer = fakeWriter();
   const lockStore = fakeLockStore(lock);
   const uc = new UpgradeProjectUseCase({
+    stagingStore: fakeStagingStore(),
     reader: fakeReader({ [PLUGIN_DEST]: "user-edited content" }),
     writer,
     lockStore,
@@ -578,6 +613,7 @@ Deno.test("UpgradeProjectUseCase: missing on-disk + plugin installed → deferre
   const writer = fakeWriter();
   const lockStore = fakeLockStore(lock);
   const uc = new UpgradeProjectUseCase({
+    stagingStore: fakeStagingStore(),
     reader: fakeReader({}), // user deleted the file
     writer,
     lockStore,
@@ -612,6 +648,7 @@ Deno.test("UpgradeProjectUseCase: vanilla on-disk + plugin NOT installed → exi
   };
   const writer = fakeWriter();
   const uc = new UpgradeProjectUseCase({
+    stagingStore: fakeStagingStore(),
     reader: fakeReader({ [PLUGIN_DEST]: "vanilla content" }),
     writer,
     lockStore: fakeLockStore(lock),
@@ -658,6 +695,7 @@ Deno.test("UpgradeProjectUseCase: writes upstream content to .specnaut/upgrade-s
   });
 
   const uc = new UpgradeProjectUseCase({
+    stagingStore: fakeStagingStore(),
     reader,
     writer,
     lockStore,
@@ -707,6 +745,7 @@ Deno.test("UpgradeProjectUseCase: does NOT write staging for auto-update files",
   });
 
   const uc = new UpgradeProjectUseCase({
+    stagingStore: fakeStagingStore(),
     reader,
     writer,
     lockStore,
@@ -737,6 +776,7 @@ Deno.test("UpgradeProjectUseCase: lock.parentManaged=true filters agentic dests 
   const writer = fakeWriter();
   const lockStore = fakeLockStore(lock);
   const uc = new UpgradeProjectUseCase({
+    stagingStore: fakeStagingStore(),
     reader: fakeReader({}), // no .claude/ on disk — it was deliberately removed
     writer,
     lockStore,
@@ -787,6 +827,7 @@ Deno.test("UpgradeProjectUseCase: parentManagedOverride re-derives + persists on
   const writer = fakeWriter();
   const lockStore = fakeLockStore(lock);
   const uc = new UpgradeProjectUseCase({
+    stagingStore: fakeStagingStore(),
     reader: fakeReader({}),
     writer,
     lockStore,
@@ -836,6 +877,7 @@ Deno.test("UpgradeProjectUseCase: legacy lock + parentManagedOverride persists p
   const writer = fakeWriter();
   const lockStore = fakeLockStore(lock);
   const uc = new UpgradeProjectUseCase({
+    stagingStore: fakeStagingStore(),
     reader: fakeReader({ ".specnaut/memory/constitution.md": content }),
     writer,
     lockStore,
@@ -892,6 +934,7 @@ Deno.test(
     const store = fakeLockStore(lock);
     const writer = fakeWriter();
     const uc = new UpgradeProjectUseCase({
+      stagingStore: fakeStagingStore(),
       reader: fakeReader({ "a.md": content }),
       writer,
       lockStore: store,
@@ -956,6 +999,7 @@ Deno.test(
     };
     const store = fakeLockStore(lock);
     const uc = new UpgradeProjectUseCase({
+      stagingStore: fakeStagingStore(),
       reader: fakeReader({ "a.md": diskContent }),
       writer: fakeWriter(),
       lockStore: store,
@@ -1002,6 +1046,7 @@ Deno.test(
     const store1 = fakeLockStore(emptyLock());
     const writer1 = fakeWriter();
     const uc1 = new UpgradeProjectUseCase({
+      stagingStore: fakeStagingStore(),
       reader: fakeReader({ "a.md": userEdit }),
       writer: writer1,
       lockStore: store1,
@@ -1025,6 +1070,7 @@ Deno.test(
     const store2 = fakeLockStore(store1.last);
     const writer2 = fakeWriter();
     const uc2 = new UpgradeProjectUseCase({
+      stagingStore: fakeStagingStore(),
       reader: fakeReader({ "a.md": userEdit }),
       writer: writer2,
       lockStore: store2,
@@ -1069,6 +1115,7 @@ Deno.test(
     };
     const store = fakeLockStore(lock);
     const uc = new UpgradeProjectUseCase({
+      stagingStore: fakeStagingStore(),
       reader: fakeReader({ "a.md": content }),
       writer: fakeWriter(),
       lockStore: store,
@@ -1105,6 +1152,7 @@ Deno.test(
     };
     const store = fakeLockStore(lock);
     const uc = new UpgradeProjectUseCase({
+      stagingStore: fakeStagingStore(),
       reader: fakeReader({ "a.md": content }),
       writer: fakeWriter(),
       lockStore: store,
@@ -1152,6 +1200,7 @@ Deno.test(
     };
     const store = fakeLockStore(lock);
     const uc = new UpgradeProjectUseCase({
+      stagingStore: fakeStagingStore(),
       reader: fakeReader({ "stable.md": stable, "moving.md": "old" }),
       writer: fakeWriter(),
       lockStore: store,
@@ -1207,6 +1256,7 @@ Deno.test(
     };
     const store = fakeLockStore(lock);
     const uc = new UpgradeProjectUseCase({
+      stagingStore: fakeStagingStore(),
       reader: fakeReader({ "stale.md": stale, "absent.md": absent }),
       writer: fakeWriter(),
       lockStore: store,
@@ -1251,6 +1301,7 @@ Deno.test(
     };
     const writer = fakeWriter();
     const uc = new UpgradeProjectUseCase({
+      stagingStore: fakeStagingStore(),
       reader: fakeReader({ "a.md": userEdit }),
       writer,
       lockStore: fakeLockStore(lock),
@@ -1300,6 +1351,7 @@ Deno.test(
     };
     const store = fakeLockStore(lock);
     const uc = new UpgradeProjectUseCase({
+      stagingStore: fakeStagingStore(),
       reader: fakeReader({ "a.md": content }),
       writer: fakeWriter(),
       lockStore: store,
@@ -1351,6 +1403,7 @@ Deno.test(
     // Path A: everything unchanged -> the up-to-date early return.
     const storeA = fakeLockStore(mkLock());
     await new UpgradeProjectUseCase({
+      stagingStore: fakeStagingStore(),
       reader: fakeReader({ "stable.md": stable }),
       writer: fakeWriter(),
       lockStore: storeA,
@@ -1374,6 +1427,7 @@ Deno.test(
     };
     const storeB = fakeLockStore(lockB);
     await new UpgradeProjectUseCase({
+      stagingStore: fakeStagingStore(),
       reader: fakeReader({ "stable.md": stable, "moving.md": "old" }),
       writer: fakeWriter(),
       lockStore: storeB,
@@ -1413,6 +1467,7 @@ Deno.test(
     };
     const store = fakeLockStore(lock);
     const uc = new UpgradeProjectUseCase({
+      stagingStore: fakeStagingStore(),
       reader: fakeReader({ "owned.md": content }),
       writer: fakeWriter(),
       lockStore: store,
@@ -1459,6 +1514,7 @@ Deno.test(
     };
     const store = fakeLockStore(lock);
     const uc = new UpgradeProjectUseCase({
+      stagingStore: fakeStagingStore(),
       reader: fakeReader({ "a.md": content }),
       writer: fakeWriter(),
       lockStore: store,
@@ -1502,6 +1558,7 @@ Deno.test(
     };
     const store = fakeLockStore(lock);
     const uc = new UpgradeProjectUseCase({
+      stagingStore: fakeStagingStore(),
       reader: fakeReader({ "owned.md": content }),
       writer: fakeWriter(),
       lockStore: store,
@@ -1546,6 +1603,7 @@ Deno.test(
     };
     const store = fakeLockStore(lock);
     await new UpgradeProjectUseCase({
+      stagingStore: fakeStagingStore(),
       reader: fakeReader({ "a.md": content }),
       writer: fakeWriter(),
       lockStore: store,
@@ -1588,6 +1646,7 @@ Deno.test(
     };
     const store = fakeLockStore(lock);
     await new UpgradeProjectUseCase({
+      stagingStore: fakeStagingStore(),
       reader: fakeReader({ "a.md": content }),
       writer: fakeWriter(),
       lockStore: store,
@@ -1629,6 +1688,7 @@ Deno.test(
     };
     const store = fakeLockStore(lock);
     await new UpgradeProjectUseCase({
+      stagingStore: fakeStagingStore(),
       reader: fakeReader({ "a.md": content }),
       writer: fakeWriter(),
       lockStore: store,
@@ -1657,3 +1717,149 @@ Deno.test(
     );
   },
 );
+
+// ── #613: staged copies left by an older upgrade ─────────────────────────────
+
+/**
+ * Three bundle dests, one per fate: `kept.md` is customized (preserved and
+ * restaged), `written.md` is vanilla behind (auto-updated), `same.md` already
+ * equals the bundle. Staging also holds two paths no current plan produces —
+ * a retired file and a user-owned one the lock does not track.
+ */
+async function olderStagingFixture() {
+  const entry = async (content: string): Promise<LockEntry> => ({
+    sha256: await sha256Hex(content),
+    installedAt: "2026-01-01T00:00:00.000Z",
+    templatesVersion: "1.2.0",
+  });
+  const lock: InstalledLock = {
+    version: 2,
+    harness: "claude",
+    backlogBackend: "local",
+    versionScheme: "semver",
+    specBackend: "local",
+    templatesVersion: "1.9.0",
+    entries: new Map([
+      ["kept.md", await entry("OLD K")],
+      ["written.md", await entry("OLD W")],
+      ["same.md", await entry("SAME")],
+    ]),
+  };
+  const reader = fakeReader({
+    "kept.md": "THE USER'S EDIT",
+    "written.md": "OLD W",
+    "same.md": "SAME",
+    "AGENTS.md": "the user's own agents file",
+  });
+  const core = coreFromBundle({
+    "kept.md": { content: "NEW K", executable: false },
+    "written.md": { content: "NEW W", executable: false },
+    "same.md": { content: "SAME", executable: false },
+  });
+  const staging = fakeStagingStore(["kept.md", "written.md", "same.md", "retired.md", "AGENTS.md"]);
+  return { lock, reader, core, staging };
+}
+
+Deno.test(
+  "UpgradeProjectUseCase prunes every staged copy this run did not stage (#613)",
+  async () => {
+    const { lock, reader, core, staging } = await olderStagingFixture();
+    const writer = fakeWriter();
+    const uc = new UpgradeProjectUseCase({
+      reader,
+      writer,
+      lockStore: fakeLockStore(lock),
+      stagingStore: staging,
+      core,
+      findHarness: findFakeHarness,
+      templatesVersion: "4.4.0",
+    });
+    const result = await uc.execute({ projectDir: "/p", dryRun: false, force: false });
+    assertEquals(result.status, "applied");
+    assertEquals(
+      [...staging.deleted].sort(),
+      ["AGENTS.md", "retired.md", "same.md", "written.md"],
+      "only the copy this run restaged may survive",
+    );
+    assertEquals(
+      writer.written.get(".specnaut/upgrade-staging/kept.md"),
+      "NEW K",
+      "the preserved dest is restaged with the current upstream",
+    );
+  },
+);
+
+Deno.test(
+  "UpgradeProjectUseCase --force neither keeps nor restages the copy of a file it overwrote",
+  async () => {
+    const { lock, reader, core, staging } = await olderStagingFixture();
+    const writer = fakeWriter();
+    const uc = new UpgradeProjectUseCase({
+      reader,
+      writer,
+      lockStore: fakeLockStore(lock),
+      stagingStore: staging,
+      core,
+      findHarness: findFakeHarness,
+      templatesVersion: "4.4.0",
+    });
+    await uc.execute({ projectDir: "/p", dryRun: false, force: true });
+    assert(staging.deleted.includes("kept.md"), "an overwritten dest has nothing to reconcile");
+    assertEquals(
+      writer.written.has(".specnaut/upgrade-staging/kept.md"),
+      false,
+      "staging a copy only to delete it a few lines later is pointless I/O",
+    );
+  },
+);
+
+Deno.test("UpgradeProjectUseCase --dry-run prunes nothing", async () => {
+  const { lock, reader, core, staging } = await olderStagingFixture();
+  const uc = new UpgradeProjectUseCase({
+    reader,
+    writer: fakeWriter(),
+    lockStore: fakeLockStore(lock),
+    stagingStore: staging,
+    core,
+    findHarness: findFakeHarness,
+    templatesVersion: "4.4.0",
+  });
+  const result = await uc.execute({ projectDir: "/p", dryRun: true, force: false });
+  assertEquals(result.status, "planned");
+  assertEquals(staging.deleted, [], "a preview must leave staging exactly as it was");
+});
+
+Deno.test("UpgradeProjectUseCase's up-to-date path prunes stale staging too", async () => {
+  // Every dest `unchanged` takes the early return. A project already on the
+  // current release lands there on its next run, so a prune that lived only on
+  // the applied path would never reach it.
+  const lock: InstalledLock = {
+    version: 2,
+    harness: "claude",
+    backlogBackend: "local",
+    versionScheme: "semver",
+    specBackend: "local",
+    templatesVersion: "4.4.0",
+    entries: new Map([["same.md", {
+      sha256: await sha256Hex("SAME"),
+      installedAt: "2026-01-01T00:00:00.000Z",
+      templatesVersion: "4.4.0",
+    }]]),
+  };
+  const run = async (dryRun: boolean) => {
+    const staging = fakeStagingStore(["same.md", "retired.md"]);
+    const result = await new UpgradeProjectUseCase({
+      reader: fakeReader({ "same.md": "SAME" }),
+      writer: fakeWriter(),
+      lockStore: fakeLockStore(lock),
+      stagingStore: staging,
+      core: coreFromBundle({ "same.md": { content: "SAME", executable: false } }),
+      findHarness: findFakeHarness,
+      templatesVersion: "4.4.0",
+    }).execute({ projectDir: "/p", dryRun, force: false });
+    assertEquals(result.status, "up-to-date");
+    return staging.deleted.sort();
+  };
+  assertEquals(await run(false), ["retired.md", "same.md"]);
+  assertEquals(await run(true), [], "not on a preview");
+});

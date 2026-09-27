@@ -1,6 +1,10 @@
 import { resolve } from "@std/path";
 import { green, red, yellow } from "@std/fmt/colors";
-import { type ReconcileMode, ReconcilePathUseCase } from "../../application/reconcile_path.ts";
+import {
+  ListPendingReconciliationsUseCase,
+  type ReconcileMode,
+  ReconcilePathUseCase,
+} from "../../application/reconcile_path.ts";
 import { DenoFsReader } from "../../infrastructure/fs_reader.ts";
 import { DenoFsWriter } from "../../infrastructure/deno_fs_writer.ts";
 import { FsLockStore } from "../../infrastructure/fs_lock_store.ts";
@@ -14,8 +18,14 @@ export async function runReconcile(intent: ReconcileIntent): Promise<number> {
   const projectDir = resolve(Deno.cwd());
 
   if (intent.kind === "reconcile-status") {
-    const staging = new FsStagingStore();
-    const pending = await staging.list(projectDir);
+    // Through the use case, not `FsStagingStore.list()` directly: the raw tree
+    // also holds copies `reconcile <path>` refuses, and listing those left a
+    // queue no command could empty (#613).
+    const pending = await new ListPendingReconciliationsUseCase({
+      reader: new DenoFsReader(),
+      lockStore: new FsLockStore(),
+      stagingStore: new FsStagingStore(),
+    }).execute(projectDir);
     const stagingDir = pending.length > 0 ? ".specnaut/upgrade-staging" : null;
     console.log(JSON.stringify({ pending, stagingDir }, null, 2));
     return 0;
