@@ -494,7 +494,7 @@ export class UpgradeProjectUseCase {
       // Every dest equals the bundle here, so no staged copy has anything left
       // to reconcile — and a project already on the current release reaches
       // its next upgrade through this branch, not the applied one (#613).
-      if (!input.dryRun) await this.pruneStaging(input.projectDir, new Set());
+      if (!input.dryRun) await this.pruneStaging(input.projectDir, new Set(), refusals);
       // The version reported is the one now recorded, not the one that was.
       return { status: "up-to-date", currentVersion: templatesVersion, refusals };
     }
@@ -585,7 +585,7 @@ export class UpgradeProjectUseCase {
 
     // What this run staged is the whole of what is pending. Everything else in
     // the staging tree predates it — see `pruneStaging` (#477, #613).
-    await this.pruneStaging(input.projectDir, stagedDests);
+    await this.pruneStaging(input.projectDir, stagedDests, refusals);
 
     // Applied *after* the plan's writes: an `auto-update` may just have
     // rewritten the whole file from the bundle, in which case the section is
@@ -786,13 +786,35 @@ export class UpgradeProjectUseCase {
    *
    * Tree-driven rather than plan-driven on purpose: the paths that strand are
    * precisely the ones no current plan, bundle or lock mentions any more.
+   *
+   * Best-effort: this is housekeeping, and it runs before the managed sections
+   * and the lock write. A delete that throws (a Windows file lock, a permission
+   * bit) is reported through `refusals` and the upgrade finishes; letting it
+   * propagate would leave the project half-upgraded over a copy nobody needs.
    */
-  private async pruneStaging(projectDir: string, keep: ReadonlySet<string>): Promise<void> {
+  private async pruneStaging(
+    projectDir: string,
+    keep: ReadonlySet<string>,
+    refusals: string[],
+  ): Promise<void> {
     const { stagingStore } = this.deps;
     for (const rel of await stagingStore.list(projectDir)) {
-      if (!keep.has(rel)) await stagingStore.delete(projectDir, rel);
+      if (keep.has(rel)) continue;
+      try {
+        await stagingStore.delete(projectDir, rel);
+      } catch (err) {
+        const why = err instanceof Error ? err.message : String(err);
+        refusals.push(
+          `could not clear the stale staged copy .specnaut/upgrade-staging/${rel} (${why}) — ` +
+            `it is safe to delete by hand`,
+        );
+      }
     }
-    await stagingStore.cleanupIfEmpty(projectDir);
+    try {
+      await stagingStore.cleanupIfEmpty(projectDir);
+    } catch {
+      // An empty directory left behind is harmless; the next run retries.
+    }
   }
 
   /**

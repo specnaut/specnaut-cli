@@ -1863,3 +1863,34 @@ Deno.test("UpgradeProjectUseCase's up-to-date path prunes stale staging too", as
   assertEquals(await run(false), ["retired.md", "same.md"]);
   assertEquals(await run(true), [], "not on a preview");
 });
+
+Deno.test("UpgradeProjectUseCase: a staged copy that cannot be deleted does not abort the upgrade", async () => {
+  // The prune runs before the managed sections and the lock write. A delete
+  // that throws — a Windows file lock, a permission bit — used to propagate and
+  // leave the upgrade half-applied over a leftover copy nobody needs. The
+  // cleanup is housekeeping: it must warn and let the upgrade finish.
+  const { lock, reader, core, staging } = await olderStagingFixture();
+  const flaky = {
+    ...staging,
+    delete: (d: string, rel: string) =>
+      rel === "retired.md"
+        ? Promise.reject(new Error("EBUSY: resource busy or locked"))
+        : staging.delete(d, rel),
+  };
+  const writer = fakeWriter();
+  const result = await new UpgradeProjectUseCase({
+    reader,
+    writer,
+    lockStore: fakeLockStore(lock),
+    stagingStore: flaky,
+    core,
+    findHarness: findFakeHarness,
+    templatesVersion: "4.4.0",
+  }).execute({ projectDir: "/p", dryRun: false, force: false });
+  assertEquals(result.status, "applied", "the upgrade must complete");
+  assert(staging.deleted.includes("written.md"), "the other stale copies are still pruned");
+  assert(
+    result.refusals.some((r) => r.includes("retired.md") && r.includes("EBUSY")),
+    `the failed prune must reach the user: ${JSON.stringify(result.refusals)}`,
+  );
+});
