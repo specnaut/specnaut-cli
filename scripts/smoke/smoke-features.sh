@@ -1129,6 +1129,16 @@ check "the selection rule is pointed at, not restated, in the scaffolded skills"
 check "backlog-reference-contract bans a bare number" \
   'grep -q "bare .#42. is opaque" .claude/skills/backlog-reference-contract/SKILL.md'
 
+# --- #611 · phase addenda -------------------------------------------------
+check "AGENTS.md carries the phase-addenda managed section" \
+  'grep -q "Specnaut: phase-addenda" AGENTS.md'
+check "the /specnaut router reads the specnaut addendum" \
+  'grep -qF ".specnaut/addenda/specnaut/<phase>.md" .claude/skills/specnaut/SKILL.md'
+check "the /ship router reads the ship addendum" \
+  'grep -qF ".specnaut/addenda/ship/<phase>.md" .claude/skills/ship/SKILL.md'
+check "init scaffolds no addenda tree — the seam is opt-in by file" \
+  'test ! -e .specnaut/addenda'
+
 # --- the three that share nothing with each other ------------------------
 check "code-audit .claude/skills/code-audit/SKILL.md runs its seats in parallel" \
   'grep -q "parallel" .claude/skills/code-audit/SKILL.md'

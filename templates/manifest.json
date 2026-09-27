@@ -1791,7 +1791,8 @@
       "managedSection": [
         "chain-stops",
         "ui-defaults",
-        "response-style"
+        "response-style",
+        "phase-addenda"
       ]
     },
     {

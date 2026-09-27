@@ -1,5 +1,36 @@
 # Upgrading Specnaut
 
+## 4.4.x → 4.5.0
+
+### Add to a bundled phase without preserving it
+
+A `/specnaut` or `/ship` phase now reads an optional **phase addendum** — a file your project owns
+at `.specnaut/addenda/<skill>/<phase>.md`, e.g. `.specnaut/addenda/ship/release.md` for
+`/ship release`. It adds to the phase at the step it names; it cannot replace or skip a bundled
+step. The README's "Adding to a bundled phase without preserving it" covers the format and when a
+full preserve is still the right tool.
+
+`specnaut upgrade` delivers the instruction to your `AGENTS.md` as a fourth fenced block, grafted in
+like the other three and printed by name:
+
+```markdown
+<!-- --- Specnaut: phase-addenda --- -->
+```
+
+It exists for the surfaces that reach a phase without going through a router — a per-phase workflow,
+a stale plugin router. Nothing else changes, and nothing is created under `.specnaut/addenda/`: with
+no addendum, a phase runs exactly as before.
+
+**If you preserved a phase doc only to add to it**, you can move off the preserve:
+
+1. `specnaut diff <path>` on the phase doc. If every difference is an addition of yours, it fits an
+   addendum; if you changed or removed a bundled step, keep the preserve.
+2. Move your additions into `.specnaut/addenda/<skill>/<phase>.md`, naming the step each one belongs
+   to.
+3. Remove the path from `.specnaut/preserve.yml`, delete the phase doc, and run `specnaut upgrade` —
+   a deleted bundled file that is no longer declared comes back at the current version, and receives
+   every later refresh.
+
 ## 4.0.x → 4.1.0
 
 ### `backlog-config.yml` no longer carries `project_node_id` / `status_field_id`

@@ -184,6 +184,36 @@ removes them from disk — the plugin serves them going forward). Customized fil
 a warning. If you later uninstall the plugin, `specnaut check --project` will warn about any covered
 files that are now missing and tell you how to recover them.
 
+### Adding to a bundled phase without preserving it
+
+Most customisations of a `/specnaut` or `/ship` phase are one project-specific rule — "run the
+migration check before tagging". Preserving the whole phase doc for that freezes it: it stops
+receiving upstream changes, and every one has to be merged in by hand from then on. Write the rule
+in a phase addendum instead — a file your project owns at `.specnaut/addenda/<skill>/<phase>.md`:
+
+```markdown
+<!-- .specnaut/addenda/ship/release.md -->
+
+Before computing the tag, run `./scripts/check-pending-migrations.sh`. If it reports a pending
+migration, stop and name it.
+```
+
+`<skill>` is `specnaut` or `ship`; `<phase>` is the phase's name as its router lists it (`plan`,
+`review`, `audit-security`, `tag`, `release`). The path is the same under every harness. The routers
+read the addendum right after the phase doc, and a managed block in `AGENTS.md` carries the same
+instruction to the surfaces that reach a phase without a router. An addendum adds to the phase at
+the step it names; it cannot replace or skip a bundled step — where it contradicts one, the bundled
+step stands and the assistant says so. No file is no addendum: nothing is printed, nothing is
+scaffolded. Contract docs a phase loads (`plan-audits`, `merge-close`, …) take no addendum of their
+own; write it in the parent phase's addendum and name the step. Specnaut never writes, tracks or
+upgrades anything under `.specnaut/addenda/`, so `upgrade` keeps refreshing the phase doc beside it.
+Commit the directory.
+
+Use an addendum when you are adding a step, a check, or a project fact to a phase. A full preserve
+is still warranted when you need a bundled step itself to be different — removed, reordered or
+rewritten — because that is exactly what an addendum cannot do. Declare the file in
+`.specnaut/preserve.yml` and take on the `specnaut diff` duty described above.
+
 ## Development setup
 
 ```bash

@@ -92,6 +92,12 @@ reimplement what the bundled scripts already do.
 | B | `phases/tag.md`, then `phases/release.md` | `tag.sh`, then `release.sh` |
 | C | `phases/release.md` | `release.sh` |
 
+With each phase document, read the project addendum `.specnaut/addenda/ship/<phase>.md` (`tag` or
+`release`) if it exists — the project's own addition to that phase, such as a pre-flight check. It
+adds to the phase at the step it names and never replaces or skips a bundled step: where it
+contradicts one, the bundled step stands and you say so. No file means no addendum — say nothing
+about it.
+
 The scripts live at `.specnaut/scripts/release/` — a project-relative path that
 does not change with the harness. The versioning scheme (SemVer or date-based)
 is baked in at `specnaut init`; the scripts read it, you do not choose it.

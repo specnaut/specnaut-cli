@@ -121,9 +121,14 @@ split, which is exactly who arrives here.
 
 1. **Read** the phase reference file (`phases/<phase>.md`) for the requested phase using the `Read`
    tool.
-2. **Substitute** the stripped phase arguments for the phase's input.
-3. **Execute** the procedure in the reference file end-to-end.
-4. **Decide whether to chain** (see below).
+2. **Read the project addendum** `.specnaut/addenda/specnaut/<phase>.md` if it exists — the
+   project's own addition to this phase. It adds to the phase at the step it names and never
+   replaces or skips a bundled step: where it contradicts one, the bundled step stands and you say
+   so. No file means no addendum — say nothing about it. Contract docs take none; the parent phase's
+   addendum names their step.
+3. **Substitute** the stripped phase arguments for the phase's input.
+4. **Execute** the procedure in the reference file end-to-end, with the addendum applied.
+5. **Decide whether to chain** (see below).
 
 Unknown phase → print the phase index and stop.
 

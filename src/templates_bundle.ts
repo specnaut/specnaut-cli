@@ -132,9 +132,14 @@ split, which is exactly who arrives here.
 
 1. **Read** the phase reference file (\`phases/<phase>.md\`) for the requested phase using the \`Read\`
    tool.
-2. **Substitute** the stripped phase arguments for the phase's input.
-3. **Execute** the procedure in the reference file end-to-end.
-4. **Decide whether to chain** (see below).
+2. **Read the project addendum** \`.specnaut/addenda/specnaut/<phase>.md\` if it exists — the
+   project's own addition to this phase. It adds to the phase at the step it names and never
+   replaces or skips a bundled step: where it contradicts one, the bundled step stands and you say
+   so. No file means no addendum — say nothing about it. Contract docs take none; the parent phase's
+   addendum names their step.
+3. **Substitute** the stripped phase arguments for the phase's input.
+4. **Execute** the procedure in the reference file end-to-end, with the addendum applied.
+5. **Decide whether to chain** (see below).
 
 Unknown phase → print the phase index and stop.
 
@@ -2588,6 +2593,12 @@ reimplement what the bundled scripts already do.
 | A | \`phases/tag.md\` | \`.specnaut/scripts/release/tag.sh\` |
 | B | \`phases/tag.md\`, then \`phases/release.md\` | \`tag.sh\`, then \`release.sh\` |
 | C | \`phases/release.md\` | \`release.sh\` |
+
+With each phase document, read the project addendum \`.specnaut/addenda/ship/<phase>.md\` (\`tag\` or
+\`release\`) if it exists — the project's own addition to that phase, such as a pre-flight check. It
+adds to the phase at the step it names and never replaces or skips a bundled step: where it
+contradicts one, the bundled step stands and you say so. No file means no addendum — say nothing
+about it.
 
 The scripts live at \`.specnaut/scripts/release/\` — a project-relative path that
 does not change with the harness. The versioning scheme (SemVer or date-based)
@@ -29119,11 +29130,27 @@ means — follows the \`response-style-contract\` skill.** Read it; never restat
 It is in force on **every** turn, not only when a skill or an agent is involved.
 
 <!-- --- End Specnaut: response-style --- -->
+
+<!-- --- Specnaut: phase-addenda --- -->
+
+## Project addenda to Specnaut phases
+
+*Owned by Specnaut — this section is not a placeholder to fill in. Edit the rest freely.*
+
+**Whenever you run a \`/specnaut\` or \`/ship\` phase, however it was reached** — the router, a
+per-phase command or workflow, a chained step — read \`.specnaut/addenda/<skill>/<phase>.md\` if it
+exists: \`<skill>\` is \`specnaut\` or \`ship\`, \`<phase>\` the phase's name (\`plan\`, \`audit-security\`,
+\`release\`), so \`/ship release\` reads \`.specnaut/addenda/ship/release.md\`. It is this project's own
+addition to that phase. It adds to the phase at the step it names and never replaces or skips a
+bundled step: where it contradicts one, the bundled step stands and you say so. No file means no
+addendum — say nothing about it.
+
+<!-- --- End Specnaut: phase-addenda --- -->
 `,
     executable: false,
     backend: null,
     skipIfExists: true,
-    managedSection: ["chain-stops", "ui-defaults", "response-style"],
+    managedSection: ["chain-stops", "ui-defaults", "response-style", "phase-addenda"],
   },
   {
     category: "mergeable-project-root",
