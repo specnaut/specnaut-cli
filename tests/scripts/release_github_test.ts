@@ -30,7 +30,10 @@ while [ "$#" -gt 0 ]; do
     *) args+=("$1"); shift ;;
   esac
 done
-out() { if [ -n "$jqexpr" ]; then jq -r "$jqexpr"; else cat; fi; }
+out() {
+  if [ -n "$jqexpr" ]; then jq -r "$jqexpr"; else cat; fi \
+    | if [ -n "\${GH_STUB_CRLF:-}" ]; then sed 's/$/\r/'; else cat; fi
+}
 case "\${args[0]} \${args[1]:-}" in
   "auth status") exit 0 ;;
   "release view")
@@ -64,6 +67,7 @@ async function withRepo(
   releases: Record<string, "draft" | "published">,
   args: string[],
   fn: (r: Result) => void | Promise<void>,
+  extraEnv: Record<string, string> = {},
 ): Promise<void> {
   const root = await Deno.makeTempDir({ prefix: "release-github-" });
   try {
@@ -115,7 +119,7 @@ async function withRepo(
     const r = await new Deno.Command("bash", {
       args: [join(scripts, "release-github.sh"), ...args],
       cwd: repo,
-      env: { PATH: `${bin}:${Deno.env.get("PATH")}`, GH_STUB_STORE: store },
+      env: { PATH: `${bin}:${Deno.env.get("PATH")}`, GH_STUB_STORE: store, ...extraEnv },
       stdout: "piped",
       stderr: "piped",
     }).output();
@@ -142,6 +146,23 @@ Deno.test("release-github: a draft on an older tag is not the deployed baseline 
     assertStringIncludes(body, "subsumes undeployed tags: `v1.2.0`, `v1.1.0`");
     assertStringIncludes(body, "feat: change v1.1.0");
   });
+});
+
+Deno.test("release-github: a CRLF-terminated tag list still finds the baseline", async () => {
+  // A Windows `jq` ends lines with CRLF. Left in, the carriage return makes
+  // every published tag read as `v1.0.0\r`, nothing matches, and the walk runs
+  // past the real baseline to the first tag — the same silent wrong range as
+  // counting a draft. First seen on the windows-latest runner.
+  await withRepo(
+    { "v1.0.0": "published", "v1.2.0": "draft" },
+    ["v1.3.0"],
+    (r) => {
+      assertEquals(r.code, 0, r.stderr);
+      const body = r.body("v1.3.0");
+      assertStringIncludes(body, "subsumes undeployed tags: `v1.2.0`, `v1.1.0`.");
+    },
+    { GH_STUB_CRLF: "1" },
+  );
 });
 
 // ---------------------------------------------------------------- #608

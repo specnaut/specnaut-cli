@@ -14,7 +14,9 @@ import { exists } from "@std/fs";
  */
 
 const root = fromFileUrl(new URL("../../", import.meta.url));
-const read = (rel: string) => Deno.readTextFile(`${root}${rel}`);
+// CRLF on a Windows checkout (core.autocrlf) must not hide a heading.
+const read = async (rel: string) =>
+  (await Deno.readTextFile(`${root}${rel}`)).replaceAll("\r\n", "\n");
 
 /** The body of the section opened by `heading`, up to the next heading of the same or higher rank. */
 function section(content: string, heading: string): string {

@@ -4422,7 +4422,7 @@ else
   # --exclude-drafts: \`gh release list\` includes drafts by default, and a
   # stray draft on an older tag would otherwise become the baseline and move
   # the changelog range, silently.
-  RELEASE_TAGS=\$(gh release list --exclude-drafts --limit 200 --json tagName --jq '.[].tagName' | tr '\\n' ' ')
+  RELEASE_TAGS=\$(gh release list --exclude-drafts --limit 200 --json tagName --jq '.[].tagName' | tr -d '\\r' | tr '\\n' ' ')
   BASELINE=""
   SUBSUMED_LIST=""
   SEEN_CURRENT=false
