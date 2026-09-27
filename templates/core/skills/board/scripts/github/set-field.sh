@@ -35,10 +35,12 @@
 #   10  no such field / type on the project / org (caller should fall back to a label)
 #   11  field / type present but the value is unrecognised (Priority/Size/IssueType only — date/number axes defer to gh for value validation)
 #   12  issue is not on the project / not in the repo
-#   13  field discovery FAILED (rate limit, bad token, any gh error) — NOT a
-#       fallback signal: the field may well exist, so the caller must not apply
-#       a label; retry, or report the value as not persisted
-#   2   backlog-config.yml missing / incomplete, or its project does not resolve
+#   13  field discovery FAILED, or the project could not be verified (rate
+#       limit, bad token, any gh error) — NOT a fallback signal: the field may
+#       well exist, so the caller must not apply a label; retry, or report the
+#       value as not persisted. Never a reason to edit backlog-config.yml
+#   2   backlog-config.yml missing / incomplete, or its project demonstrably
+#       does not exist (the owner's project listing succeeded without it)
 #   1   usage / unexpected error
 set -euo pipefail
 

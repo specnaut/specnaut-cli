@@ -43,6 +43,74 @@ esac
 exit 0
 `;
 
+/**
+ * A `gh` shaped like the reported rate-limit failure (#623): the view fails
+ * with an error that names NOTHING about rate limits, and the listing fails
+ * with GraphQL's own `RATE_LIMIT`. Neither call proves anything about the
+ * project, so the guard must not claim it "does not resolve".
+ */
+const GH_RATE_LIMITED = `#!/usr/bin/env bash
+case "$1 $2" in
+  "auth status") exit 0 ;;
+  "project view") echo 'unknown owner type' >&2; exit 1 ;;
+  "project list")
+    echo 'GraphQL: API rate limit already exceeded for user ID 1. (RATE_LIMIT)' >&2
+    exit 1 ;;
+esac
+exit 0
+`;
+
+/**
+ * A `gh` whose view fails but whose listing SUCCEEDS and names the configured
+ * number: the project demonstrably exists, so the view failure is a fault to
+ * retry, not a wrong number.
+ */
+const GH_VIEW_FAILS_BUT_LISTED = `#!/usr/bin/env bash
+case "$1 $2" in
+  "auth status") exit 0 ;;
+  "project view") echo 'HTTP 502: Bad Gateway (view-side marker)' >&2; exit 1 ;;
+  "project list") echo '{"projects":[{"number":7},{"number":42}],"totalCount":2}'; exit 0 ;;
+esac
+exit 0
+`;
+
+/** A `gh` whose listing succeeds and is EMPTY — zero projects, not a failure. */
+const GH_ZERO_PROJECTS = `#!/usr/bin/env bash
+case "$1 $2" in
+  "auth status") exit 0 ;;
+  "project view") exit 1 ;;
+  "project list") echo '{"projects":[],"totalCount":0}'; exit 0 ;;
+esac
+exit 0
+`;
+
+/**
+ * A `gh` that lists the configured project only when asked for closed projects
+ * AND for more than the default page of 30. `gh project list` omits both by
+ * default, so a listing without those flags is not the complete set — and an
+ * incomplete listing is not proof that a number is absent.
+ */
+const GH_LISTED_ONLY_WHEN_COMPLETE = `#!/usr/bin/env bash
+case "$1 $2" in
+  "auth status") exit 0 ;;
+  "project view") echo 'transient view failure (view-side marker)' >&2; exit 1 ;;
+  "project list")
+    closed=0; big=0; prev=""
+    for a in "$@"; do
+      [ "$a" = "--closed" ] && closed=1
+      if [ "$prev" = "--limit" ] || [ "$prev" = "-L" ]; then [ "$a" -gt 30 ] && big=1; fi
+      prev="$a"
+    done
+    if [ "$closed" = 1 ] && [ "$big" = 1 ]; then
+      echo '{"projects":[{"number":1},{"number":42}],"totalCount":2}'
+    else
+      echo '{"projects":[{"number":1}],"totalCount":2}'
+    fi
+    exit 0 ;;
+esac
+exit 0
+`;
+
 const SEP = Deno.build.os === "windows" ? ";" : ":";
 
 /**
@@ -286,6 +354,112 @@ Deno.test("require_project: an unauthenticated gh is not a config error", async 
     assert(
       !stderr.includes("does not resolve"),
       `an unauthenticated gh must not become a config error, got: ${JSON.stringify(stderr)}`,
+    );
+  } finally {
+    await Deno.remove(b.dir, { recursive: true });
+  }
+});
+
+for (const script of GUARDED) {
+  Deno.test(`require_project: ${script} exits 13, not 2, when gh fails and proves nothing`, async () => {
+    const b = await box(GH_RATE_LIMITED);
+    try {
+      const { code, stderr } = await run(b, script, ["1", "Done"]);
+      assertEquals(
+        code,
+        13,
+        `${script} must exit 13 when the project cannot be verified, got ${code}. stderr: ${stderr}`,
+      );
+      // Markers only the new branch can emit: `gh`'s own words, passed
+      // through verbatim. The old guard discarded both streams.
+      assert(
+        stderr.includes("unknown owner type"),
+        `${script} must quote the view's gh error, got: ${JSON.stringify(stderr)}`,
+      );
+      assert(
+        stderr.includes("RATE_LIMIT"),
+        `${script} must quote the listing's gh error, got: ${JSON.stringify(stderr)}`,
+      );
+      assert(
+        stderr.includes("could not verify project #42"),
+        `${script} must say the project could not be verified, got: ${JSON.stringify(stderr)}`,
+      );
+      assert(
+        !stderr.includes("does not resolve"),
+        `${script} must not claim the project does not resolve, got: ${JSON.stringify(stderr)}`,
+      );
+      assert(
+        !stderr.includes("backlog-config.yml"),
+        `${script} must not send the user to edit the config, got: ${JSON.stringify(stderr)}`,
+      );
+      assert(
+        stderr.includes("could not list"),
+        `${script} must say the listing failed, got: ${JSON.stringify(stderr)}`,
+      );
+    } finally {
+      await Deno.remove(b.dir, { recursive: true });
+    }
+  });
+
+  Deno.test(`require_project: ${script} exits 13 when the view fails but the listing names the project`, async () => {
+    const b = await box(GH_VIEW_FAILS_BUT_LISTED);
+    try {
+      const { code, stderr } = await run(b, script, ["1", "Done"]);
+      assertEquals(
+        code,
+        13,
+        `${script} must exit 13 when the project is listed but cannot be viewed, got ${code}. ` +
+          `stderr: ${stderr}`,
+      );
+      assert(
+        stderr.includes("view-side marker"),
+        `${script} must quote the view's gh error, got: ${JSON.stringify(stderr)}`,
+      );
+      assert(
+        !stderr.includes("does not resolve"),
+        `${script} must not claim a listed project does not resolve, got: ${
+          JSON.stringify(stderr)
+        }`,
+      );
+    } finally {
+      await Deno.remove(b.dir, { recursive: true });
+    }
+  });
+}
+
+Deno.test("require_project: a successful empty listing says zero projects, not 'could not list'", async () => {
+  const b = await box(GH_ZERO_PROJECTS);
+  try {
+    const { code, stderr } = await run(b, "move.sh", ["1", "Done"]);
+    assertEquals(code, 2, `an empty successful listing is proof, got ${code}. stderr: ${stderr}`);
+    assert(
+      stderr.includes("no projects are visible to this token"),
+      `an empty listing must be reported as zero projects, got: ${JSON.stringify(stderr)}`,
+    );
+    assert(
+      !stderr.includes("could not list"),
+      `"could not list" is reserved for a listing that FAILED, got: ${JSON.stringify(stderr)}`,
+    );
+  } finally {
+    await Deno.remove(b.dir, { recursive: true });
+  }
+});
+
+Deno.test("require_project: only a complete listing (closed + past the first page) is proof", async () => {
+  // `gh project list` defaults to open projects and a limit of 30. A number
+  // absent from that is absent from a SAMPLE — a closed project, or the
+  // thirty-first, would be reported as "does not resolve" with exit 2.
+  const b = await box(GH_LISTED_ONLY_WHEN_COMPLETE);
+  try {
+    const { code, stderr } = await run(b, "move.sh", ["1", "Done"]);
+    assertEquals(
+      code,
+      13,
+      `a project present in the complete listing must not exit 2, got ${code}. stderr: ${stderr}`,
+    );
+    assert(
+      !stderr.includes("does not resolve"),
+      `a listed project must not be reported as unresolved, got: ${JSON.stringify(stderr)}`,
     );
   } finally {
     await Deno.remove(b.dir, { recursive: true });

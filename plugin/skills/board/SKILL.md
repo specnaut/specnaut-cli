@@ -173,7 +173,7 @@ project` calls and read configuration from `backlog-config.yml`.
 .specnaut/scripts/backlog/move.sh <number> <Status>   # sets Project Status field
 .specnaut/scripts/backlog/clarify-comment.sh <num> "<question>"
 .specnaut/scripts/backlog/detect-fields.sh                                 # discover native fields (Status/Priority/Size/dates) → env lines
-.specnaut/scripts/backlog/set-field.sh <num> <Priority|Size|IssueType> <value>  # set the native field / org Issue Type; exit codes 10/11/12 signal label fallback, 13 (discovery failed) never
+.specnaut/scripts/backlog/set-field.sh <num> <Priority|Size|IssueType> <value>  # set the native field / org Issue Type; exit codes under Conventions
 .specnaut/scripts/backlog/ensure-labels.sh                                 # idempotently bootstrap the 7 Specnaut semantic labels (security/refactor/docs/tech-debt/dx/performance/dependency)
 ```
 
@@ -189,10 +189,8 @@ gh issue edit   <num> --repo <repo> --title "…" --body "…"
 When dispatched, the PO checks tool availability at runtime:
 
 1. If `mcp__github__*` tools are visible in the session, prefer them.
-2. Otherwise fall back to the shell scripts.
-
-This means a project can switch from shell to MCP (or back) without any
-Specnaut change — the skill is path-aware.
+2. Otherwise fall back to the shell scripts — so switching paths needs
+   no Specnaut change.
 
 ### Conventions
 
@@ -224,7 +222,9 @@ Specnaut change — the skill is path-aware.
   `10` = field / type absent (use the label), `11` = value unrecognised
   (Priority/Size: add the option, re-run; Issue Type: fix the call),
   `12` = issue not on the project / not in the repo, `13` = discovery
-  failed — **not** a fallback signal: retry or report it.
+  failed or the project could not be verified — **not** a fallback
+  signal: retry or report it. `2` = the project demonstrably does not
+  exist: fix `backlog-config.yml`.
 
 ### Prerequisites
 

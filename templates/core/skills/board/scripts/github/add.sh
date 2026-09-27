@@ -5,6 +5,17 @@
 #
 # Usage:
 #   add.sh "<title>" [body] [labels-csv] [--parent <num>]
+#
+# Exit codes:
+#   0   issue created — attaching and placing it are best-effort and only warn
+#   2   usage, backlog-config.yml missing / incomplete, or its project
+#       demonstrably does not exist (the owner's project listing succeeded
+#       without it)
+#   3   the --parent issue does not exist
+#   13  the project could not be verified (rate limit, bad token, any gh
+#       error) — NOT a fallback signal and not a config error: retry, or
+#       report it. Nothing was created
+#   other  `gh issue create` failed — nothing was created
 set -euo pipefail
 
 # Parse arguments before sourcing _config.sh so `--help` and unknown-flag

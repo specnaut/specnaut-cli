@@ -13,6 +13,16 @@
 #   <P>_OPT_NAMES      the option names in board order, comma-separated
 #   <P>_FIRST_OPT_ID   the first option's id — the safe default for a caller
 #                      that must place an item on a board it did not create
+#
+# Exit codes:
+#   0   fields emitted (an empty *_FIELD_ID is a real "absent")
+#   2   backlog-config.yml missing / incomplete, or its project demonstrably
+#       does not exist (the owner's project listing succeeded without it)
+#   13  the project could not be verified (rate limit, bad token, any gh
+#       error) — NOT a fallback signal and not a config error: retry, or
+#       report it
+#   other  a `gh` call failed during discovery — callers treat any non-zero
+#          as "discovery failed", never as "the fields are absent"
 set -euo pipefail
 
 # shellcheck source=./_config.sh

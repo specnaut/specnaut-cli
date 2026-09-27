@@ -10437,7 +10437,7 @@ project\` calls and read configuration from \`backlog-config.yml\`.
 .specnaut/scripts/backlog/move.sh <number> <Status>   # sets Project Status field
 .specnaut/scripts/backlog/clarify-comment.sh <num> "<question>"
 .specnaut/scripts/backlog/detect-fields.sh                                 # discover native fields (Status/Priority/Size/dates) → env lines
-.specnaut/scripts/backlog/set-field.sh <num> <Priority|Size|IssueType> <value>  # set the native field / org Issue Type; exit codes 10/11/12 signal label fallback, 13 (discovery failed) never
+.specnaut/scripts/backlog/set-field.sh <num> <Priority|Size|IssueType> <value>  # set the native field / org Issue Type; exit codes under Conventions
 .specnaut/scripts/backlog/ensure-labels.sh                                 # idempotently bootstrap the 7 Specnaut semantic labels (security/refactor/docs/tech-debt/dx/performance/dependency)
 \`\`\`
 
@@ -10453,10 +10453,8 @@ gh issue edit   <num> --repo <repo> --title "…" --body "…"
 When dispatched, the PO checks tool availability at runtime:
 
 1. If \`mcp__github__*\` tools are visible in the session, prefer them.
-2. Otherwise fall back to the shell scripts.
-
-This means a project can switch from shell to MCP (or back) without any
-Specnaut change — the skill is path-aware.
+2. Otherwise fall back to the shell scripts — so switching paths needs
+   no Specnaut change.
 
 ### Conventions
 
@@ -10488,7 +10486,9 @@ Specnaut change — the skill is path-aware.
   \`10\` = field / type absent (use the label), \`11\` = value unrecognised
   (Priority/Size: add the option, re-run; Issue Type: fix the call),
   \`12\` = issue not on the project / not in the repo, \`13\` = discovery
-  failed — **not** a fallback signal: retry or report it.
+  failed or the project could not be verified — **not** a fallback
+  signal: retry or report it. \`2\` = the project demonstrably does not
+  exist: fix \`backlog-config.yml\`.
 
 ### Prerequisites
 
@@ -11586,32 +11586,88 @@ export REPO REPO_OWNER REPO_NAME PROJECT_NUMBER
 # So the number is checked once, when the config is read, and the message says
 # which project numbers DO exist for the owner.
 #
+# Exit 2 ONLY on proof. A failed \`gh project view\` is not proof: a rate limit,
+# a network error, a 5xx or a missing scope all fail it too — and a
+# rate-limited view has been seen to print \`unknown owner type\`, which names
+# nothing. Proof is a listing that SUCCEEDED and does not contain the number.
+# Every other outcome exits 13, "could not verify", with \`gh\`'s own stderr
+# quoted so the cause is named by the tool that saw it rather than guessed
+# from a list of error texts — a list that misreports every fault it omits,
+# which is how this guard came to call a rate limit a wrong project number.
+# 13 carries the meaning \`set-field.sh\` already gives it: retry or report,
+# never a fallback signal, never a reason to edit the config.
+#
+# The listing is asked for closed projects and far past \`gh\`'s default page
+# of 30: a number missing from a partial listing proves nothing either.
+#
 # Skipped when \`gh\` is absent or unauthenticated: this must not turn a missing
 # tool into a config error, and the callers report those separately.
 require_project() {
   command -v gh >/dev/null 2>&1 || return 0
   gh auth status >/dev/null 2>&1 || return 0
-  if gh project view "\$PROJECT_NUMBER" --owner "\$REPO_OWNER" >/dev/null 2>&1; then
+  local view_err list_out list_err list_rc errfile available
+  # \`2>&1 >/dev/null\`: stderr into the substitution, stdout discarded.
+  if view_err="\$(gh project view "\$PROJECT_NUMBER" --owner "\$REPO_OWNER" 2>&1 >/dev/null)"; then
     return 0
   fi
-  echo "error: project #\$PROJECT_NUMBER does not resolve for owner '\$REPO_OWNER'." >&2
-  echo "  configured in: \$CONFIG" >&2
-  local available
-  # \`grep -o\` per occurrence, not \`sed -n s/.*"number":\\\\([0-9]*\\\\).*/\` — \`.*\`
-  # is greedy, so on \`gh\`'s single-line JSON that captures only the LAST
-  # project and the message names one number while claiming to list them all.
-  # \`|| true\` because a no-match \`grep\` exits 1, and a failed substitution is
-  # the assignment's status: under \`set -e\` this function would die here
-  # instead of reaching the fallback message two lines down.
-  available="\$(gh project list --owner "\$REPO_OWNER" --format json 2>/dev/null |
-    grep -o '"number"[[:space:]]*:[[:space:]]*[0-9]*' |
-    sed 's/.*[^0-9]//' | tr '\\n' ' ' || true)"
-  if [ -n "\$available" ]; then
-    echo "  projects that exist for '\$REPO_OWNER': \$available" >&2
-  else
-    echo "  could not list this owner's projects — check 'gh auth status' has the 'project' scope." >&2
+
+  # The listing's exit status is captured APART from its output. An earlier
+  # version piped straight into \`grep … || true\`, which folded "the listing
+  # failed" and "the listing is empty" into the same empty string — so a
+  # rate-limited listing was reported as a scope problem, and either one as
+  # proof the project does not exist. stderr goes to a file because it has to
+  # be quoted separately from the JSON that is parsed.
+  errfile="\$(mktemp "\${TMPDIR:-/tmp}/gh-project-list.XXXXXX")"
+  list_rc=0
+  list_out="\$(gh project list --owner "\$REPO_OWNER" --closed --limit 1000 \\
+    --format json 2>"\$errfile")" || list_rc=\$?
+  list_err="\$(cat "\$errfile")"
+  rm -f "\$errfile"
+
+  if [ "\$list_rc" -eq 0 ]; then
+    # \`grep -o\` per occurrence, not \`sed -n s/.*"number":\\\\([0-9]*\\\\).*/\` —
+    # \`.*\` is greedy, so on \`gh\`'s single-line JSON that captures only the
+    # LAST project. \`|| true\` because a no-match \`grep\` exits 1 under pipefail,
+    # and here "no match" is a real answer: zero projects.
+    available="\$(printf '%s' "\$list_out" |
+      grep -o '"number"[[:space:]]*:[[:space:]]*[0-9]*' |
+      sed 's/.*[^0-9]//' | tr '\\n' ' ' || true)"
+    case " \$available " in
+      *" \$PROJECT_NUMBER "*) ;; # listed: the view failure proves nothing
+      *)
+        echo "error: project #\$PROJECT_NUMBER does not resolve for owner '\$REPO_OWNER'." >&2
+        echo "  configured in: \$CONFIG" >&2
+        if [ -n "\$available" ]; then
+          echo "  projects that exist for '\$REPO_OWNER': \$available" >&2
+        else
+          echo "  no projects are visible to this token for '\$REPO_OWNER'." >&2
+        fi
+        exit 2
+        ;;
+    esac
   fi
-  exit 2
+
+  echo "error: could not verify project #\$PROJECT_NUMBER for owner '\$REPO_OWNER' — gh failed." >&2
+  echo "  This is not evidence the configured number is wrong. Retry; report it if it persists." >&2
+  echo "  gh project view said:" >&2
+  _quote_gh_stderr "\$view_err"
+  if [ "\$list_rc" -eq 0 ]; then
+    echo "  gh project list succeeded and lists #\$PROJECT_NUMBER, so the project exists." >&2
+  else
+    echo "  could not list this owner's projects either (gh exit \$list_rc); gh project list said:" >&2
+    _quote_gh_stderr "\$list_err"
+  fi
+  exit 13
+}
+
+# \`gh\`'s stderr, verbatim and indented, or a note that it printed nothing — an
+# empty quote would read as a formatting slip rather than as a silent \`gh\`.
+_quote_gh_stderr() {
+  if [ -n "\${1:-}" ]; then
+    printf '%s\\n' "\$1" | sed 's/^/    /' >&2
+  else
+    echo "    (nothing)" >&2
+  fi
 }
 
 # Browser URL for one item, per \`backlog-reference-contract\`. Prints nothing
@@ -11760,6 +11816,17 @@ gh issue view "\$1" --repo "\$REPO" --comments
 #
 # Usage:
 #   add.sh "<title>" [body] [labels-csv] [--parent <num>]
+#
+# Exit codes:
+#   0   issue created — attaching and placing it are best-effort and only warn
+#   2   usage, backlog-config.yml missing / incomplete, or its project
+#       demonstrably does not exist (the owner's project listing succeeded
+#       without it)
+#   3   the --parent issue does not exist
+#   13  the project could not be verified (rate limit, bad token, any gh
+#       error) — NOT a fallback signal and not a config error: retry, or
+#       report it. Nothing was created
+#   other  \`gh issue create\` failed — nothing was created
 set -euo pipefail
 
 # Parse arguments before sourcing _config.sh so \`--help\` and unknown-flag
@@ -11933,6 +12000,17 @@ fi
 # \`gh project item-edit\` is the CLI wrapper, used below.
 #
 # Usage: move.sh <number> <Status>
+#
+# Exit codes:
+#   0   moved
+#   1   unknown Status, or the issue is not on the project
+#   2   usage, backlog-config.yml missing / incomplete, or its project
+#       demonstrably does not exist (the owner's project listing succeeded
+#       without it)
+#   13  the project could not be verified (rate limit, bad token, any gh
+#       error) — NOT a fallback signal and not a config error: retry, or
+#       report it
+#   other  a later \`gh\` call failed; its own exit code is passed through
 set -euo pipefail
 
 # shellcheck source=./_config.sh
@@ -12316,6 +12394,16 @@ gh issue comment "\$1" --repo "\$REPO" --body "\$2"
 #   <P>_OPT_NAMES      the option names in board order, comma-separated
 #   <P>_FIRST_OPT_ID   the first option's id — the safe default for a caller
 #                      that must place an item on a board it did not create
+#
+# Exit codes:
+#   0   fields emitted (an empty *_FIELD_ID is a real "absent")
+#   2   backlog-config.yml missing / incomplete, or its project demonstrably
+#       does not exist (the owner's project listing succeeded without it)
+#   13  the project could not be verified (rate limit, bad token, any gh
+#       error) — NOT a fallback signal and not a config error: retry, or
+#       report it
+#   other  a \`gh\` call failed during discovery — callers treat any non-zero
+#          as "discovery failed", never as "the fields are absent"
 set -euo pipefail
 
 # shellcheck source=./_config.sh
@@ -12565,10 +12653,12 @@ echo "PROJECT_NODE_ID=\$PROJECT_NODE_ID"
 #   10  no such field / type on the project / org (caller should fall back to a label)
 #   11  field / type present but the value is unrecognised (Priority/Size/IssueType only — date/number axes defer to gh for value validation)
 #   12  issue is not on the project / not in the repo
-#   13  field discovery FAILED (rate limit, bad token, any gh error) — NOT a
-#       fallback signal: the field may well exist, so the caller must not apply
-#       a label; retry, or report the value as not persisted
-#   2   backlog-config.yml missing / incomplete, or its project does not resolve
+#   13  field discovery FAILED, or the project could not be verified (rate
+#       limit, bad token, any gh error) — NOT a fallback signal: the field may
+#       well exist, so the caller must not apply a label; retry, or report the
+#       value as not persisted. Never a reason to edit backlog-config.yml
+#   2   backlog-config.yml missing / incomplete, or its project demonstrably
+#       does not exist (the owner's project listing succeeded without it)
 #   1   usage / unexpected error
 set -euo pipefail
 

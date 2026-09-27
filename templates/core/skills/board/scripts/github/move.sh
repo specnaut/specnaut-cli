@@ -7,6 +7,17 @@
 # `gh project item-edit` is the CLI wrapper, used below.
 #
 # Usage: move.sh <number> <Status>
+#
+# Exit codes:
+#   0   moved
+#   1   unknown Status, or the issue is not on the project
+#   2   usage, backlog-config.yml missing / incomplete, or its project
+#       demonstrably does not exist (the owner's project listing succeeded
+#       without it)
+#   13  the project could not be verified (rate limit, bad token, any gh
+#       error) — NOT a fallback signal and not a config error: retry, or
+#       report it
+#   other  a later `gh` call failed; its own exit code is passed through
 set -euo pipefail
 
 # shellcheck source=./_config.sh

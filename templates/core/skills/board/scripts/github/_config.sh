@@ -50,32 +50,88 @@ export REPO REPO_OWNER REPO_NAME PROJECT_NUMBER
 # So the number is checked once, when the config is read, and the message says
 # which project numbers DO exist for the owner.
 #
+# Exit 2 ONLY on proof. A failed `gh project view` is not proof: a rate limit,
+# a network error, a 5xx or a missing scope all fail it too — and a
+# rate-limited view has been seen to print `unknown owner type`, which names
+# nothing. Proof is a listing that SUCCEEDED and does not contain the number.
+# Every other outcome exits 13, "could not verify", with `gh`'s own stderr
+# quoted so the cause is named by the tool that saw it rather than guessed
+# from a list of error texts — a list that misreports every fault it omits,
+# which is how this guard came to call a rate limit a wrong project number.
+# 13 carries the meaning `set-field.sh` already gives it: retry or report,
+# never a fallback signal, never a reason to edit the config.
+#
+# The listing is asked for closed projects and far past `gh`'s default page
+# of 30: a number missing from a partial listing proves nothing either.
+#
 # Skipped when `gh` is absent or unauthenticated: this must not turn a missing
 # tool into a config error, and the callers report those separately.
 require_project() {
   command -v gh >/dev/null 2>&1 || return 0
   gh auth status >/dev/null 2>&1 || return 0
-  if gh project view "$PROJECT_NUMBER" --owner "$REPO_OWNER" >/dev/null 2>&1; then
+  local view_err list_out list_err list_rc errfile available
+  # `2>&1 >/dev/null`: stderr into the substitution, stdout discarded.
+  if view_err="$(gh project view "$PROJECT_NUMBER" --owner "$REPO_OWNER" 2>&1 >/dev/null)"; then
     return 0
   fi
-  echo "error: project #$PROJECT_NUMBER does not resolve for owner '$REPO_OWNER'." >&2
-  echo "  configured in: $CONFIG" >&2
-  local available
-  # `grep -o` per occurrence, not `sed -n s/.*"number":\\([0-9]*\\).*/` — `.*`
-  # is greedy, so on `gh`'s single-line JSON that captures only the LAST
-  # project and the message names one number while claiming to list them all.
-  # `|| true` because a no-match `grep` exits 1, and a failed substitution is
-  # the assignment's status: under `set -e` this function would die here
-  # instead of reaching the fallback message two lines down.
-  available="$(gh project list --owner "$REPO_OWNER" --format json 2>/dev/null |
-    grep -o '"number"[[:space:]]*:[[:space:]]*[0-9]*' |
-    sed 's/.*[^0-9]//' | tr '\n' ' ' || true)"
-  if [ -n "$available" ]; then
-    echo "  projects that exist for '$REPO_OWNER': $available" >&2
-  else
-    echo "  could not list this owner's projects — check 'gh auth status' has the 'project' scope." >&2
+
+  # The listing's exit status is captured APART from its output. An earlier
+  # version piped straight into `grep … || true`, which folded "the listing
+  # failed" and "the listing is empty" into the same empty string — so a
+  # rate-limited listing was reported as a scope problem, and either one as
+  # proof the project does not exist. stderr goes to a file because it has to
+  # be quoted separately from the JSON that is parsed.
+  errfile="$(mktemp "${TMPDIR:-/tmp}/gh-project-list.XXXXXX")"
+  list_rc=0
+  list_out="$(gh project list --owner "$REPO_OWNER" --closed --limit 1000 \
+    --format json 2>"$errfile")" || list_rc=$?
+  list_err="$(cat "$errfile")"
+  rm -f "$errfile"
+
+  if [ "$list_rc" -eq 0 ]; then
+    # `grep -o` per occurrence, not `sed -n s/.*"number":\\([0-9]*\\).*/` —
+    # `.*` is greedy, so on `gh`'s single-line JSON that captures only the
+    # LAST project. `|| true` because a no-match `grep` exits 1 under pipefail,
+    # and here "no match" is a real answer: zero projects.
+    available="$(printf '%s' "$list_out" |
+      grep -o '"number"[[:space:]]*:[[:space:]]*[0-9]*' |
+      sed 's/.*[^0-9]//' | tr '\n' ' ' || true)"
+    case " $available " in
+      *" $PROJECT_NUMBER "*) ;; # listed: the view failure proves nothing
+      *)
+        echo "error: project #$PROJECT_NUMBER does not resolve for owner '$REPO_OWNER'." >&2
+        echo "  configured in: $CONFIG" >&2
+        if [ -n "$available" ]; then
+          echo "  projects that exist for '$REPO_OWNER': $available" >&2
+        else
+          echo "  no projects are visible to this token for '$REPO_OWNER'." >&2
+        fi
+        exit 2
+        ;;
+    esac
   fi
-  exit 2
+
+  echo "error: could not verify project #$PROJECT_NUMBER for owner '$REPO_OWNER' — gh failed." >&2
+  echo "  This is not evidence the configured number is wrong. Retry; report it if it persists." >&2
+  echo "  gh project view said:" >&2
+  _quote_gh_stderr "$view_err"
+  if [ "$list_rc" -eq 0 ]; then
+    echo "  gh project list succeeded and lists #$PROJECT_NUMBER, so the project exists." >&2
+  else
+    echo "  could not list this owner's projects either (gh exit $list_rc); gh project list said:" >&2
+    _quote_gh_stderr "$list_err"
+  fi
+  exit 13
+}
+
+# `gh`'s stderr, verbatim and indented, or a note that it printed nothing — an
+# empty quote would read as a formatting slip rather than as a silent `gh`.
+_quote_gh_stderr() {
+  if [ -n "${1:-}" ]; then
+    printf '%s\n' "$1" | sed 's/^/    /' >&2
+  else
+    echo "    (nothing)" >&2
+  fi
 }
 
 # Browser URL for one item, per `backlog-reference-contract`. Prints nothing
