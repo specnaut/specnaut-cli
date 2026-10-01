@@ -1,6 +1,19 @@
 # Upgrading Specnaut
 
-## 4.6.x → 4.7.0
+## 4.6.x → 5.0.0
+
+### Technical decisions are no longer put to you
+
+At the end of `plan`, architecture, design patterns, layering, security hardening and performance
+trade-offs are now settled by the expert agents — `architect-expert`, `security-expert`, and
+`performance-expert` when the plan has a hot path — against Specnaut's intent: long-lived software,
+clean, SOLID, secure by default. The plan stop reports what they decided and why; it asks only what
+only you can answer — business rules, scope, and anything irreversible, destructive, breaking a
+public surface, or bringing in a new external service, vendor or cost. When none of that is open,
+there is no stop at all: the plan is reported and the chain goes on. Fix loops in `implement` and
+`review` no longer ask you to choose between technical fixes either.
+
+Nothing to do on upgrade: the `chain-stops` block of your `AGENTS.md` is refreshed in place.
 
 ### The chain now merges and pushes on its own
 

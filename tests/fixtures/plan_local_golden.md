@@ -9,7 +9,8 @@ You **MUST** consider the user input before proceeding (if not empty).
 ## What this phase is for
 
 **One planning document per feature**: what it does, the architecture it must obey, and the
-questions only the user can answer. It asks the question that decides whether a feature ships once
+questions only the user can answer — for **long-lived** software: clean, SOLID, secure by default,
+never a shortcut that holds until production. It asks the question that decides whether a feature ships once
 or four times: **what are this feature's decisions, and where does each one live?** A rule whose
 home is free gets spelled twice, and finding that at review means rebuilding.
 
@@ -145,30 +146,26 @@ carries the eight questions they are asked and the rule that their findings land
 Not optional, not deferrable to `review`: architecture found at review time is architecture
 rebuilt.
 
-### 8. STOP — the user answers before any code exists
+### 8. The plan stop — ask only what only the user can answer
 
-**Mandatory. Never skipped, never inferred, never assumed from silence.** It is the chain's one
-mandatory stop: under the default `merge: auto` nothing after it asks again — the branch is merged,
+It is the chain's last
+chance to ask: under the default `merge: auto` nothing after it asks again — the branch is merged,
 pushed and its item closed. **Say so**, and ask here what autopilot would otherwise settle alone.
-Present, in this order:
+**A technical fork is never a question**: architecture, patterns, layering, security hardening and
+performance trade-offs were settled at step 6 by the expert seats (`phases/plan-audits.md`, "Who
+decides"). Present, in this order:
 
-1. **The architecture, as a proposal with its alternatives.** Name what you rejected and why. A
-   single option presented as settled gets approved by default — the same as not asking.
-2. **Both audits' findings — architecture AND security** — and what you did with each: changed the
-   plan, or accepted the objection with a reason. Never as a formality that passed, never folded
-   together.
-3. **The open questions** — business rules, thresholds, what happens to existing data, anything
-   where two readings lead to materially different work — **and what autopilot would decide
-   alone**: the base branch, anything irreversible or destructive, changes to a public surface, the
-   acceptance outcome. Put them per the
-   `response-style-contract` skill, ordered so the answer that invalidates the most others comes
-   first.
-4. **Anything you decided yourself** because the code or a standing decision already answered it —
-   one line each, so a wrong assumption is visible rather than buried.
+1. **The architecture as decided**, with what was rejected and why — a report, not a vote.
+2. **Both audits' findings — architecture AND security** — and what was done with each, separately.
+3. **The open questions — only what only the user can answer**: business rules, thresholds, what
+   happens to existing data, scope — and always: the base branch, anything irreversible or
+   destructive, breaking a public surface, a new external service, vendor or cost. Put them per the
+   `response-style-contract` skill, the answer that invalidates the most others first.
+4. **Anything you decided yourself**, one line each, so a wrong assumption is visible.
 
-Record every answer **in `plan.md` as a settled decision, with its date**. If there is genuinely
-nothing to ask, say so and present the architecture anyway: **the user's veto on the architecture is
-the point of this stop, not the questions.**
+Record every answer **in `plan.md` as a settled decision, with its date**. **Nothing open in 3 →
+no stop**: present 1, 2 and 4 as a report and invoke `tasks` in the same turn. Never stop to have a
+recommendation confirmed — that is the expert seat's job, already done.
 
 ### 9. Commit, then INVOKE `tasks` — same turn
 

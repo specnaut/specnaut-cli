@@ -160,10 +160,11 @@ plan → tasks → implement → review → merge
       → STOP 1
 ```
 
-**Autopilot is the default: the chain stops once, at the end of `plan`** — the architecture is
-presented with its alternatives, both audits' findings are presented separately, and the open
-questions are asked. Always. After that answer it runs to a merged, **pushed** base branch and a
-closed backlog item without asking again.
+**Autopilot is the default: the chain stops at most once, at the end of `plan`**, and only to ask
+what only the user can answer — business rules, scope, and anything irreversible, destructive,
+public-breaking or costly. Architecture, security and performance forks are settled by the expert
+seats and reported, never asked. Then it runs to a merged, **pushed** base branch and a closed
+backlog item without asking again.
 
 A second stop — the review verdict as the merge request, asked once — exists only when
 `.specnaut/workflow.yml` says `merge: manual`, or the run says so (`--manual-merge`, "stop before
@@ -179,7 +180,7 @@ Every other boundary is crossed by invoking the next phase yourself, in the same
   → discovery dialogue only if the brief is too fuzzy to plan
   → writes plan.md (one document)
   → architecture + security audits run concurrently on the plan
-  → STOP 1 — architecture proposal, audit findings, the open questions
+  → STOP 1 — decided architecture, audit findings, the questions only you can answer
   → /specnaut tasks       (same turn as the last answer)
   → /specnaut implement   (same turn)
   → /specnaut review      (same turn)

@@ -171,10 +171,11 @@ plan → tasks → implement → review → merge
       → STOP 1
 \`\`\`
 
-**Autopilot is the default: the chain stops once, at the end of \`plan\`** — the architecture is
-presented with its alternatives, both audits' findings are presented separately, and the open
-questions are asked. Always. After that answer it runs to a merged, **pushed** base branch and a
-closed backlog item without asking again.
+**Autopilot is the default: the chain stops at most once, at the end of \`plan\`**, and only to ask
+what only the user can answer — business rules, scope, and anything irreversible, destructive,
+public-breaking or costly. Architecture, security and performance forks are settled by the expert
+seats and reported, never asked. Then it runs to a merged, **pushed** base branch and a closed
+backlog item without asking again.
 
 A second stop — the review verdict as the merge request, asked once — exists only when
 \`.specnaut/workflow.yml\` says \`merge: manual\`, or the run says so (\`--manual-merge\`, "stop before
@@ -190,7 +191,7 @@ Every other boundary is crossed by invoking the next phase yourself, in the same
   → discovery dialogue only if the brief is too fuzzy to plan
   → writes plan.md (one document)
   → architecture + security audits run concurrently on the plan
-  → STOP 1 — architecture proposal, audit findings, the open questions
+  → STOP 1 — decided architecture, audit findings, the questions only you can answer
   → /specnaut tasks       (same turn as the last answer)
   → /specnaut implement   (same turn)
   → /specnaut review      (same turn)
@@ -223,7 +224,8 @@ You **MUST** consider the user input before proceeding (if not empty).
 ## What this phase is for
 
 **One planning document per feature**: what it does, the architecture it must obey, and the
-questions only the user can answer. It asks the question that decides whether a feature ships once
+questions only the user can answer — for **long-lived** software: clean, SOLID, secure by default,
+never a shortcut that holds until production. It asks the question that decides whether a feature ships once
 or four times: **what are this feature's decisions, and where does each one live?** A rule whose
 home is free gets spelled twice, and finding that at review means rebuilding.
 
@@ -376,30 +378,26 @@ carries the eight questions they are asked and the rule that their findings land
 Not optional, not deferrable to \`review\`: architecture found at review time is architecture
 rebuilt.
 
-### 8. STOP — the user answers before any code exists
+### 8. The plan stop — ask only what only the user can answer
 
-**Mandatory. Never skipped, never inferred, never assumed from silence.** It is the chain's one
-mandatory stop: under the default \`merge: auto\` nothing after it asks again — the branch is merged,
+It is the chain's last
+chance to ask: under the default \`merge: auto\` nothing after it asks again — the branch is merged,
 pushed and its item closed. **Say so**, and ask here what autopilot would otherwise settle alone.
-Present, in this order:
+**A technical fork is never a question**: architecture, patterns, layering, security hardening and
+performance trade-offs were settled at step 6 by the expert seats (\`phases/plan-audits.md\`, "Who
+decides"). Present, in this order:
 
-1. **The architecture, as a proposal with its alternatives.** Name what you rejected and why. A
-   single option presented as settled gets approved by default — the same as not asking.
-2. **Both audits' findings — architecture AND security** — and what you did with each: changed the
-   plan, or accepted the objection with a reason. Never as a formality that passed, never folded
-   together.
-3. **The open questions** — business rules, thresholds, what happens to existing data, anything
-   where two readings lead to materially different work — **and what autopilot would decide
-   alone**: the base branch, anything irreversible or destructive, changes to a public surface, the
-   acceptance outcome. Put them per the
-   \`response-style-contract\` skill, ordered so the answer that invalidates the most others comes
-   first.
-4. **Anything you decided yourself** because the code or a standing decision already answered it —
-   one line each, so a wrong assumption is visible rather than buried.
+1. **The architecture as decided**, with what was rejected and why — a report, not a vote.
+2. **Both audits' findings — architecture AND security** — and what was done with each, separately.
+3. **The open questions — only what only the user can answer**: business rules, thresholds, what
+   happens to existing data, scope — and always: the base branch, anything irreversible or
+   destructive, breaking a public surface, a new external service, vendor or cost. Put them per the
+   \`response-style-contract\` skill, the answer that invalidates the most others first.
+4. **Anything you decided yourself**, one line each, so a wrong assumption is visible.
 
-Record every answer **in \`plan.md\` as a settled decision, with its date**. If there is genuinely
-nothing to ask, say so and present the architecture anyway: **the user's veto on the architecture is
-the point of this stop, not the questions.**
+Record every answer **in \`plan.md\` as a settled decision, with its date**. **Nothing open in 3 →
+no stop**: present 1, 2 and 4 as a report and invoke \`tasks\` in the same turn. Never stop to have a
+recommendation confirmed — that is the expert seat's job, already done.
 
 ### 9. Commit, then INVOKE \`tasks\` — same turn
 
@@ -457,9 +455,9 @@ Loaded by \`phases/plan.md\` at step 6. Both audits run **before a single line o
 dispatched **in the same message** so they execute concurrently. They judge different things and
 neither substitutes for the other.
 
-**Both are read-only and advisory.** They do not veto — the user does, at the stop that ends \`plan\`.
-But their findings go **into \`plan.md\`**: either the plan changes, or it records why the objection
-was accepted. An audit whose output is not written down did not happen. A clean verdict is written
+**Both are read-only and advisory, and they are who settles the technical forks** — see "Who
+decides" below. Their findings go **into \`plan.md\`**: either the plan changes, or it records why the
+objection was accepted. An audit whose output is not written down did not happen. A clean verdict is written
 down **with its coverage**, because a clean verdict is worth exactly what it covered.
 
 ## 🔒 The architecture audit
@@ -498,6 +496,32 @@ questions, in this order:
    access check, a field that should never leave the server.
 4. **What does this let an authenticated stranger do to somebody else's account?** In writing.
    "Nothing" is acceptable only when it names what was checked.
+
+## ⚡ The performance seat — when the plan has a hot path
+
+When the plan's technical context names a scale constraint, a hot path, a bulk job or a query over
+an unbounded set, dispatch \`performance-expert\` on \`plan.md\` in the same message as the other two.
+Ask what grows with the data, what runs per request, and what the plan does when the set is 100×
+today's.
+
+## ⚖ Who decides — the seats, not the user
+
+Specnaut builds **long-lived** software: clean code, SOLID boundaries, sound design patterns, secure
+by default. A technical fork is settled against that intent, not put to a vote:
+
+- **Architecture, patterns, layering, naming, security hardening, performance trade-offs** — the
+  seats rank the options, the plan takes the top one, and \`plan.md\` records it as a decision with
+  the rejected alternatives and why. Presented at the plan stop as a report, **never asked**. Asking
+  the user to confirm a recommendation an expert already made is a stop with nothing behind it.
+- **When two seats disagree**, the reading better for the long-term health of the code wins:
+  security, then maintainability, then performance, then speed of delivery. Record the conflict and
+  the winner in \`plan.md\`.
+- **Escalate to the user only** when the fork changes what the product does, or falls in the
+  always-ask class of \`phases/plan.md\` step 8: the base branch, anything irreversible or
+  destructive, breaking a public surface, a new external service, vendor or cost.
+
+The same holds after the plan: a fix loop in \`implement\` or \`review\` never asks the user to choose
+between technical fixes.
 `,
     executable: false,
     backend: null,
@@ -1625,7 +1649,9 @@ Batch the cheap ones into a single dispatch. Ten one-line fixes are one commit
 and one round trip, not ten.
 
 Repeat until only MEDIUM / LOW remain OR a fix has cycled twice without
-resolution — in the latter case, stop and escalate to the user.
+resolution — in the latter case, stop and escalate to the user as a blocker.
+Choosing *between* technical fixes is never the user's call: the seat that
+found the issue ranks the options and the developer applies the top one.
 
 **Do not ask the user between cycles.** The fix loop runs before the merge; they
 asked for a working branch, not for a vote on every round.
@@ -3012,13 +3038,13 @@ artefacts indicate the user is re-running a single step.
 plan → tasks → implement → review → merge → push
   ▲                                   ▲
   STOP 1                              STOP 2
-  (always, at the end of plan)        (only under merge: manual)
+  (end of plan, if a question is open) (only under merge: manual)
 \`\`\`
 
 ## Autopilot is the default. There is ONE stop, and a second only on request.
 
-1. **The end of \`plan\`.** Always — \`phases/plan.md\` step 8. **This is where the work is decided**;
-   after it, the chain runs to a merged, pushed base branch without asking again.
+1. **The end of \`plan\`** (\`phases/plan.md\` step 8), **only if something only the user can answer is
+   open**. Expert seats settle technical forks; nothing open → a report, then \`tasks\`.
 2. **The review verdict — only under \`manual\`.** The merge mode is read **here and nowhere
    else**, per-run instruction first: \`--manual-merge\`, or "stop before merging" / "do not push",
    means \`manual\`; "merge it" means \`auto\`. Otherwise the project file decides:
@@ -3063,11 +3089,11 @@ None of these is a reason to stop, and each one gets used as one:
 | "The audits found a lot — re-confirm scope?" | The findings were folded into the plan and the plan was approved. That approval covers what the plan now says. |
 | "The user has been checkpointing each step." | Answering a question is not a request to be asked another one. |
 | "Someone should read the diff first." | Then the project sets \`merge: manual\`. |
+| "Confirm the recommended design?" | The expert seats decided it. Report it. |
 
-Asking again after STOP 1 **re-litigates a decision the user already made**, and it costs them the
-thing the chain exists to give: they approve an architecture once, and get an implemented, reviewed
-branch back. A chain that halts at every phase boundary is a slower manual workflow wearing a
-skill's name.
+Asking again after STOP 1 **re-litigates a decision already made**, and costs the thing the chain
+exists to give: a brief in, an implemented, reviewed, merged branch out. A chain that halts at every
+boundary is a slower manual workflow wearing a skill's name.
 
 ## Per-phase behavior
 
@@ -29303,11 +29329,15 @@ _(Naming, testing, commits, branches.)_
 
 *Owned by Specnaut — this section is not a placeholder to fill in. Edit the rest freely.*
 
-\`plan → tasks → implement → review → merge → push\`. It stops once by default:
+Specnaut builds **long-lived** software — clean, SOLID, secure by default — and a technical decision
+is taken against that intent by whoever is expert in it, not handed back to the user.
 
-1. **The end of \`plan\`** — the architecture is presented with the alternatives that were rejected,
-   both audits' findings are presented separately, and the open questions are asked. This is where
-   the work is decided.
+\`plan → tasks → implement → review → merge → push\`. It stops at most once by default:
+
+1. **The end of \`plan\`** — only to ask what only the user can answer: business rules, scope, and
+   anything irreversible, destructive, public-breaking or costly. Architecture, security and
+   performance forks are settled by the expert seats (\`architect-expert\`, \`security-expert\`,
+   \`performance-expert\`) and reported, never put to a vote. Nothing open → no stop.
 2. **The review verdict — only under \`merge: manual\`** in \`.specnaut/workflow.yml\`, or when the
    run says so (\`--manual-merge\`, "stop before merging"). Asked once; the yes covers the push.
    Otherwise the chain merges, pushes and closes the item without asking.

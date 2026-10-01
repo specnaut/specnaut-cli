@@ -5,7 +5,8 @@ import { skillDocName } from "../../src/domain/core_bundle.ts";
 
 /**
  * #458 — the chain must not stall between phases. Since autopilot became the
- * default it stops once, at the plan; the review verdict is a second stop only
+ * default it stops at most once, at the plan, and only for a question the user
+ * alone can answer (#630); the review verdict is a second stop only
  * under `merge: manual`.
  *
  * The rule is written in TWO places on purpose, and the reason is mechanical:
@@ -137,10 +138,10 @@ Deno.test("review, merge and merge-close follow the merge mode instead of always
 
 Deno.test("the plan stop announces that nothing after it asks again", () => {
   const { content } = phase("plan");
-  assertStringIncludes(content, "the chain's one\nmandatory stop");
+  assertStringIncludes(content, "the chain's last\nchance to ask");
   assertStringIncludes(content, "ask here what autopilot would otherwise settle alone");
   // D10: what autopilot would decide alone is named, and discovery needs an acceptance check.
-  assertStringIncludes(content, "the base branch, anything irreversible or destructive");
+  assertStringIncludes(content, "always: the base branch, anything irreversible or");
   assertStringIncludes(content, "how acceptance is checked");
 });
 
@@ -192,4 +193,40 @@ Deno.test("workflow.yml ships with merge: auto as the scaffolded default", () =>
   if (!e) throw new Error("missing .specnaut/workflow.yml entry");
   assert(/^merge: auto$/m.test(e.content), "workflow.yml must default to `merge: auto`");
   assertStringIncludes(e.content, "merge: manual");
+});
+
+/**
+ * #630 — technical forks are settled by the expert seats, not put to the user.
+ * The rule lives in plan-audits.md ("Who decides"); plan.md, auto-chain.md and
+ * the always-loaded AGENTS.md block point at it, and review.md applies it to
+ * the fix loop.
+ */
+Deno.test("technical forks are decided by the expert seats, never asked (#630)", () => {
+  const audits = phase("plan-audits").content;
+  assertStringIncludes(audits, "## ⚖ Who decides — the seats, not the user");
+  assertStringIncludes(audits, "**never asked**");
+  // The tie-break between seats is stated, in order.
+  assertStringIncludes(
+    audits,
+    "security, then maintainability, then performance, then speed of delivery",
+  );
+  // A performance seat joins when the plan has a hot path.
+  assertStringIncludes(audits, "dispatch `performance-expert` on `plan.md`");
+
+  const plan = phase("plan").content;
+  assertStringIncludes(plan, "**A technical fork is never a question**");
+  assertStringIncludes(plan, "**Nothing open in 3 →\nno stop**");
+  assertStringIncludes(plan, "a new external service, vendor or cost");
+  // The intent the seats decide against.
+  assertStringIncludes(plan, "clean, SOLID, secure by default");
+
+  const chain = phase("auto-chain").content;
+  assertStringIncludes(chain, "**only if something only the user can answer is\n   open**");
+
+  const review = phase("review").content;
+  assertStringIncludes(review, "Choosing *between* technical fixes is never the user's call");
+
+  const { content: agents } = rootAgents();
+  assertStringIncludes(agents, "never put to a vote. Nothing open → no stop.");
+  assertStringIncludes(agents, "**long-lived** software — clean, SOLID, secure by default");
 });

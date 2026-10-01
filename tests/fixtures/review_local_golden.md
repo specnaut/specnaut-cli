@@ -56,7 +56,9 @@ Batch the cheap ones into a single dispatch. Ten one-line fixes are one commit
 and one round trip, not ten.
 
 Repeat until only MEDIUM / LOW remain OR a fix has cycled twice without
-resolution — in the latter case, stop and escalate to the user.
+resolution — in the latter case, stop and escalate to the user as a blocker.
+Choosing *between* technical fixes is never the user's call: the seat that
+found the issue ranks the options and the developer applies the top one.
 
 **Do not ask the user between cycles.** The fix loop runs before the merge; they
 asked for a working branch, not for a vote on every round.

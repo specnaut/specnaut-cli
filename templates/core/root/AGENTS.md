@@ -24,11 +24,15 @@ _(Naming, testing, commits, branches.)_
 
 *Owned by Specnaut — this section is not a placeholder to fill in. Edit the rest freely.*
 
-`plan → tasks → implement → review → merge → push`. It stops once by default:
+Specnaut builds **long-lived** software — clean, SOLID, secure by default — and a technical decision
+is taken against that intent by whoever is expert in it, not handed back to the user.
 
-1. **The end of `plan`** — the architecture is presented with the alternatives that were rejected,
-   both audits' findings are presented separately, and the open questions are asked. This is where
-   the work is decided.
+`plan → tasks → implement → review → merge → push`. It stops at most once by default:
+
+1. **The end of `plan`** — only to ask what only the user can answer: business rules, scope, and
+   anything irreversible, destructive, public-breaking or costly. Architecture, security and
+   performance forks are settled by the expert seats (`architect-expert`, `security-expert`,
+   `performance-expert`) and reported, never put to a vote. Nothing open → no stop.
 2. **The review verdict — only under `merge: manual`** in `.specnaut/workflow.yml`, or when the
    run says so (`--manual-merge`, "stop before merging"). Asked once; the yes covers the push.
    Otherwise the chain merges, pushes and closes the item without asking.

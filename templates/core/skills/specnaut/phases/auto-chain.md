@@ -10,13 +10,13 @@ artefacts indicate the user is re-running a single step.
 plan → tasks → implement → review → merge → push
   ▲                                   ▲
   STOP 1                              STOP 2
-  (always, at the end of plan)        (only under merge: manual)
+  (end of plan, if a question is open) (only under merge: manual)
 ```
 
 ## Autopilot is the default. There is ONE stop, and a second only on request.
 
-1. **The end of `plan`.** Always — `phases/plan.md` step 8. **This is where the work is decided**;
-   after it, the chain runs to a merged, pushed base branch without asking again.
+1. **The end of `plan`** (`phases/plan.md` step 8), **only if something only the user can answer is
+   open**. Expert seats settle technical forks; nothing open → a report, then `tasks`.
 2. **The review verdict — only under `manual`.** The merge mode is read **here and nowhere
    else**, per-run instruction first: `--manual-merge`, or "stop before merging" / "do not push",
    means `manual`; "merge it" means `auto`. Otherwise the project file decides:
@@ -61,11 +61,11 @@ None of these is a reason to stop, and each one gets used as one:
 | "The audits found a lot — re-confirm scope?" | The findings were folded into the plan and the plan was approved. That approval covers what the plan now says. |
 | "The user has been checkpointing each step." | Answering a question is not a request to be asked another one. |
 | "Someone should read the diff first." | Then the project sets `merge: manual`. |
+| "Confirm the recommended design?" | The expert seats decided it. Report it. |
 
-Asking again after STOP 1 **re-litigates a decision the user already made**, and it costs them the
-thing the chain exists to give: they approve an architecture once, and get an implemented, reviewed
-branch back. A chain that halts at every phase boundary is a slower manual workflow wearing a
-skill's name.
+Asking again after STOP 1 **re-litigates a decision already made**, and costs the thing the chain
+exists to give: a brief in, an implemented, reviewed, merged branch out. A chain that halts at every
+boundary is a slower manual workflow wearing a skill's name.
 
 ## Per-phase behavior
 

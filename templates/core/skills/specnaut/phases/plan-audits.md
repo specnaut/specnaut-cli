@@ -4,9 +4,9 @@ Loaded by `phases/plan.md` at step 6. Both audits run **before a single line of 
 dispatched **in the same message** so they execute concurrently. They judge different things and
 neither substitutes for the other.
 
-**Both are read-only and advisory.** They do not veto — the user does, at the stop that ends `plan`.
-But their findings go **into `plan.md`**: either the plan changes, or it records why the objection
-was accepted. An audit whose output is not written down did not happen. A clean verdict is written
+**Both are read-only and advisory, and they are who settles the technical forks** — see "Who
+decides" below. Their findings go **into `plan.md`**: either the plan changes, or it records why the
+objection was accepted. An audit whose output is not written down did not happen. A clean verdict is written
 down **with its coverage**, because a clean verdict is worth exactly what it covered.
 
 ## 🔒 The architecture audit
@@ -45,3 +45,29 @@ questions, in this order:
    access check, a field that should never leave the server.
 4. **What does this let an authenticated stranger do to somebody else's account?** In writing.
    "Nothing" is acceptable only when it names what was checked.
+
+## ⚡ The performance seat — when the plan has a hot path
+
+When the plan's technical context names a scale constraint, a hot path, a bulk job or a query over
+an unbounded set, dispatch `performance-expert` on `plan.md` in the same message as the other two.
+Ask what grows with the data, what runs per request, and what the plan does when the set is 100×
+today's.
+
+## ⚖ Who decides — the seats, not the user
+
+Specnaut builds **long-lived** software: clean code, SOLID boundaries, sound design patterns, secure
+by default. A technical fork is settled against that intent, not put to a vote:
+
+- **Architecture, patterns, layering, naming, security hardening, performance trade-offs** — the
+  seats rank the options, the plan takes the top one, and `plan.md` records it as a decision with
+  the rejected alternatives and why. Presented at the plan stop as a report, **never asked**. Asking
+  the user to confirm a recommendation an expert already made is a stop with nothing behind it.
+- **When two seats disagree**, the reading better for the long-term health of the code wins:
+  security, then maintainability, then performance, then speed of delivery. Record the conflict and
+  the winner in `plan.md`.
+- **Escalate to the user only** when the fork changes what the product does, or falls in the
+  always-ask class of `phases/plan.md` step 8: the base branch, anything irreversible or
+  destructive, breaking a public surface, a new external service, vendor or cost.
+
+The same holds after the plan: a fix loop in `implement` or `review` never asks the user to choose
+between technical fixes.
