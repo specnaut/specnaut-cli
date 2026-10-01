@@ -2,6 +2,10 @@
 
 ## 4.6.x → 5.0.0
 
+**Breaking: `/specnaut` merges and pushes without asking.** A project that relied on the "Ready to
+merge?" stop gets the old behaviour back only by adding `merge: manual` to `.specnaut/workflow.yml`
+— see below. Nothing else needs a hand edit.
+
 ### Technical decisions are no longer put to you
 
 At the end of `plan`, architecture, design patterns, layering, security hardening and performance
