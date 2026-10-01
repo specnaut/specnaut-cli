@@ -158,7 +158,7 @@ Deno.test("the router parses --manual-merge without making it a chain flag", () 
  */
 Deno.test("the merge-mode reader in auto-chain.md resolves every file shape (D3)", async () => {
   const content = phase("auto-chain").content;
-  const block = content.match(/```\n   (v=\$\(sed[\s\S]*?esac)\n   ```/);
+  const block = content.match(/```\n {3}(v=\$\(sed[\s\S]*?esac)\n {3}```/);
   if (!block) throw new Error("merge-mode reader block not found in auto-chain.md");
   const script = block[1].replaceAll("\n   ", "\n");
   const cases: ReadonlyArray<[file: string | null, want: string]> = [
