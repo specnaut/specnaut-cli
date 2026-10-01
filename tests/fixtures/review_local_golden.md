@@ -58,7 +58,7 @@ and one round trip, not ten.
 Repeat until only MEDIUM / LOW remain OR a fix has cycled twice without
 resolution — in the latter case, stop and escalate to the user.
 
-**Do not ask the user between cycles.** The fix loop runs inside STOP #2; they
+**Do not ask the user between cycles.** The fix loop runs before the merge; they
 asked for a working branch, not for a vote on every round.
 
 **Report harm, not labels.** Sort each finding into *"would hurt a user, a
@@ -162,6 +162,8 @@ Remaining findings (MEDIUM/LOW, non-blocking)
 Overall: PASS | FAIL
 ```
 
-If Overall = PASS, surface the STOP #2 summary block defined in
-`phases/auto-chain.md` and ask for merge confirmation, then invoke
-`/specnaut merge` on "yes". If FAIL, stop and report to the user.
+If Overall = PASS, surface the verdict summary defined in
+`phases/auto-chain.md`, then follow the project's merge mode from that file:
+under `auto` (the default) invoke `/specnaut merge` in the same turn; under
+`manual` ask for merge confirmation and invoke it on "yes". If FAIL, stop and
+report to the user.

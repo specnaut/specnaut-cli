@@ -20,7 +20,7 @@ const MAIN = fromFileUrl(new URL("../../src/main.ts", import.meta.url));
 
 const START = "<!-- --- Specnaut: chain-stops --- -->";
 const END = "<!-- --- End Specnaut: chain-stops --- -->";
-const HEADING = "## The Specnaut chain has exactly two stops";
+const HEADING = "## The Specnaut chain runs on autopilot after the plan";
 
 /**
  * #576 added a SECOND label on the same destination. Every assertion above this
@@ -87,7 +87,7 @@ Deno.test("upgrade delivers the section into an AGENTS.md that predates Specnaut
     assertStringIncludes(after, START);
     assertStringIncludes(after, END);
     assertStringIncludes(after, HEADING);
-    assertStringIncludes(after, "no third");
+    assertStringIncludes(after, "only under `merge: manual`");
     // ...and the run says so out loud, so a section appearing in an
     // always-loaded file is never mistaken for an overwrite.
     assertStringIncludes(up.stdout, "AGENTS.md");

@@ -225,8 +225,10 @@ check "the standalone path removes the spec directory (#587 AC1)" \
 # copy of a plan that never got its plan-time commit.
 check "the removal refuses a directory git has never seen (#587 AC2)" \
   'grep -qF "git log --all --oneline" .claude/skills/specnaut/phases/merge-close.md'
-check "one yes authorises the close AND the removal, with no second prompt (#587 AC3)" \
-  'grep -qF "One \`yes\` authorises" \
+# Since autopilot the authorisation is the push itself (one yes at the review
+# verdict under merge: manual), so the invariant is "never one without the other".
+check "one authorisation covers the close AND the removal, with no second prompt (#587 AC3)" \
+  'grep -qF "never one without the other" \
      <<<"$(tr "\n" " " < .claude/skills/specnaut/phases/merge-close.md)"'
 check "the removal is its own commit, not folded into the merge (#587 AC4)" \
   'grep -qF "remove the spec directory for the shipped feature" .claude/skills/specnaut/phases/merge-close.md'
@@ -303,6 +305,8 @@ check "gates.yml scaffolded with both tiers declared empty (#555)" \
   '[ -f .specnaut/gates.yml ] &&
    grep -qE "^fast_gate:" .specnaut/gates.yml &&
    grep -qE "^full_gate:" .specnaut/gates.yml'
+check "workflow.yml scaffolded with merge: auto as the default" \
+  '[ -f .specnaut/workflow.yml ] && grep -qE "^merge: auto$" .specnaut/workflow.yml'
 check "run-gate.sh scaffolded + executable (#555)" \
   '[ -x .specnaut/scripts/bash/run-gate.sh ]'
 check "run-gate.ps1 twin scaffolded (#555)" \
@@ -777,10 +781,10 @@ echo "═══ #251  auto-chain — chain mechanics file present ═══"
 check "phases/auto-chain.md is bundled into the project" \
   'test -f .claude/skills/specnaut/phases/auto-chain.md'
 # #455 dropped the `#` and renamed the re-entry section. Asserting the
-# invariant the doc exists to state — there are exactly two stops — rather than
-# a punctuation mark.
-check "auto-chain.md documents exactly two stops" \
-  'grep -q "STOP 1" .claude/skills/specnaut/phases/auto-chain.md && grep -q "STOP 2" .claude/skills/specnaut/phases/auto-chain.md && grep -qi "EXACTLY TWO stops" .claude/skills/specnaut/phases/auto-chain.md'
+# invariant the doc exists to state — one stop by default, the second only
+# under `merge: manual` — rather than a punctuation mark.
+check "auto-chain.md documents the plan stop and the opt-in second stop" \
+  'grep -q "STOP 1" .claude/skills/specnaut/phases/auto-chain.md && grep -q "STOP 2" .claude/skills/specnaut/phases/auto-chain.md && grep -q "There is ONE stop" .claude/skills/specnaut/phases/auto-chain.md'
 check "auto-chain.md documents re-entry without a flag" \
   'grep -qi "Re-entry" .claude/skills/specnaut/phases/auto-chain.md'
 check "router SKILL.md parses --manual flag" \
@@ -865,8 +869,8 @@ check "auto-chain.md infers re-entry from artefacts, with no flag (#455)" \
   'grep -q "Re-entry, without a flag" .claude/skills/specnaut/phases/auto-chain.md'
 check "review.md owns STOP #2 (no /specnaut-auto handoff)" \
   '! grep -q "hand back to \`/specnaut-auto\`" .claude/skills/specnaut/phases/review.md'
-check "review.md surfaces STOP #2 from phases/auto-chain.md" \
-  'grep -q "STOP #2 summary block defined in" .claude/skills/specnaut/phases/review.md'
+check "review.md surfaces the verdict summary from phases/auto-chain.md and follows the merge mode" \
+  'grep -q "verdict summary defined in" .claude/skills/specnaut/phases/review.md && grep -q "merge mode" .claude/skills/specnaut/phases/review.md'
 
 echo
 echo "═══ specnaut-guide review-upgrade protocol ═══"
@@ -898,13 +902,13 @@ check "router SKILL.md keeps --manual as the only chain flag" \
   'grep -q -- "--manual" .claude/skills/specnaut/SKILL.md && ! grep -qE -- "--lite|--full|--once|--continue" .claude/skills/specnaut/SKILL.md'
 check "auto-chain.md no longer carries a lite-chain shape" \
   '! grep -qE "Lite chain|workflow_shape|CHAIN_SHAPE" .claude/skills/specnaut/phases/auto-chain.md'
-check "auto-chain.md states the chain has exactly two stops (#458)" \
-  'grep -q "EXACTLY TWO stops" .claude/skills/specnaut/phases/auto-chain.md'
+check "auto-chain.md states autopilot is the default (#458)" \
+  'grep -q "Autopilot is the default" .claude/skills/specnaut/phases/auto-chain.md'
 check "auto-chain.md refuses the stalling excuses (#458)" \
   'grep -q "real code gets written" .claude/skills/specnaut/phases/auto-chain.md'
-check "scaffolded AGENTS.md carries the two-stop rule (#458)" \
-  'grep -q "exactly two stops" AGENTS.md'
-check "the two-stop section is fenced so upgrade can deliver it (#466)" \
+check "scaffolded AGENTS.md carries the stop rule (#458)" \
+  'grep -q "runs on autopilot after the plan" AGENTS.md'
+check "the chain-stops section is fenced so upgrade can deliver it (#466)" \
   'grep -q -- "<!-- --- Specnaut: chain-stops --- -->" AGENTS.md && grep -q -- "<!-- --- End Specnaut: chain-stops --- -->" AGENTS.md'
 
 echo "═══ #442  Backlog references name the item, not just its number ═══"

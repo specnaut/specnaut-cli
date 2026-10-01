@@ -43,7 +43,7 @@ Deno.test("AGENTS.md stays user-owned AND declares its managed sections", () => 
   assert(labels.includes(UI_LABEL), `ui-defaults missing from ${JSON.stringify(labels)}`);
 });
 
-Deno.test("the two-stop rule is inside the fences, not merely in the file", () => {
+Deno.test("the stop rule is inside the fences, not merely in the file", () => {
   const { content } = rootAgents();
   const start = content.indexOf(startFence(LABEL, "html"));
   const end = content.indexOf(endFence(LABEL, "html"));
@@ -54,10 +54,10 @@ Deno.test("the two-stop rule is inside the fences, not merely in the file", () =
   assert(body !== null && body.length > 0, "the fenced region must not be empty");
   // The load-bearing sentences, checked against the BODY — a file-level
   // assertion would still pass with the fences wrapped around nothing.
-  assertStringIncludes(body!, "## The Specnaut chain has exactly two stops");
-  assertStringIncludes(body!, "no third");
+  assertStringIncludes(body!, "## The Specnaut chain runs on autopilot after the plan");
   assertStringIncludes(body!, "The end of `plan`");
-  assertStringIncludes(body!, "The review verdict");
+  assertStringIncludes(body!, "The review verdict — only under `merge: manual`");
+  assertStringIncludes(body!, "`merge` and the push are automatic");
   assertStringIncludes(body!, "invoking the next phase yourself, in the same turn");
 });
 

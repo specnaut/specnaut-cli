@@ -17,13 +17,15 @@ when_to_use: |
 
 **Response style** — brevity, visual order, questions as selections, badge colours — follows the `response-style-contract` skill; read it, never restate it here.
 
-`$ARGUMENTS` carries the user's input. Parse it as `[--manual] <phase> [rest]`:
+`$ARGUMENTS` carries the user's input. Parse it as `[--manual] [--manual-merge] <phase> [rest]`:
 
 1. **Chain mode parsing** — scan the tokens for `--manual`. It is the only chain flag.
    - `--manual` present → CHAIN_MODE = `off` (run this one phase, then stop)
    - absent → CHAIN_MODE = `auto` (the default)
 
-   Strip it from the token list before going further.
+   Then scan for `--manual-merge`: present → this run's merge mode is `manual` whatever
+   `.specnaut/workflow.yml` says (`phases/auto-chain.md` reads it). It does not stop the chain
+   anywhere else. Strip both before going further.
 
 2. **Phase extraction** — the first remaining token is the phase name. Everything after the first
    whitespace is the argument string for that phase.
@@ -158,11 +160,14 @@ plan → tasks → implement → review → merge
       → STOP 1
 ```
 
-**There are exactly two stops in this chain**, and no third:
+**Autopilot is the default: the chain stops once, at the end of `plan`** — the architecture is
+presented with its alternatives, both audits' findings are presented separately, and the open
+questions are asked. Always. After that answer it runs to a merged, **pushed** base branch and a
+closed backlog item without asking again.
 
-1. **The end of `plan`** — the architecture is presented with its alternatives, both audits' findings
-   are presented separately, and the open questions are asked. Always.
-2. **The review verdict** — which *is* the merge request. There is no separate pre-merge stop.
+A second stop — the review verdict as the merge request, asked once — exists only when
+`.specnaut/workflow.yml` says `merge: manual`, or the run says so (`--manual-merge`, "stop before
+merging").
 
 Every other boundary is crossed by invoking the next phase yourself, in the same turn. See
 `phases/auto-chain.md`.
@@ -178,8 +183,8 @@ Every other boundary is crossed by invoking the next phase yourself, in the same
   → /specnaut tasks       (same turn as the last answer)
   → /specnaut implement   (same turn)
   → /specnaut review      (same turn)
-  → STOP 2 — verdict + "ready to merge?"
-  → /specnaut merge       (on approval, or immediately if merge was already asked for)
+  → /specnaut merge       (same turn — merges, pushes, closes the item)
+                          (merge: manual → STOP 2, verdict + "ready to merge?")
 ```
 
 To run a single phase only:

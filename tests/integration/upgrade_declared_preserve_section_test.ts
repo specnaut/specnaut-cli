@@ -16,7 +16,7 @@ const MAIN = fromFileUrl(new URL("../../src/main.ts", import.meta.url));
  * Found by dogfooding v2.0.1 on the workspace that ships it, not by a report.
  */
 
-const HEADING = "## The Specnaut chain has exactly two stops";
+const HEADING = "## The Specnaut chain runs on autopilot after the plan";
 const OWN = "# AGENTS.md\n\n## House rules\n\nWe rebase, never merge commits.\n";
 const PRESERVE_YML = "preserved:\n  - AGENTS.md\n";
 

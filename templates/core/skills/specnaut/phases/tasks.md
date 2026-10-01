@@ -218,6 +218,7 @@ invisible to whoever needs it.
 **The boundary between `tasks` and `implement` is not a stop.** The size of the breakdown is not a
 reason to stop — it was known when the chain started, and the user chose the work at the plan stop.
 Neither is "this is where the real code gets written": yes, and that is the point of the chain. The
-chain has exactly two stops and this is neither of them; see `phases/auto-chain.md`.
+chain stops at the plan, and at the review verdict only under `merge: manual`; this is neither
+of them — see `phases/auto-chain.md`.
 
 Pause only when the run was started with `--manual`.

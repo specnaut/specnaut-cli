@@ -7,24 +7,37 @@ artefacts indicate the user is re-running a single step.
 ## The flow
 
 ```
-plan → tasks → implement → review → merge
+plan → tasks → implement → review → merge → push
   ▲                                   ▲
   STOP 1                              STOP 2
-  (always, at the end of plan)        (the review verdict IS the merge request)
+  (always, at the end of plan)        (only under merge: manual)
 ```
 
-## There are EXACTLY TWO stops. There is no third.
+## Autopilot is the default. There is ONE stop, and a second only on request.
 
-1. **The end of `plan`.** Always. The architecture is presented as a proposal with the alternatives
-   that were rejected and why; both audits' findings are presented **separately**; the open
-   the open questions are asked. See `phases/plan.md` step 8.
-2. **The review verdict.** Its findings are triaged, then the merge is requested. There is no
-   separate pre-merge stop — the verdict and the merge question are the same moment.
+1. **The end of `plan`.** Always — `phases/plan.md` step 8. **This is where the work is decided**;
+   after it, the chain runs to a merged, pushed base branch without asking again.
+2. **The review verdict — only under `manual`.** The merge mode is read **here and nowhere
+   else**, per-run instruction first: `--manual-merge`, or "stop before merging" / "do not push",
+   means `manual`; "merge it" means `auto`. Otherwise the project file decides:
 
-`merge` is never automatic. It is asked for — **unless the user already said to merge**, in which
-case that is their instruction and it is followed without a second confirmation.
+   ```
+   v=$(sed -n 's/^merge:[[:space:]]*\([^[:space:]#]*\).*/\1/p' .specnaut/workflow.yml 2>/dev/null | head -1)
+   case "$v" in ""|auto) echo auto ;; manual) echo manual ;; *) echo "manual (unrecognised: $v)" ;; esac
+   ```
 
-## ⛔ NEVER stop at a boundary that is not one of the two
+   No file or no key means `auto`. An unrecognised value means `manual` — say so in one line: a
+   setting that cannot be read resolves to the reading that does not push.
+
+   - **`auto`** — no stop. A verdict with no unresolved CRITICAL or HIGH finding invokes `merge`
+     in the same turn; `merge` pushes and closes.
+   - **`manual`** — STOP 2: the verdict is triaged, then the merge is requested, once. That answer
+     covers the merge, the push and the close.
+
+Autopilot still halts, and says why: an unresolved CRITICAL/HIGH, a FAIL verdict, a missing review
+seat, a merge that cannot fast-forward, a refused push. Those are failures, not stops.
+
+## ⛔ NEVER stop at a boundary that is not one of these
 
 It applies to **every** hand-off in the chain, not just one:
 
@@ -33,7 +46,8 @@ It applies to **every** hand-off in the chain, not just one:
 | user answers the last question at STOP 1 → `tasks` | invoked in the same turn |
 | `tasks` commits the breakdown → `implement` | invoked in the same turn |
 | gates green, tree frozen → `review` | invoked in the same turn |
-| `review` returns findings | **STOP 2** — triage, then the merge request |
+| `review` verdict, nothing CRITICAL/HIGH left → `merge` | same turn (`auto`) · **STOP 2** (`manual`) |
+| `merge` lands on the base branch → push | pushed, never asked |
 
 No question, no proposal, no menu, at any of those arrows.
 
@@ -46,6 +60,7 @@ None of these is a reason to stop, and each one gets used as one:
 | "This is where the real code gets written." | Yes. That is the point of the chain. |
 | "The audits found a lot — re-confirm scope?" | The findings were folded into the plan and the plan was approved. That approval covers what the plan now says. |
 | "The user has been checkpointing each step." | Answering a question is not a request to be asked another one. |
+| "Someone should read the diff first." | Then the project sets `merge: manual`. |
 
 Asking again after STOP 1 **re-litigates a decision the user already made**, and it costs them the
 thing the chain exists to give: they approve an architecture once, and get an implemented, reviewed
@@ -64,17 +79,7 @@ sufficient, and it is a **statement, never a question**.
 | `plan` | `tasks` — invoked in the same turn as the user's last answer at STOP 1 |
 | `tasks` | `implement` — invoked in the same turn as the dossier commit |
 | `implement` | `review` — invoked in the same turn the gates go green and the tree is frozen |
-| `review` | **STOP 2** — triage, then the merge request |
-
-## Silent gates
-
-These run without user interruption unless they fail hard:
-
-- `plan` — up to its own STOP 1, which is not a chain decision but part of the phase.
-- `tasks` — generates `tasks.md`.
-- `implement` — runs the developer → review-coordinator → qa-tester pipeline. It has its own
-  internal fix loop; do not intercept it.
-- `review` — the quality battery on a frozen tree.
+| `review` | `merge` — same turn (`auto`) · **STOP 2** — triage, then the merge request (`manual`) |
 
 ## Plan approval checkpoint (remote mode only)
 
@@ -90,7 +95,7 @@ After `plan` completes and **before** chaining into `tasks`, check remote mode
 - **Non-zero** (remote off / not Cloud-linked — the default) — STOP 1 is the local approval and the
   chain continues straight into `tasks`.
 
-## STOP 2 — the review verdict
+## The review verdict — STOP 2 under `manual`, a report under `auto`
 
 After `review` completes, present a compact summary:
 
@@ -101,7 +106,8 @@ After `review` completes, present a compact summary:
 - Open risks / deferred findings
 - One-line business outcome
 
-Then resolve the approval:
+Under `auto` with remote mode off it is a statement, not a question: invoke `merge` right after
+it. Otherwise resolve the approval — **remote mode keeps its gate under either mode**:
 
 - **Remote mode** (`specnaut gate status` exit 0) — raise a `merge_approval` gate instead of a
   terminal prompt:
@@ -110,7 +116,7 @@ Then resolve the approval:
   and report the rejection + any `note`; exit 3/4 (timeout/cancelled) or 1 → halt cleanly with the
   reason; exit 5 → report `specnaut cloud login` is needed and fall back to the local prompt below.
   **Never merge without an explicit approval.**
-- **Local mode** (default) — ask once: "Ready to merge? (yes to run `/specnaut merge`, no to stay on
+- **Local mode, `manual`** — ask once: "Ready to merge? (yes to run `/specnaut merge`, no to stay on
   the branch)". On "yes", invoke `merge`.
 
 ### Triage, and the rule that ends the loop
@@ -118,8 +124,8 @@ Then resolve the approval:
 **Only a CRITICAL or HIGH finding buys another fix cycle.** MEDIUM and LOW go to the backlog and the
 branch ships.
 
-Those fix cycles run **inside** this stop. Do not ask again between each one — the user asked for a
-working branch, not for a vote on every round.
+Those fix cycles run **before** the merge, under either mode. Do not ask between rounds — the user
+asked for a working branch, not for a vote on every round.
 
 A reviewer reports **harm, not labels**: sort each finding into *"would hurt a user, a maintainer,
 or the data if shipped"* versus *"should be better"*, and choose by the harm rather than the
@@ -139,7 +145,7 @@ When the user invokes a phase directly (`/specnaut implement`, `/specnaut review
 is on disk:
 
 - **Downstream artefacts missing** → chain. The user is resuming an interrupted flow (a long
-  session, a fresh shell after compaction). Continue through the remaining phases to STOP 2.
+  session, a fresh shell after compaction). Continue through the remaining phases.
 - **Downstream artefacts present** → one-shot. The user is re-running a single phase (regenerating
   `plan.md` after a tweak).
 
@@ -155,7 +161,7 @@ being invoked:
 
 ## Failure handling
 
-- Hard failure in a silent gate: stop, surface the error, ask how to proceed. Do not silently retry.
+- Hard failure in `tasks`, `implement` or `review`: stop, surface the error, ask how to proceed. Do not silently retry.
 - Task-level blockers reported during `implement`: that phase has its own fix loop; do not
   intercept.
 - **Genuinely blocked is not the same as stopped.** If something truly blocks part of the work, say
@@ -171,19 +177,12 @@ picks up where the previous run stopped.
 
 ## Orphan spec detection — the chain, inspected at rest
 
-The flow above describes a chain moving forward in one session. This check reads
-the same chain across the whole project at rest, and names the phase each stalled
-feature is missing. It was part of `groom` until the backlog//specnaut ownership
-line was drawn: grooming is backlog management, while this reads spec artefacts
-and prescribes specnaut phases, so it belongs on this side of the line.
+The flow above is a chain moving forward in one session. This check reads the same chain across the
+project at rest, and names the phase each stalled feature is missing. It reads spec artefacts and
+prescribes specnaut phases, so it lives here rather than in `groom`.
 
-Run it when asked to audit the spec pipeline, and from a grooming pass when the
-project keeps specs locally — `board/groom.md` step 4 is the caller, and it
-applies the same `.specnaut/specs/` condition. That sentence was true of the
-intent and false of the tree for as long as no caller existed: `loop.md`
-promised a grooming pass would flag orphan specs, `groom.md` said the check was
-not its business and delegated to nobody, and nothing scheduled ever reached
-here.
+Run it when asked to audit the spec pipeline, and from a grooming pass when the project keeps specs
+locally — `board/groom.md` step 4 is the caller, under the same `.specnaut/specs/` condition.
 
 Walk `.specnaut/specs/` (if present) and surface any feature directory
 that is missing the next expected artefact.
@@ -209,7 +208,7 @@ that is missing the next expected artefact.
 
 This is also read-only; never delete or modify spec files. A shipped feature's
 directory IS removed — by `phases/merge-close.md` step 8, at the merge, under
-the same `yes` that closed the issue and with the plan already in git history.
+the same authorisation that closed the issue and with the plan in git history.
 Different actor, different moment, and it holds the authorisation this pass
 does not have. A reporter that edits what it walks has no way to be trusted
 about what it found.

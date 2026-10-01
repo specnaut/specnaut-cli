@@ -20,15 +20,18 @@ _(Naming, testing, commits, branches.)_
 
 <!-- --- Specnaut: chain-stops --- -->
 
-## The Specnaut chain has exactly two stops
+## The Specnaut chain runs on autopilot after the plan
 
 *Owned by Specnaut — this section is not a placeholder to fill in. Edit the rest freely.*
 
-`plan → tasks → implement → review → merge`. It stops at exactly two points, and no third:
+`plan → tasks → implement → review → merge → push`. It stops once by default:
 
 1. **The end of `plan`** — the architecture is presented with the alternatives that were rejected,
-   both audits' findings are presented separately, and the open questions are asked.
-2. **The review verdict** — which *is* the merge request. There is no separate pre-merge stop.
+   both audits' findings are presented separately, and the open questions are asked. This is where
+   the work is decided.
+2. **The review verdict — only under `merge: manual`** in `.specnaut/workflow.yml`, or when the
+   run says so (`--manual-merge`, "stop before merging"). Asked once; the yes covers the push.
+   Otherwise the chain merges, pushes and closes the item without asking.
 
 Every other boundary is crossed by **invoking the next phase yourself, in the same turn** — your own
 next action, never a command printed for someone to paste:
@@ -38,7 +41,8 @@ next action, never a command printed for someone to paste:
 | last question answered → `tasks` | invoked in the same turn |
 | breakdown committed → `implement` | invoked in the same turn |
 | gates green, tree frozen → `review` | invoked in the same turn |
-| `review` returns findings | **STOP** — triage, then the merge request |
+| `review` verdict, nothing CRITICAL/HIGH left → `merge` → push | same turn (`auto`) · **STOP** — the merge request (`manual`) |
+| `merge` lands → push | never asked, in either mode |
 
 None of these is a reason to stop, and each one gets used as one:
 
@@ -57,10 +61,11 @@ assumption would be unsafe or would make the work useless if wrong. "I would lik
 not that case.
 
 **Only a CRITICAL or HIGH finding buys another fix cycle**; MEDIUM and LOW go to the backlog and the
-branch ships. Those cycles run inside the second stop — don't ask again between each one.
+branch ships. Those cycles run before the merge — don't ask again between each one.
 
-`merge` is never automatic. It is asked for — **unless the user already said to merge**, in which
-case that is their instruction and it is followed without a second confirmation.
+**`merge` and the push are automatic** under `merge: auto`, the default — the plan stop was the
+approval, and it is not re-collected. Under `manual` the merge is asked for once, **unless the user
+already said to merge**: that is their instruction, followed without a second confirmation.
 
 <!-- --- End Specnaut: chain-stops --- -->
 

@@ -10,6 +10,6 @@ Deno.test("auto-chain template carries guarded plan + merge approval branches", 
   assertStringIncludes(chain, "plan_approval");
   assertStringIncludes(chain, "merge_approval");
   assertStringIncludes(chain, "specnaut gate status");
-  // the local "Ready to merge?" prompt is preserved as the off-path fallback
+  // the local "Ready to merge?" prompt is preserved for `merge: manual`
   assertStringIncludes(chain, "Ready to merge?");
 });
