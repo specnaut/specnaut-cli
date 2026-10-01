@@ -4,7 +4,7 @@
 
 # Decorator
 
-**Family:** Structural · **Deeper reading:** <https://refactoring.guru/design-patterns/decorator>
+**Family:** Structural
 
 ## Intent
 

@@ -5,7 +5,7 @@
 
 # Shotgun Surgery
 
-**Family:** Change preventers · **Deeper reading:** <https://refactoring.guru/smells/shotgun-surgery>
+**Family:** Change preventers
 
 ## How to spot it
 

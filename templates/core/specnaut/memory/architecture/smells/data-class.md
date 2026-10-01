@@ -5,7 +5,7 @@
 
 # Data Class
 
-**Family:** Dispensables · **Deeper reading:** <https://refactoring.guru/smells/data-class>
+**Family:** Dispensables
 
 ## How to spot it
 

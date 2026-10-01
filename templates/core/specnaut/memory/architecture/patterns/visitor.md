@@ -4,7 +4,7 @@
 
 # Visitor
 
-**Family:** Behavioral · **Deeper reading:** <https://refactoring.guru/design-patterns/visitor>
+**Family:** Behavioral
 
 ## Intent
 

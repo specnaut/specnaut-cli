@@ -4,7 +4,7 @@
 
 # Chain of Responsibility
 
-**Family:** Behavioral · **Deeper reading:** <https://refactoring.guru/design-patterns/chain-of-responsibility>
+**Family:** Behavioral
 
 ## Intent
 

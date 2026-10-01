@@ -5,7 +5,7 @@
 
 # Divergent Change
 
-**Family:** Change preventers · **Deeper reading:** <https://refactoring.guru/smells/divergent-change>
+**Family:** Change preventers
 
 ## How to spot it
 

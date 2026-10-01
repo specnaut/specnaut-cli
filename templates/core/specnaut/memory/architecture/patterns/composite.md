@@ -4,7 +4,7 @@
 
 # Composite
 
-**Family:** Structural · **Deeper reading:** <https://refactoring.guru/design-patterns/composite>
+**Family:** Structural
 
 ## Intent
 

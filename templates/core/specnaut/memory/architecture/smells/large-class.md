@@ -5,7 +5,7 @@
 
 # Large Class
 
-**Family:** Bloaters · **Deeper reading:** <https://refactoring.guru/smells/large-class>
+**Family:** Bloaters
 
 ## How to spot it
 

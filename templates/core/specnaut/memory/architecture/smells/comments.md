@@ -5,7 +5,7 @@
 
 # Comments
 
-**Family:** Dispensables · **Deeper reading:** <https://refactoring.guru/smells/comments>
+**Family:** Dispensables
 
 ## How to spot it
 

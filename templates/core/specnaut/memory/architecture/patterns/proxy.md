@@ -4,7 +4,7 @@
 
 # Proxy
 
-**Family:** Structural · **Deeper reading:** <https://refactoring.guru/design-patterns/proxy>
+**Family:** Structural
 
 ## Intent
 

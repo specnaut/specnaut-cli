@@ -4,7 +4,7 @@
 
 # Adapter
 
-**Family:** Structural · **Deeper reading:** <https://refactoring.guru/design-patterns/adapter>
+**Family:** Structural
 
 ## Intent
 

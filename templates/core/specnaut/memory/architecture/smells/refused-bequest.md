@@ -5,7 +5,7 @@
 
 # Refused Bequest
 
-**Family:** Object-orientation abusers · **Deeper reading:** <https://refactoring.guru/smells/refused-bequest>
+**Family:** Object-orientation abusers
 
 ## How to spot it
 

@@ -5,7 +5,7 @@
 
 # Alternative Classes with Different Interfaces
 
-**Family:** Object-orientation abusers · **Deeper reading:** <https://refactoring.guru/smells/alternative-classes-with-different-interfaces>
+**Family:** Object-orientation abusers
 
 ## How to spot it
 

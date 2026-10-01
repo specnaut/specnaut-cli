@@ -4,7 +4,7 @@
 
 # Abstract Factory
 
-**Family:** Creational · **Deeper reading:** <https://refactoring.guru/design-patterns/abstract-factory>
+**Family:** Creational
 
 ## Intent
 

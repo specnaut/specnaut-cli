@@ -5,7 +5,7 @@
 
 # Duplicate Code
 
-**Family:** Dispensables · **Deeper reading:** <https://refactoring.guru/smells/duplicate-code>
+**Family:** Dispensables
 
 ## How to spot it
 

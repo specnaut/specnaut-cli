@@ -4,7 +4,7 @@
 
 # State
 
-**Family:** Behavioral · **Deeper reading:** <https://refactoring.guru/design-patterns/state>
+**Family:** Behavioral
 
 ## Intent
 

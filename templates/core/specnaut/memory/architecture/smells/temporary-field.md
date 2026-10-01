@@ -5,7 +5,7 @@
 
 # Temporary Field
 
-**Family:** Object-orientation abusers · **Deeper reading:** <https://refactoring.guru/smells/temporary-field>
+**Family:** Object-orientation abusers
 
 ## How to spot it
 

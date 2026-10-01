@@ -4,7 +4,7 @@
 
 # Facade
 
-**Family:** Structural · **Deeper reading:** <https://refactoring.guru/design-patterns/facade>
+**Family:** Structural
 
 ## Intent
 

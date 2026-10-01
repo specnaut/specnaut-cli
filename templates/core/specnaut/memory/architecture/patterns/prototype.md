@@ -4,7 +4,7 @@
 
 # Prototype
 
-**Family:** Creational · **Deeper reading:** <https://refactoring.guru/design-patterns/prototype>
+**Family:** Creational
 
 ## Intent
 

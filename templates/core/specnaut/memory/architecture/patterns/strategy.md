@@ -4,7 +4,7 @@
 
 # Strategy
 
-**Family:** Behavioral · **Deeper reading:** <https://refactoring.guru/design-patterns/strategy>
+**Family:** Behavioral
 
 ## Intent
 

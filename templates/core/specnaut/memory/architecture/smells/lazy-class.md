@@ -5,7 +5,7 @@
 
 # Lazy Class
 
-**Family:** Dispensables · **Deeper reading:** <https://refactoring.guru/smells/lazy-class>
+**Family:** Dispensables
 
 ## How to spot it
 

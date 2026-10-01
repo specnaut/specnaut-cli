@@ -4,7 +4,7 @@
 
 # Builder
 
-**Family:** Creational · **Deeper reading:** <https://refactoring.guru/design-patterns/builder>
+**Family:** Creational
 
 ## Intent
 

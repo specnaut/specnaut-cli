@@ -4,7 +4,7 @@
 
 # Iterator
 
-**Family:** Behavioral · **Deeper reading:** <https://refactoring.guru/design-patterns/iterator>
+**Family:** Behavioral
 
 ## Intent
 

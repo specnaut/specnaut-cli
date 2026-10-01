@@ -5,7 +5,7 @@
 
 # Switch Statements
 
-**Family:** Object-orientation abusers · **Deeper reading:** <https://refactoring.guru/smells/switch-statements>
+**Family:** Object-orientation abusers
 
 ## How to spot it
 

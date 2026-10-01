@@ -5,7 +5,7 @@
 
 # Dead Code
 
-**Family:** Dispensables · **Deeper reading:** <https://refactoring.guru/smells/dead-code>
+**Family:** Dispensables
 
 ## How to spot it
 

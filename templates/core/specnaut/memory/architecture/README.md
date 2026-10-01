@@ -227,6 +227,4 @@ language and are used here as such.
 
 **The prose is original and written for this catalogue.** Nothing here is
 copied from any published description, and each leaf is deliberately written
-for a stack-agnostic reader rather than any one language or framework. For a
-fuller treatment of any entry, <https://refactoring.guru> is an excellent
-reference and most leaves link to the matching page.
+for a stack-agnostic reader rather than any one language or framework.

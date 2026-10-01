@@ -5,7 +5,7 @@
 
 # Inappropriate Intimacy
 
-**Family:** Couplers · **Deeper reading:** <https://refactoring.guru/smells/inappropriate-intimacy>
+**Family:** Couplers
 
 ## How to spot it
 

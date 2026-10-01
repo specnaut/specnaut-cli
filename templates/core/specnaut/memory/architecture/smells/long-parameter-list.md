@@ -5,7 +5,7 @@
 
 # Long Parameter List
 
-**Family:** Bloaters · **Deeper reading:** <https://refactoring.guru/smells/long-parameter-list>
+**Family:** Bloaters
 
 ## How to spot it
 

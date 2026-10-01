@@ -208,3 +208,13 @@ Deno.test("every catalogue path named by architect-expert actually ships", () =>
     assert(shipped.has(c), `architect-expert cites ${c}, which does not ship`);
   }
 });
+
+Deno.test("the catalogue is self-contained — no file carries an external URL", () => {
+  // Its README is explicit that a seat opens a local file instead of deciding
+  // whether a lookup is worth it; a link out contradicts that and ties a
+  // shipped file to somebody else's URLs. Every entry, README included.
+  const all = entries();
+  assert(all.length > 100, `expected the whole catalogue, got ${all.length} entries`);
+  const linked = all.filter((e) => /https?:\/\//.test(e.content)).map((e) => e.suffix);
+  assertEquals(linked, [], `external URLs found in: ${linked.join(", ")}`);
+});

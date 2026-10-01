@@ -5,7 +5,7 @@
 
 # Data Clumps
 
-**Family:** Bloaters · **Deeper reading:** <https://refactoring.guru/smells/data-clumps>
+**Family:** Bloaters
 
 ## How to spot it
 

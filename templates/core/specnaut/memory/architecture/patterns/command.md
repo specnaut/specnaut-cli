@@ -4,7 +4,7 @@
 
 # Command
 
-**Family:** Behavioral · **Deeper reading:** <https://refactoring.guru/design-patterns/command>
+**Family:** Behavioral
 
 ## Intent
 

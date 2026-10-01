@@ -5,7 +5,7 @@
 
 # Primitive Obsession
 
-**Family:** Bloaters · **Deeper reading:** <https://refactoring.guru/smells/primitive-obsession>
+**Family:** Bloaters
 
 ## How to spot it
 

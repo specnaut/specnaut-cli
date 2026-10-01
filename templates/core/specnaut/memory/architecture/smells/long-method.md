@@ -5,7 +5,7 @@
 
 # Long Method
 
-**Family:** Bloaters · **Deeper reading:** <https://refactoring.guru/smells/long-method>
+**Family:** Bloaters
 
 ## How to spot it
 

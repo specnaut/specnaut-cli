@@ -5,7 +5,7 @@
 
 # Speculative Generality
 
-**Family:** Dispensables · **Deeper reading:** <https://refactoring.guru/smells/speculative-generality>
+**Family:** Dispensables
 
 ## How to spot it
 

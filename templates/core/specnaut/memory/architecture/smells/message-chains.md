@@ -5,7 +5,7 @@
 
 # Message Chains
 
-**Family:** Couplers · **Deeper reading:** <https://refactoring.guru/smells/message-chains>
+**Family:** Couplers
 
 ## How to spot it
 

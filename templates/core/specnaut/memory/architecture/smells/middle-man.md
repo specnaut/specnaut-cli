@@ -5,7 +5,7 @@
 
 # Middle Man
 
-**Family:** Couplers · **Deeper reading:** <https://refactoring.guru/smells/middle-man>
+**Family:** Couplers
 
 ## How to spot it
 

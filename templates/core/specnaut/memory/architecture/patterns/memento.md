@@ -4,7 +4,7 @@
 
 # Memento
 
-**Family:** Behavioral · **Deeper reading:** <https://refactoring.guru/design-patterns/memento>
+**Family:** Behavioral
 
 ## Intent
 

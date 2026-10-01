@@ -4,7 +4,7 @@
 
 # Bridge
 
-**Family:** Structural · **Deeper reading:** <https://refactoring.guru/design-patterns/bridge>
+**Family:** Structural
 
 ## Intent
 

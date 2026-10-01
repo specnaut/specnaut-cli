@@ -21130,9 +21130,7 @@ language and are used here as such.
 
 **The prose is original and written for this catalogue.** Nothing here is
 copied from any published description, and each leaf is deliberately written
-for a stack-agnostic reader rather than any one language or framework. For a
-fuller treatment of any entry, <https://refactoring.guru> is an excellent
-reference and most leaves link to the matching page.
+for a stack-agnostic reader rather than any one language or framework.
 `,
     executable: false,
     backend: null,
@@ -21271,7 +21269,7 @@ it constructs changes is its job.
 
 # Abstract Factory
 
-**Family:** Creational · **Deeper reading:** <https://refactoring.guru/design-patterns/abstract-factory>
+**Family:** Creational
 
 ## Intent
 
@@ -21309,7 +21307,7 @@ There is only one family, or the members are not actually related — then it is
 
 # Adapter
 
-**Family:** Structural · **Deeper reading:** <https://refactoring.guru/design-patterns/adapter>
+**Family:** Structural
 
 ## Intent
 
@@ -21346,7 +21344,7 @@ You own both sides and can simply change one of them — then converge the inter
 
 # Bridge
 
-**Family:** Structural · **Deeper reading:** <https://refactoring.guru/design-patterns/bridge>
+**Family:** Structural
 
 ## Intent
 
@@ -21383,7 +21381,7 @@ Only one axis actually varies. Then the second dimension is imagined, and you ha
 
 # Builder
 
-**Family:** Creational · **Deeper reading:** <https://refactoring.guru/design-patterns/builder>
+**Family:** Creational
 
 ## Intent
 
@@ -21420,7 +21418,7 @@ The type has a handful of required fields and nothing optional. A builder there 
 
 # Chain of Responsibility
 
-**Family:** Behavioral · **Deeper reading:** <https://refactoring.guru/design-patterns/chain-of-responsibility>
+**Family:** Behavioral
 
 ## Intent
 
@@ -21457,7 +21455,7 @@ Exactly one handler can ever apply and everyone knows which — that is a lookup
 
 # Command
 
-**Family:** Behavioral · **Deeper reading:** <https://refactoring.guru/design-patterns/command>
+**Family:** Behavioral
 
 ## Intent
 
@@ -21494,7 +21492,7 @@ The action is called immediately, once, from one place. Wrapping a direct call i
 
 # Composite
 
-**Family:** Structural · **Deeper reading:** <https://refactoring.guru/design-patterns/composite>
+**Family:** Structural
 
 ## Intent
 
@@ -21531,7 +21529,7 @@ The hierarchy is shallow and fixed, or leaves and containers genuinely support d
 
 # Decorator
 
-**Family:** Structural · **Deeper reading:** <https://refactoring.guru/design-patterns/decorator>
+**Family:** Structural
 
 ## Intent
 
@@ -21568,7 +21566,7 @@ The behaviour is not optional, or the ordering of wrappers is significant and un
 
 # Facade
 
-**Family:** Structural · **Deeper reading:** <https://refactoring.guru/design-patterns/facade>
+**Family:** Structural
 
 ## Intent
 
@@ -21605,7 +21603,7 @@ It grows to expose everything behind it, at which point it is a [Middle Man](../
 
 # Factory Method
 
-**Family:** Creational · **Deeper reading:** <https://refactoring.guru/design-patterns/factory-method>
+**Family:** Creational
 
 ## Intent
 
@@ -21643,7 +21641,7 @@ There is one product and no second in sight; a plain constructor says more. Reac
 
 # Flyweight
 
-**Family:** Structural · **Deeper reading:** <https://refactoring.guru/design-patterns/flyweight>
+**Family:** Structural
 
 ## Intent
 
@@ -21717,7 +21715,7 @@ The language is more than trivial. Beyond a handful of rules a parser generator 
 
 # Iterator
 
-**Family:** Behavioral · **Deeper reading:** <https://refactoring.guru/design-patterns/iterator>
+**Family:** Behavioral
 
 ## Intent
 
@@ -21754,7 +21752,7 @@ Your language already provides iteration and you are hand-rolling it. Implementi
 
 # Mediator
 
-**Family:** Behavioral · **Deeper reading:** <https://refactoring.guru/design-patterns/mediator>
+**Family:** Behavioral
 
 ## Intent
 
@@ -21790,7 +21788,7 @@ The mediator accumulates every rule in the system and becomes a [Large Class](..
 
 # Memento
 
-**Family:** Behavioral · **Deeper reading:** <https://refactoring.guru/design-patterns/memento>
+**Family:** Behavioral
 
 ## Intent
 
@@ -21827,7 +21825,7 @@ The state is already a public immutable value — then a copy is the memento and
 
 # Observer
 
-**Family:** Behavioral · **Deeper reading:** <https://refactoring.guru/design-patterns/observer>
+**Family:** Behavioral
 
 ## Intent
 
@@ -21864,7 +21862,7 @@ Control flow becomes untraceable — with several observers the order is unspeci
 
 # Prototype
 
-**Family:** Creational · **Deeper reading:** <https://refactoring.guru/design-patterns/prototype>
+**Family:** Creational
 
 ## Intent
 
@@ -21901,7 +21899,7 @@ The object is cheap to construct, or copying it is ambiguous because it owns ref
 
 # Proxy
 
-**Family:** Structural · **Deeper reading:** <https://refactoring.guru/design-patterns/proxy>
+**Family:** Structural
 
 ## Intent
 
@@ -21938,7 +21936,7 @@ It only forwards — that is a [Middle Man](../smells/middle-man.md). It is also
 
 # Singleton
 
-**Family:** Creational · **Deeper reading:** <https://refactoring.guru/design-patterns/singleton>
+**Family:** Creational
 
 ## Intent
 
@@ -21974,7 +21972,7 @@ Almost always. It is [Implicit Global](../smells/implicit-global.md) with a desi
 
 # State
 
-**Family:** Behavioral · **Deeper reading:** <https://refactoring.guru/design-patterns/state>
+**Family:** Behavioral
 
 ## Intent
 
@@ -22011,7 +22009,7 @@ There are two states and one branch. A boolean is clearer than two classes. Clos
 
 # Strategy
 
-**Family:** Behavioral · **Deeper reading:** <https://refactoring.guru/design-patterns/strategy>
+**Family:** Behavioral
 
 ## Intent
 
@@ -22049,7 +22047,7 @@ Only one behaviour exists and no second is in sight — a single-implementation 
 
 # Template Method
 
-**Family:** Behavioral · **Deeper reading:** <https://refactoring.guru/design-patterns/template-method>
+**Family:** Behavioral
 
 ## Intent
 
@@ -22086,7 +22084,7 @@ Subtypes need to change the *order*, not the steps — then inheritance is the w
 
 # Visitor
 
-**Family:** Behavioral · **Deeper reading:** <https://refactoring.guru/design-patterns/visitor>
+**Family:** Behavioral
 
 ## Intent
 
@@ -23933,7 +23931,7 @@ Without tests this is a rewrite, not a refactoring. Confirm the old behaviour is
 
 # Alternative Classes with Different Interfaces
 
-**Family:** Object-orientation abusers · **Deeper reading:** <https://refactoring.guru/smells/alternative-classes-with-different-interfaces>
+**Family:** Object-orientation abusers
 
 ## How to spot it
 
@@ -24062,7 +24060,7 @@ separable.
 
 # Comments
 
-**Family:** Dispensables · **Deeper reading:** <https://refactoring.guru/smells/comments>
+**Family:** Dispensables
 
 ## How to spot it
 
@@ -24107,7 +24105,7 @@ them.
 
 # Data Class
 
-**Family:** Dispensables · **Deeper reading:** <https://refactoring.guru/smells/data-class>
+**Family:** Dispensables
 
 ## How to spot it
 
@@ -24150,7 +24148,7 @@ object whose only rule is enforced at construction.
 
 # Data Clumps
 
-**Family:** Bloaters · **Deeper reading:** <https://refactoring.guru/smells/data-clumps>
+**Family:** Bloaters
 
 ## How to spot it
 
@@ -24193,7 +24191,7 @@ naming this.
 
 # Dead Code
 
-**Family:** Dispensables · **Deeper reading:** <https://refactoring.guru/smells/dead-code>
+**Family:** Dispensables
 
 ## How to spot it
 
@@ -24279,7 +24277,7 @@ Flattening it with a state machine can easily be worse.
 
 # Divergent Change
 
-**Family:** Change preventers · **Deeper reading:** <https://refactoring.guru/smells/divergent-change>
+**Family:** Change preventers
 
 ## How to spot it
 
@@ -24322,7 +24320,7 @@ responsibility.
 
 # Duplicate Code
 
-**Family:** Dispensables · **Deeper reading:** <https://refactoring.guru/smells/duplicate-code>
+**Family:** Dispensables
 
 ## How to spot it
 
@@ -24368,7 +24366,7 @@ abstraction.
 
 # Feature Envy
 
-**Family:** Couplers · **Deeper reading:** <https://refactoring.guru/smells/feature-envy>
+**Family:** Couplers
 
 ## How to spot it
 
@@ -24494,7 +24492,7 @@ happens, not that it happens; something must eventually touch the world.
 
 # Inappropriate Intimacy
 
-**Family:** Couplers · **Deeper reading:** <https://refactoring.guru/smells/inappropriate-intimacy>
+**Family:** Couplers
 
 ## How to spot it
 
@@ -24537,7 +24535,7 @@ it.
 
 # Large Class
 
-**Family:** Bloaters · **Deeper reading:** <https://refactoring.guru/smells/large-class>
+**Family:** Bloaters
 
 ## How to spot it
 
@@ -24624,7 +24622,7 @@ rather than importing a convention it never adopted.
 
 # Lazy Class
 
-**Family:** Dispensables · **Deeper reading:** <https://refactoring.guru/smells/lazy-class>
+**Family:** Dispensables
 
 ## How to spot it
 
@@ -24665,7 +24663,7 @@ same change.
 
 # Long Method
 
-**Family:** Bloaters · **Deeper reading:** <https://refactoring.guru/smells/long-method>
+**Family:** Bloaters
 
 ## How to spot it
 
@@ -24711,7 +24709,7 @@ between them. Length alone is not the defect; **hidden structure** is.
 
 # Long Parameter List
 
-**Family:** Bloaters · **Deeper reading:** <https://refactoring.guru/smells/long-parameter-list>
+**Family:** Bloaters
 
 ## How to spot it
 
@@ -24756,7 +24754,7 @@ the call sites read unambiguously.
 
 # Message Chains
 
-**Family:** Couplers · **Deeper reading:** <https://refactoring.guru/smells/message-chains>
+**Family:** Couplers
 
 ## How to spot it
 
@@ -24796,7 +24794,7 @@ one module. Over-applying the cure produces [Middle Man](middle-man.md).
 
 # Middle Man
 
-**Family:** Couplers · **Deeper reading:** <https://refactoring.guru/smells/middle-man>
+**Family:** Couplers
 
 ## How to spot it
 
@@ -24838,7 +24836,7 @@ implementation that delegates to a vendor SDK is doing its job.
 
 # Parallel Inheritance Hierarchies
 
-**Family:** Change preventers · **Deeper reading:** <https://refactoring.guru/smells/parallel-inheritance-hierarchies>
+**Family:** Change preventers
 
 ## How to spot it
 
@@ -24881,7 +24879,7 @@ purpose.
 
 # Primitive Obsession
 
-**Family:** Bloaters · **Deeper reading:** <https://refactoring.guru/smells/primitive-obsession>
+**Family:** Bloaters
 
 ## How to spot it
 
@@ -24926,7 +24924,7 @@ the wire. Wrapping a value that has no rule attached to it and never will is
 
 # Refused Bequest
 
-**Family:** Object-orientation abusers · **Deeper reading:** <https://refactoring.guru/smells/refused-bequest>
+**Family:** Object-orientation abusers
 
 ## How to spot it
 
@@ -24967,7 +24965,7 @@ mechanism working as intended — the refusal is a *surprise*, not a design.
 
 # Shotgun Surgery
 
-**Family:** Change preventers · **Deeper reading:** <https://refactoring.guru/smells/shotgun-surgery>
+**Family:** Change preventers
 
 ## How to spot it
 
@@ -25057,7 +25055,7 @@ error means, or merely stopped it from propagating.
 
 # Speculative Generality
 
-**Family:** Dispensables · **Deeper reading:** <https://refactoring.guru/smells/speculative-generality>
+**Family:** Dispensables
 
 ## How to spot it
 
@@ -25101,7 +25099,7 @@ a published API must stay stable for outside consumers.
 
 # Switch Statements
 
-**Family:** Object-orientation abusers · **Deeper reading:** <https://refactoring.guru/smells/switch-statements>
+**Family:** Object-orientation abusers
 
 ## How to spot it
 
@@ -25145,7 +25143,7 @@ The smell is the *second* copy of it.
 
 # Temporary Field
 
-**Family:** Object-orientation abusers · **Deeper reading:** <https://refactoring.guru/smells/temporary-field>
+**Family:** Object-orientation abusers
 
 ## How to spot it
 

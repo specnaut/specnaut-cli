@@ -4,7 +4,7 @@
 
 # Flyweight
 
-**Family:** Structural · **Deeper reading:** <https://refactoring.guru/design-patterns/flyweight>
+**Family:** Structural
 
 ## Intent
 

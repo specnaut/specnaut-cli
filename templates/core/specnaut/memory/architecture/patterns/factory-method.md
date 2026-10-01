@@ -4,7 +4,7 @@
 
 # Factory Method
 
-**Family:** Creational · **Deeper reading:** <https://refactoring.guru/design-patterns/factory-method>
+**Family:** Creational
 
 ## Intent
 

@@ -4,7 +4,7 @@
 
 # Template Method
 
-**Family:** Behavioral · **Deeper reading:** <https://refactoring.guru/design-patterns/template-method>
+**Family:** Behavioral
 
 ## Intent
 

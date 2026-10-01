@@ -4,7 +4,7 @@
 
 # Singleton
 
-**Family:** Creational · **Deeper reading:** <https://refactoring.guru/design-patterns/singleton>
+**Family:** Creational
 
 ## Intent
 

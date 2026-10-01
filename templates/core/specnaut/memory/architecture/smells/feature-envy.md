@@ -5,7 +5,7 @@
 
 # Feature Envy
 
-**Family:** Couplers · **Deeper reading:** <https://refactoring.guru/smells/feature-envy>
+**Family:** Couplers
 
 ## How to spot it
 

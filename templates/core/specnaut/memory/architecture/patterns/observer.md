@@ -4,7 +4,7 @@
 
 # Observer
 
-**Family:** Behavioral · **Deeper reading:** <https://refactoring.guru/design-patterns/observer>
+**Family:** Behavioral
 
 ## Intent
 

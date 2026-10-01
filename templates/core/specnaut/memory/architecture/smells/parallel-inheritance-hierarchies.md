@@ -5,7 +5,7 @@
 
 # Parallel Inheritance Hierarchies
 
-**Family:** Change preventers · **Deeper reading:** <https://refactoring.guru/smells/parallel-inheritance-hierarchies>
+**Family:** Change preventers
 
 ## How to spot it
 
