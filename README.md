@@ -6,9 +6,11 @@ distributed as a **native binary** (no Python prerequisites).
 Specnaut scaffolds the files your AI harness (Claude Code, Cursor, Copilot, Codex, Windsurf…) uses
 to drive a spec-driven workflow inside your project. It adds three things upstream doesn't:
 
-- **Auto mode** — chains `plan → tasks → implement → review → merge` uninterrupted, stopping at
-  exactly two points: the end of `plan`, where you approve the architecture, and the review verdict,
-  which is also the merge request
+- **Autopilot** — chains `plan → tasks → implement → review → merge → push` uninterrupted. It stops
+  once, at the end of `plan`, where you approve the architecture and answer the open questions; then
+  it implements, reviews, merges into your base branch, pushes and closes the backlog item without
+  asking again. Set `merge: manual` in `.specnaut/workflow.yml` (or pass `--manual-merge` for one
+  run) to be asked once, at the review verdict
 - **Structured `review` phase** — architecture checks + quality gates (format/lint/typecheck/tests)
   with an `implement → review → fix → re-review` loop
 - **Product backlog** — Markdown index + one file per task with structured frontmatter, a Product

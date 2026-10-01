@@ -1,5 +1,36 @@
 # Upgrading Specnaut
 
+## 4.6.x → 4.7.0
+
+### The chain now merges and pushes on its own
+
+`/specnaut` runs on **autopilot** by default. It still stops at the end of `plan` — the
+architecture, both audits' findings and the open questions are put to you there, before any code
+exists — but after your answers it no longer stops at the review verdict. It implements, reviews,
+fixes every CRITICAL or HIGH finding, merges into the base branch, **pushes**, and closes the
+backlog item without asking "Ready to merge?" or "Push to origin?".
+
+`specnaut upgrade` adds `.specnaut/workflow.yml` with the default spelled out, and refreshes the
+`chain-stops` block of your `AGENTS.md` to match. Nothing else is required.
+
+**If a human must read every change before it lands**, restore the merge stop in one line:
+
+```yaml
+# .specnaut/workflow.yml
+merge: manual
+```
+
+The chain then stops at the review verdict and asks "Ready to merge?" once; a yes covers the merge,
+the push and the close. A value the file cannot be read as — a typo — counts as `manual`, so a
+broken setting never pushes. For a single run, `--manual-merge` or "stop before merging" in your
+request does the same, and `/specnaut merge --pr` still delivers through a pull request.
+
+Two things no longer ask in either mode: the push after a merge, and closing the linked item. A
+rejected push is reported and never forced; the item then stays open. A feature delivered across
+several branches passes `--no-close` to `/specnaut merge` on every branch but the last — that used
+to be a "no" at the close question. Remote mode (`specnaut gate`) still raises its merge-approval
+gate.
+
 ## 4.4.x → 4.5.0
 
 ### Add to a bundled phase without preserving it
