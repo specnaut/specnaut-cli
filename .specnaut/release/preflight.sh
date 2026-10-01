@@ -40,14 +40,18 @@ git fetch origin main --quiet
 
 say "▶ CI green on HEAD"
 sha="$(git rev-parse HEAD)"
-# The headSha filter avoids racing on the previous commit's green run. The
+# Query by commit, not by branch: `--workflow ci --branch main` was served
+# from a stale index (its newest run was weeks old) while the run for HEAD
+# was already green, so the loop timed out on a passing CI. `--commit` asks
+# for exactly this SHA; the branch is already checked above. The
+# headSha filter avoids racing on the previous commit's green run. The
 # polling loop tolerates a fresh push where CI hasn't completed yet —
 # symmetric to postflight's release.yml polling. 10 × 30s = up to 5 min;
 # the preflight's `deno task test` runs for ~10-25 s on its own so this
 # rarely fires.
 conclusion=""
 for i in 1 2 3 4 5 6 7 8 9 10; do
-  conclusion="$(gh run list --workflow ci --branch main --limit 20 --json headSha,conclusion,status --jq "[.[] | select(.headSha == \"$sha\" and .status == \"completed\")] | .[0].conclusion")"
+  conclusion="$(gh run list --workflow ci --commit "$sha" --limit 20 --json headSha,conclusion,status --jq "[.[] | select(.headSha == \"$sha\" and .status == \"completed\")] | .[0].conclusion")"
   [ -n "$conclusion" ] && [ "$conclusion" != "null" ] && break
   say "  waiting for ci run on $sha to complete ($i/10)…"
   sleep 30
