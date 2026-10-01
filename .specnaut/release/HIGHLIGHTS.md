@@ -14,5 +14,5 @@ what was rejected; the stop reports it instead of asking you to confirm a recomm
 
 **Want a human on every merge?** `specnaut upgrade` adds `.specnaut/workflow.yml`. Set
 `merge: manual` and the chain asks once, at the review verdict, before merging and pushing. For a
-single run, pass `--manual-merge`. This is a major release because that one-line edit is the only
-way back to the previous behaviour; see UPGRADING.md.
+single run, pass `--manual-merge`. It is a major release because that one-line edit is the only way
+back to the previous behaviour — see UPGRADING.md.
