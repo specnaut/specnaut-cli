@@ -255,6 +255,24 @@ else
   exit 1
 fi
 
+# The attestation proves the bytes are the ones the workflow built; it does not
+# prove they RUN. Everything else that exercises the CLI — the test suite, the
+# smoke suite, CI — runs the source tree. So run the binary self-update just
+# installed, end to end, once (cli#632). A HARD failure for the same reason as
+# the attestation: a binary that cannot scaffold a project is not a release
+# with a warning on it. It needs the local binary to BE this release; when
+# self-update did not get there, say the step was skipped — never that it passed.
+publishedsmoke_skipped=0
+echo "▶ running the published binary end to end"
+if [ "$selfupdate_warned" -eq 1 ]; then
+  echo "⚠ skipped — the local binary is not $TAG, so it is not the published one"
+  publishedsmoke_skipped=1
+elif ! bash .specnaut/release/smoke-published.sh "$TAG"; then
+  echo "❌ $TAG is published but its binary fails a fresh init/check. Publish a"
+  echo "   patch, or retract it (see /ship release, \"Rollback\")."
+  exit 1
+fi
+
 # `|| true` is load-bearing: under `set -e` a bare `[ … ] && arr+=(…)` is exempt
 # only while it is not the final command of the script. That makes the block
 # position-dependent, and the next edit that moves it turns a green release red.
@@ -264,6 +282,7 @@ warnings=()
 [ "$docs_warned" -eq 1 ] && warnings+=("docs site stale, specnaut.com/version.json not updated") || true
 [ "$marketplace_warned" -eq 1 ] && warnings+=("marketplace catalog stale, that channel is behind") || true
 [ "$selfupdate_warned" -eq 1 ] && warnings+=("local binary not refreshed (does not affect the release)") || true
+[ "$publishedsmoke_skipped" -eq 1 ] && warnings+=("published binary NOT smoke-tested — run .specnaut/release/smoke-published.sh $TAG once updated") || true
 
 # A red job is not a warning-flavoured success. The verifications above still
 # ran and their results are worth printing, but the exit code has to say no.

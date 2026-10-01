@@ -4,11 +4,14 @@ Two scripts compose the Specnaut CLI release pipeline alongside the bundled tag 
 the design spec at
 `specnaut/specnaut-monorepo:docs/superpowers/specs/2026-05-26-release-flow-design.md`.
 
-- `preflight.sh` — runs before any release mutation: branch, cleanliness, CI, smoke audit, bundle,
-  test. Exits non-zero on any gate failure.
+- `preflight.sh` — runs before any release mutation: branch, cleanliness, the `ci` AND `smoke`
+  workflows green on HEAD, smoke audit, bundle, test. Exits non-zero on any gate failure.
 - `postflight.sh <tag>` — runs after the tag has been pushed: watches `release.yml`, verifies the
   GitHub Release has its assets, verifies the Homebrew tap formula bumped, refreshes the local
-  binary.
+  binary, verifies the artefacts against the attestation, then runs the published binary end to end
+  through `smoke-published.sh`.
+- `smoke-published.sh <tag> [binary]` — `init`, scaffold check and `check --project` with the
+  installed binary in a throwaway directory. The only check that executes what users download.
 
 These files are convention-pathed (the release skill expects them here). To adjust a check, edit the
 relevant script — never inline new checks into the skill, or you defeat the whole point of the

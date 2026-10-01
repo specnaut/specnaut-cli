@@ -38,25 +38,32 @@ say "▶ in sync with origin/main"
 git fetch origin main --quiet
 [ "$(git rev-parse HEAD)" = "$(git rev-parse origin/main)" ] || { say "❌ local main diverges from origin"; exit 1; }
 
-say "▶ CI green on HEAD"
+say "▶ ci and smoke green on HEAD"
 sha="$(git rev-parse HEAD)"
+# BEGIN workflow-gate
+# Both workflows, not just `ci`: `smoke` runs the whole smoke suite
+# (scripts/smoke/run-all.sh) against this exact commit, and nothing else in
+# the release path asked whether it passed — a red smoke would not stop a tag.
+#
 # Query by commit, not by branch: `--workflow ci --branch main` was served
 # from a stale index (its newest run was weeks old) while the run for HEAD
 # was already green, so the loop timed out on a passing CI. `--commit` asks
-# for exactly this SHA; the branch is already checked above. The
-# headSha filter avoids racing on the previous commit's green run. The
-# polling loop tolerates a fresh push where CI hasn't completed yet —
-# symmetric to postflight's release.yml polling. 10 × 30s = up to 5 min;
-# the preflight's `deno task test` runs for ~10-25 s on its own so this
-# rarely fires.
-conclusion=""
-for i in 1 2 3 4 5 6 7 8 9 10; do
-  conclusion="$(gh run list --workflow ci --commit "$sha" --limit 20 --json headSha,conclusion,status --jq "[.[] | select(.headSha == \"$sha\" and .status == \"completed\")] | .[0].conclusion")"
-  [ -n "$conclusion" ] && [ "$conclusion" != "null" ] && break
-  say "  waiting for ci run on $sha to complete ($i/10)…"
-  sleep 30
+# for exactly this SHA; the branch is already checked above. The headSha
+# filter avoids racing on the previous commit's green run. 20 × 30s = up to
+# 10 min per workflow: ci's Windows cross-smoke alone has taken longer than
+# the 5 min this loop used to allow.
+for wf in ci smoke; do
+  conclusion=""
+  for i in $(seq 1 20); do
+    conclusion="$(gh run list --workflow "$wf" --commit "$sha" --limit 20 --json headSha,conclusion,status --jq "[.[] | select(.headSha == \"$sha\" and .status == \"completed\")] | .[0].conclusion")"
+    [ -n "$conclusion" ] && [ "$conclusion" != "null" ] && break
+    say "  waiting for the $wf run on $sha to complete ($i/20)…"
+    sleep 30
+  done
+  [ "$conclusion" = "success" ] || { say "❌ $wf not green on $sha (got: ${conclusion:-no-completed-run-after-10min})"; exit 1; }
+  say "  ✓ $wf green"
 done
-[ "$conclusion" = "success" ] || { say "❌ CI not green on $sha (got: ${conclusion:-no-completed-run-after-5min})"; exit 1; }
+# END workflow-gate
 
 say "▶ smoke audit"
 # The audit owns its own verdict: its exit code IS the answer (plan.md §5 R5).
