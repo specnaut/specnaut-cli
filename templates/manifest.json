@@ -1779,6 +1779,12 @@
     {
       "category": "spec-root",
       "name": "specify",
+      "suffix": "workflow.yml",
+      "source": "core/specnaut/workflow.yml"
+    },
+    {
+      "category": "spec-root",
+      "name": "specify",
       "suffix": "scripts/powershell/setup-plan.ps1",
       "source": "core/specnaut/scripts/powershell/setup-plan.ps1"
     },

@@ -238,10 +238,11 @@ SURFACES=(
   'templates/core/specnaut/backlog.md|smoke-backlog-local.sh|specnaut-root-doc'
   'templates/core/specnaut/logs/README.md|smoke-features.sh|specnaut-root-doc'
   # A per-project declaration file, named individually rather than as
-  # `templates/core/specnaut/*.yml`. There is exactly one today, and a glob
+  # `templates/core/specnaut/*.yml`. There are two today, and a glob
   # here would claim the next one silently — which is the opposite of what
   # the unmapped class is for.
   'templates/core/specnaut/gates.yml|smoke-features.sh|specnaut-config'
+  'templates/core/specnaut/workflow.yml|smoke-features.sh|specnaut-config'
   # Harness-specific artefacts. The pathspec ignored this whole tree until
   # #551 — twelve shipped files, including all three bundled hooks, that the
   # coverage scan had never once looked at while its success line claimed

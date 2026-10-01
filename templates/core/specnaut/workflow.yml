@@ -1,0 +1,32 @@
+# How far the /specnaut chain goes on its own.
+#
+# The chain is plan → tasks → implement → review → merge. Its one mandatory
+# stop is the end of `plan`: the architecture, both audits' findings and the
+# open questions are put to you there, before any code exists. That stop is
+# where the work is decided, so it is where your attention is asked for.
+#
+#   merge: auto    — the default. After you approve the plan, the chain runs
+#                    to the end without asking again: it implements, reviews,
+#                    fixes every CRITICAL or HIGH finding, merges into the base
+#                    branch, pushes it, and closes the backlog item. It still
+#                    halts when it is genuinely blocked — a CRITICAL or HIGH
+#                    finding it cannot fix, a failed or incomplete review, a
+#                    merge that cannot fast-forward, a push the remote refuses.
+#
+#   merge: manual  — the chain stops at the review verdict and asks once,
+#                    "Ready to merge?". A yes covers the merge, the push and
+#                    the close. Choose this when a human must read every
+#                    change before it lands.
+#
+# A single run overrides this file: `/specnaut … --manual-merge`, or "stop
+# before merging" in the request, means manual for that run; "merge it" means
+# auto. Invoking `/specnaut merge` yourself is always the instruction to merge
+# and push. `/specnaut merge --pr` delivers through a pull request instead of
+# a local merge, whichever mode is set here. Remote mode (`specnaut gate`)
+# raises its merge-approval gate in both modes.
+#
+# The format is deliberately narrow: one top-level key, one bare value. No
+# file, or no `merge:` key, means `auto`. Any other value is read as `manual`
+# — a setting that cannot be read resolves to the reading that does not push.
+
+merge: auto
