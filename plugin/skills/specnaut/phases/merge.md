@@ -12,6 +12,8 @@ $ARGUMENTS
 - `$ARGUMENTS` is optional and may contain, in any order:
   - a **base branch** — the first token that is not a flag. Defaults to `main`.
   - **`--pr`** — deliver through a pull request instead of merging locally. Off by default.
+  - **`--no-close`** — merge and push, but leave the backlog item open (step 11 is skipped): for a
+    feature delivered across several branches, on every branch but the last.
 
 ## The default is a local merge. `--pr` is the opt-in.
 
@@ -30,7 +32,8 @@ wanted pull requests will say so.
 
 ## Steps
 
-1. Determine the base branch from `$ARGUMENTS` (default `main`), and whether `--pr` was passed.
+1. Determine the base branch from `$ARGUMENTS` (default `main`), and whether `--pr` or `--no-close`
+   was passed.
 2. Run `git status --porcelain` — abort if the working tree is dirty.
 3. Run `git fetch origin <base>` and verify the current branch is up-to-date with `origin/<base>`
    (fast-forward or rebase first if behind).
@@ -57,9 +60,14 @@ wanted pull requests will say so.
 7. Run `git merge --ff-only <feature-branch>`. If fast-forward is not possible, stop and ask the
    user whether to rebase.
 8. Print the merge summary (files changed, commits merged).
-9. Ask the user: "Push to origin <base>? (yes/no)" — **unless they already told you to merge**, in
-   which case pushing is part of the instruction they gave and asking re-collects permission
-   already granted at the most expensive moment: the very end of the chain.
+9. **Push `<base>` to `origin` — push without asking, in either merge mode.** Reaching this step
+   *is* the instruction: the chain only invokes `merge` once the mode allowed it
+   (`phases/auto-chain.md` reads the mode, this phase does not), and a user typing `/specnaut merge`
+   asked for it. Asking again re-collects permission at the most expensive moment of the chain.
+   **If the push is rejected**, report the remote's exact message and stop: the merge stays on the
+   local base branch (no reset), nothing is retried — never `--force`, never an automatic rebase —
+   and the close below does not run. Name the recovery: `git fetch`, reconcile, re-run
+   `/specnaut merge`.
 10. **End on the base branch.** A merge is not finished while `HEAD` is still on the feature branch —
     landing the commits is half of it; the other half is that the person who asked is back where they
     work. Delete the merged branch (`git branch -d`, never `-D`: a refusal means the merge did not
@@ -68,7 +76,8 @@ wanted pull requests will say so.
     from your side — the commits ARE on the base branch, everything looks right, and only the human
     sees the wrong branch name in their prompt.
 
-11. **Close what shipped, and reconcile the board** — only if the push happened. Load
+11. **Close what shipped, and reconcile the board** — only if the push happened and `--no-close`
+    was not passed. Load
     `phases/merge-close.md` and follow it. It covers both paths: one item and one card on the
     standalone path, N children plus the epic on an epic branch, and the reconcile sweep that asks
     the board whether it agrees with the repository.
@@ -138,7 +147,8 @@ title, and a resolved link, never a bare number. The reader uses this report to 
 a bare number is not checkable.
 
 
-A structured report with: files merged, commits merged, whether the user chose to push, and — when
+A structured report with: files merged, commits merged, whether the push ran (or the remote's
+message if it was rejected), and — when
 the close ran — whether the linked issue was closed (and via which backend), or skipped (and why:
 no `linked_issue`, user declined, or `cascade-check` returned any non-zero exit — quote which,
 since "a child is still open" and "the children could not be read" are different reasons to stop). It must also quote

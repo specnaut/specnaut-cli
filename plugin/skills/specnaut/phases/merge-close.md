@@ -42,18 +42,12 @@ which shell cannot offer, but never resting in the state that lies.
        found **or its children could not be read** — a token, scope or network problem, not a
        verdict; say so and stop rather than closing. Exit 12 means it is already closed, so there
        is nothing to do.
-    4. Ask the user to confirm, naming the item per the `backlog-reference-contract`
-       skill — number, title, and a resolved link, never a bare number. The user is being
-       asked to authorise an action on an item they must be able to identify.
-
-       Name **both** consequences in that one question: the issue is closed and its card moved,
-       **and** the spec directory is removed in its own commit (step 8). One `yes` authorises
-       both — a second prompt would only invite the state where the item is closed and its
-       consumed artefact still sits in the tree.
-
-       On `no`, skip the rest of this section — leave the column flip to a future run or to a
-       manual `move.sh`, and leave the directory alone.
-    5. On `yes`, **github + gitlab only** — close the issue, before touching the card. Dispatch
+    4. **Do not ask.** The push was the authorisation — under `merge: manual` it was given once,
+       at the review verdict, and nothing asks twice. Both consequences follow from it together:
+       the issue is closed and its card moved, **and** the spec directory is removed in its own
+       commit (step 8) — never one without the other. The report names the item per the
+       `backlog-reference-contract` skill: number, title, resolved link.
+    5. **github + gitlab only** — close the issue, before touching the card. Dispatch
        the `product-owner` subagent with the prompt:
        "The branch for issue #<linked_issue> just landed on `main`. Please run the close half of
        the two-step close: post a close comment on the issue referencing the merged commit range
@@ -103,8 +97,8 @@ which shell cannot offer, but never resting in the state that lies.
        still resolves, so `get_feature_paths` hands callers a path to nothing — exit 0, no
        warning, its branch guard skipped off a feature branch.
 
-       A feature with no `linked_issue` reaches none of this: step 1 skipped the section, so
-       nobody was asked, and that `yes` is the authorisation. Intended.
+       A feature with no `linked_issue` reaches none of this: step 1 skipped the section.
+       Intended.
 
     **Report the removal, or the reason there wasn't one.** One line naming the removed path
     and how to get it back (`git log --all -- <dir>`), or one line naming the unmet condition.
@@ -114,7 +108,8 @@ which shell cannot offer, but never resting in the state that lies.
 
     Backward-compat: feature trees without `linked_issue` (created before this field existed)
     skip the close silently. A feature delivered across several branches — the last one has not
-    landed yet — the user answers `no` at the confirmation above and re-runs `/specnaut merge` on the last one.
+    landed yet — passes `--no-close` to `/specnaut merge` on every branch but the last: it skips
+    this section, and the item closes when the last branch lands.
 
 12. **Reconcile the board** (only if push happened; github + gitlab backends only).
     Run `bash .specnaut/scripts/backlog/sweep-closed.sh --passes 2` — its header
