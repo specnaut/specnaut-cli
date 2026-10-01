@@ -9,11 +9,9 @@ You **MUST** consider the user input before proceeding (if not empty).
 ## What this phase is for
 
 **One planning document per feature**: what it does, the architecture it must obey, and the
-questions only the user can answer. It replaces four phases and asks the one question that decides
-whether a feature ships once or four times: **what are this feature's decisions, and where does each
-one live?** A developer free to choose where a rule lives will spell it twice, and finding that at
-review time means rebuilding after the code exists. So: **shorter** than what it replaced,
-**stricter** about that one thing.
+questions only the user can answer. It asks the question that decides whether a feature ships once
+or four times: **what are this feature's decisions, and where does each one live?** A rule whose
+home is free gets spelled twice, and finding that at review means rebuilding.
 
 ## Pre-Execution Checks
 
@@ -33,10 +31,10 @@ actor and a rough scope can; "something to keep track of runs" cannot.
 When it cannot, run a short discovery dialogue **before** writing anything. How a question is put
 is decided by the `response-style-contract` skill — read it; never restate it here. What is specific
 to discovery: offer genuinely different **shapes**, not three phrasings of one, and stop as soon as
-you can state the outcome, the actor, and what is out of scope.
+you can state the outcome, the actor, what is out of scope, and how acceptance is checked.
 
-Then **continue into step 2 in the same turn.** Discovery opens this phase; it is not a phase of its
-own, and not a reason to hand control back.
+Then **continue into step 2 in the same turn** — discovery opens this phase, it is not a reason to
+hand control back.
 
 ### 2. Resolve the feature and create its home
 
@@ -76,9 +74,8 @@ one and `merge`'s move to `Done`.
 
 - `.specnaut/memory/constitution.md` — binding, and it outranks this file.
 - The linked backlog item's body, when there is one.
-- **The code the feature touches.** Most of what looks like a design question is already decided
-  somewhere in the repository, and a plan that re-decides it produces a second spelling — the exact
-  defect this phase exists to prevent.
+- **The code the feature touches.** Most design questions are already decided there; re-deciding
+  one produces a second spelling.
 
 ### 4. Write ONE document: `plan.md`
 
@@ -126,8 +123,8 @@ every rule the feature introduces:
 - **Every requirement that is a rule gets a row.** If a requirement says "closed by default", the
   table says where "closed" is decided.
 - **A home is a file, not a layer.** "the service layer" is not a home.
-- **The third column is the useful one.** It is what a reviewer greps for, and writing it forces you
-  to notice when a schema constraint and an application check are two spellings of one rule.
+- **The third column is the useful one** — what a reviewer greps for, and what makes two spellings
+  of one rule visible.
 - **A rule with two genuine enforcement points** names the ONE place the *decision* is made, and
   records that both *ask* it. Two askers is fine; two deciders is the defect.
 
@@ -145,14 +142,15 @@ Read `phases/plan-audits.md` and follow it. It dispatches `architect-expert` and
 `security-expert` on `plan.md` **in the same message**, before a single line is written, and it
 carries the eight questions they are asked and the rule that their findings land **in `plan.md`**.
 
-Not optional, and not deferrable to `review`: architecture found at review time is architecture
-rebuilt, and a security finding against existing code moves a boundary the whole feature was built
-against.
+Not optional, not deferrable to `review`: architecture found at review time is architecture
+rebuilt.
 
 ### 8. STOP — the user answers before any code exists
 
-**Mandatory. Never skipped, never inferred, never assumed from silence.** This is stop 1 of the
-chain's two stops. Present, in this order:
+**Mandatory. Never skipped, never inferred, never assumed from silence.** It is the chain's one
+mandatory stop: under the default `merge: auto` nothing after it asks again — the branch is merged,
+pushed and its item closed. **Say so**, and ask here what autopilot would otherwise settle alone.
+Present, in this order:
 
 1. **The architecture, as a proposal with its alternatives.** Name what you rejected and why. A
    single option presented as settled gets approved by default — the same as not asking.
@@ -160,7 +158,9 @@ chain's two stops. Present, in this order:
    plan, or accepted the objection with a reason. Never as a formality that passed, never folded
    together.
 3. **The open questions** — business rules, thresholds, what happens to existing data, anything
-   where two readings lead to materially different work. Put them per the
+   where two readings lead to materially different work — **and what autopilot would decide
+   alone**: the base branch, anything irreversible or destructive, changes to a public surface, the
+   acceptance outcome. Put them per the
    `response-style-contract` skill, ordered so the answer that invalidates the most others comes
    first.
 4. **Anything you decided yourself** because the code or a standing decision already answered it —

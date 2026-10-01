@@ -239,7 +239,7 @@ Deno.test("workflowLength counts characters, not UTF-16 code units", () => {
  * Lower it whenever the population drops; the assertion below is an equality
  * and will tell you to. Never raise it.
  */
-const WINDSURF_CLUSTERED_WORKFLOWS = 8;
+const WINDSURF_CLUSTERED_WORKFLOWS = 7;
 
 Deno.test("the cluster of workflows crowding the Cascade budget does not grow", () => {
   // The per-file assertion above is a ceiling, and a ceiling is satisfied by
