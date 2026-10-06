@@ -445,7 +445,9 @@ check "security knowledge base scaffolded" \
 check "architecture catalogue scaffolded" \
   '[ -f .specnaut/memory/architecture/README.md ]'
 check "size limits: the one rule and the defaults are scaffolded (#645)" \
-  'grep -q "only source of thresholds" .specnaut/memory/size-limits.md'
+  'grep -q "^## Where the numbers come from" .specnaut/memory/size-limits.md && grep -q "^| file | 300 | 500 |" .specnaut/memory/size-limits.md'
+check "size limits: plan-template gates on Files touched, tasks-template extracts first (#647, #648)" \
+  'grep -q "^### Files touched" .specnaut/templates/plan-template.md && grep -qF "**Extractions first.**" .specnaut/templates/tasks-template.md'
 check "size limits: the seed constitution carries the table (#645)" \
   'grep -q "^## Size limits" .specnaut/memory/constitution.md && grep -q "^| file | 300 | 500 |" .specnaut/memory/constitution.md'
 check "a11y catalogue scaffolded" \
