@@ -85,6 +85,12 @@
       "source": "core/skills/specnaut/phases/constitution.md"
     },
     {
+      "category": "phase",
+      "name": "specnaut",
+      "suffix": "upgrade.md",
+      "source": "core/skills/specnaut/phases/upgrade.md"
+    },
+    {
       "category": "backlog-doc",
       "name": "board",
       "suffix": "groom.md",

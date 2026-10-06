@@ -168,6 +168,11 @@ specnaut diff                 # show how your customized files diverge from the 
 specnaut diff <path>          # scope that to one managed file
 ```
 
+Or, from inside your agent's session, **`/specnaut upgrade`** does the whole round: it updates the
+binary if a newer release is out, runs `specnaut upgrade`, lists what was kept as customised and
+what waits for `specnaut reconcile`, checks the project, and commits the result
+(`chore(specnaut): upgrade to v<version>`) without pushing. `--dry-run` shows the plan only.
+
 Specnaut tracks the SHA256 of each template in `.specnaut/installed.lock` so it can detect your
 local edits and avoid overwriting them. Commit this lock file alongside your project.
 

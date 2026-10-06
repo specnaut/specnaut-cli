@@ -67,7 +67,7 @@ check ".claude/commands/ is not created at all (#533)" \
   '[ ! -e .claude/commands ]'
 check "router .claude/skills/specnaut/SKILL.md present" \
   '[ -f .claude/skills/specnaut/SKILL.md ]'
-for phase in plan plan-audits tasks implement review merge merge-squash epic-commits quality-gates epic-fixups merge-close epic-loop constitution; do
+for phase in plan plan-audits tasks implement review merge merge-squash epic-commits quality-gates epic-fixups merge-close epic-loop constitution upgrade; do
   check ".claude/skills/specnaut/phases/$phase.md present" \
     "[ -f .claude/skills/specnaut/phases/$phase.md ]"
 done
@@ -340,6 +340,8 @@ check "no surface of the gate mechanism names a test tool (#555 AC2)" \
        .claude/skills/specnaut/phases/quality-gates.md'
 check "phase doc constitution.md scaffolded" \
   '[ -f .claude/skills/specnaut/phases/constitution.md ]'
+check "phase doc upgrade.md scaffolded, and routed by the router" \
+  '[ -f .claude/skills/specnaut/phases/upgrade.md ] && grep -q "phases/upgrade.md" .claude/skills/specnaut/SKILL.md'
 check "removed phases do NOT scaffold (#455)" \
   '! ls .claude/skills/specnaut/phases/ | grep -qE "^(brainstorm|specify|clarify|analyze|checklist|list-skills|lite-heuristic)\.md$"'
 check "phase doc tasks.md scaffolded" \

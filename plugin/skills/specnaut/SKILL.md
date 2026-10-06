@@ -1,7 +1,7 @@
 ---
 name: specnaut
-description: Specnaut workflow router — entry point for the spec-driven pipeline. `/specnaut <phase> [args]` dispatches to a single phase (plan, tasks, implement, review, merge, constitution, audit). `/specnaut` with no args prints the workflow overview.
-argument-hint: <plan|tasks|implement|review|merge|constitution|audit> [args]
+description: Specnaut workflow router — entry point for the spec-driven pipeline. `/specnaut <phase> [args]` dispatches to a single phase (plan, tasks, implement, review, merge, constitution, audit, upgrade). `/specnaut` with no args prints the workflow overview.
+argument-hint: <plan|tasks|implement|review|merge|constitution|audit|upgrade> [args]
 when_to_use: |
   Trigger phrases that should route here:
   - plan: "plan a feature", "spec out a feature", "write a spec", "build a technical plan", "I have a rough idea", "help me figure out what to build", "I don't know exactly what I want yet", "clarify requirements"
@@ -10,6 +10,7 @@ when_to_use: |
   - review: "review the implementation", "run quality gates"
   - merge: "merge the branch", "ship the feature"
   - constitution: "update the constitution", "edit project rules"
+  - upgrade: "upgrade specnaut", "update the specnaut templates", "get the latest specnaut"
   - audit: "audit security / performance / accessibility / architecture / dependencies", "scan the codebase for X issues"
 ---
 
@@ -49,6 +50,7 @@ when_to_use: |
 | `review` | `phases/review.md` | The quality battery on a frozen tree. Its verdict is the merge request. |
 | `merge` | `phases/merge.md` | Pre-merge validation and merge the feature branch. |
 | `constitution` | `phases/constitution.md` | Edit the project's `constitution.md` rules. |
+| `upgrade` | `phases/upgrade.md` | Update the `specnaut` binary if a newer one is out, run `specnaut upgrade`, verify, commit. |
 | `audit security` | `phases/audit-security.md` | Read-only project-wide security sweep; emits a findings report. |
 | `audit performance` | `phases/audit-performance.md` | Read-only project-wide performance sweep; emits a findings report. |
 | `audit accessibility` | `phases/audit-accessibility.md` | Read-only project-wide WCAG 2.1 AA sweep; skips when no FE surface is detected. |
@@ -86,7 +88,7 @@ after any push, `implement` loads the seventh on an epic, and the router loads t
 chains. Naming any of them as a phase prints the index and stops.
 
 Chainable phases are: `plan`, `tasks`, `implement`, `review`. The others (`merge`, `constitution`,
-`audit <axis>`) are one-shot regardless of chain mode.
+`upgrade`, `audit <axis>`) are one-shot regardless of chain mode.
 
 The accessibility phase is FE-gated — projects without front-end source receive a one-line "skipped
 — no FE surface" response instead of an empty report. The dependencies phase aborts with "skipped —
@@ -139,7 +141,7 @@ Unknown phase → print the phase index and stop.
 After the phase procedure completes successfully:
 
 - `CHAIN_MODE == off` (the user passed `--manual`) → stop. Report the phase outcome.
-- Phase is not chainable (`merge`, `constitution`, `audit <axis>`) → stop.
+- Phase is not chainable (`merge`, `constitution`, `upgrade`, `audit <axis>`) → stop.
 - Otherwise → read `phases/auto-chain.md` and follow it.
 
 **Re-entry needs no flag.** Invoking a phase whose downstream artefacts already exist runs one-shot
