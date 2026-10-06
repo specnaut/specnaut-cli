@@ -3,7 +3,7 @@
 **Branch**: `[###-feature-name]` | **Date**: [DATE] | **Backlog item**: [#N — title, as a link]
 
 **This is the feature's one planning document.** Business and technical together, read whole by
-whoever implements it. Filled in by `__SPECNAUT_COMMAND_PLAN__`; the phase doc
+whoever implements it. Filled in by `/specnaut plan`; the phase doc
 (`phases/plan.md`) is the procedure, this file is the shape.
 
 All twelve sections below are **mandatory**. Remove a section's placeholder text, never the
@@ -129,7 +129,7 @@ only" is a valid answer; an unstated one is not.]
 ```text
 .specnaut/specs/[###-feature]/
 ├── plan.md    # This file — the whole plan
-└── tasks.md   # __SPECNAUT_COMMAND_TASKS__ output, derived from THIS file once approved
+└── tasks.md   # `/specnaut tasks` output, derived from THIS file once approved
 ```
 
 Two files. There is no `research.md`, `data-model.md`, `quickstart.md` or `contracts/` — where that

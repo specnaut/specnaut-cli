@@ -594,7 +594,7 @@ loading any design document. It writes the spec's tabs to the gitignored
 (offline/auth), stop with its message — do not proceed against an empty spec.
 
 <!-- END: spec-backend=cloud -->
-1. **Setup**: Run \`{SCRIPT}\` from repo root and parse FEATURE_DIR and AVAILABLE_DOCS list. All paths must be absolute. For single quotes in args like "I'm Groot", use escape syntax: e.g 'I'\\''m Groot' (or double-quote if possible: "I'm Groot").
+1. **Setup**: Run \`.specnaut/scripts/bash/check-prerequisites.sh --json\` from repo root and parse FEATURE_DIR and AVAILABLE_DOCS list. All paths must be absolute. For single quotes in args like "I'm Groot", use escape syntax: e.g 'I'\\''m Groot' (or double-quote if possible: "I'm Groot").
 
 2. **Load design documents**: Read from FEATURE_DIR:
    - **Required**: \`plan.md\` — the feature's ONE planning document. It carries the user
@@ -670,7 +670,7 @@ loading any design document. It writes the spec's tabs to the gitignored
        \`\`\`
    - If no hooks are registered or \`.specnaut/extensions.yml\` does not exist, skip silently
 
-Context for task generation: {ARGS}
+Context for task generation: the User Input above.
 
 The tasks.md should be immediately executable - each task must be specific enough that an LLM can complete it without additional context.
 
@@ -832,7 +832,7 @@ You **MUST** consider the user input before proceeding (if not empty).
      (the \`--branch-only\` flag creates only the branch — no \`.specnaut/specs/\` dir).
 
 <!-- END: spec-backend=cloud -->
-1. Run \`{SCRIPT}\` from repo root and parse FEATURE_DIR and AVAILABLE_DOCS list. All paths must be absolute. For single quotes in args like "I'm Groot", use escape syntax: e.g 'I'\\''m Groot' (or double-quote if possible: "I'm Groot").
+1. Run \`.specnaut/scripts/bash/check-prerequisites.sh --json --require-tasks --include-tasks\` from repo root and parse FEATURE_DIR and AVAILABLE_DOCS list. All paths must be absolute. For single quotes in args like "I'm Groot", use escape syntax: e.g 'I'\\''m Groot' (or double-quote if possible: "I'm Groot").
 
 2. Load and analyze the implementation context:
    - **REQUIRED**: Read tasks.md for the complete task list and execution plan
@@ -25612,7 +25612,7 @@ above so projects that later migrate to a remote backend keep continuity.
 **Branch**: \`[###-feature-name]\` | **Date**: [DATE] | **Backlog item**: [#N — title, as a link]
 
 **This is the feature's one planning document.** Business and technical together, read whole by
-whoever implements it. Filled in by \`__SPECNAUT_COMMAND_PLAN__\`; the phase doc
+whoever implements it. Filled in by \`/specnaut plan\`; the phase doc
 (\`phases/plan.md\`) is the procedure, this file is the shape.
 
 All twelve sections below are **mandatory**. Remove a section's placeholder text, never the
@@ -25738,7 +25738,7 @@ only" is a valid answer; an unstated one is not.]
 \`\`\`text
 .specnaut/specs/[###-feature]/
 ├── plan.md    # This file — the whole plan
-└── tasks.md   # __SPECNAUT_COMMAND_TASKS__ output, derived from THIS file once approved
+└── tasks.md   # \`/specnaut tasks\` output, derived from THIS file once approved
 \`\`\`
 
 Two files. There is no \`research.md\`, \`data-model.md\`, \`quickstart.md\` or \`contracts/\` — where that
@@ -25848,7 +25848,7 @@ description: "Task list template for feature implementation"
   ============================================================================
   IMPORTANT: The tasks below are SAMPLE TASKS for illustration purposes only.
   
-  The __SPECNAUT_COMMAND_TASKS__ command MUST replace these with actual tasks based on:
+  The \`/specnaut tasks\` phase MUST replace these with actual tasks based on:
   - User stories and their priorities from plan.md § 2 (User scenarios)
   - Feature requirements from plan.md § 3 (Requirements)
   - Entities from plan.md § 6 (Technical context → Domain model)
