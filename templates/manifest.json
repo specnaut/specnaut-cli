@@ -1754,6 +1754,13 @@
     {
       "category": "spec-root",
       "name": "specify",
+      "suffix": "scripts/bash/size-ratchet.sh",
+      "source": "core/specnaut/scripts/bash/size-ratchet.sh",
+      "executable": true
+    },
+    {
+      "category": "spec-root",
+      "name": "specify",
       "suffix": "scripts/bash/setup-plan.sh",
       "source": "core/specnaut/scripts/bash/setup-plan.sh",
       "executable": true

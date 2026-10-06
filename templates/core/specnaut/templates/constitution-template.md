@@ -53,7 +53,7 @@ notes it in the completion report.
 
 Exempt: `*.lock`
 
-1. **A unit over its ceiling fails.**
+1. **A unit over its ceiling fails** — unless the change shrinks it.
 2. **A unit over its target may not grow** — lines after ≤ lines before.
 3. **Extract before you add** — when a change must touch a file over its
    target, the extraction lands first and moves out at least as many lines as

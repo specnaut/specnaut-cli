@@ -60,7 +60,7 @@ Deno.test("review: the coordinator measures base and head and briefs every seat 
   const limits = await read("templates/core/specnaut/memory/size-limits.md");
   for (
     const row of [
-      "| A unit ends over its ceiling | HIGH |",
+      "| A unit ends over its ceiling and did not shrink | HIGH |",
       "| A unit already over its target grew | HIGH |",
       "| A unit crosses its target for the first time | MEDIUM |",
     ]

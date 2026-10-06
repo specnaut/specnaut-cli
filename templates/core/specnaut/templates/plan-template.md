@@ -101,8 +101,8 @@ number beats a paragraph. Who is hurting, how often, and what it costs them toda
 ### Files touched
 
 *GATE: `Lines now` is measured with `wc -l` while writing this plan, never estimated. The plan is
-not done while any file's lines after exceed its ceiling, or a file already over its target has
-lines after > lines now. The remedy is an extraction planned here, not a justification below.*
+not done while any file's lines after exceed its ceiling without shrinking, or a file already over
+its target has lines after > lines now. The remedy is an extraction planned here, not a justification below.*
 
 | File | Lines now | Lines after (est.) | Over target? | Responsibility of each new module (one line) |
 | :--- | ---: | ---: | :--- | :--- |

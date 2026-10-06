@@ -81,6 +81,22 @@ A failing full gate is fixed on the branch and retried — a fixup commit
 attributed to the child at fault, then the gate again. It does not abandon the
 merge and does not hand the epic back.
 
+## The size ratchet — with every tier
+
+When `.specnaut/scripts/bash/size-ratchet.sh` is present, run it after each tier,
+on what the branch has committed:
+
+```
+.specnaut/scripts/bash/size-ratchet.sh --since "$(git merge-base HEAD <default branch>)"
+```
+
+It holds every changed file to the constitution's file limits
+(`.specnaut/memory/size-limits.md`): exit 1 is a failure of the tier it follows,
+fixed the same way; exit 2 means the constitution's Size limits table cannot be
+read — fix the table, never skip the check. Without `--since` it checks the
+staged changes, which is the form a pre-commit runner calls. Specnaut installs
+no git hook: wiring it into one is the project's choice.
+
 ## A standalone item
 
 None of this applies. A standalone task has one commit and one merge; there is

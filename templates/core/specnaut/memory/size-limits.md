@@ -48,7 +48,9 @@ Exempt: `*.lock`, `**/generated/**`
 
 ## The three rules
 
-1. **A unit over its ceiling fails.** Whatever the change, whatever it removed.
+1. **A unit over its ceiling fails** — unless the change shrinks it. A unit
+   already over its ceiling can only get out by shrinking, a commit at a time;
+   refusing that commit would refuse the remedy.
 2. **A unit over its target may not grow.** Lines after ≤ lines before. It may
    stay the same size or shrink.
 3. **Extract before you add.** When a change must touch a file over its target,
@@ -62,9 +64,10 @@ the agent reading it, from its first line to its last.
 
 | What the diff does | Severity |
 | :--- | :--- |
-| A unit ends over its ceiling | HIGH |
+| A unit ends over its ceiling and did not shrink | HIGH |
 | A unit already over its target grew | HIGH |
 | A unit crosses its target for the first time | MEDIUM |
+| A unit over its ceiling shrank | no finding — report how far over it still is |
 | A unit over its target shrank, or stayed the same | no finding — say so |
 
 A HIGH size finding is routed like any other HIGH finding.
@@ -80,8 +83,8 @@ the limits above cover the number.
 
 **plan** — § 7 of the plan carries the mandatory size row and the **Files
 touched** table. `Lines now` is `wc -l`, measured at plan time. The plan is not
-done while a file's lines after exceed its ceiling, or a file already over its
-target has lines after > lines now. Complexity tracking cannot accept a size
+done while a file's lines after exceed its ceiling without shrinking, or a file
+already over its target has lines after > lines now. Complexity tracking cannot accept a size
 violation: the remedy is an extraction inside the plan. Each new module gets a
 one-line responsibility; one that needs "and" is two.
 
@@ -97,7 +100,7 @@ subagent's dispatch brief: a subagent sees one task and one file, and without
 the table has no reason to stop a file from growing. Run `wc -l` on each file a
 task touches, before and after, and report every one as
 `file: before → after (target T, ceiling C)`. A file over its target that grew,
-or any file over its ceiling, is a blocker: fix it — extract — before handing
+or a file over its ceiling that did not shrink, is a blocker: fix it — extract — before handing
 off to review, never after.
 
 **review** — the review coordinator measures every changed file at the base

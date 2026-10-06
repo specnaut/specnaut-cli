@@ -309,6 +309,8 @@ check "workflow.yml scaffolded with merge: auto as the default" \
   '[ -f .specnaut/workflow.yml ] && grep -qE "^merge: auto$" .specnaut/workflow.yml'
 check "run-gate.sh scaffolded + executable (#555)" \
   '[ -x .specnaut/scripts/bash/run-gate.sh ]'
+check "size-ratchet.sh scaffolded + executable, run by the quality gates (#651)" \
+  '[ -x .specnaut/scripts/bash/size-ratchet.sh ] && grep -qF "size-ratchet.sh --since" .claude/skills/specnaut/phases/quality-gates.md'
 check "run-gate.ps1 twin scaffolded (#555)" \
   '[ -f .specnaut/scripts/powershell/run-gate.ps1 ]'
 check "an epic reaches the fast tier: implement -> epic-loop -> run-gate (#555)" \
