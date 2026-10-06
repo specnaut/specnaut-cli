@@ -1,7 +1,7 @@
 ---
 name: board
 description: Manage this project's board — the backlog and every other status column. Add, list, view, move, clarify, groom and close items, from Backlog through Done. The backend is fixed at init time and recorded in `.specnaut/installed.lock`. Run `specnaut upgrade --backlog <new>` to switch.
-argument-hint: [list|next|add|update|estimate|status|groom|brief] [args]
+argument-hint: "[list|next|add|update|estimate|status|groom|brief] [args]"
 ---
 
 # Board skill

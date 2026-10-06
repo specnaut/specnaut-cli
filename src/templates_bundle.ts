@@ -2542,7 +2542,7 @@ pre-step.
     content: `---
 name: ship
 description: Take a built thing to production — compute and push a version tag, publish a release with categorized notes, or publish a release for a tag that already exists. Inspects repository state first and asks only when the intent is genuinely ambiguous. The versioning scheme is fixed at init time and recorded in \`.specnaut/installed.lock\`.
-argument-hint: [tag|release|<version>] [--bump major|minor|patch] [--no-push]
+argument-hint: "[tag|release|<version>] [--bump major|minor|patch] [--no-push]"
 when_to_use: |
   Trigger phrases that should route here:
   - "ship it", "ship this", "cut a release", "publish a release"
@@ -10303,7 +10303,7 @@ should survive across sessions and isn't captured elsewhere:
     content: `---
 name: board
 description: Manage this project's board — the backlog and every other status column. Add, list, view, move, clarify, groom and close items, from Backlog through Done. The backend is fixed at init time and recorded in \`.specnaut/installed.lock\`. Run \`specnaut upgrade --backlog <new>\` to switch.
-argument-hint: [list|next|add|update|estimate|status|groom|brief] [args]
+argument-hint: "[list|next|add|update|estimate|status|groom|brief] [args]"
 ---
 
 # Board skill
