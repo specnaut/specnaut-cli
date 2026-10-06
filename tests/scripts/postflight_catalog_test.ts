@@ -13,6 +13,12 @@ import { fromFileUrl, join } from "@std/path";
  */
 
 const ROOT = fromFileUrl(new URL("../../", import.meta.url));
+
+// postflight.sh is the release operator's script, run from a macOS or Linux
+// shell; these tests replace PATH with the stubs and the Unix system
+// directories so a real `claude` cannot leak in, which leaves Windows without
+// bash. They run on the other two platforms.
+const ignore = Deno.build.os === "windows";
 const POSTFLIGHT = `${ROOT}.specnaut/release/postflight.sh`;
 const TAG = "v5.1.0";
 
@@ -117,22 +123,26 @@ const healthy = (): World => ({
   validate: 0,
 });
 
-Deno.test("a healthy channel passes without a warning", async () => {
+Deno.test("a healthy channel passes without a warning", { ignore }, async () => {
   const r = await run(healthy());
   assertEquals(r.code, 0, r.out);
   assertStringIncludes(r.out, "REACHED-END warned=0");
   assertStringIncludes(r.out, "accepts the published catalog");
 });
 
-Deno.test("a catalog Claude Code rejects is a warning, and the script goes on", async () => {
-  const r = await run({ ...healthy(), validate: 1 });
-  assertEquals(r.code, 0, r.out);
-  assertStringIncludes(r.out, "rejects the published catalog");
-  assertStringIncludes(r.out, "❯ name: Invalid input");
-  assertStringIncludes(r.out, "REACHED-END warned=1");
-});
+Deno.test(
+  "a catalog Claude Code rejects is a warning, and the script goes on",
+  { ignore },
+  async () => {
+    const r = await run({ ...healthy(), validate: 1 });
+    assertEquals(r.code, 0, r.out);
+    assertStringIncludes(r.out, "rejects the published catalog");
+    assertStringIncludes(r.out, "❯ name: Invalid input");
+    assertStringIncludes(r.out, "REACHED-END warned=1");
+  },
+);
 
-Deno.test("an entry whose path does not resolve at the tag is a warning", async () => {
+Deno.test("an entry whose path does not resolve at the tag is a warning", { ignore }, async () => {
   const [first] = entries(LOCAL_CLAUDE);
   const versions = { ...allVersions };
   delete versions[first[1]];
@@ -141,23 +151,27 @@ Deno.test("an entry whose path does not resolve at the tag is a warning", async 
   assertStringIncludes(r.out, "REACHED-END warned=1");
 });
 
-Deno.test("a published catalog that does not list what this release lists is a warning", async () => {
-  // Same paths, other names: a catalog from another release, or a hand edit.
-  const stale = entries(LOCAL_CLAUDE).map(([name, path]) =>
-    [`${name}-old`, path] as [string, string]
-  );
-  const r = await run({ ...healthy(), claudeCatalog: catalog(TAG, stale) });
-  assertStringIncludes(r.out, ".claude-plugin catalog lists");
-  assertStringIncludes(r.out, "REACHED-END warned=1");
-});
+Deno.test(
+  "a published catalog that does not list what this release lists is a warning",
+  { ignore },
+  async () => {
+    // Same paths, other names: a catalog from another release, or a hand edit.
+    const stale = entries(LOCAL_CLAUDE).map(([name, path]) =>
+      [`${name}-old`, path] as [string, string]
+    );
+    const r = await run({ ...healthy(), claudeCatalog: catalog(TAG, stale) });
+    assertStringIncludes(r.out, ".claude-plugin catalog lists");
+    assertStringIncludes(r.out, "REACHED-END warned=1");
+  },
+);
 
-Deno.test("a catalog left on the previous tag is a warning", async () => {
+Deno.test("a catalog left on the previous tag is a warning", { ignore }, async () => {
   const r = await run({ ...healthy(), copilotCatalog: catalog("v5.0.1", entries(LOCAL_COPILOT)) });
   assertStringIncludes(r.out, "expected v5.1.0");
   assertStringIncludes(r.out, "REACHED-END warned=1");
 });
 
-Deno.test("no claude on PATH is said, not passed silently", async () => {
+Deno.test("no claude on PATH is said, not passed silently", { ignore }, async () => {
   const r = await run({ ...healthy(), validate: undefined });
   assertStringIncludes(r.out, "was NOT validated");
   assertStringIncludes(r.out, "REACHED-END warned=1");

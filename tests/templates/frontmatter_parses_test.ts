@@ -28,7 +28,10 @@ async function frontmatters(): Promise<{ path: string; body: string }[]> {
       // A Windows checkout converts LF to CRLF. The binary bundles templates on
       // a Linux runner, so the product never sees one; normalise here.
       const parts = splitFrontmatter((await Deno.readTextFile(e.path)).replaceAll("\r\n", "\n"));
-      if (parts) out.push({ path: relative(ROOT, e.path), body: parts.fmBody });
+      // Forward slashes on every platform: the filters below match on `/SKILL.md`.
+      if (parts) {
+        out.push({ path: relative(ROOT, e.path).replaceAll("\\", "/"), body: parts.fmBody });
+      }
     }
   }
   return out;
