@@ -110,15 +110,12 @@ async function runStep(
 }
 
 Deno.test("an inaccessible query is named in a degraded-mode warning", async () => {
-  const { code, out } = await runStep("security-advisories");
-  assertStringIncludes(
-    out,
-    "::warning::Security preflight could not read:",
-  );
-  assertStringIncludes(out, "private_advisories");
-  // ...and ONLY that one. A warning naming all seven means the stub never ran
-  // and every query fell through — which is how this test first passed while
-  // proving nothing.
+  const { code, out } = await runStep("code-scanning");
+  assertStringIncludes(out, "::warning::Security preflight could not read:");
+  assertStringIncludes(out, "code_scanning/critical");
+  // ...and ONLY that source. A warning naming everything means the stub never
+  // ran and every query fell through — which is how this test first passed
+  // while proving nothing.
   assert(
     !out.includes("secret_scanning"),
     `only the inaccessible query should be named; got:\n${out}`,
@@ -136,11 +133,42 @@ Deno.test("the warning discriminates — a healthy run stays silent", async () =
   assert(code === 0, `a clean run must pass, got exit ${code}:\n${out}`);
 });
 
-Deno.test("one failing dependabot URL is named once per label, not repeated", async () => {
-  // The three dependabot counts share a URL, so a single permission gap trips
-  // fetch_count three times. The labels differ, but a naive report would repeat
-  // the source; this pins the de-duplication.
-  const { out } = await runStep("dependabot");
+Deno.test("sources the local preflight gates do not warn when this token cannot read them", async () => {
+  // GITHUB_TOKEN cannot read secret scanning or Dependabot on any run, so a
+  // warning about them printed on every release and taught everyone to skip
+  // it (#653). They are gated by `.specnaut/release/preflight.sh` instead.
+  for (const source of ["secret-scanning", "dependabot"]) {
+    const { code, out, summary } = await runStep(source);
+    assert(!out.includes("could not read:"), `${source} must not warn:\n${out}`);
+    assertStringIncludes(summary, "not read here — gated by `preflight.sh`");
+    assertEquals(summary.includes("were NOT checked"), false, summary);
+    assertEquals(code, 0, out);
+  }
+});
+
+Deno.test("private advisories are not queried here, and say where they are gated", async () => {
+  // A caller without the PAT-only scope can be answered `[]`, which reads as
+  // clean; the local preflight checks admin rights before trusting a count.
+  const script = await alertStepScript();
+  assertEquals(script.includes("security-advisories"), false, "the step must not query advisories");
+  const { summary } = await runStep(null);
+  assertStringIncludes(
+    summary,
+    "| Pending private advisories | not read here — gated by `preflight.sh` |",
+  );
+});
+
+Deno.test("the secret-scanning query never asks for the secret itself", async () => {
+  assertStringIncludes(
+    await alertStepScript(),
+    "secret-scanning/alerts?state=open&hide_secret=true",
+  );
+});
+
+Deno.test("one failing URL is named once per label, not repeated", async () => {
+  // The code-scanning counts share a URL, so one permission gap trips
+  // fetch_count once per severity. This pins the de-duplication.
+  const { out } = await runStep("code-scanning");
   assertStringIncludes(out, "::warning::");
   const warning = out.split("\n").find((l) => l.includes("could not read:"))!;
   const labels = warning.split("could not read:")[1].split(".")[0].trim().split(/\s+/);
@@ -154,22 +182,22 @@ Deno.test("a blocking gate still says what it could not read", async () => {
   // The run where this matters most, and the one that never printed it: the
   // gate hard-fails, and the reader needs to know the decision was taken on
   // partial information. The read-back used to sit BELOW the `exit 1` (#527).
-  const { code, out } = await runStep("security-advisories", "code-scanning");
+  const { code, out } = await runStep("code-scanning", "secret-scanning");
 
-  assertEquals(code, 1, `a non-zero critical count must block:\n${out}`);
+  assertEquals(code, 1, `an open secret-scanning alert must block:\n${out}`);
   assertStringIncludes(out, "::error::Security preflight blocked the release");
   assertStringIncludes(out, "::warning::Security preflight could not read:");
-  assertStringIncludes(out, "private_advisories");
+  assertStringIncludes(out, "code_scanning/critical");
 });
 
 Deno.test("an unreadable source is reported as unreadable, never as zero", async () => {
   // `0` and "could not ask" were the same cell for the entire life of this
   // gate, which is how it passed on three sources it had never obtained (#527).
-  const { summary } = await runStep("secret-scanning");
+  const { summary } = await runStep("code-scanning");
 
-  assertStringIncludes(summary, "| Secret scanning | unreadable |");
+  assertStringIncludes(summary, "| Code scanning — critical | unreadable |");
   // ...while a source that WAS read still shows its number.
-  assertStringIncludes(summary, "| Code scanning — critical | 0 |");
+  assertStringIncludes(summary, "| Secret scanning | 0 |");
   assertStringIncludes(summary, "were NOT checked");
 });
 

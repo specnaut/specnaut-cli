@@ -43,10 +43,16 @@ jobs:
     # because the warning that would have was dead code.
     #
     # The step no longer reports an unreadable source as `0`. A count it could
-    # not obtain is `unreadable`, is excluded from the gate decision, and is
-    # named in the summary — so a release that passes says which signals it
-    # actually checked. Wire a PAT and override GH_TOKEN for this step if the
-    # other three must gate releases (see #527).
+    # not obtain is excluded from the gate decision and named in the summary —
+    # so a release that passes says which signals it actually checked (#527).
+    #
+    # The three structural gaps are gated LOCALLY instead (#653): the release
+    # preflight (`.specnaut/release/preflight.sh`) reads secret scanning,
+    # Dependabot and private advisories with the operator's own `gh`, before the
+    # tag exists, and blocks on an unreadable source. No PAT: this public
+    # repository holds no Actions secrets. So their cells here say where they
+    # are gated, and the warning names only a source that SHOULD be readable —
+    # a line printed on every release is a line nobody reads.
     steps:
       - name: Query open security alerts
         env:
@@ -68,11 +74,10 @@ jobs:
           # site below is a command substitution, so `fetch_count` runs in a
           # subshell and any `missing_perms+=()` died with it: the parent's
           # array was always empty and the warning at the bottom of this step
-          # had never once printed. Not a latent path either — the
-          # `private_advisories` query returns non-numeric on every run (see
-          # its comment below), so the step has been in degraded mode
-          # permanently and silently. A revoked scope on any of the seven
-          # queries reads as "0 open alerts", and the gate then passes on an
+          # had never once printed. Not a latent path either — three of the
+          # sources were unreadable on every run, so the step had been in
+          # degraded mode permanently and silently. A revoked scope on any
+          # query reads as "0 open alerts", and the gate then passes on an
           # empty signal it believes is a clean one.
           degraded_file="${RUNNER_TEMP:-/tmp}/security-preflight-degraded.txt"
           : > "$degraded_file"
@@ -91,7 +96,7 @@ jobs:
 
           # 1. Secret scanning — pattern-based credential leak detection
           secret_open=$(fetch_count "secret_scanning" \
-            "repos/$REPO/secret-scanning/alerts?state=open&per_page=100" \
+            "repos/$REPO/secret-scanning/alerts?state=open&hide_secret=true&per_page=100" \
             '[.[] | {number, secret_type_display_name, html_url}] | length')
 
           # 2. Dependabot — vulnerable dependencies (severity-aware)
@@ -105,13 +110,10 @@ jobs:
             "repos/$REPO/dependabot/alerts?state=open&per_page=100" \
             '[.[] | select(.security_advisory.severity=="medium")] | length')
 
-          # 3. Private vulnerability reports — externally-submitted advisories.
-          # `repository-advisories` is a fine-grained PAT scope, NOT a workflow
-          # permissions key, so this returns 0 with GITHUB_TOKEN. Wire a
-          # dedicated PAT secret if pending advisories must hard-gate releases.
-          adv_pending=$(fetch_count "private_advisories" \
-            "repos/$REPO/security-advisories?state=triage,draft&per_page=100" \
-            '[.[] | {number, summary, severity, html_url}] | length')
+          # 3. Private vulnerability reports are NOT queried here. The
+          # `repository-advisories` scope is a fine-grained PAT's, and a caller
+          # without it can be answered `[]` — an empty list that reads as clean
+          # rather than an error. The local preflight gates them (#653).
 
           # 4. Code scanning (CodeQL — only counts when code scanning is enabled).
           code_critical=$(fetch_count "code_scanning/critical" \
@@ -126,9 +128,8 @@ jobs:
           #   Secret-scanning open       → fail (every match is treated as P0
           #                                regardless of "severity" — credentials
           #                                in source are always release-blocking).
-          #   Pending advisory in triage → fail (a researcher is waiting; ship
-          #                                a release without acknowledging is bad
-          #                                form).
+          #   Pending advisory in triage → fail — enforced by the local
+          #                                preflight, which can read them (#653).
           critical_total=$((dep_critical + code_critical))
 
           # Report what was READ, not what was assumed. A source `fetch_count`
@@ -136,7 +137,15 @@ jobs:
           # which is how this gate passed every release on three sources it had
           # never once obtained (#527). `unreadable` is the honest cell.
           readable() { ! grep -qxF "$1" "$degraded_file"; }
-          cell() { if readable "$1"; then printf '%s' "$2"; else printf 'unreadable'; fi; }
+          # GITHUB_TOKEN cannot read these by design; the local preflight gates
+          # them. Unreadable HERE is expected, and is not what the warning is for.
+          gated_locally() { case "$1" in secret_scanning | dependabot/*) return 0 ;; esac; return 1; }
+          cell() {
+            if readable "$1"; then printf '%s' "$2"
+            elif gated_locally "$1"; then printf 'not read here — gated by `preflight.sh`'
+            else printf 'unreadable'; fi
+          }
+          unexpected="$(sort -u "$degraded_file" | while IFS= read -r l; do gated_locally "$l" || printf '%s\n' "$l"; done)"
 
           {
             echo "## Security alert preflight"
@@ -149,10 +158,10 @@ jobs:
             echo "| Dependabot — medium | $(cell dependabot/medium "$dep_medium") |"
             echo "| Code scanning — critical | $(cell code_scanning/critical "$code_critical") |"
             echo "| Code scanning — high | $(cell code_scanning/high "$code_high") |"
-            echo "| Pending private advisories | $(cell private_advisories "$adv_pending") |"
+            echo "| Pending private advisories | not read here — gated by \`preflight.sh\` |"
             echo
             echo "Critical total (dep + code, readable sources only): **${critical_total}**"
-            if [ -s "$degraded_file" ]; then
+            if [ -n "$unexpected" ]; then
               echo
               echo "> Sources marked \`unreadable\` were NOT checked. This preflight"
               echo "> passing means the readable ones are clean — nothing more."
@@ -166,13 +175,13 @@ jobs:
           #
           # Sorted and de-duplicated: the three dependabot queries share a URL,
           # so one permission gap would otherwise name it three times.
-          if [ -s "$degraded_file" ]; then
-            missing_perms="$(sort -u "$degraded_file" | tr '\n' ' ' | sed 's/ $//')"
-            echo "::warning::Security preflight could not read: ${missing_perms}. Those sources are NOT checked and are excluded from the decision below — a pass here means the readable sources are clean, not that the repository is. Wire a PAT and override GH_TOKEN for this step if they must gate releases (#527)."
+          if [ -n "$unexpected" ]; then
+            missing_perms="$(printf '%s\n' "$unexpected" | tr '\n' ' ' | sed 's/ $//')"
+            echo "::warning::Security preflight could not read: ${missing_perms}. Those sources are NOT checked and are excluded from the decision below — a pass here means the readable sources are clean, not that the repository is. This job's token is expected to read them: check its permissions block (#527)."
           fi
 
-          if [ "$critical_total" -gt 0 ] || [ "$secret_open" -gt 0 ] || [ "$adv_pending" -gt 0 ]; then
-            echo "::error::Security preflight blocked the release. Critical/secret/advisory counts are non-zero. Resolve via the Security tab, then re-run this workflow (the tag stays valid)."
+          if [ "$critical_total" -gt 0 ] || [ "$secret_open" -gt 0 ]; then
+            echo "::error::Security preflight blocked the release. Critical/secret counts are non-zero. Resolve via the Security tab, then re-run this workflow (the tag stays valid)."
             exit 1
           fi
 
