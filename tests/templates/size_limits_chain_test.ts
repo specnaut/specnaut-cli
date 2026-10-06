@@ -29,3 +29,11 @@ Deno.test("plan: the template has the mandatory size row and a measured Files to
 Deno.test("plan: the phase points at the size gate", async () => {
   assert((await read("templates/core/skills/specnaut/phases/plan.md")).includes(LIMITS));
 });
+
+Deno.test("tasks: the phase applies the gate and the template shows the extraction task", async () => {
+  const phase = await read("templates/core/skills/specnaut/phases/tasks.md");
+  assert(phase.includes(LIMITS) && phase.includes("extraction task"), "phase gate");
+  const t = await read("templates/core/specnaut/templates/tasks-template.md");
+  assert(t.includes("**Extractions first.**"), "extraction section");
+  assert(t.includes('never "Add [X] to [file over target]"'), "no add-to-big-file task");
+});

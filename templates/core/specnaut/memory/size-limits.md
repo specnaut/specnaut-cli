@@ -84,3 +84,9 @@ done while a file's lines after exceed its ceiling, or a file already over its
 target has lines after > lines now. Complexity tracking cannot accept a size
 violation: the remedy is an extraction inside the plan. Each new module gets a
 one-line responsibility; one that needs "and" is two.
+
+**tasks** — re-measure every file the plan touches with `wc -l`; the plan's
+figure may be stale. For each file over its target, the first task that touches
+it is an extraction that moves out at least the lines the feature adds, naming
+the destination module and its one-line responsibility. New behaviour lands as
+a "create module X" task; "add X to <file over target>" is never emitted.

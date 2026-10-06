@@ -63,6 +63,15 @@ description: "Task list template for feature implementation"
 
 **⚠️ CRITICAL**: No user story work can begin until this phase is complete
 
+**Extractions first.** For every file the plan touches that is over its target in the
+constitution's Size limits table (re-measure with `wc -l` — never trust the plan's figure), the
+first task touching it is an extraction:
+
+- [ ] T003a Extract [responsibility] from [path] ([N] lines, target [T]) into [new module path] —
+  moves out ≥ [lines the feature adds]; [new module]: [one-line responsibility]
+
+New behaviour then lands as "Create [module] in [path]", never "Add [X] to [file over target]".
+
 Examples of foundational tasks (adjust based on your project):
 
 - [ ] T004 Setup database schema and migrations framework

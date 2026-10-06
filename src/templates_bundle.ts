@@ -608,6 +608,10 @@ loading any design document. It writes the spec's tabs to the gitignored
    - Map the interface contracts (section 8) to the stories they serve
    - **Carry the 🔒 decision table forward**: a task may not put a decision anywhere but its
      named home. Where a task touches a rule in the table, name that home in the task.
+   - **Apply the size gate** in \`.specnaut/memory/size-limits.md\` § In each phase → **tasks**:
+     re-measure every file the plan touches; a file over its target gets an extraction task
+     before any task that touches it, and new behaviour is a "create module" task — never "add X
+     to" a file over its target.
    - Generate tasks organized by user story (see Task Generation Rules below)
    - Generate dependency graph showing user story completion order
    - Create parallel execution examples per user story
@@ -16004,6 +16008,12 @@ done while a file's lines after exceed its ceiling, or a file already over its
 target has lines after > lines now. Complexity tracking cannot accept a size
 violation: the remedy is an extraction inside the plan. Each new module gets a
 one-line responsibility; one that needs "and" is two.
+
+**tasks** — re-measure every file the plan touches with \`wc -l\`; the plan's
+figure may be stale. For each file over its target, the first task that touches
+it is an extraction that moves out at least the lines the feature adds, naming
+the destination module and its one-line responsibility. New behaviour lands as
+a "create module X" task; "add X to <file over target>" is never emitted.
 `,
     executable: false,
     backend: null,
@@ -25794,6 +25804,15 @@ description: "Task list template for feature implementation"
 **Purpose**: Core infrastructure that MUST be complete before ANY user story can be implemented
 
 **⚠️ CRITICAL**: No user story work can begin until this phase is complete
+
+**Extractions first.** For every file the plan touches that is over its target in the
+constitution's Size limits table (re-measure with \`wc -l\` — never trust the plan's figure), the
+first task touching it is an extraction:
+
+- [ ] T003a Extract [responsibility] from [path] ([N] lines, target [T]) into [new module path] —
+  moves out ≥ [lines the feature adds]; [new module]: [one-line responsibility]
+
+New behaviour then lands as "Create [module] in [path]", never "Add [X] to [file over target]".
 
 Examples of foundational tasks (adjust based on your project):
 
