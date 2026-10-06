@@ -2,6 +2,7 @@ import { assertEquals, assertThrows } from "@std/assert";
 import {
   ClaudeSettingsParseError,
   mergeClaudeSettings,
+  pluginDeclarationNotes,
 } from "../../src/domain/claude_settings_merge.ts";
 
 const BUNDLED = JSON.stringify(
@@ -223,13 +224,16 @@ Deno.test("mergeClaudeSettings: ask rules are not duplicated on re-merge (#610)"
 
 const COCKPIT = "specnaut-cockpit@specnaut-marketplace";
 
-Deno.test("claude settings: the shipped file declares the marketplace and enables the cockpit (#642)", () => {
-  const shipped = JSON.parse(SHIPPED);
-  assertEquals(shipped.extraKnownMarketplaces?.["specnaut-marketplace"]?.source, {
-    source: "github",
-    repo: "specnaut/specnaut-marketplace",
-  });
-  assertEquals(shipped.enabledPlugins?.[COCKPIT], true);
+const SHIPPED_SOURCE = JSON.parse(SHIPPED).extraKnownMarketplaces?.["specnaut-marketplace"]?.source;
+
+Deno.test("claude settings: the shipped marketplace is this repository's catalog, pinned to a tag (#642)", () => {
+  // Pinned, so a teammate who trusts the project installs the cockpit of the
+  // binary that scaffolded it — not whatever a branch holds at install time.
+  assertEquals(SHIPPED_SOURCE.source, "github");
+  assertEquals(SHIPPED_SOURCE.repo, "specnaut/specnaut-cli");
+  assertEquals(SHIPPED_SOURCE.path, "packaging/marketplace/.claude-plugin/marketplace.json");
+  assertEquals(/^v\d+\.\d+\.\d+$/.test(SHIPPED_SOURCE.ref), true, SHIPPED_SOURCE.ref);
+  assertEquals(JSON.parse(SHIPPED).enabledPlugins?.[COCKPIT], true);
 });
 
 Deno.test("mergeClaudeSettings: an existing project gains the marketplace and the cockpit (#642)", () => {
@@ -255,4 +259,42 @@ Deno.test("mergeClaudeSettings: a marketplace the user re-pointed is left as the
   const existing = JSON.stringify({ extraKnownMarketplaces: { "specnaut-marketplace": mine } });
   const merged = JSON.parse(mergeClaudeSettings(existing, SHIPPED, DEST));
   assertEquals(merged.extraKnownMarketplaces["specnaut-marketplace"], mine);
+});
+
+Deno.test("mergeClaudeSettings: Specnaut's own marketplace is re-pinned to this release (#642)", () => {
+  const older = { ...SHIPPED_SOURCE, ref: "v0.0.1" };
+  const existing = JSON.stringify({
+    extraKnownMarketplaces: { "specnaut-marketplace": { source: older } },
+  });
+  const merged = JSON.parse(mergeClaudeSettings(existing, SHIPPED, DEST));
+  assertEquals(
+    merged.extraKnownMarketplaces["specnaut-marketplace"].source.ref,
+    SHIPPED_SOURCE.ref,
+  );
+  assertEquals(pluginDeclarationNotes(existing, SHIPPED, DEST), [
+    `${DEST}: re-pinned the marketplace specnaut-marketplace from v0.0.1 to ${SHIPPED_SOURCE.ref}`,
+    `${DEST}: enabled ${COCKPIT} — Claude Code offers to install it when the project is trusted; it runs code in Claude Code. Set it to false to decline`,
+  ]);
+});
+
+Deno.test("pluginDeclarationNotes: a re-pointed marketplace is kept, and said (#642)", () => {
+  const fork = { source: "github", repo: "my-fork/specnaut-marketplace" };
+  const existing = JSON.stringify({
+    extraKnownMarketplaces: { "specnaut-marketplace": { source: fork } },
+    enabledPlugins: { [COCKPIT]: false },
+  });
+  const notes = pluginDeclarationNotes(existing, SHIPPED, DEST);
+  assertEquals(notes.length, 1);
+  assertEquals(
+    notes[0].includes(
+      "kept the marketplace specnaut-marketplace pointed at my-fork/specnaut-marketplace",
+    ),
+    true,
+    notes[0],
+  );
+});
+
+Deno.test("pluginDeclarationNotes: nothing to say on a fresh scaffold or a project already up to date", () => {
+  assertEquals(pluginDeclarationNotes(null, SHIPPED, DEST), []);
+  assertEquals(pluginDeclarationNotes(mergeClaudeSettings(null, SHIPPED, DEST), SHIPPED, DEST), []);
 });

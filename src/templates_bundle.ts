@@ -30034,7 +30034,9 @@ patterns:
     "specnaut-marketplace": {
       "source": {
         "source": "github",
-        "repo": "specnaut/specnaut-marketplace"
+        "repo": "specnaut/specnaut-cli",
+        "ref": "v5.0.1",
+        "path": "packaging/marketplace/.claude-plugin/marketplace.json"
       }
     }
   },

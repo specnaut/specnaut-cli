@@ -2,15 +2,24 @@
 
 ## 5.0.x → 5.1.0
 
-Nothing to edit by hand.
+Nothing to edit by hand, but one thing to know: for Claude Code projects, `specnaut upgrade` now
+declares a plugin that runs code once someone installs it. The upgrade prints a line for each key it
+adds.
 
 ### Claude Code projects offer the Specnaut Cockpit
 
 `specnaut upgrade` adds two keys to `.claude/settings.json` for projects scaffolded for Claude Code:
-`extraKnownMarketplaces["specnaut-marketplace"]` and
-`enabledPlugins["specnaut-cockpit@specnaut-marketplace"]`. When someone trusts the project, Claude
-Code offers to install the marketplace and the cockpit mod: usage limits, context and cost above the
-prompt, and a clean hold before the autopilot runs out of quota. See
+
+- `extraKnownMarketplaces["specnaut-marketplace"]`: Specnaut's catalog, read from the specnaut-cli
+  repository **at the release tag** of the binary that wrote it;
+- `enabledPlugins["specnaut-cockpit@specnaut-marketplace"]`.
+
+When someone trusts the project, Claude Code offers to install the marketplace and the cockpit mod.
+The mod shows usage limits, context and cost above the prompt, and holds the autopilot cleanly
+before it runs out of quota. A mod runs a hooks module inside Claude Code with the user's
+permissions. The cockpit's only process is `git rev-parse`, and the only call it ever refuses is the
+step that would start a phase past the quota threshold. Each later `specnaut upgrade` re-pins the
+marketplace to its own release. See
 [`mods/specnaut-cockpit/README.md`](mods/specnaut-cockpit/README.md).
 
 To decline it for a project, set the plugin to `false`:
@@ -19,9 +28,9 @@ To decline it for a project, set the plugin to `false`:
 { "enabledPlugins": { "specnaut-cockpit@specnaut-marketplace": false } }
 ```
 
-The merge only adds keys that are absent, so a `false`, or a marketplace you pointed elsewhere,
-survives every later `specnaut upgrade`. Deleting the key brings it back on the next upgrade, so use
-`false` rather than deleting it.
+The merge only adds keys that are absent, so a `false` survives every later `specnaut upgrade`. So
+does a marketplace you pointed somewhere else, and the upgrade says so each time. Deleting the key
+brings it back on the next upgrade, so use `false` rather than deleting it.
 
 ### The Claude Code marketplace installs again
 

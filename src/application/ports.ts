@@ -39,6 +39,12 @@ export type BackupReport = {
    * from the lock since they aren't Specnaut-managed.
    */
   readonly skippedSkipIfExists: ReadonlyArray<string>;
+  /**
+   * What a structured merge changed that the person should hear about — a
+   * plugin Specnaut enabled, a marketplace it re-pinned or left pointed
+   * elsewhere (#642). Absent when there is nothing to say.
+   */
+  readonly notes?: ReadonlyArray<string>;
 };
 
 export interface GitAdapter {

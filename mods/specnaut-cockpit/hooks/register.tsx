@@ -22,7 +22,7 @@ import { IDLE, phaseOf, phaseOfPrompt, promptSubmitted, turnEnded } from "./core
 import { asHistory, costDelta, localDay, prune, record } from "./core/history.ts";
 import { holdFor, lift } from "./core/hold.ts";
 import { paneRows } from "./core/pane.ts";
-import { DEFAULT_THRESHOLDS, type Reading, type Thresholds } from "./core/usage.ts";
+import { type Reading, thresholdsFrom } from "./core/usage.ts";
 
 const PANE = "cockpit";
 const HISTORY_KEY = "history";
@@ -50,14 +50,6 @@ function toReading(m: Measured): Reading {
     })),
     contextPercent: m.context?.percent,
     costUsd: m.cost?.usd,
-  };
-}
-
-function thresholdsFrom(options: Record<string, unknown> | undefined): Thresholds {
-  const n = (v: unknown, d: number) => (typeof v === "number" && Number.isFinite(v) ? v : d);
-  return {
-    warnAt: n(options?.warn_at, DEFAULT_THRESHOLDS.warnAt),
-    holdAt: n(options?.hold_at, DEFAULT_THRESHOLDS.holdAt),
   };
 }
 

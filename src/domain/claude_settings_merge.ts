@@ -160,7 +160,9 @@ export function mergeClaudeSettings(
   //    the plugins it enables. A key the user already has is theirs, whatever
   //    its value: `"specnaut-cockpit@specnaut-marketplace": false` is how a
   //    project opts out, and it holds across every upgrade. Only a key that is
-  //    absent is added.
+  //    absent is added — with one exception: a marketplace still pointed at
+  //    Specnaut's own source is re-pinned to this release, or every project
+  //    would stay on the first release that wrote it.
   for (const field of ["extraKnownMarketplaces", "enabledPlugins"] as const) {
     const bundledMap = bundledParsed[field];
     if (!bundledMap || typeof bundledMap !== "object") continue;
@@ -169,7 +171,9 @@ export function mergeClaudeSettings(
       : {};
     const merged = { ...userMap };
     for (const [key, value] of Object.entries(bundledMap)) {
-      if (!(key in merged)) merged[key] = value;
+      const isOurs = field === "extraKnownMarketplaces" && key in merged &&
+        sameSource(merged[key]?.source, (value as { source?: unknown })?.source);
+      if (!(key in merged) || isOurs) merged[key] = value;
     }
     result[field] = merged;
   }
@@ -180,4 +184,69 @@ export function mergeClaudeSettings(
   }
 
   return `${JSON.stringify(result, null, 2)}\n`;
+}
+
+type SourceLike = { source?: unknown; repo?: unknown; url?: unknown; path?: unknown };
+
+/** Same marketplace location, whatever the ref: the type, the repository and the path. */
+function sameSource(a: unknown, b: unknown): boolean {
+  if (!a || !b || typeof a !== "object" || typeof b !== "object") return false;
+  const x = a as SourceLike;
+  const y = b as SourceLike;
+  return x.source === y.source && x.repo === y.repo && x.url === y.url && x.path === y.path;
+}
+
+/**
+ * What a merge did to the plugin declarations, in sentences for the person
+ * running `specnaut upgrade`. A plugin Specnaut enables runs code when
+ * installed, so it is never added silently; and a Specnaut marketplace
+ * pointed somewhere else is kept, but said (#642).
+ */
+export function pluginDeclarationNotes(
+  existing: string | null,
+  bundled: string,
+  dest: string,
+): string[] {
+  if (existing === null || existing.trim().length === 0) return [];
+  let user: SettingsShape;
+  try {
+    user = JSON.parse(existing) as SettingsShape;
+  } catch {
+    return [];
+  }
+  const ours = JSON.parse(bundled) as SettingsShape;
+  const notes: string[] = [];
+  for (const [key, value] of Object.entries(ours.extraKnownMarketplaces ?? {})) {
+    const bundledSource = (value as { source?: SourceLike })?.source;
+    const userSource = user.extraKnownMarketplaces?.[key]?.source as SourceLike | undefined;
+    const where = `${bundledSource?.repo ?? bundledSource?.url}@${
+      (bundledSource as { ref?: string })?.ref
+    }`;
+    if (userSource === undefined) {
+      notes.push(`${dest}: declared the marketplace ${key} (${where})`);
+    } else if (sameSource(userSource, bundledSource)) {
+      const was = (userSource as { ref?: string }).ref;
+      const now = (bundledSource as { ref?: string })?.ref;
+      if (was !== now) {
+        notes.push(`${dest}: re-pinned the marketplace ${key} from ${was} to ${now}`);
+      }
+    } else {
+      notes.push(
+        `${dest}: kept the marketplace ${key} pointed at ` +
+          `${
+            userSource.repo ?? userSource.url ?? "a custom source"
+          }, not Specnaut's (${where}) — ` +
+          "it receives Specnaut's updates only if that source does",
+      );
+    }
+  }
+  for (const [key, value] of Object.entries(ours.enabledPlugins ?? {})) {
+    if (value === true && !(key in (user.enabledPlugins ?? {}))) {
+      notes.push(
+        `${dest}: enabled ${key} — Claude Code offers to install it when the project is ` +
+          `trusted; it runs code in Claude Code. Set it to false to decline`,
+      );
+    }
+  }
+  return notes;
 }

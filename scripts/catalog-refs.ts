@@ -17,6 +17,40 @@ export const CATALOG_FILES = [
   "packaging/marketplace/.github/plugin/marketplace.json",
 ] as const;
 
+/**
+ * The scaffolded Claude Code settings declare Specnaut's marketplace, read from
+ * this repository at the release tag — so a project gets the cockpit of the
+ * binary that scaffolded it, not whatever a branch holds at install time.
+ */
+export const SETTINGS_TEMPLATE = "templates/harness-specific/claude/settings.json";
+const MARKETPLACE = "specnaut-marketplace";
+
+type Settings = { extraKnownMarketplaces?: Record<string, { source?: { ref?: unknown } }> };
+
+export function stampDeclarationRef(text: string, tag: string): string {
+  const settings = JSON.parse(text) as Settings;
+  const source = settings.extraKnownMarketplaces?.[MARKETPLACE]?.source;
+  if (source && typeof source === "object") source.ref = tag;
+  return `${JSON.stringify(settings, null, 2)}\n`;
+}
+
+export function declarationRefProblems(text: string, tag: string): string[] {
+  let settings: Settings;
+  try {
+    settings = JSON.parse(text) as Settings;
+  } catch (err) {
+    return [`not valid JSON: ${(err as Error).message}`];
+  }
+  const source = settings.extraKnownMarketplaces?.[MARKETPLACE]?.source;
+  if (!source) return [`declares no ${MARKETPLACE} marketplace`];
+  if (source.ref === undefined) {
+    return [`${MARKETPLACE} has no ref — it would read the default branch`];
+  }
+  return source.ref === tag
+    ? []
+    : [`${MARKETPLACE} is pinned to ${JSON.stringify(source.ref)}, not ${tag}`];
+}
+
 type Entry = { name?: unknown; source?: unknown };
 type Catalog = { plugins?: unknown };
 
@@ -68,9 +102,13 @@ async function main() {
       failed = true;
     }
   }
+  for (const p of declarationRefProblems(await Deno.readTextFile(SETTINGS_TEMPLATE), tag)) {
+    console.error(`${SETTINGS_TEMPLATE}: ${p}`);
+    failed = true;
+  }
   if (failed) Deno.exit(1);
   console.log(
-    `catalog-refs: ✓ every entry of ${CATALOG_FILES.length} catalogs is pinned to ${tag}`,
+    `catalog-refs: ✓ ${CATALOG_FILES.length} catalogs and the scaffolded marketplace are pinned to ${tag}`,
   );
 }
 

@@ -2,7 +2,7 @@ import { dirname, join, resolve } from "@std/path";
 import { assertSafeDestination, type Bundle, isInside } from "../domain/template.ts";
 import { assertInsideProject, resolveProjectRoot } from "./fs_containment.ts";
 import { mergeIntoFile } from "../domain/merge_block.ts";
-import { mergeClaudeSettings } from "../domain/claude_settings_merge.ts";
+import { mergeClaudeSettings, pluginDeclarationNotes } from "../domain/claude_settings_merge.ts";
 import type { BackupReport, FsWriter } from "../application/ports.ts";
 
 const BACKUP_SUFFIX = ".specnaut.bak";
@@ -153,6 +153,7 @@ export class DenoFsWriter implements FsWriter {
 
     const backups: { dest: string; backupPath: string }[] = [];
     const skippedSkipIfExists: string[] = [];
+    const notes: string[] = [];
 
     // PHASE 1 — check every destination, THEN create directories.
     //
@@ -194,6 +195,7 @@ export class DenoFsWriter implements FsWriter {
         const existing = await readIfExists(abs);
         // Currently only one flavor — switch when more land.
         const merged = mergeClaudeSettings(existing, file.content, dest);
+        notes.push(...pluginDeclarationNotes(existing, file.content, dest));
         await Deno.writeTextFile(abs, merged);
         continue;
       }
@@ -264,7 +266,9 @@ export class DenoFsWriter implements FsWriter {
       }
     }
 
-    return { backups, skippedSkipIfExists };
+    return notes.length > 0
+      ? { backups, skippedSkipIfExists, notes }
+      : { backups, skippedSkipIfExists };
   }
 
   async deletePaths(

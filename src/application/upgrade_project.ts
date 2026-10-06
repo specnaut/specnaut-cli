@@ -130,6 +130,8 @@ export type UpgradeProjectResult =
      * the result now carries its own.
      */
     written: ReadonlyArray<string>;
+    /** What the settings merge changed that the person should hear about (#642). */
+    notes: ReadonlyArray<string>;
   };
 
 export type UpgradeProjectDeps = {
@@ -576,11 +578,13 @@ export class UpgradeProjectUseCase {
     // present entries are skipped by the merge logic). Greenfield case
     // is handled too: writeBundle will just write the bundled content
     // when no file is present.
+    let notes: ReadonlyArray<string> = [];
     if (Object.keys(jsonMergedBundle).length > 0) {
-      await writer.writeBundle(jsonMergedBundle, input.projectDir, {
+      const merged = await writer.writeBundle(jsonMergedBundle, input.projectDir, {
         overwrite: true,
         backupExisting: false,
       });
+      notes = merged.notes ?? [];
     }
 
     // What this run staged is the whole of what is pending. Everything else in
@@ -757,6 +761,7 @@ export class UpgradeProjectUseCase {
         .map((b) => b.dest),
       managedSections: appliedSections,
       written: Object.keys(toWrite).sort(),
+      notes,
     };
   }
 

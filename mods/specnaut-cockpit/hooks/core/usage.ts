@@ -33,6 +33,20 @@ export type Thresholds = {
 
 export const DEFAULT_THRESHOLDS: Thresholds = { warnAt: 80, holdAt: 90 };
 
+/**
+ * The thresholds from the plugin's options, held to the bounds plugin.json
+ * declares (hold 50–100, warn 10–100): a stored value outside them is
+ * clamped, a missing or non-numeric one takes the default.
+ */
+export function thresholdsFrom(options: Record<string, unknown> | undefined): Thresholds {
+  const n = (v: unknown, d: number, lo: number, hi: number) =>
+    typeof v === "number" && Number.isFinite(v) ? Math.min(hi, Math.max(lo, v)) : d;
+  return {
+    warnAt: n(options?.warn_at, DEFAULT_THRESHOLDS.warnAt, 10, 100),
+    holdAt: n(options?.hold_at, DEFAULT_THRESHOLDS.holdAt, 50, 100),
+  };
+}
+
 const LABELS: Record<string, { short: string; long: string }> = {
   five_hour: { short: "5h", long: "5-hour" },
   seven_day: { short: "7d", long: "weekly" },

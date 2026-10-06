@@ -1,5 +1,10 @@
 import { assert, assertEquals } from "@std/assert";
-import { catalogRefProblems, stampCatalogRefs } from "../../scripts/catalog-refs.ts";
+import {
+  catalogRefProblems,
+  declarationRefProblems,
+  stampCatalogRefs,
+  stampDeclarationRef,
+} from "../../scripts/catalog-refs.ts";
 
 /**
  * The one definition of "a catalog is pinned to this release", used by the
@@ -61,4 +66,25 @@ Deno.test("--check over the repository's catalogs agrees with deno.json", async 
   assertEquals((await run(`v${version}`)).code, 0);
   assertEquals((await run("v0.0.1")).code, 1);
   assertEquals((await run("latest")).code, 2);
+});
+
+const settings = (source?: object) =>
+  JSON.stringify(source ? { extraKnownMarketplaces: { "specnaut-marketplace": { source } } } : {});
+
+Deno.test("the scaffolded marketplace declaration is stamped and checked like a catalog", () => {
+  const stamped = stampDeclarationRef(settings({ repo: "r", ref: "v1.0.0" }), "v2.0.0");
+  assertEquals(
+    JSON.parse(stamped).extraKnownMarketplaces["specnaut-marketplace"].source.ref,
+    "v2.0.0",
+  );
+  assertEquals(declarationRefProblems(stamped, "v2.0.0"), []);
+  assertEquals(declarationRefProblems(settings({ ref: "v1.0.0" }), "v2.0.0"), [
+    'specnaut-marketplace is pinned to "v1.0.0", not v2.0.0',
+  ]);
+  assertEquals(declarationRefProblems(settings({ repo: "r" }), "v2.0.0"), [
+    "specnaut-marketplace has no ref — it would read the default branch",
+  ]);
+  assertEquals(declarationRefProblems(settings(), "v2.0.0"), [
+    "declares no specnaut-marketplace marketplace",
+  ]);
 });

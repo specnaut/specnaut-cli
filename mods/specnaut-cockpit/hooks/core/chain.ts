@@ -24,10 +24,15 @@ function isPhase(s: string): s is Phase {
   return (PHASES as readonly string[]).includes(s);
 }
 
-/** True for `specnaut` and its plugin-scoped spellings (`specnaut-plugin:specnaut`). */
+/**
+ * True for Specnaut's router: `specnaut` as a project scaffolds it, and
+ * `specnaut-plugin:specnaut` as the plugin serves it. Not any plugin's skill
+ * that happens to be called `specnaut` — the hold refuses calls, so it names
+ * exactly whose.
+ */
 export function isSpecnautSkill(skill: string): boolean {
   const name = skill.replace(/^\//, "");
-  return name === "specnaut" || name.endsWith(":specnaut");
+  return name === "specnaut" || name === "specnaut-plugin:specnaut";
 }
 
 /** The chain phase a `specnaut` invocation starts, or null (audits, unknown, none). */
@@ -39,8 +44,8 @@ export function phaseOf(skill: string, args: string | undefined): Phase | null {
 
 /** The phase a typed prompt starts: `/specnaut plan …`, `/specnaut-plugin:specnaut merge`. */
 export function phaseOfPrompt(text: string): Phase | null {
-  const m = text.trimStart().match(/^\/([\w.-]+:)?specnaut(?:\s+([\s\S]*))?$/);
-  return m ? phaseOf("specnaut", m[2]) : null;
+  const m = text.trimStart().match(/^\/((?:specnaut-plugin:)?specnaut)(?:\s+([\s\S]*))?$/);
+  return m ? phaseOf(m[1] ?? "", m[2]) : null;
 }
 
 export function advance(state: ChainState, phase: Phase): ChainState {

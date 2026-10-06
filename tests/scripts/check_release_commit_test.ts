@@ -79,6 +79,13 @@ async function repoAt(
     await Deno.mkdir(`${dir}/${p.split("/").slice(0, -1).join("/")}`, { recursive: true });
     await Deno.writeTextFile(`${dir}/${p}`, catalog);
   }
+  await Deno.mkdir(`${dir}/templates/harness-specific/claude`, { recursive: true });
+  await Deno.writeTextFile(
+    `${dir}/templates/harness-specific/claude/settings.json`,
+    JSON.stringify({
+      extraKnownMarketplaces: { "specnaut-marketplace": { source: { ref: `v${version}` } } },
+    }),
+  );
   await git(dir, "add", "-A");
   await git(dir, "commit", "-q", "-m", subject);
   return dir;

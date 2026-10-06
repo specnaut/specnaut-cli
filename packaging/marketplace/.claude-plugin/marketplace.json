@@ -23,7 +23,7 @@
     },
     {
       "name": "specnaut-cockpit",
-      "description": "Usage limits, context, cost and the Specnaut chain's progress above the prompt in Claude Code, and a clean hold before the autopilot runs out of quota.",
+      "description": "A Claude Code mod: it runs a hooks module inside Claude Code with your permissions. Shows usage limits, context, cost and the Specnaut chain above the prompt, and refuses one call: the step that would start implement, review or merge past the quota threshold.",
       "category": "productivity",
       "tags": [
         "usage",

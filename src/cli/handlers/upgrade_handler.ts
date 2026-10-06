@@ -618,6 +618,10 @@ export async function runUpgrade(intent: UpgradeIntent): Promise<number> {
     result.status === "applied" ? result.written : [],
   );
   renderSummary(result.plan, result.fromVersion, result.toVersion, written);
+  // A plugin Specnaut enables runs code once installed: never added silently.
+  if (result.status === "applied") {
+    for (const note of result.notes) console.log(yellow(`ℹ ${note}`));
+  }
 
   // Sections Specnaut owns inside files the user owns (#466). `AGENTS.md` is
   // never rewritten by an upgrade, so the one section that has to reach an

@@ -41,6 +41,7 @@ Deno.test("VERSIONED_FILES covers every file the release workflow gates on", () 
       "mods/specnaut-cockpit/.claude-plugin/plugin.json",
       "packaging/marketplace/.claude-plugin/marketplace.json",
       "packaging/marketplace/.github/plugin/marketplace.json",
+      "templates/harness-specific/claude/settings.json",
     ] as const,
   );
 });
@@ -96,6 +97,14 @@ Deno.test("writeVersions bumps every versioned file in lockstep", async () => {
         `{\n  "plugins": [\n    { "source": { "ref": "v1.2.3" } },\n    { "source": { "ref": "v1.2.3" } }\n  ]\n}\n`,
       );
     }
+
+    await Deno.mkdir(join(tmp, "templates/harness-specific/claude"), { recursive: true });
+    await Deno.writeTextFile(
+      join(tmp, "templates/harness-specific/claude/settings.json"),
+      JSON.stringify({
+        extraKnownMarketplaces: { "specnaut-marketplace": { source: { ref: "v1.2.3" } } },
+      }),
+    );
 
     await writeVersions("1.2.4", tmp);
 

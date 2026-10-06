@@ -2,6 +2,7 @@ import { assert, assertEquals, assertStringIncludes } from "@std/assert";
 import {
   formatCost,
   ordered,
+  thresholdsFrom,
   toneOf,
   untilReset,
   type Window,
@@ -116,6 +117,11 @@ Deno.test("a specnaut Skill call names its phase, flags and plugin scope aside",
   assertEquals(phaseOf("specnaut", ""), null);
   assertEquals(phaseOf("board", "merge"), null);
   assertEquals(phaseOf("not-specnaut", "merge"), null);
+  assertEquals(
+    phaseOf("someone-else:specnaut", "merge"),
+    null,
+    "another plugin's skill of that name",
+  );
 });
 
 Deno.test("a typed /specnaut prompt names its phase", () => {
@@ -124,6 +130,7 @@ Deno.test("a typed /specnaut prompt names its phase", () => {
   assertEquals(phaseOfPrompt("/specnaut"), null);
   assertEquals(phaseOfPrompt("please run /specnaut plan"), null);
   assertEquals(phaseOfPrompt("/specnautx plan"), null);
+  assertEquals(phaseOfPrompt("/someone-else:specnaut merge"), null);
 });
 
 Deno.test("the chain line marks done, current and pending phases", () => {
@@ -181,6 +188,19 @@ Deno.test("a lifted hold stays lifted for that window, and returns with the next
     holdFor("review", [w("seven_day", 96, "R1"), w("five_hour", 92, "S1")], 90, lifted, NOW),
     "lifting one window does not lift another",
   );
+});
+
+Deno.test("a reading taken before its window reset does not hold the new window", () => {
+  assertEquals(holdFor("merge", [w("five_hour", 99, inMin(-1))], 90, {}, NOW), null);
+  assert(holdFor("merge", [w("five_hour", 99, inMin(1))], 90, {}, NOW));
+  assert(holdFor("merge", [w("seven_day", 99)], 90, {}, NOW), "no reset time: still held");
+});
+
+Deno.test("thresholds come from the options, held to the declared bounds", () => {
+  assertEquals(thresholdsFrom(undefined), { warnAt: 80, holdAt: 90 });
+  assertEquals(thresholdsFrom({ hold_at: 75, warn_at: 60 }), { warnAt: 60, holdAt: 75 });
+  assertEquals(thresholdsFrom({ hold_at: 5, warn_at: 500 }), { warnAt: 100, holdAt: 50 });
+  assertEquals(thresholdsFrom({ hold_at: "90", warn_at: Number.NaN }), { warnAt: 80, holdAt: 90 });
 });
 
 // ── band ─────────────────────────────────────────────────────────────────

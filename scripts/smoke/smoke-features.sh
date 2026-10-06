@@ -733,8 +733,8 @@ check "PreToolUse hook registered" 'grep -q "PreToolUse" .claude/settings.json'
 check "SubagentStart hook registered" 'grep -q "SubagentStart" .claude/settings.json'
 check "SessionStart hook registered" 'grep -q "SessionStart" .claude/settings.json'
 # cli#642: Claude Code offers the cockpit mod when the project is trusted.
-check "Specnaut marketplace declared" \
-  'jq -e ".extraKnownMarketplaces[\"specnaut-marketplace\"].source.repo == \"specnaut/specnaut-marketplace\"" .claude/settings.json >/dev/null'
+check "Specnaut marketplace declared, pinned to a release" \
+  'jq -e ".extraKnownMarketplaces[\"specnaut-marketplace\"].source | .repo == \"specnaut/specnaut-cli\" and (.ref | startswith(\"v\"))" .claude/settings.json >/dev/null'
 check "cockpit mod enabled" \
   'jq -e ".enabledPlugins[\"specnaut-cockpit@specnaut-marketplace\"] == true" .claude/settings.json >/dev/null'
 for hook in protect-generated log-subagent check-backlog-prereqs; do

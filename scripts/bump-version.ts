@@ -2,7 +2,12 @@
 // Pure `computeNextVersion` is exported for testability.
 
 import { SemVer } from "../src/domain/release.ts";
-import { CATALOG_FILES, stampCatalogRefs } from "./catalog-refs.ts";
+import {
+  CATALOG_FILES,
+  SETTINGS_TEMPLATE,
+  stampCatalogRefs,
+  stampDeclarationRef,
+} from "./catalog-refs.ts";
 
 export type BumpKind =
   | "patch"
@@ -56,6 +61,7 @@ export const VERSIONED_FILES = [
   "mods/specnaut-cockpit/.claude-plugin/plugin.json",
   "packaging/marketplace/.claude-plugin/marketplace.json",
   "packaging/marketplace/.github/plugin/marketplace.json",
+  "templates/harness-specific/claude/settings.json",
 ] as const;
 
 // The marketplace catalogs carry the release as a git `ref` on each entry, not
@@ -149,6 +155,12 @@ export async function writeVersions(
     const path = `${baseDir}/${catalog}`;
     await Deno.writeTextFile(path, stampCatalogRefs(await Deno.readTextFile(path), `v${next}`));
   }
+  // And the marketplace the scaffolded Claude Code settings declare.
+  const settingsPath = `${baseDir}/${SETTINGS_TEMPLATE}`;
+  await Deno.writeTextFile(
+    settingsPath,
+    stampDeclarationRef(await Deno.readTextFile(settingsPath), `v${next}`),
+  );
 }
 
 async function main() {

@@ -34,7 +34,10 @@ export function holdFor(
 ): Hold | null {
   if (holdAt >= 100 || !GUARDED.includes(phase)) return null;
   const over = ordered(windows).find((w) =>
-    w.percentUsed >= holdAt && !(w.kind in lifted && lifted[w.kind] === w.resetsAt)
+    w.percentUsed >= holdAt &&
+    !(w.kind in lifted && lifted[w.kind] === w.resetsAt) &&
+    // A reading taken before its window reset says nothing about the new one.
+    !(w.resetsAt !== undefined && Date.parse(w.resetsAt) <= now)
   );
   if (!over) return null;
   const eta = untilReset(over.resetsAt, now);
