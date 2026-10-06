@@ -137,6 +137,11 @@ check_helper codex  ".codex/goal.md"    "^# Project goal prompt"
 # claude init, and the codex text exists nowhere in that tree.
 check_helper codex  ".specnaut/harness-tools.md"  "agent_type="
 
+# cli#633. The copilot render carries the marketplace install line, which named
+# a repository and a plugin that never existed until the catalogs moved into
+# this repository. Asserted on the copilot render for the same reason as above.
+check_helper copilot ".specnaut/harness-tools.md"  "specnaut-plugin@specnaut-marketplace"
+
 # The harness count stays COUNTED, not spelled: the literal once said 8
 # while the array held 7. finish() owns the banner shape (R4); the number
 # in the label is still computed from the array itself.
