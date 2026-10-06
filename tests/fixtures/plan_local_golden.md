@@ -91,8 +91,9 @@ One file, read whole by whoever implements. Twelve sections, in order, **none op
 6. **Technical context** — language, storage, testing, constraints, scale. Where the feature has
    entities worth naming, the domain model goes here: bounded context, vocabulary, entities (which
    have identity), value objects, invariants.
-7. **Constitution check** — every principle, with a verdict. A violation goes in Complexity Tracking
-   with its justification, or the plan is not done.
+7. **Constitution check** — every principle, with a verdict, and the size gate in
+   `.specnaut/memory/size-limits.md`. A violation goes in Complexity Tracking with its justification
+   (never a size one), or the plan is not done.
 8. **Surface impact** — every client surface the feature touches, plus the interface contracts it
    exposes. "One surface only" is a valid answer; an unstated one is not.
    **Front-end / UX-UI features**: where the project has a front-end surface, add a

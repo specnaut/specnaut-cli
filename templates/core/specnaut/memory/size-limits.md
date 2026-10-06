@@ -75,3 +75,12 @@ Generated code, a vendored bundle, a lockfile, a data table: list it under
 `Exempt:` rather than arguing each review. The god-file smell in
 `.specnaut/memory/architecture/smells/god-file.md` covers the judgement call;
 the limits above cover the number.
+
+## In each phase
+
+**plan** — § 7 of the plan carries the mandatory size row and the **Files
+touched** table. `Lines now` is `wc -l`, measured at plan time. The plan is not
+done while a file's lines after exceed its ceiling, or a file already over its
+target has lines after > lines now. Complexity tracking cannot accept a size
+violation: the remedy is an extraction inside the plan. Each new module gets a
+one-line responsibility; one that needs "and" is two.

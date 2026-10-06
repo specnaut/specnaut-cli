@@ -95,12 +95,25 @@ number beats a paragraph. Who is hurting, how often, and what it costs them toda
 
 | Principle | Verdict | Note |
 | :--- | :--- | :--- |
+| Size limits (`## Size limits`, or the defaults in `.specnaut/memory/size-limits.md`) | pass / violation | [mandatory row — never removed] |
 | [principle] | pass / violation | [why] |
+
+### Files touched
+
+*GATE: `Lines now` is measured with `wc -l` while writing this plan, never estimated. The plan is
+not done while any file's lines after exceed its ceiling, or a file already over its target has
+lines after > lines now. The remedy is an extraction planned here, not a justification below.*
+
+| File | Lines now | Lines after (est.) | Over target? | Responsibility of each new module (one line) |
+| :--- | ---: | ---: | :--- | :--- |
+| [path] | [wc -l] | [estimate] | yes / no | [new module — what it is responsible for] |
+
+A responsibility that needs "and" to describe it is two responsibilities: split the module.
 
 ### Complexity tracking
 
 [Any violation above, with the justification for accepting it. An unjustified violation means the
-plan is not done.]
+plan is not done. A size violation cannot be accepted here — it is fixed in the plan.]
 
 ## 8. Surface impact
 

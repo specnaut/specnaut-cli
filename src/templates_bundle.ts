@@ -325,8 +325,9 @@ One file, read whole by whoever implements. Twelve sections, in order, **none op
 6. **Technical context** — language, storage, testing, constraints, scale. Where the feature has
    entities worth naming, the domain model goes here: bounded context, vocabulary, entities (which
    have identity), value objects, invariants.
-7. **Constitution check** — every principle, with a verdict. A violation goes in Complexity Tracking
-   with its justification, or the plan is not done.
+7. **Constitution check** — every principle, with a verdict, and the size gate in
+   \`.specnaut/memory/size-limits.md\`. A violation goes in Complexity Tracking with its justification
+   (never a size one), or the plan is not done.
 8. **Surface impact** — every client surface the feature touches, plus the interface contracts it
    exposes. "One surface only" is a valid answer; an unstated one is not.
    **Front-end / UX-UI features**: where the project has a front-end surface, add a
@@ -15994,6 +15995,15 @@ Generated code, a vendored bundle, a lockfile, a data table: list it under
 \`Exempt:\` rather than arguing each review. The god-file smell in
 \`.specnaut/memory/architecture/smells/god-file.md\` covers the judgement call;
 the limits above cover the number.
+
+## In each phase
+
+**plan** — § 7 of the plan carries the mandatory size row and the **Files
+touched** table. \`Lines now\` is \`wc -l\`, measured at plan time. The plan is not
+done while a file's lines after exceed its ceiling, or a file already over its
+target has lines after > lines now. Complexity tracking cannot accept a size
+violation: the remedy is an extraction inside the plan. Each new module gets a
+one-line responsibility; one that needs "and" is two.
 `,
     executable: false,
     backend: null,
@@ -25607,12 +25617,25 @@ number beats a paragraph. Who is hurting, how often, and what it costs them toda
 
 | Principle | Verdict | Note |
 | :--- | :--- | :--- |
+| Size limits (\`## Size limits\`, or the defaults in \`.specnaut/memory/size-limits.md\`) | pass / violation | [mandatory row — never removed] |
 | [principle] | pass / violation | [why] |
+
+### Files touched
+
+*GATE: \`Lines now\` is measured with \`wc -l\` while writing this plan, never estimated. The plan is
+not done while any file's lines after exceed its ceiling, or a file already over its target has
+lines after > lines now. The remedy is an extraction planned here, not a justification below.*
+
+| File | Lines now | Lines after (est.) | Over target? | Responsibility of each new module (one line) |
+| :--- | ---: | ---: | :--- | :--- |
+| [path] | [wc -l] | [estimate] | yes / no | [new module — what it is responsible for] |
+
+A responsibility that needs "and" to describe it is two responsibilities: split the module.
 
 ### Complexity tracking
 
 [Any violation above, with the justification for accepting it. An unjustified violation means the
-plan is not done.]
+plan is not done. A size violation cannot be accepted here — it is fixed in the plan.]
 
 ## 8. Surface impact
 
