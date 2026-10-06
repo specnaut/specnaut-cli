@@ -74,7 +74,9 @@ Deno.test("the threshold pattern catches the shapes the agents used to carry", (
 });
 
 Deno.test("the defaults file states the one rule and the default table", async () => {
-  const text = await Deno.readTextFile(`${ROOT}templates/core/specnaut/memory/size-limits.md`);
+  // A Windows checkout converts LF to CRLF; the rule's sentence spans a line break.
+  const text = (await Deno.readTextFile(`${ROOT}templates/core/specnaut/memory/size-limits.md`))
+    .replaceAll("\r\n", "\n");
   assert(text.includes("is the only\nsource of thresholds"), "resolution rule");
   assert(/^\| file \| 300 \| 500 \|$/m.test(text), "file default");
   assert(/^\| function \| 30 \| 50 \|$/m.test(text), "function default");

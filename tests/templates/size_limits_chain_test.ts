@@ -11,7 +11,8 @@ import { fromFileUrl } from "@std/path";
  */
 
 const ROOT = fromFileUrl(new URL("../../", import.meta.url));
-const read = (p: string) => Deno.readTextFile(`${ROOT}${p}`);
+// A Windows checkout converts LF to CRLF; several assertions span a line break.
+const read = async (p: string) => (await Deno.readTextFile(`${ROOT}${p}`)).replaceAll("\r\n", "\n");
 const LIMITS = ".specnaut/memory/size-limits.md";
 
 Deno.test("plan: the template has the mandatory size row and a measured Files touched table", async () => {
