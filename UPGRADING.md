@@ -1,5 +1,38 @@
 # Upgrading Specnaut
 
+## 5.0.x → 5.1.0
+
+Nothing to edit by hand.
+
+### Claude Code projects offer the Specnaut Cockpit
+
+`specnaut upgrade` adds two keys to `.claude/settings.json` for projects scaffolded for Claude Code:
+`extraKnownMarketplaces["specnaut-marketplace"]` and
+`enabledPlugins["specnaut-cockpit@specnaut-marketplace"]`. When someone trusts the project, Claude
+Code offers to install the marketplace and the cockpit mod: usage limits, context and cost above the
+prompt, and a clean hold before the autopilot runs out of quota. See
+[`mods/specnaut-cockpit/README.md`](mods/specnaut-cockpit/README.md).
+
+To decline it for a project, set the plugin to `false`:
+
+```json
+{ "enabledPlugins": { "specnaut-cockpit@specnaut-marketplace": false } }
+```
+
+The merge only adds keys that are absent, so a `false`, or a marketplace you pointed elsewhere,
+survives every later `specnaut upgrade`. Deleting the key brings it back on the next upgrade, so use
+`false` rather than deleting it.
+
+### The Claude Code marketplace installs again
+
+`/plugin install` from the marketplace installed an empty plugin, because the published catalog did
+not match Claude Code's format. The catalog is fixed, and the right commands are:
+
+```text
+/plugin marketplace add specnaut/specnaut-marketplace
+/plugin install specnaut-plugin@specnaut-marketplace
+```
+
 ## 4.6.x → 5.0.0
 
 **Breaking: `/specnaut` merges and pushes without asking.** A project that relied on the "Ready to

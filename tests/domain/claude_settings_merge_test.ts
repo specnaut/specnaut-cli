@@ -215,3 +215,44 @@ Deno.test("mergeClaudeSettings: ask rules are not duplicated on re-merge (#610)"
   assertEquals(twice, once);
   assertEquals(JSON.parse(twice).permissions.ask, PUBLISH_ASK);
 });
+
+// ── Plugin declarations (#642) ─────────────────────────────────────────────
+// The shipped settings declare Specnaut's marketplace and enable the cockpit
+// mod, so Claude Code offers both when a person trusts the project. A key the
+// user already has is theirs: `false` declines the cockpit for good.
+
+const COCKPIT = "specnaut-cockpit@specnaut-marketplace";
+
+Deno.test("claude settings: the shipped file declares the marketplace and enables the cockpit (#642)", () => {
+  const shipped = JSON.parse(SHIPPED);
+  assertEquals(shipped.extraKnownMarketplaces?.["specnaut-marketplace"]?.source, {
+    source: "github",
+    repo: "specnaut/specnaut-marketplace",
+  });
+  assertEquals(shipped.enabledPlugins?.[COCKPIT], true);
+});
+
+Deno.test("mergeClaudeSettings: an existing project gains the marketplace and the cockpit (#642)", () => {
+  const existing = JSON.stringify({
+    enabledPlugins: { "other@elsewhere": true },
+    extraKnownMarketplaces: { elsewhere: { source: { source: "github", repo: "o/r" } } },
+  });
+  const merged = JSON.parse(mergeClaudeSettings(existing, SHIPPED, DEST));
+  assertEquals(merged.enabledPlugins, { "other@elsewhere": true, [COCKPIT]: true });
+  assertEquals(Object.keys(merged.extraKnownMarketplaces), ["elsewhere", "specnaut-marketplace"]);
+});
+
+Deno.test("mergeClaudeSettings: a project's `false` for the cockpit survives every upgrade (#642)", () => {
+  const existing = JSON.stringify({ enabledPlugins: { [COCKPIT]: false } });
+  const once = mergeClaudeSettings(existing, SHIPPED, DEST);
+  const twice = mergeClaudeSettings(once, SHIPPED, DEST);
+  assertEquals(JSON.parse(twice).enabledPlugins[COCKPIT], false);
+  assertEquals(twice, once);
+});
+
+Deno.test("mergeClaudeSettings: a marketplace the user re-pointed is left as they set it (#642)", () => {
+  const mine = { source: { source: "github", repo: "my-fork/specnaut-marketplace" } };
+  const existing = JSON.stringify({ extraKnownMarketplaces: { "specnaut-marketplace": mine } });
+  const merged = JSON.parse(mergeClaudeSettings(existing, SHIPPED, DEST));
+  assertEquals(merged.extraKnownMarketplaces["specnaut-marketplace"], mine);
+});

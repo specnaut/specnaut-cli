@@ -30029,6 +30029,17 @@ patterns:
         ]
       }
     ]
+  },
+  "extraKnownMarketplaces": {
+    "specnaut-marketplace": {
+      "source": {
+        "source": "github",
+        "repo": "specnaut/specnaut-marketplace"
+      }
+    }
+  },
+  "enabledPlugins": {
+    "specnaut-cockpit@specnaut-marketplace": true
   }
 }
 `,

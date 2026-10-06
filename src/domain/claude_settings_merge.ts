@@ -24,6 +24,9 @@
  *     evaluates `ask` before `allow`, so they hold against a broader allow
  *     the user added. `allow` and `deny` are never touched: an ask rule
  *     adds a prompt, it never grants or forbids anything.
+ *   - `extraKnownMarketplaces` and `enabledPlugins` gain each bundled key the
+ *     user does not have, and keep every key they do — `false` included, which
+ *     is how a project declines a plugin Specnaut enables (#642).
  *   - All other user fields are passed through verbatim.
  *
  * Removal-on-unbundle (e.g. Specnaut drops a hook in a future
@@ -151,6 +154,24 @@ export function mergeClaudeSettings(
     const ask: string[] = [...(userPerms.ask ?? [])];
     for (const rule of bundledAsk) if (!ask.includes(rule)) ask.push(rule);
     result.permissions = { ...userPerms, ask };
+  }
+
+  // 4. Plugin declarations (#642): the marketplace Specnaut publishes to and
+  //    the plugins it enables. A key the user already has is theirs, whatever
+  //    its value: `"specnaut-cockpit@specnaut-marketplace": false` is how a
+  //    project opts out, and it holds across every upgrade. Only a key that is
+  //    absent is added.
+  for (const field of ["extraKnownMarketplaces", "enabledPlugins"] as const) {
+    const bundledMap = bundledParsed[field];
+    if (!bundledMap || typeof bundledMap !== "object") continue;
+    const userMap = userParsed[field] && typeof userParsed[field] === "object"
+      ? userParsed[field]
+      : {};
+    const merged = { ...userMap };
+    for (const [key, value] of Object.entries(bundledMap)) {
+      if (!(key in merged)) merged[key] = value;
+    }
+    result[field] = merged;
   }
 
   // Preserve hooks key only if non-empty.
