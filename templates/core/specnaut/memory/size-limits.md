@@ -99,3 +99,9 @@ task touches, before and after, and report every one as
 `file: before → after (target T, ceiling C)`. A file over its target that grew,
 or any file over its ceiling, is a blocker: fix it — extract — before handing
 off to review, never after.
+
+**review** — the review coordinator measures every changed file at the base
+and at head, and briefs each seat with both counts and the table. The severity
+table above is the only one; `code-reviewer` cites it and reports
+`wc -l <before> → <after>` for every file that ends over its target. A HIGH size
+finding is routed back to the implementer like any other HIGH.

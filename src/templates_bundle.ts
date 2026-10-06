@@ -1612,7 +1612,8 @@ proceed against an empty spec.
    \`git diff --name-only \$(git merge-base HEAD main)\`
 2. Delegate structural review to parallel sub-agents via the \`review-coordinator\`.
 3. Detect the project's toolchain and run its quality gates.
-4. If CRITICAL or HIGH findings exist, route fixes to the implementer and re-run.
+4. If CRITICAL or HIGH findings exist, route fixes to the implementer and re-run. A HIGH size
+   finding (\`.specnaut/memory/size-limits.md\`) is routed the same way — no special case.
 5. Produce a final pass/fail report.
 
 ## Phase 1 — Structural review
@@ -7816,6 +7817,12 @@ in parallel and aggregate results.
 
 ## Protocol
 
+0. **Measure sizes.** For every changed file, count lines at the base
+   (\`git show "\$(git merge-base HEAD main)":<path> | wc -l\`, 0 for a new file)
+   and at head (\`wc -l <path>\`). Put both in every seat's brief, with the
+   constitution's \`## Size limits\` table — or the path
+   \`.specnaut/memory/size-limits.md\` when it has none. The seats read; you
+   measure. Severity for size comes from that file's table, nowhere else.
 1. Always spawn \`code-reviewer\` and \`security-expert\` in parallel, passing them
    the list of changed files.
 2. If any changed file matches \`**/*test*.*\` or \`**/*_test.*\` or \`**/test/**\`
@@ -7982,7 +7989,8 @@ explore the rest of the codebase unless strictly necessary for context.
    — its thresholds come from the constitution's \`## Size limits\` table, never a
    number of your own, and its severity table is the one you apply. Name the
    unit, the measured value, and the limit with its source (\`constitution\` or
-   \`default\`).
+   \`default\`). For every file that ends over its target, report the
+   coordinator's line counts as \`wc -l <before> → <after>\`.
 
 ## Why this seat has no execution tool
 
@@ -16024,6 +16032,12 @@ task touches, before and after, and report every one as
 \`file: before → after (target T, ceiling C)\`. A file over its target that grew,
 or any file over its ceiling, is a blocker: fix it — extract — before handing
 off to review, never after.
+
+**review** — the review coordinator measures every changed file at the base
+and at head, and briefs each seat with both counts and the table. The severity
+table above is the only one; \`code-reviewer\` cites it and reports
+\`wc -l <before> → <after>\` for every file that ends over its target. A HIGH size
+finding is routed back to the implementer like any other HIGH.
 `,
     executable: false,
     backend: null,

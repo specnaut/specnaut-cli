@@ -19,6 +19,12 @@ in parallel and aggregate results.
 
 ## Protocol
 
+0. **Measure sizes.** For every changed file, count lines at the base
+   (`git show "$(git merge-base HEAD main)":<path> | wc -l`, 0 for a new file)
+   and at head (`wc -l <path>`). Put both in every seat's brief, with the
+   constitution's `## Size limits` table — or the path
+   `.specnaut/memory/size-limits.md` when it has none. The seats read; you
+   measure. Severity for size comes from that file's table, nowhere else.
 1. Always spawn `code-reviewer` and `security-expert` in parallel, passing them
    the list of changed files.
 2. If any changed file matches `**/*test*.*` or `**/*_test.*` or `**/test/**`

@@ -30,7 +30,8 @@ explore the rest of the codebase unless strictly necessary for context.
    — its thresholds come from the constitution's `## Size limits` table, never a
    number of your own, and its severity table is the one you apply. Name the
    unit, the measured value, and the limit with its source (`constitution` or
-   `default`).
+   `default`). For every file that ends over its target, report the
+   coordinator's line counts as `wc -l <before> → <after>`.
 
 ## Why this seat has no execution tool
 

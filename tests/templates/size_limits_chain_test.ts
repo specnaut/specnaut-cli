@@ -49,3 +49,20 @@ Deno.test("implement: the phase applies the gate, and the gate carries the table
   assert(limits.includes("`file: before → after (target T, ceiling C)`"), "report shape");
   assert(limits.includes("is a blocker"), "growth blocks the hand-off");
 });
+
+Deno.test("review: the coordinator measures base and head and briefs every seat with the table", async () => {
+  const c = await read("templates/core/agents/review-coordinator.md");
+  assert(c.includes("0. **Measure sizes.**"), "measurement step");
+  assert(c.includes("git merge-base HEAD main") && c.includes("wc -l"), "base and head counts");
+  assert(c.includes(LIMITS), "table or defaults in the brief");
+  const r = await read("templates/core/agents/code-reviewer.md");
+  assert(r.includes("`wc -l <before> → <after>`"), "code-reviewer reports the counts");
+  const limits = await read("templates/core/specnaut/memory/size-limits.md");
+  for (
+    const row of [
+      "| A unit ends over its ceiling | HIGH |",
+      "| A unit already over its target grew | HIGH |",
+      "| A unit crosses its target for the first time | MEDIUM |",
+    ]
+  ) assert(limits.includes(row), row);
+});
