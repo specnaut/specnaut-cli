@@ -173,18 +173,43 @@ echo "▶ verifying the marketplace catalog was published"
 # had was however long the docs poll above happened to spend — which collapses
 # to nothing when that poll's dispatch fails fast. A verification whose timing
 # budget is an accident of an unrelated step's failure mode is not one.
-catalog_version=""
+# What it checks is the PUBLISHED catalog's `ref` on every entry, in both
+# dialects (#633): the files are copied verbatim from this tag, so an entry on
+# any other ref means the copy did not happen. And the Claude Code catalog goes
+# through Claude Code's own validator, because a catalog whose only check was a
+# version string installed nothing for every release until that was added.
+catalog_refs=""
+copilot_refs=""
 for attempt in 1 2 3 4 5 6 7 8 9 10 11 12; do
-  catalog_version="$(gh api repos/specnaut/specnaut-marketplace/contents/.claude-plugin/marketplace.json \
+  catalog_json="$(gh api repos/specnaut/specnaut-marketplace/contents/.claude-plugin/marketplace.json \
+    --jq '.content' 2>/dev/null | base64 -d 2>/dev/null || true)"
+  catalog_refs="$(printf '%s' "$catalog_json" | jq -r '[.plugins[].source.ref] | unique | join(",")' 2>/dev/null || true)"
+  copilot_refs="$(gh api repos/specnaut/specnaut-marketplace/contents/.github/plugin/marketplace.json \
     --jq '.content' 2>/dev/null | base64 -d 2>/dev/null \
-    | jq -r '.plugins[] | select(.name=="specnaut-plugin") | .version' 2>/dev/null || true)"
-  [ "$catalog_version" = "${TAG#v}" ] && break
+    | jq -r '[.plugins[].source.ref] | unique | join(",")' 2>/dev/null || true)"
+  [ "$catalog_refs" = "$TAG" ] && [ "$copilot_refs" = "$TAG" ] && break
   [ "$attempt" -eq 12 ] || sleep 10
 done
-if [ "$catalog_version" = "${TAG#v}" ]; then
-  echo "  catalog lists ${TAG#v}"
+if [ "$catalog_refs" = "$TAG" ] && [ "$copilot_refs" = "$TAG" ]; then
+  echo "  both catalogs pin every entry to $TAG"
+  if command -v claude >/dev/null 2>&1; then
+    catalog_dir="$(mktemp -d)"
+    mkdir -p "$catalog_dir/.claude-plugin"
+    printf '%s' "$catalog_json" > "$catalog_dir/.claude-plugin/marketplace.json"
+    if claude plugin validate "$catalog_dir" >/dev/null 2>&1; then
+      echo "  Claude Code accepts the published catalog"
+    else
+      echo "⚠ Claude Code rejects the published catalog:"
+      claude plugin validate "$catalog_dir" 2>&1 | grep -E '❯|✘' | head -5 | sed 's/^/    /'
+      marketplace_warned=1
+    fi
+    rm -rf "$catalog_dir"
+  else
+    echo "⚠ \`claude\` is not on PATH — the published catalog was NOT validated"
+    marketplace_warned=1
+  fi
 else
-  echo "⚠ marketplace catalog lists '${catalog_version:-unreadable}', expected ${TAG#v}."
+  echo "⚠ marketplace catalogs pin '${catalog_refs:-unreadable}' (Claude Code) and '${copilot_refs:-unreadable}' (Copilot CLI), expected $TAG."
   echo "  Claude Code / Copilot CLI marketplace users are on the previous version."
   marketplace_warned=1
 fi
@@ -280,7 +305,7 @@ warnings=()
 [ "$run_failed" -eq 1 ] && warnings+=("release.yml run $run_id ended red — read its log before trusting this release") || true
 [ "$homebrew_warned" -eq 1 ] && warnings+=("tap bump unverified, re-check in ~60s") || true
 [ "$docs_warned" -eq 1 ] && warnings+=("docs site stale, specnaut.com/version.json not updated") || true
-[ "$marketplace_warned" -eq 1 ] && warnings+=("marketplace catalog stale, that channel is behind") || true
+[ "$marketplace_warned" -eq 1 ] && warnings+=("marketplace catalog stale or rejected, that channel is behind") || true
 [ "$selfupdate_warned" -eq 1 ] && warnings+=("local binary not refreshed (does not affect the release)") || true
 [ "$publishedsmoke_skipped" -eq 1 ] && warnings+=("published binary NOT smoke-tested — run .specnaut/release/smoke-published.sh $TAG once updated") || true
 

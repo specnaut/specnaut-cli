@@ -1,0 +1,25 @@
+{
+  "name": "specnaut-marketplace",
+  "owner": {
+    "name": "MakerLabs"
+  },
+  "description": "Specnaut: spec-driven planning, implementation, review and delivery for coding agents.",
+  "plugins": [
+    {
+      "name": "specnaut-plugin",
+      "description": "Specnaut's auto-chained spec-driven workflow, slash commands, and sub-agents for Claude Code — the same content the binary scaffolds, available as a versioned plugin.",
+      "category": "workflow",
+      "tags": [
+        "workflow",
+        "spec",
+        "planning"
+      ],
+      "source": {
+        "source": "github",
+        "repo": "specnaut/specnaut-cli",
+        "path": "plugin",
+        "ref": "v5.0.1"
+      }
+    }
+  ]
+}

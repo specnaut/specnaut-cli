@@ -1,5 +1,6 @@
 import { assert, assertEquals } from "@std/assert";
-import { versionsIn } from "../../scripts/check-release-commit.ts";
+import { refsIn, versionsIn } from "../../scripts/check-release-commit.ts";
+import { writeVersions } from "../../scripts/bump-version.ts";
 
 /**
  * The gate between the release commit and `git tag`.
@@ -27,8 +28,12 @@ async function git(cwd: string, ...args: string[]) {
   assert(out.success, `git ${args.join(" ")} failed`);
 }
 
-/** A repo carrying all six version files at `version`, committed with `subject`. */
-async function repoAt(version: string, subject: string, opts: { desync?: string } = {}) {
+/** A repo carrying every version file at `version`, committed with `subject`. */
+async function repoAt(
+  version: string,
+  subject: string,
+  opts: { desync?: string; staleRef?: string } = {},
+) {
   const dir = await Deno.makeTempDir();
   await git(dir, "init", "-q");
   await git(dir, "config", "user.email", "t@t");
@@ -50,6 +55,28 @@ async function repoAt(version: string, subject: string, opts: { desync?: string 
   ) {
     await Deno.mkdir(`${dir}/${p.split("/").slice(0, -1).join("/")}`, { recursive: true });
     await Deno.writeTextFile(`${dir}/${p}`, json(version));
+  }
+  // Two entries per catalog: the second can be left on an older tag, the
+  // case a "does any ref match" check would wave through.
+  const catalog = JSON.stringify(
+    {
+      name: "m",
+      plugins: [
+        { name: "a", source: { ref: `v${version}` } },
+        { name: "b", source: { ref: `v${opts.staleRef ?? version}` } },
+      ],
+    },
+    null,
+    2,
+  );
+  for (
+    const p of [
+      "packaging/marketplace/.claude-plugin/marketplace.json",
+      "packaging/marketplace/.github/plugin/marketplace.json",
+    ]
+  ) {
+    await Deno.mkdir(`${dir}/${p.split("/").slice(0, -1).join("/")}`, { recursive: true });
+    await Deno.writeTextFile(`${dir}/${p}`, catalog);
   }
   await git(dir, "add", "-A");
   await git(dir, "commit", "-q", "-m", subject);
@@ -78,6 +105,15 @@ Deno.test("version files that disagree are refused", async () => {
   assert(err.includes("src/domain/version.ts declares 2.1.0"), err);
 });
 
+Deno.test("a catalog entry left on the previous tag is refused", async () => {
+  // The marketplace copies the catalog verbatim at the tag: an entry still
+  // pinned to the previous tag installs the previous plugin.
+  const dir = await repoAt("3.0.0", "chore: release v3.0.0", { staleRef: "2.9.0" });
+  const { code, err } = await run(dir, "v3.0.0");
+  assertEquals(code, 1);
+  assert(err.includes("pins refs 3.0.0, 2.9.0, expected every one at 3.0.0"), err);
+});
+
 Deno.test("a dirty tree is refused", async () => {
   const dir = await repoAt("3.0.0", "chore: release v3.0.0");
   await Deno.writeTextFile(`${dir}/stray.txt`, "not in the tag");
@@ -96,6 +132,11 @@ Deno.test("versionsIn finds both the JSON field and the TS constant", () => {
   assertEquals(versionsIn('{"version": "1.2.3"}'), ["1.2.3"]);
   assertEquals(versionsIn('export const VERSION = "1.2.3";'), ["1.2.3"]);
   assertEquals(versionsIn('{"version":"1.0.0"}\nVERSION = "2.0.0"'), ["1.0.0", "2.0.0"]);
+});
+
+Deno.test("refsIn returns every catalog ref, duplicates included", () => {
+  assertEquals(refsIn('{"ref": "v1.2.3", "x": {"ref":"v1.2.3"}}'), ["1.2.3", "1.2.3"]);
+  assertEquals(refsIn('{"ref": "main"}'), []);
 });
 
 /**
@@ -130,22 +171,9 @@ async function repoWithHighlights(
   await git(dir, "commit", "-q", "-m", "docs(release): the lead");
   await git(dir, "tag", "-a", prev, "-m", prev);
   await after(dir);
-  // The bump to `next`, in its own commit, exactly as the pipeline writes it.
-  for (
-    const p of [
-      "deno.json",
-      "plugin/.claude-plugin/plugin.json",
-      "templates/manifest.json",
-      ".codex-plugin/plugin.json",
-      ".cursor-plugin/plugin.json",
-    ]
-  ) {
-    await Deno.writeTextFile(`${dir}/${p}`, JSON.stringify({ version: next.slice(1) }, null, 2));
-  }
-  await Deno.writeTextFile(
-    `${dir}/src/domain/version.ts`,
-    `export const VERSION = "${next.slice(1)}";\n`,
-  );
+  // The bump to `next`, in its own commit, written by the pipeline's own
+  // writer: a second list of version files here would drift from the real one.
+  await writeVersions(next.slice(1), dir);
   await git(dir, "add", "-A");
   await git(dir, "commit", "-q", "-m", `chore: release ${next}`);
   return dir;
@@ -199,18 +227,7 @@ Deno.test("highlights absent at the previous tag cannot have been republished", 
   await git(dir, "tag", "-a", "v1.0.0", "-m", "v1.0.0");
   await Deno.mkdir(`${dir}/.specnaut/release`, { recursive: true });
   await Deno.writeTextFile(`${dir}/${H}`, LEAD);
-  for (
-    const p of [
-      "deno.json",
-      "plugin/.claude-plugin/plugin.json",
-      "templates/manifest.json",
-      ".codex-plugin/plugin.json",
-      ".cursor-plugin/plugin.json",
-    ]
-  ) {
-    await Deno.writeTextFile(`${dir}/${p}`, JSON.stringify({ version: "1.1.0" }, null, 2));
-  }
-  await Deno.writeTextFile(`${dir}/src/domain/version.ts`, `export const VERSION = "1.1.0";\n`);
+  await writeVersions("1.1.0", dir);
   await git(dir, "add", "-A");
   await git(dir, "commit", "-q", "-m", "chore: release v1.1.0");
   assertEquals((await run(dir, "v1.1.0")).code, 0);

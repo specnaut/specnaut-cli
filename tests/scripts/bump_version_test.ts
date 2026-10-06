@@ -38,6 +38,8 @@ Deno.test("VERSIONED_FILES covers every file the release workflow gates on", () 
       "templates/manifest.json",
       ".codex-plugin/plugin.json",
       ".cursor-plugin/plugin.json",
+      "packaging/marketplace/.claude-plugin/marketplace.json",
+      "packaging/marketplace/.github/plugin/marketplace.json",
     ] as const,
   );
 });
@@ -76,6 +78,19 @@ Deno.test("writeVersions bumps every versioned file in lockstep", async () => {
       `{\n  "name": "specnaut",\n  "version": "1.2.3"\n}\n`,
     );
 
+    for (
+      const p of [
+        "packaging/marketplace/.claude-plugin/marketplace.json",
+        "packaging/marketplace/.github/plugin/marketplace.json",
+      ]
+    ) {
+      await Deno.mkdir(join(tmp, p.split("/").slice(0, -1).join("/")), { recursive: true });
+      await Deno.writeTextFile(
+        join(tmp, p),
+        `{\n  "plugins": [\n    { "source": { "ref": "v1.2.3" } },\n    { "source": { "ref": "v1.2.3" } }\n  ]\n}\n`,
+      );
+    }
+
     await writeVersions("1.2.4", tmp);
 
     for (const f of VERSIONED_FILES) {
@@ -94,4 +109,17 @@ Deno.test("writeVersions bumps every versioned file in lockstep", async () => {
   } finally {
     await Deno.remove(tmp, { recursive: true });
   }
+});
+
+Deno.test("--list prints exactly VERSIONED_FILES, for the runbook to stage", async () => {
+  const out = await new Deno.Command("deno", {
+    args: [
+      "run",
+      "--allow-read",
+      new URL("../../scripts/bump-version.ts", import.meta.url).pathname,
+      "--list",
+    ],
+    stdout: "piped",
+  }).output();
+  assertEquals(new TextDecoder().decode(out.stdout).trim().split("\n"), [...VERSIONED_FILES]);
 });

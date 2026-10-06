@@ -40,6 +40,23 @@ jobs:
       - name: Test
         run: deno task test
 
+  # Claude Code's own validator over what this repository publishes to it:
+  # the marketplace catalog and the plugin it lists. Shape tests in
+  # tests/plugin/ check what we can state; this checks what Claude Code
+  # accepts, which is the thing that failed silently for every release
+  # until #633 — a catalog that installed nothing. Pinned, so a validator
+  # change surfaces as a deliberate bump, not as a red main.
+  claude-plugins:
+    runs-on: ubuntu-latest
+    env:
+      CLAUDE_CODE: "@anthropic-ai/claude-code@2.1.290"
+    steps:
+      - uses: actions/checkout@v6
+      - name: Validate the marketplace catalog
+        run: npx --yes "$CLAUDE_CODE" plugin validate packaging/marketplace
+      - name: Validate the plugin
+        run: npx --yes "$CLAUDE_CODE" plugin validate plugin
+
   cross-smoke:
     needs: lint-test
     strategy:

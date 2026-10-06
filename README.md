@@ -93,17 +93,16 @@ xattr -d com.apple.quarantine /path/to/specnaut
 If you'd rather skip `specnaut init` and have Specnaut available across **all your projects**,
 install it as a plugin / extension in your harness — same skill content across all five targets:
 
-| Harness                | Install command                                                                                                            |
-| ---------------------- | -------------------------------------------------------------------------------------------------------------------------- |
-| **Claude Code**        | `/plugin install specnaut/specnaut-cli-plugin`                                                                             |
-| **Codex CLI / App**    | `/plugins` → search "specnaut" → install¹                                                                                  |
-| **Cursor**             | `/add-plugin specnaut/specnaut-cli`                                                                                        |
-| **OpenCode**           | Add to `opencode.json`: `"plugin": ["specnaut@git+https://github.com/specnaut/specnaut-cli.git"]`                          |
-| **GitHub Copilot CLI** | `copilot plugin marketplace add specnaut/specnaut-marketplace`<br/>`copilot plugin install specnaut@specnaut-marketplace`¹ |
+| Harness                | Install command                                                                                                                  |
+| ---------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
+| **Claude Code**        | `/plugin marketplace add specnaut/specnaut-marketplace`<br/>`/plugin install specnaut-plugin@specnaut-marketplace`               |
+| **Codex CLI / App**    | `/plugins` → search "specnaut" → install¹                                                                                        |
+| **Cursor**             | `/add-plugin specnaut/specnaut-cli`                                                                                              |
+| **OpenCode**           | Add to `opencode.json`: `"plugin": ["specnaut@git+https://github.com/specnaut/specnaut-cli.git"]`                                |
+| **GitHub Copilot CLI** | `copilot plugin marketplace add specnaut/specnaut-marketplace`<br/>`copilot plugin install specnaut-plugin@specnaut-marketplace` |
 
-¹ Codex CLI and the shared marketplace listing land once their one-time prereqs are provisioned —
-see [the docs](https://specnaut.com/llms.txt) for current status. The sync workflows ship inert
-(skip with a warning) until then.
+¹ Codex CLI lands once its one-time prereqs are provisioned — see
+[the docs](https://specnaut.com/llms.txt) for current status.
 
 **When to use the plugin vs the binary:**
 

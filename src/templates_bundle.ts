@@ -30556,15 +30556,14 @@ maps each Claude Code tool to its GitHub Copilot CLI equivalent.
 
 Copilot CLI distributes plugins through a **marketplace repository** — a
 separate GitHub repo registered with \`copilot plugin marketplace add\`.
-The Specnaut marketplace (see issue #281) lives at
-\`specnaut/specnaut-cli-marketplace\` (planned) and registers Specnaut as
-\`specnaut@specnaut-marketplace\`.
+The Specnaut marketplace lives at \`specnaut/specnaut-marketplace\` and
+registers Specnaut as \`specnaut-plugin@specnaut-marketplace\`.
 
 Install flow for end users:
 
 \`\`\`bash
-copilot plugin marketplace add specnaut/specnaut-cli-marketplace
-copilot plugin install specnaut@specnaut-marketplace
+copilot plugin marketplace add specnaut/specnaut-marketplace
+copilot plugin install specnaut-plugin@specnaut-marketplace
 \`\`\`
 
 ## Subagent dispatch — concrete pattern

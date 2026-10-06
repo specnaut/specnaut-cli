@@ -44,7 +44,8 @@ not the polished workflow. Handoff rewriting is a known follow-up task on #73.
 ## Install
 
 ```bash
-/plugin install specnaut/specnaut-cli-plugin
+/plugin marketplace add specnaut/specnaut-marketplace
+/plugin install specnaut-plugin@specnaut-marketplace
 ```
 
 ## Local development

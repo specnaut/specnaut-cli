@@ -52,6 +52,17 @@ export const VERSIONED_FILES = [
   "templates/manifest.json",
   ".codex-plugin/plugin.json",
   ".cursor-plugin/plugin.json",
+  "packaging/marketplace/.claude-plugin/marketplace.json",
+  "packaging/marketplace/.github/plugin/marketplace.json",
+] as const;
+
+// The marketplace catalogs carry the release as a git `ref` (`"ref": "vX.Y.Z"`),
+// not as a `version` field: each entry pins the plugin to the tag it ships in.
+// The marketplace repository copies these files verbatim at that tag, so a ref
+// left behind here installs the previous release's plugin.
+export const CATALOG_FILES = [
+  "packaging/marketplace/.claude-plugin/marketplace.json",
+  "packaging/marketplace/.github/plugin/marketplace.json",
 ] as const;
 
 async function readCurrentVersion(baseDir: string): Promise<string> {
@@ -124,10 +135,27 @@ export async function writeVersions(
     `"version": "${next}"`,
   );
   await Deno.writeTextFile(cursorManifestPath, updatedCursor);
+
+  // Stamp every catalog entry's `ref` with the tag this release will carry
+  // (#633). Every ref, not the first: a catalog lists one entry per plugin.
+  for (const catalog of CATALOG_FILES) {
+    const path = `${baseDir}/${catalog}`;
+    const raw = await Deno.readTextFile(path);
+    await Deno.writeTextFile(
+      path,
+      raw.replace(/"ref":\s*"v[^"]+"/g, `"ref": "v${next}"`),
+    );
+  }
 }
 
 async function main() {
   const [kind] = Deno.args;
+  // `--list` prints the files a bump writes, one per line, so the release
+  // runbook stages exactly this set instead of keeping a copy of it.
+  if (kind === "--list") {
+    console.log(VERSIONED_FILES.join("\n"));
+    return;
+  }
   if (!kind) {
     console.error(
       "usage: deno run -A scripts/bump-version.ts <patch|minor|major|prerelease:<tag>>",

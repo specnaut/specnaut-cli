@@ -8,7 +8,8 @@
 //   1. The working tree is clean. A tag records a commit; anything uncommitted
 //      is simply not in the release, and the difference is invisible from the
 //      tag afterwards.
-//   2. All six version files agree with the tag. They are written in lockstep
+//   2. All the version files agree with the tag (the marketplace catalogs by
+//      their entries' `ref`). They are written in lockstep
 //      by `bump-version.ts`, but nothing stops a hand-edit or a partial revert
 //      from desyncing them, and a binary whose `--version` disagrees with its
 //      templates manifest is a support ticket nobody can reproduce.
@@ -38,16 +39,27 @@ async function git(...args: string[]): Promise<string> {
 }
 
 /**
- * Every place a version can hide in these files: a JSON `"version": "x"` field
- * and the TypeScript `VERSION` constant. Deliberately not anchored to a single
+ * Every place a version can hide in these files: a JSON `"version": "x"` field,
+ * the TypeScript `VERSION` constant, and a catalog entry's `"ref": "vx"`. Deliberately not anchored to a single
  * shape — the point is to catch a file that disagrees, whatever its format.
  */
 export function versionsIn(content: string): string[] {
   const found = [
     ...content.matchAll(/"version"\s*:\s*"([^"]+)"/g),
     ...content.matchAll(/VERSION\s*=\s*"([^"]+)"/g),
+    ...content.matchAll(/"ref"\s*:\s*"v([^"]+)"/g),
   ].map((m) => m[1]);
   return [...new Set(found)];
+}
+
+/**
+ * The tags a marketplace catalog pins its entries to (`"ref": "vX.Y.Z"`).
+ * Unlike a `version` field, which appears once per file, a catalog holds one
+ * ref per plugin, and EVERY one must name this release: an entry left on the
+ * previous tag installs the previous plugin.
+ */
+export function refsIn(content: string): string[] {
+  return [...content.matchAll(/"ref"\s*:\s*"v([^"]+)"/g)].map((m) => m[1]);
 }
 
 async function main() {
@@ -84,6 +96,10 @@ async function main() {
       problems.push(`${file} declares no version at all`);
     } else if (!found.includes(expected)) {
       problems.push(`${file} declares ${found.join(", ")}, expected ${expected}`);
+    } else if (refsIn(content).some((r) => r !== expected)) {
+      problems.push(
+        `${file} pins refs ${refsIn(content).join(", ")}, expected every one at ${expected}`,
+      );
     }
   }
 
