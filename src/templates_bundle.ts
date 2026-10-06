@@ -2,7 +2,7 @@
 import type { CoreBundle } from "./domain/core_bundle.ts";
 import type { TemplateFile } from "./domain/template.ts";
 
-export const TEMPLATES_VERSION = "5.2.0";
+export const TEMPLATES_VERSION = "5.3.0";
 
 export const CORE_BUNDLE: CoreBundle = [
   {
@@ -30598,7 +30598,7 @@ patterns:
       "source": {
         "source": "github",
         "repo": "specnaut/specnaut-cli",
-        "ref": "v5.2.0",
+        "ref": "v5.3.0",
         "path": "packaging/marketplace/.claude-plugin/marketplace.json"
       }
     }

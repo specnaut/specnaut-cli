@@ -1,5 +1,9 @@
-**`/specnaut upgrade` brings a project up to date from inside the session.** It updates the
-`specnaut` binary when a newer release is out, runs `specnaut upgrade`, lists the files it kept
-because you customised them and the ones waiting for `specnaut reconcile`, checks the project, and
-commits the result as `chore(specnaut): upgrade to v<version>` without pushing. `--dry-run` shows
-the plan and changes nothing.
+**Your constitution's size limits now hold from plan through review.** The constitution gains a
+`## Size limits` table (defaults: file 300 / 500 lines, function 30 / 50), and it is the only source
+of size thresholds — the agents no longer carry their own. The plan measures every file it touches
+and is not done while a file over its target grows; tasks extracts before it adds; implement passes
+the limits to every subagent and reports `file: before → after`; review rates growth of an
+over-target file HIGH. For edits outside the agent chain, `.specnaut/scripts/bash/size-ratchet.sh`
+checks staged changes against the branch's merge base — run it by hand or from your pre-commit
+runner. An existing constitution does not receive the table from `specnaut upgrade`: run
+`/specnaut constitution`, which proposes it.

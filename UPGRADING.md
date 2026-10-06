@@ -1,5 +1,21 @@
 # Upgrading Specnaut
 
+## 5.2.x → 5.3.0
+
+Nothing to edit by hand. One behaviour changes for every project:
+
+### Reviews hold file sizes, with defaults when your constitution sets none
+
+The review now flags a file that is over its target and grew (HIGH), or that ends over its ceiling
+without shrinking (HIGH). The numbers come from the `## Size limits` table in
+`.specnaut/memory/constitution.md`. `specnaut upgrade` never rewrites an existing constitution, so
+until you add the table the defaults in `.specnaut/memory/size-limits.md` apply: 300 / 500 lines per
+file, 30 / 50 per function. To set your own, or opt out with `none`, run `/specnaut constitution` —
+it proposes the table — or add it by hand in the shape that file shows.
+
+`.specnaut/scripts/bash/size-ratchet.sh` is new and runs nowhere on its own: Specnaut installs no
+git hook. Wire it into your pre-commit runner if you want direct edits held too.
+
 ## 5.0.x → 5.1.0
 
 Nothing to edit by hand, but one thing to know: for Claude Code projects, `specnaut upgrade` now
