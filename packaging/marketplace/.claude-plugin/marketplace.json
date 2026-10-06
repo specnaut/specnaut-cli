@@ -18,7 +18,7 @@
         "source": "git-subdir",
         "url": "https://github.com/specnaut/specnaut-cli.git",
         "path": "plugin",
-        "ref": "v5.0.1"
+        "ref": "v5.1.0"
       }
     },
     {
@@ -34,7 +34,7 @@
         "source": "git-subdir",
         "url": "https://github.com/specnaut/specnaut-cli.git",
         "path": "mods/specnaut-cockpit",
-        "ref": "v5.0.1"
+        "ref": "v5.1.0"
       }
     }
   ]
