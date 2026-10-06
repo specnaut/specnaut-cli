@@ -70,7 +70,9 @@ first task touching it is an extraction:
 - [ ] T003a Extract [responsibility] from [path] ([N] lines, target [T]) into [new module path] —
   moves out ≥ [lines the feature adds]; [new module]: [one-line responsibility]
 
-New behaviour then lands as "Create [module] in [path]", never "Add [X] to [file over target]".
+New behaviour then lands as "Create [module] in [path]" wherever it can. A task that must still add
+to that file comes after its extraction and names the size it must stay within (its size at plan
+time).
 
 Examples of foundational tasks (adjust based on your project):
 

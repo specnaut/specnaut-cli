@@ -94,7 +94,10 @@ It holds every changed file to the constitution's file limits
 (`.specnaut/memory/size-limits.md`): exit 1 is a failure of the tier it follows,
 fixed the same way; exit 2 means the constitution's Size limits table cannot be
 read — fix the table, never skip the check. Without `--since` it checks the
-staged changes, which is the form a pre-commit runner calls. Specnaut installs
+staged changes against the branch's merge base, which is the form a pre-commit
+runner calls: an extraction commit followed by an addition passes, as long as
+the file ends no larger than where the branch began. Every review runs it too,
+through the review coordinator, so a standalone item is held as well. Specnaut installs
 no git hook: wiring it into one is the project's choice.
 
 ## A standalone item

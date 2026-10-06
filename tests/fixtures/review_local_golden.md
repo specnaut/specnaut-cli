@@ -12,7 +12,8 @@ $ARGUMENTS
 2. Delegate structural review to parallel sub-agents via the `review-coordinator`.
 3. Detect the project's toolchain and run its quality gates.
 4. If CRITICAL or HIGH findings exist, route fixes to the implementer and re-run. A HIGH size
-   finding (`.specnaut/memory/size-limits.md`) is routed the same way — no special case.
+   finding (`.specnaut/memory/size-limits.md`) is routed the same way — no special case, and
+   its severity is fixed there, not re-judged.
 5. Produce a final pass/fail report.
 
 ## Phase 1 — Structural review

@@ -34,7 +34,7 @@ architecture.
    constitution's `## Size limits` table (`.specnaut/memory/size-limits.md`
    holds the rule and the defaults). A file over its target gets the
    extraction first, as its own commit — rule 3, never "add it and split
-   later".
+   later". List each touched file's `before → after` in `Decisions`.
 6. **Read `plan.md` § 5 (Decision table)** if the plan has one. Each rule's
    home is a single file path, and you may not introduce a second spelling of
    it without the plan being amended first.

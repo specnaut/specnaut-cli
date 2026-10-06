@@ -14,7 +14,7 @@ down **with its coverage**, because a clean verdict is worth exactly what it cov
 **Dispatch the `architect-expert` agent on `plan.md` before a single line is written** — here,
 while changing your mind is still free, because architecture found at review time is architecture
 rebuilt. The defect class it catches: a decision that must agree, spelled in more than one place, or
-asked in a caller instead of at the decision. Ask four questions, in this order:
+asked in a caller instead of at the decision. Ask five questions, in this order:
 
 1. **Is the decision table complete?** Name any rule in the requirements with no row. A missing row
    is the defect this phase exists to prevent.
@@ -23,7 +23,10 @@ asked in a caller instead of at the decision. Ask four questions, in this order:
 3. **What is the blast radius?** How many existing call sites, routes, components or surfaces does
    each new rule touch — **counted, not estimated.** This is where the cost hides: a gate described
    in one sentence can change the behaviour of two hundred routes.
-4. **What would a reviewer find in this design three cycles from now?** In writing. A design whose
+4. **Does § 7's Files touched table hold?** Re-measure every row with `wc -l`, name any touched file
+   the table omits, and apply `.specnaut/memory/size-limits.md`: a file over its target that the
+   plan grows is a finding, whatever Complexity tracking says.
+5. **What would a reviewer find in this design three cycles from now?** In writing. A design whose
    predicted findings are already known can be corrected now, for the price of an edit.
 
 ## 🛡 The security audit

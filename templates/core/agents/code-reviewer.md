@@ -31,7 +31,8 @@ explore the rest of the codebase unless strictly necessary for context.
    number of your own, and its severity table is the one you apply. Name the
    unit, the measured value, and the limit with its source (`constitution` or
    `default`). For every file that ends over its target, report the
-   coordinator's line counts as `wc -l <before> → <after>`.
+   coordinator's line counts as `wc -l <before> → <after>`. Size severities
+   are that table's — rule 1's "at least HIGH" floor does not apply to them.
 
 ## Why this seat has no execution tool
 

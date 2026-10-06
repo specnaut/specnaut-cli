@@ -35,7 +35,7 @@ Deno.test("tasks: the phase applies the gate and the template shows the extracti
   assert(phase.includes(LIMITS) && phase.includes("extraction task"), "phase gate");
   const t = await read("templates/core/specnaut/templates/tasks-template.md");
   assert(t.includes("**Extractions first.**"), "extraction section");
-  assert(t.includes('never "Add [X] to [file over target]"'), "no add-to-big-file task");
+  assert(t.includes("comes after its extraction"), "an addition waits for the extraction");
 });
 
 Deno.test("implement: the phase applies the gate, and the gate carries the table into every brief", async () => {
@@ -53,7 +53,10 @@ Deno.test("implement: the phase applies the gate, and the gate carries the table
 Deno.test("review: the coordinator measures base and head and briefs every seat with the table", async () => {
   const c = await read("templates/core/agents/review-coordinator.md");
   assert(c.includes("0. **Measure sizes.**"), "measurement step");
-  assert(c.includes("git merge-base HEAD main") && c.includes("wc -l"), "base and head counts");
+  assert(
+    c.includes("size-ratchet.sh --since") && c.includes("--report"),
+    "one measurer, base to head",
+  );
   assert(c.includes(LIMITS), "table or defaults in the brief");
   const r = await read("templates/core/agents/code-reviewer.md");
   assert(r.includes("`wc -l <before> → <after>`"), "code-reviewer reports the counts");

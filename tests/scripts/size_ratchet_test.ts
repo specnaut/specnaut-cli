@@ -100,12 +100,71 @@ Deno.test("over the ceiling fails unless it shrinks", { ignore: isWindows }, asy
   assertStringIncludes(s.stdout, `1 ${CLEAN}`);
 });
 
-Deno.test("a new file is measured from zero", { ignore: isWindows }, async () => {
+Deno.test("a new file crossing the target is a note, not a violation; past the ceiling it is", {
+  ignore: isWindows,
+}, async () => {
   const dir = await repo(10, TABLE("| file | 300 | 400 |"));
   await stage(dir, "fresh.ts", 320);
   const r = await ratchet(dir);
-  assertEquals(r.code, 1);
-  assertStringIncludes(r.stderr, "fresh.ts: 0 → 320");
+  assertEquals(r.code, 0, r.stdout + r.stderr);
+  assertStringIncludes(
+    r.stdout,
+    "note: fresh.ts: 0 → 320 (target 300, ceiling 400) — crosses the target",
+  );
+  await stage(dir, "fresh.ts", 420);
+  const c = await ratchet(dir);
+  assertEquals(c.code, 1);
+  assertStringIncludes(c.stderr, "fresh.ts: 0 → 420");
+});
+
+Deno.test("extract, then add: measured from the branch base, the second commit passes", {
+  ignore: isWindows,
+}, async () => {
+  const dir = await repo(380, TABLE("| file | 300 | 400 |"));
+  await run("git", ["branch", "-M", "main"], dir);
+  await run("git", ["switch", "-q", "-c", "feature"], dir);
+  await stage(dir, "big.ts", 322);
+  await run("git", ["commit", "-q", "-m", "extract"], dir);
+  // The add grows the file from 322, but not past its size at the base (380).
+  await stage(dir, "big.ts", 341);
+  const ok = await ratchet(dir);
+  assertEquals(ok.code, 0, ok.stdout + ok.stderr);
+  assertStringIncludes(ok.stdout, `1 ${CLEAN}`);
+  // Past the base size it is growth, whatever the previous commit was.
+  await stage(dir, "big.ts", 390);
+  const grew = await ratchet(dir);
+  assertEquals(grew.code, 1);
+  assertStringIncludes(
+    grew.stderr,
+    "big.ts: 380 → 390 (target 300, ceiling 400) — over the target and grew",
+  );
+});
+
+Deno.test("Specnaut's own files are exempt: .specnaut/** and every installed.lock entry", {
+  ignore: isWindows,
+}, async () => {
+  const dir = await repo(10, TABLE("| file | 300 | 400 |"));
+  await Deno.mkdir(join(dir, ".claude/skills/x"), { recursive: true });
+  await Deno.writeTextFile(
+    join(dir, ".specnaut/installed.lock"),
+    "version: 2\nentries:\n  .claude/skills/x/SKILL.md:\n    sha256: abc\ntemplates_version: 1\n",
+  );
+  await run("git", ["add", ".specnaut/installed.lock"], dir);
+  await run("git", ["commit", "-q", "-m", "lock"], dir);
+  await stage(dir, ".claude/skills/x/SKILL.md", 900);
+  await Deno.mkdir(join(dir, ".specnaut/specs/001-x"), { recursive: true });
+  await stage(dir, ".specnaut/specs/001-x/plan.md", 900);
+  const r = await ratchet(dir);
+  assertEquals(r.code, 0, r.stdout + r.stderr);
+  assertStringIncludes(r.stdout, `0 ${CLEAN}`);
+});
+
+Deno.test("--report prints every checked file, before → after", { ignore: isWindows }, async () => {
+  const dir = await repo(100, TABLE("| file | 300 | 400 |"));
+  await stage(dir, "big.ts", 120);
+  const r = await run(BASH, [SCRIPT, "--report"], dir);
+  assertEquals(r.code, 0);
+  assertStringIncludes(r.stdout, "  big.ts: 100 → 120\n");
 });
 
 Deno.test(
@@ -165,6 +224,9 @@ Deno.test(
         TABLE("| file | 300 |"),
         "# C\n\n## Size limits\n\nfiles stay small\n",
         TABLE("| file | 300 | 400 |\n| file | 200 | 300 |"),
+        TABLE("| files | 300 | 400 |"),
+        TABLE("| File | 300 | 400 |"),
+        "# C\n\n## Size Limits\n\n| Unit | Target | Ceiling |\n| :--- | ---: | ---: |\n| file | 300 | 400 |\n",
       ]
     ) {
       const dir = await repo(10, constitution);

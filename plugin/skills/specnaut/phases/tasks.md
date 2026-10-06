@@ -74,8 +74,8 @@ loading any design document. It writes the spec's tabs to the gitignored
      named home. Where a task touches a rule in the table, name that home in the task.
    - **Apply the size gate** in `.specnaut/memory/size-limits.md` § In each phase → **tasks**:
      re-measure every file the plan touches; a file over its target gets an extraction task
-     before any task that touches it, and new behaviour is a "create module" task — never "add X
-     to" a file over its target.
+     before any task that adds to it, and new behaviour is a "create module" task wherever it can
+     be.
    - Generate tasks organized by user story (see Task Generation Rules below)
    - Generate dependency graph showing user story completion order
    - Create parallel execution examples per user story

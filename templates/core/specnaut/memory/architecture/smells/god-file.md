@@ -31,6 +31,8 @@ still change together.
 ## When it is NOT a smell
 
 Generated code, a vendored bundle, a lockfile, a data table, or a
-deliberately-single-file module whose content is one long flat list. Judge by
+deliberately-single-file module whose content is one long flat list — list it
+under the constitution's `Exempt:` line; an authored file is still held to its
+limit. Judge by
 responsibilities, and check whether the file is authored at all before
 flagging it.

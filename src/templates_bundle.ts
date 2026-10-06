@@ -468,7 +468,7 @@ down **with its coverage**, because a clean verdict is worth exactly what it cov
 **Dispatch the \`architect-expert\` agent on \`plan.md\` before a single line is written** — here,
 while changing your mind is still free, because architecture found at review time is architecture
 rebuilt. The defect class it catches: a decision that must agree, spelled in more than one place, or
-asked in a caller instead of at the decision. Ask four questions, in this order:
+asked in a caller instead of at the decision. Ask five questions, in this order:
 
 1. **Is the decision table complete?** Name any rule in the requirements with no row. A missing row
    is the defect this phase exists to prevent.
@@ -477,7 +477,10 @@ asked in a caller instead of at the decision. Ask four questions, in this order:
 3. **What is the blast radius?** How many existing call sites, routes, components or surfaces does
    each new rule touch — **counted, not estimated.** This is where the cost hides: a gate described
    in one sentence can change the behaviour of two hundred routes.
-4. **What would a reviewer find in this design three cycles from now?** In writing. A design whose
+4. **Does § 7's Files touched table hold?** Re-measure every row with \`wc -l\`, name any touched file
+   the table omits, and apply \`.specnaut/memory/size-limits.md\`: a file over its target that the
+   plan grows is a finding, whatever Complexity tracking says.
+5. **What would a reviewer find in this design three cycles from now?** In writing. A design whose
    predicted findings are already known can be corrected now, for the price of an edit.
 
 ## 🛡 The security audit
@@ -610,8 +613,8 @@ loading any design document. It writes the spec's tabs to the gitignored
      named home. Where a task touches a rule in the table, name that home in the task.
    - **Apply the size gate** in \`.specnaut/memory/size-limits.md\` § In each phase → **tasks**:
      re-measure every file the plan touches; a file over its target gets an extraction task
-     before any task that touches it, and new behaviour is a "create module" task — never "add X
-     to" a file over its target.
+     before any task that adds to it, and new behaviour is a "create module" task wherever it can
+     be.
    - Generate tasks organized by user story (see Task Generation Rules below)
    - Generate dependency graph showing user story completion order
    - Create parallel execution examples per user story
@@ -1180,7 +1183,10 @@ It holds every changed file to the constitution's file limits
 (\`.specnaut/memory/size-limits.md\`): exit 1 is a failure of the tier it follows,
 fixed the same way; exit 2 means the constitution's Size limits table cannot be
 read — fix the table, never skip the check. Without \`--since\` it checks the
-staged changes, which is the form a pre-commit runner calls. Specnaut installs
+staged changes against the branch's merge base, which is the form a pre-commit
+runner calls: an extraction commit followed by an addition passes, as long as
+the file ends no larger than where the branch began. Every review runs it too,
+through the review coordinator, so a standalone item is held as well. Specnaut installs
 no git hook: wiring it into one is the project's choice.
 
 ## A standalone item
@@ -1629,7 +1635,8 @@ proceed against an empty spec.
 2. Delegate structural review to parallel sub-agents via the \`review-coordinator\`.
 3. Detect the project's toolchain and run its quality gates.
 4. If CRITICAL or HIGH findings exist, route fixes to the implementer and re-run. A HIGH size
-   finding (\`.specnaut/memory/size-limits.md\`) is routed the same way — no special case.
+   finding (\`.specnaut/memory/size-limits.md\`) is routed the same way — no special case, and
+   its severity is fixed there, not re-judged.
 5. Produce a final pass/fail report.
 
 ## Phase 1 — Structural review
@@ -7692,7 +7699,7 @@ architecture.
    constitution's \`## Size limits\` table (\`.specnaut/memory/size-limits.md\`
    holds the rule and the defaults). A file over its target gets the
    extraction first, as its own commit — rule 3, never "add it and split
-   later".
+   later". List each touched file's \`before → after\` in \`Decisions\`.
 6. **Read \`plan.md\` § 5 (Decision table)** if the plan has one. Each rule's
    home is a single file path, and you may not introduce a second spelling of
    it without the plan being amended first.
@@ -7833,12 +7840,13 @@ in parallel and aggregate results.
 
 ## Protocol
 
-0. **Measure sizes.** For every changed file, count lines at the base
-   (\`git show "\$(git merge-base HEAD main)":<path> | wc -l\`, 0 for a new file)
-   and at head (\`wc -l <path>\`). Put both in every seat's brief, with the
-   constitution's \`## Size limits\` table — or the path
-   \`.specnaut/memory/size-limits.md\` when it has none. The seats read; you
-   measure. Severity for size comes from that file's table, nowhere else.
+0. **Measure sizes.** Run \`.specnaut/scripts/bash/size-ratchet.sh --since
+   "\$(git merge-base HEAD <default branch>)" --report\`: every changed file's
+   line count at the base and at head, renames measured against their old
+   path. Put its output in every seat's brief, with the constitution's
+   \`## Size limits\` table — or the path \`.specnaut/memory/size-limits.md\` when
+   it has none. The seats read; you measure. Severity for size comes from that
+   file's table, nowhere else; exit 2 (unreadable table) is a HIGH finding.
 1. Always spawn \`code-reviewer\` and \`security-expert\` in parallel, passing them
    the list of changed files.
 2. If any changed file matches \`**/*test*.*\` or \`**/*_test.*\` or \`**/test/**\`
@@ -8006,7 +8014,8 @@ explore the rest of the codebase unless strictly necessary for context.
    number of your own, and its severity table is the one you apply. Name the
    unit, the measured value, and the limit with its source (\`constitution\` or
    \`default\`). For every file that ends over its target, report the
-   coordinator's line counts as \`wc -l <before> → <after>\`.
+   coordinator's line counts as \`wc -l <before> → <after>\`. Size severities
+   are that table's — rule 1's "at least HIGH" floor does not apply to them.
 
 ## Why this seat has no execution tool
 
@@ -15918,10 +15927,11 @@ continuous supervision of long headless work, use \`/loop 5m /status-audit\`.
 Exempt: \`*.lock\`
 
 1. **A unit over its ceiling fails** — unless the change shrinks it.
-2. **A unit over its target may not grow** — lines after ≤ lines before.
-3. **Extract before you add** — when a change must touch a file over its
+2. **A unit over its target may not grow** — no larger than when the change
+   began.
+3. **Extract before you add** — when a change must add to a file over its
    target, the extraction lands first and moves out at least as many lines as
-   the change adds.
+   the change adds to that file.
 
 ## Front-end patterns
 
@@ -15993,7 +16003,11 @@ Exempt: \`*.lock\`, \`**/generated/**\`
   path from the repository root. An exempt file has no file limit at all.
   Lockfiles, generated code and vendored bundles are what it is for.
 - \`.specnaut/scripts/bash/size-ratchet.sh\` reads exactly this shape. A table it
-  cannot read stops it with exit 2; it never passes silently.
+  cannot read — including a heading spelled differently, or a \`files\` row —
+  stops it with exit 2; it never passes silently and never falls back to the
+  defaults.
+- Specnaut's own files — \`.specnaut/**\` and everything \`.specnaut/installed.lock\`
+  lists — are exempt without being listed: \`specnaut upgrade\` rewrites them.
 
 ## The three rules
 
@@ -16002,9 +16016,16 @@ Exempt: \`*.lock\`, \`**/generated/**\`
    refusing that commit would refuse the remedy.
 2. **A unit over its target may not grow.** Lines after ≤ lines before. It may
    stay the same size or shrink.
-3. **Extract before you add.** When a change must touch a file over its target,
-   the extraction lands first — as its own task — and moves out at least as many
-   lines as the change adds, into a module with one responsibility.
+3. **Extract before you add.** When a change must add to a file over its
+   target, the extraction lands first — as its own task — and moves out at least
+   as many lines as the change adds *to that file*, into a module with one
+   responsibility. After it, the addition is allowed: the file still ends no
+   larger than it was.
+
+**"Before" is the size where the change began** — at plan time in a plan, at the
+branch's merge base in implement, review and the ratchet. Never the previous
+commit or task: measured that way, rule 3's second step (add, after the
+extraction) would read as growth and be refused.
 
 A file is measured with \`wc -l\`. A function, class or component is measured by
 the agent reading it, from its first line to its last.
@@ -16019,12 +16040,15 @@ the agent reading it, from its first line to its last.
 | A unit over its ceiling shrank | no finding — report how far over it still is |
 | A unit over its target shrank, or stayed the same | no finding — say so |
 
-A HIGH size finding is routed like any other HIGH finding.
+These severities are fixed. They replace any floor a seat applies to
+constitution violations in general, and the lead does not re-judge them by
+harm: a HIGH size finding is routed back like any other HIGH, every time.
 
 ## A file that is not authored
 
 Generated code, a vendored bundle, a lockfile, a data table: list it under
-\`Exempt:\` rather than arguing each review. The god-file smell in
+\`Exempt:\` rather than arguing each review. A file that is authored is not
+excused by the smell's "when it is not a smell" — the limit still applies. The god-file smell in
 \`.specnaut/memory/architecture/smells/god-file.md\` covers the judgement call;
 the limits above cover the number.
 
@@ -16033,27 +16057,35 @@ the limits above cover the number.
 **plan** — § 7 of the plan carries the mandatory size row and the **Files
 touched** table. \`Lines now\` is \`wc -l\`, measured at plan time. The plan is not
 done while a file's lines after exceed its ceiling without shrinking, or a file
-already over its target has lines after > lines now. Complexity tracking cannot accept a size
-violation: the remedy is an extraction inside the plan. Each new module gets a
-one-line responsibility; one that needs "and" is two.
+already over its target has lines after > lines now. Complexity tracking cannot
+accept a size violation: the remedy is an extraction inside the plan. Each new
+module gets a one-line responsibility; one that needs "and" is two. The
+architecture audit of the plan re-measures the table with \`wc -l\`.
 
 **tasks** — re-measure every file the plan touches with \`wc -l\`; the plan's
 figure may be stale. For each file over its target, the first task that touches
-it is an extraction that moves out at least the lines the feature adds, naming
-the destination module and its one-line responsibility. New behaviour lands as
-a "create module X" task; "add X to <file over target>" is never emitted.
+it is an extraction that moves out at least the lines the feature will add to
+that file, naming the destination module and its one-line responsibility. New
+behaviour lands as a "create module X" task wherever it can; a task that adds
+to a file over its target comes only after that file's extraction, and says the
+size the file must stay within (its size at plan time).
 
 **implement** — re-read the constitution before the first task, and put its
 \`## Size limits\` table (or this file's path, when it has none) in every
 subagent's dispatch brief: a subagent sees one task and one file, and without
 the table has no reason to stop a file from growing. Run \`wc -l\` on each file a
-task touches, before and after, and report every one as
-\`file: before → after (target T, ceiling C)\`. A file over its target that grew,
-or a file over its ceiling that did not shrink, is a blocker: fix it — extract — before handing
-off to review, never after.
+task touches and report every one as
+\`file: before → after (target T, ceiling C)\`, "before" being its size at the
+branch's merge base. The developer puts that line in its completion report's
+\`Decisions\`. A file over its target that grew, or a file over its ceiling that
+did not shrink, is a blocker: fix it — extract — before handing off to review,
+never after.
 
-**review** — the review coordinator measures every changed file at the base
-and at head, and briefs each seat with both counts and the table. The severity
+**review** — the review coordinator runs
+\`.specnaut/scripts/bash/size-ratchet.sh --since <merge base> --report\`, which
+measures every changed file at the base and at head (a renamed file against its
+old path), and briefs each seat with that output and the table. It runs for
+every reviewed change, standalone or epic. The severity
 table above is the only one; \`code-reviewer\` cites it and reports
 \`wc -l <before> → <after>\` for every file that ends over its target. A HIGH size
 finding is routed back to the implementer like any other HIGH.
@@ -24696,7 +24728,9 @@ still change together.
 ## When it is NOT a smell
 
 Generated code, a vendored bundle, a lockfile, a data table, or a
-deliberately-single-file module whose content is one long flat list. Judge by
+deliberately-single-file module whose content is one long flat list — list it
+under the constitution's \`Exempt:\` line; an authored file is still held to its
+limit. Judge by
 responsibilities, and check whether the file is authored at all before
 flagging it.
 `,
@@ -25855,7 +25889,9 @@ first task touching it is an extraction:
 - [ ] T003a Extract [responsibility] from [path] ([N] lines, target [T]) into [new module path] —
   moves out ≥ [lines the feature adds]; [new module]: [one-line responsibility]
 
-New behaviour then lands as "Create [module] in [path]", never "Add [X] to [file over target]".
+New behaviour then lands as "Create [module] in [path]" wherever it can. A task that must still add
+to that file comes after its extraction and names the size it must stay within (its size at plan
+time).
 
 Examples of foundational tasks (adjust based on your project):
 
@@ -26111,10 +26147,11 @@ notes it in the completion report.
 Exempt: \`*.lock\`
 
 1. **A unit over its ceiling fails** — unless the change shrinks it.
-2. **A unit over its target may not grow** — lines after ≤ lines before.
-3. **Extract before you add** — when a change must touch a file over its
+2. **A unit over its target may not grow** — no larger than when the change
+   began.
+3. **Extract before you add** — when a change must add to a file over its
    target, the extraction lands first and moves out at least as many lines as
-   the change adds.
+   the change adds to that file.
 
 ## Architecture layers
 
@@ -27899,47 +27936,62 @@ exit 0
     name: "specify",
     suffix: "scripts/bash/size-ratchet.sh",
     content: `#!/usr/bin/env bash
-# Hold every staged file to the constitution's file size limits.
+# Hold every changed file to the constitution's file size limits.
 #
-#   size-ratchet.sh                 the staged changes (pre-commit)
-#   size-ratchet.sh --since <ref>   the commits from <ref> to HEAD (quality gates)
+#   size-ratchet.sh [--report]                  staged changes (pre-commit)
+#   size-ratchet.sh --since <ref> [--report]    committed changes, <ref> → HEAD
 #
 # Reads the \`file\` row and the \`Exempt:\` line of the \`## Size limits\` table in
 # \`.specnaut/memory/constitution.md\`. With no such table, or no \`file\` row in
 # it, the defaults in \`.specnaut/memory/size-limits.md\` apply (300 / 500). That
-# file states the rule; this script is its deterministic half, for the edits
-# that never go through an agent.
+# file states the rules; this script is their deterministic half, and the one
+# measurer the review coordinator calls.
 #
-# For each changed file (added, copied, modified or renamed), it compares the
-# line count before with the line count after. Staged: HEAD against the index —
-# what the commit will contain, not the working tree. --since: <ref> against
-# HEAD — what a branch has committed:
+# "Before" is the size at the BASE OF THE CHANGE, not at the previous commit:
 #
-#   - over the ceiling and did not shrink  → violation
-#   - over the target and grew             → violation
-#   - anything that shrinks                → passes
+#   - staged:  the merge base of HEAD with the default branch (HEAD itself on
+#              the default branch), compared with the index — what the commit
+#              will contain, not the working tree;
+#   - --since: <ref>, compared with HEAD.
+#
+# That is what lets rule 3 work commit by commit: an extraction commit shrinks
+# a file, and the next commit may add back up to the size the file had when the
+# branch began. Measured per commit, the second one would be refused.
+#
+#   - over the ceiling and did not shrink   → violation
+#   - over the target at the base and grew  → violation
+#   - crosses the target for the first time → note (MEDIUM in a review)
+#   - anything that shrinks                 → passes
+#
+# Exempt without asking: \`.specnaut/**\` and every file \`.specnaut/installed.lock\`
+# lists — Specnaut's own artefacts, which \`specnaut upgrade\` rewrites — plus
+# binary files and the constitution's \`Exempt:\` globs.
+#
+# \`--report\` also prints every checked file, \`path: before → after\`.
 #
 # Run it by hand, from any pre-commit runner, or from the quality gates. It
 # installs nothing: Specnaut never writes a git hook into a project.
 #
 # Exit codes:
-#   0   every staged file is within its limits (or nothing is staged)
+#   0   every changed file is within its limits (or nothing changed)
 #   1   at least one violation — each printed as
 #       \`path: before → after (target T, ceiling C)\`
-#   2   the constitution has a Size limits section this script cannot read.
-#       An unreadable table never passes silently.
+#   2   the constitution has a size-limits section this script cannot read.
+#       An unreadable table never passes silently, and never falls back to
+#       the defaults.
 #   3   not inside a git work tree, a bad <ref>, or a usage error
 set -uo pipefail
 
-SINCE=""
-case "\${1:-}" in
-  "") ;;
-  --since)
-    SINCE="\${2:-}"
-    [ -n "\$SINCE" ] || { echo "usage: size-ratchet.sh [--since <ref>]" >&2; exit 3; }
-    ;;
-  *) echo "usage: size-ratchet.sh [--since <ref>]" >&2; exit 3 ;;
-esac
+usage() { echo "usage: size-ratchet.sh [--since <ref>] [--report]" >&2; exit 3; }
+
+SINCE="" REPORT=0
+while [ "\$#" -gt 0 ]; do
+  case "\$1" in
+    --since) [ -n "\${2:-}" ] || usage; SINCE="\$2"; shift 2 ;;
+    --report) REPORT=1; shift ;;
+    *) usage ;;
+  esac
+done
 
 DEFAULT_TARGET=300
 DEFAULT_CEILING=500
@@ -27954,39 +28006,38 @@ if [ -n "\$SINCE" ] && ! git rev-parse --verify -q "\$SINCE^{commit}" >/dev/null
   exit 3
 fi
 CONSTITUTION=".specnaut/memory/constitution.md"
+LOCK=".specnaut/installed.lock"
 
 target="\$DEFAULT_TARGET"
 ceiling="\$DEFAULT_CEILING"
 source_label="default"
 exempt=()
 
+unreadable() { echo "size-ratchet: \$CONSTITUTION: \$1" >&2; exit 2; }
+
 # --- read the table -----------------------------------------------------------
 if [ -f "\$CONSTITUTION" ]; then
-  section="\$(awk '
-    /^## Size limits[[:space:]]*\$/ { inside = 1; next }
-    inside && /^## / { exit }
-    inside { print }
-  ' "\$CONSTITUTION")"
   if grep -q '^## Size limits[[:space:]]*\$' "\$CONSTITUTION"; then
-    if ! printf '%s\\n' "\$section" | grep -Eq '^\\|[[:space:]]*Unit[[:space:]]*\\|[[:space:]]*Target[[:space:]]*\\|[[:space:]]*Ceiling[[:space:]]*\\|'; then
-      echo "size-ratchet: \$CONSTITUTION has a '## Size limits' section without a 'Unit | Target | Ceiling' table" >&2
-      exit 2
-    fi
-    file_rows="\$(printf '%s\\n' "\$section" | grep -Ei '^\\|[[:space:]]*file[[:space:]]*\\|' || true)"
-    if [ -n "\$file_rows" ]; then
-      if [ "\$(printf '%s\\n' "\$file_rows" | wc -l | tr -d ' ')" != "1" ]; then
-        echo "size-ratchet: \$CONSTITUTION lists the 'file' unit more than once" >&2
-        exit 2
-      fi
+    section="\$(awk '
+      /^## Size limits[[:space:]]*\$/ { inside = 1; next }
+      inside && /^## / { exit }
+      inside { print }
+    ' "\$CONSTITUTION")"
+    printf '%s\\n' "\$section" |
+      grep -Eq '^\\|[[:space:]]*Unit[[:space:]]*\\|[[:space:]]*Target[[:space:]]*\\|[[:space:]]*Ceiling[[:space:]]*\\|' ||
+      unreadable "the '## Size limits' section has no 'Unit | Target | Ceiling' table"
+    # Any row naming a file-like unit must be exactly \`file\`; \`files\` or \`File\`
+    # would otherwise be skipped and the defaults would silently apply.
+    file_like="\$(printf '%s\\n' "\$section" | grep -Ei '^\\|[[:space:]]*files?[[:space:]]*\\|' || true)"
+    if [ -n "\$file_like" ]; then
+      [ "\$(printf '%s\\n' "\$file_like" | wc -l | tr -d ' ')" = "1" ] ||
+        unreadable "the 'file' unit is listed more than once"
       value_re='(none|[0-9]+)'
-      row_re="^\\|[[:space:]]*[Ff][Ii][Ll][Ee][[:space:]]*\\|[[:space:]]*\${value_re}[[:space:]]*\\|[[:space:]]*\${value_re}[[:space:]]*\\|[[:space:]]*\$"
-      if ! printf '%s\\n' "\$file_rows" | grep -Eq "\$row_re"; then
-        echo "size-ratchet: cannot read the 'file' row in \$CONSTITUTION: \$file_rows" >&2
-        echo "  expected: | file | <lines or none> | <lines or none> |" >&2
-        exit 2
-      fi
-      target="\$(printf '%s\\n' "\$file_rows" | awk -F'|' '{ gsub(/[[:space:]]/, "", \$3); print \$3 }')"
-      ceiling="\$(printf '%s\\n' "\$file_rows" | awk -F'|' '{ gsub(/[[:space:]]/, "", \$4); print \$4 }')"
+      printf '%s\\n' "\$file_like" |
+        grep -Eq "^\\|[[:space:]]*file[[:space:]]*\\|[[:space:]]*\${value_re}[[:space:]]*\\|[[:space:]]*\${value_re}[[:space:]]*\\|[[:space:]]*\$" ||
+        unreadable "cannot read the row '\$file_like' — expected: | file | <lines or none> | <lines or none> |"
+      target="\$(printf '%s\\n' "\$file_like" | awk -F'|' '{ gsub(/[[:space:]]/, "", \$3); print \$3 }')"
+      ceiling="\$(printf '%s\\n' "\$file_like" | awk -F'|' '{ gsub(/[[:space:]]/, "", \$4); print \$4 }')"
       source_label="constitution"
     fi
     exempt_line="\$(printf '%s\\n' "\$section" | grep -E '^Exempt:' || true)"
@@ -27995,11 +28046,30 @@ if [ -f "\$CONSTITUTION" ]; then
         [ -n "\$glob" ] && exempt+=("\$glob")
       done < <(printf '%s\\n' "\$exempt_line" | grep -o '\`[^\`]*\`' | tr -d '\`')
     fi
+  elif grep -Eiq '^#+[[:space:]]*size[[:space:]-]*limits?[[:space:]]*\$' "\$CONSTITUTION"; then
+    # A heading that means the table but is not spelled the way it is read.
+    unreadable "found a size-limits heading that is not exactly '## Size limits'"
   fi
+fi
+
+# Specnaut's own files: the lock's entries, two-space indented keys under \`entries:\`.
+managed=""
+if [ -f "\$LOCK" ]; then
+  managed="\$(awk '
+    /^entries:/ { inside = 1; next }
+    inside && /^[^ ]/ { exit }
+    inside && /^  [^ ]/ {
+      sub(/^  /, ""); sub(/:[[:space:]]*\$/, "")
+      gsub(/^["\\047]|["\\047]\$/, "")
+      print
+    }
+  ' "\$LOCK")"
 fi
 
 is_exempt() {
   local path="\$1" glob
+  case "\$path" in .specnaut/*) return 0 ;; esac
+  if [ -n "\$managed" ] && printf '%s\\n' "\$managed" | grep -Fxq -- "\$path"; then return 0; fi
   for glob in \${exempt[@]+"\${exempt[@]}"}; do
     # shellcheck disable=SC2254 — the glob is the pattern
     case "\$path" in \$glob) return 0 ;; esac
@@ -28012,15 +28082,25 @@ count_at() { # <rev-spec> → line count, 0 when the blob does not exist
   git show "\$1" 2>/dev/null | wc -l | tr -d ' '
 }
 
+default_branch_base() {
+  local branch
+  for branch in \$(git symbolic-ref -q --short refs/remotes/origin/HEAD 2>/dev/null) main master; do
+    if git rev-parse --verify -q "\$branch^{commit}" >/dev/null; then
+      git merge-base HEAD "\$branch" 2>/dev/null && return 0
+    fi
+  done
+  return 1
+}
+
 # --- walk the changed files ---------------------------------------------------
-# Staged: HEAD → the index. --since: <ref> → HEAD.
 if [ -n "\$SINCE" ]; then
   base="\$SINCE" head_prefix="HEAD:" diff_args=("\$SINCE" HEAD) scope="changed since \$SINCE"
+elif git rev-parse --verify -q HEAD >/dev/null; then
+  base="\$(default_branch_base || git rev-parse HEAD)"
+  head_prefix=":" diff_args=(--cached "\$base") scope="staged"
 else
-  base="HEAD" head_prefix=":" diff_args=(--cached) scope="staged"
+  base="" head_prefix=":" diff_args=(--cached) scope="staged"
 fi
-has_base=1
-git rev-parse --verify -q "\$base" >/dev/null || has_base=0
 
 checked=0
 violations=()
@@ -28032,14 +28112,14 @@ while IFS=\$'\\t' read -r status first second; do
     *) old="\$first" path="\$first" ;;
   esac
   is_exempt "\$path" && continue
-  # Binary files have no line count worth holding.
   numstat="\$(git diff "\${diff_args[@]}" --numstat -- "\$path" | head -n 1)"
   case "\$numstat" in -\$'\\t'-*) continue ;; esac
 
-  if [ "\$has_base" = 1 ]; then before="\$(count_at "\$base:\$old")"; else before=0; fi
+  if [ -n "\$base" ]; then before="\$(count_at "\$base:\$old")"; else before=0; fi
   after="\$(count_at "\$head_prefix\$path")"
   checked=\$((checked + 1))
   line="\$path: \$before → \$after (target \$target, ceiling \$ceiling)"
+  [ "\$REPORT" = 1 ] && echo "  \$path: \$before → \$after"
 
   if [ "\$ceiling" != "none" ] && [ "\$after" -gt "\$ceiling" ]; then
     if [ "\$after" -lt "\$before" ]; then
@@ -28047,8 +28127,12 @@ while IFS=\$'\\t' read -r status first second; do
     else
       violations+=("\$line — over the ceiling")
     fi
-  elif [ "\$target" != "none" ] && [ "\$after" -gt "\$target" ] && [ "\$after" -gt "\$before" ]; then
-    violations+=("\$line — over the target and grew")
+  elif [ "\$target" != "none" ] && [ "\$after" -gt "\$target" ]; then
+    if [ "\$before" -gt "\$target" ] && [ "\$after" -gt "\$before" ]; then
+      violations+=("\$line — over the target and grew")
+    elif [ "\$before" -le "\$target" ]; then
+      notes+=("\$line — crosses the target")
+    fi
   fi
 done < <(git diff "\${diff_args[@]}" --name-status -M --diff-filter=ACMR)
 
