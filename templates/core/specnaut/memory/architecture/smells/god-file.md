@@ -10,8 +10,11 @@
 ## How to spot it
 
 A single file far larger than its neighbours, usually accumulating unrelated
-responsibilities. Report the **distribution** rather than a fixed threshold: a
-file three times the size of the next-largest is the signal, not a round number.
+responsibilities. **The finding's threshold is the file limit in the project's
+constitution** — `.specnaut/memory/size-limits.md` holds the rule and the
+defaults; no other number decides it. In an audit, also report the
+**distribution**: a file three times the size of the next-largest tells the
+reader where to start. It is context for the finding, not a second threshold.
 
 ## What it costs
 

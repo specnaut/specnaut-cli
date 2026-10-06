@@ -21,11 +21,16 @@ explore the rest of the codebase unless strictly necessary for context.
 3. **DRY**: duplicate logic in two or more of the changed files is MEDIUM.
 4. **YAGNI**: unused exports, dead code, or abstractions without current
    callers are LOW unless they add non-trivial complexity.
-5. **Readability**: functions >50 lines, deeply nested conditionals (>3
-   levels), or unclear naming are MEDIUM.
+5. **Readability**: deeply nested conditionals (>3 levels) or unclear naming
+   are MEDIUM.
 6. **Separation of concerns**: if the project constitution defines layers
    (controllers/services/repositories or equivalent), flag layer violations as
    HIGH.
+7. **Size**: every file and function against `.specnaut/memory/size-limits.md`
+   — its thresholds come from the constitution's `## Size limits` table, never a
+   number of your own, and its severity table is the one you apply. Name the
+   unit, the measured value, and the limit with its source (`constitution` or
+   `default`).
 
 ## Why this seat has no execution tool
 

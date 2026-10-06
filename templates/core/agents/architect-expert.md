@@ -72,9 +72,11 @@ format (Mode 1 — PR review)" below).
 2. **Circular dependency introduced by the diff**: module A imports B
    which (now) imports A, direct or transitive. HIGH — circulars resist
    refactoring and corrupt module load order.
-3. **God-file threshold crossed**: a source file that grew past 500 LOC
-   in this diff (or a class/type block past 200 LOC). MEDIUM — readability
-   + testability proxy; flag with a split suggestion sketch.
+3. **Size limit crossed**: a file — or a class/type block, when the
+   constitution's table has a `class` row — over its limit after this diff,
+   per `.specnaut/memory/size-limits.md` (thresholds from the constitution,
+   severity from that file's table). Name the limit and its source; sketch
+   the split.
 4. **Implicit global in domain**: a domain-layer file that newly
    references `Deno.*`, `process.*`, `window.*`, `globalThis.*`, or any
    non-injected I/O primitive. HIGH — domain code MUST go through an
@@ -110,7 +112,7 @@ the order to walk them in.
 | --: | :--- | :--- | :--- |
 | 1 | Layer violations | `smells/layer-violation.md` | CRITICAL inward-most breach, HIGH mid-layer, MEDIUM outward |
 | 2 | Circular dependencies | `smells/circular-dependency.md` | HIGH — surface the full cycle path |
-| 3 | God files | `smells/god-file.md` | HIGH for the top five by size, LOW below |
+| 3 | God files | `smells/god-file.md` | HIGH over the ceiling, MEDIUM over the target (`size-limits.md`) |
 | 4 | Bounded-context leaks | `ddd-and-clean-code.md` | HIGH |
 | 5 | Ports/adapters discipline | `ddd-and-clean-code.md` | HIGH |
 | 6 | Deep nesting | `smells/deep-nesting.md` | MEDIUM |
@@ -122,8 +124,8 @@ the order to walk them in.
 Use the language's own tooling for axes 2, 3 and 6 where it exists (module-graph
 and complexity tools beat grep); fall back to import and brace analysis.
 
-For axis 3, report the top ten by size in absolute terms even when all are below
-the floor — the reader needs the distribution, not a pass/fail.
+For axis 3, also report the top ten by size even when all are under the target —
+the distribution is context for where to start, not a second threshold.
 
 ### Output format (Mode 2 — audit report)
 

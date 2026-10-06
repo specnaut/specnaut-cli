@@ -7665,7 +7665,12 @@ architecture.
    the direct-implementation path. If it is absent or empty, return BLOCKED
    with reason \`awaiting:product-owner-domain-brief\` and stop. Do not proceed
    without it.
-5. **Read \`plan.md\` § 5 (Decision table)** if the plan has one. Each rule's
+5. **Size limits.** Before editing a file, compare its \`wc -l\` with the
+   constitution's \`## Size limits\` table (\`.specnaut/memory/size-limits.md\`
+   holds the rule and the defaults). A file over its target gets the
+   extraction first, as its own commit — rule 3, never "add it and split
+   later".
+6. **Read \`plan.md\` § 5 (Decision table)** if the plan has one. Each rule's
    home is a single file path, and you may not introduce a second spelling of
    it without the plan being amended first.
 
@@ -7962,11 +7967,16 @@ explore the rest of the codebase unless strictly necessary for context.
 3. **DRY**: duplicate logic in two or more of the changed files is MEDIUM.
 4. **YAGNI**: unused exports, dead code, or abstractions without current
    callers are LOW unless they add non-trivial complexity.
-5. **Readability**: functions >50 lines, deeply nested conditionals (>3
-   levels), or unclear naming are MEDIUM.
+5. **Readability**: deeply nested conditionals (>3 levels) or unclear naming
+   are MEDIUM.
 6. **Separation of concerns**: if the project constitution defines layers
    (controllers/services/repositories or equivalent), flag layer violations as
    HIGH.
+7. **Size**: every file and function against \`.specnaut/memory/size-limits.md\`
+   — its thresholds come from the constitution's \`## Size limits\` table, never a
+   number of your own, and its severity table is the one you apply. Name the
+   unit, the measured value, and the limit with its source (\`constitution\` or
+   \`default\`).
 
 ## Why this seat has no execution tool
 
@@ -9567,9 +9577,11 @@ format (Mode 1 — PR review)" below).
 2. **Circular dependency introduced by the diff**: module A imports B
    which (now) imports A, direct or transitive. HIGH — circulars resist
    refactoring and corrupt module load order.
-3. **God-file threshold crossed**: a source file that grew past 500 LOC
-   in this diff (or a class/type block past 200 LOC). MEDIUM — readability
-   + testability proxy; flag with a split suggestion sketch.
+3. **Size limit crossed**: a file — or a class/type block, when the
+   constitution's table has a \`class\` row — over its limit after this diff,
+   per \`.specnaut/memory/size-limits.md\` (thresholds from the constitution,
+   severity from that file's table). Name the limit and its source; sketch
+   the split.
 4. **Implicit global in domain**: a domain-layer file that newly
    references \`Deno.*\`, \`process.*\`, \`window.*\`, \`globalThis.*\`, or any
    non-injected I/O primitive. HIGH — domain code MUST go through an
@@ -9605,7 +9617,7 @@ the order to walk them in.
 | --: | :--- | :--- | :--- |
 | 1 | Layer violations | \`smells/layer-violation.md\` | CRITICAL inward-most breach, HIGH mid-layer, MEDIUM outward |
 | 2 | Circular dependencies | \`smells/circular-dependency.md\` | HIGH — surface the full cycle path |
-| 3 | God files | \`smells/god-file.md\` | HIGH for the top five by size, LOW below |
+| 3 | God files | \`smells/god-file.md\` | HIGH over the ceiling, MEDIUM over the target (\`size-limits.md\`) |
 | 4 | Bounded-context leaks | \`ddd-and-clean-code.md\` | HIGH |
 | 5 | Ports/adapters discipline | \`ddd-and-clean-code.md\` | HIGH |
 | 6 | Deep nesting | \`smells/deep-nesting.md\` | MEDIUM |
@@ -9617,8 +9629,8 @@ the order to walk them in.
 Use the language's own tooling for axes 2, 3 and 6 where it exists (module-graph
 and complexity tools beat grep); fall back to import and brace analysis.
 
-For axis 3, report the top ten by size in absolute terms even when all are below
-the floor — the reader needs the distribution, not a pass/fail.
+For axis 3, also report the top ten by size even when all are under the target —
+the distribution is context for where to start, not a second threshold.
 
 ### Output format (Mode 2 — audit report)
 
@@ -24600,8 +24612,11 @@ merely sequences calls.
 ## How to spot it
 
 A single file far larger than its neighbours, usually accumulating unrelated
-responsibilities. Report the **distribution** rather than a fixed threshold: a
-file three times the size of the next-largest is the signal, not a round number.
+responsibilities. **The finding's threshold is the file limit in the project's
+constitution** — \`.specnaut/memory/size-limits.md\` holds the rule and the
+defaults; no other number decides it. In an audit, also report the
+**distribution**: a file three times the size of the next-largest tells the
+reader where to start. It is context for the finding, not a second threshold.
 
 ## What it costs
 
