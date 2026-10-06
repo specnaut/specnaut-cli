@@ -59,7 +59,7 @@
       "source": {
         "source": "github",
         "repo": "specnaut/specnaut-cli",
-        "ref": "v5.3.1",
+        "ref": "v5.3.2",
         "path": "packaging/marketplace/.claude-plugin/marketplace.json"
       }
     }
