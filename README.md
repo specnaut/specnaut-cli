@@ -115,6 +115,25 @@ Most teams use both. See [the docs](https://specnaut.com) for the full boundary 
 per-harness tool-mapping references. The website and documentation source live in their own repo,
 [`specnaut/specnaut-web`](https://github.com/specnaut/specnaut-web) — this repo is the CLI only.
 
+## Claude Code cockpit
+
+If you work in Claude Code, the **Specnaut Cockpit** mod puts your usage limits in front of you: the
+5-hour and weekly windows with their reset times, the context fill, the session's cost, and the
+chain's progress while the autopilot runs. It sits in a band above the prompt. `/cockpit` opens a
+pane with seven days of history, per day and per branch, kept on your machine.
+
+It also stops the autopilot **cleanly**: when a window reaches 90%, the chain halts before
+`implement`, `review` or `merge` instead of being cut off halfway, and resumes with
+`/specnaut <phase>` after the reset. Projects scaffolded for Claude Code offer to install it; to
+install it by hand:
+
+```text
+/plugin marketplace add specnaut/specnaut-marketplace
+/plugin install specnaut-cockpit@specnaut-marketplace
+```
+
+Details, settings and privacy: [`mods/specnaut-cockpit/README.md`](mods/specnaut-cockpit/README.md).
+
 ## Project-specific skill overlays
 
 Need to override an upstream Specnaut skill in one project — e.g. a monorepo `/ship tag` that has to

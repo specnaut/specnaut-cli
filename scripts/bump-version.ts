@@ -53,6 +53,7 @@ export const VERSIONED_FILES = [
   "templates/manifest.json",
   ".codex-plugin/plugin.json",
   ".cursor-plugin/plugin.json",
+  "mods/specnaut-cockpit/.claude-plugin/plugin.json",
   "packaging/marketplace/.claude-plugin/marketplace.json",
   "packaging/marketplace/.github/plugin/marketplace.json",
 ] as const;
@@ -132,6 +133,15 @@ export async function writeVersions(
     `"version": "${next}"`,
   );
   await Deno.writeTextFile(cursorManifestPath, updatedCursor);
+
+  // Lockstep the cockpit mod's manifest (#636). Claude Code pins an installed
+  // plugin to its `version`, so a cockpit left behind here would never update.
+  const cockpitManifestPath = `${baseDir}/mods/specnaut-cockpit/.claude-plugin/plugin.json`;
+  const cockpitRaw = await Deno.readTextFile(cockpitManifestPath);
+  await Deno.writeTextFile(
+    cockpitManifestPath,
+    cockpitRaw.replace(/"version":\s*"[^"]+"/, `"version": "${next}"`),
+  );
 
   // Stamp every catalog entry's `ref` with the tag this release will carry
   // (#633) — every entry, including one with no ref or a branch ref yet.

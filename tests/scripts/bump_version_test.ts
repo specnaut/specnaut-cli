@@ -38,6 +38,7 @@ Deno.test("VERSIONED_FILES covers every file the release workflow gates on", () 
       "templates/manifest.json",
       ".codex-plugin/plugin.json",
       ".cursor-plugin/plugin.json",
+      "mods/specnaut-cockpit/.claude-plugin/plugin.json",
       "packaging/marketplace/.claude-plugin/marketplace.json",
       "packaging/marketplace/.github/plugin/marketplace.json",
     ] as const,
@@ -78,6 +79,11 @@ Deno.test("writeVersions bumps every versioned file in lockstep", async () => {
       `{\n  "name": "specnaut",\n  "version": "1.2.3"\n}\n`,
     );
 
+    await Deno.mkdir(join(tmp, "mods/specnaut-cockpit/.claude-plugin"), { recursive: true });
+    await Deno.writeTextFile(
+      join(tmp, "mods/specnaut-cockpit/.claude-plugin/plugin.json"),
+      `{\n  "name": "specnaut-cockpit",\n  "version": "1.2.3"\n}\n`,
+    );
     for (
       const p of [
         "packaging/marketplace/.claude-plugin/marketplace.json",

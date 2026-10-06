@@ -65,6 +65,13 @@ jobs:
         run: npx --yes "$CLAUDE_CODE" plugin validate packaging/marketplace
       - name: Validate the plugin
         run: npx --yes "$CLAUDE_CODE" plugin validate plugin
+      # The cockpit mod: the engine's own reading of its manifest, contract and
+      # hooks module, then its wiring tests in the engine's test host. Its
+      # logic is covered by deno test (tests/cockpit/) in lint-test.
+      - name: Validate the cockpit mod
+        run: npx --yes "$CLAUDE_CODE" plugin validate mods/specnaut-cockpit
+      - name: Test the cockpit mod
+        run: npx --yes "$CLAUDE_CODE" plugin test mods/specnaut-cockpit
 
   cross-smoke:
     needs: lint-test

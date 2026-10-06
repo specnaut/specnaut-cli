@@ -46,7 +46,7 @@ const FEATURE_SUBJECT_RE = /^feat(\([^)]+\))?!?:/;
  * So this is a prompt for a sentence, not a prohibition — see
  * `REPO_INTERNAL_TRAILER`.
  */
-const USER_FACING_PREFIXES = ["src/", "templates/", "plugin/"];
+const USER_FACING_PREFIXES = ["src/", "templates/", "plugin/", "mods/"];
 
 /**
  * The escape hatch. A `feat` that ships no user-facing file must say, in one
@@ -81,7 +81,8 @@ export function findOffenders(
         offenders.push({
           hash: c.hash,
           subject: c.subject,
-          reason: "a `feat` that touches nothing under src/, templates/ or plugin/ — it ships " +
+          reason:
+            "a `feat` that touches nothing under src/, templates/, plugin/ or mods/ — it ships " +
             "no file any user installs. Use `chore:`, or add a `Repo-internal: <why " +
             "this is still user-facing>` line to the body",
         });

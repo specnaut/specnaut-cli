@@ -20,6 +20,22 @@
         "path": "plugin",
         "ref": "v5.0.1"
       }
+    },
+    {
+      "name": "specnaut-cockpit",
+      "description": "Usage limits, context, cost and the Specnaut chain's progress above the prompt in Claude Code, and a clean hold before the autopilot runs out of quota.",
+      "category": "productivity",
+      "tags": [
+        "usage",
+        "rate-limits",
+        "autopilot"
+      ],
+      "source": {
+        "source": "git-subdir",
+        "url": "https://github.com/specnaut/specnaut-cli.git",
+        "path": "mods/specnaut-cockpit",
+        "ref": "v5.0.1"
+      }
     }
   ]
 }

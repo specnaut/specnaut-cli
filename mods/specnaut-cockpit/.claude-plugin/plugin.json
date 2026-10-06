@@ -1,0 +1,38 @@
+{
+  "name": "specnaut-cockpit",
+  "displayName": "Specnaut Cockpit",
+  "version": "5.0.1",
+  "description": "Usage limits, context, cost and the Specnaut chain's progress above the prompt in Claude Code, and a clean hold before the autopilot runs out of quota.",
+  "author": {
+    "name": "MakerLabs"
+  },
+  "homepage": "https://specnaut.com",
+  "repository": "https://github.com/specnaut/specnaut-cli",
+  "license": "MIT",
+  "keywords": ["specnaut", "usage", "rate-limits", "autopilot"],
+  "types": "./types/index.d.ts",
+  "userConfig": {
+    "hold_at": {
+      "type": "number",
+      "title": "Quota hold (%)",
+      "description": "The autopilot stops before implement, review or merge when a usage window is at or above this. 100 turns the hold off.",
+      "default": 90,
+      "min": 50,
+      "max": 100
+    },
+    "warn_at": {
+      "type": "number",
+      "title": "Usage warning (%)",
+      "description": "A usage window at or above this is shown in the warning colour and announced once per window.",
+      "default": 80,
+      "min": 10,
+      "max": 100
+    },
+    "band": {
+      "type": "boolean",
+      "title": "Show the band above the prompt",
+      "description": "Turn off to keep only the /cockpit pane and the quota hold.",
+      "default": true
+    }
+  }
+}

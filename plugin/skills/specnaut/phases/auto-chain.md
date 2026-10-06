@@ -1,8 +1,8 @@
 # Auto-chain control
 
 This file carries the chain mechanics the `/specnaut` router follows after a chainable phase
-(`plan`, `tasks`, `implement`, `review`) completes — unless `--manual` was passed, or downstream
-artefacts indicate the user is re-running a single step.
+(`plan` to `review`) completes — unless `--manual` was passed, or downstream artefacts show a single
+step is being re-run.
 
 ## The flow
 
@@ -35,11 +35,12 @@ plan → tasks → implement → review → merge → push
      covers the merge, the push and the close.
 
 Autopilot still halts, and says why: an unresolved CRITICAL/HIGH, a FAIL verdict, a missing review
-seat, a merge that cannot fast-forward, a refused push. Those are failures, not stops.
+seat, a merge that cannot fast-forward, a refused push. Those are failures, not stops. A quota
+hold (a refused Skill call) is a clean stop: report it, never route around it.
 
 ## ⛔ NEVER stop at a boundary that is not one of these
 
-It applies to **every** hand-off in the chain, not just one:
+It applies to **every** hand-off:
 
 | Boundary | What happens |
 | :--- | :--- |

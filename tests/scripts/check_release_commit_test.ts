@@ -51,6 +51,7 @@ async function repoAt(
       "templates/manifest.json",
       ".codex-plugin/plugin.json",
       ".cursor-plugin/plugin.json",
+      "mods/specnaut-cockpit/.claude-plugin/plugin.json",
     ]
   ) {
     await Deno.mkdir(`${dir}/${p.split("/").slice(0, -1).join("/")}`, { recursive: true });
