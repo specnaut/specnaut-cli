@@ -70,3 +70,15 @@ Deno.test("review: the coordinator measures base and head and briefs every seat 
     ]
   ) assert(limits.includes(row), row);
 });
+
+Deno.test("the ratchet is invoked through bash, and a run that did not happen is never a pass", async () => {
+  // A lost executable bit (an archive, a Windows checkout) turns `./script` into exit 126,
+  // which no caller would read as "clean" unless the docs say what it means.
+  const c = await read("templates/core/agents/review-coordinator.md");
+  const g = await read("templates/core/skills/specnaut/phases/quality-gates.md");
+  for (const doc of [c, g]) {
+    assert(doc.includes("bash .specnaut/scripts/bash/size-ratchet.sh --since"));
+  }
+  assert(c.includes('never brief "no size data" as clean'), "coordinator");
+  assert(g.includes("never a pass"), "quality gates");
+});

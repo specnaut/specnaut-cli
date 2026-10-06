@@ -123,7 +123,7 @@ did not shrink, is a blocker: fix it — extract — before handing off to revie
 never after.
 
 **review** — the review coordinator runs
-`.specnaut/scripts/bash/size-ratchet.sh --since <merge base> --report`, which
+`bash .specnaut/scripts/bash/size-ratchet.sh --since <merge base> --report`, which
 measures every changed file at the base and at head (a renamed file against its
 old path), and briefs each seat with that output and the table. It runs for
 every reviewed change, standalone or epic. The severity

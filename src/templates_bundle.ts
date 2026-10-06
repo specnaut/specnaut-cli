@@ -1176,13 +1176,15 @@ When \`.specnaut/scripts/bash/size-ratchet.sh\` is present, run it after each ti
 on what the branch has committed:
 
 \`\`\`
-.specnaut/scripts/bash/size-ratchet.sh --since "\$(git merge-base HEAD <default branch>)"
+bash .specnaut/scripts/bash/size-ratchet.sh --since "\$(git merge-base HEAD <default branch>)"
 \`\`\`
 
 It holds every changed file to the constitution's file limits
 (\`.specnaut/memory/size-limits.md\`): exit 1 is a failure of the tier it follows,
 fixed the same way; exit 2 means the constitution's Size limits table cannot be
-read — fix the table, never skip the check. Without \`--since\` it checks the
+read — fix the table, never skip the check. Any other exit (126, 127: a lost
+executable bit, no bash) means the check did not run, which is a failure of the
+tier, never a pass. Without \`--since\` it checks the
 staged changes against the branch's merge base, which is the form a pre-commit
 runner calls: an extraction commit followed by an addition passes, as long as
 the file ends no larger than where the branch began. Every review runs it too,
@@ -7840,13 +7842,15 @@ in parallel and aggregate results.
 
 ## Protocol
 
-0. **Measure sizes.** Run \`.specnaut/scripts/bash/size-ratchet.sh --since
+0. **Measure sizes.** Run \`bash .specnaut/scripts/bash/size-ratchet.sh --since
    "\$(git merge-base HEAD <default branch>)" --report\`: every changed file's
    line count at the base and at head, renames measured against their old
    path. Put its output in every seat's brief, with the constitution's
    \`## Size limits\` table — or the path \`.specnaut/memory/size-limits.md\` when
    it has none. The seats read; you measure. Severity for size comes from that
-   file's table, nowhere else; exit 2 (unreadable table) is a HIGH finding.
+   file's table, nowhere else; exit 2 (unreadable table) is a HIGH finding,
+   and any exit but 0, 1 or 2 means nothing was measured — say so in every
+   brief; never brief "no size data" as clean.
 1. Always spawn \`code-reviewer\` and \`security-expert\` in parallel, passing them
    the list of changed files.
 2. If any changed file matches \`**/*test*.*\` or \`**/*_test.*\` or \`**/test/**\`
@@ -16082,7 +16086,7 @@ did not shrink, is a blocker: fix it — extract — before handing off to revie
 never after.
 
 **review** — the review coordinator runs
-\`.specnaut/scripts/bash/size-ratchet.sh --since <merge base> --report\`, which
+\`bash .specnaut/scripts/bash/size-ratchet.sh --since <merge base> --report\`, which
 measures every changed file at the base and at head (a renamed file against its
 old path), and briefs each seat with that output and the table. It runs for
 every reviewed change, standalone or epic. The severity

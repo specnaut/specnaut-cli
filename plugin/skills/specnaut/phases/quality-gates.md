@@ -87,13 +87,15 @@ When `.specnaut/scripts/bash/size-ratchet.sh` is present, run it after each tier
 on what the branch has committed:
 
 ```
-.specnaut/scripts/bash/size-ratchet.sh --since "$(git merge-base HEAD <default branch>)"
+bash .specnaut/scripts/bash/size-ratchet.sh --since "$(git merge-base HEAD <default branch>)"
 ```
 
 It holds every changed file to the constitution's file limits
 (`.specnaut/memory/size-limits.md`): exit 1 is a failure of the tier it follows,
 fixed the same way; exit 2 means the constitution's Size limits table cannot be
-read — fix the table, never skip the check. Without `--since` it checks the
+read — fix the table, never skip the check. Any other exit (126, 127: a lost
+executable bit, no bash) means the check did not run, which is a failure of the
+tier, never a pass. Without `--since` it checks the
 staged changes against the branch's merge base, which is the form a pre-commit
 runner calls: an extraction commit followed by an addition passes, as long as
 the file ends no larger than where the branch began. Every review runs it too,
