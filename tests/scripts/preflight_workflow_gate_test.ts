@@ -15,7 +15,9 @@ const ROOT = fromFileUrl(new URL("../../", import.meta.url));
 const PREFLIGHT = `${ROOT}.specnaut/release/preflight.sh`;
 
 async function gateBlock(): Promise<string> {
-  const src = await Deno.readTextFile(PREFLIGHT);
+  // A Windows checkout converts LF to CRLF; the markers are matched on LF, and
+  // bash would read a trailing \r on every line of the extracted block.
+  const src = (await Deno.readTextFile(PREFLIGHT)).replaceAll("\r\n", "\n");
   const m = src.match(/# BEGIN workflow-gate\n([\s\S]*?)# END workflow-gate/);
   assert(m, "preflight.sh has no workflow-gate block");
   return m[1];
@@ -50,7 +52,7 @@ esac
     const script = `set -euo pipefail\nsay() { echo "$*"; }\nsha=abc123\n${await gateBlock()}`;
     const out = await new Deno.Command("bash", {
       args: ["-c", script],
-      env: { PATH: `${bin}:${Deno.env.get("PATH")}` },
+      env: { PATH: `${bin}${Deno.build.os === "windows" ? ";" : ":"}${Deno.env.get("PATH")}` },
     }).output();
     const asked = (await Deno.readTextFile(log).catch(() => "")).trim().split("\n");
     const text = new TextDecoder().decode(out.stdout) + new TextDecoder().decode(out.stderr);

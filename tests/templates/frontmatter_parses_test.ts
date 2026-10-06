@@ -25,7 +25,9 @@ async function frontmatters(): Promise<{ path: string; body: string }[]> {
   const out: { path: string; body: string }[] = [];
   for (const dir of ["templates", "plugin"]) {
     for await (const e of walk(`${ROOT}${dir}`, { exts: [".md"], includeDirs: false })) {
-      const parts = splitFrontmatter(await Deno.readTextFile(e.path));
+      // A Windows checkout converts LF to CRLF. The binary bundles templates on
+      // a Linux runner, so the product never sees one; normalise here.
+      const parts = splitFrontmatter((await Deno.readTextFile(e.path)).replaceAll("\r\n", "\n"));
       if (parts) out.push({ path: relative(ROOT, e.path), body: parts.fmBody });
     }
   }
