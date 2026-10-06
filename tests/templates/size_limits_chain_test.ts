@@ -37,3 +37,15 @@ Deno.test("tasks: the phase applies the gate and the template shows the extracti
   assert(t.includes("**Extractions first.**"), "extraction section");
   assert(t.includes('never "Add [X] to [file over target]"'), "no add-to-big-file task");
 });
+
+Deno.test("implement: the phase applies the gate, and the gate carries the table into every brief", async () => {
+  assert(
+    (await read("templates/core/skills/specnaut/phases/implement.md")).includes(
+      `${LIMITS}\` § **implement**`,
+    ),
+  );
+  const limits = await read("templates/core/specnaut/memory/size-limits.md");
+  assert(limits.includes("in every\nsubagent's dispatch brief"), "brief carries the table");
+  assert(limits.includes("`file: before → after (target T, ceiling C)`"), "report shape");
+  assert(limits.includes("is a blocker"), "growth blocks the hand-off");
+});

@@ -67,6 +67,7 @@ You **MUST** consider the user input before proceeding (if not empty).
    - **Read `plan.md` section 5 — the 🔒 decision table — and treat it as binding.** A decision
      may not be implemented anywhere but its named home. If the code seems to want a second
      spelling, the plan is amended first; it is not resolved at the keyboard.
+   - **REQUIRED**: apply `.specnaut/memory/size-limits.md` § **implement** to every task and brief.
 
 3. **Project Setup Verification**:
    - **REQUIRED**: Create/verify ignore files based on actual project setup:
@@ -147,7 +148,7 @@ You **MUST** consider the user input before proceeding (if not empty).
    - Confirm the implementation follows the technical plan
    - Report final status with summary of completed work
 
-Note: This command assumes a complete task breakdown exists in tasks.md. If tasks are incomplete or missing, suggest running `/specnaut tasks` first to regenerate the task list.
+Note: tasks.md incomplete or missing → suggest `/specnaut tasks` first.
 
 10. **Check for extension hooks**: After completion validation, check
     `hooks.after_implement` in `.specnaut/extensions.yml` and follow the same
