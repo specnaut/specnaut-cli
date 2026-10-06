@@ -807,6 +807,12 @@
     {
       "category": "spec-root",
       "name": "specify",
+      "suffix": "memory/size-limits.md",
+      "source": "core/specnaut/memory/size-limits.md"
+    },
+    {
+      "category": "spec-root",
+      "name": "specify",
       "suffix": "memory/security/README.md",
       "source": "core/specnaut/memory/security/README.md"
     },

@@ -62,6 +62,13 @@ Follow this execution flow:
      - MINOR: New principle/section added or materially expanded guidance.
      - PATCH: Clarifications, wording, typo fixes, non-semantic refinements.
    - If version bump type ambiguous, propose reasoning before finalizing.
+   - **Size limits.** Every phase, agent and script reads its size thresholds from the
+     constitution's `## Size limits` table and nowhere else (`.specnaut/memory/size-limits.md`
+     holds the rule, the table shape and the defaults). When creating or amending, confirm the
+     table's numbers with the user. If the constitution has no such section, propose adding one
+     prefilled with the defaults — `specnaut upgrade` never touches an existing constitution, so
+     this phase is the only way an older project receives it. Keep the shape exact: the size
+     ratchet script parses it.
 
 3. Draft the updated constitution content:
    - Replace every placeholder with concrete text (no bracketed tokens left except intentionally retained template slots that the project has chosen not to define yet—explicitly justify any left).

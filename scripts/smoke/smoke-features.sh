@@ -442,6 +442,10 @@ check "security knowledge base scaffolded" \
   '[ -f .specnaut/memory/security/00-triage.md ]'
 check "architecture catalogue scaffolded" \
   '[ -f .specnaut/memory/architecture/README.md ]'
+check "size limits: the one rule and the defaults are scaffolded (#645)" \
+  'grep -q "only source of thresholds" .specnaut/memory/size-limits.md'
+check "size limits: the seed constitution carries the table (#645)" \
+  'grep -q "^## Size limits" .specnaut/memory/constitution.md && grep -q "^| file | 300 | 500 |" .specnaut/memory/constitution.md'
 check "a11y catalogue scaffolded" \
   '[ -f .specnaut/memory/a11y/00-triage.md ] && [ -f .specnaut/memory/a11y/README.md ]'
 check "a11y catalogue ships every surface leaf" \
