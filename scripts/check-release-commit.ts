@@ -27,6 +27,7 @@
 // Exit 0 = safe to tag. 1 = do not tag. 2 = usage/environment error.
 
 import { VERSIONED_FILES } from "./bump-version.ts";
+import { CATALOG_FILES, catalogRefProblems } from "./catalog-refs.ts";
 
 const SEMVER_TAG = /^v(\d+)\.(\d+)\.(\d+)(?:-[0-9A-Za-z.-]+)?$/;
 
@@ -39,27 +40,16 @@ async function git(...args: string[]): Promise<string> {
 }
 
 /**
- * Every place a version can hide in these files: a JSON `"version": "x"` field,
- * the TypeScript `VERSION` constant, and a catalog entry's `"ref": "vx"`. Deliberately not anchored to a single
+ * Every place a version can hide in these files: a JSON `"version": "x"` field
+ * and the TypeScript `VERSION` constant. (Catalogs are read by catalog-refs.ts.) Deliberately not anchored to a single
  * shape — the point is to catch a file that disagrees, whatever its format.
  */
 export function versionsIn(content: string): string[] {
   const found = [
     ...content.matchAll(/"version"\s*:\s*"([^"]+)"/g),
     ...content.matchAll(/VERSION\s*=\s*"([^"]+)"/g),
-    ...content.matchAll(/"ref"\s*:\s*"v([^"]+)"/g),
   ].map((m) => m[1]);
   return [...new Set(found)];
-}
-
-/**
- * The tags a marketplace catalog pins its entries to (`"ref": "vX.Y.Z"`).
- * Unlike a `version` field, which appears once per file, a catalog holds one
- * ref per plugin, and EVERY one must name this release: an entry left on the
- * previous tag installs the previous plugin.
- */
-export function refsIn(content: string): string[] {
-  return [...content.matchAll(/"ref"\s*:\s*"v([^"]+)"/g)].map((m) => m[1]);
 }
 
 async function main() {
@@ -91,15 +81,17 @@ async function main() {
       problems.push(`${file} is missing`);
       continue;
     }
+    // A catalog pins each entry by `ref`, not by `version`: one definition of
+    // what "pinned to this release" means, shared with the bump and release.yml.
+    if ((CATALOG_FILES as readonly string[]).includes(file)) {
+      for (const p of catalogRefProblems(content, tag)) problems.push(`${file}: ${p}`);
+      continue;
+    }
     const found = versionsIn(content);
     if (found.length === 0) {
       problems.push(`${file} declares no version at all`);
     } else if (!found.includes(expected)) {
       problems.push(`${file} declares ${found.join(", ")}, expected ${expected}`);
-    } else if (refsIn(content).some((r) => r !== expected)) {
-      problems.push(
-        `${file} pins refs ${refsIn(content).join(", ")}, expected every one at ${expected}`,
-      );
     }
   }
 

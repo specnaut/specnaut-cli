@@ -1,5 +1,5 @@
 import { assert, assertEquals } from "@std/assert";
-import { refsIn, versionsIn } from "../../scripts/check-release-commit.ts";
+import { versionsIn } from "../../scripts/check-release-commit.ts";
 import { writeVersions } from "../../scripts/bump-version.ts";
 
 /**
@@ -111,7 +111,7 @@ Deno.test("a catalog entry left on the previous tag is refused", async () => {
   const dir = await repoAt("3.0.0", "chore: release v3.0.0", { staleRef: "2.9.0" });
   const { code, err } = await run(dir, "v3.0.0");
   assertEquals(code, 1);
-  assert(err.includes("pins refs 3.0.0, 2.9.0, expected every one at 3.0.0"), err);
+  assert(err.includes('b is pinned to "v2.9.0", not v3.0.0'), err);
 });
 
 Deno.test("a dirty tree is refused", async () => {
@@ -132,11 +132,6 @@ Deno.test("versionsIn finds both the JSON field and the TS constant", () => {
   assertEquals(versionsIn('{"version": "1.2.3"}'), ["1.2.3"]);
   assertEquals(versionsIn('export const VERSION = "1.2.3";'), ["1.2.3"]);
   assertEquals(versionsIn('{"version":"1.0.0"}\nVERSION = "2.0.0"'), ["1.0.0", "2.0.0"]);
-});
-
-Deno.test("refsIn returns every catalog ref, duplicates included", () => {
-  assertEquals(refsIn('{"ref": "v1.2.3", "x": {"ref":"v1.2.3"}}'), ["1.2.3", "1.2.3"]);
-  assertEquals(refsIn('{"ref": "main"}'), []);
 });
 
 /**

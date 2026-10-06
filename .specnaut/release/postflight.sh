@@ -62,7 +62,14 @@ asset_count="$(gh api "repos/$REPO/releases/tags/$TAG" --jq '.assets | length')"
 # that ran and found nothing is indistinguishable from one that worked, so the
 # check has to happen here, before they are asked to run at all.
 echo "▶ verifying releases/latest points at $TAG"
-latest="$(gh api "repos/$REPO/releases/latest" --jq '.tag_name' 2>/dev/null || echo "")"
+# Three reads ten seconds apart: `latest` can lag a just-published release by a
+# moment, and failing here skips every check below.
+latest=""
+for attempt in 1 2 3; do
+  latest="$(gh api "repos/$REPO/releases/latest" --jq '.tag_name' 2>/dev/null || echo "")"
+  [ "$latest" = "$TAG" ] && break
+  [ "$attempt" -eq 3 ] || sleep 10
+done
 [ "$latest" = "$TAG" ] || {
   echo "❌ releases/latest is '${latest:-<unreadable>}', not $TAG — both packaging"
   echo "   syncs would no-op green. Mark $TAG as latest, then re-run this script."
@@ -167,6 +174,7 @@ fi
 # distribution channel is behind — worth shouting about, not worth reporting the
 # whole release as failed. The hard gate lives in the sync script itself, which
 # now exits non-zero when it cannot prove it published.
+# BEGIN catalog-check
 marketplace_warned=0
 echo "▶ verifying the marketplace catalog was published"
 # Its own retry loop. This read used to be single-shot, and the only slack it
@@ -182,25 +190,56 @@ catalog_refs=""
 copilot_refs=""
 for attempt in 1 2 3 4 5 6 7 8 9 10 11 12; do
   catalog_json="$(gh api repos/specnaut/specnaut-marketplace/contents/.claude-plugin/marketplace.json \
-    --jq '.content' 2>/dev/null | base64 -d 2>/dev/null || true)"
+    -H 'Accept: application/vnd.github.raw' 2>/dev/null || true)"
   catalog_refs="$(printf '%s' "$catalog_json" | jq -r '[.plugins[].source.ref] | unique | join(",")' 2>/dev/null || true)"
   copilot_refs="$(gh api repos/specnaut/specnaut-marketplace/contents/.github/plugin/marketplace.json \
-    --jq '.content' 2>/dev/null | base64 -d 2>/dev/null \
+    -H 'Accept: application/vnd.github.raw' 2>/dev/null \
     | jq -r '[.plugins[].source.ref] | unique | join(",")' 2>/dev/null || true)"
   [ "$catalog_refs" = "$TAG" ] && [ "$copilot_refs" = "$TAG" ] && break
   [ "$attempt" -eq 12 ] || sleep 10
 done
 if [ "$catalog_refs" = "$TAG" ] && [ "$copilot_refs" = "$TAG" ]; then
   echo "  both catalogs pin every entry to $TAG"
+
+  # Pinned is not installable: #633 was a resolution failure. Every entry must
+  # name a plugin that exists at its path at $TAG, with this release's version,
+  # and the published Claude catalog must list every plugin this release's
+  # catalog does — the shipped settings enable one of them.
+  for dialect in .claude-plugin .github/plugin; do
+    published="$(gh api "repos/specnaut/specnaut-marketplace/contents/$dialect/marketplace.json" \
+      -H 'Accept: application/vnd.github.raw' 2>/dev/null || true)"
+    want="$(jq -r '[.plugins[].name] | sort | join(",")' "packaging/marketplace/$dialect/marketplace.json")"
+    have="$(printf '%s' "$published" | jq -r '[.plugins[].name] | sort | join(",")' 2>/dev/null || true)"
+    if [ "$have" != "$want" ]; then
+      echo "⚠ $dialect catalog lists '${have:-unreadable}', this release lists '$want'"
+      marketplace_warned=1
+    fi
+    for entry in $(printf '%s' "$published" | jq -r '.plugins[] | "\(.name)=\(.source.path)"' 2>/dev/null); do
+      name="${entry%%=*}"
+      path="${entry#*=}"
+      got="$(gh api "repos/$REPO/contents/$path/.claude-plugin/plugin.json?ref=$TAG" \
+        -H 'Accept: application/vnd.github.raw' 2>/dev/null | jq -r '.version' 2>/dev/null || true)"
+      if [ "$got" = "${TAG#v}" ]; then
+        echo "  $dialect: $name resolves at $path ($got)"
+      else
+        echo "⚠ $dialect: $name does not resolve to ${TAG#v} at $path (got '${got:-nothing}')"
+        marketplace_warned=1
+      fi
+    done
+  done
+
   if command -v claude >/dev/null 2>&1; then
     catalog_dir="$(mktemp -d)"
     mkdir -p "$catalog_dir/.claude-plugin"
     printf '%s' "$catalog_json" > "$catalog_dir/.claude-plugin/marketplace.json"
-    if claude plugin validate "$catalog_dir" >/dev/null 2>&1; then
-      echo "  Claude Code accepts the published catalog"
+    # Captured once, then read: a rejecting validator in a pipeline under
+    # `set -euo pipefail` would end this script here, before the attestation
+    # and published-binary gates below ever ran.
+    if validate_out="$(claude plugin validate "$catalog_dir" 2>&1)"; then
+      echo "  Claude Code $(claude --version 2>/dev/null | awk '{print $1}') accepts the published catalog"
     else
-      echo "⚠ Claude Code rejects the published catalog:"
-      claude plugin validate "$catalog_dir" 2>&1 | grep -E '❯|✘' | head -5 | sed 's/^/    /'
+      echo "⚠ Claude Code $(claude --version 2>/dev/null | awk '{print $1}') rejects the published catalog:"
+      printf '%s\n' "$validate_out" | grep -E '❯|✘' | head -5 | sed 's/^/    /' || true
       marketplace_warned=1
     fi
     rm -rf "$catalog_dir"
@@ -213,6 +252,7 @@ else
   echo "  Claude Code / Copilot CLI marketplace users are on the previous version."
   marketplace_warned=1
 fi
+# END catalog-check
 
 # Soft-warn, like the two above. A self-update failure says the *operator's*
 # binary is stale — `.specnaut/release/README.md` documents exactly that case,

@@ -2,6 +2,7 @@
 // Pure `computeNextVersion` is exported for testability.
 
 import { SemVer } from "../src/domain/release.ts";
+import { CATALOG_FILES, stampCatalogRefs } from "./catalog-refs.ts";
 
 export type BumpKind =
   | "patch"
@@ -56,14 +57,10 @@ export const VERSIONED_FILES = [
   "packaging/marketplace/.github/plugin/marketplace.json",
 ] as const;
 
-// The marketplace catalogs carry the release as a git `ref` (`"ref": "vX.Y.Z"`),
-// not as a `version` field: each entry pins the plugin to the tag it ships in.
-// The marketplace repository copies these files verbatim at that tag, so a ref
-// left behind here installs the previous release's plugin.
-export const CATALOG_FILES = [
-  "packaging/marketplace/.claude-plugin/marketplace.json",
-  "packaging/marketplace/.github/plugin/marketplace.json",
-] as const;
+// The marketplace catalogs carry the release as a git `ref` on each entry, not
+// as a `version` field; ./catalog-refs.ts is the one definition of both the
+// stamp and the check.
+export { CATALOG_FILES } from "./catalog-refs.ts";
 
 async function readCurrentVersion(baseDir: string): Promise<string> {
   const raw = await Deno.readTextFile(`${baseDir}/deno.json`);
@@ -137,14 +134,10 @@ export async function writeVersions(
   await Deno.writeTextFile(cursorManifestPath, updatedCursor);
 
   // Stamp every catalog entry's `ref` with the tag this release will carry
-  // (#633). Every ref, not the first: a catalog lists one entry per plugin.
+  // (#633) — every entry, including one with no ref or a branch ref yet.
   for (const catalog of CATALOG_FILES) {
     const path = `${baseDir}/${catalog}`;
-    const raw = await Deno.readTextFile(path);
-    await Deno.writeTextFile(
-      path,
-      raw.replace(/"ref":\s*"v[^"]+"/g, `"ref": "v${next}"`),
-    );
+    await Deno.writeTextFile(path, stampCatalogRefs(await Deno.readTextFile(path), `v${next}`));
   }
 }
 

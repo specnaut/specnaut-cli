@@ -372,17 +372,11 @@ jobs:
             echo "::error::.cursor-plugin/plugin.json version ($CURSOR_VERSION) does not match deno.json version ($BIN_VERSION). Re-run scripts/bump-version.ts."
             exit 1
           fi
-          # 7. Hard fail if a marketplace catalog entry is pinned to another tag.
+          # 7. Hard fail if a marketplace catalog entry is not pinned to this tag.
           # The marketplace repository copies these files verbatim at this tag,
-          # so a stale `ref` would install the previous release's plugin (#633).
-          for CATALOG in packaging/marketplace/.claude-plugin/marketplace.json packaging/marketplace/.github/plugin/marketplace.json; do
-            jq -e '.name and .owner.name and (.plugins | length > 0)' "$CATALOG" > /dev/null
-            STALE=$(jq -r --arg t "v$BIN_VERSION" '[.plugins[] | select(.source.ref != $t) | .name] | join(", ")' "$CATALOG")
-            if [ -n "$STALE" ]; then
-              echo "::error::$CATALOG pins $STALE to a ref other than v$BIN_VERSION. Re-run scripts/bump-version.ts."
-              exit 1
-            fi
-          done
+          # so an entry on another ref (or none) installs another plugin (#633).
+          # The same definition the bump and check-release-commit.ts use.
+          deno run --allow-read scripts/catalog-refs.ts --check "v$BIN_VERSION"
           echo "✓ plugin manifests valid, scaffold present, versions $PLUGIN_VERSION/$MANIFEST_VERSION/$CODEX_VERSION/$CURSOR_VERSION match binary, catalogs pinned to v$BIN_VERSION"
       - name: Cross-compile all targets
         run: deno run --allow-read --allow-write --allow-run --allow-env scripts/build.ts
