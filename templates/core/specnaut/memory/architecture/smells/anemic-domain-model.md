@@ -1,6 +1,6 @@
 > **Agents depend on this file.** The architect is required to open it before
 > naming this smell in a report. Moving or renaming it breaks that link in
-> silence — repoint `.claude/agents/architect-expert.md` and the catalogue
+> silence — repoint the `architect-expert` agent and the catalogue
 > README in the same change.
 
 # Anemic Domain Model

@@ -246,8 +246,7 @@ FINDING <severity>: <one-line summary>
   Suggested fix: <code sketch or pointer>
 ```
 
-After the findings, emit exactly one `REVIEW SUMMARY` block in the format the
-preloaded `review-findings-contract` defines — do not restate its fields here.
+After the findings, emit exactly one `REVIEW SUMMARY` block in the format the `review-findings-contract` skill defines — do not restate its fields here.
 `REVIEW_SCOPE: dependency-expert`, `SEATS_EXPECTED: 1`, `SEATS_REPORTED: 0` when
 you could not review, and `EVIDENCE:` naming the manifests you actually
 inspected — a clean report that names none is counted as `NOT RUN`. The verdict rule is the contract's, including the

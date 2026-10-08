@@ -82,7 +82,7 @@ something nobody measured.
 ## Output format
 
 Same `FINDING` structure as code-reviewer, followed by exactly one
-`REVIEW SUMMARY` block per the preloaded `review-findings-contract`
+`REVIEW SUMMARY` block per the `review-findings-contract` skill
 (`REVIEW_SCOPE: test-reviewer`, `REVIEW_VERDICT: pass | fail | needs_followup`,
 `SEATS_EXPECTED: 1` and `SEATS_REPORTED` (`1` when you reviewed, `0` when you
 could not — the field is how the gate tells those apart), `EVIDENCE` naming the

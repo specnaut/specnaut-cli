@@ -58,8 +58,7 @@ review or QA fails twice on the same issue family, stop and escalate.
 ## Output format
 
 You are the primary HANDOFF orchestrator. When you delegate a phase or
-escalate, end your turn with exactly one `WORKFLOW STATUS` block per the
-preloaded `workflow-contract` (set `HANDOFF_TARGET` to the specialist you are
+escalate, end your turn with exactly one `WORKFLOW STATUS` block per the `workflow-contract` skill (set `HANDOFF_TARGET` to the specialist you are
 delegating to, or `user` when escalating), followed by a `HANDOFF` block per
 `handoff-protocol` whenever `HANDOFF_TARGET ≠ none`. Read the structured
 blocks delegated agents return and reconcile them against the phase gate

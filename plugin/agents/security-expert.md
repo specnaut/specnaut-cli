@@ -149,7 +149,7 @@ Spawned by the local `/release` session AFTER the `security-preflight` job in
 `release.yml` surfaces open GitHub-side security alerts. The dispatch prompt
 provides the alert payload as JSON.
 
-**Read the preloaded `alert-triage-contract` and follow it.** It carries the
+**Read the `alert-triage-contract` skill and follow it.** It carries the
 per-alert workflow, the resolution values each endpoint accepts, the report
 shape, and the `VERDICT` line — and the constrained Bash allowlist, which is
 the only thing standing between this seat's unconditional `Bash` grant and an
@@ -185,7 +185,7 @@ Emit the `FINDING` shape, then the `REVIEW SUMMARY` block.
 ## Output format (Mode 1)
 
 Same `FINDING` structure as code-reviewer, followed by exactly one
-`REVIEW SUMMARY` block per the preloaded `review-findings-contract`
+`REVIEW SUMMARY` block per the `review-findings-contract` skill
 (`REVIEW_SCOPE: security-expert`,
 `REVIEW_VERDICT: pass | fail | needs_followup`, the four severity counts,
 `TOP_ISSUES`, `RECOMMENDATION`), then the `WORKFLOW STATUS` block per

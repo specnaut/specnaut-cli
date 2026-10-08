@@ -61,7 +61,7 @@ reachability.
 The main session does **not** run the scripts directly. Dispatch the
 `product-owner` subagent for any mutation: creating items, clarifying
 bodies, moving status, closing. The PO is the single owner of the backlog
-lifecycle (see `.claude/agents/product-owner.md`).
+lifecycle (see the `product-owner` agent).
 
 The scripts under `.specnaut/scripts/backlog/` are the toolbox the PO
 uses. The main session may call the read-only ones (`list.sh`, `view.sh`)
@@ -353,8 +353,8 @@ matching stage hook (see `product-owner.md` → "Cloud stage reconcile").
 ### Stage reconcile (poll model)
 
 The product-owner reacts to board moves by **polling**, not a webhook — the CLI
-has no daemon. Run `reconcile.sh` by hand or on a `/loop` cadence from
-`.claude/loop.md`; it drains stage transitions since the cursor and prints one
+has no daemon. Run `reconcile.sh` by hand or on a recurring cadence (Claude
+Code: `/loop`); it drains stage transitions since the cursor and prints one
 line each (`CREATED <n> -> <stage>` / `MOVED <n> <from> -> <to>`). For each
 line the PO resolves the destination against `columns.sh` (canonical names,
 case-insensitive) and runs the mapped hook — parity with a GitHub Projects
@@ -415,8 +415,8 @@ uses it to put a whole epic on one branch.
 detects epic-worthy requests (>5 AC bullets, scope crosses ≥2
 subsystems, trigger phrases like "break down" / "phased" / "as an
 epic") and either auto-decomposes or proposes a concrete sub-task list
-— see the "Epic detection heuristic" section in
-`.claude/agents/product-owner.md`.
+— see the "Epic detection heuristic" section of the `product-owner`
+agent.
 
 <!-- BEGIN: spec-autogen=on -->
 ## Auto-generate a task's spec at creation (cloud, opt-in)

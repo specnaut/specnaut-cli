@@ -1,7 +1,7 @@
 > **Agents depend on this file.** It is the entry point the architect is
 > required to read before naming anything from this catalogue. Moving or
 > renaming it, or any leaf it lists, breaks that link in silence — repoint
-> `.claude/agents/architect-expert.md` in the same change.
+> the `architect-expert` agent in the same change.
 
 # The architecture catalogue
 

@@ -87,7 +87,7 @@ a supervising human (or a watching session) sees `blocked` agents, stalls
 (stale ≥ 15 min), false completions (contradictions), and dropped batons
 (missing handoffs) as they emerge — without interrupting the agents at work.
 Tune the interval to the cadence of the work (`/loop 1m` for tight loops,
-`/loop 15m` for slow long-runs). See `.claude/loop.md` for the loop mechanism.
+`/loop 15m` for slow long-runs) — `/loop` is Claude Code's; on another harness, re-run this audit on whatever schedule it offers.
 
 ## Out of scope
 

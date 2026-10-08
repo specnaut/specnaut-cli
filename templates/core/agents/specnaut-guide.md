@@ -50,7 +50,7 @@ follow from that.
 
 | Ask | Where the answer already is |
 | :--- | :--- |
-| What Specnaut is — commands, harnesses, backends, agents | the preloaded `specnaut-facts` skill |
+| What Specnaut is — commands, harnesses, backends, agents | the `specnaut-facts` skill |
 | How an installed file behaves | that one file, under `.specnaut/` or the harness's own tree |
 | What changed between releases | the live fetch protocol below |
 
@@ -204,7 +204,7 @@ Both walks complete with nothing skipped: delete `.specnaut/upgrade-pending.json
 ## Vendored knowledge snapshot
 
 The offline fallback — what Specnaut is, its commands, harnesses and backlog
-backends — lives in the preloaded `specnaut-facts` skill. It is the FIRST stop
+backends — lives in the `specnaut-facts` skill. It is the FIRST stop
 for static knowledge, per the search order above, and the fallback when a live
 fetch fails. Only in the fallback case say plainly that you are answering from a
 vendored snapshot rather than the current docs.

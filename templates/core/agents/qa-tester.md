@@ -35,8 +35,7 @@ P2. Unit tests for services, domain logic, and validators.
 
 ## Required report
 
-After your prose, emit exactly one `QA SUMMARY` block as defined by the
-preloaded `qa-report-contract` skill (it is the single authoritative schema:
+After your prose, emit exactly one `QA SUMMARY` block as defined by the `qa-report-contract` skill (it is the single authoritative schema:
 `QA_SCOPE`, `QA_VERDICT: pass | fail | blocked`, the test counts, `BUGS_FOUND`,
 `QA_RECOMMENDATION`). Then emit the `WORKFLOW STATUS` block per
 `workflow-contract`. Route any bug found to the developer via the

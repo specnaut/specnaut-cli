@@ -288,5 +288,5 @@ Task({
 child's model as: explicit spawn value → the `[agents]` default in
 `.codex/config.toml` → **the parent session's value**. A child spawned by
 description alone selects no role, so it falls through to the last link and
-inherits your primary model. Always pass `agent_type=` (see
-`references/codex-tools.md`).
+inherits your primary model. Always pass `agent_type=` (see the harness
+tool mapping `using-specnaut` points to).

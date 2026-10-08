@@ -175,7 +175,5 @@ agent skill-aware. It does not:
   specific skill)
 - Override `CLAUDE.md` / `AGENTS.md` project directives
 
-For per-harness adapter details, see the manifest at
-`plugin/.claude-plugin/plugin.json`, `.cursor-plugin/plugin.json`,
-`.codex-plugin/plugin.json`, or the `.opencode/plugins/specnaut.js`
-adapter (issues #277–#280).
+For per-harness adapter details, see the per-harness plugin manifests in
+the Specnaut repository (issues #277–#280).

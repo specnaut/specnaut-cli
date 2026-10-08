@@ -59,8 +59,8 @@ MEDIUM / LOW findings: <N>, list suppressed — see per-agent reports for detail
 
 ### Aggregated REVIEW SUMMARY block (canonical)
 
-Emit exactly one `REVIEW SUMMARY` block per the preloaded
-`review-findings-contract`. Its counts are the SUM of every seat's findings
+Emit exactly one `REVIEW SUMMARY` block per the
+`review-findings-contract` skill. Its counts are the SUM of every seat's findings
 (after de-duplication); its verdict is derived from those aggregated counts:
 
 **This block is restated here on purpose, unlike every other seat's** (#565).

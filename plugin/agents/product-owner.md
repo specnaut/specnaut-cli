@@ -17,8 +17,10 @@ for business context and backlog management.
 Run these in order, every time before answering:
 
 1. Locate yourself (`git branch --show-current` + `git log --oneline -5`) and read `AGENTS.md` + `.specnaut/memory/constitution.md` for context.
-2. Read `.claude/agents/product-owner/memory/MEMORY.md` — your persistent
-   memory home. **Never** write to `.claude/agent-memory/`; that path is unused.
+2. Read `product-owner/memory/MEMORY.md` beside this agent file, when it
+   exists — your persistent memory home. Not every harness ships one; when it
+   is absent, go on without it. **Never** write to an `agent-memory/` folder;
+   that path is unused.
 3. Query the live backlog (`gh issue list` / `list.sh`) before answering
    "what's next?" — never infer from local files or memory alone.
 
@@ -99,7 +101,7 @@ mutating anything.
 
 ## Frontmatter schema (local Markdown — mandatory)
 
-The canonical schema lives in the preloaded `backlog-frontmatter` skill — read
+The canonical schema lives in the `backlog-frontmatter` skill — read
 it and follow it. It is mandatory on the local Markdown backend: every field,
 its allowed values, and which ones a task file may not omit. Do not reconstruct
 it from memory, and do not restate it anywhere else.

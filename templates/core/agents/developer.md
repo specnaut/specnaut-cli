@@ -136,7 +136,7 @@ Risks / follow-ups
 ```
 
 Do NOT define a separate status block here. The authoritative machine-readable
-status is the `WORKFLOW STATUS` block from the preloaded `workflow-contract`
+status is the `WORKFLOW STATUS` block from the `workflow-contract` skill
 (it carries `STATE`, `DONE_CRITERIA_MET`, `FILES_CHANGED`, `VALIDATION`,
 `BLOCKERS`, `NEXT_ACTION`, `HANDOFF_TARGET`) — emit exactly one such block
 after the summary above, and a `HANDOFF` block per `handoff-protocol` whenever

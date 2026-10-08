@@ -5423,8 +5423,8 @@ Task({
 child's model as: explicit spawn value → the \`[agents]\` default in
 \`.codex/config.toml\` → **the parent session's value**. A child spawned by
 description alone selects no role, so it falls through to the last link and
-inherits your primary model. Always pass \`agent_type=\` (see
-\`references/codex-tools.md\`).
+inherits your primary model. Always pass \`agent_type=\` (see the harness
+tool mapping \`using-specnaut\` points to).
 `,
     executable: false,
     backend: null,
@@ -5611,10 +5611,8 @@ agent skill-aware. It does not:
   specific skill)
 - Override \`CLAUDE.md\` / \`AGENTS.md\` project directives
 
-For per-harness adapter details, see the manifest at
-\`plugin/.claude-plugin/plugin.json\`, \`.cursor-plugin/plugin.json\`,
-\`.codex-plugin/plugin.json\`, or the \`.opencode/plugins/specnaut.js\`
-adapter (issues #277–#280).
+For per-harness adapter details, see the per-harness plugin manifests in
+the Specnaut repository (issues #277–#280).
 `,
     executable: false,
     backend: null,
@@ -5670,7 +5668,7 @@ when:
   catch rate
 - The user explicitly asked for inline execution
 - Subagent dispatch is unavailable on the current harness (rare —
-  see \`references/<harness>-tools.md\` for the dispatch mapping)
+  see the harness tool mapping \`using-specnaut\` points to)
 
 ## The loop — per task
 
@@ -5906,15 +5904,15 @@ This skill does not:
 - For trivial single-file changes — direct execution is faster than
   the subagent loop overhead
 - When dispatch isn't available on the current harness (rare; check
-  \`references/<harness>-tools.md\`)
+  the harness tool mapping \`using-specnaut\` points to)
 - When the user explicitly asked for inline execution
 
 **On Codex, name the role — do not describe the task.** \`spawn_agent\` resolves a
 child's model as: explicit spawn value → the \`[agents]\` default in
 \`.codex/config.toml\` → **the parent session's value**. A child spawned by
 description alone selects no role, so it falls through to the last link and
-inherits your primary model. Always pass \`agent_type=\` (see
-\`references/codex-tools.md\`).
+inherits your primary model. Always pass \`agent_type=\` (see the harness
+tool mapping \`using-specnaut\` points to).
 `,
     executable: false,
     backend: null,
@@ -7416,8 +7414,10 @@ for business context and backlog management.
 Run these in order, every time before answering:
 
 1. Locate yourself (\`git branch --show-current\` + \`git log --oneline -5\`) and read \`AGENTS.md\` + \`.specnaut/memory/constitution.md\` for context.
-2. Read \`.claude/agents/product-owner/memory/MEMORY.md\` — your persistent
-   memory home. **Never** write to \`.claude/agent-memory/\`; that path is unused.
+2. Read \`product-owner/memory/MEMORY.md\` beside this agent file, when it
+   exists — your persistent memory home. Not every harness ships one; when it
+   is absent, go on without it. **Never** write to an \`agent-memory/\` folder;
+   that path is unused.
 3. Query the live backlog (\`gh issue list\` / \`list.sh\`) before answering
    "what's next?" — never infer from local files or memory alone.
 
@@ -7498,7 +7498,7 @@ mutating anything.
 
 ## Frontmatter schema (local Markdown — mandatory)
 
-The canonical schema lives in the preloaded \`backlog-frontmatter\` skill — read
+The canonical schema lives in the \`backlog-frontmatter\` skill — read
 it and follow it. It is mandatory on the local Markdown backend: every field,
 its allowed values, and which ones a task file may not omit. Do not reconstruct
 it from memory, and do not restate it anywhere else.
@@ -7803,7 +7803,7 @@ Risks / follow-ups
 \`\`\`
 
 Do NOT define a separate status block here. The authoritative machine-readable
-status is the \`WORKFLOW STATUS\` block from the preloaded \`workflow-contract\`
+status is the \`WORKFLOW STATUS\` block from the \`workflow-contract\` skill
 (it carries \`STATE\`, \`DONE_CRITERIA_MET\`, \`FILES_CHANGED\`, \`VALIDATION\`,
 \`BLOCKERS\`, \`NEXT_ACTION\`, \`HANDOFF_TARGET\`) — emit exactly one such block
 after the summary above, and a \`HANDOFF\` block per \`handoff-protocol\` whenever
@@ -7882,8 +7882,8 @@ MEDIUM / LOW findings: <N>, list suppressed — see per-agent reports for detail
 
 ### Aggregated REVIEW SUMMARY block (canonical)
 
-Emit exactly one \`REVIEW SUMMARY\` block per the preloaded
-\`review-findings-contract\`. Its counts are the SUM of every seat's findings
+Emit exactly one \`REVIEW SUMMARY\` block per the
+\`review-findings-contract\` skill. Its counts are the SUM of every seat's findings
 (after de-duplication); its verdict is derived from those aggregated counts:
 
 **This block is restated here on purpose, unlike every other seat's** (#565).
@@ -8052,8 +8052,7 @@ FINDING
   suggestion: <one sentence, actionable>
 \`\`\`
 
-After the findings, emit exactly one \`REVIEW SUMMARY\` block in the format the
-preloaded \`review-findings-contract\` defines — do not restate its fields here.
+After the findings, emit exactly one \`REVIEW SUMMARY\` block in the format the \`review-findings-contract\` skill defines — do not restate its fields here.
 \`REVIEW_SCOPE: code-reviewer\`, \`SEATS_EXPECTED: 1\`, and \`SEATS_REPORTED: 0\` when you
 could not review, with \`EVIDENCE:\` naming the paths you inspected — a clean
 report that names none is counted as \`NOT RUN\`. The verdict rule is the
@@ -8221,7 +8220,7 @@ Spawned by the local \`/release\` session AFTER the \`security-preflight\` job i
 \`release.yml\` surfaces open GitHub-side security alerts. The dispatch prompt
 provides the alert payload as JSON.
 
-**Read the preloaded \`alert-triage-contract\` and follow it.** It carries the
+**Read the \`alert-triage-contract\` skill and follow it.** It carries the
 per-alert workflow, the resolution values each endpoint accepts, the report
 shape, and the \`VERDICT\` line — and the constrained Bash allowlist, which is
 the only thing standing between this seat's unconditional \`Bash\` grant and an
@@ -8257,7 +8256,7 @@ Emit the \`FINDING\` shape, then the \`REVIEW SUMMARY\` block.
 ## Output format (Mode 1)
 
 Same \`FINDING\` structure as code-reviewer, followed by exactly one
-\`REVIEW SUMMARY\` block per the preloaded \`review-findings-contract\`
+\`REVIEW SUMMARY\` block per the \`review-findings-contract\` skill
 (\`REVIEW_SCOPE: security-expert\`,
 \`REVIEW_VERDICT: pass | fail | needs_followup\`, the four severity counts,
 \`TOP_ISSUES\`, \`RECOMMENDATION\`), then the \`WORKFLOW STATUS\` block per
@@ -8357,7 +8356,7 @@ something nobody measured.
 ## Output format
 
 Same \`FINDING\` structure as code-reviewer, followed by exactly one
-\`REVIEW SUMMARY\` block per the preloaded \`review-findings-contract\`
+\`REVIEW SUMMARY\` block per the \`review-findings-contract\` skill
 (\`REVIEW_SCOPE: test-reviewer\`, \`REVIEW_VERDICT: pass | fail | needs_followup\`,
 \`SEATS_EXPECTED: 1\` and \`SEATS_REPORTED\` (\`1\` when you reviewed, \`0\` when you
 could not — the field is how the gate tells those apart), \`EVIDENCE\` naming the
@@ -8410,8 +8409,7 @@ P2. Unit tests for services, domain logic, and validators.
 
 ## Required report
 
-After your prose, emit exactly one \`QA SUMMARY\` block as defined by the
-preloaded \`qa-report-contract\` skill (it is the single authoritative schema:
+After your prose, emit exactly one \`QA SUMMARY\` block as defined by the \`qa-report-contract\` skill (it is the single authoritative schema:
 \`QA_SCOPE\`, \`QA_VERDICT: pass | fail | blocked\`, the test counts, \`BUGS_FOUND\`,
 \`QA_RECOMMENDATION\`). Then emit the \`WORKFLOW STATUS\` block per
 \`workflow-contract\`. Route any bug found to the developer via the
@@ -8485,8 +8483,7 @@ review or QA fails twice on the same issue family, stop and escalate.
 ## Output format
 
 You are the primary HANDOFF orchestrator. When you delegate a phase or
-escalate, end your turn with exactly one \`WORKFLOW STATUS\` block per the
-preloaded \`workflow-contract\` (set \`HANDOFF_TARGET\` to the specialist you are
+escalate, end your turn with exactly one \`WORKFLOW STATUS\` block per the \`workflow-contract\` skill (set \`HANDOFF_TARGET\` to the specialist you are
 delegating to, or \`user\` when escalating), followed by a \`HANDOFF\` block per
 \`handoff-protocol\` whenever \`HANDOFF_TARGET ≠ none\`. Read the structured
 blocks delegated agents return and reconcile them against the phase gate
@@ -8668,7 +8665,7 @@ follow from that.
 
 | Ask | Where the answer already is |
 | :--- | :--- |
-| What Specnaut is — commands, harnesses, backends, agents | the preloaded \`specnaut-facts\` skill |
+| What Specnaut is — commands, harnesses, backends, agents | the \`specnaut-facts\` skill |
 | How an installed file behaves | that one file, under \`.specnaut/\` or the harness's own tree |
 | What changed between releases | the live fetch protocol below |
 
@@ -8822,7 +8819,7 @@ Both walks complete with nothing skipped: delete \`.specnaut/upgrade-pending.jso
 ## Vendored knowledge snapshot
 
 The offline fallback — what Specnaut is, its commands, harnesses and backlog
-backends — lives in the preloaded \`specnaut-facts\` skill. It is the FIRST stop
+backends — lives in the \`specnaut-facts\` skill. It is the FIRST stop
 for static knowledge, per the search order above, and the fallback when a live
 fetch fails. Only in the fallback case say plainly that you are answering from a
 vendored snapshot rather than the current docs.
@@ -9300,7 +9297,7 @@ material for the PO to triage.
 ## Output format (Mode 1 — PR review)
 
 Same \`FINDING\` structure as code-reviewer, followed by exactly one
-\`REVIEW SUMMARY\` block per the preloaded \`review-findings-contract\`
+\`REVIEW SUMMARY\` block per the \`review-findings-contract\` skill
 (\`REVIEW_SCOPE: performance-expert\`,
 \`REVIEW_VERDICT: pass | fail | needs_followup\`,
 \`SEATS_EXPECTED: 1\` and \`SEATS_REPORTED\` (\`1\` when you reviewed, \`0\` when you
@@ -9528,7 +9525,7 @@ backlog material for the PO to triage.
 ## Output format (Mode 1 — PR review)
 
 Same \`FINDING\` structure as code-reviewer, followed by exactly one
-\`REVIEW SUMMARY\` block per the preloaded \`review-findings-contract\`
+\`REVIEW SUMMARY\` block per the \`review-findings-contract\` skill
 (\`REVIEW_SCOPE: accessibility-expert\`,
 \`REVIEW_VERDICT: pass | fail | needs_followup\`,
 \`SEATS_EXPECTED: 1\` and \`SEATS_REPORTED\` (\`1\` when you reviewed, \`0\` when you
@@ -9774,8 +9771,7 @@ FINDING <severity>: <one-line summary>
   Suggested fix: <code sketch or pointer>
 \`\`\`
 
-After the findings, emit exactly one \`REVIEW SUMMARY\` block in the format the
-preloaded \`review-findings-contract\` defines — do not restate its fields here.
+After the findings, emit exactly one \`REVIEW SUMMARY\` block in the format the \`review-findings-contract\` skill defines — do not restate its fields here.
 \`REVIEW_SCOPE: architect-expert\`, \`SEATS_EXPECTED: 1\`, and \`SEATS_REPORTED: 0\` when you
 could not review, with \`EVIDENCE:\` naming the paths you inspected — a clean
 report that names none is counted as \`NOT RUN\`. The verdict rule is the
@@ -10041,8 +10037,7 @@ FINDING <severity>: <one-line summary>
   Suggested fix: <code sketch or pointer>
 \`\`\`
 
-After the findings, emit exactly one \`REVIEW SUMMARY\` block in the format the
-preloaded \`review-findings-contract\` defines — do not restate its fields here.
+After the findings, emit exactly one \`REVIEW SUMMARY\` block in the format the \`review-findings-contract\` skill defines — do not restate its fields here.
 \`REVIEW_SCOPE: dependency-expert\`, \`SEATS_EXPECTED: 1\`, \`SEATS_REPORTED: 0\` when
 you could not review, and \`EVIDENCE:\` naming the manifests you actually
 inspected — a clean report that names none is counted as \`NOT RUN\`. The verdict rule is the contract's, including the
@@ -10501,7 +10496,7 @@ reachability.
 The main session does **not** run the scripts directly. Dispatch the
 \`product-owner\` subagent for any mutation: creating items, clarifying
 bodies, moving status, closing. The PO is the single owner of the backlog
-lifecycle (see \`.claude/agents/product-owner.md\`).
+lifecycle (see the \`product-owner\` agent).
 
 The scripts under \`.specnaut/scripts/backlog/\` are the toolbox the PO
 uses. The main session may call the read-only ones (\`list.sh\`, \`view.sh\`)
@@ -10793,8 +10788,8 @@ matching stage hook (see \`product-owner.md\` → "Cloud stage reconcile").
 ### Stage reconcile (poll model)
 
 The product-owner reacts to board moves by **polling**, not a webhook — the CLI
-has no daemon. Run \`reconcile.sh\` by hand or on a \`/loop\` cadence from
-\`.claude/loop.md\`; it drains stage transitions since the cursor and prints one
+has no daemon. Run \`reconcile.sh\` by hand or on a recurring cadence (Claude
+Code: \`/loop\`); it drains stage transitions since the cursor and prints one
 line each (\`CREATED <n> -> <stage>\` / \`MOVED <n> <from> -> <to>\`). For each
 line the PO resolves the destination against \`columns.sh\` (canonical names,
 case-insensitive) and runs the mapped hook — parity with a GitHub Projects
@@ -10855,8 +10850,8 @@ uses it to put a whole epic on one branch.
 detects epic-worthy requests (>5 AC bullets, scope crosses ≥2
 subsystems, trigger phrases like "break down" / "phased" / "as an
 epic") and either auto-decomposes or proposes a concrete sub-task list
-— see the "Epic detection heuristic" section in
-\`.claude/agents/product-owner.md\`.
+— see the "Epic detection heuristic" section of the \`product-owner\`
+agent.
 
 <!-- BEGIN: spec-autogen=on -->
 ## Auto-generate a task's spec at creation (cloud, opt-in)
@@ -15794,7 +15789,7 @@ a supervising human (or a watching session) sees \`blocked\` agents, stalls
 (stale ≥ 15 min), false completions (contradictions), and dropped batons
 (missing handoffs) as they emerge — without interrupting the agents at work.
 Tune the interval to the cadence of the work (\`/loop 1m\` for tight loops,
-\`/loop 15m\` for slow long-runs). See \`.claude/loop.md\` for the loop mechanism.
+\`/loop 15m\` for slow long-runs) — \`/loop\` is Claude Code's; on another harness, re-run this audit on whatever schedule it offers.
 
 ## Out of scope
 
@@ -21203,7 +21198,7 @@ function confirmDeletion(dialog) {
     content: `> **Agents depend on this file.** It is the entry point the architect is
 > required to read before naming anything from this catalogue. Moving or
 > renaming it, or any leaf it lists, breaks that link in silence — repoint
-> \`.claude/agents/architect-expert.md\` in the same change.
+> the \`architect-expert\` agent in the same change.
 
 # The architecture catalogue
 
@@ -24225,7 +24220,7 @@ Without tests this is a rewrite, not a refactoring. Confirm the old behaviour is
     suffix: "memory/architecture/smells/alternative-classes.md",
     content: `> **Agents depend on this file.** The architect is required to open it before
 > naming this smell in a report. Moving or renaming it breaks that link in
-> silence — repoint \`.claude/agents/architect-expert.md\` and the catalogue
+> silence — repoint the \`architect-expert\` agent and the catalogue
 > README in the same change.
 
 # Alternative Classes with Different Interfaces
@@ -24268,7 +24263,7 @@ produces an interface that satisfies neither caller — see
     suffix: "memory/architecture/smells/anemic-domain-model.md",
     content: `> **Agents depend on this file.** The architect is required to open it before
 > naming this smell in a report. Moving or renaming it breaks that link in
-> silence — repoint \`.claude/agents/architect-expert.md\` and the catalogue
+> silence — repoint the \`architect-expert\` agent and the catalogue
 > README in the same change.
 
 # Anemic Domain Model
@@ -24311,7 +24306,7 @@ inventing invariants for it is [Speculative Generality](speculative-generality.m
     suffix: "memory/architecture/smells/circular-dependency.md",
     content: `> **Agents depend on this file.** The architect is required to open it before
 > naming this smell in a report. Moving or renaming it breaks that link in
-> silence — repoint \`.claude/agents/architect-expert.md\` and the catalogue
+> silence — repoint the \`architect-expert\` agent and the catalogue
 > README in the same change.
 
 # Circular Dependency
@@ -24354,7 +24349,7 @@ separable.
     suffix: "memory/architecture/smells/comments.md",
     content: `> **Agents depend on this file.** The architect is required to open it before
 > naming this smell in a report. Moving or renaming it breaks that link in
-> silence — repoint \`.claude/agents/architect-expert.md\` and the catalogue
+> silence — repoint the \`architect-expert\` agent and the catalogue
 > README in the same change.
 
 # Comments
@@ -24399,7 +24394,7 @@ them.
     suffix: "memory/architecture/smells/data-class.md",
     content: `> **Agents depend on this file.** The architect is required to open it before
 > naming this smell in a report. Moving or renaming it breaks that link in
-> silence — repoint \`.claude/agents/architect-expert.md\` and the catalogue
+> silence — repoint the \`architect-expert\` agent and the catalogue
 > README in the same change.
 
 # Data Class
@@ -24442,7 +24437,7 @@ object whose only rule is enforced at construction.
     suffix: "memory/architecture/smells/data-clumps.md",
     content: `> **Agents depend on this file.** The architect is required to open it before
 > naming this smell in a report. Moving or renaming it breaks that link in
-> silence — repoint \`.claude/agents/architect-expert.md\` and the catalogue
+> silence — repoint the \`architect-expert\` agent and the catalogue
 > README in the same change.
 
 # Data Clumps
@@ -24485,7 +24480,7 @@ naming this.
     suffix: "memory/architecture/smells/dead-code.md",
     content: `> **Agents depend on this file.** The architect is required to open it before
 > naming this smell in a report. Moving or renaming it breaks that link in
-> silence — repoint \`.claude/agents/architect-expert.md\` and the catalogue
+> silence — repoint the \`architect-expert\` agent and the catalogue
 > README in the same change.
 
 # Dead Code
@@ -24528,7 +24523,7 @@ an unproven claim here causes deletions that break consumers.
     suffix: "memory/architecture/smells/deep-nesting.md",
     content: `> **Agents depend on this file.** The architect is required to open it before
 > naming this smell in a report. Moving or renaming it breaks that link in
-> silence — repoint \`.claude/agents/architect-expert.md\` and the catalogue
+> silence — repoint the \`architect-expert\` agent and the catalogue
 > README in the same change.
 
 # Deep Nesting
@@ -24571,7 +24566,7 @@ Flattening it with a state machine can easily be worse.
     suffix: "memory/architecture/smells/divergent-change.md",
     content: `> **Agents depend on this file.** The architect is required to open it before
 > naming this smell in a report. Moving or renaming it breaks that link in
-> silence — repoint \`.claude/agents/architect-expert.md\` and the catalogue
+> silence — repoint the \`architect-expert\` agent and the catalogue
 > README in the same change.
 
 # Divergent Change
@@ -24614,7 +24609,7 @@ responsibility.
     suffix: "memory/architecture/smells/duplicate-code.md",
     content: `> **Agents depend on this file.** The architect is required to open it before
 > naming this smell in a report. Moving or renaming it breaks that link in
-> silence — repoint \`.claude/agents/architect-expert.md\` and the catalogue
+> silence — repoint the \`architect-expert\` agent and the catalogue
 > README in the same change.
 
 # Duplicate Code
@@ -24660,7 +24655,7 @@ abstraction.
     suffix: "memory/architecture/smells/feature-envy.md",
     content: `> **Agents depend on this file.** The architect is required to open it before
 > naming this smell in a report. Moving or renaming it breaks that link in
-> silence — repoint \`.claude/agents/architect-expert.md\` and the catalogue
+> silence — repoint the \`architect-expert\` agent and the catalogue
 > README in the same change.
 
 # Feature Envy
@@ -24701,7 +24696,7 @@ merely sequences calls.
     suffix: "memory/architecture/smells/god-file.md",
     content: `> **Agents depend on this file.** The architect is required to open it before
 > naming this smell in a report. Moving or renaming it breaks that link in
-> silence — repoint \`.claude/agents/architect-expert.md\` and the catalogue
+> silence — repoint the \`architect-expert\` agent and the catalogue
 > README in the same change.
 
 # God File
@@ -24748,7 +24743,7 @@ flagging it.
     suffix: "memory/architecture/smells/implicit-global.md",
     content: `> **Agents depend on this file.** The architect is required to open it before
 > naming this smell in a report. Moving or renaming it breaks that link in
-> silence — repoint \`.claude/agents/architect-expert.md\` and the catalogue
+> silence — repoint the \`architect-expert\` agent and the catalogue
 > README in the same change.
 
 # Implicit Global
@@ -24791,7 +24786,7 @@ happens, not that it happens; something must eventually touch the world.
     suffix: "memory/architecture/smells/inappropriate-intimacy.md",
     content: `> **Agents depend on this file.** The architect is required to open it before
 > naming this smell in a report. Moving or renaming it breaks that link in
-> silence — repoint \`.claude/agents/architect-expert.md\` and the catalogue
+> silence — repoint the \`architect-expert\` agent and the catalogue
 > README in the same change.
 
 # Inappropriate Intimacy
@@ -24834,7 +24829,7 @@ it.
     suffix: "memory/architecture/smells/large-class.md",
     content: `> **Agents depend on this file.** The architect is required to open it before
 > naming this smell in a report. Moving or renaming it breaks that link in
-> silence — repoint \`.claude/agents/architect-expert.md\` and the catalogue
+> silence — repoint the \`architect-expert\` agent and the catalogue
 > README in the same change.
 
 # Large Class
@@ -24878,7 +24873,7 @@ creates two classes that must change together.
     suffix: "memory/architecture/smells/layer-violation.md",
     content: `> **Agents depend on this file.** The architect is required to open it before
 > naming this smell in a report. Moving or renaming it breaks that link in
-> silence — repoint \`.claude/agents/architect-expert.md\` and the catalogue
+> silence — repoint the \`architect-expert\` agent and the catalogue
 > README in the same change.
 
 # Layer Violation
@@ -24921,7 +24916,7 @@ rather than importing a convention it never adopted.
     suffix: "memory/architecture/smells/lazy-class.md",
     content: `> **Agents depend on this file.** The architect is required to open it before
 > naming this smell in a report. Moving or renaming it breaks that link in
-> silence — repoint \`.claude/agents/architect-expert.md\` and the catalogue
+> silence — repoint the \`architect-expert\` agent and the catalogue
 > README in the same change.
 
 # Lazy Class
@@ -24962,7 +24957,7 @@ same change.
     suffix: "memory/architecture/smells/long-method.md",
     content: `> **Agents depend on this file.** The architect is required to open it before
 > naming this smell in a report. Moving or renaming it breaks that link in
-> silence — repoint \`.claude/agents/architect-expert.md\` and the catalogue
+> silence — repoint the \`architect-expert\` agent and the catalogue
 > README in the same change.
 
 # Long Method
@@ -25008,7 +25003,7 @@ between them. Length alone is not the defect; **hidden structure** is.
     suffix: "memory/architecture/smells/long-parameter-list.md",
     content: `> **Agents depend on this file.** The architect is required to open it before
 > naming this smell in a report. Moving or renaming it breaks that link in
-> silence — repoint \`.claude/agents/architect-expert.md\` and the catalogue
+> silence — repoint the \`architect-expert\` agent and the catalogue
 > README in the same change.
 
 # Long Parameter List
@@ -25053,7 +25048,7 @@ the call sites read unambiguously.
     suffix: "memory/architecture/smells/message-chains.md",
     content: `> **Agents depend on this file.** The architect is required to open it before
 > naming this smell in a report. Moving or renaming it breaks that link in
-> silence — repoint \`.claude/agents/architect-expert.md\` and the catalogue
+> silence — repoint the \`architect-expert\` agent and the catalogue
 > README in the same change.
 
 # Message Chains
@@ -25093,7 +25088,7 @@ one module. Over-applying the cure produces [Middle Man](middle-man.md).
     suffix: "memory/architecture/smells/middle-man.md",
     content: `> **Agents depend on this file.** The architect is required to open it before
 > naming this smell in a report. Moving or renaming it breaks that link in
-> silence — repoint \`.claude/agents/architect-expert.md\` and the catalogue
+> silence — repoint the \`architect-expert\` agent and the catalogue
 > README in the same change.
 
 # Middle Man
@@ -25135,7 +25130,7 @@ implementation that delegates to a vendor SDK is doing its job.
     suffix: "memory/architecture/smells/parallel-inheritance-hierarchies.md",
     content: `> **Agents depend on this file.** The architect is required to open it before
 > naming this smell in a report. Moving or renaming it breaks that link in
-> silence — repoint \`.claude/agents/architect-expert.md\` and the catalogue
+> silence — repoint the \`architect-expert\` agent and the catalogue
 > README in the same change.
 
 # Parallel Inheritance Hierarchies
@@ -25178,7 +25173,7 @@ purpose.
     suffix: "memory/architecture/smells/primitive-obsession.md",
     content: `> **Agents depend on this file.** The architect is required to open it before
 > naming this smell in a report. Moving or renaming it breaks that link in
-> silence — repoint \`.claude/agents/architect-expert.md\` and the catalogue
+> silence — repoint the \`architect-expert\` agent and the catalogue
 > README in the same change.
 
 # Primitive Obsession
@@ -25223,7 +25218,7 @@ the wire. Wrapping a value that has no rule attached to it and never will is
     suffix: "memory/architecture/smells/refused-bequest.md",
     content: `> **Agents depend on this file.** The architect is required to open it before
 > naming this smell in a report. Moving or renaming it breaks that link in
-> silence — repoint \`.claude/agents/architect-expert.md\` and the catalogue
+> silence — repoint the \`architect-expert\` agent and the catalogue
 > README in the same change.
 
 # Refused Bequest
@@ -25264,7 +25259,7 @@ mechanism working as intended — the refusal is a *surprise*, not a design.
     suffix: "memory/architecture/smells/shotgun-surgery.md",
     content: `> **Agents depend on this file.** The architect is required to open it before
 > naming this smell in a report. Moving or renaming it breaks that link in
-> silence — repoint \`.claude/agents/architect-expert.md\` and the catalogue
+> silence — repoint the \`architect-expert\` agent and the catalogue
 > README in the same change.
 
 # Shotgun Surgery
@@ -25308,7 +25303,7 @@ sites, not a one-off sweep.
     suffix: "memory/architecture/smells/silent-catch.md",
     content: `> **Agents depend on this file.** The architect is required to open it before
 > naming this smell in a report. Moving or renaming it breaks that link in
-> silence — repoint \`.claude/agents/architect-expert.md\` and the catalogue
+> silence — repoint the \`architect-expert\` agent and the catalogue
 > README in the same change.
 
 # Silent Catch
@@ -25354,7 +25349,7 @@ error means, or merely stopped it from propagating.
     suffix: "memory/architecture/smells/speculative-generality.md",
     content: `> **Agents depend on this file.** The architect is required to open it before
 > naming this smell in a report. Moving or renaming it breaks that link in
-> silence — repoint \`.claude/agents/architect-expert.md\` and the catalogue
+> silence — repoint the \`architect-expert\` agent and the catalogue
 > README in the same change.
 
 # Speculative Generality
@@ -25398,7 +25393,7 @@ a published API must stay stable for outside consumers.
     suffix: "memory/architecture/smells/switch-statements.md",
     content: `> **Agents depend on this file.** The architect is required to open it before
 > naming this smell in a report. Moving or renaming it breaks that link in
-> silence — repoint \`.claude/agents/architect-expert.md\` and the catalogue
+> silence — repoint the \`architect-expert\` agent and the catalogue
 > README in the same change.
 
 # Switch Statements
@@ -25442,7 +25437,7 @@ The smell is the *second* copy of it.
     suffix: "memory/architecture/smells/temporary-field.md",
     content: `> **Agents depend on this file.** The architect is required to open it before
 > naming this smell in a report. Moving or renaming it breaks that link in
-> silence — repoint \`.claude/agents/architect-expert.md\` and the catalogue
+> silence — repoint the \`architect-expert\` agent and the catalogue
 > README in the same change.
 
 # Temporary Field
