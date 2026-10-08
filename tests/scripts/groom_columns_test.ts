@@ -25,6 +25,8 @@ function scriptPath(rel: string): string {
 async function board(
   options: string[] | "unreadable",
   config = "",
+  /** Wrap `jq` so every line ends in CRLF, as its Windows build prints them. */
+  crlf = false,
 ): Promise<string> {
   const tmp = await Deno.makeTempDir({ prefix: "groom-columns-" });
   const scripts = `${tmp}/board/scripts/github`;
@@ -62,6 +64,16 @@ exit 1
 `,
   );
   await Deno.chmod(`${tmp}/bin/gh`, 0o755);
+  if (crlf) {
+    const real = new TextDecoder().decode(
+      (await new Deno.Command("bash", { args: ["-c", "command -v jq"] }).output()).stdout,
+    ).trim();
+    await Deno.writeTextFile(
+      `${tmp}/bin/jq`,
+      `#!/usr/bin/env bash\n"${real}" "$@" | sed 's/$/\\r/'\n`,
+    );
+    await Deno.chmod(`${tmp}/bin/jq`, 0o755);
+  }
   return tmp;
 }
 
@@ -144,4 +156,11 @@ Deno.test("a board that cannot be read is exit 13, never a guessed column", asyn
   const r = await run(await board("unreadable"));
   assertEquals(r.code, 13, r.out);
   assertEquals(r.out.includes("READY="), false, r.out);
+});
+
+Deno.test("a jq that ends lines in CRLF (its Windows build) still resolves the columns", async () => {
+  // CI's Windows runner read every option as "Ready\\r" and matched nothing.
+  const r = await run(await board(DEFAULTS, "", true));
+  assertEquals(r.code, 0, r.out + r.err);
+  assertStringIncludes(r.out, "READY=Ready\n");
 });

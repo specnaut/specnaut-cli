@@ -766,10 +766,14 @@ echo
 echo "═══ #258  PO Bash allowlist + memory-home directive ═══"
 check "PO agent has full Bash allowlist" \
   'grep -q "^tools: Read, Write, Edit, Grep, Glob, Bash$" .claude/agents/product-owner.md'
+# Harness-neutral since #656: the memory is named relative to the agent file,
+# which resolves on Claude Code and names nothing that is absent elsewhere.
 check "PO agent documents memory home path" \
-  'grep -q ".claude/agents/product-owner/memory/MEMORY.md" .claude/agents/product-owner.md'
+  'grep -q "product-owner/memory/MEMORY.md" .claude/agents/product-owner.md &&
+   [ -f .claude/agents/product-owner/memory/MEMORY.md ]'
 check "PO agent forbids legacy agent-memory path" \
-  'grep -q ".claude/agent-memory/" .claude/agents/product-owner.md && grep -qE "unused|never|not used" .claude/agents/product-owner.md'
+  'grep -qF "**Never** write to an" .claude/agents/product-owner.md &&
+   grep -qF "\`agent-memory/\` folder" .claude/agents/product-owner.md'
 
 echo
 echo "═══ #260  Auto-propagate parent Epic status (local backend scaffold) ═══"

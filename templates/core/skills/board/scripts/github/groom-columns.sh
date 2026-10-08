@@ -42,7 +42,9 @@ config_value() {
 board_options() {
   local json
   json="$(gh project field-list "$PROJECT_NUMBER" --owner "$REPO_OWNER" --format json 2>/dev/null)" || return 1
-  printf '%s' "$json" | jq -er '[.fields[] | select(.name=="Status")][0].options // empty | .[].name' 2>/dev/null
+  # `tr -d '\r'`: jq on Windows ends lines with CRLF, and a column read as
+  # "Ready\r" matches no name the user or the config gives.
+  printf '%s' "$json" | jq -er '[.fields[] | select(.name=="Status")][0].options // empty | .[].name' 2>/dev/null | tr -d '\r'
 }
 
 # The board's own spelling of <name>, matched case-insensitively; empty if absent.
