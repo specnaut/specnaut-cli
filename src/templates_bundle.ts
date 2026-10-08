@@ -2305,17 +2305,22 @@ by the agent that has the right tools and prompt for the job.
 
 ### 1. Backlog grooming
 
-Dispatch the **\`product-owner\`** subagent to clarify any items currently
-in the \`Backlog\` column (i.e. not yet promoted to \`Ready\`).
+Dispatch the **\`product-owner\`** subagent to groom the items in the board's
+intake column. **Grooming ends with a promotion** — the rule is in the PO's own
+\`/board groom\` contract; name it in the dispatch, do not restate it here.
+
+**Resolve the columns once per run** (GitHub: \`groom-columns.sh\`). Exit \`0\`
+prints \`INTAKE\` / \`READY\` (\`PROMOTE=no\`: the user chose not to promote — report
+it). Exit \`4\`: ask the user **once**, a selection from \`OPTIONS\` — an existing
+column, add the missing one to the Status field and re-run, or no promotion —
+and persist it: \`groom-columns.sh --set ready_column <column|none>\`. Exit \`13\`:
+board unread — promote nothing, report it. GitLab's \`Status::*\` labels come
+from \`ensure-labels.sh\`; the local backend has no columns.
 
 Epic and sub-task hygiene — orphaned children, parents due to close, sub-tasks
 that escaped a closed epic — is part of this dispatch and is specified in the
 \`product-owner\` agent's contract. Do not restate those rules here, and do not
 assume a run covered them unless the PO reports on them.
-
-The PO must respect the column model: items in \`Backlog\` need more
-information / sizing / prioritisation; items in \`Ready\` are picked up by
-development. The PO never auto-promotes from \`Ready\` to \`In progress\`.
 
 The PO will:
 
@@ -2365,13 +2370,14 @@ The PO will:
        on a field that exists never blocks: it emits a \`⚠ no target date set\`
        / \`⚠ no start date set\` line in the final report and the run moves on.
   4. **Decide the outcome:**
-     - **Promote to \`Ready\`** when the body is clear, both labels are
-       applied, AND no scope decisions remain.
+     - **Promote to the ready column** (\`move.sh <num> "\$READY"\`) when the
+       body is clear, both labels are applied, AND no scope decisions remain.
+       A failed move goes in the report with its reason.
      - **Leave a clarification comment** marked with the \`🤖 specnaut-groom\`
        prefix when 1–3 scope decisions still need the user's input. Steps 2
        and 3 are still mandatory — apply best-estimate labels from
-       available context; the item stays in \`Backlog\` until the
-       user replies.
+       available context; the item stays in the intake column
+       until the user replies.
      - **Recommend closure** if the item is genuinely stale or
        duplicates a closed ticket — leave a comment recommending
        \`not_planned\`. Steps 2 and 3 are still mandatory (apply labels
@@ -2419,16 +2425,11 @@ Use the bundled scripts at \`.specnaut/scripts/backlog/\`:
   which is the gate step 3a reads. Run **once per groom run**, not per
   ticket.
 
-  **This samples the board's capabilities once and assumes the tooling
-  does not change underneath the run.** Nothing can invalidate that sample.
-  \`groom-report.md\` says what it costs, and requires you to disclose it.
-- \`set-field.sh <issue> <Priority|Size> <value>\` — writes the field if
-  present. Exit \`0\` wrote it (do NOT also label); \`10\` no such field and
-  \`11\` no such option (only \`priority:P3\` today) — caller MUST apply the
-  matching label instead; \`12\` issue not on the project — caller MUST
-  report it under "⚠ size / priority missing", since neither path can
-  persist the value; \`13\` field discovery failed — **never** label (the
-  field may exist): retry, else report it the same way.
+  **That is a sample, taken once** — \`groom-report.md\` says what it costs and
+  requires you to disclose it.
+- \`set-field.sh <issue> <Priority|Size> <value>\` — writes the field; its exit
+  codes are in the PO's classification contract. \`12\` / \`13\` go under
+  "⚠ size / priority missing"; only \`10\` / \`11\` fall back to a label.
 
 **Label fallback** (exit \`10\` / \`11\` only) — \`gh label list\`, then
 \`gh label create "<name>" --color <hex> --description "<desc>"\` if absent,
@@ -2440,10 +2441,8 @@ re-groom). All \`--repo <owner>/<repo>\`. Suggested colors:
 
 ##### GitLab backend
 
-GitLab does not yet have a parallel \`set-field.sh\` helper; the PO
-applies scoped labels directly: \`glab label list\` / \`glab label create
--n <name> --color "#hex" --description "<desc>"\` / \`glab issue update
-<num> --label "size:M,priority:P2"\`.
+No \`set-field.sh\` helper: scoped labels via \`glab\`, per the PO's
+classification contract.
 
 ##### Local Markdown backend
 
@@ -2585,7 +2584,10 @@ Fields:     sampled once at the start of this run via detect-fields.sh
             (ALWAYS emitted — including when every field is present and nothing
              was skipped. Its absence would be the same silence it exists to remove.)
 
-Backlog:    <N> items reviewed, <P> promoted to Ready, <C> awaiting clarification
+Columns:    intake=<name>  ready=<name | none — grooming without promoting>
+            (from groom-columns.sh; "none" is the user's recorded choice)
+
+Backlog:    <N> items reviewed, <P> promoted to <ready>, <C> awaiting clarification
             <R> body rewrites, <S> sized, <Z> prioritised
 
 Per-ticket:
@@ -2594,6 +2596,11 @@ Per-ticket:
   ↳ <backlog-reference> → comment
        size=<X> (field) + priority=P3 (label fallback — no native option)
   ↳ ...
+
+⚠ promotion failed — groomed but still in <intake>:
+  ↳ <backlog-reference> — <move.sh's error, verbatim>
+  (omit when every promotion landed; never omitted when one did not — a
+   groomed item left in intake is exactly what grooming exists to prevent)
 
 ⚠ size / priority missing:
   ↳ <backlog-reference> — <reason: e.g. gh label create failed (rate-limited)>
@@ -7414,10 +7421,9 @@ for business context and backlog management.
 Run these in order, every time before answering:
 
 1. Locate yourself (\`git branch --show-current\` + \`git log --oneline -5\`) and read \`AGENTS.md\` + \`.specnaut/memory/constitution.md\` for context.
-2. Read \`product-owner/memory/MEMORY.md\` beside this agent file, when it
-   exists — your persistent memory home. Not every harness ships one; when it
-   is absent, go on without it. **Never** write to an \`agent-memory/\` folder;
-   that path is unused.
+2. Read \`product-owner/memory/MEMORY.md\` beside this file if it exists (not
+   every harness ships one) — your memory home. **Never** write to an
+   \`agent-memory/\` folder.
 3. Query the live backlog (\`gh issue list\` / \`list.sh\`) before answering
    "what's next?" — never infer from local files or memory alone.
 
@@ -7491,9 +7497,8 @@ mutating anything.
 ### Specnaut Cloud layout
 
 - Hosted board over \`/api/v1\` via the bundled \`*.sh\` wrappers. **Read
-  \`columns.sh\` first** (use the board's names, never the GitHub set); react to
-  moves by polling \`reconcile.sh\` → run the mapped stage hook per transition.
-  Full mechanics, mapping + rules: the \`/board\` skill ("Specnaut Cloud" +
+  \`columns.sh\` first** (the board's names, never the GitHub set); poll
+  \`reconcile.sh\` for moves. Mechanics: the \`/board\` skill ("Specnaut Cloud",
   "Stage reconcile"). Public API only.
 
 ## Frontmatter schema (local Markdown — mandatory)
@@ -7611,10 +7616,12 @@ Dashboard: counts, total points, velocity, open epics with ≥1 open child.
 
 ### \`/board groom\`
 
-Full grooming — review priorities, re-estimate, flag blockers, audit
-epic / sub-task hygiene (orphaned children, parents due to close,
-sub-tasks that escaped a closed epic). Items missing a hard axis get
-classified on the spot (the classification contract applies retroactively).
+Full grooming per the \`/board\` skill's \`groom.md\`: review priorities,
+re-estimate, flag blockers, audit epic / sub-task hygiene, classify on the spot.
+**It ends with a promotion**: a groomed item moves from the board's intake
+column to its ready column (default \`Backlog\` → \`Ready\`), so the next run skips
+it. Groomed but unmoved is the failure; only open scope decisions keep it in
+intake. Report failed moves. Never promote Ready → In progress.
 
 ### \`/board brief <id>\`
 
@@ -10480,8 +10487,8 @@ today.
 
 ## \`groom\`
 
-The grooming pass — Backlog-column clarification, board drift, stale PRs — is
-specified in **\`groom.md\`, beside this file**. Read and follow it. It is the
+The grooming pass — intake clarification ending in a promotion, board drift,
+stale PRs — is specified in **\`groom.md\`, beside this file**. Read and follow it. It is the
 only copy, and \`/board groom\` is its only entry point — the \`/specnaut\`
 router carries no \`groom\` verb. Do not restate any of it here, and do not
 answer a grooming request from memory.
@@ -10607,9 +10614,10 @@ project\` calls and read configuration from \`backlog-config.yml\`.
 .specnaut/scripts/backlog/add.sh "<title>" [body] [labels-csv]
 .specnaut/scripts/backlog/move.sh <number> <Status>   # sets Project Status field
 .specnaut/scripts/backlog/clarify-comment.sh <num> "<question>"
-.specnaut/scripts/backlog/detect-fields.sh                                 # discover native fields (Status/Priority/Size/dates) → env lines
-.specnaut/scripts/backlog/set-field.sh <num> <Priority|Size|IssueType> <value>  # set the native field / org Issue Type; exit codes under Conventions
-.specnaut/scripts/backlog/ensure-labels.sh                                 # idempotently bootstrap the 7 Specnaut semantic labels (security/refactor/docs/tech-debt/dx/performance/dependency)
+.specnaut/scripts/backlog/detect-fields.sh            # native fields → env lines
+.specnaut/scripts/backlog/groom-columns.sh [--set <key> <column|none>]  # columns grooming moves between
+.specnaut/scripts/backlog/set-field.sh <num> <Priority|Size|IssueType> <value>  # exit codes under Conventions
+.specnaut/scripts/backlog/ensure-labels.sh            # bootstrap the semantic labels (LABELS.md)
 \`\`\`
 
 For closing or editing, use \`gh\` directly:
@@ -12518,6 +12526,122 @@ gh api graphql -f query="\$M" >/dev/null
 
 echo "\$TARGETS" | jq -r --arg s "\$STATUS" '.[] | "✓ #\\(.number) → \\(\$s)"'
 echo "moved \$COUNT of \$# in 2 requests"
+`,
+    executable: true,
+    backend: "github",
+    skipIfExists: false,
+  },
+  {
+    category: "backlog-script",
+    name: "groom-columns",
+    suffix: "groom-columns.sh",
+    content: `#!/usr/bin/env bash
+# Resolve the two columns grooming moves an item between (#654).
+#
+# Grooming ends with a promotion: the item leaves the board's INTAKE column
+# for its READY column, so the next run can skip it by column alone. The
+# names are the board's, not Specnaut's — \`Backlog\` and \`Ready\` are only the
+# default — so they are read from the board once per run, and an answer the
+# user gave once is kept in \`.specnaut/backlog-config.yml\`:
+#
+#   intake_column: Backlog
+#   ready_column: Ready      # \`none\` = groom without promoting
+#
+# Usage:
+#   groom-columns.sh                       resolve; prints INTAKE= READY= PROMOTE= OPTIONS=
+#   groom-columns.sh --set <key> <value>   persist intake_column | ready_column
+#
+# Exit codes:
+#   0   resolved — or ready_column is \`none\` (PROMOTE=no)
+#   4   a column is not on the board: ask the user ONCE, then --set the answer
+#       (prints MISSING= and the board's OPTIONS= to build the question from)
+#   2   usage, or backlog-config.yml missing / incomplete
+#   13  the board could not be read — retry or report; never guess a column
+set -euo pipefail
+
+# shellcheck source=_config.sh
+source "\$(dirname "\$0")/_config.sh"
+require_project
+
+config_value() {
+  awk -v key="\$1" '
+    \$0 ~ "^"key":" {
+      sub("^"key":[[:space:]]*", "")
+      sub(/[[:space:]]+#.*\$/, "")
+      gsub(/^["'"'"']|["'"'"']\$/, "")
+      print
+      exit
+    }
+  ' "\$CONFIG"
+}
+
+# One read of the board's Status options, newline-separated.
+board_options() {
+  local json
+  json="\$(gh project field-list "\$PROJECT_NUMBER" --owner "\$REPO_OWNER" --format json 2>/dev/null)" || return 1
+  printf '%s' "\$json" | jq -er '[.fields[] | select(.name=="Status")][0].options // empty | .[].name' 2>/dev/null
+}
+
+# The board's own spelling of <name>, matched case-insensitively; empty if absent.
+on_board() {
+  local want lower
+  want="\$(printf '%s' "\$1" | tr '[:upper:]' '[:lower:]')"
+  while IFS= read -r opt; do
+    lower="\$(printf '%s' "\$opt" | tr '[:upper:]' '[:lower:]')"
+    if [ "\$lower" = "\$want" ]; then printf '%s' "\$opt"; return 0; fi
+  done <<< "\$OPTIONS"
+  return 1
+}
+
+if ! OPTIONS="\$(board_options)" || [ -z "\$OPTIONS" ]; then
+  echo "error: could not read the Status options of project #\$PROJECT_NUMBER — not checked; retry or report" >&2
+  exit 13
+fi
+
+if [ "\${1:-}" = "--set" ]; then
+  key="\${2:-}"; value="\${3:-}"
+  case "\$key" in intake_column | ready_column) ;; *)
+    echo "usage: groom-columns.sh --set <intake_column|ready_column> <column|none>" >&2; exit 2 ;;
+  esac
+  [ -n "\$value" ] || { echo "usage: groom-columns.sh --set \$key <column|none>" >&2; exit 2; }
+  if [ "\$key" = "ready_column" ] && [ "\$value" = "none" ]; then
+    :
+  elif name="\$(on_board "\$value")"; then
+    value="\$name"
+  else
+    echo "error: '\$value' is not a Status column of project #\$PROJECT_NUMBER" >&2
+    printf 'OPTIONS=%s\\n' "\$(printf '%s' "\$OPTIONS" | paste -sd '|' -)"
+    exit 4
+  fi
+  tmp="\$(mktemp)"
+  awk -v key="\$key" -v line="\$key: \\"\$value\\"" '
+    \$0 ~ "^"key":" { print line; done = 1; next } { print }
+    END { if (!done) print line }
+  ' "\$CONFIG" > "\$tmp" && mv "\$tmp" "\$CONFIG"
+  echo "✓ \$key: \$value"
+  exit 0
+fi
+
+intake_want="\$(config_value intake_column)"; intake_want="\${intake_want:-Backlog}"
+ready_want="\$(config_value ready_column)"; ready_want="\${ready_want:-Ready}"
+
+missing=""
+intake="\$(on_board "\$intake_want")" || missing="\$missing intake_column=\$intake_want"
+promote=yes
+if [ "\$ready_want" = "none" ]; then
+  ready=""; promote=no
+else
+  ready="\$(on_board "\$ready_want")" || missing="\$missing ready_column=\$ready_want"
+fi
+
+printf 'INTAKE=%s\\n' "\${intake:-}"
+printf 'READY=%s\\n' "\${ready:-}"
+printf 'PROMOTE=%s\\n' "\$promote"
+printf 'OPTIONS=%s\\n' "\$(printf '%s' "\$OPTIONS" | paste -sd '|' -)"
+if [ -n "\$missing" ]; then
+  printf 'MISSING=%s\\n' "\${missing# }"
+  exit 4
+fi
 `,
     executable: true,
     backend: "github",

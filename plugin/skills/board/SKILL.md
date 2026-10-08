@@ -45,8 +45,8 @@ today.
 
 ## `groom`
 
-The grooming pass — Backlog-column clarification, board drift, stale PRs — is
-specified in **`groom.md`, beside this file**. Read and follow it. It is the
+The grooming pass — intake clarification ending in a promotion, board drift,
+stale PRs — is specified in **`groom.md`, beside this file**. Read and follow it. It is the
 only copy, and `/board groom` is its only entry point — the `/specnaut`
 router carries no `groom` verb. Do not restate any of it here, and do not
 answer a grooming request from memory.
@@ -172,9 +172,10 @@ project` calls and read configuration from `backlog-config.yml`.
 .specnaut/scripts/backlog/add.sh "<title>" [body] [labels-csv]
 .specnaut/scripts/backlog/move.sh <number> <Status>   # sets Project Status field
 .specnaut/scripts/backlog/clarify-comment.sh <num> "<question>"
-.specnaut/scripts/backlog/detect-fields.sh                                 # discover native fields (Status/Priority/Size/dates) → env lines
-.specnaut/scripts/backlog/set-field.sh <num> <Priority|Size|IssueType> <value>  # set the native field / org Issue Type; exit codes under Conventions
-.specnaut/scripts/backlog/ensure-labels.sh                                 # idempotently bootstrap the 7 Specnaut semantic labels (security/refactor/docs/tech-debt/dx/performance/dependency)
+.specnaut/scripts/backlog/detect-fields.sh            # native fields → env lines
+.specnaut/scripts/backlog/groom-columns.sh [--set <key> <column|none>]  # columns grooming moves between
+.specnaut/scripts/backlog/set-field.sh <num> <Priority|Size|IssueType> <value>  # exit codes under Conventions
+.specnaut/scripts/backlog/ensure-labels.sh            # bootstrap the semantic labels (LABELS.md)
 ```
 
 For closing or editing, use `gh` directly:

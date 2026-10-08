@@ -77,6 +77,15 @@ check "SKILL.md documents set-field exit codes 10-13 and the preflight's 2" \
   '(for c in 10 11 12 13 2; do grep -q "\`$c\` = " .claude/skills/board/SKILL.md || exit 1; done)'
 
 echo
+echo "═══ #654  grooming ends with a promotion ═══"
+check "groom-columns.sh present + executable" \
+  '[ -x .specnaut/scripts/backlog/groom-columns.sh ]'
+check "groom.md resolves the columns before promoting (#654)" \
+  'grep -q "groom-columns.sh" .claude/skills/board/groom.md'
+check "the product-owner's own groom contract promotes (#654)" \
+  'grep -q "It ends with a promotion" .claude/agents/product-owner.md'
+
+echo
 # --- #561  a warning must be gated on the field existing --------------------
 # Date / Estimate are OPTIONAL Project V2 fields the user adds to their own
 # board. Instructing the PO to warn "no target date set" unconditionally

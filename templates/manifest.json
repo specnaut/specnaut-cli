@@ -535,6 +535,14 @@
     },
     {
       "category": "backlog-script",
+      "name": "groom-columns",
+      "suffix": "groom-columns.sh",
+      "source": "core/skills/board/scripts/github/groom-columns.sh",
+      "executable": true,
+      "backend": "github"
+    },
+    {
+      "category": "backlog-script",
       "name": "clarify-comment",
       "suffix": "clarify-comment.sh",
       "source": "core/skills/board/scripts/github/clarify-comment.sh",

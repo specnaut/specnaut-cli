@@ -19,17 +19,22 @@ by the agent that has the right tools and prompt for the job.
 
 ### 1. Backlog grooming
 
-Dispatch the **`product-owner`** subagent to clarify any items currently
-in the `Backlog` column (i.e. not yet promoted to `Ready`).
+Dispatch the **`product-owner`** subagent to groom the items in the board's
+intake column. **Grooming ends with a promotion** — the rule is in the PO's own
+`/board groom` contract; name it in the dispatch, do not restate it here.
+
+**Resolve the columns once per run** (GitHub: `groom-columns.sh`). Exit `0`
+prints `INTAKE` / `READY` (`PROMOTE=no`: the user chose not to promote — report
+it). Exit `4`: ask the user **once**, a selection from `OPTIONS` — an existing
+column, add the missing one to the Status field and re-run, or no promotion —
+and persist it: `groom-columns.sh --set ready_column <column|none>`. Exit `13`:
+board unread — promote nothing, report it. GitLab's `Status::*` labels come
+from `ensure-labels.sh`; the local backend has no columns.
 
 Epic and sub-task hygiene — orphaned children, parents due to close, sub-tasks
 that escaped a closed epic — is part of this dispatch and is specified in the
 `product-owner` agent's contract. Do not restate those rules here, and do not
 assume a run covered them unless the PO reports on them.
-
-The PO must respect the column model: items in `Backlog` need more
-information / sizing / prioritisation; items in `Ready` are picked up by
-development. The PO never auto-promotes from `Ready` to `In progress`.
 
 The PO will:
 
@@ -79,13 +84,14 @@ The PO will:
        on a field that exists never blocks: it emits a `⚠ no target date set`
        / `⚠ no start date set` line in the final report and the run moves on.
   4. **Decide the outcome:**
-     - **Promote to `Ready`** when the body is clear, both labels are
-       applied, AND no scope decisions remain.
+     - **Promote to the ready column** (`move.sh <num> "$READY"`) when the
+       body is clear, both labels are applied, AND no scope decisions remain.
+       A failed move goes in the report with its reason.
      - **Leave a clarification comment** marked with the `🤖 specnaut-groom`
        prefix when 1–3 scope decisions still need the user's input. Steps 2
        and 3 are still mandatory — apply best-estimate labels from
-       available context; the item stays in `Backlog` until the
-       user replies.
+       available context; the item stays in the intake column
+       until the user replies.
      - **Recommend closure** if the item is genuinely stale or
        duplicates a closed ticket — leave a comment recommending
        `not_planned`. Steps 2 and 3 are still mandatory (apply labels
@@ -133,16 +139,11 @@ Use the bundled scripts at `.specnaut/scripts/backlog/`:
   which is the gate step 3a reads. Run **once per groom run**, not per
   ticket.
 
-  **This samples the board's capabilities once and assumes the tooling
-  does not change underneath the run.** Nothing can invalidate that sample.
-  `groom-report.md` says what it costs, and requires you to disclose it.
-- `set-field.sh <issue> <Priority|Size> <value>` — writes the field if
-  present. Exit `0` wrote it (do NOT also label); `10` no such field and
-  `11` no such option (only `priority:P3` today) — caller MUST apply the
-  matching label instead; `12` issue not on the project — caller MUST
-  report it under "⚠ size / priority missing", since neither path can
-  persist the value; `13` field discovery failed — **never** label (the
-  field may exist): retry, else report it the same way.
+  **That is a sample, taken once** — `groom-report.md` says what it costs and
+  requires you to disclose it.
+- `set-field.sh <issue> <Priority|Size> <value>` — writes the field; its exit
+  codes are in the PO's classification contract. `12` / `13` go under
+  "⚠ size / priority missing"; only `10` / `11` fall back to a label.
 
 **Label fallback** (exit `10` / `11` only) — `gh label list`, then
 `gh label create "<name>" --color <hex> --description "<desc>"` if absent,
@@ -154,10 +155,8 @@ re-groom). All `--repo <owner>/<repo>`. Suggested colors:
 
 ##### GitLab backend
 
-GitLab does not yet have a parallel `set-field.sh` helper; the PO
-applies scoped labels directly: `glab label list` / `glab label create
--n <name> --color "#hex" --description "<desc>"` / `glab issue update
-<num> --label "size:M,priority:P2"`.
+No `set-field.sh` helper: scoped labels via `glab`, per the PO's
+classification contract.
 
 ##### Local Markdown backend
 

@@ -62,7 +62,10 @@ Fields:     sampled once at the start of this run via detect-fields.sh
             (ALWAYS emitted — including when every field is present and nothing
              was skipped. Its absence would be the same silence it exists to remove.)
 
-Backlog:    <N> items reviewed, <P> promoted to Ready, <C> awaiting clarification
+Columns:    intake=<name>  ready=<name | none — grooming without promoting>
+            (from groom-columns.sh; "none" is the user's recorded choice)
+
+Backlog:    <N> items reviewed, <P> promoted to <ready>, <C> awaiting clarification
             <R> body rewrites, <S> sized, <Z> prioritised
 
 Per-ticket:
@@ -71,6 +74,11 @@ Per-ticket:
   ↳ <backlog-reference> → comment
        size=<X> (field) + priority=P3 (label fallback — no native option)
   ↳ ...
+
+⚠ promotion failed — groomed but still in <intake>:
+  ↳ <backlog-reference> — <move.sh's error, verbatim>
+  (omit when every promotion landed; never omitted when one did not — a
+   groomed item left in intake is exactly what grooming exists to prevent)
 
 ⚠ size / priority missing:
   ↳ <backlog-reference> — <reason: e.g. gh label create failed (rate-limited)>

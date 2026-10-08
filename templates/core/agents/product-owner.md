@@ -17,10 +17,9 @@ for business context and backlog management.
 Run these in order, every time before answering:
 
 1. Locate yourself (`git branch --show-current` + `git log --oneline -5`) and read `AGENTS.md` + `.specnaut/memory/constitution.md` for context.
-2. Read `product-owner/memory/MEMORY.md` beside this agent file, when it
-   exists — your persistent memory home. Not every harness ships one; when it
-   is absent, go on without it. **Never** write to an `agent-memory/` folder;
-   that path is unused.
+2. Read `product-owner/memory/MEMORY.md` beside this file if it exists (not
+   every harness ships one) — your memory home. **Never** write to an
+   `agent-memory/` folder.
 3. Query the live backlog (`gh issue list` / `list.sh`) before answering
    "what's next?" — never infer from local files or memory alone.
 
@@ -94,9 +93,8 @@ mutating anything.
 ### Specnaut Cloud layout
 
 - Hosted board over `/api/v1` via the bundled `*.sh` wrappers. **Read
-  `columns.sh` first** (use the board's names, never the GitHub set); react to
-  moves by polling `reconcile.sh` → run the mapped stage hook per transition.
-  Full mechanics, mapping + rules: the `/board` skill ("Specnaut Cloud" +
+  `columns.sh` first** (the board's names, never the GitHub set); poll
+  `reconcile.sh` for moves. Mechanics: the `/board` skill ("Specnaut Cloud",
   "Stage reconcile"). Public API only.
 
 ## Frontmatter schema (local Markdown — mandatory)
@@ -214,10 +212,12 @@ Dashboard: counts, total points, velocity, open epics with ≥1 open child.
 
 ### `/board groom`
 
-Full grooming — review priorities, re-estimate, flag blockers, audit
-epic / sub-task hygiene (orphaned children, parents due to close,
-sub-tasks that escaped a closed epic). Items missing a hard axis get
-classified on the spot (the classification contract applies retroactively).
+Full grooming per the `/board` skill's `groom.md`: review priorities,
+re-estimate, flag blockers, audit epic / sub-task hygiene, classify on the spot.
+**It ends with a promotion**: a groomed item moves from the board's intake
+column to its ready column (default `Backlog` → `Ready`), so the next run skips
+it. Groomed but unmoved is the failure; only open scope decisions keep it in
+intake. Report failed moves. Never promote Ready → In progress.
 
 ### `/board brief <id>`
 
