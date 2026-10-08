@@ -2368,10 +2368,10 @@ The PO will:
      - **Promote to \`Ready\`** when the body is clear, both labels are
        applied, AND no scope decisions remain.
      - **Leave a clarification comment** marked with the \`🤖 specnaut-groom\`
-       prefix when 1–3 scope decisions still need Kevin's input. Steps 2
+       prefix when 1–3 scope decisions still need the user's input. Steps 2
        and 3 are still mandatory — apply best-estimate labels from
-       available context; the item stays in \`Backlog\` until Kevin
-       replies.
+       available context; the item stays in \`Backlog\` until the
+       user replies.
      - **Recommend closure** if the item is genuinely stale or
        duplicates a closed ticket — leave a comment recommending
        \`not_planned\`. Steps 2 and 3 are still mandatory (apply labels
@@ -5579,7 +5579,7 @@ context.
 | "This doesn't need a formal skill" | If a skill exists, use it. |
 | "I remember this skill" | Skills evolve. Read the current version. |
 | "The skill is overkill" | Simple things become complex. Use it. |
-| "Kevin asked me to do X, just go" | Kevin's order is honored; the skill tells you HOW to honor it. |
+| "The user asked me to do X, just go" | The user's order is honored; the skill tells you HOW to honor it. |
 
 ## When NOT to invoke any Specnaut skill
 
@@ -7182,7 +7182,7 @@ For each alert, decide ONE of three actions:
    will close it on merge.
 2. **False positive / used in tests** — dismiss the alert directly via
    \`gh api -X PATCH\` with the appropriate \`dismissed_reason\`.
-3. **Escalate** — if the alert needs Kevin's judgement (e.g. unclear
+3. **Escalate** — if the alert needs the user's judgement (e.g. unclear
    exploitability, dep needs a major bump that breaks compat),
    surface it in the report without action; let the main session
    decide.
@@ -10232,7 +10232,7 @@ across sessions and isn't captured elsewhere:
 
 - Recurring backlog conventions specific to this project (label taxonomy,
   body shape preferences, escalation patterns).
-- Stakeholder preferences ("Kevin always wants AC bullets to start with
+- Stakeholder preferences ("The project owner always wants AC bullets to start with
   testable verbs").
 - Incidents and their resolutions ("when \`gh\` returns 404 on a project
   command, refresh the auth token with \`gh auth refresh -s project\`").

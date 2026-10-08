@@ -16,7 +16,7 @@ across sessions and isn't captured elsewhere:
 
 - Recurring backlog conventions specific to this project (label taxonomy,
   body shape preferences, escalation patterns).
-- Stakeholder preferences ("Kevin always wants AC bullets to start with
+- Stakeholder preferences ("The project owner always wants AC bullets to start with
   testable verbs").
 - Incidents and their resolutions ("when `gh` returns 404 on a project
   command, refresh the auth token with `gh auth refresh -s project`").

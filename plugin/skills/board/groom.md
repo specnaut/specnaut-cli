@@ -82,10 +82,10 @@ The PO will:
      - **Promote to `Ready`** when the body is clear, both labels are
        applied, AND no scope decisions remain.
      - **Leave a clarification comment** marked with the `🤖 specnaut-groom`
-       prefix when 1–3 scope decisions still need Kevin's input. Steps 2
+       prefix when 1–3 scope decisions still need the user's input. Steps 2
        and 3 are still mandatory — apply best-estimate labels from
-       available context; the item stays in `Backlog` until Kevin
-       replies.
+       available context; the item stays in `Backlog` until the
+       user replies.
      - **Recommend closure** if the item is genuinely stale or
        duplicates a closed ticket — leave a comment recommending
        `not_planned`. Steps 2 and 3 are still mandatory (apply labels

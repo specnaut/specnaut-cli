@@ -143,7 +143,7 @@ context.
 | "This doesn't need a formal skill" | If a skill exists, use it. |
 | "I remember this skill" | Skills evolve. Read the current version. |
 | "The skill is overkill" | Simple things become complex. Use it. |
-| "Kevin asked me to do X, just go" | Kevin's order is honored; the skill tells you HOW to honor it. |
+| "The user asked me to do X, just go" | The user's order is honored; the skill tells you HOW to honor it. |
 
 ## When NOT to invoke any Specnaut skill
 

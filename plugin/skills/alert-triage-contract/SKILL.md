@@ -33,7 +33,7 @@ For each alert, decide ONE of three actions:
    will close it on merge.
 2. **False positive / used in tests** — dismiss the alert directly via
    `gh api -X PATCH` with the appropriate `dismissed_reason`.
-3. **Escalate** — if the alert needs Kevin's judgement (e.g. unclear
+3. **Escalate** — if the alert needs the user's judgement (e.g. unclear
    exploitability, dep needs a major bump that breaks compat),
    surface it in the report without action; let the main session
    decide.
