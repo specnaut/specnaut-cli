@@ -8,7 +8,7 @@ description: >
   or any question about the tool. Do NOT trigger on plain command
   invocations (`specnaut init`, `specnaut upgrade`, `/specnaut plan`,
   `/board ...`) — those are command runs, not questions.
-model: opus
+model: haiku
 effort: high
 tools: Read, WebFetch, Grep, Glob, Bash, Agent(developer)
 permissionMode: default
@@ -172,11 +172,11 @@ API failure fallback: use vendored snapshot for high-level guidance; warn "Could
 
 ### 3. Present plan
 
-Show: versions in range, adoption prompt count + titles, `specnaut reconcile --status` pending list, offer branch `specnaut-upgrade-v{to}` [Y/n].
+Show: one row per tag in `(from, to]` — release body fetched or not, adoption entries parsed — then the prompt titles, `specnaut reconcile --status` pending list, offer branch `specnaut-upgrade-v{to}` [Y/n]. A missed fetch or a zero parse is visible here, before the walk starts.
 
 ### 4. Branch (optional)
 
-If Y: run `git status --porcelain`. If upgrade-related changes present → `git checkout -b specnaut-upgrade-v{to} && git add -A && git commit -m "chore: specnaut upgrade v{from} → v{to}"`. If clean, continue on current branch. If unrelated changes, refuse and ask user to stash/commit first. If n, continue on current branch.
+If Y: run `git status --porcelain` and show its output — the user, not you, confirms which changes are upgrade-related. If confirmed → `git checkout -b specnaut-upgrade-v{to} && git add -A && git commit -m "chore: specnaut upgrade v{from} → v{to}"`. If clean, continue on current branch. If unrelated changes, refuse and ask user to stash/commit first. If n, continue on current branch.
 
 ### 5. Walk adoption prompts
 

@@ -6,13 +6,13 @@ import type { CoreEntry } from "../../src/domain/core_bundle.ts";
  * Locks the per-agent `model` + `effort` tuning rubric.
  *
  * Every bundled agent must carry exactly one `effort:` ∈ {low, medium, high,
- * xhigh}, no Sonnet-pinned agent may carry `xhigh` (the model-compatibility
- * invariant — `xhigh` is Opus-only), every bundled agent is pinned to Opus,
- * and each agent's value must match the authoritative assignment below.
+ * xhigh}, and each agent's `effort:` and `model:` must match the
+ * authoritative assignments below — so moving a seat to another tier is an
+ * edit to this file, made on purpose, never a drive-by.
  *
  * The authority is `templates/core/agents/README.md`, not the frozen
  * `016-agent-effort-rubric` spec contract: spec dirs record a decision as it
- * was taken, and this rubric has since been retuned (all-Opus, `high` floor).
+ * was taken, and this rubric has since been retuned (`high` floor, one Haiku seat).
  */
 
 const VALID_EFFORTS = ["low", "medium", "high", "xhigh"] as const;
@@ -77,22 +77,6 @@ for (const entry of agentEntries()) {
   });
 }
 
-// SC-002: no Sonnet-pinned agent carries `xhigh` (xhigh is Opus-only).
-for (const entry of agentEntries()) {
-  Deno.test(`agent "${entry.name}" respects xhigh⇒Opus`, () => {
-    const fm = frontmatter(entry.content);
-    const effort = scalarField(fm, "effort");
-    const model = scalarField(fm, "model");
-    if (effort === "xhigh") {
-      assertEquals(
-        model,
-        "opus",
-        `agent "${entry.name}" has effort: xhigh but model: ${model} — xhigh is Opus-only`,
-      );
-    }
-  });
-}
-
 // The bundled value matches the authoritative README.md assignment.
 for (const [name, expected] of Object.entries(EFFORT_MAP)) {
   Deno.test(`agent "${name}" effort matches the README rubric (${expected})`, () => {
@@ -112,20 +96,47 @@ Deno.test("the effort rubric covers exactly the bundled agent fleet", () => {
   assertEquals(bundled, mapped);
 });
 
-// Every bundled agent is pinned to Opus. This is what makes `xhigh` available
-// fleet-wide, and it is the invariant a future "pin this one to Sonnet to save
-// tokens" change must trip over — an under-provisioned review lens fails by
-// returning fewer findings, which is indistinguishable from clean code.
-for (const entry of agentEntries()) {
-  Deno.test(`agent "${entry.name}" is pinned to Opus`, () => {
-    const model = scalarField(frontmatter(entry.content), "model");
-    assertEquals(
-      model,
-      "opus",
-      `agent "${entry.name}" is model: ${model} — every bundled agent must be Opus`,
-    );
+/**
+ * Authoritative agent → `model:` assignment, mirroring the model table in
+ * `templates/core/agents/README.md`: 14 opus · 1 haiku = 15.
+ *
+ * The rule is "who checks the output?". A seat goes to `haiku` only when the
+ * person who asked reads its whole output and nothing downstream treats it as
+ * complete. A review lens moved here to save tokens fails by returning fewer
+ * findings, which is indistinguishable from clean code — this map is what such
+ * a change has to edit, in the open.
+ */
+const MODEL_MAP: Record<string, "opus" | "haiku"> = {
+  "review-coordinator": "opus",
+  "workflow-manager": "opus",
+  "accessibility-expert": "opus",
+  "dependency-expert": "opus",
+  "performance-expert": "opus",
+  "code-reviewer": "opus",
+  "test-reviewer": "opus",
+  "specnaut-guide": "haiku",
+  "product-owner": "opus",
+  "ui-ux-designer": "opus",
+  "architect-expert": "opus",
+  "security-expert": "opus",
+  "developer": "opus",
+  "qa-tester": "opus",
+  "devops-sre": "opus",
+};
+
+for (const [name, expected] of Object.entries(MODEL_MAP)) {
+  Deno.test(`agent "${name}" model matches the README rubric (${expected})`, () => {
+    const entry = agentEntries().find((e) => e.name === name);
+    assert(entry, `agent "${name}" missing from CORE_BUNDLE`);
+    const value = scalarField(frontmatter(entry.content), "model");
+    assertEquals(value, expected, `agent "${name}" model drifted from the contract`);
   });
 }
+
+Deno.test("the model rubric covers exactly the bundled agent fleet", () => {
+  const bundled = agentEntries().map((e) => e.name).sort();
+  assertEquals(Object.keys(MODEL_MAP).sort(), bundled);
+});
 
 /**
  * Authoritative agent → `maxTurns` assignment.

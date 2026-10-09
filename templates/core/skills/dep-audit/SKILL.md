@@ -53,7 +53,7 @@ Dispatch the **single** `dependency-expert` agent — never a team, never
 another axis. Give it the resolved file list and an **audit framing**: judge
 the dependency hygiene of the scoped manifests (outdated pins, unbounded
 ranges, unused declared deps, license violations, advisory-shape signals,
-peer-dep conflicts, typosquatting heuristics) — not a per-line review.
+peer-dep conflicts, typosquatting heuristics) — not a per-line review. Do not pass a `model:` override — a lens runs on the tier its agent file declares.
 
 Include its Step 0 in the dispatch prompt, verbatim: read
 `.specnaut/memory/security/06-supply-chain-and-integrity.md`

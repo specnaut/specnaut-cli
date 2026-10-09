@@ -53,7 +53,7 @@ Dispatch the **single** `security-expert` agent — never a team, never
 another axis. Give it the resolved file list and an **audit framing**: judge
 the security shape of the scoped code (input validation, authz, secrets,
 injection, SSRF, path traversal, silent error swallowing) — not a per-line
-review.
+review. Do not pass a `model:` override — a lens runs on the tier its agent file declares.
 
 **Name the knowledge base in the dispatch prompt.** The agent is required
 to read `.specnaut/memory/security/00-triage.md` plus the domain files its

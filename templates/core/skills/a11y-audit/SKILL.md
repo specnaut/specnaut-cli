@@ -53,7 +53,7 @@ Dispatch the **single** `accessibility-expert` agent — never a team, never ano
 axis. Give it the resolved file list and an **audit framing**: judge the
 accessibility shape of the scoped front-end source (semantic HTML, heading
 hierarchy, alt text, form labels, keyboard nav, focus indicators, ARIA
-correctness, color contrast where computable) — not a per-line review.
+correctness, color contrast where computable) — not a per-line review. Do not pass a `model:` override — a lens runs on the tier its agent file declares.
 
 Include its Step 0 in the dispatch prompt, verbatim: read
 `.specnaut/memory/a11y/00-triage.md` first — it sets Level A/AA scope, the

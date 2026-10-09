@@ -53,7 +53,7 @@ Dispatch the **single** `performance-expert` agent — never a team, never
 another axis. Give it the resolved file list and an **audit framing**: judge
 the performance shape of the scoped code (N+1 queries, blocking I/O on hot
 paths, missing indexes, cache misuse, hot-path allocation, sync-in-async,
-large bundles, render-thrash) — not a per-line review.
+large bundles, render-thrash) — not a per-line review. Do not pass a `model:` override — a lens runs on the tier its agent file declares.
 
 ## Step 4 — Return findings inline
 

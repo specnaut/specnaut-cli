@@ -71,7 +71,7 @@ seats.
 **Dispatch every selected seat in a SINGLE message — one `Agent` call per seat,
 never one after another.** Issuing them sequentially defeats the entire point of
 the skill: the seats are independent and must run concurrently. Put all the
-`Agent` tool calls in the same assistant turn so they execute in parallel.
+`Agent` tool calls in the same assistant turn so they execute in parallel. Do not pass a `model:` override — each seat runs on the tier its agent file declares.
 
 Give each seat the **same scope context** (the `SCOPE_LABEL`, the commit list,
 and the file list from Step 1) and an **audit framing**: judge the shape of the

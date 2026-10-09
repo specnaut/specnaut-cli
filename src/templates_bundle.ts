@@ -5205,7 +5205,8 @@ HEAD is the current task's commit. For a whole feature, BASE is
 prompt template (see below). Use the \`Task\` tool with
 \`subagent_type: code-reviewer\` — on Codex,
 \`spawn_agent(agent_type="code-reviewer", ...)\` — and pass the four placeholders:
-\`{DESCRIPTION}\`, \`{PLAN_OR_REQUIREMENTS}\`, \`{BASE_SHA}\`, \`{HEAD_SHA}\`.
+\`{DESCRIPTION}\`, \`{PLAN_OR_REQUIREMENTS}\`, \`{BASE_SHA}\`, \`{HEAD_SHA}\`. Do not pass a \`model:\` override — a reviewer runs on the
+tier its agent file declares.
 
 **Step 3: Act on the feedback.**
 
@@ -5849,7 +5850,11 @@ Use the least capable model that can handle each role:
   matching, judgment): standard model.
 - **Architecture / design / review**: most capable model.
 
-Pass \`model: "haiku"\` for fast cheap dispatches, default otherwise.
+Pass \`model: "haiku"\` only when someone checks the output in full: a
+mechanical implementer task qualifies, because you and both reviewers check
+it. The spec-compliance and code-quality reviewer dispatches never take it —
+a reviewer that misses something returns a clean report, and nothing
+downstream re-reads what it cleared.
 
 ## Red flags
 
@@ -8630,7 +8635,7 @@ description: >
   or any question about the tool. Do NOT trigger on plain command
   invocations (\`specnaut init\`, \`specnaut upgrade\`, \`/specnaut plan\`,
   \`/board ...\`) — those are command runs, not questions.
-model: opus
+model: haiku
 effort: high
 tools: Read, WebFetch, Grep, Glob, Bash, Agent(developer)
 permissionMode: default
@@ -8794,11 +8799,11 @@ API failure fallback: use vendored snapshot for high-level guidance; warn "Could
 
 ### 3. Present plan
 
-Show: versions in range, adoption prompt count + titles, \`specnaut reconcile --status\` pending list, offer branch \`specnaut-upgrade-v{to}\` [Y/n].
+Show: one row per tag in \`(from, to]\` — release body fetched or not, adoption entries parsed — then the prompt titles, \`specnaut reconcile --status\` pending list, offer branch \`specnaut-upgrade-v{to}\` [Y/n]. A missed fetch or a zero parse is visible here, before the walk starts.
 
 ### 4. Branch (optional)
 
-If Y: run \`git status --porcelain\`. If upgrade-related changes present → \`git checkout -b specnaut-upgrade-v{to} && git add -A && git commit -m "chore: specnaut upgrade v{from} → v{to}"\`. If clean, continue on current branch. If unrelated changes, refuse and ask user to stash/commit first. If n, continue on current branch.
+If Y: run \`git status --porcelain\` and show its output — the user, not you, confirms which changes are upgrade-related. If confirmed → \`git checkout -b specnaut-upgrade-v{to} && git add -A && git commit -m "chore: specnaut upgrade v{from} → v{to}"\`. If clean, continue on current branch. If unrelated changes, refuse and ask user to stash/commit first. If n, continue on current branch.
 
 ### 5. Walk adoption prompts
 
@@ -10100,16 +10105,40 @@ reviewing your code, so it carries neither a lens suffix nor a role noun. It
 is **not** an \`-expert\`: giving it that suffix would imply an
 \`/specnaut audit specnaut\` phase that does not and should not exist.
 
-## Effort — the reasoning budget
+## Model and effort — two budgets
 
 Every bundled agent declares \`model:\` and \`effort:\` in its frontmatter.
-\`effort\` is a reasoning-budget hint the harness reads on dispatch: a higher
-tier thinks harder and costs more.
+\`model\` picks the capability tier; \`effort\` is a reasoning-budget hint the
+harness reads on dispatch: a higher tier thinks harder and costs more.
 
-**Every bundled agent is \`model: opus\`.** Opus is the capable default, and a
-fleet that mixes tiers mostly produces a fleet where the cheap agents are the
-ones that miss things — the failure is silent, arrives as a clean report, and
-costs more to discover later than the tokens it saved.
+### Model — who checks the output?
+
+**Opus is the default, and fourteen of the fifteen seats keep it.** A fleet
+that mixes tiers mostly produces a fleet where the cheap agents are the ones
+that miss things — the failure is silent, arrives as a clean report, and costs
+more to discover later than the tokens it saved.
+
+\`haiku\` is right for a seat when **the person who asked reads its whole output
+and is the check on it, and no downstream gate treats that output as
+complete.** It is wrong for any seat whose "nothing found" is trusted as
+"nothing there", and for any seat whose work is only sampled afterwards.
+
+The rule is about **whether a miss is visible**, not about how capable the
+model is. A stronger \`haiku\` makes a miss rarer, not easier to see, so a new
+release never widens the list on its own — re-run the test on the seat.
+
+| Model | Agents | Why |
+| ----- | ------ | --- |
+| \`haiku\` | \`specnaut-guide\` | Reads docs and explains; the user reads the whole answer. Its upgrade walk shows each fetched release and the files it commits before acting, and hands adoption and merges to \`developer\`. |
+| \`opus\` | \`code-reviewer\`, \`test-reviewer\`, \`accessibility-expert\`, \`performance-expert\`, \`dependency-expert\`, \`security-expert\`, \`architect-expert\` | Review lenses — nobody re-reads what they cleared. |
+| \`opus\` | \`review-coordinator\`, \`workflow-manager\` | Orchestrators — a dropped finding or a skipped step leaves no trace downstream. |
+| \`opus\` | \`product-owner\` | Grooming is judgement; its mechanical board moves share the seat. |
+| \`opus\` | \`developer\`, \`devops-sre\`, \`ui-ux-designer\`, \`qa-tester\` | Builders and the QA gate — review samples their work, it does not re-derive it. |
+
+The same test applies per dispatch: a skill may pass \`model: "haiku"\` for a
+mechanical subtask the caller will check, never for a review lens.
+
+### Effort — the reasoning budget
 
 | Tier | Role class | Agents |
 | ---- | ---------- | ------ |
@@ -10118,6 +10147,10 @@ costs more to discover later than the tokens it saved.
 
 Tally: 13 \`high\` · 2 \`xhigh\` = 15 agents. \`low\` and \`medium\` remain valid
 values for a project's own agents; **no bundled agent uses them.**
+
+Effort is independent of the model tier: a \`haiku\` seat takes the same
+\`effort:\` scale, and \`specnaut-guide\` keeps \`high\` — its upgrade walk is a
+multi-step procedure, and the tier change already pays for the saving.
 
 ### Why \`high\` is the floor
 
@@ -10209,9 +10242,8 @@ content survives, the dispatch boundary does not. Neither axis applies.
 Pick the suffix from the naming table, then the tier from the effort table.
 Default to \`high\`. Reach for \`xhigh\` only when the agent's output is the last
 line of defence — when nothing downstream would catch it thinking too little.
-Doing hard work is not the test; being unchecked is. \`xhigh\` requires \`model: opus\` — a Sonnet-pinned
-agent declaring it is rejected by the harness on dispatch, which is why the
-all-Opus rule above makes the tier universally available.
+Doing hard work is not the test; being unchecked is. Then pick the model
+with the question above — who checks the output? — and default to \`opus\`.
 `,
     executable: false,
     backend: null,
@@ -15052,7 +15084,7 @@ seats.
 **Dispatch every selected seat in a SINGLE message — one \`Agent\` call per seat,
 never one after another.** Issuing them sequentially defeats the entire point of
 the skill: the seats are independent and must run concurrently. Put all the
-\`Agent\` tool calls in the same assistant turn so they execute in parallel.
+\`Agent\` tool calls in the same assistant turn so they execute in parallel. Do not pass a \`model:\` override — each seat runs on the tier its agent file declares.
 
 Give each seat the **same scope context** (the \`SCOPE_LABEL\`, the commit list,
 and the file list from Step 1) and an **audit framing**: judge the shape of the
@@ -15428,7 +15460,7 @@ Dispatch the **single** \`architect-expert\` agent — never a team, never
 another axis. Give it the resolved file list and an **audit framing**: judge
 the architectural shape of the scoped code (hex-layer violations, circular
 deps, god files, bounded-context leaks, ports/adapters discipline, SOLID/DRY)
-— not a per-line review.
+— not a per-line review. Do not pass a \`model:\` override — a lens runs on the tier its agent file declares.
 
 ## Step 4 — Return findings inline
 
@@ -15512,7 +15544,7 @@ Dispatch the **single** \`security-expert\` agent — never a team, never
 another axis. Give it the resolved file list and an **audit framing**: judge
 the security shape of the scoped code (input validation, authz, secrets,
 injection, SSRF, path traversal, silent error swallowing) — not a per-line
-review.
+review. Do not pass a \`model:\` override — a lens runs on the tier its agent file declares.
 
 **Name the knowledge base in the dispatch prompt.** The agent is required
 to read \`.specnaut/memory/security/00-triage.md\` plus the domain files its
@@ -15611,7 +15643,7 @@ Dispatch the **single** \`performance-expert\` agent — never a team, never
 another axis. Give it the resolved file list and an **audit framing**: judge
 the performance shape of the scoped code (N+1 queries, blocking I/O on hot
 paths, missing indexes, cache misuse, hot-path allocation, sync-in-async,
-large bundles, render-thrash) — not a per-line review.
+large bundles, render-thrash) — not a per-line review. Do not pass a \`model:\` override — a lens runs on the tier its agent file declares.
 
 ## Step 4 — Return findings inline
 
@@ -15695,7 +15727,7 @@ Dispatch the **single** \`dependency-expert\` agent — never a team, never
 another axis. Give it the resolved file list and an **audit framing**: judge
 the dependency hygiene of the scoped manifests (outdated pins, unbounded
 ranges, unused declared deps, license violations, advisory-shape signals,
-peer-dep conflicts, typosquatting heuristics) — not a per-line review.
+peer-dep conflicts, typosquatting heuristics) — not a per-line review. Do not pass a \`model:\` override — a lens runs on the tier its agent file declares.
 
 Include its Step 0 in the dispatch prompt, verbatim: read
 \`.specnaut/memory/security/06-supply-chain-and-integrity.md\`
@@ -15788,7 +15820,7 @@ Dispatch the **single** \`accessibility-expert\` agent — never a team, never a
 axis. Give it the resolved file list and an **audit framing**: judge the
 accessibility shape of the scoped front-end source (semantic HTML, heading
 hierarchy, alt text, form labels, keyboard nav, focus indicators, ARIA
-correctness, color contrast where computable) — not a per-line review.
+correctness, color contrast where computable) — not a per-line review. Do not pass a \`model:\` override — a lens runs on the tier its agent file declares.
 
 Include its Step 0 in the dispatch prompt, verbatim: read
 \`.specnaut/memory/a11y/00-triage.md\` first — it sets Level A/AA scope, the

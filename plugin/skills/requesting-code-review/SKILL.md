@@ -63,7 +63,8 @@ HEAD is the current task's commit. For a whole feature, BASE is
 prompt template (see below). Use the `Task` tool with
 `subagent_type: code-reviewer` — on Codex,
 `spawn_agent(agent_type="code-reviewer", ...)` — and pass the four placeholders:
-`{DESCRIPTION}`, `{PLAN_OR_REQUIREMENTS}`, `{BASE_SHA}`, `{HEAD_SHA}`.
+`{DESCRIPTION}`, `{PLAN_OR_REQUIREMENTS}`, `{BASE_SHA}`, `{HEAD_SHA}`. Do not pass a `model:` override — a reviewer runs on the
+tier its agent file declares.
 
 **Step 3: Act on the feedback.**
 

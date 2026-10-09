@@ -53,7 +53,7 @@ Dispatch the **single** `architect-expert` agent — never a team, never
 another axis. Give it the resolved file list and an **audit framing**: judge
 the architectural shape of the scoped code (hex-layer violations, circular
 deps, god files, bounded-context leaks, ports/adapters discipline, SOLID/DRY)
-— not a per-line review.
+— not a per-line review. Do not pass a `model:` override — a lens runs on the tier its agent file declares.
 
 ## Step 4 — Return findings inline
 

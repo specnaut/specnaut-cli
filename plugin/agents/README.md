@@ -38,16 +38,40 @@ reviewing your code, so it carries neither a lens suffix nor a role noun. It
 is **not** an `-expert`: giving it that suffix would imply an
 `/specnaut audit specnaut` phase that does not and should not exist.
 
-## Effort — the reasoning budget
+## Model and effort — two budgets
 
 Every bundled agent declares `model:` and `effort:` in its frontmatter.
-`effort` is a reasoning-budget hint the harness reads on dispatch: a higher
-tier thinks harder and costs more.
+`model` picks the capability tier; `effort` is a reasoning-budget hint the
+harness reads on dispatch: a higher tier thinks harder and costs more.
 
-**Every bundled agent is `model: opus`.** Opus is the capable default, and a
-fleet that mixes tiers mostly produces a fleet where the cheap agents are the
-ones that miss things — the failure is silent, arrives as a clean report, and
-costs more to discover later than the tokens it saved.
+### Model — who checks the output?
+
+**Opus is the default, and fourteen of the fifteen seats keep it.** A fleet
+that mixes tiers mostly produces a fleet where the cheap agents are the ones
+that miss things — the failure is silent, arrives as a clean report, and costs
+more to discover later than the tokens it saved.
+
+`haiku` is right for a seat when **the person who asked reads its whole output
+and is the check on it, and no downstream gate treats that output as
+complete.** It is wrong for any seat whose "nothing found" is trusted as
+"nothing there", and for any seat whose work is only sampled afterwards.
+
+The rule is about **whether a miss is visible**, not about how capable the
+model is. A stronger `haiku` makes a miss rarer, not easier to see, so a new
+release never widens the list on its own — re-run the test on the seat.
+
+| Model | Agents | Why |
+| ----- | ------ | --- |
+| `haiku` | `specnaut-guide` | Reads docs and explains; the user reads the whole answer. Its upgrade walk shows each fetched release and the files it commits before acting, and hands adoption and merges to `developer`. |
+| `opus` | `code-reviewer`, `test-reviewer`, `accessibility-expert`, `performance-expert`, `dependency-expert`, `security-expert`, `architect-expert` | Review lenses — nobody re-reads what they cleared. |
+| `opus` | `review-coordinator`, `workflow-manager` | Orchestrators — a dropped finding or a skipped step leaves no trace downstream. |
+| `opus` | `product-owner` | Grooming is judgement; its mechanical board moves share the seat. |
+| `opus` | `developer`, `devops-sre`, `ui-ux-designer`, `qa-tester` | Builders and the QA gate — review samples their work, it does not re-derive it. |
+
+The same test applies per dispatch: a skill may pass `model: "haiku"` for a
+mechanical subtask the caller will check, never for a review lens.
+
+### Effort — the reasoning budget
 
 | Tier | Role class | Agents |
 | ---- | ---------- | ------ |
@@ -56,6 +80,10 @@ costs more to discover later than the tokens it saved.
 
 Tally: 13 `high` · 2 `xhigh` = 15 agents. `low` and `medium` remain valid
 values for a project's own agents; **no bundled agent uses them.**
+
+Effort is independent of the model tier: a `haiku` seat takes the same
+`effort:` scale, and `specnaut-guide` keeps `high` — its upgrade walk is a
+multi-step procedure, and the tier change already pays for the saving.
 
 ### Why `high` is the floor
 
@@ -147,6 +175,5 @@ content survives, the dispatch boundary does not. Neither axis applies.
 Pick the suffix from the naming table, then the tier from the effort table.
 Default to `high`. Reach for `xhigh` only when the agent's output is the last
 line of defence — when nothing downstream would catch it thinking too little.
-Doing hard work is not the test; being unchecked is. `xhigh` requires `model: opus` — a Sonnet-pinned
-agent declaring it is rejected by the harness on dispatch, which is why the
-all-Opus rule above makes the tier universally available.
+Doing hard work is not the test; being unchecked is. Then pick the model
+with the question above — who checks the output? — and default to `opus`.

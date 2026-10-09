@@ -218,7 +218,11 @@ Use the least capable model that can handle each role:
   matching, judgment): standard model.
 - **Architecture / design / review**: most capable model.
 
-Pass `model: "haiku"` for fast cheap dispatches, default otherwise.
+Pass `model: "haiku"` only when someone checks the output in full: a
+mechanical implementer task qualifies, because you and both reviewers check
+it. The spec-compliance and code-quality reviewer dispatches never take it —
+a reviewer that misses something returns a clean report, and nothing
+downstream re-reads what it cleared.
 
 ## Red flags
 
