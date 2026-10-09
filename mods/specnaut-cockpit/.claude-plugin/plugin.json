@@ -1,7 +1,7 @@
 {
   "name": "specnaut-cockpit",
   "displayName": "Specnaut Cockpit",
-  "version": "5.4.0",
+  "version": "5.5.0",
   "description": "A Claude Code mod: it runs a hooks module inside Claude Code with your permissions. Shows usage limits, context, cost and the Specnaut chain above the prompt, and refuses one call: the step that would start implement, review or merge past the quota threshold.",
   "author": {
     "name": "MakerLabs"
