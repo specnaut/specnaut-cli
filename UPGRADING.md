@@ -1,5 +1,30 @@
 # Upgrading Specnaut
 
+## 5.5.x → 6.0.0
+
+Only projects installed for **Windsurf** need to act. Every other harness upgrades as usual.
+
+### Windsurf is no longer supported
+
+5.5.0 is the last release that installs Windsurf. From 6.0.0, `specnaut upgrade`, `diff`,
+`reconcile` and `check` on a Windsurf project exit 1 with:
+
+```
+error: this project was installed for windsurf, which Specnaut no longer supports (5.5.0 was the last release to install it). Nothing was changed.
+```
+
+Nothing in the project is touched — not `.windsurf/`, not `.specnaut/installed.lock`, not your own
+files. To keep using Specnaut, switch the project to a supported harness:
+
+```bash
+specnaut init --here --force --ai <claude|cursor|codex|copilot|opencode|antigravity>
+```
+
+`--force` is needed because the shared `.specnaut/` files the Windsurf install wrote are already
+there. Every file it replaces is first backed up to `<file>.specnaut.bak`, so your `AGENTS.md` and
+constitution edits are one copy away. `.windsurf/` is left in place; delete it when you no longer
+need it.
+
 ## 5.2.x → 5.3.0
 
 Nothing to edit by hand. One behaviour changes for every project:

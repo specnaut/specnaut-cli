@@ -3,8 +3,9 @@
 An enhanced fork of the [GitHub Spec Kit](https://github.com/github/spec-kit) `specify` CLI,
 distributed as a **native binary** (no Python prerequisites).
 
-Specnaut scaffolds the files your AI harness (Claude Code, Cursor, Copilot, Codex, Windsurf…) uses
-to drive a spec-driven workflow inside your project. It adds three things upstream doesn't:
+Specnaut scaffolds the files your AI harness (Claude Code, Cursor, Copilot, Codex, OpenCode,
+Antigravity) uses to drive a spec-driven workflow inside your project. It adds three things upstream
+doesn't:
 
 - **Autopilot** — chains `plan → tasks → implement → review → merge → push` uninterrupted. It stops
   at most once, at the end of `plan`, and only to ask what only you can answer — architecture,
@@ -52,7 +53,6 @@ Specnaut scaffolds for one AI harness per invocation:
 | `--ai claude` (default) | Claude Code        |
 | `--ai cursor`           | Cursor             |
 | `--ai codex`            | Codex CLI          |
-| `--ai windsurf`         | Windsurf           |
 | `--ai copilot`          | GitHub Copilot CLI |
 | `--ai opencode`         | OpenCode           |
 | `--ai antigravity`      | Antigravity        |

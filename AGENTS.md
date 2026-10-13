@@ -9,10 +9,10 @@ Specnaut is an **enhanced fork of the `specify` CLI** from
 prerequisites on the user side).
 
 Specnaut's role is **exactly** that of upstream `specify init`: scaffold, inside an existing
-project, the files consumed by the user's AI harness (Claude Code, Cursor, Copilot, Codex, Windsurf,
-…) — SpecKit commands, spec/plan/tasks templates, constitution, utility scripts. **Specnaut does not
-talk to any LLM. Specnaut does not orchestrate any agent. It is the user's harness that consumes the
-generated files.**
+project, the files consumed by the user's AI harness (Claude Code, Cursor, Copilot, Codex, OpenCode,
+Antigravity) — SpecKit commands, spec/plan/tasks templates, constitution, utility scripts.
+**Specnaut does not talk to any LLM. Specnaut does not orchestrate any agent. It is the user's
+harness that consumes the generated files.**
 
 ### The 3 differences from upstream
 
