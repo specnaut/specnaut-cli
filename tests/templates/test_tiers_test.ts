@@ -10,7 +10,9 @@ import { fromFileUrl } from "@std/path";
  */
 
 const CORE = fromFileUrl(new URL("../../templates/core/", import.meta.url));
-const read = (rel: string) => Deno.readTextFileSync(CORE + rel);
+// LF-normalised: Windows CI checks the templates out with CRLF, and several
+// assertions below match a phrase across a line break.
+const read = (rel: string) => Deno.readTextFileSync(CORE + rel).replaceAll("\r\n", "\n");
 
 /** The text between `start` and the next heading of the same or higher level. */
 function section(doc: string, start: string): string {
