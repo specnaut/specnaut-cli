@@ -14,8 +14,8 @@ import type { Bundle } from "../../../src/domain/template.ts";
  * build could report it — which is why the refusal lives at the write site in
  * `addUnique` and this file is the second opinion rather than the only one.
  *
- * The hazard is real rather than theoretical. Flat harnesses (Windsurf,
- * Copilot) have no folders, so two skills' sub-documents are separated ONLY by
+ * The hazard is real rather than theoretical. A flat harness (Copilot) has
+ * no folders, so two skills' sub-documents are separated ONLY by
  * the owner prefix in their filename: the moment a second top-level skill owns
  * a document whose name matches one of `specnaut`'s, they compete for one path.
  */
@@ -48,9 +48,9 @@ Deno.test("no harness maps two bundle entries to one destination, in any combina
   // HARNESSES.length`, which is `N*M === N*M` and cannot fail: with an empty
   // HARNESSES both sides are 0, the callback never runs, and the sweep reports
   // green having tested nothing. That is #562 reproduced inside its own guard.
-  assertEquals(HARNESSES.length, 7, "a harness was added or lost");
+  assertEquals(HARNESSES.length, 6, "a harness was added or lost");
   assertEquals(everyBundleOption().length, 32, "the install parameter space changed size");
-  assertEquals(combinations, 224, "the sweep did not cover every harness × combination");
+  assertEquals(combinations, 192, "the sweep did not cover every harness × combination");
 });
 
 Deno.test("addUnique refuses the second write and names the destination", () => {
@@ -97,7 +97,7 @@ Deno.test("the owner-prefix rule is not injective, and the guard catches it", ()
   ] as ReadonlyArray<CoreEntry>;
 
   const opts = everyBundleOption()[0];
-  const FLAT = ["windsurf", "copilot"];
+  const FLAT = ["copilot"];
 
   for (const h of HARNESSES) {
     if (FLAT.includes(h.key)) {

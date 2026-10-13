@@ -12,7 +12,7 @@ set -euo pipefail
 
 NAME="${1:?usage: smoke-all-harnesses.sh <name>}"
 . "$(dirname "$0")/_common.sh"
-HARNESSES=(claude cursor codex windsurf copilot opencode antigravity)
+HARNESSES=(claude cursor codex copilot opencode antigravity)
 
 # Per-harness expected output root (relative to project dir). The lock
 # declares the same key, which is also asserted. Using a case statement
@@ -22,7 +22,6 @@ expected_root_for() {
     claude)      echo ".claude" ;;
     cursor)      echo ".cursor" ;;
     codex)       echo ".agents" ;;
-    windsurf)    echo ".windsurf" ;;
     copilot)     echo ".github/instructions" ;;
     opencode)    echo ".opencode" ;;
     # `.agents`, plural. Singular `.agent` came from community write-ups

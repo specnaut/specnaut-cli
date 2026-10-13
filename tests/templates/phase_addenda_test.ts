@@ -175,8 +175,7 @@ Deno.test("every harness carries both routers' addendum step and the AGENTS.md d
 Deno.test("no bundled phase doc carries a character of the addendum seam", () => {
   // The ruling's first line. A phase doc is classified by whole-file SHA on
   // upgrade; a region or pointer written into it either flips the file to
-  // "customized" the moment a project touches it, or costs budget in a
-  // Windsurf workflow no build-time test can measure with the user's text in.
+  // "customized" the moment a project touches it.
   const phases = CORE_BUNDLE.filter((e) => e.category === "phase");
   // Non-vacuity: both routed skills, and the two docs the ACs are about.
   assert(phases.length >= 20, `only ${phases.length} phase docs found — the sweep read nothing`);

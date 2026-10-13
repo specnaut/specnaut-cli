@@ -15,7 +15,12 @@ import {
 } from "../scheme_picker.ts";
 import { pickSpecBackend, pickSpecBackendInteractive } from "../spec_picker.ts";
 import { makeStdinSelectIO } from "../select.ts";
-import type { BacklogBackend, SpecBackend, VersionScheme } from "../../domain/installed_lock.ts";
+import {
+  type BacklogBackend,
+  RemovedHarnessError,
+  type SpecBackend,
+  type VersionScheme,
+} from "../../domain/installed_lock.ts";
 import { SPEC_STRATEGIES } from "../../domain/spec_strategies/registry.ts";
 import { detectVersionScheme } from "../../domain/project_detection.ts";
 import {
@@ -442,7 +447,12 @@ export async function runInit(intent: InitIntent): Promise<number> {
     });
     const conflicts = await writer.detectConflicts(probeBundle, targetDir);
     if (conflicts.length > 0) {
-      const lock = await lockStore.read(targetDir);
+      // A lock for a removed harness exists, but `upgrade` cannot run on it,
+      // so the advice must be the `--force` path, not "run specnaut upgrade".
+      const lock = await lockStore.read(targetDir).catch((err) => {
+        if (err instanceof RemovedHarnessError) return null;
+        throw err;
+      });
       const totalManaged = countManagedFiles(probeBundle);
       printConflictsError(conflicts, lock !== null, totalManaged);
       return 3;

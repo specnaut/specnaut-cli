@@ -12,8 +12,8 @@ import type { Harness } from "../../src/application/ports.ts";
  * The fix hinges on a fact the old text obscured: `specnaut init --ai <harness>`
  * fixes the harness at scaffold time, so exactly ONE mapping is ever relevant.
  * It ships at a harness-neutral path, `.specnaut/harness-tools.md`, which also
- * sidesteps the folder/flat split — Windsurf and Copilot flatten a skill into a
- * single file and have nowhere to put a `references/` directory.
+ * sidesteps the folder/flat split — Copilot flattens a skill into a single
+ * file and have nowhere to put a `references/` directory.
  *
  * The plugin distribution is the other case: there the harness is unknown, so
  * all five references ship side by side and the agent detects its own. Both
@@ -81,7 +81,7 @@ Deno.test("each harness gets its own mapping, not another's", () => {
 });
 
 Deno.test("harnesses with no mapping ship none, and the skill says so", () => {
-  // Windsurf and Antigravity have no recorded mapping. Shipping nothing is
+  // Antigravity has no recorded mapping. Shipping nothing is
   // correct — what would be wrong is an instruction to read a file that is not
   // there, which is the original defect.
   const unmapped = HARNESSES.map((h) => h.key).filter(

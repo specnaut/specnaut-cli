@@ -122,22 +122,6 @@ deno test --allow-read tests/plugin/plugin_sync_test.ts
 Expected: every pair in SYNC_PAIRS green. If a new file landed, add
 the SYNC_PAIR entry.
 
-### Windsurf cap (when touching SKILL.md or agent prompts)
-
-If your change touched any `templates/core/agents/*.md` or
-`templates/core/skills/*/SKILL.md`:
-
-```bash
-deno test --allow-read tests/infrastructure/harness/windsurf_harness_test.ts
-```
-
-The Windsurf 12,000-**character** rendered cap is hard-gated. A file
-that overruns blocks the release.
-
-Measure with a character count, not `wc -c`. `wc -c` counts bytes, and
-on em-dash-dense prose the two diverge by well over a percent — enough
-to read a passing file as an overrun, or the reverse.
-
 ## When a verification fails
 
 **Stop. Do not report DONE.** Fix the failure first.

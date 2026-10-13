@@ -21,7 +21,7 @@ export function applyScheme(entry: CoreEntry, opts: BundleOptions): CoreEntry {
  * Uniform destination for any `phase-script` entry — same path for every
  * harness. The phase docs reference scripts via this path so the
  * scaffolded tag/release commands stay portable across harnesses
- * (including the flat ones like Windsurf and Copilot that don't have a
+ * (including the flat one, Copilot, which doesn't have a
  * `skills/<name>/` layout). Mirrors the `backlog-script` convention.
  */
 export function phaseScriptDestination(entry: CoreEntry): string {

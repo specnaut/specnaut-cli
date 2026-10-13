@@ -6,7 +6,7 @@ import type { CoreEntry } from "./core_bundle.ts";
  * Declared as **(owner, document)** rather than as a path, deliberately. A path
  * is harness-specific — the same document is
  * `.claude/skills/ship/phases/tag.md` on Claude and
- * `.windsurf/workflows/specnaut-ship-tag.md` on Windsurf — and spelling either
+ * `.github/instructions/specnaut-ship-tag.instructions.md` on Copilot — and spelling either
  * here would be a second statement of the adapter's rule, which spec 033 §5
  * forbids. The harness resolves both ends itself.
  */

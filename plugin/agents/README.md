@@ -166,8 +166,8 @@ the provider there, so a value valid for one errors on another. Omitting both
 means each agent runs on whatever the user configured: the correct answer,
 not a missing feature.
 
-**Cursor, Windsurf, and Copilot have no subagent concept at all.** Agents
-reach them as skills, workflows, and instruction files respectively — the
+**Cursor and Copilot have no subagent concept at all.** Agents reach them
+as skills and instruction files respectively — the
 content survives, the dispatch boundary does not. Neither axis applies.
 
 ### Adding an agent

@@ -1,8 +1,9 @@
-import { assertEquals, assertThrows } from "@std/assert";
+import { assert, assertEquals, assertStringIncludes, assertThrows } from "@std/assert";
 import {
   type InstalledLock,
   type LockEntry,
   parseLock,
+  RemovedHarnessError,
   serializeLock,
 } from "../../src/domain/installed_lock.ts";
 
@@ -178,7 +179,7 @@ entries:
   assertEquals(lock.harness, "codex");
 });
 
-Deno.test("parseLock accepts v2 lock with harness=windsurf", () => {
+Deno.test("parseLock on a removed harness names the removal and the way forward", () => {
   const v2 = `version: 2
 harness: windsurf
 templates_version: 0.6.0
@@ -188,9 +189,21 @@ entries:
     installed_at: "2026-04-25T00:00:00Z"
     templates_version: "0.6.0"
 `;
-  const lock = parseLock(v2);
-  assertEquals(lock.version, 2);
-  assertEquals(lock.harness, "windsurf");
+  const err = assertThrows(() => parseLock(v2), Error);
+  assert(err instanceof RemovedHarnessError, String(err));
+  assertStringIncludes(err.message, "installed for windsurf, which Specnaut no longer supports");
+  assertStringIncludes(err.message, "5.5.0 was the last release");
+  assertStringIncludes(err.message, "Nothing was changed.");
+  assertStringIncludes(err.message, "specnaut init --here --force --ai <harness>");
+  assert(!err.message.includes("Unsupported harness"), err.message);
+});
+
+Deno.test("parseLock on an unknown harness keeps the generic message", () => {
+  const err = assertThrows(
+    () => parseLock("version: 2\nharness: nope\ntemplates_version: 0.6.0\nentries: {}\n"),
+    Error,
+  );
+  assertStringIncludes(err.message, "Unsupported harness 'nope'");
 });
 
 Deno.test("parseLock accepts v2 lock with harness=copilot", () => {

@@ -36,7 +36,7 @@ ${bold("Usage:")}
 ${bold("Flags (for init):")}
   --here              Scaffold into the current directory instead of creating a new one
   --no-git            Skip "git init" detection and prompt
-  --ai <name>         Target AI harness: claude (default) | cursor | codex | windsurf | copilot | opencode | antigravity
+  --ai <name>         Target AI harness: claude (default) | cursor | codex | copilot | opencode | antigravity
   --backlog <name>    Backlog backend: cloud (default) | local | github | gitlab
                       (non-interactive runs take the default, and cloud needs
                        "specnaut cloud login" before the backlog works)

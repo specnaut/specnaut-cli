@@ -82,7 +82,8 @@ check "plan-audits.md dispatches BOTH auditors (#456)" \
   'grep -q "architect-expert" .claude/skills/specnaut/phases/plan-audits.md && grep -q "security-expert" .claude/skills/specnaut/phases/plan-audits.md'
 # Companion docs, named literally for the audit's basename scan — the
 # interpolated loop above hides them from `grep -qF`. Both exist because
-# their host phase ran out of room under the 12,000-character Windsurf cap:
+# their host phase ran out of room under a since-removed harness's
+# 12,000-character cap — the split stands on its own:
 # merge.md was at 11,960 (#558), implement.md at 11,377 (#556).
 check "companion doc merge-squash.md scaffolded (#558)" \
   '[ -f .claude/skills/specnaut/phases/merge-squash.md ]'
@@ -601,8 +602,6 @@ check "verification-before-completion still carries the maintainer gates" \
   'grep -q "audit.sh" .claude/skills/verification-before-completion/SKILL.md && grep -q "Specnaut bundle source" .claude/skills/verification-before-completion/SKILL.md'
 check "verification-before-completion references plugin sync test" \
   'grep -q "plugin_sync_test" .claude/skills/verification-before-completion/SKILL.md'
-check "verification-before-completion references Windsurf cap" \
-  'grep -q "windsurf_harness_test\|Windsurf 12000-char" .claude/skills/verification-before-completion/SKILL.md'
 check "verification-before-completion documents report shape with evidence" \
   'grep -q "Verification:" .claude/skills/verification-before-completion/SKILL.md'
 check "verification-before-completion credits obra/superpowers attribution" \
@@ -687,8 +686,6 @@ check "specnaut-guide is auto-triggerable (no disable-model-invocation: true)" \
   '! grep -q "disable-model-invocation: true" .claude/agents/specnaut-guide.md'
 check "specnaut-guide grants WebFetch" \
   'grep -q "WebFetch" .claude/agents/specnaut-guide.md'
-check "specnaut-guide agent body fits Windsurf 12000-char Cascade cap" \
-  'deno eval --no-config "const s = await Deno.readTextFile(\".claude/agents/specnaut-guide.md\"); Deno.exit(s.length <= 12000 ? 0 : 1);"'
 check "vendored knowledge snapshot present" \
   'grep -q "## Vendored knowledge snapshot" .claude/agents/specnaut-guide.md'
 
@@ -702,8 +699,6 @@ check "ui-ux-designer declares the three modes" \
   'grep -q "Discovery interview" .claude/agents/ui-ux-designer.md && grep -q "Edit (DESIGN.md present" .claude/agents/ui-ux-designer.md && grep -q "Audit (explicit" .claude/agents/ui-ux-designer.md'
 check "ui-ux-designer ships the canonical DESIGN.md template" \
   'grep -q "Canonical DESIGN.md template" .claude/agents/ui-ux-designer.md && grep -q "Brand identity" .claude/agents/ui-ux-designer.md && grep -q "Color palette" .claude/agents/ui-ux-designer.md'
-check "ui-ux-designer fits the Windsurf 12000-char Cascade cap" \
-  'deno eval --no-config "const s = await Deno.readTextFile(\".claude/agents/ui-ux-designer.md\"); Deno.exit(s.length <= 12000 ? 0 : 1);"'
 check "live fetch protocol present" \
   'grep -q "## Live fetch protocol" .claude/agents/specnaut-guide.md'
 

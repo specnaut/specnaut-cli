@@ -2,10 +2,26 @@ import { red, yellow } from "@std/fmt/colors";
 import { HELP, renderVersionLine } from "./cli/help.ts";
 import { parseArgs } from "./cli/parser.ts";
 import { isLegacyInvocation, LEGACY_INVOCATION_WARNING } from "./domain/deprecation.ts";
+import { RemovedHarnessError, removedHarnessInitNotice } from "./domain/installed_lock.ts";
 import { VERSION } from "./domain/version.ts";
 import { TEMPLATES_VERSION } from "./templates_bundle.ts";
 
 export async function run(argv: string[]): Promise<number> {
+  try {
+    return await dispatch(argv);
+  } catch (err) {
+    // A project installed for a harness Specnaut has since dropped. Every
+    // command that loads the lock lands here, so the message is said once
+    // and never reaches the user as a stack trace.
+    if (err instanceof RemovedHarnessError) {
+      console.error(red(`error: ${err.message}`));
+      return 1;
+    }
+    throw err;
+  }
+}
+
+async function dispatch(argv: string[]): Promise<number> {
   const intent = parseArgs(argv);
   switch (intent.kind) {
     case "version":
@@ -53,6 +69,9 @@ export async function run(argv: string[]): Promise<number> {
       const { runSpec } = await import("./cli/handlers/spec_handler.ts");
       return await runSpec(intent);
     }
+    case "removed-harness":
+      console.error(red(`error: ${removedHarnessInitNotice(intent.harness)}`));
+      return 1;
     case "unknown":
       console.error(red(`Unknown command: "${intent.received}"`));
       console.error(HELP);

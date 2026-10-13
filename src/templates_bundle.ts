@@ -5486,7 +5486,7 @@ not re-read the file with \`Read\`.
 | \`subagent-driven-development\` | Execute a plan task-by-task with mandatory two-stage review (spec compliance + code quality) per task. Consumes plans produced by \`writing-plans\`. |
 | \`executing-plans\` | Inline alternative to subagent-driven — execute a plan task-by-task in-session with checkpoint pauses. Faster for trivial plans. |
 | \`response-style-contract\` | Preloaded, never invoked. How every answer is shaped — brevity, visual order, questions as selections, badge colours. In force on every turn. |
-| \`verification-before-completion\` | Discipline checklist that any agent MUST run before reporting DONE. Tests green / pre-commit clean / plan boxes ticked / smoke audit / plugin sync / Windsurf cap / requirements addressed. |
+| \`verification-before-completion\` | Discipline checklist that any agent MUST run before reporting DONE. Tests green / pre-commit clean / plan boxes ticked / smoke audit / plugin sync / requirements addressed. |
 | \`brainstorming\` | Spec-discovery entry point when the idea is vague — discovery dialogue, then present the design and hand off to \`writing-plans\`. Questions follow the \`response-style-contract\` skill. |
 | \`code-audit\` | User wants a broad, multi-seat health-check ("audit the codebase", "code audit", "audit the last N commits"). Resolves a scope, dispatches the applicable expert seats (architecture / security / performance / a11y / dependency) in parallel, synthesizes one report. Read-only. Complementary to \`/specnaut audit <axis>\`, which runs a single axis. |
 | \`arch-audit\` / \`sec-audit\` / \`perf-audit\` / \`dep-audit\` / \`a11y-audit\` | Per-axis audit family — user wants **one** lens over a scope ("arch audit", "security audit \`--path src/\`", "perf audit \`--diff\`"). Each resolves a uniform scope (\`--path\` / \`--range\` / \`--diff\` / whole) and dispatches its **single** bound expert (architecture / security / performance / dependency / a11y), returning findings **inline**. Read-only, writes no report. Complements \`/specnaut audit <axis>\` (which persists a dated report) and \`/code-audit\` (the multi-seat team). |
@@ -5713,8 +5713,7 @@ read the plan file.
 
 Use Specnaut's bundled \`developer\` agent (it knows the project
 conventions: hexagonal layout, TDD discipline, in-code documentation,
-Windsurf cap, byte-identity plugin sync, smoke audit, pre-commit
-hook gates).
+byte-identity plugin sync, smoke audit, pre-commit hook gates).
 
 \`\`\`
 Task({
@@ -6284,22 +6283,6 @@ deno test --allow-read tests/plugin/plugin_sync_test.ts
 
 Expected: every pair in SYNC_PAIRS green. If a new file landed, add
 the SYNC_PAIR entry.
-
-### Windsurf cap (when touching SKILL.md or agent prompts)
-
-If your change touched any \`templates/core/agents/*.md\` or
-\`templates/core/skills/*/SKILL.md\`:
-
-\`\`\`bash
-deno test --allow-read tests/infrastructure/harness/windsurf_harness_test.ts
-\`\`\`
-
-The Windsurf 12,000-**character** rendered cap is hard-gated. A file
-that overruns blocks the release.
-
-Measure with a character count, not \`wc -c\`. \`wc -c\` counts bytes, and
-on em-dash-dense prose the two diverge by well over a percent — enough
-to read a passing file as an overrun, or the reverse.
 
 ## When a verification fails
 
@@ -7167,9 +7150,8 @@ user-invocable: false
 
 # alert-triage-contract
 
-Preloaded by \`security-expert\`. Split out of that agent under #562, when the
-emitted Windsurf workflow had 49 characters of room left and no duplication to
-reclaim — the seat and its triage procedure change for different reasons, and
+Preloaded by \`security-expert\`. Split out of that agent under #562 — the seat
+and its triage procedure change for different reasons, and
 the procedure is long enough to be worth reading on its own.
 
 **Nothing was cut in the move.** In particular the Bash constraint below is the
@@ -7312,9 +7294,7 @@ user-invocable: false
 
 # specnaut-facts
 
-Preloaded by \`specnaut-guide\`. Split out of that agent under #562, when its
-emitted Windsurf workflow had 47 characters of room left and no duplication to
-reclaim. The seat's *protocol* (fetch live, check versions, file bugs) and the
+Preloaded by \`specnaut-guide\`. Split out of that agent under #562. The seat's *protocol* (fetch live, check versions, file bugs) and the
 *facts* it falls back on change for different reasons, which is the split.
 
 **This is a snapshot and it goes stale.** The live docs win; see the seat's
@@ -7328,7 +7308,7 @@ Enhanced fork of [\`specify\` CLI](https://github.com/github/spec-kit), distribu
 
 **Install:** \`curl -fsSL https://raw.githubusercontent.com/specnaut/specnaut-cli/main/install.sh | bash\` or \`brew tap specnaut/tap && brew install specnaut\`.
 
-**Harnesses:** claude, cursor, codex, windsurf, copilot, opencode, antigravity — all share \`templates/core/\` content, mapped per-harness by an adapter.
+**Harnesses:** claude, cursor, codex, copilot, opencode, antigravity — all share \`templates/core/\` content, mapped per-harness by an adapter.
 
 **Different from upstream Spec Kit:** auto-chained pipeline (\`/specnaut plan\` chains all phases); dedicated \`review\` phase after implement; backlog as product source of truth via \`product-owner\` agent (backends: local, github, gitlab); Claude Code plugin distribution (\`specnaut-plugin\` marketplace).
 
@@ -10233,8 +10213,8 @@ the provider there, so a value valid for one errors on another. Omitting both
 means each agent runs on whatever the user configured: the correct answer,
 not a missing feature.
 
-**Cursor, Windsurf, and Copilot have no subagent concept at all.** Agents
-reach them as skills, workflows, and instruction files respectively — the
+**Cursor and Copilot have no subagent concept at all.** Agents reach them
+as skills and instruction files respectively — the
 content survives, the dispatch boundary does not. Neither axis applies.
 
 ### Adding an agent
@@ -10479,6 +10459,8 @@ argument-hint: "[list|next|add|update|estimate|status|groom|brief] [args]"
 ---
 
 # Board skill
+
+**Response style** — brevity, visual order, questions as selections, badge colours — follows the \`response-style-contract\` skill; read it, never restate it here.
 
 Use this skill when the user says "add to backlog", "list backlog", "what's
 next?", "move task X to in-progress", or any backlog mutation. The exact

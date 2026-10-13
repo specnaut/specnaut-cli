@@ -281,9 +281,9 @@ Deno.test("parseArgs accepts init --ai codex", () => {
   if (r.kind === "init") assertEquals(r.ai, "codex");
 });
 
-Deno.test("parseArgs accepts init --ai windsurf", () => {
+Deno.test("parseArgs rejects init --ai windsurf — the harness was removed", () => {
   const r = parseArgs(["init", "demo", "--ai", "windsurf"]);
-  if (r.kind === "init") assertEquals(r.ai, "windsurf");
+  assertEquals(r, { kind: "removed-harness", harness: "windsurf" });
 });
 
 Deno.test("parseArgs accepts init --backlog local", () => {

@@ -6,9 +6,7 @@ user-invocable: false
 
 # specnaut-facts
 
-Preloaded by `specnaut-guide`. Split out of that agent under #562, when its
-emitted Windsurf workflow had 47 characters of room left and no duplication to
-reclaim. The seat's *protocol* (fetch live, check versions, file bugs) and the
+Preloaded by `specnaut-guide`. Split out of that agent under #562. The seat's *protocol* (fetch live, check versions, file bugs) and the
 *facts* it falls back on change for different reasons, which is the split.
 
 **This is a snapshot and it goes stale.** The live docs win; see the seat's
@@ -22,7 +20,7 @@ Enhanced fork of [`specify` CLI](https://github.com/github/spec-kit), distribute
 
 **Install:** `curl -fsSL https://raw.githubusercontent.com/specnaut/specnaut-cli/main/install.sh | bash` or `brew tap specnaut/tap && brew install specnaut`.
 
-**Harnesses:** claude, cursor, codex, windsurf, copilot, opencode, antigravity — all share `templates/core/` content, mapped per-harness by an adapter.
+**Harnesses:** claude, cursor, codex, copilot, opencode, antigravity — all share `templates/core/` content, mapped per-harness by an adapter.
 
 **Different from upstream Spec Kit:** auto-chained pipeline (`/specnaut plan` chains all phases); dedicated `review` phase after implement; backlog as product source of truth via `product-owner` agent (backends: local, github, gitlab); Claude Code plugin distribution (`specnaut-plugin` marketplace).
 

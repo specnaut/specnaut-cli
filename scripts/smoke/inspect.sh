@@ -15,7 +15,7 @@ fi
 cd "$SANDBOX_DIR"
 
 echo "=== sandbox/$NAME ==="
-for path in .claude .cursor .codex .windsurf .opencode .agent .agents \
+for path in .claude .cursor .codex .opencode .agent .agents \
   .github/instructions .specnaut tasks AGENTS.md CLAUDE.md .gitignore; do
   if [ -e "$path" ]; then
     if [ -d "$path" ]; then

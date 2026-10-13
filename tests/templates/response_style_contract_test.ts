@@ -219,7 +219,11 @@ const POINTED_BY_DECISION: ReadonlyMap<string, string> = new Map([
   ],
   [
     "skill/ship",
-    "the production verb — it asks a disambiguation question when the repository cannot resolve the intent, so questions-as-selections is load-bearing rather than incidental; and unlike /board it has ~6,500 characters of Windsurf headroom, so the pointer costs nothing it needs",
+    "the production verb — it asks a disambiguation question when the repository cannot resolve the intent, so questions-as-selections is load-bearing rather than incidental;",
+  ],
+  [
+    "backlog-skill/board",
+    "the backlog verb — grooming collects decisions as pickers, so questions-as-selections is load-bearing; it was withheld at #575 only because of a harness size cap that no longer applies",
   ],
   [
     "skill/using-specnaut",
@@ -237,10 +241,6 @@ const POINTED_BY_DECISION: ReadonlyMap<string, string> = new Map([
 
 /** An entry-point skill that deliberately does NOT point here. */
 const WITHHELD_BY_DECISION: ReadonlyMap<string, string> = new Map([
-  [
-    "board",
-    "settled at #575's plan stop: its worst-case Windsurf render leaves 38 characters and the pointer costs 98. /board is reached by the always-on leg, which is in force before the skill fires.",
-  ],
   ...(["a11y-audit", "arch-audit", "dep-audit", "perf-audit", "sec-audit", "code-audit"].map((
     n,
   ) =>

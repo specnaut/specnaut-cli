@@ -10,7 +10,7 @@ NAME="${1:?usage: compare-harnesses.sh <name>}"
 # `gemini` was in this list and is not a supported harness — `run-init.sh`
 # would have failed on it. Same family as a banner asserting a count it does
 # not compute. smoke-all-harnesses.sh carries the authoritative set.
-HARNESSES=(claude cursor codex windsurf copilot opencode antigravity)
+HARNESSES=(claude cursor codex copilot opencode antigravity)
 
 bash "$SMOKE_DIR/bootstrap-vite.sh" "$NAME"
 

@@ -8,6 +8,7 @@ import type {
   SpecBackend,
   VersionScheme,
 } from "../domain/installed_lock.ts";
+import { RemovedHarnessError } from "../domain/installed_lock.ts";
 import type { CoreBundle } from "../domain/core_bundle.ts";
 import type { Bundle } from "../domain/template.ts";
 import { TEMPLATES_VERSION } from "../templates_bundle.ts";
@@ -140,7 +141,12 @@ export class InitProjectUseCase {
     if (!input.force) {
       const conflicts = await writer.detectConflicts(bundle, input.targetDir);
       if (conflicts.length > 0) {
-        const existingLock = await lockStore.read(input.targetDir);
+        // A removed harness's lock is present but un-upgradeable — report it
+        // as no lock, so the advice is `--force` rather than `upgrade`.
+        const existingLock = await lockStore.read(input.targetDir).catch((err) => {
+          if (err instanceof RemovedHarnessError) return null;
+          throw err;
+        });
         return {
           status: "conflicts",
           conflicts,

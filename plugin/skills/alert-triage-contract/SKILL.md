@@ -6,9 +6,8 @@ user-invocable: false
 
 # alert-triage-contract
 
-Preloaded by `security-expert`. Split out of that agent under #562, when the
-emitted Windsurf workflow had 49 characters of room left and no duplication to
-reclaim — the seat and its triage procedure change for different reasons, and
+Preloaded by `security-expert`. Split out of that agent under #562 — the seat
+and its triage procedure change for different reasons, and
 the procedure is long enough to be worth reading on its own.
 
 **Nothing was cut in the move.** In particular the Bash constraint below is the

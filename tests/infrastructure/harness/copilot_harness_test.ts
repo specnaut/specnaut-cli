@@ -123,7 +123,7 @@ Deno.test("CopilotHarness maps spec-root to .specnaut/<suffix> and project-root 
   assert("AGENTS.md" in mapped);
 });
 
-Deno.test("CopilotHarness emits no Claude/Cursor/Codex/Windsurf artefacts", () => {
+Deno.test("CopilotHarness emits no Claude/Cursor/Codex artefacts", () => {
   const h = new CopilotHarness();
   const mapped = h.mapBundle(SAMPLE, {
     backlogBackend: "local",
@@ -135,6 +135,5 @@ Deno.test("CopilotHarness emits no Claude/Cursor/Codex/Windsurf artefacts", () =
   assert(!keys.some((k) => k.startsWith(".cursor/")), "no .cursor/");
   assert(!keys.some((k) => k.startsWith(".agents/")), "no .agents/");
   assert(!keys.some((k) => k.startsWith(".codex/")), "no .codex/");
-  assert(!keys.some((k) => k.startsWith(".windsurf/")), "no .windsurf/");
   assert(!keys.includes("CLAUDE.md"), "no CLAUDE.md");
 });

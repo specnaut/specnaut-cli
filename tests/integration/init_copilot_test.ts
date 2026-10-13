@@ -108,7 +108,7 @@ Deno.test("specnaut init --ai copilot scaffolds a Copilot layout", async () => {
       Deno.readDir(join(root, ".github/instructions")),
     )).length;
     // 66 since spec 033: /ship adds three flat instruction files and retires
-    // two — net +1. See init_windsurf_test.ts for the same arithmetic. 67 with
+    // two — net +1. 67 with
     // the `upgrade` phase.
     assertEquals(instructionsCount, 67);
 
@@ -128,7 +128,6 @@ Deno.test("specnaut init --ai copilot scaffolds a Copilot layout", async () => {
     assertEquals(await exists(join(root, ".cursor/")), false);
     assertEquals(await exists(join(root, ".agents/")), false);
     assertEquals(await exists(join(root, ".codex/")), false);
-    assertEquals(await exists(join(root, ".windsurf/")), false);
     assertEquals(await exists(join(root, "CLAUDE.md")), false);
 
     // Lock reflects copilot

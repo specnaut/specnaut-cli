@@ -25,7 +25,11 @@ import { isAgenticPath, isParentManaged } from "../../domain/parent_managed.ts";
 import { CORE_BUNDLE, TEMPLATES_VERSION } from "../../templates_bundle.ts";
 import { renderUnifiedDiff } from "../../domain/diff.ts";
 import type { UpgradePlan } from "../../domain/upgrade_plan.ts";
-import type { BacklogBackend, InstalledLock } from "../../domain/installed_lock.ts";
+import {
+  type BacklogBackend,
+  type InstalledLock,
+  RemovedHarnessError,
+} from "../../domain/installed_lock.ts";
 import { sha256Hex } from "../../domain/sha256.ts";
 
 export type UpgradeIntent = {
@@ -504,6 +508,7 @@ export async function runUpgrade(intent: UpgradeIntent): Promise<number> {
           console.log(dim(`↳ already using backend: ${intent.backlog} — nothing to switch`));
         }
       } catch (err) {
+        if (err instanceof RemovedHarnessError) throw err; // main says it, exit 1
         const msg = err instanceof Error ? err.message : String(err);
         console.error(red(`error: ${msg}`));
         return 2;
@@ -598,6 +603,7 @@ export async function runUpgrade(intent: UpgradeIntent): Promise<number> {
       ...(parentManagedOverride !== undefined ? { parentManagedOverride } : {}),
     });
   } catch (err) {
+    if (err instanceof RemovedHarnessError) throw err; // main says it, exit 1
     const msg = err instanceof Error ? err.message : String(err);
     console.error(red(`error: ${msg}`));
     return 2;

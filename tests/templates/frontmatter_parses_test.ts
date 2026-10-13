@@ -10,7 +10,7 @@ import { splitFrontmatter } from "../../src/infrastructure/harness/frontmatter.t
  * A value such as `argument-hint: [tag|release] [--no-push]` reads as a flow
  * sequence followed by text, which no YAML parser accepts. Nothing fails
  * loudly when that happens: Claude Code loads the skill with empty metadata,
- * and `frontmatterField` — which the Codex, Windsurf, OpenCode, Copilot and
+ * and `frontmatterField` — which the Codex, OpenCode, Copilot and
  * Antigravity adapters read `description` through — returns null. The `board`
  * and `ship` skills shipped that way, and every harness lost their
  * descriptions without a single test noticing.

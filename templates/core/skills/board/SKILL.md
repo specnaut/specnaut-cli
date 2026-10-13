@@ -6,6 +6,8 @@ argument-hint: "[list|next|add|update|estimate|status|groom|brief] [args]"
 
 # Board skill
 
+**Response style** — brevity, visual order, questions as selections, badge colours — follows the `response-style-contract` skill; read it, never restate it here.
+
 Use this skill when the user says "add to backlog", "list backlog", "what's
 next?", "move task X to in-progress", or any backlog mutation. The exact
 flow depends on the backend chosen at `specnaut init` (or the most recent

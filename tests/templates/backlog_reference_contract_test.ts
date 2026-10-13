@@ -39,12 +39,6 @@ const CHANNEL_B_CORE: ReadonlyArray<{ category: string; name: string }> = [
   // `merge.md` still specifies the report, and this file does the naming.
   { category: "phase", name: "merge-close" },
   { category: "project-root", name: "root" },
-  // `specify` is deliberately absent. Windsurf renders each phase as a Cascade
-  // workflow capped at 12 000 characters, and specify.md already sits ~40 chars
-  // under it — any pointer pushes it over. Its backlog mentions are `linked_issue`
-  // plumbing (storing the number in feature.json) rather than user-facing
-  // references, and the agents that do the talking are wired through Channel A,
-  // so the rule still reaches the output. Revisit if specify.md is ever trimmed.
 ];
 
 /** Harness rules files, which ship through HARNESS_STATIC rather than the core bundle. */

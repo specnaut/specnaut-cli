@@ -81,8 +81,7 @@ read the plan file.
 
 Use Specnaut's bundled `developer` agent (it knows the project
 conventions: hexagonal layout, TDD discipline, in-code documentation,
-Windsurf cap, byte-identity plugin sync, smoke audit, pre-commit
-hook gates).
+byte-identity plugin sync, smoke audit, pre-commit hook gates).
 
 ```
 Task({

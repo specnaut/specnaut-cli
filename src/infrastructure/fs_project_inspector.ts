@@ -9,7 +9,12 @@ import {
   auditAddendum,
 } from "../domain/addendum_audit.ts";
 import type { CheckOutcome } from "../domain/check_result.ts";
-import { type BacklogBackend, type KnownHarness, parseLock } from "../domain/installed_lock.ts";
+import {
+  type BacklogBackend,
+  type KnownHarness,
+  parseLock,
+  RemovedHarnessError,
+} from "../domain/installed_lock.ts";
 import { PLUGIN_COVERED_PATHS_CLAUDE } from "../domain/plugin_coverage.ts";
 
 const PLUGIN_NAME = "specnaut-plugin";
@@ -105,6 +110,19 @@ function validateHooks(hooks: unknown): string[] {
     }
   }
   return errors;
+}
+
+/**
+ * A lock that will not parse, as one check row. A removed harness is reported
+ * in full once, by the harness check; every other row that reads the lock
+ * points there instead of repeating the notice.
+ */
+function lockFailure(err: unknown): string {
+  if (err instanceof RemovedHarnessError) {
+    return `lock names a harness Specnaut no longer supports — see harness`;
+  }
+  const msg = err instanceof Error ? err.message : String(err);
+  return `corrupt lock — ${msg}`;
 }
 
 export class FsProjectInspector implements ProjectInspector {
@@ -231,8 +249,7 @@ export class FsProjectInspector implements ProjectInspector {
     try {
       backend = parseLock(await Deno.readTextFile(lockPath)).backlogBackend;
     } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err);
-      return { name: "backlog backend", status: "fail", message: `corrupt lock — ${msg}` };
+      return { name: "backlog backend", status: "fail", message: lockFailure(err) };
     }
 
     if (backend === "local") {
@@ -404,7 +421,6 @@ export class FsProjectInspector implements ProjectInspector {
         claude: ".claude/",
         cursor: ".cursor/",
         codex: ".agents/",
-        windsurf: ".windsurf/",
         copilot: ".github/instructions/",
         opencode: ".opencode/",
         antigravity: ".agents/",
@@ -424,6 +440,9 @@ export class FsProjectInspector implements ProjectInspector {
         message: `${lock.harness} — ${folder} present`,
       };
     } catch (err) {
+      if (err instanceof RemovedHarnessError) {
+        return { name: "harness", status: "fail", message: err.message };
+      }
       const msg = err instanceof Error ? err.message : String(err);
       return { name: "harness", status: "fail", message: `corrupt lock — ${msg}` };
     }
@@ -459,8 +478,7 @@ export class FsProjectInspector implements ProjectInspector {
           `project on ${lock.templatesVersion}, bundled on ${bundledTemplatesVersion} — run 'specnaut upgrade'`,
       };
     } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err);
-      return { name: "templates version", status: "fail", message: `corrupt lock — ${msg}` };
+      return { name: "templates version", status: "fail", message: lockFailure(err) };
     }
   }
 

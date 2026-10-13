@@ -10,10 +10,9 @@ import type { Harness } from "../../../src/application/ports.ts";
 /**
  * `init`'s "Next steps" told every user to type the Claude commands.
  *
- * On the five harnesses that namespace their skills the board is
+ * On the harnesses that namespace their skills the board is
  * `/specnaut-board`, so `/board add` — the headline command of 4.0.0 — was a
- * no-op in the one place a first-time user reads. Windsurf was wrong twice
- * over: its documents are flat sibling workflows.
+ * no-op in the one place a first-time user reads.
  *
  * These do not assert a table's contents. They assert the command against the
  * destination each harness actually emits, so a harness that changes its
@@ -78,10 +77,10 @@ Deno.test("every skill document's command locates the file the harness emits", (
       checked++;
     }
   }
-  // Non-vacuity: 6 invocable harnesses × 25 sub-documents (22 phases + 3
+  // Non-vacuity: 5 invocable harnesses × 25 sub-documents (22 phases + 3
   // backlog docs). A derivation that silently returned nothing would otherwise
   // report green having asserted nothing at all.
-  assertEquals(checked, 150, "the sweep did not cover every harness × sub-document");
+  assertEquals(checked, 125, "the sweep did not cover every harness × sub-document");
 });
 
 Deno.test("every top-level skill's command locates the folder the harness emits", () => {

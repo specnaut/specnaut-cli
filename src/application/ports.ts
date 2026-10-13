@@ -227,10 +227,9 @@ export type BundleOptions = {
  * with "property is missing", so the parameter space cannot silently narrow.
  * `Required<…>` is what extends that guarantee to *optional* fields, which is
  * where it was needed: `specAutogen` is optional, so every caller that never
- * mentioned it compiled fine and pinned it to `false` — and the guard that
- * measures Windsurf workflow sizes did exactly that, measuring 16 of 32
- * combinations while reporting itself green over a workflow that was 539
- * characters past the vendor's cap (#562).
+ * mentioned it compiled fine and pinned it to `false` — and a size guard did
+ * exactly that, measuring 16 of 32 combinations while reporting itself green
+ * over a file that was 539 characters past its cap (#562).
  *
  * The values are **imported**, never retyped. `KNOWN_*` in
  * `domain/installed_lock.ts` is the single source for what values exist; a

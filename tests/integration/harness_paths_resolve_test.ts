@@ -24,7 +24,6 @@ const ROOTS: Record<string, RegExp> = {
   claude: /(?<![\w~])\.claude\//g,
   codex: /(?<![\w~])\.codex\//g,
   cursor: /(?<![\w~])\.cursor\//g,
-  windsurf: /(?<![\w~])\.windsurf\//g,
   opencode: /(?<![\w~])\.opencode\//g,
 };
 

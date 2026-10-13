@@ -6,10 +6,9 @@ import { skillNameFor } from "./skill_folder.ts";
  * What a user actually types, per harness.
  *
  * `init`'s "Next steps" hardcoded the Claude surface — `/specnaut plan`,
- * `/board add` — and printed it under every harness. On the five that namespace
+ * `/board add` — and printed it under every harness. On the harnesses that namespace
  * their skills the board is `/specnaut-board`, so the first thing a new user
- * was told to type did nothing; on Windsurf the phases are flat workflows, so
- * `/specnaut plan` was wrong too. It is the headline command of the release,
+ * was told to type did nothing. It is the headline command of the release,
  * named wrong in the one place a first-time user reads.
  *
  * The shapes are not a preference. They fall out of where each harness's
@@ -17,7 +16,7 @@ import { skillNameFor } from "./skill_folder.ts";
  *
  *   - documents nested under their skill's own folder → the skill takes the
  *     document as an argument, `/specnaut plan`, `/ship tag-version`
- *   - documents emitted as sibling files (Windsurf) → each is its own command,
+ *   - documents emitted as sibling files on an invocable flat layout → each is its own command,
  *     `/specnaut-plan`, `/specnaut-ship-tag-version`
  *   - Copilot writes `.github/instructions/*.instructions.md`, which the agent
  *     applies by context rather than by invocation — there is no command to

@@ -1,3 +1,4 @@
+import { RemovedHarnessError } from "../../domain/installed_lock.ts";
 import { resolve } from "@std/path";
 import { bold, cyan, dim, green, red, yellow } from "@std/fmt/colors";
 import { DiffProjectUseCase, type DivergenceResult } from "../../application/diff_project.ts";
@@ -43,6 +44,7 @@ export async function runDiff(intent: DiffIntent): Promise<number> {
       path: intent.path,
     });
   } catch (err) {
+    if (err instanceof RemovedHarnessError) throw err; // main says it, exit 1
     const msg = err instanceof Error ? err.message : String(err);
     console.error(red(`error: ${msg}`));
     return 2;

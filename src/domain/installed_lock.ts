@@ -15,7 +15,6 @@ export type KnownHarness =
   | "claude"
   | "cursor"
   | "codex"
-  | "windsurf"
   | "copilot"
   | "opencode"
   | "antigravity";
@@ -23,7 +22,6 @@ export const KNOWN_HARNESSES: ReadonlyArray<KnownHarness> = [
   "claude",
   "cursor",
   "codex",
-  "windsurf",
   "copilot",
   "opencode",
   "antigravity",
@@ -102,7 +100,56 @@ function asObject(v: unknown, name: string): Record<string, unknown> {
   return v as Record<string, unknown>;
 }
 
+/**
+ * Harnesses Specnaut used to install and no longer supports, with the last
+ * release that still did. A lock naming one is not corrupt — it is a project
+ * the CLI left behind — so it gets a message that says what happened and what
+ * to do, instead of the generic "unsupported" one that reads as a typo.
+ * Nothing in the project is touched: the files the old adapter wrote stay
+ * where they are.
+ */
+export const REMOVED_HARNESSES: Readonly<Record<string, string>> = {
+  windsurf: "5.5.0",
+};
+
+export function isRemovedHarness(key: string): boolean {
+  return Object.hasOwn(REMOVED_HARNESSES, key);
+}
+
+/**
+ * The way off a removed harness, as one line. `init --force` is the command
+ * that works on such a project: without `--force`, init stops on the files the
+ * old install left and points at `upgrade`, which is exactly what cannot run.
+ * `--force` backs every file it replaces up to `*.specnaut.bak` first.
+ */
+export function removedHarnessMigration(key: string): string {
+  return `To switch harness, run \`specnaut init --here --force --ai <harness>\` with one of: ` +
+    `${KNOWN_HARNESSES.join(", ")}. Files it replaces are backed up to *.specnaut.bak; ` +
+    `.${key}/ is left in place for you to delete.`;
+}
+
+/** What `init --ai <removed>` prints: there is no project yet, so no migration. */
+export function removedHarnessInitNotice(key: string): string {
+  return `${key} is no longer supported — ${REMOVED_HARNESSES[key]} was the last ` +
+    `Specnaut release to install it. Supported harnesses: ${KNOWN_HARNESSES.join(", ")}.`;
+}
+
+/** A lock naming a {@link REMOVED_HARNESSES} entry — left behind, not corrupt. */
+export class RemovedHarnessError extends Error {
+  override name = "RemovedHarnessError";
+  constructor(readonly harness: string) {
+    super(
+      `this project was installed for ${harness}, which Specnaut no longer supports ` +
+        `(${REMOVED_HARNESSES[harness]} was the last release to install it). ` +
+        `Nothing was changed.\n${removedHarnessMigration(harness)}`,
+    );
+  }
+}
+
 function assertKnownHarness(v: unknown): asserts v is KnownHarness {
+  if (typeof v === "string" && isRemovedHarness(v)) {
+    throw new RemovedHarnessError(v);
+  }
   if (typeof v !== "string" || !KNOWN_HARNESSES.includes(v as KnownHarness)) {
     throw new Error(
       `Unsupported harness '${String(v)}' — known: ${KNOWN_HARNESSES.join(", ")}`,

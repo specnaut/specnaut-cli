@@ -61,7 +61,7 @@ export function skillFolderName(entry: CoreEntry): string {
  * doc sits directly beside its `SKILL.md`.
  *
  * A category absent from this map has no subdirectory. Adding a sub-document
- * category means adding a row here, not a branch in seven adapters.
+ * category means adding a row here, not a branch in every adapter.
  */
 const SKILL_DOC_SUBDIR = {
   phase: "phases",
@@ -105,7 +105,7 @@ export type SkillDocShape =
   }
   | {
     readonly kind: "flat";
-    /** The workflow/instruction directory, e.g. `.windsurf/workflows`. */
+    /** The instruction directory, e.g. `.github/instructions`. */
     readonly dir: string;
     /** Everything after the base name, e.g. `.md` or `.instructions.md`. */
     readonly ext: string;

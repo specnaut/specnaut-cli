@@ -191,8 +191,8 @@ check "groom report: every \"no start date set\" sits beside its STARTDATE_FIELD
 check "groom points at the report contract rather than restating it" \
   'grep -qF "groom-report.md" .claude/skills/board/groom.md'
 # #562 split the cloud auto-generation guidance out of the board SKILL.md,
-# which is what took the emitted Windsurf workflow 539 characters past the
-# vendor cap. The doc ships on every backend; only the pointer to it is
+# which took a since-removed harness's emitted workflow 539 characters past
+# that vendor's cap. The doc ships on every backend; only the pointer to it is
 # conditional.
 check "spec-autogen contract ships beside the board skill" \
   'test -f .claude/skills/board/spec-autogen.md'

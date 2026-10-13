@@ -53,10 +53,6 @@ export const SKILL_SURFACE: Record<KnownHarness, SkillSurface> = {
     layout: { kind: "nested", root: ".opencode/skills", namespaced: true },
     invocable: true,
   },
-  windsurf: {
-    layout: { kind: "flat", dir: ".windsurf/workflows", ext: ".md" },
-    invocable: true,
-  },
   copilot: {
     layout: { kind: "flat", dir: ".github/instructions", ext: ".instructions.md" },
     invocable: false,

@@ -1,3 +1,4 @@
+import { isRemovedHarness } from "../domain/installed_lock.ts";
 import { parseArgs as stdParseArgs } from "@std/cli/parse-args";
 import { normaliseDiffPath } from "../domain/diff.ts";
 import {
@@ -63,7 +64,6 @@ export type Intent =
       | "claude"
       | "cursor"
       | "codex"
-      | "windsurf"
       | "copilot"
       | "opencode"
       | "antigravity"
@@ -152,6 +152,8 @@ export type Intent =
     path: string | null;
   }
   | { kind: "unknown"; received: string }
+  /** `init --ai <key>` naming a harness Specnaut used to support. */
+  | { kind: "removed-harness"; harness: string }
   | { kind: "reconcile-status" }
   | {
     kind: "reconcile-path";
@@ -232,12 +234,14 @@ export function parseArgs(argv: string[]): Intent {
   if (command === "init") {
     const aiProvided = typeof parsed.ai === "string";
     const aiRaw = aiProvided ? (parsed.ai as string) : null;
+    if (aiRaw !== null && isRemovedHarness(aiRaw)) {
+      return { kind: "removed-harness", harness: aiRaw };
+    }
     if (
       aiRaw !== null &&
       aiRaw !== "claude" &&
       aiRaw !== "cursor" &&
       aiRaw !== "codex" &&
-      aiRaw !== "windsurf" &&
       aiRaw !== "copilot" &&
       aiRaw !== "opencode" &&
       aiRaw !== "antigravity"

@@ -72,7 +72,7 @@ const ADDENDUM_PATH = ".specnaut/addenda/ship/release.md";
 
 const HARNESS_CASES = [
   { ai: "claude", phaseDoc: ".claude/skills/ship/phases/release.md" },
-  { ai: "windsurf", phaseDoc: ".windsurf/workflows/specnaut-ship-release.md" },
+  { ai: "copilot", phaseDoc: ".github/instructions/specnaut-ship-release.instructions.md" },
 ] as const;
 
 for (const { ai, phaseDoc } of HARNESS_CASES) {
@@ -152,7 +152,7 @@ Deno.test("upgrade grafts the phase-addenda pointer into an AGENTS.md that preda
     await Deno.writeTextFile(join(dir, "AGENTS.md"), own);
     assertEquals(
       (await runSpecnaut(
-        ["init", "--here", "--no-git", "--ai", "windsurf", "--backlog", "local"],
+        ["init", "--here", "--no-git", "--ai", "copilot", "--backlog", "local"],
         dir,
       )).code,
       0,
