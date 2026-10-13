@@ -7,15 +7,21 @@
 # about.
 #
 #   fast_gate — runs after EVERY commit while an epic's children are being
-#               worked. Keep it short. Its intended content is a surface pass:
-#               unit tests, an agent review, type checking. If it takes
-#               minutes, the loop it exists to make affordable stops being
-#               affordable.
+#               worked. A static pass only: formatter, linter, type checker.
+#               Not the unit suite — an agent commits many times per item,
+#               and the suite runs later at two points it cannot skip: once
+#               when the work is done (the review on the frozen tree), and
+#               once at the merge.
 #
 #   full_gate — runs ONCE, before the merge to the default branch, and never
-#               per child. This is where a long-running end-to-end suite
-#               belongs — the kind that drives a real browser, boots real
-#               services, or takes tens of minutes.
+#               per child. The unit suite plus whatever long-running
+#               functional or end-to-end suite the project has — the kind
+#               that drives a real browser, boots real services, or takes
+#               tens of minutes.
+#
+# Your own commit hook, if you have one, is the same moment as fast_gate and
+# should carry the same static checks. Specnaut installs no hook and edits
+# none; a hook that runs the whole suite runs it once per agent commit.
 #
 # Each key is a flat list of shell command strings, run in order, from the
 # repository root. A non-zero exit from any one of them fails that tier.
@@ -31,7 +37,8 @@
 # Example shape (the commands are yours; these are placeholders):
 #
 #   fast_gate:
-#     - <your unit test command>
+#     - <your formatter, in check mode>
+#     - <your linter>
 #     - <your type checker>
 #   full_gate:
 #     - <your unit test command>

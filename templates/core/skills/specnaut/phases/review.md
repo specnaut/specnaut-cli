@@ -44,6 +44,13 @@ a single report.
 Detect the project's toolchain by looking for marker files and run the
 corresponding commands. Stop at the first failure.
 
+**The test command runs once per item, not once per child.** On an epic child
+that is not the last, run the format, lint and type-check commands and **do not
+run the test command** — report it as `SKIPPED (epic child — runs at the last
+review)`, never as PASS. On a standalone item's review and on the last child's
+review, run it. That last run is the "work done" moment in
+`phases/quality-gates.md`: the unit suite, once, on the frozen tree.
+
 | Marker file       | Format command        | Lint command       | Type-check command | Test command        |
 |-------------------|-----------------------|--------------------|--------------------|---------------------|
 | `deno.json(c)`    | `deno fmt --check`    | `deno lint`        | `deno check **/*.ts` | `deno test`      |
@@ -162,7 +169,7 @@ Quality gates
   format              : PASS | FAIL | SKIPPED
   lint                : PASS | FAIL | SKIPPED
   typecheck           : PASS | FAIL | SKIPPED
-  test                : PASS | FAIL | SKIPPED
+  test                : PASS | FAIL | SKIPPED | SKIPPED (epic child — runs at the last review)
 
 Fixes applied
   - <file>:<line> — <one-line summary>

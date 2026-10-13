@@ -1097,6 +1097,29 @@ cheap. Running a project's whole suite once per child would cost more than the
 N-merges problem the loop removes. So there are two tiers, and the difference
 between them is **how often they run**, not how thorough they are.
 
+## Three moments, and what runs at each
+
+The workflow commits often — one commit per task, split by scope, and one per
+child on an epic. What is checked has to follow how often it runs:
+
+| Moment | What runs | How often |
+|--------|-----------|-----------|
+| **Every commit**, every epic child | Static checks only: format, lint, type check. The \`fast\` tier. **No unit suite.** | Once per commit |
+| **Work done** — \`implement\` freezes the tree and invokes \`review\` | The unit suite, on the frozen tree — \`review\`'s test command | **Once** per item; on an epic, at the last child's review |
+| **Merge** to the default branch | Unit plus functional / end-to-end. The \`full\` tier. | **Once** |
+
+The middle row needs no declaration: \`phases/review.md\` detects the project's
+test command and runs it there. On an epic it skips it for every child but the
+last, and reports the skip as its own state — a skipped suite never reads as a
+pass. If \`full\` is not declared, the merge runs nothing, and that last review's
+run is the latest the suite ran.
+
+**A commit hook is the first row.** Specnaut installs no git hook and edits
+none, and nothing here asks an agent to get past one. But if the project has a
+hook of its own, it runs at the first row's rate, so it should carry the
+static checks only. A hook that runs the whole suite runs it once per agent
+commit — the cost this table exists to remove.
+
 ## Where they are declared, and by whom
 
 \`.specnaut/gates.yml\`, two keys:
@@ -1111,15 +1134,18 @@ full_gate:
 
 Each key is a flat list of shell command strings. **They are the project's
 commands, run verbatim.** Specnaut does not know what a test is, what your
-runner is called, or what any of these do — and no bundled Specnaut file names
-a test tool, runner or framework. That is a constitutional constraint, not a
-style preference: this tool is stack-agnostic, and a tool name written into a
-shipped file would end that.
+runner is called, or what any of these do, and the gate mechanism names no test
+tool, runner or framework. That is a constitutional constraint, not a style
+preference: this tool is stack-agnostic, and a tool name written into the
+mechanism would end that.
 
 The constraint holds **structurally** rather than by review. There is nowhere
 in the mechanism for a tool name to be written: the declaration is yours, the
 runner executes what it reads, and neither this document nor the script has a
-default to fall back to.
+default to fall back to. The one sanctioned place where runners are named is
+\`phases/review.md\`'s auto-detect table, which recognises common toolchains by
+their marker files; it is detection, not a default this mechanism falls back
+to.
 
 ## Running one
 
@@ -1143,24 +1169,26 @@ is a second definition of what a gate is, and two definitions drift.
 
 ## \`fast\` — after every child commit
 
-Its intended content is a **surface pass**: unit tests, an agent review, type
-checking. Short enough that running it N times over an epic's children is not
-what makes the loop expensive. The content is yours to declare; the intent is
-what this document is for.
+Its intended content is a **static pass**: format, lint, type check. Not the
+unit suite — that runs once when the work is done, and again at the merge.
+Short enough that running it N times over an epic's children is not what makes
+the loop expensive. The content is yours to declare; the intent is what this
+document is for.
 
 **A child that fails its fast gate is fixed in place.** The lead fixes it, the
 gate re-runs for that child, and the loop continues to the next. It is not an
 escalation and it does not hand back to the user.
 
-**The agent review inside this tier never stops the loop either.** Findings go
-to the lead, who triages, fixes, commits the child and moves on in the same
-turn. Only the last child's review is a stop.
+**The child's review never stops the loop either** (\`phases/review.md\`, which
+skips the test command on every child but the last). Findings go to the lead,
+who triages, fixes, commits the child and moves on in the same turn. Only the
+last child's review is a stop.
 
 ## \`full\` — once, before the merge
 
-Its intended content includes whatever **long-running end-to-end suite** the
-project has: the kind that drives a real browser, boots real services, or takes
-tens of minutes.
+Its intended content is the **unit suite plus whatever long-running functional
+or end-to-end suite** the project has: the kind that drives a real browser,
+boots real services, or takes tens of minutes.
 
 **It runs once, before the merge to the default branch, and never per child.**
 That is the whole reason the tiers exist, and it is stated here plainly rather
@@ -1662,6 +1690,13 @@ a single report.
 Detect the project's toolchain by looking for marker files and run the
 corresponding commands. Stop at the first failure.
 
+**The test command runs once per item, not once per child.** On an epic child
+that is not the last, run the format, lint and type-check commands and **do not
+run the test command** — report it as \`SKIPPED (epic child — runs at the last
+review)\`, never as PASS. On a standalone item's review and on the last child's
+review, run it. That last run is the "work done" moment in
+\`phases/quality-gates.md\`: the unit suite, once, on the frozen tree.
+
 | Marker file       | Format command        | Lint command       | Type-check command | Test command        |
 |-------------------|-----------------------|--------------------|--------------------|---------------------|
 | \`deno.json(c)\`    | \`deno fmt --check\`    | \`deno lint\`        | \`deno check **/*.ts\` | \`deno test\`      |
@@ -1780,7 +1815,7 @@ Quality gates
   format              : PASS | FAIL | SKIPPED
   lint                : PASS | FAIL | SKIPPED
   typecheck           : PASS | FAIL | SKIPPED
-  test                : PASS | FAIL | SKIPPED
+  test                : PASS | FAIL | SKIPPED | SKIPPED (epic child — runs at the last review)
 
 Fixes applied
   - <file>:<line> — <one-line summary>
@@ -6197,15 +6232,26 @@ Run each item literally. Don't trust memory — the whole point of this
 skill is to override the agent's tendency to say "I'm pretty sure I
 did that already".
 
-### 1. Tests are actually green
+### 1. Tests are actually green — at the right scope
 
-\`\`\`bash
-deno task test
-\`\`\`
+Which tests depends on what you are about to call done:
 
-Expected: \`<N> passed | 0 failed\`. **Read the actual output.** If the
-number of passed tests is lower than the previous baseline AND no
-tests were intentionally removed, that's a silent skip — find it.
+- **A task inside a larger piece of work** (an implementer reporting
+  \`DONE\` to its controller, one child of an epic): the tests **relevant
+  to your change** — the files you touched and the ones that exercise
+  them. Not the whole suite. The bundled workflow commits once per task,
+  and the whole suite at that rate costs its runtime times the commit
+  count while catching nothing a single run at the end would miss.
+- **The work as a whole** (a feature reported complete, before a PR or a
+  merge, before a release): the project's **whole** unit suite, once.
+
+Use this project's own test command — read it from the task runner or
+the CI workflow, the same way item 2 finds the other gates. Do not
+assume one.
+
+Expected: a pass count and zero failures. **Read the actual output.**
+If the number of passed tests is lower than the previous baseline AND
+no tests were intentionally removed, that's a silent skip — find it.
 
 A test that didn't run is not a test that passed.
 
@@ -6335,7 +6381,7 @@ The user trusts a report shaped like this far more than a bare "done".
 - \`executing-plans\` — the inline executor invokes this skill at the
   final whole-plan checkpoint before opening the PR
 - \`/release\` — the release skill already includes inline verification
-  (preflight checks, smoke audit, deno task test). This skill formalises
+  (preflight checks, smoke audit, the whole suite). This skill formalises
   the same discipline for non-release work.
 
 ## Out of scope
@@ -6653,7 +6699,7 @@ HANDOFF_TARGET: developer | review-coordinator | qa-tester | product-owner | wor
 - \`STATE: done\` only when assigned exit criteria are met; otherwise use \`awaiting_review\` /
   \`awaiting_qa\` / \`blocked\`. Never \`done\` with \`DONE_CRITERIA_MET: no\`.
 - \`FILES_CHANGED: none\` for read-only agents (experts/reviewers).
-- \`VALIDATION\` is explicit, e.g. \`deno task test (pass)\`.
+- \`VALIDATION\` is explicit, e.g. \`<the command you ran> (pass)\`.
 - \`HANDOFF_TARGET: none\` when work terminates here.
 `,
     executable: false,
@@ -29844,15 +29890,21 @@ exit 0
 # about.
 #
 #   fast_gate — runs after EVERY commit while an epic's children are being
-#               worked. Keep it short. Its intended content is a surface pass:
-#               unit tests, an agent review, type checking. If it takes
-#               minutes, the loop it exists to make affordable stops being
-#               affordable.
+#               worked. A static pass only: formatter, linter, type checker.
+#               Not the unit suite — an agent commits many times per item,
+#               and the suite runs later at two points it cannot skip: once
+#               when the work is done (the review on the frozen tree), and
+#               once at the merge.
 #
 #   full_gate — runs ONCE, before the merge to the default branch, and never
-#               per child. This is where a long-running end-to-end suite
-#               belongs — the kind that drives a real browser, boots real
-#               services, or takes tens of minutes.
+#               per child. The unit suite plus whatever long-running
+#               functional or end-to-end suite the project has — the kind
+#               that drives a real browser, boots real services, or takes
+#               tens of minutes.
+#
+# Your own commit hook, if you have one, is the same moment as fast_gate and
+# should carry the same static checks. Specnaut installs no hook and edits
+# none; a hook that runs the whole suite runs it once per agent commit.
 #
 # Each key is a flat list of shell command strings, run in order, from the
 # repository root. A non-zero exit from any one of them fails that tier.
@@ -29868,7 +29920,8 @@ exit 0
 # Example shape (the commands are yours; these are placeholders):
 #
 #   fast_gate:
-#     - <your unit test command>
+#     - <your formatter, in check mode>
+#     - <your linter>
 #     - <your type checker>
 #   full_gate:
 #     - <your unit test command>

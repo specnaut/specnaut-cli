@@ -35,5 +35,5 @@ HANDOFF_TARGET: developer | review-coordinator | qa-tester | product-owner | wor
 - `STATE: done` only when assigned exit criteria are met; otherwise use `awaiting_review` /
   `awaiting_qa` / `blocked`. Never `done` with `DONE_CRITERIA_MET: no`.
 - `FILES_CHANGED: none` for read-only agents (experts/reviewers).
-- `VALIDATION` is explicit, e.g. `deno task test (pass)`.
+- `VALIDATION` is explicit, e.g. `<the command you ran> (pass)`.
 - `HANDOFF_TARGET: none` when work terminates here.

@@ -35,15 +35,26 @@ Run each item literally. Don't trust memory — the whole point of this
 skill is to override the agent's tendency to say "I'm pretty sure I
 did that already".
 
-### 1. Tests are actually green
+### 1. Tests are actually green — at the right scope
 
-```bash
-deno task test
-```
+Which tests depends on what you are about to call done:
 
-Expected: `<N> passed | 0 failed`. **Read the actual output.** If the
-number of passed tests is lower than the previous baseline AND no
-tests were intentionally removed, that's a silent skip — find it.
+- **A task inside a larger piece of work** (an implementer reporting
+  `DONE` to its controller, one child of an epic): the tests **relevant
+  to your change** — the files you touched and the ones that exercise
+  them. Not the whole suite. The bundled workflow commits once per task,
+  and the whole suite at that rate costs its runtime times the commit
+  count while catching nothing a single run at the end would miss.
+- **The work as a whole** (a feature reported complete, before a PR or a
+  merge, before a release): the project's **whole** unit suite, once.
+
+Use this project's own test command — read it from the task runner or
+the CI workflow, the same way item 2 finds the other gates. Do not
+assume one.
+
+Expected: a pass count and zero failures. **Read the actual output.**
+If the number of passed tests is lower than the previous baseline AND
+no tests were intentionally removed, that's a silent skip — find it.
 
 A test that didn't run is not a test that passed.
 
@@ -173,7 +184,7 @@ The user trusts a report shaped like this far more than a bare "done".
 - `executing-plans` — the inline executor invokes this skill at the
   final whole-plan checkpoint before opening the PR
 - `/release` — the release skill already includes inline verification
-  (preflight checks, smoke audit, deno task test). This skill formalises
+  (preflight checks, smoke audit, the whole suite). This skill formalises
   the same discipline for non-release work.
 
 ## Out of scope
