@@ -2164,6 +2164,8 @@ Follow this execution flow:
    - Preserve heading hierarchy and comments can be removed once replaced unless they still add clarifying guidance.
    - Ensure each Principle section: succinct name line, paragraph (or bullet list) capturing non‑negotiable rules, explicit rationale if not obvious.
    - Ensure Governance section lists amendment procedure, versioning policy, and compliance review expectations.
+   - Keep the constitution to principles. Delivery status, task and epic narratives, and dated incident history do not belong in it: link the issue or spec that holds them instead. The file is loaded into every session, and the size ratchet holds it to the \`constitution\` unit of the \`## Size limits\` table (\`.specnaut/memory/size-limits.md\`).
+   - Shrinking the file never licenses dropping a principle: a removal still takes the MAJOR bump of step 2.
 
 4. Consistency propagation checklist (convert prior checklist into active validations):
    - Read \`.specnaut/templates/plan-template.md\` and ensure any "Constitution Check" or rules align with updated principles.
@@ -2172,7 +2174,7 @@ Follow this execution flow:
    - Read each command file in \`.specnaut/templates/commands/*.md\` (including this one) to verify no outdated references (agent-specific names like CLAUDE only) remain when generic guidance is required.
    - Read any runtime guidance docs (e.g., \`README.md\`, \`docs/quickstart.md\`, or agent-specific guidance files if present). Update references to principles changed.
 
-5. Produce a Sync Impact Report (prepend as an HTML comment at top of the constitution file after update):
+5. Produce a Sync Impact Report as an HTML comment at the top of the constitution file, **replacing** the existing one. The file carries exactly one report, the latest; earlier ones stay in git history. Carry forward into the new report any follow-up from the previous one that is still intentionally unresolved. The report holds:
    - Version change: old → new
    - List of modified principles (old title → new title if renamed)
    - Added sections
@@ -2182,6 +2184,7 @@ Follow this execution flow:
 
 6. Validation before final output:
    - No remaining unexplained bracket tokens.
+   - Exactly one Sync Impact Report, at the top of the file.
    - Version line matches report.
    - Dates ISO format YYYY-MM-DD.
    - Principles are declarative, testable, and free of vague language ("should" → replace with MUST/SHOULD rationale where appropriate).
@@ -16108,6 +16111,7 @@ continuous supervision of long headless work, use \`/loop 5m /status-audit\`.
 | :--- | ---: | ---: |
 | file | 300 | 500 |
 | function | 30 | 50 |
+| constitution | 300 | 500 |
 
 Exempt: \`*.lock\`
 
@@ -16166,6 +16170,11 @@ limit with its source: \`constitution\` or \`default\`.
 | :--- | ---: | ---: |
 | file | 300 | 500 |
 | function | 30 | 50 |
+| constitution | 300 | 500 |
+
+\`constitution\` is the constitution file itself. It is loaded into every
+session, so every line it gains is paid by every later session; it is the one
+file under \`.specnaut/\` the limits measure.
 
 ## The table, in a constitution
 
@@ -16176,12 +16185,14 @@ limit with its source: \`constitution\` or \`default\`.
 | :--- | ---: | ---: |
 | file | 300 | 500 |
 | function | 30 | 50 |
+| constitution | 300 | 500 |
 
 Exempt: \`*.lock\`, \`**/generated/**\`
 \`\`\`
 
-- One row per unit, no merged cells. \`file\` and \`function\` are the expected
-  rows; others (\`class\`, \`component\`) are allowed and judged by the agents.
+- One row per unit, no merged cells. \`file\`, \`function\` and \`constitution\` are
+  the expected rows; others (\`class\`, \`component\`) are allowed and judged by
+  the agents.
 - A value is a whole number of lines, or \`none\`. \`none\` as a target turns off
   rule 2 for that unit; \`none\` as a ceiling turns off rule 1.
 - \`Exempt:\` is optional: backquoted globs, comma-separated, matched against the
@@ -16193,6 +16204,9 @@ Exempt: \`*.lock\`, \`**/generated/**\`
   defaults.
 - Specnaut's own files — \`.specnaut/**\` and everything \`.specnaut/installed.lock\`
   lists — are exempt without being listed: \`specnaut upgrade\` rewrites them.
+  The constitution is the exception: whenever it changes, the ratchet holds it
+  to the \`constitution\` unit, and \`Exempt:\` globs do not reach it. To lift its
+  limit, write \`| constitution | none | none |\`.
 
 ## The three rules
 
@@ -26328,6 +26342,7 @@ notes it in the completion report.
 | :--- | ---: | ---: |
 | file | 300 | 500 |
 | function | 30 | 50 |
+| constitution | 300 | 500 |
 
 Exempt: \`*.lock\`
 
@@ -28126,11 +28141,11 @@ exit 0
 #   size-ratchet.sh [--report]                  staged changes (pre-commit)
 #   size-ratchet.sh --since <ref> [--report]    committed changes, <ref> → HEAD
 #
-# Reads the \`file\` row and the \`Exempt:\` line of the \`## Size limits\` table in
-# \`.specnaut/memory/constitution.md\`. With no such table, or no \`file\` row in
-# it, the defaults in \`.specnaut/memory/size-limits.md\` apply (300 / 500). That
-# file states the rules; this script is their deterministic half, and the one
-# measurer the review coordinator calls.
+# Reads the \`file\` and \`constitution\` rows and the \`Exempt:\` line of the
+# \`## Size limits\` table in \`.specnaut/memory/constitution.md\`. A unit the table
+# does not list takes the defaults in \`.specnaut/memory/size-limits.md\` (300 /
+# 500 for both). That file states the rules; this script is their deterministic
+# half, and the one measurer the review coordinator calls.
 #
 # "Before" is the size at the BASE OF THE CHANGE, not at the previous commit:
 #
@@ -28150,7 +28165,10 @@ exit 0
 #
 # Exempt without asking: \`.specnaut/**\` and every file \`.specnaut/installed.lock\`
 # lists — Specnaut's own artefacts, which \`specnaut upgrade\` rewrites — plus
-# binary files and the constitution's \`Exempt:\` globs.
+# binary files and the constitution's \`Exempt:\` globs. One file is the
+# exception: the constitution itself, loaded into every session, is held to the
+# \`constitution\` unit whenever it changes. \`Exempt:\` globs do not reach it; a
+# project that wants no limit says \`| constitution | none | none |\`.
 #
 # \`--report\` also prints every checked file, \`path: before → after\`.
 #
@@ -28196,9 +28214,28 @@ LOCK=".specnaut/installed.lock"
 target="\$DEFAULT_TARGET"
 ceiling="\$DEFAULT_CEILING"
 source_label="default"
+c_target="\$DEFAULT_TARGET"
+c_ceiling="\$DEFAULT_CEILING"
+c_source="default"
 exempt=()
 
 unreadable() { echo "size-ratchet: \$CONSTITUTION: \$1" >&2; exit 2; }
+
+# read_row <unit> <section> → "target ceiling" when the table lists the unit,
+# nothing when it does not. Any row naming the unit loosely (a plural, another
+# case) must be exactly <unit>: otherwise it would be skipped and the defaults
+# would silently apply.
+read_row() {
+  local unit="\$1" section="\$2" like value_re='(none|[0-9]+)'
+  like="\$(printf '%s\\n' "\$section" | grep -Ei "^\\|[[:space:]]*\${unit}s?[[:space:]]*\\|" || true)"
+  [ -n "\$like" ] || return 0
+  [ "\$(printf '%s\\n' "\$like" | wc -l | tr -d ' ')" = "1" ] ||
+    unreadable "the '\$unit' unit is listed more than once"
+  printf '%s\\n' "\$like" |
+    grep -Eq "^\\|[[:space:]]*\${unit}[[:space:]]*\\|[[:space:]]*\${value_re}[[:space:]]*\\|[[:space:]]*\${value_re}[[:space:]]*\\|[[:space:]]*\$" ||
+    unreadable "cannot read the row '\$like' — expected: | \$unit | <lines or none> | <lines or none> |"
+  printf '%s\\n' "\$like" | awk -F'|' '{ gsub(/[[:space:]]/, "", \$3); gsub(/[[:space:]]/, "", \$4); print \$3, \$4 }'
+}
 
 # --- read the table -----------------------------------------------------------
 if [ -f "\$CONSTITUTION" ]; then
@@ -28211,19 +28248,17 @@ if [ -f "\$CONSTITUTION" ]; then
     printf '%s\\n' "\$section" |
       grep -Eq '^\\|[[:space:]]*Unit[[:space:]]*\\|[[:space:]]*Target[[:space:]]*\\|[[:space:]]*Ceiling[[:space:]]*\\|' ||
       unreadable "the '## Size limits' section has no 'Unit | Target | Ceiling' table"
-    # Any row naming a file-like unit must be exactly \`file\`; \`files\` or \`File\`
-    # would otherwise be skipped and the defaults would silently apply.
-    file_like="\$(printf '%s\\n' "\$section" | grep -Ei '^\\|[[:space:]]*files?[[:space:]]*\\|' || true)"
-    if [ -n "\$file_like" ]; then
-      [ "\$(printf '%s\\n' "\$file_like" | wc -l | tr -d ' ')" = "1" ] ||
-        unreadable "the 'file' unit is listed more than once"
-      value_re='(none|[0-9]+)'
-      printf '%s\\n' "\$file_like" |
-        grep -Eq "^\\|[[:space:]]*file[[:space:]]*\\|[[:space:]]*\${value_re}[[:space:]]*\\|[[:space:]]*\${value_re}[[:space:]]*\\|[[:space:]]*\$" ||
-        unreadable "cannot read the row '\$file_like' — expected: | file | <lines or none> | <lines or none> |"
-      target="\$(printf '%s\\n' "\$file_like" | awk -F'|' '{ gsub(/[[:space:]]/, "", \$3); print \$3 }')"
-      ceiling="\$(printf '%s\\n' "\$file_like" | awk -F'|' '{ gsub(/[[:space:]]/, "", \$4); print \$4 }')"
+    # read_row exits 2 itself, so its output is captured before it is split:
+    # \`read -r a b < <(read_row …)\` would swallow that exit.
+    row="\$(read_row file "\$section")" || exit 2
+    if [ -n "\$row" ]; then
+      read -r target ceiling <<<"\$row"
       source_label="constitution"
+    fi
+    row="\$(read_row constitution "\$section")" || exit 2
+    if [ -n "\$row" ]; then
+      read -r c_target c_ceiling <<<"\$row"
+      c_source="constitution"
     fi
     exempt_line="\$(printf '%s\\n' "\$section" | grep -E '^Exempt:' || true)"
     if [ -n "\$exempt_line" ]; then
@@ -28288,6 +28323,7 @@ else
 fi
 
 checked=0
+constitution_over=0
 violations=()
 notes=()
 while IFS=\$'\\t' read -r status first second; do
@@ -28296,28 +28332,38 @@ while IFS=\$'\\t' read -r status first second; do
     R* | C*) old="\$first" path="\$second" ;;
     *) old="\$first" path="\$first" ;;
   esac
-  is_exempt "\$path" && continue
+  if [ "\$path" = "\$CONSTITUTION" ]; then
+    t="\$c_target" c="\$c_ceiling" label=" (unit constitution, source: \$c_source)"
+  else
+    is_exempt "\$path" && continue
+    t="\$target" c="\$ceiling" label=""
+  fi
   numstat="\$(git diff "\${diff_args[@]}" --numstat -- "\$path" | head -n 1)"
   case "\$numstat" in -\$'\\t'-*) continue ;; esac
 
   if [ -n "\$base" ]; then before="\$(count_at "\$base:\$old")"; else before=0; fi
   after="\$(count_at "\$head_prefix\$path")"
   checked=\$((checked + 1))
-  line="\$path: \$before → \$after (target \$target, ceiling \$ceiling)"
+  line="\$path: \$before → \$after (target \$t, ceiling \$c)\$label"
   [ "\$REPORT" = 1 ] && echo "  \$path: \$before → \$after"
 
-  if [ "\$ceiling" != "none" ] && [ "\$after" -gt "\$ceiling" ]; then
+  verdict=""
+  if [ "\$c" != "none" ] && [ "\$after" -gt "\$c" ]; then
     if [ "\$after" -lt "\$before" ]; then
       notes+=("\$line — over the ceiling, shrinking")
     else
-      violations+=("\$line — over the ceiling")
+      verdict="over the ceiling"
     fi
-  elif [ "\$target" != "none" ] && [ "\$after" -gt "\$target" ]; then
-    if [ "\$before" -gt "\$target" ] && [ "\$after" -gt "\$before" ]; then
-      violations+=("\$line — over the target and grew")
-    elif [ "\$before" -le "\$target" ]; then
+  elif [ "\$t" != "none" ] && [ "\$after" -gt "\$t" ]; then
+    if [ "\$before" -gt "\$t" ] && [ "\$after" -gt "\$before" ]; then
+      verdict="over the target and grew"
+    elif [ "\$before" -le "\$t" ]; then
       notes+=("\$line — crosses the target")
     fi
+  fi
+  if [ -n "\$verdict" ]; then
+    violations+=("\$line — \$verdict")
+    [ "\$path" = "\$CONSTITUTION" ] && constitution_over=1
   fi
 done < <(git diff "\${diff_args[@]}" --name-status -M --diff-filter=ACMR)
 
@@ -28327,6 +28373,11 @@ if [ "\${#violations[@]}" -gt 0 ]; then
   echo "size-ratchet: \${#violations[@]} of \$checked \$scope file(s) break the file limits (source: \$source_label)" >&2
   for v in "\${violations[@]}"; do echo "  \$v" >&2; done
   echo "  extract before you add — .specnaut/memory/size-limits.md" >&2
+  if [ "\$constitution_over" = 1 ]; then
+    echo "  the constitution keeps principles only: move delivery status, task and epic" >&2
+    echo "  narratives, dated incident history and every Sync Impact Report but the" >&2
+    echo "  latest out of it, and link the issue or spec instead" >&2
+  fi
   exit 1
 fi
 echo "size-ratchet: \$checked \$scope file(s) within the file limits (target \$target, ceiling \$ceiling, source: \$source_label)"

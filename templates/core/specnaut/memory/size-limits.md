@@ -22,6 +22,11 @@ limit with its source: `constitution` or `default`.
 | :--- | ---: | ---: |
 | file | 300 | 500 |
 | function | 30 | 50 |
+| constitution | 300 | 500 |
+
+`constitution` is the constitution file itself. It is loaded into every
+session, so every line it gains is paid by every later session; it is the one
+file under `.specnaut/` the limits measure.
 
 ## The table, in a constitution
 
@@ -32,12 +37,14 @@ limit with its source: `constitution` or `default`.
 | :--- | ---: | ---: |
 | file | 300 | 500 |
 | function | 30 | 50 |
+| constitution | 300 | 500 |
 
 Exempt: `*.lock`, `**/generated/**`
 ```
 
-- One row per unit, no merged cells. `file` and `function` are the expected
-  rows; others (`class`, `component`) are allowed and judged by the agents.
+- One row per unit, no merged cells. `file`, `function` and `constitution` are
+  the expected rows; others (`class`, `component`) are allowed and judged by
+  the agents.
 - A value is a whole number of lines, or `none`. `none` as a target turns off
   rule 2 for that unit; `none` as a ceiling turns off rule 1.
 - `Exempt:` is optional: backquoted globs, comma-separated, matched against the
@@ -49,6 +56,9 @@ Exempt: `*.lock`, `**/generated/**`
   defaults.
 - Specnaut's own files — `.specnaut/**` and everything `.specnaut/installed.lock`
   lists — are exempt without being listed: `specnaut upgrade` rewrites them.
+  The constitution is the exception: whenever it changes, the ratchet holds it
+  to the `constitution` unit, and `Exempt:` globs do not reach it. To lift its
+  limit, write `| constitution | none | none |`.
 
 ## The three rules
 

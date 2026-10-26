@@ -75,6 +75,8 @@ Follow this execution flow:
    - Preserve heading hierarchy and comments can be removed once replaced unless they still add clarifying guidance.
    - Ensure each Principle section: succinct name line, paragraph (or bullet list) capturing non‑negotiable rules, explicit rationale if not obvious.
    - Ensure Governance section lists amendment procedure, versioning policy, and compliance review expectations.
+   - Keep the constitution to principles. Delivery status, task and epic narratives, and dated incident history do not belong in it: link the issue or spec that holds them instead. The file is loaded into every session, and the size ratchet holds it to the `constitution` unit of the `## Size limits` table (`.specnaut/memory/size-limits.md`).
+   - Shrinking the file never licenses dropping a principle: a removal still takes the MAJOR bump of step 2.
 
 4. Consistency propagation checklist (convert prior checklist into active validations):
    - Read `.specnaut/templates/plan-template.md` and ensure any "Constitution Check" or rules align with updated principles.
@@ -83,7 +85,7 @@ Follow this execution flow:
    - Read each command file in `.specnaut/templates/commands/*.md` (including this one) to verify no outdated references (agent-specific names like CLAUDE only) remain when generic guidance is required.
    - Read any runtime guidance docs (e.g., `README.md`, `docs/quickstart.md`, or agent-specific guidance files if present). Update references to principles changed.
 
-5. Produce a Sync Impact Report (prepend as an HTML comment at top of the constitution file after update):
+5. Produce a Sync Impact Report as an HTML comment at the top of the constitution file, **replacing** the existing one. The file carries exactly one report, the latest; earlier ones stay in git history. Carry forward into the new report any follow-up from the previous one that is still intentionally unresolved. The report holds:
    - Version change: old → new
    - List of modified principles (old title → new title if renamed)
    - Added sections
@@ -93,6 +95,7 @@ Follow this execution flow:
 
 6. Validation before final output:
    - No remaining unexplained bracket tokens.
+   - Exactly one Sync Impact Report, at the top of the file.
    - Version line matches report.
    - Dates ISO format YYYY-MM-DD.
    - Principles are declarative, testable, and free of vague language ("should" → replace with MUST/SHOULD rationale where appropriate).

@@ -82,3 +82,22 @@ Deno.test("the ratchet is invoked through bash, and a run that did not happen is
   assert(c.includes('never brief "no size data" as clean'), "coordinator");
   assert(g.includes("never a pass"), "quality gates");
 });
+
+Deno.test("constitution: one Sync Impact Report, replaced, and the file is held to its own unit (#663)", async () => {
+  const phase = await read("templates/core/skills/specnaut/phases/constitution.md");
+  assert(phase.includes("**replacing** the existing one"), "step 5 replaces the report");
+  assert(!/prepend/i.test(phase), "no step prepends a report");
+  assert(phase.includes("Exactly one Sync Impact Report"), "step 6 validates it");
+  assert(phase.includes("Delivery status, task and epic narratives"), "step 3 keeps history out");
+  assert(phase.includes("still takes the MAJOR bump"), "shrinking never drops a principle");
+  const limits = await read("templates/core/specnaut/memory/size-limits.md");
+  assert(limits.includes("| constitution | 300 | 500 |"), "default row");
+  for (
+    const p of [
+      "templates/core/specnaut/templates/constitution-template.md",
+      "templates/core/specnaut/memory/constitution.md",
+    ]
+  ) {
+    assert((await read(p)).includes("| constitution | 300 | 500 |"), `${p} ships the row`);
+  }
+});

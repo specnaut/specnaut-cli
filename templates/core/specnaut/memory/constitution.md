@@ -20,6 +20,7 @@
 | :--- | ---: | ---: |
 | file | 300 | 500 |
 | function | 30 | 50 |
+| constitution | 300 | 500 |
 
 Exempt: `*.lock`
 

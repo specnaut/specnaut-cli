@@ -7,59 +7,18 @@
 // check ran, not merely that nothing failed.
 
 import { assert, assertEquals, assertStringIncludes } from "@std/assert";
-import { fromFileUrl, join } from "@std/path";
-
-const SCRIPT = fromFileUrl(
-  new URL("../../templates/core/specnaut/scripts/bash/size-ratchet.sh", import.meta.url),
-);
-
-type Result = { code: number; stdout: string; stderr: string };
-
-async function run(bin: string, args: string[], cwd: string): Promise<Result> {
-  const { code, stdout, stderr } = await new Deno.Command(bin, {
-    args,
-    cwd,
-    stdout: "piped",
-    stderr: "piped",
-    env: {
-      GIT_AUTHOR_NAME: "t",
-      GIT_AUTHOR_EMAIL: "t@t",
-      GIT_COMMITTER_NAME: "t",
-      GIT_COMMITTER_EMAIL: "t@t",
-    },
-  }).output();
-  const d = new TextDecoder();
-  return { code, stdout: d.decode(stdout), stderr: d.decode(stderr) };
-}
-
-const lines = (n: number) => Array.from({ length: n }, (_, i) => `line ${i + 1}`).join("\n") + "\n";
-
-const TABLE = (file: string, exempt = "") =>
-  `# Constitution\n\n## Size limits\n\n| Unit | Target | Ceiling |\n| :--- | ---: | ---: |\n${file}\n| function | 30 | 50 |\n${exempt}\n## Next\n`;
-
-/** A repo with `big.ts` committed at `start` lines and the constitution given. */
-async function repo(start: number, constitution?: string): Promise<string> {
-  const dir = await Deno.makeTempDir({ prefix: "size-ratchet-" });
-  await run("git", ["init", "-q"], dir);
-  await Deno.writeTextFile(join(dir, "big.ts"), lines(start));
-  if (constitution !== undefined) {
-    await Deno.mkdir(join(dir, ".specnaut/memory"), { recursive: true });
-    await Deno.writeTextFile(join(dir, ".specnaut/memory/constitution.md"), constitution);
-  }
-  await run("git", ["add", "-A"], dir);
-  await run("git", ["commit", "-q", "-m", "init"], dir);
-  return dir;
-}
-
-async function stage(dir: string, path: string, n: number): Promise<void> {
-  await Deno.writeTextFile(join(dir, path), lines(n));
-  await run("git", ["add", path], dir);
-}
-
-const BASH = "bash";
-const ratchet = (dir: string) => run(BASH, [SCRIPT], dir);
-const CLEAN = "staged file(s) within the file limits";
-const isWindows = Deno.build.os === "windows";
+import { join } from "@std/path";
+import {
+  BASH,
+  CLEAN,
+  isWindows,
+  ratchet,
+  repo,
+  run,
+  SCRIPT,
+  stage,
+  TABLE,
+} from "./size_ratchet_fixture.ts";
 
 Deno.test("an over-target file that grows is refused, with before → after and the limits", {
   ignore: isWindows,
