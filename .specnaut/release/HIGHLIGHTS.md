@@ -1,10 +1,10 @@
-**The OpenCode plugin installs.** The documented `opencode.json` line never installed anything:
-OpenCode installs plugins with npm's installer, which needs a `package.json` this repository did not
-have. It has one now, and the line is pinned to the release tag, so an install gets a released
-plugin rather than whatever `main` holds. Copy the line again from the README to pick it up.
+**A file you declared preserved survives its retirement.** When a release stopped shipping a path
+listed in `.specnaut/preserve.yml`, `specnaut upgrade` warned that the declaration was ignored and
+then deleted the file. It now keeps the file and keeps tracking it, and every upgrade reports that
+upstream no longer ships it until you remove the declaration. A declared file that a release renamed
+stays where it is, and the new document is added beside it.
 
-**`specnaut upgrade` deletes only what Specnaut wrote.** A file that left the bundle is removed only
-from the folders Specnaut writes, such as `.claude/skills/` or `.specnaut/scripts/`, and never
-through a symbolic link that leads elsewhere. Anything else the lock names is reported as no longer
-tracked and left on disk, `--force` included. A retired file you edited now stays tracked, so every
-upgrade reports it until you delete it or pass `--force`, which backs it up first.
+**Removing a file never reaches the project itself.** `upgrade` judges each removal on the file it
+actually removes. A path that lands on the project folder, whether through a symbolic link or as
+`.`, is refused, and so is a name the filesystem could read as something else, such as one ending in
+a dot or a space.

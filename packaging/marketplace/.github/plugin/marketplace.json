@@ -18,7 +18,7 @@
         "source": "github",
         "repo": "specnaut/specnaut-cli",
         "path": "plugin",
-        "ref": "v7.0.1"
+        "ref": "v7.0.2"
       }
     }
   ]
