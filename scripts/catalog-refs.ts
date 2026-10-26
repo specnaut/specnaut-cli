@@ -62,7 +62,7 @@ const OPENCODE_SPEC = "specnaut@git+https://github.com/specnaut/specnaut-cli.git
 // The ref is a tag's characters only, so punctuation after the specifier —
 // `#v7.0.0)`, `#v7.0.0',` — is neither swallowed by a stamp nor read as the ref.
 const OPENCODE_PIN = new RegExp(
-  `${OPENCODE_SPEC.replace(/[.+]/g, "\\$&")}(#[0-9A-Za-z._+-]*)?`,
+  `${OPENCODE_SPEC.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}(#[0-9A-Za-z._+-]*)?`,
   "g",
 );
 
