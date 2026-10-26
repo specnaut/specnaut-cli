@@ -8,9 +8,15 @@ design spec (2026-05-26, "release flow") lives in the maintainer workspace.
 - `postflight.sh <tag>` — runs after the tag has been pushed: watches `release.yml`, verifies the
   GitHub Release has its assets, verifies the Homebrew tap formula bumped, refreshes the local
   binary, verifies the artefacts against the attestation, then runs the published binary end to end
-  through `smoke-published.sh`.
+  through `smoke-published.sh` and `smoke-upgrade.sh`.
 - `smoke-published.sh <tag> [binary]` — `init`, scaffold check and `check --project` with the
-  installed binary in a throwaway directory. The only check that executes what users download.
+  installed binary in a throwaway directory. With `smoke-upgrade.sh`, the only checks that execute
+  what users download.
+- `smoke-upgrade.sh <tag> [binary]` — installs the previous published stable release with
+  `install.sh`, scaffolds with it, and upgrades that project twice with the installed binary: a
+  declared file the bundle does not ship stays on disk, in the lock and reported, and a lock entry
+  outside Specnaut's folders leaves its file untouched. Exit 1 is a broken release; exit 3 (no
+  release before `<tag>`) and exit 4 (the previous project could not be prepared) are skips.
 
 These files are convention-pathed (the release skill expects them here). To adjust a check, edit the
 relevant script — never inline new checks into the skill, or you defeat the whole point of the

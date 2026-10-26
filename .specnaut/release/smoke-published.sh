@@ -30,7 +30,7 @@ fail() { echo "❌ published-binary smoke: $*"; exit 1; }
 
 git -C "$dir" init -q || fail "could not create a throwaway git repository"
 
-( cd "$dir" && $BIN init --here --no-git --ai claude --backlog local ) > "$dir/.init.log" 2>&1 ||
+( cd "$dir" && $BIN init --here --no-git --ai claude --backlog local ) < /dev/null > "$dir/.init.log" 2>&1 ||
   { tail -20 "$dir/.init.log"; fail "\`specnaut init\` exited non-zero"; }
 
 for f in AGENTS.md .claude/skills/specnaut/SKILL.md .claude/skills/board/SKILL.md \
@@ -41,7 +41,7 @@ done
 got="$(sed -n 's/^templates_version:[[:space:]]*//p' "$dir/.specnaut/installed.lock" | head -1)"
 [ "$got" = "$want" ] || fail "the lock records templates $got, expected $want — the binary carries a stale bundle"
 
-( cd "$dir" && $BIN check --project ) > "$dir/.check.log" 2>&1 ||
+( cd "$dir" && $BIN check --project ) < /dev/null > "$dir/.check.log" 2>&1 ||
   { tail -20 "$dir/.check.log"; fail "\`specnaut check --project\` exited non-zero on a fresh scaffold"; }
 
 echo "✓ published binary: init, scaffold (templates $want) and check --project all pass"

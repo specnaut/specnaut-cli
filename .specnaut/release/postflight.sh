@@ -338,6 +338,28 @@ elif ! bash .specnaut/release/smoke-published.sh "$TAG"; then
   exit 1
 fi
 
+# A fresh init is not what most users run on a release: they upgrade a project
+# an earlier one made (cli#670). The same hard failure and the same skip rule;
+# no earlier release to upgrade from is a skip, said as one, never a pass, and so
+# is a project the previous release could not prepare: that says nothing of $TAG.
+upgradesmoke_skip=""
+echo "▶ upgrading a previous release's project with the published binary"
+if [ "$selfupdate_warned" -eq 1 ]; then
+  upgradesmoke_skip="the local binary is not $TAG"
+else
+  upgradesmoke_rc=0
+  bash .specnaut/release/smoke-upgrade.sh "$TAG" || upgradesmoke_rc=$?
+  if [ "$upgradesmoke_rc" -eq 3 ]; then
+    upgradesmoke_skip="no release was published before $TAG"
+  elif [ "$upgradesmoke_rc" -eq 4 ]; then
+    upgradesmoke_skip="its project could not be prepared — re-run .specnaut/release/smoke-upgrade.sh $TAG"
+  elif [ "$upgradesmoke_rc" -ne 0 ]; then
+    echo "❌ $TAG is published but its binary fails to upgrade a previous release's"
+    echo "   project. Publish a patch, or retract it (see /ship release, \"Rollback\")."
+    exit 1
+  fi
+fi
+
 # `|| true` is load-bearing: under `set -e` a bare `[ … ] && arr+=(…)` is exempt
 # only while it is not the final command of the script. That makes the block
 # position-dependent, and the next edit that moves it turns a green release red.
@@ -348,6 +370,7 @@ warnings=()
 [ "$marketplace_warned" -eq 1 ] && warnings+=("marketplace catalog stale or rejected, that channel is behind") || true
 [ "$selfupdate_warned" -eq 1 ] && warnings+=("local binary not refreshed (does not affect the release)") || true
 [ "$publishedsmoke_skipped" -eq 1 ] && warnings+=("published binary NOT smoke-tested — run .specnaut/release/smoke-published.sh $TAG once updated") || true
+[ -n "$upgradesmoke_skip" ] && warnings+=("upgrade from the previous release NOT smoke-tested ($upgradesmoke_skip)") || true
 
 # A red job is not a warning-flavoured success. The verifications above still
 # ran and their results are worth printing, but the exit code has to say no.
