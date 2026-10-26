@@ -98,11 +98,15 @@ install it as a plugin / extension in your harness — same skill content across
 | **Claude Code**        | `/plugin marketplace add specnaut/specnaut-marketplace`<br/>`/plugin install specnaut-plugin@specnaut-marketplace`               |
 | **Codex CLI / App**    | `/plugins` → search "specnaut" → install¹                                                                                        |
 | **Cursor**             | `/add-plugin specnaut/specnaut-cli`                                                                                              |
-| **OpenCode**           | Add to `opencode.json`: `"plugin": ["specnaut@git+https://github.com/specnaut/specnaut-cli.git"]`                                |
+| **OpenCode**           | Add to `opencode.json`: `"plugin": ["specnaut@git+https://github.com/specnaut/specnaut-cli.git#v7.0.0"]`²                        |
 | **GitHub Copilot CLI** | `copilot plugin marketplace add specnaut/specnaut-marketplace`<br/>`copilot plugin install specnaut-plugin@specnaut-marketplace` |
 
 ¹ Codex CLI lands once its one-time prereqs are provisioned — see
 [the docs](https://specnaut.com/llms.txt) for current status.
+
+² Pinned to a release tag, so an install gets a released plugin rather than whatever `main` holds.
+To upgrade, change the tag to the
+[latest release](https://github.com/specnaut/specnaut-cli/releases/latest).
 
 **When to use the plugin vs the binary:**
 

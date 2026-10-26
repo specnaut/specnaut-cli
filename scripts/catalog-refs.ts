@@ -51,6 +51,69 @@ export function declarationRefProblems(text: string, tag: string): string[] {
     : [`${MARKETPLACE} is pinned to ${JSON.stringify(source.ref)}, not ${tag}`];
 }
 
+/**
+ * The README documents OpenCode's install as a git specifier, and a specifier
+ * with no ref installs whatever the default branch holds (cli#667). OpenCode
+ * hands the string to npm's installer, which honours `#<tag>`, so the line is
+ * pinned to the release tag — by the bump, never by hand.
+ */
+export const README = "README.md";
+const OPENCODE_SPEC = "specnaut@git+https://github.com/specnaut/specnaut-cli.git";
+// The ref is a tag's characters only, so punctuation after the specifier —
+// `#v7.0.0)`, `#v7.0.0',` — is neither swallowed by a stamp nor read as the ref.
+const OPENCODE_PIN = new RegExp(
+  `${OPENCODE_SPEC.replace(/[.+]/g, "\\$&")}(#[0-9A-Za-z._+-]*)?`,
+  "g",
+);
+
+export function stampOpencodePin(text: string, tag: string): string {
+  return text.replace(OPENCODE_PIN, `${OPENCODE_SPEC}#${tag}`);
+}
+
+export function opencodePinProblems(text: string, tag: string): string[] {
+  const refs = [...text.matchAll(OPENCODE_PIN)].map((m) => m[1]);
+  if (refs.length === 0) return ["documents no OpenCode install line"];
+  return refs.flatMap((ref) =>
+    ref === undefined
+      ? ["the OpenCode install line has no ref — it would install the default branch"]
+      : ref === `#${tag}`
+      ? []
+      : [`the OpenCode install line is pinned to ${ref.slice(1)}, not ${tag}`]
+  );
+}
+
+/**
+ * Every file that pins a release ref rather than declaring a version, with how
+ * to stamp it and how to check it — the one list the bump, the release gate and
+ * `--check` all walk, so a file added here is stamped and checked everywhere.
+ */
+const REF_RULES: ReadonlyArray<{
+  file: string;
+  stamp: (text: string, tag: string) => string;
+  problems: (text: string, tag: string) => string[];
+}> = [
+  ...CATALOG_FILES.map((file) => ({ file, stamp: stampCatalogRefs, problems: catalogRefProblems })),
+  { file: SETTINGS_TEMPLATE, stamp: stampDeclarationRef, problems: declarationRefProblems },
+  { file: README, stamp: stampOpencodePin, problems: opencodePinProblems },
+];
+export const RELEASE_REF_FILES: ReadonlyArray<string> = REF_RULES.map((r) => r.file);
+
+/** Pin every release ref this repository carries to `tag`. */
+export async function stampReleaseRefs(baseDir: string, tag: string): Promise<void> {
+  for (const { file, stamp } of REF_RULES) {
+    const path = `${baseDir}/${file}`;
+    await Deno.writeTextFile(path, stamp(await Deno.readTextFile(path), tag));
+  }
+}
+
+/**
+ * Every way `file` fails to pin its release refs to `tag`, or `null` when
+ * `file` carries refs rather than a version — the release gate's one question.
+ */
+export function releaseRefProblems(file: string, text: string, tag: string): string[] | null {
+  return REF_RULES.find((r) => r.file === file)?.problems(text, tag) ?? null;
+}
+
 type Entry = { name?: unknown; source?: unknown };
 type Catalog = { plugins?: unknown };
 
@@ -96,19 +159,15 @@ async function main() {
     Deno.exit(2);
   }
   let failed = false;
-  for (const file of CATALOG_FILES) {
-    for (const p of catalogRefProblems(await Deno.readTextFile(file), tag)) {
+  for (const file of RELEASE_REF_FILES) {
+    for (const p of releaseRefProblems(file, await Deno.readTextFile(file), tag) ?? []) {
       console.error(`${file}: ${p}`);
       failed = true;
     }
   }
-  for (const p of declarationRefProblems(await Deno.readTextFile(SETTINGS_TEMPLATE), tag)) {
-    console.error(`${SETTINGS_TEMPLATE}: ${p}`);
-    failed = true;
-  }
   if (failed) Deno.exit(1);
   console.log(
-    `catalog-refs: ✓ ${CATALOG_FILES.length} catalogs and the scaffolded marketplace are pinned to ${tag}`,
+    `catalog-refs: ✓ ${CATALOG_FILES.length} catalogs, the scaffolded marketplace and the OpenCode install line are pinned to ${tag}`,
   );
 }
 

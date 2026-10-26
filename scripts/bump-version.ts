@@ -2,12 +2,7 @@
 // Pure `computeNextVersion` is exported for testability.
 
 import { SemVer } from "../src/domain/release.ts";
-import {
-  CATALOG_FILES,
-  SETTINGS_TEMPLATE,
-  stampCatalogRefs,
-  stampDeclarationRef,
-} from "./catalog-refs.ts";
+import { RELEASE_REF_FILES, stampReleaseRefs } from "./catalog-refs.ts";
 
 export type BumpKind =
   | "patch"
@@ -59,10 +54,9 @@ export const VERSIONED_FILES = [
   ".codex-plugin/plugin.json",
   ".cursor-plugin/plugin.json",
   "mods/specnaut-cockpit/.claude-plugin/plugin.json",
-  "packaging/marketplace/.claude-plugin/marketplace.json",
-  "packaging/marketplace/.github/plugin/marketplace.json",
-  "templates/harness-specific/claude/settings.json",
-] as const;
+  // The catalogs, the scaffolded settings and the README pin a ref, not a version.
+  ...RELEASE_REF_FILES,
+];
 
 // The marketplace catalogs carry the release as a git `ref` on each entry, not
 // as a `version` field; ./catalog-refs.ts is the one definition of both the
@@ -149,18 +143,9 @@ export async function writeVersions(
     cockpitRaw.replace(/"version":\s*"[^"]+"/, `"version": "${next}"`),
   );
 
-  // Stamp every catalog entry's `ref` with the tag this release will carry
-  // (#633) — every entry, including one with no ref or a branch ref yet.
-  for (const catalog of CATALOG_FILES) {
-    const path = `${baseDir}/${catalog}`;
-    await Deno.writeTextFile(path, stampCatalogRefs(await Deno.readTextFile(path), `v${next}`));
-  }
-  // And the marketplace the scaffolded Claude Code settings declare.
-  const settingsPath = `${baseDir}/${SETTINGS_TEMPLATE}`;
-  await Deno.writeTextFile(
-    settingsPath,
-    stampDeclarationRef(await Deno.readTextFile(settingsPath), `v${next}`),
-  );
+  // Every release ref — the catalogs' (#633), the scaffolded settings' and the
+  // README's OpenCode install line (cli#667) — through the one definition.
+  await stampReleaseRefs(baseDir, `v${next}`);
 }
 
 async function main() {

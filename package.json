@@ -1,0 +1,7 @@
+{
+  "name": "specnaut",
+  "private": true,
+  "type": "module",
+  "main": ".opencode/plugins/specnaut.js",
+  "files": [".opencode/plugins/", "plugin/skills/"]
+}

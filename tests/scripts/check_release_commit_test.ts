@@ -1,4 +1,4 @@
-import { assert, assertEquals } from "@std/assert";
+import { assert, assertEquals, assertStringIncludes } from "@std/assert";
 import { versionsIn } from "../../scripts/check-release-commit.ts";
 import { writeVersions } from "../../scripts/bump-version.ts";
 
@@ -85,6 +85,10 @@ async function repoAt(
     JSON.stringify({
       extraKnownMarketplaces: { "specnaut-marketplace": { source: { ref: `v${version}` } } },
     }),
+  );
+  await Deno.writeTextFile(
+    `${dir}/README.md`,
+    `\`"plugin": ["specnaut@git+https://github.com/specnaut/specnaut-cli.git#v${version}"]\`\n`,
   );
   await git(dir, "add", "-A");
   await git(dir, "commit", "-q", "-m", subject);
@@ -234,4 +238,16 @@ Deno.test("highlights absent at the previous tag cannot have been republished", 
   await git(dir, "add", "-A");
   await git(dir, "commit", "-q", "-m", "chore: release v1.1.0");
   assertEquals((await run(dir, "v1.1.0")).code, 0);
+});
+
+Deno.test("an OpenCode install line left on the previous release is refused (cli#667)", async () => {
+  const dir = await repoAt("3.0.0", "chore: release v3.0.0");
+  await Deno.writeTextFile(
+    `${dir}/README.md`,
+    '`"plugin": ["specnaut@git+https://github.com/specnaut/specnaut-cli.git#v2.9.0"]`\n',
+  );
+  await git(dir, "commit", "-qam", "chore: release v3.0.0");
+  const { code, err } = await run(dir, "v3.0.0");
+  assertEquals(code, 1);
+  assertStringIncludes(err, "README.md: the OpenCode install line is pinned to v2.9.0, not v3.0.0");
 });

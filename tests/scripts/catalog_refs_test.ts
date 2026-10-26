@@ -2,8 +2,10 @@ import { assert, assertEquals } from "@std/assert";
 import {
   catalogRefProblems,
   declarationRefProblems,
+  opencodePinProblems,
   stampCatalogRefs,
   stampDeclarationRef,
+  stampOpencodePin,
 } from "../../scripts/catalog-refs.ts";
 
 /**
@@ -87,4 +89,38 @@ Deno.test("the scaffolded marketplace declaration is stamped and checked like a 
   assertEquals(declarationRefProblems(settings(), "v2.0.0"), [
     "declares no specnaut-marketplace marketplace",
   ]);
+});
+
+// ── The README's OpenCode install line (cli#667) ────────────────────────────
+
+const line = (spec: string) => `Add to \`opencode.json\`: \`"plugin": ["${spec}"]\`\n`;
+const SPEC = "specnaut@git+https://github.com/specnaut/specnaut-cli.git";
+
+Deno.test("stampOpencodePin pins an unpinned line and re-pins a pinned one", () => {
+  assertEquals(stampOpencodePin(line(SPEC), "v2.0.0"), line(`${SPEC}#v2.0.0`));
+  assertEquals(stampOpencodePin(line(`${SPEC}#v1.9.0`), "v2.0.0"), line(`${SPEC}#v2.0.0`));
+  // Every occurrence, not the first.
+  assertEquals(
+    stampOpencodePin(line(SPEC) + line(`${SPEC}#main`), "v2.0.0"),
+    line(`${SPEC}#v2.0.0`) + line(`${SPEC}#v2.0.0`),
+  );
+});
+
+Deno.test("opencodePinProblems names a missing, unpinned or stale line", () => {
+  assertEquals(opencodePinProblems(line(`${SPEC}#v2.0.0`), "v2.0.0"), []);
+  assertEquals(opencodePinProblems("no install line here\n", "v2.0.0"), [
+    "documents no OpenCode install line",
+  ]);
+  assertEquals(opencodePinProblems(line(SPEC), "v2.0.0"), [
+    "the OpenCode install line has no ref — it would install the default branch",
+  ]);
+  assertEquals(opencodePinProblems(line(`${SPEC}#v1.9.0`), "v2.0.0"), [
+    "the OpenCode install line is pinned to v1.9.0, not v2.0.0",
+  ]);
+});
+
+Deno.test("the OpenCode ref is a tag's characters only — punctuation after it survives a stamp", () => {
+  const prose = (ref: string) => `(see \`${SPEC}${ref}\`), and ${SPEC}${ref}', next\n`;
+  assertEquals(stampOpencodePin(prose("#v1.9.0"), "v2.0.0"), prose("#v2.0.0"));
+  assertEquals(opencodePinProblems(prose("#v2.0.0"), "v2.0.0"), []);
 });

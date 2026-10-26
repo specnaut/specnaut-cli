@@ -27,12 +27,7 @@
 // Exit 0 = safe to tag. 1 = do not tag. 2 = usage/environment error.
 
 import { VERSIONED_FILES } from "./bump-version.ts";
-import {
-  CATALOG_FILES,
-  catalogRefProblems,
-  declarationRefProblems,
-  SETTINGS_TEMPLATE,
-} from "./catalog-refs.ts";
+import { releaseRefProblems } from "./catalog-refs.ts";
 
 const SEMVER_TAG = /^v(\d+)\.(\d+)\.(\d+)(?:-[0-9A-Za-z.-]+)?$/;
 
@@ -86,14 +81,11 @@ async function main() {
       problems.push(`${file} is missing`);
       continue;
     }
-    // A catalog pins each entry by `ref`, not by `version`: one definition of
-    // what "pinned to this release" means, shared with the bump and release.yml.
-    if ((CATALOG_FILES as readonly string[]).includes(file)) {
-      for (const p of catalogRefProblems(content, tag)) problems.push(`${file}: ${p}`);
-      continue;
-    }
-    if (file === SETTINGS_TEMPLATE) {
-      for (const p of declarationRefProblems(content, tag)) problems.push(`${file}: ${p}`);
+    // A catalog, the settings and the README pin by `ref`, not by `version`: one
+    // definition of "pinned to this release", shared with the bump and release.yml.
+    const refProblems = releaseRefProblems(file, content, tag);
+    if (refProblems !== null) {
+      for (const p of refProblems) problems.push(`${file}: ${p}`);
       continue;
     }
     const found = versionsIn(content);
