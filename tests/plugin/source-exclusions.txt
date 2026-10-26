@@ -23,8 +23,7 @@
 # documents already reference `.specnaut/scripts/backlog/` — the project's
 # installed location — so they are self-sufficient without them.
 #
-# The plugin ships no shell script today except its own `hooks/session-start`,
-# which is plugin-only and has no template source.
+# The plugin ships no shell script today.
 core/skills/board/scripts/  46 backend scripts; see the ROOT-resolution reason above — mirrored, they would resolve a config path that cannot exist
 core/skills/code-audit/scripts/collect-audit-scope.sh  same rule: a scope collector that resolves paths from its installed location, not from the plugin
 

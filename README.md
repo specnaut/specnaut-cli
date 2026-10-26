@@ -106,8 +106,8 @@ install it as a plugin / extension in your harness — same skill content across
 
 **When to use the plugin vs the binary:**
 
-- Plugin: cross-project, always up-to-date, no `specnaut init` needed, auto-activates skills on
-  session start via the `using-specnaut` bootstrap.
+- Plugin: cross-project, always up-to-date, no `specnaut init` needed; the harness discovers the
+  skills and agents from the plugin.
 - Binary: project-local customization, short slash-commands (`/specnaut plan`, `/ship`), backlog +
   hooks support.
 
@@ -225,15 +225,15 @@ migration, stop and name it.
 ```
 
 `<skill>` is `specnaut` or `ship`; `<phase>` is the phase's name as its router lists it (`plan`,
-`review`, `audit-security`, `tag`, `release`). The path is the same under every harness. The routers
-read the addendum right after the phase doc, and a managed block in `AGENTS.md` carries the same
-instruction to the surfaces that reach a phase without a router. An addendum adds to the phase at
-the step it names; it cannot replace or skip a bundled step — where it contradicts one, the bundled
-step stands and the assistant says so. No file is no addendum: nothing is printed, nothing is
-scaffolded. Contract docs a phase loads (`plan-audits`, `merge-close`, …) take no addendum of their
-own; write it in the parent phase's addendum and name the step. Specnaut never writes, tracks or
-upgrades anything under `.specnaut/addenda/`, so `upgrade` keeps refreshing the phase doc beside it.
-Commit the directory. `specnaut check --project` warns about any file there that no router reads — a
+`review`, `merge`, `tag`, `release`). The path is the same under every harness. The routers read the
+addendum right after the phase doc, and a managed block in `AGENTS.md` carries the same instruction
+to the surfaces that reach a phase without a router. An addendum adds to the phase at the step it
+names; it cannot replace or skip a bundled step — where it contradicts one, the bundled step stands
+and the assistant says so. No file is no addendum: nothing is printed, nothing is scaffolded.
+Contract docs a phase loads (`plan-audits`, `merge-close`, …) take no addendum of their own; write
+it in the parent phase's addendum and name the step. Specnaut never writes, tracks or upgrades
+anything under `.specnaut/addenda/`, so `upgrade` keeps refreshing the phase doc beside it. Commit
+the directory. `specnaut check --project` warns about any file there that no router reads — a
 mistyped or renamed phase, a contract doc, a wrong directory — and names the path it belongs at.
 
 Use an addendum when you are adding a step, a check, or a project fact to a phase. A full preserve

@@ -1,6 +1,6 @@
 ---
 name: code-audit
-description: High-altitude, multi-seat parallel code audit of a scope on main. Use when the user says "audit the codebase", "code audit", "audit recent changes", "do a full audit", "health-check this code", or "audit the last N commits". Resolves a scope, dispatches the applicable expert seats (architecture / security / performance / accessibility / dependency) IN PARALLEL, and synthesizes one deduplicated, severity-ranked report. Read-only. Complementary to `/specnaut audit <axis>` (single-axis).
+description: High-altitude, multi-seat parallel code audit of a scope on main. Use when the user says "audit the codebase", "code audit", "audit recent changes", "do a full audit", "health-check this code", or "audit the last N commits". Resolves a scope, dispatches the applicable expert seats (architecture / security / performance / accessibility / dependency) IN PARALLEL, and synthesizes one deduplicated, severity-ranked report. Read-only. Complementary to the single-axis skills (`/sec-audit`, `/perf-audit`, `/a11y-audit`, `/arch-audit`, `/dep-audit`).
 argument-hint: "[--path <subtree> | --range <a>..<b>] [--last <n>]"
 ---
 
@@ -12,8 +12,8 @@ deploys the applicable expert seats **in parallel**, and merges their output
 into one report.
 
 It is **read-only**: running it mutates **no tracked files**. It dispatches the
-same expert agents `/specnaut audit <axis>` uses; the difference is breadth —
-`/specnaut audit <axis>` runs one axis, `/code-audit` runs all applicable seats
+same expert agents the single-axis skills use (`/sec-audit` and its siblings);
+the difference is breadth — a single-axis skill runs one, `/code-audit` runs all applicable seats
 in a single parallel batch and synthesizes one verdict. The two are
 **complementary**.
 

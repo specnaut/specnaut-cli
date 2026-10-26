@@ -1,8 +1,7 @@
 # `.specnaut/release/` — Release contract
 
-Two scripts compose the Specnaut CLI release pipeline alongside the bundled tag + notes scripts. See
-the design spec at
-`specnaut/specnaut-monorepo:docs/superpowers/specs/2026-05-26-release-flow-design.md`.
+Two scripts compose the Specnaut CLI release pipeline alongside the bundled tag + notes scripts. The
+design spec (2026-05-26, "release flow") lives in the maintainer workspace.
 
 - `preflight.sh` — runs before any release mutation: branch, cleanliness, the `ci` AND `smoke`
   workflows green on HEAD, smoke audit, bundle, test. Exits non-zero on any gate failure.

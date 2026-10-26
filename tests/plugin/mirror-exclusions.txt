@@ -4,11 +4,11 @@
 # written decision and it lives here, where it is visible, rather than in a glob
 # in the test, where it would be silent. An earlier design scoped the sweep to
 # `*.md` and treated the non-Markdown case as a *future* risk; there were four
-# such assets at the time, and one of them —
-# `plugin/hooks/session-start` — is the plugin's only executable, running on
-# every consumer session start. It also has no extension, so even widening the
-# glob to `*.md`/`*.json`/`*.sh` would still have missed it. A file type is not
-# a reason; a fact about the file is.
+# such assets at the time, and one of them — a session hook, since removed —
+# was the plugin's only executable, running on every consumer session start. It
+# also had no extension, so even widening the glob to `*.md`/`*.json`/`*.sh`
+# would still have missed it. A file type is not a reason; a fact about the
+# file is.
 #
 # FORMAT: <path><whitespace><reason>
 # An entry with no written reason is NOT an entry — the same refusal
@@ -22,7 +22,4 @@
 # whole ticket is about.
 
 plugin/README.md  the plugin's own front door — describes installing the plugin, which no scaffolded project ever sees, so nothing under templates/core/ can be its source
-plugin/hooks/session-start  plugin-only entry point; the Claude Code SessionStart hook that injects the bootstrap skill. No templates/core/ counterpart exists — the scaffolded harness wires its hooks through .claude/settings.json instead
-plugin/hooks/hooks.json  declares what session-start runs, for the plugin loader only; scaffolded projects declare hooks through the harness, not through this file
-plugin/hooks/hooks-cursor.json  the same declaration for Cursor's loader; same reason
 plugin/.claude-plugin/plugin.json  the plugin manifest. Generated shape, asserted by its own test below for name/description/version, and there is no template that could be its source

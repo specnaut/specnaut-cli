@@ -228,7 +228,6 @@ SURFACES=(
   # `/`, so those swallow the whole scaffolded memory tree and turn 150
   # documents into gaps against a smoke that never claimed them.
   'templates/core/root/*|smoke-features.sh smoke-all-harnesses.sh|project-root-file'
-  'templates/core/skills/using-specnaut/references/*|smoke-features.sh|skill-reference'
   'templates/core/skills/code-audit/scripts/*|smoke-features.sh|skill-script'
   # #562 split two contracts out of the board skill. The map used to name
   # `groom.md` alone, so a sibling doc added beside it was UNMAPPED — nothing

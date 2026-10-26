@@ -226,14 +226,6 @@ const POINTED_BY_DECISION: ReadonlyMap<string, string> = new Map([
     "the backlog verb — grooming collects decisions as pickers, so questions-as-selections is load-bearing; it was withheld at #575 only because of a harness size cap that no longer applies",
   ],
   [
-    "skill/using-specnaut",
-    "the on-demand route for copilot and opencode, whose only static entry is .specnaut/harness-tools.md",
-  ],
-  [
-    "skill/brainstorming",
-    "owned the selection rule until #575; it now points at the owner instead of restating it",
-  ],
-  [
     "phase/specnaut/plan.md",
     "same — two restatements of the selection rule replaced by pointers",
   ],

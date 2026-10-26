@@ -14,7 +14,6 @@ Deno.test("a routable phase of either skill is a valid addendum", () => {
     const rel of [
       "specnaut/plan.md",
       "specnaut/merge.md",
-      "specnaut/audit-security.md",
       "ship/tag.md",
       "ship/release.md",
     ]
@@ -39,7 +38,15 @@ Deno.test("a stem that a phase prefixes, or that prefixes a phase, suggests that
 });
 
 Deno.test("prefix ties go to the earliest row of the router's phase table", () => {
-  assertEquals(auditAddendum("specnaut/audit.md")?.suggestion, specnaut("audit-security"));
+  // `re` prefixes `review` (specnaut) and `release` (ship); specnaut's table comes first.
+  assertEquals(auditAddendum("other/re.md")?.suggestion, specnaut("review"));
+});
+
+Deno.test("an addendum for a retired phase is reported, not silently read (spec 034)", () => {
+  assertEquals(auditAddendum("specnaut/audit-security.md")?.problem, {
+    kind: "unknown-phase",
+    skill: "specnaut",
+  });
 });
 
 Deno.test("a stem within two edits of a phase suggests it", () => {

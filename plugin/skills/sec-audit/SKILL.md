@@ -81,9 +81,6 @@ file.**
 
 - **`/sec-audit`** (this skill) — dispatches the **one** `security-expert`
   over a scope and returns findings **inline**. No report file.
-- **`/specnaut audit security`** — the report-writing single-axis audit:
-  runs the same expert but **persists a dated report** under
-  `docs/specnaut/audits/`. Use it when you want a durable artifact.
 - **`/code-audit`** — the **multi-seat** team audit: dispatches every
   applicable expert (architecture / security / performance / a11y /
   dependency) in parallel and synthesizes one combined report. Use it for a

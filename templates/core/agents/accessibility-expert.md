@@ -1,6 +1,6 @@
 ---
 name: accessibility-expert
-description: Reviews front-end code for WCAG 2.1 AA accessibility issues — semantic HTML, heading hierarchy, alt text, form labels, keyboard nav, focus indicators, ARIA correctness, color contrast (where computable from source). Two dispatch shapes — (1) PR review (spawned by the review-coordinator during /specnaut review), (2) full-codebase audit (spawned by /specnaut audit accessibility).
+description: Reviews front-end code for WCAG 2.1 AA accessibility issues — semantic HTML, heading hierarchy, alt text, form labels, keyboard nav, focus indicators, ARIA correctness, color contrast (where computable from source). Two dispatch shapes — (1) PR review (spawned by the review-coordinator during /specnaut review), (2) scoped audit (spawned by a single-axis audit skill or /code-audit, over the scope it resolved).
 model: opus
 effort: high
 tools: Read, Grep, Glob, Bash
@@ -37,8 +37,8 @@ no FE surface detected — accessibility audit skipped (this project ships no fr
 ```
 
 Do NOT continue to Step 0 or to any surface. Do NOT emit an empty report. The
-gating signal is the contract — `/specnaut audit accessibility` on a
-CLI-only project is a no-op by design.
+gating signal is the contract — an accessibility audit of a CLI-only project
+is a no-op by design.
 
 ## Step 0 — open the catalogue (mandatory, once the gate passes)
 
@@ -113,10 +113,11 @@ is the fix for a decorative image, not a missing alternative**, and **ARIA
 that merely repeats a native element's own semantics is redundant, not
 broken**. The leaves state the rest.
 
-## Mode 2 — Full-codebase audit
+## Mode 2 — Scoped audit
 
-Spawned by `/specnaut audit accessibility`. Read-only; full project
-scope; **subject to the FE-surface gate above**.
+Spawned by a single-axis audit skill or by `/code-audit`, over the scope it
+resolved — the whole project by default. Returns its findings inline to the
+caller. Read-only; **subject to the FE-surface gate above**.
 
 ### Read-only contract (NON-NEGOTIABLE)
 
@@ -152,7 +153,7 @@ modes, the confirm step, the severity, and the criterion to cite.
 Walk only the surfaces the project actually has. A surface with no code is
 recorded under `Out of scope`, not reported as empty.
 
-### Output format (Mode 2 — audit report)
+### Output format (Mode 2 — scoped audit)
 
 Write a Markdown document with these EXACT sections in this order
 (all required, even when empty):

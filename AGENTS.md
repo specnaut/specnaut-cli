@@ -210,8 +210,7 @@ cross-platform build matrix lives in `.github/workflows/release.yml`; each binar
 
 - Use the DDD/hexagonal layering under `src/`: `domain/` (pure), `application/` (use cases + ports),
   `infrastructure/` (adapters), `cli/` (presentation). Tests mirror `src/`.
-- Every brick follows the same cycle: brainstorming spec → plan → subagent-driven-development
-  execution (managed via the Specnaut workflow).
+- Every brick follows the same cycle: `/specnaut plan` → tasks → implement → review → merge.
 - Templates live in `templates/` and are bundled into the binary at build time via
   `scripts/bundle-templates.ts`. Never hand-edit `src/templates_bundle.ts`.
 - Pre-commit hook runs `deno fmt --check + lint + bundle + check` — must be green before every

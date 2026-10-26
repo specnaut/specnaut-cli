@@ -83,34 +83,16 @@ Deno.test("specnaut init --ai copilot scaffolds a Copilot layout", async () => {
     assertEquals(cmdContent.includes("model: opus"), false);
     assertEquals(cmdContent.includes("tools:"), false);
 
-    // Router + 16 phases (plan + plan-audits + tasks + implement + review +
-    // merge + constitution + groom + tag-version + release-version +
-    // auto-chain + audit-security #303 + audit-performance #304 +
-    // audit-accessibility #305 + audit-architecture #321 +
-    // audit-dependencies #322 — brainstorm/specify/clarify/analyze/checklist/
-    // list-skills/lite-heuristic removed in #455) +
-    // writing-plans (#271) +
-    // requesting-code-review (#273) + using-specnaut (#282) +
-    // subagent-driven-development (#272) + executing-plans (#274) +
-    // verification-before-completion (#275) + brainstorming (#276) +
-    // 5 output-contract skills (#378 + #445: workflow-contract,
-    // handoff-protocol, review-findings-contract, qa-report-contract,
-    // backlog-reference-contract) + code-audit (#379) +
-    // 5 per-axis audit skills (#380: arch-audit, sec-audit, perf-audit,
-    // dep-audit, a11y-audit) + status-audit (#381) +
-    // board + 15 agents (11 original + performance-expert #304 +
-    // accessibility-expert #305 + architect-expert #321 + dependency-expert
-    // #322) = 54 (specnaut-auto removed in #409; merge-squash #558 + epic-commits #556 + quality-gates #555 + epic-fixups #559 + merge-close #560 + epic-loop #554 added; board spec-autogen + groom-report + 3 seat contracts #562 split out). code-audit's scope script
-    // ships under .specnaut/scripts/code-audit/, not as a flattened instruction file;
-    // status-audit's schema doc ships to .specnaut/logs/README.md, also not
+    // One flat instruction file per bundled skill, phase document and agent.
+    // code-audit's scope script ships under .specnaut/scripts/code-audit/, and
+    // status-audit's schema doc to .specnaut/logs/README.md — neither is
     // flattened here.
     const instructionsCount = (await Array.fromAsync(
       Deno.readDir(join(root, ".github/instructions")),
     )).length;
-    // 66 since spec 033: /ship adds three flat instruction files and retires
-    // two — net +1. 67 with
-    // the `upgrade` phase.
-    assertEquals(instructionsCount, 67);
+    // 67 after spec 033 and the `upgrade` phase; 55 since spec 034 retired
+    // seven skills and the five audit phases.
+    assertEquals(instructionsCount, 55);
 
     // Shared (cross-harness)
     assertEquals(await exists(join(root, ".specnaut/memory/constitution.md")), true);

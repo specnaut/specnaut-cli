@@ -1,7 +1,7 @@
 {
   "name": "specnaut",
   "displayName": "Specnaut",
-  "description": "Spec-driven planning, TDD, review, and delivery workflows for coding agents — bundled skills, sub-agents, and a SessionStart bootstrap that makes the agent skill-aware on every turn.",
+  "description": "Spec-driven planning, TDD, review, and delivery workflows for coding agents — Specnaut's bundled skills and sub-agents.",
   "version": "6.0.0",
   "author": {
     "name": "MakerLabs",
@@ -20,6 +20,5 @@
     "best-practices"
   ],
   "skills": "./plugin/skills/",
-  "agents": "./plugin/agents/",
-  "hooks": "./plugin/hooks/hooks-cursor.json"
+  "agents": "./plugin/agents/"
 }

@@ -142,26 +142,17 @@ Deno.test("a guard whose pattern cannot compile refuses rather than allows", () 
   assertEquals(refusal, "refused");
 });
 
-Deno.test("the bundled dispatch prose names agent_type on the Codex path", () => {
+Deno.test("the always-on AGENTS.md names agent_type on the Codex path", () => {
   // The other half of the fix, and the half no config can deliver: a dispatch
   // that never names a role cannot be rescued by a default, only bounded by
-  // one. These three skills showed the Claude shape alone.
-  for (
-    const skill of [
-      "using-specnaut",
-      "requesting-code-review",
-      "subagent-driven-development",
-    ]
-  ) {
-    const dest = `.codex/skills/${skill}/SKILL.md`;
-    const alt = Object.keys(emitted).find((d) => d.includes(skill) && d.endsWith(".md"));
-    const file = emitted[dest] ?? (alt ? emitted[alt] : undefined);
-    assert(file !== undefined, `${skill} is not emitted by the Codex adapter`);
-    assertStringIncludes(
-      file.content,
-      "agent_type=",
-      `${skill} documents dispatch without naming agent_type, so a reader on ` +
-        `Codex follows it into the inheritance this ticket closes`,
-    );
-  }
+  // one. Since spec 034 the rule has one home, the AGENTS.md every Codex
+  // session loads.
+  const file = emitted["AGENTS.md"];
+  assert(file !== undefined, "AGENTS.md is not emitted by the Codex adapter");
+  assertStringIncludes(
+    file.content,
+    "agent_type=",
+    "AGENTS.md documents dispatch without naming agent_type, so a reader on " +
+      "Codex follows it into the inheritance cli#599 closes",
+  );
 });

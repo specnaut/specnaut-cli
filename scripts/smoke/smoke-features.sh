@@ -361,22 +361,14 @@ check "ship doc release.md scaffolded (was specnaut/phases/release-version.md)" 
   '[ -f .claude/skills/ship/phases/release.md ]'
 check "the retired addresses are gone, not duplicated" \
   '[ ! -f .claude/skills/specnaut/phases/tag-version.md ] && [ ! -f .claude/skills/specnaut/phases/release-version.md ]'
-check "phase doc audit-security.md scaffolded (Epic #302, #303)" \
-  '[ -f .claude/skills/specnaut/phases/audit-security.md ]'
-check "audit-security phase doc declares read-only contract" \
-  'grep -q "Read-only contract" .claude/skills/specnaut/phases/audit-security.md'
-check "audit-security phase doc dispatches the security-expert agent" \
-  'grep -q "security-expert" .claude/skills/specnaut/phases/audit-security.md'
-check "audit-security phase doc parses --severity flag" \
-  'grep -q "\-\-severity" .claude/skills/specnaut/phases/audit-security.md'
-check "router phase index lists audit security" \
-  'grep -q "audit security" .claude/skills/specnaut/SKILL.md'
-check "phase doc audit-performance.md scaffolded (Epic #302, #304)" \
-  '[ -f .claude/skills/specnaut/phases/audit-performance.md ]'
-check "audit-performance phase doc dispatches the performance-expert agent" \
-  'grep -q "performance-expert" .claude/skills/specnaut/phases/audit-performance.md'
-check "audit-performance phase doc declares read-only contract" \
-  'grep -q "Read-only contract" .claude/skills/specnaut/phases/audit-performance.md'
+check "the retired audit phases are not scaffolded (spec 034)" \
+  '[ -z "$(ls .claude/skills/specnaut/phases/audit-*.md 2>/dev/null)" ]'
+check "the router answers a retired audit phase with its replacement (spec 034)" \
+  'grep -q "/specnaut audit. is retired" .claude/skills/specnaut/SKILL.md && grep -q "/sec-audit" .claude/skills/specnaut/SKILL.md'
+check "the retired workflow skills are not scaffolded (spec 034)" \
+  '[ -z "$(ls -d .claude/skills/{brainstorming,writing-plans,executing-plans,subagent-driven-development,requesting-code-review,verification-before-completion,using-specnaut} 2>/dev/null)" ] && [ ! -f .specnaut/harness-tools.md ]'
+check "AGENTS.md carries the per-harness dispatch rule (spec 034, cli#599)" \
+  'grep -q "agent_type=" AGENTS.md && grep -q "subagent_type" AGENTS.md'
 check "performance-expert agent bundled (Epic #302, #304)" \
   '[ -f .claude/agents/performance-expert.md ]'
 check "performance-expert agent declares disable-model-invocation" \
@@ -385,14 +377,6 @@ check "performance-expert agent covers N+1 axis" \
   'grep -q "N+1" .claude/agents/performance-expert.md'
 check "performance-expert agent enforces read-only Bash allow-list" \
   'grep -q "Read-only contract" .claude/agents/performance-expert.md'
-check "router phase index lists audit performance" \
-  'grep -q "audit performance" .claude/skills/specnaut/SKILL.md'
-check "phase doc audit-accessibility.md scaffolded (Epic #302, #305)" \
-  '[ -f .claude/skills/specnaut/phases/audit-accessibility.md ]'
-check "audit-accessibility phase doc dispatches the accessibility-expert agent" \
-  'grep -q "accessibility-expert" .claude/skills/specnaut/phases/audit-accessibility.md'
-check "audit-accessibility phase documents FE-surface gate" \
-  'grep -q "no FE surface detected" .claude/skills/specnaut/phases/audit-accessibility.md'
 check "accessibility-expert agent bundled (Epic #302, #305)" \
   '[ -f .claude/agents/accessibility-expert.md ]'
 check "accessibility-expert agent declares disable-model-invocation" \
@@ -401,14 +385,6 @@ check "accessibility-expert agent covers WCAG 2.1 AA" \
   'grep -q "WCAG 2.1 AA" .claude/agents/accessibility-expert.md'
 check "accessibility-expert agent implements FE-surface gate" \
   'grep -q "Front-end surface detection" .claude/agents/accessibility-expert.md'
-check "router phase index lists audit accessibility" \
-  'grep -q "audit accessibility" .claude/skills/specnaut/SKILL.md'
-check "phase doc audit-architecture.md scaffolded (Epic #320, #321)" \
-  '[ -f .claude/skills/specnaut/phases/audit-architecture.md ]'
-check "audit-architecture phase doc dispatches the architect-expert agent" \
-  'grep -q "architect-expert" .claude/skills/specnaut/phases/audit-architecture.md'
-check "audit-architecture phase doc declares read-only contract" \
-  'grep -q "Read-only contract" .claude/skills/specnaut/phases/audit-architecture.md'
 check "architect-expert agent bundled (Epic #320, #321)" \
   '[ -f .claude/agents/architect-expert.md ]'
 check "architect-expert agent declares disable-model-invocation" \
@@ -417,16 +393,6 @@ check "architect-expert agent covers hex-layer violations axis" \
   'grep -q "[Hh]ex-layer" .claude/agents/architect-expert.md'
 check "architect-expert agent enforces read-only Bash allow-list" \
   'grep -q "Read-only contract" .claude/agents/architect-expert.md'
-check "router phase index lists audit architecture" \
-  'grep -q "audit architecture" .claude/skills/specnaut/SKILL.md'
-check "phase doc audit-dependencies.md scaffolded (Epic #320, #322)" \
-  '[ -f .claude/skills/specnaut/phases/audit-dependencies.md ]'
-check "audit-dependencies phase doc dispatches the dependency-expert agent" \
-  'grep -q "dependency-expert" .claude/skills/specnaut/phases/audit-dependencies.md'
-check "audit-dependencies phase doc declares read-only contract" \
-  'grep -q "Read-only contract" .claude/skills/specnaut/phases/audit-dependencies.md'
-check "audit-dependencies phase doc bans live advisory tooling" \
-  'grep -q "npm audit\|cargo audit\|pip-audit" .claude/skills/specnaut/phases/audit-dependencies.md'
 check "dependency-expert agent bundled (Epic #320, #322)" \
   '[ -f .claude/agents/dependency-expert.md ]'
 check "dependency-expert agent declares disable-model-invocation" \
@@ -476,8 +442,6 @@ check "dependency-expert points at the supply-chain domain file rather than dupl
 check "performance-expert carries the measure gate instead of a catalogue" \
   'grep -q "did you measure" .claude/agents/performance-expert.md && [ ! -d .specnaut/memory/performance ]'
 
-check "router phase index lists audit dependencies" \
-  'grep -q "audit dependencies" .claude/skills/specnaut/SKILL.md'
 check "name: specnaut on the router SKILL.md" \
   'head -3 .claude/skills/specnaut/SKILL.md | grep -q "name: specnaut"'
 check "disable-model-invocation NOT set on the router (Skill-tool chaining must work)" \
@@ -485,150 +449,6 @@ check "disable-model-invocation NOT set on the router (Skill-tool chaining must 
 check "specnaut-review alias no longer scaffolds (retired)" \
   '[ ! -e .claude/skills/specnaut-review/SKILL.md ]'
 
-echo
-echo "═══ #271  writing-plans skill (Epic #270 / A1) ═══"
-check "writing-plans skill scaffolded" \
-  '[ -f .claude/skills/writing-plans/SKILL.md ]'
-check "writing-plans frontmatter declares name: writing-plans" \
-  'head -5 .claude/skills/writing-plans/SKILL.md | grep -q "name: writing-plans"'
-check "writing-plans description targets plan-related trigger phrases" \
-  'head -10 .claude/skills/writing-plans/SKILL.md | grep -q "plan this"'
-check "writing-plans save path documented as docs/specnaut/plans/" \
-  'grep -q "docs/specnaut/plans" .claude/skills/writing-plans/SKILL.md'
-check "writing-plans enforces zero-placeholder discipline" \
-  'grep -qF "No placeholders" .claude/skills/writing-plans/SKILL.md'
-check "writing-plans credits obra/superpowers attribution" \
-  'grep -q "obra/superpowers" .claude/skills/writing-plans/SKILL.md'
-
-echo
-echo "═══ #273  requesting-code-review skill (Epic #270 / A3) ═══"
-check "requesting-code-review skill scaffolded" \
-  '[ -f .claude/skills/requesting-code-review/SKILL.md ]'
-check "requesting-code-review frontmatter declares name" \
-  'head -5 .claude/skills/requesting-code-review/SKILL.md | grep -q "name: requesting-code-review"'
-check "requesting-code-review description targets review-related triggers" \
-  'head -10 .claude/skills/requesting-code-review/SKILL.md | grep -q "review this"'
-check "requesting-code-review documents code-reviewer agent dispatch" \
-  'grep -q "subagent_type: code-reviewer\|subagent_type=\"code-reviewer\"" .claude/skills/requesting-code-review/SKILL.md'
-check "requesting-code-review embeds canonical reviewer prompt template" \
-  'grep -qF "Critical (Must Fix)" .claude/skills/requesting-code-review/SKILL.md'
-check "requesting-code-review documents two-stage review pattern" \
-  'grep -q "Two-stage review\|two-stage review" .claude/skills/requesting-code-review/SKILL.md'
-check "requesting-code-review credits obra/superpowers attribution" \
-  'grep -q "obra/superpowers" .claude/skills/requesting-code-review/SKILL.md'
-
-echo
-echo "═══ #282  using-specnaut bootstrap skill (Epic #270 / B6) ═══"
-check "using-specnaut skill scaffolded" \
-  '[ -f .claude/skills/using-specnaut/SKILL.md ]'
-check "using-specnaut frontmatter declares name" \
-  'head -5 .claude/skills/using-specnaut/SKILL.md | grep -q "name: using-specnaut"'
-check "using-specnaut describes SessionStart auto-injection" \
-  'head -10 .claude/skills/using-specnaut/SKILL.md | grep -q "SessionStart hook"'
-check "using-specnaut lists writing-plans skill in registry" \
-  'grep -q "writing-plans" .claude/skills/using-specnaut/SKILL.md'
-check "using-specnaut lists requesting-code-review skill in registry" \
-  'grep -q "requesting-code-review" .claude/skills/using-specnaut/SKILL.md'
-check "using-specnaut lists product-owner agent + backlog mutation rule" \
-  'grep -q "product-owner" .claude/skills/using-specnaut/SKILL.md'
-check "using-specnaut lists devops-sre agent + release advisory rule" \
-  'grep -q "devops-sre" .claude/skills/using-specnaut/SKILL.md'
-# Matched on the suffix, not a full filename: the skill names these as a brace
-# expansion (`references/{claude,codex,…}-tools.md`), so a literal
-# `references/claude-tools.md` never appears and the old assertion could not see
-# a pointer that was right there.
-check "using-specnaut points at per-harness tool-mapping references" \
-  'grep -q -- "-tools.md" .claude/skills/using-specnaut/SKILL.md'
-check "using-specnaut credits obra/superpowers attribution" \
-  'grep -q "obra/superpowers" .claude/skills/using-specnaut/SKILL.md'
-# The tool-mapping reference is HARNESS-SELECTED: five `*-tools.md` sources
-# collapse into one `.specnaut/harness-tools.md`, renamed to the harness this
-# project was initialised with. So a claude init cannot see the codex variant,
-# and asserting a `references/codex-tools.md` path here fails — there is no such
-# destination for any harness. The codex content is asserted where a codex init
-# actually happens, in smoke-all-harnesses.sh.
-check "harness-tools reference scaffolded for this harness (#599)" \
-  '[ -f .specnaut/harness-tools.md ]'
-
-echo
-echo "═══ #272  subagent-driven-development skill (Epic #270 / A2) ═══"
-check "subagent-driven-development skill scaffolded" \
-  '[ -f .claude/skills/subagent-driven-development/SKILL.md ]'
-check "subagent-driven-development frontmatter declares name" \
-  'head -5 .claude/skills/subagent-driven-development/SKILL.md | grep -q "name: subagent-driven-development"'
-check "subagent-driven-development describes two-stage review pattern" \
-  'grep -q "two-stage review\|Two-stage review" .claude/skills/subagent-driven-development/SKILL.md'
-check "subagent-driven-development documents developer agent dispatch" \
-  'grep -q "subagent_type: \"developer\"" .claude/skills/subagent-driven-development/SKILL.md'
-check "subagent-driven-development documents code-reviewer agent dispatch" \
-  'grep -q "subagent_type: \"code-reviewer\"" .claude/skills/subagent-driven-development/SKILL.md'
-check "subagent-driven-development handles all 4 status codes" \
-  'grep -q "DONE_WITH_CONCERNS" .claude/skills/subagent-driven-development/SKILL.md && grep -q "NEEDS_CONTEXT" .claude/skills/subagent-driven-development/SKILL.md && grep -q "BLOCKED" .claude/skills/subagent-driven-development/SKILL.md'
-check "subagent-driven-development covers model selection guidance" \
-  'grep -q "Model selection" .claude/skills/subagent-driven-development/SKILL.md'
-check "subagent-driven-development credits obra/superpowers attribution" \
-  'grep -q "obra/superpowers" .claude/skills/subagent-driven-development/SKILL.md'
-
-echo
-echo "═══ #274  executing-plans skill (Epic #270 / A4) ═══"
-check "executing-plans skill scaffolded" \
-  '[ -f .claude/skills/executing-plans/SKILL.md ]'
-check "executing-plans frontmatter declares name" \
-  'head -5 .claude/skills/executing-plans/SKILL.md | grep -q "name: executing-plans"'
-check "executing-plans describes checkpoint pauses between tasks" \
-  'grep -q "checkpoint" .claude/skills/executing-plans/SKILL.md'
-check "executing-plans cross-references subagent-driven-development alternative" \
-  'grep -q "subagent-driven-development" .claude/skills/executing-plans/SKILL.md'
-check "executing-plans documents self-review at task boundaries" \
-  'grep -q "self-review\|Self-review" .claude/skills/executing-plans/SKILL.md'
-check "executing-plans references pre-commit gate awareness" \
-  'grep -q "pre-commit\|Pre-commit" .claude/skills/executing-plans/SKILL.md'
-check "executing-plans credits obra/superpowers attribution" \
-  'grep -q "obra/superpowers" .claude/skills/executing-plans/SKILL.md'
-
-echo
-echo "═══ #275  verification-before-completion skill (Epic #270 / A5) ═══"
-check "verification-before-completion skill scaffolded" \
-  '[ -f .claude/skills/verification-before-completion/SKILL.md ]'
-check "verification-before-completion frontmatter declares name" \
-  'head -5 .claude/skills/verification-before-completion/SKILL.md | grep -q "name: verification-before-completion"'
-# v4.0.0 split this skill: five checks that hold in any project, then the
-# Specnaut-maintainer gates below them. The old assertion required
-# `deno fmt --check` in the general half — the exact line that was removed
-# because it prescribes a toolchain to projects that do not have it.
-check "verification-before-completion keeps its general checks toolchain-agnostic" \
-  '! grep -q "deno fmt --check" .claude/skills/verification-before-completion/SKILL.md'
-check "verification-before-completion still carries the maintainer gates" \
-  'grep -q "audit.sh" .claude/skills/verification-before-completion/SKILL.md && grep -q "Specnaut bundle source" .claude/skills/verification-before-completion/SKILL.md'
-check "verification-before-completion references plugin sync test" \
-  'grep -q "plugin_sync_test" .claude/skills/verification-before-completion/SKILL.md'
-check "verification-before-completion documents report shape with evidence" \
-  'grep -q "Verification:" .claude/skills/verification-before-completion/SKILL.md'
-check "verification-before-completion credits obra/superpowers attribution" \
-  'grep -q "obra/superpowers" .claude/skills/verification-before-completion/SKILL.md'
-
-echo
-echo "═══ #276  brainstorming skill (Epic #270 / A6) ═══"
-check "brainstorming skill scaffolded" \
-  '[ -f .claude/skills/brainstorming/SKILL.md ]'
-check "brainstorming frontmatter declares name" \
-  'head -5 .claude/skills/brainstorming/SKILL.md | grep -q "name: brainstorming"'
-# INVERTED by #575, deliberately. This asserted that `brainstorming` states the
-# one-question-at-a-time rule ITSELF. It now must not: the rule has exactly one
-# author, and every other surface points at it. Asserting the pointer is the same
-# guarantee for the user and a stronger one for the tree — the old form was
-# satisfied by any of the six copies that used to exist.
-check "brainstorming points at the response-style contract for how to ask" \
-  'grep -q "response-style-contract" .claude/skills/brainstorming/SKILL.md \
-   && ! grep -qi "one at a time" .claude/skills/brainstorming/SKILL.md'
-check "brainstorming hands off to writing-plans" \
-  'grep -q "hand off to .writing-plans.\|writing-plans" .claude/skills/brainstorming/SKILL.md'
-check "brainstorming documents coexistence with the spec flow" \
-  'grep -q "/specnaut plan" .claude/skills/brainstorming/SKILL.md'
-check "brainstorming enforces the no-implementation-before-design rule" \
-  'grep -q "No implementation, no plan\|approval before handing off" .claude/skills/brainstorming/SKILL.md'
-check "brainstorming credits obra/superpowers attribution" \
-  'grep -q "obra/superpowers" .claude/skills/brainstorming/SKILL.md'
 
 echo
 echo "═══ #75  loop.md + groom phase ═══"

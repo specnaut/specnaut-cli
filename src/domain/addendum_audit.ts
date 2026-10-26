@@ -40,11 +40,6 @@ export const ROUTABLE_PHASES: Readonly<Record<AddendumSkill, ReadonlyArray<strin
     "merge",
     "constitution",
     "upgrade",
-    "audit-security",
-    "audit-performance",
-    "audit-accessibility",
-    "audit-architecture",
-    "audit-dependencies",
   ],
   ship: ["tag", "release"],
 };

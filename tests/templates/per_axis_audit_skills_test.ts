@@ -6,8 +6,9 @@ import type { CoreEntry } from "../../src/domain/core_bundle.ts";
  * Locks the per-axis audit-dispatch family (#380) into the bundle so the five
  * thin skills can't drift apart. Each `/{axis}-audit` skill binds exactly one
  * axis to its existing expert agent, documents the uniform scope args, carries
- * the 3-way disambiguation note (vs `/specnaut audit <axis>` report-writing, vs
- * `/code-audit` multi-seat team), and states it is read-only / writes no report.
+ * the disambiguation note (vs the `/code-audit` multi-seat team), and states it
+ * is read-only / writes no report. The third surface it used to name — the
+ * report-writing `/specnaut audit <axis>` phase — was retired in spec 034.
  *
  * The five share one body template — looping the same invariants over all of
  * them is exactly how the spec wants the family policed (SC-001, SC-005, FR-008;
@@ -55,14 +56,9 @@ for (const { skill, agent } of AXIS_SKILLS) {
     }
   });
 
-  Deno.test(`${skill} carries the 3-way disambiguation note`, () => {
+  Deno.test(`${skill} carries the disambiguation note, and names no retired phase`, () => {
     const { content } = skillEntry(skill)!;
-    // Must reference both sibling surfaces so a reader can tell them apart.
-    assertStringIncludes(
-      content,
-      "/specnaut audit",
-      `${skill} must disambiguate from the report-writing /specnaut audit <axis>`,
-    );
+    assert(!content.includes("/specnaut audit"), `${skill} still points at the retired phase`);
     assertStringIncludes(
       content,
       "/code-audit",

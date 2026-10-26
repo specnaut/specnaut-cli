@@ -37,9 +37,8 @@ import type { KnownHarness } from "./installed_lock.ts";
  * document it owns.** A partially covered skill is the #455 shape with fewer
  * paths, and `plugin_coverage_parity_test.ts` fails one.
  *
- * Everything else stays binary-owned: `.specnaut/**` project state — including
- * `harness-tools.md`, which five harness-specific sources collapse into, so it
- * has no 1:1 plugin counterpart — plus harness-static files like
+ * Everything else stays binary-owned: `.specnaut/**` project state, plus
+ * harness-static files like
  * `.claude/settings.json`, hooks, `CLAUDE.md`, and the backlog scripts, which
  * resolve paths relative to their own location and so fail criterion 3.
  * `architect.md` is excluded as a contributor-only agent never bundled into
@@ -123,16 +122,10 @@ export function isPluginCoveredPath(
  * test red, which is the only reason a third mirror is tolerable at all.
  *
  * Sub-document names may be hyphenated — the legacy regex was widened in #303
- * after it silently dropped three of them. The phase-1 audit family (`audit-security` #303,
- * `audit-performance` #304, `audit-accessibility` #305) shipped in
- * v1.9.0; the phase-2 family added `audit-architecture` (#321) and
- * `audit-dependencies` (#322) closing Epic #320. The lite-chain
- * heuristic (`lite-heuristic`, #346) ships under the same
- * `phases/` directory because it's bundled and synced through the
- * same channel, even though it's a contract doc rather than a phase.
- * `ui-ux-designer` was added alongside `architect-expert` in #321
- * to close a long-standing drift bug; this array continues to mirror
- * the bundled Claude scaffold exactly.
+ * after it silently dropped three of them. Contract docs (`plan-audits`,
+ * `merge-squash`, …) ship under the same `phases/` directory because they are
+ * bundled and synced through the same channel, even though they are not
+ * routable. This array mirrors the bundled Claude scaffold exactly.
  */
 /**
  * The plugin-root-relative path a covered destination corresponds to, or null.
@@ -143,9 +136,8 @@ export function isPluginCoveredPath(
  * criterion that claims it.
  *
  * The mapping is 1:1 for exactly the two prefixes the criterion covers, which
- * is itself a reason coverage stops there. `.specnaut/harness-tools.md`, for
- * one, has five plugin sources and one destination — no path this could return
- * would be right.
+ * is itself a reason coverage stops there: a destination fed by several
+ * harness-specific sources has no single plugin path this could return.
  */
 export function pluginRelativePath(dest: string): string | null {
   const PREFIX = ".claude/";
@@ -198,11 +190,6 @@ export const PLUGIN_COVERED_PATHS_CLAUDE: ReadonlyArray<string> = [
     "auto-chain",
     "constitution",
     "upgrade",
-    "audit-security",
-    "audit-performance",
-    "audit-accessibility",
-    "audit-architecture",
-    "audit-dependencies",
   ].map((name) => `.claude/skills/specnaut/phases/${name}.md`),
 
   // `board` and its documents. Its `scripts/` subtree is NOT here and must not
@@ -225,24 +212,17 @@ export const PLUGIN_COVERED_PATHS_CLAUDE: ReadonlyArray<string> = [
     "arch-audit",
     "backlog-frontmatter",
     "backlog-reference-contract",
-    "brainstorming",
     "code-audit",
     "dep-audit",
-    "executing-plans",
     "handoff-protocol",
     "mobile-first-contract",
     "perf-audit",
     "qa-report-contract",
-    "requesting-code-review",
     "response-style-contract",
     "review-findings-contract",
     "sec-audit",
     "specnaut-facts",
     "status-audit",
-    "subagent-driven-development",
-    "using-specnaut",
-    "verification-before-completion",
     "workflow-contract",
-    "writing-plans",
   ].map((name) => `.claude/skills/${name}/SKILL.md`),
 ];

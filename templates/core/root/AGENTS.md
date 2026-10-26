@@ -114,10 +114,23 @@ It is in force on **every** turn, not only when a skill or an agent is involved.
 
 **Whenever you run a `/specnaut` or `/ship` phase, however it was reached** — the router, a
 per-phase command or workflow, a chained step — read `.specnaut/addenda/<skill>/<phase>.md` if it
-exists: `<skill>` is `specnaut` or `ship`, `<phase>` the phase's name (`plan`, `audit-security`,
+exists: `<skill>` is `specnaut` or `ship`, `<phase>` the phase's name (`plan`, `review`,
 `release`), so `/ship release` reads `.specnaut/addenda/ship/release.md`. It is this project's own
 addition to that phase. It adds to the phase at the step it names and never replaces or skips a
 bundled step: where it contradicts one, the bundled step stands and you say so. No file means no
 addendum — say nothing about it.
 
 <!-- --- End Specnaut: phase-addenda --- -->
+
+<!-- --- Specnaut: agent-dispatch --- -->
+
+## Dispatching Specnaut agents
+
+*Owned by Specnaut — this section is not a placeholder to fill in. Edit the rest freely.*
+
+**Dispatch a Specnaut agent by its name, never by describing the task.** On Claude Code that is
+`Task(subagent_type: "<name>")`; on Codex, `spawn_agent(agent_type="<name>")`. A child started
+from a description selects no role: it runs without that agent's instructions and, on Codex, on
+the primary session's model.
+
+<!-- --- End Specnaut: agent-dispatch --- -->

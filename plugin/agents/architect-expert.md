@@ -1,6 +1,6 @@
 ---
 name: architect-expert
-description: Reviews code for architectural drift — hex-layer violations, circular deps, god files, bounded-context leaks, ports/adapters discipline, implicit globals, deep nesting, test-isolation bleed. Two dispatch shapes — (1) PR review (spawned by the review-coordinator during /specnaut review), (2) full-codebase audit (spawned by /specnaut audit architecture).
+description: Reviews code for architectural drift — hex-layer violations, circular deps, god files, bounded-context leaks, ports/adapters discipline, implicit globals, deep nesting, test-isolation bleed. Two dispatch shapes — (1) PR review (spawned by the review-coordinator during /specnaut review), (2) scoped audit (spawned by a single-axis audit skill or /code-audit, over the scope it resolved).
 model: opus
 effort: xhigh
 tools: Read, Grep, Glob, Bash
@@ -82,9 +82,9 @@ format (Mode 1 — PR review)" below).
    non-injected I/O primitive. HIGH — domain code MUST go through an
    injected port; this leak corrupts the testability guarantee.
 
-## Mode 2 — Full-codebase audit
+## Mode 2 — Scoped audit
 
-Spawned by `/specnaut audit architecture`. Read-only; full project scope.
+Spawned by a single-axis audit skill or by `/code-audit`, over the scope it resolved — the whole project by default. Returns its findings inline to the caller. Read-only.
 
 ### Read-only contract (NON-NEGOTIABLE)
 
@@ -127,7 +127,7 @@ and complexity tools beat grep); fall back to import and brace analysis.
 For axis 3, also report the top ten by size even when all are under the target —
 the distribution is context for where to start, not a second threshold.
 
-### Output format (Mode 2 — audit report)
+### Output format (Mode 2 — scoped audit)
 
 Write a Markdown document with these EXACT sections in this order
 (all required, even when empty):

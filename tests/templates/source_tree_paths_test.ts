@@ -40,8 +40,6 @@ const SOURCE_TREE_MARKERS = [
  * repository, and the text says so.
  */
 const ADDRESSES_THIS_REPO: Record<string, string> = {
-  "skill/verification-before-completion":
-    "its maintainer section opens by stating it applies only to a project containing templates/core/",
   // #562 moved the vendored snapshot out of the seat and into a preloaded
   // skill. The excuse moved with the text, not with the file name — an
   // allowlist keyed on a location goes stale the moment the content relocates,

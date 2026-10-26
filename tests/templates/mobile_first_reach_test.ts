@@ -79,13 +79,11 @@ Deno.test("every always-on context file carries the pointer", async () => {
   // its pointer left every assertion green. Pin membership, not cardinality.
   //
   // The set is inverted rather than hand-listed: a harness whose HARNESS_STATIC
-  // carries a context file of its own — anything that is not the on-demand
-  // `.specnaut/harness-tools.md` — must be flagged, or written down as an
+  // carries a context file of its own must be flagged, or written down as an
   // exception. Adding a context file to copilot tomorrow turns this red.
   const shouldBeFlagged = new Set<string>();
   for (const [harnessKey, files] of Object.entries(HARNESS_STATIC)) {
     for (const dest of Object.keys(files)) {
-      if (dest === ".specnaut/harness-tools.md") continue;
       if (/\.(md|mdc)$/.test(dest) && !dest.includes("/hooks/")) shouldBeFlagged.add(harnessKey);
     }
   }

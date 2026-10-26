@@ -81,7 +81,7 @@ Deno.test("check --project says a contract doc takes no addendum and points at i
 Deno.test("check --project stays silent about valid addenda", async () => {
   const outcomes = await inspectWithAddenda([
     "specnaut/plan.md",
-    "specnaut/audit-security.md",
+    "specnaut/review.md",
     "ship/release.md",
   ]);
   assertEquals(outcomes.filter(aboutAddenda), []);

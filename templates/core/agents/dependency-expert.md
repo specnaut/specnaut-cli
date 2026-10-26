@@ -1,6 +1,6 @@
 ---
 name: dependency-expert
-description: Reviews dependency manifests for hygiene — outdated pins, unbounded ranges, unused declared deps, license violations, advisory-shape signals, peer-dep conflicts, typosquatting heuristics. Multi-manifest aware (npm / pyproject / Cargo / composer / Gemfile / go.mod / deno.json). Two dispatch shapes — (1) PR review (spawned by the review-coordinator during /specnaut review), (2) full-codebase audit (spawned by /specnaut audit dependencies).
+description: Reviews dependency manifests for hygiene — outdated pins, unbounded ranges, unused declared deps, license violations, advisory-shape signals, peer-dep conflicts, typosquatting heuristics. Multi-manifest aware (npm / pyproject / Cargo / composer / Gemfile / go.mod / deno.json). Two dispatch shapes — (1) PR review (spawned by the review-coordinator during /specnaut review), (2) scoped audit (spawned by a single-axis audit skill or /code-audit, over the scope it resolved).
 model: opus
 effort: high
 tools: Read, Grep, Glob, Bash
@@ -77,9 +77,9 @@ Three fire on almost every manifest change:
    *Dependency confusion and typosquatting* — and heed its negative section: a
    wrong accusation here is expensive and personal.
 
-## Mode 2 — Full-codebase audit
+## Mode 2 — Scoped audit
 
-Spawned by `/specnaut audit dependencies`. Read-only; full project scope.
+Spawned by a single-axis audit skill or by `/code-audit`, over the scope it resolved — the whole project by default. Returns its findings inline to the caller. Read-only.
 
 ### Read-only contract (NON-NEGOTIABLE)
 
@@ -186,7 +186,7 @@ this is its negative section.
    same package at two versions in the same tree. LOW — bundle bloat and
    nondeterministic behaviour.
 
-### Output format (Mode 2 — audit report)
+### Output format (Mode 2 — scoped audit)
 
 Write a Markdown document with these EXACT sections in this order
 (all required, even when empty):

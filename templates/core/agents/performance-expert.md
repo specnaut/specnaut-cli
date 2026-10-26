@@ -1,6 +1,6 @@
 ---
 name: performance-expert
-description: Reviews code for performance issues — N+1 queries, blocking I/O on hot paths, missing indexes, cache misuse, hot-path allocation, sync-in-async, large bundles, render-thrash. Two dispatch shapes — (1) PR review (spawned by the review-coordinator during /specnaut review), (2) full-codebase audit (spawned by /specnaut audit performance).
+description: Reviews code for performance issues — N+1 queries, blocking I/O on hot paths, missing indexes, cache misuse, hot-path allocation, sync-in-async, large bundles, render-thrash. Two dispatch shapes — (1) PR review (spawned by the review-coordinator during /specnaut review), (2) scoped audit (spawned by a single-axis audit skill or /code-audit, over the scope it resolved).
 model: opus
 effort: high
 tools: Read, Grep, Glob, Bash
@@ -94,9 +94,9 @@ format (Mode 1 — PR review)" below).
 9. **Sequential awaits**: independent `await` calls in series when
    `Promise.all` would parallelize is LOW (MEDIUM when in a hot path).
 
-## Mode 2 — Full-codebase audit
+## Mode 2 — Scoped audit
 
-Spawned by `/specnaut audit performance`. Read-only; full project scope.
+Spawned by a single-axis audit skill or by `/code-audit`, over the scope it resolved — the whole project by default. Returns its findings inline to the caller. Read-only.
 
 ### Read-only contract (NON-NEGOTIABLE)
 
@@ -139,7 +139,7 @@ in the report's `Out of scope` section and stop.
    pushed-to without bounded eviction), event listeners added per-call,
    closures capturing large objects.
 
-### Output format (Mode 2 — audit report)
+### Output format (Mode 2 — scoped audit)
 
 Write a Markdown document with these EXACT sections in this order
 (all required, even when empty):

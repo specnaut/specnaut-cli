@@ -71,13 +71,11 @@ Deno.test("every always-on context file carries the pointer", async () => {
   // Membership, not cardinality: an oracle that derives its expectation from the
   // very field an edit touches goes green when a harness's flag is dropped
   // together with its pointer. The set is INVERTED instead — a harness whose
-  // HARNESS_STATIC ships a context file of its own (anything that is not the
-  // on-demand `.specnaut/harness-tools.md`) must be flagged, or written down as
-  // an exception. Giving copilot a context file tomorrow turns this red.
+  // HARNESS_STATIC ships a context file of its own must be flagged, or written
+  // down as an exception. Giving copilot a context file tomorrow turns this red.
   const shouldBeFlagged = new Set<string>();
   for (const [harnessKey, files] of Object.entries(HARNESS_STATIC)) {
     for (const dest of Object.keys(files)) {
-      if (dest === ".specnaut/harness-tools.md") continue;
       if (/\.(md|mdc)$/.test(dest) && !dest.includes("/hooks/")) shouldBeFlagged.add(harnessKey);
     }
   }

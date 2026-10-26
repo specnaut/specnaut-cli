@@ -1,6 +1,5 @@
 import { assert, assertStringIncludes } from "@std/assert";
 import { CORE_BUNDLE } from "../../src/templates_bundle.ts";
-import { skillDocName } from "../../src/domain/core_bundle.ts";
 
 /**
  * Locks `dependency-expert` to the supply-chain domain file it used to
@@ -133,16 +132,10 @@ Deno.test("dependency-expert degrades cleanly when installed as a plugin", () =>
   assertStringIncludes(body, "is absent");
 });
 
-Deno.test("both dependency dispatch surfaces name the domain file", () => {
-  // The agent can be entered from the skill or from the phase. A Step 0 the
-  // dispatch prompt never mentions is a Step 0 that gets skipped under load.
+Deno.test("the dependency dispatch surface names the domain file", () => {
+  // A Step 0 the dispatch prompt never mentions is a Step 0 that gets skipped
+  // under load.
   const skill = CORE_BUNDLE.find((e) => e.category === "skill" && e.name === "dep-audit");
   assert(skill, "dep-audit skill is missing from the bundle");
   assertStringIncludes(skill.content, `memory/security/${DOMAIN_FILE}`);
-
-  const phase = CORE_BUNDLE.find(
-    (e) => e.category === "phase" && skillDocName(e) === "audit-dependencies",
-  );
-  assert(phase, "audit-dependencies phase is missing from the bundle");
-  assertStringIncludes(phase.content, `memory/security/${DOMAIN_FILE}`);
 });

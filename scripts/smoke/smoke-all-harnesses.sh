@@ -130,16 +130,9 @@ check_helper codex  ".codex/goal.md"    "^# Project goal prompt"
 
 # cli#599. `spawn_agent` resolves a child's model as: explicit spawn value →
 # the `[agents]` default → the PARENT session's value. A dispatch that names no
-# role takes the last link, so this reference has to tell the reader to pass
-# `agent_type=`. Asserted on the codex render because the file is
-# harness-selected — `.specnaut/harness-tools.md` holds the claude mapping on a
-# claude init, and the codex text exists nowhere in that tree.
-check_helper codex  ".specnaut/harness-tools.md"  "agent_type="
-
-# cli#633. The copilot render carries the marketplace install line, which named
-# a repository and a plugin that never existed until the catalogs moved into
-# this repository. Asserted on the copilot render for the same reason as above.
-check_helper copilot ".specnaut/harness-tools.md"  "specnaut-plugin@specnaut-marketplace"
+# role takes the last link, so the always-on AGENTS.md has to tell the reader
+# to pass `agent_type=`. Asserted on the codex render, where it is read.
+check_helper codex  "AGENTS.md"  "agent_type="
 
 # The harness count stays COUNTED, not spelled: the literal once said 8
 # while the array held 7. finish() owns the banner shape (R4); the number

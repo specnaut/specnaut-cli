@@ -31,12 +31,7 @@ const ROOTS: Record<string, RegExp> = {
  * A reference that is RIGHT on every harness, each with its reason. Keyed on
  * the shipped file's basename stem and the root it names.
  */
-const ALLOWED: Record<string, string> = {
-  // An "**On Codex, …**" paragraph naming Codex's own config file: advice for
-  // a Codex session, harmless prose on any other.
-  "requesting-code-review .codex/": "harness-scoped advice paragraph",
-  "subagent-driven-development .codex/": "harness-scoped advice paragraph",
-};
+const ALLOWED: Record<string, string> = {};
 
 /** Entries an allowance actually excused, so a stale one is caught. */
 const used = new Set<string>();

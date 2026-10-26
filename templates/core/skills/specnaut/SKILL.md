@@ -1,7 +1,7 @@
 ---
 name: specnaut
-description: Specnaut workflow router — entry point for the spec-driven pipeline. `/specnaut <phase> [args]` dispatches to a single phase (plan, tasks, implement, review, merge, constitution, audit, upgrade). `/specnaut` with no args prints the workflow overview.
-argument-hint: <plan|tasks|implement|review|merge|constitution|audit|upgrade> [args]
+description: Specnaut workflow router — entry point for the spec-driven pipeline. `/specnaut <phase> [args]` dispatches to a single phase (plan, tasks, implement, review, merge, constitution, upgrade). `/specnaut` with no args prints the workflow overview.
+argument-hint: <plan|tasks|implement|review|merge|constitution|upgrade> [args]
 when_to_use: |
   Trigger phrases that should route here:
   - plan: "plan a feature", "spec out a feature", "write a spec", "build a technical plan", "I have a rough idea", "help me figure out what to build", "I don't know exactly what I want yet", "clarify requirements"
@@ -11,7 +11,6 @@ when_to_use: |
   - merge: "merge the branch", "ship the feature"
   - constitution: "update the constitution", "edit project rules"
   - upgrade: "upgrade specnaut", "update the specnaut templates", "get the latest specnaut"
-  - audit: "audit security / performance / accessibility / architecture / dependencies", "scan the codebase for X issues"
 ---
 
 # Specnaut router
@@ -31,12 +30,6 @@ when_to_use: |
 2. **Phase extraction** — the first remaining token is the phase name. Everything after the first
    whitespace is the argument string for that phase.
 
-   **Compound `audit` phase exception** — when the first token is exactly `audit` AND the next token
-   is one of `security`, `performance`, `accessibility`, `architecture`, or `dependencies`, treat
-   the pair as a single hyphenated phase name `audit-<axis>` (matching `phases/audit-<axis>.md`).
-   The remaining tokens become the argument string. Users may also invoke the hyphenated form
-   directly (`/specnaut audit-security`); both forms route to the same phase doc.
-
 3. **Empty arguments** — if no tokens remain after flag parsing (or `$ARGUMENTS` was empty to start
    with), render the **Workflow overview** below and stop. Do not pick a phase yourself.
 
@@ -51,11 +44,6 @@ when_to_use: |
 | `merge` | `phases/merge.md` | Pre-merge validation and merge the feature branch. |
 | `constitution` | `phases/constitution.md` | Edit the project's `constitution.md` rules. |
 | `upgrade` | `phases/upgrade.md` | Update the `specnaut` binary if a newer one is out, run `specnaut upgrade`, verify, commit. |
-| `audit security` | `phases/audit-security.md` | Read-only project-wide security sweep; emits a findings report. |
-| `audit performance` | `phases/audit-performance.md` | Read-only project-wide performance sweep; emits a findings report. |
-| `audit accessibility` | `phases/audit-accessibility.md` | Read-only project-wide WCAG 2.1 AA sweep; skips when no FE surface is detected. |
-| `audit architecture` | `phases/audit-architecture.md` | Read-only project-wide architectural sweep — hex-layer violations, circular deps, god files, bounded-context leaks. |
-| `audit dependencies` | `phases/audit-dependencies.md` | Read-only multi-manifest dependency-hygiene sweep. |
 
 ## Which skill owns what
 
@@ -88,13 +76,7 @@ after any push, `implement` loads the seventh on an epic, and the router loads t
 chains. Naming any of them as a phase prints the index and stops.
 
 Chainable phases are: `plan`, `tasks`, `implement`, `review`. The others (`merge`, `constitution`,
-`upgrade`, `audit <axis>`) are one-shot regardless of chain mode.
-
-The accessibility phase is FE-gated — projects without front-end source receive a one-line "skipped
-— no FE surface" response instead of an empty report. The dependencies phase aborts with "skipped —
-no dependency manifest detected" when zero recognised manifests are present. The architecture phase
-is always-on; axes that don't match the codebase's structure go to "Out of scope" in the report
-rather than skipping the whole run.
+`upgrade`) are one-shot regardless of chain mode.
 
 ## Removed phases — this is deliberate, not a gap
 
@@ -112,6 +94,18 @@ Then stop. Do not route it silently, and do not print a bare "unknown phase" —
 that reads as a bug to someone following an instruction written before the
 split, which is exactly who arrives here.
 
+**`audit` is RETIRED in the same way.** If the user names `audit`, with or
+without an axis, in either spelling (`audit security`, `audit-security`), say
+so and name the skill that does that work now:
+
+> `/specnaut audit` is retired: each axis is its own skill, and it returns its
+> findings inline.
+> `security` → `/sec-audit` · `performance` → `/perf-audit` ·
+> `accessibility` → `/a11y-audit` · `architecture` → `/arch-audit` ·
+> `dependencies` → `/dep-audit` · every axis at once → `/code-audit`
+
+Then stop.
+
 | Gone | Where its work happens now |
 |------|----------------------------|
 | `brainstorm` | `plan`, step 1 — the discovery dialogue when the input is too fuzzy to plan. |
@@ -120,6 +114,7 @@ split, which is exactly who arrives here.
 | `analyze` | Replaced, not moved. With one document there are no artefacts to hold in agreement; the plan-time architecture and security audits are its successor and run *before* the code. |
 | `checklist` | `plan`'s success criteria and decision table. |
 | `list-skills` | `.specnaut/installed.lock` is readable directly. |
+| `audit`, `audit-security`, `audit-performance`, `audit-accessibility`, `audit-architecture`, `audit-dependencies` | The per-axis skills above, or `/code-audit` for all of them. |
 
 ## Routing
 
@@ -141,7 +136,7 @@ Unknown phase → print the phase index and stop.
 After the phase procedure completes successfully:
 
 - `CHAIN_MODE == off` (the user passed `--manual`) → stop. Report the phase outcome.
-- Phase is not chainable (`merge`, `constitution`, `upgrade`, `audit <axis>`) → stop.
+- Phase is not chainable (`merge`, `constitution`, `upgrade`) → stop.
 - Otherwise → read `phases/auto-chain.md` and follow it.
 
 **Re-entry needs no flag.** Invoking a phase whose downstream artefacts already exist runs one-shot

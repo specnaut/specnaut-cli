@@ -132,36 +132,6 @@
       "source": "core/skills/specnaut/phases/auto-chain.md"
     },
     {
-      "category": "phase",
-      "name": "specnaut",
-      "suffix": "audit-security.md",
-      "source": "core/skills/specnaut/phases/audit-security.md"
-    },
-    {
-      "category": "phase",
-      "name": "specnaut",
-      "suffix": "audit-performance.md",
-      "source": "core/skills/specnaut/phases/audit-performance.md"
-    },
-    {
-      "category": "phase",
-      "name": "specnaut",
-      "suffix": "audit-accessibility.md",
-      "source": "core/skills/specnaut/phases/audit-accessibility.md"
-    },
-    {
-      "category": "phase",
-      "name": "specnaut",
-      "suffix": "audit-architecture.md",
-      "source": "core/skills/specnaut/phases/audit-architecture.md"
-    },
-    {
-      "category": "phase",
-      "name": "specnaut",
-      "suffix": "audit-dependencies.md",
-      "source": "core/skills/specnaut/phases/audit-dependencies.md"
-    },
-    {
       "category": "phase-script",
       "name": "tag",
       "suffix": "tag.sh",
@@ -195,41 +165,6 @@
       "suffix": "release-local.sh",
       "source": "core/skills/ship/scripts/release-local.sh",
       "executable": true
-    },
-    {
-      "category": "skill",
-      "name": "writing-plans",
-      "source": "core/skills/writing-plans/SKILL.md"
-    },
-    {
-      "category": "skill",
-      "name": "requesting-code-review",
-      "source": "core/skills/requesting-code-review/SKILL.md"
-    },
-    {
-      "category": "skill",
-      "name": "using-specnaut",
-      "source": "core/skills/using-specnaut/SKILL.md"
-    },
-    {
-      "category": "skill",
-      "name": "subagent-driven-development",
-      "source": "core/skills/subagent-driven-development/SKILL.md"
-    },
-    {
-      "category": "skill",
-      "name": "executing-plans",
-      "source": "core/skills/executing-plans/SKILL.md"
-    },
-    {
-      "category": "skill",
-      "name": "verification-before-completion",
-      "source": "core/skills/verification-before-completion/SKILL.md"
-    },
-    {
-      "category": "skill",
-      "name": "brainstorming",
-      "source": "core/skills/brainstorming/SKILL.md"
     },
     {
       "category": "skill",
@@ -1825,7 +1760,8 @@
         "chain-stops",
         "ui-defaults",
         "response-style",
-        "phase-addenda"
+        "phase-addenda",
+        "agent-dispatch"
       ]
     },
     {
@@ -1903,31 +1839,6 @@
       "destination": ".cursor/rules/specify-rules.mdc",
       "source": "harness-specific/cursor/specify-rules.mdc",
       "alwaysOn": true
-    },
-    {
-      "harness": "claude",
-      "destination": ".specnaut/harness-tools.md",
-      "source": "core/skills/using-specnaut/references/claude-tools.md"
-    },
-    {
-      "harness": "codex",
-      "destination": ".specnaut/harness-tools.md",
-      "source": "core/skills/using-specnaut/references/codex-tools.md"
-    },
-    {
-      "harness": "copilot",
-      "destination": ".specnaut/harness-tools.md",
-      "source": "core/skills/using-specnaut/references/copilot-tools.md"
-    },
-    {
-      "harness": "cursor",
-      "destination": ".specnaut/harness-tools.md",
-      "source": "core/skills/using-specnaut/references/cursor-tools.md"
-    },
-    {
-      "harness": "opencode",
-      "destination": ".specnaut/harness-tools.md",
-      "source": "core/skills/using-specnaut/references/opencode-tools.md"
     }
   ]
 }

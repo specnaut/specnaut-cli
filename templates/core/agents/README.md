@@ -12,17 +12,18 @@ someone reads a dispatch line without opening the agent file.
 
 | Suffix | Meaning | Agents |
 | ------ | ------- | ------ |
-| `<domain>-expert` | A review lens that **also** has a standalone `/specnaut audit <domain>` phase — dual mode: per-diff review *and* whole-codebase audit | `accessibility-expert`, `architect-expert`, `dependency-expert`, `performance-expert`, `security-expert` |
-| `<domain>-reviewer` | A review lens with **no** audit phase — it only ever sees a diff | `code-reviewer`, `test-reviewer` |
+| `<domain>-expert` | A review lens that **also** has a standalone single-axis audit skill — dual mode: per-diff review *and* scoped audit | `accessibility-expert`, `architect-expert`, `dependency-expert`, `performance-expert`, `security-expert` |
+| `<domain>-reviewer` | A review lens with **no** audit skill — it only ever sees a diff | `code-reviewer`, `test-reviewer` |
 | `-coordinator` | Fans out the lenses of a **single** phase and aggregates what returns | `review-coordinator` |
 | `-manager` | Drives a **multi-phase** delivery across several agents | `workflow-manager` |
 | role noun | Does the work rather than judging it | `developer`, `qa-tester`, `devops-sre`, `product-owner`, `ui-ux-designer` |
 
 Two rules follow, and they are the whole point of writing this down:
 
-- **`-expert` ⇔ an audit phase exists.** The five `-expert` agents correspond
-  exactly to the five `audit-*.md` phases. If you give `code-reviewer` or
-  `test-reviewer` an audit phase, **rename it to `-expert` in the same
+- **`-expert` ⇔ an audit skill exists.** The five `-expert` agents correspond
+  exactly to the five single-axis audit skills (`/sec-audit`, `/perf-audit`,
+  `/a11y-audit`, `/arch-audit`, `/dep-audit`). If you give `code-reviewer` or
+  `test-reviewer` an audit skill, **rename it to `-expert` in the same
   change** — otherwise the suffix stops predicting anything and the next
   person picks one at random.
 - **Agents spell the domain out; skills may abbreviate.** The agent is
@@ -35,8 +36,8 @@ Two rules follow, and they are the whole point of writing this down:
 `specnaut-guide` is the deliberate exception to the table — the only agent
 named after the tool itself. It answers questions about Specnaut rather than
 reviewing your code, so it carries neither a lens suffix nor a role noun. It
-is **not** an `-expert`: giving it that suffix would imply an
-`/specnaut audit specnaut` phase that does not and should not exist.
+is **not** an `-expert`: giving it that suffix would imply an audit skill for
+Specnaut itself, which does not and should not exist.
 
 ## Model and effort — two budgets
 

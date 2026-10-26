@@ -73,18 +73,14 @@ Deno.test("isPluginCoveredPath: claude + .claude/skills/specnaut/phases/<phase>.
 });
 
 // Hyphenated phase names — the previous `[a-z]+` regex silently failed
-// for these. Locked in by Epic #302 / #303 (which added audit-security).
+// for these (#303). This pins the path SHAPE, not the bundle: a shipped
+// hyphenated contract doc, and an invented name the regex must also accept.
 Deno.test("isPluginCoveredPath: claude + hyphenated phase names are covered", () => {
   for (
     const name of [
-      "tag-version",
-      "release-version",
-      "list-skills",
-      "audit-security",
-      "audit-performance",
-      "audit-accessibility",
-      "audit-architecture",
-      "audit-dependencies",
+      "plan-audits",
+      "merge-squash",
+      "some-future-phase",
     ]
   ) {
     assertEquals(

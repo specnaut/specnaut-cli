@@ -18,11 +18,9 @@ const SYNC_PAIRS: ReadonlyArray<{ plugin: string; source: string }> = [
     plugin: "plugin/skills/specnaut/SKILL.md",
     source: "templates/core/skills/specnaut/SKILL.md",
   },
-  // 15 phase reference docs, loaded by the router on demand. The
-  // phase-1 audit trio (`audit-security` #303, `audit-performance` #304,
-  // `audit-accessibility` #305) shipped in v1.9.0; the phase-2 pair
-  // (`audit-architecture` #321 + `audit-dependencies` #322) closes
-  // Epic #320. `brainstorm`, `specify`, `clarify`, `analyze`, `checklist`,
+  // Phase reference docs, loaded by the router on demand. The five
+  // `audit-<axis>` phases were retired in spec 034 — the per-axis skills
+  // below took their work. `brainstorm`, `specify`, `clarify`, `analyze`, `checklist`,
   // `list-skills` and the `lite-heuristic` contract doc were removed in
   // #455 / #456 — the chain is `plan → tasks → implement → review → merge`
   // and `plan` absorbed the first four. `plan-audits` is a contract doc
@@ -36,11 +34,6 @@ const SYNC_PAIRS: ReadonlyArray<{ plugin: string; source: string }> = [
     "merge",
     "constitution",
     "upgrade",
-    "audit-security",
-    "audit-performance",
-    "audit-accessibility",
-    "audit-architecture",
-    "audit-dependencies",
     // Seven docs the list had never claimed, found by the completeness sweep
     // All seven were already byte-identical to their sources —
     // correct by luck, since nothing compared them. `auto-chain` is the
@@ -70,59 +63,6 @@ const SYNC_PAIRS: ReadonlyArray<{ plugin: string; source: string }> = [
     plugin: `plugin/skills/ship/phases/${name}.md`,
     source: `templates/core/skills/ship/phases/${name}.md`,
   })),
-  // writing-plans skill — Specnaut's native equivalent of obra/superpowers
-  // writing-plans, used for issue-driven planning where the spec-kit
-  // /specnaut plan ceremony would be overkill (Epic #270, A1 #271).
-  {
-    plugin: "plugin/skills/writing-plans/SKILL.md",
-    source: "templates/core/skills/writing-plans/SKILL.md",
-  },
-  // requesting-code-review skill — canonical reviewer prompt template +
-  // dispatch guide for Specnaut's bundled code-reviewer agent. Foundation
-  // for the two-stage review pattern used by subagent-driven-development
-  // (Epic #270, A3 #273).
-  {
-    plugin: "plugin/skills/requesting-code-review/SKILL.md",
-    source: "templates/core/skills/requesting-code-review/SKILL.md",
-  },
-  // using-specnaut bootstrap skill + 6 tool-mapping references — loaded
-  // by the SessionStart hook (plugin/hooks/) to make the agent
-  // skill-aware on every turn. Per-harness references already shipped
-  // in #283; mirror covers them all for the plugin distribution
-  // (Epic #270, B6 #282).
-  {
-    plugin: "plugin/skills/using-specnaut/SKILL.md",
-    source: "templates/core/skills/using-specnaut/SKILL.md",
-  },
-  // subagent-driven-development — per-task two-stage review loop
-  // (spec compliance then code quality) that consumes plans produced
-  // by writing-plans and the canonical reviewer prompt template from
-  // requesting-code-review (Epic #270, A2 #272).
-  {
-    plugin: "plugin/skills/subagent-driven-development/SKILL.md",
-    source: "templates/core/skills/subagent-driven-development/SKILL.md",
-  },
-  // executing-plans — inline alternative to subagent-driven-development
-  // for trivial plans where dispatch overhead exceeds the catch rate
-  // (Epic #270, A4 #274).
-  {
-    plugin: "plugin/skills/executing-plans/SKILL.md",
-    source: "templates/core/skills/executing-plans/SKILL.md",
-  },
-  // verification-before-completion — discipline checklist that
-  // implementing agents MUST run before claiming DONE (Epic #270,
-  // A5 #275).
-  {
-    plugin: "plugin/skills/verification-before-completion/SKILL.md",
-    source: "templates/core/skills/verification-before-completion/SKILL.md",
-  },
-  // brainstorming — spec-discovery entry point. One question at a
-  // time, propose 2-3 approaches, present design for approval, hand
-  // off to writing-plans (Epic #270, A6 #276).
-  {
-    plugin: "plugin/skills/brainstorming/SKILL.md",
-    source: "templates/core/skills/brainstorming/SKILL.md",
-  },
   // Four machine-readable output-contract skills (#378). `user-invocable:
   // false` — never user-invoked; preloaded into agent context via the
   // `skills:` frontmatter to normalize the WORKFLOW STATUS / HANDOFF /
@@ -152,16 +92,6 @@ const SYNC_PAIRS: ReadonlyArray<{ plugin: string; source: string }> = [
   ].map((name) => ({
     plugin: `plugin/skills/${name}/SKILL.md`,
     source: `templates/core/skills/${name}/SKILL.md`,
-  })),
-  ...[
-    "claude",
-    "codex",
-    "cursor",
-    "opencode",
-    "copilot",
-  ].map((name) => ({
-    plugin: `plugin/skills/using-specnaut/references/${name}-tools.md`,
-    source: `templates/core/skills/using-specnaut/references/${name}-tools.md`,
   })),
   // Five per-axis audit-dispatch skills (#380). Markdown-only thin
   // dispatchers (no scripts/) — unlike the script-backed `code-audit`

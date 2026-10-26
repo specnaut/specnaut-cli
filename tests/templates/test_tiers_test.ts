@@ -69,19 +69,6 @@ Deno.test("review.md runs the test command once per item and reports the skip", 
   assertStringIncludes(report, "SKIPPED (epic child — runs at the last review)");
 });
 
-Deno.test("verification-before-completion scopes the suite and names no runner", () => {
-  const doc = read("skills/verification-before-completion/SKILL.md");
-  const item1 = section(doc, "### 1. Tests are actually green");
-  assertStringIncludes(item1, "the tests **relevant\n  to your change**");
-  assertStringIncludes(item1, "**whole** unit suite, once");
-  // Everything but the maintainer-only section, which names this repository's
-  // own tools behind an explicit condition.
-  const maintainer = section(doc, "## If this project *is* the Specnaut bundle source");
-  const generic = doc.replace(maintainer, "");
-  const hit = generic.match(RUNNERS);
-  assert(hit === null, `generic section hard-codes a runner: ${hit?.[0]}`);
-});
-
 Deno.test("workflow-contract's VALIDATION example names no runner", () => {
   const doc = read("skills/workflow-contract/SKILL.md");
   const hit = doc.match(RUNNERS);

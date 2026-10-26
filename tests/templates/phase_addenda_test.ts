@@ -178,7 +178,7 @@ Deno.test("no bundled phase doc carries a character of the addendum seam", () =>
   // "customized" the moment a project touches it.
   const phases = CORE_BUNDLE.filter((e) => e.category === "phase");
   // Non-vacuity: both routed skills, and the two docs the ACs are about.
-  assert(phases.length >= 20, `only ${phases.length} phase docs found — the sweep read nothing`);
+  assert(phases.length >= 15, `only ${phases.length} phase docs found — the sweep read nothing`);
   assert(
     phases.some((e) => e.name === "ship" && e.suffix === "release.md"),
     "ship/release.md not swept",

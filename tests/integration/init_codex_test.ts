@@ -93,11 +93,7 @@ Deno.test("specnaut init --ai codex scaffolds a Codex layout", async () => {
     assertEquals(codexGoalMd.includes("/board groom"), true);
 
     // Top-level skill folders post-consolidation: specnaut router +
-    // specnaut-board +
-    // writing-plans (A1) + requesting-code-review (A3) +
-    // using-specnaut bootstrap (B6) + subagent-driven-development (A2) +
-    // executing-plans (A4) + verification-before-completion (A5) +
-    // brainstorming (A6) + 5 output-contract skills (#378 + #445:
+    // specnaut-board + 5 output-contract skills (#378 + #445:
     // workflow-contract, handoff-protocol, review-findings-contract,
     // qa-report-contract, backlog-reference-contract) + code-audit (#379) + 5 per-axis audit skills
     // (#380: arch-audit, sec-audit, perf-audit, dep-audit, a11y-audit) +
@@ -109,16 +105,16 @@ Deno.test("specnaut init --ai codex scaffolds a Codex layout", async () => {
     // of 25 — it had been stale for four features, because nothing checks a
     // comment. Do not restore it: the number below is the fact, and the list
     // above is history. Bump the number when a skill is added, and say which.
-    // The audit-security phase (#303) lands under specnaut/phases/, not as a
-    // top-level skill — no bump there. code-audit's scope script ships under
+    // Phase documents land under specnaut/phases/, not as top-level skills.
+    // code-audit's scope script ships under
     // .specnaut/scripts/code-audit/, not as a skill folder; status-audit's
     // schema doc ships to .specnaut/logs/README.md, also not a skill folder.
     const agentsSkillsCount = (await Array.fromAsync(
       Deno.readDir(join(root, ".agents/skills")),
     )).length;
-    // 27 since spec 033: /ship is a new top-level skill folder. Its two
-    // documents live INSIDE that folder, so they do not add to this count.
-    assertEquals(agentsSkillsCount, 27);
+    // 27 since spec 033 (/ship is a top-level skill folder; its documents live
+    // inside it). 20 since spec 034 retired seven skills.
+    assertEquals(agentsSkillsCount, 20);
     const codexAgentsCount = (await Array.fromAsync(
       Deno.readDir(join(root, ".codex/agents")),
     )).length;

@@ -191,7 +191,6 @@ Deno.test("harness adapter — Cursor manifest has required path refs", async ()
     displayName?: string;
     skills?: string;
     agents?: string;
-    hooks?: string;
   };
   const m = await readJson<CursorManifest>(".cursor-plugin/plugin.json");
   assert(
@@ -200,7 +199,6 @@ Deno.test("harness adapter — Cursor manifest has required path refs", async ()
   );
   assert(typeof m.skills === "string", "Cursor manifest missing skills path");
   assert(typeof m.agents === "string", "Cursor manifest missing agents path");
-  assert(typeof m.hooks === "string", "Cursor manifest missing hooks path");
 });
 
 Deno.test("harness adapter — path references resolve to existing files", async () => {
@@ -222,11 +220,10 @@ Deno.test("harness adapter — path references resolve to existing files", async
     `Codex logo ${codex.interface.logo} does not exist`,
   );
 
-  // Cursor: skills + agents + hooks file
+  // Cursor: skills + agents (no hooks since spec 034)
   const cursor = await readJson<{
     skills: string;
     agents: string;
-    hooks: string;
   }>(".cursor-plugin/plugin.json");
   assert(
     await pathExists(cursor.skills.replace(/^\.\//, "")),
@@ -235,10 +232,6 @@ Deno.test("harness adapter — path references resolve to existing files", async
   assert(
     await pathExists(cursor.agents.replace(/^\.\//, "")),
     `Cursor agents path ${cursor.agents} does not resolve to a directory`,
-  );
-  assert(
-    await pathExists(cursor.hooks.replace(/^\.\//, "")),
-    `Cursor hooks file ${cursor.hooks} does not exist`,
   );
 });
 
@@ -250,11 +243,6 @@ Deno.test("harness adapter — OpenCode JS adapter exports SpecnautPlugin", asyn
   assert(
     /export\s+const\s+SpecnautPlugin\s*=/.test(raw),
     ".opencode/plugins/specnaut.js must export `SpecnautPlugin`",
-  );
-  // Sanity: must reference the using-specnaut bootstrap skill.
-  assert(
-    raw.includes("using-specnaut"),
-    ".opencode/plugins/specnaut.js must reference the using-specnaut bootstrap skill",
   );
   // Sanity: must register skills path into config.skills.paths.
   assert(
