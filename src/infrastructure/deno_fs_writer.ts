@@ -1,6 +1,11 @@
 import { dirname, join, resolve } from "@std/path";
 import { assertSafeDestination, type Bundle } from "../domain/template.ts";
-import { assertInsideProject, resolvedRelative, resolveProjectRoot } from "./fs_containment.ts";
+import {
+  assertInsideProject,
+  assertRemovableInProject,
+  resolvedRelative,
+  resolveProjectRoot,
+} from "./fs_containment.ts";
 import { pruneEmptyParents } from "./fs_prune.ts";
 import { mergeIntoFile } from "../domain/merge_block.ts";
 import { mergeClaudeSettings, pluginDeclarationNotes } from "../domain/claude_settings_merge.ts";
@@ -257,8 +262,9 @@ export class DenoFsWriter implements FsWriter {
       // `Deno.rename` operate on the LINK rather than its target, so neither
       // reaches outside on its own — but the path may cross a symlinked
       // ANCESTOR, and then both do. Measured: with `.claude/` a link out,
-      // `deletePaths` deleted the file at the target.
-      await assertInsideProject(root, abs);
+      // `deletePaths` deleted the file at the target. Judged on what they act
+      // on, the leaf as is (cli#669).
+      await assertRemovableInProject(root, abs);
       // Inside the project is not enough when the caller bounds WHERE (cli#665):
       // a committed link under an allowed folder can lead anywhere else in it.
       if (options.within && !options.within(await resolvedRelative(root, abs))) {

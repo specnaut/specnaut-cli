@@ -24,6 +24,24 @@ Deno.test("assertSafeDestination rejects plain '..' and its prefix", () => {
   assertThrows(() => assertSafeDestination(".."), Error, "escape");
 });
 
+Deno.test("assertSafeDestination rejects the target directory itself (cli#669)", () => {
+  for (const dest of [".", "./", "", "a/..", "a/b/../..", "a/../"]) {
+    assertThrows(() => assertSafeDestination(dest), Error, "target directory itself", dest);
+  }
+  // Names that merely start with a dot are files.
+  assertSafeDestination(".claude");
+  assertSafeDestination("./a.md");
+});
+
+Deno.test("assertSafeDestination rejects a name the filesystem may read differently (cli#669)", () => {
+  // A trailing separator follows a leaf link; Windows drops trailing dots and spaces.
+  for (const dest of ["x/", "a/b/", "...", "a/...", "a.", "a/b /c.md", "a/c.md "]) {
+    assertThrows(() => assertSafeDestination(dest), Error, "read differently", dest);
+  }
+  assertSafeDestination("a.b/c.md");
+  assertSafeDestination(".specnaut/memory/size-limits.md");
+});
+
 // `isInside` is the pure half of containment (cli#574). The filesystem half —
 // resolving symlinks on both sides — lives in the adapter; everything below is
 // decidable from two strings.

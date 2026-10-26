@@ -196,3 +196,48 @@ symlinkTest("an ordinary project is written exactly as before", async () => {
     await Deno.remove(root, { recursive: true });
   }
 });
+
+// cli#669: a delete is judged on what `Deno.remove` / `Deno.rename` act on — the
+// parent resolved, the leaf as is — not on where a leaf link points.
+
+symlinkTest("a leaf link pointing out is removed as a link; its target is untouched", async () => {
+  for (const backupExisting of [false, true]) {
+    const { root, proj, outside } = await box();
+    try {
+      await Deno.writeTextFile(join(outside, "t.md"), "keep");
+      await Deno.mkdir(join(proj, ".claude"));
+      await Deno.symlink(join(outside, "t.md"), join(proj, ".claude/l.md"));
+      await w.deletePaths([".claude/l.md"], proj, { backupExisting });
+      const gone = await Deno.lstat(join(proj, ".claude/l.md")).then(() => false, () => true);
+      assert(gone, `backupExisting=${backupExisting}: the link is still there`);
+      assertEquals(await Deno.readTextFile(join(outside, "t.md")), "keep");
+      if (backupExisting) {
+        assert((await Deno.lstat(join(proj, ".claude/l.md.specnaut.bak"))).isSymlink);
+      }
+    } finally {
+      await Deno.remove(root, { recursive: true });
+    }
+  }
+});
+
+symlinkTest("a path that lands on the project directory itself is refused", async () => {
+  const { root, proj } = await box();
+  try {
+    await Deno.writeTextFile(join(proj, "a.md"), "keep");
+    // `up/proj` is the project: `up` points at its parent.
+    await Deno.symlink(root, join(proj, "up"));
+    for (const dest of [".", "a/..", "up/proj"]) {
+      await assertRejects(
+        () => w.deletePaths([dest], proj, { backupExisting: true }),
+        Error,
+        undefined,
+        dest,
+      );
+      assertEquals(await Deno.readTextFile(join(proj, "a.md")), "keep", dest);
+      const aside = await Deno.lstat(`${proj}.specnaut.bak`).then(() => true, () => false);
+      assertEquals(aside, false, `${dest}: the project was moved aside`);
+    }
+  } finally {
+    await Deno.remove(root, { recursive: true });
+  }
+});

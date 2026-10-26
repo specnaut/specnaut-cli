@@ -180,15 +180,22 @@ export async function assertInsideProject(root: string, abs: string): Promise<vo
     // which path. Deliberately narrow — every other error still propagates, so
     // a permission problem is not silently reported as a bad layout.
     if (!(err instanceof Deno.errors.FilesystemLoop)) throw err;
-    throw new Error(
-      `refusing to touch a path whose symlinks form a cycle:\n` +
-        `  path:    ${abs}\n` +
-        `  project: ${root}\n` +
-        `Follow the links from that path and break the loop.`,
-    );
+    throw loopRefusal(root, abs);
   }
   if (isInside(root, resolved)) return;
-  throw new Error(
+  throw leavesRefusal(root, abs, resolved);
+}
+
+const loopRefusal = (root: string, abs: string) =>
+  new Error(
+    `refusing to touch a path whose symlinks form a cycle:\n` +
+      `  path:    ${abs}\n` +
+      `  project: ${root}\n` +
+      `Follow the links from that path and break the loop.`,
+  );
+
+const leavesRefusal = (root: string, abs: string, resolved: string) =>
+  new Error(
     `refusing to touch a path that leaves the project:\n` +
       `  path:     ${abs}\n` +
       `  resolves: ${resolved}\n` +
@@ -196,18 +203,50 @@ export async function assertInsideProject(root: string, abs: string): Promise<vo
       `A symlink in the project points outside it. Specnaut will not write, ` +
       `move, delete or read through it.`,
   );
+
+/**
+ * What a removal or a rename of `abs` acts on: the parent resolved
+ * through every symlink, the leaf kept as is — removing a link removes the
+ * link, not its target.
+ */
+async function removalTarget(abs: string): Promise<string> {
+  return join(await resolveDeepestExisting(dirname(abs)), basename(abs));
 }
 
 /**
- * The project-relative path `Deno.remove(abs)` would actually unlink, with `/`
- * separators: the parent resolved through every symlink, the leaf kept as is —
- * removing a link removes the link, not its target. A path that resolves
- * outside `root` comes back starting with `..`.
+ * `assertInsideProject` for a removal or a rename: throws unless what they act
+ * on is inside `root`, and is not `root` itself (cli#669).
+ *
+ * Not `assertInsideProject`, which follows a leaf link to its target: the check
+ * judged one file and the action touched another. A link inside the project
+ * pointing out was refused although removing it touches nothing outside, and a
+ * link pointing at the project was judged by its target, not by itself. The
+ * check and the action must name the same file.
+ */
+export async function assertRemovableInProject(root: string, abs: string): Promise<void> {
+  let target: string;
+  try {
+    target = await removalTarget(abs);
+  } catch (err) {
+    if (!(err instanceof Deno.errors.FilesystemLoop)) throw err;
+    throw loopRefusal(root, abs);
+  }
+  if (!isInside(root, target)) throw leavesRefusal(root, abs, target);
+  if (relative(root, target) === "") {
+    throw new Error(
+      `refusing to remove the project directory itself:\n  path:    ${abs}\n  project: ${root}`,
+    );
+  }
+}
+
+/**
+ * The project-relative path a removal of `abs` would actually unlink, with `/`
+ * separators (see `removalTarget`). A path that resolves outside `root` comes
+ * back starting with `..`.
  *
  * For callers that bound WHERE inside the project a mutation may land (cli#665):
- * `assertInsideProject` only answers whether it stays in the project at all.
+ * `assertRemovableInProject` only answers whether it stays in the project at all.
  */
 export async function resolvedRelative(root: string, abs: string): Promise<string> {
-  const target = join(await resolveDeepestExisting(dirname(abs)), basename(abs));
-  return relative(root, target).split(SEPARATOR).join("/");
+  return relative(root, await removalTarget(abs)).split(SEPARATOR).join("/");
 }

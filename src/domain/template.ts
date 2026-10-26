@@ -117,13 +117,23 @@ export function isInside(root: string, target: string): boolean {
 }
 
 /**
- * Throws if the destination path is unsafe: absolute, or attempts to escape
- * the target directory via "..". Pure — no IO.
+ * Throws if the destination path is unsafe: absolute, an attempt to escape the
+ * target directory via "..", the target directory itself, or a name the
+ * filesystem may read as something else. Pure — no IO.
+ *
+ * The last two because a destination names a file (cli#669). `.` (or `a/..`,
+ * `""`, `./`) names the project: `deletePaths` with `backupExisting` renamed
+ * the whole project folder aside on one. A trailing separator makes the kernel
+ * follow a leaf link the containment check took as is, and Windows drops a
+ * segment's trailing dots and spaces, so `...` names the project there too.
  */
 export function assertSafeDestination(dest: string): void {
   const normalized = normalize(dest);
   if (isAbsolute(normalized)) {
     throw new Error(`Unsafe destination (absolute path): ${dest}`);
+  }
+  if (normalized.replace(/[\\/]+$/, "") === ".") {
+    throw new Error(`Unsafe destination (the target directory itself): ${dest}`);
   }
   if (
     normalized === ".." ||
@@ -132,6 +142,9 @@ export function assertSafeDestination(dest: string): void {
     normalized.endsWith(`${SEPARATOR}..`)
   ) {
     throw new Error(`Unsafe destination (escape attempt): ${dest}`);
+  }
+  if (/[\\/]$/.test(normalized) || normalized.split(/[\\/]/).some((s) => /[. ]$/.test(s))) {
+    throw new Error(`Unsafe destination (a name the filesystem may read differently): ${dest}`);
   }
 }
 
