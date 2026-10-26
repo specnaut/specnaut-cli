@@ -26,6 +26,13 @@ import {
 } from "../domain/merge_block.ts";
 import { isPluginCoveredPath, pluginRelativePath } from "../domain/plugin_coverage.ts";
 import { isAgenticPath, pruneAgenticEntries } from "../domain/parent_managed.ts";
+import {
+  deletesOrphan,
+  keptOrphanEntries,
+  orphanScope,
+  relabelRefused,
+} from "../domain/orphan_scope.ts";
+import { deriveUnchangedEntries } from "./upgrade_lock.ts";
 
 /** The plugin name used for both the install probe and the cache directory. */
 export const PLUGIN_NAME = "specnaut-plugin";
@@ -385,6 +392,7 @@ export class UpgradeProjectUseCase {
         isSkipIfExists: (dest) => bundle[dest]?.skipIfExists === true,
         resetBaseline: input.resetBaseline ?? false,
         isDeclaredPreserved,
+        managedRoots: harness.managedRoots,
       },
     );
 
@@ -413,7 +421,7 @@ export class UpgradeProjectUseCase {
       a.kind === "migrate-to-plugin" ||
       a.kind === "defer-to-plugin" ||
       isForceWritablePreserve(a) ||
-      (a.kind === "remove" && (!a.wasCustomized || input.force))
+      deletesOrphan(a, input.force)
     );
     if (
       !hasActualWork && plannedSections.length === 0 &&
@@ -601,30 +609,8 @@ export class UpgradeProjectUseCase {
       isDeclaredPreserved,
     );
 
-    const cleanRemovals = plan
-      .filter((a): a is Extract<typeof a, { kind: "remove" }> =>
-        a.kind === "remove" && !a.wasCustomized
-      )
-      .map((a) => a.dest);
-    const customizedRemovals = plan
-      .filter((a): a is Extract<typeof a, { kind: "remove" }> =>
-        a.kind === "remove" && a.wasCustomized
-      )
-      .map((a) => a.dest);
-
-    let extraBackups: BackupReport["backups"] = [];
-    if (cleanRemovals.length > 0) {
-      const r = await writer.deletePaths(cleanRemovals, input.projectDir, {
-        backupExisting: false,
-      });
-      extraBackups = [...extraBackups, ...r.backups];
-    }
-    if (input.force && customizedRemovals.length > 0) {
-      const r = await writer.deletePaths(customizedRemovals, input.projectDir, {
-        backupExisting: true,
-      });
-      extraBackups = [...extraBackups, ...r.backups];
-    }
+    const removal = await this.removeOrphans(plan, input, harness.managedRoots, refusals);
+    let extraBackups = removal.backups;
 
     // Plugin migrations: vanilla file on disk + plugin installed →
     // backup + delete; plugin serves the file going forward. Always
@@ -732,6 +718,10 @@ export class UpgradeProjectUseCase {
           : (existing?.templatesVersion ?? templatesVersion),
       });
     }
+    // cli#666: a customised orphan this run kept stays tracked — see `keptOrphanEntries`.
+    for (const [d, e] of keptOrphanEntries(plan, effectiveLock, input.force)) {
+      updatedEntries.set(d, e);
+    }
     const newLock: InstalledLock = {
       version: 2,
       harness: lock.harness,
@@ -750,7 +740,7 @@ export class UpgradeProjectUseCase {
     return {
       status: "applied",
       refusals,
-      plan,
+      plan: removal.plan,
       fromVersion: lock.templatesVersion,
       toVersion: templatesVersion,
       backups: [...backupReport.backups, ...extraBackups]
@@ -763,6 +753,40 @@ export class UpgradeProjectUseCase {
       written: Object.keys(toWrite).sort(),
       notes,
     };
+  }
+
+  /**
+   * Delete the orphans this run removes (`deletesOrphan`): a vanilla one
+   * outright, a customised one only under `--force` and backed up first.
+   *
+   * `within` re-asks `orphanScope` on the path with symlinks resolved (cli#665).
+   * The plan only read the text, and a committed link under a managed folder
+   * can lead anywhere else in the project. Returns the plan with each orphan
+   * the writer refused re-labelled `orphan-refused`, so the summary reports
+   * what happened rather than what was planned; its entry leaves the lock.
+   */
+  private async removeOrphans(
+    plan: UpgradePlan,
+    input: UpgradeProjectInput,
+    managedRoots: ReadonlyArray<string> | undefined,
+    notes: string[],
+  ): Promise<{ backups: BackupReport["backups"]; plan: UpgradePlan }> {
+    const removes = plan.filter((a) => deletesOrphan(a, input.force));
+    const within = (rel: string) => orphanScope(rel, managedRoots) === "in-scope";
+    let backups: BackupReport["backups"] = [];
+    const refused = new Set<string>();
+    for (const backupExisting of [false, true]) {
+      const paths = removes.flatMap((a) =>
+        a.kind === "remove" && a.wasCustomized === backupExisting ? [a.dest] : []
+      );
+      if (paths.length === 0) continue;
+      const opts = { backupExisting, within };
+      const r = await this.deps.writer.deletePaths(paths, input.projectDir, opts);
+      backups = [...backups, ...r.backups];
+      for (const dest of r.refused ?? []) refused.add(dest);
+      notes.push(...(r.notes ?? []));
+    }
+    return { backups, plan: relabelRefused(plan, refused) };
   }
 
   /**
@@ -892,49 +916,6 @@ function managedSectionEntries(bundle: Bundle): Array<[string, string, string]> 
       if (body === null || body.length === 0) continue;
       out.push([dest, label, body]);
     }
-  }
-  return out;
-}
-
-/**
- * The lock entry set for a project where every dest is `unchanged` (#572).
- *
- * Derived from the BUNDLE, not copied from the previous lock, so it applies the
- * same three rules the rebuild loop applies by iterating the same map: a dest
- * the bundle no longer carries is dropped, a `skipIfExists` dest the run did not
- * write is dropped, and everything else records the bundle's sha and the current
- * version. The early return used to copy `lock.entries` verbatim and skip all
- * three — harmless while that branch was near-unreachable, and not once
- * `staleVersion` made it the ordinary post-release path.
- *
- * `installedAt` is kept when the entry existed: the content matches the bundle,
- * but it did not arrive now, and trading a known date for a false one buys
- * nothing.
- */
-function deriveUnchangedEntries(
-  previous: ReadonlyMap<string, LockEntry>,
-  newShas: Map<string, string>,
-  bundle: Bundle,
-  templatesVersion: string,
-  now: string,
-): Map<string, LockEntry> {
-  const out = new Map<string, LockEntry>();
-  for (const [dest, sha] of newShas) {
-    const existing = previous.get(dest);
-    // Same refusal as the rebuild loop, and it must be the SAME condition. The
-    // first version added `existing === undefined`, which the rebuild loop does
-    // not require: there, nothing is written on any dest this branch can see, so
-    // a `skipIfExists` entry is dropped whether or not the lock already carried
-    // it. Keeping it here meant the two builders disagreed on precisely the
-    // input this helper exists to make them agree on — and the helper's version
-    // re-stamped the user's own file with the bundle's sha, which is the
-    // adoption the rebuild loop's comment refuses in as many words.
-    if (bundle[dest]?.skipIfExists === true) continue;
-    out.set(dest, {
-      sha256: sha,
-      installedAt: existing?.installedAt ?? now,
-      templatesVersion,
-    });
   }
   return out;
 }

@@ -43,6 +43,7 @@ function destinationFor(entry: CoreEntry): string {
 export class CursorHarness implements Harness {
   readonly key = "cursor";
   readonly displayName = "Cursor";
+  readonly managedRoots = [".cursor/rules/", ".cursor/skills/"] as const;
 
   mapBundle(core: CoreBundle, opts: BundleOptions): Bundle {
     const out: Bundle = {};

@@ -14,7 +14,7 @@ export interface FsWriter {
   deletePaths(
     paths: ReadonlyArray<string>,
     targetDir: string,
-    options: { backupExisting: boolean },
+    options: { backupExisting: boolean; within?: (resolvedRel: string) => boolean },
   ): Promise<BackupReport>;
 }
 
@@ -32,17 +32,15 @@ export type BackupReport = {
     { readonly dest: string; readonly backupPath: string; readonly wasSymlink?: true }
   >;
   /**
-   * Dests that were silently skipped because the file pre-existed AND the
-   * bundle entry had `skipIfExists: true` (placeholder semantics — the
-   * user's existing content always wins). Always present; empty when no
-   * placeholder skipping happened. The init use case omits these dests
-   * from the lock since they aren't Specnaut-managed.
+   * Dests skipped because the file pre-existed and the entry is `skipIfExists`
+   * (the user's content wins). Always present; init leaves them out of the lock.
    */
   readonly skippedSkipIfExists: ReadonlyArray<string>;
+  /** Dests `deletePaths` left because their resolved path failed `within` (cli#665). */
+  readonly refused?: ReadonlyArray<string>;
   /**
-   * What a structured merge changed that the person should hear about — a
-   * plugin Specnaut enabled, a marketplace it re-pinned or left pointed
-   * elsewhere (#642). Absent when there is nothing to say.
+   * What a structured merge changed that the person should hear about — a plugin Specnaut
+   * enabled, a marketplace it re-pinned or left pointed elsewhere (#642). Absent when silent.
    */
   readonly notes?: ReadonlyArray<string>;
 };
@@ -311,6 +309,8 @@ export interface SpecCacheStore {
 export interface Harness {
   readonly key: string;
   readonly displayName: string;
+  /** Folders `upgrade` may remove an orphan from (cli#665); see `orphanScope`. */
+  readonly managedRoots?: ReadonlyArray<string>;
   mapBundle(core: CoreBundle, opts: BundleOptions): Bundle;
 }
 

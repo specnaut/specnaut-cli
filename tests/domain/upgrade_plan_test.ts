@@ -96,14 +96,14 @@ Deno.test("computeUpgradePlan re-adds file that user deleted (was in lock)", () 
 
 Deno.test("computeUpgradePlan emits remove for files removed from the new bundle (on disk, unmodified)", () => {
   const plan = computeUpgradePlan(
-    new Map([["old.md", "a-sha"]]),
-    lockWith("old.md", "a-sha"),
+    new Map([[".specnaut/scripts/old.md", "a-sha"]]),
+    lockWith(".specnaut/scripts/old.md", "a-sha"),
     new Map(),
   );
   assertEquals(plan.length, 1);
   assertEquals(plan[0].kind, "remove");
   if (plan[0].kind === "remove") {
-    assertEquals(plan[0].dest, "old.md");
+    assertEquals(plan[0].dest, ".specnaut/scripts/old.md");
     assertEquals(plan[0].wasCustomized, false);
     assertEquals(plan[0].oldSha, "a-sha");
   }
@@ -137,20 +137,20 @@ Deno.test("computeUpgradePlan emits remove for clean orphan (lock + on disk + ma
         installedAt: "2026-04-25T00:00:00Z",
         templatesVersion: "0.6.1",
       }],
-      ["orphan.md", {
+      [".specnaut/scripts/orphan.md", {
         sha256: sha,
         installedAt: "2026-04-25T00:00:00Z",
         templatesVersion: "0.6.1",
       }],
     ]),
   };
-  const diskShas = new Map([["a.md", await sha256Hex("a")], ["orphan.md", sha]]);
+  const diskShas = new Map([["a.md", await sha256Hex("a")], [".specnaut/scripts/orphan.md", sha]]);
   const newShas = new Map([["a.md", await sha256Hex("a")]]);
   const plan = computeUpgradePlan(diskShas, lock, newShas);
   const remove = plan.find((p) => p.kind === "remove");
   assert(remove !== undefined);
   if (remove?.kind === "remove") {
-    assertEquals(remove.dest, "orphan.md");
+    assertEquals(remove.dest, ".specnaut/scripts/orphan.md");
     assertEquals(remove.wasCustomized, false);
     assertEquals(remove.oldSha, sha);
   }
@@ -167,20 +167,20 @@ Deno.test("computeUpgradePlan emits remove with wasCustomized=true when disk div
     specBackend: "local",
     templatesVersion: "0.6.1",
     entries: new Map([
-      ["orphan.md", {
+      [".specnaut/scripts/orphan.md", {
         sha256: lockSha,
         installedAt: "2026-04-25T00:00:00Z",
         templatesVersion: "0.6.1",
       }],
     ]),
   };
-  const diskShas = new Map([["orphan.md", diskSha]]);
+  const diskShas = new Map([[".specnaut/scripts/orphan.md", diskSha]]);
   const newShas = new Map<string, string>();
   const plan = computeUpgradePlan(diskShas, lock, newShas);
   const remove = plan.find((p) => p.kind === "remove");
   assert(remove !== undefined);
   if (remove?.kind === "remove") {
-    assertEquals(remove.dest, "orphan.md");
+    assertEquals(remove.dest, ".specnaut/scripts/orphan.md");
     assertEquals(remove.wasCustomized, true);
     assertEquals(remove.oldSha, lockSha);
   }
@@ -430,7 +430,7 @@ Deno.test("computeUpgradePlan: declared path absent from newShas → preserve/de
     new Map([[path, "disk-sha"]]),
     lockWith(path, "disk-sha"),
     new Map(), // dropped upstream
-    { isDeclaredPreserved: (d) => d === path },
+    { isDeclaredPreserved: (d) => d === path, managedRoots: [".claude/agents/"] },
   );
   assertEquals(plan.length, 1);
   assertEquals(plan[0].kind, "preserve");

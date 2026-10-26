@@ -50,6 +50,7 @@ function destinationFor(entry: CoreEntry): string {
 export class CopilotHarness implements Harness {
   readonly key = "copilot";
   readonly displayName = "GitHub Copilot CLI";
+  readonly managedRoots = [".github/instructions/"] as const;
 
   mapBundle(core: CoreBundle, opts: BundleOptions): Bundle {
     const out: Bundle = {};

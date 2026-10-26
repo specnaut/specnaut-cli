@@ -55,6 +55,12 @@ function destinationFor(entry: CoreEntry): string {
 export class ClaudeHarness implements Harness {
   readonly key = "claude";
   readonly displayName = "Claude Code";
+  readonly managedRoots = [
+    ".claude/agents/",
+    ".claude/hooks/",
+    ".claude/scripts/",
+    ".claude/skills/",
+  ] as const;
 
   mapBundle(core: CoreBundle, opts: BundleOptions): Bundle {
     const out: Bundle = {};

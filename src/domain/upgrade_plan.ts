@@ -1,4 +1,5 @@
 import type { InstalledLock } from "./installed_lock.ts";
+import { planOrphans, type RefusedScope } from "./orphan_scope.ts";
 
 export type UpgradeAction =
   | { kind: "auto-update"; dest: string; oldSha: string; newSha: string }
@@ -103,7 +104,9 @@ export type UpgradeAction =
     kind: "defer-to-plugin";
     dest: string;
   }
-  | { kind: "remove"; dest: string; oldSha: string; wasCustomized: boolean };
+  | { kind: "remove"; dest: string; oldSha: string; wasCustomized: boolean }
+  /** cli#665: an orphan `upgrade` may not delete — reported, untracked, never touched. */
+  | { kind: "orphan-refused"; dest: string; reason: RefusedScope; onDisk: boolean };
 
 export type UpgradePlan = ReadonlyArray<UpgradeAction>;
 
@@ -131,11 +134,11 @@ export type UpgradePlan = ReadonlyArray<UpgradeAction>;
  * For uncovered dests, or any dest when the plugin is not installed,
  * behavior is identical to before the migration table existed.
  *
- * Emits one UpgradeAction per destination in the new bundle, plus a
- * `remove` action for each lock entry that is no longer in the new
- * bundle but is still on disk. Orphan entries that are not on disk
- * produce no action — the caller drops them from the new lock
- * implicitly by iterating only `newShas`.
+ * Emits one UpgradeAction per destination in the new bundle, plus the
+ * orphan actions `planOrphans` decides for each lock entry the bundle no
+ * longer carries: `remove` when it may go and is still on disk, and
+ * `orphan-refused` when it lies outside what `upgrade` may delete. An
+ * in-scope orphan no longer on disk produces no action.
  */
 /**
  * Optional inputs that didn't exist in the v1.0 plan signature. Carried as
@@ -174,6 +177,8 @@ export type UpgradePlanOptions = {
    * Injected by the upgrade handler; the domain never reads the manifest.
    */
   isDeclaredPreserved?: (dest: string) => boolean;
+  /** `Harness.managedRoots`: bounds which orphans may be removed (`orphanScope`). */
+  managedRoots?: ReadonlyArray<string>;
 };
 
 /**
@@ -369,37 +374,12 @@ export function computeUpgradePlan(
     });
   }
 
-  // Orphans: lock entries not in newShas. Emit `remove` if still on disk.
-  const orphanDests = [...lock.entries.keys()]
-    .filter((dest) => !newShas.has(dest))
-    .sort();
-  for (const dest of orphanDests) {
-    const diskSha = diskShas.get(dest);
-    if (diskSha === undefined) continue;
-    // FR-009: a declared path the bundle dropped is kept on disk
-    // (preservation wins over removal), surfaced as preserve/declared.
-    if (isDeclaredPreserved(dest)) {
-      // This loop walks paths the BUNDLE no longer carries, so there is no
-      // upstream content to be behind. Its own state, not folded into
-      // "current" — the file being kept is right, and upstream having dropped
-      // it is worth knowing.
-      actions.push({
-        kind: "preserve",
-        dest,
-        reason: "declared",
-        pluginAvailable: pluginInstalled && isPluginCoveredFn(dest),
-        declaredDrift: "dropped-upstream",
-      });
-      continue;
-    }
-    const lockSha = lock.entries.get(dest)!.sha256;
-    actions.push({
-      kind: "remove",
-      dest,
-      oldSha: lockSha,
-      wasCustomized: diskSha !== lockSha,
-    });
-  }
+  // Orphans: lock entries the bundle no longer carries — see `planOrphans`.
+  actions.push(...planOrphans(diskShas, lock, newShas, {
+    managedRoots: opts.managedRoots,
+    isDeclaredPreserved,
+    pluginAvailable: (dest) => pluginInstalled && isPluginCoveredFn(dest),
+  }));
 
   return actions;
 }

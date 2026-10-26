@@ -49,6 +49,7 @@ function toCodexSubagentToml(entry: CoreEntry): string {
 export class CodexHarness implements Harness {
   readonly key = "codex";
   readonly displayName = "Codex CLI";
+  readonly managedRoots = [".codex/agents/", ".agents/skills/"] as const;
 
   mapBundle(core: CoreBundle, opts: BundleOptions): Bundle {
     const out: Bundle = {};

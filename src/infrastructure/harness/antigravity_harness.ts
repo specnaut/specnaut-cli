@@ -70,6 +70,7 @@ function destinationFor(entry: CoreEntry): string {
 export class AntigravityHarness implements Harness {
   readonly key = "antigravity";
   readonly displayName = "Antigravity";
+  readonly managedRoots = [".agents/agents/", ".agents/skills/"] as const;
 
   mapBundle(core: CoreBundle, opts: BundleOptions): Bundle {
     const out: Bundle = {};

@@ -1,4 +1,4 @@
-import { basename, dirname, isAbsolute, join, parse } from "@std/path";
+import { basename, dirname, isAbsolute, join, parse, relative, SEPARATOR } from "@std/path";
 import { isInside } from "../domain/template.ts";
 
 /**
@@ -196,4 +196,18 @@ export async function assertInsideProject(root: string, abs: string): Promise<vo
       `A symlink in the project points outside it. Specnaut will not write, ` +
       `move, delete or read through it.`,
   );
+}
+
+/**
+ * The project-relative path `Deno.remove(abs)` would actually unlink, with `/`
+ * separators: the parent resolved through every symlink, the leaf kept as is —
+ * removing a link removes the link, not its target. A path that resolves
+ * outside `root` comes back starting with `..`.
+ *
+ * For callers that bound WHERE inside the project a mutation may land (cli#665):
+ * `assertInsideProject` only answers whether it stays in the project at all.
+ */
+export async function resolvedRelative(root: string, abs: string): Promise<string> {
+  const target = join(await resolveDeepestExisting(dirname(abs)), basename(abs));
+  return relative(root, target).split(SEPARATOR).join("/");
 }

@@ -18,6 +18,6 @@ src/infrastructure/fs_legacy_migrator.ts  refuses a symlinked .specflow/.specnau
 # Per-METHOD exemptions, written `<path>::<method>`. These sit inside modules
 # that ARE guarded; the entry says why this particular sink does not carry its
 # own `assertInsideProject`.
-src/infrastructure/deno_fs_writer.ts::pruneEmptyParents  asks `isInside` and RETURNS instead of throwing — it is a best-effort cleanup walk, and a throw here would fail an upgrade whose files are already written
+src/infrastructure/fs_prune.ts::pruneEmptyParents  asks `isInside` and RETURNS instead of throwing — it is a best-effort cleanup walk, and a throw here would fail an upgrade whose files are already written
 src/infrastructure/deno_fs_writer.ts::backupAside  a private helper with two callers, both of which assert containment on the same path immediately before calling it
 src/cli/handlers/init_handler.ts::runInit  its only mutation is the git adapter's ensureDir, which receives the target directory itself rather than a path built under it

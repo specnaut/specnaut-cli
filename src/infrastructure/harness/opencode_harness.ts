@@ -127,6 +127,7 @@ function destinationFor(entry: CoreEntry): string {
 export class OpenCodeHarness implements Harness {
   readonly key = "opencode";
   readonly displayName = "OpenCode";
+  readonly managedRoots = [".opencode/agents/", ".opencode/skills/"] as const;
 
   mapBundle(core: CoreBundle, opts: BundleOptions): Bundle {
     const out: Bundle = {};

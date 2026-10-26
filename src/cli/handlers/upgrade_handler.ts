@@ -25,6 +25,7 @@ import { isAgenticPath, isParentManaged } from "../../domain/parent_managed.ts";
 import { CORE_BUNDLE, TEMPLATES_VERSION } from "../../templates_bundle.ts";
 import { renderUnifiedDiff } from "../../domain/diff.ts";
 import type { UpgradePlan } from "../../domain/upgrade_plan.ts";
+import { orphanCounts, renderOrphanGroups } from "./upgrade_orphan_summary.ts";
 import {
   type BacklogBackend,
   type InstalledLock,
@@ -226,12 +227,14 @@ export async function switchBacklogBackend(
 /**
  * @param written Dests this run actually wrote. Empty for a dry run, which has
  *   nothing to report but the forecast — there, the plan IS the outcome.
+ * @param force Whether `--force` was passed — see `upgrade_orphan_summary.ts`.
  */
 function renderSummary(
   plan: UpgradePlan,
   from: string,
   to: string,
   written: ReadonlySet<string> = new Set(),
+  force = false,
 ) {
   const groups = {
     auto: plan.filter((a) => a.kind === "auto-update"),
@@ -243,8 +246,6 @@ function renderSummary(
     overwritten: plan.filter((a) => a.kind === "preserve" && written.has(a.dest)),
     added: plan.filter((a) => a.kind === "add-new"),
     unchanged: plan.filter((a) => a.kind === "unchanged"),
-    removed: plan.filter((a) => a.kind === "remove" && !a.wasCustomized),
-    orphanPreserved: plan.filter((a) => a.kind === "remove" && a.wasCustomized),
     migrated: plan.filter((a) => a.kind === "migrate-to-plugin"),
     deferred: plan.filter((a) => a.kind === "defer-to-plugin"),
   };
@@ -396,16 +397,7 @@ function renderSummary(
       ),
     );
   }
-  if (groups.removed.length > 0) {
-    console.log(bold("  removed (no longer in templates)"));
-    for (const a of groups.removed) console.log(red(`    ✗ ${a.dest}`));
-    console.log();
-  }
-  if (groups.orphanPreserved.length > 0) {
-    console.log(bold("  removed but customized (not touched without --force)"));
-    for (const a of groups.orphanPreserved) console.log(yellow(`    ⚠ ${a.dest}`));
-    console.log();
-  }
+  renderOrphanGroups(plan, force);
   if (groups.migrated.length > 0) {
     console.log(bold("  migrated to specnaut-plugin plugin (backed up + removed)"));
     for (const a of groups.migrated) console.log(cyan(`    → ${a.dest}`));
@@ -427,8 +419,9 @@ function renderSummary(
       `  ${groups.auto.length} auto-update, ${settled.length + declCurrent.length} preserved, ` +
         `${behind.length + declBehind.length} behind, ` +
         (groups.overwritten.length > 0 ? `${groups.overwritten.length} overwritten, ` : "") +
-        `${groups.added.length} added, ${groups.removed.length} removed, ` +
-        `${groups.orphanPreserved.length} orphan-preserved, ${groups.migrated.length} migrated, ` +
+        `${groups.added.length} added, ${
+          orphanCounts(plan, force)
+        }${groups.migrated.length} migrated, ` +
         `${groups.deferred.length} deferred, ${groups.unchanged.length} unchanged`,
     ),
   );
@@ -623,7 +616,7 @@ export async function runUpgrade(intent: UpgradeIntent): Promise<number> {
   const written: ReadonlySet<string> = new Set(
     result.status === "applied" ? result.written : [],
   );
-  renderSummary(result.plan, result.fromVersion, result.toVersion, written);
+  renderSummary(result.plan, result.fromVersion, result.toVersion, written, intent.force);
   // A plugin Specnaut enables runs code once installed: never added silently.
   if (result.status === "applied") {
     for (const note of result.notes) console.log(yellow(`ℹ ${note}`));

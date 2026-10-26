@@ -1,55 +1,22 @@
 import { dirname, join, resolve } from "@std/path";
-import { assertSafeDestination, type Bundle, isInside } from "../domain/template.ts";
-import { assertInsideProject, resolveProjectRoot } from "./fs_containment.ts";
+import { assertSafeDestination, type Bundle } from "../domain/template.ts";
+import { assertInsideProject, resolvedRelative, resolveProjectRoot } from "./fs_containment.ts";
+import { pruneEmptyParents } from "./fs_prune.ts";
 import { mergeIntoFile } from "../domain/merge_block.ts";
 import { mergeClaudeSettings, pluginDeclarationNotes } from "../domain/claude_settings_merge.ts";
 import type { BackupReport, FsWriter } from "../application/ports.ts";
 
 const BACKUP_SUFFIX = ".specnaut.bak";
 
-/**
- * Removes `dir` and each now-empty ancestor, stopping below `stopAt`.
- *
- * Deleting a file leaves its directory behind. For a file that simply went
- * away that is invisible; for a *renamed* skill it is not — the emptied
- * folder keeps the old command's name sitting in the harness's skills
- * directory, so `upgrade` reports "removed" while the old name is still
- * listed. `FsStagingStore.delete` has always pruned its own parents; the
- * real tree did not, and the asymmetry is what let the ghost through.
- *
- * Best-effort by construction: every failure breaks the walk instead of
- * propagating. A directory that cannot be removed is not a reason to fail
- * an upgrade whose files are already written.
- */
-async function pruneEmptyParents(dir: string, stopAt: string): Promise<void> {
-  let current = dir;
-  while (current !== stopAt) {
-    // Containment via `relative`, not a string prefix. The first version
-    // tested `current.startsWith(stopAt + "/")`, which hardcodes the POSIX
-    // separator: on Windows `resolve` yields `C:\a\b`, the prefix never
-    // matched, and the prune silently never ran — the ghost directory this
-    // whole function exists to remove survived on exactly one platform.
-    // The predicate moved to the domain (cli#574) so seven other adapters can
-    // ask the same question without importing this file. The equality case is
-    // handled by the `while` condition above, not by the predicate: `isInside`
-    // counts a root as inside itself, and stopping AT `stopAt` is this walk's
-    // own business.
-    //
-    // RETURNS, does not throw — and that is why the predicate is shared while
-    // the verdict is not. This walk is best-effort by construction; a throw
-    // here would fail an upgrade whose files are already written, for a
-    // directory that could not be tidied.
-    if (!isInside(stopAt, current)) return;
-    try {
-      for await (const _ of Deno.readDir(current)) return; // still in use — stop
-      await Deno.remove(current);
-    } catch {
-      return;
-    }
-    const parent = dirname(current);
-    if (parent === current) return; // filesystem root; `dirname` is a fixpoint there
-    current = parent;
-  }
+/** Move `abs` aside instead of deleting it, and say what was moved. */
+async function backupForDelete(abs: string, dest: string) {
+  const wasSymlink = await isSymlink(abs);
+  const suffix = await backupAside(abs);
+  return {
+    dest,
+    backupPath: `${dest}${suffix}`,
+    ...(wasSymlink ? { wasSymlink: true as const } : {}),
+  };
 }
 
 /** Whether `path` is itself a symlink — `lstat`, never `stat`. */
@@ -274,12 +241,13 @@ export class DenoFsWriter implements FsWriter {
   async deletePaths(
     paths: ReadonlyArray<string>,
     targetDir: string,
-    options: { backupExisting: boolean },
+    options: { backupExisting: boolean; within?: (resolvedRel: string) => boolean },
   ): Promise<BackupReport> {
     const resolved = resolve(targetDir);
     const root = await resolveProjectRoot(resolved);
     const backups: { dest: string; backupPath: string }[] = [];
     const emptied = new Set<string>();
+    const refused: string[] = [];
 
     for (const dest of paths) {
       assertSafeDestination(dest);
@@ -291,16 +259,15 @@ export class DenoFsWriter implements FsWriter {
       // ANCESTOR, and then both do. Measured: with `.claude/` a link out,
       // `deletePaths` deleted the file at the target.
       await assertInsideProject(root, abs);
+      // Inside the project is not enough when the caller bounds WHERE (cli#665):
+      // a committed link under an allowed folder can lead anywhere else in it.
+      if (options.within && !options.within(await resolvedRelative(root, abs))) {
+        refused.push(dest);
+        continue;
+      }
 
-      if (options.backupExisting) {
-        const wasSymlink = await isSymlink(abs);
-        const suffix = await backupAside(abs);
-        backups.push({
-          dest,
-          backupPath: `${dest}${suffix}`,
-          ...(wasSymlink ? { wasSymlink: true as const } : {}),
-        });
-      } else {
+      if (options.backupExisting) backups.push(await backupForDelete(abs, dest));
+      else {
         await Deno.remove(abs);
         emptied.add(dirname(abs));
       }
@@ -308,8 +275,8 @@ export class DenoFsWriter implements FsWriter {
 
     // After every delete, not during: two files removed from the same
     // directory must not have the first one's prune decide for the second.
-    for (const dir of emptied) await pruneEmptyParents(dir, resolved);
-
-    return { backups, skippedSkipIfExists: [] };
+    const notes: string[] = [];
+    for (const dir of emptied) await pruneEmptyParents(dir, resolved, notes);
+    return { backups, skippedSkipIfExists: [], refused, notes };
   }
 }
