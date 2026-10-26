@@ -41,6 +41,10 @@ const ROOT = new URL("..", import.meta.url);
 const TEMPLATES_DIR = new URL("templates/", ROOT);
 const MANIFEST_PATH = new URL("templates/manifest.json", ROOT);
 const OUTPUT_PATH = new URL("src/templates_bundle.ts", ROOT);
+/** `deno fmt`'s line width, read from its one home so the emitter cannot disagree with it. */
+const FMT_LINE_WIDTH: number = JSON.parse(
+  await Deno.readTextFile(new URL("deno.json", ROOT)),
+).fmt.lineWidth;
 
 async function readManifest(): Promise<Manifest> {
   return JSON.parse(await Deno.readTextFile(MANIFEST_PATH)) as Manifest;
@@ -130,15 +134,19 @@ async function buildCoreEntries(m: Manifest): Promise<string[]> {
     // produces `["a","b"]` with no space after the comma, which fmt rewrites —
     // so `deno task bundle` would dirty the tree for `fmt --check` on every
     // run, and only CI would ever say so. It was a string until #576 and the
-    // question could not arise.
+    // question could not arise. Past the line width fmt breaks an ARRAY one
+    // element per line, so the emitter does the same, or a fifth label dirties
+    // the tree exactly as above. A single label stays a string at any length.
     const labels = managedSectionLabels(entry.managedSection);
+    const quoted = labels.map((l) => JSON.stringify(l));
+    const inline = `    managedSection: ${
+      labels.length === 1 ? quoted[0] : `[${quoted.join(", ")}]`
+    },`;
     const managedSection = labels.length === 0
       ? ""
-      : `    managedSection: ${
-        labels.length === 1
-          ? JSON.stringify(labels[0])
-          : `[${labels.map((l) => JSON.stringify(l)).join(", ")}]`
-      },\n`;
+      : labels.length === 1 || inline.length <= FMT_LINE_WIDTH
+      ? `${inline}\n`
+      : `    managedSection: [\n${quoted.map((q) => `      ${q},\n`).join("")}    ],\n`;
     lines.push(
       `  {\n` +
         `    category: ${JSON.stringify(entry.category)},\n` +
