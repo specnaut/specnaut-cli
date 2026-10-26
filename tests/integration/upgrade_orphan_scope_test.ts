@@ -7,7 +7,7 @@ const MAIN = fromFileUrl(new URL("../../src/main.ts", import.meta.url));
 /**
  * The orphan path end to end, on the real filesystem writer and the real
  * summary: what a committed lock may make `upgrade` delete (cli#665), and what
- * happens to a customised orphan `upgrade` keeps (cli#666).
+ * happens to an orphan `upgrade` keeps, customised (cli#666) or declared (cli#668).
  *
  * The use-case tests prove the decisions; this proves they reach the disk, the
  * lock file and the output a user reads.
@@ -147,6 +147,42 @@ Deno.test("upgrade keeps a customised orphan tracked until --force removes it, b
       !(await lockText(dir)).includes(`  ${KEPT}:`),
       "--force removed the file, kept the entry",
     );
+  });
+});
+
+Deno.test("upgrade keeps reporting a declared orphan until --reset-preserved lifts it (cli#668)", async () => {
+  await withProject(async (dir, home) => {
+    await plant(dir, [[KEPT, "original\n", "original\n"]]);
+    await Deno.writeTextFile(join(dir, ".specnaut/preserve.yml"), `preserved:\n  - ${KEPT}\n`);
+    const entry = `  ${KEPT}:\n    sha256: ${await sha256("original\n")}\n`;
+    // The first run used to delete it, the "ignored" declaration notwithstanding;
+    // the second is the one that went silent once that was fixed. `--force`
+    // does not lift a declaration either.
+    for (const args of [["upgrade"], ["upgrade"], ["upgrade", "--force"]]) {
+      const run = args.join(" ");
+      const up = await runSpecnaut(args, dir, home);
+      assertEquals(up.code, 0, up.out);
+      assert(await exists(join(dir, KEPT)), `\`${run}\` deleted the declared orphan`);
+      assert(!up.out.includes("not a managed file"), `\`${run}\` ignored the declaration`);
+      assertStringIncludes(up.out, "upstream no longer ships this path", `${run} run`);
+      assertStringIncludes(up.out, `⚠ ${KEPT}`);
+      assertStringIncludes(await lockText(dir), entry);
+    }
+    // Lifted, it is an ordinary clean orphan: removed and untracked.
+    const reset = await runSpecnaut(["upgrade", "--reset-preserved"], dir, home);
+    assertEquals(reset.code, 0, reset.out);
+    assertEquals(await exists(join(dir, KEPT)), false, "--reset-preserved kept the orphan");
+    assert(!(await lockText(dir)).includes(`  ${KEPT}:`), "--reset-preserved kept the entry");
+  });
+});
+
+Deno.test("a declared lock entry outside Specnaut's folders is not a managed file", async () => {
+  await withProject(async (dir, home) => {
+    await plant(dir, [["src/app.ts", FOREIGN["src/app.ts"], FOREIGN["src/app.ts"]]]);
+    await Deno.writeTextFile(join(dir, ".specnaut/preserve.yml"), "preserved:\n  - src/app.ts\n");
+    const up = await runSpecnaut(["upgrade"], dir, home);
+    assertEquals(up.code, 0, up.out);
+    assertStringIncludes(up.out, "src/app.ts — declared preserved but not a managed file");
   });
 });
 

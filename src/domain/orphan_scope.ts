@@ -149,8 +149,14 @@ export function planOrphans(
   return actions;
 }
 
+/** An orphan this run leaves on disk on purpose: customised and unforced, or declared. */
+const keepsOrphan = (action: UpgradeAction, force: boolean): boolean =>
+  action.kind === "remove"
+    ? !deletesOrphan(action, force)
+    : action.kind === "preserve" && action.declaredDrift === "dropped-upstream";
+
 /**
- * The lock entries of the customised orphans this run KEPT, verbatim (cli#666).
+ * The lock entries of the orphans this run KEPT, verbatim (cli#666, cli#668).
  *
  * The lock is rebuilt from the bundle, so an orphan's entry used to fall out of
  * it whatever happened to the file. For a removed orphan that is right; for a
@@ -160,6 +166,11 @@ export function planOrphans(
  * so every later run reaches the same verdict and `--force` can still back the
  * file up and delete it. Never the user's sha: that would make the next run
  * read the edit as vanilla and delete it without a backup.
+ *
+ * A declared-preserved orphan is carried for the same reason (cli#668): without
+ * its entry the next run no longer sees an orphan and stops saying that
+ * upstream dropped the path. `--reset-preserved` lifts the declaration before
+ * the plan is built, so the path arrives here as an ordinary `remove`.
  *
  * `orphan-refused` entries are not carried: an entry nothing may delete is
  * dropped, not kept (cli#665).
@@ -171,7 +182,7 @@ export function keptOrphanEntries(
 ): Map<string, LockEntry> {
   const kept = new Map<string, LockEntry>();
   for (const action of plan) {
-    if (action.kind !== "remove" || deletesOrphan(action, force)) continue;
+    if (!keepsOrphan(action, force)) continue;
     const entry = lock.entries.get(action.dest);
     if (entry !== undefined) kept.set(action.dest, entry);
   }

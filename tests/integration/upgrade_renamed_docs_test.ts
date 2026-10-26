@@ -176,3 +176,21 @@ Deno.test("an unmodified document is updated at the new address, not preserved",
     await Deno.remove(dir, { recursive: true });
   }
 });
+
+Deno.test("a declared document stays at the old address, and the new one is added (cli#668)", async () => {
+  const dir = await Deno.makeTempDir({ prefix: "specnaut-rename-declared-" });
+  try {
+    await projectBeforeRename(dir, { customise: false });
+    await Deno.writeTextFile(join(dir, ".specnaut/preserve.yml"), `preserved:\n  - ${OLD_DEST}\n`);
+    const frozen = await Deno.readTextFile(join(dir, OLD_DEST));
+
+    const up = await runSpecnaut(["upgrade"], dir);
+    assertEquals(up.code, 0, `upgrade failed: ${up.stderr}\n${up.stdout}`);
+
+    assertEquals(await Deno.readTextFile(join(dir, OLD_DEST)), frozen, "the declared copy moved");
+    assertStringIncludes(await Deno.readTextFile(join(dir, NEW_DEST)), "/ship tag");
+    assertStringIncludes(up.stdout, "upstream no longer ships this path");
+  } finally {
+    await Deno.remove(dir, { recursive: true });
+  }
+});

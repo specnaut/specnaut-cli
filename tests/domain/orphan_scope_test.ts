@@ -124,3 +124,27 @@ Deno.test("keptOrphanEntries: carries a kept customised orphan verbatim, and not
   assertEquals([...keptOrphanEntries(plan, lock, false)], [["a/kept.md", entry("k")]]);
   assertEquals(keptOrphanEntries(plan, lock, true).size, 0);
 });
+
+Deno.test("keptOrphanEntries: carries a declared orphan the bundle dropped, --force or not (cli#668)", () => {
+  const lock = lockOf({ "a/declared.md": "d", "a/current.md": "c" });
+  const plan: UpgradePlan = [
+    {
+      kind: "preserve",
+      dest: "a/declared.md",
+      reason: "declared",
+      pluginAvailable: false,
+      declaredDrift: "dropped-upstream",
+    },
+    // A declared path the bundle still ships is rebuilt from the bundle, not carried.
+    {
+      kind: "preserve",
+      dest: "a/current.md",
+      reason: "declared",
+      pluginAvailable: false,
+      declaredDrift: "current",
+    },
+  ];
+  for (const force of [false, true]) {
+    assertEquals([...keptOrphanEntries(plan, lock, force)], [["a/declared.md", entry("d")]]);
+  }
+});

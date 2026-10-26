@@ -286,9 +286,10 @@ export class UpgradeProjectUseCase {
       const newDest = destFor(r.to.owner, r.to.doc);
       if (oldDest === null || newDest === null) continue;
       // Only when the project is actually mid-migration: the old path is
-      // tracked AND present, the new document ships now, and nothing has
-      // already claimed the new path.
-      if (!lock.entries.has(oldDest)) continue;
+      // tracked AND present and not declared preserved (cli#668: it stays put,
+      // an orphan the bundle dropped), the new document ships now, and nothing
+      // has already claimed the new path.
+      if (!lock.entries.has(oldDest) || input.isDeclaredPreserved?.(oldDest)) continue;
       if (!diskShas.has(oldDest)) continue;
       if (!(newDest in bundle)) continue;
       if (lock.entries.has(newDest)) continue;
@@ -314,11 +315,9 @@ export class UpgradeProjectUseCase {
     if (applicable.length > 0) {
       const entries = new Map(lockForPlan.entries);
       for (const { oldDest, newDest } of applicable) {
-        const entry = entries.get(oldDest)!;
+        entries.set(newDest, entries.get(oldDest)!);
         entries.delete(oldDest);
-        entries.set(newDest, entry);
-        const sha = diskShas.get(oldDest)!;
-        diskShas.set(newDest, sha);
+        diskShas.set(newDest, diskShas.get(oldDest)!);
         diskShas.delete(oldDest);
       }
       effectiveLock = { ...lockForPlan, entries };

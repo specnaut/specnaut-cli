@@ -19,8 +19,7 @@ import {
 } from "../../infrastructure/fs_legacy_migrator.ts";
 import { FsPluginDetector } from "../../infrastructure/fs_plugin_detector.ts";
 import { FsParentWorkspaceReader } from "../../infrastructure/fs_parent_workspace_reader.ts";
-import { FsPreserveStore } from "../../infrastructure/fs_preserve_store.ts";
-import { resolvePreserveDeclarations } from "./preserve_resolution.ts";
+import { resolveUpgradePreserves } from "./upgrade_preserve.ts";
 import { isAgenticPath, isParentManaged } from "../../domain/parent_managed.ts";
 import { CORE_BUNDLE, TEMPLATES_VERSION } from "../../templates_bundle.ts";
 import { renderUnifiedDiff } from "../../domain/diff.ts";
@@ -523,56 +522,12 @@ export async function runUpgrade(intent: UpgradeIntent): Promise<number> {
     parentManagedOverride = isParentManaged(providingAncestor, standaloneOverride);
   }
 
-  // Preserve declarations (spec 011 / issue #367). Resolve the manifest against
-  // the bundle dests for the lock's harness/backend so we can warn ineffective
-  // declarations (FR-008) and build the predicate the use case threads into the
-  // plan. The parent-managed agentic filter is applied first so a declared
-  // agentic path in a parent-managed sub-repo is a clean no-op (D8). When
-  // `--reset-preserved` is passed, the predicate is forced off (FR-005).
-  let declaredKnown: ReadonlyArray<string> = [];
-  if (lockForDetection !== null) {
-    const harnessForPreserve = findHarness(lockForDetection.harness);
-    if (harnessForPreserve) {
-      const mapped = harnessForPreserve.mapBundle(CORE_BUNDLE, {
-        backlogBackend: lockForDetection.backlogBackend,
-        versionScheme: lockForDetection.versionScheme,
-        specBackend: lockForDetection.specBackend,
-        specAutogen: lockForDetection.specAutogen,
-      });
-      const parentManaged = (parentManagedOverride ?? lockForDetection.parentManaged) ?? false;
-      const bundleDests = parentManaged
-        ? Object.keys(mapped).filter((d) => !isAgenticPath(d))
-        : Object.keys(mapped);
-      const store = new FsPreserveStore();
-      // A manifest that exists but declares nothing used to produce no output
-      // at all — identical to having no manifest, so a maintainer read the
-      // silence as protection while their files were refreshed. Advisory only:
-      // it never changes the exit code, per the store's own contract.
-      const diagnosis = await store.diagnose(projectDir);
-      if (diagnosis !== null && diagnosis.kind !== "ok") {
-        const why = diagnosis.kind === "unparseable"
-          ? "not valid YAML"
-          : diagnosis.kind === "missing-key"
-          ? "no top-level `preserved:` key (a bare list is not one either)"
-          : "`preserved:` is present but holds no usable paths";
-        console.error(
-          yellow(
-            `warn: .specnaut/preserve.yml — ${why}; nothing is being preserved`,
-          ),
-        );
-      }
-      const cfg = await store.read(projectDir);
-      const { known, unknown } = resolvePreserveDeclarations(cfg, bundleDests);
-      declaredKnown = known;
-      for (const path of unknown) {
-        console.error(
-          yellow(`warn: ${path} — declared preserved but not a managed file (ignored)`),
-        );
-      }
-    }
-  }
-  const declaredSet = intent.resetPreserved ? new Set<string>() : new Set(declaredKnown);
-  const isDeclaredPreserved = (dest: string): boolean => declaredSet.has(dest);
+  const { known: declaredKnown, isDeclaredPreserved } = await resolveUpgradePreserves(
+    projectDir,
+    lockForDetection,
+    (parentManagedOverride ?? lockForDetection?.parentManaged) ?? false,
+    intent.resetPreserved,
+  );
 
   const useCase = new UpgradeProjectUseCase({
     reader: new DenoFsReader(),
