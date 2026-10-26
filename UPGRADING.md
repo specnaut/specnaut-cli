@@ -1,5 +1,38 @@
 # Upgrading Specnaut
 
+## 6.x → 7.0.0
+
+Run `specnaut upgrade`. Most projects need nothing else. You act by hand only if you edited one of
+the retired files, or if your own docs or scripts invoke a retired command.
+
+### The second, derived workflow is retired
+
+Specnaut used to ship two workflows for the same job. 7.0.0 keeps only its own:
+`plan → tasks → implement → review → merge`. These are no longer shipped:
+
+- the skills `brainstorming`, `writing-plans`, `executing-plans`, `subagent-driven-development`,
+  `requesting-code-review`, `verification-before-completion` and `using-specnaut`;
+- `.specnaut/harness-tools.md`;
+- the phases `/specnaut audit security|performance|accessibility|architecture|dependencies`.
+
+`specnaut upgrade` deletes every copy you never edited and drops it from the lock. A copy you did
+edit is kept and listed under "removed but customized (not touched without --force)". Delete it
+yourself, or run `specnaut upgrade --force`, which moves it aside to `<file>.specnaut.bak` first.
+
+### Audits: use the per-axis skills
+
+`/specnaut audit <axis>` now answers with a notice instead of running. The same experts are reached
+through `/sec-audit`, `/perf-audit`, `/a11y-audit`, `/arch-audit` and `/dep-audit`, or `/code-audit`
+for every axis at once. These return their findings inline. `/code-audit` can still save a dated
+report under `docs/specnaut/audits/`.
+
+### Plugins inject nothing at session start
+
+The Claude Code, Cursor and OpenCode plugins no longer inject a bootstrap skill when a session
+starts. Skills and agents are still discovered from the plugin. Update the plugin the way your
+harness does. On Cursor, updating also removes a session hook that ran a script by a path relative
+to the working directory.
+
 ## 5.5.x → 6.0.0
 
 Only projects installed for **Windsurf** need to act. Every other harness upgrades as usual.
