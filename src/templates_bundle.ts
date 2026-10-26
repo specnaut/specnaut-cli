@@ -368,6 +368,24 @@ every rule the feature introduces:
 amended first. A review finding that a decision has two homes is a **plan violation, not a style
 opinion**.
 
+**A new script, helper or automation is a decision too — reuse before you build.** Any the plan
+introduces gets a row whose first cell names three things: **(a)** the existing helpers and commands
+you inventoried for the procedure, **(b)** the recurrence evidence, and **(c)** the outcome — *reuse
+directly*, *extend the existing helper at its owner*, or *add a new helper*.
+
+- **The evidence bar is two separate prior occurrences**, besides the current one, each traceable to
+  an issue or a commit. Several receipts from one repair count as one occurrence. Below the bar the
+  outcome is *reuse directly*: run the existing commands, and write nothing new.
+- **A new or extended helper takes data, never code.** It accepts no arbitrary executable path, shell
+  string, or caller-chosen argv or environment. It keeps the exit codes of the helper it extends, and
+  it never reports a missing, refused or skipped result as a pass.
+
+For example, a plan proposes \`scripts/reset-fixtures.sh\` because the agent re-derived the same
+\`git clean\` and seed commands while building this feature. The inventory finds the project's \`seed\`
+task already does the second half; the history shows one earlier occurrence, in a single repair. That
+is below the bar, so the row reads *reuse directly*: call \`git clean\` and the \`seed\` task, and add no
+script.
+
 ### 6. 🔒 The two audits — MANDATORY, and they audit the PLAN, not the code
 
 **An epic is one plan.** If the item has open sub-issues, write **one**
