@@ -4,8 +4,10 @@
 // struct; the secret lives in the CredentialBlob field — never an argv (FR-002).
 // The `cmdkey` CLI is avoided (its `/pass:` form would expose the value on argv).
 //
-// Untestable in CI (no Windows host); every operation is wrapped so any FFI
-// fault reports `unavailable`, degrading safely to the file store (FR-003).
+// Every operation is wrapped so any FFI fault reports `unavailable`, degrading
+// safely to the file store (FR-003). The real roundtrip runs on CI's Windows
+// runner (tests/infrastructure/keychain_windows_test.ts); the layout below is
+// pinned on every OS by the same file.
 
 import {
   KEYCHAIN_SERVICE,
@@ -33,14 +35,26 @@ function u8(s: string): Uint8Array<ArrayBuffer> {
   return out;
 }
 
-// CREDENTIALW field offsets (x64, see windows.ts header note): Type@8,
-// TargetName@16, CredentialBlobSize@40, CredentialBlob@48, Persist@56.
-const CRED_SIZE = 88;
-const OFF_TYPE = 8;
-const OFF_TARGET = 16;
-const OFF_BLOB_SIZE = 40;
-const OFF_BLOB = 48;
-const OFF_PERSIST = 56;
+/**
+ * The Win64 CREDENTIALW layout (wincred.h), natural alignment:
+ *
+ *   Flags u32 @0 · Type u32 @4 · TargetName ptr @8 · Comment ptr @16 ·
+ *   LastWritten FILETIME @24 · CredentialBlobSize u32 @32 (+4 pad) ·
+ *   CredentialBlob ptr @40 · Persist u32 @48 · AttributeCount u32 @52 ·
+ *   Attributes ptr @56 · TargetAlias ptr @64 · UserName ptr @72 — 80 bytes.
+ *
+ * Every field used to sit one slot late (Type@8 … size 88): CredWriteW saw
+ * Type 0 and refused every write, and CredReadW's result was read with a
+ * pointer as the blob size, which crashed on any existing item.
+ */
+export const CREDENTIALW = {
+  size: 80,
+  type: 4,
+  targetName: 8,
+  blobSize: 32,
+  blob: 40,
+  persist: 48,
+} as const;
 
 class WindowsCredentialBackend implements KeychainBackend {
   readonly platform = "windows" as const;
@@ -68,8 +82,8 @@ class WindowsCredentialBackend implements KeychainBackend {
       if (!credPtr) return { kind: "unavailable" };
       try {
         const v = new Deno.UnsafePointerView(credPtr);
-        const size = v.getUint32(OFF_BLOB_SIZE);
-        const blobPtr = Deno.UnsafePointer.create(v.getBigUint64(OFF_BLOB));
+        const size = v.getUint32(CREDENTIALW.blobSize);
+        const blobPtr = Deno.UnsafePointer.create(v.getBigUint64(CREDENTIALW.blob));
         if (!blobPtr || size === 0) return { kind: "ok", value: "" };
         const bytes = new Deno.UnsafePointerView(blobPtr).getArrayBuffer(size);
         return { kind: "ok", value: new TextDecoder().decode(bytes) };
@@ -85,13 +99,13 @@ class WindowsCredentialBackend implements KeychainBackend {
     try {
       const name = wstr(this.target(service, account));
       const blob = u8(secret);
-      const cred = new Uint8Array(CRED_SIZE);
+      const cred = new Uint8Array(CREDENTIALW.size);
       const view = new DataView(cred.buffer);
-      view.setUint32(OFF_TYPE, CRED_TYPE_GENERIC, true);
-      view.setBigUint64(OFF_TARGET, ptrVal(Deno.UnsafePointer.of(name)), true);
-      view.setUint32(OFF_BLOB_SIZE, blob.length, true);
-      view.setBigUint64(OFF_BLOB, ptrVal(Deno.UnsafePointer.of(blob)), true);
-      view.setUint32(OFF_PERSIST, CRED_PERSIST_LOCAL_MACHINE, true);
+      view.setUint32(CREDENTIALW.type, CRED_TYPE_GENERIC, true);
+      view.setBigUint64(CREDENTIALW.targetName, ptrVal(Deno.UnsafePointer.of(name)), true);
+      view.setUint32(CREDENTIALW.blobSize, blob.length, true);
+      view.setBigUint64(CREDENTIALW.blob, ptrVal(Deno.UnsafePointer.of(blob)), true);
+      view.setUint32(CREDENTIALW.persist, CRED_PERSIST_LOCAL_MACHINE, true);
       const ok = this.advapi.symbols.CredWriteW(cred, 0);
       return ok ? { kind: "ok", value: undefined } : { kind: "unavailable" };
     } catch {
