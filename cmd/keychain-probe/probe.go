@@ -83,7 +83,7 @@ func compare(w io.Writer, kr keyring, o options, canary string) int {
 	if got == canary {
 		verdict = "match"
 	}
-	printf(w, "read: %s length=%d (canary length=%d)\n", verdict, len(got), len(canary))
+	printf(w, "read: %s\n", verdict)
 	if verdict == "match" {
 		return 0
 	}

@@ -7,7 +7,7 @@
 # answers).
 #
 # Usage: scripts/keychain-probe-matrix.sh <go-probe> <ts-probe>
-# Prints only verdicts: match/mismatch + lengths, ok/miss/unavailable.
+# Prints only verdicts: match/mismatch, ok/miss/unavailable.
 set -uo pipefail
 
 go_probe=${1:?usage: keychain-probe-matrix.sh <go-probe> <ts-probe>}

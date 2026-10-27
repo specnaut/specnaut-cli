@@ -11,7 +11,7 @@
 //   deno compile --allow-ffi --allow-env --allow-read -o dist/keychain-probe-ts scripts/keychain-probe.ts
 //   dist/keychain-probe-ts <reachable|write|read|remove|roundtrip> --service <name> [--account <name>]
 // write/read/roundtrip read a per-run canary on stdin. Output is match /
-// mismatch and a length, never a value.
+// mismatch, never a value nor anything derived from it (its length included).
 
 import {
   KEYCHAIN_SERVICE,
@@ -54,7 +54,7 @@ function compare(backend: KeychainBackend, o: Options, canary: string): number {
   const got = backend.get(o.service, o.account);
   if (got.kind !== "ok") return outcome("read", got) || 1;
   const verdict = got.value === canary ? "match" : "mismatch";
-  console.log(`read: ${verdict} length=${got.value.length} (canary length=${canary.length})`);
+  console.log(`read: ${verdict}`);
   return verdict === "match" ? 0 : 1;
 }
 

@@ -8,7 +8,7 @@
 //   - it owns the probe service name, and refuses the two the CLI uses
 //     (main_test.go holds that list equal to keychain_backend.ts);
 //   - the secret is a per-run canary read from stdin, never an argument;
-//   - it prints only match/mismatch and a length, never a value;
+//   - it prints only match/mismatch, never a value nor its length;
 //   - `roundtrip` removes its item on the way out, whatever happened.
 //
 // Usage: keychain-probe <service|version|reachable|write|read|remove|roundtrip>

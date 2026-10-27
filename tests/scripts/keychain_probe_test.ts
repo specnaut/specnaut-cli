@@ -94,7 +94,7 @@ Deno.test("a read of a differently-encoded item says mismatch, by length only, a
   const o = { mode: "roundtrip", service: "specnaut-keychain-probe", account: "p" };
   const { code, out } = captured(() => probe(encoding, o, CANARY));
   assertEquals(code, 1);
-  assertEquals(out.includes("read: mismatch length=25 (canary length=23)"), true, out);
+  assertEquals(out.includes("read: mismatch\n"), true, out);
   assertEquals(out.includes(CANARY), false, "the canary was printed");
   assertEquals(b.items.size, 0, "the mismatching roundtrip left its item");
   const read = captured(() => probe(encoding, { ...o, mode: "read" }, CANARY));
