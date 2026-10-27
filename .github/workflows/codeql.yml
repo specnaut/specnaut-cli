@@ -12,6 +12,10 @@
 # imports. Initial findings are expected to be a small set (0-5) of
 # generic style/safety issues — triage manually via the security-expert
 # agent.
+#
+# Go (cli#662): the Go port and the parity harness live beside the TS tree
+# under one root go.mod. `autobuild` compiles them; setup-go provides the
+# toolchain go.mod names.
 name: codeql
 
 on:
@@ -31,7 +35,7 @@ on:
 
 jobs:
   analyze:
-    name: Analyze (javascript-typescript)
+    name: Analyze (${{ matrix.language }})
     runs-on: ubuntu-latest
     permissions:
       actions: read
@@ -44,15 +48,25 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        language: [javascript-typescript]
+        include:
+          - language: javascript-typescript
+            build-mode: none
+          - language: go
+            build-mode: autobuild
 
     steps:
       - uses: actions/checkout@v6
+
+      - uses: actions/setup-go@v6
+        if: matrix.language == 'go'
+        with:
+          go-version-file: go.mod
 
       - name: Initialize CodeQL
         uses: github/codeql-action/init@v4
         with:
           languages: ${{ matrix.language }}
+          build-mode: ${{ matrix.build-mode }}
           queries: security-extended
 
       - name: Perform CodeQL Analysis

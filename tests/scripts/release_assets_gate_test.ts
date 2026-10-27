@@ -162,3 +162,44 @@ Deno.test("postflight's asset floor matches what the workflow uploads", async ()
       "release missing it is one every current binary refuses to install",
   );
 });
+
+// ── The Go dry run copies the release's shape (cli#662) ─────────────────────
+//
+// `go-dry-run.yml` cannot reuse release.yml's steps — that would need a
+// callable release.yml, which release_actions_pinned_test.ts forbids — so it
+// copies them. A copy is guarded here: the dry run proves the release shape
+// only while its attest step and checksum loop ARE the release's.
+
+type AnyStep = Step & { uses?: string; run?: string };
+
+async function allSteps(file: string): Promise<AnyStep[]> {
+  const wf = parse(await Deno.readTextFile(`${ROOT}.github/workflows/${file}`)) as {
+    jobs: Record<string, { steps?: AnyStep[] }>;
+  };
+  return Object.values(wf.jobs).flatMap((j) => j.steps ?? []);
+}
+
+Deno.test("the dry run attests with release.yml's exact action SHA and inputs", async () => {
+  const pick = (steps: AnyStep[]) => steps.filter((s) => s.uses?.startsWith("actions/attest@"));
+  const [release, dryRun] = [
+    pick(await allSteps("release.yml")),
+    pick(await allSteps("go-dry-run.yml")),
+  ];
+  assertEquals(release.length, 1, "release.yml no longer has exactly one attest step");
+  assertEquals(dryRun.length, 1, "go-dry-run.yml must attest exactly once");
+  assertEquals(dryRun[0].uses, release[0].uses, "the dry run attests with a different action SHA");
+  assertEquals(dryRun[0].with, release[0].with, "the dry run attests with different inputs");
+});
+
+Deno.test("the dry run checksums with release.yml's exact loop, and stages the same bundle name", async () => {
+  const loop = (steps: AnyStep[]) => steps.find((s) => s.name === "Compute checksums")?.run;
+  const dryRun = await allSteps("go-dry-run.yml");
+  const releaseLoop = loop(await allSteps("release.yml"));
+  assert(releaseLoop, "release.yml has no 'Compute checksums' step");
+  assertEquals(loop(dryRun), releaseLoop, "the dry run's checksum loop differs from the release's");
+  const stage = dryRun.find((s) => s.run?.includes("cp "));
+  assert(
+    stage?.run?.includes(`dist/${ATTESTATION_ASSET_NAME}`),
+    `the dry run does not stage the bundle as ${ATTESTATION_ASSET_NAME}`,
+  );
+});

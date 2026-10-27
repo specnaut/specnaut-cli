@@ -105,7 +105,7 @@ async function anchorOf(dir: string) {
 async function run(dir: string, version = VERSION) {
   return await verifyReleaseDir({
     dir,
-    version,
+    identity: expectedSignerIdentity(version),
     anchor: await anchorOf(dir),
     now: NOW,
     targets: TARGETS,

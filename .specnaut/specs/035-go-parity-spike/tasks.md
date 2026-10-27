@@ -66,57 +66,57 @@ a rule names its 🔒 home from plan §5; a decision may not land anywhere else.
 
 ## Phase 5 — Foundational (#662)
 
-- [ ] T021 `templates.go` + `templates_test.go`: `//go:embed all:templates`; every read through the
+- [x] T021 `templates.go` + `templates_test.go`: `//go:embed all:templates`; every read through the
       manifest; manifest ⊂ embedded set, extras equal a named list of 4 (home: shipped-set row)
-- [ ] T022 [P] `internal/lockfile/{lockfile,contain}.go` + tests: parse `installed.lock` over an
+- [x] T022 [P] `internal/lockfile/{lockfile,contain}.go` + tests: parse `installed.lock` over an
       `fs.FS`; lock keys stay inside the project via `os.Root` (home: containment row)
-- [ ] T023 `cmd/specnaut/main.go`: entry point; every Go build writes under `dist/`
+- [x] T023 `cmd/specnaut/main.go`: entry point; every Go build writes under `dist/`
 
 ## Phase 6 — US3: the Go binary answers the whole surface (P1, #662)
 
-- [ ] T024 [US3] `internal/cli/surface.go`: the command and flag table from `src/cli/parser.ts`
+- [x] T024 [US3] `internal/cli/surface.go`: the command and flag table from `src/cli/parser.ts`
       (home: surface row)
-- [ ] T025 [US3] `internal/cli/argv.go` + tests: the `parseArgs`-compatible tokeniser, split per
+- [x] T025 [US3] `internal/cli/argv.go` + tests: the `parseArgs`-compatible tokeniser, split per
       token kind so no function passes 50 lines (home: argv row)
-- [ ] T026 [US3] `internal/cli/parse.go` + tests: every parse-time refusal, `Unknown command` + help
+- [x] T026 [US3] `internal/cli/parse.go` + tests: every parse-time refusal, `Unknown command` + help
       exit 2, removed harness exit 1 (home: parse row)
-- [ ] T027 [P] [US3] `internal/cli/help.go` (byte-identical copy) and `notported.go` (exit 3)
-- [ ] T028 [US3] `internal/cli/dispatch.go`: `--help`, `--version` (from the manifest), not-ported
-- [ ] T029 [US3] `internal/reconcile/{preflight,status}.go` + tests: shared refusal preflight, the
+- [x] T027 [P] [US3] `internal/cli/help.go` (byte-identical copy) and `notported.go` (exit 3)
+- [x] T028 [US3] `internal/cli/dispatch.go`: `--help`, `--version` (from the manifest), not-ported
+- [x] T029 [US3] `internal/reconcile/{preflight,status}.go` + tests: shared refusal preflight, the
       pending list (unsorted pre-order walk, HTML escaping off, empty slice not `null`) (home:
       preflight row)
-- [ ] T030 [US3] Harness Go against TS on the ported subset: 0 differences outside the declared
+- [x] T030 [US3] Harness Go against TS on the ported subset: 0 differences outside the declared
       uncaught-trace exclusions (SC-003)
 
 ## Phase 7 — US4: the release shape survives (P1, #662)
 
-- [ ] T031 [US4] `scripts/build.ts`: `goos`/`goarch` per `TARGETS` entry, one `outName` each, `--go`
+- [x] T031 [US4] `scripts/build.ts`: `goos`/`goarch` per `TARGETS` entry, one `outName` each, `--go`
       builds with `CGO_ENABLED=0` into `dist/` (home: targets row); extend its tests
-- [ ] T032 [US4] `scripts/verify-release.ts`: `--dry-run-ref <ref>` derives the
+- [x] T032 [US4] `scripts/verify-release.ts`: `--dry-run-ref <ref>` derives the
       `go-dry-run.yml@<ref>` identity, exact match, exclusive with `--tag` (exit 2) (home: identity
       row); `tests/scripts/verify_release_test.ts` covers derivation, exclusivity, and that
       postflight/release never pass it
-- [ ] T033 [US4] `tests/scripts/release_actions_pinned_test.ts`: `release.yml` triggers are exactly
+- [x] T033 [US4] `tests/scripts/release_actions_pinned_test.ts`: `release.yml` triggers are exactly
       `push: tags`; every workflow requesting `id-token: write` is fully SHA-pinned
-- [ ] T034 [US4] `.github/workflows/go-dry-run.yml`: `workflow_dispatch`, `permissions: {}`, jobs
+- [x] T034 [US4] `.github/workflows/go-dry-run.yml`: `workflow_dispatch`, `permissions: {}`, jobs
       guarded to `refs/heads/main`; build (contents: read) → measure (verify the latest release with
       `verify-release.ts --tag` before running it; size + startup per target) → attest (input
       `attest`, default false; same `shasum` loop and attest SHA as `release.yml`; executes nothing)
       → verify with `--dry-run-ref`; artefact retention 3 days
-- [ ] T035 [US4] `tests/scripts/release_assets_gate_test.ts`: the dry run's attest SHA and checksum
+- [x] T035 [US4] `tests/scripts/release_assets_gate_test.ts`: the dry run's attest SHA and checksum
       loop equal `release.yml`'s
-- [ ] T036 [US4] `.github/workflows/codeql.yml`: add `go` (autobuild)
+- [x] T036 [US4] `.github/workflows/codeql.yml`: add `go` (autobuild)
 
 ## Phase 8 — US5: the keychain question per OS (P2, #662)
 
-- [ ] T037 [P] [US5] `cmd/keychain-probe/` (Go, `go-keyring`, cgo off): driver owning the probe
+- [x] T037 [P] [US5] `cmd/keychain-probe/` (Go, `go-keyring`, cgo off): driver owning the probe
       service name, refusing both real names (held equal to `keychain_backend.ts` by a Go test),
       canary on stdin, match/mismatch + length only, deferred cleanup (home: probe row)
-- [ ] T038 [P] [US5] `scripts/keychain-probe.ts`: the shipped `KeychainBackend` port directly,
+- [x] T038 [P] [US5] `scripts/keychain-probe.ts`: the shipped `KeychainBackend` port directly,
       service name passed in, same refusals and cleanup; `deno check` it
-- [ ] T039 [US5] Probe matrix job in `go-dry-run.yml` (Linux with gnome-keyring under
+- [x] T039 [US5] Probe matrix job in `go-dry-run.yml` (Linux with gnome-keyring under
       `dbus-run-session`, Windows wincred): both directions, reachability probe; macOS run locally
-- [ ] T040 [US5] Prepare the guided macOS session: the exact commands for the maintainer (the
+- [x] T040 [US5] Prepare the guided macOS session: the exact commands for the maintainer (the
       "Always Allow" grant on a Go- and a TS-written item, then binary replacement; the
       `sudo eslogger exec` capture with positive marker and canary). Agents never perform either
       step

@@ -1,0 +1,247 @@
+name: go-dry-run
+
+# A dry run of the release shape for the Go port (cli#662, FR-019). It builds
+# the Go artefacts under the current asset names, measures them against the
+# latest release, and — only when asked — checksums and attests them exactly as
+# release.yml does, then verifies the bundle with the shipped verifier.
+#
+# What it never does: publish a release, read a secret (GITHUB_TOKEN only),
+# call release.yml (that workflow's triggers are exactly `push: tags`, held by
+# tests/scripts/release_actions_pinned_test.ts), or run from anywhere but main.
+#
+# An attestation is a PERMANENT public Rekor entry naming this workflow on
+# main. Installed CLIs refuse it (self_update.ts demands the release.yml
+# identity at a tag); an unscoped `gh attestation verify --repo` would accept
+# it. That residual was accepted at the plan stop, with `attest` off by
+# default and a 3-day artefact retention.
+#
+# Every action is pinned to a commit SHA, as in every workflow that can request
+# `id-token: write` (release_actions_pinned_test.ts). The attest step and the
+# checksum loop are COPIES of release.yml's, held equal by
+# tests/scripts/release_assets_gate_test.ts — a copy, because reusing them would
+# need a callable release.yml.
+
+on:
+  workflow_dispatch:
+    inputs:
+      attest:
+        description: "Attest the artefacts (a permanent public Rekor entry)"
+        type: boolean
+        default: false
+
+permissions: {}
+
+jobs:
+  build:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+          cache: false
+      - uses: denoland/setup-deno@22d081ff2d3a40755e97629de92e3bcbfa7cf2ed # v2.0.5
+        with:
+          deno-version: v2.x
+      - name: Cross-compile the Go port (cgo off, every release target)
+        # The target table is scripts/build.ts's TARGETS — the release's own.
+        run: deno run --allow-read --allow-write --allow-run --allow-env scripts/build.ts --go
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: go-dist
+          path: dist/specnaut-*
+          if-no-files-found: error
+          retention-days: 3
+
+  measure:
+    needs: build
+    if: github.ref == 'refs/heads/main'
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { os: ubuntu-latest, asset: specnaut-linux-x64 }
+          - { os: ubuntu-24.04-arm, asset: specnaut-linux-arm64 }
+          - { os: macos-latest, asset: specnaut-macos-arm64 }
+          - { os: macos-15-intel, asset: specnaut-macos-x64 }
+          - { os: windows-latest, asset: specnaut-windows-x64.exe }
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        shell: bash
+    env:
+      ASSET: ${{ matrix.asset }}
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+        with:
+          persist-credentials: false
+      - uses: denoland/setup-deno@22d081ff2d3a40755e97629de92e3bcbfa7cf2ed # v2.0.5
+        with:
+          deno-version: v2.x
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: go-dist
+          path: go-dist
+      - name: Download the latest release's asset for this target
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          tag=$(gh release view --repo "$GITHUB_REPOSITORY" --json tagName --jq .tagName)
+          gh release download "$tag" --repo "$GITHUB_REPOSITORY" --dir baseline \
+            --pattern "$ASSET" --pattern specnaut.attestation.sigstore.json
+          echo "BASELINE_TAG=$tag" >> "$GITHUB_ENV"
+      - name: Verify the baseline BEFORE executing it
+        # The shipped verifier, the release identity at that tag: a binary
+        # that does not verify is never run.
+        run: deno run --allow-read scripts/verify-release.ts --tag "$BASELINE_TAG" --dir baseline --only "$ASSET"
+      - name: Measure size and startup (20 runs of --version each)
+        run: |
+          set -euo pipefail
+          chmod +x "go-dist/$ASSET" "baseline/$ASSET"
+          mkdir -p measure
+          python3 - "go-dist/$ASSET" "baseline/$ASSET" > "measure/$ASSET.md" <<'PY'
+          import os, statistics, subprocess, sys, time
+          rows = []
+          for label, path in (("go", sys.argv[1]), ("deno", sys.argv[2])):
+              subprocess.run([path, "--version"], check=True, capture_output=True)  # warm the page cache
+              samples = []
+              for _ in range(20):
+                  t = time.perf_counter()
+                  subprocess.run([path, "--version"], check=True, capture_output=True)
+                  samples.append((time.perf_counter() - t) * 1000)
+              rows.append(f"| {os.environ['ASSET']} | {label} | {os.path.getsize(path)} | "
+                          f"{statistics.median(samples):.1f} | {max(samples):.1f} |")
+          print("\n".join(rows))
+          PY
+          {
+            echo "| asset | impl | bytes | median ms | max ms |"
+            echo "| :-- | :-- | --: | --: | --: |"
+            cat "measure/$ASSET.md"
+            echo
+            echo "baseline: $BASELINE_TAG"
+          } >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: measure-${{ matrix.asset }}
+          path: measure/
+          retention-days: 3
+
+  attest:
+    needs: [build, measure]
+    if: github.ref == 'refs/heads/main' && inputs.attest
+    runs-on: ubuntu-latest
+    # The only job that can mint a token. It checks nothing out and executes
+    # nothing it downloaded: it hashes, attests and copies.
+    permissions:
+      contents: read
+      id-token: write
+      attestations: write
+    steps:
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: go-dist
+          path: dist
+      - name: Attest build provenance
+        id: attest
+        # Same SHA and inputs as release.yml's step, held equal by
+        # tests/scripts/release_assets_gate_test.ts; see release.yml for why
+        # this pin must never float (`verifiedSigningTime`).
+        uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
+        with:
+          subject-path: dist/specnaut-*
+          create-storage-record: false
+      - name: Compute checksums
+        run: |
+          cd dist
+          for f in specnaut-*; do
+            shasum -a 256 "$f" > "$f.sha256"
+          done
+      - name: Stage the attestation bundle
+        env:
+          BUNDLE: ${{ steps.attest.outputs.bundle-path }}
+        run: cp "$BUNDLE" dist/specnaut.attestation.sigstore.json
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: go-release-shape
+          path: dist/
+          if-no-files-found: error
+          retention-days: 3
+
+  verify:
+    needs: attest
+    if: github.ref == 'refs/heads/main' && inputs.attest
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+        with:
+          persist-credentials: false
+      - uses: denoland/setup-deno@22d081ff2d3a40755e97629de92e3bcbfa7cf2ed # v2.0.5
+        with:
+          deno-version: v2.x
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: go-release-shape
+          path: shape
+      - name: The eleven current asset names, and nothing else
+        run: |
+          set -euo pipefail
+          find shape -mindepth 1 -maxdepth 1 -exec basename {} \; | sort > got.txt
+          { for n in specnaut-linux-arm64 specnaut-linux-x64 specnaut-macos-arm64 specnaut-macos-x64 specnaut-windows-x64.exe; do
+              echo "$n"; echo "$n.sha256"; done; echo specnaut.attestation.sigstore.json; } | sort > want.txt
+          diff want.txt got.txt
+      - name: Verify the dry-run attestation with the shipped verifier
+        run: deno run --allow-read scripts/verify-release.ts --dry-run-ref refs/heads/main --dir shape
+
+  keychain-probe:
+    if: github.ref == 'refs/heads/main'
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    permissions:
+      contents: read
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+          cache: false
+      - uses: denoland/setup-deno@22d081ff2d3a40755e97629de92e3bcbfa7cf2ed # v2.0.5
+        with:
+          deno-version: v2.x
+      - name: Build both probes (Go with cgo off; TypeScript compiled, as the CLI is)
+        run: |
+          set -euo pipefail
+          ext=""; if [ "$RUNNER_OS" = Windows ]; then ext=.exe; fi
+          CGO_ENABLED=0 go build -trimpath -o "dist/keychain-probe$ext" ./cmd/keychain-probe
+          deno compile --allow-ffi --allow-env --allow-read -o "dist/keychain-probe-ts$ext" scripts/keychain-probe.ts
+          echo "EXT=$ext" >> "$GITHUB_ENV"
+      - name: Install a Secret Service (gnome-keyring)
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y gnome-keyring dbus-daemon libsecret-1-0
+      - name: Probe matrix (Linux, under a fresh session bus)
+        if: runner.os == 'Linux'
+        run: |
+          dbus-run-session -- bash -c '
+            printf "" | gnome-keyring-daemon --unlock --components=secrets >/dev/null
+            scripts/keychain-probe-matrix.sh dist/keychain-probe dist/keychain-probe-ts
+          ' | tee -a "$GITHUB_STEP_SUMMARY"
+      - name: Probe matrix (Windows Credential Manager)
+        if: runner.os == 'Windows'
+        run: scripts/keychain-probe-matrix.sh "dist/keychain-probe$EXT" "dist/keychain-probe-ts$EXT" | tee -a "$GITHUB_STEP_SUMMARY"
