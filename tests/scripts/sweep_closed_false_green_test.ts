@@ -80,6 +80,7 @@ const ONE_ITEM = JSON.stringify({
     status: "Ready",
     content: { type: "Issue", number: 42, repository: "acme/widgets" },
   }],
+  totalCount: 1,
 }).replace(/'/g, "'\\''");
 
 Deno.test("sweep [github]: a failed project read does not blame the configuration", async () => {

@@ -49,7 +49,7 @@ async function runSweep(fx: Fixture, args: string[] = []) {
 STUB_STATE="\${STUB_STATE:-/dev/null}"
 case "$1 $2" in
   "project item-list") cat <<'J'
-${JSON.stringify({ items: fx.items })}
+${JSON.stringify({ items: fx.items, totalCount: (fx.items as unknown[]).length })}
 J
   ;;
   "issue list")

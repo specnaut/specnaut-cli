@@ -89,13 +89,25 @@ read_failed() {
 SINCE="$(date -u -v-"${SINCE_HOURS}"H '+%Y-%m-%dT%H:%M:%SZ' 2>/dev/null \
   || date -u -d "${SINCE_HOURS} hours ago" '+%Y-%m-%dT%H:%M:%SZ')"
 
-rc=0
-CLOSED="$(glab issue list --repo "$PROJECT_ID" --closed --per-page 500 --output json 2>"$sweep_err")" || rc=$?
-[ "$rc" -eq 0 ] || read_failed "recently closed issues in $PROJECT_ID"
+# Every page, not the first: see `glab_issues_all` in `_config.sh`. Overlapping
+# pages are exit 4 too — this run did not see one consistent board.
+# shellcheck disable=SC2034  # read by glab_issues_all, from _config.sh
+GLAB_ERR="$sweep_err"
+read_all() {
+  local what="$1" rc=0
+  shift
+  glab_issues_all "$@" || rc=$?
+  [ "$rc" -ne 2 ] || {
+    echo "error: the pages of $what overlapped — refusing to report a board state this run never saw" >&2
+    exit 4
+  }
+  [ "$rc" -eq 0 ] || read_failed "$what"
+}
 
-rc=0
-OPEN="$(glab issue list --repo "$PROJECT_ID" --per-page 500 --output json 2>"$sweep_err")" || rc=$?
-[ "$rc" -eq 0 ] || read_failed "open issues in $PROJECT_ID"
+read_all "recently closed issues in $PROJECT_ID" --closed
+CLOSED="$GLAB_ISSUES"
+read_all "open issues in $PROJECT_ID"
+OPEN="$GLAB_ISSUES"
 
 SCANNED="$(jq -n --argjson c "$CLOSED" --argjson o "$OPEN" '($c | length) + ($o | length)')"
 

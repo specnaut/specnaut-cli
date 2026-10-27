@@ -266,7 +266,10 @@ Deno.test("cascade-check: the API backends ask for a complete enumeration", asyn
   );
 
   const gl = code(await Deno.readTextFile(join(SCRIPTS, "gitlab", "cascade-check.sh")));
-  assert(/--per-page/.test(gl), "the gitlab child listing has no explicit page size");
+  // The listing goes through the shared pager, which asks for every page.
+  assert(/glab_issues_all/.test(gl), "the gitlab child listing does not go through the pager");
+  const pager = code(await Deno.readTextFile(join(SCRIPTS, "gitlab", "_config.sh")));
+  assert(/--per-page[\s\S]{0,80}--page/.test(pager), "the gitlab pager does not ask for each page");
   assert(
     !/wc -l/.test(gl),
     "the gitlab count is still a line count of a discarded-stderr pipe",

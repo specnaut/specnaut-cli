@@ -111,6 +111,28 @@ read_failed() {
   exit 4
 }
 
+# A truncated read is not a complete one either. Every list call below caps
+# what it returns, and a cap that is reached drops the rest without a word: a
+# board larger than `--limit 500` scanned 500 and reported `drifted 0` over the
+# items it never saw. So the caps are generous and every read checks it
+# got everything — the project read against its own `totalCount`, each issue
+# read by refusing a result that fills its cap. The closed read goes through
+# search, which GitHub stops at 1000 results whatever the limit says.
+READ_LIMIT=5000
+SEARCH_LIMIT=1000
+
+# Exit 4, as for a failed read: this run did not see the whole board.
+read_truncated() {
+  echo "error: $1 — refusing to report a board state this run only partly saw" >&2
+  exit 4
+}
+
+# <json array> <cap> <what>
+check_not_capped() {
+  [ "$(echo "$1" | jq 'length')" -lt "$2" ] ||
+    read_truncated "the $3 filled the $2 cap and may be cut short"
+}
+
 pass=1
 while [ "$pass" -le "$PASSES" ]; do
   [ "$pass" -gt 1 ] && sleep 5
@@ -118,13 +140,19 @@ while [ "$pass" -le "$PASSES" ]; do
   # One project read, then one issue-state read per repo — not per item.
   rc=0
   ITEMS="$(gh project item-list "$PROJECT_NUMBER" --owner "$REPO_OWNER" \
-    --format json --limit 500 2>"$sweep_err")" || rc=$?
+    --format json --limit "$READ_LIMIT" 2>"$sweep_err")" || rc=$?
   [ "$rc" -eq 0 ] || read_failed "Project #$PROJECT_NUMBER for owner $REPO_OWNER"
   if [ -z "$ITEMS" ]; then
     echo "error: Project #$PROJECT_NUMBER for owner $REPO_OWNER returned no output" >&2
     echo "  The call succeeded, so this is the board answering, not a failed read." >&2
     exit 1
   fi
+  read_count="$(echo "$ITEMS" | jq '.items | length')"
+  total_count="$(echo "$ITEMS" | jq '.totalCount // empty')"
+  [ -n "$total_count" ] ||
+    read_truncated "Project #$PROJECT_NUMBER returned no totalCount, so this run cannot tell whether it read every item"
+  [ "$read_count" -ge "$total_count" ] ||
+    read_truncated "read $read_count of the $total_count items on Project #$PROJECT_NUMBER"
 
   # `.content.repository` — NOT `.repository`. Filtering on the latter silently
   # yields an empty set, which reads as "the board is clean" when it is not.
@@ -141,16 +169,18 @@ while [ "$pass" -le "$PASSES" ]; do
   # on the flag, and trying one then the other is the portability shim, not a
   # discarded error.
   rc=0
-  CLOSED="$(gh issue list --repo "$REPO" --state closed --limit 500 \
+  CLOSED="$(gh issue list --repo "$REPO" --state closed --limit "$SEARCH_LIMIT" \
     --search "closed:>=$(date -u -v-"${SINCE_HOURS}"H '+%Y-%m-%dT%H:%M:%SZ' 2>/dev/null \
       || date -u -d "${SINCE_HOURS} hours ago" '+%Y-%m-%dT%H:%M:%SZ')" \
     --json number --jq '[.[].number]' 2>"$sweep_err")" || rc=$?
   [ "$rc" -eq 0 ] || read_failed "recently closed issues in $REPO"
+  check_not_capped "$CLOSED" "$SEARCH_LIMIT" "recently closed issue list for $REPO"
 
   rc=0
-  OPEN="$(gh issue list --repo "$REPO" --state open --limit 500 \
+  OPEN="$(gh issue list --repo "$REPO" --state open --limit "$READ_LIMIT" \
     --json number --jq '[.[].number]' 2>"$sweep_err")" || rc=$?
   [ "$rc" -eq 0 ] || read_failed "open issues in $REPO"
+  check_not_capped "$OPEN" "$READ_LIMIT" "open issue list for $REPO"
 
   D="$(jq -n -c --argjson items "$SCOPED" --argjson closed "$CLOSED" '
     [ $items[] | select(.status != "Done") | select(.number as $n | $closed | index($n)) ]')"

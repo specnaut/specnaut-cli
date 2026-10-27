@@ -75,12 +75,13 @@ fi
 # Counting rendered lines was also wrong on its own terms — the default output
 # is a human table, not one issue per line.
 #
-# JSON, every state, an explicit page size, and an exit code that is checked.
-# `--per-page 500` matches the sibling `sweep-closed.sh`; every state because
-# telling "no child is linked" from "every child is closed" needs the total.
+# JSON, every state, every page, and an exit code that is checked. Every state
+# because telling "no child is linked" from "every child is closed" needs the
+# total; every page because the API stops at 100 a page and says nothing
+# (`glab_issues_all` in `_config.sh`).
 rc=0
-CHILDREN=$(glab issue list --repo "$PROJECT_ID" \
-  --label "parent::#$NUM" --all --per-page 500 --output json 2>/dev/null) || rc=$?
+glab_issues_all --label "parent::#$NUM" --all || rc=$?
+CHILDREN="$GLAB_ISSUES"
 if [ "$rc" -ne 0 ] || [ -z "$CHILDREN" ]; then
   echo "✗ could not read the children of #$NUM — refusing to answer" >&2
   echo "  This is not a verdict: the gate could not see the labelled issues." >&2

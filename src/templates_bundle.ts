@@ -9825,6 +9825,28 @@ read_failed() {
   exit 4
 }
 
+# A truncated read is not a complete one either. Every list call below caps
+# what it returns, and a cap that is reached drops the rest without a word: a
+# board larger than \`--limit 500\` scanned 500 and reported \`drifted 0\` over the
+# items it never saw. So the caps are generous and every read checks it
+# got everything — the project read against its own \`totalCount\`, each issue
+# read by refusing a result that fills its cap. The closed read goes through
+# search, which GitHub stops at 1000 results whatever the limit says.
+READ_LIMIT=5000
+SEARCH_LIMIT=1000
+
+# Exit 4, as for a failed read: this run did not see the whole board.
+read_truncated() {
+  echo "error: \$1 — refusing to report a board state this run only partly saw" >&2
+  exit 4
+}
+
+# <json array> <cap> <what>
+check_not_capped() {
+  [ "\$(echo "\$1" | jq 'length')" -lt "\$2" ] ||
+    read_truncated "the \$3 filled the \$2 cap and may be cut short"
+}
+
 pass=1
 while [ "\$pass" -le "\$PASSES" ]; do
   [ "\$pass" -gt 1 ] && sleep 5
@@ -9832,13 +9854,19 @@ while [ "\$pass" -le "\$PASSES" ]; do
   # One project read, then one issue-state read per repo — not per item.
   rc=0
   ITEMS="\$(gh project item-list "\$PROJECT_NUMBER" --owner "\$REPO_OWNER" \\
-    --format json --limit 500 2>"\$sweep_err")" || rc=\$?
+    --format json --limit "\$READ_LIMIT" 2>"\$sweep_err")" || rc=\$?
   [ "\$rc" -eq 0 ] || read_failed "Project #\$PROJECT_NUMBER for owner \$REPO_OWNER"
   if [ -z "\$ITEMS" ]; then
     echo "error: Project #\$PROJECT_NUMBER for owner \$REPO_OWNER returned no output" >&2
     echo "  The call succeeded, so this is the board answering, not a failed read." >&2
     exit 1
   fi
+  read_count="\$(echo "\$ITEMS" | jq '.items | length')"
+  total_count="\$(echo "\$ITEMS" | jq '.totalCount // empty')"
+  [ -n "\$total_count" ] ||
+    read_truncated "Project #\$PROJECT_NUMBER returned no totalCount, so this run cannot tell whether it read every item"
+  [ "\$read_count" -ge "\$total_count" ] ||
+    read_truncated "read \$read_count of the \$total_count items on Project #\$PROJECT_NUMBER"
 
   # \`.content.repository\` — NOT \`.repository\`. Filtering on the latter silently
   # yields an empty set, which reads as "the board is clean" when it is not.
@@ -9855,16 +9883,18 @@ while [ "\$pass" -le "\$PASSES" ]; do
   # on the flag, and trying one then the other is the portability shim, not a
   # discarded error.
   rc=0
-  CLOSED="\$(gh issue list --repo "\$REPO" --state closed --limit 500 \\
+  CLOSED="\$(gh issue list --repo "\$REPO" --state closed --limit "\$SEARCH_LIMIT" \\
     --search "closed:>=\$(date -u -v-"\${SINCE_HOURS}"H '+%Y-%m-%dT%H:%M:%SZ' 2>/dev/null \\
       || date -u -d "\${SINCE_HOURS} hours ago" '+%Y-%m-%dT%H:%M:%SZ')" \\
     --json number --jq '[.[].number]' 2>"\$sweep_err")" || rc=\$?
   [ "\$rc" -eq 0 ] || read_failed "recently closed issues in \$REPO"
+  check_not_capped "\$CLOSED" "\$SEARCH_LIMIT" "recently closed issue list for \$REPO"
 
   rc=0
-  OPEN="\$(gh issue list --repo "\$REPO" --state open --limit 500 \\
+  OPEN="\$(gh issue list --repo "\$REPO" --state open --limit "\$READ_LIMIT" \\
     --json number --jq '[.[].number]' 2>"\$sweep_err")" || rc=\$?
   [ "\$rc" -eq 0 ] || read_failed "open issues in \$REPO"
+  check_not_capped "\$OPEN" "\$READ_LIMIT" "open issue list for \$REPO"
 
   D="\$(jq -n -c --argjson items "\$SCOPED" --argjson closed "\$CLOSED" '
     [ \$items[] | select(.status != "Done") | select(.number as \$n | \$closed | index(\$n)) ]')"
@@ -11279,6 +11309,36 @@ item_url() {
   esac
   echo "\${HOST%/}/\$path/-/issues/\$1"
 }
+
+# Every issue a \`glab issue list\` query matches, across pages.
+#
+# The GitLab API serves at most 100 issues a page whatever \`--per-page\` asks
+# for, and \`glab issue list\` returns that page without a word about the rest.
+# One call with \`--per-page 500\` therefore read 100 issues and reported on them
+# as if they were all: a sweep said \`drifted 0\` over work it never saw, and the
+# cascade gate said "all closed" past its hundredth child.
+#
+# So page until a page comes back short. Sets GLAB_ISSUES to one JSON array.
+# Returns 1 when a page could not be read (its stderr goes to \$GLAB_ERR when
+# set), 2 when two pages overlap — issues changed mid-read, or a glab that
+# ignores \`--page\` served page 1 again, which would otherwise loop forever.
+# Call it directly, never inside \`\$( )\`: the caller decides how to stop.
+GLAB_PAGE_SIZE=100
+glab_issues_all() {
+  local page=1 got n
+  GLAB_ISSUES='[]'
+  while :; do
+    got="\$(glab issue list --repo "\$PROJECT_ID" "\$@" --per-page "\$GLAB_PAGE_SIZE" \\
+      --page "\$page" --output json 2>"\${GLAB_ERR:-/dev/null}")" || return 1
+    n="\$(jq 'length' <<<"\$got" 2>/dev/null)" || return 1
+    [ -n "\$n" ] || return 1
+    GLAB_ISSUES="\$(jq -c -n --argjson a "\$GLAB_ISSUES" --argjson b "\$got" '\$a + \$b')" || return 1
+    [ "\$(jq '[.[].iid] | unique | length' <<<"\$GLAB_ISSUES")" -eq "\$(jq 'length' <<<"\$GLAB_ISSUES")" ] ||
+      return 2
+    [ "\$n" -ge "\$GLAB_PAGE_SIZE" ] || return 0
+    page=\$((page + 1))
+  done
+}
 `,
     executable: true,
     backend: "gitlab",
@@ -11564,13 +11624,25 @@ read_failed() {
 SINCE="\$(date -u -v-"\${SINCE_HOURS}"H '+%Y-%m-%dT%H:%M:%SZ' 2>/dev/null \\
   || date -u -d "\${SINCE_HOURS} hours ago" '+%Y-%m-%dT%H:%M:%SZ')"
 
-rc=0
-CLOSED="\$(glab issue list --repo "\$PROJECT_ID" --closed --per-page 500 --output json 2>"\$sweep_err")" || rc=\$?
-[ "\$rc" -eq 0 ] || read_failed "recently closed issues in \$PROJECT_ID"
+# Every page, not the first: see \`glab_issues_all\` in \`_config.sh\`. Overlapping
+# pages are exit 4 too — this run did not see one consistent board.
+# shellcheck disable=SC2034  # read by glab_issues_all, from _config.sh
+GLAB_ERR="\$sweep_err"
+read_all() {
+  local what="\$1" rc=0
+  shift
+  glab_issues_all "\$@" || rc=\$?
+  [ "\$rc" -ne 2 ] || {
+    echo "error: the pages of \$what overlapped — refusing to report a board state this run never saw" >&2
+    exit 4
+  }
+  [ "\$rc" -eq 0 ] || read_failed "\$what"
+}
 
-rc=0
-OPEN="\$(glab issue list --repo "\$PROJECT_ID" --per-page 500 --output json 2>"\$sweep_err")" || rc=\$?
-[ "\$rc" -eq 0 ] || read_failed "open issues in \$PROJECT_ID"
+read_all "recently closed issues in \$PROJECT_ID" --closed
+CLOSED="\$GLAB_ISSUES"
+read_all "open issues in \$PROJECT_ID"
+OPEN="\$GLAB_ISSUES"
 
 SCANNED="\$(jq -n --argjson c "\$CLOSED" --argjson o "\$OPEN" '(\$c | length) + (\$o | length)')"
 
@@ -11754,12 +11826,13 @@ fi
 # Counting rendered lines was also wrong on its own terms — the default output
 # is a human table, not one issue per line.
 #
-# JSON, every state, an explicit page size, and an exit code that is checked.
-# \`--per-page 500\` matches the sibling \`sweep-closed.sh\`; every state because
-# telling "no child is linked" from "every child is closed" needs the total.
+# JSON, every state, every page, and an exit code that is checked. Every state
+# because telling "no child is linked" from "every child is closed" needs the
+# total; every page because the API stops at 100 a page and says nothing
+# (\`glab_issues_all\` in \`_config.sh\`).
 rc=0
-CHILDREN=\$(glab issue list --repo "\$PROJECT_ID" \\
-  --label "parent::#\$NUM" --all --per-page 500 --output json 2>/dev/null) || rc=\$?
+glab_issues_all --label "parent::#\$NUM" --all || rc=\$?
+CHILDREN="\$GLAB_ISSUES"
 if [ "\$rc" -ne 0 ] || [ -z "\$CHILDREN" ]; then
   echo "✗ could not read the children of #\$NUM — refusing to answer" >&2
   echo "  This is not a verdict: the gate could not see the labelled issues." >&2
