@@ -10,7 +10,7 @@ specnaut --bogus
 specnaut --bogus init
 specnaut -x
 # A flag after a positional, and the = form.
-specnaut cloud bogus --api-url http://127.0.0.1:9
+specnaut cloud bogus --api-url $CLOUD_URL
 specnaut --ai=claude bogus
 # Commands that need a subcommand.
 specnaut cloud

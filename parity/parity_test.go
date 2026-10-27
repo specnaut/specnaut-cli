@@ -1,7 +1,6 @@
 package parity
 
 import (
-	"runtime"
 	"slices"
 	"testing"
 
@@ -31,7 +30,7 @@ func (w withCleanup) Run() int {
 // it runs them against that binary too and fails on every difference.
 func TestParity(t *testing.T) {
 	a, b := Binaries(t)
-	requireUnix(t)
+	skipExcludedHost(t)
 	scenarios := loadScenarios(t)
 	if b == nil {
 		runBinary(t, a, scenarios, Pair{}, false)
@@ -48,7 +47,7 @@ func TestParity(t *testing.T) {
 // ones the binary advertises.
 func TestMatrixMatchesHelp(t *testing.T) {
 	a, _ := Binaries(t)
-	requireUnix(t)
+	skipExcludedHost(t)
 	help, err := a.Help()
 	if err != nil {
 		t.Fatal(err)
@@ -75,11 +74,12 @@ func sameSet(a, b []string) bool {
 	return slices.Equal(x, y)
 }
 
-// requireUnix: the harness covers macOS and Linux hosts; Windows gets the
-// build and the keychain probe, not the harness.
-func requireUnix(t *testing.T) {
-	if runtime.GOOS == "windows" {
-		t.Skip("the parity harness runs on macOS and Linux hosts only")
+// skipExcludedHost reports a host excluded.go excludes as a visible SKIP,
+// with its reason. The decision is HostExcluded's; this only reports it.
+func skipExcludedHost(t *testing.T) {
+	t.Helper()
+	if why, ok := HostExcluded(CurrentHost()); ok {
+		t.Skip("excluded: " + why)
 	}
 }
 
@@ -125,24 +125,12 @@ func runBinary(t *testing.T, bin *Binary, scenarios []Scenario, pair Pair, versi
 	records := rec.Records()
 	for _, s := range run {
 		if rec.Started(s.Name) { // not started: filtered out by -run
-			checkRecord(t, bin, s, records[s.Name])
+			for _, p := range RecordProblems(bin, s, records[s.Name]) {
+				t.Error(p)
+			}
 		}
 	}
 	return records
-}
-
-func checkRecord(t *testing.T, bin *Binary, s Scenario, r *Record) {
-	t.Helper()
-	switch {
-	case r == nil:
-		t.Errorf("%s/%s: the scenario never ran the binary", bin.Label, s.Name)
-	case r.Err != nil:
-		t.Errorf("%s/%s: capturing the tree: %v", bin.Label, s.Name, r.Err)
-	default:
-		for _, p := range stubs.CheckHits(s.Uses, r.Hits) {
-			t.Errorf("%s/%s: %s (stub log: %v)", bin.Label, s.Name, p, r.HitLog)
-		}
-	}
 }
 
 // reportExclusions turns every exclusion into a visible SKIP and returns the

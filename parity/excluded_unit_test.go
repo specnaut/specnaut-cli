@@ -29,6 +29,34 @@ func TestUncaughtTraceScenariosAreComparedWithinOneImplementation(t *testing.T) 
 	}
 }
 
+func TestOnlyPortedScenariosAreComparedAcrossImplementations(t *testing.T) {
+	cross, same := Pair{CrossImpl: true}, Pair{}
+	for _, name := range PortedToGo {
+		if why, ok := Excluded(name, HostFor("linux"), cross); ok {
+			t.Errorf("%s is ported, yet excluded from Go against TypeScript: %s", name, why)
+		}
+	}
+	for _, name := range []string{"init", "upgrade-claude-local", "gate"} {
+		if _, ok := Excluded(name, HostFor("linux"), cross); !ok {
+			t.Errorf("%s is not ported, yet compared Go against TypeScript", name)
+		}
+		if why, ok := Excluded(name, HostFor("linux"), same); ok {
+			t.Errorf("%s excluded from a same-implementation pair: %s", name, why)
+		}
+	}
+}
+
+func TestTheHarnessExcludesWindowsHostsWithAReason(t *testing.T) {
+	if why, ok := HostExcluded(HostFor("windows")); !ok || why == "" {
+		t.Errorf("windows: excluded=%v, reason %q", ok, why)
+	}
+	for _, goos := range []string{"darwin", "linux"} {
+		if why, ok := HostExcluded(HostFor(goos)); ok {
+			t.Errorf("%s excluded: %s", goos, why)
+		}
+	}
+}
+
 func TestCredentialGuard(t *testing.T) {
 	mac, linux := HostFor("darwin"), HostFor("linux")
 	cases := []struct {
@@ -89,6 +117,11 @@ func TestEveryClassifiedScenarioExists(t *testing.T) {
 			if _, err := os.Stat(filepath.Join("testdata", name+".txtar")); err != nil {
 				t.Errorf("%s is classified but has no script: %v", name, err)
 			}
+		}
+	}
+	for _, name := range PortedToGo {
+		if _, err := os.Stat(filepath.Join("testdata", name+".txtar")); err != nil {
+			t.Errorf("%s is declared ported but has no script: %v", name, err)
 		}
 	}
 	for _, e := range Unrunnable {

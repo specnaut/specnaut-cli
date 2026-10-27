@@ -90,17 +90,19 @@ func compare(w io.Writer, kr keyring, o options, canary string) int {
 	return 1
 }
 
-// roundtrip is set, get, remove in one process, with the removal deferred so
-// a failed read never leaves an item behind.
+// roundtrip is set, get, remove in one process. The removal is deferred
+// before the write, so no exit path leaves an item behind — a write that
+// stored the item and then reported an error included. Removing an item that
+// was never written is a miss, not a failure.
 func roundtrip(w io.Writer, kr keyring, o options, canary string) (code int) {
-	if c := report(w, "write", kr.Set(o.service, o.account, canary)); c != 0 {
-		return c
-	}
 	defer func() {
 		if c := report(w, "remove", kr.Delete(o.service, o.account)); c != 0 && code == 0 {
 			code = c
 		}
 	}()
+	if c := report(w, "write", kr.Set(o.service, o.account, canary)); c != 0 {
+		return c
+	}
 	return compare(w, kr, o, canary)
 }
 

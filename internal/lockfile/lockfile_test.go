@@ -1,41 +1,44 @@
 package lockfile
 
 import (
-	"encoding/json"
 	"errors"
-	"os"
 	"slices"
+	"strings"
 	"testing"
 	"testing/fstest"
+
+	"github.com/specnaut/specnaut-cli/internal/golden"
 )
 
 // The goldens are internal/testdata/golden.ts's output: parseLock and
 // assertSafeDestination run on the same inputs, so the port is judged
 // against the implementation.
 
-func readGolden(t *testing.T, name string, into any) {
-	t.Helper()
-	data, err := os.ReadFile("testdata/" + name)
-	if err != nil {
-		t.Fatal(err)
+type lockCase struct {
+	Name   string `json:"name"`
+	YAML   string `json:"yaml"`
+	Result struct {
+		Harness string   `json:"harness"`
+		Entries []string `json:"entries"`
+		Removed string   `json:"removed"`
+		Error   string   `json:"error"` // "<class>: <message>"
+	} `json:"result"`
+}
+
+// reason is the Go refusal spelled as the golden spells TypeScript's. A
+// SyntaxError is held to its class only (yaml.go says why); every refusal of
+// parseLock's own is held to its exact text.
+func reason(err error, want string) (got string, same bool) {
+	var syntax *SyntaxError
+	if errors.As(err, &syntax) {
+		return "SyntaxError: " + err.Error(), strings.HasPrefix(want, "SyntaxError: ")
 	}
-	if err := json.Unmarshal(data, into); err != nil {
-		t.Fatal(err)
-	}
+	got = "Error: " + err.Error()
+	return got, got == want
 }
 
 func TestParseMatchesParseLock(t *testing.T) {
-	var cases []struct {
-		Name   string `json:"name"`
-		YAML   string `json:"yaml"`
-		Result struct {
-			Harness string   `json:"harness"`
-			Entries []string `json:"entries"`
-			Removed string   `json:"removed"`
-			Error   bool     `json:"error"`
-		} `json:"result"`
-	}
-	readGolden(t, "lock_golden.json", &cases)
+	cases := golden.Load[lockCase](t, "testdata/lock_golden.jsonl", 25)
 	for _, c := range cases {
 		lock, err := Parse([]byte(c.YAML))
 		want := c.Result
@@ -45,9 +48,11 @@ func TestParseMatchesParseLock(t *testing.T) {
 			if !errors.As(err, &removed) || removed.Error() != want.Removed {
 				t.Errorf("%s: err = %v; parseLock throws RemovedHarnessError %q", c.Name, err, want.Removed)
 			}
-		case want.Error:
+		case want.Error != "":
 			if err == nil || errors.As(err, &removed) {
-				t.Errorf("%s: err = %v; parseLock throws (not a removed harness)", c.Name, err)
+				t.Errorf("%s: err = %v; parseLock throws %q", c.Name, err, want.Error)
+			} else if got, same := reason(err, want.Error); !same {
+				t.Errorf("%s: refused for %q; parseLock: %q", c.Name, got, want.Error)
 			}
 		case err != nil:
 			t.Errorf("%s: %v; parseLock accepts it", c.Name, err)
@@ -62,18 +67,15 @@ func TestParseMatchesParseLock(t *testing.T) {
 			}
 		}
 	}
-	if len(cases) < 25 {
-		t.Fatalf("only %d lock cases", len(cases))
-	}
+}
+
+type destinationCase struct {
+	Dest   string `json:"dest"`
+	Result string `json:"result"`
 }
 
 func TestSafeDestinationMatchesAssertSafeDestination(t *testing.T) {
-	var cases []struct {
-		Dest   string `json:"dest"`
-		Result string `json:"result"`
-	}
-	readGolden(t, "destination_golden.json", &cases)
-	for _, c := range cases {
+	for _, c := range golden.Load[destinationCase](t, "testdata/destination_golden.jsonl", 28) {
 		got := "ok"
 		if err := SafeDestination(c.Dest); err != nil {
 			got = err.Error()

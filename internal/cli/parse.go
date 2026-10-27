@@ -20,6 +20,28 @@ type Intent struct {
 
 func unknown(received string) Intent { return Intent{Kind: "unknown", Received: received} }
 
+// The exit codes of a refused command line, as main.ts returns them: 2 for a
+// call the CLI does not understand, 1 for a harness it no longer installs.
+const (
+	ExitUsage          = 2
+	ExitRemovedHarness = 1
+)
+
+// Refusal is what a refused command line answers — the text for stderr and
+// the exit code — or ok false when in is not a refusal. It lives beside Parse
+// so the refusal and its answer have one home; dispatch only forwards it.
+// The two lines main.ts writes for `unknown` (the message, then HELP) are one
+// text here, joined by the newline console.error would put between them.
+func Refusal(in Intent, p Palette) (text string, code int, ok bool) {
+	switch in.Kind {
+	case "unknown":
+		return p.Red(`Unknown command: "`+in.Received+`"`) + "\n" + Help(p), ExitUsage, true
+	case "removed-harness":
+		return p.Red("error: " + lockfile.RemovedHarnessInitNotice(in.Harness)), ExitRemovedHarness, true
+	}
+	return "", 0, false
+}
+
 // Parse is parser.ts's parseArgs, every parse-time refusal included, in its
 // order: version and help win over any command; an unrecognised value is
 // `unknown` (exit 2 with help), a removed harness is its own kind (exit 1).

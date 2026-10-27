@@ -57,6 +57,12 @@ async function sha256OfFile(path: string): Promise<string> {
   return [...new Uint8Array(digest)].map((b) => b.toString(16).padStart(2, "0")).join("");
 }
 
+type Anchor = {
+  readonly issuerCertDer: Uint8Array;
+  readonly expectedOidcIssuer: string;
+  readonly rekorPublicKeyDer: Uint8Array;
+};
+
 /**
  * Verify every published binary in `dir` against the bundle beside it.
  *
@@ -68,55 +74,61 @@ export async function verifyReleaseDir(opts: {
   readonly dir: string;
   /** The exact certificate identity every artefact must carry (see `identityFor`). */
   readonly identity: string;
-  readonly anchor: {
-    readonly issuerCertDer: Uint8Array;
-    readonly expectedOidcIssuer: string;
-    readonly rekorPublicKeyDer: Uint8Array;
-  };
+  readonly anchor: Anchor;
   readonly now?: Date;
   readonly targets?: readonly { readonly outName: string }[];
 }): Promise<ArtifactVerification[]> {
-  const targets = opts.targets ?? TARGETS;
-  const now = opts.now ?? new Date();
-
-  let bundleJson: string | null;
-  try {
-    bundleJson = await Deno.readTextFile(`${opts.dir}/${ATTESTATION_ASSET_NAME}`);
-  } catch {
-    bundleJson = null; // the verifier reports this as `no-bundle`, per artefact
-  }
-
+  const bundleJson = await readBundle(opts.dir);
+  const check = { ...opts, bundleJson, now: opts.now ?? new Date() };
   const results: ArtifactVerification[] = [];
-  for (const t of targets) {
-    let sha: string;
-    try {
-      sha = await sha256OfFile(`${opts.dir}/${t.outName}`);
-    } catch {
-      results.push({
-        outName: t.outName,
-        ok: false,
-        reason: "missing",
-        detail: "the published release does not carry this binary, or it was not downloaded",
-      });
-      continue;
-    }
-    const outcome: VerificationOutcome = await verifyArtifact({
-      bundleJson,
-      artifactSha256: sha,
-      now,
-      anchor: { ...opts.anchor, expectedSanUri: opts.identity },
-    });
-    results.push(
-      outcome.ok
-        ? { outName: t.outName, ok: true, reason: "", detail: outcome.identity }
-        : { outName: t.outName, ok: false, reason: outcome.reason, detail: outcome.detail },
-    );
-  }
+  for (const t of opts.targets ?? TARGETS) results.push(await verifyOne(t.outName, check));
   return results;
+}
+
+/** The bundle beside the binaries, or null — which the verifier reports as
+ *  `no-bundle`, per artefact, rather than this script deciding for it. */
+async function readBundle(dir: string): Promise<string | null> {
+  try {
+    return await Deno.readTextFile(`${dir}/${ATTESTATION_ASSET_NAME}`);
+  } catch (err) {
+    if (err instanceof Deno.errors.NotFound) return null;
+    throw err;
+  }
+}
+
+/** One binary: `missing` when absent, else the shipped verifier's verdict. */
+async function verifyOne(outName: string, c: {
+  readonly dir: string;
+  readonly identity: string;
+  readonly anchor: Anchor;
+  readonly now: Date;
+  readonly bundleJson: string | null;
+}): Promise<ArtifactVerification> {
+  let sha: string;
+  try {
+    sha = await sha256OfFile(`${c.dir}/${outName}`);
+  } catch (err) {
+    if (!(err instanceof Deno.errors.NotFound)) throw err;
+    const detail = "the published release does not carry this binary, or it was not downloaded";
+    return { outName, ok: false, reason: "missing", detail };
+  }
+  const outcome: VerificationOutcome = await verifyArtifact({
+    bundleJson: c.bundleJson,
+    artifactSha256: sha,
+    now: c.now,
+    anchor: { ...c.anchor, expectedSanUri: c.identity },
+  });
+  return outcome.ok
+    ? { outName, ok: true, reason: "", detail: outcome.identity }
+    : { outName, ok: false, reason: outcome.reason, detail: outcome.detail };
 }
 
 /** The workflow whose dispatch-only dry run attests the Go artefacts. */
 export const DRY_RUN_WORKFLOW_PATH = ".github/workflows/go-dry-run.yml";
+
+/** The only ref a dry run attests from: every go-dry-run.yml job is guarded
+ *  to it, so any other ref names a certificate that cannot exist. */
+export const DRY_RUN_REF = "refs/heads/main";
 
 /**
  * The identity a dry run's certificate carries for `ref`, derived as
@@ -141,9 +153,9 @@ export function identityFor(
     return { identity: expectedSignerIdentity(opts.tag.replace(/^v/, "")), label: opts.tag };
   }
   const ref = opts.dryRunRef!;
-  // A branch or tag ref spelled with plain characters only: the match is exact
-  // anyway, but a `*` here would read as a pattern to whoever runs it.
-  if (!/^refs\/(heads|tags)\/[A-Za-z0-9._\/-]+$/.test(ref)) return null;
+  // Exactly the one ref the workflow runs from — not a pattern, not "any
+  // branch": accepting another would accept an identity no run can carry.
+  if (ref !== DRY_RUN_REF) return null;
   return { identity: dryRunSignerIdentity(ref), label: `the dry run on ${ref}` };
 }
 
@@ -160,54 +172,65 @@ export function targetsFor(only: string | null): readonly { readonly outName: st
   return t ? [t] : null;
 }
 
-function arg(name: string): string | null {
-  const i = Deno.args.indexOf(`--${name}`);
-  return i >= 0 && i + 1 < Deno.args.length ? Deno.args[i + 1] : null;
-}
+const USAGE = "usage: verify-release.ts (--tag <vX.Y.Z> | --dry-run-ref refs/heads/main) " +
+  "--dir <dir> [--only <asset>]";
 
-async function main(): Promise<number> {
+/** What the command line asks for, or null for a usage error (exit 2). */
+export function parseCommandLine(args: readonly string[]): {
+  dir: string;
+  wanted: { identity: string; label: string };
+  targets: readonly { readonly outName: string }[];
+} | null {
+  const arg = (name: string): string | null => {
+    const i = args.indexOf(`--${name}`);
+    return i >= 0 && i + 1 < args.length ? args[i + 1] : null;
+  };
   const dir = arg("dir");
   const wanted = identityFor({ tag: arg("tag"), dryRunRef: arg("dry-run-ref") });
   const targets = targetsFor(arg("only"));
-  if (wanted === null || dir === null || targets === null) {
-    console.error(
-      "usage: verify-release.ts (--tag <vX.Y.Z> | --dry-run-ref refs/heads/<branch>) --dir <dir> " +
-        "[--only <asset>]",
+  return dir === null || wanted === null || targets === null ? null : { dir, wanted, targets };
+}
+
+/** Prints one line per binary and the verdict; returns the exit code. */
+function report(results: readonly ArtifactVerification[], label: string): number {
+  const failed = results.filter((r) => !r.ok);
+  for (const r of results) {
+    // Name the binary AND the verifier's own reason: the operator reading
+    // this is mid-release and should not have to re-derive either.
+    if (r.ok) console.log(`  ✓ ${r.outName}`);
+    else console.error(`  ❌ ${r.outName} — ${r.reason}: ${r.detail}`);
+  }
+  if (failed.length === 0) {
+    console.log(
+      `✓ all ${results.length} published binaries verify against the ${label} attestation`,
     );
+    return 0;
+  }
+  console.error(
+    `❌ ${failed.length}/${results.length} published binaries do not verify against ` +
+      `the attestation for ${label}.`,
+  );
+  console.error(
+    "   Every installed client runs this same check, so they will refuse this " +
+      "release. Publish a patch, or unpublish.",
+  );
+  return 1;
+}
+
+async function main(): Promise<number> {
+  const cmd = parseCommandLine(Deno.args);
+  if (cmd === null) {
+    console.error(USAGE);
     return 2;
   }
-  const tag = wanted.label;
-
+  const { dir, wanted, targets } = cmd;
   const results = await verifyReleaseDir({
     dir,
     identity: wanted.identity,
     anchor: DEFAULT_TRUST_ANCHOR,
     targets,
   });
-  let failed = 0;
-  for (const r of results) {
-    if (r.ok) {
-      console.log(`  ✓ ${r.outName}`);
-    } else {
-      // Name the binary AND the verifier's own reason: the operator reading
-      // this is mid-release and should not have to re-derive either.
-      console.error(`  ❌ ${r.outName} — ${r.reason}: ${r.detail}`);
-      failed++;
-    }
-  }
-  if (failed > 0) {
-    console.error(
-      `❌ ${failed}/${results.length} published binaries do not verify against ` +
-        `the attestation for ${tag}.`,
-    );
-    console.error(
-      "   Every installed client runs this same check, so they will refuse this " +
-        "release. Publish a patch, or unpublish.",
-    );
-    return 1;
-  }
-  console.log(`✓ all ${results.length} published binaries verify against the ${tag} attestation`);
-  return 0;
+  return report(results, wanted.label);
 }
 
 if (import.meta.main) Deno.exit(await main());

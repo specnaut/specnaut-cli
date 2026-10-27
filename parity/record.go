@@ -2,6 +2,7 @@ package parity
 
 import (
 	"errors"
+	"fmt"
 	"io/fs"
 	"os"
 	"os/exec"
@@ -11,6 +12,8 @@ import (
 	"sync"
 
 	"github.com/rogpeppe/go-internal/testscript"
+
+	"github.com/specnaut/specnaut-cli/parity/stubs"
 )
 
 // Step is one invocation of the binary inside a scenario.
@@ -81,6 +84,23 @@ func (r *Recorder) Started(name string) bool {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	return r.started[name]
+}
+
+// RecordProblems is what is wrong with a started scenario's record: none at
+// all (the script never ran the binary, so it asserted nothing), a tree that
+// could not be captured, or stub hits that disagree with its `# uses:`.
+func RecordProblems(bin *Binary, s Scenario, r *Record) []string {
+	switch {
+	case r == nil:
+		return []string{fmt.Sprintf("%s/%s: the scenario never ran the binary", bin.Label, s.Name)}
+	case r.Err != nil:
+		return []string{fmt.Sprintf("%s/%s: capturing the tree: %v", bin.Label, s.Name, r.Err)}
+	}
+	var out []string
+	for _, p := range stubs.CheckHits(s.Uses, r.Hits) {
+		out = append(out, fmt.Sprintf("%s/%s: %s (stub log: %v)", bin.Label, s.Name, p, r.HitLog))
+	}
+	return out
 }
 
 // Records returns the collected records.

@@ -5,6 +5,8 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+
+	"github.com/rogpeppe/go-internal/testscript"
 )
 
 func TestCaptureTreeRecordsPathModeAndContent(t *testing.T) {
@@ -58,5 +60,40 @@ func must(t *testing.T, err error) {
 	t.Helper()
 	if err != nil {
 		t.Fatal(err)
+	}
+}
+
+// A scenario whose script never runs the binary asserts nothing; the driver
+// must name it, not pass it.
+func TestAScenarioThatNeverRanTheBinaryIsReported(t *testing.T) {
+	dir := t.TempDir()
+	write(t, dir, "idle.txtar", "env X=1\n", 0o644)
+	bin := &Binary{Label: "A"}
+	rec := NewRecorder(bin, false)
+	t.Run("run", func(t *testing.T) { // its parallel scripts end with this subtest
+		testscript.Run(t, testscript.Params{
+			Files: []string{filepath.Join(dir, "idle.txtar")},
+			Setup: rec.Track(func(*testscript.Env) error { return nil }),
+		})
+	})
+	if !rec.Started("idle") {
+		t.Fatal("Track did not see the scenario start")
+	}
+	got := RecordProblems(bin, Scenario{Name: "idle"}, rec.Records()["idle"])
+	if want := "A/idle: the scenario never ran the binary"; len(got) != 1 || got[0] != want {
+		t.Errorf("problems = %q, want [%q]", got, want)
+	}
+	if rec.Started("other") {
+		t.Error("a scenario that never started reads as started")
+	}
+}
+
+func TestRecordProblemsChecksTheDeclaredStubs(t *testing.T) {
+	bin := &Binary{Label: "A"}
+	if got := RecordProblems(bin, Scenario{Name: "s"}, &Record{Hits: map[string]int{}}); len(got) != 0 {
+		t.Errorf("a clean record has problems: %q", got)
+	}
+	if got := RecordProblems(bin, Scenario{Name: "s", Uses: []string{"cloud"}}, &Record{Hits: map[string]int{}}); len(got) != 1 {
+		t.Errorf("a declared stub with no hit went unreported: %q", got)
 	}
 }

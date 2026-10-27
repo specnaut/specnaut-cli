@@ -63,18 +63,9 @@ func MatrixScript(command, harness, backend string) (name, script string) {
 // Scenarios writes the matrix into dir and returns it with every hand-written
 // script under testdata, sorted by name.
 func Scenarios(dir, testdata string) ([]Scenario, error) {
-	var out []Scenario
-	for _, c := range matrixCommands {
-		for _, h := range Harnesses {
-			for _, bk := range Backends {
-				name, script := MatrixScript(c, h, bk)
-				file := filepath.Join(dir, name+".txtar")
-				if err := os.WriteFile(file, []byte(script), 0o644); err != nil {
-					return nil, err
-				}
-				out = append(out, Scenario{Name: name, File: file, Uses: parseUses(script)})
-			}
-		}
+	out, err := writeMatrix(dir)
+	if err != nil {
+		return nil, err
 	}
 	files, err := filepath.Glob(filepath.Join(testdata, "*.txtar"))
 	if err != nil {
@@ -92,6 +83,24 @@ func Scenarios(dir, testdata string) ([]Scenario, error) {
 		})
 	}
 	sort.Slice(out, func(i, j int) bool { return out[i].Name < out[j].Name })
+	return out, nil
+}
+
+// writeMatrix writes one script per command × harness × backend into dir.
+func writeMatrix(dir string) ([]Scenario, error) {
+	var out []Scenario
+	for _, c := range matrixCommands {
+		for _, h := range Harnesses {
+			for _, bk := range Backends {
+				name, script := MatrixScript(c, h, bk)
+				file := filepath.Join(dir, name+".txtar")
+				if err := os.WriteFile(file, []byte(script), 0o644); err != nil {
+					return nil, err
+				}
+				out = append(out, Scenario{Name: name, File: file, Uses: parseUses(script)})
+			}
+		}
+	}
 	return out, nil
 }
 

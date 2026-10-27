@@ -1,16 +1,16 @@
 package cli
 
 import (
-	"encoding/json"
 	"errors"
-	"os"
 	"testing"
+
+	"github.com/specnaut/specnaut-cli/internal/golden"
 )
 
 // golden is internal/testdata/golden.ts's output: parser.ts's own answer for
 // each command line. The Go parser is judged against the implementation, not
 // against a reading of minimist.
-type golden struct {
+type parseCase struct {
 	Args   []string `json:"args"`
 	Intent struct {
 		Kind     string `json:"kind"`
@@ -20,24 +20,8 @@ type golden struct {
 	} `json:"intent"`
 }
 
-func loadGolden(t *testing.T) []golden {
-	t.Helper()
-	data, err := os.ReadFile("testdata/parse_golden.json")
-	if err != nil {
-		t.Fatal(err)
-	}
-	var cases []golden
-	if err := json.Unmarshal(data, &cases); err != nil {
-		t.Fatal(err)
-	}
-	if len(cases) < 100 {
-		t.Fatalf("only %d golden cases: is the file truncated?", len(cases))
-	}
-	return cases
-}
-
 func TestParseMatchesParserTS(t *testing.T) {
-	for _, c := range loadGolden(t) {
+	for _, c := range golden.Load[parseCase](t, "testdata/parse_golden.jsonl", 100) {
 		got, err := Parse(c.Args)
 		want := c.Intent
 		if want.Crash != "" {

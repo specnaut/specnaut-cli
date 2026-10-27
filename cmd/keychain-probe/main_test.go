@@ -94,6 +94,40 @@ func TestRoundtripRemovesEvenWhenTheReadFails(t *testing.T) {
 	}
 }
 
+// failingSet stores the item, then reports an error — a backend that wrote
+// before it failed.
+type failingSet struct{ memKeyring }
+
+func (f failingSet) Set(s, a, p string) error {
+	f.memKeyring[s+"\x00"+a] = p
+	return errors.New("timeout")
+}
+
+func TestRoundtripRemovesEvenWhenTheWriteFails(t *testing.T) {
+	kr := failingSet{memKeyring{}}
+	if out, code := probe(t, kr, canary, "roundtrip"); code == 0 || len(kr.memKeyring) != 0 {
+		t.Errorf("exit %d, %d items left, output %q", code, len(kr.memKeyring), out)
+	}
+}
+
+// encodingSet stores what go-keyring stores on macOS for some values: the
+// secret behind a prefix. The read must say mismatch, by length, and the
+// item must still go.
+type encodingSet struct{ memKeyring }
+
+func (e encodingSet) Set(s, a, p string) error { return e.memKeyring.Set(s, a, "go-keyring-base64:"+p) }
+
+func TestRoundtripMismatchIsAFailureThatLeavesNothing(t *testing.T) {
+	kr := encodingSet{memKeyring{}}
+	out, code := probe(t, kr, canary, "roundtrip")
+	if code != 1 || !strings.Contains(out, "read: mismatch length=41 (canary length=23)") {
+		t.Errorf("exit %d, %q", code, out)
+	}
+	if len(kr.memKeyring) != 0 || strings.Contains(out, canary) {
+		t.Errorf("%d items left, output %q", len(kr.memKeyring), out)
+	}
+}
+
 func TestReadSaysMismatchByLengthOnly(t *testing.T) {
 	kr := memKeyring{ProbeService + "\x00probe": "go-keyring-base64:" + canary}
 	out, code := probe(t, kr, canary, "read")

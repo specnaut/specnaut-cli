@@ -15,10 +15,20 @@ ts_probe=${2:?usage: keychain-probe-matrix.sh <go-probe> <ts-probe>}
 svc=$("$go_probe" service) || exit 1 # the Go driver owns the name
 canary=$(openssl rand -hex 24) || exit 1
 
+# Every account either probe writes, removed on every exit path: a normal end,
+# a failed step, and a roundtrip killed between its write and its own remove.
+# bash runs the EXIT trap when SIGTERM ends it too (keychain_probe_test.ts
+# kills it mid-roundtrip). Removing an item that was never written is a miss,
+# which both probes treat as success.
 cleanup() {
-  "$go_probe" remove --account go-wrote >/dev/null || echo "warning: Go-written probe item not removed"
-  "$ts_probe" remove --service "$svc" --account ts-wrote >/dev/null ||
-    echo "warning: TS-written probe item not removed"
+  for account in go-rt go-wrote; do
+    "$go_probe" remove --account "$account" >/dev/null ||
+      echo "warning: probe item $account not removed" >&2
+  done
+  for account in ts-rt ts-wrote; do
+    "$ts_probe" remove --service "$svc" --account "$account" >/dev/null ||
+      echo "warning: probe item $account not removed" >&2
+  done
 }
 trap cleanup EXIT
 

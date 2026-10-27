@@ -2,8 +2,12 @@
 // Go packages reimplement, run on one case list, so a Go unit test is judged
 // against the implementation rather than against a reading of it.
 //
-// Regenerate after changing a case or the TypeScript side:
-//   deno run --allow-read --allow-write internal/testdata/golden.ts && deno fmt internal/
+// Regenerate after changing a case or the TypeScript side (CI regenerates
+// them and fails on any diff, so a stale golden cannot land):
+//   deno run --allow-read --allow-write internal/testdata/golden.ts
+//
+// Each golden is JSON Lines — one case per line — so a file stays as long as
+// its case list, and `deno fmt` (which does not read .jsonl) never re-wraps it.
 import { parseArgs } from "../../src/cli/parser.ts";
 import { parseLock, RemovedHarnessError } from "../../src/domain/installed_lock.ts";
 import { assertSafeDestination } from "../../src/domain/template.ts";
@@ -133,6 +137,11 @@ const argv: string[][] = [
   ["😀"],
 ];
 
+/** `Name: message`, as an uncaught trace's first line names the error. */
+function reasonOf(err: unknown): string {
+  return err instanceof Error ? `${err.name}: ${err.message}` : String(err);
+}
+
 function intentOf(args: string[]): unknown {
   try {
     return parseArgs(args);
@@ -167,6 +176,12 @@ const destinations = [
   "a\\..\\b",
   ".hidden",
   "a/.git/config",
+  // Windows-shaped and NUL keys: assertSafeDestination runs @std/path's
+  // host-dependent normalize. These goldens are generated on a POSIX host,
+  // where all three are ordinary relative names.
+  "C:\\x",
+  "\\\\srv\\x",
+  "a\0b",
 ];
 
 function destinationOf(d: string): string {
@@ -174,7 +189,7 @@ function destinationOf(d: string): string {
     assertSafeDestination(d);
     return "ok";
   } catch (err) {
-    return (err as Error).message;
+    return err instanceof Error ? err.message : String(err);
   }
 }
 
@@ -227,24 +242,31 @@ function lockOf(yaml: string): unknown {
     return { harness: lock.harness, entries: [...lock.entries.keys()].sort() };
   } catch (err) {
     if (err instanceof RemovedHarnessError) return { removed: err.message };
-    return { error: true };
+    // The reason, not a boolean: two ports refusing one lock for different
+    // reasons would otherwise agree.
+    return { error: reasonOf(err) };
   }
 }
 
 const here = new URL(".", import.meta.url);
-await Deno.writeTextFile(
-  new URL("../cli/testdata/parse_golden.json", here),
-  JSON.stringify(argv.map((args) => ({ args, intent: intentOf(args) })), null, 2) + "\n",
+
+/** One compact JSON value per line. */
+async function writeLines(path: string, cases: unknown[]): Promise<void> {
+  await Deno.writeTextFile(
+    new URL(path, here),
+    cases.map((c) => JSON.stringify(c)).join("\n") + "\n",
+  );
+}
+
+await writeLines(
+  "../cli/testdata/parse_golden.jsonl",
+  argv.map((args) => ({ args, intent: intentOf(args) })),
 );
-await Deno.writeTextFile(
-  new URL("../lockfile/testdata/destination_golden.json", here),
-  JSON.stringify(destinations.map((d) => ({ dest: d, result: destinationOf(d) })), null, 2) + "\n",
+await writeLines(
+  "../lockfile/testdata/destination_golden.jsonl",
+  destinations.map((d) => ({ dest: d, result: destinationOf(d) })),
 );
-await Deno.writeTextFile(
-  new URL("../lockfile/testdata/lock_golden.json", here),
-  JSON.stringify(
-    Object.entries(locks).map(([name, yaml]) => ({ name, yaml, result: lockOf(yaml) })),
-    null,
-    2,
-  ) + "\n",
+await writeLines(
+  "../lockfile/testdata/lock_golden.jsonl",
+  Object.entries(locks).map(([name, yaml]) => ({ name, yaml, result: lockOf(yaml) })),
 );

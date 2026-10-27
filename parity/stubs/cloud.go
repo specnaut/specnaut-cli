@@ -27,48 +27,59 @@ const StubProjectKey = "WID"
 // StubGateID is the id of the one gate the stub ever opens.
 const StubGateID = "g-1"
 
+// cloudRoute is one route of the stub and its fixed answer.
+type cloudRoute struct {
+	pattern string
+	status  int
+	payload any
+}
+
+// cloudRoutes are the answers, one per route the CLI calls.
+func cloudRoutes() []cloudRoute {
+	return []cloudRoute{
+		{"GET /api/v1/orgs", 200, map[string]any{"orgs": []any{
+			map[string]any{"slug": "acme", "name": "Acme", "role": "owner", "isActive": true},
+			map[string]any{"slug": "acme-labs", "name": "Acme Labs", "role": "member", "isActive": false},
+		}}},
+		{"GET /api/v1/columns", 200, map[string]any{"columns": []any{
+			map[string]any{"id": "col-done", "name": "Done", "order": 2},
+			map[string]any{"id": "col-todo", "name": "Todo", "order": 1},
+		}}},
+		{"GET /api/v1/tasks", 200, map[string]any{"tasks": []any{
+			map[string]any{"number": 7, "title": "Ship the widget", "columnId": "col-todo", "priority": "P1", "size": "3"},
+			map[string]any{"number": 8, "title": "Polish the widget", "columnId": "col-todo"},
+		}}},
+		{"POST /api/v1/gates", 201, map[string]any{"gate": gate("open", nil)}},
+		{"GET /api/v1/gates", 200, map[string]any{
+			"gates":   []any{gate("answered", map[string]any{"choice": "yes"})},
+			"hasMore": false,
+		}},
+		{"POST /api/v1/gates/{id}/apply", 200, map[string]any{"gate": gate("applied", nil)}},
+		{"POST /api/v1/gates/{id}/cancel", 200, map[string]any{"gate": gate("cancelled", nil)}},
+		{"GET /api/v1/specs", 200, map[string]any{"spec": spec()}},
+		{"POST /api/v1/specs", 201, map[string]any{"spec": spec()}},
+		{"PUT /api/v1/specs/steps", 200, map[string]any{}},
+		{"/", 404, map[string]any{"error": "not found"}},
+	}
+}
+
+// cloudHandler serves cloudRoutes, counting every request, and answers 401
+// to any request not carrying the canary.
 func cloudHandler(c *counter, canary string) http.Handler {
 	mux := http.NewServeMux()
-	route := func(pattern string, body func(*http.Request) (int, any)) {
-		mux.HandleFunc(pattern, func(w http.ResponseWriter, r *http.Request) {
-			status, payload := body(r)
-			if r.Header.Get("Authorization") != "Bearer "+canary {
+	for _, r := range cloudRoutes() {
+		mux.HandleFunc(r.pattern, func(w http.ResponseWriter, req *http.Request) {
+			status, payload := r.status, r.payload
+			if req.Header.Get("Authorization") != "Bearer "+canary {
 				status, payload = http.StatusUnauthorized, map[string]any{"error": "unauthorized"}
 			}
 			writeJSON(w, status, payload)
 		})
 	}
-	route("GET /api/v1/orgs", fixed(200, map[string]any{"orgs": []any{
-		map[string]any{"slug": "acme", "name": "Acme", "role": "owner", "isActive": true},
-		map[string]any{"slug": "acme-labs", "name": "Acme Labs", "role": "member", "isActive": false},
-	}}))
-	route("GET /api/v1/columns", fixed(200, map[string]any{"columns": []any{
-		map[string]any{"id": "col-done", "name": "Done", "order": 2},
-		map[string]any{"id": "col-todo", "name": "Todo", "order": 1},
-	}}))
-	route("GET /api/v1/tasks", fixed(200, map[string]any{"tasks": []any{
-		map[string]any{"number": 7, "title": "Ship the widget", "columnId": "col-todo", "priority": "P1", "size": "3"},
-		map[string]any{"number": 8, "title": "Polish the widget", "columnId": "col-todo"},
-	}}))
-	route("POST /api/v1/gates", fixed(201, map[string]any{"gate": gate("open", nil)}))
-	route("GET /api/v1/gates", fixed(200, map[string]any{
-		"gates":   []any{gate("answered", map[string]any{"choice": "yes"})},
-		"hasMore": false,
-	}))
-	route("POST /api/v1/gates/{id}/apply", fixed(200, map[string]any{"gate": gate("applied", nil)}))
-	route("POST /api/v1/gates/{id}/cancel", fixed(200, map[string]any{"gate": gate("cancelled", nil)}))
-	route("GET /api/v1/specs", fixed(200, map[string]any{"spec": spec()}))
-	route("POST /api/v1/specs", fixed(201, map[string]any{"spec": spec()}))
-	route("PUT /api/v1/specs/steps", fixed(200, map[string]any{}))
-	route("/", fixed(404, map[string]any{"error": "not found"}))
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		c.hit(r.Method + " " + r.URL.RequestURI())
 		mux.ServeHTTP(w, r)
 	})
-}
-
-func fixed(status int, payload any) func(*http.Request) (int, any) {
-	return func(*http.Request) (int, any) { return status, payload }
 }
 
 func gate(state string, answer map[string]any) map[string]any {

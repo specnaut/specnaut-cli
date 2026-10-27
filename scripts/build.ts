@@ -5,13 +5,21 @@
 // asset names, with cgo off: `deno run --allow-read --allow-write --allow-run
 // --allow-env scripts/build.ts --go [<target>]`. One target table for both
 // languages, so a dry run cannot drift from the release.
+//
+// `--list-json` prints that table and nothing else (no permission needed), so
+// a workflow builds its matrix and its expected asset list from it
+// (`fromJSON`) instead of naming an asset itself.
 
 const ROOT = new URL("..", import.meta.url);
 const OUT = new URL("dist/", ROOT);
 const ENTRY = new URL("src/main.ts", ROOT).pathname;
 
-/** `goos`/`goarch` are the Go port's coordinates for the same target. */
-type Target = { triple: string; goos: string; goarch: string; outName: string };
+/**
+ * `goos`/`goarch` are the Go port's coordinates for the same target; `runner`
+ * is the GitHub-hosted runner that executes it natively (the dry run measures
+ * each binary on its own platform).
+ */
+type Target = { triple: string; goos: string; goarch: string; runner: string; outName: string };
 
 /**
  * Exported so `verify-release.ts` checks exactly the set this compiler emits,
@@ -22,29 +30,39 @@ type Target = { triple: string; goos: string; goarch: string; outName: string };
  * gate greps for — spelling it here makes this comment match as a sixth target.
  */
 export const TARGETS: Target[] = [
-  { triple: "x86_64-apple-darwin", goos: "darwin", goarch: "amd64", outName: "specnaut-macos-x64" },
+  {
+    triple: "x86_64-apple-darwin",
+    goos: "darwin",
+    goarch: "amd64",
+    runner: "macos-15-intel",
+    outName: "specnaut-macos-x64",
+  },
   {
     triple: "aarch64-apple-darwin",
     goos: "darwin",
     goarch: "arm64",
+    runner: "macos-latest",
     outName: "specnaut-macos-arm64",
   },
   {
     triple: "x86_64-unknown-linux-gnu",
     goos: "linux",
     goarch: "amd64",
+    runner: "ubuntu-latest",
     outName: "specnaut-linux-x64",
   },
   {
     triple: "aarch64-unknown-linux-gnu",
     goos: "linux",
     goarch: "arm64",
+    runner: "ubuntu-24.04-arm",
     outName: "specnaut-linux-arm64",
   },
   {
     triple: "x86_64-pc-windows-msvc",
     goos: "windows",
     goarch: "amd64",
+    runner: "windows-latest",
     outName: "specnaut-windows-x64.exe",
   },
 ];
@@ -123,6 +141,10 @@ async function compileGo(target: Target): Promise<void> {
 }
 
 async function main() {
+  if (Deno.args.includes("--list-json")) {
+    console.log(JSON.stringify(TARGETS));
+    return;
+  }
   await ensureOutDir();
   const go = Deno.args.includes("--go");
   const only = Deno.args.find((a) => a !== "--go");

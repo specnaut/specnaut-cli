@@ -79,7 +79,6 @@ func Setup(bin *Binary) func(*testscript.Env) error {
 }
 
 func scenarioVars(work, home, stubDir string, set *stubs.Set) []string {
-	deny := set.URL(stubs.Deny)
 	vars := []string{
 		"WORK=" + work, // first: testscript abbreviates logs by it
 		"PATH=" + stubDir + string(os.PathListSeparator) + systemPath,
@@ -89,11 +88,28 @@ func scenarioVars(work, home, stubDir string, set *stubs.Set) []string {
 		// Colour stays on: the CLI writes ANSI codes whenever NO_COLOR is
 		// unset, piped or not, and the harness compares those bytes.
 		"TERM=dumb",
-		"NO_PROXY=127.0.0.1,localhost", "no_proxy=127.0.0.1,localhost",
+		// Kept for testscript's own builtins.
+		"devnull=" + os.DevNull, "/=" + string(os.PathSeparator), ":=" + string(os.PathListSeparator), "$=$", "exe=",
+	}
+	vars = append(vars, serviceVars(set)...)
+	vars = append(vars, isolationVars(work, home)...)
+	return append(vars, proxyVars(set.URL(stubs.Deny))...)
+}
+
+// serviceVars point every service the CLI can reach at its stub, and give
+// it the canary as its only credential.
+func serviceVars(set *stubs.Set) []string {
+	return []string{
 		"SPECNAUT_CLOUD_TOKEN=" + Canary(),
 		"CLOUD_URL=" + set.URL(stubs.Cloud),
 		stubs.GhURLVar + "=" + set.URL(stubs.GH),
 		stubs.GlabURLVar + "=" + set.URL(stubs.Glab),
+	}
+}
+
+// isolationVars keep the developer's gh, glab, git and keyring out of reach.
+func isolationVars(work, home string) []string {
+	return []string{
 		"GH_CONFIG_DIR=" + filepath.Join(home, ".config", "gh"),
 		"GLAB_CONFIG_DIR=" + filepath.Join(home, ".config", "glab"),
 		"XDG_CONFIG_HOME=" + filepath.Join(home, ".config"),
@@ -103,9 +119,12 @@ func scenarioVars(work, home, stubDir string, set *stubs.Set) []string {
 		"GIT_TERMINAL_PROMPT=0",
 		"GIT_ALLOW_PROTOCOL=file",
 		"GIT_AUTHOR_DATE=2026-01-01T00:00:00Z", "GIT_COMMITTER_DATE=2026-01-01T00:00:00Z",
-		// Kept for testscript's own builtins.
-		"devnull=" + os.DevNull, "/=" + string(os.PathSeparator), ":=" + string(os.PathListSeparator), "$=$", "exe=",
 	}
+}
+
+// proxyVars send every proxied request to the deny stub, loopback exempt.
+func proxyVars(deny string) []string {
+	vars := []string{"NO_PROXY=127.0.0.1,localhost", "no_proxy=127.0.0.1,localhost"}
 	for _, name := range []string{"HTTP_PROXY", "HTTPS_PROXY", "ALL_PROXY"} {
 		vars = append(vars, name+"="+deny, strings.ToLower(name)+"="+deny)
 	}

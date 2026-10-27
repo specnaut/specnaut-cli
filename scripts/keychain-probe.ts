@@ -71,12 +71,12 @@ export function probe(backend: KeychainBackend, o: Options, canary: string): num
     case "read":
       return compare(backend, o, canary);
   }
-  const wrote = outcome("write", backend.set(o.service, o.account, canary));
-  if (wrote !== 0) return wrote;
   try {
-    return compare(backend, o, canary);
+    const wrote = outcome("write", backend.set(o.service, o.account, canary));
+    return wrote !== 0 ? wrote : compare(backend, o, canary);
   } finally {
-    // Whatever the read said, the item does not outlive the probe.
+    // Whatever the write or the read did — threw included — the item does
+    // not outlive the probe. Removing one never written is a miss.
     outcome("remove", backend.remove(o.service, o.account));
   }
 }

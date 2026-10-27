@@ -7,8 +7,10 @@ import {
   testRekorPublicKeyDer,
 } from "../helpers/sigstore_fixture.ts";
 import {
+  DRY_RUN_REF,
   dryRunSignerIdentity,
   identityFor,
+  parseCommandLine,
   targetsFor,
   verifyReleaseDir,
 } from "../../scripts/verify-release.ts";
@@ -49,14 +51,36 @@ Deno.test("the dry-run identity is the go-dry-run.yml workflow at that ref, exac
   );
 });
 
-Deno.test("--tag and --dry-run-ref are exclusive, and a ref is a full ref", () => {
+Deno.test("--tag and --dry-run-ref are exclusive, and the only ref is main", () => {
+  assertEquals(DRY_RUN_REF, "refs/heads/main");
   assertEquals(identityFor({ tag: "v1.2.3", dryRunRef: "refs/heads/main" }), null);
   assertEquals(identityFor({ tag: null, dryRunRef: null }), null);
   for (
-    const ref of ["main", "refs/heads/*", "refs/heads/a b", "refs/heads/x@y", "refs/pull/1/merge"]
+    const ref of [
+      "main",
+      "refs/heads/*",
+      "refs/heads/a b",
+      "refs/heads/x@y",
+      "refs/pull/1/merge",
+      // Well-formed, but go-dry-run.yml never runs there: no such certificate.
+      "refs/heads/feature",
+      "refs/heads/main2",
+      "refs/tags/v1.2.3",
+    ]
   ) {
     assertEquals(identityFor({ tag: null, dryRunRef: ref }), null, `${ref} was accepted`);
   }
+});
+
+Deno.test("the command line needs a directory and exactly one identity", () => {
+  assertEquals(
+    parseCommandLine(["--dry-run-ref", "refs/heads/main", "--dir", "d"])?.wanted.identity,
+    dryRunSignerIdentity("refs/heads/main"),
+  );
+  assertEquals(parseCommandLine(["--dry-run-ref", "refs/heads/main"]), null);
+  assertEquals(parseCommandLine(["--dry-run-ref", "refs/heads/feature", "--dir", "d"]), null);
+  assertEquals(parseCommandLine(["--tag", "v1.2.3", "--dir", "d", "--only", "x"]), null);
+  assertEquals(parseCommandLine(["--tag", "v1.2.3", "--dir", "d"])?.targets, TARGETS);
 });
 
 Deno.test("the entrypoint exits 2 when given both --tag and --dry-run-ref", async () => {

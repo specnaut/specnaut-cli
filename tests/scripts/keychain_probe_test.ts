@@ -60,3 +60,92 @@ Deno.test("roundtrip removes its item even when the read throws", () => {
   );
   assertEquals(b.items.size, 0);
 });
+
+Deno.test("roundtrip removes its item even when the write throws after storing it", () => {
+  const b = memBackend();
+  const throwing = {
+    ...b,
+    set: (s: string, a: string, v: string) => {
+      b.set(s, a, v);
+      throw new Error("timeout");
+    },
+  };
+  assertThrows(() =>
+    probe(throwing, { mode: "roundtrip", service: "specnaut-keychain-probe", account: "p" }, CANARY)
+  );
+  assertEquals(b.items.size, 0, "a write that stored and then threw left its item");
+});
+
+/** Runs `f` with console.log captured; returns what it printed and returned. */
+function captured(f: () => number): { code: number; out: string } {
+  const lines: string[] = [];
+  const log = console.log;
+  console.log = (...a: unknown[]) => lines.push(a.join(" "));
+  try {
+    return { code: f(), out: lines.join("\n") };
+  } finally {
+    console.log = log;
+  }
+}
+
+Deno.test("a read of a differently-encoded item says mismatch, by length only, and fails", () => {
+  const b = memBackend();
+  const encoding = { ...b, set: (s: string, a: string, v: string) => b.set(s, a, `x:${v}`) };
+  const o = { mode: "roundtrip", service: "specnaut-keychain-probe", account: "p" };
+  const { code, out } = captured(() => probe(encoding, o, CANARY));
+  assertEquals(code, 1);
+  assertEquals(out.includes("read: mismatch length=25 (canary length=23)"), true, out);
+  assertEquals(out.includes(CANARY), false, "the canary was printed");
+  assertEquals(b.items.size, 0, "the mismatching roundtrip left its item");
+  const read = captured(() => probe(encoding, { ...o, mode: "read" }, CANARY));
+  assertEquals(read.code, 1, "a read of an absent item passed");
+});
+
+/**
+ * The matrix script's cleanup, driven with stand-in probes that log every
+ * removal. `killAt` makes the TS stand-in send SIGTERM to the script during
+ * that mode, as a cancelled job would.
+ */
+async function matrixRemovals(killAt: string): Promise<string[]> {
+  const dir = await Deno.makeTempDir({ prefix: "probe-matrix-" });
+  try {
+    const fake = (name: string) =>
+      `#!/usr/bin/env bash\ncat >/dev/null 2>&1 || true\n` +
+      `if [ "$1" = service ]; then echo svc; exit 0; fi\n` +
+      `if [ "$1" = remove ]; then echo "${name} $*" >> "${dir}/removed"; fi\n` +
+      `if [ "${name}" = ts ] && [ "$1" = "${killAt}" ]; then kill -TERM "$PPID"; sleep 1; fi\n`;
+    for (const name of ["go", "ts"]) {
+      await Deno.writeTextFile(`${dir}/${name}`, fake(name));
+      await Deno.chmod(`${dir}/${name}`, 0o755);
+    }
+    await new Deno.Command("bash", {
+      args: [
+        new URL("../../scripts/keychain-probe-matrix.sh", import.meta.url).pathname,
+        `${dir}/go`,
+        `${dir}/ts`,
+      ],
+      stdout: "null",
+      stderr: "null",
+    }).output();
+    const log = await Deno.readTextFile(`${dir}/removed`).catch((err) => {
+      if (err instanceof Deno.errors.NotFound) return "";
+      throw err;
+    });
+    return log.split("\n").filter(Boolean).map((l) =>
+      l.replace(/^(\w+) remove .*--account (\S+).*$/, "$1:$2")
+    )
+      .filter((l) => !l.includes(" ")).sort();
+  } finally {
+    await Deno.remove(dir, { recursive: true });
+  }
+}
+
+const EVERY_ACCOUNT = ["go:go-rt", "go:go-wrote", "ts:ts-rt", "ts:ts-wrote"];
+
+Deno.test("the matrix script removes every probe account when it ends", async () => {
+  assertEquals([...new Set(await matrixRemovals("none"))], EVERY_ACCOUNT);
+});
+
+Deno.test("the matrix script removes every probe account when it is killed mid-roundtrip", async () => {
+  assertEquals([...new Set(await matrixRemovals("roundtrip"))], EVERY_ACCOUNT);
+});

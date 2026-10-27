@@ -27,7 +27,7 @@ var mutationCases = []mutationCase{
 // purpose, on every run.
 func TestMutationsAreCaught(t *testing.T) {
 	a, _ := Binaries(t)
-	requireUnix(t)
+	skipExcludedHost(t)
 	all := loadScenarios(t)
 	for _, c := range mutationCases {
 		t.Run(string(c.kind), func(t *testing.T) {

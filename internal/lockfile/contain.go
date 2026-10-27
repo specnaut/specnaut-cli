@@ -2,7 +2,10 @@ package lockfile
 
 import (
 	"errors"
+	"io/fs"
+	"os"
 	"path"
+	"path/filepath"
 	"regexp"
 	"strings"
 )
@@ -18,8 +21,9 @@ import (
 //     goes through one, and the kernel refuses a symlink leading out. The
 //     root itself is vetted by RefuseRoot before it is opened.
 //
-// Nothing else checks containment; a `strings.HasPrefix` test in a caller is
-// the duplicate this file exists to prevent.
+// Nothing else checks containment, and nothing else opens the root; a
+// `strings.HasPrefix` test or an os.OpenRoot in a caller is the duplicate this
+// file exists to prevent.
 
 var trailingName = regexp.MustCompile(`[. ]$`)
 
@@ -77,4 +81,40 @@ func RefuseRoot(root, home string) error {
 		return errors.New("refusing to operate with the home directory as the project: " + root)
 	}
 	return nil
+}
+
+// OpenContained opens dir for contained reads (`resolveProjectRoot` in
+// fs_containment.ts): dir resolved through links, vetted by RefuseRoot against
+// home, then opened as an *os.Root, whose FS refuses any path — a symlink
+// included — that leads outside it. home is HOME as the environment gives it,
+// "" when unset; it is resolved here, as TypeScript resolves it.
+func OpenContained(dir, home string) (fs.FS, error) {
+	root, err := filepath.EvalSymlinks(dir)
+	if err != nil {
+		return nil, err
+	}
+	if err := RefuseRoot(root, resolveHome(home)); err != nil {
+		return nil, err
+	}
+	r, err := os.OpenRoot(root)
+	if err != nil {
+		return nil, err
+	}
+	return r.FS(), nil
+}
+
+// resolveHome is fs_containment.ts's home: resolved through links when it
+// can be, as given when it cannot.
+func resolveHome(home string) string {
+	if home == "" {
+		return ""
+	}
+	abs, err := filepath.Abs(home)
+	if err != nil {
+		return home
+	}
+	if real, err := filepath.EvalSymlinks(abs); err == nil {
+		return real
+	}
+	return home
 }

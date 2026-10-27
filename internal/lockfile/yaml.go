@@ -20,11 +20,35 @@ import (
 // it is for `@std/yaml`, where a plain `yaml.Unmarshal` would hand back text.
 type opaque struct{ tag string }
 
+// SyntaxError is a lock the YAML reader refuses. TypeScript throws a
+// SyntaxError there too, so the class is the same; the message is not. The
+// TypeScript one is @std/yaml's own diagnostic (line, column, a caret under the
+// snippet), and porting one parser's prose to another is a convergence with no
+// end. So the lock goldens hold this class to TypeScript's, and the text is
+// compared only TypeScript against TypeScript, as an uncaught trace
+// (parity/excluded.go).
+type SyntaxError struct{ Err error }
+
+func (e *SyntaxError) Error() string { return e.Err.Error() }
+func (e *SyntaxError) Unwrap() error { return e.Err }
+
+// Name is the JavaScript class an uncaught trace would name.
+func (e *SyntaxError) Name() string { return "SyntaxError" }
+
 // decodeYAML reads one YAML document into JavaScript-shaped values: nil,
 // bool, float64, string, map[string]any, []any or opaque — what `@std/yaml`
 // `parse` gives parseLock. Tags are read off the node, never inferred from the
-// Go type a decoder chose.
+// Go type a decoder chose. Every failure is a *SyntaxError, as every failure of
+// `parse` is.
 func decodeYAML(data []byte) (any, error) {
+	v, err := decodeDocument(data)
+	if err != nil {
+		return nil, &SyntaxError{err}
+	}
+	return v, nil
+}
+
+func decodeDocument(data []byte) (any, error) {
 	dec := yaml.NewDecoder(bytes.NewReader(data))
 	var doc yaml.Node
 	if err := dec.Decode(&doc); err != nil {
@@ -36,7 +60,7 @@ func decodeYAML(data []byte) (any, error) {
 	var extra yaml.Node
 	if err := dec.Decode(&extra); !errors.Is(err, io.EOF) {
 		if err == nil {
-			err = errors.New("expected a single document in the stream, but found more")
+			err = errors.New("Found more than 1 document in the stream: expected a single document")
 		}
 		return nil, err
 	}

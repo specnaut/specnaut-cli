@@ -91,9 +91,12 @@ jobs:
           deno task bundle
           deno task test
 
-  # The black-box parity harness (parity/, cli#661). It builds no CLI from Go:
-  # it runs a TypeScript binary built here, so the parity and mutation tests
-  # execute instead of reporting SKIP. Not a release gate.
+  # The black-box parity harness (parity/, cli#661) and the Go port (cli#662).
+  # The harness builds nothing itself: it runs a TypeScript binary built here
+  # (so the parity and mutation tests execute instead of reporting SKIP), that
+  # binary against itself (FR-009), and the Go binary against it. Which
+  # scenarios the Go pair compares is parity/excluded.go's PortedToGo — no
+  # -run filter here. Not a release gate.
   go:
     runs-on: ubuntu-latest
     permissions:
@@ -114,11 +117,25 @@ jobs:
         run: go vet ./...
       - name: Unit tests (no binary — the parity tests skip here, by design)
         run: go test ./...
+      - name: The Go goldens are what the TypeScript side answers today
+        # internal/testdata/golden.ts runs parser.ts, parseLock and
+        # assertSafeDestination; a stale golden would judge the port against
+        # an answer TypeScript no longer gives.
+        run: |
+          deno run --allow-read --allow-write internal/testdata/golden.ts
+          if [ -n "$(git status --porcelain -- internal/cli/testdata internal/lockfile/testdata)" ]; then
+            echo "::error::the Go goldens are stale; run internal/testdata/golden.ts and commit them"
+            git status --short -- internal/cli/testdata internal/lockfile/testdata
+            git diff --stat -- internal/cli/testdata internal/lockfile/testdata
+            exit 1
+          fi
       - name: Build the linux-x64 TypeScript binary under test
         run: |
           deno task bundle
           deno run --allow-read --allow-write --allow-run scripts/build.ts x86_64-unknown-linux-gnu
-      - name: Parity harness and mutation tests against it
+      - name: Build the Go binary (cgo off)
+        run: CGO_ENABLED=0 go build -trimpath -o dist/specnaut-go ./cmd/specnaut
+      - name: Parity harness and mutation tests against the TypeScript binary
         env:
           SPECNAUT_BIN: ${{ github.workspace }}/dist/specnaut-linux-x64
         # Explicit bash gets -o pipefail, so `| tee` cannot hide a failure.
@@ -130,3 +147,14 @@ jobs:
             echo "::error::a parity test skipped although SPECNAUT_BIN is set"
             exit 1
           fi
+      - name: Diff mode, TypeScript against itself (FR-009) and Go against TypeScript
+        shell: bash
+        run: |
+          ts="$GITHUB_WORKSPACE/dist/specnaut-linux-x64"
+          for b in "$ts" "$GITHUB_WORKSPACE/dist/specnaut-go"; do
+            SPECNAUT_BIN="$ts" SPECNAUT_BIN_B="$b" go test -count=1 -v -run '^TestParity$' ./parity/ | tee diff.log
+            if grep -E -- '^--- SKIP: TestParity ' diff.log; then
+              echo "::error::TestParity skipped in diff mode against $b"
+              exit 1
+            fi
+          done

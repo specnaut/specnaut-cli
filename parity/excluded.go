@@ -64,6 +64,26 @@ var uncaughtTrace = map[string]string{
 	"reconcile-malformed-lock": "a malformed installed.lock ends `reconcile --status` in an uncaught Deno trace",
 }
 
+// PortedToGo are the scenarios whose every step the Go binary implements;
+// every other step answers "not ported" (exit 3) by design. A pair across
+// implementations compares these and reports the rest as SKIP, so a full
+// Go-against-TypeScript run is green exactly when the port matches. CI runs
+// that pair with no -run filter, so nothing else lists these names.
+var PortedToGo = []string{"help", "legacy", "parser", "reconcile-status", "version"}
+
+// unsupportedHosts are operating systems the harness does not run on, and why.
+var unsupportedHosts = map[string]string{
+	"windows": "the parity harness runs on macOS and Linux hosts only (its fixtures, file modes and " +
+		"stub shims are POSIX); Windows gets the Go build and the keychain probe instead",
+}
+
+// HostExcluded says whether the whole harness is excluded on this host, and
+// why. Every parity test asks it first and reports the answer as SKIP.
+func HostExcluded(h Host) (string, bool) {
+	why, ok := unsupportedHosts[h.GOOS]
+	return why, ok
+}
+
 // Excluded says whether a scenario is excluded on this host for this pair,
 // and why.
 func Excluded(scenario string, h Host, p Pair) (string, bool) {
@@ -72,6 +92,9 @@ func Excluded(scenario string, h Host, p Pair) (string, bool) {
 	}
 	if why, ok := uncaughtTrace[scenario]; ok && p.CrossImpl {
 		return why + "; not portable across implementations", true
+	}
+	if p.CrossImpl && !slices.Contains(PortedToGo, scenario) {
+		return "not ported to the Go binary yet (PortedToGo): its steps answer exit 3 by design", true
 	}
 	return "", false
 }

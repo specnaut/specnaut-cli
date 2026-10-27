@@ -57,6 +57,10 @@ func dispatch(env Env, p Palette) (int, error) {
 	if err != nil {
 		return 0, err
 	}
+	if text, code, refused := Refusal(in, p); refused {
+		fmt.Fprintln(env.Stderr, text)
+		return code, nil
+	}
 	switch in.Kind {
 	case "version":
 		v, err := specnaut.Version()
@@ -70,13 +74,6 @@ func dispatch(env Env, p Palette) (int, error) {
 		return 0, nil
 	case "reconcile-status":
 		return reconcileStatus(env)
-	case "removed-harness":
-		fmt.Fprintln(env.Stderr, p.Red("error: "+lockfile.RemovedHarnessInitNotice(in.Harness)))
-		return 1, nil
-	case "unknown":
-		fmt.Fprintln(env.Stderr, p.Red(`Unknown command: "`+in.Received+`"`))
-		fmt.Fprintln(env.Stderr, Help(p))
-		return 2, nil
 	}
 	return NotPorted(env.Stderr, p, in.Command), nil
 }
@@ -96,14 +93,25 @@ func reconcileStatus(env Env) (int, error) {
 }
 
 // uncaught stands in for the trace Deno prints when TypeScript throws past
-// main.ts: same stream, same exit code, same first word. The trace itself is
-// not portable, which is why the harness compares those scenarios only
-// between TypeScript binaries (parity/excluded.go).
+// main.ts: same stream, same exit code, same first word, and the class
+// TypeScript would have thrown (an error naming one, such as a lock's
+// SyntaxError, else Error). The trace itself is not portable, which is why the
+// harness compares those scenarios only between TypeScript binaries
+// (parity/excluded.go).
 func uncaught(w io.Writer, p Palette, err error) int {
 	word := "error"
 	if p.Enabled {
 		word = "\x1b[0m\x1b[1m\x1b[31merror\x1b[0m"
 	}
-	fmt.Fprintf(w, "%s: Uncaught (in promise) Error: %v\n", word, err)
+	fmt.Fprintf(w, "%s: Uncaught (in promise) %s: %v\n", word, className(err), err)
 	return 1
+}
+
+// className is the JavaScript class an error stands for.
+func className(err error) string {
+	var named interface{ Name() string }
+	if errors.As(err, &named) {
+		return named.Name()
+	}
+	return "Error"
 }
