@@ -242,8 +242,14 @@ jobs:
       - name: Probe matrix (Linux, under a fresh session bus)
         if: runner.os == 'Linux'
         run: |
+          # An empty password leaves no default collection, and creating one
+          # asks a GUI prompter a runner does not have: every write then fails
+          # and both probes measure nothing. Unlocking with a throwaway
+          # password creates and unlocks the login collection up front.
           dbus-run-session -- bash -c '
-            printf "" | gnome-keyring-daemon --unlock --components=secrets >/dev/null
+            set -euo pipefail
+            mkdir -p ~/.local/share/keyrings
+            printf "probe" | gnome-keyring-daemon --unlock --replace --daemonize --components=secrets >/dev/null
             scripts/keychain-probe-matrix.sh dist/keychain-probe dist/keychain-probe-ts
           ' | tee -a "$GITHUB_STEP_SUMMARY"
       - name: Probe matrix (Windows Credential Manager)
