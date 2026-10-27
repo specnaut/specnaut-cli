@@ -336,7 +336,15 @@ on `main`, accepted by an unscoped `gh attestation verify`, refused by every ins
 
 ## 12. Open questions
 
-_Asked at the plan stop, 2026-10-27; answers recorded here._
+Asked at the plan stop and settled by the maintainer, 2026-10-27:
+
+- **Q1 — Does the dry run attest its artefacts, given the permanent public Rekor entry?** Settled:
+  **yes, from `main` only**, with the `attest` input defaulting to false and a 3-day artefact
+  retention. The §11 residual is accepted.
+- **Q2 — How are the two macOS observations that need a human (the "Always Allow" grant, and the
+  `sudo` exec capture) run?** Settled: **a guided session** at the end of implementation. Everything
+  is prepared beforehand; the maintainer performs only the grant and the `sudo` command, and the
+  results go into `spike-report.md`. Neither step is ever performed by an agent.
 
 ### Decided without asking
 
