@@ -1,0 +1,33 @@
+# spec pull/push against the Cloud stub. Linux only (excluded.go): both open
+# the credential store.
+# uses: cloud
+cd local-specs
+specnaut spec pull 7
+cd $WORK/cloud-specs
+specnaut spec pull
+specnaut spec push 9 --api-url $CLOUD_URL
+specnaut spec pull 7 --api-url $CLOUD_URL
+specnaut spec push 7 --api-url $CLOUD_URL
+
+-- local-specs/.specnaut/backlog-config.yml --
+backend: cloud
+api_url: ""
+project_key: "WID"
+-- cloud-specs/.specnaut/backlog-config.yml --
+backend: cloud
+api_url: ""
+project_key: "WID"
+-- cloud-specs/.specnaut/installed.lock --
+version: 2
+harness: claude
+backlog_backend: cloud
+version_scheme: semver
+spec_backend: cloud
+templates_version: 0.0.1
+entries:
+  AGENTS.md:
+    sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+    installed_at: '2026-01-01T00:00:00.000Z'
+    templates_version: 0.0.1
+-- cloud-specs/AGENTS.md --
+# Acme widgets

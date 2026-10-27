@@ -1,0 +1,50 @@
+# reconcile <path>: both resolutions, and each refusal — no lock, a path the
+# lock does not track, no staged copy, no project file.
+cd project
+specnaut reconcile a/one.md --accept-upstream
+specnaut reconcile a/two.md --accept-current
+specnaut reconcile c/untracked.md --accept-upstream
+specnaut reconcile a/unstaged.md --accept-upstream
+specnaut reconcile a/gone.md --accept-current
+specnaut reconcile --status
+cd $WORK
+specnaut reconcile a/one.md --accept-upstream
+
+-- project/.specnaut/installed.lock --
+version: 2
+harness: claude
+backlog_backend: local
+version_scheme: semver
+spec_backend: local
+templates_version: 0.0.1
+entries:
+  a/one.md:
+    sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+    installed_at: '2026-01-01T00:00:00.000Z'
+    templates_version: 0.0.1
+  a/two.md:
+    sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+    installed_at: '2026-01-01T00:00:00.000Z'
+    templates_version: 0.0.1
+  a/unstaged.md:
+    sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+    installed_at: '2026-01-01T00:00:00.000Z'
+    templates_version: 0.0.1
+  a/gone.md:
+    sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+    installed_at: '2026-01-01T00:00:00.000Z'
+    templates_version: 0.0.1
+-- project/a/one.md --
+local one
+-- project/a/two.md --
+local two
+-- project/a/unstaged.md --
+local, nothing staged
+-- project/.specnaut/upgrade-staging/a/one.md --
+upstream one
+-- project/.specnaut/upgrade-staging/a/two.md --
+upstream two
+-- project/.specnaut/upgrade-staging/c/untracked.md --
+staged, but the lock does not track it
+-- project/.specnaut/upgrade-staging/a/gone.md --
+staged, but the project file is gone

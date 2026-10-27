@@ -23,3 +23,10 @@ docs-dist/
 id_rsa*
 .npmrc
 secrets.json
+
+# Go build outputs (cli#661). Every Go build writes under dist/ (ignored
+# above); these are the backstop for a bare `go build` / `go test -c` at the
+# repository root.
+/specnaut
+/keychain-probe
+*.test

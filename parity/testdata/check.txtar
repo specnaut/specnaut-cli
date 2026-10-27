@@ -1,0 +1,6 @@
+# check outside a project, and check --project in a directory that is not one.
+# uses: gh
+specnaut check
+mkdir empty
+cd empty
+specnaut check --project

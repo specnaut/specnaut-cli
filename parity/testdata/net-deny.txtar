@@ -1,0 +1,5 @@
+# The environment denies every host that is not stubbed. self-update calls
+# api.github.com with no override; the deny proxy must see that request and
+# refuse it, and the step must fail.
+# uses: deny
+! specnaut self-update --check

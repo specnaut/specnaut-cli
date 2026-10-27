@@ -90,3 +90,43 @@ jobs:
         run: |
           deno task bundle
           deno task test
+
+  # The black-box parity harness (parity/, cli#661). It builds no CLI from Go:
+  # it runs a TypeScript binary built here, so the parity and mutation tests
+  # execute instead of reporting SKIP. Not a release gate.
+  go:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+      - uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
+      - name: gofmt
+        run: test -z "$(gofmt -l .)" || { gofmt -l .; exit 1; }
+      - name: go vet
+        run: go vet ./...
+      - name: Unit tests (no binary — the parity tests skip here, by design)
+        run: go test ./...
+      - name: Build the linux-x64 TypeScript binary under test
+        run: |
+          deno task bundle
+          deno run --allow-read --allow-write --allow-run scripts/build.ts x86_64-unknown-linux-gnu
+      - name: Parity harness and mutation tests against it
+        env:
+          SPECNAUT_BIN: ${{ github.workspace }}/dist/specnaut-linux-x64
+        # Explicit bash gets -o pipefail, so `| tee` cannot hide a failure.
+        shell: bash
+        run: |
+          go test -count=1 -v ./parity/... | tee parity.log
+          # A green job whose parity tests all skipped would prove nothing.
+          if grep -E -- '^--- SKIP: (TestParity|TestMutationsAreCaught|TestMatrixMatchesHelp) ' parity.log; then
+            echo "::error::a parity test skipped although SPECNAUT_BIN is set"
+            exit 1
+          fi

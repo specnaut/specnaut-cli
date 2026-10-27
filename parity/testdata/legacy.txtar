@@ -1,0 +1,3 @@
+# Invoked under its pre-rebrand name, the binary warns on stderr and proceeds.
+specflow --version
+specflow --help

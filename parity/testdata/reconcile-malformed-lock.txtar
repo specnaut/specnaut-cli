@@ -1,0 +1,9 @@
+# A malformed lock: TypeScript ends in an uncaught Deno trace (excluded.go
+# keeps this out of cross-implementation comparisons).
+cd project
+specnaut reconcile --status
+
+-- project/.specnaut/installed.lock --
+version: [unterminated
+-- project/.specnaut/upgrade-staging/a/one.md --
+upstream one

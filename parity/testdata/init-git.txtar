@@ -1,0 +1,28 @@
+# init in git work trees. The github backend derives its repo from origin when
+# --backlog-repo is absent. GIT_ALLOW_PROTOCOL=file (env.go) keeps git from
+# contacting the forge the URL names; get-url only reads .git/config.
+mkdir fresh
+cd fresh
+specnaut init --here --ai claude --backlog local --scheme semver --spec-backend local
+cd $WORK
+mkdir derived
+cd derived
+exec git init -q
+exec git remote add origin https://github.com/acme/widgets.git
+specnaut init --here --ai claude --backlog github --backlog-url https://github.com/orgs/acme/projects/1 --scheme semver --spec-backend local
+# A file:// origin names no GitHub repo.
+cd $WORK
+exec git init -q --bare remote.git
+mkdir local-remote
+cd local-remote
+exec git init -q
+exec git remote add origin file://$WORK/remote.git
+specnaut init --here --ai claude --backlog github --backlog-url https://github.com/orgs/acme/projects/1 --scheme semver --spec-backend local
+# A tagged repository suggests the semver scheme when --scheme is absent.
+cd $WORK
+mkdir tagged
+cd tagged
+exec git init -q
+exec git commit -q --allow-empty -m init
+exec git tag v1.2.3
+specnaut init --here --ai claude --backlog local --spec-backend local

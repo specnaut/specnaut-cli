@@ -1,0 +1,6 @@
+# --version, -v, --version after a command, and the combined short flags.
+specnaut --version
+specnaut -v
+specnaut init --version
+specnaut -vh
+specnaut -hv

@@ -1,0 +1,95 @@
+# reconcile --status: no project, an empty queue, three files across two
+# directories plus a path holding `&`, and every refusal that hides a staged
+# copy (not in the lock, no project file, no lock, a removed harness).
+specnaut reconcile --status
+cd project
+specnaut reconcile --status
+cd $WORK/no-lock
+specnaut reconcile --status
+cd $WORK/removed
+specnaut reconcile --status
+cd $WORK/empty-queue
+specnaut reconcile --status
+
+-- project/.specnaut/installed.lock --
+version: 2
+harness: claude
+backlog_backend: local
+version_scheme: semver
+spec_backend: local
+templates_version: 0.0.1
+entries:
+  a/one.md:
+    sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+    installed_at: '2026-01-01T00:00:00.000Z'
+    templates_version: 0.0.1
+  a/two.md:
+    sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+    installed_at: '2026-01-01T00:00:00.000Z'
+    templates_version: 0.0.1
+  b/three.md:
+    sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+    installed_at: '2026-01-01T00:00:00.000Z'
+    templates_version: 0.0.1
+  b/r&d.md:
+    sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+    installed_at: '2026-01-01T00:00:00.000Z'
+    templates_version: 0.0.1
+  a/gone.md:
+    sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+    installed_at: '2026-01-01T00:00:00.000Z'
+    templates_version: 0.0.1
+-- project/a/one.md --
+local one
+-- project/a/two.md --
+local two
+-- project/b/three.md --
+local three
+-- project/b/r&d.md --
+local r&d
+-- project/.specnaut/upgrade-staging/a/one.md --
+upstream one
+-- project/.specnaut/upgrade-staging/a/two.md --
+upstream two
+-- project/.specnaut/upgrade-staging/b/three.md --
+upstream three
+-- project/.specnaut/upgrade-staging/b/r&d.md --
+upstream r&d
+-- project/.specnaut/upgrade-staging/c/untracked.md --
+staged, but the lock does not track it
+-- project/.specnaut/upgrade-staging/a/gone.md --
+staged, but the project file is gone
+-- no-lock/a/one.md --
+local one
+-- no-lock/.specnaut/upgrade-staging/a/one.md --
+upstream one
+-- removed/.specnaut/installed.lock --
+version: 2
+harness: windsurf
+backlog_backend: local
+version_scheme: semver
+spec_backend: local
+templates_version: 0.0.1
+entries:
+  a/one.md:
+    sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+    installed_at: '2026-01-01T00:00:00.000Z'
+    templates_version: 0.0.1
+-- removed/a/one.md --
+local one
+-- removed/.specnaut/upgrade-staging/a/one.md --
+upstream one
+-- empty-queue/.specnaut/installed.lock --
+version: 2
+harness: claude
+backlog_backend: local
+version_scheme: semver
+spec_backend: local
+templates_version: 0.0.1
+entries:
+  a/one.md:
+    sha256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+    installed_at: '2026-01-01T00:00:00.000Z'
+    templates_version: 0.0.1
+-- empty-queue/a/one.md --
+local one

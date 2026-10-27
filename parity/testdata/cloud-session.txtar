@@ -1,0 +1,18 @@
+# The cloud commands that read a stored session, against the Cloud stub.
+# Linux only (excluded.go): they open the credential store, which env.go
+# leaves at the file fallback under $WORK/home.
+# uses: cloud
+specnaut cloud orgs --api-url $CLOUD_URL
+cloud-session
+specnaut cloud orgs --api-url $CLOUD_URL
+specnaut cloud orgs --api-url ftp://example.com
+specnaut cloud board --api-url $CLOUD_URL
+cd linked
+specnaut cloud board --api-url $CLOUD_URL
+specnaut cloud logout --api-url $CLOUD_URL
+specnaut cloud board --api-url $CLOUD_URL
+
+-- linked/.specnaut/backlog-config.yml --
+backend: cloud
+api_url: ""
+project_key: "WID"

@@ -1,0 +1,5 @@
+# The cloud commands that never open a credential store: token prints
+# SPECNAUT_CLOUD_TOKEN, and login refuses without a terminal.
+specnaut cloud token
+specnaut login
+specnaut cloud login --api-url $CLOUD_URL

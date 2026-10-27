@@ -1,0 +1,19 @@
+# diff: the whole-project view, --only-customised, one path, and a path the
+# lock does not track.
+mkdir project
+cd project
+specnaut diff
+specnaut init --here --no-git --ai claude --backlog local --scheme semver --spec-backend local
+specnaut diff --only-customised
+cp $WORK/custom.md .claude/agents/developer.md
+specnaut diff --only-customised
+specnaut diff .claude/agents/developer.md
+specnaut diff ./.claude/agents/developer.md --only-customised
+specnaut diff not/tracked.md
+specnaut diff
+
+-- custom.md --
+---
+name: developer
+---
+A customised developer agent.

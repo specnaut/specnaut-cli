@@ -1,0 +1,22 @@
+# init beyond the matrix: a named directory, the non-interactive defaults, the
+# cloud spec backend, a re-run onto an initialised project, and its flags.
+specnaut init acme-app --no-git --ai claude --backlog local --scheme semver --spec-backend local
+# No flags and no terminal: every picker takes its default from empty stdin.
+specnaut init defaults-app --no-git
+specnaut init cloud-specs --no-git --ai claude --backlog cloud --scheme date --spec-backend cloud
+cd acme-app
+# A second init stops on the files it would overwrite; --dry-run trumps --force.
+specnaut init --here --no-git --ai claude --backlog local --scheme semver --spec-backend local
+cp $WORK/custom.md AGENTS.md
+specnaut init --here --no-git --ai claude --backlog local --scheme semver --spec-backend local --force --dry-run
+specnaut init --here --no-git --ai claude --backlog local --scheme semver --spec-backend local --force
+# A remote backend with no board URL, and no terminal to ask for one.
+cd $WORK
+mkdir no-url
+cd no-url
+specnaut init --here --no-git --ai claude --backlog github --scheme semver --spec-backend local
+
+-- custom.md --
+# Acme widgets
+
+Hand-written, so init must not overwrite it without --force.

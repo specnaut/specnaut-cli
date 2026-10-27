@@ -1,0 +1,6 @@
+# --help, -h, and no arguments all print the help text.
+specnaut
+specnaut --help
+specnaut -h
+# --help wins over any command.
+specnaut init --help

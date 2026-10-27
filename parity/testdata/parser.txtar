@@ -1,0 +1,35 @@
+# Parse-time behaviour: every refusal parser.ts makes before a handler runs,
+# and the argument shapes @std/cli parseArgs accepts.
+# An unknown command, and number-like positionals (coerced to numbers).
+specnaut bogus
+specnaut 42
+specnaut 0042
+specnaut 1e3
+# An unknown flag, alone and swallowing the next word.
+specnaut --bogus
+specnaut --bogus init
+specnaut -x
+# A flag after a positional, and the = form.
+specnaut cloud bogus --api-url http://127.0.0.1:9
+specnaut --ai=claude bogus
+# Commands that need a subcommand.
+specnaut cloud
+specnaut gate
+specnaut gate bogus
+specnaut spec
+specnaut spec bogus
+# init refusals: unknown values, and a removed harness (exit 1).
+specnaut init --ai bogus
+specnaut init --ai windsurf
+specnaut init --backlog bogus
+specnaut init --scheme bogus
+specnaut init --spec-backend bogus
+specnaut upgrade --backlog bogus
+# diff and reconcile argument refusals.
+specnaut diff a.md b.md
+specnaut reconcile
+specnaut reconcile --status extra
+specnaut reconcile --status --accept-upstream
+specnaut reconcile a.md --accept-upstream --accept-current
+specnaut reconcile --accept-upstream
+specnaut reconcile a.md b.md --accept-current

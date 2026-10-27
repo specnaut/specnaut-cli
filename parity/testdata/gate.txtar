@@ -1,0 +1,28 @@
+# gate status/raise/cancel against the Cloud stub. Linux only (excluded.go):
+# every gate command opens the credential store.
+# uses: cloud
+cd linked
+specnaut gate status
+specnaut gate status --api-url $CLOUD_URL
+specnaut gate raise --api-url $CLOUD_URL --type bogus --title 'Which widget?'
+specnaut gate raise --api-url $CLOUD_URL --type clarification
+specnaut gate raise --api-url $CLOUD_URL --type clarification --title 'Which widget?' --payload '[1]'
+specnaut gate raise --api-url $CLOUD_URL --type clarification --title 'Which widget?' --payload '{"question":"Which widget?"}' --task 7
+specnaut gate cancel g-1 --api-url $CLOUD_URL
+specnaut gate cancel --api-url $CLOUD_URL
+cd $WORK/remote-off
+specnaut gate status --api-url $CLOUD_URL
+cd $WORK
+specnaut gate status
+
+-- linked/.specnaut/backlog-config.yml --
+backend: cloud
+api_url: ""
+project_key: "WID"
+remote:
+  enabled: true
+  poll_interval_s: 1
+-- remote-off/.specnaut/backlog-config.yml --
+backend: cloud
+api_url: ""
+project_key: "WID"

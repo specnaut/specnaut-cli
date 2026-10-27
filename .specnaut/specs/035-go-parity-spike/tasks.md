@@ -6,63 +6,63 @@ a rule names its 🔒 home from plan §5; a decision may not land anywhere else.
 
 ## Phase 1 — Setup (#661)
 
-- [ ] T001 Create the Go module: `go.mod` (`module github.com/specnaut/specnaut-cli`, `go 1.26`),
+- [x] T001 Create the Go module: `go.mod` (`module github.com/specnaut/specnaut-cli`, `go 1.26`),
       add `github.com/rogpeppe/go-internal` to `go.sum`; append `/specnaut`, `/keychain-probe`,
       `*.test` to `.gitignore`
-- [ ] T002 Confirm the Deno side ignores the module: `deno task fmt:check`, `deno task lint`,
+- [x] T002 Confirm the Deno side ignores the module: `deno task fmt:check`, `deno task lint`,
       `deno task test` and `bash scripts/smoke/audit.sh` give the same verdicts as on `main`
 
 ## Phase 2 — Foundational (#661)
 
-- [ ] T003 [P] `parity/binaries.go`: read `SPECNAUT_BIN` / `SPECNAUT_BIN_B` once; unset → SKIP with
+- [x] T003 [P] `parity/binaries.go`: read `SPECNAUT_BIN` / `SPECNAUT_BIN_B` once; unset → SKIP with
       the reason, never PASS (home: binaries row)
-- [ ] T004 [P] `parity/normalise.go`: the `Rules` table (`$WORK` paths, lock timestamps, the version
+- [x] T004 [P] `parity/normalise.go`: the `Rules` table (`$WORK` paths, lock timestamps, the version
       rule applied only when the two `--version` outputs differ), each rule with its reason (home:
       normalise row)
-- [ ] T005 [P] `parity/excluded.go`: the exclusion list with reasons (TTY pickers, `self-update`,
+- [x] T005 [P] `parity/excluded.go`: the exclusion list with reasons (TTY pickers, `self-update`,
       uncaught-trace scenarios for Go-vs-TS, credential scenarios wherever a keyring is reachable —
       always on darwin) (home: excluded row)
-- [ ] T006 `parity/env.go`: the `Setup` hook — `HOME=$WORK/home`, `TZ=UTC`, `LANG=C`, fixed
+- [x] T006 `parity/env.go`: the `Setup` hook — `HOME=$WORK/home`, `TZ=UTC`, `LANG=C`, fixed
       colour/`TERM`, proxies to `127.0.0.1:9` with `NO_PROXY` for loopback, canary
       `SPECNAUT_CLOUD_TOKEN`, `GIT_CONFIG_NOSYSTEM=1`, `GIT_CONFIG_GLOBAL`, `GIT_TERMINAL_PROMPT=0`,
       `GH_CONFIG_DIR`/`GLAB_CONFIG_DIR` under `$WORK`, `DBUS_SESSION_BUS_ADDRESS` unset, stubs first
       on `PATH`, the Cloud stub URL injected (home: env row)
-- [ ] T007 `parity/record.go`: capture stdout, stderr, exit, and the tree under `$WORK` (path, mode,
+- [x] T007 `parity/record.go`: capture stdout, stderr, exit, and the tree under `$WORK` (path, mode,
       content), normalised once through `Rules` (home: record row)
-- [ ] T008 `parity/diff.go`: compare two records; a Difference names scenario + artefact + detail
+- [x] T008 `parity/diff.go`: compare two records; a Difference names scenario + artefact + detail
       (home: diff row)
-- [ ] T009 [P] Unit tests for T004, T007, T008 on synthetic records (`parity/*_unit_test.go`)
+- [x] T009 [P] Unit tests for T004, T007, T008 on synthetic records (`parity/*_unit_test.go`)
 
 ## Phase 3 — US1: a behaviour change in the TypeScript CLI shows up (P1, #661)
 
-- [ ] T010 [P] [US1] `parity/stubs/gh.go`, `glab.go`, `cloud.go`: loopback `httptest` servers and
+- [x] T010 [P] [US1] `parity/stubs/gh.go`, `glab.go`, `cloud.go`: loopback `httptest` servers and
       `PATH` shims answering only what the CLI parses, each naming the TS file it mirrors, each with
       a hit counter (home: stubs row); git uses local bare `file://` remotes
-- [ ] T011 [US1] `parity/matrix.go`: harnesses (read from `--help`, fail on disagreement with the
+- [x] T011 [US1] `parity/matrix.go`: harnesses (read from `--help`, fail on disagreement with the
       declared list) × backends × `init`/`upgrade`/`check --project`, plus every FR-003 extra (home:
       matrix row)
-- [ ] T012 [US1] `parity/testdata/*.txtar`: one scenario family per file — init/upgrade/check, diff,
+- [x] T012 [US1] `parity/testdata/*.txtar`: one scenario family per file — init/upgrade/check, diff,
       reconcile (status cases incl. three files over two dirs, `&`, every refusal), gate, spec,
       login/cloud, help/version/unknown, legacy `specflow` name, parser edge cases
-- [ ] T013 [US1] `parity/parity_test.go`: run mode (one binary, record each scenario, enforce
+- [x] T013 [US1] `parity/parity_test.go`: run mode (one binary, record each scenario, enforce
       declared stub hits) and diff mode (`SPECNAUT_BIN_B`)
-- [ ] T014 [US1] One scenario must fail to reach a non-stubbed host, proving the network deny
+- [x] T014 [US1] One scenario must fail to reach a non-stubbed host, proving the network deny
 
 ## Phase 4 — US2: a change is caught by name (P1, #661)
 
-- [ ] T015 [US2] `parity/mutant.go`: a `testscript` command registered in `TestMain` that wraps the
+- [x] T015 [US2] `parity/mutant.go`: a `testscript` command registered in `TestMain` that wraps the
       binary and applies one of four mutations (stdout line, exit code, missing file, altered file)
       (home: mutant row)
-- [ ] T016 [US2] `parity/mutation_test.go`: for each kind, diff(real, mutant) is red and names the
+- [x] T016 [US2] `parity/mutation_test.go`: for each kind, diff(real, mutant) is red and names the
       scenario and artefact
-- [ ] T017 [US2] Build the TS binary (`deno task build`), run the whole harness against it: run
+- [x] T017 [US2] Build the TS binary (`deno task build`), run the whole harness against it: run
       mode, then TS against itself (0 differences, FR-009), then HEAD against the latest release
       (US1); record runtime against SC-001
-- [ ] T018 [US2] Observe each new assertion red at least once (mutate the comparator, the normaliser
+- [x] T018 [US2] Observe each new assertion red at least once (mutate the comparator, the normaliser
       and the exclusion check, then restore) and note the mutants in the commit body
-- [ ] T019 `.github/workflows/ci.yml`: a `go` job (`go vet`, `go test ./...`, build one linux-x64 TS
+- [x] T019 `.github/workflows/ci.yml`: a `go` job (`go vet`, `go test ./...`, build one linux-x64 TS
       binary, run the harness and the mutation tests with it); no existing job touched
-- [ ] T020 Commit #661: `test(parity): a black-box parity harness for the CLI binary` (Closes #661)
+- [x] T020 Commit #661: `test(parity): a black-box parity harness for the CLI binary` (Closes #661)
 
 ## Phase 5 — Foundational (#662)
 

@@ -1,0 +1,19 @@
+# upgrade outside a project, then on one with a customised file, with each flag.
+mkdir project
+cd project
+specnaut upgrade
+specnaut init --here --no-git --ai claude --backlog local --scheme semver --spec-backend local
+cp $WORK/custom.md .claude/agents/developer.md
+specnaut upgrade --dry-run
+specnaut upgrade
+specnaut upgrade --reset-baseline --dry-run
+specnaut upgrade --reset-baseline
+specnaut upgrade --force
+specnaut upgrade --backlog gitlab
+specnaut upgrade --reset-preserved
+
+-- custom.md --
+---
+name: developer
+---
+A customised developer agent.
