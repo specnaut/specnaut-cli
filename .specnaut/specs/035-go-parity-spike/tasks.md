@@ -123,12 +123,12 @@ a rule names its 🔒 home from plan §5; a decision may not land anywhere else.
 
 ## Phase 9 — Report and land (#662)
 
-- [ ] T041 Dispatch the dry run from `main` after #662 lands locally and is pushed; collect sizes,
+- [x] T041 Dispatch the dry run from `main` after #662 lands locally and is pushed; collect sizes,
       startup times, keychain verdicts
-- [ ] T042 `spike-report.md`: parser decision, command choice, keychain verdicts per OS (no verdict
+- [x] T042 `spike-report.md`: parser decision, command choice, keychain verdicts per OS (no verdict
       on an empty observation), macOS observations, size/startup, layering rule, where `TARGETS`
       moves at cutover, proposed decomposition of the remaining ports
-- [ ] T043 Commit #662: `build(go): spike a Go CLI skeleton and its release dry run` (Closes #662);
+- [x] T043 Commit #662: `build(go): spike a Go CLI skeleton and its release dry run` (Closes #662);
       report commit after the dry run
 
 ## Dependencies
