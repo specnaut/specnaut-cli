@@ -1,10 +1,9 @@
-**A file you declared preserved survives its retirement.** When a release stopped shipping a path
-listed in `.specnaut/preserve.yml`, `specnaut upgrade` warned that the declaration was ignored and
-then deleted the file. It now keeps the file and keeps tracking it, and every upgrade reports that
-upstream no longer ships it until you remove the declaration. A declared file that a release renamed
-stays where it is, and the new document is added beside it.
+**`specnaut cloud login` works on Windows.** The Windows credential store was handed a malformed
+record, so every attempt to save the Cloud token failed, and reading an existing entry could crash
+the CLI. The record now has the layout Windows expects, and the suite tests a real save, read and
+removal on Windows in CI.
 
-**Removing a file never reaches the project itself.** `upgrade` judges each removal on the file it
-actually removes. A path that lands on the project folder, whether through a symbolic link or as
-`.`, is refused, and so is a name the filesystem could read as something else, such as one ending in
-a dot or a space.
+**A board too large for one read is no longer reported clean.** The backlog sweep read a fixed
+number of cards and judged the board on those alone, so a large board could report no drift over
+items it never saw. A read that stops at its limit is now refused instead, and the GitLab scripts
+read every page rather than the first hundred issues.

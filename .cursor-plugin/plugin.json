@@ -2,7 +2,7 @@
   "name": "specnaut",
   "displayName": "Specnaut",
   "description": "Spec-driven planning, TDD, review, and delivery workflows for coding agents — Specnaut's bundled skills and sub-agents.",
-  "version": "7.0.2",
+  "version": "7.0.3",
   "author": {
     "name": "MakerLabs",
     "url": "https://github.com/mkrlabs"
