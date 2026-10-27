@@ -57,11 +57,28 @@ var load = sync.OnceValue(func() loaded {
 		return loaded{err: err}
 	}
 	if pb == "" {
-		return loaded{a: a}
+		return loaded{a: a, err: prepareLegacy(a)}
 	}
 	b, err := Probe("B", pb)
-	return loaded{a: a, b: b, err: err}
+	if err != nil {
+		return loaded{err: err}
+	}
+	return loaded{a: a, b: b, err: prepareLegacy(a, b)}
 })
+
+// prepareLegacy writes every `specflow` copy now, before any scenario runs.
+// Written lazily from inside a parallel scenario, the copy was still open for
+// writing in some sibling's forked child when the scenario exec'd it, and
+// Linux refused with "text file busy" — a scenario that intermittently never
+// ran its binary.
+func prepareLegacy(bins ...*Binary) error {
+	for _, b := range bins {
+		if _, err := b.LegacyPath(); err != nil {
+			return err
+		}
+	}
+	return nil
+}
 
 // Binaries returns the binary under test and, in diff mode, the second one.
 // With SPECNAUT_BIN unset it skips the test — a parity test that ran nothing
