@@ -142,10 +142,24 @@ async function matrixRemovals(killAt: string): Promise<string[]> {
 
 const EVERY_ACCOUNT = ["go:go-rt", "go:go-wrote", "ts:ts-rt", "ts:ts-wrote"];
 
-Deno.test("the matrix script removes every probe account when it ends", async () => {
-  assertEquals([...new Set(await matrixRemovals("none"))], EVERY_ACCOUNT);
+// The stand-ins are bash scripts addressed by POSIX paths and the kill case
+// signals the script's PID; neither holds under Windows' Git Bash, where the
+// suite also runs (CI cross-smoke). The cleanup itself is bash's EXIT trap,
+// identical on every OS the dry run uses.
+const POSIX_ONLY = Deno.build.os === "windows";
+
+Deno.test({
+  name: "the matrix script removes every probe account when it ends",
+  ignore: POSIX_ONLY,
+  async fn() {
+    assertEquals([...new Set(await matrixRemovals("none"))], EVERY_ACCOUNT);
+  },
 });
 
-Deno.test("the matrix script removes every probe account when it is killed mid-roundtrip", async () => {
-  assertEquals([...new Set(await matrixRemovals("roundtrip"))], EVERY_ACCOUNT);
+Deno.test({
+  name: "the matrix script removes every probe account when it is killed mid-roundtrip",
+  ignore: POSIX_ONLY,
+  async fn() {
+    assertEquals([...new Set(await matrixRemovals("roundtrip"))], EVERY_ACCOUNT);
+  },
 });
