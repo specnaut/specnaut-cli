@@ -5,8 +5,6 @@ import {
   KNOWN_VERSION_SCHEMES,
 } from "./installed_lock.ts";
 
-const BEGIN_RE = /^\s*<!--\s*BEGIN:\s*backend=([a-zA-Z0-9_-]+)\s*-->\s*$/;
-const END_RE = /^\s*<!--\s*END:\s*backend=([a-zA-Z0-9_-]+)\s*-->\s*$/;
 const FENCE_RE = /^\s*```/;
 
 /**
@@ -27,66 +25,7 @@ const FENCE_RE = /^\s*```/;
  * and on nested markers.
  */
 export function renderBackend(source: string, active: BacklogBackend): string {
-  const lines = source.split("\n");
-  const out: string[] = [];
-  let insideFence = false;
-  let openBackend: string | null = null;
-  let openLine = -1;
-  let keepBlock = false;
-
-  for (let i = 0; i < lines.length; i++) {
-    const line = lines[i];
-
-    if (FENCE_RE.test(line)) {
-      insideFence = !insideFence;
-      if (openBackend === null || keepBlock) out.push(line);
-      continue;
-    }
-
-    if (!insideFence) {
-      const beginMatch = line.match(BEGIN_RE);
-      if (beginMatch) {
-        if (openBackend !== null) {
-          throw new Error(
-            `nested backend marker at line ${i + 1}: BEGIN ${beginMatch[1]} ` +
-              `inside open block ${openBackend} (started at line ${openLine + 1})`,
-          );
-        }
-        openBackend = beginMatch[1];
-        openLine = i;
-        keepBlock = openBackend === active;
-        continue;
-      }
-
-      const endMatch = line.match(END_RE);
-      if (endMatch) {
-        if (openBackend === null) {
-          throw new Error(
-            `unmatched END marker at line ${i + 1}: backend=${endMatch[1]}`,
-          );
-        }
-        if (endMatch[1] !== openBackend) {
-          throw new Error(
-            `mismatched END marker at line ${i + 1}: expected backend=${openBackend} ` +
-              `(opened at line ${openLine + 1}), got backend=${endMatch[1]}`,
-          );
-        }
-        openBackend = null;
-        keepBlock = false;
-        continue;
-      }
-    }
-
-    if (openBackend === null || keepBlock) out.push(line);
-  }
-
-  if (openBackend !== null) {
-    throw new Error(
-      `unmatched BEGIN marker at line ${openLine + 1}: backend=${openBackend}`,
-    );
-  }
-
-  return out.join("\n");
+  return renderMarked(source, "backend", active, "html");
 }
 
 /** Throws if `s` is not a known backlog backend. */
@@ -97,9 +36,6 @@ export function assertKnownBackend(s: string): asserts s is BacklogBackend {
     );
   }
 }
-
-const SPEC_BEGIN_RE = /^\s*<!--\s*BEGIN:\s*spec-backend=([a-zA-Z0-9_-]+)\s*-->\s*$/;
-const SPEC_END_RE = /^\s*<!--\s*END:\s*spec-backend=([a-zA-Z0-9_-]+)\s*-->\s*$/;
 
 /**
  * Strip spec-backend-conditional sections from a Markdown source (spec 020).
@@ -119,66 +55,7 @@ const SPEC_END_RE = /^\s*<!--\s*END:\s*spec-backend=([a-zA-Z0-9_-]+)\s*-->\s*$/;
  * Throws on unmatched (BEGIN without END, END without BEGIN) or nested markers.
  */
 export function renderSpecBackend(source: string, active: SpecBackend): string {
-  const lines = source.split("\n");
-  const out: string[] = [];
-  let insideFence = false;
-  let openBackend: string | null = null;
-  let openLine = -1;
-  let keepBlock = false;
-
-  for (let i = 0; i < lines.length; i++) {
-    const line = lines[i];
-
-    if (FENCE_RE.test(line)) {
-      insideFence = !insideFence;
-      if (openBackend === null || keepBlock) out.push(line);
-      continue;
-    }
-
-    if (!insideFence) {
-      const beginMatch = line.match(SPEC_BEGIN_RE);
-      if (beginMatch) {
-        if (openBackend !== null) {
-          throw new Error(
-            `nested spec-backend marker at line ${i + 1}: BEGIN ${beginMatch[1]} ` +
-              `inside open block ${openBackend} (started at line ${openLine + 1})`,
-          );
-        }
-        openBackend = beginMatch[1];
-        openLine = i;
-        keepBlock = openBackend === active;
-        continue;
-      }
-
-      const endMatch = line.match(SPEC_END_RE);
-      if (endMatch) {
-        if (openBackend === null) {
-          throw new Error(
-            `unmatched END marker at line ${i + 1}: spec-backend=${endMatch[1]}`,
-          );
-        }
-        if (endMatch[1] !== openBackend) {
-          throw new Error(
-            `mismatched END marker at line ${i + 1}: expected spec-backend=${openBackend} ` +
-              `(opened at line ${openLine + 1}), got spec-backend=${endMatch[1]}`,
-          );
-        }
-        openBackend = null;
-        keepBlock = false;
-        continue;
-      }
-    }
-
-    if (openBackend === null || keepBlock) out.push(line);
-  }
-
-  if (openBackend !== null) {
-    throw new Error(
-      `unmatched BEGIN marker at line ${openLine + 1}: spec-backend=${openBackend}`,
-    );
-  }
-
-  return out.join("\n");
+  return renderMarked(source, "spec-backend", active, "html");
 }
 
 /** Throws if `s` is not a known spec backend. */
@@ -189,9 +66,6 @@ export function assertKnownSpecBackend(s: string): asserts s is SpecBackend {
     );
   }
 }
-
-const SPEC_AUTOGEN_BEGIN_RE = /^\s*<!--\s*BEGIN:\s*spec-autogen=([a-zA-Z0-9_-]+)\s*-->\s*$/;
-const SPEC_AUTOGEN_END_RE = /^\s*<!--\s*END:\s*spec-autogen=([a-zA-Z0-9_-]+)\s*-->\s*$/;
 
 /**
  * Strip spec-autogen-conditional sections from a Markdown source (spec 021).
@@ -212,71 +86,8 @@ const SPEC_AUTOGEN_END_RE = /^\s*<!--\s*END:\s*spec-autogen=([a-zA-Z0-9_-]+)\s*-
  * Throws on unmatched (BEGIN without END, END without BEGIN) or nested markers.
  */
 export function renderSpecAutogen(source: string, enabled: boolean): string {
-  const active = enabled ? "on" : "off";
-  const lines = source.split("\n");
-  const out: string[] = [];
-  let insideFence = false;
-  let openToken: string | null = null;
-  let openLine = -1;
-  let keepBlock = false;
-
-  for (let i = 0; i < lines.length; i++) {
-    const line = lines[i];
-
-    if (FENCE_RE.test(line)) {
-      insideFence = !insideFence;
-      if (openToken === null || keepBlock) out.push(line);
-      continue;
-    }
-
-    if (!insideFence) {
-      const beginMatch = line.match(SPEC_AUTOGEN_BEGIN_RE);
-      if (beginMatch) {
-        if (openToken !== null) {
-          throw new Error(
-            `nested spec-autogen marker at line ${i + 1}: BEGIN ${beginMatch[1]} ` +
-              `inside open block ${openToken} (started at line ${openLine + 1})`,
-          );
-        }
-        openToken = beginMatch[1];
-        openLine = i;
-        keepBlock = openToken === active;
-        continue;
-      }
-
-      const endMatch = line.match(SPEC_AUTOGEN_END_RE);
-      if (endMatch) {
-        if (openToken === null) {
-          throw new Error(
-            `unmatched END marker at line ${i + 1}: spec-autogen=${endMatch[1]}`,
-          );
-        }
-        if (endMatch[1] !== openToken) {
-          throw new Error(
-            `mismatched END marker at line ${i + 1}: expected spec-autogen=${openToken} ` +
-              `(opened at line ${openLine + 1}), got spec-autogen=${endMatch[1]}`,
-          );
-        }
-        openToken = null;
-        keepBlock = false;
-        continue;
-      }
-    }
-
-    if (openToken === null || keepBlock) out.push(line);
-  }
-
-  if (openToken !== null) {
-    throw new Error(
-      `unmatched BEGIN marker at line ${openLine + 1}: spec-autogen=${openToken}`,
-    );
-  }
-
-  return out.join("\n");
+  return renderMarked(source, "spec-autogen", enabled ? "on" : "off", "html");
 }
-
-const SH_SCHEME_BEGIN_RE = /^\s*#\s*BEGIN:\s*scheme=([a-zA-Z0-9_-]+)\s*$/;
-const SH_SCHEME_END_RE = /^\s*#\s*END:\s*scheme=([a-zA-Z0-9_-]+)\s*$/;
 
 /**
  * Strip scheme-conditional sections from a shell source.
@@ -297,57 +108,7 @@ const SH_SCHEME_END_RE = /^\s*#\s*END:\s*scheme=([a-zA-Z0-9_-]+)\s*$/;
  * and on nested markers.
  */
 export function renderScheme(source: string, active: VersionScheme): string {
-  const lines = source.split("\n");
-  const out: string[] = [];
-  let openScheme: string | null = null;
-  let openLine = -1;
-  let keepBlock = false;
-
-  for (let i = 0; i < lines.length; i++) {
-    const line = lines[i];
-
-    const beginMatch = line.match(SH_SCHEME_BEGIN_RE);
-    if (beginMatch) {
-      if (openScheme !== null) {
-        throw new Error(
-          `nested scheme marker at line ${i + 1}: BEGIN ${beginMatch[1]} ` +
-            `inside open block ${openScheme} (started at line ${openLine + 1})`,
-        );
-      }
-      openScheme = beginMatch[1];
-      openLine = i;
-      keepBlock = openScheme === active;
-      continue;
-    }
-
-    const endMatch = line.match(SH_SCHEME_END_RE);
-    if (endMatch) {
-      if (openScheme === null) {
-        throw new Error(
-          `unmatched END marker at line ${i + 1}: scheme=${endMatch[1]}`,
-        );
-      }
-      if (endMatch[1] !== openScheme) {
-        throw new Error(
-          `mismatched END marker at line ${i + 1}: expected scheme=${openScheme} ` +
-            `(opened at line ${openLine + 1}), got scheme=${endMatch[1]}`,
-        );
-      }
-      openScheme = null;
-      keepBlock = false;
-      continue;
-    }
-
-    if (openScheme === null || keepBlock) out.push(line);
-  }
-
-  if (openScheme !== null) {
-    throw new Error(
-      `unmatched BEGIN marker at line ${openLine + 1}: scheme=${openScheme}`,
-    );
-  }
-
-  return out.join("\n");
+  return renderMarked(source, "scheme", active, "shell");
 }
 
 /** Throws if `s` is not a known version scheme. */
@@ -357,4 +118,84 @@ export function assertKnownScheme(s: string): asserts s is VersionScheme {
       `unknown version scheme '${s}' — known: ${KNOWN_VERSION_SCHEMES.join(", ")}`,
     );
   }
+}
+
+/**
+ * The one marker renderer every family above calls: keep the block whose token
+ * is `active` (markers stripped), drop the others with their markers.
+ *
+ * It was four copies of this loop — backend, spec-backend, spec-autogen,
+ * scheme — byte-identical apart from the key, which is how a fix to one family
+ * misses the other three. `html` markers are `<!-- BEGIN: key=X -->` and are
+ * plain content inside a fenced code block; `shell` markers are
+ * `# BEGIN: key=X`, and shell sources have no fences to guard.
+ *
+ * Throws on unmatched markers (BEGIN without END, END without BEGIN) and on
+ * nested markers.
+ */
+export function renderMarked(
+  source: string,
+  key: string,
+  active: string,
+  syntax: "html" | "shell",
+): string {
+  const [open, close] = syntax === "html" ? ["<!--\\s*", "\\s*-->"] : ["#\\s*", ""];
+  const begin = new RegExp(`^\\s*${open}BEGIN:\\s*${key}=([a-zA-Z0-9_-]+)${close}\\s*$`);
+  const end = new RegExp(`^\\s*${open}END:\\s*${key}=([a-zA-Z0-9_-]+)${close}\\s*$`);
+  const lines = source.split("\n");
+  const out: string[] = [];
+  let insideFence = false;
+  let openToken: string | null = null;
+  let openLine = -1;
+  let keepBlock = false;
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+
+    if (syntax === "html" && FENCE_RE.test(line)) {
+      insideFence = !insideFence;
+      if (openToken === null || keepBlock) out.push(line);
+      continue;
+    }
+
+    if (!insideFence) {
+      const beginMatch = line.match(begin);
+      if (beginMatch) {
+        if (openToken !== null) {
+          throw new Error(
+            `nested ${key} marker at line ${i + 1}: BEGIN ${beginMatch[1]} ` +
+              `inside open block ${openToken} (started at line ${openLine + 1})`,
+          );
+        }
+        openToken = beginMatch[1];
+        openLine = i;
+        keepBlock = openToken === active;
+        continue;
+      }
+
+      const endMatch = line.match(end);
+      if (endMatch) {
+        if (openToken === null) {
+          throw new Error(`unmatched END marker at line ${i + 1}: ${key}=${endMatch[1]}`);
+        }
+        if (endMatch[1] !== openToken) {
+          throw new Error(
+            `mismatched END marker at line ${i + 1}: expected ${key}=${openToken} ` +
+              `(opened at line ${openLine + 1}), got ${key}=${endMatch[1]}`,
+          );
+        }
+        openToken = null;
+        keepBlock = false;
+        continue;
+      }
+    }
+
+    if (openToken === null || keepBlock) out.push(line);
+  }
+
+  if (openToken !== null) {
+    throw new Error(`unmatched BEGIN marker at line ${openLine + 1}: ${key}=${openToken}`);
+  }
+
+  return out.join("\n");
 }
