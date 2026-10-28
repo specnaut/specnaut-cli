@@ -1,4 +1,5 @@
 import { isAbsolute, normalize, relative, SEPARATOR } from "@std/path";
+import { canonicalBlockBody } from "./merge_block.ts";
 
 export type TemplateFile = {
   content: string;
@@ -162,4 +163,19 @@ export function managedSectionLabels(
 ): readonly string[] {
   if (declared === undefined) return [];
   return typeof declared === "string" ? [declared] : declared;
+}
+
+/**
+ * The string whose sha256 `installed.lock` records for a bundle entry — the one
+ * statement of it.
+ *
+ * Init, the upgrade plan and the upgrade's lock rebuild each spelled this out
+ * on their own, and the comment beside the third copy said why that was a
+ * hazard: a divergence between them is what caused #163's false "customized"
+ * reports on `.gitignore`. A merge block is hashed on its canonical body only,
+ * because that is all the comparison on disk can extract from a user-owned
+ * file; everything else on its content.
+ */
+export function lockShaInput(file: TemplateFile): string {
+  return file.mergeBlock !== undefined ? canonicalBlockBody(file.content) : file.content;
 }

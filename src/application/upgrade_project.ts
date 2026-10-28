@@ -6,7 +6,7 @@ import type {
   PluginDetector,
   StagingStore,
 } from "./ports.ts";
-import type { Bundle } from "../domain/template.ts";
+import { type Bundle, lockShaInput } from "../domain/template.ts";
 import { sha256Hex } from "../domain/sha256.ts";
 import type { InstalledLock } from "../domain/installed_lock.ts";
 import type { CoreBundle } from "../domain/core_bundle.ts";
@@ -15,7 +15,7 @@ import {
   type UpgradeAction,
   type UpgradePlan,
 } from "../domain/upgrade_plan.ts";
-import { canonicalBlockBody, extractBlock, mergeRefusal } from "../domain/merge_block.ts";
+import { extractBlock, mergeRefusal } from "../domain/merge_block.ts";
 import { isPluginCoveredPath, pluginRelativePath } from "../domain/plugin_coverage.ts";
 import { isAgenticPath, pruneAgenticEntries } from "../domain/parent_managed.ts";
 import { deletesOrphan } from "../domain/orphan_scope.ts";
@@ -272,10 +272,7 @@ export class UpgradeProjectUseCase {
 
     const newShas = new Map<string, string>();
     for (const [dest, file] of Object.entries(bundle)) {
-      const shaInput = file.mergeBlock !== undefined
-        ? canonicalBlockBody(file.content)
-        : file.content;
-      newShas.set(dest, await sha256Hex(shaInput));
+      newShas.set(dest, await sha256Hex(lockShaInput(file)));
     }
 
     const isDeclaredPreserved = input.isDeclaredPreserved ?? (() => false);

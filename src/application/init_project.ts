@@ -10,10 +10,9 @@ import type {
 } from "../domain/installed_lock.ts";
 import { RemovedHarnessError } from "../domain/installed_lock.ts";
 import type { CoreBundle } from "../domain/core_bundle.ts";
-import type { Bundle } from "../domain/template.ts";
+import { type Bundle, lockShaInput } from "../domain/template.ts";
 import { TEMPLATES_VERSION } from "../templates_bundle.ts";
 import { mergeRefusal } from "../domain/merge_block.ts";
-import { canonicalBlockBody } from "../domain/merge_block.ts";
 import { isAgenticPath } from "../domain/parent_managed.ts";
 
 export type InitResult =
@@ -198,19 +197,9 @@ export class InitProjectUseCase {
     // caller prints the same "would write N files" summary as a real run —
     // excluding the preserved paths it would skip.
     if (input.dryRun) {
-      const mergedPaths: string[] = [];
-      let writtenCount = 0;
-      for (const [dest, file] of Object.entries(bundleToWrite)) {
-        if (file.mergeBlock !== undefined || file.mergeJson !== undefined) {
-          mergedPaths.push(dest);
-        } else {
-          writtenCount++;
-        }
-      }
       return {
         status: "initialized",
-        filesWritten: writtenCount,
-        filesMerged: mergedPaths,
+        ...countWrites(bundleToWrite),
         warnings,
         backups: [],
         linksMoved: [],
@@ -238,14 +227,8 @@ export class InitProjectUseCase {
       // We never overwrite or upgrade them, so they don't belong in the
       // lock. Same logic as skipIfExists.
       if (file.mergeJson !== undefined) continue;
-      // For mergeable files the lock holds the SHA of the *block body in
-      // canonical form* (no leading/trailing newlines) so it stays
-      // comparable against the body extracted from disk on upgrade reads.
-      const shaInput = file.mergeBlock !== undefined
-        ? canonicalBlockBody(file.content)
-        : file.content;
       lockEntries.set(dest, {
-        sha256: await sha256Hex(shaInput),
+        sha256: await sha256Hex(lockShaInput(file)),
         installedAt: now,
         templatesVersion: TEMPLATES_VERSION,
       });
@@ -284,20 +267,9 @@ export class InitProjectUseCase {
     // Count from `bundleToWrite` (the post-preserve-filter set), NOT the full
     // `bundle`: preserved paths were skipped on disk, so "wrote N files" must
     // not count files this run never touched (spec 011 / issue #367).
-    const mergedPaths: string[] = [];
-    let writtenCount = 0;
-    for (const [dest, file] of Object.entries(bundleToWrite)) {
-      if (file.mergeBlock !== undefined || file.mergeJson !== undefined) {
-        mergedPaths.push(dest);
-      } else {
-        writtenCount++;
-      }
-    }
-
     return {
       status: "initialized",
-      filesWritten: writtenCount,
-      filesMerged: mergedPaths,
+      ...countWrites(bundleToWrite),
       warnings,
       backups: report.backups.filter((b) => b.wasSymlink !== true).map((b) => b.dest),
       linksMoved: report.backups.filter((b) => b.wasSymlink === true).map((b) => b.dest),
@@ -305,4 +277,19 @@ export class InitProjectUseCase {
       preserved,
     };
   }
+}
+
+/**
+ * What "wrote N files (+ merged: …)" counts: a merge into a user-owned file is
+ * listed by name, every other entry is one file written. Shared by the real run
+ * and the dry run, so the preview cannot count differently from the write.
+ */
+function countWrites(bundle: Bundle): { filesWritten: number; filesMerged: string[] } {
+  const filesMerged: string[] = [];
+  let filesWritten = 0;
+  for (const [dest, file] of Object.entries(bundle)) {
+    if (file.mergeBlock !== undefined || file.mergeJson !== undefined) filesMerged.push(dest);
+    else filesWritten++;
+  }
+  return { filesWritten, filesMerged };
 }

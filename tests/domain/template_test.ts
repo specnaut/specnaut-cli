@@ -1,5 +1,5 @@
 import { assertEquals, assertThrows } from "@std/assert";
-import { assertSafeDestination, isInside } from "../../src/domain/template.ts";
+import { assertSafeDestination, isInside, lockShaInput } from "../../src/domain/template.ts";
 
 Deno.test("assertSafeDestination accepts normal relative paths", () => {
   assertSafeDestination(".claude/commands/hello.md");
@@ -70,4 +70,15 @@ Deno.test("isInside answers on the host's separator", () => {
   const root = Deno.build.os === "windows" ? "C:\\p" : "/p";
   const out = Deno.build.os === "windows" ? "C:\\outside\\x.md" : "/outside/x.md";
   assertEquals(isInside(root, out), false);
+});
+
+Deno.test("lockShaInput: a merge block is hashed on its canonical body, anything else on its content", () => {
+  // The one statement of what the lock hashes (#163): init and both upgrade
+  // builders read it, so a merge block must lose its surrounding newlines here
+  // exactly as `extractBlock` loses them from the file on disk.
+  assertEquals(
+    lockShaInput({ content: "\n\nbody\n\n", executable: false, mergeBlock: "gitignore" }),
+    "body",
+  );
+  assertEquals(lockShaInput({ content: "\nplain\n", executable: false }), "\nplain\n");
 });

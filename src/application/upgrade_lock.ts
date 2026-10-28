@@ -1,8 +1,7 @@
-import type { Bundle, TemplateFile } from "../domain/template.ts";
+import { type Bundle, lockShaInput } from "../domain/template.ts";
 import type { InstalledLock, LockEntry } from "../domain/installed_lock.ts";
 import type { UpgradePlan } from "../domain/upgrade_plan.ts";
 import { keptOrphanEntries } from "../domain/orphan_scope.ts";
-import { canonicalBlockBody } from "../domain/merge_block.ts";
 import { sha256Hex } from "../domain/sha256.ts";
 
 /**
@@ -97,7 +96,8 @@ export async function rebuildEntries(input: RebuildInput): Promise<Map<string, L
   for (const [dest] of newShas) {
     if (droppedToPlugin.has(dest)) continue;
     const existing = lock.entries.get(dest);
-    const sha = await shaOfBundle(bundle[dest]);
+    const file = bundle[dest];
+    const sha = file === undefined ? "" : await sha256Hex(lockShaInput(file));
     const wrote = written[dest] !== undefined;
     // A `skipIfExists` file the user already had is theirs, and init
     // deliberately left it out of the lock. An upgrade that did not write it
@@ -161,14 +161,4 @@ export async function rebuildEntries(input: RebuildInput): Promise<Map<string, L
     updatedEntries.set(d, e);
   }
   return updatedEntries;
-}
-
-async function shaOfBundle(file: TemplateFile | undefined): Promise<string> {
-  if (!file) return "";
-  // Mirror init_project's hash logic: mergeBlock files are hashed on the
-  // *block body* only, not the full file. Keeping these two paths in
-  // lockstep is critical — a divergence here is what caused #163's
-  // false-positive "customized" reports on `.gitignore` upgrades.
-  const shaInput = file.mergeBlock !== undefined ? canonicalBlockBody(file.content) : file.content;
-  return await sha256Hex(shaInput);
 }
