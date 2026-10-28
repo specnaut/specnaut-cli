@@ -1,5 +1,6 @@
 import { isAbsolute, normalize, relative, SEPARATOR } from "@std/path";
 import { canonicalBlockBody } from "./merge_block.ts";
+import { linkIdentity } from "./context_link.ts";
 
 export type TemplateFile = {
   content: string;
@@ -88,6 +89,19 @@ export type TemplateFile = {
    * `installed.lock` — they are user-owned, not Specnaut-managed.
    */
   skipIfExists?: true;
+  /**
+   * When set, the destination is written as a **relative symlink** with this
+   * text — relative to the destination's own directory, `/` separators
+   * (cli#680, cli#681). `content` is then the fallback: the one-line file
+   * written where the system refuses links. Keeping the fallback in `content`
+   * means every consumer that reads content — reach tests, size guards, diff —
+   * reads an honest string rather than an empty one.
+   *
+   * The lock records `linkIdentity(symlinkTo)` whichever form was written
+   * (`lockShaInput`), and `upgrade` classifies the destination by what `lstat`
+   * sees there (`context_link.ts`), never by reading through it.
+   */
+  symlinkTo?: string;
 };
 
 export type Bundle = Record<string, TemplateFile>;
@@ -172,10 +186,12 @@ export function managedSectionLabels(
  * Init, the upgrade plan and the upgrade's lock rebuild each spelled this out
  * on their own, and the comment beside the third copy said why that was a
  * hazard: a divergence between them is what caused #163's false "customized"
- * reports on `.gitignore`. A merge block is hashed on its canonical body only,
- * because that is all the comparison on disk can extract from a user-owned
- * file; everything else on its content.
+ * reports on `.gitignore`. A context link is hashed on its link identity, so
+ * the link and its fallback record the same sha; a merge block on its
+ * canonical body only, because that is all the comparison on disk can extract
+ * from a user-owned file; everything else on its content.
  */
 export function lockShaInput(file: TemplateFile): string {
+  if (file.symlinkTo !== undefined) return linkIdentity(file.symlinkTo);
   return file.mergeBlock !== undefined ? canonicalBlockBody(file.content) : file.content;
 }
