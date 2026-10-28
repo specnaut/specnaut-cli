@@ -48,6 +48,8 @@ function fakeLockStore(lock: InstalledLock | null): LockStore {
 function fakeReader(disk: Record<string, string>): FsReader {
   return {
     readText: (_dir, rel) => Promise.resolve(rel in disk ? disk[rel] : null),
+    readEntry: (_dir, rel) =>
+      Promise.resolve(rel in disk ? { kind: "file", content: disk[rel] } : null),
   };
 }
 

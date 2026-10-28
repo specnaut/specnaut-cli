@@ -2,6 +2,7 @@ import { dirname, join, resolve } from "@std/path";
 import { assertSafeDestination, type Bundle } from "../domain/template.ts";
 import {
   assertInsideProject,
+  assertLinkTargetInProject,
   assertRemovableInProject,
   resolvedRelative,
   resolveProjectRoot,
@@ -9,7 +10,9 @@ import {
 import { pruneEmptyParents } from "./fs_prune.ts";
 import { mergeIntoFile } from "../domain/merge_block.ts";
 import { mergeClaudeSettings, pluginDeclarationNotes } from "../domain/claude_settings_merge.ts";
-import type { BackupReport, FsWriter } from "../application/ports.ts";
+import type { BackupReport, ContextLinkWrite, FsWriter } from "../application/ports.ts";
+import type { TemplateFile } from "../domain/template.ts";
+import { linkTargetPath } from "../domain/context_link.ts";
 
 const BACKUP_SUFFIX = ".specnaut.bak";
 
@@ -80,7 +83,42 @@ async function readIfExists(path: string): Promise<string | null> {
   }
 }
 
+/** Makes the symlink at `path` reading `target`. The seam a test fakes a refusal through. */
+export type Linker = (target: string, path: string) => Promise<void>;
+
+/**
+ * `Deno.symlink`, with the Windows details a context link needs: `type:
+ * "file"` (Windows links are typed and Deno cannot infer a missing target's
+ * type), and the target in `\` form, which is what Windows itself writes.
+ */
+function denoSymlink(target: string, path: string): Promise<void> {
+  const text = Deno.build.os === "windows" ? target.replaceAll("/", "\\") : target;
+  return Deno.symlink(text, path, { type: "file" });
+}
+
+/**
+ * Errors that are not "this system cannot make links here" and so must not
+ * fall back. `NotCapable` is Deno refusing a permission the binary was not
+ * granted; `AlreadyExists` is a race with something else writing the path;
+ * `NotFound` is a parent directory that should exist and does not. Every
+ * other error falls back — a deny-list, because Windows reports a missing
+ * symlink privilege (error 1314) as `PermissionDenied` or as a generic error
+ * depending on the build, and init must never fail over a convenience link.
+ */
+const NOT_A_LINK_REFUSAL = [
+  Deno.errors.NotCapable,
+  Deno.errors.AlreadyExists,
+  Deno.errors.NotFound,
+];
+
 export class DenoFsWriter implements FsWriter {
+  /**
+   * @param linker how a symlink is made. A constructor seam rather than a
+   *   port: the application never decides HOW a link is made, only that one
+   *   is wanted, and a refusing system is an infrastructure fact.
+   */
+  constructor(private readonly linker: Linker = denoSymlink) {}
+
   async detectConflicts(bundle: Bundle, targetDir: string): Promise<string[]> {
     const conflicts: string[] = [];
     const resolved = resolve(targetDir);
@@ -126,6 +164,7 @@ export class DenoFsWriter implements FsWriter {
     const backups: { dest: string; backupPath: string }[] = [];
     const skippedSkipIfExists: string[] = [];
     const notes: string[] = [];
+    const links: ContextLinkWrite[] = [];
 
     // PHASE 1 — check every destination, THEN create directories.
     //
@@ -140,15 +179,32 @@ export class DenoFsWriter implements FsWriter {
     // never leaves a half-written bundle. It does not make the operation
     // atomic and is not claimed to: cleared destinations keep the directories
     // made for them, which `pruneEmptyParents` already exists to tidy.
-    for (const dest of Object.keys(bundle)) {
+    for (const [dest, file] of Object.entries(bundle)) {
       const abs = join(resolved, dest);
-      await assertInsideProject(root, abs);
+      if (file.symlinkTo !== undefined) {
+        // A link is REPLACED, never written through, so it is judged as a
+        // removal is — the leaf as is. `assertInsideProject` follows the leaf:
+        // it reads `AGENTS.md` through our own link, and aborts the whole
+        // bundle on a foreign link pointing out, which replacing touches
+        // nothing outside. What the new link points at is judged on its own.
+        await assertRemovableInProject(root, abs);
+        await assertLinkTargetInProject(root, abs, file.symlinkTo);
+      } else {
+        await assertInsideProject(root, abs);
+      }
       await Deno.mkdir(dirname(abs), { recursive: true });
     }
 
     // PHASE 2 — write.
     for (const [dest, file] of Object.entries(bundle)) {
       const abs = join(resolved, dest);
+
+      if (file.symlinkTo !== undefined) {
+        const made = await this.writeLink(abs, dest, file, file.symlinkTo, backupExisting);
+        if (made.backup) backups.push(made.backup);
+        if (made.link) links.push(made.link);
+        continue;
+      }
 
       // Mergeable files are never backed up: merge is non-destructive and
       // writing a backup of an unchanged user file is noisy. They also
@@ -238,9 +294,46 @@ export class DenoFsWriter implements FsWriter {
       }
     }
 
-    return notes.length > 0
-      ? { backups, skippedSkipIfExists, notes }
-      : { backups, skippedSkipIfExists };
+    return {
+      backups,
+      skippedSkipIfExists,
+      ...(notes.length > 0 ? { notes } : {}),
+      ...(links.length > 0 ? { links } : {}),
+    };
+  }
+
+  /**
+   * Put a context link at `abs`. Our own link already there is left alone —
+   * even under `backupExisting`, or every forced run would back up its own
+   * link. Anything else there is moved aside (`backupExisting`) or removed:
+   * the caller decided it may go. Then the link, or the fallback file when
+   * the system refuses links.
+   */
+  private async writeLink(
+    abs: string,
+    dest: string,
+    file: TemplateFile,
+    target: string,
+    backupExisting: boolean,
+  ): Promise<{ backup?: BackupReport["backups"][number]; link?: ContextLinkWrite }> {
+    if (await isSymlink(abs)) {
+      const current = await Deno.readLink(abs);
+      if (linkTargetPath(dest, current) === linkTargetPath(dest, target)) return {};
+    }
+    let backup: BackupReport["backups"][number] | undefined;
+    if (await fileExists(abs)) {
+      if (backupExisting) backup = await backupForDelete(abs, dest);
+      else await Deno.remove(abs);
+    }
+    try {
+      await this.linker(target, abs);
+      return { backup, link: { dest, target, form: "symlink" } };
+    } catch (err) {
+      if (NOT_A_LINK_REFUSAL.some((e) => err instanceof e)) throw err;
+      const reason = err instanceof Error ? `${err.name}: ${err.message}` : String(err);
+      await Deno.writeTextFile(abs, file.content);
+      return { backup, link: { dest, target, form: "fallback", reason } };
+    }
   }
 
   async deletePaths(

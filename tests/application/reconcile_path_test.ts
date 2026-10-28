@@ -37,6 +37,10 @@ class StubReader implements FsReader {
   readText(_dir: string, rel: string): Promise<string | null> {
     return Promise.resolve(this.files[rel] ?? null);
   }
+  readEntry(_dir: string, rel: string) {
+    const content = this.files[rel];
+    return Promise.resolve(content === undefined ? null : { kind: "file" as const, content });
+  }
 }
 
 class StubWriter implements FsWriter {

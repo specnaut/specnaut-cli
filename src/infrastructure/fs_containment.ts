@@ -250,3 +250,22 @@ export async function assertRemovableInProject(root: string, abs: string): Promi
 export async function resolvedRelative(root: string, abs: string): Promise<string> {
   return relative(root, await removalTarget(abs)).split(SEPARATOR).join("/");
 }
+
+/**
+ * Throws unless a symlink at `abs` with text `target` would land inside
+ * `root` (cli#680, cli#681).
+ *
+ * The link's parent is resolved through every symlink, the text joined to it
+ * lexically — which is how the kernel applies a relative link from where it
+ * sits. A context link Specnaut writes must never become a door out of the
+ * project, whatever the destination's ancestors turn out to be.
+ */
+export async function assertLinkTargetInProject(
+  root: string,
+  abs: string,
+  target: string,
+): Promise<void> {
+  const parent = await resolveDeepestExisting(dirname(abs));
+  const landing = isAbsolute(target) ? target : join(parent, target);
+  if (!isInside(root, landing)) throw leavesRefusal(root, abs, landing);
+}

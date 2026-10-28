@@ -102,9 +102,27 @@ export function fakeStagingStore(
   };
 }
 
-export function fakeReader(files: Record<string, string>): FsReader {
+/**
+ * An in-memory reader. `links` puts a symlink at a path: `readEntry` reports
+ * it as one, and `readText` reads through it to the file it lands on, as the
+ * real reader does.
+ */
+export function fakeReader(
+  files: Record<string, string>,
+  links: Record<string, { target: string; resolved: string | null }> = {},
+): FsReader {
   return {
-    readText: (_d, rel) => Promise.resolve(files[rel] ?? null),
+    readText: (_d, rel) => {
+      const link = links[rel];
+      if (link !== undefined) return Promise.resolve(files[link.resolved ?? ""] ?? null);
+      return Promise.resolve(files[rel] ?? null);
+    },
+    readEntry: (_d, rel) => {
+      const link = links[rel];
+      if (link !== undefined) return Promise.resolve({ kind: "symlink", ...link });
+      const content = files[rel];
+      return Promise.resolve(content === undefined ? null : { kind: "file", content });
+    },
   };
 }
 

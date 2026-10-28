@@ -1,7 +1,13 @@
-import { join } from "@std/path";
+import { join, relative, SEPARATOR } from "@std/path";
 import type { FsReader } from "../application/ports.ts";
 import { assertSafeDestination } from "../domain/template.ts";
-import { assertInsideProject, resolveProjectRoot } from "./fs_containment.ts";
+import type { DiskEntry } from "../domain/context_link.ts";
+import {
+  assertInsideProject,
+  assertRemovableInProject,
+  resolveProjectRoot,
+  resolveTarget,
+} from "./fs_containment.ts";
 
 export class DenoFsReader implements FsReader {
   /**
@@ -32,5 +38,39 @@ export class DenoFsReader implements FsReader {
       if (err instanceof Deno.errors.NotFound) return null;
       throw err;
     }
+  }
+
+  /**
+   * What is at `rel` itself (cli#680): a link is reported with its text and
+   * where it lands, never read through — reading through `.claude/CLAUDE.md`
+   * reads `AGENTS.md`, and through a foreign link pointing out of the project
+   * it would read, or refuse, a file that is none of this project's business.
+   *
+   * Guarded as a removal is (the leaf as is, ancestors resolved), because the
+   * only content this returns is a regular file's, at the very path judged.
+   */
+  async readEntry(projectDir: string, rel: string): Promise<DiskEntry | null> {
+    assertSafeDestination(rel);
+    const root = await resolveProjectRoot(projectDir);
+    const abs = join(projectDir, rel);
+    await assertRemovableInProject(root, abs);
+    let info: Deno.FileInfo;
+    try {
+      info = await Deno.lstat(abs);
+    } catch (err) {
+      if (err instanceof Deno.errors.NotFound) return null;
+      throw err;
+    }
+    if (!info.isSymlink) return { kind: "file", content: await Deno.readTextFile(abs) };
+    const target = await Deno.readLink(abs);
+    let resolved: string | null;
+    try {
+      resolved = relative(root, await resolveTarget(abs)).split(SEPARATOR).join("/");
+    } catch (err) {
+      // A cycle cannot be followed; say so with `null` rather than guess.
+      if (!(err instanceof Deno.errors.FilesystemLoop)) throw err;
+      resolved = null;
+    }
+    return { kind: "symlink", target, resolved };
   }
 }

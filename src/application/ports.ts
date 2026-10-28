@@ -6,6 +6,7 @@ import type { CoreBundle } from "../domain/core_bundle.ts";
 import type { SpecStep } from "../domain/spec/spec_step.ts";
 import type { UpgradeMarker } from "../domain/upgrade_marker.ts";
 import type { BundleOptions } from "./bundle_options.ts";
+import type { DiskEntry } from "../domain/context_link.ts";
 import type { PreserveConfig, PreserveManifestDiagnosis } from "../domain/preserve_config.ts";
 
 export interface FsWriter {
@@ -47,6 +48,21 @@ export type BackupReport = {
    * enabled, a marketplace it re-pinned or left pointed elsewhere (#642). Absent when silent.
    */
   readonly notes?: ReadonlyArray<string>;
+  /**
+   * Context links this write made (cli#680, cli#681), and in which form: the
+   * symlink, or — where the system refused it — the one-line fallback file,
+   * with the refusal's reason. Absent when the bundle carried no link, or
+   * every link was already in place.
+   */
+  readonly links?: ReadonlyArray<ContextLinkWrite>;
+};
+
+/** One context link a write made. `reason` is set for the fallback form only. */
+export type ContextLinkWrite = {
+  readonly dest: string;
+  readonly target: string;
+  readonly form: "symlink" | "fallback";
+  readonly reason?: string;
 };
 
 export interface GitAdapter {
@@ -105,6 +121,11 @@ export interface LockStore {
 
 export interface FsReader {
   readText(projectDir: string, rel: string): Promise<string | null>;
+  /**
+   * What is at `rel` itself, judged with `lstat` — a link is reported as a
+   * link, never read through (cli#680). `null` when nothing is there.
+   */
+  readEntry(projectDir: string, rel: string): Promise<DiskEntry | null>;
 }
 
 /**
