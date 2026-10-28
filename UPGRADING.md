@@ -1,5 +1,34 @@
 # Upgrading Specnaut
 
+## 7.0.x → 7.1.0
+
+Run `specnaut upgrade`. You act by hand only if you edited `.claude/CLAUDE.md`.
+
+### One instruction file: `AGENTS.md`
+
+`.claude/CLAUDE.md` and `.codex/AGENTS.md` are now relative symlinks to `../AGENTS.md`, so Claude
+Code and Codex both load the project's root `AGENTS.md`. Where the system refuses symlinks, each is
+a one-line pointer file instead (`@../AGENTS.md` on Claude Code). `init` and `upgrade` say which
+form they wrote.
+
+**If you edited `.claude/CLAUDE.md`, `upgrade` replaces it with the link** and backs your copy up to
+`.claude/CLAUDE.md.specnaut.bak`. The report lists it under "replaced with a link to AGENTS.md".
+Your old text is no longer loaded. Move whatever you still need into `AGENTS.md`, outside the
+sections marked as owned by Specnaut. Do not copy the backup back over the link. To keep your old
+file instead, list `.claude/CLAUDE.md` in `.specnaut/preserve.yml` before you upgrade.
+
+On a clone made with `core.symlinks=false`, git checks the link out as a small text file, and
+`upgrade` may show a type change there. Either form loads the same file, so you can commit whichever
+git gives you.
+
+### Codex: `goal.md` is retired, and agents are enabled
+
+- `.codex/goal.md` is no longer shipped. Codex's `/goal <objective>` never read it. An untouched
+  copy is removed. A copy you edited is kept, and the report names it.
+- The `[agents]` block in `.codex/config.toml` gains `enabled = true`, so Codex can start the
+  Specnaut agents by name. If you own the `[agents]` table yourself, it is left alone and the report
+  lists the keys to add by hand.
+
 ## 6.x → 7.0.0
 
 Run `specnaut upgrade`. Most projects need nothing else. You act by hand only if you edited one of
