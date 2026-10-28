@@ -153,63 +153,88 @@ export function renderMarked(
   active: string,
   syntax: "html" | "shell",
 ): string {
-  const [open, close] = syntax === "html" ? ["<!--\\s*", "\\s*-->"] : ["#\\s*", ""];
-  const begin = new RegExp(`^\\s*${open}BEGIN:\\s*${key}=([a-zA-Z0-9_-]+)${close}\\s*$`);
-  const end = new RegExp(`^\\s*${open}END:\\s*${key}=([a-zA-Z0-9_-]+)${close}\\s*$`);
+  const markers = markerPatterns(key, syntax);
   const lines = source.split("\n");
   const out: string[] = [];
   let insideFence = false;
-  let openToken: string | null = null;
-  let openLine = -1;
-  let keepBlock = false;
+  let open: OpenBlock | null = null;
 
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
 
     if (syntax === "html" && FENCE_RE.test(line)) {
       insideFence = !insideFence;
-      if (openToken === null || keepBlock) out.push(line);
+      if (open === null || open.keep) out.push(line);
       continue;
     }
 
-    if (!insideFence) {
-      const beginMatch = line.match(begin);
-      if (beginMatch) {
-        if (openToken !== null) {
-          throw new Error(
-            `nested ${key} marker at line ${i + 1}: BEGIN ${beginMatch[1]} ` +
-              `inside open block ${openToken} (started at line ${openLine + 1})`,
-          );
-        }
-        openToken = beginMatch[1];
-        openLine = i;
-        keepBlock = openToken === active;
-        continue;
-      }
-
-      const endMatch = line.match(end);
-      if (endMatch) {
-        if (openToken === null) {
-          throw new Error(`unmatched END marker at line ${i + 1}: ${key}=${endMatch[1]}`);
-        }
-        if (endMatch[1] !== openToken) {
-          throw new Error(
-            `mismatched END marker at line ${i + 1}: expected ${key}=${openToken} ` +
-              `(opened at line ${openLine + 1}), got ${key}=${endMatch[1]}`,
-          );
-        }
-        openToken = null;
-        keepBlock = false;
-        continue;
-      }
+    const step: MarkerStep = insideFence
+      ? undefined
+      : afterMarker(line, i, key, active, markers, open);
+    if (step !== undefined) {
+      open = step.open;
+      continue;
     }
 
-    if (openToken === null || keepBlock) out.push(line);
+    if (open === null || open.keep) out.push(line);
   }
 
-  if (openToken !== null) {
-    throw new Error(`unmatched BEGIN marker at line ${openLine + 1}: ${key}=${openToken}`);
+  if (open !== null) {
+    throw new Error(`unmatched BEGIN marker at line ${open.line + 1}: ${key}=${open.token}`);
   }
 
   return out.join("\n");
+}
+
+/** The marker block `renderMarked` is inside: its token, 0-based line, and fate. */
+type OpenBlock = { readonly token: string; readonly line: number; readonly keep: boolean };
+
+/** A marker line's effect: the block left open after it; `undefined` for any other line. */
+type MarkerStep = { readonly open: OpenBlock | null } | undefined;
+
+/** The BEGIN / END patterns for `key`, in the marker syntax of the source. */
+function markerPatterns(key: string, syntax: "html" | "shell"): { begin: RegExp; end: RegExp } {
+  const [open, close] = syntax === "html" ? ["<!--\\s*", "\\s*-->"] : ["#\\s*", ""];
+  return {
+    begin: new RegExp(`^\\s*${open}BEGIN:\\s*${key}=([a-zA-Z0-9_-]+)${close}\\s*$`),
+    end: new RegExp(`^\\s*${open}END:\\s*${key}=([a-zA-Z0-9_-]+)${close}\\s*$`),
+  };
+}
+
+/**
+ * The open block after line `i` when it is a BEGIN or END marker for `key`,
+ * or `undefined` when it is neither. Throws on a BEGIN inside an open block
+ * (markers do not nest) and on an END that closes nothing or another token.
+ */
+function afterMarker(
+  line: string,
+  i: number,
+  key: string,
+  active: string,
+  markers: { begin: RegExp; end: RegExp },
+  open: OpenBlock | null,
+): MarkerStep {
+  const beginMatch = line.match(markers.begin);
+  if (beginMatch) {
+    if (open !== null) {
+      throw new Error(
+        `nested ${key} marker at line ${i + 1}: BEGIN ${beginMatch[1]} ` +
+          `inside open block ${open.token} (started at line ${open.line + 1})`,
+      );
+    }
+    return { open: { token: beginMatch[1], line: i, keep: beginMatch[1] === active } };
+  }
+
+  const endMatch = line.match(markers.end);
+  if (!endMatch) return undefined;
+  if (open === null) {
+    throw new Error(`unmatched END marker at line ${i + 1}: ${key}=${endMatch[1]}`);
+  }
+  if (endMatch[1] !== open.token) {
+    throw new Error(
+      `mismatched END marker at line ${i + 1}: expected ${key}=${open.token} ` +
+        `(opened at line ${open.line + 1}), got ${key}=${endMatch[1]}`,
+    );
+  }
+  return { open: null };
 }
