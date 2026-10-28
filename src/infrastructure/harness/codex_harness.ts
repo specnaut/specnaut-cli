@@ -14,7 +14,7 @@ import {
 import { ensureSkillFrontmatter, skillDocDestination, skillFolderName } from "./skill_folder.ts";
 import { frontmatterField, splitFrontmatter } from "./frontmatter.ts";
 import { effortToCodexReasoning, tierToCodexModel } from "../../domain/codex_models.ts";
-import { applyBackend, backlogScriptDestination } from "./backlog_filter.ts";
+import { applyBackend, applyHarness, backlogScriptDestination } from "./backlog_filter.ts";
 import { applyScheme, phaseScriptDestination } from "./scheme_filter.ts";
 import { applySpecBackend } from "./spec_backend_filter.ts";
 import { applySpecAutogen } from "./spec_autogen_filter.ts";
@@ -55,7 +55,7 @@ export class CodexHarness implements Harness {
   mapBundle(core: CoreBundle, opts: BundleOptions): Bundle {
     const out: Bundle = {};
     for (const raw of core) {
-      const backendApplied = applyBackend(raw, opts);
+      const backendApplied = applyBackend(applyHarness(raw, this.key), opts);
       if (backendApplied === null) continue;
       const entry = applySpecAutogen(
         applySpecBackend(applyScheme(backendApplied, opts), opts),

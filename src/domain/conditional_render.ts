@@ -121,6 +121,20 @@ export function assertKnownScheme(s: string): asserts s is VersionScheme {
 }
 
 /**
+ * Strip harness-conditional sections from a Markdown source (cli#680):
+ *   <!-- BEGIN: harness=claude -->
+ *   ...kept only in the scaffold of that harness...
+ *   <!-- END: harness=claude -->
+ *
+ * The root AGENTS.md is the one always-on file on every harness, so a line
+ * about one harness's own features — its folders, its commands — would send
+ * every other harness to paths it never received (#656).
+ */
+export function renderHarness(source: string, harnessKey: string): string {
+  return renderMarked(source, "harness", harnessKey, "html");
+}
+
+/**
  * The one marker renderer every family above calls: keep the block whose token
  * is `active` (markers stripped), drop the others with their markers.
  *

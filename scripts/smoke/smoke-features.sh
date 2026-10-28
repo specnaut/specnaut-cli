@@ -784,6 +784,10 @@ check ".claude/CLAUDE.md does not cite the retired .claude/commands/" \
   '! grep -q "\.claude/commands/" .claude/CLAUDE.md'
 check ".claude/CLAUDE.md carries no unrendered backend markers" \
   '! grep -q "backend=" .claude/CLAUDE.md'
+check "AGENTS.md carries the backlog section, rendered for its backend (cli#680)" \
+  'grep -q -- "<!-- --- Specnaut: backlog --- -->" AGENTS.md && grep -q "\.specnaut/backlog\.md" AGENTS.md && ! grep -q "backend=" AGENTS.md'
+check "AGENTS.md carries the optional-integrations section (cli#680)" \
+  'grep -q -- "<!-- --- Specnaut: optional-integrations --- -->" AGENTS.md'
 
 echo
 echo "═══ #23  a silent review seat fails the gate ═══"

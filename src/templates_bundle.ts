@@ -27594,8 +27594,6 @@ _(List your non-negotiable rules — layering, DI, error handling, security.)_
 
 _(Naming, testing, commits, branches.)_
 
-**Backlog references** follow the \`backlog-reference-contract\` skill — read it; never restate it here.
-
 <!-- --- Specnaut: chain-stops --- -->
 
 ## The Specnaut chain runs on autopilot after the plan
@@ -27711,7 +27709,128 @@ addendum — say nothing about it.
 from a description selects no role: it runs without that agent's instructions and, on Codex, on
 the primary session's model.
 
+Each step of the chain that delegates names its agent:
+
+| Step | Agent |
+| :--- | :--- |
+| \`plan\` — the architecture audit | \`architect-expert\` |
+| \`plan\` — the security audit | \`security-expert\` |
+| \`plan\` — the performance audit, when the plan has a hot path | \`performance-expert\` |
+| \`review\` — the structural review, which spawns the seats below | \`review-coordinator\` |
+| \`review\` — the seats | \`code-reviewer\`, \`security-expert\`, \`test-reviewer\` (when tests changed) |
+| every backlog write — create, clarify, move, close | \`product-owner\` |
+
+Each name is the \`name\` of an agent Specnaut scaffolded for your harness.
+
 <!-- --- End Specnaut: agent-dispatch --- -->
+
+<!-- --- Specnaut: backlog --- -->
+
+## Backlog
+
+*Owned by Specnaut — this section is not a placeholder to fill in. Edit the rest freely.*
+
+<!-- BEGIN: backend=local -->
+The backlog is managed through the \`board\` skill — local Markdown backend, indexed in
+\`.specnaut/backlog.md\`.
+<!-- END: backend=local -->
+<!-- BEGIN: backend=github -->
+The backlog is managed through the \`board\` skill — GitHub Issues and a GitHub Project, configured
+in \`.specnaut/backlog-config.yml\`.
+<!-- END: backend=github -->
+<!-- BEGIN: backend=gitlab -->
+The backlog is managed through the \`board\` skill — GitLab Issues, configured in
+\`.specnaut/backlog-config.yml\`.
+<!-- END: backend=gitlab -->
+<!-- BEGIN: backend=cloud -->
+The backlog is managed through the \`board\` skill — Specnaut Cloud, configured in
+\`.specnaut/backlog-config.yml\`.
+<!-- END: backend=cloud -->
+
+**Backlog references** follow the \`backlog-reference-contract\` skill — read it; never restate it here.
+
+<!-- --- End Specnaut: backlog --- -->
+
+<!-- --- Specnaut: optional-integrations --- -->
+
+## Optional integrations
+
+*Owned by Specnaut — this section is not a placeholder to fill in. Edit the rest freely.*
+
+Harness features Specnaut does not configure, but that pair well with its workflow. A project
+scaffolded for a harness without such features gets none here.
+
+<!-- BEGIN: harness=claude -->
+**Claude Code only:**
+
+- **Periodic maintenance** — \`/loop 1h\` runs the prompt in
+  \`.claude/loop.md\` every hour. The bundled default delegates to the
+  \`/board groom\` skill (groom backlog, surface stale PRs, list orphan
+  specs); edit \`loop.md\` freely to add project-specific checks. See
+  https://code.claude.com/docs/en/scheduled-tasks.
+
+- **Goal-directed sessions** — \`/goal <condition>\` keeps Claude taking
+  turns until a fast model judges the condition met. Best conditions
+  state one measurable end state and a turn cap, e.g. \`/goal the Ready
+  column on the Specnaut Project is empty and deno task test exits 0,
+  or stop after 20 turns\`. Run headless with \`claude -p "/goal …"\`.
+  Check status with \`/goal\`; cancel with \`/goal clear\` (aliases:
+  \`stop\`/\`off\`/\`reset\`/\`cancel\`). For recurring periodic checks use
+  \`/loop\` (see \`.claude/loop.md\`) instead. See
+  https://code.claude.com/docs/en/goal.
+
+- **Multi-session dispatch (\`claude agents\`)** — opens a terminal UI
+  that lists every background Claude session, dispatches new ones,
+  and lets you peek / reply / attach without losing context. Specnaut's
+  scaffolded subagents in \`.claude/agents/\` appear in the dispatch
+  picker automatically — start one with the agent name as the first
+  word, e.g. \`developer fix the lint errors in src/cli/\`, \`@qa-tester
+  run a sandbox smoke pass\`, or \`@product-owner groom the backlog\`.
+  Skills are dispatchable too: \`/specnaut plan "<feature>"\` launches
+  a session running the full spec-plan-tasks chain. File edits are
+  isolated under \`.claude/worktrees/\` (git worktrees), so several
+  Specnaut agents can work in parallel without stepping on each
+  other. Requires Claude Code v2.1.139+. See
+  https://code.claude.com/docs/en/agent-view.
+
+- **Async notifications** — install one of the channel plugins (Telegram,
+  Discord, iMessage) so Claude can ping you when a long-running task or
+  agent dispatch finishes. See
+  https://code.claude.com/docs/en/channels.
+
+- **Headless / CI invocation** — \`claude -p "<prompt>"\` runs Claude Code
+  non-interactively, useful for CI gates, pre-commit hooks, and cron jobs
+  that dispatch a specific agent. Specnaut ships a wrapper at
+  \`.claude/scripts/dispatch-agent.sh <agent-name> "<prompt>"\` that auto-
+  derives the right \`--allowedTools\` from the agent's frontmatter. See
+  https://code.claude.com/docs/en/headless.
+
+- **Deep links** — a \`claude-cli://open?repo=<owner>/<repo>&q=<prompt>\` URL
+  opens a fresh Claude Code session in the right project with the prompt
+  pre-filled. Useful in runbooks, dashboards, and Slack messages. See
+  https://code.claude.com/docs/en/deep-links.
+
+- **MCP servers** — connect external tools (GitHub, GCP, AWS, databases)
+  via \`.mcp.json\`. See https://code.claude.com/docs/en/mcp.
+<!-- END: harness=claude -->
+
+<!-- BEGIN: harness=codex -->
+**Codex only:**
+
+- **Goal-directed sessions** — \`/goal <objective>\` keeps Codex working toward
+  one objective across turns until its stopping condition holds; bare \`/goal\`
+  shows the current goal, and \`/goal pause\`, \`/goal resume\`, \`/goal clear\`
+  control the run. The feature may need \`goals = true\` under \`[features]\` in
+  your Codex \`config.toml\`. See https://learn.chatgpt.com/use-cases/follow-goals.
+
+- **CLI reference** — the full Codex CLI surface (slash commands, config
+  schema, headless mode):
+  https://learn.chatgpt.com/docs/developer-commands?surface=cli.
+
+- **More Codex use cases** — https://learn.chatgpt.com/use-cases.
+<!-- END: harness=codex -->
+
+<!-- --- End Specnaut: optional-integrations --- -->
 `,
     executable: false,
     backend: null,
@@ -27722,6 +27841,8 @@ the primary session's model.
       "response-style",
       "phase-addenda",
       "agent-dispatch",
+      "backlog",
+      "optional-integrations",
     ],
   },
   {

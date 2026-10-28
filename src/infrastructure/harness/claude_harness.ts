@@ -5,7 +5,7 @@ import type { CoreBundle, CoreEntry } from "../../domain/core_bundle.ts";
 import type { Bundle } from "../../domain/template.ts";
 import { HARNESS_STATIC } from "../../templates_bundle.ts";
 import { applyHarnessStatic } from "./harness_static.ts";
-import { applyBackend, backlogScriptDestination } from "./backlog_filter.ts";
+import { applyBackend, applyHarness, backlogScriptDestination } from "./backlog_filter.ts";
 import { applyScheme, phaseScriptDestination } from "./scheme_filter.ts";
 import { applySpecBackend } from "./spec_backend_filter.ts";
 import { applySpecAutogen } from "./spec_autogen_filter.ts";
@@ -66,7 +66,7 @@ export class ClaudeHarness implements Harness {
   mapBundle(core: CoreBundle, opts: BundleOptions): Bundle {
     const out: Bundle = {};
     for (const raw of core) {
-      const backendApplied = applyBackend(raw, opts);
+      const backendApplied = applyBackend(applyHarness(raw, this.key), opts);
       if (backendApplied === null) continue;
       const entry = applySpecAutogen(
         applySpecBackend(applyScheme(backendApplied, opts), opts),
