@@ -1,5 +1,4 @@
 import type {
-  BackupReport,
   FsReader,
   FsWriter,
   Harness,
@@ -7,32 +6,28 @@ import type {
   PluginDetector,
   StagingStore,
 } from "./ports.ts";
-import type { Bundle, TemplateFile } from "../domain/template.ts";
-import { managedSectionLabels } from "../domain/template.ts";
+import type { Bundle } from "../domain/template.ts";
 import { sha256Hex } from "../domain/sha256.ts";
-import type { InstalledLock, LockEntry } from "../domain/installed_lock.ts";
+import type { InstalledLock } from "../domain/installed_lock.ts";
 import type { CoreBundle } from "../domain/core_bundle.ts";
-import { renameEndpointEntry, SKILL_DOC_RENAMES } from "../domain/skill_doc_renames.ts";
 import {
   computeUpgradePlan,
   type UpgradeAction,
   type UpgradePlan,
 } from "../domain/upgrade_plan.ts";
-import {
-  canonicalBlockBody,
-  extractBlock,
-  mergeIntoFile,
-  mergeRefusal,
-} from "../domain/merge_block.ts";
+import { canonicalBlockBody, extractBlock, mergeRefusal } from "../domain/merge_block.ts";
 import { isPluginCoveredPath, pluginRelativePath } from "../domain/plugin_coverage.ts";
 import { isAgenticPath, pruneAgenticEntries } from "../domain/parent_managed.ts";
+import { deletesOrphan } from "../domain/orphan_scope.ts";
+import { deriveUnchangedEntries, rebuildEntries } from "./upgrade_lock.ts";
 import {
-  deletesOrphan,
-  keptOrphanEntries,
-  orphanScope,
-  relabelRefused,
-} from "../domain/orphan_scope.ts";
-import { deriveUnchangedEntries } from "./upgrade_lock.ts";
+  applyManagedSections,
+  type ManagedSectionOutcome,
+  surveyManagedSections,
+} from "./upgrade_managed_sections.ts";
+import { planStaging, pruneStaging } from "./upgrade_staging.ts";
+import { removeOrphans } from "./upgrade_orphan_removal.ts";
+import { carryRenamedDocs } from "./upgrade_renames.ts";
 
 /** The plugin name used for both the install probe and the cache directory. */
 export const PLUGIN_NAME = "specnaut-plugin";
@@ -71,17 +66,7 @@ export type UpgradeProjectInput = {
   isDeclaredPreserved?: (dest: string) => boolean;
 };
 
-/**
- * What `upgrade` did to a Specnaut-owned section inside a user-owned file
- * (#466). Reported so the run ends with the user either having the section or
- * being told, in the same output, that they do not.
- */
-export type ManagedSectionOutcome = {
-  readonly dest: string;
-  readonly label: string;
-  /** `added` — the file had no such block. `refreshed` — it did, and it moved. */
-  readonly kind: "added" | "refreshed";
-};
+export type { ManagedSectionOutcome };
 
 export type UpgradeProjectResult =
   | {
@@ -250,52 +235,6 @@ export class UpgradeProjectUseCase {
       }
     }
 
-    // --- Renamed documents carry their lock identity across the move ---------
-    //
-    // A sub-document that changed address is otherwise TWO unrelated events: an
-    // orphan at the old path and an add-new at the new one. The user's bytes
-    // survive — a customised orphan is removed only under `--force`, with a
-    // backup — but they stop being READ. The agent loads the vanilla document
-    // at the new address while the edit sits at the old one, behind a success
-    // message. A release guardrail that stops firing silently is worse than one
-    // that is deleted loudly.
-    //
-    // Moving the lock entry makes it ONE event, so the ordinary customized /
-    // vanilla logic below applies at the new address with no special case: a
-    // vanilla file updates, a customised one lands in the `customized` bucket
-    // where the summary names it.
-    const bundleOpts = {
-      backlogBackend: lock.backlogBackend,
-      versionScheme: lock.versionScheme,
-      specBackend: lock.specBackend,
-      specAutogen: lock.specAutogen,
-    };
-    /** Destinations this harness emits regardless of the bundle. */
-    const harnessOnlyDests = harness.mapBundle([], bundleOpts);
-    const destFor = (owner: string, doc: string): string | null => {
-      // Ask the HARNESS where it puts this document. Composing the path here
-      // would be a second statement of the adapter's rule (spec 033 §5) — and
-      // it is harness-specific, so any literal would be wrong on six of seven.
-      const mapped = harness.mapBundle([renameEndpointEntry(owner, doc)], bundleOpts);
-      return Object.keys(mapped).find((d) => !(d in harnessOnlyDests)) ?? null;
-    };
-
-    const applicable: Array<{ oldDest: string; newDest: string; reason: string }> = [];
-    for (const r of SKILL_DOC_RENAMES) {
-      const oldDest = destFor(r.from.owner, r.from.doc);
-      const newDest = destFor(r.to.owner, r.to.doc);
-      if (oldDest === null || newDest === null) continue;
-      // Only when the project is actually mid-migration: the old path is
-      // tracked AND present and not declared preserved (cli#668: it stays put,
-      // an orphan the bundle dropped), the new document ships now, and nothing
-      // has already claimed the new path.
-      if (!lock.entries.has(oldDest) || input.isDeclaredPreserved?.(oldDest)) continue;
-      if (!diskShas.has(oldDest)) continue;
-      if (!(newDest in bundle)) continue;
-      if (lock.entries.has(newDest)) continue;
-      applicable.push({ oldDest, newDest, reason: r.reason });
-    }
-
     // A refused dest must leave the LOCK as well as the bundle.
     //
     // Dropping it from the bundle alone leaves its lock entry behind, and a
@@ -311,39 +250,25 @@ export class UpgradeProjectUseCase {
       ),
     };
 
-    let effectiveLock = lockForPlan;
-    if (applicable.length > 0) {
-      const entries = new Map(lockForPlan.entries);
-      for (const { oldDest, newDest } of applicable) {
-        entries.set(newDest, entries.get(oldDest)!);
-        entries.delete(oldDest);
-        diskShas.set(newDest, diskShas.get(oldDest)!);
-        diskShas.delete(oldDest);
-      }
-      effectiveLock = { ...lockForPlan, entries };
-
-      // The maps above are enough for `--dry-run` to report the move
-      // faithfully; the bytes only travel on a real run.
-      if (!input.dryRun) {
-        const moved: Bundle = {};
-        for (const { oldDest, newDest } of applicable) {
-          const content = await reader.readText(input.projectDir, oldDest);
-          if (content === null) continue;
-          moved[newDest] = { content, executable: false };
-        }
-        if (Object.keys(moved).length > 0) {
-          await writer.writeBundle(moved, input.projectDir, { overwrite: true });
-          await writer.deletePaths(
-            applicable.map((a) => a.oldDest),
-            input.projectDir,
-            // No backup: the bytes were moved, not discarded. A backup here
-            // would leave a `.specnaut.bak` beside every renamed file on an
-            // upgrade that lost nothing.
-            { backupExisting: false },
-          );
-        }
-      }
-    }
+    const effectiveLock = await carryRenamedDocs(
+      {
+        reader,
+        writer,
+        harness,
+        bundleOpts: {
+          backlogBackend: lock.backlogBackend,
+          versionScheme: lock.versionScheme,
+          specBackend: lock.specBackend,
+          specAutogen: lock.specAutogen,
+        },
+        projectDir: input.projectDir,
+        dryRun: input.dryRun,
+        isDeclaredPreserved: input.isDeclaredPreserved,
+      },
+      bundle,
+      lockForPlan,
+      diskShas,
+    );
 
     const newShas = new Map<string, string>();
     for (const [dest, file] of Object.entries(bundle)) {
@@ -408,7 +333,8 @@ export class UpgradeProjectUseCase {
     // section that has to reach a project that upgrades rather than inits.
     // Merged in under their own fence, they never overwrite or reorder a line
     // the user wrote.
-    const plannedSections = await this.surveyManagedSections(
+    const plannedSections = await surveyManagedSections(
+      reader,
       bundle,
       input.projectDir,
       isDeclaredPreserved,
@@ -503,7 +429,9 @@ export class UpgradeProjectUseCase {
       // Every dest equals the bundle here, so no staged copy has anything left
       // to reconcile — and a project already on the current release reaches
       // its next upgrade through this branch, not the applied one (#613).
-      if (!input.dryRun) await this.pruneStaging(input.projectDir, new Set(), refusals);
+      if (!input.dryRun) {
+        await pruneStaging(this.deps.stagingStore, input.projectDir, new Set(), refusals);
+      }
       // The version reported is the one now recorded, not the one that was.
       return { status: "up-to-date", currentVersion: templatesVersion, refusals };
     }
@@ -528,29 +456,9 @@ export class UpgradeProjectUseCase {
 
     // Stage upstream content for preserved (customized) files so that
     // `specnaut reconcile` can act on them later.
-    const stagingWrites: Bundle = {};
-    const stagedDests = new Set<string>();
-    for (const action of plan) {
-      // Stage only `customized` preserves for reconcile; a declared-preserve is
-      // a deliberate freeze, not a pending reconciliation.
-      if (action.kind !== "preserve" || action.reason !== "customized") continue;
-      // Nor one `--force` is about to overwrite: its destination becomes the
-      // upstream a few lines down, so the copy would be stale on arrival (#477).
-      if (isForceWritablePreserve(action)) continue;
-      // And only if the lock can speak for it. `ReconcilePathUseCase` answers
-      // `no-lock-entry` for a dest the lock does not carry, so staging one
-      // produces a path `reconcile --status` lists forever and
-      // `reconcile <path>` refuses — a pending item no command can clear.
-      // Since #572 an unwritten preserve with no prior entry deliberately gets
-      // no entry, which is exactly the population that would strand here.
-      if (!effectiveLock.entries.has(action.dest)) continue;
-      const file = bundle[action.dest];
-      if (!file) continue;
-      stagingWrites[`.specnaut/upgrade-staging/${action.dest}`] = file;
-      stagedDests.add(action.dest);
-    }
-    if (Object.keys(stagingWrites).length > 0) {
-      await writer.writeBundle(stagingWrites, input.projectDir, {
+    const staging = planStaging(plan, bundle, effectiveLock.entries, isForceWritablePreserve);
+    if (Object.keys(staging.writes).length > 0) {
+      await writer.writeBundle(staging.writes, input.projectDir, {
         overwrite: true,
         backupExisting: false,
       });
@@ -596,19 +504,27 @@ export class UpgradeProjectUseCase {
 
     // What this run staged is the whole of what is pending. Everything else in
     // the staging tree predates it — see `pruneStaging` (#477, #613).
-    await this.pruneStaging(input.projectDir, stagedDests, refusals);
+    await pruneStaging(this.deps.stagingStore, input.projectDir, staging.staged, refusals);
 
     // Applied *after* the plan's writes: an `auto-update` may just have
     // rewritten the whole file from the bundle, in which case the section is
     // already there and the merge is a no-op. Re-reading is what keeps the
     // reported outcome honest instead of echoing back what we predicted.
-    const appliedSections = await this.applyManagedSections(
+    const appliedSections = await applyManagedSections(
+      { reader, writer },
       bundle,
       input.projectDir,
       isDeclaredPreserved,
     );
 
-    const removal = await this.removeOrphans(plan, input, harness.managedRoots, refusals);
+    const removal = await removeOrphans(
+      writer,
+      plan,
+      input.projectDir,
+      input.force,
+      harness.managedRoots,
+      refusals,
+    );
     let extraBackups = removal.backups;
 
     // Plugin migrations: vanilla file on disk + plugin installed →
@@ -628,99 +544,16 @@ export class UpgradeProjectUseCase {
       extraBackups = [...extraBackups, ...r.backups];
     }
 
-    const now = (this.deps.now ?? (() => new Date()))().toISOString();
-    // Dests handed off to the plugin are dropped from the new lock —
-    // the binary is no longer the owner of those files.
-    const droppedToPlugin = new Set<string>(
-      plan
-        .filter((a) => a.kind === "migrate-to-plugin" || a.kind === "defer-to-plugin")
-        .map((a) => a.dest),
-    );
-    // #572. A dest the plan classified `unchanged` has disk content that
-    // ALREADY equals the bundle — that is the definition of the branch. Its
-    // lock entry was nevertheless carried over verbatim, because `wrote` is
-    // false for anything outside `toWrite`, so a project whose lock had fallen
-    // behind kept a sha matching NEITHER the file NOR the bundle, forever.
-    // `upgrade` could not heal it (nothing to write), and `--reset-baseline`
-    // could not either (it assigns a local `lockSha` inside the planner and
-    // never reaches `lock.entries`). The only remaining remedy was editing the
-    // lock by hand, which is the opposite of what a lock is for.
-    //
-    // This is NOT the freeze the `staleSince` doc describes and deliberately
-    // leaves alone. That one is about a **customized** preserve, where the
-    // frozen `templatesVersion` is the only record of when the divergence
-    // began and re-stamping would destroy it. Here there is no divergence to
-    // record: the file and the bundle agree.
-    const unchangedDests = new Set(
-      plan.filter((a) => a.kind === "unchanged").map((a) => a.dest),
-    );
-    const updatedEntries = new Map<string, LockEntry>();
-    for (const [dest] of newShas) {
-      if (droppedToPlugin.has(dest)) continue;
-      const existing = effectiveLock.entries.get(dest);
-      const sha = await shaOfBundle(bundle[dest]);
-      const wrote = toWrite[dest] !== undefined;
-      // A `skipIfExists` file the user already had is theirs, and init
-      // deliberately left it out of the lock. An upgrade that did not write it
-      // must not adopt it either: recording the BUNDLE's sha against THEIR
-      // file makes every later upgrade report it as "customized locally" and
-      // dump a full diff — and makes `--force` overwrite it. That is the #163
-      // false positive, arriving one run later through the lock instead of
-      // through the plan.
-      //
-      // This drops a PRE-EXISTING entry too, and that is the point. The guard
-      // used to require `existing === undefined`, so it only ever prevented
-      // adoption on a clean lock — a project whose lock already carried the
-      // dest (tracked by an older binary, or by a partial upgrade) kept that
-      // entry forever, which is precisely what disarmed the plan-side guard.
-      // Dropping it here heals the project on its next upgrade, without the
-      // user needing to know the problem existed.
-      if (!wrote && bundle[dest]?.skipIfExists === true) continue;
-      // True when the file on disk holds this bundle's content — either
-      // because we just wrote it, or because it already did.
-      const matchesBundle = wrote || unchangedDests.has(dest);
-      // An unwritten dest with no prior entry gets NO entry — the same refusal,
-      // for the same reason, one branch over.
-      //
-      // The first version of this fix recorded `diskShas.get(dest)` here. That
-      // was aimed at a DECLARED preserve after a template rename, but nothing
-      // gated it on the reason, so it fired for a `customized` preserve too —
-      // the `lockSha === undefined` branch, whose own comment reads "the user's
-      // own edit of a file Specnaut manages". Recording the user's sha as the
-      // installed baseline makes the NEXT run see `diskSha === lockSha`,
-      // classify the file `auto-update`, and overwrite it — with no
-      // `.specnaut.bak`, because a plain upgrade passes `backupExisting: false`.
-      // Two runs, no flag, no warning, and the edits are gone.
-      //
-      // Recording nothing keeps the file exactly as untracked as it was, so the
-      // next run reaches the same branch and preserves it again. The ticket's
-      // own criterion allows "the disk sha OR no entry at all"; only one of the
-      // two is safe for both reasons, so it is the one taken.
-      if (!wrote && existing === undefined && !matchesBundle) continue;
-      updatedEntries.set(dest, {
-        // `existing` is defined here whenever `matchesBundle` is false — the
-        // guard above returned for every other case — so no fallback sha is
-        // reachable and none is offered. The old `?? sha` recorded the BUNDLE's
-        // sha against a file the run refused to touch; its replacement recorded
-        // the user's, which was worse.
-        sha256: matchesBundle ? sha : existing?.sha256 ?? sha,
-        // NOT re-stamped for `unchanged`. The content matches the bundle, but
-        // it did not arrive now — it arrived whenever it was last written, and
-        // that is what the recorded value says. Overwriting it would trade a
-        // known date for a false one and buy nothing: no consumer reads
-        // `installedAt` to decide anything, and the one place it is read
-        // (`staleSince`) only fires on customized preserves, which this branch
-        // never touches.
-        installedAt: wrote ? now : (existing?.installedAt ?? now),
-        templatesVersion: matchesBundle
-          ? templatesVersion
-          : (existing?.templatesVersion ?? templatesVersion),
-      });
-    }
-    // cli#666: a customised orphan this run kept stays tracked — see `keptOrphanEntries`.
-    for (const [d, e] of keptOrphanEntries(plan, effectiveLock, input.force)) {
-      updatedEntries.set(d, e);
-    }
+    const updatedEntries = await rebuildEntries({
+      plan,
+      lock: effectiveLock,
+      newShas,
+      bundle,
+      written: toWrite,
+      templatesVersion,
+      now: (this.deps.now ?? (() => new Date()))().toISOString(),
+      force: input.force,
+    });
     const newLock: InstalledLock = {
       version: 2,
       harness: lock.harness,
@@ -753,178 +586,4 @@ export class UpgradeProjectUseCase {
       notes,
     };
   }
-
-  /**
-   * Delete the orphans this run removes (`deletesOrphan`): a vanilla one
-   * outright, a customised one only under `--force` and backed up first.
-   *
-   * `within` re-asks `orphanScope` on the path with symlinks resolved (cli#665).
-   * The plan only read the text, and a committed link under a managed folder
-   * can lead anywhere else in the project. Returns the plan with each orphan
-   * the writer refused re-labelled `orphan-refused`, so the summary reports
-   * what happened rather than what was planned; its entry leaves the lock.
-   */
-  private async removeOrphans(
-    plan: UpgradePlan,
-    input: UpgradeProjectInput,
-    managedRoots: ReadonlyArray<string> | undefined,
-    notes: string[],
-  ): Promise<{ backups: BackupReport["backups"]; plan: UpgradePlan }> {
-    const removes = plan.filter((a) => deletesOrphan(a, input.force));
-    const within = (rel: string) => orphanScope(rel, managedRoots) === "in-scope";
-    let backups: BackupReport["backups"] = [];
-    const refused = new Set<string>();
-    for (const backupExisting of [false, true]) {
-      const paths = removes.flatMap((a) =>
-        a.kind === "remove" && a.wasCustomized === backupExisting ? [a.dest] : []
-      );
-      if (paths.length === 0) continue;
-      const opts = { backupExisting, within };
-      const r = await this.deps.writer.deletePaths(paths, input.projectDir, opts);
-      backups = [...backups, ...r.backups];
-      for (const dest of r.refused ?? []) refused.add(dest);
-      notes.push(...(r.notes ?? []));
-    }
-    return { backups, plan: relabelRefused(plan, refused) };
-  }
-
-  /**
-   * Delete every staged copy except the ones this run just staged.
-   *
-   * Staging exists so `reconcile` can offer the upstream version of a file an
-   * upgrade refused to touch. After an applied upgrade the only such files are
-   * the ones THIS run preserved, and it has just restaged each of them with the
-   * current upstream. Any other copy in the tree is from an older release:
-   *
-   * - its dest was written by this run — the destination IS the upstream now,
-   *   so there is nothing to reconcile (#477: 23 of 46 pending paths were
-   *   byte-identical to their staged copy);
-   * - its dest already equals the bundle (`unchanged`) — `--accept-upstream`
-   *   would roll it back to the OLDER upstream;
-   * - its dest left the bundle (retired, handed to the plugin, `remove`d) or
-   *   was never tracked (`skipIfExists`) — `reconcile <path>` refuses it as
-   *   "not tracked by Specnaut", so it sat in `--status` forever and kept the
-   *   review marker from ever being retired (#613).
-   *
-   * Pruned without a backup, like #477's pruning before it: a staged copy is
-   * upstream content Specnaut wrote, never the user's. Every run already
-   * overwrites a restaged copy in place, and the review walk's merge option
-   * edits the DESTINATION, not the copy. The user's bytes live at the dest,
-   * which this never touches.
-   *
-   * Tree-driven rather than plan-driven on purpose: the paths that strand are
-   * precisely the ones no current plan, bundle or lock mentions any more.
-   *
-   * Best-effort: this is housekeeping, and it runs before the managed sections
-   * and the lock write. A delete that throws (a Windows file lock, a permission
-   * bit) is reported through `refusals` and the upgrade finishes; letting it
-   * propagate would leave the project half-upgraded over a copy nobody needs.
-   */
-  private async pruneStaging(
-    projectDir: string,
-    keep: ReadonlySet<string>,
-    refusals: string[],
-  ): Promise<void> {
-    const { stagingStore } = this.deps;
-    for (const rel of await stagingStore.list(projectDir)) {
-      if (keep.has(rel)) continue;
-      try {
-        await stagingStore.delete(projectDir, rel);
-      } catch (err) {
-        const why = err instanceof Error ? err.message : String(err);
-        refusals.push(
-          `could not clear the stale staged copy .specnaut/upgrade-staging/${rel} (${why}) — ` +
-            `it is safe to delete by hand`,
-        );
-      }
-    }
-    try {
-      await stagingStore.cleanupIfEmpty(projectDir);
-    } catch {
-      // An empty directory left behind is harmless; the next run retries.
-    }
-  }
-
-  /**
-   * What the managed sections would need, without writing anything. A
-   * destination that does not exist yet is not listed: the plan writes that
-   * file whole, fences included.
-   */
-  private async surveyManagedSections(
-    bundle: Bundle,
-    projectDir: string,
-    isDeclaredPreserved: (dest: string) => boolean,
-  ): Promise<ManagedSectionOutcome[]> {
-    const out: ManagedSectionOutcome[] = [];
-    for (const [dest, label, body] of managedSectionEntries(bundle)) {
-      if (isDeclaredPreserved(dest)) continue;
-      const existing = await this.deps.reader.readText(projectDir, dest);
-      if (existing === null) continue;
-      const current = extractBlock(existing, label, "html");
-      if (current === body) continue;
-      out.push({ dest, label, kind: current === null ? "added" : "refreshed" });
-    }
-    return out;
-  }
-
-  /** Merges each managed section in, and reports only what actually changed. */
-  private async applyManagedSections(
-    bundle: Bundle,
-    projectDir: string,
-    isDeclaredPreserved: (dest: string) => boolean,
-  ): Promise<ManagedSectionOutcome[]> {
-    const out: ManagedSectionOutcome[] = [];
-    for (const [dest, label, body] of managedSectionEntries(bundle)) {
-      // A declared preserve wins over everything, `--force` included (spec 011
-      // / #367, FR-009). #466 grafted its section straight off the bundle and
-      // never consulted the predicate, so a file the maintainer had frozen was
-      // written anyway — and the same run printed both "preserved … declared"
-      // and "added the … section" for it. Only `--reset-preserved` lifts this,
-      // and it does so by flipping the predicate in the handler.
-      if (isDeclaredPreserved(dest)) continue;
-      const existing = await this.deps.reader.readText(projectDir, dest);
-      if (existing === null) continue;
-      const current = extractBlock(existing, label, "html");
-      if (current === body) continue;
-      const merged = mergeIntoFile(existing, body, label, "html");
-      if (merged === existing) continue;
-      await this.deps.writer.writeBundle(
-        { [dest]: { content: merged, executable: false } },
-        projectDir,
-        { overwrite: true, backupExisting: false },
-      );
-      out.push({ dest, label, kind: current === null ? "added" : "refreshed" });
-    }
-    return out;
-  }
-}
-
-/**
- * Bundle entries declaring a managed section, as `[dest, label, body]`. The
- * body is the fenced region of the *bundled* template — an entry whose fences
- * are missing is dropped here, but it cannot reach a released binary:
- * `scripts/bundle-templates.ts` fails the build on that exact mismatch.
- */
-function managedSectionEntries(bundle: Bundle): Array<[string, string, string]> {
-  const out: Array<[string, string, string]> = [];
-  for (const [dest, file] of Object.entries(bundle)) {
-    // A destination may declare several labels (#576). Each is grafted
-    // independently, so one being unfenced never silently suppresses another.
-    for (const label of managedSectionLabels(file.managedSection)) {
-      const body = extractBlock(file.content, label, "html");
-      if (body === null || body.length === 0) continue;
-      out.push([dest, label, body]);
-    }
-  }
-  return out;
-}
-
-async function shaOfBundle(file: TemplateFile | undefined): Promise<string> {
-  if (!file) return "";
-  // Mirror init_project's hash logic: mergeBlock files are hashed on the
-  // *block body* only, not the full file. Keeping these two paths in
-  // lockstep is critical — a divergence here is what caused #163's
-  // false-positive "customized" reports on `.gitignore` upgrades.
-  const shaInput = file.mergeBlock !== undefined ? canonicalBlockBody(file.content) : file.content;
-  return await sha256Hex(shaInput);
 }
