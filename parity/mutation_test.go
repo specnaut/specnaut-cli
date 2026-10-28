@@ -18,7 +18,7 @@ var mutationCases = []mutationCase{
 	{MutateStdoutLine, "", "help", "stdout", ""},
 	{MutateExitCode, "", "version", "exit", ""},
 	{MutateMissingFile, ".specnaut/installed.lock", "init-claude-local", "tree:project/.specnaut/installed.lock", "presence"},
-	{MutateAlteredFile, ".claude/CLAUDE.md", "init-claude-local", "tree:project/.claude/CLAUDE.md", "content"},
+	{MutateAlteredFile, "AGENTS.md", "init-claude-local", "tree:project/AGENTS.md", "content"},
 }
 
 // TestMutationsAreCaught diffs the binary against a mutant of itself, once per
