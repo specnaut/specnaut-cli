@@ -97,8 +97,14 @@ export async function pruneStaging(
   }
   try {
     await stagingStore.cleanupIfEmpty(projectDir);
-  } catch {
-    // An empty directory left behind is harmless; the next run retries.
+  } catch (err) {
+    // An empty directory left behind is harmless and the next run retries —
+    // but it is said, not swallowed: a catch that reports nothing would hide
+    // the next failure here that is not harmless.
+    refusals.push(
+      `could not remove the empty .specnaut/upgrade-staging/ (${why(err)}) — ` +
+        `it is safe to delete by hand`,
+    );
   }
 }
 
