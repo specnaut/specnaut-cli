@@ -92,6 +92,17 @@ export type UpgradeAction =
     declaredFrozenAt?: { templatesVersion: string; installedAt: string };
   }
   | { kind: "add-new"; dest: string }
+  | {
+    /**
+     * A context-link destination (cli#680, cli#681) holding something that is
+     * not ours: the user's own file, or a link elsewhere. Replaced by the link,
+     * ALWAYS with a backup, and named in the summary — a preserve would leave
+     * the defect the link fixes live for exactly the users who edited it.
+     */
+    kind: "replace-with-link";
+    dest: string;
+    previous: "customized-file" | "foreign-link";
+  }
   | { kind: "unchanged"; dest: string }
   | {
     kind: "migrate-to-plugin";

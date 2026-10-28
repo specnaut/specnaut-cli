@@ -36,7 +36,7 @@ import {
   resolveKanbanURL,
   writeBacklogConfigStub,
 } from "./init_backlog_config.ts";
-import { backupLine, linkMovedLine } from "./write_report.ts";
+import { backupLine, contextLinkLine, linkMovedLine } from "./write_report.ts";
 import { CORE_BUNDLE } from "../../templates_bundle.ts";
 import type { Bundle } from "../../domain/template.ts";
 
@@ -496,9 +496,8 @@ export async function runInit(intent: InitIntent): Promise<number> {
     }
   }
   for (const b of result.backups) console.log(backupLine(b));
-  for (const b of result.linksMoved) {
-    console.log(linkMovedLine(b));
-  }
+  for (const b of result.linksMoved) console.log(linkMovedLine(b));
+  for (const link of result.contextLinks) console.log(contextLinkLine(link));
   const mergedSuffix = result.filesMerged.length > 0
     ? ` (+ merged: ${result.filesMerged.join(", ")})`
     : "";

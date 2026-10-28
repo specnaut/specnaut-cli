@@ -31,6 +31,7 @@ export function renderSummary(
     unchanged: plan.filter((a) => a.kind === "unchanged"),
     migrated: plan.filter((a) => a.kind === "migrate-to-plugin"),
     deferred: plan.filter((a) => a.kind === "defer-to-plugin"),
+    relinked: plan.filter((a) => a.kind === "replace-with-link"),
   };
 
   console.log(
@@ -45,6 +46,18 @@ export function renderSummary(
   if (groups.added.length > 0) {
     console.log(bold("  new files to add"));
     for (const a of groups.added) console.log(green(`    + ${a.dest}`));
+    console.log();
+  }
+  if (groups.relinked.length > 0) {
+    // Not a preserve: the link is the fix (cli#680), and keeping the user's
+    // file would leave AGENTS.md unread for exactly the people who edited it.
+    console.log(bold("  replaced with a link to AGENTS.md (yours backed up — see below)"));
+    for (const a of groups.relinked) {
+      const was = a.kind === "replace-with-link" && a.previous === "foreign-link"
+        ? "was a link elsewhere"
+        : "was your own file — move what you need into AGENTS.md";
+      console.log(yellow(`    ↪ ${a.dest} ${dim(`(${was})`)}`));
+    }
     console.log();
   }
   if (groups.overwritten.length > 0) {
@@ -202,6 +215,7 @@ export function renderSummary(
       `  ${groups.auto.length} auto-update, ${settled.length + declCurrent.length} preserved, ` +
         `${behind.length + declBehind.length} behind, ` +
         (groups.overwritten.length > 0 ? `${groups.overwritten.length} overwritten, ` : "") +
+        (groups.relinked.length > 0 ? `${groups.relinked.length} relinked, ` : "") +
         `${groups.added.length} added, ${
           orphanCounts(plan, force)
         }${groups.migrated.length} migrated, ` +

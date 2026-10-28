@@ -1,6 +1,7 @@
 import type { InstalledLock } from "./installed_lock.ts";
 import { planOrphans } from "./orphan_scope.ts";
 import type { UpgradeAction, UpgradePlan } from "./upgrade_action.ts";
+import { linkAction, type PlannableLinkState } from "./link_plan.ts";
 
 export type { UpgradeAction, UpgradePlan } from "./upgrade_action.ts";
 
@@ -73,6 +74,8 @@ export type UpgradePlanOptions = {
   isDeclaredPreserved?: (dest: string) => boolean;
   /** `Harness.managedRoots`: bounds which orphans may be removed (`orphanScope`). */
   managedRoots?: ReadonlyArray<string>;
+  /** What is on disk at each context-link destination — see `linkAction`. */
+  linkStates?: ReadonlyMap<string, PlannableLinkState>;
 };
 
 /**
@@ -164,6 +167,13 @@ export function computeUpgradePlan(
         // silently acquires a population it was never written for.
         ...(stale !== null ? { declaredFrozenAt: stale.staleSince } : {}),
       });
+      continue;
+    }
+
+    // A context link is planned from its disk state, after the declaration.
+    const linkState = opts.linkStates?.get(dest);
+    if (linkState !== undefined) {
+      actions.push(linkAction(dest, linkState, lockSha, newSha));
       continue;
     }
 

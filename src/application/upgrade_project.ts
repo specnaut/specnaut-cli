@@ -1,4 +1,5 @@
 import type {
+  ContextLinkWrite,
   FsReader,
   FsWriter,
   Harness,
@@ -28,6 +29,7 @@ import {
 import { planStaging, pruneStaging } from "./upgrade_staging.ts";
 import { removeOrphans } from "./upgrade_orphan_removal.ts";
 import { carryRenamedDocs } from "./upgrade_renames.ts";
+import { surveyContextLinks } from "./upgrade_context_links.ts";
 
 /** The plugin name used for both the install probe and the cache directory. */
 export const PLUGIN_NAME = "specnaut-plugin";
@@ -124,6 +126,8 @@ export type UpgradeProjectResult =
     written: ReadonlyArray<string>;
     /** What the settings merge changed that the person should hear about (#642). */
     notes: ReadonlyArray<string>;
+    /** The context links this run wrote, and in which form (cli#680). */
+    contextLinks: ReadonlyArray<ContextLinkWrite>;
   };
 
 export type UpgradeProjectDeps = {
@@ -215,12 +219,29 @@ export class UpgradeProjectUseCase {
       refusedDests.add(dest);
     }
 
+    // Context links are classified by what `lstat` sees (cli#680); an inverted
+    // consolidation is refused like the merges above, for the same reason.
+    const links = await surveyContextLinks(
+      reader,
+      input.projectDir,
+      bundle,
+      lock,
+      input.isDeclaredPreserved ?? (() => false),
+    );
+    for (const { dest, message } of links.refused) {
+      refusals.push(message);
+      delete bundle[dest];
+      refusedDests.add(dest);
+    }
+
     const destPaths = new Set<string>([
       ...Object.keys(bundle),
       ...lock.entries.keys(),
     ]);
-    const diskShas = new Map<string, string>();
+    const diskShas = new Map<string, string>(links.diskShas);
     for (const dest of destPaths) {
+      // Never read through a link: that is `AGENTS.md`, or outside the project.
+      if (bundle[dest]?.symlinkTo !== undefined || refusedDests.has(dest)) continue;
       const content = await reader.readText(input.projectDir, dest);
       if (content === null) continue;
       // For mergeable files we hash the *block content only* (not the whole
@@ -314,6 +335,7 @@ export class UpgradeProjectUseCase {
         resetBaseline: input.resetBaseline ?? false,
         isDeclaredPreserved,
         managedRoots: harness.managedRoots,
+        linkStates: links.states,
       },
     );
 
@@ -484,19 +506,30 @@ export class UpgradeProjectUseCase {
       overwrite: true,
       backupExisting: input.force || (input.resetBaseline ?? false),
     });
+    // Replacing what is not ours with a link ALWAYS keeps a backup (cli#680).
+    const toRelink: Bundle = Object.fromEntries(
+      plan.flatMap((a) => a.kind === "replace-with-link" ? [[a.dest, bundle[a.dest]]] : []),
+    );
+    const relinkReport = Object.keys(toRelink).length === 0
+      ? { backups: [], skippedSkipIfExists: [] }
+      : await writer.writeBundle(toRelink, input.projectDir, {
+        overwrite: true,
+        backupExisting: true,
+      });
+    const allWritten: Bundle = { ...toWrite, ...toRelink };
 
     // JSON-merged files are not part of the plan; re-graft the bundled
     // entries into whatever the user has on disk (idempotent — already-
     // present entries are skipped by the merge logic). Greenfield case
     // is handled too: writeBundle will just write the bundled content
     // when no file is present.
-    let notes: ReadonlyArray<string> = [];
+    let notes: ReadonlyArray<string> = links.notes;
     if (Object.keys(jsonMergedBundle).length > 0) {
       const merged = await writer.writeBundle(jsonMergedBundle, input.projectDir, {
         overwrite: true,
         backupExisting: false,
       });
-      notes = merged.notes ?? [];
+      notes = [...notes, ...(merged.notes ?? [])];
     }
 
     // What this run staged is the whole of what is pending. Everything else in
@@ -546,7 +579,7 @@ export class UpgradeProjectUseCase {
       lock: effectiveLock,
       newShas,
       bundle,
-      written: toWrite,
+      written: allWritten,
       templatesVersion,
       now: (this.deps.now ?? (() => new Date()))().toISOString(),
       force: input.force,
@@ -572,14 +605,15 @@ export class UpgradeProjectUseCase {
       plan: removal.plan,
       fromVersion: lock.templatesVersion,
       toVersion: templatesVersion,
-      backups: [...backupReport.backups, ...extraBackups]
+      backups: [...backupReport.backups, ...relinkReport.backups, ...extraBackups]
         .filter((b) => b.wasSymlink !== true)
         .map((b) => b.dest),
-      linksMoved: [...backupReport.backups, ...extraBackups]
+      linksMoved: [...backupReport.backups, ...relinkReport.backups, ...extraBackups]
         .filter((b) => b.wasSymlink === true)
         .map((b) => b.dest),
+      contextLinks: [...(backupReport.links ?? []), ...(relinkReport.links ?? [])],
       managedSections: appliedSections,
-      written: Object.keys(toWrite).sort(),
+      written: Object.keys(allWritten).sort(),
       notes,
     };
   }

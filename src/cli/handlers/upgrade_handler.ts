@@ -21,7 +21,7 @@ import { FsPluginDetector } from "../../infrastructure/fs_plugin_detector.ts";
 import { FsParentWorkspaceReader } from "../../infrastructure/fs_parent_workspace_reader.ts";
 import { resolveUpgradePreserves } from "./upgrade_preserve.ts";
 import { isAgenticPath, isParentManaged } from "../../domain/parent_managed.ts";
-import { backupLine, linkMovedLine } from "./write_report.ts";
+import { backupLine, contextLinkLine, linkMovedLine } from "./write_report.ts";
 import { CORE_BUNDLE, TEMPLATES_VERSION } from "../../templates_bundle.ts";
 import { renderUnifiedDiff } from "../../domain/diff.ts";
 import { renderSummary } from "./upgrade_summary.ts";
@@ -463,6 +463,8 @@ export async function runUpgrade(intent: UpgradeIntent): Promise<number> {
       console.log(linkMovedLine(b));
     }
   }
+  if (result.contextLinks.length > 0) console.log();
+  for (const link of result.contextLinks) console.log(contextLinkLine(link));
   console.log();
   console.log(green(`✓ upgraded to templates ${result.fromVersion} → ${result.toVersion}`));
 

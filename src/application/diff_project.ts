@@ -1,6 +1,7 @@
 import type { FsReader, Harness, LockStore } from "./ports.ts";
 import type { CoreBundle } from "../domain/core_bundle.ts";
 import { sha256Hex } from "../domain/sha256.ts";
+import { classifyLinkDisk, linkTargetPath } from "../domain/context_link.ts";
 
 /**
  * Per-file outcome of comparing a managed file's on-disk content against the
@@ -125,6 +126,21 @@ export class DiffProjectUseCase {
     for (const [dest, entry] of lock.entries) {
       if (wanted !== null && dest !== wanted) continue;
 
+      const symlinkTo = bundle[dest]?.symlinkTo;
+      if (symlinkTo !== undefined) {
+        const link = await linkDivergence(reader, input.projectDir, dest, {
+          symlinkTo,
+          content: bundle[dest].content,
+        }, entry.sha256);
+        if (link === null) {
+          if (wanted !== null) scopedAbsent = true;
+          continue;
+        }
+        if (input.onlyCustomised && !link.customised) continue;
+        results.push(link.result);
+        continue;
+      }
+
       const diskContent = await reader.readText(input.projectDir, dest);
       // A lock entry whose file is gone from disk is outside this view's remit
       // (the divergence is between disk and bundle); skip it rather than invent
@@ -163,4 +179,35 @@ export class DiffProjectUseCase {
       pathProblem: scopedAbsent ? "absent-on-disk" : null,
     };
   }
+}
+
+/**
+ * A context-link destination's divergence (cli#680), judged by what is there
+ * rather than by its content: read through the link, `.claude/CLAUDE.md` is
+ * `AGENTS.md`, which would render as the whole of AGENTS.md "differing" from a
+ * one-line fallback. Our link and our fallback match; anything else differs,
+ * shown as what Specnaut would put there.
+ */
+async function linkDivergence(
+  reader: FsReader,
+  projectDir: string,
+  dest: string,
+  file: { readonly symlinkTo: string; readonly content: string },
+  lockSha: string,
+): Promise<{ result: DivergenceResult; customised: boolean } | null> {
+  const disk = await reader.readEntry(projectDir, dest);
+  if (disk === null) return null;
+  const state = classifyLinkDisk(dest, file, {
+    disk,
+    diskSha: disk.kind === "file" ? await sha256Hex(disk.content) : undefined,
+    lockSha,
+    targetEntry: await reader.readEntry(projectDir, linkTargetPath(dest, file.symlinkTo)),
+  });
+  const customised = state === "customized" || state === "foreign-link" || state === "inverted";
+  if (state === "ours-link" || state === "ours-fallback") {
+    return { result: { kind: "matches", dest }, customised };
+  }
+  const diskContent = disk.kind === "file" ? disk.content : `symlink → ${disk.target}\n`;
+  const bundledContent = `symlink → ${file.symlinkTo}\n`;
+  return { result: { kind: "differs", dest, diskContent, bundledContent }, customised };
 }

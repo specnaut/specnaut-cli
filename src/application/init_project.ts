@@ -1,4 +1,11 @@
-import type { FsReader, FsWriter, GitAdapter, Harness, LockStore } from "./ports.ts";
+import type {
+  ContextLinkWrite,
+  FsReader,
+  FsWriter,
+  GitAdapter,
+  Harness,
+  LockStore,
+} from "./ports.ts";
 import { sha256Hex } from "../domain/sha256.ts";
 import type {
   BacklogBackend,
@@ -26,6 +33,8 @@ export type InitResult =
     backups: string[];
     /** Backups that moved a SYMLINK rather than content (cli#574). */
     linksMoved: string[];
+    /** The context links written, and in which form (cli#680). */
+    contextLinks: ReadonlyArray<ContextLinkWrite>;
     lockWritten: boolean;
     /**
      * Destination paths skipped from the WRITE set because they were declared
@@ -203,6 +212,7 @@ export class InitProjectUseCase {
         warnings,
         backups: [],
         linksMoved: [],
+        contextLinks: [],
         lockWritten: false,
         preserved,
       };
@@ -273,6 +283,7 @@ export class InitProjectUseCase {
       warnings,
       backups: report.backups.filter((b) => b.wasSymlink !== true).map((b) => b.dest),
       linksMoved: report.backups.filter((b) => b.wasSymlink === true).map((b) => b.dest),
+      contextLinks: report.links ?? [],
       lockWritten: true,
       preserved,
     };
