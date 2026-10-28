@@ -6,6 +6,7 @@ import { KNOWN_BACKLOG_BACKENDS } from "../../src/domain/installed_lock.ts";
 import type { BacklogBackend } from "../../src/domain/installed_lock.ts";
 import { findBacklogStrategy } from "../../src/domain/backlog_strategies/registry.ts";
 import type { Bundle } from "../../src/domain/template.ts";
+import { linkTargetPath } from "../../src/domain/context_link.ts";
 
 /**
  * #612 — a harness template must not point at a path that the bundle for the
@@ -28,20 +29,34 @@ const MANIFEST = fromFileUrl(new URL("../../templates/manifest.json", import.met
 
 /**
  * The destinations whose SOURCE is a harness-specific Markdown template — the
- * tree #551 found no scan was reading. Derived from the manifest, not a hand
+ * tree #551 found no scan was reading — plus every context link, whose text is
+ * the file it points at (cli#680). Derived from the manifest, not a hand
  * list: a new harness context file is scanned the day it is registered.
  */
 async function harnessTemplateDestinations(): Promise<Map<string, string[]>> {
   const m = JSON.parse(await Deno.readTextFile(MANIFEST)) as {
-    harness_static: Array<{ harness: string; destination: string; source: string }>;
+    harness_static: Array<
+      { harness: string; destination: string; source?: string; link?: string }
+    >;
   };
   const out = new Map<string, string[]>();
   for (const e of m.harness_static) {
-    if (!e.source.startsWith("harness-specific/")) continue;
-    if (!/\.(md|mdc)$/.test(e.source)) continue;
+    const template = e.source?.startsWith("harness-specific/") === true &&
+      /\.(md|mdc)$/.test(e.source);
+    if (!template && e.link === undefined) continue;
     out.set(e.harness, [...(out.get(e.harness) ?? []), e.destination]);
   }
   return out;
+}
+
+/**
+ * What a harness reads at `dest`: the file, or — for a context link — the file
+ * it points at, as that harness's bundle renders it.
+ */
+function readsAs(_harnessKey: string, bundle: Bundle, dest: string): string | undefined {
+  const file = bundle[dest];
+  if (file === undefined || file.symlinkTo === undefined) return file?.content;
+  return bundle[linkTargetPath(dest, file.symlinkTo)]?.content;
 }
 
 /**
@@ -59,6 +74,10 @@ const CREATED_OUTSIDE_THE_BUNDLE: Record<
   },
   ".claude/claude-security-guidance.local.md": {
     reason: "the user's optional override; Specnaut documents it and never writes it",
+  },
+  ".specnaut/addenda/": {
+    reason:
+      "the project's own additions to a phase (cli#611); Specnaut reads them, never writes them",
   },
   ".specnaut/backlog/": {
     reason: "the local backend's add script creates one file per item on first use",
@@ -129,9 +148,9 @@ Deno.test("every path a harness template cites is shipped by that backend's bund
       const bundle = bundleFor(harnessKey, backend);
       const destinations = [...Object.keys(bundle), ...writtenBesideTheBundle(backend)];
       for (const dest of dests) {
-        const file = bundle[dest];
-        assert(file, `${harnessKey}: ${dest} is registered but not written`);
-        for (const path of citedPaths(file.content)) {
+        const content = readsAs(harnessKey, bundle, dest);
+        assert(content !== undefined, `${harnessKey}: ${dest} is registered but not written`);
+        for (const path of citedPaths(content)) {
           checked++;
           if (resolves(path, destinations) || excused(path, backend)) continue;
           dangling.push(`${harnessKey} × ${backend}: ${dest} cites \`${path}\``);
@@ -155,6 +174,7 @@ Deno.test("the backlog pointer names the backend the project actually uses", () 
   // asserts what each rendering must SAY, per backend, on every harness that
   // carries the pointer.
   const CARRIERS: Array<[string, string]> = [
+    // Since cli#680 the Claude context file is a link: what it says is AGENTS.md.
     ["claude", ".claude/CLAUDE.md"],
     ["codex", ".codex/AGENTS.md"],
     ["cursor", ".cursor/rules/specify-rules.mdc"],
@@ -162,7 +182,7 @@ Deno.test("the backlog pointer names the backend the project actually uses", () 
   const wrong: string[] = [];
   for (const [harnessKey, dest] of CARRIERS) {
     for (const backend of KNOWN_BACKLOG_BACKENDS) {
-      const content = bundleFor(harnessKey, backend)[dest]?.content ?? "";
+      const content = readsAs(harnessKey, bundleFor(harnessKey, backend), dest) ?? "";
       const pointsAtIndex = content.includes("`.specnaut/backlog.md`");
       const pointsAtConfig = content.includes("`.specnaut/backlog-config.yml`");
       const local = backend === "local";
@@ -190,7 +210,7 @@ Deno.test("the allow-list has no dead entries", async () => {
     for (const backend of KNOWN_BACKLOG_BACKENDS) {
       const bundle = bundleFor(harnessKey, backend);
       for (const dest of dests) {
-        for (const p of citedPaths(bundle[dest]?.content ?? "")) cited.add(p);
+        for (const p of citedPaths(readsAs(harnessKey, bundle, dest) ?? "")) cited.add(p);
       }
     }
   }

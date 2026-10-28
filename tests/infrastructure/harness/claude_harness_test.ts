@@ -51,6 +51,20 @@ Deno.test("ClaudeHarness.mapBundle emits the Claude tree", () => {
   assert(!("CLAUDE.md" in mapped), "CLAUDE.md must not live at project root");
 });
 
+Deno.test("ClaudeHarness writes .claude/CLAUDE.md as a link to the root AGENTS.md (cli#680)", () => {
+  const mapped = new ClaudeHarness().mapBundle(CORE_BUNDLE, {
+    backlogBackend: "local",
+    versionScheme: "semver",
+    specBackend: "local",
+  });
+  // Claude Code reads AGENTS.md natively only when no CLAUDE.md exists, so the
+  // one always-on file reaches Claude through this link — or, where links are
+  // refused, through the one-line import that is its fallback.
+  assertEquals(mapped[".claude/CLAUDE.md"]?.symlinkTo, "../AGENTS.md");
+  assertEquals(mapped[".claude/CLAUDE.md"]?.content, "@../AGENTS.md\n");
+  assert("AGENTS.md" in mapped);
+});
+
 Deno.test("ClaudeHarness includes HARNESS_STATIC claude files (.claude/CLAUDE.md)", () => {
   const h = new ClaudeHarness();
   const mapped = h.mapBundle(CORE_BUNDLE, {

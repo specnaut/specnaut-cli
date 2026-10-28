@@ -99,8 +99,8 @@ done
 # the generic root + lock. Kept inline (not a loop over harnesses) so
 # additions stay obvious in code review.
 #
-# - Claude: .claude/CLAUDE.md (harness reference) + .claude/loop.md
-#   (default prompt for /loop, recurring maintenance).
+# - Claude: .claude/loop.md (default prompt for /loop, recurring
+#   maintenance). Its context file is a link — see check_link below.
 # - Codex: .codex/AGENTS.md (harness reference) + .codex/goal.md
 #   (default prompt for /goal, one-shot long-horizon maintenance,
 #   shipped in v1.2.1).
@@ -123,7 +123,25 @@ check_helper() {
   pass "$harness helper: $path ok"
 }
 
-check_helper claude ".claude/CLAUDE.md" "^# Claude Reference"
+# cli#680: the harness context file is a relative symlink to the root
+# AGENTS.md, the one always-on file. `-L`, not `-f`: `-f` follows the link.
+check_link() {
+  local harness="$1" path="$2" target="$3"
+  local dir file
+  dir="$(scenario_dir "$NAME-$harness")"
+  file="$dir/$path"
+  if [ ! -L "$file" ]; then
+    fail "$harness context link" "$path is not a symlink"
+    return
+  fi
+  if [ "$(readlink "$file")" != "$target" ]; then
+    fail "$harness context link" "$path points at '$(readlink "$file")', not '$target'"
+    return
+  fi
+  pass "$harness context link: $path → $target"
+}
+
+check_link   claude ".claude/CLAUDE.md" "../AGENTS.md"
 check_helper claude ".claude/loop.md"   "^# Project loop prompt"
 check_helper codex  ".codex/AGENTS.md"  "^# Codex Reference"
 check_helper codex  ".codex/goal.md"    "^# Project goal prompt"

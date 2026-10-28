@@ -7,6 +7,7 @@
 
 import { relative } from "@std/path";
 import { managedSectionLabels } from "../src/domain/template.ts";
+import { linkTargetPath } from "../src/domain/context_link.ts";
 
 type CoreManifestEntry = {
   category: string;
@@ -25,10 +26,19 @@ type CoreManifestEntry = {
 type HarnessStaticManifestEntry = {
   harness: string;
   destination: string;
-  source: string;
+  /** Absent on a link entry, which has no file behind it. */
+  source?: string;
   executable?: boolean;
   /** When set, the file is merged structurally rather than written verbatim. */
   mergeJson?: "claude-settings";
+  /**
+   * A context link (cli#680, cli#681): the destination is written as a relative
+   * symlink with this text, and `fallback` — one line — where links are refused.
+   */
+  link?: string;
+  fallback?: string;
+  /** Read by the reach tests; the bundler only carries it. */
+  alwaysOn?: boolean;
 };
 
 type Manifest = {
@@ -62,7 +72,9 @@ async function assertAllSourcesPresent(m: Manifest): Promise<void> {
     }
   };
   for (const e of m.core) await check(e.source);
-  for (const e of m.harness_static) await check(e.source);
+  for (const e of m.harness_static) {
+    if (e.link === undefined) await check(e.source ?? "(no source)");
+  }
   if (missing.length > 0) {
     throw new Error(`Missing template sources:\n  - ${missing.join("\n  - ")}`);
   }
@@ -115,6 +127,44 @@ async function assertManagedSectionsFenced(m: Manifest): Promise<void> {
     throw new Error(
       `managedSection declared but not fenced in the source:\n  - ${broken.join("\n  - ")}`,
     );
+  }
+}
+
+/**
+ * What is wrong with a link entry, or nothing. A context link exists to point
+ * at the project's own root file, so its text must be relative and land on a
+ * core `project-root` destination; its fallback is a single line, because a
+ * harness reads it as an always-on file. An entry with a `source` as well is
+ * two definitions of one destination.
+ */
+export function linkEntryProblems(
+  e: HarnessStaticManifestEntry,
+  projectRootSuffixes: ReadonlySet<string>,
+): string[] {
+  if (e.link === undefined) return [];
+  const at = `${e.harness}:${e.destination}`;
+  const problems: string[] = [];
+  if (e.source !== undefined || e.mergeJson !== undefined) {
+    problems.push(`${at} has a link and a source`);
+  }
+  if (e.link.startsWith("/") || /^[A-Za-z]:/.test(e.link)) {
+    problems.push(`${at} link is absolute: ${e.link}`);
+  } else if (!projectRootSuffixes.has(linkTargetPath(e.destination, e.link))) {
+    problems.push(`${at} link ${e.link} does not land on a project-root file`);
+  }
+  if (e.fallback === undefined || e.fallback === "" || e.fallback.includes("\n")) {
+    problems.push(`${at} needs a one-line fallback`);
+  }
+  return problems;
+}
+
+function assertLinkEntries(m: Manifest): void {
+  const roots = new Set(
+    m.core.filter((e) => e.category === "project-root" && e.suffix).map((e) => e.suffix!),
+  );
+  const problems = m.harness_static.flatMap((e) => linkEntryProblems(e, roots));
+  if (problems.length > 0) {
+    throw new Error(`Invalid context-link entries:\n  - ${problems.join("\n  - ")}`);
   }
 }
 
@@ -171,17 +221,21 @@ async function buildHarnessStatic(m: Manifest): Promise<string> {
       content: string;
       executable: boolean;
       mergeJson?: "claude-settings";
+      symlinkTo?: string;
     }>
   > = {};
   for (const e of m.harness_static) {
-    const abs = new URL(e.source, TEMPLATES_DIR);
-    const content = await Deno.readTextFile(abs);
+    // A link's content IS its fallback, so every content reader reads a line.
+    const content = e.link !== undefined
+      ? `${e.fallback}\n`
+      : await Deno.readTextFile(new URL(e.source!, TEMPLATES_DIR));
     byHarness[e.harness] ??= [];
     byHarness[e.harness].push({
       destination: e.destination,
       content,
       executable: e.executable === true,
       ...(e.mergeJson ? { mergeJson: e.mergeJson } : {}),
+      ...(e.link !== undefined ? { symlinkTo: e.link } : {}),
     });
   }
   const outer: string[] = [];
@@ -190,11 +244,15 @@ async function buildHarnessStatic(m: Manifest): Promise<string> {
       const mergeJsonLine = f.mergeJson !== undefined
         ? `      mergeJson: ${JSON.stringify(f.mergeJson)},\n`
         : "";
+      const symlinkLine = f.symlinkTo !== undefined
+        ? `      symlinkTo: ${JSON.stringify(f.symlinkTo)},\n`
+        : "";
       return (
         `    ${JSON.stringify(f.destination)}: {\n` +
         `      content: \`${escapeTemplateLiteral(f.content)}\`,\n` +
         `      executable: ${f.executable},\n` +
         mergeJsonLine +
+        symlinkLine +
         `    }`
       );
     }).join(",\n");
@@ -207,6 +265,7 @@ async function main() {
   const manifest = await readManifest();
   await assertAllSourcesPresent(manifest);
   await assertManagedSectionsFenced(manifest);
+  assertLinkEntries(manifest);
   const core = await buildCoreEntries(manifest);
   const staticBlock = await buildHarnessStatic(manifest);
 

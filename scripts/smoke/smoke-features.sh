@@ -777,13 +777,14 @@ check "and fires each rule once per file per session, not on every edit" \
   'grep -q "once per" .claude/security-patterns.yaml'
 
 echo
-echo "═══ #612  the context file points only at what was scaffolded ═══"
-check ".claude/CLAUDE.md points a local project at its backlog index" \
-  'grep -q "\.specnaut/backlog\.md" .claude/CLAUDE.md && [ -f .specnaut/backlog.md ]'
-check ".claude/CLAUDE.md does not cite the retired .claude/commands/" \
-  '! grep -q "\.claude/commands/" .claude/CLAUDE.md'
-check ".claude/CLAUDE.md carries no unrendered backend markers" \
-  '! grep -q "backend=" .claude/CLAUDE.md'
+echo "═══ #612 / cli#680  the context file is AGENTS.md, and points only at what was scaffolded ═══"
+check ".claude/CLAUDE.md is a relative symlink to the root AGENTS.md (cli#680)" \
+  '[ -L .claude/CLAUDE.md ] && [ "$(readlink .claude/CLAUDE.md)" = "../AGENTS.md" ]'
+check "no root CLAUDE.md is written (cli#680)" '[ ! -e CLAUDE.md ]'
+check "AGENTS.md points a local project at its backlog index" \
+  'grep -q "\.specnaut/backlog\.md" AGENTS.md && [ -f .specnaut/backlog.md ]'
+check "AGENTS.md does not cite the retired .claude/commands/" \
+  '! grep -q "\.claude/commands/" AGENTS.md'
 check "AGENTS.md carries the backlog section, rendered for its backend (cli#680)" \
   'grep -q -- "<!-- --- Specnaut: backlog --- -->" AGENTS.md && grep -q "\.specnaut/backlog\.md" AGENTS.md && ! grep -q "backend=" AGENTS.md'
 check "AGENTS.md carries the optional-integrations section (cli#680)" \

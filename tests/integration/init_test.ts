@@ -46,6 +46,10 @@ Deno.test("specnaut init <name> writes a complete tree", async () => {
 
     const root = join(dir, "demo");
     assertEquals(await exists(join(root, ".claude/CLAUDE.md")), true);
+    // A relative link to the root AGENTS.md (cli#680) — `lstat`, not `exists`,
+    // which follows the link.
+    assertEquals((await Deno.lstat(join(root, ".claude/CLAUDE.md"))).isSymlink, true);
+    assertEquals(await Deno.readLink(join(root, ".claude/CLAUDE.md")), "../AGENTS.md");
     assertEquals(await exists(join(root, "CLAUDE.md")), false);
     assertEquals(await exists(join(root, "AGENTS.md")), true);
     assertEquals(await exists(join(root, "tasks/backlog.md")), false);
@@ -515,6 +519,8 @@ Deno.test("specnaut init scaffolds the consolidated router skill + its phase doc
   });
 });
 
+// Since cli#680 `.claude/CLAUDE.md` is a link to AGENTS.md: reading it reads
+// what Claude Code loads, the root AGENTS.md as rendered for Claude.
 Deno.test("scaffolded .claude/CLAUDE.md documents /goal", async () => {
   await withTempDir(async (dir) => {
     const { code, stderr } = await runSpecnaut(
@@ -528,7 +534,7 @@ Deno.test("scaffolded .claude/CLAUDE.md documents /goal", async () => {
     assertStringIncludes(claudeMd, "## Optional integrations");
     assertStringIncludes(claudeMd, "Goal-directed sessions");
     assertStringIncludes(claudeMd, "/goal");
-    assertStringIncludes(claudeMd, "code.claude.com/docs/fr/goal");
+    assertStringIncludes(claudeMd, "code.claude.com/docs/en/goal");
     assertStringIncludes(claudeMd, ".claude/loop.md");
   });
 });
@@ -545,7 +551,7 @@ Deno.test("scaffolded .claude/CLAUDE.md documents `claude agents`", async () => 
     );
     assertStringIncludes(claudeMd, "Multi-session dispatch");
     assertStringIncludes(claudeMd, "claude agents");
-    assertStringIncludes(claudeMd, "code.claude.com/docs/fr/agent-view");
+    assertStringIncludes(claudeMd, "code.claude.com/docs/en/agent-view");
     assertStringIncludes(claudeMd, ".claude/worktrees/");
   });
 });

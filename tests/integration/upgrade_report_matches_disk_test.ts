@@ -71,7 +71,10 @@ async function freezeBehind(dir: string): Promise<string> {
 /** Mark every managed markdown file as customized, the way a formatter would. */
 async function customizeAll(dir: string, marker: string): Promise<string[]> {
   const touched: string[] = [];
-  for await (const e of walk(join(dir, ".claude"), { includeDirs: false, exts: [".md"] })) {
+  // Not through links: `.claude/CLAUDE.md` is a link to the user's own
+  // AGENTS.md (cli#680), and writing through it edits a file upgrade never owns.
+  const opts = { includeDirs: false, includeSymlinks: false, exts: [".md"] };
+  for await (const e of walk(join(dir, ".claude"), opts)) {
     await Deno.writeTextFile(e.path, (await Deno.readTextFile(e.path)) + `\n${marker}\n`);
     touched.push(e.path);
   }

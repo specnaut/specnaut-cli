@@ -3,6 +3,7 @@ import { fromFileUrl } from "@std/path";
 import { CORE_BUNDLE, HARNESS_STATIC } from "../../src/templates_bundle.ts";
 import { HARNESSES } from "../../src/cli/harnesses.ts";
 import { extractBlock } from "../../src/domain/merge_block.ts";
+import { linkTargetPath } from "../../src/domain/context_link.ts";
 
 /**
  * REACH, not shape (#576, FR-015).
@@ -106,8 +107,12 @@ Deno.test("every always-on context file carries the pointer", async () => {
     const statics = HARNESS_STATIC[harnessKey] ?? {};
     for (const dest of dests) {
       const file = statics[dest];
+      // A context link (cli#680) is always-on through the file it points at.
+      const content = file?.symlinkTo === undefined ? file?.content : HARNESSES
+        .find((h) => h.key === harnessKey)
+        ?.mapBundle(CORE_BUNDLE, OPTS)[linkTargetPath(dest, file.symlinkTo)]?.content;
       if (!file) missing.push(`${harnessKey}:${dest} (not in HARNESS_STATIC)`);
-      else if (!file.content.includes(CONTRACT)) missing.push(`${harnessKey}:${dest}`);
+      else if (!content?.includes(CONTRACT)) missing.push(`${harnessKey}:${dest}`);
     }
   }
   assertEquals(missing, [], "always-on surfaces with no pointer");

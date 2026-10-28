@@ -65,20 +65,22 @@ Deno.test("diff <path> scopes to one managed file and stays silent about the res
 
     // Two managed files, one edited. Asking about the untouched one must report
     // it clean rather than surfacing the edit to the other.
-    const edited = join(dir, ".claude", "CLAUDE.md");
+    // A plain managed file: `.claude/CLAUDE.md` is a link since cli#680, and
+    // writing through it would edit AGENTS.md instead.
+    const edited = join(dir, ".claude", "loop.md");
     const original = await Deno.readTextFile(edited);
     await Deno.writeTextFile(edited, original + "\n<!-- local edit -->\n");
 
     const scoped = await runSpecnaut(["diff", ".claude/agents/developer.md"], dir);
     assertEquals(scoped.code, 0);
     assertStringIncludes(scoped.stdout, "no divergence");
-    assertEquals(scoped.stdout.includes("CLAUDE.md"), false);
+    assertEquals(scoped.stdout.includes("loop.md"), false);
 
     // And the whole-project view still sees the edit — scoping narrowed the
     // question, it did not change what the command can find.
     const all = await runSpecnaut(["diff"], dir);
     assertEquals(all.code, 0);
-    assertStringIncludes(all.stdout, "CLAUDE.md");
+    assertStringIncludes(all.stdout, "loop.md");
   } finally {
     await Deno.remove(dir, { recursive: true });
   }

@@ -1777,7 +1777,8 @@
     {
       "harness": "claude",
       "destination": ".claude/CLAUDE.md",
-      "source": "harness-specific/claude/CLAUDE.md",
+      "link": "../AGENTS.md",
+      "fallback": "@../AGENTS.md",
       "alwaysOn": true
     },
     {

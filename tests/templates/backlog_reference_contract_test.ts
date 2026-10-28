@@ -2,6 +2,7 @@ import { assert, assertEquals, assertStringIncludes } from "@std/assert";
 import { CORE_BUNDLE, HARNESS_STATIC } from "../../src/templates_bundle.ts";
 import { fromFileUrl } from "@std/path";
 import { skillDocName } from "../../src/domain/core_bundle.ts";
+import { linkTargetPath } from "../../src/domain/context_link.ts";
 
 /**
  * Locks the backlog-reference rule to a single canonical home.
@@ -111,6 +112,12 @@ Deno.test("Channel B — every non-preloading surface carries the pointer", () =
   for (const { harness, dest } of CHANNEL_B_STATIC) {
     const file = HARNESS_STATIC[harness]?.[dest];
     assert(file, `${harness} ${dest} missing from HARNESS_STATIC`);
+    // A context link (cli#680) says what its target says: the root AGENTS.md,
+    // which CHANNEL_B_CORE asserts carries the pointer.
+    if (file.symlinkTo !== undefined) {
+      assertEquals(linkTargetPath(dest, file.symlinkTo), "AGENTS.md", `${harness} ${dest}`);
+      continue;
+    }
     assertStringIncludes(file.content, CONTRACT, `${harness} ${dest} lacks the pointer`);
   }
 });
