@@ -123,21 +123,9 @@ check_helper() {
 }
 
 # cli#680: the harness context file is a relative symlink to the root
-# AGENTS.md, the one always-on file. `-L`, not `-f`: `-f` follows the link.
+# AGENTS.md, the one always-on file — asserted by _common.sh's one spelling.
 check_link() {
-  local harness="$1" path="$2" target="$3"
-  local dir file
-  dir="$(scenario_dir "$NAME-$harness")"
-  file="$dir/$path"
-  if [ ! -L "$file" ]; then
-    fail "$harness context link" "$path is not a symlink"
-    return
-  fi
-  if [ "$(readlink "$file")" != "$target" ]; then
-    fail "$harness context link" "$path points at '$(readlink "$file")', not '$target'"
-    return
-  fi
-  pass "$harness context link: $path → $target"
+  check_context_link "$1 context link: $2 → $3" "$(scenario_dir "$NAME-$1")/$2" "$3"
 }
 
 check_link   claude ".claude/CLAUDE.md" "../AGENTS.md"

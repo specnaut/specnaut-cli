@@ -41,16 +41,7 @@ check "no orphan BEGIN markers" \
 
 echo
 echo "═══ #612 / cli#680  the context file describes this backend, not the local one ═══"
-check ".claude/CLAUDE.md is a relative symlink to the root AGENTS.md (cli#680)" \
-  '[ -L .claude/CLAUDE.md ] && [ "$(readlink .claude/CLAUDE.md)" = "../AGENTS.md" ]'
-check "AGENTS.md does not send a github project to the local index" \
-  '! grep -q "\.specnaut/backlog\.md" AGENTS.md'
-check "AGENTS.md points at the backlog config it was given" \
-  'grep -q "\.specnaut/backlog-config\.yml" AGENTS.md'
-check "AGENTS.md does not cite the retired .claude/commands/" \
-  '! grep -q "\.claude/commands/" AGENTS.md'
-check "AGENTS.md carries no unrendered backend markers" \
-  '! grep -q "backend=" AGENTS.md'
+check_context_file github
 
 echo
 echo "═══ canonical backlog scripts (5 originals) ═══"
