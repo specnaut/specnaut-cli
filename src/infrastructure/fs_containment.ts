@@ -1,6 +1,6 @@
 import { basename, dirname, isAbsolute, join, parse, relative, SEPARATOR } from "@std/path";
 import { isInside } from "../domain/template.ts";
-import { walkLinkText } from "./fs_link_walk.ts";
+import { UnwalkableLinkError, walkLinkText } from "./fs_link_walk.ts";
 
 /**
  * The filesystem half of containment (cli#574). The pure half — comparing two
@@ -187,6 +187,7 @@ export async function assertInsideProject(root: string, abs: string): Promise<vo
     // as an escape: the path is unusable either way, and the message should say
     // which path. Deliberately narrow — every other error still propagates, so
     // a permission problem is not silently reported as a bad layout.
+    if (err instanceof UnwalkableLinkError) throw unwalkableRefusal(root, abs, err.missing);
     if (!(err instanceof Deno.errors.FilesystemLoop)) throw err;
     throw loopRefusal(root, abs);
   }
@@ -200,6 +201,16 @@ const loopRefusal = (root: string, abs: string) =>
       `  path:    ${abs}\n` +
       `  project: ${root}\n` +
       `Follow the links from that path and break the loop.`,
+  );
+
+const unwalkableRefusal = (root: string, abs: string, missing: string) =>
+  new Error(
+    `refusing to touch a path whose symlink passes through a directory that does not exist:\n` +
+      `  path:    ${abs}\n` +
+      `  missing: ${missing}\n` +
+      `  project: ${root}\n` +
+      `Where it lands would depend on directories created later, so Specnaut ` +
+      `cannot tell whether it stays inside the project. Fix or remove that link.`,
   );
 
 const leavesRefusal = (root: string, abs: string, resolved: string) =>
@@ -274,6 +285,12 @@ export async function assertLinkTargetInProject(
   target: string,
 ): Promise<void> {
   const parent = await resolveDeepestExisting(dirname(abs));
-  const landing = isAbsolute(target) ? target : await walkLinkText(parent, target);
+  let landing: string;
+  try {
+    landing = isAbsolute(target) ? target : await walkLinkText(parent, target);
+  } catch (err) {
+    if (!(err instanceof UnwalkableLinkError)) throw err;
+    throw unwalkableRefusal(root, abs, err.missing);
+  }
   if (!isInside(root, landing)) throw leavesRefusal(root, abs, landing);
 }

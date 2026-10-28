@@ -143,3 +143,29 @@ Deno.test("a link whose text would leave the project is refused before anything 
     assertStringIncludes(err.message, "leaves the project");
   });
 });
+
+Deno.test({
+  name: "a link text with `..` after a link is walked as the kernel walks it (cli#686)",
+  ignore: WINDOWS,
+  fn: () =>
+    withProject(async (dir) => {
+      // `s -> <outside>/deep`: lexically `../s/../evil` from `.claude/` is
+      // `<dir>/evil`, inside; the kernel lands on `<outside>/evil`.
+      const outside = await Deno.makeTempDir();
+      try {
+        await Deno.mkdir(join(outside, "deep"));
+        await Deno.symlink(join(outside, "deep"), join(dir, "s"));
+        const escaping: Bundle = {
+          [DEST]: { content: "x\n", executable: false, symlinkTo: "../s/../evil" },
+        };
+        const err = await assertRejects(
+          () => new DenoFsWriter().writeBundle(escaping, dir, { overwrite: true }),
+          Error,
+        );
+        assertStringIncludes(err.message, "leaves the project");
+        assertEquals(await Deno.lstat(join(dir, DEST)).then(() => true, () => false), false);
+      } finally {
+        await Deno.remove(outside, { recursive: true });
+      }
+    }),
+});

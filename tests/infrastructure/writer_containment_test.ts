@@ -270,3 +270,31 @@ symlinkTest("a `..` after a link in a link's text cannot carry a write out (cli#
     await Deno.remove(root, { recursive: true });
   }
 });
+
+symlinkTest(
+  "a link through a directory the bundle itself creates is refused (cli#686)",
+  async () => {
+    // `D -> .specnaut-new/../..` is dangling until phase 1 makes `.specnaut-new/`;
+    // then `AGENTS.md -> D/victim.txt` lands one level above the project.
+    const { root, proj } = await box();
+    try {
+      await Deno.writeTextFile(join(root, "victim.txt"), "ORIGINAL\n");
+      await Deno.symlink([".specnaut-new", "..", ".."].join(SEPARATOR), join(proj, "D"));
+      await Deno.symlink(["D", "victim.txt"].join(SEPARATOR), join(proj, "AGENTS.md"));
+      const err = await assertRejects(() =>
+        w.writeBundle(
+          {
+            "AGENTS.md": { content: "BLOCK\n", executable: false, mergeBlock: "specnaut" },
+            ".specnaut-new/x.md": { content: "y", executable: false },
+          },
+          proj,
+          { overwrite: false },
+        )
+      );
+      assert(err instanceof Error && err.message.includes("does not exist"), String(err));
+      assertEquals(await Deno.readTextFile(join(root, "victim.txt")), "ORIGINAL\n");
+    } finally {
+      await Deno.remove(root, { recursive: true });
+    }
+  },
+);
