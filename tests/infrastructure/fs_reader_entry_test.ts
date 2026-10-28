@@ -73,3 +73,19 @@ Deno.test(
     });
   },
 );
+
+Deno.test("readEntry: a link through a missing directory is reported with no landing (cli#686)", {
+  ignore: WINDOWS,
+}, async () => {
+  // The walk refuses to guess where `nope/AGENTS.md` lands; `readEntry` must
+  // still report the link, not abort `upgrade` or `diff` over it.
+  await withProject(async (dir) => {
+    await Deno.mkdir(join(dir, ".claude"));
+    await Deno.symlink("nope/AGENTS.md", join(dir, ".claude/CLAUDE.md"));
+    assertEquals(await new DenoFsReader().readEntry(dir, ".claude/CLAUDE.md"), {
+      kind: "symlink",
+      target: "nope/AGENTS.md",
+      resolved: null,
+    });
+  });
+});

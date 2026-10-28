@@ -44,68 +44,81 @@ function symlinkTest(name: string, fn: () => Promise<void>): void {
 
 type Layout = { name: string; build: (proj: string, outside: string) => Promise<void> };
 
+/** The link targets every layout is generated with, by name. */
+const targets = (proj: string, outside: string) => ({
+  "abs-inside-file": join(proj, "real.md"),
+  "abs-outside-file": join(outside, "real.md"),
+  "abs-inside-absent": join(proj, "absent.md"),
+  "abs-outside-absent": join(outside, "absent.md"),
+  "rel-sibling": "real.md",
+  "rel-up-inside": join("..", "real.md"),
+  "rel-up-outside": join("..", "..", "outside", "real.md"),
+  "rel-dotdot-chain": join("..", "..", "outside", "sub", "real.md"),
+  // `..` AFTER a link, in the link's own text (cli#686). Built with a raw
+  // separator, never `join`: `join` collapses `s/..` to nothing, which is the
+  // very misreading under test. The kernel follows `s` first, then applies
+  // `..` to where it landed.
+  "rel-through-link-up": ["s", "..", "real.md"].join(SEPARATOR),
+  "rel-through-link-up-absent": ["s", "..", "evil.md"].join(SEPARATOR),
+  "rel-through-link-twice": ["s", "..", "sub", "..", "evil.md"].join(SEPARATOR),
+  "abs-through-link-up": [proj, "ps", "..", "evil.md"].join(SEPARATOR),
+});
+
+type Ancestor = "real" | "link-inside" | "link-outside";
+type TargetKey = keyof ReturnType<typeof targets>;
+
+/** Builds one layout: the fixture tree, the `d` ancestor, and a `chain`-link leaf to `key`. */
+async function buildLayout(
+  proj: string,
+  outside: string,
+  ancestor: Ancestor,
+  chain: number,
+  key: TargetKey,
+): Promise<void> {
+  await Deno.writeTextFile(join(proj, "real.md"), "inside");
+  await Deno.mkdir(join(outside, "sub"), { recursive: true });
+  await Deno.writeTextFile(join(outside, "real.md"), "outside");
+  await Deno.writeTextFile(join(outside, "sub", "real.md"), "outside-sub");
+  await Deno.mkdir(join(proj, "realdir"));
+  await Deno.writeTextFile(join(proj, "realdir", "real.md"), "inside-dir");
+  await Deno.mkdir(join(outside, "linked"));
+  await Deno.writeTextFile(join(outside, "linked", "real.md"), "outside-dir");
+
+  const dir = join(proj, "d");
+  if (ancestor === "real") await Deno.mkdir(dir);
+  else if (ancestor === "link-inside") await Deno.symlink(join(proj, "realdir"), dir);
+  else await Deno.symlink(join(outside, "linked"), dir);
+
+  // The links the through-link targets pass through: `s` beside the
+  // leaf and `ps` at the project root, both into the outside tree.
+  await Deno.symlink(join(outside, "sub"), join(dir, "s"));
+  await Deno.symlink(join(outside, "sub"), join(proj, "ps"));
+
+  const t = targets(proj, outside)[key];
+  if (chain === 0) {
+    // The leaf is a real file, no link at all — the control case.
+    await Deno.writeTextFile(join(dir, "leaf.md"), "leaf");
+    return;
+  }
+  // A chain of `chain` links ending at `t`.
+  let prev = t;
+  for (let i = chain - 1; i >= 1; i--) {
+    await Deno.symlink(prev, join(dir, `hop${i}.md`));
+    prev = `hop${i}.md`;
+  }
+  await Deno.symlink(prev, join(dir, "leaf.md"));
+}
+
 /** Every combination worth generating, enumerated rather than randomised, so a
  * failure names a layout that can be rebuilt by hand. */
 function layouts(): Layout[] {
   const out: Layout[] = [];
-  const targets = (proj: string, outside: string) => ({
-    "abs-inside-file": join(proj, "real.md"),
-    "abs-outside-file": join(outside, "real.md"),
-    "abs-inside-absent": join(proj, "absent.md"),
-    "abs-outside-absent": join(outside, "absent.md"),
-    "rel-sibling": "real.md",
-    "rel-up-inside": join("..", "real.md"),
-    "rel-up-outside": join("..", "..", "outside", "real.md"),
-    "rel-dotdot-chain": join("..", "..", "outside", "sub", "real.md"),
-    // `..` AFTER a link, in the link's own text (cli#686). Built with a raw
-    // separator, never `join`: `join` collapses `s/..` to nothing, which is the
-    // very misreading under test. The kernel follows `s` first, then applies
-    // `..` to where it landed.
-    "rel-through-link-up": ["s", "..", "real.md"].join(SEPARATOR),
-    "rel-through-link-up-absent": ["s", "..", "evil.md"].join(SEPARATOR),
-    "rel-through-link-twice": ["s", "..", "sub", "..", "evil.md"].join(SEPARATOR),
-    "abs-through-link-up": [proj, "ps", "..", "evil.md"].join(SEPARATOR),
-  });
-
   for (const ancestor of ["real", "link-inside", "link-outside"] as const) {
     for (const chain of [0, 1, 2, 3]) {
-      for (const key of Object.keys(targets("", ""))) {
+      for (const key of Object.keys(targets("", "")) as TargetKey[]) {
         out.push({
           name: `ancestor=${ancestor} chain=${chain} target=${key}`,
-          build: async (proj, outside) => {
-            await Deno.writeTextFile(join(proj, "real.md"), "inside");
-            await Deno.mkdir(join(outside, "sub"), { recursive: true });
-            await Deno.writeTextFile(join(outside, "real.md"), "outside");
-            await Deno.writeTextFile(join(outside, "sub", "real.md"), "outside-sub");
-            await Deno.mkdir(join(proj, "realdir"));
-            await Deno.writeTextFile(join(proj, "realdir", "real.md"), "inside-dir");
-            await Deno.mkdir(join(outside, "linked"));
-            await Deno.writeTextFile(join(outside, "linked", "real.md"), "outside-dir");
-
-            const dir = join(proj, "d");
-            if (ancestor === "real") await Deno.mkdir(dir);
-            else if (ancestor === "link-inside") await Deno.symlink(join(proj, "realdir"), dir);
-            else await Deno.symlink(join(outside, "linked"), dir);
-
-            // The links the through-link targets pass through: `s` beside the
-            // leaf and `ps` at the project root, both into the outside tree.
-            await Deno.symlink(join(outside, "sub"), join(dir, "s"));
-            await Deno.symlink(join(outside, "sub"), join(proj, "ps"));
-
-            const t = targets(proj, outside)[key as keyof ReturnType<typeof targets>];
-            if (chain === 0) {
-              // The leaf is a real file, no link at all — the control case.
-              await Deno.writeTextFile(join(dir, "leaf.md"), "leaf");
-              return;
-            }
-            // A chain of `chain` links ending at `t`.
-            let prev = t;
-            for (let i = chain - 1; i >= 1; i--) {
-              await Deno.symlink(prev, join(dir, `hop${i}.md`));
-              prev = `hop${i}.md`;
-            }
-            await Deno.symlink(prev, join(dir, "leaf.md"));
-          },
+          build: (proj, outside) => buildLayout(proj, outside, ancestor, chain, key),
         });
       }
     }

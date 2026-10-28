@@ -93,6 +93,9 @@ async function resolveDeepestExisting(p: string): Promise<string> {
     } catch (err) {
       if (!(err instanceof Deno.errors.NotFound)) throw err;
     }
+    // NotFound for a dangling link too — not absent: what lies under it depends
+    // on a target that may be created later (cli#686). Fail closed.
+    if (await Deno.lstat(cur).then(() => true, () => false)) throw new UnwalkableLinkError(cur);
     const parent = dirname(cur);
     // `dirname("/") === "/"`: nothing above us resolved, so there is nothing
     // left to resolve against. Returning `p` unchanged makes the comparison
@@ -108,6 +111,14 @@ async function resolveDeepestExisting(p: string): Promise<string> {
  * Deno's own limit is around 40; anything past a handful is a cycle in practice.
  */
 const MAX_SYMLINK_HOPS = 40;
+
+/** Where the symlink at `abs` points, one hop, walked as the kernel walks it. */
+async function followLink(abs: string): Promise<string> {
+  const link = await Deno.readLink(abs);
+  if (!isAbsolute(link)) return walkLinkText(await resolveDeepestExisting(dirname(abs)), link);
+  const root = parse(link).root;
+  return walkLinkText(root, link.slice(root.length));
+}
 
 export async function resolveTarget(abs: string): Promise<string> {
   let cur = abs;
@@ -140,18 +151,9 @@ export async function resolveTarget(abs: string): Promise<string> {
     // to loop rather than to special-case is that any fixed depth is the same
     // bug waiting for one more link.
     //
-    // The link text is walked one segment at a time from a real directory
-    // (cli#686), never `join`ed whole. `join` collapses `..` lexically, and the
-    // kernel only applies a `..` after following the component before it: with
-    // `s -> outside/deep`, the text `s/../evil` is `outside/evil` to the kernel
-    // and `<dir>/evil` to `join`. Nor can the raw string be handed to the OS to
-    // walk: under a scoped `--allow-read`, Deno normalises a path before the
-    // syscall, so `lstat("s/../evil")` answers for `<dir>/evil` — the same
-    // lexical misreading, one layer down.
-    const link = await Deno.readLink(cur);
-    cur = isAbsolute(link)
-      ? await walkLinkText(parse(link).root, link.slice(parse(link).root.length))
-      : await walkLinkText(await resolveDeepestExisting(dirname(cur)), link);
+    // The text is walked segment by segment, never `join`ed whole (cli#686):
+    // see `walkLinkText` for why, and why the raw string cannot go to the OS.
+    cur = await followLink(cur);
   }
   // A cycle never reaches a non-symlink, so the cap is what ends it.
   // `FilesystemLoop` on purpose: `assertInsideProject` already turns that into
@@ -247,6 +249,7 @@ export async function assertRemovableInProject(root: string, abs: string): Promi
   try {
     target = await removalTarget(abs);
   } catch (err) {
+    if (err instanceof UnwalkableLinkError) throw unwalkableRefusal(root, abs, err.missing);
     if (!(err instanceof Deno.errors.FilesystemLoop)) throw err;
     throw loopRefusal(root, abs);
   }
@@ -284,10 +287,11 @@ export async function assertLinkTargetInProject(
   abs: string,
   target: string,
 ): Promise<void> {
-  const parent = await resolveDeepestExisting(dirname(abs));
   let landing: string;
   try {
-    landing = isAbsolute(target) ? target : await walkLinkText(parent, target);
+    landing = isAbsolute(target)
+      ? target
+      : await walkLinkText(await resolveDeepestExisting(dirname(abs)), target);
   } catch (err) {
     if (!(err instanceof UnwalkableLinkError)) throw err;
     throw unwalkableRefusal(root, abs, err.missing);

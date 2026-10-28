@@ -1,5 +1,5 @@
 import { assert, assertEquals, assertRejects, assertStringIncludes } from "@std/assert";
-import { join } from "@std/path";
+import { join, SEPARATOR } from "@std/path";
 import { DenoFsWriter, type Linker } from "../../src/infrastructure/deno_fs_writer.ts";
 import type { Bundle } from "../../src/domain/template.ts";
 import { readLinkText, WINDOWS } from "../helpers/link_text.ts";
@@ -167,5 +167,30 @@ Deno.test({
       } finally {
         await Deno.remove(outside, { recursive: true });
       }
+    }),
+});
+
+Deno.test({
+  name: "a dangling link as an ancestor is refused by the guard, not by mkdir (cli#686)",
+  ignore: WINDOWS,
+  fn: () =>
+    withProject(async (dir) => {
+      // `.claude -> .codex/../..` is dangling until `.codex/` exists. `.claude/x.md`
+      // comes first, so it is judged while the link still dangles: containment
+      // must not rest on `mkdir` happening to fail on it.
+      await Deno.symlink([".codex", "..", ".."].join(SEPARATOR), join(dir, ".claude"));
+      const err = await assertRejects(
+        () =>
+          new DenoFsWriter().writeBundle(
+            {
+              ".claude/x.md": { content: "x\n", executable: false },
+              ".codex/x.md": { content: "y\n", executable: false },
+            },
+            dir,
+            { overwrite: true },
+          ),
+        Error,
+      );
+      assertStringIncludes(err.message, "does not exist");
     }),
 });

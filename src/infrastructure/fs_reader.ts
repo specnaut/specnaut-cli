@@ -2,6 +2,7 @@ import { join, relative, SEPARATOR } from "@std/path";
 import type { FsReader } from "../application/ports.ts";
 import { assertSafeDestination } from "../domain/template.ts";
 import type { DiskEntry } from "../domain/context_link.ts";
+import { UnwalkableLinkError } from "./fs_link_walk.ts";
 import {
   assertInsideProject,
   assertRemovableInProject,
@@ -67,8 +68,11 @@ export class DenoFsReader implements FsReader {
     try {
       resolved = relative(root, await resolveTarget(abs)).split(SEPARATOR).join("/");
     } catch (err) {
-      // A cycle cannot be followed; say so with `null` rather than guess.
-      if (!(err instanceof Deno.errors.FilesystemLoop)) throw err;
+      // A cycle, or a link through a directory that does not exist, cannot be
+      // followed; say so with `null` rather than guess.
+      if (!(err instanceof Deno.errors.FilesystemLoop || err instanceof UnwalkableLinkError)) {
+        throw err;
+      }
       resolved = null;
     }
     return { kind: "symlink", target, resolved };
