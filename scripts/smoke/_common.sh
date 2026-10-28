@@ -153,12 +153,14 @@ check_context_link() {
 }
 
 # check_context_file <backend> — from a claude scaffold's root (#612, cli#680):
-# `.claude/CLAUDE.md` links to AGENTS.md, and AGENTS.md describes the backend
-# it was given — the local index on `local` only, the backlog config on every
-# other — with no retired path and no unrendered backend marker.
+# `.claude/CLAUDE.md` links to AGENTS.md, no root CLAUDE.md is written, and
+# AGENTS.md describes the backend it was given — the local index on `local`
+# only, the backlog config on every other — with no retired path and no
+# unrendered backend marker.
 check_context_file() {
   check_context_link ".claude/CLAUDE.md is a relative symlink to the root AGENTS.md (cli#680)" \
     .claude/CLAUDE.md ../AGENTS.md
+  check "no root CLAUDE.md is written (cli#680)" '[ ! -e CLAUDE.md ]'
   if [ "$1" = local ]; then
     check "AGENTS.md points a local project at its backlog index" \
       'grep -q "\.specnaut/backlog\.md" AGENTS.md && [ -f .specnaut/backlog.md ]'

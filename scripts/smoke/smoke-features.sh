@@ -779,7 +779,6 @@ check "and fires each rule once per file per session, not on every edit" \
 echo
 echo "═══ #612 / cli#680  the context file is AGENTS.md, and points only at what was scaffolded ═══"
 check_context_file local
-check "no root CLAUDE.md is written (cli#680)" '[ ! -e CLAUDE.md ]'
 check "AGENTS.md carries the backlog section, rendered for its backend (cli#680)" \
   'grep -q -- "<!-- --- Specnaut: backlog --- -->" AGENTS.md && grep -q "\.specnaut/backlog\.md" AGENTS.md && ! grep -q "backend=" AGENTS.md'
 check "AGENTS.md carries the optional-integrations section (cli#680)" \
