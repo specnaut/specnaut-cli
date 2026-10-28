@@ -26,6 +26,16 @@ while [ "$#" -gt 0 ]; do
   esac
 done
 
+# A tag names a commit, but what ships is built from the tree around it: a
+# release cut from a dirty tree records a state nobody committed. `/ship` says
+# a dirty tree stops; this is where that becomes true.
+DIRTY=$(git status --porcelain)
+if [ -n "$DIRTY" ]; then
+  echo "working tree is not clean — commit or stash first. Uncommitted:" >&2
+  printf '%s\n' "$DIRTY" >&2
+  exit 1
+fi
+
 COMMIT="${COMMIT:-HEAD}"
 COMMIT_SHA=$(git rev-parse "$COMMIT")
 git fetch --tags --quiet 2>/dev/null || true

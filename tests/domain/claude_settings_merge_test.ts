@@ -188,6 +188,12 @@ const PUBLISH_ASK = [
   "Bash(gh release create *)",
   "Bash(gh release edit *--draft*)",
   "Bash(gh run rerun *)",
+  // The `/ship` path never types `gh release create` or `git push` itself:
+  // the scripts do (#682). A rule on the command alone is one the
+  // recommended path walks around.
+  "Bash(*release/tag.sh*)",
+  "Bash(*release/release-github.sh*)",
+  "Bash(*release/release-gitlab.sh*)",
 ];
 
 Deno.test("claude settings: the shipped file asks before every publish-capable command (#610)", () => {

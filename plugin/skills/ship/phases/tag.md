@@ -28,6 +28,8 @@ bash .specnaut/scripts/release/tag.sh "$@"
 
 What the script does:
 
+0. Refuses a dirty working tree (tracked changes or untracked files):
+   it exits non-zero, lists what is uncommitted, and creates nothing.
 1. Runs `git fetch --tags --quiet` so the next-tag computation sees
    every tag that already exists on `origin`.
 2. Computes the next tag from the project's scheme:

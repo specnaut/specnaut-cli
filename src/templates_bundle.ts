@@ -2878,6 +2878,8 @@ bash .specnaut/scripts/release/tag.sh "\$@"
 
 What the script does:
 
+0. Refuses a dirty working tree (tracked changes or untracked files):
+   it exits non-zero, lists what is uncommitted, and creates nothing.
 1. Runs \`git fetch --tags --quiet\` so the next-tag computation sees
    every tag that already exists on \`origin\`.
 2. Computes the next tag from the project's scheme:
@@ -3449,6 +3451,16 @@ while [ "\$#" -gt 0 ]; do
     *) COMMIT="\$1"; shift ;;
   esac
 done
+
+# A tag names a commit, but what ships is built from the tree around it: a
+# release cut from a dirty tree records a state nobody committed. \`/ship\` says
+# a dirty tree stops; this is where that becomes true.
+DIRTY=\$(git status --porcelain)
+if [ -n "\$DIRTY" ]; then
+  echo "working tree is not clean — commit or stash first. Uncommitted:" >&2
+  printf '%s\\n' "\$DIRTY" >&2
+  exit 1
+fi
 
 COMMIT="\${COMMIT:-HEAD}"
 COMMIT_SHA=\$(git rev-parse "\$COMMIT")
@@ -28261,7 +28273,10 @@ patterns:
     "ask": [
       "Bash(gh release create *)",
       "Bash(gh release edit *--draft*)",
-      "Bash(gh run rerun *)"
+      "Bash(gh run rerun *)",
+      "Bash(*release/tag.sh*)",
+      "Bash(*release/release-github.sh*)",
+      "Bash(*release/release-gitlab.sh*)"
     ]
   },
   "hooks": {

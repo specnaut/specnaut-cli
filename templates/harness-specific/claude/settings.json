@@ -4,7 +4,10 @@
     "ask": [
       "Bash(gh release create *)",
       "Bash(gh release edit *--draft*)",
-      "Bash(gh run rerun *)"
+      "Bash(gh run rerun *)",
+      "Bash(*release/tag.sh*)",
+      "Bash(*release/release-github.sh*)",
+      "Bash(*release/release-gitlab.sh*)"
     ]
   },
   "hooks": {
