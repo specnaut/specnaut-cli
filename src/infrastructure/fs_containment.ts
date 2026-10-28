@@ -51,31 +51,6 @@ export async function resolveProjectRoot(projectDir: string): Promise<string> {
 }
 
 /**
- * The path a mutation or read of `abs` would actually land on, with symlinks
- * followed as the kernel would follow them.
- *
- * Three states, distinguished with `lstat` and never by catching one exception:
- *
- *  1. **Absent** — resolve the parent and append the leaf. Nothing to follow.
- *  2. **A symlink** — follow it, one hop at a time, until the leaf is not a
- *     link. A *dangling* link resolves to where it points rather than to
- *     nothing: `Deno.writeTextFile` on a dangling link CREATES the target, so
- *     treating "cannot resolve" as "does not exist" is itself the escape this
- *     function exists to close.
- *  3. **Anything else** — `realPath`.
- *
- * The naive version of this is "try `realPath(abs)`, fall back to the parent on
- * `NotFound`". It is wrong, and quietly: `realPath` raises `NotFound` for a
- * dangling link and for an absent file alike, so the fallback says "inside" for
- * a link pointing anywhere at all.
- *
- * An earlier version of this comment claimed `realPath` does NOT throw on a
- * dangling link. That was false, and it was false because the probe that
- * "measured" it had already written through the link and created the target
- * before asking. The correction is kept here: a measurement taken after the
- * state it measures has changed is not a measurement.
- */
-/**
  * The deepest ancestor of `p` that exists, resolved, with whatever remainder
  * did not exist appended back on.
  *
@@ -127,6 +102,31 @@ async function followLink(abs: string): Promise<string> {
   return walkLinkText(root, link.slice(root.length));
 }
 
+/**
+ * The path a mutation or read of `abs` would actually land on, with symlinks
+ * followed as the kernel would follow them.
+ *
+ * Three states, distinguished with `lstat` and never by catching one exception:
+ *
+ *  1. **Absent** — resolve the parent and append the leaf. Nothing to follow.
+ *  2. **A symlink** — follow it, one hop at a time, until the leaf is not a
+ *     link. A *dangling* link resolves to where it points rather than to
+ *     nothing: `Deno.writeTextFile` on a dangling link CREATES the target, so
+ *     treating "cannot resolve" as "does not exist" is itself the escape this
+ *     function exists to close.
+ *  3. **Anything else** — `realPath`.
+ *
+ * The naive version of this is "try `realPath(abs)`, fall back to the parent on
+ * `NotFound`". It is wrong, and quietly: `realPath` raises `NotFound` for a
+ * dangling link and for an absent file alike, so the fallback says "inside" for
+ * a link pointing anywhere at all.
+ *
+ * An earlier version of this comment claimed `realPath` does NOT throw on a
+ * dangling link. That was false, and it was false because the probe that
+ * "measured" it had already written through the link and created the target
+ * before asking. The correction is kept here: a measurement taken after the
+ * state it measures has changed is not a measurement.
+ */
 export async function resolveTarget(abs: string): Promise<string> {
   let cur = abs;
   for (let hops = 0; hops <= MAX_SYMLINK_HOPS; hops++) {

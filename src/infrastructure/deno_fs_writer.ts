@@ -11,7 +11,7 @@ import { pruneEmptyParents } from "./fs_prune.ts";
 import { mergeIntoFile } from "../domain/merge_block.ts";
 import { mergeClaudeSettings, pluginDeclarationNotes } from "../domain/claude_settings_merge.ts";
 import type { BackupReport, ContextLinkWrite, FsWriter } from "../application/ports.ts";
-import { backupAside, backupForDelete, fileExists, isSymlink, readIfExists } from "./fs_backup.ts";
+import { backupForDelete, fileExists, isSymlink, readIfExists } from "./fs_backup.ts";
 import { denoSymlink, type Linker, writeContextLink } from "./fs_link_writer.ts";
 
 export type { Linker };
@@ -183,14 +183,7 @@ export class DenoFsWriter implements FsWriter {
       }
 
       if (backupExisting && (await fileExists(abs))) {
-        // Read BEFORE the rename — afterwards there is nothing at `abs` to ask.
-        const wasSymlink = await isSymlink(abs);
-        const suffix = await backupAside(abs);
-        backups.push({
-          dest,
-          backupPath: `${dest}${suffix}`,
-          ...(wasSymlink ? { wasSymlink: true as const } : {}),
-        });
+        backups.push(await backupForDelete(abs, dest));
       }
 
       await Deno.writeTextFile(abs, file.content);

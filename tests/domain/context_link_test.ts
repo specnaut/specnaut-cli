@@ -4,6 +4,7 @@ import {
   type DiskEntry,
   type LinkEvidence,
   linkIdentity,
+  linkOwnership,
   linkTargetPath,
 } from "../../src/domain/context_link.ts";
 import { lockShaInput } from "../../src/domain/template.ts";
@@ -82,4 +83,30 @@ Deno.test("the lock hashes a context link's identity, never its fallback text", 
     lockShaInput({ content: "@../AGENTS.md\n", executable: false, symlinkTo: "../AGENTS.md" }),
     linkIdentity("../AGENTS.md"),
   );
+});
+
+Deno.test("linkOwnership: one rule for diff and upgrade — every state has an owner", () => {
+  const owners = Object.fromEntries(
+    ([
+      "absent",
+      "ours-link",
+      "ours-fallback",
+      "materialised",
+      "generated",
+      "customized",
+      "foreign-link",
+      "inverted",
+    ] as const)
+      .map((s) => [s, linkOwnership(s)]),
+  );
+  assertEquals(owners, {
+    "absent": "rewritable",
+    "ours-link": "ours",
+    "ours-fallback": "ours",
+    "materialised": "rewritable",
+    "generated": "rewritable",
+    "customized": "theirs",
+    "foreign-link": "theirs",
+    "inverted": "theirs",
+  });
 });

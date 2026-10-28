@@ -56,6 +56,33 @@ export type LinkState =
   | "inverted";
 
 /**
+ * Whose a context link's disk state is — the one ownership rule `diff` and
+ * `upgrade` both answer by. An exhaustive `switch`, so a new `LinkState` fails
+ * to compile here rather than falling into a default somewhere else.
+ *
+ *  - `ours`: what Specnaut writes, as written. Nothing to do.
+ *  - `rewritable`: Specnaut's own, but not in its current form (absent, a
+ *    generated file, a link git checked out as text). Rewritten without asking.
+ *  - `theirs`: the user's — an edited file, a foreign link, or `AGENTS.md`
+ *    linked the other way round. Never rewritten without a backup.
+ */
+export function linkOwnership(state: LinkState): "ours" | "rewritable" | "theirs" {
+  switch (state) {
+    case "ours-link":
+    case "ours-fallback":
+      return "ours";
+    case "absent":
+    case "materialised":
+    case "generated":
+      return "rewritable";
+    case "customized":
+    case "foreign-link":
+    case "inverted":
+      return "theirs";
+  }
+}
+
+/**
  * The string `installed.lock` hashes for a context link — whichever form was
  * written. Recording the written form instead would make a committed lock
  * change between a contributor whose system makes links and one whose does not.

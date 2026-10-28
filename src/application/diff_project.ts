@@ -1,7 +1,7 @@
 import type { FsReader, Harness, LockStore } from "./ports.ts";
 import type { CoreBundle } from "../domain/core_bundle.ts";
 import { sha256Hex } from "../domain/sha256.ts";
-import { classifyLinkDisk, linkTargetPath } from "../domain/context_link.ts";
+import { classifyLinkDisk, linkOwnership, linkTargetPath } from "../domain/context_link.ts";
 
 /**
  * Per-file outcome of comparing a managed file's on-disk content against the
@@ -203,10 +203,9 @@ async function linkDivergence(
     lockSha,
     targetEntry: await reader.readEntry(projectDir, linkTargetPath(dest, file.symlinkTo)),
   });
-  const customised = state === "customized" || state === "foreign-link" || state === "inverted";
-  if (state === "ours-link" || state === "ours-fallback") {
-    return { result: { kind: "matches", dest }, customised };
-  }
+  const owner = linkOwnership(state);
+  const customised = owner === "theirs";
+  if (owner === "ours") return { result: { kind: "matches", dest }, customised };
   const diskContent = disk.kind === "file" ? disk.content : `symlink → ${disk.target}\n`;
   const bundledContent = `symlink → ${file.symlinkTo}\n`;
   return { result: { kind: "differs", dest, diskContent, bundledContent }, customised };
