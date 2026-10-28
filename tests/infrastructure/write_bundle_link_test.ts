@@ -2,6 +2,7 @@ import { assert, assertEquals, assertRejects, assertStringIncludes } from "@std/
 import { join } from "@std/path";
 import { DenoFsWriter, type Linker } from "../../src/infrastructure/deno_fs_writer.ts";
 import type { Bundle } from "../../src/domain/template.ts";
+import { readLinkText, WINDOWS } from "../helpers/link_text.ts";
 
 /**
  * The writer's context-link branch (cli#680, cli#681): a destination carrying
@@ -30,7 +31,7 @@ Deno.test("a context link is written as a relative symlink that resolves to AGEN
     const report = await new DenoFsWriter().writeBundle(LINKED, dir, { overwrite: true });
     const abs = join(dir, DEST);
     assert((await Deno.lstat(abs)).isSymlink, "not a symlink");
-    assertEquals(await Deno.readLink(abs), "../AGENTS.md");
+    assertEquals(await readLinkText(abs), "../AGENTS.md");
     assertEquals(await Deno.readTextFile(abs), "# AGENTS\n");
     assertEquals(report.links, [{ dest: DEST, target: "../AGENTS.md", form: "symlink" }]);
   });
@@ -61,7 +62,9 @@ Deno.test("a refusal that is not about links propagates instead of falling back"
   });
 });
 
-Deno.test("our own link is left alone even under backupExisting — no backup, no report", async () => {
+Deno.test("our own link is left alone even under backupExisting — no backup, no report", {
+  ignore: WINDOWS,
+}, async () => {
   await withProject(async (dir) => {
     await Deno.mkdir(join(dir, ".claude"));
     await Deno.symlink("../AGENTS.md", join(dir, DEST));
@@ -71,30 +74,36 @@ Deno.test("our own link is left alone even under backupExisting — no backup, n
     });
     assertEquals(report.backups, []);
     assertEquals(report.links, undefined);
-    assertEquals(await Deno.readLink(join(dir, DEST)), "../AGENTS.md");
+    assertEquals(await readLinkText(join(dir, DEST)), "../AGENTS.md");
   });
 });
 
-Deno.test("a foreign link is moved aside as a link, and ours takes its place", async () => {
-  await withProject(async (dir) => {
-    await Deno.mkdir(join(dir, ".claude"));
-    await Deno.writeTextFile(join(dir, "OTHER.md"), "other\n");
-    await Deno.symlink("../OTHER.md", join(dir, DEST));
-    const report = await new DenoFsWriter().writeBundle(LINKED, dir, {
-      overwrite: true,
-      backupExisting: true,
+Deno.test(
+  "a foreign link is moved aside as a link, and ours takes its place",
+  { ignore: WINDOWS },
+  async () => {
+    await withProject(async (dir) => {
+      await Deno.mkdir(join(dir, ".claude"));
+      await Deno.writeTextFile(join(dir, "OTHER.md"), "other\n");
+      await Deno.symlink("../OTHER.md", join(dir, DEST));
+      const report = await new DenoFsWriter().writeBundle(LINKED, dir, {
+        overwrite: true,
+        backupExisting: true,
+      });
+      assertEquals(report.backups, [{
+        dest: DEST,
+        backupPath: `${DEST}.specnaut.bak`,
+        wasSymlink: true,
+      }]);
+      assertEquals(await readLinkText(join(dir, DEST)), "../AGENTS.md");
+      assertEquals(await Deno.readTextFile(join(dir, "OTHER.md")), "other\n");
     });
-    assertEquals(report.backups, [{
-      dest: DEST,
-      backupPath: `${DEST}.specnaut.bak`,
-      wasSymlink: true,
-    }]);
-    assertEquals(await Deno.readLink(join(dir, DEST)), "../AGENTS.md");
-    assertEquals(await Deno.readTextFile(join(dir, "OTHER.md")), "other\n");
-  });
-});
+  },
+);
 
-Deno.test("a foreign link pointing OUT of the project is replaced, not refused", async () => {
+Deno.test("a foreign link pointing OUT of the project is replaced, not refused", {
+  ignore: WINDOWS,
+}, async () => {
   // Replacing a link touches the link, not its target. Judged by its target,
   // the whole bundle aborted on a link the run was about to remove.
   await withProject(async (dir) => {
@@ -104,7 +113,7 @@ Deno.test("a foreign link pointing OUT of the project is replaced, not refused",
       await Deno.mkdir(join(dir, ".claude"));
       await Deno.symlink(join(outside, "theirs.md"), join(dir, DEST));
       await new DenoFsWriter().writeBundle(LINKED, dir, { overwrite: true, backupExisting: true });
-      assertEquals(await Deno.readLink(join(dir, DEST)), "../AGENTS.md");
+      assertEquals(await readLinkText(join(dir, DEST)), "../AGENTS.md");
       assertEquals(await Deno.readTextFile(join(outside, "theirs.md")), "theirs\n");
     } finally {
       await Deno.remove(outside, { recursive: true });
@@ -118,7 +127,7 @@ Deno.test("a plain file is replaced without a backup when none was asked for", a
     await Deno.writeTextFile(join(dir, DEST), "# generated\n");
     const report = await new DenoFsWriter().writeBundle(LINKED, dir, { overwrite: true });
     assertEquals(report.backups, []);
-    assertEquals(await Deno.readLink(join(dir, DEST)), "../AGENTS.md");
+    assertEquals(await readLinkText(join(dir, DEST)), "../AGENTS.md");
   });
 });
 

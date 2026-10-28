@@ -10,6 +10,7 @@ import { DenoFsWriter, type Linker } from "../../src/infrastructure/deno_fs_writ
 import { DenoFsReader } from "../../src/infrastructure/fs_reader.ts";
 import { FsLockStore } from "../../src/infrastructure/fs_lock_store.ts";
 import { FsStagingStore } from "../../src/infrastructure/fs_staging_store.ts";
+import { readLinkText, WINDOWS } from "../helpers/link_text.ts";
 
 /**
  * A context link through the real init and upgrade use cases, on a real
@@ -87,7 +88,7 @@ async function plantFile(dir: string, content: string, lockedAs: string) {
 
 const isOurLink = async (dir: string) =>
   (await Deno.lstat(join(dir, DEST))).isSymlink &&
-  (await Deno.readLink(join(dir, DEST))) === "../AGENTS.md";
+  (await readLinkText(join(dir, DEST))) === "../AGENTS.md";
 
 Deno.test("init links the context file and the next upgrade is a no-op", async () => {
   await withProject(async (dir) => {
@@ -145,7 +146,9 @@ Deno.test("a preserve.yml declaration keeps a customized context file as it is",
   });
 });
 
-Deno.test("a declaration wins over an inverted consolidation too: preserved, not refused", async () => {
+Deno.test("a declaration wins over an inverted consolidation too: preserved, not refused", {
+  ignore: WINDOWS,
+}, async () => {
   await withProject(async (dir) => {
     await initProject(dir);
     await Deno.remove(join(dir, DEST));
@@ -175,7 +178,9 @@ Deno.test("a link checked out as text (core.symlinks=false) is relinked and said
   });
 });
 
-Deno.test("AGENTS.md linking back to the context file is refused, never relinked", async () => {
+Deno.test("AGENTS.md linking back to the context file is refused, never relinked", {
+  ignore: WINDOWS,
+}, async () => {
   await withProject(async (dir) => {
     await initProject(dir);
     await Deno.remove(join(dir, DEST));
@@ -193,7 +198,9 @@ Deno.test("AGENTS.md linking back to the context file is refused, never relinked
   });
 });
 
-Deno.test("a foreign link pointing out of the project is replaced, its target untouched", async () => {
+Deno.test("a foreign link pointing out of the project is replaced, its target untouched", {
+  ignore: WINDOWS,
+}, async () => {
   await withProject(async (dir) => {
     const outside = await Deno.makeTempDir();
     try {

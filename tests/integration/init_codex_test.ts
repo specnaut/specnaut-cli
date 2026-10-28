@@ -2,6 +2,7 @@ import { assertEquals } from "@std/assert";
 import { exists } from "@std/fs/exists";
 import { parse as parseToml } from "@std/toml";
 import { fromFileUrl, join } from "@std/path";
+import { readLinkText } from "../helpers/link_text.ts";
 
 const MAIN = fromFileUrl(new URL("../../src/main.ts", import.meta.url));
 
@@ -84,7 +85,7 @@ Deno.test("specnaut init --ai codex scaffolds a Codex layout", async () => {
     // Codex reads the root file itself; the link is for symmetry and tooling.
     // `.codex/goal.md` is retired: Codex's `/goal` reads no file.
     assertEquals((await Deno.lstat(join(root, ".codex/AGENTS.md"))).isSymlink, true);
-    assertEquals(await Deno.readLink(join(root, ".codex/AGENTS.md")), "../AGENTS.md");
+    assertEquals(await readLinkText(join(root, ".codex/AGENTS.md")), "../AGENTS.md");
     assertEquals(await exists(join(root, ".codex/goal.md")), false);
     const agentsMd = await Deno.readTextFile(join(root, "AGENTS.md"));
     assertEquals(agentsMd.includes("**Codex only:**"), true);

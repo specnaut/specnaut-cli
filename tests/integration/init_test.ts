@@ -1,6 +1,7 @@
 import { assertEquals, assertStringIncludes } from "@std/assert";
 import { exists } from "@std/fs/exists";
 import { fromFileUrl, join } from "@std/path";
+import { readLinkText } from "../helpers/link_text.ts";
 
 const MAIN = fromFileUrl(new URL("../../src/main.ts", import.meta.url));
 
@@ -49,7 +50,7 @@ Deno.test("specnaut init <name> writes a complete tree", async () => {
     // A relative link to the root AGENTS.md (cli#680) — `lstat`, not `exists`,
     // which follows the link.
     assertEquals((await Deno.lstat(join(root, ".claude/CLAUDE.md"))).isSymlink, true);
-    assertEquals(await Deno.readLink(join(root, ".claude/CLAUDE.md")), "../AGENTS.md");
+    assertEquals(await readLinkText(join(root, ".claude/CLAUDE.md")), "../AGENTS.md");
     assertEquals(await exists(join(root, "CLAUDE.md")), false);
     assertEquals(await exists(join(root, "AGENTS.md")), true);
     assertEquals(await exists(join(root, "tasks/backlog.md")), false);

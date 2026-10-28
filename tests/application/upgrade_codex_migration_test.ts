@@ -12,6 +12,7 @@ import { DenoFsReader } from "../../src/infrastructure/fs_reader.ts";
 import { FsLockStore } from "../../src/infrastructure/fs_lock_store.ts";
 import { FsStagingStore } from "../../src/infrastructure/fs_staging_store.ts";
 import { CORE_BUNDLE } from "../../src/templates_bundle.ts";
+import { readLinkText } from "../helpers/link_text.ts";
 
 /**
  * A Codex project scaffolded before cli#681, upgraded: `.codex/AGENTS.md`
@@ -89,7 +90,7 @@ Deno.test("upgrade links .codex/AGENTS.md, retires goal.md, enables agents, then
     await oldCodexProject(dir, OLD_GOAL);
     const r = await upgrade(dir);
     assert(r.status === "applied", r.status);
-    assertEquals(await Deno.readLink(join(dir, ".codex/AGENTS.md")), "../AGENTS.md");
+    assertEquals(await readLinkText(join(dir, ".codex/AGENTS.md")), "../AGENTS.md");
     assertEquals(await exists(join(dir, ".codex/goal.md")), false, "a vanilla goal.md stays");
     assertEquals(r.backups, [], "nothing here was the user's");
     const config = await Deno.readTextFile(join(dir, ".codex/config.toml"));

@@ -1,6 +1,7 @@
 import { assertEquals } from "@std/assert";
 import { join } from "@std/path";
 import { DenoFsReader } from "../../src/infrastructure/fs_reader.ts";
+import { WINDOWS } from "../helpers/link_text.ts";
 
 /** `readEntry` reports what is at a path itself — a link as a link (cli#680). */
 
@@ -22,7 +23,9 @@ Deno.test("readEntry: absent is null, a file is its content", async () => {
   });
 });
 
-Deno.test("readEntry: a link is reported with its text and landing, not read through", async () => {
+Deno.test("readEntry: a link is reported with its text and landing, not read through", {
+  ignore: WINDOWS,
+}, async () => {
   await withProject(async (dir) => {
     await Deno.writeTextFile(join(dir, "AGENTS.md"), "# A\n");
     await Deno.mkdir(join(dir, ".claude"));
@@ -35,7 +38,9 @@ Deno.test("readEntry: a link is reported with its text and landing, not read thr
   });
 });
 
-Deno.test("readEntry: a link out of the project is reported, never refused or read", async () => {
+Deno.test("readEntry: a link out of the project is reported, never refused or read", {
+  ignore: WINDOWS,
+}, async () => {
   // `readText` refuses this path; `upgrade` still has to know what is there to
   // decide to replace it.
   await withProject(async (dir) => {
@@ -53,14 +58,18 @@ Deno.test("readEntry: a link out of the project is reported, never refused or re
   });
 });
 
-Deno.test("readEntry: a link cycle resolves to null instead of throwing", async () => {
-  await withProject(async (dir) => {
-    await Deno.symlink("b.md", join(dir, "a.md"));
-    await Deno.symlink("a.md", join(dir, "b.md"));
-    assertEquals(await new DenoFsReader().readEntry(dir, "a.md"), {
-      kind: "symlink",
-      target: "b.md",
-      resolved: null,
+Deno.test(
+  "readEntry: a link cycle resolves to null instead of throwing",
+  { ignore: WINDOWS },
+  async () => {
+    await withProject(async (dir) => {
+      await Deno.symlink("b.md", join(dir, "a.md"));
+      await Deno.symlink("a.md", join(dir, "b.md"));
+      assertEquals(await new DenoFsReader().readEntry(dir, "a.md"), {
+        kind: "symlink",
+        target: "b.md",
+        resolved: null,
+      });
     });
-  });
-});
+  },
+);
