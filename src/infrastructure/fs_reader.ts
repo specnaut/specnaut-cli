@@ -8,6 +8,7 @@ import {
   assertRemovableInProject,
   resolveProjectRoot,
   resolveTarget,
+  UnwalkableRefusal,
 } from "./fs_containment.ts";
 
 export class DenoFsReader implements FsReader {
@@ -32,7 +33,7 @@ export class DenoFsReader implements FsReader {
   async readText(projectDir: string, rel: string): Promise<string | null> {
     assertSafeDestination(rel);
     const abs = join(projectDir, rel);
-    await assertInsideProject(await resolveProjectRoot(projectDir), abs);
+    if (!await guarded(assertInsideProject(await resolveProjectRoot(projectDir), abs))) return null;
     try {
       return await Deno.readTextFile(abs);
     } catch (err) {
@@ -54,7 +55,7 @@ export class DenoFsReader implements FsReader {
     assertSafeDestination(rel);
     const root = await resolveProjectRoot(projectDir);
     const abs = join(projectDir, rel);
-    await assertRemovableInProject(root, abs);
+    if (!await guarded(assertRemovableInProject(root, abs))) return null;
     let info: Deno.FileInfo;
     try {
       info = await Deno.lstat(abs);
@@ -76,5 +77,21 @@ export class DenoFsReader implements FsReader {
       resolved = null;
     }
     return { kind: "symlink", target, resolved };
+  }
+}
+
+/**
+ * Runs a containment check for a READ. A link through a directory that does not
+ * exist has nothing to read, so a reader reports it as absent (`false`) where a
+ * writer refuses (cli#686) — `diff` must not abort over the user's dangling
+ * link. Every other refusal still throws.
+ */
+async function guarded(check: Promise<void>): Promise<boolean> {
+  try {
+    await check;
+    return true;
+  } catch (err) {
+    if (err instanceof UnwalkableRefusal) return false;
+    throw err;
   }
 }

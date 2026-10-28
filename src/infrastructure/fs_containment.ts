@@ -1,6 +1,9 @@
 import { basename, dirname, isAbsolute, join, parse, relative, SEPARATOR } from "@std/path";
 import { isInside } from "../domain/template.ts";
 import { UnwalkableLinkError, walkLinkText } from "./fs_link_walk.ts";
+import { leavesRefusal, refuseUnusable } from "./fs_refusals.ts";
+
+export { UnwalkableRefusal } from "./fs_refusals.ts";
 
 /**
  * The filesystem half of containment (cli#574). The pure half — comparing two
@@ -95,7 +98,11 @@ async function resolveDeepestExisting(p: string): Promise<string> {
     }
     // NotFound for a dangling link too — not absent: what lies under it depends
     // on a target that may be created later (cli#686). Fail closed.
-    if (await Deno.lstat(cur).then(() => true, () => false)) throw new UnwalkableLinkError(cur);
+    const seen = await Deno.lstat(cur).then(() => true, (e) => {
+      if (e instanceof Deno.errors.NotFound) return false;
+      throw e;
+    });
+    if (seen) throw new UnwalkableLinkError(cur);
     const parent = dirname(cur);
     // `dirname("/") === "/"`: nothing above us resolved, so there is nothing
     // left to resolve against. Returning `p` unchanged makes the comparison
@@ -183,47 +190,11 @@ export async function assertInsideProject(root: string, abs: string): Promise<vo
   try {
     resolved = await resolveTarget(abs);
   } catch (err) {
-    // A symlink cycle cannot be written through — the kernel refuses it too —
-    // but it surfaced as a raw `FilesystemLoop` with a `realpath` in the text,
-    // which tells the user nothing about their project. Refuse it the same way
-    // as an escape: the path is unusable either way, and the message should say
-    // which path. Deliberately narrow — every other error still propagates, so
-    // a permission problem is not silently reported as a bad layout.
-    if (err instanceof UnwalkableLinkError) throw unwalkableRefusal(root, abs, err.missing);
-    if (!(err instanceof Deno.errors.FilesystemLoop)) throw err;
-    throw loopRefusal(root, abs);
+    refuseUnusable(root, abs, err);
   }
   if (isInside(root, resolved)) return;
   throw leavesRefusal(root, abs, resolved);
 }
-
-const loopRefusal = (root: string, abs: string) =>
-  new Error(
-    `refusing to touch a path whose symlinks form a cycle:\n` +
-      `  path:    ${abs}\n` +
-      `  project: ${root}\n` +
-      `Follow the links from that path and break the loop.`,
-  );
-
-const unwalkableRefusal = (root: string, abs: string, missing: string) =>
-  new Error(
-    `refusing to touch a path whose symlink passes through a directory that does not exist:\n` +
-      `  path:    ${abs}\n` +
-      `  missing: ${missing}\n` +
-      `  project: ${root}\n` +
-      `Where it lands would depend on directories created later, so Specnaut ` +
-      `cannot tell whether it stays inside the project. Fix or remove that link.`,
-  );
-
-const leavesRefusal = (root: string, abs: string, resolved: string) =>
-  new Error(
-    `refusing to touch a path that leaves the project:\n` +
-      `  path:     ${abs}\n` +
-      `  resolves: ${resolved}\n` +
-      `  project:  ${root}\n` +
-      `A symlink in the project points outside it. Specnaut will not write, ` +
-      `move, delete or read through it.`,
-  );
 
 /**
  * What a removal or a rename of `abs` acts on: the parent resolved
@@ -249,9 +220,7 @@ export async function assertRemovableInProject(root: string, abs: string): Promi
   try {
     target = await removalTarget(abs);
   } catch (err) {
-    if (err instanceof UnwalkableLinkError) throw unwalkableRefusal(root, abs, err.missing);
-    if (!(err instanceof Deno.errors.FilesystemLoop)) throw err;
-    throw loopRefusal(root, abs);
+    refuseUnusable(root, abs, err);
   }
   if (!isInside(root, target)) throw leavesRefusal(root, abs, target);
   if (relative(root, target) === "") {
@@ -293,8 +262,7 @@ export async function assertLinkTargetInProject(
       ? target
       : await walkLinkText(await resolveDeepestExisting(dirname(abs)), target);
   } catch (err) {
-    if (!(err instanceof UnwalkableLinkError)) throw err;
-    throw unwalkableRefusal(root, abs, err.missing);
+    refuseUnusable(root, abs, err);
   }
   if (!isInside(root, landing)) throw leavesRefusal(root, abs, landing);
 }

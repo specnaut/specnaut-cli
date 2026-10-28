@@ -89,3 +89,14 @@ Deno.test("readEntry: a link through a missing directory is reported with no lan
     });
   });
 });
+
+Deno.test("a dangling ancestor reads as absent, never as a refusal (cli#686)", {
+  ignore: WINDOWS,
+}, async () => {
+  await withProject(async (dir) => {
+    await Deno.symlink("nope", join(dir, ".claude"));
+    const reader = new DenoFsReader();
+    assertEquals(await reader.readEntry(dir, ".claude/CLAUDE.md"), null);
+    assertEquals(await reader.readText(dir, ".claude/CLAUDE.md"), null);
+  });
+});

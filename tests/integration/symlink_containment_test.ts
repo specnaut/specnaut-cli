@@ -116,3 +116,28 @@ Deno.test({
     }
   },
 });
+
+Deno.test({
+  name: "specnaut diff reports a dangling .claude link instead of aborting (cli#686)",
+  ignore: Deno.build.os === "windows",
+  fn: async () => {
+    // A writer refuses a path through a missing directory; a reader has nothing
+    // to read there and must say "absent", not abort the user's `diff`.
+    const { root, proj } = await box();
+    try {
+      const init = await runSpecnaut(
+        ["init", "--here", "--no-git", "--ai", "claude", "--backlog", "local"],
+        { cwd: proj },
+      );
+      assertEquals(init.code, 0, init.stderr);
+      await Deno.remove(join(proj, ".claude"), { recursive: true });
+      await Deno.symlink("nope", join(proj, ".claude"));
+
+      const r = await runSpecnaut(["diff"], { cwd: proj });
+      assertEquals(r.code, 0, r.stderr);
+      assert(!r.stderr.includes("refusing"), r.stderr);
+    } finally {
+      await Deno.remove(root, { recursive: true });
+    }
+  },
+});
