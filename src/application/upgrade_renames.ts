@@ -30,6 +30,9 @@ export type RenameContext = {
   readonly isDeclaredPreserved?: (dest: string) => boolean;
 };
 
+/** One rename this project is actually mid-way through. */
+type ApplicableRename = { oldDest: string; newDest: string; reason: string };
+
 /**
  * Returns the lock with every applicable rename's entry moved to its new
  * address, and moves the matching `diskShas` entry in place. On a real run the
@@ -42,6 +45,33 @@ export async function carryRenamedDocs(
   lock: InstalledLock,
   diskShas: Map<string, string>,
 ): Promise<InstalledLock> {
+  const applicable = applicableRenames(ctx, bundle, lock, diskShas);
+  if (applicable.length === 0) return lock;
+
+  const entries = new Map(lock.entries);
+  for (const { oldDest, newDest } of applicable) {
+    entries.set(newDest, entries.get(oldDest)!);
+    entries.delete(oldDest);
+    diskShas.set(newDest, diskShas.get(oldDest)!);
+    diskShas.delete(oldDest);
+  }
+
+  // The maps above are enough for `--dry-run` to report the move
+  // faithfully; the bytes only travel on a real run.
+  if (!ctx.dryRun) await moveRenamedBytes(ctx, applicable);
+  return { ...lock, entries };
+}
+
+/**
+ * The renames that apply to this project, each endpoint placed where THIS
+ * harness puts the document.
+ */
+function applicableRenames(
+  ctx: RenameContext,
+  bundle: Bundle,
+  lock: InstalledLock,
+  diskShas: Map<string, string>,
+): ApplicableRename[] {
   const { harness, bundleOpts } = ctx;
   /** Destinations this harness emits regardless of the bundle. */
   const harnessOnlyDests = harness.mapBundle([], bundleOpts);
@@ -53,7 +83,7 @@ export async function carryRenamedDocs(
     return Object.keys(mapped).find((d) => !(d in harnessOnlyDests)) ?? null;
   };
 
-  const applicable: Array<{ oldDest: string; newDest: string; reason: string }> = [];
+  const applicable: ApplicableRename[] = [];
   for (const r of SKILL_DOC_RENAMES) {
     const oldDest = destFor(r.from.owner, r.from.doc);
     const newDest = destFor(r.to.owner, r.to.doc);
@@ -68,36 +98,28 @@ export async function carryRenamedDocs(
     if (lock.entries.has(newDest)) continue;
     applicable.push({ oldDest, newDest, reason: r.reason });
   }
-  if (applicable.length === 0) return lock;
+  return applicable;
+}
 
-  const entries = new Map(lock.entries);
+/** Moves each renamed document's bytes from its old address to its new one. */
+async function moveRenamedBytes(
+  ctx: RenameContext,
+  applicable: ReadonlyArray<ApplicableRename>,
+): Promise<void> {
+  const moved: Bundle = {};
   for (const { oldDest, newDest } of applicable) {
-    entries.set(newDest, entries.get(oldDest)!);
-    entries.delete(oldDest);
-    diskShas.set(newDest, diskShas.get(oldDest)!);
-    diskShas.delete(oldDest);
+    const content = await ctx.reader.readText(ctx.projectDir, oldDest);
+    if (content === null) continue;
+    moved[newDest] = { content, executable: false };
   }
-
-  // The maps above are enough for `--dry-run` to report the move
-  // faithfully; the bytes only travel on a real run.
-  if (!ctx.dryRun) {
-    const moved: Bundle = {};
-    for (const { oldDest, newDest } of applicable) {
-      const content = await ctx.reader.readText(ctx.projectDir, oldDest);
-      if (content === null) continue;
-      moved[newDest] = { content, executable: false };
-    }
-    if (Object.keys(moved).length > 0) {
-      await ctx.writer.writeBundle(moved, ctx.projectDir, { overwrite: true });
-      await ctx.writer.deletePaths(
-        applicable.map((a) => a.oldDest),
-        ctx.projectDir,
-        // No backup: the bytes were moved, not discarded. A backup here
-        // would leave a `.specnaut.bak` beside every renamed file on an
-        // upgrade that lost nothing.
-        { backupExisting: false },
-      );
-    }
-  }
-  return { ...lock, entries };
+  if (Object.keys(moved).length === 0) return;
+  await ctx.writer.writeBundle(moved, ctx.projectDir, { overwrite: true });
+  await ctx.writer.deletePaths(
+    applicable.map((a) => a.oldDest),
+    ctx.projectDir,
+    // No backup: the bytes were moved, not discarded. A backup here would
+    // leave a `.specnaut.bak` beside every renamed file on an upgrade that
+    // lost nothing.
+    { backupExisting: false },
+  );
 }
