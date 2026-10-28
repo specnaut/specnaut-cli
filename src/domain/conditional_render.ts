@@ -194,7 +194,9 @@ type MarkerStep = { readonly open: OpenBlock | null } | undefined;
 
 /** The BEGIN / END patterns for `key`, in the marker syntax of the source. */
 function markerPatterns(key: string, syntax: "html" | "shell"): { begin: RegExp; end: RegExp } {
-  const [open, close] = syntax === "html" ? ["<!--\\s*", "\\s*-->"] : ["#\\s*", ""];
+  // `--!?>`: HTML also ends a comment at `--!>`; accepting it keeps a marker
+  // line read the way a browser would read it (CodeQL js/bad-tag-filter).
+  const [open, close] = syntax === "html" ? ["<!--\\s*", "\\s*--!?>"] : ["#\\s*", ""];
   return {
     begin: new RegExp(`^\\s*${open}BEGIN:\\s*${key}=([a-zA-Z0-9_-]+)${close}\\s*$`),
     end: new RegExp(`^\\s*${open}END:\\s*${key}=([a-zA-Z0-9_-]+)${close}\\s*$`),

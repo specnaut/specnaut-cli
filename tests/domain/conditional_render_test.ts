@@ -167,3 +167,11 @@ Deno.test("renderBackend tolerates whitespace around marker syntax", () => {
   ].join("\n");
   assertEquals(renderBackend(src, "local"), "kept");
 });
+
+Deno.test("renderBackend reads a marker closed by `--!>` as a marker", () => {
+  // HTML also ends a comment at `--!>`; a marker line closed that way must not
+  // leak into the rendered file as text.
+  const src = ["a", "<!-- BEGIN: backend=github --!>", "gh", "<!-- END: backend=github --!>", "b"]
+    .join("\n");
+  assertEquals(renderBackend(src, "local"), "a\nb");
+});

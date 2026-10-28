@@ -25,9 +25,11 @@ var embedded embed.FS
 const root = "templates"
 
 // Entry is one shipped file, as templates/manifest.json declares it. Only the
-// fields the Go port reads so far are decoded.
+// fields the Go port reads so far are decoded. A context-link entry
+// (cli#680/#681) carries `link` instead of `source`: it ships no file.
 type Entry struct {
 	Source string `json:"source"`
+	Link   string `json:"link"`
 }
 
 // Manifest is templates/manifest.json: the shipped file set and the version.
@@ -40,11 +42,10 @@ type Manifest struct {
 // Sources lists every shipped source path, relative to templates/.
 func (m Manifest) Sources() []string {
 	out := make([]string, 0, len(m.Core)+len(m.HarnessStatic))
-	for _, e := range m.Core {
-		out = append(out, e.Source)
-	}
-	for _, e := range m.HarnessStatic {
-		out = append(out, e.Source)
+	for _, e := range append(append([]Entry{}, m.Core...), m.HarnessStatic...) {
+		if e.Link == "" {
+			out = append(out, e.Source)
+		}
 	}
 	return out
 }
