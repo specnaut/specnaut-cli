@@ -1,5 +1,6 @@
 import { basename, dirname, isAbsolute, join, parse, relative, SEPARATOR } from "@std/path";
 import { isInside } from "../domain/template.ts";
+import { walkLinkText } from "./fs_link_walk.ts";
 
 /**
  * The filesystem half of containment (cli#574). The pure half — comparing two
@@ -139,11 +140,18 @@ export async function resolveTarget(abs: string): Promise<string> {
     // to loop rather than to special-case is that any fixed depth is the same
     // bug waiting for one more link.
     //
-    // The parent is resolved before the join for the round-1 reason: `join`
-    // collapses `..` lexically, the kernel applies it from where it landed.
+    // The link text is walked one segment at a time from a real directory
+    // (cli#686), never `join`ed whole. `join` collapses `..` lexically, and the
+    // kernel only applies a `..` after following the component before it: with
+    // `s -> outside/deep`, the text `s/../evil` is `outside/evil` to the kernel
+    // and `<dir>/evil` to `join`. Nor can the raw string be handed to the OS to
+    // walk: under a scoped `--allow-read`, Deno normalises a path before the
+    // syscall, so `lstat("s/../evil")` answers for `<dir>/evil` — the same
+    // lexical misreading, one layer down.
     const link = await Deno.readLink(cur);
-    const realParent = await resolveDeepestExisting(dirname(cur));
-    cur = isAbsolute(link) ? link : join(realParent, link);
+    cur = isAbsolute(link)
+      ? await walkLinkText(parse(link).root, link.slice(parse(link).root.length))
+      : await walkLinkText(await resolveDeepestExisting(dirname(cur)), link);
   }
   // A cycle never reaches a non-symlink, so the cap is what ends it.
   // `FilesystemLoop` on purpose: `assertInsideProject` already turns that into
@@ -255,10 +263,10 @@ export async function resolvedRelative(root: string, abs: string): Promise<strin
  * Throws unless a symlink at `abs` with text `target` would land inside
  * `root` (cli#680, cli#681).
  *
- * The link's parent is resolved through every symlink, the text joined to it
- * lexically — which is how the kernel applies a relative link from where it
- * sits. A context link Specnaut writes must never become a door out of the
- * project, whatever the destination's ancestors turn out to be.
+ * The link's parent is resolved through every symlink, and the text walked from
+ * it segment by segment (`walkLinkText`) — how the kernel applies a relative
+ * link from where it sits. A context link Specnaut writes must never become a
+ * door out of the project, whatever the destination's ancestors turn out to be.
  */
 export async function assertLinkTargetInProject(
   root: string,
@@ -266,6 +274,6 @@ export async function assertLinkTargetInProject(
   target: string,
 ): Promise<void> {
   const parent = await resolveDeepestExisting(dirname(abs));
-  const landing = isAbsolute(target) ? target : join(parent, target);
+  const landing = isAbsolute(target) ? target : await walkLinkText(parent, target);
   if (!isInside(root, landing)) throw leavesRefusal(root, abs, landing);
 }

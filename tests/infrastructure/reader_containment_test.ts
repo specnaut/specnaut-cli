@@ -1,5 +1,5 @@
 import { assert, assertEquals, assertRejects } from "@std/assert";
-import { join } from "@std/path";
+import { join, SEPARATOR } from "@std/path";
 import { DenoFsReader } from "../../src/infrastructure/fs_reader.ts";
 import { parseLock } from "../../src/domain/installed_lock.ts";
 
@@ -105,3 +105,22 @@ symlinkTest("parseLock rejects an entry KEY that is not a legal destination", as
   assert(err instanceof Error);
   assert(err.message.includes("not a legal destination"), err.message);
 });
+
+symlinkTest(
+  "a read through a `..` after a link in a link's text is refused (cli#686)",
+  async () => {
+    const { root, proj, outside } = await box();
+    try {
+      await Deno.mkdir(join(outside, "deep"));
+      await Deno.writeTextFile(join(outside, "secret.txt"), "SECRET");
+      await Deno.writeTextFile(join(proj, "secret.txt"), "inside");
+      await Deno.symlink(join(outside, "deep"), join(proj, "s"));
+      await Deno.symlink(["s", "..", "secret.txt"].join(SEPARATOR), join(proj, "c.md"));
+      const err = await assertRejects(() => new DenoFsReader().readText(proj, "c.md"));
+      assert(err instanceof Error);
+      assert(err.message.includes("leaves the project"), err.message);
+    } finally {
+      await Deno.remove(root, { recursive: true });
+    }
+  },
+);

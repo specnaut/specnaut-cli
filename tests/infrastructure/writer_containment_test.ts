@@ -1,5 +1,5 @@
 import { assert, assertEquals, assertRejects } from "@std/assert";
-import { join } from "@std/path";
+import { join, SEPARATOR } from "@std/path";
 import { DenoFsWriter } from "../../src/infrastructure/deno_fs_writer.ts";
 
 /**
@@ -237,6 +237,35 @@ symlinkTest("a path that lands on the project directory itself is refused", asyn
       const aside = await Deno.lstat(`${proj}.specnaut.bak`).then(() => true, () => false);
       assertEquals(aside, false, `${dest}: the project was moved aside`);
     }
+  } finally {
+    await Deno.remove(root, { recursive: true });
+  }
+});
+
+symlinkTest("a `..` after a link in a link's text cannot carry a write out (cli#686)", async () => {
+  // `s -> outside/deep`, `a -> s/../evil`. Lexically `s/../evil` is
+  // `proj/evil`; the kernel follows `s` first and lands on `outside/evil`.
+  const { root, proj, outside } = await box();
+  try {
+    await Deno.mkdir(join(outside, "deep"));
+    await Deno.symlink(join(outside, "deep"), join(proj, "s"));
+    await Deno.symlink(["s", "..", "evil"].join(SEPARATOR), join(proj, "a"));
+    // The refusal must be the guard's. Without the fix the guard approves, and
+    // the write then fails on its own (Deno, under this binary's permissions,
+    // reports ENOENT) — a rejection that proves nothing about containment and
+    // that a different runtime or flag set would not give.
+    const err = await assertRejects(() =>
+      w.writeBundle({ a: { content: "A", executable: false } }, proj, {
+        overwrite: true,
+        backupExisting: false,
+      })
+    );
+    assert(err instanceof Error && err.message.includes("leaves the project"), String(err));
+    assertEquals(
+      await Deno.lstat(join(outside, "evil")).then(() => true).catch(() => false),
+      false,
+      "nothing may be created where the kernel resolves the link",
+    );
   } finally {
     await Deno.remove(root, { recursive: true });
   }

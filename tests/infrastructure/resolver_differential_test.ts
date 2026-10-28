@@ -1,5 +1,5 @@
 import { assertEquals } from "@std/assert";
-import { join } from "@std/path";
+import { join, SEPARATOR } from "@std/path";
 import { resolveTarget } from "../../src/infrastructure/fs_containment.ts";
 
 /**
@@ -57,6 +57,14 @@ function layouts(): Layout[] {
     "rel-up-inside": join("..", "real.md"),
     "rel-up-outside": join("..", "..", "outside", "real.md"),
     "rel-dotdot-chain": join("..", "..", "outside", "sub", "real.md"),
+    // `..` AFTER a link, in the link's own text (cli#686). Built with a raw
+    // separator, never `join`: `join` collapses `s/..` to nothing, which is the
+    // very misreading under test. The kernel follows `s` first, then applies
+    // `..` to where it landed.
+    "rel-through-link-up": ["s", "..", "real.md"].join(SEPARATOR),
+    "rel-through-link-up-absent": ["s", "..", "evil.md"].join(SEPARATOR),
+    "rel-through-link-twice": ["s", "..", "sub", "..", "evil.md"].join(SEPARATOR),
+    "abs-through-link-up": [proj, "ps", "..", "evil.md"].join(SEPARATOR),
   });
 
   for (const ancestor of ["real", "link-inside", "link-outside"] as const) {
@@ -78,6 +86,11 @@ function layouts(): Layout[] {
             if (ancestor === "real") await Deno.mkdir(dir);
             else if (ancestor === "link-inside") await Deno.symlink(join(proj, "realdir"), dir);
             else await Deno.symlink(join(outside, "linked"), dir);
+
+            // The links the through-link targets pass through: `s` beside the
+            // leaf and `ps` at the project root, both into the outside tree.
+            await Deno.symlink(join(outside, "sub"), join(dir, "s"));
+            await Deno.symlink(join(outside, "sub"), join(proj, "ps"));
 
             const t = targets(proj, outside)[key as keyof ReturnType<typeof targets>];
             if (chain === 0) {
