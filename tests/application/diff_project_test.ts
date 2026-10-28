@@ -1,9 +1,10 @@
 import { assert, assertEquals } from "@std/assert";
 import { DiffProjectUseCase } from "../../src/application/diff_project.ts";
-import type { FsReader, Harness, LockStore } from "../../src/application/ports.ts";
+import type { Harness, LockStore } from "../../src/application/ports.ts";
 import type { InstalledLock, LockEntry } from "../../src/domain/installed_lock.ts";
 import type { CoreBundle } from "../../src/domain/core_bundle.ts";
 import { sha256Hex } from "../../src/domain/sha256.ts";
+import { fakeReader } from "./upgrade_fakes.ts";
 
 /**
  * Fake harness mirroring the init/upgrade test fakes: project-root suffix → flat
@@ -41,15 +42,6 @@ function fakeLockStore(lock: InstalledLock | null): LockStore {
     read: () => Promise.resolve(lock),
     write: () => Promise.resolve(),
     lockPath: (d) => `${d}/.specnaut/installed.lock`,
-  };
-}
-
-/** In-memory reader over a dest→content map; `null` for absent paths. */
-function fakeReader(disk: Record<string, string>): FsReader {
-  return {
-    readText: (_dir, rel) => Promise.resolve(rel in disk ? disk[rel] : null),
-    readEntry: (_dir, rel) =>
-      Promise.resolve(rel in disk ? { kind: "file", content: disk[rel] } : null),
   };
 }
 

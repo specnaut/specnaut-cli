@@ -1,35 +1,8 @@
 import { assertEquals, assertStringIncludes } from "@std/assert";
 import { exists } from "@std/fs/exists";
-import { fromFileUrl, join } from "@std/path";
+import { join } from "@std/path";
 import { readLinkText } from "../helpers/link_text.ts";
-
-const MAIN = fromFileUrl(new URL("../../src/main.ts", import.meta.url));
-
-async function runSpecnaut(
-  args: string[],
-  opts: { cwd?: string } = {},
-): Promise<{ code: number; stdout: string; stderr: string }> {
-  const p = new Deno.Command("deno", {
-    args: [
-      "run",
-      "--allow-read",
-      "--allow-write",
-      "--allow-run",
-      "--allow-env",
-      MAIN,
-      ...args,
-    ],
-    cwd: opts.cwd,
-    stdout: "piped",
-    stderr: "piped",
-  });
-  const { code, stdout, stderr } = await p.output();
-  return {
-    code,
-    stdout: new TextDecoder().decode(stdout),
-    stderr: new TextDecoder().decode(stderr),
-  };
-}
+import { runSpecnaut } from "../helpers/run_specnaut.ts";
 
 async function withTempDir(fn: (dir: string) => Promise<void>) {
   const dir = await Deno.makeTempDir({ prefix: "specnaut-integ-" });
@@ -317,55 +290,6 @@ Deno.test("specnaut init on a previously-initialised project recommends upgrade 
     // switching harness or backlog backend). Both options surface.
     assertStringIncludes(stderr, "specnaut init --here --force");
   });
-});
-
-Deno.test("specnaut --version prints semver line", async () => {
-  const { code, stdout } = await runSpecnaut(["--version"]);
-  assertEquals(code, 0);
-  assertStringIncludes(stdout, "specnaut ");
-  assertStringIncludes(stdout, "templates ");
-});
-
-Deno.test("specnaut -v matches --version", async () => {
-  const long = await runSpecnaut(["--version"]);
-  const short = await runSpecnaut(["-v"]);
-  assertEquals(short.code, 0);
-  assertEquals(short.stdout, long.stdout);
-});
-
-Deno.test("specnaut --help prints usage", async () => {
-  const { code, stdout } = await runSpecnaut(["--help"]);
-  assertEquals(code, 0);
-  assertStringIncludes(stdout, "Usage:");
-  assertStringIncludes(stdout, "specnaut init");
-});
-
-Deno.test("specnaut -h matches --help", async () => {
-  const long = await runSpecnaut(["--help"]);
-  const short = await runSpecnaut(["-h"]);
-  assertEquals(short.code, 0);
-  assertEquals(short.stdout, long.stdout);
-});
-
-Deno.test("specnaut --help advertises -v and -h shortcuts", async () => {
-  const { stdout } = await runSpecnaut(["--help"]);
-  assertStringIncludes(stdout, "--version, -v");
-  assertStringIncludes(stdout, "--help, -h");
-});
-
-Deno.test("specnaut --help tagline does not mention spec-kit", async () => {
-  const { stdout } = await runSpecnaut(["--help"]);
-  assertStringIncludes(stdout, "AI project scaffolding CLI");
-  assertEquals(
-    stdout.toLowerCase().includes("spec-kit"),
-    false,
-    "help tagline must not mention spec-kit (lineage belongs in README/AGENTS.md)",
-  );
-});
-
-Deno.test("specnaut bogus returns exit code 2", async () => {
-  const { code } = await runSpecnaut(["bogus"]);
-  assertEquals(code, 2);
 });
 
 // ── Skip-if-exists placeholders (#119) ─────────────────────────────────────
