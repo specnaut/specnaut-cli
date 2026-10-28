@@ -1,6 +1,6 @@
 import { assert, assertEquals, assertThrows } from "@std/assert";
 import { HARNESSES } from "../../../src/cli/harnesses.ts";
-import { everyBundleOption } from "../../../src/application/ports.ts";
+import { everyBundleOption } from "../../../src/application/bundle_options.ts";
 import { CORE_BUNDLE } from "../../../src/templates_bundle.ts";
 import type { CoreBundle, CoreEntry } from "../../../src/domain/core_bundle.ts";
 import { addUnique } from "../../../src/infrastructure/harness/bundle_writer.ts";

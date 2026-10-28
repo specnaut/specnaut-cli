@@ -1,4 +1,4 @@
-import type { BundleOptions } from "../../application/ports.ts";
+import type { BundleOptions } from "../../application/bundle_options.ts";
 import type { Bundle, TemplateFile } from "../../domain/template.ts";
 import { renderBackend } from "../../domain/conditional_render.ts";
 

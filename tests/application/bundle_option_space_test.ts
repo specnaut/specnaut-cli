@@ -1,5 +1,5 @@
 import { assert, assertEquals } from "@std/assert";
-import { BUNDLE_OPTION_DOMAINS, everyBundleOption } from "../../src/application/ports.ts";
+import { BUNDLE_OPTION_DOMAINS, everyBundleOption } from "../../src/application/bundle_options.ts";
 
 Deno.test("the parameter space is the product of its value domains", () => {
   // Derive BOTH sides. Hard-coding 32 here would make this the next thing that

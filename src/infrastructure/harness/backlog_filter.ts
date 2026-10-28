@@ -1,5 +1,5 @@
 import type { CoreEntry } from "../../domain/core_bundle.ts";
-import type { BundleOptions } from "../../application/ports.ts";
+import type { BundleOptions } from "../../application/bundle_options.ts";
 import { renderBackend } from "../../domain/conditional_render.ts";
 
 /**

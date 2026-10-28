@@ -1,7 +1,7 @@
 import { assertEquals } from "@std/assert";
 import { ClaudeHarness } from "../../src/infrastructure/harness/claude_harness.ts";
 import { CORE_BUNDLE } from "../../src/templates_bundle.ts";
-import type { BundleOptions } from "../../src/application/ports.ts";
+import type { BundleOptions } from "../../src/application/bundle_options.ts";
 
 // Spec 021 — end-to-end phase wiring through the real harness pipeline
 // (applyBackend → applyScheme → applySpecBackend → applySpecAutogen). We drive

@@ -1,6 +1,7 @@
 import { managedSectionField } from "./harness_managed.ts";
 import { stringify as stringifyToml } from "@std/toml";
-import type { BundleOptions, Harness } from "../../application/ports.ts";
+import type { Harness } from "../../application/ports.ts";
+import type { BundleOptions } from "../../application/bundle_options.ts";
 import type { CoreBundle, CoreEntry } from "../../domain/core_bundle.ts";
 import type { Bundle } from "../../domain/template.ts";
 import { HARNESS_STATIC } from "../../templates_bundle.ts";

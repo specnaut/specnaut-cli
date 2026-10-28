@@ -1,6 +1,6 @@
 import { assert, assertEquals } from "@std/assert";
 import { HARNESSES } from "../../../src/cli/harnesses.ts";
-import { everyBundleOption } from "../../../src/application/ports.ts";
+import { everyBundleOption } from "../../../src/application/bundle_options.ts";
 import { CORE_BUNDLE } from "../../../src/templates_bundle.ts";
 import { orphanScope, SHARED_ROOTS, SPECNAUT_FILES } from "../../../src/domain/orphan_scope.ts";
 

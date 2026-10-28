@@ -1,7 +1,7 @@
 import { assertEquals } from "@std/assert";
 import { applySpecAutogen } from "../../../src/infrastructure/harness/spec_autogen_filter.ts";
 import type { CoreEntry } from "../../../src/domain/core_bundle.ts";
-import type { BundleOptions } from "../../../src/application/ports.ts";
+import type { BundleOptions } from "../../../src/application/bundle_options.ts";
 
 // Spec 021 — applySpecAutogen gates the `spec-autogen=on` guidance in the
 // backlog skill on `specAutogen && specBackend === "cloud"`, and leaves every

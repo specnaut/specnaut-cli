@@ -2,7 +2,7 @@ import { assert, assertStringIncludes } from "@std/assert";
 import { fromFileUrl } from "@std/path";
 import { CORE_BUNDLE } from "../../src/templates_bundle.ts";
 import { HARNESSES } from "../../src/cli/harnesses.ts";
-import { everyBundleOption } from "../../src/application/ports.ts";
+import { everyBundleOption } from "../../src/application/bundle_options.ts";
 
 /**
  * #654 — grooming ends with a promotion, and the agent that grooms is told so.

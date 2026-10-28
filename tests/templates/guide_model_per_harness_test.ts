@@ -1,7 +1,7 @@
 import { assert, assertEquals } from "@std/assert";
 import { CORE_BUNDLE } from "../../src/templates_bundle.ts";
 import { HARNESSES } from "../../src/cli/harnesses.ts";
-import { everyBundleOption } from "../../src/application/ports.ts";
+import { everyBundleOption } from "../../src/application/bundle_options.ts";
 
 /**
  * #657 — `specnaut-guide` is the one bundled seat on the `haiku` tier, and the

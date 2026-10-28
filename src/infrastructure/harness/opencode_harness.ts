@@ -1,5 +1,6 @@
 import { managedSectionField } from "./harness_managed.ts";
-import type { BundleOptions, Harness } from "../../application/ports.ts";
+import type { Harness } from "../../application/ports.ts";
+import type { BundleOptions } from "../../application/bundle_options.ts";
 import { HARNESS_STATIC } from "../../templates_bundle.ts";
 import { applyHarnessStatic } from "./harness_static.ts";
 import type { CoreBundle, CoreEntry } from "../../domain/core_bundle.ts";
