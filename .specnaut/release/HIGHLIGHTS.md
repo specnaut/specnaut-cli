@@ -1,9 +1,18 @@
-**`specnaut cloud login` works on Windows.** The Windows credential store was handed a malformed
-record, so every attempt to save the Cloud token failed, and reading an existing entry could crash
-the CLI. The record now has the layout Windows expects, and the suite tests a real save, read and
-removal on Windows in CI.
+**One instruction file for Claude Code and Codex.** `.claude/CLAUDE.md` and `.codex/AGENTS.md` are
+now links to the project's root `AGENTS.md`, so both harnesses load the same rules. Where the system
+refuses links, each is a one-line pointer instead, and `init` and `upgrade` say which form they
+wrote. If you edited `.claude/CLAUDE.md`, `upgrade` backs your copy up and replaces it: move what
+you still need into `AGENTS.md` (see
+[UPGRADING.md](https://github.com/specnaut/specnaut-cli/blob/main/UPGRADING.md)).
 
-**A board too large for one read is no longer reported clean.** The backlog sweep read a fixed
-number of cards and judged the board on those alone, so a large board could report no drift over
-items it never saw. A read that stops at its limit is now refused instead, and the GitLab scripts
-read every page rather than the first hundred issues.
+**Codex starts Specnaut's agents by name.** `.codex/config.toml` now enables agents, and `AGENTS.md`
+names the agent for each delegated step of the chain. `.codex/goal.md`, which Codex never read, is
+retired.
+
+**Specnaut no longer writes or reads outside the project through a planted link.** The containment
+check now follows a link's text the way the operating system does, segment by segment. It refuses a
+link that passes through a directory that does not exist yet. Before, a link chain in a cloned
+repository could make `init`, `upgrade` or `diff` touch a file outside the project.
+
+**`/ship tag` refuses a dirty working tree** and lists what is uncommitted, instead of tagging a
+HEAD that does not match the files beside it.
