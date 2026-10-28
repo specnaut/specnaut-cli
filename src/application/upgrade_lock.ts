@@ -1,5 +1,6 @@
 import { type Bundle, lockShaInput } from "../domain/template.ts";
 import type { InstalledLock, LockEntry } from "../domain/installed_lock.ts";
+import type { BundleOptions } from "./bundle_options.ts";
 import type { UpgradePlan } from "../domain/upgrade_plan.ts";
 import { keptOrphanEntries } from "../domain/orphan_scope.ts";
 import { sha256Hex } from "../domain/sha256.ts";
@@ -173,5 +174,35 @@ async function entryFor(
     templatesVersion: matchesBundle
       ? templatesVersion
       : (existing?.templatesVersion ?? templatesVersion),
+  };
+}
+
+/** The install options a lock records, as the bundle mapper takes them. */
+export function bundleOptionsOf(lock: InstalledLock): BundleOptions {
+  return {
+    backlogBackend: lock.backlogBackend,
+    versionScheme: lock.versionScheme,
+    specBackend: lock.specBackend,
+    specAutogen: lock.specAutogen,
+  };
+}
+
+/**
+ * `lock` with new entries and templates version: the same install options and
+ * harness, and the parent-managed decision recorded only when it holds.
+ */
+export function lockWith(
+  lock: InstalledLock,
+  templatesVersion: string,
+  entries: InstalledLock["entries"],
+  parentManaged: boolean,
+): InstalledLock {
+  return {
+    version: 2,
+    harness: lock.harness,
+    ...bundleOptionsOf(lock),
+    templatesVersion,
+    entries,
+    ...(parentManaged ? { parentManaged: true as const } : {}),
   };
 }

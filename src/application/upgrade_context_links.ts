@@ -1,6 +1,7 @@
-import type { FsReader } from "./ports.ts";
+import type { BackupReport, FsReader, FsWriter } from "./ports.ts";
 import type { Bundle } from "../domain/template.ts";
 import type { InstalledLock } from "../domain/installed_lock.ts";
+import type { UpgradePlan } from "../domain/upgrade_plan.ts";
 import { sha256Hex } from "../domain/sha256.ts";
 import { classifyLinkDisk, linkIdentity, linkTargetPath } from "../domain/context_link.ts";
 import type { PlannableLinkState } from "../domain/link_plan.ts";
@@ -78,3 +79,23 @@ const materialisedNote = (dest: string, target: string) =>
   `${dest} held the text "${target}" — a link that git checked out as a plain file ` +
   `(core.symlinks=false). It is a context link again, so git may show a type change ` +
   `there; either form works if you commit it.`;
+
+/**
+ * The apply half of `surveyContextLinks`: every `replace-with-link` action is
+ * written with a backup — always, whatever `--force` says (cli#680), because
+ * what it replaces is not ours.
+ */
+export async function applyContextLinks(
+  writer: FsWriter,
+  plan: UpgradePlan,
+  bundle: Bundle,
+  projectDir: string,
+): Promise<{ report: BackupReport; written: Bundle }> {
+  const written: Bundle = Object.fromEntries(
+    plan.flatMap((a) => a.kind === "replace-with-link" ? [[a.dest, bundle[a.dest]]] : []),
+  );
+  const report = Object.keys(written).length === 0
+    ? { backups: [], skippedSkipIfExists: [] }
+    : await writer.writeBundle(written, projectDir, { overwrite: true, backupExisting: true });
+  return { report, written };
+}

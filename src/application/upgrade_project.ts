@@ -9,7 +9,6 @@ import type {
 } from "./ports.ts";
 import { type Bundle, lockShaInput } from "../domain/template.ts";
 import { sha256Hex } from "../domain/sha256.ts";
-import type { InstalledLock } from "../domain/installed_lock.ts";
 import type { CoreBundle } from "../domain/core_bundle.ts";
 import {
   computeUpgradePlan,
@@ -19,8 +18,12 @@ import {
 import { extractBlock, mergeRefusal } from "../domain/merge_block.ts";
 import { isPluginCoveredPath, pluginRelativePath } from "../domain/plugin_coverage.ts";
 import { isAgenticPath, pruneAgenticEntries } from "../domain/parent_managed.ts";
-import { deletesOrphan } from "../domain/orphan_scope.ts";
-import { deriveUnchangedEntries, rebuildEntries } from "./upgrade_lock.ts";
+import {
+  bundleOptionsOf,
+  deriveUnchangedEntries,
+  lockWith,
+  rebuildEntries,
+} from "./upgrade_lock.ts";
 import {
   applyManagedSections,
   type ManagedSectionOutcome,
@@ -29,7 +32,7 @@ import {
 import { planStaging, pruneStaging } from "./upgrade_staging.ts";
 import { removeOrphans } from "./upgrade_orphan_removal.ts";
 import { carryRenamedDocs } from "./upgrade_renames.ts";
-import { surveyContextLinks } from "./upgrade_context_links.ts";
+import { applyContextLinks, surveyContextLinks } from "./upgrade_context_links.ts";
 
 /** The plugin name used for both the install probe and the cache directory. */
 export const PLUGIN_NAME = "specnaut-plugin";
@@ -171,12 +174,7 @@ export class UpgradeProjectUseCase {
     if (!harness) {
       throw new Error(`unknown harness in lock: ${lock.harness}`);
     }
-    const mappedBundle = harness.mapBundle(core, {
-      backlogBackend: lock.backlogBackend,
-      versionScheme: lock.versionScheme,
-      specBackend: lock.specBackend,
-      specAutogen: lock.specAutogen,
-    });
+    const mappedBundle = harness.mapBundle(core, bundleOptionsOf(lock));
 
     // Parent-managed targets inherit agentic files from the providing
     // workspace. Drop agentic dests from the full bundle *before* the plan is
@@ -276,12 +274,7 @@ export class UpgradeProjectUseCase {
         reader,
         writer,
         harness,
-        bundleOpts: {
-          backlogBackend: lock.backlogBackend,
-          versionScheme: lock.versionScheme,
-          specBackend: lock.specBackend,
-          specAutogen: lock.specAutogen,
-        },
+        bundleOpts: bundleOptionsOf(lock),
         projectDir: input.projectDir,
         dryRun: input.dryRun,
         isDeclaredPreserved: input.isDeclaredPreserved,
@@ -360,18 +353,7 @@ export class UpgradeProjectUseCase {
       isDeclaredPreserved,
     );
 
-    const hasActualWork = plan.some((a) =>
-      a.kind === "auto-update" ||
-      a.kind === "add-new" ||
-      a.kind === "migrate-to-plugin" ||
-      a.kind === "defer-to-plugin" ||
-      isForceWritablePreserve(a) ||
-      deletesOrphan(a, input.force)
-    );
-    if (
-      !hasActualWork && plannedSections.length === 0 &&
-      plan.every((a) => a.kind === "unchanged")
-    ) {
+    if (plannedSections.length === 0 && plan.every((a) => a.kind === "unchanged")) {
       // No file work to do. But a legacy lock (or any lock whose recorded
       // `parent_managed` differs from the decision we just computed) still
       // needs the corrected field persisted — otherwise a handler-derived
@@ -425,17 +407,12 @@ export class UpgradeProjectUseCase {
         parentManaged !== lockParentManaged || staleAgentic ||
         staleEntries || staleVersion
       ) {
-        const correctedLock: InstalledLock = {
-          version: 2,
-          harness: lock.harness,
-          backlogBackend: lock.backlogBackend,
-          versionScheme: lock.versionScheme,
-          specBackend: lock.specBackend,
-          specAutogen: lock.specAutogen,
+        const correctedLock = lockWith(
+          lock,
           templatesVersion,
-          entries: parentManaged ? pruneAgenticEntries(upToDateEntries) : upToDateEntries,
-          ...(parentManaged ? { parentManaged: true as const } : {}),
-        };
+          parentManaged ? pruneAgenticEntries(upToDateEntries) : upToDateEntries,
+          parentManaged,
+        );
         // NOT on a dry run. `input.dryRun` is first consulted below, AFTER
         // this early return, so this write happened on a preview — and the new
         // `staleVersion` clause fires on the ordinary post-release state (files
@@ -507,17 +484,9 @@ export class UpgradeProjectUseCase {
       overwrite: true,
       backupExisting: input.force || (input.resetBaseline ?? false),
     });
-    // Replacing what is not ours with a link ALWAYS keeps a backup (cli#680).
-    const toRelink: Bundle = Object.fromEntries(
-      plan.flatMap((a) => a.kind === "replace-with-link" ? [[a.dest, bundle[a.dest]]] : []),
-    );
-    const relinkReport = Object.keys(toRelink).length === 0
-      ? { backups: [], skippedSkipIfExists: [] }
-      : await writer.writeBundle(toRelink, input.projectDir, {
-        overwrite: true,
-        backupExisting: true,
-      });
-    const allWritten: Bundle = { ...toWrite, ...toRelink };
+    const relinked = await applyContextLinks(writer, plan, bundle, input.projectDir);
+    const relinkReport = relinked.report;
+    const allWritten: Bundle = { ...toWrite, ...relinked.written };
 
     // JSON-merged files are not part of the plan; re-graft the bundled
     // entries into whatever the user has on disk (idempotent — already-
@@ -585,19 +554,9 @@ export class UpgradeProjectUseCase {
       now: (this.deps.now ?? (() => new Date()))().toISOString(),
       force: input.force,
     });
-    const newLock: InstalledLock = {
-      version: 2,
-      harness: lock.harness,
-      backlogBackend: lock.backlogBackend,
-      versionScheme: lock.versionScheme,
-      specBackend: lock.specBackend,
-      specAutogen: lock.specAutogen,
-      templatesVersion,
-      entries: updatedEntries,
-      // Persist the (possibly re-derived) decision so future upgrades read it
-      // directly without re-walking the filesystem.
-      ...(parentManaged ? { parentManaged: true as const } : {}),
-    };
+    // Persists the (possibly re-derived) parent-managed decision, so future
+    // upgrades read it directly without re-walking the filesystem.
+    const newLock = lockWith(lock, templatesVersion, updatedEntries, parentManaged);
     await lockStore.write(input.projectDir, newLock);
 
     return {
