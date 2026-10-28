@@ -77,12 +77,14 @@ export const deletesOrphan = (action: UpgradeAction, force: boolean): boolean =>
  * anywhere and no reading of the text can see it.
  *
  * `managedRoots` absent means the harness declared none: only `SHARED_ROOTS`
- * are in scope. Failing closed is the point — a caller that forgets the roots
+ * are in scope. `managedFiles` admits single files by exact name, the way
+ * `SPECNAUT_FILES` does for `.specnaut/` — never a prefix. Failing closed is the point — a caller that forgets the roots
  * removes less, never more.
  */
 export function orphanScope(
   dest: string,
   managedRoots: ReadonlyArray<string> = [],
+  managedFiles: ReadonlyArray<string> = [],
 ): OrphanScope {
   const segments = dest.split("/");
   if (segments.some((s) => isGit(s.replace(new RegExp(IGNORABLE, "g"), "")))) return "git-dir";
@@ -91,7 +93,7 @@ export function orphanScope(
       s !== "" && s !== "." && s !== ".." && !s.includes(":") && windowsName(s) === s.toLowerCase()
     );
   if (!plain) return "outside-managed-roots";
-  if (SPECNAUT_FILES.includes(dest)) return "in-scope";
+  if (SPECNAUT_FILES.includes(dest) || managedFiles.includes(dest)) return "in-scope";
   return [...SHARED_ROOTS, ...managedRoots].some((root) =>
       dest.startsWith(root) && dest.length > root.length
     )
@@ -101,6 +103,7 @@ export function orphanScope(
 
 type PlanOrphansOptions = {
   managedRoots?: ReadonlyArray<string>;
+  managedFiles?: ReadonlyArray<string>;
   isDeclaredPreserved: (dest: string) => boolean;
   pluginAvailable: (dest: string) => boolean;
 };
@@ -131,7 +134,7 @@ export function planOrphans(
   const orphans = [...lock.entries.keys()].filter((dest) => !newShas.has(dest)).sort();
   for (const dest of orphans) {
     const diskSha = diskShas.get(dest);
-    const scope = orphanScope(dest, opts.managedRoots);
+    const scope = orphanScope(dest, opts.managedRoots, opts.managedFiles);
     if (scope !== "in-scope") {
       actions.push({ kind: "orphan-refused", dest, reason: scope, onDisk: diskSha !== undefined });
       continue;

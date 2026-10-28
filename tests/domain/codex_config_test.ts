@@ -1,5 +1,9 @@
 import { assert, assertEquals, assertStringIncludes } from "@std/assert";
-import { CODEX_CONFIG_REFUSAL, codexAgentDefaultsBlock } from "../../src/domain/codex_config.ts";
+import {
+  CODEX_AGENTS_KEYS,
+  CODEX_CONFIG_REFUSAL,
+  codexAgentDefaultsBlock,
+} from "../../src/domain/codex_config.ts";
 import { tierToCodexModel } from "../../src/domain/codex_models.ts";
 import { mergeIntoFile, mergeRefusal } from "../../src/domain/merge_block.ts";
 import { CodexHarness } from "../../src/infrastructure/harness/codex_harness.ts";
@@ -155,4 +159,19 @@ Deno.test("the always-on AGENTS.md names agent_type on the Codex path", () => {
     "AGENTS.md documents dispatch without naming agent_type, so a reader on " +
       "Codex follows it into the inheritance cli#599 closes",
   );
+});
+
+Deno.test("the block enables agents explicitly (cli#681), and never writes the legacy alias", () => {
+  const block = codexAgentDefaultsBlock();
+  assert(/^enabled = true$/m.test(block), "no `enabled = true` under [agents]");
+  assert(!/^max_threads\s*=/m.test(block), "`max_threads` is a legacy alias of the cap");
+  assert(/^max_concurrent_threads_per_session = \d+$/m.test(block), "no concurrency cap");
+});
+
+Deno.test("the refusal names every key the block writes, and the list is the block's", () => {
+  // Read the keys off the block itself: a key added there and not to the list
+  // would be withheld from exactly the user whose own [agents] table refused it.
+  const written = [...codexAgentDefaultsBlock().matchAll(/^([a-z_]+) = /gm)].map((m) => m[1]);
+  assertEquals(written, [...CODEX_AGENTS_KEYS]);
+  for (const key of written) assertStringIncludes(CODEX_CONFIG_REFUSAL.message, key);
 });

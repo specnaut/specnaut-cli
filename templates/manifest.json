@@ -1829,13 +1829,8 @@
     {
       "harness": "codex",
       "destination": ".codex/AGENTS.md",
-      "source": "harness-specific/codex/AGENTS.md",
-      "alwaysOn": true
-    },
-    {
-      "harness": "codex",
-      "destination": ".codex/goal.md",
-      "source": "harness-specific/codex/goal.md"
+      "link": "../AGENTS.md",
+      "fallback": "This project's instructions are in ../AGENTS.md, which Codex reads itself."
     },
     {
       "harness": "cursor",

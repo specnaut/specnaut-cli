@@ -101,9 +101,8 @@ done
 #
 # - Claude: .claude/loop.md (default prompt for /loop, recurring
 #   maintenance). Its context file is a link — see check_link below.
-# - Codex: .codex/AGENTS.md (harness reference) + .codex/goal.md
-#   (default prompt for /goal, one-shot long-horizon maintenance,
-#   shipped in v1.2.1).
+# - Codex: its context file is a link too (cli#681); `.codex/goal.md` is
+#   retired — Codex's /goal reads no file.
 check_helper() {
   local harness="$1" path="$2" anchor="$3"
   # Declared and assigned separately: `local x="$(cmd)"` makes the local
@@ -143,14 +142,20 @@ check_link() {
 
 check_link   claude ".claude/CLAUDE.md" "../AGENTS.md"
 check_helper claude ".claude/loop.md"   "^# Project loop prompt"
-check_helper codex  ".codex/AGENTS.md"  "^# Codex Reference"
-check_helper codex  ".codex/goal.md"    "^# Project goal prompt"
+check_link   codex  ".codex/AGENTS.md"  "../AGENTS.md"
+if [ -e "$(scenario_dir "$NAME-codex")/.codex/goal.md" ]; then
+  fail "codex helper" ".codex/goal.md is retired (cli#681) but was written"
+else
+  pass "codex helper: .codex/goal.md not written"
+fi
 
 # cli#599. `spawn_agent` resolves a child's model as: explicit spawn value →
 # the `[agents]` default → the PARENT session's value. A dispatch that names no
 # role takes the last link, so the always-on AGENTS.md has to tell the reader
 # to pass `agent_type=`. Asserted on the codex render, where it is read.
 check_helper codex  "AGENTS.md"  "agent_type="
+# cli#681: agents explicitly enabled beside the cap, in Specnaut's block.
+check_helper codex  ".codex/config.toml"  "^enabled = true"
 
 # The harness count stays COUNTED, not spelled: the literal once said 8
 # while the array held 7. finish() owns the banner shape (R4); the number

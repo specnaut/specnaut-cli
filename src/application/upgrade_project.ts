@@ -335,6 +335,7 @@ export class UpgradeProjectUseCase {
         resetBaseline: input.resetBaseline ?? false,
         isDeclaredPreserved,
         managedRoots: harness.managedRoots,
+        managedFiles: harness.managedFiles,
         linkStates: links.states,
       },
     );
@@ -552,7 +553,7 @@ export class UpgradeProjectUseCase {
       plan,
       input.projectDir,
       input.force,
-      harness.managedRoots,
+      harness,
       refusals,
     );
     let extraBackups = removal.backups;

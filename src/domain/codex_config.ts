@@ -40,8 +40,11 @@ import { tierToCodexModel } from "./codex_models.ts";
  * `enabled`, `max_concurrent_threads_per_session`, `default_subagent_model`,
  * `default_subagent_reasoning_effort`, `interrupt_message`. An invented key in
  * a user's config file is a defect we would ship into their editor, so nothing
- * here is guessed — and the two keys written are the two the documentation
- * describes as setting spawned-agent defaults.
+ * here is guessed. Four are written: the two the documentation describes as
+ * setting spawned-agent defaults, the cap, and `enabled` (cli#681). `enabled`
+ * defaults to true in current Codex; writing it keeps the intent — Specnaut's
+ * agents are meant to be used — visible, and survives a change of default.
+ * `max_threads` is a legacy alias of the cap and is never written.
  */
 
 /** The capability tier a role-less child falls back to. */
@@ -60,6 +63,18 @@ const DEFAULT_CHILD_EFFORT = "medium";
  * broken one.
  */
 const DEFAULT_MAX_CONCURRENT = 4;
+
+/**
+ * Every key the block writes, in the order it writes them — the one list the
+ * refusal message names, so a key added to the block cannot be left out of the
+ * advice given to a user whose own `[agents]` table refused it.
+ */
+export const CODEX_AGENTS_KEYS = [
+  "enabled",
+  "default_subagent_model",
+  "default_subagent_reasoning_effort",
+  "max_concurrent_threads_per_session",
+] as const;
 
 /** The fence label. Stable — changing it orphans every already-written block. */
 export const CODEX_CONFIG_BLOCK_LABEL = "codex agent defaults";
@@ -94,6 +109,7 @@ export function codexAgentDefaultsBlock(): string {
     "# Bundled Specnaut roles are unaffected: each pins its own model in",
     "# .codex/agents/*.toml, and an explicit spawn value still wins.",
     "[agents]",
+    "enabled = true",
     `default_subagent_model = "${model}"`,
     `default_subagent_reasoning_effort = "${DEFAULT_CHILD_EFFORT}"`,
     `max_concurrent_threads_per_session = ${DEFAULT_MAX_CONCURRENT}`,
@@ -123,6 +139,7 @@ export const CODEX_CONFIG_REFUSAL = {
   pattern: "^\\s*\\[agents(\\.|\\])",
   message: ".codex/config.toml already declares an [agents] table outside Specnaut's block — " +
     "left untouched, because a second [agents] header is a TOML redefinition error. " +
-    "Add these to your own [agents] table to stop role-less subagents inheriting your " +
-    "primary model: default_subagent_model, default_subagent_reasoning_effort.",
+    "Add these to your own [agents] table — Specnaut writes them, and a role-less subagent " +
+    "inherits your primary model without the two defaults: " +
+    `${CODEX_AGENTS_KEYS.join(", ")}.`,
 } as const;

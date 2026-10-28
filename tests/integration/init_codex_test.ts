@@ -80,17 +80,16 @@ Deno.test("specnaut init --ai codex scaffolds a Codex layout", async () => {
     assertEquals(parsed.model, "gpt-5.6-sol");
     assertEquals(parsed.model_reasoning_effort, "high");
 
-    // Codex harness reference doc + /goal prompt template
-    assertEquals(await exists(join(root, ".codex/AGENTS.md")), true);
-    assertEquals(await exists(join(root, ".codex/goal.md")), true);
-    const codexAgentsMd = await Deno.readTextFile(join(root, ".codex/AGENTS.md"));
-    assertEquals(codexAgentsMd.includes("# Codex Reference"), true);
-    assertEquals(codexAgentsMd.includes("## Optional integrations"), true);
-    assertEquals(codexAgentsMd.includes(".codex/goal.md"), true);
-    const codexGoalMd = await Deno.readTextFile(join(root, ".codex/goal.md"));
-    assertEquals(codexGoalMd.includes("# Project goal prompt"), true);
-    assertEquals(codexGoalMd.includes("## Default goal prompt"), true);
-    assertEquals(codexGoalMd.includes("/board groom"), true);
+    // cli#681: `.codex/AGENTS.md` is a relative link to the root AGENTS.md —
+    // Codex reads the root file itself; the link is for symmetry and tooling.
+    // `.codex/goal.md` is retired: Codex's `/goal` reads no file.
+    assertEquals((await Deno.lstat(join(root, ".codex/AGENTS.md"))).isSymlink, true);
+    assertEquals(await Deno.readLink(join(root, ".codex/AGENTS.md")), "../AGENTS.md");
+    assertEquals(await exists(join(root, ".codex/goal.md")), false);
+    const agentsMd = await Deno.readTextFile(join(root, "AGENTS.md"));
+    assertEquals(agentsMd.includes("**Codex only:**"), true);
+    assertEquals(agentsMd.includes("`/goal <objective>`"), true);
+    assertEquals(agentsMd.includes(".claude/"), false);
 
     // Top-level skill folders post-consolidation: specnaut router +
     // specnaut-board + 5 output-contract skills (#378 + #445:

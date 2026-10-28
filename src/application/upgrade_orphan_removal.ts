@@ -17,11 +17,12 @@ export async function removeOrphans(
   plan: UpgradePlan,
   projectDir: string,
   force: boolean,
-  managedRoots: ReadonlyArray<string> | undefined,
+  scope: { managedRoots?: ReadonlyArray<string>; managedFiles?: ReadonlyArray<string> },
   notes: string[],
 ): Promise<{ backups: BackupReport["backups"]; plan: UpgradePlan }> {
   const removes = plan.filter((a) => deletesOrphan(a, force));
-  const within = (rel: string) => orphanScope(rel, managedRoots) === "in-scope";
+  const within = (rel: string) =>
+    orphanScope(rel, scope.managedRoots, scope.managedFiles) === "in-scope";
   let backups: BackupReport["backups"] = [];
   const refused = new Set<string>();
   for (const backupExisting of [false, true]) {

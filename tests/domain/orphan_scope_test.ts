@@ -148,3 +148,13 @@ Deno.test("keptOrphanEntries: carries a declared orphan the bundle dropped, --fo
     assertEquals([...keptOrphanEntries(plan, lock, force)], [["a/declared.md", entry("d")]]);
   }
 });
+
+Deno.test("orphanScope: a managed file is in scope by its exact name only (cli#681)", () => {
+  // `.codex/` holds the user's own `config.toml`: a retired file there is
+  // admitted by name, never by its folder.
+  const files = [".codex/goal.md"];
+  assertEquals(orphanScope(".codex/goal.md", [], files), "in-scope");
+  assertEquals(orphanScope(".codex/config.toml", [], files), "outside-managed-roots");
+  assertEquals(orphanScope(".codex/goal.md.bak", [], files), "outside-managed-roots");
+  assertEquals(orphanScope(".codex/goal.md", []), "outside-managed-roots");
+});

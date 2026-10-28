@@ -28632,96 +28632,10 @@ exit 0
   },
   "codex": {
     ".codex/AGENTS.md": {
-      content: `# Codex Reference
-
-- **Project documentation and rules**: the primary reference is \`AGENTS.md\`
-  at the project root. Read it first.
-- **Skills**: installed skills live in \`.agents/skills/\`.
-- **Subagents**: Codex subagent definitions live in \`.codex/agents/\`
-  (TOML format).
-<!-- BEGIN: backend=local -->
-- **Backlog**: managed via the \`/board groom\` workflow — local Markdown
-  backend, indexed in \`.specnaut/backlog.md\`.
-<!-- END: backend=local -->
-<!-- BEGIN: backend=github -->
-- **Backlog**: managed via the \`/board groom\` workflow — GitHub Issues and a
-  GitHub Project, configured in \`.specnaut/backlog-config.yml\`.
-<!-- END: backend=github -->
-<!-- BEGIN: backend=gitlab -->
-- **Backlog**: managed via the \`/board groom\` workflow — GitLab Issues,
-  configured in \`.specnaut/backlog-config.yml\`.
-<!-- END: backend=gitlab -->
-<!-- BEGIN: backend=cloud -->
-- **Backlog**: managed via the \`/board groom\` workflow — Specnaut Cloud,
-  configured in \`.specnaut/backlog-config.yml\`.
-<!-- END: backend=cloud -->
-
-**Backlog references** follow the \`backlog-reference-contract\` skill — read it; never restate it here.
-
-**Response style** — brevity, visual order, questions as selections, badge colours — follows the \`response-style-contract\` skill; read it, never restate it here.
-
-**UI work** follows the \`mobile-first-contract\` skill — read it; never restate it here.
-
-## Optional integrations
-
-These are Codex CLI features Specnaut does NOT configure by default, but
-that pair well with the scaffolded workflow.
-
-- **Periodic maintenance** — \`/goal\` runs the prompt in \`.codex/goal.md\`
-  as a one-shot long-horizon objective (groom backlog, surface stale PRs,
-  list orphan specs); edit \`goal.md\` freely. The feature is experimental
-  — opt in by adding \`goals = true\` under \`[features]\` in your Codex
-  \`config.toml\`, or toggle it with \`/experimental\`. Lifecycle controls:
-  \`/goal pause\`, \`/goal resume\`, \`/goal clear\`. See
-  https://developers.openai.com/codex/use-cases/follow-goals.
-
-- **CLI reference** — full Codex CLI surface (slash commands, config
-  schema, headless mode): https://developers.openai.com/codex/cli/reference.
-
-- **More Codex use cases** — https://developers.openai.com/codex/use-cases.
+      content: `This project's instructions are in ../AGENTS.md, which Codex reads itself.
 `,
       executable: false,
-    },
-    ".codex/goal.md": {
-      content: `# Project goal prompt
-
-This file customizes what \`/goal\` runs when invoked without an explicit
-objective. Specnaut ships a sensible default below — edit freely to match
-this project's hygiene needs.
-
-## Default goal prompt
-
-Run a hygiene pass on this Specnaut project:
-
-1. Invoke the \`/board groom\` skill — it grooms the backlog, surfaces
-   stale PRs, and flags orphan specs.
-2. If anything actionable came out of the pass, summarize it concisely
-   so the human reading the result can decide what to do.
-3. If everything is healthy, say so in one sentence and stop. Do not
-   manufacture work.
-
-## Recommended invocation
-
-\`/goal\` is one-shot long-horizon, not a recurring timer. Good moments to
-run it:
-
-- **Start of a session**: open Codex, run \`/goal\`, let it groom while
-  you context-switch.
-- **End of a sprint**: run \`/goal\` to leave the backlog tidy before a
-  release branch is cut.
-- **Lifecycle controls**: \`/goal pause\`, \`/goal resume\`, \`/goal clear\`.
-
-## Customizing further
-
-Append project-specific checks to the prompt above. Examples:
-
-- "Check that the staging deploy from the last \`main\` commit succeeded."
-- "Verify the daily backup ran in the last 24 hours."
-- "Ping if any feature flag is still enabled after its sunset date."
-
-Each \`/goal\` run loads the full prompt, so keep it focused.
-`,
-      executable: false,
+      symlinkTo: "../AGENTS.md",
     },
   },
   "cursor": {

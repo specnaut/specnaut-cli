@@ -74,6 +74,8 @@ export type UpgradePlanOptions = {
   isDeclaredPreserved?: (dest: string) => boolean;
   /** `Harness.managedRoots`: bounds which orphans may be removed (`orphanScope`). */
   managedRoots?: ReadonlyArray<string>;
+  /** `Harness.managedFiles`: single files an orphan may also be (`orphanScope`). */
+  managedFiles?: ReadonlyArray<string>;
   /** What is on disk at each context-link destination — see `linkAction`. */
   linkStates?: ReadonlyMap<string, PlannableLinkState>;
 };
@@ -281,6 +283,7 @@ export function computeUpgradePlan(
   // Orphans: lock entries the bundle no longer carries — see `planOrphans`.
   actions.push(...planOrphans(diskShas, lock, newShas, {
     managedRoots: opts.managedRoots,
+    managedFiles: opts.managedFiles,
     isDeclaredPreserved,
     pluginAvailable: (dest) => pluginInstalled && isPluginCoveredFn(dest),
   }));

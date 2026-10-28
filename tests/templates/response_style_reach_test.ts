@@ -80,9 +80,13 @@ Deno.test("every always-on context file carries the pointer", async () => {
       if (/\.(md|mdc)$/.test(dest) && !dest.includes("/hooks/")) shouldBeFlagged.add(harnessKey);
     }
   }
-  /** A harness shipping a context file that is deliberately NOT always-on. Empty
-   * today; a row here is a decision on the record, never a way to quiet a red. */
-  const NOT_ALWAYS_ON = new Map<string, string>();
+  /** A harness shipping a context file that is deliberately NOT always-on. A row
+   * here is a decision on the record, never a way to quiet a red. */
+  const NOT_ALWAYS_ON = new Map<string, string>([[
+    "codex",
+    "Codex never reads .codex/AGENTS.md: it discovers the root AGENTS.md itself, and the " +
+    "link there exists for symmetry with Claude Code and for tooling (cli#681)",
+  ]]);
 
   const unflagged = [...shouldBeFlagged]
     .filter((h) => !alwaysOn.has(h))

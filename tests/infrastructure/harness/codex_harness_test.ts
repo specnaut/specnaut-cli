@@ -188,6 +188,18 @@ Deno.test("CodexHarness maps spec-root to .specnaut/<suffix> and project-root to
   assert("AGENTS.md" in mapped);
 });
 
+Deno.test("CodexHarness links .codex/AGENTS.md to the root and no longer writes goal.md (cli#681)", () => {
+  const mapped = new CodexHarness().mapBundle(SAMPLE, {
+    backlogBackend: "local",
+    versionScheme: "semver",
+    specBackend: "local",
+  });
+  assertEquals(mapped[".codex/AGENTS.md"]?.symlinkTo, "../AGENTS.md");
+  assert(!(".codex/goal.md" in mapped), "goal.md is retired: /goal reads no file");
+  // Still retirable: the orphan path admits it by exact name.
+  assert(new CodexHarness().managedFiles.includes(".codex/goal.md"));
+});
+
 Deno.test("CodexHarness emits no Claude/Cursor artefacts", () => {
   const h = new CodexHarness();
   const mapped = h.mapBundle(SAMPLE, {

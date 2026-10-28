@@ -51,6 +51,13 @@ export class CodexHarness implements Harness {
   readonly key = "codex";
   readonly displayName = "Codex CLI";
   readonly managedRoots = [".codex/agents/", ".agents/skills/"] as const;
+  /**
+   * Retired files directly in `.codex/`, which no root may hold: the folder's
+   * other files are the user's. `goal.md` was retired by cli#681 — Codex's
+   * `/goal` reads no file, and the only pointer to it sat in a context file
+   * Codex never read. It stays listed until no supported upgrade path has it.
+   */
+  readonly managedFiles = [".codex/goal.md"] as const;
 
   mapBundle(core: CoreBundle, opts: BundleOptions): Bundle {
     const out: Bundle = {};

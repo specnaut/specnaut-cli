@@ -246,6 +246,12 @@ export interface Harness {
   readonly displayName: string;
   /** Folders `upgrade` may remove an orphan from (cli#665); see `orphanScope`. */
   readonly managedRoots?: ReadonlyArray<string>;
+  /**
+   * Files, by exact name, `upgrade` may remove as orphans although no managed
+   * root holds them (cli#681): a retired file directly in the harness folder,
+   * whose siblings are the user's (`.codex/config.toml`).
+   */
+  readonly managedFiles?: ReadonlyArray<string>;
   mapBundle(core: CoreBundle, opts: BundleOptions): Bundle;
 }
 
