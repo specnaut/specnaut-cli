@@ -703,13 +703,14 @@ confirmed closed.
 4. **Remove the spec directory — once, for the whole epic too:**
 
    \`\`\`
-   bash .specnaut/scripts/bash/remove-spec.sh
+   bash .specnaut/scripts/bash/remove-spec.sh <branch>
    \`\`\`
 
-   It runs only on the base branch, only for a \`feature_directory\` that is directly under
-   \`.specnaut/specs/\` and in git history, in its own commit, pushed. Exit 22 is a skip, and its
-   reason is printed — report it, never silently. Never run it before the close succeeded: nobody
-   authorised a removal then.
+   \`<branch>\` is the feature branch \`land-feature.sh\` just landed — the one you merged, not one read
+   back from \`feature.json\`. It runs only on the base branch, only for a \`feature_directory\` that is
+   directly under \`.specnaut/specs/\`, named like that branch, and in git history, in its own commit,
+   pushed. Exit 22 is a skip, and its reason is printed — report it, never silently.
+   Never run it before the close succeeded: nobody authorised a removal then.
 
 ## The report names every item, one line each
 
@@ -8565,7 +8566,7 @@ exit 0
 #
 # Usage: close-shipped.sh <issue-number>…
 set -uo pipefail
-here=\${BASH_SOURCE[0]%/*}
+here=\$(CDPATH="" cd "\$(dirname "\${BASH_SOURCE[0]}")" && pwd)
 
 [ \$# -gt 0 ] || { echo "usage: close-shipped.sh <issue-number>…" >&2; exit 2; }
 for n in "\$@"; do
@@ -10502,7 +10503,7 @@ exit 0
 #
 # Usage: close-shipped.sh <issue-number>…
 set -uo pipefail
-here=\${BASH_SOURCE[0]%/*}
+here=\$(CDPATH="" cd "\$(dirname "\${BASH_SOURCE[0]}")" && pwd)
 
 [ \$# -gt 0 ] || { echo "usage: close-shipped.sh <issue-number>…" >&2; exit 2; }
 for n in "\$@"; do
@@ -11661,7 +11662,9 @@ exit 0
 # exit 12, and nothing else, means closed) — an open issue's card is left
 # alone, because the close comes first and a Done card over an open issue is
 # the drift the sweep exists to report. Then move it to Done. Then reconcile
-# the whole board once: sweep-closed.sh --passes 2, and one move.sh Done per DRIFTED.
+# the whole board once: sweep-closed.sh, one pass (this backend's sweep takes
+# no --passes; the items settled here were confirmed closed above), and one
+# move.sh Done per DRIFTED.
 # One line per item on stdout, and the sweep's own summary line verbatim.
 #
 # Exit: 0 every item settled · 2 usage · 20 an issue was still open (its card
@@ -11670,7 +11673,7 @@ exit 0
 #
 # Usage: close-shipped.sh <issue-number>…
 set -uo pipefail
-here=\${BASH_SOURCE[0]%/*}
+here=\$(CDPATH="" cd "\$(dirname "\${BASH_SOURCE[0]}")" && pwd)
 
 [ \$# -gt 0 ] || { echo "usage: close-shipped.sh <issue-number>…" >&2; exit 2; }
 for n in "\$@"; do
@@ -11694,7 +11697,7 @@ for n in "\$@"; do
   fi
 done
 
-if ! sweep=\$(bash "\$here/sweep-closed.sh" --passes 2 2>&1); then
+if ! sweep=\$(bash "\$here/sweep-closed.sh" 2>&1); then
   printf '%s\\n' "\$sweep" | tail -1
   echo "FAILED reconcile — the sweep did not complete"
   [ "\$rc" -ne 0 ] || rc=21
@@ -12259,7 +12262,7 @@ exit 0
 #
 # Usage: close-shipped.sh <issue-number>…
 set -uo pipefail
-here=\${BASH_SOURCE[0]%/*}
+here=\$(CDPATH="" cd "\$(dirname "\${BASH_SOURCE[0]}")" && pwd)
 
 [ \$# -gt 0 ] || { echo "usage: close-shipped.sh <issue-number>…" >&2; exit 2; }
 for n in "\$@"; do
@@ -24598,17 +24601,29 @@ echo auto
 # unknown. Callers never substitute \`main\` for unknown: \`/task merge\`
 # stops and asks for the base, and the landing hook gates every landing.
 #
+# Every caller hands the name to git as an argument, so a name git would read
+# as an option (\`--exec=…\` reached \`git rebase\` and ran a command), or one
+# with \`..\` (a range), is exit 3 too — never printed.
+#
 # Usage: base-branch.sh
 set -euo pipefail
 export GIT_OPTIONAL_LOCKS=0
 
+# emit <name> — print it if it is a plain branch name, else exit 3.
+emit() {
+  if [[ \$1 =~ ^[A-Za-z0-9][A-Za-z0-9._/-]*\$ ]] && [[ \$1 != *..* ]]; then
+    printf '%s\\n' "\$1"
+    exit 0
+  fi
+  echo "base-branch: '\$1' is not a branch name this script hands to git — set origin/HEAD to the real base: git remote set-head origin --auto" >&2
+  exit 3
+}
+
 if ref=\$(git --no-pager symbolic-ref --quiet --short refs/remotes/origin/HEAD 2>/dev/null); then
-  printf '%s\\n' "\${ref#origin/}"
-  exit 0
+  emit "\${ref#origin/}"
 fi
 if name=\$(git --no-pager config --get init.defaultBranch 2>/dev/null) && [ -n "\$name" ]; then
-  printf '%s\\n' "\$name"
-  exit 0
+  emit "\$name"
 fi
 echo "base-branch: unknown — no origin/HEAD and no init.defaultBranch. Pass the base explicitly, or run: git remote set-head origin --auto" >&2
 exit 3
@@ -24641,7 +24656,7 @@ exit 3
 # Usage: epic-status.sh
 set -euo pipefail
 export GIT_OPTIONAL_LOCKS=0
-here=\${BASH_SOURCE[0]%/*}
+here=\$(CDPATH="" cd "\$(dirname "\${BASH_SOURCE[0]}")" && pwd)
 
 if [ \$# -ne 0 ]; then echo "usage: epic-status.sh" >&2; exit 2; fi
 # The base has one home, base-branch.sh — never an argument.
@@ -24734,7 +24749,7 @@ exit 0
 # Usage: fold-fixups.sh [--verify <pre-sha>]
 set -euo pipefail
 export GIT_OPTIONAL_LOCKS=0
-here=\${BASH_SOURCE[0]%/*}
+here=\$(CDPATH="" cd "\$(dirname "\${BASH_SOURCE[0]}")" && pwd)
 
 pre=""
 case \$# in
@@ -24756,7 +24771,9 @@ fi
 if [ -z "\$pre" ]; then
   pre=\$(git rev-parse HEAD)
   printf 'PRE %s\\n' "\$pre"
-  if ! GIT_SEQUENCE_EDITOR=true git rebase --quiet --autosquash --keep-base "\$range_base" >/dev/null 2>&1; then
+  # -i: before git 2.44, --autosquash does nothing without it. The editor
+  # accepts the todo list as autosquash wrote it; git's stderr is the report.
+  if ! GIT_SEQUENCE_EDITOR=true git rebase -i --quiet --autosquash --keep-base "\$range_base" >/dev/null; then
     echo "fold-fixups: the rebase stopped on a conflict — resolve it, 'git rebase --continue', then: fold-fixups.sh --verify \$pre" >&2
     exit 13
   fi
@@ -24824,7 +24841,7 @@ echo "fold-fixups: folded — tree unchanged, worktree clean, one commit per chi
 # Usage: land-feature.sh
 set -euo pipefail
 export GIT_OPTIONAL_LOCKS=0
-here=\${BASH_SOURCE[0]%/*}
+here=\$(CDPATH="" cd "\$(dirname "\${BASH_SOURCE[0]}")" && pwd)
 
 if [ \$# -ne 0 ]; then echo "usage: land-feature.sh" >&2; exit 2; fi
 base=\$(bash "\$here/base-branch.sh") || exit 3
@@ -24889,24 +24906,30 @@ printf 'LANDED %s %s..%s %s commit(s)\\n' "\$base" "\${first:0:12}" "\${last:0:1
 # Five conditions, all required, else nothing is touched: HEAD is the base;
 # \`.specnaut/feature.json\` names a \`feature_directory\`; it exists; it is in
 # git history (so the removal is lossless — \`git log --all -- <dir>\` brings
-# it back); and it is a feature directory: relative, no \`..\`, not a link,
-# resolving directly under \`.specnaut/specs/\`. Then \`git rm -r\` of it and of
+# it back); and it is the landed feature's directory: relative, no \`..\`, not
+# a link, resolving directly under \`.specnaut/specs/\`, its basename the
+# branch that landed (a stale feature.json names another). Nothing else may
+# be staged, nor edited under it. Then \`git rm -r\` of it and of
 # feature.json, a check that every staged path is one of those deletions,
 # a commit, and a push with an explicit refspec and never its tags. Under
 # \`merge: manual\` the landing hook holds this script (merge-commands.txt).
 #
 # Exit: 0 removed and pushed · 2 usage · 3 base unknown · 22 skipped — the
-# condition that failed is printed, and nothing changed · 23 the staged
-# change held something else (reset, nothing committed) · 7 the push was
-# rejected (the commit stays local).
+# condition that failed is printed, and nothing changed · 23 something else
+# was staged after the check (the removal undone, the rest left staged,
+# nothing committed) · 7 the push was rejected (the commit stays local).
 #
-# Usage: remove-spec.sh
+# Usage: remove-spec.sh <landed-branch>   (the feature branch just landed)
 set -euo pipefail
 export GIT_OPTIONAL_LOCKS=0
-here=\${BASH_SOURCE[0]%/*}
+here=\$(CDPATH="" cd "\$(dirname "\${BASH_SOURCE[0]}")" && pwd)
 skip() { echo "remove-spec: skipped — \$*" >&2; exit 22; }
 
-if [ \$# -ne 0 ]; then echo "usage: remove-spec.sh" >&2; exit 2; fi
+if [ \$# -ne 1 ] || [[ ! \$1 =~ ^[A-Za-z0-9][A-Za-z0-9._-]*\$ ]]; then
+  echo "usage: remove-spec.sh <landed-branch>" >&2
+  exit 2
+fi
+landed=\$1
 base=\$(bash "\$here/base-branch.sh") || exit 3
 root=\$(git rev-parse --show-toplevel)
 cd "\$root"
@@ -24921,19 +24944,30 @@ case \$dir in
 esac
 name=\${dir#.specnaut/specs/}
 [[ \$name =~ ^[A-Za-z0-9][A-Za-z0-9._-]*\$ ]] || skip "'\$dir' is not one feature directory directly under .specnaut/specs/"
+[ "\$name" = "\$landed" ] || skip "'\$dir' is not the spec of \$landed, the branch that landed — feature.json is stale"
 [ ! -L "\$dir" ] || skip "'\$dir' is a link"
 [ -d "\$dir" ] || skip "'\$dir' does not exist"
 [ "\$(cd -P "\$dir" && pwd)" = "\$(cd -P .specnaut/specs && pwd)/\$name" ] || skip "'\$dir' resolves outside .specnaut/specs/"
 [ -n "\$(git log --all --oneline -1 -- "\$dir")" ] || skip "'\$dir' is in no commit — deleting it would destroy the only copy"
 
 id=\$(sed -n 's/.*"linked_issue"[[:space:]]*:[[:space:]]*\\([0-9][0-9]*\\).*/\\1/p' .specnaut/feature.json | head -1)
+# The commit takes the whole index, so it must hold the removal alone: work
+# someone else staged is theirs, never swept into this commit or unstaged.
+git diff --cached --quiet || skip "the index already holds staged changes — commit or unstage them first"
+git diff --quiet -- "\$dir" .specnaut/feature.json || skip "'\$dir' or feature.json has uncommitted changes"
+git ls-files --error-unmatch -- .specnaut/feature.json >/dev/null 2>&1 || skip "feature.json is not tracked"
 git rm -r --quiet -- "\$dir" .specnaut/feature.json
-while IFS=\$'\\t' read -r status path; do
+# -z: a name git would quote (core.quotePath) is still compared as written.
+while IFS= read -r -d '' status && IFS= read -r -d '' path; do
   case \$status:\$path in
     D:"\$dir"/* | D:.specnaut/feature.json) ;;
-    *) git reset --quiet; echo "remove-spec: the staged change held '\$path' — reset, nothing committed" >&2; exit 23 ;;
+    *)
+      # Something staged after the check: restore this script's own paths only.
+      git restore --staged --worktree --source=HEAD -- "\$dir" .specnaut/feature.json
+      echo "remove-spec: the staged change held '\$path' — the removal is undone, nothing committed" >&2
+      exit 23 ;;
   esac
-done < <(git diff --cached --name-status)
+done < <(git diff --cached --no-renames --name-status -z)
 git commit --quiet -m "chore(\${id:-spec}): remove the spec directory for the shipped feature"
 if ! out=\$(git -c push.followTags=false push --quiet --no-follow-tags origin "refs/heads/\$base:refs/heads/\$base" 2>&1); then
   printf '%s\\n' "\$out" >&2
@@ -28588,7 +28622,9 @@ approval_require() {
 # it. Scripts, interpreters and shell functions are not seen: the stated limit.
 #
 # After cmd_parse: CMD_SEGS holds one entry per simple command, its words
-# joined by CMD_SEP, the first word reduced to its basename. CMD_MOVED=1 when
+# joined by CMD_SEP, the first word reduced to its basename. A substitution
+# leaves a \`\$\` in the word it stood in, so a command word that is one still
+# reads as a word the shell rewrites (_listed.sh). CMD_MOVED=1 when
 # the line may act on another repository: cd/pushd, env -C, a GIT_DIR/
 # GIT_WORK_TREE/GIT_CONFIG* assignment (and, through _git.sh's cmd_git,
 # git -C/--git-dir/--work-tree and -c alias.*).
@@ -28666,8 +28702,8 @@ cmd_parse() {
       case \$c in
         '\\') case \$nx in '"' | '\\' | '\$' | '\`') word+=\$nx i=\$((i + 1)) ;; \$'\\n') i=\$((i + 1)) ;; *) word+=\$c ;; esac ;;
         '"') q="" ;;
-        '\$') if [ "\$nx" = "(" ]; then _cmd_end; stack="d\$stack" q="" i=\$((i + 1)); _cmd_arith; else word+=\$c; fi ;;
-        '\`') _cmd_end; bt=d q="" ;;
+        '\$') if [ "\$nx" = "(" ]; then word+=\$c have=1; _cmd_end; stack="d\$stack" q="" i=\$((i + 1)); _cmd_arith; else word+=\$c; fi ;;
+        '\`') word+='\$' have=1; _cmd_end; bt=d q="" ;;
         *) word+=\$c ;;
       esac
     else
@@ -28678,10 +28714,10 @@ cmd_parse() {
         \$'\\n') _cmd_end; if [ -n "\$heredocs" ]; then _cmd_heredocs; fi ;;
         ';' | '|') _cmd_end ;;
         '&') case \$word in *'>' | *'<') word+=\$c ;; *) if [ "\$nx" = ">" ]; then word+=\$c; else _cmd_end; fi ;; esac ;;
-        '\$') if [ "\$nx" = "(" ]; then _cmd_end; stack="u\$stack" i=\$((i + 1)); _cmd_arith; else word+=\$c; fi ;;
+        '\$') if [ "\$nx" = "(" ]; then word+=\$c have=1; _cmd_end; stack="u\$stack" i=\$((i + 1)); _cmd_arith; else word+=\$c; fi ;;
         '(') _cmd_end; stack="u\$stack"; _cmd_arith ;;
         ')') _cmd_end; if [ "\${stack:0:1}" = d ]; then q='"'; fi; stack=\${stack:1} ;;
-        '\`') _cmd_end; if [ -z "\$bt" ]; then bt=u; elif [ "\$bt" = d ]; then q='"' bt=""; else bt=""; fi ;;
+        '\`') if [ -z "\$bt" ]; then word+='\$' have=1; fi; _cmd_end; if [ -z "\$bt" ]; then bt=u; elif [ "\$bt" = d ]; then q='"' bt=""; else bt=""; fi ;;
         '#') if [ -z "\$word" ] && [ "\$have" = 0 ]; then d=\${s:i}; d=\${d%%\$'\\n'*}; i=\$((i + \${#d})); else word+=\$c; fi ;;
         '<') _cmd_lt ;;
         *) word+=\$c ;;
@@ -28898,8 +28934,18 @@ _cmd_emit() {
 # \`gh release create\`. A first word ending in \`.sh\` is a script: _command.sh
 # has already reduced the command word to its basename, so it matches however
 # the script is reached (a path, \`bash x\`, \`source x\`, \`timeout 60 x\`, …).
+# The script word is matched ignoring case (a case-folding filesystem, APFS or
+# NTFS, runs \`Land-Feature.sh\`), and a command word the shell rewrites after
+# this hook has read it — a \`\$VAR\`, a substitution, a glob, a brace — matches
+# every script line: what it names is unknown here, so it is gated (fail
+# closed). An argument is never judged so: \`ls *.sh\` runs \`ls\`.
 # \`<words> except <flag>\`: that flag anywhere in the segment exempts it.
 # \`#\` comments and blank lines are skipped; a \`\\r\` (a CRLF checkout) is read past.
+
+# _listed_expands <word> — the shell rewrites it before it runs: a \`\$\`, a
+# substitution (_command.sh leaves a \`\$\` where one stood), \`*\`, \`?\`, or a
+# bracket or brace pair. A lone \`[\` or \`{\` is literal — \`[\` is test(1).
+_listed_expands() { case \$1 in *'\$'* | *'\`'* | *'*'* | *'?'* | *'['*']'* | *'{'*'}'*) return 0 ;; esac; return 1; }
 
 # listed <list file> — HIT: the entry of the list the segment (W, and POS:
 # its words without options) runs, else "". Always returns 0 and is called
@@ -28918,7 +28964,11 @@ listed() {
     read -r -a e <<<"\$entry"
     ok=1
     for ((i = 0; i < \${#e[@]}; i++)); do
-      if [ "\${e[i]}" != "\${POS[i]:-}" ]; then ok=0; break; fi
+      if [ "\${e[i]}" = "\${POS[i]:-}" ]; then continue; fi
+      if [ "\$i" = 0 ] && [[ \${e[0]} == *.sh ]] &&
+        { guard_ieq "\${e[0]}" "\${POS[0]:-}" || _listed_expands "\${POS[0]:-}"; }; then continue; fi
+      ok=0
+      break
     done
     [ "\$ok" = 1 ] || continue
     if [ -n "\$except" ]; then
@@ -30184,10 +30234,10 @@ workflow-manager
 49a4f9a91f8b91559f087d02c151d4069575cf466fcd09b21354749f188c16a8  _agents.txt
 eff27f37501f08c5a39cfcc2c6c7a8382e0d0467dc4a63cf3d29bb84d5ea26d6  _approval.sh
 43d7f7db80493808631ae998e4a172bbf9ed494ce0fcbf23b0e083bbc9fed58a  _baseline.sh
-7f838f6982981d046015499bdac3a8ee99573b4006f32686519e64525e46bbeb  _command.sh
+e8d23b92fdbb6b61d612e28a324af6ed3f2dca70a99bae722e8d06fb3e4b9e58  _command.sh
 fa8afb422b9af3b7f80580666d66e9332ed35cc3c24c7182300b3224f2a96548  _git.sh
 2829e6a5db6984fee451e242ba16beca68808a7647316cff24930aa8ec53c73a  _guard.sh
-40e09c2580471d6ad3275787236b1a9d75a88a95f253c4136d3c4d0adc1dc952  _listed.sh
+e44d8f40482c92e2be71a966d5ff9b16f728fd77fffd52940bd66aaba9a34291  _listed.sh
 f5552945f77fb0d24f56bbf2e97fb64d284d9c716abf211ebcbe081cacdf8bdf  _paths.sh
 994d3877b951fbd9a97fc7d563de8837796fe4655607d2f75ec57081da14ab5b  _simple.sh
 298471e25d869161087ddd4f4c0a488ca8ec5508ad01c4589e440af9274d0820  approve-on-prompt.sh
@@ -30546,7 +30596,9 @@ approval_require() {
 # it. Scripts, interpreters and shell functions are not seen: the stated limit.
 #
 # After cmd_parse: CMD_SEGS holds one entry per simple command, its words
-# joined by CMD_SEP, the first word reduced to its basename. CMD_MOVED=1 when
+# joined by CMD_SEP, the first word reduced to its basename. A substitution
+# leaves a \`\$\` in the word it stood in, so a command word that is one still
+# reads as a word the shell rewrites (_listed.sh). CMD_MOVED=1 when
 # the line may act on another repository: cd/pushd, env -C, a GIT_DIR/
 # GIT_WORK_TREE/GIT_CONFIG* assignment (and, through _git.sh's cmd_git,
 # git -C/--git-dir/--work-tree and -c alias.*).
@@ -30624,8 +30676,8 @@ cmd_parse() {
       case \$c in
         '\\') case \$nx in '"' | '\\' | '\$' | '\`') word+=\$nx i=\$((i + 1)) ;; \$'\\n') i=\$((i + 1)) ;; *) word+=\$c ;; esac ;;
         '"') q="" ;;
-        '\$') if [ "\$nx" = "(" ]; then _cmd_end; stack="d\$stack" q="" i=\$((i + 1)); _cmd_arith; else word+=\$c; fi ;;
-        '\`') _cmd_end; bt=d q="" ;;
+        '\$') if [ "\$nx" = "(" ]; then word+=\$c have=1; _cmd_end; stack="d\$stack" q="" i=\$((i + 1)); _cmd_arith; else word+=\$c; fi ;;
+        '\`') word+='\$' have=1; _cmd_end; bt=d q="" ;;
         *) word+=\$c ;;
       esac
     else
@@ -30636,10 +30688,10 @@ cmd_parse() {
         \$'\\n') _cmd_end; if [ -n "\$heredocs" ]; then _cmd_heredocs; fi ;;
         ';' | '|') _cmd_end ;;
         '&') case \$word in *'>' | *'<') word+=\$c ;; *) if [ "\$nx" = ">" ]; then word+=\$c; else _cmd_end; fi ;; esac ;;
-        '\$') if [ "\$nx" = "(" ]; then _cmd_end; stack="u\$stack" i=\$((i + 1)); _cmd_arith; else word+=\$c; fi ;;
+        '\$') if [ "\$nx" = "(" ]; then word+=\$c have=1; _cmd_end; stack="u\$stack" i=\$((i + 1)); _cmd_arith; else word+=\$c; fi ;;
         '(') _cmd_end; stack="u\$stack"; _cmd_arith ;;
         ')') _cmd_end; if [ "\${stack:0:1}" = d ]; then q='"'; fi; stack=\${stack:1} ;;
-        '\`') _cmd_end; if [ -z "\$bt" ]; then bt=u; elif [ "\$bt" = d ]; then q='"' bt=""; else bt=""; fi ;;
+        '\`') if [ -z "\$bt" ]; then word+='\$' have=1; fi; _cmd_end; if [ -z "\$bt" ]; then bt=u; elif [ "\$bt" = d ]; then q='"' bt=""; else bt=""; fi ;;
         '#') if [ -z "\$word" ] && [ "\$have" = 0 ]; then d=\${s:i}; d=\${d%%\$'\\n'*}; i=\$((i + \${#d})); else word+=\$c; fi ;;
         '<') _cmd_lt ;;
         *) word+=\$c ;;
@@ -30856,8 +30908,18 @@ _cmd_emit() {
 # \`gh release create\`. A first word ending in \`.sh\` is a script: _command.sh
 # has already reduced the command word to its basename, so it matches however
 # the script is reached (a path, \`bash x\`, \`source x\`, \`timeout 60 x\`, …).
+# The script word is matched ignoring case (a case-folding filesystem, APFS or
+# NTFS, runs \`Land-Feature.sh\`), and a command word the shell rewrites after
+# this hook has read it — a \`\$VAR\`, a substitution, a glob, a brace — matches
+# every script line: what it names is unknown here, so it is gated (fail
+# closed). An argument is never judged so: \`ls *.sh\` runs \`ls\`.
 # \`<words> except <flag>\`: that flag anywhere in the segment exempts it.
 # \`#\` comments and blank lines are skipped; a \`\\r\` (a CRLF checkout) is read past.
+
+# _listed_expands <word> — the shell rewrites it before it runs: a \`\$\`, a
+# substitution (_command.sh leaves a \`\$\` where one stood), \`*\`, \`?\`, or a
+# bracket or brace pair. A lone \`[\` or \`{\` is literal — \`[\` is test(1).
+_listed_expands() { case \$1 in *'\$'* | *'\`'* | *'*'* | *'?'* | *'['*']'* | *'{'*'}'*) return 0 ;; esac; return 1; }
 
 # listed <list file> — HIT: the entry of the list the segment (W, and POS:
 # its words without options) runs, else "". Always returns 0 and is called
@@ -30876,7 +30938,11 @@ listed() {
     read -r -a e <<<"\$entry"
     ok=1
     for ((i = 0; i < \${#e[@]}; i++)); do
-      if [ "\${e[i]}" != "\${POS[i]:-}" ]; then ok=0; break; fi
+      if [ "\${e[i]}" = "\${POS[i]:-}" ]; then continue; fi
+      if [ "\$i" = 0 ] && [[ \${e[0]} == *.sh ]] &&
+        { guard_ieq "\${e[0]}" "\${POS[0]:-}" || _listed_expands "\${POS[0]:-}"; }; then continue; fi
+      ok=0
+      break
     done
     [ "\$ok" = 1 ] || continue
     if [ -n "\$except" ]; then
@@ -32142,10 +32208,10 @@ workflow-manager
 49a4f9a91f8b91559f087d02c151d4069575cf466fcd09b21354749f188c16a8  _agents.txt
 eff27f37501f08c5a39cfcc2c6c7a8382e0d0467dc4a63cf3d29bb84d5ea26d6  _approval.sh
 43d7f7db80493808631ae998e4a172bbf9ed494ce0fcbf23b0e083bbc9fed58a  _baseline.sh
-7f838f6982981d046015499bdac3a8ee99573b4006f32686519e64525e46bbeb  _command.sh
+e8d23b92fdbb6b61d612e28a324af6ed3f2dca70a99bae722e8d06fb3e4b9e58  _command.sh
 fa8afb422b9af3b7f80580666d66e9332ed35cc3c24c7182300b3224f2a96548  _git.sh
 2829e6a5db6984fee451e242ba16beca68808a7647316cff24930aa8ec53c73a  _guard.sh
-40e09c2580471d6ad3275787236b1a9d75a88a95f253c4136d3c4d0adc1dc952  _listed.sh
+e44d8f40482c92e2be71a966d5ff9b16f728fd77fffd52940bd66aaba9a34291  _listed.sh
 f5552945f77fb0d24f56bbf2e97fb64d284d9c716abf211ebcbe081cacdf8bdf  _paths.sh
 994d3877b951fbd9a97fc7d563de8837796fe4655607d2f75ec57081da14ab5b  _simple.sh
 298471e25d869161087ddd4f4c0a488ca8ec5508ad01c4589e440af9274d0820  approve-on-prompt.sh
@@ -32177,17 +32243,17 @@ a8ee3b3537f1718a140bca74815dcfa5ce510bb87b62f63caebfebff090094a6  guard-release.
         "hooks": [
           {
             "type": "command",
-            "command": "r=\$PWD; while [ -n \\"\$r\\" ] && [ ! -d \\"\$r/.specnaut/hooks\\" ]; do r=\${r%/*}; done; [ \\"\$( (sha256sum 2>/dev/null || shasum -a 256) < \\"\$r/.specnaut/hooks/SHA256SUMS\\" 2>/dev/null | cut -c1-64)\\" = \\"3643c4660789495270438c763705c894e1fb6fa3dc2d9063d2e5092db59fc222\\" ] && (cd \\"\$r/.specnaut/hooks\\" && (sha256sum -c --status SHA256SUMS 2>/dev/null || shasum -a 256 -c --status SHA256SUMS)) && exec bash \\"\$r/.specnaut/hooks/guard-merge.sh\\" codex; echo \\"specnaut: .specnaut/hooks changed since it was trusted — run specnaut upgrade, then /hooks\\" >&2; exit 2",
+            "command": "r=\$PWD; while [ -n \\"\$r\\" ] && [ ! -d \\"\$r/.specnaut/hooks\\" ]; do r=\${r%/*}; done; [ \\"\$( (sha256sum 2>/dev/null || shasum -a 256) < \\"\$r/.specnaut/hooks/SHA256SUMS\\" 2>/dev/null | cut -c1-64)\\" = \\"5340253e3912b58c4132af21dafd1eb66e7a887af399b8c0b295ca2d1b91ffac\\" ] && (cd \\"\$r/.specnaut/hooks\\" && (sha256sum -c --status SHA256SUMS 2>/dev/null || shasum -a 256 -c --status SHA256SUMS)) && exec bash \\"\$r/.specnaut/hooks/guard-merge.sh\\" codex; echo \\"specnaut: .specnaut/hooks changed since it was trusted — run specnaut upgrade, then /hooks\\" >&2; exit 2",
             "timeout": 10
           },
           {
             "type": "command",
-            "command": "r=\$PWD; while [ -n \\"\$r\\" ] && [ ! -d \\"\$r/.specnaut/hooks\\" ]; do r=\${r%/*}; done; [ \\"\$( (sha256sum 2>/dev/null || shasum -a 256) < \\"\$r/.specnaut/hooks/SHA256SUMS\\" 2>/dev/null | cut -c1-64)\\" = \\"3643c4660789495270438c763705c894e1fb6fa3dc2d9063d2e5092db59fc222\\" ] && (cd \\"\$r/.specnaut/hooks\\" && (sha256sum -c --status SHA256SUMS 2>/dev/null || shasum -a 256 -c --status SHA256SUMS)) && exec bash \\"\$r/.specnaut/hooks/guard-release.sh\\" codex; echo \\"specnaut: .specnaut/hooks changed since it was trusted — run specnaut upgrade, then /hooks\\" >&2; exit 2",
+            "command": "r=\$PWD; while [ -n \\"\$r\\" ] && [ ! -d \\"\$r/.specnaut/hooks\\" ]; do r=\${r%/*}; done; [ \\"\$( (sha256sum 2>/dev/null || shasum -a 256) < \\"\$r/.specnaut/hooks/SHA256SUMS\\" 2>/dev/null | cut -c1-64)\\" = \\"5340253e3912b58c4132af21dafd1eb66e7a887af399b8c0b295ca2d1b91ffac\\" ] && (cd \\"\$r/.specnaut/hooks\\" && (sha256sum -c --status SHA256SUMS 2>/dev/null || shasum -a 256 -c --status SHA256SUMS)) && exec bash \\"\$r/.specnaut/hooks/guard-release.sh\\" codex; echo \\"specnaut: .specnaut/hooks changed since it was trusted — run specnaut upgrade, then /hooks\\" >&2; exit 2",
             "timeout": 10
           },
           {
             "type": "command",
-            "command": "r=\$PWD; while [ -n \\"\$r\\" ] && [ ! -d \\"\$r/.specnaut/hooks\\" ]; do r=\${r%/*}; done; [ \\"\$( (sha256sum 2>/dev/null || shasum -a 256) < \\"\$r/.specnaut/hooks/SHA256SUMS\\" 2>/dev/null | cut -c1-64)\\" = \\"3643c4660789495270438c763705c894e1fb6fa3dc2d9063d2e5092db59fc222\\" ] && (cd \\"\$r/.specnaut/hooks\\" && (sha256sum -c --status SHA256SUMS 2>/dev/null || shasum -a 256 -c --status SHA256SUMS)) && exec bash \\"\$r/.specnaut/hooks/protect-constitution.sh\\" codex; echo \\"specnaut: .specnaut/hooks changed since it was trusted — run specnaut upgrade, then /hooks\\" >&2; exit 2",
+            "command": "r=\$PWD; while [ -n \\"\$r\\" ] && [ ! -d \\"\$r/.specnaut/hooks\\" ]; do r=\${r%/*}; done; [ \\"\$( (sha256sum 2>/dev/null || shasum -a 256) < \\"\$r/.specnaut/hooks/SHA256SUMS\\" 2>/dev/null | cut -c1-64)\\" = \\"5340253e3912b58c4132af21dafd1eb66e7a887af399b8c0b295ca2d1b91ffac\\" ] && (cd \\"\$r/.specnaut/hooks\\" && (sha256sum -c --status SHA256SUMS 2>/dev/null || shasum -a 256 -c --status SHA256SUMS)) && exec bash \\"\$r/.specnaut/hooks/protect-constitution.sh\\" codex; echo \\"specnaut: .specnaut/hooks changed since it was trusted — run specnaut upgrade, then /hooks\\" >&2; exit 2",
             "timeout": 10
           }
         ]
@@ -32197,12 +32263,12 @@ a8ee3b3537f1718a140bca74815dcfa5ce510bb87b62f63caebfebff090094a6  guard-release.
         "hooks": [
           {
             "type": "command",
-            "command": "r=\$PWD; while [ -n \\"\$r\\" ] && [ ! -d \\"\$r/.specnaut/hooks\\" ]; do r=\${r%/*}; done; [ \\"\$( (sha256sum 2>/dev/null || shasum -a 256) < \\"\$r/.specnaut/hooks/SHA256SUMS\\" 2>/dev/null | cut -c1-64)\\" = \\"3643c4660789495270438c763705c894e1fb6fa3dc2d9063d2e5092db59fc222\\" ] && (cd \\"\$r/.specnaut/hooks\\" && (sha256sum -c --status SHA256SUMS 2>/dev/null || shasum -a 256 -c --status SHA256SUMS)) && exec bash \\"\$r/.specnaut/hooks/protect-generated.sh\\" codex; echo \\"specnaut: .specnaut/hooks changed since it was trusted — run specnaut upgrade, then /hooks\\" >&2; exit 2",
+            "command": "r=\$PWD; while [ -n \\"\$r\\" ] && [ ! -d \\"\$r/.specnaut/hooks\\" ]; do r=\${r%/*}; done; [ \\"\$( (sha256sum 2>/dev/null || shasum -a 256) < \\"\$r/.specnaut/hooks/SHA256SUMS\\" 2>/dev/null | cut -c1-64)\\" = \\"5340253e3912b58c4132af21dafd1eb66e7a887af399b8c0b295ca2d1b91ffac\\" ] && (cd \\"\$r/.specnaut/hooks\\" && (sha256sum -c --status SHA256SUMS 2>/dev/null || shasum -a 256 -c --status SHA256SUMS)) && exec bash \\"\$r/.specnaut/hooks/protect-generated.sh\\" codex; echo \\"specnaut: .specnaut/hooks changed since it was trusted — run specnaut upgrade, then /hooks\\" >&2; exit 2",
             "timeout": 10
           },
           {
             "type": "command",
-            "command": "r=\$PWD; while [ -n \\"\$r\\" ] && [ ! -d \\"\$r/.specnaut/hooks\\" ]; do r=\${r%/*}; done; [ \\"\$( (sha256sum 2>/dev/null || shasum -a 256) < \\"\$r/.specnaut/hooks/SHA256SUMS\\" 2>/dev/null | cut -c1-64)\\" = \\"3643c4660789495270438c763705c894e1fb6fa3dc2d9063d2e5092db59fc222\\" ] && (cd \\"\$r/.specnaut/hooks\\" && (sha256sum -c --status SHA256SUMS 2>/dev/null || shasum -a 256 -c --status SHA256SUMS)) && exec bash \\"\$r/.specnaut/hooks/protect-constitution.sh\\" codex; echo \\"specnaut: .specnaut/hooks changed since it was trusted — run specnaut upgrade, then /hooks\\" >&2; exit 2",
+            "command": "r=\$PWD; while [ -n \\"\$r\\" ] && [ ! -d \\"\$r/.specnaut/hooks\\" ]; do r=\${r%/*}; done; [ \\"\$( (sha256sum 2>/dev/null || shasum -a 256) < \\"\$r/.specnaut/hooks/SHA256SUMS\\" 2>/dev/null | cut -c1-64)\\" = \\"5340253e3912b58c4132af21dafd1eb66e7a887af399b8c0b295ca2d1b91ffac\\" ] && (cd \\"\$r/.specnaut/hooks\\" && (sha256sum -c --status SHA256SUMS 2>/dev/null || shasum -a 256 -c --status SHA256SUMS)) && exec bash \\"\$r/.specnaut/hooks/protect-constitution.sh\\" codex; echo \\"specnaut: .specnaut/hooks changed since it was trusted — run specnaut upgrade, then /hooks\\" >&2; exit 2",
             "timeout": 10
           }
         ]
@@ -32212,7 +32278,7 @@ a8ee3b3537f1718a140bca74815dcfa5ce510bb87b62f63caebfebff090094a6  guard-release.
         "hooks": [
           {
             "type": "command",
-            "command": "r=\$PWD; while [ -n \\"\$r\\" ] && [ ! -d \\"\$r/.specnaut/hooks\\" ]; do r=\${r%/*}; done; [ \\"\$( (sha256sum 2>/dev/null || shasum -a 256) < \\"\$r/.specnaut/hooks/SHA256SUMS\\" 2>/dev/null | cut -c1-64)\\" = \\"3643c4660789495270438c763705c894e1fb6fa3dc2d9063d2e5092db59fc222\\" ] && (cd \\"\$r/.specnaut/hooks\\" && (sha256sum -c --status SHA256SUMS 2>/dev/null || shasum -a 256 -c --status SHA256SUMS)) && exec bash \\"\$r/.specnaut/hooks/guard-dispatch-model.sh\\" codex; echo \\"specnaut: .specnaut/hooks changed since it was trusted — run specnaut upgrade, then /hooks\\" >&2; exit 2",
+            "command": "r=\$PWD; while [ -n \\"\$r\\" ] && [ ! -d \\"\$r/.specnaut/hooks\\" ]; do r=\${r%/*}; done; [ \\"\$( (sha256sum 2>/dev/null || shasum -a 256) < \\"\$r/.specnaut/hooks/SHA256SUMS\\" 2>/dev/null | cut -c1-64)\\" = \\"5340253e3912b58c4132af21dafd1eb66e7a887af399b8c0b295ca2d1b91ffac\\" ] && (cd \\"\$r/.specnaut/hooks\\" && (sha256sum -c --status SHA256SUMS 2>/dev/null || shasum -a 256 -c --status SHA256SUMS)) && exec bash \\"\$r/.specnaut/hooks/guard-dispatch-model.sh\\" codex; echo \\"specnaut: .specnaut/hooks changed since it was trusted — run specnaut upgrade, then /hooks\\" >&2; exit 2",
             "timeout": 10
           }
         ]
@@ -32223,7 +32289,7 @@ a8ee3b3537f1718a140bca74815dcfa5ce510bb87b62f63caebfebff090094a6  guard-release.
         "hooks": [
           {
             "type": "command",
-            "command": "r=\$PWD; while [ -n \\"\$r\\" ] && [ ! -d \\"\$r/.specnaut/hooks\\" ]; do r=\${r%/*}; done; [ \\"\$( (sha256sum 2>/dev/null || shasum -a 256) < \\"\$r/.specnaut/hooks/SHA256SUMS\\" 2>/dev/null | cut -c1-64)\\" = \\"3643c4660789495270438c763705c894e1fb6fa3dc2d9063d2e5092db59fc222\\" ] && (cd \\"\$r/.specnaut/hooks\\" && (sha256sum -c --status SHA256SUMS 2>/dev/null || shasum -a 256 -c --status SHA256SUMS)) && exec bash \\"\$r/.specnaut/hooks/approve-on-prompt.sh\\" codex; echo \\"specnaut: .specnaut/hooks changed since it was trusted — run specnaut upgrade, then /hooks\\" >&2; exit 0",
+            "command": "r=\$PWD; while [ -n \\"\$r\\" ] && [ ! -d \\"\$r/.specnaut/hooks\\" ]; do r=\${r%/*}; done; [ \\"\$( (sha256sum 2>/dev/null || shasum -a 256) < \\"\$r/.specnaut/hooks/SHA256SUMS\\" 2>/dev/null | cut -c1-64)\\" = \\"5340253e3912b58c4132af21dafd1eb66e7a887af399b8c0b295ca2d1b91ffac\\" ] && (cd \\"\$r/.specnaut/hooks\\" && (sha256sum -c --status SHA256SUMS 2>/dev/null || shasum -a 256 -c --status SHA256SUMS)) && exec bash \\"\$r/.specnaut/hooks/approve-on-prompt.sh\\" codex; echo \\"specnaut: .specnaut/hooks changed since it was trusted — run specnaut upgrade, then /hooks\\" >&2; exit 0",
             "timeout": 10
           }
         ]
@@ -32234,7 +32300,7 @@ a8ee3b3537f1718a140bca74815dcfa5ce510bb87b62f63caebfebff090094a6  guard-release.
         "hooks": [
           {
             "type": "command",
-            "command": "r=\$PWD; while [ -n \\"\$r\\" ] && [ ! -d \\"\$r/.specnaut/hooks\\" ]; do r=\${r%/*}; done; [ \\"\$( (sha256sum 2>/dev/null || shasum -a 256) < \\"\$r/.specnaut/hooks/SHA256SUMS\\" 2>/dev/null | cut -c1-64)\\" = \\"3643c4660789495270438c763705c894e1fb6fa3dc2d9063d2e5092db59fc222\\" ] && (cd \\"\$r/.specnaut/hooks\\" && (sha256sum -c --status SHA256SUMS 2>/dev/null || shasum -a 256 -c --status SHA256SUMS)) && exec bash \\"\$r/.specnaut/hooks/approve-on-prompt.sh\\" codex; echo \\"specnaut: .specnaut/hooks changed since it was trusted — run specnaut upgrade, then /hooks\\" >&2; exit 0",
+            "command": "r=\$PWD; while [ -n \\"\$r\\" ] && [ ! -d \\"\$r/.specnaut/hooks\\" ]; do r=\${r%/*}; done; [ \\"\$( (sha256sum 2>/dev/null || shasum -a 256) < \\"\$r/.specnaut/hooks/SHA256SUMS\\" 2>/dev/null | cut -c1-64)\\" = \\"5340253e3912b58c4132af21dafd1eb66e7a887af399b8c0b295ca2d1b91ffac\\" ] && (cd \\"\$r/.specnaut/hooks\\" && (sha256sum -c --status SHA256SUMS 2>/dev/null || shasum -a 256 -c --status SHA256SUMS)) && exec bash \\"\$r/.specnaut/hooks/approve-on-prompt.sh\\" codex; echo \\"specnaut: .specnaut/hooks changed since it was trusted — run specnaut upgrade, then /hooks\\" >&2; exit 0",
             "timeout": 10
           }
         ]
@@ -32245,7 +32311,7 @@ a8ee3b3537f1718a140bca74815dcfa5ce510bb87b62f63caebfebff090094a6  guard-release.
         "hooks": [
           {
             "type": "command",
-            "command": "r=\$PWD; while [ -n \\"\$r\\" ] && [ ! -d \\"\$r/.specnaut/hooks\\" ]; do r=\${r%/*}; done; [ \\"\$( (sha256sum 2>/dev/null || shasum -a 256) < \\"\$r/.specnaut/hooks/SHA256SUMS\\" 2>/dev/null | cut -c1-64)\\" = \\"3643c4660789495270438c763705c894e1fb6fa3dc2d9063d2e5092db59fc222\\" ] && (cd \\"\$r/.specnaut/hooks\\" && (sha256sum -c --status SHA256SUMS 2>/dev/null || shasum -a 256 -c --status SHA256SUMS)) && exec bash \\"\$r/.specnaut/hooks/log-subagent.sh\\" start; echo \\"specnaut: .specnaut/hooks changed since it was trusted — run specnaut upgrade, then /hooks\\" >&2; exit 0",
+            "command": "r=\$PWD; while [ -n \\"\$r\\" ] && [ ! -d \\"\$r/.specnaut/hooks\\" ]; do r=\${r%/*}; done; [ \\"\$( (sha256sum 2>/dev/null || shasum -a 256) < \\"\$r/.specnaut/hooks/SHA256SUMS\\" 2>/dev/null | cut -c1-64)\\" = \\"5340253e3912b58c4132af21dafd1eb66e7a887af399b8c0b295ca2d1b91ffac\\" ] && (cd \\"\$r/.specnaut/hooks\\" && (sha256sum -c --status SHA256SUMS 2>/dev/null || shasum -a 256 -c --status SHA256SUMS)) && exec bash \\"\$r/.specnaut/hooks/log-subagent.sh\\" start; echo \\"specnaut: .specnaut/hooks changed since it was trusted — run specnaut upgrade, then /hooks\\" >&2; exit 0",
             "timeout": 10
           }
         ]
@@ -32256,7 +32322,7 @@ a8ee3b3537f1718a140bca74815dcfa5ce510bb87b62f63caebfebff090094a6  guard-release.
         "hooks": [
           {
             "type": "command",
-            "command": "r=\$PWD; while [ -n \\"\$r\\" ] && [ ! -d \\"\$r/.specnaut/hooks\\" ]; do r=\${r%/*}; done; [ \\"\$( (sha256sum 2>/dev/null || shasum -a 256) < \\"\$r/.specnaut/hooks/SHA256SUMS\\" 2>/dev/null | cut -c1-64)\\" = \\"3643c4660789495270438c763705c894e1fb6fa3dc2d9063d2e5092db59fc222\\" ] && (cd \\"\$r/.specnaut/hooks\\" && (sha256sum -c --status SHA256SUMS 2>/dev/null || shasum -a 256 -c --status SHA256SUMS)) && exec bash \\"\$r/.specnaut/hooks/log-subagent.sh\\" stop; echo \\"specnaut: .specnaut/hooks changed since it was trusted — run specnaut upgrade, then /hooks\\" >&2; exit 0",
+            "command": "r=\$PWD; while [ -n \\"\$r\\" ] && [ ! -d \\"\$r/.specnaut/hooks\\" ]; do r=\${r%/*}; done; [ \\"\$( (sha256sum 2>/dev/null || shasum -a 256) < \\"\$r/.specnaut/hooks/SHA256SUMS\\" 2>/dev/null | cut -c1-64)\\" = \\"5340253e3912b58c4132af21dafd1eb66e7a887af399b8c0b295ca2d1b91ffac\\" ] && (cd \\"\$r/.specnaut/hooks\\" && (sha256sum -c --status SHA256SUMS 2>/dev/null || shasum -a 256 -c --status SHA256SUMS)) && exec bash \\"\$r/.specnaut/hooks/log-subagent.sh\\" stop; echo \\"specnaut: .specnaut/hooks changed since it was trusted — run specnaut upgrade, then /hooks\\" >&2; exit 0",
             "timeout": 10
           }
         ]
