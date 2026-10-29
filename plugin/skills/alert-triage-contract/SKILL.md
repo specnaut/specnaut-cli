@@ -2,6 +2,7 @@
 name: alert-triage-contract
 description: Defines the security-expert's alert-triage mode — the per-alert workflow, the constrained Bash allowlist, the resolution values each GitHub endpoint accepts, and the VERDICT line. Preloaded, not user-invocable.
 user-invocable: false
+constitution-exempt: a triage procedure preloaded by security-expert, which already reads the constitution first
 ---
 
 # alert-triage-contract

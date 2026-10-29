@@ -2,6 +2,7 @@
 name: status-audit
 description: Read-only health audit of a multi-agent session from the status ledger. Use when the user says "status audit", "audit the session", "how are the agents doing", "what's blocked", "session health", or when supervising long headless work with /loop. Reads .specnaut/logs/agents.jsonl, derives each agent's current state from its latest entry, and reports seven health views. Writes nothing.
 argument-hint: "[latest|<agent>|<session>]"
+constitution-exempt: reads the session's agent ledger only; it starts no work and writes nothing
 ---
 
 # Status Audit — read-only session health report

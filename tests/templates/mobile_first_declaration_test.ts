@@ -1,5 +1,6 @@
 import { assert } from "@std/assert";
 import { CORE_BUNDLE } from "../../src/templates_bundle.ts";
+import { bodyOf } from "./constitution_reference.ts";
 
 /**
  * The mobile-first contract's opt-out (#576 FR-005, spec 038 FR-009): where a
@@ -51,7 +52,9 @@ Deno.test("no constitution section is where the exception or the values live", (
       .exec(agents.content)?.[1];
   assert(uiDefaults, "the ui-defaults section is missing");
   assert(uiDefaults.includes("`.specnaut/ui.yml`"), "the section names where the exception lives");
-  for (const text of [contractEntry().content, uiDefaults]) {
+  // The contract's prose, not its frontmatter: `constitution-exempt` is the key
+  // that says why it does not open with the reference (spec 039), not a pointer.
+  for (const text of [bodyOf(contractEntry().content), uiDefaults]) {
     assert(!/constitution/i.test(text), "names the constitution");
     assert(!flat(text).includes("Target surface"), "names the old heading");
     assert(!flat(text).includes("Front-end patterns"), "names a constitution section");

@@ -13,6 +13,8 @@ when_to_use: |
 
 # Task router
 
+Read `docs/constitution.md` before anything else: it is this project's binding rules, and no agent edits it unasked.
+
 **Response style** — brevity, visual order, questions as selections, badge colours — follows the `response-style-contract` skill; read it, never restate it here.
 
 **Backlog references** follow the `backlog-reference-contract` skill — read it; never restate it here.

@@ -9,6 +9,8 @@ maxTurns: 40
 color: yellow
 ---
 
+Read `docs/constitution.md` before anything else: it is this project's binding rules, and no agent edits it unasked.
+
 You are a **test reviewer**. Review ONLY the test files in the diff, cross-
 referenced against the implementation files they cover.
 

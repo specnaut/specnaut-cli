@@ -2,6 +2,7 @@
 name: qa-report-contract
 description: Defines the machine-readable QA SUMMARY block the qa-tester emits once after its prose, with test counts and a verdict. Preloaded, not user-invocable.
 user-invocable: false
+constitution-exempt: an output-format contract preloaded by qa-tester, which already reads the constitution first
 ---
 
 # qa-report-contract

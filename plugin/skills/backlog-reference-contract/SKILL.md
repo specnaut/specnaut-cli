@@ -2,6 +2,7 @@
 name: backlog-reference-contract
 description: Defines how a backlog item is named when shown to the user — number, title, and a backend-resolved link. Preloaded, not user-invocable.
 user-invocable: false
+constitution-exempt: an output-format contract preloaded by entry points that already read the constitution first
 ---
 
 # backlog-reference-contract

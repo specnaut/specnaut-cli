@@ -1,7 +1,8 @@
 # Constitution
 
 The principles this project's code is held to. Every plan and every review checks a change
-against them. Amend it deliberately, as a team, and say why in the commit.
+against them. Amend it deliberately, as a team, and say why in the commit. It is loaded into every
+agent session, so it imports no other file, and a change to it is reviewed like code.
 
 ## Domain isolation
 

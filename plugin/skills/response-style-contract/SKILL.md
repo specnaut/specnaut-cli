@@ -2,6 +2,7 @@
 name: response-style-contract
 description: Defines how the assistant answers — brevity, visual order, how a question is put, and what a badge colour means. In force on every turn. Preloaded, not user-invocable.
 user-invocable: false
+constitution-exempt: an answer-format contract preloaded by entry points that already read the constitution first
 ---
 
 # response-style-contract

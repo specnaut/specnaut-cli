@@ -1,4 +1,6 @@
 
+Read `docs/constitution.md` before anything else: it is this project's binding rules, and no agent edits it unasked.
+
 ## User Input
 
 ```text

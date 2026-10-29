@@ -1,20 +1,7 @@
 # AGENTS.md — Project Context
 
-> Read this first. It is the source of truth for the project's architecture,
-> rules, and conventions. Agents, reviewers, and developers all consult this
-> file before touching code.
-
-## Tech stack
-
-_(Describe your stack here — languages, frameworks, databases, deployment targets.)_
-
-## Architecture rules
-
-_(List your non-negotiable rules — layering, DI, error handling, security.)_
-
-## Conventions
-
-_(Naming, testing, commits, branches.)_
+> Read this first. It holds the project's working context — its stack, its conventions, and how
+> the agents here work. The rules every change is held to are in `docs/constitution.md`.
 
 <!-- --- Specnaut: constitution --- -->
 
@@ -22,12 +9,29 @@ _(Naming, testing, commits, branches.)_
 
 *Owned by Specnaut — this section is not a placeholder to fill in. Edit the rest freely.*
 
-**`docs/constitution.md` holds the principles every plan, change and review is checked
-against.** Read it before you design or change code. It is the team's document: no agent edits
-it on its own initiative. When a request conflicts with it, stop and ask which one gives way —
-never work around it, and never amend it to fit.
+Read `docs/constitution.md` before anything else: it is this project's binding rules, and no agent edits it unasked.
+
+@docs/constitution.md
+
+It holds the principles every plan, change and review is checked against, and it is the team's
+document. When a request conflicts with it, stop and ask which one gives way — never work around
+it, and never amend it to fit. Claude Code loads it into every session, so it imports no other
+file, and a change to it is reviewed like code.
 
 <!-- --- End Specnaut: constitution --- -->
+
+## Tech stack
+
+_(Describe your stack here — languages, frameworks, databases, deployment targets.)_
+
+## Architecture rules
+
+_(These live in `docs/constitution.md`, so there is one place to write a rule. Add here only how
+this codebase applies them — where each layer sits, which module owns what.)_
+
+## Conventions
+
+_(Naming, testing, commits, branches.)_
 
 <!-- --- Specnaut: chain-stops --- -->
 

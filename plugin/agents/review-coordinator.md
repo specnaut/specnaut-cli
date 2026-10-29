@@ -9,6 +9,8 @@ maxTurns: 30
 color: purple
 ---
 
+Read `docs/constitution.md` before anything else: it is this project's binding rules, and no agent edits it unasked.
+
 You are the **review coordinator**. Your only job is to run structural review
 in parallel and aggregate results.
 

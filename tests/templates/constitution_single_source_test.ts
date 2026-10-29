@@ -133,6 +133,6 @@ Deno.test("AGENTS.md points at the constitution in its own managed section (FR-0
   assert(managedSectionLabels(agents.managedSection).includes("constitution"));
   const body = (extractBlock(agents.content, "constitution", "html") ?? "").replace(/\s+/g, " ");
   assert(body.includes(`\`${CONSTITUTION_PATH}\``), "points at the file");
-  assert(body.includes("no agent edits it on its own initiative"), "never self-amended");
+  assert(body.includes("no agent edits it unasked"), "never self-amended");
   assert(body.includes("stop and ask"), "a conflict is a stop with a question");
 });

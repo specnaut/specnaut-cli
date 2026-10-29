@@ -11,6 +11,8 @@ disable-model-invocation: true
 color: green
 ---
 
+Read `docs/constitution.md` before anything else: it is this project's binding rules, and no agent edits it unasked.
+
 You are the **QA tester** for this project.
 
 ## Mission

@@ -2,6 +2,7 @@
 name: mobile-first-contract
 description: Defines what mobile-first obliges for any UI — web or native — as the assumed default, with a project-level opt-out. Preloaded, not user-invocable.
 user-invocable: false
+constitution-exempt: a UI-default contract, preloaded by entry points that read the project's binding rules first
 ---
 
 # mobile-first-contract

@@ -1,5 +1,4 @@
 import { assert, assertEquals } from "@std/assert";
-import { CORE_BUNDLE } from "../../src/templates_bundle.ts";
 import {
   ADDENDUM_SKILLS,
   auditAddendum,
@@ -7,6 +6,7 @@ import {
   ROUTABLE_PHASES,
 } from "../../src/domain/addendum_audit.ts";
 import { SKILL_DOC_RENAMES } from "../../src/domain/skill_doc_renames.ts";
+import { docOf, router, verbTable } from "./verb_table.ts";
 
 /**
  * #622 — `ROUTABLE_PHASES` and `CONTRACT_DOCS` are declared in code, once, so
@@ -32,28 +32,6 @@ function phaseDocsOnDisk(skill: string): string[] {
   return names.sort();
 }
 
-function router(skill: string): string {
-  const e = CORE_BUNDLE.find((x) =>
-    (x.category === "skill" || x.category === "backlog-skill") && x.name === skill
-  );
-  if (!e) throw new Error(`no bundled router for ${skill}`);
-  return e.content;
-}
-
-/**
- * The router's verb table, in row order: `| \`<verb> [args]\` | \`<doc>.md\` |`.
- * `/ship` routes by path, not by a verb table, so it yields nothing here and
- * its verbs are `phases/<verb>.md` by construction.
- */
-function verbTable(content: string): Array<{ verb: string; doc: string }> {
-  const rows: Array<{ verb: string; doc: string }> = [];
-  for (const line of content.split("\n")) {
-    const m = line.match(/^\| `([a-z][a-z-]*)[^`]*`(?: _[^|]*_)? \| `([a-z0-9/-]+\.md)` \|/);
-    if (m) rows.push({ verb: m[1], doc: m[2] });
-  }
-  return rows;
-}
-
 /**
  * The `phases/<doc>.md` references in the router's table rows, in row order,
  * first mention only — used for `/ship`, whose tables are by path.
@@ -67,11 +45,6 @@ function phaseRefOrder(content: string): string[] {
     }
   }
   return seen;
-}
-
-/** The document a routable verb is read from, relative to its skill directory. */
-function docOf(skill: string, verb: string): string {
-  return verbTable(router(skill)).find((r) => r.verb === verb)?.doc ?? `phases/${verb}.md`;
 }
 
 const contractDocsOf = (skill: string) =>

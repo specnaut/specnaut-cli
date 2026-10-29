@@ -1,4 +1,6 @@
 
+Read `docs/constitution.md` before anything else: it is this project's binding rules, and no agent edits it unasked.
+
 ## User Input
 
 ```text
@@ -76,6 +78,8 @@ constitution first, then the configs. A plain "yes", "ok" or "go" approves nothi
      is read by every planning and review step, and the size limits hold it to its own
      `constitution` unit.
    - No HTML comments, no change log, no report inside the file: git history is the record.
+   - No import: a line holding `@` followed by a path is refused, whoever asks. Claude Code loads
+     the file into every session and would follow the import, unguarded, into every one.
 4. **Bump `Version:`** (the footer line) for a constitution change, by semantic versioning:
    - MAJOR: a principle removed, or redefined so that existing code may now violate it.
    - MINOR: a principle added, or materially expanded.

@@ -2,6 +2,7 @@
 name: review-findings-contract
 description: Defines the machine-readable REVIEW SUMMARY block every expert/reviewer emits once after its prose, with severity counts and a verdict. Preloaded, not user-invocable.
 user-invocable: false
+constitution-exempt: an output-format contract preloaded by reviewers that already read the constitution first
 ---
 
 # review-findings-contract

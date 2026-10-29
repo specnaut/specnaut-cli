@@ -2,6 +2,7 @@
 name: backlog-frontmatter
 description: The canonical task-file frontmatter schema for the local Markdown backlog backend — every field, its allowed values, and which are mandatory. Preloaded, not user-invocable.
 user-invocable: false
+constitution-exempt: a backlog schema preloaded by product-owner, which already reads the constitution first
 ---
 
 # backlog-frontmatter

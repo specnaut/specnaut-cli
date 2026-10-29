@@ -2,6 +2,7 @@
 name: handoff-protocol
 description: Defines the machine-readable HANDOFF block emitted right after WORKFLOW STATUS whenever an agent hands work to another actor. Preloaded, not user-invocable.
 user-invocable: false
+constitution-exempt: an output-format contract preloaded by agents that already read the constitution first
 ---
 
 # handoff-protocol

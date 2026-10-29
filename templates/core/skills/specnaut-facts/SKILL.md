@@ -2,6 +2,7 @@
 name: specnaut-facts
 description: The vendored offline snapshot of what Specnaut is, its commands, harnesses and backlog backends — what specnaut-guide answers from when the live docs cannot be fetched. Preloaded, not user-invocable.
 user-invocable: false
+constitution-exempt: reference facts about Specnaut preloaded by specnaut-guide, which already reads the constitution first
 ---
 
 # specnaut-facts

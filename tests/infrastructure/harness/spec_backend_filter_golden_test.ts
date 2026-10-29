@@ -17,6 +17,8 @@ import { skillDocName } from "../../../src/domain/core_bundle.ts";
 // in the same commit; an accidental drift fails here. cli#683 moved the four
 // docs to `/task` and re-captured implement's and review's goldens for the
 // address text alone (`/specnaut merge` → `/task merge`) — nothing else moved.
+// cli#685 re-captured all four for the constitution reference each now opens
+// with, and plan's step-3 wording — nothing else moved.
 
 function abs(rel: string): string {
   return fromFileUrl(new URL(`../../${rel}`, import.meta.url));

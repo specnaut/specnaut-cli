@@ -1,5 +1,7 @@
 # groom — board and delivery hygiene
 
+Read `docs/constitution.md` before anything else: it is this project's binding rules, and no agent edits it unasked.
+
 Keeps the backlog and delivery pipeline flowing without human intervention.
 Reachable as **`/task groom`** — the only door.
 

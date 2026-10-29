@@ -2,6 +2,7 @@
 name: workflow-contract
 description: Defines the machine-readable WORKFLOW STATUS block every workflow-shaped agent emits once at end of turn. Preloaded, not user-invocable.
 user-invocable: false
+constitution-exempt: an output-format contract preloaded by agents that already read the constitution first
 ---
 
 # workflow-contract

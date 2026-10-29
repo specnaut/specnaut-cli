@@ -1,3 +1,5 @@
+Read `docs/constitution.md` before anything else: it is this project's binding rules, and no agent edits it unasked.
+
 ## User Input
 
 ```text
@@ -73,7 +75,7 @@ one and `merge`'s move to `Done`.
 
 ### 3. Read the ground truth before writing a line
 
-- `docs/constitution.md` — binding, and it outranks this file.
+- `docs/constitution.md`, already read — binding, and it outranks this file.
 - The linked backlog item's body, when there is one.
 - **The code the feature touches.** Most design questions are already decided there; re-deciding
   one produces a second spelling.
