@@ -14,7 +14,7 @@ import {
 } from "../../domain/codex_config.ts";
 import { ensureSkillFrontmatter, skillDocDestination, skillFolderName } from "./skill_folder.ts";
 import { frontmatterField, splitFrontmatter } from "./frontmatter.ts";
-import { effortToCodexReasoning, tierToCodexModel } from "../../domain/codex_models.ts";
+import { codexFamilyOf, effortToCodexReasoning } from "../../domain/codex_models.ts";
 import { applyBackend, applyHarness, backlogScriptDestination } from "./backlog_filter.ts";
 import { applyScheme, phaseScriptDestination } from "./scheme_filter.ts";
 import { applySpecBackend } from "./spec_backend_filter.ts";
@@ -36,16 +36,21 @@ function parseAgentFrontmatter(
 }
 
 function toCodexSubagentToml(entry: CoreEntry): string {
+  // No `model` key: Specnaut names no model version (codex_models.ts). The
+  // family is a comment, so the agent runs on the session's model and the
+  // user still sees which family it was written for.
   const { description, model, effort, body } = parseAgentFrontmatter(entry.content);
-  const codexModel = tierToCodexModel(model);
+  const family = codexFamilyOf(model);
   const reasoning = effortToCodexReasoning(effort);
-  return stringifyToml({
+  const toml = stringifyToml({
     name: entry.name,
     description: description || `Specnaut ${entry.name} agent`,
-    ...(codexModel ? { model: codexModel } : {}),
     ...(reasoning ? { model_reasoning_effort: reasoning } : {}),
     developer_instructions: body,
   });
+  return family === null
+    ? toml
+    : `# Model family: ${family} (${model!.trim().toLowerCase()} on Claude Code)\n${toml}`;
 }
 
 export class CodexHarness implements Harness {
@@ -155,11 +160,8 @@ export class CodexHarness implements Harness {
 
     // `[agents]` defaults for children spawned without a role (cli#599).
     //
-    // Synthesised here rather than shipped as a static template because the
-    // model id must come from `codex_models.ts` — that file states it is the
-    // only place to edit when OpenAI renames a model, and a template carrying
-    // the literal would become the second, drifting on exactly the release
-    // that renamed it.
+    // Synthesised here so its keys come from `codex_config.ts`, the one place
+    // that decides them.
     //
     // A merge block, not `skipIfExists`: anyone who already keeps a
     // `.codex/config.toml` is the normal case AND the population with this

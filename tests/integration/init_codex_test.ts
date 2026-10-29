@@ -1,4 +1,4 @@
-import { assertEquals } from "@std/assert";
+import { assert, assertEquals } from "@std/assert";
 import { exists } from "@std/fs/exists";
 import { parse as parseToml } from "@std/toml";
 import { fromFileUrl, join } from "@std/path";
@@ -75,10 +75,10 @@ Deno.test("specnaut init --ai codex scaffolds a Codex layout", async () => {
     assertEquals(parsed.name, "product-owner");
     assertEquals(typeof parsed.description, "string");
     assertEquals(typeof parsed.developer_instructions, "string");
-    // The bundled product-owner declares `model: opus` + `effort: high`, which
-    // map onto Codex's own two axes: the capability tier picks the model, the
-    // effort passes through verbatim.
-    assertEquals(parsed.model, "gpt-5.6-sol");
+    // The bundled product-owner declares `model: opus` + `effort: high`. No model
+    // version is pinned (cli#707): the family is a comment, the effort is verbatim.
+    assertEquals("model" in parsed, false);
+    assert(tomlContent.startsWith("# Model family: Sol (opus on Claude Code)\n"));
     assertEquals(parsed.model_reasoning_effort, "high");
 
     // cli#681: `.codex/AGENTS.md` is a relative link to the root AGENTS.md —

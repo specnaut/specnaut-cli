@@ -29,18 +29,16 @@ function codexAgents(): Map<string, Record<string, unknown>> {
   return out;
 }
 
-Deno.test("every bundled agent reaches Codex with both a model and an effort", () => {
+Deno.test("every bundled agent reaches Codex with an effort and no pinned model", () => {
   const agents = codexAgents();
   assert(agents.size > 0, "no Codex agent TOML emitted");
   const incomplete = [...agents.entries()]
-    .filter(([, t]) => !t.model || !t.model_reasoning_effort)
+    .filter(([, t]) => "model" in t || !t.model_reasoning_effort)
     .map(([n]) => n);
   assertEquals(
     incomplete,
     [],
-    `these agents omit a key and would silently inherit the session default: ${
-      incomplete.join(", ")
-    }`,
+    `these agents pin a model version or omit their effort: ${incomplete.join(", ")}`,
   );
 });
 
@@ -69,10 +67,16 @@ Deno.test("the xhigh seats keep xhigh on Codex", () => {
   }
 });
 
-Deno.test("every emitted Codex model id is one of the three GPT-5.6 tiers", () => {
-  const known = new Set(["gpt-5.6-sol", "gpt-5.6-terra", "gpt-5.6-luna"]);
-  const unknown = [...codexAgents().entries()]
-    .filter(([, t]) => !known.has(String(t.model)))
-    .map(([n, t]) => `${n}=${t.model}`);
-  assertEquals(unknown, [], `unknown Codex model id emitted: ${unknown.join(", ")}`);
+Deno.test("every emitted Codex agent names its model family, never a version", () => {
+  const mapped = new CodexHarness().mapBundle(CORE_BUNDLE, {
+    backlogBackend: "local",
+    versionScheme: "semver",
+    specBackend: "local",
+  });
+  const families = new Set(["Luna", "Terra", "Sol", "Astra"]);
+  const wrong = Object.entries(mapped)
+    .filter(([path]) => /^\.codex\/agents\/.+\.toml$/.test(path))
+    .filter(([, f]) => !families.has(f.content.match(/^# Model family: (\w+)/)?.[1] ?? ""))
+    .map(([path]) => path);
+  assertEquals(wrong, [], `Codex agents with no known family comment: ${wrong.join(", ")}`);
 });

@@ -239,7 +239,7 @@ scaffolded for a harness without such features gets none here.
   a session running the full spec-plan-tasks chain. File edits are
   isolated under `.claude/worktrees/` (git worktrees), so several
   Specnaut agents can work in parallel without stepping on each
-  other. Requires Claude Code v2.1.139+. See
+  other. See
   https://code.claude.com/docs/en/agent-view.
 
 - **Async notifications** — install one of the channel plugins (Telegram,

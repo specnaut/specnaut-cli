@@ -1,29 +1,42 @@
 /**
- * Codex model + reasoning-effort mapping.
+ * Codex reasoning-effort mapping.
  *
- * Specnaut agents declare two frontmatter fields: `model:` — a *capability
- * tier* borrowed from Claude's names — and `effort:` — a reasoning budget.
- * Codex subagent TOML accepts the same two axes (`model`, and
- * `model_reasoning_effort`), so both map across rather than one standing in
- * for the other.
+ * Specnaut agents declare two frontmatter fields: `model:` — a capability
+ * family borrowed from Claude's names (`opus`, `sonnet`, `haiku`) — and
+ * `effort:` — a reasoning budget. Only the second crosses to Codex.
  *
- * They used to collapse: the harness derived `model_reasoning_effort` from
- * the *model* tier and never read `effort:` at all. That worked only while
- * the fleet happened to spread across Sonnet and Opus. When every bundled
- * agent moved to Opus the mapping went degenerate — all fifteen emitted
- * `high`, and the five `xhigh` seats lost their budget on Codex with nothing
- * to report it.
+ * **Specnaut names no model version** (Kevin, 2026-10-29; specnaut-cli#707).
+ * Codex has no family aliases, only versioned ids, and an id written into a
+ * scaffolded `.codex/agents/*.toml` is obsolete within weeks: it fails at
+ * dispatch the day the account's catalogue drops it. So an emitted Codex
+ * agent carries no `model` key and runs on the session's model; the budget it
+ * needs still reaches it as `model_reasoning_effort`, and its model FAMILY —
+ * never a version — is named in a comment, so the user knows which to pick.
  *
- * **When OpenAI renames these models, this file is the only place to edit.**
- * That is why the ids live here and not inline in the harness.
+ * The two axes used to collapse the other way: the harness derived the effort
+ * from the model tier and never read `effort:`, so when every bundled agent
+ * moved to Opus all fifteen emitted `high` and the `xhigh` seats lost their
+ * budget on Codex. Effort is read from `effort:` alone.
  */
 
-/** Capability tier → Codex model id. */
-const TIER_TO_MODEL: Readonly<Record<string, string>> = {
-  opus: "gpt-5.6-sol", // deepest: complex, open-ended, high-value work
-  sonnet: "gpt-5.6-terra", // the everyday all-rounder
-  haiku: "gpt-5.6-luna", // clear, repeatable, high-volume tasks
+/**
+ * Claude family → Codex family (Kevin, 2026-10-29). Families only: a version
+ * is never written, because it is obsolete within weeks.
+ */
+const CLAUDE_TO_CODEX_FAMILY: Readonly<Record<string, string>> = {
+  haiku: "Luna",
+  sonnet: "Terra",
+  opus: "Sol",
+  fable: "Astra",
 };
+
+/**
+ * The Codex model family that matches an agent's `model:` family, or `null`
+ * for an absent, `inherit` or unknown value. Names a family, never an id.
+ */
+export function codexFamilyOf(claudeFamily: string | null): string | null {
+  return CLAUDE_TO_CODEX_FAMILY[claudeFamily?.trim().toLowerCase() ?? ""] ?? null;
+}
 
 /**
  * Reasoning efforts Codex accepts. Specnaut's own vocabulary
@@ -39,22 +52,11 @@ const CODEX_EFFORTS: ReadonlySet<string> = new Set([
 ]);
 
 /**
- * Resolves an agent's `model:` tier to a Codex model id.
- *
- * Returns `null` for an absent, empty, `inherit`, or unrecognised tier, so
- * the emitted TOML omits the key and the subagent inherits the parent Codex
- * session's model. Guessing would be worse than inheriting: a wrong pin fails
- * at dispatch, on the user's machine, against a model list we cannot see.
- */
-export function tierToCodexModel(tier: string | null): string | null {
-  return TIER_TO_MODEL[tier?.trim().toLowerCase() ?? ""] ?? null;
-}
-
-/**
  * Resolves an agent's `effort:` to a Codex `model_reasoning_effort`.
  *
- * Identity over the shared vocabulary; `null` for anything else, on the same
- * inherit-rather-than-guess reasoning as above.
+ * Identity over the shared vocabulary; `null` for anything else, so the
+ * emitted TOML omits the key and the subagent inherits the session's setting —
+ * a guess would fail on the user's machine, against a list we cannot see.
  */
 export function effortToCodexReasoning(effort: string | null): string | null {
   const v = effort?.trim().toLowerCase() ?? "";

@@ -13,7 +13,8 @@ import { everyBundleOption } from "../../src/application/bundle_options.ts";
 
 const EXPECTED: Record<string, string[]> = {
   claude: ["model: haiku"],
-  codex: ['model = "gpt-5.6-luna"'],
+  // Codex takes only versioned ids, so the family is a comment (cli#707).
+  codex: ["# Model family: Luna (haiku on Claude Code)"],
   antigravity: ["model: flash"],
   // Provider-agnostic: the user's configured model, never a pin.
   opencode: [],
@@ -32,7 +33,7 @@ function guideModelLines(key: string): string[] {
     `${key}: expected one emitted guide agent, got ${files.map(([p]) => p)}`,
   );
   const content = (files[0][1] as { content: string }).content;
-  return content.split("\n").filter((l) => /^model\s*[:=]/.test(l));
+  return content.split("\n").filter((l) => /^(model\s*[:=]|# Model family:)/.test(l));
 }
 
 for (const [key, expected] of Object.entries(EXPECTED)) {

@@ -46,7 +46,9 @@ Deno.test("init scaffolds the agent defaults for a Codex project", async () => {
   try {
     const toml = await Deno.readTextFile(join(dir, CONFIG));
     assertStringIncludes(toml, "[agents]");
-    assertStringIncludes(toml, "default_subagent_model");
+    assertStringIncludes(toml, "default_subagent_reasoning_effort");
+    // Specnaut names no model version (cli#707).
+    assert(!/^\s*default_subagent_model\s*=/m.test(toml), "the block pins a default model");
   } finally {
     await Deno.remove(dir, { recursive: true });
   }
@@ -56,7 +58,11 @@ Deno.test("upgrade refreshes only the managed block in a hand-edited config", as
   const dir = await codexProject();
   try {
     // The user makes the file their own, on both sides of our block.
-    const scaffolded = await Deno.readTextFile(join(dir, CONFIG));
+    // The block as an earlier release wrote it: with a pinned default model.
+    const scaffolded = (await Deno.readTextFile(join(dir, CONFIG))).replace(
+      "[agents]\n",
+      '[agents]\ndefault_subagent_model = "gpt-5.6-terra"\n',
+    );
     const mine =
       `# my own header\napproval_policy = "on-request"\n\n${scaffolded}\n# my own footer\n`;
     await Deno.writeTextFile(join(dir, CONFIG), mine);
@@ -68,7 +74,15 @@ Deno.test("upgrade refreshes only the managed block in a hand-edited config", as
     assertStringIncludes(after, "# my own header", "the user's leading lines were lost");
     assertStringIncludes(after, 'approval_policy = "on-request"', "a user setting was lost");
     assertStringIncludes(after, "# my own footer", "the user's trailing lines were lost");
-    assertStringIncludes(after, "default_subagent_model", "the managed block did not survive");
+    assertStringIncludes(
+      after,
+      "default_subagent_reasoning_effort",
+      "the managed block did not survive",
+    );
+    assert(
+      !after.includes("default_subagent_model"),
+      "the stale pinned model survived the upgrade",
+    );
 
     // The failure that makes the file unusable rather than merely wrong.
     assertEquals(
@@ -105,9 +119,40 @@ Deno.test("upgrade refuses, and says so, when the user owns an [agents] table", 
     // would keep the bug and never learn the fix had been withheld.
     const out = up.stdout + up.stderr;
     assert(
-      out.includes("[agents]") && out.includes("default_subagent_model"),
+      out.includes("[agents]") && out.includes("default_subagent_reasoning_effort"),
       `the refusal was not reported, or did not name the keys to add:\n${out}`,
     );
+  } finally {
+    await Deno.remove(dir, { recursive: true });
+  }
+});
+
+Deno.test("upgrade rewrites an agent TOML an earlier release pinned to a model version", async () => {
+  const dir = await codexProject();
+  try {
+    // The file exactly as an earlier release wrote it, and recorded in the lock as
+    // such — pristine, not customised — so a plain upgrade must refresh it.
+    const rel = ".codex/agents/developer.toml";
+    const current = await Deno.readTextFile(join(dir, rel));
+    const old = current.replace(/^# Model family: .*\n/, "").replace(
+      /^description = .*$/m,
+      (line) => `${line}\nmodel = "gpt-5.6-sol"`,
+    );
+    await Deno.writeTextFile(join(dir, rel), old);
+    const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(old));
+    const sha = [...new Uint8Array(digest)].map((b) => b.toString(16).padStart(2, "0")).join("");
+    const lockPath = join(dir, ".specnaut/installed.lock");
+    const lock = await Deno.readTextFile(lockPath);
+    const entry = new RegExp(`(  ${rel.replaceAll(".", "\\.")}:\\n    sha256: )[0-9a-f]{64}`);
+    assert(entry.test(lock), "no lock entry for the agent file");
+    await Deno.writeTextFile(lockPath, lock.replace(entry, `$1${sha}`));
+
+    const up = await runSpecnaut(["upgrade"], dir);
+    assertEquals(up.code, 0, `upgrade failed: ${up.stderr}\n${up.stdout}`);
+
+    const after = await Deno.readTextFile(join(dir, rel));
+    assert(!/^model\s*=/m.test(after), `the pinned model survived the upgrade:\n${after}`);
+    assert(after.startsWith("# Model family: Sol"), "the family comment was not written");
   } finally {
     await Deno.remove(dir, { recursive: true });
   }

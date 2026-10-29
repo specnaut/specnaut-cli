@@ -13,7 +13,7 @@
 #   .claude/scripts/dispatch-agent.sh <agent-name> "<prompt>"
 #
 # Environment variables:
-#   MODEL          Override the model (e.g. "claude-sonnet-4-6").
+#   MODEL          Override the model by family (e.g. "sonnet").
 #                  Defaults to whatever the agent or claude binary picks.
 #                  A human override for a headless run: the person setting it
 #                  chose the tier. The rule that a Specnaut agent runs on its

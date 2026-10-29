@@ -1,5 +1,3 @@
-import { tierToCodexModel } from "./codex_models.ts";
-
 /**
  * The `[agents]` defaults Specnaut writes into a project's `.codex/config.toml`.
  *
@@ -16,39 +14,26 @@ import { tierToCodexModel } from "./codex_models.ts";
  * generic child with it, so a long orchestration can escalate onto the most
  * expensive model on the user's own account without anything saying so.
  *
- * ## Why the default is the all-rounder and not the deepest tier
+ * ## Why the default is a reasoning budget, not a model
  *
- * A child spawned without a role is, by definition, not one of the curated
- * seats — nobody chose a capability tier for it. Defaulting it to the deepest
- * model would make the silent-escalation path the *designed* path.
- *
- * This changes nothing for role-based dispatch: every bundled role TOML pins
- * its own `model`, and an explicit spawn value is the first link in the
- * resolution order, so it still wins. What it changes is the floor for work
- * nobody tiered.
- *
- * ## The model id is derived, never spelled here
- *
- * `codex_models.ts` says it is the only place to edit when OpenAI renames a
- * model. Writing the id into a template would make it the second, and the two
- * would drift on exactly the release that renamed it. So this builds the block
- * from `tierToCodexModel`, and `codex_config_test.ts` pins the relationship
- * rather than the string.
+ * A child spawned without a role is untiered work, so it should not run on
+ * the deepest budget by accident. It used to be pinned to a model id as well;
+ * Specnaut names no model version (`codex_models.ts`, specnaut-cli#707),
+ * so the floor is the reasoning effort alone. The child runs on the session's
+ * model at `medium`, which is the cost lever that does not go stale.
  *
  * ## Every key here was read off Codex's own documentation
  *
  * `enabled`, `max_concurrent_threads_per_session`, `default_subagent_model`,
  * `default_subagent_reasoning_effort`, `interrupt_message`. An invented key in
  * a user's config file is a defect we would ship into their editor, so nothing
- * here is guessed. Four are written: the two the documentation describes as
- * setting spawned-agent defaults, the cap, and `enabled` (cli#681). `enabled`
+ * here is guessed. Three are written: the reasoning default for spawned
+ * agents, the cap, and `enabled` (cli#681). `default_subagent_model` is not:
+ * its value would be a model version. `enabled`
  * defaults to true in current Codex; writing it keeps the intent — Specnaut's
  * agents are meant to be used — visible, and survives a change of default.
  * `max_threads` is a legacy alias of the cap and is never written.
  */
-
-/** The capability tier a role-less child falls back to. */
-const DEFAULT_CHILD_TIER = "sonnet";
 
 /** Matching reasoning budget. Codex accepts low|medium|high|xhigh|ultra|max. */
 const DEFAULT_CHILD_EFFORT = "medium";
@@ -71,7 +56,6 @@ const DEFAULT_MAX_CONCURRENT = 4;
  */
 export const CODEX_AGENTS_KEYS = [
   "enabled",
-  "default_subagent_model",
   "default_subagent_reasoning_effort",
   "max_concurrent_threads_per_session",
 ] as const;
@@ -87,30 +71,14 @@ export const CODEX_CONFIG_BLOCK_LABEL = "codex agent defaults";
  * children, not to take that decision over.
  */
 export function codexAgentDefaultsBlock(): string {
-  const model = tierToCodexModel(DEFAULT_CHILD_TIER);
-  if (model === null) {
-    // Unreachable while `DEFAULT_CHILD_TIER` is a known tier, and a thrown
-    // error beats emitting a TOML file with a missing value: a config that
-    // half-declares a default is worse than one that declares none, because
-    // the fall-through it produces is the very bug this closes.
-    throw new Error(
-      `codex_config: tier "${DEFAULT_CHILD_TIER}" has no Codex model — ` +
-        `codex_models.ts and this file have diverged`,
-    );
-  }
   return [
     "# Defaults for subagents Codex spawns WITHOUT an explicit role.",
     "#",
-    "# Codex resolves a child's model as: explicit spawn value → this default →",
-    "# the parent session's value. Without these keys the last link is the only",
-    "# one, so a child dispatched by task description silently inherits your",
-    "# primary model — and raising your primary model raises every such child.",
-    "#",
-    "# Bundled Specnaut roles are unaffected: each pins its own model in",
-    "# .codex/agents/*.toml, and an explicit spawn value still wins.",
+    "# Such a child runs on your session's model; this caps its reasoning budget",
+    "# so untiered work does not run at the deepest one by accident. Bundled",
+    "# Specnaut roles set their own budget in .codex/agents/*.toml.",
     "[agents]",
     "enabled = true",
-    `default_subagent_model = "${model}"`,
     `default_subagent_reasoning_effort = "${DEFAULT_CHILD_EFFORT}"`,
     `max_concurrent_threads_per_session = ${DEFAULT_MAX_CONCURRENT}`,
   ].join("\n");
@@ -139,7 +107,7 @@ export const CODEX_CONFIG_REFUSAL = {
   pattern: "^\\s*\\[agents(\\.|\\])",
   message: ".codex/config.toml already declares an [agents] table outside Specnaut's block — " +
     "left untouched, because a second [agents] header is a TOML redefinition error. " +
-    "Add these to your own [agents] table — Specnaut writes them, and a role-less subagent " +
-    "inherits your primary model without the two defaults: " +
+    "Add these to your own [agents] table — Specnaut writes them, and without the reasoning " +
+    "default a role-less subagent runs at your session's budget: " +
     `${CODEX_AGENTS_KEYS.join(", ")}.`,
 } as const;

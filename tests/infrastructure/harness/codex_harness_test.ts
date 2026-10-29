@@ -102,12 +102,13 @@ Deno.test("CodexHarness maps agent to .codex/agents/<name>.toml with valid TOML"
     (parsed.developer_instructions as string).includes("You are the PO"),
     "agent body should end up in developer_instructions",
   );
-  // The Claude `model` tier picks a Codex model id; `tools` is dropped.
-  assertEquals(parsed.model, "gpt-5.6-sol"); // opus → Sol
+  // No model version is pinned (cli#707): the family is a comment; `tools` is dropped.
+  assertEquals("model" in parsed, false);
+  assert(agentToml.content.startsWith("# Model family: Sol (opus on Claude Code)\n"));
   assertEquals("tools" in parsed, false);
 });
 
-Deno.test("CodexHarness maps the tier to a model and the effort to reasoning", () => {
+Deno.test("CodexHarness names the family, pins no model, and maps the effort", () => {
   const agent = (
     name: string,
     model: string | null,
@@ -122,59 +123,49 @@ Deno.test("CodexHarness maps the tier to a model and the effort to reasoning", (
     executable: false,
   });
   const core: CoreBundle = [
-    agent("deep", "opus", "xhigh"), // → Sol + xhigh
-    agent("standard", "opus", "high"), // → Sol + high
-    agent("mid", "sonnet", "medium"), // → Terra + medium
-    agent("light", "haiku", "low"), // → Luna + low
-    agent("no-model", null, "high"), // → model omitted, effort kept
-    agent("no-effort", "opus", null), // → model kept, effort omitted
-    agent("inherit", "inherit", "inherit"), // → both omitted
-    agent("weird", "gpt-9-ultra", "cosmic"), // → both omitted, no guess
+    agent("deep", "opus", "xhigh"),
+    agent("standard", "opus", "high"),
+    agent("mid", "sonnet", "medium"),
+    agent("light", "haiku", "low"),
+    agent("top", "fable", "high"),
+    agent("no-model", null, "high"),
+    agent("inherit", "inherit", "inherit"),
+    agent("weird", "gpt-9-ultra", "cosmic"),
   ];
-  const h = new CodexHarness();
-  const mapped = h.mapBundle(core, {
+  const mapped = new CodexHarness().mapBundle(core, {
     backlogBackend: "local",
     versionScheme: "semver",
     specBackend: "local",
   });
-  const toml = (name: string) => {
-    const file = mapped[`.codex/agents/${name}.toml`];
-    assert(file, `${name} TOML not emitted`);
-    return parseToml(file.content);
+  const file = (name: string) => {
+    const f = mapped[`.codex/agents/${name}.toml`];
+    assert(f, `${name} TOML not emitted`);
+    return f.content;
   };
+  const toml = (name: string) => parseToml(file(name));
+  const family = (name: string) => file(name).match(/^# Model family: (\w+)/)?.[1] ?? null;
 
-  assertEquals(toml("deep").model, "gpt-5.6-sol");
-  assertEquals(toml("deep").model_reasoning_effort, "xhigh");
-  assertEquals(toml("mid").model, "gpt-5.6-terra");
-  assertEquals(toml("mid").model_reasoning_effort, "medium");
-  assertEquals(toml("light").model, "gpt-5.6-luna");
-  assertEquals(toml("light").model_reasoning_effort, "low");
-
-  // The whole point of reading `effort:` rather than deriving it from the
-  // model: two agents on the same tier must still emit distinct budgets.
-  // While effort came from the tier, these two were indistinguishable — and
-  // an all-Opus fleet made *every* agent indistinguishable.
-  assertEquals(toml("standard").model, toml("deep").model);
-  assert(
-    toml("standard").model_reasoning_effort !== toml("deep").model_reasoning_effort,
-    "same tier, different effort must not collapse to one budget",
-  );
-
-  // The two axes are independent — one being unresolvable never suppresses
-  // the other.
-  assertEquals("model" in toml("no-model"), false);
-  assertEquals(toml("no-model").model_reasoning_effort, "high");
-  assertEquals(toml("no-effort").model, "gpt-5.6-sol");
-  assertEquals("model_reasoning_effort" in toml("no-effort"), false);
-
-  // Absent / inherit / unrecognised omit the key so Codex inherits the parent
-  // session default, and the file stays valid & discoverable.
-  for (const name of ["inherit", "weird"]) {
-    const parsed = toml(name);
-    assertEquals("model" in parsed, false, `${name} should omit model`);
-    assertEquals("model_reasoning_effort" in parsed, false, `${name} should omit effort`);
-    assertEquals(parsed.name, name);
+  // Families, never ids (cli#707): no emitted agent carries a `model` key.
+  for (const name of ["deep", "standard", "mid", "light", "top", "no-model", "inherit", "weird"]) {
+    assertEquals("model" in toml(name), false, `${name} pins a model`);
   }
+  assertEquals(family("deep"), "Sol");
+  assertEquals(family("mid"), "Terra");
+  assertEquals(family("light"), "Luna");
+  assertEquals(family("top"), "Astra");
+  // Absent / inherit / unrecognised: no family named, no guess.
+  assertEquals(family("no-model"), null);
+  assertEquals(family("inherit"), null);
+  assertEquals(family("weird"), null);
+
+  // The effort crosses verbatim, and two agents of one family keep distinct budgets.
+  assertEquals(toml("deep").model_reasoning_effort, "xhigh");
+  assertEquals(toml("standard").model_reasoning_effort, "high");
+  assertEquals(toml("mid").model_reasoning_effort, "medium");
+  assertEquals(toml("light").model_reasoning_effort, "low");
+  assertEquals(toml("no-model").model_reasoning_effort, "high");
+  assertEquals("model_reasoning_effort" in toml("inherit"), false);
+  assertEquals("model_reasoning_effort" in toml("weird"), false);
 });
 
 Deno.test("CodexHarness maps spec-root to .specnaut/<suffix> and project-root to <suffix>", () => {

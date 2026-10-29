@@ -4,7 +4,6 @@ import {
   CODEX_CONFIG_REFUSAL,
   codexAgentDefaultsBlock,
 } from "../../src/domain/codex_config.ts";
-import { tierToCodexModel } from "../../src/domain/codex_models.ts";
 import { mergeIntoFile, mergeRefusal } from "../../src/domain/merge_block.ts";
 import { CodexHarness } from "../../src/infrastructure/harness/codex_harness.ts";
 import { CORE_BUNDLE } from "../../src/templates_bundle.ts";
@@ -28,35 +27,27 @@ import { CORE_BUNDLE } from "../../src/templates_bundle.ts";
 const OPTS = { backlogBackend: "local", versionScheme: "semver", specBackend: "local" } as const;
 const emitted = new CodexHarness().mapBundle(CORE_BUNDLE, OPTS);
 
-Deno.test("the emitted config carries the two spawned-agent defaults and a cap", () => {
+Deno.test("the emitted config carries the reasoning default and a cap", () => {
   const file = emitted[".codex/config.toml"];
   assert(file !== undefined, "no .codex/config.toml is emitted, so there is no default at all");
   assertStringIncludes(file.content, "[agents]");
-  assertStringIncludes(file.content, "default_subagent_model = ");
   assertStringIncludes(file.content, "default_subagent_reasoning_effort = ");
   assertStringIncludes(file.content, "max_concurrent_threads_per_session = ");
 });
 
-Deno.test("the default model is derived from the tier map, not spelled a second time", () => {
-  // `codex_models.ts` states it is the only place to edit when OpenAI renames a
-  // model. This pins the RELATIONSHIP rather than the string, so a rename there
-  // carries here automatically instead of leaving two ids to drift apart on
-  // exactly the release that renamed one of them.
-  const expected = tierToCodexModel("sonnet");
-  assert(expected !== null, "the tier map no longer knows the tier this default is built from");
-  assertStringIncludes(codexAgentDefaultsBlock(), `default_subagent_model = "${expected}"`);
+Deno.test("the block names no model: a version would be obsolete within weeks (cli#707)", () => {
+  assert(
+    !/^\s*default_subagent_model\s*=/m.test(codexAgentDefaultsBlock()),
+    "a default model is pinned",
+  );
+  assert(!(CODEX_AGENTS_KEYS as readonly string[]).includes("default_subagent_model"));
 });
 
-Deno.test("the default is not the deepest tier", () => {
-  // The whole point. A role-less child is untiered work; defaulting it to the
-  // deepest model would make the silent-escalation path the designed one.
-  const deepest = tierToCodexModel("opus");
-  assert(deepest !== null);
-  assert(
-    !codexAgentDefaultsBlock().includes(`default_subagent_model = "${deepest}"`),
-    "role-less children default to the most expensive tier, which is the cost " +
-      "escalation this ticket exists to stop",
-  );
+Deno.test("the reasoning default is not the deepest budget", () => {
+  // The whole point of cli#599: a role-less child is untiered work, and
+  // defaulting it to the deepest budget would make silent escalation the design.
+  assert(!codexAgentDefaultsBlock().includes('default_subagent_reasoning_effort = "xhigh"'));
+  assertStringIncludes(codexAgentDefaultsBlock(), 'default_subagent_reasoning_effort = "medium"');
 });
 
 Deno.test("the config is a merge block, never a whole-file write", () => {
@@ -71,11 +62,11 @@ Deno.test("the config is a merge block, never a whole-file write", () => {
   assertEquals(file.mergeRefuseIf, CODEX_CONFIG_REFUSAL);
 });
 
-Deno.test("every emitted role TOML pins a model and a reasoning effort", () => {
+Deno.test("every emitted role TOML pins a reasoning effort and no model", () => {
   const roles = Object.entries(emitted).filter(([d]) => d.startsWith(".codex/agents/"));
   assert(roles.length > 0, "the adapter emitted no role files at all");
   for (const [dest, file] of roles) {
-    assertStringIncludes(file.content, "model = ", `${dest} pins no model`);
+    assert(!/^model\s*=/m.test(file.content), `${dest} pins a model version`);
     assertStringIncludes(
       file.content,
       "model_reasoning_effort = ",
@@ -87,16 +78,16 @@ Deno.test("every emitted role TOML pins a model and a reasoning effort", () => {
 // ── The refusal: a second [agents] table is a TOML redefinition error ──────
 
 Deno.test("an existing [agents] table outside the block refuses the merge", () => {
-  const userFile = '# my config\nmodel = "gpt-5.6-sol"\n\n[agents]\nenabled = true\n';
+  const userFile = '# my config\nmodel = "my-model"\n\n[agents]\nenabled = true\n';
   const refusal = mergeRefusal(userFile, emitted[".codex/config.toml"]);
   assert(refusal !== null, "the block would be appended, making the user's TOML unparseable");
   // Actionable, not merely safe: the user has to be told what to add by hand.
-  assertStringIncludes(refusal, "default_subagent_model");
   assertStringIncludes(refusal, "default_subagent_reasoning_effort");
+  assertStringIncludes(refusal, "max_concurrent_threads_per_session");
 });
 
 Deno.test("a config with no [agents] table accepts the merge", () => {
-  const userFile = '# my config\nmodel = "gpt-5.6-sol"\napproval_policy = "on-request"\n';
+  const userFile = '# my config\nmodel = "my-model"\napproval_policy = "on-request"\n';
   assertEquals(mergeRefusal(userFile, emitted[".codex/config.toml"]), null);
 });
 
@@ -122,10 +113,10 @@ Deno.test("SPECNAUT'S OWN block does not trigger its own refusal", () => {
 
 Deno.test("re-merging preserves the user's surrounding lines", () => {
   const file = emitted[".codex/config.toml"];
-  const original = '# mine\nmodel = "gpt-5.6-sol"\n';
+  const original = '# mine\nmodel = "my-model"\n';
   const once = mergeIntoFile(original, file.content, file.mergeBlock!);
   const twice = mergeIntoFile(once, file.content, file.mergeBlock!);
-  assertStringIncludes(twice, 'model = "gpt-5.6-sol"');
+  assertStringIncludes(twice, 'model = "my-model"');
   assertStringIncludes(twice, "# mine");
   assertEquals(twice, once, "a second merge changed the file, so upgrade is not idempotent");
   assertEquals(
