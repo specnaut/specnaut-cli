@@ -19,10 +19,11 @@
 // nothing and exits 1 when a generated file is stale — the test suite runs it.
 
 import { encodeHex } from "@std/encoding/hex";
-import { join } from "@std/path";
+import { fromFileUrl, join } from "@std/path";
 import { type CodexHookCall, codexHookCommand } from "../src/domain/hook_command.ts";
 
-const ROOT = new URL("..", import.meta.url).pathname;
+// fromFileUrl, not `.pathname`: on Windows that is `/D:/…`, which no API opens.
+const ROOT = fromFileUrl(new URL("..", import.meta.url));
 const HOOKS = join(ROOT, "templates/harness-specific/shared/hooks");
 const CODEX_HOOKS_JSON = join(ROOT, "templates/harness-specific/codex/hooks.json");
 
