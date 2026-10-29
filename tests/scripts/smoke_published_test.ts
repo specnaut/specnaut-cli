@@ -16,7 +16,8 @@ const POSTFLIGHT = `${ROOT}.specnaut/release/postflight.sh`;
 const FILES = [
   "AGENTS.md",
   ".claude/skills/specnaut/SKILL.md",
-  ".claude/skills/board/SKILL.md",
+  ".claude/skills/task/SKILL.md",
+  ".claude/skills/task/phases/plan.md",
   ".claude/skills/ship/SKILL.md",
   ".specnaut/workflow.yml",
 ];

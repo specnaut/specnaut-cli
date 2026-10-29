@@ -33,7 +33,7 @@ git -C "$dir" init -q || fail "could not create a throwaway git repository"
 ( cd "$dir" && $BIN init --here --no-git --ai claude --backlog local ) < /dev/null > "$dir/.init.log" 2>&1 ||
   { tail -20 "$dir/.init.log"; fail "\`specnaut init\` exited non-zero"; }
 
-for f in AGENTS.md .claude/skills/specnaut/SKILL.md .claude/skills/board/SKILL.md \
+for f in AGENTS.md .claude/skills/specnaut/SKILL.md .claude/skills/task/SKILL.md .claude/skills/task/phases/plan.md \
   .claude/skills/ship/SKILL.md .specnaut/workflow.yml .specnaut/installed.lock; do
   [ -f "$dir/$f" ] || fail "the scaffold is missing $f"
 done
