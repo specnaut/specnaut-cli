@@ -57,10 +57,10 @@ function outcomeFor(outcomes: ReadonlyArray<CheckOutcome>, rel: string): CheckOu
 }
 
 Deno.test("check --project warns about a mistyped phase addendum and names the phase it meant", async () => {
-  const outcomes = await inspectWithAddenda(["specnaut/planning.md"]);
-  const o = outcomeFor(outcomes, "specnaut/planning.md");
+  const outcomes = await inspectWithAddenda(["task/planning.md"]);
+  const o = outcomeFor(outcomes, "task/planning.md");
   assertEquals(o.status, "warn");
-  assertStringIncludes(o.message, ".specnaut/addenda/specnaut/plan.md");
+  assertStringIncludes(o.message, ".specnaut/addenda/task/plan.md");
 });
 
 Deno.test("check --project points a renamed phase's addendum at the new address, across skills", async () => {
@@ -68,20 +68,25 @@ Deno.test("check --project points a renamed phase's addendum at the new address,
   const o = outcomeFor(outcomes, "specnaut/tag-version.md");
   assertEquals(o.status, "warn");
   assertStringIncludes(o.message, ".specnaut/addenda/ship/tag.md");
+  // Spec 037: a phase that moved to /task is pointed there.
+  const plan = outcomeFor(await inspectWithAddenda(["specnaut/plan.md"]), "specnaut/plan.md");
+  assertStringIncludes(plan.message, "move it to .specnaut/addenda/task/plan.md");
 });
 
 Deno.test("check --project says a contract doc takes no addendum and points at its parent phase", async () => {
-  const outcomes = await inspectWithAddenda(["specnaut/merge-squash.md"]);
-  const o = outcomeFor(outcomes, "specnaut/merge-squash.md");
+  const outcomes = await inspectWithAddenda(["task/merge-squash.md"]);
+  const o = outcomeFor(outcomes, "task/merge-squash.md");
   assertEquals(o.status, "warn");
   assertStringIncludes(o.message, "contract doc");
-  assertStringIncludes(o.message, ".specnaut/addenda/specnaut/merge.md");
+  assertStringIncludes(o.message, ".specnaut/addenda/task/merge.md");
 });
 
 Deno.test("check --project stays silent about valid addenda", async () => {
   const outcomes = await inspectWithAddenda([
-    "specnaut/plan.md",
-    "specnaut/review.md",
+    "task/plan.md",
+    "task/review.md",
+    "task/groom.md",
+    "specnaut/upgrade.md",
     "ship/release.md",
   ]);
   assertEquals(outcomes.filter(aboutAddenda), []);
@@ -102,9 +107,9 @@ Deno.test("check --project ignores dotfiles under .specnaut/addenda/", async () 
 });
 
 Deno.test("an addenda warning alone does not fail check — the worst status is warn", async () => {
-  const outcomes = await inspectWithAddenda(["specnaut/reveiw.md"]);
-  const o = outcomeFor(outcomes, "specnaut/reveiw.md");
-  assertStringIncludes(o.message, ".specnaut/addenda/specnaut/review.md");
+  const outcomes = await inspectWithAddenda(["task/reveiw.md"]);
+  const o = outcomeFor(outcomes, "task/reveiw.md");
+  assertStringIncludes(o.message, ".specnaut/addenda/task/review.md");
   // `runCheck` maps `warn` to exit 0; `fail` is the only status that exits 1.
   assertEquals(worstStatusOf(outcomes), "warn");
 });
@@ -115,8 +120,8 @@ Deno.test("check --project lists wrong nesting, an unknown skill and a non-.md f
     "specnut/review.md",
     "ship/tag.txt",
   ]);
-  assertStringIncludes(outcomeFor(outcomes, "plan.md").message, "specnaut/plan.md");
-  assertStringIncludes(outcomeFor(outcomes, "specnut/review.md").message, "specnaut/review.md");
+  assertStringIncludes(outcomeFor(outcomes, "plan.md").message, "task/plan.md");
+  assertStringIncludes(outcomeFor(outcomes, "specnut/review.md").message, "task/review.md");
   assertStringIncludes(outcomeFor(outcomes, "ship/tag.txt").message, "ship/tag.md");
   for (const o of outcomes.filter(aboutAddenda)) assertEquals(o.status, "warn", o.name);
 });

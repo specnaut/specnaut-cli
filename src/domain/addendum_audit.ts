@@ -7,7 +7,7 @@ import { SKILL_DOC_RENAMES } from "./skill_doc_renames.ts";
 export const ADDENDA_ROOT = ".specnaut/addenda";
 
 /** The skills whose routers read an addendum. No other skill reads one. */
-export const ADDENDUM_SKILLS = ["specnaut", "ship"] as const;
+export const ADDENDUM_SKILLS = ["specnaut", "task", "ship"] as const;
 export type AddendumSkill = typeof ADDENDUM_SKILLS[number];
 
 /** One `<skill>/<phase>` an addendum can be written for. */
@@ -32,15 +32,10 @@ export interface PhaseAddress {
  * instead of turning this check stale.
  */
 export const ROUTABLE_PHASES: Readonly<Record<AddendumSkill, ReadonlyArray<string>>> = {
-  specnaut: [
-    "plan",
-    "tasks",
-    "implement",
-    "review",
-    "merge",
-    "constitution",
-    "upgrade",
-  ],
+  specnaut: ["doc", "list", "upgrade"],
+  // `groom` is the one backlog verb that reads an addendum: it is a full pass,
+  // where the others are single reads or writes (plan 037 § 10).
+  task: ["groom", "plan", "tasks", "implement", "review", "merge", "audit", "constitution"],
   ship: ["tag", "release"],
 };
 
@@ -56,25 +51,25 @@ export interface ContractDoc {
   readonly parents: ReadonlyArray<PhaseAddress>;
 }
 
-const sp = (phase: string): PhaseAddress => ({ skill: "specnaut", phase });
+const tk = (phase: string): PhaseAddress => ({ skill: "task", phase });
 
 /**
- * Parents follow the `/specnaut` router's own account of who loads what.
+ * Parents follow the `/task` router's own account of who loads what.
  * `auto-chain` is loaded by the router when a chainable phase completes, so its
  * step belongs in the addendum of the phase it follows.
  */
 export const CONTRACT_DOCS: ReadonlyArray<ContractDoc> = [
-  { skill: "specnaut", doc: "plan-audits", parents: [sp("plan")] },
-  { skill: "specnaut", doc: "merge-squash", parents: [sp("merge")] },
-  { skill: "specnaut", doc: "epic-commits", parents: [sp("implement")] },
-  { skill: "specnaut", doc: "quality-gates", parents: [sp("implement"), sp("merge")] },
-  { skill: "specnaut", doc: "epic-fixups", parents: [sp("merge")] },
-  { skill: "specnaut", doc: "merge-close", parents: [sp("merge")] },
-  { skill: "specnaut", doc: "epic-loop", parents: [sp("implement")] },
+  { skill: "task", doc: "plan-audits", parents: [tk("plan")] },
+  { skill: "task", doc: "merge-squash", parents: [tk("merge")] },
+  { skill: "task", doc: "epic-commits", parents: [tk("implement")] },
+  { skill: "task", doc: "quality-gates", parents: [tk("implement"), tk("merge")] },
+  { skill: "task", doc: "epic-fixups", parents: [tk("merge")] },
+  { skill: "task", doc: "merge-close", parents: [tk("merge")] },
+  { skill: "task", doc: "epic-loop", parents: [tk("implement")] },
   {
-    skill: "specnaut",
+    skill: "task",
     doc: "auto-chain",
-    parents: [sp("plan"), sp("tasks"), sp("implement"), sp("review")],
+    parents: [tk("plan"), tk("tasks"), tk("implement"), tk("review")],
   },
 ];
 
@@ -133,13 +128,22 @@ export function auditAddendum(relPath: string): AddendumFinding | null {
   if (segments.length === 2 && isAddendumSkill(skillDir) && isMarkdown) {
     if (ROUTABLE_PHASES[skillDir].includes(stem)) return null;
     const rename = renameOf(skillDir, stem);
-    if (rename) return finding({ kind: "renamed", reason: rename.reason }, rename.to);
-    const contract = CONTRACT_DOCS.find((c) => c.skill === skillDir && c.doc === stem);
+    // A contract doc that moved is still a contract doc: pointing at its new
+    // address would send the user from one unread path to another.
+    const contract = contractDocAt(rename?.to ?? { skill: skillDir, phase: stem });
     if (contract) return finding({ kind: "contract-doc", parents: contract.parents }, null);
+    if (rename) return finding({ kind: "renamed", reason: rename.reason }, rename.to);
     return finding({ kind: "unknown-phase", skill: skillDir }, suggestFor(skillDir, stem));
   }
 
-  const suggestion = renameOf(skillDir, stem)?.to ?? suggestFor(skillDir, stem);
+  const moved = renameOf(skillDir, stem)?.to;
+  // A moved doc that is not itself routable (`groom-report`, loaded by groom)
+  // is pointed at the nearest phase of its new skill, never at another unread path.
+  const suggestion = moved
+    ? (ROUTABLE_PHASES[moved.skill].includes(moved.phase)
+      ? moved
+      : suggestFor(moved.skill, moved.phase))
+    : suggestFor(skillDir, stem);
   if (segments.length !== 2) return finding({ kind: "wrong-depth" }, suggestion);
   if (!isAddendumSkill(skillDir)) {
     return finding({ kind: "unknown-skill", skill: skillDir ?? "" }, suggestion);
@@ -147,16 +151,50 @@ export function auditAddendum(relPath: string): AddendumFinding | null {
   return finding({ kind: "not-markdown" }, suggestion);
 }
 
+function contractDocAt(address: PhaseAddress): ContractDoc | undefined {
+  return CONTRACT_DOCS.find((c) => c.skill === address.skill && c.doc === address.phase);
+}
+
+const stemOf = (doc: string) => doc.replace(/\.md$/, "");
+
+/** One addendum the upgrade carries to its phase's new address (FR-005). */
+export interface AddendumRename {
+  readonly from: PhaseAddress;
+  readonly to: PhaseAddress;
+  readonly reason: string;
+}
+
+/**
+ * The addendum moves, **derived from `SKILL_DOC_RENAMES`** rather than listed
+ * (plan 037 § 5): a phase that moves without its addendum leaves a guardrail
+ * at an address no router reads, which is how the spec 033 `/ship` rename
+ * stranded `specnaut/tag-version.md`.
+ *
+ * Rows whose both ends sit under a skill that reads addenda. The backlog docs
+ * leaving `/board` carry none: `/board` read no addendum, so a file under
+ * `addenda/board/` was never in force, and moving it would switch it on with
+ * nobody having asked.
+ */
+export function addendumRenames(): ReadonlyArray<AddendumRename> {
+  return SKILL_DOC_RENAMES.flatMap((r) => {
+    const { from, to } = r;
+    if (!isAddendumSkill(from.owner) || !isAddendumSkill(to.owner)) return [];
+    return [{
+      from: { skill: from.owner, phase: stemOf(from.doc) },
+      to: { skill: to.owner, phase: stemOf(to.doc) },
+      reason: r.reason,
+    }];
+  });
+}
+
 /** The rename whose old address is `<skill>/<stem>`, as an addressed pair. */
 function renameOf(
   skill: string | null,
   stem: string,
 ): { to: PhaseAddress; reason: string } | null {
-  const r = SKILL_DOC_RENAMES.find((x) =>
-    x.from.owner === skill && x.from.doc.replace(/\.md$/, "") === stem
-  );
+  const r = SKILL_DOC_RENAMES.find((x) => x.from.owner === skill && stemOf(x.from.doc) === stem);
   if (!r || !isAddendumSkill(r.to.owner)) return null;
-  return { to: { skill: r.to.owner, phase: r.to.doc.replace(/\.md$/, "") }, reason: r.reason };
+  return { to: { skill: r.to.owner, phase: stemOf(r.to.doc) }, reason: r.reason };
 }
 
 /**

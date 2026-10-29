@@ -5,6 +5,9 @@ import { DenoSubprocessRunner } from "../../infrastructure/deno_subprocess.ts";
 import { DenoEnvironmentProbe } from "../../infrastructure/deno_environment_probe.ts";
 import { FsProjectInspector } from "../../infrastructure/fs_project_inspector.ts";
 import { FsPluginDetector } from "../../infrastructure/fs_plugin_detector.ts";
+import { phaseRouterDest } from "../../application/upgrade_renames.ts";
+import { bundleOptionsOf } from "../../application/upgrade_lock.ts";
+import { findHarness } from "../harnesses.ts";
 import { TEMPLATES_VERSION } from "../../templates_bundle.ts";
 import { type CheckOutcome, worstStatusOf } from "../../domain/check_result.ts";
 
@@ -32,7 +35,10 @@ function renderSection(title: string, outcomes: ReadonlyArray<CheckOutcome>) {
 export async function runCheck(intent: CheckIntent): Promise<number> {
   const runner = new DenoSubprocessRunner();
   const env = new DenoEnvironmentProbe(runner);
-  const inspector = new FsProjectInspector(new FsPluginDetector());
+  const inspector = new FsProjectInspector(new FsPluginDetector(), (lock) => {
+    const harness = findHarness(lock.harness);
+    return harness === null ? null : phaseRouterDest(harness, bundleOptionsOf(lock));
+  });
 
   const projectDir = intent.projectMode ? resolve(Deno.cwd()) : null;
   const uc = new RunChecksUseCase({ env, inspector });

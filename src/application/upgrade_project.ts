@@ -31,7 +31,7 @@ import {
 } from "./upgrade_managed_sections.ts";
 import { planStaging, pruneStaging } from "./upgrade_staging.ts";
 import { removeOrphans } from "./upgrade_orphan_removal.ts";
-import { carryRenamedDocs } from "./upgrade_renames.ts";
+import { carryRenames } from "./upgrade_renames.ts";
 import { applyContextLinks, surveyContextLinks } from "./upgrade_context_links.ts";
 import { reMergeJsonFiles, splitJsonMerged } from "./upgrade_json_merges.ts";
 
@@ -80,7 +80,9 @@ export type { ManagedSectionOutcome };
  * Carried on every result rather than logged, because a refusal the user never
  * sees is the same as the silent skip it replaced — and on the up-to-date one
  * too, which is the likely path: a project whose only outstanding difference is
- * the refused file lands there.
+ * the refused file lands there. Anything else every path must say joins them:
+ * staging cleanup, orphan prunes, and what `carryRenames` moved or would not —
+ * the one list a dry run also prints.
  */
 type WithRefusals = { refusals: ReadonlyArray<string> };
 
@@ -251,16 +253,9 @@ export class UpgradeProjectUseCase {
       ),
     };
 
-    const effectiveLock = await carryRenamedDocs(
-      {
-        reader,
-        writer,
-        harness,
-        bundleOpts: bundleOptionsOf(lock),
-        projectDir: input.projectDir,
-        dryRun: input.dryRun,
-        isDeclaredPreserved: input.isDeclaredPreserved,
-      },
+    // Renamed docs, then the addenda of moved phases; what it did or refused is said.
+    const effectiveLock = await carryRenames(
+      { ...input, reader, writer, harness, bundleOpts: bundleOptionsOf(lock), notes: refusals },
       bundle,
       lockForPlan,
       diskShas,

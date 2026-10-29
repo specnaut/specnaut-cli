@@ -26,7 +26,16 @@ export type DiskEntry =
      */
     readonly resolved: string | null;
   }
-  | { readonly kind: "file"; readonly content: string };
+  | {
+    readonly kind: "file";
+    readonly content: string;
+    /**
+     * Set when `content` is not the file's bytes — they are not valid UTF-8, so
+     * decoding replaced some of them. Writing `content` back would not
+     * reproduce the file, so nothing that MOVES a file may move this one.
+     */
+    readonly lossy?: true;
+  };
 
 /**
  * What `upgrade` found at a context-link destination.

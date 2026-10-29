@@ -63,7 +63,7 @@ export class DenoFsReader implements FsReader {
       if (err instanceof Deno.errors.NotFound) return null;
       throw err;
     }
-    if (!info.isSymlink) return { kind: "file", content: await Deno.readTextFile(abs) };
+    if (!info.isSymlink) return fileEntry(await Deno.readFile(abs));
     const target = await Deno.readLink(abs);
     let resolved: string | null;
     try {
@@ -78,6 +78,21 @@ export class DenoFsReader implements FsReader {
     }
     return { kind: "symlink", target, resolved };
   }
+}
+
+/**
+ * A regular file's entry, its text decoded as `Deno.readTextFile` does (a BOM
+ * kept, an invalid sequence replaced), so every caller judges the same text it
+ * always has. What a decode cannot say is whether that text IS the file, and an
+ * upgrade that moves a file writes the text and deletes the bytes: so the round
+ * trip is proved here, where the bytes are, and a file that fails it is marked
+ * `lossy` rather than refused — reading it is still fine, moving it is not.
+ */
+function fileEntry(bytes: Uint8Array): DiskEntry {
+  const content = new TextDecoder("utf-8", { ignoreBOM: true }).decode(bytes);
+  const back = new TextEncoder().encode(content);
+  const exact = back.length === bytes.length && back.every((b, i) => b === bytes[i]);
+  return exact ? { kind: "file", content } : { kind: "file", content, lossy: true };
 }
 
 /**

@@ -7,13 +7,18 @@ import { auditAddendum, type PhaseAddress } from "../../src/domain/addendum_audi
  */
 
 const specnaut = (phase: string): PhaseAddress => ({ skill: "specnaut", phase });
+const task = (phase: string): PhaseAddress => ({ skill: "task", phase });
 const ship = (phase: string): PhaseAddress => ({ skill: "ship", phase });
 
-Deno.test("a routable phase of either skill is a valid addendum", () => {
+Deno.test("a routable phase of any skill is a valid addendum", () => {
   for (
     const rel of [
-      "specnaut/plan.md",
-      "specnaut/merge.md",
+      "specnaut/upgrade.md",
+      "specnaut/doc.md",
+      "task/plan.md",
+      "task/merge.md",
+      "task/audit.md",
+      "task/groom.md",
       "ship/tag.md",
       "ship/release.md",
     ]
@@ -29,17 +34,18 @@ Deno.test("dotfiles are ignored at any depth", () => {
 });
 
 Deno.test("a stem that a phase prefixes, or that prefixes a phase, suggests that phase", () => {
-  assertEquals(auditAddendum("specnaut/planning.md"), {
-    path: "specnaut/planning.md",
-    problem: { kind: "unknown-phase", skill: "specnaut" },
-    suggestion: specnaut("plan"),
+  assertEquals(auditAddendum("task/planning.md"), {
+    path: "task/planning.md",
+    problem: { kind: "unknown-phase", skill: "task" },
+    suggestion: task("plan"),
   });
-  assertEquals(auditAddendum("specnaut/impl.md")?.suggestion, specnaut("implement"));
+  assertEquals(auditAddendum("task/impl.md")?.suggestion, task("implement"));
+  assertEquals(auditAddendum("specnaut/upgrades.md")?.suggestion, specnaut("upgrade"));
 });
 
 Deno.test("prefix ties go to the earliest row of the router's phase table", () => {
-  // `re` prefixes `review` (specnaut) and `release` (ship); specnaut's table comes first.
-  assertEquals(auditAddendum("other/re.md")?.suggestion, specnaut("review"));
+  // `re` prefixes `review` (task) and `release` (ship); task's table comes first.
+  assertEquals(auditAddendum("other/re.md")?.suggestion, task("review"));
 });
 
 Deno.test("an addendum for a retired phase is reported, not silently read (spec 034)", () => {
@@ -50,7 +56,7 @@ Deno.test("an addendum for a retired phase is reported, not silently read (spec 
 });
 
 Deno.test("a stem within two edits of a phase suggests it", () => {
-  assertEquals(auditAddendum("specnaut/reveiw.md")?.suggestion, specnaut("review"));
+  assertEquals(auditAddendum("task/reveiw.md")?.suggestion, task("review"));
   assertEquals(auditAddendum("ship/relaese.md")?.suggestion, ship("release"));
 });
 
@@ -61,7 +67,7 @@ Deno.test("no suggestion when neither prefix nor two edits reaches a phase", () 
     suggestion: null,
   });
   // Suggestions stay within the skill the file sits under: `plan` is a
-  // /specnaut phase, and /ship has nothing near it.
+  // /task phase, and /ship has nothing near it.
   assertEquals(auditAddendum("ship/plan.md")?.suggestion, null);
 });
 
@@ -75,18 +81,18 @@ Deno.test("a renamed phase suggests its new address, which may be under the othe
 });
 
 Deno.test("a contract doc is listed and points at the phase(s) that load it", () => {
-  assertEquals(auditAddendum("specnaut/merge-squash.md"), {
-    path: "specnaut/merge-squash.md",
-    problem: { kind: "contract-doc", parents: [specnaut("merge")] },
+  assertEquals(auditAddendum("task/merge-squash.md"), {
+    path: "task/merge-squash.md",
+    problem: { kind: "contract-doc", parents: [task("merge")] },
     suggestion: null,
   });
-  assertEquals(auditAddendum("specnaut/plan-audits.md")?.problem, {
+  assertEquals(auditAddendum("task/plan-audits.md")?.problem, {
     kind: "contract-doc",
-    parents: [specnaut("plan")],
+    parents: [task("plan")],
   });
-  assertEquals(auditAddendum("specnaut/quality-gates.md")?.problem, {
+  assertEquals(auditAddendum("task/quality-gates.md")?.problem, {
     kind: "contract-doc",
-    parents: [specnaut("implement"), specnaut("merge")],
+    parents: [task("implement"), task("merge")],
   });
 });
 
@@ -94,14 +100,14 @@ Deno.test("a file outside <skill>/<phase>.md depth is listed with the nearest ph
   assertEquals(auditAddendum("plan.md"), {
     path: "plan.md",
     problem: { kind: "wrong-depth" },
-    suggestion: specnaut("plan"),
+    suggestion: task("plan"),
   });
   // At the root there is no skill, so both skills are candidates.
   assertEquals(auditAddendum("release.md")?.suggestion, ship("release"));
-  assertEquals(auditAddendum("specnaut/extra/review.md"), {
-    path: "specnaut/extra/review.md",
+  assertEquals(auditAddendum("task/extra/review.md"), {
+    path: "task/extra/review.md",
     problem: { kind: "wrong-depth" },
-    suggestion: specnaut("review"),
+    suggestion: task("review"),
   });
 });
 
@@ -109,9 +115,14 @@ Deno.test("an unknown skill directory is listed with the nearest phase of any sk
   assertEquals(auditAddendum("specnut/review.md"), {
     path: "specnut/review.md",
     problem: { kind: "unknown-skill", skill: "specnut" },
-    suggestion: specnaut("review"),
+    suggestion: task("review"),
   });
-  assertEquals(auditAddendum("board/groom.md")?.problem, { kind: "unknown-skill", skill: "board" });
+  // `/board` never read an addendum; its groom is now `/task`'s.
+  assertEquals(auditAddendum("board/groom.md"), {
+    path: "board/groom.md",
+    problem: { kind: "unknown-skill", skill: "board" },
+    suggestion: task("groom"),
+  });
 });
 
 Deno.test("a non-.md file is listed, even when its stem names a phase", () => {
@@ -120,10 +131,10 @@ Deno.test("a non-.md file is listed, even when its stem names a phase", () => {
     problem: { kind: "not-markdown" },
     suggestion: ship("tag"),
   });
-  assertEquals(auditAddendum("specnaut/plan")?.problem, { kind: "not-markdown" });
+  assertEquals(auditAddendum("task/plan")?.problem, { kind: "not-markdown" });
 });
 
 Deno.test("the phase match is exact — a differently-cased name is not read everywhere", () => {
   // Case-insensitive filesystems would find it; case-sensitive ones would not.
-  assertEquals(auditAddendum("specnaut/Plan.md")?.suggestion, specnaut("plan"));
+  assertEquals(auditAddendum("task/Plan.md")?.suggestion, task("plan"));
 });
