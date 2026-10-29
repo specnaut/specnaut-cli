@@ -1,5 +1,41 @@
 # Upgrading Specnaut
 
+## 7.2.x → 7.3.0
+
+Run `specnaut upgrade`. On Codex, you then trust the hooks again. If upgrade refuses to move your
+constitution, resolve it by hand as described below.
+
+### The constitution is yours, at `docs/constitution.md`
+
+The constitution moves out of Specnaut's tree to `docs/constitution.md`. It is a team document now:
+no `init` or `upgrade` rewrites it once it exists, with or without `--force`. A new project gets a
+short bootstrap with four principles (domain isolation, dependencies point inward, bounded contexts,
+SOLID), each with a `Check:` line. Amend it with `/task constitution`; it is not a step you must run
+before your first plan.
+
+`upgrade`, and `init` in a project that already has one, move `.specnaut/memory/constitution.md` to
+`docs/constitution.md` byte for byte. If both files exist and hold the same text, the old one is
+removed. Upgrade **refuses** the move, and leaves both files as they are, when:
+
+- both files exist and differ: merge them into `docs/constitution.md`, then delete the old one;
+- the old file is a link: replace it with the file it points to, or move it yourself;
+- the old file is not UTF-8: convert it, then run `upgrade` again.
+
+`upgrade --dry-run` prints the move without making it. `upgrade` also names any default principle
+your constitution lacks, and `specnaut check` and `upgrade` warn when the file is over its size
+ceiling: every session loads it, so keep it short.
+
+**If you publish `docs/` as a site**, your constitution is now published with it. Exclude
+`docs/constitution.md` from the site if it must stay private.
+
+`.specnaut/templates/constitution-template.md` is retired. Upgrade removes an untouched copy and
+keeps one you edited, with a warning.
+
+### Codex: trust the hooks again
+
+The hooks changed, so Codex runs none of them until you trust them again: open Codex in the project,
+run `/hooks`, and trust Specnaut's hooks. `upgrade` prints this note and the list of hooks.
+
 ## 7.1.x → 7.2.0
 
 Run `specnaut upgrade`. On Codex, you then trust the hooks once. On Claude Code you have nothing to
@@ -268,58 +304,8 @@ several branches passes `--no-close` to `/specnaut merge` on every branch but th
 to be a "no" at the close question. Remote mode (`specnaut gate`) still raises its merge-approval
 gate.
 
-## 4.4.x → 4.5.0
-
-### Add to a bundled phase without preserving it
-
-A `/specnaut` or `/ship` phase now reads an optional **phase addendum** — a file your project owns
-at `.specnaut/addenda/<skill>/<phase>.md`, e.g. `.specnaut/addenda/ship/release.md` for
-`/ship release`. It adds to the phase at the step it names; it cannot replace or skip a bundled
-step. The README's "Adding to a bundled phase without preserving it" covers the format and when a
-full preserve is still the right tool.
-
-`specnaut upgrade` delivers the instruction to your `AGENTS.md` as a fourth fenced block, grafted in
-like the other three and printed by name:
-
-```markdown
-<!-- --- Specnaut: phase-addenda --- -->
-```
-
-It exists for the surfaces that reach a phase without going through a router — a per-phase workflow,
-a stale plugin router. Nothing else changes, and nothing is created under `.specnaut/addenda/`: with
-no addendum, a phase runs exactly as before.
-
-**If you preserved a phase doc only to add to it**, you can move off the preserve:
-
-1. `specnaut diff <path>` on the phase doc. If every difference is an addition of yours, it fits an
-   addendum; if you changed or removed a bundled step, keep the preserve.
-2. Move your additions into `.specnaut/addenda/<skill>/<phase>.md`, naming the step each one belongs
-   to.
-3. Remove the path from `.specnaut/preserve.yml`, delete the phase doc, and run `specnaut upgrade` —
-   a deleted bundled file that is no longer declared comes back at the current version, and receives
-   every later refresh.
-
-## 4.0.x → 4.1.0
-
-### `backlog-config.yml` no longer carries `project_node_id` / `status_field_id`
-
-`specnaut init --backlog github` used to generate two extra keys with a comment saying they were
-"cached on first run", and the board skill documented a PO that would refresh them automatically
-when blank.
-
-**Nothing ever implemented that.** A sweep of the whole repository found writers of the literal
-empty string and the claim itself — no reader of either key, and nothing that would ever populate
-one. Both keys are removed from the generated stub and from the documentation.
-
-**An existing `backlog-config.yml` carrying them needs no edit.** The keys were inert, the config
-reader only extracts `repo` and `project_number`, and an unrecognised key is ignored. Delete them or
-leave them; the behaviour is identical either way.
-
-The worked example's `project_number` is now a `<N>` placeholder rather than an integer, so it
-cannot be copied as a working value, and the block names `gh project list --owner <org>` as the way
-to resolve the real one.
-
 ## Older releases
 
+- [4.0.x → 4.1.0 and 4.4.x → 4.5.0](docs/upgrading/4.0-to-4.5.md)
 - [2.1.x → 3.0.0 and 3.2.x → 4.0.0](docs/upgrading/2.x-to-4.0.md)
 - [1.x → 2.0.0 and 2.0.x → 2.1.0](docs/upgrading/1.x-to-2.1.md)
