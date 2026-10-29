@@ -182,7 +182,7 @@ Deno.test(
       repo: "specnaut/specnaut-cli",
     });
     const joined = msgs.join("\n");
-    assertEquals(joined.includes("ready to run /board"), true);
+    assertEquals(joined.includes("ready to run /task"), true);
     assertEquals(joined.includes("specnaut/specnaut-cli"), true);
     assertEquals(joined.includes("project #6"), true);
     assertEquals(joined.includes("fill in"), false);
@@ -201,7 +201,7 @@ Deno.test(
     });
     const joined = msgs.join("\n");
     assertEquals(joined.includes("gitlab.example.com/team/repo"), true);
-    assertEquals(joined.includes("ready to run /board"), true);
+    assertEquals(joined.includes("ready to run /task"), true);
   },
 );
 

@@ -94,7 +94,7 @@ mutating anything.
 
 - Hosted board over `/api/v1` via the bundled `*.sh` wrappers. **Read
   `columns.sh` first** (the board's names, never the GitHub set); poll
-  `reconcile.sh` for moves. Mechanics: the `/board` skill ("Specnaut Cloud",
+  `reconcile.sh` for moves. Mechanics: the `/task` skill ("Specnaut Cloud",
   "Stage reconcile"). Public API only.
 
 ## Frontmatter schema (local Markdown — mandatory)
@@ -124,7 +124,7 @@ frontmatter. Exit 3 = parent doesn't exist.
 
 ### Epic detection heuristic
 
-Propose decomposition on every `/board add` and during grooming.
+Propose decomposition on every `/task add` and during grooming.
 
 **Triggers:** phrases like "break down" / "phased" / "rewrite" /
 "end-to-end"; >5 AC bullets; scope crosses ≥2 subsystems; size L/XL.
@@ -173,19 +173,19 @@ Total > 7 → critical, 5–7 → high, 3–5 → medium, < 3 → low.
 
 ## Commands
 
-### `/board` or `/board list`
+### `/task` or `/task list`
 
 Display the backlog. Local: render `.specnaut/backlog.md` (recompose
 from task files if the index drifted). GitHub: list issues grouped by
 priority / project status.
 
-### `/board next`
+### `/task next`
 
 Recommend the top 3 tasks. For each: business justification, domain
 context, workflow recommendation (spec vs direct), quick-win flag (≤3
 pts), exact start command. Skip sub-tasks whose parent epic isn't ready.
 
-### `/board add <title>`
+### `/task add <title>`
 
 Create a new task. Local: write `.specnaut/backlog/NNN-slug.md` with full
 frontmatter and update `.specnaut/backlog.md`. GitHub: `gh issue create`
@@ -196,30 +196,30 @@ on creation (frontmatter `parent: "#042"` locally, sub-issue API on GitHub).
 Every created task MUST exit fully classified per the "Mandatory
 classification contract" above — same dispatch, not a follow-up.
 
-### `/board update <id>`
+### `/task edit <id>`
 
 Update an existing task (status, priority, complexity, notes, parent link).
 Sync the index on the local backend; use `gh issue edit` on GitHub.
 
-### `/board estimate <id>`
+### `/task estimate <id>`
 
 Detailed complexity estimate. If the work exceeds one task, apply the
 "Epic detection heuristic" above.
 
-### `/board status`
+### `/task status`
 
 Dashboard: counts, total points, velocity, open epics with ≥1 open child.
 
-### `/board groom`
+### `/task groom`
 
-Full grooming per the `/board` skill's `groom.md`: review priorities,
+Full grooming per the `/task` skill's `groom.md`: review priorities,
 re-estimate, flag blockers, audit epic / sub-task hygiene, classify on the spot.
 **It ends with a promotion**: a groomed item moves from the board's intake
 column to its ready column (default `Backlog` → `Ready`), so the next run skips
 it. Groomed but unmoved is the failure; only open scope decisions keep it in
 intake. Report failed moves. Never promote Ready → In progress.
 
-### `/board brief <id>`
+### `/task brief <id>`
 
 Generate a PO business brief for a developer: purpose, business rules,
 user stories, gotchas, acceptance criteria. If the task is in an epic,
@@ -234,17 +234,18 @@ otherwise it lives in the issue / task file.
 **Gate:** a brief without a Domain Model is incomplete. If you lack
 information to populate it, clarify with the user first.
 
-### `/board epic <id>`
+### `/task <id>`
 
-Show an epic with all its sub-tasks (status, complexity, owner). Useful
-before estimating epic completion or reporting progress.
+Show that item. On an epic, show it with all its sub-tasks (status,
+complexity, owner) — useful before estimating epic completion or reporting
+progress.
 
 ## Rules
 
 - **Batch platform mutations; native fields over labels.** Bulk creates /
   moves / closes / field-sets in the fewest requests (one multi-alias
   `gh api graphql` / REST batch), never call-by-call; native field/type
-  over a duplicate `priority:*`/`size:*` label. Detail: `/board` skill.
+  over a duplicate `priority:*`/`size:*` label. Detail: `/task` skill.
 - Never delete task files — change status to `done` or `deferred`.
 - Respect dependencies — don't recommend blocked tasks.
 - Respect epic semantics — never close a parent while children remain open.

@@ -8,7 +8,7 @@ when_to_use: |
   - "tag a version", "create a release tag", "bump the version"
   - "release notes", "generate the changelog for the tag"
   - "publish v1.2.0", "release the tag we pushed yesterday"
-  Do NOT route here for merging a feature branch — that is `/specnaut merge`.
+  Do NOT route here for merging a feature branch — that is `/task merge`.
 ---
 
 # Ship skill
@@ -19,14 +19,14 @@ Specnaut gives a project three skills, and they divide by what they own:
 
 | Skill | Owns |
 | :--- | :--- |
-| `/board` | the backlog — what we might do, and what we are doing |
-| `/specnaut` | the specification — what a thing is, and whether it is built right |
+| `/task` | one unit of work — from backlog item to merged branch, audits included |
+| `/specnaut` | the framework itself — its documentation, what is installed, upgrading it |
 | **`/ship`** | **production — getting a built thing out the door** |
 
-Shipping is not a specification concern. It has a different cadence, a
-different risk profile — irreversible, outward-facing, it triggers live
-pipelines — and a different audience. That is why it is its own verb rather
-than a phase of the router that writes plans.
+Shipping is not part of delivering a unit of work. It has a different cadence,
+a different risk profile — irreversible, outward-facing, it triggers live
+pipelines — and a different audience. That is why it is its own skill rather
+than a verb of the router that writes plans.
 
 ## The three paths
 
@@ -125,4 +125,4 @@ deploy. Before either:
 - **It does not run tests or quality gates.** Run them before shipping; that
   contract is project-specific and lives outside this skill.
 - **It does not merge anything.** Landing a feature branch is
-  `/specnaut merge`.
+  `/task merge`.

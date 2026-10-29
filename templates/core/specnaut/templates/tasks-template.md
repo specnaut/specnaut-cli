@@ -29,7 +29,7 @@ description: "Task list template for feature implementation"
   ============================================================================
   IMPORTANT: The tasks below are SAMPLE TASKS for illustration purposes only.
   
-  The `/specnaut tasks` phase MUST replace these with actual tasks based on:
+  The `/task tasks` phase MUST replace these with actual tasks based on:
   - User stories and their priorities from plan.md § 2 (User scenarios)
   - Feature requirements from plan.md § 3 (Requirements)
   - Entities from plan.md § 6 (Technical context → Domain model)

@@ -118,4 +118,4 @@ done
 
 approval_gate merge \
   "merge: manual — $(IFS=';'; echo "${reasons[*]}") would land on the base branch (${base:-unknown}) without the user" \
-  "\`merge\` (or \`/specnaut merge\`)"
+  "\`merge\` (or \`/task merge\`)"

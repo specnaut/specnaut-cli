@@ -23,12 +23,12 @@ Deno.test("ClaudeHarness.mapBundle emits the Claude tree", () => {
   const keys = Object.keys(mapped);
   assert(keys.length > 50, `expected ~58 entries, got ${keys.length}`);
   assert(".claude/skills/specnaut/SKILL.md" in mapped);
-  assert(".claude/skills/specnaut/phases/plan.md" in mapped);
-  assert(".claude/skills/board/groom.md" in mapped);
+  assert(".claude/skills/task/phases/plan.md" in mapped);
+  assert(".claude/skills/task/groom.md" in mapped);
+  assert(!(".claude/skills/board/SKILL.md" in mapped), "cli#683 retired /board");
   // #534 retired the auto-invoke alias; the router is model-invocable itself.
   assert(!(".claude/skills/specnaut-review/SKILL.md" in mapped));
-  // /board stays as a flat command
-  // #533 retired the command shims; /board is the skill.
+  // #533 retired the command shims; /task is the skill.
   assert(!(".claude/commands/backlog.md" in mapped));
   // Old per-phase skill folders are gone post-consolidation
   assert(!(".claude/skills/specnaut-plan/SKILL.md" in mapped));
@@ -44,7 +44,7 @@ Deno.test("ClaudeHarness.mapBundle emits the Claude tree", () => {
   assert(".claude/agents/product-owner.md" in mapped);
   // Deprecated specnaut-auto alias was removed (#409) — must no longer scaffold
   assert(!(".claude/skills/specnaut-auto/SKILL.md" in mapped));
-  assert(".claude/skills/board/SKILL.md" in mapped);
+  assert(".claude/skills/task/SKILL.md" in mapped);
   assert(".specnaut/scripts/backlog/list.sh" in mapped);
   assert(".specnaut/memory/constitution.md" in mapped);
   assert("AGENTS.md" in mapped);

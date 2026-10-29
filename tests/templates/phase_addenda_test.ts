@@ -4,21 +4,24 @@ import type { CoreEntry } from "../../src/domain/core_bundle.ts";
 import { HARNESSES } from "../../src/cli/harnesses.ts";
 import { extractBlock } from "../../src/domain/merge_block.ts";
 import { managedSectionLabels } from "../../src/domain/template.ts";
+import { ADDENDUM_SKILLS, ROUTABLE_PHASES } from "../../src/domain/addendum_audit.ts";
 
 /**
  * #611 — a project adds to a bundled phase without preserving or editing it.
  *
  * The seam is a project-owned sidecar at `.specnaut/addenda/<skill>/<phase>.md`,
- * read at one defined position by three surfaces: the `/specnaut` router's
- * Routing step 2, the `/ship` router's Step 3, and a managed `phase-addenda`
- * block in `AGENTS.md` for the surfaces that reach a phase without a router
- * (a per-phase workflow, an always-on context file, a stale plugin router).
+ * read at one defined position by four surfaces: the `/task` and `/specnaut`
+ * routers' Routing step 2, the `/ship` router's Step 3, and a managed
+ * `phase-addenda` block in `AGENTS.md` for the surfaces that reach a phase
+ * without a router (a per-phase workflow, an always-on context file, a stale
+ * plugin router). Since cli#683 that block names addenda **by phase**, so an
+ * older router that still runs `plan` finds the addendum at its new home.
  *
  * What this file pins is the shape of that seam, not its existence:
  *
  * - the read happens at the step it is claimed to, not merely somewhere in the
  *   file — a sentence moved below `Execute` reads the addendum after the work;
- * - the three surfaces state ONE precedence rule, byte-identical, so the router
+ * - the four surfaces state ONE precedence rule, byte-identical, so the router
  *   and the always-on block cannot drift into disagreeing about whether an
  *   addendum may replace a bundled step;
  * - no phase doc carries a single character of it. Upgrade classifies phase
@@ -28,9 +31,9 @@ import { managedSectionLabels } from "../../src/domain/template.ts";
 
 /** The sidecar root. Under `.specnaut/`, the one root no harness relocates. */
 const ADDENDA_ROOT = ".specnaut/addenda/";
-const SPECNAUT_ADDENDUM = ".specnaut/addenda/specnaut/<phase>.md";
+const TASK_ADDENDUM = ".specnaut/addenda/task/<verb>.md";
+const SPECNAUT_ADDENDUM = ".specnaut/addenda/specnaut/<verb>.md";
 const SHIP_ADDENDUM = ".specnaut/addenda/ship/<phase>.md";
-const AGENTS_ADDENDUM = ".specnaut/addenda/<skill>/<phase>.md";
 
 /**
  * The precedence rule, as every surface must spell it. One string, so a
@@ -46,6 +49,7 @@ const LABEL = "phase-addenda";
 
 /** Each router's H1, paired with the addendum path its read step must carry. */
 const ROUTER_MARKERS = [
+  ["# Task router", TASK_ADDENDUM],
   ["# Specnaut router", SPECNAUT_ADDENDUM],
   ["# Ship skill", SHIP_ADDENDUM],
 ] as const;
@@ -64,7 +68,10 @@ function entry(pred: (e: CoreEntry) => boolean, what: string): CoreEntry {
 }
 
 const router = (name: string) =>
-  entry((e) => e.category === "skill" && e.name === name, `${name} router`).content;
+  entry(
+    (e) => (e.category === "skill" || e.category === "backlog-skill") && e.name === name,
+    `${name} router`,
+  ).content;
 
 /** The body of one `## ` section, heading excluded, up to the next `## `. */
 function section(content: string, heading: string): string {
@@ -80,32 +87,34 @@ function unwrap(text: string): string {
   return text.replace(/\s*\n\s*/g, " ");
 }
 
-Deno.test("/specnaut reads the addendum at Routing step 2 — after the phase doc, before executing it", () => {
-  const routing = section(router("specnaut"), "## Routing");
-  const readPhase = routing.indexOf("1. **Read** the phase reference file");
-  const readAddendum = routing.indexOf("2. **Read the project addendum**");
-  const execute = routing.indexOf("**Execute**");
-  assert(readPhase !== -1, "Routing step 1 no longer reads the phase doc");
-  assert(readAddendum !== -1, "Routing step 2 is not the addendum read");
-  assert(execute !== -1, "Routing has no Execute step");
-  assert(readPhase < readAddendum, "the addendum is read before the phase it adds to");
-  assert(readAddendum < execute, "the addendum is read after the phase already ran");
-  // The path is asserted in the STEP, not the file: a mention elsewhere in the
-  // router (a docs paragraph, the index) would satisfy a file-level check and
-  // move the read to no defined position at all.
-  const step = routing.slice(readAddendum, routing.indexOf("\n3. ", readAddendum));
-  assertStringIncludes(step, SPECNAUT_ADDENDUM);
-  assertStringIncludes(unwrap(step), PRECEDENCE);
-  assertStringIncludes(unwrap(step), NO_OP);
-});
+for (const [name, path] of [["task", TASK_ADDENDUM], ["specnaut", SPECNAUT_ADDENDUM]] as const) {
+  Deno.test(`/${name} reads the addendum at Routing step 2 — after the verb's doc, before executing it`, () => {
+    const routing = section(router(name), "## Routing");
+    const readDoc = routing.indexOf("1. **Read** the verb's reference file");
+    const readAddendum = routing.indexOf("2. **Read the project addendum**");
+    const execute = routing.indexOf("**Execute**");
+    assert(readDoc !== -1, "Routing step 1 no longer reads the verb's doc");
+    assert(readAddendum !== -1, "Routing step 2 is not the addendum read");
+    assert(execute !== -1, "Routing has no Execute step");
+    assert(readDoc < readAddendum, "the addendum is read before the doc it adds to");
+    assert(readAddendum < execute, "the addendum is read after the verb already ran");
+    // The path is asserted in the STEP, not the file: a mention elsewhere in the
+    // router (a docs paragraph, the table) would satisfy a file-level check and
+    // move the read to no defined position at all.
+    const step = routing.slice(readAddendum, routing.indexOf("\n3. ", readAddendum));
+    assertStringIncludes(step, path);
+    assertStringIncludes(unwrap(step), PRECEDENCE);
+    assertStringIncludes(unwrap(step), NO_OP);
+  });
+}
 
-Deno.test("/specnaut contract docs are anchored through their parent phase, not addressed", () => {
-  // `plan-audits`, `merge-close` … are loaded BY a phase, never routed to. An
+Deno.test("/task contract docs are anchored through their parent verb, not addressed", () => {
+  // `plan-audits`, `merge-close` … are loaded BY a verb, never routed to. An
   // addendum keyed on one would sit at a path nothing reads, silently.
-  const routing = unwrap(section(router("specnaut"), "## Routing"));
+  const routing = unwrap(section(router("task"), "## Routing"));
   assertStringIncludes(
     routing,
-    "Contract docs take none; the parent phase's addendum names their step.",
+    "Contract docs take none; the parent verb's addendum names their step.",
   );
 });
 
@@ -135,7 +144,17 @@ Deno.test("AGENTS.md declares the phase-addenda section and fences the rule insi
   // and deliver no instruction.
   const body = extractBlock(agents.content, LABEL, "html");
   assert(body !== null && body.trim().length > 0, "the phase-addenda block is absent or empty");
-  assertStringIncludes(body!, AGENTS_ADDENDUM);
+  // By phase (plan 037 § 11 M1): one row per router, its first column exactly
+  // the phases that router reads an addendum for, its second the address. A
+  // phase missing from the row is a guardrail an older router never finds.
+  const rows = body!.split("\n").filter((l) => l.startsWith("| `"));
+  for (const skill of ADDENDUM_SKILLS) {
+    const address = `\`.specnaut/addenda/${skill}/<name>.md\``;
+    const row = rows.find((r) => r.split("|")[2]?.trim() === address);
+    assert(row !== undefined, `no phase-addenda row for ${address}`);
+    const named = [...row.split("|")[1].matchAll(/`([a-z-]+)`/g)].map((m) => m[1]).sort();
+    assertEquals(named, [...ROUTABLE_PHASES[skill]].sort(), `${skill}: the row's phases drifted`);
+  }
   assertStringIncludes(unwrap(body!), PRECEDENCE);
   assertStringIncludes(unwrap(body!), NO_OP);
   // The surfaces this block exists for bypass the router — it must say it
@@ -143,7 +162,7 @@ Deno.test("AGENTS.md declares the phase-addenda section and fences the rule insi
   assertStringIncludes(unwrap(body!), "however it was reached");
 });
 
-Deno.test("every harness carries both routers' addendum step and the AGENTS.md declaration", () => {
+Deno.test("every harness carries every router's addendum step and the AGENTS.md declaration", () => {
   for (const harness of HARNESSES) {
     const bundle = harness.mapBundle(CORE_BUNDLE, OPTS);
     const files = Object.values(bundle);
@@ -184,8 +203,8 @@ Deno.test("no bundled phase doc carries a character of the addendum seam", () =>
     "ship/release.md not swept",
   );
   assert(
-    phases.some((e) => e.name === "specnaut" && e.suffix === "plan.md"),
-    "specnaut/plan.md not swept",
+    phases.some((e) => e.name === "task" && e.suffix === "plan.md"),
+    "task/plan.md not swept",
   );
 
   const carrying = phases

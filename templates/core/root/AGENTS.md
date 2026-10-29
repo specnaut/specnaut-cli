@@ -114,13 +114,19 @@ It is in force on **every** turn, not only when a skill or an agent is involved.
 
 *Owned by Specnaut — this section is not a placeholder to fill in. Edit the rest freely.*
 
-**Whenever you run a `/specnaut` or `/ship` phase, however it was reached** — the router, a
-per-phase command or workflow, a chained step — read `.specnaut/addenda/<skill>/<phase>.md` if it
-exists: `<skill>` is `specnaut` or `ship`, `<phase>` the phase's name (`plan`, `review`,
-`release`), so `/ship release` reads `.specnaut/addenda/ship/release.md`. It is this project's own
-addition to that phase. It adds to the phase at the step it names and never replaces or skips a
-bundled step: where it contradicts one, the bundled step stands and you say so. No file means no
-addendum — say nothing about it.
+**Whenever you run one of these, however it was reached** — a router, a per-phase command or
+workflow, a chained step — read its addendum if the file exists:
+
+| What runs | Its addendum |
+| :--- | :--- |
+| `plan`, `tasks`, `implement`, `review`, `merge`, `audit`, `constitution`, `groom` | `.specnaut/addenda/task/<name>.md` |
+| `tag`, `release` | `.specnaut/addenda/ship/<name>.md` |
+| `doc`, `list`, `upgrade` | `.specnaut/addenda/specnaut/<name>.md` |
+
+So `/task plan` reads `.specnaut/addenda/task/plan.md`, and so does any older router that still runs
+a `plan` phase. It is this project's own addition to that phase. It adds to the phase at the step it
+names and never replaces or skips a bundled step: where it contradicts one, the bundled step stands
+and you say so. No file means no addendum — say nothing about it.
 
 <!-- --- End Specnaut: phase-addenda --- -->
 
@@ -157,19 +163,19 @@ Each name is the `name` of an agent Specnaut scaffolded for your harness.
 *Owned by Specnaut — this section is not a placeholder to fill in. Edit the rest freely.*
 
 <!-- BEGIN: backend=local -->
-The backlog is managed through the `board` skill — local Markdown backend, indexed in
+The backlog is managed through the `task` skill — local Markdown backend, indexed in
 `.specnaut/backlog.md`.
 <!-- END: backend=local -->
 <!-- BEGIN: backend=github -->
-The backlog is managed through the `board` skill — GitHub Issues and a GitHub Project, configured
+The backlog is managed through the `task` skill — GitHub Issues and a GitHub Project, configured
 in `.specnaut/backlog-config.yml`.
 <!-- END: backend=github -->
 <!-- BEGIN: backend=gitlab -->
-The backlog is managed through the `board` skill — GitLab Issues, configured in
+The backlog is managed through the `task` skill — GitLab Issues, configured in
 `.specnaut/backlog-config.yml`.
 <!-- END: backend=gitlab -->
 <!-- BEGIN: backend=cloud -->
-The backlog is managed through the `board` skill — Specnaut Cloud, configured in
+The backlog is managed through the `task` skill — Specnaut Cloud, configured in
 `.specnaut/backlog-config.yml`.
 <!-- END: backend=cloud -->
 
@@ -191,7 +197,7 @@ scaffolded for a harness without such features gets none here.
 
 - **Periodic maintenance** — `/loop 1h` runs the prompt in
   `.claude/loop.md` every hour. The bundled default delegates to the
-  `/board groom` skill (groom backlog, surface stale PRs, list orphan
+  `/task groom` skill (groom backlog, surface stale PRs, list orphan
   specs); edit `loop.md` freely to add project-specific checks. See
   https://code.claude.com/docs/en/scheduled-tasks.
 
@@ -212,7 +218,7 @@ scaffolded for a harness without such features gets none here.
   picker automatically — start one with the agent name as the first
   word, e.g. `developer fix the lint errors in src/cli/`, `@qa-tester
   run a sandbox smoke pass`, or `@product-owner groom the backlog`.
-  Skills are dispatchable too: `/specnaut plan "<feature>"` launches
+  Skills are dispatchable too: `/task plan "<feature>"` launches
   a session running the full spec-plan-tasks chain. File edits are
   isolated under `.claude/worktrees/` (git worktrees), so several
   Specnaut agents can work in parallel without stepping on each

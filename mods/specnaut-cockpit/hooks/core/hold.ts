@@ -50,7 +50,7 @@ export function holdFor(
       (eta ? ` and resets in ${eta}.` : "."),
       `Starting \`${phase}\` now risks the limit cutting it off half-done.`,
       "Stop the chain here. Tell the user it is paused at a clean phase boundary," +
-      ` give them the figures above, and say that \`/specnaut ${phase}\` resumes it` +
+      ` give them the figures above, and say that \`/task ${phase}\` resumes it` +
       (eta ? " after the reset." : " once the window has room."),
       "Do not run the phase's steps by any other means.",
       "If the user tells you to continue anyway, invoke the phase again:" +

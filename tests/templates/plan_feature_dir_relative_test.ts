@@ -18,7 +18,7 @@ import { assert, assertStringIncludes } from "@std/assert";
 import { fromFileUrl, join } from "@std/path";
 
 const PLAN = fromFileUrl(
-  new URL("../../templates/core/skills/specnaut/phases/plan.md", import.meta.url),
+  new URL("../../templates/core/skills/task/phases/plan.md", import.meta.url),
 );
 const PS_COMMON = fromFileUrl(
   new URL("../../templates/core/specnaut/scripts/powershell/common.ps1", import.meta.url),

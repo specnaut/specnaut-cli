@@ -12,23 +12,23 @@ someone reads a dispatch line without opening the agent file.
 
 | Suffix | Meaning | Agents |
 | ------ | ------- | ------ |
-| `<domain>-expert` | A review lens that **also** has a standalone single-axis audit skill — dual mode: per-diff review *and* scoped audit | `accessibility-expert`, `architect-expert`, `dependency-expert`, `performance-expert`, `security-expert` |
-| `<domain>-reviewer` | A review lens with **no** audit skill — it only ever sees a diff | `code-reviewer`, `test-reviewer` |
+| `<domain>-expert` | A review lens that **also** has a `/task audit` axis — dual mode: per-diff review *and* scoped audit | `accessibility-expert`, `architect-expert`, `dependency-expert`, `performance-expert`, `security-expert` |
+| `<domain>-reviewer` | A review lens with **no** audit axis — it only ever sees a diff | `code-reviewer`, `test-reviewer` |
 | `-coordinator` | Fans out the lenses of a **single** phase and aggregates what returns | `review-coordinator` |
 | `-manager` | Drives a **multi-phase** delivery across several agents | `workflow-manager` |
 | role noun | Does the work rather than judging it | `developer`, `qa-tester`, `devops-sre`, `product-owner`, `ui-ux-designer` |
 
 Two rules follow, and they are the whole point of writing this down:
 
-- **`-expert` ⇔ an audit skill exists.** The five `-expert` agents correspond
-  exactly to the five single-axis audit skills (`/sec-audit`, `/perf-audit`,
-  `/a11y-audit`, `/arch-audit`, `/dep-audit`). If you give `code-reviewer` or
-  `test-reviewer` an audit skill, **rename it to `-expert` in the same
+- **`-expert` ⇔ an audit axis exists.** The five `-expert` agents correspond
+  exactly to the five axis flags of `/task audit` (`--security`, `--perf`,
+  `--a11y`, `--archi`, `--deps`). If you give `code-reviewer` or
+  `test-reviewer` an audit axis, **rename it to `-expert` in the same
   change** — otherwise the suffix stops predicting anything and the next
   person picks one at random.
-- **Agents spell the domain out; skills may abbreviate.** The agent is
-  `accessibility-expert` while its skill is `a11y-audit`, and that asymmetry
-  is deliberate: a skill name is *typed by a human* at a prompt, where short
+- **Agents spell the domain out; flags may abbreviate.** The agent is
+  `accessibility-expert` while its flag is `--a11y`, and that asymmetry
+  is deliberate: a flag is *typed by a human* at a prompt, where short
   wins, whereas an agent name is *matched semantically by a model* against a
   request, where `a11y` is a far weaker signal than `accessibility`. Optimise
   each for its own reader.
@@ -36,7 +36,7 @@ Two rules follow, and they are the whole point of writing this down:
 `specnaut-guide` is the deliberate exception to the table — the only agent
 named after the tool itself. It answers questions about Specnaut rather than
 reviewing your code, so it carries neither a lens suffix nor a role noun. It
-is **not** an `-expert`: giving it that suffix would imply an audit skill for
+is **not** an `-expert`: giving it that suffix would imply an audit axis for
 Specnaut itself, which does not and should not exist.
 
 ## Model and effort — two budgets

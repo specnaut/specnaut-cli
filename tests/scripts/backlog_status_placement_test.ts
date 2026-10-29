@@ -13,7 +13,7 @@
 import { assert, assertEquals, assertStringIncludes } from "@std/assert";
 import { fromFileUrl } from "@std/path";
 
-const GITHUB_DIR = "../../templates/core/skills/board/scripts/github";
+const GITHUB_DIR = "../../templates/core/skills/task/scripts/github";
 
 function scriptPath(rel: string): string {
   return fromFileUrl(new URL(rel, import.meta.url));
@@ -179,9 +179,9 @@ Deno.test("github add.sh resolves ids at runtime instead of hardcoding them", as
 Deno.test("the other backends already place items at creation", async () => {
   // Placement is atomic for these, so they have no equivalent defect and were
   // deliberately left untouched.
-  const gitlab = await read("../../templates/core/skills/board/scripts/gitlab/add.sh");
+  const gitlab = await read("../../templates/core/skills/task/scripts/gitlab/add.sh");
   assertStringIncludes(gitlab, "Status::Backlog");
 
-  const local = await read("../../templates/core/skills/board/scripts/local/add.sh");
+  const local = await read("../../templates/core/skills/task/scripts/local/add.sh");
   assertStringIncludes(local, "status: Backlog");
 });

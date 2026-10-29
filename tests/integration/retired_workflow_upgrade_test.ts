@@ -34,10 +34,12 @@ const LAYOUT = {
   claude: {
     skill: (n: string) => `.claude/skills/${n}/SKILL.md`,
     phases: ".claude/skills/specnaut/phases",
+    pipeline: ".claude/skills/task/phases",
   },
   codex: {
     skill: (n: string) => `.agents/skills/specnaut-${n}/SKILL.md`,
     phases: ".agents/skills/specnaut/phases",
+    pipeline: ".agents/skills/specnaut-task/phases",
   },
 } as const;
 type Harness = keyof typeof LAYOUT;
@@ -114,7 +116,7 @@ for (const h of ["claude", "codex"] as const) {
         assertEquals(await exists(join(dir, rel)), false, `fresh init wrote retired ${rel}`);
       }
       // The surviving workflow is there: the absence above is not an empty init.
-      assert(await exists(join(dir, `${LAYOUT[h].phases}/plan.md`)), "plan phase missing");
+      assert(await exists(join(dir, `${LAYOUT[h].pipeline}/plan.md`)), "plan phase missing");
     } finally {
       await cleanup(dir, home);
     }
@@ -163,7 +165,7 @@ Deno.test("[claude] check --project reports no retired path as missing, removed 
     // A still-covered file goes too, so the plugin-gap branch has something it
     // MUST report. Without it, "no retired path is named" is also what a check
     // that never ran the branch would print.
-    const probe = ".claude/skills/board/groom.md";
+    const probe = ".claude/skills/task/groom.md";
     await Deno.remove(join(dir, probe));
     const byHand = await runSpecnaut(["check", "--project"], dir, home);
     const handOut = byHand.stdout + byHand.stderr;

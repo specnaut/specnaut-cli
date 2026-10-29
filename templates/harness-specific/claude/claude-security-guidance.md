@@ -9,7 +9,7 @@ off.
 > then `/reload-plugins`. To turn it on for everyone who clones this repo,
 > add `"enabledPlugins": {"security-guidance@claude-plugins-official": true}`
 > to `.claude/settings.json`. Without the plugin this file is inert — the
-> `security-expert` agent and `/sec-audit` still work, and read the same
+> `security-expert` agent and `/task audit --security` still work, and read the same
 > knowledge base.
 
 ## The full knowledge base lives in the repo

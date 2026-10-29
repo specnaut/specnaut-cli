@@ -174,6 +174,20 @@ export const PLUGIN_COVERED_PATHS_CLAUDE: ReadonlyArray<string> = [
   ".claude/skills/ship/SKILL.md",
   ".claude/skills/ship/phases/tag.md",
   ".claude/skills/ship/phases/release.md",
+  ...["doc", "list", "upgrade"].map((name) => `.claude/skills/specnaut/phases/${name}.md`),
+
+  // `task` (cli#683): the backlog verbs, the delivery pipeline and audits. Its
+  // `scripts/` subtree is NOT here and must not be: those resolve paths
+  // relative to their own location, so they fail criterion 3 — and they are
+  // not emitted under `.claude/skills/` at all, they land in
+  // `.specnaut/scripts/backlog/` and `.specnaut/scripts/audit/`. The documents
+  // themselves name only project-root-relative paths and are plugin-servable
+  // like any other.
+  ".claude/skills/task/SKILL.md",
+  ".claude/skills/task/backlog.md",
+  ".claude/skills/task/groom.md",
+  ".claude/skills/task/groom-report.md",
+  ".claude/skills/task/spec-autogen.md",
   ...[
     "plan",
     "plan-audits",
@@ -188,39 +202,23 @@ export const PLUGIN_COVERED_PATHS_CLAUDE: ReadonlyArray<string> = [
     "merge",
     "merge-squash",
     "auto-chain",
+    "audit",
     "constitution",
-    "upgrade",
-  ].map((name) => `.claude/skills/specnaut/phases/${name}.md`),
-
-  // `board` and its documents. Its `scripts/` subtree is NOT here and must not
-  // be: those resolve paths relative to their own location, so they fail
-  // criterion 3 — and they are not emitted under `.claude/skills/` at all, they
-  // land in `.specnaut/scripts/backlog/`. The documents themselves name only
-  // project-root-relative paths and are plugin-servable like any other.
-  ".claude/skills/board/SKILL.md",
-  ".claude/skills/board/groom.md",
-  ".claude/skills/board/groom-report.md",
-  ".claude/skills/board/spec-autogen.md",
+  ].map((name) => `.claude/skills/task/phases/${name}.md`),
 
   // Every remaining core skill, each owning exactly one document. They were
   // uncovered not by decision but by omission: the list was written when
   // `specnaut` was the only skill, and each of these joined the plugin without
   // anyone revisiting it (specnaut-cli#605).
   ...[
-    "a11y-audit",
     "alert-triage-contract",
-    "arch-audit",
     "backlog-frontmatter",
     "backlog-reference-contract",
-    "code-audit",
-    "dep-audit",
     "handoff-protocol",
     "mobile-first-contract",
-    "perf-audit",
     "qa-report-contract",
     "response-style-contract",
     "review-findings-contract",
-    "sec-audit",
     "specnaut-facts",
     "status-audit",
     "workflow-contract",

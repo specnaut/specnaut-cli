@@ -247,7 +247,7 @@ get_feature_paths() {
 
     # Resolve feature directory.  Priority:
     #   1. SPECIFY_FEATURE_DIRECTORY env var (explicit override)
-    #   2. .specnaut/feature.json "feature_directory" key (persisted by /specnaut plan)
+    #   2. .specnaut/feature.json "feature_directory" key (persisted by /task plan)
     #   3. Branch-name-based prefix lookup (legacy fallback)
     local feature_dir
     local feature_dir_source

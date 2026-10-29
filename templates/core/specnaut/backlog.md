@@ -1,13 +1,13 @@
 # Backlog
 
-> Managed by the Product Owner agent (`/board`). Each task is one
+> Managed by the Product Owner agent (`/task`). Each task is one
 > file under `.specnaut/backlog/NNN-slug.md` with frontmatter; this
 > index lists items grouped by status column.
 
 The 5 status columns mirror the GitHub Projects "kanban" model:
 
 - **Backlog** — needs more info, sizing, or prioritisation. The PO
-  works these on `/board groom` until they're ready.
+  works these on `/task groom` until they're ready.
 - **Ready** — clarified, sized, prioritised. The PO proposes these
   for development when asked "what's next".
 - **In progress** — actively being worked on (a branch is open).
@@ -29,7 +29,7 @@ created: ...
 ---
 ```
 
-The PO assigns size + priority during the `/board groom` pass.
+The PO assigns size + priority during the `/task groom` pass.
 
 ---
 

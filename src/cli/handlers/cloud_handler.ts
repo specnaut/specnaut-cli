@@ -342,7 +342,7 @@ async function runLogin(intent: CloudIntent): Promise<number> {
   await writeCloudConfig(cloudDir, apiUrl, projectKey);
   console.log(green(`✓ linked to project ${bold(projectKey)}`));
   console.log(
-    dim("  wrote .specnaut/backlog-config.yml — /board now runs against Specnaut Cloud"),
+    dim("  wrote .specnaut/backlog-config.yml — /task now runs against Specnaut Cloud"),
   );
   return 0;
 }

@@ -18,7 +18,7 @@ import { join } from "@std/path";
 import { BACKLOG_STRATEGIES } from "../../src/domain/backlog_strategies/registry.ts";
 
 const ROOT = fromFileUrl(new URL("../../", import.meta.url));
-const SCRIPTS = join(ROOT, "templates/core/skills/board/scripts");
+const SCRIPTS = join(ROOT, "templates/core/skills/task/scripts");
 
 /** YAML scalar keys in a config body, ignoring comments and blank lines. */
 function keysOf(yaml: string): string[] {
@@ -62,7 +62,7 @@ for (const strategy of BACKLOG_STRATEGIES) {
       orphans.length === 0,
       `\`specnaut init --backlog ${strategy.key}\` generates ${
         orphans.map((k) => `\`${k}\``).join(", ")
-      } but no script under templates/core/skills/board/scripts/${strategy.key}/ ` +
+      } but no script under templates/core/skills/task/scripts/${strategy.key}/ ` +
         `ever reads ${orphans.length === 1 ? "it" : "them"}. A key nothing reads is a ` +
         `promise the product does not keep: either wire it up, or delete it from the stub.`,
     );
@@ -76,15 +76,16 @@ for (const strategy of BACKLOG_STRATEGIES) {
 //    explained.
 // ---------------------------------------------------------------------------
 
-// One SKILL.md documents the config block of EVERY backend it can be
-// configured for, so a key is checked against the union of all four script
+// One doc — `task/backlog.md`, which took over the backend sections of the
+// `/board` SKILL.md in spec 037 — documents the config block of EVERY backend
+// it can be configured for, so a key is checked against the union of all four script
 // corpora rather than against one backend's. Per-backend attribution would
 // need the fence's surrounding prose to name its backend, which is exactly the
 // kind of coupling that rots; "some shipped script reads this key" is the
 // property that actually matters here.
 const DOCS = [
-  "templates/core/skills/board/SKILL.md",
-  "plugin/skills/board/SKILL.md",
+  "templates/core/skills/task/backlog.md",
+  "plugin/skills/task/backlog.md",
 ];
 
 async function allBackendsCorpus(): Promise<string> {
@@ -129,7 +130,7 @@ for (const rel of DOCS) {
     assert(
       orphans.length === 0,
       `${rel} documents ${orphans.map((k) => `\`${k}\``).join(", ")} in a ` +
-        `backlog-config.yml block, but no board script on any backend reads ` +
+        `backlog-config.yml block, but no backlog script on any backend reads ` +
         `${orphans.length === 1 ? "it" : "them"}. A documented key with no reader ` +
         `is a promise the product does not keep.`,
     );
@@ -173,7 +174,7 @@ Deno.test("config keys: the fence scanner is not defeated by CRLF line endings",
   // CRLF-ifying it assumes the checkout is LF — on windows-latest, where
   // `core.autocrlf` already handed back CRLF, that produced `\r\r\n` and this
   // very test failed on the platform it was written to protect.
-  const raw = await Deno.readTextFile(join(ROOT, "templates/core/skills/board/SKILL.md"));
+  const raw = await Deno.readTextFile(join(ROOT, DOCS[0]));
   const posix = raw.replaceAll("\r\n", "\n");
   const crlf = posix.replaceAll("\n", "\r\n");
   assertEquals(

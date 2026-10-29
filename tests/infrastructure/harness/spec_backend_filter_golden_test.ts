@@ -14,14 +14,19 @@ import { skillDocName } from "../../../src/domain/core_bundle.ts";
 // nothing else moves. The `specify` and `analyze` fixtures went with their phases
 // in #455; `plan`'s was re-captured in the same change, since #456 rewrote it.
 // If a future edit legitimately changes the local content, re-capture the fixture
-// in the same commit; an accidental drift fails here.
+// in the same commit; an accidental drift fails here. cli#683 moved the four
+// docs to `/task` and re-captured implement's and review's goldens for the
+// address text alone (`/specnaut merge` → `/task merge`) — nothing else moved.
 
 function abs(rel: string): string {
   return fromFileUrl(new URL(`../../${rel}`, import.meta.url));
 }
 
+/** A pipeline phase doc — `/task`'s since cli#683. */
 function phaseEntry(name: string): CoreEntry {
-  const e = CORE_BUNDLE.find((x) => x.category === "phase" && skillDocName(x) === name);
+  const e = CORE_BUNDLE.find((x) =>
+    x.category === "phase" && x.name === "task" && skillDocName(x) === name
+  );
   if (!e) throw new Error(`missing phase entry: ${name}`);
   return e;
 }

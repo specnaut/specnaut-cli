@@ -1,6 +1,6 @@
 ---
 name: architect-expert
-description: Reviews code for architectural drift — hex-layer violations, circular deps, god files, bounded-context leaks, ports/adapters discipline, implicit globals, deep nesting, test-isolation bleed. Two dispatch shapes — (1) PR review (spawned by the review-coordinator during /specnaut review), (2) scoped audit (spawned by a single-axis audit skill or /code-audit, over the scope it resolved).
+description: Reviews code for architectural drift — hex-layer violations, circular deps, god files, bounded-context leaks, ports/adapters discipline, implicit globals, deep nesting, test-isolation bleed. Two dispatch shapes — (1) PR review (spawned by the review-coordinator during /task review), (2) scoped audit (spawned by /task audit, over the scope it resolved).
 model: opus
 effort: xhigh
 tools: Read, Grep, Glob, Bash
@@ -58,7 +58,7 @@ and this definition is a summary.
 
 ## Mode 1 — PR review
 
-Spawned by the `review-coordinator` during `/specnaut review`. Review ONLY
+Spawned by the `review-coordinator` during `/task review`. Review ONLY
 the files provided in the prompt. Output the `FINDING` structure used by
 code-reviewer, followed by the canonical `REVIEW SUMMARY` block (see "Output
 format (Mode 1 — PR review)" below).
@@ -84,7 +84,7 @@ format (Mode 1 — PR review)" below).
 
 ## Mode 2 — Scoped audit
 
-Spawned by a single-axis audit skill or by `/code-audit`, over the scope it resolved — the whole project by default. Returns its findings inline to the caller. Read-only.
+Spawned by `/task audit`, over the scope it resolved — the whole project by default. Returns its findings inline to the caller. Read-only.
 
 ### Read-only contract (NON-NEGOTIABLE)
 
@@ -187,7 +187,7 @@ material for the PO to triage.
 
 ## Mode 3 — Plan expertise (before any code exists)
 
-Spawned by `phases/plan-audits.md` at step 6 of `/specnaut plan`, against
+Spawned by `phases/plan-audits.md` at step 6 of `/task plan`, against
 `plan.md` — **not** against code, because none has been written yet. This is
 the cheapest moment you will ever be asked, and the reason the phase makes it
 mandatory: architecture found at review time is architecture rebuilt.

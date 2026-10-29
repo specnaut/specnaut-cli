@@ -56,11 +56,11 @@ Deno.test("specnaut init --ai copilot scaffolds a Copilot layout", async () => {
       true,
     );
     assertEquals(
-      await exists(join(root, ".github/instructions/specnaut-plan.instructions.md")),
+      await exists(join(root, ".github/instructions/specnaut-task-plan.instructions.md")),
       true,
     );
     assertEquals(
-      await exists(join(root, ".github/instructions/specnaut-board.instructions.md")),
+      await exists(join(root, ".github/instructions/specnaut-task.instructions.md")),
       true,
     );
     // #409: the deprecated specnaut-auto alias no longer scaffolds.
@@ -84,15 +84,17 @@ Deno.test("specnaut init --ai copilot scaffolds a Copilot layout", async () => {
     assertEquals(cmdContent.includes("tools:"), false);
 
     // One flat instruction file per bundled skill, phase document and agent.
-    // code-audit's scope script ships under .specnaut/scripts/code-audit/, and
+    // The audit scope script ships under .specnaut/scripts/audit/, and
     // status-audit's schema doc to .specnaut/logs/README.md — neither is
     // flattened here.
     const instructionsCount = (await Array.fromAsync(
       Deno.readDir(join(root, ".github/instructions")),
     )).length;
     // 67 after spec 033 and the `upgrade` phase; 55 since spec 034 retired
-    // seven skills and the five audit phases.
-    assertEquals(instructionsCount, 55);
+    // seven skills and the five audit phases. 53 since cli#683: `board`,
+    // `code-audit` and the five `*-audit` skills became one `task` skill, which
+    // gained `backlog` and `audit` documents; `specnaut` gained `doc` and `list`.
+    assertEquals(instructionsCount, 53);
 
     // Shared (cross-harness)
     assertEquals(await exists(join(root, ".specnaut/memory/constitution.md")), true);

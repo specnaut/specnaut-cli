@@ -51,7 +51,7 @@ Deno.test("specnaut init --ai cursor scaffolds a Cursor layout", async () => {
     // Cursor-specific (v1.0.0 consolidated layout)
     assertEquals(await exists(join(root, ".cursor/skills/specnaut/SKILL.md")), true);
     assertEquals(
-      await exists(join(root, ".cursor/skills/specnaut/phases/plan.md")),
+      await exists(join(root, ".cursor/skills/specnaut-task/phases/plan.md")),
       true,
     );
     assertEquals(

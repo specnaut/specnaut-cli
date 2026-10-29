@@ -22,8 +22,11 @@ import { skillDocName } from "../../src/domain/core_bundle.ts";
  * to ask permission it was already given at the plan stop.
  */
 
+/** A pipeline phase doc — `/task`'s since cli#683. */
 function phase(name: string): CoreEntry {
-  const e = CORE_BUNDLE.find((x) => x.category === "phase" && skillDocName(x) === name);
+  const e = CORE_BUNDLE.find((x) =>
+    x.category === "phase" && x.name === "task" && skillDocName(x) === name
+  );
   if (!e) throw new Error(`missing phase entry: ${name}`);
   return e;
 }
@@ -129,7 +132,7 @@ Deno.test("review, merge and merge-close follow the merge mode instead of always
   const review = phase("review").content;
   assertStringIncludes(
     review,
-    "under `auto` (the default) invoke `/specnaut merge` in the same turn",
+    "under `auto` (the default) invoke `/task merge` in the same turn",
   );
   const merge = phase("merge").content;
   // The base branch has one home (spec 036); merge.md asks it and never assumes main.
@@ -157,10 +160,11 @@ Deno.test("the plan stop announces that nothing after it asks again", () => {
 });
 
 Deno.test("the router parses --manual-merge without making it a chain flag", () => {
-  const router = CORE_BUNDLE.find((x) => x.category === "skill" && x.name === "specnaut");
-  if (!router) throw new Error("missing /specnaut router");
-  assertStringIncludes(router.content, "[--manual] [--manual-merge] <phase> [rest]");
-  assertStringIncludes(router.content, "It does not stop the chain\n   anywhere else.");
+  const router = CORE_BUNDLE.find((x) => x.category === "backlog-skill" && x.name === "task");
+  if (!router) throw new Error("missing /task router");
+  assertStringIncludes(router.content, "[--manual] [--manual-merge] <verb> [rest]");
+  assertStringIncludes(router.content, "`--manual` is the only chain flag");
+  assertStringIncludes(router.content, "It does not\n   stop the chain anywhere else.");
 });
 
 /**

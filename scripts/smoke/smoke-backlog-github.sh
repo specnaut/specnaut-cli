@@ -33,11 +33,11 @@ check "backlog-config.yml stub present" \
 echo
 echo "═══ #69  github backend SKILL.md ═══"
 check "SKILL renders github backend section" \
-  'grep -q "Backend: GitHub" .claude/skills/board/SKILL.md'
+  'grep -q "Backend: GitHub" .claude/skills/task/backlog.md'
 check "local backend section stripped (github backend)" \
-  '! grep -q "Backend: local Markdown" .claude/skills/board/SKILL.md'
+  '! grep -q "Backend: local Markdown" .claude/skills/task/backlog.md'
 check "no orphan BEGIN markers" \
-  '! grep -q "BEGIN: backend=" .claude/skills/board/SKILL.md'
+  '! grep -q "BEGIN: backend=" .claude/skills/task/backlog.md'
 
 echo
 echo "═══ #612 / cli#680  the context file describes this backend, not the local one ═══"
@@ -60,21 +60,21 @@ check "detect-fields.sh present + executable" \
 check "set-field.sh present + executable" \
   '[ -x .specnaut/scripts/backlog/set-field.sh ]'
 check "SKILL.md mentions detect-fields.sh (#161)" \
-  'grep -q "detect-fields.sh" .claude/skills/board/SKILL.md'
+  'grep -q "detect-fields.sh" .claude/skills/task/backlog.md'
 check "SKILL.md mentions set-field.sh (#161)" \
-  'grep -q "set-field.sh" .claude/skills/board/SKILL.md'
+  'grep -q "set-field.sh" .claude/skills/task/backlog.md'
 # The exit-code contract, keyed on each code's definition rather than on one
 # phrasing of it (#623 reworded "10/11/12 signal label fallback" into a
 # per-code sentence, and a check pinned to the old string went red).
 check "SKILL.md documents set-field exit codes 10-13 and the preflight's 2" \
-  '(for c in 10 11 12 13 2; do grep -q "\`$c\` = " .claude/skills/board/SKILL.md || exit 1; done)'
+  '(for c in 10 11 12 13 2; do grep -q "\`$c\` = " .claude/skills/task/backlog.md || exit 1; done)'
 
 echo
 echo "═══ #654  grooming ends with a promotion ═══"
 check "groom-columns.sh present + executable" \
   '[ -x .specnaut/scripts/backlog/groom-columns.sh ]'
 check "groom.md resolves the columns before promoting (#654)" \
-  'grep -q "groom-columns.sh" .claude/skills/board/groom.md'
+  'grep -q "groom-columns.sh" .claude/skills/task/groom.md'
 check "the product-owner's own groom contract promotes (#654)" \
   'grep -q "It ends with a promotion" .claude/agents/product-owner.md'
 
@@ -155,46 +155,46 @@ check "PO agent advertises Target date soft axis (#264)" \
 check "PO agent advertises Start date soft axis (#264)" \
   'grep -qE "\*\*Start date\*\* \(soft" .claude/agents/product-owner.md'
 check "groom phase mentions Roadmap dates step (#264)" \
-  'grep -q "Roadmap dates" .claude/skills/board/groom.md'
+  'grep -q "Roadmap dates" .claude/skills/task/groom.md'
 check "groom phase report surfaces Roadmap-dates-missing warning (#264)" \
-  'grep -qE "no target date set|no start date set" .claude/skills/board/groom.md'
+  'grep -qE "no target date set|no start date set" .claude/skills/task/groom.md'
 
 echo
 echo "═══ #561  the date warnings are gated on the field existing ═══"
 check "groom: every \"no target date set\" sits beside its TARGETDATE_FIELD_ID gate" \
-  'gated_warning .claude/skills/board/groom.md "no target date set" TARGETDATE_FIELD_ID'
+  'gated_warning .claude/skills/task/groom.md "no target date set" TARGETDATE_FIELD_ID'
 check "groom: every \"no start date set\" sits beside its STARTDATE_FIELD_ID gate" \
-  'gated_warning .claude/skills/board/groom.md "no start date set" STARTDATE_FIELD_ID'
+  'gated_warning .claude/skills/task/groom.md "no start date set" STARTDATE_FIELD_ID'
 check "PO agent: every \"no target date set\" sits beside its TARGETDATE_FIELD_ID gate" \
   'gated_warning .claude/agents/product-owner.md "no target date set" TARGETDATE_FIELD_ID'
 check "PO agent: every \"no start date set\" sits beside its STARTDATE_FIELD_ID gate" \
   'gated_warning .claude/agents/product-owner.md "no start date set" STARTDATE_FIELD_ID'
 check "groom step 3a says what to do when the fields are absent" \
-  'grep -qF "Both IDs empty" .claude/skills/board/groom.md'
+  'grep -qF "Both IDs empty" .claude/skills/task/groom.md'
 # #562 split the report contract out of groom.md into groom-report.md. These
 # assertions follow the TEXT, not the file name — an assertion keyed on a
 # location silently stops covering anything the moment its subject moves, and
 # it reads as a passing check right up until someone notices.
 check "groom report template repeats the condition, so it cannot reintroduce the line" \
-  'awk "/Roadmap dates missing \\(GitHub backend, soft\\)/{f=1} f&&/TARGETDATE_FIELD_ID/{ok=1} END{exit !ok}" .claude/skills/board/groom-report.md'
+  'awk "/Roadmap dates missing \\(GitHub backend, soft\\)/{f=1} f&&/TARGETDATE_FIELD_ID/{ok=1} END{exit !ok}" .claude/skills/task/groom-report.md'
 check "groom report: every \"no target date set\" sits beside its TARGETDATE_FIELD_ID gate" \
-  'gated_warning .claude/skills/board/groom-report.md "no target date set" TARGETDATE_FIELD_ID'
+  'gated_warning .claude/skills/task/groom-report.md "no target date set" TARGETDATE_FIELD_ID'
 check "groom report: every \"no start date set\" sits beside its STARTDATE_FIELD_ID gate" \
-  'gated_warning .claude/skills/board/groom-report.md "no start date set" STARTDATE_FIELD_ID'
+  'gated_warning .claude/skills/task/groom-report.md "no start date set" STARTDATE_FIELD_ID'
 check "groom points at the report contract rather than restating it" \
-  'grep -qF "groom-report.md" .claude/skills/board/groom.md'
+  'grep -qF "groom-report.md" .claude/skills/task/groom.md'
 # #562 split the cloud auto-generation guidance out of the board SKILL.md,
 # which took a since-removed harness's emitted workflow 539 characters past
 # that vendor's cap. The doc ships on every backend; only the pointer to it is
 # conditional.
 check "spec-autogen contract ships beside the board skill" \
-  'test -f .claude/skills/board/spec-autogen.md'
+  'test -f .claude/skills/task/spec-autogen.md'
 check "spec-autogen keeps the never-fatal rule — a failed spec-gen must not lose the task" \
-  'tr "\n" " " < .claude/skills/board/spec-autogen.md | grep -qF "Never fatal to task creation"'
+  'tr "\n" " " < .claude/skills/task/spec-autogen.md | grep -qF "Never fatal to task creation"'
 check "spec-autogen says the retry path, not just that it is retryable" \
-  'tr "\n" " " < .claude/skills/board/spec-autogen.md | grep -qF "the task stays created"'
+  'tr "\n" " " < .claude/skills/task/spec-autogen.md | grep -qF "the task stays created"'
 check "groom documents detect-fields.sh emitting the date field IDs" \
-  'grep -qF "TARGETDATE_FIELD_ID" .claude/skills/board/groom.md'
+  'grep -qF "TARGETDATE_FIELD_ID" .claude/skills/task/groom.md'
 
 echo
 echo "═══ #553  parent-of.sh — cascade-check read from the other end ═══"
@@ -208,7 +208,7 @@ check "no parent and could-not-ask are DIFFERENT exit codes (#553)" \
 check "it branches on gh exit status, not on empty stdout (#553)" \
   'grep -qF "api_rc" .specnaut/scripts/backlog/parent-of.sh'
 check "SKILL.md documents parent-of.sh and its exit 10 (#553)" \
-  'flat="$(tr "\n" " " < .claude/skills/board/SKILL.md)";
+  'flat="$(tr "\n" " " < .claude/skills/task/backlog.md)";
    grep -qF "parent-of.sh" <<<"$flat" && grep -qF "exits **10**" <<<"$flat"'
 
 echo "═══ #158  semantic labels bootstrap (ensure-labels.sh) ═══"
@@ -225,14 +225,14 @@ check "ensure-labels.sh idempotent (skips already-present labels)" \
 check "ensure-labels.sh verifies the GitHub default '"'"'bug'"'"' label" \
   'grep -qF "bug" .specnaut/scripts/backlog/ensure-labels.sh'
 check "SKILL.md mentions ensure-labels.sh (#158)" \
-  'grep -q "ensure-labels.sh" .claude/skills/board/SKILL.md'
+  'grep -q "ensure-labels.sh" .claude/skills/task/backlog.md'
 check "SKILL.md states fields take priority over labels (#194)" \
-  'grep -q "reserved as a strict fallback" .claude/skills/board/SKILL.md'
+  'grep -q "reserved as a strict fallback" .claude/skills/task/backlog.md'
 
 echo
 echo "═══ #157  Priority/Size native fields documented in SKILL.md ═══"
 check "SKILL.md describes Priority/Size field-first contract" \
-  'grep -q "Priority" .claude/skills/board/SKILL.md && grep -q "Size" .claude/skills/board/SKILL.md'
+  'grep -q "Priority" .claude/skills/task/backlog.md && grep -q "Size" .claude/skills/task/backlog.md'
 
 echo
 echo "═══ #180  add.sh --parent flag (sub-issues API wiring) ═══"

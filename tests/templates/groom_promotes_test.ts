@@ -31,7 +31,7 @@ for (const h of HARNESSES) {
 }
 
 Deno.test("groom.md resolves the columns, asks once, and promotes to the resolved column", async () => {
-  const groom = await Deno.readTextFile(`${ROOT}templates/core/skills/board/groom.md`);
+  const groom = await Deno.readTextFile(`${ROOT}templates/core/skills/task/groom.md`);
   assertStringIncludes(groom, "groom-columns.sh");
   assertStringIncludes(groom, "ask the user **once**");
   assertStringIncludes(groom, "groom-columns.sh --set ready_column <column|none>");
@@ -41,7 +41,7 @@ Deno.test("groom.md resolves the columns, asks once, and promotes to the resolve
 });
 
 Deno.test("the groom report carries the columns and every failed promotion", async () => {
-  const report = await Deno.readTextFile(`${ROOT}templates/core/skills/board/groom-report.md`);
+  const report = await Deno.readTextFile(`${ROOT}templates/core/skills/task/groom-report.md`);
   assertStringIncludes(report, "Columns:    intake=<name>  ready=<name | none");
   assertStringIncludes(report, "⚠ promotion failed — groomed but still in <intake>:");
 });

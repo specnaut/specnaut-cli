@@ -22,17 +22,17 @@ doesn't:
 
 Specnaut gives your harness three skills, and they divide by what they own:
 
-| Skill       | Owns                                                               | Typical invocation                    |
-| :---------- | :----------------------------------------------------------------- | :------------------------------------ |
-| `/board`    | the backlog — what you might do, and what you are doing            | `/board add "…"`, `/board groom`      |
-| `/specnaut` | the specification — what a thing is, and whether it is built right | `/specnaut plan "…"`                  |
-| `/ship`     | production — getting a built thing out the door                    | `/ship`, `/ship tag`, `/ship release` |
+| Skill       | Owns                                                                   | Typical invocation                                           |
+| :---------- | :--------------------------------------------------------------------- | :----------------------------------------------------------- |
+| `/task`     | one unit of work — from backlog item to merged branch, audits included | `/task add "…"`, `/task plan <id>`, `/task audit --security` |
+| `/specnaut` | the framework itself — its documentation, what is installed, upgrading | `/specnaut doc`, `/specnaut upgrade`                         |
+| `/ship`     | production — getting a built thing out the door                        | `/ship`, `/ship tag`, `/ship release`                        |
 
-Shipping is deliberately not a specification concern. It has a different cadence, a different risk
-profile — irreversible, outward-facing, it triggers live pipelines — and a different audience from
-writing a plan.
+Shipping is deliberately not part of delivering a unit of work. It has a different cadence, a
+different risk profile — irreversible, outward-facing, it triggers live pipelines — and a different
+audience from writing a plan.
 
-On harnesses that namespace their skills the names carry a prefix (`/specnaut-board`,
+On harnesses that namespace their skills the names carry a prefix (`/specnaut-task`,
 `/specnaut-ship`); `specnaut init` prints the exact commands for the harness you chose.
 
 > **Upgrading an existing project?** Some releases rename or remove things `specnaut upgrade` cannot
@@ -112,8 +112,8 @@ To upgrade, change the tag to the
 
 - Plugin: cross-project, always up-to-date, no `specnaut init` needed; the harness discovers the
   skills and agents from the plugin.
-- Binary: project-local customization, short slash-commands (`/specnaut plan`, `/ship`), backlog +
-  hooks support.
+- Binary: project-local customization, short slash-commands (`/task plan`, `/ship`), backlog + hooks
+  support.
 
 Most teams use both. See [the docs](https://specnaut.com) for the full boundary table and
 per-harness tool-mapping references. The website and documentation source live in their own repo,
@@ -127,9 +127,8 @@ chain's progress while the autopilot runs. It sits in a band above the prompt. `
 pane with seven days of history, per day and per branch, kept on your machine.
 
 It also stops the autopilot **cleanly**: when a window reaches 90%, the chain halts before
-`implement`, `review` or `merge` instead of being cut off halfway, and resumes with
-`/specnaut <phase>` after the reset. Projects scaffolded for Claude Code offer to install it; to
-install it by hand:
+`implement`, `review` or `merge` instead of being cut off halfway, and resumes with `/task <phase>`
+after the reset. Projects scaffolded for Claude Code offer to install it; to install it by hand:
 
 ```text
 /plugin marketplace add specnaut/specnaut-marketplace
@@ -216,10 +215,10 @@ files that are now missing and tell you how to recover them.
 
 ### Adding to a bundled phase without preserving it
 
-Most customisations of a `/specnaut` or `/ship` phase are one project-specific rule — "run the
-migration check before tagging". Preserving the whole phase doc for that freezes it: it stops
-receiving upstream changes, and every one has to be merged in by hand from then on. Write the rule
-in a phase addendum instead — a file your project owns at `.specnaut/addenda/<skill>/<phase>.md`:
+Most customisations of a `/task` or `/ship` phase are one project-specific rule — "run the migration
+check before tagging". Preserving the whole phase doc for that freezes it: it stops receiving
+upstream changes, and every one has to be merged in by hand from then on. Write the rule in a phase
+addendum instead — a file your project owns at `.specnaut/addenda/<skill>/<phase>.md`:
 
 ```markdown
 <!-- .specnaut/addenda/ship/release.md -->

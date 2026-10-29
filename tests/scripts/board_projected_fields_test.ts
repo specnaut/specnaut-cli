@@ -34,7 +34,7 @@ import { fromFileUrl } from "@std/path";
  * board may own a field of the same name without projecting it).
  */
 
-const GITHUB_DIR = "../../templates/core/skills/board/scripts/github";
+const GITHUB_DIR = "../../templates/core/skills/task/scripts/github";
 
 function scriptPath(rel: string): string {
   return fromFileUrl(new URL(rel, import.meta.url));

@@ -79,7 +79,7 @@ const MUST_SURVIVE: ReadonlyArray<
   },
   {
     label: "implement.md",
-    body: () => entry("phase", "specnaut", "implement.md"),
+    body: () => entry("phase", "task", "implement.md"),
     sentences: [
       // An eval-refusal rule on a contributor-writable file, on a path that
       // terminates in EXECUTE_COMMAND. It is stated twice, and collapsing the
@@ -119,20 +119,23 @@ const MUST_SURVIVE: ReadonlyArray<
     sentences: ["Specnaut"],
   },
   {
-    label: "board/spec-autogen.md",
-    body: () => entry("backlog-doc", "board", "spec-autogen.md"),
+    label: "task/spec-autogen.md",
+    body: () => entry("backlog-doc", "task", "spec-autogen.md"),
     sentences: [
       "**Never fatal to task creation**",
     ],
   },
   {
-    label: "board/SKILL.md",
-    body: () => entry("backlog-skill", "board", null),
+    // `board/SKILL.md` until cli#683, when the backlog verbs' bodies moved to
+    // `task/backlog.md` and the rule moved with them — so the assertion moved
+    // too, rather than being deleted for failing where the text no longer is.
+    label: "task/backlog.md",
+    body: () => entry("backlog-doc", "task", "backlog.md"),
     sentences: [
       // The skill's scope-confinement rule, on an agent holding forge
       // credentials. It sits in the file's tail — the first thing a truncation
       // would eat.
-      "this skill is wired to this project only",
+      "The user asks about another project's backlog — these verbs are wired to this project only.",
     ],
   },
 ];

@@ -175,6 +175,6 @@ Overall: PASS | FAIL
 
 If Overall = PASS, surface the verdict summary defined in
 `phases/auto-chain.md`, then follow the project's merge mode from that file:
-under `auto` (the default) invoke `/specnaut merge` in the same turn; under
+under `auto` (the default) invoke `/task merge` in the same turn; under
 `manual` ask for merge confirmation and invoke it on "yes". If FAIL, stop and
 report to the user.

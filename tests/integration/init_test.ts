@@ -38,19 +38,6 @@ Deno.test("specnaut init <name> writes a complete tree", async () => {
     // #457: the per-feature artefact templates are down to plan + tasks.
     assertEquals(await exists(join(root, ".specnaut/templates/spec-template.md")), false);
     assertEquals(await exists(join(root, ".specnaut/templates/checklist-template.md")), false);
-    // The phase chain lives in the specnaut router skill (#455 / #456).
-    assertEquals(
-      await exists(join(root, ".claude/skills/specnaut/SKILL.md")),
-      true,
-    );
-    assertEquals(
-      await exists(join(root, ".claude/skills/specnaut/phases/plan.md")),
-      true,
-    );
-    assertEquals(
-      await exists(join(root, ".claude/skills/board/groom.md")),
-      true,
-    );
     // #534: the auto-invoke alias is retired, not scaffolded.
     assertEquals(
       await exists(join(root, ".claude/skills/specnaut-review/SKILL.md")),
@@ -66,7 +53,7 @@ Deno.test("specnaut init <name> writes a complete tree", async () => {
       const gone of ["brainstorm", "specify", "clarify", "analyze", "checklist", "list-skills"]
     ) {
       assertEquals(
-        await exists(join(root, `.claude/skills/specnaut/phases/${gone}.md`)),
+        await exists(join(root, `.claude/skills/task/phases/${gone}.md`)),
         false,
         `removed phase must NOT scaffold: ${gone}.md`,
       );
@@ -87,7 +74,7 @@ Deno.test("specnaut init <name> writes a complete tree", async () => {
     assertEquals(await exists(join(root, ".claude/skills/specnaut-auto/SKILL.md")), false);
 
     // #533: no commands ship at all — both shims are retired and the skills
-    // register `/board` and `/specnaut` from their own frontmatter. The
+    // register `/task` and `/specnaut` from their own frontmatter. The
     // directory itself is not created, which is what a count would miss.
     assertEquals(await exists(join(root, ".claude/commands")), false);
     // 15 agent .md files (11 original + performance-expert #304 +
@@ -183,15 +170,16 @@ Deno.test("scaffolded product-owner agent documents epic / sub-task support", as
   });
 });
 
-Deno.test("specnaut init's Next steps nudges towards /specnaut-constitution first", async () => {
+Deno.test("specnaut init's Next steps nudges towards /task constitution first", async () => {
   await withTempDir(async (dir) => {
     const { code, stdout } = await runSpecnaut(["init", "demo", "--no-git"], { cwd: dir });
     assertEquals(code, 0);
     assertStringIncludes(stdout, "Next steps:");
-    assertStringIncludes(stdout, "/specnaut constitution");
-    // The constitution step must come before /specnaut plan in the rendered list.
-    const constitutionIdx = stdout.indexOf("/specnaut constitution");
-    const planIdx = stdout.indexOf("/specnaut plan");
+    assertStringIncludes(stdout, "/task constitution");
+    assertStringIncludes(stdout, "/task add");
+    // The constitution step must come before /task plan in the rendered list.
+    const constitutionIdx = stdout.indexOf("/task constitution");
+    const planIdx = stdout.indexOf("/task plan");
     assertEquals(
       constitutionIdx > 0 && constitutionIdx < planIdx,
       true,
@@ -377,74 +365,6 @@ Deno.test("specnaut init --here on a project with existing constitution.md leave
     assertEquals(after, userConstitution);
   });
 });
-
-// ── Consolidated router skill (v1.0.0) ──────────────────────────────────
-
-Deno.test("specnaut init scaffolds the consolidated router skill + its phase docs", async () => {
-  await withTempDir(async (dir) => {
-    const { code } = await runSpecnaut(
-      ["init", "demo", "--no-git", "--ai", "claude", "--backlog", "local"],
-      { cwd: dir },
-    );
-    assertEquals(code, 0);
-
-    const root = join(dir, "demo");
-    assertEquals(
-      await exists(join(root, ".claude/skills/specnaut/SKILL.md")),
-      true,
-    );
-    for (
-      const name of [
-        "plan",
-        "plan-audits",
-        "tasks",
-        "implement",
-        "review",
-        "merge",
-        "constitution",
-      ]
-    ) {
-      assertEquals(
-        await exists(
-          join(root, `.claude/skills/specnaut/phases/${name}.md`),
-        ),
-        true,
-        `expected .claude/skills/specnaut/phases/${name}.md`,
-      );
-      // Old per-phase folders are gone post-consolidation.
-      if (name !== "review") {
-        assertEquals(
-          await exists(join(root, `.claude/skills/specnaut-${name}/SKILL.md`)),
-          false,
-          `legacy per-phase folder must NOT exist`,
-        );
-      }
-    }
-    // Old standalone groom skill removed.
-    assertEquals(
-      await exists(join(root, ".claude/skills/specnaut-groom/SKILL.md")),
-      false,
-    );
-    // #534: retired.
-    assertEquals(
-      await exists(join(root, ".claude/skills/specnaut-review/SKILL.md")),
-      false,
-    );
-    const routerContent = await Deno.readTextFile(
-      join(root, ".claude/skills/specnaut/SKILL.md"),
-    );
-    assertStringIncludes(routerContent, "name: specnaut");
-    // The router must NOT carry `disable-model-invocation: true` —
-    // /specnaut auto-chains phases via `Skill(specnaut, "<phase>")`,
-    // and that flag would block the chain on Claude Code (#166).
-    assertEquals(
-      routerContent.includes("disable-model-invocation: true"),
-      false,
-    );
-  });
-});
-
-// Since cli#680 `.claude/CLAUDE.md` is a link to AGENTS.md: reading it reads
 // what Claude Code loads, the root AGENTS.md as rendered for Claude.
 Deno.test("scaffolded .claude/CLAUDE.md documents /goal", async () => {
   await withTempDir(async (dir) => {

@@ -103,9 +103,9 @@ The complete answer to this class is mutation testing — deliberately breaking 
 prove each assertion goes red. That is what found all three of #546's constant-true assertions, and
 it is a far larger ticket.
 
-The surface map lives in the `SURFACES` array in `audit.sh`; each entry is
-`<glob>|<smoke-script-list>|<kind>`. The stale scan walks the smoke scripts it enumerates from the
-smoke directory itself — there is no second list to keep in step — extracts each `.claude/…` /
+The surface map lives in the `SURFACES` array in `_surfaces.sh`, sourced by `audit.sh`; each entry
+is `<glob>|<smoke-script-list>|<kind>`. The stale scan walks the smoke scripts it enumerates from
+the smoke directory itself — there is no second list to keep in step — extracts each `.claude/…` /
 `.specnaut/…` token, and maps it back to a candidate under `templates/core/` or
 `templates/harness-specific/<harness>/`. Runtime-only paths (`installed.lock`, `specs/`, `logs/`, …)
 are skipped explicitly, and a path a smoke only ever asserts the **absence** of is not stale — that

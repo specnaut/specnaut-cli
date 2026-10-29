@@ -15,7 +15,7 @@ import { fromFileUrl, join } from "@std/path";
  */
 
 const SCRIPTS = fromFileUrl(
-  new URL("../../templates/core/skills/board/scripts/", import.meta.url),
+  new URL("../../templates/core/skills/task/scripts/", import.meta.url),
 );
 
 type Files = Record<string, unknown>;

@@ -8,7 +8,7 @@ this project's hygiene needs.
 
 Run a hygiene pass on this Specnaut project:
 
-1. Invoke the `/board groom` skill — it grooms the backlog, surfaces
+1. Invoke the `/task groom` skill — it grooms the backlog, surfaces
    stale PRs, and flags orphan specs.
 2. If anything actionable came out of the pass, summarize it concisely
    so the human reading the loop output can decide what to do.
@@ -19,7 +19,7 @@ Run a hygiene pass on this Specnaut project:
 
 - **Active development**: `/loop 1h` — frequent grooming during a sprint.
 - **Quiet projects**: `/loop 12h` or `/loop 24h` — daily cadence.
-- **One-off check**: just `/board groom` (no loop) — runs once and exits.
+- **One-off check**: just `/task groom` (no loop) — runs once and exits.
 
 ## Customizing further
 

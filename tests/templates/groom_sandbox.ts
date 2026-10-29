@@ -14,7 +14,7 @@ import { DELIMITER, fromFileUrl, join } from "@std/path";
 
 export const TEMPLATES = fromFileUrl(new URL("../../templates/", import.meta.url));
 export const RULES = join(TEMPLATES, "core/specnaut/scripts/bash/groom-rules.sh");
-export const BOARD_SCRIPTS = join(TEMPLATES, "core/skills/board/scripts");
+export const BOARD_SCRIPTS = join(TEMPLATES, "core/skills/task/scripts");
 
 export interface Run {
   code: number;

@@ -6,8 +6,8 @@ import { skillNameFor } from "./skill_folder.ts";
  * What a user actually types, per harness.
  *
  * `init`'s "Next steps" hardcoded the Claude surface — `/specnaut plan`,
- * `/board add` — and printed it under every harness. On the harnesses that namespace
- * their skills the board is `/specnaut-board`, so the first thing a new user
+ * `/board add` (pre-7.2 addresses) — and printed it under every harness. On the harnesses that namespace
+ * their skills that was `/specnaut-board`, so the first thing a new user
  * was told to type did nothing. It is the headline command of the release,
  * named wrong in the one place a first-time user reads.
  *
@@ -15,9 +15,9 @@ import { skillNameFor } from "./skill_folder.ts";
  * `destinationFor` puts a skill and its documents:
  *
  *   - documents nested under their skill's own folder → the skill takes the
- *     document as an argument, `/specnaut plan`, `/ship tag-version`
+ *     document as an argument, `/task plan`, `/ship tag`
  *   - documents emitted as sibling files on an invocable flat layout → each is its own command,
- *     `/specnaut-plan`, `/specnaut-ship-tag-version`
+ *     `/specnaut-task-plan`, `/specnaut-ship-tag`
  *   - Copilot writes `.github/instructions/*.instructions.md`, which the agent
  *     applies by context rather than by invocation — there is no command to
  *     name, so it is `{ invocable: false }` and callers must narrow.
@@ -43,11 +43,11 @@ export type HarnessCommands =
   | { readonly invocable: false }
   | {
     readonly invocable: true;
-    /** How a top-level skill is invoked: `/board`, `/specnaut-board`, `/ship`. */
+    /** How a top-level skill is invoked: `/task`, `/specnaut-task`, `/ship`. */
     readonly skill: (name: string) => string;
     /**
      * How one of a skill's documents is invoked:
-     * `/specnaut plan`, `/ship tag-version`, `/specnaut-ship-tag-version`.
+     * `/task plan`, `/ship tag`, `/specnaut-ship-tag`.
      */
     readonly skillDoc: (owner: string, doc: string) => string;
   };

@@ -45,7 +45,9 @@ Read these rather than any list in prose — prose lists here have drifted befor
 - Harnesses: `src/cli/harnesses.ts` (`specnaut init --help` prints them).
 - Backlog backends: `src/domain/backlog_strategies/`.
 - Bundled skills, agents, templates: `templates/` and `templates/manifest.json`.
-- Phases of `/specnaut` and their order: `templates/core/skills/specnaut/SKILL.md`.
+- Verbs of `/task` (backlog, pipeline, audits) and their order:
+  `templates/core/skills/task/SKILL.md`; `/specnaut` (framework) and its retired-address table:
+  `templates/core/skills/specnaut/SKILL.md`.
 - Version and changes: `deno.json`, `gh release list -R specnaut/specnaut-cli`.
 
 ## Conventions for work on this repo

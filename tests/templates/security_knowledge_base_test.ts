@@ -184,10 +184,19 @@ Deno.test("security-expert is required to load the knowledge base first", () => 
   assertStringIncludes(agent.content, "never emit a secret value");
 });
 
-Deno.test("the sec-audit dispatch prompt names the knowledge base", () => {
-  const skill = CORE_BUNDLE.find((e) => e.category === "skill" && e.name === "sec-audit");
-  assert(skill, "sec-audit skill missing from the bundle");
-  assertStringIncludes(skill.content, ".specnaut/memory/security/00-triage.md");
+Deno.test("the security seat's audit dispatch names the knowledge base", () => {
+  // `/task audit` (formerly `/sec-audit`) must hand the triage gate to the
+  // security seat itself: an agent that skips it produces a report full of
+  // unreachable pattern matches. Pinned to the Security bullet, so moving the
+  // path under another seat goes red.
+  const doc = CORE_BUNDLE.find(
+    (e) => e.category === "phase" && e.name === "task" && e.suffix === "audit.md",
+  );
+  assert(doc, "the `task` audit phase is missing from the bundle");
+  const seat = doc.content.split("\n- ").find((b) => b.startsWith("**Security**"));
+  assert(seat, "audit.md carries no Security knowledge-base instruction");
+  assertStringIncludes(seat, ".specnaut/memory/security/00-triage.md");
+  assertStringIncludes(seat, "finding format defined in `00-triage.md`");
 });
 
 Deno.test("Claude gets the security-guidance plugin extension points", () => {

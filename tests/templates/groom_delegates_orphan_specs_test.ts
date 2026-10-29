@@ -2,7 +2,8 @@ import { assert, assertEquals, assertStringIncludes } from "@std/assert";
 import { fromFileUrl } from "@std/path";
 
 /**
- * The bundled `/loop` prompt promised that `/board groom` "flags orphan specs".
+ * The bundled `/loop` prompt promised that the grooming pass (`/board groom`
+ * then, `/task groom` since cli#683) "flags orphan specs".
  * `groom.md` said the check was not its business and had moved. No line in it
  * told anyone to read the file it named, and `auto-chain.md` — believing
  * itself reachable — said to run the walk "from a grooming pass".
@@ -19,8 +20,8 @@ import { fromFileUrl } from "@std/path";
  */
 
 const CORE = fromFileUrl(new URL("../../templates/core/skills/", import.meta.url));
-const GROOM = `${CORE}board/groom.md`;
-const AUTO_CHAIN = `${CORE}specnaut/phases/auto-chain.md`;
+const GROOM = `${CORE}task/groom.md`;
+const AUTO_CHAIN = `${CORE}task/phases/auto-chain.md`;
 
 const NUMBER_WORDS: Record<string, number> = {
   one: 1,
@@ -61,7 +62,17 @@ Deno.test("groom: the delegation is gated on the project keeping specs locally",
 Deno.test("groom: the walk is delegated, never copied", async () => {
   // The logic stays in one place. A second copy is the half that rots.
   const src = await Deno.readTextFile(GROOM);
-  for (const leaked of ["needs `/specnaut tasks`", "needs `/specnaut implement`", "spec.md"]) {
+  // The walk's own flag strings, at the address auto-chain.md spells them now
+  // and at the one it spelled before cli#683 — a copy taken from either is a copy.
+  for (
+    const leaked of [
+      "needs `/task tasks`",
+      "needs `/task implement`",
+      "needs `/specnaut tasks`",
+      "needs `/specnaut implement`",
+      "spec.md",
+    ]
+  ) {
     assert(
       !src.includes(leaked),
       `the orphan-spec walk was copied into groom.md (found ${leaked}) — delegate, do not duplicate`,
@@ -99,7 +110,7 @@ Deno.test("auto-chain: its trigger sentence names a caller that exists", async (
   // reached it. The claim is now checkable, so check it.
   const auto = await Deno.readTextFile(AUTO_CHAIN);
   const sentence = auto.slice(auto.indexOf("Run it when asked to audit"));
-  const named = sentence.match(/`(board\/groom\.md)`/);
+  const named = sentence.match(/`(task\/groom\.md)`/);
   assert(named, "auto-chain.md does not name the caller its trigger sentence claims");
 
   const groom = await Deno.readTextFile(GROOM);
@@ -110,14 +121,18 @@ Deno.test("auto-chain: its trigger sentence names a caller that exists", async (
   );
 });
 
-Deno.test("groom: /board does not reclaim ownership by running the check", async () => {
-  // The ownership line stands: the walk lives on the specnaut side. Both
-  // skills' "which owns what" prose must keep saying so while the delegation
-  // exists, or the next reader moves the logic to match the caller.
-  const boardSkill = await Deno.readTextFile(`${CORE}board/SKILL.md`);
-  assertStringIncludes(boardSkill, "not owned here");
-  assertStringIncludes(boardSkill, "phases/auto-chain.md");
+Deno.test("groom: the grooming pass does not reclaim ownership by running the check", async () => {
+  // The ownership line stands: the walk lives in the pipeline's contract doc,
+  // not in the grooming pass that calls it. Since cli#683 both sit under
+  // `/task`, so the line is drawn between the two documents rather than two
+  // skills — and both must keep saying so while the delegation exists, or the
+  // next reader moves the logic to match the caller.
+  const groom = (await Deno.readTextFile(GROOM)).replace(/\s+/g, " ");
+  assertStringIncludes(groom, "Orphan **spec** detection is not owned here");
 
-  const specnautSkill = await Deno.readTextFile(`${CORE}specnaut/SKILL.md`);
-  assertStringIncludes(specnautSkill, "phases/auto-chain.md");
+  // The router lists auto-chain.md as a contract doc of the chain — the side
+  // that owns the walk.
+  const taskSkill = await Deno.readTextFile(`${CORE}task/SKILL.md`);
+  assertStringIncludes(taskSkill, "phases/auto-chain.md");
+  assertStringIncludes(taskSkill, "**contract docs, not verbs**");
 });

@@ -43,7 +43,7 @@ Deno.test("gates.yml: fast_gate is a static pass, the suite is in full_gate", ()
 });
 
 Deno.test("quality-gates.md names three moments, and fast is static", () => {
-  const doc = read("skills/specnaut/phases/quality-gates.md");
+  const doc = read("skills/task/phases/quality-gates.md");
   const table = section(doc, "## Three moments, and what runs at each");
   assertStringIncludes(table, "| **Every commit**");
   assertStringIncludes(table, "**No unit suite.**");
@@ -61,7 +61,7 @@ Deno.test("quality-gates.md names three moments, and fast is static", () => {
 });
 
 Deno.test("review.md runs the test command once per item and reports the skip", () => {
-  const doc = read("skills/specnaut/phases/review.md");
+  const doc = read("skills/task/phases/review.md");
   const phase2 = section(doc, "## Phase 2 — Quality gates (auto-detected)");
   assertStringIncludes(phase2, "**do not\nrun the test command**");
   assertStringIncludes(phase2, "never as PASS");

@@ -81,7 +81,7 @@ while [ $i -le $# ]; do
             echo "  --json              Output in JSON format"
             echo "  --dry-run           Compute branch name and paths without creating branches, directories, or files"
             echo "  --branch-only       Create ONLY the git branch — skip the spec directory + spec file."
-            echo "                      Used by cloud-mode /specnaut implement, where the spec lives on"
+            echo "                      Used by cloud-mode /task implement, where the spec lives on"
             echo "                      SpecNaut Cloud and the branch is created at implement (not specify)."
             echo "  --allow-existing-branch  Switch to branch if it already exists instead of failing"
             echo "  --short-name <name> Provide a custom short name (2-4 words) for the branch"
@@ -89,7 +89,7 @@ while [ $i -le $# ]; do
             echo "  --timestamp         Use timestamp prefix (YYYYMMDD-HHMMSS) instead of sequential numbering"
             echo "  --issue <id>        Link this feature to a backlog issue (id is a positive integer);"
             echo "                      surfaces in JSON output and is persisted to .specnaut/feature.json"
-            echo "                      so /specnaut merge can close the loop on the project board."
+            echo "                      so /task merge can close the loop on the project board."
             echo "  --help, -h          Show this help message"
             echo ""
             echo "Examples:"
@@ -539,7 +539,7 @@ if [ "$DRY_RUN" != true ]; then
     fi
 
     # --branch-only: create the branch above but skip the spec directory + file.
-    # In cloud spec mode the spec lives on SpecNaut Cloud, so /specnaut implement
+    # In cloud spec mode the spec lives on SpecNaut Cloud, so /task implement
     # only needs the branch (the decoupling point — no local .specnaut/specs/ dir).
     if [ "$BRANCH_ONLY" != true ]; then
         mkdir -p "$FEATURE_DIR"

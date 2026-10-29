@@ -134,8 +134,13 @@ Deno.test("dependency-expert degrades cleanly when installed as a plugin", () =>
 
 Deno.test("the dependency dispatch surface names the domain file", () => {
   // A Step 0 the dispatch prompt never mentions is a Step 0 that gets skipped
-  // under load.
-  const skill = CORE_BUNDLE.find((e) => e.category === "skill" && e.name === "dep-audit");
-  assert(skill, "dep-audit skill is missing from the bundle");
-  assertStringIncludes(skill.content, `memory/security/${DOMAIN_FILE}`);
+  // under load. The surface is `/task audit` (formerly `/dep-audit`), and the
+  // instruction must sit on the Dependency seat's own bullet.
+  const doc = CORE_BUNDLE.find(
+    (e) => e.category === "phase" && e.name === "task" && e.suffix === "audit.md",
+  );
+  assert(doc, "the `task` audit phase is missing from the bundle");
+  const seat = doc.content.split("\n- ").find((b) => b.startsWith("**Dependency**"));
+  assert(seat, "audit.md carries no Dependency knowledge-base instruction");
+  assertStringIncludes(seat, `.specnaut/memory/security/${DOMAIN_FILE}`);
 });

@@ -1,5 +1,6 @@
 import { assertEquals } from "@std/assert";
 import { CORE_BUNDLE, HARNESS_STATIC } from "../../src/templates_bundle.ts";
+import { skillFolderName } from "../../src/infrastructure/harness/skill_folder.ts";
 
 /**
  * A shipped file must not name a slash command the bundle does not emit.
@@ -16,7 +17,7 @@ import { CORE_BUNDLE, HARNESS_STATIC } from "../../src/templates_bundle.ts";
  *
  * Scoped to the `specnaut-` prefixed form on purpose. That form is produced
  * entirely by `skillFolderName`, so the valid set is derivable and the check
- * has no judgement in it. Bare `/specnaut <phase>` is a subcommand, not a
+ * has no judgement in it. Bare `/task <verb>` is a subcommand, not a
  * folder, and harness built-ins like `/loop` are none of our business.
  */
 
@@ -42,14 +43,18 @@ const ENTRIES: Entry[] = [
   ),
 ];
 
-/** Mirrors `skillFolderName` — the only thing that names these folders. */
+/**
+ * Asks `skillFolderName` — the only thing that names these folders — rather
+ * than mirroring its rule here: a mirror is a second spelling of the rule, and
+ * it is the spelling that goes stale.
+ */
 function emittedNames(): Set<string> {
   const out = new Set<string>(["specnaut"]);
-  for (const e of CORE_BUNDLE as ReadonlyArray<Entry>) {
+  for (const e of CORE_BUNDLE) {
     if (e.category === "skill" || e.category === "backlog-skill") {
-      out.add(e.name.startsWith("specnaut") ? e.name : `specnaut-${e.name}`);
+      out.add(skillFolderName(e));
     } else if (e.category === "agent") {
-      out.add(`specnaut-agent-${e.name}`);
+      out.add(skillFolderName(e));
       // Claude keeps agents unprefixed in `.claude/agents/`, and the docs
       // reference them by that bare name.
       out.add(e.name);
@@ -85,6 +90,18 @@ Deno.test("the check is anchored to something that exists", () => {
   // input at all. Two spot-checks that the set is real.
   const valid = emittedNames();
   assertEquals(valid.has("specnaut"), true, "the router must be in the set");
-  assertEquals(valid.has("specnaut-board"), true, "the board skill must be in the set");
-  assertEquals(valid.has("specnaut-backlog"), false, "the old name must be gone");
+  assertEquals(valid.has("specnaut-task"), true, "the task skill must be in the set");
+  assertEquals(valid.has("specnaut-ship"), true, "the ship skill must be in the set");
+  // Retired names must be gone — `backlog` before #571, `board` and the
+  // audit skills since cli#683.
+  for (
+    const gone of [
+      "specnaut-backlog",
+      "specnaut-board",
+      "specnaut-code-audit",
+      "specnaut-sec-audit",
+    ]
+  ) {
+    assertEquals(valid.has(gone), false, `${gone} is retired and must not be emitted`);
+  }
 });

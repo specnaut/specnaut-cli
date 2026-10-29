@@ -8,81 +8,81 @@
     },
     {
       "category": "phase",
-      "name": "specnaut",
+      "name": "task",
       "suffix": "plan.md",
-      "source": "core/skills/specnaut/phases/plan.md"
+      "source": "core/skills/task/phases/plan.md"
     },
     {
       "category": "phase",
-      "name": "specnaut",
+      "name": "task",
       "suffix": "plan-audits.md",
-      "source": "core/skills/specnaut/phases/plan-audits.md"
+      "source": "core/skills/task/phases/plan-audits.md"
     },
     {
       "category": "phase",
-      "name": "specnaut",
+      "name": "task",
       "suffix": "tasks.md",
-      "source": "core/skills/specnaut/phases/tasks.md"
+      "source": "core/skills/task/phases/tasks.md"
     },
     {
       "category": "phase",
-      "name": "specnaut",
+      "name": "task",
       "suffix": "implement.md",
-      "source": "core/skills/specnaut/phases/implement.md"
+      "source": "core/skills/task/phases/implement.md"
     },
     {
       "category": "phase",
-      "name": "specnaut",
+      "name": "task",
       "suffix": "epic-commits.md",
-      "source": "core/skills/specnaut/phases/epic-commits.md"
+      "source": "core/skills/task/phases/epic-commits.md"
     },
     {
       "category": "phase",
-      "name": "specnaut",
+      "name": "task",
       "suffix": "quality-gates.md",
-      "source": "core/skills/specnaut/phases/quality-gates.md"
+      "source": "core/skills/task/phases/quality-gates.md"
     },
     {
       "category": "phase",
-      "name": "specnaut",
+      "name": "task",
       "suffix": "epic-fixups.md",
-      "source": "core/skills/specnaut/phases/epic-fixups.md"
+      "source": "core/skills/task/phases/epic-fixups.md"
     },
     {
       "category": "phase",
-      "name": "specnaut",
+      "name": "task",
       "suffix": "merge-close.md",
-      "source": "core/skills/specnaut/phases/merge-close.md"
+      "source": "core/skills/task/phases/merge-close.md"
     },
     {
       "category": "phase",
-      "name": "specnaut",
+      "name": "task",
       "suffix": "epic-loop.md",
-      "source": "core/skills/specnaut/phases/epic-loop.md"
+      "source": "core/skills/task/phases/epic-loop.md"
     },
     {
       "category": "phase",
-      "name": "specnaut",
+      "name": "task",
       "suffix": "review.md",
-      "source": "core/skills/specnaut/phases/review.md"
+      "source": "core/skills/task/phases/review.md"
     },
     {
       "category": "phase",
-      "name": "specnaut",
+      "name": "task",
       "suffix": "merge.md",
-      "source": "core/skills/specnaut/phases/merge.md"
+      "source": "core/skills/task/phases/merge.md"
     },
     {
       "category": "phase",
-      "name": "specnaut",
+      "name": "task",
       "suffix": "merge-squash.md",
-      "source": "core/skills/specnaut/phases/merge-squash.md"
+      "source": "core/skills/task/phases/merge-squash.md"
     },
     {
       "category": "phase",
-      "name": "specnaut",
+      "name": "task",
       "suffix": "constitution.md",
-      "source": "core/skills/specnaut/phases/constitution.md"
+      "source": "core/skills/task/phases/constitution.md"
     },
     {
       "category": "phase",
@@ -91,22 +91,46 @@
       "source": "core/skills/specnaut/phases/upgrade.md"
     },
     {
+      "category": "phase",
+      "name": "specnaut",
+      "suffix": "doc.md",
+      "source": "core/skills/specnaut/phases/doc.md"
+    },
+    {
+      "category": "phase",
+      "name": "specnaut",
+      "suffix": "list.md",
+      "source": "core/skills/specnaut/phases/list.md"
+    },
+    {
+      "category": "phase",
+      "name": "task",
+      "suffix": "audit.md",
+      "source": "core/skills/task/phases/audit.md"
+    },
+    {
       "category": "backlog-doc",
-      "name": "board",
+      "name": "task",
+      "suffix": "backlog.md",
+      "source": "core/skills/task/backlog.md"
+    },
+    {
+      "category": "backlog-doc",
+      "name": "task",
       "suffix": "groom.md",
-      "source": "core/skills/board/groom.md"
+      "source": "core/skills/task/groom.md"
     },
     {
       "category": "backlog-doc",
-      "name": "board",
+      "name": "task",
       "suffix": "groom-report.md",
-      "source": "core/skills/board/groom-report.md"
+      "source": "core/skills/task/groom-report.md"
     },
     {
       "category": "backlog-doc",
-      "name": "board",
+      "name": "task",
       "suffix": "spec-autogen.md",
-      "source": "core/skills/board/spec-autogen.md"
+      "source": "core/skills/task/spec-autogen.md"
     },
     {
       "category": "skill",
@@ -127,9 +151,9 @@
     },
     {
       "category": "phase",
-      "name": "specnaut",
+      "name": "task",
       "suffix": "auto-chain.md",
-      "source": "core/skills/specnaut/phases/auto-chain.md"
+      "source": "core/skills/task/phases/auto-chain.md"
     },
     {
       "category": "phase-script",
@@ -329,14 +353,14 @@
     },
     {
       "category": "backlog-skill",
-      "name": "board",
-      "source": "core/skills/board/SKILL.md"
+      "name": "task",
+      "source": "core/skills/task/SKILL.md"
     },
     {
       "category": "backlog-script",
       "name": "_config",
       "suffix": "_config.sh",
-      "source": "core/skills/board/scripts/local/_config.sh",
+      "source": "core/skills/task/scripts/local/_config.sh",
       "executable": true,
       "backend": "local"
     },
@@ -344,7 +368,7 @@
       "category": "backlog-script",
       "name": "list",
       "suffix": "list.sh",
-      "source": "core/skills/board/scripts/local/list.sh",
+      "source": "core/skills/task/scripts/local/list.sh",
       "executable": true,
       "backend": "local"
     },
@@ -352,7 +376,7 @@
       "category": "backlog-script",
       "name": "view",
       "suffix": "view.sh",
-      "source": "core/skills/board/scripts/local/view.sh",
+      "source": "core/skills/task/scripts/local/view.sh",
       "executable": true,
       "backend": "local"
     },
@@ -360,7 +384,7 @@
       "category": "backlog-script",
       "name": "groom-verify",
       "suffix": "groom-verify.sh",
-      "source": "core/skills/board/scripts/local/groom-verify.sh",
+      "source": "core/skills/task/scripts/local/groom-verify.sh",
       "executable": true,
       "backend": "local"
     },
@@ -368,7 +392,7 @@
       "category": "backlog-script",
       "name": "add",
       "suffix": "add.sh",
-      "source": "core/skills/board/scripts/local/add.sh",
+      "source": "core/skills/task/scripts/local/add.sh",
       "executable": true,
       "backend": "local"
     },
@@ -376,7 +400,7 @@
       "category": "backlog-script",
       "name": "move",
       "suffix": "move.sh",
-      "source": "core/skills/board/scripts/local/move.sh",
+      "source": "core/skills/task/scripts/local/move.sh",
       "executable": true,
       "backend": "local"
     },
@@ -384,7 +408,7 @@
       "category": "backlog-script",
       "name": "clarify-comment",
       "suffix": "clarify-comment.sh",
-      "source": "core/skills/board/scripts/local/clarify-comment.sh",
+      "source": "core/skills/task/scripts/local/clarify-comment.sh",
       "executable": true,
       "backend": "local"
     },
@@ -392,7 +416,7 @@
       "category": "backlog-script",
       "name": "render-index",
       "suffix": "render-index.sh",
-      "source": "core/skills/board/scripts/local/render-index.sh",
+      "source": "core/skills/task/scripts/local/render-index.sh",
       "executable": true,
       "backend": "local"
     },
@@ -400,7 +424,7 @@
       "category": "backlog-script",
       "name": "propagate-parent-status",
       "suffix": "propagate-parent-status.sh",
-      "source": "core/skills/board/scripts/local/propagate-parent-status.sh",
+      "source": "core/skills/task/scripts/local/propagate-parent-status.sh",
       "executable": true,
       "backend": "local"
     },
@@ -408,7 +432,7 @@
       "category": "backlog-script",
       "name": "propagate-parent-status",
       "suffix": "cascade-check.sh",
-      "source": "core/skills/board/scripts/local/cascade-check.sh",
+      "source": "core/skills/task/scripts/local/cascade-check.sh",
       "executable": true,
       "backend": "local"
     },
@@ -416,7 +440,7 @@
       "category": "backlog-script",
       "name": "propagate-parent-status",
       "suffix": "parent-of.sh",
-      "source": "core/skills/board/scripts/local/parent-of.sh",
+      "source": "core/skills/task/scripts/local/parent-of.sh",
       "executable": true,
       "backend": "local"
     },
@@ -424,7 +448,7 @@
       "category": "backlog-script",
       "name": "_config",
       "suffix": "_config.sh",
-      "source": "core/skills/board/scripts/github/_config.sh",
+      "source": "core/skills/task/scripts/github/_config.sh",
       "executable": true,
       "backend": "github"
     },
@@ -432,7 +456,7 @@
       "category": "backlog-script",
       "name": "list",
       "suffix": "list.sh",
-      "source": "core/skills/board/scripts/github/list.sh",
+      "source": "core/skills/task/scripts/github/list.sh",
       "executable": true,
       "backend": "github"
     },
@@ -440,7 +464,7 @@
       "category": "backlog-script",
       "name": "view",
       "suffix": "view.sh",
-      "source": "core/skills/board/scripts/github/view.sh",
+      "source": "core/skills/task/scripts/github/view.sh",
       "executable": true,
       "backend": "github"
     },
@@ -448,7 +472,7 @@
       "category": "backlog-script",
       "name": "groom-verify",
       "suffix": "groom-verify.sh",
-      "source": "core/skills/board/scripts/github/groom-verify.sh",
+      "source": "core/skills/task/scripts/github/groom-verify.sh",
       "executable": true,
       "backend": "github"
     },
@@ -456,7 +480,7 @@
       "category": "backlog-script",
       "name": "add",
       "suffix": "add.sh",
-      "source": "core/skills/board/scripts/github/add.sh",
+      "source": "core/skills/task/scripts/github/add.sh",
       "executable": true,
       "backend": "github"
     },
@@ -464,7 +488,7 @@
       "category": "backlog-script",
       "name": "move",
       "suffix": "move.sh",
-      "source": "core/skills/board/scripts/github/move.sh",
+      "source": "core/skills/task/scripts/github/move.sh",
       "executable": true,
       "backend": "github"
     },
@@ -472,7 +496,7 @@
       "category": "backlog-script",
       "name": "sweep-closed",
       "suffix": "sweep-closed.sh",
-      "source": "core/skills/board/scripts/github/sweep-closed.sh",
+      "source": "core/skills/task/scripts/github/sweep-closed.sh",
       "executable": true,
       "backend": "github"
     },
@@ -480,7 +504,7 @@
       "category": "backlog-script",
       "name": "move-batch",
       "suffix": "move-batch.sh",
-      "source": "core/skills/board/scripts/github/move-batch.sh",
+      "source": "core/skills/task/scripts/github/move-batch.sh",
       "executable": true,
       "backend": "github"
     },
@@ -488,7 +512,7 @@
       "category": "backlog-script",
       "name": "groom-columns",
       "suffix": "groom-columns.sh",
-      "source": "core/skills/board/scripts/github/groom-columns.sh",
+      "source": "core/skills/task/scripts/github/groom-columns.sh",
       "executable": true,
       "backend": "github"
     },
@@ -496,7 +520,7 @@
       "category": "backlog-script",
       "name": "clarify-comment",
       "suffix": "clarify-comment.sh",
-      "source": "core/skills/board/scripts/github/clarify-comment.sh",
+      "source": "core/skills/task/scripts/github/clarify-comment.sh",
       "executable": true,
       "backend": "github"
     },
@@ -504,7 +528,7 @@
       "category": "backlog-script",
       "name": "detect-fields",
       "suffix": "detect-fields.sh",
-      "source": "core/skills/board/scripts/github/detect-fields.sh",
+      "source": "core/skills/task/scripts/github/detect-fields.sh",
       "executable": true,
       "backend": "github"
     },
@@ -512,7 +536,7 @@
       "category": "backlog-script",
       "name": "set-field",
       "suffix": "set-field.sh",
-      "source": "core/skills/board/scripts/github/set-field.sh",
+      "source": "core/skills/task/scripts/github/set-field.sh",
       "executable": true,
       "backend": "github"
     },
@@ -520,7 +544,7 @@
       "category": "backlog-script",
       "name": "ensure-labels",
       "suffix": "ensure-labels.sh",
-      "source": "core/skills/board/scripts/github/ensure-labels.sh",
+      "source": "core/skills/task/scripts/github/ensure-labels.sh",
       "executable": true,
       "backend": "github"
     },
@@ -528,7 +552,7 @@
       "category": "backlog-script",
       "name": "cascade-check",
       "suffix": "cascade-check.sh",
-      "source": "core/skills/board/scripts/github/cascade-check.sh",
+      "source": "core/skills/task/scripts/github/cascade-check.sh",
       "executable": true,
       "backend": "github"
     },
@@ -536,7 +560,7 @@
       "category": "backlog-script",
       "name": "cascade-check",
       "suffix": "parent-of.sh",
-      "source": "core/skills/board/scripts/github/parent-of.sh",
+      "source": "core/skills/task/scripts/github/parent-of.sh",
       "executable": true,
       "backend": "github"
     },
@@ -544,7 +568,7 @@
       "category": "backlog-script",
       "name": "propagate-parent-status",
       "suffix": "propagate-parent-status.sh",
-      "source": "core/skills/board/scripts/github/propagate-parent-status.sh",
+      "source": "core/skills/task/scripts/github/propagate-parent-status.sh",
       "executable": true,
       "backend": "github"
     },
@@ -552,7 +576,7 @@
       "category": "backlog-script",
       "name": "_config",
       "suffix": "_config.sh",
-      "source": "core/skills/board/scripts/gitlab/_config.sh",
+      "source": "core/skills/task/scripts/gitlab/_config.sh",
       "executable": true,
       "backend": "gitlab"
     },
@@ -560,7 +584,7 @@
       "category": "backlog-script",
       "name": "list",
       "suffix": "list.sh",
-      "source": "core/skills/board/scripts/gitlab/list.sh",
+      "source": "core/skills/task/scripts/gitlab/list.sh",
       "executable": true,
       "backend": "gitlab"
     },
@@ -568,7 +592,7 @@
       "category": "backlog-script",
       "name": "view",
       "suffix": "view.sh",
-      "source": "core/skills/board/scripts/gitlab/view.sh",
+      "source": "core/skills/task/scripts/gitlab/view.sh",
       "executable": true,
       "backend": "gitlab"
     },
@@ -576,7 +600,7 @@
       "category": "backlog-script",
       "name": "groom-verify",
       "suffix": "groom-verify.sh",
-      "source": "core/skills/board/scripts/gitlab/groom-verify.sh",
+      "source": "core/skills/task/scripts/gitlab/groom-verify.sh",
       "executable": true,
       "backend": "gitlab"
     },
@@ -584,7 +608,7 @@
       "category": "backlog-script",
       "name": "add",
       "suffix": "add.sh",
-      "source": "core/skills/board/scripts/gitlab/add.sh",
+      "source": "core/skills/task/scripts/gitlab/add.sh",
       "executable": true,
       "backend": "gitlab"
     },
@@ -592,7 +616,7 @@
       "category": "backlog-script",
       "name": "move",
       "suffix": "move.sh",
-      "source": "core/skills/board/scripts/gitlab/move.sh",
+      "source": "core/skills/task/scripts/gitlab/move.sh",
       "executable": true,
       "backend": "gitlab"
     },
@@ -600,7 +624,7 @@
       "category": "backlog-script",
       "name": "sweep-closed",
       "suffix": "sweep-closed.sh",
-      "source": "core/skills/board/scripts/gitlab/sweep-closed.sh",
+      "source": "core/skills/task/scripts/gitlab/sweep-closed.sh",
       "executable": true,
       "backend": "gitlab"
     },
@@ -608,7 +632,7 @@
       "category": "backlog-script",
       "name": "clarify-comment",
       "suffix": "clarify-comment.sh",
-      "source": "core/skills/board/scripts/gitlab/clarify-comment.sh",
+      "source": "core/skills/task/scripts/gitlab/clarify-comment.sh",
       "executable": true,
       "backend": "gitlab"
     },
@@ -616,7 +640,7 @@
       "category": "backlog-script",
       "name": "ensure-labels",
       "suffix": "ensure-labels.sh",
-      "source": "core/skills/board/scripts/gitlab/ensure-labels.sh",
+      "source": "core/skills/task/scripts/gitlab/ensure-labels.sh",
       "executable": true,
       "backend": "gitlab"
     },
@@ -624,7 +648,7 @@
       "category": "backlog-script",
       "name": "cascade-check",
       "suffix": "cascade-check.sh",
-      "source": "core/skills/board/scripts/gitlab/cascade-check.sh",
+      "source": "core/skills/task/scripts/gitlab/cascade-check.sh",
       "executable": true,
       "backend": "gitlab"
     },
@@ -632,7 +656,7 @@
       "category": "backlog-script",
       "name": "cascade-check",
       "suffix": "parent-of.sh",
-      "source": "core/skills/board/scripts/gitlab/parent-of.sh",
+      "source": "core/skills/task/scripts/gitlab/parent-of.sh",
       "executable": true,
       "backend": "gitlab"
     },
@@ -640,7 +664,7 @@
       "category": "backlog-script",
       "name": "_config",
       "suffix": "_config.sh",
-      "source": "core/skills/board/scripts/cloud/_config.sh",
+      "source": "core/skills/task/scripts/cloud/_config.sh",
       "executable": true,
       "backend": "cloud"
     },
@@ -648,7 +672,7 @@
       "category": "backlog-script",
       "name": "list",
       "suffix": "list.sh",
-      "source": "core/skills/board/scripts/cloud/list.sh",
+      "source": "core/skills/task/scripts/cloud/list.sh",
       "executable": true,
       "backend": "cloud"
     },
@@ -656,7 +680,7 @@
       "category": "backlog-script",
       "name": "view",
       "suffix": "view.sh",
-      "source": "core/skills/board/scripts/cloud/view.sh",
+      "source": "core/skills/task/scripts/cloud/view.sh",
       "executable": true,
       "backend": "cloud"
     },
@@ -664,7 +688,7 @@
       "category": "backlog-script",
       "name": "groom-verify",
       "suffix": "groom-verify.sh",
-      "source": "core/skills/board/scripts/cloud/groom-verify.sh",
+      "source": "core/skills/task/scripts/cloud/groom-verify.sh",
       "executable": true,
       "backend": "cloud"
     },
@@ -672,7 +696,7 @@
       "category": "backlog-script",
       "name": "add",
       "suffix": "add.sh",
-      "source": "core/skills/board/scripts/cloud/add.sh",
+      "source": "core/skills/task/scripts/cloud/add.sh",
       "executable": true,
       "backend": "cloud"
     },
@@ -680,7 +704,7 @@
       "category": "backlog-script",
       "name": "move",
       "suffix": "move.sh",
-      "source": "core/skills/board/scripts/cloud/move.sh",
+      "source": "core/skills/task/scripts/cloud/move.sh",
       "executable": true,
       "backend": "cloud"
     },
@@ -688,7 +712,7 @@
       "category": "backlog-script",
       "name": "move",
       "suffix": "cascade-check.sh",
-      "source": "core/skills/board/scripts/cloud/cascade-check.sh",
+      "source": "core/skills/task/scripts/cloud/cascade-check.sh",
       "executable": true,
       "backend": "cloud"
     },
@@ -696,7 +720,7 @@
       "category": "backlog-script",
       "name": "move",
       "suffix": "parent-of.sh",
-      "source": "core/skills/board/scripts/cloud/parent-of.sh",
+      "source": "core/skills/task/scripts/cloud/parent-of.sh",
       "executable": true,
       "backend": "cloud"
     },
@@ -704,7 +728,7 @@
       "category": "backlog-script",
       "name": "clarify-comment",
       "suffix": "clarify-comment.sh",
-      "source": "core/skills/board/scripts/cloud/clarify-comment.sh",
+      "source": "core/skills/task/scripts/cloud/clarify-comment.sh",
       "executable": true,
       "backend": "cloud"
     },
@@ -712,7 +736,7 @@
       "category": "backlog-script",
       "name": "columns",
       "suffix": "columns.sh",
-      "source": "core/skills/board/scripts/cloud/columns.sh",
+      "source": "core/skills/task/scripts/cloud/columns.sh",
       "executable": true,
       "backend": "cloud"
     },
@@ -720,46 +744,16 @@
       "category": "backlog-script",
       "name": "reconcile",
       "suffix": "reconcile.sh",
-      "source": "core/skills/board/scripts/cloud/reconcile.sh",
+      "source": "core/skills/task/scripts/cloud/reconcile.sh",
       "executable": true,
       "backend": "cloud"
     },
     {
-      "category": "skill",
-      "name": "code-audit",
-      "source": "core/skills/code-audit/SKILL.md"
-    },
-    {
       "category": "spec-root",
       "name": "specify",
-      "suffix": "scripts/code-audit/collect-audit-scope.sh",
-      "source": "core/skills/code-audit/scripts/collect-audit-scope.sh",
+      "suffix": "scripts/audit/collect-audit-scope.sh",
+      "source": "core/skills/task/scripts/collect-audit-scope.sh",
       "executable": true
-    },
-    {
-      "category": "skill",
-      "name": "arch-audit",
-      "source": "core/skills/arch-audit/SKILL.md"
-    },
-    {
-      "category": "skill",
-      "name": "sec-audit",
-      "source": "core/skills/sec-audit/SKILL.md"
-    },
-    {
-      "category": "skill",
-      "name": "perf-audit",
-      "source": "core/skills/perf-audit/SKILL.md"
-    },
-    {
-      "category": "skill",
-      "name": "dep-audit",
-      "source": "core/skills/dep-audit/SKILL.md"
-    },
-    {
-      "category": "skill",
-      "name": "a11y-audit",
-      "source": "core/skills/a11y-audit/SKILL.md"
     },
     {
       "category": "skill",

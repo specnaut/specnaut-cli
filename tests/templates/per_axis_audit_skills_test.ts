@@ -1,81 +1,130 @@
-import { assert, assertStringIncludes } from "@std/assert";
+import { assert, assertEquals, assertStringIncludes } from "@std/assert";
 import { CORE_BUNDLE } from "../../src/templates_bundle.ts";
 import type { CoreEntry } from "../../src/domain/core_bundle.ts";
 
 /**
- * Locks the per-axis audit-dispatch family (#380) into the bundle so the five
- * thin skills can't drift apart. Each `/{axis}-audit` skill binds exactly one
- * axis to its existing expert agent, documents the uniform scope args, carries
- * the disambiguation note (vs the `/code-audit` multi-seat team), and states it
- * is read-only / writes no report. The third surface it used to name — the
- * report-writing `/specnaut audit <axis>` phase — was retired in spec 034.
+ * Locks the per-axis mode of `/task audit` (#380, re-homed by spec 037).
  *
- * The five share one body template — looping the same invariants over all of
- * them is exactly how the spec wants the family policed (SC-001, SC-005, FR-008;
- * data-model.md invariants + contracts/dispatch-contract.md).
+ * The five single-axis skills (`/sec-audit`, `/arch-audit`, `/perf-audit`,
+ * `/a11y-audit`, `/dep-audit`) were folded into one verb doc,
+ * `task/phases/audit.md`, where each axis is a flag. The rules those five
+ * skills carried did not go away with their files; they moved here, and so did
+ * this lock:
+ *
+ * - each axis binds exactly one existing expert agent — now one row of the
+ *   axis table, which is the decision's single home (plan.md § 5);
+ * - every axis takes the same scope arguments;
+ * - an axis flag runs only its own seat, never a team;
+ * - the audit is read-only, and a single-axis run writes no file;
+ * - no retired address survives in the doc that replaced them.
+ *
+ * The no-flag (multi-seat) contract is locked in `code_audit_skill_test.ts`.
  */
 
-/** Skill name → its single bound expert agent (research.md axis→agent table). */
-const AXIS_SKILLS: ReadonlyArray<{ skill: string; agent: string }> = [
-  { skill: "arch-audit", agent: "architect-expert" },
-  { skill: "sec-audit", agent: "security-expert" },
-  { skill: "perf-audit", agent: "performance-expert" },
-  { skill: "dep-audit", agent: "dependency-expert" },
-  { skill: "a11y-audit", agent: "accessibility-expert" },
+/** Axis flag → its single bound expert agent. */
+const AXES: ReadonlyArray<{ flag: string; agent: string }> = [
+  { flag: "--archi", agent: "architect-expert" },
+  { flag: "--security", agent: "security-expert" },
+  { flag: "--perf", agent: "performance-expert" },
+  { flag: "--deps", agent: "dependency-expert" },
+  { flag: "--a11y", agent: "accessibility-expert" },
 ];
 
-function skillEntry(name: string): CoreEntry | undefined {
-  return CORE_BUNDLE.find((e) => e.category === "skill" && e.name === name);
+function auditDoc(): CoreEntry {
+  const e = CORE_BUNDLE.find(
+    (x) => x.category === "phase" && x.name === "task" && x.suffix === "audit.md",
+  );
+  assert(e, "expected the `task` phase audit.md in CORE_BUNDLE");
+  return e;
 }
 
-for (const { skill, agent } of AXIS_SKILLS) {
-  Deno.test(`${skill} ships in CORE_BUNDLE`, () => {
-    assert(
-      skillEntry(skill),
-      `expected a \`skill\` entry named ${skill} in CORE_BUNDLE`,
-    );
-  });
+/**
+ * The axis table's rows, as `[flag, seat, agent, applicable-when]` cells.
+ *
+ * Parsed rather than substring-matched: "the doc names architect-expert" is
+ * satisfied by any sentence anywhere, while the rule is that the `--archi` ROW
+ * binds `architect-expert` — swapping two agents between rows must go red.
+ */
+function axisRows(body: string): string[][] {
+  return body.split("\n")
+    .filter((l) => /^\|\s*`--[a-z0-9]+`\s*\|/.test(l))
+    .map((l) => l.split("|").slice(1, -1).map((c) => c.trim().replaceAll("`", "")));
+}
 
-  Deno.test(`${skill} names its bound expert agent (${agent})`, () => {
-    const entry = skillEntry(skill)!;
-    assertStringIncludes(
-      entry.content,
-      agent,
-      `${skill} must name its single bound expert ${agent}`,
-    );
-  });
+Deno.test("audit.md ships as the `task` audit phase", () => {
+  auditDoc();
+});
 
-  Deno.test(`${skill} documents the uniform scope args`, () => {
-    const { content } = skillEntry(skill)!;
-    for (const arg of ["--path", "--range", "--diff"]) {
-      assertStringIncludes(
-        content,
-        arg,
-        `${skill} must document the ${arg} scope form`,
-      );
-    }
-  });
+Deno.test("audit.md's axis table binds each flag to exactly one agent", () => {
+  const rows = axisRows(auditDoc().content);
+  assertEquals(
+    rows.map((r) => r[0]).sort(),
+    AXES.map((a) => a.flag).sort(),
+    "the axis table must carry one row per axis flag, and no other",
+  );
+  for (const { flag, agent } of AXES) {
+    const row = rows.find((r) => r[0] === flag)!;
+    assertEquals(row[2], agent, `${flag} must bind ${agent}`);
+  }
+});
 
-  Deno.test(`${skill} carries the disambiguation note, and names no retired phase`, () => {
-    const { content } = skillEntry(skill)!;
-    assert(!content.includes("/specnaut audit"), `${skill} still points at the retired phase`);
-    assertStringIncludes(
-      content,
+Deno.test("audit.md's usage line offers every axis flag", () => {
+  const usage = auditDoc().content.split("\n").find((l) => l.startsWith("/task audit "));
+  assert(usage, "audit.md must carry a `/task audit …` usage line");
+  for (const { flag } of AXES) assertStringIncludes(usage, `[${flag}]`);
+});
+
+Deno.test("every axis takes the same scope arguments", () => {
+  const body = auditDoc().content;
+  const usage = body.split("\n").find((l) => l.startsWith("/task audit "))!;
+  for (const arg of ["--path <subtree>", "--range <a>..<b>", "--diff", "--last <n>"]) {
+    assertStringIncludes(usage, arg, `the usage line must offer ${arg}`);
+  }
+  // One scope rule for any flag: the scope is resolved once, before seats are
+  // selected, so no axis can grow a private scope form.
+  assertStringIncludes(body, "**An axis flag and no scope argument** → `--path .`");
+  assert(
+    body.indexOf("## Step 2 — Resolve the scope") <
+      body.indexOf("## Step 3 — Select the seats"),
+    "the scope must be resolved before any seat is selected",
+  );
+  // An unrecognised argument stops; it never widens the audit.
+  assertStringIncludes(body, "Never silently fall back to a wider audit");
+});
+
+Deno.test("an axis flag runs only its own seat, whatever the signals say", () => {
+  const body = auditDoc().content;
+  assertStringIncludes(body, "**One or more axis flags** → only those seats run.");
+  assertStringIncludes(body, "A flag the user named runs its seat whatever the signals say.");
+});
+
+Deno.test("the audit is read-only, and a single-axis run writes no file", () => {
+  const body = auditDoc().content;
+  assertStringIncludes(body, "read-only");
+  assertStringIncludes(body, "It mutates **no tracked file**");
+  assertStringIncludes(
+    body,
+    "**One seat** → return its findings inline, with its `REVIEW SUMMARY` verbatim. Write no file.",
+  );
+  // The one write the verb may make is the multi-seat report, never the code.
+  assertStringIncludes(body, "You may persist a multi-seat report");
+  assertStringIncludes(body, "the audited code is never touched");
+});
+
+Deno.test("audit.md names no address it replaced", () => {
+  const body = auditDoc().content;
+  for (
+    const retired of [
+      "/specnaut audit",
       "/code-audit",
-      `${skill} must disambiguate from the multi-seat /code-audit`,
-    );
-  });
-
-  Deno.test(`${skill} states it is read-only / writes no report`, () => {
-    const lower = skillEntry(skill)!.content.toLowerCase();
-    assert(
-      lower.includes("read-only"),
-      `${skill} must state it is read-only`,
-    );
-    assert(
-      lower.includes("no report") || lower.includes("no file") ||
-        lower.includes("writes no"),
-      `${skill} must state it writes no report file`,
-    );
-  });
-}
+      "/sec-audit",
+      "/arch-audit",
+      "/perf-audit",
+      "/a11y-audit",
+      "/dep-audit",
+      "scripts/code-audit/",
+    ]
+  ) {
+    assert(!body.includes(retired), `audit.md still names the retired ${retired}`);
+  }
+});

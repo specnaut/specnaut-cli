@@ -1,6 +1,6 @@
 ---
 name: security-expert
-description: Reviews code for security issues — input validation, authz, secrets, injection, SSRF, path traversal, silent error swallowing. Three dispatch shapes — (1) PR review (spawned by the review-coordinator during /specnaut review), (2) alert triage (spawned by /release after the security-preflight workflow surfaces open GitHub security alerts).
+description: Reviews code for security issues — input validation, authz, secrets, injection, SSRF, path traversal, silent error swallowing. Three dispatch shapes — (1) PR review (spawned by the review-coordinator during /task review), (2) alert triage (spawned by /release after the security-preflight workflow surfaces open GitHub security alerts).
 model: opus
 effort: xhigh
 tools: Read, Grep, Glob, Bash
@@ -109,7 +109,7 @@ partially masked. Recommend rotation at the issuer, not just deletion.
 
 ## Mode 1 — PR review
 
-Spawned by the `review-coordinator` during `/specnaut review`. Review
+Spawned by the `review-coordinator` during `/task review`. Review
 ONLY the files provided in the prompt. Output the `FINDING` structure
 used by code-reviewer, followed by the canonical `REVIEW SUMMARY` block
 (see "Output format (Mode 1)" below).
@@ -157,7 +157,7 @@ arbitrary shell. Do not improvise any of it from this summary.
 
 ## Mode 3 — Plan expertise (before any code exists)
 
-Spawned by `phases/plan-audits.md` at step 6 of `/specnaut plan`, against
+Spawned by `phases/plan-audits.md` at step 6 of `/task plan`, against
 `plan.md`, in the same message as the architect — **not** against code,
 because none has been written yet.
 

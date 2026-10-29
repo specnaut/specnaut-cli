@@ -15,7 +15,7 @@ import { fromFileUrl } from "@std/path";
  * so exit 4 with MISSING= IS "the one-time choice instead of a silent stay".
  */
 
-const GITHUB_DIR = "../../templates/core/skills/board/scripts/github";
+const GITHUB_DIR = "../../templates/core/skills/task/scripts/github";
 const DEFAULTS = ["Backlog", "Ready", "In progress", "In review", "Done"];
 
 function scriptPath(rel: string): string {

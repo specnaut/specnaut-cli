@@ -1,8 +1,8 @@
 // Where the Specnaut chain stands, read from how its phases are invoked.
 //
 // The autopilot crosses each boundary by calling the Skill tool on the
-// `specnaut` skill with the next phase as its argument; a person starts it by
-// typing `/specnaut <phase>`. Both name the phase as the first argument that is
+// `task` skill with the next phase as its argument; a person starts it by
+// typing `/task <phase>`. Both name the phase as the first argument that is
 // not a flag. The Skill call returns as soon as the phase's instructions are
 // loaded, so what can be known is the phase in progress, not its completion:
 // a phase is done when the next one starts, and the chain is done when the turn
@@ -25,26 +25,34 @@ function isPhase(s: string): s is Phase {
 }
 
 /**
- * True for Specnaut's router: `specnaut` as a project scaffolds it, and
- * `specnaut-plugin:specnaut` as the plugin serves it. Not any plugin's skill
- * that happens to be called `specnaut` — the hold refuses calls, so it names
- * exactly whose.
+ * The routers that run the chain: `task` as a project scaffolds it and
+ * `specnaut-plugin:task` as the plugin serves it — and `specnaut` /
+ * `specnaut-plugin:specnaut`, which ran it before 7.2 (cli#683) and still do
+ * under an older plugin. Dropping those would switch the hold off silently for
+ * anyone whose plugin lags the binary. Not any plugin's skill that happens to
+ * carry one of these names — the hold refuses calls, so it names exactly whose.
  */
+const CHAIN_ROUTERS: readonly string[] = [
+  "task",
+  "specnaut-plugin:task",
+  "specnaut",
+  "specnaut-plugin:specnaut",
+];
+
 export function isSpecnautSkill(skill: string): boolean {
-  const name = skill.replace(/^\//, "");
-  return name === "specnaut" || name === "specnaut-plugin:specnaut";
+  return CHAIN_ROUTERS.includes(skill.replace(/^\//, ""));
 }
 
-/** The chain phase a `specnaut` invocation starts, or null (audits, unknown, none). */
+/** The chain phase a router invocation starts, or null (audits, unknown, none). */
 export function phaseOf(skill: string, args: string | undefined): Phase | null {
   if (!isSpecnautSkill(skill)) return null;
   const first = (args ?? "").trim().split(/\s+/).find((t) => t.length > 0 && !t.startsWith("--"));
   return first !== undefined && isPhase(first) ? first : null;
 }
 
-/** The phase a typed prompt starts: `/specnaut plan …`, `/specnaut-plugin:specnaut merge`. */
+/** The phase a typed prompt starts: `/task plan …`, `/specnaut-plugin:task merge`. */
 export function phaseOfPrompt(text: string): Phase | null {
-  const m = text.trimStart().match(/^\/((?:specnaut-plugin:)?specnaut)(?:\s+([\s\S]*))?$/);
+  const m = text.trimStart().match(/^\/((?:specnaut-plugin:)?(?:task|specnaut))(?:\s+([\s\S]*))?$/);
   return m ? phaseOf(m[1] ?? "", m[2]) : null;
 }
 

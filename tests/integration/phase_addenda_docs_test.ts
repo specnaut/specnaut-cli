@@ -60,6 +60,7 @@ Deno.test("every concrete addendum path shown anywhere names a routable phase", 
     "UPGRADING.md",
     "templates/core/root/AGENTS.md",
     "templates/core/skills/specnaut/SKILL.md",
+    "templates/core/skills/task/SKILL.md",
     "templates/core/skills/ship/SKILL.md",
   ];
   // `auditAddendum` is the one home of "does a router read this path" — the
@@ -68,10 +69,19 @@ Deno.test("every concrete addendum path shown anywhere names a routable phase", 
   const seen: string[] = [];
   const bad: string[] = [];
   for (const rel of surfaces) {
-    for (const m of (await read(rel)).matchAll(/\.specnaut\/addenda\/([a-z-]+\/[a-z-]+\.md)/g)) {
+    const content = await read(rel);
+    for (const m of content.matchAll(/\.specnaut\/addenda\/([a-z-]+\/[a-z-]+\.md)/g)) {
       seen.push(m[0]);
       const finding = auditAddendum(m[1]);
-      if (finding) bad.push(`${rel}: ${m[0]} — ${finding.problem.kind}`);
+      if (!finding) continue;
+      // The upgrade notes are the one surface whose subject is a MOVE: they
+      // must name the old address to say where it went (cli#683). Accepted
+      // there only for a renamed address whose new address the same notes
+      // name too — an old path shown with nowhere to go is still a dead end.
+      const to = finding.suggestion;
+      const announcesMove = rel === "UPGRADING.md" && finding.problem.kind === "renamed" &&
+        to !== null && content.includes(`.specnaut/addenda/${to.skill}/${to.phase}.md`);
+      if (!announcesMove) bad.push(`${rel}: ${m[0]} — ${finding.problem.kind}`);
     }
   }
   // Non-vacuity: the docs do show a worked path, or this sweep checked nothing.

@@ -197,7 +197,7 @@ export interface PluginDetector {
 
   /**
    * Does the installed plugin actually carry `pluginRelPath` (plugin-root
-   * relative, e.g. `skills/board/SKILL.md`)?
+   * relative, e.g. `skills/task/SKILL.md`)?
    *
    * Migration used to be decided by a compile-time list alone, which describes
    * what the plugin is EXPECTED to ship rather than what the user's installed

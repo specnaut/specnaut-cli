@@ -3,19 +3,19 @@ import { fromFileUrl } from "@std/path";
 
 /**
  * Hermetic behaviour test for `collect-audit-scope.sh` (the scope resolver the
- * `/code-audit` skill runs first). Each case spins up a throwaway git repo in a
+ * `/task audit` verb runs first). Each case spins up a throwaway git repo in a
  * temp dir, commits fixtures, runs the script, and asserts the CODE-AUDIT SCOPE
  * block shape + the CATEGORY SIGNALS integer counts. No network, no shared
  * state — the script must run unmodified in any scaffolded project.
  *
- * Contract: contracts/scope-signals.md. The script lives under the skill's own
- * `scripts/` dir (source); it ships to `.specnaut/scripts/code-audit/` in a
+ * Contract: contracts/scope-signals.md. The script lives under the `task` skill's
+ * `scripts/` dir (source); it ships to `.specnaut/scripts/audit/` in a
  * scaffolded project, but the test exercises the source copy directly.
  */
 
 const SCRIPT = fromFileUrl(
   new URL(
-    "../../templates/core/skills/code-audit/scripts/collect-audit-scope.sh",
+    "../../templates/core/skills/task/scripts/collect-audit-scope.sh",
     import.meta.url,
   ),
 );

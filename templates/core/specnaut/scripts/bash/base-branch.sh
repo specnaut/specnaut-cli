@@ -3,7 +3,7 @@
 #
 # Prints the name on stdout: what origin/HEAD points at (the remote's own
 # default), else the configured `init.defaultBranch`. Neither → exit 3,
-# unknown. Callers never substitute `main` for unknown: `/specnaut merge`
+# unknown. Callers never substitute `main` for unknown: `/task merge`
 # stops and asks for the base, and the landing hook gates every landing.
 #
 # Usage: base-branch.sh

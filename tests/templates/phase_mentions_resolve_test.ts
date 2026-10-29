@@ -1,17 +1,24 @@
 import { assert } from "@std/assert";
 import { CORE_BUNDLE, HARNESS_STATIC } from "../../src/templates_bundle.ts";
-import { skillDocName } from "../../src/domain/core_bundle.ts";
+import { retiredAddresses } from "./retired_table.ts";
 
 /**
- * Every `/specnaut <phase>` a shipped document tells someone to run resolves:
- * to a phase the router routes, or to a row of the router's "Removed phases"
- * section, which answers it with a notice. Anything else is an instruction
- * that leads nowhere — what spec 034 found in five skills and four agents
- * once the audit phases were gone.
+ * Every `/specnaut <verb>`, `/task <verb>` and `/ship <verb>` a shipped document
+ * tells someone to run resolves: to a verb its router routes, or to a row of
+ * the `/specnaut` router's "Retired addresses" section, which answers it with a
+ * one-line notice. Anything else is an instruction that leads nowhere — what
+ * spec 034 found in five skills and four agents once the audit phases were
+ * gone, and what cli#683's split of `/specnaut` into `/task` would otherwise
+ * have left behind in every document that named a pipeline phase.
  *
- * Derived from the bundle, not from a list of retired names: a list would be a
- * registry kept forever, and it would only catch the names someone remembered.
+ * Derived from the bundle, not from a list of names: a list would be a registry
+ * kept forever, and it would only catch the names someone remembered. The
+ * retired rows come from the section itself (`retired_table.ts`); whether a
+ * retired address may be named at all is `retired_addresses_test.ts`'s lock.
  */
+
+const ROUTERS = ["specnaut", "task", "ship"] as const;
+type Router = typeof ROUTERS[number];
 
 const documents: Array<{ where: string; content: string; isStatic: boolean }> = [
   ...CORE_BUNDLE.map((e) => ({
@@ -28,87 +35,121 @@ const documents: Array<{ where: string; content: string; isStatic: boolean }> = 
   ),
 ];
 
-const router = CORE_BUNDLE.find((e) => e.category === "skill" && e.name === "specnaut");
+function routerOf(name: Router): string {
+  const e = CORE_BUNDLE.find((x) =>
+    (x.category === "skill" || x.category === "backlog-skill") && x.name === name
+  );
+  if (!e) throw new Error(`no bundled router for /${name}`);
+  return e.content;
+}
 
-/**
- * What the router routes: the first column of its "Phase index" table, and only
- * where the phase document actually ships. Not every bundled document under
- * `phases/` — `merge-squash`, `plan-audits` and the other contract docs sit
- * there too, and the router answers them with the index, not a phase.
- */
-const shipped = new Set(
-  CORE_BUNDLE.filter((e) => e.category === "phase" && e.name === "specnaut").map(skillDocName),
-);
-const indexSection = router?.content.split(/^## /m).find((s) => s.startsWith("Phase index")) ?? "";
-const routed = new Set(
-  indexSection.split("\n")
-    .filter((l) => l.startsWith("| `"))
-    .map((l) => /`([a-z][a-z-]*)`/.exec(l.split("|")[1])?.[1])
-    .filter((p): p is string => p !== undefined && shipped.has(p)),
-);
-const removedSection = router?.content.split(/^## /m).find((s) => s.startsWith("Removed phases")) ??
-  "";
-/**
- * What the router answers with a notice: the first column of the section's table,
- * and the names on its "… are RETIRED" lines. Not every backticked word in the
- * section — `/ship tag` and `/sec-audit` sit there too, and counting them would
- * let `/specnaut security` resolve.
- */
-const removed = new Set(
-  removedSection.split("\n").flatMap((line) => {
-    const source = line.startsWith("|") ? line.split("|")[1] : /RETIRED/.test(line) ? line : "";
-    return [...source.matchAll(/`([a-z][a-z-]*)`/g)].map((m) => m[1]);
-  }),
-);
-
-/**
- * `/specnaut <phase>`; a two-word `audit <axis>` reads as `audit-<axis>`.
- *
- * In Markdown only inside a code span: prose says "the `/specnaut` router", and a
- * word after the command is a phase only where the text is quoting a command. A
- * script has no prose, so there every mention counts.
- */
-function mentions(where: string, content: string): string[] {
-  const script = /\.(sh|ps1|js|ts)$/.test(where);
-  const re = script
-    ? /\/specnaut ([a-z][a-z-]*)(?: ([a-z]+))?/g
-    : /`\/specnaut ([a-z][a-z-]*)(?: ([a-z]+))?[^`]*`/g;
-  return [...content.matchAll(re)].map(([, phase, next]) =>
-    phase === "audit" && next ? `audit-${next}` : phase
+/** The documents a router owns that actually ship, by their path under its folder. */
+function shippedDocs(name: Router): Set<string> {
+  return new Set(
+    CORE_BUNDLE.filter((e) => e.name === name && e.suffix !== null).map((e) =>
+      e.category === "phase" ? `phases/${e.suffix}` : `${e.suffix}`
+    ),
   );
 }
 
-Deno.test("the router and its removed-phases section were found, and read narrowly", () => {
-  assert(routed.has("plan") && routed.has("review"), "no routed phase read from the bundle");
-  assert(!routed.has("merge-squash"), "a contract doc read as a routed phase");
+/**
+ * What a router routes: the first column of its verb table, and only where the
+ * document that row points at actually ships. Not every document under
+ * `phases/` — `merge-squash`, `plan-audits` and the other contract docs sit
+ * there too, and the router answers them with its table, not a verb.
+ *
+ * `/ship` routes by path rather than by a verb table; its verbs are the phase
+ * documents it ships (`tag`, `release`).
+ */
+function routedBy(name: Router): Set<string> {
+  const shipped = shippedDocs(name);
+  if (name === "ship") {
+    return new Set(
+      [...shipped].filter((d) => d.startsWith("phases/")).map((d) =>
+        d.slice("phases/".length).replace(/\.md$/, "")
+      ),
+    );
+  }
+  const out = new Set<string>();
+  for (const line of routerOf(name).split("\n")) {
+    const m = line.match(/^\| `([a-z][a-z-]*)[^`]*`(?: _[^|]*_)? \| `([a-z0-9/-]+\.md)` \|/);
+    if (m && shipped.has(m[2])) out.add(m[1]);
+  }
+  return out;
+}
+
+const routed: Record<Router, Set<string>> = {
+  specnaut: routedBy("specnaut"),
+  task: routedBy("task"),
+  ship: routedBy("ship"),
+};
+
+/**
+ * What the `/specnaut` router answers with a notice, per router: the retired
+ * rows that name a verb (`/specnaut plan`, `/specnaut brainstorm`). A whole
+ * retired skill (`/board`) is not a mention of any of the three routers.
+ */
+const retired = new Set(
+  retiredAddresses().filter((a) => a.verb !== null).map((a) => `${a.skill} ${a.verb}`),
+);
+
+/**
+ * `/<router> <verb>`, the plugin's `/specnaut-plugin:<router> <verb>` included.
+ * Leading `--flags` are skipped, as the router strips them. A version
+ * (`/ship v7.2.0`, `/ship 7.2.0`) is the `/ship` input, not a verb.
+ *
+ * In Markdown only inside a code span: prose says "the `/task` router", and a
+ * word after the command is a verb only where the text is quoting a command. A
+ * script has no prose, so there every mention counts.
+ */
+function mentions(where: string, content: string): Array<{ router: Router; verb: string }> {
+  const script = /\.(sh|ps1|js|ts)$/.test(where);
+  const body = "\\/(?:specnaut-plugin:)?(specnaut|task|ship) (?:--[a-z-]+ )*([a-z][a-z0-9.-]*)";
+  const re = script ? new RegExp(body, "g") : new RegExp("`" + body + "[^`]*`", "g");
+  return [...content.matchAll(re)]
+    .filter(([, , verb]) => !/^v?\d/.test(verb))
+    .map(([, router, verb]) => ({ router: router as Router, verb: verb.replace(/[.-]+$/, "") }));
+}
+
+Deno.test("the routers and the retired section were found, and read narrowly", () => {
+  assert(routed.task.has("plan") && routed.task.has("review"), "no pipeline verb read from /task");
+  assert(routed.task.has("groom") && routed.task.has("edit"), "no backlog verb read from /task");
+  assert(!routed.task.has("merge-squash"), "a contract doc read as a routed verb");
+  assert(routed.specnaut.has("upgrade") && !routed.specnaut.has("plan"), "/specnaut read wrongly");
+  assert(routed.ship.has("tag") && routed.ship.has("release"), "no /ship verb read");
   assert(
-    removed.has("brainstorm") && removed.has("audit-security"),
-    "no removed-phases section read",
+    retired.has("specnaut plan") && retired.has("specnaut brainstorm"),
+    "no retired row read",
   );
-  // A bare axis or a replacement skill must never resolve as a retired phase.
-  assert(!removed.has("security") && !removed.has("sec-audit"), "the removed set reads too wide");
+  // A successor or a bare axis must never resolve as retired.
+  assert(!retired.has("task plan") && !retired.has("specnaut security"), "retired reads too wide");
 });
 
-Deno.test("every /specnaut <phase> a shipped document names resolves", () => {
+Deno.test("every /specnaut, /task and /ship <verb> a shipped document names resolves", () => {
   const dangling: string[] = [];
   const seen = new Set<string>();
   let total = 0;
   const from = { script: 0, static: 0 };
+  const per: Record<Router, number> = { specnaut: 0, task: 0, ship: 0 };
   for (const { where, content, isStatic } of documents) {
-    for (const phase of mentions(where, content)) {
+    for (const { router, verb } of mentions(where, content)) {
       total++;
+      per[router]++;
       if (/\.(sh|ps1|js|ts)$/.test(where)) from.script++;
       if (isStatic) from.static++;
-      seen.add(phase);
-      if (!routed.has(phase) && !removed.has(phase)) dangling.push(`${where}: /specnaut ${phase}`);
+      seen.add(`${router} ${verb}`);
+      if (!routed[router].has(verb) && !retired.has(`${router} ${verb}`)) {
+        dangling.push(`${where}: /${router} ${verb}`);
+      }
     }
   }
   // Non-vacuity: a regex that stopped matching would report "nothing dangles".
-  assert(total > 20 && seen.has("plan") && seen.has("merge"), `only ${total} mentions read`);
-  // Per source, so a broken script regex or a dropped HARNESS_STATIC spread fails alone.
+  assert(total > 20 && seen.has("task plan") && seen.has("task merge"), `only ${total} read`);
+  // Per router and per source, so a scan gone blind to one fails alone.
+  for (const r of ROUTERS) assert(per[r] > 0, `no /${r} mention read`);
   assert(from.script > 0, "no mention read from a script — the script scan read nothing");
   assert(from.static > 0, "no mention read from a harness static — the static scan read nothing");
-  assert(dangling.length === 0, `mentions of a phase nothing answers:\n${dangling.join("\n")}`);
+  assert(dangling.length === 0, `mentions of a verb nothing answers:\n${dangling.join("\n")}`);
 });
 
 Deno.test("no shipped document carries the retired upstream's attribution", () => {

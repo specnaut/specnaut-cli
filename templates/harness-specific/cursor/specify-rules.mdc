@@ -20,12 +20,12 @@ clarifications needed) STOP #2 (pre-merge validation)
 
 ## Skills available
 
-- `/specnaut plan` — the feature's one planning document, then the architecture + security audits, then the stop
-- `/specnaut tasks` — break the approved plan into tasks
-- `/specnaut implement` — run the developer → review-coordinator → qa-tester pipeline
-- `/specnaut review` — architecture + quality gates
-- `/specnaut merge` — merge the feature branch to main
-- `/specnaut-board` — manage the project board (via the PO agent)
+- `/task plan` — the feature's one planning document, then the architecture + security audits, then the stop
+- `/task tasks` — break the approved plan into tasks
+- `/task implement` — run the developer → review-coordinator → qa-tester pipeline
+- `/task review` — architecture + quality gates
+- `/task merge` — merge the feature branch to main
+- `/specnaut-task` — the backlog, the pipeline above, and audits (`audit --security|--archi|…`)
 
 ## Agent roles (invocable manually as skills)
 

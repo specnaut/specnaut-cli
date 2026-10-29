@@ -46,7 +46,7 @@ export async function printInitNextSteps(
   } else {
     console.log(
       `  1. Open the project in ${displayName}, then run ${
-        bold(cmd.skillDoc("specnaut", "constitution"))
+        bold(cmd.skillDoc("task", "constitution"))
       } to scaffold your project's guiding principles`,
     );
     console.log(
@@ -56,11 +56,11 @@ export async function printInitNextSteps(
     );
     console.log(
       `  3. Run ${
-        bold(`${cmd.skillDoc("specnaut", "plan")} "<feature description>"`)
+        bold(`${cmd.skillDoc("task", "plan")} "<feature description>"`)
       } to plan your first feature`,
     );
     console.log(
-      `  4. Use ${bold(`${cmd.skill("board")} add "<task title>"`)} for follow-up work`,
+      `  4. Use ${bold(`${cmd.skill("task")} add "<task title>"`)} for follow-up work`,
     );
   }
   await printHookTrustNote(

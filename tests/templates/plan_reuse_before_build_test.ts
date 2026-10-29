@@ -12,7 +12,7 @@ const read = async (p: string) =>
   (await Deno.readTextFile(`${ROOT}${p}`)).replaceAll("\r\n", "\n").replace(/\s+/g, " ");
 
 Deno.test("plan: a new helper gets a decision row with inventory, evidence and outcome", async () => {
-  const plan = await read("templates/core/skills/specnaut/phases/plan.md");
+  const plan = await read("templates/core/skills/task/phases/plan.md");
   assert(plan.includes("reuse before you build"), "the rule is present");
   assert(plan.includes("the existing helpers and commands you inventoried"), "(a) inventory");
   assert(plan.includes("the recurrence evidence"), "(b) evidence");
@@ -28,7 +28,7 @@ Deno.test("plan: a new helper gets a decision row with inventory, evidence and o
 });
 
 Deno.test("plan: the evidence bar and the helper's safety clauses are written down", async () => {
-  const plan = await read("templates/core/skills/specnaut/phases/plan.md");
+  const plan = await read("templates/core/skills/task/phases/plan.md");
   assert(plan.includes("two separate prior occurrences"), "bar");
   assert(
     plan.includes("Several receipts from one repair count as one occurrence"),

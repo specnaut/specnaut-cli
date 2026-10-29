@@ -68,10 +68,10 @@ test(
     let ran = false;
     on("tool.call", { tool: "Skill" }, () => {
       ran = true;
-      return { result: { success: true, commandName: "specnaut" } };
+      return { result: { success: true, commandName: "task" } };
     });
     await $.session.measure(measure(93));
-    const out = await $.tool.call({ tool: "Skill", skill: "specnaut", args: "merge" });
+    const out = await $.tool.call({ tool: "Skill", skill: "task", args: "merge" });
     expect(ran).toBe(false);
     expect(out.text ?? out.deny ?? "").toMatch(/quota hold before `merge`/);
   },
@@ -82,10 +82,10 @@ test("below the threshold the chain goes through, and the band shows its phase",
   let ran = false;
   on("tool.call", { tool: "Skill" }, () => {
     ran = true;
-    return { result: { success: true, commandName: "specnaut" } };
+    return { result: { success: true, commandName: "task" } };
   });
   await $.session.measure(measure(42));
-  await $.tool.call({ tool: "Skill", skill: "specnaut", args: "implement" });
+  await $.tool.call({ tool: "Skill", skill: "task", args: "implement" });
   expect(ran).toBe(true);
   const ui = await $.ui.mount(band());
   expect(await ui.find({ type: "Text", text: /implement ●/ })).toBeDefined();
@@ -101,7 +101,7 @@ test("unrelated skills are never touched, whatever the usage", async ($, on) => 
     return { result: { success: true, commandName: "board" } };
   });
   await $.session.measure(measure(99));
-  await $.tool.call({ tool: "Skill", skill: "board", args: "merge" });
+  await $.tool.call({ tool: "Skill", skill: "ship", args: "merge" });
   expect(ran).toBe(true);
 });
 
@@ -110,14 +110,14 @@ test("the person's next message lifts the hold for that window", async ($, on) =
   let runs = 0;
   on("tool.call", { tool: "Skill" }, () => {
     runs += 1;
-    return { result: { success: true, commandName: "specnaut" } };
+    return { result: { success: true, commandName: "task" } };
   });
   on("prompt.submit", (_$, e) => ({ text: e.text }));
   await $.session.measure(measure(95));
-  await $.tool.call({ tool: "Skill", skill: "specnaut", args: "review" });
+  await $.tool.call({ tool: "Skill", skill: "task", args: "review" });
   expect(runs).toBe(0);
   await $.prompt.submit({ text: "continue anyway", wait: false, origin: { kind: "composer" } });
-  await $.tool.call({ tool: "Skill", skill: "specnaut", args: "review" });
+  await $.tool.call({ tool: "Skill", skill: "task", args: "review" });
   expect(runs).toBe(1);
 });
 

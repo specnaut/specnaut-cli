@@ -26,7 +26,7 @@ import { fromFileUrl } from "@std/path";
  * process survives.
  */
 
-const GITHUB_DIR = "../../templates/core/skills/board/scripts/github";
+const GITHUB_DIR = "../../templates/core/skills/task/scripts/github";
 const ISSUE_URL = "https://github.com/acme/my-app/issues/42";
 
 function scriptPath(rel: string): string {

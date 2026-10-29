@@ -215,32 +215,26 @@ Deno.test("the selection rule is stated once and pointed at everywhere else", ()
 const POINTED_BY_DECISION: ReadonlyMap<string, string> = new Map([
   [
     "skill/specnaut",
-    "the workflow router — #575 names it as an anchor; it has room and every phase it dispatches answers a person",
+    "the framework router — #575 named it as an anchor while it carried the workflow; since cli#683 its verbs (doc, list, upgrade) still answer a person directly",
   ],
   [
     "skill/ship",
     "the production verb — it asks a disambiguation question when the repository cannot resolve the intent, so questions-as-selections is load-bearing rather than incidental;",
   ],
   [
-    "backlog-skill/board",
-    "the backlog verb — grooming collects decisions as pickers, so questions-as-selections is load-bearing; it was withheld at #575 only because of a harness size cap that no longer applies",
+    "backlog-skill/task",
+    "the work router (the `board` skill until cli#683, which also took the workflow from /specnaut) — grooming collects decisions as pickers and the plan stop asks the user, so questions-as-selections is load-bearing",
   ],
   [
-    "phase/specnaut/plan.md",
-    "same — two restatements of the selection rule replaced by pointers",
+    "phase/task/plan.md",
+    "the plan stop — two restatements of the selection rule replaced by pointers",
   ],
 ]);
 
 /** An entry-point skill that deliberately does NOT point here. */
 const WITHHELD_BY_DECISION: ReadonlyMap<string, string> = new Map([
-  ...(["a11y-audit", "arch-audit", "dep-audit", "perf-audit", "sec-audit", "code-audit"].map((
-    n,
-  ) =>
-    [
-      n,
-      "a thin dispatcher — the expert seat it dispatches answers the user, and reaches the contract by the same always-on leg",
-    ] as [string, string]
-  )),
+  // The six audit dispatchers withheld here until cli#683 folded them into
+  // `/task audit`, which reaches the contract through the `/task` router.
   [
     "status-audit",
     "read-only reporter over a log file; reached by the always-on leg like any other turn",

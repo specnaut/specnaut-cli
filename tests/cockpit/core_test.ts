@@ -13,8 +13,6 @@ import {
   chainLine,
   chainShort,
   IDLE,
-  phaseOf,
-  phaseOfPrompt,
   promptSubmitted,
   turnEnded,
 } from "../../mods/specnaut-cockpit/hooks/core/chain.ts";
@@ -107,31 +105,7 @@ Deno.test("jumping past both thresholds announces the higher one only", () => {
   assertEquals(r.toasts, ["weekly usage window at 93%"]);
 });
 
-// ── chain ────────────────────────────────────────────────────────────────
-
-Deno.test("a specnaut Skill call names its phase, flags and plugin scope aside", () => {
-  assertEquals(phaseOf("specnaut", "implement"), "implement");
-  assertEquals(phaseOf("specnaut", "--manual merge --no-close"), "merge");
-  assertEquals(phaseOf("specnaut-plugin:specnaut", "review"), "review");
-  assertEquals(phaseOf("specnaut", "audit security"), null);
-  assertEquals(phaseOf("specnaut", ""), null);
-  assertEquals(phaseOf("board", "merge"), null);
-  assertEquals(phaseOf("not-specnaut", "merge"), null);
-  assertEquals(
-    phaseOf("someone-else:specnaut", "merge"),
-    null,
-    "another plugin's skill of that name",
-  );
-});
-
-Deno.test("a typed /specnaut prompt names its phase", () => {
-  assertEquals(phaseOfPrompt('/specnaut plan "Add OAuth2 login"'), "plan");
-  assertEquals(phaseOfPrompt("/specnaut-plugin:specnaut merge"), "merge");
-  assertEquals(phaseOfPrompt("/specnaut"), null);
-  assertEquals(phaseOfPrompt("please run /specnaut plan"), null);
-  assertEquals(phaseOfPrompt("/specnautx plan"), null);
-  assertEquals(phaseOfPrompt("/someone-else:specnaut merge"), null);
-});
+// ── chain ── which routers are recognised: chain_routers_test.ts ─────────
 
 Deno.test("the chain line marks done, current and pending phases", () => {
   const s = advance(IDLE, "implement");
@@ -163,7 +137,7 @@ Deno.test("the hold refuses a guarded phase when a window is at the threshold", 
   assertEquals(h.window.kind, "five_hour");
   assertStringIncludes(h.reason, "quota hold before `merge`");
   assertStringIncludes(h.reason, "5-hour usage window is at 93% and resets in 1h05");
-  assertStringIncludes(h.reason, "`/specnaut merge` resumes it");
+  assertStringIncludes(h.reason, "`/task merge` resumes it");
   assertStringIncludes(h.reason, "Do not run the phase's steps by any other means");
 });
 

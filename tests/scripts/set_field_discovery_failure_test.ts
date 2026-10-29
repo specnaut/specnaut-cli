@@ -19,7 +19,7 @@ import { fromFileUrl } from "@std/path";
  * a script that exited 13 after writing would pass an exit-code-only test.
  */
 
-const GITHUB_DIR = "../../templates/core/skills/board/scripts/github";
+const GITHUB_DIR = "../../templates/core/skills/task/scripts/github";
 
 /** The exit code `set-field.sh` reserves for "discovery failed — never a label". */
 const DISCOVERY_FAILED = 13;

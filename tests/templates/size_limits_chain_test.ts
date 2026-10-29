@@ -28,11 +28,11 @@ Deno.test("plan: the template has the mandatory size row and a measured Files to
 });
 
 Deno.test("plan: the phase points at the size gate", async () => {
-  assert((await read("templates/core/skills/specnaut/phases/plan.md")).includes(LIMITS));
+  assert((await read("templates/core/skills/task/phases/plan.md")).includes(LIMITS));
 });
 
 Deno.test("tasks: the phase applies the gate and the template shows the extraction task", async () => {
-  const phase = await read("templates/core/skills/specnaut/phases/tasks.md");
+  const phase = await read("templates/core/skills/task/phases/tasks.md");
   assert(phase.includes(LIMITS) && phase.includes("extraction task"), "phase gate");
   const t = await read("templates/core/specnaut/templates/tasks-template.md");
   assert(t.includes("**Extractions first.**"), "extraction section");
@@ -41,7 +41,7 @@ Deno.test("tasks: the phase applies the gate and the template shows the extracti
 
 Deno.test("implement: the phase applies the gate, and the gate carries the table into every brief", async () => {
   assert(
-    (await read("templates/core/skills/specnaut/phases/implement.md")).includes(
+    (await read("templates/core/skills/task/phases/implement.md")).includes(
       `${LIMITS}\` § **implement**`,
     ),
   );
@@ -75,7 +75,7 @@ Deno.test("the ratchet is invoked through bash, and a run that did not happen is
   // A lost executable bit (an archive, a Windows checkout) turns `./script` into exit 126,
   // which no caller would read as "clean" unless the docs say what it means.
   const c = await read("templates/core/agents/review-coordinator.md");
-  const g = await read("templates/core/skills/specnaut/phases/quality-gates.md");
+  const g = await read("templates/core/skills/task/phases/quality-gates.md");
   for (const doc of [c, g]) {
     assert(doc.includes("bash .specnaut/scripts/bash/size-ratchet.sh --since"));
   }
@@ -84,7 +84,7 @@ Deno.test("the ratchet is invoked through bash, and a run that did not happen is
 });
 
 Deno.test("constitution: one Sync Impact Report, replaced, and the file is held to its own unit (#663)", async () => {
-  const phase = await read("templates/core/skills/specnaut/phases/constitution.md");
+  const phase = await read("templates/core/skills/task/phases/constitution.md");
   assert(phase.includes("**replacing** the existing one"), "step 5 replaces the report");
   assert(!/prepend/i.test(phase), "no step prepends a report");
   assert(phase.includes("Exactly one Sync Impact Report"), "step 6 validates it");

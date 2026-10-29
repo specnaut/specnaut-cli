@@ -13,20 +13,57 @@ call, on Claude Code and on Codex:
 - **`merge: manual` really stops.** Under `merge: manual` in `.specnaut/workflow.yml`, a merge into
   or a push of the base branch needs your go-ahead. Claude Code shows its own permission prompt.
   Codex refuses the command until your own message in that turn says to merge (`merge`,
-  `/specnaut merge`, `$specnaut merge`). A bare "yes" is not enough.
+  `/task merge`, `$specnaut-task merge`). A bare "yes" is not enough.
 - **A Specnaut agent runs on the model its definition declares.** A dispatch that overrides the
   model, or on Codex the reasoning effort, is refused. Your own agents are not affected.
 - **`.specnaut/installed.lock` cannot be hand-edited.** The edit is refused rather than warned
   about. Edits to `.specnaut/workflow.yml`, to `.specnaut/hooks/` and to the files that register the
   hooks ask first.
 - **On Codex, publishing a release needs your go-ahead in the same turn** (`release it`,
-  `/ship release`).
+  `$specnaut-ship release`).
 
 The hook scripts moved from `.claude/hooks/` to `.specnaut/hooks/`, so both harnesses use one copy.
 `upgrade` removes the old copies and rewrites their entries in `.claude/settings.json` in place.
 Your own hooks there are left as they are. If you had edited one of the old copies, `upgrade` keeps
 it and warns, but nothing runs it any more: carry your change over to `.specnaut/hooks/`, then
 delete the old file (or run `upgrade --force`, which backs it up first).
+
+### `/board` and the pipeline are now `/task`
+
+The skills are regrouped by what you are doing:
+
+| Before                                                                    | Now                                                                            |
+| :------------------------------------------------------------------------ | :----------------------------------------------------------------------------- |
+| `/board …`                                                                | `/task …` (`/board update` is `/task edit`; `/task close <id>` closes an item) |
+| `/specnaut plan`, `tasks`, `implement`, `review`, `merge`, `constitution` | `/task plan`, …                                                                |
+| `/code-audit`                                                             | `/task audit`                                                                  |
+| `/sec-audit`, `/arch-audit`, `/perf-audit`, `/a11y-audit`, `/dep-audit`   | `/task audit --security`, `--archi`, `--perf`, `--a11y`, `--deps`              |
+| `/specnaut`                                                               | the framework only: `/specnaut doc`, `/specnaut list`, `/specnaut upgrade`     |
+
+On harnesses that prefix their skills, `specnaut-board` is now `specnaut-task`. `/specnaut plan` and
+the other moved verbs print the new address and stop; there are no aliases.
+
+`upgrade` does the move:
+
+- **Phase documents you edited travel with you.** An edited `plan.md`, `groom.md`, … is carried to
+  its new address under `task/` and stays in the `customized` bucket.
+- **Addenda move too.** `.specnaut/addenda/specnaut/plan.md` becomes
+  `.specnaut/addenda/task/plan.md`, for every moved verb — and an addendum still left at
+  `specnaut/tag-version.md` or `release-version.md` moves to `ship/tag.md` / `ship/release.md`. If a
+  file already exists at the new address, nothing moves and `upgrade` (and `check --project`) warn.
+  A symbolic link is never followed: it stays where it is, with a warning.
+- **Retired skills you edited are kept** (`board/SKILL.md`, `code-audit`, the `*-audit` skills) with
+  a warning until `upgrade --force`, which backs them up first. Nothing reads them any more: carry a
+  rule you need into an addendum under `.specnaut/addenda/task/`.
+- **An edited `specnaut/SKILL.md`** is kept as it is, but it no longer routes the pipeline;
+  `check --project` names it until you take the new one.
+- The audit scope script moved from `.specnaut/scripts/code-audit/` to `.specnaut/scripts/audit/`.
+
+**Update the Claude Code plugin with the binary.** An older `specnaut-plugin` still serves
+`/specnaut plan`, which reads the old addenda folder.
+
+Saved prompts, your own skills and your `AGENTS.md` prose that name `/board`, `/specnaut plan` or an
+`*-audit` skill are yours to update.
 
 ### Codex: trust the hooks once
 

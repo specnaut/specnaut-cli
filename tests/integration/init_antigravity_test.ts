@@ -49,7 +49,7 @@ Deno.test("specnaut init --ai antigravity scaffolds an Antigravity layout", asyn
 
     const root = join(parent, "demo");
 
-    // #533 retired the backlog command shim; the skill registers /board.
+    // #533 retired the backlog command shim; the skill registers /task.
     assertEquals(
       await exists(join(root, ".agents/workflows/backlog.md")),
       false,
@@ -66,7 +66,7 @@ Deno.test("specnaut init --ai antigravity scaffolds an Antigravity layout", asyn
       true,
     );
     assertEquals(
-      await exists(join(root, ".agents/skills/specnaut/phases/plan.md")),
+      await exists(join(root, ".agents/skills/specnaut-task/phases/plan.md")),
       true,
     );
     // #409: the deprecated specnaut-auto alias no longer scaffolds.

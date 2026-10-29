@@ -31,9 +31,11 @@ const LOAD_BEARING = [
 const CHANNEL_A = ["product-owner", "developer", "workflow-manager"] as const;
 
 /** Bundled surfaces with no frontmatter preloading — they carry a pointer. */
-const CHANNEL_B_CORE: ReadonlyArray<{ category: string; name: string }> = [
-  { category: "backlog-skill", name: "board" },
-  { category: "backlog-doc", name: "board" },
+const CHANNEL_B_CORE: ReadonlyArray<{ category: string; name: string; doc?: string }> = [
+  // The `/task` router (the `board` skill until cli#683). It loads
+  // `backlog.md` for the item-listing verbs, so its pointer covers that doc.
+  { category: "backlog-skill", name: "task" },
+  { category: "backlog-doc", name: "task", doc: "groom.md" },
   { category: "phase", name: "merge" },
   // #560 moved the close and reconcile block out of `merge.md` into this
   // companion, which is where items are actually named now. Both are listed:
@@ -49,16 +51,18 @@ const CHANNEL_B_STATIC: ReadonlyArray<{ harness: string; dest: string }> = [
   { harness: "cursor", dest: ".cursor/rules/specify-rules.mdc" },
 ];
 
-function entry(category: string, name: string) {
+function entry(category: string, name: string, doc?: string) {
   // `phase` changed shape in spec 033: `name` is now the owning skill and the
   // document is the suffix, so a phase is addressed by its document name.
-  // `backlog-doc` did NOT change — its rows above address it by owner (`board`),
-  // which resolves to that skill's first doc, and that is the behaviour they
-  // have always had. Applying the phase rule to both would silently stop
-  // matching `board`.
+  // A `backlog-doc` is addressed by owner AND document: by owner alone it
+  // resolved to whichever of the skill's docs the bundle listed first — groom.md
+  // while `board` owned three, `backlog.md` once `task` owned five (cli#683),
+  // which silently pointed this lock at a different file.
   return CORE_BUNDLE.find((e) =>
     e.category === category &&
-    (category === "phase" ? skillDocName(e) === name : e.name === name)
+    (category === "phase"
+      ? skillDocName(e) === name
+      : e.name === name && (doc === undefined || e.suffix === doc))
   );
 }
 
@@ -100,8 +104,8 @@ Deno.test("Channel A — every reference-emitting agent preloads the contract", 
 });
 
 Deno.test("Channel B — every non-preloading surface carries the pointer", () => {
-  for (const { category, name } of CHANNEL_B_CORE) {
-    const e = entry(category, name);
+  for (const { category, name, doc } of CHANNEL_B_CORE) {
+    const e = entry(category, name, doc);
     assert(e, `${category}/${name} missing from CORE_BUNDLE`);
     assertStringIncludes(
       e.content,
@@ -123,7 +127,7 @@ Deno.test("Channel B — every non-preloading surface carries the pointer", () =
 });
 
 Deno.test("groom.md's local restatement was replaced, not left beside the pointer", () => {
-  const e = entry("backlog-doc", "board")!;
+  const e = entry("backlog-doc", "task", "groom.md")!;
   assert(
     !e.content.includes('#<num> "<short title>"'),
     "groom.md must not keep its own partial statement of the rule alongside the pointer",
@@ -143,7 +147,7 @@ Deno.test("merge.md's confirmation prompt no longer names a bare number", () => 
 // Behaviour of the per-backend `item_url` helpers.
 // ---------------------------------------------------------------------------
 
-const SCRIPTS = "../../templates/core/skills/board/scripts";
+const SCRIPTS = "../../templates/core/skills/task/scripts";
 
 /**
  * Lays a backend's scripts out so `_config.sh` resolves a project root three
@@ -151,7 +155,7 @@ const SCRIPTS = "../../templates/core/skills/board/scripts";
  */
 async function backendHarness(backend: string, config: string | null): Promise<string> {
   const tmp = await Deno.makeTempDir({ prefix: `item-url-${backend}-` });
-  const dir = `${tmp}/board/scripts/${backend}`;
+  const dir = `${tmp}/task/scripts/${backend}`;
   await Deno.mkdir(dir, { recursive: true });
   await Deno.mkdir(`${tmp}/.specnaut`, { recursive: true });
   const src = fromFileUrl(new URL(`${SCRIPTS}/${backend}/_config.sh`, import.meta.url));
@@ -173,13 +177,20 @@ async function runItemUrl(
   backend: string,
   args: string,
 ): Promise<{ code: number; out: string }> {
-  const dir = `${tmp}/board/scripts/${backend}`;
+  const dir = `${tmp}/task/scripts/${backend}`;
   await Deno.writeTextFile(
     `${dir}/probe.sh`,
     `#!/usr/bin/env bash\nset -euo pipefail\n. "$(dirname "$0")/_config.sh"\n${args}\n`,
   );
+  // `${tmp}/bin` is where a test stubs a CLI (gitlabHarness). PATH goes through
+  // the process environment, not an `export` inside the script: on Windows,
+  // bash converts an inherited PATH to POSIX form at startup, but a native path
+  // assigned inside the script is left as-is and the stub becomes unfindable.
+  // That failure is silent — the helper degrades to no output — so the
+  // degradation case would pass for the wrong reason.
   const { code, stdout } = await new Deno.Command("bash", {
     args: [`${dir}/probe.sh`],
+    env: { PATH: `${tmp}/bin:${Deno.env.get("PATH")}` },
     stdout: "piped",
     stderr: "piped",
   }).output();
@@ -225,24 +236,8 @@ async function gitlabHarness(projectId: string, glabBody: string): Promise<strin
   return tmp;
 }
 
-async function gitlabItemUrl(tmp: string, num: string): Promise<{ code: number; out: string }> {
-  const dir = `${tmp}/board/scripts/gitlab`;
-  await Deno.writeTextFile(
-    `${dir}/probe.sh`,
-    `#!/usr/bin/env bash\nset -euo pipefail\n. "$(dirname "$0")/_config.sh"\nitem_url ${num}\n`,
-  );
-  // PATH goes through the process environment, not an `export` inside the
-  // script: on Windows, bash converts an inherited PATH to POSIX form at
-  // startup, but a native path assigned inside the script is left as-is and the
-  // stub becomes unfindable. That failure is silent here — the helper degrades
-  // to no output — so the degradation case would pass for the wrong reason.
-  const { code, stdout } = await new Deno.Command("bash", {
-    args: [`${dir}/probe.sh`],
-    env: { PATH: `${tmp}/bin:${Deno.env.get("PATH")}` },
-    stdout: "piped",
-    stderr: "piped",
-  }).output();
-  return { code, out: new TextDecoder().decode(stdout).trim() };
+function gitlabItemUrl(tmp: string, num: string): Promise<{ code: number; out: string }> {
+  return runItemUrl(tmp, "gitlab", `item_url ${num}`);
 }
 
 Deno.test("gitlab item_url links directly when project_id is a path", async () => {

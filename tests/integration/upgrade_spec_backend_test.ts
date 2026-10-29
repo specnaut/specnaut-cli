@@ -65,7 +65,7 @@ Deno.test("pre-feature lock → upgrade → spec_backend: local, plan.md unchang
     // natively; released binaries embed LF from the committed bundle).
     const lf = (s: string) => s.replaceAll("\r\n", "\n");
     const onDisk = lf(
-      await Deno.readTextFile(join(dir, ".claude/skills/specnaut/phases/plan.md")),
+      await Deno.readTextFile(join(dir, ".claude/skills/task/phases/plan.md")),
     );
     assertEquals(onDisk, lf(await Deno.readTextFile(GOLDEN)));
   } finally {

@@ -52,7 +52,7 @@ export interface BacklogBackendStrategy {
    * after a successful init. Empty array = silent. Always emitted in
    * order. The same `ctx` passed to `initConfigStub` is forwarded so
    * the message can reflect whether the populated or empty stub was
-   * rendered (e.g. "ready to run /board" vs "fill in fields first").
+   * rendered (e.g. "ready to run /task" vs "fill in fields first").
    */
   initConfigMessages(ctx?: StubContext): readonly string[];
 }

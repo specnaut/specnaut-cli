@@ -20,9 +20,10 @@ import { isPluginCoveredPath } from "../../src/domain/plugin_coverage.ts";
  * chain at the seam where it is decided.
  *
  * **They use the real predicate, not a stub.** A stub would prove the plan
- * logic and say nothing about whether `board/SKILL.md` is actually covered —
- * which is the part #605 changed and the part a future edit could quietly
- * revert.
+ * logic and say nothing about whether the backlog router — `board/SKILL.md`
+ * when #605 widened coverage to it, `task/SKILL.md` since cli#683 — is actually
+ * covered, which is the part #605 changed and the part a future edit could
+ * quietly revert.
  *
  * The load-bearing precondition is stated in `plugin_coverage.ts` and asserted
  * by the parity test: every covered path must still be in `CORE_BUNDLE`.
@@ -31,7 +32,7 @@ import { isPluginCoveredPath } from "../../src/domain/plugin_coverage.ts";
  * safe while staleness is not.
  */
 
-const DEST = ".claude/skills/board/SKILL.md";
+const DEST = ".claude/skills/task/SKILL.md";
 const VANILLA = "sha-vanilla";
 
 function lockWith(entries: [string, string][]): InstalledLock {
@@ -132,7 +133,7 @@ Deno.test("a customised covered skill is preserved, never migrated", () => {
 });
 
 Deno.test("an uncovered path is untouched by plugin state", () => {
-  // The boundary the criterion draws. `board`'s SCRIPTS resolve paths relative
+  // The boundary the criterion draws. `task`'s SCRIPTS resolve paths relative
   // to their own location, so they stay binary-owned however the documents are
   // treated — the distinction the old "(project-stateful)" assertion conflated.
   const script = ".specnaut/scripts/backlog/add.sh";

@@ -67,7 +67,7 @@ export class FsPluginDetector implements PluginDetector {
    * heard of, and migrating those deletes the project's only copy and puts
    * nothing in its place. This asks the tree instead of assuming.
    *
-   * `pluginRelPath` is plugin-root-relative (`skills/board/SKILL.md`). Anything
+   * `pluginRelPath` is plugin-root-relative (`skills/task/SKILL.md`). Anything
    * absolute, or escaping the plugin directory, answers `false` — the argument
    * is assembled from a destination path, so it must not become a way to ask
    * about arbitrary files.

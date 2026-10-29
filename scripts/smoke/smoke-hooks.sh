@@ -45,6 +45,9 @@ for support in .specnaut/hooks/_guard.sh .specnaut/hooks/_approval.sh \
   .specnaut/hooks/_agents.txt .specnaut/hooks/release-commands.txt .specnaut/hooks/SHA256SUMS; do
   check "$support installed" "[ -f $support ]"
 done
+# cli#679: a CRLF checkout would change every hash SHA256SUMS pins.
+check ".specnaut/hooks/.gitattributes keeps git from converting the hooks" \
+  'grep -qxF "* -text" .specnaut/hooks/.gitattributes'
 check "check-backlog-prereqs.sh executable" '[ -x .claude/hooks/check-backlog-prereqs.sh ]'
 check "retired protect-generated copy not scaffolded" '[ ! -e .claude/hooks/protect-generated.sh ]'
 check "retired log-subagent copy not scaffolded" '[ ! -e .claude/hooks/log-subagent.sh ]'

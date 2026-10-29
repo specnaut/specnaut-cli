@@ -10,7 +10,7 @@
 //   - keeps a local history of cost and peaks per day and per git branch;
 //   - serves `/cockpit` (a pane), `/cockpit hide` and `/cockpit show`;
 //   - REFUSES one kind of tool call: the Skill call that starts `implement`,
-//     `review` or `merge` of the `specnaut` skill while a usage window is at
+//     `review` or `merge` of the `task` skill while a usage window is at
 //     or above the hold threshold. Nothing else is ever refused or rewritten.
 
 import { atom, read, update } from "claude-code";

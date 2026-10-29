@@ -28,12 +28,20 @@ type Entry = {
 
 const ENTRIES = CORE_BUNDLE as unknown as Entry[];
 
+/**
+ * `category/name`, plus `/suffix` for a sub-document — `task` owns five
+ * backlog docs, and an excuse for one must not excuse its siblings.
+ */
+const keyOf = (e: Entry) => `${e.category}/${e.name}${e.suffix ? `/${e.suffix}` : ""}`;
+
 function find(predicate: (e: Entry) => boolean): Entry | undefined {
   return ENTRIES.find(predicate);
 }
 
 Deno.test("the markdown backlog index ships only to the local backend", () => {
-  const entry = find((e) => e.suffix === "backlog.md");
+  // The project's `.specnaut/backlog.md` index — not `task/backlog.md`, the
+  // backlog verbs' document beside the `/task` router, which shares its name.
+  const entry = find((e) => e.category === "spec-root" && e.suffix === "backlog.md");
   assert(entry, "the backlog index is no longer bundled — did it move?");
   assertEquals(
     entry.backend,
@@ -66,7 +74,11 @@ const DOCUMENTS_ALL_BACKENDS: Record<string, string> = {
   "skill/backlog-reference-contract":
     "defines how an item is named across every backend; the local path is one row of that table",
   "agent/product-owner": "owns the backlog lifecycle on all three backends",
-  "backlog-skill/board": "rendered per backend at install time rather than gated in the manifest",
+  // `backlog-skill/board` until cli#683, when the backend sections moved from
+  // the router into `task/backlog.md`.
+  "backlog-doc/task/backlog.md":
+    "the backlog verbs' document, rendered per backend at install time " +
+    "rather than gated in the manifest; its parent-link table documents all three backends",
 };
 
 Deno.test("no ungated entry describes a single backend's storage layout", () => {
@@ -77,7 +89,7 @@ Deno.test("no ungated entry describes a single backend's storage layout", () => 
   const offenders = ENTRIES
     .filter((e) => e.backend == null)
     .filter((e) => typeof e.content === "string" && e.content.includes(LOCAL_ONLY_SHAPE))
-    .map((e) => `${e.category}/${e.name}`)
+    .map(keyOf)
     .filter((key) => !(key in DOCUMENTS_ALL_BACKENDS));
 
   assertEquals(
@@ -95,7 +107,7 @@ Deno.test("the allow-list has no dead entries", () => {
   const live = new Set(
     ENTRIES
       .filter((e) => typeof e.content === "string" && e.content.includes(".specnaut/backlog/"))
-      .map((e) => `${e.category}/${e.name}`),
+      .map(keyOf),
   );
   assertEquals(
     Object.keys(DOCUMENTS_ALL_BACKENDS).filter((k) => !live.has(k)),

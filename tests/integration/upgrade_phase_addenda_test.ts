@@ -166,7 +166,9 @@ Deno.test("upgrade grafts the phase-addenda pointer into an AGENTS.md that preda
     const body = after.slice(after.indexOf(START), after.indexOf(END));
     assert(after.includes(START) && after.includes(END), "no phase-addenda block");
     // The BODY, not the file — fences around nothing deliver no instruction.
-    assertStringIncludes(body, ".specnaut/addenda/<skill>/<phase>.md");
+    // cli#683: the section names each phase's addendum home, by phase.
+    assertStringIncludes(body, ".specnaut/addenda/task/<name>.md");
+    assertStringIncludes(body, ".specnaut/addenda/ship/<name>.md");
     assertEquals(after.split(START).length - 1, 1, "grafted twice");
     assert(after.startsWith(own.trimEnd()), "the user's own content must stay the exact prefix");
   });

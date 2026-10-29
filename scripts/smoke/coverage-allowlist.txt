@@ -18,12 +18,12 @@
 #
 # Example (not active — the leading # makes it a comment):
 # templates/core/skills/foo/SKILL.md  deferred to #123, assertion lands with the backend
-templates/core/skills/board/scripts/cloud/_config.sh  cloud backlog backend has no smoke of its own yet; tracked as a follow-up
-templates/core/skills/board/scripts/cloud/add.sh  cloud backlog backend has no smoke of its own yet; tracked as a follow-up
-templates/core/skills/board/scripts/cloud/clarify-comment.sh  cloud backlog backend has no smoke of its own yet; tracked as a follow-up
-templates/core/skills/board/scripts/cloud/columns.sh  cloud backlog backend has no smoke of its own yet; tracked as a follow-up
-templates/core/skills/board/scripts/cloud/list.sh  cloud backlog backend has no smoke of its own yet; tracked as a follow-up
-templates/core/skills/board/scripts/cloud/move.sh  cloud backlog backend has no smoke of its own yet; tracked as a follow-up
-templates/core/skills/board/scripts/cloud/reconcile.sh  cloud backlog backend has no smoke of its own yet; tracked as a follow-up
-templates/core/skills/board/scripts/cloud/view.sh  cloud backlog backend has no smoke of its own yet; tracked as a follow-up
+templates/core/skills/task/scripts/cloud/_config.sh  cloud backlog backend has no smoke of its own yet; tracked as a follow-up
+templates/core/skills/task/scripts/cloud/add.sh  cloud backlog backend has no smoke of its own yet; tracked as a follow-up
+templates/core/skills/task/scripts/cloud/clarify-comment.sh  cloud backlog backend has no smoke of its own yet; tracked as a follow-up
+templates/core/skills/task/scripts/cloud/columns.sh  cloud backlog backend has no smoke of its own yet; tracked as a follow-up
+templates/core/skills/task/scripts/cloud/list.sh  cloud backlog backend has no smoke of its own yet; tracked as a follow-up
+templates/core/skills/task/scripts/cloud/move.sh  cloud backlog backend has no smoke of its own yet; tracked as a follow-up
+templates/core/skills/task/scripts/cloud/reconcile.sh  cloud backlog backend has no smoke of its own yet; tracked as a follow-up
+templates/core/skills/task/scripts/cloud/view.sh  cloud backlog backend has no smoke of its own yet; tracked as a follow-up
 templates/core/root/README.md	maintainer note, not shipped — absent from templates/manifest.json, so no consumer receives it and no smoke can assert on it

@@ -113,4 +113,4 @@ fi
 [ ${#gated[@]} -gt 0 ] || guard_allow
 approval_gate merge \
   "editing ${gated[*]} changes how Specnaut gates landings on the base branch, so it needs the user" \
-  "\`merge\` (or \`/specnaut merge\`)"
+  "\`merge\` (or \`/task merge\`)"

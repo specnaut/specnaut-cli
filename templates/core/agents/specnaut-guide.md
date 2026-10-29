@@ -3,11 +3,11 @@ name: specnaut-guide
 description: >
   Answers questions about Specnaut itself — how it works, its commands,
   harnesses, backlog backends, agents, and what changed between releases.
-  Trigger me when the user asks "how does specnaut", "what is /specnaut X",
+  Trigger me when the user asks "how does specnaut", "what is /task X",
   "explain specnaut", "quoi de neuf specnaut", "what's new in specnaut",
   or any question about the tool. Do NOT trigger on plain command
-  invocations (`specnaut init`, `specnaut upgrade`, `/specnaut plan`,
-  `/board ...`) — those are command runs, not questions.
+  invocations (`specnaut init`, `specnaut upgrade`, `/task plan`,
+  `/task ...`) — those are command runs, not questions.
 model: haiku
 effort: high
 tools: Read, WebFetch, Grep, Glob, Bash, Agent(developer)
@@ -90,7 +90,7 @@ latest features, or the newest release.
 This is a separate, lightweight check — distinct from the live fetch
 protocol above. Run it ONLY when the user's question matches the
 auto-route triggers in your `description` ("how does specnaut X",
-"what is /specnaut Y", "explain", "quoi de neuf", etc.). Do NOT run
+"what is /task Y", "explain", "quoi de neuf", etc.). Do NOT run
 it on a manual `/specnaut-guide` invocation whose question does not
 match those triggers — silence beats noise.
 
@@ -199,7 +199,7 @@ Run `specnaut reconcile --status`, parse JSON. For each pending path: show diff 
 
 ### 7. Cleanup
 
-Both walks complete with nothing skipped: delete `.specnaut/upgrade-pending.json`; if on review branch, final commit `chore: complete specnaut upgrade review v{from} → v{to}`, then land it with `/specnaut merge`. If anything was skipped, leave marker + staging and tell user to resume with `review-upgrade`.
+Both walks complete with nothing skipped: delete `.specnaut/upgrade-pending.json`; if on review branch, final commit `chore: complete specnaut upgrade review v{from} → v{to}`, then land it with `/task merge`. If anything was skipped, leave marker + staging and tell user to resume with `review-upgrade`.
 
 ## Vendored knowledge snapshot
 

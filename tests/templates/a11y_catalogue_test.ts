@@ -239,7 +239,15 @@ Deno.test("the agent's leaf pointers all resolve", () => {
 });
 
 Deno.test("the a11y dispatch surface names the catalogue", () => {
-  const skill = CORE_BUNDLE.find((e) => e.category === "skill" && e.name === "a11y-audit");
-  assert(skill, "a11y-audit skill is missing from the bundle");
-  assertStringIncludes(skill.content, `${DIR}00-triage.md`);
+  // The surface is `/task audit` (formerly `/a11y-audit`); the triage gate and
+  // the router must sit on the Accessibility seat's own bullet.
+  const doc = CORE_BUNDLE.find(
+    (e) => e.category === "phase" && e.name === "task" && e.suffix === "audit.md",
+  );
+  assert(doc, "the `task` audit phase is missing from the bundle");
+  const seat = doc.content.split("\n- ").find((b) => b.startsWith("**Accessibility**"));
+  assert(seat, "audit.md carries no Accessibility knowledge-base instruction");
+  assertStringIncludes(seat, `.specnaut/${DIR}00-triage.md`);
+  assertStringIncludes(seat, `.specnaut/${DIR}README.md`);
+  assertStringIncludes(seat, "## When it is NOT a finding");
 });

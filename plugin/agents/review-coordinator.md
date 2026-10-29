@@ -1,6 +1,6 @@
 ---
 name: review-coordinator
-description: Coordinates parallel structural review agents (code, security, tests) and aggregates their findings. Use when /specnaut review is running Phase 1.
+description: Coordinates parallel structural review agents (code, security, tests) and aggregates their findings. Use when /task review is running Phase 1.
 model: opus
 effort: high
 tools: Read, Grep, Glob, Bash, Agent(code-reviewer, security-expert, test-reviewer)
@@ -15,7 +15,7 @@ in parallel and aggregate results.
 ## Inputs
 
 - The list of files changed in the current feature branch (provided by
-  `/specnaut review`).
+  `/task review`).
 
 ## Protocol
 

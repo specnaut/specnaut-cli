@@ -1,6 +1,6 @@
 ---
 name: performance-expert
-description: Reviews code for performance issues — N+1 queries, blocking I/O on hot paths, missing indexes, cache misuse, hot-path allocation, sync-in-async, large bundles, render-thrash. Two dispatch shapes — (1) PR review (spawned by the review-coordinator during /specnaut review), (2) scoped audit (spawned by a single-axis audit skill or /code-audit, over the scope it resolved).
+description: Reviews code for performance issues — N+1 queries, blocking I/O on hot paths, missing indexes, cache misuse, hot-path allocation, sync-in-async, large bundles, render-thrash. Two dispatch shapes — (1) PR review (spawned by the review-coordinator during /task review), (2) scoped audit (spawned by /task audit, over the scope it resolved).
 model: opus
 effort: high
 tools: Read, Grep, Glob, Bash
@@ -64,7 +64,7 @@ say so in one line at the top of your report.
 
 ## Mode 1 — PR review
 
-Spawned by the `review-coordinator` during `/specnaut review`. Review ONLY
+Spawned by the `review-coordinator` during `/task review`. Review ONLY
 the files provided in the prompt. Output the `FINDING` structure used by
 code-reviewer, followed by the canonical `REVIEW SUMMARY` block (see "Output
 format (Mode 1 — PR review)" below).
@@ -96,7 +96,7 @@ format (Mode 1 — PR review)" below).
 
 ## Mode 2 — Scoped audit
 
-Spawned by a single-axis audit skill or by `/code-audit`, over the scope it resolved — the whole project by default. Returns its findings inline to the caller. Read-only.
+Spawned by `/task audit`, over the scope it resolved — the whole project by default. Returns its findings inline to the caller. Read-only.
 
 ### Read-only contract (NON-NEGOTIABLE)
 

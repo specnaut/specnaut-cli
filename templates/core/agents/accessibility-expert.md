@@ -1,6 +1,6 @@
 ---
 name: accessibility-expert
-description: Reviews front-end code for WCAG 2.1 AA accessibility issues — semantic HTML, heading hierarchy, alt text, form labels, keyboard nav, focus indicators, ARIA correctness, color contrast (where computable from source). Two dispatch shapes — (1) PR review (spawned by the review-coordinator during /specnaut review), (2) scoped audit (spawned by a single-axis audit skill or /code-audit, over the scope it resolved).
+description: Reviews front-end code for WCAG 2.1 AA accessibility issues — semantic HTML, heading hierarchy, alt text, form labels, keyboard nav, focus indicators, ARIA correctness, color contrast (where computable from source). Two dispatch shapes — (1) PR review (spawned by the review-coordinator during /task review), (2) scoped audit (spawned by /task audit, over the scope it resolved).
 model: opus
 effort: high
 tools: Read, Grep, Glob, Bash
@@ -88,7 +88,7 @@ the maintained source and this definition is a summary.
 
 ## Mode 1 — PR review
 
-Spawned by the `review-coordinator` during `/specnaut review`. Review
+Spawned by the `review-coordinator` during `/task review`. Review
 ONLY the files provided in the prompt (and only if they include FE
 source — otherwise skip per the gate above). Output the `FINDING`
 structure used by code-reviewer, followed by the canonical
@@ -115,7 +115,7 @@ broken**. The leaves state the rest.
 
 ## Mode 2 — Scoped audit
 
-Spawned by a single-axis audit skill or by `/code-audit`, over the scope it
+Spawned by `/task audit`, over the scope it
 resolved — the whole project by default. Returns its findings inline to the
 caller. Read-only; **subject to the FE-surface gate above**.
 

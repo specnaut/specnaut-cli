@@ -39,15 +39,16 @@ const ALLOWED = new Map<string, string>([
   // work at it. They are NOT pinned defects — anything added here needs the
   // same kind of justification.
   ["specify|templates/plan-template.md", "states that they do not exist"],
-  ["specnaut|tasks.md", "states that they do not exist"],
+  ["task|tasks.md", "states that they do not exist"],
   // Moved out of groom with the backlog//specnaut ownership split (#540): the
-  // check reads spec artefacts and prescribes specnaut phases, so it lives
-  // with the chain it inspects. The exemption travels with it unchanged.
-  ["specnaut|auto-chain.md", "detects pre-2.0.0 spec dirs, which genuinely have one"],
+  // check reads spec artefacts and prescribes pipeline phases, so it lives
+  // with the chain it inspects — under `/task` since cli#683. The exemption
+  // travels with it unchanged.
+  ["task|auto-chain.md", "detects pre-2.0.0 spec dirs, which genuinely have one"],
   ["developer|", "tolerates a pre-2.0.0 dir without ever requiring it"],
-  ["specnaut|constitution.md", "a project's own docs/quickstart.md, not ours"],
+  ["task|constitution.md", "a project's own docs/quickstart.md, not ours"],
   ["product-owner|", "a spec the user attaches; never generated, never required"],
-  ["specify|scripts/code-audit/collect-audit-scope.sh", "the audit skill's own design records"],
+  ["specify|scripts/audit/collect-audit-scope.sh", "the audit phase's own design records"],
 ]);
 
 Deno.test("no bundled file directs an agent at an artefact 2.0.0 removed", () => {
@@ -65,4 +66,17 @@ Deno.test("no bundled file directs an agent at an artefact 2.0.0 removed", () =>
     [],
     `these bundled files still name a removed artefact:\n  ${offenders.join("\n  ")}`,
   );
+});
+
+Deno.test("every allowance still excuses a bundled file", () => {
+  // An allowance keyed on a file that moved excuses nothing while looking like
+  // it does — and it hides the day a file comes back at the old key with a
+  // stale mention. cli#683 moved four of the seven keys at once.
+  const keys = new Set(CORE_BUNDLE.map((e) => `${e.name}|${e.suffix ?? ""}`));
+  const named = new Set(
+    CORE_BUNDLE.filter((e) => REMOVED.some((p) => p.test(e.content)))
+      .map((e) => `${e.name}|${e.suffix ?? ""}`),
+  );
+  const dead = [...ALLOWED.keys()].filter((k) => !keys.has(k) || !named.has(k));
+  assertEquals(dead, [], "these allowances excuse no bundled file that names a removed artefact");
 });

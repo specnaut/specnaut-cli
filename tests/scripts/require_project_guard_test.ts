@@ -20,7 +20,7 @@ import { fromFileUrl } from "@std/path";
 import { join } from "@std/path";
 
 const SRC = fromFileUrl(
-  new URL("../../templates/core/skills/board/scripts/github/", import.meta.url),
+  new URL("../../templates/core/skills/task/scripts/github/", import.meta.url),
 );
 
 /** A `gh` that authenticates, refuses to resolve any project, and lists 1 and 7. */

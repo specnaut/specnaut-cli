@@ -103,12 +103,12 @@ Deno.test("upgrade removes every phase and template #455/#457 deleted, leaving n
     for (
       const rel of [
         ".claude/skills/specnaut/SKILL.md",
-        ".claude/skills/specnaut/phases/plan.md",
-        ".claude/skills/specnaut/phases/plan-audits.md",
-        ".claude/skills/specnaut/phases/tasks.md",
-        ".claude/skills/specnaut/phases/implement.md",
-        ".claude/skills/specnaut/phases/review.md",
-        ".claude/skills/specnaut/phases/merge.md",
+        ".claude/skills/task/phases/plan.md",
+        ".claude/skills/task/phases/plan-audits.md",
+        ".claude/skills/task/phases/tasks.md",
+        ".claude/skills/task/phases/implement.md",
+        ".claude/skills/task/phases/review.md",
+        ".claude/skills/task/phases/merge.md",
         ".specnaut/templates/plan-template.md",
         ".specnaut/templates/tasks-template.md",
       ]

@@ -73,7 +73,7 @@ async function upgradeFrom(version: string) {
     // the plan is all-unchanged and `upgrade` short-circuits to "already up to
     // date" before any of this is reached. Remove a managed file so the run has
     // real work, which is also what a genuine 1.x → 2.x upgrade looks like.
-    await Deno.remove(join(dir, ".claude/skills/specnaut/phases/tasks.md"));
+    await Deno.remove(join(dir, ".claude/skills/task/phases/tasks.md"));
     const up = await runSpecnaut(["upgrade", "--force"], dir);
     assertEquals(up.code, 0, `upgrade failed: ${up.stderr}`);
     return up.stdout;

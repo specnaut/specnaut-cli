@@ -7,8 +7,10 @@
 # outlives its turn — Stop ends it, the next prompt replaces it. A prompt then
 # mints one only when the WHOLE prompt (trimmed, lowercased, spaces collapsed,
 # a trailing . or ! dropped, an optional leading "yes, ") is one of:
-#   merge    /specnaut merge…  $specnaut merge…  merge  merge it  land it  push it
-#   release  /ship release…  /ship tag…  $ship release…  $ship tag…  release it  tag it
+#   merge    /task merge…  /specnaut-task merge…  $specnaut-task merge…  merge  merge it  land it  push it
+#   release  /ship release|tag…  /specnaut-ship release|tag…  $specnaut-ship release|tag…  release it  tag it
+# Claude spells the skills /task, /ship; Codex /specnaut-task or $specnaut-task
+# (harness_commands.ts). A test holds these spellings to harnessCommands.
 # Never a bare yes/ok/go: a reply to some other question must not land code.
 # A prompt carrying agent_id comes from a subagent, not the user (§ 11
 # Measured): nothing is minted or deleted for it.
@@ -34,11 +36,17 @@ approval_kind_of() {
     case $p in *. | *!) p=${p%?} ;; *) break ;; esac
   done
   case $p in "yes, "*) p=${p#yes, } ;; esac
-  # shellcheck disable=SC2016 # the $ is literal: Codex invokes skills as `$specnaut`
+  # shellcheck disable=SC2016 # the $ is literal: Codex invokes skills as `$specnaut-task`
   case $p in
-    merge | "merge it" | "land it" | "push it" | "/specnaut merge" | "/specnaut merge "* | '$specnaut merge' | '$specnaut merge '*)
+    merge | "merge it" | "land it" | "push it" | \
+      "/task merge" | "/task merge "* | \
+      "/specnaut-task merge" | "/specnaut-task merge "* | \
+      '$specnaut-task merge' | '$specnaut-task merge '*)
       echo merge ;;
-    "release it" | "tag it" | "/ship release" | "/ship release "* | "/ship tag" | "/ship tag "* | '$ship release' | '$ship release '* | '$ship tag' | '$ship tag '*)
+    "release it" | "tag it" | \
+      "/ship release" | "/ship release "* | "/ship tag" | "/ship tag "* | \
+      "/specnaut-ship release" | "/specnaut-ship release "* | "/specnaut-ship tag" | "/specnaut-ship tag "* | \
+      '$specnaut-ship release' | '$specnaut-ship release '* | '$specnaut-ship tag' | '$specnaut-ship tag '*)
       echo release ;;
   esac
 }

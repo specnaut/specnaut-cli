@@ -33,8 +33,8 @@ async function runSpecnaut(args: string[], cwd: string) {
 
 const INIT = ["init", "--here", "--no-git", "--ai", "claude", "--backlog", "local"];
 const CUSTOMIZED = [
-  ".claude/skills/specnaut/phases/tasks.md",
-  ".claude/skills/specnaut/phases/review.md",
+  ".claude/skills/task/phases/tasks.md",
+  ".claude/skills/task/phases/review.md",
 ];
 
 async function pending(dir: string): Promise<string[]> {
@@ -131,7 +131,7 @@ const STALE = {
   /** On disk and user-owned (`skipIfExists`), so the lock carries no entry. */
   untracked: "AGENTS.md",
   /** Tracked, and its destination already IS the new upstream. */
-  unchanged: ".claude/skills/specnaut/phases/plan.md",
+  unchanged: ".claude/skills/task/phases/plan.md",
 };
 
 async function seedStaleStaging(dir: string): Promise<void> {

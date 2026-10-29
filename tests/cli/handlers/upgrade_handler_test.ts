@@ -117,7 +117,7 @@ async function stripLockEntries(child: string): Promise<void> {
 /** A plain project, NOT parent-managed. The distinction is load-bearing for the
  * backup assertion: a parent-managed child excludes agentic entries, so nothing
  * `writeBundle` writes during a backend switch pre-exists, and the backup flag
- * is unobservable there. `.claude/skills/board/SKILL.md` ships under both
+ * is unobservable there. `.claude/skills/task/backlog.md` ships under both
  * backends, so in a plain project the switch overwrites it — which is the only
  * shape where "was it backed up" is a question with an answer. */
 async function initializedPlainProject(): Promise<string> {
@@ -178,7 +178,7 @@ Deno.test("switchBacklogBackend refuses a dest the lock cannot speak for", async
 Deno.test("a forced backend switch backs up what it overwrites", async () => {
   const dir = await initializedPlainProject();
   try {
-    const overwritten = join(dir, ".claude/skills/board/SKILL.md");
+    const overwritten = join(dir, ".claude/skills/task/backlog.md");
     const original = await Deno.readTextFile(overwritten);
     await stripLockEntries(dir);
 
@@ -242,14 +242,14 @@ Deno.test("a backend switch backs up what it deletes", async () => {
       true,
       `the switch must report where it put the copy, got: ${JSON.stringify(backups)}`,
     );
-    // …and nothing it merely rewrote. `.claude/skills/board/SKILL.md` ships
+    // …and nothing it merely rewrote. `.claude/skills/task/backlog.md` ships
     // under both backends, so this switch overwrote it — and the forced test
     // above proves that overwrite CAN produce a `.bak`. Here it must not: the
     // guard this switch cleared proves the file was vanilla, and copying aside
     // what Specnaut generated and can regenerate buried the one backup that
     // matters under thirty that do not.
     assertEquals(
-      (await bakFiles(dir)).some((f) => f.endsWith("board/SKILL.md.specnaut.bak")),
+      (await bakFiles(dir)).some((f) => f.endsWith("task/backlog.md.specnaut.bak")),
       false,
       "an unforced switch leaves no .bak for a vanilla file it rewrote",
     );

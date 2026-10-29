@@ -48,7 +48,7 @@ Deno.test("init --backlog local renders the local backlog skill", async () => {
     assertEquals(r.code, 0, r.stderr);
 
     const skill = await Deno.readTextFile(
-      join(parent, "demo/.claude/skills/board/SKILL.md"),
+      join(parent, "demo/.claude/skills/task/backlog.md"),
     );
     assertStringIncludes(skill, "Backend: local Markdown files");
     assertEquals(skill.includes("Backend: GitHub"), false);
@@ -109,7 +109,7 @@ Deno.test("init --backlog github renders the github skill + writes config stub",
     assertEquals(r.code, 0, r.stderr);
 
     const skill = await Deno.readTextFile(
-      join(parent, "demo/.claude/skills/board/SKILL.md"),
+      join(parent, "demo/.claude/skills/task/backlog.md"),
     );
     assertStringIncludes(skill, "Backend: GitHub Issues + Project");
     assertEquals(skill.includes("Backend: local Markdown"), false);
@@ -154,7 +154,7 @@ Deno.test("init --backlog cloud renders the cloud skill + writes config stub (no
     assertEquals(r.code, 0, r.stderr);
 
     const skill = await Deno.readTextFile(
-      join(parent, "demo/.claude/skills/board/SKILL.md"),
+      join(parent, "demo/.claude/skills/task/backlog.md"),
     );
     assertStringIncludes(skill, "Backend: Specnaut Cloud");
     assertEquals(skill.includes("Backend: local Markdown"), false);
@@ -224,7 +224,7 @@ Deno.test("init --backlog gitlab renders the gitlab skill + writes config stub",
     assertEquals(r.code, 0, r.stderr);
 
     const skill = await Deno.readTextFile(
-      join(parent, "demo/.claude/skills/board/SKILL.md"),
+      join(parent, "demo/.claude/skills/task/backlog.md"),
     );
     assertStringIncludes(skill, "Backend: GitLab Issues + scoped Status labels");
     assertEquals(skill.includes("Backend: local Markdown"), false);
@@ -317,7 +317,7 @@ Deno.test("upgrade --backlog github switches a local project to github", async (
 
     // Skill re-rendered
     const skill = await Deno.readTextFile(
-      join(projectDir, ".claude/skills/board/SKILL.md"),
+      join(projectDir, ".claude/skills/task/backlog.md"),
     );
     assertStringIncludes(skill, "Backend: GitHub Issues + Project");
     assertEquals(skill.includes("Backend: local Markdown"), false);

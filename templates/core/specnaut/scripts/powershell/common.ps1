@@ -230,7 +230,7 @@ function Get-FeaturePathsEnv {
 
     # Resolve feature directory.  Priority:
     #   1. SPECIFY_FEATURE_DIRECTORY env var (explicit override)
-    #   2. .specnaut/feature.json "feature_directory" key (persisted by /specnaut.specify)
+    #   2. .specnaut/feature.json "feature_directory" key (persisted by /task plan)
     #   3. Branch-name-based prefix lookup (same as scripts/bash/common.sh)
     $featureJson = Join-Path $repoRoot '.specnaut/feature.json'
     $featureDirSource = 'branch'

@@ -26,7 +26,7 @@ architecture.
    (A directory scaffolded before 2.0.0 may also carry `spec.md` and friends;
    read them if present, but never require them.)
 4. **Read the domain model** — `plan.md` § 6 (Technical context → Domain
-   model) on the spec path, or the Product Owner's `/board brief` output on
+   model) on the spec path, or the Product Owner's `/task brief` output on
    the direct-implementation path. If it is absent or empty, return BLOCKED
    with reason `awaiting:product-owner-domain-brief` and stop. Do not proceed
    without it.

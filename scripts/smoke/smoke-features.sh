@@ -45,17 +45,20 @@ check "create-new-feature.ps1 scaffolds from plan-template (#457)" \
 echo
 echo "═══ #69 + #93  backlog backends + strategy refactor ═══"
 check "lock records local backend" 'grep -q "backlog_backend: local" .specnaut/installed.lock'
-check "backlog SKILL.md present" '[ -f .claude/skills/board/SKILL.md ]'
-check "SKILL renders local backend section" \
-  'grep -q "Backend: local Markdown" .claude/skills/board/SKILL.md'
+# Spec 037: the backlog skill is `/task`. Its router is SKILL.md; the
+# per-backend sections moved to backlog.md, and both are backend-filtered.
+check "backlog SKILL.md present" '[ -f .claude/skills/task/SKILL.md ] && [ -f .claude/skills/task/backlog.md ]'
+check "the /board skill is not scaffolded (spec 037)" '[ ! -e .claude/skills/board ]'
+check "backlog.md renders local backend section" \
+  'grep -q "Backend: local Markdown" .claude/skills/task/backlog.md'
 check "github section stripped (local backend)" \
-  '! grep -q "Backend: GitHub" .claude/skills/board/SKILL.md'
+  '! grep -q "Backend: GitHub" .claude/skills/task/SKILL.md .claude/skills/task/backlog.md'
 check "gitlab section stripped (local backend)" \
-  '! grep -q "Backend: GitLab" .claude/skills/board/SKILL.md'
+  '! grep -q "Backend: GitLab" .claude/skills/task/SKILL.md .claude/skills/task/backlog.md'
 check "no orphan BEGIN markers" \
-  '! grep -q "BEGIN: backend=" .claude/skills/board/SKILL.md'
+  '! grep -q "BEGIN: backend=" .claude/skills/task/SKILL.md .claude/skills/task/backlog.md'
 check "no orphan END markers" \
-  '! grep -q "END: backend=" .claude/skills/board/SKILL.md'
+  '! grep -q "END: backend=" .claude/skills/task/SKILL.md .claude/skills/task/backlog.md'
 
 echo
 echo "═══ v1.0.0  consolidated specnaut router ═══"
@@ -67,77 +70,73 @@ check ".claude/commands/ is not created at all (#533)" \
   '[ ! -e .claude/commands ]'
 check "router .claude/skills/specnaut/SKILL.md present" \
   '[ -f .claude/skills/specnaut/SKILL.md ]'
-for phase in plan plan-audits tasks implement review merge merge-squash epic-commits quality-gates epic-fixups merge-close epic-loop constitution upgrade; do
-  check ".claude/skills/specnaut/phases/$phase.md present" \
-    "[ -f .claude/skills/specnaut/phases/$phase.md ]"
-done
 # Explicit literal-name assertions for the audit's basename-substring
-# coverage scan — the interpolated loop above hides $phase.md from
-# `grep -qF`, so each phase needs its filename rendered in the source.
+# coverage scan — smoke-task.sh's interpolated phase loop hides $phase.md
+# from `grep -qF`, so each phase needs its filename rendered in the source.
 check "phase doc plan.md scaffolded" \
-  '[ -f .claude/skills/specnaut/phases/plan.md ]'
+  '[ -f .claude/skills/task/phases/plan.md ]'
 check "phase doc plan-audits.md scaffolded (#456)" \
-  '[ -f .claude/skills/specnaut/phases/plan-audits.md ]'
+  '[ -f .claude/skills/task/phases/plan-audits.md ]'
 check "plan-audits.md dispatches BOTH auditors (#456)" \
-  'grep -q "architect-expert" .claude/skills/specnaut/phases/plan-audits.md && grep -q "security-expert" .claude/skills/specnaut/phases/plan-audits.md'
+  'grep -q "architect-expert" .claude/skills/task/phases/plan-audits.md && grep -q "security-expert" .claude/skills/task/phases/plan-audits.md'
 # Companion docs, named literally for the audit's basename scan — the
 # interpolated loop above hides them from `grep -qF`. Both exist because
 # their host phase ran out of room under a since-removed harness's
 # 12,000-character cap — the split stands on its own:
 # merge.md was at 11,960 (#558), implement.md at 11,377 (#556).
 check "companion doc merge-squash.md scaffolded (#558)" \
-  '[ -f .claude/skills/specnaut/phases/merge-squash.md ]'
+  '[ -f .claude/skills/task/phases/merge-squash.md ]'
 check "merge.md routes to it rather than carrying the rules (#558)" \
-  'grep -qF "phases/merge-squash.md" .claude/skills/specnaut/phases/merge.md'
+  'grep -qF "phases/merge-squash.md" .claude/skills/task/phases/merge.md'
 check "merge-squash.md kept the rule that makes a squash safe (#558)" \
-  'grep -qF "byte-identical" .claude/skills/specnaut/phases/merge-squash.md'
+  'grep -qF "byte-identical" .claude/skills/task/phases/merge-squash.md'
 check "companion doc epic-commits.md scaffolded (#556)" \
-  '[ -f .claude/skills/specnaut/phases/epic-commits.md ]'
+  '[ -f .claude/skills/task/phases/epic-commits.md ]'
 # #554 consolidated implement.md's two epic pointers into one, so the route
 # to the commit format is now implement -> epic-loop -> epic-commits. Asserted
 # as the whole CHAIN rather than one hop: a broken middle link would leave the
 # original one-hop check green while nothing reached the format at all.
 check "an epic reaches the commit format: implement -> epic-loop -> epic-commits (#556)" \
-  'P=.claude/skills/specnaut/phases;
+  'P=.claude/skills/task/phases;
    grep -qF "phases/epic-loop.md" "$P/implement.md" &&
    grep -qF "phases/epic-commits.md" "$P/epic-loop.md" &&
    [ -f "$P/epic-commits.md" ]'
 check "epic-commits.md carries the Epic trailer and the width-agnostic parse (#556)" \
-  'grep -qF "Epic: #" .claude/skills/specnaut/phases/epic-commits.md &&
-   grep -qF "T(\\d+)" .claude/skills/specnaut/phases/epic-commits.md'
+  'grep -qF "Epic: #" .claude/skills/task/phases/epic-commits.md &&
+   grep -qF "T(\\d+)" .claude/skills/task/phases/epic-commits.md'
 check "epic-commits.md names no test tool (constitution: stack-agnostic)" \
-  '! grep -qiE "jest|vitest|playwright|pytest|rspec|junit" .claude/skills/specnaut/phases/epic-commits.md'
+  '! grep -qiE "jest|vitest|playwright|pytest|rspec|junit" .claude/skills/task/phases/epic-commits.md'
 # #554 — the loop itself. Four phase docs learned that an epic is one unit,
 # and the loop's rules live in one companion so the four cannot drift.
 check "companion doc epic-loop.md scaffolded (#554)" \
-  '[ -f .claude/skills/specnaut/phases/epic-loop.md ]'
+  '[ -f .claude/skills/task/phases/epic-loop.md ]'
 check "implement.md runs an epic as a loop (#554)" \
-  'grep -qF "phases/epic-loop.md" .claude/skills/specnaut/phases/implement.md'
+  'grep -qF "phases/epic-loop.md" .claude/skills/task/phases/implement.md'
 check "plan.md makes an epic ONE plan with ONE stop (#554 AC9/AC10)" \
-  'flat="$(tr "\n" " " < .claude/skills/specnaut/phases/plan.md)";
+  'flat="$(tr "\n" " " < .claude/skills/task/phases/plan.md)";
    grep -qF "An epic is one plan" <<<"$flat" && grep -qF "not one per" <<<"$flat"'
 check "tasks.md makes an epic ONE tasks.md (#554 AC8)" \
-  'grep -qF "An epic is one" .claude/skills/specnaut/phases/tasks.md'
+  'grep -qF "An epic is one" .claude/skills/task/phases/tasks.md'
 check "review.md stops only on the LAST child (#554 AC12/AC13)" \
-  'flat="$(tr "\n" " " < .claude/skills/specnaut/phases/review.md)";
+  'flat="$(tr "\n" " " < .claude/skills/task/phases/review.md)";
    grep -qF "does not stop the run" <<<"$flat" &&
    grep -qF "last child" <<<"$flat"'
 check "the loop iterates sub-issues, not tasks.md entries (#554 AC8/D3)" \
-  'grep -qF "Board sub-issues, one per commit" .claude/skills/specnaut/phases/epic-loop.md'
+  'grep -qF "Board sub-issues, one per commit" .claude/skills/task/phases/epic-loop.md'
 check "it re-reads the child list each iteration (#554 AC11/D5)" \
-  'grep -qF "added mid-flight" .claude/skills/specnaut/phases/epic-loop.md'
+  'grep -qF "added mid-flight" .claude/skills/task/phases/epic-loop.md'
 check "resume reads commits, never issue state (#554 AC16/AC17)" \
-  'flat="$(tr "\n" " " < .claude/skills/specnaut/phases/epic-loop.md)";
+  'flat="$(tr "\n" " " < .claude/skills/task/phases/epic-loop.md)";
    grep -qF "no state file" <<<"$flat" &&
    grep -qF "not use issue state as a progress signal" <<<"$flat"'
 check "a child's card goes In progress then In review, never Done here (#554 AC15/D17)" \
-  'flat="$(tr "\n" " " < .claude/skills/specnaut/phases/epic-loop.md)";
+  'flat="$(tr "\n" " " < .claude/skills/task/phases/epic-loop.md)";
    grep -qF "Move its card to In review" <<<"$flat" &&
    grep -qF "it is not Done" <<<"$flat"'
 check "the loop never returns to the user between children (#554 AC3)" \
-  'grep -qF "does not return to the user between children" .claude/skills/specnaut/phases/epic-loop.md'
+  'grep -qF "does not return to the user between children" .claude/skills/task/phases/epic-loop.md'
 check "the two T counters are named as different counters (#554 AC18)" \
-  'grep -qF "not the same counter" .claude/skills/specnaut/phases/epic-loop.md'
+  'grep -qF "not the same counter" .claude/skills/task/phases/epic-loop.md'
 
 # #553 — one branch per epic. Both twins, and the two degradation outcomes
 # that AC 14 requires to be distinguishable: a missing install is fixable
@@ -169,11 +168,11 @@ check "no new flag was introduced (#553 AC7/D1)" \
 # issue is open as REOPENED, so moving the card first manufactures the exact
 # state an existing tool is built to flag.
 check "companion doc merge-close.md scaffolded (#560)" \
-  '[ -f .claude/skills/specnaut/phases/merge-close.md ]'
+  '[ -f .claude/skills/task/phases/merge-close.md ]'
 check "merge.md routes to it after a push (#560)" \
-  'grep -qF "phases/merge-close.md" .claude/skills/specnaut/phases/merge.md'
+  'grep -qF "phases/merge-close.md" .claude/skills/task/phases/merge.md'
 check "the epic path closes every child AND the epic (#560 AC1)" \
-  'grep -qF "N children" .claude/skills/specnaut/phases/merge-close.md'
+  'grep -qF "N children" .claude/skills/task/phases/merge-close.md'
 # The three checks below were one check, and it certified a file that broke
 # the rule it is named for. It flattened merge-close.md and grepped for the
 # rule sentence plus "REOPENED" — both of which live in the ordering section.
@@ -183,7 +182,7 @@ check "the epic path closes every child AND the epic (#560 AC1)" \
 # only prose cannot tell the two apart. So: one check that the rule is stated
 # and argued, and one per path that the two operations appear in that order.
 check "the ordering rule is stated once, and says why (#560 AC4)" \
-  'flat="$(tr "\n" " " < .claude/skills/specnaut/phases/merge-close.md)";
+  'flat="$(tr "\n" " " < .claude/skills/task/phases/merge-close.md)";
    grep -qF "close the issue first, then move the card" <<<"$flat" &&
    grep -qF "REOPENED" <<<"$flat"'
 # The standalone path names both operations as commands, so its order is
@@ -196,80 +195,80 @@ check "the STANDALONE path closes before it moves, in that order (#588 AC4)" \
         s && /gh issue close <linked_issue>/ && !c {c=NR}
         s && /move\.sh <linked_issue> Done/ && !m {m=NR}
         END{exit !(c && m && c < m)}" \
-     .claude/skills/specnaut/phases/merge-close.md'
+     .claude/skills/task/phases/merge-close.md'
 # The epic path issues no literal commands — it states the order in prose, so
 # the order IS the sentence. Reversing the procedure means rewriting this
 # phrase, which is what makes a phrase match binding here and not elsewhere.
 check "the EPIC path closes before it moves, in that order (#588 AC4)" \
   'grep -qF "close the issue with a reason, then move its card" \
-     <<<"$(tr "\n" " " < .claude/skills/specnaut/phases/merge-close.md)"'
+     <<<"$(tr "\n" " " < .claude/skills/task/phases/merge-close.md)"'
 check "cascade-check still gates the parent close (#560 AC2)" \
-  'grep -qF "cascade-check.sh <epic>" .claude/skills/specnaut/phases/merge-close.md'
+  'grep -qF "cascade-check.sh <epic>" .claude/skills/task/phases/merge-close.md'
 check "children are enumerated from the branch, not from memory (#560)" \
-  'grep -qF "did not ship" .claude/skills/specnaut/phases/merge-close.md'
+  'grep -qF "did not ship" .claude/skills/task/phases/merge-close.md'
 check "the report names every item, not a count (#560 AC5)" \
-  'flat="$(tr "\n" " " < .claude/skills/specnaut/phases/merge-close.md)";
+  'flat="$(tr "\n" " " < .claude/skills/task/phases/merge-close.md)";
    grep -qF "One line per issue closed" <<<"$flat" &&
    grep -qF "could not move and why" <<<"$flat"'
 check "nothing closes when the merge did not push (#560 AC6)" \
-  'grep -qF "only when the push" .claude/skills/specnaut/phases/merge-close.md'
+  'grep -qF "only when the push" .claude/skills/task/phases/merge-close.md'
 
 # #587 — a shipped feature's spec directory is removed at the merge. The code
 # is the authority afterwards; the plan is already in git history, which is
 # what makes the removal lossless. Each check below guards a condition whose
 # loss turns a cleanup into data destruction or into a silent no-op.
 check "the standalone path removes the spec directory (#587 AC1)" \
-  'flat="$(tr "\n" " " < .claude/skills/specnaut/phases/merge-close.md)";
+  'flat="$(tr "\n" " " < .claude/skills/task/phases/merge-close.md)";
    grep -qF "Remove the feature'"'"'s spec directory" <<<"$flat" &&
    grep -qF "feature_directory" <<<"$flat"'
 # The load-bearing one. Without the history check the step deletes the only
 # copy of a plan that never got its plan-time commit.
 check "the removal refuses a directory git has never seen (#587 AC2)" \
-  'grep -qF "git log --all --oneline" .claude/skills/specnaut/phases/merge-close.md'
+  'grep -qF "git log --all --oneline" .claude/skills/task/phases/merge-close.md'
 # Since autopilot the authorisation is the push itself (one yes at the review
 # verdict under merge: manual), so the invariant is "never one without the other".
 check "one authorisation covers the close AND the removal, with no second prompt (#587 AC3)" \
   'grep -qF "never one without the other" \
-     <<<"$(tr "\n" " " < .claude/skills/specnaut/phases/merge-close.md)"'
+     <<<"$(tr "\n" " " < .claude/skills/task/phases/merge-close.md)"'
 check "the removal is its own commit, not folded into the merge (#587 AC4)" \
-  'grep -qF "remove the spec directory for the shipped feature" .claude/skills/specnaut/phases/merge-close.md'
+  'grep -qF "remove the spec directory for the shipped feature" .claude/skills/task/phases/merge-close.md'
 # An epic is one branch over one tree: a per-child removal would aim at the
 # same directory N times and strand the children still to be closed.
 check "an epic removes one directory once, never per child (#587 AC5)" \
-  'grep -qF "Never per child" .claude/skills/specnaut/phases/merge-close.md'
+  'grep -qF "Never per child" .claude/skills/task/phases/merge-close.md'
 # feature.json NAMES the removed directory, and common.sh never checks that
 # the name still resolves: get_feature_paths returns the deleted path with
 # exit 0 and no warning, its branch-contradiction guard skipped off a feature
 # branch. Measured, not reasoned. The removal must take it along.
 check "the removal takes feature.json with it, not just the directory (#587)" \
   'grep -qF "git rm -r --quiet \"<feature_directory>\" .specnaut/feature.json" \
-     .claude/skills/specnaut/phases/merge-close.md'
+     .claude/skills/task/phases/merge-close.md'
 check "a skip is reported, never silent (#587 AC6)" \
-  'grep -qF "Report the removal, or the reason there wasn" .claude/skills/specnaut/phases/merge-close.md'
+  'grep -qF "Report the removal, or the reason there wasn" .claude/skills/task/phases/merge-close.md'
 # auto-chain.md walks the same directories and must NOT delete. Its read-only
 # line survives verbatim; what it gained is why it does not contradict the
 # phase that does delete — without that, the next reader reads one of the two
 # as a bug.
 check "orphan detection stays read-only, and says why that is not a contradiction (#587 AC8)" \
-  'flat="$(tr "\n" " " < .claude/skills/specnaut/phases/auto-chain.md)";
+  'flat="$(tr "\n" " " < .claude/skills/task/phases/auto-chain.md)";
    grep -qF "never delete or modify spec files" <<<"$flat" &&
    grep -qF "merge-close.md\` step 8" <<<"$flat"'
 check "the false retention claim is gone from auto-chain.md (#587 AC7)" \
-  '! grep -qF "historical records" .claude/skills/specnaut/phases/auto-chain.md'
+  '! grep -qF "historical records" .claude/skills/task/phases/auto-chain.md'
 check "the legacy spec.md rule survives the reword (#587 AC9)" \
-  'grep -qF "Has \`spec.md\` but no \`plan.md\`" .claude/skills/specnaut/phases/auto-chain.md'
+  'grep -qF "Has \`spec.md\` but no \`plan.md\`" .claude/skills/task/phases/auto-chain.md'
 
 # #559 — a fixup folds into ITS OWN child, and the fold is verified here
 # rather than borrowed from squash-by-scope, which governs the other path and
 # since #558 lives in another file entirely. AC 7 is the load-bearing one.
 check "companion doc epic-fixups.md scaffolded (#559)" \
-  '[ -f .claude/skills/specnaut/phases/epic-fixups.md ]'
+  '[ -f .claude/skills/task/phases/epic-fixups.md ]'
 check "merge.md folds fixups before merging an epic (#559)" \
-  'grep -qF "phases/epic-fixups.md" .claude/skills/specnaut/phases/merge.md'
+  'grep -qF "phases/epic-fixups.md" .claude/skills/task/phases/merge.md'
 check "a fixup is written against its own child, not matched afterwards (#559)" \
-  'grep -qF "git commit --fixup=" .claude/skills/specnaut/phases/epic-fixups.md'
+  'grep -qF "git commit --fixup=" .claude/skills/task/phases/epic-fixups.md'
 check "the fold verifies the tree did not move (#559 AC5)" \
-  'grep -qF "byte-identical" .claude/skills/specnaut/phases/epic-fixups.md'
+  'grep -qF "byte-identical" .claude/skills/task/phases/epic-fixups.md'
 # Prose wraps. A phrase that reads as one sentence is several lines in the
 # file, and a line-based grep misses it — three assertions today have failed
 # for exactly that, on this ticket and on #557 and #561 before it. Newlines
@@ -277,31 +276,31 @@ check "the fold verifies the tree did not move (#559 AC5)" \
 # exits early, and under `pipefail` that SIGPIPEs the producer and decides
 # the assertion on the writer's death instead of the content (#550).
 check "and it says so for THIS procedure, not by inheritance (#559 AC7)" \
-  'grep -qF "does not reach here" <<<"$(tr "\n" " " < .claude/skills/specnaut/phases/epic-fixups.md)"'
+  'grep -qF "does not reach here" <<<"$(tr "\n" " " < .claude/skills/task/phases/epic-fixups.md)"'
 check "the fold verifies the worktree is empty afterwards (#559 AC6)" \
-  'grep -qF "git status --short" .claude/skills/specnaut/phases/epic-fixups.md'
+  'grep -qF "git status --short" .claude/skills/task/phases/epic-fixups.md'
 check "a surviving fixup! is a finding, not something to fold by eye (#559)" \
-  'grep -qF "folding it by" .claude/skills/specnaut/phases/epic-fixups.md'
+  'grep -qF "folding it by" .claude/skills/task/phases/epic-fixups.md'
 check "the fold does not read diff exit 2 as \"they differ\" (#559)" \
-  'flat="$(tr "\n" " " < .claude/skills/specnaut/phases/epic-fixups.md)";
+  'flat="$(tr "\n" " " < .claude/skills/task/phases/epic-fixups.md)";
    grep -qF "is not \"they differ\"" <<<"$flat" &&
    grep -qF "check for exit" <<<"$flat"'
 
 # #557 — merge.md routes by history rule, and the epic path does not squash.
 # Each of these is a sentence a later edit would plausibly "simplify" away.
 check "merge.md asks the BRANCH which rule applies, not the board (#557)" \
-  'grep -qF "Epic: #" .claude/skills/specnaut/phases/merge.md &&
-   grep -qF "log <base>..HEAD" .claude/skills/specnaut/phases/merge.md'
+  'grep -qF "Epic: #" .claude/skills/task/phases/merge.md &&
+   grep -qF "log <base>..HEAD" .claude/skills/task/phases/merge.md'
 check "merge.md says an epic branch is NOT squashed (#557)" \
-  'grep -qF "The epic branch is not squashed" .claude/skills/specnaut/phases/merge.md'
+  'grep -qF "The epic branch is not squashed" .claude/skills/task/phases/merge.md'
 check "merge.md keeps one merge decision for the whole epic (#557)" \
-  'grep -qF "not one per child" .claude/skills/specnaut/phases/merge.md'
+  'grep -qF "not one per child" .claude/skills/task/phases/merge.md'
 check "merge.md says a failing full tier is repaired, not escalated (#557)" \
-  'grep -qF "hand the epic back" .claude/skills/specnaut/phases/merge.md'
+  'grep -qF "hand the epic back" .claude/skills/task/phases/merge.md'
 check "merge-squash.md no longer reads as an absolute over both paths (#557)" \
-  'grep -qF "not \"either kind of branch\"" .claude/skills/specnaut/phases/merge-squash.md'
+  'grep -qF "not \"either kind of branch\"" .claude/skills/task/phases/merge-squash.md'
 check "companion doc quality-gates.md scaffolded (#555)" \
-  '[ -f .claude/skills/specnaut/phases/quality-gates.md ]'
+  '[ -f .claude/skills/task/phases/quality-gates.md ]'
 check "gates.yml scaffolded with both tiers declared empty (#555)" \
   '[ -f .specnaut/gates.yml ] &&
    grep -qE "^fast_gate:" .specnaut/gates.yml &&
@@ -311,24 +310,24 @@ check "workflow.yml scaffolded with merge: auto as the default" \
 check "run-gate.sh scaffolded + executable (#555)" \
   '[ -x .specnaut/scripts/bash/run-gate.sh ]'
 check "size-ratchet.sh scaffolded + executable, run by the quality gates (#651)" \
-  '[ -x .specnaut/scripts/bash/size-ratchet.sh ] && grep -qF "size-ratchet.sh --since" .claude/skills/specnaut/phases/quality-gates.md'
+  '[ -x .specnaut/scripts/bash/size-ratchet.sh ] && grep -qF "size-ratchet.sh --since" .claude/skills/task/phases/quality-gates.md'
 check "merge-mode.sh, base-branch.sh, groom-rules.sh scaffolded; merge-mode reads the default as auto (spec 036)" \
   '[ -x .specnaut/scripts/bash/base-branch.sh ] && [ -x .specnaut/scripts/bash/groom-rules.sh ] &&
    [ "$(bash .specnaut/scripts/bash/merge-mode.sh 2>/dev/null)" = auto ]'
 check "run-gate.ps1 twin scaffolded (#555)" \
   '[ -f .specnaut/scripts/powershell/run-gate.ps1 ]'
 check "an epic reaches the fast tier: implement -> epic-loop -> run-gate (#555)" \
-  'P=.claude/skills/specnaut/phases;
+  'P=.claude/skills/task/phases;
    grep -qF "phases/epic-loop.md" "$P/implement.md" &&
    grep -qF "run-gate.sh fast" "$P/epic-loop.md" &&
    grep -qF "phases/quality-gates.md" "$P/epic-loop.md"'
 check "merge.md runs the full tier once, never per child (#555)" \
-  'grep -qF "run-gate.sh full" .claude/skills/specnaut/phases/merge.md &&
-   grep -qF "Never per child" .claude/skills/specnaut/phases/merge.md'
+  'grep -qF "run-gate.sh full" .claude/skills/task/phases/merge.md &&
+   grep -qF "Never per child" .claude/skills/task/phases/merge.md'
 check "quality-gates.md states the full tier runs once, before the merge (#555)" \
-  'grep -qF "never per child" .claude/skills/specnaut/phases/quality-gates.md'
+  'grep -qF "never per child" .claude/skills/task/phases/quality-gates.md'
 check "an undeclared tier degrades rather than failing (#555)" \
-  'grep -qF "is not a failure" .claude/skills/specnaut/phases/quality-gates.md'
+  'grep -qF "is not a failure" .claude/skills/task/phases/quality-gates.md'
 # AC 2, asserted as a sweep over the whole mechanism rather than one file.
 # Specnaut is stack-agnostic; a tool name in ANY of these surfaces ends that,
 # and a check on one file would pass while the name sat in another.
@@ -343,15 +342,21 @@ check "no surface of the gate mechanism names a test tool (#555 AC2)" \
        .specnaut/gates.yml \
        .specnaut/scripts/bash/run-gate.sh \
        .specnaut/scripts/powershell/run-gate.ps1 \
-       .claude/skills/specnaut/phases/quality-gates.md'
+       .claude/skills/task/phases/quality-gates.md'
 check "phase doc constitution.md scaffolded" \
-  '[ -f .claude/skills/specnaut/phases/constitution.md ]'
+  '[ -f .claude/skills/task/phases/constitution.md ]'
 check "phase doc upgrade.md scaffolded, and routed by the router" \
   '[ -f .claude/skills/specnaut/phases/upgrade.md ] && grep -q "phases/upgrade.md" .claude/skills/specnaut/SKILL.md'
 check "removed phases do NOT scaffold (#455)" \
-  '! ls .claude/skills/specnaut/phases/ | grep -qE "^(brainstorm|specify|clarify|analyze|checklist|list-skills|lite-heuristic)\.md$"'
+  '! ls .claude/skills/specnaut/phases/ .claude/skills/task/phases/ | grep -qE "^(brainstorm|specify|clarify|analyze|checklist|list-skills|lite-heuristic)\.md$"'
 check "phase doc tasks.md scaffolded" \
-  '[ -f .claude/skills/specnaut/phases/tasks.md ]'
+  '[ -f .claude/skills/task/phases/tasks.md ]'
+check "phase doc audit.md scaffolded, and routed by the /task router (spec 037)" \
+  '[ -f .claude/skills/task/phases/audit.md ] && grep -qF "phases/audit.md" .claude/skills/task/SKILL.md'
+check "phase doc doc.md scaffolded, and routed by the /specnaut router (spec 037)" \
+  '[ -f .claude/skills/specnaut/phases/doc.md ] && grep -qF "phases/doc.md" .claude/skills/specnaut/SKILL.md'
+check "phase doc list.md scaffolded, and routed by the /specnaut router (spec 037)" \
+  '[ -f .claude/skills/specnaut/phases/list.md ] && grep -qF "phases/list.md" .claude/skills/specnaut/SKILL.md'
 # Spec 033 moved these two out of /specnaut and into /ship. The assertions
 # follow the documents rather than the router: they are still scaffolded, at a
 # different owner's address, and a check left pointing at the old path would
@@ -363,11 +368,26 @@ check "ship doc tag.md scaffolded (was specnaut/phases/tag-version.md)" \
 check "ship doc release.md scaffolded (was specnaut/phases/release-version.md)" \
   '[ -f .claude/skills/ship/phases/release.md ]'
 check "the retired addresses are gone, not duplicated" \
-  '[ ! -f .claude/skills/specnaut/phases/tag-version.md ] && [ ! -f .claude/skills/specnaut/phases/release-version.md ]'
+  '[ ! -f .claude/skills/specnaut/phases/tag-version.md ] && [ ! -f .claude/skills/specnaut/phases/release-version.md ] &&
+   [ ! -f .claude/skills/task/phases/tag-version.md ] && [ ! -f .claude/skills/task/phases/release-version.md ]'
 check "the retired audit phases are not scaffolded (spec 034)" \
-  '[ -z "$(ls .claude/skills/specnaut/phases/audit-*.md 2>/dev/null)" ]'
-check "the router answers a retired audit phase with its replacement (spec 034)" \
-  'grep -q "/specnaut audit. is retired" .claude/skills/specnaut/SKILL.md && grep -q "/sec-audit" .claude/skills/specnaut/SKILL.md'
+  '[ -z "$(ls .claude/skills/specnaut/phases/audit-*.md .claude/skills/task/phases/audit-*.md 2>/dev/null)" ]'
+# Spec 037 folded the audit phase and all six audit skills into `/task audit`.
+# Each retired address must map to its own flag — a table that sent all five
+# axes to the bare verb would pass a check that only looked for the names.
+check "the router answers the retired audit phase with /task audit (spec 034, 037)" \
+  'grep -qF "| \`/specnaut audit\` (any axis or spelling) | \`/task audit\`" .claude/skills/specnaut/SKILL.md &&
+   grep -qF "| \`/code-audit\` | \`/task audit\` |" .claude/skills/specnaut/SKILL.md'
+while read -r old flag; do
+  check "the router maps the retired /$old to /task audit $flag (spec 037)" \
+    'grep -qF "| \`/$old\` | \`/task audit $flag\` |" .claude/skills/specnaut/SKILL.md'
+done <<'EOF'
+sec-audit --security
+arch-audit --archi
+perf-audit --perf
+a11y-audit --a11y
+dep-audit --deps
+EOF
 check "the retired workflow skills are not scaffolded (spec 034)" \
   '[ -z "$(ls -d .claude/skills/{brainstorming,writing-plans,executing-plans,subagent-driven-development,requesting-code-review,verification-before-completion,using-specnaut} 2>/dev/null)" ] && [ ! -f .specnaut/harness-tools.md ]'
 check "AGENTS.md carries the per-harness dispatch rule (spec 034, cli#599)" \
@@ -466,8 +486,8 @@ echo "═══ #75  loop.md + groom phase ═══"
 # of the adapter files lives directly in CI's release.yml pre-flight
 # (Plugin pre-flight step).
 check ".claude/loop.md scaffolded" '[ -f .claude/loop.md ]'
-check "groom ships beside the board skill, not as a router phase" \
-  '[ -f .claude/skills/board/groom.md ] && [ ! -e .claude/skills/specnaut/phases/groom.md ]'
+check "groom ships beside the /task router, not as a phase" \
+  '[ -f .claude/skills/task/groom.md ] && [ ! -e .claude/skills/task/phases/groom.md ]'
 
 echo
 echo "═══ #77  manual-only flags ═══"
@@ -589,31 +609,31 @@ check "propagator carries the SPECNAUT_INTERNAL_PROPAGATION recursion guard" \
   'grep -q "SPECNAUT_INTERNAL_PROPAGATION" .specnaut/scripts/backlog/propagate-parent-status.sh'
 
 echo
-echo "═══ #180  SKILL.md — Epics & sub-tasks section ═══"
-check "SKILL.md gains an Epics & sub-tasks section" \
-  'grep -q "Epics & sub-tasks" .claude/skills/board/SKILL.md'
-check "SKILL.md describes the --parent flag" \
-  'grep -q -- "--parent" .claude/skills/board/SKILL.md'
-check "SKILL.md describes the cascade-check close gate" \
-  'grep -q "cascade-check.sh" .claude/skills/board/SKILL.md'
+echo "═══ #180  backlog.md — Epics & sub-tasks section ═══"
+check "backlog.md gains an Epics & sub-tasks section" \
+  'grep -q "Epics & sub-tasks" .claude/skills/task/backlog.md'
+check "backlog.md describes the --parent flag" \
+  'grep -q -- "--parent" .claude/skills/task/backlog.md'
+check "backlog.md describes the cascade-check close gate" \
+  'grep -q "cascade-check.sh" .claude/skills/task/backlog.md'
 
 echo
 echo "═══ #251  auto-chain — chain mechanics file present ═══"
 check "phases/auto-chain.md is bundled into the project" \
-  'test -f .claude/skills/specnaut/phases/auto-chain.md'
+  'test -f .claude/skills/task/phases/auto-chain.md'
 # #455 dropped the `#` and renamed the re-entry section. Asserting the
 # invariant the doc exists to state — one stop by default, the second only
 # under `merge: manual` — rather than a punctuation mark.
 check "auto-chain.md documents the plan stop and the opt-in second stop" \
-  'grep -q "STOP 1" .claude/skills/specnaut/phases/auto-chain.md && grep -q "STOP 2" .claude/skills/specnaut/phases/auto-chain.md && grep -q "There is ONE stop" .claude/skills/specnaut/phases/auto-chain.md'
+  'grep -q "STOP 1" .claude/skills/task/phases/auto-chain.md && grep -q "STOP 2" .claude/skills/task/phases/auto-chain.md && grep -q "There is ONE stop" .claude/skills/task/phases/auto-chain.md'
 check "auto-chain.md documents re-entry without a flag" \
-  'grep -qi "Re-entry" .claude/skills/specnaut/phases/auto-chain.md'
-check "router SKILL.md parses --manual flag" \
-  'grep -q -- "--manual" .claude/skills/specnaut/SKILL.md'
-check "router SKILL.md routes to phases/auto-chain.md when chain mode is on" \
-  'grep -q "phases/auto-chain.md" .claude/skills/specnaut/SKILL.md'
-check "router SKILL.md no longer recommends /specnaut-auto for end-to-end runs" \
-  '! grep -q "use \`/specnaut-auto specify" .claude/skills/specnaut/SKILL.md'
+  'grep -qi "Re-entry" .claude/skills/task/phases/auto-chain.md'
+check "the /task router parses --manual flag" \
+  'grep -q -- "--manual" .claude/skills/task/SKILL.md'
+check "the /task router routes to phases/auto-chain.md when chain mode is on" \
+  'grep -q "phases/auto-chain.md" .claude/skills/task/SKILL.md'
+check "the /task router no longer recommends /specnaut-auto for end-to-end runs" \
+  '! grep -q "use \`/specnaut-auto specify" .claude/skills/task/SKILL.md'
 check "specnaut-auto skill is removed (auto-chain is the /specnaut default)" \
   '! test -d .claude/skills/specnaut-auto'
 
@@ -664,34 +684,34 @@ check "create-new-feature.ps1 says so when no bash is available to run the helpe
 check "create-new-feature.sh exposes --issue flag" \
   'grep -q -- "--issue" .specnaut/scripts/bash/create-new-feature.sh'
 check "plan.md persists linked_issue into feature.json" \
-  'grep -q "linked_issue" .claude/skills/specnaut/phases/plan.md'
+  'grep -q "linked_issue" .claude/skills/task/phases/plan.md'
 # Both re-anchored by #560: the close block moved to the merge-close
 # companion, so this is where feature.json is read and the PO is dispatched.
 # merge.md keeps a routing assertion instead — a companion nobody loads is a
 # deletion, and that is the half the move created.
 check "the close step reads feature.json.linked_issue and closes the loop" \
-  'grep -q "linked_issue" .claude/skills/specnaut/phases/merge-close.md'
+  'grep -q "linked_issue" .claude/skills/task/phases/merge-close.md'
 check "the close step dispatches the PO for the close comment" \
-  'grep -q "product-owner" .claude/skills/specnaut/phases/merge-close.md'
+  'grep -q "product-owner" .claude/skills/task/phases/merge-close.md'
 check "merge.md routes to the close step rather than carrying it" \
-  'grep -qF "phases/merge-close.md" .claude/skills/specnaut/phases/merge.md &&
-   ! grep -q "product-owner" .claude/skills/specnaut/phases/merge.md'
+  'grep -qF "phases/merge-close.md" .claude/skills/task/phases/merge.md &&
+   ! grep -q "product-owner" .claude/skills/task/phases/merge.md'
 
 echo
 echo "═══ Developer agent doctrine — Domain Model gate (PR #249) ═══"
 check "plan.md carries the domain model in its technical context (#457)" \
-  'grep -q "Domain model\|domain model" .claude/skills/specnaut/phases/plan.md'
+  'grep -q "Domain model\|domain model" .claude/skills/task/phases/plan.md'
 check "implement.md halts BLOCKED when the Domain Model is absent" \
-  'grep -q "awaiting:product-owner-domain-brief" .claude/skills/specnaut/phases/implement.md'
+  'grep -q "awaiting:product-owner-domain-brief" .claude/skills/task/phases/implement.md'
 
 echo
 echo "═══ Phase-doc drift fixes — auto-chain default ═══"
 check "auto-chain.md infers re-entry from artefacts, with no flag (#455)" \
-  'grep -q "Re-entry, without a flag" .claude/skills/specnaut/phases/auto-chain.md'
+  'grep -q "Re-entry, without a flag" .claude/skills/task/phases/auto-chain.md'
 check "review.md owns STOP #2 (no /specnaut-auto handoff)" \
-  '! grep -q "hand back to \`/specnaut-auto\`" .claude/skills/specnaut/phases/review.md'
+  '! grep -q "hand back to \`/specnaut-auto\`" .claude/skills/task/phases/review.md'
 check "review.md surfaces the verdict summary from phases/auto-chain.md and follows the merge mode" \
-  'grep -q "verdict summary defined in" .claude/skills/specnaut/phases/review.md && grep -q "merge mode" .claude/skills/specnaut/phases/review.md'
+  'grep -q "verdict summary defined in" .claude/skills/task/phases/review.md && grep -q "merge mode" .claude/skills/task/phases/review.md'
 
 echo
 echo "═══ specnaut-guide review-upgrade protocol ═══"
@@ -719,14 +739,14 @@ check "vendored snapshot mentions specnaut reconcile" \
 
 echo
 echo "═══ #455  the lite chain and its flags are gone ═══"
-check "router SKILL.md keeps --manual as the only chain flag" \
-  'grep -q -- "--manual" .claude/skills/specnaut/SKILL.md && ! grep -qE -- "--lite|--full|--once|--continue" .claude/skills/specnaut/SKILL.md'
+check "the /task router keeps --manual as the only chain flag" \
+  'grep -q -- "--manual" .claude/skills/task/SKILL.md && ! grep -qE -- "--lite|--full|--once|--continue" .claude/skills/task/SKILL.md'
 check "auto-chain.md no longer carries a lite-chain shape" \
-  '! grep -qE "Lite chain|workflow_shape|CHAIN_SHAPE" .claude/skills/specnaut/phases/auto-chain.md'
+  '! grep -qE "Lite chain|workflow_shape|CHAIN_SHAPE" .claude/skills/task/phases/auto-chain.md'
 check "auto-chain.md states autopilot is the default (#458)" \
-  'grep -q "Autopilot is the default" .claude/skills/specnaut/phases/auto-chain.md'
+  'grep -q "Autopilot is the default" .claude/skills/task/phases/auto-chain.md'
 check "auto-chain.md refuses the stalling excuses (#458)" \
-  'grep -q "real code gets written" .claude/skills/specnaut/phases/auto-chain.md'
+  'grep -q "real code gets written" .claude/skills/task/phases/auto-chain.md'
 check "scaffolded AGENTS.md carries the stop rule (#458)" \
   'grep -q "runs on autopilot after the plan" AGENTS.md'
 check "the chain-stops section is fenced so upgrade can deliver it (#466)" \
@@ -736,12 +756,12 @@ echo "═══ #442  Backlog references name the item, not just its number ═�
 # Repointed off the retired command shim (#533), which the board skill
 # replaced. The absence check was passing vacuously against the missing file —
 # `! grep` on a path that does not exist succeeds.
-check "the board skill exists to be checked at all" \
-  '[ -f .claude/skills/board/SKILL.md ]'
-check "the board skill points at the backlog-reference-contract" \
-  'grep -q "backlog-reference-contract" .claude/skills/board/SKILL.md'
-check "the board skill does not restate the rule (single canonical copy)" \
-  '! grep -q "Never a number alone" .claude/skills/board/SKILL.md'
+check "the backlog skill exists to be checked at all" \
+  '[ -f .claude/skills/task/SKILL.md ] && [ -f .claude/skills/task/backlog.md ]'
+check "the backlog skill points at the backlog-reference-contract" \
+  'grep -q "backlog-reference-contract" .claude/skills/task/SKILL.md'
+check "the backlog skill does not restate the rule (single canonical copy)" \
+  '! grep -q "Never a number alone" .claude/skills/task/SKILL.md .claude/skills/task/backlog.md'
 # The negative alone made deleting the rule from the product turn the suite
 # GREENER. A rule asserted only by its absence elsewhere is not asserted.
 check "and the rule itself exists where it is supposed to live" \
@@ -825,9 +845,9 @@ check "no automatic re-dispatch: zero findings stays a legitimate result" \
 # The consumer of the gate. Without this the coordinator can say fail and the
 # chain still reaches the merge prompt.
 check "the review phase stops the run when a seat did not report" \
-  'grep -qF "SEATS_REPORTED <" .claude/skills/specnaut/phases/review.md'
+  'grep -qF "SEATS_REPORTED <" .claude/skills/task/phases/review.md'
 check "and re-dispatching narrower is allowed, repeating the brief is not" \
-  'grep -qF "Repeating the same brief is not" .claude/skills/specnaut/phases/review.md'
+  'grep -qF "Repeating the same brief is not" .claude/skills/task/phases/review.md'
 
 echo "═══ #547  the thirteen skills nothing asserted on ═══"
 # These shipped covered by an audit that could not fail: every skill's file
@@ -835,36 +855,6 @@ echo "═══ #547  the thirteen skills nothing asserted on ═══"
 # names what the skill PROMISES — a presence check would satisfy the coverage
 # token and close none of the hole, which is this feature's own defect coming
 # back through the door marked done.
-
-# --- the five per-axis audits share a scope contract ---------------------
-# `body` strips the frontmatter: everything below the second `---`. Without it
-# the scope assertion is satisfied by the `argument-hint:` line alone, so all
-# five skills could be truncated to five lines with every check still green —
-# found in review, and it is the exact failure this feature exists to prevent.
-body() { awk 'BEGIN{c=0} /^---$/{c++; next} c>=2' "$1"; }
-for axis in a11y arch dep perf sec; do
-  check "$axis-audit scaffolded" \
-    "[ -f .claude/skills/$axis-audit/SKILL.md ]"
-  check "$axis-audit frontmatter declares its own name" \
-    "head -5 .claude/skills/$axis-audit/SKILL.md | grep -q 'name: $axis-audit'"
-  check "$axis-audit documents all three scopes in its body, not just its frontmatter" \
-    "body .claude/skills/$axis-audit/SKILL.md > /tmp/_ax.txt && grep -q -- '--path' /tmp/_ax.txt && grep -q -- '--range' /tmp/_ax.txt && grep -q -- '--diff' /tmp/_ax.txt"
-  check "$axis-audit dispatches one expert and never a team" \
-    "grep -q 'never a team, never' .claude/skills/$axis-audit/SKILL.md"
-done
-# Literal paths for the coverage token (024-R1) — the loop above interpolates
-# $axis and so is invisible to it, the same reason the phase block at the top
-# of this file spells its filenames out.
-check "a11y-audit .claude/skills/a11y-audit/SKILL.md audits against WCAG 2.1 AA" \
-  'body .claude/skills/a11y-audit/SKILL.md | grep -q "WCAG 2.1 AA"'
-check "arch-audit .claude/skills/arch-audit/SKILL.md names hex-layer drift" \
-  'body .claude/skills/arch-audit/SKILL.md | grep -q "hex-layer"'
-check "dep-audit .claude/skills/dep-audit/SKILL.md names typosquats" \
-  'body .claude/skills/dep-audit/SKILL.md | grep -q "typosquats"'
-check "perf-audit .claude/skills/perf-audit/SKILL.md names N+1 queries" \
-  'body .claude/skills/perf-audit/SKILL.md | grep -qF "N+1"'
-check "sec-audit .claude/skills/sec-audit/SKILL.md names SSRF" \
-  'body .claude/skills/sec-audit/SKILL.md | grep -q "SSRF"'
 
 # --- the five output contracts define a named machine-readable block -----
 check "workflow-contract .claude/skills/workflow-contract/SKILL.md is not user-invocable" \
@@ -966,19 +956,16 @@ check "backlog-reference-contract bans a bare number" \
 check "AGENTS.md carries the phase-addenda managed section" \
   'grep -q "Specnaut: phase-addenda" AGENTS.md'
 check "the /specnaut router reads the specnaut addendum" \
-  'grep -qF ".specnaut/addenda/specnaut/<phase>.md" .claude/skills/specnaut/SKILL.md'
+  'grep -qF ".specnaut/addenda/specnaut/<verb>.md" .claude/skills/specnaut/SKILL.md'
+check "the /task router reads the task addendum, audit included (spec 037)" \
+  'grep -qF ".specnaut/addenda/task/<verb>.md" .claude/skills/task/SKILL.md &&
+   grep -qF "\`merge\`, \`audit\`, \`constitution\`" .claude/skills/task/SKILL.md'
 check "the /ship router reads the ship addendum" \
   'grep -qF ".specnaut/addenda/ship/<phase>.md" .claude/skills/ship/SKILL.md'
 check "init scaffolds no addenda tree — the seam is opt-in by file" \
   'test ! -e .specnaut/addenda'
 
-# --- the three that share nothing with each other ------------------------
-check "code-audit .claude/skills/code-audit/SKILL.md runs its seats in parallel" \
-  'grep -q "parallel" .claude/skills/code-audit/SKILL.md'
-# `grep -q -- "--last"` was satisfied by `--lastN`, so it pinned nothing —
-# found by mutating the template and watching this assertion stay green.
-check "code-audit scopes by commit count with --last <n>" \
-  'grep -qF -- "--last <n>" .claude/skills/code-audit/SKILL.md'
+# --- the two that share nothing with each other --------------------------
 check "status-audit .claude/skills/status-audit/SKILL.md reads the agent ledger" \
   'grep -q ".specnaut/logs/agents.jsonl" .claude/skills/status-audit/SKILL.md'
 # alias-example is deliberately NOT bundled — verified by scaffolding: 21

@@ -54,10 +54,10 @@ Deno.test("specnaut init --ai codex scaffolds a Codex layout", async () => {
     // Codex team-shared skills (v1.0.0 consolidated layout)
     assertEquals(await exists(join(root, ".agents/skills/specnaut/SKILL.md")), true);
     assertEquals(
-      await exists(join(root, ".agents/skills/specnaut/phases/plan.md")),
+      await exists(join(root, ".agents/skills/specnaut-task/phases/plan.md")),
       true,
     );
-    assertEquals(await exists(join(root, ".agents/skills/specnaut-board/SKILL.md")), true);
+    assertEquals(await exists(join(root, ".agents/skills/specnaut-task/SKILL.md")), true);
     // #409: the deprecated specnaut-auto alias no longer scaffolds.
     assertEquals(await exists(join(root, ".agents/skills/specnaut-auto/SKILL.md")), false);
     // Old per-phase folders are gone post-consolidation.
@@ -93,7 +93,7 @@ Deno.test("specnaut init --ai codex scaffolds a Codex layout", async () => {
     assertEquals(agentsMd.includes(".claude/"), false);
 
     // Top-level skill folders post-consolidation: specnaut router +
-    // specnaut-board + 5 output-contract skills (#378 + #445:
+    // specnaut-task + 5 output-contract skills (#378 + #445:
     // workflow-contract, handoff-protocol, review-findings-contract,
     // qa-report-contract, backlog-reference-contract) + code-audit (#379) + 5 per-axis audit skills
     // (#380: arch-audit, sec-audit, perf-audit, dep-audit, a11y-audit) +
@@ -105,16 +105,24 @@ Deno.test("specnaut init --ai codex scaffolds a Codex layout", async () => {
     // of 25 — it had been stale for four features, because nothing checks a
     // comment. Do not restore it: the number below is the fact, and the list
     // above is history. Bump the number when a skill is added, and say which.
-    // Phase documents land under specnaut/phases/, not as top-level skills.
-    // code-audit's scope script ships under
-    // .specnaut/scripts/code-audit/, not as a skill folder; status-audit's
+    // Phase documents land under specnaut-task/phases/, not as top-level skills.
+    // The audit scope script ships under
+    // .specnaut/scripts/audit/, not as a skill folder; status-audit's
     // schema doc ships to .specnaut/logs/README.md, also not a skill folder.
     const agentsSkillsCount = (await Array.fromAsync(
       Deno.readDir(join(root, ".agents/skills")),
     )).length;
     // 27 since spec 033 (/ship is a top-level skill folder; its documents live
-    // inside it). 20 since spec 034 retired seven skills.
-    assertEquals(agentsSkillsCount, 20);
+    // inside it). 20 since spec 034 retired seven skills. 14 since cli#683:
+    // `board`, `code-audit` and the five `*-audit` skills became `specnaut-task`.
+    assertEquals(agentsSkillsCount, 14);
+    for (const retired of ["specnaut-board", "specnaut-code-audit", "specnaut-sec-audit"]) {
+      assertEquals(
+        await exists(join(root, ".agents/skills", retired)),
+        false,
+        `${retired} is retired`,
+      );
+    }
     const codexAgentsCount = (await Array.fromAsync(
       Deno.readDir(join(root, ".codex/agents")),
     )).length;

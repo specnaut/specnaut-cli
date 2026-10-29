@@ -13,18 +13,24 @@ import { walk } from "@std/fs";
  * against rewraps.
  */
 const SYNC_PAIRS: ReadonlyArray<{ plugin: string; source: string }> = [
-  // Consolidated router skill (v1.0.0).
+  // The /specnaut router (v1.0.0). Since cli#683 it carries only the
+  // framework verbs — `doc`, `list`, `upgrade` — and the one "Retired
+  // addresses" table; the pipeline moved to /task.
   {
     plugin: "plugin/skills/specnaut/SKILL.md",
     source: "templates/core/skills/specnaut/SKILL.md",
   },
-  // Phase reference docs, loaded by the router on demand. The five
-  // `audit-<axis>` phases were retired in spec 034 — the per-axis skills
-  // below took their work. `brainstorm`, `specify`, `clarify`, `analyze`, `checklist`,
-  // `list-skills` and the `lite-heuristic` contract doc were removed in
-  // #455 / #456 — the chain is `plan → tasks → implement → review → merge`
-  // and `plan` absorbed the first four. `plan-audits` is a contract doc
-  // `plan` loads at step 6 — not routable, synced through the same channel.
+  ...["doc", "list", "upgrade"].map((name) => ({
+    plugin: `plugin/skills/specnaut/phases/${name}.md`,
+    source: `templates/core/skills/specnaut/phases/${name}.md`,
+  })),
+  // The /task router (cli#683) — the former `board` skill plus the pipeline
+  // taken from /specnaut and the audits merged from `code-audit` and the five
+  // `*-audit` skills. Its phase and contract docs moved byte-for-byte from
+  // `specnaut/phases/` (only addresses changed), so they keep the one channel
+  // they had: every one is a mirror. `plan-audits`, `auto-chain`, `epic-*`,
+  // `merge-*` and `quality-gates` are contract docs, not verbs — synced all
+  // the same, because the router loads them on demand.
   ...[
     "plan",
     "plan-audits",
@@ -32,15 +38,8 @@ const SYNC_PAIRS: ReadonlyArray<{ plugin: string; source: string }> = [
     "implement",
     "review",
     "merge",
+    "audit",
     "constitution",
-    "upgrade",
-    // Seven docs the list had never claimed, found by the completeness sweep
-    // All seven were already byte-identical to their sources —
-    // correct by luck, since nothing compared them. `auto-chain` is the
-    // contract the router loads when it chains; the `epic-*` and `merge-*`
-    // docs and `quality-gates` are loaded by `merge` and `implement`. Every
-    // one of them is a mirror; the only reason they were absent is that
-    // nobody added them.
     "auto-chain",
     "epic-commits",
     "epic-fixups",
@@ -49,11 +48,11 @@ const SYNC_PAIRS: ReadonlyArray<{ plugin: string; source: string }> = [
     "merge-squash",
     "quality-gates",
   ].map((name) => ({
-    plugin: `plugin/skills/specnaut/phases/${name}.md`,
-    source: `templates/core/skills/specnaut/phases/${name}.md`,
+    plugin: `plugin/skills/task/phases/${name}.md`,
+    source: `templates/core/skills/task/phases/${name}.md`,
   })),
   // The /ship skill — release concerns left /specnaut in spec 033. It owns its
-  // documents the way /board owns groom.md: the owner is the entry's `name`,
+  // documents the way /task owns groom.md: the owner is the entry's `name`,
   // the document its `suffix`.
   {
     plugin: "plugin/skills/ship/SKILL.md",
@@ -89,21 +88,6 @@ const SYNC_PAIRS: ReadonlyArray<{ plugin: string; source: string }> = [
     // rather than on a topic — so it is reached by the always-on leg and the
     // AGENTS.md fence, never by a per-seat `skills:` enumeration.
     "response-style-contract",
-  ].map((name) => ({
-    plugin: `plugin/skills/${name}/SKILL.md`,
-    source: `templates/core/skills/${name}/SKILL.md`,
-  })),
-  // Five per-axis audit-dispatch skills (#380). Markdown-only thin
-  // dispatchers (no scripts/) — unlike the script-backed `code-audit`
-  // (#379) which the plugin omits — so they mirror through the same
-  // byte-identical channel. Each binds one axis to its existing expert
-  // agent and returns findings inline.
-  ...[
-    "arch-audit",
-    "sec-audit",
-    "perf-audit",
-    "dep-audit",
-    "a11y-audit",
   ].map((name) => ({
     plugin: `plugin/skills/${name}/SKILL.md`,
     source: `templates/core/skills/${name}/SKILL.md`,
@@ -150,36 +134,32 @@ const SYNC_PAIRS: ReadonlyArray<{ plugin: string; source: string }> = [
     plugin: "plugin/agents/README.md",
     source: "templates/core/agents/README.md",
   },
-  // The `board` skill's own documents (#571). It was never in the plugin at
-  // all, while EIGHT plugin assets — `developer`, `product-owner` and
-  // `specnaut-guide`, plus five skills — dispatch to `/board`. Installing the
-  // plugin gave you agents pointing at a skill that is not there.
+  // The `task` skill's own documents — the router, the backlog verbs and the
+  // grooming docs (#571, carried over from `board` in cli#683). `board` was
+  // never in the plugin at all, while EIGHT plugin assets dispatched to it:
+  // installing the plugin gave you agents pointing at a skill that was not
+  // there. The same guard now holds for its successor.
   //
   // Its `scripts/` are deliberately NOT mirrored, and that is not a
   // preference. They are backend-filtered at init and land FLATTENED at
   // `.specnaut/scripts/backlog/<name>.sh`, and `_config.sh` resolves
   // `ROOT="$(dirname "$0")/../../.."` from that flattened destination. Under
-  // `plugin/skills/board/scripts/github/` those three levels land inside the
+  // `plugin/skills/task/scripts/github/` those three levels land inside the
   // plugin, so every script would resolve a `CONFIG` that cannot exist — 46
-  // broken files rather than a working backend. The skill's own text already
-  // points at `.specnaut/scripts/backlog/`, the project's installed location,
+  // broken files rather than a working backend. The audit scope collector
+  // (`scripts/collect-audit-scope.sh`) is excluded under the same rule. The
+  // skill's own text points at the project's installed `.specnaut/scripts/`,
   // so the documents are self-sufficient without them.
   ...[
     "SKILL.md",
+    "backlog.md",
     "groom.md",
     "groom-report.md",
     "spec-autogen.md",
   ].map((name) => ({
-    plugin: `plugin/skills/board/${name}`,
-    source: `templates/core/skills/board/${name}`,
+    plugin: `plugin/skills/task/${name}`,
+    source: `templates/core/skills/task/${name}`,
   })),
-  // `/code-audit`, missing from the plugin for the same reason and found by
-  // the same sweep. Six plugin skills route to it. Its
-  // `scripts/collect-audit-scope.sh` is excluded under the same rule.
-  {
-    plugin: "plugin/skills/code-audit/SKILL.md",
-    source: "templates/core/skills/code-audit/SKILL.md",
-  },
 ];
 
 function abs(rel: string): string {

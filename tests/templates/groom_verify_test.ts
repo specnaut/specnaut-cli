@@ -114,7 +114,7 @@ Deno.test("local: usage and unreadable items exit 2, never 'complete'", async ()
 // ---------------------------------------------------------------------------
 
 Deno.test("groom.md runs groom-verify.sh before the report and points at the rules", async () => {
-  const groom = await Deno.readTextFile(join(TEMPLATES, "core/skills/board/groom.md"));
+  const groom = await Deno.readTextFile(join(TEMPLATES, "core/skills/task/groom.md"));
   const verify = groom.indexOf(".specnaut/scripts/backlog/groom-verify.sh");
   assert(verify > 0, "groom.md never runs groom-verify.sh");
   assert(verify < groom.indexOf("## Output format"), "the verify step must come before the report");
@@ -139,7 +139,7 @@ Deno.test("every backend that ships board scripts ships groom-verify.sh", async 
   assertEquals(shipped, backends);
   for (const b of backends) {
     const e = flat.find((x) => x.backend === b && x.suffix === "groom-verify.sh")!;
-    assertEquals(e.source, `core/skills/board/scripts/${b}/groom-verify.sh`);
+    assertEquals(e.source, `core/skills/task/scripts/${b}/groom-verify.sh`);
   }
   assert(
     flat.some((e) => e.category === "spec-root" && e.suffix === "scripts/bash/groom-rules.sh"),

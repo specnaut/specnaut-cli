@@ -79,7 +79,7 @@ git config user.name "smoke-audit"
 # ignored the whole tree, and only a hand-written literal elsewhere could have
 # caught it.
 mkdir -p templates/core/agents \
-         templates/core/skills/board/scripts/github \
+         templates/core/skills/task/scripts/github \
          templates/harness-specific/claude/hooks \
          "$SYNTH_SMOKE"
 
@@ -262,8 +262,8 @@ mkdir -p templates/core/skills/lonely-skill templates/core/skills/mentioned-else
 printf -- '---\nname: lonely-skill\n---\n' > templates/core/skills/lonely-skill/SKILL.md
 printf -- '---\nname: mentioned-elsewhere\n---\n' > templates/core/skills/mentioned-elsewhere/SKILL.md
 cat >> "$SYNTH_SMOKE/smoke-features.sh" <<'EOF'
-[ -f .claude/skills/board/SKILL.md ] || { echo "missing board"; exit 1; }
-grep -q "mentioned-elsewhere" .claude/skills/board/SKILL.md || { echo "no xref"; exit 1; }
+[ -f .claude/skills/task/SKILL.md ] || { echo "missing task"; exit 1; }
+grep -q "mentioned-elsewhere" .claude/skills/task/SKILL.md || { echo "no xref"; exit 1; }
 EOF
 git add -A
 git commit -q -m "plant two skills, one named only in another file's assertion"
@@ -321,14 +321,14 @@ rm -f "$SYNTH_SMOKE/coverage-allowlist.txt"
 # one left, then flips only its allow-list reason. If unmapped stops being
 # fatal, the first half goes green and this assertion fails.
 rm -f "$SYNTH_SMOKE/smoke-stale.sh"
-# 3g's appended assertion references .claude/skills/board/SKILL.md, which has
+# 3g's appended assertion references .claude/skills/task/SKILL.md, which has
 # no source counterpart in this synthetic tree — a stale assertion that would
 # keep the isolated run non-zero for a reason unrelated to the class under
 # test. Give it its source; the same assertion then covers it.
-mkdir -p templates/core/skills/board
-printf -- '---\nname: board\n---\nmentioned-elsewhere\n' > templates/core/skills/board/SKILL.md
+mkdir -p templates/core/skills/task
+printf -- '---\nname: task\n---\nmentioned-elsewhere\n' > templates/core/skills/task/SKILL.md
 git add -A
-git commit -q -m "give the board reference a source, so the isolated run is isolated"
+git commit -q -m "give the task reference a source, so the isolated run is isolated"
 cat > "$SYNTH_SMOKE/coverage-allowlist.txt" <<'EOF'
 templates/core/agents/new-fake-agent.md  isolated run: not the class under test
 templates/core/agents/comment-only-agent.md  isolated run: not the class under test

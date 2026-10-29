@@ -34,7 +34,7 @@ const phaseDest = (name: string) => {
   if (!hit) throw new Error(`no bundled phase document named ${name}.md`);
   return hit;
 };
-const BACKLOG_SKILL = ".claude/skills/board/SKILL.md";
+const BACKLOG_SKILL = ".claude/skills/task/SKILL.md";
 
 /** Any single combination resolves a destination; the render options do not move it. */
 const LOCAL_OPTS: BundleOptions = {

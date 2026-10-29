@@ -28,7 +28,7 @@ import { fromFileUrl } from "@std/path";
  * only what it prints.
  */
 
-const GITHUB_DIR = "../../templates/core/skills/board/scripts/github";
+const GITHUB_DIR = "../../templates/core/skills/task/scripts/github";
 
 function scriptPath(rel: string): string {
   return fromFileUrl(new URL(rel, import.meta.url));

@@ -1,5 +1,6 @@
 import { assert, assertEquals, assertMatch } from "@std/assert";
 import { join } from "@std/path";
+import { harnessCommands } from "../../../src/infrastructure/harness/harness_commands.ts";
 import {
   approve,
   bashPath,
@@ -25,16 +26,19 @@ const MERGE = [
   "land it",
   "push it.",
   "yes, merge",
-  "/specnaut merge",
-  "/specnaut merge --no-close",
-  "$specnaut merge",
+  "/task merge",
+  "/task merge --no-close",
+  "/specnaut-task merge",
+  "$specnaut-task merge",
 ];
 const RELEASE = [
   "release it",
   "tag it",
   "/ship release",
   "/ship tag v2",
-  "$ship release",
+  "/specnaut-ship release",
+  "$specnaut-ship release",
+  "$specnaut-ship tag",
   "yes, release it",
 ];
 const NOTHING = [
@@ -46,8 +50,16 @@ const NOTHING = [
   "please merge it when ready",
   "don't merge",
   "merge it and then delete the branch",
-  "/specnaut merged",
-  "/specnaut review then merge",
+  "/task merged",
+  "/task review then merge",
+  "/task merge-x",
+  "/task mergex",
+  "please /task merge",
+  "/tasks merge",
+  // cli#683 retired these: they name a verb that no longer runs.
+  "/specnaut merge",
+  "$specnaut merge",
+  "$ship release",
   "mergeit",
   "release",
   "ship it",
@@ -173,5 +185,38 @@ Deno.test("no stamp for a session id that is not a plain token, or a Codex promp
     assertEquals(await stamps(sb), []);
   } finally {
     await sb.cleanup();
+  }
+});
+
+Deno.test("the merge and release commands each harness prints mint an approval (cli#683)", async () => {
+  // The hook's spellings are literals; what a user is told to type comes from
+  // harnessCommands. This holds the two together, so a renamed skill cannot
+  // leave `merge: manual` refusing the very command init printed.
+  for (const harness of HARNESSES) {
+    const sb = await sandbox();
+    try {
+      const repo = await makeRepo(sb);
+      const cmd = harnessCommands(harness);
+      assert(cmd.invocable, `${harness} invokes skills by name`);
+      for (
+        const [prompt, kind] of [
+          [cmd.skillDoc("task", "merge"), "merge"],
+          [cmd.skillDoc("ship", "release"), "release"],
+          [cmd.skillDoc("ship", "tag"), "release"],
+        ] as const
+      ) {
+        const r = await approve(sb, harness, repo, prompt);
+        assertEquals(r.code, 0, `${harness} ${prompt}: ${r.stderr}`);
+        const files = await stamps(sb);
+        assertEquals(files.length, 1, `${harness}: ${prompt} must mint one stamp`);
+        assertEquals(
+          JSON.parse(await Deno.readTextFile(files[0])).kind,
+          kind,
+          `${harness}: ${prompt}`,
+        );
+      }
+    } finally {
+      await sb.cleanup();
+    }
   }
 });
