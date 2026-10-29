@@ -57,6 +57,9 @@ Deno.test("the stop rule is inside the fences, not merely in the file", () => {
   assertStringIncludes(body!, "## The Specnaut chain runs on autopilot after the plan");
   assertStringIncludes(body!, "The end of `plan`");
   assertStringIncludes(body!, "The review verdict — only under `merge: manual`");
+  // D3 (spec 036): the file is enforced by a hook, and the stop names the word that releases it.
+  assertStringIncludes(body!, "The file is enforced, not just read");
+  assertStringIncludes(body!, "naming the word to reply");
   assertStringIncludes(body!, "`merge` and the push are automatic");
   assertStringIncludes(body!, "invoking the next phase yourself, in the same turn");
 });

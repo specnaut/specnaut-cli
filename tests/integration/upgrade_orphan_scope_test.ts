@@ -1,6 +1,7 @@
 import { assert, assertEquals, assertStringIncludes } from "@std/assert";
 import { exists } from "@std/fs/exists";
 import { fromFileUrl, join } from "@std/path";
+import { appendLock, lockText, plant, sha256 } from "./_lock_fixture.ts";
 
 const MAIN = fromFileUrl(new URL("../../src/main.ts", import.meta.url));
 
@@ -24,37 +25,6 @@ async function runSpecnaut(args: string[], cwd: string, home: string) {
   const d = new TextDecoder();
   return { code, out: d.decode(stdout) + d.decode(stderr) };
 }
-
-async function sha256(text: string): Promise<string> {
-  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(text));
-  return [...new Uint8Array(digest)].map((b) => b.toString(16).padStart(2, "0")).join("");
-}
-
-/** Write `rel` with `body` and record it in the lock as installed with `recorded`. */
-async function plant(dir: string, entries: Array<[rel: string, body: string, recorded: string]>) {
-  const lockPath = join(dir, ".specnaut/installed.lock");
-  let lock = await Deno.readTextFile(lockPath);
-  for (const [rel, body, recorded] of entries) {
-    await Deno.mkdir(join(dir, rel, ".."), { recursive: true });
-    await Deno.writeTextFile(join(dir, rel), body);
-    lock += `  ${rel}:\n    sha256: ${await sha256(recorded)}\n` +
-      `    installed_at: "2026-01-01T00:00:00Z"\n    templates_version: 6.0.0\n`;
-  }
-  await Deno.writeTextFile(lockPath, lock);
-}
-
-/** Record `rel` in the lock as installed with `recorded`, writing nothing on disk. */
-async function appendLock(dir: string, entries: Array<[rel: string, recorded: string]>) {
-  const lockPath = join(dir, ".specnaut/installed.lock");
-  let lock = await Deno.readTextFile(lockPath);
-  for (const [rel, recorded] of entries) {
-    lock += `  ${rel}:\n    sha256: ${await sha256(recorded)}\n` +
-      `    installed_at: "2026-01-01T00:00:00Z"\n    templates_version: 6.0.0\n`;
-  }
-  await Deno.writeTextFile(lockPath, lock);
-}
-
-const lockText = (dir: string) => Deno.readTextFile(join(dir, ".specnaut/installed.lock"));
 
 /**
  * A fresh Claude project, handed to `body` and removed afterwards whatever

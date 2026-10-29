@@ -8,6 +8,7 @@ import type { UpgradeMarker } from "../domain/upgrade_marker.ts";
 import type { BundleOptions } from "./bundle_options.ts";
 import type { DiskEntry } from "../domain/context_link.ts";
 import type { PreserveConfig, PreserveManifestDiagnosis } from "../domain/preserve_config.ts";
+import type { HookTrust } from "../domain/hook_trust.ts";
 
 export interface FsWriter {
   detectConflicts(bundle: Bundle, targetDir: string): Promise<string[]>;
@@ -48,6 +49,11 @@ export type BackupReport = {
    * enabled, a marketplace it re-pinned or left pointed elsewhere (#642). Absent when silent.
    */
   readonly notes?: ReadonlyArray<string>;
+  /**
+   * JSON-merged dests whose content this write changed — the merge flavor's own verdict,
+   * so no caller re-diffs the file (plan § 5). Absent when every merge was a no-op.
+   */
+  readonly mergedChanged?: ReadonlyArray<string>;
   /**
    * Context links this write made (cli#680, cli#681), and in which form: the
    * symlink, or — where the system refused it — the one-line fallback file,
@@ -252,6 +258,12 @@ export interface Harness {
    * whose siblings are the user's (`.codex/config.toml`).
    */
   readonly managedFiles?: ReadonlyArray<string>;
+  /**
+   * Set by a harness that runs project hooks only once the user trusts them and
+   * hashes what it trusted (Codex): the paths whose change voids that trust, and
+   * the note `init` / `upgrade` print when a run changed one (`hook_trust.ts`).
+   */
+  readonly hookTrust?: HookTrust;
   mapBundle(core: CoreBundle, opts: BundleOptions): Bundle;
 }
 

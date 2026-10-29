@@ -10,7 +10,9 @@ $ARGUMENTS
 - The feature branch must be checked out.
 - All Specnaut phases must have completed successfully (plan, tasks, implement, review).
 - `$ARGUMENTS` is optional and may contain, in any order:
-  - a **base branch** — the first token that is not a flag. Defaults to `main`.
+  - a **base branch** — the first token that is not a flag. Defaults to what
+    `bash .specnaut/scripts/bash/base-branch.sh` prints (`origin/HEAD`, else `init.defaultBranch`).
+    Exit 3 means the base is unknown: stop and say so — never assume `main`.
   - **`--pr`** — deliver through a pull request instead of merging locally. Off by default.
   - **`--no-close`** — merge and push, but leave the backlog item open (step 11 is skipped): for a
     feature delivered across several branches, on every branch but the last.
@@ -32,8 +34,8 @@ wanted pull requests will say so.
 
 ## Steps
 
-1. Determine the base branch from `$ARGUMENTS` (default `main`), and whether `--pr` or `--no-close`
-   was passed.
+1. Determine the base branch from `$ARGUMENTS` (default: `base-branch.sh`, above), and whether
+   `--pr` or `--no-close` was passed.
 2. Run `git status --porcelain` — abort if the working tree is dirty.
 3. Run `git fetch origin <base>` and verify the current branch is up-to-date with `origin/<base>`
    (fast-forward or rebase first if behind).
@@ -64,6 +66,10 @@ wanted pull requests will say so.
    *is* the instruction: the chain only invokes `merge` once the mode allowed it
    (`phases/auto-chain.md` reads the mode, this phase does not), and a user typing `/specnaut merge`
    asked for it. Asking again re-collects permission at the most expensive moment of the chain.
+   **Under `merge: manual` a hook holds steps 7 and 9** until the user's own prompt in this turn
+   said `merge` or `/specnaut merge` (Claude Code shows its permission prompt instead, in its
+   default modes). A refusal from it is not an obstacle to route around: quote it, tell the user
+   the word to type, and stop on the branch.
    **If the push is rejected**, report the remote's exact message and stop: the merge stays on the
    local base branch (no reset), nothing is retried — never `--force`, never an automatic rebase —
    and the close below does not run. Name the recovery: `git fetch`, reconcile, re-run

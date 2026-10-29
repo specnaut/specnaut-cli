@@ -56,11 +56,16 @@ function destinationFor(entry: CoreEntry): string {
 export class ClaudeHarness implements Harness {
   readonly key = "claude";
   readonly displayName = "Claude Code";
+  /**
+   * `.specnaut/hooks/` is here, not in `SHARED_ROOTS`: only the harnesses that
+   * register hooks write it, and that root means "every harness writes it".
+   */
   readonly managedRoots = [
     ".claude/agents/",
     ".claude/hooks/",
     ".claude/scripts/",
     ".claude/skills/",
+    ".specnaut/hooks/",
   ] as const;
 
   mapBundle(core: CoreBundle, opts: BundleOptions): Bundle {

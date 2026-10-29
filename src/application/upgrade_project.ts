@@ -33,6 +33,7 @@ import { planStaging, pruneStaging } from "./upgrade_staging.ts";
 import { removeOrphans } from "./upgrade_orphan_removal.ts";
 import { carryRenamedDocs } from "./upgrade_renames.ts";
 import { applyContextLinks, surveyContextLinks } from "./upgrade_context_links.ts";
+import { reMergeJsonFiles, splitJsonMerged } from "./upgrade_json_merges.ts";
 
 /** The plugin name used for both the install probe and the cache directory. */
 export const PLUGIN_NAME = "specnaut-plugin";
@@ -73,42 +74,35 @@ export type UpgradeProjectInput = {
 
 export type { ManagedSectionOutcome };
 
+/**
+ * Merges this run declined because the host file could not safely take the
+ * block — e.g. a `.codex/config.toml` already declaring `[agents]` (cli#599).
+ * Carried on every result rather than logged, because a refusal the user never
+ * sees is the same as the silent skip it replaced — and on the up-to-date one
+ * too, which is the likely path: a project whose only outstanding difference is
+ * the refused file lands there.
+ */
+type WithRefusals = { refusals: ReadonlyArray<string> };
+
+/** What the JSON re-merge did (`upgrade_json_merges.ts`) on a run that writes. */
+type WithMerges = {
+  /** What the merges changed that the person should hear about (#642). */
+  notes: ReadonlyArray<string>;
+  /** JSON-merged dests this run changed. */
+  mergedChanged: ReadonlyArray<string>;
+};
+
 export type UpgradeProjectResult =
-  | {
-    status: "up-to-date";
-    currentVersion: string;
-    /**
-     * Refusals still reach the user on the path where NOTHING else changed.
-     *
-     * That is not an edge case, it is the likely one: a project whose only
-     * outstanding difference is the refused file lands here, so a result type
-     * without this field dropped the message on exactly the run that needed it.
-     */
-    refusals: ReadonlyArray<string>;
-  }
-  | {
+  | WithRefusals & WithMerges & { status: "up-to-date"; currentVersion: string }
+  | WithRefusals & {
     status: "planned";
-    /**
-     * Merges this run declined because the host file could not safely take the
-     * block — e.g. a `.codex/config.toml` already declaring `[agents]`
-     * (cli#599). Carried on the result rather than logged, because a refusal
-     * the user never sees is the same as the silent skip it replaced.
-     */
-    refusals: ReadonlyArray<string>;
     plan: UpgradePlan;
     fromVersion: string;
     toVersion: string;
     managedSections: ReadonlyArray<ManagedSectionOutcome>;
   }
-  | {
+  | WithRefusals & WithMerges & {
     status: "applied";
-    /**
-     * Merges this run declined because the host file could not safely take the
-     * block — e.g. a `.codex/config.toml` already declaring `[agents]`
-     * (cli#599). Carried on the result rather than logged, because a refusal
-     * the user never sees is the same as the silent skip it replaced.
-     */
-    refusals: ReadonlyArray<string>;
     plan: UpgradePlan;
     fromVersion: string;
     toVersion: string;
@@ -127,8 +121,6 @@ export type UpgradeProjectResult =
      * the result now carries its own.
      */
     written: ReadonlyArray<string>;
-    /** What the settings merge changed that the person should hear about (#642). */
-    notes: ReadonlyArray<string>;
     /** The context links this run wrote, and in which form (cli#680). */
     contextLinks: ReadonlyArray<ContextLinkWrite>;
   };
@@ -188,18 +180,8 @@ export class UpgradeProjectUseCase {
       )
       : mappedBundle;
 
-    // JSON-merged files (e.g. `.claude/settings.json`) are user-owned: we
-    // never overwrite them, only graft our entries in. They live outside
-    // the lock-tracked plan and are re-merged at the end as a flat write.
-    const jsonMergedBundle: Bundle = {};
-    const bundle: Bundle = {};
-    for (const [dest, file] of Object.entries(fullBundle)) {
-      if (file.mergeJson !== undefined) {
-        jsonMergedBundle[dest] = file;
-      } else {
-        bundle[dest] = file;
-      }
-    }
+    // JSON-merged files are user-owned and live outside the lock-tracked plan.
+    const { jsonMerged, planned: bundle } = splitJsonMerged(fullBundle);
 
     // Refuse a merge whose host file cannot safely take the block (cli#599).
     //
@@ -426,11 +408,20 @@ export class UpgradeProjectUseCase {
       // Every dest equals the bundle here, so no staged copy has anything left
       // to reconcile — and a project already on the current release reaches
       // its next upgrade through this branch, not the applied one (#613).
+      const merges = input.dryRun
+        ? { notes: [], changed: [] }
+        : await reMergeJsonFiles(writer, jsonMerged, input.projectDir);
       if (!input.dryRun) {
         await pruneStaging(this.deps.stagingStore, input.projectDir, new Set(), refusals);
       }
       // The version reported is the one now recorded, not the one that was.
-      return { status: "up-to-date", currentVersion: templatesVersion, refusals };
+      return {
+        status: "up-to-date",
+        currentVersion: templatesVersion,
+        refusals,
+        notes: merges.notes,
+        mergedChanged: merges.changed,
+      };
     }
 
     // `--dry-run` returns here, BEFORE anything is written. It used to fall
@@ -488,19 +479,7 @@ export class UpgradeProjectUseCase {
     const relinkReport = relinked.report;
     const allWritten: Bundle = { ...toWrite, ...relinked.written };
 
-    // JSON-merged files are not part of the plan; re-graft the bundled
-    // entries into whatever the user has on disk (idempotent — already-
-    // present entries are skipped by the merge logic). Greenfield case
-    // is handled too: writeBundle will just write the bundled content
-    // when no file is present.
-    let notes: ReadonlyArray<string> = links.notes;
-    if (Object.keys(jsonMergedBundle).length > 0) {
-      const merged = await writer.writeBundle(jsonMergedBundle, input.projectDir, {
-        overwrite: true,
-        backupExisting: false,
-      });
-      notes = [...notes, ...(merged.notes ?? [])];
-    }
+    const merges = await reMergeJsonFiles(writer, jsonMerged, input.projectDir);
 
     // What this run staged is the whole of what is pending. Everything else in
     // the staging tree predates it — see `pruneStaging` (#477, #613).
@@ -574,7 +553,8 @@ export class UpgradeProjectUseCase {
       contextLinks: [...(backupReport.links ?? []), ...(relinkReport.links ?? [])],
       managedSections: appliedSections,
       written: Object.keys(allWritten).sort(),
-      notes,
+      notes: [...links.notes, ...merges.notes],
+      mergedChanged: merges.changed,
     };
   }
 }

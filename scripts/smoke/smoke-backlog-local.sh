@@ -50,6 +50,15 @@ echo "$out" | grep -q "✓ created #001" \
   || fail "expected file at .specnaut/backlog/001-first-item.md" "missing"
 
 echo
+echo "═══ groom-verify (spec 036) ═══"
+# A fresh item has no size, no priority and no outcome: the groom check must
+# say so and exit 1, never report it complete.
+rc=0; out=$(bash .specnaut/scripts/backlog/groom-verify.sh 1 2>&1) || rc=$?  # set -e: never a bare $?
+[ "$rc" = 1 ] && echo "$out" | grep -qE "#0*1:" && echo "$out" | grep -qi "size" \
+  && pass "groom-verify flags #001 as incomplete (size missing), exit 1" \
+  || fail "groom-verify on a fresh item (rc=$rc)" "$out"
+
+echo
 echo "═══ list (Backlog) ═══"
 out=$(bash .specnaut/scripts/backlog/list.sh)
 echo "$out"
@@ -157,6 +166,11 @@ bash .specnaut/scripts/backlog/add.sh "Second sibling of 1" "" --parent 1 >/dev/
   && pass "second sibling child #004 created for #263 multi-child smoke" \
   || fail "second sibling #004 not created" "$(ls .specnaut/backlog/)"
 
+# Parent #001's frontmatter status after each move below, against the expected one.
+assert_parent() {
+  local got; got=$(awk '/^---$/{n++; next} n==1 && /^status:/{sub(/^status:[[:space:]]*/, ""); print; exit}' .specnaut/backlog/001-first-item.md)
+  [ "$got" = "$1" ] && pass "$2" || fail "$3" "expected '$1', got '$got'"
+}
 # Baseline: parent #001 back to Backlog, child #003 (sub-task) back to Backlog.
 bash .specnaut/scripts/backlog/move.sh 1 Backlog >/dev/null
 bash .specnaut/scripts/backlog/move.sh 3 Backlog >/dev/null
@@ -165,17 +179,13 @@ bash .specnaut/scripts/backlog/move.sh 3 Backlog >/dev/null
 # means "groomed, waiting", not "active work" — only In progress / In review
 # / Done promote the parent).
 bash .specnaut/scripts/backlog/move.sh 3 "Ready" >/dev/null
-parent_status=$(awk '/^---$/{n++; next} n==1 && /^status:/{sub(/^status:[[:space:]]*/, ""); print; exit}' .specnaut/backlog/001-first-item.md)
-[ "$parent_status" = "Backlog" ] \
-  && pass "parent stays Backlog when child moves to Ready (AC a fidelity)" \
-  || fail "parent unexpectedly promoted on child→Ready" "expected 'Backlog', got '$parent_status'"
+assert_parent "Backlog" "parent stays Backlog when child moves to Ready (AC a fidelity)" \
+  "parent unexpectedly promoted on child→Ready"
 
 # Move child to In progress → parent should auto-promote.
 bash .specnaut/scripts/backlog/move.sh 3 "In progress" >/dev/null
-parent_status=$(awk '/^---$/{n++; next} n==1 && /^status:/{sub(/^status:[[:space:]]*/, ""); print; exit}' .specnaut/backlog/001-first-item.md)
-[ "$parent_status" = "In progress" ] \
-  && pass "parent auto-promoted from Backlog to In progress on child sub-task move" \
-  || fail "parent auto-promotion broken" "expected 'In progress', got '$parent_status'"
+assert_parent "In progress" "parent auto-promoted from Backlog to In progress on child sub-task move" \
+  "parent auto-promotion broken"
 
 # #260 regression guard: parent at 'In review' must stay there when a
 # child moves to Done WHILE other open siblings still exist. With #263
@@ -183,10 +193,8 @@ parent_status=$(awk '/^---$/{n++; next} n==1 && /^status:/{sub(/^status:[[:space
 # otherwise child #003 → Done would itself complete the set.
 bash .specnaut/scripts/backlog/move.sh 1 "In review" >/dev/null
 bash .specnaut/scripts/backlog/move.sh 3 "Done" >/dev/null
-parent_status=$(awk '/^---$/{n++; next} n==1 && /^status:/{sub(/^status:[[:space:]]*/, ""); print; exit}' .specnaut/backlog/001-first-item.md)
-[ "$parent_status" = "In review" ] \
-  && pass "parent in 'In review' stays there while #004 still open (AC c regression guard)" \
-  || fail "#260 regression guard broken" "expected 'In review', got '$parent_status'"
+assert_parent "In review" "parent in 'In review' stays there while #004 still open (AC c regression guard)" \
+  "#260 regression guard broken"
 
 echo
 echo "═══ #263  Auto-Done propagation when all Epic children Done ═══"
@@ -202,18 +210,14 @@ grep -q 'all_done=true' .specnaut/scripts/backlog/propagate-parent-status.sh \
 # State before: #001=In review, #003=Done, #004=Backlog.
 # Expected after: #001=Done (auto-promoted), #003=Done, #004=Done.
 bash .specnaut/scripts/backlog/move.sh 4 "Done" >/dev/null
-parent_status=$(awk '/^---$/{n++; next} n==1 && /^status:/{sub(/^status:[[:space:]]*/, ""); print; exit}' .specnaut/backlog/001-first-item.md)
-[ "$parent_status" = "Done" ] \
-  && pass "parent auto-advances In review → Done when last open child reaches Done (AC a)" \
-  || fail "#263 AC(a) broken" "expected 'Done', got '$parent_status'"
+assert_parent "Done" "parent auto-advances In review → Done when last open child reaches Done (AC a)" \
+  "#263 AC(a) broken"
 
 # AC(b) idempotency: moving a Done child to Done again, with parent already Done,
 # must NOT corrupt the parent's status (no-op via *) case in PARENT_STATUS).
 bash .specnaut/scripts/backlog/move.sh 4 "Done" >/dev/null
-parent_status=$(awk '/^---$/{n++; next} n==1 && /^status:/{sub(/^status:[[:space:]]*/, ""); print; exit}' .specnaut/backlog/001-first-item.md)
-[ "$parent_status" = "Done" ] \
-  && pass "re-moving a Done child to Done is idempotent on a Done parent (AC b)" \
-  || fail "#263 AC(b) idempotency broken" "expected 'Done', got '$parent_status'"
+assert_parent "Done" "re-moving a Done child to Done is idempotent on a Done parent (AC b)" \
+  "#263 AC(b) idempotency broken"
 
 # AC(c) regression guard: parent manually moved back from Done. The
 # propagator must NOT re-promote unless a fresh child→Done transition
@@ -225,10 +229,8 @@ bash .specnaut/scripts/backlog/move.sh 1 "In review" >/dev/null
 # Step 1: parent is at In review with all children at Done. The
 # propagator only fires on child moves, so a `move.sh 1 "In review"`
 # call should not re-trigger Done propagation by itself.
-parent_status=$(awk '/^---$/{n++; next} n==1 && /^status:/{sub(/^status:[[:space:]]*/, ""); print; exit}' .specnaut/backlog/001-first-item.md)
-[ "$parent_status" = "In review" ] \
-  && pass "manually demoting parent from Done to In review lands (no auto-reversal at rest, AC c)" \
-  || fail "#263 AC(c) — manual demotion not respected" "expected 'In review', got '$parent_status'"
+assert_parent "In review" "manually demoting parent from Done to In review lands (no auto-reversal at rest, AC c)" \
+  "#263 AC(c) — manual demotion not respected"
 
 # Step 2: move a Done child OUT of Done (Backlog), then to a non-Done
 # state. The propagator only fires on out-of-Backlog and Done transitions;
@@ -236,19 +238,15 @@ parent_status=$(awk '/^---$/{n++; next} n==1 && /^status:/{sub(/^status:[[:space
 # (parent should stay at In review since In review is not in Backlog/Ready).
 bash .specnaut/scripts/backlog/move.sh 4 "Backlog" >/dev/null
 bash .specnaut/scripts/backlog/move.sh 4 "In progress" >/dev/null
-parent_status=$(awk '/^---$/{n++; next} n==1 && /^status:/{sub(/^status:[[:space:]]*/, ""); print; exit}' .specnaut/backlog/001-first-item.md)
-[ "$parent_status" = "In review" ] \
-  && pass "parent at In review (manually demoted from Done) is not re-promoted on a non-Done child move (AC c)" \
-  || fail "#263 AC(c) — child→In progress re-triggers Done propagation" "expected 'In review', got '$parent_status'"
+assert_parent "In review" "parent at In review (manually demoted from Done) is not re-promoted on a non-Done child move (AC c)" \
+  "#263 AC(c) — child→In progress re-triggers Done propagation"
 
 # Parent at Backlog branch — moving a Done child to Done must not promote a
 # Backlog parent (AC a explicitly excludes Backlog). Demote parent, re-run.
 bash .specnaut/scripts/backlog/move.sh 1 "Backlog" >/dev/null
 bash .specnaut/scripts/backlog/move.sh 4 "Done" >/dev/null
-parent_status=$(awk '/^---$/{n++; next} n==1 && /^status:/{sub(/^status:[[:space:]]*/, ""); print; exit}' .specnaut/backlog/001-first-item.md)
-[ "$parent_status" = "Backlog" ] \
-  && pass "Backlog parent is not auto-advanced even when all children Done (AC a exclusion)" \
-  || fail "#263 Backlog parent exclusion broken" "expected 'Backlog', got '$parent_status'"
+assert_parent "Backlog" "Backlog parent is not auto-advanced even when all children Done (AC a exclusion)" \
+  "#263 Backlog parent exclusion broken"
 
 echo "═══ #442  local _config.sh resolves an item path ═══"
 # The local backend writes no backlog-config.yml, so _config.sh exists purely to
@@ -281,8 +279,8 @@ bash .specnaut/scripts/backlog/render-index.sh . >/dev/null 2>&1 \
 
 # Checked against each item's own `status:` frontmatter rather than against a
 # column this script moved it to earlier. The first version asserted item 1 was
-# under ## Ready because line 54 put it there — and line 147 legitimately moves
-# it back to Backlog to exercise epic propagation, so the check failed on
+# under ## Ready because "move 1 → Ready" put it there — and the #260 baseline
+# moves it back to Backlog to exercise epic propagation, so the check failed on
 # correct behaviour. An assertion that encodes an assumed state instead of the
 # invariant breaks whenever an unrelated step is added above it.
 grouping_ok=1

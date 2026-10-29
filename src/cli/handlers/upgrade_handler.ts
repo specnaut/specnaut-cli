@@ -1,11 +1,6 @@
 import { resolve } from "@std/path";
 import { bold, cyan, dim, green, red, yellow } from "@std/fmt/colors";
 import { FsUpgradeMarkerStore } from "../../infrastructure/fs_upgrade_marker_store.ts";
-import {
-  crossesMajorBoundary,
-  MIGRATION_GUIDE_PATH,
-  MIGRATION_GUIDE_URL,
-} from "../../domain/major_boundary.ts";
 import { mergeMarker } from "../../domain/upgrade_marker.ts";
 import { UpgradeProjectUseCase } from "../../application/upgrade_project.ts";
 import { findHarness } from "../harnesses.ts";
@@ -21,10 +16,10 @@ import { FsPluginDetector } from "../../infrastructure/fs_plugin_detector.ts";
 import { FsParentWorkspaceReader } from "../../infrastructure/fs_parent_workspace_reader.ts";
 import { resolveUpgradePreserves } from "./upgrade_preserve.ts";
 import { isAgenticPath, isParentManaged } from "../../domain/parent_managed.ts";
-import { backupLine, contextLinkLine, linkMovedLine } from "./write_report.ts";
 import { CORE_BUNDLE, TEMPLATES_VERSION } from "../../templates_bundle.ts";
 import { renderUnifiedDiff } from "../../domain/diff.ts";
-import { renderSummary } from "./upgrade_summary.ts";
+import { renderOutcome, renderSummary } from "./upgrade_summary.ts";
+import { printUpgradeHookTrust } from "./hook_trust_note.ts";
 import {
   type BacklogBackend,
   type InstalledLock,
@@ -312,6 +307,7 @@ export async function runUpgrade(intent: UpgradeIntent): Promise<number> {
   // rewritten lock (009-parent-managed-init / FR-007).
   let parentManagedOverride: boolean | undefined;
   const lockForDetection = await new FsLockStore().read(projectDir);
+  const harness = lockForDetection ? findHarness(lockForDetection.harness) : null;
   if (lockForDetection !== null && lockForDetection.parentManaged === undefined) {
     const parentReader = new FsParentWorkspaceReader();
     const standaloneOverride = await parentReader.hasStandaloneOverride(projectDir);
@@ -361,6 +357,9 @@ export async function runUpgrade(intent: UpgradeIntent): Promise<number> {
   }
 
   if (result.status === "up-to-date") {
+    // The JSON files are re-merged here too, so a plugin enabled on this path is said.
+    for (const note of result.notes) console.log(yellow(`ℹ ${note}`));
+    await printUpgradeHookTrust({ harness, projectDir }, result);
     console.log(green(`✓ already up to date (templates ${result.currentVersion})`));
     return 0;
   }
@@ -419,16 +418,13 @@ export async function runUpgrade(intent: UpgradeIntent): Promise<number> {
           "Re-run with --force to overwrite them (edits will be backed up to .specnaut.bak).\n",
       ),
     );
-    // Resolve the harness from the lock to render diffs in the correct file tree.
-    const lockStore = new FsLockStore();
-    const lock = await lockStore.read(projectDir);
-    const harness = lock ? findHarness(lock.harness) : null;
-    const previewBundle = harness && lock
+    // The pre-run lock's harness and options (the run keeps them) pick the diffs' file tree.
+    const previewBundle = harness && lockForDetection
       ? harness.mapBundle(CORE_BUNDLE, {
-        backlogBackend: lock.backlogBackend,
-        versionScheme: lock.versionScheme,
-        specBackend: lock.specBackend,
-        specAutogen: lock.specAutogen,
+        backlogBackend: lockForDetection.backlogBackend,
+        versionScheme: lockForDetection.versionScheme,
+        specBackend: lockForDetection.specBackend,
+        specAutogen: lockForDetection.specAutogen,
       })
       : {};
     for (const action of preserves) {
@@ -451,57 +447,7 @@ export async function runUpgrade(intent: UpgradeIntent): Promise<number> {
     return 0;
   }
 
-  if (result.backups.length > 0) {
-    console.log();
-    for (const b of result.backups) {
-      console.log(backupLine(b));
-    }
-  }
-  if (result.linksMoved.length > 0) {
-    console.log();
-    for (const b of result.linksMoved) {
-      console.log(linkMovedLine(b));
-    }
-  }
-  if (result.contextLinks.length > 0) console.log();
-  for (const link of result.contextLinks) console.log(contextLinkLine(link));
-  console.log();
-  console.log(green(`✓ upgraded to templates ${result.fromVersion} → ${result.toVersion}`));
-
-  // A run whose only outcome is skips still printed a bare green tick. That is
-  // the line people read, and it said the work was done. Name what was left,
-  // right where the eye lands, or the group above goes unread.
-  // Only files the run left alone. A `--force` run delivers the whole behind
-  // bucket, and this warning still fired for every one of them — telling the
-  // reader that "nothing will deliver them on a later run" about updates the
-  // same command had just applied, which reads as a failure and invites a
-  // pointless second pass (#519).
-  const leftBehind = result.plan.filter(
-    (a) => a.kind === "preserve" && a.staleSince && !written.has(a.dest),
-  );
-  if (leftBehind.length > 0) {
-    console.log(
-      yellow(
-        `⚠ ${leftBehind.length} file${leftBehind.length === 1 ? "" : "s"} did not receive ` +
-          `${leftBehind.length === 1 ? "an update" : "updates"} published for ` +
-          `${leftBehind.length === 1 ? "it" : "them"} — see "customized, and behind" above. ` +
-          `Nothing will deliver ${leftBehind.length === 1 ? "it" : "them"} on a later run.`,
-      ),
-    );
-  }
-
-  // A breaking upgrade is the one moment `UPGRADING.md` exists for, and until
-  // now the binary never named it — the only inbound links were the README and
-  // one published release body, neither of which somebody mid-upgrade is
-  // reading (#481). Printed only when the major actually changes, so it stays
-  // meaningful instead of becoming a line people learn to skip.
-  if (crossesMajorBoundary(result.fromVersion, result.toVersion)) {
-    console.log();
-    console.log(
-      yellow(`⚠ this crossed a major version — read the migration guide before you continue:`),
-    );
-    console.log(`  ${MIGRATION_GUIDE_PATH}  ·  ${MIGRATION_GUIDE_URL}`);
-  }
+  await renderOutcome(result, { harness, projectDir });
 
   // Write the upgrade-pending marker (preserves original `from` if a
   // marker already exists from a previous unreconciled upgrade).

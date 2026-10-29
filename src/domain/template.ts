@@ -2,6 +2,9 @@ import { isAbsolute, normalize, relative, SEPARATOR } from "@std/path";
 import { canonicalBlockBody } from "./merge_block.ts";
 import { linkIdentity } from "./context_link.ts";
 
+/** The structured JSON merges a template file may ask for — see `TemplateFile.mergeJson`. */
+export type MergeJsonFlavor = "claude-settings" | "codex-hooks";
+
 export type TemplateFile = {
   content: string;
   executable: boolean;
@@ -23,17 +26,18 @@ export type TemplateFile = {
    *
    * Currently supported flavors:
    *
-   *   - `"claude-settings"` — `.claude/settings.json` (Claude Code).
-   *     Splice rule: for each `hooks.<event>` entry in our content, append
-   *     it to the user's existing matcher group (or create one). The match
-   *     key is the hook's `command:` path — re-running is idempotent.
-   *     Other top-level fields (theme, permissions, env, attribution,
-   *     plugins, MCP, etc.) are passed through verbatim.
+   *   - `"claude-settings"` — `.claude/settings.json` (Claude Code): the
+   *     hook splice, plus `permissions.ask` and the plugin declarations.
+   *   - `"codex-hooks"` — `.codex/hooks.json` (Codex): the hook splice only.
+   *
+   *   The splice (`hook_settings_merge.ts`) replaces Specnaut's own entries in
+   *   place and never touches the user's. Other top-level fields (theme, env,
+   *   attribution, MCP, etc.) are passed through verbatim.
    *
    * JSON-merged files are NEVER raised as conflicts (`detectConflicts`
    * skips them, same as `mergeBlock` and `skipIfExists`).
    */
-  mergeJson?: "claude-settings";
+  mergeJson?: MergeJsonFlavor;
   /**
    * Refuse the merge when the host file already contains this pattern OUTSIDE
    * Specnaut's own block.

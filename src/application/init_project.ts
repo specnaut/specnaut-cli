@@ -27,6 +27,8 @@ export type InitResult =
     status: "initialized";
     /** Count of non-mergeable files written. Matches the collision-guard count. */
     filesWritten: number;
+    /** Those files' dests — what the hook-trust check reads (`hook_trust.ts`). */
+    written: string[];
     /** Paths of mergeable files (e.g. .gitignore) merged into pre-existing user content. */
     filesMerged: string[];
     warnings: string[];
@@ -35,6 +37,10 @@ export type InitResult =
     linksMoved: string[];
     /** The context links written, and in which form (cli#680). */
     contextLinks: ReadonlyArray<ContextLinkWrite>;
+    /** What a JSON merge did that the person should hear about (#642). */
+    notes: ReadonlyArray<string>;
+    /** JSON-merged dests this run changed — the flavor's verdict, via the writer. */
+    mergedChanged: ReadonlyArray<string>;
     lockWritten: boolean;
     /**
      * Destination paths skipped from the WRITE set because they were declared
@@ -213,6 +219,8 @@ export class InitProjectUseCase {
         backups: [],
         linksMoved: [],
         contextLinks: [],
+        notes: [],
+        mergedChanged: [],
         lockWritten: false,
         preserved,
       };
@@ -231,11 +239,9 @@ export class InitProjectUseCase {
     const lockEntries = new Map<string, LockEntry>();
     for (const [dest, file] of Object.entries(bundle)) {
       if (skippedSet.has(dest)) continue;
-      // JSON-merged files (#139) live entirely in user-owned space — the
-      // user's settings.json may diverge from our bundled snapshot in
-      // arbitrary ways (theme, permissions, env, …) and that's fine.
-      // We never overwrite or upgrade them, so they don't belong in the
-      // lock. Same logic as skipIfExists.
+      // JSON-merged files (#139) live in user-owned space: the user's copy may
+      // diverge from our snapshot in any way (theme, permissions, env, …). We
+      // never overwrite them, so they stay out of the lock, like skipIfExists.
       if (file.mergeJson !== undefined) continue;
       lockEntries.set(dest, {
         sha256: await sha256Hex(lockShaInput(file)),
@@ -257,21 +263,13 @@ export class InitProjectUseCase {
     };
     await lockStore.write(input.targetDir, lock);
 
-    if (input.initGit) {
-      const available = await git.isAvailable();
-      if (!available) {
-        warnings.push("git not found on PATH — skipping git init");
-      } else {
-        const already = await git.isInitialized(input.targetDir);
-        if (!already) {
-          try {
-            await git.init(input.targetDir);
-          } catch (err) {
-            const msg = err instanceof Error ? err.message : String(err);
-            warnings.push(`git init failed — ${msg}`);
-          }
-        }
-      }
+    // A git that is missing or refuses is a warning: the scaffold is already written.
+    if (input.initGit && !(await git.isAvailable())) {
+      warnings.push("git not found on PATH — skipping git init");
+    } else if (input.initGit && !(await git.isInitialized(input.targetDir))) {
+      await git.init(input.targetDir).catch((err) => {
+        warnings.push(`git init failed — ${err instanceof Error ? err.message : String(err)}`);
+      });
     }
 
     // Count from `bundleToWrite` (the post-preserve-filter set), NOT the full
@@ -284,6 +282,8 @@ export class InitProjectUseCase {
       backups: report.backups.filter((b) => b.wasSymlink !== true).map((b) => b.dest),
       linksMoved: report.backups.filter((b) => b.wasSymlink === true).map((b) => b.dest),
       contextLinks: report.links ?? [],
+      notes: report.notes ?? [],
+      mergedChanged: report.mergedChanged ?? [],
       lockWritten: true,
       preserved,
     };
@@ -295,12 +295,12 @@ export class InitProjectUseCase {
  * listed by name, every other entry is one file written. Shared by the real run
  * and the dry run, so the preview cannot count differently from the write.
  */
-function countWrites(bundle: Bundle): { filesWritten: number; filesMerged: string[] } {
+function countWrites(bundle: Bundle) {
   const filesMerged: string[] = [];
-  let filesWritten = 0;
+  const written: string[] = [];
   for (const [dest, file] of Object.entries(bundle)) {
     if (file.mergeBlock !== undefined || file.mergeJson !== undefined) filesMerged.push(dest);
-    else filesWritten++;
+    else written.push(dest);
   }
-  return { filesWritten, filesMerged };
+  return { filesWritten: written.length, written, filesMerged };
 }

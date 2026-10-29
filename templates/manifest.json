@@ -358,6 +358,14 @@
     },
     {
       "category": "backlog-script",
+      "name": "groom-verify",
+      "suffix": "groom-verify.sh",
+      "source": "core/skills/board/scripts/local/groom-verify.sh",
+      "executable": true,
+      "backend": "local"
+    },
+    {
+      "category": "backlog-script",
       "name": "add",
       "suffix": "add.sh",
       "source": "core/skills/board/scripts/local/add.sh",
@@ -433,6 +441,14 @@
       "name": "view",
       "suffix": "view.sh",
       "source": "core/skills/board/scripts/github/view.sh",
+      "executable": true,
+      "backend": "github"
+    },
+    {
+      "category": "backlog-script",
+      "name": "groom-verify",
+      "suffix": "groom-verify.sh",
+      "source": "core/skills/board/scripts/github/groom-verify.sh",
       "executable": true,
       "backend": "github"
     },
@@ -558,6 +574,14 @@
     },
     {
       "category": "backlog-script",
+      "name": "groom-verify",
+      "suffix": "groom-verify.sh",
+      "source": "core/skills/board/scripts/gitlab/groom-verify.sh",
+      "executable": true,
+      "backend": "gitlab"
+    },
+    {
+      "category": "backlog-script",
       "name": "add",
       "suffix": "add.sh",
       "source": "core/skills/board/scripts/gitlab/add.sh",
@@ -633,6 +657,14 @@
       "name": "view",
       "suffix": "view.sh",
       "source": "core/skills/board/scripts/cloud/view.sh",
+      "executable": true,
+      "backend": "cloud"
+    },
+    {
+      "category": "backlog-script",
+      "name": "groom-verify",
+      "suffix": "groom-verify.sh",
+      "source": "core/skills/board/scripts/cloud/groom-verify.sh",
       "executable": true,
       "backend": "cloud"
     },
@@ -1697,8 +1729,29 @@
     {
       "category": "spec-root",
       "name": "specify",
+      "suffix": "scripts/bash/merge-mode.sh",
+      "source": "core/specnaut/scripts/bash/merge-mode.sh",
+      "executable": true
+    },
+    {
+      "category": "spec-root",
+      "name": "specify",
+      "suffix": "scripts/bash/base-branch.sh",
+      "source": "core/specnaut/scripts/bash/base-branch.sh",
+      "executable": true
+    },
+    {
+      "category": "spec-root",
+      "name": "specify",
       "suffix": "scripts/bash/size-ratchet.sh",
       "source": "core/specnaut/scripts/bash/size-ratchet.sh",
+      "executable": true
+    },
+    {
+      "category": "spec-root",
+      "name": "specify",
+      "suffix": "scripts/bash/groom-rules.sh",
+      "source": "core/specnaut/scripts/bash/groom-rules.sh",
       "executable": true
     },
     {
@@ -1810,21 +1863,167 @@
     },
     {
       "harness": "claude",
-      "destination": ".claude/hooks/protect-generated.sh",
-      "source": "harness-specific/claude/hooks/protect-generated.sh",
+      "destination": ".specnaut/hooks/_guard.sh",
+      "source": "harness-specific/shared/hooks/_guard.sh"
+    },
+    {
+      "harness": "claude",
+      "destination": ".specnaut/hooks/_approval.sh",
+      "source": "harness-specific/shared/hooks/_approval.sh"
+    },
+    {
+      "harness": "claude",
+      "destination": ".specnaut/hooks/_command.sh",
+      "source": "harness-specific/shared/hooks/_command.sh"
+    },
+    {
+      "harness": "claude",
+      "destination": ".specnaut/hooks/_simple.sh",
+      "source": "harness-specific/shared/hooks/_simple.sh"
+    },
+    {
+      "harness": "claude",
+      "destination": ".specnaut/hooks/_git.sh",
+      "source": "harness-specific/shared/hooks/_git.sh"
+    },
+    {
+      "harness": "claude",
+      "destination": ".specnaut/hooks/approve-on-prompt.sh",
+      "source": "harness-specific/shared/hooks/approve-on-prompt.sh",
       "executable": true
     },
     {
       "harness": "claude",
-      "destination": ".claude/hooks/log-subagent.sh",
-      "source": "harness-specific/claude/hooks/log-subagent.sh",
+      "destination": ".specnaut/hooks/guard-merge.sh",
+      "source": "harness-specific/shared/hooks/guard-merge.sh",
       "executable": true
+    },
+    {
+      "harness": "claude",
+      "destination": ".specnaut/hooks/guard-release.sh",
+      "source": "harness-specific/shared/hooks/guard-release.sh",
+      "executable": true
+    },
+    {
+      "harness": "claude",
+      "destination": ".specnaut/hooks/guard-dispatch-model.sh",
+      "source": "harness-specific/shared/hooks/guard-dispatch-model.sh",
+      "executable": true
+    },
+    {
+      "harness": "claude",
+      "destination": ".specnaut/hooks/protect-generated.sh",
+      "source": "harness-specific/shared/hooks/protect-generated.sh",
+      "executable": true
+    },
+    {
+      "harness": "claude",
+      "destination": ".specnaut/hooks/log-subagent.sh",
+      "source": "harness-specific/shared/hooks/log-subagent.sh",
+      "executable": true
+    },
+    {
+      "harness": "claude",
+      "destination": ".specnaut/hooks/release-commands.txt",
+      "source": "harness-specific/shared/hooks/release-commands.txt"
+    },
+    {
+      "harness": "claude",
+      "destination": ".specnaut/hooks/_agents.txt",
+      "source": "harness-specific/shared/hooks/_agents.txt"
+    },
+    {
+      "harness": "claude",
+      "destination": ".specnaut/hooks/SHA256SUMS",
+      "source": "harness-specific/shared/hooks/SHA256SUMS"
     },
     {
       "harness": "claude",
       "destination": ".claude/hooks/check-backlog-prereqs.sh",
       "source": "harness-specific/claude/hooks/check-backlog-prereqs.sh",
       "executable": true
+    },
+    {
+      "harness": "codex",
+      "destination": ".specnaut/hooks/_guard.sh",
+      "source": "harness-specific/shared/hooks/_guard.sh"
+    },
+    {
+      "harness": "codex",
+      "destination": ".specnaut/hooks/_approval.sh",
+      "source": "harness-specific/shared/hooks/_approval.sh"
+    },
+    {
+      "harness": "codex",
+      "destination": ".specnaut/hooks/_command.sh",
+      "source": "harness-specific/shared/hooks/_command.sh"
+    },
+    {
+      "harness": "codex",
+      "destination": ".specnaut/hooks/_simple.sh",
+      "source": "harness-specific/shared/hooks/_simple.sh"
+    },
+    {
+      "harness": "codex",
+      "destination": ".specnaut/hooks/_git.sh",
+      "source": "harness-specific/shared/hooks/_git.sh"
+    },
+    {
+      "harness": "codex",
+      "destination": ".specnaut/hooks/approve-on-prompt.sh",
+      "source": "harness-specific/shared/hooks/approve-on-prompt.sh",
+      "executable": true
+    },
+    {
+      "harness": "codex",
+      "destination": ".specnaut/hooks/guard-merge.sh",
+      "source": "harness-specific/shared/hooks/guard-merge.sh",
+      "executable": true
+    },
+    {
+      "harness": "codex",
+      "destination": ".specnaut/hooks/guard-release.sh",
+      "source": "harness-specific/shared/hooks/guard-release.sh",
+      "executable": true
+    },
+    {
+      "harness": "codex",
+      "destination": ".specnaut/hooks/guard-dispatch-model.sh",
+      "source": "harness-specific/shared/hooks/guard-dispatch-model.sh",
+      "executable": true
+    },
+    {
+      "harness": "codex",
+      "destination": ".specnaut/hooks/protect-generated.sh",
+      "source": "harness-specific/shared/hooks/protect-generated.sh",
+      "executable": true
+    },
+    {
+      "harness": "codex",
+      "destination": ".specnaut/hooks/log-subagent.sh",
+      "source": "harness-specific/shared/hooks/log-subagent.sh",
+      "executable": true
+    },
+    {
+      "harness": "codex",
+      "destination": ".specnaut/hooks/release-commands.txt",
+      "source": "harness-specific/shared/hooks/release-commands.txt"
+    },
+    {
+      "harness": "codex",
+      "destination": ".specnaut/hooks/_agents.txt",
+      "source": "harness-specific/shared/hooks/_agents.txt"
+    },
+    {
+      "harness": "codex",
+      "destination": ".specnaut/hooks/SHA256SUMS",
+      "source": "harness-specific/shared/hooks/SHA256SUMS"
+    },
+    {
+      "harness": "codex",
+      "destination": ".codex/hooks.json",
+      "source": "harness-specific/codex/hooks.json",
+      "mergeJson": "codex-hooks"
     },
     {
       "harness": "codex",

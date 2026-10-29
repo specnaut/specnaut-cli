@@ -22,12 +22,17 @@ plan → tasks → implement → review → merge → push
    means `manual`; "merge it" means `auto`. Otherwise the project file decides:
 
    ```
-   v=$(sed -n 's/^merge:[[:space:]]*\([^[:space:]#]*\).*/\1/p' .specnaut/workflow.yml 2>/dev/null | head -1)
-   case "$v" in ""|auto) echo auto ;; manual) echo manual ;; *) echo "manual (unrecognised: $v)" ;; esac
+   bash .specnaut/scripts/bash/merge-mode.sh
    ```
 
-   No file or no key means `auto`. An unrecognised value means `manual` — say so in one line: a
-   setting that cannot be read resolves to the reading that does not push.
+   It prints `auto` or `manual`, and says why on stderr. No file or no key means `auto`. An
+   unrecognised value means `manual` — say so in one line: a setting that cannot be read resolves to
+   the reading that does not push.
+
+   **Under `merge: manual` in the file, a hook holds the landing whatever the run said** (D3). The
+   landing hook asks the same script (`--strict`) and holds every merge into, and push of, the base
+   branch until the user's own prompt in that turn says `merge` or `/specnaut merge`. A per-run
+   "merge it" moves the chain; it does not lift the file.
 
    - **`auto`** — no stop. A verdict with no unresolved CRITICAL or HIGH finding invokes `merge`
      in the same turn; `merge` pushes and closes.
@@ -117,8 +122,9 @@ it. Otherwise resolve the approval — **remote mode keeps its gate under either
   and report the rejection + any `note`; exit 3/4 (timeout/cancelled) or 1 → halt cleanly with the
   reason; exit 5 → report `specnaut cloud login` is needed and fall back to the local prompt below.
   **Never merge without an explicit approval.**
-- **Local mode, `manual`** — ask once: "Ready to merge? (yes to run `/specnaut merge`, no to stay on
-  the branch)". On "yes", invoke `merge`.
+- **Local mode, `manual`** — ask once, naming the word to type: "Ready to merge? Reply `merge` to
+  land it, anything else to stay on the branch." On `merge`, invoke `merge`. A plain "yes" does not
+  release the landing hook — if that is the answer, say so and ask for the word.
 
 ### Triage, and the rule that ends the loop
 

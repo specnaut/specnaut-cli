@@ -1,0 +1,19 @@
+# The release commands that need the user's go-ahead — the one list (spec 036,
+# plan § 5, FR-006). guard-release.sh refuses each on Codex unless the user's
+# own prompt this turn approved a release; Claude Code's permissions.ask rules
+# are held to this list by Specnaut's own tests.
+#
+# One command per line: the words it starts with. A first word ending in `.sh`
+# is a script, matched by its basename however it is reached (a path, or as
+# the argument of sh/bash). `except <flag>`: that flag in the same command
+# segment exempts it — `tag.sh --no-push` creates a tag and publishes nothing.
+# Any push of a tag ref is gated too; that is a rule, not a word list, and it
+# lives in guard-release.sh.
+tag.sh except --no-push
+release-github.sh
+release-gitlab.sh
+gh release create
+gh release edit
+gh release upload
+glab release create
+gh run rerun

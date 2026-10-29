@@ -140,8 +140,8 @@ Deno.test("isPluginCoveredPath: claude + harness-static paths NOT covered", () =
     const dest of [
       ".claude/settings.json",
       ".claude/settings.local.json",
-      ".claude/hooks/protect-generated.sh",
-      ".claude/hooks/log-subagent.sh",
+      ".specnaut/hooks/protect-generated.sh",
+      ".specnaut/hooks/log-subagent.sh",
       ".claude/hooks/check-backlog-prereqs.sh",
       ".claude/loop.md",
       ".claude/scripts/dispatch-agent.sh",

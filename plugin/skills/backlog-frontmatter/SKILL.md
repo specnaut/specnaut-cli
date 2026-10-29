@@ -15,19 +15,19 @@ a passage inside a role description.
 
 ```yaml
 ---
-id: NNN                # zero-padded 3 digits, globally unique within this project
+number: NNN            # zero-padded 3 digits, globally unique within this project
 title: string
-category: string       # free-form, but consistent across tasks
-priority: critical | high | medium | low
-complexity: 1 | 2 | 3 | 5 | 8 | 13 | 21   # Fibonacci
-status: todo | in_progress | done | deferred | blocked
-parent: "#NNN" | null  # local task id of the parent epic, if this is a sub-task
-depends_on: [string]   # other task titles or ids
-spec: string | null    # Specnaut spec id if attached
-tags: [string]
-created: YYYY-MM-DD
+status: Backlog | Ready | In progress | In review | Done
+size: XS | S | M | L | XL       # empty at creation; set when groomed
+priority: P0 | P1 | P2 | P3     # empty at creation; set when groomed
+parent: "#NNN"         # only on a sub-task: the local number of its parent epic
+created: YYYY-MM-DDTHH:MM:SSZ   # UTC, written by add.sh
 ---
 ```
 
-`parent: "#NNN"` is the local-Markdown sub-task convention (grep-friendly);
-missing or `null` means a top-level task or an epic, legacy tasks included.
+This is what `scripts/local/add.sh` writes and `scripts/local/move.sh` accepts. `size` and
+`priority` start empty: an item is not groomed until both hold exactly one value.
+
+`parent: "#NNN"` is the local-Markdown sub-task convention (grep-friendly); absent means a
+top-level task or an epic. Older task files may carry `id`, `complexity`, `category`, `tags` or a
+lowercase `status`: read them, never write them.

@@ -2,7 +2,7 @@
   "name": "@specnaut/cli",
   "version": "7.1.0",
   "tasks": {
-    "bundle": "deno run --allow-read --allow-write scripts/bundle-templates.ts",
+    "bundle": "deno run --allow-read --allow-write scripts/gen-hooks.ts && deno run --allow-read --allow-write scripts/bundle-templates.ts",
     "dev": "deno run --allow-read --allow-write --allow-run --allow-env src/main.ts",
     "test": "deno task bundle && deno test --allow-read --allow-write --allow-run --allow-env tests/",
     "check": "deno check src/main.ts",

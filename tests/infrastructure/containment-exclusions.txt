@@ -21,5 +21,8 @@ src/infrastructure/fs_legacy_migrator.ts  refuses a symlinked .specflow/.specnau
 src/infrastructure/fs_prune.ts::pruneEmptyParents  asks `isInside` and RETURNS instead of throwing — it is a best-effort cleanup walk, and a throw here would fail an upgrade whose files are already written
 src/infrastructure/fs_backup.ts::backupAside  a helper whose callers in the bundle and link writers each assert containment on the same path immediately before calling it
 src/infrastructure/fs_link_writer.ts::denoSymlink  the default Linker; its only caller, writeContextLink, runs after writeBundle's phase 1 judged the link's own path removable and its target inside the project
-src/infrastructure/fs_link_writer.ts::writeContextLink  called only from DenoFsWriter.writeBundle's phase 2, after phase 1 ran assertRemovableInProject and assertLinkTargetInProject on this exact path
+src/infrastructure/fs_link_writer.ts::writeContextLink  called only from DenoFsWriter.writeBundle's phase 2 (writeEntry), after phase 1 (assertDestinations) ran assertRemovableInProject and assertLinkTargetInProject on this exact path
+src/infrastructure/deno_fs_writer.ts::writeJsonMerge  called only from DenoFsWriter.writeBundle's phase 2 (writeEntry), after phase 1 (assertDestinations) ran assertInsideProject on this exact path
+src/infrastructure/deno_fs_writer.ts::writeEntry  DenoFsWriter.writeBundle's phase 2, called only after phase 1 (assertDestinations) ran assertInsideProject, or the two link asserts, on every destination of the bundle
+src/infrastructure/deno_fs_writer.ts::writeOwnedFile  called only from writeEntry in writeBundle's phase 2, after phase 1 (assertDestinations) ran assertInsideProject on this exact path; its chmod re-asserts it, since a mode change follows a link created since
 src/cli/handlers/init_handler.ts::runInit  its only mutation is the git adapter's ensureDir, which receives the target directory itself rather than a path built under it

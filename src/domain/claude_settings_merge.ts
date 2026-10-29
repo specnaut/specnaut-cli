@@ -3,21 +3,15 @@
  * settings file Specnaut tags with `mergeJson: "claude-settings"`).
  *
  * Why: `.claude/settings.json` is user-owned (theme, permissions, env,
- * attribution, plugins, MCP, …) but Specnaut needs to register four
- * hooks there for the bundled hook scripts to fire (#139). A fenced
- * text block — the trick we use for `.gitignore` — doesn't compose
- * with structured JSON. So we splice our hook entries into the user's
- * existing `hooks.*` arrays, keying on the hook's `command:` path.
+ * attribution, plugins, MCP, …) but Specnaut needs to register its hooks
+ * there for the bundled hook scripts to fire (#139). A fenced text block —
+ * the trick we use for `.gitignore` — doesn't compose with structured JSON.
  *
  * Merge semantics (additive-only):
  *
- *   - For each hook entry in our bundled content, find the matching
- *     user-side `matcher:` group (same matcher string OR both
- *     undefined) inside `hooks.<event>` and append our hook to its
- *     `hooks` array — IF the same `command:` path is not already
- *     present. The path-match makes re-runs idempotent.
- *   - If no matching matcher group exists, create one.
- *   - User-side groups with different matchers are NEVER touched.
+ *   - Hook entries are spliced into the user's `hooks.*` arrays by
+ *     `spliceHooks` (`hook_settings_merge.ts`), which owns the rule for
+ *     which entries are Specnaut's.
  *   - `permissions.ask` is a set union: the user's rules first, in their
  *     order, then each bundled rule not already present. Ask rules are how
  *     Specnaut guarantees a prompt before a publish (#610) — Claude Code
@@ -37,22 +31,16 @@
  * Pure — no IO, no Deno globals.
  */
 
-type Hook = {
-  type?: string;
-  command?: string;
-  // Other Claude Code hook fields (timeout, prompt, permission, etc.)
-  // are preserved verbatim — we only inspect `command` for identity.
-  // deno-lint-ignore no-explicit-any
-  [k: string]: any;
-};
-
-type MatcherGroup = {
-  matcher?: string;
-  hooks: Hook[];
-};
+import {
+  type HookMap,
+  type JsonMergeResult,
+  jsonMergeResult,
+  parseUserJson,
+  spliceHooks,
+} from "./hook_settings_merge.ts";
 
 type SettingsShape = {
-  hooks?: Record<string, MatcherGroup[]>;
+  hooks?: HookMap;
   // Any other user-managed top-level fields are preserved through the
   // round-trip without inspection.
   // deno-lint-ignore no-explicit-any
@@ -60,24 +48,10 @@ type SettingsShape = {
 };
 
 /**
- * Error thrown when the on-disk settings.json is not valid JSON.
- * Surfaces a clear actionable hint at the CLI level rather than a
- * raw `SyntaxError` from `JSON.parse`.
- */
-export class ClaudeSettingsParseError extends Error {
-  constructor(public readonly destPath: string, override readonly cause: Error) {
-    super(
-      `${destPath} is not valid JSON: ${cause.message}\n` +
-        `Fix the file (or back it up and re-run with --force) before re-running specnaut.`,
-    );
-    this.name = "ClaudeSettingsParseError";
-  }
-}
-
-/**
  * Merge Specnaut's bundled hook entries into the user's existing
  * `.claude/settings.json` content. Returns the merged JSON as a
- * pretty-printed string (2-space indent, trailing newline).
+ * pretty-printed string (2-space indent, trailing newline), and whether it
+ * differs from what is on disk.
  *
  *   - `existing`: on-disk content, or `null` when no file is present
  *     (greenfield — the bundled content is written verbatim).
@@ -89,62 +63,14 @@ export function mergeClaudeSettings(
   existing: string | null,
   bundled: string,
   destPath: string,
-): string {
+): JsonMergeResult {
   const bundledParsed = JSON.parse(bundled) as SettingsShape;
-
-  if (existing === null || existing.trim().length === 0) {
-    return `${JSON.stringify(bundledParsed, null, 2)}\n`;
-  }
-
-  let userParsed: SettingsShape;
-  try {
-    userParsed = JSON.parse(existing) as SettingsShape;
-  } catch (err) {
-    throw new ClaudeSettingsParseError(
-      destPath,
-      err instanceof Error ? err : new Error(String(err)),
-    );
-  }
+  const userParsed = parseUserJson(existing, destPath) as SettingsShape | null;
+  if (userParsed === null) return jsonMergeResult(bundledParsed, existing);
 
   const result: SettingsShape = { ...userParsed };
-  const userHooks = userParsed.hooks ?? {};
-  const bundledHooks = bundledParsed.hooks ?? {};
-  const mergedHooks: Record<string, MatcherGroup[]> = {};
-
-  // 1. Carry every user event group through unchanged as the starting
-  //    point — we will graft Specnaut entries onto these.
-  for (const [event, groups] of Object.entries(userHooks)) {
-    mergedHooks[event] = groups.map((g) => ({
-      ...(g.matcher !== undefined ? { matcher: g.matcher } : {}),
-      hooks: [...(g.hooks ?? [])],
-    }));
-  }
-
-  // 2. For each bundled event/hook, find or create the matcher group
-  //    and append the hook iff its `command:` path is not already in
-  //    the user's existing hooks.
-  for (const [event, groups] of Object.entries(bundledHooks)) {
-    if (!mergedHooks[event]) mergedHooks[event] = [];
-    const eventGroups = mergedHooks[event];
-
-    for (const bundledGroup of groups) {
-      let target = eventGroups.find((g) => g.matcher === bundledGroup.matcher);
-      if (target === undefined) {
-        target = {
-          ...(bundledGroup.matcher !== undefined ? { matcher: bundledGroup.matcher } : {}),
-          hooks: [],
-        };
-        eventGroups.push(target);
-      }
-
-      for (const bundledHook of bundledGroup.hooks ?? []) {
-        const cmd = bundledHook.command;
-        const alreadyPresent = cmd !== undefined &&
-          target.hooks.some((h) => h.command === cmd);
-        if (!alreadyPresent) target.hooks.push(bundledHook);
-      }
-    }
-  }
+  // 1–2. Specnaut's hook entries, spliced into the user's.
+  const mergedHooks = spliceHooks(userParsed.hooks ?? {}, bundledParsed.hooks ?? {});
 
   // 3. Union the bundled ask rules into the user's, without reordering or
   //    dropping anything of theirs.
@@ -183,7 +109,7 @@ export function mergeClaudeSettings(
     result.hooks = mergedHooks;
   }
 
-  return `${JSON.stringify(result, null, 2)}\n`;
+  return jsonMergeResult(result, existing);
 }
 
 type SourceLike = { source?: unknown; repo?: unknown; url?: unknown; path?: unknown };
@@ -207,13 +133,10 @@ export function pluginDeclarationNotes(
   bundled: string,
   dest: string,
 ): string[] {
-  if (existing === null || existing.trim().length === 0) return [];
-  let user: SettingsShape;
-  try {
-    user = JSON.parse(existing) as SettingsShape;
-  } catch {
-    return [];
-  }
+  // Throws like the merge does: the writer merges first, so a malformed file
+  // never reaches here, and a caller that skipped the merge is told why.
+  const user = parseUserJson(existing, dest) as SettingsShape | null;
+  if (user === null) return [];
   const ours = JSON.parse(bundled) as SettingsShape;
   const notes: string[] = [];
   for (const [key, value] of Object.entries(ours.extraKnownMarketplaces ?? {})) {

@@ -31,7 +31,7 @@ which shell cannot offer, but never resting in the state that lies.
     1. Read `.specnaut/feature.json`. Extract `linked_issue` (`jq -r '.linked_issue // empty'`).
        If absent / null / empty, skip the rest of this section silently — no backlog backend wiring
        to act on.
-    2. Detect the backend by checking `.specnaut/installed.lock` (`backlog_backend: <local|github|gitlab>`)
+    2. Detect the backend by checking `.specnaut/installed.lock` (`backlog_backend: <local|github|gitlab|cloud>`)
        or, equivalently, the presence of `.specnaut/backlog-config.yml` (github/gitlab) vs
        `.specnaut/backlog.md` (local).
     3. **github + gitlab only** — run `bash .specnaut/scripts/backlog/cascade-check.sh <linked_issue>`.

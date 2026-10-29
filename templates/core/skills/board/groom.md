@@ -47,8 +47,11 @@ The PO will:
   per-ticket loop must close labelling before the PO can consider a
   ticket "done for this run". Batched labelling-as-an-afterthought is
   the failure mode this contract exists to prevent.
-- For each remaining item, the loop is a strict 4-step sequence and **a
-  ticket is NOT considered processed until both labels are applied**:
+- For each remaining item, the loop is a strict 4-step sequence. **What a
+  processed ticket must carry is decided by
+  `.specnaut/scripts/bash/groom-rules.sh`** — its header is the rule, and
+  `groom-verify.sh` checks it at the end of the run (see "Before the report").
+  The steps below are how the PO satisfies it:
 
   1. **Rewrite the body when it's poorly worded.** If the description is
      missing, incomplete, or unclear, the PO MUST rewrite it in the
@@ -94,18 +97,17 @@ The PO will:
        until the user replies.
      - **Recommend closure** if the item is genuinely stale or
        duplicates a closed ticket — leave a comment recommending
-       `not_planned`. Steps 2 and 3 are still mandatory (apply labels
+       `not_planned`, with the same `🤖 specnaut-groom` prefix. Steps 2 and 3 are still mandatory (apply labels
        reflecting the recommendation, e.g. `priority:P3`). Do not close
        autonomously.
 
   **Mandatory sizing + priority contract.** Steps 2 and 3 are NOT
-  optional and NOT discretionary — every ticket the PO touches in a
-  groom run MUST exit with both a size and a priority value persisted,
-  regardless of the outcome chosen at step 4. If persistence fails for
-  an external reason (the user lacks scope, the API rate-limited, etc.),
-  the PO MUST capture the failure reason and surface it under "⚠ size /
-  priority missing" in the final report — silent skip is a contract
-  violation.
+  optional and NOT discretionary, whatever the outcome chosen at step 4
+  — what counts as persisted is `groom-rules.sh`'s to say, not this
+  list's. If persistence fails for an external reason (the user lacks
+  scope, the API rate-limited, etc.), the PO MUST capture the failure
+  reason and surface it under "⚠ size / priority missing" in the final
+  report — silent skip is a contract violation.
 
 The PO must respect the standard backlog skill — do not bypass its
 scripts.
@@ -160,12 +162,10 @@ classification contract.
 
 ##### Local Markdown backend
 
-When the local backend ships support for the 5-column model (tracked
-in #130), size and priority will be applied as front-matter keys
-(`priority:` and `complexity:`) per that ticket's convention. Until
-then, the local backend has no column model and this groom phase is a
-no-op for it (the PO should report "skipped — local backend predates
-the column model").
+The local backend has the same five columns (`scripts/local/move.sh`).
+Size and priority are front-matter keys, `size:` and `priority:`, which
+`add.sh` writes empty: set each to exactly one value (`XS`–`XL`,
+`P0`–`P3`) by editing the task file, then move the card to `Ready`.
 
 ### 2. Board drift — closed items outside Done
 
@@ -210,6 +210,32 @@ Read-only, like the two checks above: never delete or modify a spec file.
 backend-resolved link — never a bare `#<num>`. Read that contract for the format
 and the degradation ladder; do not restate it here.
 
+
+## Before the report — prove the groom
+
+**The last step of the pass, after the four checks and before the report.**
+Run it with every item backlog grooming processed in this run:
+
+```bash
+bash .specnaut/scripts/backlog/groom-verify.sh [--ready "$READY"] <num>...
+```
+
+`--ready` is the column `groom-columns.sh` resolved (`none` when
+`PROMOTE=no`); without it, `Ready`. The script fetches each item and hands it
+to `.specnaut/scripts/bash/groom-rules.sh`, the one definition of a complete
+item — read its header, do not restate it here.
+
+- **Exit `0`** — every item is complete.
+- **Exit `1`** — one line per incomplete item, naming what it lacks. Fix what
+  you can and re-run; each line still standing goes under "⚠ size / priority
+  missing", verbatim, with the persistence failure behind it when you know
+  it, and counts towards the report's `<K>`. Never report as groomed an item
+  the script listed.
+- **Exit `2`** — an item could not be read. The run is **not verified**: say
+  so at the top of the report with the script's stderr, never a clean run.
+
+A field a backend cannot expose is named in that backend's script header and
+reads as missing, never as present — report such a line as what it is.
 
 ## Output format
 

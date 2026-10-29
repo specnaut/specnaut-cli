@@ -1,5 +1,43 @@
 # Upgrading Specnaut
 
+## 7.1.x → 7.2.0
+
+Run `specnaut upgrade`. On Codex, you then trust the hooks once. On Claude Code you have nothing to
+do by hand.
+
+### Rules that must hold are now hooks
+
+Specnaut used to state these rules as instructions. They are now hooks that run before the tool
+call, on Claude Code and on Codex:
+
+- **`merge: manual` really stops.** Under `merge: manual` in `.specnaut/workflow.yml`, a merge into
+  or a push of the base branch needs your go-ahead. Claude Code shows its own permission prompt.
+  Codex refuses the command until your own message in that turn says to merge (`merge`,
+  `/specnaut merge`, `$specnaut merge`). A bare "yes" is not enough.
+- **A Specnaut agent runs on the model its definition declares.** A dispatch that overrides the
+  model, or on Codex the reasoning effort, is refused. Your own agents are not affected.
+- **`.specnaut/installed.lock` cannot be hand-edited.** The edit is refused rather than warned
+  about. Edits to `.specnaut/workflow.yml`, to `.specnaut/hooks/` and to the files that register the
+  hooks ask first.
+- **On Codex, publishing a release needs your go-ahead in the same turn** (`release it`,
+  `/ship release`).
+
+The hook scripts moved from `.claude/hooks/` to `.specnaut/hooks/`, so both harnesses use one copy.
+`upgrade` removes the old copies and rewrites their entries in `.claude/settings.json` in place.
+Your own hooks there are left as they are. If you had edited one of the old copies, `upgrade` keeps
+it and warns, but nothing runs it any more: carry your change over to `.specnaut/hooks/`, then
+delete the old file (or run `upgrade --force`, which backs it up first).
+
+### Codex: trust the hooks once
+
+Codex runs a project's hooks only after you trust them. Open Codex in the project, run `/hooks`, and
+trust Specnaut's hooks. Until you do, none of the rules above holds on Codex. `init` and `upgrade`
+print this whenever a hook changed. Every release that changes a hook asks again, because each
+registration carries the hash of `.specnaut/hooks/SHA256SUMS`.
+
+If you edit a file in `.specnaut/hooks/`, Codex refuses to run any Specnaut hook until the folder
+matches `SHA256SUMS` again. `specnaut upgrade --force` restores the shipped files.
+
 ## 7.0.x → 7.1.0
 
 Run `specnaut upgrade`. You act by hand only if you edited `.claude/CLAUDE.md`.

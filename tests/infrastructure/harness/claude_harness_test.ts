@@ -37,8 +37,9 @@ Deno.test("ClaudeHarness.mapBundle emits the Claude tree", () => {
   // Bundled assets unchanged
   assert(".claude/loop.md" in mapped);
   assert(".claude/settings.json" in mapped);
-  assert(".claude/hooks/protect-generated.sh" in mapped);
-  assert(".claude/hooks/log-subagent.sh" in mapped);
+  assert(".specnaut/hooks/protect-generated.sh" in mapped);
+  assert(".specnaut/hooks/log-subagent.sh" in mapped);
+  assert(!(".claude/hooks/protect-generated.sh" in mapped), "moved to .specnaut/hooks/ (spec 036)");
   assert(".claude/hooks/check-backlog-prereqs.sh" in mapped);
   assert(".claude/agents/product-owner.md" in mapped);
   // Deprecated specnaut-auto alias was removed (#409) — must no longer scaffold

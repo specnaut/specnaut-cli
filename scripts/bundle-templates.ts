@@ -6,7 +6,7 @@
 // Runtime code reads nothing from disk.
 
 import { relative } from "@std/path";
-import { managedSectionLabels } from "../src/domain/template.ts";
+import { managedSectionLabels, type MergeJsonFlavor } from "../src/domain/template.ts";
 import { linkTargetPath } from "../src/domain/context_link.ts";
 
 type CoreManifestEntry = {
@@ -30,7 +30,7 @@ type HarnessStaticManifestEntry = {
   source?: string;
   executable?: boolean;
   /** When set, the file is merged structurally rather than written verbatim. */
-  mergeJson?: "claude-settings";
+  mergeJson?: MergeJsonFlavor;
   /**
    * A context link (cli#680, cli#681): the destination is written as a relative
    * symlink with this text, and `fallback` — one line — where links are refused.
@@ -220,7 +220,7 @@ async function buildHarnessStatic(m: Manifest): Promise<string> {
       destination: string;
       content: string;
       executable: boolean;
-      mergeJson?: "claude-settings";
+      mergeJson?: MergeJsonFlavor;
       symlinkTo?: string;
     }>
   > = {};

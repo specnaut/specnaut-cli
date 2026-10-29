@@ -312,6 +312,9 @@ check "run-gate.sh scaffolded + executable (#555)" \
   '[ -x .specnaut/scripts/bash/run-gate.sh ]'
 check "size-ratchet.sh scaffolded + executable, run by the quality gates (#651)" \
   '[ -x .specnaut/scripts/bash/size-ratchet.sh ] && grep -qF "size-ratchet.sh --since" .claude/skills/specnaut/phases/quality-gates.md'
+check "merge-mode.sh, base-branch.sh, groom-rules.sh scaffolded; merge-mode reads the default as auto (spec 036)" \
+  '[ -x .specnaut/scripts/bash/base-branch.sh ] && [ -x .specnaut/scripts/bash/groom-rules.sh ] &&
+   [ "$(bash .specnaut/scripts/bash/merge-mode.sh 2>/dev/null)" = auto ]'
 check "run-gate.ps1 twin scaffolded (#555)" \
   '[ -f .specnaut/scripts/powershell/run-gate.ps1 ]'
 check "an epic reaches the fast tier: implement -> epic-loop -> run-gate (#555)" \
@@ -551,23 +554,7 @@ check ".specnaut/LABELS.md scaffolded (always-on, regardless of backend)" \
 check "LABELS.md lists the canonical 7-label palette" \
   'grep -q "security" .specnaut/LABELS.md && grep -q "refactor" .specnaut/LABELS.md && grep -q "tech-debt" .specnaut/LABELS.md'
 
-echo
-echo "═══ #88  hooks bundled ═══"
-check ".claude/settings.json scaffolded" '[ -f .claude/settings.json ]'
-check "PreToolUse hook registered" 'grep -q "PreToolUse" .claude/settings.json'
-check "SubagentStart hook registered" 'grep -q "SubagentStart" .claude/settings.json'
-check "SessionStart hook registered" 'grep -q "SessionStart" .claude/settings.json'
-# cli#642: Claude Code offers the cockpit mod when the project is trusted.
-check "Specnaut marketplace declared, pinned to a release" \
-  'jq -e ".extraKnownMarketplaces[\"specnaut-marketplace\"].source | .repo == \"specnaut/specnaut-cli\" and (.ref | startswith(\"v\"))" .claude/settings.json >/dev/null'
-check "cockpit mod enabled" \
-  'jq -e ".enabledPlugins[\"specnaut-cockpit@specnaut-marketplace\"] == true" .claude/settings.json >/dev/null'
-for hook in protect-generated log-subagent check-backlog-prereqs; do
-  check "$hook.sh executable" "[ -x .claude/hooks/$hook.sh ]"
-done
-check ".specnaut/logs/ in bundled .gitignore" \
-  'grep -q "\.specnaut/logs/" .gitignore'
-
+# #88 (hooks bundled, settings.json registrations) lives in smoke-hooks.sh, which owns hooks.
 echo
 echo "═══ #180  PO doc — epic detection heuristic + cascade-check refs ═══"
 check "PO doc documents the epic detection heuristic" \

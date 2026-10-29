@@ -29,7 +29,7 @@ import { fromFileUrl } from "@std/path";
 
 const HOOK = fromFileUrl(
   new URL(
-    "../../templates/harness-specific/claude/hooks/log-subagent.sh",
+    "../../templates/harness-specific/shared/hooks/log-subagent.sh",
     import.meta.url,
   ),
 );

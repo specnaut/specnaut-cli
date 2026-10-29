@@ -22,9 +22,9 @@ Enhanced fork of [`specify` CLI](https://github.com/github/spec-kit), distribute
 
 **Harnesses:** claude, cursor, codex, copilot, opencode, antigravity — all share `templates/core/` content, mapped per-harness by an adapter.
 
-**Different from upstream Spec Kit:** auto-chained pipeline (`/specnaut plan` chains all phases); dedicated `review` phase after implement; backlog as product source of truth via `product-owner` agent (backends: local, github, gitlab); Claude Code plugin distribution (`specnaut-plugin` marketplace).
+**Different from upstream Spec Kit:** auto-chained pipeline (`/specnaut plan` chains all phases); dedicated `review` phase after implement; backlog as product source of truth via `product-owner` agent (backends: local, github, gitlab, cloud); Claude Code plugin distribution (the `specnaut-cockpit` plugin from the `specnaut-marketplace` marketplace).
 
-**Bundled agents:** product-owner, developer, review-coordinator, code-reviewer, security-expert, test-reviewer, qa-tester, workflow-manager, devops-sre, specnaut-guide.
+**Bundled agents:** product-owner, developer, review-coordinator, code-reviewer, security-expert, test-reviewer, qa-tester, workflow-manager, devops-sre, specnaut-guide, architect-expert, performance-expert, accessibility-expert, dependency-expert, ui-ux-designer.
 
 ### Commands
 
@@ -34,12 +34,13 @@ Enhanced fork of [`specify` CLI](https://github.com/github/spec-kit), distribute
 - `specnaut reconcile <path> --accept-upstream` — take the new template version (backs up local, updates lock).
 - `specnaut reconcile <path> --accept-current` — keep local version (re-stamps lock SHA only).
 - `specnaut check [--project]` — verify scaffold integrity.
+- `specnaut gate <status|raise|cancel>` — the non-interactive bridge a skill phase uses to raise a remote-control gate (Specnaut Cloud).
 - `specnaut self-update` — replace binary with latest release, verifying SHA256.
 - `specnaut --version` — print binary + bundled templates version.
 
 ### Backlog conventions (GitHub backend)
 
-`Priority` (P0–P2) and `Size` (XS–XL) via Project V2 native fields (`set-field.sh`); fall back to `priority:*`/`size:*` labels when the native field is absent. Two-step close: `move.sh <num> Done` then `gh issue close --reason completed`. `/board groom` catches items closed via paths that bypassed the move step.
+`Priority` (P0–P3) and `Size` (XS–XL) via Project V2 native fields (`set-field.sh`); fall back to `priority:*`/`size:*` labels when the native field is absent. Two-step close: `gh issue close --reason completed` first, then `move.sh <num> Done` — moving first makes a sweep report the open card in Done as drift. `/board groom` catches items closed via paths that bypassed the move step.
 
 ### Design principles
 

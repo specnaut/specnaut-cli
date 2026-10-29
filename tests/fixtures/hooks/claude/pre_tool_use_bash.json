@@ -1,0 +1,10 @@
+{
+  "session_id": "3f2c9a1e-7b4d-4e8a-9c21-5d6f0e8b7a10",
+  "transcript_path": "/home/dev/.claude/projects/my-app/3f2c9a1e-7b4d-4e8a-9c21-5d6f0e8b7a10.jsonl",
+  "cwd": "/home/dev/my-app",
+  "permission_mode": "default",
+  "hook_event_name": "PreToolUse",
+  "tool_name": "Bash",
+  "tool_input": { "command": "git status", "description": "Show working tree status" },
+  "tool_use_id": "toolu_01A2B3C4D5E6F7G8H9J0K1L2"
+}

@@ -88,6 +88,7 @@ Deno.test("upgrade delivers the section into an AGENTS.md that predates Specnaut
     assertStringIncludes(after, END);
     assertStringIncludes(after, HEADING);
     assertStringIncludes(after, "only under `merge: manual`");
+    assertStringIncludes(after, "The file is enforced, not just read");
     // ...and the run says so out loud, so a section appearing in an
     // always-loaded file is never mistaken for an overwrite.
     assertStringIncludes(up.stdout, "AGENTS.md");

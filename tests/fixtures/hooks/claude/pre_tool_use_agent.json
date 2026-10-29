@@ -1,0 +1,14 @@
+{
+  "session_id": "3f2c9a1e-7b4d-4e8a-9c21-5d6f0e8b7a10",
+  "transcript_path": "/home/dev/.claude/projects/my-app/3f2c9a1e-7b4d-4e8a-9c21-5d6f0e8b7a10.jsonl",
+  "cwd": "/home/dev/my-app",
+  "permission_mode": "default",
+  "hook_event_name": "PreToolUse",
+  "tool_name": "Agent",
+  "tool_input": {
+    "description": "Audit the plan",
+    "prompt": "Audit plan.md for architecture risks.",
+    "subagent_type": "architect-expert"
+  },
+  "tool_use_id": "toolu_01Y2Z3A4B5C6D7E8F9G0H1J2"
+}

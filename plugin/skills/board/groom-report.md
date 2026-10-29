@@ -82,8 +82,10 @@ Per-ticket:
 
 ⚠ size / priority missing:
   ↳ <backlog-reference> — <reason: e.g. gh label create failed (rate-limited)>
+  ↳ <backlog-reference> — <groom-verify.sh's line for it, verbatim>
   ↳ ...
-  (omit this whole section when K == 0)
+  (omit this whole section when K == 0 — K counts every line groom-verify.sh
+   printed; when it exited 2, the run is "not verified", never K == 0)
 
 ⚠ Roadmap dates missing (GitHub backend, soft):
   ↳ <backlog-reference> — Ready since <date>, no target date set

@@ -4,6 +4,7 @@ import type { Harness } from "../../application/ports.ts";
 import type { BundleOptions } from "../../application/bundle_options.ts";
 import type { CoreBundle, CoreEntry } from "../../domain/core_bundle.ts";
 import type { Bundle } from "../../domain/template.ts";
+import type { HookTrust } from "../../domain/hook_trust.ts";
 import { HARNESS_STATIC } from "../../templates_bundle.ts";
 import { applyHarnessStatic } from "./harness_static.ts";
 import {
@@ -50,7 +51,8 @@ function toCodexSubagentToml(entry: CoreEntry): string {
 export class CodexHarness implements Harness {
   readonly key = "codex";
   readonly displayName = "Codex CLI";
-  readonly managedRoots = [".codex/agents/", ".agents/skills/"] as const;
+  /** `.specnaut/hooks/`: see `ClaudeHarness.managedRoots` for why it is not a shared root. */
+  readonly managedRoots = [".codex/agents/", ".agents/skills/", ".specnaut/hooks/"] as const;
   /**
    * Retired files directly in `.codex/`, which no root may hold: the folder's
    * other files are the user's. `goal.md` was retired by cli#681 — Codex's
@@ -58,6 +60,18 @@ export class CodexHarness implements Harness {
    * Codex never read. It stays listed until no supported upgrade path has it.
    */
   readonly managedFiles = [".codex/goal.md"] as const;
+  /**
+   * Codex hashes each registration in `.codex/hooks.json` and runs none until
+   * the user trusts it through `/hooks` (plan § 11, "Measured"). Every command
+   * pins `.specnaut/hooks/SHA256SUMS`, so a change to either path voids it.
+   */
+  readonly hookTrust: HookTrust = {
+    paths: [".codex/hooks.json", ".specnaut/hooks/"],
+    registry: ".codex/hooks.json",
+    note: "Codex runs project hooks only once you trust them: open Codex here and run /hooks, " +
+      "then trust Specnaut's hooks. Until then the merge, release, generated-file and model " +
+      "guards do not run.",
+  };
 
   mapBundle(core: CoreBundle, opts: BundleOptions): Bundle {
     const out: Bundle = {};

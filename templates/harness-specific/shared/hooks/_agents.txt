@@ -1,0 +1,17 @@
+# The Specnaut agents: one name per line, generated from the Specnaut
+# manifest when the binary is built. guard-dispatch-model.sh reads it.
+accessibility-expert
+architect-expert
+code-reviewer
+dependency-expert
+developer
+devops-sre
+performance-expert
+product-owner
+qa-tester
+review-coordinator
+security-expert
+specnaut-guide
+test-reviewer
+ui-ux-designer
+workflow-manager

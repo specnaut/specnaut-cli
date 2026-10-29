@@ -70,7 +70,16 @@ export function fakeWriter(links: Record<string, string> = {}): FsWriter & {
       for (const [dest, file] of Object.entries(bundle)) {
         written.set(dest, file.content);
       }
-      return Promise.resolve({ backups: [], skippedSkipIfExists: [] } as BackupReport);
+      // Every JSON merge "changes" its file here, with a note, so a test can
+      // see both reach the result — the real flavors decide it (`deno_fs_writer.ts`).
+      const merged = Object.keys(bundle).filter((d) => bundle[d].mergeJson !== undefined);
+      return Promise.resolve({
+        backups: [],
+        skippedSkipIfExists: [],
+        ...(merged.length > 0
+          ? { mergedChanged: merged, notes: merged.map((d) => `${d}: merged`) }
+          : {}),
+      } as BackupReport);
     },
     deletePaths: (paths, _t, options) => {
       if (options.backupExisting) deleteBackupsRequested = true;
@@ -171,6 +180,7 @@ export function fakeHarness(managedRoots?: ReadonlyArray<string>): Harness {
             executable: e.executable,
             ...(entry.skipIfExists !== undefined ? { skipIfExists: entry.skipIfExists } : {}),
             ...(entry.mergeBlock !== undefined ? { mergeBlock: entry.mergeBlock } : {}),
+            ...(entry.mergeJson !== undefined ? { mergeJson: entry.mergeJson } : {}),
             ...(entry.managedSection !== undefined ? { managedSection: entry.managedSection } : {}),
           };
         }

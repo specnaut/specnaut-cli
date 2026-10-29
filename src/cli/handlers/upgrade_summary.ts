@@ -1,10 +1,19 @@
 import { bold, cyan, dim, green, yellow } from "@std/fmt/colors";
 import type { UpgradePlan } from "../../domain/upgrade_plan.ts";
+import type { UpgradeProjectResult } from "../../application/upgrade_project.ts";
+import {
+  crossesMajorBoundary,
+  MIGRATION_GUIDE_PATH,
+  MIGRATION_GUIDE_URL,
+} from "../../domain/major_boundary.ts";
 import { orphanCounts, renderOrphanGroups } from "./upgrade_orphan_summary.ts";
+import { backupLine, contextLinkLine, linkMovedLine } from "./write_report.ts";
+import { type HookTrustTarget, printUpgradeHookTrust } from "./hook_trust_note.ts";
 
 /**
- * The grouped summary `specnaut upgrade` prints: what the plan did to each
- * file, bucketed by the response each bucket needs from the reader.
+ * The report `specnaut upgrade` prints: the grouped summary of what the plan
+ * did to each file, bucketed by the response each bucket needs from the
+ * reader, then the outcome of an applied run.
  */
 
 /**
@@ -222,4 +231,67 @@ export function renderSummary(
         `${groups.deferred.length} deferred, ${groups.unchanged.length} unchanged`,
     ),
   );
+}
+
+type Applied = Extract<UpgradeProjectResult, { status: "applied" }>;
+
+/**
+ * What an applied run wrote, after the summary: the backups and links it made,
+ * the tick, then the hook-trust note and the two warnings that belong right
+ * where the eye lands.
+ */
+export async function renderOutcome(result: Applied, hooks: HookTrustTarget): Promise<void> {
+  const written = new Set(result.written);
+  if (result.backups.length > 0) console.log();
+  for (const b of result.backups) console.log(backupLine(b));
+  if (result.linksMoved.length > 0) console.log();
+  for (const b of result.linksMoved) console.log(linkMovedLine(b));
+  if (result.contextLinks.length > 0) console.log();
+  for (const link of result.contextLinks) console.log(contextLinkLine(link));
+  console.log();
+  console.log(green(`✓ upgraded to templates ${result.fromVersion} → ${result.toVersion}`));
+  await printUpgradeHookTrust(hooks, result);
+  warnLeftBehind(result.plan, written);
+  warnMajorBoundary(result.fromVersion, result.toVersion);
+}
+
+/**
+ * A run whose only outcome is skips still printed a bare green tick. That is
+ * the line people read, and it said the work was done. Name what was left,
+ * right where the eye lands, or the group above goes unread.
+ *
+ * Only files the run left alone. A `--force` run delivers the whole behind
+ * bucket, and this warning still fired for every one of them — telling the
+ * reader that "nothing will deliver them on a later run" about updates the
+ * same command had just applied, which reads as a failure and invites a
+ * pointless second pass (#519).
+ */
+function warnLeftBehind(plan: UpgradePlan, written: ReadonlySet<string>): void {
+  const n = plan.filter((a) => a.kind === "preserve" && a.staleSince && !written.has(a.dest))
+    .length;
+  if (n === 0) return;
+  console.log(
+    yellow(
+      `⚠ ${n} file${n === 1 ? "" : "s"} did not receive ` +
+        `${n === 1 ? "an update" : "updates"} published for ` +
+        `${n === 1 ? "it" : "them"} — see "customized, and behind" above. ` +
+        `Nothing will deliver ${n === 1 ? "it" : "them"} on a later run.`,
+    ),
+  );
+}
+
+/**
+ * A breaking upgrade is the one moment `UPGRADING.md` exists for, and until
+ * now the binary never named it — the only inbound links were the README and
+ * one published release body, neither of which somebody mid-upgrade is
+ * reading (#481). Printed only when the major actually changes, so it stays
+ * meaningful instead of becoming a line people learn to skip.
+ */
+function warnMajorBoundary(from: string, to: string): void {
+  if (!crossesMajorBoundary(from, to)) return;
+  console.log();
+  console.log(
+    yellow(`⚠ this crossed a major version — read the migration guide before you continue:`),
+  );
+  console.log(`  ${MIGRATION_GUIDE_PATH}  ·  ${MIGRATION_GUIDE_URL}`);
 }

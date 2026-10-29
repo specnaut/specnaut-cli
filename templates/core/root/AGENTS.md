@@ -32,8 +32,9 @@ is taken against that intent by whoever is expert in it, not handed back to the 
    performance forks are settled by the expert seats (`architect-expert`, `security-expert`,
    `performance-expert`) and reported, never put to a vote. Nothing open → no stop.
 2. **The review verdict — only under `merge: manual`** in `.specnaut/workflow.yml`, or when the
-   run says so (`--manual-merge`, "stop before merging"). Asked once; the yes covers the push.
-   Otherwise the chain merges, pushes and closes the item without asking.
+   run says so (`--manual-merge`, "stop before merging"). Asked once, naming the word to reply:
+   `merge`; that reply covers the push. Otherwise the chain merges, pushes and closes the item
+   without asking.
 
 Every other boundary is crossed by **invoking the next phase yourself, in the same turn** — your own
 next action, never a command printed for someone to paste:
@@ -68,6 +69,9 @@ branch ships. Those cycles run before the merge — don't ask again between each
 **`merge` and the push are automatic** under `merge: auto`, the default — the plan stop was the
 approval, and it is not re-collected. Under `manual` the merge is asked for once, **unless the user
 already said to merge**: that is their instruction, followed without a second confirmation.
+**The file is enforced, not just read**: under `merge: manual` a hook holds every landing on the base
+branch until the user's own prompt in that turn says `merge` — a "yes", or a "merge it" from an
+earlier turn, does not release it. When the hook refuses, say what to type; never route around it.
 
 <!-- --- End Specnaut: chain-stops --- -->
 

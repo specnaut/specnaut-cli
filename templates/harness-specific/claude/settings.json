@@ -7,7 +7,10 @@
       "Bash(gh run rerun *)",
       "Bash(*release/tag.sh*)",
       "Bash(*release/release-github.sh*)",
-      "Bash(*release/release-gitlab.sh*)"
+      "Bash(*release/release-gitlab.sh*)",
+      "Bash(gh release edit *)",
+      "Bash(gh release upload *)",
+      "Bash(glab release create *)"
     ]
   },
   "hooks": {
@@ -17,7 +20,49 @@
         "hooks": [
           {
             "type": "command",
-            "command": ".claude/hooks/protect-generated.sh",
+            "command": "bash \"$CLAUDE_PROJECT_DIR/.specnaut/hooks/protect-generated.sh\" claude",
+            "timeout": 5
+          }
+        ]
+      },
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"$CLAUDE_PROJECT_DIR/.specnaut/hooks/guard-merge.sh\" claude",
+            "timeout": 5
+          }
+        ]
+      },
+      {
+        "matcher": "Agent|Task",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"$CLAUDE_PROJECT_DIR/.specnaut/hooks/guard-dispatch-model.sh\" claude",
+            "timeout": 5
+          }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"$CLAUDE_PROJECT_DIR/.specnaut/hooks/approve-on-prompt.sh\" claude",
+            "timeout": 5
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"$CLAUDE_PROJECT_DIR/.specnaut/hooks/approve-on-prompt.sh\" claude",
             "timeout": 5
           }
         ]
@@ -28,7 +73,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": ".claude/hooks/log-subagent.sh start",
+            "command": "bash \"$CLAUDE_PROJECT_DIR/.specnaut/hooks/log-subagent.sh\" start",
             "timeout": 5
           }
         ]
@@ -39,7 +84,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": ".claude/hooks/log-subagent.sh stop",
+            "command": "bash \"$CLAUDE_PROJECT_DIR/.specnaut/hooks/log-subagent.sh\" stop",
             "timeout": 5
           }
         ]

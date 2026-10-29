@@ -14,14 +14,20 @@
 #                    merge that cannot fast-forward, a push the remote refuses.
 #
 #   merge: manual  — the chain stops at the review verdict and asks once,
-#                    "Ready to merge?". A yes covers the merge, the push and
-#                    the close. Choose this when a human must read every
-#                    change before it lands.
+#                    "Ready to merge?", naming the word to reply: `merge`.
+#                    That reply covers the merge, the push and the close.
+#                    Choose this when a human must read every change before
+#                    it lands. A hook enforces it: every merge into, or push
+#                    of, the base branch is held — Claude Code shows its
+#                    permission prompt, Codex refuses — until your own prompt
+#                    in that turn says `merge` or `/specnaut merge`.
 #
-# A single run overrides this file: `/specnaut … --manual-merge`, or "stop
-# before merging" in the request, means manual for that run; "merge it" means
-# auto. Invoking `/specnaut merge` yourself is always the instruction to merge
-# and push. `/specnaut merge --pr` delivers through a pull request instead of
+# A single run can make the chain stricter: `/specnaut … --manual-merge`, or
+# "stop before merging" in the request, means manual for that run. It cannot
+# loosen this file: under `merge: manual` a "merge it" earlier in the run moves
+# the chain, but the hook still waits for the word in the turn that lands.
+# Typing `/specnaut merge` yourself is always the instruction to merge and
+# push. `/specnaut merge --pr` delivers through a pull request instead of
 # a local merge, whichever mode is set here. Remote mode (`specnaut gate`)
 # raises its merge-approval gate in both modes.
 #

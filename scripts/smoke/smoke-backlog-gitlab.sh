@@ -36,7 +36,7 @@ echo "═══ canonical backlog scripts ═══"
 # greps each smoke file for a literal basename; a name assembled from a loop
 # variable is invisible to it, so this loop covered six scripts while being
 # reported as six gaps.
-for s in list.sh view.sh add.sh move.sh clarify-comment.sh ensure-labels.sh; do
+for s in list.sh view.sh add.sh move.sh clarify-comment.sh ensure-labels.sh groom-verify.sh; do
   check "$s present + executable" "[ -x .specnaut/scripts/backlog/$s ]"
 done
 

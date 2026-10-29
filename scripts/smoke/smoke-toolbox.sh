@@ -201,9 +201,9 @@ cl_out="$(smoke_code_lines "$cl_fixture")"
 # survivor-g.sh is the one that matters most and was missing at review: the
 # other fixtures sit inside quotes, so they exercise the quote clause only.
 # An UNQUOTED `${var#…}` is held together solely by the rule that a `#` must
-# be preceded by whitespace to start a comment — audit.sh:175 and :421 are
-# real instances, and dropping that clause truncates them while every other
-# assertion here still passes.
+# be preceded by whitespace to start a comment — `${line#…}` in audit.sh's
+# allow_reason is a real instance, and dropping that clause truncates it
+# while every other assertion here still passes.
 # survivor-i.sh and victim-f.sh are the backslash clause's only witnesses
 # (#548). `\"` must not toggle the quote state: on the dq_escape line the
 # string stays OPEN, so its `#` is quoted and survivor-i.sh survives; on the

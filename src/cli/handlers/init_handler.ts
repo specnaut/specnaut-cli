@@ -20,8 +20,7 @@ import {
 import { SPEC_STRATEGIES } from "../../domain/spec_strategies/registry.ts";
 import { detectVersionScheme } from "../../domain/project_detection.ts";
 import { BACKLOG_STRATEGIES } from "../../domain/backlog_strategies/registry.ts";
-import { harnessCommands } from "../../infrastructure/harness/harness_commands.ts";
-import { ClaudeSettingsParseError } from "../../domain/claude_settings_merge.ts";
+import { JsonMergeParseError } from "../../domain/hook_settings_merge.ts";
 import { DenoFsWriter } from "../../infrastructure/deno_fs_writer.ts";
 import { DenoGit } from "../../infrastructure/deno_git.ts";
 import { FsLockStore } from "../../infrastructure/fs_lock_store.ts";
@@ -37,6 +36,7 @@ import {
   writeBacklogConfigStub,
 } from "./init_backlog_config.ts";
 import { backupLine, contextLinkLine, linkMovedLine } from "./write_report.ts";
+import { printInitNextSteps } from "./init_next_steps.ts";
 import { CORE_BUNDLE } from "../../templates_bundle.ts";
 import type { Bundle } from "../../domain/template.ts";
 
@@ -73,6 +73,15 @@ export type InitIntent = {
   resetPreserved: boolean;
 };
 
+/** The user closed an interactive picker: stop the whole init, as Ctrl-C would (exit 130). */
+function orAbort<T>(picked: T | null): T {
+  if (picked === null) {
+    console.error(red("aborted."));
+    Deno.exit(130);
+  }
+  return picked;
+}
+
 async function resolveHarnessKey(
   explicit: HarnessKey | null,
 ): Promise<HarnessKey> {
@@ -85,11 +94,7 @@ async function resolveHarnessKey(
     });
   }
   const picked = await pickHarnessInteractive(makeStdinSelectIO());
-  if (picked === null) {
-    console.error(red("aborted."));
-    Deno.exit(130);
-  }
-  return picked;
+  return orAbort(picked);
 }
 
 async function resolveBacklogBackend(
@@ -104,11 +109,7 @@ async function resolveBacklogBackend(
     });
   }
   const picked = await pickBacklogBackendInteractive(makeStdinSelectIO());
-  if (picked === null) {
-    console.error(red("aborted."));
-    Deno.exit(130);
-  }
-  return picked;
+  return orAbort(picked);
 }
 
 /**
@@ -128,11 +129,7 @@ async function resolveSpecBackend(
     });
   }
   const picked = await pickSpecBackendInteractive(makeStdinSelectIO());
-  if (picked === null) {
-    console.error(red("aborted."));
-    Deno.exit(130);
-  }
-  return picked;
+  return orAbort(picked);
 }
 
 /**
@@ -203,11 +200,7 @@ async function resolveVersionScheme(
     makeStdinSelectIO(),
     suggestion,
   );
-  if (picked === null) {
-    console.error(red("aborted."));
-    Deno.exit(130);
-  }
-  return picked;
+  return orAbort(picked);
 }
 
 function printConflictsError(
@@ -453,11 +446,12 @@ export async function runInit(intent: InitIntent): Promise<number> {
     });
   } catch (err) {
     // Surface the actionable first-line message for known structured
-    // errors (currently only the JSON merge of `.claude/settings.json`).
+    // errors (currently only a JSON merge: `.claude/settings.json`,
+    // `.codex/hooks.json`).
     // Without this catch, Deno's default top-level handler prints a
     // 10-line stack trace from inside the compiled binary's cache —
     // unprofessional and noisy for what is a user-fixable typo.
-    if (err instanceof ClaudeSettingsParseError) {
+    if (err instanceof JsonMergeParseError) {
       console.error(red(err.message));
       return 2;
     }
@@ -509,68 +503,10 @@ export async function runInit(intent: InitIntent): Promise<number> {
     return 0;
   }
   console.log(green(`✓ wrote ${result.filesWritten} files${mergedSuffix}`));
+  // A plugin Specnaut enables runs code once installed: never added silently (#642).
+  for (const note of result.notes) console.log(yellow(`ℹ ${note}`));
 
   await writeBacklogConfigStub(targetDir, backlogBackend, kanbanUrl, githubRepo);
-  // Named for the harness the user just chose, not for Claude. See
-  // `harness_commands.ts` — the previous version printed `/specnaut plan` and
-  // `/board add` everywhere, and both are wrong on most harnesses.
-  const cmd = harnessCommands(aiKey);
-  console.log("\nNext steps:");
-  if (!cmd.invocable) {
-    // Copilot applies `.github/instructions/` by context; there is nothing to type.
-    console.log(
-      `  1. Open the project in ${harness.displayName} — Specnaut's instructions ` +
-        `apply automatically from ${bold(".github/instructions/")}`,
-    );
-    console.log(
-      `  2. Edit ${bold("AGENTS.md")} and refine ${
-        bold(".specnaut/memory/constitution.md")
-      } for your stack`,
-    );
-    console.log(
-      `  3. Ask your agent to plan a feature — it will follow the Specnaut chain`,
-    );
-  } else {
-    console.log(
-      `  1. Open the project in ${harness.displayName}, then run ${
-        bold(cmd.skillDoc("specnaut", "constitution"))
-      } to scaffold your project's guiding principles`,
-    );
-    console.log(
-      `  2. Edit ${bold("AGENTS.md")} and refine ${
-        bold(".specnaut/memory/constitution.md")
-      } for your stack`,
-    );
-    console.log(
-      `  3. Run ${
-        bold(`${cmd.skillDoc("specnaut", "plan")} "<feature description>"`)
-      } to plan your first feature`,
-    );
-    console.log(
-      `  4. Use ${bold(`${cmd.skill("board")} add "<task title>"`)} for follow-up work`,
-    );
-  }
-
-  // Specnaut Cloud funnel: point CLI users at the hosted product once they've
-  // scaffolded — run headless + remote-control the agent's checkpoints. The
-  // headless/remote pitch is worth showing regardless of backend, but when the
-  // user already picked the cloud backlog backend the cloud strategy has already
-  // emitted the `specnaut cloud login` CTA — so we drop the duplicate login line
-  // here and just point at the site, keeping the call-to-action to once (#407).
-  console.log(
-    `\n${cyan("✦ Specnaut Cloud")} — run Specnaut headless and answer your agent from your phone:`,
-  );
-  console.log(
-    dim(
-      "     approve plans, answer clarifications & sign off merges remotely · hosted backlog + team roles.",
-    ),
-  );
-  console.log(
-    backlogBackend === "cloud"
-      ? `     Learn more: ${cyan("https://specnaut.com")}`
-      : `     Start free: ${bold("specnaut cloud login")} ${dim("·")} ${
-        cyan("https://specnaut.com")
-      }`,
-  );
+  await printInitNextSteps(aiKey, harness, backlogBackend, { targetDir, ...result });
   return 0;
 }

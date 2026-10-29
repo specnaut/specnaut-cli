@@ -247,6 +247,10 @@ SURFACES=(
   # coverage scan had never once looked at while its success line claimed
   # otherwise.
   'templates/harness-specific/*/hooks/*|smoke-hooks.sh|bundled-hook'
+  # The two hook registries (spec 036). Named before the catch-all below, which
+  # would send them to smoke-features.sh — the hook checks moved out of it.
+  'templates/harness-specific/claude/settings.json|smoke-hooks.sh|hook-registration'
+  'templates/harness-specific/codex/hooks.json|smoke-hooks.sh|hook-registration'
   'templates/harness-specific/*/scripts/*|smoke-features.sh|harness-script'
   'templates/harness-specific/*/*|smoke-features.sh smoke-all-harnesses.sh|harness-file'
 )
@@ -428,63 +432,9 @@ allow_reason() {
   return 1
 }
 
-# --- What identifies a changed file for coverage (plan.md §5 024-R1) -----
-# Almost every surface is identified by its basename, and that is deliberate,
-# not sloppiness this scan tolerates: the smokes' loop lists were written out
-# with literal names SO THIS GREP COULD FIND THEM — said in as many words at
-# smoke-backlog-gitlab.sh:33 and smoke-features.sh:74. Matching the runtime
-# path a source file scaffolds to would be invisible to those loops; measured
-# over the v3.1.0 window it reports 9 false gaps out of 44.
-#
-# One surface has a basename that identifies nothing. Every skill's file is
-# named SKILL.md, a string this suite contains by the dozen, so the test was
-# constant-true for all of them and 13 shipped skills were asserted on by
-# nothing at all. There the token is the runtime path suffix.
-#
-# NOT the bare skill name. `backlog-reference-contract` is named at
-# smoke-features.sh:591 inside an assertion whose subject is BOARD's SKILL.md
-# — delete the skill and that assertion still passes — so the bare name would
-# report covered exactly the file this fix exists for. Both plan-time audits
-# found that independently.
-#
-# What this measures is a MENTION, not an assertion (024-R4). Verifying that
-# an assertion's subject is the file would mean parsing the smoke, which is
-# the line this suite has declined to cross every time it has come up.
-coverage_token() {
-  case "$1" in
-    templates/harness-specific/*)
-      # The runtime path, not the basename: CLAUDE.md, AGENTS.md and
-      # settings.json all exist elsewhere in the bundle, so a basename token
-      # matches assertions about a different file — the collapse #547 removed
-      # for SKILL.md and #549 for logs/README.md, a third time.
-      _rest="${1#templates/harness-specific/}"
-      case "$_rest" in
-        claude/*)  echo ".claude/${_rest#claude/}" ;;
-        codex/*)   echo ".codex/${_rest#codex/}" ;;
-        # cursor nests its rules a level deeper than the source tree does,
-        # so a mechanical `.cursor/<rest>` token names a path that is never
-        # written and can never match an assertion.
-        cursor/specify-rules.mdc) echo ".cursor/rules/specify-rules.mdc" ;;
-        cursor/*)  echo ".cursor/${_rest#cursor/}" ;;
-        *)         echo "$_rest" ;;
-      esac
-      ;;
-    templates/core/specnaut/logs/*)
-      # `README.md` as a token matches assertions about OTHER READMEs — the
-      # same collapse #547 removed for SKILL.md, one directory over. Emit the
-      # runtime path suffix instead.
-      echo "specnaut/logs/${1#templates/core/specnaut/logs/}"
-      ;;
-    templates/core/skills/*/SKILL.md)
-      _n="${1#templates/core/skills/}"
-      # `case` globs match `/`, so a hypothetical nested SKILL.md reaches here
-      # too. Its token stays exact rather than collapsing to a name — a token
-      # is all this is used for, so a longer one is precise, not wrong.
-      echo "skills/${_n}"
-      ;;
-    *) basename "$1" ;;
-  esac
-}
+# What identifies a changed file for coverage (plan.md §5 024-R1): its own file,
+# reading only its argument. Beside this script, like _common.sh — never $SMOKE_DIR.
+. "$(dirname "$0")/_coverage_token.sh"
 
 gaps_count=0
 allowed_count=0
@@ -688,6 +638,9 @@ resolves() {
       ;;
     .claude/settings.json|.claude/settings.local.json)
       return 0 # merged at init time from per-harness logic; no single source file
+      ;;
+    .specnaut/hooks/*)
+      [ -e "$SRC_ROOT/templates/harness-specific/shared/hooks/${rt#.specnaut/hooks/}" ]
       ;;
     .specnaut/scripts/backlog/*)
       local n="${rt#.specnaut/scripts/backlog/}"

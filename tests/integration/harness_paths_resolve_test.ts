@@ -31,7 +31,14 @@ const ROOTS: Record<string, RegExp> = {
  * A reference that is RIGHT on every harness, each with its reason. Keyed on
  * the shipped file's basename stem and the root it names.
  */
-const ALLOWED: Record<string, string> = {};
+const ALLOWED: Record<string, string> = {
+  // The guard ships to both harnesses from one source and protects each one's
+  // hook registration; on the other harness the path simply never exists.
+  "protect-generated.sh .codex/":
+    "names the Codex registration it gates; absent on Claude, never written to",
+  "protect-generated.sh .claude/":
+    "names the Claude registration it gates; absent on Codex, never written to",
+};
 
 /** Entries an allowance actually excused, so a stale one is caught. */
 const used = new Set<string>();

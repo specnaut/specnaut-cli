@@ -15,6 +15,11 @@
 # Environment variables:
 #   MODEL          Override the model (e.g. "claude-sonnet-4-6").
 #                  Defaults to whatever the agent or claude binary picks.
+#                  A human override for a headless run: the person setting it
+#                  chose the tier. The rule that a Specnaut agent runs on its
+#                  declared model targets a session choosing a tier in an
+#                  Agent/Task call, which .specnaut/hooks/guard-dispatch-model.sh
+#                  refuses; this variable never reaches that hook.
 #   OUTPUT_FORMAT  json | text | stream-json. Defaults to text.
 #
 # Examples:

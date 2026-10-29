@@ -42,7 +42,7 @@ const NOT_A_FUNCTION = new Set(["if", "while", "for", "switch", "catch", "do", "
  */
 function unguardedSinks(src: string): string[] {
   const sig =
-    /(?:^|\n)[ \t]*(?:export )?(?:async )?(?:function )?([A-Za-z_$][\w$]*)\s*\([^)]*\)[^{;=]*\{/g;
+    /(?:^|\n)[ \t]*(?:export )?(?:(?:private|protected|public|static) )*(?:async )?(?:function )?([A-Za-z_$][\w$]*)\s*\([^)]*\)[^{;=]*\{/g;
   const sigs: Array<{ at: number; name: string }> = [];
   let m: RegExpExecArray | null;
   while ((m = sig.exec(src)) !== null) {
@@ -62,6 +62,26 @@ function unguardedSinks(src: string): string[] {
   }
   return [...out];
 }
+
+Deno.test("unguardedSinks: a sink is charged to the method it sits in, modifiers and all", () => {
+  // A `private async` method the signature pattern cannot see hands its sinks
+  // to whatever function precedes it — a false alarm on the wrong name at best,
+  // and a sink excused under its neighbour's exclusion at worst.
+  const src = [
+    "class C {",
+    "  async guarded(p: string) {",
+    "    await assertInsideProject(root, p);",
+    "  }",
+    "  private async write(p: string) {",
+    "    await Deno.writeTextFile(p, 'x');",
+    "  }",
+    "  static remove(p: string) {",
+    "    Deno.remove(p);",
+    "  }",
+    "}",
+  ].join("\n");
+  assertEquals(unguardedSinks(src).sort(), ["remove", "write"]);
+});
 
 type Exclusion = { path: string; reason: string };
 

@@ -143,3 +143,44 @@ Deno.test("specnaut init --ai codex scaffolds a Codex layout", async () => {
     assertEquals(lock.includes("harness: codex"), true);
   });
 });
+
+// spec 036: the guards are installed once, at `.specnaut/hooks/`, and Codex
+// learns of them only through `.codex/hooks.json` — a JSON merge, so the user's
+// own registrations in that file survive the init.
+Deno.test("specnaut init --ai codex installs the guards and merges them into .codex/hooks.json", async () => {
+  await withTempDir(async (root) => {
+    const own = { type: "command", command: "./tools/acme-check.sh" };
+    await Deno.mkdir(join(root, ".codex"), { recursive: true });
+    await Deno.writeTextFile(
+      join(root, ".codex/hooks.json"),
+      JSON.stringify({ hooks: { Stop: [{ hooks: [own] }] } }, null, 2),
+    );
+    const { code, stdout, stderr } = await runSpecnaut(
+      ["init", "--here", "--no-git", "--ai", "codex", "--backlog", "local"],
+      { cwd: root },
+    );
+    assertEquals(code, 0, `init failed: ${stderr}`);
+    assertEquals(stdout.includes(".codex/hooks.json"), true, "hooks.json is not reported merged");
+
+    const guard = await Deno.stat(join(root, ".specnaut/hooks/guard-merge.sh"));
+    assertEquals(guard.isFile, true);
+    assertEquals((guard.mode ?? 0) & 0o111, 0o111, "guard-merge.sh is not executable");
+
+    const hooks = JSON.parse(await Deno.readTextFile(join(root, ".codex/hooks.json"))).hooks;
+    const commands: string[] = Object.values(hooks).flatMap((groups) =>
+      (groups as Array<{ hooks: Array<{ command: string }> }>).flatMap((g) =>
+        g.hooks.map((h) => h.command)
+      )
+    );
+    assertEquals(commands.filter((c) => c === own.command).length, 1, "the user's hook was lost");
+    const scripts = commands.flatMap((c) => [...c.matchAll(/\.specnaut\/hooks\/([\w-]+\.sh)/g)])
+      .map((m) => m[1]);
+    assertEquals(scripts.includes("guard-merge.sh"), true, JSON.stringify(commands));
+    for (const script of scripts) {
+      assertEquals(await exists(join(root, ".specnaut/hooks", script)), true, `${script} missing`);
+    }
+    // A merged file is the user's: never lock-tracked.
+    const lock = await Deno.readTextFile(join(root, ".specnaut/installed.lock"));
+    assertEquals(lock.includes(".codex/hooks.json"), false);
+  });
+});
