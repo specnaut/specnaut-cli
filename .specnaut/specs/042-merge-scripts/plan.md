@@ -57,6 +57,12 @@ seat rules).
 - An upgrade installs the four scripts; `deno task test` green; `size-ratchet.sh` passes.
 - Bytes before/after for `merge.md` + `merge-close.md` + `epic-fixups.md` (25,619 B at `d6c0f095`).
 
+**Measured at the end (2026-10-29):** `deno task test` 2,629 passed, 0 failed; fmt and lint clean;
+`gen-hooks.ts --check` clean; smoke `merge`, `features`, `hooks`, `task` and the four
+`backlog-<backend>` scripts green; `audit.sh` 0 coverage gaps. Bytes: `merge.md` 10,082 → 4,611,
+`merge-close.md` 11,364 → 3,035, `epic-fixups.md` 4,173 → 1,993 — **25,619 → 9,639 B (−62 %)**.
+`smoke-features.sh` 964 → 786 lines: the merge checks moved to `smoke-merge.sh` (257).
+
 ## 4. Audit findings — and the design they produced
 
 **The scripts, as built** (supersedes § 1's table where they differ):
