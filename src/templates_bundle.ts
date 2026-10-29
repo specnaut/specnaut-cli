@@ -65,7 +65,8 @@ someone following an instruction written before the move, which is exactly who a
 | Retired address | New address |
 | :--- | :--- |
 | \`/specnaut plan\` | \`/task plan\` |
-| \`/specnaut tasks\` | \`/task tasks\` |
+| \`/specnaut tasks\` | \`/task implement\` |
+| \`/task tasks\` | \`/task implement\` |
 | \`/specnaut implement\` | \`/task implement\` |
 | \`/specnaut review\` | \`/task review\` |
 | \`/specnaut merge\` | \`/task merge\` |
@@ -90,8 +91,8 @@ unknown; their rows are here so a reader looking for them finds the new address.
 | Gone without a successor address | Where its work happens now |
 | :--- | :--- |
 | \`brainstorm\` | \`/task plan\`, step 1 — the discovery dialogue when the input is too fuzzy to plan. |
-| \`specify\` | \`/task plan\` — the same document, sections 1–4. |
-| \`clarify\` | \`/task plan\`, step 8 — questions asked at the stop, before any code exists. |
+| \`specify\` | \`/task plan\` — the brief's task, guardrails and done checks. |
+| \`clarify\` | \`/task plan\`, step 7 — questions asked at the stop, before any code exists. |
 | \`analyze\` | Replaced, not moved: the plan-time architecture and security audits run *before* the code. |
 | \`checklist\` | \`/task plan\`'s success criteria and decision table. |
 | \`list-skills\` | \`/specnaut list\`. |
@@ -113,73 +114,46 @@ unknown; their rows are here so a reader looking for them finds the new address.
 \$ARGUMENTS
 \`\`\`
 
-You **MUST** consider the user input before proceeding (if not empty).
-
 ## What this phase is for
 
-**One planning document per feature**: what it does, the architecture it must obey, and the
-questions only the user can answer — for **long-lived** software: clean, SOLID, secure by default,
-never a shortcut that holds until production. It asks the question that decides whether a feature ships once
-or four times: **what are this feature's decisions, and where does each one live?** A rule whose
-home is free gets spelled twice, and finding that at review means rebuilding.
+One short document per feature — **the brief** — that names the task, the decisions and where each
+one lives, and how done is checked, for **long-lived** software: clean, SOLID, secure by default. A
+rule whose home is not named gets written twice, and finding that at review means rebuilding.
 
-## Pre-Execution Checks
-
-**Check \`hooks.before_plan\` in \`.specnaut/extensions.yml\`** — skip silently if absent or
-unparseable. For each enabled entry (missing \`enabled\` counts as \`true\`) with no non-empty
-\`condition\`, emit an \`## Extension Hooks\` block: \`**Optional Pre-Hook**\` with command, description
-and prompt, or \`**Automatic Pre-Hook**\` with \`EXECUTE_COMMAND: {command}\` — then wait for its
-result. Non-empty \`condition\`s are deferred to the HookExecutor.
+\`--full\` in the arguments asks for the full plan instead (step 4b). So does the risk threshold in
+step 4b, without being asked.
 
 ## Steps
 
 ### 1. If the idea is still fuzzy, find out what it is — then keep going
 
-Judge the input on one question: **can this be planned as written?** A brief naming an outcome, an
-actor and a rough scope can; "something to keep track of runs" cannot.
-
-When it cannot, run a short discovery dialogue **before** writing anything. How a question is put
-is decided by the \`response-style-contract\` skill — read it; never restate it here. What is specific
-to discovery: offer genuinely different **shapes**, not three phrasings of one, and stop as soon as
-you can state the outcome, the actor, what is out of scope, and how acceptance is checked.
-
-Then **continue into step 2 in the same turn** — discovery opens this phase, it is not a reason to
-hand control back.
+Can this be planned as written? A request naming an outcome, an actor and a rough scope can;
+"something to keep track of runs" cannot. When it cannot, ask a few questions first, offering
+genuinely different shapes (how a question is put follows the \`response-style-contract\` skill), and
+stop asking once you can state the outcome, the actor, what is out of scope and how acceptance is
+checked. Then continue into step 2 in the same turn.
 
 ### 2. Resolve the feature and create its home
 
 <!-- BEGIN: spec-backend=local -->
-Generate a concise short name (2–4 words, action-noun where possible — \`add-user-auth\`,
-\`fix-payment-bug\`), preserving technical terms and acronyms. Then:
+Pick a short name (2–4 words, \`add-user-auth\`), then:
 
 \`\`\`bash
 .specnaut/scripts/bash/create-new-feature.sh --json --short-name "<short-name>" [--issue <N>] "<description>"
 \`\`\`
 
-Read \`BRANCH_NAME\`, \`SPEC_FILE\` and the feature directory from the JSON. \`create-new-feature.sh\` is
-re-entrant: run against an existing feature it switches to the existing branch. Specs live under
-\`.specnaut/specs/<prefix>-<short-name>/\`, the prefix following \`branch_numbering\` in
-\`.specnaut/init-options.json\`.
-
-Persist \`{ "feature_directory": "<dir>", "linked_issue": <N or null> }\` to
-\`.specnaut/feature.json\`: \`<dir>\` is the real \`.specnaut/specs/<prefix>-<name>\`, repo-relative.
-Never absolute: it is committed. \`linked_issue\` is the backlog item id when \`--issue <N>\` was passed
-(or a hook returned one); \`merge\` reads it to close the item, and its absence is a no-op downstream.
-
-**Persist it before the next command, not after.** Every script that resolves feature paths reads
-\`.specnaut/feature.json\` ahead of the branch name, so one left naming the previous feature sends the
-next command's writes into that feature's directory. Then:
+Read \`BRANCH_NAME\`, \`SPEC_FILE\` and the feature directory from the JSON (re-running it on an
+existing feature switches to its branch). **Before the next command**, write
+\`{ "feature_directory": "<dir>", "linked_issue": <N or null> }\` to \`.specnaut/feature.json\`: \`<dir>\`
+is the real \`.specnaut/specs/<prefix>-<name>\`, repo-relative, never absolute — it is committed. Every
+feature-path script reads it first, and \`merge\` reads \`linked_issue\` to close the item. Then:
 
 \`\`\`bash
 .specnaut/scripts/bash/setup-plan.sh --json
 \`\`\`
 
-**The card moves itself.** With \`--issue <N>\`, \`create-new-feature.sh\` moves that item to
-\`In progress\` as part of creating the branch, and reports the outcome — including when nothing
-moved. Do **not** move it yourself as well: the workflow's board writes have one home each, this
-one and \`merge\`'s move to \`Done\`.
-
-**One feature per invocation.** The feature directory name and the branch name are independent.
+With \`--issue <N>\` the script moves the card to \`In progress\` itself; do not move it again. One
+feature per invocation.
 <!-- END: spec-backend=local -->
 <!-- BEGIN: spec-backend=cloud -->
 This project stores specifications on SpecNaut Cloud. Do **NOT** create a git branch and do **NOT**
@@ -197,486 +171,119 @@ write any \`.specnaut/specs/<n>/\` files here — the branch is created later, a
 features can be planned concurrently — one \`plan\` per task, each pushed independently.
 <!-- END: spec-backend=cloud -->
 
-### 3. Read the ground truth before writing a line
+### 3. Read the ground truth first
 
-- \`docs/constitution.md\`, already read — binding, and it outranks this file.
-- The linked backlog item's body, when there is one.
-- **The code the feature touches.** Most design questions are already decided there; re-deciding
-  one produces a second spelling.
+The linked backlog item's body, and **the code the feature touches** — most design questions are
+already decided there, and re-deciding one produces a second spelling. Where a document and the code
+disagree, the code wins and the document is corrected in the same change.
 
-### 4. Write ONE document: \`plan.md\`
+### 4a. Write the brief: \`plan.md\`, five parts
 
-One file, read whole by whoever implements. Twelve sections, in order, **none optional**:
+1. **Task and out of scope** — the outcome in the user's terms, and what this change does not do.
+2. **Guardrails** — the decision table (step 5); the constitution's principles this change could
+   break, cited by name, with how it keeps each (not a table of every principle); every surface it
+   touches and the interface contracts it exposes ("one surface" is a valid answer, an unstated one
+   is not); and one required line, **Surfaces added or widened: none | <list>** — trust boundaries
+   in the sense of step 4b, where "none" names what was checked. Requirements follow the
+   \`mobile-first-contract\` skill. Where the project has a front-end surface — detected with the
+   same signals as the \`accessibility-expert\` FE-surface list, never a second heuristic — add a
+   \`Visual Prototyping with Claude Artifacts\` subsection; with none, the plan must not mention
+   artifacts at all.
+3. **Done, as runnable checks** — the commands and tests that prove it: the project's gates
+   (\`.specnaut/scripts/bash/run-gate.sh\`), the test each requirement maps to, and the size ratchet
+   (\`.specnaut/memory/size-limits.md\`).
+4. **Audit findings** — architecture and security, kept separate (step 6).
+5. **Open questions**, and the answers once given (step 7).
 
-1. **Why this exists** — the problem in the user's terms, measured where a measurement is available.
-2. **User scenarios** — prioritised journeys (P1, P2, P3…), each independently testable, with
-   Given/When/Then acceptance scenarios. Edge cases named.
-3. **Requirements** — \`FR-001…\`, each testable.
-4. **Success criteria** — \`SC-001…\`, measurable and technology-agnostic.
-5. **🔒 The decision table** — step 5. **This is the section this phase exists for.**
-6. **Technical context** — language, storage, testing, constraints, scale. Where the feature has
-   entities worth naming, the domain model goes here: bounded context, vocabulary, entities (which
-   have identity), value objects, invariants.
-7. **Constitution check** — every principle, with a verdict, and the size gate in
-   \`.specnaut/memory/size-limits.md\`. A violation goes in Complexity Tracking with its justification
-   (never a size one), or the plan is not done.
-8. **Surface impact** — every client surface the feature touches, plus the interface contracts it
-   exposes. "One surface only" is a valid answer; an unstated one is not.
-   **Front-end / UX-UI features**: where the project has a front-end surface, add a
-   \`## Visual Prototyping with Claude Artifacts\` subsection. Detect that surface with the SAME
-   signals the accessibility gate uses — the \`accessibility-expert\` FE-surface list; don't invent a second
-   heuristic. No front-end surface → the plan **must not mention** artifacts at all.
-   The plan's requirements follow the \`mobile-first-contract\` skill — read it; never restate it here.
-9. **Risks** — each with its mitigation.
-10. **Architecture audit** — findings, and what was done with each. Step 6.
-11. **Security audit** — same, and kept **separate**: the two answer different questions and a
-    reader needs both verdicts on their own terms.
-12. **Open questions**, and the answers once given. Step 8.
+A requirement that quantifies over a set ("every", "none anywhere") says so and names the search
+that enumerates it.
 
-Write for whoever implements: **what** and **why**, and the **how** only where it is a decision the
-implementer must not re-take.
+### 4b. The full plan — on request, or past the risk threshold
 
-Use \`.specnaut/templates/plan-template.md\` — it carries these twelve sections with the decision
-table pre-stubbed.
+Write the full plan (\`.specnaut/templates/plan-template.md\`: scenarios, \`FR-\` / \`SC-\` ids, the
+decision table, domain model, constitution check, surfaces, risks, both audits, open questions)
+when the arguments say \`--full\`, or when the change **adds or widens a trust boundary**: a data
+migration or a change to stored data; authentication or authorisation; secrets, credentials or
+cryptography; a new place that accepts untrusted input (a route, webhook, upload, argument or file
+content that reaches a shell, a path or a parser); a new external service, outbound call, dependency
+or network listener; files written or deleted in someone else's project; an agent instruction
+surface (tool grants, permission allowlists, hooks that run on their own); a change to a public
+interface other projects consume. Say which line triggered it. When the security seat answers
+"crosses the threshold: <which>", the full plan is due even if you judged otherwise.
 
-### 5. 🔒 The decision table — binding, and mechanically checkable
-
-Prose does not bind anything. A table does, because a reviewer can diff the code against it. For
-every rule the feature introduces:
+### 5. 🔒 The decision table — binding
 
 | The decision | Its single home | What would duplicate it |
 | :--- | :--- | :--- |
 | _the rule, in the user's words_ | _one file path_ | _the shapes a second spelling takes_ |
 
-- **Every requirement that is a rule gets a row.** If a requirement says "closed by default", the
-  table says where "closed" is decided.
-- **A home is a file, not a layer.** "the service layer" is not a home.
-- **The third column is the useful one** — what a reviewer greps for, and what makes two spellings
-  of one rule visible.
-- **A rule with two genuine enforcement points** names the ONE place the *decision* is made, and
-  records that both *ask* it. Two askers is fine; two deciders is the defect.
+Every requirement that is a rule gets a row. A home is a file, not a layer. The third column is what
+a reviewer greps for. A rule with two enforcement points names the one place it is *decided*; two
+askers are fine, two deciders are the defect. **Binding on the implementer**: a decision moves out of
+its home only after the brief is amended, and a review finding of two homes is a plan violation.
 
-**Binding on the implementer.** A decision may not move out of its home without the plan being
-amended first. A review finding that a decision has two homes is a **plan violation, not a style
-opinion**.
+**A new script, helper or automation is a decision too — reuse before you build.** Its row names
+**(a)** the existing helpers and commands you inventoried for the procedure, **(b)** the recurrence
+evidence, and **(c)** the outcome — *reuse directly*, *extend the existing helper at its owner*, or
+*add a new helper*. The evidence bar is two separate prior occurrences, besides the current one,
+each traceable to an issue or a commit. Several receipts from one repair count as one occurrence.
+Below the bar the outcome is *reuse directly*. A new or extended helper takes data, never code: it
+accepts no arbitrary executable path, shell string, or caller-chosen argv or environment, keeps the
+exit codes of the helper it extends, and never reports a missing, refused or skipped result as a
+pass.
 
-**A new script, helper or automation is a decision too — reuse before you build.** Any the plan
-introduces gets a row whose first cell names three things: **(a)** the existing helpers and commands
-you inventoried for the procedure, **(b)** the recurrence evidence, and **(c)** the outcome — *reuse
-directly*, *extend the existing helper at its owner*, or *add a new helper*.
+### 6. 🔒 The audits — every feature, before any code
 
-- **The evidence bar is two separate prior occurrences**, besides the current one, each traceable to
-  an issue or a commit. Several receipts from one repair count as one occurrence. Below the bar the
-  outcome is *reuse directly*: run the existing commands, and write nothing new.
-- **A new or extended helper takes data, never code.** It accepts no arbitrary executable path, shell
-  string, or caller-chosen argv or environment. It keeps the exit codes of the helper it extends, and
-  it never reports a missing, refused or skipped result as a pass.
+**An epic is one plan**: one brief covering every open child, one table, one stop
+(\`phases/epic-loop.md\`).
 
-For example, a plan proposes \`scripts/reset-fixtures.sh\` because the agent re-derived the same
-\`git clean\` and seed commands while building this feature. The inventory finds the project's \`seed\`
-task already does the second half; the history shows one earlier occurrence, in a single repair. That
-is below the bar, so the row reads *reuse directly*: call \`git clean\` and the \`seed\` task, and add no
-script.
-
-### 6. 🔒 The two audits — MANDATORY, and they audit the PLAN, not the code
-
-**An epic is one plan.** If the item has open sub-issues, write **one**
-\`plan.md\` covering every child — one decision table, one stop — not one per
-child. \`phases/epic-loop.md\` has the rest.
-
-Read \`phases/plan-audits.md\` and follow it. It dispatches \`architect-expert\` and
-\`security-expert\` on \`plan.md\` **in the same message**, before a single line is written, and it
-carries the eight questions they are asked and the rule that their findings land **in \`plan.md\`**.
-
-Not optional, not deferrable to \`review\`: architecture found at review time is architecture
+**They run on every plan, brief or full** — the threshold changes the plan's shape, never whether it
+is audited. Dispatch **in the same message** \`architect-expert\` and \`security-expert\` on \`plan.md\`,
+and \`performance-expert\` too when the change has a hot path, a bulk job or a query over an unbounded
+set. Each answers its own plan-audit questions (its **Mode 3**). Where the harness cannot dispatch a
+subagent, read each seat's file and answer its Mode 3 questions yourself, each seat's findings kept
+separate. Their findings go **into \`plan.md\`**:
+the plan changes, or it records why an objection was accepted; a clean verdict is written down with
+what it covered. Not deferrable to \`review\`: architecture found at review time is architecture
 rebuilt.
 
-### 8. The plan stop — ask only what only the user can answer
+**Who decides — the seats, not the user.** **A technical fork is never a question**: architecture,
+patterns, layering, security hardening and performance trade-offs are ranked by the seats, the brief
+takes the top option and records what was rejected and why — reported at the stop, **never
+asked**. When two seats disagree, the reading better for the code's long-term health
+wins: security, then maintainability, then performance, then speed of delivery. Escalate only a fork
+that changes what the product does, or one in the always-ask class of step 7.
 
-It is the chain's last
-chance to ask: under the default \`merge: auto\` nothing after it asks again — the branch is merged,
-pushed and its item closed. **Say so**, and ask here what autopilot would otherwise settle alone.
-**A technical fork is never a question**: architecture, patterns, layering, security hardening and
-performance trade-offs were settled at step 6 by the expert seats (\`phases/plan-audits.md\`, "Who
-decides"). Present, in this order:
+### 7. The plan stop — ask only what only the user can answer
 
-1. **The architecture as decided**, with what was rejected and why — a report, not a vote.
-2. **Both audits' findings — architecture AND security** — and what was done with each, separately.
-3. **The open questions — only what only the user can answer**: business rules, thresholds, what
+This is the chain's last chance to ask: under the default \`merge: auto\` nothing after it asks again
+— say so, and ask here what autopilot would otherwise settle alone. Present, in order:
+
+1. the decided design, with what was rejected and why — a report, not a vote;
+2. both audits' findings, separately, and what was done with each;
+3. **the open questions — only what only the user can answer**: business rules, thresholds, what
    happens to existing data, scope — and always: the base branch, anything irreversible or
-   destructive, breaking a public surface, a new external service, vendor or cost. Put them per the
-   \`response-style-contract\` skill, the answer that invalidates the most others first.
-4. **Anything you decided yourself**, one line each, so a wrong assumption is visible.
+   destructive, breaking a public surface, a new external service, vendor or cost — the answer that
+   invalidates the most others first;
+4. anything you decided yourself, one line each.
 
-Record every answer **in \`plan.md\` as a settled decision, with its date**. **Nothing open in 3 →
-no stop**: present 1, 2 and 4 as a report and invoke \`tasks\` in the same turn. Never stop to have a
-recommendation confirmed — that is the expert seat's job, already done.
+Record each answer in \`plan.md\` with its date. **Nothing open → no stop**: report 1, 2 and 4 and go
+on. Never stop to have a recommendation confirmed.
 
-### 9. Commit, then INVOKE \`tasks\` — same turn
+### 8. Commit, then INVOKE \`implement\` — same turn
 
 <!-- BEGIN: spec-backend=local -->
 \`\`\`bash
 git add .specnaut/specs/<feature-dir>/ && git commit -m "plan(<id>): <what the feature does>"
 \`\`\`
 
-Commit **before** handing off: a worktree runs off committed HEAD, and an uncommitted plan is
-invisible to whoever needs it.
+Commit before handing off: a worktree runs off committed HEAD.
 <!-- END: spec-backend=local -->
 
-**INVOKE \`tasks\` yourself, in the same turn as the user's last answer** — your own next action, not
-a command printed for them to paste. The stop is over the moment the questions are answered; asking
-for a second approval re-litigates what they just decided.
-
-\`tasks\` derives from the **approved** plan — hence a separate phase; decomposing here would break
-down an architecture the user has not approved. Only an **unanswered** question legitimately holds
-it. Answered means go. Pause only when the run was started with \`--manual\`.
-
-## Post-Execution Checks
-
-**Check \`hooks.after_plan\`** — same rules, \`**Optional Hook**\` / \`**Automatic Hook**\` wording.
-
-## Key rules
-
-- **Absolute paths** for filesystem operations; project-relative paths inside documents.
-- **A number is not a name.** Follow the \`backlog-reference-contract\` skill for every reference.
-- **A requirement that quantifies over a set must say so unambiguously.** "every", "all", "none
-  anywhere" names a set, and \`tasks\` decomposes it by SEARCH, never by example. Name the search that
-  enumerates it where you can.
-- **Make informed guesses** from context and common patterns, recorded under open questions as
-  decisions you took — one line each. No need to ask about data retention, performance targets,
-  error handling, authentication method or integration patterns.
-- **Success criteria are measurable, technology-agnostic and user-focused.** "Users complete
-  checkout in under 3 minutes", not "API response time under 200ms".
-- **The code is the present; a document is a claim about the past.** Where they disagree, the code
-  wins and the document is corrected in the same change.
-- **There is no cross-artefact consistency check any more, and none should be re-added.** With one
-  document there are no artefacts to hold in agreement — the step-6 audits replaced it, and run
-  before the code exists rather than after.
-- **Do not pad.** A plan long enough to be skimmed is a plan nobody reads.
-`,
-    executable: false,
-    backend: null,
-    skipIfExists: false,
-  },
-  {
-    category: "phase",
-    name: "task",
-    suffix: "plan-audits.md",
-    content: `# Plan audits — architecture and security, against the plan
-
-Loaded by \`phases/plan.md\` at step 6. Both audits run **before a single line of code is written**,
-dispatched **in the same message** so they execute concurrently. They judge different things and
-neither substitutes for the other.
-
-**Both are read-only and advisory, and they are who settles the technical forks** — see "Who
-decides" below. Their findings go **into \`plan.md\`**: either the plan changes, or it records why the
-objection was accepted. An audit whose output is not written down did not happen. A clean verdict is written
-down **with its coverage**, because a clean verdict is worth exactly what it covered.
-
-## 🔒 The architecture audit
-
-**Dispatch the \`architect-expert\` agent on \`plan.md\` before a single line is written** — here,
-while changing your mind is still free, because architecture found at review time is architecture
-rebuilt. The defect class it catches: a decision that must agree, spelled in more than one place, or
-asked in a caller instead of at the decision. Ask five questions, in this order:
-
-1. **Is the decision table complete?** Name any rule in the requirements with no row. A missing row
-   is the defect this phase exists to prevent.
-2. **Is each home the right home?** A pure rule belongs in its bounded context, not in a service; a
-   decision asked by two gates belongs *in* the decision, not in either caller.
-3. **What is the blast radius?** How many existing call sites, routes, components or surfaces does
-   each new rule touch — **counted, not estimated.** This is where the cost hides: a gate described
-   in one sentence can change the behaviour of two hundred routes.
-4. **Does § 7's Files touched table hold?** Re-measure every row with \`wc -l\`, name any touched file
-   the table omits, and apply \`.specnaut/memory/size-limits.md\`: a file over its target that the
-   plan grows is a finding, whatever Complexity tracking says.
-5. **What would a reviewer find in this design three cycles from now?** In writing. A design whose
-   predicted findings are already known can be corrected now, for the price of an edit.
-
-## 🛡 The security audit
-
-**Dispatch the \`security-expert\` agent on \`plan.md\` in the same message as the architecture audit**
-so both run concurrently. Neither substitutes for the other: the architect asks whether a rule has
-one home, the security seat asks whether that home is reachable by someone who should not reach it.
-These are the most expensive findings to fix late — a missing authorization gate is one line, but a
-data model that made the gate impossible is a migration, a backfill, and every caller. Ask four
-questions, in this order:
-
-1. **Which new surface accepts input, and where does it stop?** Every route, job, webhook and upload
-   path the plan adds, and the validator that bounds it. A boundary with no validator named is the
-   finding.
-2. **Who is allowed, and where is that decided?** One authorization decision per new capability, at
-   its home. Two gates for one rule, or a gate in a caller rather than at the decision, is the
-   architect's defect class arriving through a different door.
-3. **What identifiers and what bytes become reachable?** Enumerable ids, a path that skips its
-   access check, a field that should never leave the server.
-4. **What does this let an authenticated stranger do to somebody else's account?** In writing.
-   "Nothing" is acceptable only when it names what was checked.
-
-## ⚡ The performance seat — when the plan has a hot path
-
-When the plan's technical context names a scale constraint, a hot path, a bulk job or a query over
-an unbounded set, dispatch \`performance-expert\` on \`plan.md\` in the same message as the other two.
-Ask what grows with the data, what runs per request, and what the plan does when the set is 100×
-today's.
-
-## ⚖ Who decides — the seats, not the user
-
-Specnaut builds **long-lived** software: clean code, SOLID boundaries, sound design patterns, secure
-by default. A technical fork is settled against that intent, not put to a vote:
-
-- **Architecture, patterns, layering, naming, security hardening, performance trade-offs** — the
-  seats rank the options, the plan takes the top one, and \`plan.md\` records it as a decision with
-  the rejected alternatives and why. Presented at the plan stop as a report, **never asked**. Asking
-  the user to confirm a recommendation an expert already made is a stop with nothing behind it.
-- **When two seats disagree**, the reading better for the long-term health of the code wins:
-  security, then maintainability, then performance, then speed of delivery. Record the conflict and
-  the winner in \`plan.md\`.
-- **Escalate to the user only** when the fork changes what the product does, or falls in the
-  always-ask class of \`phases/plan.md\` step 8: the base branch, anything irreversible or
-  destructive, breaking a public surface, a new external service, vendor or cost.
-
-The same holds after the plan: a fix loop in \`implement\` or \`review\` never asks the user to choose
-between technical fixes.
-`,
-    executable: false,
-    backend: null,
-    skipIfExists: false,
-  },
-  {
-    category: "phase",
-    name: "task",
-    suffix: "tasks.md",
-    content: `
-Read \`docs/constitution.md\` before anything else: it is this project's binding rules, and no agent edits it unasked.
-
-## User Input
-
-\`\`\`text
-\$ARGUMENTS
-\`\`\`
-
-You **MUST** consider the user input before proceeding (if not empty).
-
-**An epic is one \`tasks.md\`.** Its breakdown is the child list in dependency
-order; a child may hold several \`T\` entries and still produce one commit. That
-\`T00N\` counter is **not** the one a commit's scope position carries — see
-\`phases/epic-loop.md\`.
-
-## Pre-Execution Checks
-
-**Check for extension hooks (before tasks generation)**:
-- Check if \`.specnaut/extensions.yml\` exists in the project root.
-- If it exists, read it and look for entries under the \`hooks.before_tasks\` key
-- If the YAML cannot be parsed or is invalid, skip hook checking silently and continue normally
-- Filter out hooks where \`enabled\` is explicitly \`false\`. Treat hooks without an \`enabled\` field as enabled by default.
-- For each remaining hook, do **not** attempt to interpret or evaluate hook \`condition\` expressions:
-  - If the hook has no \`condition\` field, or it is null/empty, treat the hook as executable
-  - If the hook defines a non-empty \`condition\`, skip the hook and leave condition evaluation to the HookExecutor implementation
-- For each executable hook, output the following based on its \`optional\` flag:
-  - **Optional hook** (\`optional: true\`):
-    \`\`\`
-    ## Extension Hooks
-
-    **Optional Pre-Hook**: {extension}
-    Command: \`/{command}\`
-    Description: {description}
-
-    Prompt: {prompt}
-    To execute: \`/{command}\`
-    \`\`\`
-  - **Mandatory hook** (\`optional: false\`):
-    \`\`\`
-    ## Extension Hooks
-
-    **Automatic Pre-Hook**: {extension}
-    Executing: \`/{command}\`
-    EXECUTE_COMMAND: {command}
-    
-    Wait for the result of the hook command before proceeding to the Outline.
-    \`\`\`
-- If no hooks are registered or \`.specnaut/extensions.yml\` does not exist, skip silently
-
-## Outline
-
-<!-- BEGIN: spec-backend=cloud -->
-**Materialise the spec (cloud backend):** run \`specnaut spec pull <task>\` ONCE now, before
-loading any design document. It writes the spec's tabs to the gitignored
-\`.specnaut/specs/.cache/<task>/\`; read the spec from there as files. If the pull fails
-(offline/auth), stop with its message — do not proceed against an empty spec.
-
-<!-- END: spec-backend=cloud -->
-1. **Setup**: Run \`.specnaut/scripts/bash/check-prerequisites.sh --json\` from repo root and parse FEATURE_DIR and AVAILABLE_DOCS list. All paths must be absolute. For single quotes in args like "I'm Groot", use escape syntax: e.g 'I'\\''m Groot' (or double-quote if possible: "I'm Groot").
-
-2. **Load design documents**: Read from FEATURE_DIR:
-   - **Required**: \`plan.md\` — the feature's ONE planning document. It carries the user
-     scenarios and their priorities, the requirements, the success criteria, the domain model,
-     the surface impact, and the 🔒 decision table.
-   - There are no other artefacts to load. \`research.md\`, \`data-model.md\`, \`contracts/\` and
-     \`quickstart.md\` no longer exist — that content lives in \`plan.md\`'s sections 6 and 8.
-   - Note: Not all projects have all documents. Generate tasks based on what's available.
-
-3. **Execute task generation workflow**:
-   - Load plan.md and extract tech stack, libraries, project structure
-   - Extract the user stories and their priorities (P1, P2, P3…) from \`plan.md\` section 2
-   - Map the domain model's entities (section 6) to the stories that need them
-   - Map the interface contracts (section 8) to the stories they serve
-   - **Carry the 🔒 decision table forward**: a task may not put a decision anywhere but its
-     named home. Where a task touches a rule in the table, name that home in the task.
-   - **Apply the size gate** in \`.specnaut/memory/size-limits.md\` § In each phase → **tasks**:
-     re-measure every file the plan touches; a file over its target gets an extraction task
-     before any task that adds to it, and new behaviour is a "create module" task wherever it can
-     be.
-   - Generate tasks organized by user story (see Task Generation Rules below)
-   - Generate dependency graph showing user story completion order
-   - Create parallel execution examples per user story
-   - Validate task completeness (each user story has all needed tasks, independently testable)
-
-4. **Generate tasks.md**: Use \`templates/tasks-template.md\` as structure, fill with:
-   - Correct feature name from plan.md
-   - Phase 1: Setup tasks (project initialization)
-   - Phase 2: Foundational tasks (blocking prerequisites for all user stories)
-   - Phase 3+: One phase per user story (in priority order from \`plan.md\`)
-   - Each phase includes: story goal, independent test criteria, tests (if requested), implementation tasks
-   - Final Phase: Polish & cross-cutting concerns
-   - All tasks must follow the strict checklist format (see Task Generation Rules below)
-   - Clear file paths for each task
-   - Dependencies section showing story completion order
-   - Parallel execution examples per story
-   - Implementation strategy section (MVP first, incremental delivery)
-
-5. **Report**: Output path to generated tasks.md and summary:
-   - Total task count
-   - Task count per user story
-   - Parallel opportunities identified
-   - Independent test criteria for each story
-   - Suggested MVP scope (typically just User Story 1)
-   - Format validation: Confirm ALL tasks follow the checklist format (checkbox, ID, labels, file paths)
-
-6. **Check for extension hooks**: After tasks.md is generated, check if \`.specnaut/extensions.yml\` exists in the project root.
-   - If it exists, read it and look for entries under the \`hooks.after_tasks\` key
-   - If the YAML cannot be parsed or is invalid, skip hook checking silently and continue normally
-   - Filter out hooks where \`enabled\` is explicitly \`false\`. Treat hooks without an \`enabled\` field as enabled by default.
-   - For each remaining hook, do **not** attempt to interpret or evaluate hook \`condition\` expressions:
-     - If the hook has no \`condition\` field, or it is null/empty, treat the hook as executable
-     - If the hook defines a non-empty \`condition\`, skip the hook and leave condition evaluation to the HookExecutor implementation
-   - For each executable hook, output the following based on its \`optional\` flag:
-     - **Optional hook** (\`optional: true\`):
-       \`\`\`
-       ## Extension Hooks
-
-       **Optional Hook**: {extension}
-       Command: \`/{command}\`
-       Description: {description}
-
-       Prompt: {prompt}
-       To execute: \`/{command}\`
-       \`\`\`
-     - **Mandatory hook** (\`optional: false\`):
-       \`\`\`
-       ## Extension Hooks
-
-       **Automatic Hook**: {extension}
-       Executing: \`/{command}\`
-       EXECUTE_COMMAND: {command}
-       \`\`\`
-   - If no hooks are registered or \`.specnaut/extensions.yml\` does not exist, skip silently
-
-Context for task generation: the User Input above.
-
-The tasks.md should be immediately executable - each task must be specific enough that an LLM can complete it without additional context.
-
-## Task Generation Rules
-
-**CRITICAL**: Tasks MUST be organized by user story to enable independent implementation and testing.
-
-**Tests are OPTIONAL**: Only generate test tasks if explicitly requested in the feature specification or if user requests TDD approach.
-
-### Checklist Format (REQUIRED)
-
-Every task MUST strictly follow this format:
-
-\`\`\`text
-- [ ] [TaskID] [P?] [Story?] Description with file path
-\`\`\`
-
-**Format Components**:
-
-1. **Checkbox**: ALWAYS start with \`- [ ]\` (markdown checkbox)
-2. **Task ID**: Sequential number (T001, T002, T003...) in execution order
-3. **[P] marker**: Include ONLY if task is parallelizable (different files, no dependencies on incomplete tasks)
-4. **[Story] label**: REQUIRED for user story phase tasks only
-   - Format: [US1], [US2], [US3], etc. (maps to user stories from \`plan.md\`)
-   - Setup phase: NO story label
-   - Foundational phase: NO story label  
-   - User Story phases: MUST have story label
-   - Polish phase: NO story label
-5. **Description**: Clear action with exact file path
-
-**Examples**:
-
-- ✅ CORRECT: \`- [ ] T001 Create project structure per implementation plan\`
-- ✅ CORRECT: \`- [ ] T005 [P] Implement authentication middleware in src/middleware/auth.py\`
-- ✅ CORRECT: \`- [ ] T012 [P] [US1] Create User model in src/models/user.py\`
-- ✅ CORRECT: \`- [ ] T014 [US1] Implement UserService in src/services/user_service.py\`
-- ❌ WRONG: \`- [ ] Create User model\` (missing ID and Story label)
-- ❌ WRONG: \`T001 [US1] Create model\` (missing checkbox)
-- ❌ WRONG: \`- [ ] [US1] Create User model\` (missing Task ID)
-- ❌ WRONG: \`- [ ] T001 [US1] Create model\` (missing file path)
-
-### Task Organization
-
-1. **From User Stories (\`plan.md\` section 2)** - PRIMARY ORGANIZATION:
-   - Each user story (P1, P2, P3...) gets its own phase
-   - Map all related components to their story:
-     - Models needed for that story
-     - Services needed for that story
-     - Interfaces/UI needed for that story
-     - If tests requested: Tests specific to that story
-   - Mark story dependencies (most stories should be independent)
-
-2. **From Contracts**:
-   - Map each interface contract → to the user story it serves
-   - If tests requested: Each interface contract → contract test task [P] before implementation in that story's phase
-
-3. **From Data Model**:
-   - Map each entity to the user story(ies) that need it
-   - If entity serves multiple stories: Put in earliest story or Setup phase
-   - Relationships → service layer tasks in appropriate story phase
-
-4. **From Setup/Infrastructure**:
-   - Shared infrastructure → Setup phase (Phase 1)
-   - Foundational/blocking tasks → Foundational phase (Phase 2)
-   - Story-specific setup → within that story's phase
-
-### Phase Structure
-
-- **Phase 1**: Setup (project initialization)
-- **Phase 2**: Foundational (blocking prerequisites - MUST complete before user stories)
-- **Phase 3+**: User Stories in priority order (P1, P2, P3...)
-  - Within each story: Tests (if requested) → Models → Services → Endpoints → Integration
-  - Each phase should be a complete, independently testable increment
-- **Final Phase**: Polish & Cross-Cutting Concerns
-
-## Ending this phase — INVOKE \`implement\`, same turn
-
-Commit the breakdown, then **invoke \`implement\` yourself, in the same turn**. Your own next action —
-not a suggestion, not a command printed for the user to paste.
-
-\`\`\`bash
-git add <feature-dir>/tasks.md && git commit -m "tasks(<id>): <what the feature does>"
-\`\`\`
-
-Commit **before** handing off: a worktree runs off committed HEAD, and an uncommitted breakdown is
-invisible to whoever needs it.
-
-**The boundary between \`tasks\` and \`implement\` is not a stop.** The size of the breakdown is not a
-reason to stop — it was known when the chain started, and the user chose the work at the plan stop.
-Neither is "this is where the real code gets written": yes, and that is the point of the chain. The
-chain stops at the plan, and at the review verdict only under \`merge: manual\`; this is neither
-of them — see \`phases/auto-chain.md\`.
-
-Pause only when the run was started with \`--manual\`.
+Then **invoke \`implement\` yourself, in the same turn as the user's last answer** — your own next
+action, not a command printed for them. This boundary is not a stop; pause only when the run was
+started with \`--manual\`.
+References to a backlog item follow the \`backlog-reference-contract\` skill.
 `,
     executable: false,
     backend: null,
@@ -686,8 +293,8 @@ Pause only when the run was started with \`--manual\`.
     category: "phase",
     name: "task",
     suffix: "implement.md",
-    content: `
-Read \`docs/constitution.md\` before anything else: it is this project's binding rules, and no agent edits it unasked.
+    content:
+      `Read \`docs/constitution.md\` before anything else: it is this project's binding rules, and no agent edits it unasked.
 
 ## User Input
 
@@ -695,198 +302,60 @@ Read \`docs/constitution.md\` before anything else: it is this project's binding
 \$ARGUMENTS
 \`\`\`
 
-You **MUST** consider the user input before proceeding (if not empty).
-
-## Pre-Execution Checks
-
-**Check for extension hooks (before implementation)**:
-- Check if \`.specnaut/extensions.yml\` exists in the project root.
-- If it exists, read it and look for entries under the \`hooks.before_implement\` key
-- If the YAML cannot be parsed or is invalid, skip hook checking silently and continue normally
-- Filter out hooks where \`enabled\` is explicitly \`false\`. Treat hooks without an \`enabled\` field as enabled by default.
-- For each remaining hook, do **not** attempt to interpret or evaluate hook \`condition\` expressions:
-  - If the hook has no \`condition\` field, or it is null/empty, treat the hook as executable
-  - If the hook defines a non-empty \`condition\`, skip the hook and leave condition evaluation to the HookExecutor implementation
-- For each executable hook, output the following based on its \`optional\` flag:
-  - **Optional hook** (\`optional: true\`):
-    \`\`\`
-    ## Extension Hooks
-
-    **Optional Pre-Hook**: {extension}
-    Command: \`/{command}\`
-    Description: {description}
-
-    Prompt: {prompt}
-    To execute: \`/{command}\`
-    \`\`\`
-  - **Mandatory hook** (\`optional: false\`):
-    \`\`\`
-    ## Extension Hooks
-
-    **Automatic Pre-Hook**: {extension}
-    Executing: \`/{command}\`
-    EXECUTE_COMMAND: {command}
-    
-    Wait for the result of the hook command before proceeding to the Outline.
-    \`\`\`
-- If no hooks are registered or \`.specnaut/extensions.yml\` does not exist, skip silently
-
-## Outline
+## Before the first line
 
 <!-- BEGIN: spec-backend=cloud -->
-0. **Cloud spec setup** (spec backend = cloud): the spec lives on SpecNaut Cloud
-   and \`/task plan\` created NO git branch. Before anything else, in this order:
-   - **Materialise the spec (pull-on-entry)** — run \`specnaut spec pull <task>\` ONCE
-     now; it writes the spec's tabs to the gitignored \`.specnaut/specs/.cache/<task>/\`.
-     Read the spec, plan, tasks, and the mandatory Domain Model block from that cache
-     directory instead of \`.specnaut/specs/<n>/\`. If the pull fails (offline/auth),
-     stop with its message — do not proceed against an empty spec.
-   - **Create the feature branch now** — this is the decoupling point. Run
-     \`.specnaut/scripts/bash/create-new-feature.sh --branch-only "<feature description>"\`
-     (the \`--branch-only\` flag creates only the branch — no \`.specnaut/specs/\` dir).
+**Cloud spec setup** — the spec lives on SpecNaut Cloud and \`/task plan\` created no branch. First,
+run \`specnaut spec pull <task>\` once: it writes the spec to the gitignored
+\`.specnaut/specs/.cache/<task>/\`, and you read it from there. If the pull fails, stop with its
+message. Then create the branch:
+\`.specnaut/scripts/bash/create-new-feature.sh --branch-only "<feature description>"\`.
 
 <!-- END: spec-backend=cloud -->
-1. Run \`.specnaut/scripts/bash/check-prerequisites.sh --json --require-tasks --include-tasks\` from repo root and parse FEATURE_DIR and AVAILABLE_DOCS list. All paths must be absolute. For single quotes in args like "I'm Groot", use escape syntax: e.g 'I'\\''m Groot' (or double-quote if possible: "I'm Groot").
+Run \`.specnaut/scripts/bash/check-prerequisites.sh --json\` for the feature directory, and read its
+\`plan.md\` — the brief, or the full plan. Then:
 
-2. Load and analyze the implementation context:
-   - **REQUIRED**: Read tasks.md for the complete task list and execution plan
-   - **REQUIRED**: Read plan.md for tech stack, architecture, and file structure
-   - **REQUIRED**: Read the domain model in the plan's technical-context section. If the section is absent, empty, or still contains \`[NEEDS CLARIFICATION]\` markers / template placeholders → halt and report BLOCKED with reason \`awaiting:product-owner-domain-brief\`. The developer agent refuses to write code without this brief — its "First action" checklist (step 4) reads the block and returns the same BLOCKED reason. Recommend re-running \`/task plan\` to fill it before re-attempting \`/task implement\`.
-   - Read \`plan.md\` section 6 for the domain model — entities, value objects, invariants
-   - Read \`plan.md\` section 8 for the surfaces touched and the interface contracts
-   - **Read \`plan.md\` section 5 — the 🔒 decision table — and treat it as binding.** A decision
-     may not be implemented anywhere but its named home. If the code seems to want a second
-     spelling, the plan is amended first; it is not resolved at the keyboard.
-   - **REQUIRED**: apply \`.specnaut/memory/size-limits.md\` § **implement** to every task and brief.
+- **The decision table is binding.** A decision is implemented only in its named home. If the code
+  wants a second spelling, amend the brief first; it is not resolved at the keyboard.
+- **Extract before you grow** — apply \`.specnaut/memory/size-limits.md\` § **implement**: re-measure
+  every file you will touch, split a file over its target first, in its own commit, and put new
+  behaviour in a new module wherever it can.
+- **Done is the brief's checks.** Work until every one of them passes; they are what \`review\` runs.
+- **Keep secrets out of git.** The project's ignore files must exclude \`.env*\`, \`*.tfstate*\`,
+  \`*.tfvars\`, \`kubeconfig*\`, \`*.key\`, \`*.crt\` and \`secrets/\` where the stack produces them, and
+  generated output (\`node_modules/\`, \`dist/\`, \`build/\`, \`target/\`, \`.venv/\`). Append a missing
+  pattern; never rewrite the user's file.
 
-3. **Project Setup Verification**:
-   - **REQUIRED**: Create/verify ignore files based on actual project setup:
+## Building it
 
-   **Detection & Creation Logic**:
-   - Check if the following command succeeds to determine if the repository is a git repo (create/verify .gitignore if so):
+Order the work yourself, from the brief: there is no separate breakdown. Write the test before the
+code it proves where you can, and commit by scope as you go.
 
-     \`\`\`sh
-     git rev-parse --git-dir 2>/dev/null
-     \`\`\`
+**Size your own team, under a cap.** Split independent parts across subagents when that is faster —
+at most four at once, each given its files, the rows of the decision table it touches and the check
+it must pass. Two agents never hold the same file. You stay the one who integrates, gates and
+commits.
 
-   - Check if Dockerfile* exists or Docker in plan.md → create/verify .dockerignore
-   - Check if .eslintrc* exists → create/verify .eslintignore
-   - Check if eslint.config.* exists → ensure the config's \`ignores\` entries cover required patterns
-   - Check if .prettierrc* exists → create/verify .prettierignore
-   - Check if .npmrc or package.json exists → create/verify .npmignore (if publishing)
-   - Check if terraform files (*.tf) exist → create/verify .terraformignore
-   - Check if .helmignore needed (helm charts present) → create/verify .helmignore
-
-   **If ignore file already exists**: Verify it contains essential patterns, append missing critical patterns only
-   **If ignore file missing**: Create with full pattern set for detected technology
-
-   **Common Patterns by Technology** (from plan.md tech stack):
-   - **Node.js/JavaScript/TypeScript**: \`node_modules/\`, \`dist/\`, \`build/\`, \`*.log\`, \`.env*\`
-   - **Python**: \`__pycache__/\`, \`*.pyc\`, \`.venv/\`, \`venv/\`, \`dist/\`, \`*.egg-info/\`
-   - **Java**: \`target/\`, \`*.class\`, \`*.jar\`, \`.gradle/\`, \`build/\`
-   - **C#/.NET**: \`bin/\`, \`obj/\`, \`*.user\`, \`*.suo\`, \`packages/\`
-   - **Go**: \`*.exe\`, \`*.test\`, \`vendor/\`, \`*.out\`
-   - **Ruby**: \`.bundle/\`, \`log/\`, \`tmp/\`, \`*.gem\`, \`vendor/bundle/\`
-   - **PHP**: \`vendor/\`, \`*.log\`, \`*.cache\`, \`*.env\`
-   - **Rust**: \`target/\`, \`debug/\`, \`release/\`, \`*.rs.bk\`, \`*.rlib\`, \`*.prof*\`, \`.idea/\`, \`*.log\`, \`.env*\`
-   - **Kotlin**: \`build/\`, \`out/\`, \`.gradle/\`, \`.idea/\`, \`*.class\`, \`*.jar\`, \`*.iml\`, \`*.log\`, \`.env*\`
-   - **C++**: \`build/\`, \`bin/\`, \`obj/\`, \`out/\`, \`*.o\`, \`*.so\`, \`*.a\`, \`*.exe\`, \`*.dll\`, \`.idea/\`, \`*.log\`, \`.env*\`
-   - **C**: \`build/\`, \`bin/\`, \`obj/\`, \`out/\`, \`*.o\`, \`*.a\`, \`*.so\`, \`*.exe\`, \`*.dll\`, \`autom4te.cache/\`, \`config.status\`, \`config.log\`, \`.idea/\`, \`*.log\`, \`.env*\`
-   - **Swift**: \`.build/\`, \`DerivedData/\`, \`*.swiftpm/\`, \`Packages/\`
-   - **R**: \`.Rproj.user/\`, \`.Rhistory\`, \`.RData\`, \`.Ruserdata\`, \`*.Rproj\`, \`packrat/\`, \`renv/\`
-   - **Universal**: \`.DS_Store\`, \`Thumbs.db\`, \`*.tmp\`, \`*.swp\`, \`.vscode/\`, \`.idea/\`
-
-   **Tool-Specific Patterns**:
-   - **Docker**: \`node_modules/\`, \`.git/\`, \`Dockerfile*\`, \`.dockerignore\`, \`*.log*\`, \`.env*\`, \`coverage/\`
-   - **ESLint**: \`node_modules/\`, \`dist/\`, \`build/\`, \`coverage/\`, \`*.min.js\`
-   - **Prettier**: \`node_modules/\`, \`dist/\`, \`build/\`, \`coverage/\`, \`package-lock.json\`, \`yarn.lock\`, \`pnpm-lock.yaml\`
-   - **Terraform**: \`.terraform/\`, \`*.tfstate*\`, \`*.tfvars\`, \`.terraform.lock.hcl\`
-   - **Kubernetes/k8s**: \`*.secret.yaml\`, \`secrets/\`, \`.kube/\`, \`kubeconfig*\`, \`*.key\`, \`*.crt\`
-
-4. Parse tasks.md structure and extract:
-   - **Task phases**: Setup, Tests, Core, Integration, Polish
-   - **Task dependencies**: Sequential vs parallel execution rules
-   - **Task details**: ID, description, file paths, parallel markers [P]
-   - **Execution flow**: Order and dependency requirements
-
-5. Execute implementation following the task plan:
-   - **Phase-by-phase execution**: Complete each phase before moving to the next
-   - **Respect dependencies**: Run sequential tasks in order, parallel tasks [P] can run together  
-   - **Follow TDD approach**: Execute test tasks before their corresponding implementation tasks
-   - **File-based coordination**: Tasks affecting the same files must run sequentially
-   - **Validation checkpoints**: Verify each phase completion before proceeding
-
-6. Implementation execution rules:
-   - **Setup first**: Initialize project structure, dependencies, configuration
-   - **Tests before code**: If you need to write tests for contracts, entities, and integration scenarios
-   - **Core development**: Implement models, services, CLI commands, endpoints
-   - **Integration work**: Database connections, middleware, logging, external services
-   - **Polish and validation**: Unit tests, performance optimization, documentation
-
-7. Progress tracking and error handling:
-   - Report progress after each completed task
-   - Halt execution if any non-parallel task fails
-   - For parallel tasks [P], continue with successful tasks, report failed ones
-   - Provide clear error messages with context for debugging
-   - Suggest next steps if implementation cannot proceed
-   - **IMPORTANT** For completed tasks, make sure to mark the task off as [X] in the tasks file.
-
-8. Completion validation:
-   - Verify all required tasks are completed
-   - Check that implemented features match the original specification
-   - Validate that tests pass and coverage meets requirements
-   - Confirm the implementation follows the technical plan
-   - Report final status with summary of completed work
-
-Note: tasks.md incomplete or missing → suggest \`/task tasks\` first.
-
-10. **Check for extension hooks**: After completion validation, check
-    \`hooks.after_implement\` in \`.specnaut/extensions.yml\` and follow the same
-    procedure as the pre-hook block above — same parse, same \`enabled\` default,
-    same refusal to evaluate a \`condition\`, same silent skip when absent. Two
-    differences only: the key is \`after_implement\`, and the emitted wording is
-    \`**Optional Hook**\` / \`**Automatic Hook**\` (no "Pre-").
-## An epic runs as a loop, not as one implementation
-
-When the item being worked is an **epic with open sub-issues**, read
-\`phases/epic-loop.md\` and follow it: one commit per child on the epic's
-branch, the fast gate after each, and no return to the user between children.
-It carries the commit format and the gate tiers by reference. On a standalone
-item none of it applies — implement and commit as usual.
+**An epic runs as a loop.** When the item is an epic with open sub-issues, read
+\`phases/epic-loop.md\` and follow it: one commit per child on the epic's branch, the fast gate after
+each, no return to the user between children.
 
 ## 🔒 What you find while building, you fix while building
 
-You will hit things the task did not name: a stale comment, a guard with no
-test, a message promising something the code does not do, a helper that swallows
-an error. **Fix them, in this branch, in their own commit.** That is the job, not
-an interruption to it.
-
-Log one instead of fixing it only when it needs a **product decision**, crosses a
-**boundary this task does not touch**, needs a **migration**, or the fix is
-**larger than the task itself** — and then say, in one sentence, why. Anything
-that clears that bar is significant enough to be opened at **P0 or P1**.
-
-A run that lands one task and leaves four behind has made the backlog longer than
-it found it. Do that a few times and the backlog is the work, and the work never
-happens.
+A stale comment, a guard with no test, a message promising what the code does not do, a helper that
+swallows an error: **fix it, in this branch, in its own commit**. Log it instead only when it needs a
+product decision, crosses a boundary this task does not touch, needs a migration, or is larger than
+the task — and say why in one sentence; such an item is opened at P0 or P1.
 
 ## Ending this phase — freeze, then INVOKE \`review\`, same turn
 
-**An implementation that has not been through review is not finished.** \`review\` is this phase's
-mandatory last act, not a separate thing the user has to ask for.
+An implementation that has not been through review is not finished.
 
-1. **Freeze the tree.** Reviewers and suites read the working tree live, and only you know whether
-   it is still moving. Name the commit, stop every implementer agent still holding the tree, then
-   gate. A lingering agent row is a live teammate, not a leftover — it can write into a tree
-   somebody is about to freeze.
-2. **Invoke \`review\` yourself, in the same turn.** Your own next action.
+1. **Freeze the tree.** Name the commit and stop every agent still holding the tree before anything
+   is gated: reviewers and suites read it live.
+2. **Invoke \`review\` yourself, in the same turn.**
 
-**This boundary is not a stop.** "The audits found a lot, should I re-confirm scope?" is not a
-reason — the findings were folded into the plan and the plan was approved, and that approval covers
-what the plan now says. Neither is "the user has been checkpointing each step": answering a question
-is not a request to be asked another one.
-
-Pause only when the run was started with \`--manual\`.
+This boundary is not a stop. Pause only when the run was started with \`--manual\`.
 `,
     executable: false,
     backend: null,
@@ -932,43 +401,13 @@ Epic: #540
 - **\`T<NN>\` is the child's ordinal in the epic's dependency order**, minted over
   the **sub-issues**: \`T01\`, \`T02\`, \`T03\`, … It is dense and stable, so the
   match from a commit to its child is one-to-one and the resume path is a
-  deterministic parse rather than a guess.
-  **The parse is width-agnostic — \`T(\\d+)\`.** Two digits is what this document
-  renders and what you should write; it is a convention, not a constraint, and a
-  commit written with a different width is still legal and still parses. See
-  "Two \`T\` counters" below for why the width is worth keeping anyway.
+  deterministic parse rather than a guess. **The parse is width-agnostic —
+  \`T(\\d+)\`**: write two digits; another width is still legal and still parses.
 - **\`(#<child-issue>)\` is the child's own GitHub issue number.** Never the
   epic's. The epic never appears in the subject line.
 - **\`Epic: #<epic-issue>\` is a trailer.** Machine-readable, greppable
   (\`git log --grep '^Epic: #540'\`), and out of the subject so the subject stays
   about the child.
-
-### Two \`T\` counters exist, and they are not the same counter
-
-An epic has **one** \`tasks.md\`, whose ids run in execution order across every
-child: \`T001\`, \`T002\`, … Those ids **never** appear in a commit's scope
-position. The scope position carries the epic ordinal only.
-
-A reader will assume the two are the same counter unless told. One child may
-contain several \`tasks.md\` entries and still produces exactly one commit.
-
-**What separates them is position, not width.** A \`tasks.md\` id lives in
-\`tasks.md\`; an epic ordinal lives in a commit's scope position. Nothing else in
-the format depends on how many digits either one carries, and the parse does
-not: it is \`T(\\d+)\`.
-
-The rendering convention — \`tasks.md\` writes three digits, the scope position
-writes two — is kept because it makes the two visually distinct on sight, which
-is worth having even though nothing enforces it. It is **not** what makes the
-match correct.
-
-**Why the width is a convention and not a rule.** D6 recorded the format with
-the sample \`type(T012): sujet (#547)\`; D18, answered later and specifically
-about what the number *is*, gives the series as \`T01\`, \`T02\`, …. The two do not
-agree on width. Rather than edit either recorded string, the format takes
-neither as binding: both are legal, and \`T(\\d+)\` accepts both. The cost is
-named rather than hidden — "dense and stable" is a property of how the ordinals
-are **minted**, not something the format can enforce on a hand-written commit.
 
 ## An id is never inherited
 
@@ -1484,103 +923,47 @@ a repository drift apart while both look healthy.
     suffix: "epic-loop.md",
     content: `# The epic loop — one branch, one commit per child, one merge
 
-Loaded by \`phases/implement.md\` when the item being worked is an **epic with
-open sub-issues**. \`plan\` and \`tasks\` treat an epic as one unit too; the short
-version of why is in each of them, and the whole of it is here.
+Loaded by \`phases/implement.md\` when the item is an **epic with open sub-issues**. A standalone item
+is one commit and one merge; none of this applies to it.
 
-Nothing in this file applies to a standalone item. A standalone item is one
-commit and one merge, exactly as before — this is an additional path, not a
-replacement.
+## One plan, one stop
 
-## What the loop iterates
+**One \`plan\` for the whole epic** — one brief, one decision table covering every child — and exactly
+**one plan stop**. N children used to mean N stops, each after the work was done: the most expensive
+moment to interrupt anyone, for an answer that is almost always yes.
 
-**Board sub-issues, one per commit.** One child = one sub-issue = one commit.
-
-\`tasks.md\` is the decomposition *inside* a child: several \`T00N\` entries may
-belong to one sub-issue and still produce a single commit. It is not the loop's
-unit and never was — a loop over \`tasks.md\` entries would commit several times
-per child and break the one-to-one match resume depends on.
-
-\`#553\` has already put the whole epic on one branch and moved the epic's card
-to In progress. This phase never creates a branch.
-
-## One plan, one tasks, one stop
-
-**One \`plan\` for the whole epic** — one decision table covering every child,
-not one per child. **One \`tasks.md\`**, whose breakdown is the child list in
-dependency order. And **exactly one \`plan\` stop**, for the epic.
-
-That last one is the point of the whole exercise. N children used to mean N
-stops arriving after each child's work was already done, which is the most
-expensive moment to interrupt anyone: the context is spent and the answer is
-almost always yes.
+The whole epic is already on one branch and its card is In progress; this phase creates no branch.
 
 ## The loop
 
-For each child, in dependency order:
+**Board sub-issues, one per commit**: one child = one sub-issue = one commit. For each child, in
+dependency order:
 
-1. **Move its card to In progress.** Its own card, not the epic's — the epic
-   moved when the branch was created.
-2. **Implement it**, following \`tasks.md\` for the entries that belong to it.
-3. **Commit it** — one commit, per \`phases/epic-commits.md\`. The scope position
-   carries \`T<NN>\`, the child's ordinal in the epic's dependency order, minted
-   here by this loop.
-4. **Run the fast gate tier** — \`.specnaut/scripts/bash/run-gate.sh fast\`, or
-   its PowerShell twin. \`phases/quality-gates.md\` says what it is for.
-   A child that fails it is **fixed in place**: fix, re-run the gate for that
-   child, carry on. It is not an escalation and it does not hand back.
-5. **Move its card to In review.** Its commit is written; it is not Done, and
-   its issue is not closed. Both of those happen at the epic's merge (#560).
+1. **Move its own card to In progress.**
+2. **Implement it**, from the brief's rows that concern it.
+3. **Commit it** — one commit, per \`phases/epic-commits.md\`, its scope carrying \`T<NN>\`, the
+   child's ordinal in dependency order.
+4. **Run the fast gate** — \`.specnaut/scripts/bash/run-gate.sh fast\` (or its PowerShell twin;
+   \`phases/quality-gates.md\`). A child that fails it is **fixed in place** and the gate re-run; it
+   is not an escalation.
+5. **Move its card to In review.** Its commit is written; it is not Done, and its issue stays open
+   until the epic merges.
 6. **Next child.**
 
-**The loop does not return to the user between children.** Not for a review
-finding, not for a failed fast gate, not to confirm the next child. The one
-user-facing checkpoint is the last child's review.
+**The loop does not return to the user between children** — not for a finding, a failed gate, or
+the next child.
+A child's review never stops the loop: the lead triages, fixes, commits and moves on in the same
+turn. **The last child's review is the one checkpoint.**
 
-**Re-read the open-children list at each iteration.** A child added mid-flight
-is picked up if it arrives before its turn. Freezing the list when the loop
-starts is a decision to ignore work somebody added on purpose.
-
-**A child's commit contains only that child's work.** Do not accumulate an
-uncommitted tree across children — if two children's changes land in one
-commit, the match resume depends on is gone and no amount of later tidying
-brings it back.
-
-## Reviews inside the loop
-
-A child's review **never stops the loop**. Findings go to the lead, who
-triages, fixes, commits against that child and moves on **in the same turn**.
-
-**The last child's review is the stop** — the single checkpoint before the
-merge, and the one the whole chain has been saving up for.
+Re-read the open-children list at each iteration: a child added mid-flight is picked up. A child's
+commit holds only that child's work — two children in one commit break the match resume relies on.
 
 ## Resuming, without a state file
 
-The loop is interrupted often: a session ends, a machine sleeps, somebody
-closes the terminal. There is **no state file** — resume reconstructs from git
-and the board:
-
-1. Read the commits already on the branch.
-2. Match each to its sub-issue through the commit convention. The match is
-   one-to-one because the ordinal is the child's position in dependency order.
-3. **Resume at the first child with no commit.**
-
-**Do not use issue state as a progress signal.** Child issues stay open for the
-entire loop by design (D10) — "open" says nothing about whether the work is
-done, and a resume that trusted it would redo every child. What is finished is
-what has a commit. That is the only reading.
-
-If a commit matches no sub-issue, or a child matches two, **stop and say so.**
-That is the case the no-state-file decision was taken on the assumption would
-not happen; if it does, it is worth knowing rather than working around.
-
-## The two \`T\` counters are not the same counter
-
-\`tasks.md\` mints \`T001\`, \`T002\`, … in execution order across the whole epic.
-The commit scope position carries \`T01\`, \`T02\`, … over the **sub-issues**. A
-reader will assume they are one counter unless told, so say which is which
-whenever either appears. \`phases/epic-commits.md\` carries the format and the
-parse.
+There is no state file: resume reconstructs from git. Read the branch's commits, match each to its
+sub-issue through the commit convention (one-to-one, by ordinal), and **resume at the first child
+with no commit**. Do not use issue state as a progress signal — child issues stay open for the whole
+loop. If a commit matches no child, or a child matches two, stop and say so.
 `,
     executable: false,
     backend: null,
@@ -1800,7 +1183,7 @@ Read \`docs/constitution.md\` before anything else: it is this project's binding
 ## Preconditions
 
 - The feature branch must be checked out.
-- All Specnaut phases must have completed successfully (plan, tasks, implement, review).
+- All Specnaut phases must have completed successfully (plan, implement, review).
 - \`\$ARGUMENTS\` is optional and may contain, in any order:
   - a **base branch** — the first token that is not a flag. Defaults to what
     \`bash .specnaut/scripts/bash/base-branch.sh\` prints (\`origin/HEAD\`, else \`init.defaultBranch\`).
@@ -2054,40 +1437,6 @@ Read \`docs/constitution.md\` before anything else: it is this project's binding
 
 You **MUST** consider the user input before proceeding (if not empty).
 
-## Pre-Execution Checks
-
-**Check for extension hooks (before constitution update)**:
-- Check if \`.specnaut/extensions.yml\` exists in the project root.
-- If it exists, read it and look for entries under the \`hooks.before_constitution\` key
-- If the YAML cannot be parsed or is invalid, skip hook checking silently and continue normally
-- Filter out hooks where \`enabled\` is explicitly \`false\`. Treat hooks without an \`enabled\` field as enabled by default.
-- For each remaining hook, do **not** attempt to interpret or evaluate hook \`condition\` expressions:
-  - If the hook has no \`condition\` field, or it is null/empty, treat the hook as executable
-  - If the hook defines a non-empty \`condition\`, skip the hook and leave condition evaluation to the HookExecutor implementation
-- For each executable hook, output the following based on its \`optional\` flag:
-  - **Optional hook** (\`optional: true\`):
-    \`\`\`
-    ## Extension Hooks
-
-    **Optional Pre-Hook**: {extension}
-    Command: \`/{command}\`
-    Description: {description}
-
-    Prompt: {prompt}
-    To execute: \`/{command}\`
-    \`\`\`
-  - **Mandatory hook** (\`optional: false\`):
-    \`\`\`
-    ## Extension Hooks
-
-    **Automatic Pre-Hook**: {extension}
-    Executing: \`/{command}\`
-    EXECUTE_COMMAND: {command}
-
-    Wait for the result of the hook command before proceeding to the Outline.
-    \`\`\`
-- If no hooks are registered or \`.specnaut/extensions.yml\` does not exist, skip silently
-
 ## Outline
 
 The project's constitution is \`docs/constitution.md\`. It is the team's document, not Specnaut's:
@@ -2159,38 +1508,6 @@ constitution first, then the configs. A plain "yes", "ok" or "go" approves nothi
 
 If a principle now conflicts with the code, or with another principle, report it as a stop with a
 question. Never resolve it by amending the constitution on your own initiative.
-
-## Post-Execution Checks
-
-**Check for extension hooks (after constitution update)**:
-Check if \`.specnaut/extensions.yml\` exists in the project root.
-- If it exists, read it and look for entries under the \`hooks.after_constitution\` key
-- If the YAML cannot be parsed or is invalid, skip hook checking silently and continue normally
-- Filter out hooks where \`enabled\` is explicitly \`false\`. Treat hooks without an \`enabled\` field as enabled by default.
-- For each remaining hook, do **not** attempt to interpret or evaluate hook \`condition\` expressions:
-  - If the hook has no \`condition\` field, or it is null/empty, treat the hook as executable
-  - If the hook defines a non-empty \`condition\`, skip the hook and leave condition evaluation to the HookExecutor implementation
-- For each executable hook, output the following based on its \`optional\` flag:
-  - **Optional hook** (\`optional: true\`):
-    \`\`\`
-    ## Extension Hooks
-
-    **Optional Hook**: {extension}
-    Command: \`/{command}\`
-    Description: {description}
-
-    Prompt: {prompt}
-    To execute: \`/{command}\`
-    \`\`\`
-  - **Mandatory hook** (\`optional: false\`):
-    \`\`\`
-    ## Extension Hooks
-
-    **Automatic Hook**: {extension}
-    Executing: \`/{command}\`
-    EXECUTE_COMMAND: {command}
-    \`\`\`
-- If no hooks are registered or \`.specnaut/extensions.yml\` does not exist, skip silently
 `,
     executable: false,
     backend: null,
@@ -3073,7 +2390,7 @@ mutate PRs.
 **Only when the project keeps its specs locally**, i.e. \`.specnaut/specs/\`
 exists. Skip the step and say so otherwise; do not report an empty section.
 
-**Read \`phases/auto-chain.md\` and follow its "Orphan spec detection" section.**
+**Read \`phases/orphan-specs.md\` and follow it.**
 An instruction to load that file and execute it, not a pointer for the reader.
 The walk stays there — naming it here twice makes one copy the half that rots.
 Ownership says where the logic lives, not who may call it; saying only the
@@ -3775,225 +3092,162 @@ The script emits the body verbatim. Do NOT:
     suffix: "auto-chain.md",
     content: `# Auto-chain control
 
-This file carries the chain mechanics the \`/task\` router follows after a chainable phase
-(\`plan\` to \`review\`) completes — unless \`--manual\` was passed, or downstream artefacts show a single
-step is being re-run.
-
-## The flow
+What the \`/task\` router follows after a chainable verb (\`plan\`, \`implement\`, \`review\`) completes —
+unless \`--manual\` was passed, or what is on disk shows a single step is being re-run.
 
 \`\`\`
-plan → tasks → implement → review → merge → push
-  ▲                                   ▲
-  STOP 1                              STOP 2
-  (end of plan, if a question is open) (only under merge: manual)
+plan → implement → review → merge → push
+  ▲                           ▲
+  STOP 1                      STOP 2
+  (a question only the user   (only under merge: manual)
+   can answer is open)
 \`\`\`
 
 ## Autopilot is the default. There is ONE stop, and a second only on request.
 
-1. **The end of \`plan\`** (\`phases/plan.md\` step 8), **only if something only the user can answer is
-   open**. Expert seats settle technical forks; nothing open → a report, then \`tasks\`.
-2. **The review verdict — only under \`manual\`.** The merge mode is read **here and nowhere
-   else**, per-run instruction first: \`--manual-merge\`, or "stop before merging" / "do not push",
-   means \`manual\`; "merge it" means \`auto\`. Otherwise the project file decides:
+1. **The end of \`plan\`**, **only if something only the user can answer is open**. Expert seats
+   settle technical forks; nothing open → a report, then \`implement\`.
+2. **The review verdict — only under \`manual\`.** The merge mode is read here and nowhere else,
+   the per-run instruction first: \`--manual-merge\`, or "stop before merging" / "do not push", means
+   \`manual\`; "merge it" means \`auto\`. Otherwise:
 
    \`\`\`
    bash .specnaut/scripts/bash/merge-mode.sh
    \`\`\`
 
-   It prints \`auto\` or \`manual\`, and says why on stderr. No file or no key means \`auto\`. An
-   unrecognised value means \`manual\` — say so in one line: a setting that cannot be read resolves to
-   the reading that does not push.
+   It prints \`auto\` or \`manual\` and says why on stderr. No file or no key is \`auto\`; an unreadable
+   value is \`manual\` — say so in one line. **Under \`merge: manual\` in the file, a hook holds the
+   landing whatever the run said**: every merge into, and push of, the base branch waits until the
+   user's own prompt in that turn says \`merge\` or \`/task merge\`.
 
-   **Under \`merge: manual\` in the file, a hook holds the landing whatever the run said** (D3). The
-   landing hook asks the same script (\`--strict\`) and holds every merge into, and push of, the base
-   branch until the user's own prompt in that turn says \`merge\` or \`/task merge\`. A per-run
-   "merge it" moves the chain; it does not lift the file.
+   - **\`auto\`** — a verdict with no unresolved CRITICAL or HIGH invokes \`merge\` in the same turn.
+   - **\`manual\`** — ask once: "Ready to merge? Reply \`merge\` to land it, anything else to stay on the
+     branch." A plain "yes" does not release the hook; if that is the answer, ask for the word.
 
-   - **\`auto\`** — no stop. A verdict with no unresolved CRITICAL or HIGH finding invokes \`merge\`
-     in the same turn; \`merge\` pushes and closes.
-   - **\`manual\`** — STOP 2: the verdict is triaged, then the merge is requested, once. That answer
-     covers the merge, the push and the close.
+When the project is in remote mode (\`specnaut gate status\` exits 0), read \`phases/remote-gates.md\`:
+it raises the plan and merge approvals as gates, and remote mode keeps its gate under either mode.
 
 Autopilot still halts, and says why: an unresolved CRITICAL/HIGH, a FAIL verdict, a missing review
-seat, a merge that cannot fast-forward, a refused push. Those are failures, not stops. A quota
-hold (a refused Skill call) is a clean stop: report it, never route around it.
+seat, a merge that cannot fast-forward, a refused push. Those are failures, not stops. A quota hold
+(a refused Skill call) is a clean stop: report it, never route around it.
 
-## ⛔ NEVER stop at a boundary that is not one of these
+## ⛔ No stop at any other boundary
 
-It applies to **every** hand-off:
+After each verb, **invoke the next one yourself, in the same turn** — a one-line \`✓ <verb> complete
+— proceeding to <next>\`, a statement, never a question. \`plan\` → \`implement\` (same turn as the last
+answer) → \`review\` (gates green, tree frozen) → \`merge\` (\`auto\`) → push, never asked.
 
-| Boundary | What happens |
+None of these is a reason to stop:
+
+| The excuse | Why not |
 | :--- | :--- |
-| user answers the last question at STOP 1 → \`tasks\` | invoked in the same turn |
-| \`tasks\` commits the breakdown → \`implement\` | invoked in the same turn |
-| gates green, tree frozen → \`review\` | invoked in the same turn |
-| \`review\` verdict, nothing CRITICAL/HIGH left → \`merge\` | same turn (\`auto\`) · **STOP 2** (\`manual\`) |
-| \`merge\` lands on the base branch → push | pushed, never asked |
+| "That's a lot of tasks — confirm first?" | The size was known when the chain started. |
+| "MVP only, or the whole thing?" | Build the full path; the MVP is a checkpoint inside it. |
+| "This is where the real code gets written." | That is the point of the chain. |
+| "The audits found a lot — re-confirm scope?" | The findings are in the approved plan. |
+| "The user has been checkpointing each step." | An answer is not a request for another question. |
 
-No question, no proposal, no menu, at any of those arrows.
+## The verdict summary
 
-None of these is a reason to stop, and each one gets used as one:
+After \`review\`, present: the feature and its branch; files created and modified (count and key
+paths); tests added and the full-suite status; deviations from the plan, with their reason; open
+risks and deferred findings; the business outcome in one line. Under \`auto\` it is a statement and
+\`merge\` follows; under \`manual\` it precedes the one question.
 
-| The excuse | Why it is not a reason |
-| :--- | :--- |
-| "That's a lot of tasks — confirm first?" | The size was known when the chain started. The user chose the work at STOP 1. |
-| "MVP only, or the whole thing?" | The plan states both. Build the full path; the MVP is a checkpoint inside it, not a fork to offer. |
-| "This is where the real code gets written." | Yes. That is the point of the chain. |
-| "The audits found a lot — re-confirm scope?" | The findings were folded into the plan and the plan was approved. That approval covers what the plan now says. |
-| "The user has been checkpointing each step." | Answering a question is not a request to be asked another one. |
-| "Someone should read the diff first." | Then the project sets \`merge: manual\`. |
-| "Confirm the recommended design?" | The expert seats decided it. Report it. |
+## The review loop ends
 
-Asking again after STOP 1 **re-litigates a decision already made**, and costs the thing the chain
-exists to give: a brief in, an implemented, reviewed, merged branch out. A chain that halts at every
-boundary is a slower manual workflow wearing a skill's name.
+**Only a CRITICAL or HIGH finding buys another fix cycle**, before the merge, under either mode, and
+never with a question between rounds. MEDIUM and LOW go to the backlog and the branch ships. Sort
+findings by whether they **would hurt a user, a maintainer or the data if shipped**, not by the
+severity word; "nothing here would hurt anyone" is a valid verdict. Re-reviewing because the last
+review was not empty is a loop that does not terminate.
 
-## Per-phase behavior
+## Re-entry, without a flag
 
-After each phase completes successfully, **invoke the next phase yourself, in the same turn**, via
-the \`Skill\` tool (or the platform equivalent). Not a suggestion, not a command printed for the user
-to paste — your own next action. A one-line \`✓ <phase> complete — proceeding to <next>\` log is
-sufficient, and it is a **statement, never a question**.
+A verb invoked directly chains when what follows it is missing, and runs one-shot when it exists:
 
-| Current phase | Next |
+| Invoked | Chains when |
 |---|---|
-| \`plan\` | \`tasks\` — invoked in the same turn as the user's last answer at STOP 1 |
-| \`tasks\` | \`implement\` — invoked in the same turn as the dossier commit |
-| \`implement\` | \`review\` — invoked in the same turn the gates go green and the tree is frozen |
-| \`review\` | \`merge\` — same turn (\`auto\`) · **STOP 2** — triage, then the merge request (\`manual\`) |
+| \`plan\` | nothing is committed on the feature branch past \`plan.md\` |
+| \`implement\` | the branch is not merged into the base branch |
+| \`review\` | always one-shot |
+
+## Failure
+
+A hard failure in \`implement\` or \`review\`: stop, surface it, ask how to proceed; never retry
+silently. **Genuinely blocked is not stopped**: say in a sentence or two what is blocked, build
+everything that is not, and name the rest. If context runs out mid-chain, say so; re-entry resumes
+from what is on disk.
+`,
+    executable: false,
+    backend: null,
+    skipIfExists: false,
+  },
+  {
+    category: "phase",
+    name: "task",
+    suffix: "remote-gates.md",
+    content: `# Remote-mode gates — plan and merge approval
+
+Loaded by \`phases/auto-chain.md\` when \`specnaut gate status\` exits 0: the project is in remote
+mode, and approvals are raised as gates instead of asked in the terminal. **Remote mode keeps its
+gate under either mode** — \`merge: auto\` does not lift it.
 
 ## Plan approval checkpoint (remote mode only)
 
-After \`plan\` completes and **before** chaining into \`tasks\`, check remote mode
+After \`plan\` completes and **before** chaining into \`implement\`, check remote mode
 (\`specnaut gate status\`):
 
 - **Exit 0** (remote on) — raise a plan-approval gate and suspend:
   \`specnaut gate raise --type plan_approval --title "Approve the plan for <feature>" --payload '{"summary":"<plan summary>","planRef":"<plan.md path>","context":"<short>"}'\`.
-  exit 0 + \`{"approved":true}\` → resume into \`tasks\`; exit 0 + \`{"approved":false}\` → halt and
+  exit 0 + \`{"approved":true}\` → resume into \`implement\`; exit 0 + \`{"approved":false}\` → halt and
   report the rejection + any \`note\`; exit 3/4/1 → halt cleanly with the reason; exit 5 → report
-  \`specnaut cloud login\` is needed and fall back to the default below. **Never proceed to \`tasks\`
+  \`specnaut cloud login\` is needed and fall back to the default below. **Never proceed to \`implement\`
   without an explicit approval.**
 - **Non-zero** (remote off / not Cloud-linked — the default) — STOP 1 is the local approval and the
-  chain continues straight into \`tasks\`.
+  chain continues straight into \`implement\`.
 
-## The review verdict — STOP 2 under \`manual\`, a report under \`auto\`
+## Merge approval
 
-After \`review\` completes, present a compact summary:
+After \`review\`, in remote mode, raise a \`merge_approval\` gate instead of a terminal prompt:
+\`specnaut gate raise --type merge_approval --title "Approve merge of <feature>" --payload '{"summary":"<change summary>","prUrl":"<pr/diff ref>","context":"<short>"}'\`.
+exit 0 + \`{"approved":true}\` → invoke \`merge\`; exit 0 + \`{"approved":false}\` → halt on the branch
+and report the rejection + any \`note\`; exit 3/4 (timeout/cancelled) or 1 → halt cleanly with the
+reason; exit 5 → report \`specnaut cloud login\` is needed and fall back to the local prompt in \`phases/auto-chain.md\`.
+**Never merge without an explicit approval.**
+`,
+    executable: false,
+    backend: null,
+    skipIfExists: false,
+  },
+  {
+    category: "phase",
+    name: "task",
+    suffix: "orphan-specs.md",
+    content: `# Orphan spec detection — the chain, inspected at rest
 
-- Feature name and branch
-- Files created / modified (count + key paths)
-- Tests added and full-suite status
-- Known deviations from \`tasks.md\` and the rationale
-- Open risks / deferred findings
-- One-line business outcome
-
-Under \`auto\` with remote mode off it is a statement, not a question: invoke \`merge\` right after
-it. Otherwise resolve the approval — **remote mode keeps its gate under either mode**:
-
-- **Remote mode** (\`specnaut gate status\` exit 0) — raise a \`merge_approval\` gate instead of a
-  terminal prompt:
-  \`specnaut gate raise --type merge_approval --title "Approve merge of <feature>" --payload '{"summary":"<change summary>","prUrl":"<pr/diff ref>","context":"<short>"}'\`.
-  exit 0 + \`{"approved":true}\` → invoke \`merge\`; exit 0 + \`{"approved":false}\` → halt on the branch
-  and report the rejection + any \`note\`; exit 3/4 (timeout/cancelled) or 1 → halt cleanly with the
-  reason; exit 5 → report \`specnaut cloud login\` is needed and fall back to the local prompt below.
-  **Never merge without an explicit approval.**
-- **Local mode, \`manual\`** — ask once, naming the word to type: "Ready to merge? Reply \`merge\` to
-  land it, anything else to stay on the branch." On \`merge\`, invoke \`merge\`. A plain "yes" does not
-  release the landing hook — if that is the answer, say so and ask for the word.
-
-### Triage, and the rule that ends the loop
-
-**Only a CRITICAL or HIGH finding buys another fix cycle.** MEDIUM and LOW go to the backlog and the
-branch ships.
-
-Those fix cycles run **before** the merge, under either mode. Do not ask between rounds — the user
-asked for a working branch, not for a vote on every round.
-
-A reviewer reports **harm, not labels**: sort each finding into *"would hurt a user, a maintainer,
-or the data if shipped"* versus *"should be better"*, and choose by the harm rather than the
-severity word. **"Nothing here would hurt anyone" is a valid and valuable verdict**, not a failure
-to find things.
-
-Justifying another round with "the last one found something" is not a reason — it is always true,
-and **a loop with no exit criterion does not terminate**. Two habits produce the runaway: treating a
-severity as a label to be cleared rather than asking what harm it describes, and re-reviewing
-because the previous review was not empty.
-
-After merge, the chain ends.
-
-## Re-entry, without a flag
-
-When the user invokes a phase directly (\`/task implement\`, \`/task review\`), decide from what
-is on disk:
-
-- **Downstream artefacts missing** → chain. The user is resuming an interrupted flow (a long
-  session, a fresh shell after compaction). Continue through the remaining phases.
-- **Downstream artefacts present** → one-shot. The user is re-running a single phase (regenerating
-  \`plan.md\` after a tweak).
-
-"Downstream artefacts" means files under the feature directory produced by phases **after** the one
-being invoked:
-
-| Invoked phase | Downstream artefacts to check |
-|---|---|
-| \`plan\` | \`tasks.md\` |
-| \`tasks\` | any task in \`tasks.md\` marked done |
-| \`implement\` | the branch already merged into the base branch, or task completion past 50% |
-| \`review\` | nothing past review (the chain tail is just \`merge\`) — treat as one-shot |
-
-## Failure handling
-
-- Hard failure in \`tasks\`, \`implement\` or \`review\`: stop, surface the error, ask how to proceed. Do not silently retry.
-- Task-level blockers reported during \`implement\`: that phase has its own fix loop; do not
-  intercept.
-- **Genuinely blocked is not the same as stopped.** If something truly blocks part of the work, say
-  what is blocked in one or two sentences, implement everything that is not blocked, and name the
-  remainder. Stopping with nothing built is reserved for the case where proceeding under any
-  assumption would be unsafe or would make the work useless if wrong.
-
-## Context budget
-
-Long features (≥13 story points or ≥30 tasks) may exhaust context during \`implement\`. If compaction
-occurs mid-chain, say so and let the user resume from a fresh session — the re-entry detection above
-picks up where the previous run stopped.
-
-## Orphan spec detection — the chain, inspected at rest
-
-The flow above is a chain moving forward in one session. This check reads the same chain across the
-project at rest, and names the phase each stalled feature is missing. It reads spec artefacts and
-prescribes specnaut phases, so it lives here rather than in \`groom\`.
+The chain moves a feature forward in one session. This check reads it across the project at rest,
+and names the verb each stalled feature is missing. It reads spec artefacts and prescribes \`/task\`
+verbs, so it is the pipeline's, not the backlog's.
 
 Run it when asked to audit the spec pipeline, and from a grooming pass when the project keeps specs
 locally — \`task/groom.md\` step 4 is the caller, under the same \`.specnaut/specs/\` condition.
 
-Walk \`.specnaut/specs/\` (if present) and surface any feature directory
-that is missing the next expected artefact.
+Walk \`.specnaut/specs/\` (if present) and surface any feature directory missing its next step:
 
-**Current-pipeline artefacts** — a 3.x feature produces these in this order:
-
-- Has \`plan.md\` but no \`tasks.md\` → flag as "needs \`/task tasks\`".
-- Has \`tasks.md\` but no \`installed\` markers in commits → flag as
-  "needs \`/task implement\`".
+- Has \`plan.md\`, and its branch is not merged into the base branch → "needs \`/task implement\`".
 
 **Legacy, pre-3.x only** — kept deliberately, not an oversight:
 
-- Has \`spec.md\` but no \`plan.md\` → flag as "needs \`/task plan\`".
+- Has \`spec.md\` but no \`plan.md\` → "needs \`/task plan\`". 3.x writes no \`spec.md\` (removed in
+  2.0.0), so this matches only a feature directory a 1.x project left behind — exactly the thing
+  worth surfacing. \`tests/templates/removed_artefacts_test.ts\` carries the matching allowlist entry.
+- Has \`tasks.md\`: written before the \`tasks\` verb was folded into \`implement\`; read it as part of
+  the plan, never as a step still owed.
 
-  **3.x writes no \`spec.md\`.** The artefact was removed in 2.0.0 and no phase
-  produces one, so this rule can only ever match a feature directory left
-  behind by a 1.x project — one that never shipped, so no merge ever removed
-  it. It stays because a pre-migration spec that never got a plan is exactly
-  the thing worth surfacing. Do not read it as
-  evidence that the current pipeline emits \`spec.md\`, and do not delete it as
-  dead code — \`tests/templates/removed_artefacts_test.ts\` carries a matching
-  allowlist entry recording the same decision.
-
-This is also read-only; never delete or modify spec files. A shipped feature's
-directory IS removed — by \`phases/merge-close.md\` step 8, at the merge, under
-the same authorisation that closed the issue and with the plan in git history.
-Different actor, different moment, and it holds the authorisation this pass
-does not have. A reporter that edits what it walks has no way to be trusted
-about what it found.
+This is read-only: never delete or modify spec files. A shipped feature's directory **is** removed —
+by \`phases/merge-close.md\` step 8, at the merge, under the authorisation that closed the issue. A
+reporter that edits what it walks cannot be trusted about what it found.
 `,
     executable: false,
     backend: null,
@@ -5369,7 +4623,7 @@ Enhanced fork of [\`specify\` CLI](https://github.com/github/spec-kit), distribu
 
 ### Skills
 
-- \`/task\` — one unit of work: backlog (\`list\`, \`next\`, \`add\`, \`edit\`, \`close\`, \`groom\`), pipeline (\`plan\`, \`tasks\`, \`implement\`, \`review\`, \`merge\`), \`audit\` (\`--security\`, \`--archi\`, \`--perf\`, \`--a11y\`, \`--deps\`; every applicable axis with no flag), \`constitution\`.
+- \`/task\` — one unit of work: backlog (\`list\`, \`next\`, \`add\`, \`edit\`, \`close\`, \`groom\`), pipeline (\`plan\`, \`implement\`, \`review\`, \`merge\`), \`audit\` (\`--security\`, \`--archi\`, \`--perf\`, \`--a11y\`, \`--deps\`; every applicable axis with no flag), \`constitution\`.
 - \`/specnaut\` — the framework: \`doc\`, \`list\`, \`upgrade\`.
 - \`/ship\` — production: \`tag\`, \`release\`.
 
@@ -5713,7 +4967,7 @@ Line format: \`<one-liner> @ <path>:<line> — <reason out of scope>\`.
     suffix: null,
     content: `---
 name: developer
-description: Senior developer that implements tasks from tasks.md, fixes review feedback, and ships features. Manual-only — invoke explicitly when you have a tasks.md to execute or a review note to address.
+description: Senior developer that implements a planned feature from its plan.md, fixes review feedback, and ships features. Manual-only — invoke explicitly when you have a plan to build or a review note to address.
 model: opus
 effort: high
 tools: Read, Write, Edit, Grep, Glob, Bash
@@ -5735,23 +4989,25 @@ architecture.
 1. Read \`AGENTS.md\` at the project root to learn the tech stack and rules.
 2. Under each principle of \`docs/constitution.md\`, note its \`Check:\` line —
    the test your change must pass.
-3. Read the current feature's \`plan.md\` and \`tasks.md\` if a Specnaut feature
-   directory is in context. Those are the only two artefacts a feature has.
-   (A directory scaffolded before 2.0.0 may also carry \`spec.md\` and friends;
-   read them if present, but never require them.)
-4. **Read the domain model** — \`plan.md\` § 6 (Technical context → Domain
-   model) on the spec path, or the Product Owner's \`/task brief\` output on
-   the direct-implementation path. If it is absent or empty, return BLOCKED
-   with reason \`awaiting:product-owner-domain-brief\` and stop. Do not proceed
-   without it.
+3. Read the current feature's \`plan.md\` if a Specnaut feature directory is in
+   context — the brief, or the full plan. It is the one artefact a feature
+   has; a \`tasks.md\` or \`spec.md\` left by an older release is read as part of
+   it, never required. Its **Guardrails** say what you must not break, and its
+   **Done** checks are what you work until they pass.
+4. **The domain model** is wherever the plan states it (the full plan's
+   technical context, or the brief's guardrails), or the Product Owner's
+   \`/task brief\` output on the direct-implementation path. Where the change
+   introduces entities and none of these names them, say so in \`Decisions\`
+   and model them from the code that exists.
 5. **Size limits.** Before editing a file, compare its \`wc -l\` with
    \`.specnaut/memory/size-limits.md\` (the rule and the defaults;
    \`.specnaut/size-limits.yml\` overrides them when present). A file over its target gets the
    extraction first, as its own commit — rule 3, never "add it and split
    later". List each touched file's \`before → after\` in \`Decisions\`.
-6. **Read \`plan.md\` § 5 (Decision table)** if the plan has one. Each rule's
-   home is a single file path, and you may not introduce a second spelling of
-   it without the plan being amended first.
+6. **Read the plan's decision table** (the heading "The decision table", or
+   the rows under Guardrails). Each rule's home is a single file path, and you
+   may not introduce a second spelling of it without the plan being amended
+   first.
 
 ## Non-negotiable rules
 
@@ -6285,8 +5541,8 @@ arbitrary shell. Do not improvise any of it from this summary.
 
 ## Mode 3 — Plan expertise (before any code exists)
 
-Spawned by \`phases/plan-audits.md\` at step 6 of \`/task plan\`, against
-\`plan.md\`, in the same message as the architect — **not** against code,
+Spawned by \`phases/plan.md\` at step 6 of \`/task plan\`, on every plan —
+brief or full — against \`plan.md\`, in the same message as the architect — **not** against code,
 because none has been written yet.
 
 Step 0 still binds: read the routing table and load the domain files that
@@ -6306,7 +5562,21 @@ evidence:
   backfill, and every caller — that asymmetry is the whole reason you are
   asked before the code exists, so say which of your findings is which.
 
-The dispatch carries the questions. Answer them in the order given.
+Answer these four, in order, then any the dispatch adds:
+
+1. **Which new surface accepts input, and where does it stop?** Every route, job, webhook, upload,
+   argument or file content the plan adds, and the validator that bounds it. A boundary with no
+   validator named is the finding.
+2. **Who is allowed, and where is that decided?** One authorization decision per new capability, at
+   its home. Two gates for one rule, or a gate in a caller rather than at the decision, is the
+   finding.
+3. **What identifiers and what bytes become reachable?** Enumerable ids, a path that skips its
+   access check, a field that should never leave the server.
+4. **What does this let an authenticated stranger do to somebody else's account?** In writing.
+   "Nothing" is acceptable only when it names what was checked.
+
+When the plan is a brief and the change adds or widens a trust boundary (the list in \`plan.md\` step
+4b), say **"crosses the threshold: <which>"** — that makes the full plan due.
 
 Emit the \`FINDING\` shape, then the \`REVIEW SUMMARY\` block.
 
@@ -7184,7 +6454,7 @@ Read \`docs/constitution.md\` before anything else: it is this project's binding
 
 You are the **performance expert**. You judge what a system will cost to
 run — the work it repeats, the work it blocks on, and the work it does not
-need to do at all. You operate in one of two modes depending on the dispatch
+need to do at all. You operate in one of three modes depending on the dispatch
 shape.
 
 ## Step 0 — ground the review (mandatory, every mode)
@@ -7364,6 +6634,24 @@ material for the PO to triage.
 - **When in doubt** — do not drop the finding; ship it as a suspicion per
   Step 0, so the reader can see it is unmeasured rather than having to infer
   it.
+
+## Mode 3 — Plan expertise (before any code exists)
+
+Spawned by \`phases/plan.md\` at step 6 of \`/task plan\`, in the same message as
+the architect and the security seat, when the plan has a hot path, a bulk job
+or a query over an unbounded set — against \`plan.md\`, not code. Step 0 still
+binds; the evidence is the design. Your findings go INTO \`plan.md\`.
+
+Answer these three, in order, then any the dispatch adds:
+
+1. **What grows with the data?** Every query, loop, payload or file the plan adds whose cost rises
+   with the size of a set — and the set's expected size.
+2. **What runs per request, or per item?** Work the plan puts on a hot path that could be done once,
+   in bulk, or not at all.
+3. **What does the plan do at 100× today's set?** In writing: what breaks first, and whether the
+   design leaves room to fix it without a rewrite.
+
+Emit the \`FINDING\` shape, then the \`REVIEW SUMMARY\` block.
 
 ## Output format (Mode 1 — PR review)
 
@@ -7808,8 +7096,8 @@ material for the PO to triage.
 
 ## Mode 3 — Plan expertise (before any code exists)
 
-Spawned by \`phases/plan-audits.md\` at step 6 of \`/task plan\`, against
-\`plan.md\` — **not** against code, because none has been written yet. This is
+Spawned by \`phases/plan.md\` at step 6 of \`/task plan\`, on every plan —
+brief or full — against \`plan.md\` — **not** against code, because none has been written yet. This is
 the cheapest moment you will ever be asked, and the reason the phase makes it
 mandatory: architecture found at review time is architecture rebuilt.
 
@@ -7825,10 +7113,19 @@ Three things are different here, and they change how you read:
 - **A clean verdict is written down with its coverage**, because a clean
   verdict is worth exactly what it covered and no more.
 
-The dispatch carries the questions. Answer them in the order given, and
-answer the forward-looking one in writing even when it is uncomfortable — a
-design whose predicted findings are already known can be corrected now, for
-the price of an edit.
+Answer these five, in order, then any the dispatch adds:
+
+1. **Is the decision table complete?** Name any rule in the requirements with no row — the defect
+   this phase exists to prevent.
+2. **Is each home the right home?** A pure rule belongs in its bounded context, not in a service; a
+   decision asked by two gates belongs *in* the decision, not in either caller.
+3. **What is the blast radius?** How many existing call sites, routes, components or surfaces each
+   new rule touches.
+4. **Do the touched files hold their size?** Re-measure them with \`wc -l\` against
+   \`.specnaut/memory/size-limits.md\`: a file over its target that the plan grows is a finding.
+5. **What would a reviewer find in this design three cycles from now?** In writing, even when it is
+   uncomfortable — a design whose predicted findings are known can be corrected now, for the price
+   of an edit.
 
 Blast radius is **counted, not estimated**. A rule described in one sentence
 can change the behaviour of two hundred call sites, and that number is itself
@@ -8546,7 +7843,7 @@ should survive across sessions and isn't captured elsewhere:
     content: `---
 name: task
 description: Carry one unit of work from the backlog to a merged branch — list, add, edit, close and groom items, then plan, implement, review and merge them, and audit the code. \`/task <verb> [args]\`; \`/task\` alone prints the overview.
-argument-hint: "<list|next|add|edit|close|groom|plan|tasks|implement|review|merge|audit|constitution> [args]"
+argument-hint: "<list|next|add|edit|close|groom|plan|implement|review|merge|audit|constitution> [args]"
 when_to_use: |
   Trigger phrases that should route here:
   - backlog: "add to backlog", "what's next?", "move task X", "close task X", "groom the backlog"
@@ -8587,25 +7884,30 @@ Read \`docs/constitution.md\` before anything else: it is this project's binding
 | \`brief <id>\` | \`backlog.md\` | Product-owner business brief |
 | \`<id>\` | \`backlog.md\` | Show that item |
 | \`groom\` | \`groom.md\` | Full grooming pass |
-| \`plan [<id>] [brief]\` | \`phases/plan.md\` | The feature's **one** document, its architecture and security audit, then the stop. |
-| \`tasks\` | \`phases/tasks.md\` | The dependency-ordered breakdown, derived from the **approved** plan. |
-| \`implement\` | \`phases/implement.md\` | Build it. Ends by invoking \`review\`. |
+| \`plan [<id>] [--full] [brief]\` | \`phases/plan.md\` | The feature's brief — or the full plan — its architecture and security audit, then the stop. |
+| \`implement\` | \`phases/implement.md\` | Build it, ordering the work itself. Ends by invoking \`review\`. |
 | \`review\` | \`phases/review.md\` | The quality battery on a frozen tree. Its verdict is the merge request. |
 | \`merge\` | \`phases/merge.md\` | Pre-merge validation; merge, push, close the item. |
 | \`audit [--security\\|--archi\\|--perf\\|--a11y\\|--deps]\` | \`phases/audit.md\` | Read-only audit of a scope; every applicable axis with no flag. |
 | \`constitution\` | \`phases/constitution.md\` | Amend the project's constitution, on the user's explicit request only. |
 
-\`phases/plan-audits.md\`, \`phases/merge-squash.md\`, \`phases/epic-commits.md\`,
-\`phases/quality-gates.md\`, \`phases/epic-fixups.md\`, \`phases/merge-close.md\`, \`phases/epic-loop.md\`
-and \`phases/auto-chain.md\` are **contract docs, not verbs** — \`plan\` loads the first at its step 6,
-\`merge\` loads the second at its step 4, \`implement\` loads the third when the item is an epic,
-\`implement\` and \`merge\` share the fourth, \`merge\` loads the fifth before an epic merge and the sixth
-after any push, \`implement\` loads the seventh on an epic, and this router loads the eighth when it
-chains. Naming any of them as a verb prints the verb table and stops.
+These are **contract docs, not verbs** — naming one prints the verb table and stops:
 
-Unknown verb → print the verb table and stop. A verb that lived at another address before this
-router existed is listed, with where it went, in the \`specnaut\` skill's **Retired addresses**
-table.
+| Contract doc | Loaded by |
+| :--- | :--- |
+| \`phases/merge-squash.md\` | \`merge\`, at its step 4 |
+| \`phases/epic-commits.md\` | \`implement\`, on an epic |
+| \`phases/quality-gates.md\` | \`implement\` and \`merge\` |
+| \`phases/epic-fixups.md\` | \`merge\`, before an epic merge |
+| \`phases/merge-close.md\` | \`merge\`, after any push |
+| \`phases/epic-loop.md\` | \`implement\`, on an epic |
+| \`phases/auto-chain.md\` | this router, when it chains |
+| \`phases/remote-gates.md\` | \`auto-chain\`, in remote mode |
+| \`phases/orphan-specs.md\` | \`groom\`, when specs are kept locally |
+
+Unknown verb → look it up first in the \`specnaut\` skill's **Retired addresses** table: a verb
+retired from this router, or one from before it existed, is answered with where it went. Any other
+unknown verb → print the verb table and stop.
 
 ## Which skill owns what
 
@@ -8633,7 +7935,7 @@ item \`/task add\` creates, also generate its spec — read \`spec-autogen.md\` 
 
 1. **Read** the verb's reference file from the table, with the \`Read\` tool.
 2. **Read the project addendum** \`.specnaut/addenda/task/<verb>.md\` if it exists, for \`plan\`,
-   \`tasks\`, \`implement\`, \`review\`, \`merge\`, \`audit\`, \`constitution\` and \`groom\` — the project's own
+   \`implement\`, \`review\`, \`merge\`, \`audit\`, \`constitution\` and \`groom\` — the project's own
    addition to that verb. It adds to the phase at the step it names and never replaces or skips a
    bundled step: where it contradicts one, the bundled step stands and you say so. No file means no
    addendum — say nothing about it. Contract docs take none; the parent verb's addendum names their
@@ -8647,7 +7949,7 @@ item \`/task add\` creates, also generate its spec — read \`spec-autogen.md\` 
 After the verb completes successfully:
 
 - \`CHAIN_MODE == off\` → stop. Report the outcome.
-- The verb is not chainable → stop. Chainable verbs: \`plan\`, \`tasks\`, \`implement\`, \`review\`.
+- The verb is not chainable → stop. Chainable verbs: \`plan\`, \`implement\`, \`review\`.
 - Otherwise → read \`phases/auto-chain.md\` and follow it.
 
 **Re-entry needs no flag.** A verb whose downstream artefacts already exist runs one-shot; one whose
@@ -8656,10 +7958,10 @@ downstream artefacts are absent chains. \`phases/auto-chain.md\` holds the detec
 ## Overview
 
 \`\`\`
-/task add → /task plan <id> → tasks → implement → review → merge
-                 ▲                                  │        ▲
-                 │                                  └────────┘
-                 └── discovery (if fuzzy) → the one document
+/task add → /task plan <id> → implement → review → merge
+                 ▲                         │        ▲
+                 │                         └────────┘
+                 └── discovery (if fuzzy) → the brief (or --full)
                      → architecture + security audit OF THE PLAN
                      → STOP 1
 \`\`\`
@@ -13836,23 +13138,21 @@ the limits above cover the number.
 
 ## In each phase
 
-**plan** — § 7 of the plan carries the mandatory size row and the **Files
-touched** table. \`Lines now\` is \`wc -l\`, measured at plan time. The plan is not
+**plan** — the brief's guardrails name every file the change touches and its
+\`wc -l\` now; the full plan carries them in § 7's **Files touched** table. \`Lines now\` is \`wc -l\`, measured at plan time. The plan is not
 done while a file's lines after exceed its ceiling without shrinking, or a file
 already over its target has lines after > lines now. Complexity tracking cannot
 accept a size violation: the remedy is an extraction inside the plan. Each new
 module gets a one-line responsibility; one that needs "and" is two. The
 architecture audit of the plan re-measures the table with \`wc -l\`.
 
-**tasks** — re-measure every file the plan touches with \`wc -l\`; the plan's
-figure may be stale. For each file over its target, the first task that touches
-it is an extraction that moves out at least the lines the feature will add to
-that file, naming the destination module and its one-line responsibility. New
-behaviour lands as a "create module X" task wherever it can; a task that adds
-to a file over its target comes only after that file's extraction, and says the
-size the file must stay within (its size at plan time).
-
-**implement** — read \`.specnaut/size-limits.yml\` before the first task, and
+**implement** — first re-measure every file the plan touches with \`wc -l\`; the
+plan's figure may be stale. For each file over its target, the first change to
+it is an extraction task, in its own commit, that moves out at least the lines
+the feature will add, naming the destination module and its one-line
+responsibility. New behaviour lands in a new module wherever it can; an addition
+to a file over its target comes only after that file's extraction, and keeps it
+within its size at plan time. Read \`.specnaut/size-limits.yml\` before the first change, and
 put its limits (or this file's path, when the project has none) in every
 subagent's dispatch brief: a subagent sees one task and one file, and without
 the limits has no reason to stop a file from growing. Run \`wc -l\` on each file a
@@ -23519,8 +22819,7 @@ only" is a valid answer; an unstated one is not.]
 
 \`\`\`text
 .specnaut/specs/[###-feature]/
-├── plan.md    # This file — the whole plan
-└── tasks.md   # \`/task tasks\` output, derived from THIS file once approved
+└── plan.md    # This file — the whole plan; implement orders the work from it
 \`\`\`
 
 Two files. There is no \`research.md\`, \`data-model.md\`, \`quickstart.md\` or \`contracts/\` — where that
@@ -23598,280 +22897,6 @@ line each, so a wrong assumption is visible rather than buried.]
   {
     category: "spec-root",
     name: "specify",
-    suffix: "templates/tasks-template.md",
-    content: `---
-
-description: "Task list template for feature implementation"
----
-
-# Tasks: [FEATURE NAME]
-
-**Input**: Design documents from \`/.specnaut/specs/[###-feature-name]/\`
-**Prerequisites**: plan.md (required — it is the only design document; a feature produces plan.md and tasks.md, nothing else)
-
-**Tests**: The examples below include test tasks. Tests are OPTIONAL - only include them if explicitly requested in the feature specification.
-
-**Organization**: Tasks are grouped by user story to enable independent implementation and testing of each story.
-
-## Format: \`[ID] [P?] [Story] Description\`
-
-- **[P]**: Can run in parallel (different files, no dependencies)
-- **[Story]**: Which user story this task belongs to (e.g., US1, US2, US3)
-- Include exact file paths in descriptions
-
-## Path Conventions
-
-- **Single project**: \`src/\`, \`tests/\` at repository root
-- **Web app**: \`backend/src/\`, \`frontend/src/\`
-- **Mobile**: \`api/src/\`, \`ios/src/\` or \`android/src/\`
-- Paths shown below assume single project - adjust based on plan.md structure
-
-<!-- 
-  ============================================================================
-  IMPORTANT: The tasks below are SAMPLE TASKS for illustration purposes only.
-  
-  The \`/task tasks\` phase MUST replace these with actual tasks based on:
-  - User stories and their priorities from plan.md § 2 (User scenarios)
-  - Feature requirements from plan.md § 3 (Requirements)
-  - Entities from plan.md § 6 (Technical context → Domain model)
-  - Endpoints and other surfaces from plan.md § 8 (Surface impact)
-
-  Every task must also respect plan.md § 5 (Decision table): a rule's home is
-  a file path, and a task may not introduce a second spelling of it.
-  
-  Tasks MUST be organized by user story so each story can be:
-  - Implemented independently
-  - Tested independently
-  - Delivered as an MVP increment
-  
-  DO NOT keep these sample tasks in the generated tasks.md file.
-  ============================================================================
--->
-
-## Phase 1: Setup (Shared Infrastructure)
-
-**Purpose**: Project initialization and basic structure
-
-- [ ] T001 Create project structure per implementation plan
-- [ ] T002 Initialize [language] project with [framework] dependencies
-- [ ] T003 [P] Configure linting and formatting tools
-
----
-
-## Phase 2: Foundational (Blocking Prerequisites)
-
-**Purpose**: Core infrastructure that MUST be complete before ANY user story can be implemented
-
-**⚠️ CRITICAL**: No user story work can begin until this phase is complete
-
-**Extractions first.** For every file the plan touches that is over its target in
-\`.specnaut/memory/size-limits.md\` (re-measure with \`wc -l\` — never trust the plan's figure), the
-first task touching it is an extraction:
-
-- [ ] T003a Extract [responsibility] from [path] ([N] lines, target [T]) into [new module path] —
-  moves out ≥ [lines the feature adds]; [new module]: [one-line responsibility]
-
-New behaviour then lands as "Create [module] in [path]" wherever it can. A task that must still add
-to that file comes after its extraction and names the size it must stay within (its size at plan
-time).
-
-Examples of foundational tasks (adjust based on your project):
-
-- [ ] T004 Setup database schema and migrations framework
-- [ ] T005 [P] Implement authentication/authorization framework
-- [ ] T006 [P] Setup API routing and middleware structure
-- [ ] T007 Create base models/entities that all stories depend on
-- [ ] T008 Configure error handling and logging infrastructure
-- [ ] T009 Setup environment configuration management
-
-**Checkpoint**: Foundation ready - user story implementation can now begin in parallel
-
----
-
-## Phase 3: User Story 1 - [Title] (Priority: P1) 🎯 MVP
-
-**Goal**: [Brief description of what this story delivers]
-
-**Independent Test**: [How to verify this story works on its own]
-
-### Tests for User Story 1 (OPTIONAL - only if tests requested) ⚠️
-
-> **NOTE: Write these tests FIRST, ensure they FAIL before implementation**
-
-- [ ] T010 [P] [US1] Contract test for [endpoint] in tests/contract/test_[name].py
-- [ ] T011 [P] [US1] Integration test for [user journey] in tests/integration/test_[name].py
-
-### Implementation for User Story 1
-
-- [ ] T012 [P] [US1] Create [Entity1] model in src/models/[entity1].py
-- [ ] T013 [P] [US1] Create [Entity2] model in src/models/[entity2].py
-- [ ] T014 [US1] Implement [Service] in src/services/[service].py (depends on T012, T013)
-- [ ] T015 [US1] Implement [endpoint/feature] in src/[location]/[file].py
-- [ ] T016 [US1] Add validation and error handling
-- [ ] T017 [US1] Add logging for user story 1 operations
-
-**Checkpoint**: At this point, User Story 1 should be fully functional and testable independently
-
----
-
-## Phase 4: User Story 2 - [Title] (Priority: P2)
-
-**Goal**: [Brief description of what this story delivers]
-
-**Independent Test**: [How to verify this story works on its own]
-
-### Tests for User Story 2 (OPTIONAL - only if tests requested) ⚠️
-
-- [ ] T018 [P] [US2] Contract test for [endpoint] in tests/contract/test_[name].py
-- [ ] T019 [P] [US2] Integration test for [user journey] in tests/integration/test_[name].py
-
-### Implementation for User Story 2
-
-- [ ] T020 [P] [US2] Create [Entity] model in src/models/[entity].py
-- [ ] T021 [US2] Implement [Service] in src/services/[service].py
-- [ ] T022 [US2] Implement [endpoint/feature] in src/[location]/[file].py
-- [ ] T023 [US2] Integrate with User Story 1 components (if needed)
-
-**Checkpoint**: At this point, User Stories 1 AND 2 should both work independently
-
----
-
-## Phase 5: User Story 3 - [Title] (Priority: P3)
-
-**Goal**: [Brief description of what this story delivers]
-
-**Independent Test**: [How to verify this story works on its own]
-
-### Tests for User Story 3 (OPTIONAL - only if tests requested) ⚠️
-
-- [ ] T024 [P] [US3] Contract test for [endpoint] in tests/contract/test_[name].py
-- [ ] T025 [P] [US3] Integration test for [user journey] in tests/integration/test_[name].py
-
-### Implementation for User Story 3
-
-- [ ] T026 [P] [US3] Create [Entity] model in src/models/[entity].py
-- [ ] T027 [US3] Implement [Service] in src/services/[service].py
-- [ ] T028 [US3] Implement [endpoint/feature] in src/[location]/[file].py
-
-**Checkpoint**: All user stories should now be independently functional
-
----
-
-[Add more user story phases as needed, following the same pattern]
-
----
-
-## Phase N: Polish & Cross-Cutting Concerns
-
-**Purpose**: Improvements that affect multiple user stories
-
-- [ ] TXXX [P] Documentation updates in docs/
-- [ ] TXXX Code cleanup and refactoring
-- [ ] TXXX Performance optimization across all stories
-- [ ] TXXX [P] Additional unit tests (if requested) in tests/unit/
-- [ ] TXXX Security hardening
-- [ ] TXXX Verify every success criterion in plan.md § 4 is met
-
----
-
-## Dependencies & Execution Order
-
-### Phase Dependencies
-
-- **Setup (Phase 1)**: No dependencies - can start immediately
-- **Foundational (Phase 2)**: Depends on Setup completion - BLOCKS all user stories
-- **User Stories (Phase 3+)**: All depend on Foundational phase completion
-  - User stories can then proceed in parallel (if staffed)
-  - Or sequentially in priority order (P1 → P2 → P3)
-- **Polish (Final Phase)**: Depends on all desired user stories being complete
-
-### User Story Dependencies
-
-- **User Story 1 (P1)**: Can start after Foundational (Phase 2) - No dependencies on other stories
-- **User Story 2 (P2)**: Can start after Foundational (Phase 2) - May integrate with US1 but should be independently testable
-- **User Story 3 (P3)**: Can start after Foundational (Phase 2) - May integrate with US1/US2 but should be independently testable
-
-### Within Each User Story
-
-- Tests (if included) MUST be written and FAIL before implementation
-- Models before services
-- Services before endpoints
-- Core implementation before integration
-- Story complete before moving to next priority
-
-### Parallel Opportunities
-
-- All Setup tasks marked [P] can run in parallel
-- All Foundational tasks marked [P] can run in parallel (within Phase 2)
-- Once Foundational phase completes, all user stories can start in parallel (if team capacity allows)
-- All tests for a user story marked [P] can run in parallel
-- Models within a story marked [P] can run in parallel
-- Different user stories can be worked on in parallel by different team members
-
----
-
-## Parallel Example: User Story 1
-
-\`\`\`bash
-# Launch all tests for User Story 1 together (if tests requested):
-Task: "Contract test for [endpoint] in tests/contract/test_[name].py"
-Task: "Integration test for [user journey] in tests/integration/test_[name].py"
-
-# Launch all models for User Story 1 together:
-Task: "Create [Entity1] model in src/models/[entity1].py"
-Task: "Create [Entity2] model in src/models/[entity2].py"
-\`\`\`
-
----
-
-## Implementation Strategy
-
-### MVP First (User Story 1 Only)
-
-1. Complete Phase 1: Setup
-2. Complete Phase 2: Foundational (CRITICAL - blocks all stories)
-3. Complete Phase 3: User Story 1
-4. **STOP and VALIDATE**: Test User Story 1 independently
-5. Deploy/demo if ready
-
-### Incremental Delivery
-
-1. Complete Setup + Foundational → Foundation ready
-2. Add User Story 1 → Test independently → Deploy/Demo (MVP!)
-3. Add User Story 2 → Test independently → Deploy/Demo
-4. Add User Story 3 → Test independently → Deploy/Demo
-5. Each story adds value without breaking previous stories
-
-### Parallel Team Strategy
-
-With multiple developers:
-
-1. Team completes Setup + Foundational together
-2. Once Foundational is done:
-   - Developer A: User Story 1
-   - Developer B: User Story 2
-   - Developer C: User Story 3
-3. Stories complete and integrate independently
-
----
-
-## Notes
-
-- [P] tasks = different files, no dependencies
-- [Story] label maps task to specific user story for traceability
-- Each user story should be independently completable and testable
-- Verify tests fail before implementing
-- Commit after each task or logical group
-- Stop at any checkpoint to validate story independently
-- Avoid: vague tasks, same file conflicts, cross-story dependencies that break independence
-`,
-    executable: false,
-    backend: null,
-    skipIfExists: false,
-  },
-  {
-    category: "spec-root",
-    name: "specify",
     suffix: "templates/agent-file-template.md",
     content: `# [PROJECT NAME] Development Guidelines
 
@@ -23921,7 +22946,7 @@ Auto-generated from all feature plans. Last updated: [DATE]
 #
 # OPTIONS:
 #   --json              Output in JSON format
-#   --require-tasks     Require tasks.md to exist (for implementation phase)
+#   --require-tasks     Accepted and ignored: tasks.md is no longer produced (spec 041)
 #   --include-tasks     Include tasks.md in AVAILABLE_DOCS list
 #   --paths-only        Only output path variables (no validation)
 #   --help, -h          Show help message
@@ -23961,7 +22986,7 @@ Consolidated prerequisite checking for Spec-Driven Development workflow.
 
 OPTIONS:
   --json              Output in JSON format
-  --require-tasks     Require tasks.md to exist (for implementation phase)
+  --require-tasks     Accepted and ignored: tasks.md is no longer produced
   --include-tasks     Include tasks.md in AVAILABLE_DOCS list
   --paths-only        Only output path variables (no prerequisite validation)
   --help, -h          Show this help message
@@ -23970,8 +22995,8 @@ EXAMPLES:
   # Check task prerequisites (plan.md required)
   ./check-prerequisites.sh --json
   
-  # Check implementation prerequisites (plan.md + tasks.md required)
-  ./check-prerequisites.sh --json --require-tasks --include-tasks
+  # Check implementation prerequisites (plan.md required)
+  ./check-prerequisites.sh --json
   
   # Get feature paths only (no validation)
   ./check-prerequisites.sh --paths-only
@@ -24037,11 +23062,10 @@ if [[ ! -f "\$IMPL_PLAN" ]]; then
     exit 1
 fi
 
-# Check for tasks.md if required
-if \$REQUIRE_TASKS && [[ ! -f "\$TASKS" ]]; then
-    echo "ERROR: tasks.md not found in \$FEATURE_DIR" >&2
-    echo "Run /task tasks first to create the task list." >&2
-    exit 1
+# The breakdown is done inside implement now, so tasks.md is never required.
+# A customised implement doc may still pass the flag: say so, and carry on.
+if \$REQUIRE_TASKS; then
+    echo "note: --require-tasks is ignored; the plan is the one required document" >&2
 fi
 
 # Build list of available documents
@@ -26464,7 +25488,7 @@ fi
 #
 # OPTIONS:
 #   -Json               Output in JSON format
-#   -RequireTasks       Require tasks.md to exist (for implementation phase)
+#   -RequireTasks       Accepted and ignored: tasks.md is no longer produced (spec 041)
 #   -IncludeTasks       Include tasks.md in AVAILABLE_DOCS list
 #   -PathsOnly          Only output path variables (no validation)
 #   -Help, -h           Show help message
@@ -26489,7 +25513,7 @@ Consolidated prerequisite checking for Spec-Driven Development workflow.
 
 OPTIONS:
   -Json               Output in JSON format
-  -RequireTasks       Require tasks.md to exist (for implementation phase)
+  -RequireTasks       Accepted and ignored: tasks.md is no longer produced
   -IncludeTasks       Include tasks.md in AVAILABLE_DOCS list
   -PathsOnly          Only output path variables (no prerequisite validation)
   -Help, -h           Show this help message
@@ -26498,8 +25522,8 @@ EXAMPLES:
   # Check task prerequisites (plan.md required)
   .\\check-prerequisites.ps1 -Json
   
-  # Check implementation prerequisites (plan.md + tasks.md required)
-  .\\check-prerequisites.ps1 -Json -RequireTasks -IncludeTasks
+  # Check implementation prerequisites (plan.md required)
+  .\\check-prerequisites.ps1 -Json
   
   # Get feature paths only (no validation)
   .\\check-prerequisites.ps1 -PathsOnly
@@ -26553,11 +25577,10 @@ if (-not (Test-Path \$paths.IMPL_PLAN -PathType Leaf)) {
     exit 1
 }
 
-# Check for tasks.md if required
-if (\$RequireTasks -and -not (Test-Path \$paths.TASKS -PathType Leaf)) {
-    Write-Output "ERROR: tasks.md not found in \$(\$paths.FEATURE_DIR)"
-    Write-Output "Run /task tasks first to create the task list."
-    exit 1
+# The breakdown is done inside implement now, so tasks.md is never required.
+# A customised implement doc may still pass the flag: say so, and carry on.
+if (\$RequireTasks) {
+    [Console]::Error.WriteLine("note: -RequireTasks is ignored; the plan is the one required document")
 }
 
 # Build list of available documents
@@ -28122,7 +27145,7 @@ _(Naming, testing, commits, branches.)_
 Specnaut builds **long-lived** software — clean, SOLID, secure by default — and a technical decision
 is taken against that intent by whoever is expert in it, not handed back to the user.
 
-\`plan → tasks → implement → review → merge → push\`. It stops at most once by default:
+\`plan → implement → review → merge → push\`. It stops at most once by default:
 
 1. **The end of \`plan\`** — only to ask what only the user can answer: business rules, scope, and
    anything irreversible, destructive, public-breaking or costly. Architecture, security and
@@ -28138,8 +27161,7 @@ next action, never a command printed for someone to paste:
 
 | Boundary | What happens |
 | :--- | :--- |
-| last question answered → \`tasks\` | invoked in the same turn |
-| breakdown committed → \`implement\` | invoked in the same turn |
+| last question answered → \`implement\` | invoked in the same turn |
 | gates green, tree frozen → \`review\` | invoked in the same turn |
 | \`review\` verdict, nothing CRITICAL/HIGH left → \`merge\` → push | same turn (\`auto\`) · **STOP** — the merge request (\`manual\`) |
 | \`merge\` lands → push | never asked, in either mode |
@@ -28216,7 +27238,7 @@ workflow, a chained step — read its addendum if the file exists:
 
 | What runs | Its addendum |
 | :--- | :--- |
-| \`plan\`, \`tasks\`, \`implement\`, \`review\`, \`merge\`, \`audit\`, \`constitution\`, \`groom\` | \`.specnaut/addenda/task/<name>.md\` |
+| \`plan\`, \`implement\`, \`review\`, \`merge\`, \`audit\`, \`constitution\`, \`groom\` | \`.specnaut/addenda/task/<name>.md\` |
 | \`tag\`, \`release\` | \`.specnaut/addenda/ship/<name>.md\` |
 | \`doc\`, \`list\`, \`upgrade\` | \`.specnaut/addenda/specnaut/<name>.md\` |
 
@@ -28316,7 +27338,7 @@ scaffolded for a harness without such features gets none here.
   word, e.g. \`developer fix the lint errors in src/cli/\`, \`@qa-tester
   run a sandbox smoke pass\`, or \`@product-owner groom the backlog\`.
   Skills are dispatchable too: \`/task plan "<feature>"\` launches
-  a session running the full spec-plan-tasks chain. File edits are
+  a session running the full plan-implement-review chain. File edits are
   isolated under \`.claude/worktrees/\` (git worktrees), so several
   Specnaut agents can work in parallel without stepping on each
   other. See
@@ -32801,15 +31823,14 @@ spec-driven workflow. When working with the user, consult the skills below.
 
 \`\`\`
 
-specify → clarify → plan → tasks → analyze → implement → review → merge ▲ ▲ STOP #1 (only if
-clarifications needed) STOP #2 (pre-merge validation)
+plan → implement → review → merge ▲ ▲ STOP #1 (only if a question is open) STOP #2 (only under
+merge: manual)
 
 \`\`\`
 
 ## Skills available
 
-- \`/task plan\` — the feature's one planning document, then the architecture + security audits, then the stop
-- \`/task tasks\` — break the approved plan into tasks
+- \`/task plan\` — the feature's brief (or \`--full\` plan), then the architecture + security audits, then the stop
 - \`/task implement\` — run the developer → review-coordinator → qa-tester pipeline
 - \`/task review\` — architecture + quality gates
 - \`/task merge\` — merge the feature branch to main
