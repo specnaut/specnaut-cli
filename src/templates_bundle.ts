@@ -1385,7 +1385,7 @@ which shell cannot offer, but never resting in the state that lies.
     1. Read \`.specnaut/feature.json\`. Extract \`linked_issue\` (\`jq -r '.linked_issue // empty'\`).
        If absent / null / empty, skip the rest of this section silently — no backlog backend wiring
        to act on.
-    2. Detect the backend by checking \`.specnaut/installed.lock\` (\`backlog_backend: <local|github|gitlab>\`)
+    2. Detect the backend by checking \`.specnaut/installed.lock\` (\`backlog_backend: <local|github|gitlab|cloud>\`)
        or, equivalently, the presence of \`.specnaut/backlog-config.yml\` (github/gitlab) vs
        \`.specnaut/backlog.md\` (local).
     3. **github + gitlab only** — run \`bash .specnaut/scripts/backlog/cascade-check.sh <linked_issue>\`.
@@ -1865,7 +1865,9 @@ report to the user.
 - The feature branch must be checked out.
 - All Specnaut phases must have completed successfully (plan, tasks, implement, review).
 - \`\$ARGUMENTS\` is optional and may contain, in any order:
-  - a **base branch** — the first token that is not a flag. Defaults to \`main\`.
+  - a **base branch** — the first token that is not a flag. Defaults to what
+    \`bash .specnaut/scripts/bash/base-branch.sh\` prints (\`origin/HEAD\`, else \`init.defaultBranch\`).
+    Exit 3 means the base is unknown: stop and say so — never assume \`main\`.
   - **\`--pr\`** — deliver through a pull request instead of merging locally. Off by default.
   - **\`--no-close\`** — merge and push, but leave the backlog item open (step 11 is skipped): for a
     feature delivered across several branches, on every branch but the last.
@@ -1887,8 +1889,8 @@ wanted pull requests will say so.
 
 ## Steps
 
-1. Determine the base branch from \`\$ARGUMENTS\` (default \`main\`), and whether \`--pr\` or \`--no-close\`
-   was passed.
+1. Determine the base branch from \`\$ARGUMENTS\` (default: \`base-branch.sh\`, above), and whether
+   \`--pr\` or \`--no-close\` was passed.
 2. Run \`git status --porcelain\` — abort if the working tree is dirty.
 3. Run \`git fetch origin <base>\` and verify the current branch is up-to-date with \`origin/<base>\`
    (fast-forward or rebase first if behind).
@@ -1919,6 +1921,10 @@ wanted pull requests will say so.
    *is* the instruction: the chain only invokes \`merge\` once the mode allowed it
    (\`phases/auto-chain.md\` reads the mode, this phase does not), and a user typing \`/specnaut merge\`
    asked for it. Asking again re-collects permission at the most expensive moment of the chain.
+   **Under \`merge: manual\` a hook holds steps 7 and 9** until the user's own prompt in this turn
+   said \`merge\` or \`/specnaut merge\` (Claude Code shows its permission prompt instead, in its
+   default modes). A refusal from it is not an obstacle to route around: quote it, tell the user
+   the word to type, and stop on the branch.
    **If the push is rejected**, report the remote's exact message and stop: the merge stays on the
    local base branch (no reset), nothing is retried — never \`--force\`, never an automatic rebase —
    and the close below does not run. Name the recovery: \`git fetch\`, reconcile, re-run
@@ -2384,8 +2390,11 @@ The PO will:
   per-ticket loop must close labelling before the PO can consider a
   ticket "done for this run". Batched labelling-as-an-afterthought is
   the failure mode this contract exists to prevent.
-- For each remaining item, the loop is a strict 4-step sequence and **a
-  ticket is NOT considered processed until both labels are applied**:
+- For each remaining item, the loop is a strict 4-step sequence. **What a
+  processed ticket must carry is decided by
+  \`.specnaut/scripts/bash/groom-rules.sh\`** — its header is the rule, and
+  \`groom-verify.sh\` checks it at the end of the run (see "Before the report").
+  The steps below are how the PO satisfies it:
 
   1. **Rewrite the body when it's poorly worded.** If the description is
      missing, incomplete, or unclear, the PO MUST rewrite it in the
@@ -2431,18 +2440,17 @@ The PO will:
        until the user replies.
      - **Recommend closure** if the item is genuinely stale or
        duplicates a closed ticket — leave a comment recommending
-       \`not_planned\`. Steps 2 and 3 are still mandatory (apply labels
+       \`not_planned\`, with the same \`🤖 specnaut-groom\` prefix. Steps 2 and 3 are still mandatory (apply labels
        reflecting the recommendation, e.g. \`priority:P3\`). Do not close
        autonomously.
 
   **Mandatory sizing + priority contract.** Steps 2 and 3 are NOT
-  optional and NOT discretionary — every ticket the PO touches in a
-  groom run MUST exit with both a size and a priority value persisted,
-  regardless of the outcome chosen at step 4. If persistence fails for
-  an external reason (the user lacks scope, the API rate-limited, etc.),
-  the PO MUST capture the failure reason and surface it under "⚠ size /
-  priority missing" in the final report — silent skip is a contract
-  violation.
+  optional and NOT discretionary, whatever the outcome chosen at step 4
+  — what counts as persisted is \`groom-rules.sh\`'s to say, not this
+  list's. If persistence fails for an external reason (the user lacks
+  scope, the API rate-limited, etc.), the PO MUST capture the failure
+  reason and surface it under "⚠ size / priority missing" in the final
+  report — silent skip is a contract violation.
 
 The PO must respect the standard backlog skill — do not bypass its
 scripts.
@@ -2497,12 +2505,10 @@ classification contract.
 
 ##### Local Markdown backend
 
-When the local backend ships support for the 5-column model (tracked
-in #130), size and priority will be applied as front-matter keys
-(\`priority:\` and \`complexity:\`) per that ticket's convention. Until
-then, the local backend has no column model and this groom phase is a
-no-op for it (the PO should report "skipped — local backend predates
-the column model").
+The local backend has the same five columns (\`scripts/local/move.sh\`).
+Size and priority are front-matter keys, \`size:\` and \`priority:\`, which
+\`add.sh\` writes empty: set each to exactly one value (\`XS\`–\`XL\`,
+\`P0\`–\`P3\`) by editing the task file, then move the card to \`Ready\`.
 
 ### 2. Board drift — closed items outside Done
 
@@ -2547,6 +2553,32 @@ Read-only, like the two checks above: never delete or modify a spec file.
 backend-resolved link — never a bare \`#<num>\`. Read that contract for the format
 and the degradation ladder; do not restate it here.
 
+
+## Before the report — prove the groom
+
+**The last step of the pass, after the four checks and before the report.**
+Run it with every item backlog grooming processed in this run:
+
+\`\`\`bash
+bash .specnaut/scripts/backlog/groom-verify.sh [--ready "\$READY"] <num>...
+\`\`\`
+
+\`--ready\` is the column \`groom-columns.sh\` resolved (\`none\` when
+\`PROMOTE=no\`); without it, \`Ready\`. The script fetches each item and hands it
+to \`.specnaut/scripts/bash/groom-rules.sh\`, the one definition of a complete
+item — read its header, do not restate it here.
+
+- **Exit \`0\`** — every item is complete.
+- **Exit \`1\`** — one line per incomplete item, naming what it lacks. Fix what
+  you can and re-run; each line still standing goes under "⚠ size / priority
+  missing", verbatim, with the persistence failure behind it when you know
+  it, and counts towards the report's \`<K>\`. Never report as groomed an item
+  the script listed.
+- **Exit \`2\`** — an item could not be read. The run is **not verified**: say
+  so at the top of the report with the script's stderr, never a clean run.
+
+A field a backend cannot expose is named in that backend's script header and
+reads as missing, never as present — report such a line as what it is.
 
 ## Output format
 
@@ -2655,8 +2687,10 @@ Per-ticket:
 
 ⚠ size / priority missing:
   ↳ <backlog-reference> — <reason: e.g. gh label create failed (rate-limited)>
+  ↳ <backlog-reference> — <groom-verify.sh's line for it, verbatim>
   ↳ ...
-  (omit this whole section when K == 0)
+  (omit this whole section when K == 0 — K counts every line groom-verify.sh
+   printed; when it exited 2, the run is "not verified", never K == 0)
 
 ⚠ Roadmap dates missing (GitHub backend, soft):
   ↳ <backlog-reference> — Ready since <date>, no target date set
@@ -3224,12 +3258,17 @@ plan → tasks → implement → review → merge → push
    means \`manual\`; "merge it" means \`auto\`. Otherwise the project file decides:
 
    \`\`\`
-   v=\$(sed -n 's/^merge:[[:space:]]*\\([^[:space:]#]*\\).*/\\1/p' .specnaut/workflow.yml 2>/dev/null | head -1)
-   case "\$v" in ""|auto) echo auto ;; manual) echo manual ;; *) echo "manual (unrecognised: \$v)" ;; esac
+   bash .specnaut/scripts/bash/merge-mode.sh
    \`\`\`
 
-   No file or no key means \`auto\`. An unrecognised value means \`manual\` — say so in one line: a
-   setting that cannot be read resolves to the reading that does not push.
+   It prints \`auto\` or \`manual\`, and says why on stderr. No file or no key means \`auto\`. An
+   unrecognised value means \`manual\` — say so in one line: a setting that cannot be read resolves to
+   the reading that does not push.
+
+   **Under \`merge: manual\` in the file, a hook holds the landing whatever the run said** (D3). The
+   landing hook asks the same script (\`--strict\`) and holds every merge into, and push of, the base
+   branch until the user's own prompt in that turn says \`merge\` or \`/specnaut merge\`. A per-run
+   "merge it" moves the chain; it does not lift the file.
 
    - **\`auto\`** — no stop. A verdict with no unresolved CRITICAL or HIGH finding invokes \`merge\`
      in the same turn; \`merge\` pushes and closes.
@@ -3319,8 +3358,9 @@ it. Otherwise resolve the approval — **remote mode keeps its gate under either
   and report the rejection + any \`note\`; exit 3/4 (timeout/cancelled) or 1 → halt cleanly with the
   reason; exit 5 → report \`specnaut cloud login\` is needed and fall back to the local prompt below.
   **Never merge without an explicit approval.**
-- **Local mode, \`manual\`** — ask once: "Ready to merge? (yes to run \`/specnaut merge\`, no to stay on
-  the branch)". On "yes", invoke \`merge\`.
+- **Local mode, \`manual\`** — ask once, naming the word to type: "Ready to merge? Reply \`merge\` to
+  land it, anything else to stay on the branch." On \`merge\`, invoke \`merge\`. A plain "yes" does not
+  release the landing hook — if that is the answer, say so and ask for the word.
 
 ### Triage, and the rule that ends the loop
 
@@ -4718,22 +4758,22 @@ a passage inside a role description.
 
 \`\`\`yaml
 ---
-id: NNN                # zero-padded 3 digits, globally unique within this project
+number: NNN            # zero-padded 3 digits, globally unique within this project
 title: string
-category: string       # free-form, but consistent across tasks
-priority: critical | high | medium | low
-complexity: 1 | 2 | 3 | 5 | 8 | 13 | 21   # Fibonacci
-status: todo | in_progress | done | deferred | blocked
-parent: "#NNN" | null  # local task id of the parent epic, if this is a sub-task
-depends_on: [string]   # other task titles or ids
-spec: string | null    # Specnaut spec id if attached
-tags: [string]
-created: YYYY-MM-DD
+status: Backlog | Ready | In progress | In review | Done
+size: XS | S | M | L | XL       # empty at creation; set when groomed
+priority: P0 | P1 | P2 | P3     # empty at creation; set when groomed
+parent: "#NNN"         # only on a sub-task: the local number of its parent epic
+created: YYYY-MM-DDTHH:MM:SSZ   # UTC, written by add.sh
 ---
 \`\`\`
 
-\`parent: "#NNN"\` is the local-Markdown sub-task convention (grep-friendly);
-missing or \`null\` means a top-level task or an epic, legacy tasks included.
+This is what \`scripts/local/add.sh\` writes and \`scripts/local/move.sh\` accepts. \`size\` and
+\`priority\` start empty: an item is not groomed until both hold exactly one value.
+
+\`parent: "#NNN"\` is the local-Markdown sub-task convention (grep-friendly); absent means a
+top-level task or an epic. Older task files may carry \`id\`, \`complexity\`, \`category\`, \`tags\` or a
+lowercase \`status\`: read them, never write them.
 `,
     executable: false,
     backend: null,
@@ -4767,9 +4807,9 @@ Enhanced fork of [\`specify\` CLI](https://github.com/github/spec-kit), distribu
 
 **Harnesses:** claude, cursor, codex, copilot, opencode, antigravity — all share \`templates/core/\` content, mapped per-harness by an adapter.
 
-**Different from upstream Spec Kit:** auto-chained pipeline (\`/specnaut plan\` chains all phases); dedicated \`review\` phase after implement; backlog as product source of truth via \`product-owner\` agent (backends: local, github, gitlab); Claude Code plugin distribution (\`specnaut-plugin\` marketplace).
+**Different from upstream Spec Kit:** auto-chained pipeline (\`/specnaut plan\` chains all phases); dedicated \`review\` phase after implement; backlog as product source of truth via \`product-owner\` agent (backends: local, github, gitlab, cloud); Claude Code plugin distribution (the \`specnaut-cockpit\` plugin from the \`specnaut-marketplace\` marketplace).
 
-**Bundled agents:** product-owner, developer, review-coordinator, code-reviewer, security-expert, test-reviewer, qa-tester, workflow-manager, devops-sre, specnaut-guide.
+**Bundled agents:** product-owner, developer, review-coordinator, code-reviewer, security-expert, test-reviewer, qa-tester, workflow-manager, devops-sre, specnaut-guide, architect-expert, performance-expert, accessibility-expert, dependency-expert, ui-ux-designer.
 
 ### Commands
 
@@ -4779,12 +4819,13 @@ Enhanced fork of [\`specify\` CLI](https://github.com/github/spec-kit), distribu
 - \`specnaut reconcile <path> --accept-upstream\` — take the new template version (backs up local, updates lock).
 - \`specnaut reconcile <path> --accept-current\` — keep local version (re-stamps lock SHA only).
 - \`specnaut check [--project]\` — verify scaffold integrity.
+- \`specnaut gate <status|raise|cancel>\` — the non-interactive bridge a skill phase uses to raise a remote-control gate (Specnaut Cloud).
 - \`specnaut self-update\` — replace binary with latest release, verifying SHA256.
 - \`specnaut --version\` — print binary + bundled templates version.
 
 ### Backlog conventions (GitHub backend)
 
-\`Priority\` (P0–P2) and \`Size\` (XS–XL) via Project V2 native fields (\`set-field.sh\`); fall back to \`priority:*\`/\`size:*\` labels when the native field is absent. Two-step close: \`move.sh <num> Done\` then \`gh issue close --reason completed\`. \`/board groom\` catches items closed via paths that bypassed the move step.
+\`Priority\` (P0–P3) and \`Size\` (XS–XL) via Project V2 native fields (\`set-field.sh\`); fall back to \`priority:*\`/\`size:*\` labels when the native field is absent. Two-step close: \`gh issue close --reason completed\` first, then \`move.sh <num> Done\` — moving first makes a sweep report the open card in Done as drift. \`/board groom\` catches items closed via paths that bypassed the move step.
 
 ### Design principles
 
@@ -4908,7 +4949,7 @@ Persistence per backend:
 
 - **GitHub** — use \`set-field.sh <issue> <Priority|Size|IssueType|StartDate|TargetDate|Estimate> <value>\`; exit \`0\` OK, \`10\`/\`11\` fall back to a label (Priority/Size only; on a date/Estimate axis \`10\` = field absent → skip, warn nothing), \`12\` = issue not on project, \`13\` = discovery failed → never label, report it. Run \`detect-fields.sh\` once per groom. Never dual-write field + matching label.
 - **GitLab** — scoped labels via \`glab\` (\`priority::P1\`, \`size::M\`, \`type::feature\`). Date / Estimate axes are GitHub-only (Roadmap view); GitLab has no equivalent in this scope.
-- **Local Markdown** — \`priority:\` / \`complexity:\` / \`category:\` frontmatter. No labels. Date / Estimate are not tracked on local backends (no Roadmap view to feed).
+- **Local Markdown** — \`size:\` / \`priority:\` / \`category:\` frontmatter (\`complexity:\` is retired; \`groom-verify.sh\` does not read it as a size). No labels. Date / Estimate are not tracked on local backends (no Roadmap view to feed).
 
 Persistence failures on hard axes MUST appear as \`⚠ classification incomplete\` — a silent skip is a contract violation. Date axes are warn-only.
 
@@ -8455,6 +8496,110 @@ cat "\${matches[0]}"
   },
   {
     category: "backlog-script",
+    name: "groom-verify",
+    suffix: "groom-verify.sh",
+    content: `#!/usr/bin/env bash
+# Prove a groom run left every item it processed complete — local backend.
+#
+# This script FETCHES and NORMALISES; it decides nothing. What "complete" means
+# lives in \`.specnaut/scripts/bash/groom-rules.sh\`, and its header is the rule.
+#
+# Where each part of the record comes from, in a task file
+# (\`.specnaut/backlog/NNN-slug.md\`):
+#   body         everything after the frontmatter
+#   sizes        the frontmatter \`size:\` value, split on commas — so \`M, L\` is
+#                two sizes. \`complexity:\` is a retired key and is NOT a size.
+#   priorities   the frontmatter \`priority:\` value, split the same way
+#   status       the frontmatter \`status:\` (the column \`move.sh\` writes)
+#   comments     each \`## Clarification (…)\` section \`clarify-comment.sh\` appends
+#   state, closed_reason
+#                CANNOT be read: a task file has no closed state and records no
+#                close reason (\`Done\` is a column). Passed as open / "", so
+#                "closed as not_planned" is never an outcome on this backend.
+#
+# Usage: groom-verify.sh [--ready <column>|none] <number>...
+# Output and exit codes: those of groom-rules.sh — plus exit 2 when an item has
+# no task file or its frontmatter cannot be read. Nothing is reported complete
+# that was not read.
+set -euo pipefail
+
+usage() { echo "usage: groom-verify.sh [--ready <column>|none] <number>..." >&2; exit 2; }
+
+# shellcheck source=./_config.sh
+. "\$(dirname "\$0")/_config.sh"
+RULES="\$(dirname "\$0")/../bash/groom-rules.sh"
+
+READY="Ready"
+ITEMS=()
+while [ "\$#" -gt 0 ]; do
+  case "\$1" in
+    --ready) [ -n "\${2:-}" ] || usage; READY="\$2"; shift 2 ;;
+    -h | --help) usage ;;
+    '' | *[!0-9]*) echo "groom-verify.sh: not an item number: '\$1'" >&2; usage ;;
+    *) ITEMS+=("\$1"); shift ;;
+  esac
+done
+[ "\${#ITEMS[@]}" -gt 0 ] || usage
+
+# One task file → one record on stdout. Fails (non-zero) on a file it cannot read.
+record() {
+  local num="\$1" padded file
+  padded=\$(printf '%03d' "\$((10#\$num))")
+  file=""
+  for file in "\$BACKLOG_DIR/\$padded"-*.md; do break; done
+  if [ -z "\$file" ] || [ ! -f "\$file" ]; then
+    echo "groom-verify.sh: no backlog item #\$padded in \$BACKLOG_DIR" >&2
+    return 1
+  fi
+  # shellcheck disable=SC2016  # jq program.
+  jq -n -c --arg item "\$num" --rawfile text "\$file" '
+    (\$text | gsub("\\r"; "") | split("\\n")) as \$l
+    | if \$l[0] != "---" then error("no frontmatter") else . end
+    | ([range(1; \$l | length) | select(\$l[.] == "---")] | first
+       // error("frontmatter never closed")) as \$end
+    | \$l[1:\$end] as \$fm
+    | \$l[\$end + 1:] as \$body
+    | def key(\$k):
+        [\$fm[] | select(test("^" + \$k + ":")) | sub("^" + \$k + ":\\\\s*"; "") | sub("\\\\s+#.*\$"; "")]
+        | first // "";
+      def values: gsub("[\\\\[\\\\]\\"'\\'']"; "") | [splits("\\\\s*,\\\\s*")] | map(gsub("^\\\\s+|\\\\s+\$"; "")) | map(select(. != ""));
+      def clarifications:
+        reduce \$body[] as \$x ({cur: null, out: []};
+          if (\$x | test("^##\\\\s+Clarification\\\\b")) then
+            (if .cur != null then .out += [.cur] else . end) | .cur = ""
+          elif (\$x | test("^#{1,2}\\\\s")) then
+            (if .cur != null then .out += [.cur] else . end) | .cur = null
+          elif .cur != null then .cur += (\$x + "\\n")
+          else . end)
+        | if .cur != null then .out + [.cur] else .out end
+        | map(sub("^\\\\s+"; ""));
+    { item: \$item,
+      body: (\$body | join("\\n")),
+      sizes: (key("size") | values),
+      priorities: (key("priority") | values),
+      status: key("status"),
+      comments: clarifications,
+      state: "open",
+      closed_reason: "" }
+  ' || { echo "groom-verify.sh: cannot read the frontmatter of \$file" >&2; return 1; }
+}
+
+RECORDS=""
+for num in "\${ITEMS[@]}"; do
+  rec=\$(record "\$num") || { echo "groom-verify.sh: #\$num not read — nothing verified" >&2; exit 2; }
+  RECORDS+="\$rec"\$'\\n'
+done
+
+rc=0
+printf '%s' "\$RECORDS" | bash "\$RULES" --ready "\$READY" || rc=\$?
+exit "\$rc"
+`,
+    executable: true,
+    backend: "local",
+    skipIfExists: false,
+  },
+  {
+    category: "backlog-script",
     name: "add",
     suffix: "add.sh",
     content: `#!/usr/bin/env bash
@@ -9452,6 +9597,130 @@ if [ "\$#" -lt 1 ]; then
 fi
 
 gh issue view "\$1" --repo "\$REPO" --comments
+`,
+    executable: true,
+    backend: "github",
+    skipIfExists: false,
+  },
+  {
+    category: "backlog-script",
+    name: "groom-verify",
+    suffix: "groom-verify.sh",
+    content: `#!/usr/bin/env bash
+# Prove a groom run left every issue it processed complete — GitHub backend.
+#
+# This script FETCHES and NORMALISES; it decides nothing. What "complete" means
+# lives in \`.specnaut/scripts/bash/groom-rules.sh\`, and its header is the rule.
+#
+# One GraphQL round-trip per issue (\`gh issue view --json projectItems\` carries
+# the Status of each project item but no other field, so it cannot answer for
+# Priority / Size). Where each part of the record comes from:
+#   body         the issue body
+#   sizes        the \`Size\` single-select of THIS project's item (project number
+#                and owner from backlog-config.yml), plus every \`size:<X>\` label
+#   priorities   the same, \`Priority\` field + \`priority:<X>\` labels. Both
+#                surfaces are read because a value may live on either (field
+#                first, label fallback) — a disagreement is two values.
+#   status       the \`Status\` single-select of this project's item; "" when the
+#                issue is not on the project
+#   comments     the last 100 comment bodies (the groom's comment is recent)
+#   state, closed_reason
+#                the issue's state and stateReason, lower-cased
+#                (\`not_planned\`, \`completed\`, …)
+# Field names match case-insensitively, as \`detect-fields.sh\` does. A projected
+# organization field is read as the project item lists it; if the item does not
+# carry the value, the axis reads as missing — never as present.
+#
+# Usage: groom-verify.sh [--ready <column>|none] <number>...
+#   --ready  the board's ready column, as \`groom-columns.sh\` resolved it
+#            (READY=…; \`none\` when PROMOTE=no). Default \`Ready\`.
+# Output and exit codes: those of groom-rules.sh — plus exit 2 when an issue
+# cannot be fetched (gh error, rate limit, missing scope, unknown issue).
+# Nothing is reported complete that was not read.
+set -euo pipefail
+
+usage() { echo "usage: groom-verify.sh [--ready <column>|none] <number>..." >&2; exit 2; }
+
+# shellcheck source=./_config.sh
+. "\$(dirname "\$0")/_config.sh"
+RULES="\$(dirname "\$0")/../bash/groom-rules.sh"
+
+READY="Ready"
+ITEMS=()
+while [ "\$#" -gt 0 ]; do
+  case "\$1" in
+    --ready) [ -n "\${2:-}" ] || usage; READY="\$2"; shift 2 ;;
+    -h | --help) usage ;;
+    '' | *[!0-9]*) echo "groom-verify.sh: not an issue number: '\$1'" >&2; usage ;;
+    *) ITEMS+=("\$1"); shift ;;
+  esac
+done
+[ "\${#ITEMS[@]}" -gt 0 ] || usage
+case "\$PROJECT_NUMBER" in
+  '' | *[!0-9]*) echo "groom-verify.sh: project_number '\$PROJECT_NUMBER' is not a number" >&2; exit 2 ;;
+esac
+
+# shellcheck disable=SC2016  # GraphQL variables, not shell ones.
+QUERY='
+  query(\$owner: String!, \$name: String!, \$num: Int!) {
+    repository(owner: \$owner, name: \$name) {
+      issue(number: \$num) {
+        body state stateReason
+        labels(first: 100) { nodes { name } }
+        comments(last: 100) { nodes { body } }
+        projectItems(first: 20) {
+          nodes {
+            project { number owner { ... on Organization { login } ... on User { login } } }
+            fieldValues(first: 50) {
+              nodes {
+                ... on ProjectV2ItemFieldSingleSelectValue {
+                  name
+                  field { ... on ProjectV2SingleSelectField { name } }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }'
+
+# One issue → one record on stdout. Fails (non-zero) when it cannot be read.
+record() {
+  local raw
+  raw=\$(gh api graphql -f query="\$QUERY" -f owner="\$REPO_OWNER" -f name="\$REPO_NAME" -F num="\$1") ||
+    return 1
+  # shellcheck disable=SC2016  # jq program.
+  printf '%s' "\$raw" | jq -c -e --arg item "\$1" --argjson project "\$PROJECT_NUMBER" --arg owner "\$REPO_OWNER" '
+    .data.repository.issue // error("no such issue")
+    | ([.projectItems.nodes[]?
+        | select(.project.number == \$project
+                 and ((.project.owner.login // "") | ascii_downcase) == (\$owner | ascii_downcase))]
+       | first // {}) as \$card
+    | def field(\$n):
+        [\$card.fieldValues.nodes[]? | select(((.field.name // "") | ascii_downcase) == \$n) | .name];
+      def labelled(\$prefix):
+        [.labels.nodes[]?.name | select(ascii_downcase | startswith(\$prefix)) | .[(\$prefix | length):]];
+    { item: \$item,
+      body: (.body // ""),
+      sizes: (field("size") + labelled("size:")),
+      priorities: (field("priority") + labelled("priority:")),
+      status: (field("status") | first // ""),
+      comments: [.comments.nodes[]?.body // ""],
+      state: (if .state == "CLOSED" then "closed" elif .state == "OPEN" then "open" else error("state \\(.state)") end),
+      closed_reason: ((.stateReason // "") | ascii_downcase) }
+  '
+}
+
+RECORDS=""
+for num in "\${ITEMS[@]}"; do
+  rec=\$(record "\$num") || { echo "groom-verify.sh: #\$num could not be read from \$REPO — nothing verified" >&2; exit 2; }
+  RECORDS+="\$rec"\$'\\n'
+done
+
+rc=0
+printf '%s' "\$RECORDS" | bash "\$RULES" --ready "\$READY" || rc=\$?
+exit "\$rc"
 `,
     executable: true,
     backend: "github",
@@ -11414,6 +11683,98 @@ glab issue view "\$1" --repo "\$PROJECT_ID" --comments
   },
   {
     category: "backlog-script",
+    name: "groom-verify",
+    suffix: "groom-verify.sh",
+    content: `#!/usr/bin/env bash
+# Prove a groom run left every issue it processed complete — GitLab backend.
+#
+# This script FETCHES and NORMALISES; it decides nothing. What "complete" means
+# lives in \`.specnaut/scripts/bash/groom-rules.sh\`, and its header is the rule.
+#
+# Two \`glab\` calls per issue: \`glab issue view --output json\` (as \`move.sh\`
+# reads labels) and the notes API. Where each part of the record comes from:
+#   body         the issue description
+#   sizes        every \`size::<X>\` scoped label (\`size::M\`)
+#   priorities   every \`priority::<X>\` scoped label (\`priority::P1\`)
+#   status       the \`Status::<X>\` scoped label \`move.sh\` sets; "" without one
+#   comments     the latest 100 notes, system notes excluded — a label change
+#                is GitLab's note, not the groom's comment
+#   state        \`opened\` → open, \`closed\` → closed
+#   closed_reason
+#                CANNOT be read: GitLab records no reason for closing an issue.
+#                Passed as "", so "closed as not_planned" is never an outcome
+#                on this backend — the groom's marked comment is.
+#
+# Usage: groom-verify.sh [--ready <column>|none] <number>...
+# Output and exit codes: those of groom-rules.sh — plus exit 2 when an issue
+# cannot be fetched. Nothing is reported complete that was not read.
+set -euo pipefail
+
+usage() { echo "usage: groom-verify.sh [--ready <column>|none] <number>..." >&2; exit 2; }
+
+# shellcheck source=./_config.sh
+. "\$(dirname "\$0")/_config.sh"
+RULES="\$(dirname "\$0")/../bash/groom-rules.sh"
+
+READY="Ready"
+ITEMS=()
+while [ "\$#" -gt 0 ]; do
+  case "\$1" in
+    --ready) [ -n "\${2:-}" ] || usage; READY="\$2"; shift 2 ;;
+    -h | --help) usage ;;
+    '' | *[!0-9]*) echo "groom-verify.sh: not an issue number: '\$1'" >&2; usage ;;
+    *) ITEMS+=("\$1"); shift ;;
+  esac
+done
+[ "\${#ITEMS[@]}" -gt 0 ] || usage
+
+# The API path segment: a \`group/project\` path must be URL-encoded; a numeric
+# id passes through unchanged.
+PROJECT_PATH=\$(jq -rn --arg p "\$PROJECT_ID" '\$p | @uri')
+
+# One issue → one record on stdout. Fails (non-zero) when it cannot be read.
+record() {
+  local issue notes
+  issue=\$(glab issue view "\$1" --repo "\$PROJECT_ID" --output json) || return 1
+  notes=\$(glab api "projects/\$PROJECT_PATH/issues/\$1/notes?per_page=100&sort=desc&order_by=created_at") ||
+    return 1
+  # On stdin, not as \`--argjson\`: a hundred notes can outgrow the argument limit.
+  # shellcheck disable=SC2016  # jq program.
+  printf '%s\\n%s\\n' "\$issue" "\$notes" | jq -n -c -e --arg item "\$1" '
+    input as \$issue | input as \$notes
+    | def scoped(\$scope):
+      [\$issue.labels[]? | select(ascii_downcase | startswith(\$scope))
+       | .[(\$scope | length):] | gsub("^\\"|\\"\$"; "")];
+    if (\$notes | type) != "array" then error("notes are not a list") else . end
+    | { item: \$item,
+        body: (\$issue.description // ""),
+        sizes: scoped("size::"),
+        priorities: scoped("priority::"),
+        status: (scoped("status::") | first // ""),
+        comments: [\$notes[] | select(.system != true) | .body // ""],
+        state: (if \$issue.state == "closed" then "closed"
+                elif \$issue.state == "opened" then "open"
+                else error("state \\(\$issue.state)") end),
+        closed_reason: "" }
+  '
+}
+
+RECORDS=""
+for num in "\${ITEMS[@]}"; do
+  rec=\$(record "\$num") || { echo "groom-verify.sh: #\$num could not be read from \$PROJECT_ID — nothing verified" >&2; exit 2; }
+  RECORDS+="\$rec"\$'\\n'
+done
+
+rc=0
+printf '%s' "\$RECORDS" | bash "\$RULES" --ready "\$READY" || rc=\$?
+exit "\$rc"
+`,
+    executable: true,
+    backend: "gitlab",
+    skipIfExists: false,
+  },
+  {
+    category: "backlog-script",
     name: "add",
     suffix: "add.sh",
     content: `#!/usr/bin/env bash
@@ -12081,6 +12442,97 @@ echo "\$RESP" | jq -r --argjson cols "\$COLS" '
     "",
     (.body // "(no description)")
 '
+`,
+    executable: true,
+    backend: "cloud",
+    skipIfExists: false,
+  },
+  {
+    category: "backlog-script",
+    name: "groom-verify",
+    suffix: "groom-verify.sh",
+    content: `#!/usr/bin/env bash
+# Prove a groom run left every task it processed complete — Specnaut Cloud.
+#
+# This script FETCHES and NORMALISES; it decides nothing. What "complete" means
+# lives in \`.specnaut/scripts/bash/groom-rules.sh\`, and its header is the rule.
+#
+# The board's columns once per run, then one \`GET /tasks?number=\` per task —
+# the calls \`view.sh\` makes. Where each part of the record comes from:
+#   body         the task's \`body\`
+#   sizes        the task's \`size\`, upper-cased (the API carries \`m\`, \`xl\`, …)
+#   priorities   the task's \`priority\`, upper-cased (\`p1\` → \`P1\`)
+#   status       the name of the task's column (\`columnId\` → \`/columns\`)
+#   comments     CANNOT be read: the API accepts a comment (\`clarify-comment.sh\`
+#                posts one) but serves none back. Passed as null, so a task the
+#                groom left with a clarification reads "comments unreadable" —
+#                the only outcome this backend can prove is the ready column.
+#   state, closed_reason
+#                CANNOT be read: a task carries no closed state or close reason
+#                (\`Done\` is a column). Passed as open / "".
+#
+# Usage: groom-verify.sh [--ready <column>|none] <number>...
+# Output and exit codes: those of groom-rules.sh — plus exit 2 when a task
+# cannot be fetched (API error, no such task, not authenticated). Nothing is
+# reported complete that was not read.
+set -euo pipefail
+
+usage() { echo "usage: groom-verify.sh [--ready <column>|none] <number>..." >&2; exit 2; }
+
+READY="Ready"
+ITEMS=()
+while [ "\$#" -gt 0 ]; do
+  case "\$1" in
+    --ready) [ -n "\${2:-}" ] || usage; READY="\$2"; shift 2 ;;
+    -h | --help) usage ;;
+    '' | *[!0-9]*) echo "groom-verify.sh: not a task number: '\$1'" >&2; usage ;;
+    *) ITEMS+=("\$1"); shift ;;
+  esac
+done
+[ "\${#ITEMS[@]}" -gt 0 ] || usage
+
+# After the arguments: \`_config.sh\` resolves a token, which a usage error
+# should not cost.
+# shellcheck source=./_config.sh
+. "\$(dirname "\$0")/_config.sh"
+RULES="\$(dirname "\$0")/../bash/groom-rules.sh"
+AUTH=(-H "Authorization: Bearer \$API_TOKEN")
+
+if ! COLS=\$(curl -fsS "\$API_BASE/columns?projectKey=\$PROJECT_KEY" "\${AUTH[@]}"); then
+  echo "groom-verify.sh: could not read the board's columns — nothing verified" >&2
+  exit 2
+fi
+
+# One task → one record on stdout. Fails (non-zero) when it cannot be read.
+record() {
+  local resp
+  resp=\$(curl -fsS "\$API_BASE/tasks?projectKey=\$PROJECT_KEY&number=\$1" "\${AUTH[@]}") || return 1
+  # shellcheck disable=SC2016  # jq program.
+  printf '%s\\n%s\\n' "\$COLS" "\$resp" | jq -n -c -e --arg item "\$1" '
+    input as \$cols | input as \$resp
+    | ([\$cols.columns[]? | { (.id): .name }] | add // {}) as \$names
+    | (\$resp.task // error("no such task")) as \$t
+    | def one(\$v): [\$v | select(. != null and . != "") | tostring | ascii_upcase];
+    { item: \$item,
+      body: (\$t.body // ""),
+      sizes: one(\$t.size),
+      priorities: one(\$t.priority),
+      status: (\$names[\$t.columnId // ""] // ""),
+      comments: null,
+      state: "open",
+      closed_reason: "" }
+  '
+}
+
+RECORDS=""
+for num in "\${ITEMS[@]}"; do
+  rec=\$(record "\$num") || { echo "groom-verify.sh: #\$num could not be read from \$PROJECT_KEY — nothing verified" >&2; exit 2; }
+  RECORDS+="\$rec"\$'\\n'
+done
+
+rc=0
+printf '%s' "\$RECORDS" | bash "\$RULES" --ready "\$READY" || rc=\$?
+exit "\$rc"
 `,
     executable: true,
     backend: "cloud",
@@ -25602,6 +26054,144 @@ exit 0
   {
     category: "spec-root",
     name: "specify",
+    suffix: "scripts/bash/merge-mode.sh",
+    content: `#!/usr/bin/env bash
+# The merge mode of this project — its one reader (spec 036, plan § 5, FR-002).
+#
+# Prints exactly \`auto\` or \`manual\` on stdout; a one-line note on stderr says
+# why. Two callers, neither of which parses the file itself:
+#   - the Specnaut chain (phases/auto-chain.md), which applies a per-run
+#     instruction first and asks this script only when there is none;
+#   - the landing hook (.specnaut/hooks/guard-merge.sh), which calls
+#     \`--strict\` and enforces the file alone (D3).
+#
+#   (default)  the first top-level \`merge:\` line of the working tree's
+#              .specnaut/workflow.yml. No file or no key → auto. An
+#              unrecognised value → manual: a setting that cannot be read
+#              resolves to the reading that does not push.
+#   --strict   manual if ANY copy says anything but \`auto\` — the working
+#              tree, HEAD's committed copy, or the base branch's (local and
+#              origin) — and within a copy every \`merge:\` line counts,
+#              indented or quoted. A model that rewrites the file in its
+#              worktree, or commits that rewrite, has not changed the base
+#              (§ 11 F2). Comment lines are never settings.
+#
+# Usage: merge-mode.sh [--strict]
+set -euo pipefail
+export GIT_OPTIONAL_LOCKS=0
+
+strict=0
+case "\${1:-}" in
+  "") ;;
+  --strict) strict=1 ;;
+  *) echo "usage: merge-mode.sh [--strict]" >&2; exit 2 ;;
+esac
+
+here=\$(cd "\$(dirname "\${BASH_SOURCE[0]}")" && pwd -P)
+# The project this script is installed in, not the git toplevel: a project
+# without its own .git inside another repository reads its own workflow.yml.
+case \$here in
+  */.specnaut/scripts/bash) root=\${here%/.specnaut/scripts/bash} ;;
+  *) if ! root=\$(git --no-pager rev-parse --show-toplevel 2>/dev/null); then root=\$PWD; fi ;;
+esac
+rel=.specnaut/workflow.yml
+
+if [ "\$strict" = 0 ]; then
+  v=""
+  if [ -f "\$root/\$rel" ]; then
+    v=\$(awk '/^merge:/ { v = \$0; sub(/^merge:[[:space:]]*/, "", v); sub(/[[:space:]#].*\$/, "", v); print v; exit }' "\$root/\$rel")
+  fi
+  case "\$v" in
+    "") echo "merge-mode: auto (no merge: key in \$rel)" >&2; echo auto ;;
+    auto) echo "merge-mode: auto (\$rel)" >&2; echo auto ;;
+    manual) echo "merge-mode: manual (\$rel)" >&2; echo manual ;;
+    *) echo "merge-mode: manual (unrecognised: \$v)" >&2; echo manual ;;
+  esac
+  exit 0
+fi
+
+# Every \`merge:\` value in one copy, one per line (empty value printed as "").
+values() {
+  awk '/^[[:space:]]*["'"'"']?merge["'"'"']?[[:space:]]*:/ {
+    v = \$0; sub(/^[^:]*:[[:space:]]*/, "", v); sub(/[[:space:]#].*\$/, "", v); print v
+  }'
+}
+
+# Reads one copy from stdin; prints the offending value and fails if non-auto.
+copy_is_auto() {
+  local v
+  while IFS= read -r v; do
+    if [ "\$v" != auto ]; then printf '%s' "\${v:-<empty>}"; return 1; fi
+  done < <(values)
+  return 0
+}
+
+verdict() { # <label> — reads the copy on stdin
+  local bad
+  if ! bad=\$(copy_is_auto); then
+    echo "merge-mode: manual (\$1 says merge: \$bad)" >&2
+    echo manual
+    exit 0
+  fi
+}
+
+[ -f "\$root/\$rel" ] && verdict "the working tree" < "\$root/\$rel"
+
+# \`<rev>:./<path>\` is relative to -C, so a project below the toplevel reads its own copy.
+blob() { git --no-pager -C "\$root" cat-file -e "\$1:./\$rel" 2>/dev/null && git --no-pager -C "\$root" cat-file blob "\$1:./\$rel"; }
+
+if git --no-pager -C "\$root" rev-parse --verify --quiet HEAD >/dev/null; then
+  if b=\$(blob HEAD); then verdict HEAD <<<"\$b"; fi
+fi
+
+if base=\$(cd "\$root" && bash "\$here/base-branch.sh" 2>/dev/null); then
+  for ref in "refs/heads/\$base" "refs/remotes/origin/\$base"; do
+    git --no-pager -C "\$root" show-ref --verify --quiet "\$ref" || continue
+    if b=\$(blob "\$ref"); then verdict "\$ref" <<<"\$b"; fi
+  done
+fi
+
+echo "merge-mode: auto (every copy of \$rel agrees, or none sets merge:)" >&2
+echo auto
+`,
+    executable: true,
+    backend: null,
+    skipIfExists: false,
+  },
+  {
+    category: "spec-root",
+    name: "specify",
+    suffix: "scripts/bash/base-branch.sh",
+    content: `#!/usr/bin/env bash
+# The base branch of this repository — its one home (spec 036, plan § 5).
+#
+# Prints the name on stdout: what origin/HEAD points at (the remote's own
+# default), else the configured \`init.defaultBranch\`. Neither → exit 3,
+# unknown. Callers never substitute \`main\` for unknown: \`/specnaut merge\`
+# stops and asks for the base, and the landing hook gates every landing.
+#
+# Usage: base-branch.sh
+set -euo pipefail
+export GIT_OPTIONAL_LOCKS=0
+
+if ref=\$(git --no-pager symbolic-ref --quiet --short refs/remotes/origin/HEAD 2>/dev/null); then
+  printf '%s\\n' "\${ref#origin/}"
+  exit 0
+fi
+if name=\$(git --no-pager config --get init.defaultBranch 2>/dev/null) && [ -n "\$name" ]; then
+  printf '%s\\n' "\$name"
+  exit 0
+fi
+echo "base-branch: unknown — no origin/HEAD and no init.defaultBranch. Pass the base explicitly, or run: git remote set-head origin --auto" >&2
+exit 3
+`,
+    executable: true,
+    backend: null,
+    skipIfExists: false,
+  },
+  {
+    category: "spec-root",
+    name: "specify",
     suffix: "scripts/bash/size-ratchet.sh",
     content: `#!/usr/bin/env bash
 # Hold every changed file to the constitution's file size limits.
@@ -25850,6 +26440,148 @@ if [ "\${#violations[@]}" -gt 0 ]; then
 fi
 echo "size-ratchet: \$checked \$scope file(s) within the file limits (target \$target, ceiling \$ceiling, source: \$source_label)"
 exit 0
+`,
+    executable: true,
+    backend: null,
+    skipIfExists: false,
+  },
+  {
+    category: "spec-root",
+    name: "specify",
+    suffix: "scripts/bash/groom-rules.sh",
+    content: `#!/usr/bin/env bash
+# groom-rules.sh — what makes a groomed backlog item complete. The ONE home of
+# that rule: \`groom.md\` points here, and each backend's
+# \`.specnaut/scripts/backlog/groom-verify.sh\` only fetches an item, normalises
+# it, and pipes it in. A backend that decided anything itself would be a second
+# copy of the rule set, free to drift from this one.
+#
+# A processed item is complete when it has ALL of:
+#
+#   1. the body sections \`## Why\`, \`## Acceptance criteria\`, \`## Out of scope\`,
+#      each with at least one non-blank line before the next \`#\`/\`##\` heading
+#      (a \`###\` sub-heading is content). A heading with nothing under it is a
+#      template nobody filled in, not a section.
+#   2. exactly one size, one of XS S M L XL;
+#   3. exactly one priority, one of P0 P1 P2 P3. The same value on two surfaces
+#      (a native field and a label) is one value; two different values are two,
+#      and the item is incomplete until one is removed.
+#   4. an outcome: in the ready column, OR a comment whose text starts with the
+#      marker \`🤖 specnaut-groom\`, OR closed with the reason \`not_planned\`.
+#      With \`--ready none\` (the user chose to groom without promoting) the item
+#      stays where it is by design, and the outcome is not checked.
+#
+# Pure: reads stdin, writes stdout, touches nothing else.
+#
+# Input: one JSON object per item, as a stream (one per line is fine):
+#
+#   { "item": "42",              item number, as the backend names it
+#     "body": "…",               the item's description
+#     "sizes": ["M"],            every size value found, on every surface
+#     "priorities": ["P1"],      every priority value found, on every surface
+#     "status": "Ready",         the board column, "" when the item has none
+#     "comments": ["…"] | null,  comment texts; null = this backend cannot read
+#                                them, which counts as no comment, never as one
+#     "state": "open"|"closed",
+#     "closed_reason": "not_planned" | "completed" | "" }
+#
+# A value the backend could not read is passed as absent (an empty list, "",
+# null) — never invented. Missing is the safe direction: it is reported.
+#
+# Usage:  <records> | groom-rules.sh [--ready <column>|none]   (default Ready)
+# Output: one line per incomplete item, nothing for a complete one:
+#           #42: missing ## Why; size (none); outcome (not in Ready, …)
+# Exit:   0 every item complete · 1 at least one incomplete ·
+#         2 usage, \`jq\` missing, no record, or a record it cannot read — it
+#           never answers "complete" for an item it did not see.
+set -euo pipefail
+
+READY="Ready"
+while [ "\$#" -gt 0 ]; do
+  case "\$1" in
+    --ready)
+      [ -n "\${2:-}" ] || { echo "usage: groom-rules.sh [--ready <column>|none] < records" >&2; exit 2; }
+      READY="\$2"
+      shift 2
+      ;;
+    *)
+      echo "groom-rules.sh: unknown argument '\$1'" >&2
+      echo "usage: groom-rules.sh [--ready <column>|none] < records" >&2
+      exit 2
+      ;;
+  esac
+done
+
+if ! command -v jq >/dev/null 2>&1; then
+  echo "groom-rules.sh: jq is required — nothing verified" >&2
+  exit 2
+fi
+
+# shellcheck disable=SC2016  # \$ready, \$l, … are jq variables, not shell ones.
+PROGRAM='
+def strings_or_empty: type == "array" and all(.[]; type == "string");
+
+def readable:
+  type == "object"
+  and ((.item | type) == "string" or (.item | type) == "number")
+  and ((.item | tostring) != "")
+  and (.body | type) == "string"
+  and (.sizes | strings_or_empty)
+  and (.priorities | strings_or_empty)
+  and (.status | type) == "string"
+  and (.comments == null or (.comments | strings_or_empty))
+  and (.state == "open" or .state == "closed")
+  and (.closed_reason | type) == "string";
+
+# A section is filled when its \`##\` heading has a non-blank line under it
+# before the next \`#\` or \`##\` heading.
+def filled(\$heading):
+  reduce (.body | gsub("\\r"; "") | split("\\n"))[] as \$l ({in: false, ok: false};
+    if (\$l | test("^#{1,2}\\\\s")) then .in = (\$l | test("^##\\\\s+" + \$heading + "\\\\s*\$"; "i"))
+    elif .in and (\$l | test("\\\\S")) then .ok = true
+    else . end)
+  | .ok;
+
+def exactly_one(\$axis; \$values; \$allowed):
+  (\$values | map(gsub("^\\\\s+|\\\\s+\$"; "")) | map(select(. != "")) | unique) as \$v
+  | if (\$v | length) == 0 then "\\(\$axis) (none)"
+    elif (\$v | length) > 1 then "\\(\$axis) (\\(\$v | length) values: \\(\$v | join(", ")))"
+    elif any(\$allowed[]; . == \$v[0]) | not then "\\(\$axis) (\\(\$v[0]) is not one of \\(\$allowed | join(" ")))"
+    else empty end;
+
+def marked: any(.comments // [] | .[]; sub("^\\\\s+"; "") | startswith("🤖 specnaut-groom"));
+
+def outcome(\$ready):
+  if \$ready == "none" then empty
+  elif (.status | ascii_downcase) == (\$ready | ascii_downcase) then empty
+  elif .state == "closed" and .closed_reason == "not_planned" then empty
+  elif marked then empty
+  else "outcome (not in \\(\$ready), "
+    + (if .comments == null then "comments unreadable on this backend" else "no 🤖 specnaut-groom comment" end)
+    + ", not closed as not_planned)"
+  end;
+
+[inputs] as \$records
+| if (\$records | length) == 0 then error("no record on stdin") else . end
+| (\$records | map(select(readable | not)) | first) as \$bad
+| if \$bad != null then error("unreadable record: \\(\$bad | tojson | .[0:200])") else . end
+| \$records[]
+| [ (("Why", "Acceptance criteria", "Out of scope") as \$h | if filled(\$h) then empty else "## \\(\$h)" end),
+    exactly_one("size"; .sizes; ["XS", "S", "M", "L", "XL"]),
+    exactly_one("priority"; .priorities; ["P0", "P1", "P2", "P3"]),
+    outcome(\$ready) ] as \$missing
+| select(\$missing | length > 0)
+| "#\\(.item): missing \\(\$missing | join("; "))"
+'
+
+if ! out="\$(jq -n -r --arg ready "\$READY" "\$PROGRAM")"; then
+  echo "groom-rules.sh: could not read the records — nothing verified" >&2
+  exit 2
+fi
+
+[ -n "\$out" ] || exit 0
+printf '%s\\n' "\$out"
+exit 1
 `,
     executable: true,
     backend: null,
@@ -27474,14 +28206,20 @@ full_gate: []
 #                    merge that cannot fast-forward, a push the remote refuses.
 #
 #   merge: manual  — the chain stops at the review verdict and asks once,
-#                    "Ready to merge?". A yes covers the merge, the push and
-#                    the close. Choose this when a human must read every
-#                    change before it lands.
+#                    "Ready to merge?", naming the word to reply: \`merge\`.
+#                    That reply covers the merge, the push and the close.
+#                    Choose this when a human must read every change before
+#                    it lands. A hook enforces it: every merge into, or push
+#                    of, the base branch is held — Claude Code shows its
+#                    permission prompt, Codex refuses — until your own prompt
+#                    in that turn says \`merge\` or \`/specnaut merge\`.
 #
-# A single run overrides this file: \`/specnaut … --manual-merge\`, or "stop
-# before merging" in the request, means manual for that run; "merge it" means
-# auto. Invoking \`/specnaut merge\` yourself is always the instruction to merge
-# and push. \`/specnaut merge --pr\` delivers through a pull request instead of
+# A single run can make the chain stricter: \`/specnaut … --manual-merge\`, or
+# "stop before merging" in the request, means manual for that run. It cannot
+# loosen this file: under \`merge: manual\` a "merge it" earlier in the run moves
+# the chain, but the hook still waits for the word in the turn that lands.
+# Typing \`/specnaut merge\` yourself is always the instruction to merge and
+# push. \`/specnaut merge --pr\` delivers through a pull request instead of
 # a local merge, whichever mode is set here. Remote mode (\`specnaut gate\`)
 # raises its merge-approval gate in both modes.
 #
@@ -27610,8 +28348,9 @@ is taken against that intent by whoever is expert in it, not handed back to the 
    performance forks are settled by the expert seats (\`architect-expert\`, \`security-expert\`,
    \`performance-expert\`) and reported, never put to a vote. Nothing open → no stop.
 2. **The review verdict — only under \`merge: manual\`** in \`.specnaut/workflow.yml\`, or when the
-   run says so (\`--manual-merge\`, "stop before merging"). Asked once; the yes covers the push.
-   Otherwise the chain merges, pushes and closes the item without asking.
+   run says so (\`--manual-merge\`, "stop before merging"). Asked once, naming the word to reply:
+   \`merge\`; that reply covers the push. Otherwise the chain merges, pushes and closes the item
+   without asking.
 
 Every other boundary is crossed by **invoking the next phase yourself, in the same turn** — your own
 next action, never a command printed for someone to paste:
@@ -27646,6 +28385,9 @@ branch ships. Those cycles run before the merge — don't ask again between each
 **\`merge\` and the push are automatic** under \`merge: auto\`, the default — the plan stop was the
 approval, and it is not re-collected. Under \`manual\` the merge is asked for once, **unless the user
 already said to merge**: that is their instruction, followed without a second confirmation.
+**The file is enforced, not just read**: under \`merge: manual\` a hook holds every landing on the base
+branch until the user's own prompt in that turn says \`merge\` — a "yes", or a "merge it" from an
+earlier turn, does not release it. When the hook refuses, say what to type; never route around it.
 
 <!-- --- End Specnaut: chain-stops --- -->
 
@@ -27887,6 +28629,11 @@ export const HARNESS_STATIC: Record<string, Record<string, TemplateFile>> = {
 # Environment variables:
 #   MODEL          Override the model (e.g. "claude-sonnet-4-6").
 #                  Defaults to whatever the agent or claude binary picks.
+#                  A human override for a headless run: the person setting it
+#                  chose the tier. The rule that a Specnaut agent runs on its
+#                  declared model targets a session choosing a tier in an
+#                  Agent/Task call, which .specnaut/hooks/guard-dispatch-model.sh
+#                  refuses; this variable never reaches that hook.
 #   OUTPUT_FORMAT  json | text | stream-json. Defaults to text.
 #
 # Examples:
@@ -28314,7 +29061,10 @@ patterns:
       "Bash(gh run rerun *)",
       "Bash(*release/tag.sh*)",
       "Bash(*release/release-github.sh*)",
-      "Bash(*release/release-gitlab.sh*)"
+      "Bash(*release/release-gitlab.sh*)",
+      "Bash(gh release edit *)",
+      "Bash(gh release upload *)",
+      "Bash(glab release create *)"
     ]
   },
   "hooks": {
@@ -28324,7 +29074,49 @@ patterns:
         "hooks": [
           {
             "type": "command",
-            "command": ".claude/hooks/protect-generated.sh",
+            "command": "bash \\"\$CLAUDE_PROJECT_DIR/.specnaut/hooks/protect-generated.sh\\" claude",
+            "timeout": 5
+          }
+        ]
+      },
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \\"\$CLAUDE_PROJECT_DIR/.specnaut/hooks/guard-merge.sh\\" claude",
+            "timeout": 5
+          }
+        ]
+      },
+      {
+        "matcher": "Agent|Task",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \\"\$CLAUDE_PROJECT_DIR/.specnaut/hooks/guard-dispatch-model.sh\\" claude",
+            "timeout": 5
+          }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \\"\$CLAUDE_PROJECT_DIR/.specnaut/hooks/approve-on-prompt.sh\\" claude",
+            "timeout": 5
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \\"\$CLAUDE_PROJECT_DIR/.specnaut/hooks/approve-on-prompt.sh\\" claude",
             "timeout": 5
           }
         ]
@@ -28335,7 +29127,7 @@ patterns:
         "hooks": [
           {
             "type": "command",
-            "command": ".claude/hooks/log-subagent.sh start",
+            "command": "bash \\"\$CLAUDE_PROJECT_DIR/.specnaut/hooks/log-subagent.sh\\" start",
             "timeout": 5
           }
         ]
@@ -28346,7 +29138,7 @@ patterns:
         "hooks": [
           {
             "type": "command",
-            "command": ".claude/hooks/log-subagent.sh stop",
+            "command": "bash \\"\$CLAUDE_PROJECT_DIR/.specnaut/hooks/log-subagent.sh\\" stop",
             "timeout": 5
           }
         ]
@@ -28382,44 +29174,1015 @@ patterns:
       executable: false,
       mergeJson: "claude-settings",
     },
-    ".claude/hooks/protect-generated.sh": {
-      content: `#!/usr/bin/env bash
-# Soft-warn on edits to Specnaut-generated files.
+    ".specnaut/hooks/_guard.sh": {
+      content: `# shellcheck shell=bash disable=SC2034,SC2016
+# (SC2034: GUARD_*/P_* are read by the sourcing guard. SC2016: the single-
+# quoted strings are jq programs; \`\$v\` is a jq variable.)
+# Sourced prelude of every Specnaut guard — the one home of "how a guard
+# fails" (spec 036, plan § 5, FR-015).
 #
-# Reads a JSON event from stdin (Claude Code's PreToolUse payload), prints
-# a stderr warning if the target is a managed file, then exits 0 — does
-# NOT block. The point is to nudge users who attempt to hand-edit files
-# that get regenerated by \`specnaut upgrade\`, not to enforce.
-set -euo pipefail
+# Claude Code and Codex both let a tool call through on any exit other than 2.
+# A guard that crashes, meets a payload it cannot parse, or runs without jq
+# would therefore allow by failing. Here every such path — the ERR trap, a bad
+# payload, a missing jq, a shape the guard does not know — ends in exit 2 with
+# the reason on stderr. A guard allows only by calling guard_allow.
+#
+# Git runs as read-only plumbing (§ 11 F10): --no-pager, GIT_OPTIONAL_LOCKS=0,
+# fsmonitor off, every expansion quoted, no eval anywhere.
+#
+# Usage (first lines of a guard):
+#   . "\$HOOK_DIR/_guard.sh" || { echo "…_guard.sh missing" >&2; exit 2; }
+#   guard_init <guard-name> "\$@" [field…]   # \$1 = harness: claude | codex
+# guard_init reads stdin once and parses it in ONE jq call (each process
+# spawn costs tens of ms, and a guard runs on every tool call). It sets
+# GUARD_HARNESS, GUARD_CWD (payload cwd, else \$PWD), P_TOOL, P_SESSION,
+# P_TURN, P_MODE (permission_mode), P_EVENT, P_AGENT (agent_id), and GF: one
+# entry per extra field, in order. A field is a jq path, read as a string
+# ("" when absent or null, any other type is a shape error), or prefixed:
+#   any:<path>   any JSON value, as text      argv:<path>  string, or argv as shell words
+#   lines:<path> string, or strings joined by newlines
+set -Eeuo pipefail
+set -f          # words are split on purpose below, never globbed
+export LC_ALL=C # byte-wise string ops: fast, and case folding stays ASCII
+export GIT_OPTIONAL_LOCKS=0 GIT_PAGER=cat PAGER=cat
 
-INPUT=\$(cat || true)
-if [ -z "\$INPUT" ]; then
+GUARD_NAME=hook
+# The approval writer sets 0 after sourcing: it is not a guard, and an exit 2
+# there would block the user's prompt or keep a Claude turn from stopping.
+GUARD_FAIL_CODE=2
+GUARD_ROOT=""
+
+guard_fail() {
+  printf 'specnaut %s: %s\\n' "\$GUARD_NAME" "\$1" >&2
+  exit "\$GUARD_FAIL_CODE"
+}
+trap 'guard_fail "unexpected error at line \$LINENO — refusing rather than allowing"' ERR
+GUARD_ALLOWED=0
+
+# guard_allow — the ONLY way a guard lets a call through.
+guard_allow() {
+  GUARD_ALLOWED=1
   exit 0
-fi
+}
 
-# Extract the target file path. The PreToolUse JSON shape is
-# { "tool_name": "Edit"|"Write", "tool_input": { "file_path": "..." } }.
-FILE=\$(printf '%s' "\$INPUT" | jq -r '.tool_input.file_path // empty' 2>/dev/null || true)
-if [ -z "\$FILE" ]; then
-  exit 0
-fi
+# The net under the ERR trap. A \`set -u\` abort skips the ERR trap and exits 1
+# — "allow" to both harnesses — and under bash 3.2 (macOS's /bin/bash) with
+# \`set -e\` it even exits 0, the EXIT trap seeing \$? = 0. So a 0 counts only
+# when guard_allow said so; every other status becomes the fail code.
+_guard_exit() {
+  local rc=\$?
+  if [ "\$rc" = "\$GUARD_FAIL_CODE" ]; then return 0; fi
+  if [ "\$rc" = 0 ] && [ "\$GUARD_ALLOWED" = 1 ]; then return 0; fi
+  printf 'specnaut %s: unexpected exit %s — refusing rather than allowing\\n' "\$GUARD_NAME" "\$rc" >&2
+  exit "\$GUARD_FAIL_CODE"
+}
+trap _guard_exit EXIT
 
-case "\$FILE" in
-  *.specnaut/installed.lock|*/.specnaut/installed.lock)
-    cat >&2 <<'WARN'
-warn: .specnaut/installed.lock is generated by \`specnaut init\` / \`specnaut
-      upgrade\`. Manual edits will be overwritten by the next upgrade. If
-      you need to change the recorded harness or backend, re-run
-      \`specnaut upgrade\` instead.
-WARN
-    ;;
+# _guard_expr <field> — the jq expression reading one field as a string (into \$e).
+_guard_expr() {
+  local p=\${1#*:} t='if \$v == null then ""
+    elif (\$v | type) == "string" then \$v'
+  case \$1 in
+    any:*) t+=' else (\$v | tojson)' ;;
+    argv:*) t+=' elif (\$v | type) == "array" and all(\$v[]; type == "string") then (\$v | map(@sh) | join(" "))' ;;
+    lines:*) t+=' elif (\$v | type) == "array" and all(\$v[]; type == "string") then (\$v | join("\\n"))' ;;
+    *) p=\$1 ;;
+  esac
+  case \$1 in any:*) ;; *) t+=' else error("shape")' ;; esac
+  e="((\$p) as \\\$v | \$t end)"
+}
+
+guard_init() {
+  local spec prog="" e out
+  GUARD_NAME=\$1
+  case "\${2:-}" in
+    claude | codex) GUARD_HARNESS=\$2 ;;
+    *) guard_fail "first argument must be the harness (claude or codex), got '\${2:-}'" ;;
+  esac
+  command -v jq >/dev/null 2>&1 \\
+    || guard_fail "jq is required and is not on PATH — install jq; until then this hook refuses"
+  GUARD_INPUT=\$(cat)
+  for spec in .cwd .tool_name .session_id .turn_id .permission_mode .hook_event_name .agent_id "\${@:3}"; do
+    _guard_expr "\$spec"
+    prog+="\${prog:+, }\$e"
+  done
+  out=\$(printf '%s' "\$GUARD_INPUT" | jq -j "if type != \\"object\\" then error(\\"not an object\\") else
+    [ \$prog ] | map(gsub(\\"\\\\u001e\\"; \\" \\")) | join(\\"\\\\u001e\\") + \\"\\\\u001e.\\" end" 2>/dev/null) \\
+    || guard_fail "the payload is not JSON, or not of the shape this hook reads — refusing"
+  local IFS=\$'\\x1e'
+  # shellcheck disable=SC2206 # split on the record separator on purpose; set -f is on
+  GF=(\$out)
+  IFS=\$' \\t\\n' # bash 3.2 joins "\${a[@]:n}" with spaces under an IFS without one
+  [ "\${#GF[@]}" = \$((8 + \$# - 2)) ] && [ "\${GF[\${#GF[@]} - 1]}" = . ] \\
+    || guard_fail "the payload did not parse into the fields this hook reads — refusing"
+  GUARD_CWD=\${GF[0]} P_TOOL=\${GF[1]} P_SESSION=\${GF[2]} P_TURN=\${GF[3]} P_MODE=\${GF[4]} P_EVENT=\${GF[5]} P_AGENT=\${GF[6]}
+  GF=("\${GF[@]:7}")
+  unset 'GF[\${#GF[@]}-1]' # the sentinel
+  [ -n "\$GUARD_CWD" ] || GUARD_CWD=\$PWD
+  case \$GUARD_CWD in /*) ;; *) guard_fail "payload cwd '\$GUARD_CWD' is not absolute" ;; esac
+}
+
+# guard_root — GUARD_ROOT: the project whose hooks are running, i.e. the
+# folder above this script's \`.specnaut/hooks/\`. Not the git toplevel: a
+# project without its own .git inside another repository (a workspace member)
+# would be judged against the outer one, and its lock left unprotected.
+# Outside an installed \`.specnaut/hooks/\` (the source tree, its tests): the git
+# toplevel of the payload cwd, else the cwd. Lazy: one git spawn at most.
+guard_root() {
+  [ -z "\$GUARD_ROOT" ] || return 0
+  case \$(cd "\$HOOK_DIR" 2>/dev/null && pwd -P) in
+    */.specnaut/hooks) GUARD_ROOT=\$(cd "\$HOOK_DIR/../.." && pwd -P); return 0 ;;
+  esac
+  if ! GUARD_ROOT=\$(guard_git -C "\$GUARD_CWD" rev-parse --show-toplevel 2>/dev/null); then
+    GUARD_ROOT=\$GUARD_CWD
+  fi
+}
+
+# guard_eq <a> <b> — equal AND non-empty: an absent id never matches an absent id.
+guard_eq() { [ -n "\$1" ] && [ "\$1" = "\$2" ]; }
+
+# guard_ieq <a> <b> — equal ignoring ASCII case (refs and paths on case-folding systems).
+guard_ieq() {
+  local r=1
+  shopt -s nocasematch
+  if [[ \$1 == "\$2" ]]; then r=0; fi
+  shopt -u nocasematch
+  return "\$r"
+}
+
+# guard_git <args…> — git as read-only plumbing (§ 11 F10).
+guard_git() { git --no-pager -c core.fsmonitor=false "\$@"; }
+`,
+      executable: false,
+    },
+    ".specnaut/hooks/_approval.sh": {
+      content: `# shellcheck shell=bash
+# Sourced after _guard.sh. The reader of the turn approval (spec 036, plan § 5,
+# FR-007) — approve-on-prompt.sh is its only writer — and the gate every
+# gated arm resolves through (FR-017).
+#
+# The stamp sits OUTSIDE the workspace, under
+#   \${XDG_STATE_HOME:-\$HOME/.local/state}/specnaut/approvals/<sha256(toplevel)>/<session_id>
+# because Codex's workspace-write sandbox refuses the model's writes there
+# while hooks, spawned unsandboxed, can write it (§ 11 F3, Measured). It holds
+# {session_id, turn_id, kind}. Claude's prompts carry no turn_id: its stamp is
+# scoped to the session and deleted by the Stop hook at the end of the turn.
+
+# approval_session_ok <id> — a session id is a path component; only plain tokens.
+approval_session_ok() { [[ \$1 =~ ^[A-Za-z0-9_-]+\$ ]]; }
+
+# approval_path <session_id> — where this project's stamp for that session lives.
+approval_path() {
+  local state=\${XDG_STATE_HOME:-} hash
+  guard_root
+  case \$state in /*) ;; *) state="\$HOME/.local/state" ;; esac
+  if command -v sha256sum >/dev/null 2>&1; then
+    hash=\$(printf '%s' "\$GUARD_ROOT" | sha256sum)
+  elif command -v shasum >/dev/null 2>&1; then
+    hash=\$(printf '%s' "\$GUARD_ROOT" | shasum -a 256)
+  else
+    guard_fail "neither sha256sum nor shasum is on PATH"
+  fi
+  printf '%s/specnaut/approvals/%s/%s' "\$state" "\${hash%% *}" "\$1"
+}
+
+# approved <kind> — the user's own prompt in THIS turn approved <kind>: the
+# stamp exists, and its session and kind match; its turn_id must match too
+# whenever the payload carries one, which on Codex it always must. Every
+# compare is non-empty: an absent id never matches an absent id.
+approved() {
+  local stamp out
+  local -a f
+  approval_session_ok "\$P_SESSION" || return 1
+  if [ "\$GUARD_HARNESS" = codex ] && [ -z "\$P_TURN" ]; then return 1; fi
+  stamp=\$(approval_path "\$P_SESSION")
+  [ -f "\$stamp" ] || return 1
+  out=\$(jq -j '[.session_id, .kind, .turn_id] | map(if type == "string" then gsub("\\u001e"; " ") else "" end)
+    | join("\\u001e") + "\\u001e."' "\$stamp" 2>/dev/null) || return 1
+  IFS=\$'\\x1e' read -r -a f <<<"\$out"
+  guard_eq "\${f[0]}" "\$P_SESSION" || return 1
+  guard_eq "\${f[1]}" "\$1" || return 1
+  if [ -n "\$P_TURN" ]; then guard_eq "\${f[2]}" "\$P_TURN" || return 1; fi
+  return 0
+}
+
+# approval_gate <kind> <reason> <what the user types> — resolve a gated arm.
+# Claude in default/acceptEdits/plan: its native permission prompt (exit 0 +
+# "ask"). Everywhere else — Claude bypassPermissions/auto/any unknown mode,
+# and Codex, whose "ask" fails open — allowed only on this turn's approval.
+approval_gate() {
+  if [ "\$GUARD_HARNESS" = claude ]; then
+    case \$P_MODE in
+      default | acceptEdits | plan)
+        jq -cn --arg r "\$2" \\
+          '{hookSpecificOutput: {hookEventName: "PreToolUse", permissionDecision: "ask", permissionDecisionReason: \$r}}'
+        guard_allow
+        ;;
+    esac
+  fi
+  if approved "\$1"; then guard_allow; fi
+  guard_fail "\$2. To let it through, reply \$3 — a plain \\"yes\\" does not approve it."
+}
+`,
+      executable: false,
+    },
+    ".specnaut/hooks/_command.sh": {
+      content: `# shellcheck shell=bash disable=SC2034,SC1003
+# (SC2034: the CMD_* results are read by the sourcing guard. SC1003: the case
+# patterns match a literal quote or backslash.)
+# Sourced after _guard.sh by the guards that read a Bash command (guard-merge,
+# guard-release): splits one command line into the simple commands a shell
+# would run, so a rule matches what runs — not text that merely mentions it.
+#
+# A heuristic by design (plan § 6 threat model). It sees: ; && || | & and
+# newlines, ( ) \$( ) and backticks (also inside "…"), quotes and escapes,
+# comments, heredoc bodies (skipped: they are data), \`<<<\` herestrings, \`<<\`
+# inside \`\$((…))\`/\`((…))\` (a shift, not a heredoc), redirections, VAR=val
+# prefixes, the env/command/sudo/nice/… wrappers, and ONE level of
+# \`sh|bash|zsh -c '…'\`. A deeper \`-c\`, or \`eval\`, sets CMD_OPAQUE — and so
+# does a line that never closes: a quote, \`(\`, \`\$(\` or backtick left open, a
+# heredoc whose body never ends. Fail closed: a guard gates what it cannot
+# read rather than guessing at it. Scripts, interpreters and shell functions
+# are not seen: the stated limit.
+#
+# After cmd_parse: CMD_SEGS holds one entry per simple command, its words
+# joined by CMD_SEP, the first word reduced to its basename. CMD_MOVED=1 when
+# the line may act on another repository: cd/pushd, env -C, a GIT_DIR/
+# GIT_WORK_TREE/GIT_CONFIG* assignment (and, through _git.sh's cmd_git,
+# git -C/--git-dir/--work-tree and -c alias.*).
+CMD_SEP=\$'\\x1f'
+# shellcheck source=_simple.sh
+. "\${BASH_SOURCE[0]%/*}/_simple.sh" || guard_fail "_simple.sh is missing beside _command.sh"
+CMD_SEGS=()
+CMD_MOVED=0
+CMD_OPAQUE=0
+
+_cmd_word() { if [ "\$have" = 1 ] || [ -n "\$word" ]; then seg+="\$word\$CMD_SEP"; fi; word=""; have=0; }
+_cmd_end() { _cmd_word; if [ -n "\$seg" ]; then _cmd_emit "\$seg" "\$depth"; fi; seg=""; }
+
+# Skips the bodies of the heredocs opened on the line just ended. A body that
+# runs to the end of the input never closed: as likely a misread as a typo,
+# and what follows a phantom heredoc is hidden — so the line is opaque.
+_cmd_heredocs() {
+  local d strip line closed
+  for d in \$heredocs; do
+    strip=\${d:0:1} d=\${d:1} closed=0
+    while [ "\$i" -lt "\$n" ]; do
+      line=\${s:i}
+      line=\${line%%\$'\\n'*}
+      i=\$((i + \${#line} + 1))
+      if [ "\$strip" = 1 ]; then line=\${line#"\${line%%[!\$'\\t']*}"}; fi
+      if [ "\$line" = "\$d" ]; then closed=1; break; fi
+    done
+    if [ "\$closed" = 0 ]; then CMD_OPAQUE=1; fi
+  done
+  heredocs=""
+}
+
+# Reads the delimiter of the \`<<\` / \`<<-\` heredoc whose operator ends at i and
+# queues it for _cmd_heredocs. Quotes and escapes in it are dropped, as bash does.
+_cmd_heredoc_open() {
+  local strip=0 d="" ch
+  if [ "\${s:i:1}" = "-" ]; then strip=1 i=\$((i + 1)); fi
+  while [ "\${s:i:1}" = " " ]; do i=\$((i + 1)); done
+  while [ "\$i" -lt "\$n" ]; do
+    ch=\${s:i:1}
+    case \$ch in [[:space:]] | ';' | '&' | '|' | '<' | '>' | '(' | ')') break ;; "'" | '"' | '\\') ;; *) d+=\$ch ;; esac
+    i=\$((i + 1))
+  done
+  heredocs+="\$strip\$d\$CMD_SEP"
+}
+
+# A \`(\` just opened a frame: if another follows (\`\$((\`, \`((\`), this is
+# arithmetic, where \`<<\` is a shift. Pushes an "a" frame for the second \`(\`,
+# so the matching \`))\` pops both.
+_cmd_arith() { if [ "\${s:i:1}" = "(" ]; then stack="a\$stack" i=\$((i + 1)); fi; }
+
+# \`<\` at i-1: a plain redirection, a herestring (its word is data, dropped
+# with it by _cmd_emit), a shift inside arithmetic, or a heredoc.
+_cmd_lt() {
+  if [ "\$nx" != "<" ]; then word+=\$c
+  elif [ "\${s:i+1:1}" = "<" ]; then word+="<<<" i=\$((i + 2))
+  else
+    case \$stack in
+      *a*) word+="<<" i=\$((i + 1)) ;;
+      *) _cmd_word; i=\$((i + 1)); _cmd_heredoc_open ;;
+    esac
+  fi
+}
+
+# cmd_parse <command line> [depth]
+cmd_parse() {
+  local s=\$1 depth=\${2:-0} n=\${#1} i=0 c nx q="" word="" have=0 seg="" stack="" bt="" heredocs="" d
+  local IFS=\$CMD_SEP
+  while [ "\$i" -lt "\$n" ]; do
+    c=\${s:i:1} nx=\${s:i+1:1}
+    i=\$((i + 1))
+    if [ "\$q" = "'" ]; then
+      if [ "\$c" = "'" ]; then q=""; else word+=\$c; fi
+    elif [ "\$q" = '"' ]; then
+      case \$c in
+        '\\') case \$nx in '"' | '\\' | '\$' | '\`') word+=\$nx i=\$((i + 1)) ;; \$'\\n') i=\$((i + 1)) ;; *) word+=\$c ;; esac ;;
+        '"') q="" ;;
+        '\$') if [ "\$nx" = "(" ]; then _cmd_end; stack="d\$stack" q="" i=\$((i + 1)); _cmd_arith; else word+=\$c; fi ;;
+        '\`') _cmd_end; bt=d q="" ;;
+        *) word+=\$c ;;
+      esac
+    else
+      case \$c in
+        '\\') if [ "\$nx" != \$'\\n' ]; then word+=\$nx have=1; fi; i=\$((i + 1)) ;;
+        "'" | '"') q=\$c have=1 ;;
+        ' ' | \$'\\t') _cmd_word ;;
+        \$'\\n') _cmd_end; if [ -n "\$heredocs" ]; then _cmd_heredocs; fi ;;
+        ';' | '|') _cmd_end ;;
+        '&') case \$word in *'>' | *'<') word+=\$c ;; *) if [ "\$nx" = ">" ]; then word+=\$c; else _cmd_end; fi ;; esac ;;
+        '\$') if [ "\$nx" = "(" ]; then _cmd_end; stack="u\$stack" i=\$((i + 1)); _cmd_arith; else word+=\$c; fi ;;
+        '(') _cmd_end; stack="u\$stack"; _cmd_arith ;;
+        ')') _cmd_end; if [ "\${stack:0:1}" = d ]; then q='"'; fi; stack=\${stack:1} ;;
+        '\`') _cmd_end; if [ -z "\$bt" ]; then bt=u; elif [ "\$bt" = d ]; then q='"' bt=""; else bt=""; fi ;;
+        '#') if [ -z "\$word" ] && [ "\$have" = 0 ]; then d=\${s:i}; d=\${d%%\$'\\n'*}; i=\$((i + \${#d})); else word+=\$c; fi ;;
+        '<') _cmd_lt ;;
+        *) word+=\$c ;;
+      esac
+    fi
+  done
+  _cmd_end
+  if [ -n "\$q\$stack\$bt\$heredocs" ]; then CMD_OPAQUE=1; fi
+}
+
+# cmd_words <segment> — split a CMD_SEGS entry into the array W.
+# shellcheck disable=SC2206 # split on CMD_SEP on purpose; set -f rules out globbing
+cmd_words() { local IFS=\$CMD_SEP; W=(\$1); }
+
+# cmd_pos — POS: the words of W that are not options. For gh and glab, the
+# value of -R/--repo goes too: they take it before the subcommand, and
+# \`gh -R o/r release create\` must read as \`gh release create\`.
+cmd_pos() {
+  local w skip=0
+  POS=()
+  for w in "\${W[@]}"; do
+    if [ "\$skip" = 1 ]; then skip=0; continue; fi
+    case "\${W[0]}:\$w" in
+      gh:-R | gh:--repo | glab:-R | glab:--repo) skip=1 ;;
+      *:-*) ;;
+      *) POS+=("\$w") ;;
+    esac
+  done
+}
+`,
+      executable: false,
+    },
+    ".specnaut/hooks/_simple.sh": {
+      content: `# shellcheck shell=bash disable=SC2034,SC2153
+# (SC2034/SC2153: CMD_* are shared with _command.sh, which sources this file.)
+# Sourced by _command.sh. What ONE simple command runs, once cmd_parse has cut
+# it out of the line: redirections dropped, VAR=val prefixes and wrappers
+# (env, command, sudo, nice, time, …) skipped, the command word reduced to
+# its basename, and \`sh|bash|zsh -c '…'\` read one level deep — the string is
+# parsed again as a command line; a second level, or a shell fed on stdin, or
+# \`eval\`, sets CMD_OPAQUE instead of being guessed at.
+#
+# The helpers below share _cmd_emit's locals by bash's dynamic scope: v (the
+# words), m (their count) and k (the index of the command word).
+
+_CMD_RE_REDIR='^[0-9]*(>>|>&|<&|<>|>[|]|<<<|>|<)(.*)\$'
+_CMD_RE_AMP='^&>>?(.*)\$'
+
+_cmd_env() { case \${1%%=*} in GIT_DIR | GIT_WORK_TREE | GIT_COMMON_DIR | GIT_INDEX_FILE | GIT_CONFIG*) CMD_MOVED=1 ;; esac; }
+
+# _cmd_strip_redirs <raw segment> — v: its words, each redirection dropped
+# with its target (the next word, when the operator stands alone).
+_cmd_strip_redirs() {
+  local -a w
+  local x skip=0 IFS=\$CMD_SEP
+  # shellcheck disable=SC2206 # split on CMD_SEP on purpose; set -f rules out globbing
+  w=(\$1)
+  IFS=\$' \\t\\n' # bash 3.2 joins "\${a[@]:n}" with spaces under an IFS without one
+  v=()
+  for x in \${w[@]+"\${w[@]}"}; do
+    if [ "\$skip" = 1 ]; then skip=0; continue; fi
+    if [[ \$x =~ \$_CMD_RE_REDIR ]] || [[ \$x =~ \$_CMD_RE_AMP ]]; then
+      [ -n "\${BASH_REMATCH[\${#BASH_REMATCH[@]}-1]}" ] || skip=1
+      continue
+    fi
+    v+=("\$x")
+  done
+  m=\${#v[@]}
+}
+
+# _cmd_skip_prefixes — k: past VAR=val assignments, reserved words and the
+# wrappers that run their argument (env, sudo, nice, command, exec, …).
+_cmd_skip_prefixes() {
+  local x
+  while [ "\$k" -lt "\$m" ]; do
+    x=\${v[k]}
+    if [[ \$x =~ ^[A-Za-z_][A-Za-z0-9_]*= ]]; then _cmd_env "\$x"; k=\$((k + 1)); continue; fi
+    case \$x in
+      '{' | '}' | '!' | if | then | else | elif | do | while | until | time | nohup | exec | command | builtin | noglob)
+        k=\$((k + 1))
+        while [ "\$k" -lt "\$m" ] && [[ \${v[k]} == -* ]]; do k=\$((k + 1)); done ;;
+      env)
+        for ((k = k + 1; k < m; )); do
+          case \${v[k]} in
+            -C | --chdir) CMD_MOVED=1 k=\$((k + 2)) ;;
+            -u | --unset) k=\$((k + 2)) ;;
+            -*) k=\$((k + 1)) ;;
+            *=*) _cmd_env "\${v[k]}"; k=\$((k + 1)) ;;
+            *) break ;;
+          esac
+        done ;;
+      sudo | doas)
+        for ((k = k + 1; k < m; )); do
+          case \${v[k]} in -u | -g | -p | -C | -D | -h | -r | -t | -U) k=\$((k + 2)) ;; -*) k=\$((k + 1)) ;; *) break ;; esac
+        done ;;
+      nice) k=\$((k + 1)); if [ "\${v[k]:-}" = -n ]; then k=\$((k + 2)); elif [[ \${v[k]:-} == -* ]]; then k=\$((k + 1)); fi ;;
+      *) return 0 ;;
+    esac
+  done
+}
+
+# _cmd_shell_c <depth> — v[k] is a shell. \`-c '…'\` at depth 0 is parsed as a
+# command line, deeper it is opaque; either way the shell itself is not
+# recorded (k=m). A script operand becomes the command (k moves to it); no
+# operand at all means commands on stdin: opaque. Always returns 0, so the
+# nested cmd_parse never runs where bash mutes the ERR trap (an \`||\` list).
+_cmd_shell_c() {
+  local x j sawc=0
+  for ((j = k + 1; j < m; j++)); do
+    x=\${v[j]}
+    case \$x in
+      -o | +o | -O | +O) j=\$((j + 1)) ;;
+      --*) ;;
+      -*c*) sawc=1 ;;
+      -* | +*) ;;
+      *)
+        if [ "\$sawc" = 0 ]; then v[j]=\${x##*/} k=\$j; return 0; fi
+        if [ "\$1" = 0 ]; then cmd_parse "\$x" 1; else CMD_OPAQUE=1; fi
+        k=\$m
+        return 0 ;;
+    esac
+  done
+  CMD_OPAQUE=1
+}
+
+# _cmd_emit <raw segment> <depth> — strip redirections, prefixes and wrappers; record the command.
+_cmd_emit() {
+  local -a v
+  local x k=0 m=0 IFS=\$' \\t\\n'
+  _cmd_strip_redirs "\$1"
+  _cmd_skip_prefixes
+  [ "\$k" -lt "\$m" ] || return 0
+  v[k]=\${v[k]##*/}
+  case \${v[k]} in
+    cd | pushd | popd) CMD_MOVED=1 ;;
+    eval) CMD_OPAQUE=1 ;;
+    export | declare | typeset | local | readonly) for x in "\${v[@]:k}"; do _cmd_env "\$x"; done ;;
+    sh | bash | zsh | dash | ksh) _cmd_shell_c "\$2"; [ "\$k" -lt "\$m" ] || return 0 ;;
+  esac
+  IFS=\$CMD_SEP
+  CMD_SEGS+=("\${v[*]:k}")
+}
+`,
+      executable: false,
+    },
+    ".specnaut/hooks/_git.sh": {
+      content: `# shellcheck shell=bash disable=SC2034
+# (SC2034: CMD_MOVED belongs to _command.sh and is read by the guard.)
+# Sourced after _command.sh by the guards that read git commands (guard-merge,
+# guard-release). Reads one \`git\` segment the way git itself would: past its
+# global options, and through its aliases — so \`git -C x -c k=v pm\` is seen as
+# the command it runs, not as an unknown subcommand.
+
+# cmd_git <git words…> — skip git's global options and expand git aliases
+# (up to 5 levels), so \`git -C x -c k=v pm\` is read as the command it runs.
+# Sets GIT_SUB and GIT_ARGS; GIT_SUB is "!" for a shell alias or an alias we
+# cannot follow. git ignores an alias that shadows a builtin, so do we.
+cmd_git() {
+  shift
+  GIT_SUB="" GIT_ARGS=()
+  while [ \$# -gt 0 ]; do
+    case \$1 in
+      -C | --git-dir | --work-tree) CMD_MOVED=1; shift; if [ \$# -gt 0 ]; then shift; fi ;;
+      --git-dir=* | --work-tree=*) CMD_MOVED=1; shift ;;
+      -c | --config-env) if [[ \${2:-} == [Aa][Ll][Ii][Aa][Ss].* ]]; then CMD_MOVED=1; fi; shift; if [ \$# -gt 0 ]; then shift; fi ;;
+      --namespace | --exec-path | --super-prefix) shift; if [ \$# -gt 0 ]; then shift; fi ;;
+      -*) shift ;;
+      *) break ;;
+    esac
+  done
+  [ \$# -gt 0 ] || return 0
+  GIT_SUB=\$1
+  shift
+  GIT_ARGS=("\$@")
+  local level val rc
+  local -a a
+  for level in 1 2 3 4 5; do
+    case \$GIT_SUB in
+      merge | pull | push | checkout | switch | status | log | diff | show | add | commit | fetch | branch | tag | rebase | reset | config | rev-parse | stash) return 0 ;;
+    esac
+    [[ \$GIT_SUB =~ ^[A-Za-z0-9][A-Za-z0-9._-]*\$ ]] || return 0
+    if val=\$(guard_git -C "\$GUARD_CWD" config --get "alias.\$GIT_SUB" 2>/dev/null); then :; else
+      rc=\$?
+      if [ "\$rc" = 1 ]; then return 0; fi # not an alias: a builtin or an unknown command
+      GIT_SUB="!"
+      return 0
+    fi
+    case \$val in '!'* | -*) GIT_SUB="!"; return 0 ;; esac
+    IFS=\$' \\t\\n' read -r -a a <<<"\$val"
+    [ \${#a[@]} -gt 0 ] || return 0
+    GIT_SUB=\${a[0]}
+    GIT_ARGS=(\${a[@]+"\${a[@]:1}"} \${GIT_ARGS[@]+"\${GIT_ARGS[@]}"})
+    if [ "\$level" = 5 ]; then GIT_SUB="!"; fi
+  done
+  return 0
+}
+`,
+      executable: false,
+    },
+    ".specnaut/hooks/approve-on-prompt.sh": {
+      content: `#!/usr/bin/env bash
+# UserPromptSubmit + Stop — the only writer of the turn approval (spec 036,
+# plan § 5, FR-007; D1: minted from the user's prompt, never from a flag the
+# model passes). _approval.sh reads it.
+#
+# On every event the session's stamp is deleted first: an approval never
+# outlives its turn — Stop ends it, the next prompt replaces it. A prompt then
+# mints one only when the WHOLE prompt (trimmed, lowercased, spaces collapsed,
+# a trailing . or ! dropped, an optional leading "yes, ") is one of:
+#   merge    /specnaut merge…  \$specnaut merge…  merge  merge it  land it  push it
+#   release  /ship release…  /ship tag…  \$ship release…  \$ship tag…  release it  tag it
+# Never a bare yes/ok/go: a reply to some other question must not land code.
+# A prompt carrying agent_id comes from a subagent, not the user (§ 11
+# Measured): nothing is minted or deleted for it.
+#
+# Not a guard: every failure exits 0 with the reason on stderr. Exit 2 here
+# would block the user's prompt, or keep a Claude turn from stopping; failing
+# to mint is already the closed outcome.
+case \${BASH_SOURCE[0]} in */*) HOOK_DIR=\${BASH_SOURCE[0]%/*} ;; *) HOOK_DIR=. ;; esac
+# shellcheck source=_guard.sh
+. "\$HOOK_DIR/_guard.sh" || { echo "specnaut: \$HOOK_DIR/_guard.sh is missing" >&2; exit 0; }
+# shellcheck source=_approval.sh
+. "\$HOOK_DIR/_approval.sh"
+GUARD_FAIL_CODE=0
+guard_init approve-on-prompt "\${1:-}" .prompt
+
+# approval_kind_of <prompt> — prints merge, release, or nothing.
+approval_kind_of() {
+  local p
+  p=\$(printf '%s' "\$1" | tr '[:upper:]' '[:lower:]' | tr -s '[:space:]' ' ')
+  p=\${p# }
+  p=\${p% }
+  while :; do
+    case \$p in *. | *!) p=\${p%?} ;; *) break ;; esac
+  done
+  case \$p in "yes, "*) p=\${p#yes, } ;; esac
+  # shellcheck disable=SC2016 # the \$ is literal: Codex invokes skills as \`\$specnaut\`
+  case \$p in
+    merge | "merge it" | "land it" | "push it" | "/specnaut merge" | "/specnaut merge "* | '\$specnaut merge' | '\$specnaut merge '*)
+      echo merge ;;
+    "release it" | "tag it" | "/ship release" | "/ship release "* | "/ship tag" | "/ship tag "* | '\$ship release' | '\$ship release '* | '\$ship tag' | '\$ship tag '*)
+      echo release ;;
+  esac
+}
+
+[ -z "\$P_AGENT" ] || exit 0
+
+approval_session_ok "\$P_SESSION" || guard_fail "session_id is missing or not a plain token — no approval minted"
+stamp=\$(approval_path "\$P_SESSION")
+rm -f "\$stamp"
+
+case \$P_EVENT in
+  Stop) exit 0 ;;
+  UserPromptSubmit) ;;
+  *) guard_fail "unexpected event '\$P_EVENT' — expected UserPromptSubmit or Stop" ;;
 esac
 
-exit 0
+kind=\$(approval_kind_of "\${GF[0]}")
+[ -n "\$kind" ] || exit 0
+if [ "\$GUARD_HARNESS" = codex ] && [ -z "\$P_TURN" ]; then
+  guard_fail "a Codex prompt without turn_id — no approval minted"
+fi
+
+dir=\${stamp%/*}
+mkdir -p "\$dir"
+chmod 700 "\$dir"
+tmp=\$(mktemp "\$dir/.stamp.XXXXXX")
+jq -n --arg s "\$P_SESSION" --arg t "\$P_TURN" --arg k "\$kind" \\
+  '{session_id: \$s, turn_id: \$t, kind: \$k}' >"\$tmp"
+mv -f "\$tmp" "\$stamp"
 `,
       executable: true,
     },
-    ".claude/hooks/log-subagent.sh": {
+    ".specnaut/hooks/guard-merge.sh": {
+      content: `#!/usr/bin/env bash
+# PreToolUse(Bash) — under \`merge: manual\`, nothing lands on the base branch
+# without the user (spec 036: FR-001, FR-016, FR-017, D3). The one home of
+# "does this command land on the base branch" (plan § 5).
+#
+# Inert unless \`.specnaut/scripts/bash/merge-mode.sh --strict\` prints \`manual\`
+# (a missing or failing reader counts as manual). Then, gated:
+#   git merge, git pull  unless HEAD is a branch other than the base, and the
+#                        command neither switches branch nor leaves the repo
+#   git push             unless every refspec is explicit and none lands on
+#                        the base — an allow list (§ 11 F6): no refspec, HEAD
+#                        on the base, :dst deletes, globs, a refspec the
+#                        shell would expand (\$VAR, \`…\`, quotes, ?, [, {),
+#                        --all, --mirror, --delete and unknown options are
+#                        all gated
+#   gh pr merge, glab mr merge, a git shell alias, a line it cannot read
+# An unknown base gates every form. A gated command goes through
+# approval_gate: Claude's own prompt where it can ask, else this turn's
+# \`merge\` approval (FR-017).
+#
+# Usage: guard-merge.sh <claude|codex>   (payload on stdin)
+case \${BASH_SOURCE[0]} in */*) HOOK_DIR=\${BASH_SOURCE[0]%/*} ;; *) HOOK_DIR=. ;; esac
+# shellcheck source=_guard.sh
+. "\$HOOK_DIR/_guard.sh" || { echo "specnaut: \$HOOK_DIR/_guard.sh is missing — refusing" >&2; exit 2; }
+# shellcheck source=_command.sh
+. "\$HOOK_DIR/_command.sh"
+# shellcheck source=_git.sh
+. "\$HOOK_DIR/_git.sh"
+# shellcheck source=_approval.sh
+. "\$HOOK_DIR/_approval.sh"
+guard_init guard-merge "\${1:-}" argv:.tool_input.command
+[ "\$P_TOOL" = Bash ] || guard_fail "expected a Bash tool call, got '\$P_TOOL'"
+[ -n "\${GF[0]}" ] || guard_fail "a Bash call without tool_input.command"
+cmd_parse "\${GF[0]}"
+
+reasons=() pushes=() merges=0 switched=0
+for seg in \${CMD_SEGS[@]+"\${CMD_SEGS[@]}"}; do
+  cmd_words "\$seg"
+  case \${W[0]} in
+    git)
+      cmd_git "\${W[@]}"
+      case \$GIT_SUB in
+        merge | pull) merges=1 ;;
+        push) pushes+=("\$(IFS=\$CMD_SEP; echo "\${GIT_ARGS[*]:-}")") ;;
+        checkout | switch) switched=1 ;;
+        '!') reasons+=("a git alias that runs a shell command") ;;
+      esac ;;
+    gh | glab)
+      cmd_pos
+      case "\${POS[*]}" in "gh pr merge"* | "glab mr merge"*) reasons+=("\${POS[0]} \${POS[1]} merge") ;; esac ;;
+  esac
+done
+if [ "\$CMD_OPAQUE" = 1 ]; then reasons+=("a command it cannot read (eval, sh -c in sh -c, a shell fed on stdin, a quote or heredoc left open)"); fi
+if [ "\$merges" = 0 ] && [ \${#pushes[@]} = 0 ] && [ \${#reasons[@]} = 0 ]; then guard_allow; fi
+
+guard_root
+mode=\$(cd "\$GUARD_ROOT" && bash .specnaut/scripts/bash/merge-mode.sh --strict 2>/dev/null) || mode=manual
+[ "\$mode" != auto ] || guard_allow
+
+if ! base=\$(cd "\$GUARD_ROOT" && bash .specnaut/scripts/bash/base-branch.sh 2>/dev/null); then base=""; fi
+if ! head=\$(guard_git -C "\$GUARD_CWD" symbolic-ref --quiet --short HEAD 2>/dev/null); then head=""; fi
+
+# lands_on_base <ref> — the ref, as a push destination, names the base branch.
+lands_on_base() {
+  local r=\$1
+  case \$r in HEAD | @) r=\$head ;; esac
+  r=\${r#refs/heads/}
+  r=\${r#heads/}
+  [ -z "\$r" ] || guard_ieq "\$r" "\$base"
+}
+
+# A refspec as written: [+]src[:dst], ref-name characters only. Anything else
+# (\$VAR, \`…\`, a glob, a quote) is resolved by the shell after this hook reads
+# it, so what it names is unknown here.
+RE_REFSPEC='^\\+?[A-Za-z0-9._/@-]*(:[A-Za-z0-9._/@-]+)?\$'
+
+# push_allowed <args…> — every refspec explicit, none landing on the base.
+push_allowed() {
+  local a dst skip=0 tags=0
+  local -a pos=()
+  for a in "\$@"; do
+    if [ "\$skip" = 1 ]; then skip=0; continue; fi
+    case \$a in
+      --all | --mirror | --delete | -d | --prune | --branches) return 1 ;;
+      -o | --push-option | --repo | --receive-pack | --exec) skip=1 ;;
+      --tags) tags=1 ;;
+      --push-option=* | --repo=* | --receive-pack=* | --exec=* | --force-with-lease* | --force-if-includes | --recurse-submodules=* | --signed* | --no-signed) ;;
+      --set-upstream | --force | --dry-run | --verbose | --quiet | --follow-tags | --no-follow-tags | --no-verify | --verify | --atomic | --no-atomic | --porcelain | --progress | --no-progress | --thin | --no-thin | --ipv4 | --ipv6) ;;
+      -[ufnvq46]*) [[ \$a =~ ^-[ufnvq46]+\$ ]] || return 1 ;;
+      -*) return 1 ;;
+      *) pos+=("\$a") ;;
+    esac
+  done
+  if [ \${#pos[@]} -le 1 ]; then [ "\$tags" = 1 ] && return 0; return 1; fi
+  for a in "\${pos[@]:1}"; do
+    [[ \$a =~ \$RE_REFSPEC ]] || return 1
+    a=\${a#+}
+    case \$a in *:*) dst=\${a#*:}; [ -n "\${a%%:*}" ] || return 1 ;; *) dst=\$a ;; esac
+    if lands_on_base "\$dst"; then return 1; fi
+  done
+  return 0
+}
+
+if [ "\$merges" = 1 ]; then
+  if [ -z "\$base" ]; then reasons+=("git merge/pull with the base branch unknown")
+  elif [ "\$CMD_MOVED" = 1 ] || [ "\$switched" = 1 ] || [ -z "\$head" ] || guard_ieq "\$head" "\$base"; then
+    reasons+=("git merge/pull onto \$base")
+  fi
+fi
+for p in \${pushes[@]+"\${pushes[@]}"}; do
+  cmd_words "\$p"
+  if [ -z "\$base" ]; then reasons+=("git push with the base branch unknown")
+  elif [ "\$CMD_MOVED" = 1 ]; then reasons+=("git push from another directory or repository")
+  elif ! push_allowed \${W[@]+"\${W[@]}"}; then reasons+=("git push that is not an explicit push of a branch other than \$base")
+  fi
+done
+[ \${#reasons[@]} -gt 0 ] || guard_allow
+
+approval_gate merge \\
+  "merge: manual — \$(IFS=';'; echo "\${reasons[*]}") would land on the base branch (\${base:-unknown}) without the user" \\
+  "\\\`merge\\\` (or \\\`/specnaut merge\\\`)"
+`,
+      executable: true,
+    },
+    ".specnaut/hooks/guard-release.sh": {
+      content: `#!/usr/bin/env bash
+# PreToolUse(Bash), Codex only — publishing a release needs the user (spec
+# 036, US5, FR-006). The one home of "is this Codex release command approved"
+# (plan § 5). Claude holds the same list with permissions.ask, so there this
+# hook exits 0 before reading anything.
+#
+# Refused unless the user's own prompt this turn approved a release (\`release
+# it\`, \`/ship release\`): every command in release-commands.txt, and any push
+# of a tag ref — --tags, --follow-tags, --mirror, push.followTags=true, a
+# refs/tags/ ref, \`tag <name>\`, or a name that is a tag, or not a branch and
+# either version-shaped or created as a tag on the same line (tag.sh and
+# \`git tag\` run before the push does, so the tag does not exist yet when this
+# hook reads the command). And a line too nested to read (eval, sh -c in
+# sh -c, a shell fed on stdin, a line that never closes): fail closed.
+#
+# Usage: guard-release.sh <claude|codex>   (payload on stdin)
+[ "\${1:-}" != claude ] || exit 0
+case \${BASH_SOURCE[0]} in */*) HOOK_DIR=\${BASH_SOURCE[0]%/*} ;; *) HOOK_DIR=. ;; esac
+# shellcheck source=_guard.sh
+. "\$HOOK_DIR/_guard.sh" || { echo "specnaut: \$HOOK_DIR/_guard.sh is missing — refusing" >&2; exit 2; }
+# shellcheck source=_command.sh
+. "\$HOOK_DIR/_command.sh"
+# shellcheck source=_git.sh
+. "\$HOOK_DIR/_git.sh"
+# shellcheck source=_approval.sh
+. "\$HOOK_DIR/_approval.sh"
+guard_init guard-release "\${1:-}" argv:.tool_input.command
+[ "\$P_TOOL" = Bash ] || guard_fail "expected a Bash tool call, got '\$P_TOOL'"
+[ -n "\${GF[0]}" ] || guard_fail "a Bash call without tool_input.command"
+[ -f "\$HOOK_DIR/release-commands.txt" ] || guard_fail "release-commands.txt is missing beside this hook — refusing"
+cmd_parse "\${GF[0]}"
+
+# A git tag ref, by name: an existing tag, or no branch of that name and version-shaped or made on this line.
+is_tag() {
+  local n=\$1
+  case \$n in refs/tags/*) return 0 ;; refs/* | HEAD | @ | '') return 1 ;; esac
+  [[ \$n =~ ^[A-Za-z0-9._/-]+\$ ]] || return 1 # a revision expression (HEAD~1, @{u}), not a ref name
+  if guard_git -C "\$GUARD_CWD" show-ref --verify --quiet "refs/tags/\$n"; then return 0; fi
+  if guard_git -C "\$GUARD_CWD" show-ref --verify --quiet "refs/heads/\$n"; then return 1; fi
+  [ "\$tags_made" = 1 ] || [[ \$n =~ ^v?[0-9]+(\\.[0-9]+)+ ]]
+}
+
+# tag_push <push args…> — the push publishes a tag.
+tag_push() {
+  local a skip=0 follow
+  local -a pos=()
+  follow=\$(guard_git -C "\$GUARD_CWD" config --type=bool --get push.followTags 2>/dev/null) || follow=false
+  [ "\$follow" != true ] || return 0
+  for a in "\$@"; do
+    if [ "\$skip" = 1 ]; then skip=0; continue; fi
+    case \$a in
+      --tags | --follow-tags | --mirror) return 0 ;;
+      -o | --push-option | --repo | --receive-pack | --exec) skip=1 ;;
+      -*) ;;
+      *) pos+=("\$a") ;;
+    esac
+  done
+  for a in \${pos[@]+"\${pos[@]:1}"}; do
+    [ "\$a" != tag ] || return 0
+    a=\${a#+}
+    if is_tag "\${a%%:*}" || { [[ \$a == *:* ]] && is_tag "\${a#*:}"; }; then return 0; fi
+  done
+  return 1
+}
+
+# listed — HIT: the entry of release-commands.txt the segment (W, and POS:
+# its words without options) runs, else "". Always returns 0 and is called
+# bare, never in \`\$(…)\` or a condition: there an error is muted, and a crash
+# would read as "not listed" — an allow.
+listed() {
+  local line entry except i ok w
+  local -a e
+  HIT=""
+  while IFS= read -r line || [ -n "\$line" ]; do
+    case \$line in '' | '#'*) continue ;; esac
+    entry=\${line%% except *} except=""
+    if [ "\$entry" != "\$line" ]; then except=\${line#* except }; fi
+    read -r -a e <<<"\$entry"
+    ok=1
+    for ((i = 0; i < \${#e[@]}; i++)); do
+      if [ "\${e[i]}" != "\${POS[i]:-}" ]; then ok=0; break; fi
+    done
+    [ "\$ok" = 1 ] || continue
+    if [ -n "\$except" ]; then
+      for w in "\${W[@]}"; do if [ "\$w" = "\$except" ]; then continue 2; fi; done
+    fi
+    HIT=\$entry
+    return 0
+  done <"\$HOOK_DIR/release-commands.txt"
+}
+
+tags_made=0 pushes=() hits=()
+for seg in \${CMD_SEGS[@]+"\${CMD_SEGS[@]}"}; do
+  cmd_words "\$seg"
+  if [ "\${W[0]}" = git ]; then
+    cmd_git "\${W[@]}"
+    case \$GIT_SUB in
+      tag) tags_made=1 ;;
+      push) pushes+=("\$(IFS=\$CMD_SEP; echo "\${GIT_ARGS[*]:-}")") ;;
+    esac
+    continue
+  fi
+  [ "\${W[0]}" != tag.sh ] || tags_made=1
+  cmd_pos
+  listed
+  if [ -n "\$HIT" ]; then hits+=("\$HIT"); fi
+done
+if [ "\$CMD_OPAQUE" = 1 ]; then hits+=("a command it cannot read (eval, sh -c in sh -c, a shell fed on stdin, a quote or heredoc left open)"); fi
+for p in \${pushes[@]+"\${pushes[@]}"}; do
+  cmd_words "\$p"
+  if tag_push \${W[@]+"\${W[@]}"}; then hits+=("a push of a tag"); fi
+done
+[ \${#hits[@]} -gt 0 ] || guard_allow
+
+approval_gate release \\
+  "\$(IFS=';'; echo "\${hits[*]}") publishes a release, and Codex needs the user's go-ahead in this turn" \\
+  "\\\`release it\\\` (or \\\`/ship release\\\`)"
+`,
+      executable: true,
+    },
+    ".specnaut/hooks/guard-dispatch-model.sh": {
+      content: `#!/usr/bin/env bash
+# PreToolUse(Agent|Task on Claude, spawn_agent on Codex) — a Specnaut agent
+# runs on the tier its definition declares (spec 036, FR-003). The one home of
+# "does this dispatch override a Specnaut agent's model" (plan § 5); the "no
+# model: override" sentence in the skills stays as the reason, not the rule.
+#
+# Read: Claude tool_input.{subagent_type,model}; Codex
+# tool_input.{agent_type,model,reasoning_effort} — both Codex fields move an
+# agent off its tier (§ 11 Measured). Never the top-level \`model\`: that is the
+# session's own, present in every Codex payload.
+#
+# A Specnaut agent: \`\${name##*:}\` (a plugin prefix dropped) is listed in
+# _agents.txt beside this script, generated from the manifest. An agent file
+# alone is not proof: the user's own agents live there too, and FR-003 never
+# touches them. A name that is not a plain token cannot be checked, so with an
+# override set it is refused (§ 11 F9); so is a missing list. No name is the
+# harness's default agent: never ours.
+#
+# Usage: guard-dispatch-model.sh <claude|codex>   (payload on stdin)
+case \${BASH_SOURCE[0]} in */*) HOOK_DIR=\${BASH_SOURCE[0]%/*} ;; *) HOOK_DIR=. ;; esac
+# shellcheck source=_guard.sh
+. "\$HOOK_DIR/_guard.sh" || { echo "specnaut: \$HOOK_DIR/_guard.sh is missing — refusing" >&2; exit 2; }
+guard_init guard-dispatch-model "\${1:-}" \\
+  .tool_input.subagent_type .tool_input.agent_type any:.tool_input.model any:.tool_input.reasoning_effort
+
+case "\$GUARD_HARNESS:\$P_TOOL" in
+  claude:Agent | claude:Task) name=\${GF[0]} override=\${GF[2]} ;;
+  codex:spawn_agent) name=\${GF[1]} override=\${GF[2]}\${GF[3]} ;;
+  *) guard_fail "expected an agent dispatch, got tool '\$P_TOOL' on \$GUARD_HARNESS" ;;
+esac
+[ -n "\$override" ] || guard_allow
+[ -n "\$name" ] || guard_allow
+[[ \$name =~ ^[A-Za-z0-9:_-]+\$ ]] \\
+  || guard_fail "the agent name '\$name' is not a plain name, so it cannot be checked — dispatch it without a model override"
+
+agent=\${name##*:}
+[ -f "\$HOOK_DIR/_agents.txt" ] \\
+  || guard_fail "\$HOOK_DIR/_agents.txt is missing, so '\$agent' cannot be checked — dispatch it without a model override"
+grep -qxF -- "\$agent" "\$HOOK_DIR/_agents.txt" || guard_allow
+
+guard_fail "'\$agent' is a Specnaut agent: it runs on the model its definition declares, and a dispatch may not choose another tier. Dispatch it again without model or reasoning_effort."
+`,
+      executable: true,
+    },
+    ".specnaut/hooks/protect-generated.sh": {
+      content: `#!/usr/bin/env bash
+# PreToolUse(Edit|Write on Claude, apply_patch on Codex) — the one home of
+# "which files are generated and may not be edited" (spec 036, plan § 5,
+# FR-004). It used to warn and exit 0; the edit went through.
+#
+#   denied  .specnaut/installed.lock — \`specnaut upgrade\` owns it
+#   gated   the gate's own switches: what the landing guard reads or runs, and
+#           what registers it — .specnaut/workflow.yml, .specnaut/hooks/**,
+#           .specnaut/scripts/bash/{merge-mode,base-branch}.sh,
+#           .codex/hooks.json, .claude/settings.json and
+#           .claude/settings.local.json (its \`disableAllHooks\` switches every
+#           guard off). Gated like a merge: Claude's prompt where it can ask,
+#           else this turn's \`merge\` approval.
+#
+# Decided by identity, never by text (§ 11 F5): each target is resolved
+# against the payload cwd, \`.\`/\`..\`/\`//\` collapsed, then its deepest existing
+# ancestor is compared with \`-ef\` to the protected path's, the remainder case-
+# folded — so a symlink, a case variant on APFS, or a path relative to a
+# subdirectory names the same file. Codex paths come from the patch headers
+# \`*** Add|Update|Delete File:\` and \`*** Move to:\` (indented, CRLF, any case);
+# a patch from which no path can be read is refused.
+#
+# Usage: protect-generated.sh <claude|codex>   (payload on stdin)
+case \${BASH_SOURCE[0]} in */*) HOOK_DIR=\${BASH_SOURCE[0]%/*} ;; *) HOOK_DIR=. ;; esac
+# shellcheck source=_guard.sh
+. "\$HOOK_DIR/_guard.sh" || { echo "specnaut: \$HOOK_DIR/_guard.sh is missing — refusing" >&2; exit 2; }
+# shellcheck source=_approval.sh
+. "\$HOOK_DIR/_approval.sh"
+guard_init protect-generated "\${1:-}" .tool_input.file_path .tool_input.notebook_path lines:.tool_input.command
+
+paths=()
+case "\$GUARD_HARNESS:\$P_TOOL" in
+  claude:Edit | claude:Write | claude:MultiEdit) paths=("\${GF[0]}") ;;
+  claude:NotebookEdit) paths=("\${GF[1]}") ;;
+  codex:apply_patch)
+    re_file='^[[:space:]]*\\*\\*\\*[[:space:]]*(add|update|delete)[[:space:]]+file:[[:space:]]*(.*)\$'
+    re_move='^[[:space:]]*\\*\\*\\*[[:space:]]*move[[:space:]]+to:[[:space:]]*(.*)\$'
+    shopt -s nocasematch
+    while IFS= read -r line || [ -n "\$line" ]; do
+      if [[ \$line =~ \$re_file ]]; then p=\${BASH_REMATCH[2]}
+      elif [[ \$line =~ \$re_move ]]; then p=\${BASH_REMATCH[1]}
+      else continue; fi
+      p=\${p%"\${p##*[![:space:]]}"} # trailing blanks, a CRLF's \\r among them
+      if [ -n "\$p" ]; then paths+=("\$p"); fi
+    done <<<"\${GF[2]}"
+    shopt -u nocasematch ;;
+  *) guard_fail "expected an edit, got tool '\$P_TOOL' on \$GUARD_HARNESS" ;;
+esac
+if [ \${#paths[@]} = 0 ] || [ -z "\${paths[0]}" ]; then
+  guard_fail "could not read the file path this \$P_TOOL edits — refusing an edit it cannot check"
+fi
+guard_root
+
+# norm <path> — absolute against the payload cwd, with //, . and .. collapsed.
+norm() {
+  local p=\$1 part out="" IFS=/
+  case \$p in /*) ;; *) p="\$GUARD_CWD/\$p" ;; esac
+  for part in \$p; do
+    case \$part in '' | .) ;; ..) out=\${out%/*} ;; *) out="\$out/\$part" ;; esac
+  done
+  printf '%s' "\${out:-/}"
+}
+
+# names <abs target> <path relative to the root> [under] — the target IS the
+# protected path (with \`under\`: is it, or lies beneath it). Walks up the
+# target; at each existing ancestor, an \`-ef\` match against an existing
+# prefix of the protected path decides, the rest compared case-folded.
+names() {
+  local anc=\$1 rest="" k n r=1
+  local -a pc suf
+  IFS=/ read -r -a pc <<<"\$2"
+  n=\${#pc[@]}
+  suf[n]=""
+  for ((k = n - 1; k >= 0; k--)); do suf[k]="\${pc[k]}\${suf[k + 1]:+/\${suf[k + 1]}}"; done
+  shopt -s nocasematch
+  while [ "\$r" = 1 ]; do
+    if [ -e "\$anc" ]; then
+      local pk=\$GUARD_ROOT
+      for ((k = 0; k <= n; k++)); do
+        [ -e "\$pk" ] || break
+        if [ "\$anc" -ef "\$pk" ]; then
+          if [[ \$rest == "\${suf[k]}" ]]; then r=0; break; fi
+          if [ "\${3:-}" = under ] && { [ -z "\${suf[k]}" ] || [[ \$rest == "\${suf[k]}"/* ]]; }; then r=0; break; fi
+        fi
+        if [ "\$k" -lt "\$n" ]; then pk="\$pk/\${pc[k]}"; fi
+      done
+    fi
+    if [ "\$r" = 0 ] || [ "\$anc" = / ]; then break; fi
+    rest="\${anc##*/}\${rest:+/\$rest}"
+    anc=\${anc%/*}
+    anc=\${anc:-/}
+  done
+  shopt -u nocasematch
+  return "\$r"
+}
+
+denied="" gated=()
+for p in "\${paths[@]}"; do
+  t=\$(norm "\$p")
+  if names "\$t" .specnaut/installed.lock; then denied=\$p; break; fi
+  for g in .specnaut/workflow.yml .specnaut/scripts/bash/merge-mode.sh .specnaut/scripts/bash/base-branch.sh \\
+    .codex/hooks.json .claude/settings.json .claude/settings.local.json; do
+    if names "\$t" "\$g"; then gated+=("\$g"); fi
+  done
+  if names "\$t" .specnaut/hooks under; then gated+=(".specnaut/hooks/"); fi
+done
+
+if [ -n "\$denied" ]; then
+  guard_fail "denied: \$denied is .specnaut/installed.lock. .specnaut/installed.lock is generated by \\\`specnaut init\\\` / \\\`specnaut upgrade\\\`. Manual edits will be overwritten by the next upgrade. If you need to change the recorded harness or backend, re-run \\\`specnaut upgrade\\\` instead."
+fi
+[ \${#gated[@]} -gt 0 ] || guard_allow
+approval_gate merge \\
+  "editing \${gated[*]} changes how Specnaut gates landings on the base branch, so it needs the user" \\
+  "\\\`merge\\\` (or \\\`/specnaut merge\\\`)"
+`,
+      executable: true,
+    },
+    ".specnaut/hooks/log-subagent.sh": {
       content: `#!/usr/bin/env bash
 # Append a structured JSON line to .specnaut/logs/agents.jsonl per
 # subagent start/stop event so workflow audits can read who-dispatched-
@@ -28571,6 +30334,67 @@ exit 0
 `,
       executable: true,
     },
+    ".specnaut/hooks/release-commands.txt": {
+      content: `# The release commands that need the user's go-ahead — the one list (spec 036,
+# plan § 5, FR-006). guard-release.sh refuses each on Codex unless the user's
+# own prompt this turn approved a release; Claude Code's permissions.ask rules
+# are held to this list by Specnaut's own tests.
+#
+# One command per line: the words it starts with. A first word ending in \`.sh\`
+# is a script, matched by its basename however it is reached (a path, or as
+# the argument of sh/bash). \`except <flag>\`: that flag in the same command
+# segment exempts it — \`tag.sh --no-push\` creates a tag and publishes nothing.
+# Any push of a tag ref is gated too; that is a rule, not a word list, and it
+# lives in guard-release.sh.
+tag.sh except --no-push
+release-github.sh
+release-gitlab.sh
+gh release create
+gh release edit
+gh release upload
+glab release create
+gh run rerun
+`,
+      executable: false,
+    },
+    ".specnaut/hooks/_agents.txt": {
+      content: `# The Specnaut agents: one name per line, generated from the Specnaut
+# manifest when the binary is built. guard-dispatch-model.sh reads it.
+accessibility-expert
+architect-expert
+code-reviewer
+dependency-expert
+developer
+devops-sre
+performance-expert
+product-owner
+qa-tester
+review-coordinator
+security-expert
+specnaut-guide
+test-reviewer
+ui-ux-designer
+workflow-manager
+`,
+      executable: false,
+    },
+    ".specnaut/hooks/SHA256SUMS": {
+      content: `49a4f9a91f8b91559f087d02c151d4069575cf466fcd09b21354749f188c16a8  _agents.txt
+0260a671c65563b99032753f6fa60553adbc3849506a6155a280a655e5eee796  _approval.sh
+7556762e50be2b68d2bc432dddded521f736cc06abb084e895c1f1ddf5986039  _command.sh
+1b00c99c5df6ce2e72d39f76103fc58728d785392fb6cc632143d30ebfa1357b  _git.sh
+66ca4cce13eae027438cec506332ccd1fb5f638287361c44912309bb5a63d859  _guard.sh
+7675a9df90d21f2390940870fa8458d09e7418a68de7d682b3f8d6a36a94019c  _simple.sh
+7ef60a25af68fa7d84d1c65c44bc8ce4801f29f83439b858775afa44ea77262d  approve-on-prompt.sh
+624291e9b6c4c7eac986998782110749ef66aa7a95f056d52834800cedfecffe  guard-dispatch-model.sh
+e2f7d4779e26518bea16290522367d452af0fd088d68c9dec18eaa7c0b94e279  guard-merge.sh
+57ee8ff38940b0c31784c8c2f14ba43181e0aee6e53ceaeca7408f73bd84f40a  guard-release.sh
+163962fd20ed5d92b4608a1a3b80210ea5a53250069437bf72f8e99b72ed50f3  log-subagent.sh
+e0afbee104ac094f3b4b3b2bf5353d53cb320ec68351c3178db1b63c14548dd9  protect-generated.sh
+4e0f336ed4eafecca2904fba2aab427d3e8528889aa68e9e347c4ac03dc53853  release-commands.txt
+`,
+      executable: false,
+    },
     ".claude/hooks/check-backlog-prereqs.sh": {
       content: `#!/usr/bin/env bash
 # Self-gates on .specnaut/installed.lock: if the project's backlog
@@ -28631,6 +30455,1317 @@ exit 0
     },
   },
   "codex": {
+    ".specnaut/hooks/_guard.sh": {
+      content: `# shellcheck shell=bash disable=SC2034,SC2016
+# (SC2034: GUARD_*/P_* are read by the sourcing guard. SC2016: the single-
+# quoted strings are jq programs; \`\$v\` is a jq variable.)
+# Sourced prelude of every Specnaut guard — the one home of "how a guard
+# fails" (spec 036, plan § 5, FR-015).
+#
+# Claude Code and Codex both let a tool call through on any exit other than 2.
+# A guard that crashes, meets a payload it cannot parse, or runs without jq
+# would therefore allow by failing. Here every such path — the ERR trap, a bad
+# payload, a missing jq, a shape the guard does not know — ends in exit 2 with
+# the reason on stderr. A guard allows only by calling guard_allow.
+#
+# Git runs as read-only plumbing (§ 11 F10): --no-pager, GIT_OPTIONAL_LOCKS=0,
+# fsmonitor off, every expansion quoted, no eval anywhere.
+#
+# Usage (first lines of a guard):
+#   . "\$HOOK_DIR/_guard.sh" || { echo "…_guard.sh missing" >&2; exit 2; }
+#   guard_init <guard-name> "\$@" [field…]   # \$1 = harness: claude | codex
+# guard_init reads stdin once and parses it in ONE jq call (each process
+# spawn costs tens of ms, and a guard runs on every tool call). It sets
+# GUARD_HARNESS, GUARD_CWD (payload cwd, else \$PWD), P_TOOL, P_SESSION,
+# P_TURN, P_MODE (permission_mode), P_EVENT, P_AGENT (agent_id), and GF: one
+# entry per extra field, in order. A field is a jq path, read as a string
+# ("" when absent or null, any other type is a shape error), or prefixed:
+#   any:<path>   any JSON value, as text      argv:<path>  string, or argv as shell words
+#   lines:<path> string, or strings joined by newlines
+set -Eeuo pipefail
+set -f          # words are split on purpose below, never globbed
+export LC_ALL=C # byte-wise string ops: fast, and case folding stays ASCII
+export GIT_OPTIONAL_LOCKS=0 GIT_PAGER=cat PAGER=cat
+
+GUARD_NAME=hook
+# The approval writer sets 0 after sourcing: it is not a guard, and an exit 2
+# there would block the user's prompt or keep a Claude turn from stopping.
+GUARD_FAIL_CODE=2
+GUARD_ROOT=""
+
+guard_fail() {
+  printf 'specnaut %s: %s\\n' "\$GUARD_NAME" "\$1" >&2
+  exit "\$GUARD_FAIL_CODE"
+}
+trap 'guard_fail "unexpected error at line \$LINENO — refusing rather than allowing"' ERR
+GUARD_ALLOWED=0
+
+# guard_allow — the ONLY way a guard lets a call through.
+guard_allow() {
+  GUARD_ALLOWED=1
+  exit 0
+}
+
+# The net under the ERR trap. A \`set -u\` abort skips the ERR trap and exits 1
+# — "allow" to both harnesses — and under bash 3.2 (macOS's /bin/bash) with
+# \`set -e\` it even exits 0, the EXIT trap seeing \$? = 0. So a 0 counts only
+# when guard_allow said so; every other status becomes the fail code.
+_guard_exit() {
+  local rc=\$?
+  if [ "\$rc" = "\$GUARD_FAIL_CODE" ]; then return 0; fi
+  if [ "\$rc" = 0 ] && [ "\$GUARD_ALLOWED" = 1 ]; then return 0; fi
+  printf 'specnaut %s: unexpected exit %s — refusing rather than allowing\\n' "\$GUARD_NAME" "\$rc" >&2
+  exit "\$GUARD_FAIL_CODE"
+}
+trap _guard_exit EXIT
+
+# _guard_expr <field> — the jq expression reading one field as a string (into \$e).
+_guard_expr() {
+  local p=\${1#*:} t='if \$v == null then ""
+    elif (\$v | type) == "string" then \$v'
+  case \$1 in
+    any:*) t+=' else (\$v | tojson)' ;;
+    argv:*) t+=' elif (\$v | type) == "array" and all(\$v[]; type == "string") then (\$v | map(@sh) | join(" "))' ;;
+    lines:*) t+=' elif (\$v | type) == "array" and all(\$v[]; type == "string") then (\$v | join("\\n"))' ;;
+    *) p=\$1 ;;
+  esac
+  case \$1 in any:*) ;; *) t+=' else error("shape")' ;; esac
+  e="((\$p) as \\\$v | \$t end)"
+}
+
+guard_init() {
+  local spec prog="" e out
+  GUARD_NAME=\$1
+  case "\${2:-}" in
+    claude | codex) GUARD_HARNESS=\$2 ;;
+    *) guard_fail "first argument must be the harness (claude or codex), got '\${2:-}'" ;;
+  esac
+  command -v jq >/dev/null 2>&1 \\
+    || guard_fail "jq is required and is not on PATH — install jq; until then this hook refuses"
+  GUARD_INPUT=\$(cat)
+  for spec in .cwd .tool_name .session_id .turn_id .permission_mode .hook_event_name .agent_id "\${@:3}"; do
+    _guard_expr "\$spec"
+    prog+="\${prog:+, }\$e"
+  done
+  out=\$(printf '%s' "\$GUARD_INPUT" | jq -j "if type != \\"object\\" then error(\\"not an object\\") else
+    [ \$prog ] | map(gsub(\\"\\\\u001e\\"; \\" \\")) | join(\\"\\\\u001e\\") + \\"\\\\u001e.\\" end" 2>/dev/null) \\
+    || guard_fail "the payload is not JSON, or not of the shape this hook reads — refusing"
+  local IFS=\$'\\x1e'
+  # shellcheck disable=SC2206 # split on the record separator on purpose; set -f is on
+  GF=(\$out)
+  IFS=\$' \\t\\n' # bash 3.2 joins "\${a[@]:n}" with spaces under an IFS without one
+  [ "\${#GF[@]}" = \$((8 + \$# - 2)) ] && [ "\${GF[\${#GF[@]} - 1]}" = . ] \\
+    || guard_fail "the payload did not parse into the fields this hook reads — refusing"
+  GUARD_CWD=\${GF[0]} P_TOOL=\${GF[1]} P_SESSION=\${GF[2]} P_TURN=\${GF[3]} P_MODE=\${GF[4]} P_EVENT=\${GF[5]} P_AGENT=\${GF[6]}
+  GF=("\${GF[@]:7}")
+  unset 'GF[\${#GF[@]}-1]' # the sentinel
+  [ -n "\$GUARD_CWD" ] || GUARD_CWD=\$PWD
+  case \$GUARD_CWD in /*) ;; *) guard_fail "payload cwd '\$GUARD_CWD' is not absolute" ;; esac
+}
+
+# guard_root — GUARD_ROOT: the project whose hooks are running, i.e. the
+# folder above this script's \`.specnaut/hooks/\`. Not the git toplevel: a
+# project without its own .git inside another repository (a workspace member)
+# would be judged against the outer one, and its lock left unprotected.
+# Outside an installed \`.specnaut/hooks/\` (the source tree, its tests): the git
+# toplevel of the payload cwd, else the cwd. Lazy: one git spawn at most.
+guard_root() {
+  [ -z "\$GUARD_ROOT" ] || return 0
+  case \$(cd "\$HOOK_DIR" 2>/dev/null && pwd -P) in
+    */.specnaut/hooks) GUARD_ROOT=\$(cd "\$HOOK_DIR/../.." && pwd -P); return 0 ;;
+  esac
+  if ! GUARD_ROOT=\$(guard_git -C "\$GUARD_CWD" rev-parse --show-toplevel 2>/dev/null); then
+    GUARD_ROOT=\$GUARD_CWD
+  fi
+}
+
+# guard_eq <a> <b> — equal AND non-empty: an absent id never matches an absent id.
+guard_eq() { [ -n "\$1" ] && [ "\$1" = "\$2" ]; }
+
+# guard_ieq <a> <b> — equal ignoring ASCII case (refs and paths on case-folding systems).
+guard_ieq() {
+  local r=1
+  shopt -s nocasematch
+  if [[ \$1 == "\$2" ]]; then r=0; fi
+  shopt -u nocasematch
+  return "\$r"
+}
+
+# guard_git <args…> — git as read-only plumbing (§ 11 F10).
+guard_git() { git --no-pager -c core.fsmonitor=false "\$@"; }
+`,
+      executable: false,
+    },
+    ".specnaut/hooks/_approval.sh": {
+      content: `# shellcheck shell=bash
+# Sourced after _guard.sh. The reader of the turn approval (spec 036, plan § 5,
+# FR-007) — approve-on-prompt.sh is its only writer — and the gate every
+# gated arm resolves through (FR-017).
+#
+# The stamp sits OUTSIDE the workspace, under
+#   \${XDG_STATE_HOME:-\$HOME/.local/state}/specnaut/approvals/<sha256(toplevel)>/<session_id>
+# because Codex's workspace-write sandbox refuses the model's writes there
+# while hooks, spawned unsandboxed, can write it (§ 11 F3, Measured). It holds
+# {session_id, turn_id, kind}. Claude's prompts carry no turn_id: its stamp is
+# scoped to the session and deleted by the Stop hook at the end of the turn.
+
+# approval_session_ok <id> — a session id is a path component; only plain tokens.
+approval_session_ok() { [[ \$1 =~ ^[A-Za-z0-9_-]+\$ ]]; }
+
+# approval_path <session_id> — where this project's stamp for that session lives.
+approval_path() {
+  local state=\${XDG_STATE_HOME:-} hash
+  guard_root
+  case \$state in /*) ;; *) state="\$HOME/.local/state" ;; esac
+  if command -v sha256sum >/dev/null 2>&1; then
+    hash=\$(printf '%s' "\$GUARD_ROOT" | sha256sum)
+  elif command -v shasum >/dev/null 2>&1; then
+    hash=\$(printf '%s' "\$GUARD_ROOT" | shasum -a 256)
+  else
+    guard_fail "neither sha256sum nor shasum is on PATH"
+  fi
+  printf '%s/specnaut/approvals/%s/%s' "\$state" "\${hash%% *}" "\$1"
+}
+
+# approved <kind> — the user's own prompt in THIS turn approved <kind>: the
+# stamp exists, and its session and kind match; its turn_id must match too
+# whenever the payload carries one, which on Codex it always must. Every
+# compare is non-empty: an absent id never matches an absent id.
+approved() {
+  local stamp out
+  local -a f
+  approval_session_ok "\$P_SESSION" || return 1
+  if [ "\$GUARD_HARNESS" = codex ] && [ -z "\$P_TURN" ]; then return 1; fi
+  stamp=\$(approval_path "\$P_SESSION")
+  [ -f "\$stamp" ] || return 1
+  out=\$(jq -j '[.session_id, .kind, .turn_id] | map(if type == "string" then gsub("\\u001e"; " ") else "" end)
+    | join("\\u001e") + "\\u001e."' "\$stamp" 2>/dev/null) || return 1
+  IFS=\$'\\x1e' read -r -a f <<<"\$out"
+  guard_eq "\${f[0]}" "\$P_SESSION" || return 1
+  guard_eq "\${f[1]}" "\$1" || return 1
+  if [ -n "\$P_TURN" ]; then guard_eq "\${f[2]}" "\$P_TURN" || return 1; fi
+  return 0
+}
+
+# approval_gate <kind> <reason> <what the user types> — resolve a gated arm.
+# Claude in default/acceptEdits/plan: its native permission prompt (exit 0 +
+# "ask"). Everywhere else — Claude bypassPermissions/auto/any unknown mode,
+# and Codex, whose "ask" fails open — allowed only on this turn's approval.
+approval_gate() {
+  if [ "\$GUARD_HARNESS" = claude ]; then
+    case \$P_MODE in
+      default | acceptEdits | plan)
+        jq -cn --arg r "\$2" \\
+          '{hookSpecificOutput: {hookEventName: "PreToolUse", permissionDecision: "ask", permissionDecisionReason: \$r}}'
+        guard_allow
+        ;;
+    esac
+  fi
+  if approved "\$1"; then guard_allow; fi
+  guard_fail "\$2. To let it through, reply \$3 — a plain \\"yes\\" does not approve it."
+}
+`,
+      executable: false,
+    },
+    ".specnaut/hooks/_command.sh": {
+      content: `# shellcheck shell=bash disable=SC2034,SC1003
+# (SC2034: the CMD_* results are read by the sourcing guard. SC1003: the case
+# patterns match a literal quote or backslash.)
+# Sourced after _guard.sh by the guards that read a Bash command (guard-merge,
+# guard-release): splits one command line into the simple commands a shell
+# would run, so a rule matches what runs — not text that merely mentions it.
+#
+# A heuristic by design (plan § 6 threat model). It sees: ; && || | & and
+# newlines, ( ) \$( ) and backticks (also inside "…"), quotes and escapes,
+# comments, heredoc bodies (skipped: they are data), \`<<<\` herestrings, \`<<\`
+# inside \`\$((…))\`/\`((…))\` (a shift, not a heredoc), redirections, VAR=val
+# prefixes, the env/command/sudo/nice/… wrappers, and ONE level of
+# \`sh|bash|zsh -c '…'\`. A deeper \`-c\`, or \`eval\`, sets CMD_OPAQUE — and so
+# does a line that never closes: a quote, \`(\`, \`\$(\` or backtick left open, a
+# heredoc whose body never ends. Fail closed: a guard gates what it cannot
+# read rather than guessing at it. Scripts, interpreters and shell functions
+# are not seen: the stated limit.
+#
+# After cmd_parse: CMD_SEGS holds one entry per simple command, its words
+# joined by CMD_SEP, the first word reduced to its basename. CMD_MOVED=1 when
+# the line may act on another repository: cd/pushd, env -C, a GIT_DIR/
+# GIT_WORK_TREE/GIT_CONFIG* assignment (and, through _git.sh's cmd_git,
+# git -C/--git-dir/--work-tree and -c alias.*).
+CMD_SEP=\$'\\x1f'
+# shellcheck source=_simple.sh
+. "\${BASH_SOURCE[0]%/*}/_simple.sh" || guard_fail "_simple.sh is missing beside _command.sh"
+CMD_SEGS=()
+CMD_MOVED=0
+CMD_OPAQUE=0
+
+_cmd_word() { if [ "\$have" = 1 ] || [ -n "\$word" ]; then seg+="\$word\$CMD_SEP"; fi; word=""; have=0; }
+_cmd_end() { _cmd_word; if [ -n "\$seg" ]; then _cmd_emit "\$seg" "\$depth"; fi; seg=""; }
+
+# Skips the bodies of the heredocs opened on the line just ended. A body that
+# runs to the end of the input never closed: as likely a misread as a typo,
+# and what follows a phantom heredoc is hidden — so the line is opaque.
+_cmd_heredocs() {
+  local d strip line closed
+  for d in \$heredocs; do
+    strip=\${d:0:1} d=\${d:1} closed=0
+    while [ "\$i" -lt "\$n" ]; do
+      line=\${s:i}
+      line=\${line%%\$'\\n'*}
+      i=\$((i + \${#line} + 1))
+      if [ "\$strip" = 1 ]; then line=\${line#"\${line%%[!\$'\\t']*}"}; fi
+      if [ "\$line" = "\$d" ]; then closed=1; break; fi
+    done
+    if [ "\$closed" = 0 ]; then CMD_OPAQUE=1; fi
+  done
+  heredocs=""
+}
+
+# Reads the delimiter of the \`<<\` / \`<<-\` heredoc whose operator ends at i and
+# queues it for _cmd_heredocs. Quotes and escapes in it are dropped, as bash does.
+_cmd_heredoc_open() {
+  local strip=0 d="" ch
+  if [ "\${s:i:1}" = "-" ]; then strip=1 i=\$((i + 1)); fi
+  while [ "\${s:i:1}" = " " ]; do i=\$((i + 1)); done
+  while [ "\$i" -lt "\$n" ]; do
+    ch=\${s:i:1}
+    case \$ch in [[:space:]] | ';' | '&' | '|' | '<' | '>' | '(' | ')') break ;; "'" | '"' | '\\') ;; *) d+=\$ch ;; esac
+    i=\$((i + 1))
+  done
+  heredocs+="\$strip\$d\$CMD_SEP"
+}
+
+# A \`(\` just opened a frame: if another follows (\`\$((\`, \`((\`), this is
+# arithmetic, where \`<<\` is a shift. Pushes an "a" frame for the second \`(\`,
+# so the matching \`))\` pops both.
+_cmd_arith() { if [ "\${s:i:1}" = "(" ]; then stack="a\$stack" i=\$((i + 1)); fi; }
+
+# \`<\` at i-1: a plain redirection, a herestring (its word is data, dropped
+# with it by _cmd_emit), a shift inside arithmetic, or a heredoc.
+_cmd_lt() {
+  if [ "\$nx" != "<" ]; then word+=\$c
+  elif [ "\${s:i+1:1}" = "<" ]; then word+="<<<" i=\$((i + 2))
+  else
+    case \$stack in
+      *a*) word+="<<" i=\$((i + 1)) ;;
+      *) _cmd_word; i=\$((i + 1)); _cmd_heredoc_open ;;
+    esac
+  fi
+}
+
+# cmd_parse <command line> [depth]
+cmd_parse() {
+  local s=\$1 depth=\${2:-0} n=\${#1} i=0 c nx q="" word="" have=0 seg="" stack="" bt="" heredocs="" d
+  local IFS=\$CMD_SEP
+  while [ "\$i" -lt "\$n" ]; do
+    c=\${s:i:1} nx=\${s:i+1:1}
+    i=\$((i + 1))
+    if [ "\$q" = "'" ]; then
+      if [ "\$c" = "'" ]; then q=""; else word+=\$c; fi
+    elif [ "\$q" = '"' ]; then
+      case \$c in
+        '\\') case \$nx in '"' | '\\' | '\$' | '\`') word+=\$nx i=\$((i + 1)) ;; \$'\\n') i=\$((i + 1)) ;; *) word+=\$c ;; esac ;;
+        '"') q="" ;;
+        '\$') if [ "\$nx" = "(" ]; then _cmd_end; stack="d\$stack" q="" i=\$((i + 1)); _cmd_arith; else word+=\$c; fi ;;
+        '\`') _cmd_end; bt=d q="" ;;
+        *) word+=\$c ;;
+      esac
+    else
+      case \$c in
+        '\\') if [ "\$nx" != \$'\\n' ]; then word+=\$nx have=1; fi; i=\$((i + 1)) ;;
+        "'" | '"') q=\$c have=1 ;;
+        ' ' | \$'\\t') _cmd_word ;;
+        \$'\\n') _cmd_end; if [ -n "\$heredocs" ]; then _cmd_heredocs; fi ;;
+        ';' | '|') _cmd_end ;;
+        '&') case \$word in *'>' | *'<') word+=\$c ;; *) if [ "\$nx" = ">" ]; then word+=\$c; else _cmd_end; fi ;; esac ;;
+        '\$') if [ "\$nx" = "(" ]; then _cmd_end; stack="u\$stack" i=\$((i + 1)); _cmd_arith; else word+=\$c; fi ;;
+        '(') _cmd_end; stack="u\$stack"; _cmd_arith ;;
+        ')') _cmd_end; if [ "\${stack:0:1}" = d ]; then q='"'; fi; stack=\${stack:1} ;;
+        '\`') _cmd_end; if [ -z "\$bt" ]; then bt=u; elif [ "\$bt" = d ]; then q='"' bt=""; else bt=""; fi ;;
+        '#') if [ -z "\$word" ] && [ "\$have" = 0 ]; then d=\${s:i}; d=\${d%%\$'\\n'*}; i=\$((i + \${#d})); else word+=\$c; fi ;;
+        '<') _cmd_lt ;;
+        *) word+=\$c ;;
+      esac
+    fi
+  done
+  _cmd_end
+  if [ -n "\$q\$stack\$bt\$heredocs" ]; then CMD_OPAQUE=1; fi
+}
+
+# cmd_words <segment> — split a CMD_SEGS entry into the array W.
+# shellcheck disable=SC2206 # split on CMD_SEP on purpose; set -f rules out globbing
+cmd_words() { local IFS=\$CMD_SEP; W=(\$1); }
+
+# cmd_pos — POS: the words of W that are not options. For gh and glab, the
+# value of -R/--repo goes too: they take it before the subcommand, and
+# \`gh -R o/r release create\` must read as \`gh release create\`.
+cmd_pos() {
+  local w skip=0
+  POS=()
+  for w in "\${W[@]}"; do
+    if [ "\$skip" = 1 ]; then skip=0; continue; fi
+    case "\${W[0]}:\$w" in
+      gh:-R | gh:--repo | glab:-R | glab:--repo) skip=1 ;;
+      *:-*) ;;
+      *) POS+=("\$w") ;;
+    esac
+  done
+}
+`,
+      executable: false,
+    },
+    ".specnaut/hooks/_simple.sh": {
+      content: `# shellcheck shell=bash disable=SC2034,SC2153
+# (SC2034/SC2153: CMD_* are shared with _command.sh, which sources this file.)
+# Sourced by _command.sh. What ONE simple command runs, once cmd_parse has cut
+# it out of the line: redirections dropped, VAR=val prefixes and wrappers
+# (env, command, sudo, nice, time, …) skipped, the command word reduced to
+# its basename, and \`sh|bash|zsh -c '…'\` read one level deep — the string is
+# parsed again as a command line; a second level, or a shell fed on stdin, or
+# \`eval\`, sets CMD_OPAQUE instead of being guessed at.
+#
+# The helpers below share _cmd_emit's locals by bash's dynamic scope: v (the
+# words), m (their count) and k (the index of the command word).
+
+_CMD_RE_REDIR='^[0-9]*(>>|>&|<&|<>|>[|]|<<<|>|<)(.*)\$'
+_CMD_RE_AMP='^&>>?(.*)\$'
+
+_cmd_env() { case \${1%%=*} in GIT_DIR | GIT_WORK_TREE | GIT_COMMON_DIR | GIT_INDEX_FILE | GIT_CONFIG*) CMD_MOVED=1 ;; esac; }
+
+# _cmd_strip_redirs <raw segment> — v: its words, each redirection dropped
+# with its target (the next word, when the operator stands alone).
+_cmd_strip_redirs() {
+  local -a w
+  local x skip=0 IFS=\$CMD_SEP
+  # shellcheck disable=SC2206 # split on CMD_SEP on purpose; set -f rules out globbing
+  w=(\$1)
+  IFS=\$' \\t\\n' # bash 3.2 joins "\${a[@]:n}" with spaces under an IFS without one
+  v=()
+  for x in \${w[@]+"\${w[@]}"}; do
+    if [ "\$skip" = 1 ]; then skip=0; continue; fi
+    if [[ \$x =~ \$_CMD_RE_REDIR ]] || [[ \$x =~ \$_CMD_RE_AMP ]]; then
+      [ -n "\${BASH_REMATCH[\${#BASH_REMATCH[@]}-1]}" ] || skip=1
+      continue
+    fi
+    v+=("\$x")
+  done
+  m=\${#v[@]}
+}
+
+# _cmd_skip_prefixes — k: past VAR=val assignments, reserved words and the
+# wrappers that run their argument (env, sudo, nice, command, exec, …).
+_cmd_skip_prefixes() {
+  local x
+  while [ "\$k" -lt "\$m" ]; do
+    x=\${v[k]}
+    if [[ \$x =~ ^[A-Za-z_][A-Za-z0-9_]*= ]]; then _cmd_env "\$x"; k=\$((k + 1)); continue; fi
+    case \$x in
+      '{' | '}' | '!' | if | then | else | elif | do | while | until | time | nohup | exec | command | builtin | noglob)
+        k=\$((k + 1))
+        while [ "\$k" -lt "\$m" ] && [[ \${v[k]} == -* ]]; do k=\$((k + 1)); done ;;
+      env)
+        for ((k = k + 1; k < m; )); do
+          case \${v[k]} in
+            -C | --chdir) CMD_MOVED=1 k=\$((k + 2)) ;;
+            -u | --unset) k=\$((k + 2)) ;;
+            -*) k=\$((k + 1)) ;;
+            *=*) _cmd_env "\${v[k]}"; k=\$((k + 1)) ;;
+            *) break ;;
+          esac
+        done ;;
+      sudo | doas)
+        for ((k = k + 1; k < m; )); do
+          case \${v[k]} in -u | -g | -p | -C | -D | -h | -r | -t | -U) k=\$((k + 2)) ;; -*) k=\$((k + 1)) ;; *) break ;; esac
+        done ;;
+      nice) k=\$((k + 1)); if [ "\${v[k]:-}" = -n ]; then k=\$((k + 2)); elif [[ \${v[k]:-} == -* ]]; then k=\$((k + 1)); fi ;;
+      *) return 0 ;;
+    esac
+  done
+}
+
+# _cmd_shell_c <depth> — v[k] is a shell. \`-c '…'\` at depth 0 is parsed as a
+# command line, deeper it is opaque; either way the shell itself is not
+# recorded (k=m). A script operand becomes the command (k moves to it); no
+# operand at all means commands on stdin: opaque. Always returns 0, so the
+# nested cmd_parse never runs where bash mutes the ERR trap (an \`||\` list).
+_cmd_shell_c() {
+  local x j sawc=0
+  for ((j = k + 1; j < m; j++)); do
+    x=\${v[j]}
+    case \$x in
+      -o | +o | -O | +O) j=\$((j + 1)) ;;
+      --*) ;;
+      -*c*) sawc=1 ;;
+      -* | +*) ;;
+      *)
+        if [ "\$sawc" = 0 ]; then v[j]=\${x##*/} k=\$j; return 0; fi
+        if [ "\$1" = 0 ]; then cmd_parse "\$x" 1; else CMD_OPAQUE=1; fi
+        k=\$m
+        return 0 ;;
+    esac
+  done
+  CMD_OPAQUE=1
+}
+
+# _cmd_emit <raw segment> <depth> — strip redirections, prefixes and wrappers; record the command.
+_cmd_emit() {
+  local -a v
+  local x k=0 m=0 IFS=\$' \\t\\n'
+  _cmd_strip_redirs "\$1"
+  _cmd_skip_prefixes
+  [ "\$k" -lt "\$m" ] || return 0
+  v[k]=\${v[k]##*/}
+  case \${v[k]} in
+    cd | pushd | popd) CMD_MOVED=1 ;;
+    eval) CMD_OPAQUE=1 ;;
+    export | declare | typeset | local | readonly) for x in "\${v[@]:k}"; do _cmd_env "\$x"; done ;;
+    sh | bash | zsh | dash | ksh) _cmd_shell_c "\$2"; [ "\$k" -lt "\$m" ] || return 0 ;;
+  esac
+  IFS=\$CMD_SEP
+  CMD_SEGS+=("\${v[*]:k}")
+}
+`,
+      executable: false,
+    },
+    ".specnaut/hooks/_git.sh": {
+      content: `# shellcheck shell=bash disable=SC2034
+# (SC2034: CMD_MOVED belongs to _command.sh and is read by the guard.)
+# Sourced after _command.sh by the guards that read git commands (guard-merge,
+# guard-release). Reads one \`git\` segment the way git itself would: past its
+# global options, and through its aliases — so \`git -C x -c k=v pm\` is seen as
+# the command it runs, not as an unknown subcommand.
+
+# cmd_git <git words…> — skip git's global options and expand git aliases
+# (up to 5 levels), so \`git -C x -c k=v pm\` is read as the command it runs.
+# Sets GIT_SUB and GIT_ARGS; GIT_SUB is "!" for a shell alias or an alias we
+# cannot follow. git ignores an alias that shadows a builtin, so do we.
+cmd_git() {
+  shift
+  GIT_SUB="" GIT_ARGS=()
+  while [ \$# -gt 0 ]; do
+    case \$1 in
+      -C | --git-dir | --work-tree) CMD_MOVED=1; shift; if [ \$# -gt 0 ]; then shift; fi ;;
+      --git-dir=* | --work-tree=*) CMD_MOVED=1; shift ;;
+      -c | --config-env) if [[ \${2:-} == [Aa][Ll][Ii][Aa][Ss].* ]]; then CMD_MOVED=1; fi; shift; if [ \$# -gt 0 ]; then shift; fi ;;
+      --namespace | --exec-path | --super-prefix) shift; if [ \$# -gt 0 ]; then shift; fi ;;
+      -*) shift ;;
+      *) break ;;
+    esac
+  done
+  [ \$# -gt 0 ] || return 0
+  GIT_SUB=\$1
+  shift
+  GIT_ARGS=("\$@")
+  local level val rc
+  local -a a
+  for level in 1 2 3 4 5; do
+    case \$GIT_SUB in
+      merge | pull | push | checkout | switch | status | log | diff | show | add | commit | fetch | branch | tag | rebase | reset | config | rev-parse | stash) return 0 ;;
+    esac
+    [[ \$GIT_SUB =~ ^[A-Za-z0-9][A-Za-z0-9._-]*\$ ]] || return 0
+    if val=\$(guard_git -C "\$GUARD_CWD" config --get "alias.\$GIT_SUB" 2>/dev/null); then :; else
+      rc=\$?
+      if [ "\$rc" = 1 ]; then return 0; fi # not an alias: a builtin or an unknown command
+      GIT_SUB="!"
+      return 0
+    fi
+    case \$val in '!'* | -*) GIT_SUB="!"; return 0 ;; esac
+    IFS=\$' \\t\\n' read -r -a a <<<"\$val"
+    [ \${#a[@]} -gt 0 ] || return 0
+    GIT_SUB=\${a[0]}
+    GIT_ARGS=(\${a[@]+"\${a[@]:1}"} \${GIT_ARGS[@]+"\${GIT_ARGS[@]}"})
+    if [ "\$level" = 5 ]; then GIT_SUB="!"; fi
+  done
+  return 0
+}
+`,
+      executable: false,
+    },
+    ".specnaut/hooks/approve-on-prompt.sh": {
+      content: `#!/usr/bin/env bash
+# UserPromptSubmit + Stop — the only writer of the turn approval (spec 036,
+# plan § 5, FR-007; D1: minted from the user's prompt, never from a flag the
+# model passes). _approval.sh reads it.
+#
+# On every event the session's stamp is deleted first: an approval never
+# outlives its turn — Stop ends it, the next prompt replaces it. A prompt then
+# mints one only when the WHOLE prompt (trimmed, lowercased, spaces collapsed,
+# a trailing . or ! dropped, an optional leading "yes, ") is one of:
+#   merge    /specnaut merge…  \$specnaut merge…  merge  merge it  land it  push it
+#   release  /ship release…  /ship tag…  \$ship release…  \$ship tag…  release it  tag it
+# Never a bare yes/ok/go: a reply to some other question must not land code.
+# A prompt carrying agent_id comes from a subagent, not the user (§ 11
+# Measured): nothing is minted or deleted for it.
+#
+# Not a guard: every failure exits 0 with the reason on stderr. Exit 2 here
+# would block the user's prompt, or keep a Claude turn from stopping; failing
+# to mint is already the closed outcome.
+case \${BASH_SOURCE[0]} in */*) HOOK_DIR=\${BASH_SOURCE[0]%/*} ;; *) HOOK_DIR=. ;; esac
+# shellcheck source=_guard.sh
+. "\$HOOK_DIR/_guard.sh" || { echo "specnaut: \$HOOK_DIR/_guard.sh is missing" >&2; exit 0; }
+# shellcheck source=_approval.sh
+. "\$HOOK_DIR/_approval.sh"
+GUARD_FAIL_CODE=0
+guard_init approve-on-prompt "\${1:-}" .prompt
+
+# approval_kind_of <prompt> — prints merge, release, or nothing.
+approval_kind_of() {
+  local p
+  p=\$(printf '%s' "\$1" | tr '[:upper:]' '[:lower:]' | tr -s '[:space:]' ' ')
+  p=\${p# }
+  p=\${p% }
+  while :; do
+    case \$p in *. | *!) p=\${p%?} ;; *) break ;; esac
+  done
+  case \$p in "yes, "*) p=\${p#yes, } ;; esac
+  # shellcheck disable=SC2016 # the \$ is literal: Codex invokes skills as \`\$specnaut\`
+  case \$p in
+    merge | "merge it" | "land it" | "push it" | "/specnaut merge" | "/specnaut merge "* | '\$specnaut merge' | '\$specnaut merge '*)
+      echo merge ;;
+    "release it" | "tag it" | "/ship release" | "/ship release "* | "/ship tag" | "/ship tag "* | '\$ship release' | '\$ship release '* | '\$ship tag' | '\$ship tag '*)
+      echo release ;;
+  esac
+}
+
+[ -z "\$P_AGENT" ] || exit 0
+
+approval_session_ok "\$P_SESSION" || guard_fail "session_id is missing or not a plain token — no approval minted"
+stamp=\$(approval_path "\$P_SESSION")
+rm -f "\$stamp"
+
+case \$P_EVENT in
+  Stop) exit 0 ;;
+  UserPromptSubmit) ;;
+  *) guard_fail "unexpected event '\$P_EVENT' — expected UserPromptSubmit or Stop" ;;
+esac
+
+kind=\$(approval_kind_of "\${GF[0]}")
+[ -n "\$kind" ] || exit 0
+if [ "\$GUARD_HARNESS" = codex ] && [ -z "\$P_TURN" ]; then
+  guard_fail "a Codex prompt without turn_id — no approval minted"
+fi
+
+dir=\${stamp%/*}
+mkdir -p "\$dir"
+chmod 700 "\$dir"
+tmp=\$(mktemp "\$dir/.stamp.XXXXXX")
+jq -n --arg s "\$P_SESSION" --arg t "\$P_TURN" --arg k "\$kind" \\
+  '{session_id: \$s, turn_id: \$t, kind: \$k}' >"\$tmp"
+mv -f "\$tmp" "\$stamp"
+`,
+      executable: true,
+    },
+    ".specnaut/hooks/guard-merge.sh": {
+      content: `#!/usr/bin/env bash
+# PreToolUse(Bash) — under \`merge: manual\`, nothing lands on the base branch
+# without the user (spec 036: FR-001, FR-016, FR-017, D3). The one home of
+# "does this command land on the base branch" (plan § 5).
+#
+# Inert unless \`.specnaut/scripts/bash/merge-mode.sh --strict\` prints \`manual\`
+# (a missing or failing reader counts as manual). Then, gated:
+#   git merge, git pull  unless HEAD is a branch other than the base, and the
+#                        command neither switches branch nor leaves the repo
+#   git push             unless every refspec is explicit and none lands on
+#                        the base — an allow list (§ 11 F6): no refspec, HEAD
+#                        on the base, :dst deletes, globs, a refspec the
+#                        shell would expand (\$VAR, \`…\`, quotes, ?, [, {),
+#                        --all, --mirror, --delete and unknown options are
+#                        all gated
+#   gh pr merge, glab mr merge, a git shell alias, a line it cannot read
+# An unknown base gates every form. A gated command goes through
+# approval_gate: Claude's own prompt where it can ask, else this turn's
+# \`merge\` approval (FR-017).
+#
+# Usage: guard-merge.sh <claude|codex>   (payload on stdin)
+case \${BASH_SOURCE[0]} in */*) HOOK_DIR=\${BASH_SOURCE[0]%/*} ;; *) HOOK_DIR=. ;; esac
+# shellcheck source=_guard.sh
+. "\$HOOK_DIR/_guard.sh" || { echo "specnaut: \$HOOK_DIR/_guard.sh is missing — refusing" >&2; exit 2; }
+# shellcheck source=_command.sh
+. "\$HOOK_DIR/_command.sh"
+# shellcheck source=_git.sh
+. "\$HOOK_DIR/_git.sh"
+# shellcheck source=_approval.sh
+. "\$HOOK_DIR/_approval.sh"
+guard_init guard-merge "\${1:-}" argv:.tool_input.command
+[ "\$P_TOOL" = Bash ] || guard_fail "expected a Bash tool call, got '\$P_TOOL'"
+[ -n "\${GF[0]}" ] || guard_fail "a Bash call without tool_input.command"
+cmd_parse "\${GF[0]}"
+
+reasons=() pushes=() merges=0 switched=0
+for seg in \${CMD_SEGS[@]+"\${CMD_SEGS[@]}"}; do
+  cmd_words "\$seg"
+  case \${W[0]} in
+    git)
+      cmd_git "\${W[@]}"
+      case \$GIT_SUB in
+        merge | pull) merges=1 ;;
+        push) pushes+=("\$(IFS=\$CMD_SEP; echo "\${GIT_ARGS[*]:-}")") ;;
+        checkout | switch) switched=1 ;;
+        '!') reasons+=("a git alias that runs a shell command") ;;
+      esac ;;
+    gh | glab)
+      cmd_pos
+      case "\${POS[*]}" in "gh pr merge"* | "glab mr merge"*) reasons+=("\${POS[0]} \${POS[1]} merge") ;; esac ;;
+  esac
+done
+if [ "\$CMD_OPAQUE" = 1 ]; then reasons+=("a command it cannot read (eval, sh -c in sh -c, a shell fed on stdin, a quote or heredoc left open)"); fi
+if [ "\$merges" = 0 ] && [ \${#pushes[@]} = 0 ] && [ \${#reasons[@]} = 0 ]; then guard_allow; fi
+
+guard_root
+mode=\$(cd "\$GUARD_ROOT" && bash .specnaut/scripts/bash/merge-mode.sh --strict 2>/dev/null) || mode=manual
+[ "\$mode" != auto ] || guard_allow
+
+if ! base=\$(cd "\$GUARD_ROOT" && bash .specnaut/scripts/bash/base-branch.sh 2>/dev/null); then base=""; fi
+if ! head=\$(guard_git -C "\$GUARD_CWD" symbolic-ref --quiet --short HEAD 2>/dev/null); then head=""; fi
+
+# lands_on_base <ref> — the ref, as a push destination, names the base branch.
+lands_on_base() {
+  local r=\$1
+  case \$r in HEAD | @) r=\$head ;; esac
+  r=\${r#refs/heads/}
+  r=\${r#heads/}
+  [ -z "\$r" ] || guard_ieq "\$r" "\$base"
+}
+
+# A refspec as written: [+]src[:dst], ref-name characters only. Anything else
+# (\$VAR, \`…\`, a glob, a quote) is resolved by the shell after this hook reads
+# it, so what it names is unknown here.
+RE_REFSPEC='^\\+?[A-Za-z0-9._/@-]*(:[A-Za-z0-9._/@-]+)?\$'
+
+# push_allowed <args…> — every refspec explicit, none landing on the base.
+push_allowed() {
+  local a dst skip=0 tags=0
+  local -a pos=()
+  for a in "\$@"; do
+    if [ "\$skip" = 1 ]; then skip=0; continue; fi
+    case \$a in
+      --all | --mirror | --delete | -d | --prune | --branches) return 1 ;;
+      -o | --push-option | --repo | --receive-pack | --exec) skip=1 ;;
+      --tags) tags=1 ;;
+      --push-option=* | --repo=* | --receive-pack=* | --exec=* | --force-with-lease* | --force-if-includes | --recurse-submodules=* | --signed* | --no-signed) ;;
+      --set-upstream | --force | --dry-run | --verbose | --quiet | --follow-tags | --no-follow-tags | --no-verify | --verify | --atomic | --no-atomic | --porcelain | --progress | --no-progress | --thin | --no-thin | --ipv4 | --ipv6) ;;
+      -[ufnvq46]*) [[ \$a =~ ^-[ufnvq46]+\$ ]] || return 1 ;;
+      -*) return 1 ;;
+      *) pos+=("\$a") ;;
+    esac
+  done
+  if [ \${#pos[@]} -le 1 ]; then [ "\$tags" = 1 ] && return 0; return 1; fi
+  for a in "\${pos[@]:1}"; do
+    [[ \$a =~ \$RE_REFSPEC ]] || return 1
+    a=\${a#+}
+    case \$a in *:*) dst=\${a#*:}; [ -n "\${a%%:*}" ] || return 1 ;; *) dst=\$a ;; esac
+    if lands_on_base "\$dst"; then return 1; fi
+  done
+  return 0
+}
+
+if [ "\$merges" = 1 ]; then
+  if [ -z "\$base" ]; then reasons+=("git merge/pull with the base branch unknown")
+  elif [ "\$CMD_MOVED" = 1 ] || [ "\$switched" = 1 ] || [ -z "\$head" ] || guard_ieq "\$head" "\$base"; then
+    reasons+=("git merge/pull onto \$base")
+  fi
+fi
+for p in \${pushes[@]+"\${pushes[@]}"}; do
+  cmd_words "\$p"
+  if [ -z "\$base" ]; then reasons+=("git push with the base branch unknown")
+  elif [ "\$CMD_MOVED" = 1 ]; then reasons+=("git push from another directory or repository")
+  elif ! push_allowed \${W[@]+"\${W[@]}"}; then reasons+=("git push that is not an explicit push of a branch other than \$base")
+  fi
+done
+[ \${#reasons[@]} -gt 0 ] || guard_allow
+
+approval_gate merge \\
+  "merge: manual — \$(IFS=';'; echo "\${reasons[*]}") would land on the base branch (\${base:-unknown}) without the user" \\
+  "\\\`merge\\\` (or \\\`/specnaut merge\\\`)"
+`,
+      executable: true,
+    },
+    ".specnaut/hooks/guard-release.sh": {
+      content: `#!/usr/bin/env bash
+# PreToolUse(Bash), Codex only — publishing a release needs the user (spec
+# 036, US5, FR-006). The one home of "is this Codex release command approved"
+# (plan § 5). Claude holds the same list with permissions.ask, so there this
+# hook exits 0 before reading anything.
+#
+# Refused unless the user's own prompt this turn approved a release (\`release
+# it\`, \`/ship release\`): every command in release-commands.txt, and any push
+# of a tag ref — --tags, --follow-tags, --mirror, push.followTags=true, a
+# refs/tags/ ref, \`tag <name>\`, or a name that is a tag, or not a branch and
+# either version-shaped or created as a tag on the same line (tag.sh and
+# \`git tag\` run before the push does, so the tag does not exist yet when this
+# hook reads the command). And a line too nested to read (eval, sh -c in
+# sh -c, a shell fed on stdin, a line that never closes): fail closed.
+#
+# Usage: guard-release.sh <claude|codex>   (payload on stdin)
+[ "\${1:-}" != claude ] || exit 0
+case \${BASH_SOURCE[0]} in */*) HOOK_DIR=\${BASH_SOURCE[0]%/*} ;; *) HOOK_DIR=. ;; esac
+# shellcheck source=_guard.sh
+. "\$HOOK_DIR/_guard.sh" || { echo "specnaut: \$HOOK_DIR/_guard.sh is missing — refusing" >&2; exit 2; }
+# shellcheck source=_command.sh
+. "\$HOOK_DIR/_command.sh"
+# shellcheck source=_git.sh
+. "\$HOOK_DIR/_git.sh"
+# shellcheck source=_approval.sh
+. "\$HOOK_DIR/_approval.sh"
+guard_init guard-release "\${1:-}" argv:.tool_input.command
+[ "\$P_TOOL" = Bash ] || guard_fail "expected a Bash tool call, got '\$P_TOOL'"
+[ -n "\${GF[0]}" ] || guard_fail "a Bash call without tool_input.command"
+[ -f "\$HOOK_DIR/release-commands.txt" ] || guard_fail "release-commands.txt is missing beside this hook — refusing"
+cmd_parse "\${GF[0]}"
+
+# A git tag ref, by name: an existing tag, or no branch of that name and version-shaped or made on this line.
+is_tag() {
+  local n=\$1
+  case \$n in refs/tags/*) return 0 ;; refs/* | HEAD | @ | '') return 1 ;; esac
+  [[ \$n =~ ^[A-Za-z0-9._/-]+\$ ]] || return 1 # a revision expression (HEAD~1, @{u}), not a ref name
+  if guard_git -C "\$GUARD_CWD" show-ref --verify --quiet "refs/tags/\$n"; then return 0; fi
+  if guard_git -C "\$GUARD_CWD" show-ref --verify --quiet "refs/heads/\$n"; then return 1; fi
+  [ "\$tags_made" = 1 ] || [[ \$n =~ ^v?[0-9]+(\\.[0-9]+)+ ]]
+}
+
+# tag_push <push args…> — the push publishes a tag.
+tag_push() {
+  local a skip=0 follow
+  local -a pos=()
+  follow=\$(guard_git -C "\$GUARD_CWD" config --type=bool --get push.followTags 2>/dev/null) || follow=false
+  [ "\$follow" != true ] || return 0
+  for a in "\$@"; do
+    if [ "\$skip" = 1 ]; then skip=0; continue; fi
+    case \$a in
+      --tags | --follow-tags | --mirror) return 0 ;;
+      -o | --push-option | --repo | --receive-pack | --exec) skip=1 ;;
+      -*) ;;
+      *) pos+=("\$a") ;;
+    esac
+  done
+  for a in \${pos[@]+"\${pos[@]:1}"}; do
+    [ "\$a" != tag ] || return 0
+    a=\${a#+}
+    if is_tag "\${a%%:*}" || { [[ \$a == *:* ]] && is_tag "\${a#*:}"; }; then return 0; fi
+  done
+  return 1
+}
+
+# listed — HIT: the entry of release-commands.txt the segment (W, and POS:
+# its words without options) runs, else "". Always returns 0 and is called
+# bare, never in \`\$(…)\` or a condition: there an error is muted, and a crash
+# would read as "not listed" — an allow.
+listed() {
+  local line entry except i ok w
+  local -a e
+  HIT=""
+  while IFS= read -r line || [ -n "\$line" ]; do
+    case \$line in '' | '#'*) continue ;; esac
+    entry=\${line%% except *} except=""
+    if [ "\$entry" != "\$line" ]; then except=\${line#* except }; fi
+    read -r -a e <<<"\$entry"
+    ok=1
+    for ((i = 0; i < \${#e[@]}; i++)); do
+      if [ "\${e[i]}" != "\${POS[i]:-}" ]; then ok=0; break; fi
+    done
+    [ "\$ok" = 1 ] || continue
+    if [ -n "\$except" ]; then
+      for w in "\${W[@]}"; do if [ "\$w" = "\$except" ]; then continue 2; fi; done
+    fi
+    HIT=\$entry
+    return 0
+  done <"\$HOOK_DIR/release-commands.txt"
+}
+
+tags_made=0 pushes=() hits=()
+for seg in \${CMD_SEGS[@]+"\${CMD_SEGS[@]}"}; do
+  cmd_words "\$seg"
+  if [ "\${W[0]}" = git ]; then
+    cmd_git "\${W[@]}"
+    case \$GIT_SUB in
+      tag) tags_made=1 ;;
+      push) pushes+=("\$(IFS=\$CMD_SEP; echo "\${GIT_ARGS[*]:-}")") ;;
+    esac
+    continue
+  fi
+  [ "\${W[0]}" != tag.sh ] || tags_made=1
+  cmd_pos
+  listed
+  if [ -n "\$HIT" ]; then hits+=("\$HIT"); fi
+done
+if [ "\$CMD_OPAQUE" = 1 ]; then hits+=("a command it cannot read (eval, sh -c in sh -c, a shell fed on stdin, a quote or heredoc left open)"); fi
+for p in \${pushes[@]+"\${pushes[@]}"}; do
+  cmd_words "\$p"
+  if tag_push \${W[@]+"\${W[@]}"}; then hits+=("a push of a tag"); fi
+done
+[ \${#hits[@]} -gt 0 ] || guard_allow
+
+approval_gate release \\
+  "\$(IFS=';'; echo "\${hits[*]}") publishes a release, and Codex needs the user's go-ahead in this turn" \\
+  "\\\`release it\\\` (or \\\`/ship release\\\`)"
+`,
+      executable: true,
+    },
+    ".specnaut/hooks/guard-dispatch-model.sh": {
+      content: `#!/usr/bin/env bash
+# PreToolUse(Agent|Task on Claude, spawn_agent on Codex) — a Specnaut agent
+# runs on the tier its definition declares (spec 036, FR-003). The one home of
+# "does this dispatch override a Specnaut agent's model" (plan § 5); the "no
+# model: override" sentence in the skills stays as the reason, not the rule.
+#
+# Read: Claude tool_input.{subagent_type,model}; Codex
+# tool_input.{agent_type,model,reasoning_effort} — both Codex fields move an
+# agent off its tier (§ 11 Measured). Never the top-level \`model\`: that is the
+# session's own, present in every Codex payload.
+#
+# A Specnaut agent: \`\${name##*:}\` (a plugin prefix dropped) is listed in
+# _agents.txt beside this script, generated from the manifest. An agent file
+# alone is not proof: the user's own agents live there too, and FR-003 never
+# touches them. A name that is not a plain token cannot be checked, so with an
+# override set it is refused (§ 11 F9); so is a missing list. No name is the
+# harness's default agent: never ours.
+#
+# Usage: guard-dispatch-model.sh <claude|codex>   (payload on stdin)
+case \${BASH_SOURCE[0]} in */*) HOOK_DIR=\${BASH_SOURCE[0]%/*} ;; *) HOOK_DIR=. ;; esac
+# shellcheck source=_guard.sh
+. "\$HOOK_DIR/_guard.sh" || { echo "specnaut: \$HOOK_DIR/_guard.sh is missing — refusing" >&2; exit 2; }
+guard_init guard-dispatch-model "\${1:-}" \\
+  .tool_input.subagent_type .tool_input.agent_type any:.tool_input.model any:.tool_input.reasoning_effort
+
+case "\$GUARD_HARNESS:\$P_TOOL" in
+  claude:Agent | claude:Task) name=\${GF[0]} override=\${GF[2]} ;;
+  codex:spawn_agent) name=\${GF[1]} override=\${GF[2]}\${GF[3]} ;;
+  *) guard_fail "expected an agent dispatch, got tool '\$P_TOOL' on \$GUARD_HARNESS" ;;
+esac
+[ -n "\$override" ] || guard_allow
+[ -n "\$name" ] || guard_allow
+[[ \$name =~ ^[A-Za-z0-9:_-]+\$ ]] \\
+  || guard_fail "the agent name '\$name' is not a plain name, so it cannot be checked — dispatch it without a model override"
+
+agent=\${name##*:}
+[ -f "\$HOOK_DIR/_agents.txt" ] \\
+  || guard_fail "\$HOOK_DIR/_agents.txt is missing, so '\$agent' cannot be checked — dispatch it without a model override"
+grep -qxF -- "\$agent" "\$HOOK_DIR/_agents.txt" || guard_allow
+
+guard_fail "'\$agent' is a Specnaut agent: it runs on the model its definition declares, and a dispatch may not choose another tier. Dispatch it again without model or reasoning_effort."
+`,
+      executable: true,
+    },
+    ".specnaut/hooks/protect-generated.sh": {
+      content: `#!/usr/bin/env bash
+# PreToolUse(Edit|Write on Claude, apply_patch on Codex) — the one home of
+# "which files are generated and may not be edited" (spec 036, plan § 5,
+# FR-004). It used to warn and exit 0; the edit went through.
+#
+#   denied  .specnaut/installed.lock — \`specnaut upgrade\` owns it
+#   gated   the gate's own switches: what the landing guard reads or runs, and
+#           what registers it — .specnaut/workflow.yml, .specnaut/hooks/**,
+#           .specnaut/scripts/bash/{merge-mode,base-branch}.sh,
+#           .codex/hooks.json, .claude/settings.json and
+#           .claude/settings.local.json (its \`disableAllHooks\` switches every
+#           guard off). Gated like a merge: Claude's prompt where it can ask,
+#           else this turn's \`merge\` approval.
+#
+# Decided by identity, never by text (§ 11 F5): each target is resolved
+# against the payload cwd, \`.\`/\`..\`/\`//\` collapsed, then its deepest existing
+# ancestor is compared with \`-ef\` to the protected path's, the remainder case-
+# folded — so a symlink, a case variant on APFS, or a path relative to a
+# subdirectory names the same file. Codex paths come from the patch headers
+# \`*** Add|Update|Delete File:\` and \`*** Move to:\` (indented, CRLF, any case);
+# a patch from which no path can be read is refused.
+#
+# Usage: protect-generated.sh <claude|codex>   (payload on stdin)
+case \${BASH_SOURCE[0]} in */*) HOOK_DIR=\${BASH_SOURCE[0]%/*} ;; *) HOOK_DIR=. ;; esac
+# shellcheck source=_guard.sh
+. "\$HOOK_DIR/_guard.sh" || { echo "specnaut: \$HOOK_DIR/_guard.sh is missing — refusing" >&2; exit 2; }
+# shellcheck source=_approval.sh
+. "\$HOOK_DIR/_approval.sh"
+guard_init protect-generated "\${1:-}" .tool_input.file_path .tool_input.notebook_path lines:.tool_input.command
+
+paths=()
+case "\$GUARD_HARNESS:\$P_TOOL" in
+  claude:Edit | claude:Write | claude:MultiEdit) paths=("\${GF[0]}") ;;
+  claude:NotebookEdit) paths=("\${GF[1]}") ;;
+  codex:apply_patch)
+    re_file='^[[:space:]]*\\*\\*\\*[[:space:]]*(add|update|delete)[[:space:]]+file:[[:space:]]*(.*)\$'
+    re_move='^[[:space:]]*\\*\\*\\*[[:space:]]*move[[:space:]]+to:[[:space:]]*(.*)\$'
+    shopt -s nocasematch
+    while IFS= read -r line || [ -n "\$line" ]; do
+      if [[ \$line =~ \$re_file ]]; then p=\${BASH_REMATCH[2]}
+      elif [[ \$line =~ \$re_move ]]; then p=\${BASH_REMATCH[1]}
+      else continue; fi
+      p=\${p%"\${p##*[![:space:]]}"} # trailing blanks, a CRLF's \\r among them
+      if [ -n "\$p" ]; then paths+=("\$p"); fi
+    done <<<"\${GF[2]}"
+    shopt -u nocasematch ;;
+  *) guard_fail "expected an edit, got tool '\$P_TOOL' on \$GUARD_HARNESS" ;;
+esac
+if [ \${#paths[@]} = 0 ] || [ -z "\${paths[0]}" ]; then
+  guard_fail "could not read the file path this \$P_TOOL edits — refusing an edit it cannot check"
+fi
+guard_root
+
+# norm <path> — absolute against the payload cwd, with //, . and .. collapsed.
+norm() {
+  local p=\$1 part out="" IFS=/
+  case \$p in /*) ;; *) p="\$GUARD_CWD/\$p" ;; esac
+  for part in \$p; do
+    case \$part in '' | .) ;; ..) out=\${out%/*} ;; *) out="\$out/\$part" ;; esac
+  done
+  printf '%s' "\${out:-/}"
+}
+
+# names <abs target> <path relative to the root> [under] — the target IS the
+# protected path (with \`under\`: is it, or lies beneath it). Walks up the
+# target; at each existing ancestor, an \`-ef\` match against an existing
+# prefix of the protected path decides, the rest compared case-folded.
+names() {
+  local anc=\$1 rest="" k n r=1
+  local -a pc suf
+  IFS=/ read -r -a pc <<<"\$2"
+  n=\${#pc[@]}
+  suf[n]=""
+  for ((k = n - 1; k >= 0; k--)); do suf[k]="\${pc[k]}\${suf[k + 1]:+/\${suf[k + 1]}}"; done
+  shopt -s nocasematch
+  while [ "\$r" = 1 ]; do
+    if [ -e "\$anc" ]; then
+      local pk=\$GUARD_ROOT
+      for ((k = 0; k <= n; k++)); do
+        [ -e "\$pk" ] || break
+        if [ "\$anc" -ef "\$pk" ]; then
+          if [[ \$rest == "\${suf[k]}" ]]; then r=0; break; fi
+          if [ "\${3:-}" = under ] && { [ -z "\${suf[k]}" ] || [[ \$rest == "\${suf[k]}"/* ]]; }; then r=0; break; fi
+        fi
+        if [ "\$k" -lt "\$n" ]; then pk="\$pk/\${pc[k]}"; fi
+      done
+    fi
+    if [ "\$r" = 0 ] || [ "\$anc" = / ]; then break; fi
+    rest="\${anc##*/}\${rest:+/\$rest}"
+    anc=\${anc%/*}
+    anc=\${anc:-/}
+  done
+  shopt -u nocasematch
+  return "\$r"
+}
+
+denied="" gated=()
+for p in "\${paths[@]}"; do
+  t=\$(norm "\$p")
+  if names "\$t" .specnaut/installed.lock; then denied=\$p; break; fi
+  for g in .specnaut/workflow.yml .specnaut/scripts/bash/merge-mode.sh .specnaut/scripts/bash/base-branch.sh \\
+    .codex/hooks.json .claude/settings.json .claude/settings.local.json; do
+    if names "\$t" "\$g"; then gated+=("\$g"); fi
+  done
+  if names "\$t" .specnaut/hooks under; then gated+=(".specnaut/hooks/"); fi
+done
+
+if [ -n "\$denied" ]; then
+  guard_fail "denied: \$denied is .specnaut/installed.lock. .specnaut/installed.lock is generated by \\\`specnaut init\\\` / \\\`specnaut upgrade\\\`. Manual edits will be overwritten by the next upgrade. If you need to change the recorded harness or backend, re-run \\\`specnaut upgrade\\\` instead."
+fi
+[ \${#gated[@]} -gt 0 ] || guard_allow
+approval_gate merge \\
+  "editing \${gated[*]} changes how Specnaut gates landings on the base branch, so it needs the user" \\
+  "\\\`merge\\\` (or \\\`/specnaut merge\\\`)"
+`,
+      executable: true,
+    },
+    ".specnaut/hooks/log-subagent.sh": {
+      content: `#!/usr/bin/env bash
+# Append a structured JSON line to .specnaut/logs/agents.jsonl per
+# subagent start/stop event so workflow audits can read who-dispatched-
+# whom-when after the fact.
+#
+# Argument: "start" or "stop" (passed by the hook config in settings.json).
+# Reads the Claude Code event payload from stdin.
+set -euo pipefail
+
+EVENT="\${1:-unknown}"
+
+ROOT="\$(pwd)"
+LOG_DIR="\$ROOT/.specnaut/logs"
+LOG_FILE="\$LOG_DIR/agents.jsonl"
+mkdir -p "\$LOG_DIR"
+
+INPUT=\$(cat || true)
+TS=\$(date -u +%Y-%m-%dT%H:%M:%SZ)
+
+# Best-effort field extraction — the exact payload shape varies by
+# Claude Code version; defaults to "unknown" when fields are absent.
+#
+# The agent name lives under \`.agent_type\` in the real Claude Code
+# SubagentStart/Stop payload (empirically captured, #388); the earlier
+# \`.agent_name\`/\`.subagent_name\`/\`.tool_name\` probes matched nothing and the
+# ledger recorded \`agent:"unknown"\` for every event. We prefer \`.agent_type\`
+# and keep the historical keys as version-drift fallbacks.
+HAVE_JQ=0
+AGENT_ID=""
+EFFORT=""
+if command -v jq >/dev/null 2>&1 && [ -n "\$INPUT" ]; then
+  HAVE_JQ=1
+  SESSION=\$(printf '%s' "\$INPUT" | jq -r '.session_id // "unknown"' 2>/dev/null || echo "unknown")
+  AGENT=\$(printf '%s' "\$INPUT" | jq -r '.agent_type // .agent_name // .subagent_name // .tool_name // "unknown"' 2>/dev/null || echo "unknown")
+  # Optional context (omit-if-absent): \`agent_id\` disambiguates two concurrent
+  # agents of the same type in \`/status-audit\`; \`effort.level\` is cheap context.
+  AGENT_ID=\$(printf '%s' "\$INPUT" | jq -r '.agent_id // ""' 2>/dev/null || echo "")
+  EFFORT=\$(printf '%s' "\$INPUT" | jq -r '.effort.level // ""' 2>/dev/null || echo "")
+else
+  SESSION="unknown"
+  AGENT="unknown"
+fi
+
+# Optional contract-field enrichment (#381). On a \`stop\` event the subagent's
+# final message may carry the machine-readable contract blocks (WORKFLOW STATUS
+# / REVIEW SUMMARY / QA SUMMARY) defined by mechanism A (#378). We parse those
+# values out of the output text and append them as OPTIONAL JSONL keys beside
+# the four base fields. Every extraction is guarded so a parse miss can never
+# abort the hook — a missing field is simply omitted (never emitted empty).
+STATE=""
+DONE_MET=""
+HANDOFF=""
+REVIEW=""
+QA=""
+if [ "\$HAVE_JQ" = "1" ] && [ "\$EVENT" = "stop" ]; then
+  # The agent's final message — where the end-of-turn contract blocks live — is
+  # carried under \`.last_assistant_message\` in the real SubagentStop payload
+  # (#388). The earlier \`.output\`/\`.result\`/… probes matched nothing, so the
+  # ledger captured zero contract fields. Prefer \`.last_assistant_message\`,
+  # keep the historical keys as version-drift fallbacks, then fall back to the
+  # raw payload. The first candidate that yields a non-empty string wins.
+  OUTPUT=\$(printf '%s' "\$INPUT" | jq -r \\
+    '(.last_assistant_message // .output // .result // .response // .tool_response // .message // "") | if type=="string" then . else tojson end' \\
+    2>/dev/null || echo "")
+  if [ -z "\$OUTPUT" ]; then
+    OUTPUT="\$INPUT"
+  fi
+
+  # SEGMENT the output per contract block before extracting any field, so a
+  # value is read only from inside its own block. A naive whole-output grep
+  # would let the FIRST block's \`verdict:\` satisfy BOTH review_verdict and
+  # qa_verdict when both blocks are present (cross-contamination). \`awk\`
+  # captures the text from a header line up to (but excluding) the next
+  # all-caps block header — the headers being WORKFLOW STATUS / REVIEW SUMMARY
+  # / QA SUMMARY.
+  segment() {
+    # \$1 = header to capture from. Emits the block body (header included) up to
+    # the next recognised block header.
+    printf '%s' "\$OUTPUT" | awk -v hdr="\$1" '
+      \$0 ~ ("^[[:space:]]*" hdr "[[:space:]]*\$") { capture=1; print; next }
+      capture && /^[[:space:]]*(WORKFLOW STATUS|REVIEW SUMMARY|QA SUMMARY)[[:space:]]*\$/ { capture=0 }
+      capture { print }
+    '
+  }
+
+  WORKFLOW_SEG=\$(segment "WORKFLOW STATUS")
+  REVIEW_SEG=\$(segment "REVIEW SUMMARY")
+  QA_SEG=\$(segment "QA SUMMARY")
+
+  # The #378 contract blocks use canonical UPPERCASE field names
+  # (\`STATE:\` / \`DONE_CRITERIA_MET:\` / \`HANDOFF_TARGET:\` / \`REVIEW_VERDICT:\` /
+  # \`QA_VERDICT:\`). The earlier lowercase \`state:\`/\`verdict:\` greps never
+  # matched a real contract block. We grep the canonical names
+  # CASE-INSENSITIVELY (\`-i\`) for robustness, then strip the \`FIELD:\` prefix.
+  # \`field_value\` lowercases the whole matched token before stripping the prefix
+  # so the case-insensitive sed needs no per-letter alternation; the values
+  # (state names, yes/no, verdicts, agent names) are themselves lowercase.
+  field_value() {
+    # \$1 = segment text; \$2 = canonical field name; \$3 = value charclass/alt.
+    printf '%s' "\$1" |
+      grep -ioE "\$2:[[:space:]]*\$3" |
+      head -1 |
+      tr '[:upper:]' '[:lower:]' |
+      sed -E "s/^[a-z_]+:[[:space:]]*//" || true
+  }
+
+  # WORKFLOW STATUS fields — extracted only from the WORKFLOW STATUS segment.
+  STATE=\$(field_value "\$WORKFLOW_SEG" "STATE" "[a-z_]+")
+  DONE_MET=\$(field_value "\$WORKFLOW_SEG" "DONE_CRITERIA_MET" "(yes|no)")
+  HANDOFF=\$(field_value "\$WORKFLOW_SEG" "HANDOFF_TARGET" "[A-Za-z0-9_-]+")
+
+  # \`REVIEW_VERDICT\` and \`QA_VERDICT\` are DISTINCT canonical names. Extracting
+  # each from its OWN block segment is belt-and-suspenders — even a stray match
+  # of the other name in the wrong block can't cross-contaminate.
+  REVIEW=\$(field_value "\$REVIEW_SEG" "REVIEW_VERDICT" "(pass|fail|needs_followup)")
+  QA=\$(field_value "\$QA_SEG" "QA_VERDICT" "(pass|fail|blocked)")
+fi
+
+# Compose the line with jq so every field is quoted/escaped correctly and a
+# hostile session_id/agent_name (e.g. one containing \`"\` or \`:\`) can never
+# break the JSON or inject a key. Optional contract keys are merged in only
+# when their shell var is non-empty (omit-if-absent), via the args list.
+if [ "\$HAVE_JQ" = "1" ]; then
+  JQ_ARGS=(--arg ts "\$TS" --arg event "\$EVENT" --arg session "\$SESSION" --arg agent "\$AGENT")
+  # The \`\$ts\`/\`\$state\`/… tokens below are jq variables (bound via --arg), NOT
+  # shell variables — single quotes are deliberate so the shell leaves them for
+  # jq to resolve.
+  # shellcheck disable=SC2016
+  {
+    JQ_FILTER='{ts: \$ts, event: \$event, session: \$session, agent: \$agent}'
+    [ -n "\$AGENT_ID" ] && { JQ_ARGS+=(--arg agent_id "\$AGENT_ID"); JQ_FILTER+=' + {agent_id: \$agent_id}'; }
+    [ -n "\$EFFORT" ] && { JQ_ARGS+=(--arg effort "\$EFFORT"); JQ_FILTER+=' + {effort: \$effort}'; }
+    [ -n "\$STATE" ] && { JQ_ARGS+=(--arg state "\$STATE"); JQ_FILTER+=' + {state: \$state}'; }
+    [ -n "\$DONE_MET" ] && { JQ_ARGS+=(--arg done_criteria_met "\$DONE_MET"); JQ_FILTER+=' + {done_criteria_met: \$done_criteria_met}'; }
+    [ -n "\$HANDOFF" ] && { JQ_ARGS+=(--arg handoff_target "\$HANDOFF"); JQ_FILTER+=' + {handoff_target: \$handoff_target}'; }
+    [ -n "\$REVIEW" ] && { JQ_ARGS+=(--arg review_verdict "\$REVIEW"); JQ_FILTER+=' + {review_verdict: \$review_verdict}'; }
+    [ -n "\$QA" ] && { JQ_ARGS+=(--arg qa_verdict "\$QA"); JQ_FILTER+=' + {qa_verdict: \$qa_verdict}'; }
+  }
+  jq -nc "\${JQ_ARGS[@]}" "\$JQ_FILTER" >> "\$LOG_FILE"
+else
+  # No-jq fallback: emit only the four base fields. SESSION/AGENT are "unknown"
+  # in this path (contract parsing requires jq), so no untrusted interpolation
+  # reaches this printf.
+  printf '{"ts":"%s","event":"%s","session":"%s","agent":"%s"}\\n' \\
+    "\$TS" "\$EVENT" "\$SESSION" "\$AGENT" >> "\$LOG_FILE"
+fi
+
+exit 0
+`,
+      executable: true,
+    },
+    ".specnaut/hooks/release-commands.txt": {
+      content: `# The release commands that need the user's go-ahead — the one list (spec 036,
+# plan § 5, FR-006). guard-release.sh refuses each on Codex unless the user's
+# own prompt this turn approved a release; Claude Code's permissions.ask rules
+# are held to this list by Specnaut's own tests.
+#
+# One command per line: the words it starts with. A first word ending in \`.sh\`
+# is a script, matched by its basename however it is reached (a path, or as
+# the argument of sh/bash). \`except <flag>\`: that flag in the same command
+# segment exempts it — \`tag.sh --no-push\` creates a tag and publishes nothing.
+# Any push of a tag ref is gated too; that is a rule, not a word list, and it
+# lives in guard-release.sh.
+tag.sh except --no-push
+release-github.sh
+release-gitlab.sh
+gh release create
+gh release edit
+gh release upload
+glab release create
+gh run rerun
+`,
+      executable: false,
+    },
+    ".specnaut/hooks/_agents.txt": {
+      content: `# The Specnaut agents: one name per line, generated from the Specnaut
+# manifest when the binary is built. guard-dispatch-model.sh reads it.
+accessibility-expert
+architect-expert
+code-reviewer
+dependency-expert
+developer
+devops-sre
+performance-expert
+product-owner
+qa-tester
+review-coordinator
+security-expert
+specnaut-guide
+test-reviewer
+ui-ux-designer
+workflow-manager
+`,
+      executable: false,
+    },
+    ".specnaut/hooks/SHA256SUMS": {
+      content: `49a4f9a91f8b91559f087d02c151d4069575cf466fcd09b21354749f188c16a8  _agents.txt
+0260a671c65563b99032753f6fa60553adbc3849506a6155a280a655e5eee796  _approval.sh
+7556762e50be2b68d2bc432dddded521f736cc06abb084e895c1f1ddf5986039  _command.sh
+1b00c99c5df6ce2e72d39f76103fc58728d785392fb6cc632143d30ebfa1357b  _git.sh
+66ca4cce13eae027438cec506332ccd1fb5f638287361c44912309bb5a63d859  _guard.sh
+7675a9df90d21f2390940870fa8458d09e7418a68de7d682b3f8d6a36a94019c  _simple.sh
+7ef60a25af68fa7d84d1c65c44bc8ce4801f29f83439b858775afa44ea77262d  approve-on-prompt.sh
+624291e9b6c4c7eac986998782110749ef66aa7a95f056d52834800cedfecffe  guard-dispatch-model.sh
+e2f7d4779e26518bea16290522367d452af0fd088d68c9dec18eaa7c0b94e279  guard-merge.sh
+57ee8ff38940b0c31784c8c2f14ba43181e0aee6e53ceaeca7408f73bd84f40a  guard-release.sh
+163962fd20ed5d92b4608a1a3b80210ea5a53250069437bf72f8e99b72ed50f3  log-subagent.sh
+e0afbee104ac094f3b4b3b2bf5353d53cb320ec68351c3178db1b63c14548dd9  protect-generated.sh
+4e0f336ed4eafecca2904fba2aab427d3e8528889aa68e9e347c4ac03dc53853  release-commands.txt
+`,
+      executable: false,
+    },
+    ".codex/hooks.json": {
+      content: `{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "r=\$PWD; while [ -n \\"\$r\\" ] && [ ! -d \\"\$r/.specnaut/hooks\\" ]; do r=\${r%/*}; done; [ \\"\$( (sha256sum 2>/dev/null || shasum -a 256) < \\"\$r/.specnaut/hooks/SHA256SUMS\\" 2>/dev/null | cut -c1-64)\\" = \\"e22716d73b8254c76465242046747bc05797ff1e7fd90c557e48857343cc7984\\" ] && (cd \\"\$r/.specnaut/hooks\\" && (sha256sum -c --status SHA256SUMS 2>/dev/null || shasum -a 256 -c --status SHA256SUMS)) && exec bash \\"\$r/.specnaut/hooks/guard-merge.sh\\" codex; echo \\"specnaut: .specnaut/hooks changed since it was trusted — run specnaut upgrade, then /hooks\\" >&2; exit 2",
+            "timeout": 10
+          },
+          {
+            "type": "command",
+            "command": "r=\$PWD; while [ -n \\"\$r\\" ] && [ ! -d \\"\$r/.specnaut/hooks\\" ]; do r=\${r%/*}; done; [ \\"\$( (sha256sum 2>/dev/null || shasum -a 256) < \\"\$r/.specnaut/hooks/SHA256SUMS\\" 2>/dev/null | cut -c1-64)\\" = \\"e22716d73b8254c76465242046747bc05797ff1e7fd90c557e48857343cc7984\\" ] && (cd \\"\$r/.specnaut/hooks\\" && (sha256sum -c --status SHA256SUMS 2>/dev/null || shasum -a 256 -c --status SHA256SUMS)) && exec bash \\"\$r/.specnaut/hooks/guard-release.sh\\" codex; echo \\"specnaut: .specnaut/hooks changed since it was trusted — run specnaut upgrade, then /hooks\\" >&2; exit 2",
+            "timeout": 10
+          }
+        ]
+      },
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "r=\$PWD; while [ -n \\"\$r\\" ] && [ ! -d \\"\$r/.specnaut/hooks\\" ]; do r=\${r%/*}; done; [ \\"\$( (sha256sum 2>/dev/null || shasum -a 256) < \\"\$r/.specnaut/hooks/SHA256SUMS\\" 2>/dev/null | cut -c1-64)\\" = \\"e22716d73b8254c76465242046747bc05797ff1e7fd90c557e48857343cc7984\\" ] && (cd \\"\$r/.specnaut/hooks\\" && (sha256sum -c --status SHA256SUMS 2>/dev/null || shasum -a 256 -c --status SHA256SUMS)) && exec bash \\"\$r/.specnaut/hooks/protect-generated.sh\\" codex; echo \\"specnaut: .specnaut/hooks changed since it was trusted — run specnaut upgrade, then /hooks\\" >&2; exit 2",
+            "timeout": 10
+          }
+        ]
+      },
+      {
+        "matcher": "Agent",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "r=\$PWD; while [ -n \\"\$r\\" ] && [ ! -d \\"\$r/.specnaut/hooks\\" ]; do r=\${r%/*}; done; [ \\"\$( (sha256sum 2>/dev/null || shasum -a 256) < \\"\$r/.specnaut/hooks/SHA256SUMS\\" 2>/dev/null | cut -c1-64)\\" = \\"e22716d73b8254c76465242046747bc05797ff1e7fd90c557e48857343cc7984\\" ] && (cd \\"\$r/.specnaut/hooks\\" && (sha256sum -c --status SHA256SUMS 2>/dev/null || shasum -a 256 -c --status SHA256SUMS)) && exec bash \\"\$r/.specnaut/hooks/guard-dispatch-model.sh\\" codex; echo \\"specnaut: .specnaut/hooks changed since it was trusted — run specnaut upgrade, then /hooks\\" >&2; exit 2",
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "r=\$PWD; while [ -n \\"\$r\\" ] && [ ! -d \\"\$r/.specnaut/hooks\\" ]; do r=\${r%/*}; done; [ \\"\$( (sha256sum 2>/dev/null || shasum -a 256) < \\"\$r/.specnaut/hooks/SHA256SUMS\\" 2>/dev/null | cut -c1-64)\\" = \\"e22716d73b8254c76465242046747bc05797ff1e7fd90c557e48857343cc7984\\" ] && (cd \\"\$r/.specnaut/hooks\\" && (sha256sum -c --status SHA256SUMS 2>/dev/null || shasum -a 256 -c --status SHA256SUMS)) && exec bash \\"\$r/.specnaut/hooks/approve-on-prompt.sh\\" codex; echo \\"specnaut: .specnaut/hooks changed since it was trusted — run specnaut upgrade, then /hooks\\" >&2; exit 0",
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "r=\$PWD; while [ -n \\"\$r\\" ] && [ ! -d \\"\$r/.specnaut/hooks\\" ]; do r=\${r%/*}; done; [ \\"\$( (sha256sum 2>/dev/null || shasum -a 256) < \\"\$r/.specnaut/hooks/SHA256SUMS\\" 2>/dev/null | cut -c1-64)\\" = \\"e22716d73b8254c76465242046747bc05797ff1e7fd90c557e48857343cc7984\\" ] && (cd \\"\$r/.specnaut/hooks\\" && (sha256sum -c --status SHA256SUMS 2>/dev/null || shasum -a 256 -c --status SHA256SUMS)) && exec bash \\"\$r/.specnaut/hooks/approve-on-prompt.sh\\" codex; echo \\"specnaut: .specnaut/hooks changed since it was trusted — run specnaut upgrade, then /hooks\\" >&2; exit 0",
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "SubagentStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "r=\$PWD; while [ -n \\"\$r\\" ] && [ ! -d \\"\$r/.specnaut/hooks\\" ]; do r=\${r%/*}; done; [ \\"\$( (sha256sum 2>/dev/null || shasum -a 256) < \\"\$r/.specnaut/hooks/SHA256SUMS\\" 2>/dev/null | cut -c1-64)\\" = \\"e22716d73b8254c76465242046747bc05797ff1e7fd90c557e48857343cc7984\\" ] && (cd \\"\$r/.specnaut/hooks\\" && (sha256sum -c --status SHA256SUMS 2>/dev/null || shasum -a 256 -c --status SHA256SUMS)) && exec bash \\"\$r/.specnaut/hooks/log-subagent.sh\\" start; echo \\"specnaut: .specnaut/hooks changed since it was trusted — run specnaut upgrade, then /hooks\\" >&2; exit 0",
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "SubagentStop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "r=\$PWD; while [ -n \\"\$r\\" ] && [ ! -d \\"\$r/.specnaut/hooks\\" ]; do r=\${r%/*}; done; [ \\"\$( (sha256sum 2>/dev/null || shasum -a 256) < \\"\$r/.specnaut/hooks/SHA256SUMS\\" 2>/dev/null | cut -c1-64)\\" = \\"e22716d73b8254c76465242046747bc05797ff1e7fd90c557e48857343cc7984\\" ] && (cd \\"\$r/.specnaut/hooks\\" && (sha256sum -c --status SHA256SUMS 2>/dev/null || shasum -a 256 -c --status SHA256SUMS)) && exec bash \\"\$r/.specnaut/hooks/log-subagent.sh\\" stop; echo \\"specnaut: .specnaut/hooks changed since it was trusted — run specnaut upgrade, then /hooks\\" >&2; exit 0",
+            "timeout": 10
+          }
+        ]
+      }
+    ]
+  }
+}
+`,
+      executable: false,
+      mergeJson: "codex-hooks",
+    },
     ".codex/AGENTS.md": {
       content: `This project's instructions are in ../AGENTS.md, which Codex reads itself.
 `,
