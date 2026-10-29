@@ -67,7 +67,10 @@ Deno.test("protect-generated: every spelling of the lock, and the gate's switche
         `*** Update File: ./${L}\n`,
         "deny",
       ],
-      ["absolute //", repo, `/${repo}/${L}`, `*** Update File: /${repo}/${L}\n`, "deny"],
+      // POSIX only: on Windows `/${repo}` is `/C:\…`, a shape no harness sends.
+      ...(Deno.build.os === "windows" ? [] : [
+        ["absolute //", repo, `/${repo}/${L}`, `*** Update File: /${repo}/${L}\n`, "deny" as Want],
+      ] as [string, string, string, string, Want][]),
       ["..", repo, `${repo}/src/../${L}`, `*** Update File: src/../${L}\n`, "deny"],
       [
         "case",

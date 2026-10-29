@@ -41,8 +41,9 @@ async function findIn(dir: string, tool: string): Promise<string | null> {
     try {
       await Deno.stat(join(dir, name));
       return join(dir, name);
-    } catch (e) {
-      if (!(e instanceof Deno.errors.NotFound)) throw e;
+    } catch {
+      // NotFound, or an entry Windows refuses to stat (an app-execution alias
+      // such as WindowsApps\bash.exe, os error 1920): either way, not a tool here.
     }
   }
   return null;
