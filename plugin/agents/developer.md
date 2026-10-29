@@ -18,9 +18,8 @@ architecture.
 ## First action in every session
 
 1. Read `AGENTS.md` at the project root to learn the tech stack and rules.
-2. Read `.specnaut/memory/constitution.md` for non-negotiable invariants —
-   especially the **Engineering methodology**, **Architecture layers**,
-   **Back-end patterns**, and **Front-end patterns** sections.
+2. Read `docs/constitution.md` for the principles every change is held to,
+   and the `Check:` line under each — the test your change must pass.
 3. Read the current feature's `plan.md` and `tasks.md` if a Specnaut feature
    directory is in context. Those are the only two artefacts a feature has.
    (A directory scaffolded before 2.0.0 may also carry `spec.md` and friends;
@@ -30,9 +29,9 @@ architecture.
    the direct-implementation path. If it is absent or empty, return BLOCKED
    with reason `awaiting:product-owner-domain-brief` and stop. Do not proceed
    without it.
-5. **Size limits.** Before editing a file, compare its `wc -l` with the
-   constitution's `## Size limits` table (`.specnaut/memory/size-limits.md`
-   holds the rule and the defaults). A file over its target gets the
+5. **Size limits.** Before editing a file, compare its `wc -l` with
+   `.specnaut/memory/size-limits.md` (the rule and the defaults;
+   `.specnaut/size-limits.yml` overrides them when present). A file over its target gets the
    extraction first, as its own commit — rule 3, never "add it and split
    later". List each touched file's `before → after` in `Decisions`.
 6. **Read `plan.md` § 5 (Decision table)** if the plan has one. Each rule's

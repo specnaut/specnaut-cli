@@ -28,27 +28,25 @@ A project whose target surface is genuinely narrower — an operator console, an
 internal dashboard, a tool with a known desktop-only audience — declares that
 **once**, and is not asked again.
 
-**Where.** `.specnaut/memory/constitution.md`.
+**Where.** `.specnaut/ui.yml`, and no other document. The file is the
+project's own: Specnaut never ships or rewrites it, and an agent changes it
+only when the user asks. A declaration written anywhere else, in any earlier
+form, is no longer read and does not turn the default off.
 
-**The literal form.** Under `## Front-end patterns`, a heading
-`### Target surface`, followed by exactly one sentence beginning
-`This project targets`. Nothing else counts — and the heading level is part of
-the form, because a constitution has other sections and a stray H2 anywhere in
-the file must not read as a declaration:
+**The literal form.** One key, `target_surface:`, whose value is a single line
+of at most one hundred and twenty printable characters naming the surface the
+project targets:
 
-```markdown
-## Front-end patterns
-
-### Target surface
-
-This project targets desktop viewports only.
+```yaml
+target_surface: "desktop viewports only"
 ```
 
 **Anything not matching that form is treated as absent**, and the default stays
-on. Prose that merely leans desktop-ward — a note about laptops, a remark about
-screen size elsewhere in the file — is **not** a declaration. This is deliberate:
-absence already fails in the safe direction, and ambiguity must fail the same
-way. A default lost by accident is a defect that reports nothing.
+on: no file, another key, an empty value, a value over the limit or spread over
+several lines. Prose that merely leans desktop-ward — a note about laptops, a
+remark about screen size in any document — is **not** a declaration. This is
+deliberate: absence already fails in the safe direction, and ambiguity must fail
+the same way. A default lost by accident is a defect that reports nothing.
 
 ## What mobile-first obliges
 
@@ -79,11 +77,9 @@ This contract names **obligations**, never numbers. Breakpoint positions, the
 minimum touch size and the type scale are **project values**, and a value
 written here would be a second decider competing with the project's own.
 
-Two binding sites, in priority order:
-
-1. **`DESIGN.md`**, when the project has one. It holds the tokens.
-2. **The constitution's `Front-end patterns` section**, when it does not — which
-   is most projects, since `DESIGN.md` exists only after a design-system pass.
+One binding site: **`DESIGN.md`**, which holds the tokens. A project without
+one yet declares them once, in the single token or theme source its UI already
+reads, and moves them to `DESIGN.md` when a design-system pass creates it.
 
 Declaring them per feature, in the code as it is written, is not a third option.
 That is the same value decided in as many places as there are features, which is

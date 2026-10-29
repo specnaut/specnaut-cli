@@ -194,7 +194,7 @@ features can be planned concurrently — one \`plan\` per task, each pushed inde
 
 ### 3. Read the ground truth before writing a line
 
-- \`.specnaut/memory/constitution.md\` — binding, and it outranks this file.
+- \`docs/constitution.md\` — binding, and it outranks this file.
 - The linked backlog item's body, when there is one.
 - **The code the feature touches.** Most design questions are already decided there; re-deciding
   one produces a second spelling.
@@ -1112,10 +1112,11 @@ on what the branch has committed:
 bash .specnaut/scripts/bash/size-ratchet.sh --since "\$(git merge-base HEAD <default branch>)"
 \`\`\`
 
-It holds every changed file to the constitution's file limits
-(\`.specnaut/memory/size-limits.md\`): exit 1 is a failure of the tier it follows,
-fixed the same way; exit 2 means the constitution's Size limits table cannot be
-read — fix the table, never skip the check. Any other exit (126, 127: a lost
+It holds every changed file to the project's file limits
+(\`.specnaut/memory/size-limits.md\`, overridden by \`.specnaut/size-limits.yml\`):
+exit 1 is a failure of the tier it follows, fixed the same way; exit 2 means
+\`.specnaut/size-limits.yml\` cannot be read — fix the file, never skip the
+check. Any other exit (126, 127: a lost
 executable bit, no bash) means the check did not run, which is a failure of the
 tier, never a pass. Without \`--since\` it checks the
 staged changes against the branch's merge base, which is the form a pre-commit
@@ -1123,6 +1124,37 @@ runner calls: an extraction commit followed by an addition passes, as long as
 the file ends no larger than where the branch began. Every review runs it too,
 through the review coordinator, so a standalone item is held as well. Specnaut installs
 no git hook: wiring it into one is the project's choice.
+
+## The import boundary — with every tier
+
+When \`.specnaut/scripts/bash/boundary-check.sh\` is present, run it after each
+tier, beside the size ratchet:
+
+\`\`\`
+bash .specnaut/scripts/bash/boundary-check.sh
+\`\`\`
+
+It holds the tracked files under the \`domain:\` paths of
+\`.specnaut/boundaries.yml\` free of the \`forbid:\` patterns (extended regular
+expressions), minus the \`exempt:\` globs. Which paths are the domain and which
+imports break it are the project's to write: Specnaut ships no copy of that
+file and no default pattern, because a guessed one would report a pass that
+checked nothing.
+
+- **Exit 0** — every file was checked and none matches. Report it as a pass.
+- **Exit 1** — a forbidden import, printed as \`path:line: pattern\`. A failure
+  of the tier it follows, fixed the same way.
+- **Exit 2** — the check could not run: an unreadable config, a pattern that
+  does not compile, a \`domain:\` path outside the repository, or a file it
+  cannot read. Fix the cause; never skip the check.
+- **Exit 4** — **skipped**, with the reason on stdout: no
+  \`.specnaut/boundaries.yml\`, no \`forbid:\` patterns, no \`domain:\` paths, or no
+  file left to check under them. Report it as *skipped: <reason>* — **never as
+  a pass**. A project without the file has declared no boundary, and the gate
+  says so instead of passing it.
+
+Any other exit (126, 127) means the check did not run: a failure of the tier,
+never a pass. Every review runs it too, through the review coordinator.
 
 ## A standalone item
 
@@ -1580,7 +1612,7 @@ Spawn the \`review-coordinator\` agent with the list of changed files. It in tur
 spawns:
 
 - \`code-reviewer\` (always) — architecture, DRY, YAGNI, readability, alignment
-  with \`.specnaut/memory/constitution.md\`.
+  with \`docs/constitution.md\`.
 - \`security-expert\` (always) — input validation, auth/authz, secret handling,
   SQL/command injection, path traversal, silent catches that swallow errors.
 - \`test-reviewer\` (if test files are in the diff) — adequacy of coverage, test
@@ -2043,82 +2075,73 @@ You **MUST** consider the user input before proceeding (if not empty).
 
 ## Outline
 
-You are updating the project constitution at \`.specnaut/memory/constitution.md\`. This file is a TEMPLATE containing placeholder tokens in square brackets (e.g. \`[PROJECT_NAME]\`, \`[PRINCIPLE_1_NAME]\`). Your job is to (a) collect/derive concrete values, (b) fill the template precisely, and (c) propagate any amendments across dependent artifacts.
+The project's constitution is \`docs/constitution.md\`. It is the team's document, not Specnaut's:
+Specnaut bootstrapped it once and only reads it since. An amendment is exceptional, happens only
+because the user asked for it, and is written only after the user has seen it and typed the
+confirmation phrase below. A hook enforces that last part: without the phrase, every write to the
+file is refused, whatever tool attempts it, and a change made some other way is caught when the turn
+ends. Never look for another route; ask.
 
-**Note**: If \`.specnaut/memory/constitution.md\` does not exist yet, it should have been initialized from \`.specnaut/templates/constitution-template.md\` during project setup. If it's missing, copy the template first.
+The same verb changes the three **gate configs**, which hold the settings the project's gates read:
+\`.specnaut/size-limits.yml\`, \`.specnaut/boundaries.yml\` and \`.specnaut/ui.yml\`. They are not the
+constitution, so they take no version bump, but they are gated the same way under their own phrase.
 
-Follow this execution flow:
+| What changes | The user types, as their whole message | Kind |
+| --- | --- | --- |
+| \`docs/constitution.md\` | \`approve the constitution amendment\` | \`constitution\` |
+| a gate config | \`approve the gate config change\` | \`gate-config\` |
 
-1. Load the existing constitution at \`.specnaut/memory/constitution.md\`.
-   - Identify every placeholder token of the form \`[ALL_CAPS_IDENTIFIER]\`.
-   **IMPORTANT**: The user might require less or more principles than the ones used in the template. If a number is specified, respect that - follow the general template. You will update the doc accordingly.
+One approval covers one kind for one turn. A request that changes both is two rounds: the
+constitution first, then the configs. A plain "yes", "ok" or "go" approves nothing.
 
-2. Collect/derive values for placeholders:
-   - If user input (conversation) supplies a value, use it.
-   - Otherwise infer from existing repo context (README, docs, prior constitution versions if embedded).
-   - For governance dates: \`RATIFICATION_DATE\` is the original adoption date (if unknown ask or mark TODO), \`LAST_AMENDED_DATE\` is today if changes are made, otherwise keep previous.
-   - \`CONSTITUTION_VERSION\` must increment according to semantic versioning rules:
-     - MAJOR: Backward incompatible governance/principle removals or redefinitions.
-     - MINOR: New principle/section added or materially expanded guidance.
-     - PATCH: Clarifications, wording, typo fixes, non-semantic refinements.
-   - If version bump type ambiguous, propose reasoning before finalizing.
-   - **Size limits.** Every phase, agent and script reads its size thresholds from the
-     constitution's \`## Size limits\` table and nowhere else (\`.specnaut/memory/size-limits.md\`
-     holds the rule, the table shape and the defaults). When creating or amending, confirm the
-     table's numbers with the user. If the constitution has no such section, propose adding one
-     prefilled with the defaults — \`specnaut upgrade\` never touches an existing constitution, so
-     this phase is the only way an older project receives it. Keep the shape exact: the size
-     ratchet script parses it.
+### Round 1: draft, then stop
 
-3. Draft the updated constitution content:
-   - Replace every placeholder with concrete text (no bracketed tokens left except intentionally retained template slots that the project has chosen not to define yet—explicitly justify any left).
-   - Preserve heading hierarchy and comments can be removed once replaced unless they still add clarifying guidance.
-   - Ensure each Principle section: succinct name line, paragraph (or bullet list) capturing non‑negotiable rules, explicit rationale if not obvious.
-   - Ensure Governance section lists amendment procedure, versioning policy, and compliance review expectations.
-   - Keep the constitution to principles. Delivery status, task and epic narratives, and dated incident history do not belong in it: link the issue or spec that holds them instead. The file is loaded into every session, and the size ratchet holds it to the \`constitution\` unit of the \`## Size limits\` table (\`.specnaut/memory/size-limits.md\`).
-   - Shrinking the file never licenses dropping a principle: a removal still takes the MAJOR bump of step 2.
+1. **The reason.** If the request does not say why the change is needed, ask, in one question.
+   Nothing is drafted without a reason the user gave: it goes into the commit body.
+2. **Read** the current file. If \`docs/constitution.md\` is missing, say so and stop: \`specnaut
+   upgrade\` bootstraps it. Never recreate it from memory.
+3. **Draft** the smallest change that serves the reason:
+   - Keep each principle declarative and checkable: a short rule, and a \`Check:\` line a reviewer
+     can apply to a plan or a diff.
+   - Keep the constitution to principles. Delivery status, task and epic narratives, and dated
+     incident history do not belong in it: link the issue or spec that holds them instead. The file
+     is read by every planning and review step, and the size limits hold it to its own
+     \`constitution\` unit.
+   - No HTML comments, no change log, no report inside the file: git history is the record.
+4. **Bump \`Version:\`** (the footer line) for a constitution change, by semantic versioning:
+   - MAJOR: a principle removed, or redefined so that existing code may now violate it.
+   - MINOR: a principle added, or materially expanded.
+   - PATCH: wording, clarification, a typo.
 
-4. Consistency propagation checklist (convert prior checklist into active validations):
-   - Read \`.specnaut/templates/plan-template.md\` and ensure any "Constitution Check" or rules align with updated principles.
-   - Read \`.specnaut/templates/plan-template.md\` for scope/requirements alignment—update if constitution adds/removes mandatory sections or constraints.
-   - Read \`.specnaut/templates/tasks-template.md\` and ensure task categorization reflects new or removed principle-driven task types (e.g., observability, versioning, testing discipline).
-   - Read each command file in \`.specnaut/templates/commands/*.md\` (including this one) to verify no outdated references (agent-specific names like CLAUDE only) remain when generic guidance is required.
-   - Read any runtime guidance docs (e.g., \`README.md\`, \`docs/quickstart.md\`, or agent-specific guidance files if present). Update references to principles changed.
+   Shrinking the file never licenses dropping a principle: a removal still takes the MAJOR bump.
+   A gate config change has no version.
+5. **Show** the user the diff, the bump with its one-line rationale, and the commit message you will
+   use. Then print the phrase for that kind, exactly as in the table, and end the turn:
 
-5. Produce a Sync Impact Report as an HTML comment at the top of the constitution file, **replacing** the existing one. The file carries exactly one report, the latest; earlier ones stay in git history. Carry forward into the new report any follow-up from the previous one that is still intentionally unresolved. The report holds:
-   - Version change: old → new
-   - List of modified principles (old title → new title if renamed)
-   - Added sections
-   - Removed sections
-   - Templates requiring updates (✅ updated / ⚠ pending) with file paths
-   - Follow-up TODOs if any placeholders intentionally deferred.
+   \`\`\`text
+   To apply this, reply with exactly: approve the constitution amendment
+   \`\`\`
 
-6. Validation before final output:
-   - No remaining unexplained bracket tokens.
-   - Exactly one Sync Impact Report, at the top of the file.
-   - Version line matches report.
-   - Dates ISO format YYYY-MM-DD.
-   - Principles are declarative, testable, and free of vague language ("should" → replace with MUST/SHOULD rationale where appropriate).
+   Do not write the file in this turn. Any reply other than the phrase is feedback: revise the draft,
+   show it again, print the phrase again.
 
-7. Write the completed constitution back to \`.specnaut/memory/constitution.md\` (overwrite).
+### Round 2: the user typed the phrase
 
-8. Output a final summary to the user with:
-   - New version and bump rationale.
-   - Any files flagged for manual follow-up.
-   - Suggested commit message (e.g., \`docs: amend constitution to vX.Y.Z (principle additions + governance update)\`).
+6. **Write** the drafted change, exactly as shown, to the file it names. Nothing else is touched.
+7. **Commit** it alone. The subject names the change; the body carries the reason, in the user's
+   words, and for the constitution the version change:
 
-Formatting & Style Requirements:
+   \`\`\`text
+   docs(constitution): <what changed>
 
-- Use Markdown headings exactly as in the template (do not demote/promote levels).
-- Wrap long rationale lines to keep readability (<100 chars ideally) but do not hard enforce with awkward breaks.
-- Keep a single blank line between sections.
-- Avoid trailing whitespace.
+   Reason: <the reason the user gave>
+   Version: 1.2.0 → 1.3.0
+   \`\`\`
 
-If the user supplies partial updates (e.g., only one principle revision), still perform validation and version decision steps.
+8. **Report** the new version (or the config written) and the commit, in two lines.
 
-If critical info missing (e.g., ratification date truly unknown), insert \`TODO(<FIELD_NAME>): explanation\` and include in the Sync Impact Report under deferred items.
-
-Do not create a new template; always operate on the existing \`.specnaut/memory/constitution.md\` file.
+If a principle now conflicts with the code, or with another principle, report it as a stop with a
+question. Never resolve it by amending the constitution on your own initiative.
 
 ## Post-Execution Checks
 
@@ -4788,27 +4811,25 @@ A project whose target surface is genuinely narrower — an operator console, an
 internal dashboard, a tool with a known desktop-only audience — declares that
 **once**, and is not asked again.
 
-**Where.** \`.specnaut/memory/constitution.md\`.
+**Where.** \`.specnaut/ui.yml\`, and no other document. The file is the
+project's own: Specnaut never ships or rewrites it, and an agent changes it
+only when the user asks. A declaration written anywhere else, in any earlier
+form, is no longer read and does not turn the default off.
 
-**The literal form.** Under \`## Front-end patterns\`, a heading
-\`### Target surface\`, followed by exactly one sentence beginning
-\`This project targets\`. Nothing else counts — and the heading level is part of
-the form, because a constitution has other sections and a stray H2 anywhere in
-the file must not read as a declaration:
+**The literal form.** One key, \`target_surface:\`, whose value is a single line
+of at most one hundred and twenty printable characters naming the surface the
+project targets:
 
-\`\`\`markdown
-## Front-end patterns
-
-### Target surface
-
-This project targets desktop viewports only.
+\`\`\`yaml
+target_surface: "desktop viewports only"
 \`\`\`
 
 **Anything not matching that form is treated as absent**, and the default stays
-on. Prose that merely leans desktop-ward — a note about laptops, a remark about
-screen size elsewhere in the file — is **not** a declaration. This is deliberate:
-absence already fails in the safe direction, and ambiguity must fail the same
-way. A default lost by accident is a defect that reports nothing.
+on: no file, another key, an empty value, a value over the limit or spread over
+several lines. Prose that merely leans desktop-ward — a note about laptops, a
+remark about screen size in any document — is **not** a declaration. This is
+deliberate: absence already fails in the safe direction, and ambiguity must fail
+the same way. A default lost by accident is a defect that reports nothing.
 
 ## What mobile-first obliges
 
@@ -4839,11 +4860,9 @@ This contract names **obligations**, never numbers. Breakpoint positions, the
 minimum touch size and the type scale are **project values**, and a value
 written here would be a second decider competing with the project's own.
 
-Two binding sites, in priority order:
-
-1. **\`DESIGN.md\`**, when the project has one. It holds the tokens.
-2. **The constitution's \`Front-end patterns\` section**, when it does not — which
-   is most projects, since \`DESIGN.md\` exists only after a design-system pass.
+One binding site: **\`DESIGN.md\`**, which holds the tokens. A project without
+one yet declares them once, in the single token or theme source its UI already
+reads, and moves them to \`DESIGN.md\` when a design-system pass creates it.
 
 Declaring them per feature, in the code as it is written, is not a third option.
 That is the same value decided in as many places as there are features, which is
@@ -5404,7 +5423,7 @@ for business context and backlog management.
 
 Run these in order, every time before answering:
 
-1. Locate yourself (\`git branch --show-current\` + \`git log --oneline -5\`) and read \`AGENTS.md\` + \`.specnaut/memory/constitution.md\` for context.
+1. Locate yourself (\`git branch --show-current\` + \`git log --oneline -5\`) and read \`AGENTS.md\` + \`docs/constitution.md\` for context.
 2. Read \`product-owner/memory/MEMORY.md\` beside this file if it exists (not
    every harness ships one) — your memory home. **Never** write to an
    \`agent-memory/\` folder.
@@ -5677,9 +5696,8 @@ architecture.
 ## First action in every session
 
 1. Read \`AGENTS.md\` at the project root to learn the tech stack and rules.
-2. Read \`.specnaut/memory/constitution.md\` for non-negotiable invariants —
-   especially the **Engineering methodology**, **Architecture layers**,
-   **Back-end patterns**, and **Front-end patterns** sections.
+2. Read \`docs/constitution.md\` for the principles every change is held to,
+   and the \`Check:\` line under each — the test your change must pass.
 3. Read the current feature's \`plan.md\` and \`tasks.md\` if a Specnaut feature
    directory is in context. Those are the only two artefacts a feature has.
    (A directory scaffolded before 2.0.0 may also carry \`spec.md\` and friends;
@@ -5689,9 +5707,9 @@ architecture.
    the direct-implementation path. If it is absent or empty, return BLOCKED
    with reason \`awaiting:product-owner-domain-brief\` and stop. Do not proceed
    without it.
-5. **Size limits.** Before editing a file, compare its \`wc -l\` with the
-   constitution's \`## Size limits\` table (\`.specnaut/memory/size-limits.md\`
-   holds the rule and the defaults). A file over its target gets the
+5. **Size limits.** Before editing a file, compare its \`wc -l\` with
+   \`.specnaut/memory/size-limits.md\` (the rule and the defaults;
+   \`.specnaut/size-limits.yml\` overrides them when present). A file over its target gets the
    extraction first, as its own commit — rule 3, never "add it and split
    later". List each touched file's \`before → after\` in \`Decisions\`.
 6. **Read \`plan.md\` § 5 (Decision table)** if the plan has one. Each rule's
@@ -5837,12 +5855,16 @@ in parallel and aggregate results.
 0. **Measure sizes.** Run \`bash .specnaut/scripts/bash/size-ratchet.sh --since
    "\$(git merge-base HEAD <default branch>)" --report\`: every changed file's
    line count at the base and at head, renames measured against their old
-   path. Put its output in every seat's brief, with the constitution's
-   \`## Size limits\` table — or the path \`.specnaut/memory/size-limits.md\` when
-   it has none. The seats read; you measure. Severity for size comes from that
+   path. Put its output in every seat's brief, with the path
+   \`.specnaut/memory/size-limits.md\` (and \`.specnaut/size-limits.yml\` when the
+   project has one). The seats read; you measure. Severity for size comes from that
    file's table, nowhere else; exit 2 (unreadable table) is a HIGH finding,
    and any exit but 0, 1 or 2 means nothing was measured — say so in every
-   brief; never brief "no size data" as clean.
+   brief; never brief "no size data" as clean. Then run
+   \`bash .specnaut/scripts/bash/boundary-check.sh\` when it is present, and put
+   its output in every brief too: exit 1 (a forbidden import in the domain) and
+   exit 2 (the check could not run) are HIGH findings; exit 4 is briefed as
+   *skipped: <reason>*, never as clean (\`phases/quality-gates.md\`).
 1. Always spawn \`code-reviewer\` and \`security-expert\` in parallel, passing them
    the list of changed files.
 2. If any changed file matches \`**/*test*.*\` or \`**/*_test.*\` or \`**/test/**\`
@@ -5993,7 +6015,7 @@ explore the rest of the codebase unless strictly necessary for context.
 
 ## Always-check rules
 
-1. **Constitution compliance**: read \`.specnaut/memory/constitution.md\` first.
+1. **Constitution compliance**: read \`docs/constitution.md\` first.
    Any violation is at least HIGH severity.
 2. **Silent error handling**: any \`catch\` block that swallows the error (empty
    body, comment-only, or discards the error object) is CRITICAL.
@@ -6006,10 +6028,10 @@ explore the rest of the codebase unless strictly necessary for context.
    (controllers/services/repositories or equivalent), flag layer violations as
    HIGH.
 7. **Size**: every file and function against \`.specnaut/memory/size-limits.md\`
-   — its thresholds come from the constitution's \`## Size limits\` table, never a
-   number of your own, and its severity table is the one you apply. Name the
-   unit, the measured value, and the limit with its source (\`constitution\` or
-   \`default\`). For every file that ends over its target, report the
+   — its rule and defaults, or \`.specnaut/size-limits.yml\` where the project
+   overrides them; never a number of your own, and its severity table is the one
+   you apply. Name the unit, the measured value, and the limit with its source,
+   as that file names it. For every file that ends over its target, report the
    coordinator's line counts as \`wc -l <before> → <after>\`. Size severities
    are that table's — rule 1's "at least HIGH" floor does not apply to them.
 
@@ -6507,7 +6529,7 @@ between "the code compiles" and "the user sees a green dashboard at 3 a.m."
 ## First action in every session
 
 1. Read \`AGENTS.md\` at the project root for tech stack and constraints.
-2. Read \`.specnaut/memory/constitution.md\` for non-negotiable invariants
+2. Read \`docs/constitution.md\` for non-negotiable invariants
    (often where SLOs, error budgets, and security posture live).
 3. Identify which cloud(s) the project targets (GCP, Azure, AWS, multi-cloud)
    and which IaC tool is canonical (Terraform, Pulumi, OpenTofu, CDK).
@@ -7116,7 +7138,7 @@ the runtime, the data volume and the access pattern, none of which a general
 reference can carry without being wrong somewhere. What you have instead is the
 project itself.
 
-1. **Read \`.specnaut/memory/constitution.md\` if it exists.** A project that has
+1. **Read \`docs/constitution.md\` if it exists.** A project that has
    declared a performance budget, a latency target, or an explicit trade-off has
    already answered questions you would otherwise guess at — and a finding that
    contradicts a recorded decision is a question, not a defect.
@@ -7151,7 +7173,7 @@ cannot fail a gate on its own, which is the point.
 read is otherwise invisible, and the reader cannot tell a judgement from a
 guess.
 
-**If \`.specnaut/memory/constitution.md\` is absent** — you were installed as a
+**If \`docs/constitution.md\` is absent** — you were installed as a
 standalone plugin rather than scaffolded — review against the rules below and
 say so in one line at the top of your report.
 
@@ -8303,7 +8325,7 @@ survive across sessions and isn't captured elsewhere:
 
 ## When NOT to add an entry
 
-- Architecture decisions → those go in \`AGENTS.md\` or \`.specnaut/memory/constitution.md\`.
+- Architecture decisions → those go in \`AGENTS.md\` or \`docs/constitution.md\`.
 - One-off bug fixes that are captured in the commit message → no memory
   needed.
 - Anything the developer can re-derive by reading the current code.
@@ -8392,8 +8414,7 @@ should survive across sessions and isn't captured elsewhere:
 ## When NOT to add an entry
 
 - IaC / pipeline definitions → those live in the actual config files.
-- Architecture choices → those go in \`AGENTS.md\` or
-  \`.specnaut/memory/constitution.md\`.
+- Architecture choices → those go in \`AGENTS.md\` or \`docs/constitution.md\`.
 - One-off incidents that are fully resolved with no recurring risk → no
   memory needed.
 
@@ -13623,81 +13644,28 @@ continuous supervision of long headless work, use \`/loop 5m /status-audit\`.
   {
     category: "spec-root",
     name: "specify",
-    suffix: "memory/constitution.md",
-    content: `# Project Constitution
-
-> This file holds the invariants of your project: architecture rules, conventions, and
-> non-negotiable policies. Specnaut commands and review agents read it at every step.
->
-> Replace this placeholder with your own constitution. Use
-> \`.specnaut/templates/constitution-template.md\` as a starting point.
-
-## Principles
-
-(none defined yet)
-
-## Size limits
-
-> This table is the only source of size thresholds for every Specnaut phase,
-> agent and script. A unit it does not list falls back to the default in
-> \`.specnaut/memory/size-limits.md\`. Edit the numbers; keep the shape.
-
-| Unit | Target | Ceiling |
-| :--- | ---: | ---: |
-| file | 300 | 500 |
-| function | 30 | 50 |
-| constitution | 300 | 500 |
-
-Exempt: \`*.lock\`
-
-1. **A unit over its ceiling fails** — unless the change shrinks it.
-2. **A unit over its target may not grow** — no larger than when the change
-   began.
-3. **Extract before you add** — when a change must add to a file over its
-   target, the extraction lands first and moves out at least as many lines as
-   the change adds to that file.
-
-## Front-end patterns
-
-- **Mobile-first is the default** — any UI, web or native, follows the
-  \`mobile-first-contract\` skill. Read it; never restate it here.
-
-### Target surface
-
-*This project has NOT declared an exception, so mobile-first is assumed.*
-
-If it genuinely targets a narrower surface — an operator console, an internal
-dashboard, a known desktop-only audience — the \`mobile-first-contract\` skill
-names the exact heading and sentence to write here. Read it there; the literal
-form is deliberately not reproduced in this file, because a copy of it sitting
-in a shipped seed is indistinguishable from a project that made the
-declaration.
-`,
-    executable: false,
-    backend: null,
-    skipIfExists: true,
-  },
-  {
-    category: "spec-root",
-    name: "specify",
     suffix: "memory/size-limits.md",
     content: `> **Agents depend on this file.** Every phase and agent that judges the size of
 > a file or a function cites it instead of carrying its own number. Moving or
 > renaming it breaks those links in silence. Specnaut owns it: \`specnaut
-> upgrade\` rewrites it, so a project changes its limits in its constitution,
-> never here.
+> upgrade\` rewrites it, so a project changes its limits in
+> \`.specnaut/size-limits.yml\`, never here.
 
 # Size limits
 
 ## Where the numbers come from — the one rule
 
-**The \`## Size limits\` table in \`.specnaut/memory/constitution.md\` is the only
-source of thresholds. The defaults below apply only to a unit that table does
-not list** — including every unit, when the constitution has no such table.
+**\`.specnaut/size-limits.yml\` is the only source of a project's thresholds.
+The defaults below apply only to a unit that file does not set** — including
+every unit, when the project has no such file. The project owns the file:
+Specnaut never ships or rewrites it, and where the harness runs Specnaut's
+hooks, an agent's edit to it needs the user's approval: loosening a limit
+disarms its own gate.
 
-A threshold written anywhere else — an agent, a phase, a catalogue leaf — is
-not a threshold. Every size finding names the unit, the measured value, and the
-limit with its source: \`constitution\` or \`default\`.
+A threshold written anywhere else — an agent, a phase, a catalogue leaf, a
+table in the constitution — is not a threshold. Every size finding names the
+unit, the measured value, and the limit with its source: \`config\` or
+\`default\`.
 
 ## Defaults
 
@@ -13705,43 +13673,52 @@ limit with its source: \`constitution\` or \`default\`.
 | :--- | ---: | ---: |
 | file | 300 | 500 |
 | function | 30 | 50 |
-| constitution | 300 | 500 |
+| constitution | 60 | 100 |
 
-\`constitution\` is the constitution file itself. It is loaded into every
-session, so every line it gains is paid by every later session; it is the one
-file under \`.specnaut/\` the limits measure.
+\`constitution\` is \`docs/constitution.md\` itself. It is loaded into every
+session, so every line it gains is paid by every later session: it keeps
+principles only, which is why its limits are the shortest.
 
-## The table, in a constitution
+## The config file
 
-\`\`\`markdown
-## Size limits
-
-| Unit | Target | Ceiling |
-| :--- | ---: | ---: |
-| file | 300 | 500 |
-| function | 30 | 50 |
-| constitution | 300 | 500 |
-
-Exempt: \`*.lock\`, \`**/generated/**\`
+\`\`\`yaml
+# .specnaut/size-limits.yml — set only what differs from the defaults
+file:
+  target: 300
+  ceiling: 500
+function:
+  target: 30
+  ceiling: 50
+constitution:
+  target: 60
+  ceiling: 100
+exempt:
+  - "*.lock"
+  - "**/generated/**"
 \`\`\`
 
-- One row per unit, no merged cells. \`file\`, \`function\` and \`constitution\` are
-  the expected rows; others (\`class\`, \`component\`) are allowed and judged by
-  the agents.
-- A value is a whole number of lines, or \`none\`. \`none\` as a target turns off
-  rule 2 for that unit; \`none\` as a ceiling turns off rule 1.
-- \`Exempt:\` is optional: backquoted globs, comma-separated, matched against the
-  path from the repository root. An exempt file has no file limit at all.
-  Lockfiles, generated code and vendored bundles are what it is for.
-- \`.specnaut/scripts/bash/size-ratchet.sh\` reads exactly this shape. A table it
-  cannot read — including a heading spelled differently, or a \`files\` row —
-  stops it with exit 2; it never passes silently and never falls back to the
-  defaults.
+- Each unit — \`file\`, \`function\`, \`constitution\` — sets both \`target\` and
+  \`ceiling\`. A value is a whole number of lines, or \`none\`. \`none\` as a target
+  turns off rule 2 for that unit; \`none\` as a ceiling turns off rule 1. Other
+  units (\`class\`, \`component\`) are the agents' judgement, never the config's.
+- \`exempt:\` is optional: globs, one per line and quoted (\`*.lock\` bare is not
+  YAML), matched against the path from the repository root. An exempt file has
+  no file limit at all. Lockfiles, generated code and vendored bundles are what
+  it is for.
+- The form is a narrow block YAML: a key alone on its line, children indented
+  two spaces, full-line \`#\` comments. A flow map (\`file: {…}\`), a tab, a
+  trailing comment, a repeated key, a link at the path, or a value that is not
+  a number or \`none\` stops \`.specnaut/scripts/bash/size-ratchet.sh\` with exit 2;
+  it never passes silently and never falls back to the defaults.
 - Specnaut's own files — \`.specnaut/**\` and everything \`.specnaut/installed.lock\`
   lists — are exempt without being listed: \`specnaut upgrade\` rewrites them.
   The constitution is the exception: whenever it changes, the ratchet holds it
-  to the \`constitution\` unit, and \`Exempt:\` globs do not reach it. To lift its
-  limit, write \`| constitution | none | none |\`.
+  to the \`constitution\` unit, and \`exempt:\` globs do not reach it. To lift its
+  limit, set both its values to \`none\`.
+- A constitution written before this file existed may still carry a size
+  table. It is no longer read: \`specnaut upgrade\` copies a non-default one into
+  \`.specnaut/size-limits.yml\` once, when that file is absent, and says the
+  table can be deleted.
 
 ## The three rules
 
@@ -13781,7 +13758,7 @@ harm: a HIGH size finding is routed back like any other HIGH, every time.
 ## A file that is not authored
 
 Generated code, a vendored bundle, a lockfile, a data table: list it under
-\`Exempt:\` rather than arguing each review. A file that is authored is not
+\`exempt:\` in the config rather than arguing each review. A file that is authored is not
 excused by the smell's "when it is not a smell" — the limit still applies. The god-file smell in
 \`.specnaut/memory/architecture/smells/god-file.md\` covers the judgement call;
 the limits above cover the number.
@@ -13804,10 +13781,10 @@ behaviour lands as a "create module X" task wherever it can; a task that adds
 to a file over its target comes only after that file's extraction, and says the
 size the file must stay within (its size at plan time).
 
-**implement** — re-read the constitution before the first task, and put its
-\`## Size limits\` table (or this file's path, when it has none) in every
+**implement** — read \`.specnaut/size-limits.yml\` before the first task, and
+put its limits (or this file's path, when the project has none) in every
 subagent's dispatch brief: a subagent sees one task and one file, and without
-the table has no reason to stop a file from growing. Run \`wc -l\` on each file a
+the limits has no reason to stop a file from growing. Run \`wc -l\` on each file a
 task touches and report every one as
 \`file: before → after (target T, ceiling C)\`, "before" being its size at the
 branch's merge base. The developer puts that line in its completion report's
@@ -13818,7 +13795,7 @@ never after.
 **review** — the review coordinator runs
 \`bash .specnaut/scripts/bash/size-ratchet.sh --since <merge base> --report\`, which
 measures every changed file at the base and at head (a renamed file against its
-old path), and briefs each seat with that output and the table. It runs for
+old path), and briefs each seat with that output and the limits. It runs for
 every reviewed change, standalone or epic. The severity
 table above is the only one; \`code-reviewer\` cites it and reports
 \`wc -l <before> → <after>\` for every file that ends over its target. A HIGH size
@@ -22441,9 +22418,9 @@ merely sequences calls.
 ## How to spot it
 
 A single file far larger than its neighbours, usually accumulating unrelated
-responsibilities. **The finding's threshold is the file limit in the project's
-constitution** — \`.specnaut/memory/size-limits.md\` holds the rule and the
-defaults; no other number decides it. In an audit, also report the
+responsibilities. **The finding's threshold is the project's file limit** —
+\`.specnaut/memory/size-limits.md\` holds the rule and the defaults; no other
+number decides it. In an audit, also report the
 **distribution**: a file three times the size of the next-largest tells the
 reader where to start. It is context for the finding, not a second threshold.
 
@@ -22463,7 +22440,7 @@ still change together.
 
 Generated code, a vendored bundle, a lockfile, a data table, or a
 deliberately-single-file module whose content is one long flat list — list it
-under the constitution's \`Exempt:\` line; an authored file is still held to its
+under the size limits' \`exempt:\` list; an authored file is still held to its
 limit. Judge by
 responsibilities, and check whether the file is authored at all before
 flagging it.
@@ -23438,7 +23415,7 @@ number beats a paragraph. Who is hurting, how often, and what it costs them toda
 
 | Principle | Verdict | Note |
 | :--- | :--- | :--- |
-| Size limits (\`## Size limits\`, or the defaults in \`.specnaut/memory/size-limits.md\`) | pass / violation | [mandatory row — never removed] |
+| Size limits (\`.specnaut/memory/size-limits.md\`, or the project's \`.specnaut/size-limits.yml\`) | pass / violation | [mandatory row — never removed] |
 | [principle] | pass / violation | [why] |
 
 ### Files touched
@@ -23616,8 +23593,8 @@ description: "Task list template for feature implementation"
 
 **⚠️ CRITICAL**: No user story work can begin until this phase is complete
 
-**Extractions first.** For every file the plan touches that is over its target in the
-constitution's Size limits table (re-measure with \`wc -l\` — never trust the plan's figure), the
+**Extractions first.** For every file the plan touches that is over its target in
+\`.specnaut/memory/size-limits.md\` (re-measure with \`wc -l\` — never trust the plan's figure), the
 first task touching it is an extraction:
 
 - [ ] T003a Extract [responsibility] from [path] ([N] lines, target [T]) into [new module path] —
@@ -23816,189 +23793,6 @@ With multiple developers:
 - Commit after each task or logical group
 - Stop at any checkpoint to validate story independently
 - Avoid: vague tasks, same file conflicts, cross-story dependencies that break independence
-`,
-    executable: false,
-    backend: null,
-    skipIfExists: false,
-  },
-  {
-    category: "spec-root",
-    name: "specify",
-    suffix: "templates/constitution-template.md",
-    content: `# [PROJECT_NAME] Constitution
-<!-- Example: Spec Constitution, TaskFlow Constitution, etc. -->
-
-## Engineering methodology (Specnaut baseline)
-
-> Specnaut ships these as opinionated defaults. Amend, soften, or remove
-> per principle — but a project that overrides them MUST document why.
-
-### Test-Driven Development (NON-NEGOTIABLE)
-
-Red → Green → Refactor on every implementation. No business logic ships
-untested. If no test infra exists, the developer bootstraps it as part
-of the task (Vitest for TS/JS, Pytest for Python, JUnit for Java,
-\`go test\` for Go, \`cargo test\` for Rust, PHPUnit for PHP, etc.) and
-notes it in the completion report.
-
-### Domain-Driven Design (NON-NEGOTIABLE)
-
-- Every business concept lives in its own bounded-context folder.
-- Domain layer is pure: no I/O, no framework, no DB.
-- Application layer orchestrates use cases via ports.
-- Infrastructure layer holds adapters (DB, HTTP, queues, filesystem, SDKs).
-- Presentation layer (CLI, web UI, controllers) talks only to use cases.
-- Cross-bounded-context leakage is forbidden — split or use an
-  anti-corruption layer.
-
-### SOLID / DRY / KISS / YAGNI
-
-- Single Responsibility, Open/Closed, Liskov, Interface Segregation,
-  Dependency Inversion.
-- DRY only when duplication is *semantic*, not accidental similarity.
-- KISS: ship the smallest correct design.
-- YAGNI: build what the task requires, nothing more.
-
-### Boy Scout Rule (with escalation)
-
-- Always leave touched files cleaner than you found them.
-- In-scope small cleanups (≤ 1 file, ~15 lines diff, no API change):
-  do them.
-- Out-of-scope larger cleanups: log under \`Tech debt surfaced\` in the
-  completion report — the Product Owner opens a tech-debt ticket.
-
-## Size limits
-
-> This table is the only source of size thresholds for every Specnaut phase,
-> agent and script. A unit it does not list falls back to the default in
-> \`.specnaut/memory/size-limits.md\`. Edit the numbers; keep the shape.
-
-| Unit | Target | Ceiling |
-| :--- | ---: | ---: |
-| file | 300 | 500 |
-| function | 30 | 50 |
-| constitution | 300 | 500 |
-
-Exempt: \`*.lock\`
-
-1. **A unit over its ceiling fails** — unless the change shrinks it.
-2. **A unit over its target may not grow** — no larger than when the change
-   began.
-3. **Extract before you add** — when a change must add to a file over its
-   target, the extraction lands first and moves out at least as many lines as
-   the change adds to that file.
-
-## Architecture layers
-
-> Default is hexagonal / DDD. Customize for your project's idiom.
-
-- \`domain/\` — pure business types, entities, value objects, domain services
-- \`application/\` — use cases, ports (interfaces), orchestration
-- \`infrastructure/\` — adapters (DB, HTTP clients, queues, filesystem, SDKs)
-- \`presentation/\` — CLI commands, web routes, API controllers, UI shells
-
-Each bounded context gets its own subtree: \`domain/<context>/\`,
-\`application/<context>/\`, \`infrastructure/<context>/\`.
-
-## Back-end patterns
-
-> Tune to your stack. Remove what doesn't apply.
-
-- **Repository pattern** for data access — one repository port per
-  aggregate root in \`application/\`, with the adapter in
-  \`infrastructure/\`. Domain never imports a DB driver.
-- **Service objects / use cases** — one class per use case in
-  \`application/\`. Verb-named (\`PlaceOrder\`, \`RefundPayment\`).
-- **Dependency injection through constructors** — no service locators,
-  no module-level globals, no hidden singletons.
-- **Controllers stay thin** — translate transport ↔ use case. No
-  business logic in controllers.
-- **Errors are domain types** — return typed results or throw domain
-  errors; never let an HTTP/SQL error reach the domain layer.
-- **Pure domain** — no logging, no metrics, no clocks inside \`domain/\`;
-  pass them as ports from \`application/\`.
-
-## Front-end patterns
-
-> Defaults assume a component-based UI framework (React, Vue, Svelte,
-> Solid…). Tune accordingly.
-
-- **Separation of view and logic** — components render markup;
-  business logic lives in hooks / composables / services / view-models.
-- **No business rules in templates** — derive in hooks/composables, then
-  render the result. Templates only branch on view state.
-- **Smart vs dumb components** — presentational components stay pure
-  and prop-driven; container components / hooks hold state and effects.
-- **Single source of truth for cross-cutting state** — typed store
-  (Redux, Pinia, Zustand…) or context, not deep prop-drilling.
-- **API access through a typed client** — never call \`fetch\` directly
-  from a component; route it through a service / repository layer.
-- **Accessibility is non-optional** — semantic HTML, keyboard paths,
-  visible focus, ARIA only when semantic HTML doesn't suffice.
-- **Mobile-first is the default** — any UI, web or native, follows the
-  \`mobile-first-contract\` skill. Read it; never restate it here. It is a
-  default, not a mandate: to declare an exception, replace the body of
-  \`### Target surface\` below with the sentence the contract names. Leave it as
-  it is and mobile-first is assumed.
-
-### Target surface
-
-*This project has NOT declared an exception, so mobile-first is assumed.*
-
-If it genuinely targets a narrower surface, the \`mobile-first-contract\` skill
-names the exact sentence to write here. Read it there. The form is deliberately
-not reproduced in this file: a copy of it sitting under this heading is
-indistinguishable from a project that made the declaration, so a template
-carrying one would ship the feature switched off to everyone who copies the
-template without editing it.
-
-## Core Principles
-
-### [PRINCIPLE_1_NAME]
-<!-- Example: I. Library-First -->
-[PRINCIPLE_1_DESCRIPTION]
-<!-- Example: Every feature starts as a standalone library; Libraries must be self-contained, independently testable, documented; Clear purpose required - no organizational-only libraries -->
-
-### [PRINCIPLE_2_NAME]
-<!-- Example: II. CLI Interface -->
-[PRINCIPLE_2_DESCRIPTION]
-<!-- Example: Every library exposes functionality via CLI; Text in/out protocol: stdin/args → stdout, errors → stderr; Support JSON + human-readable formats -->
-
-### [PRINCIPLE_3_NAME]
-<!-- Example: III. Test-First (NON-NEGOTIABLE) -->
-[PRINCIPLE_3_DESCRIPTION]
-<!-- Example: TDD mandatory: Tests written → User approved → Tests fail → Then implement; Red-Green-Refactor cycle strictly enforced -->
-
-### [PRINCIPLE_4_NAME]
-<!-- Example: IV. Integration Testing -->
-[PRINCIPLE_4_DESCRIPTION]
-<!-- Example: Focus areas requiring integration tests: New library contract tests, Contract changes, Inter-service communication, Shared schemas -->
-
-### [PRINCIPLE_5_NAME]
-<!-- Example: V. Observability, VI. Versioning & Breaking Changes, VII. Simplicity -->
-[PRINCIPLE_5_DESCRIPTION]
-<!-- Example: Text I/O ensures debuggability; Structured logging required; Or: MAJOR.MINOR.BUILD format; Or: Start simple, YAGNI principles -->
-
-## [SECTION_2_NAME]
-<!-- Example: Additional Constraints, Security Requirements, Performance Standards, etc. -->
-
-[SECTION_2_CONTENT]
-<!-- Example: Technology stack requirements, compliance standards, deployment policies, etc. -->
-
-## [SECTION_3_NAME]
-<!-- Example: Development Workflow, Review Process, Quality Gates, etc. -->
-
-[SECTION_3_CONTENT]
-<!-- Example: Code review requirements, testing gates, deployment approval process, etc. -->
-
-## Governance
-<!-- Example: Constitution supersedes all other practices; Amendments require documentation, approval, migration plan -->
-
-[GOVERNANCE_RULES]
-<!-- Example: All PRs/reviews must verify compliance; Complexity must be justified; Use [GUIDANCE_FILE] for runtime development guidance -->
-
-**Version**: [CONSTITUTION_VERSION] | **Ratified**: [RATIFICATION_DATE] | **Last Amended**: [LAST_AMENDED_DATE]
-<!-- Example: Version: 2.1.1 | Ratified: 2025-06-13 | Last Amended: 2025-07-16 -->
 `,
     executable: false,
     backend: null,
@@ -25807,18 +25601,192 @@ exit 3
   {
     category: "spec-root",
     name: "specify",
+    suffix: "scripts/bash/_config.sh",
+    content: `# shellcheck shell=bash disable=SC2034
+# (SC2034: the CONFIG_* paths and defaults are read by the sourcing script.)
+#
+# Sourced by the gate scripts beside it (size-ratchet.sh, boundary-check.sh):
+# the one bash reader of the project-owned configs (spec 038). Its TypeScript
+# twin is \`readSizeLimits\` in the CLI; both are held to one fixture corpus, so
+# the two cannot read one file two ways.
+#
+# The grammar is a narrow block YAML, and nothing else:
+#
+#   # a full-line comment
+#   file:               a key alone on its line, at column 0
+#     target: 300       a map child, indented two spaces
+#   exempt:
+#     - "*.lock"        a list entry; "…" or '…' quotes are stripped
+#
+# Refused, with exit 2: a tab, a carriage return other than a CRLF line end,
+# a flow map or inline value (\`file: {…}\`, \`exempt: [...]\`), a block scalar or
+# deeper indentation (a multi-line value), an unknown or repeated key, a key
+# with no value, and a plain entry YAML would read as something else (\`*x\`,
+# \`a: b\`, a trailing \` #\`). A trailing comment is not stripped: it fails the
+# value check. A link at the config path is refused too — the hooks guard the
+# file by its path, and a link moves it where they do not look.
+#
+# Values are checked, never evaluated: a limit is \`none\` or at most nine
+# digits, so a later \`[ -gt ]\` can neither run code nor overflow.
+#
+# API — each function prints to stdout; on exit 2, stdout is the one-line
+# reason (\`line N: …\`, or \`is a link …\`), which the caller prefixes:
+#
+#   config_present <file>       0 when anything is at the path, a dangling link included
+#   config_parse <file> "<map keys>" "<list keys>"
+#                               0, one tab-separated record per line:
+#                                 K <line> <key>                 a key
+#                                 M <line> <key> <child> <value> a map child
+#                                 L <line> <key> <value>         a list entry
+#                               nothing when the file is absent; 2 unreadable
+#   config_size_limits <file>   0, the limits with the defaults filled in:
+#                                 <unit> <target> <ceiling> <config|default>
+#                                 exempt <glob>
+#                               for file, function, constitution in that order;
+#                               2 unreadable
+
+# The project-owned paths the gates read. The TypeScript twin is
+# src/domain/constitution_paths.ts; paths_parity_test.ts holds them equal.
+CONFIG_CONSTITUTION=docs/constitution.md
+CONFIG_SIZE_LIMITS=.specnaut/size-limits.yml
+CONFIG_BOUNDARIES=.specnaut/boundaries.yml
+
+# The defaults of .specnaut/memory/size-limits.md — "target ceiling" per unit.
+# size_thresholds_single_arbiter_test.ts pins them to that file's table.
+CONFIG_DEFAULT_FILE="300 500"
+CONFIG_DEFAULT_FUNCTION="30 50"
+CONFIG_DEFAULT_CONSTITUTION="60 100"
+
+config_present() { [ -e "\$1" ] || [ -L "\$1" ]; }
+
+# Read with \`read -d ''\`, not \`\$(cat <<…)\`: bash 3.2 mis-parses a quoted
+# heredoc inside a command substitution when it holds unbalanced quotes.
+IFS= read -r -d '' _CONFIG_AWK <<'AWK' || true
+BEGIN {
+  n = split(maps, a, " "); for (i = 1; i <= n; i++) kind[a[i]] = "map"
+  n = split(lists, a, " "); for (i = 1; i <= n; i++) kind[a[i]] = "list"
+}
+function fail(m) { if (err == "") err = "line " NR ": " m; exit }
+{
+  line = \$0
+  sub(/\\r\$/, "", line)
+  if (index(line, "\\r")) fail("a carriage return inside a line")
+  if (index(line, "\\t")) fail("a tab — indent with two spaces")
+  if (line ~ /^ *\$/ || line ~ /^ *#/) next
+  if (line ~ /^[a-z_]+: *\$/) {
+    key = line; sub(/: *\$/, "", key)
+    if (!(key in kind)) fail("unknown key '" key "'")
+    if (key in seen) fail("'" key "' is given twice")
+    seen[key] = NR; order[++nk] = key; cur = key
+    out = out "K\\t" NR "\\t" key "\\n"; next
+  }
+  if (line ~ /^[a-z_]+:/) fail("an inline or flow value — write the block form, one value per line")
+  if (line ~ /^[^ ]/) fail("a line this reader does not take")
+  if (cur == "") fail("a value outside any key")
+  if (kind[cur] == "map" && line ~ /^  [a-z_]+:/) {
+    child = line; sub(/^  /, "", child); sub(/:.*\$/, "", child)
+    val = line; sub(/^  [a-z_]+:/, "", val); sub(/^ +/, "", val); sub(/ +\$/, "", val)
+    if (val == "") fail("'" cur "." child "' has no value")
+    if ((cur, child) in got) fail("'" cur "." child "' is given twice")
+    got[cur, child] = 1; has[cur] = 1
+    out = out "M\\t" NR "\\t" cur "\\t" child "\\t" val "\\n"; next
+  }
+  if (kind[cur] == "list" && substr(line, 1, 4) == "  - ") {
+    val = substr(line, 5); sub(/ +\$/, "", val)
+    if (val ~ /^"[^"\\\\]*"\$/ || val ~ /^'[^']*'\$/) val = substr(val, 2, length(val) - 2)
+    else if (val ~ /^[][{}*&!|>%@\`#,?:'"]/ || val ~ /^- / || val ~ / #/ || val ~ /: / || val ~ /:\$/) fail("a value YAML reads otherwise — quote it")
+    if (val == "") fail("an empty entry")
+    has[cur] = 1
+    out = out "L\\t" NR "\\t" cur "\\t" val "\\n"; next
+  }
+  fail("a line this reader does not take — one value per line, indented two spaces")
+}
+END {
+  if (err != "") { print err; exit 2 }
+  for (i = 1; i <= nk; i++) if (!(order[i] in has)) { print "line " seen[order[i]] ": '" order[i] "' has no value"; exit 2 }
+  printf "%s", out
+}
+AWK
+
+config_parse() {
+  local file="\$1"
+  if [ -L "\$file" ]; then echo "is a link — the config is read only from a regular file"; return 2; fi
+  [ -e "\$file" ] || return 0
+  if [ ! -f "\$file" ]; then echo "is not a regular file"; return 2; fi
+  if [ ! -r "\$file" ]; then echo "cannot be read"; return 2; fi
+  awk -v maps="\$2" -v lists="\$3" "\$_CONFIG_AWK" "\$file" || return 2
+}
+
+# One unit's "<target> <ceiling>" from its M records, or the reason and 2.
+# \$1 unit, \$2 its key line, \$3 the records. Values are already checked.
+_config_unit() {
+  local kind n key child value t="" c=""
+  while IFS=\$'\\t' read -r kind n key child value; do
+    [ "\$kind" = M ] && [ "\$key" = "\$1" ] || continue
+    case "\$child" in target) t="\$value" ;; ceiling) c="\$value" ;; esac
+  done <<<"\$3"
+  [ -n "\$t" ] || { echo "line \$2: '\$1' lacks its target"; return 2; }
+  [ -n "\$c" ] || { echo "line \$2: '\$1' lacks its ceiling"; return 2; }
+  echo "\$t \$c"
+}
+
+config_size_limits() {
+  local records kind n key child value lim
+  local re='^(none|[0-9]{1,9})\$' file="" function="" constitution=""
+  records="\$(config_parse "\$1" "file function constitution" "exempt")" || {
+    echo "\$records"
+    return 2
+  }
+  # Settings in file order, then each unit in key order — the order the
+  # TypeScript reader checks them in, so both name the same first fault.
+  while IFS=\$'\\t' read -r kind n key child value; do
+    [ "\$kind" = M ] || continue
+    case "\$child" in target | ceiling) ;; *)
+      echo "line \$n: '\$key.\$child' is not a setting — expected target and ceiling"
+      return 2
+      ;;
+    esac
+    [[ \$value =~ \$re ]] || {
+      echo "line \$n: '\$key.\$child' is '\$value' — expected a whole number of lines or none"
+      return 2
+    }
+  done <<<"\$records"
+  while IFS=\$'\\t' read -r kind n key child; do
+    [ "\$kind" = K ] && [ "\$key" != exempt ] || continue
+    lim="\$(_config_unit "\$key" "\$n" "\$records")" || { echo "\$lim"; return 2; }
+    case "\$key" in
+      file) file="\$lim config" ;;
+      function) function="\$lim config" ;;
+      constitution) constitution="\$lim config" ;;
+    esac
+  done <<<"\$records"
+  echo "file \${file:-\$CONFIG_DEFAULT_FILE default}"
+  echo "function \${function:-\$CONFIG_DEFAULT_FUNCTION default}"
+  echo "constitution \${constitution:-\$CONFIG_DEFAULT_CONSTITUTION default}"
+  while IFS=\$'\\t' read -r kind n key child; do
+    [ "\$kind" != L ] || printf 'exempt %s\\n' "\$child"
+  done <<<"\$records"
+}
+`,
+    executable: false,
+    backend: null,
+    skipIfExists: false,
+  },
+  {
+    category: "spec-root",
+    name: "specify",
     suffix: "scripts/bash/size-ratchet.sh",
     content: `#!/usr/bin/env bash
-# Hold every changed file to the constitution's file size limits.
+# Hold every changed file to the project's file size limits.
 #
 #   size-ratchet.sh [--report]                  staged changes (pre-commit)
 #   size-ratchet.sh --since <ref> [--report]    committed changes, <ref> → HEAD
 #
-# Reads the \`file\` and \`constitution\` rows and the \`Exempt:\` line of the
-# \`## Size limits\` table in \`.specnaut/memory/constitution.md\`. A unit the table
-# does not list takes the defaults in \`.specnaut/memory/size-limits.md\` (300 /
-# 500 for both). That file states the rules; this script is their deterministic
-# half, and the one measurer the review coordinator calls.
+# Reads the \`file\` and \`constitution\` units and the \`exempt:\` globs of
+# \`.specnaut/size-limits.yml\` through \`_config.sh\` beside it. A unit the file
+# does not set — every unit, with no file — takes the defaults of
+# \`.specnaut/memory/size-limits.md\`. That file states the rules; this script is
+# their deterministic half, and the one measurer the review coordinator calls.
 #
 # "Before" is the size at the BASE OF THE CHANGE, not at the previous commit:
 #
@@ -25838,10 +25806,10 @@ exit 3
 #
 # Exempt without asking: \`.specnaut/**\` and every file \`.specnaut/installed.lock\`
 # lists — Specnaut's own artefacts, which \`specnaut upgrade\` rewrites — plus
-# binary files and the constitution's \`Exempt:\` globs. One file is the
-# exception: the constitution itself, loaded into every session, is held to the
-# \`constitution\` unit whenever it changes. \`Exempt:\` globs do not reach it; a
-# project that wants no limit says \`| constitution | none | none |\`.
+# binary files and the config's \`exempt:\` globs. One file is the exception:
+# \`docs/constitution.md\`, loaded into every session, is held to the
+# \`constitution\` unit whenever it changes. \`exempt:\` globs do not reach it; a
+# project that wants no limit sets its \`target\` and \`ceiling\` to \`none\`.
 #
 # \`--report\` also prints every checked file, \`path: before → after\`.
 #
@@ -25852,10 +25820,11 @@ exit 3
 #   0   every changed file is within its limits (or nothing changed)
 #   1   at least one violation — each printed as
 #       \`path: before → after (target T, ceiling C)\`
-#   2   the constitution has a size-limits section this script cannot read.
-#       An unreadable table never passes silently, and never falls back to
-#       the defaults.
-#   3   not inside a git work tree, a bad <ref>, or a usage error
+#   2   \`.specnaut/size-limits.yml\` cannot be read (see \`_config.sh\` for the
+#       grammar). An unreadable config never passes silently, and never falls
+#       back to the defaults.
+#   3   not inside a git work tree, a bad <ref>, a missing \`_config.sh\`, or a
+#       usage error
 set -uo pipefail
 
 usage() { echo "usage: size-ratchet.sh [--since <ref>] [--report]" >&2; exit 3; }
@@ -25869,8 +25838,12 @@ while [ "\$#" -gt 0 ]; do
   esac
 done
 
-DEFAULT_TARGET=300
-DEFAULT_CEILING=500
+# Sourced before the \`cd\` below: the script's own directory may be relative.
+# shellcheck source=SCRIPTDIR/_config.sh
+. "\$(cd -- "\$(dirname -- "\${BASH_SOURCE[0]}")" && pwd)/_config.sh" || {
+  echo "size-ratchet: _config.sh is missing beside the script" >&2
+  exit 3
+}
 
 REPO_ROOT="\$(git rev-parse --show-toplevel 2>/dev/null)" || {
   echo "size-ratchet: not inside a git work tree" >&2
@@ -25881,69 +25854,23 @@ if [ -n "\$SINCE" ] && ! git rev-parse --verify -q "\$SINCE^{commit}" >/dev/null
   echo "size-ratchet: not a commit: \$SINCE" >&2
   exit 3
 fi
-CONSTITUTION=".specnaut/memory/constitution.md"
+CONSTITUTION="\$CONFIG_CONSTITUTION"
 LOCK=".specnaut/installed.lock"
 
-target="\$DEFAULT_TARGET"
-ceiling="\$DEFAULT_CEILING"
-source_label="default"
-c_target="\$DEFAULT_TARGET"
-c_ceiling="\$DEFAULT_CEILING"
-c_source="default"
-exempt=()
-
-unreadable() { echo "size-ratchet: \$CONSTITUTION: \$1" >&2; exit 2; }
-
-# read_row <unit> <section> → "target ceiling" when the table lists the unit,
-# nothing when it does not. Any row naming the unit loosely (a plural, another
-# case) must be exactly <unit>: otherwise it would be skipped and the defaults
-# would silently apply.
-read_row() {
-  local unit="\$1" section="\$2" like value_re='(none|[0-9]+)'
-  like="\$(printf '%s\\n' "\$section" | grep -Ei "^\\|[[:space:]]*\${unit}s?[[:space:]]*\\|" || true)"
-  [ -n "\$like" ] || return 0
-  [ "\$(printf '%s\\n' "\$like" | wc -l | tr -d ' ')" = "1" ] ||
-    unreadable "the '\$unit' unit is listed more than once"
-  printf '%s\\n' "\$like" |
-    grep -Eq "^\\|[[:space:]]*\${unit}[[:space:]]*\\|[[:space:]]*\${value_re}[[:space:]]*\\|[[:space:]]*\${value_re}[[:space:]]*\\|[[:space:]]*\$" ||
-    unreadable "cannot read the row '\$like' — expected: | \$unit | <lines or none> | <lines or none> |"
-  printf '%s\\n' "\$like" | awk -F'|' '{ gsub(/[[:space:]]/, "", \$3); gsub(/[[:space:]]/, "", \$4); print \$3, \$4 }'
+# The limits, defaults filled in: \`<unit> <target> <ceiling> <source>\` and
+# \`exempt <glob>\` lines. Captured before it is split, so its exit 2 is seen.
+limits="\$(config_size_limits "\$CONFIG_SIZE_LIMITS")" || {
+  echo "size-ratchet: \$CONFIG_SIZE_LIMITS: \$limits" >&2
+  exit 2
 }
-
-# --- read the table -----------------------------------------------------------
-if [ -f "\$CONSTITUTION" ]; then
-  if grep -q '^## Size limits[[:space:]]*\$' "\$CONSTITUTION"; then
-    section="\$(awk '
-      /^## Size limits[[:space:]]*\$/ { inside = 1; next }
-      inside && /^## / { exit }
-      inside { print }
-    ' "\$CONSTITUTION")"
-    printf '%s\\n' "\$section" |
-      grep -Eq '^\\|[[:space:]]*Unit[[:space:]]*\\|[[:space:]]*Target[[:space:]]*\\|[[:space:]]*Ceiling[[:space:]]*\\|' ||
-      unreadable "the '## Size limits' section has no 'Unit | Target | Ceiling' table"
-    # read_row exits 2 itself, so its output is captured before it is split:
-    # \`read -r a b < <(read_row …)\` would swallow that exit.
-    row="\$(read_row file "\$section")" || exit 2
-    if [ -n "\$row" ]; then
-      read -r target ceiling <<<"\$row"
-      source_label="constitution"
-    fi
-    row="\$(read_row constitution "\$section")" || exit 2
-    if [ -n "\$row" ]; then
-      read -r c_target c_ceiling <<<"\$row"
-      c_source="constitution"
-    fi
-    exempt_line="\$(printf '%s\\n' "\$section" | grep -E '^Exempt:' || true)"
-    if [ -n "\$exempt_line" ]; then
-      while IFS= read -r glob; do
-        [ -n "\$glob" ] && exempt+=("\$glob")
-      done < <(printf '%s\\n' "\$exempt_line" | grep -o '\`[^\`]*\`' | tr -d '\`')
-    fi
-  elif grep -Eiq '^#+[[:space:]]*size[[:space:]-]*limits?[[:space:]]*\$' "\$CONSTITUTION"; then
-    # A heading that means the table but is not spelled the way it is read.
-    unreadable "found a size-limits heading that is not exactly '## Size limits'"
-  fi
-fi
+exempt=()
+while read -r unit rest; do
+  case "\$unit" in
+    file) read -r target ceiling source_label <<<"\$rest" ;;
+    constitution) read -r c_target c_ceiling c_source <<<"\$rest" ;;
+    exempt) exempt+=("\$rest") ;;
+  esac
+done <<<"\$limits"
 
 # Specnaut's own files: the lock's entries, two-space indented keys under \`entries:\`.
 managed=""
@@ -25963,8 +25890,8 @@ is_exempt() {
   local path="\$1" glob
   case "\$path" in .specnaut/*) return 0 ;; esac
   if [ -n "\$managed" ] && printf '%s\\n' "\$managed" | grep -Fxq -- "\$path"; then return 0; fi
+  # shellcheck disable=SC2254 # the glob is the pattern, in both arms
   for glob in \${exempt[@]+"\${exempt[@]}"}; do
-    # shellcheck disable=SC2254 — the glob is the pattern
     case "\$path" in \$glob) return 0 ;; esac
     case "/\$path" in \$glob) return 0 ;; esac
   done
@@ -26054,6 +25981,154 @@ if [ "\${#violations[@]}" -gt 0 ]; then
   exit 1
 fi
 echo "size-ratchet: \$checked \$scope file(s) within the file limits (target \$target, ceiling \$ceiling, source: \$source_label)"
+exit 0
+`,
+    executable: true,
+    backend: null,
+    skipIfExists: false,
+  },
+  {
+    category: "spec-root",
+    name: "specify",
+    suffix: "scripts/bash/boundary-check.sh",
+    content: `#!/usr/bin/env bash
+# Hold the project's domain paths free of the imports it forbids.
+#
+#   boundary-check.sh
+#
+# Reads three flat lists from \`.specnaut/boundaries.yml\`, through \`_config.sh\`
+# beside it (the grammar is stated there):
+#
+#   domain:   the paths whose tracked files are checked, from the repo root
+#   forbid:   extended regular expressions no line of those files may match
+#   exempt:   globs that keep a file out, matched as the size ratchet matches
+#             its own (\`path\` or \`/path\`, shell \`case\` semantics)
+#
+# Specnaut ships no copy of that file and no default pattern: which imports
+# break a domain is the project's call, and a guessed default would report a
+# pass that checked nothing.
+#
+# The tracked files are listed by git, never by a glob or a walk, so an
+# untracked or ignored file is never read. Only regular files (modes 100644 and
+# 100755) are, and never through a link: a symlink, committed or swapped in by
+# the work tree, could point anywhere on the disk. Binary files are skipped.
+#
+# Exit codes — a skip is never a pass, and neither is a check that broke:
+#   0   every tracked file under \`domain:\` was checked and none matches
+#   1   at least one match — each printed as \`path:line: pattern\`
+#   2   the check could not run: the config is unreadable or holds a pattern
+#       that does not compile, a \`domain:\` path git cannot list (outside the
+#       repo), a file grep cannot read, not a git work tree, \`_config.sh\`
+#       missing, or an argument (the script takes none)
+#   4   skipped, with the reason on stdout: no config, no \`forbid:\` patterns,
+#       no \`domain:\` paths, or no file left to check under them
+set -uo pipefail
+
+NAME=boundary-check
+fail() { echo "\$NAME: \$*" >&2; exit 2; }
+skip() { echo "\$NAME: skipped — \$*"; exit 4; }
+
+[ "\$#" -eq 0 ] || fail "usage: boundary-check.sh (it takes no arguments)"
+
+# Sourced before the \`cd\` below: the script's own directory may be relative.
+# shellcheck source=SCRIPTDIR/_config.sh
+. "\$(cd -- "\$(dirname -- "\${BASH_SOURCE[0]}")" && pwd)/_config.sh" ||
+  fail "_config.sh is missing beside the script"
+
+REPO_ROOT="\$(git rev-parse --show-toplevel 2>/dev/null)" || fail "not inside a git work tree"
+cd -- "\$REPO_ROOT" || fail "cannot enter \$REPO_ROOT"
+
+config_present "\$CONFIG_BOUNDARIES" || skip "no \$CONFIG_BOUNDARIES"
+# Captured before it is split, so its exit 2 is seen.
+records="\$(config_parse "\$CONFIG_BOUNDARIES" "" "domain forbid exempt")" ||
+  fail "\$CONFIG_BOUNDARIES: \$records"
+
+domains=() domain_lines=() patterns=() exempt=()
+while IFS=\$'\\t' read -r kind n key value; do
+  [ "\$kind" = L ] || continue
+  case "\$key" in
+    domain) domains+=("\$value") domain_lines+=("\$n") ;;
+    exempt) exempt+=("\$value") ;;
+    forbid)
+      # A pattern grep refuses would make every file "unreadable" at once;
+      # name the entry instead. Exit 1 is "no match", which is fine here.
+      grep -E -q -e "\$value" </dev/null 2>/dev/null
+      [ "\$?" -le 1 ] ||
+        fail "\$CONFIG_BOUNDARIES: line \$n: forbid: '\$value' is not an extended regular expression"
+      patterns+=("\$value")
+      ;;
+  esac
+done <<<"\$records"
+
+[ "\${#patterns[@]}" -gt 0 ] || skip "no forbid: patterns in \$CONFIG_BOUNDARIES"
+[ "\${#domains[@]}" -gt 0 ] || skip "no domain: paths in \$CONFIG_BOUNDARIES"
+
+is_exempt() {
+  local glob
+  # shellcheck disable=SC2254 # the glob is the pattern, in both arms
+  for glob in \${exempt[@]+"\${exempt[@]}"}; do
+    case "\$1" in \$glob) return 0 ;; esac
+    case "/\$1" in \$glob) return 0 ;; esac
+  done
+  return 1
+}
+
+# \`ls-files -z\` output holds NULs, which no bash variable can, and a process
+# substitution's exit status is lost on bash 3.2 — so it goes through a file.
+listing="\$(mktemp "\${TMPDIR:-/tmp}/boundary-check.XXXXXX")" || fail "cannot create a temporary file"
+trap 'rm -f -- "\$listing"' EXIT
+
+files=() tracked=0
+for i in "\${!domains[@]}"; do
+  domain="\${domains[\$i]}"
+  err="\$(git -c core.quotePath=false --literal-pathspecs ls-files -z -s -- "\$domain" 2>&1 >"\$listing")" ||
+    fail "\$CONFIG_BOUNDARIES: line \${domain_lines[\$i]}: domain: '\$domain' cannot be listed — \${err%%\$'\\n'*}"
+  found=0 prev=""
+  # Each record: \`<mode> <object> <stage>\\t<path>\`. A conflicted path comes
+  # once per stage, adjacent; it is checked once.
+  while IFS= read -r -d '' rec; do
+    path="\${rec#*\$'\\t'}"
+    [ "\$path" != "\$prev" ] || continue
+    prev="\$path"
+    case "\${rec%% *}" in 100644 | 100755) ;; *) continue ;; esac
+    found=1 tracked=\$((tracked + 1))
+    [ -L "\$path" ] && continue
+    is_exempt "\$path" || files+=("\$path")
+  done <"\$listing"
+  [ "\$found" = 1 ] || echo "  note: domain: '\$domain' (line \${domain_lines[\$i]}) names no tracked file"
+done
+
+[ "\$tracked" -gt 0 ] || skip "no tracked file under domain: in \$CONFIG_BOUNDARIES"
+[ "\${#files[@]}" -gt 0 ] || skip "every tracked file under domain: is exempt or a link"
+
+grep_args=()
+for pat in "\${patterns[@]}"; do grep_args+=(-e "\$pat"); done
+
+violations=()
+for file in "\${files[@]}"; do
+  # One pass with every pattern; only a file that matches is read again, per
+  # pattern, to say which one.
+  grep -E -I -q "\${grep_args[@]}" -- "\$file"
+  status=\$?
+  [ "\$status" -le 1 ] || fail "\$file: grep could not read it (exit \$status)"
+  [ "\$status" = 0 ] || continue
+  for pat in "\${patterns[@]}"; do
+    hits="\$(grep -E -I -n -e "\$pat" -- "\$file")"
+    status=\$?
+    [ "\$status" -le 1 ] || fail "\$file: grep could not read it (exit \$status)"
+    while IFS= read -r hit; do
+      [ -n "\$hit" ] && violations+=("\$file:\${hit%%:*}: \$pat")
+    done <<<"\$hits"
+  done
+done
+
+if [ "\${#violations[@]}" -gt 0 ]; then
+  echo "\$NAME: \${#violations[@]} forbidden import(s) in \${#files[@]} file(s) under domain:" >&2
+  for v in "\${violations[@]}"; do echo "  \$v" >&2; done
+  echo "  the domain stays free of frameworks — move the dependency behind a port" >&2
+  exit 1
+fi
+echo "\$NAME: \${#files[@]} file(s) under domain: clean of \${#patterns[@]} pattern(s)"
 exit 0
 `,
     executable: true,
@@ -27950,6 +28025,19 @@ _(List your non-negotiable rules — layering, DI, error handling, security.)_
 
 _(Naming, testing, commits, branches.)_
 
+<!-- --- Specnaut: constitution --- -->
+
+## Constitution
+
+*Owned by Specnaut — this section is not a placeholder to fill in. Edit the rest freely.*
+
+**\`docs/constitution.md\` holds the principles every plan, change and review is checked
+against.** Read it before you design or change code. It is the team's document: no agent edits
+it on its own initiative. When a request conflicts with it, stop and ask which one gives way —
+never work around it, and never amend it to fit.
+
+<!-- --- End Specnaut: constitution --- -->
+
 <!-- --- Specnaut: chain-stops --- -->
 
 ## The Specnaut chain runs on autopilot after the plan
@@ -28025,8 +28113,8 @@ Generated by Specnaut. Edit freely.
 
 **Any UI you build — web or native — follows the \`mobile-first-contract\` skill.**
 Read it; never restate it here. It is a **default, not a mandate**: a project
-whose target surface is genuinely narrower says so once, in
-\`.specnaut/memory/constitution.md\`, and is not asked again.
+whose target surface is genuinely narrower says so once, in \`.specnaut/ui.yml\`,
+and is not asked again.
 
 <!-- --- End Specnaut: ui-defaults --- -->
 
@@ -28202,6 +28290,7 @@ scaffolded for a harness without such features gets none here.
     backend: null,
     skipIfExists: true,
     managedSection: [
+      "constitution",
       "chain-stops",
       "ui-defaults",
       "response-style",
@@ -28210,6 +28299,65 @@ scaffolded for a harness without such features gets none here.
       "backlog",
       "optional-integrations",
     ],
+  },
+  {
+    category: "project-root",
+    name: "root",
+    suffix: "docs/constitution.md",
+    content: `# Constitution
+
+The principles this project's code is held to. Every plan and every review checks a change
+against them. Amend it deliberately, as a team, and say why in the commit.
+
+## Domain isolation
+
+Business rules live in a domain core that knows nothing of frameworks, databases, the network
+or the file system. The outside world reaches it through ports (interfaces the core owns) and
+adapters (the code that implements them).
+
+Check: no file in the domain core imports a framework, a database driver, an SDK or an I/O module.
+
+Override: name the folder that holds your domain core and the imports your stack forbids there.
+
+## Dependencies point inward
+
+Presentation depends on application, application on domain. Infrastructure implements the ports
+the inner layers declare. Nothing inner knows anything outer.
+
+Check: no import goes from the domain to any other layer, or from application to infrastructure or presentation.
+
+Override: list your layers, outermost first, when they differ from these four.
+
+## Bounded contexts
+
+Each part of the business keeps its own model and its own words. One context never reaches into
+another's internals: it goes through that context's published interface, or translates at the
+border.
+
+Check: no module imports another context's internal types; data crosses a context only through its public interface.
+
+Override: name your contexts and the folder each one lives in.
+
+## SOLID
+
+Each module has one reason to change, grows by extension rather than by edit, honours the
+contracts it implements, depends on narrow interfaces, and is handed its collaborators rather
+than building them.
+
+Check: a new behaviour adds a module or an implementation, not another branch in an existing one.
+
+Check: a module that needs a collaborator receives it as a parameter, never constructs it inside.
+
+Override: record any letter your stack applies differently, and how.
+
+---
+
+Version: 1.0.0
+`,
+    executable: false,
+    backend: null,
+    skipIfExists: false,
+    projectOwned: true,
   },
   {
     category: "mergeable-project-root",
@@ -28704,11 +28852,26 @@ patterns:
         ]
       },
       {
+        "matcher": "Edit|Write|MultiEdit|NotebookEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \\"\$CLAUDE_PROJECT_DIR/.specnaut/hooks/protect-constitution.sh\\" claude",
+            "timeout": 5
+          }
+        ]
+      },
+      {
         "matcher": "Bash",
         "hooks": [
           {
             "type": "command",
             "command": "bash \\"\$CLAUDE_PROJECT_DIR/.specnaut/hooks/guard-merge.sh\\" claude",
+            "timeout": 5
+          },
+          {
+            "type": "command",
+            "command": "bash \\"\$CLAUDE_PROJECT_DIR/.specnaut/hooks/protect-constitution.sh\\" claude",
             "timeout": 5
           }
         ]
@@ -28972,21 +29135,29 @@ guard_git() { git --no-pager -c core.fsmonitor=false "\$@"; }
 # approval_session_ok <id> — a session id is a path component; only plain tokens.
 approval_session_ok() { [[ \$1 =~ ^[A-Za-z0-9_-]+\$ ]]; }
 
-# approval_path <session_id> — where this project's stamp for that session lives.
-approval_path() {
+# approval_sha256 — the hex SHA-256 of stdin: the store key here, and the
+# guarded files' fingerprints in _baseline.sh.
+approval_sha256() {
+  local h
+  if command -v sha256sum >/dev/null 2>&1; then h=\$(sha256sum)
+  elif command -v shasum >/dev/null 2>&1; then h=\$(shasum -a 256)
+  else guard_fail "neither sha256sum nor shasum is on PATH"; fi
+  printf '%s' "\${h%% *}"
+}
+
+# approval_state <store> <session_id> — where this project keeps that session's
+# <store> entry: \`approvals\` (the stamp) or \`baselines\` (_baseline.sh).
+approval_state() {
   local state hash
   guard_path state "\${XDG_STATE_HOME:-}" # a Windows user's C:\\… is still theirs
   guard_root
   case \$state in /*) ;; *) state="\$HOME/.local/state" ;; esac
-  if command -v sha256sum >/dev/null 2>&1; then
-    hash=\$(printf '%s' "\$GUARD_ROOT" | sha256sum)
-  elif command -v shasum >/dev/null 2>&1; then
-    hash=\$(printf '%s' "\$GUARD_ROOT" | shasum -a 256)
-  else
-    guard_fail "neither sha256sum nor shasum is on PATH"
-  fi
-  printf '%s/specnaut/approvals/%s/%s' "\$state" "\${hash%% *}" "\$1"
+  hash=\$(printf '%s' "\$GUARD_ROOT" | approval_sha256)
+  printf '%s/specnaut/%s/%s/%s' "\$state" "\$1" "\$hash" "\$2"
 }
+
+# approval_path <session_id> — where this project's stamp for that session lives.
+approval_path() { approval_state approvals "\$1"; }
 
 # approved <kind> — the user's own prompt in THIS turn approved <kind>: the
 # stamp exists, and its session and kind match; its turn_id must match too
@@ -29008,22 +29179,40 @@ approved() {
   return 0
 }
 
+# _approval_ask <reason> — Claude's native permission prompt (exit 0 + "ask").
+_approval_ask() {
+  jq -cn --arg r "\$1" \\
+    '{hookSpecificOutput: {hookEventName: "PreToolUse", permissionDecision: "ask", permissionDecisionReason: \$r}}'
+  guard_allow
+}
+
+# _approval_can_ask — Claude in a mode whose "ask" reaches the user:
+# default/acceptEdits/plan. bypassPermissions/auto/any unknown mode, and
+# Codex, whose "ask" fails open, cannot.
+_approval_can_ask() {
+  [ "\$GUARD_HARNESS" = claude ] || return 1
+  case \$P_MODE in default | acceptEdits | plan) return 0 ;; esac
+  return 1
+}
+
 # approval_gate <kind> <reason> <what the user types> — resolve a gated arm.
-# Claude in default/acceptEdits/plan: its native permission prompt (exit 0 +
-# "ask"). Everywhere else — Claude bypassPermissions/auto/any unknown mode,
-# and Codex, whose "ask" fails open — allowed only on this turn's approval.
+# Where Claude can ask: its permission prompt. Everywhere else: allowed only
+# on this turn's approval.
 approval_gate() {
-  if [ "\$GUARD_HARNESS" = claude ]; then
-    case \$P_MODE in
-      default | acceptEdits | plan)
-        jq -cn --arg r "\$2" \\
-          '{hookSpecificOutput: {hookEventName: "PreToolUse", permissionDecision: "ask", permissionDecisionReason: \$r}}'
-        guard_allow
-        ;;
-    esac
-  fi
+  if _approval_can_ask; then _approval_ask "\$2"; fi
   if approved "\$1"; then guard_allow; fi
   guard_fail "\$2. To let it through, reply \$3 — a plain \\"yes\\" does not approve it."
+}
+
+# approval_require <kind> <reason> <how the user approves> — stricter than
+# approval_gate (spec 038 FR-012): with no approval of <kind> this turn it
+# denies even where Claude could ask, because a click on a permission prompt
+# is not the user's decision to amend what the project holds itself to. With
+# one, Claude asks once more where it can; Codex and bypass mode allow.
+approval_require() {
+  approved "\$1" || guard_fail "\$2. \$3"
+  if _approval_can_ask; then _approval_ask "\$2"; fi
+  guard_allow
 }
 `,
       executable: false,
@@ -29185,7 +29374,11 @@ cmd_pos() {
 # \`eval\`, sets CMD_OPAQUE instead of being guessed at.
 #
 # The helpers below share _cmd_emit's locals by bash's dynamic scope: v (the
-# words), m (their count) and k (the index of the command word).
+# words), m (their count) and k (the index of the command word). So does
+# CMD_ON_SEG: when a guard sets it to a function name, _cmd_emit calls it with
+# the raw segment once v and k are read, before the command word is reduced
+# to its basename — what protect-constitution.sh needs to judge \`/x/cat\`, a
+# VAR= prefix, or a redirection the words here no longer show.
 
 _CMD_RE_REDIR='^[0-9]*(>>|>&|<&|<>|>[|]|<<<|>|<)(.*)\$'
 _CMD_RE_AMP='^&>>?(.*)\$'
@@ -29273,6 +29466,7 @@ _cmd_emit() {
   local x k=0 m=0 IFS=\$' \\t\\n'
   _cmd_strip_redirs "\$1"
   _cmd_skip_prefixes
+  if [ -n "\${CMD_ON_SEG:-}" ]; then "\$CMD_ON_SEG" "\$1"; fi
   [ "\$k" -lt "\$m" ] || return 0
   v[k]=\${v[k]##*/}
   case \${v[k]} in
@@ -29346,6 +29540,283 @@ cmd_git() {
 `,
       executable: false,
     },
+    ".specnaut/hooks/_paths.sh": {
+      content: `# shellcheck shell=bash disable=SC2034
+# (SC2034: PATHS_* are read by the sourcing guard.)
+# Sourced after _guard.sh by the guards that protect files (protect-generated,
+# protect-constitution) and by approve-on-prompt.sh (the guarded list):
+# the one home of "which file does this edit name" (spec 036 § 11 F5, spec 038
+# § 5).
+#
+# Decided by identity, never by text: each target is resolved against the
+# payload cwd, \`.\`/\`..\`/\`//\` collapsed, then its deepest existing ancestor is
+# compared with \`-ef\` to the protected path's, the remainder case-folded — so
+# a symlink, a case variant on APFS, or a path relative to a subdirectory
+# names the same file. Codex paths come from the patch headers
+# \`*** Add|Update|Delete File:\` and \`*** Move to:\` (indented, CRLF, any case).
+
+# The project-owned files spec 038 guards. The TypeScript twin is
+# src/domain/constitution_paths.ts; a test holds the two equal.
+PATHS_CONSTITUTION=docs/constitution.md
+PATHS_GATE_CONFIGS=(.specnaut/size-limits.yml .specnaut/boundaries.yml .specnaut/ui.yml)
+
+# paths_of_edit <file_path> <notebook_path> <patch> — EDIT_PATHS: the files
+# this Edit/Write/MultiEdit/NotebookEdit or apply_patch call names, read from
+# the payload fields the caller passes. Any other tool is refused; so is an
+# edit from which no path can be read. Call it as a plain statement, never
+# under \`||\` or \`if\`: either would switch \`set -e\` and the ERR trap off inside.
+paths_of_edit() {
+  local re_file re_move line p
+  EDIT_PATHS=()
+  case "\$GUARD_HARNESS:\$P_TOOL" in
+    claude:Edit | claude:Write | claude:MultiEdit) EDIT_PATHS=("\$1") ;;
+    claude:NotebookEdit) EDIT_PATHS=("\$2") ;;
+    codex:apply_patch)
+      re_file='^[[:space:]]*\\*\\*\\*[[:space:]]*(add|update|delete)[[:space:]]+file:[[:space:]]*(.*)\$'
+      re_move='^[[:space:]]*\\*\\*\\*[[:space:]]*move[[:space:]]+to:[[:space:]]*(.*)\$'
+      shopt -s nocasematch
+      while IFS= read -r line || [ -n "\$line" ]; do
+        if [[ \$line =~ \$re_file ]]; then p=\${BASH_REMATCH[2]}
+        elif [[ \$line =~ \$re_move ]]; then p=\${BASH_REMATCH[1]}
+        else continue; fi
+        p=\${p%"\${p##*[![:space:]]}"} # trailing blanks, a CRLF's \\r among them
+        if [ -n "\$p" ]; then EDIT_PATHS+=("\$p"); fi
+      done <<<"\$3"
+      shopt -u nocasematch ;;
+    *) guard_fail "expected an edit, got tool '\$P_TOOL' on \$GUARD_HARNESS" ;;
+  esac
+  if [ \${#EDIT_PATHS[@]} = 0 ] || [ -z "\${EDIT_PATHS[0]}" ]; then
+    guard_fail "could not read the file path this \$P_TOOL edits — refusing an edit it cannot check"
+  fi
+}
+
+# paths_norm_to <var> <path> — <path> absolute against the payload cwd, with
+# //, . and .. collapsed, into <var>; a Windows path (\`C:\\…\`, \`src\\…\`) first in
+# this shell's own form. No subshell: the Bash arm of protect-constitution.sh
+# normalizes every word of a command.
+paths_norm_to() {
+  local _pn_p _pn_part _pn_out="" IFS=/
+  guard_path _pn_p "\$2"
+  case \$_pn_p in /*) ;; *) _pn_p="\$GUARD_CWD/\$_pn_p" ;; esac
+  for _pn_part in \$_pn_p; do
+    case \$_pn_part in '' | .) ;; ..) _pn_out=\${_pn_out%/*} ;; *) _pn_out="\$_pn_out/\$_pn_part" ;; esac
+  done
+  printf -v "\$1" '%s' "\${_pn_out:-/}"
+}
+
+# paths_norm <path> — paths_norm_to, printed.
+paths_norm() {
+  local r
+  paths_norm_to r "\$1"
+  printf '%s' "\$r"
+}
+
+# paths_names <abs target> <path relative to the root> [under] — the target IS
+# the protected path (with \`under\`: is it, or lies beneath it). Walks up the
+# target; at each existing ancestor, an \`-ef\` match against an existing
+# prefix of the protected path decides, the rest compared case-folded.
+# Needs GUARD_ROOT: call guard_root first.
+paths_names() {
+  local anc=\$1 rest="" k n r=1 IFS=/
+  local -a pc suf
+  # shellcheck disable=SC2206 # split on / on purpose; set -f rules out globbing
+  pc=(\$2) # not \`read <<<\`: a here-string is a temp file per call before bash 5.1
+  IFS=\$' \\t\\n'
+  n=\${#pc[@]}
+  suf[n]=""
+  for ((k = n - 1; k >= 0; k--)); do suf[k]="\${pc[k]}\${suf[k + 1]:+/\${suf[k + 1]}}"; done
+  shopt -s nocasematch
+  while [ "\$r" = 1 ]; do
+    if [ -e "\$anc" ]; then
+      local pk=\$GUARD_ROOT
+      for ((k = 0; k <= n; k++)); do
+        [ -e "\$pk" ] || break
+        if [ "\$anc" -ef "\$pk" ]; then
+          if [[ \$rest == "\${suf[k]}" ]]; then r=0; break; fi
+          if [ "\${3:-}" = under ] && { [ -z "\${suf[k]}" ] || [[ \$rest == "\${suf[k]}"/* ]]; }; then r=0; break; fi
+        fi
+        if [ "\$k" -lt "\$n" ]; then pk="\$pk/\${pc[k]}"; fi
+      done
+    fi
+    if [ "\$r" = 0 ] || [ "\$anc" = / ]; then break; fi
+    rest="\${anc##*/}\${rest:+/\$rest}"
+    anc=\${anc%/*}
+    anc=\${anc:-/}
+  done
+  shopt -u nocasematch
+  return "\$r"
+}
+
+# paths_imatch <text> <ere> — <text> matches, ASCII case ignored. Sets
+# nocasematch around its own test only: paths_names unsets it on return.
+paths_imatch() { local r=1; shopt -s nocasematch; if [[ \$1 =~ \$2 ]]; then r=0; fi; shopt -u nocasematch; return "\$r"; }
+
+# paths_ere_to <var> <text> — <text> as an ERE matching itself, into <var>.
+paths_ere_to() {
+  local _pe_s=\$2 _pe_o="" _pe_c
+  while [ -n "\$_pe_s" ]; do
+    _pe_c=\${_pe_s:0:1} _pe_s=\${_pe_s:1}
+    case \$_pe_c in [.^\\\$*+?\\(\\)\\[\\]{}\\|\\\\]) _pe_o+="\\\\\$_pe_c" ;; *) _pe_o+=\$_pe_c ;; esac
+  done
+  printf -v "\$1" '%s' "\$_pe_o"
+}
+
+# paths_rel_to <var> <path from the root> — that path as written from the
+# payload cwd (\`../docs/x\` from \`src/\`), into <var>; "" when the cwd is not
+# inside the root. Needs GUARD_ROOT.
+_PATHS_SUB="unset"
+paths_rel_to() {
+  local d=\$GUARD_CWD p=\$2 up="" sub
+  if [ "\$_PATHS_SUB" = unset ]; then
+    _PATHS_SUB=""
+    while ! [ "\$d" -ef "\$GUARD_ROOT" ]; do
+      if [ -z "\$d" ] || [ "\$d" = / ]; then _PATHS_SUB=-; break; fi
+      _PATHS_SUB="\${d##*/}\${_PATHS_SUB:+/\$_PATHS_SUB}" d=\${d%/*}
+    done
+  fi
+  sub=\$_PATHS_SUB
+  if [ "\$sub" = - ]; then printf -v "\$1" '%s' ""; return 0; fi
+  while [ -n "\$sub" ] && [[ \$p == */* ]] && [ "\${sub%%/*}" = "\${p%%/*}" ]; do
+    if [[ \$sub == */* ]]; then sub=\${sub#*/}; else sub=""; fi
+    p=\${p#*/}
+  done
+  while [ -n "\$sub" ]; do
+    up+="../"
+    if [[ \$sub == */* ]]; then sub=\${sub#*/}; else sub=""; fi
+  done
+  printf -v "\$1" '%s' "\$up\$p"
+}
+
+# paths_pattern <word> — PATHS_RE: the ERE of every path the shell could
+# expand <word> to (\$… and {…,…} anything; * ? […] within one component), and
+# PATHS_LIT=1 when it keeps a literal character other than \`/\` and \`.\`.
+# Returns 1 when the word holds nothing the shell would expand.
+paths_pattern() {
+  local w=\$1 i=0 n=\${#1} c re="" wild=0 j d e
+  PATHS_LIT=0
+  while [ "\$i" -lt "\$n" ]; do
+    c=\${w:i:1} i=\$((i + 1))
+    # A brace with no closing one is the reserved word, or plain text.
+    if [ "\$c" = '{' ] && [[ \${w:i} != *'}'* ]]; then c=lone; fi
+    case \$c in
+      '\$' | '{')
+        wild=1 re+='.*'
+        if [ "\$c" = '{' ] || [ "\${w:i:1}" = '{' ]; then
+          [ "\$c" = '{' ] || i=\$((i + 1))
+          d=1
+          while [ "\$i" -lt "\$n" ] && [ "\$d" -gt 0 ]; do
+            case \${w:i:1} in '{') d=\$((d + 1)) ;; '}') d=\$((d - 1)) ;; esac
+            i=\$((i + 1))
+          done
+        elif [[ \${w:i:1} == [@*#?\\\$!-] ]]; then i=\$((i + 1))
+        else while [ "\$i" -lt "\$n" ] && [[ \${w:i:1} == [A-Za-z0-9_] ]]; do i=\$((i + 1)); done; fi ;;
+      '*') wild=1 re+='[^/]*' ;;
+      '?') wild=1 re+='[^/]' ;;
+      '[')
+        j=\${w:i}
+        if [[ \$j == *']'* ]]; then
+          j=\${j%%]*} i=\$((i + \${#j} + 1)) wild=1
+          case \$j in '!'*) j="^\${j:1}" ;; esac
+          re+="[\$j]"
+        else re+='\\[' PATHS_LIT=1; fi ;;
+      lone) PATHS_LIT=1 re+='\\{' ;;
+      *)
+        case \$c in / | .) ;; *) PATHS_LIT=1 ;; esac
+        paths_ere_to e "\$c"
+        re+=\$e ;;
+    esac
+  done
+  PATHS_RE="^\$re\\\$"
+  [ "\$wild" = 1 ]
+}
+`,
+      executable: false,
+    },
+    ".specnaut/hooks/_baseline.sh": {
+      content: `# shellcheck shell=bash
+# Sourced by approve-on-prompt.sh after _approval.sh and _paths.sh. The
+# writer-agnostic backstop behind protect-constitution.sh (spec 038 § 11 S1):
+# the PreToolUse guard reads commands, and no reading of a command sees every
+# writer — an interpreter, a script, a formatter, \`git checkout\`. So the user's
+# prompt fingerprints the four project-owned files, and Stop compares.
+#
+# A file that changed during the turn with no approval of its kind blocks the
+# stop with a question for the user, and the version from the start of the
+# turn is kept. It is never restored: the change may be the user's own, made
+# in their editor while the agent worked.
+#
+# Kept under \${XDG_STATE_HOME:-\$HOME/.local/state}/specnaut/, beside the
+# stamps and outside the workspace for the same reason (spec 036 § 11 F3):
+#   baselines/<sha256(toplevel)>/<session_id>/  sums, and a copy of each file
+#   kept/<sha256(toplevel)>/                    the copies a blocked stop kept
+
+# _baseline_lists — the files, and the approval kind each one needs.
+_baseline_lists() {
+  BL_FILES=("\$PATHS_CONSTITUTION" "\${PATHS_GATE_CONFIGS[@]}")
+  BL_KINDS=(constitution)
+  local _
+  for _ in "\${PATHS_GATE_CONFIGS[@]}"; do BL_KINDS+=(gate-config); done
+}
+
+# _baseline_sum <file> — its SHA-256, or \`-\` when it is not a regular file.
+_baseline_sum() {
+  if [ -f "\$1" ]; then approval_sha256 <"\$1"; else printf -- -; fi
+}
+
+# baseline_snapshot <dir> — fingerprint and copy the files as they are now.
+baseline_snapshot() {
+  local i f sums=""
+  _baseline_lists
+  rm -rf "\$1"
+  mkdir -p "\$1"
+  chmod 700 "\${1%/*}"
+  for i in "\${!BL_FILES[@]}"; do
+    f="\$GUARD_ROOT/\${BL_FILES[i]}"
+    sums+="\$i \$(_baseline_sum "\$f")"\$'\\n'
+    if [ -f "\$f" ]; then cp "\$f" "\$1/\$i"; fi
+  done
+  printf '%s' "\$sums" >"\$1/sums"
+}
+
+# baseline_check <dir> <approved kinds, space-separated> <stop_hook_active> —
+# prints a Stop \`block\` decision when a file changed with no approval of its
+# kind; nothing otherwise. Any difference re-baselines, approved or not, so a
+# turn the stop continues is judged from here and never asked about twice.
+baseline_check() {
+  local i sum f kept keepdir ts seen=0
+  local -a changed=()
+  [ -f "\$1/sums" ] || return 0 # no prompt fingerprinted this session yet
+  _baseline_lists
+  while read -r i sum; do
+    f="\$GUARD_ROOT/\${BL_FILES[i]}"
+    [ "\$(_baseline_sum "\$f")" != "\$sum" ] || continue
+    seen=1
+    case " \$2 " in *" \${BL_KINDS[i]} "*) continue ;; esac
+    if [ -f "\$1/\$i" ]; then
+      keepdir=\${1%/*}                                 # …/specnaut/baselines/<hash>
+      keepdir=\${keepdir%/*/*}/kept/\${keepdir##*/}     # …/specnaut/kept/<hash>
+      mkdir -p "\$keepdir"
+      ts=\$(date -u +%Y%m%dT%H%M%SZ)
+      kept="\$keepdir/\$ts-\${BL_FILES[i]##*/}"
+      cp "\$1/\$i" "\$kept"
+      changed+=("\${BL_FILES[i]} (its version from the start of the turn is kept at \$kept)")
+    else
+      changed+=("\${BL_FILES[i]} (it did not exist when the turn began)")
+    fi
+  done <"\$1/sums"
+  [ "\$seen" = 0 ] || baseline_snapshot "\$1"
+  [ \${#changed[@]} -gt 0 ] || return 0
+  local r
+  r="Specnaut: \$(IFS=';'; echo "\${changed[*]}") changed during this turn, and the user's prompt did not approve it. Nothing was restored. Before you stop, ask the user one question: keep this change, or restore the kept version? Do not touch the file again until they answer."
+  if [ "\$3" = true ]; then
+    printf '%s\\n' "\$r" >&2 # a stop this hook already continued: never loop
+    return 0
+  fi
+  jq -cn --arg r "\$r" '{decision: "block", reason: \$r}'
+}
+`,
+      executable: false,
+    },
     ".specnaut/hooks/approve-on-prompt.sh": {
       content: `#!/usr/bin/env bash
 # UserPromptSubmit + Stop — the only writer of the turn approval (spec 036,
@@ -29358,11 +29829,17 @@ cmd_git() {
 # a trailing . or ! dropped, an optional leading "yes, ") is one of:
 #   merge    /task merge…  /specnaut-task merge…  \$specnaut-task merge…  merge  merge it  land it  push it
 #   release  /ship release|tag…  /specnaut-ship release|tag…  \$specnaut-ship release|tag…  release it  tag it
+#   constitution  approve the constitution amendment   (spec 038 S2: the phrase
+#   gate-config   approve the gate config change        the constitution verb prints)
 # Claude spells the skills /task, /ship; Codex /specnaut-task or \$specnaut-task
 # (harness_commands.ts). A test holds these spellings to harnessCommands.
 # Never a bare yes/ok/go: a reply to some other question must not land code.
 # A prompt carrying agent_id comes from a subagent, not the user (§ 11
 # Measured): nothing is minted or deleted for it.
+#
+# Each user prompt also fingerprints the project-owned files, and Stop
+# compares them (_baseline.sh): a change no approval covered blocks the stop
+# with a question.
 #
 # Not a guard: every failure exits 0 with the reason on stderr. Exit 2 here
 # would block the user's prompt, or keep a Claude turn from stopping; failing
@@ -29372,10 +29849,14 @@ case \${BASH_SOURCE[0]} in */*) HOOK_DIR=\${BASH_SOURCE[0]%/*} ;; *) HOOK_DIR=. 
 . "\$HOOK_DIR/_guard.sh" || { echo "specnaut: \$HOOK_DIR/_guard.sh is missing" >&2; exit 0; }
 # shellcheck source=_approval.sh
 . "\$HOOK_DIR/_approval.sh"
+# shellcheck source=_paths.sh
+. "\$HOOK_DIR/_paths.sh"
+# shellcheck source=_baseline.sh
+. "\$HOOK_DIR/_baseline.sh"
 GUARD_FAIL_CODE=0
-guard_init approve-on-prompt "\${1:-}" .prompt
+guard_init approve-on-prompt "\${1:-}" .prompt any:.stop_hook_active
 
-# approval_kind_of <prompt> — prints merge, release, or nothing.
+# approval_kind_of <prompt> — prints merge, release, constitution, gate-config, or nothing.
 approval_kind_of() {
   local p
   p=\$(printf '%s' "\$1" | tr '[:upper:]' '[:lower:]' | tr -s '[:space:]' ' ')
@@ -29397,20 +29878,31 @@ approval_kind_of() {
       "/specnaut-ship release" | "/specnaut-ship release "* | "/specnaut-ship tag" | "/specnaut-ship tag "* | \\
       '\$specnaut-ship release' | '\$specnaut-ship release '* | '\$specnaut-ship tag' | '\$specnaut-ship tag '*)
       echo release ;;
+    "approve the constitution amendment") echo constitution ;;
+    "approve the gate config change") echo gate-config ;;
   esac
 }
 
 [ -z "\$P_AGENT" ] || exit 0
 
 approval_session_ok "\$P_SESSION" || guard_fail "session_id is missing or not a plain token — no approval minted"
+guard_root # here, not in the subshells below: _baseline.sh reads GUARD_ROOT
 stamp=\$(approval_path "\$P_SESSION")
-rm -f "\$stamp"
+baseline=\$(approval_state baselines "\$P_SESSION")
 
 case \$P_EVENT in
-  Stop) exit 0 ;;
-  UserPromptSubmit) ;;
-  *) guard_fail "unexpected event '\$P_EVENT' — expected UserPromptSubmit or Stop" ;;
+  Stop)
+    # What this turn approved is read before the stamp goes; the stamp goes
+    # before anything that could fail and leave it outliving the turn.
+    kinds=""
+    for k in constitution gate-config; do if approved "\$k"; then kinds+=" \$k"; fi; done
+    rm -f "\$stamp"
+    baseline_check "\$baseline" "\$kinds" "\${GF[1]}"
+    exit 0 ;;
+  UserPromptSubmit) rm -f "\$stamp" ;;
+  *) rm -f "\$stamp"; guard_fail "unexpected event '\$P_EVENT' — expected UserPromptSubmit or Stop" ;;
 esac
+baseline_snapshot "\$baseline"
 
 kind=\$(approval_kind_of "\${GF[0]}")
 [ -n "\$kind" ] || exit 0
@@ -29737,13 +30229,9 @@ guard_fail "'\$agent' is a Specnaut agent: it runs on the model its definition d
 #           guard off). Gated like a merge: Claude's prompt where it can ask,
 #           else this turn's \`merge\` approval.
 #
-# Decided by identity, never by text (§ 11 F5): each target is resolved
-# against the payload cwd, \`.\`/\`..\`/\`//\` collapsed, then its deepest existing
-# ancestor is compared with \`-ef\` to the protected path's, the remainder case-
-# folded — so a symlink, a case variant on APFS, or a path relative to a
-# subdirectory names the same file. Codex paths come from the patch headers
-# \`*** Add|Update|Delete File:\` and \`*** Move to:\` (indented, CRLF, any case);
-# a patch from which no path can be read is refused.
+# Decided by identity, never by text (§ 11 F5) — see _paths.sh, which reads
+# the paths an edit names and resolves them; a patch from which no path can be
+# read is refused.
 #
 # Usage: protect-generated.sh <claude|codex>   (payload on stdin)
 case \${BASH_SOURCE[0]} in */*) HOOK_DIR=\${BASH_SOURCE[0]%/*} ;; *) HOOK_DIR=. ;; esac
@@ -29751,85 +30239,22 @@ case \${BASH_SOURCE[0]} in */*) HOOK_DIR=\${BASH_SOURCE[0]%/*} ;; *) HOOK_DIR=. 
 . "\$HOOK_DIR/_guard.sh" || { echo "specnaut: \$HOOK_DIR/_guard.sh is missing — refusing" >&2; exit 2; }
 # shellcheck source=_approval.sh
 . "\$HOOK_DIR/_approval.sh"
+# shellcheck source=_paths.sh
+. "\$HOOK_DIR/_paths.sh" || guard_fail "_paths.sh is missing beside protect-generated.sh"
 guard_init protect-generated "\${1:-}" .tool_input.file_path .tool_input.notebook_path lines:.tool_input.command
 
-paths=()
-case "\$GUARD_HARNESS:\$P_TOOL" in
-  claude:Edit | claude:Write | claude:MultiEdit) paths=("\${GF[0]}") ;;
-  claude:NotebookEdit) paths=("\${GF[1]}") ;;
-  codex:apply_patch)
-    re_file='^[[:space:]]*\\*\\*\\*[[:space:]]*(add|update|delete)[[:space:]]+file:[[:space:]]*(.*)\$'
-    re_move='^[[:space:]]*\\*\\*\\*[[:space:]]*move[[:space:]]+to:[[:space:]]*(.*)\$'
-    shopt -s nocasematch
-    while IFS= read -r line || [ -n "\$line" ]; do
-      if [[ \$line =~ \$re_file ]]; then p=\${BASH_REMATCH[2]}
-      elif [[ \$line =~ \$re_move ]]; then p=\${BASH_REMATCH[1]}
-      else continue; fi
-      p=\${p%"\${p##*[![:space:]]}"} # trailing blanks, a CRLF's \\r among them
-      if [ -n "\$p" ]; then paths+=("\$p"); fi
-    done <<<"\${GF[2]}"
-    shopt -u nocasematch ;;
-  *) guard_fail "expected an edit, got tool '\$P_TOOL' on \$GUARD_HARNESS" ;;
-esac
-if [ \${#paths[@]} = 0 ] || [ -z "\${paths[0]}" ]; then
-  guard_fail "could not read the file path this \$P_TOOL edits — refusing an edit it cannot check"
-fi
+paths_of_edit "\${GF[0]}" "\${GF[1]}" "\${GF[2]}"
 guard_root
 
-# norm <path> — absolute against the payload cwd, with //, . and .. collapsed;
-# a Windows path (\`C:\\…\`, \`src\\…\`) first in this shell's own form.
-norm() {
-  local p part out="" IFS=/
-  guard_path p "\$1"
-  case \$p in /*) ;; *) p="\$GUARD_CWD/\$p" ;; esac
-  for part in \$p; do
-    case \$part in '' | .) ;; ..) out=\${out%/*} ;; *) out="\$out/\$part" ;; esac
-  done
-  printf '%s' "\${out:-/}"
-}
-
-# names <abs target> <path relative to the root> [under] — the target IS the
-# protected path (with \`under\`: is it, or lies beneath it). Walks up the
-# target; at each existing ancestor, an \`-ef\` match against an existing
-# prefix of the protected path decides, the rest compared case-folded.
-names() {
-  local anc=\$1 rest="" k n r=1
-  local -a pc suf
-  IFS=/ read -r -a pc <<<"\$2"
-  n=\${#pc[@]}
-  suf[n]=""
-  for ((k = n - 1; k >= 0; k--)); do suf[k]="\${pc[k]}\${suf[k + 1]:+/\${suf[k + 1]}}"; done
-  shopt -s nocasematch
-  while [ "\$r" = 1 ]; do
-    if [ -e "\$anc" ]; then
-      local pk=\$GUARD_ROOT
-      for ((k = 0; k <= n; k++)); do
-        [ -e "\$pk" ] || break
-        if [ "\$anc" -ef "\$pk" ]; then
-          if [[ \$rest == "\${suf[k]}" ]]; then r=0; break; fi
-          if [ "\${3:-}" = under ] && { [ -z "\${suf[k]}" ] || [[ \$rest == "\${suf[k]}"/* ]]; }; then r=0; break; fi
-        fi
-        if [ "\$k" -lt "\$n" ]; then pk="\$pk/\${pc[k]}"; fi
-      done
-    fi
-    if [ "\$r" = 0 ] || [ "\$anc" = / ]; then break; fi
-    rest="\${anc##*/}\${rest:+/\$rest}"
-    anc=\${anc%/*}
-    anc=\${anc:-/}
-  done
-  shopt -u nocasematch
-  return "\$r"
-}
-
 denied="" gated=()
-for p in "\${paths[@]}"; do
-  t=\$(norm "\$p")
-  if names "\$t" .specnaut/installed.lock; then denied=\$p; break; fi
+for p in "\${EDIT_PATHS[@]}"; do
+  t=\$(paths_norm "\$p")
+  if paths_names "\$t" .specnaut/installed.lock; then denied=\$p; break; fi
   for g in .specnaut/workflow.yml .specnaut/scripts/bash/merge-mode.sh .specnaut/scripts/bash/base-branch.sh \\
     .codex/hooks.json .claude/settings.json .claude/settings.local.json; do
-    if names "\$t" "\$g"; then gated+=("\$g"); fi
+    if paths_names "\$t" "\$g"; then gated+=("\$g"); fi
   done
-  if names "\$t" .specnaut/hooks under; then gated+=(".specnaut/hooks/"); fi
+  if paths_names "\$t" .specnaut/hooks under; then gated+=(".specnaut/hooks/"); fi
 done
 
 if [ -n "\$denied" ]; then
@@ -29839,6 +30264,262 @@ fi
 approval_gate merge \\
   "editing \${gated[*]} changes how Specnaut gates landings on the base branch, so it needs the user" \\
   "\\\`merge\\\` (or \\\`/task merge\\\`)"
+`,
+      executable: true,
+    },
+    ".specnaut/hooks/protect-constitution.sh": {
+      content: `#!/usr/bin/env bash
+# PreToolUse(Edit|Write|MultiEdit|NotebookEdit and Bash on Claude; Edit|Write
+# and Bash on Codex) — the one home of "what may write the project's
+# constitution and its gate configs" (spec 038, plan § 5, FR-012). Guarded,
+# each by the approval kind its phrase mints (S2):
+#
+#   docs/constitution.md                       constitution
+#   .specnaut/{size-limits,boundaries,ui}.yml  gate-config
+#   .specnaut/hooks/**                         constitution — this guard and
+#                                              what it sources; protect-generated
+#                                              gates the same folder under merge
+#
+# A write needs THIS turn's approval of its kind (approval_require): no stamp
+# denies on every harness and in every mode.
+#
+# The Bash arm (S1) reads each simple command _command.sh cuts out of the line.
+# One goes through untouched only when it is a bare read: the command word
+# exactly \`cat head tail grep wc diff\`, or \`git diff|log|show|blame|status|add\`
+# with no option before the subcommand (so no -c) and none of --output*,
+# --ext-diff, --textconv, add -e/-p/-i; no \`/\` in it, no VAR= prefix, and
+# nothing on the line that redefines a command (a function, an alias, hash,
+# source, a PATH/GIT_* assignment). Any other
+# command is judged by the words it carries: a word names a guarded file by
+# identity (_paths.sh), by carrying its basename, or — unexpanded \`\$\`, glob or
+# brace — by a pattern that could expand to it, case ignored. A redirection
+# onto a guarded file is judged whatever the command. An opaque form (eval,
+# sh -c, an interpreter's -c/-e, a line it cannot read) is judged by text: it
+# names a guarded file when the line mentions one. A commit message or branch
+# name that says "constitution" names nothing. What no reading sees — a script,
+# a formatter, \`git checkout .\` — the Stop backstop in _baseline.sh catches.
+#
+# Usage: protect-constitution.sh <claude|codex>   (payload on stdin)
+case \${BASH_SOURCE[0]} in */*) HOOK_DIR=\${BASH_SOURCE[0]%/*} ;; *) HOOK_DIR=. ;; esac
+# shellcheck source=_guard.sh
+. "\$HOOK_DIR/_guard.sh" || { echo "specnaut: \$HOOK_DIR/_guard.sh is missing — refusing" >&2; exit 2; }
+# shellcheck source=_approval.sh
+. "\$HOOK_DIR/_approval.sh"
+# shellcheck source=_paths.sh
+. "\$HOOK_DIR/_paths.sh" || guard_fail "_paths.sh is missing beside protect-constitution.sh"
+# shellcheck source=_command.sh
+. "\$HOOK_DIR/_command.sh"
+guard_init protect-constitution "\${1:-}" .tool_input.file_path .tool_input.notebook_path \\
+  lines:.tool_input.command argv:.tool_input.command
+guard_root
+
+# The guarded entries: path, kind, and how a pattern may name it (the files a
+# glob or \`\$\` could expand to — for the hooks folder, the scripts it holds).
+PC_HOOKS=.specnaut/hooks
+PC_PATHS=("\$PATHS_CONSTITUTION" "\${PATHS_GATE_CONFIGS[@]}" "\$PC_HOOKS")
+PC_KINDS=(constitution)
+for _ in "\${PATHS_GATE_CONFIGS[@]}"; do PC_KINDS+=(gate-config); done
+PC_KINDS+=(constitution)
+PC_LAST=\$((\${#PC_PATHS[@]} - 1))
+PC_SELF=(protect-constitution.sh _paths.sh _guard.sh _approval.sh _command.sh _simple.sh
+  _baseline.sh approve-on-prompt.sh)
+
+# PC_BASE_RE[i] — entry i's basename (the folder's path) as a whole token;
+# PC_STEM_RE[i] — its stem, which is all an opaque string has to mention.
+PC_BASE_RE=() PC_STEM_RE=() PC_LEAF_RE=""
+for i in "\${!PC_PATHS[@]}"; do
+  b=\${PC_PATHS[i]##*/}
+  paths_ere_to s "\$b"
+  PC_LEAF_RE+="\${PC_LEAF_RE:+|}\$s"
+  if [ "\$i" = "\$PC_LAST" ]; then b=\$PC_HOOKS; fi
+  s=\${b%.*}
+  if [ "\${#s}" -lt 5 ]; then s=\$b; fi
+  paths_ere_to b "\$b"
+  paths_ere_to s "\$s"
+  PC_BASE_RE+=("(^|[^A-Za-z0-9_.-])\$b(/|[^A-Za-z0-9_.-]|\\\$)") PC_STEM_RE+=("\$s")
+done
+PC_LEAF_RE="^(\$PC_LEAF_RE)\\\$"
+
+# PC_FORMS / PC_FORM_OF — each spelling a pattern is tried against, and its entry.
+PC_FORMS=() PC_FORM_OF=()
+_pc_form() { local r; paths_rel_to r "\$2"; PC_FORMS+=("\$GUARD_ROOT/\$2") PC_FORM_OF+=("\$1"); if [ -n "\$r" ]; then PC_FORMS+=("\$r" "./\$r") PC_FORM_OF+=("\$1" "\$1"); fi; }
+for i in "\${!PC_PATHS[@]}"; do
+  if [ "\$i" = "\$PC_LAST" ]; then
+    _pc_form "\$i" "\$PC_HOOKS"
+    for f in "\${PC_SELF[@]}"; do _pc_form "\$i" "\$PC_HOOKS/\$f"; done
+  else _pc_form "\$i" "\${PC_PATHS[i]}"; fi
+done
+
+PC_NEED="" PC_WHAT=()
+# _pc_need <entry> <how it was named>
+_pc_need() {
+  case " \$PC_NEED " in *" \${PC_KINDS[\$1]} "*) ;; *) PC_NEED+=" \${PC_KINDS[\$1]}" ;; esac
+  PC_WHAT+=("\${PC_PATHS[\$1]}\${2:+ (\$2)}")
+}
+
+# _pc_identity <path> <how> — record each entry <path> is, by identity. A
+# word with no separator that names nothing on disk can only be an entry whose
+# last component it is — unless the cwd is inside the hooks folder: every other
+# one skips the walk (most words of a line).
+PC_SKIP=1
+if paths_names "\$GUARD_CWD" "\$PC_HOOKS" under; then PC_SKIP=0; fi
+_pc_identity() {
+  local t i
+  if [ "\$PC_SKIP" = 1 ] && [[ \$1 != */* && \$1 != *\\\\* ]] && [ ! -e "\$GUARD_CWD/\$1" ] \\
+    && [ ! -L "\$GUARD_CWD/\$1" ] && ! paths_imatch "\$1" "\$PC_LEAF_RE"; then return 0; fi
+  paths_norm_to t "\$1"
+  for i in "\${!PC_PATHS[@]}"; do
+    if [ "\$i" = "\$PC_LAST" ]; then
+      if paths_names "\$t" "\$PC_HOOKS" under; then _pc_need "\$i" "\$2"; fi
+    elif paths_names "\$t" "\${PC_PATHS[i]}"; then _pc_need "\$i" "\$2"; fi
+  done
+}
+
+# _pc_names <word> <how> — record each entry a word of a command names: by its
+# basename, by a pattern that could expand to it, or by identity. A word
+# holding \`=\` (an assignment, \`--file=…\`, dd's \`of=…\`) is read after it too.
+_pc_names() {
+  local c i
+  local -a cands=("\$1")
+  [ -n "\$1" ] || return 0
+  case \$1 in *=*) cands+=("\${1#*=}") ;; esac
+  for i in "\${!PC_PATHS[@]}"; do
+    if paths_imatch "\$1" "\${PC_BASE_RE[i]}"; then _pc_need "\$i" "\$2"; fi
+  done
+  for c in "\${cands[@]}"; do
+    if paths_pattern "\$c"; then
+      if [ "\$PATHS_LIT" = 1 ]; then
+        for i in "\${!PC_FORMS[@]}"; do
+          if paths_imatch "\${PC_FORMS[i]}" "\$PATHS_RE"; then _pc_need "\${PC_FORM_OF[i]}" "\$2"; fi
+        done
+      else # nothing but expansions: it names what the line itself mentions
+        for i in "\${!PC_PATHS[@]}"; do
+          if paths_imatch "\$PC_LINE" "\${PC_BASE_RE[i]}"; then _pc_need "\$i" "\$2, which the line may set to it"; fi
+        done
+      fi
+    elif [ -n "\$c" ] && [[ \$c != -* ]]; then
+      # shellcheck disable=SC2088 # the literal ~ the shell would expand
+      if [ "\${c:0:2}" = "~/" ]; then c="\$HOME/\${c:2}"; fi
+      _pc_identity "\$c" "\$2"
+    fi
+  done
+}
+
+# Per simple command, from _cmd_emit (CMD_ON_SEG): the raw words, and the words
+# without redirections with the index of the command word.
+PC_RAW=() PC_V=() PC_K=() PC_REDEFINES=0
+# shellcheck disable=SC2329 # called through CMD_ON_SEG
+_pc_seg() {
+  local x IFS=\$CMD_SEP
+  PC_RAW+=("\$1") PC_K+=("\$k")
+  PC_V+=("\${v[*]+"\${v[*]}"}")
+  for x in \${v[@]+"\${v[@]}"}; do
+    case \$x in PATH=* | BASH_ENV=* | ENV=* | GIT_*=* | LD_*=* | DYLD_*=*) PC_REDEFINES=1 ;; esac
+  done
+  case \${v[k]:-} in function | alias | hash | enable | source | . | builtin) PC_REDEFINES=1 ;; esac
+}
+
+# _pc_read_only — W (from k) is a bare allowlisted read (see the header).
+_pc_read_only() {
+  local j sub w
+  [ "\$PC_REDEFINES" = 0 ] || return 1
+  for ((j = 0; j < K; j++)); do
+    case \${W[j]} in '{' | '}' | '!' | if | then | else | elif | do | while | until) ;; *) return 1 ;; esac
+  done
+  case \${W[K]:-} in
+    cat | head | tail | grep | wc | diff) return 0 ;;
+    git) sub=\${W[K + 1]:-} ;;
+    *) return 1 ;;
+  esac
+  case \$sub in diff | log | show | blame | status | add) ;; *) return 1 ;; esac
+  for w in "\${W[@]:K+2}"; do
+    case \$w in --output* | --ext-diff | --textconv) return 1 ;; esac
+    if [ "\$sub" = add ]; then
+      case \$w in --edit | --patch | --interactive) return 1 ;; --*) ;; -*[epi]*) return 1 ;; esac
+    fi
+  done
+  return 0
+}
+
+# _pc_opaque — W (from K) runs a string this guard cannot read as commands.
+_pc_opaque() {
+  local w c=\${W[K]:-}
+  c=\${c##*/}
+  case \$c in
+    eval) return 0 ;;
+    sh | bash | zsh | dash | ksh | mksh | ash | fish)
+      for w in "\${W[@]:K+1}"; do case \$w in --*) ;; -*c*) return 0 ;; -*) ;; *) return 1 ;; esac; done
+      return 0 ;;
+    python* | perl* | ruby* | node | nodejs | bun | deno | php* | lua* | osascript | pwsh | powershell | tclsh* | Rscript)
+      for w in "\${W[@]:K+1}"; do
+        case \$w in eval | - | --eval* | --print* | -Command | -command | -[cerpE] | -[a-zA-Z]*[ceE]*) return 0 ;; -*) ;; *) return 1 ;; esac
+      done
+      return 0 ;;
+  esac
+  return 1
+}
+
+# _pc_redirects <raw segment> — judge each redirection that writes.
+_pc_redirects() {
+  local x t skip=0 op
+  local -a rw
+  local IFS=\$CMD_SEP
+  # shellcheck disable=SC2206 # split on CMD_SEP on purpose; set -f rules out globbing
+  rw=(\$1)
+  IFS=\$' \\t\\n'
+  for x in \${rw[@]+"\${rw[@]}"}; do
+    if [ "\$skip" = 1 ]; then skip=0; _pc_names "\$x" "a redirection onto it"; continue; fi
+    op=""
+    if [[ \$x =~ \$_CMD_RE_REDIR ]]; then op=\${BASH_REMATCH[1]} t=\${BASH_REMATCH[2]}
+    elif [[ \$x =~ \$_CMD_RE_AMP ]]; then op='&>' t=\${BASH_REMATCH[1]}; fi
+    case \$op in
+      '>' | '>>' | '>|' | '<>' | '&>') ;;
+      '>&') [[ \$t =~ ^[0-9]*-?\$ ]] && continue ;;
+      *) continue ;;
+    esac
+    if [ -n "\$t" ]; then _pc_names "\$t" "a redirection onto it"; else skip=1; fi
+  done
+}
+
+if [ "\$P_TOOL" = Bash ]; then
+  PC_LINE=\${GF[3]}
+  [ -n "\$PC_LINE" ] || guard_fail "a Bash call without tool_input.command"
+  if [[ \$PC_LINE =~ (^|[^A-Za-z0-9_\\\$])[A-Za-z_][A-Za-z0-9_.:-]*[[:space:]]*\\([[:space:]]*\\) ]]; then PC_REDEFINES=1; fi
+  CMD_ON_SEG=_pc_seg
+  cmd_parse "\$PC_LINE"
+  opaque=\$CMD_OPAQUE
+  for j in \${PC_RAW[@]+"\${!PC_RAW[@]}"}; do
+    _pc_redirects "\${PC_RAW[j]}"
+    cmd_words "\${PC_V[j]}"
+    K=\${PC_K[j]}
+    if _pc_read_only; then continue; fi
+    for w in \${W[@]+"\${W[@]}"}; do _pc_names "\$w" "named by \\\`\${W[K]:-\$w}\\\`"; done
+    if _pc_opaque; then opaque=1; fi
+  done
+  if [ "\$opaque" = 1 ]; then
+    for i in "\${!PC_PATHS[@]}"; do
+      if paths_imatch "\$PC_LINE" "\${PC_STEM_RE[i]}"; then
+        _pc_need "\$i" "in a command it cannot read: eval, sh -c, an interpreter's -c/-e"
+      fi
+    done
+  fi
+else
+  paths_of_edit "\${GF[0]}" "\${GF[1]}" "\${GF[2]}"
+  for p in "\${EDIT_PATHS[@]}"; do _pc_identity "\$p" ""; done
+fi
+
+[ -n "\$PC_NEED" ] || guard_allow
+what=\$(IFS=';'; echo "\${PC_WHAT[*]}")
+read -r kind other <<<"\$PC_NEED"
+if [ -n "\$other" ]; then
+  guard_fail "this call changes \$what — files of two approval kinds. One approval covers one kind: make the changes one at a time"
+fi
+case \$kind in
+  constitution) reason="this call would change \$what: the team's constitution, or the hooks that guard it. An agent never amends it on its own initiative" ;;
+  *) reason="this call would change \$what: a gate config, which loosens or tightens the project's own gates. An agent never changes it on its own initiative" ;;
+esac
+approval_require "\$kind" "\$reason" \\
+  "Only the user approves it: draft the change with the task skill's \\\`constitution\\\` verb, which prints the phrase the user types as their whole message — a plain \\"yes\\" does not approve it. Reading is allowed with a bare cat, head, tail, grep, wc, diff, or git diff/log/show/blame/status/add."
 `,
       executable: true,
     },
@@ -30042,17 +30723,20 @@ workflow-manager
     ".specnaut/hooks/SHA256SUMS": {
       content: `e51a8a1291eb7e2e5a5a21122b971ee78c5392d4dbbabd28798f8f89df9ca08a  .gitattributes
 49a4f9a91f8b91559f087d02c151d4069575cf466fcd09b21354749f188c16a8  _agents.txt
-d248ada612da7ce04d3d2cd4f8576070c62371166e35ed6351b0069fcd066fad  _approval.sh
+eff27f37501f08c5a39cfcc2c6c7a8382e0d0467dc4a63cf3d29bb84d5ea26d6  _approval.sh
+23dedb316a7137333450d578cf52b5ce8c25fb773c4263f283fde37017f3f435  _baseline.sh
 7556762e50be2b68d2bc432dddded521f736cc06abb084e895c1f1ddf5986039  _command.sh
 fa8afb422b9af3b7f80580666d66e9332ed35cc3c24c7182300b3224f2a96548  _git.sh
 2829e6a5db6984fee451e242ba16beca68808a7647316cff24930aa8ec53c73a  _guard.sh
-7675a9df90d21f2390940870fa8458d09e7418a68de7d682b3f8d6a36a94019c  _simple.sh
-f12446930a31e489c0a3edc8599c47aab2c90dcdb156d6c849d0b760e8ddc84e  approve-on-prompt.sh
+f5552945f77fb0d24f56bbf2e97fb64d284d9c716abf211ebcbe081cacdf8bdf  _paths.sh
+675a334dbce3d787fe3cd42223dd02f53c9f26b92f2e9aac35855662f335a865  _simple.sh
+298471e25d869161087ddd4f4c0a488ca8ec5508ad01c4589e440af9274d0820  approve-on-prompt.sh
 28d13e1fbd696f79036cc1f94c3fd6aa68f4f862f0dd5f6d32191ad05392534f  guard-dispatch-model.sh
 09103676aa00371ece40171b577cfbe24e02fdfcfe39c47ff2905ed189708499  guard-merge.sh
 6f8dd791eb7c797dae9f9c5f6f6bc0d07c2930552aa9087ccc8b619f0844476e  guard-release.sh
 3364feb0f3a7892224b67e4f857bb6c085456da98c892d7199c4bbd10f122f8b  log-subagent.sh
-b235e7b333245290ac890804d5f95338eaaf87b6141e0fb51b319e676b95b1c7  protect-generated.sh
+0d231c09ef29b1e46b774d283fad725382f33d6f3098545dc8a504bf89c40a80  protect-constitution.sh
+79f8bc840e2e691c2011c0350bd5140bad8caa4448d65ed209e79da582a075a3  protect-generated.sh
 4e0f336ed4eafecca2904fba2aab427d3e8528889aa68e9e347c4ac03dc53853  release-commands.txt
 `,
       executable: false,
@@ -30299,21 +30983,29 @@ guard_git() { git --no-pager -c core.fsmonitor=false "\$@"; }
 # approval_session_ok <id> — a session id is a path component; only plain tokens.
 approval_session_ok() { [[ \$1 =~ ^[A-Za-z0-9_-]+\$ ]]; }
 
-# approval_path <session_id> — where this project's stamp for that session lives.
-approval_path() {
+# approval_sha256 — the hex SHA-256 of stdin: the store key here, and the
+# guarded files' fingerprints in _baseline.sh.
+approval_sha256() {
+  local h
+  if command -v sha256sum >/dev/null 2>&1; then h=\$(sha256sum)
+  elif command -v shasum >/dev/null 2>&1; then h=\$(shasum -a 256)
+  else guard_fail "neither sha256sum nor shasum is on PATH"; fi
+  printf '%s' "\${h%% *}"
+}
+
+# approval_state <store> <session_id> — where this project keeps that session's
+# <store> entry: \`approvals\` (the stamp) or \`baselines\` (_baseline.sh).
+approval_state() {
   local state hash
   guard_path state "\${XDG_STATE_HOME:-}" # a Windows user's C:\\… is still theirs
   guard_root
   case \$state in /*) ;; *) state="\$HOME/.local/state" ;; esac
-  if command -v sha256sum >/dev/null 2>&1; then
-    hash=\$(printf '%s' "\$GUARD_ROOT" | sha256sum)
-  elif command -v shasum >/dev/null 2>&1; then
-    hash=\$(printf '%s' "\$GUARD_ROOT" | shasum -a 256)
-  else
-    guard_fail "neither sha256sum nor shasum is on PATH"
-  fi
-  printf '%s/specnaut/approvals/%s/%s' "\$state" "\${hash%% *}" "\$1"
+  hash=\$(printf '%s' "\$GUARD_ROOT" | approval_sha256)
+  printf '%s/specnaut/%s/%s/%s' "\$state" "\$1" "\$hash" "\$2"
 }
+
+# approval_path <session_id> — where this project's stamp for that session lives.
+approval_path() { approval_state approvals "\$1"; }
 
 # approved <kind> — the user's own prompt in THIS turn approved <kind>: the
 # stamp exists, and its session and kind match; its turn_id must match too
@@ -30335,22 +31027,40 @@ approved() {
   return 0
 }
 
+# _approval_ask <reason> — Claude's native permission prompt (exit 0 + "ask").
+_approval_ask() {
+  jq -cn --arg r "\$1" \\
+    '{hookSpecificOutput: {hookEventName: "PreToolUse", permissionDecision: "ask", permissionDecisionReason: \$r}}'
+  guard_allow
+}
+
+# _approval_can_ask — Claude in a mode whose "ask" reaches the user:
+# default/acceptEdits/plan. bypassPermissions/auto/any unknown mode, and
+# Codex, whose "ask" fails open, cannot.
+_approval_can_ask() {
+  [ "\$GUARD_HARNESS" = claude ] || return 1
+  case \$P_MODE in default | acceptEdits | plan) return 0 ;; esac
+  return 1
+}
+
 # approval_gate <kind> <reason> <what the user types> — resolve a gated arm.
-# Claude in default/acceptEdits/plan: its native permission prompt (exit 0 +
-# "ask"). Everywhere else — Claude bypassPermissions/auto/any unknown mode,
-# and Codex, whose "ask" fails open — allowed only on this turn's approval.
+# Where Claude can ask: its permission prompt. Everywhere else: allowed only
+# on this turn's approval.
 approval_gate() {
-  if [ "\$GUARD_HARNESS" = claude ]; then
-    case \$P_MODE in
-      default | acceptEdits | plan)
-        jq -cn --arg r "\$2" \\
-          '{hookSpecificOutput: {hookEventName: "PreToolUse", permissionDecision: "ask", permissionDecisionReason: \$r}}'
-        guard_allow
-        ;;
-    esac
-  fi
+  if _approval_can_ask; then _approval_ask "\$2"; fi
   if approved "\$1"; then guard_allow; fi
   guard_fail "\$2. To let it through, reply \$3 — a plain \\"yes\\" does not approve it."
+}
+
+# approval_require <kind> <reason> <how the user approves> — stricter than
+# approval_gate (spec 038 FR-012): with no approval of <kind> this turn it
+# denies even where Claude could ask, because a click on a permission prompt
+# is not the user's decision to amend what the project holds itself to. With
+# one, Claude asks once more where it can; Codex and bypass mode allow.
+approval_require() {
+  approved "\$1" || guard_fail "\$2. \$3"
+  if _approval_can_ask; then _approval_ask "\$2"; fi
+  guard_allow
 }
 `,
       executable: false,
@@ -30512,7 +31222,11 @@ cmd_pos() {
 # \`eval\`, sets CMD_OPAQUE instead of being guessed at.
 #
 # The helpers below share _cmd_emit's locals by bash's dynamic scope: v (the
-# words), m (their count) and k (the index of the command word).
+# words), m (their count) and k (the index of the command word). So does
+# CMD_ON_SEG: when a guard sets it to a function name, _cmd_emit calls it with
+# the raw segment once v and k are read, before the command word is reduced
+# to its basename — what protect-constitution.sh needs to judge \`/x/cat\`, a
+# VAR= prefix, or a redirection the words here no longer show.
 
 _CMD_RE_REDIR='^[0-9]*(>>|>&|<&|<>|>[|]|<<<|>|<)(.*)\$'
 _CMD_RE_AMP='^&>>?(.*)\$'
@@ -30600,6 +31314,7 @@ _cmd_emit() {
   local x k=0 m=0 IFS=\$' \\t\\n'
   _cmd_strip_redirs "\$1"
   _cmd_skip_prefixes
+  if [ -n "\${CMD_ON_SEG:-}" ]; then "\$CMD_ON_SEG" "\$1"; fi
   [ "\$k" -lt "\$m" ] || return 0
   v[k]=\${v[k]##*/}
   case \${v[k]} in
@@ -30673,6 +31388,283 @@ cmd_git() {
 `,
       executable: false,
     },
+    ".specnaut/hooks/_paths.sh": {
+      content: `# shellcheck shell=bash disable=SC2034
+# (SC2034: PATHS_* are read by the sourcing guard.)
+# Sourced after _guard.sh by the guards that protect files (protect-generated,
+# protect-constitution) and by approve-on-prompt.sh (the guarded list):
+# the one home of "which file does this edit name" (spec 036 § 11 F5, spec 038
+# § 5).
+#
+# Decided by identity, never by text: each target is resolved against the
+# payload cwd, \`.\`/\`..\`/\`//\` collapsed, then its deepest existing ancestor is
+# compared with \`-ef\` to the protected path's, the remainder case-folded — so
+# a symlink, a case variant on APFS, or a path relative to a subdirectory
+# names the same file. Codex paths come from the patch headers
+# \`*** Add|Update|Delete File:\` and \`*** Move to:\` (indented, CRLF, any case).
+
+# The project-owned files spec 038 guards. The TypeScript twin is
+# src/domain/constitution_paths.ts; a test holds the two equal.
+PATHS_CONSTITUTION=docs/constitution.md
+PATHS_GATE_CONFIGS=(.specnaut/size-limits.yml .specnaut/boundaries.yml .specnaut/ui.yml)
+
+# paths_of_edit <file_path> <notebook_path> <patch> — EDIT_PATHS: the files
+# this Edit/Write/MultiEdit/NotebookEdit or apply_patch call names, read from
+# the payload fields the caller passes. Any other tool is refused; so is an
+# edit from which no path can be read. Call it as a plain statement, never
+# under \`||\` or \`if\`: either would switch \`set -e\` and the ERR trap off inside.
+paths_of_edit() {
+  local re_file re_move line p
+  EDIT_PATHS=()
+  case "\$GUARD_HARNESS:\$P_TOOL" in
+    claude:Edit | claude:Write | claude:MultiEdit) EDIT_PATHS=("\$1") ;;
+    claude:NotebookEdit) EDIT_PATHS=("\$2") ;;
+    codex:apply_patch)
+      re_file='^[[:space:]]*\\*\\*\\*[[:space:]]*(add|update|delete)[[:space:]]+file:[[:space:]]*(.*)\$'
+      re_move='^[[:space:]]*\\*\\*\\*[[:space:]]*move[[:space:]]+to:[[:space:]]*(.*)\$'
+      shopt -s nocasematch
+      while IFS= read -r line || [ -n "\$line" ]; do
+        if [[ \$line =~ \$re_file ]]; then p=\${BASH_REMATCH[2]}
+        elif [[ \$line =~ \$re_move ]]; then p=\${BASH_REMATCH[1]}
+        else continue; fi
+        p=\${p%"\${p##*[![:space:]]}"} # trailing blanks, a CRLF's \\r among them
+        if [ -n "\$p" ]; then EDIT_PATHS+=("\$p"); fi
+      done <<<"\$3"
+      shopt -u nocasematch ;;
+    *) guard_fail "expected an edit, got tool '\$P_TOOL' on \$GUARD_HARNESS" ;;
+  esac
+  if [ \${#EDIT_PATHS[@]} = 0 ] || [ -z "\${EDIT_PATHS[0]}" ]; then
+    guard_fail "could not read the file path this \$P_TOOL edits — refusing an edit it cannot check"
+  fi
+}
+
+# paths_norm_to <var> <path> — <path> absolute against the payload cwd, with
+# //, . and .. collapsed, into <var>; a Windows path (\`C:\\…\`, \`src\\…\`) first in
+# this shell's own form. No subshell: the Bash arm of protect-constitution.sh
+# normalizes every word of a command.
+paths_norm_to() {
+  local _pn_p _pn_part _pn_out="" IFS=/
+  guard_path _pn_p "\$2"
+  case \$_pn_p in /*) ;; *) _pn_p="\$GUARD_CWD/\$_pn_p" ;; esac
+  for _pn_part in \$_pn_p; do
+    case \$_pn_part in '' | .) ;; ..) _pn_out=\${_pn_out%/*} ;; *) _pn_out="\$_pn_out/\$_pn_part" ;; esac
+  done
+  printf -v "\$1" '%s' "\${_pn_out:-/}"
+}
+
+# paths_norm <path> — paths_norm_to, printed.
+paths_norm() {
+  local r
+  paths_norm_to r "\$1"
+  printf '%s' "\$r"
+}
+
+# paths_names <abs target> <path relative to the root> [under] — the target IS
+# the protected path (with \`under\`: is it, or lies beneath it). Walks up the
+# target; at each existing ancestor, an \`-ef\` match against an existing
+# prefix of the protected path decides, the rest compared case-folded.
+# Needs GUARD_ROOT: call guard_root first.
+paths_names() {
+  local anc=\$1 rest="" k n r=1 IFS=/
+  local -a pc suf
+  # shellcheck disable=SC2206 # split on / on purpose; set -f rules out globbing
+  pc=(\$2) # not \`read <<<\`: a here-string is a temp file per call before bash 5.1
+  IFS=\$' \\t\\n'
+  n=\${#pc[@]}
+  suf[n]=""
+  for ((k = n - 1; k >= 0; k--)); do suf[k]="\${pc[k]}\${suf[k + 1]:+/\${suf[k + 1]}}"; done
+  shopt -s nocasematch
+  while [ "\$r" = 1 ]; do
+    if [ -e "\$anc" ]; then
+      local pk=\$GUARD_ROOT
+      for ((k = 0; k <= n; k++)); do
+        [ -e "\$pk" ] || break
+        if [ "\$anc" -ef "\$pk" ]; then
+          if [[ \$rest == "\${suf[k]}" ]]; then r=0; break; fi
+          if [ "\${3:-}" = under ] && { [ -z "\${suf[k]}" ] || [[ \$rest == "\${suf[k]}"/* ]]; }; then r=0; break; fi
+        fi
+        if [ "\$k" -lt "\$n" ]; then pk="\$pk/\${pc[k]}"; fi
+      done
+    fi
+    if [ "\$r" = 0 ] || [ "\$anc" = / ]; then break; fi
+    rest="\${anc##*/}\${rest:+/\$rest}"
+    anc=\${anc%/*}
+    anc=\${anc:-/}
+  done
+  shopt -u nocasematch
+  return "\$r"
+}
+
+# paths_imatch <text> <ere> — <text> matches, ASCII case ignored. Sets
+# nocasematch around its own test only: paths_names unsets it on return.
+paths_imatch() { local r=1; shopt -s nocasematch; if [[ \$1 =~ \$2 ]]; then r=0; fi; shopt -u nocasematch; return "\$r"; }
+
+# paths_ere_to <var> <text> — <text> as an ERE matching itself, into <var>.
+paths_ere_to() {
+  local _pe_s=\$2 _pe_o="" _pe_c
+  while [ -n "\$_pe_s" ]; do
+    _pe_c=\${_pe_s:0:1} _pe_s=\${_pe_s:1}
+    case \$_pe_c in [.^\\\$*+?\\(\\)\\[\\]{}\\|\\\\]) _pe_o+="\\\\\$_pe_c" ;; *) _pe_o+=\$_pe_c ;; esac
+  done
+  printf -v "\$1" '%s' "\$_pe_o"
+}
+
+# paths_rel_to <var> <path from the root> — that path as written from the
+# payload cwd (\`../docs/x\` from \`src/\`), into <var>; "" when the cwd is not
+# inside the root. Needs GUARD_ROOT.
+_PATHS_SUB="unset"
+paths_rel_to() {
+  local d=\$GUARD_CWD p=\$2 up="" sub
+  if [ "\$_PATHS_SUB" = unset ]; then
+    _PATHS_SUB=""
+    while ! [ "\$d" -ef "\$GUARD_ROOT" ]; do
+      if [ -z "\$d" ] || [ "\$d" = / ]; then _PATHS_SUB=-; break; fi
+      _PATHS_SUB="\${d##*/}\${_PATHS_SUB:+/\$_PATHS_SUB}" d=\${d%/*}
+    done
+  fi
+  sub=\$_PATHS_SUB
+  if [ "\$sub" = - ]; then printf -v "\$1" '%s' ""; return 0; fi
+  while [ -n "\$sub" ] && [[ \$p == */* ]] && [ "\${sub%%/*}" = "\${p%%/*}" ]; do
+    if [[ \$sub == */* ]]; then sub=\${sub#*/}; else sub=""; fi
+    p=\${p#*/}
+  done
+  while [ -n "\$sub" ]; do
+    up+="../"
+    if [[ \$sub == */* ]]; then sub=\${sub#*/}; else sub=""; fi
+  done
+  printf -v "\$1" '%s' "\$up\$p"
+}
+
+# paths_pattern <word> — PATHS_RE: the ERE of every path the shell could
+# expand <word> to (\$… and {…,…} anything; * ? […] within one component), and
+# PATHS_LIT=1 when it keeps a literal character other than \`/\` and \`.\`.
+# Returns 1 when the word holds nothing the shell would expand.
+paths_pattern() {
+  local w=\$1 i=0 n=\${#1} c re="" wild=0 j d e
+  PATHS_LIT=0
+  while [ "\$i" -lt "\$n" ]; do
+    c=\${w:i:1} i=\$((i + 1))
+    # A brace with no closing one is the reserved word, or plain text.
+    if [ "\$c" = '{' ] && [[ \${w:i} != *'}'* ]]; then c=lone; fi
+    case \$c in
+      '\$' | '{')
+        wild=1 re+='.*'
+        if [ "\$c" = '{' ] || [ "\${w:i:1}" = '{' ]; then
+          [ "\$c" = '{' ] || i=\$((i + 1))
+          d=1
+          while [ "\$i" -lt "\$n" ] && [ "\$d" -gt 0 ]; do
+            case \${w:i:1} in '{') d=\$((d + 1)) ;; '}') d=\$((d - 1)) ;; esac
+            i=\$((i + 1))
+          done
+        elif [[ \${w:i:1} == [@*#?\\\$!-] ]]; then i=\$((i + 1))
+        else while [ "\$i" -lt "\$n" ] && [[ \${w:i:1} == [A-Za-z0-9_] ]]; do i=\$((i + 1)); done; fi ;;
+      '*') wild=1 re+='[^/]*' ;;
+      '?') wild=1 re+='[^/]' ;;
+      '[')
+        j=\${w:i}
+        if [[ \$j == *']'* ]]; then
+          j=\${j%%]*} i=\$((i + \${#j} + 1)) wild=1
+          case \$j in '!'*) j="^\${j:1}" ;; esac
+          re+="[\$j]"
+        else re+='\\[' PATHS_LIT=1; fi ;;
+      lone) PATHS_LIT=1 re+='\\{' ;;
+      *)
+        case \$c in / | .) ;; *) PATHS_LIT=1 ;; esac
+        paths_ere_to e "\$c"
+        re+=\$e ;;
+    esac
+  done
+  PATHS_RE="^\$re\\\$"
+  [ "\$wild" = 1 ]
+}
+`,
+      executable: false,
+    },
+    ".specnaut/hooks/_baseline.sh": {
+      content: `# shellcheck shell=bash
+# Sourced by approve-on-prompt.sh after _approval.sh and _paths.sh. The
+# writer-agnostic backstop behind protect-constitution.sh (spec 038 § 11 S1):
+# the PreToolUse guard reads commands, and no reading of a command sees every
+# writer — an interpreter, a script, a formatter, \`git checkout\`. So the user's
+# prompt fingerprints the four project-owned files, and Stop compares.
+#
+# A file that changed during the turn with no approval of its kind blocks the
+# stop with a question for the user, and the version from the start of the
+# turn is kept. It is never restored: the change may be the user's own, made
+# in their editor while the agent worked.
+#
+# Kept under \${XDG_STATE_HOME:-\$HOME/.local/state}/specnaut/, beside the
+# stamps and outside the workspace for the same reason (spec 036 § 11 F3):
+#   baselines/<sha256(toplevel)>/<session_id>/  sums, and a copy of each file
+#   kept/<sha256(toplevel)>/                    the copies a blocked stop kept
+
+# _baseline_lists — the files, and the approval kind each one needs.
+_baseline_lists() {
+  BL_FILES=("\$PATHS_CONSTITUTION" "\${PATHS_GATE_CONFIGS[@]}")
+  BL_KINDS=(constitution)
+  local _
+  for _ in "\${PATHS_GATE_CONFIGS[@]}"; do BL_KINDS+=(gate-config); done
+}
+
+# _baseline_sum <file> — its SHA-256, or \`-\` when it is not a regular file.
+_baseline_sum() {
+  if [ -f "\$1" ]; then approval_sha256 <"\$1"; else printf -- -; fi
+}
+
+# baseline_snapshot <dir> — fingerprint and copy the files as they are now.
+baseline_snapshot() {
+  local i f sums=""
+  _baseline_lists
+  rm -rf "\$1"
+  mkdir -p "\$1"
+  chmod 700 "\${1%/*}"
+  for i in "\${!BL_FILES[@]}"; do
+    f="\$GUARD_ROOT/\${BL_FILES[i]}"
+    sums+="\$i \$(_baseline_sum "\$f")"\$'\\n'
+    if [ -f "\$f" ]; then cp "\$f" "\$1/\$i"; fi
+  done
+  printf '%s' "\$sums" >"\$1/sums"
+}
+
+# baseline_check <dir> <approved kinds, space-separated> <stop_hook_active> —
+# prints a Stop \`block\` decision when a file changed with no approval of its
+# kind; nothing otherwise. Any difference re-baselines, approved or not, so a
+# turn the stop continues is judged from here and never asked about twice.
+baseline_check() {
+  local i sum f kept keepdir ts seen=0
+  local -a changed=()
+  [ -f "\$1/sums" ] || return 0 # no prompt fingerprinted this session yet
+  _baseline_lists
+  while read -r i sum; do
+    f="\$GUARD_ROOT/\${BL_FILES[i]}"
+    [ "\$(_baseline_sum "\$f")" != "\$sum" ] || continue
+    seen=1
+    case " \$2 " in *" \${BL_KINDS[i]} "*) continue ;; esac
+    if [ -f "\$1/\$i" ]; then
+      keepdir=\${1%/*}                                 # …/specnaut/baselines/<hash>
+      keepdir=\${keepdir%/*/*}/kept/\${keepdir##*/}     # …/specnaut/kept/<hash>
+      mkdir -p "\$keepdir"
+      ts=\$(date -u +%Y%m%dT%H%M%SZ)
+      kept="\$keepdir/\$ts-\${BL_FILES[i]##*/}"
+      cp "\$1/\$i" "\$kept"
+      changed+=("\${BL_FILES[i]} (its version from the start of the turn is kept at \$kept)")
+    else
+      changed+=("\${BL_FILES[i]} (it did not exist when the turn began)")
+    fi
+  done <"\$1/sums"
+  [ "\$seen" = 0 ] || baseline_snapshot "\$1"
+  [ \${#changed[@]} -gt 0 ] || return 0
+  local r
+  r="Specnaut: \$(IFS=';'; echo "\${changed[*]}") changed during this turn, and the user's prompt did not approve it. Nothing was restored. Before you stop, ask the user one question: keep this change, or restore the kept version? Do not touch the file again until they answer."
+  if [ "\$3" = true ]; then
+    printf '%s\\n' "\$r" >&2 # a stop this hook already continued: never loop
+    return 0
+  fi
+  jq -cn --arg r "\$r" '{decision: "block", reason: \$r}'
+}
+`,
+      executable: false,
+    },
     ".specnaut/hooks/approve-on-prompt.sh": {
       content: `#!/usr/bin/env bash
 # UserPromptSubmit + Stop — the only writer of the turn approval (spec 036,
@@ -30685,11 +31677,17 @@ cmd_git() {
 # a trailing . or ! dropped, an optional leading "yes, ") is one of:
 #   merge    /task merge…  /specnaut-task merge…  \$specnaut-task merge…  merge  merge it  land it  push it
 #   release  /ship release|tag…  /specnaut-ship release|tag…  \$specnaut-ship release|tag…  release it  tag it
+#   constitution  approve the constitution amendment   (spec 038 S2: the phrase
+#   gate-config   approve the gate config change        the constitution verb prints)
 # Claude spells the skills /task, /ship; Codex /specnaut-task or \$specnaut-task
 # (harness_commands.ts). A test holds these spellings to harnessCommands.
 # Never a bare yes/ok/go: a reply to some other question must not land code.
 # A prompt carrying agent_id comes from a subagent, not the user (§ 11
 # Measured): nothing is minted or deleted for it.
+#
+# Each user prompt also fingerprints the project-owned files, and Stop
+# compares them (_baseline.sh): a change no approval covered blocks the stop
+# with a question.
 #
 # Not a guard: every failure exits 0 with the reason on stderr. Exit 2 here
 # would block the user's prompt, or keep a Claude turn from stopping; failing
@@ -30699,10 +31697,14 @@ case \${BASH_SOURCE[0]} in */*) HOOK_DIR=\${BASH_SOURCE[0]%/*} ;; *) HOOK_DIR=. 
 . "\$HOOK_DIR/_guard.sh" || { echo "specnaut: \$HOOK_DIR/_guard.sh is missing" >&2; exit 0; }
 # shellcheck source=_approval.sh
 . "\$HOOK_DIR/_approval.sh"
+# shellcheck source=_paths.sh
+. "\$HOOK_DIR/_paths.sh"
+# shellcheck source=_baseline.sh
+. "\$HOOK_DIR/_baseline.sh"
 GUARD_FAIL_CODE=0
-guard_init approve-on-prompt "\${1:-}" .prompt
+guard_init approve-on-prompt "\${1:-}" .prompt any:.stop_hook_active
 
-# approval_kind_of <prompt> — prints merge, release, or nothing.
+# approval_kind_of <prompt> — prints merge, release, constitution, gate-config, or nothing.
 approval_kind_of() {
   local p
   p=\$(printf '%s' "\$1" | tr '[:upper:]' '[:lower:]' | tr -s '[:space:]' ' ')
@@ -30724,20 +31726,31 @@ approval_kind_of() {
       "/specnaut-ship release" | "/specnaut-ship release "* | "/specnaut-ship tag" | "/specnaut-ship tag "* | \\
       '\$specnaut-ship release' | '\$specnaut-ship release '* | '\$specnaut-ship tag' | '\$specnaut-ship tag '*)
       echo release ;;
+    "approve the constitution amendment") echo constitution ;;
+    "approve the gate config change") echo gate-config ;;
   esac
 }
 
 [ -z "\$P_AGENT" ] || exit 0
 
 approval_session_ok "\$P_SESSION" || guard_fail "session_id is missing or not a plain token — no approval minted"
+guard_root # here, not in the subshells below: _baseline.sh reads GUARD_ROOT
 stamp=\$(approval_path "\$P_SESSION")
-rm -f "\$stamp"
+baseline=\$(approval_state baselines "\$P_SESSION")
 
 case \$P_EVENT in
-  Stop) exit 0 ;;
-  UserPromptSubmit) ;;
-  *) guard_fail "unexpected event '\$P_EVENT' — expected UserPromptSubmit or Stop" ;;
+  Stop)
+    # What this turn approved is read before the stamp goes; the stamp goes
+    # before anything that could fail and leave it outliving the turn.
+    kinds=""
+    for k in constitution gate-config; do if approved "\$k"; then kinds+=" \$k"; fi; done
+    rm -f "\$stamp"
+    baseline_check "\$baseline" "\$kinds" "\${GF[1]}"
+    exit 0 ;;
+  UserPromptSubmit) rm -f "\$stamp" ;;
+  *) rm -f "\$stamp"; guard_fail "unexpected event '\$P_EVENT' — expected UserPromptSubmit or Stop" ;;
 esac
+baseline_snapshot "\$baseline"
 
 kind=\$(approval_kind_of "\${GF[0]}")
 [ -n "\$kind" ] || exit 0
@@ -31064,13 +32077,9 @@ guard_fail "'\$agent' is a Specnaut agent: it runs on the model its definition d
 #           guard off). Gated like a merge: Claude's prompt where it can ask,
 #           else this turn's \`merge\` approval.
 #
-# Decided by identity, never by text (§ 11 F5): each target is resolved
-# against the payload cwd, \`.\`/\`..\`/\`//\` collapsed, then its deepest existing
-# ancestor is compared with \`-ef\` to the protected path's, the remainder case-
-# folded — so a symlink, a case variant on APFS, or a path relative to a
-# subdirectory names the same file. Codex paths come from the patch headers
-# \`*** Add|Update|Delete File:\` and \`*** Move to:\` (indented, CRLF, any case);
-# a patch from which no path can be read is refused.
+# Decided by identity, never by text (§ 11 F5) — see _paths.sh, which reads
+# the paths an edit names and resolves them; a patch from which no path can be
+# read is refused.
 #
 # Usage: protect-generated.sh <claude|codex>   (payload on stdin)
 case \${BASH_SOURCE[0]} in */*) HOOK_DIR=\${BASH_SOURCE[0]%/*} ;; *) HOOK_DIR=. ;; esac
@@ -31078,85 +32087,22 @@ case \${BASH_SOURCE[0]} in */*) HOOK_DIR=\${BASH_SOURCE[0]%/*} ;; *) HOOK_DIR=. 
 . "\$HOOK_DIR/_guard.sh" || { echo "specnaut: \$HOOK_DIR/_guard.sh is missing — refusing" >&2; exit 2; }
 # shellcheck source=_approval.sh
 . "\$HOOK_DIR/_approval.sh"
+# shellcheck source=_paths.sh
+. "\$HOOK_DIR/_paths.sh" || guard_fail "_paths.sh is missing beside protect-generated.sh"
 guard_init protect-generated "\${1:-}" .tool_input.file_path .tool_input.notebook_path lines:.tool_input.command
 
-paths=()
-case "\$GUARD_HARNESS:\$P_TOOL" in
-  claude:Edit | claude:Write | claude:MultiEdit) paths=("\${GF[0]}") ;;
-  claude:NotebookEdit) paths=("\${GF[1]}") ;;
-  codex:apply_patch)
-    re_file='^[[:space:]]*\\*\\*\\*[[:space:]]*(add|update|delete)[[:space:]]+file:[[:space:]]*(.*)\$'
-    re_move='^[[:space:]]*\\*\\*\\*[[:space:]]*move[[:space:]]+to:[[:space:]]*(.*)\$'
-    shopt -s nocasematch
-    while IFS= read -r line || [ -n "\$line" ]; do
-      if [[ \$line =~ \$re_file ]]; then p=\${BASH_REMATCH[2]}
-      elif [[ \$line =~ \$re_move ]]; then p=\${BASH_REMATCH[1]}
-      else continue; fi
-      p=\${p%"\${p##*[![:space:]]}"} # trailing blanks, a CRLF's \\r among them
-      if [ -n "\$p" ]; then paths+=("\$p"); fi
-    done <<<"\${GF[2]}"
-    shopt -u nocasematch ;;
-  *) guard_fail "expected an edit, got tool '\$P_TOOL' on \$GUARD_HARNESS" ;;
-esac
-if [ \${#paths[@]} = 0 ] || [ -z "\${paths[0]}" ]; then
-  guard_fail "could not read the file path this \$P_TOOL edits — refusing an edit it cannot check"
-fi
+paths_of_edit "\${GF[0]}" "\${GF[1]}" "\${GF[2]}"
 guard_root
 
-# norm <path> — absolute against the payload cwd, with //, . and .. collapsed;
-# a Windows path (\`C:\\…\`, \`src\\…\`) first in this shell's own form.
-norm() {
-  local p part out="" IFS=/
-  guard_path p "\$1"
-  case \$p in /*) ;; *) p="\$GUARD_CWD/\$p" ;; esac
-  for part in \$p; do
-    case \$part in '' | .) ;; ..) out=\${out%/*} ;; *) out="\$out/\$part" ;; esac
-  done
-  printf '%s' "\${out:-/}"
-}
-
-# names <abs target> <path relative to the root> [under] — the target IS the
-# protected path (with \`under\`: is it, or lies beneath it). Walks up the
-# target; at each existing ancestor, an \`-ef\` match against an existing
-# prefix of the protected path decides, the rest compared case-folded.
-names() {
-  local anc=\$1 rest="" k n r=1
-  local -a pc suf
-  IFS=/ read -r -a pc <<<"\$2"
-  n=\${#pc[@]}
-  suf[n]=""
-  for ((k = n - 1; k >= 0; k--)); do suf[k]="\${pc[k]}\${suf[k + 1]:+/\${suf[k + 1]}}"; done
-  shopt -s nocasematch
-  while [ "\$r" = 1 ]; do
-    if [ -e "\$anc" ]; then
-      local pk=\$GUARD_ROOT
-      for ((k = 0; k <= n; k++)); do
-        [ -e "\$pk" ] || break
-        if [ "\$anc" -ef "\$pk" ]; then
-          if [[ \$rest == "\${suf[k]}" ]]; then r=0; break; fi
-          if [ "\${3:-}" = under ] && { [ -z "\${suf[k]}" ] || [[ \$rest == "\${suf[k]}"/* ]]; }; then r=0; break; fi
-        fi
-        if [ "\$k" -lt "\$n" ]; then pk="\$pk/\${pc[k]}"; fi
-      done
-    fi
-    if [ "\$r" = 0 ] || [ "\$anc" = / ]; then break; fi
-    rest="\${anc##*/}\${rest:+/\$rest}"
-    anc=\${anc%/*}
-    anc=\${anc:-/}
-  done
-  shopt -u nocasematch
-  return "\$r"
-}
-
 denied="" gated=()
-for p in "\${paths[@]}"; do
-  t=\$(norm "\$p")
-  if names "\$t" .specnaut/installed.lock; then denied=\$p; break; fi
+for p in "\${EDIT_PATHS[@]}"; do
+  t=\$(paths_norm "\$p")
+  if paths_names "\$t" .specnaut/installed.lock; then denied=\$p; break; fi
   for g in .specnaut/workflow.yml .specnaut/scripts/bash/merge-mode.sh .specnaut/scripts/bash/base-branch.sh \\
     .codex/hooks.json .claude/settings.json .claude/settings.local.json; do
-    if names "\$t" "\$g"; then gated+=("\$g"); fi
+    if paths_names "\$t" "\$g"; then gated+=("\$g"); fi
   done
-  if names "\$t" .specnaut/hooks under; then gated+=(".specnaut/hooks/"); fi
+  if paths_names "\$t" .specnaut/hooks under; then gated+=(".specnaut/hooks/"); fi
 done
 
 if [ -n "\$denied" ]; then
@@ -31166,6 +32112,262 @@ fi
 approval_gate merge \\
   "editing \${gated[*]} changes how Specnaut gates landings on the base branch, so it needs the user" \\
   "\\\`merge\\\` (or \\\`/task merge\\\`)"
+`,
+      executable: true,
+    },
+    ".specnaut/hooks/protect-constitution.sh": {
+      content: `#!/usr/bin/env bash
+# PreToolUse(Edit|Write|MultiEdit|NotebookEdit and Bash on Claude; Edit|Write
+# and Bash on Codex) — the one home of "what may write the project's
+# constitution and its gate configs" (spec 038, plan § 5, FR-012). Guarded,
+# each by the approval kind its phrase mints (S2):
+#
+#   docs/constitution.md                       constitution
+#   .specnaut/{size-limits,boundaries,ui}.yml  gate-config
+#   .specnaut/hooks/**                         constitution — this guard and
+#                                              what it sources; protect-generated
+#                                              gates the same folder under merge
+#
+# A write needs THIS turn's approval of its kind (approval_require): no stamp
+# denies on every harness and in every mode.
+#
+# The Bash arm (S1) reads each simple command _command.sh cuts out of the line.
+# One goes through untouched only when it is a bare read: the command word
+# exactly \`cat head tail grep wc diff\`, or \`git diff|log|show|blame|status|add\`
+# with no option before the subcommand (so no -c) and none of --output*,
+# --ext-diff, --textconv, add -e/-p/-i; no \`/\` in it, no VAR= prefix, and
+# nothing on the line that redefines a command (a function, an alias, hash,
+# source, a PATH/GIT_* assignment). Any other
+# command is judged by the words it carries: a word names a guarded file by
+# identity (_paths.sh), by carrying its basename, or — unexpanded \`\$\`, glob or
+# brace — by a pattern that could expand to it, case ignored. A redirection
+# onto a guarded file is judged whatever the command. An opaque form (eval,
+# sh -c, an interpreter's -c/-e, a line it cannot read) is judged by text: it
+# names a guarded file when the line mentions one. A commit message or branch
+# name that says "constitution" names nothing. What no reading sees — a script,
+# a formatter, \`git checkout .\` — the Stop backstop in _baseline.sh catches.
+#
+# Usage: protect-constitution.sh <claude|codex>   (payload on stdin)
+case \${BASH_SOURCE[0]} in */*) HOOK_DIR=\${BASH_SOURCE[0]%/*} ;; *) HOOK_DIR=. ;; esac
+# shellcheck source=_guard.sh
+. "\$HOOK_DIR/_guard.sh" || { echo "specnaut: \$HOOK_DIR/_guard.sh is missing — refusing" >&2; exit 2; }
+# shellcheck source=_approval.sh
+. "\$HOOK_DIR/_approval.sh"
+# shellcheck source=_paths.sh
+. "\$HOOK_DIR/_paths.sh" || guard_fail "_paths.sh is missing beside protect-constitution.sh"
+# shellcheck source=_command.sh
+. "\$HOOK_DIR/_command.sh"
+guard_init protect-constitution "\${1:-}" .tool_input.file_path .tool_input.notebook_path \\
+  lines:.tool_input.command argv:.tool_input.command
+guard_root
+
+# The guarded entries: path, kind, and how a pattern may name it (the files a
+# glob or \`\$\` could expand to — for the hooks folder, the scripts it holds).
+PC_HOOKS=.specnaut/hooks
+PC_PATHS=("\$PATHS_CONSTITUTION" "\${PATHS_GATE_CONFIGS[@]}" "\$PC_HOOKS")
+PC_KINDS=(constitution)
+for _ in "\${PATHS_GATE_CONFIGS[@]}"; do PC_KINDS+=(gate-config); done
+PC_KINDS+=(constitution)
+PC_LAST=\$((\${#PC_PATHS[@]} - 1))
+PC_SELF=(protect-constitution.sh _paths.sh _guard.sh _approval.sh _command.sh _simple.sh
+  _baseline.sh approve-on-prompt.sh)
+
+# PC_BASE_RE[i] — entry i's basename (the folder's path) as a whole token;
+# PC_STEM_RE[i] — its stem, which is all an opaque string has to mention.
+PC_BASE_RE=() PC_STEM_RE=() PC_LEAF_RE=""
+for i in "\${!PC_PATHS[@]}"; do
+  b=\${PC_PATHS[i]##*/}
+  paths_ere_to s "\$b"
+  PC_LEAF_RE+="\${PC_LEAF_RE:+|}\$s"
+  if [ "\$i" = "\$PC_LAST" ]; then b=\$PC_HOOKS; fi
+  s=\${b%.*}
+  if [ "\${#s}" -lt 5 ]; then s=\$b; fi
+  paths_ere_to b "\$b"
+  paths_ere_to s "\$s"
+  PC_BASE_RE+=("(^|[^A-Za-z0-9_.-])\$b(/|[^A-Za-z0-9_.-]|\\\$)") PC_STEM_RE+=("\$s")
+done
+PC_LEAF_RE="^(\$PC_LEAF_RE)\\\$"
+
+# PC_FORMS / PC_FORM_OF — each spelling a pattern is tried against, and its entry.
+PC_FORMS=() PC_FORM_OF=()
+_pc_form() { local r; paths_rel_to r "\$2"; PC_FORMS+=("\$GUARD_ROOT/\$2") PC_FORM_OF+=("\$1"); if [ -n "\$r" ]; then PC_FORMS+=("\$r" "./\$r") PC_FORM_OF+=("\$1" "\$1"); fi; }
+for i in "\${!PC_PATHS[@]}"; do
+  if [ "\$i" = "\$PC_LAST" ]; then
+    _pc_form "\$i" "\$PC_HOOKS"
+    for f in "\${PC_SELF[@]}"; do _pc_form "\$i" "\$PC_HOOKS/\$f"; done
+  else _pc_form "\$i" "\${PC_PATHS[i]}"; fi
+done
+
+PC_NEED="" PC_WHAT=()
+# _pc_need <entry> <how it was named>
+_pc_need() {
+  case " \$PC_NEED " in *" \${PC_KINDS[\$1]} "*) ;; *) PC_NEED+=" \${PC_KINDS[\$1]}" ;; esac
+  PC_WHAT+=("\${PC_PATHS[\$1]}\${2:+ (\$2)}")
+}
+
+# _pc_identity <path> <how> — record each entry <path> is, by identity. A
+# word with no separator that names nothing on disk can only be an entry whose
+# last component it is — unless the cwd is inside the hooks folder: every other
+# one skips the walk (most words of a line).
+PC_SKIP=1
+if paths_names "\$GUARD_CWD" "\$PC_HOOKS" under; then PC_SKIP=0; fi
+_pc_identity() {
+  local t i
+  if [ "\$PC_SKIP" = 1 ] && [[ \$1 != */* && \$1 != *\\\\* ]] && [ ! -e "\$GUARD_CWD/\$1" ] \\
+    && [ ! -L "\$GUARD_CWD/\$1" ] && ! paths_imatch "\$1" "\$PC_LEAF_RE"; then return 0; fi
+  paths_norm_to t "\$1"
+  for i in "\${!PC_PATHS[@]}"; do
+    if [ "\$i" = "\$PC_LAST" ]; then
+      if paths_names "\$t" "\$PC_HOOKS" under; then _pc_need "\$i" "\$2"; fi
+    elif paths_names "\$t" "\${PC_PATHS[i]}"; then _pc_need "\$i" "\$2"; fi
+  done
+}
+
+# _pc_names <word> <how> — record each entry a word of a command names: by its
+# basename, by a pattern that could expand to it, or by identity. A word
+# holding \`=\` (an assignment, \`--file=…\`, dd's \`of=…\`) is read after it too.
+_pc_names() {
+  local c i
+  local -a cands=("\$1")
+  [ -n "\$1" ] || return 0
+  case \$1 in *=*) cands+=("\${1#*=}") ;; esac
+  for i in "\${!PC_PATHS[@]}"; do
+    if paths_imatch "\$1" "\${PC_BASE_RE[i]}"; then _pc_need "\$i" "\$2"; fi
+  done
+  for c in "\${cands[@]}"; do
+    if paths_pattern "\$c"; then
+      if [ "\$PATHS_LIT" = 1 ]; then
+        for i in "\${!PC_FORMS[@]}"; do
+          if paths_imatch "\${PC_FORMS[i]}" "\$PATHS_RE"; then _pc_need "\${PC_FORM_OF[i]}" "\$2"; fi
+        done
+      else # nothing but expansions: it names what the line itself mentions
+        for i in "\${!PC_PATHS[@]}"; do
+          if paths_imatch "\$PC_LINE" "\${PC_BASE_RE[i]}"; then _pc_need "\$i" "\$2, which the line may set to it"; fi
+        done
+      fi
+    elif [ -n "\$c" ] && [[ \$c != -* ]]; then
+      # shellcheck disable=SC2088 # the literal ~ the shell would expand
+      if [ "\${c:0:2}" = "~/" ]; then c="\$HOME/\${c:2}"; fi
+      _pc_identity "\$c" "\$2"
+    fi
+  done
+}
+
+# Per simple command, from _cmd_emit (CMD_ON_SEG): the raw words, and the words
+# without redirections with the index of the command word.
+PC_RAW=() PC_V=() PC_K=() PC_REDEFINES=0
+# shellcheck disable=SC2329 # called through CMD_ON_SEG
+_pc_seg() {
+  local x IFS=\$CMD_SEP
+  PC_RAW+=("\$1") PC_K+=("\$k")
+  PC_V+=("\${v[*]+"\${v[*]}"}")
+  for x in \${v[@]+"\${v[@]}"}; do
+    case \$x in PATH=* | BASH_ENV=* | ENV=* | GIT_*=* | LD_*=* | DYLD_*=*) PC_REDEFINES=1 ;; esac
+  done
+  case \${v[k]:-} in function | alias | hash | enable | source | . | builtin) PC_REDEFINES=1 ;; esac
+}
+
+# _pc_read_only — W (from k) is a bare allowlisted read (see the header).
+_pc_read_only() {
+  local j sub w
+  [ "\$PC_REDEFINES" = 0 ] || return 1
+  for ((j = 0; j < K; j++)); do
+    case \${W[j]} in '{' | '}' | '!' | if | then | else | elif | do | while | until) ;; *) return 1 ;; esac
+  done
+  case \${W[K]:-} in
+    cat | head | tail | grep | wc | diff) return 0 ;;
+    git) sub=\${W[K + 1]:-} ;;
+    *) return 1 ;;
+  esac
+  case \$sub in diff | log | show | blame | status | add) ;; *) return 1 ;; esac
+  for w in "\${W[@]:K+2}"; do
+    case \$w in --output* | --ext-diff | --textconv) return 1 ;; esac
+    if [ "\$sub" = add ]; then
+      case \$w in --edit | --patch | --interactive) return 1 ;; --*) ;; -*[epi]*) return 1 ;; esac
+    fi
+  done
+  return 0
+}
+
+# _pc_opaque — W (from K) runs a string this guard cannot read as commands.
+_pc_opaque() {
+  local w c=\${W[K]:-}
+  c=\${c##*/}
+  case \$c in
+    eval) return 0 ;;
+    sh | bash | zsh | dash | ksh | mksh | ash | fish)
+      for w in "\${W[@]:K+1}"; do case \$w in --*) ;; -*c*) return 0 ;; -*) ;; *) return 1 ;; esac; done
+      return 0 ;;
+    python* | perl* | ruby* | node | nodejs | bun | deno | php* | lua* | osascript | pwsh | powershell | tclsh* | Rscript)
+      for w in "\${W[@]:K+1}"; do
+        case \$w in eval | - | --eval* | --print* | -Command | -command | -[cerpE] | -[a-zA-Z]*[ceE]*) return 0 ;; -*) ;; *) return 1 ;; esac
+      done
+      return 0 ;;
+  esac
+  return 1
+}
+
+# _pc_redirects <raw segment> — judge each redirection that writes.
+_pc_redirects() {
+  local x t skip=0 op
+  local -a rw
+  local IFS=\$CMD_SEP
+  # shellcheck disable=SC2206 # split on CMD_SEP on purpose; set -f rules out globbing
+  rw=(\$1)
+  IFS=\$' \\t\\n'
+  for x in \${rw[@]+"\${rw[@]}"}; do
+    if [ "\$skip" = 1 ]; then skip=0; _pc_names "\$x" "a redirection onto it"; continue; fi
+    op=""
+    if [[ \$x =~ \$_CMD_RE_REDIR ]]; then op=\${BASH_REMATCH[1]} t=\${BASH_REMATCH[2]}
+    elif [[ \$x =~ \$_CMD_RE_AMP ]]; then op='&>' t=\${BASH_REMATCH[1]}; fi
+    case \$op in
+      '>' | '>>' | '>|' | '<>' | '&>') ;;
+      '>&') [[ \$t =~ ^[0-9]*-?\$ ]] && continue ;;
+      *) continue ;;
+    esac
+    if [ -n "\$t" ]; then _pc_names "\$t" "a redirection onto it"; else skip=1; fi
+  done
+}
+
+if [ "\$P_TOOL" = Bash ]; then
+  PC_LINE=\${GF[3]}
+  [ -n "\$PC_LINE" ] || guard_fail "a Bash call without tool_input.command"
+  if [[ \$PC_LINE =~ (^|[^A-Za-z0-9_\\\$])[A-Za-z_][A-Za-z0-9_.:-]*[[:space:]]*\\([[:space:]]*\\) ]]; then PC_REDEFINES=1; fi
+  CMD_ON_SEG=_pc_seg
+  cmd_parse "\$PC_LINE"
+  opaque=\$CMD_OPAQUE
+  for j in \${PC_RAW[@]+"\${!PC_RAW[@]}"}; do
+    _pc_redirects "\${PC_RAW[j]}"
+    cmd_words "\${PC_V[j]}"
+    K=\${PC_K[j]}
+    if _pc_read_only; then continue; fi
+    for w in \${W[@]+"\${W[@]}"}; do _pc_names "\$w" "named by \\\`\${W[K]:-\$w}\\\`"; done
+    if _pc_opaque; then opaque=1; fi
+  done
+  if [ "\$opaque" = 1 ]; then
+    for i in "\${!PC_PATHS[@]}"; do
+      if paths_imatch "\$PC_LINE" "\${PC_STEM_RE[i]}"; then
+        _pc_need "\$i" "in a command it cannot read: eval, sh -c, an interpreter's -c/-e"
+      fi
+    done
+  fi
+else
+  paths_of_edit "\${GF[0]}" "\${GF[1]}" "\${GF[2]}"
+  for p in "\${EDIT_PATHS[@]}"; do _pc_identity "\$p" ""; done
+fi
+
+[ -n "\$PC_NEED" ] || guard_allow
+what=\$(IFS=';'; echo "\${PC_WHAT[*]}")
+read -r kind other <<<"\$PC_NEED"
+if [ -n "\$other" ]; then
+  guard_fail "this call changes \$what — files of two approval kinds. One approval covers one kind: make the changes one at a time"
+fi
+case \$kind in
+  constitution) reason="this call would change \$what: the team's constitution, or the hooks that guard it. An agent never amends it on its own initiative" ;;
+  *) reason="this call would change \$what: a gate config, which loosens or tightens the project's own gates. An agent never changes it on its own initiative" ;;
+esac
+approval_require "\$kind" "\$reason" \\
+  "Only the user approves it: draft the change with the task skill's \\\`constitution\\\` verb, which prints the phrase the user types as their whole message — a plain \\"yes\\" does not approve it. Reading is allowed with a bare cat, head, tail, grep, wc, diff, or git diff/log/show/blame/status/add."
 `,
       executable: true,
     },
@@ -31369,17 +32571,20 @@ workflow-manager
     ".specnaut/hooks/SHA256SUMS": {
       content: `e51a8a1291eb7e2e5a5a21122b971ee78c5392d4dbbabd28798f8f89df9ca08a  .gitattributes
 49a4f9a91f8b91559f087d02c151d4069575cf466fcd09b21354749f188c16a8  _agents.txt
-d248ada612da7ce04d3d2cd4f8576070c62371166e35ed6351b0069fcd066fad  _approval.sh
+eff27f37501f08c5a39cfcc2c6c7a8382e0d0467dc4a63cf3d29bb84d5ea26d6  _approval.sh
+23dedb316a7137333450d578cf52b5ce8c25fb773c4263f283fde37017f3f435  _baseline.sh
 7556762e50be2b68d2bc432dddded521f736cc06abb084e895c1f1ddf5986039  _command.sh
 fa8afb422b9af3b7f80580666d66e9332ed35cc3c24c7182300b3224f2a96548  _git.sh
 2829e6a5db6984fee451e242ba16beca68808a7647316cff24930aa8ec53c73a  _guard.sh
-7675a9df90d21f2390940870fa8458d09e7418a68de7d682b3f8d6a36a94019c  _simple.sh
-f12446930a31e489c0a3edc8599c47aab2c90dcdb156d6c849d0b760e8ddc84e  approve-on-prompt.sh
+f5552945f77fb0d24f56bbf2e97fb64d284d9c716abf211ebcbe081cacdf8bdf  _paths.sh
+675a334dbce3d787fe3cd42223dd02f53c9f26b92f2e9aac35855662f335a865  _simple.sh
+298471e25d869161087ddd4f4c0a488ca8ec5508ad01c4589e440af9274d0820  approve-on-prompt.sh
 28d13e1fbd696f79036cc1f94c3fd6aa68f4f862f0dd5f6d32191ad05392534f  guard-dispatch-model.sh
 09103676aa00371ece40171b577cfbe24e02fdfcfe39c47ff2905ed189708499  guard-merge.sh
 6f8dd791eb7c797dae9f9c5f6f6bc0d07c2930552aa9087ccc8b619f0844476e  guard-release.sh
 3364feb0f3a7892224b67e4f857bb6c085456da98c892d7199c4bbd10f122f8b  log-subagent.sh
-b235e7b333245290ac890804d5f95338eaaf87b6141e0fb51b319e676b95b1c7  protect-generated.sh
+0d231c09ef29b1e46b774d283fad725382f33d6f3098545dc8a504bf89c40a80  protect-constitution.sh
+79f8bc840e2e691c2011c0350bd5140bad8caa4448d65ed209e79da582a075a3  protect-generated.sh
 4e0f336ed4eafecca2904fba2aab427d3e8528889aa68e9e347c4ac03dc53853  release-commands.txt
 `,
       executable: false,
@@ -31401,12 +32606,17 @@ b235e7b333245290ac890804d5f95338eaaf87b6141e0fb51b319e676b95b1c7  protect-genera
         "hooks": [
           {
             "type": "command",
-            "command": "r=\$PWD; while [ -n \\"\$r\\" ] && [ ! -d \\"\$r/.specnaut/hooks\\" ]; do r=\${r%/*}; done; [ \\"\$( (sha256sum 2>/dev/null || shasum -a 256) < \\"\$r/.specnaut/hooks/SHA256SUMS\\" 2>/dev/null | cut -c1-64)\\" = \\"dccae95046ba568fe5d3a338128d69b99d9aa7d0d41c114e431c5bb922fc4471\\" ] && (cd \\"\$r/.specnaut/hooks\\" && (sha256sum -c --status SHA256SUMS 2>/dev/null || shasum -a 256 -c --status SHA256SUMS)) && exec bash \\"\$r/.specnaut/hooks/guard-merge.sh\\" codex; echo \\"specnaut: .specnaut/hooks changed since it was trusted — run specnaut upgrade, then /hooks\\" >&2; exit 2",
+            "command": "r=\$PWD; while [ -n \\"\$r\\" ] && [ ! -d \\"\$r/.specnaut/hooks\\" ]; do r=\${r%/*}; done; [ \\"\$( (sha256sum 2>/dev/null || shasum -a 256) < \\"\$r/.specnaut/hooks/SHA256SUMS\\" 2>/dev/null | cut -c1-64)\\" = \\"dba742789bae2806eb8ab16b0f7a099afbb9d8929b807d819949e99851b98bce\\" ] && (cd \\"\$r/.specnaut/hooks\\" && (sha256sum -c --status SHA256SUMS 2>/dev/null || shasum -a 256 -c --status SHA256SUMS)) && exec bash \\"\$r/.specnaut/hooks/guard-merge.sh\\" codex; echo \\"specnaut: .specnaut/hooks changed since it was trusted — run specnaut upgrade, then /hooks\\" >&2; exit 2",
             "timeout": 10
           },
           {
             "type": "command",
-            "command": "r=\$PWD; while [ -n \\"\$r\\" ] && [ ! -d \\"\$r/.specnaut/hooks\\" ]; do r=\${r%/*}; done; [ \\"\$( (sha256sum 2>/dev/null || shasum -a 256) < \\"\$r/.specnaut/hooks/SHA256SUMS\\" 2>/dev/null | cut -c1-64)\\" = \\"dccae95046ba568fe5d3a338128d69b99d9aa7d0d41c114e431c5bb922fc4471\\" ] && (cd \\"\$r/.specnaut/hooks\\" && (sha256sum -c --status SHA256SUMS 2>/dev/null || shasum -a 256 -c --status SHA256SUMS)) && exec bash \\"\$r/.specnaut/hooks/guard-release.sh\\" codex; echo \\"specnaut: .specnaut/hooks changed since it was trusted — run specnaut upgrade, then /hooks\\" >&2; exit 2",
+            "command": "r=\$PWD; while [ -n \\"\$r\\" ] && [ ! -d \\"\$r/.specnaut/hooks\\" ]; do r=\${r%/*}; done; [ \\"\$( (sha256sum 2>/dev/null || shasum -a 256) < \\"\$r/.specnaut/hooks/SHA256SUMS\\" 2>/dev/null | cut -c1-64)\\" = \\"dba742789bae2806eb8ab16b0f7a099afbb9d8929b807d819949e99851b98bce\\" ] && (cd \\"\$r/.specnaut/hooks\\" && (sha256sum -c --status SHA256SUMS 2>/dev/null || shasum -a 256 -c --status SHA256SUMS)) && exec bash \\"\$r/.specnaut/hooks/guard-release.sh\\" codex; echo \\"specnaut: .specnaut/hooks changed since it was trusted — run specnaut upgrade, then /hooks\\" >&2; exit 2",
+            "timeout": 10
+          },
+          {
+            "type": "command",
+            "command": "r=\$PWD; while [ -n \\"\$r\\" ] && [ ! -d \\"\$r/.specnaut/hooks\\" ]; do r=\${r%/*}; done; [ \\"\$( (sha256sum 2>/dev/null || shasum -a 256) < \\"\$r/.specnaut/hooks/SHA256SUMS\\" 2>/dev/null | cut -c1-64)\\" = \\"dba742789bae2806eb8ab16b0f7a099afbb9d8929b807d819949e99851b98bce\\" ] && (cd \\"\$r/.specnaut/hooks\\" && (sha256sum -c --status SHA256SUMS 2>/dev/null || shasum -a 256 -c --status SHA256SUMS)) && exec bash \\"\$r/.specnaut/hooks/protect-constitution.sh\\" codex; echo \\"specnaut: .specnaut/hooks changed since it was trusted — run specnaut upgrade, then /hooks\\" >&2; exit 2",
             "timeout": 10
           }
         ]
@@ -31416,7 +32626,12 @@ b235e7b333245290ac890804d5f95338eaaf87b6141e0fb51b319e676b95b1c7  protect-genera
         "hooks": [
           {
             "type": "command",
-            "command": "r=\$PWD; while [ -n \\"\$r\\" ] && [ ! -d \\"\$r/.specnaut/hooks\\" ]; do r=\${r%/*}; done; [ \\"\$( (sha256sum 2>/dev/null || shasum -a 256) < \\"\$r/.specnaut/hooks/SHA256SUMS\\" 2>/dev/null | cut -c1-64)\\" = \\"dccae95046ba568fe5d3a338128d69b99d9aa7d0d41c114e431c5bb922fc4471\\" ] && (cd \\"\$r/.specnaut/hooks\\" && (sha256sum -c --status SHA256SUMS 2>/dev/null || shasum -a 256 -c --status SHA256SUMS)) && exec bash \\"\$r/.specnaut/hooks/protect-generated.sh\\" codex; echo \\"specnaut: .specnaut/hooks changed since it was trusted — run specnaut upgrade, then /hooks\\" >&2; exit 2",
+            "command": "r=\$PWD; while [ -n \\"\$r\\" ] && [ ! -d \\"\$r/.specnaut/hooks\\" ]; do r=\${r%/*}; done; [ \\"\$( (sha256sum 2>/dev/null || shasum -a 256) < \\"\$r/.specnaut/hooks/SHA256SUMS\\" 2>/dev/null | cut -c1-64)\\" = \\"dba742789bae2806eb8ab16b0f7a099afbb9d8929b807d819949e99851b98bce\\" ] && (cd \\"\$r/.specnaut/hooks\\" && (sha256sum -c --status SHA256SUMS 2>/dev/null || shasum -a 256 -c --status SHA256SUMS)) && exec bash \\"\$r/.specnaut/hooks/protect-generated.sh\\" codex; echo \\"specnaut: .specnaut/hooks changed since it was trusted — run specnaut upgrade, then /hooks\\" >&2; exit 2",
+            "timeout": 10
+          },
+          {
+            "type": "command",
+            "command": "r=\$PWD; while [ -n \\"\$r\\" ] && [ ! -d \\"\$r/.specnaut/hooks\\" ]; do r=\${r%/*}; done; [ \\"\$( (sha256sum 2>/dev/null || shasum -a 256) < \\"\$r/.specnaut/hooks/SHA256SUMS\\" 2>/dev/null | cut -c1-64)\\" = \\"dba742789bae2806eb8ab16b0f7a099afbb9d8929b807d819949e99851b98bce\\" ] && (cd \\"\$r/.specnaut/hooks\\" && (sha256sum -c --status SHA256SUMS 2>/dev/null || shasum -a 256 -c --status SHA256SUMS)) && exec bash \\"\$r/.specnaut/hooks/protect-constitution.sh\\" codex; echo \\"specnaut: .specnaut/hooks changed since it was trusted — run specnaut upgrade, then /hooks\\" >&2; exit 2",
             "timeout": 10
           }
         ]
@@ -31426,7 +32641,7 @@ b235e7b333245290ac890804d5f95338eaaf87b6141e0fb51b319e676b95b1c7  protect-genera
         "hooks": [
           {
             "type": "command",
-            "command": "r=\$PWD; while [ -n \\"\$r\\" ] && [ ! -d \\"\$r/.specnaut/hooks\\" ]; do r=\${r%/*}; done; [ \\"\$( (sha256sum 2>/dev/null || shasum -a 256) < \\"\$r/.specnaut/hooks/SHA256SUMS\\" 2>/dev/null | cut -c1-64)\\" = \\"dccae95046ba568fe5d3a338128d69b99d9aa7d0d41c114e431c5bb922fc4471\\" ] && (cd \\"\$r/.specnaut/hooks\\" && (sha256sum -c --status SHA256SUMS 2>/dev/null || shasum -a 256 -c --status SHA256SUMS)) && exec bash \\"\$r/.specnaut/hooks/guard-dispatch-model.sh\\" codex; echo \\"specnaut: .specnaut/hooks changed since it was trusted — run specnaut upgrade, then /hooks\\" >&2; exit 2",
+            "command": "r=\$PWD; while [ -n \\"\$r\\" ] && [ ! -d \\"\$r/.specnaut/hooks\\" ]; do r=\${r%/*}; done; [ \\"\$( (sha256sum 2>/dev/null || shasum -a 256) < \\"\$r/.specnaut/hooks/SHA256SUMS\\" 2>/dev/null | cut -c1-64)\\" = \\"dba742789bae2806eb8ab16b0f7a099afbb9d8929b807d819949e99851b98bce\\" ] && (cd \\"\$r/.specnaut/hooks\\" && (sha256sum -c --status SHA256SUMS 2>/dev/null || shasum -a 256 -c --status SHA256SUMS)) && exec bash \\"\$r/.specnaut/hooks/guard-dispatch-model.sh\\" codex; echo \\"specnaut: .specnaut/hooks changed since it was trusted — run specnaut upgrade, then /hooks\\" >&2; exit 2",
             "timeout": 10
           }
         ]
@@ -31437,7 +32652,7 @@ b235e7b333245290ac890804d5f95338eaaf87b6141e0fb51b319e676b95b1c7  protect-genera
         "hooks": [
           {
             "type": "command",
-            "command": "r=\$PWD; while [ -n \\"\$r\\" ] && [ ! -d \\"\$r/.specnaut/hooks\\" ]; do r=\${r%/*}; done; [ \\"\$( (sha256sum 2>/dev/null || shasum -a 256) < \\"\$r/.specnaut/hooks/SHA256SUMS\\" 2>/dev/null | cut -c1-64)\\" = \\"dccae95046ba568fe5d3a338128d69b99d9aa7d0d41c114e431c5bb922fc4471\\" ] && (cd \\"\$r/.specnaut/hooks\\" && (sha256sum -c --status SHA256SUMS 2>/dev/null || shasum -a 256 -c --status SHA256SUMS)) && exec bash \\"\$r/.specnaut/hooks/approve-on-prompt.sh\\" codex; echo \\"specnaut: .specnaut/hooks changed since it was trusted — run specnaut upgrade, then /hooks\\" >&2; exit 0",
+            "command": "r=\$PWD; while [ -n \\"\$r\\" ] && [ ! -d \\"\$r/.specnaut/hooks\\" ]; do r=\${r%/*}; done; [ \\"\$( (sha256sum 2>/dev/null || shasum -a 256) < \\"\$r/.specnaut/hooks/SHA256SUMS\\" 2>/dev/null | cut -c1-64)\\" = \\"dba742789bae2806eb8ab16b0f7a099afbb9d8929b807d819949e99851b98bce\\" ] && (cd \\"\$r/.specnaut/hooks\\" && (sha256sum -c --status SHA256SUMS 2>/dev/null || shasum -a 256 -c --status SHA256SUMS)) && exec bash \\"\$r/.specnaut/hooks/approve-on-prompt.sh\\" codex; echo \\"specnaut: .specnaut/hooks changed since it was trusted — run specnaut upgrade, then /hooks\\" >&2; exit 0",
             "timeout": 10
           }
         ]
@@ -31448,7 +32663,7 @@ b235e7b333245290ac890804d5f95338eaaf87b6141e0fb51b319e676b95b1c7  protect-genera
         "hooks": [
           {
             "type": "command",
-            "command": "r=\$PWD; while [ -n \\"\$r\\" ] && [ ! -d \\"\$r/.specnaut/hooks\\" ]; do r=\${r%/*}; done; [ \\"\$( (sha256sum 2>/dev/null || shasum -a 256) < \\"\$r/.specnaut/hooks/SHA256SUMS\\" 2>/dev/null | cut -c1-64)\\" = \\"dccae95046ba568fe5d3a338128d69b99d9aa7d0d41c114e431c5bb922fc4471\\" ] && (cd \\"\$r/.specnaut/hooks\\" && (sha256sum -c --status SHA256SUMS 2>/dev/null || shasum -a 256 -c --status SHA256SUMS)) && exec bash \\"\$r/.specnaut/hooks/approve-on-prompt.sh\\" codex; echo \\"specnaut: .specnaut/hooks changed since it was trusted — run specnaut upgrade, then /hooks\\" >&2; exit 0",
+            "command": "r=\$PWD; while [ -n \\"\$r\\" ] && [ ! -d \\"\$r/.specnaut/hooks\\" ]; do r=\${r%/*}; done; [ \\"\$( (sha256sum 2>/dev/null || shasum -a 256) < \\"\$r/.specnaut/hooks/SHA256SUMS\\" 2>/dev/null | cut -c1-64)\\" = \\"dba742789bae2806eb8ab16b0f7a099afbb9d8929b807d819949e99851b98bce\\" ] && (cd \\"\$r/.specnaut/hooks\\" && (sha256sum -c --status SHA256SUMS 2>/dev/null || shasum -a 256 -c --status SHA256SUMS)) && exec bash \\"\$r/.specnaut/hooks/approve-on-prompt.sh\\" codex; echo \\"specnaut: .specnaut/hooks changed since it was trusted — run specnaut upgrade, then /hooks\\" >&2; exit 0",
             "timeout": 10
           }
         ]
@@ -31459,7 +32674,7 @@ b235e7b333245290ac890804d5f95338eaaf87b6141e0fb51b319e676b95b1c7  protect-genera
         "hooks": [
           {
             "type": "command",
-            "command": "r=\$PWD; while [ -n \\"\$r\\" ] && [ ! -d \\"\$r/.specnaut/hooks\\" ]; do r=\${r%/*}; done; [ \\"\$( (sha256sum 2>/dev/null || shasum -a 256) < \\"\$r/.specnaut/hooks/SHA256SUMS\\" 2>/dev/null | cut -c1-64)\\" = \\"dccae95046ba568fe5d3a338128d69b99d9aa7d0d41c114e431c5bb922fc4471\\" ] && (cd \\"\$r/.specnaut/hooks\\" && (sha256sum -c --status SHA256SUMS 2>/dev/null || shasum -a 256 -c --status SHA256SUMS)) && exec bash \\"\$r/.specnaut/hooks/log-subagent.sh\\" start; echo \\"specnaut: .specnaut/hooks changed since it was trusted — run specnaut upgrade, then /hooks\\" >&2; exit 0",
+            "command": "r=\$PWD; while [ -n \\"\$r\\" ] && [ ! -d \\"\$r/.specnaut/hooks\\" ]; do r=\${r%/*}; done; [ \\"\$( (sha256sum 2>/dev/null || shasum -a 256) < \\"\$r/.specnaut/hooks/SHA256SUMS\\" 2>/dev/null | cut -c1-64)\\" = \\"dba742789bae2806eb8ab16b0f7a099afbb9d8929b807d819949e99851b98bce\\" ] && (cd \\"\$r/.specnaut/hooks\\" && (sha256sum -c --status SHA256SUMS 2>/dev/null || shasum -a 256 -c --status SHA256SUMS)) && exec bash \\"\$r/.specnaut/hooks/log-subagent.sh\\" start; echo \\"specnaut: .specnaut/hooks changed since it was trusted — run specnaut upgrade, then /hooks\\" >&2; exit 0",
             "timeout": 10
           }
         ]
@@ -31470,7 +32685,7 @@ b235e7b333245290ac890804d5f95338eaaf87b6141e0fb51b319e676b95b1c7  protect-genera
         "hooks": [
           {
             "type": "command",
-            "command": "r=\$PWD; while [ -n \\"\$r\\" ] && [ ! -d \\"\$r/.specnaut/hooks\\" ]; do r=\${r%/*}; done; [ \\"\$( (sha256sum 2>/dev/null || shasum -a 256) < \\"\$r/.specnaut/hooks/SHA256SUMS\\" 2>/dev/null | cut -c1-64)\\" = \\"dccae95046ba568fe5d3a338128d69b99d9aa7d0d41c114e431c5bb922fc4471\\" ] && (cd \\"\$r/.specnaut/hooks\\" && (sha256sum -c --status SHA256SUMS 2>/dev/null || shasum -a 256 -c --status SHA256SUMS)) && exec bash \\"\$r/.specnaut/hooks/log-subagent.sh\\" stop; echo \\"specnaut: .specnaut/hooks changed since it was trusted — run specnaut upgrade, then /hooks\\" >&2; exit 0",
+            "command": "r=\$PWD; while [ -n \\"\$r\\" ] && [ ! -d \\"\$r/.specnaut/hooks\\" ]; do r=\${r%/*}; done; [ \\"\$( (sha256sum 2>/dev/null || shasum -a 256) < \\"\$r/.specnaut/hooks/SHA256SUMS\\" 2>/dev/null | cut -c1-64)\\" = \\"dba742789bae2806eb8ab16b0f7a099afbb9d8929b807d819949e99851b98bce\\" ] && (cd \\"\$r/.specnaut/hooks\\" && (sha256sum -c --status SHA256SUMS 2>/dev/null || shasum -a 256 -c --status SHA256SUMS)) && exec bash \\"\$r/.specnaut/hooks/log-subagent.sh\\" stop; echo \\"specnaut: .specnaut/hooks changed since it was trusted — run specnaut upgrade, then /hooks\\" >&2; exit 0",
             "timeout": 10
           }
         ]
@@ -31540,7 +32755,7 @@ clarifications needed) STOP #2 (pre-merge validation)
 
 ## Project context
 
-- Constitution lives at \`.specnaut/memory/constitution.md\` — treat as non-negotiable rules.
+- Constitution lives at \`docs/constitution.md\` — treat as non-negotiable rules.
 <!-- BEGIN: backend=local -->
 - Product backlog (local Markdown backend): index at \`.specnaut/backlog.md\`,
   task files at \`.specnaut/backlog/NNN-*.md\`.

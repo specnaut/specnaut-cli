@@ -23,7 +23,7 @@ the runtime, the data volume and the access pattern, none of which a general
 reference can carry without being wrong somewhere. What you have instead is the
 project itself.
 
-1. **Read `.specnaut/memory/constitution.md` if it exists.** A project that has
+1. **Read `docs/constitution.md` if it exists.** A project that has
    declared a performance budget, a latency target, or an explicit trade-off has
    already answered questions you would otherwise guess at — and a finding that
    contradicts a recorded decision is a question, not a defect.
@@ -58,7 +58,7 @@ cannot fail a gate on its own, which is the point.
 read is otherwise invisible, and the reader cannot tell a judgement from a
 guess.
 
-**If `.specnaut/memory/constitution.md` is absent** — you were installed as a
+**If `docs/constitution.md` is absent** — you were installed as a
 standalone plugin rather than scaffolded — review against the rules below and
 say so in one line at the top of your report.
 

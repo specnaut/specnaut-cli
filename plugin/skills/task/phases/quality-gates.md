@@ -118,10 +118,11 @@ on what the branch has committed:
 bash .specnaut/scripts/bash/size-ratchet.sh --since "$(git merge-base HEAD <default branch>)"
 ```
 
-It holds every changed file to the constitution's file limits
-(`.specnaut/memory/size-limits.md`): exit 1 is a failure of the tier it follows,
-fixed the same way; exit 2 means the constitution's Size limits table cannot be
-read — fix the table, never skip the check. Any other exit (126, 127: a lost
+It holds every changed file to the project's file limits
+(`.specnaut/memory/size-limits.md`, overridden by `.specnaut/size-limits.yml`):
+exit 1 is a failure of the tier it follows, fixed the same way; exit 2 means
+`.specnaut/size-limits.yml` cannot be read — fix the file, never skip the
+check. Any other exit (126, 127: a lost
 executable bit, no bash) means the check did not run, which is a failure of the
 tier, never a pass. Without `--since` it checks the
 staged changes against the branch's merge base, which is the form a pre-commit
@@ -129,6 +130,37 @@ runner calls: an extraction commit followed by an addition passes, as long as
 the file ends no larger than where the branch began. Every review runs it too,
 through the review coordinator, so a standalone item is held as well. Specnaut installs
 no git hook: wiring it into one is the project's choice.
+
+## The import boundary — with every tier
+
+When `.specnaut/scripts/bash/boundary-check.sh` is present, run it after each
+tier, beside the size ratchet:
+
+```
+bash .specnaut/scripts/bash/boundary-check.sh
+```
+
+It holds the tracked files under the `domain:` paths of
+`.specnaut/boundaries.yml` free of the `forbid:` patterns (extended regular
+expressions), minus the `exempt:` globs. Which paths are the domain and which
+imports break it are the project's to write: Specnaut ships no copy of that
+file and no default pattern, because a guessed one would report a pass that
+checked nothing.
+
+- **Exit 0** — every file was checked and none matches. Report it as a pass.
+- **Exit 1** — a forbidden import, printed as `path:line: pattern`. A failure
+  of the tier it follows, fixed the same way.
+- **Exit 2** — the check could not run: an unreadable config, a pattern that
+  does not compile, a `domain:` path outside the repository, or a file it
+  cannot read. Fix the cause; never skip the check.
+- **Exit 4** — **skipped**, with the reason on stdout: no
+  `.specnaut/boundaries.yml`, no `forbid:` patterns, no `domain:` paths, or no
+  file left to check under them. Report it as *skipped: <reason>* — **never as
+  a pass**. A project without the file has declared no boundary, and the gate
+  says so instead of passing it.
+
+Any other exit (126, 127) means the check did not run: a failure of the tier,
+never a pass. Every review runs it too, through the review coordinator.
 
 ## A standalone item
 
