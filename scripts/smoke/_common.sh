@@ -95,6 +95,7 @@ smoke_code_lines() {
 # anything while still reading like the source of truth.
 SUITE_FILES="smoke-toolbox.sh
 smoke-features.sh
+smoke-merge.sh
 smoke-gates.sh
 smoke-task.sh
 smoke-backlog-local.sh

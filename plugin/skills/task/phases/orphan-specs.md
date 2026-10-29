@@ -20,5 +20,5 @@ Walk `.specnaut/specs/` (if present) and surface any feature directory missing i
   the plan, never as a step still owed.
 
 This is read-only: never delete or modify spec files. A shipped feature's directory **is** removed —
-by `phases/merge-close.md` step 8, at the merge, under the authorisation that closed the issue. A
+by `phases/merge-close.md` step 4, at the merge, under the authorisation that closed the issue. A
 reporter that edits what it walks cannot be trusted about what it found.

@@ -14,9 +14,17 @@
 #                        --all, --mirror, --delete and unknown options are
 #                        all gated
 #   gh pr merge, glab mr merge, a git shell alias, a line it cannot read
+#   every command in merge-commands.txt — the scripts that land on the base
+#                        themselves (land-feature.sh, remove-spec.sh), matched
+#                        by basename however they are reached (_listed.sh)
 # An unknown base gates every form. A gated command goes through
 # approval_gate: Claude's own prompt where it can ask, else this turn's
 # `merge` approval (FR-017).
+#
+# The limit: it reads the command line, not what a program does. A listed
+# script copied or renamed, a task-runner alias for it, or an interpreter
+# that runs it gets past — the same limit a hand-written script that runs
+# `git push` already has.
 #
 # Usage: guard-merge.sh <claude|codex>   (payload on stdin)
 case ${BASH_SOURCE[0]} in */*) HOOK_DIR=${BASH_SOURCE[0]%/*} ;; *) HOOK_DIR=. ;; esac
@@ -28,6 +36,8 @@ case ${BASH_SOURCE[0]} in */*) HOOK_DIR=${BASH_SOURCE[0]%/*} ;; *) HOOK_DIR=. ;;
 . "$HOOK_DIR/_git.sh"
 # shellcheck source=_approval.sh
 . "$HOOK_DIR/_approval.sh"
+# shellcheck source=_listed.sh
+. "$HOOK_DIR/_listed.sh"
 guard_init guard-merge "${1:-}" argv:.tool_input.command
 [ "$P_TOOL" = Bash ] || guard_fail "expected a Bash tool call, got '$P_TOOL'"
 [ -n "${GF[0]}" ] || guard_fail "a Bash call without tool_input.command"
@@ -36,7 +46,8 @@ cmd_parse "${GF[0]}"
 reasons=() pushes=() merges=0 switched=0
 for seg in ${CMD_SEGS[@]+"${CMD_SEGS[@]}"}; do
   cmd_words "$seg"
-  case ${W[0]} in
+  case ${W[0]:-} in
+    '') continue ;; # an empty word as the command runs nothing
     git)
       cmd_git "${W[@]}"
       case $GIT_SUB in
@@ -44,11 +55,13 @@ for seg in ${CMD_SEGS[@]+"${CMD_SEGS[@]}"}; do
         push) pushes+=("$(IFS=$CMD_SEP; echo "${GIT_ARGS[*]:-}")") ;;
         checkout | switch) switched=1 ;;
         '!') reasons+=("a git alias that runs a shell command") ;;
-      esac ;;
-    gh | glab)
-      cmd_pos
-      case "${POS[*]}" in "gh pr merge"* | "glab mr merge"*) reasons+=("${POS[0]} ${POS[1]} merge") ;; esac ;;
+      esac
+      continue ;;
   esac
+  cmd_pos
+  case "${POS[*]:-}" in "gh pr merge"* | "glab mr merge"*) reasons+=("${POS[0]} ${POS[1]} merge") ;; esac
+  listed "$HOOK_DIR/merge-commands.txt"
+  if [ -n "$HIT" ]; then reasons+=("$HIT"); fi
 done
 if [ "$CMD_OPAQUE" = 1 ]; then reasons+=("a command it cannot read (eval, sh -c in sh -c, a shell fed on stdin, a quote or heredoc left open)"); fi
 if [ "$merges" = 0 ] && [ ${#pushes[@]} = 0 ] && [ ${#reasons[@]} = 0 ]; then guard_allow; fi

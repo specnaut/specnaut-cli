@@ -90,6 +90,10 @@ check "merge.md routes to it rather than carrying the rules (#558)" \
   'grep -qF "phases/merge-squash.md" .claude/skills/task/phases/merge.md'
 check "merge-squash.md kept the rule that makes a squash safe (#558)" \
   'grep -qF "byte-identical" .claude/skills/task/phases/merge-squash.md'
+# Spec 041: the remote-gate contract is loaded on demand by the chain.
+check "companion doc remote-gates.md scaffolded, and loaded by auto-chain.md (spec 041)" \
+  '[ -f .claude/skills/task/phases/remote-gates.md ] &&
+   grep -qF "phases/remote-gates.md" .claude/skills/task/phases/auto-chain.md'
 check "companion doc epic-commits.md scaffolded (#556)" \
   '[ -f .claude/skills/task/phases/epic-commits.md ]'
 # #554 consolidated implement.md's two epic pointers into one, so the route
@@ -114,7 +118,7 @@ check "implement.md runs an epic as a loop (#554)" \
   'grep -qF "phases/epic-loop.md" .claude/skills/task/phases/implement.md'
 check "plan.md makes an epic ONE plan with ONE stop (#554 AC9/AC10)" \
   'flat="$(tr "\n" " " < .claude/skills/task/phases/plan.md)";
-   grep -qF "An epic is one plan" <<<"$flat" && grep -qF "not one per" <<<"$flat"'
+   grep -qF "An epic is one plan" <<<"$flat" && grep -qF "one table, one stop" <<<"$flat"'
 check "review.md stops only on the LAST child (#554 AC12/AC13)" \
   'flat="$(tr "\n" " " < .claude/skills/task/phases/review.md)";
    grep -qF "does not stop the run" <<<"$flat" &&
@@ -159,184 +163,6 @@ check "the EPIC card moves, never the child's (#553 AC9/AC10)" \
 check "no new flag was introduced (#553 AC7/D1)" \
   '! grep -qE -- "--epic" .specnaut/scripts/bash/create-new-feature.sh'
 
-# #560 — an epic merge closes N children AND the epic, and moves N+1 cards.
-# The order is derived, not chosen: sweep-closed.sh reports a Done card whose
-# issue is open as REOPENED, so moving the card first manufactures the exact
-# state an existing tool is built to flag.
-check "companion doc merge-close.md scaffolded (#560)" \
-  '[ -f .claude/skills/task/phases/merge-close.md ]'
-check "merge.md routes to it after a push (#560)" \
-  'grep -qF "phases/merge-close.md" .claude/skills/task/phases/merge.md'
-check "the epic path closes every child AND the epic (#560 AC1)" \
-  'grep -qF "N children" .claude/skills/task/phases/merge-close.md'
-# The three checks below were one check, and it certified a file that broke
-# the rule it is named for. It flattened merge-close.md and grepped for the
-# rule sentence plus "REOPENED" — both of which live in the ordering section.
-# The standalone path moved the card and only then closed the issue, a few
-# dozen lines away, and this check passed on it for as long as it existed
-# (#588). Presence of a rule is not conformance to it, and a check that reads
-# only prose cannot tell the two apart. So: one check that the rule is stated
-# and argued, and one per path that the two operations appear in that order.
-check "the ordering rule is stated once, and says why (#560 AC4)" \
-  'flat="$(tr "\n" " " < .claude/skills/task/phases/merge-close.md)";
-   grep -qF "close the issue first, then move the card" <<<"$flat" &&
-   grep -qF "REOPENED" <<<"$flat"'
-# The standalone path names both operations as commands, so its order is
-# readable structurally: the line that closes must precede the line that moves,
-# within that section only. `!c` / `!m` keep the FIRST of each, so a later
-# mention in prose cannot rescue a wrong order. A missing marker fails too — a
-# renamed command must re-state its order, not silently stop being checked.
-check "the STANDALONE path closes before it moves, in that order (#588 AC4)" \
-  'awk "/^## Standalone/{s=1} /^## An epic/{s=0}
-        s && /gh issue close <linked_issue>/ && !c {c=NR}
-        s && /move\.sh <linked_issue> Done/ && !m {m=NR}
-        END{exit !(c && m && c < m)}" \
-     .claude/skills/task/phases/merge-close.md'
-# The epic path issues no literal commands — it states the order in prose, so
-# the order IS the sentence. Reversing the procedure means rewriting this
-# phrase, which is what makes a phrase match binding here and not elsewhere.
-check "the EPIC path closes before it moves, in that order (#588 AC4)" \
-  'grep -qF "close the issue with a reason, then move its card" \
-     <<<"$(tr "\n" " " < .claude/skills/task/phases/merge-close.md)"'
-check "cascade-check still gates the parent close (#560 AC2)" \
-  'grep -qF "cascade-check.sh <epic>" .claude/skills/task/phases/merge-close.md'
-check "children are enumerated from the branch, not from memory (#560)" \
-  'grep -qF "did not ship" .claude/skills/task/phases/merge-close.md'
-check "the report names every item, not a count (#560 AC5)" \
-  'flat="$(tr "\n" " " < .claude/skills/task/phases/merge-close.md)";
-   grep -qF "One line per issue closed" <<<"$flat" &&
-   grep -qF "could not move and why" <<<"$flat"'
-check "nothing closes when the merge did not push (#560 AC6)" \
-  'grep -qF "only when the push" .claude/skills/task/phases/merge-close.md'
-
-# #587 — a shipped feature's spec directory is removed at the merge. The code
-# is the authority afterwards; the plan is already in git history, which is
-# what makes the removal lossless. Each check below guards a condition whose
-# loss turns a cleanup into data destruction or into a silent no-op.
-check "the standalone path removes the spec directory (#587 AC1)" \
-  'flat="$(tr "\n" " " < .claude/skills/task/phases/merge-close.md)";
-   grep -qF "Remove the feature'"'"'s spec directory" <<<"$flat" &&
-   grep -qF "feature_directory" <<<"$flat"'
-# The load-bearing one. Without the history check the step deletes the only
-# copy of a plan that never got its plan-time commit.
-check "the removal refuses a directory git has never seen (#587 AC2)" \
-  'grep -qF "git log --all --oneline" .claude/skills/task/phases/merge-close.md'
-# Since autopilot the authorisation is the push itself (one yes at the review
-# verdict under merge: manual), so the invariant is "never one without the other".
-check "one authorisation covers the close AND the removal, with no second prompt (#587 AC3)" \
-  'grep -qF "never one without the other" \
-     <<<"$(tr "\n" " " < .claude/skills/task/phases/merge-close.md)"'
-check "the removal is its own commit, not folded into the merge (#587 AC4)" \
-  'grep -qF "remove the spec directory for the shipped feature" .claude/skills/task/phases/merge-close.md'
-# An epic is one branch over one tree: a per-child removal would aim at the
-# same directory N times and strand the children still to be closed.
-check "an epic removes one directory once, never per child (#587 AC5)" \
-  'grep -qF "Never per child" .claude/skills/task/phases/merge-close.md'
-# feature.json NAMES the removed directory, and common.sh never checks that
-# the name still resolves: get_feature_paths returns the deleted path with
-# exit 0 and no warning, its branch-contradiction guard skipped off a feature
-# branch. Measured, not reasoned. The removal must take it along.
-check "the removal takes feature.json with it, not just the directory (#587)" \
-  'grep -qF "git rm -r --quiet \"<feature_directory>\" .specnaut/feature.json" \
-     .claude/skills/task/phases/merge-close.md'
-check "a skip is reported, never silent (#587 AC6)" \
-  'grep -qF "Report the removal, or the reason there wasn" .claude/skills/task/phases/merge-close.md'
-# orphan-specs.md walks the same directories and must NOT delete. Its read-only
-# line survives verbatim; what it gained is why it does not contradict the
-# phase that does delete — without that, the next reader reads one of the two
-# as a bug.
-check "orphan detection stays read-only, and says why that is not a contradiction (#587 AC8)" \
-  'flat="$(tr "\n" " " < .claude/skills/task/phases/orphan-specs.md)";
-   grep -qF "never delete or modify spec files" <<<"$flat" &&
-   grep -qF "merge-close.md\` step 8" <<<"$flat"'
-check "the false retention claim is gone from orphan-specs.md (#587 AC7)" \
-  '! grep -qF "historical records" .claude/skills/task/phases/orphan-specs.md'
-check "the legacy spec.md rule survives the reword (#587 AC9)" \
-  'grep -qF "Has \`spec.md\` but no \`plan.md\`" .claude/skills/task/phases/orphan-specs.md'
-
-# #559 — a fixup folds into ITS OWN child, and the fold is verified here
-# rather than borrowed from squash-by-scope, which governs the other path and
-# since #558 lives in another file entirely. AC 7 is the load-bearing one.
-check "companion doc epic-fixups.md scaffolded (#559)" \
-  '[ -f .claude/skills/task/phases/epic-fixups.md ]'
-check "merge.md folds fixups before merging an epic (#559)" \
-  'grep -qF "phases/epic-fixups.md" .claude/skills/task/phases/merge.md'
-check "a fixup is written against its own child, not matched afterwards (#559)" \
-  'grep -qF "git commit --fixup=" .claude/skills/task/phases/epic-fixups.md'
-check "the fold verifies the tree did not move (#559 AC5)" \
-  'grep -qF "byte-identical" .claude/skills/task/phases/epic-fixups.md'
-# Prose wraps. A phrase that reads as one sentence is several lines in the
-# file, and a line-based grep misses it — three assertions today have failed
-# for exactly that, on this ticket and on #557 and #561 before it. Newlines
-# are flattened first, through a here-string rather than a pipe: `grep -q`
-# exits early, and under `pipefail` that SIGPIPEs the producer and decides
-# the assertion on the writer's death instead of the content (#550).
-check "and it says so for THIS procedure, not by inheritance (#559 AC7)" \
-  'grep -qF "does not reach here" <<<"$(tr "\n" " " < .claude/skills/task/phases/epic-fixups.md)"'
-check "the fold verifies the worktree is empty afterwards (#559 AC6)" \
-  'grep -qF "git status --short" .claude/skills/task/phases/epic-fixups.md'
-check "a surviving fixup! is a finding, not something to fold by eye (#559)" \
-  'grep -qF "folding it by" .claude/skills/task/phases/epic-fixups.md'
-check "the fold does not read diff exit 2 as \"they differ\" (#559)" \
-  'flat="$(tr "\n" " " < .claude/skills/task/phases/epic-fixups.md)";
-   grep -qF "is not \"they differ\"" <<<"$flat" &&
-   grep -qF "check for exit" <<<"$flat"'
-
-# #557 — merge.md routes by history rule, and the epic path does not squash.
-# Each of these is a sentence a later edit would plausibly "simplify" away.
-check "merge.md asks the BRANCH which rule applies, not the board (#557)" \
-  'grep -qF "Epic: #" .claude/skills/task/phases/merge.md &&
-   grep -qF "log <base>..HEAD" .claude/skills/task/phases/merge.md'
-check "merge.md says an epic branch is NOT squashed (#557)" \
-  'grep -qF "The epic branch is not squashed" .claude/skills/task/phases/merge.md'
-check "merge.md keeps one merge decision for the whole epic (#557)" \
-  'grep -qF "not one per child" .claude/skills/task/phases/merge.md'
-check "merge.md says a failing full tier is repaired, not escalated (#557)" \
-  'grep -qF "hand the epic back" .claude/skills/task/phases/merge.md'
-check "merge-squash.md no longer reads as an absolute over both paths (#557)" \
-  'grep -qF "not \"either kind of branch\"" .claude/skills/task/phases/merge-squash.md'
-check "companion doc quality-gates.md scaffolded (#555)" \
-  '[ -f .claude/skills/task/phases/quality-gates.md ]'
-check "gates.yml scaffolded with both tiers declared empty (#555)" \
-  '[ -f .specnaut/gates.yml ] &&
-   grep -qE "^fast_gate:" .specnaut/gates.yml &&
-   grep -qE "^full_gate:" .specnaut/gates.yml'
-check "workflow.yml scaffolded with merge: auto as the default" \
-  '[ -f .specnaut/workflow.yml ] && grep -qE "^merge: auto$" .specnaut/workflow.yml'
-check "run-gate.sh scaffolded + executable (#555)" \
-  '[ -x .specnaut/scripts/bash/run-gate.sh ]'
-check "merge-mode.sh, base-branch.sh, groom-rules.sh scaffolded; merge-mode reads the default as auto (spec 036)" \
-  '[ -x .specnaut/scripts/bash/base-branch.sh ] && [ -x .specnaut/scripts/bash/groom-rules.sh ] &&
-   [ "$(bash .specnaut/scripts/bash/merge-mode.sh 2>/dev/null)" = auto ]'
-check "run-gate.ps1 twin scaffolded (#555)" \
-  '[ -f .specnaut/scripts/powershell/run-gate.ps1 ]'
-check "an epic reaches the fast tier: implement -> epic-loop -> run-gate (#555)" \
-  'P=.claude/skills/task/phases;
-   grep -qF "phases/epic-loop.md" "$P/implement.md" &&
-   grep -qF "run-gate.sh fast" "$P/epic-loop.md" &&
-   grep -qF "phases/quality-gates.md" "$P/epic-loop.md"'
-check "merge.md runs the full tier once, never per child (#555)" \
-  'grep -qF "run-gate.sh full" .claude/skills/task/phases/merge.md &&
-   grep -qF "Never per child" .claude/skills/task/phases/merge.md'
-check "quality-gates.md states the full tier runs once, before the merge (#555)" \
-  'grep -qF "never per child" .claude/skills/task/phases/quality-gates.md'
-check "an undeclared tier degrades rather than failing (#555)" \
-  'grep -qF "is not a failure" .claude/skills/task/phases/quality-gates.md'
-# AC 2, asserted as a sweep over the whole mechanism rather than one file.
-# Specnaut is stack-agnostic; a tool name in ANY of these surfaces ends that,
-# and a check on one file would pass while the name sat in another.
-# NEVER `exit` inside a check expression. `check` runs `eval "$2"` in the
-# CURRENT shell, so an `exit` terminates the whole smoke script — and the
-# first draft of this very assertion ended with `exit 0`, which left the run
-# finishing silently at code 0 with every later check unrun and no closing
-# banner. A fail-open guard, written inside the ticket about guards.
-# grep takes several files, so no loop is needed here at all.
-check "no surface of the gate mechanism names a test tool (#555 AC2)" \
-  '! grep -qiE "jest|vitest|playwright|cypress|pytest|rspec|junit|mocha|karma|nightwatch|testcafe|phpunit|xunit|nunit" \
-       .specnaut/gates.yml \
-       .specnaut/scripts/bash/run-gate.sh \
-       .specnaut/scripts/powershell/run-gate.ps1 \
-       .claude/skills/task/phases/quality-gates.md'
 check "phase doc constitution.md scaffolded" \
   '[ -f .claude/skills/task/phases/constitution.md ]'
 check "phase doc upgrade.md scaffolded, and routed by the router" \
@@ -428,8 +254,9 @@ check "security knowledge base scaffolded" \
   '[ -f .specnaut/memory/security/00-triage.md ]'
 check "architecture catalogue scaffolded" \
   '[ -f .specnaut/memory/architecture/README.md ]'
-check "size limits: plan-template gates on Files touched, tasks-template extracts first (#647, #648)" \
-  'grep -q "^### Files touched" .specnaut/templates/plan-template.md && grep -qF "**Extractions first.**" .specnaut/templates/tasks-template.md'
+# Spec 041 folded tasks into implement: the extract-first rule lives there now.
+check "size limits: plan-template gates on Files touched, implement extracts first (#647, #648)" \
+  'grep -q "^### Files touched" .specnaut/templates/plan-template.md && grep -qF "**Extract before you grow**" .claude/skills/task/phases/implement.md'
 check "a11y catalogue scaffolded" \
   '[ -f .specnaut/memory/a11y/00-triage.md ] && [ -f .specnaut/memory/a11y/README.md ]'
 check "a11y catalogue ships every surface leaf" \
@@ -729,8 +556,10 @@ check "vendored snapshot mentions specnaut reconcile" \
 
 echo
 echo "═══ #455  the lite chain and its flags are gone ═══"
+# Spec 041 gave plan a --full argument; it shapes the plan, it is not a chain flag.
 check "the /task router keeps --manual as the only chain flag" \
-  'grep -q -- "--manual" .claude/skills/task/SKILL.md && ! grep -qE -- "--lite|--full|--once|--continue" .claude/skills/task/SKILL.md'
+  'grep -q -- "--manual" .claude/skills/task/SKILL.md && ! grep -qE -- "--lite|--once|--continue" .claude/skills/task/SKILL.md &&
+   ! grep -qE -- "\[--full\] <verb>|--full\]? *<verb>" .claude/skills/task/SKILL.md'
 check "auto-chain.md no longer carries a lite-chain shape" \
   '! grep -qE "Lite chain|workflow_shape|CHAIN_SHAPE" .claude/skills/task/phases/auto-chain.md'
 check "auto-chain.md states autopilot is the default (#458)" \

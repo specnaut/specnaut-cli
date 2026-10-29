@@ -43,6 +43,8 @@ const CASES: ReadonlyArray<[command: string, denied: boolean]> = [
   ["tag.sh --no-push; release-github.sh v1.2.3", true],
   ["release-github.sh v1.2.3", true],
   ["./release-gitlab.sh v1.2.3", true],
+  ["timeout 600 bash .claude/skills/ship/scripts/release-github.sh v1.2.3", true],
+  ['"" ; gh release list', false],
   // the publishing commands themselves (§ 11 F4)
   ["gh release create v1.2.3 --notes x", true],
   ["gh release edit v1.2.3 --draft=false", true],

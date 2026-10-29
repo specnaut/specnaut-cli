@@ -1,4 +1,4 @@
-import { assertStringIncludes } from "@std/assert";
+import { assert, assertStringIncludes } from "@std/assert";
 import { CORE_BUNDLE } from "../../src/templates_bundle.ts";
 import type { CoreEntry } from "../../src/domain/core_bundle.ts";
 import { skillDocName } from "../../src/domain/core_bundle.ts";
@@ -98,13 +98,21 @@ Deno.test("merge documents the protected-branch limit and refuses the forge squa
   assertStringIncludes(content, '"Squash and merge"');
 });
 
-Deno.test("a merge ends on the base branch, verified rather than assumed", () => {
-  const { content } = mergePhase();
-  assertStringIncludes(content, "End on the base branch");
-  assertStringIncludes(content, "rev-parse --abbrev-ref HEAD");
+Deno.test("a merge ends on the base branch, verified rather than assumed", async () => {
+  // Spec 042 moved the mechanics into land-feature.sh; the rule moved with them.
+  const script = await Deno.readTextFile(
+    new URL("../../templates/core/specnaut/scripts/bash/land-feature.sh", import.meta.url),
+  );
+  assertStringIncludes(script, "git branch --quiet -d");
   // -D would paper over a merge that did not actually land.
-  assertStringIncludes(content, "never `-D`");
-  assertStringIncludes(content, "a finding, not an obstacle");
+  // Commands only: the refusal message itself says "never --force".
+  const commands = script.split("\n").filter((l) => !/^\s*(#|echo )/.test(l)).join("\n");
+  assert(!/branch[^\n]* -D\b|--force\b|push[^\n]* -f\b/.test(commands), "land-feature.sh forces");
+  assertStringIncludes(script, 'if [ "$now" != "$base" ]');
+  const { content } = mergePhase();
+  assertStringIncludes(content, "bash .specnaut/scripts/bash/land-feature.sh");
+  assertStringIncludes(content, "the person who asked must be back where they work");
+  assertStringIncludes(content, "the merge did not land as expected: a finding");
 });
 
 function closeDoc(): CoreEntry {
@@ -118,7 +126,10 @@ function closeDoc(): CoreEntry {
 // epic path needed more than that. Re-anchored verbatim, not relaxed.
 Deno.test("merge keeps the backlog close step intact", () => {
   const { content } = closeDoc();
-  assertStringIncludes(content, "Close the linked backlog issue");
+  assertStringIncludes(content, "Close each one");
   assertStringIncludes(content, "cascade-check.sh");
   assertStringIncludes(content, "linked_issue");
+  // Spec 042: the board half runs in close-shipped.sh, after the product-owner's close.
+  assertStringIncludes(content, "bash .specnaut/scripts/backlog/close-shipped.sh");
+  assertStringIncludes(content, "**only exit 0 authorises the close**");
 });

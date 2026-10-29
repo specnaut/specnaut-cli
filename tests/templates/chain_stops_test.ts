@@ -153,7 +153,8 @@ Deno.test("review, merge and merge-close follow the merge mode instead of always
   assertStringIncludes(merge, "bash .specnaut/scripts/bash/base-branch.sh");
   assertStringIncludes(merge, "never assume `main`");
   // D6: merge never asks about the push; D4: it does not read the mode itself.
-  assertStringIncludes(merge, "push without asking, in either merge mode");
+  // Spec 042: the push runs inside land-feature.sh; the doc still says it is not asked.
+  assertStringIncludes(merge, "pushes without asking, in either merge mode");
   assert(!merge.includes("workflow.yml"), "merge.md must not read the merge mode (one reader)");
   // D7: a rejected push is never forced or rebased, and nothing closes.
   assertStringIncludes(merge, "never `--force`, never an automatic rebase");

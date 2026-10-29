@@ -56,11 +56,8 @@ epic merge path, not here.
 
 ## Reading it back
 
-Given a commit on an epic branch, the child it belongs to is recoverable two
-ways, and they must agree:
-
-- the `(#<child-issue>)` in the subject — the child's issue number outright;
-- the `T<NN>` ordinal — its position in the epic's dependency order.
-
-If they disagree, the branch has been rewritten by something that did not read
-this file. Stop and say so rather than picking one.
+`bash .specnaut/scripts/bash/epic-status.sh` is the one reader of this format: it prints a
+`CHILD T<NN> #<child> <sha>` line per child, checks the ordinals run 1, 2, 3… and that no child
+has two commits, and exits 12 when the history does not read back to the board. Never parse the
+log a second way. If it exits 12, the branch has been rewritten by something that did not follow
+this file: stop and say so rather than picking one reading.

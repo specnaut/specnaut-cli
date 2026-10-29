@@ -9,12 +9,12 @@
 # newlines, ( ) $( ) and backticks (also inside "…"), quotes and escapes,
 # comments, heredoc bodies (skipped: they are data), `<<<` herestrings, `<<`
 # inside `$((…))`/`((…))` (a shift, not a heredoc), redirections, VAR=val
-# prefixes, the env/command/sudo/nice/… wrappers, and ONE level of
-# `sh|bash|zsh -c '…'`. A deeper `-c`, or `eval`, sets CMD_OPAQUE — and so
-# does a line that never closes: a quote, `(`, `$(` or backtick left open, a
-# heredoc whose body never ends. Fail closed: a guard gates what it cannot
-# read rather than guessing at it. Scripts, interpreters and shell functions
-# are not seen: the stated limit.
+# prefixes, the env/command/sudo/nice/timeout/xargs/… wrappers, `source x`,
+# the command of `find -exec`, and ONE level of `sh|bash|zsh -c '…'`. A
+# deeper `-c`, or `eval`, sets CMD_OPAQUE — and so does a line that never
+# closes: a quote, `(`, `$(` or backtick left open, a heredoc whose body never
+# ends. Fail closed: a guard gates what it cannot read rather than guessing at
+# it. Scripts, interpreters and shell functions are not seen: the stated limit.
 #
 # After cmd_parse: CMD_SEGS holds one entry per simple command, its words
 # joined by CMD_SEP, the first word reduced to its basename. CMD_MOVED=1 when

@@ -103,4 +103,18 @@ check "gitlab sweep emits DRIFTED / REOPENED / scanned lines" \
 check "gitlab sweep treats scanned 0 as a failure, not a quiet run" \
   'grep -q "scanned 0" .specnaut/scripts/backlog/sweep-closed.sh'
 
+
+echo "═══ spec 042  close-shipped.sh settles the board after the close ═══"
+check "close-shipped.sh present + executable (spec 042)" \
+  '[ -x .specnaut/scripts/backlog/close-shipped.sh ]'
+# The card moves only once cascade-check.sh proves the issue closed (exit 12):
+# a Done card over an open issue is exactly what sweep-closed.sh flags REOPENED.
+check "close-shipped.sh confirms the close before it moves the card (spec 042)" \
+  'F=.specnaut/scripts/backlog/close-shipped.sh;
+   c=$(grep -nF "/cascade-check.sh" "$F" | head -1 | cut -d: -f1);
+   m=$(grep -nF "/move.sh" "$F" | head -1 | cut -d: -f1);
+   [ -n "$c" ] && [ -n "$m" ] && [ "$c" -lt "$m" ] && grep -qF -- "-ne 12" "$F"'
+check "close-shipped.sh reconciles the board once, after the moves (spec 042)" \
+  'grep -qF "sweep-closed.sh\" --passes 2" .specnaut/scripts/backlog/close-shipped.sh'
+
 finish "BACKLOG-GITLAB"

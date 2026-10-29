@@ -1,0 +1,14 @@
+# The commands that land on the base branch by themselves — the one list (spec
+# 042, plan § 2). Under `merge: manual`, guard-merge.sh gates each like a
+# `git push` to the base; under `auto` they run like anything else.
+#
+# One command per line: the words it starts with. A first word ending in `.sh`
+# is a script, matched by its basename however it is reached (a path, or as
+# the argument of sh/bash/source, or behind timeout, env, xargs, …); how a line
+# matches lives in _listed.sh. A copy of the script under another name, a
+# task-runner alias or an interpreter that runs it is not seen — the limit a
+# hand-written script that runs `git push` already has. `git merge`, `git
+# push`, `gh pr merge` and `glab mr merge` are rules, not words, and live in
+# guard-merge.sh.
+land-feature.sh
+remove-spec.sh

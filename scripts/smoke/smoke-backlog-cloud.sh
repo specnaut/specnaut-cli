@@ -73,4 +73,12 @@ check "no internal identifier of the hosted board appears (#563 AC6)" \
    ! grep -qE "parentId|convex|_creationTime" .specnaut/scripts/backlog/cascade-check.sh &&
    ! grep -qE "parentId|convex|_creationTime" .specnaut/scripts/backlog/add.sh'
 
+
+echo "═══ spec 042  close-shipped.sh — the move is the close ═══"
+check "close-shipped.sh present + executable (spec 042)" \
+  '[ -x .specnaut/scripts/backlog/close-shipped.sh ]'
+check "close-shipped.sh moves each item to Done and asks no forge (spec 042)" \
+  'grep -qF "move.sh\" \"\$n\" Done" .specnaut/scripts/backlog/close-shipped.sh &&
+   ! grep -qF "/cascade-check.sh" .specnaut/scripts/backlog/close-shipped.sh'
+
 finish "BACKLOG-CLOUD"

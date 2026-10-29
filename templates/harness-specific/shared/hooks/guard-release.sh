@@ -24,6 +24,8 @@ case ${BASH_SOURCE[0]} in */*) HOOK_DIR=${BASH_SOURCE[0]%/*} ;; *) HOOK_DIR=. ;;
 . "$HOOK_DIR/_git.sh"
 # shellcheck source=_approval.sh
 . "$HOOK_DIR/_approval.sh"
+# shellcheck source=_listed.sh
+. "$HOOK_DIR/_listed.sh"
 guard_init guard-release "${1:-}" argv:.tool_input.command
 [ "$P_TOOL" = Bash ] || guard_fail "expected a Bash tool call, got '$P_TOOL'"
 [ -n "${GF[0]}" ] || guard_fail "a Bash call without tool_input.command"
@@ -63,36 +65,10 @@ tag_push() {
   return 1
 }
 
-# listed — HIT: the entry of release-commands.txt the segment (W, and POS:
-# its words without options) runs, else "". Always returns 0 and is called
-# bare, never in `$(…)` or a condition: there an error is muted, and a crash
-# would read as "not listed" — an allow.
-listed() {
-  local line entry except i ok w
-  local -a e
-  HIT=""
-  while IFS= read -r line || [ -n "$line" ]; do
-    line=${line%$'\r'} # a CRLF checkout (Windows, core.autocrlf)
-    case $line in '' | '#'*) continue ;; esac
-    entry=${line%% except *} except=""
-    if [ "$entry" != "$line" ]; then except=${line#* except }; fi
-    read -r -a e <<<"$entry"
-    ok=1
-    for ((i = 0; i < ${#e[@]}; i++)); do
-      if [ "${e[i]}" != "${POS[i]:-}" ]; then ok=0; break; fi
-    done
-    [ "$ok" = 1 ] || continue
-    if [ -n "$except" ]; then
-      for w in "${W[@]}"; do if [ "$w" = "$except" ]; then continue 2; fi; done
-    fi
-    HIT=$entry
-    return 0
-  done <"$HOOK_DIR/release-commands.txt"
-}
-
 tags_made=0 pushes=() hits=()
 for seg in ${CMD_SEGS[@]+"${CMD_SEGS[@]}"}; do
   cmd_words "$seg"
+  [ ${#W[@]} -gt 0 ] || continue # an empty word as the command runs nothing
   if [ "${W[0]}" = git ]; then
     cmd_git "${W[@]}"
     case $GIT_SUB in
@@ -103,7 +79,7 @@ for seg in ${CMD_SEGS[@]+"${CMD_SEGS[@]}"}; do
   fi
   [ "${W[0]}" != tag.sh ] || tags_made=1
   cmd_pos
-  listed
+  listed "$HOOK_DIR/release-commands.txt"
   if [ -n "$HIT" ]; then hits+=("$HIT"); fi
 done
 if [ "$CMD_OPAQUE" = 1 ]; then hits+=("a command it cannot read (eval, sh -c in sh -c, a shell fed on stdin, a quote or heredoc left open)"); fi

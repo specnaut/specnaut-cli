@@ -44,8 +44,9 @@ for hook in .specnaut/hooks/protect-generated.sh .specnaut/hooks/log-subagent.sh
 done
 for support in .specnaut/hooks/_guard.sh .specnaut/hooks/_approval.sh \
   .specnaut/hooks/_command.sh .specnaut/hooks/_git.sh .specnaut/hooks/_simple.sh \
-  .specnaut/hooks/_paths.sh .specnaut/hooks/_baseline.sh \
-  .specnaut/hooks/_agents.txt .specnaut/hooks/release-commands.txt .specnaut/hooks/SHA256SUMS; do
+  .specnaut/hooks/_listed.sh .specnaut/hooks/_paths.sh .specnaut/hooks/_baseline.sh \
+  .specnaut/hooks/_agents.txt .specnaut/hooks/release-commands.txt \
+  .specnaut/hooks/merge-commands.txt .specnaut/hooks/SHA256SUMS; do
   check "$support installed" "[ -f $support ]"
 done
 # cli#679: a CRLF checkout would change every hash SHA256SUMS pins.

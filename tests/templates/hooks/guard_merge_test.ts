@@ -3,18 +3,17 @@ import { join } from "@std/path";
 import {
   approve,
   git,
-  type Harness,
   HARNESSES,
   makeRepo,
   payload,
   pool,
   type RepoOptions,
-  type Run,
   runHook,
   type Sandbox,
   sandbox,
   stampDir,
 } from "./hook_sandbox.ts";
+import { bash, GATED, type Verdict, verdict } from "./guard_merge_fixture.ts";
 
 /**
  * US1 / FR-001, FR-016, FR-017, D3 — under `merge: manual`, nothing lands on
@@ -22,35 +21,6 @@ import {
  * Claude (default mode → native "ask") and on Codex (deny unless this turn's
  * prompt approved it). SC-002: a stamp from a previous turn does not count.
  */
-
-type Verdict = "allow" | "ask" | "deny";
-
-function verdict(r: Run): Verdict | string {
-  if (r.code === 2) return "deny";
-  if (r.code === 0 && r.stdout === "") return "allow";
-  if (r.code === 0 && JSON.parse(r.stdout).hookSpecificOutput?.permissionDecision === "ask") {
-    return "ask";
-  }
-  return `unexpected exit ${r.code}: ${r.stdout} ${r.stderr}`;
-}
-
-async function bash(
-  sb: Sandbox,
-  harness: Harness,
-  repo: string,
-  command: string,
-  extra: Record<string, unknown> = {},
-): Promise<Run> {
-  const p = await payload(harness, "pre_tool_use_bash", {
-    cwd: repo,
-    tool_input: { command },
-    ...extra,
-  });
-  return runHook(sb, "guard-merge.sh", harness, p);
-}
-
-/** What a gated command yields when nothing approved it. */
-const GATED: Record<Harness, Verdict> = { claude: "ask", codex: "deny" };
 
 /** [repo shape, command, gated?] — repo shapes are built once per test. */
 const FORMS: ReadonlyArray<[shape: string, command: string, gated: boolean]> = [

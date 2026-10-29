@@ -37,7 +37,7 @@ commit holds only that child's work — two children in one commit break the mat
 
 ## Resuming, without a state file
 
-There is no state file: resume reconstructs from git. Read the branch's commits, match each to its
-sub-issue through the commit convention (one-to-one, by ordinal), and **resume at the first child
-with no commit**. Do not use issue state as a progress signal — child issues stay open for the whole
-loop. If a commit matches no child, or a child matches two, stop and say so.
+There is no state file: resume reconstructs from git. `bash .specnaut/scripts/bash/epic-status.sh`
+reads the branch's commits — one `CHILD T<NN> #<child> <sha>` line per child done, one-to-one by
+ordinal — and **resume at the first child with no commit**. Do not use issue state as a progress signal — child issues stay open for the whole
+loop. If it exits 12 — a commit matches no child, or a child matches two — stop and say so.

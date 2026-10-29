@@ -438,6 +438,14 @@
     },
     {
       "category": "backlog-script",
+      "name": "close-shipped",
+      "suffix": "close-shipped.sh",
+      "source": "core/skills/task/scripts/local/close-shipped.sh",
+      "executable": true,
+      "backend": "local"
+    },
+    {
+      "category": "backlog-script",
       "name": "propagate-parent-status",
       "suffix": "parent-of.sh",
       "source": "core/skills/task/scripts/local/parent-of.sh",
@@ -558,6 +566,14 @@
     },
     {
       "category": "backlog-script",
+      "name": "close-shipped",
+      "suffix": "close-shipped.sh",
+      "source": "core/skills/task/scripts/github/close-shipped.sh",
+      "executable": true,
+      "backend": "github"
+    },
+    {
+      "category": "backlog-script",
       "name": "cascade-check",
       "suffix": "parent-of.sh",
       "source": "core/skills/task/scripts/github/parent-of.sh",
@@ -654,6 +670,14 @@
     },
     {
       "category": "backlog-script",
+      "name": "close-shipped",
+      "suffix": "close-shipped.sh",
+      "source": "core/skills/task/scripts/gitlab/close-shipped.sh",
+      "executable": true,
+      "backend": "gitlab"
+    },
+    {
+      "category": "backlog-script",
       "name": "cascade-check",
       "suffix": "parent-of.sh",
       "source": "core/skills/task/scripts/gitlab/parent-of.sh",
@@ -713,6 +737,14 @@
       "name": "move",
       "suffix": "cascade-check.sh",
       "source": "core/skills/task/scripts/cloud/cascade-check.sh",
+      "executable": true,
+      "backend": "cloud"
+    },
+    {
+      "category": "backlog-script",
+      "name": "close-shipped",
+      "suffix": "close-shipped.sh",
+      "source": "core/skills/task/scripts/cloud/close-shipped.sh",
       "executable": true,
       "backend": "cloud"
     },
@@ -1718,6 +1750,34 @@
     {
       "category": "spec-root",
       "name": "specify",
+      "suffix": "scripts/bash/epic-status.sh",
+      "source": "core/specnaut/scripts/bash/epic-status.sh",
+      "executable": true
+    },
+    {
+      "category": "spec-root",
+      "name": "specify",
+      "suffix": "scripts/bash/fold-fixups.sh",
+      "source": "core/specnaut/scripts/bash/fold-fixups.sh",
+      "executable": true
+    },
+    {
+      "category": "spec-root",
+      "name": "specify",
+      "suffix": "scripts/bash/land-feature.sh",
+      "source": "core/specnaut/scripts/bash/land-feature.sh",
+      "executable": true
+    },
+    {
+      "category": "spec-root",
+      "name": "specify",
+      "suffix": "scripts/bash/remove-spec.sh",
+      "source": "core/specnaut/scripts/bash/remove-spec.sh",
+      "executable": true
+    },
+    {
+      "category": "spec-root",
+      "name": "specify",
       "suffix": "scripts/bash/_config.sh",
       "source": "core/specnaut/scripts/bash/_config.sh"
     },
@@ -1879,6 +1939,11 @@
     },
     {
       "harness": "claude",
+      "destination": ".specnaut/hooks/_listed.sh",
+      "source": "harness-specific/shared/hooks/_listed.sh"
+    },
+    {
+      "harness": "claude",
       "destination": ".specnaut/hooks/_git.sh",
       "source": "harness-specific/shared/hooks/_git.sh"
     },
@@ -1938,6 +2003,11 @@
       "harness": "claude",
       "destination": ".specnaut/hooks/release-commands.txt",
       "source": "harness-specific/shared/hooks/release-commands.txt"
+    },
+    {
+      "harness": "claude",
+      "destination": ".specnaut/hooks/merge-commands.txt",
+      "source": "harness-specific/shared/hooks/merge-commands.txt"
     },
     {
       "harness": "claude",
@@ -1982,6 +2052,11 @@
     },
     {
       "harness": "codex",
+      "destination": ".specnaut/hooks/_listed.sh",
+      "source": "harness-specific/shared/hooks/_listed.sh"
+    },
+    {
+      "harness": "codex",
       "destination": ".specnaut/hooks/_git.sh",
       "source": "harness-specific/shared/hooks/_git.sh"
     },
@@ -2041,6 +2116,11 @@
       "harness": "codex",
       "destination": ".specnaut/hooks/release-commands.txt",
       "source": "harness-specific/shared/hooks/release-commands.txt"
+    },
+    {
+      "harness": "codex",
+      "destination": ".specnaut/hooks/merge-commands.txt",
+      "source": "harness-specific/shared/hooks/merge-commands.txt"
     },
     {
       "harness": "codex",
