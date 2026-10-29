@@ -8263,29 +8263,34 @@ which also bounds what the tier costs.
 
 ### How the two axes reach other harnesses
 
-\`model:\` and \`effort:\` are Claude's vocabulary, but they describe two axes
-every harness has. On Codex they translate onto its own two, in
-\`src/domain/codex_models.ts\`:
+\`model:\` and \`effort:\` are Claude's vocabulary, but \`model:\` names a family
+(\`opus\`, \`sonnet\`, \`haiku\`), never a version: it always resolves to the
+current model of that family. **Specnaut names no model version anywhere**,
+because a versioned id is obsolete within weeks of being written.
+
+The families correspond across harnesses — the only model names Specnaut
+writes:
+
+| Claude Code | Codex |
+| ----------- | ----- |
+| Haiku | Luna |
+| Sonnet | Terra |
+| Opus | Sol |
+| Fable | Astra |
+
+Codex accepts only versioned ids, so an agent file Specnaut writes for Codex
+carries no \`model\` key and runs on the session's model; a comment names the family it
+was written for. The budget crosses verbatim (\`src/domain/codex_models.ts\`):
 
 | Specnaut | Codex |
 | -------- | ----- |
-| \`model: opus\` | \`model = "gpt-5.6-sol"\` |
-| \`model: sonnet\` | \`model = "gpt-5.6-terra"\` |
-| \`model: haiku\` | \`model = "gpt-5.6-luna"\` |
+| \`model: opus\` / \`sonnet\` / \`haiku\` | \`# Model family: Sol\` / \`Terra\` / \`Luna\` (comment) |
 | \`effort: low\` / \`medium\` / \`high\` / \`xhigh\` | \`model_reasoning_effort\`, verbatim |
 
 Specnaut's effort vocabulary is a strict subset of Codex's
 (\`ultra\`, \`max\`, \`xhigh\`, \`high\`, \`medium\`, \`low\`), so that half is identity.
 \`ultra\` and \`max\` are never emitted — a subagent is already the unit \`ultra\`
-fans out over.
-
-An unrecognised value on either axis omits that key rather than guessing, so
-the subagent inherits the parent session's setting. A wrong pin fails on the
-user's machine, against a model list we cannot see; inheriting cannot.
-
-**When OpenAI renames a model, \`src/domain/codex_models.ts\` is the only file
-to edit.** The ids live there for that reason, and a fleet-level test asserts
-every emitted id is one of the three.
+fans out over. An unrecognised value omits the key rather than guessing.
 
 On **Antigravity** the vocabulary is \`inherit | flash | pro\`, so the two
 capable tiers collapse onto \`pro\` and \`haiku\` maps to \`flash\`
@@ -28314,7 +28319,7 @@ scaffolded for a harness without such features gets none here.
   a session running the full spec-plan-tasks chain. File edits are
   isolated under \`.claude/worktrees/\` (git worktrees), so several
   Specnaut agents can work in parallel without stepping on each
-  other. Requires Claude Code v2.1.139+. See
+  other. See
   https://code.claude.com/docs/en/agent-view.
 
 - **Async notifications** — install one of the channel plugins (Telegram,
@@ -28470,7 +28475,7 @@ export const HARNESS_STATIC: Record<string, Record<string, TemplateFile>> = {
 #   .claude/scripts/dispatch-agent.sh <agent-name> "<prompt>"
 #
 # Environment variables:
-#   MODEL          Override the model (e.g. "claude-sonnet-4-6").
+#   MODEL          Override the model by family (e.g. "sonnet").
 #                  Defaults to whatever the agent or claude binary picks.
 #                  A human override for a headless run: the person setting it
 #                  chose the tier. The rule that a Specnaut agent runs on its
