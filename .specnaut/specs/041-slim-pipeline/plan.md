@@ -93,6 +93,19 @@ Verified against the tree: `implement.md` passes `--require-tasks`; `SKILL_DOC_R
 | LOW — a user's own extension hook stops silently                                          | `upgrade` prints one line when `.specnaut/extensions.yml` exists, pointing at `.specnaut/addenda/task/<phase>.md`; only the prose extension blocks go — harness hooks (`.specnaut/hooks/`, `.codex/hooks.json`, Claude settings) stay |
 | LOW — no fallback where a harness cannot dispatch; two pointers at `plan-audits.md`       | `plan.md` says to answer each seat's Mode 3 inline, kept separate; the seats' "Spawned by" lines point at `plan.md`                                                                                                                   |
 
+## Measured
+
+| Set                                                      |                    Before (`af339c1d`) |                    After |
+| :------------------------------------------------------- | -------------------------------------: | -----------------------: |
+| `/task` skill: router + every doc under `phases/`        |                              131,353 B |         91,407 B (−30 %) |
+| Read set of one standalone feature                       | 96,687 B (with `plan-audits`, `tasks`) |         60,361 B (−38 %) |
+| `plan` (with `plan-audits`) / `implement` / `auto-chain` |             19,324 / 11,844 / 11,869 B | 10,212 / 3,218 / 4,494 B |
+
+`review`, `merge`, `merge-squash` and `merge-close` are untouched here: #678 and #677 own them. Full
+suite green (2,606), fmt and lint clean, six new locks red-probed (folds, audits on every plan, a
+seat's Mode 3 question, the cockpit's phases, the remote check's place, the `extensions.yml`
+notice).
+
 ## 5. Open questions
 
 None for the user: the epic's rulings (2026-10-28: slim is the default; 2026-10-29: no eval) settle
