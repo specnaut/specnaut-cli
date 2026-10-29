@@ -1,0 +1,6 @@
+# Size limits for this repository. Defaults: .specnaut/memory/size-limits.md.
+# Generated or data files are not authored code: the ratchet does not judge them.
+exempt:
+  - "*.lock"
+  - src/templates_bundle.ts
+  - templates/manifest.json
