@@ -1939,6 +1939,11 @@
     },
     {
       "harness": "claude",
+      "destination": ".specnaut/hooks/.gitattributes",
+      "source": "harness-specific/shared/hooks/.gitattributes"
+    },
+    {
+      "harness": "claude",
       "destination": ".claude/hooks/check-backlog-prereqs.sh",
       "source": "harness-specific/claude/hooks/check-backlog-prereqs.sh",
       "executable": true
@@ -2018,6 +2023,11 @@
       "harness": "codex",
       "destination": ".specnaut/hooks/SHA256SUMS",
       "source": "harness-specific/shared/hooks/SHA256SUMS"
+    },
+    {
+      "harness": "codex",
+      "destination": ".specnaut/hooks/.gitattributes",
+      "source": "harness-specific/shared/hooks/.gitattributes"
     },
     {
       "harness": "codex",

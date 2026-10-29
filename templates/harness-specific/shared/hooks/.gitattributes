@@ -1,0 +1,4 @@
+# Specnaut's hooks are checked byte for byte: Codex runs them only while the
+# folder matches SHA256SUMS. A CRLF checkout (core.autocrlf on Windows) would
+# change every hash and every list the guards read, so git never converts here.
+* -text

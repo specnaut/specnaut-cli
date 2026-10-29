@@ -72,6 +72,7 @@ listed() {
   local -a e
   HIT=""
   while IFS= read -r line || [ -n "$line" ]; do
+    line=${line%$'\r'} # a CRLF checkout (Windows, core.autocrlf)
     case $line in '' | '#'*) continue ;; esac
     entry=${line%% except *} except=""
     if [ "$entry" != "$line" ]; then except=${line#* except }; fi

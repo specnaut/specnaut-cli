@@ -182,7 +182,8 @@ Deno.test("gitlab: scoped labels, notes without system notes, no close reason", 
     await p.crlfJq();
     r = await p.verify("1", "2");
     assertEquals([r.code, r.stdout], [0, ""], r.stderr);
-    await Deno.remove(join(p.dir, "bin", "jq"));
+    // On Windows crlfJq installs no stub: the real jq.exe already writes CRLF.
+    if (Deno.build.os !== "windows") await Deno.remove(join(p.dir, "bin", "jq"));
 
     r = await p.verify("1", "5");
     assertEquals([r.code, r.stdout], [2, ""]);

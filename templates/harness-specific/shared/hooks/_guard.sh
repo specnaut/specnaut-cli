@@ -117,7 +117,14 @@ guard_jq() {
 guard_path() {
   local _gp=$2 # not `p`: printf -v would set this local, not the caller's p
   case ${OSTYPE:-} in
-    msys* | cygwin*) _gp=${_gp//\\//}; case $_gp in [A-Za-z]:/*) _gp=$(cygpath -u "$_gp") ;; esac ;;
+    msys* | cygwin*)
+      _gp=${_gp//\\//}
+      # Repeated slashes after the first character (`C:/a//b`): cygpath and
+      # -ef disagree on them. A leading `//` stays: it is a UNC path.
+      local _t=${_gp:1}
+      while [[ $_t == *//* ]]; do _t=${_t//\/\//\/}; done
+      _gp=${_gp:0:1}$_t
+      case $_gp in [A-Za-z]:/*) _gp=$(cygpath -u "$_gp") ;; esac ;;
   esac
   printf -v "$1" '%s' "$_gp"
 }

@@ -36,6 +36,8 @@ esac
 agent=${name##*:}
 [ -f "$HOOK_DIR/_agents.txt" ] \
   || guard_fail "$HOOK_DIR/_agents.txt is missing, so '$agent' cannot be checked — dispatch it without a model override"
-grep -qxF -- "$agent" "$HOOK_DIR/_agents.txt" || guard_allow
+# tr: a CRLF checkout (Windows, core.autocrlf) would otherwise match nothing,
+# and an unmatched Specnaut agent is allowed its override.
+tr -d '\r' <"$HOOK_DIR/_agents.txt" | grep -qxF -- "$agent" || guard_allow
 
 guard_fail "'$agent' is a Specnaut agent: it runs on the model its definition declares, and a dispatch may not choose another tier. Dispatch it again without model or reasoning_effort."
