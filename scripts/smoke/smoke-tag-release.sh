@@ -90,7 +90,7 @@ check "lock records version_scheme: semver" \
 check "specnaut SKILL.md no longer advertises the retired phases" \
   '! grep -qE "^\| .(tag-version|release-version). \|" .claude/skills/specnaut/SKILL.md && ! grep -q "argument-hint:.*tag-version" .claude/skills/specnaut/SKILL.md'
 check "specnaut SKILL.md retires them explicitly rather than dropping them" \
-  'grep -q "RETIRED, not unknown" .claude/skills/specnaut/SKILL.md'
+  'grep -q "Retired addresses — this is deliberate, not a gap" .claude/skills/specnaut/SKILL.md && grep -qF "| \`/specnaut tag-version\` | \`/ship tag\` |" .claude/skills/specnaut/SKILL.md && grep -qF "| \`/specnaut release-version\` | \`/ship release\` |" .claude/skills/specnaut/SKILL.md'
 check "specnaut SKILL.md names /ship as the new address" \
   'grep -q "/ship" .claude/skills/specnaut/SKILL.md'
 check "ship SKILL.md offers the three paths" \
