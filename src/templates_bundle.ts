@@ -29298,7 +29298,14 @@ guard_jq() {
 guard_path() {
   local _gp=\$2 # not \`p\`: printf -v would set this local, not the caller's p
   case \${OSTYPE:-} in
-    msys* | cygwin*) _gp=\${_gp//\\\\//}; case \$_gp in [A-Za-z]:/*) _gp=\$(cygpath -u "\$_gp") ;; esac ;;
+    msys* | cygwin*)
+      _gp=\${_gp//\\\\//}
+      # Repeated slashes after the first character (\`C:/a//b\`): cygpath and
+      # -ef disagree on them. A leading \`//\` stays: it is a UNC path.
+      local _t=\${_gp:1}
+      while [[ \$_t == *//* ]]; do _t=\${_t//\\/\\//\\/}; done
+      _gp=\${_gp:0:1}\$_t
+      case \$_gp in [A-Za-z]:/*) _gp=\$(cygpath -u "\$_gp") ;; esac ;;
   esac
   printf -v "\$1" '%s' "\$_gp"
 }
@@ -29993,6 +30000,7 @@ listed() {
   local -a e
   HIT=""
   while IFS= read -r line || [ -n "\$line" ]; do
+    line=\${line%\$'\\r'} # a CRLF checkout (Windows, core.autocrlf)
     case \$line in '' | '#'*) continue ;; esac
     entry=\${line%% except *} except=""
     if [ "\$entry" != "\$line" ]; then except=\${line#* except }; fi
@@ -30078,7 +30086,9 @@ esac
 agent=\${name##*:}
 [ -f "\$HOOK_DIR/_agents.txt" ] \\
   || guard_fail "\$HOOK_DIR/_agents.txt is missing, so '\$agent' cannot be checked — dispatch it without a model override"
-grep -qxF -- "\$agent" "\$HOOK_DIR/_agents.txt" || guard_allow
+# tr: a CRLF checkout (Windows, core.autocrlf) would otherwise match nothing,
+# and an unmatched Specnaut agent is allowed its override.
+tr -d '\\r' <"\$HOOK_DIR/_agents.txt" | grep -qxF -- "\$agent" || guard_allow
 
 guard_fail "'\$agent' is a Specnaut agent: it runs on the model its definition declares, and a dispatch may not choose another tier. Dispatch it again without model or reasoning_effort."
 `,
@@ -30402,19 +30412,28 @@ workflow-manager
       executable: false,
     },
     ".specnaut/hooks/SHA256SUMS": {
-      content: `49a4f9a91f8b91559f087d02c151d4069575cf466fcd09b21354749f188c16a8  _agents.txt
+      content: `e51a8a1291eb7e2e5a5a21122b971ee78c5392d4dbbabd28798f8f89df9ca08a  .gitattributes
+49a4f9a91f8b91559f087d02c151d4069575cf466fcd09b21354749f188c16a8  _agents.txt
 d248ada612da7ce04d3d2cd4f8576070c62371166e35ed6351b0069fcd066fad  _approval.sh
 7556762e50be2b68d2bc432dddded521f736cc06abb084e895c1f1ddf5986039  _command.sh
 fa8afb422b9af3b7f80580666d66e9332ed35cc3c24c7182300b3224f2a96548  _git.sh
-840885ccd0436124893e6852fcd48215688c509d3ae79ac3410b1cd9943bae6f  _guard.sh
+2829e6a5db6984fee451e242ba16beca68808a7647316cff24930aa8ec53c73a  _guard.sh
 7675a9df90d21f2390940870fa8458d09e7418a68de7d682b3f8d6a36a94019c  _simple.sh
 7ef60a25af68fa7d84d1c65c44bc8ce4801f29f83439b858775afa44ea77262d  approve-on-prompt.sh
-624291e9b6c4c7eac986998782110749ef66aa7a95f056d52834800cedfecffe  guard-dispatch-model.sh
+28d13e1fbd696f79036cc1f94c3fd6aa68f4f862f0dd5f6d32191ad05392534f  guard-dispatch-model.sh
 e2f7d4779e26518bea16290522367d452af0fd088d68c9dec18eaa7c0b94e279  guard-merge.sh
-57ee8ff38940b0c31784c8c2f14ba43181e0aee6e53ceaeca7408f73bd84f40a  guard-release.sh
+6f8dd791eb7c797dae9f9c5f6f6bc0d07c2930552aa9087ccc8b619f0844476e  guard-release.sh
 3364feb0f3a7892224b67e4f857bb6c085456da98c892d7199c4bbd10f122f8b  log-subagent.sh
 4f188591173cb0790bcf411ec15023110315c84d306c55365b002ca39849d7b0  protect-generated.sh
 4e0f336ed4eafecca2904fba2aab427d3e8528889aa68e9e347c4ac03dc53853  release-commands.txt
+`,
+      executable: false,
+    },
+    ".specnaut/hooks/.gitattributes": {
+      content: `# Specnaut's hooks are checked byte for byte: Codex runs them only while the
+# folder matches SHA256SUMS. A CRLF checkout (core.autocrlf on Windows) would
+# change every hash and every list the guards read, so git never converts here.
+* -text
 `,
       executable: false,
     },
@@ -30598,7 +30617,14 @@ guard_jq() {
 guard_path() {
   local _gp=\$2 # not \`p\`: printf -v would set this local, not the caller's p
   case \${OSTYPE:-} in
-    msys* | cygwin*) _gp=\${_gp//\\\\//}; case \$_gp in [A-Za-z]:/*) _gp=\$(cygpath -u "\$_gp") ;; esac ;;
+    msys* | cygwin*)
+      _gp=\${_gp//\\\\//}
+      # Repeated slashes after the first character (\`C:/a//b\`): cygpath and
+      # -ef disagree on them. A leading \`//\` stays: it is a UNC path.
+      local _t=\${_gp:1}
+      while [[ \$_t == *//* ]]; do _t=\${_t//\\/\\//\\/}; done
+      _gp=\${_gp:0:1}\$_t
+      case \$_gp in [A-Za-z]:/*) _gp=\$(cygpath -u "\$_gp") ;; esac ;;
   esac
   printf -v "\$1" '%s' "\$_gp"
 }
@@ -31293,6 +31319,7 @@ listed() {
   local -a e
   HIT=""
   while IFS= read -r line || [ -n "\$line" ]; do
+    line=\${line%\$'\\r'} # a CRLF checkout (Windows, core.autocrlf)
     case \$line in '' | '#'*) continue ;; esac
     entry=\${line%% except *} except=""
     if [ "\$entry" != "\$line" ]; then except=\${line#* except }; fi
@@ -31378,7 +31405,9 @@ esac
 agent=\${name##*:}
 [ -f "\$HOOK_DIR/_agents.txt" ] \\
   || guard_fail "\$HOOK_DIR/_agents.txt is missing, so '\$agent' cannot be checked — dispatch it without a model override"
-grep -qxF -- "\$agent" "\$HOOK_DIR/_agents.txt" || guard_allow
+# tr: a CRLF checkout (Windows, core.autocrlf) would otherwise match nothing,
+# and an unmatched Specnaut agent is allowed its override.
+tr -d '\\r' <"\$HOOK_DIR/_agents.txt" | grep -qxF -- "\$agent" || guard_allow
 
 guard_fail "'\$agent' is a Specnaut agent: it runs on the model its definition declares, and a dispatch may not choose another tier. Dispatch it again without model or reasoning_effort."
 `,
@@ -31702,19 +31731,28 @@ workflow-manager
       executable: false,
     },
     ".specnaut/hooks/SHA256SUMS": {
-      content: `49a4f9a91f8b91559f087d02c151d4069575cf466fcd09b21354749f188c16a8  _agents.txt
+      content: `e51a8a1291eb7e2e5a5a21122b971ee78c5392d4dbbabd28798f8f89df9ca08a  .gitattributes
+49a4f9a91f8b91559f087d02c151d4069575cf466fcd09b21354749f188c16a8  _agents.txt
 d248ada612da7ce04d3d2cd4f8576070c62371166e35ed6351b0069fcd066fad  _approval.sh
 7556762e50be2b68d2bc432dddded521f736cc06abb084e895c1f1ddf5986039  _command.sh
 fa8afb422b9af3b7f80580666d66e9332ed35cc3c24c7182300b3224f2a96548  _git.sh
-840885ccd0436124893e6852fcd48215688c509d3ae79ac3410b1cd9943bae6f  _guard.sh
+2829e6a5db6984fee451e242ba16beca68808a7647316cff24930aa8ec53c73a  _guard.sh
 7675a9df90d21f2390940870fa8458d09e7418a68de7d682b3f8d6a36a94019c  _simple.sh
 7ef60a25af68fa7d84d1c65c44bc8ce4801f29f83439b858775afa44ea77262d  approve-on-prompt.sh
-624291e9b6c4c7eac986998782110749ef66aa7a95f056d52834800cedfecffe  guard-dispatch-model.sh
+28d13e1fbd696f79036cc1f94c3fd6aa68f4f862f0dd5f6d32191ad05392534f  guard-dispatch-model.sh
 e2f7d4779e26518bea16290522367d452af0fd088d68c9dec18eaa7c0b94e279  guard-merge.sh
-57ee8ff38940b0c31784c8c2f14ba43181e0aee6e53ceaeca7408f73bd84f40a  guard-release.sh
+6f8dd791eb7c797dae9f9c5f6f6bc0d07c2930552aa9087ccc8b619f0844476e  guard-release.sh
 3364feb0f3a7892224b67e4f857bb6c085456da98c892d7199c4bbd10f122f8b  log-subagent.sh
 4f188591173cb0790bcf411ec15023110315c84d306c55365b002ca39849d7b0  protect-generated.sh
 4e0f336ed4eafecca2904fba2aab427d3e8528889aa68e9e347c4ac03dc53853  release-commands.txt
+`,
+      executable: false,
+    },
+    ".specnaut/hooks/.gitattributes": {
+      content: `# Specnaut's hooks are checked byte for byte: Codex runs them only while the
+# folder matches SHA256SUMS. A CRLF checkout (core.autocrlf on Windows) would
+# change every hash and every list the guards read, so git never converts here.
+* -text
 `,
       executable: false,
     },
@@ -31727,12 +31765,12 @@ e2f7d4779e26518bea16290522367d452af0fd088d68c9dec18eaa7c0b94e279  guard-merge.sh
         "hooks": [
           {
             "type": "command",
-            "command": "r=\$PWD; while [ -n \\"\$r\\" ] && [ ! -d \\"\$r/.specnaut/hooks\\" ]; do r=\${r%/*}; done; [ \\"\$( (sha256sum 2>/dev/null || shasum -a 256) < \\"\$r/.specnaut/hooks/SHA256SUMS\\" 2>/dev/null | cut -c1-64)\\" = \\"995c4a72ba93bef35bdef548c5eda9dbe59f89878c2251995d523e269d6d3737\\" ] && (cd \\"\$r/.specnaut/hooks\\" && (sha256sum -c --status SHA256SUMS 2>/dev/null || shasum -a 256 -c --status SHA256SUMS)) && exec bash \\"\$r/.specnaut/hooks/guard-merge.sh\\" codex; echo \\"specnaut: .specnaut/hooks changed since it was trusted — run specnaut upgrade, then /hooks\\" >&2; exit 2",
+            "command": "r=\$PWD; while [ -n \\"\$r\\" ] && [ ! -d \\"\$r/.specnaut/hooks\\" ]; do r=\${r%/*}; done; [ \\"\$( (sha256sum 2>/dev/null || shasum -a 256) < \\"\$r/.specnaut/hooks/SHA256SUMS\\" 2>/dev/null | cut -c1-64)\\" = \\"8fe9afa74bea1d4acbb41d4ec5af1875b4b68a6c1afc6dec16aba147c530c97f\\" ] && (cd \\"\$r/.specnaut/hooks\\" && (sha256sum -c --status SHA256SUMS 2>/dev/null || shasum -a 256 -c --status SHA256SUMS)) && exec bash \\"\$r/.specnaut/hooks/guard-merge.sh\\" codex; echo \\"specnaut: .specnaut/hooks changed since it was trusted — run specnaut upgrade, then /hooks\\" >&2; exit 2",
             "timeout": 10
           },
           {
             "type": "command",
-            "command": "r=\$PWD; while [ -n \\"\$r\\" ] && [ ! -d \\"\$r/.specnaut/hooks\\" ]; do r=\${r%/*}; done; [ \\"\$( (sha256sum 2>/dev/null || shasum -a 256) < \\"\$r/.specnaut/hooks/SHA256SUMS\\" 2>/dev/null | cut -c1-64)\\" = \\"995c4a72ba93bef35bdef548c5eda9dbe59f89878c2251995d523e269d6d3737\\" ] && (cd \\"\$r/.specnaut/hooks\\" && (sha256sum -c --status SHA256SUMS 2>/dev/null || shasum -a 256 -c --status SHA256SUMS)) && exec bash \\"\$r/.specnaut/hooks/guard-release.sh\\" codex; echo \\"specnaut: .specnaut/hooks changed since it was trusted — run specnaut upgrade, then /hooks\\" >&2; exit 2",
+            "command": "r=\$PWD; while [ -n \\"\$r\\" ] && [ ! -d \\"\$r/.specnaut/hooks\\" ]; do r=\${r%/*}; done; [ \\"\$( (sha256sum 2>/dev/null || shasum -a 256) < \\"\$r/.specnaut/hooks/SHA256SUMS\\" 2>/dev/null | cut -c1-64)\\" = \\"8fe9afa74bea1d4acbb41d4ec5af1875b4b68a6c1afc6dec16aba147c530c97f\\" ] && (cd \\"\$r/.specnaut/hooks\\" && (sha256sum -c --status SHA256SUMS 2>/dev/null || shasum -a 256 -c --status SHA256SUMS)) && exec bash \\"\$r/.specnaut/hooks/guard-release.sh\\" codex; echo \\"specnaut: .specnaut/hooks changed since it was trusted — run specnaut upgrade, then /hooks\\" >&2; exit 2",
             "timeout": 10
           }
         ]
@@ -31742,7 +31780,7 @@ e2f7d4779e26518bea16290522367d452af0fd088d68c9dec18eaa7c0b94e279  guard-merge.sh
         "hooks": [
           {
             "type": "command",
-            "command": "r=\$PWD; while [ -n \\"\$r\\" ] && [ ! -d \\"\$r/.specnaut/hooks\\" ]; do r=\${r%/*}; done; [ \\"\$( (sha256sum 2>/dev/null || shasum -a 256) < \\"\$r/.specnaut/hooks/SHA256SUMS\\" 2>/dev/null | cut -c1-64)\\" = \\"995c4a72ba93bef35bdef548c5eda9dbe59f89878c2251995d523e269d6d3737\\" ] && (cd \\"\$r/.specnaut/hooks\\" && (sha256sum -c --status SHA256SUMS 2>/dev/null || shasum -a 256 -c --status SHA256SUMS)) && exec bash \\"\$r/.specnaut/hooks/protect-generated.sh\\" codex; echo \\"specnaut: .specnaut/hooks changed since it was trusted — run specnaut upgrade, then /hooks\\" >&2; exit 2",
+            "command": "r=\$PWD; while [ -n \\"\$r\\" ] && [ ! -d \\"\$r/.specnaut/hooks\\" ]; do r=\${r%/*}; done; [ \\"\$( (sha256sum 2>/dev/null || shasum -a 256) < \\"\$r/.specnaut/hooks/SHA256SUMS\\" 2>/dev/null | cut -c1-64)\\" = \\"8fe9afa74bea1d4acbb41d4ec5af1875b4b68a6c1afc6dec16aba147c530c97f\\" ] && (cd \\"\$r/.specnaut/hooks\\" && (sha256sum -c --status SHA256SUMS 2>/dev/null || shasum -a 256 -c --status SHA256SUMS)) && exec bash \\"\$r/.specnaut/hooks/protect-generated.sh\\" codex; echo \\"specnaut: .specnaut/hooks changed since it was trusted — run specnaut upgrade, then /hooks\\" >&2; exit 2",
             "timeout": 10
           }
         ]
@@ -31752,7 +31790,7 @@ e2f7d4779e26518bea16290522367d452af0fd088d68c9dec18eaa7c0b94e279  guard-merge.sh
         "hooks": [
           {
             "type": "command",
-            "command": "r=\$PWD; while [ -n \\"\$r\\" ] && [ ! -d \\"\$r/.specnaut/hooks\\" ]; do r=\${r%/*}; done; [ \\"\$( (sha256sum 2>/dev/null || shasum -a 256) < \\"\$r/.specnaut/hooks/SHA256SUMS\\" 2>/dev/null | cut -c1-64)\\" = \\"995c4a72ba93bef35bdef548c5eda9dbe59f89878c2251995d523e269d6d3737\\" ] && (cd \\"\$r/.specnaut/hooks\\" && (sha256sum -c --status SHA256SUMS 2>/dev/null || shasum -a 256 -c --status SHA256SUMS)) && exec bash \\"\$r/.specnaut/hooks/guard-dispatch-model.sh\\" codex; echo \\"specnaut: .specnaut/hooks changed since it was trusted — run specnaut upgrade, then /hooks\\" >&2; exit 2",
+            "command": "r=\$PWD; while [ -n \\"\$r\\" ] && [ ! -d \\"\$r/.specnaut/hooks\\" ]; do r=\${r%/*}; done; [ \\"\$( (sha256sum 2>/dev/null || shasum -a 256) < \\"\$r/.specnaut/hooks/SHA256SUMS\\" 2>/dev/null | cut -c1-64)\\" = \\"8fe9afa74bea1d4acbb41d4ec5af1875b4b68a6c1afc6dec16aba147c530c97f\\" ] && (cd \\"\$r/.specnaut/hooks\\" && (sha256sum -c --status SHA256SUMS 2>/dev/null || shasum -a 256 -c --status SHA256SUMS)) && exec bash \\"\$r/.specnaut/hooks/guard-dispatch-model.sh\\" codex; echo \\"specnaut: .specnaut/hooks changed since it was trusted — run specnaut upgrade, then /hooks\\" >&2; exit 2",
             "timeout": 10
           }
         ]
@@ -31763,7 +31801,7 @@ e2f7d4779e26518bea16290522367d452af0fd088d68c9dec18eaa7c0b94e279  guard-merge.sh
         "hooks": [
           {
             "type": "command",
-            "command": "r=\$PWD; while [ -n \\"\$r\\" ] && [ ! -d \\"\$r/.specnaut/hooks\\" ]; do r=\${r%/*}; done; [ \\"\$( (sha256sum 2>/dev/null || shasum -a 256) < \\"\$r/.specnaut/hooks/SHA256SUMS\\" 2>/dev/null | cut -c1-64)\\" = \\"995c4a72ba93bef35bdef548c5eda9dbe59f89878c2251995d523e269d6d3737\\" ] && (cd \\"\$r/.specnaut/hooks\\" && (sha256sum -c --status SHA256SUMS 2>/dev/null || shasum -a 256 -c --status SHA256SUMS)) && exec bash \\"\$r/.specnaut/hooks/approve-on-prompt.sh\\" codex; echo \\"specnaut: .specnaut/hooks changed since it was trusted — run specnaut upgrade, then /hooks\\" >&2; exit 0",
+            "command": "r=\$PWD; while [ -n \\"\$r\\" ] && [ ! -d \\"\$r/.specnaut/hooks\\" ]; do r=\${r%/*}; done; [ \\"\$( (sha256sum 2>/dev/null || shasum -a 256) < \\"\$r/.specnaut/hooks/SHA256SUMS\\" 2>/dev/null | cut -c1-64)\\" = \\"8fe9afa74bea1d4acbb41d4ec5af1875b4b68a6c1afc6dec16aba147c530c97f\\" ] && (cd \\"\$r/.specnaut/hooks\\" && (sha256sum -c --status SHA256SUMS 2>/dev/null || shasum -a 256 -c --status SHA256SUMS)) && exec bash \\"\$r/.specnaut/hooks/approve-on-prompt.sh\\" codex; echo \\"specnaut: .specnaut/hooks changed since it was trusted — run specnaut upgrade, then /hooks\\" >&2; exit 0",
             "timeout": 10
           }
         ]
@@ -31774,7 +31812,7 @@ e2f7d4779e26518bea16290522367d452af0fd088d68c9dec18eaa7c0b94e279  guard-merge.sh
         "hooks": [
           {
             "type": "command",
-            "command": "r=\$PWD; while [ -n \\"\$r\\" ] && [ ! -d \\"\$r/.specnaut/hooks\\" ]; do r=\${r%/*}; done; [ \\"\$( (sha256sum 2>/dev/null || shasum -a 256) < \\"\$r/.specnaut/hooks/SHA256SUMS\\" 2>/dev/null | cut -c1-64)\\" = \\"995c4a72ba93bef35bdef548c5eda9dbe59f89878c2251995d523e269d6d3737\\" ] && (cd \\"\$r/.specnaut/hooks\\" && (sha256sum -c --status SHA256SUMS 2>/dev/null || shasum -a 256 -c --status SHA256SUMS)) && exec bash \\"\$r/.specnaut/hooks/approve-on-prompt.sh\\" codex; echo \\"specnaut: .specnaut/hooks changed since it was trusted — run specnaut upgrade, then /hooks\\" >&2; exit 0",
+            "command": "r=\$PWD; while [ -n \\"\$r\\" ] && [ ! -d \\"\$r/.specnaut/hooks\\" ]; do r=\${r%/*}; done; [ \\"\$( (sha256sum 2>/dev/null || shasum -a 256) < \\"\$r/.specnaut/hooks/SHA256SUMS\\" 2>/dev/null | cut -c1-64)\\" = \\"8fe9afa74bea1d4acbb41d4ec5af1875b4b68a6c1afc6dec16aba147c530c97f\\" ] && (cd \\"\$r/.specnaut/hooks\\" && (sha256sum -c --status SHA256SUMS 2>/dev/null || shasum -a 256 -c --status SHA256SUMS)) && exec bash \\"\$r/.specnaut/hooks/approve-on-prompt.sh\\" codex; echo \\"specnaut: .specnaut/hooks changed since it was trusted — run specnaut upgrade, then /hooks\\" >&2; exit 0",
             "timeout": 10
           }
         ]
@@ -31785,7 +31823,7 @@ e2f7d4779e26518bea16290522367d452af0fd088d68c9dec18eaa7c0b94e279  guard-merge.sh
         "hooks": [
           {
             "type": "command",
-            "command": "r=\$PWD; while [ -n \\"\$r\\" ] && [ ! -d \\"\$r/.specnaut/hooks\\" ]; do r=\${r%/*}; done; [ \\"\$( (sha256sum 2>/dev/null || shasum -a 256) < \\"\$r/.specnaut/hooks/SHA256SUMS\\" 2>/dev/null | cut -c1-64)\\" = \\"995c4a72ba93bef35bdef548c5eda9dbe59f89878c2251995d523e269d6d3737\\" ] && (cd \\"\$r/.specnaut/hooks\\" && (sha256sum -c --status SHA256SUMS 2>/dev/null || shasum -a 256 -c --status SHA256SUMS)) && exec bash \\"\$r/.specnaut/hooks/log-subagent.sh\\" start; echo \\"specnaut: .specnaut/hooks changed since it was trusted — run specnaut upgrade, then /hooks\\" >&2; exit 0",
+            "command": "r=\$PWD; while [ -n \\"\$r\\" ] && [ ! -d \\"\$r/.specnaut/hooks\\" ]; do r=\${r%/*}; done; [ \\"\$( (sha256sum 2>/dev/null || shasum -a 256) < \\"\$r/.specnaut/hooks/SHA256SUMS\\" 2>/dev/null | cut -c1-64)\\" = \\"8fe9afa74bea1d4acbb41d4ec5af1875b4b68a6c1afc6dec16aba147c530c97f\\" ] && (cd \\"\$r/.specnaut/hooks\\" && (sha256sum -c --status SHA256SUMS 2>/dev/null || shasum -a 256 -c --status SHA256SUMS)) && exec bash \\"\$r/.specnaut/hooks/log-subagent.sh\\" start; echo \\"specnaut: .specnaut/hooks changed since it was trusted — run specnaut upgrade, then /hooks\\" >&2; exit 0",
             "timeout": 10
           }
         ]
@@ -31796,7 +31834,7 @@ e2f7d4779e26518bea16290522367d452af0fd088d68c9dec18eaa7c0b94e279  guard-merge.sh
         "hooks": [
           {
             "type": "command",
-            "command": "r=\$PWD; while [ -n \\"\$r\\" ] && [ ! -d \\"\$r/.specnaut/hooks\\" ]; do r=\${r%/*}; done; [ \\"\$( (sha256sum 2>/dev/null || shasum -a 256) < \\"\$r/.specnaut/hooks/SHA256SUMS\\" 2>/dev/null | cut -c1-64)\\" = \\"995c4a72ba93bef35bdef548c5eda9dbe59f89878c2251995d523e269d6d3737\\" ] && (cd \\"\$r/.specnaut/hooks\\" && (sha256sum -c --status SHA256SUMS 2>/dev/null || shasum -a 256 -c --status SHA256SUMS)) && exec bash \\"\$r/.specnaut/hooks/log-subagent.sh\\" stop; echo \\"specnaut: .specnaut/hooks changed since it was trusted — run specnaut upgrade, then /hooks\\" >&2; exit 0",
+            "command": "r=\$PWD; while [ -n \\"\$r\\" ] && [ ! -d \\"\$r/.specnaut/hooks\\" ]; do r=\${r%/*}; done; [ \\"\$( (sha256sum 2>/dev/null || shasum -a 256) < \\"\$r/.specnaut/hooks/SHA256SUMS\\" 2>/dev/null | cut -c1-64)\\" = \\"8fe9afa74bea1d4acbb41d4ec5af1875b4b68a6c1afc6dec16aba147c530c97f\\" ] && (cd \\"\$r/.specnaut/hooks\\" && (sha256sum -c --status SHA256SUMS 2>/dev/null || shasum -a 256 -c --status SHA256SUMS)) && exec bash \\"\$r/.specnaut/hooks/log-subagent.sh\\" stop; echo \\"specnaut: .specnaut/hooks changed since it was trusted — run specnaut upgrade, then /hooks\\" >&2; exit 0",
             "timeout": 10
           }
         ]
