@@ -12,11 +12,12 @@
 cmd_git() {
   shift
   GIT_SUB="" GIT_ARGS=()
+  local inline_alias=0
   while [ $# -gt 0 ]; do
     case $1 in
       -C | --git-dir | --work-tree) CMD_MOVED=1; shift; if [ $# -gt 0 ]; then shift; fi ;;
       --git-dir=* | --work-tree=*) CMD_MOVED=1; shift ;;
-      -c | --config-env) if [[ ${2:-} == [Aa][Ll][Ii][Aa][Ss].* ]]; then CMD_MOVED=1; fi; shift; if [ $# -gt 0 ]; then shift; fi ;;
+      -c | --config-env) if [[ ${2:-} == [Aa][Ll][Ii][Aa][Ss].* ]]; then CMD_MOVED=1 inline_alias=1; fi; shift; if [ $# -gt 0 ]; then shift; fi ;;
       --namespace | --exec-path | --super-prefix) shift; if [ $# -gt 0 ]; then shift; fi ;;
       -*) shift ;;
       *) break ;;
@@ -26,6 +27,10 @@ cmd_git() {
   GIT_SUB=$1
   shift
   GIT_ARGS=("$@")
+  # An alias set on the command line (`git -c alias.p=push p`) is not in any
+  # config file, so `git config --get` cannot follow it, and how it fails
+  # differs by platform: what the command runs is unknowable, so it is gated.
+  if [ "$inline_alias" = 1 ]; then GIT_SUB="!"; return 0; fi
   local level val rc
   local -a a
   for level in 1 2 3 4 5; do
