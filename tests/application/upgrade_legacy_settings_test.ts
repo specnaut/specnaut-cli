@@ -68,7 +68,7 @@ Deno.test("a config already there is the project's: never rewritten, nothing sai
 Deno.test("a dangling link at each config path: nothing is created outside the project", async () => {
   await project(async (dir, outside) => {
     for (const [i, rel] of GATE_CONFIG_PATHS.entries()) {
-      await Deno.symlink(join(outside, `target-${i}.yml`), join(dir, rel));
+      await Deno.symlink(join(outside, `target-${i}.yml`), join(dir, rel), { type: "file" });
     }
     assertEquals(await carryLegacySettings(io(dir), OLD), []);
     assertEquals([...Deno.readDirSync(outside)], []);
@@ -104,7 +104,7 @@ Deno.test("a refused value is said and written nowhere; a default table says not
 Deno.test("a link planted after the check is not written through, even inside the project", async () => {
   await project(async (dir) => {
     // The check saw nothing; by the write, a link pointing inside is there.
-    await Deno.symlink(join(dir, "elsewhere.yml"), join(dir, UI_CONFIG_PATH));
+    await Deno.symlink(join(dir, "elsewhere.yml"), join(dir, UI_CONFIG_PATH), { type: "file" });
     const real = new DenoFsReader();
     const blind = {
       ...io(dir),

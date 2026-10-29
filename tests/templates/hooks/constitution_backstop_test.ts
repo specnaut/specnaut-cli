@@ -180,3 +180,27 @@ Deno.test("the phrases /task constitution prints are the ones that mint each kin
     }
   }
 });
+
+Deno.test({
+  name: "under Git Bash the kept copy is named as a Windows path the agent's tools can open",
+  // A fake `cygpath` stands in for Git Bash's; a real one is only on Windows runners.
+  ignore: Deno.build.os === "windows",
+  async fn() {
+    const sb = await sandbox();
+    try {
+      const bin = join(sb.dir, "bin");
+      await Deno.mkdir(bin);
+      await Deno.writeTextFile(join(bin, "cygpath"), '#!/bin/sh\nprintf "WIN:%s\\n" "$2"\n');
+      await Deno.chmod(join(bin, "cygpath"), 0o755);
+      sb.env.PATH = `${bin}:${sb.env.PATH}`;
+      const repo = await project(sb);
+      await approve(sb, "claude", repo, "please tidy the readme");
+      await Deno.writeTextFile(join(repo, C), "rewritten\n");
+      const reason = blocked(await stop(sb, "claude", repo));
+      assert(reason !== null);
+      assertStringIncludes(reason, "kept at WIN:/");
+    } finally {
+      await sb.cleanup();
+    }
+  },
+});

@@ -64,6 +64,8 @@ baseline_check() {
       ts=$(date -u +%Y%m%dT%H%M%SZ)
       kept="$keepdir/$ts-${BL_FILES[i]##*/}"
       cp "$1/$i" "$kept"
+      # Git Bash on Windows: name the copy as the agent's own tools can open it.
+      if command -v cygpath >/dev/null 2>&1; then kept=$(cygpath -w "$kept"); fi
       changed+=("${BL_FILES[i]} (its version from the start of the turn is kept at $kept)")
     else
       changed+=("${BL_FILES[i]} (it did not exist when the turn began)")
