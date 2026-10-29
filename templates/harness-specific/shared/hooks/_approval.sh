@@ -15,7 +15,8 @@ approval_session_ok() { [[ $1 =~ ^[A-Za-z0-9_-]+$ ]]; }
 
 # approval_path <session_id> — where this project's stamp for that session lives.
 approval_path() {
-  local state=${XDG_STATE_HOME:-} hash
+  local state hash
+  guard_path state "${XDG_STATE_HOME:-}" # a Windows user's C:\… is still theirs
   guard_root
   case $state in /*) ;; *) state="$HOME/.local/state" ;; esac
   if command -v sha256sum >/dev/null 2>&1; then
@@ -39,7 +40,7 @@ approved() {
   if [ "$GUARD_HARNESS" = codex ] && [ -z "$P_TURN" ]; then return 1; fi
   stamp=$(approval_path "$P_SESSION")
   [ -f "$stamp" ] || return 1
-  out=$(jq -j '[.session_id, .kind, .turn_id] | map(if type == "string" then gsub("\u001e"; " ") else "" end)
+  out=$(guard_jq -j '[.session_id, .kind, .turn_id] | map(if type == "string" then gsub("\u001e"; " ") else "" end)
     | join("\u001e") + "\u001e."' "$stamp" 2>/dev/null) || return 1
   IFS=$'\x1e' read -r -a f <<<"$out"
   guard_eq "${f[0]}" "$P_SESSION" || return 1

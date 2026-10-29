@@ -1,6 +1,15 @@
 import { assert, assertEquals, assertMatch } from "@std/assert";
 import { join } from "@std/path";
-import { approve, HARNESSES, makeRepo, payload, runHook, sandbox, stamps } from "./hook_sandbox.ts";
+import {
+  approve,
+  bashPath,
+  HARNESSES,
+  makeRepo,
+  payload,
+  runHook,
+  sandbox,
+  stamps,
+} from "./hook_sandbox.ts";
 
 /**
  * FR-007 — an approval exists only when the user's own top-level prompt
@@ -92,10 +101,10 @@ Deno.test("the stamp lives under XDG_STATE_HOME, keyed by a hash of the toplevel
     await approve(sb, "codex", repo, "merge", { cwd: join(repo, "src") });
     const files = await stamps(sb);
     assertEquals(files.length, 1);
-    assertMatch(
-      files[0],
-      new RegExp(`^${sb.state}/specnaut/approvals/[0-9a-f]{64}/[A-Za-z0-9_-]+$`),
-    );
+    // Compared in `/` form: on Windows both sides are `C:\…` paths.
+    const store = `${bashPath(sb.state)}/specnaut/approvals/`;
+    assert(bashPath(files[0]).startsWith(store), files[0]);
+    assertMatch(bashPath(files[0]).slice(store.length), /^[0-9a-f]{64}\/[A-Za-z0-9_-]+$/);
     assert(!files[0].startsWith(repo));
   } finally {
     await sb.cleanup();

@@ -1,5 +1,4 @@
 import { assertEquals, assertStringIncludes } from "@std/assert";
-import { encodeHex } from "@std/encoding/hex";
 import { join } from "@std/path";
 import {
   approve,
@@ -14,6 +13,7 @@ import {
   runHook,
   type Sandbox,
   sandbox,
+  stampDir,
 } from "./hook_sandbox.ts";
 
 /**
@@ -252,14 +252,8 @@ Deno.test("guard-merge: Claude asks only in default, acceptEdits and plan (FR-01
   }
 });
 
-async function writeStamp(
-  sb: Sandbox,
-  repo: string,
-  session: string,
-  stamp: unknown,
-): Promise<void> {
-  const hash = encodeHex(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(repo)));
-  const dir = join(sb.state, "specnaut", "approvals", hash);
+async function writeStamp(sb: Sandbox, repo: string, session: string, stamp: unknown) {
+  const dir = await stampDir(sb, repo);
   await Deno.mkdir(dir, { recursive: true });
   await Deno.writeTextFile(join(dir, session), JSON.stringify(stamp));
 }
@@ -291,6 +285,10 @@ Deno.test("guard-merge on Codex: only this turn's merge approval lets a landing 
     await approve(sb, "codex", repo, "release it");
     assertEquals(verdict(await push()), "deny", "a stamp of the wrong kind");
 
+    // Control: a well-formed forgery where the guard looks is read, so each one
+    // below fails on its content, never on its location.
+    await writeStamp(sb, repo, session, { session_id: session, turn_id: turn, kind: "merge" });
+    assertEquals(verdict(await push()), "allow", "a stamp writeStamp put where the guard reads");
     await writeStamp(sb, repo, session, { session_id: session, turn_id: "", kind: "merge" });
     assertEquals(verdict(await push({ turn_id: "" })), "deny", "empty turn ids on both sides");
 

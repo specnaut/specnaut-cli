@@ -1,5 +1,5 @@
 import { assert, assertEquals, assertStringIncludes } from "@std/assert";
-import { fromFileUrl } from "@std/path";
+import { basename, fromFileUrl } from "@std/path";
 import { walk } from "@std/fs";
 import { CORE_BUNDLE } from "../../src/templates_bundle.ts";
 import type { CoreEntry } from "../../src/domain/core_bundle.ts";
@@ -177,7 +177,7 @@ Deno.test("auto-chain.md asks merge-mode.sh, and no template parses `merge:` its
   const templates = new URL("../../templates/", import.meta.url);
   const parsers: string[] = [];
   for await (const e of walk(templates, { includeDirs: false })) {
-    if (e.path.endsWith("/merge-mode.sh")) continue;
+    if (basename(e.path) === "merge-mode.sh") continue; // `\` on Windows, never `/`
     if ((await Deno.readTextFile(e.path)).includes("^merge:")) parsers.push(e.path);
   }
   assertEquals(parsers, [], "a second `^merge:` parser exists");
@@ -195,6 +195,9 @@ Deno.test("merge-mode.sh resolves every file shape the chain reads (D3)", async 
     ["merge: manual\n", "manual"],
     ["merge:manual  # a comment\n", "manual"],
     ["merge: manul\n", "manual", "unrecognised: manul"],
+    // Saved on Windows, or checked out with core.autocrlf: the \r is no part of the value.
+    ["merge: manual\r\n", "manual"],
+    ["merge: auto\r\n", "auto"],
   ];
   for (const [file, want, note] of cases) {
     const dir = await Deno.makeTempDir();

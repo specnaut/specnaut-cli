@@ -164,7 +164,11 @@ Deno.test("specnaut init --ai codex installs the guards and merges them into .co
 
     const guard = await Deno.stat(join(root, ".specnaut/hooks/guard-merge.sh"));
     assertEquals(guard.isFile, true);
-    assertEquals((guard.mode ?? 0) & 0o111, 0o111, "guard-merge.sh is not executable");
+    // Windows has no POSIX mode (Deno reports none): nothing to assert there, and
+    // nothing lost — every registration runs the guard as `bash <script>`.
+    if (Deno.build.os !== "windows") {
+      assertEquals((guard.mode ?? 0) & 0o111, 0o111, "guard-merge.sh is not executable");
+    }
 
     const hooks = JSON.parse(await Deno.readTextFile(join(root, ".codex/hooks.json"))).hooks;
     const commands: string[] = Object.values(hooks).flatMap((groups) =>

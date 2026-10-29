@@ -119,6 +119,12 @@ Deno.test("github: native fields, label fallback, the project's own item only", 
     r = await p.verify("1", "99");
     assertEquals([r.code, r.stdout], [2, ""], r.stderr);
     assertStringIncludes(r.stderr, "#99");
+
+    // A jq that writes CRLF (its Windows build): the verdict is the same text,
+    // not "#3: … L, M\r".
+    await p.crlfJq();
+    r = await p.verify("3", "5");
+    assertEquals(r.stdout.split("\n")[0], "#3: missing size (2 values: L, M)");
   } finally {
     await p.cleanup();
   }
@@ -170,6 +176,13 @@ Deno.test("gitlab: scoped labels, notes without system notes, no close reason", 
     assertEquals(r.code, 1, r.stderr);
     assertStringIncludes(r.stdout, "#3: missing outcome");
     assertStringIncludes(r.stdout, "#4: missing outcome");
+
+    // A jq that writes CRLF (its Windows build) still names the project
+    // `acme%2Fwidget`, never `acme%2Fwidget\r`, which the stub refuses.
+    await p.crlfJq();
+    r = await p.verify("1", "2");
+    assertEquals([r.code, r.stdout], [0, ""], r.stderr);
+    await Deno.remove(join(p.dir, "bin", "jq"));
 
     r = await p.verify("1", "5");
     assertEquals([r.code, r.stdout], [2, ""]);

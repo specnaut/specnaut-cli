@@ -1,6 +1,6 @@
 import { assertEquals } from "@std/assert";
 import { join } from "@std/path";
-import { BASH_SCRIPTS_DIR, HOOKS_DIR } from "./hook_sandbox.ts";
+import { BASH_SCRIPTS_DIR, bashPath, HOOKS_DIR } from "./hook_sandbox.ts";
 import { CODEX_REGISTRATIONS } from "../../../scripts/gen-hooks.ts";
 import { codexHookCommand } from "../../../src/domain/hook_command.ts";
 
@@ -58,8 +58,10 @@ Deno.test("nested project: protect-generated guards the inner lock, not the oute
   const { outer, inner } = await nested();
   try {
     const hook = join(inner, ".specnaut", "hooks", "protect-generated.sh");
-    const r = await run("bash", [hook, "claude"], join(inner, "src"), editLock(inner));
+    const r = await run("bash", [bashPath(hook), "claude"], join(inner, "src"), editLock(inner));
     assertEquals(r.code, 2, r.stderr);
+    // Refused as the lock: a guard that could not even start exits 2 as well.
+    assertEquals(r.stderr.includes("is .specnaut/installed.lock"), true, r.stderr);
   } finally {
     await Deno.remove(outer, { recursive: true });
   }

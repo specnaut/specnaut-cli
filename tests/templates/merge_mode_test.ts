@@ -70,6 +70,12 @@ Deno.test("merge-mode --strict: every copy must agree on auto, or it is manual",
     const sb5 = await makeRepo(sb, { mode: null });
     r = await runScript(sb, "merge-mode.sh", sb5, "--strict");
     assertEquals([r.code, r.stdout.trim()], [0, "auto"]);
+
+    // CRLF in every copy (a Windows editor, core.autocrlf): still read as auto.
+    const sb6 = await makeRepo(sb, { mode: "auto\r", head: "feat" });
+    await Deno.writeTextFile(join(sb6, ".specnaut", "workflow.yml"), "merge: auto\r\n");
+    r = await runScript(sb, "merge-mode.sh", sb6, "--strict");
+    assertEquals([r.code, r.stdout.trim()], [0, "auto"], r.stderr);
   } finally {
     await sb.cleanup();
   }

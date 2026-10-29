@@ -1,4 +1,5 @@
-import { fromFileUrl, join } from "@std/path";
+import { encodeHex } from "@std/encoding/hex";
+import { fromFileUrl, isAbsolute, join } from "@std/path";
 
 /**
  * Shared harness for the hook tests (spec 036). Every guard is a bash script
@@ -19,6 +20,17 @@ export const BASH_SCRIPTS_DIR = fromFileUrl(
   new URL("../../../templates/core/specnaut/scripts/bash/", import.meta.url),
 );
 const FIXTURES_DIR = fromFileUrl(new URL("../../fixtures/hooks/", import.meta.url));
+const WINDOWS = Deno.build.os === "windows";
+
+/**
+ * A path as Git Bash takes it from us: forward slashes on Windows. A guard
+ * finds `_guard.sh` by the last `/` of its own path, so `D:\a\guard.sh` sends
+ * it looking in `.`; `D:/a/guard.sh` is still a Windows path, and absolute.
+ * Elsewhere unchanged — on POSIX a `\` is a filename character.
+ */
+export function bashPath(p: string): string {
+  return WINDOWS ? p.replaceAll("\\", "/") : p;
+}
 
 export type Harness = "claude" | "codex";
 export const HARNESSES: readonly Harness[] = ["claude", "codex"];
@@ -144,7 +156,7 @@ export function runHook(
   input: Record<string, unknown> | string,
   opts: { cwd?: string; env?: Record<string, string> } = {},
 ): Promise<Run> {
-  return exec("bash", [join(HOOKS_DIR, hook), harness], {
+  return exec("bash", [bashPath(join(HOOKS_DIR, hook)), harness], {
     cwd: opts.cwd ?? sb.dir,
     env: { ...sb.env, ...opts.env },
     stdin: typeof input === "string" ? input : JSON.stringify(input),
@@ -158,8 +170,28 @@ export function runScript(
   cwd: string,
   ...args: string[]
 ): Promise<Run> {
-  const path = script.startsWith("/") ? script : join(BASH_SCRIPTS_DIR, script);
-  return exec("bash", [path, ...args], { cwd, env: sb.env });
+  const path = isAbsolute(script) ? script : join(BASH_SCRIPTS_DIR, script);
+  return exec("bash", [bashPath(path), ...args], { cwd, env: sb.env });
+}
+
+/**
+ * Where the guards keep `repo`'s approval stamps, to forge one there: the
+ * store, then a hash of the toplevel as their bash spells it — `/c/…` on
+ * Windows, never the `C:\…` Deno holds; elsewhere `repo` itself (the sandbox
+ * is already a real path).
+ */
+export async function stampDir(sb: Sandbox, repo: string): Promise<string> {
+  let root = repo;
+  if (WINDOWS) {
+    const r = await exec("bash", ["-c", 'cd -- "$1" && pwd -P', "_", bashPath(repo)], {
+      cwd: sb.dir,
+      env: sb.env,
+    });
+    if (r.code !== 0) throw new Error(`cannot resolve ${repo} in bash: ${r.stderr}`);
+    root = r.stdout.trim();
+  }
+  const hash = encodeHex(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(root)));
+  return join(sb.state, "specnaut", "approvals", hash);
 }
 
 /** Mint an approval the way a user prompt does: through approve-on-prompt.sh. */
@@ -210,49 +242,4 @@ export async function pool<T, R>(
   };
   await Promise.all(Array.from({ length: Math.min(width, items.length) }, worker));
   return out;
-}
-
-const TOOLS = [
-  "bash",
-  "git",
-  "cat",
-  "tr",
-  "grep",
-  "awk",
-  "sed",
-  "mktemp",
-  "mv",
-  "rm",
-  "mkdir",
-  "chmod",
-  "dirname",
-  "head",
-  "shasum",
-  "sha256sum",
-  "env",
-  "perl",
-];
-
-/**
- * A PATH holding every tool the hooks use except `jq` — the "jq is missing"
- * case (FR-015). Stripping PATH outright would test that bash is missing.
- */
-export async function pathWithoutJq(sb: Sandbox): Promise<string> {
-  const bin = join(sb.dir, "bin-nojq");
-  await Deno.mkdir(bin, { recursive: true });
-  for (const tool of TOOLS) {
-    for (const dir of (Deno.env.get("PATH") ?? "").split(":")) {
-      try {
-        await Deno.stat(join(dir, tool));
-      } catch (e) {
-        if (e instanceof Deno.errors.NotFound) continue;
-        throw e;
-      }
-      await Deno.symlink(join(dir, tool), join(bin, tool)).catch((e) => {
-        if (!(e instanceof Deno.errors.AlreadyExists)) throw e;
-      });
-      break;
-    }
-  }
-  return bin;
 }

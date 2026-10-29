@@ -30,12 +30,14 @@ AGENT_ID=""
 EFFORT=""
 if command -v jq >/dev/null 2>&1 && [ -n "$INPUT" ]; then
   HAVE_JQ=1
-  SESSION=$(printf '%s' "$INPUT" | jq -r '.session_id // "unknown"' 2>/dev/null || echo "unknown")
-  AGENT=$(printf '%s' "$INPUT" | jq -r '.agent_type // .agent_name // .subagent_name // .tool_name // "unknown"' 2>/dev/null || echo "unknown")
-  # Optional context (omit-if-absent): `agent_id` disambiguates two concurrent
-  # agents of the same type in `/status-audit`; `effort.level` is cheap context.
-  AGENT_ID=$(printf '%s' "$INPUT" | jq -r '.agent_id // ""' 2>/dev/null || echo "")
-  EFFORT=$(printf '%s' "$INPUT" | jq -r '.effort.level // ""' 2>/dev/null || echo "")
+  # read_field <jq filter> <fallback> — a native Windows jq.exe ends each line in
+  # CRLF; every \r is dropped (a ledger decides nothing, unlike the guards).
+  read_field() { printf '%s' "$INPUT" | jq -r "$1" 2>/dev/null | tr -d '\r' || echo "$2"; }
+  SESSION=$(read_field '.session_id // "unknown"' unknown)
+  AGENT=$(read_field '.agent_type // .agent_name // .subagent_name // .tool_name // "unknown"' unknown)
+  # Optional, omitted when absent: `agent_id` tells two concurrent agents of a type apart.
+  AGENT_ID=$(read_field '.agent_id // ""' "")
+  EFFORT=$(read_field '.effort.level // ""' "")
 else
   SESSION="unknown"
   AGENT="unknown"
@@ -59,9 +61,8 @@ if [ "$HAVE_JQ" = "1" ] && [ "$EVENT" = "stop" ]; then
   # ledger captured zero contract fields. Prefer `.last_assistant_message`,
   # keep the historical keys as version-drift fallbacks, then fall back to the
   # raw payload. The first candidate that yields a non-empty string wins.
-  OUTPUT=$(printf '%s' "$INPUT" | jq -r \
-    '(.last_assistant_message // .output // .result // .response // .tool_response // .message // "") | if type=="string" then . else tojson end' \
-    2>/dev/null || echo "")
+  OUTPUT=$(read_field '(.last_assistant_message // .output // .result // .response // .tool_response // .message // "")
+    | if type=="string" then . else tojson end' "")
   if [ -z "$OUTPUT" ]; then
     OUTPUT="$INPUT"
   fi

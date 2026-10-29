@@ -42,8 +42,9 @@ done
 [ "${#ITEMS[@]}" -gt 0 ] || usage
 
 # The API path segment: a `group/project` path must be URL-encoded; a numeric
-# id passes through unchanged.
-PROJECT_PATH=$(jq -rn --arg p "$PROJECT_ID" '$p | @uri')
+# id passes through unchanged. `-j`, never `-r`: no newline is written, so a
+# native Windows jq.exe has none to turn into CRLF — `acme%2Fwidget\r` is no project.
+PROJECT_PATH=$(jq -jn --arg p "$PROJECT_ID" '$p | @uri')
 
 # One issue → one record on stdout. Fails (non-zero) when it cannot be read.
 record() {

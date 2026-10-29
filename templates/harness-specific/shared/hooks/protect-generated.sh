@@ -51,9 +51,11 @@ if [ ${#paths[@]} = 0 ] || [ -z "${paths[0]}" ]; then
 fi
 guard_root
 
-# norm <path> — absolute against the payload cwd, with //, . and .. collapsed.
+# norm <path> — absolute against the payload cwd, with //, . and .. collapsed;
+# a Windows path (`C:\…`, `src\…`) first in this shell's own form.
 norm() {
-  local p=$1 part out="" IFS=/
+  local p part out="" IFS=/
+  guard_path p "$1"
   case $p in /*) ;; *) p="$GUARD_CWD/$p" ;; esac
   for part in $p; do
     case $part in '' | .) ;; ..) out=${out%/*} ;; *) out="$out/$part" ;; esac

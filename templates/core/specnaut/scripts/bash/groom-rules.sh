@@ -127,6 +127,9 @@ if ! out="$(jq -n -r --arg ready "$READY" "$PROGRAM")"; then
   echo "groom-rules.sh: could not read the records — nothing verified" >&2
   exit 2
 fi
+# A native Windows jq.exe ends every line in CRLF: "#3: … L, M\r" is no line
+# the caller wrote. The verdict is this script's own text, so every \r goes.
+out=${out//$'\r'/}
 
 [ -n "$out" ] || exit 0
 printf '%s\n' "$out"

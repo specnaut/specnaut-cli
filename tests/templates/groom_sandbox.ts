@@ -1,4 +1,4 @@
-import { fromFileUrl, join } from "@std/path";
+import { DELIMITER, fromFileUrl, join } from "@std/path";
 
 /**
  * Shared harness for the groom-completeness tests (US4 / FR-005).
@@ -77,10 +77,27 @@ export async function project(backend: string, files: string[], config?: string)
       await Deno.writeTextFile(join(dir, "bin", name), `#!/usr/bin/env bash\n${body}`);
       await Deno.chmod(join(dir, "bin", name), 0o755);
     },
+    /**
+     * Make `jq` write CRLF, as a native Windows jq.exe does (every `\n` as
+     * `\r\n`). On Windows the real one already does, and wrapping it would
+     * double each `\r`, so it is left as it is.
+     */
+    async crlfJq() {
+      if (Deno.build.os === "windows") return;
+      const real = await run("bash", ["-c", "command -v jq"]);
+      await this.stub(
+        "jq",
+        `set -o pipefail\n"${real.stdout.trim()}" "$@" | perl -pe 's/\\n/\\r\\n/'\n`,
+      );
+    },
     verify(...args: string[]): Promise<Run> {
       return run("bash", [join(scripts, "groom-verify.sh"), ...args], {
         cwd: dir,
-        env: { PATH: `${join(dir, "bin")}:${Deno.env.get("PATH")}`, HOME: dir, FIXTURES: dir },
+        env: {
+          PATH: `${join(dir, "bin")}${DELIMITER}${Deno.env.get("PATH")}`,
+          HOME: dir,
+          FIXTURES: dir,
+        },
       });
     },
     cleanup: () => Deno.remove(dir, { recursive: true }),

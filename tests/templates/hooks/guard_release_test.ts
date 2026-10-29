@@ -5,13 +5,13 @@ import {
   git,
   HOOKS_DIR,
   makeRepo,
-  pathWithoutJq,
   payload,
   pool,
   runHook,
   type Sandbox,
   sandbox,
 } from "./hook_sandbox.ts";
+import { pathWithoutJq } from "./hook_path.ts";
 
 /**
  * US5 / FR-006 — on Codex, every command in release-commands.txt, and any

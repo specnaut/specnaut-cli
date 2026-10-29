@@ -1,16 +1,17 @@
 import { assertEquals, assertStringIncludes } from "@std/assert";
 import { join } from "@std/path";
 import {
+  bashPath,
   type Harness,
   HOOKS_DIR,
   makeRepo,
-  pathWithoutJq,
   payload,
   runHook,
   runScript,
   sandbox,
   stamps,
 } from "./hook_sandbox.ts";
+import { pathWithoutJq } from "./hook_path.ts";
 
 /**
  * FR-015 — no guard can allow by failing. Both harnesses let a tool call
@@ -78,7 +79,10 @@ Deno.test("a shell error the ERR trap does not see (set -u) still exits 2, never
     // `set -u` aborts with status 1 without running the ERR trap, and 1 means
     // "allow" to both harnesses. The EXIT net in _guard.sh turns it into 2.
     const script = join(sb.dir, "probe.sh");
-    await Deno.writeTextFile(script, `. "${join(HOOKS_DIR, "_guard.sh")}"\necho "$NEVER_SET"\n`);
+    await Deno.writeTextFile(
+      script,
+      `. "${bashPath(join(HOOKS_DIR, "_guard.sh"))}"\necho "$NEVER_SET"\n`,
+    );
     const r = await runScript(sb, script, sb.dir);
     assertEquals(r.code, 2, r.stderr);
     assertStringIncludes(r.stderr, "refusing");
