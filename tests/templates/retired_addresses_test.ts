@@ -297,3 +297,15 @@ Deno.test("no exclusion excuses a path that no longer exists", () => {
   );
   for (const x of EXCLUDED) assert(x.reason.trim() !== "", `${x.path} has no reason`);
 });
+
+Deno.test("no successor is itself retired — a user is sent straight to a live address", () => {
+  // Spec 041 retired `/task tasks` while `/specnaut tasks` still pointed at it: a two-step
+  // chain. Read the second column generically, so the next retirement cannot recreate one.
+  const retired = new Set(retiredAddresses().map((r) => r.address));
+  const successors = retiredSection().split("\n")
+    .map((line) => line.match(/^\| `[^`]+`[^|]*\| `([^`]+)`/)?.[1])
+    .filter((s): s is string => s !== undefined);
+  assert(successors.length >= 10, `read only ${successors.length} successors from the table`);
+  const chained = successors.filter((s) => retired.has(s));
+  assertEquals(chained, [], "a retired address points at another retired address");
+});
