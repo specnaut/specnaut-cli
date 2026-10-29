@@ -39,12 +39,11 @@ const ALLOWED = new Map<string, string>([
   // work at it. They are NOT pinned defects — anything added here needs the
   // same kind of justification.
   ["specify|templates/plan-template.md", "states that they do not exist"],
-  ["task|tasks.md", "states that they do not exist"],
   // Moved out of groom with the backlog//specnaut ownership split (#540): the
   // check reads spec artefacts and prescribes pipeline phases, so it lives
-  // with the chain it inspects — under `/task` since cli#683. The exemption
-  // travels with it unchanged.
-  ["task|auto-chain.md", "detects pre-2.0.0 spec dirs, which genuinely have one"],
+  // with the chain it inspects — under `/task` since cli#683, in its own
+  // contract doc since spec 041. The exemption travels with it unchanged.
+  ["task|orphan-specs.md", "detects pre-2.0.0 spec dirs, which genuinely have one"],
   ["developer|", "tolerates a pre-2.0.0 dir without ever requiring it"],
   ["product-owner|", "a spec the user attaches; never generated, never required"],
   ["specify|scripts/audit/collect-audit-scope.sh", "the audit phase's own design records"],

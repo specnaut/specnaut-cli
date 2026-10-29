@@ -33,7 +33,7 @@ async function runSpecnaut(args: string[], cwd: string) {
 
 const INIT = ["init", "--here", "--no-git", "--ai", "claude", "--backlog", "local"];
 const CUSTOMIZED = [
-  ".claude/skills/task/phases/tasks.md",
+  ".claude/skills/task/phases/implement.md",
   ".claude/skills/task/phases/review.md",
 ];
 

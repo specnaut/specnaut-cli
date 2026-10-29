@@ -122,7 +122,7 @@ export function isPluginCoveredPath(
  * test red, which is the only reason a third mirror is tolerable at all.
  *
  * Sub-document names may be hyphenated — the legacy regex was widened in #303
- * after it silently dropped three of them. Contract docs (`plan-audits`,
+ * after it silently dropped three of them. Contract docs (`auto-chain`,
  * `merge-squash`, …) ship under the same `phases/` directory because they are
  * bundled and synced through the same channel, even though they are not
  * routable. This array mirrors the bundled Claude scaffold exactly.
@@ -190,8 +190,6 @@ export const PLUGIN_COVERED_PATHS_CLAUDE: ReadonlyArray<string> = [
   ".claude/skills/task/spec-autogen.md",
   ...[
     "plan",
-    "plan-audits",
-    "tasks",
     "implement",
     "epic-commits",
     "quality-gates",
@@ -202,6 +200,8 @@ export const PLUGIN_COVERED_PATHS_CLAUDE: ReadonlyArray<string> = [
     "merge",
     "merge-squash",
     "auto-chain",
+    "remote-gates",
+    "orphan-specs",
     "audit",
     "constitution",
   ].map((name) => `.claude/skills/task/phases/${name}.md`),

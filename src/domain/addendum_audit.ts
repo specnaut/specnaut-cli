@@ -35,7 +35,7 @@ export const ROUTABLE_PHASES: Readonly<Record<AddendumSkill, ReadonlyArray<strin
   specnaut: ["doc", "list", "upgrade"],
   // `groom` is the one backlog verb that reads an addendum: it is a full pass,
   // where the others are single reads or writes (plan 037 § 10).
-  task: ["groom", "plan", "tasks", "implement", "review", "merge", "audit", "constitution"],
+  task: ["groom", "plan", "implement", "review", "merge", "audit", "constitution"],
   ship: ["tag", "release"],
 };
 
@@ -59,18 +59,38 @@ const tk = (phase: string): PhaseAddress => ({ skill: "task", phase });
  * step belongs in the addendum of the phase it follows.
  */
 export const CONTRACT_DOCS: ReadonlyArray<ContractDoc> = [
-  { skill: "task", doc: "plan-audits", parents: [tk("plan")] },
   { skill: "task", doc: "merge-squash", parents: [tk("merge")] },
   { skill: "task", doc: "epic-commits", parents: [tk("implement")] },
   { skill: "task", doc: "quality-gates", parents: [tk("implement"), tk("merge")] },
   { skill: "task", doc: "epic-fixups", parents: [tk("merge")] },
   { skill: "task", doc: "merge-close", parents: [tk("merge")] },
   { skill: "task", doc: "epic-loop", parents: [tk("implement")] },
-  {
-    skill: "task",
-    doc: "auto-chain",
-    parents: [tk("plan"), tk("tasks"), tk("implement"), tk("review")],
-  },
+  { skill: "task", doc: "auto-chain", parents: [tk("plan"), tk("implement"), tk("review")] },
+  // Loaded by auto-chain in remote mode, at the plan stop and at the review verdict.
+  { skill: "task", doc: "remote-gates", parents: [tk("plan"), tk("review")] },
+  // Loaded by groom's orphan-spec step (spec 041).
+  { skill: "task", doc: "orphan-specs", parents: [tk("groom")] },
+];
+
+/**
+ * A phase that stopped being a verb and whose work moved into another one
+ * (spec 041). Unlike a `SKILL_DOC_RENAMES` row, nothing moves but the
+ * ADDENDUM's address: the retired doc's bytes are not the successor's, so they
+ * are pruned as an orphan rather than carried. Each row is resolved to its end
+ * — never a step through another retired address.
+ */
+export interface PhaseFold {
+  readonly from: { readonly skill: string; readonly phase: string };
+  readonly into: PhaseAddress;
+  readonly reason: string;
+}
+
+const TASKS_FOLDED =
+  "the tasks breakdown is now done inside implement — re-anchor the steps this addendum names";
+
+export const PHASE_FOLDS: ReadonlyArray<PhaseFold> = [
+  { from: { skill: "task", phase: "tasks" }, into: tk("implement"), reason: TASKS_FOLDED },
+  { from: { skill: "specnaut", phase: "tasks" }, into: tk("implement"), reason: TASKS_FOLDED },
 ];
 
 /** Why an addendum file is never read. */
@@ -173,18 +193,26 @@ export interface AddendumRename {
  * Rows whose both ends sit under a skill that reads addenda. The backlog docs
  * leaving `/board` carry none: `/board` read no addendum, so a file under
  * `addenda/board/` was never in force, and moving it would switch it on with
- * nobody having asked.
+ * nobody having asked. The {@link PHASE_FOLDS} follow, with their own reason.
  */
 export function addendumRenames(): ReadonlyArray<AddendumRename> {
-  return SKILL_DOC_RENAMES.flatMap((r) => {
-    const { from, to } = r;
-    if (!isAddendumSkill(from.owner) || !isAddendumSkill(to.owner)) return [];
-    return [{
-      from: { skill: from.owner, phase: stemOf(from.doc) },
-      to: { skill: to.owner, phase: stemOf(to.doc) },
-      reason: r.reason,
-    }];
-  });
+  const folds = PHASE_FOLDS.flatMap((f) =>
+    isAddendumSkill(f.from.skill)
+      ? [{ from: { skill: f.from.skill, phase: f.from.phase }, to: f.into, reason: f.reason }]
+      : []
+  );
+  return [
+    ...SKILL_DOC_RENAMES.flatMap((r) => {
+      const { from, to } = r;
+      if (!isAddendumSkill(from.owner) || !isAddendumSkill(to.owner)) return [];
+      return [{
+        from: { skill: from.owner, phase: stemOf(from.doc) },
+        to: { skill: to.owner, phase: stemOf(to.doc) },
+        reason: r.reason,
+      }];
+    }),
+    ...folds,
+  ];
 }
 
 /** The rename whose old address is `<skill>/<stem>`, as an addressed pair. */
@@ -192,6 +220,8 @@ function renameOf(
   skill: string | null,
   stem: string,
 ): { to: PhaseAddress; reason: string } | null {
+  const fold = PHASE_FOLDS.find((f) => f.from.skill === skill && f.from.phase === stem);
+  if (fold) return { to: fold.into, reason: fold.reason };
   const r = SKILL_DOC_RENAMES.find((x) => x.from.owner === skill && stemOf(x.from.doc) === stem);
   if (!r || !isAddendumSkill(r.to.owner)) return null;
   return { to: { skill: r.to.owner, phase: stemOf(r.to.doc) }, reason: r.reason };

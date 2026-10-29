@@ -8,7 +8,7 @@
 // a phase is done when the next one starts, and the chain is done when the turn
 // that ran `merge` ends.
 
-export const PHASES = ["plan", "tasks", "implement", "review", "merge"] as const;
+export const PHASES = ["plan", "implement", "review", "merge"] as const;
 export type Phase = typeof PHASES[number];
 
 export type ChainState = {
@@ -86,7 +86,7 @@ export function steps(state: ChainState): { phase: Phase; mark: StepMark }[] {
 
 const GLYPH: Record<StepMark, string> = { done: "✓", current: "●", todo: "○" };
 
-/** `plan ✓ tasks ✓ implement ● review ○ merge ○`, or `` when idle. */
+/** `plan ✓ implement ● review ○ merge ○`, or `` when idle. */
 export function chainLine(state: ChainState): string {
   return steps(state).map((s) => `${s.phase} ${GLYPH[s.mark]}`).join(" ");
 }

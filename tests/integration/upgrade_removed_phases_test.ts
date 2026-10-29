@@ -104,13 +104,12 @@ Deno.test("upgrade removes every phase and template #455/#457 deleted, leaving n
       const rel of [
         ".claude/skills/specnaut/SKILL.md",
         ".claude/skills/task/phases/plan.md",
-        ".claude/skills/task/phases/plan-audits.md",
-        ".claude/skills/task/phases/tasks.md",
         ".claude/skills/task/phases/implement.md",
         ".claude/skills/task/phases/review.md",
         ".claude/skills/task/phases/merge.md",
+        ".claude/skills/task/phases/remote-gates.md",
+        ".claude/skills/task/phases/orphan-specs.md",
         ".specnaut/templates/plan-template.md",
-        ".specnaut/templates/tasks-template.md",
       ]
     ) {
       assertEquals(await exists(join(dir, rel)), true, `${rel} must survive the upgrade`);
@@ -121,6 +120,63 @@ Deno.test("upgrade removes every phase and template #455/#457 deleted, leaving n
     for (const rel of planted) {
       assert(!after.includes(rel), `lock still records the removed ${rel}`);
     }
+  } finally {
+    await Deno.remove(dir, { recursive: true });
+  }
+});
+
+/**
+ * Spec 041 folded `tasks` into `implement` and `plan-audits` into `plan`. A
+ * project upgrading from the release before it has both docs and the tasks
+ * template installed, and may hold an addendum for the retired verb and an
+ * extension-hook file the phases no longer read.
+ */
+Deno.test("upgrade prunes the folded phase docs, carries a tasks addendum, names extensions.yml", async () => {
+  const dir = await Deno.makeTempDir({ prefix: "specnaut-upgrade-fold-" });
+  try {
+    const init = await runSpecnaut(
+      ["init", "--here", "--no-git", "--ai", "claude", "--backlog", "local"],
+      dir,
+    );
+    assertEquals(init.code, 0, `init failed: ${init.stderr}`);
+
+    const planted = [
+      ".claude/skills/task/phases/tasks.md",
+      ".claude/skills/task/phases/plan-audits.md",
+      ".specnaut/templates/tasks-template.md",
+    ];
+    const lockPath = join(dir, ".specnaut/installed.lock");
+    let lock = await Deno.readTextFile(lockPath);
+    const body = `# a phase doc the previous release shipped\n`;
+    const hash = await sha256(body);
+    for (const rel of planted) {
+      await Deno.mkdir(join(dir, rel, ".."), { recursive: true });
+      await Deno.writeTextFile(join(dir, rel), body);
+      lock += `  ${rel}:\n    sha256: ${hash}\n    installed_at: "2026-01-01T00:00:00Z"\n` +
+        `    templates_version: 7.2.0\n`;
+    }
+    await Deno.writeTextFile(lockPath, lock);
+    const addendum = "Before step 1, read the team's release calendar.\n";
+    await Deno.mkdir(join(dir, ".specnaut/addenda/task"), { recursive: true });
+    await Deno.writeTextFile(join(dir, ".specnaut/addenda/task/tasks.md"), addendum);
+    await Deno.writeTextFile(join(dir, ".specnaut/extensions.yml"), "hooks: {}\n");
+
+    // No --force: the planted docs are pristine, so a plain upgrade owns them.
+    const up = await runSpecnaut(["upgrade"], dir);
+    assertEquals(up.code, 0, `upgrade failed: ${up.stderr}\n${up.stdout}`);
+
+    for (const rel of planted) {
+      assertEquals(await exists(join(dir, rel)), false, `${rel} survived the upgrade`);
+    }
+    assertEquals(
+      await Deno.readTextFile(join(dir, ".specnaut/addenda/task/implement.md")),
+      addendum,
+      "the tasks addendum was not carried to implement, byte for byte",
+    );
+    assertEquals(await exists(join(dir, ".specnaut/addenda/task/tasks.md")), false);
+    const out = up.stdout + up.stderr;
+    assert(out.includes(".specnaut/extensions.yml is no longer read"), `no notice:\n${out}`);
+    assert(await exists(join(dir, ".specnaut/extensions.yml")), "the user's file was deleted");
   } finally {
     await Deno.remove(dir, { recursive: true });
   }

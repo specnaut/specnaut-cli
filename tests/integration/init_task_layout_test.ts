@@ -78,8 +78,6 @@ Deno.test("specnaut init scaffolds the consolidated router skill + its phase doc
     for (
       const name of [
         "plan",
-        "plan-audits",
-        "tasks",
         "implement",
         "review",
         "merge",

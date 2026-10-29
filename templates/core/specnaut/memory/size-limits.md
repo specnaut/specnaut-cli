@@ -118,23 +118,21 @@ the limits above cover the number.
 
 ## In each phase
 
-**plan** — § 7 of the plan carries the mandatory size row and the **Files
-touched** table. `Lines now` is `wc -l`, measured at plan time. The plan is not
+**plan** — the brief's guardrails name every file the change touches and its
+`wc -l` now; the full plan carries them in § 7's **Files touched** table. `Lines now` is `wc -l`, measured at plan time. The plan is not
 done while a file's lines after exceed its ceiling without shrinking, or a file
 already over its target has lines after > lines now. Complexity tracking cannot
 accept a size violation: the remedy is an extraction inside the plan. Each new
 module gets a one-line responsibility; one that needs "and" is two. The
 architecture audit of the plan re-measures the table with `wc -l`.
 
-**tasks** — re-measure every file the plan touches with `wc -l`; the plan's
-figure may be stale. For each file over its target, the first task that touches
-it is an extraction that moves out at least the lines the feature will add to
-that file, naming the destination module and its one-line responsibility. New
-behaviour lands as a "create module X" task wherever it can; a task that adds
-to a file over its target comes only after that file's extraction, and says the
-size the file must stay within (its size at plan time).
-
-**implement** — read `.specnaut/size-limits.yml` before the first task, and
+**implement** — first re-measure every file the plan touches with `wc -l`; the
+plan's figure may be stale. For each file over its target, the first change to
+it is an extraction task, in its own commit, that moves out at least the lines
+the feature will add, naming the destination module and its one-line
+responsibility. New behaviour lands in a new module wherever it can; an addition
+to a file over its target comes only after that file's extraction, and keeps it
+within its size at plan time. Read `.specnaut/size-limits.yml` before the first change, and
 put its limits (or this file's path, when the project has none) in every
 subagent's dispatch brief: a subagent sees one task and one file, and without
 the limits has no reason to stop a file from growing. Run `wc -l` on each file a

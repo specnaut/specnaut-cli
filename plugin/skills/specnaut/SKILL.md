@@ -54,7 +54,8 @@ someone following an instruction written before the move, which is exactly who a
 | Retired address | New address |
 | :--- | :--- |
 | `/specnaut plan` | `/task plan` |
-| `/specnaut tasks` | `/task tasks` |
+| `/specnaut tasks` | `/task implement` |
+| `/task tasks` | `/task implement` |
 | `/specnaut implement` | `/task implement` |
 | `/specnaut review` | `/task review` |
 | `/specnaut merge` | `/task merge` |
@@ -79,8 +80,8 @@ unknown; their rows are here so a reader looking for them finds the new address.
 | Gone without a successor address | Where its work happens now |
 | :--- | :--- |
 | `brainstorm` | `/task plan`, step 1 — the discovery dialogue when the input is too fuzzy to plan. |
-| `specify` | `/task plan` — the same document, sections 1–4. |
-| `clarify` | `/task plan`, step 8 — questions asked at the stop, before any code exists. |
+| `specify` | `/task plan` — the brief's task, guardrails and done checks. |
+| `clarify` | `/task plan`, step 7 — questions asked at the stop, before any code exists. |
 | `analyze` | Replaced, not moved: the plan-time architecture and security audits run *before* the code. |
 | `checklist` | `/task plan`'s success criteria and decision table. |
 | `list-skills` | `/specnaut list`. |

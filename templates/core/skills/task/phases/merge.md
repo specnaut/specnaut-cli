@@ -10,7 +10,7 @@ $ARGUMENTS
 ## Preconditions
 
 - The feature branch must be checked out.
-- All Specnaut phases must have completed successfully (plan, tasks, implement, review).
+- All Specnaut phases must have completed successfully (plan, implement, review).
 - `$ARGUMENTS` is optional and may contain, in any order:
   - a **base branch** — the first token that is not a flag. Defaults to what
     `bash .specnaut/scripts/bash/base-branch.sh` prints (`origin/HEAD`, else `init.defaultBranch`).

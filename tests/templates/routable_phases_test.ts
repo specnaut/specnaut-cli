@@ -122,9 +122,12 @@ Deno.test("the contract docs are the ones the /task router calls contract docs",
   const content = router("task");
   const at = content.indexOf(marker);
   assert(at !== -1, "the router no longer names its contract docs");
-  const paragraph = content.slice(content.lastIndexOf("\n\n", at), at);
-  const named = [...paragraph.matchAll(/phases\/([a-z0-9-]+)\.md/g)].map((m) => m[1]).sort();
-  assert(named.length > 0, "the contract-doc paragraph names no document");
+  // The router lists them in a table right below the marker (spec 041): its rows, up to the
+  // first blank line after the table, are the contract docs.
+  const after = content.slice(at);
+  const table = after.slice(0, after.indexOf("\n\n", after.indexOf("| :---")));
+  const named = [...table.matchAll(/^\| `phases\/([a-z0-9-]+)\.md`/gm)].map((m) => m[1]).sort();
+  assert(named.length > 0, "the contract-doc table names no document");
   assertEquals([...contractDocsOf("task")].sort(), named);
   // Since cli#683 the contract docs all live under `/task`; none is left
   // declared against a router that no longer carries it.

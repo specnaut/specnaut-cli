@@ -12,7 +12,7 @@ export type CockpitReading = {
 };
 
 export type CockpitChain = {
-  current: "plan" | "tasks" | "implement" | "review" | "merge" | null;
+  current: "plan" | "implement" | "review" | "merge" | null;
   finished: boolean;
 };
 

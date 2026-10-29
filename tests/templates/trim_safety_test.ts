@@ -81,10 +81,9 @@ const MUST_SURVIVE: ReadonlyArray<
     label: "implement.md",
     body: () => entry("phase", "task", "implement.md"),
     sentences: [
-      // An eval-refusal rule on a contributor-writable file, on a path that
-      // terminates in EXECUTE_COMMAND. It is stated twice, and collapsing the
-      // second copy BY REFERENCE is a legitimate trim; deleting the rule is not.
-      "leave condition evaluation to the HookExecutor",
+      // The eval-refusal rule ("leave condition evaluation to the HookExecutor")
+      // guarded the extension-hook path, which spec 041 removed whole; the test
+      // below asserts the path itself is gone, which is stronger than the rule.
       // Integrity control against a TOCTOU between "reviewed" and "what ships".
       "Freeze the tree.",
       // Secret-exclusion patterns for CONSUMER repositories. Collapsing the
@@ -152,6 +151,13 @@ for (const { label, body, sentences } of MUST_SURVIVE) {
     }
   });
 }
+
+Deno.test("implement.md runs no command read from a contributor-writable file (spec 041)", () => {
+  const content = entry("phase", "task", "implement.md");
+  for (const shape of ["EXECUTE_COMMAND", "extensions.yml"]) {
+    assert(!content.includes(shape), `implement.md still carries ${shape}`);
+  }
+});
 
 Deno.test("the trim-safety list is not vacuously empty", () => {
   // A list that quietly emptied would make every test above pass. This is the

@@ -5,7 +5,7 @@ import {
   SKILL_DOC_RENAMES,
   type SkillDocRename,
 } from "../../src/domain/skill_doc_renames.ts";
-import { addendumRenames, auditAddendum } from "../../src/domain/addendum_audit.ts";
+import { addendumRenames, auditAddendum, PHASE_FOLDS } from "../../src/domain/addendum_audit.ts";
 
 /**
  * Spec 037 — the rename table is the single home of every moved doc's old and
@@ -38,6 +38,24 @@ Deno.test("no rename source still ships — the old address is retired", () => {
   }
 });
 
+Deno.test("no fold starts where a rename or another fold ends — folds never chain", () => {
+  // A fold moves only an addendum's address (spec 041); it must not lead to a retired address.
+  const ends = new Set([
+    ...SKILL_DOC_RENAMES.map((r) => `${r.to.owner}/${r.to.doc.replace(/\.md$/, "")}`),
+    ...PHASE_FOLDS.map((f) => `${f.into.skill}/${f.into.phase}`),
+  ]);
+  for (const f of PHASE_FOLDS) {
+    const from = `${f.from.skill}/${f.from.phase}`;
+    assert(!ends.has(from), `${from} is both a fold source and a target: collapse it`);
+    assert(
+      !PHASE_FOLDS.some((g) =>
+        `${g.from.skill}/${g.from.phase}` === `${f.into.skill}/${f.into.phase}`
+      ),
+      `${from} folds into a retired address`,
+    );
+  }
+});
+
 Deno.test("no row's source is another row's target — renames never chain", () => {
   const targets = new Set(SKILL_DOC_RENAMES.map((r) => key(r.to, kindOf(r))));
   for (const r of SKILL_DOC_RENAMES) {
@@ -51,8 +69,6 @@ Deno.test("no row's source is another row's target — renames never chain", () 
 
 const TASK_PHASE_DOCS = [
   "plan",
-  "plan-audits",
-  "tasks",
   "implement",
   "epic-commits",
   "epic-fixups",
@@ -66,13 +82,21 @@ const TASK_PHASE_DOCS = [
   "constitution",
 ];
 
-Deno.test("addendumRenames() yields the 14 phase moves to /task, the /ship moves, nothing from /board", () => {
+Deno.test("addendumRenames() yields the 12 phase moves to /task, the /ship moves, the folds, nothing from /board", () => {
   const moves = addendumRenames().map((m) =>
     `${m.from.skill}/${m.from.phase}→${m.to.skill}/${m.to.phase}`
   );
+  const folds = PHASE_FOLDS.map((f) =>
+    `${f.from.skill}/${f.from.phase}→${f.into.skill}/${f.into.phase}`
+  );
   assertEquals(
-    moves.filter((m) => m.includes("→task/")).sort(),
+    moves.filter((m) => m.includes("→task/") && !folds.includes(m)).sort(),
     TASK_PHASE_DOCS.map((d) => `specnaut/${d}→task/${d}`).sort(),
+  );
+  assertEquals(
+    folds.sort(),
+    ["specnaut/tasks→task/implement", "task/tasks→task/implement"],
+    "the tasks fold carries both addendum addresses, each straight to its end",
   );
   assert(
     moves.includes("specnaut/tag-version→ship/tag"),
@@ -83,7 +107,7 @@ Deno.test("addendumRenames() yields the 14 phase moves to /task, the /ship moves
     !moves.some((m) => m.startsWith("board/")),
     "an addendum under board/ was never read — moving it would switch it on unasked",
   );
-  assertEquals(moves.length, TASK_PHASE_DOCS.length + 2);
+  assertEquals(moves.length, TASK_PHASE_DOCS.length + 2 + folds.length);
 });
 
 Deno.test("an addendum left at a moved phase's old address is named, with the new one", () => {

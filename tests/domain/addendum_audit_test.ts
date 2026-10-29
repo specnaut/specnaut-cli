@@ -86,9 +86,13 @@ Deno.test("a contract doc is listed and points at the phase(s) that load it", ()
     problem: { kind: "contract-doc", parents: [task("merge")] },
     suggestion: null,
   });
-  assertEquals(auditAddendum("task/plan-audits.md")?.problem, {
+  assertEquals(auditAddendum("task/remote-gates.md")?.problem, {
     kind: "contract-doc",
-    parents: [task("plan")],
+    parents: [task("plan"), task("review")],
+  });
+  assertEquals(auditAddendum("task/orphan-specs.md")?.problem, {
+    kind: "contract-doc",
+    parents: [task("groom")],
   });
   assertEquals(auditAddendum("task/quality-gates.md")?.problem, {
     kind: "contract-doc",
@@ -137,4 +141,12 @@ Deno.test("a non-.md file is listed, even when its stem names a phase", () => {
 Deno.test("the phase match is exact — a differently-cased name is not read everywhere", () => {
   // Case-insensitive filesystems would find it; case-sensitive ones would not.
   assertEquals(auditAddendum("task/Plan.md")?.suggestion, task("plan"));
+});
+
+Deno.test("an addendum written for the retired tasks verb is pointed at implement (spec 041)", () => {
+  for (const path of ["task/tasks.md", "specnaut/tasks.md"]) {
+    const finding = auditAddendum(path);
+    assertEquals(finding?.problem.kind, "renamed", path);
+    assertEquals(finding?.suggestion, task("implement"), path);
+  }
 });

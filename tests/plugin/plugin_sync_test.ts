@@ -28,19 +28,19 @@ const SYNC_PAIRS: ReadonlyArray<{ plugin: string; source: string }> = [
   // taken from /specnaut and the audits merged from `code-audit` and the five
   // `*-audit` skills. Its phase and contract docs moved byte-for-byte from
   // `specnaut/phases/` (only addresses changed), so they keep the one channel
-  // they had: every one is a mirror. `plan-audits`, `auto-chain`, `epic-*`,
-  // `merge-*` and `quality-gates` are contract docs, not verbs — synced all
-  // the same, because the router loads them on demand.
+  // they had: every one is a mirror. `auto-chain`, `remote-gates`,
+  // `orphan-specs`, `epic-*`, `merge-*` and `quality-gates` are contract docs,
+  // not verbs — synced all the same, because the router loads them on demand.
   ...[
     "plan",
-    "plan-audits",
-    "tasks",
     "implement",
     "review",
     "merge",
     "audit",
     "constitution",
     "auto-chain",
+    "remote-gates",
+    "orphan-specs",
     "epic-commits",
     "epic-fixups",
     "epic-loop",

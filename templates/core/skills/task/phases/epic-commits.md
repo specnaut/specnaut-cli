@@ -34,43 +34,13 @@ Epic: #540
 - **`T<NN>` is the child's ordinal in the epic's dependency order**, minted over
   the **sub-issues**: `T01`, `T02`, `T03`, … It is dense and stable, so the
   match from a commit to its child is one-to-one and the resume path is a
-  deterministic parse rather than a guess.
-  **The parse is width-agnostic — `T(\d+)`.** Two digits is what this document
-  renders and what you should write; it is a convention, not a constraint, and a
-  commit written with a different width is still legal and still parses. See
-  "Two `T` counters" below for why the width is worth keeping anyway.
+  deterministic parse rather than a guess. **The parse is width-agnostic —
+  `T(\d+)`**: write two digits; another width is still legal and still parses.
 - **`(#<child-issue>)` is the child's own GitHub issue number.** Never the
   epic's. The epic never appears in the subject line.
 - **`Epic: #<epic-issue>` is a trailer.** Machine-readable, greppable
   (`git log --grep '^Epic: #540'`), and out of the subject so the subject stays
   about the child.
-
-### Two `T` counters exist, and they are not the same counter
-
-An epic has **one** `tasks.md`, whose ids run in execution order across every
-child: `T001`, `T002`, … Those ids **never** appear in a commit's scope
-position. The scope position carries the epic ordinal only.
-
-A reader will assume the two are the same counter unless told. One child may
-contain several `tasks.md` entries and still produces exactly one commit.
-
-**What separates them is position, not width.** A `tasks.md` id lives in
-`tasks.md`; an epic ordinal lives in a commit's scope position. Nothing else in
-the format depends on how many digits either one carries, and the parse does
-not: it is `T(\d+)`.
-
-The rendering convention — `tasks.md` writes three digits, the scope position
-writes two — is kept because it makes the two visually distinct on sight, which
-is worth having even though nothing enforces it. It is **not** what makes the
-match correct.
-
-**Why the width is a convention and not a rule.** D6 recorded the format with
-the sample `type(T012): sujet (#547)`; D18, answered later and specifically
-about what the number *is*, gives the series as `T01`, `T02`, …. The two do not
-agree on width. Rather than edit either recorded string, the format takes
-neither as binding: both are legal, and `T(\d+)` accepts both. The cost is
-named rather than hidden — "dense and stable" is a property of how the ordinals
-are **minted**, not something the format can enforce on a hand-written commit.
 
 ## An id is never inherited
 

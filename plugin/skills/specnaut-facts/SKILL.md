@@ -41,7 +41,7 @@ Enhanced fork of [`specify` CLI](https://github.com/github/spec-kit), distribute
 
 ### Skills
 
-- `/task` — one unit of work: backlog (`list`, `next`, `add`, `edit`, `close`, `groom`), pipeline (`plan`, `tasks`, `implement`, `review`, `merge`), `audit` (`--security`, `--archi`, `--perf`, `--a11y`, `--deps`; every applicable axis with no flag), `constitution`.
+- `/task` — one unit of work: backlog (`list`, `next`, `add`, `edit`, `close`, `groom`), pipeline (`plan`, `implement`, `review`, `merge`), `audit` (`--security`, `--archi`, `--perf`, `--a11y`, `--deps`; every applicable axis with no flag), `constitution`.
 - `/specnaut` — the framework: `doc`, `list`, `upgrade`.
 - `/ship` — production: `tag`, `release`.
 

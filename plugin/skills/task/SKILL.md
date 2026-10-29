@@ -1,7 +1,7 @@
 ---
 name: task
 description: Carry one unit of work from the backlog to a merged branch — list, add, edit, close and groom items, then plan, implement, review and merge them, and audit the code. `/task <verb> [args]`; `/task` alone prints the overview.
-argument-hint: "<list|next|add|edit|close|groom|plan|tasks|implement|review|merge|audit|constitution> [args]"
+argument-hint: "<list|next|add|edit|close|groom|plan|implement|review|merge|audit|constitution> [args]"
 when_to_use: |
   Trigger phrases that should route here:
   - backlog: "add to backlog", "what's next?", "move task X", "close task X", "groom the backlog"
@@ -42,25 +42,30 @@ Read `docs/constitution.md` before anything else: it is this project's binding r
 | `brief <id>` | `backlog.md` | Product-owner business brief |
 | `<id>` | `backlog.md` | Show that item |
 | `groom` | `groom.md` | Full grooming pass |
-| `plan [<id>] [brief]` | `phases/plan.md` | The feature's **one** document, its architecture and security audit, then the stop. |
-| `tasks` | `phases/tasks.md` | The dependency-ordered breakdown, derived from the **approved** plan. |
-| `implement` | `phases/implement.md` | Build it. Ends by invoking `review`. |
+| `plan [<id>] [--full] [brief]` | `phases/plan.md` | The feature's brief — or the full plan — its architecture and security audit, then the stop. |
+| `implement` | `phases/implement.md` | Build it, ordering the work itself. Ends by invoking `review`. |
 | `review` | `phases/review.md` | The quality battery on a frozen tree. Its verdict is the merge request. |
 | `merge` | `phases/merge.md` | Pre-merge validation; merge, push, close the item. |
 | `audit [--security\|--archi\|--perf\|--a11y\|--deps]` | `phases/audit.md` | Read-only audit of a scope; every applicable axis with no flag. |
 | `constitution` | `phases/constitution.md` | Amend the project's constitution, on the user's explicit request only. |
 
-`phases/plan-audits.md`, `phases/merge-squash.md`, `phases/epic-commits.md`,
-`phases/quality-gates.md`, `phases/epic-fixups.md`, `phases/merge-close.md`, `phases/epic-loop.md`
-and `phases/auto-chain.md` are **contract docs, not verbs** — `plan` loads the first at its step 6,
-`merge` loads the second at its step 4, `implement` loads the third when the item is an epic,
-`implement` and `merge` share the fourth, `merge` loads the fifth before an epic merge and the sixth
-after any push, `implement` loads the seventh on an epic, and this router loads the eighth when it
-chains. Naming any of them as a verb prints the verb table and stops.
+These are **contract docs, not verbs** — naming one prints the verb table and stops:
 
-Unknown verb → print the verb table and stop. A verb that lived at another address before this
-router existed is listed, with where it went, in the `specnaut` skill's **Retired addresses**
-table.
+| Contract doc | Loaded by |
+| :--- | :--- |
+| `phases/merge-squash.md` | `merge`, at its step 4 |
+| `phases/epic-commits.md` | `implement`, on an epic |
+| `phases/quality-gates.md` | `implement` and `merge` |
+| `phases/epic-fixups.md` | `merge`, before an epic merge |
+| `phases/merge-close.md` | `merge`, after any push |
+| `phases/epic-loop.md` | `implement`, on an epic |
+| `phases/auto-chain.md` | this router, when it chains |
+| `phases/remote-gates.md` | `auto-chain`, in remote mode |
+| `phases/orphan-specs.md` | `groom`, when specs are kept locally |
+
+Unknown verb → look it up first in the `specnaut` skill's **Retired addresses** table: a verb
+retired from this router, or one from before it existed, is answered with where it went. Any other
+unknown verb → print the verb table and stop.
 
 ## Which skill owns what
 
@@ -88,7 +93,7 @@ item `/task add` creates, also generate its spec — read `spec-autogen.md` and 
 
 1. **Read** the verb's reference file from the table, with the `Read` tool.
 2. **Read the project addendum** `.specnaut/addenda/task/<verb>.md` if it exists, for `plan`,
-   `tasks`, `implement`, `review`, `merge`, `audit`, `constitution` and `groom` — the project's own
+   `implement`, `review`, `merge`, `audit`, `constitution` and `groom` — the project's own
    addition to that verb. It adds to the phase at the step it names and never replaces or skips a
    bundled step: where it contradicts one, the bundled step stands and you say so. No file means no
    addendum — say nothing about it. Contract docs take none; the parent verb's addendum names their
@@ -102,7 +107,7 @@ item `/task add` creates, also generate its spec — read `spec-autogen.md` and 
 After the verb completes successfully:
 
 - `CHAIN_MODE == off` → stop. Report the outcome.
-- The verb is not chainable → stop. Chainable verbs: `plan`, `tasks`, `implement`, `review`.
+- The verb is not chainable → stop. Chainable verbs: `plan`, `implement`, `review`.
 - Otherwise → read `phases/auto-chain.md` and follow it.
 
 **Re-entry needs no flag.** A verb whose downstream artefacts already exist runs one-shot; one whose
@@ -111,10 +116,10 @@ downstream artefacts are absent chains. `phases/auto-chain.md` holds the detecti
 ## Overview
 
 ```
-/task add → /task plan <id> → tasks → implement → review → merge
-                 ▲                                  │        ▲
-                 │                                  └────────┘
-                 └── discovery (if fuzzy) → the one document
+/task add → /task plan <id> → implement → review → merge
+                 ▲                         │        ▲
+                 │                         └────────┘
+                 └── discovery (if fuzzy) → the brief (or --full)
                      → architecture + security audit OF THE PLAN
                      → STOP 1
 ```

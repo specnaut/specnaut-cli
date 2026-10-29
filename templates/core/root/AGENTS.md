@@ -42,7 +42,7 @@ _(Naming, testing, commits, branches.)_
 Specnaut builds **long-lived** software — clean, SOLID, secure by default — and a technical decision
 is taken against that intent by whoever is expert in it, not handed back to the user.
 
-`plan → tasks → implement → review → merge → push`. It stops at most once by default:
+`plan → implement → review → merge → push`. It stops at most once by default:
 
 1. **The end of `plan`** — only to ask what only the user can answer: business rules, scope, and
    anything irreversible, destructive, public-breaking or costly. Architecture, security and
@@ -58,8 +58,7 @@ next action, never a command printed for someone to paste:
 
 | Boundary | What happens |
 | :--- | :--- |
-| last question answered → `tasks` | invoked in the same turn |
-| breakdown committed → `implement` | invoked in the same turn |
+| last question answered → `implement` | invoked in the same turn |
 | gates green, tree frozen → `review` | invoked in the same turn |
 | `review` verdict, nothing CRITICAL/HIGH left → `merge` → push | same turn (`auto`) · **STOP** — the merge request (`manual`) |
 | `merge` lands → push | never asked, in either mode |
@@ -136,7 +135,7 @@ workflow, a chained step — read its addendum if the file exists:
 
 | What runs | Its addendum |
 | :--- | :--- |
-| `plan`, `tasks`, `implement`, `review`, `merge`, `audit`, `constitution`, `groom` | `.specnaut/addenda/task/<name>.md` |
+| `plan`, `implement`, `review`, `merge`, `audit`, `constitution`, `groom` | `.specnaut/addenda/task/<name>.md` |
 | `tag`, `release` | `.specnaut/addenda/ship/<name>.md` |
 | `doc`, `list`, `upgrade` | `.specnaut/addenda/specnaut/<name>.md` |
 
@@ -236,7 +235,7 @@ scaffolded for a harness without such features gets none here.
   word, e.g. `developer fix the lint errors in src/cli/`, `@qa-tester
   run a sandbox smoke pass`, or `@product-owner groom the backlog`.
   Skills are dispatchable too: `/task plan "<feature>"` launches
-  a session running the full spec-plan-tasks chain. File edits are
+  a session running the full plan-implement-review chain. File edits are
   isolated under `.claude/worktrees/` (git worktrees), so several
   Specnaut agents can work in parallel without stepping on each
   other. See

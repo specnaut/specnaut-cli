@@ -31,6 +31,10 @@ function phase(name: string): CoreEntry {
   return e;
 }
 
+/** A document's text with every whitespace run folded to one space, so a lock pins the words of a
+ * rule and not where a line happened to wrap. */
+const flat = (text: string) => text.replace(/\s+/g, " ");
+
 function rootAgents(): CoreEntry {
   const e = CORE_BUNDLE.find(
     (x) => x.category === "project-root" && x.suffix === "AGENTS.md",
@@ -79,19 +83,20 @@ Deno.test("AGENTS.md refuses every excuse that has been used to stall the chain"
 });
 
 Deno.test("auto-chain.md carries the same rule for the phase that is already running", () => {
-  const { content } = phase("auto-chain");
+  const content = flat(phase("auto-chain").content);
   assertStringIncludes(content, "Autopilot is the default. There is ONE stop");
   // D4: the mode has one reader, at the review→merge boundary.
-  assertStringIncludes(content, "read **here and nowhere\n   else**");
+  assertStringIncludes(content, "read here and nowhere else");
   // D5: the per-run override comes first.
   assertStringIncludes(content, "`--manual-merge`");
   // D3 (spec 036): the per-run override moves the chain, never the hook; STOP 2 names the word.
   assertStringIncludes(content, "a hook holds the landing whatever the run said");
-  assertStringIncludes(content, "Reply `merge` to\n  land it");
-  // D2: remote mode keeps its merge gate whatever the mode.
+  assertStringIncludes(content, "Reply `merge` to land it");
+  // D2: remote mode keeps its merge gate whatever the mode — and the check stays here (spec 041).
   assertStringIncludes(content, "remote mode keeps its gate under either mode");
+  assertStringIncludes(content, "`specnaut gate status` exits 0), read `phases/remote-gates.md`");
   // D1: autopilot is not a licence to press on through a blocker.
-  for (const halt of ["a FAIL verdict", "a missing review\nseat", "a refused push"]) {
+  for (const halt of ["a FAIL verdict", "a missing review seat", "a refused push"]) {
     assertStringIncludes(content, halt);
   }
   for (const [label, fragment] of EXCUSES) {
@@ -102,11 +107,20 @@ Deno.test("auto-chain.md carries the same rule for the phase that is already run
   assertStringIncludes(content, "would hurt a user");
 });
 
+Deno.test("remote-gates.md raises both approvals and never proceeds without one", () => {
+  const content = flat(phase("remote-gates").content);
+  assertStringIncludes(content, "Remote mode keeps its gate under either mode");
+  assertStringIncludes(content, "--type plan_approval");
+  assertStringIncludes(content, "--type merge_approval");
+  assertStringIncludes(content, "Never proceed to `implement` without an explicit approval.");
+  assertStringIncludes(content, "Never merge without an explicit approval.");
+});
+
 Deno.test("every chaining phase ends by invoking the next one itself", () => {
   // The gap this closes: the instruction used to live only in auto-chain.md,
   // which a running phase may never load.
-  for (const [name, next] of [["tasks", "implement"], ["implement", "review"]] as const) {
-    const { content } = phase(name);
+  for (const [name, next] of [["plan", "implement"], ["implement", "review"]] as const) {
+    const content = flat(phase(name).content);
     assertStringIncludes(
       content,
       `INVOKE \`${next}\``,
@@ -151,8 +165,8 @@ Deno.test("review, merge and merge-close follow the merge mode instead of always
 });
 
 Deno.test("the plan stop announces that nothing after it asks again", () => {
-  const { content } = phase("plan");
-  assertStringIncludes(content, "the chain's last\nchance to ask");
+  const content = flat(phase("plan").content);
+  assertStringIncludes(content, "the chain's last chance to ask");
   assertStringIncludes(content, "ask here what autopilot would otherwise settle alone");
   // D10: what autopilot would decide alone is named, and discovery needs an acceptance check.
   assertStringIncludes(content, "always: the base branch, anything irreversible or");
@@ -232,26 +246,25 @@ Deno.test("workflow.yml ships with merge: auto as the scaffolded default", () =>
  * the fix loop.
  */
 Deno.test("technical forks are decided by the expert seats, never asked (#630)", () => {
-  const audits = phase("plan-audits").content;
-  assertStringIncludes(audits, "## ⚖ Who decides — the seats, not the user");
-  assertStringIncludes(audits, "**never asked**");
+  // `plan-audits.md` was folded into `plan.md` (spec 041): the rule moved, the lock followed it.
+  const plan = flat(phase("plan").content);
+  assertStringIncludes(plan, "**Who decides — the seats, not the user.**");
+  assertStringIncludes(plan, "**never asked**");
   // The tie-break between seats is stated, in order.
   assertStringIncludes(
-    audits,
+    plan,
     "security, then maintainability, then performance, then speed of delivery",
   );
   // A performance seat joins when the plan has a hot path.
-  assertStringIncludes(audits, "dispatch `performance-expert` on `plan.md`");
-
-  const plan = phase("plan").content;
+  assertStringIncludes(plan, "`performance-expert` too when the change has a hot path");
   assertStringIncludes(plan, "**A technical fork is never a question**");
-  assertStringIncludes(plan, "**Nothing open in 3 →\nno stop**");
+  assertStringIncludes(plan, "**Nothing open → no stop**");
   assertStringIncludes(plan, "a new external service, vendor or cost");
   // The intent the seats decide against.
   assertStringIncludes(plan, "clean, SOLID, secure by default");
 
-  const chain = phase("auto-chain").content;
-  assertStringIncludes(chain, "**only if something only the user can answer is\n   open**");
+  const chain = flat(phase("auto-chain").content);
+  assertStringIncludes(chain, "**only if something only the user can answer is open**");
 
   const review = phase("review").content;
   assertStringIncludes(review, "Choosing *between* technical fixes is never the user's call");
@@ -259,4 +272,51 @@ Deno.test("technical forks are decided by the expert seats, never asked (#630)",
   const { content: agents } = rootAgents();
   assertStringIncludes(agents, "never put to a vote. Nothing open → no stop.");
   assertStringIncludes(agents, "**long-lived** software — clean, SOLID, secure by default");
+});
+
+Deno.test("the plan-time audits run on every plan, and each seat states its own questions", () => {
+  // Security audit of spec 041: the slim brief must not make the audit optional, and the
+  // questions that left `plan-audits.md` must live where the seat reads them.
+  const plan = flat(phase("plan").content);
+  assertStringIncludes(plan, "**They run on every plan, brief or full**");
+  assertStringIncludes(plan, "`architect-expert` and `security-expert` on `plan.md`");
+  const seat = (name: string) => {
+    const e = CORE_BUNDLE.find((x) => x.category === "agent" && x.name === name);
+    if (!e) throw new Error(`missing agent ${name}`);
+    const text = flat(e.content);
+    const at = text.indexOf("## Mode 3");
+    assert(at >= 0, `${name} has no Mode 3`);
+    return text.slice(at);
+  };
+  const questions: Record<string, string[]> = {
+    "architect-expert": [
+      "Is the decision table complete?",
+      "Is each home the right home?",
+      "What is the blast radius?",
+      "Do the touched files hold their size?",
+      "What would a reviewer find in this design three cycles from now?",
+    ],
+    "security-expert": [
+      "Which new surface accepts input, and where does it stop?",
+      "Who is allowed, and where is that decided?",
+      "What identifiers and what bytes become reachable?",
+      "What does this let an authenticated stranger do to somebody else's account?",
+    ],
+    "performance-expert": [
+      "What grows with the data?",
+      "What runs per request, or per item?",
+      "What does the plan do at 100× today's set?",
+    ],
+  };
+  for (const [name, qs] of Object.entries(questions)) {
+    const mode3 = seat(name);
+    assertStringIncludes(mode3, "Spawned by `phases/plan.md`", `${name} names its dispatcher`);
+    let from = 0;
+    for (const q of qs) {
+      const at = mode3.indexOf(q, from);
+      assert(at >= 0, `${name} Mode 3 lost, or reordered, "${q}"`);
+      from = at;
+    }
+  }
+  assertStringIncludes(seat("security-expert"), "crosses the threshold: <which>");
 });

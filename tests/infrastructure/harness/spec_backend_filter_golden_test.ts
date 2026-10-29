@@ -18,7 +18,8 @@ import { skillDocName } from "../../../src/domain/core_bundle.ts";
 // docs to `/task` and re-captured implement's and review's goldens for the
 // address text alone (`/specnaut merge` → `/task merge`) — nothing else moved.
 // cli#685 re-captured all four for the constitution reference each now opens
-// with, and plan's step-3 wording — nothing else moved.
+// with, and plan's step-3 wording — nothing else moved. Spec 041 rewrote plan and
+// implement (the brief by default; tasks folded in) and retired tasks' golden with its phase.
 
 function abs(rel: string): string {
   return fromFileUrl(new URL(`../../${rel}`, import.meta.url));
@@ -33,7 +34,7 @@ function phaseEntry(name: string): CoreEntry {
   return e;
 }
 
-for (const name of ["plan", "implement", "review", "tasks"]) {
+for (const name of ["plan", "implement", "review"]) {
   Deno.test(`${name}.md rendered for spec-backend=local is byte-identical to the pre-feature bundle`, async () => {
     // EOL-agnostic: a released binary always embeds LF (the bundle is compiled
     // from committed LF source), but Windows CI regenerates the bundle from a
@@ -60,7 +61,7 @@ for (const name of ["plan", "implement", "review", "tasks"]) {
 }
 
 Deno.test("cloud render diverges from local for every marked phase doc (markers are consumed)", () => {
-  for (const name of ["plan", "implement", "review", "tasks"]) {
+  for (const name of ["plan", "implement", "review"]) {
     const entry = phaseEntry(name);
     assertNotEquals(
       renderSpecBackend(entry.content, "cloud"),

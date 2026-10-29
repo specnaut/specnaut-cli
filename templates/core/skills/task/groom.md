@@ -194,7 +194,7 @@ mutate PRs.
 **Only when the project keeps its specs locally**, i.e. `.specnaut/specs/`
 exists. Skip the step and say so otherwise; do not report an empty section.
 
-**Read `phases/auto-chain.md` and follow its "Orphan spec detection" section.**
+**Read `phases/orphan-specs.md` and follow it.**
 An instruction to load that file and execute it, not a pointer for the reader.
 The walk stays there — naming it here twice makes one copy the half that rots.
 Ownership says where the logic lives, not who may call it; saying only the

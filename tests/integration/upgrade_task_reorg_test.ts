@@ -115,7 +115,7 @@ async function projectOn71(
     entries.set(oldDest, { ...tracked, sha256: await sha256(vanilla) });
     moves.push({ row, oldDest, newDest });
   }
-  assert(moves.length >= 16, `only ${moves.length} moves resolved — the fixture is not a 7.1 tree`);
+  assert(moves.length >= 14, `only ${moves.length} moves resolved — the fixture is not a 7.1 tree`);
 
   if (opts.customiseRouter) {
     const router = dest(routerEndpointEntry("specnaut"));
@@ -189,7 +189,7 @@ for (const ai of HARNESSES) {
         `your edits to ${plan.oldDest} moved to ${plan.newDest} (${plan.row.reason})`,
       );
       assertStringIncludes(up.stdout, `your edits to ${find(moves, "groom.md").oldDest} moved`);
-      assert(!up.stdout.includes(`your edits to ${find(moves, "tasks.md").oldDest}`));
+      assert(!up.stdout.includes(`your edits to ${find(moves, "implement.md").oldDest}`));
     });
   });
 
@@ -288,7 +288,7 @@ for (const ai of HARNESSES) {
           relative(dirname(join(dir, link)), join(dir, ".env.local")),
           join(dir, link),
         );
-        const doc = find(moves, "tasks.md");
+        const doc = find(moves, "implement.md");
         await Deno.remove(join(dir, doc.oldDest));
         await Deno.symlink(
           relative(dirname(join(dir, doc.oldDest)), join(dir, ".env.local")),
@@ -317,7 +317,7 @@ for (const ai of HARNESSES) {
       // file. A BOM decodes losslessly and must still survive the move.
       const bytes = new Uint8Array([...new TextEncoder().encode("step\n"), 0xff, 0xfe, 0x0a]);
       const bom = new Uint8Array([0xef, 0xbb, 0xbf, ...new TextEncoder().encode(ADDENDUM)]);
-      const doc = find(moves, "tasks.md");
+      const doc = find(moves, "implement.md");
       await Deno.mkdir(dirname(join(dir, addendum("specnaut", "plan"))), { recursive: true });
       for (const rel of [addendum("specnaut", "plan"), doc.oldDest]) {
         await Deno.writeFile(join(dir, rel), bytes);

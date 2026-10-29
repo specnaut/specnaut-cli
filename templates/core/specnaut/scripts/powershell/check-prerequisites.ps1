@@ -9,7 +9,7 @@
 #
 # OPTIONS:
 #   -Json               Output in JSON format
-#   -RequireTasks       Require tasks.md to exist (for implementation phase)
+#   -RequireTasks       Accepted and ignored: tasks.md is no longer produced (spec 041)
 #   -IncludeTasks       Include tasks.md in AVAILABLE_DOCS list
 #   -PathsOnly          Only output path variables (no validation)
 #   -Help, -h           Show help message
@@ -34,7 +34,7 @@ Consolidated prerequisite checking for Spec-Driven Development workflow.
 
 OPTIONS:
   -Json               Output in JSON format
-  -RequireTasks       Require tasks.md to exist (for implementation phase)
+  -RequireTasks       Accepted and ignored: tasks.md is no longer produced
   -IncludeTasks       Include tasks.md in AVAILABLE_DOCS list
   -PathsOnly          Only output path variables (no prerequisite validation)
   -Help, -h           Show this help message
@@ -43,8 +43,8 @@ EXAMPLES:
   # Check task prerequisites (plan.md required)
   .\check-prerequisites.ps1 -Json
   
-  # Check implementation prerequisites (plan.md + tasks.md required)
-  .\check-prerequisites.ps1 -Json -RequireTasks -IncludeTasks
+  # Check implementation prerequisites (plan.md required)
+  .\check-prerequisites.ps1 -Json
   
   # Get feature paths only (no validation)
   .\check-prerequisites.ps1 -PathsOnly
@@ -98,11 +98,10 @@ if (-not (Test-Path $paths.IMPL_PLAN -PathType Leaf)) {
     exit 1
 }
 
-# Check for tasks.md if required
-if ($RequireTasks -and -not (Test-Path $paths.TASKS -PathType Leaf)) {
-    Write-Output "ERROR: tasks.md not found in $($paths.FEATURE_DIR)"
-    Write-Output "Run /task tasks first to create the task list."
-    exit 1
+# The breakdown is done inside implement now, so tasks.md is never required.
+# A customised implement doc may still pass the flag: say so, and carry on.
+if ($RequireTasks) {
+    [Console]::Error.WriteLine("note: -RequireTasks is ignored; the plan is the one required document")
 }
 
 # Build list of available documents

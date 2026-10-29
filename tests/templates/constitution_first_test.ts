@@ -101,7 +101,7 @@ Deno.test("no agent and no task-routing router may opt out", () => {
 
 Deno.test("the document behind every /task routable verb opens with the reference", () => {
   const verbs = ROUTABLE_PHASES.task;
-  assert(verbs.length >= 8, "read no routable /task verbs");
+  assert(verbs.length > 0, "read no routable /task verbs");
   const wrong = verbs.filter((v) => firstStep(taskDoc(v).content) !== CONSTITUTION_REFERENCE);
   assertEquals(wrong, [], "/task verbs whose document does not open with the reference");
 });

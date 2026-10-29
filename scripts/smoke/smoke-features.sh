@@ -75,10 +75,10 @@ check "router .claude/skills/specnaut/SKILL.md present" \
 # from `grep -qF`, so each phase needs its filename rendered in the source.
 check "phase doc plan.md scaffolded" \
   '[ -f .claude/skills/task/phases/plan.md ]'
-check "phase doc plan-audits.md scaffolded (#456)" \
-  '[ -f .claude/skills/task/phases/plan-audits.md ]'
-check "plan-audits.md dispatches BOTH auditors (#456)" \
-  'grep -q "architect-expert" .claude/skills/task/phases/plan-audits.md && grep -q "security-expert" .claude/skills/task/phases/plan-audits.md'
+check "plan-audits.md is folded into plan.md, not scaffolded (spec 041)" \
+  '[ ! -e .claude/skills/task/phases/plan-audits.md ]'
+check "plan.md dispatches BOTH auditors on every plan (#456, spec 041)" \
+  'grep -q "architect-expert" .claude/skills/task/phases/plan.md && grep -q "security-expert" .claude/skills/task/phases/plan.md'
 # Companion docs, named literally for the audit's basename scan — the
 # interpolated loop above hides them from `grep -qF`. Both exist because
 # their host phase ran out of room under a since-removed harness's
@@ -115,8 +115,6 @@ check "implement.md runs an epic as a loop (#554)" \
 check "plan.md makes an epic ONE plan with ONE stop (#554 AC9/AC10)" \
   'flat="$(tr "\n" " " < .claude/skills/task/phases/plan.md)";
    grep -qF "An epic is one plan" <<<"$flat" && grep -qF "not one per" <<<"$flat"'
-check "tasks.md makes an epic ONE tasks.md (#554 AC8)" \
-  'grep -qF "An epic is one" .claude/skills/task/phases/tasks.md'
 check "review.md stops only on the LAST child (#554 AC12/AC13)" \
   'flat="$(tr "\n" " " < .claude/skills/task/phases/review.md)";
    grep -qF "does not stop the run" <<<"$flat" &&
@@ -135,8 +133,6 @@ check "a child's card goes In progress then In review, never Done here (#554 AC1
    grep -qF "it is not Done" <<<"$flat"'
 check "the loop never returns to the user between children (#554 AC3)" \
   'grep -qF "does not return to the user between children" .claude/skills/task/phases/epic-loop.md'
-check "the two T counters are named as different counters (#554 AC18)" \
-  'grep -qF "not the same counter" .claude/skills/task/phases/epic-loop.md'
 
 # #553 — one branch per epic. Both twins, and the two degradation outcomes
 # that AC 14 requires to be distinguishable: a missing install is fixable
@@ -245,18 +241,18 @@ check "the removal takes feature.json with it, not just the directory (#587)" \
      .claude/skills/task/phases/merge-close.md'
 check "a skip is reported, never silent (#587 AC6)" \
   'grep -qF "Report the removal, or the reason there wasn" .claude/skills/task/phases/merge-close.md'
-# auto-chain.md walks the same directories and must NOT delete. Its read-only
+# orphan-specs.md walks the same directories and must NOT delete. Its read-only
 # line survives verbatim; what it gained is why it does not contradict the
 # phase that does delete — without that, the next reader reads one of the two
 # as a bug.
 check "orphan detection stays read-only, and says why that is not a contradiction (#587 AC8)" \
-  'flat="$(tr "\n" " " < .claude/skills/task/phases/auto-chain.md)";
+  'flat="$(tr "\n" " " < .claude/skills/task/phases/orphan-specs.md)";
    grep -qF "never delete or modify spec files" <<<"$flat" &&
    grep -qF "merge-close.md\` step 8" <<<"$flat"'
-check "the false retention claim is gone from auto-chain.md (#587 AC7)" \
-  '! grep -qF "historical records" .claude/skills/task/phases/auto-chain.md'
+check "the false retention claim is gone from orphan-specs.md (#587 AC7)" \
+  '! grep -qF "historical records" .claude/skills/task/phases/orphan-specs.md'
 check "the legacy spec.md rule survives the reword (#587 AC9)" \
-  'grep -qF "Has \`spec.md\` but no \`plan.md\`" .claude/skills/task/phases/auto-chain.md'
+  'grep -qF "Has \`spec.md\` but no \`plan.md\`" .claude/skills/task/phases/orphan-specs.md'
 
 # #559 — a fixup folds into ITS OWN child, and the fold is verified here
 # rather than borrowed from squash-by-scope, which governs the other path and
@@ -347,8 +343,8 @@ check "phase doc upgrade.md scaffolded, and routed by the router" \
   '[ -f .claude/skills/specnaut/phases/upgrade.md ] && grep -q "phases/upgrade.md" .claude/skills/specnaut/SKILL.md'
 check "removed phases do NOT scaffold (#455)" \
   '! ls .claude/skills/specnaut/phases/ .claude/skills/task/phases/ | grep -qE "^(brainstorm|specify|clarify|analyze|checklist|list-skills|lite-heuristic)\.md$"'
-check "phase doc tasks.md scaffolded" \
-  '[ -f .claude/skills/task/phases/tasks.md ]'
+check "tasks.md is folded into implement, not scaffolded (spec 041)" \
+  '[ ! -e .claude/skills/task/phases/tasks.md ]'
 check "phase doc audit.md scaffolded, and routed by the /task router (spec 037)" \
   '[ -f .claude/skills/task/phases/audit.md ] && grep -qF "phases/audit.md" .claude/skills/task/SKILL.md'
 check "phase doc doc.md scaffolded, and routed by the /specnaut router (spec 037)" \
@@ -695,8 +691,8 @@ echo
 echo "═══ Developer agent doctrine — Domain Model gate (PR #249) ═══"
 check "plan.md carries the domain model in its technical context (#457)" \
   'grep -q "Domain model\|domain model" .claude/skills/task/phases/plan.md'
-check "implement.md halts BLOCKED when the Domain Model is absent" \
-  'grep -q "awaiting:product-owner-domain-brief" .claude/skills/task/phases/implement.md'
+check "implement.md holds the plan's decision table binding (spec 041)" \
+  'grep -qF "The decision table is binding" .claude/skills/task/phases/implement.md'
 
 echo
 echo "═══ Phase-doc drift fixes — auto-chain default ═══"

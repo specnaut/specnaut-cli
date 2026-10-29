@@ -15,18 +15,6 @@
     {
       "category": "phase",
       "name": "task",
-      "suffix": "plan-audits.md",
-      "source": "core/skills/task/phases/plan-audits.md"
-    },
-    {
-      "category": "phase",
-      "name": "task",
-      "suffix": "tasks.md",
-      "source": "core/skills/task/phases/tasks.md"
-    },
-    {
-      "category": "phase",
-      "name": "task",
       "suffix": "implement.md",
       "source": "core/skills/task/phases/implement.md"
     },
@@ -154,6 +142,18 @@
       "name": "task",
       "suffix": "auto-chain.md",
       "source": "core/skills/task/phases/auto-chain.md"
+    },
+    {
+      "category": "phase",
+      "name": "task",
+      "suffix": "remote-gates.md",
+      "source": "core/skills/task/phases/remote-gates.md"
+    },
+    {
+      "category": "phase",
+      "name": "task",
+      "suffix": "orphan-specs.md",
+      "source": "core/skills/task/phases/orphan-specs.md"
     },
     {
       "category": "phase-script",
@@ -1666,12 +1666,6 @@
       "name": "specify",
       "suffix": "templates/plan-template.md",
       "source": "core/specnaut/templates/plan-template.md"
-    },
-    {
-      "category": "spec-root",
-      "name": "specify",
-      "suffix": "templates/tasks-template.md",
-      "source": "core/specnaut/templates/tasks-template.md"
     },
     {
       "category": "spec-root",

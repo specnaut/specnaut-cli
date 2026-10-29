@@ -13,15 +13,14 @@ spec-driven workflow. When working with the user, consult the skills below.
 
 ```
 
-specify → clarify → plan → tasks → analyze → implement → review → merge ▲ ▲ STOP #1 (only if
-clarifications needed) STOP #2 (pre-merge validation)
+plan → implement → review → merge ▲ ▲ STOP #1 (only if a question is open) STOP #2 (only under
+merge: manual)
 
 ```
 
 ## Skills available
 
-- `/task plan` — the feature's one planning document, then the architecture + security audits, then the stop
-- `/task tasks` — break the approved plan into tasks
+- `/task plan` — the feature's brief (or `--full` plan), then the architecture + security audits, then the stop
 - `/task implement` — run the developer → review-coordinator → qa-tester pipeline
 - `/task review` — architecture + quality gates
 - `/task merge` — merge the feature branch to main

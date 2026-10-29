@@ -9,7 +9,7 @@
 #
 # OPTIONS:
 #   --json              Output in JSON format
-#   --require-tasks     Require tasks.md to exist (for implementation phase)
+#   --require-tasks     Accepted and ignored: tasks.md is no longer produced (spec 041)
 #   --include-tasks     Include tasks.md in AVAILABLE_DOCS list
 #   --paths-only        Only output path variables (no validation)
 #   --help, -h          Show help message
@@ -49,7 +49,7 @@ Consolidated prerequisite checking for Spec-Driven Development workflow.
 
 OPTIONS:
   --json              Output in JSON format
-  --require-tasks     Require tasks.md to exist (for implementation phase)
+  --require-tasks     Accepted and ignored: tasks.md is no longer produced
   --include-tasks     Include tasks.md in AVAILABLE_DOCS list
   --paths-only        Only output path variables (no prerequisite validation)
   --help, -h          Show this help message
@@ -58,8 +58,8 @@ EXAMPLES:
   # Check task prerequisites (plan.md required)
   ./check-prerequisites.sh --json
   
-  # Check implementation prerequisites (plan.md + tasks.md required)
-  ./check-prerequisites.sh --json --require-tasks --include-tasks
+  # Check implementation prerequisites (plan.md required)
+  ./check-prerequisites.sh --json
   
   # Get feature paths only (no validation)
   ./check-prerequisites.sh --paths-only
@@ -125,11 +125,10 @@ if [[ ! -f "$IMPL_PLAN" ]]; then
     exit 1
 fi
 
-# Check for tasks.md if required
-if $REQUIRE_TASKS && [[ ! -f "$TASKS" ]]; then
-    echo "ERROR: tasks.md not found in $FEATURE_DIR" >&2
-    echo "Run /task tasks first to create the task list." >&2
-    exit 1
+# The breakdown is done inside implement now, so tasks.md is never required.
+# A customised implement doc may still pass the flag: say so, and carry on.
+if $REQUIRE_TASKS; then
+    echo "note: --require-tasks is ignored; the plan is the one required document" >&2
 fi
 
 # Build list of available documents

@@ -13,6 +13,7 @@ import {
   chainLine,
   chainShort,
   IDLE,
+  PHASES,
   promptSubmitted,
   turnEnded,
 } from "../../mods/specnaut-cockpit/hooks/core/chain.ts";
@@ -109,15 +110,15 @@ Deno.test("jumping past both thresholds announces the higher one only", () => {
 
 Deno.test("the chain line marks done, current and pending phases", () => {
   const s = advance(IDLE, "implement");
-  assertEquals(chainLine(s), "plan ✓ tasks ✓ implement ● review ○ merge ○");
-  assertEquals(chainShort(s), "implement 3/5");
+  assertEquals(chainLine(s), "plan ✓ implement ● review ○ merge ○");
+  assertEquals(chainShort(s), "implement 2/4");
   assertEquals(chainLine(IDLE), "");
 });
 
 Deno.test("the turn that ran merge finishes the chain; the next plain prompt clears it", () => {
   let s = turnEnded(advance(IDLE, "merge"));
   assert(s.finished);
-  assertEquals(chainLine(s), "plan ✓ tasks ✓ implement ✓ review ✓ merge ✓");
+  assertEquals(chainLine(s), "plan ✓ implement ✓ review ✓ merge ✓");
   assertEquals(chainShort(s), "merged ✓");
   s = promptSubmitted(s, null);
   assertEquals(s, IDLE);
@@ -142,7 +143,6 @@ Deno.test("the hold refuses a guarded phase when a window is at the threshold", 
 });
 
 Deno.test("the hold leaves unguarded phases, room below the threshold, and holdAt 100 alone", () => {
-  assertEquals(holdFor("tasks", [w("five_hour", 99)], 90, {}, NOW), null);
   assertEquals(holdFor("plan", [w("five_hour", 99)], 90, {}, NOW), null);
   assertEquals(holdFor("merge", [w("five_hour", 89.9)], 90, {}, NOW), null);
   assert(holdFor("merge", [w("five_hour", 90)], 90, {}, NOW), "at the threshold is held");
@@ -190,7 +190,7 @@ Deno.test("the band shows everything when it fits", () => {
   const text = s.map((x) => x.text).join("");
   assertEquals(
     text,
-    "5h 82% ↻2h10 · 7d 31% ↻3d4h · ctx 48% · $3.12 · ▸ plan ✓ tasks ✓ implement ● review ○ merge ○",
+    "5h 82% ↻2h10 · 7d 31% ↻3d4h · ctx 48% · $3.12 · ▸ plan ✓ implement ● review ○ merge ○",
   );
   assertEquals(s.find((x) => x.text === "82%")?.tone, "warn");
 });
@@ -315,7 +315,7 @@ Deno.test("the pane lists limits, the session, seven days and the branches", () 
   assertStringIncludes(text, "resets in 2h10");
   assertStringIncludes(text, "holds before implement, review and merge at 90%");
   assertStringIncludes(text, "context 48% · cost $3.12");
-  assertStringIncludes(text, "chain  plan ✓ tasks ✓ implement ✓ review ● merge ○");
+  assertStringIncludes(text, "chain  plan ✓ implement ✓ review ● merge ○");
   assertStringIncludes(text, "Tue 06 (today)");
   assertStringIncludes(text, "peak 5h 82%");
   assertStringIncludes(text, "app · feat/x");
@@ -333,4 +333,16 @@ Deno.test("the pane says when the hold is off and when nothing is measured", () 
   assertStringIncludes(text, "No rate-limit reading yet");
   assertStringIncludes(text, "The quota hold is off.");
   assertStringIncludes(text, "nothing measured yet");
+});
+
+Deno.test("the cockpit's phases are the /task router's chainable verbs, then merge", async () => {
+  // The phase sequence is declared in several places; this one is checked against the router
+  // itself, so a verb folded away there (spec 041 retired `tasks`) cannot linger here.
+  const { CORE_BUNDLE } = await import("../../src/templates_bundle.ts");
+  const router = CORE_BUNDLE.find((e) => e.category === "backlog-skill" && e.name === "task");
+  assert(router, "no /task router in the bundle");
+  const line = router.content.match(/Chainable verbs: ([^.\n]+)\./)?.[1] ?? "";
+  const chainable = [...line.matchAll(/`([a-z-]+)`/g)].map((m) => m[1]);
+  assert(chainable.length > 0, "read no chainable verbs from the router");
+  assertEquals([...PHASES], [...chainable, "merge"]);
 });

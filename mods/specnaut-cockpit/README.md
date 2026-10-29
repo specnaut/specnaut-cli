@@ -10,7 +10,7 @@ autopilot cleanly before a limit would cut a phase off halfway.
 A band above the prompt, sized to your terminal:
 
 ```text
-5h 82% ↻2h10 · 7d 31% ↻3d4h · ctx 48% · $3.12 · ▸ plan ✓ tasks ✓ implement ● review ○ merge ○
+5h 82% ↻2h10 · 7d 31% ↻3d4h · ctx 48% · $3.12 · ▸ plan ✓ implement ● review ○ merge ○
 ```
 
 - **5h / 7d**: the 5-hour and weekly usage windows, with the time until each resets. Yellow from the

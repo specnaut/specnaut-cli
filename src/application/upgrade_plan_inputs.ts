@@ -6,6 +6,7 @@ import { extractBlock, mergeRefusal } from "../domain/merge_block.ts";
 import { type ContextLinkSurvey, surveyContextLinks } from "./upgrade_context_links.ts";
 import { executeConstitutionMove } from "./upgrade_constitution_move.ts";
 import { constitutionAfterRun, constitutionNotices } from "./upgrade_constitution_notices.ts";
+import { retiredConfigNotices } from "./upgrade_retired_notices.ts";
 import { carryLegacySettings } from "./upgrade_legacy_settings.ts";
 import { CONSTITUTION_PATH } from "../domain/constitution_paths.ts";
 
@@ -72,7 +73,8 @@ export async function gatherPlanInputs(
     planned[CONSTITUTION_PATH]?.content,
     move.verdict,
   );
-  const refusals: string[] = [...move.notes, ...carried, ...notices];
+  const retired = await retiredConfigNotices(reader, projectDir);
+  const refusals: string[] = [...move.notes, ...carried, ...notices, ...retired];
   const refusedDests = new Set<string>(move.exclude);
   for (const dest of move.exclude) delete bundle[dest];
   for (const [dest, file] of Object.entries(bundle)) {

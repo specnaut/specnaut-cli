@@ -21,7 +21,8 @@ import { fromFileUrl } from "@std/path";
 
 const CORE = fromFileUrl(new URL("../../templates/core/skills/", import.meta.url));
 const GROOM = `${CORE}task/groom.md`;
-const AUTO_CHAIN = `${CORE}task/phases/auto-chain.md`;
+// The walk moved out of auto-chain.md into its own contract doc (spec 041).
+const ORPHAN_SPECS = `${CORE}task/phases/orphan-specs.md`;
 
 const NUMBER_WORDS: Record<string, number> = {
   one: 1,
@@ -38,9 +39,8 @@ Deno.test("groom: the orphan-spec check is an instruction, not a disclaimer", as
 
   // Naming the file is what the BROKEN version did. The imperative is the fix.
   assert(
-    /\*\*Read `phases\/auto-chain\.md` and follow its "Orphan spec detection" section\.\*\*/
-      .test(src),
-    "groom.md no longer instructs reading auto-chain.md — a delegation that only " +
+    /\*\*Read `phases\/orphan-specs\.md` and follow it\.\*\*/.test(src),
+    "groom.md no longer instructs reading orphan-specs.md — a delegation that only " +
       "names the file is the disclaimer this ticket removed",
   );
 
@@ -52,7 +52,7 @@ Deno.test("groom: the orphan-spec check is an instruction, not a disclaimer", as
 });
 
 Deno.test("groom: the delegation is gated on the project keeping specs locally", async () => {
-  // `auto-chain.md` qualifies its own trigger on this condition. A caller that
+  // `orphan-specs.md` qualifies its own trigger on this condition. A caller that
   // ignored it would make that sentence false in the other direction.
   const src = await Deno.readTextFile(GROOM);
   const step = src.slice(src.search(/^### \d+\. Orphan specs/m));
@@ -62,7 +62,7 @@ Deno.test("groom: the delegation is gated on the project keeping specs locally",
 Deno.test("groom: the walk is delegated, never copied", async () => {
   // The logic stays in one place. A second copy is the half that rots.
   const src = await Deno.readTextFile(GROOM);
-  // The walk's own flag strings, at the address auto-chain.md spells them now
+  // The walk's own flag strings, at the address orphan-specs.md spells them now
   // and at the one it spelled before cli#683 — a copy taken from either is a copy.
   for (
     const leaked of [
@@ -101,23 +101,23 @@ Deno.test("groom: the stated number of checks matches the steps that exist", asy
 Deno.test("groom: the delegation target still exists", async () => {
   // A delegation to a section that has been renamed is the same outage with
   // extra steps, and nothing else in the suite reads this heading.
-  const src = await Deno.readTextFile(AUTO_CHAIN);
-  assertStringIncludes(src, "## Orphan spec detection");
+  const src = await Deno.readTextFile(ORPHAN_SPECS);
+  assertStringIncludes(src, "# Orphan spec detection");
 });
 
-Deno.test("auto-chain: its trigger sentence names a caller that exists", async () => {
+Deno.test("orphan-specs: its trigger sentence names a caller that exists", async () => {
   // It claimed to run "from a grooming pass" for as long as no grooming pass
   // reached it. The claim is now checkable, so check it.
-  const auto = await Deno.readTextFile(AUTO_CHAIN);
-  const sentence = auto.slice(auto.indexOf("Run it when asked to audit"));
+  const doc = await Deno.readTextFile(ORPHAN_SPECS);
+  const sentence = doc.slice(doc.indexOf("Run it when asked to audit"));
   const named = sentence.match(/`(task\/groom\.md)`/);
-  assert(named, "auto-chain.md does not name the caller its trigger sentence claims");
+  assert(named, "orphan-specs.md does not name the caller its trigger sentence claims");
 
   const groom = await Deno.readTextFile(GROOM);
   assertStringIncludes(
     groom,
-    "auto-chain.md",
-    "auto-chain.md names groom.md as its caller, and groom.md does not call it",
+    "orphan-specs.md",
+    "orphan-specs.md names groom.md as its caller, and groom.md does not call it",
   );
 });
 
@@ -130,9 +130,9 @@ Deno.test("groom: the grooming pass does not reclaim ownership by running the ch
   const groom = (await Deno.readTextFile(GROOM)).replace(/\s+/g, " ");
   assertStringIncludes(groom, "Orphan **spec** detection is not owned here");
 
-  // The router lists auto-chain.md as a contract doc of the chain — the side
+  // The router lists orphan-specs.md as a contract doc of the chain — the side
   // that owns the walk.
   const taskSkill = await Deno.readTextFile(`${CORE}task/SKILL.md`);
-  assertStringIncludes(taskSkill, "phases/auto-chain.md");
+  assertStringIncludes(taskSkill, "phases/orphan-specs.md");
   assertStringIncludes(taskSkill, "**contract docs, not verbs**");
 });

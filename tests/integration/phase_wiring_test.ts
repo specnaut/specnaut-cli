@@ -15,7 +15,7 @@ function bundle(opts: BundleOptions): Record<string, string> {
   return Object.fromEntries(Object.entries(b).map(([k, v]) => [k, v.content]));
 }
 
-const CONSUMING = ["implement", "review", "tasks"] as const;
+const CONSUMING = ["implement", "review"] as const;
 /**
  * A phase document's destination, derived through the adapter rather than
  * spelled here. A literal would be a second statement of the adapter's rule

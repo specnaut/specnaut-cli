@@ -31,12 +31,13 @@ Deno.test("plan: the phase points at the size gate", async () => {
   assert((await read("templates/core/skills/task/phases/plan.md")).includes(LIMITS));
 });
 
-Deno.test("tasks: the phase applies the gate and the template shows the extraction task", async () => {
-  const phase = await read("templates/core/skills/task/phases/tasks.md");
-  assert(phase.includes(LIMITS) && phase.includes("extraction task"), "phase gate");
-  const t = await read("templates/core/specnaut/templates/tasks-template.md");
-  assert(t.includes("**Extractions first.**"), "extraction section");
-  assert(t.includes("comes after its extraction"), "an addition waits for the extraction");
+Deno.test("implement: extraction comes first, the rule that left the tasks phase (spec 041)", async () => {
+  const limits = await read("templates/core/specnaut/memory/size-limits.md");
+  const at = limits.indexOf("**implement** —");
+  assert(at >= 0, "size-limits.md has no implement rule");
+  const rule = limits.slice(at, limits.indexOf("**review** —", at)).replace(/\s+/g, " ");
+  assert(rule.includes("extraction task"), "the extraction comes first");
+  assert(rule.includes("comes only after that file's extraction"), "an addition waits for it");
 });
 
 Deno.test("implement: the phase applies the gate, and the gate carries the table into every brief", async () => {

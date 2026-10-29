@@ -74,9 +74,9 @@ export const SKILL_DOC_RENAMES: ReadonlyArray<SkillDocRename> = [
     reason: "release concerns moved from /specnaut to /ship",
   },
   ...[
+    // `plan-audits.md` and `tasks.md` moved here too, then retired (spec 041): their vanilla
+    // copies prune as orphans, and a `tasks` addendum is carried by `PHASE_FOLDS`.
     "plan.md",
-    "plan-audits.md",
-    "tasks.md",
     "implement.md",
     "epic-commits.md",
     "epic-fixups.md",

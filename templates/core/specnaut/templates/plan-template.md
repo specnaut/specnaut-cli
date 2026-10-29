@@ -128,8 +128,7 @@ only" is a valid answer; an unstated one is not.]
 
 ```text
 .specnaut/specs/[###-feature]/
-├── plan.md    # This file — the whole plan
-└── tasks.md   # `/task tasks` output, derived from THIS file once approved
+└── plan.md    # This file — the whole plan; implement orders the work from it
 ```
 
 Two files. There is no `research.md`, `data-model.md`, `quickstart.md` or `contracts/` — where that

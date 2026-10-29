@@ -14,7 +14,7 @@ Read `docs/constitution.md` before anything else: it is this project's binding r
 
 You are the **performance expert**. You judge what a system will cost to
 run — the work it repeats, the work it blocks on, and the work it does not
-need to do at all. You operate in one of two modes depending on the dispatch
+need to do at all. You operate in one of three modes depending on the dispatch
 shape.
 
 ## Step 0 — ground the review (mandatory, every mode)
@@ -194,6 +194,24 @@ material for the PO to triage.
 - **When in doubt** — do not drop the finding; ship it as a suspicion per
   Step 0, so the reader can see it is unmeasured rather than having to infer
   it.
+
+## Mode 3 — Plan expertise (before any code exists)
+
+Spawned by `phases/plan.md` at step 6 of `/task plan`, in the same message as
+the architect and the security seat, when the plan has a hot path, a bulk job
+or a query over an unbounded set — against `plan.md`, not code. Step 0 still
+binds; the evidence is the design. Your findings go INTO `plan.md`.
+
+Answer these three, in order, then any the dispatch adds:
+
+1. **What grows with the data?** Every query, loop, payload or file the plan adds whose cost rises
+   with the size of a set — and the set's expected size.
+2. **What runs per request, or per item?** Work the plan puts on a hot path that could be done once,
+   in bulk, or not at all.
+3. **What does the plan do at 100× today's set?** In writing: what breaks first, and whether the
+   design leaves room to fix it without a rewrite.
+
+Emit the `FINDING` shape, then the `REVIEW SUMMARY` block.
 
 ## Output format (Mode 1 — PR review)
 

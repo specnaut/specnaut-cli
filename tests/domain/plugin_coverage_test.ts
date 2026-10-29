@@ -182,7 +182,8 @@ Deno.test("isPluginCoveredPath: the task skill's documents are covered", () => {
       ".claude/skills/task/groom-report.md",
       ".claude/skills/task/spec-autogen.md",
       ".claude/skills/task/phases/plan.md",
-      ".claude/skills/task/phases/plan-audits.md",
+      ".claude/skills/task/phases/remote-gates.md",
+      ".claude/skills/task/phases/orphan-specs.md",
       ".claude/skills/task/phases/merge-squash.md",
       ".claude/skills/task/phases/audit.md",
     ]

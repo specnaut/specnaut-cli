@@ -159,8 +159,8 @@ arbitrary shell. Do not improvise any of it from this summary.
 
 ## Mode 3 — Plan expertise (before any code exists)
 
-Spawned by `phases/plan-audits.md` at step 6 of `/task plan`, against
-`plan.md`, in the same message as the architect — **not** against code,
+Spawned by `phases/plan.md` at step 6 of `/task plan`, on every plan —
+brief or full — against `plan.md`, in the same message as the architect — **not** against code,
 because none has been written yet.
 
 Step 0 still binds: read the routing table and load the domain files that
@@ -180,7 +180,21 @@ evidence:
   backfill, and every caller — that asymmetry is the whole reason you are
   asked before the code exists, so say which of your findings is which.
 
-The dispatch carries the questions. Answer them in the order given.
+Answer these four, in order, then any the dispatch adds:
+
+1. **Which new surface accepts input, and where does it stop?** Every route, job, webhook, upload,
+   argument or file content the plan adds, and the validator that bounds it. A boundary with no
+   validator named is the finding.
+2. **Who is allowed, and where is that decided?** One authorization decision per new capability, at
+   its home. Two gates for one rule, or a gate in a caller rather than at the decision, is the
+   finding.
+3. **What identifiers and what bytes become reachable?** Enumerable ids, a path that skips its
+   access check, a field that should never leave the server.
+4. **What does this let an authenticated stranger do to somebody else's account?** In writing.
+   "Nothing" is acceptable only when it names what was checked.
+
+When the plan is a brief and the change adds or widens a trust boundary (the list in `plan.md` step
+4b), say **"crosses the threshold: <which>"** — that makes the full plan due.
 
 Emit the `FINDING` shape, then the `REVIEW SUMMARY` block.
 

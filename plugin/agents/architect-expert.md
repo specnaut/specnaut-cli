@@ -189,8 +189,8 @@ material for the PO to triage.
 
 ## Mode 3 — Plan expertise (before any code exists)
 
-Spawned by `phases/plan-audits.md` at step 6 of `/task plan`, against
-`plan.md` — **not** against code, because none has been written yet. This is
+Spawned by `phases/plan.md` at step 6 of `/task plan`, on every plan —
+brief or full — against `plan.md` — **not** against code, because none has been written yet. This is
 the cheapest moment you will ever be asked, and the reason the phase makes it
 mandatory: architecture found at review time is architecture rebuilt.
 
@@ -206,10 +206,19 @@ Three things are different here, and they change how you read:
 - **A clean verdict is written down with its coverage**, because a clean
   verdict is worth exactly what it covered and no more.
 
-The dispatch carries the questions. Answer them in the order given, and
-answer the forward-looking one in writing even when it is uncomfortable — a
-design whose predicted findings are already known can be corrected now, for
-the price of an edit.
+Answer these five, in order, then any the dispatch adds:
+
+1. **Is the decision table complete?** Name any rule in the requirements with no row — the defect
+   this phase exists to prevent.
+2. **Is each home the right home?** A pure rule belongs in its bounded context, not in a service; a
+   decision asked by two gates belongs *in* the decision, not in either caller.
+3. **What is the blast radius?** How many existing call sites, routes, components or surfaces each
+   new rule touches.
+4. **Do the touched files hold their size?** Re-measure them with `wc -l` against
+   `.specnaut/memory/size-limits.md`: a file over its target that the plan grows is a finding.
+5. **What would a reviewer find in this design three cycles from now?** In writing, even when it is
+   uncomfortable — a design whose predicted findings are known can be corrected now, for the price
+   of an edit.
 
 Blast radius is **counted, not estimated**. A rule described in one sentence
 can change the behaviour of two hundred call sites, and that number is itself

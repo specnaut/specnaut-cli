@@ -26,7 +26,7 @@ echo "═══ spec 037  the pipeline phases live under /task ═══"
 # Spec 037 moved the pipeline phases under /task; /specnaut keeps only the
 # framework's own verbs. Both halves are asserted, and so is the absence at
 # the old address — a copy left behind is a second router reading stale rules.
-for phase in plan plan-audits tasks implement review merge merge-squash epic-commits quality-gates epic-fixups merge-close epic-loop constitution audit; do
+for phase in plan implement review merge merge-squash epic-commits quality-gates epic-fixups merge-close epic-loop constitution audit remote-gates orphan-specs; do
   check ".claude/skills/task/phases/$phase.md present" \
     "[ -f .claude/skills/task/phases/$phase.md ]"
   check ".claude/skills/specnaut/phases/$phase.md is gone (spec 037)" \
