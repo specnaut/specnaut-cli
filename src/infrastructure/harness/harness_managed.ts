@@ -17,3 +17,19 @@ export function managedSectionField(
   const labels = managedSectionLabels(entry.managedSection);
   return labels.length > 0 ? { managedSection: labels } : {};
 }
+
+/**
+ * The ownership flags of a mapped `TemplateFile`: `skipIfExists`, and
+ * `projectOwned` with the `skipIfExists` it implies (spec 038, A-M6).
+ *
+ * The manifest carries `projectOwned` alone. Deriving the pair here, once,
+ * is what keeps seven adapters from each spreading the flags by hand — one
+ * that forgot `skipIfExists` would write the team's document on every
+ * upgrade, before the writer's `projectOwned` guard is ever asked.
+ */
+export function ownershipFields(
+  entry: CoreEntry,
+): { skipIfExists?: true; projectOwned?: true } {
+  if (entry.projectOwned === true) return { skipIfExists: true, projectOwned: true };
+  return entry.skipIfExists === true ? { skipIfExists: true } : {};
+}

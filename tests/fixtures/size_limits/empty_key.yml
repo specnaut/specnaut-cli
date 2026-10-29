@@ -1,0 +1,4 @@
+exempt:
+file:
+  target: 300
+  ceiling: 500

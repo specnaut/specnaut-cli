@@ -94,6 +94,13 @@ export type TemplateFile = {
    */
   skipIfExists?: true;
   /**
+   * When `true`, the file is the **project's**, not a placeholder Specnaut may
+   * refresh: once it exists, nothing rewrites it — not `upgrade --force`, not
+   * `init --force` (spec 038, FR-004). Always paired with `skipIfExists`, which
+   * `ownershipFields` derives from it; the writer's `keepsProjectFile` reads it.
+   */
+  projectOwned?: true;
+  /**
    * When set, the destination is written as a **relative symlink** with this
    * text — relative to the destination's own directory, `/` separators
    * (cli#680, cli#681). `content` is then the fallback: the one-line file

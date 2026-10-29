@@ -1,0 +1,8 @@
+# full-line comments and blank lines are skipped
+
+file:
+  # even indented ones
+  target: 300
+
+  ceiling: 450
+   

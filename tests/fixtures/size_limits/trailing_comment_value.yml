@@ -1,0 +1,3 @@
+file:
+  target: 300 # soft
+  ceiling: 500

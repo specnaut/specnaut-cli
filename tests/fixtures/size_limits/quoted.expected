@@ -1,0 +1,7 @@
+file 300 500 default
+function 30 50 default
+constitution 60 100 default
+exempt *.min.js
+exempt vendor/**
+exempt dist/app.js
+exempt a # b

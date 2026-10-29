@@ -47,7 +47,7 @@ clarifications needed) STOP #2 (pre-merge validation)
 
 ## Project context
 
-- Constitution lives at `.specnaut/memory/constitution.md` — treat as non-negotiable rules.
+- Constitution lives at `docs/constitution.md` — treat as non-negotiable rules.
 <!-- BEGIN: backend=local -->
 - Product backlog (local Markdown backend): index at `.specnaut/backlog.md`,
   task files at `.specnaut/backlog/NNN-*.md`.

@@ -769,13 +769,6 @@
     {
       "category": "spec-root",
       "name": "specify",
-      "suffix": "memory/constitution.md",
-      "source": "core/specnaut/memory/constitution.md",
-      "skipIfExists": true
-    },
-    {
-      "category": "spec-root",
-      "name": "specify",
       "suffix": "memory/size-limits.md",
       "source": "core/specnaut/memory/size-limits.md"
     },
@@ -1683,12 +1676,6 @@
     {
       "category": "spec-root",
       "name": "specify",
-      "suffix": "templates/constitution-template.md",
-      "source": "core/specnaut/templates/constitution-template.md"
-    },
-    {
-      "category": "spec-root",
-      "name": "specify",
       "suffix": "templates/agent-file-template.md",
       "source": "core/specnaut/templates/agent-file-template.md"
     },
@@ -1737,8 +1724,21 @@
     {
       "category": "spec-root",
       "name": "specify",
+      "suffix": "scripts/bash/_config.sh",
+      "source": "core/specnaut/scripts/bash/_config.sh"
+    },
+    {
+      "category": "spec-root",
+      "name": "specify",
       "suffix": "scripts/bash/size-ratchet.sh",
       "source": "core/specnaut/scripts/bash/size-ratchet.sh",
+      "executable": true
+    },
+    {
+      "category": "spec-root",
+      "name": "specify",
+      "suffix": "scripts/bash/boundary-check.sh",
+      "source": "core/specnaut/scripts/bash/boundary-check.sh",
       "executable": true
     },
     {
@@ -1804,6 +1804,7 @@
       "source": "core/root/AGENTS.md",
       "skipIfExists": true,
       "managedSection": [
+        "constitution",
         "chain-stops",
         "ui-defaults",
         "response-style",
@@ -1812,6 +1813,13 @@
         "backlog",
         "optional-integrations"
       ]
+    },
+    {
+      "category": "project-root",
+      "name": "root",
+      "suffix": "docs/constitution.md",
+      "source": "core/root/docs/constitution.md",
+      "projectOwned": true
     },
     {
       "category": "mergeable-project-root",
@@ -1882,6 +1890,16 @@
     },
     {
       "harness": "claude",
+      "destination": ".specnaut/hooks/_paths.sh",
+      "source": "harness-specific/shared/hooks/_paths.sh"
+    },
+    {
+      "harness": "claude",
+      "destination": ".specnaut/hooks/_baseline.sh",
+      "source": "harness-specific/shared/hooks/_baseline.sh"
+    },
+    {
+      "harness": "claude",
       "destination": ".specnaut/hooks/approve-on-prompt.sh",
       "source": "harness-specific/shared/hooks/approve-on-prompt.sh",
       "executable": true
@@ -1908,6 +1926,12 @@
       "harness": "claude",
       "destination": ".specnaut/hooks/protect-generated.sh",
       "source": "harness-specific/shared/hooks/protect-generated.sh",
+      "executable": true
+    },
+    {
+      "harness": "claude",
+      "destination": ".specnaut/hooks/protect-constitution.sh",
+      "source": "harness-specific/shared/hooks/protect-constitution.sh",
       "executable": true
     },
     {
@@ -1969,6 +1993,16 @@
     },
     {
       "harness": "codex",
+      "destination": ".specnaut/hooks/_paths.sh",
+      "source": "harness-specific/shared/hooks/_paths.sh"
+    },
+    {
+      "harness": "codex",
+      "destination": ".specnaut/hooks/_baseline.sh",
+      "source": "harness-specific/shared/hooks/_baseline.sh"
+    },
+    {
+      "harness": "codex",
       "destination": ".specnaut/hooks/approve-on-prompt.sh",
       "source": "harness-specific/shared/hooks/approve-on-prompt.sh",
       "executable": true
@@ -1995,6 +2029,12 @@
       "harness": "codex",
       "destination": ".specnaut/hooks/protect-generated.sh",
       "source": "harness-specific/shared/hooks/protect-generated.sh",
+      "executable": true
+    },
+    {
+      "harness": "codex",
+      "destination": ".specnaut/hooks/protect-constitution.sh",
+      "source": "harness-specific/shared/hooks/protect-constitution.sh",
       "executable": true
     },
     {

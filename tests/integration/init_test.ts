@@ -1,8 +1,10 @@
 import { assertEquals, assertStringIncludes } from "@std/assert";
 import { exists } from "@std/fs/exists";
+import { stripAnsiCode } from "@std/fmt/colors";
 import { join } from "@std/path";
 import { readLinkText } from "../helpers/link_text.ts";
 import { runSpecnaut } from "../helpers/run_specnaut.ts";
+import { LEGACY_CONSTITUTION_PATH } from "../../src/domain/constitution_paths.ts";
 
 async function withTempDir(fn: (dir: string) => Promise<void>) {
   const dir = await Deno.makeTempDir({ prefix: "specnaut-integ-" });
@@ -33,7 +35,7 @@ Deno.test("specnaut init <name> writes a complete tree", async () => {
     // of truth for data that lives elsewhere. See init_backlog_test.ts for the
     // local case, where it belongs.
     assertEquals(await exists(join(root, ".specnaut/backlog.md")), false);
-    assertEquals(await exists(join(root, ".specnaut/memory/constitution.md")), true);
+    assertEquals(await exists(join(root, "docs/constitution.md")), true);
     assertEquals(await exists(join(root, ".specnaut/templates/plan-template.md")), true);
     // #457: the per-feature artefact templates are down to plan + tasks.
     assertEquals(await exists(join(root, ".specnaut/templates/spec-template.md")), false);
@@ -170,21 +172,16 @@ Deno.test("scaffolded product-owner agent documents epic / sub-task support", as
   });
 });
 
-Deno.test("specnaut init's Next steps nudges towards /task constitution first", async () => {
+Deno.test("specnaut init's Next steps starts with a plan, and points at docs/constitution.md", async () => {
+  // Spec 038, FR-013: amending the bootstrap is never a step before the first plan.
   await withTempDir(async (dir) => {
     const { code, stdout } = await runSpecnaut(["init", "demo", "--no-git"], { cwd: dir });
     assertEquals(code, 0);
-    assertStringIncludes(stdout, "Next steps:");
-    assertStringIncludes(stdout, "/task constitution");
-    assertStringIncludes(stdout, "/task add");
-    // The constitution step must come before /task plan in the rendered list.
-    const constitutionIdx = stdout.indexOf("/task constitution");
-    const planIdx = stdout.indexOf("/task plan");
-    assertEquals(
-      constitutionIdx > 0 && constitutionIdx < planIdx,
-      true,
-      "constitution step must precede plan step in Next steps",
-    );
+    const steps = stripAnsiCode(stdout.slice(stdout.indexOf("Next steps:")));
+    assertStringIncludes(steps, '1. Open the project in Claude Code, then run /task plan "');
+    assertStringIncludes(steps, "docs/constitution.md");
+    assertStringIncludes(steps, "/task add");
+    assertEquals(steps.includes(".specnaut/memory/"), false, steps);
   });
 });
 
@@ -211,6 +208,8 @@ Deno.test("specnaut init on a fresh project recommends --force (no lock present)
     assertEquals(code, 3);
     assertStringIncludes(stderr, ".claude/skills/specnaut/SKILL.md");
     assertStringIncludes(stderr, "would be overwritten");
+    // Most of the rest are absent; docs/constitution.md is never overwritten (spec 038).
+    assertStringIncludes(stderr, "are new, or the project's own)");
     assertStringIncludes(stderr, "specnaut init --here --force");
     assertEquals(
       stderr.includes("specnaut upgrade"),
@@ -343,13 +342,13 @@ Deno.test("specnaut init on a fresh project writes AGENTS.md normally and tracks
   });
 });
 
-Deno.test("specnaut init --here on a project with existing constitution.md leaves it untouched", async () => {
+Deno.test("specnaut init --here moves an existing legacy constitution.md, unlocked and unforced", async () => {
   await withTempDir(async (dir) => {
     const target = join(dir, "demo");
     await Deno.mkdir(join(target, ".specnaut/memory"), { recursive: true });
     const userConstitution = "# My Project Constitution\n\nMy own principles.\n";
     await Deno.writeTextFile(
-      join(target, ".specnaut/memory/constitution.md"),
+      join(target, LEGACY_CONSTITUTION_PATH),
       userConstitution,
     );
 
@@ -359,10 +358,9 @@ Deno.test("specnaut init --here on a project with existing constitution.md leave
     );
     assertEquals(code, 0);
 
-    const after = await Deno.readTextFile(
-      join(target, ".specnaut/memory/constitution.md"),
-    );
-    assertEquals(after, userConstitution);
+    // Spec 038, A-H2: the move runs whenever the old address holds a file.
+    assertEquals(await Deno.readTextFile(join(target, "docs/constitution.md")), userConstitution);
+    assertEquals(await exists(join(target, LEGACY_CONSTITUTION_PATH)), false);
   });
 });
 // what Claude Code loads, the root AGENTS.md as rendered for Claude.

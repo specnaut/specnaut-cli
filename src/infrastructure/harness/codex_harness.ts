@@ -1,4 +1,4 @@
-import { managedSectionField } from "./harness_managed.ts";
+import { managedSectionField, ownershipFields } from "./harness_managed.ts";
 import { stringify as stringifyToml } from "@std/toml";
 import type { Harness } from "../../application/ports.ts";
 import type { BundleOptions } from "../../application/bundle_options.ts";
@@ -69,8 +69,8 @@ export class CodexHarness implements Harness {
     paths: [".codex/hooks.json", ".specnaut/hooks/"],
     registry: ".codex/hooks.json",
     note: "Codex runs project hooks only once you trust them: open Codex here and run /hooks, " +
-      "then trust Specnaut's hooks. Until then the merge, release, generated-file and model " +
-      "guards do not run.",
+      "then trust Specnaut's hooks. Until then the merge, release, generated-file, constitution " +
+      "and model guards do not run.",
   };
 
   mapBundle(core: CoreBundle, opts: BundleOptions): Bundle {
@@ -128,7 +128,7 @@ export class CodexHarness implements Harness {
           addUnique(out, `.specnaut/${entry.suffix}`, {
             content: entry.content,
             executable: entry.executable,
-            ...(entry.skipIfExists ? { skipIfExists: true as const } : {}),
+            ...ownershipFields(entry),
             ...managedSectionField(entry),
           }, this.key);
           break;
@@ -137,7 +137,7 @@ export class CodexHarness implements Harness {
           addUnique(out, entry.suffix, {
             content: entry.content,
             executable: entry.executable,
-            ...(entry.skipIfExists ? { skipIfExists: true as const } : {}),
+            ...ownershipFields(entry),
             ...managedSectionField(entry),
           }, this.key);
           break;

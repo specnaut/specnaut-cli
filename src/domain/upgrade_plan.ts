@@ -45,7 +45,7 @@ export type UpgradePlanOptions = {
   isPluginCovered?: (dest: string) => boolean;
   /**
    * Predicate identifying `skipIfExists` bundle entries. Such files
-   * (e.g. `AGENTS.md`, `.specnaut/memory/constitution.md`) may exist on
+   * (e.g. `AGENTS.md`, `docs/constitution.md`) may exist on
    * disk before init touches them — in which case init deliberately
    * skips writing AND skips recording them in the lock. Without this
    * predicate, upgrade saw `diskSha defined + lockSha undefined` and

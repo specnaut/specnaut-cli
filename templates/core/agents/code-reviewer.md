@@ -14,7 +14,7 @@ explore the rest of the codebase unless strictly necessary for context.
 
 ## Always-check rules
 
-1. **Constitution compliance**: read `.specnaut/memory/constitution.md` first.
+1. **Constitution compliance**: read `docs/constitution.md` first.
    Any violation is at least HIGH severity.
 2. **Silent error handling**: any `catch` block that swallows the error (empty
    body, comment-only, or discards the error object) is CRITICAL.
@@ -27,10 +27,10 @@ explore the rest of the codebase unless strictly necessary for context.
    (controllers/services/repositories or equivalent), flag layer violations as
    HIGH.
 7. **Size**: every file and function against `.specnaut/memory/size-limits.md`
-   — its thresholds come from the constitution's `## Size limits` table, never a
-   number of your own, and its severity table is the one you apply. Name the
-   unit, the measured value, and the limit with its source (`constitution` or
-   `default`). For every file that ends over its target, report the
+   — its rule and defaults, or `.specnaut/size-limits.yml` where the project
+   overrides them; never a number of your own, and its severity table is the one
+   you apply. Name the unit, the measured value, and the limit with its source,
+   as that file names it. For every file that ends over its target, report the
    coordinator's line counts as `wc -l <before> → <after>`. Size severities
    are that table's — rule 1's "at least HIGH" floor does not apply to them.
 

@@ -63,8 +63,8 @@ description: "Task list template for feature implementation"
 
 **⚠️ CRITICAL**: No user story work can begin until this phase is complete
 
-**Extractions first.** For every file the plan touches that is over its target in the
-constitution's Size limits table (re-measure with `wc -l` — never trust the plan's figure), the
+**Extractions first.** For every file the plan touches that is over its target in
+`.specnaut/memory/size-limits.md` (re-measure with `wc -l` — never trust the plan's figure), the
 first task touching it is an extraction:
 
 - [ ] T003a Extract [responsibility] from [path] ([N] lines, target [T]) into [new module path] —

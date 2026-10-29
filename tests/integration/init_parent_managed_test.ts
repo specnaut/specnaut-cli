@@ -73,7 +73,7 @@ Deno.test("parent-managed suppresses agentic", async () => {
     assertEquals(await exists(join(child, ".claude/commands")), false);
 
     // Toolkit still provisioned.
-    assertEquals(await exists(join(child, ".specnaut/memory/constitution.md")), true);
+    assertEquals(await exists(join(child, "docs/constitution.md")), true);
     assertEquals(await exists(join(child, "AGENTS.md")), true);
 
     // Notice printed exactly once.
@@ -111,7 +111,7 @@ Deno.test("standalone provisions normally", async () => {
     assertEquals(await exists(join(dir, ".claude/skills/specnaut/SKILL.md")), true);
     assertEquals(await exists(join(dir, ".claude/agents/developer.md")), true);
     assertEquals(await exists(join(dir, ".claude/commands/specnaut.md")), false);
-    assertEquals(await exists(join(dir, ".specnaut/memory/constitution.md")), true);
+    assertEquals(await exists(join(dir, "docs/constitution.md")), true);
 
     // No notice on the standalone path.
     assert(!stdout.includes(NOTICE), "standalone init must not print the notice");

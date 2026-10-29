@@ -1,0 +1,3 @@
+file:
+  target: $(touch pwned)
+  ceiling: 500

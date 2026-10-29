@@ -30,7 +30,7 @@ Deno.test("isAgenticPath: .claude/commands/ paths are agentic", () => {
 });
 
 Deno.test("isAgenticPath: .specnaut/ paths are not agentic", () => {
-  assertEquals(isAgenticPath(".specnaut/memory/constitution.md"), false);
+  assertEquals(isAgenticPath(".specnaut/memory/size-limits.md"), false);
   assertEquals(isAgenticPath(".specnaut/templates/spec-template.md"), false);
 });
 

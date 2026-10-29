@@ -8,7 +8,11 @@
 # `eval`, sets CMD_OPAQUE instead of being guessed at.
 #
 # The helpers below share _cmd_emit's locals by bash's dynamic scope: v (the
-# words), m (their count) and k (the index of the command word).
+# words), m (their count) and k (the index of the command word). So does
+# CMD_ON_SEG: when a guard sets it to a function name, _cmd_emit calls it with
+# the raw segment once v and k are read, before the command word is reduced
+# to its basename — what protect-constitution.sh needs to judge `/x/cat`, a
+# VAR= prefix, or a redirection the words here no longer show.
 
 _CMD_RE_REDIR='^[0-9]*(>>|>&|<&|<>|>[|]|<<<|>|<)(.*)$'
 _CMD_RE_AMP='^&>>?(.*)$'
@@ -96,6 +100,7 @@ _cmd_emit() {
   local x k=0 m=0 IFS=$' \t\n'
   _cmd_strip_redirs "$1"
   _cmd_skip_prefixes
+  if [ -n "${CMD_ON_SEG:-}" ]; then "$CMD_ON_SEG" "$1"; fi
   [ "$k" -lt "$m" ] || return 0
   v[k]=${v[k]##*/}
   case ${v[k]} in

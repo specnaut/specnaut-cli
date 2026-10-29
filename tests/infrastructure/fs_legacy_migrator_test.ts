@@ -33,7 +33,7 @@ Deno.test("migrate: renames legacy .specflow/ → .specnaut/ preserving contents
   await withTempDir(async (dir) => {
     await Deno.mkdir(join(dir, ".specflow/memory"), { recursive: true });
     await Deno.writeTextFile(join(dir, ".specflow/installed.lock"), "lock");
-    await Deno.writeTextFile(join(dir, ".specflow/memory/constitution.md"), "c");
+    await Deno.writeTextFile(join(dir, ".specflow/memory/notes.md"), "c");
 
     const r = await migrateLegacyConfigDir(dir);
     assertEquals(r.kind, "migrated");
@@ -41,7 +41,7 @@ Deno.test("migrate: renames legacy .specflow/ → .specnaut/ preserving contents
     assertEquals(await exists(join(dir, ".specflow")), false);
     assertEquals(await exists(join(dir, ".specnaut/installed.lock")), true);
     assertEquals(
-      await Deno.readTextFile(join(dir, ".specnaut/memory/constitution.md")),
+      await Deno.readTextFile(join(dir, ".specnaut/memory/notes.md")),
       "c",
     );
   });

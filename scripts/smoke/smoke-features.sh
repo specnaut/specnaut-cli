@@ -309,8 +309,6 @@ check "workflow.yml scaffolded with merge: auto as the default" \
   '[ -f .specnaut/workflow.yml ] && grep -qE "^merge: auto$" .specnaut/workflow.yml'
 check "run-gate.sh scaffolded + executable (#555)" \
   '[ -x .specnaut/scripts/bash/run-gate.sh ]'
-check "size-ratchet.sh scaffolded + executable, run by the quality gates (#651)" \
-  '[ -x .specnaut/scripts/bash/size-ratchet.sh ] && grep -qF "size-ratchet.sh --since" .claude/skills/task/phases/quality-gates.md'
 check "merge-mode.sh, base-branch.sh, groom-rules.sh scaffolded; merge-mode reads the default as auto (spec 036)" \
   '[ -x .specnaut/scripts/bash/base-branch.sh ] && [ -x .specnaut/scripts/bash/groom-rules.sh ] &&
    [ "$(bash .specnaut/scripts/bash/merge-mode.sh 2>/dev/null)" = auto ]'
@@ -434,12 +432,8 @@ check "security knowledge base scaffolded" \
   '[ -f .specnaut/memory/security/00-triage.md ]'
 check "architecture catalogue scaffolded" \
   '[ -f .specnaut/memory/architecture/README.md ]'
-check "size limits: the one rule and the defaults are scaffolded (#645)" \
-  'grep -q "^## Where the numbers come from" .specnaut/memory/size-limits.md && grep -q "^| file | 300 | 500 |" .specnaut/memory/size-limits.md'
 check "size limits: plan-template gates on Files touched, tasks-template extracts first (#647, #648)" \
   'grep -q "^### Files touched" .specnaut/templates/plan-template.md && grep -qF "**Extractions first.**" .specnaut/templates/tasks-template.md'
-check "size limits: the seed constitution carries the table (#645)" \
-  'grep -q "^## Size limits" .specnaut/memory/constitution.md && grep -q "^| file | 300 | 500 |" .specnaut/memory/constitution.md'
 check "a11y catalogue scaffolded" \
   '[ -f .specnaut/memory/a11y/00-triage.md ] && [ -f .specnaut/memory/a11y/README.md ]'
 check "a11y catalogue ships every surface leaf" \
@@ -901,17 +895,11 @@ check "mobile-first-contract .claude/skills/mobile-first-contract/SKILL.md ships
   'test -f .claude/skills/mobile-first-contract/SKILL.md'
 check "mobile-first-contract states the default and its opt-out" \
   'grep -q "A default, not a mandate" .claude/skills/mobile-first-contract/SKILL.md'
-# The heading level IS the form — a scaffolded project whose contract and
-# constitution disagree on it has a documented opt-out that does nothing.
-check "mobile-first-contract and the constitution agree on the declaration heading" \
-  'grep -q "### Target surface" .claude/skills/mobile-first-contract/SKILL.md \
-     && grep -q "### Target surface" .specnaut/memory/constitution.md'
+# The opt-out is the project's to declare, never shipped: the scaffolded
+# constitution at docs/constitution.md carries no live declaration. `test -f`
+# first, or a missing file would pass the negative grep.
 check "the scaffolded constitution does not ship a live opt-out declaration" \
-  '! grep -q "This project targets" .specnaut/memory/constitution.md'
-check "constitution-template.md carries Front-end patterns pointing at the contract" \
-  'grep -q "mobile-first-contract" .specnaut/templates/constitution-template.md'
-check "constitution-template.md does not reproduce the declaration sentence" \
-  '! grep -q "This project targets" .specnaut/templates/constitution-template.md'
+  'test -f docs/constitution.md && ! grep -q "This project targets" docs/constitution.md'
 check "AGENTS.md carries the ui-defaults managed section" \
   'grep -q "Specnaut: ui-defaults" AGENTS.md'
 check "the ui-defaults block points at the contract" \

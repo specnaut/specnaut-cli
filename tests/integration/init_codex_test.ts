@@ -131,7 +131,7 @@ Deno.test("specnaut init --ai codex scaffolds a Codex layout", async () => {
     assertEquals(codexAgentsCount, 15);
 
     // Shared (cross-harness)
-    assertEquals(await exists(join(root, ".specnaut/memory/constitution.md")), true);
+    assertEquals(await exists(join(root, "docs/constitution.md")), true);
     assertEquals(await exists(join(root, "AGENTS.md")), true);
     assertEquals(await exists(join(root, "tasks/backlog.md")), false);
     // These inits take the DEFAULT backend, which is `cloud` — so there is no

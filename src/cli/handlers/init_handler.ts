@@ -210,19 +210,12 @@ function printConflictsError(
 ): void {
   const n = conflicts.length;
   const noun = n === 1 ? "file" : "files";
-  // Surface the gap between `wrote N files` (init success) and the
-  // overwrite count when the two diverge. The difference is files
-  // that are managed but never overwritten without --force —
-  // skipIfExists placeholders like AGENTS.md and the constitution
-  // template. Without this framing, a fresh user reads the two counts
-  // as contradictory (#135).
-  const owned = totalManagedFiles - n;
-  const gapSuffix = owned > 0
-    ? dim(
-      ` (of ${totalManagedFiles} managed; ${owned} user-owned placeholder${
-        owned === 1 ? "" : "s"
-      } excluded — never overwritten without --force)`,
-    )
+  // Surface the gap between `wrote N files` (init success) and the overwrite
+  // count (#135): the rest are not on disk yet, or project-owned files
+  // (AGENTS.md, docs/constitution.md) init keeps as they are.
+  const rest = totalManagedFiles - n;
+  const gapSuffix = rest > 0
+    ? dim(` (of ${totalManagedFiles} managed; the other ${rest} are new, or the project's own)`)
     : "";
   console.error(red(`error: ${n} ${noun} would be overwritten${gapSuffix}:`));
   for (const c of conflicts) console.error(red(`  - ${c}`));
@@ -250,8 +243,8 @@ function printConflictsError(
  * Number of managed files emitted by the bundle — i.e. everything
  * `init` reports as `wrote N files`. Excludes mergeable files (counted
  * separately in the merged-paths suffix). Includes both writeable and
- * `skipIfExists` placeholder entries: the latter are part of the
- * managed set, just immune to overwrite without `--force`.
+ * `skipIfExists` entries: the latter are part of the managed set, just
+ * never overwritten by a conflict-free init.
  *
  * Used to surface the gap between the success and conflict messages
  * in `printConflictsError` (#135).

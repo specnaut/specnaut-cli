@@ -34,7 +34,7 @@ const SAMPLE: CoreBundle = [
   {
     category: "spec-root",
     name: "specify",
-    suffix: "memory/constitution.md",
+    suffix: "memory/size-limits.md",
     content: "# const\n",
     executable: false,
   },
@@ -100,7 +100,7 @@ Deno.test("CursorHarness maps spec-root to .specnaut/ and project-root unchanged
     versionScheme: "semver",
     specBackend: "local",
   });
-  assert(".specnaut/memory/constitution.md" in mapped);
+  assert(".specnaut/memory/size-limits.md" in mapped);
   assert("AGENTS.md" in mapped);
 });
 

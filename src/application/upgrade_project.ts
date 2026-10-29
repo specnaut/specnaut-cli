@@ -15,7 +15,6 @@ import {
   type UpgradeAction,
   type UpgradePlan,
 } from "../domain/upgrade_plan.ts";
-import { extractBlock, mergeRefusal } from "../domain/merge_block.ts";
 import { isPluginCoveredPath, pluginRelativePath } from "../domain/plugin_coverage.ts";
 import { isAgenticPath, pruneAgenticEntries } from "../domain/parent_managed.ts";
 import {
@@ -32,7 +31,8 @@ import {
 import { planStaging, pruneStaging } from "./upgrade_staging.ts";
 import { removeOrphans } from "./upgrade_orphan_removal.ts";
 import { carryRenames } from "./upgrade_renames.ts";
-import { applyContextLinks, surveyContextLinks } from "./upgrade_context_links.ts";
+import { applyContextLinks } from "./upgrade_context_links.ts";
+import { gatherPlanInputs } from "./upgrade_plan_inputs.ts";
 import { reMergeJsonFiles, splitJsonMerged } from "./upgrade_json_merges.ts";
 
 /** The plugin name used for both the install probe and the cache directory. */
@@ -183,75 +183,16 @@ export class UpgradeProjectUseCase {
       : mappedBundle;
 
     // JSON-merged files are user-owned and live outside the lock-tracked plan.
-    const { jsonMerged, planned: bundle } = splitJsonMerged(fullBundle);
-
-    // Refuse a merge whose host file cannot safely take the block (cli#599).
-    //
-    // Dropped from the bundle BEFORE the plan is computed, so the refused path
-    // is never planned, written, or lock-tracked — an entry for a file we
-    // deliberately did not write would report as drift on every later run.
-    const refusals: string[] = [];
-    const refusedDests = new Set<string>();
-    for (const [dest, file] of Object.entries(bundle)) {
-      if (file.mergeRefuseIf === undefined) continue;
-      const refusal = mergeRefusal(await reader.readText(input.projectDir, dest), file);
-      if (refusal === null) continue;
-      refusals.push(refusal);
-      delete bundle[dest];
-      refusedDests.add(dest);
-    }
-
-    // Context links are classified by what `lstat` sees (cli#680); an inverted
-    // consolidation is refused like the merges above, for the same reason.
-    const links = await surveyContextLinks(
-      reader,
+    const { jsonMerged, planned } = splitJsonMerged(fullBundle);
+    const isDeclaredPreserved = input.isDeclaredPreserved ?? (() => false);
+    // Refusals out of the bundle and the lock, then the disk state the plan reads.
+    const { bundle, refusals, links, diskShas, lockForPlan } = await gatherPlanInputs(
+      { reader, writer, dryRun: input.dryRun },
       input.projectDir,
-      bundle,
+      planned,
       lock,
-      input.isDeclaredPreserved ?? (() => false),
+      isDeclaredPreserved,
     );
-    for (const { dest, message } of links.refused) {
-      refusals.push(message);
-      delete bundle[dest];
-      refusedDests.add(dest);
-    }
-
-    const destPaths = new Set<string>([
-      ...Object.keys(bundle),
-      ...lock.entries.keys(),
-    ]);
-    const diskShas = new Map<string, string>(links.diskShas);
-    for (const dest of destPaths) {
-      // Never read through a link: that is `AGENTS.md`, or outside the project.
-      if (bundle[dest]?.symlinkTo !== undefined || refusedDests.has(dest)) continue;
-      const content = await reader.readText(input.projectDir, dest);
-      if (content === null) continue;
-      // For mergeable files we hash the *block content only* (not the whole
-      // user-owned file) so the SHA is comparable against the lock entry,
-      // which also stores only the block content.
-      const file = bundle[dest];
-      if (file?.mergeBlock !== undefined) {
-        const block = extractBlock(content, file.mergeBlock) ?? "";
-        diskShas.set(dest, await sha256Hex(block));
-      } else {
-        diskShas.set(dest, await sha256Hex(content));
-      }
-    }
-
-    // A refused dest must leave the LOCK as well as the bundle.
-    //
-    // Dropping it from the bundle alone leaves its lock entry behind, and a
-    // dest that is in the lock but not in the bundle is an ORPHAN — so the very
-    // next plan removed the user's `.codex/config.toml` instead of leaving it
-    // alone. Refusing to write a file must never be a route to deleting it.
-    // Caught by the end-to-end test; the merge-level unit tests could not see
-    // it, because the deletion happens nowhere near the merge.
-    const lockForPlan = refusedDests.size === 0 ? lock : {
-      ...lock,
-      entries: new Map(
-        [...lock.entries].filter(([dest]) => !refusedDests.has(dest)),
-      ),
-    };
 
     // Renamed docs, then the addenda of moved phases; what it did or refused is said.
     const effectiveLock = await carryRenames(
@@ -266,7 +207,6 @@ export class UpgradeProjectUseCase {
       newShas.set(dest, await sha256Hex(lockShaInput(file)));
     }
 
-    const isDeclaredPreserved = input.isDeclaredPreserved ?? (() => false);
     const detector = this.deps.pluginDetector;
     const pluginInstalled = detector !== undefined &&
       await detector.isPluginInstalled(PLUGIN_NAME);

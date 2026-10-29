@@ -1,4 +1,4 @@
-import { managedSectionField } from "./harness_managed.ts";
+import { managedSectionField, ownershipFields } from "./harness_managed.ts";
 import type { Harness } from "../../application/ports.ts";
 import type { BundleOptions } from "../../application/bundle_options.ts";
 import type { CoreBundle, CoreEntry } from "../../domain/core_bundle.ts";
@@ -91,7 +91,7 @@ export class ClaudeHarness implements Harness {
         content,
         executable: entry.executable,
         ...(entry.category === "mergeable-project-root" ? { mergeBlock: "gitignore" } : {}),
-        ...(entry.skipIfExists ? { skipIfExists: true as const } : {}),
+        ...ownershipFields(entry),
         ...managedSectionField(entry),
       }, this.key);
     }

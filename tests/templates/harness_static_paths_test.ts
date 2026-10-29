@@ -79,6 +79,10 @@ const CREATED_OUTSIDE_THE_BUNDLE: Record<
     reason:
       "the project's own additions to a phase (cli#611); Specnaut reads them, never writes them",
   },
+  ".specnaut/ui.yml": {
+    reason:
+      "project-owned (spec 038): never shipped; upgrade writes it once from an old constitution",
+  },
   ".specnaut/backlog/": {
     reason: "the local backend's add script creates one file per item on first use",
     backends: ["local"],

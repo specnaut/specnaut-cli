@@ -178,7 +178,7 @@ Deno.test("spec-root and project-root pass through unchanged", () => {
   const specRoot: CoreBundle[number] = {
     category: "spec-root",
     name: "specify",
-    suffix: "memory/constitution.md",
+    suffix: "memory/size-limits.md",
     content: "raw constitution",
     executable: false,
   };
@@ -194,6 +194,6 @@ Deno.test("spec-root and project-root pass through unchanged", () => {
     versionScheme: "semver",
     specBackend: "local",
   });
-  assertEquals(bundle[".specnaut/memory/constitution.md"].content, "raw constitution");
+  assertEquals(bundle[".specnaut/memory/size-limits.md"].content, "raw constitution");
   assertEquals(bundle["AGENTS.md"].content, "raw AGENTS");
 });

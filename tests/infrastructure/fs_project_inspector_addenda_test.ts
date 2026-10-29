@@ -19,9 +19,10 @@ const TEMPLATES_VERSION = "0.2.0";
 /** A project the other checks pass on, so an addenda warning is the only noise. */
 async function healthyProject(dir: string): Promise<void> {
   await Deno.mkdir(join(dir, ".specnaut/memory"), { recursive: true });
+  await Deno.mkdir(join(dir, "docs"), { recursive: true });
   await Deno.mkdir(join(dir, ".claude"), { recursive: true });
   await Deno.writeTextFile(
-    join(dir, ".specnaut/memory/constitution.md"),
+    join(dir, "docs/constitution.md"),
     "# Project Constitution\n\n- No silent catches.\n",
   );
   await Deno.writeTextFile(

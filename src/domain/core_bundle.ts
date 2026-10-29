@@ -39,11 +39,17 @@ export type CoreEntry = {
   readonly backend?: BacklogBackend | null;
   /**
    * When `true`, the harness's `mapBundle` propagates this to the resulting
-   * `TemplateFile.skipIfExists`. Used for placeholder files (`AGENTS.md`,
-   * `.specnaut/memory/constitution.md`) where the user's existing content
-   * is always more useful than our empty template — see #119.
+   * `TemplateFile.skipIfExists`. Used for placeholder files (`AGENTS.md`)
+   * where the user's existing content is always more useful than our empty
+   * template — see #119.
    */
   readonly skipIfExists?: boolean;
+  /**
+   * The team's own document, bootstrapped once and never rewritten — not even
+   * forced (spec 038). Implies `skipIfExists`; read it through
+   * `ownershipFields` (`harness_managed.ts`), never by hand.
+   */
+  readonly projectOwned?: boolean;
   /**
    * Labels of the Specnaut-owned sections fenced inside `content`. The
    * harness's `mapBundle` propagates them to `TemplateFile.managedSection`,

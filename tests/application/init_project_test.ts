@@ -4,6 +4,13 @@ import type { FsWriter, GitAdapter, Harness, LockStore } from "../../src/applica
 import type { InstalledLock } from "../../src/domain/installed_lock.ts";
 import type { CoreBundle } from "../../src/domain/core_bundle.ts";
 
+/** The backend and scheme options every use case here is built with. */
+const LOCAL_SCHEMES = {
+  backlogBackend: "local",
+  versionScheme: "semver",
+  specBackend: "local",
+} as const;
+
 function fakeLockStore(
   opts: { existing?: InstalledLock | null } = {},
 ): LockStore & { lastWritten: InstalledLock | null } {
@@ -67,7 +74,7 @@ function fakeClaudeHarness(): Harness {
 // A core bundle whose mapped dests mix agentic (.claude/skills|agents|commands)
 // and non-agentic (.specnaut, AGENTS.md, .claude/settings.json) paths.
 const MIXED_CORE: CoreBundle = [
-  ".specnaut/memory/constitution.md",
+  ".specnaut/memory/size-limits.md",
   "AGENTS.md",
   ".claude/settings.json",
   ".claude/skills/specnaut/SKILL.md",
@@ -98,9 +105,7 @@ Deno.test("InitProjectUseCase writes the bundle to the target dir (happy path)",
     git: fakeGit(),
     lockStore: fakeLockStore(),
     harness: fakeClaudeHarness(),
-    backlogBackend: "local",
-    versionScheme: "semver",
-    specBackend: "local",
+    ...LOCAL_SCHEMES,
     core: SAMPLE_CORE,
     ensureDir: () => Promise.resolve(),
   });
@@ -124,9 +129,7 @@ Deno.test("InitProjectUseCase fails with 'conflicts' when target already has spe
     git: fakeGit(),
     lockStore: fakeLockStore(),
     harness: fakeClaudeHarness(),
-    backlogBackend: "local",
-    versionScheme: "semver",
-    specBackend: "local",
+    ...LOCAL_SCHEMES,
     core: SAMPLE_CORE,
     ensureDir: () => Promise.resolve(),
   });
@@ -159,9 +162,7 @@ Deno.test("InitProjectUseCase reports lockExists=true when conflicts hit a previ
     git: fakeGit(),
     lockStore: fakeLockStore({ existing: existingLock }),
     harness: fakeClaudeHarness(),
-    backlogBackend: "local",
-    versionScheme: "semver",
-    specBackend: "local",
+    ...LOCAL_SCHEMES,
     core: SAMPLE_CORE,
     ensureDir: () => Promise.resolve(),
   });
@@ -184,9 +185,7 @@ Deno.test("InitProjectUseCase calls git.init when repo not initialized and initG
     git: fakeGit({ available: true, initialized: false, initCalled }),
     lockStore: fakeLockStore(),
     harness: fakeClaudeHarness(),
-    backlogBackend: "local",
-    versionScheme: "semver",
-    specBackend: "local",
+    ...LOCAL_SCHEMES,
     core: SAMPLE_CORE,
     ensureDir: () => Promise.resolve(),
   });
@@ -201,9 +200,7 @@ Deno.test("InitProjectUseCase skips git.init when initGit=false", async () => {
     git: fakeGit({ available: true, initialized: false, initCalled }),
     lockStore: fakeLockStore(),
     harness: fakeClaudeHarness(),
-    backlogBackend: "local",
-    versionScheme: "semver",
-    specBackend: "local",
+    ...LOCAL_SCHEMES,
     core: SAMPLE_CORE,
     ensureDir: () => Promise.resolve(),
   });
@@ -218,9 +215,7 @@ Deno.test("InitProjectUseCase skips git.init when git not available", async () =
     git: fakeGit({ available: false, initCalled }),
     lockStore: fakeLockStore(),
     harness: fakeClaudeHarness(),
-    backlogBackend: "local",
-    versionScheme: "semver",
-    specBackend: "local",
+    ...LOCAL_SCHEMES,
     core: SAMPLE_CORE,
     ensureDir: () => Promise.resolve(),
   });
@@ -245,9 +240,7 @@ Deno.test("InitProjectUseCase skips git.init when repo already initialized", asy
     git: fakeGit({ available: true, initialized: true, initCalled }),
     lockStore: fakeLockStore(),
     harness: fakeClaudeHarness(),
-    backlogBackend: "local",
-    versionScheme: "semver",
-    specBackend: "local",
+    ...LOCAL_SCHEMES,
     core: SAMPLE_CORE,
     ensureDir: () => Promise.resolve(),
   });
@@ -272,9 +265,7 @@ Deno.test("InitProjectUseCase with force=true skips conflict detection and reque
     git: fakeGit(),
     lockStore: fakeLockStore(),
     harness: fakeClaudeHarness(),
-    backlogBackend: "local",
-    versionScheme: "semver",
-    specBackend: "local",
+    ...LOCAL_SCHEMES,
     core: SAMPLE_CORE,
     ensureDir: () => Promise.resolve(),
   });
@@ -305,9 +296,7 @@ Deno.test("InitProjectUseCase returns backups array from writer report", async (
     git: fakeGit(),
     lockStore: fakeLockStore(),
     harness: fakeClaudeHarness(),
-    backlogBackend: "local",
-    versionScheme: "semver",
-    specBackend: "local",
+    ...LOCAL_SCHEMES,
     core: SAMPLE_CORE,
     ensureDir: () => Promise.resolve(),
   });
@@ -329,9 +318,7 @@ Deno.test("InitProjectUseCase persists an installed.lock with SHA256 of every fi
     git: fakeGit(),
     lockStore,
     harness: fakeClaudeHarness(),
-    backlogBackend: "local",
-    versionScheme: "semver",
-    specBackend: "local",
+    ...LOCAL_SCHEMES,
     core: [
       {
         category: "project-root",
@@ -373,9 +360,7 @@ Deno.test("InitProjectUseCase records harness.key in the installed lock", async 
     git: fakeGit(),
     lockStore,
     harness: fakeClaudeHarness(),
-    backlogBackend: "local",
-    versionScheme: "semver",
-    specBackend: "local",
+    ...LOCAL_SCHEMES,
     core: SAMPLE_CORE,
     ensureDir: () => Promise.resolve(),
   });
@@ -391,9 +376,7 @@ Deno.test("InitProjectUseCase suppresses agentic dests from writes AND lock when
     git: fakeGit(),
     lockStore,
     harness: fakeClaudeHarness(),
-    backlogBackend: "local",
-    versionScheme: "semver",
-    specBackend: "local",
+    ...LOCAL_SCHEMES,
     core: MIXED_CORE,
     ensureDir: () => Promise.resolve(),
   });
@@ -411,7 +394,7 @@ Deno.test("InitProjectUseCase suppresses agentic dests from writes AND lock when
   assert(!writtenDests.includes(".claude/agents/developer.md"));
   assert(!writtenDests.includes(".claude/commands/specnaut.md"));
   // Non-agentic dests still provisioned.
-  assert(writtenDests.includes(".specnaut/memory/constitution.md"));
+  assert(writtenDests.includes(".specnaut/memory/size-limits.md"));
   assert(writtenDests.includes("AGENTS.md"));
   assert(writtenDests.includes(".claude/settings.json"));
 
@@ -420,7 +403,7 @@ Deno.test("InitProjectUseCase suppresses agentic dests from writes AND lock when
   assert(!lock.entries.has(".claude/skills/specnaut/SKILL.md"));
   assert(!lock.entries.has(".claude/agents/developer.md"));
   assert(!lock.entries.has(".claude/commands/specnaut.md"));
-  assert(lock.entries.has(".specnaut/memory/constitution.md"));
+  assert(lock.entries.has(".specnaut/memory/size-limits.md"));
   assert(lock.entries.has("AGENTS.md"));
   assertEquals(lock.parentManaged, true);
 });
@@ -433,9 +416,7 @@ Deno.test("InitProjectUseCase writes all dests and sets no parentManaged when no
     git: fakeGit(),
     lockStore,
     harness: fakeClaudeHarness(),
-    backlogBackend: "local",
-    versionScheme: "semver",
-    specBackend: "local",
+    ...LOCAL_SCHEMES,
     core: MIXED_CORE,
     ensureDir: () => Promise.resolve(),
   });
@@ -464,9 +445,7 @@ Deno.test("InitProjectUseCase uses harness.mapBundle output as the file tree", a
     git: fakeGit(),
     lockStore: fakeLockStore(),
     harness: fakeClaudeHarness(),
-    backlogBackend: "local",
-    versionScheme: "semver",
-    specBackend: "local",
+    ...LOCAL_SCHEMES,
     core: SAMPLE_CORE,
     ensureDir: () => Promise.resolve(),
   });
@@ -498,9 +477,7 @@ Deno.test("InitProjectUseCase: preservedPaths are absent from the write set and 
     git: fakeGit(),
     lockStore: fakeLockStore(),
     harness: fakeClaudeHarness(),
-    backlogBackend: "local",
-    versionScheme: "semver",
-    specBackend: "local",
+    ...LOCAL_SCHEMES,
     core: PRESERVE_CORE,
     ensureDir: () => Promise.resolve(),
   });
@@ -531,9 +508,7 @@ Deno.test("InitProjectUseCase: filesWritten excludes preserved paths", async () 
     git: fakeGit(),
     lockStore: fakeLockStore(),
     harness: fakeClaudeHarness(),
-    backlogBackend: "local",
-    versionScheme: "semver",
-    specBackend: "local",
+    ...LOCAL_SCHEMES,
     core: PRESERVE_CORE, // 3 non-mergeable files
     ensureDir: () => Promise.resolve(),
   });
@@ -560,9 +535,7 @@ Deno.test("InitProjectUseCase: dry-run filesWritten excludes preserved paths", a
     git: fakeGit(),
     lockStore: fakeLockStore(),
     harness: fakeClaudeHarness(),
-    backlogBackend: "local",
-    versionScheme: "semver",
-    specBackend: "local",
+    ...LOCAL_SCHEMES,
     core: PRESERVE_CORE,
     ensureDir: () => Promise.resolve(),
   });
@@ -589,9 +562,7 @@ Deno.test("InitProjectUseCase: preserved file remains in the installed.lock (FR-
     git: fakeGit(),
     lockStore,
     harness: fakeClaudeHarness(),
-    backlogBackend: "local",
-    versionScheme: "semver",
-    specBackend: "local",
+    ...LOCAL_SCHEMES,
     core: PRESERVE_CORE,
     ensureDir: () => Promise.resolve(),
   });
@@ -616,9 +587,7 @@ Deno.test("InitProjectUseCase: new bundle path still written when preserves are 
     git: fakeGit(),
     lockStore: fakeLockStore(),
     harness: fakeClaudeHarness(),
-    backlogBackend: "local",
-    versionScheme: "semver",
-    specBackend: "local",
+    ...LOCAL_SCHEMES,
     core: PRESERVE_CORE,
     ensureDir: () => Promise.resolve(),
   });
@@ -646,9 +615,7 @@ Deno.test("InitProjectUseCase: declared agentic path in a parent-managed sub-rep
     git: fakeGit(),
     lockStore,
     harness: fakeClaudeHarness(),
-    backlogBackend: "local",
-    versionScheme: "semver",
-    specBackend: "local",
+    ...LOCAL_SCHEMES,
     core: MIXED_CORE,
     ensureDir: () => Promise.resolve(),
   });
@@ -684,9 +651,7 @@ Deno.test("InitProjectUseCase: absent preservedPaths writes the full bundle (FR-
     git: fakeGit(),
     lockStore: fakeLockStore(),
     harness: fakeClaudeHarness(),
-    backlogBackend: "local",
-    versionScheme: "semver",
-    specBackend: "local",
+    ...LOCAL_SCHEMES,
     core: PRESERVE_CORE,
     ensureDir: () => Promise.resolve(),
   });

@@ -109,7 +109,7 @@ Deno.test("performance-expert is grounded in the project rather than a catalogue
   // five. The seat is grounded in what the repository itself records instead.
   const body = agent("performance-expert");
   assertStringIncludes(body, "## Step 0");
-  assertStringIncludes(body, ".specnaut/memory/constitution.md");
+  assertStringIncludes(body, "docs/constitution.md");
   assertStringIncludes(body, "standalone plugin");
   const stray = CORE_BUNDLE.filter((e) => (e.suffix ?? "").startsWith("memory/performance"));
   assert(

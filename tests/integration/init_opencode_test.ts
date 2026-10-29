@@ -85,7 +85,7 @@ Deno.test("specnaut init --ai opencode scaffolds a complete OpenCode project lay
     );
 
     // Shared (cross-harness)
-    assertEquals(await exists(join(root, ".specnaut/memory/constitution.md")), true);
+    assertEquals(await exists(join(root, "docs/constitution.md")), true);
     assertEquals(await exists(join(root, "AGENTS.md")), true);
     const agentsRoot = await Deno.readTextFile(join(root, "AGENTS.md"));
     assertEquals(agentsRoot.length > 0, true);

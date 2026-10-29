@@ -251,9 +251,9 @@ for (const ai of HARNESSES) {
       );
       assertStringIncludes(
         up.stdout,
-        `addendum ${addendum("specnaut", "review")} is not moved: ${
+        `addendum ${addendum("specnaut", "review")} is not moved to ${
           addendum("task", "review")
-        } already exists`,
+        }: a file is already there`,
       );
     });
   });
@@ -353,7 +353,7 @@ for (const ai of HARNESSES) {
       assertEquals(await Deno.readTextFile(join(dir, plan.newDest)), "# Our own plan notes\n");
       assertStringIncludes(
         up.stdout,
-        `${plan.oldDest} is not moved to ${plan.newDest}: a file Specnaut does not track`,
+        `${plan.oldDest} is not moved to ${plan.newDest}: a file is already there`,
       );
       // The customisation is not lost: it stays at the old address.
       assertStringIncludes(await Deno.readTextFile(join(dir, plan.oldDest)), USER_EDIT);

@@ -19,6 +19,8 @@ type CoreManifestEntry = {
   backend?: "local" | "github" | "gitlab";
   /** When true, the file is only written if absent (placeholder semantics). */
   skipIfExists?: boolean;
+  /** The team's own file: written if absent, never rewritten (spec 038). */
+  projectOwned?: boolean;
   /** Labels of the Specnaut-owned sections fenced inside the source (#466, #576). */
   managedSection?: string | readonly string[];
 };
@@ -206,6 +208,7 @@ async function buildCoreEntries(m: Manifest): Promise<string[]> {
         `    executable: ${entry.executable === true},\n` +
         `    backend: ${backend},\n` +
         `    skipIfExists: ${skipIfExists},\n` +
+        (entry.projectOwned === true ? `    projectOwned: true,\n` : "") +
         managedSection +
         `  }`,
     );

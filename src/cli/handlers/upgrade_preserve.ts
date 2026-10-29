@@ -6,6 +6,7 @@ import { isAgenticPath } from "../../domain/parent_managed.ts";
 import { orphanScope } from "../../domain/orphan_scope.ts";
 import { CORE_BUNDLE } from "../../templates_bundle.ts";
 import type { InstalledLock } from "../../domain/installed_lock.ts";
+import { CONSTITUTION_PATH, LEGACY_CONSTITUTION_PATH } from "../../domain/constitution_paths.ts";
 
 /**
  * Upgrade's preserve declarations (spec 011 / issue #367): the effective ones,
@@ -46,8 +47,18 @@ export async function resolveUpgradePreserves(
     .filter((d) => !parentManaged || !isAgenticPath(d));
   const store = new FsPreserveStore();
   await warnUnusableManifest(store, projectDir);
-  const { known, unknown } = resolvePreserveDeclarations(await store.read(projectDir), managed);
-  for (const path of unknown) {
+  const resolved = resolvePreserveDeclarations(await store.read(projectDir), managed);
+  // The old constitution moves whatever preserve.yml says (spec 038): every
+  // reader moved with it, so a preserved copy would be one nothing reads.
+  const legacy = (p: string) => p === LEGACY_CONSTITUTION_PATH;
+  if ([...resolved.known, ...resolved.unknown].some(legacy)) {
+    console.error(yellow(
+      `warn: ${LEGACY_CONSTITUTION_PATH} — declared preserved, but upgrade moves it to ` +
+        `${CONSTITUTION_PATH}, which it never rewrites; remove the line from .specnaut/preserve.yml`,
+    ));
+  }
+  const known = resolved.known.filter((p) => !legacy(p));
+  for (const path of resolved.unknown.filter((p) => !legacy(p))) {
     console.error(yellow(`warn: ${path} — declared preserved but not a managed file (ignored)`));
   }
   const declared = new Set(resetPreserved ? [] : known);

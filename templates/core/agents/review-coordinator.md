@@ -22,12 +22,16 @@ in parallel and aggregate results.
 0. **Measure sizes.** Run `bash .specnaut/scripts/bash/size-ratchet.sh --since
    "$(git merge-base HEAD <default branch>)" --report`: every changed file's
    line count at the base and at head, renames measured against their old
-   path. Put its output in every seat's brief, with the constitution's
-   `## Size limits` table — or the path `.specnaut/memory/size-limits.md` when
-   it has none. The seats read; you measure. Severity for size comes from that
+   path. Put its output in every seat's brief, with the path
+   `.specnaut/memory/size-limits.md` (and `.specnaut/size-limits.yml` when the
+   project has one). The seats read; you measure. Severity for size comes from that
    file's table, nowhere else; exit 2 (unreadable table) is a HIGH finding,
    and any exit but 0, 1 or 2 means nothing was measured — say so in every
-   brief; never brief "no size data" as clean.
+   brief; never brief "no size data" as clean. Then run
+   `bash .specnaut/scripts/bash/boundary-check.sh` when it is present, and put
+   its output in every brief too: exit 1 (a forbidden import in the domain) and
+   exit 2 (the check could not run) are HIGH findings; exit 4 is briefed as
+   *skipped: <reason>*, never as clean (`phases/quality-gates.md`).
 1. Always spawn `code-reviewer` and `security-expert` in parallel, passing them
    the list of changed files.
 2. If any changed file matches `**/*test*.*` or `**/*_test.*` or `**/test/**`

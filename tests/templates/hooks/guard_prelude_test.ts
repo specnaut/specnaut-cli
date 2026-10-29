@@ -30,6 +30,10 @@ const GUARDS: ReadonlyArray<[hook: string, harness: Harness, fixture: string]> =
   ["guard-dispatch-model.sh", "codex", "pre_tool_use_spawn_agent"],
   ["protect-generated.sh", "claude", "pre_tool_use_edit"],
   ["protect-generated.sh", "codex", "pre_tool_use_apply_patch"],
+  ["protect-constitution.sh", "claude", "pre_tool_use_edit"],
+  ["protect-constitution.sh", "claude", "pre_tool_use_bash"],
+  ["protect-constitution.sh", "codex", "pre_tool_use_apply_patch"],
+  ["protect-constitution.sh", "codex", "pre_tool_use_bash"],
 ];
 
 Deno.test("every guard exits 2 on bad JSON, an unknown shape, a missing jq or a missing harness", async () => {

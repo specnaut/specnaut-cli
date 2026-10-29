@@ -103,3 +103,21 @@ export async function pathWithCrlfJq(sb: Sandbox): Promise<string> {
   await Deno.chmod(join(bin, "jq"), 0o755);
   return [bin, ...pathEntries(sb.env.PATH)].join(DELIMITER);
 }
+
+/** Git Bash, faked off Windows: its OSTYPE, and a cygpath that maps `C:/x` to `/x`. */
+export async function gitBash(
+  sb: Sandbox,
+): Promise<{ env: Record<string, string>; win: (p: string) => string }> {
+  if (WINDOWS) return { env: {}, win: (p) => p };
+  const bin = join(sb.dir, "bin-cygpath");
+  await Deno.mkdir(bin);
+  await Deno.writeTextFile(
+    join(bin, "cygpath"),
+    `#!/usr/bin/env bash\n[ "$1" = -u ] || exit 64\nprintf '%s\\n' "\${2#[A-Za-z]:}"\n`,
+  );
+  await Deno.chmod(join(bin, "cygpath"), 0o755);
+  return {
+    env: { OSTYPE: "msys", PATH: [bin, ...pathEntries(sb.env.PATH)].join(DELIMITER) },
+    win: (p) => `C:${p.replaceAll("/", "\\")}`,
+  };
+}

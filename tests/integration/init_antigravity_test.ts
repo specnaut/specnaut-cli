@@ -96,7 +96,7 @@ Deno.test("specnaut init --ai antigravity scaffolds an Antigravity layout", asyn
     assertEquals(agentContent.includes("model: opus"), false);
 
     // Shared (cross-harness) project metadata still emitted.
-    assertEquals(await exists(join(root, ".specnaut/memory/constitution.md")), true);
+    assertEquals(await exists(join(root, "docs/constitution.md")), true);
     assertEquals(await exists(join(root, "AGENTS.md")), true);
     assertEquals(await exists(join(root, "tasks/backlog.md")), false);
     // These inits take the DEFAULT backend, which is `cloud` — so there is no

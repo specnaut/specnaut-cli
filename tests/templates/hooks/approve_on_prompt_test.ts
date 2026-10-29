@@ -41,7 +41,21 @@ const RELEASE = [
   "$specnaut-ship tag",
   "yes, release it",
 ];
+// Spec 038 S2: each of the two project-owned kinds has its own phrase, and
+// asking for an amendment is never approving one.
+const CONSTITUTION = [
+  "approve the constitution amendment",
+  "  Approve the Constitution Amendment. ",
+  "yes, approve the constitution amendment",
+];
+const GATE_CONFIG = ["approve the gate config change", "Approve the gate config change!"];
 const NOTHING = [
+  "amend the constitution",
+  "/task constitution",
+  "approve the constitution",
+  "approve the constitution amendment and merge",
+  "approve the gate config",
+  "approve",
   "yes",
   "ok",
   "go",
@@ -74,6 +88,8 @@ Deno.test("approve-on-prompt mints the right kind for each anchored phrase, on b
       const cases: Array<[string, string | null]> = [
         ...MERGE.map((p): [string, string] => [p, "merge"]),
         ...RELEASE.map((p): [string, string] => [p, "release"]),
+        ...CONSTITUTION.map((p): [string, string] => [p, "constitution"]),
+        ...GATE_CONFIG.map((p): [string, string] => [p, "gate-config"]),
         ...NOTHING.map((p): [string, null] => [p, null]),
       ];
       for (const [prompt, kind] of cases) {

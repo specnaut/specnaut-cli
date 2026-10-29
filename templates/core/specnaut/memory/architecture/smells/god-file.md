@@ -10,9 +10,9 @@
 ## How to spot it
 
 A single file far larger than its neighbours, usually accumulating unrelated
-responsibilities. **The finding's threshold is the file limit in the project's
-constitution** — `.specnaut/memory/size-limits.md` holds the rule and the
-defaults; no other number decides it. In an audit, also report the
+responsibilities. **The finding's threshold is the project's file limit** —
+`.specnaut/memory/size-limits.md` holds the rule and the defaults; no other
+number decides it. In an audit, also report the
 **distribution**: a file three times the size of the next-largest tells the
 reader where to start. It is context for the finding, not a second threshold.
 
@@ -32,7 +32,7 @@ still change together.
 
 Generated code, a vendored bundle, a lockfile, a data table, or a
 deliberately-single-file module whose content is one long flat list — list it
-under the constitution's `Exempt:` line; an authored file is still held to its
+under the size limits' `exempt:` list; an authored file is still held to its
 limit. Judge by
 responsibilities, and check whether the file is authored at all before
 flagging it.

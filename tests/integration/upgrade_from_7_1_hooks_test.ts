@@ -106,10 +106,17 @@ async function plant7_1(dir: string, customized: boolean): Promise<Registration[
 /** SC-003, read off the file: each Specnaut hook once at its new path, the user's kept, none dangling. */
 async function assertHooksMigrated(dir: string, bundled: Registration[], run: string) {
   const regs = registrations(await readSettings(dir));
+  // Keyed on the group too: one script may guard two (spec 038 registers
+  // protect-constitution.sh under both the Edit and the Bash matcher).
   for (const b of bundled) {
-    const found = regs.filter((r) => r.event === b.event && r.command === b.command);
-    assertEquals(found.length, 1, `${run}: ${b.event} \`${b.command}\` × ${found.length}`);
-    assertEquals(found[0].matcher, b.matcher, `${run}: \`${b.command}\` in the wrong group`);
+    const found = regs.filter((r) =>
+      r.event === b.event && r.matcher === b.matcher && r.command === b.command
+    );
+    assertEquals(
+      found.length,
+      1,
+      `${run}: ${b.event} ${b.matcher} \`${b.command}\` × ${found.length}`,
+    );
   }
   const ours = (rs: Registration[]) => rs.filter((r) => r.command.includes(".specnaut/hooks/"));
   assertEquals(ours(regs).length, ours(bundled).length, `${run}: a stale Specnaut entry is left`);

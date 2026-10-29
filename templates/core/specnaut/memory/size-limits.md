@@ -1,20 +1,24 @@
 > **Agents depend on this file.** Every phase and agent that judges the size of
 > a file or a function cites it instead of carrying its own number. Moving or
 > renaming it breaks those links in silence. Specnaut owns it: `specnaut
-> upgrade` rewrites it, so a project changes its limits in its constitution,
-> never here.
+> upgrade` rewrites it, so a project changes its limits in
+> `.specnaut/size-limits.yml`, never here.
 
 # Size limits
 
 ## Where the numbers come from — the one rule
 
-**The `## Size limits` table in `.specnaut/memory/constitution.md` is the only
-source of thresholds. The defaults below apply only to a unit that table does
-not list** — including every unit, when the constitution has no such table.
+**`.specnaut/size-limits.yml` is the only source of a project's thresholds.
+The defaults below apply only to a unit that file does not set** — including
+every unit, when the project has no such file. The project owns the file:
+Specnaut never ships or rewrites it, and where the harness runs Specnaut's
+hooks, an agent's edit to it needs the user's approval: loosening a limit
+disarms its own gate.
 
-A threshold written anywhere else — an agent, a phase, a catalogue leaf — is
-not a threshold. Every size finding names the unit, the measured value, and the
-limit with its source: `constitution` or `default`.
+A threshold written anywhere else — an agent, a phase, a catalogue leaf, a
+table in the constitution — is not a threshold. Every size finding names the
+unit, the measured value, and the limit with its source: `config` or
+`default`.
 
 ## Defaults
 
@@ -22,43 +26,52 @@ limit with its source: `constitution` or `default`.
 | :--- | ---: | ---: |
 | file | 300 | 500 |
 | function | 30 | 50 |
-| constitution | 300 | 500 |
+| constitution | 60 | 100 |
 
-`constitution` is the constitution file itself. It is loaded into every
-session, so every line it gains is paid by every later session; it is the one
-file under `.specnaut/` the limits measure.
+`constitution` is `docs/constitution.md` itself. It is loaded into every
+session, so every line it gains is paid by every later session: it keeps
+principles only, which is why its limits are the shortest.
 
-## The table, in a constitution
+## The config file
 
-```markdown
-## Size limits
-
-| Unit | Target | Ceiling |
-| :--- | ---: | ---: |
-| file | 300 | 500 |
-| function | 30 | 50 |
-| constitution | 300 | 500 |
-
-Exempt: `*.lock`, `**/generated/**`
+```yaml
+# .specnaut/size-limits.yml — set only what differs from the defaults
+file:
+  target: 300
+  ceiling: 500
+function:
+  target: 30
+  ceiling: 50
+constitution:
+  target: 60
+  ceiling: 100
+exempt:
+  - "*.lock"
+  - "**/generated/**"
 ```
 
-- One row per unit, no merged cells. `file`, `function` and `constitution` are
-  the expected rows; others (`class`, `component`) are allowed and judged by
-  the agents.
-- A value is a whole number of lines, or `none`. `none` as a target turns off
-  rule 2 for that unit; `none` as a ceiling turns off rule 1.
-- `Exempt:` is optional: backquoted globs, comma-separated, matched against the
-  path from the repository root. An exempt file has no file limit at all.
-  Lockfiles, generated code and vendored bundles are what it is for.
-- `.specnaut/scripts/bash/size-ratchet.sh` reads exactly this shape. A table it
-  cannot read — including a heading spelled differently, or a `files` row —
-  stops it with exit 2; it never passes silently and never falls back to the
-  defaults.
+- Each unit — `file`, `function`, `constitution` — sets both `target` and
+  `ceiling`. A value is a whole number of lines, or `none`. `none` as a target
+  turns off rule 2 for that unit; `none` as a ceiling turns off rule 1. Other
+  units (`class`, `component`) are the agents' judgement, never the config's.
+- `exempt:` is optional: globs, one per line and quoted (`*.lock` bare is not
+  YAML), matched against the path from the repository root. An exempt file has
+  no file limit at all. Lockfiles, generated code and vendored bundles are what
+  it is for.
+- The form is a narrow block YAML: a key alone on its line, children indented
+  two spaces, full-line `#` comments. A flow map (`file: {…}`), a tab, a
+  trailing comment, a repeated key, a link at the path, or a value that is not
+  a number or `none` stops `.specnaut/scripts/bash/size-ratchet.sh` with exit 2;
+  it never passes silently and never falls back to the defaults.
 - Specnaut's own files — `.specnaut/**` and everything `.specnaut/installed.lock`
   lists — are exempt without being listed: `specnaut upgrade` rewrites them.
   The constitution is the exception: whenever it changes, the ratchet holds it
-  to the `constitution` unit, and `Exempt:` globs do not reach it. To lift its
-  limit, write `| constitution | none | none |`.
+  to the `constitution` unit, and `exempt:` globs do not reach it. To lift its
+  limit, set both its values to `none`.
+- A constitution written before this file existed may still carry a size
+  table. It is no longer read: `specnaut upgrade` copies a non-default one into
+  `.specnaut/size-limits.yml` once, when that file is absent, and says the
+  table can be deleted.
 
 ## The three rules
 
@@ -98,7 +111,7 @@ harm: a HIGH size finding is routed back like any other HIGH, every time.
 ## A file that is not authored
 
 Generated code, a vendored bundle, a lockfile, a data table: list it under
-`Exempt:` rather than arguing each review. A file that is authored is not
+`exempt:` in the config rather than arguing each review. A file that is authored is not
 excused by the smell's "when it is not a smell" — the limit still applies. The god-file smell in
 `.specnaut/memory/architecture/smells/god-file.md` covers the judgement call;
 the limits above cover the number.
@@ -121,10 +134,10 @@ behaviour lands as a "create module X" task wherever it can; a task that adds
 to a file over its target comes only after that file's extraction, and says the
 size the file must stay within (its size at plan time).
 
-**implement** — re-read the constitution before the first task, and put its
-`## Size limits` table (or this file's path, when it has none) in every
+**implement** — read `.specnaut/size-limits.yml` before the first task, and
+put its limits (or this file's path, when the project has none) in every
 subagent's dispatch brief: a subagent sees one task and one file, and without
-the table has no reason to stop a file from growing. Run `wc -l` on each file a
+the limits has no reason to stop a file from growing. Run `wc -l` on each file a
 task touches and report every one as
 `file: before → after (target T, ceiling C)`, "before" being its size at the
 branch's merge base. The developer puts that line in its completion report's
@@ -135,7 +148,7 @@ never after.
 **review** — the review coordinator runs
 `bash .specnaut/scripts/bash/size-ratchet.sh --since <merge base> --report`, which
 measures every changed file at the base and at head (a renamed file against its
-old path), and briefs each seat with that output and the table. It runs for
+old path), and briefs each seat with that output and the limits. It runs for
 every reviewed change, standalone or epic. The severity
 table above is the only one; `code-reviewer` cites it and reports
 `wc -l <before> → <after>` for every file that ends over its target. A HIGH size

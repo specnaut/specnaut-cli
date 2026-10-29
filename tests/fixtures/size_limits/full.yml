@@ -1,0 +1,13 @@
+# Size limits for this project.
+file:
+  target: 250
+  ceiling: 400
+function:
+  target: 25
+  ceiling: 40
+constitution:
+  target: 80
+  ceiling: 120
+exempt:
+  - "*.lock"
+  - "**/generated/**"

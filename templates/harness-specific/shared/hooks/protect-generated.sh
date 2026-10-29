@@ -12,13 +12,9 @@
 #           guard off). Gated like a merge: Claude's prompt where it can ask,
 #           else this turn's `merge` approval.
 #
-# Decided by identity, never by text (§ 11 F5): each target is resolved
-# against the payload cwd, `.`/`..`/`//` collapsed, then its deepest existing
-# ancestor is compared with `-ef` to the protected path's, the remainder case-
-# folded — so a symlink, a case variant on APFS, or a path relative to a
-# subdirectory names the same file. Codex paths come from the patch headers
-# `*** Add|Update|Delete File:` and `*** Move to:` (indented, CRLF, any case);
-# a patch from which no path can be read is refused.
+# Decided by identity, never by text (§ 11 F5) — see _paths.sh, which reads
+# the paths an edit names and resolves them; a patch from which no path can be
+# read is refused.
 #
 # Usage: protect-generated.sh <claude|codex>   (payload on stdin)
 case ${BASH_SOURCE[0]} in */*) HOOK_DIR=${BASH_SOURCE[0]%/*} ;; *) HOOK_DIR=. ;; esac
@@ -26,85 +22,22 @@ case ${BASH_SOURCE[0]} in */*) HOOK_DIR=${BASH_SOURCE[0]%/*} ;; *) HOOK_DIR=. ;;
 . "$HOOK_DIR/_guard.sh" || { echo "specnaut: $HOOK_DIR/_guard.sh is missing — refusing" >&2; exit 2; }
 # shellcheck source=_approval.sh
 . "$HOOK_DIR/_approval.sh"
+# shellcheck source=_paths.sh
+. "$HOOK_DIR/_paths.sh" || guard_fail "_paths.sh is missing beside protect-generated.sh"
 guard_init protect-generated "${1:-}" .tool_input.file_path .tool_input.notebook_path lines:.tool_input.command
 
-paths=()
-case "$GUARD_HARNESS:$P_TOOL" in
-  claude:Edit | claude:Write | claude:MultiEdit) paths=("${GF[0]}") ;;
-  claude:NotebookEdit) paths=("${GF[1]}") ;;
-  codex:apply_patch)
-    re_file='^[[:space:]]*\*\*\*[[:space:]]*(add|update|delete)[[:space:]]+file:[[:space:]]*(.*)$'
-    re_move='^[[:space:]]*\*\*\*[[:space:]]*move[[:space:]]+to:[[:space:]]*(.*)$'
-    shopt -s nocasematch
-    while IFS= read -r line || [ -n "$line" ]; do
-      if [[ $line =~ $re_file ]]; then p=${BASH_REMATCH[2]}
-      elif [[ $line =~ $re_move ]]; then p=${BASH_REMATCH[1]}
-      else continue; fi
-      p=${p%"${p##*[![:space:]]}"} # trailing blanks, a CRLF's \r among them
-      if [ -n "$p" ]; then paths+=("$p"); fi
-    done <<<"${GF[2]}"
-    shopt -u nocasematch ;;
-  *) guard_fail "expected an edit, got tool '$P_TOOL' on $GUARD_HARNESS" ;;
-esac
-if [ ${#paths[@]} = 0 ] || [ -z "${paths[0]}" ]; then
-  guard_fail "could not read the file path this $P_TOOL edits — refusing an edit it cannot check"
-fi
+paths_of_edit "${GF[0]}" "${GF[1]}" "${GF[2]}"
 guard_root
 
-# norm <path> — absolute against the payload cwd, with //, . and .. collapsed;
-# a Windows path (`C:\…`, `src\…`) first in this shell's own form.
-norm() {
-  local p part out="" IFS=/
-  guard_path p "$1"
-  case $p in /*) ;; *) p="$GUARD_CWD/$p" ;; esac
-  for part in $p; do
-    case $part in '' | .) ;; ..) out=${out%/*} ;; *) out="$out/$part" ;; esac
-  done
-  printf '%s' "${out:-/}"
-}
-
-# names <abs target> <path relative to the root> [under] — the target IS the
-# protected path (with `under`: is it, or lies beneath it). Walks up the
-# target; at each existing ancestor, an `-ef` match against an existing
-# prefix of the protected path decides, the rest compared case-folded.
-names() {
-  local anc=$1 rest="" k n r=1
-  local -a pc suf
-  IFS=/ read -r -a pc <<<"$2"
-  n=${#pc[@]}
-  suf[n]=""
-  for ((k = n - 1; k >= 0; k--)); do suf[k]="${pc[k]}${suf[k + 1]:+/${suf[k + 1]}}"; done
-  shopt -s nocasematch
-  while [ "$r" = 1 ]; do
-    if [ -e "$anc" ]; then
-      local pk=$GUARD_ROOT
-      for ((k = 0; k <= n; k++)); do
-        [ -e "$pk" ] || break
-        if [ "$anc" -ef "$pk" ]; then
-          if [[ $rest == "${suf[k]}" ]]; then r=0; break; fi
-          if [ "${3:-}" = under ] && { [ -z "${suf[k]}" ] || [[ $rest == "${suf[k]}"/* ]]; }; then r=0; break; fi
-        fi
-        if [ "$k" -lt "$n" ]; then pk="$pk/${pc[k]}"; fi
-      done
-    fi
-    if [ "$r" = 0 ] || [ "$anc" = / ]; then break; fi
-    rest="${anc##*/}${rest:+/$rest}"
-    anc=${anc%/*}
-    anc=${anc:-/}
-  done
-  shopt -u nocasematch
-  return "$r"
-}
-
 denied="" gated=()
-for p in "${paths[@]}"; do
-  t=$(norm "$p")
-  if names "$t" .specnaut/installed.lock; then denied=$p; break; fi
+for p in "${EDIT_PATHS[@]}"; do
+  t=$(paths_norm "$p")
+  if paths_names "$t" .specnaut/installed.lock; then denied=$p; break; fi
   for g in .specnaut/workflow.yml .specnaut/scripts/bash/merge-mode.sh .specnaut/scripts/bash/base-branch.sh \
     .codex/hooks.json .claude/settings.json .claude/settings.local.json; do
-    if names "$t" "$g"; then gated+=("$g"); fi
+    if paths_names "$t" "$g"; then gated+=("$g"); fi
   done
-  if names "$t" .specnaut/hooks under; then gated+=(".specnaut/hooks/"); fi
+  if paths_names "$t" .specnaut/hooks under; then gated+=(".specnaut/hooks/"); fi
 done
 
 if [ -n "$denied" ]; then

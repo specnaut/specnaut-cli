@@ -9,11 +9,17 @@
 # a trailing . or ! dropped, an optional leading "yes, ") is one of:
 #   merge    /task merge…  /specnaut-task merge…  $specnaut-task merge…  merge  merge it  land it  push it
 #   release  /ship release|tag…  /specnaut-ship release|tag…  $specnaut-ship release|tag…  release it  tag it
+#   constitution  approve the constitution amendment   (spec 038 S2: the phrase
+#   gate-config   approve the gate config change        the constitution verb prints)
 # Claude spells the skills /task, /ship; Codex /specnaut-task or $specnaut-task
 # (harness_commands.ts). A test holds these spellings to harnessCommands.
 # Never a bare yes/ok/go: a reply to some other question must not land code.
 # A prompt carrying agent_id comes from a subagent, not the user (§ 11
 # Measured): nothing is minted or deleted for it.
+#
+# Each user prompt also fingerprints the project-owned files, and Stop
+# compares them (_baseline.sh): a change no approval covered blocks the stop
+# with a question.
 #
 # Not a guard: every failure exits 0 with the reason on stderr. Exit 2 here
 # would block the user's prompt, or keep a Claude turn from stopping; failing
@@ -23,10 +29,14 @@ case ${BASH_SOURCE[0]} in */*) HOOK_DIR=${BASH_SOURCE[0]%/*} ;; *) HOOK_DIR=. ;;
 . "$HOOK_DIR/_guard.sh" || { echo "specnaut: $HOOK_DIR/_guard.sh is missing" >&2; exit 0; }
 # shellcheck source=_approval.sh
 . "$HOOK_DIR/_approval.sh"
+# shellcheck source=_paths.sh
+. "$HOOK_DIR/_paths.sh"
+# shellcheck source=_baseline.sh
+. "$HOOK_DIR/_baseline.sh"
 GUARD_FAIL_CODE=0
-guard_init approve-on-prompt "${1:-}" .prompt
+guard_init approve-on-prompt "${1:-}" .prompt any:.stop_hook_active
 
-# approval_kind_of <prompt> — prints merge, release, or nothing.
+# approval_kind_of <prompt> — prints merge, release, constitution, gate-config, or nothing.
 approval_kind_of() {
   local p
   p=$(printf '%s' "$1" | tr '[:upper:]' '[:lower:]' | tr -s '[:space:]' ' ')
@@ -48,20 +58,31 @@ approval_kind_of() {
       "/specnaut-ship release" | "/specnaut-ship release "* | "/specnaut-ship tag" | "/specnaut-ship tag "* | \
       '$specnaut-ship release' | '$specnaut-ship release '* | '$specnaut-ship tag' | '$specnaut-ship tag '*)
       echo release ;;
+    "approve the constitution amendment") echo constitution ;;
+    "approve the gate config change") echo gate-config ;;
   esac
 }
 
 [ -z "$P_AGENT" ] || exit 0
 
 approval_session_ok "$P_SESSION" || guard_fail "session_id is missing or not a plain token — no approval minted"
+guard_root # here, not in the subshells below: _baseline.sh reads GUARD_ROOT
 stamp=$(approval_path "$P_SESSION")
-rm -f "$stamp"
+baseline=$(approval_state baselines "$P_SESSION")
 
 case $P_EVENT in
-  Stop) exit 0 ;;
-  UserPromptSubmit) ;;
-  *) guard_fail "unexpected event '$P_EVENT' — expected UserPromptSubmit or Stop" ;;
+  Stop)
+    # What this turn approved is read before the stamp goes; the stamp goes
+    # before anything that could fail and leave it outliving the turn.
+    kinds=""
+    for k in constitution gate-config; do if approved "$k"; then kinds+=" $k"; fi; done
+    rm -f "$stamp"
+    baseline_check "$baseline" "$kinds" "${GF[1]}"
+    exit 0 ;;
+  UserPromptSubmit) rm -f "$stamp" ;;
+  *) rm -f "$stamp"; guard_fail "unexpected event '$P_EVENT' — expected UserPromptSubmit or Stop" ;;
 esac
+baseline_snapshot "$baseline"
 
 kind=$(approval_kind_of "${GF[0]}")
 [ -n "$kind" ] || exit 0

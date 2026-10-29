@@ -1,0 +1,6 @@
+constitution:
+  target: none
+  ceiling: none
+file:
+  ceiling: 600
+  target: none

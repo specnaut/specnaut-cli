@@ -1,0 +1,5 @@
+file 250 400 config
+function 25 40 config
+constitution 80 120 config
+exempt *.lock
+exempt **/generated/**

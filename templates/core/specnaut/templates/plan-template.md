@@ -95,7 +95,7 @@ number beats a paragraph. Who is hurting, how often, and what it costs them toda
 
 | Principle | Verdict | Note |
 | :--- | :--- | :--- |
-| Size limits (`## Size limits`, or the defaults in `.specnaut/memory/size-limits.md`) | pass / violation | [mandatory row — never removed] |
+| Size limits (`.specnaut/memory/size-limits.md`, or the project's `.specnaut/size-limits.yml`) | pass / violation | [mandatory row — never removed] |
 | [principle] | pass / violation | [why] |
 
 ### Files touched

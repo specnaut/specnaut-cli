@@ -62,7 +62,10 @@ async function editRegistry(dir: string, rel: string): Promise<void> {
 Deno.test("codex init prints the trust note with the hooks it registered", async () => {
   await withProject("codex", (_dir, _home, out) => {
     assertStringIncludes(out, NOTE);
-    assertStringIncludes(out, "Until then the merge, release, generated-file and model guards");
+    assertStringIncludes(
+      out,
+      "Until then the merge, release, generated-file, constitution and model guards",
+    );
     assertStringIncludes(out, "Specnaut's hooks: approve-on-prompt.sh, guard-dispatch-model.sh");
     assert(!out.includes("not installed by Specnaut"), out);
     return Promise.resolve();
@@ -119,5 +122,32 @@ Deno.test("a customized hook file is named until --force restores the folder", a
     assert(!forced.out.includes("is customized:"), forced.out);
     // `--force` rewrote a file Codex hashes: the trust has to be given again.
     assertStringIncludes(forced.out, NOTE);
+  });
+});
+
+/** A project init'ed by the release before: its hook file is untouched, the bundle's is newer. */
+async function outdateHook(dir: string, rel: string): Promise<void> {
+  const old = "#!/usr/bin/env bash\n# the previous release's copy\nexit 0\n";
+  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(old));
+  const sha = [...new Uint8Array(digest)].map((b) => b.toString(16).padStart(2, "0")).join("");
+  await Deno.writeTextFile(join(dir, rel), old);
+  const lockPath = join(dir, ".specnaut/installed.lock");
+  const lock = await Deno.readTextFile(lockPath);
+  const at = lock.indexOf(`  ${rel}:\n    sha256: `);
+  assert(at >= 0, `the lock does not track ${rel}`);
+  const start = at + `  ${rel}:\n    sha256: `.length;
+  await Deno.writeTextFile(lockPath, lock.slice(0, start) + sha + lock.slice(start + 64));
+}
+
+Deno.test("a codex upgrade that rewrites an outdated Specnaut hook tells the user to trust it again", async () => {
+  // Spec 038, FR-016: a release that changes the hooks (the constitution guard)
+  // leaves every Codex guard off until re-trusted, and the upgrade must say so.
+  await withProject("codex", async (dir, home) => {
+    await outdateHook(dir, CUSTOMIZED);
+    const up = await runSpecnaut(["upgrade"], dir, home);
+    assertEquals(up.code, 0, up.out);
+    assertStringIncludes(up.out, CUSTOMIZED);
+    assertStringIncludes(up.out, NOTE);
+    assert(!up.out.includes("is customized:"), up.out);
   });
 });

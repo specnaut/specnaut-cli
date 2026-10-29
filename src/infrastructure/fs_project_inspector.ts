@@ -2,6 +2,7 @@ import { join } from "@std/path";
 import { parse as parseYaml } from "@std/yaml";
 import type { PluginDetector, ProjectInspector } from "../application/ports.ts";
 import { checkAddenda, checkStaleRouter } from "./fs_phase_routing_checks.ts";
+import { checkConstitution } from "./fs_constitution_check.ts";
 import type { CheckOutcome } from "../domain/check_result.ts";
 import {
   type BacklogBackend,
@@ -22,10 +23,6 @@ async function exists(path: string): Promise<boolean> {
     if (err instanceof Deno.errors.NotFound) return false;
     throw err;
   }
-}
-
-function isEmptyPlaceholderConstitution(text: string): boolean {
-  return text.includes("(none defined yet)") || text.trim().length === 0;
 }
 
 /**
@@ -101,7 +98,7 @@ export class FsProjectInspector implements ProjectInspector {
 
     outcomes.push(await this.checkDir(projectDir, ".specnaut/"));
     outcomes.push(await this.checkHarness(projectDir));
-    outcomes.push(await this.checkConstitution(projectDir));
+    outcomes.push(await checkConstitution(projectDir));
     outcomes.push(await this.checkTemplatesVersion(projectDir, templatesVersion));
     outcomes.push(await this.checkBacklogConfig(projectDir));
     outcomes.push(...await this.checkClaudeConfig(projectDir));
@@ -416,25 +413,5 @@ export class FsProjectInspector implements ProjectInspector {
     return (await exists(path))
       ? { name: rel, status: "pass", message: "present" }
       : { name: rel, status: "fail", message: `missing — run 'specnaut init --here'` };
-  }
-
-  private async checkConstitution(projectDir: string): Promise<CheckOutcome> {
-    const path = join(projectDir, ".specnaut/memory/constitution.md");
-    if (!(await exists(path))) {
-      return {
-        name: "constitution",
-        status: "fail",
-        message: "missing .specnaut/memory/constitution.md",
-      };
-    }
-    const text = await Deno.readTextFile(path);
-    if (isEmptyPlaceholderConstitution(text)) {
-      return {
-        name: "constitution",
-        status: "warn",
-        message: "placeholder — edit .specnaut/memory/constitution.md",
-      };
-    }
-    return { name: "constitution", status: "pass", message: "populated" };
   }
 }

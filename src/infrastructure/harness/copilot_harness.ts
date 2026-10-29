@@ -1,4 +1,4 @@
-import { managedSectionField } from "./harness_managed.ts";
+import { managedSectionField, ownershipFields } from "./harness_managed.ts";
 import type { Harness } from "../../application/ports.ts";
 import type { BundleOptions } from "../../application/bundle_options.ts";
 import { HARNESS_STATIC } from "../../templates_bundle.ts";
@@ -74,7 +74,7 @@ export class CopilotHarness implements Harness {
         content: isInstruction ? toCopilotInstructionMarkdown(entry) : entry.content,
         executable: entry.executable,
         ...(entry.category === "mergeable-project-root" ? { mergeBlock: "gitignore" } : {}),
-        ...(entry.skipIfExists ? { skipIfExists: true as const } : {}),
+        ...ownershipFields(entry),
         ...managedSectionField(entry),
       }, this.key);
     }

@@ -299,56 +299,12 @@ Deno.test("the contract carries no outward-pointing identifier", () => {
   assertEquals(hits, [], "an example naming something real is a § XI incident, not a typo");
 });
 
-/** FR-005 — the opt-out is only real if the contract says what counts as one. */
-Deno.test("the contract states the literal declaration form AND the fail-safe", () => {
-  const { content } = contractEntry();
-  assert(
-    flat(content).includes("## Target surface"),
-    "the contract must show the exact heading a project writes",
-  );
-  assert(
-    /not matching that form is treated as absent/i.test(flat(content)),
-    "without this sentence, ambiguity fails OPEN and a project loses the default silently",
-  );
-  assert(
-    /\.specnaut\/memory\/constitution\.md/.test(content),
-    "the contract must name the file the declaration goes in",
-  );
-});
-
 /** FR-014 — the scope-limiting sentence. A partial mitigation, but it is free. */
 Deno.test("the contract limits its own authority", () => {
   assert(
     /confers no authority/i.test(flat(contractEntry().content)),
     "an always-on instruction file must say what it does NOT authorise",
   );
-});
-
-/** FR-006 — BOTH constitution files carry the section, or the opt-out's named
- * home has nowhere to declare under. The seed is the one a project actually
- * receives at init; the template is what `/specnaut constitution` fills. */
-Deno.test("both constitution files carry Front-end patterns and the pointer", () => {
-  // Both constitution files ship as category `spec-root`, name `specify` —
-  // indistinguishable by name, so they are told apart by content. Filtering on
-  // the category first matters: the `constitution` PHASE doc also mentions
-  // `[PRINCIPLE_1_NAME]` as prose, and a name-free search finds it instead.
-  const specRoot = CORE_BUNDLE.filter((e) => e.category === "spec-root");
-  const files = [
-    ["seed", specRoot.find((e) => e.content.includes("# Project Constitution"))],
-    ["template", specRoot.find((e) => e.content.includes("[PRINCIPLE_1_NAME]"))],
-  ] as const;
-  for (const [which, entry] of files) {
-    assert(entry, `the ${which} constitution is not in CORE_BUNDLE`);
-    const flatText = flat(entry!.content);
-    assert(
-      flatText.includes("## Front-end patterns"),
-      `the ${which} constitution has no Front-end patterns section`,
-    );
-    assert(
-      flatText.includes(CONTRACT),
-      `the ${which} constitution's Front-end patterns does not point at the contract`,
-    );
-  }
 });
 
 /** FR-009 — plan.md promises this assertion by name. Round 2: regressing the

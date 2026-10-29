@@ -28,7 +28,7 @@ SURFACES=(
   # map keyed on claims.
   'templates/core/skills/task/scripts/cloud/*|smoke-backlog-cloud.sh|cloud-backlog-script'
   'templates/core/hooks/*|smoke-hooks.sh|bundled-hook'
-  'templates/core/specnaut/scripts/*/*|smoke-features.sh|specnaut-helper-script'
+  'templates/core/specnaut/scripts/*/*|smoke-features.sh smoke-gates.sh|specnaut-helper-script'
   'templates/core/specnaut/LABELS.md|smoke-features.sh smoke-backlog-github.sh smoke-backlog-gitlab.sh|labels-doc'
   # Categories that ship and were claimed by no glob. Explicit, NOT
   # `templates/core/specnaut/*.md` or `skills/*/*.md`: `case` globs traverse

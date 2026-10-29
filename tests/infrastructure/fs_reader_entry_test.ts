@@ -1,4 +1,4 @@
-import { assertEquals } from "@std/assert";
+import { assertEquals, assertRejects } from "@std/assert";
 import { join } from "@std/path";
 import { DenoFsReader } from "../../src/infrastructure/fs_reader.ts";
 import { WINDOWS } from "../helpers/link_text.ts";
@@ -98,5 +98,33 @@ Deno.test("a dangling ancestor reads as absent, never as a refusal (cli#686)", {
     const reader = new DenoFsReader();
     assertEquals(await reader.readEntry(dir, ".claude/CLAUDE.md"), null);
     assertEquals(await reader.readText(dir, ".claude/CLAUDE.md"), null);
+  });
+});
+
+Deno.test("a project directory that does not exist yet holds nothing: null, not a throw", async () => {
+  await withProject(async (dir) => {
+    const r = new DenoFsReader();
+    const ahead = join(dir, "not-yet");
+    assertEquals(await r.readEntry(ahead, "AGENTS.md"), null);
+    assertEquals(await r.readText(ahead, "AGENTS.md"), null);
+  });
+});
+
+Deno.test({
+  name: "a file that is there and cannot be read throws, never reads as absent",
+  ignore: WINDOWS,
+}, async () => {
+  await withProject(async (dir) => {
+    await Deno.writeTextFile(join(dir, "AGENTS.md"), "# A\n");
+    await Deno.chmod(join(dir, "AGENTS.md"), 0o000);
+    try {
+      const r = new DenoFsReader();
+      const readable = await Deno.readFile(join(dir, "AGENTS.md")).then(() => true, () => false);
+      if (readable) return; // root reads through any mode: nothing to observe.
+      await assertRejects(() => r.readEntry(dir, "AGENTS.md"), Deno.errors.PermissionDenied);
+      await assertRejects(() => r.readText(dir, "AGENTS.md"), Deno.errors.PermissionDenied);
+    } finally {
+      await Deno.chmod(join(dir, "AGENTS.md"), 0o644);
+    }
   });
 });

@@ -79,7 +79,7 @@ Deno.test(
 
       assertEquals(await exists(join(dir, "demo/AGENTS.md")), true);
       assertEquals(
-        await exists(join(dir, "demo/.specnaut/memory/constitution.md")),
+        await exists(join(dir, "demo/docs/constitution.md")),
         true,
       );
     });

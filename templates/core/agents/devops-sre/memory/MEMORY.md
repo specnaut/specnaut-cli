@@ -26,8 +26,7 @@ should survive across sessions and isn't captured elsewhere:
 ## When NOT to add an entry
 
 - IaC / pipeline definitions → those live in the actual config files.
-- Architecture choices → those go in `AGENTS.md` or
-  `.specnaut/memory/constitution.md`.
+- Architecture choices → those go in `AGENTS.md` or `docs/constitution.md`.
 - One-off incidents that are fully resolved with no recurring risk → no
   memory needed.
 

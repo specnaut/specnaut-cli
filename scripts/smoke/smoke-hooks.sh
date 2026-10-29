@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
 # Check that the bundled hooks are installed and registered on Claude Code and
 # Codex, then fire each Claude hook with a synthetic stdin payload and verify
-# the side effects and exit codes: the guard (protect-generated) refuses with
-# exit 2, the observers (log-subagent, check-backlog-prereqs) always exit 0.
+# the side effects and exit codes: the guards (protect-generated, protect-
+# constitution) refuse with exit 2, the observers (log-subagent,
+# check-backlog-prereqs) always exit 0, and Stop blocks an unapproved change.
 #
 # Usage: smoke-hooks.sh <name>
 set -euo pipefail
@@ -37,11 +38,13 @@ check "cockpit mod enabled" \
 # Spelled out, not looped: audit.sh counts a path as covered only where it is written.
 for hook in .specnaut/hooks/protect-generated.sh .specnaut/hooks/log-subagent.sh \
   .specnaut/hooks/guard-merge.sh .specnaut/hooks/guard-release.sh \
-  .specnaut/hooks/guard-dispatch-model.sh .specnaut/hooks/approve-on-prompt.sh; do
+  .specnaut/hooks/guard-dispatch-model.sh .specnaut/hooks/approve-on-prompt.sh \
+  .specnaut/hooks/protect-constitution.sh; do
   check "$hook executable" "[ -x $hook ]"
 done
 for support in .specnaut/hooks/_guard.sh .specnaut/hooks/_approval.sh \
   .specnaut/hooks/_command.sh .specnaut/hooks/_git.sh .specnaut/hooks/_simple.sh \
+  .specnaut/hooks/_paths.sh .specnaut/hooks/_baseline.sh \
   .specnaut/hooks/_agents.txt .specnaut/hooks/release-commands.txt .specnaut/hooks/SHA256SUMS; do
   check "$support installed" "[ -f $support ]"
 done
@@ -261,5 +264,33 @@ echo "$out" | grep -q "ec=0" \
   && pass "check-backlog-prereqs exits 0 with no lock" \
   || fail "check-backlog-prereqs crashed" "$out"
 mv .installed.lock.aside .specnaut/installed.lock
+
+echo
+echo "═══ spec 038  protect-constitution.sh + the Stop backstop (_baseline.sh) ═══"
+# Stamps and baselines kept inside the scenario tree, which the EXIT trap removes.
+export XDG_STATE_HOME="$DIR/state"
+# pc <harness> <tool> <tool_input JSON> — the guard's verdict, its status last.
+pc() {
+  jq -cn --arg cwd "$PWD" --arg t "$2" --argjson i "$3" '{session_id: "s1", turn_id: "t1", cwd: $cwd,
+    permission_mode: "default", hook_event_name: "PreToolUse", tool_name: $t, tool_input: $i}' \
+    | bash .specnaut/hooks/protect-constitution.sh "$1" 2>&1; echo "ec=$?"
+}
+DENY="protect-constitution: this call would change docs/constitution.md"
+out=$(pc claude Edit "$(jq -cn --arg f "$PWD/docs/constitution.md" '{file_path: $f}')")
+echo "$out" | grep -q "ec=2" && echo "$out" | grep -qF "$DENY" && pass "a Claude Edit of docs/constitution.md with no stamp is denied" \
+  || fail "the Claude Edit of the constitution was not denied" "$out"
+out=$(pc codex apply_patch '{"command": "*** Begin Patch\n*** Update File: docs/constitution.md\n*** End Patch\n"}')
+echo "$out" | grep -q "ec=2" && echo "$out" | grep -qF "$DENY" && pass "a Codex apply_patch of docs/constitution.md with no stamp is denied" \
+  || fail "the Codex patch of the constitution was not denied" "$out"
+out=$(pc claude Bash '{"command": "cat docs/constitution.md"}')
+[ "$out" = "ec=0" ] && pass "reading it with a bare cat is allowed" || fail "a read of the constitution was refused" "$out"
+# A writer no command reading sees: the user's prompt fingerprints, Stop compares.
+aop() { jq -cn --arg cwd "$PWD" --arg e "$1" '{session_id: "s1", cwd: $cwd, permission_mode: "default",
+  hook_event_name: $e, prompt: "tidy the readme", stop_hook_active: false}' | bash .specnaut/hooks/approve-on-prompt.sh claude; }
+aop UserPromptSubmit
+echo "- a principle nobody approved" >>docs/constitution.md
+out=$(aop Stop 2>&1)
+jq -e '.decision == "block" and (.reason | startswith("Specnaut: docs/constitution.md (") and contains("changed during this turn"))' <<<"$out" >/dev/null \
+  && pass "Stop blocks after an unapproved change to the constitution" || fail "Stop let an unapproved change through" "$out"
 
 finish "HOOKS"

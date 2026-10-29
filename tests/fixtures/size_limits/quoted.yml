@@ -1,0 +1,5 @@
+exempt:
+  - '*.min.js'
+  - "vendor/**"
+  - dist/app.js
+  - "a # b"

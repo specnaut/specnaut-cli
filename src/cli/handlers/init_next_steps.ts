@@ -3,6 +3,7 @@ import type { BacklogBackend, KnownHarness } from "../../domain/installed_lock.t
 import { harnessCommands } from "../../infrastructure/harness/harness_commands.ts";
 import type { Harness } from "../../application/ports.ts";
 import { printHookTrustNote } from "./hook_trust_note.ts";
+import { CONSTITUTION_PATH } from "../../domain/constitution_paths.ts";
 
 /** What this init run put on disk: the trust note is due when it touched a hashed hook path. */
 type InitRun = {
@@ -14,7 +15,9 @@ type InitRun = {
 /**
  * The guidance `specnaut init` closes on: what to type first in the harness
  * the user just chose, the hook-trust note when that harness needs one, then
- * the Specnaut Cloud pointer.
+ * the Specnaut Cloud pointer. The first step is a plan: the bootstrap
+ * constitution already carries its principles, so amending it is never a
+ * prerequisite (spec 038, FR-013).
  *
  * Named for that harness, not for Claude. See `harness_commands.ts` — the
  * previous version printed `/specnaut plan` and `/board add` everywhere, and
@@ -36,9 +39,7 @@ export async function printInitNextSteps(
         `apply automatically from ${bold(".github/instructions/")}`,
     );
     console.log(
-      `  2. Edit ${bold("AGENTS.md")} and refine ${
-        bold(".specnaut/memory/constitution.md")
-      } for your stack`,
+      `  2. Edit ${bold("AGENTS.md")} and refine ${bold(CONSTITUTION_PATH)} for your stack`,
     );
     console.log(
       `  3. Ask your agent to plan a feature — it will follow the Specnaut chain`,
@@ -46,21 +47,15 @@ export async function printInitNextSteps(
   } else {
     console.log(
       `  1. Open the project in ${displayName}, then run ${
-        bold(cmd.skillDoc("task", "constitution"))
-      } to scaffold your project's guiding principles`,
-    );
-    console.log(
-      `  2. Edit ${bold("AGENTS.md")} and refine ${
-        bold(".specnaut/memory/constitution.md")
-      } for your stack`,
-    );
-    console.log(
-      `  3. Run ${
         bold(`${cmd.skillDoc("task", "plan")} "<feature description>"`)
       } to plan your first feature`,
     );
     console.log(
-      `  4. Use ${bold(`${cmd.skill("task")} add "<task title>"`)} for follow-up work`,
+      `  2. Read ${bold(CONSTITUTION_PATH)} — the principles every plan and review checks; ` +
+        `amend it with ${bold(cmd.skillDoc("task", "constitution"))}`,
+    );
+    console.log(
+      `  3. Use ${bold(`${cmd.skill("task")} add "<task title>"`)} for follow-up work`,
     );
   }
   await printHookTrustNote(

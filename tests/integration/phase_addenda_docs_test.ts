@@ -43,8 +43,10 @@ Deno.test("README documents the addendum under upgrading, with when-to-preserve 
   assertStringIncludes(prose, "cannot replace or skip a bundled step");
 });
 
-Deno.test("UPGRADING announces the phase-addenda block and the way off a preserve", async () => {
-  const guide = await read("UPGRADING.md");
+Deno.test("the 4.5.0 upgrade guide announces the phase-addenda block and the way off a preserve", async () => {
+  // Archived with the other 4.x sections; the link from UPGRADING.md is what a reader follows.
+  assertStringIncludes(await read("UPGRADING.md"), "(docs/upgrading/4.0-to-4.5.md)");
+  const guide = await read("docs/upgrading/4.0-to-4.5.md");
   const addenda = section(guide, "### Add to a bundled phase without preserving it");
   const prose = unwrap(addenda);
   assertStringIncludes(prose, "<!-- --- Specnaut: phase-addenda --- -->");
@@ -58,6 +60,7 @@ Deno.test("every concrete addendum path shown anywhere names a routable phase", 
   const surfaces = [
     "README.md",
     "UPGRADING.md",
+    "docs/upgrading/4.0-to-4.5.md",
     "templates/core/root/AGENTS.md",
     "templates/core/skills/specnaut/SKILL.md",
     "templates/core/skills/task/SKILL.md",

@@ -1,5 +1,7 @@
 import type { FsReader, FsWriter } from "./ports.ts";
 import { addendumPath, addendumRenames } from "../domain/addendum_audit.ts";
+import { judgeExactMove } from "../domain/exact_move.ts";
+import { exactMoveRefusal, moveExact } from "./upgrade_exact_move.ts";
 
 /** What moving the addenda needs: the two existing ports, no new one (plan 037 § 5). */
 export type AddendaMoveContext = {
@@ -50,55 +52,23 @@ async function carryOne(
   to: string,
   reason: string,
 ): Promise<void> {
-  const source = await ctx.reader.readEntry(ctx.projectDir, from);
-  if (source === null) return;
-  if (source.kind === "symlink") {
-    ctx.notes.push(
-      `addendum ${from} is a link, so it is not moved to ${to} — no router reads it ` +
-        `there; point a file at the new address yourself`,
-    );
-    return;
-  }
-  if (source.lossy) {
-    ctx.notes.push(`addendum ${from} is not moved to ${to}: ${NOT_EXACT}`);
-    return;
-  }
-  if (await ctx.reader.readEntry(ctx.projectDir, to) !== null) {
-    ctx.notes.push(
-      `addendum ${from} is not moved: ${to} already exists, and only that one is read — ` +
-        `merge the two by hand`,
-    );
+  const verdict = judgeExactMove(
+    await ctx.reader.readEntry(ctx.projectDir, from),
+    await ctx.reader.readEntry(ctx.projectDir, to),
+  );
+  const what = `addendum ${from}`;
+  if (verdict.kind !== "ok") {
+    const refusal = exactMoveRefusal(verdict, what, to);
+    if (refusal !== null) ctx.notes.push(refusal);
     return;
   }
   if (ctx.dryRun) {
-    ctx.notes.push(`addendum ${from} would move to ${to} (${reason})`);
+    ctx.notes.push(`${what} would move to ${to} (${reason})`);
     return;
   }
-  await ctx.writer.writeBundle(
-    { [to]: { content: source.content, executable: false } },
-    ctx.projectDir,
-    { overwrite: false },
-  );
-  // Bounded to the old address itself: under a linked folder it resolves
-  // elsewhere, and is then left in place rather than deleted where it lands.
-  const r = await ctx.writer.deletePaths([from], ctx.projectDir, {
-    backupExisting: false,
-    within: (resolved) => resolved === from,
-  });
-  ctx.notes.push(...(r.notes ?? []));
-  ctx.notes.push(
-    (r.refused ?? []).length > 0
-      ? `addendum ${from} was copied to ${to} but not deleted: it resolves to another path — ` +
-        `delete the old copy yourself`
-      : `addendum ${from} moved to ${to} (${reason})`,
-  );
+  if (await moveExact(ctx, what, from, to, verdict.content) === "moved") {
+    ctx.notes.push(`${what} moved to ${to} (${reason})`);
+  }
 }
-
-/**
- * Why a file whose bytes are not UTF-8 stays where it is. One sentence for both
- * movers — this one and `upgrade_renames.ts` — so the refusal reads the same.
- */
-export const NOT_EXACT = "its bytes are not valid UTF-8, and upgrade moves a file only " +
-  "when it can write back exactly what it read — move it yourself";
 
 const why = (err: unknown) => err instanceof Error ? err.message : String(err);

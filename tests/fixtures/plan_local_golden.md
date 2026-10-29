@@ -73,7 +73,7 @@ one and `merge`'s move to `Done`.
 
 ### 3. Read the ground truth before writing a line
 
-- `.specnaut/memory/constitution.md` — binding, and it outranks this file.
+- `docs/constitution.md` — binding, and it outranks this file.
 - The linked backlog item's body, when there is one.
 - **The code the feature touches.** Most design questions are already decided there; re-deciding
   one produces a second spelling.

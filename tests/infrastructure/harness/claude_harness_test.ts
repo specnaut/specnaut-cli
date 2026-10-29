@@ -46,7 +46,7 @@ Deno.test("ClaudeHarness.mapBundle emits the Claude tree", () => {
   assert(!(".claude/skills/specnaut-auto/SKILL.md" in mapped));
   assert(".claude/skills/task/SKILL.md" in mapped);
   assert(".specnaut/scripts/backlog/list.sh" in mapped);
-  assert(".specnaut/memory/constitution.md" in mapped);
+  assert("docs/constitution.md" in mapped);
   assert("AGENTS.md" in mapped);
   assert(".claude/CLAUDE.md" in mapped);
   assert(!("CLAUDE.md" in mapped), "CLAUDE.md must not live at project root");

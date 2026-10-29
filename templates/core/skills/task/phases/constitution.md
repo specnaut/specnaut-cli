@@ -43,82 +43,73 @@ You **MUST** consider the user input before proceeding (if not empty).
 
 ## Outline
 
-You are updating the project constitution at `.specnaut/memory/constitution.md`. This file is a TEMPLATE containing placeholder tokens in square brackets (e.g. `[PROJECT_NAME]`, `[PRINCIPLE_1_NAME]`). Your job is to (a) collect/derive concrete values, (b) fill the template precisely, and (c) propagate any amendments across dependent artifacts.
+The project's constitution is `docs/constitution.md`. It is the team's document, not Specnaut's:
+Specnaut bootstrapped it once and only reads it since. An amendment is exceptional, happens only
+because the user asked for it, and is written only after the user has seen it and typed the
+confirmation phrase below. A hook enforces that last part: without the phrase, every write to the
+file is refused, whatever tool attempts it, and a change made some other way is caught when the turn
+ends. Never look for another route; ask.
 
-**Note**: If `.specnaut/memory/constitution.md` does not exist yet, it should have been initialized from `.specnaut/templates/constitution-template.md` during project setup. If it's missing, copy the template first.
+The same verb changes the three **gate configs**, which hold the settings the project's gates read:
+`.specnaut/size-limits.yml`, `.specnaut/boundaries.yml` and `.specnaut/ui.yml`. They are not the
+constitution, so they take no version bump, but they are gated the same way under their own phrase.
 
-Follow this execution flow:
+| What changes | The user types, as their whole message | Kind |
+| --- | --- | --- |
+| `docs/constitution.md` | `approve the constitution amendment` | `constitution` |
+| a gate config | `approve the gate config change` | `gate-config` |
 
-1. Load the existing constitution at `.specnaut/memory/constitution.md`.
-   - Identify every placeholder token of the form `[ALL_CAPS_IDENTIFIER]`.
-   **IMPORTANT**: The user might require less or more principles than the ones used in the template. If a number is specified, respect that - follow the general template. You will update the doc accordingly.
+One approval covers one kind for one turn. A request that changes both is two rounds: the
+constitution first, then the configs. A plain "yes", "ok" or "go" approves nothing.
 
-2. Collect/derive values for placeholders:
-   - If user input (conversation) supplies a value, use it.
-   - Otherwise infer from existing repo context (README, docs, prior constitution versions if embedded).
-   - For governance dates: `RATIFICATION_DATE` is the original adoption date (if unknown ask or mark TODO), `LAST_AMENDED_DATE` is today if changes are made, otherwise keep previous.
-   - `CONSTITUTION_VERSION` must increment according to semantic versioning rules:
-     - MAJOR: Backward incompatible governance/principle removals or redefinitions.
-     - MINOR: New principle/section added or materially expanded guidance.
-     - PATCH: Clarifications, wording, typo fixes, non-semantic refinements.
-   - If version bump type ambiguous, propose reasoning before finalizing.
-   - **Size limits.** Every phase, agent and script reads its size thresholds from the
-     constitution's `## Size limits` table and nowhere else (`.specnaut/memory/size-limits.md`
-     holds the rule, the table shape and the defaults). When creating or amending, confirm the
-     table's numbers with the user. If the constitution has no such section, propose adding one
-     prefilled with the defaults — `specnaut upgrade` never touches an existing constitution, so
-     this phase is the only way an older project receives it. Keep the shape exact: the size
-     ratchet script parses it.
+### Round 1: draft, then stop
 
-3. Draft the updated constitution content:
-   - Replace every placeholder with concrete text (no bracketed tokens left except intentionally retained template slots that the project has chosen not to define yet—explicitly justify any left).
-   - Preserve heading hierarchy and comments can be removed once replaced unless they still add clarifying guidance.
-   - Ensure each Principle section: succinct name line, paragraph (or bullet list) capturing non‑negotiable rules, explicit rationale if not obvious.
-   - Ensure Governance section lists amendment procedure, versioning policy, and compliance review expectations.
-   - Keep the constitution to principles. Delivery status, task and epic narratives, and dated incident history do not belong in it: link the issue or spec that holds them instead. The file is loaded into every session, and the size ratchet holds it to the `constitution` unit of the `## Size limits` table (`.specnaut/memory/size-limits.md`).
-   - Shrinking the file never licenses dropping a principle: a removal still takes the MAJOR bump of step 2.
+1. **The reason.** If the request does not say why the change is needed, ask, in one question.
+   Nothing is drafted without a reason the user gave: it goes into the commit body.
+2. **Read** the current file. If `docs/constitution.md` is missing, say so and stop: `specnaut
+   upgrade` bootstraps it. Never recreate it from memory.
+3. **Draft** the smallest change that serves the reason:
+   - Keep each principle declarative and checkable: a short rule, and a `Check:` line a reviewer
+     can apply to a plan or a diff.
+   - Keep the constitution to principles. Delivery status, task and epic narratives, and dated
+     incident history do not belong in it: link the issue or spec that holds them instead. The file
+     is read by every planning and review step, and the size limits hold it to its own
+     `constitution` unit.
+   - No HTML comments, no change log, no report inside the file: git history is the record.
+4. **Bump `Version:`** (the footer line) for a constitution change, by semantic versioning:
+   - MAJOR: a principle removed, or redefined so that existing code may now violate it.
+   - MINOR: a principle added, or materially expanded.
+   - PATCH: wording, clarification, a typo.
 
-4. Consistency propagation checklist (convert prior checklist into active validations):
-   - Read `.specnaut/templates/plan-template.md` and ensure any "Constitution Check" or rules align with updated principles.
-   - Read `.specnaut/templates/plan-template.md` for scope/requirements alignment—update if constitution adds/removes mandatory sections or constraints.
-   - Read `.specnaut/templates/tasks-template.md` and ensure task categorization reflects new or removed principle-driven task types (e.g., observability, versioning, testing discipline).
-   - Read each command file in `.specnaut/templates/commands/*.md` (including this one) to verify no outdated references (agent-specific names like CLAUDE only) remain when generic guidance is required.
-   - Read any runtime guidance docs (e.g., `README.md`, `docs/quickstart.md`, or agent-specific guidance files if present). Update references to principles changed.
+   Shrinking the file never licenses dropping a principle: a removal still takes the MAJOR bump.
+   A gate config change has no version.
+5. **Show** the user the diff, the bump with its one-line rationale, and the commit message you will
+   use. Then print the phrase for that kind, exactly as in the table, and end the turn:
 
-5. Produce a Sync Impact Report as an HTML comment at the top of the constitution file, **replacing** the existing one. The file carries exactly one report, the latest; earlier ones stay in git history. Carry forward into the new report any follow-up from the previous one that is still intentionally unresolved. The report holds:
-   - Version change: old → new
-   - List of modified principles (old title → new title if renamed)
-   - Added sections
-   - Removed sections
-   - Templates requiring updates (✅ updated / ⚠ pending) with file paths
-   - Follow-up TODOs if any placeholders intentionally deferred.
+   ```text
+   To apply this, reply with exactly: approve the constitution amendment
+   ```
 
-6. Validation before final output:
-   - No remaining unexplained bracket tokens.
-   - Exactly one Sync Impact Report, at the top of the file.
-   - Version line matches report.
-   - Dates ISO format YYYY-MM-DD.
-   - Principles are declarative, testable, and free of vague language ("should" → replace with MUST/SHOULD rationale where appropriate).
+   Do not write the file in this turn. Any reply other than the phrase is feedback: revise the draft,
+   show it again, print the phrase again.
 
-7. Write the completed constitution back to `.specnaut/memory/constitution.md` (overwrite).
+### Round 2: the user typed the phrase
 
-8. Output a final summary to the user with:
-   - New version and bump rationale.
-   - Any files flagged for manual follow-up.
-   - Suggested commit message (e.g., `docs: amend constitution to vX.Y.Z (principle additions + governance update)`).
+6. **Write** the drafted change, exactly as shown, to the file it names. Nothing else is touched.
+7. **Commit** it alone. The subject names the change; the body carries the reason, in the user's
+   words, and for the constitution the version change:
 
-Formatting & Style Requirements:
+   ```text
+   docs(constitution): <what changed>
 
-- Use Markdown headings exactly as in the template (do not demote/promote levels).
-- Wrap long rationale lines to keep readability (<100 chars ideally) but do not hard enforce with awkward breaks.
-- Keep a single blank line between sections.
-- Avoid trailing whitespace.
+   Reason: <the reason the user gave>
+   Version: 1.2.0 → 1.3.0
+   ```
 
-If the user supplies partial updates (e.g., only one principle revision), still perform validation and version decision steps.
+8. **Report** the new version (or the config written) and the commit, in two lines.
 
-If critical info missing (e.g., ratification date truly unknown), insert `TODO(<FIELD_NAME>): explanation` and include in the Sync Impact Report under deferred items.
-
-Do not create a new template; always operate on the existing `.specnaut/memory/constitution.md` file.
+If a principle now conflicts with the code, or with another principle, report it as a stop with a
+question. Never resolve it by amending the constitution on your own initiative.
 
 ## Post-Execution Checks
 

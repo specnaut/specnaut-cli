@@ -53,7 +53,7 @@ Deno.test("upgrade on freshly-init'd project is up-to-date", async () => {
 
 // Regression guard for #163: a fresh init followed by `upgrade --dry-run`
 // MUST report "already up to date". Before the fix, AGENTS.md and
-// .specnaut/memory/constitution.md (skipIfExists files) were classified
+// docs/constitution.md (skipIfExists files) were classified
 // as "customized locally" because they had no lock entry. The guard
 // catches any future regression that re-introduces a similar
 // false-positive on a never-edited project.

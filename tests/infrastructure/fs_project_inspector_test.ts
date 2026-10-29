@@ -20,6 +20,13 @@ const CONSTITUTION_EMPTY_PLACEHOLDER = `# Project Constitution
 (none defined yet)
 `;
 
+/** `docs/constitution.md` holding `text`, and the `.specnaut/` the lock goes in. */
+async function writeConstitution(dir: string, text: string) {
+  await Deno.mkdir(join(dir, ".specnaut"), { recursive: true });
+  await Deno.mkdir(join(dir, "docs"), { recursive: true });
+  await Deno.writeTextFile(join(dir, "docs/constitution.md"), text);
+}
+
 async function withProjectDir(
   fill: (dir: string) => Promise<void>,
   fn: (dir: string) => Promise<void>,
@@ -34,12 +41,8 @@ async function withProjectDir(
 }
 
 async function filledProject(dir: string) {
-  await Deno.mkdir(join(dir, ".specnaut/memory"), { recursive: true });
+  await writeConstitution(dir, CONSTITUTION_FILLED);
   await Deno.mkdir(join(dir, ".claude/commands"), { recursive: true });
-  await Deno.writeTextFile(
-    join(dir, ".specnaut/memory/constitution.md"),
-    CONSTITUTION_FILLED,
-  );
   await Deno.writeTextFile(
     join(dir, ".specnaut/installed.lock"),
     `version: 2
@@ -86,12 +89,8 @@ Deno.test("inspect reports fail when .specnaut missing", async () => {
 Deno.test("inspect reports warn for empty placeholder constitution", async () => {
   await withProjectDir(
     async (dir) => {
-      await Deno.mkdir(join(dir, ".specnaut/memory"), { recursive: true });
+      await writeConstitution(dir, CONSTITUTION_EMPTY_PLACEHOLDER);
       await Deno.mkdir(join(dir, ".claude"), { recursive: true });
-      await Deno.writeTextFile(
-        join(dir, ".specnaut/memory/constitution.md"),
-        CONSTITUTION_EMPTY_PLACEHOLDER,
-      );
     },
     async (dir) => {
       const inspector = new FsProjectInspector();
@@ -554,12 +553,8 @@ async function backlogProject(
   backend: "local" | "github" | "gitlab",
   configYml?: string,
 ): Promise<void> {
-  await Deno.mkdir(join(dir, ".specnaut/memory"), { recursive: true });
+  await writeConstitution(dir, CONSTITUTION_FILLED);
   await Deno.mkdir(join(dir, ".claude"), { recursive: true });
-  await Deno.writeTextFile(
-    join(dir, ".specnaut/memory/constitution.md"),
-    CONSTITUTION_FILLED,
-  );
   await Deno.writeTextFile(
     join(dir, ".specnaut/installed.lock"),
     `version: 2
@@ -799,12 +794,8 @@ Deno.test("inspect: plugin gap check warns for each missing covered path when pl
 Deno.test("inspect: plugin gap check skipped on non-claude harnesses", async () => {
   await withProjectDir(
     async (dir) => {
-      await Deno.mkdir(join(dir, ".specnaut/memory"), { recursive: true });
+      await writeConstitution(dir, CONSTITUTION_FILLED);
       await Deno.mkdir(join(dir, ".cursor"), { recursive: true });
-      await Deno.writeTextFile(
-        join(dir, ".specnaut/memory/constitution.md"),
-        CONSTITUTION_FILLED,
-      );
       await Deno.writeTextFile(
         join(dir, ".specnaut/installed.lock"),
         `version: 2

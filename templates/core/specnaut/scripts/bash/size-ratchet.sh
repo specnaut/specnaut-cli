@@ -1,14 +1,14 @@
 #!/usr/bin/env bash
-# Hold every changed file to the constitution's file size limits.
+# Hold every changed file to the project's file size limits.
 #
 #   size-ratchet.sh [--report]                  staged changes (pre-commit)
 #   size-ratchet.sh --since <ref> [--report]    committed changes, <ref> → HEAD
 #
-# Reads the `file` and `constitution` rows and the `Exempt:` line of the
-# `## Size limits` table in `.specnaut/memory/constitution.md`. A unit the table
-# does not list takes the defaults in `.specnaut/memory/size-limits.md` (300 /
-# 500 for both). That file states the rules; this script is their deterministic
-# half, and the one measurer the review coordinator calls.
+# Reads the `file` and `constitution` units and the `exempt:` globs of
+# `.specnaut/size-limits.yml` through `_config.sh` beside it. A unit the file
+# does not set — every unit, with no file — takes the defaults of
+# `.specnaut/memory/size-limits.md`. That file states the rules; this script is
+# their deterministic half, and the one measurer the review coordinator calls.
 #
 # "Before" is the size at the BASE OF THE CHANGE, not at the previous commit:
 #
@@ -28,10 +28,10 @@
 #
 # Exempt without asking: `.specnaut/**` and every file `.specnaut/installed.lock`
 # lists — Specnaut's own artefacts, which `specnaut upgrade` rewrites — plus
-# binary files and the constitution's `Exempt:` globs. One file is the
-# exception: the constitution itself, loaded into every session, is held to the
-# `constitution` unit whenever it changes. `Exempt:` globs do not reach it; a
-# project that wants no limit says `| constitution | none | none |`.
+# binary files and the config's `exempt:` globs. One file is the exception:
+# `docs/constitution.md`, loaded into every session, is held to the
+# `constitution` unit whenever it changes. `exempt:` globs do not reach it; a
+# project that wants no limit sets its `target` and `ceiling` to `none`.
 #
 # `--report` also prints every checked file, `path: before → after`.
 #
@@ -42,10 +42,11 @@
 #   0   every changed file is within its limits (or nothing changed)
 #   1   at least one violation — each printed as
 #       `path: before → after (target T, ceiling C)`
-#   2   the constitution has a size-limits section this script cannot read.
-#       An unreadable table never passes silently, and never falls back to
-#       the defaults.
-#   3   not inside a git work tree, a bad <ref>, or a usage error
+#   2   `.specnaut/size-limits.yml` cannot be read (see `_config.sh` for the
+#       grammar). An unreadable config never passes silently, and never falls
+#       back to the defaults.
+#   3   not inside a git work tree, a bad <ref>, a missing `_config.sh`, or a
+#       usage error
 set -uo pipefail
 
 usage() { echo "usage: size-ratchet.sh [--since <ref>] [--report]" >&2; exit 3; }
@@ -59,8 +60,12 @@ while [ "$#" -gt 0 ]; do
   esac
 done
 
-DEFAULT_TARGET=300
-DEFAULT_CEILING=500
+# Sourced before the `cd` below: the script's own directory may be relative.
+# shellcheck source=SCRIPTDIR/_config.sh
+. "$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)/_config.sh" || {
+  echo "size-ratchet: _config.sh is missing beside the script" >&2
+  exit 3
+}
 
 REPO_ROOT="$(git rev-parse --show-toplevel 2>/dev/null)" || {
   echo "size-ratchet: not inside a git work tree" >&2
@@ -71,69 +76,23 @@ if [ -n "$SINCE" ] && ! git rev-parse --verify -q "$SINCE^{commit}" >/dev/null; 
   echo "size-ratchet: not a commit: $SINCE" >&2
   exit 3
 fi
-CONSTITUTION=".specnaut/memory/constitution.md"
+CONSTITUTION="$CONFIG_CONSTITUTION"
 LOCK=".specnaut/installed.lock"
 
-target="$DEFAULT_TARGET"
-ceiling="$DEFAULT_CEILING"
-source_label="default"
-c_target="$DEFAULT_TARGET"
-c_ceiling="$DEFAULT_CEILING"
-c_source="default"
-exempt=()
-
-unreadable() { echo "size-ratchet: $CONSTITUTION: $1" >&2; exit 2; }
-
-# read_row <unit> <section> → "target ceiling" when the table lists the unit,
-# nothing when it does not. Any row naming the unit loosely (a plural, another
-# case) must be exactly <unit>: otherwise it would be skipped and the defaults
-# would silently apply.
-read_row() {
-  local unit="$1" section="$2" like value_re='(none|[0-9]+)'
-  like="$(printf '%s\n' "$section" | grep -Ei "^\|[[:space:]]*${unit}s?[[:space:]]*\|" || true)"
-  [ -n "$like" ] || return 0
-  [ "$(printf '%s\n' "$like" | wc -l | tr -d ' ')" = "1" ] ||
-    unreadable "the '$unit' unit is listed more than once"
-  printf '%s\n' "$like" |
-    grep -Eq "^\|[[:space:]]*${unit}[[:space:]]*\|[[:space:]]*${value_re}[[:space:]]*\|[[:space:]]*${value_re}[[:space:]]*\|[[:space:]]*$" ||
-    unreadable "cannot read the row '$like' — expected: | $unit | <lines or none> | <lines or none> |"
-  printf '%s\n' "$like" | awk -F'|' '{ gsub(/[[:space:]]/, "", $3); gsub(/[[:space:]]/, "", $4); print $3, $4 }'
+# The limits, defaults filled in: `<unit> <target> <ceiling> <source>` and
+# `exempt <glob>` lines. Captured before it is split, so its exit 2 is seen.
+limits="$(config_size_limits "$CONFIG_SIZE_LIMITS")" || {
+  echo "size-ratchet: $CONFIG_SIZE_LIMITS: $limits" >&2
+  exit 2
 }
-
-# --- read the table -----------------------------------------------------------
-if [ -f "$CONSTITUTION" ]; then
-  if grep -q '^## Size limits[[:space:]]*$' "$CONSTITUTION"; then
-    section="$(awk '
-      /^## Size limits[[:space:]]*$/ { inside = 1; next }
-      inside && /^## / { exit }
-      inside { print }
-    ' "$CONSTITUTION")"
-    printf '%s\n' "$section" |
-      grep -Eq '^\|[[:space:]]*Unit[[:space:]]*\|[[:space:]]*Target[[:space:]]*\|[[:space:]]*Ceiling[[:space:]]*\|' ||
-      unreadable "the '## Size limits' section has no 'Unit | Target | Ceiling' table"
-    # read_row exits 2 itself, so its output is captured before it is split:
-    # `read -r a b < <(read_row …)` would swallow that exit.
-    row="$(read_row file "$section")" || exit 2
-    if [ -n "$row" ]; then
-      read -r target ceiling <<<"$row"
-      source_label="constitution"
-    fi
-    row="$(read_row constitution "$section")" || exit 2
-    if [ -n "$row" ]; then
-      read -r c_target c_ceiling <<<"$row"
-      c_source="constitution"
-    fi
-    exempt_line="$(printf '%s\n' "$section" | grep -E '^Exempt:' || true)"
-    if [ -n "$exempt_line" ]; then
-      while IFS= read -r glob; do
-        [ -n "$glob" ] && exempt+=("$glob")
-      done < <(printf '%s\n' "$exempt_line" | grep -o '`[^`]*`' | tr -d '`')
-    fi
-  elif grep -Eiq '^#+[[:space:]]*size[[:space:]-]*limits?[[:space:]]*$' "$CONSTITUTION"; then
-    # A heading that means the table but is not spelled the way it is read.
-    unreadable "found a size-limits heading that is not exactly '## Size limits'"
-  fi
-fi
+exempt=()
+while read -r unit rest; do
+  case "$unit" in
+    file) read -r target ceiling source_label <<<"$rest" ;;
+    constitution) read -r c_target c_ceiling c_source <<<"$rest" ;;
+    exempt) exempt+=("$rest") ;;
+  esac
+done <<<"$limits"
 
 # Specnaut's own files: the lock's entries, two-space indented keys under `entries:`.
 managed=""
@@ -153,8 +112,8 @@ is_exempt() {
   local path="$1" glob
   case "$path" in .specnaut/*) return 0 ;; esac
   if [ -n "$managed" ] && printf '%s\n' "$managed" | grep -Fxq -- "$path"; then return 0; fi
+  # shellcheck disable=SC2254 # the glob is the pattern, in both arms
   for glob in ${exempt[@]+"${exempt[@]}"}; do
-    # shellcheck disable=SC2254 — the glob is the pattern
     case "$path" in $glob) return 0 ;; esac
     case "/$path" in $glob) return 0 ;; esac
   done

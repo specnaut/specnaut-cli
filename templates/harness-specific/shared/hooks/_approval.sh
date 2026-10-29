@@ -13,21 +13,29 @@
 # approval_session_ok <id> — a session id is a path component; only plain tokens.
 approval_session_ok() { [[ $1 =~ ^[A-Za-z0-9_-]+$ ]]; }
 
-# approval_path <session_id> — where this project's stamp for that session lives.
-approval_path() {
+# approval_sha256 — the hex SHA-256 of stdin: the store key here, and the
+# guarded files' fingerprints in _baseline.sh.
+approval_sha256() {
+  local h
+  if command -v sha256sum >/dev/null 2>&1; then h=$(sha256sum)
+  elif command -v shasum >/dev/null 2>&1; then h=$(shasum -a 256)
+  else guard_fail "neither sha256sum nor shasum is on PATH"; fi
+  printf '%s' "${h%% *}"
+}
+
+# approval_state <store> <session_id> — where this project keeps that session's
+# <store> entry: `approvals` (the stamp) or `baselines` (_baseline.sh).
+approval_state() {
   local state hash
   guard_path state "${XDG_STATE_HOME:-}" # a Windows user's C:\… is still theirs
   guard_root
   case $state in /*) ;; *) state="$HOME/.local/state" ;; esac
-  if command -v sha256sum >/dev/null 2>&1; then
-    hash=$(printf '%s' "$GUARD_ROOT" | sha256sum)
-  elif command -v shasum >/dev/null 2>&1; then
-    hash=$(printf '%s' "$GUARD_ROOT" | shasum -a 256)
-  else
-    guard_fail "neither sha256sum nor shasum is on PATH"
-  fi
-  printf '%s/specnaut/approvals/%s/%s' "$state" "${hash%% *}" "$1"
+  hash=$(printf '%s' "$GUARD_ROOT" | approval_sha256)
+  printf '%s/specnaut/%s/%s/%s' "$state" "$1" "$hash" "$2"
 }
+
+# approval_path <session_id> — where this project's stamp for that session lives.
+approval_path() { approval_state approvals "$1"; }
 
 # approved <kind> — the user's own prompt in THIS turn approved <kind>: the
 # stamp exists, and its session and kind match; its turn_id must match too
@@ -49,20 +57,38 @@ approved() {
   return 0
 }
 
+# _approval_ask <reason> — Claude's native permission prompt (exit 0 + "ask").
+_approval_ask() {
+  jq -cn --arg r "$1" \
+    '{hookSpecificOutput: {hookEventName: "PreToolUse", permissionDecision: "ask", permissionDecisionReason: $r}}'
+  guard_allow
+}
+
+# _approval_can_ask — Claude in a mode whose "ask" reaches the user:
+# default/acceptEdits/plan. bypassPermissions/auto/any unknown mode, and
+# Codex, whose "ask" fails open, cannot.
+_approval_can_ask() {
+  [ "$GUARD_HARNESS" = claude ] || return 1
+  case $P_MODE in default | acceptEdits | plan) return 0 ;; esac
+  return 1
+}
+
 # approval_gate <kind> <reason> <what the user types> — resolve a gated arm.
-# Claude in default/acceptEdits/plan: its native permission prompt (exit 0 +
-# "ask"). Everywhere else — Claude bypassPermissions/auto/any unknown mode,
-# and Codex, whose "ask" fails open — allowed only on this turn's approval.
+# Where Claude can ask: its permission prompt. Everywhere else: allowed only
+# on this turn's approval.
 approval_gate() {
-  if [ "$GUARD_HARNESS" = claude ]; then
-    case $P_MODE in
-      default | acceptEdits | plan)
-        jq -cn --arg r "$2" \
-          '{hookSpecificOutput: {hookEventName: "PreToolUse", permissionDecision: "ask", permissionDecisionReason: $r}}'
-        guard_allow
-        ;;
-    esac
-  fi
+  if _approval_can_ask; then _approval_ask "$2"; fi
   if approved "$1"; then guard_allow; fi
   guard_fail "$2. To let it through, reply $3 — a plain \"yes\" does not approve it."
+}
+
+# approval_require <kind> <reason> <how the user approves> — stricter than
+# approval_gate (spec 038 FR-012): with no approval of <kind> this turn it
+# denies even where Claude could ask, because a click on a permission prompt
+# is not the user's decision to amend what the project holds itself to. With
+# one, Claude asks once more where it can; Codex and bypass mode allow.
+approval_require() {
+  approved "$1" || guard_fail "$2. $3"
+  if _approval_can_ask; then _approval_ask "$2"; fi
+  guard_allow
 }

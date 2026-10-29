@@ -1,5 +1,5 @@
 import { assertEquals, assertStringIncludes } from "@std/assert";
-import { DELIMITER, join } from "@std/path";
+import { join } from "@std/path";
 import {
   bashPath,
   type Harness,
@@ -9,11 +9,10 @@ import {
   type Run,
   runHook,
   runScript,
-  type Sandbox,
   sandbox,
   stamps,
 } from "./hook_sandbox.ts";
-import { pathEntries, pathWithCrlfJq } from "./hook_path.ts";
+import { gitBash, pathWithCrlfJq } from "./hook_path.ts";
 
 /**
  * What a Windows harness hands the guards, run through the real scripts.
@@ -150,24 +149,6 @@ Deno.test("guard_jq undoes the \\r\\n guard_init measured, and nothing else", as
     await sb.cleanup();
   }
 });
-
-/** Git Bash, faked off Windows: its OSTYPE, and a cygpath that maps `C:/x` to `/x`. */
-async function gitBash(
-  sb: Sandbox,
-): Promise<{ env: Record<string, string>; win: (p: string) => string }> {
-  if (WINDOWS) return { env: {}, win: (p) => p };
-  const bin = join(sb.dir, "bin-cygpath");
-  await Deno.mkdir(bin);
-  await Deno.writeTextFile(
-    join(bin, "cygpath"),
-    `#!/usr/bin/env bash\n[ "$1" = -u ] || exit 64\nprintf '%s\\n' "\${2#[A-Za-z]:}"\n`,
-  );
-  await Deno.chmod(join(bin, "cygpath"), 0o755);
-  return {
-    env: { OSTYPE: "msys", PATH: [bin, ...pathEntries(sb.env.PATH)].join(DELIMITER) },
-    win: (p) => `C:${p.replaceAll("/", "\\")}`,
-  };
-}
 
 Deno.test("a C:\\ cwd and file path, as a Windows harness sends them, are judged, not refused", async () => {
   const sb = await sandbox();

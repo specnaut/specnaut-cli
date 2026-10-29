@@ -19,7 +19,7 @@ import { RemovedHarnessError } from "../domain/installed_lock.ts";
 import type { CoreBundle } from "../domain/core_bundle.ts";
 import { type Bundle, lockShaInput } from "../domain/template.ts";
 import { TEMPLATES_VERSION } from "../templates_bundle.ts";
-import { mergeRefusal } from "../domain/merge_block.ts";
+import { filterInitBundle } from "./init_bundle_filter.ts";
 import { isAgenticPath } from "../domain/parent_managed.ts";
 
 export type InitResult =
@@ -169,43 +169,14 @@ export class InitProjectUseCase {
       }
     }
 
-    // Preserve filter (spec 011 / issue #367): declared paths are removed from
-    // the WRITE set so a forced refresh never clobbers them, but they stay in
-    // `bundle` for lock-entry construction below — preserved files MUST remain
-    // lock-tracked (FR-012). Only dests that are actually in the bundle count
-    // as preserved (a declared path outside the bundle is a handler-side warn).
-    // Computed before the dry-run short-circuit so the previewed
-    // "would write N files" count excludes preserved paths too.
-    const preservedSet = input.preservedPaths ?? new Set<string>();
-    const preserved: string[] = [];
-    const bundleToWrite: Bundle = {};
-    for (const [dest, file] of Object.entries(bundle)) {
-      if (preservedSet.has(dest)) {
-        preserved.push(dest);
-        continue;
-      }
-      // A merge block is non-destructive, but that is not the same as always
-      // safe to add: `.codex/config.toml` already carrying an `[agents]` table
-      // cannot take a second one without ceasing to parse. Refuse, and say
-      // which keys to add by hand — a silent skip would leave the user with the
-      // defect and no idea the fix had been withheld (cli#599).
-      //
-      // Checked before the dry-run branch so a preview reports the refusal too.
-      // `catch → null` because the target directory may not exist yet: on a
-      // greenfield `init` (and on `--dry-run`, which creates nothing at all)
-      // the reader resolves the project root through `realPath` and throws.
-      // "Nothing on disk" is the correct reading of a directory that is not
-      // there, and a guard that can only REFUSE must never be the thing that
-      // makes init fail.
-      const existing = this.deps.reader === undefined ? null : await this.deps.reader
-        .readText(input.targetDir, dest).catch(() => null);
-      const refusal = mergeRefusal(existing, file);
-      if (refusal !== null) {
-        warnings.push(refusal);
-        continue;
-      }
-      bundleToWrite[dest] = file;
-    }
+    // What is written: preserved and refused dests held back (`init_bundle_filter.ts`).
+    const { bundleToWrite, preserved, refusals, excluded } = await filterInitBundle(
+      { reader: this.deps.reader, writer, dryRun: input.dryRun },
+      input.targetDir,
+      bundle,
+      input.preservedPaths ?? new Set<string>(),
+    );
+    warnings.push(...refusals);
 
     // Dry-run short-circuit: no writes, no lock, no git init. Synthesize
     // an InitResult from `bundleToWrite` (the post-preserve-filter set) so the
@@ -238,7 +209,7 @@ export class InitProjectUseCase {
     const skippedSet = new Set(report.skippedSkipIfExists);
     const lockEntries = new Map<string, LockEntry>();
     for (const [dest, file] of Object.entries(bundle)) {
-      if (skippedSet.has(dest)) continue;
+      if (skippedSet.has(dest) || excluded.has(dest)) continue;
       // JSON-merged files (#139) live in user-owned space: the user's copy may
       // diverge from our snapshot in any way (theme, permissions, env, …). We
       // never overwrite them, so they stay out of the lock, like skipIfExists.

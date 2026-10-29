@@ -11,7 +11,9 @@ import {
   SKILL_DOC_RENAMES,
   staleRouterAdvice,
 } from "../domain/skill_doc_renames.ts";
-import { carryAddenda, NOT_EXACT } from "./upgrade_addenda_moves.ts";
+import { judgeExactMove } from "../domain/exact_move.ts";
+import { carryAddenda } from "./upgrade_addenda_moves.ts";
+import { exactMoveRefusal, moveExact } from "./upgrade_exact_move.ts";
 
 /**
  * Renamed documents carry their lock identity across the move.
@@ -164,15 +166,9 @@ async function applicableRenames(
 
 /**
  * The bytes at `oldDest` when the move is safe, else `null` with the reason
- * said. Both ends are judged with `lstat` (plan 037 § 11):
- *
- * - anything at `newDest` is a file Specnaut does not track — the lock check
- *   ran first — and a rename never writes over it (M3);
- * - a link at `oldDest` is left where it is: copying through it would turn
- *   whatever it points at, an ignored secret included, into a tracked
- *   regular file (M2);
- * - a file whose bytes are not UTF-8 stays too: the move writes the decoded
- *   text and deletes the bytes, so a lossy decode would lose them for good.
+ * said. Both ends are judged with `lstat` by `judgeExactMove`: anything at
+ * `newDest` is a file Specnaut does not track — the lock check ran first — and
+ * a rename never writes over it; a link or a lossy file at `oldDest` stays.
  *
  * A read that throws is said and skipped: one odd path never aborts the run.
  */
@@ -182,24 +178,13 @@ async function movableContent(
   newDest: string,
 ): Promise<string | null> {
   try {
-    if (await ctx.reader.readEntry(ctx.projectDir, newDest) !== null) {
-      ctx.notes.push(
-        `${oldDest} is not moved to ${newDest}: a file Specnaut does not track is already ` +
-          `there, and it is kept as it is`,
-      );
-      return null;
-    }
-    const source = await ctx.reader.readEntry(ctx.projectDir, oldDest);
-    if (source?.kind === "file") {
-      if (!source.lossy) return source.content;
-      ctx.notes.push(`${oldDest} is not moved to ${newDest}: ${NOT_EXACT}`);
-    }
-    if (source?.kind === "symlink") {
-      ctx.notes.push(
-        `${oldDest} is a link, so it is not moved to ${newDest} — upgrade never copies ` +
-          `through a link; point it at the new address yourself if it should follow`,
-      );
-    }
+    const verdict = judgeExactMove(
+      await ctx.reader.readEntry(ctx.projectDir, oldDest),
+      await ctx.reader.readEntry(ctx.projectDir, newDest),
+    );
+    if (verdict.kind === "ok") return verdict.content;
+    const refusal = exactMoveRefusal(verdict, oldDest, newDest);
+    if (refusal !== null) ctx.notes.push(refusal);
     return null;
   } catch (err) {
     ctx.notes.push(`${oldDest} is not moved to ${newDest}: ${why(err)}`);
@@ -209,11 +194,8 @@ async function movableContent(
 
 /**
  * Moves each renamed document's bytes, one at a time, and returns the moves
- * that landed. The delete is bounded to the old address itself (`within`):
- * a path under a linked folder resolves elsewhere, and is left in place rather
- * than deleted at whatever it reaches. No backup: the bytes were moved, not
- * discarded — a backup would leave a `.specnaut.bak` beside every renamed file
- * on an upgrade that lost nothing.
+ * that landed — written at the new address, whether or not the old copy could
+ * be deleted (`moveExact`).
  */
 async function moveRenamedBytes(
   ctx: RenameContext,
@@ -221,31 +203,8 @@ async function moveRenamedBytes(
 ): Promise<ApplicableRename[]> {
   const landed: ApplicableRename[] = [];
   for (const a of applicable) {
-    try {
-      await ctx.writer.writeBundle(
-        { [a.newDest]: { content: a.content, executable: false } },
-        ctx.projectDir,
-        { overwrite: false },
-      );
-    } catch (err) {
-      ctx.notes.push(`${a.oldDest} is not moved to ${a.newDest}: ${why(err)}`);
-      continue;
-    }
-    landed.push(a);
-    try {
-      const r = await ctx.writer.deletePaths([a.oldDest], ctx.projectDir, {
-        backupExisting: false,
-        within: (resolved) => resolved === a.oldDest,
-      });
-      if ((r.refused ?? []).length > 0) {
-        ctx.notes.push(
-          `${a.oldDest} was copied to ${a.newDest} but not deleted: it resolves to another ` +
-            `path — delete the old copy yourself once you have checked it`,
-        );
-      }
-      ctx.notes.push(...(r.notes ?? []));
-    } catch (err) {
-      ctx.notes.push(`${a.oldDest} was copied to ${a.newDest} but not deleted: ${why(err)}`);
+    if (await moveExact(ctx, a.oldDest, a.oldDest, a.newDest, a.content) !== "failed") {
+      landed.push(a);
     }
   }
   return landed;

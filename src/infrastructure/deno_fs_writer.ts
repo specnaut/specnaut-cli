@@ -108,8 +108,8 @@ async function assertDestinations(bundle: Bundle, resolved: string, root: string
  *
  * Written only if absent, unless the caller asked to overwrite: with
  * `overwrite` (`--force` from init, or any upgrade call) the placeholder is
- * treated like an owned file — backed up, then written — which keeps the
- * `upgrade --force` semantics for files init originally created.
+ * treated like an owned file — backed up, then written. A `projectOwned` file
+ * (the team's constitution, spec 038) is never: `overwrite` does not reach it.
  *
  * A project may also have made the dest a symlink — consolidating several
  * context files onto one, then leaving `AGENTS.md` pointing at the survivor;
@@ -122,13 +122,13 @@ async function assertDestinations(bundle: Bundle, resolved: string, root: string
  * caller is already safe — `Deno.rename` moves the LINK aside, so the write
  * lands on a fresh regular file and the target survives.
  *
- * Gated on `skipIfExists` on purpose. The managed-section merge builds its own
- * bundle entry without that flag and MUST follow the link, so its fenced
- * section reaches the real file (`upgrade_project.ts`).
+ * Gated on `skipIfExists` on purpose: the managed-section merge
+ * (`upgrade_managed_sections.ts`) builds its own entry without it and MUST
+ * follow the link, so its fenced section reaches the real file.
  */
 async function keepsProjectFile(abs: string, file: TemplateFile, run: EntryRun): Promise<boolean> {
   if (file.skipIfExists !== true) return false;
-  if (!run.overwrite && (await fileExists(abs))) return true;
+  if ((!run.overwrite || file.projectOwned) && (await fileExists(abs))) return true;
   return !run.backupExisting && (await isSymlink(abs));
 }
 

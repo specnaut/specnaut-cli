@@ -33,7 +33,8 @@ export class DenoFsReader implements FsReader {
   async readText(projectDir: string, rel: string): Promise<string | null> {
     assertSafeDestination(rel);
     const abs = join(projectDir, rel);
-    if (!await guarded(assertInsideProject(await resolveProjectRoot(projectDir), abs))) return null;
+    const root = await existingRoot(projectDir);
+    if (root === null || !await guarded(assertInsideProject(root, abs))) return null;
     try {
       return await Deno.readTextFile(abs);
     } catch (err) {
@@ -53,9 +54,9 @@ export class DenoFsReader implements FsReader {
    */
   async readEntry(projectDir: string, rel: string): Promise<DiskEntry | null> {
     assertSafeDestination(rel);
-    const root = await resolveProjectRoot(projectDir);
+    const root = await existingRoot(projectDir);
     const abs = join(projectDir, rel);
-    if (!await guarded(assertRemovableInProject(root, abs))) return null;
+    if (root === null || !await guarded(assertRemovableInProject(root, abs))) return null;
     let info: Deno.FileInfo;
     try {
       info = await Deno.lstat(abs);
@@ -93,6 +94,23 @@ function fileEntry(bytes: Uint8Array): DiskEntry {
   const back = new TextEncoder().encode(content);
   const exact = back.length === bytes.length && back.every((b, i) => b === bytes[i]);
   return exact ? { kind: "file", content } : { kind: "file", content, lossy: true };
+}
+
+/**
+ * The project root, or `null` when the directory does not exist yet. Nothing
+ * is at any path under a directory that is not there — a greenfield `init`,
+ * and its `--dry-run` that creates nothing, read before the first write — so
+ * that is absence, said here once instead of each caller swallowing the throw.
+ * A root that exists and is refused (the filesystem root, the home directory)
+ * or cannot be resolved for another reason still throws.
+ */
+async function existingRoot(projectDir: string): Promise<string | null> {
+  try {
+    return await resolveProjectRoot(projectDir);
+  } catch (err) {
+    if (err instanceof Deno.errors.NotFound) return null;
+    throw err;
+  }
 }
 
 /**

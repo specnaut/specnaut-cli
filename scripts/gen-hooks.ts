@@ -42,6 +42,20 @@ export const CODEX_REGISTRATIONS: readonly Registration[] = [
   },
   {
     event: "PreToolUse",
+    matcher: "Edit|Write",
+    script: "protect-constitution.sh",
+    args: "codex",
+    onChanged: 2,
+  },
+  {
+    event: "PreToolUse",
+    matcher: "Bash",
+    script: "protect-constitution.sh",
+    args: "codex",
+    onChanged: 2,
+  },
+  {
+    event: "PreToolUse",
     matcher: "Agent",
     script: "guard-dispatch-model.sh",
     args: "codex",

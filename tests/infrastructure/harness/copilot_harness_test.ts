@@ -36,7 +36,7 @@ const SAMPLE: CoreBundle = [
   {
     category: "spec-root",
     name: "specify",
-    suffix: "memory/constitution.md",
+    suffix: "memory/size-limits.md",
     content: "# const\n",
     executable: false,
   },
@@ -119,7 +119,7 @@ Deno.test("CopilotHarness maps spec-root to .specnaut/<suffix> and project-root 
     versionScheme: "semver",
     specBackend: "local",
   });
-  assert(".specnaut/memory/constitution.md" in mapped);
+  assert(".specnaut/memory/size-limits.md" in mapped);
   assert("AGENTS.md" in mapped);
 });
 
