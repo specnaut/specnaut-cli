@@ -11,10 +11,10 @@ The reference, verbatim (home: `CONSTITUTION_REFERENCE`,
 
 ## Phase 1 — Foundation: the guard's helpers
 
-- [ ] T001 Move `verbTable` and `docOf` out of `tests/templates/routable_phases_test.ts` into
+- [x] T001 Move `verbTable` and `docOf` out of `tests/templates/routable_phases_test.ts` into
       `tests/templates/verb_table.ts`, exported; `routable_phases_test.ts` imports them and stays
       green unchanged otherwise.
-- [ ] T002 Create `tests/templates/constitution_reference.ts`: `CONSTITUTION_REFERENCE` and
+- [x] T002 Create `tests/templates/constitution_reference.ts`: `CONSTITUTION_REFERENCE` and
       `CONSTITUTION_IMPORT` built from `CONSTITUTION_PATH`; `firstInstruction(body, skip)`;
       `importTokens(text)` by Claude Code's rule (`(^|\s)@<path>`, skipping code spans, fenced
       blocks and HTML comments); `exemptionReason(content)` reading `constitution-exempt` through
@@ -22,7 +22,7 @@ The reference, verbatim (home: `CONSTITUTION_REFERENCE`,
 
 ## Phase 2 — US1/US3: the guard, written first and red
 
-- [ ] T003 [US3] Create `tests/templates/constitution_first_test.ts`, enumerating from
+- [x] T003 [US3] Create `tests/templates/constitution_first_test.ts`, enumerating from
       `CORE_BUNDLE`: routers (`skill`, `backlog-skill`; title skipped), the documents behind
       `ROUTABLE_PHASES.task` (through `docOf`), agents (`agent`); the `AGENTS.md` constitution fence
       (heading + ownership line skipped; the import on the next line); emitted Claude agent `.md`
@@ -35,36 +35,36 @@ The reference, verbatim (home: `CONSTITUTION_REFERENCE`,
 
 ## Phase 3 — US1/US2: the files
 
-- [ ] T004 [US1] `templates/core/root/AGENTS.md`: reword the header blockquote; move the
+- [x] T004 [US1] `templates/core/root/AGENTS.md`: reword the header blockquote; move the
       constitution fence directly after it; `## Architecture rules` becomes a pointer to
       `docs/constitution.md`; fence body = heading, ownership line, the reference,
       `@docs/constitution.md`, then the existing stop-and-ask paragraph minus its now-duplicated
       "read it" (FR-010) and one line that it loads every Claude Code session and imports nothing
       (FR-011).
-- [ ] T005 [US1] `templates/core/root/docs/constitution.md`: one line — it loads into every Claude
+- [x] T005 [US1] `templates/core/root/docs/constitution.md`: one line — it loads into every Claude
       Code session, imports nothing, and a change is reviewed like code. Stays ≤ 60 lines.
-- [ ] T006 [P] [US2] Routers `templates/core/skills/{task,ship,specnaut}/SKILL.md`: the reference as
+- [x] T006 [P] [US2] Routers `templates/core/skills/{task,ship,specnaut}/SKILL.md`: the reference as
       the first line after the title.
-- [ ] T007 [P] [US2] `/task` documents:
+- [x] T007 [P] [US2] `/task` documents:
       `phases/{plan,tasks,implement,review,merge,audit,constitution}.md` and `groom.md`: the
       reference as the first non-blank line; FR-010 on `plan` step 3 and `constitution` step 2;
       `constitution.md` drafting step refuses an import token (FR-011).
-- [ ] T008 [P] [US2] 15 agents `templates/core/agents/*.md`: the reference as the first body line;
+- [x] T008 [P] [US2] 15 agents `templates/core/agents/*.md`: the reference as the first body line;
       FR-010 on the five that already say "read `docs/constitution.md`" (developer, devops-sre,
       code-reviewer, performance-expert, product-owner) — keep the parts that _use_ it.
-- [ ] T009 [P] [US3] `constitution-exempt: <reason>` in the frontmatter of the 11 exempt skills (9
+- [x] T009 [P] [US3] `constitution-exempt: <reason>` in the frontmatter of the 11 exempt skills (9
       contracts, `specnaut-facts`, `status-audit`).
-- [ ] T010 Copy every edited skill, phase and agent to its `plugin/` mirror; `deno task bundle`.
-- [ ] T011 Update `tests/templates/constitution_single_source_test.ts` assertions on the fence
+- [x] T010 Copy every edited skill, phase and agent to its `plugin/` mirror; `deno task bundle`.
+- [x] T011 Update `tests/templates/constitution_single_source_test.ts` assertions on the fence
       wording to follow the new text (no assertion weakened).
 
 ## Phase 4 — Proof
 
-- [ ] T012 `deno task test` green (task permissions, never `-A`).
-- [ ] T013 Red-probes, each observed red then restored: the reference removed from one router, one
+- [x] T012 `deno task test` green (task permissions, never `-A`).
+- [x] T013 Red-probes, each observed red then restored: the reference removed from one router, one
       phase, one agent, the fence; the import line removed; a second `@` token added to the
       constitution template; an empty `constitution-exempt`; an exemption on an agent.
-- [ ] T014 Measure always-loaded bytes after (Claude: `AGENTS.md` + `docs/constitution.md`; Codex:
+- [x] T014 Measure always-loaded bytes after (Claude: `AGENTS.md` + `docs/constitution.md`; Codex:
       `AGENTS.md`), record in plan § 6.
 
 ## Dependencies

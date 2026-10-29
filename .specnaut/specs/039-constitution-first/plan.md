@@ -126,14 +126,12 @@ ownership line, 0 otherwise). Exemptions are read from the **source** bundle: Co
 frontmatter (`ensureSkillFrontmatter`) and drops the key. The reference line sits outside every
 harness/backend conditional marker, so no filter removes it.
 
-Always-loaded bytes, measured on the bundle at `cc2429b5`:
+Always-loaded bytes, measured on the bundle (before: `cc2429b5`; after: this branch):
 
-| Harness     |               Before |                                                                            After (estimate) |
-| :---------- | -------------------: | ------------------------------------------------------------------------------------------: |
-| Claude Code | `AGENTS.md` 12,824 B | `AGENTS.md` ≈ 12,950 B + `docs/constitution.md` 1,920 B (49 lines; ceiling 100 lines, #684) |
-| Codex       | `AGENTS.md` 12,824 B |                                         ≈ 12,950 B; the constitution is read on instruction |
-
-The exact figures are measured at implement and recorded in § 12.
+| Harness     |               Before |                                                                                    After |
+| :---------- | -------------------: | ---------------------------------------------------------------------------------------: |
+| Claude Code | `AGENTS.md` 12,824 B | `AGENTS.md` 13,076 B + `docs/constitution.md` 2,030 B (50 lines; ceiling 100) = 15,106 B |
+| Codex       | `AGENTS.md` 12,824 B |                                        13,076 B; the constitution is read on instruction |
 
 ## 7. Constitution check
 
