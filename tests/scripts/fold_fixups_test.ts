@@ -31,6 +31,27 @@ Deno.test("it prints PRE, folds the fixup into its own child, and keeps the tree
   }
 });
 
+Deno.test("it folds on a git older than 2.44, where --autosquash needs --interactive", {
+  // The shim is a bash script named `git` on PATH; Windows resolves `git.exe` first.
+  ignore: Deno.build.os === "windows",
+}, async () => {
+  const sb = await epicWithFixup();
+  try {
+    // git < 2.44 ignores --autosquash unless the rebase is interactive.
+    const r = await sb.scriptWithGit(
+      `if [ "$1" = rebase ] && [[ " $* " != *" -i "* && " $* " != *" --interactive "* ]]; then
+  args=(); for a in "$@"; do [ "$a" = --autosquash ] || args+=("$a"); done; set -- "\${args[@]}"
+fi
+exec "$REAL_GIT" "$@"`,
+      "fold-fixups.sh",
+    );
+    assertEquals(r.code, 0, r.stderr);
+    assertEquals(await git(sb.work, "rev-list", "--count", "main..HEAD"), "2");
+  } finally {
+    await sb.cleanup();
+  }
+});
+
 Deno.test("a conflict stops at 13; --verify then checks against the tree recorded before", async () => {
   const sb = await sandbox();
   try {
@@ -43,6 +64,8 @@ Deno.test("a conflict stops at 13; --verify then checks against the tree recorde
     const before = await git(sb.work, "rev-parse", "HEAD");
     const r = await sb.script("fold-fixups.sh");
     assertEquals(r.code, 13, r.stderr);
+    // git's own conflict report reaches the reader: the script never prints a subject.
+    assertStringIncludes(r.stderr, "fixup! feat(T01): a (#51)");
     const pre = r.stdout.match(/^PRE ([0-9a-f]{40})$/m)?.[1];
     assertEquals(pre, before);
     // Resolve keeping the branch's final content: the fold must not change the tree.

@@ -69,14 +69,7 @@ Deno.test("its refusals: on the base 2, no base 3, dirty 4, behind 5", async () 
 Deno.test("a rejected push is 7, leaves the merge local, and a re-run after reconciling lands", async () => {
   const sb = await featureBranch();
   try {
-    // A remote hook that refuses once, then accepts: the shape of a transient rejection.
-    const hook = join(sb.remote, "hooks/pre-receive");
-    await Deno.writeTextFile(
-      hook,
-      `#!/bin/sh\n[ -f "${sb.root}/allow" ] && exit 0\necho refused >&2\nexit 1\n`,
-    );
-    // Windows has no mode bits: Git for Windows runs a hook by its `#!` line.
-    if (Deno.build.os !== "windows") await Deno.chmod(hook, 0o755);
+    await sb.refusePushes();
     const r = await sb.script("land-feature.sh");
     assertEquals(r.code, 7, r.stderr);
     assertStringIncludes(r.stderr, "never --force");
@@ -99,6 +92,28 @@ Deno.test("it never publishes a tag, even with push.followTags set", async () =>
     await git(sb.work, "tag", "-a", "v9.9.9", "-m", "local only");
     assertEquals((await sb.script("land-feature.sh")).code, 0);
     assertEquals(await git(sb.remote, "tag", "--list"), "", "a tag rode along on the push");
+  } finally {
+    await sb.cleanup();
+  }
+});
+
+Deno.test("every merge script finds base-branch.sh when run by bare name from its own directory", async () => {
+  // `${BASH_SOURCE[0]%/*}` of a bare name is the name itself, and of a
+  // Windows path with backslashes the whole path: the sibling went unfound (3).
+  const sb = await sandbox();
+  try {
+    const dir = join(sb.work, ".specnaut/scripts/bash");
+    // On main, with no feature: each stops at its own refusal, past the base lookup.
+    const want: Record<string, [number, ...string[]]> = {
+      "epic-status.sh": [14],
+      "fold-fixups.sh": [14],
+      "land-feature.sh": [2],
+      "remove-spec.sh": [22, "007-x"],
+    };
+    for (const [name, [code, ...args]] of Object.entries(want)) {
+      const r = await run("bash", [name, ...args], dir);
+      assertEquals(r.code, code, `${name}: ${r.stderr}`);
+    }
   } finally {
     await sb.cleanup();
   }

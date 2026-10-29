@@ -10,8 +10,7 @@ NAME="${1:?usage: smoke-backlog-local.sh <name>}"
 . "$(dirname "$0")/_common.sh"
 DIR="$(scenario_dir "$NAME")"
 
-# Trap-based cleanup: wipe the scenario directory on every exit path
-# (success OR failure) so the sandbox/ tree never accumulates orphans.
+# Wipe the scenario directory on every exit path, so sandbox/ never accumulates orphans.
 trap 'bash "$SMOKE_DIR/clean.sh" "$NAME" >/dev/null 2>&1 || true' EXIT
 
 bash "$SMOKE_DIR/bootstrap-vite.sh" "$NAME" >/dev/null
@@ -157,9 +156,8 @@ grep -q "propagate-parent-status.sh" .specnaut/scripts/backlog/move.sh \
   && pass "move.sh invokes propagate-parent-status.sh as tail hook" \
   || fail "move.sh tail hook missing" "$(tail -10 .specnaut/scripts/backlog/move.sh)"
 
-# #263 setup: create a second sibling child of #001 so the original
-# #260 single-child assertions below stay meaningful (otherwise child
-# #003 → Done would itself complete the set and trigger #263's
+# #263 setup: a second sibling child of #001 keeps the #260 single-child assertions below
+# meaningful (otherwise child #003 → Done would complete the set and trigger #263's
 # all-children-Done promotion).
 bash .specnaut/scripts/backlog/add.sh "Second sibling of 1" "" --parent 1 >/dev/null
 [ -f .specnaut/backlog/004-second-sibling-of-1.md ] \
@@ -249,9 +247,8 @@ assert_parent "Backlog" "Backlog parent is not auto-advanced even when all child
   "#263 Backlog parent exclusion broken"
 
 echo "═══ #442  local _config.sh resolves an item path ═══"
-# The local backend writes no backlog-config.yml, so _config.sh exists purely to
-# give it the same item_url surface as the other backends. It was missing from
-# the manifest on first ship — assert it is actually scaffolded, not just authored.
+# No backlog-config.yml here: _config.sh only gives the local backend the item_url surface the
+# others have. It was missing from the first manifest — assert it is scaffolded, not just authored.
 [ -f .specnaut/scripts/backlog/_config.sh ] \
   && pass "_config.sh is scaffolded for the local backend" \
   || fail "_config.sh not scaffolded (manifest entry missing?)" "$(ls .specnaut/scripts/backlog/)"
@@ -307,12 +304,7 @@ done
   && pass "every item is rendered under the column its frontmatter declares, exactly once" \
   || fail "render-index grouping does not match the items' status fields" "$grouping_why"
 
-
-echo "═══ spec 042  close-shipped.sh — the move is the close ═══"
-check "close-shipped.sh present + executable (spec 042)" \
-  '[ -x .specnaut/scripts/backlog/close-shipped.sh ]'
-check "close-shipped.sh moves each item to Done and asks no forge (spec 042)" \
-  'grep -qF "move.sh\" \"\$n\" Done" .specnaut/scripts/backlog/close-shipped.sh &&
-   ! grep -qF "/cascade-check.sh" .specnaut/scripts/backlog/close-shipped.sh'
+check "close-shipped.sh is the close: it moves each item to Done and asks no forge (spec 042)" \
+  'F=.specnaut/scripts/backlog/close-shipped.sh; [ -x "$F" ] && grep -qF "move.sh\" \"\$n\" Done" "$F" && ! grep -qF "/cascade-check.sh" "$F"'
 
 finish "BACKLOG-LOCAL"

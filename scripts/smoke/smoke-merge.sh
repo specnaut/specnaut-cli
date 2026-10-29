@@ -101,11 +101,11 @@ check "one authorisation covers the close AND the removal, with no second prompt
 check "the removal is its own commit, not folded into the merge (#587 AC4)" \
   'grep -qF "remove the spec directory for the shipped feature" .specnaut/scripts/bash/remove-spec.sh'
 # An epic is one tree: a per-child removal hits one directory N times. The
-# script takes no argument, so there is nothing to run per child.
+# script takes exactly one argument, the landed branch, never a child id.
 check "an epic removes one directory once, never per child (#587 AC5)" \
   'grep -qF "once, for the whole epic too" .claude/skills/task/phases/merge-close.md &&
-   grep -qF "usage: remove-spec.sh\"" .specnaut/scripts/bash/remove-spec.sh &&
-   grep -qF "[ \$# -ne 0 ]" .specnaut/scripts/bash/remove-spec.sh'
+   grep -qF "usage: remove-spec.sh <landed-branch>\"" .specnaut/scripts/bash/remove-spec.sh &&
+   grep -qF "[ \$# -ne 1 ]" .specnaut/scripts/bash/remove-spec.sh'
 # feature.json NAMES the removed directory, and common.sh never checks that
 # the name still resolves: get_feature_paths returns the deleted path with
 # exit 0 and no warning, its branch-contradiction guard skipped off a feature

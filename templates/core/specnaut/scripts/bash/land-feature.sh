@@ -22,7 +22,7 @@
 # Usage: land-feature.sh
 set -euo pipefail
 export GIT_OPTIONAL_LOCKS=0
-here=${BASH_SOURCE[0]%/*}
+here=$(CDPATH="" cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 
 if [ $# -ne 0 ]; then echo "usage: land-feature.sh" >&2; exit 2; fi
 base=$(bash "$here/base-branch.sh") || exit 3

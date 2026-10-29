@@ -9,8 +9,18 @@
 # `gh release create`. A first word ending in `.sh` is a script: _command.sh
 # has already reduced the command word to its basename, so it matches however
 # the script is reached (a path, `bash x`, `source x`, `timeout 60 x`, …).
+# The script word is matched ignoring case (a case-folding filesystem, APFS or
+# NTFS, runs `Land-Feature.sh`), and a command word the shell rewrites after
+# this hook has read it — a `$VAR`, a substitution, a glob, a brace — matches
+# every script line: what it names is unknown here, so it is gated (fail
+# closed). An argument is never judged so: `ls *.sh` runs `ls`.
 # `<words> except <flag>`: that flag anywhere in the segment exempts it.
 # `#` comments and blank lines are skipped; a `\r` (a CRLF checkout) is read past.
+
+# _listed_expands <word> — the shell rewrites it before it runs: a `$`, a
+# substitution (_command.sh leaves a `$` where one stood), `*`, `?`, or a
+# bracket or brace pair. A lone `[` or `{` is literal — `[` is test(1).
+_listed_expands() { case $1 in *'$'* | *'`'* | *'*'* | *'?'* | *'['*']'* | *'{'*'}'*) return 0 ;; esac; return 1; }
 
 # listed <list file> — HIT: the entry of the list the segment (W, and POS:
 # its words without options) runs, else "". Always returns 0 and is called
@@ -29,7 +39,11 @@ listed() {
     read -r -a e <<<"$entry"
     ok=1
     for ((i = 0; i < ${#e[@]}; i++)); do
-      if [ "${e[i]}" != "${POS[i]:-}" ]; then ok=0; break; fi
+      if [ "${e[i]}" = "${POS[i]:-}" ]; then continue; fi
+      if [ "$i" = 0 ] && [[ ${e[0]} == *.sh ]] &&
+        { guard_ieq "${e[0]}" "${POS[0]:-}" || _listed_expands "${POS[0]:-}"; }; then continue; fi
+      ok=0
+      break
     done
     [ "$ok" = 1 ] || continue
     if [ -n "$except" ]; then

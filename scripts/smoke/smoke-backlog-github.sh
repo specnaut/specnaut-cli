@@ -1,9 +1,7 @@
 #!/usr/bin/env bash
-# Verify the GitHub-backend backlog scaffolding ships every script the
-# PO + grooming contracts depend on. Tests file presence, executable
-# bits, and SKILL.md references — no live `gh` calls (the actual
-# script behavior against a real repo is covered by integration tests
-# and manual QA).
+# Verify the GitHub-backend backlog scaffolding ships every script the PO + grooming contracts
+# depend on: presence, executable bits, SKILL.md references. No live `gh` calls — behaviour
+# against a real repo is covered by integration tests and manual QA.
 #
 # Usage: smoke-backlog-github.sh <name>
 set -euo pipefail
@@ -12,8 +10,7 @@ NAME="${1:?usage: smoke-backlog-github.sh <name>}"
 . "$(dirname "$0")/_common.sh"
 DIR="$(scenario_dir "$NAME")"
 
-# Trap-based cleanup: wipe the scenario directory on every exit path
-# (success OR failure) so the sandbox/ tree never accumulates orphans.
+# Wipe the scenario directory on every exit path, so sandbox/ never accumulates orphans.
 trap 'bash "$SMOKE_DIR/clean.sh" "$NAME" >/dev/null 2>&1 || true' EXIT
 
 bash "$SMOKE_DIR/bootstrap-empty.sh" "$NAME" >/dev/null
@@ -22,7 +19,6 @@ bash "$SMOKE_DIR/bootstrap-empty.sh" "$NAME" >/dev/null
   --backlog-url "https://github.com/orgs/example/projects/1" >/dev/null 2>&1)
 
 cd "$DIR"
-
 
 echo "═══ #69 + #93  backlog backend lock + config ═══"
 check "lock records github backend" \
@@ -45,10 +41,8 @@ check_context_file github
 
 echo
 echo "═══ canonical backlog scripts (5 originals) ═══"
-# Names carry their `.sh` so the coverage scan can find them. `audit.sh`
-# greps each smoke file for a literal basename; a name assembled from a loop
-# variable is invisible to it, so this loop covered six scripts while being
-# reported as six gaps.
+# Names carry their `.sh`: `audit.sh` greps each smoke file for a literal basename, and a name
+# assembled from a loop variable is invisible to it (six scripts covered, reported as six gaps).
 for s in list.sh view.sh add.sh move.sh clarify-comment.sh groom-verify.sh; do
   check "$s present + executable" "[ -x .specnaut/scripts/backlog/$s ]"
 done
@@ -358,18 +352,10 @@ check "move-batch reports its request count, so batching is observable" \
 check "move-batch does not fire the parent-epic propagation hook" \
   '! grep -q "propagate-parent-status" .specnaut/scripts/backlog/move-batch.sh'
 
-
 echo "═══ spec 042  close-shipped.sh settles the board after the close ═══"
-check "close-shipped.sh present + executable (spec 042)" \
-  '[ -x .specnaut/scripts/backlog/close-shipped.sh ]'
-# The card moves only once cascade-check.sh proves the issue closed (exit 12):
-# a Done card over an open issue is exactly what sweep-closed.sh flags REOPENED.
-check "close-shipped.sh confirms the close before it moves the card (spec 042)" \
-  'F=.specnaut/scripts/backlog/close-shipped.sh;
-   c=$(grep -nF "/cascade-check.sh" "$F" | head -1 | cut -d: -f1);
-   m=$(grep -nF "/move.sh" "$F" | head -1 | cut -d: -f1);
-   [ -n "$c" ] && [ -n "$m" ] && [ "$c" -lt "$m" ] && grep -qF -- "-ne 12" "$F"'
-check "close-shipped.sh reconciles the board once, after the moves (spec 042)" \
-  'grep -qF "sweep-closed.sh\" --passes 2" .specnaut/scripts/backlog/close-shipped.sh'
+check "close-shipped.sh moves a card only once its issue is closed (exit 12; Done over an open issue is REOPENED drift), then reconciles once (spec 042)" \
+  'F=.specnaut/scripts/backlog/close-shipped.sh; [ -x "$F" ] && grep -qF -- "-ne 12" "$F" &&
+   c=$(grep -nF "/cascade-check.sh" "$F" | head -1 | cut -d: -f1) && m=$(grep -nF "/move.sh" "$F" | head -1 | cut -d: -f1) &&
+   [ -n "$c" ] && [ -n "$m" ] && [ "$c" -lt "$m" ] && grep -qF "sweep-closed.sh\" --passes 2" "$F"'
 
 finish "BACKLOG-GITHUB"

@@ -8,7 +8,7 @@
 #
 # Usage: close-shipped.sh <issue-number>…
 set -uo pipefail
-here=${BASH_SOURCE[0]%/*}
+here=$(CDPATH="" cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 
 [ $# -gt 0 ] || { echo "usage: close-shipped.sh <issue-number>…" >&2; exit 2; }
 for n in "$@"; do

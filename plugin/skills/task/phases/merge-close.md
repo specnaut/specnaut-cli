@@ -37,13 +37,14 @@ confirmed closed.
 4. **Remove the spec directory — once, for the whole epic too:**
 
    ```
-   bash .specnaut/scripts/bash/remove-spec.sh
+   bash .specnaut/scripts/bash/remove-spec.sh <branch>
    ```
 
-   It runs only on the base branch, only for a `feature_directory` that is directly under
-   `.specnaut/specs/` and in git history, in its own commit, pushed. Exit 22 is a skip, and its
-   reason is printed — report it, never silently. Never run it before the close succeeded: nobody
-   authorised a removal then.
+   `<branch>` is the feature branch `land-feature.sh` just landed — the one you merged, not one read
+   back from `feature.json`. It runs only on the base branch, only for a `feature_directory` that is
+   directly under `.specnaut/specs/`, named like that branch, and in git history, in its own commit,
+   pushed. Exit 22 is a skip, and its reason is printed — report it, never silently.
+   Never run it before the close succeeded: nobody authorised a removal then.
 
 ## The report names every item, one line each
 

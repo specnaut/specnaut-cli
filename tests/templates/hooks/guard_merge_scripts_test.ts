@@ -28,6 +28,33 @@ const REACHED = [
   "git status && S",
 ];
 
+/**
+ * Spellings that run a listed script under another name: a case-folding
+ * filesystem (APFS, NTFS) runs `Land-Feature.sh`, and the shell resolves a
+ * variable, a glob or a brace after the hook has read the line. The controls
+ * use the same characters where they do not name the command.
+ */
+const SPELLED: ReadonlyArray<[command: string, gated: boolean]> = [
+  ["Land-Feature.sh", true],
+  ["bash .specnaut/scripts/bash/REMOVE-SPEC.SH 007-x", true],
+  ["land-*.sh", true],
+  ["bash .specnaut/scripts/bash/land-feature.s?", true],
+  ["./land-feature.[s]h", true],
+  ["{land-feature,x}.sh", true],
+  ["$S", true],
+  ['"$S" 007-x', true],
+  ["${S}", true],
+  ["S=.specnaut/scripts/bash/land-feature.sh; bash $S", true],
+  ["`echo land-feature.sh`", true],
+  ["$(echo .specnaut/scripts/bash/land-feature.sh)", true],
+  ["ls *.sh", false],
+  ["grep -l push .specnaut/scripts/bash/*.sh", false],
+  ["cat .specnaut/scripts/bash/land-feature.sh", false],
+  ["echo $HOME ${PWD} $(date)", false],
+  ['"$HOME/bin/tool" --help', false],
+  ["[ -f land-feature.sh ] && [[ -n $x ]]", false],
+];
+
 /** [command, gated under manual?] — a wrapper reads like the command it runs. */
 const WRAPPED: ReadonlyArray<[command: string, gated: boolean]> = [
   ["timeout 60 git push origin main", true],
@@ -92,6 +119,29 @@ Deno.test("guard-merge: a wrapper does not hide the command it runs", async () =
       const want = gated ? GATED[h] : "allow";
       const v = verdict(got[i]);
       return v === want ? [] : [`${h} ${JSON.stringify(command)}: want ${want}, got ${v}`];
+    });
+    assertEquals(wrong, [], wrong.join("\n"));
+  } finally {
+    await sb.cleanup();
+  }
+});
+
+Deno.test("guard-merge: a listed script spelled in another case, a glob or a variable is still gated", async () => {
+  const sb = await sandbox();
+  try {
+    const manual = await makeRepo(sb, { head: "feat" });
+    const auto = await makeRepo(sb, { head: "feat", mode: "auto" });
+    const cases = HARNESSES.flatMap((h) =>
+      SPELLED.flatMap(([c, gated]) => [[h, manual, c, gated], [h, auto, c, false]] as const)
+    );
+    const got = await pool(cases, ([h, repo, command]) => bash(sb, h, repo, command));
+    const wrong = cases.flatMap(([h, repo, command, gated], i) => {
+      const want = gated ? GATED[h] : "allow";
+      const v = verdict(got[i]);
+      const mode = repo === manual ? "manual" : "auto";
+      return v === want
+        ? []
+        : [`${h} [${mode}] ${JSON.stringify(command)}: want ${want}, got ${v}`];
     });
     assertEquals(wrong, [], wrong.join("\n"));
   } finally {

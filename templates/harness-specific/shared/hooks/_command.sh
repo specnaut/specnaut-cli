@@ -17,7 +17,9 @@
 # it. Scripts, interpreters and shell functions are not seen: the stated limit.
 #
 # After cmd_parse: CMD_SEGS holds one entry per simple command, its words
-# joined by CMD_SEP, the first word reduced to its basename. CMD_MOVED=1 when
+# joined by CMD_SEP, the first word reduced to its basename. A substitution
+# leaves a `$` in the word it stood in, so a command word that is one still
+# reads as a word the shell rewrites (_listed.sh). CMD_MOVED=1 when
 # the line may act on another repository: cd/pushd, env -C, a GIT_DIR/
 # GIT_WORK_TREE/GIT_CONFIG* assignment (and, through _git.sh's cmd_git,
 # git -C/--git-dir/--work-tree and -c alias.*).
@@ -95,8 +97,8 @@ cmd_parse() {
       case $c in
         '\') case $nx in '"' | '\' | '$' | '`') word+=$nx i=$((i + 1)) ;; $'\n') i=$((i + 1)) ;; *) word+=$c ;; esac ;;
         '"') q="" ;;
-        '$') if [ "$nx" = "(" ]; then _cmd_end; stack="d$stack" q="" i=$((i + 1)); _cmd_arith; else word+=$c; fi ;;
-        '`') _cmd_end; bt=d q="" ;;
+        '$') if [ "$nx" = "(" ]; then word+=$c have=1; _cmd_end; stack="d$stack" q="" i=$((i + 1)); _cmd_arith; else word+=$c; fi ;;
+        '`') word+='$' have=1; _cmd_end; bt=d q="" ;;
         *) word+=$c ;;
       esac
     else
@@ -107,10 +109,10 @@ cmd_parse() {
         $'\n') _cmd_end; if [ -n "$heredocs" ]; then _cmd_heredocs; fi ;;
         ';' | '|') _cmd_end ;;
         '&') case $word in *'>' | *'<') word+=$c ;; *) if [ "$nx" = ">" ]; then word+=$c; else _cmd_end; fi ;; esac ;;
-        '$') if [ "$nx" = "(" ]; then _cmd_end; stack="u$stack" i=$((i + 1)); _cmd_arith; else word+=$c; fi ;;
+        '$') if [ "$nx" = "(" ]; then word+=$c have=1; _cmd_end; stack="u$stack" i=$((i + 1)); _cmd_arith; else word+=$c; fi ;;
         '(') _cmd_end; stack="u$stack"; _cmd_arith ;;
         ')') _cmd_end; if [ "${stack:0:1}" = d ]; then q='"'; fi; stack=${stack:1} ;;
-        '`') _cmd_end; if [ -z "$bt" ]; then bt=u; elif [ "$bt" = d ]; then q='"' bt=""; else bt=""; fi ;;
+        '`') if [ -z "$bt" ]; then word+='$' have=1; fi; _cmd_end; if [ -z "$bt" ]; then bt=u; elif [ "$bt" = d ]; then q='"' bt=""; else bt=""; fi ;;
         '#') if [ -z "$word" ] && [ "$have" = 0 ]; then d=${s:i}; d=${d%%$'\n'*}; i=$((i + ${#d})); else word+=$c; fi ;;
         '<') _cmd_lt ;;
         *) word+=$c ;;

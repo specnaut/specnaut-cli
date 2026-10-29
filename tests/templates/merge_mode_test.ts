@@ -113,3 +113,25 @@ Deno.test("base-branch: origin/HEAD, else init.defaultBranch, else exit 3", asyn
     await sb.cleanup();
   }
 });
+
+Deno.test("base-branch: a name git would read as an option, or one with '..', is exit 3", async () => {
+  // Every caller passes the name to git as an argument: `--exec=…` reached
+  // `git rebase` through fold-fixups.sh and ran a command.
+  const sb = await sandbox();
+  try {
+    for (const bad of ["-x", "--exec=true"]) {
+      const repo = await makeRepo(sb, { base: bad, head: "feat" });
+      const r = await runScript(sb, "base-branch.sh", repo);
+      assertEquals([r.code, r.stdout], [3, ""], `origin/HEAD → ${bad}`);
+    }
+    const repo = await makeRepo(sb, { base: null, head: "feat" });
+    for (const bad of ["-x", "--exec=true", "a..b", "a b", ".hidden"]) {
+      await git(sb, repo, "config", "init.defaultBranch", bad);
+      const r = await runScript(sb, "base-branch.sh", repo);
+      assertEquals([r.code, r.stdout], [3, ""], `init.defaultBranch=${bad}`);
+      assertStringIncludes(r.stderr, "not a branch name");
+    }
+  } finally {
+    await sb.cleanup();
+  }
+});

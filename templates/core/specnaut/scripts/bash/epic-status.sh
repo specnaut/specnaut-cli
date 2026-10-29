@@ -18,7 +18,7 @@
 # Usage: epic-status.sh
 set -euo pipefail
 export GIT_OPTIONAL_LOCKS=0
-here=${BASH_SOURCE[0]%/*}
+here=$(CDPATH="" cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 
 if [ $# -ne 0 ]; then echo "usage: epic-status.sh" >&2; exit 2; fi
 # The base has one home, base-branch.sh — never an argument.

@@ -114,7 +114,11 @@ check "close-shipped.sh confirms the close before it moves the card (spec 042)" 
    c=$(grep -nF "/cascade-check.sh" "$F" | head -1 | cut -d: -f1);
    m=$(grep -nF "/move.sh" "$F" | head -1 | cut -d: -f1);
    [ -n "$c" ] && [ -n "$m" ] && [ "$c" -lt "$m" ] && grep -qF -- "-ne 12" "$F"'
-check "close-shipped.sh reconciles the board once, after the moves (spec 042)" \
-  'grep -qF "sweep-closed.sh\" --passes 2" .specnaut/scripts/backlog/close-shipped.sh'
+# This backend's sweep takes --since only (it exits 2 on anything else), so the
+# reconcile passes it nothing: a --passes here made every gitlab close exit 21.
+check "close-shipped.sh reconciles the board once, with no flag the gitlab sweep rejects (spec 042)" \
+  'F=.specnaut/scripts/backlog/close-shipped.sh;
+   grep -qF "/sweep-closed.sh\" 2>&1)" "$F" && ! grep -qF "sweep-closed.sh\" --" "$F" &&
+   ! grep -qF -- "--passes" .specnaut/scripts/backlog/sweep-closed.sh'
 
 finish "BACKLOG-GITLAB"

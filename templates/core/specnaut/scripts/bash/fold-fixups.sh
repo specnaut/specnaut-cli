@@ -22,7 +22,7 @@
 # Usage: fold-fixups.sh [--verify <pre-sha>]
 set -euo pipefail
 export GIT_OPTIONAL_LOCKS=0
-here=${BASH_SOURCE[0]%/*}
+here=$(CDPATH="" cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 
 pre=""
 case $# in
@@ -44,7 +44,9 @@ fi
 if [ -z "$pre" ]; then
   pre=$(git rev-parse HEAD)
   printf 'PRE %s\n' "$pre"
-  if ! GIT_SEQUENCE_EDITOR=true git rebase --quiet --autosquash --keep-base "$range_base" >/dev/null 2>&1; then
+  # -i: before git 2.44, --autosquash does nothing without it. The editor
+  # accepts the todo list as autosquash wrote it; git's stderr is the report.
+  if ! GIT_SEQUENCE_EDITOR=true git rebase -i --quiet --autosquash --keep-base "$range_base" >/dev/null; then
     echo "fold-fixups: the rebase stopped on a conflict — resolve it, 'git rebase --continue', then: fold-fixups.sh --verify $pre" >&2
     exit 13
   fi

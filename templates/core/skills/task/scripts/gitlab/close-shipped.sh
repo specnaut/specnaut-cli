@@ -7,7 +7,9 @@
 # exit 12, and nothing else, means closed) — an open issue's card is left
 # alone, because the close comes first and a Done card over an open issue is
 # the drift the sweep exists to report. Then move it to Done. Then reconcile
-# the whole board once: sweep-closed.sh --passes 2, and one move.sh Done per DRIFTED.
+# the whole board once: sweep-closed.sh, one pass (this backend's sweep takes
+# no --passes; the items settled here were confirmed closed above), and one
+# move.sh Done per DRIFTED.
 # One line per item on stdout, and the sweep's own summary line verbatim.
 #
 # Exit: 0 every item settled · 2 usage · 20 an issue was still open (its card
@@ -16,7 +18,7 @@
 #
 # Usage: close-shipped.sh <issue-number>…
 set -uo pipefail
-here=${BASH_SOURCE[0]%/*}
+here=$(CDPATH="" cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 
 [ $# -gt 0 ] || { echo "usage: close-shipped.sh <issue-number>…" >&2; exit 2; }
 for n in "$@"; do
@@ -40,7 +42,7 @@ for n in "$@"; do
   fi
 done
 
-if ! sweep=$(bash "$here/sweep-closed.sh" --passes 2 2>&1); then
+if ! sweep=$(bash "$here/sweep-closed.sh" 2>&1); then
   printf '%s\n' "$sweep" | tail -1
   echo "FAILED reconcile — the sweep did not complete"
   [ "$rc" -ne 0 ] || rc=21
