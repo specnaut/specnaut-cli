@@ -423,14 +423,11 @@ epic merge path, not here.
 
 ## Reading it back
 
-Given a commit on an epic branch, the child it belongs to is recoverable two
-ways, and they must agree:
-
-- the \`(#<child-issue>)\` in the subject — the child's issue number outright;
-- the \`T<NN>\` ordinal — its position in the epic's dependency order.
-
-If they disagree, the branch has been rewritten by something that did not read
-this file. Stop and say so rather than picking one.
+\`bash .specnaut/scripts/bash/epic-status.sh\` is the one reader of this format: it prints a
+\`CHILD T<NN> #<child> <sha>\` line per child, checks the ordinals run 1, 2, 3… and that no child
+has two commits, and exits 12 when the history does not read back to the board. Never parse the
+log a second way. If it exits 12, the branch has been rewritten by something that did not follow
+this file: stop and say so rather than picking one reading.
 `,
     executable: false,
     backend: null,
@@ -622,99 +619,42 @@ them by hand. The tiers are an epic mechanism.
 
 Loaded by \`phases/merge.md\` on the epic path, before the merge.
 
-On an epic branch the scope is the task: one commit per child, and children
-never merge together. Real work does not arrive that way. A child gets fixed
-after its commit is written — because its fast gate failed as the loop moved
-on, or because the full gate failed at the end and the fault was attributed to
-it. Those fixes have to fold back into **their own child's** commit, so what
-reaches the default branch still reads as one commit per child.
+A child fixed after its commit is written — its fast gate failed as the loop moved on, or the full
+gate failed at the end and the fault was traced to it — must fold back into **its own child's**
+commit, so the default branch still reads one commit per child.
 
 ## Write the fixup so it already knows where it goes
-
-When you fix a child whose commit is already written, commit the fix as a
-**fixup of that child's commit**:
 
 \`\`\`
 git commit --fixup=<sha-of-that-child's-commit>
 \`\`\`
 
-This is the whole of AC 1 and AC 2, done at the moment the fix is written
-rather than reconstructed later. The commit git produces is titled
-\`fixup! <that child's subject>\`, so:
-
-- it is **attributed to the child at fault** by construction;
-- it **never acquires an id of its own** — no \`T<NN>\` scope, no \`(#N)\`, no
-  \`Epic:\` trailer, because it is not a child;
-- it **cannot inherit a different child's id**, because the target is a sha
-  you named, not a guess made afterwards from a subject line.
-
-A fixup written any other way has to be matched to a child by reading it, and
-a match made by reading is a match that can be wrong.
+The commit is titled \`fixup! <that child's subject>\`: attributed to the child at fault by
+construction, with no id of its own (no \`T<NN>\`, no \`(#N)\`, no \`Epic:\` trailer), and unable to
+inherit a sibling's, because its target is a sha you named. A fixup matched to a child by reading
+it is a match that can be wrong.
 
 ## The fold
 
-Capture the diff **before** touching anything. This is not optional, and the
-reason is at the bottom of this file.
-
 \`\`\`
-git diff <base>..HEAD > /tmp/epic-before.diff
-GIT_SEQUENCE_EDITOR=true git rebase --autosquash --keep-base <base>
+bash .specnaut/scripts/bash/fold-fixups.sh
 \`\`\`
 
-\`--autosquash\` moves each \`fixup!\` commit next to the commit it names and
-squashes it in. It touches nothing else: a fixup folds into **its own** target
-and no other, so two children are never collapsed however related they look,
-and the children keep their relative order. \`GIT_SEQUENCE_EDITOR=true\` accepts
-the plan git generated rather than opening an editor — the plan is the point,
-not something to hand-edit.
+It prints \`PRE <sha>\`, folds each fixup into the commit it names (\`rebase --autosquash
+--keep-base\`), and runs three checks: the tree is the one recorded before the fold, the worktree is
+clean, and \`epic-status.sh\` reads one commit per child in order with no \`fixup!\` left.
 
-If the rebase stops on a conflict, resolve it, \`git rebase --continue\`, and
-re-run **every** check below afterwards. Do not skip a commit.
+| Exit | Meaning | What you do |
+| :--- | :--- | :--- |
+| 0 | folded | merge |
+| 13 | the rebase stopped on a conflict | resolve it, \`git rebase --continue\`, then \`fold-fixups.sh --verify <PRE sha>\` — the checks run against the tree recorded before the fold |
+| 10 | the tree moved | stop: a fold that changes the tree is a rewrite |
+| 11 | the worktree is not clean | untracked output belongs in the child's commit or \`.gitignore\`; a modified file means something still holds the tree — stop it first |
+| 12 | not one commit per child | a surviving \`fixup!\` lost its target or was written by hand; attribute it by sha |
+| 14 | not an epic branch | this file does not apply |
 
-## Verification, which is not optional — and is stated here on purpose
-
-Squash-by-scope has a verification block of its own. It governs the
-**standalone** path, it lives in \`phases/merge-squash.md\`, and it does not
-reach here. This procedure rewrites history for a different reason, so it
-carries its own checks rather than borrowing them by implication.
-
-**1. The tree did not move.**
-
-\`\`\`
-git diff <base>..HEAD > /tmp/epic-after.diff
-diff /tmp/epic-before.diff /tmp/epic-after.diff
-\`\`\`
-
-The two must be **byte-identical**. A fold that changes the tree is not a fold,
-it is a rewrite. \`diff\` exiting non-zero here stops the merge — and note that
-\`diff\` exits \`2\` when it cannot read a file, which is not "they differ": check
-for exit \`0\`, do not check for "not 1".
-
-**2. Nothing is left in the working tree.** \`git status --short\` must be empty.
-If anything appears:
-
-- **Untracked (\`??\`)** — usually generated output. Decide per file: it belongs
-  either in the child's commit or in \`.gitignore\`. Never leave it dangling and
-  never report success over it.
-- **Modified** — something wrote to the tree during the rebase. Find out what
-  before going further; an agent still holding the worktree is the usual
-  answer, and it must be stopped first.
-
-**3. One commit per child, in dependency order.**
-
-\`\`\`
-git log <base>..HEAD --oneline
-\`\`\`
-
-Every remaining commit must carry a \`T<NN>\` scope, the ordinals must run in
-order with none missing and none twice, and no \`fixup!\` subject may survive. A
-surviving \`fixup!\` means \`--autosquash\` did not match it — its target was
-rewritten, or it was written by hand with the wrong subject — and folding it by
-eye is how a fix lands on the wrong child.
-
-If any of the three fails, **stop and say which one**. A merge that proceeds
-past a failed fold puts a history on the default branch that nobody can read
-back to the board, which is the whole thing #552 exists to produce.
+**Do not merge past a failed fold**, and say which check failed: a history nobody can read back to
+the board is the thing the epic loop exists to prevent.
 `,
     executable: false,
     backend: null,
@@ -726,192 +666,58 @@ back to the board, which is the whole thing #552 exists to produce.
     suffix: "merge-close.md",
     content: `# Closing and reconciling after a merge
 
-Loaded by \`phases/merge.md\` at its steps 11 and 12, **only when the push
-happened**. If the merge did not push, nothing here runs: nothing is closed and
-no card is moved. A repository that has not published the work cannot
-corroborate a board that says it is done.
+Loaded by \`phases/merge.md\` at its step 5, **only when the push happened** and \`--no-close\` was
+not passed. If nothing was pushed, nothing here runs: a repository that has not published the work
+cannot corroborate a board that says it is done.
 
-Two paths, the same as the merge itself. \`merge.md\` has already decided which
-one you are on.
+## Order matters: close the issue first, then move the card
 
-## Order matters, and it is derived rather than chosen
+\`sweep-closed.sh\` reports a card in \`Done\` over an **open** issue as \`REOPENED\` drift; moving the
+card first manufactures exactly that state. Closing first leaves the opposite transient, which the
+reconcile resolves. \`close-shipped.sh\` enforces the order: it moves no card whose issue is not
+confirmed closed.
 
-**For every item: close the issue first, then move the card.** Both paths below
-obey this. Stated here once, above both: a rule written out separately in each
-place will eventually be written two ways — which is how the standalone path came
-to do the opposite of it.
+## The procedure
 
-\`sweep-closed.sh\` reports a card in \`Done\` whose issue is still **open** as
-\`REOPENED\` drift. Moving the card first therefore manufactures exactly the
-state an existing tool is built to flag — for every item, for as long as the
-close takes. Closing first leaves the opposite transient (a closed issue whose
-card is not yet Done), which the same sweep reports as \`DRIFTED\` and which the
-reconcile below resolves anyway.
-
-An item's card and its issue thus change **together**: not simultaneously,
-which shell cannot offer, but never resting in the state that lies.
-
-## Standalone — one item, one card
-
-11. **Close the linked backlog issue** (only if push happened and \`feature.json.linked_issue\` is set):
-    1. Read \`.specnaut/feature.json\`. Extract \`linked_issue\` (\`jq -r '.linked_issue // empty'\`).
-       If absent / null / empty, skip the rest of this section silently — no backlog backend wiring
-       to act on.
-    2. Detect the backend by checking \`.specnaut/installed.lock\` (\`backlog_backend: <local|github|gitlab|cloud>\`)
-       or, equivalently, the presence of \`.specnaut/backlog-config.yml\` (github/gitlab) vs
-       \`.specnaut/backlog.md\` (local).
-    3. **github + gitlab only** — run \`bash .specnaut/scripts/backlog/cascade-check.sh <linked_issue>\`.
-       **Only exit 0 authorises the close. Treat EVERY non-zero exit as "do not close"** — this is
-       a safety gate, and a gate that could not answer must never read as a yes. Exit 11 means the
-       parent has open sub-issues: report them to the user and stop (the issue stays in
-       \`In progress\` / \`Ready\` until the children are closed). Exit 3 means the parent was not
-       found **or its children could not be read** — a token, scope or network problem, not a
-       verdict; say so and stop rather than closing. Exit 12 means it is already closed, so there
-       is nothing to do.
-    4. **Do not ask.** The push was the authorisation — under \`merge: manual\` it was given once,
-       at the review verdict, and nothing asks twice. Both consequences follow from it together:
-       the issue is closed and its card moved, **and** the spec directory is removed in its own
-       commit (step 8) — never one without the other. The report names the item per the
-       \`backlog-reference-contract\` skill: number, title, resolved link.
-    5. **github + gitlab only** — close the issue, before touching the card. Dispatch
-       the \`product-owner\` subagent with the prompt:
-       "The branch for issue #<linked_issue> just landed on \`main\`. Please run the close half of
-       the two-step close: post a close comment on the issue referencing the merged commit range
-       \`<first-sha>..<last-sha>\` (from step 8's summary), then
-       \`gh issue close <linked_issue> --reason completed\`. Leave the card alone — the merge phase
-       moves it next. Confirm with a one-line report." This keeps the audit comment under PO
-       ownership.
-
-       The order is not this step's to argue — see "Order matters" above, which governs both.
-    6. **Then** run \`bash .specnaut/scripts/backlog/move.sh <linked_issue> Done\`. This is the
-       mechanical column flip — \`move.sh\` is idempotent and the working contract permits the merge
-       phase to call it directly (the PO retains exclusive ownership of the close + comment, not
-       the column move). If step 5 reported the close did not land, **report it and leave the
-       card alone**: moving it produces the one state the order above exists to avoid.
-    7. **local backend only** — step 5 does not apply. The ordering above is a two-object
-       problem this backend does not have: there is no "issue" beyond the task file, so step 6's
-       \`move.sh <id> Done\` flips the frontmatter and *is* the close, in one write.
-    8. **Remove the feature's spec directory** — the planning artefact is consumed, the code
-       is the authority, and the intent survives on the item just closed. After the close
-       landed, before step 12.
-
-       Five conditions, **all** required. Any one failing is a skip — reported (see below),
-       never silent — that changes nothing else here:
-
-       - the push happened — the entry condition for this file;
-       - **the close succeeded** — a refused \`cascade-check.sh\` gate, a non-zero exit or a \`no\`
-         at step 4 leaves the directory alone: nobody authorised a removal;
-       - \`.specnaut/feature.json\` carries a non-empty \`feature_directory\`
-         (\`jq -r '.feature_directory // empty' .specnaut/feature.json\`) — absent in
-         \`spec-backend=cloud\` trees, where the spec never lived on disk, and in older trees;
-       - the directory exists on disk;
-       - **the directory is in git history** — \`git log --all --oneline -- "<dir>"\` returns at
-         least one commit. This is what makes the removal lossless rather than destructive, and
-         it is not a formality: \`phases/plan.md\` commits the directory at plan time, so one with
-         no history never got that commit, and deleting it destroys the only copy.
-
-       Then, on the base branch step 10 left you on — its own commit, since the merge was
-       pushed several steps ago and there is nothing left to fold into:
-
-       \`\`\`
-       git rm -r --quiet "<feature_directory>" .specnaut/feature.json
-       git commit -m "chore(<id>): remove the spec directory for the shipped feature"
-       git push
-       \`\`\`
-
-       \`feature.json\` goes with it: it names the directory and nothing verifies the name
-       still resolves, so \`get_feature_paths\` hands callers a path to nothing — exit 0, no
-       warning, its branch guard skipped off a feature branch.
-
-       A feature with no \`linked_issue\` reaches none of this: step 1 skipped the section.
-       Intended.
-
-    **Report the removal, or the reason there wasn't one.** One line naming the removed path
-    and how to get it back (\`git log --all -- <dir>\`), or one line naming the unmet condition.
-    The epic report's rule — anything the merge could not finish is stated — is not a property
-    of epics: a silent non-removal is how a report comes to agree with a tree it does not
-    describe.
-
-    Backward-compat: feature trees without \`linked_issue\` (created before this field existed)
-    skip the close silently. A feature delivered across several branches — the last one has not
-    landed yet — passes \`--no-close\` to \`/task merge\` on every branch but the last: it skips
-    this section, and the item closes when the last branch lands.
-
-12. **Reconcile the board** (only if push happened; github + gitlab backends only).
-    Run \`bash .specnaut/scripts/backlog/sweep-closed.sh --passes 2\` — its header
-    explains the second pass. It reports; it moves nothing.
-
-    - Collect every \`DRIFTED <number>\` and move them in **one** call:
-      \`bash .specnaut/scripts/backlog/move-batch.sh Done <n> <n> …\` (github) or a
-      \`move.sh\` per item (gitlab). A card it reports as absent from the project is
-      reported and skipped — one bad card never aborts the rest, and nothing here
-      may fail the merge, which has already happened.
-    - For each \`REOPENED <number>\` line, **report it and move nothing.** \`Ready\` vs
-      \`In progress\` is not guessable, and guessing wrong is worse than saying so.
-    - Quote the script's **summary line** in the report, not your own count.
-
-    The close only ever sees \`feature.json.linked_issue\`; a \`Closes #N\` in a commit
-    body, a web-UI close or another agent's close is invisible to it. This step asks
-    the board whether it agrees with the repository, rather than asking the merge
-    what it believes it closed — the second question is answerable without being
-    true.
-
-## An epic — N children plus the epic itself
-
-An epic merge closes N children **and** the epic, and moves N+1 cards. Under
-D17 the children's cards arrive here sitting in **In review**: the loop put
-them there as each commit was written, and deliberately did not take them
-further. This is where they become Done.
-
-### The procedure
-
-1. **Enumerate the children from the branch, not from memory.** Every child's
-   commit carries its own issue number and an \`Epic:\` trailer
-   (\`phases/epic-commits.md\`):
+1. **What shipped.** Standalone: \`linked_issue\` from \`.specnaut/feature.json\` (absent → skip this
+   file; a tree from before the field existed). Epic: the children are the \`CHILD\` lines of
+   \`bash .specnaut/scripts/bash/epic-status.sh\`, and the epic its \`EPIC\` line — a child whose
+   commit is not on the branch did not ship, and is not closed.
+2. **Close each one — github and gitlab.** **Do not ask.** The push was the authorisation. For the
+   epic itself, and for a standalone item, run \`bash .specnaut/scripts/backlog/cascade-check.sh <n>\`
+   first: **only exit 0 authorises the close**. 11 — a child is still open: name it and stop. 3 —
+   the gate could not answer: say so and stop. 12 — already closed: nothing to close. Then dispatch
+   the \`product-owner\` to post a close comment naming the merged range from \`land-feature.sh\`'s
+   \`LANDED\` line and run \`gh issue close <n> --reason completed\` (gitlab: its equivalent), leaving
+   the card alone. Children first, the epic last. On local and cloud there is no separate issue:
+   skip to step 3, which is the close.
+3. **Settle the board:**
 
    \`\`\`
-   git log <base>..HEAD --format='%s%n%b' | grep -oE '\\(#[0-9]+\\)|^Epic: #[0-9]+'
+   bash .specnaut/scripts/backlog/close-shipped.sh <n>…
    \`\`\`
 
-   The subjects give the children; the trailer gives the epic. A child whose
-   commit is not on the branch did not ship, and must not be closed.
+   It confirms each issue closed, moves its card to Done, then reconciles the whole board once and
+   prints the sweep's summary line. Exit 20 — an issue was still open, its card left alone; 21 — a
+   move or the reconcile failed. Neither fails the merge, which has happened: report it.
+4. **Remove the spec directory — once, for the whole epic too:**
 
-2. **Per child, in order:** close the issue with a reason, then move its card to
-   \`Done\`. Name each one per the \`backlog-reference-contract\` — number, title,
-   resolved link — because the report is what the reader uses to check the work,
-   and a bare number is not checkable.
+   \`\`\`
+   bash .specnaut/scripts/bash/remove-spec.sh
+   \`\`\`
 
-3. **Then the epic.** Run \`cascade-check.sh <epic>\` first, exactly as the
-   standalone path does. **Only exit 0 authorises the close.** Exit 11 means a
-   child is still open — stop and say which. It is a gate, not a formality: if
-   it fires here, step 2 missed a child, and closing the parent over it would
-   hide that permanently. Exit 3 means the children could not be read at all;
-   that is not a clean bill of health, and closing on it is the failure the
-   gate exists to prevent.
+   It runs only on the base branch, only for a \`feature_directory\` that is directly under
+   \`.specnaut/specs/\` and in git history, in its own commit, pushed. Exit 22 is a skip, and its
+   reason is printed — report it, never silently. Never run it before the close succeeded: nobody
+   authorised a removal then.
 
-4. **Then remove the spec directory — once, for the whole epic.** Same five conditions and
-   commands as the standalone path's step 8, after step 3's close. Not repeated here: a second
-   copy is a second thing to keep in step with the first.
+## The report names every item, one line each
 
-   **Never per child.** \`/task plan\` creates one directory per invocation and an epic is
-   one branch over one tree carrying N child commits — a per-child removal would aim at the same
-   directory N times, the first taking the plan out from under every child still to be closed.
-
-5. **Then reconcile, once, over everything the merge touched.** The sweep in
-   the standalone section covers the whole board, so it already sees all N+1
-   cards; the only change is that the batch move may now carry N+1 numbers
-   rather than one. Quote the script's summary line, not your own count.
-
-### The report names every item, one line each
-
-Not a count. \`closed 9 issues, moved 9 cards\` is unverifiable by the reader,
-and it is exactly as easy to write when three of them silently failed.
-
-One line per issue closed and per card moved, **including every item it could
-not move and why** — an item the sweep reported as absent from the project, a
-close the gate refused, an API call that failed. Anything the merge could not
-finish is stated. A merge report that omits its own failures is how a board and
-a repository drift apart while both look healthy.
+Not a count: one line per issue closed and per card moved, each named per the
+\`backlog-reference-contract\` skill, including every item that could not be settled and why, the
+sweep's summary line verbatim (\`drifted 0\` is the evidence the board was checked), and the spec
+removal or its reason. A feature delivered across several branches passes \`--no-close\` on every
+branch but the last.
 `,
     executable: false,
     backend: null,
@@ -960,10 +766,10 @@ commit holds only that child's work — two children in one commit break the mat
 
 ## Resuming, without a state file
 
-There is no state file: resume reconstructs from git. Read the branch's commits, match each to its
-sub-issue through the commit convention (one-to-one, by ordinal), and **resume at the first child
-with no commit**. Do not use issue state as a progress signal — child issues stay open for the whole
-loop. If a commit matches no child, or a child matches two, stop and say so.
+There is no state file: resume reconstructs from git. \`bash .specnaut/scripts/bash/epic-status.sh\`
+reads the branch's commits — one \`CHILD T<NN> #<child> <sha>\` line per child done, one-to-one by
+ordinal — and **resume at the first child with no commit**. Do not use issue state as a progress signal — child issues stay open for the whole
+loop. If it exits 12 — a commit matches no child, or a child matches two — stop and say so.
 `,
     executable: false,
     backend: null,
@@ -1182,168 +988,77 @@ Read \`docs/constitution.md\` before anything else: it is this project's binding
 
 ## Preconditions
 
-- The feature branch must be checked out.
-- All Specnaut phases must have completed successfully (plan, implement, review).
-- \`\$ARGUMENTS\` is optional and may contain, in any order:
-  - a **base branch** — the first token that is not a flag. Defaults to what
-    \`bash .specnaut/scripts/bash/base-branch.sh\` prints (\`origin/HEAD\`, else \`init.defaultBranch\`).
-    Exit 3 means the base is unknown: stop and say so — never assume \`main\`.
-  - **\`--pr\`** — deliver through a pull request instead of merging locally. Off by default.
-  - **\`--no-close\`** — merge and push, but leave the backlog item open (step 11 is skipped): for a
-    feature delivered across several branches, on every branch but the last.
+- The feature branch is checked out, and \`plan\`, \`implement\` and \`review\` have completed.
+- \`\$ARGUMENTS\` may carry, in any order: **\`--pr\`** — deliver through a pull request instead of a
+  local merge; **\`--no-close\`** — merge and push but leave the backlog item open (a feature
+  delivered across several branches, on every branch but the last).
+- The base branch is what \`bash .specnaut/scripts/bash/base-branch.sh\` prints. Exit 3 means it is
+  unknown: stop and say so — never assume \`main\`.
 
 ## The default is a local merge. \`--pr\` is the opt-in.
 
-This phase lands the branch on the base branch with a local fast-forward. It does not open a pull
-request, does not push a branch for review, and does not need a forge to exist. That is the default
-because it is what most work actually needs, and because a merge you can perform is a merge that
-cannot be left half-done in somebody else's queue.
-
-Pass \`--pr\` when the project genuinely requires the round-trip — a protected base branch, a review
-another human must sign off, or a CI job that only triggers on \`pull_request\`. The squash still runs
-first (step 4), so the PR carries the same readable history; the phase then pushes the branch, opens
-the PR, and stops.
-
-**Do not infer \`--pr\` from the presence of a remote, a forge, or an open issue.** A project that
-wanted pull requests will say so.
+This phase lands the branch on the base with a local fast-forward; it needs no forge. Pass \`--pr\`
+when the project genuinely requires the round-trip — a protected base, a human sign-off, a CI job
+that runs only on \`pull_request\`. **Do not infer \`--pr\` from a remote, a forge or an open issue.**
 
 ## Steps
 
-1. Determine the base branch from \`\$ARGUMENTS\` (default: \`base-branch.sh\`, above), and whether
-   \`--pr\` or \`--no-close\` was passed.
-2. Run \`git status --porcelain\` — abort if the working tree is dirty.
-3. Run \`git fetch origin <base>\` and verify the current branch is up-to-date with \`origin/<base>\`
-   (fast-forward or rebase first if behind).
-4. **Decide which history rule applies, then apply it.** Ask the branch, not the board:
+1. **Shape the history.** Ask the branch, not the board: \`git log <base>..HEAD --format=%B | grep
+   -m1 '^Epic: #'\`.
+   - **No match — standalone**: load \`phases/merge-squash.md\` — **Squash by scope**.
+   - **A match — an epic**: do **not** squash. Run the full gate tier once,
+     \`.specnaut/scripts/bash/run-gate.sh full\` (a failure is fixed on the branch as a \`--fixup\` of the
+     child at fault, then the tier re-run — never escalated), then load \`phases/epic-fixups.md\` and
+     fold. Do not merge past a failed fold.
+2. **\`--pr\` only** — push the branch, open the pull request against the base, name any issue its
+   body references that \`gh pr view <n> --json closingIssuesReferences\` omits, report the PR URL,
+   and **stop**: nothing has merged, so the backlog item does not move. Re-run \`/task merge\` after
+   the PR lands, or let the forge's close keyword handle it. Never use the forge's "Squash and
+   merge": it collapses the scopes the squash produced.
+3. **Land it:**
 
    \`\`\`
-   git log <base>..HEAD --format=%B | grep -m1 '^Epic: #'
+   bash .specnaut/scripts/bash/land-feature.sh
    \`\`\`
 
-   - **A match — this is an epic branch.** Follow "An epic branch merges flat" below. Do **not**
-     squash.
-   - **No match — standalone.** Load \`phases/merge-squash.md\` and follow it.
+   It checks the tree is clean and the branch contains \`origin/<base>\`, fast-forwards the base,
+   pushes it, deletes the branch with \`-d\`, and verifies \`HEAD\` is the base; it prints \`LANDED <base>
+   <first>..<last> <n> commit(s)\`. **It pushes without asking, in either merge mode**: reaching
+   this step is the instruction — \`phases/auto-chain.md\` reads the mode, this phase does not.
+   **Under \`merge: manual\` the landing hook holds it** until the user's own prompt this turn says
+   \`merge\` or \`/task merge\`; a refusal is not an obstacle to route around — quote it, name the word,
+   stop on the branch.
+4. **Read its exit:**
 
-   This phase performs whichever applies; it does not check that somebody else did it, and it does
-   not ask permission to do its own job.
-5. **\`--pr\` only** — push the feature branch, open the pull request against \`<base>\`, and **stop
-   here**. First run \`gh pr view <n> --json closingIssuesReferences\` and name any issue the
-   body references but that list omits — mentioned, not closed. Report only. Then: report the PR URL and end. Nothing below this line applies, because nothing has merged
-   yet. In particular the backlog item stays where it is — a PR that is open is not work that is
-   done, and flipping the column now would make the board claim an outcome the repository cannot
-   corroborate. Re-run \`/task merge\` (without \`--pr\`) after the PR lands, or let the forge's own
-   close-keyword handle it.
-6. Run \`git checkout <base>\`.
-7. Run \`git merge --ff-only <feature-branch>\`. If fast-forward is not possible, stop and ask the
-   user whether to rebase.
-8. Print the merge summary (files changed, commits merged).
-9. **Push \`<base>\` to \`origin\` — push without asking, in either merge mode.** Reaching this step
-   *is* the instruction: the chain only invokes \`merge\` once the mode allowed it
-   (\`phases/auto-chain.md\` reads the mode, this phase does not), and a user typing \`/task merge\`
-   asked for it. Asking again re-collects permission at the most expensive moment of the chain.
-   **Under \`merge: manual\` a hook holds steps 7 and 9** until the user's own prompt in this turn
-   said \`merge\` or \`/task merge\` (Claude Code shows its permission prompt instead, in its
-   default modes). A refusal from it is not an obstacle to route around: quote it, tell the user
-   the word to type, and stop on the branch.
-   **If the push is rejected**, report the remote's exact message and stop: the merge stays on the
-   local base branch (no reset), nothing is retried — never \`--force\`, never an automatic rebase —
-   and the close below does not run. Name the recovery: \`git fetch\`, reconcile, re-run
-   \`/task merge\`.
-10. **End on the base branch.** A merge is not finished while \`HEAD\` is still on the feature branch —
-    landing the commits is half of it; the other half is that the person who asked is back where they
-    work. Delete the merged branch (\`git branch -d\`, never \`-D\`: a refusal means the merge did not
-    actually land, which is a finding, not an obstacle), then **verify with
-    \`git rev-parse --abbrev-ref HEAD\` and quote the result in the report.** This failure is invisible
-    from your side — the commits ARE on the base branch, everything looks right, and only the human
-    sees the wrong branch name in their prompt.
+   | Exit | Meaning | What you do |
+   | :--- | :--- | :--- |
+   | 0 | landed and pushed | step 5 |
+   | 4 | the tree is dirty | commit, or stop whoever holds it |
+   | 5 | behind \`origin/<base>\` | rebase, re-run the gates, land again |
+   | 6 | not a fast-forward | stop and ask whether to rebase |
+   | 7 | the push was rejected | quote the remote's message; the merge stays on the local base — never \`--force\`, never an automatic rebase — and the close below does not run. Recovery: \`git fetch\`, reconcile, \`/task merge\` |
+   | 8 | the branch would not delete with \`-d\` | the merge did not land as expected: a finding |
+   | 9 | \`HEAD\` is not the base | say so; the person who asked must be back where they work |
 
-11. **Close what shipped, and reconcile the board** — only if the push happened and \`--no-close\`
-    was not passed. Load
-    \`phases/merge-close.md\` and follow it. It covers both paths: one item and one card on the
-    standalone path, N children plus the epic on an epic branch, and the reconcile sweep that asks
-    the board whether it agrees with the repository.
-
-## Squash by scope
-
-Read \`phases/merge-squash.md\` and follow it. It carries the scope table, the four-step procedure,
-the verification that is not optional, and the \`--pr\` clause. Nothing was cut in the move — the
-rules live there in full, and this phase performs them.
-
-## An epic branch merges flat
-
-One merge decision for the whole epic, at the end — not one per child. That is the cost #552 exists
-to remove, and it is removed here: the loop never calls this phase, and this phase is reached once.
-
-**The epic branch is not squashed.** Its history is already what a squash would be trying to
-produce: one commit per child, in dependency order, each carrying its child's own issue number and
-an \`Epic:\` trailer (\`phases/epic-commits.md\`). Collapsing it would destroy exactly the readable
-history the loop just built, and would attribute every child's work to one id.
-
-So **on an epic branch the scope is the task**: one commit per child, and children never merge
-together however related two of them look. \`git merge --ff-only\` at step 7 preserves that; the
-forge's "Squash and merge" button destroys it, on this path as on the other.
-
-### The full gate tier, once
-
-Before the merge, run the **full** tier exactly once —
-\`.specnaut/scripts/bash/run-gate.sh full\`, or its PowerShell twin. Never per child: that is the
-fast tier's job and it already ran, per child, as each commit was written. \`phases/quality-gates.md\`
-carries what each tier is for.
-
-A project that has declared no gates keeps today's behaviour: the run reports that the tier is not
-declared and continues.
-
-**If the full tier fails, fix it on the branch and run it again.** Commit the fix as
-\`git commit --fixup=<that child's commit>\`, then re-run the tier. This does **not** abandon the
-merge and does **not** hand the epic back — the whole point of one merge decision is that a late
-failure is repaired, not escalated.
-
-### Fold the fixups before merging
-
-A child fixed after its commit was written — here, or earlier when its fast gate failed — leaves a
-\`fixup!\` commit on the branch. Load \`phases/epic-fixups.md\` and follow it: the fixups fold into
-their own children, and three checks confirm the tree did not move, the worktree is clean, and the
-branch is one commit per child in order. Do not merge past a failed fold.
+5. **Close what shipped, and reconcile** — only after a push, and not under \`--no-close\`: load
+   \`phases/merge-close.md\`.
 
 ## 🔒 Merge is not a filing desk
 
-Nothing gets opened here that could have been fixed in \`implement\` or \`review\`.
-If a leftover surfaces at merge time and it is repairable inside what the branch
-already touches, **fix it and amend the branch** — you are one commit away, and
-that is the cheapest this repair will ever be.
-
-Open an item at merge only for the four reasons the earlier phases use: a
-**product decision**, a **boundary this branch does not touch**, a **migration**,
-or a fix **larger than the work being merged**. Those are opened at **P0 or P1**;
-anything smaller was a fix, not a ticket.
-
-The measure of a good merge is a backlog that is **shorter** than before it —
-one item closed, none opened. When that is not true, the report says why, by
-name, in one sentence per item.
+Nothing gets opened here that could have been fixed in \`implement\` or \`review\`. A leftover
+repairable inside what the branch touches is fixed and the branch amended — the cheapest this repair
+will ever be. Open an item only for a **product decision**, a **boundary this branch does not
+touch**, a **migration**, or a fix **larger than the work being merged**, at **P0 or P1**. A good
+merge leaves the backlog **shorter**: one item closed, none opened — or the report says why, by
+name.
 
 ## Output
 
-Every backlog item this report names is named per the \`backlog-reference-contract\` skill — number,
-title, and a resolved link, never a bare number. The reader uses this report to check the work, and
-a bare number is not checkable.
-
-
-A structured report with: files merged, commits merged, whether the push ran (or the remote's
-message if it was rejected), and — when
-the close ran — whether the linked issue was closed (and via which backend), or skipped (and why:
-no \`linked_issue\`, user declined, or \`cascade-check\` returned any non-zero exit — quote which,
-since "a child is still open" and "the children could not be read" are different reasons to stop). It must also quote
-the branch \`HEAD\` is on after the merge, from \`git rev-parse --abbrev-ref HEAD\` — a merge report
-that claims success without naming the branch is unverifiable.
-
-When the reconcile ran, quote \`sweep-closed.sh\`'s summary line verbatim and list any card it moved and
-any \`REOPENED\` it reported. Report the summary even when nothing moved: "drifted 0" is the evidence
-that the board was checked, and omitting it makes a checked board indistinguishable from a skipped
-step.
-
-On the \`--pr\` path the report is shorter and must say so plainly: the branch pushed, the PR URL,
-and the fact that **nothing has merged and the backlog item has not moved**. A report that reads
-like a completed merge when a PR is merely open is the failure this phase is most likely to produce.
+Files and commits merged (from \`LANDED\`), whether the push ran or the remote's message, the branch
+\`HEAD\` is on, and — when the close ran — each item closed, each card moved and why any was not,
+the sweep's summary line verbatim, and the spec removal or its reason. Every backlog item is named
+per the \`backlog-reference-contract\` skill. On \`--pr\` the report is shorter and says plainly: the
+branch pushed, the PR URL, and **nothing has merged and the backlog item has not moved**.
 `,
     executable: false,
     backend: null,
@@ -3246,7 +2961,7 @@ Walk \`.specnaut/specs/\` (if present) and surface any feature directory missing
   the plan, never as a step still owed.
 
 This is read-only: never delete or modify spec files. A shipped feature's directory **is** removed —
-by \`phases/merge-close.md\` step 8, at the merge, under the authorisation that closed the issue. A
+by \`phases/merge-close.md\` step 4, at the merge, under the authorisation that closed the issue. A
 reporter that edits what it walks cannot be trusted about what it found.
 `,
     executable: false,
@@ -8838,6 +8553,41 @@ exit 0
   },
   {
     category: "backlog-script",
+    name: "close-shipped",
+    suffix: "close-shipped.sh",
+    content: `#!/usr/bin/env bash
+# After a merge: settle the board for the shipped items (phases/merge-close.md,
+# spec 042) — the local copy. On this backend there is no separate issue to
+# close: \`move.sh <n> Done\` IS the close, in one write, and there is no
+# board to reconcile against. Same exit contract as the forge copies.
+#
+# Exit: 0 every item settled · 2 usage · 21 a move failed.
+#
+# Usage: close-shipped.sh <issue-number>…
+set -uo pipefail
+here=\${BASH_SOURCE[0]%/*}
+
+[ \$# -gt 0 ] || { echo "usage: close-shipped.sh <issue-number>…" >&2; exit 2; }
+for n in "\$@"; do
+  [[ \$n =~ ^[1-9][0-9]{0,9}\$ ]] || { echo "close-shipped: '\$n' is not an issue number" >&2; exit 2; }
+done
+rc=0
+for n in "\$@"; do
+  if bash "\$here/move.sh" "\$n" Done >/dev/null 2>&1; then
+    echo "DONE #\$n"
+  else
+    echo "FAILED #\$n — it did not move to Done"
+    rc=21
+  fi
+done
+exit "\$rc"
+`,
+    executable: true,
+    backend: "local",
+    skipIfExists: false,
+  },
+  {
+    category: "backlog-script",
     name: "propagate-parent-status",
     suffix: "parent-of.sh",
     content: `#!/usr/bin/env bash
@@ -10732,6 +10482,76 @@ exit 0
   },
   {
     category: "backlog-script",
+    name: "close-shipped",
+    suffix: "close-shipped.sh",
+    content: `#!/usr/bin/env bash
+# After a merge: settle the board for the items the product-owner just closed
+# (phases/merge-close.md, spec 042) — the github copy. One copy per backend, one
+# exit contract; the installer picks this one, so no caller branches on it.
+#
+# Per issue, in the order given: confirm the issue is closed (cascade-check.sh
+# exit 12, and nothing else, means closed) — an open issue's card is left
+# alone, because the close comes first and a Done card over an open issue is
+# the drift the sweep exists to report. Then move it to Done. Then reconcile
+# the whole board once: sweep-closed.sh --passes 2, and one move-batch.sh Done for every DRIFTED.
+# One line per item on stdout, and the sweep's own summary line verbatim.
+#
+# Exit: 0 every item settled · 2 usage · 20 an issue was still open (its card
+# left alone; the others still settled) · 21 a card move or the reconcile
+# failed — reported, the merge has already happened.
+#
+# Usage: close-shipped.sh <issue-number>…
+set -uo pipefail
+here=\${BASH_SOURCE[0]%/*}
+
+[ \$# -gt 0 ] || { echo "usage: close-shipped.sh <issue-number>…" >&2; exit 2; }
+for n in "\$@"; do
+  [[ \$n =~ ^[1-9][0-9]{0,9}\$ ]] || { echo "close-shipped: '\$n' is not an issue number" >&2; exit 2; }
+done
+
+rc=0
+for n in "\$@"; do
+  bash "\$here/cascade-check.sh" "\$n" >/dev/null 2>&1
+  state=\$?
+  if [ "\$state" -ne 12 ]; then
+    echo "OPEN #\$n — not confirmed closed (cascade-check exit \$state); card left alone"
+    rc=20
+    continue
+  fi
+  if bash "\$here/move.sh" "\$n" Done >/dev/null 2>&1; then
+    echo "DONE #\$n"
+  else
+    echo "FAILED #\$n — the card did not move to Done"
+    [ "\$rc" -ne 0 ] || rc=21
+  fi
+done
+
+if ! sweep=\$(bash "\$here/sweep-closed.sh" --passes 2 2>&1); then
+  printf '%s\\n' "\$sweep" | tail -1
+  echo "FAILED reconcile — the sweep did not complete"
+  [ "\$rc" -ne 0 ] || rc=21
+  exit "\$rc"
+fi
+drifted=\$(printf '%s\\n' "\$sweep" | awk '\$1 == "DRIFTED" { print \$2 }' | grep -E '^[0-9]+\$' || true)
+printf '%s\\n' "\$sweep" | grep '^REOPENED' || true
+if [ -n "\$drifted" ]; then
+  # shellcheck disable=SC2086 # numbers only, validated above
+  if bash "\$here/move-batch.sh" Done \$drifted >/dev/null 2>&1; then
+    for d in \$drifted; do echo "RECONCILED #\$d"; done
+  else
+    echo "FAILED reconcile — move-batch.sh did not move the drifted cards"
+    [ "\$rc" -ne 0 ] || rc=21
+  fi
+fi
+printf '%s\\n' "\$sweep" | tail -1
+exit "\$rc"
+`,
+    executable: true,
+    backend: "github",
+    skipIfExists: false,
+  },
+  {
+    category: "backlog-script",
     name: "cascade-check",
     suffix: "parent-of.sh",
     content: `#!/usr/bin/env bash
@@ -11830,6 +11650,75 @@ exit 0
   },
   {
     category: "backlog-script",
+    name: "close-shipped",
+    suffix: "close-shipped.sh",
+    content: `#!/usr/bin/env bash
+# After a merge: settle the board for the items the product-owner just closed
+# (phases/merge-close.md, spec 042) — the gitlab copy. One copy per backend, one
+# exit contract; the installer picks this one, so no caller branches on it.
+#
+# Per issue, in the order given: confirm the issue is closed (cascade-check.sh
+# exit 12, and nothing else, means closed) — an open issue's card is left
+# alone, because the close comes first and a Done card over an open issue is
+# the drift the sweep exists to report. Then move it to Done. Then reconcile
+# the whole board once: sweep-closed.sh --passes 2, and one move.sh Done per DRIFTED.
+# One line per item on stdout, and the sweep's own summary line verbatim.
+#
+# Exit: 0 every item settled · 2 usage · 20 an issue was still open (its card
+# left alone; the others still settled) · 21 a card move or the reconcile
+# failed — reported, the merge has already happened.
+#
+# Usage: close-shipped.sh <issue-number>…
+set -uo pipefail
+here=\${BASH_SOURCE[0]%/*}
+
+[ \$# -gt 0 ] || { echo "usage: close-shipped.sh <issue-number>…" >&2; exit 2; }
+for n in "\$@"; do
+  [[ \$n =~ ^[1-9][0-9]{0,9}\$ ]] || { echo "close-shipped: '\$n' is not an issue number" >&2; exit 2; }
+done
+
+rc=0
+for n in "\$@"; do
+  bash "\$here/cascade-check.sh" "\$n" >/dev/null 2>&1
+  state=\$?
+  if [ "\$state" -ne 12 ]; then
+    echo "OPEN #\$n — not confirmed closed (cascade-check exit \$state); card left alone"
+    rc=20
+    continue
+  fi
+  if bash "\$here/move.sh" "\$n" Done >/dev/null 2>&1; then
+    echo "DONE #\$n"
+  else
+    echo "FAILED #\$n — the card did not move to Done"
+    [ "\$rc" -ne 0 ] || rc=21
+  fi
+done
+
+if ! sweep=\$(bash "\$here/sweep-closed.sh" --passes 2 2>&1); then
+  printf '%s\\n' "\$sweep" | tail -1
+  echo "FAILED reconcile — the sweep did not complete"
+  [ "\$rc" -ne 0 ] || rc=21
+  exit "\$rc"
+fi
+drifted=\$(printf '%s\\n' "\$sweep" | awk '\$1 == "DRIFTED" { print \$2 }' | grep -E '^[0-9]+\$' || true)
+printf '%s\\n' "\$sweep" | grep '^REOPENED' || true
+for d in \$drifted; do
+  if bash "\$here/move.sh" "\$d" Done >/dev/null 2>&1; then
+    echo "RECONCILED #\$d"
+  else
+    echo "FAILED #\$d — the drifted card did not move"
+    [ "\$rc" -ne 0 ] || rc=21
+  fi
+done
+printf '%s\\n' "\$sweep" | tail -1
+exit "\$rc"
+`,
+    executable: true,
+    backend: "gitlab",
+    skipIfExists: false,
+  },
+  {
+    category: "backlog-script",
     name: "cascade-check",
     suffix: "parent-of.sh",
     content: `#!/usr/bin/env bash
@@ -12351,6 +12240,41 @@ else
   echo "✓ #\$NUM safe to close — all \$TOTAL child task(s) are in \\"\$TERMINAL_NAME\\""
 fi
 exit 0
+`,
+    executable: true,
+    backend: "cloud",
+    skipIfExists: false,
+  },
+  {
+    category: "backlog-script",
+    name: "close-shipped",
+    suffix: "close-shipped.sh",
+    content: `#!/usr/bin/env bash
+# After a merge: settle the board for the shipped items (phases/merge-close.md,
+# spec 042) — the cloud copy. On this backend there is no separate issue to
+# close: \`move.sh <n> Done\` IS the close, in one write, and there is no
+# board to reconcile against. Same exit contract as the forge copies.
+#
+# Exit: 0 every item settled · 2 usage · 21 a move failed.
+#
+# Usage: close-shipped.sh <issue-number>…
+set -uo pipefail
+here=\${BASH_SOURCE[0]%/*}
+
+[ \$# -gt 0 ] || { echo "usage: close-shipped.sh <issue-number>…" >&2; exit 2; }
+for n in "\$@"; do
+  [[ \$n =~ ^[1-9][0-9]{0,9}\$ ]] || { echo "close-shipped: '\$n' is not an issue number" >&2; exit 2; }
+done
+rc=0
+for n in "\$@"; do
+  if bash "\$here/move.sh" "\$n" Done >/dev/null 2>&1; then
+    echo "DONE #\$n"
+  else
+    echo "FAILED #\$n — it did not move to Done"
+    rc=21
+  fi
+done
+exit "\$rc"
 `,
     executable: true,
     backend: "cloud",
@@ -24696,6 +24620,335 @@ exit 3
   {
     category: "spec-root",
     name: "specify",
+    suffix: "scripts/bash/epic-status.sh",
+    content: `#!/usr/bin/env bash
+# What an epic branch has done — the one reader of the epic commit format
+# (phases/epic-commits.md, spec 042).
+#
+# Reads <base>..HEAD, the base being base-branch.sh's, and prints on stdout:
+#   CHILD T<NN> #<child> <sha>   one line per child commit, oldest first
+#   FIXUP <sha>                  a \`fixup!\` commit not yet folded
+#   EPIC #<n>                    the epic, from the \`Epic: #<n>\` trailers
+# It checks the history reads back to the board: every other commit's
+# subject is \`<type>(T<NN>): <subject> (#<child>)\`, the ordinals run 1, 2,
+# 3… with none missing or twice, no child has two commits, and every commit
+# names the same epic. Only digits and hex shas are printed; a problem is
+# named by sha and ordinal on stderr, never by echoing commit text.
+#
+# Exit: 0 consistent · 2 usage · 3 base unknown · 12 inconsistent · 14 not an
+# epic branch (no \`Epic:\` trailer at all).
+#
+# Usage: epic-status.sh
+set -euo pipefail
+export GIT_OPTIONAL_LOCKS=0
+here=\${BASH_SOURCE[0]%/*}
+
+if [ \$# -ne 0 ]; then echo "usage: epic-status.sh" >&2; exit 2; fi
+# The base has one home, base-branch.sh — never an argument.
+base=\$(bash "\$here/base-branch.sh") || exit 3
+if ! git --no-pager rev-parse --verify --quiet "refs/heads/\$base^{commit}" >/dev/null &&
+  ! git --no-pager rev-parse --verify --quiet "refs/remotes/origin/\$base^{commit}" >/dev/null; then
+  echo "epic-status: the base '\$base' does not resolve to a commit" >&2
+  exit 3
+fi
+range="\$base..HEAD"
+git --no-pager rev-parse --verify --quiet "refs/heads/\$base" >/dev/null || range="origin/\$base..HEAD"
+
+problems=() epic="" expected=1 children=0
+seen=" " # " #<child>=<sha> " pairs: bash 3.2 (macOS) has no associative arrays
+while IFS=\$'\\x1f' read -r sha subject; do
+  [ -n "\$sha" ] || continue
+  if [[ \$subject == "fixup! "* ]]; then
+    printf 'FIXUP %s\\n' "\$sha"
+    continue
+  fi
+  # The trailer is the one field read from the body: an anchored line of digits.
+  trailer=\$(git --no-pager log -1 --format=%b "\$sha" | sed -n 's/^Epic: #\\([0-9][0-9]*\\)\$/\\1/p' | head -1)
+  if [ -z "\$trailer" ]; then
+    problems+=("\${sha:0:12} has no 'Epic: #<n>' trailer")
+  elif [ -z "\$epic" ]; then
+    epic=\$trailer
+  elif [ "\$trailer" != "\$epic" ]; then
+    problems+=("\${sha:0:12} names epic #\$trailer, the branch is #\$epic")
+  fi
+  if [[ \$subject =~ ^[a-z]+\\(T([0-9]{1,4})\\):\\ .+\\ \\(#([1-9][0-9]{0,9})\\)\$ ]]; then
+    ordinal=\$((10#\${BASH_REMATCH[1]}))
+    child=\${BASH_REMATCH[2]}
+    if [ "\$ordinal" -ne "\$expected" ]; then
+      problems+=("\${sha:0:12} is T\$(printf '%02d' "\$ordinal"); T\$(printf '%02d' "\$expected") was expected next")
+    fi
+    expected=\$((ordinal + 1))
+    case \$seen in
+      *" #\$child="*)
+        first=\${seen#*" #\$child="}
+        problems+=("child #\$child has two commits: \${first%% *} and \${sha:0:12}") ;;
+    esac
+    seen="\$seen#\$child=\${sha:0:12} "
+    children=\$((children + 1))
+    printf 'CHILD T%02d #%s %s\\n' "\$ordinal" "\$child" "\$sha"
+  else
+    problems+=("\${sha:0:12}: its subject is not '<type>(T<NN>): <subject> (#<child>)'")
+  fi
+done < <(git --no-pager log --reverse --format='%H%x1f%s' "\$range")
+
+if [ -z "\$epic" ] && [ "\$children" -eq 0 ]; then
+  echo "epic-status: no 'Epic:' trailer on \$range — not an epic branch" >&2
+  exit 14
+fi
+[ -z "\$epic" ] || printf 'EPIC #%s\\n' "\$epic"
+if [ \${#problems[@]} -gt 0 ]; then
+  printf 'epic-status: %s\\n' "\${problems[@]}" >&2
+  exit 12
+fi
+exit 0
+`,
+    executable: true,
+    backend: null,
+    skipIfExists: false,
+  },
+  {
+    category: "spec-root",
+    name: "specify",
+    suffix: "scripts/bash/fold-fixups.sh",
+    content: `#!/usr/bin/env bash
+# Folds an epic branch's \`fixup!\` commits into their own children, then
+# proves nothing else moved (phases/epic-fixups.md, spec 042).
+#
+# Each fixup was written as \`git commit --fixup=<child sha>\`, so autosquash
+# places it by the sha it names — never by reading a subject. Three checks
+# follow, and all must hold:
+#   1. the tree did not move   — HEAD's tree is the tree recorded before the fold
+#   2. nothing is left behind  — \`git status --porcelain\` is empty
+#   3. one commit per child    — \`epic-status.sh\` reads the history back, no \`fixup!\` survives
+#
+# It prints \`PRE <sha>\` before it rewrites anything. If the rebase stops on a
+# conflict (exit 13), resolve it, \`git rebase --continue\`, then run
+# \`fold-fixups.sh --verify <that sha>\`: the checks compare against the tree
+# recorded before the fold, never against a tree the conflict already moved.
+#
+# Exit: 0 folded · 2 usage · 3 base unknown · 10 the tree moved · 11 the
+# worktree is not clean · 12 not one commit per child · 13 the rebase stopped
+# on a conflict · 14 not an epic branch. 12 and 14 are epic-status.sh's own,
+# passed through; any other epic-status exit is reported as 3.
+#
+# Usage: fold-fixups.sh [--verify <pre-sha>]
+set -euo pipefail
+export GIT_OPTIONAL_LOCKS=0
+here=\${BASH_SOURCE[0]%/*}
+
+pre=""
+case \$# in
+  0) ;;
+  2) [ "\$1" = --verify ] && [[ \$2 =~ ^[0-9a-f]{7,64}\$ ]] || { echo "usage: fold-fixups.sh [--verify <pre-sha>]" >&2; exit 2; }
+     pre=\$2 ;;
+  *) echo "usage: fold-fixups.sh [--verify <pre-sha>]" >&2; exit 2 ;;
+esac
+base=\$(bash "\$here/base-branch.sh") || exit 3
+range_base=\$base
+git --no-pager rev-parse --verify --quiet "refs/heads/\$base" >/dev/null || range_base="origin/\$base"
+
+if [ -n "\$(git status --porcelain)" ]; then
+  git status --short >&2
+  echo "fold-fixups: the worktree is not clean — commit, or stop whoever holds it" >&2
+  exit 11
+fi
+
+if [ -z "\$pre" ]; then
+  pre=\$(git rev-parse HEAD)
+  printf 'PRE %s\\n' "\$pre"
+  if ! GIT_SEQUENCE_EDITOR=true git rebase --quiet --autosquash --keep-base "\$range_base" >/dev/null 2>&1; then
+    echo "fold-fixups: the rebase stopped on a conflict — resolve it, 'git rebase --continue', then: fold-fixups.sh --verify \$pre" >&2
+    exit 13
+  fi
+fi
+
+if ! git --no-pager rev-parse --verify --quiet "\$pre^{tree}" >/dev/null; then
+  echo "fold-fixups: \$pre is not a commit in this repository" >&2
+  exit 2
+fi
+if [ "\$(git rev-parse "\$pre^{tree}")" != "\$(git rev-parse "HEAD^{tree}")" ]; then
+  echo "fold-fixups: the tree moved during the fold — this is a rewrite, not a fold" >&2
+  exit 10
+fi
+if [ -n "\$(git status --porcelain)" ]; then
+  git status --short >&2
+  echo "fold-fixups: the worktree is not clean after the fold" >&2
+  exit 11
+fi
+set +e
+status=\$(bash "\$here/epic-status.sh")
+rc=\$?
+set -e
+case \$rc in
+  0) ;;
+  12 | 14) exit "\$rc" ;;
+  *) echo "fold-fixups: epic-status.sh could not read the branch (exit \$rc)" >&2; exit 3 ;;
+esac
+if printf '%s\\n' "\$status" | grep -q '^FIXUP '; then
+  printf '%s\\n' "\$status" | grep '^FIXUP ' >&2
+  echo "fold-fixups: a fixup! survived — its target was rewritten, or it was written by hand" >&2
+  exit 12
+fi
+printf '%s\\n' "\$status"
+echo "fold-fixups: folded — tree unchanged, worktree clean, one commit per child"
+`,
+    executable: true,
+    backend: null,
+    skipIfExists: false,
+  },
+  {
+    category: "spec-root",
+    name: "specify",
+    suffix: "scripts/bash/land-feature.sh",
+    content: `#!/usr/bin/env bash
+# Lands the current feature branch on the base branch — the one home of the
+# mechanical merge (phases/merge.md, spec 042). The squash, or the epic's
+# fixup fold, has already run: this rewrites no history.
+#
+# In order: HEAD is a branch other than the base, and the tree is clean;
+# \`origin/<base>\` is fetched and the branch contains it; the base is checked
+# out and fast-forwarded to the branch; the base is pushed with an explicit
+# refspec and never its tags; the merged branch is deleted with \`-d\`; HEAD is
+# verified to be the base. The base is base-branch.sh's, never an argument.
+# Under \`merge: manual\` the landing hook holds this script like a \`git push\`
+# (merge-commands.txt) — the script does not read the mode itself.
+#
+# Prints \`LANDED <base> <first>..<last> <n> commit(s)\` on success.
+#
+# Exit: 0 landed and pushed · 2 usage, or not on a feature branch · 3 base
+# unknown · 4 the tree is dirty · 5 behind origin/<base> (rebase, re-gate,
+# land again) · 6 not a fast-forward · 7 the push was rejected (the merge
+# stays on the local base; nothing is retried, never forced) · 8 the branch
+# would not delete with -d · 9 HEAD is not the base afterwards.
+#
+# Usage: land-feature.sh
+set -euo pipefail
+export GIT_OPTIONAL_LOCKS=0
+here=\${BASH_SOURCE[0]%/*}
+
+if [ \$# -ne 0 ]; then echo "usage: land-feature.sh" >&2; exit 2; fi
+base=\$(bash "\$here/base-branch.sh") || exit 3
+branch=\$(git symbolic-ref --quiet --short HEAD) || {
+  echo "land-feature: HEAD is detached — check out the feature branch" >&2
+  exit 2
+}
+if [ "\$branch" = "\$base" ]; then
+  echo "land-feature: already on \$base — check out the feature branch" >&2
+  exit 2
+fi
+if [ -n "\$(git status --porcelain)" ]; then
+  git status --short >&2
+  echo "land-feature: the tree is dirty — commit, or stop whoever holds it" >&2
+  exit 4
+fi
+
+git fetch --quiet origin "refs/heads/\$base:refs/remotes/origin/\$base"
+if ! git merge-base --is-ancestor "refs/remotes/origin/\$base" HEAD; then
+  echo "land-feature: \$branch is behind origin/\$base — rebase it, re-run the gates, then land" >&2
+  exit 5
+fi
+first=\$(git rev-list --reverse "refs/remotes/origin/\$base..HEAD" | head -1)
+last=\$(git rev-parse HEAD)
+count=\$(git rev-list --count "refs/remotes/origin/\$base..HEAD")
+
+git checkout --quiet "\$base"
+if ! git merge --quiet --ff-only "refs/heads/\$branch"; then
+  git checkout --quiet "\$branch"
+  echo "land-feature: \$base cannot fast-forward to \$branch" >&2
+  exit 6
+fi
+if ! out=\$(git -c push.followTags=false push --quiet --no-follow-tags origin "refs/heads/\$base:refs/heads/\$base" 2>&1); then
+  printf '%s\\n' "\$out" >&2
+  echo "land-feature: the push was rejected — the merge stays on the local \$base. git fetch, reconcile, land again; never --force" >&2
+  exit 7
+fi
+if ! git branch --quiet -d "\$branch"; then
+  echo "land-feature: \$branch would not delete with -d — the merge did not land as expected" >&2
+  exit 8
+fi
+now=\$(git symbolic-ref --quiet --short HEAD || true)
+if [ "\$now" != "\$base" ]; then
+  echo "land-feature: HEAD is on '\$now', not \$base" >&2
+  exit 9
+fi
+printf 'LANDED %s %s..%s %s commit(s)\\n' "\$base" "\${first:0:12}" "\${last:0:12}" "\$count"
+`,
+    executable: true,
+    backend: null,
+    skipIfExists: false,
+  },
+  {
+    category: "spec-root",
+    name: "specify",
+    suffix: "scripts/bash/remove-spec.sh",
+    content: `#!/usr/bin/env bash
+# Removes a shipped feature's spec directory, in its own commit, pushed
+# (phases/merge-close.md, spec 042). Run on the base branch after the merge
+# landed and the backlog item closed.
+#
+# Five conditions, all required, else nothing is touched: HEAD is the base;
+# \`.specnaut/feature.json\` names a \`feature_directory\`; it exists; it is in
+# git history (so the removal is lossless — \`git log --all -- <dir>\` brings
+# it back); and it is a feature directory: relative, no \`..\`, not a link,
+# resolving directly under \`.specnaut/specs/\`. Then \`git rm -r\` of it and of
+# feature.json, a check that every staged path is one of those deletions,
+# a commit, and a push with an explicit refspec and never its tags. Under
+# \`merge: manual\` the landing hook holds this script (merge-commands.txt).
+#
+# Exit: 0 removed and pushed · 2 usage · 3 base unknown · 22 skipped — the
+# condition that failed is printed, and nothing changed · 23 the staged
+# change held something else (reset, nothing committed) · 7 the push was
+# rejected (the commit stays local).
+#
+# Usage: remove-spec.sh
+set -euo pipefail
+export GIT_OPTIONAL_LOCKS=0
+here=\${BASH_SOURCE[0]%/*}
+skip() { echo "remove-spec: skipped — \$*" >&2; exit 22; }
+
+if [ \$# -ne 0 ]; then echo "usage: remove-spec.sh" >&2; exit 2; fi
+base=\$(bash "\$here/base-branch.sh") || exit 3
+root=\$(git rev-parse --show-toplevel)
+cd "\$root"
+[ "\$(git symbolic-ref --quiet --short HEAD || true)" = "\$base" ] || skip "HEAD is not \$base"
+[ -f .specnaut/feature.json ] || skip "no .specnaut/feature.json"
+dir=\$(sed -n 's/.*"feature_directory"[[:space:]]*:[[:space:]]*"\\([^"]*\\)".*/\\1/p' .specnaut/feature.json | head -1)
+[ -n "\$dir" ] || skip "feature.json names no feature_directory"
+dir=\${dir%/}
+case \$dir in
+  .specnaut/specs/*) ;;
+  *) skip "'\$dir' is not under .specnaut/specs/" ;;
+esac
+name=\${dir#.specnaut/specs/}
+[[ \$name =~ ^[A-Za-z0-9][A-Za-z0-9._-]*\$ ]] || skip "'\$dir' is not one feature directory directly under .specnaut/specs/"
+[ ! -L "\$dir" ] || skip "'\$dir' is a link"
+[ -d "\$dir" ] || skip "'\$dir' does not exist"
+[ "\$(cd -P "\$dir" && pwd)" = "\$(cd -P .specnaut/specs && pwd)/\$name" ] || skip "'\$dir' resolves outside .specnaut/specs/"
+[ -n "\$(git log --all --oneline -1 -- "\$dir")" ] || skip "'\$dir' is in no commit — deleting it would destroy the only copy"
+
+id=\$(sed -n 's/.*"linked_issue"[[:space:]]*:[[:space:]]*\\([0-9][0-9]*\\).*/\\1/p' .specnaut/feature.json | head -1)
+git rm -r --quiet -- "\$dir" .specnaut/feature.json
+while IFS=\$'\\t' read -r status path; do
+  case \$status:\$path in
+    D:"\$dir"/* | D:.specnaut/feature.json) ;;
+    *) git reset --quiet; echo "remove-spec: the staged change held '\$path' — reset, nothing committed" >&2; exit 23 ;;
+  esac
+done < <(git diff --cached --name-status)
+git commit --quiet -m "chore(\${id:-spec}): remove the spec directory for the shipped feature"
+if ! out=\$(git -c push.followTags=false push --quiet --no-follow-tags origin "refs/heads/\$base:refs/heads/\$base" 2>&1); then
+  printf '%s\\n' "\$out" >&2
+  echo "remove-spec: the push was rejected — the commit stays on the local \$base" >&2
+  exit 7
+fi
+echo "remove-spec: removed \$dir — restore with: git log --all -- \$dir"
+`,
+    executable: true,
+    backend: null,
+    skipIfExists: false,
+  },
+  {
+    category: "spec-root",
+    name: "specify",
     suffix: "scripts/bash/_config.sh",
     content: `# shellcheck shell=bash disable=SC2034
 # (SC2034: the CONFIG_* paths and defaults are read by the sourcing script.)
@@ -28327,12 +28580,12 @@ approval_require() {
 # newlines, ( ) \$( ) and backticks (also inside "…"), quotes and escapes,
 # comments, heredoc bodies (skipped: they are data), \`<<<\` herestrings, \`<<\`
 # inside \`\$((…))\`/\`((…))\` (a shift, not a heredoc), redirections, VAR=val
-# prefixes, the env/command/sudo/nice/… wrappers, and ONE level of
-# \`sh|bash|zsh -c '…'\`. A deeper \`-c\`, or \`eval\`, sets CMD_OPAQUE — and so
-# does a line that never closes: a quote, \`(\`, \`\$(\` or backtick left open, a
-# heredoc whose body never ends. Fail closed: a guard gates what it cannot
-# read rather than guessing at it. Scripts, interpreters and shell functions
-# are not seen: the stated limit.
+# prefixes, the env/command/sudo/nice/timeout/xargs/… wrappers, \`source x\`,
+# the command of \`find -exec\`, and ONE level of \`sh|bash|zsh -c '…'\`. A
+# deeper \`-c\`, or \`eval\`, sets CMD_OPAQUE — and so does a line that never
+# closes: a quote, \`(\`, \`\$(\` or backtick left open, a heredoc whose body never
+# ends. Fail closed: a guard gates what it cannot read rather than guessing at
+# it. Scripts, interpreters and shell functions are not seen: the stated limit.
 #
 # After cmd_parse: CMD_SEGS holds one entry per simple command, its words
 # joined by CMD_SEP, the first word reduced to its basename. CMD_MOVED=1 when
@@ -28466,10 +28719,12 @@ cmd_pos() {
 # (SC2034/SC2153: CMD_* are shared with _command.sh, which sources this file.)
 # Sourced by _command.sh. What ONE simple command runs, once cmd_parse has cut
 # it out of the line: redirections dropped, VAR=val prefixes and wrappers
-# (env, command, sudo, nice, time, …) skipped, the command word reduced to
-# its basename, and \`sh|bash|zsh -c '…'\` read one level deep — the string is
-# parsed again as a command line; a second level, or a shell fed on stdin, or
-# \`eval\`, sets CMD_OPAQUE instead of being guessed at.
+# (env, command, sudo, nice, time, timeout, xargs, flock, …) skipped, the
+# command word reduced to its basename, \`source <script>\` and \`. <script>\`
+# read as the script, each \`find -exec … ;\` read as a command of its own, and
+# \`sh|bash|zsh -c '…'\` read one level deep — the string is parsed again as a
+# command line; a second level, or a shell fed on stdin, or \`eval\`, sets
+# CMD_OPAQUE instead of being guessed at.
 #
 # The helpers below share _cmd_emit's locals by bash's dynamic scope: v (the
 # words), m (their count) and k (the index of the command word). So does
@@ -28529,18 +28784,50 @@ _cmd_skip_prefixes() {
           case \${v[k]} in -u | -g | -p | -C | -D | -h | -r | -t | -U) k=\$((k + 2)) ;; -*) k=\$((k + 1)) ;; *) break ;; esac
         done ;;
       nice) k=\$((k + 1)); if [ "\${v[k]:-}" = -n ]; then k=\$((k + 2)); elif [[ \${v[k]:-} == -* ]]; then k=\$((k + 1)); fi ;;
+      *) _cmd_runner || return 0 ;;
+    esac
+  done
+}
+
+# _cmd_opts <option that takes a value…> — k: past v[k] and the options that
+# follow it, each listed one with its value; \`--\` ends them.
+_cmd_opts() {
+  local o
+  for ((k = k + 1; k < m; k++)); do
+    case \${v[k]} in
+      --) k=\$((k + 1)); return 0 ;;
+      -*) for o in "\$@"; do if [ "\${v[k]}" = "\$o" ]; then k=\$((k + 1)); break; fi; done ;;
       *) return 0 ;;
     esac
   done
 }
 
-# _cmd_shell_c <depth> — v[k] is a shell. \`-c '…'\` at depth 0 is parsed as a
-# command line, deeper it is opaque; either way the shell itself is not
-# recorded (k=m). A script operand becomes the command (k moves to it); no
-# operand at all means commands on stdin: opaque. Always returns 0, so the
-# nested cmd_parse never runs where bash mutes the ERR trap (an \`||\` list).
+# _cmd_runner — v[k] is a command that runs the command after its options and
+# its own operands (a duration, a priority, a CPU mask, a lock file): k moves
+# there. Returns 1 when v[k] is none of them. After flock's lock file, \`-c
+# '…'\` is left for _cmd_emit, which reads the string as a shell's.
+_cmd_runner() {
+  case \${v[k]} in
+    timeout | gtimeout) _cmd_opts -s -k --signal --kill-after; k=\$((k + 1)) ;;
+    caffeinate) _cmd_opts -t -w ;;
+    stdbuf) _cmd_opts -i -o -e --input --output --error ;;
+    ionice) _cmd_opts -c -n -p --class --classdata --pid ;;
+    chrt) _cmd_opts -T -P -D --sched-runtime --sched-period --sched-deadline; k=\$((k + 1)) ;;
+    taskset) _cmd_opts; k=\$((k + 1)) ;;
+    xargs) _cmd_opts -a -d -E -I -J -L -n -P -R -S -s --arg-file --delimiter --max-args --max-procs --max-chars --max-lines --process-slot-var ;;
+    flock) _cmd_opts -w -E --timeout --conflict-exit-code; k=\$((k + 1)) ;;
+    *) return 1 ;;
+  esac
+}
+
+# _cmd_shell_c <depth> [1] — v[k] is a shell (1: or flock's \`-c\`, already
+# seen). \`-c '…'\` at depth 0 is parsed as a command line, deeper it is opaque;
+# either way the shell itself is not recorded (k=m). A script operand becomes
+# the command (k moves to it); no operand at all means commands on stdin:
+# opaque. Always returns 0, so the nested cmd_parse never runs where bash
+# mutes the ERR trap (an \`||\` list).
 _cmd_shell_c() {
-  local x j sawc=0
+  local x j sawc=\${2:-0}
   for ((j = k + 1; j < m; j++)); do
     x=\${v[j]}
     case \$x in
@@ -28558,6 +28845,23 @@ _cmd_shell_c() {
   CMD_OPAQUE=1
 }
 
+# _cmd_find <depth> — v[k] is find: the command of each -exec, -execdir, -ok
+# or -okdir, up to its \`;\` or \`+\`, is emitted as a simple command of its own.
+_cmd_find() {
+  local j run="" on=0
+  for ((j = k + 1; j < m; j++)); do
+    if [ "\$on" = 0 ]; then
+      case \${v[j]} in -exec | -execdir | -ok | -okdir) on=1 ;; esac
+      continue
+    fi
+    case \${v[j]} in
+      ';' | '+') _cmd_emit "\$run" "\$1"; run="" on=0 ;;
+      *) run+="\${v[j]}\$CMD_SEP" ;;
+    esac
+  done
+  if [ -n "\$run" ]; then _cmd_emit "\$run" "\$1"; fi
+}
+
 # _cmd_emit <raw segment> <depth> — strip redirections, prefixes and wrappers; record the command.
 _cmd_emit() {
   local -a v
@@ -28572,9 +28876,57 @@ _cmd_emit() {
     eval) CMD_OPAQUE=1 ;;
     export | declare | typeset | local | readonly) for x in "\${v[@]:k}"; do _cmd_env "\$x"; done ;;
     sh | bash | zsh | dash | ksh) _cmd_shell_c "\$2"; [ "\$k" -lt "\$m" ] || return 0 ;;
+    -c | --command) _cmd_shell_c "\$2" 1; [ "\$k" -lt "\$m" ] || return 0 ;;
+    source | .) k=\$((k + 1)); [ "\$k" -lt "\$m" ] || return 0; v[k]=\${v[k]##*/} ;;
+    find) _cmd_find "\$2" ;;
   esac
   IFS=\$CMD_SEP
   CMD_SEGS+=("\${v[*]:k}")
+}
+`,
+      executable: false,
+    },
+    ".specnaut/hooks/_listed.sh": {
+      content: `# shellcheck shell=bash disable=SC2034
+# (SC2034: HIT is read by the sourcing guard.)
+# Sourced by the guards that hold a command list — guard-release.sh
+# (release-commands.txt) and guard-merge.sh (merge-commands.txt): the one
+# home of how a line of such a list matches a simple command.
+#
+# A line is the words a command starts with, matched against its words
+# without options (POS, from cmd_pos), so \`gh -R o/r release create\` matches
+# \`gh release create\`. A first word ending in \`.sh\` is a script: _command.sh
+# has already reduced the command word to its basename, so it matches however
+# the script is reached (a path, \`bash x\`, \`source x\`, \`timeout 60 x\`, …).
+# \`<words> except <flag>\`: that flag anywhere in the segment exempts it.
+# \`#\` comments and blank lines are skipped; a \`\\r\` (a CRLF checkout) is read past.
+
+# listed <list file> — HIT: the entry of the list the segment (W, and POS:
+# its words without options) runs, else "". Always returns 0 and is called
+# bare, never in \`\$(…)\` or a condition: there an error is muted, and a crash
+# would read as "not listed" — an allow. A missing list refuses.
+listed() {
+  local line entry except i ok w
+  local -a e
+  HIT=""
+  [ -f "\$1" ] || guard_fail "\${1##*/} is missing beside this hook — refusing"
+  while IFS= read -r line || [ -n "\$line" ]; do
+    line=\${line%\$'\\r'} # a CRLF checkout (Windows, core.autocrlf)
+    case \$line in '' | '#'*) continue ;; esac
+    entry=\${line%% except *} except=""
+    if [ "\$entry" != "\$line" ]; then except=\${line#* except }; fi
+    read -r -a e <<<"\$entry"
+    ok=1
+    for ((i = 0; i < \${#e[@]}; i++)); do
+      if [ "\${e[i]}" != "\${POS[i]:-}" ]; then ok=0; break; fi
+    done
+    [ "\$ok" = 1 ] || continue
+    if [ -n "\$except" ]; then
+      for w in "\${W[@]}"; do if [ "\$w" = "\$except" ]; then continue 2; fi; done
+    fi
+    HIT=\$entry
+    return 0
+  done <"\$1"
 }
 `,
       executable: false,
@@ -29037,9 +29389,17 @@ mv -f "\$tmp" "\$stamp"
 #                        --all, --mirror, --delete and unknown options are
 #                        all gated
 #   gh pr merge, glab mr merge, a git shell alias, a line it cannot read
+#   every command in merge-commands.txt — the scripts that land on the base
+#                        themselves (land-feature.sh, remove-spec.sh), matched
+#                        by basename however they are reached (_listed.sh)
 # An unknown base gates every form. A gated command goes through
 # approval_gate: Claude's own prompt where it can ask, else this turn's
 # \`merge\` approval (FR-017).
+#
+# The limit: it reads the command line, not what a program does. A listed
+# script copied or renamed, a task-runner alias for it, or an interpreter
+# that runs it gets past — the same limit a hand-written script that runs
+# \`git push\` already has.
 #
 # Usage: guard-merge.sh <claude|codex>   (payload on stdin)
 case \${BASH_SOURCE[0]} in */*) HOOK_DIR=\${BASH_SOURCE[0]%/*} ;; *) HOOK_DIR=. ;; esac
@@ -29051,6 +29411,8 @@ case \${BASH_SOURCE[0]} in */*) HOOK_DIR=\${BASH_SOURCE[0]%/*} ;; *) HOOK_DIR=. 
 . "\$HOOK_DIR/_git.sh"
 # shellcheck source=_approval.sh
 . "\$HOOK_DIR/_approval.sh"
+# shellcheck source=_listed.sh
+. "\$HOOK_DIR/_listed.sh"
 guard_init guard-merge "\${1:-}" argv:.tool_input.command
 [ "\$P_TOOL" = Bash ] || guard_fail "expected a Bash tool call, got '\$P_TOOL'"
 [ -n "\${GF[0]}" ] || guard_fail "a Bash call without tool_input.command"
@@ -29059,7 +29421,8 @@ cmd_parse "\${GF[0]}"
 reasons=() pushes=() merges=0 switched=0
 for seg in \${CMD_SEGS[@]+"\${CMD_SEGS[@]}"}; do
   cmd_words "\$seg"
-  case \${W[0]} in
+  case \${W[0]:-} in
+    '') continue ;; # an empty word as the command runs nothing
     git)
       cmd_git "\${W[@]}"
       case \$GIT_SUB in
@@ -29067,11 +29430,13 @@ for seg in \${CMD_SEGS[@]+"\${CMD_SEGS[@]}"}; do
         push) pushes+=("\$(IFS=\$CMD_SEP; echo "\${GIT_ARGS[*]:-}")") ;;
         checkout | switch) switched=1 ;;
         '!') reasons+=("a git alias that runs a shell command") ;;
-      esac ;;
-    gh | glab)
-      cmd_pos
-      case "\${POS[*]}" in "gh pr merge"* | "glab mr merge"*) reasons+=("\${POS[0]} \${POS[1]} merge") ;; esac ;;
+      esac
+      continue ;;
   esac
+  cmd_pos
+  case "\${POS[*]:-}" in "gh pr merge"* | "glab mr merge"*) reasons+=("\${POS[0]} \${POS[1]} merge") ;; esac
+  listed "\$HOOK_DIR/merge-commands.txt"
+  if [ -n "\$HIT" ]; then reasons+=("\$HIT"); fi
 done
 if [ "\$CMD_OPAQUE" = 1 ]; then reasons+=("a command it cannot read (eval, sh -c in sh -c, a shell fed on stdin, a quote or heredoc left open)"); fi
 if [ "\$merges" = 0 ] && [ \${#pushes[@]} = 0 ] && [ \${#reasons[@]} = 0 ]; then guard_allow; fi
@@ -29172,6 +29537,8 @@ case \${BASH_SOURCE[0]} in */*) HOOK_DIR=\${BASH_SOURCE[0]%/*} ;; *) HOOK_DIR=. 
 . "\$HOOK_DIR/_git.sh"
 # shellcheck source=_approval.sh
 . "\$HOOK_DIR/_approval.sh"
+# shellcheck source=_listed.sh
+. "\$HOOK_DIR/_listed.sh"
 guard_init guard-release "\${1:-}" argv:.tool_input.command
 [ "\$P_TOOL" = Bash ] || guard_fail "expected a Bash tool call, got '\$P_TOOL'"
 [ -n "\${GF[0]}" ] || guard_fail "a Bash call without tool_input.command"
@@ -29211,36 +29578,10 @@ tag_push() {
   return 1
 }
 
-# listed — HIT: the entry of release-commands.txt the segment (W, and POS:
-# its words without options) runs, else "". Always returns 0 and is called
-# bare, never in \`\$(…)\` or a condition: there an error is muted, and a crash
-# would read as "not listed" — an allow.
-listed() {
-  local line entry except i ok w
-  local -a e
-  HIT=""
-  while IFS= read -r line || [ -n "\$line" ]; do
-    line=\${line%\$'\\r'} # a CRLF checkout (Windows, core.autocrlf)
-    case \$line in '' | '#'*) continue ;; esac
-    entry=\${line%% except *} except=""
-    if [ "\$entry" != "\$line" ]; then except=\${line#* except }; fi
-    read -r -a e <<<"\$entry"
-    ok=1
-    for ((i = 0; i < \${#e[@]}; i++)); do
-      if [ "\${e[i]}" != "\${POS[i]:-}" ]; then ok=0; break; fi
-    done
-    [ "\$ok" = 1 ] || continue
-    if [ -n "\$except" ]; then
-      for w in "\${W[@]}"; do if [ "\$w" = "\$except" ]; then continue 2; fi; done
-    fi
-    HIT=\$entry
-    return 0
-  done <"\$HOOK_DIR/release-commands.txt"
-}
-
 tags_made=0 pushes=() hits=()
 for seg in \${CMD_SEGS[@]+"\${CMD_SEGS[@]}"}; do
   cmd_words "\$seg"
+  [ \${#W[@]} -gt 0 ] || continue # an empty word as the command runs nothing
   if [ "\${W[0]}" = git ]; then
     cmd_git "\${W[@]}"
     case \$GIT_SUB in
@@ -29251,7 +29592,7 @@ for seg in \${CMD_SEGS[@]+"\${CMD_SEGS[@]}"}; do
   fi
   [ "\${W[0]}" != tag.sh ] || tags_made=1
   cmd_pos
-  listed
+  listed "\$HOOK_DIR/release-commands.txt"
   if [ -n "\$HIT" ]; then hits+=("\$HIT"); fi
 done
 if [ "\$CMD_OPAQUE" = 1 ]; then hits+=("a command it cannot read (eval, sh -c in sh -c, a shell fed on stdin, a quote or heredoc left open)"); fi
@@ -29799,6 +30140,24 @@ gh run rerun
 `,
       executable: false,
     },
+    ".specnaut/hooks/merge-commands.txt": {
+      content: `# The commands that land on the base branch by themselves — the one list (spec
+# 042, plan § 2). Under \`merge: manual\`, guard-merge.sh gates each like a
+# \`git push\` to the base; under \`auto\` they run like anything else.
+#
+# One command per line: the words it starts with. A first word ending in \`.sh\`
+# is a script, matched by its basename however it is reached (a path, or as
+# the argument of sh/bash/source, or behind timeout, env, xargs, …); how a line
+# matches lives in _listed.sh. A copy of the script under another name, a
+# task-runner alias or an interpreter that runs it is not seen — the limit a
+# hand-written script that runs \`git push\` already has. \`git merge\`, \`git
+# push\`, \`gh pr merge\` and \`glab mr merge\` are rules, not words, and live in
+# guard-merge.sh.
+land-feature.sh
+remove-spec.sh
+`,
+      executable: false,
+    },
     ".specnaut/hooks/_agents.txt": {
       content: `# The Specnaut agents: one name per line, generated from the Specnaut
 # manifest when the binary is built. guard-dispatch-model.sh reads it.
@@ -29825,16 +30184,18 @@ workflow-manager
 49a4f9a91f8b91559f087d02c151d4069575cf466fcd09b21354749f188c16a8  _agents.txt
 eff27f37501f08c5a39cfcc2c6c7a8382e0d0467dc4a63cf3d29bb84d5ea26d6  _approval.sh
 43d7f7db80493808631ae998e4a172bbf9ed494ce0fcbf23b0e083bbc9fed58a  _baseline.sh
-7556762e50be2b68d2bc432dddded521f736cc06abb084e895c1f1ddf5986039  _command.sh
+7f838f6982981d046015499bdac3a8ee99573b4006f32686519e64525e46bbeb  _command.sh
 fa8afb422b9af3b7f80580666d66e9332ed35cc3c24c7182300b3224f2a96548  _git.sh
 2829e6a5db6984fee451e242ba16beca68808a7647316cff24930aa8ec53c73a  _guard.sh
+40e09c2580471d6ad3275787236b1a9d75a88a95f253c4136d3c4d0adc1dc952  _listed.sh
 f5552945f77fb0d24f56bbf2e97fb64d284d9c716abf211ebcbe081cacdf8bdf  _paths.sh
-675a334dbce3d787fe3cd42223dd02f53c9f26b92f2e9aac35855662f335a865  _simple.sh
+994d3877b951fbd9a97fc7d563de8837796fe4655607d2f75ec57081da14ab5b  _simple.sh
 298471e25d869161087ddd4f4c0a488ca8ec5508ad01c4589e440af9274d0820  approve-on-prompt.sh
 28d13e1fbd696f79036cc1f94c3fd6aa68f4f862f0dd5f6d32191ad05392534f  guard-dispatch-model.sh
-09103676aa00371ece40171b577cfbe24e02fdfcfe39c47ff2905ed189708499  guard-merge.sh
-6f8dd791eb7c797dae9f9c5f6f6bc0d07c2930552aa9087ccc8b619f0844476e  guard-release.sh
+6cf21b277e7b417675d7625421887ef305f4ab8c6e938b80e815b517aead1dd2  guard-merge.sh
+a8ee3b3537f1718a140bca74815dcfa5ce510bb87b62f63caebfebff090094a6  guard-release.sh
 3364feb0f3a7892224b67e4f857bb6c085456da98c892d7199c4bbd10f122f8b  log-subagent.sh
+75ea767aff8b89199c59ad060a230bf5f0caaf050fe2bdc1dd43146d31d637fc  merge-commands.txt
 0d231c09ef29b1e46b774d283fad725382f33d6f3098545dc8a504bf89c40a80  protect-constitution.sh
 79f8bc840e2e691c2011c0350bd5140bad8caa4448d65ed209e79da582a075a3  protect-generated.sh
 4e0f336ed4eafecca2904fba2aab427d3e8528889aa68e9e347c4ac03dc53853  release-commands.txt
@@ -30177,12 +30538,12 @@ approval_require() {
 # newlines, ( ) \$( ) and backticks (also inside "…"), quotes and escapes,
 # comments, heredoc bodies (skipped: they are data), \`<<<\` herestrings, \`<<\`
 # inside \`\$((…))\`/\`((…))\` (a shift, not a heredoc), redirections, VAR=val
-# prefixes, the env/command/sudo/nice/… wrappers, and ONE level of
-# \`sh|bash|zsh -c '…'\`. A deeper \`-c\`, or \`eval\`, sets CMD_OPAQUE — and so
-# does a line that never closes: a quote, \`(\`, \`\$(\` or backtick left open, a
-# heredoc whose body never ends. Fail closed: a guard gates what it cannot
-# read rather than guessing at it. Scripts, interpreters and shell functions
-# are not seen: the stated limit.
+# prefixes, the env/command/sudo/nice/timeout/xargs/… wrappers, \`source x\`,
+# the command of \`find -exec\`, and ONE level of \`sh|bash|zsh -c '…'\`. A
+# deeper \`-c\`, or \`eval\`, sets CMD_OPAQUE — and so does a line that never
+# closes: a quote, \`(\`, \`\$(\` or backtick left open, a heredoc whose body never
+# ends. Fail closed: a guard gates what it cannot read rather than guessing at
+# it. Scripts, interpreters and shell functions are not seen: the stated limit.
 #
 # After cmd_parse: CMD_SEGS holds one entry per simple command, its words
 # joined by CMD_SEP, the first word reduced to its basename. CMD_MOVED=1 when
@@ -30316,10 +30677,12 @@ cmd_pos() {
 # (SC2034/SC2153: CMD_* are shared with _command.sh, which sources this file.)
 # Sourced by _command.sh. What ONE simple command runs, once cmd_parse has cut
 # it out of the line: redirections dropped, VAR=val prefixes and wrappers
-# (env, command, sudo, nice, time, …) skipped, the command word reduced to
-# its basename, and \`sh|bash|zsh -c '…'\` read one level deep — the string is
-# parsed again as a command line; a second level, or a shell fed on stdin, or
-# \`eval\`, sets CMD_OPAQUE instead of being guessed at.
+# (env, command, sudo, nice, time, timeout, xargs, flock, …) skipped, the
+# command word reduced to its basename, \`source <script>\` and \`. <script>\`
+# read as the script, each \`find -exec … ;\` read as a command of its own, and
+# \`sh|bash|zsh -c '…'\` read one level deep — the string is parsed again as a
+# command line; a second level, or a shell fed on stdin, or \`eval\`, sets
+# CMD_OPAQUE instead of being guessed at.
 #
 # The helpers below share _cmd_emit's locals by bash's dynamic scope: v (the
 # words), m (their count) and k (the index of the command word). So does
@@ -30379,18 +30742,50 @@ _cmd_skip_prefixes() {
           case \${v[k]} in -u | -g | -p | -C | -D | -h | -r | -t | -U) k=\$((k + 2)) ;; -*) k=\$((k + 1)) ;; *) break ;; esac
         done ;;
       nice) k=\$((k + 1)); if [ "\${v[k]:-}" = -n ]; then k=\$((k + 2)); elif [[ \${v[k]:-} == -* ]]; then k=\$((k + 1)); fi ;;
+      *) _cmd_runner || return 0 ;;
+    esac
+  done
+}
+
+# _cmd_opts <option that takes a value…> — k: past v[k] and the options that
+# follow it, each listed one with its value; \`--\` ends them.
+_cmd_opts() {
+  local o
+  for ((k = k + 1; k < m; k++)); do
+    case \${v[k]} in
+      --) k=\$((k + 1)); return 0 ;;
+      -*) for o in "\$@"; do if [ "\${v[k]}" = "\$o" ]; then k=\$((k + 1)); break; fi; done ;;
       *) return 0 ;;
     esac
   done
 }
 
-# _cmd_shell_c <depth> — v[k] is a shell. \`-c '…'\` at depth 0 is parsed as a
-# command line, deeper it is opaque; either way the shell itself is not
-# recorded (k=m). A script operand becomes the command (k moves to it); no
-# operand at all means commands on stdin: opaque. Always returns 0, so the
-# nested cmd_parse never runs where bash mutes the ERR trap (an \`||\` list).
+# _cmd_runner — v[k] is a command that runs the command after its options and
+# its own operands (a duration, a priority, a CPU mask, a lock file): k moves
+# there. Returns 1 when v[k] is none of them. After flock's lock file, \`-c
+# '…'\` is left for _cmd_emit, which reads the string as a shell's.
+_cmd_runner() {
+  case \${v[k]} in
+    timeout | gtimeout) _cmd_opts -s -k --signal --kill-after; k=\$((k + 1)) ;;
+    caffeinate) _cmd_opts -t -w ;;
+    stdbuf) _cmd_opts -i -o -e --input --output --error ;;
+    ionice) _cmd_opts -c -n -p --class --classdata --pid ;;
+    chrt) _cmd_opts -T -P -D --sched-runtime --sched-period --sched-deadline; k=\$((k + 1)) ;;
+    taskset) _cmd_opts; k=\$((k + 1)) ;;
+    xargs) _cmd_opts -a -d -E -I -J -L -n -P -R -S -s --arg-file --delimiter --max-args --max-procs --max-chars --max-lines --process-slot-var ;;
+    flock) _cmd_opts -w -E --timeout --conflict-exit-code; k=\$((k + 1)) ;;
+    *) return 1 ;;
+  esac
+}
+
+# _cmd_shell_c <depth> [1] — v[k] is a shell (1: or flock's \`-c\`, already
+# seen). \`-c '…'\` at depth 0 is parsed as a command line, deeper it is opaque;
+# either way the shell itself is not recorded (k=m). A script operand becomes
+# the command (k moves to it); no operand at all means commands on stdin:
+# opaque. Always returns 0, so the nested cmd_parse never runs where bash
+# mutes the ERR trap (an \`||\` list).
 _cmd_shell_c() {
-  local x j sawc=0
+  local x j sawc=\${2:-0}
   for ((j = k + 1; j < m; j++)); do
     x=\${v[j]}
     case \$x in
@@ -30408,6 +30803,23 @@ _cmd_shell_c() {
   CMD_OPAQUE=1
 }
 
+# _cmd_find <depth> — v[k] is find: the command of each -exec, -execdir, -ok
+# or -okdir, up to its \`;\` or \`+\`, is emitted as a simple command of its own.
+_cmd_find() {
+  local j run="" on=0
+  for ((j = k + 1; j < m; j++)); do
+    if [ "\$on" = 0 ]; then
+      case \${v[j]} in -exec | -execdir | -ok | -okdir) on=1 ;; esac
+      continue
+    fi
+    case \${v[j]} in
+      ';' | '+') _cmd_emit "\$run" "\$1"; run="" on=0 ;;
+      *) run+="\${v[j]}\$CMD_SEP" ;;
+    esac
+  done
+  if [ -n "\$run" ]; then _cmd_emit "\$run" "\$1"; fi
+}
+
 # _cmd_emit <raw segment> <depth> — strip redirections, prefixes and wrappers; record the command.
 _cmd_emit() {
   local -a v
@@ -30422,9 +30834,57 @@ _cmd_emit() {
     eval) CMD_OPAQUE=1 ;;
     export | declare | typeset | local | readonly) for x in "\${v[@]:k}"; do _cmd_env "\$x"; done ;;
     sh | bash | zsh | dash | ksh) _cmd_shell_c "\$2"; [ "\$k" -lt "\$m" ] || return 0 ;;
+    -c | --command) _cmd_shell_c "\$2" 1; [ "\$k" -lt "\$m" ] || return 0 ;;
+    source | .) k=\$((k + 1)); [ "\$k" -lt "\$m" ] || return 0; v[k]=\${v[k]##*/} ;;
+    find) _cmd_find "\$2" ;;
   esac
   IFS=\$CMD_SEP
   CMD_SEGS+=("\${v[*]:k}")
+}
+`,
+      executable: false,
+    },
+    ".specnaut/hooks/_listed.sh": {
+      content: `# shellcheck shell=bash disable=SC2034
+# (SC2034: HIT is read by the sourcing guard.)
+# Sourced by the guards that hold a command list — guard-release.sh
+# (release-commands.txt) and guard-merge.sh (merge-commands.txt): the one
+# home of how a line of such a list matches a simple command.
+#
+# A line is the words a command starts with, matched against its words
+# without options (POS, from cmd_pos), so \`gh -R o/r release create\` matches
+# \`gh release create\`. A first word ending in \`.sh\` is a script: _command.sh
+# has already reduced the command word to its basename, so it matches however
+# the script is reached (a path, \`bash x\`, \`source x\`, \`timeout 60 x\`, …).
+# \`<words> except <flag>\`: that flag anywhere in the segment exempts it.
+# \`#\` comments and blank lines are skipped; a \`\\r\` (a CRLF checkout) is read past.
+
+# listed <list file> — HIT: the entry of the list the segment (W, and POS:
+# its words without options) runs, else "". Always returns 0 and is called
+# bare, never in \`\$(…)\` or a condition: there an error is muted, and a crash
+# would read as "not listed" — an allow. A missing list refuses.
+listed() {
+  local line entry except i ok w
+  local -a e
+  HIT=""
+  [ -f "\$1" ] || guard_fail "\${1##*/} is missing beside this hook — refusing"
+  while IFS= read -r line || [ -n "\$line" ]; do
+    line=\${line%\$'\\r'} # a CRLF checkout (Windows, core.autocrlf)
+    case \$line in '' | '#'*) continue ;; esac
+    entry=\${line%% except *} except=""
+    if [ "\$entry" != "\$line" ]; then except=\${line#* except }; fi
+    read -r -a e <<<"\$entry"
+    ok=1
+    for ((i = 0; i < \${#e[@]}; i++)); do
+      if [ "\${e[i]}" != "\${POS[i]:-}" ]; then ok=0; break; fi
+    done
+    [ "\$ok" = 1 ] || continue
+    if [ -n "\$except" ]; then
+      for w in "\${W[@]}"; do if [ "\$w" = "\$except" ]; then continue 2; fi; done
+    fi
+    HIT=\$entry
+    return 0
+  done <"\$1"
 }
 `,
       executable: false,
@@ -30887,9 +31347,17 @@ mv -f "\$tmp" "\$stamp"
 #                        --all, --mirror, --delete and unknown options are
 #                        all gated
 #   gh pr merge, glab mr merge, a git shell alias, a line it cannot read
+#   every command in merge-commands.txt — the scripts that land on the base
+#                        themselves (land-feature.sh, remove-spec.sh), matched
+#                        by basename however they are reached (_listed.sh)
 # An unknown base gates every form. A gated command goes through
 # approval_gate: Claude's own prompt where it can ask, else this turn's
 # \`merge\` approval (FR-017).
+#
+# The limit: it reads the command line, not what a program does. A listed
+# script copied or renamed, a task-runner alias for it, or an interpreter
+# that runs it gets past — the same limit a hand-written script that runs
+# \`git push\` already has.
 #
 # Usage: guard-merge.sh <claude|codex>   (payload on stdin)
 case \${BASH_SOURCE[0]} in */*) HOOK_DIR=\${BASH_SOURCE[0]%/*} ;; *) HOOK_DIR=. ;; esac
@@ -30901,6 +31369,8 @@ case \${BASH_SOURCE[0]} in */*) HOOK_DIR=\${BASH_SOURCE[0]%/*} ;; *) HOOK_DIR=. 
 . "\$HOOK_DIR/_git.sh"
 # shellcheck source=_approval.sh
 . "\$HOOK_DIR/_approval.sh"
+# shellcheck source=_listed.sh
+. "\$HOOK_DIR/_listed.sh"
 guard_init guard-merge "\${1:-}" argv:.tool_input.command
 [ "\$P_TOOL" = Bash ] || guard_fail "expected a Bash tool call, got '\$P_TOOL'"
 [ -n "\${GF[0]}" ] || guard_fail "a Bash call without tool_input.command"
@@ -30909,7 +31379,8 @@ cmd_parse "\${GF[0]}"
 reasons=() pushes=() merges=0 switched=0
 for seg in \${CMD_SEGS[@]+"\${CMD_SEGS[@]}"}; do
   cmd_words "\$seg"
-  case \${W[0]} in
+  case \${W[0]:-} in
+    '') continue ;; # an empty word as the command runs nothing
     git)
       cmd_git "\${W[@]}"
       case \$GIT_SUB in
@@ -30917,11 +31388,13 @@ for seg in \${CMD_SEGS[@]+"\${CMD_SEGS[@]}"}; do
         push) pushes+=("\$(IFS=\$CMD_SEP; echo "\${GIT_ARGS[*]:-}")") ;;
         checkout | switch) switched=1 ;;
         '!') reasons+=("a git alias that runs a shell command") ;;
-      esac ;;
-    gh | glab)
-      cmd_pos
-      case "\${POS[*]}" in "gh pr merge"* | "glab mr merge"*) reasons+=("\${POS[0]} \${POS[1]} merge") ;; esac ;;
+      esac
+      continue ;;
   esac
+  cmd_pos
+  case "\${POS[*]:-}" in "gh pr merge"* | "glab mr merge"*) reasons+=("\${POS[0]} \${POS[1]} merge") ;; esac
+  listed "\$HOOK_DIR/merge-commands.txt"
+  if [ -n "\$HIT" ]; then reasons+=("\$HIT"); fi
 done
 if [ "\$CMD_OPAQUE" = 1 ]; then reasons+=("a command it cannot read (eval, sh -c in sh -c, a shell fed on stdin, a quote or heredoc left open)"); fi
 if [ "\$merges" = 0 ] && [ \${#pushes[@]} = 0 ] && [ \${#reasons[@]} = 0 ]; then guard_allow; fi
@@ -31022,6 +31495,8 @@ case \${BASH_SOURCE[0]} in */*) HOOK_DIR=\${BASH_SOURCE[0]%/*} ;; *) HOOK_DIR=. 
 . "\$HOOK_DIR/_git.sh"
 # shellcheck source=_approval.sh
 . "\$HOOK_DIR/_approval.sh"
+# shellcheck source=_listed.sh
+. "\$HOOK_DIR/_listed.sh"
 guard_init guard-release "\${1:-}" argv:.tool_input.command
 [ "\$P_TOOL" = Bash ] || guard_fail "expected a Bash tool call, got '\$P_TOOL'"
 [ -n "\${GF[0]}" ] || guard_fail "a Bash call without tool_input.command"
@@ -31061,36 +31536,10 @@ tag_push() {
   return 1
 }
 
-# listed — HIT: the entry of release-commands.txt the segment (W, and POS:
-# its words without options) runs, else "". Always returns 0 and is called
-# bare, never in \`\$(…)\` or a condition: there an error is muted, and a crash
-# would read as "not listed" — an allow.
-listed() {
-  local line entry except i ok w
-  local -a e
-  HIT=""
-  while IFS= read -r line || [ -n "\$line" ]; do
-    line=\${line%\$'\\r'} # a CRLF checkout (Windows, core.autocrlf)
-    case \$line in '' | '#'*) continue ;; esac
-    entry=\${line%% except *} except=""
-    if [ "\$entry" != "\$line" ]; then except=\${line#* except }; fi
-    read -r -a e <<<"\$entry"
-    ok=1
-    for ((i = 0; i < \${#e[@]}; i++)); do
-      if [ "\${e[i]}" != "\${POS[i]:-}" ]; then ok=0; break; fi
-    done
-    [ "\$ok" = 1 ] || continue
-    if [ -n "\$except" ]; then
-      for w in "\${W[@]}"; do if [ "\$w" = "\$except" ]; then continue 2; fi; done
-    fi
-    HIT=\$entry
-    return 0
-  done <"\$HOOK_DIR/release-commands.txt"
-}
-
 tags_made=0 pushes=() hits=()
 for seg in \${CMD_SEGS[@]+"\${CMD_SEGS[@]}"}; do
   cmd_words "\$seg"
+  [ \${#W[@]} -gt 0 ] || continue # an empty word as the command runs nothing
   if [ "\${W[0]}" = git ]; then
     cmd_git "\${W[@]}"
     case \$GIT_SUB in
@@ -31101,7 +31550,7 @@ for seg in \${CMD_SEGS[@]+"\${CMD_SEGS[@]}"}; do
   fi
   [ "\${W[0]}" != tag.sh ] || tags_made=1
   cmd_pos
-  listed
+  listed "\$HOOK_DIR/release-commands.txt"
   if [ -n "\$HIT" ]; then hits+=("\$HIT"); fi
 done
 if [ "\$CMD_OPAQUE" = 1 ]; then hits+=("a command it cannot read (eval, sh -c in sh -c, a shell fed on stdin, a quote or heredoc left open)"); fi
@@ -31649,6 +32098,24 @@ gh run rerun
 `,
       executable: false,
     },
+    ".specnaut/hooks/merge-commands.txt": {
+      content: `# The commands that land on the base branch by themselves — the one list (spec
+# 042, plan § 2). Under \`merge: manual\`, guard-merge.sh gates each like a
+# \`git push\` to the base; under \`auto\` they run like anything else.
+#
+# One command per line: the words it starts with. A first word ending in \`.sh\`
+# is a script, matched by its basename however it is reached (a path, or as
+# the argument of sh/bash/source, or behind timeout, env, xargs, …); how a line
+# matches lives in _listed.sh. A copy of the script under another name, a
+# task-runner alias or an interpreter that runs it is not seen — the limit a
+# hand-written script that runs \`git push\` already has. \`git merge\`, \`git
+# push\`, \`gh pr merge\` and \`glab mr merge\` are rules, not words, and live in
+# guard-merge.sh.
+land-feature.sh
+remove-spec.sh
+`,
+      executable: false,
+    },
     ".specnaut/hooks/_agents.txt": {
       content: `# The Specnaut agents: one name per line, generated from the Specnaut
 # manifest when the binary is built. guard-dispatch-model.sh reads it.
@@ -31675,16 +32142,18 @@ workflow-manager
 49a4f9a91f8b91559f087d02c151d4069575cf466fcd09b21354749f188c16a8  _agents.txt
 eff27f37501f08c5a39cfcc2c6c7a8382e0d0467dc4a63cf3d29bb84d5ea26d6  _approval.sh
 43d7f7db80493808631ae998e4a172bbf9ed494ce0fcbf23b0e083bbc9fed58a  _baseline.sh
-7556762e50be2b68d2bc432dddded521f736cc06abb084e895c1f1ddf5986039  _command.sh
+7f838f6982981d046015499bdac3a8ee99573b4006f32686519e64525e46bbeb  _command.sh
 fa8afb422b9af3b7f80580666d66e9332ed35cc3c24c7182300b3224f2a96548  _git.sh
 2829e6a5db6984fee451e242ba16beca68808a7647316cff24930aa8ec53c73a  _guard.sh
+40e09c2580471d6ad3275787236b1a9d75a88a95f253c4136d3c4d0adc1dc952  _listed.sh
 f5552945f77fb0d24f56bbf2e97fb64d284d9c716abf211ebcbe081cacdf8bdf  _paths.sh
-675a334dbce3d787fe3cd42223dd02f53c9f26b92f2e9aac35855662f335a865  _simple.sh
+994d3877b951fbd9a97fc7d563de8837796fe4655607d2f75ec57081da14ab5b  _simple.sh
 298471e25d869161087ddd4f4c0a488ca8ec5508ad01c4589e440af9274d0820  approve-on-prompt.sh
 28d13e1fbd696f79036cc1f94c3fd6aa68f4f862f0dd5f6d32191ad05392534f  guard-dispatch-model.sh
-09103676aa00371ece40171b577cfbe24e02fdfcfe39c47ff2905ed189708499  guard-merge.sh
-6f8dd791eb7c797dae9f9c5f6f6bc0d07c2930552aa9087ccc8b619f0844476e  guard-release.sh
+6cf21b277e7b417675d7625421887ef305f4ab8c6e938b80e815b517aead1dd2  guard-merge.sh
+a8ee3b3537f1718a140bca74815dcfa5ce510bb87b62f63caebfebff090094a6  guard-release.sh
 3364feb0f3a7892224b67e4f857bb6c085456da98c892d7199c4bbd10f122f8b  log-subagent.sh
+75ea767aff8b89199c59ad060a230bf5f0caaf050fe2bdc1dd43146d31d637fc  merge-commands.txt
 0d231c09ef29b1e46b774d283fad725382f33d6f3098545dc8a504bf89c40a80  protect-constitution.sh
 79f8bc840e2e691c2011c0350bd5140bad8caa4448d65ed209e79da582a075a3  protect-generated.sh
 4e0f336ed4eafecca2904fba2aab427d3e8528889aa68e9e347c4ac03dc53853  release-commands.txt
@@ -31708,17 +32177,17 @@ f5552945f77fb0d24f56bbf2e97fb64d284d9c716abf211ebcbe081cacdf8bdf  _paths.sh
         "hooks": [
           {
             "type": "command",
-            "command": "r=\$PWD; while [ -n \\"\$r\\" ] && [ ! -d \\"\$r/.specnaut/hooks\\" ]; do r=\${r%/*}; done; [ \\"\$( (sha256sum 2>/dev/null || shasum -a 256) < \\"\$r/.specnaut/hooks/SHA256SUMS\\" 2>/dev/null | cut -c1-64)\\" = \\"0a408b298539104b7e50751c46c7a838a9a105d7dd61e73bf7509284f738e515\\" ] && (cd \\"\$r/.specnaut/hooks\\" && (sha256sum -c --status SHA256SUMS 2>/dev/null || shasum -a 256 -c --status SHA256SUMS)) && exec bash \\"\$r/.specnaut/hooks/guard-merge.sh\\" codex; echo \\"specnaut: .specnaut/hooks changed since it was trusted — run specnaut upgrade, then /hooks\\" >&2; exit 2",
+            "command": "r=\$PWD; while [ -n \\"\$r\\" ] && [ ! -d \\"\$r/.specnaut/hooks\\" ]; do r=\${r%/*}; done; [ \\"\$( (sha256sum 2>/dev/null || shasum -a 256) < \\"\$r/.specnaut/hooks/SHA256SUMS\\" 2>/dev/null | cut -c1-64)\\" = \\"3643c4660789495270438c763705c894e1fb6fa3dc2d9063d2e5092db59fc222\\" ] && (cd \\"\$r/.specnaut/hooks\\" && (sha256sum -c --status SHA256SUMS 2>/dev/null || shasum -a 256 -c --status SHA256SUMS)) && exec bash \\"\$r/.specnaut/hooks/guard-merge.sh\\" codex; echo \\"specnaut: .specnaut/hooks changed since it was trusted — run specnaut upgrade, then /hooks\\" >&2; exit 2",
             "timeout": 10
           },
           {
             "type": "command",
-            "command": "r=\$PWD; while [ -n \\"\$r\\" ] && [ ! -d \\"\$r/.specnaut/hooks\\" ]; do r=\${r%/*}; done; [ \\"\$( (sha256sum 2>/dev/null || shasum -a 256) < \\"\$r/.specnaut/hooks/SHA256SUMS\\" 2>/dev/null | cut -c1-64)\\" = \\"0a408b298539104b7e50751c46c7a838a9a105d7dd61e73bf7509284f738e515\\" ] && (cd \\"\$r/.specnaut/hooks\\" && (sha256sum -c --status SHA256SUMS 2>/dev/null || shasum -a 256 -c --status SHA256SUMS)) && exec bash \\"\$r/.specnaut/hooks/guard-release.sh\\" codex; echo \\"specnaut: .specnaut/hooks changed since it was trusted — run specnaut upgrade, then /hooks\\" >&2; exit 2",
+            "command": "r=\$PWD; while [ -n \\"\$r\\" ] && [ ! -d \\"\$r/.specnaut/hooks\\" ]; do r=\${r%/*}; done; [ \\"\$( (sha256sum 2>/dev/null || shasum -a 256) < \\"\$r/.specnaut/hooks/SHA256SUMS\\" 2>/dev/null | cut -c1-64)\\" = \\"3643c4660789495270438c763705c894e1fb6fa3dc2d9063d2e5092db59fc222\\" ] && (cd \\"\$r/.specnaut/hooks\\" && (sha256sum -c --status SHA256SUMS 2>/dev/null || shasum -a 256 -c --status SHA256SUMS)) && exec bash \\"\$r/.specnaut/hooks/guard-release.sh\\" codex; echo \\"specnaut: .specnaut/hooks changed since it was trusted — run specnaut upgrade, then /hooks\\" >&2; exit 2",
             "timeout": 10
           },
           {
             "type": "command",
-            "command": "r=\$PWD; while [ -n \\"\$r\\" ] && [ ! -d \\"\$r/.specnaut/hooks\\" ]; do r=\${r%/*}; done; [ \\"\$( (sha256sum 2>/dev/null || shasum -a 256) < \\"\$r/.specnaut/hooks/SHA256SUMS\\" 2>/dev/null | cut -c1-64)\\" = \\"0a408b298539104b7e50751c46c7a838a9a105d7dd61e73bf7509284f738e515\\" ] && (cd \\"\$r/.specnaut/hooks\\" && (sha256sum -c --status SHA256SUMS 2>/dev/null || shasum -a 256 -c --status SHA256SUMS)) && exec bash \\"\$r/.specnaut/hooks/protect-constitution.sh\\" codex; echo \\"specnaut: .specnaut/hooks changed since it was trusted — run specnaut upgrade, then /hooks\\" >&2; exit 2",
+            "command": "r=\$PWD; while [ -n \\"\$r\\" ] && [ ! -d \\"\$r/.specnaut/hooks\\" ]; do r=\${r%/*}; done; [ \\"\$( (sha256sum 2>/dev/null || shasum -a 256) < \\"\$r/.specnaut/hooks/SHA256SUMS\\" 2>/dev/null | cut -c1-64)\\" = \\"3643c4660789495270438c763705c894e1fb6fa3dc2d9063d2e5092db59fc222\\" ] && (cd \\"\$r/.specnaut/hooks\\" && (sha256sum -c --status SHA256SUMS 2>/dev/null || shasum -a 256 -c --status SHA256SUMS)) && exec bash \\"\$r/.specnaut/hooks/protect-constitution.sh\\" codex; echo \\"specnaut: .specnaut/hooks changed since it was trusted — run specnaut upgrade, then /hooks\\" >&2; exit 2",
             "timeout": 10
           }
         ]
@@ -31728,12 +32197,12 @@ f5552945f77fb0d24f56bbf2e97fb64d284d9c716abf211ebcbe081cacdf8bdf  _paths.sh
         "hooks": [
           {
             "type": "command",
-            "command": "r=\$PWD; while [ -n \\"\$r\\" ] && [ ! -d \\"\$r/.specnaut/hooks\\" ]; do r=\${r%/*}; done; [ \\"\$( (sha256sum 2>/dev/null || shasum -a 256) < \\"\$r/.specnaut/hooks/SHA256SUMS\\" 2>/dev/null | cut -c1-64)\\" = \\"0a408b298539104b7e50751c46c7a838a9a105d7dd61e73bf7509284f738e515\\" ] && (cd \\"\$r/.specnaut/hooks\\" && (sha256sum -c --status SHA256SUMS 2>/dev/null || shasum -a 256 -c --status SHA256SUMS)) && exec bash \\"\$r/.specnaut/hooks/protect-generated.sh\\" codex; echo \\"specnaut: .specnaut/hooks changed since it was trusted — run specnaut upgrade, then /hooks\\" >&2; exit 2",
+            "command": "r=\$PWD; while [ -n \\"\$r\\" ] && [ ! -d \\"\$r/.specnaut/hooks\\" ]; do r=\${r%/*}; done; [ \\"\$( (sha256sum 2>/dev/null || shasum -a 256) < \\"\$r/.specnaut/hooks/SHA256SUMS\\" 2>/dev/null | cut -c1-64)\\" = \\"3643c4660789495270438c763705c894e1fb6fa3dc2d9063d2e5092db59fc222\\" ] && (cd \\"\$r/.specnaut/hooks\\" && (sha256sum -c --status SHA256SUMS 2>/dev/null || shasum -a 256 -c --status SHA256SUMS)) && exec bash \\"\$r/.specnaut/hooks/protect-generated.sh\\" codex; echo \\"specnaut: .specnaut/hooks changed since it was trusted — run specnaut upgrade, then /hooks\\" >&2; exit 2",
             "timeout": 10
           },
           {
             "type": "command",
-            "command": "r=\$PWD; while [ -n \\"\$r\\" ] && [ ! -d \\"\$r/.specnaut/hooks\\" ]; do r=\${r%/*}; done; [ \\"\$( (sha256sum 2>/dev/null || shasum -a 256) < \\"\$r/.specnaut/hooks/SHA256SUMS\\" 2>/dev/null | cut -c1-64)\\" = \\"0a408b298539104b7e50751c46c7a838a9a105d7dd61e73bf7509284f738e515\\" ] && (cd \\"\$r/.specnaut/hooks\\" && (sha256sum -c --status SHA256SUMS 2>/dev/null || shasum -a 256 -c --status SHA256SUMS)) && exec bash \\"\$r/.specnaut/hooks/protect-constitution.sh\\" codex; echo \\"specnaut: .specnaut/hooks changed since it was trusted — run specnaut upgrade, then /hooks\\" >&2; exit 2",
+            "command": "r=\$PWD; while [ -n \\"\$r\\" ] && [ ! -d \\"\$r/.specnaut/hooks\\" ]; do r=\${r%/*}; done; [ \\"\$( (sha256sum 2>/dev/null || shasum -a 256) < \\"\$r/.specnaut/hooks/SHA256SUMS\\" 2>/dev/null | cut -c1-64)\\" = \\"3643c4660789495270438c763705c894e1fb6fa3dc2d9063d2e5092db59fc222\\" ] && (cd \\"\$r/.specnaut/hooks\\" && (sha256sum -c --status SHA256SUMS 2>/dev/null || shasum -a 256 -c --status SHA256SUMS)) && exec bash \\"\$r/.specnaut/hooks/protect-constitution.sh\\" codex; echo \\"specnaut: .specnaut/hooks changed since it was trusted — run specnaut upgrade, then /hooks\\" >&2; exit 2",
             "timeout": 10
           }
         ]
@@ -31743,7 +32212,7 @@ f5552945f77fb0d24f56bbf2e97fb64d284d9c716abf211ebcbe081cacdf8bdf  _paths.sh
         "hooks": [
           {
             "type": "command",
-            "command": "r=\$PWD; while [ -n \\"\$r\\" ] && [ ! -d \\"\$r/.specnaut/hooks\\" ]; do r=\${r%/*}; done; [ \\"\$( (sha256sum 2>/dev/null || shasum -a 256) < \\"\$r/.specnaut/hooks/SHA256SUMS\\" 2>/dev/null | cut -c1-64)\\" = \\"0a408b298539104b7e50751c46c7a838a9a105d7dd61e73bf7509284f738e515\\" ] && (cd \\"\$r/.specnaut/hooks\\" && (sha256sum -c --status SHA256SUMS 2>/dev/null || shasum -a 256 -c --status SHA256SUMS)) && exec bash \\"\$r/.specnaut/hooks/guard-dispatch-model.sh\\" codex; echo \\"specnaut: .specnaut/hooks changed since it was trusted — run specnaut upgrade, then /hooks\\" >&2; exit 2",
+            "command": "r=\$PWD; while [ -n \\"\$r\\" ] && [ ! -d \\"\$r/.specnaut/hooks\\" ]; do r=\${r%/*}; done; [ \\"\$( (sha256sum 2>/dev/null || shasum -a 256) < \\"\$r/.specnaut/hooks/SHA256SUMS\\" 2>/dev/null | cut -c1-64)\\" = \\"3643c4660789495270438c763705c894e1fb6fa3dc2d9063d2e5092db59fc222\\" ] && (cd \\"\$r/.specnaut/hooks\\" && (sha256sum -c --status SHA256SUMS 2>/dev/null || shasum -a 256 -c --status SHA256SUMS)) && exec bash \\"\$r/.specnaut/hooks/guard-dispatch-model.sh\\" codex; echo \\"specnaut: .specnaut/hooks changed since it was trusted — run specnaut upgrade, then /hooks\\" >&2; exit 2",
             "timeout": 10
           }
         ]
@@ -31754,7 +32223,7 @@ f5552945f77fb0d24f56bbf2e97fb64d284d9c716abf211ebcbe081cacdf8bdf  _paths.sh
         "hooks": [
           {
             "type": "command",
-            "command": "r=\$PWD; while [ -n \\"\$r\\" ] && [ ! -d \\"\$r/.specnaut/hooks\\" ]; do r=\${r%/*}; done; [ \\"\$( (sha256sum 2>/dev/null || shasum -a 256) < \\"\$r/.specnaut/hooks/SHA256SUMS\\" 2>/dev/null | cut -c1-64)\\" = \\"0a408b298539104b7e50751c46c7a838a9a105d7dd61e73bf7509284f738e515\\" ] && (cd \\"\$r/.specnaut/hooks\\" && (sha256sum -c --status SHA256SUMS 2>/dev/null || shasum -a 256 -c --status SHA256SUMS)) && exec bash \\"\$r/.specnaut/hooks/approve-on-prompt.sh\\" codex; echo \\"specnaut: .specnaut/hooks changed since it was trusted — run specnaut upgrade, then /hooks\\" >&2; exit 0",
+            "command": "r=\$PWD; while [ -n \\"\$r\\" ] && [ ! -d \\"\$r/.specnaut/hooks\\" ]; do r=\${r%/*}; done; [ \\"\$( (sha256sum 2>/dev/null || shasum -a 256) < \\"\$r/.specnaut/hooks/SHA256SUMS\\" 2>/dev/null | cut -c1-64)\\" = \\"3643c4660789495270438c763705c894e1fb6fa3dc2d9063d2e5092db59fc222\\" ] && (cd \\"\$r/.specnaut/hooks\\" && (sha256sum -c --status SHA256SUMS 2>/dev/null || shasum -a 256 -c --status SHA256SUMS)) && exec bash \\"\$r/.specnaut/hooks/approve-on-prompt.sh\\" codex; echo \\"specnaut: .specnaut/hooks changed since it was trusted — run specnaut upgrade, then /hooks\\" >&2; exit 0",
             "timeout": 10
           }
         ]
@@ -31765,7 +32234,7 @@ f5552945f77fb0d24f56bbf2e97fb64d284d9c716abf211ebcbe081cacdf8bdf  _paths.sh
         "hooks": [
           {
             "type": "command",
-            "command": "r=\$PWD; while [ -n \\"\$r\\" ] && [ ! -d \\"\$r/.specnaut/hooks\\" ]; do r=\${r%/*}; done; [ \\"\$( (sha256sum 2>/dev/null || shasum -a 256) < \\"\$r/.specnaut/hooks/SHA256SUMS\\" 2>/dev/null | cut -c1-64)\\" = \\"0a408b298539104b7e50751c46c7a838a9a105d7dd61e73bf7509284f738e515\\" ] && (cd \\"\$r/.specnaut/hooks\\" && (sha256sum -c --status SHA256SUMS 2>/dev/null || shasum -a 256 -c --status SHA256SUMS)) && exec bash \\"\$r/.specnaut/hooks/approve-on-prompt.sh\\" codex; echo \\"specnaut: .specnaut/hooks changed since it was trusted — run specnaut upgrade, then /hooks\\" >&2; exit 0",
+            "command": "r=\$PWD; while [ -n \\"\$r\\" ] && [ ! -d \\"\$r/.specnaut/hooks\\" ]; do r=\${r%/*}; done; [ \\"\$( (sha256sum 2>/dev/null || shasum -a 256) < \\"\$r/.specnaut/hooks/SHA256SUMS\\" 2>/dev/null | cut -c1-64)\\" = \\"3643c4660789495270438c763705c894e1fb6fa3dc2d9063d2e5092db59fc222\\" ] && (cd \\"\$r/.specnaut/hooks\\" && (sha256sum -c --status SHA256SUMS 2>/dev/null || shasum -a 256 -c --status SHA256SUMS)) && exec bash \\"\$r/.specnaut/hooks/approve-on-prompt.sh\\" codex; echo \\"specnaut: .specnaut/hooks changed since it was trusted — run specnaut upgrade, then /hooks\\" >&2; exit 0",
             "timeout": 10
           }
         ]
@@ -31776,7 +32245,7 @@ f5552945f77fb0d24f56bbf2e97fb64d284d9c716abf211ebcbe081cacdf8bdf  _paths.sh
         "hooks": [
           {
             "type": "command",
-            "command": "r=\$PWD; while [ -n \\"\$r\\" ] && [ ! -d \\"\$r/.specnaut/hooks\\" ]; do r=\${r%/*}; done; [ \\"\$( (sha256sum 2>/dev/null || shasum -a 256) < \\"\$r/.specnaut/hooks/SHA256SUMS\\" 2>/dev/null | cut -c1-64)\\" = \\"0a408b298539104b7e50751c46c7a838a9a105d7dd61e73bf7509284f738e515\\" ] && (cd \\"\$r/.specnaut/hooks\\" && (sha256sum -c --status SHA256SUMS 2>/dev/null || shasum -a 256 -c --status SHA256SUMS)) && exec bash \\"\$r/.specnaut/hooks/log-subagent.sh\\" start; echo \\"specnaut: .specnaut/hooks changed since it was trusted — run specnaut upgrade, then /hooks\\" >&2; exit 0",
+            "command": "r=\$PWD; while [ -n \\"\$r\\" ] && [ ! -d \\"\$r/.specnaut/hooks\\" ]; do r=\${r%/*}; done; [ \\"\$( (sha256sum 2>/dev/null || shasum -a 256) < \\"\$r/.specnaut/hooks/SHA256SUMS\\" 2>/dev/null | cut -c1-64)\\" = \\"3643c4660789495270438c763705c894e1fb6fa3dc2d9063d2e5092db59fc222\\" ] && (cd \\"\$r/.specnaut/hooks\\" && (sha256sum -c --status SHA256SUMS 2>/dev/null || shasum -a 256 -c --status SHA256SUMS)) && exec bash \\"\$r/.specnaut/hooks/log-subagent.sh\\" start; echo \\"specnaut: .specnaut/hooks changed since it was trusted — run specnaut upgrade, then /hooks\\" >&2; exit 0",
             "timeout": 10
           }
         ]
@@ -31787,7 +32256,7 @@ f5552945f77fb0d24f56bbf2e97fb64d284d9c716abf211ebcbe081cacdf8bdf  _paths.sh
         "hooks": [
           {
             "type": "command",
-            "command": "r=\$PWD; while [ -n \\"\$r\\" ] && [ ! -d \\"\$r/.specnaut/hooks\\" ]; do r=\${r%/*}; done; [ \\"\$( (sha256sum 2>/dev/null || shasum -a 256) < \\"\$r/.specnaut/hooks/SHA256SUMS\\" 2>/dev/null | cut -c1-64)\\" = \\"0a408b298539104b7e50751c46c7a838a9a105d7dd61e73bf7509284f738e515\\" ] && (cd \\"\$r/.specnaut/hooks\\" && (sha256sum -c --status SHA256SUMS 2>/dev/null || shasum -a 256 -c --status SHA256SUMS)) && exec bash \\"\$r/.specnaut/hooks/log-subagent.sh\\" stop; echo \\"specnaut: .specnaut/hooks changed since it was trusted — run specnaut upgrade, then /hooks\\" >&2; exit 0",
+            "command": "r=\$PWD; while [ -n \\"\$r\\" ] && [ ! -d \\"\$r/.specnaut/hooks\\" ]; do r=\${r%/*}; done; [ \\"\$( (sha256sum 2>/dev/null || shasum -a 256) < \\"\$r/.specnaut/hooks/SHA256SUMS\\" 2>/dev/null | cut -c1-64)\\" = \\"3643c4660789495270438c763705c894e1fb6fa3dc2d9063d2e5092db59fc222\\" ] && (cd \\"\$r/.specnaut/hooks\\" && (sha256sum -c --status SHA256SUMS 2>/dev/null || shasum -a 256 -c --status SHA256SUMS)) && exec bash \\"\$r/.specnaut/hooks/log-subagent.sh\\" stop; echo \\"specnaut: .specnaut/hooks changed since it was trusted — run specnaut upgrade, then /hooks\\" >&2; exit 0",
             "timeout": 10
           }
         ]
