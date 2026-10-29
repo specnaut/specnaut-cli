@@ -11,16 +11,12 @@ export const CORE_BUNDLE: CoreBundle = [
     suffix: null,
     content: `---
 name: specnaut
-description: Specnaut workflow router — entry point for the spec-driven pipeline. \`/specnaut <phase> [args]\` dispatches to a single phase (plan, tasks, implement, review, merge, constitution, upgrade). \`/specnaut\` with no args prints the workflow overview.
-argument-hint: <plan|tasks|implement|review|merge|constitution|upgrade> [args]
+description: The Specnaut framework itself — \`/specnaut doc\` explains how it works, \`/specnaut list\` shows the skills and agents installed in this project, \`/specnaut upgrade\` updates the binary and the project's Specnaut files. Work on the project goes through \`/task\`; production through \`/ship\`.
+argument-hint: <doc|list|upgrade> [args]
 when_to_use: |
   Trigger phrases that should route here:
-  - plan: "plan a feature", "spec out a feature", "write a spec", "build a technical plan", "I have a rough idea", "help me figure out what to build", "I don't know exactly what I want yet", "clarify requirements"
-  - tasks: "generate tasks", "break down the plan"
-  - implement: "implement the feature", "start coding"
-  - review: "review the implementation", "run quality gates"
-  - merge: "merge the branch", "ship the feature"
-  - constitution: "update the constitution", "edit project rules"
+  - doc: "how does specnaut work", "explain specnaut", "what is /task"
+  - list: "which skills are installed", "list the specnaut agents"
   - upgrade: "upgrade specnaut", "update the specnaut templates", "get the latest specnaut"
 ---
 
@@ -28,179 +24,75 @@ when_to_use: |
 
 **Response style** — brevity, visual order, questions as selections, badge colours — follows the \`response-style-contract\` skill; read it, never restate it here.
 
-\`\$ARGUMENTS\` carries the user's input. Parse it as \`[--manual] [--manual-merge] <phase> [rest]\`:
+\`\$ARGUMENTS\` carries the user's input. The first token is the verb; everything after it is the
+verb's argument string. Nothing → render the verb table below and stop.
 
-1. **Chain mode parsing** — scan the tokens for \`--manual\`. It is the only chain flag.
-   - \`--manual\` present → CHAIN_MODE = \`off\` (run this one phase, then stop)
-   - absent → CHAIN_MODE = \`auto\` (the default)
+## Verbs
 
-   Then scan for \`--manual-merge\`: present → this run's merge mode is \`manual\` whatever
-   \`.specnaut/workflow.yml\` says (\`phases/auto-chain.md\` reads it). It does not stop the chain
-   anywhere else. Strip both before going further.
-
-2. **Phase extraction** — the first remaining token is the phase name. Everything after the first
-   whitespace is the argument string for that phase.
-
-3. **Empty arguments** — if no tokens remain after flag parsing (or \`\$ARGUMENTS\` was empty to start
-   with), render the **Workflow overview** below and stop. Do not pick a phase yourself.
-
-## Phase index
-
-| Phase | Reference | One-liner |
-|-------|-----------|-----------|
-| \`plan\` | \`phases/plan.md\` | The feature's **one** document: why, scenarios, requirements, criteria, the binding decision table, constitution check, surfaces, risks — then a mandatory architecture **and** security audit of the plan itself, then the stop. |
-| \`tasks\` | \`phases/tasks.md\` | The dependency-ordered breakdown, derived from the **approved** plan. |
-| \`implement\` | \`phases/implement.md\` | Build it. Ends by invoking \`review\` — an implementation not through review is not finished. |
-| \`review\` | \`phases/review.md\` | The quality battery on a frozen tree. Its verdict is the merge request. |
-| \`merge\` | \`phases/merge.md\` | Pre-merge validation and merge the feature branch. |
-| \`constitution\` | \`phases/constitution.md\` | Edit the project's \`constitution.md\` rules. |
+| Verb | Reference | One-liner |
+| :--- | :--- | :--- |
+| \`doc [topic]\` | \`phases/doc.md\` | How Specnaut works, its commands, harnesses and backends. |
+| \`list\` | \`phases/list.md\` | The skills and agents installed in this project, from \`.specnaut/installed.lock\`. |
 | \`upgrade\` | \`phases/upgrade.md\` | Update the \`specnaut\` binary if a newer one is out, run \`specnaut upgrade\`, verify, commit. |
+
+All three are one-shot; none chains.
 
 ## Which skill owns what
 
-Specnaut gives a project **three** skills, and they divide by what they own:
-
 | Skill | Owns |
 | :--- | :--- |
-| \`/board\` | the backlog — what we might do, and what we are doing |
-| \`/specnaut\` | the specification — what a thing is, and whether it is built right |
+| \`/task\` | one unit of work — from backlog item to merged branch, audits included |
+| \`/specnaut\` | the framework itself — its documentation, what is installed, upgrading it |
 | \`/ship\` | production — getting a built thing out the door |
-
-\`/specnaut\` owns the **specification** phases tied to the project, and code
-implementation, planning and review. It does **not** own going to production:
-tagging a version and publishing a release are \`/ship\`. Shipping has a
-different cadence, a different risk profile — irreversible, outward-facing, it
-triggers live pipelines — and a different audience from writing a plan.
-
-The line decides where a new capability lands, not where a file happens to sit
-today. Grooming is backlog management, so it is reached only as \`/board
-groom\` — this router does not carry a \`groom\` verb at all. Orphan
-spec detection sits on this side and lives in \`phases/auto-chain.md\`, because it
-reads spec artefacts and prescribes specnaut phases.
-
-\`phases/plan-audits.md\`, \`phases/merge-squash.md\`, \`phases/epic-commits.md\`,
-\`phases/quality-gates.md\`, \`phases/epic-fixups.md\`, \`phases/merge-close.md\`,
-\`phases/epic-loop.md\` and \`phases/auto-chain.md\` are **contract docs, not routable phases** — \`plan\` loads the first at its
-step 6, \`merge\` loads the second at its step 4, \`implement\` loads the third when the item is an epic,
-\`implement\` and \`merge\` share the fourth, \`merge\` loads the fifth before an epic merge and the sixth
-after any push, \`implement\` loads the seventh on an epic, and the router loads the eighth when it
-chains. Naming any of them as a phase prints the index and stops.
-
-Chainable phases are: \`plan\`, \`tasks\`, \`implement\`, \`review\`. The others (\`merge\`, \`constitution\`,
-\`upgrade\`) are one-shot regardless of chain mode.
-
-## Removed phases — this is deliberate, not a gap
-
-\`brainstorm\`, \`specify\`, \`clarify\` and \`analyze\` **no longer exist**, and neither do \`checklist\` and
-\`list-skills\`. If the user names one, print this phase index and stop — do not improvise the old
-behaviour, and do not route it silently.
-
-**\`tag-version\` and \`release-version\` are RETIRED, not unknown — they moved to
-\`/ship\`.** If the user names either, say so and name the new address:
-
-> Release concerns moved out of \`/specnaut\` and into \`/ship\`.
-> \`tag-version\` → \`/ship tag\` · \`release-version\` → \`/ship release\`
-
-Then stop. Do not route it silently, and do not print a bare "unknown phase" —
-that reads as a bug to someone following an instruction written before the
-split, which is exactly who arrives here.
-
-**\`audit\` is RETIRED in the same way.** If the user names \`audit\`, with or
-without an axis, in either spelling (\`audit security\`, \`audit-security\`), say
-so and name the skill that does that work now:
-
-> \`/specnaut audit\` is retired: each axis is its own skill, and it returns its
-> findings inline.
-> \`security\` → \`/sec-audit\` · \`performance\` → \`/perf-audit\` ·
-> \`accessibility\` → \`/a11y-audit\` · \`architecture\` → \`/arch-audit\` ·
-> \`dependencies\` → \`/dep-audit\` · every axis at once → \`/code-audit\`
-
-Then stop.
-
-| Gone | Where its work happens now |
-|------|----------------------------|
-| \`brainstorm\` | \`plan\`, step 1 — the discovery dialogue when the input is too fuzzy to plan. |
-| \`specify\` | \`plan\` — the same document, sections 1–4. |
-| \`clarify\` | \`plan\`, step 8 — questions asked at the stop, before any code exists. |
-| \`analyze\` | Replaced, not moved. With one document there are no artefacts to hold in agreement; the plan-time architecture and security audits are its successor and run *before* the code. |
-| \`checklist\` | \`plan\`'s success criteria and decision table. |
-| \`list-skills\` | \`.specnaut/installed.lock\` is readable directly. |
-| \`audit\`, \`audit-security\`, \`audit-performance\`, \`audit-accessibility\`, \`audit-architecture\`, \`audit-dependencies\` | The per-axis skills above, or \`/code-audit\` for all of them. |
 
 ## Routing
 
-1. **Read** the phase reference file (\`phases/<phase>.md\`) for the requested phase using the \`Read\`
-   tool.
-2. **Read the project addendum** \`.specnaut/addenda/specnaut/<phase>.md\` if it exists — the
-   project's own addition to this phase. It adds to the phase at the step it names and never
-   replaces or skips a bundled step: where it contradicts one, the bundled step stands and you say
-   so. No file means no addendum — say nothing about it. Contract docs take none; the parent phase's
-   addendum names their step.
-3. **Substitute** the stripped phase arguments for the phase's input.
-4. **Execute** the procedure in the reference file end-to-end, with the addendum applied.
-5. **Decide whether to chain** (see below).
+1. **Read** the verb's reference file with the \`Read\` tool.
+2. **Read the project addendum** \`.specnaut/addenda/specnaut/<verb>.md\` if it exists — the
+   project's own addition to that verb. It adds to the phase at the step it names and never replaces
+   or skips a bundled step: where it contradicts one, the bundled step stands and you say so. No
+   file means no addendum — say nothing about it.
+3. **Execute** the procedure end-to-end, with the addendum applied.
 
-Unknown phase → print the phase index and stop.
+## Retired addresses — this is deliberate, not a gap
 
-## Chain decision
+If the user names a verb or skill below, **do not run it, and do not improvise the old behaviour**.
+Print the one line naming its new address, then stop. A bare "unknown verb" reads as a bug to
+someone following an instruction written before the move, which is exactly who arrives here.
 
-After the phase procedure completes successfully:
+| Retired address | New address |
+| :--- | :--- |
+| \`/specnaut plan\` | \`/task plan\` |
+| \`/specnaut tasks\` | \`/task tasks\` |
+| \`/specnaut implement\` | \`/task implement\` |
+| \`/specnaut review\` | \`/task review\` |
+| \`/specnaut merge\` | \`/task merge\` |
+| \`/specnaut constitution\` | \`/task constitution\` |
+| \`/specnaut audit\` (any axis or spelling) | \`/task audit\` (\`--security\`, \`--archi\`, \`--perf\`, \`--a11y\`, \`--deps\`) |
+| \`/specnaut tag-version\` | \`/ship tag\` |
+| \`/specnaut release-version\` | \`/ship release\` |
+| \`/board\` | \`/task\` (\`list\`, \`next\`, \`add\`, \`close\`, \`groom\`, …) |
+| \`/board update\` | \`/task edit\` |
+| \`/code-audit\` | \`/task audit\` |
+| \`/sec-audit\` | \`/task audit --security\` |
+| \`/arch-audit\` | \`/task audit --archi\` |
+| \`/perf-audit\` | \`/task audit --perf\` |
+| \`/a11y-audit\` | \`/task audit --a11y\` |
+| \`/dep-audit\` | \`/task audit --deps\` |
 
-- \`CHAIN_MODE == off\` (the user passed \`--manual\`) → stop. Report the phase outcome.
-- Phase is not chainable (\`merge\`, \`constitution\`, \`upgrade\`) → stop.
-- Otherwise → read \`phases/auto-chain.md\` and follow it.
+The line to print: "\`<retired>\` moved to \`<new>\`." — then stop.
 
-**Re-entry needs no flag.** Invoking a phase whose downstream artefacts already exist runs one-shot
-— the user is re-running a single step. Invoking one whose downstream artefacts are absent chains —
-the user is resuming an interrupted flow. \`phases/auto-chain.md\` holds the detection table.
+\`/board\` and the \`*-audit\` skills are no longer installed, so the harness itself answers them as
+unknown; their rows are here so a reader looking for them finds the new address.
 
-## Workflow overview
-
-\`\`\`
-plan → tasks → implement → review → merge
-  ▲                          │        ▲
-  │                          └────────┘
-  │                     review is implement's
-  │                     mandatory last act
-  │
-  └── discovery (if fuzzy) → the one document
-      → architecture + security audit OF THE PLAN
-      → STOP 1
-\`\`\`
-
-**Autopilot is the default: the chain stops at most once, at the end of \`plan\`**, and only to ask
-what only the user can answer — business rules, scope, and anything irreversible, destructive,
-public-breaking or costly. Architecture, security and performance forks are settled by the expert
-seats and reported, never asked. Then it runs to a merged, **pushed** base branch and a closed
-backlog item without asking again.
-
-A second stop — the review verdict as the merge request, asked once — exists only when
-\`.specnaut/workflow.yml\` says \`merge: manual\`, or the run says so (\`--manual-merge\`, "stop before
-merging").
-
-Every other boundary is crossed by invoking the next phase yourself, in the same turn. See
-\`phases/auto-chain.md\`.
-
-## Typical flow
-
-\`\`\`
-/specnaut plan "Add OAuth2 login"
-  → discovery dialogue only if the brief is too fuzzy to plan
-  → writes plan.md (one document)
-  → architecture + security audits run concurrently on the plan
-  → STOP 1 — decided architecture, audit findings, the questions only you can answer
-  → /specnaut tasks       (same turn as the last answer)
-  → /specnaut implement   (same turn)
-  → /specnaut review      (same turn)
-  → /specnaut merge       (same turn — merges, pushes, closes the item)
-                          (merge: manual → STOP 2, verdict + "ready to merge?")
-\`\`\`
-
-To run a single phase only:
-
-\`\`\`
-/specnaut plan --manual "Add OAuth2 login"
-\`\`\`
+| Gone without a successor address | Where its work happens now |
+| :--- | :--- |
+| \`brainstorm\` | \`/task plan\`, step 1 — the discovery dialogue when the input is too fuzzy to plan. |
+| \`specify\` | \`/task plan\` — the same document, sections 1–4. |
+| \`clarify\` | \`/task plan\`, step 8 — questions asked at the stop, before any code exists. |
+| \`analyze\` | Replaced, not moved: the plan-time architecture and security audits run *before* the code. |
+| \`checklist\` | \`/task plan\`'s success criteria and decision table. |
+| \`list-skills\` | \`/specnaut list\`. |
 `,
     executable: false,
     backend: null,
@@ -208,7 +100,7 @@ To run a single phase only:
   },
   {
     category: "phase",
-    name: "specnaut",
+    name: "task",
     suffix: "plan.md",
     content: `## User Input
 
@@ -286,7 +178,7 @@ one and \`merge\`'s move to \`Done\`.
 <!-- END: spec-backend=local -->
 <!-- BEGIN: spec-backend=cloud -->
 This project stores specifications on SpecNaut Cloud. Do **NOT** create a git branch and do **NOT**
-write any \`.specnaut/specs/<n>/\` files here — the branch is created later, at \`/specnaut implement\`.
+write any \`.specnaut/specs/<n>/\` files here — the branch is created later, at \`/task implement\`.
 
 1. Determine the task number: use \`--issue <N>\` when the user passed one; otherwise
    \`specnaut spec push\` auto-creates a backlog task named from the feature and links it.
@@ -463,7 +355,7 @@ it. Answered means go. Pause only when the run was started with \`--manual\`.
   },
   {
     category: "phase",
-    name: "specnaut",
+    name: "task",
     suffix: "plan-audits.md",
     content: `# Plan audits — architecture and security, against the plan
 
@@ -548,7 +440,7 @@ between technical fixes.
   },
   {
     category: "phase",
-    name: "specnaut",
+    name: "task",
     suffix: "tasks.md",
     content: `
 ## User Input
@@ -785,7 +677,7 @@ Pause only when the run was started with \`--manual\`.
   },
   {
     category: "phase",
-    name: "specnaut",
+    name: "task",
     suffix: "implement.md",
     content: `
 ## User Input
@@ -834,7 +726,7 @@ You **MUST** consider the user input before proceeding (if not empty).
 
 <!-- BEGIN: spec-backend=cloud -->
 0. **Cloud spec setup** (spec backend = cloud): the spec lives on SpecNaut Cloud
-   and \`/specnaut plan\` created NO git branch. Before anything else, in this order:
+   and \`/task plan\` created NO git branch. Before anything else, in this order:
    - **Materialise the spec (pull-on-entry)** — run \`specnaut spec pull <task>\` ONCE
      now; it writes the spec's tabs to the gitignored \`.specnaut/specs/.cache/<task>/\`.
      Read the spec, plan, tasks, and the mandatory Domain Model block from that cache
@@ -850,7 +742,7 @@ You **MUST** consider the user input before proceeding (if not empty).
 2. Load and analyze the implementation context:
    - **REQUIRED**: Read tasks.md for the complete task list and execution plan
    - **REQUIRED**: Read plan.md for tech stack, architecture, and file structure
-   - **REQUIRED**: Read the domain model in the plan's technical-context section. If the section is absent, empty, or still contains \`[NEEDS CLARIFICATION]\` markers / template placeholders → halt and report BLOCKED with reason \`awaiting:product-owner-domain-brief\`. The developer agent refuses to write code without this brief — its "First action" checklist (step 4) reads the block and returns the same BLOCKED reason. Recommend re-running \`/specnaut plan\` to fill it before re-attempting \`/specnaut implement\`.
+   - **REQUIRED**: Read the domain model in the plan's technical-context section. If the section is absent, empty, or still contains \`[NEEDS CLARIFICATION]\` markers / template placeholders → halt and report BLOCKED with reason \`awaiting:product-owner-domain-brief\`. The developer agent refuses to write code without this brief — its "First action" checklist (step 4) reads the block and returns the same BLOCKED reason. Recommend re-running \`/task plan\` to fill it before re-attempting \`/task implement\`.
    - Read \`plan.md\` section 6 for the domain model — entities, value objects, invariants
    - Read \`plan.md\` section 8 for the surfaces touched and the interface contracts
    - **Read \`plan.md\` section 5 — the 🔒 decision table — and treat it as binding.** A decision
@@ -937,7 +829,7 @@ You **MUST** consider the user input before proceeding (if not empty).
    - Confirm the implementation follows the technical plan
    - Report final status with summary of completed work
 
-Note: tasks.md incomplete or missing → suggest \`/specnaut tasks\` first.
+Note: tasks.md incomplete or missing → suggest \`/task tasks\` first.
 
 10. **Check for extension hooks**: After completion validation, check
     \`hooks.after_implement\` in \`.specnaut/extensions.yml\` and follow the same
@@ -993,7 +885,7 @@ Pause only when the run was started with \`--manual\`.
   },
   {
     category: "phase",
-    name: "specnaut",
+    name: "task",
     suffix: "epic-commits.md",
     content: `# Epic commits — one commit per child, placeable from \`git log\` alone
 
@@ -1098,7 +990,7 @@ this file. Stop and say so rather than picking one.
   },
   {
     category: "phase",
-    name: "specnaut",
+    name: "task",
     suffix: "quality-gates.md",
     content: `# Quality gates — two tiers, declared by the project
 
@@ -1244,7 +1136,7 @@ them by hand. The tiers are an epic mechanism.
   },
   {
     category: "phase",
-    name: "specnaut",
+    name: "task",
     suffix: "epic-fixups.md",
     content: `# Folding an epic's fixups — one commit per child, still
 
@@ -1350,7 +1242,7 @@ back to the board, which is the whole thing #552 exists to produce.
   },
   {
     category: "phase",
-    name: "specnaut",
+    name: "task",
     suffix: "merge-close.md",
     content: `# Closing and reconciling after a merge
 
@@ -1462,7 +1354,7 @@ which shell cannot offer, but never resting in the state that lies.
 
     Backward-compat: feature trees without \`linked_issue\` (created before this field existed)
     skip the close silently. A feature delivered across several branches — the last one has not
-    landed yet — passes \`--no-close\` to \`/specnaut merge\` on every branch but the last: it skips
+    landed yet — passes \`--no-close\` to \`/task merge\` on every branch but the last: it skips
     this section, and the item closes when the last branch lands.
 
 12. **Reconcile the board** (only if push happened; github + gitlab backends only).
@@ -1521,7 +1413,7 @@ further. This is where they become Done.
    commands as the standalone path's step 8, after step 3's close. Not repeated here: a second
    copy is a second thing to keep in step with the first.
 
-   **Never per child.** \`/specnaut plan\` creates one directory per invocation and an epic is
+   **Never per child.** \`/task plan\` creates one directory per invocation and an epic is
    one branch over one tree carrying N child commits — a per-child removal would aim at the same
    directory N times, the first taking the plan out from under every child still to be closed.
 
@@ -1547,7 +1439,7 @@ a repository drift apart while both look healthy.
   },
   {
     category: "phase",
-    name: "specnaut",
+    name: "task",
     suffix: "epic-loop.md",
     content: `# The epic loop — one branch, one commit per child, one merge
 
@@ -1655,7 +1547,7 @@ parse.
   },
   {
     category: "phase",
-    name: "specnaut",
+    name: "task",
     suffix: "review.md",
     content: `
 ## User Input
@@ -1841,7 +1733,7 @@ Overall: PASS | FAIL
 
 If Overall = PASS, surface the verdict summary defined in
 \`phases/auto-chain.md\`, then follow the project's merge mode from that file:
-under \`auto\` (the default) invoke \`/specnaut merge\` in the same turn; under
+under \`auto\` (the default) invoke \`/task merge\` in the same turn; under
 \`manual\` ask for merge confirmation and invoke it on "yes". If FAIL, stop and
 report to the user.
 `,
@@ -1851,7 +1743,7 @@ report to the user.
   },
   {
     category: "phase",
-    name: "specnaut",
+    name: "task",
     suffix: "merge.md",
     content: `
 ## User Input
@@ -1911,7 +1803,7 @@ wanted pull requests will say so.
    body references but that list omits — mentioned, not closed. Report only. Then: report the PR URL and end. Nothing below this line applies, because nothing has merged
    yet. In particular the backlog item stays where it is — a PR that is open is not work that is
    done, and flipping the column now would make the board claim an outcome the repository cannot
-   corroborate. Re-run \`/specnaut merge\` (without \`--pr\`) after the PR lands, or let the forge's own
+   corroborate. Re-run \`/task merge\` (without \`--pr\`) after the PR lands, or let the forge's own
    close-keyword handle it.
 6. Run \`git checkout <base>\`.
 7. Run \`git merge --ff-only <feature-branch>\`. If fast-forward is not possible, stop and ask the
@@ -1919,16 +1811,16 @@ wanted pull requests will say so.
 8. Print the merge summary (files changed, commits merged).
 9. **Push \`<base>\` to \`origin\` — push without asking, in either merge mode.** Reaching this step
    *is* the instruction: the chain only invokes \`merge\` once the mode allowed it
-   (\`phases/auto-chain.md\` reads the mode, this phase does not), and a user typing \`/specnaut merge\`
+   (\`phases/auto-chain.md\` reads the mode, this phase does not), and a user typing \`/task merge\`
    asked for it. Asking again re-collects permission at the most expensive moment of the chain.
    **Under \`merge: manual\` a hook holds steps 7 and 9** until the user's own prompt in this turn
-   said \`merge\` or \`/specnaut merge\` (Claude Code shows its permission prompt instead, in its
+   said \`merge\` or \`/task merge\` (Claude Code shows its permission prompt instead, in its
    default modes). A refusal from it is not an obstacle to route around: quote it, tell the user
    the word to type, and stop on the branch.
    **If the push is rejected**, report the remote's exact message and stop: the merge stays on the
    local base branch (no reset), nothing is retried — never \`--force\`, never an automatic rebase —
    and the close below does not run. Name the recovery: \`git fetch\`, reconcile, re-run
-   \`/specnaut merge\`.
+   \`/task merge\`.
 10. **End on the base branch.** A merge is not finished while \`HEAD\` is still on the feature branch —
     landing the commits is half of it; the other half is that the person who asked is back where they
     work. Delete the merged branch (\`git branch -d\`, never \`-D\`: a refusal means the merge did not
@@ -2031,7 +1923,7 @@ like a completed merge when a PR is merely open is the failure this phase is mos
   },
   {
     category: "phase",
-    name: "specnaut",
+    name: "task",
     suffix: "merge-squash.md",
     content: `# Squash by scope — one commit per scope, never "exactly one commit"
 
@@ -2104,7 +1996,7 @@ rejected. That is precisely what \`--pr\` is for; it is not a reason for this ph
   },
   {
     category: "phase",
-    name: "specnaut",
+    name: "task",
     suffix: "constitution.md",
     content: `
 ## User Input
@@ -2338,21 +2230,622 @@ expected them to print.
     skipIfExists: false,
   },
   {
+    category: "phase",
+    name: "specnaut",
+    suffix: "doc.md",
+    content: `# /specnaut doc
+
+## User Input
+
+\`\`\`text
+\$ARGUMENTS
+\`\`\`
+
+Answers a question about Specnaut itself — how it works, its commands, harnesses, backlog backends,
+agents, and what changed between releases. One-shot; it changes nothing.
+
+## Steps
+
+1. **Dispatch the \`specnaut-guide\` agent** with the user's question (or "give an overview of
+   Specnaut" when \`\$ARGUMENTS\` is empty). It answers from the live docs at \`https://specnaut.com\`
+   and falls back to the vendored \`specnaut-facts\` skill when they cannot be fetched.
+2. **Relay its answer.** Name the commands it cites at their current addresses — \`/task\` for work,
+   \`/specnaut\` for the framework, \`/ship\` for production.
+3. **A question about this project's own work** (an item, a plan, a branch) is not a \`doc\`
+   question: name the \`/task\` verb that answers it and stop.
+`,
+    executable: false,
+    backend: null,
+    skipIfExists: false,
+  },
+  {
+    category: "phase",
+    name: "specnaut",
+    suffix: "list.md",
+    content: `# /specnaut list
+
+## User Input
+
+\`\`\`text
+\$ARGUMENTS
+\`\`\`
+
+Shows what Specnaut installed in this project. Read-only and one-shot.
+
+## Steps
+
+1. **Read \`.specnaut/installed.lock\`.** If it is absent, say that Specnaut is not installed here and
+   stop.
+2. **Group its entries** into skills and agents, from the paths this harness installs them under.
+   For each, give its name and the first sentence of its \`description\` frontmatter.
+3. **Mark local changes.** An entry whose file differs from its recorded hash is customised; name
+   it as such. A recorded file missing on disk is named as missing.
+4. **End with the three entry points**: \`/task\` for work, \`/specnaut\` for the framework, \`/ship\`
+   for production.
+`,
+    executable: false,
+    backend: null,
+    skipIfExists: false,
+  },
+  {
+    category: "phase",
+    name: "task",
+    suffix: "audit.md",
+    content: `# /task audit
+
+## User Input
+
+\`\`\`text
+\$ARGUMENTS
+\`\`\`
+
+\`\`\`text
+/task audit [--security] [--archi] [--perf] [--a11y] [--deps] [--path <subtree> | --range <a>..<b> | --diff | --last <n>]
+\`\`\`
+
+A **high-altitude, read-only** audit: it judges the *shape* of the code on one or more axes —
+layering, security exposure, performance cliffs, accessibility gaps, dependency risk — not a
+per-line PR review. It mutates **no tracked file**: \`git status\` is unchanged after a run. It is
+one-shot and never chains.
+
+- **One or more axis flags** → only those seats run.
+- **No axis flag** → every applicable seat runs, in parallel, and their findings are synthesized
+  into one report.
+
+## Step 1 — Parse the arguments
+
+Accept the axis flags above and at most one scope argument. Anything else → print the usage block
+above and **STOP**. Never silently fall back to a wider audit than the one asked for.
+
+## Step 2 — Resolve the scope
+
+Run the bundled scope resolver and read its block:
+
+\`\`\`bash
+.specnaut/scripts/audit/collect-audit-scope.sh [--path <subtree> | --range <a>..<b>] [--last <n>]
+\`\`\`
+
+- \`--diff\` is passed as \`--range "\$(git merge-base main HEAD)"..HEAD\`.
+- **An axis flag and no scope argument** → \`--path .\` (the whole repository).
+- **No axis flag and no scope argument** → pass nothing: the script auto-resolves, in priority
+  order, unpushed (\`origin/main..HEAD\`) → since the latest tag → the last N commits (default 20).
+
+The script prints a \`CODE-AUDIT SCOPE\` block: \`SCOPE\`, \`SCOPE_LABEL\`, \`COMMITS\`, \`FILES\`,
+\`TOTAL_FILES\`, and \`CATEGORY SIGNALS\` (\`FRONTEND_COUNT\`, \`TEST_COUNT\`, \`DEP_COUNT\`,
+\`INFRA_COUNT\`). If it exits non-zero (not a git repository), surface its error and stop.
+
+If \`TOTAL_FILES: 0\`, dispatch nothing. Emit exactly one line and stop — no report, no REVIEW
+SUMMARY:
+
+\`\`\`text
+Nothing to audit in this scope. Widen it with --path <subtree>, --range <a>..<b>, --diff, or --last <n>.
+\`\`\`
+
+## Step 3 — Select the seats
+
+| Flag | Seat | Agent | Applicable when (no flag given) |
+| :--- | :--- | :--- | :--- |
+| \`--archi\` | Architecture | \`architect-expert\` | scope non-empty (always) |
+| \`--security\` | Security | \`security-expert\` | scope non-empty (always) |
+| \`--perf\` | Performance | \`performance-expert\` | scope non-empty (always) |
+| \`--a11y\` | Accessibility | \`accessibility-expert\` | \`FRONTEND_COUNT > 0\` |
+| \`--deps\` | Dependency | \`dependency-expert\` | \`DEP_COUNT > 0\` |
+
+A flag the user named runs its seat whatever the signals say. With no flag, a seat whose gating
+signal is zero is skipped and the skip, with its reason, is recorded in the report's \`### Scope\`
+line. Only \`FRONTEND_COUNT\` and \`DEP_COUNT\` gate; \`TEST_COUNT\` and \`INFRA_COUNT\` describe the scope
+and select nothing — there is no test or infra seat. These are the **existing** expert agents; this
+verb defines none.
+
+## Step 4 — Dispatch every selected seat IN PARALLEL (one message)
+
+**One \`Agent\` call per seat, all in the same message** — never one after another. On Codex, one
+\`spawn_agent(agent_type="<agent>")\` per seat. Do not pass a \`model:\` override: each seat runs on the
+tier its agent file declares.
+
+Give each seat the same scope context (\`SCOPE_LABEL\`, the commit list, the file list) and an
+**audit framing** for its axis, plus the seat's knowledge-base instruction **verbatim**:
+
+- **Security** — "Before judging anything, read \`.specnaut/memory/security/00-triage.md\`, then
+  \`README.md\`, then the domain files its routing table selects for this scope. Report using the
+  finding format defined in \`00-triage.md\`." If the scope is obviously one-sided (a migration, an
+  auth module, a CI workflow), name the domain file yourself.
+- **Accessibility** — read \`.specnaut/memory/a11y/00-triage.md\` first — it sets Level A/AA scope,
+  the severity rubric, and what source cannot establish — then route by surface through
+  \`.specnaut/memory/a11y/README.md\`, and read the matching leaf's \`## When it is NOT a finding\`
+  before shipping each finding. Cite the criterion by number **and** name; downgrade to
+  \`Suspicion —\` at LOW anything it cannot attribute.
+- **Dependency** — read \`.specnaut/memory/security/06-supply-chain-and-integrity.md\` before writing
+  a finding; it owns the shape of the supply chain, the agent owns license policy, version currency
+  and per-manifest mechanics. Downgrade to \`Suspicion —\` at LOW anything it cannot cite.
+- **Architecture** and **Performance** — the framing alone; their agents carry their own
+  catalogues.
+
+Each seat states which sources it read and ends with the canonical \`REVIEW SUMMARY\` block. If a
+named knowledge base is absent, the seat says so in one line.
+
+## Step 5 — Report
+
+**One seat** → return its findings inline, with its \`REVIEW SUMMARY\` verbatim. Write no file.
+
+**Several seats** → wait for every one, then **merge → dedupe by \`file:line\` (keep the most
+detailed instance) → severity-rank** (critical > high > medium > low). A seat that errored or
+returned nothing is shown as \`errored\` / \`empty\` — **never silently dropped**.
+
+\`\`\`text
+## Audit — <SCOPE_LABEL>
+
+### Scope
+- <N commits>, <M files> | seats deployed: <list> | skipped: <seat (reason)>, …
+
+### Seats
+| Seat | Agent | Status | Findings |
+|------|-------|--------|----------|
+
+### 🏛 Architecture   ### 🔒 Security   ### ⚡ Performance   ### ♿ Accessibility   ### 📦 Dependency
+- (deployed seats only) findings, each \`file:line\` + suggested fix, deduplicated, severity-ranked.
+
+### Top issues to fix first
+1. …
+
+### Verdict: HEALTHY | NEEDS WORK | DEBT ACCRUING
+\`\`\`
+
+Then the aggregated block:
+
+\`\`\`text
+REVIEW SUMMARY
+REVIEW_SCOPE: audit <SCOPE_LABEL> (seats: <list>)
+REVIEW_VERDICT: pass | fail | needs_followup
+CRITICAL_COUNT: <sum>
+HIGH_COUNT: <sum>
+MEDIUM_COUNT: <sum>
+LOW_COUNT: <sum>
+TOP_ISSUES: <one sentence | none>
+RECOMMENDATION: <one sentence>
+\`\`\`
+
+**Dominance rule:** \`REVIEW_VERDICT\` is \`fail\` if **any** seat reported \`fail\`; else
+\`needs_followup\` if any seat reported \`needs_followup\`; else \`pass\`. The counts are per-seat sums.
+
+You may persist a multi-seat report at \`docs/specnaut/audits/YYYY-MM-DD-audit.md\` — the only write
+this verb ever makes; the audited code is never touched.
+`,
+    executable: false,
+    backend: null,
+    skipIfExists: false,
+  },
+  {
     category: "backlog-doc",
-    name: "board",
+    name: "task",
+    suffix: "backlog.md",
+    content: `# /task — backlog verbs
+
+\`list\`, \`next\`, \`add\`, \`edit\`, \`close\`, \`estimate\`, \`status\`, \`brief\` and \`<id>\`. The router
+(\`SKILL.md\`, beside this file) dispatched here; \`groom\` has its own document, \`groom.md\`. The
+backend is fixed at init time and recorded in \`.specnaut/installed.lock\`; run
+\`specnaut upgrade --backlog <new>\` to switch.
+
+| Input | Action |
+| --- | --- |
+| _(empty)_ or \`list\` | Backlog overview |
+| \`next\` | Recommend the top 3 items, with workflow advice |
+| \`add <title>\` | Create an item |
+| \`edit <id>\` | Update an existing item — title, body, status, fields |
+| \`close <id> [--not-planned]\` | Close the item: completed by default, not planned with the flag. Reopening undoes it; nothing is deleted. |
+| \`estimate <id>\` | Estimate complexity |
+| \`status\` | Dashboard summary |
+| \`brief <id>\` | Product-owner business brief |
+| \`<number>\` | Show that item |
+
+Every write — \`add\`, \`edit\`, \`close\`, \`estimate\` — is dispatched to the \`product-owner\` agent. After
+one, commit the backlog changes — \`chore(backlog): add task NNN — <short title>\`, or
+\`chore(backlog): update task NNN — <what changed>\`. Stage only the files the product-owner agent
+reports as touched. This applies to the local backend, where the backlog is files in the repo;
+remote backends have nothing to commit.
+
+The scripts under \`.specnaut/scripts/backlog/\` are the toolbox the PO uses. The main session may
+call the read-only ones (\`list.sh\`, \`view.sh\`) to inspect state, but every write goes through the
+PO.
+
+<!-- BEGIN: backend=local -->
+## Backend: local Markdown files
+
+This project's backlog lives entirely on disk under \`.specnaut/\`. No remote
+service required.
+
+| Path | Purpose |
+|---|---|
+| \`.specnaut/backlog.md\` | Top-level index — one line per item with status |
+| \`.specnaut/backlog/<NNN>-<slug>.md\` | One file per item (frontmatter + body) |
+
+### Scripts (preferred path)
+
+\`\`\`bash
+.specnaut/scripts/backlog/list.sh [Status]            # all items, optional Status filter
+.specnaut/scripts/backlog/view.sh <number>            # one item + body
+.specnaut/scripts/backlog/add.sh "<title>" [body]     # create new item, auto-numbered
+.specnaut/scripts/backlog/move.sh <number> <Status>   # Backlog|Ready|In progress|In review|Done
+.specnaut/scripts/backlog/clarify-comment.sh <num> "<question>"
+\`\`\`
+
+### Conventions
+
+- Items are numbered sequentially (\`001\`, \`002\`, …) — the \`add.sh\` script
+  picks the next free number.
+- Status is tracked in each item's YAML frontmatter and mirrored in the
+  index for fast listing.
+- **Closing** an item = move to \`Done\`. The file stays on disk as the
+  audit trail; nothing is deleted.
+- Bodies follow \`## Why\` / \`## Acceptance criteria\` / \`## Out of scope\`.
+- Titles are short imperatives ("Add docx skill", not "I want to add a docx skill").
+<!-- END: backend=local -->
+
+<!-- BEGIN: backend=github -->
+## Backend: GitHub Issues + Project
+
+This project's backlog lives on a GitHub Project linked to issues in the
+configured repo. Configuration is read from \`.specnaut/backlog-config.yml\`
+at runtime — fill in \`repo\` and \`project_number\` before running any
+mutation.
+
+### Configuration file
+
+\`\`\`yaml
+# .specnaut/backlog-config.yml
+repo: myorg/myproject              # GitHub repo (owner/name)
+project_number: <N>                # GitHub Project V2 number
+\`\`\`
+
+Both are placeholders; resolve the number with
+\`gh project list --owner <org>\`. A wrong \`project_number\` is invisible to
+\`list.sh\` / \`view.sh\` — they address the board through \`repo:\` alone — and
+refused up front by every writing script.
+
+### Two paths to GitHub: MCP (preferred) and shell (always available)
+
+Two ways to talk to GitHub from this project. Pick whichever fits your
+setup; the skill works either way.
+
+#### A. GitHub MCP — preferred when available
+
+If the **GitHub MCP server is wired up in Claude Code**, the PO
+subagent should call its tools directly: \`mcp__github__issue_write\`,
+\`mcp__github__issue_read\`, \`mcp__github__add_issue_comment\`,
+\`mcp__github__list_issues\`, \`mcp__github__search_issues\`, etc. They
+return structured data, no shell parsing needed.
+
+Two ways to enable the GitHub MCP:
+
+1. **Claude Code cloud connector (recommended)** — open a Claude Code
+   session in this project, run \`/mcp\`, choose **GitHub**, and complete
+   the OAuth flow. No file lives in this repo for that — it's stored
+   in your Claude Code account.
+
+2. **Self-hosted MCP** — add the official server to the project's
+   \`.mcp.json\` (creates the file if absent). Specnaut does NOT scaffold
+   this for you because it requires Node + a GitHub token; do it
+   manually:
+
+   \`\`\`json
+   {
+     "mcpServers": {
+       "github": {
+         "command": "npx",
+         "args": ["-y", "@modelcontextprotocol/server-github"],
+         "env": { "GITHUB_PERSONAL_ACCESS_TOKEN": "\${GITHUB_TOKEN}" }
+       }
+     }
+   }
+   \`\`\`
+
+   Then restart your Claude Code session.
+
+#### B. Shell scripts — always available
+
+The \`gh\` CLI scripts under \`.specnaut/scripts/backlog/\` are scaffolded
+unconditionally and work without MCP. They wrap \`gh issue\` / \`gh
+project\` calls and read configuration from \`backlog-config.yml\`.
+
+\`\`\`bash
+.specnaut/scripts/backlog/list.sh [Status]            # all items, optional Status filter
+.specnaut/scripts/backlog/view.sh <number>            # one issue + comments
+.specnaut/scripts/backlog/add.sh "<title>" [body] [labels-csv]
+.specnaut/scripts/backlog/move.sh <number> <Status>   # sets Project Status field
+.specnaut/scripts/backlog/clarify-comment.sh <num> "<question>"
+.specnaut/scripts/backlog/detect-fields.sh            # native fields → env lines
+.specnaut/scripts/backlog/groom-columns.sh [--set <key> <column|none>]  # columns grooming moves between
+.specnaut/scripts/backlog/set-field.sh <num> <Priority|Size|IssueType> <value>  # exit codes under Conventions
+.specnaut/scripts/backlog/ensure-labels.sh            # bootstrap the semantic labels (LABELS.md)
+\`\`\`
+
+For closing or editing, use \`gh\` directly:
+
+\`\`\`bash
+gh issue close  <num> --repo <repo> --reason completed     # or not_planned
+gh issue edit   <num> --repo <repo> --title "…" --body "…"
+\`\`\`
+
+#### Decision rule for the PO subagent
+
+When dispatched, the PO checks tool availability at runtime:
+
+1. If \`mcp__github__*\` tools are visible in the session, prefer them.
+2. Otherwise fall back to the shell scripts — so switching paths needs
+   no Specnaut change.
+
+### Conventions
+
+- **Titles** — short imperative phrases. Lowercase OK; no leading emoji.
+- **Bodies** — \`## Why\` / \`## Acceptance criteria\` / \`## Out of scope\`.
+- **Closing** — close the issue (don't just move to Done). The repo's
+  issue history is the audit trail.
+- **Drafts** are not used. Every task is a real issue.
+- **Batch every mutation — fewest requests possible.** Creating /
+  moving / closing / field-setting **multiple** items goes in **one
+  batched \`gh api graphql\` multi-alias mutation** (\`m1:\`, \`m2:\`, …), or
+  the REST batch equivalent — **never call-by-call**. Gather all node /
+  field / option ids in one query, then emit a single mutation. N items
+  → 1–2 requests, not N. This is the default (not an optimization): it
+  is what keeps grooming inside GitHub's REST + GraphQL rate limits.
+  Loop the per-item scripts only for a single item.
+- **Classification is mandatory — every created or clarified item
+  exits with Size, Priority, Issue Type, and at least one label.**
+  \`Priority\` / \`Size\` are native Project V2 single-select fields;
+  \`Issue Type\` (\`Task\` / \`Bug\` / \`Feature\`) is a native org-level
+  concept. Write all three through \`set-field.sh\` and **NEVER also
+  apply a matching \`priority:*\` / \`size:*\` / \`type:*\` label on an item
+  that already carries the native field or type** — that dual-signal
+  drift is exactly what the helper exists to prevent. Labels are
+  reserved as a strict fallback for projects / orgs without the native
+  field or type — or *temporarily* when the platform is rate-limiting and
+  a native write cannot land; the native field is always the goal, so
+  reconcile a label fallback back to it once unblocked. Exit codes:
+  \`10\` = field / type absent (use the label), \`11\` = value unrecognised
+  (Priority/Size: add the option, re-run; Issue Type: fix the call),
+  \`12\` = issue not on the project / not in the repo, \`13\` = discovery
+  failed or the project could not be verified — **not** a fallback
+  signal: retry or report it. \`2\` = the project demonstrably does not
+  exist: fix \`backlog-config.yml\`.
+
+### Prerequisites
+
+For the **shell path**: the \`gh\` CLI must be authenticated with the
+\`project\` scope. If \`gh project\` returns 404, run
+\`gh auth refresh -s project\`.
+
+For the **MCP path**: see "Two paths to GitHub" above.
+<!-- END: backend=github -->
+
+<!-- BEGIN: backend=gitlab -->
+## Backend: GitLab Issues + scoped Status labels
+
+This project's backlog lives on GitLab Issues, with workflow state
+tracked via scoped labels (\`Status::Backlog\`, \`Status::Ready\`,
+\`Status::"In progress"\`, \`Status::"In review"\`, \`Status::Done\`).
+GitLab doesn't have a Project Status field equivalent to GitHub's
+Projects V2 — scoped labels are the canonical way to model kanban-
+style state on GitLab.
+
+Configuration is read from \`.specnaut/backlog-config.yml\` at runtime —
+fill in \`host\` and \`project_id\` before running any mutation.
+
+### Configuration file
+
+\`\`\`yaml
+# .specnaut/backlog-config.yml
+host: gitlab.com         # or your self-hosted instance
+project_id: ""           # numeric id (e.g. "12345") or path "group/project"
+\`\`\`
+
+### Scripts (preferred path)
+
+\`\`\`bash
+.specnaut/scripts/backlog/list.sh [Status]            # all issues, optional Status:: filter
+.specnaut/scripts/backlog/view.sh <number>            # one issue + comments
+.specnaut/scripts/backlog/add.sh "<title>" [body] [labels-csv]
+.specnaut/scripts/backlog/move.sh <number> <Status>   # swaps the Status:: label
+.specnaut/scripts/backlog/clarify-comment.sh <num> "<question>"
+\`\`\`
+
+For closing or editing, use \`glab\` directly:
+
+\`\`\`bash
+glab issue close   <num> --repo <project_id>
+glab issue update  <num> --repo <project_id> --title "…" --description "…"
+\`\`\`
+
+### Conventions
+
+- **Titles** — short imperative phrases. Lowercase OK; no leading emoji.
+- **Bodies** — \`## Why\` / \`## Acceptance criteria\` / \`## Out of scope\`.
+- **Status** — set by adding/swapping a \`Status::*\` scoped label.
+  Scoped labels are mutually exclusive on the same scope, so swapping
+  is atomic.
+- **Closing** — close the issue (don't just move to Done). The repo's
+  issue history is the audit trail.
+- **Drafts** are not used. Every task is a real issue.
+
+### Prerequisites
+
+The \`glab\` CLI must be installed and authenticated.
+
+- Install: https://gitlab.com/gitlab-org/cli
+- Authenticate: \`glab auth login\` (use the same host as in
+  \`backlog-config.yml\`)
+
+The first time the PO runs against this project, it will create the 5
+\`Status::*\` scoped labels if they don't exist (\`Backlog\`, \`Ready\`,
+\`In progress\`, \`In review\`, \`Done\`).
+<!-- END: backend=gitlab -->
+
+<!-- BEGIN: backend=cloud -->
+## Backend: Specnaut Cloud
+
+This project's backlog lives on **Specnaut Cloud** — a hosted, real-time Kanban
+board reached over a small HTTP API. No \`gh\`/\`glab\` CLI and no GitHub/GitLab
+rate limits. Configuration is read from \`.specnaut/backlog-config.yml\` at
+runtime.
+
+### Configuration file
+
+\`\`\`yaml
+# .specnaut/backlog-config.yml
+backend: cloud
+api_url: https://api.specnaut.com               # optional — defaults to Specnaut Cloud
+project_key: CLOUD                              # the project's short key
+\`\`\`
+
+**No token is stored here.** Credentials are obtained by \`specnaut cloud login\`
+(an interactive browser device-authorization flow) and kept in the OS keychain
+(or a \`0600\` file under \`~/.specnaut\`). They refresh transparently. For CI /
+headless runs, set \`SPECNAUT_CLOUD_TOKEN\` to a Cloud API token instead of
+logging in.
+
+### Scripts
+
+\`\`\`bash
+.specnaut/scripts/backlog/list.sh [Status]            # all tasks (status = column), optional filter
+.specnaut/scripts/backlog/view.sh <number>            # one task (status, priority, size, body)
+.specnaut/scripts/backlog/add.sh "<title>" [body]     # create a task → returns KEY-N
+.specnaut/scripts/backlog/move.sh <number> <Status>   # Backlog|Ready|"In Progress"|"In Review"|Done
+.specnaut/scripts/backlog/clarify-comment.sh <number> "<question>"
+.specnaut/scripts/backlog/columns.sh                  # live board column layout (order + name)
+.specnaut/scripts/backlog/reconcile.sh [--reset|--seek-end] [--limit N]  # drain stage transitions
+\`\`\`
+
+The scripts get a fresh access token from \`specnaut cloud token\` (which refreshes
+it transparently) and authenticate with \`Authorization: Bearer <token>\`, talking
+to \`<api_url>/api/v1/\` (\`/tasks\`, \`/columns\`, \`/activity\`). \`move.sh\` passes a
+**status name** (the column name); the API resolves it to the column
+server-side. \`columns.sh\` reads the board's real columns (renames/reorders are
+reflected with no code change). \`reconcile.sh\` is the **poll/reconcile** feed:
+it asks \`/activity\` for every stage transition newer than a stored per-project
+cursor (\`.specnaut/.cloud-cursor-<KEY>\`), prints one line per transition, and
+advances the cursor — the product-owner consumes those lines and runs the
+matching stage hook (see \`product-owner.md\` → "Cloud stage reconcile").
+
+### Prerequisites
+
+- \`curl\` and \`jq\` on PATH, and the \`specnaut\` CLI on PATH (the scripts call
+  \`specnaut cloud token\`).
+- Authenticated once via \`specnaut cloud login\` (or \`SPECNAUT_CLOUD_TOKEN\` set
+  for headless / CI).
+
+### Stage reconcile (poll model)
+
+The product-owner reacts to board moves by **polling**, not a webhook — the CLI
+has no daemon. Run \`reconcile.sh\` by hand or on a recurring cadence (Claude
+Code: \`/loop\`); it drains stage transitions since the cursor and prints one
+line each (\`CREATED <n> -> <stage>\` / \`MOVED <n> <from> -> <to>\`). For each
+line the PO resolves the destination against \`columns.sh\` (canonical names,
+case-insensitive) and runs the mapped hook — parity with a GitHub Projects
+board, just poll-triggered:
+
+| Destination stage | Hook |
+|---|---|
+| **Backlog / Ready** (incl. \`CREATED\`) | **Classify** — ensure priority/size/type per the mandatory classification contract; skip if already set. |
+| **In Review** | *(opt-in, off by default)* post a review-readiness checklist comment. |
+| **Done** | *(opt-in, off by default)* post a closing-summary comment; run the board-hygiene check. |
+| **In Progress** / any unmapped column | **No-op** — never invent behaviour for an unmapped stage. |
+
+Rules: **idempotent** (delivery is at-least-once — read \`view.sh\` before
+writing, never double-post or re-classify); **comments are opt-in** (if the
+board posts its own stage comments, leave In Review / Done off to avoid
+duplicates — classification is the always-on parity behaviour); **public API
+only** (act through the \`*.sh\` wrappers; reference only column names + task
+numbers). First run replays history — \`reconcile.sh --seek-end\` fast-forwards
+an existing board to "from now".
+
+### Not yet on the Cloud backend
+
+- Epics / sub-tasks and label management are not exposed over the API yet —
+  use the board UI for those for now.
+<!-- END: backend=cloud -->
+
+## Epics & sub-tasks
+
+Big work that needs decomposition lives as a parent **epic** with one or
+more **sub-tasks**. The link mechanism differs per backend, but the PO
+contract is the same: parents cannot close while any child is open.
+
+| Backend | Parent → child link | Discoverability |
+|---|---|---|
+| local | \`parent: "#NNN"\` in the child's frontmatter, plus a \`## Sub-tasks\` cross-link added to the parent file's body | \`grep -l 'parent: "#042"' .specnaut/backlog/*.md\` lists every child of #042 |
+| github | Native sub-issues API (\`gh api -X POST .../issues/<parent>/sub_issues\`) | Project V2 boards render the children automatically under the parent's \`Sub-issues progress\` field |
+| gitlab | Scoped label \`parent::#NNN\` on the child (Free-tier compatible; native Epics are Premium-only) | \`glab issue list --label "parent::#042" --opened\` lists every child of #042 |
+
+**Creating a child:** \`add.sh --parent <num>\` does the right thing on
+every backend — writes the link, attaches to the project/board, and
+fails fast if the named parent doesn't exist (exit 3).
+
+**Closing a parent:** \`cascade-check.sh <num>\` (github + gitlab) is the
+close gate — exits 11 with the open children listed when close is
+unsafe, exits 0 when all children are closed. The PO must run it before
+\`gh issue close\` / \`glab issue close\`. The local backend uses an
+inline grep equivalent.
+
+**Finding a child's parent:** \`parent-of.sh <num>\` (github + gitlab) is
+\`cascade-check.sh\` read from the other end — given a child it prints its
+parent's number and exits 0, exits **10** when the item has no parent, and
+exits 3 when it could not ask. Those last two are separate codes on purpose:
+"this is a standalone item" and "the lookup failed" would otherwise be
+indistinguishable, and a caller branches the same way on each. Branch creation
+uses it to put a whole epic on one branch.
+
+**Auto-detection:** the bundled \`product-owner\` agent proactively
+detects epic-worthy requests (>5 AC bullets, scope crosses ≥2
+subsystems, trigger phrases like "break down" / "phased" / "as an
+epic") and either auto-decomposes or proposes a concrete sub-task list
+— see the "Epic detection heuristic" section of the \`product-owner\`
+agent.
+
+## When NOT to use these verbs
+
+- The user is implementing a backlog item — that's \`/task implement\`; return
+  here only to update the item's status afterwards.
+- The user asks about another project's backlog — these verbs are wired to
+  this project only.
+`,
+    executable: false,
+    backend: null,
+    skipIfExists: false,
+  },
+  {
+    category: "backlog-doc",
+    name: "task",
     suffix: "groom.md",
     content: `# groom — board and delivery hygiene
 
 Keeps the backlog and delivery pipeline flowing without human intervention.
-Reachable as **\`/board groom\`** — the only door. The \`/specnaut\` router
-carries no \`groom\` verb.
+Reachable as **\`/task groom\`** — the only door.
 
-**Owned by \`/board\`** — see "Which skill owns what" in \`SKILL.md\`. Orphan
+**Owned by \`/task\`** — see "Which skill owns what" in \`SKILL.md\`. Orphan
 **spec** detection is not owned here; step 4 says where it lives and runs it.
 
 Auto-invocable: the router advertises "groom the backlog" and "run a hygiene
 pass", and this file honours them. Also invoked explicitly, or scheduled with
-\`/loop 1h /board groom\`.
+\`/loop 1h /task groom\`.
 
 ## What this pass does
 
@@ -2364,7 +2857,7 @@ by the agent that has the right tools and prompt for the job.
 
 Dispatch the **\`product-owner\`** subagent to groom the items in the board's
 intake column. **Grooming ends with a promotion** — the rule is in the PO's own
-\`/board groom\` contract; name it in the dispatch, do not restate it here.
+\`/task groom\` contract; name it in the dispatch, do not restate it here.
 
 **Resolve the columns once per run** (GitHub: \`groom-columns.sh\`). Exit \`0\`
 prints \`INTAKE\` / \`READY\` (\`PROMOTE=no\`: the user chose not to promote — report
@@ -2518,12 +3011,12 @@ output verbatim, summary line included. The script's header documents what each
 line means; do not restate it, or the two definitions will drift.
 
 **Read-only — report, never move.** Correcting drift belongs to
-\`/specnaut merge\`, which already owns board mutations; a detector that also
+\`/task merge\`, which already owns board mutations; a detector that also
 mutates cannot be run freely on a schedule.
 
 ### 3. Stale PR surface
 
-**Only when the project actually opens pull requests** — \`/specnaut merge\` opens
+**Only when the project actually opens pull requests** — \`/task merge\` opens
 none unless \`--pr\` is passed, so otherwise say the step does not apply rather
 than reporting an empty section forever.
 
@@ -2542,7 +3035,7 @@ The walk stays there — naming it here twice makes one copy the half that rots.
 Ownership says where the logic lives, not who may call it; saying only the
 first is what left this check unreachable from anything scheduled.
 
-The path is relative to the **specnaut** skill, beside \`phases/plan.md\`; under
+The path is relative to the **task** skill, beside \`phases/plan.md\`; under
 a harness that flattens phases into siblings, whatever it named that document.
 
 Read-only, like the two checks above: never delete or modify a spec file.
@@ -2593,7 +3086,7 @@ priority contract was honoured.
   subagent directly with the item number.
 - For PR review on a specific PR → invoke \`code-reviewer\` /
   \`security-expert\` directly.
-- For implementing a spec → invoke \`/specnaut implement\` directly.
+- For implementing a spec → invoke \`/task implement\` directly.
 `,
     executable: false,
     backend: null,
@@ -2601,11 +3094,11 @@ priority contract was honoured.
   },
   {
     category: "backlog-doc",
-    name: "board",
+    name: "task",
     suffix: "groom-report.md",
     content: `# Groom report — the output contract
 
-Loaded by the board skill's \`groom\` pass at its end. Split out of \`groom.md\`
+Loaded by the task skill's \`groom\` pass at its end. Split out of \`groom.md\`
 under #562: the pass and the shape of its report change for different reasons,
 and the report is a contract worth reading on its own.
 
@@ -2716,11 +3209,11 @@ to be a **no-op when the project is healthy**.
   },
   {
     category: "backlog-doc",
-    name: "board",
+    name: "task",
     suffix: "spec-autogen.md",
     content: `# Auto-generate a task's spec at creation (cloud, opt-in)
 
-Loaded from the board skill when this project has \`spec_autogen: true\` in
+Loaded from the task skill when this project has \`spec_autogen: true\` in
 \`.specnaut/installed.lock\` **and** stores its specs on SpecNaut Cloud. When either is
 false the skill does not point here and task creation is unchanged.
 
@@ -2755,7 +3248,7 @@ when_to_use: |
   - "tag a version", "create a release tag", "bump the version"
   - "release notes", "generate the changelog for the tag"
   - "publish v1.2.0", "release the tag we pushed yesterday"
-  Do NOT route here for merging a feature branch — that is \`/specnaut merge\`.
+  Do NOT route here for merging a feature branch — that is \`/task merge\`.
 ---
 
 # Ship skill
@@ -2766,14 +3259,14 @@ Specnaut gives a project three skills, and they divide by what they own:
 
 | Skill | Owns |
 | :--- | :--- |
-| \`/board\` | the backlog — what we might do, and what we are doing |
-| \`/specnaut\` | the specification — what a thing is, and whether it is built right |
+| \`/task\` | one unit of work — from backlog item to merged branch, audits included |
+| \`/specnaut\` | the framework itself — its documentation, what is installed, upgrading it |
 | **\`/ship\`** | **production — getting a built thing out the door** |
 
-Shipping is not a specification concern. It has a different cadence, a
-different risk profile — irreversible, outward-facing, it triggers live
-pipelines — and a different audience. That is why it is its own verb rather
-than a phase of the router that writes plans.
+Shipping is not part of delivering a unit of work. It has a different cadence,
+a different risk profile — irreversible, outward-facing, it triggers live
+pipelines — and a different audience. That is why it is its own skill rather
+than a verb of the router that writes plans.
 
 ## The three paths
 
@@ -2872,7 +3365,7 @@ deploy. Before either:
 - **It does not run tests or quality gates.** Run them before shipping; that
   contract is project-specific and lives outside this skill.
 - **It does not merge anything.** Landing a feature branch is
-  \`/specnaut merge\`.
+  \`/task merge\`.
 `,
     executable: false,
     backend: null,
@@ -3232,11 +3725,11 @@ The script emits the body verbatim. Do NOT:
   },
   {
     category: "phase",
-    name: "specnaut",
+    name: "task",
     suffix: "auto-chain.md",
     content: `# Auto-chain control
 
-This file carries the chain mechanics the \`/specnaut\` router follows after a chainable phase
+This file carries the chain mechanics the \`/task\` router follows after a chainable phase
 (\`plan\` to \`review\`) completes — unless \`--manual\` was passed, or downstream artefacts show a single
 step is being re-run.
 
@@ -3267,7 +3760,7 @@ plan → tasks → implement → review → merge → push
 
    **Under \`merge: manual\` in the file, a hook holds the landing whatever the run said** (D3). The
    landing hook asks the same script (\`--strict\`) and holds every merge into, and push of, the base
-   branch until the user's own prompt in that turn says \`merge\` or \`/specnaut merge\`. A per-run
+   branch until the user's own prompt in that turn says \`merge\` or \`/task merge\`. A per-run
    "merge it" moves the chain; it does not lift the file.
 
    - **\`auto\`** — no stop. A verdict with no unresolved CRITICAL or HIGH finding invokes \`merge\`
@@ -3384,7 +3877,7 @@ After merge, the chain ends.
 
 ## Re-entry, without a flag
 
-When the user invokes a phase directly (\`/specnaut implement\`, \`/specnaut review\`), decide from what
+When the user invokes a phase directly (\`/task implement\`, \`/task review\`), decide from what
 is on disk:
 
 - **Downstream artefacts missing** → chain. The user is resuming an interrupted flow (a long
@@ -3425,20 +3918,20 @@ project at rest, and names the phase each stalled feature is missing. It reads s
 prescribes specnaut phases, so it lives here rather than in \`groom\`.
 
 Run it when asked to audit the spec pipeline, and from a grooming pass when the project keeps specs
-locally — \`board/groom.md\` step 4 is the caller, under the same \`.specnaut/specs/\` condition.
+locally — \`task/groom.md\` step 4 is the caller, under the same \`.specnaut/specs/\` condition.
 
 Walk \`.specnaut/specs/\` (if present) and surface any feature directory
 that is missing the next expected artefact.
 
 **Current-pipeline artefacts** — a 3.x feature produces these in this order:
 
-- Has \`plan.md\` but no \`tasks.md\` → flag as "needs \`/specnaut tasks\`".
+- Has \`plan.md\` but no \`tasks.md\` → flag as "needs \`/task tasks\`".
 - Has \`tasks.md\` but no \`installed\` markers in commits → flag as
-  "needs \`/specnaut implement\`".
+  "needs \`/task implement\`".
 
 **Legacy, pre-3.x only** — kept deliberately, not an oversight:
 
-- Has \`spec.md\` but no \`plan.md\` → flag as "needs \`/specnaut plan\`".
+- Has \`spec.md\` but no \`plan.md\` → flag as "needs \`/task plan\`".
 
   **3.x writes no \`spec.md\`.** The artefact was removed in 2.0.0 and no phase
   produces one, so this rule can only ever match a feature directory left
@@ -4807,7 +5300,7 @@ Enhanced fork of [\`specify\` CLI](https://github.com/github/spec-kit), distribu
 
 **Harnesses:** claude, cursor, codex, copilot, opencode, antigravity — all share \`templates/core/\` content, mapped per-harness by an adapter.
 
-**Different from upstream Spec Kit:** auto-chained pipeline (\`/specnaut plan\` chains all phases); dedicated \`review\` phase after implement; backlog as product source of truth via \`product-owner\` agent (backends: local, github, gitlab, cloud); Claude Code plugin distribution (the \`specnaut-cockpit\` plugin from the \`specnaut-marketplace\` marketplace).
+**Different from upstream Spec Kit:** auto-chained pipeline (\`/task plan\` chains all phases); dedicated \`review\` phase after implement; backlog as product source of truth via \`product-owner\` agent (backends: local, github, gitlab, cloud); Claude Code plugin distribution (the \`specnaut-cockpit\` plugin from the \`specnaut-marketplace\` marketplace).
 
 **Bundled agents:** product-owner, developer, review-coordinator, code-reviewer, security-expert, test-reviewer, qa-tester, workflow-manager, devops-sre, specnaut-guide, architect-expert, performance-expert, accessibility-expert, dependency-expert, ui-ux-designer.
 
@@ -4823,9 +5316,17 @@ Enhanced fork of [\`specify\` CLI](https://github.com/github/spec-kit), distribu
 - \`specnaut self-update\` — replace binary with latest release, verifying SHA256.
 - \`specnaut --version\` — print binary + bundled templates version.
 
+### Skills
+
+- \`/task\` — one unit of work: backlog (\`list\`, \`next\`, \`add\`, \`edit\`, \`close\`, \`groom\`), pipeline (\`plan\`, \`tasks\`, \`implement\`, \`review\`, \`merge\`), \`audit\` (\`--security\`, \`--archi\`, \`--perf\`, \`--a11y\`, \`--deps\`; every applicable axis with no flag), \`constitution\`.
+- \`/specnaut\` — the framework: \`doc\`, \`list\`, \`upgrade\`.
+- \`/ship\` — production: \`tag\`, \`release\`.
+
+Before 7.2 the pipeline, the backlog and the audits lived at other addresses; the \`specnaut\` skill's **Retired addresses** table maps each to its new one, and \`specnaut upgrade\` moves them.
+
 ### Backlog conventions (GitHub backend)
 
-\`Priority\` (P0–P3) and \`Size\` (XS–XL) via Project V2 native fields (\`set-field.sh\`); fall back to \`priority:*\`/\`size:*\` labels when the native field is absent. Two-step close: \`gh issue close --reason completed\` first, then \`move.sh <num> Done\` — moving first makes a sweep report the open card in Done as drift. \`/board groom\` catches items closed via paths that bypassed the move step.
+\`Priority\` (P0–P3) and \`Size\` (XS–XL) via Project V2 native fields (\`set-field.sh\`); fall back to \`priority:*\`/\`size:*\` labels when the native field is absent. Two-step close: \`gh issue close --reason completed\` first, then \`move.sh <num> Done\` — moving first makes a sweep report the open card in Done as drift. \`/task groom\` catches items closed via paths that bypassed the move step.
 
 ### Design principles
 
@@ -4981,7 +5482,7 @@ mutating anything.
 
 - Hosted board over \`/api/v1\` via the bundled \`*.sh\` wrappers. **Read
   \`columns.sh\` first** (the board's names, never the GitHub set); poll
-  \`reconcile.sh\` for moves. Mechanics: the \`/board\` skill ("Specnaut Cloud",
+  \`reconcile.sh\` for moves. Mechanics: the \`/task\` skill ("Specnaut Cloud",
   "Stage reconcile"). Public API only.
 
 ## Frontmatter schema (local Markdown — mandatory)
@@ -5011,7 +5512,7 @@ frontmatter. Exit 3 = parent doesn't exist.
 
 ### Epic detection heuristic
 
-Propose decomposition on every \`/board add\` and during grooming.
+Propose decomposition on every \`/task add\` and during grooming.
 
 **Triggers:** phrases like "break down" / "phased" / "rewrite" /
 "end-to-end"; >5 AC bullets; scope crosses ≥2 subsystems; size L/XL.
@@ -5060,19 +5561,19 @@ Total > 7 → critical, 5–7 → high, 3–5 → medium, < 3 → low.
 
 ## Commands
 
-### \`/board\` or \`/board list\`
+### \`/task\` or \`/task list\`
 
 Display the backlog. Local: render \`.specnaut/backlog.md\` (recompose
 from task files if the index drifted). GitHub: list issues grouped by
 priority / project status.
 
-### \`/board next\`
+### \`/task next\`
 
 Recommend the top 3 tasks. For each: business justification, domain
 context, workflow recommendation (spec vs direct), quick-win flag (≤3
 pts), exact start command. Skip sub-tasks whose parent epic isn't ready.
 
-### \`/board add <title>\`
+### \`/task add <title>\`
 
 Create a new task. Local: write \`.specnaut/backlog/NNN-slug.md\` with full
 frontmatter and update \`.specnaut/backlog.md\`. GitHub: \`gh issue create\`
@@ -5083,30 +5584,30 @@ on creation (frontmatter \`parent: "#042"\` locally, sub-issue API on GitHub).
 Every created task MUST exit fully classified per the "Mandatory
 classification contract" above — same dispatch, not a follow-up.
 
-### \`/board update <id>\`
+### \`/task edit <id>\`
 
 Update an existing task (status, priority, complexity, notes, parent link).
 Sync the index on the local backend; use \`gh issue edit\` on GitHub.
 
-### \`/board estimate <id>\`
+### \`/task estimate <id>\`
 
 Detailed complexity estimate. If the work exceeds one task, apply the
 "Epic detection heuristic" above.
 
-### \`/board status\`
+### \`/task status\`
 
 Dashboard: counts, total points, velocity, open epics with ≥1 open child.
 
-### \`/board groom\`
+### \`/task groom\`
 
-Full grooming per the \`/board\` skill's \`groom.md\`: review priorities,
+Full grooming per the \`/task\` skill's \`groom.md\`: review priorities,
 re-estimate, flag blockers, audit epic / sub-task hygiene, classify on the spot.
 **It ends with a promotion**: a groomed item moves from the board's intake
 column to its ready column (default \`Backlog\` → \`Ready\`), so the next run skips
 it. Groomed but unmoved is the failure; only open scope decisions keep it in
 intake. Report failed moves. Never promote Ready → In progress.
 
-### \`/board brief <id>\`
+### \`/task brief <id>\`
 
 Generate a PO business brief for a developer: purpose, business rules,
 user stories, gotchas, acceptance criteria. If the task is in an epic,
@@ -5121,17 +5622,18 @@ otherwise it lives in the issue / task file.
 **Gate:** a brief without a Domain Model is incomplete. If you lack
 information to populate it, clarify with the user first.
 
-### \`/board epic <id>\`
+### \`/task <id>\`
 
-Show an epic with all its sub-tasks (status, complexity, owner). Useful
-before estimating epic completion or reporting progress.
+Show that item. On an epic, show it with all its sub-tasks (status,
+complexity, owner) — useful before estimating epic completion or reporting
+progress.
 
 ## Rules
 
 - **Batch platform mutations; native fields over labels.** Bulk creates /
   moves / closes / field-sets in the fewest requests (one multi-alias
   \`gh api graphql\` / REST batch), never call-by-call; native field/type
-  over a duplicate \`priority:*\`/\`size:*\` label. Detail: \`/board\` skill.
+  over a duplicate \`priority:*\`/\`size:*\` label. Detail: \`/task\` skill.
 - Never delete task files — change status to \`done\` or \`deferred\`.
 - Respect dependencies — don't recommend blocked tasks.
 - Respect epic semantics — never close a parent while children remain open.
@@ -5183,7 +5685,7 @@ architecture.
    (A directory scaffolded before 2.0.0 may also carry \`spec.md\` and friends;
    read them if present, but never require them.)
 4. **Read the domain model** — \`plan.md\` § 6 (Technical context → Domain
-   model) on the spec path, or the Product Owner's \`/board brief\` output on
+   model) on the spec path, or the Product Owner's \`/task brief\` output on
    the direct-implementation path. If it is absent or empty, return BLOCKED
    with reason \`awaiting:product-owner-domain-brief\` and stop. Do not proceed
    without it.
@@ -5313,7 +5815,7 @@ needs to make in the prose and the \`BLOCKERS\` field.
     suffix: null,
     content: `---
 name: review-coordinator
-description: Coordinates parallel structural review agents (code, security, tests) and aggregates their findings. Use when /specnaut review is running Phase 1.
+description: Coordinates parallel structural review agents (code, security, tests) and aggregates their findings. Use when /task review is running Phase 1.
 model: opus
 effort: high
 tools: Read, Grep, Glob, Bash, Agent(code-reviewer, security-expert, test-reviewer)
@@ -5328,7 +5830,7 @@ in parallel and aggregate results.
 ## Inputs
 
 - The list of files changed in the current feature branch (provided by
-  \`/specnaut review\`).
+  \`/task review\`).
 
 ## Protocol
 
@@ -5477,7 +5979,7 @@ and, when handing the gate result back, the \`HANDOFF\` block per
     suffix: null,
     content: `---
 name: code-reviewer
-description: Reviews code quality, architecture, DRY/YAGNI, readability, and conformance to the project constitution. Spawned by the review-coordinator during /specnaut review.
+description: Reviews code quality, architecture, DRY/YAGNI, readability, and conformance to the project constitution. Spawned by the review-coordinator during /task review.
 model: opus
 effort: high
 tools: Read, Grep, Glob
@@ -5561,7 +6063,7 @@ rule that mentions only counts reads that as clean. Then emit the
     suffix: null,
     content: `---
 name: security-expert
-description: Reviews code for security issues — input validation, authz, secrets, injection, SSRF, path traversal, silent error swallowing. Three dispatch shapes — (1) PR review (spawned by the review-coordinator during /specnaut review), (2) alert triage (spawned by /release after the security-preflight workflow surfaces open GitHub security alerts).
+description: Reviews code for security issues — input validation, authz, secrets, injection, SSRF, path traversal, silent error swallowing. Three dispatch shapes — (1) PR review (spawned by the review-coordinator during /task review), (2) alert triage (spawned by /release after the security-preflight workflow surfaces open GitHub security alerts).
 model: opus
 effort: xhigh
 tools: Read, Grep, Glob, Bash
@@ -5670,7 +6172,7 @@ partially masked. Recommend rotation at the issuer, not just deletion.
 
 ## Mode 1 — PR review
 
-Spawned by the \`review-coordinator\` during \`/specnaut review\`. Review
+Spawned by the \`review-coordinator\` during \`/task review\`. Review
 ONLY the files provided in the prompt. Output the \`FINDING\` structure
 used by code-reviewer, followed by the canonical \`REVIEW SUMMARY\` block
 (see "Output format (Mode 1)" below).
@@ -5718,7 +6220,7 @@ arbitrary shell. Do not improvise any of it from this summary.
 
 ## Mode 3 — Plan expertise (before any code exists)
 
-Spawned by \`phases/plan-audits.md\` at step 6 of \`/specnaut plan\`, against
+Spawned by \`phases/plan-audits.md\` at step 6 of \`/task plan\`, against
 \`plan.md\`, in the same message as the architect — **not** against code,
 because none has been written yet.
 
@@ -5864,7 +6366,7 @@ no evidence is counted as \`NOT RUN\`), the four severity counts, \`TOP_ISSUES\`
     suffix: null,
     content: `---
 name: qa-tester
-description: Audits test coverage, writes missing tests, and runs the full suite. Manual-only — spawned by /specnaut implement after the review gate passes; do not auto-invoke for casual "run tests" mentions.
+description: Audits test coverage, writes missing tests, and runs the full suite. Manual-only — spawned by /task implement after the review gate passes; do not auto-invoke for casual "run tests" mentions.
 model: opus
 effort: high
 tools: Read, Write, Edit, Grep, Glob, Bash
@@ -6108,11 +6610,11 @@ name: specnaut-guide
 description: >
   Answers questions about Specnaut itself — how it works, its commands,
   harnesses, backlog backends, agents, and what changed between releases.
-  Trigger me when the user asks "how does specnaut", "what is /specnaut X",
+  Trigger me when the user asks "how does specnaut", "what is /task X",
   "explain specnaut", "quoi de neuf specnaut", "what's new in specnaut",
   or any question about the tool. Do NOT trigger on plain command
-  invocations (\`specnaut init\`, \`specnaut upgrade\`, \`/specnaut plan\`,
-  \`/board ...\`) — those are command runs, not questions.
+  invocations (\`specnaut init\`, \`specnaut upgrade\`, \`/task plan\`,
+  \`/task ...\`) — those are command runs, not questions.
 model: haiku
 effort: high
 tools: Read, WebFetch, Grep, Glob, Bash, Agent(developer)
@@ -6195,7 +6697,7 @@ latest features, or the newest release.
 This is a separate, lightweight check — distinct from the live fetch
 protocol above. Run it ONLY when the user's question matches the
 auto-route triggers in your \`description\` ("how does specnaut X",
-"what is /specnaut Y", "explain", "quoi de neuf", etc.). Do NOT run
+"what is /task Y", "explain", "quoi de neuf", etc.). Do NOT run
 it on a manual \`/specnaut-guide\` invocation whose question does not
 match those triggers — silence beats noise.
 
@@ -6304,7 +6806,7 @@ Run \`specnaut reconcile --status\`, parse JSON. For each pending path: show dif
 
 ### 7. Cleanup
 
-Both walks complete with nothing skipped: delete \`.specnaut/upgrade-pending.json\`; if on review branch, final commit \`chore: complete specnaut upgrade review v{from} → v{to}\`, then land it with \`/specnaut merge\`. If anything was skipped, leave marker + staging and tell user to resume with \`review-upgrade\`.
+Both walks complete with nothing skipped: delete \`.specnaut/upgrade-pending.json\`; if on review branch, final commit \`chore: complete specnaut upgrade review v{from} → v{to}\`, then land it with \`/task merge\`. If anything was skipped, leave marker + staging and tell user to resume with \`review-upgrade\`.
 
 ## Vendored knowledge snapshot
 
@@ -6591,7 +7093,7 @@ or other agents. Design decisions are not cheap and must be intentional
     suffix: null,
     content: `---
 name: performance-expert
-description: Reviews code for performance issues — N+1 queries, blocking I/O on hot paths, missing indexes, cache misuse, hot-path allocation, sync-in-async, large bundles, render-thrash. Two dispatch shapes — (1) PR review (spawned by the review-coordinator during /specnaut review), (2) scoped audit (spawned by a single-axis audit skill or /code-audit, over the scope it resolved).
+description: Reviews code for performance issues — N+1 queries, blocking I/O on hot paths, missing indexes, cache misuse, hot-path allocation, sync-in-async, large bundles, render-thrash. Two dispatch shapes — (1) PR review (spawned by the review-coordinator during /task review), (2) scoped audit (spawned by /task audit, over the scope it resolved).
 model: opus
 effort: high
 tools: Read, Grep, Glob, Bash
@@ -6655,7 +7157,7 @@ say so in one line at the top of your report.
 
 ## Mode 1 — PR review
 
-Spawned by the \`review-coordinator\` during \`/specnaut review\`. Review ONLY
+Spawned by the \`review-coordinator\` during \`/task review\`. Review ONLY
 the files provided in the prompt. Output the \`FINDING\` structure used by
 code-reviewer, followed by the canonical \`REVIEW SUMMARY\` block (see "Output
 format (Mode 1 — PR review)" below).
@@ -6687,7 +7189,7 @@ format (Mode 1 — PR review)" below).
 
 ## Mode 2 — Scoped audit
 
-Spawned by a single-axis audit skill or by \`/code-audit\`, over the scope it resolved — the whole project by default. Returns its findings inline to the caller. Read-only.
+Spawned by \`/task audit\`, over the scope it resolved — the whole project by default. Returns its findings inline to the caller. Read-only.
 
 ### Read-only contract (NON-NEGOTIABLE)
 
@@ -6807,7 +7309,7 @@ no evidence is counted as \`NOT RUN\`), the four severity counts,
     suffix: null,
     content: `---
 name: accessibility-expert
-description: Reviews front-end code for WCAG 2.1 AA accessibility issues — semantic HTML, heading hierarchy, alt text, form labels, keyboard nav, focus indicators, ARIA correctness, color contrast (where computable from source). Two dispatch shapes — (1) PR review (spawned by the review-coordinator during /specnaut review), (2) scoped audit (spawned by a single-axis audit skill or /code-audit, over the scope it resolved).
+description: Reviews front-end code for WCAG 2.1 AA accessibility issues — semantic HTML, heading hierarchy, alt text, form labels, keyboard nav, focus indicators, ARIA correctness, color contrast (where computable from source). Two dispatch shapes — (1) PR review (spawned by the review-coordinator during /task review), (2) scoped audit (spawned by /task audit, over the scope it resolved).
 model: opus
 effort: high
 tools: Read, Grep, Glob, Bash
@@ -6895,7 +7397,7 @@ the maintained source and this definition is a summary.
 
 ## Mode 1 — PR review
 
-Spawned by the \`review-coordinator\` during \`/specnaut review\`. Review
+Spawned by the \`review-coordinator\` during \`/task review\`. Review
 ONLY the files provided in the prompt (and only if they include FE
 source — otherwise skip per the gate above). Output the \`FINDING\`
 structure used by code-reviewer, followed by the canonical
@@ -6922,7 +7424,7 @@ broken**. The leaves state the rest.
 
 ## Mode 2 — Scoped audit
 
-Spawned by a single-axis audit skill or by \`/code-audit\`, over the scope it
+Spawned by \`/task audit\`, over the scope it
 resolved — the whole project by default. Returns its findings inline to the
 caller. Read-only; **subject to the FE-surface gate above**.
 
@@ -7036,7 +7538,7 @@ no evidence is counted as \`NOT RUN\`), the four severity counts,
     suffix: null,
     content: `---
 name: architect-expert
-description: Reviews code for architectural drift — hex-layer violations, circular deps, god files, bounded-context leaks, ports/adapters discipline, implicit globals, deep nesting, test-isolation bleed. Two dispatch shapes — (1) PR review (spawned by the review-coordinator during /specnaut review), (2) scoped audit (spawned by a single-axis audit skill or /code-audit, over the scope it resolved).
+description: Reviews code for architectural drift — hex-layer violations, circular deps, god files, bounded-context leaks, ports/adapters discipline, implicit globals, deep nesting, test-isolation bleed. Two dispatch shapes — (1) PR review (spawned by the review-coordinator during /task review), (2) scoped audit (spawned by /task audit, over the scope it resolved).
 model: opus
 effort: xhigh
 tools: Read, Grep, Glob, Bash
@@ -7094,7 +7596,7 @@ and this definition is a summary.
 
 ## Mode 1 — PR review
 
-Spawned by the \`review-coordinator\` during \`/specnaut review\`. Review ONLY
+Spawned by the \`review-coordinator\` during \`/task review\`. Review ONLY
 the files provided in the prompt. Output the \`FINDING\` structure used by
 code-reviewer, followed by the canonical \`REVIEW SUMMARY\` block (see "Output
 format (Mode 1 — PR review)" below).
@@ -7120,7 +7622,7 @@ format (Mode 1 — PR review)" below).
 
 ## Mode 2 — Scoped audit
 
-Spawned by a single-axis audit skill or by \`/code-audit\`, over the scope it resolved — the whole project by default. Returns its findings inline to the caller. Read-only.
+Spawned by \`/task audit\`, over the scope it resolved — the whole project by default. Returns its findings inline to the caller. Read-only.
 
 ### Read-only contract (NON-NEGOTIABLE)
 
@@ -7223,7 +7725,7 @@ material for the PO to triage.
 
 ## Mode 3 — Plan expertise (before any code exists)
 
-Spawned by \`phases/plan-audits.md\` at step 6 of \`/specnaut plan\`, against
+Spawned by \`phases/plan-audits.md\` at step 6 of \`/task plan\`, against
 \`plan.md\` — **not** against code, because none has been written yet. This is
 the cheapest moment you will ever be asked, and the reason the phase makes it
 mandatory: architecture found at review time is architecture rebuilt.
@@ -7282,7 +7784,7 @@ block — backlog material is not pass/fail.
     suffix: null,
     content: `---
 name: dependency-expert
-description: Reviews dependency manifests for hygiene — outdated pins, unbounded ranges, unused declared deps, license violations, advisory-shape signals, peer-dep conflicts, typosquatting heuristics. Multi-manifest aware (npm / pyproject / Cargo / composer / Gemfile / go.mod / deno.json). Two dispatch shapes — (1) PR review (spawned by the review-coordinator during /specnaut review), (2) scoped audit (spawned by a single-axis audit skill or /code-audit, over the scope it resolved).
+description: Reviews dependency manifests for hygiene — outdated pins, unbounded ranges, unused declared deps, license violations, advisory-shape signals, peer-dep conflicts, typosquatting heuristics. Multi-manifest aware (npm / pyproject / Cargo / composer / Gemfile / go.mod / deno.json). Two dispatch shapes — (1) PR review (spawned by the review-coordinator during /task review), (2) scoped audit (spawned by /task audit, over the scope it resolved).
 model: opus
 effort: high
 tools: Read, Grep, Glob, Bash
@@ -7336,7 +7838,7 @@ If the domain file contradicts this definition, **the domain file wins.**
 
 ## Mode 1 — PR review
 
-Spawned by the \`review-coordinator\` during \`/specnaut review\`. Review ONLY
+Spawned by the \`review-coordinator\` during \`/task review\`. Review ONLY
 the files provided in the prompt (typically dependency manifests +
 lockfiles touched by the diff). Output the \`FINDING\` structure used by
 code-reviewer, followed by the canonical \`REVIEW SUMMARY\` block (see "Output
@@ -7361,7 +7863,7 @@ Three fire on almost every manifest change:
 
 ## Mode 2 — Scoped audit
 
-Spawned by a single-axis audit skill or by \`/code-audit\`, over the scope it resolved — the whole project by default. Returns its findings inline to the caller. Read-only.
+Spawned by \`/task audit\`, over the scope it resolved — the whole project by default. Returns its findings inline to the caller. Read-only.
 
 ### Read-only contract (NON-NEGOTIABLE)
 
@@ -7558,23 +8060,23 @@ someone reads a dispatch line without opening the agent file.
 
 | Suffix | Meaning | Agents |
 | ------ | ------- | ------ |
-| \`<domain>-expert\` | A review lens that **also** has a standalone single-axis audit skill — dual mode: per-diff review *and* scoped audit | \`accessibility-expert\`, \`architect-expert\`, \`dependency-expert\`, \`performance-expert\`, \`security-expert\` |
-| \`<domain>-reviewer\` | A review lens with **no** audit skill — it only ever sees a diff | \`code-reviewer\`, \`test-reviewer\` |
+| \`<domain>-expert\` | A review lens that **also** has a \`/task audit\` axis — dual mode: per-diff review *and* scoped audit | \`accessibility-expert\`, \`architect-expert\`, \`dependency-expert\`, \`performance-expert\`, \`security-expert\` |
+| \`<domain>-reviewer\` | A review lens with **no** audit axis — it only ever sees a diff | \`code-reviewer\`, \`test-reviewer\` |
 | \`-coordinator\` | Fans out the lenses of a **single** phase and aggregates what returns | \`review-coordinator\` |
 | \`-manager\` | Drives a **multi-phase** delivery across several agents | \`workflow-manager\` |
 | role noun | Does the work rather than judging it | \`developer\`, \`qa-tester\`, \`devops-sre\`, \`product-owner\`, \`ui-ux-designer\` |
 
 Two rules follow, and they are the whole point of writing this down:
 
-- **\`-expert\` ⇔ an audit skill exists.** The five \`-expert\` agents correspond
-  exactly to the five single-axis audit skills (\`/sec-audit\`, \`/perf-audit\`,
-  \`/a11y-audit\`, \`/arch-audit\`, \`/dep-audit\`). If you give \`code-reviewer\` or
-  \`test-reviewer\` an audit skill, **rename it to \`-expert\` in the same
+- **\`-expert\` ⇔ an audit axis exists.** The five \`-expert\` agents correspond
+  exactly to the five axis flags of \`/task audit\` (\`--security\`, \`--perf\`,
+  \`--a11y\`, \`--archi\`, \`--deps\`). If you give \`code-reviewer\` or
+  \`test-reviewer\` an audit axis, **rename it to \`-expert\` in the same
   change** — otherwise the suffix stops predicting anything and the next
   person picks one at random.
-- **Agents spell the domain out; skills may abbreviate.** The agent is
-  \`accessibility-expert\` while its skill is \`a11y-audit\`, and that asymmetry
-  is deliberate: a skill name is *typed by a human* at a prompt, where short
+- **Agents spell the domain out; flags may abbreviate.** The agent is
+  \`accessibility-expert\` while its flag is \`--a11y\`, and that asymmetry
+  is deliberate: a flag is *typed by a human* at a prompt, where short
   wins, whereas an agent name is *matched semantically by a model* against a
   request, where \`a11y\` is a far weaker signal than \`accessibility\`. Optimise
   each for its own reader.
@@ -7582,7 +8084,7 @@ Two rules follow, and they are the whole point of writing this down:
 \`specnaut-guide\` is the deliberate exception to the table — the only agent
 named after the tool itself. It answers questions about Specnaut rather than
 reviewing your code, so it carries neither a lens suffix nor a role noun. It
-is **not** an \`-expert\`: giving it that suffix would imply an audit skill for
+is **not** an \`-expert\`: giving it that suffix would imply an audit axis for
 Specnaut itself, which does not and should not exist.
 
 ## Model and effort — two budgets
@@ -7950,444 +8452,138 @@ should survive across sessions and isn't captured elsewhere:
   },
   {
     category: "backlog-skill",
-    name: "board",
+    name: "task",
     suffix: null,
     content: `---
-name: board
-description: Manage this project's board — the backlog and every other status column. Add, list, view, move, clarify, groom and close items, from Backlog through Done. The backend is fixed at init time and recorded in \`.specnaut/installed.lock\`. Run \`specnaut upgrade --backlog <new>\` to switch.
-argument-hint: "[list|next|add|update|estimate|status|groom|brief] [args]"
+name: task
+description: Carry one unit of work from the backlog to a merged branch — list, add, edit, close and groom items, then plan, implement, review and merge them, and audit the code. \`/task <verb> [args]\`; \`/task\` alone prints the overview.
+argument-hint: "<list|next|add|edit|close|groom|plan|tasks|implement|review|merge|audit|constitution> [args]"
+when_to_use: |
+  Trigger phrases that should route here:
+  - backlog: "add to backlog", "what's next?", "move task X", "close task X", "groom the backlog"
+  - plan: "plan a feature", "spec out a feature", "I have a rough idea", "clarify requirements"
+  - implement / review / merge: "implement the feature", "review the implementation", "merge the branch"
+  - audit: "audit the codebase", "security audit", "check for vulnerabilities", "audit the architecture"
+  - constitution: "update the constitution", "edit project rules"
 ---
 
-# Board skill
+# Task router
 
 **Response style** — brevity, visual order, questions as selections, badge colours — follows the \`response-style-contract\` skill; read it, never restate it here.
 
-Use this skill when the user says "add to backlog", "list backlog", "what's
-next?", "move task X to in-progress", or any backlog mutation. The exact
-flow depends on the backend chosen at \`specnaut init\` (or the most recent
-\`specnaut upgrade --backlog <name>\`).
-
 **Backlog references** follow the \`backlog-reference-contract\` skill — read it; never restate it here.
 
-## Dispatch
+\`\$ARGUMENTS\` carries the user's input. Parse it as \`[--manual] [--manual-merge] <verb> [rest]\`:
 
-\`/board [subcommand] [args]\`. Absorbed from the command shim that used to
-carry it, so the table and the \`argument-hint\` above cannot drift apart again.
+1. **Chain mode** — \`--manual\` is the only chain flag: present → CHAIN_MODE = \`off\` (run this one
+   verb, then stop); absent → \`auto\`, the default. \`--manual-merge\` present → this run's merge mode
+   is \`manual\` whatever \`.specnaut/workflow.yml\` says (\`phases/auto-chain.md\` reads it). It does not
+   stop the chain anywhere else. Strip both.
+2. **Verb** — the first remaining token. Everything after it is the verb's argument string.
+3. **Nothing left** → render the **Overview** below and stop. Do not pick a verb yourself.
 
-| Input | Action |
-| --- | --- |
-| _(empty)_ or \`list\` | Backlog overview |
-| \`next\` | Recommend the top 3 items, with workflow advice |
-| \`add <title>\` | Create an item |
-| \`update <id>\` | Update an existing item |
-| \`estimate <id>\` | Estimate complexity |
-| \`status\` | Dashboard summary |
-| \`groom\` | Full grooming pass — see \`groom.md\` |
-| \`brief <id>\` | Product-owner business brief |
-| \`<number>\` | Show that item |
+## Verbs
 
-After any mutation (\`add\` / \`update\` / \`groom\` / \`estimate\`), commit the backlog
-changes — \`chore(backlog): add task NNN — <short title>\`, or
-\`chore(backlog): update task NNN — <what changed>\`. Stage only the files the
-product-owner agent reports as touched. This applies to the local backend, where
-the backlog is files in the repo; remote backends have nothing to commit.
+| Verb | Reference | One-liner |
+| :--- | :--- | :--- |
+| \`list\` _(or empty)_ | \`backlog.md\` | Backlog overview |
+| \`next\` | \`backlog.md\` | Recommend the top 3 items, with workflow advice |
+| \`add <title>\` | \`backlog.md\` | Create an item |
+| \`edit <id>\` | \`backlog.md\` | Change an item's title, body, status or fields |
+| \`close <id> [--not-planned]\` | \`backlog.md\` | Close an item — completed, or not planned |
+| \`estimate <id>\` | \`backlog.md\` | Estimate complexity |
+| \`status\` | \`backlog.md\` | Dashboard summary |
+| \`brief <id>\` | \`backlog.md\` | Product-owner business brief |
+| \`<id>\` | \`backlog.md\` | Show that item |
+| \`groom\` | \`groom.md\` | Full grooming pass |
+| \`plan [<id>] [brief]\` | \`phases/plan.md\` | The feature's **one** document, its architecture and security audit, then the stop. |
+| \`tasks\` | \`phases/tasks.md\` | The dependency-ordered breakdown, derived from the **approved** plan. |
+| \`implement\` | \`phases/implement.md\` | Build it. Ends by invoking \`review\`. |
+| \`review\` | \`phases/review.md\` | The quality battery on a frozen tree. Its verdict is the merge request. |
+| \`merge\` | \`phases/merge.md\` | Pre-merge validation; merge, push, close the item. |
+| \`audit [--security\\|--archi\\|--perf\\|--a11y\\|--deps]\` | \`phases/audit.md\` | Read-only audit of a scope; every applicable axis with no flag. |
+| \`constitution\` | \`phases/constitution.md\` | Amend the project's constitution, on the user's explicit request only. |
+
+\`phases/plan-audits.md\`, \`phases/merge-squash.md\`, \`phases/epic-commits.md\`,
+\`phases/quality-gates.md\`, \`phases/epic-fixups.md\`, \`phases/merge-close.md\`, \`phases/epic-loop.md\`
+and \`phases/auto-chain.md\` are **contract docs, not verbs** — \`plan\` loads the first at its step 6,
+\`merge\` loads the second at its step 4, \`implement\` loads the third when the item is an epic,
+\`implement\` and \`merge\` share the fourth, \`merge\` loads the fifth before an epic merge and the sixth
+after any push, \`implement\` loads the seventh on an epic, and this router loads the eighth when it
+chains. Naming any of them as a verb prints the verb table and stops.
+
+Unknown verb → print the verb table and stop. A verb that lived at another address before this
+router existed is listed, with where it went, in the \`specnaut\` skill's **Retired addresses**
+table.
 
 ## Which skill owns what
 
-\`/board\` owns **backlog management**. \`/specnaut\` owns the specification
-phases tied to the project, and code implementation, planning and review. The
-line decides where a new capability lands, not where a file happens to sit
-today.
-
-## \`groom\`
-
-The grooming pass — intake clarification ending in a promotion, board drift,
-stale PRs — is specified in **\`groom.md\`, beside this file**. Read and follow it. It is the
-only copy, and \`/board groom\` is its only entry point — the \`/specnaut\`
-router carries no \`groom\` verb. Do not restate any of it here, and do not
-answer a grooming request from memory.
-
-Orphan **spec** detection is not owned here. That reads spec artefacts and
-prescribes specnaut phases, so it lives in the specnaut skill's
-\`phases/auto-chain.md\` — which \`groom.md\` step 4 runs. Ownership is not
-reachability.
-
-## All mutations go through the Product Owner agent
-
-The main session does **not** run the scripts directly. Dispatch the
-\`product-owner\` subagent for any mutation: creating items, clarifying
-bodies, moving status, closing. The PO is the single owner of the backlog
-lifecycle (see the \`product-owner\` agent).
-
-The scripts under \`.specnaut/scripts/backlog/\` are the toolbox the PO
-uses. The main session may call the read-only ones (\`list.sh\`, \`view.sh\`)
-to inspect state, but every write goes through the PO.
-
-<!-- BEGIN: backend=local -->
-## Backend: local Markdown files
-
-This project's backlog lives entirely on disk under \`.specnaut/\`. No remote
-service required.
-
-| Path | Purpose |
-|---|---|
-| \`.specnaut/backlog.md\` | Top-level index — one line per item with status |
-| \`.specnaut/backlog/<NNN>-<slug>.md\` | One file per item (frontmatter + body) |
-
-### Scripts (preferred path)
-
-\`\`\`bash
-.specnaut/scripts/backlog/list.sh [Status]            # all items, optional Status filter
-.specnaut/scripts/backlog/view.sh <number>            # one item + body
-.specnaut/scripts/backlog/add.sh "<title>" [body]     # create new item, auto-numbered
-.specnaut/scripts/backlog/move.sh <number> <Status>   # Backlog|Ready|In progress|In review|Done
-.specnaut/scripts/backlog/clarify-comment.sh <num> "<question>"
-\`\`\`
-
-### Conventions
-
-- Items are numbered sequentially (\`001\`, \`002\`, …) — the \`add.sh\` script
-  picks the next free number.
-- Status is tracked in each item's YAML frontmatter and mirrored in the
-  index for fast listing.
-- **Closing** an item = move to \`Done\`. The file stays on disk as the
-  audit trail; nothing is deleted.
-- Bodies follow \`## Why\` / \`## Acceptance criteria\` / \`## Out of scope\`.
-- Titles are short imperatives ("Add docx skill", not "I want to add a docx skill").
-<!-- END: backend=local -->
-
-<!-- BEGIN: backend=github -->
-## Backend: GitHub Issues + Project
-
-This project's backlog lives on a GitHub Project linked to issues in the
-configured repo. Configuration is read from \`.specnaut/backlog-config.yml\`
-at runtime — fill in \`repo\` and \`project_number\` before running any
-mutation.
-
-### Configuration file
-
-\`\`\`yaml
-# .specnaut/backlog-config.yml
-repo: myorg/myproject              # GitHub repo (owner/name)
-project_number: <N>                # GitHub Project V2 number
-\`\`\`
-
-Both are placeholders; resolve the number with
-\`gh project list --owner <org>\`. A wrong \`project_number\` is invisible to
-\`list.sh\` / \`view.sh\` — they address the board through \`repo:\` alone — and
-refused up front by every writing script.
-
-### Two paths to GitHub: MCP (preferred) and shell (always available)
-
-Two ways to talk to GitHub from this project. Pick whichever fits your
-setup; the skill works either way.
-
-#### A. GitHub MCP — preferred when available
-
-If the **GitHub MCP server is wired up in Claude Code**, the PO
-subagent should call its tools directly: \`mcp__github__issue_write\`,
-\`mcp__github__issue_read\`, \`mcp__github__add_issue_comment\`,
-\`mcp__github__list_issues\`, \`mcp__github__search_issues\`, etc. They
-return structured data, no shell parsing needed.
-
-Two ways to enable the GitHub MCP:
-
-1. **Claude Code cloud connector (recommended)** — open a Claude Code
-   session in this project, run \`/mcp\`, choose **GitHub**, and complete
-   the OAuth flow. No file lives in this repo for that — it's stored
-   in your Claude Code account.
-
-2. **Self-hosted MCP** — add the official server to the project's
-   \`.mcp.json\` (creates the file if absent). Specnaut does NOT scaffold
-   this for you because it requires Node + a GitHub token; do it
-   manually:
-
-   \`\`\`json
-   {
-     "mcpServers": {
-       "github": {
-         "command": "npx",
-         "args": ["-y", "@modelcontextprotocol/server-github"],
-         "env": { "GITHUB_PERSONAL_ACCESS_TOKEN": "\${GITHUB_TOKEN}" }
-       }
-     }
-   }
-   \`\`\`
-
-   Then restart your Claude Code session.
-
-#### B. Shell scripts — always available
-
-The \`gh\` CLI scripts under \`.specnaut/scripts/backlog/\` are scaffolded
-unconditionally and work without MCP. They wrap \`gh issue\` / \`gh
-project\` calls and read configuration from \`backlog-config.yml\`.
-
-\`\`\`bash
-.specnaut/scripts/backlog/list.sh [Status]            # all items, optional Status filter
-.specnaut/scripts/backlog/view.sh <number>            # one issue + comments
-.specnaut/scripts/backlog/add.sh "<title>" [body] [labels-csv]
-.specnaut/scripts/backlog/move.sh <number> <Status>   # sets Project Status field
-.specnaut/scripts/backlog/clarify-comment.sh <num> "<question>"
-.specnaut/scripts/backlog/detect-fields.sh            # native fields → env lines
-.specnaut/scripts/backlog/groom-columns.sh [--set <key> <column|none>]  # columns grooming moves between
-.specnaut/scripts/backlog/set-field.sh <num> <Priority|Size|IssueType> <value>  # exit codes under Conventions
-.specnaut/scripts/backlog/ensure-labels.sh            # bootstrap the semantic labels (LABELS.md)
-\`\`\`
-
-For closing or editing, use \`gh\` directly:
-
-\`\`\`bash
-gh issue close  <num> --repo <repo> --reason completed     # or not_planned
-gh issue edit   <num> --repo <repo> --title "…" --body "…"
-\`\`\`
-
-#### Decision rule for the PO subagent
-
-When dispatched, the PO checks tool availability at runtime:
-
-1. If \`mcp__github__*\` tools are visible in the session, prefer them.
-2. Otherwise fall back to the shell scripts — so switching paths needs
-   no Specnaut change.
-
-### Conventions
-
-- **Titles** — short imperative phrases. Lowercase OK; no leading emoji.
-- **Bodies** — \`## Why\` / \`## Acceptance criteria\` / \`## Out of scope\`.
-- **Closing** — close the issue (don't just move to Done). The repo's
-  issue history is the audit trail.
-- **Drafts** are not used. Every task is a real issue.
-- **Batch every mutation — fewest requests possible.** Creating /
-  moving / closing / field-setting **multiple** items goes in **one
-  batched \`gh api graphql\` multi-alias mutation** (\`m1:\`, \`m2:\`, …), or
-  the REST batch equivalent — **never call-by-call**. Gather all node /
-  field / option ids in one query, then emit a single mutation. N items
-  → 1–2 requests, not N. This is the default (not an optimization): it
-  is what keeps grooming inside GitHub's REST + GraphQL rate limits.
-  Loop the per-item scripts only for a single item.
-- **Classification is mandatory — every created or clarified item
-  exits with Size, Priority, Issue Type, and at least one label.**
-  \`Priority\` / \`Size\` are native Project V2 single-select fields;
-  \`Issue Type\` (\`Task\` / \`Bug\` / \`Feature\`) is a native org-level
-  concept. Write all three through \`set-field.sh\` and **NEVER also
-  apply a matching \`priority:*\` / \`size:*\` / \`type:*\` label on an item
-  that already carries the native field or type** — that dual-signal
-  drift is exactly what the helper exists to prevent. Labels are
-  reserved as a strict fallback for projects / orgs without the native
-  field or type — or *temporarily* when the platform is rate-limiting and
-  a native write cannot land; the native field is always the goal, so
-  reconcile a label fallback back to it once unblocked. Exit codes:
-  \`10\` = field / type absent (use the label), \`11\` = value unrecognised
-  (Priority/Size: add the option, re-run; Issue Type: fix the call),
-  \`12\` = issue not on the project / not in the repo, \`13\` = discovery
-  failed or the project could not be verified — **not** a fallback
-  signal: retry or report it. \`2\` = the project demonstrably does not
-  exist: fix \`backlog-config.yml\`.
-
-### Prerequisites
-
-For the **shell path**: the \`gh\` CLI must be authenticated with the
-\`project\` scope. If \`gh project\` returns 404, run
-\`gh auth refresh -s project\`.
-
-For the **MCP path**: see "Two paths to GitHub" above.
-<!-- END: backend=github -->
-
-<!-- BEGIN: backend=gitlab -->
-## Backend: GitLab Issues + scoped Status labels
-
-This project's backlog lives on GitLab Issues, with workflow state
-tracked via scoped labels (\`Status::Backlog\`, \`Status::Ready\`,
-\`Status::"In progress"\`, \`Status::"In review"\`, \`Status::Done\`).
-GitLab doesn't have a Project Status field equivalent to GitHub's
-Projects V2 — scoped labels are the canonical way to model kanban-
-style state on GitLab.
-
-Configuration is read from \`.specnaut/backlog-config.yml\` at runtime —
-fill in \`host\` and \`project_id\` before running any mutation.
-
-### Configuration file
-
-\`\`\`yaml
-# .specnaut/backlog-config.yml
-host: gitlab.com         # or your self-hosted instance
-project_id: ""           # numeric id (e.g. "12345") or path "group/project"
-\`\`\`
-
-### Scripts (preferred path)
-
-\`\`\`bash
-.specnaut/scripts/backlog/list.sh [Status]            # all issues, optional Status:: filter
-.specnaut/scripts/backlog/view.sh <number>            # one issue + comments
-.specnaut/scripts/backlog/add.sh "<title>" [body] [labels-csv]
-.specnaut/scripts/backlog/move.sh <number> <Status>   # swaps the Status:: label
-.specnaut/scripts/backlog/clarify-comment.sh <num> "<question>"
-\`\`\`
-
-For closing or editing, use \`glab\` directly:
-
-\`\`\`bash
-glab issue close   <num> --repo <project_id>
-glab issue update  <num> --repo <project_id> --title "…" --description "…"
-\`\`\`
-
-### Conventions
-
-- **Titles** — short imperative phrases. Lowercase OK; no leading emoji.
-- **Bodies** — \`## Why\` / \`## Acceptance criteria\` / \`## Out of scope\`.
-- **Status** — set by adding/swapping a \`Status::*\` scoped label.
-  Scoped labels are mutually exclusive on the same scope, so swapping
-  is atomic.
-- **Closing** — close the issue (don't just move to Done). The repo's
-  issue history is the audit trail.
-- **Drafts** are not used. Every task is a real issue.
-
-### Prerequisites
-
-The \`glab\` CLI must be installed and authenticated.
-
-- Install: https://gitlab.com/gitlab-org/cli
-- Authenticate: \`glab auth login\` (use the same host as in
-  \`backlog-config.yml\`)
-
-The first time the PO runs against this project, it will create the 5
-\`Status::*\` scoped labels if they don't exist (\`Backlog\`, \`Ready\`,
-\`In progress\`, \`In review\`, \`Done\`).
-<!-- END: backend=gitlab -->
-
-<!-- BEGIN: backend=cloud -->
-## Backend: Specnaut Cloud
-
-This project's backlog lives on **Specnaut Cloud** — a hosted, real-time Kanban
-board reached over a small HTTP API. No \`gh\`/\`glab\` CLI and no GitHub/GitLab
-rate limits. Configuration is read from \`.specnaut/backlog-config.yml\` at
-runtime.
-
-### Configuration file
-
-\`\`\`yaml
-# .specnaut/backlog-config.yml
-backend: cloud
-api_url: https://api.specnaut.com               # optional — defaults to Specnaut Cloud
-project_key: CLOUD                              # the project's short key
-\`\`\`
-
-**No token is stored here.** Credentials are obtained by \`specnaut cloud login\`
-(an interactive browser device-authorization flow) and kept in the OS keychain
-(or a \`0600\` file under \`~/.specnaut\`). They refresh transparently. For CI /
-headless runs, set \`SPECNAUT_CLOUD_TOKEN\` to a Cloud API token instead of
-logging in.
-
-### Scripts
-
-\`\`\`bash
-.specnaut/scripts/backlog/list.sh [Status]            # all tasks (status = column), optional filter
-.specnaut/scripts/backlog/view.sh <number>            # one task (status, priority, size, body)
-.specnaut/scripts/backlog/add.sh "<title>" [body]     # create a task → returns KEY-N
-.specnaut/scripts/backlog/move.sh <number> <Status>   # Backlog|Ready|"In Progress"|"In Review"|Done
-.specnaut/scripts/backlog/clarify-comment.sh <number> "<question>"
-.specnaut/scripts/backlog/columns.sh                  # live board column layout (order + name)
-.specnaut/scripts/backlog/reconcile.sh [--reset|--seek-end] [--limit N]  # drain stage transitions
-\`\`\`
-
-The scripts get a fresh access token from \`specnaut cloud token\` (which refreshes
-it transparently) and authenticate with \`Authorization: Bearer <token>\`, talking
-to \`<api_url>/api/v1/\` (\`/tasks\`, \`/columns\`, \`/activity\`). \`move.sh\` passes a
-**status name** (the column name); the API resolves it to the column
-server-side. \`columns.sh\` reads the board's real columns (renames/reorders are
-reflected with no code change). \`reconcile.sh\` is the **poll/reconcile** feed:
-it asks \`/activity\` for every stage transition newer than a stored per-project
-cursor (\`.specnaut/.cloud-cursor-<KEY>\`), prints one line per transition, and
-advances the cursor — the product-owner consumes those lines and runs the
-matching stage hook (see \`product-owner.md\` → "Cloud stage reconcile").
-
-### Prerequisites
-
-- \`curl\` and \`jq\` on PATH, and the \`specnaut\` CLI on PATH (the scripts call
-  \`specnaut cloud token\`).
-- Authenticated once via \`specnaut cloud login\` (or \`SPECNAUT_CLOUD_TOKEN\` set
-  for headless / CI).
-
-### Stage reconcile (poll model)
-
-The product-owner reacts to board moves by **polling**, not a webhook — the CLI
-has no daemon. Run \`reconcile.sh\` by hand or on a recurring cadence (Claude
-Code: \`/loop\`); it drains stage transitions since the cursor and prints one
-line each (\`CREATED <n> -> <stage>\` / \`MOVED <n> <from> -> <to>\`). For each
-line the PO resolves the destination against \`columns.sh\` (canonical names,
-case-insensitive) and runs the mapped hook — parity with a GitHub Projects
-board, just poll-triggered:
-
-| Destination stage | Hook |
-|---|---|
-| **Backlog / Ready** (incl. \`CREATED\`) | **Classify** — ensure priority/size/type per the mandatory classification contract; skip if already set. |
-| **In Review** | *(opt-in, off by default)* post a review-readiness checklist comment. |
-| **Done** | *(opt-in, off by default)* post a closing-summary comment; run the board-hygiene check. |
-| **In Progress** / any unmapped column | **No-op** — never invent behaviour for an unmapped stage. |
-
-Rules: **idempotent** (delivery is at-least-once — read \`view.sh\` before
-writing, never double-post or re-classify); **comments are opt-in** (if the
-board posts its own stage comments, leave In Review / Done off to avoid
-duplicates — classification is the always-on parity behaviour); **public API
-only** (act through the \`*.sh\` wrappers; reference only column names + task
-numbers). First run replays history — \`reconcile.sh --seek-end\` fast-forwards
-an existing board to "from now".
-
-### Not yet on the Cloud backend
-
-- Epics / sub-tasks and label management are not exposed over the API yet —
-  use the board UI for those for now.
-<!-- END: backend=cloud -->
-
-## Epics & sub-tasks
-
-Big work that needs decomposition lives as a parent **epic** with one or
-more **sub-tasks**. The link mechanism differs per backend, but the PO
-contract is the same: parents cannot close while any child is open.
-
-| Backend | Parent → child link | Discoverability |
-|---|---|---|
-| local | \`parent: "#NNN"\` in the child's frontmatter, plus a \`## Sub-tasks\` cross-link added to the parent file's body | \`grep -l 'parent: "#042"' .specnaut/backlog/*.md\` lists every child of #042 |
-| github | Native sub-issues API (\`gh api -X POST .../issues/<parent>/sub_issues\`) | Project V2 boards render the children automatically under the parent's \`Sub-issues progress\` field |
-| gitlab | Scoped label \`parent::#NNN\` on the child (Free-tier compatible; native Epics are Premium-only) | \`glab issue list --label "parent::#042" --opened\` lists every child of #042 |
-
-**Creating a child:** \`add.sh --parent <num>\` does the right thing on
-every backend — writes the link, attaches to the project/board, and
-fails fast if the named parent doesn't exist (exit 3).
-
-**Closing a parent:** \`cascade-check.sh <num>\` (github + gitlab) is the
-close gate — exits 11 with the open children listed when close is
-unsafe, exits 0 when all children are closed. The PO must run it before
-\`gh issue close\` / \`glab issue close\`. The local backend uses an
-inline grep equivalent.
-
-**Finding a child's parent:** \`parent-of.sh <num>\` (github + gitlab) is
-\`cascade-check.sh\` read from the other end — given a child it prints its
-parent's number and exits 0, exits **10** when the item has no parent, and
-exits 3 when it could not ask. Those last two are separate codes on purpose:
-"this is a standalone item" and "the lookup failed" would otherwise be
-indistinguishable, and a caller branches the same way on each. Branch creation
-uses it to put a whole epic on one branch.
-
-**Auto-detection:** the bundled \`product-owner\` agent proactively
-detects epic-worthy requests (>5 AC bullets, scope crosses ≥2
-subsystems, trigger phrases like "break down" / "phased" / "as an
-epic") and either auto-decomposes or proposes a concrete sub-task list
-— see the "Epic detection heuristic" section of the \`product-owner\`
-agent.
+| Skill | Owns |
+| :--- | :--- |
+| \`/task\` | one unit of work — from backlog item to merged branch, audits included |
+| \`/specnaut\` | the framework itself — its documentation, what is installed, upgrading it |
+| \`/ship\` | production — getting a built thing out the door |
+
+## All backlog writes go through the Product Owner
+
+The main session does **not** run the backlog scripts' writing commands. Every create, edit, move
+and close — including the ones \`plan\` and \`merge\` make — is dispatched to the \`product-owner\`
+agent, the single owner of backlog state. The read-only scripts (\`list.sh\`, \`view.sh\`) may be run
+directly.
 
 <!-- BEGIN: spec-autogen=on -->
 ## Auto-generate a task's spec at creation (cloud, opt-in)
 
 This project has \`spec_autogen: true\` and stores its specs on SpecNaut Cloud. After every
-task you create, also generate its spec — read \`spec-autogen.md\` and follow it.
+item \`/task add\` creates, also generate its spec — read \`spec-autogen.md\` and follow it.
 <!-- END: spec-autogen=on -->
 
-## When NOT to use this skill
+## Routing
 
-- The user is implementing a backlog item — that's normal coding work;
-  return here only when they want to update its status afterwards.
-- The user asks about another project's backlog — this skill is wired to
-  this project only.
+1. **Read** the verb's reference file from the table, with the \`Read\` tool.
+2. **Read the project addendum** \`.specnaut/addenda/task/<verb>.md\` if it exists, for \`plan\`,
+   \`tasks\`, \`implement\`, \`review\`, \`merge\`, \`audit\`, \`constitution\` and \`groom\` — the project's own
+   addition to that verb. It adds to the phase at the step it names and never replaces or skips a
+   bundled step: where it contradicts one, the bundled step stands and you say so. No file means no
+   addendum — say nothing about it. Contract docs take none; the parent verb's addendum names their
+   step.
+3. **Substitute** the stripped arguments for the reference's input.
+4. **Execute** the procedure end-to-end, with the addendum applied.
+5. **Decide whether to chain** (below).
+
+## Chain decision
+
+After the verb completes successfully:
+
+- \`CHAIN_MODE == off\` → stop. Report the outcome.
+- The verb is not chainable → stop. Chainable verbs: \`plan\`, \`tasks\`, \`implement\`, \`review\`.
+- Otherwise → read \`phases/auto-chain.md\` and follow it.
+
+**Re-entry needs no flag.** A verb whose downstream artefacts already exist runs one-shot; one whose
+downstream artefacts are absent chains. \`phases/auto-chain.md\` holds the detection table.
+
+## Overview
+
+\`\`\`
+/task add → /task plan <id> → tasks → implement → review → merge
+                 ▲                                  │        ▲
+                 │                                  └────────┘
+                 └── discovery (if fuzzy) → the one document
+                     → architecture + security audit OF THE PLAN
+                     → STOP 1
+\`\`\`
+
+**Autopilot is the default: the chain stops at most once, at the end of \`plan\`**, and only to ask
+what only the user can answer — business rules, scope, and anything irreversible, destructive,
+public-breaking or costly. Architecture, security and performance forks are settled by the expert
+seats and reported, never asked. Then it runs to a merged, **pushed** base branch and a closed
+backlog item without asking again.
+
+A second stop — the review verdict as the merge request, asked once — exists only when
+\`.specnaut/workflow.yml\` says \`merge: manual\`, or the run says so (\`--manual-merge\`, "stop before
+merging"). Every other boundary is crossed by invoking the next verb yourself, in the same turn.
+
+To run a single verb only: \`/task plan --manual "Add OAuth2 login"\`.
 `,
     executable: false,
     backend: null,
@@ -8902,14 +9098,14 @@ emit_section() {
   cat <<'HEADER'
 # Backlog
 
-> Managed by the Product Owner agent (\`/board\`). Each task is one
+> Managed by the Product Owner agent (\`/task\`). Each task is one
 > file under \`.specnaut/backlog/NNN-slug.md\` with frontmatter; this
 > index lists items grouped by status column.
 
 The 5 status columns mirror the GitHub Projects "kanban" model:
 
 - **Backlog** — needs more info, sizing, or prioritisation. The PO
-  works these on \`/board groom\` until they're ready.
+  works these on \`/task groom\` until they're ready.
 - **Ready** — clarified, sized, prioritised. The PO proposes these
   for development when asked "what's next".
 - **In progress** — actively being worked on (a branch is open).
@@ -8931,7 +9127,7 @@ created: ...
 ---
 \`\`\`
 
-The PO assigns size + priority during the \`/board groom\` pass.
+The PO assigns size + priority during the \`/task groom\` pass.
 
 ---
 
@@ -9997,8 +10193,8 @@ fi
 # List backlog items whose board column disagrees with the issue's real state.
 #
 # This script REPORTS. It never moves a card. Detection and correction are
-# split on purpose: \`/board groom\` prints this output read-only, while
-# \`/specnaut merge\` pipes the DRIFTED lines into \`move.sh\`. A read-only core
+# split on purpose: \`/task groom\` prints this output read-only, while
+# \`/task merge\` pipes the DRIFTED lines into \`move.sh\`. A read-only core
 # cannot mutate anything from the wrong caller, and both callers get the same
 # answer to "what drifted".
 #
@@ -11911,8 +12107,8 @@ echo "✓ #\$NUM → Status::\$STATUS"
 # List backlog items whose Status:: label disagrees with the issue's real state.
 #
 # This script REPORTS. It never moves an issue. Detection and correction are
-# split on purpose: \`/board groom\` prints this output read-only, while
-# \`/specnaut merge\` pipes the DRIFTED lines into \`move.sh\`.
+# split on purpose: \`/task groom\` prints this output read-only, while
+# \`/task merge\` pipes the DRIFTED lines into \`move.sh\`.
 #
 # Why reconcile rather than attribute: asking "which issues did my merge close"
 # reports success from its own belief about the answer, and every failure in
@@ -12975,155 +13171,11 @@ done
     skipIfExists: false,
   },
   {
-    category: "skill",
-    name: "code-audit",
-    suffix: null,
-    content: `---
-name: code-audit
-description: High-altitude, multi-seat parallel code audit of a scope on main. Use when the user says "audit the codebase", "code audit", "audit recent changes", "do a full audit", "health-check this code", or "audit the last N commits". Resolves a scope, dispatches the applicable expert seats (architecture / security / performance / accessibility / dependency) IN PARALLEL, and synthesizes one deduplicated, severity-ranked report. Read-only. Complementary to the single-axis skills (\`/sec-audit\`, \`/perf-audit\`, \`/a11y-audit\`, \`/arch-audit\`, \`/dep-audit\`).
-argument-hint: "[--path <subtree> | --range <a>..<b>] [--last <n>]"
----
-
-# Code Audit — multi-seat parallel audit
-
-A **high-altitude** audit: judge the *shape* of merged work across several
-expert lenses at once, not a per-line PR review. This skill resolves a scope,
-deploys the applicable expert seats **in parallel**, and merges their output
-into one report.
-
-It is **read-only**: running it mutates **no tracked files**. It dispatches the
-same expert agents the single-axis skills use (\`/sec-audit\` and its siblings);
-the difference is breadth — a single-axis skill runs one, \`/code-audit\` runs all applicable seats
-in a single parallel batch and synthesizes one verdict. The two are
-**complementary**.
-
-## Step 1 — Resolve the scope
-
-Run the bundled scope resolver and read its block:
-
-\`\`\`bash
-.specnaut/scripts/code-audit/collect-audit-scope.sh [--path <subtree> | --range <a>..<b>] [--last <n>]
-\`\`\`
-
-Pass through whatever \`\$ARGUMENTS\` the user gave. With no arguments the script
-auto-resolves in priority order: explicit \`--path\`/\`--range\` → unpushed
-(\`origin/main..HEAD\`) → since-latest-tag → last-N commits (default 20).
-
-The script prints a \`CODE-AUDIT SCOPE\` block: \`SCOPE\`, \`SCOPE_LABEL\`, \`COMMITS\`,
-\`FILES\`, \`TOTAL_FILES\`, and a \`CATEGORY SIGNALS\` section with \`FRONTEND_COUNT\`,
-\`TEST_COUNT\`, \`DEP_COUNT\`, \`INFRA_COUNT\`. If the script exits non-zero (not a git
-repo), surface its error and stop.
-
-## Step 2 — Stop on an empty scope
-
-If \`TOTAL_FILES: 0\`, do **not** dispatch any seats. Emit exactly one line and
-stop — no report, no REVIEW SUMMARY:
-
-\`\`\`text
-Nothing to audit in this scope. Widen it with --path <subtree>, --range <a>..<b>, or --last <n>.
-\`\`\`
-
-## Step 3 — Select the seats from CATEGORY SIGNALS
-
-Seats are proportional to the signals — skip a seat when its governing signal is
-zero, and record the skip with its reason in the report's \`### Scope\` line.
-
-| Seat          | Agent                 | Deployed when                          |
-| ------------- | --------------------- | -------------------------------------- |
-| Architecture  | architect-expert  | scope non-empty (always)               |
-| Security      | security-expert      | scope non-empty (always)               |
-| Performance   | performance-expert   | scope non-empty (always)               |
-| Accessibility | accessibility-expert          | \`FRONTEND_COUNT > 0\` (gating signal)   |
-| Dependency    | dependency-expert    | \`DEP_COUNT > 0\` (gating signal)        |
-
-These are the **existing** expert agents — this skill defines no new agents.
-
-**Gating vs informational signals.** Only \`FRONTEND_COUNT\` and \`DEP_COUNT\`
-**gate** a seat (accessibility and dependency, respectively). \`TEST_COUNT\` and
-\`INFRA_COUNT\` are **informational context only** — no seat consumes them, and
-there is intentionally no test/coverage or infra seat (no such expert agent
-exists). All four counts are always emitted (the scope-signals contract requires
-it); the two informational ones simply describe the scope, they do not select
-seats.
-
-## Step 4 — Dispatch all selected seats IN PARALLEL (one message)
-
-**Dispatch every selected seat in a SINGLE message — one \`Agent\` call per seat,
-never one after another.** Issuing them sequentially defeats the entire point of
-the skill: the seats are independent and must run concurrently. Put all the
-\`Agent\` tool calls in the same assistant turn so they execute in parallel. Do not pass a \`model:\` override — each seat runs on the tier its agent file declares.
-
-Give each seat the **same scope context** (the \`SCOPE_LABEL\`, the commit list,
-and the file list from Step 1) and an **audit framing**: judge the shape of the
-merged work — architecture drift, security exposure, performance cliffs,
-accessibility gaps, dependency risk — not line-by-line PR nitpicks. Each expert
-already emits the canonical \`REVIEW SUMMARY\` block (verdict + severity counts)
-after its prose; rely on it for synthesis.
-
-## Step 5 — Synthesize ONE report
-
-Wait for every seat to return, then **merge → dedupe by \`file:line\` (keep the
-most detailed instance) → severity-rank** (critical > high > medium > low). A
-seat that errored or returned nothing is shown in the table as \`errored\` /
-\`empty\` — **never silently dropped**.
-
-Emit one report:
-
-\`\`\`text
-## Code Audit — <SCOPE_LABEL>
-
-### Scope
-- <N commits>, <M files> | seats deployed: <list> | skipped: <seat (reason)>, …
-
-### Seats
-| Seat | Agent | Status | Findings |
-|------|-------|--------|----------|
-| Architecture | architect-expert | ✅ / errored / empty | <n> |
-| …            | …                    | …                    | … |
-
-### 🏛 Architecture   ### 🔒 Security   ### ⚡ Performance   ### ♿ Accessibility   ### 📦 Dependency
-- (only the deployed seats) CRITICAL/HIGH/MEDIUM/LOW findings, each \`file:line\` +
-  suggested fix, deduplicated by file+line across seats, severity-ranked.
-
-### Top issues to fix first
-1. …
-
-### Verdict: HEALTHY | NEEDS WORK | DEBT ACCRUING
-\`\`\`
-
-Then close with the aggregated normalized block:
-
-\`\`\`text
-REVIEW SUMMARY
-REVIEW_SCOPE: code-audit <SCOPE_LABEL> (seats: <list>)
-REVIEW_VERDICT: pass | fail | needs_followup
-CRITICAL_COUNT: <sum>
-HIGH_COUNT: <sum>
-MEDIUM_COUNT: <sum>
-LOW_COUNT: <sum>
-TOP_ISSUES: <one sentence | none>
-RECOMMENDATION: <one sentence>
-\`\`\`
-
-**Aggregated verdict — dominance rule:** \`REVIEW_VERDICT\` is \`fail\` if **any**
-seat reported \`fail\`; else \`needs_followup\` if **any** seat reported
-\`needs_followup\`; else \`pass\`. The four \`*_COUNT\` values are the **per-seat
-sums**.
-
-You may optionally persist the report at
-\`docs/specnaut/audits/YYYY-MM-DD-code-audit.md\` — that doc dir is the only write
-this skill ever makes; the audited code is never touched.
-`,
-    executable: false,
-    backend: null,
-    skipIfExists: false,
-  },
-  {
     category: "spec-root",
     name: "specify",
-    suffix: "scripts/code-audit/collect-audit-scope.sh",
+    suffix: "scripts/audit/collect-audit-scope.sh",
     content: `#!/usr/bin/env bash
-# collect-audit-scope.sh — resolve the scope for \`/code-audit\` and emit the
+# collect-audit-scope.sh — resolve the scope for \`/task audit\` and emit the
 # CODE-AUDIT SCOPE block + CATEGORY SIGNALS the orchestrator skill parses.
 #
 # Read-only: it never mutates the tree. Pure bash + git, no extra deps, so it
@@ -13218,7 +13270,7 @@ done
 
 # Git-repo guard — abort with a clear message, no block on stdout.
 if ! git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
-  echo "error: /code-audit requires a git repository" >&2
+  echo "error: /task audit requires a git repository" >&2
   exit 1
 fi
 
@@ -13365,444 +13417,6 @@ echo "DEP_COUNT: \${DEP_COUNT}"
 echo "INFRA_COUNT: \${INFRA_COUNT}"
 `,
     executable: true,
-    backend: null,
-    skipIfExists: false,
-  },
-  {
-    category: "skill",
-    name: "arch-audit",
-    suffix: null,
-    content: `---
-name: arch-audit
-description: Single-axis architecture audit of a scope. Use when the user says "arch audit", "audit the architecture", "check for architectural drift", "audit layering", or "review the architecture of <path>". Dispatches ONLY the architect-expert over a resolved scope (layering / DDD / SOLID / DRY) and returns its findings inline. Read-only — writes no report file.
-argument-hint: "[--path <subtree> | --range <a>..<b> | --diff]"
----
-
-# Architecture Audit — single-axis dispatch
-
-A **thin, read-only** audit of one axis: architecture. This skill resolves a
-scope, dispatches the **single** \`architect-expert\` agent over it, and
-returns that agent's findings **inline**. It writes **no file** and mutates
-**no tracked files** — \`git status\` is unchanged after a run.
-
-It judges the *shape* of the code on its axis — layering / DDD boundaries /
-SOLID / DRY — not line-by-line PR nitpicks.
-
-## Step 1 — Parse the scope argument
-
-Accept exactly one optional scope argument. The accepted forms are:
-
-\`\`\`text
-/arch-audit                      # whole repo
-/arch-audit --path <subtree>     # files under a subtree
-/arch-audit --range <a>..<b>     # files changed in a commit range
-/arch-audit --diff               # files changed on current branch vs main
-\`\`\`
-
-If the argument is **unrecognized**, print the four accepted forms above and
-**STOP**. Never silently fall back to a whole-repo audit.
-
-## Step 2 — Resolve the scope file list
-
-Run the matching git command for the parsed shape:
-
-| Shape | Command |
-|---|---|
-| \`--path <subtree>\` | \`git ls-files <subtree>\` |
-| \`--range <a>..<b>\` | \`git diff --name-only <a>..<b>\` |
-| \`--diff\` | \`git diff --name-only main...HEAD\` |
-| whole (no arg) | \`git ls-files\` |
-
-If \`--range\`/\`--diff\` is used outside a git repository, surface the git error
-and **STOP**. If the resolved list is **empty**, emit exactly one line and
-**STOP** — no dispatch, no REVIEW SUMMARY:
-
-\`\`\`text
-Nothing in scope. Widen it with --path <subtree>, --range <a>..<b>, or --diff.
-\`\`\`
-
-## Step 3 — Dispatch ONLY the architect-expert
-
-Dispatch the **single** \`architect-expert\` agent — never a team, never
-another axis. Give it the resolved file list and an **audit framing**: judge
-the architectural shape of the scoped code (hex-layer violations, circular
-deps, god files, bounded-context leaks, ports/adapters discipline, SOLID/DRY)
-— not a per-line review. Do not pass a \`model:\` override — a lens runs on the tier its agent file declares.
-
-## Step 4 — Return findings inline
-
-Return the agent's findings inline. The \`architect-expert\` ends with the
-canonical \`REVIEW SUMMARY\` block (verdict + severity counts, per the
-review-findings-contract, #378) — surface it verbatim. **Write no report
-file.**
-
-## How this differs — disambiguation
-
-- **\`/arch-audit\`** (this skill) — dispatches the **one** \`architect-expert\`
-  over a scope and returns findings **inline**. No report file.
-- **\`/code-audit\`** — the **multi-seat** team audit: dispatches every
-  applicable expert (architecture / security / performance / a11y /
-  dependency) in parallel and synthesizes one combined report. Use it for a
-  broad health-check, not a single axis.
-`,
-    executable: false,
-    backend: null,
-    skipIfExists: false,
-  },
-  {
-    category: "skill",
-    name: "sec-audit",
-    suffix: null,
-    content: `---
-name: sec-audit
-description: Single-axis security audit of a scope. Use when the user says "sec audit", "security audit", "audit for security issues", "check for vulnerabilities", or "review the security of <path>". Dispatches ONLY the security-expert over a resolved scope (authz / inputs / secrets / injection) and returns its findings inline. Read-only — writes no report file.
-argument-hint: "[--path <subtree> | --range <a>..<b> | --diff]"
----
-
-# Security Audit — single-axis dispatch
-
-A **thin, read-only** audit of one axis: security. This skill resolves a
-scope, dispatches the **single** \`security-expert\` agent over it, and
-returns that agent's findings **inline**. It writes **no file** and mutates
-**no tracked files** — \`git status\` is unchanged after a run.
-
-It judges the *shape* of the code on its axis — authz / input validation /
-secrets / injection — not line-by-line PR nitpicks.
-
-## Step 1 — Parse the scope argument
-
-Accept exactly one optional scope argument. The accepted forms are:
-
-\`\`\`text
-/sec-audit                      # whole repo
-/sec-audit --path <subtree>     # files under a subtree
-/sec-audit --range <a>..<b>     # files changed in a commit range
-/sec-audit --diff               # files changed on current branch vs main
-\`\`\`
-
-If the argument is **unrecognized**, print the four accepted forms above and
-**STOP**. Never silently fall back to a whole-repo audit.
-
-## Step 2 — Resolve the scope file list
-
-Run the matching git command for the parsed shape:
-
-| Shape | Command |
-|---|---|
-| \`--path <subtree>\` | \`git ls-files <subtree>\` |
-| \`--range <a>..<b>\` | \`git diff --name-only <a>..<b>\` |
-| \`--diff\` | \`git diff --name-only main...HEAD\` |
-| whole (no arg) | \`git ls-files\` |
-
-If \`--range\`/\`--diff\` is used outside a git repository, surface the git error
-and **STOP**. If the resolved list is **empty**, emit exactly one line and
-**STOP** — no dispatch, no REVIEW SUMMARY:
-
-\`\`\`text
-Nothing in scope. Widen it with --path <subtree>, --range <a>..<b>, or --diff.
-\`\`\`
-
-## Step 3 — Dispatch ONLY the security-expert
-
-Dispatch the **single** \`security-expert\` agent — never a team, never
-another axis. Give it the resolved file list and an **audit framing**: judge
-the security shape of the scoped code (input validation, authz, secrets,
-injection, SSRF, path traversal, silent error swallowing) — not a per-line
-review. Do not pass a \`model:\` override — a lens runs on the tier its agent file declares.
-
-**Name the knowledge base in the dispatch prompt.** The agent is required
-to read \`.specnaut/memory/security/00-triage.md\` plus the domain files its
-routing table selects, before reporting anything. Say so explicitly rather
-than assuming — an agent that skips the triage gate produces a report full
-of unreachable pattern matches. If the scope is obviously one-sided (a
-migration, an auth module, a CI workflow), name the domain file yourself so
-the agent does not have to guess:
-
-\`\`\`text
-Before judging anything, read .specnaut/memory/security/00-triage.md, then
-README.md, then the domain files its routing table selects for this scope
-(here: 03-injection-and-input.md and 07-data-protection.md). Report using
-the finding format defined in 00-triage.md.
-\`\`\`
-
-## Step 4 — Return findings inline
-
-Return the agent's findings inline. The \`security-expert\` ends with the
-canonical \`REVIEW SUMMARY\` block (verdict + severity counts, per the
-review-findings-contract, #378) — surface it verbatim. **Write no report
-file.**
-
-## How this differs — disambiguation
-
-- **\`/sec-audit\`** (this skill) — dispatches the **one** \`security-expert\`
-  over a scope and returns findings **inline**. No report file.
-- **\`/code-audit\`** — the **multi-seat** team audit: dispatches every
-  applicable expert (architecture / security / performance / a11y /
-  dependency) in parallel and synthesizes one combined report. Use it for a
-  broad health-check, not a single axis.
-`,
-    executable: false,
-    backend: null,
-    skipIfExists: false,
-  },
-  {
-    category: "skill",
-    name: "perf-audit",
-    suffix: null,
-    content: `---
-name: perf-audit
-description: Single-axis performance audit of a scope. Use when the user says "perf audit", "performance audit", "audit for performance issues", "check for N+1 queries", or "review the performance of <path>". Dispatches ONLY the performance-expert over a resolved scope (N+1 / hot paths / re-renders / caching) and returns its findings inline. Read-only — writes no report file.
-argument-hint: "[--path <subtree> | --range <a>..<b> | --diff]"
----
-
-# Performance Audit — single-axis dispatch
-
-A **thin, read-only** audit of one axis: performance. This skill resolves a
-scope, dispatches the **single** \`performance-expert\` agent over it, and
-returns that agent's findings **inline**. It writes **no file** and mutates
-**no tracked files** — \`git status\` is unchanged after a run.
-
-It judges the *shape* of the code on its axis — N+1 queries / hot paths /
-re-renders / caching — not line-by-line PR nitpicks.
-
-## Step 1 — Parse the scope argument
-
-Accept exactly one optional scope argument. The accepted forms are:
-
-\`\`\`text
-/perf-audit                      # whole repo
-/perf-audit --path <subtree>     # files under a subtree
-/perf-audit --range <a>..<b>     # files changed in a commit range
-/perf-audit --diff               # files changed on current branch vs main
-\`\`\`
-
-If the argument is **unrecognized**, print the four accepted forms above and
-**STOP**. Never silently fall back to a whole-repo audit.
-
-## Step 2 — Resolve the scope file list
-
-Run the matching git command for the parsed shape:
-
-| Shape | Command |
-|---|---|
-| \`--path <subtree>\` | \`git ls-files <subtree>\` |
-| \`--range <a>..<b>\` | \`git diff --name-only <a>..<b>\` |
-| \`--diff\` | \`git diff --name-only main...HEAD\` |
-| whole (no arg) | \`git ls-files\` |
-
-If \`--range\`/\`--diff\` is used outside a git repository, surface the git error
-and **STOP**. If the resolved list is **empty**, emit exactly one line and
-**STOP** — no dispatch, no REVIEW SUMMARY:
-
-\`\`\`text
-Nothing in scope. Widen it with --path <subtree>, --range <a>..<b>, or --diff.
-\`\`\`
-
-## Step 3 — Dispatch ONLY the performance-expert
-
-Dispatch the **single** \`performance-expert\` agent — never a team, never
-another axis. Give it the resolved file list and an **audit framing**: judge
-the performance shape of the scoped code (N+1 queries, blocking I/O on hot
-paths, missing indexes, cache misuse, hot-path allocation, sync-in-async,
-large bundles, render-thrash) — not a per-line review. Do not pass a \`model:\` override — a lens runs on the tier its agent file declares.
-
-## Step 4 — Return findings inline
-
-Return the agent's findings inline. The \`performance-expert\` ends with the
-canonical \`REVIEW SUMMARY\` block (verdict + severity counts, per the
-review-findings-contract, #378) — surface it verbatim. **Write no report
-file.**
-
-## How this differs — disambiguation
-
-- **\`/perf-audit\`** (this skill) — dispatches the **one** \`performance-expert\`
-  over a scope and returns findings **inline**. No report file.
-- **\`/code-audit\`** — the **multi-seat** team audit: dispatches every
-  applicable expert (architecture / security / performance / a11y /
-  dependency) in parallel and synthesizes one combined report. Use it for a
-  broad health-check, not a single axis.
-`,
-    executable: false,
-    backend: null,
-    skipIfExists: false,
-  },
-  {
-    category: "skill",
-    name: "dep-audit",
-    suffix: null,
-    content: `---
-name: dep-audit
-description: Single-axis dependency audit of a scope. Use when the user says "dep audit", "dependency audit", "audit the dependencies", "check the lockfile", or "review the dependencies of <path>". Dispatches ONLY the dependency-expert over a resolved scope (ranges / lockfiles / unused / licenses / typosquats) and returns its findings inline. Read-only — writes no report file.
-argument-hint: "[--path <subtree> | --range <a>..<b> | --diff]"
----
-
-# Dependency Audit — single-axis dispatch
-
-A **thin, read-only** audit of one axis: dependencies. This skill resolves a
-scope, dispatches the **single** \`dependency-expert\` agent over it, and
-returns that agent's findings **inline**. It writes **no file** and mutates
-**no tracked files** — \`git status\` is unchanged after a run.
-
-It judges the *shape* of the code on its axis — version ranges / lockfiles /
-unused declarations / licenses / typosquats — not line-by-line PR nitpicks.
-
-## Step 1 — Parse the scope argument
-
-Accept exactly one optional scope argument. The accepted forms are:
-
-\`\`\`text
-/dep-audit                      # whole repo
-/dep-audit --path <subtree>     # files under a subtree
-/dep-audit --range <a>..<b>     # files changed in a commit range
-/dep-audit --diff               # files changed on current branch vs main
-\`\`\`
-
-If the argument is **unrecognized**, print the four accepted forms above and
-**STOP**. Never silently fall back to a whole-repo audit.
-
-## Step 2 — Resolve the scope file list
-
-Run the matching git command for the parsed shape:
-
-| Shape | Command |
-|---|---|
-| \`--path <subtree>\` | \`git ls-files <subtree>\` |
-| \`--range <a>..<b>\` | \`git diff --name-only <a>..<b>\` |
-| \`--diff\` | \`git diff --name-only main...HEAD\` |
-| whole (no arg) | \`git ls-files\` |
-
-If \`--range\`/\`--diff\` is used outside a git repository, surface the git error
-and **STOP**. If the resolved list is **empty**, emit exactly one line and
-**STOP** — no dispatch, no REVIEW SUMMARY:
-
-\`\`\`text
-Nothing in scope. Widen it with --path <subtree>, --range <a>..<b>, or --diff.
-\`\`\`
-
-## Step 3 — Dispatch ONLY the dependency-expert
-
-Dispatch the **single** \`dependency-expert\` agent — never a team, never
-another axis. Give it the resolved file list and an **audit framing**: judge
-the dependency hygiene of the scoped manifests (outdated pins, unbounded
-ranges, unused declared deps, license violations, advisory-shape signals,
-peer-dep conflicts, typosquatting heuristics) — not a per-line review. Do not pass a \`model:\` override — a lens runs on the tier its agent file declares.
-
-Include its Step 0 in the dispatch prompt, verbatim: read
-\`.specnaut/memory/security/06-supply-chain-and-integrity.md\`
-before writing a finding — it owns the *shape* of the supply chain (pinning,
-lockfiles, provenance, dependency confusion, transitive weight) and the agent
-owns what that file hands back (license policy, version currency, per-manifest
-mechanics). The agent must state which sources it read at the top of its
-findings, and downgrade to \`Suspicion —\` at LOW anything it cannot cite. If
-\`.specnaut/memory/security/\` is absent, it says so in one line instead.
-
-## Step 4 — Return findings inline
-
-Return the agent's findings inline. The \`dependency-expert\` ends with the
-canonical \`REVIEW SUMMARY\` block (verdict + severity counts, per the
-review-findings-contract, #378) — surface it verbatim. **Write no report
-file.**
-
-## How this differs — disambiguation
-
-- **\`/dep-audit\`** (this skill) — dispatches the **one** \`dependency-expert\`
-  over a scope and returns findings **inline**. No report file.
-- **\`/code-audit\`** — the **multi-seat** team audit: dispatches every
-  applicable expert (architecture / security / performance / a11y /
-  dependency) in parallel and synthesizes one combined report. Use it for a
-  broad health-check, not a single axis.
-`,
-    executable: false,
-    backend: null,
-    skipIfExists: false,
-  },
-  {
-    category: "skill",
-    name: "a11y-audit",
-    suffix: null,
-    content: `---
-name: a11y-audit
-description: Single-axis accessibility audit of a scope. Use when the user says "a11y audit", "accessibility audit", "audit for accessibility", "check WCAG compliance", or "review the accessibility of <path>". Dispatches ONLY the accessibility-expert over a resolved scope (WCAG 2.1 AA over front-end source) and returns its findings inline. Read-only — writes no report file.
-argument-hint: "[--path <subtree> | --range <a>..<b> | --diff]"
----
-
-# Accessibility Audit — single-axis dispatch
-
-A **thin, read-only** audit of one axis: accessibility. This skill resolves a
-scope, dispatches the **single** \`accessibility-expert\` agent over it, and returns
-that agent's findings **inline**. It writes **no file** and mutates **no
-tracked files** — \`git status\` is unchanged after a run.
-
-It judges the *shape* of the code on its axis — WCAG 2.1 AA over front-end
-source — not line-by-line PR nitpicks.
-
-## Step 1 — Parse the scope argument
-
-Accept exactly one optional scope argument. The accepted forms are:
-
-\`\`\`text
-/a11y-audit                      # whole repo
-/a11y-audit --path <subtree>     # files under a subtree
-/a11y-audit --range <a>..<b>     # files changed in a commit range
-/a11y-audit --diff               # files changed on current branch vs main
-\`\`\`
-
-If the argument is **unrecognized**, print the four accepted forms above and
-**STOP**. Never silently fall back to a whole-repo audit.
-
-## Step 2 — Resolve the scope file list
-
-Run the matching git command for the parsed shape:
-
-| Shape | Command |
-|---|---|
-| \`--path <subtree>\` | \`git ls-files <subtree>\` |
-| \`--range <a>..<b>\` | \`git diff --name-only <a>..<b>\` |
-| \`--diff\` | \`git diff --name-only main...HEAD\` |
-| whole (no arg) | \`git ls-files\` |
-
-If \`--range\`/\`--diff\` is used outside a git repository, surface the git error
-and **STOP**. If the resolved list is **empty**, emit exactly one line and
-**STOP** — no dispatch, no REVIEW SUMMARY:
-
-\`\`\`text
-Nothing in scope. Widen it with --path <subtree>, --range <a>..<b>, or --diff.
-\`\`\`
-
-## Step 3 — Dispatch ONLY the accessibility-expert
-
-Dispatch the **single** \`accessibility-expert\` agent — never a team, never another
-axis. Give it the resolved file list and an **audit framing**: judge the
-accessibility shape of the scoped front-end source (semantic HTML, heading
-hierarchy, alt text, form labels, keyboard nav, focus indicators, ARIA
-correctness, color contrast where computable) — not a per-line review. Do not pass a \`model:\` override — a lens runs on the tier its agent file declares.
-
-Include its Step 0 in the dispatch prompt, verbatim: read
-\`.specnaut/memory/a11y/00-triage.md\` first — it sets Level A/AA scope, the
-severity rubric, and the list of things source cannot establish — then route
-by surface through \`.specnaut/memory/a11y/README.md\`, and read the matching
-leaf's \`## When it is NOT a finding\` before shipping each finding. The agent
-must state which sources it read, cite the criterion by number **and** name,
-and downgrade to \`Suspicion —\` at LOW anything it cannot attribute. If
-\`.specnaut/memory/a11y/\` is absent, it says so in one line instead.
-
-## Step 4 — Return findings inline
-
-Return the agent's findings inline. The \`accessibility-expert\` ends with the
-canonical \`REVIEW SUMMARY\` block (verdict + severity counts, per the
-review-findings-contract, #378) — surface it verbatim. **Write no report
-file.**
-
-## How this differs — disambiguation
-
-- **\`/a11y-audit\`** (this skill) — dispatches the **one** \`accessibility-expert\`
-  over a scope and returns findings **inline**. No report file.
-- **\`/code-audit\`** — the **multi-seat** team audit: dispatches every
-  applicable expert (architecture / security / performance / a11y /
-  dependency) in parallel and synthesizes one combined report. Use it for a
-  broad health-check, not a single axis.
-`,
-    executable: false,
     backend: null,
     skipIfExists: false,
   },
@@ -23602,14 +23216,14 @@ with a real invariant, not an undescribed state.
     suffix: "backlog.md",
     content: `# Backlog
 
-> Managed by the Product Owner agent (\`/board\`). Each task is one
+> Managed by the Product Owner agent (\`/task\`). Each task is one
 > file under \`.specnaut/backlog/NNN-slug.md\` with frontmatter; this
 > index lists items grouped by status column.
 
 The 5 status columns mirror the GitHub Projects "kanban" model:
 
 - **Backlog** — needs more info, sizing, or prioritisation. The PO
-  works these on \`/board groom\` until they're ready.
+  works these on \`/task groom\` until they're ready.
 - **Ready** — clarified, sized, prioritised. The PO proposes these
   for development when asked "what's next".
 - **In progress** — actively being worked on (a branch is open).
@@ -23631,7 +23245,7 @@ created: ...
 ---
 \`\`\`
 
-The PO assigns size + priority during the \`/board groom\` pass.
+The PO assigns size + priority during the \`/task groom\` pass.
 
 ---
 
@@ -23732,7 +23346,7 @@ above so projects that later migrate to a remote backend keep continuity.
 **Branch**: \`[###-feature-name]\` | **Date**: [DATE] | **Backlog item**: [#N — title, as a link]
 
 **This is the feature's one planning document.** Business and technical together, read whole by
-whoever implements it. Filled in by \`/specnaut plan\`; the phase doc
+whoever implements it. Filled in by \`/task plan\`; the phase doc
 (\`phases/plan.md\`) is the procedure, this file is the shape.
 
 All twelve sections below are **mandatory**. Remove a section's placeholder text, never the
@@ -23858,7 +23472,7 @@ only" is a valid answer; an unstated one is not.]
 \`\`\`text
 .specnaut/specs/[###-feature]/
 ├── plan.md    # This file — the whole plan
-└── tasks.md   # \`/specnaut tasks\` output, derived from THIS file once approved
+└── tasks.md   # \`/task tasks\` output, derived from THIS file once approved
 \`\`\`
 
 Two files. There is no \`research.md\`, \`data-model.md\`, \`quickstart.md\` or \`contracts/\` — where that
@@ -23968,7 +23582,7 @@ description: "Task list template for feature implementation"
   ============================================================================
   IMPORTANT: The tasks below are SAMPLE TASKS for illustration purposes only.
   
-  The \`/specnaut tasks\` phase MUST replace these with actual tasks based on:
+  The \`/task tasks\` phase MUST replace these with actual tasks based on:
   - User stories and their priorities from plan.md § 2 (User scenarios)
   - Feature requirements from plan.md § 3 (Requirements)
   - Entities from plan.md § 6 (Technical context → Domain model)
@@ -24548,20 +24162,20 @@ fi
 # Validate required directories and files
 if [[ ! -d "\$FEATURE_DIR" ]]; then
     echo "ERROR: Feature directory not found: \$FEATURE_DIR" >&2
-    echo "Run /specnaut plan first to create the feature structure." >&2
+    echo "Run /task plan first to create the feature structure." >&2
     exit 1
 fi
 
 if [[ ! -f "\$IMPL_PLAN" ]]; then
     echo "ERROR: plan.md not found in \$FEATURE_DIR" >&2
-    echo "Run /specnaut plan first to create the implementation plan." >&2
+    echo "Run /task plan first to create the implementation plan." >&2
     exit 1
 fi
 
 # Check for tasks.md if required
 if \$REQUIRE_TASKS && [[ ! -f "\$TASKS" ]]; then
     echo "ERROR: tasks.md not found in \$FEATURE_DIR" >&2
-    echo "Run /specnaut tasks first to create the task list." >&2
+    echo "Run /task tasks first to create the task list." >&2
     exit 1
 fi
 
@@ -24868,7 +24482,7 @@ get_feature_paths() {
 
     # Resolve feature directory.  Priority:
     #   1. SPECIFY_FEATURE_DIRECTORY env var (explicit override)
-    #   2. .specnaut/feature.json "feature_directory" key (persisted by /specnaut plan)
+    #   2. .specnaut/feature.json "feature_directory" key (persisted by /task plan)
     #   3. Branch-name-based prefix lookup (legacy fallback)
     local feature_dir
     local feature_dir_source
@@ -25380,7 +24994,7 @@ while [ \$i -le \$# ]; do
             echo "  --json              Output in JSON format"
             echo "  --dry-run           Compute branch name and paths without creating branches, directories, or files"
             echo "  --branch-only       Create ONLY the git branch — skip the spec directory + spec file."
-            echo "                      Used by cloud-mode /specnaut implement, where the spec lives on"
+            echo "                      Used by cloud-mode /task implement, where the spec lives on"
             echo "                      SpecNaut Cloud and the branch is created at implement (not specify)."
             echo "  --allow-existing-branch  Switch to branch if it already exists instead of failing"
             echo "  --short-name <name> Provide a custom short name (2-4 words) for the branch"
@@ -25388,7 +25002,7 @@ while [ \$i -le \$# ]; do
             echo "  --timestamp         Use timestamp prefix (YYYYMMDD-HHMMSS) instead of sequential numbering"
             echo "  --issue <id>        Link this feature to a backlog issue (id is a positive integer);"
             echo "                      surfaces in JSON output and is persisted to .specnaut/feature.json"
-            echo "                      so /specnaut merge can close the loop on the project board."
+            echo "                      so /task merge can close the loop on the project board."
             echo "  --help, -h          Show this help message"
             echo ""
             echo "Examples:"
@@ -25838,7 +25452,7 @@ if [ "\$DRY_RUN" != true ]; then
     fi
 
     # --branch-only: create the branch above but skip the spec directory + file.
-    # In cloud spec mode the spec lives on SpecNaut Cloud, so /specnaut implement
+    # In cloud spec mode the spec lives on SpecNaut Cloud, so /task implement
     # only needs the branch (the decoupling point — no local .specnaut/specs/ dir).
     if [ "\$BRANCH_ONLY" != true ]; then
         mkdir -p "\$FEATURE_DIR"
@@ -26168,7 +25782,7 @@ echo auto
 #
 # Prints the name on stdout: what origin/HEAD points at (the remote's own
 # default), else the configured \`init.defaultBranch\`. Neither → exit 3,
-# unknown. Callers never substitute \`main\` for unknown: \`/specnaut merge\`
+# unknown. Callers never substitute \`main\` for unknown: \`/task merge\`
 # stops and asks for the base, and the landing hook gates every landing.
 #
 # Usage: base-branch.sh
@@ -26783,20 +26397,20 @@ if (\$PathsOnly) {
 # Validate required directories and files
 if (-not (Test-Path \$paths.FEATURE_DIR -PathType Container)) {
     Write-Output "ERROR: Feature directory not found: \$(\$paths.FEATURE_DIR)"
-    Write-Output "Run /specnaut.specify first to create the feature structure."
+    Write-Output "Run /task plan first to create the feature structure."
     exit 1
 }
 
 if (-not (Test-Path \$paths.IMPL_PLAN -PathType Leaf)) {
     Write-Output "ERROR: plan.md not found in \$(\$paths.FEATURE_DIR)"
-    Write-Output "Run /specnaut.plan first to create the implementation plan."
+    Write-Output "Run /task plan first to create the implementation plan."
     exit 1
 }
 
 # Check for tasks.md if required
 if (\$RequireTasks -and -not (Test-Path \$paths.TASKS -PathType Leaf)) {
     Write-Output "ERROR: tasks.md not found in \$(\$paths.FEATURE_DIR)"
-    Write-Output "Run /specnaut.tasks first to create the task list."
+    Write-Output "Run /task tasks first to create the task list."
     exit 1
 }
 
@@ -27071,7 +26685,7 @@ function Get-FeaturePathsEnv {
 
     # Resolve feature directory.  Priority:
     #   1. SPECIFY_FEATURE_DIRECTORY env var (explicit override)
-    #   2. .specnaut/feature.json "feature_directory" key (persisted by /specnaut.specify)
+    #   2. .specnaut/feature.json "feature_directory" key (persisted by /task plan)
     #   3. Branch-name-based prefix lookup (same as scripts/bash/common.sh)
     \$featureJson = Join-Path \$repoRoot '.specnaut/feature.json'
     \$featureDirSource = 'branch'
@@ -27481,7 +27095,7 @@ if (\$Help) {
     Write-Host "  -Timestamp          Use timestamp prefix (YYYYMMDD-HHMMSS) instead of sequential numbering"
     Write-Host "  -Issue <id>         Link this feature to a backlog issue (positive integer);"
     Write-Host "                      surfaces in JSON output and is persisted to .specnaut/feature.json"
-    Write-Host "                      so /specnaut merge can close the loop on the project board."
+    Write-Host "                      so /task merge can close the loop on the project board."
     Write-Host "  -Help               Show this help message"
     Write-Host ""
     Write-Host "Examples:"
@@ -28194,7 +27808,7 @@ full_gate: []
     category: "spec-root",
     name: "specify",
     suffix: "workflow.yml",
-    content: `# How far the /specnaut chain goes on its own.
+    content: `# How far the /task chain goes on its own.
 #
 # The chain is plan → tasks → implement → review → merge. Its one mandatory
 # stop is the end of \`plan\`: the architecture, both audits' findings and the
@@ -28216,14 +27830,14 @@ full_gate: []
 #                    it lands. A hook enforces it: every merge into, or push
 #                    of, the base branch is held — Claude Code shows its
 #                    permission prompt, Codex refuses — until your own prompt
-#                    in that turn says \`merge\` or \`/specnaut merge\`.
+#                    in that turn says \`merge\` or \`/task merge\`.
 #
-# A single run can make the chain stricter: \`/specnaut … --manual-merge\`, or
+# A single run can make the chain stricter: \`/task … --manual-merge\`, or
 # "stop before merging" in the request, means manual for that run. It cannot
 # loosen this file: under \`merge: manual\` a "merge it" earlier in the run moves
 # the chain, but the hook still waits for the word in the turn that lands.
-# Typing \`/specnaut merge\` yourself is always the instruction to merge and
-# push. \`/specnaut merge --pr\` delivers through a pull request instead of
+# Typing \`/task merge\` yourself is always the instruction to merge and
+# push. \`/task merge --pr\` delivers through a pull request instead of
 # a local merge, whichever mode is set here. Remote mode (\`specnaut gate\`)
 # raises its merge-approval gate in both modes.
 #
@@ -28434,13 +28048,19 @@ It is in force on **every** turn, not only when a skill or an agent is involved.
 
 *Owned by Specnaut — this section is not a placeholder to fill in. Edit the rest freely.*
 
-**Whenever you run a \`/specnaut\` or \`/ship\` phase, however it was reached** — the router, a
-per-phase command or workflow, a chained step — read \`.specnaut/addenda/<skill>/<phase>.md\` if it
-exists: \`<skill>\` is \`specnaut\` or \`ship\`, \`<phase>\` the phase's name (\`plan\`, \`review\`,
-\`release\`), so \`/ship release\` reads \`.specnaut/addenda/ship/release.md\`. It is this project's own
-addition to that phase. It adds to the phase at the step it names and never replaces or skips a
-bundled step: where it contradicts one, the bundled step stands and you say so. No file means no
-addendum — say nothing about it.
+**Whenever you run one of these, however it was reached** — a router, a per-phase command or
+workflow, a chained step — read its addendum if the file exists:
+
+| What runs | Its addendum |
+| :--- | :--- |
+| \`plan\`, \`tasks\`, \`implement\`, \`review\`, \`merge\`, \`audit\`, \`constitution\`, \`groom\` | \`.specnaut/addenda/task/<name>.md\` |
+| \`tag\`, \`release\` | \`.specnaut/addenda/ship/<name>.md\` |
+| \`doc\`, \`list\`, \`upgrade\` | \`.specnaut/addenda/specnaut/<name>.md\` |
+
+So \`/task plan\` reads \`.specnaut/addenda/task/plan.md\`, and so does any older router that still runs
+a \`plan\` phase. It is this project's own addition to that phase. It adds to the phase at the step it
+names and never replaces or skips a bundled step: where it contradicts one, the bundled step stands
+and you say so. No file means no addendum — say nothing about it.
 
 <!-- --- End Specnaut: phase-addenda --- -->
 
@@ -28477,19 +28097,19 @@ Each name is the \`name\` of an agent Specnaut scaffolded for your harness.
 *Owned by Specnaut — this section is not a placeholder to fill in. Edit the rest freely.*
 
 <!-- BEGIN: backend=local -->
-The backlog is managed through the \`board\` skill — local Markdown backend, indexed in
+The backlog is managed through the \`task\` skill — local Markdown backend, indexed in
 \`.specnaut/backlog.md\`.
 <!-- END: backend=local -->
 <!-- BEGIN: backend=github -->
-The backlog is managed through the \`board\` skill — GitHub Issues and a GitHub Project, configured
+The backlog is managed through the \`task\` skill — GitHub Issues and a GitHub Project, configured
 in \`.specnaut/backlog-config.yml\`.
 <!-- END: backend=github -->
 <!-- BEGIN: backend=gitlab -->
-The backlog is managed through the \`board\` skill — GitLab Issues, configured in
+The backlog is managed through the \`task\` skill — GitLab Issues, configured in
 \`.specnaut/backlog-config.yml\`.
 <!-- END: backend=gitlab -->
 <!-- BEGIN: backend=cloud -->
-The backlog is managed through the \`board\` skill — Specnaut Cloud, configured in
+The backlog is managed through the \`task\` skill — Specnaut Cloud, configured in
 \`.specnaut/backlog-config.yml\`.
 <!-- END: backend=cloud -->
 
@@ -28511,7 +28131,7 @@ scaffolded for a harness without such features gets none here.
 
 - **Periodic maintenance** — \`/loop 1h\` runs the prompt in
   \`.claude/loop.md\` every hour. The bundled default delegates to the
-  \`/board groom\` skill (groom backlog, surface stale PRs, list orphan
+  \`/task groom\` skill (groom backlog, surface stale PRs, list orphan
   specs); edit \`loop.md\` freely to add project-specific checks. See
   https://code.claude.com/docs/en/scheduled-tasks.
 
@@ -28532,7 +28152,7 @@ scaffolded for a harness without such features gets none here.
   picker automatically — start one with the agent name as the first
   word, e.g. \`developer fix the lint errors in src/cli/\`, \`@qa-tester
   run a sandbox smoke pass\`, or \`@product-owner groom the backlog\`.
-  Skills are dispatchable too: \`/specnaut plan "<feature>"\` launches
+  Skills are dispatchable too: \`/task plan "<feature>"\` launches
   a session running the full spec-plan-tasks chain. File edits are
   isolated under \`.claude/worktrees/\` (git worktrees), so several
   Specnaut agents can work in parallel without stepping on each
@@ -28759,7 +28379,7 @@ this project's hygiene needs.
 
 Run a hygiene pass on this Specnaut project:
 
-1. Invoke the \`/board groom\` skill — it grooms the backlog, surfaces
+1. Invoke the \`/task groom\` skill — it grooms the backlog, surfaces
    stale PRs, and flags orphan specs.
 2. If anything actionable came out of the pass, summarize it concisely
    so the human reading the loop output can decide what to do.
@@ -28770,7 +28390,7 @@ Run a hygiene pass on this Specnaut project:
 
 - **Active development**: \`/loop 1h\` — frequent grooming during a sprint.
 - **Quiet projects**: \`/loop 12h\` or \`/loop 24h\` — daily cadence.
-- **One-off check**: just \`/board groom\` (no loop) — runs once and exits.
+- **One-off check**: just \`/task groom\` (no loop) — runs once and exits.
 
 ## Customizing further
 
@@ -28798,7 +28418,7 @@ off.
 > then \`/reload-plugins\`. To turn it on for everyone who clones this repo,
 > add \`"enabledPlugins": {"security-guidance@claude-plugins-official": true}\`
 > to \`.claude/settings.json\`. Without the plugin this file is inert — the
-> \`security-expert\` agent and \`/sec-audit\` still work, and read the same
+> \`security-expert\` agent and \`/task audit --security\` still work, and read the same
 > knowledge base.
 
 ## The full knowledge base lives in the repo
@@ -29736,8 +29356,10 @@ cmd_git() {
 # outlives its turn — Stop ends it, the next prompt replaces it. A prompt then
 # mints one only when the WHOLE prompt (trimmed, lowercased, spaces collapsed,
 # a trailing . or ! dropped, an optional leading "yes, ") is one of:
-#   merge    /specnaut merge…  \$specnaut merge…  merge  merge it  land it  push it
-#   release  /ship release…  /ship tag…  \$ship release…  \$ship tag…  release it  tag it
+#   merge    /task merge…  /specnaut-task merge…  \$specnaut-task merge…  merge  merge it  land it  push it
+#   release  /ship release|tag…  /specnaut-ship release|tag…  \$specnaut-ship release|tag…  release it  tag it
+# Claude spells the skills /task, /ship; Codex /specnaut-task or \$specnaut-task
+# (harness_commands.ts). A test holds these spellings to harnessCommands.
 # Never a bare yes/ok/go: a reply to some other question must not land code.
 # A prompt carrying agent_id comes from a subagent, not the user (§ 11
 # Measured): nothing is minted or deleted for it.
@@ -29763,11 +29385,17 @@ approval_kind_of() {
     case \$p in *. | *!) p=\${p%?} ;; *) break ;; esac
   done
   case \$p in "yes, "*) p=\${p#yes, } ;; esac
-  # shellcheck disable=SC2016 # the \$ is literal: Codex invokes skills as \`\$specnaut\`
+  # shellcheck disable=SC2016 # the \$ is literal: Codex invokes skills as \`\$specnaut-task\`
   case \$p in
-    merge | "merge it" | "land it" | "push it" | "/specnaut merge" | "/specnaut merge "* | '\$specnaut merge' | '\$specnaut merge '*)
+    merge | "merge it" | "land it" | "push it" | \\
+      "/task merge" | "/task merge "* | \\
+      "/specnaut-task merge" | "/specnaut-task merge "* | \\
+      '\$specnaut-task merge' | '\$specnaut-task merge '*)
       echo merge ;;
-    "release it" | "tag it" | "/ship release" | "/ship release "* | "/ship tag" | "/ship tag "* | '\$ship release' | '\$ship release '* | '\$ship tag' | '\$ship tag '*)
+    "release it" | "tag it" | \\
+      "/ship release" | "/ship release "* | "/ship tag" | "/ship tag "* | \\
+      "/specnaut-ship release" | "/specnaut-ship release "* | "/specnaut-ship tag" | "/specnaut-ship tag "* | \\
+      '\$specnaut-ship release' | '\$specnaut-ship release '* | '\$specnaut-ship tag' | '\$specnaut-ship tag '*)
       echo release ;;
   esac
 }
@@ -29921,7 +29549,7 @@ done
 
 approval_gate merge \\
   "merge: manual — \$(IFS=';'; echo "\${reasons[*]}") would land on the base branch (\${base:-unknown}) without the user" \\
-  "\\\`merge\\\` (or \\\`/specnaut merge\\\`)"
+  "\\\`merge\\\` (or \\\`/task merge\\\`)"
 `,
       executable: true,
     },
@@ -30210,7 +29838,7 @@ fi
 [ \${#gated[@]} -gt 0 ] || guard_allow
 approval_gate merge \\
   "editing \${gated[*]} changes how Specnaut gates landings on the base branch, so it needs the user" \\
-  "\\\`merge\\\` (or \\\`/specnaut merge\\\`)"
+  "\\\`merge\\\` (or \\\`/task merge\\\`)"
 `,
       executable: true,
     },
@@ -30419,12 +30047,12 @@ d248ada612da7ce04d3d2cd4f8576070c62371166e35ed6351b0069fcd066fad  _approval.sh
 fa8afb422b9af3b7f80580666d66e9332ed35cc3c24c7182300b3224f2a96548  _git.sh
 2829e6a5db6984fee451e242ba16beca68808a7647316cff24930aa8ec53c73a  _guard.sh
 7675a9df90d21f2390940870fa8458d09e7418a68de7d682b3f8d6a36a94019c  _simple.sh
-7ef60a25af68fa7d84d1c65c44bc8ce4801f29f83439b858775afa44ea77262d  approve-on-prompt.sh
+f12446930a31e489c0a3edc8599c47aab2c90dcdb156d6c849d0b760e8ddc84e  approve-on-prompt.sh
 28d13e1fbd696f79036cc1f94c3fd6aa68f4f862f0dd5f6d32191ad05392534f  guard-dispatch-model.sh
-e2f7d4779e26518bea16290522367d452af0fd088d68c9dec18eaa7c0b94e279  guard-merge.sh
+09103676aa00371ece40171b577cfbe24e02fdfcfe39c47ff2905ed189708499  guard-merge.sh
 6f8dd791eb7c797dae9f9c5f6f6bc0d07c2930552aa9087ccc8b619f0844476e  guard-release.sh
 3364feb0f3a7892224b67e4f857bb6c085456da98c892d7199c4bbd10f122f8b  log-subagent.sh
-4f188591173cb0790bcf411ec15023110315c84d306c55365b002ca39849d7b0  protect-generated.sh
+b235e7b333245290ac890804d5f95338eaaf87b6141e0fb51b319e676b95b1c7  protect-generated.sh
 4e0f336ed4eafecca2904fba2aab427d3e8528889aa68e9e347c4ac03dc53853  release-commands.txt
 `,
       executable: false,
@@ -31055,8 +30683,10 @@ cmd_git() {
 # outlives its turn — Stop ends it, the next prompt replaces it. A prompt then
 # mints one only when the WHOLE prompt (trimmed, lowercased, spaces collapsed,
 # a trailing . or ! dropped, an optional leading "yes, ") is one of:
-#   merge    /specnaut merge…  \$specnaut merge…  merge  merge it  land it  push it
-#   release  /ship release…  /ship tag…  \$ship release…  \$ship tag…  release it  tag it
+#   merge    /task merge…  /specnaut-task merge…  \$specnaut-task merge…  merge  merge it  land it  push it
+#   release  /ship release|tag…  /specnaut-ship release|tag…  \$specnaut-ship release|tag…  release it  tag it
+# Claude spells the skills /task, /ship; Codex /specnaut-task or \$specnaut-task
+# (harness_commands.ts). A test holds these spellings to harnessCommands.
 # Never a bare yes/ok/go: a reply to some other question must not land code.
 # A prompt carrying agent_id comes from a subagent, not the user (§ 11
 # Measured): nothing is minted or deleted for it.
@@ -31082,11 +30712,17 @@ approval_kind_of() {
     case \$p in *. | *!) p=\${p%?} ;; *) break ;; esac
   done
   case \$p in "yes, "*) p=\${p#yes, } ;; esac
-  # shellcheck disable=SC2016 # the \$ is literal: Codex invokes skills as \`\$specnaut\`
+  # shellcheck disable=SC2016 # the \$ is literal: Codex invokes skills as \`\$specnaut-task\`
   case \$p in
-    merge | "merge it" | "land it" | "push it" | "/specnaut merge" | "/specnaut merge "* | '\$specnaut merge' | '\$specnaut merge '*)
+    merge | "merge it" | "land it" | "push it" | \\
+      "/task merge" | "/task merge "* | \\
+      "/specnaut-task merge" | "/specnaut-task merge "* | \\
+      '\$specnaut-task merge' | '\$specnaut-task merge '*)
       echo merge ;;
-    "release it" | "tag it" | "/ship release" | "/ship release "* | "/ship tag" | "/ship tag "* | '\$ship release' | '\$ship release '* | '\$ship tag' | '\$ship tag '*)
+    "release it" | "tag it" | \\
+      "/ship release" | "/ship release "* | "/ship tag" | "/ship tag "* | \\
+      "/specnaut-ship release" | "/specnaut-ship release "* | "/specnaut-ship tag" | "/specnaut-ship tag "* | \\
+      '\$specnaut-ship release' | '\$specnaut-ship release '* | '\$specnaut-ship tag' | '\$specnaut-ship tag '*)
       echo release ;;
   esac
 }
@@ -31240,7 +30876,7 @@ done
 
 approval_gate merge \\
   "merge: manual — \$(IFS=';'; echo "\${reasons[*]}") would land on the base branch (\${base:-unknown}) without the user" \\
-  "\\\`merge\\\` (or \\\`/specnaut merge\\\`)"
+  "\\\`merge\\\` (or \\\`/task merge\\\`)"
 `,
       executable: true,
     },
@@ -31529,7 +31165,7 @@ fi
 [ \${#gated[@]} -gt 0 ] || guard_allow
 approval_gate merge \\
   "editing \${gated[*]} changes how Specnaut gates landings on the base branch, so it needs the user" \\
-  "\\\`merge\\\` (or \\\`/specnaut merge\\\`)"
+  "\\\`merge\\\` (or \\\`/task merge\\\`)"
 `,
       executable: true,
     },
@@ -31738,12 +31374,12 @@ d248ada612da7ce04d3d2cd4f8576070c62371166e35ed6351b0069fcd066fad  _approval.sh
 fa8afb422b9af3b7f80580666d66e9332ed35cc3c24c7182300b3224f2a96548  _git.sh
 2829e6a5db6984fee451e242ba16beca68808a7647316cff24930aa8ec53c73a  _guard.sh
 7675a9df90d21f2390940870fa8458d09e7418a68de7d682b3f8d6a36a94019c  _simple.sh
-7ef60a25af68fa7d84d1c65c44bc8ce4801f29f83439b858775afa44ea77262d  approve-on-prompt.sh
+f12446930a31e489c0a3edc8599c47aab2c90dcdb156d6c849d0b760e8ddc84e  approve-on-prompt.sh
 28d13e1fbd696f79036cc1f94c3fd6aa68f4f862f0dd5f6d32191ad05392534f  guard-dispatch-model.sh
-e2f7d4779e26518bea16290522367d452af0fd088d68c9dec18eaa7c0b94e279  guard-merge.sh
+09103676aa00371ece40171b577cfbe24e02fdfcfe39c47ff2905ed189708499  guard-merge.sh
 6f8dd791eb7c797dae9f9c5f6f6bc0d07c2930552aa9087ccc8b619f0844476e  guard-release.sh
 3364feb0f3a7892224b67e4f857bb6c085456da98c892d7199c4bbd10f122f8b  log-subagent.sh
-4f188591173cb0790bcf411ec15023110315c84d306c55365b002ca39849d7b0  protect-generated.sh
+b235e7b333245290ac890804d5f95338eaaf87b6141e0fb51b319e676b95b1c7  protect-generated.sh
 4e0f336ed4eafecca2904fba2aab427d3e8528889aa68e9e347c4ac03dc53853  release-commands.txt
 `,
       executable: false,
@@ -31765,12 +31401,12 @@ e2f7d4779e26518bea16290522367d452af0fd088d68c9dec18eaa7c0b94e279  guard-merge.sh
         "hooks": [
           {
             "type": "command",
-            "command": "r=\$PWD; while [ -n \\"\$r\\" ] && [ ! -d \\"\$r/.specnaut/hooks\\" ]; do r=\${r%/*}; done; [ \\"\$( (sha256sum 2>/dev/null || shasum -a 256) < \\"\$r/.specnaut/hooks/SHA256SUMS\\" 2>/dev/null | cut -c1-64)\\" = \\"8fe9afa74bea1d4acbb41d4ec5af1875b4b68a6c1afc6dec16aba147c530c97f\\" ] && (cd \\"\$r/.specnaut/hooks\\" && (sha256sum -c --status SHA256SUMS 2>/dev/null || shasum -a 256 -c --status SHA256SUMS)) && exec bash \\"\$r/.specnaut/hooks/guard-merge.sh\\" codex; echo \\"specnaut: .specnaut/hooks changed since it was trusted — run specnaut upgrade, then /hooks\\" >&2; exit 2",
+            "command": "r=\$PWD; while [ -n \\"\$r\\" ] && [ ! -d \\"\$r/.specnaut/hooks\\" ]; do r=\${r%/*}; done; [ \\"\$( (sha256sum 2>/dev/null || shasum -a 256) < \\"\$r/.specnaut/hooks/SHA256SUMS\\" 2>/dev/null | cut -c1-64)\\" = \\"dccae95046ba568fe5d3a338128d69b99d9aa7d0d41c114e431c5bb922fc4471\\" ] && (cd \\"\$r/.specnaut/hooks\\" && (sha256sum -c --status SHA256SUMS 2>/dev/null || shasum -a 256 -c --status SHA256SUMS)) && exec bash \\"\$r/.specnaut/hooks/guard-merge.sh\\" codex; echo \\"specnaut: .specnaut/hooks changed since it was trusted — run specnaut upgrade, then /hooks\\" >&2; exit 2",
             "timeout": 10
           },
           {
             "type": "command",
-            "command": "r=\$PWD; while [ -n \\"\$r\\" ] && [ ! -d \\"\$r/.specnaut/hooks\\" ]; do r=\${r%/*}; done; [ \\"\$( (sha256sum 2>/dev/null || shasum -a 256) < \\"\$r/.specnaut/hooks/SHA256SUMS\\" 2>/dev/null | cut -c1-64)\\" = \\"8fe9afa74bea1d4acbb41d4ec5af1875b4b68a6c1afc6dec16aba147c530c97f\\" ] && (cd \\"\$r/.specnaut/hooks\\" && (sha256sum -c --status SHA256SUMS 2>/dev/null || shasum -a 256 -c --status SHA256SUMS)) && exec bash \\"\$r/.specnaut/hooks/guard-release.sh\\" codex; echo \\"specnaut: .specnaut/hooks changed since it was trusted — run specnaut upgrade, then /hooks\\" >&2; exit 2",
+            "command": "r=\$PWD; while [ -n \\"\$r\\" ] && [ ! -d \\"\$r/.specnaut/hooks\\" ]; do r=\${r%/*}; done; [ \\"\$( (sha256sum 2>/dev/null || shasum -a 256) < \\"\$r/.specnaut/hooks/SHA256SUMS\\" 2>/dev/null | cut -c1-64)\\" = \\"dccae95046ba568fe5d3a338128d69b99d9aa7d0d41c114e431c5bb922fc4471\\" ] && (cd \\"\$r/.specnaut/hooks\\" && (sha256sum -c --status SHA256SUMS 2>/dev/null || shasum -a 256 -c --status SHA256SUMS)) && exec bash \\"\$r/.specnaut/hooks/guard-release.sh\\" codex; echo \\"specnaut: .specnaut/hooks changed since it was trusted — run specnaut upgrade, then /hooks\\" >&2; exit 2",
             "timeout": 10
           }
         ]
@@ -31780,7 +31416,7 @@ e2f7d4779e26518bea16290522367d452af0fd088d68c9dec18eaa7c0b94e279  guard-merge.sh
         "hooks": [
           {
             "type": "command",
-            "command": "r=\$PWD; while [ -n \\"\$r\\" ] && [ ! -d \\"\$r/.specnaut/hooks\\" ]; do r=\${r%/*}; done; [ \\"\$( (sha256sum 2>/dev/null || shasum -a 256) < \\"\$r/.specnaut/hooks/SHA256SUMS\\" 2>/dev/null | cut -c1-64)\\" = \\"8fe9afa74bea1d4acbb41d4ec5af1875b4b68a6c1afc6dec16aba147c530c97f\\" ] && (cd \\"\$r/.specnaut/hooks\\" && (sha256sum -c --status SHA256SUMS 2>/dev/null || shasum -a 256 -c --status SHA256SUMS)) && exec bash \\"\$r/.specnaut/hooks/protect-generated.sh\\" codex; echo \\"specnaut: .specnaut/hooks changed since it was trusted — run specnaut upgrade, then /hooks\\" >&2; exit 2",
+            "command": "r=\$PWD; while [ -n \\"\$r\\" ] && [ ! -d \\"\$r/.specnaut/hooks\\" ]; do r=\${r%/*}; done; [ \\"\$( (sha256sum 2>/dev/null || shasum -a 256) < \\"\$r/.specnaut/hooks/SHA256SUMS\\" 2>/dev/null | cut -c1-64)\\" = \\"dccae95046ba568fe5d3a338128d69b99d9aa7d0d41c114e431c5bb922fc4471\\" ] && (cd \\"\$r/.specnaut/hooks\\" && (sha256sum -c --status SHA256SUMS 2>/dev/null || shasum -a 256 -c --status SHA256SUMS)) && exec bash \\"\$r/.specnaut/hooks/protect-generated.sh\\" codex; echo \\"specnaut: .specnaut/hooks changed since it was trusted — run specnaut upgrade, then /hooks\\" >&2; exit 2",
             "timeout": 10
           }
         ]
@@ -31790,7 +31426,7 @@ e2f7d4779e26518bea16290522367d452af0fd088d68c9dec18eaa7c0b94e279  guard-merge.sh
         "hooks": [
           {
             "type": "command",
-            "command": "r=\$PWD; while [ -n \\"\$r\\" ] && [ ! -d \\"\$r/.specnaut/hooks\\" ]; do r=\${r%/*}; done; [ \\"\$( (sha256sum 2>/dev/null || shasum -a 256) < \\"\$r/.specnaut/hooks/SHA256SUMS\\" 2>/dev/null | cut -c1-64)\\" = \\"8fe9afa74bea1d4acbb41d4ec5af1875b4b68a6c1afc6dec16aba147c530c97f\\" ] && (cd \\"\$r/.specnaut/hooks\\" && (sha256sum -c --status SHA256SUMS 2>/dev/null || shasum -a 256 -c --status SHA256SUMS)) && exec bash \\"\$r/.specnaut/hooks/guard-dispatch-model.sh\\" codex; echo \\"specnaut: .specnaut/hooks changed since it was trusted — run specnaut upgrade, then /hooks\\" >&2; exit 2",
+            "command": "r=\$PWD; while [ -n \\"\$r\\" ] && [ ! -d \\"\$r/.specnaut/hooks\\" ]; do r=\${r%/*}; done; [ \\"\$( (sha256sum 2>/dev/null || shasum -a 256) < \\"\$r/.specnaut/hooks/SHA256SUMS\\" 2>/dev/null | cut -c1-64)\\" = \\"dccae95046ba568fe5d3a338128d69b99d9aa7d0d41c114e431c5bb922fc4471\\" ] && (cd \\"\$r/.specnaut/hooks\\" && (sha256sum -c --status SHA256SUMS 2>/dev/null || shasum -a 256 -c --status SHA256SUMS)) && exec bash \\"\$r/.specnaut/hooks/guard-dispatch-model.sh\\" codex; echo \\"specnaut: .specnaut/hooks changed since it was trusted — run specnaut upgrade, then /hooks\\" >&2; exit 2",
             "timeout": 10
           }
         ]
@@ -31801,7 +31437,7 @@ e2f7d4779e26518bea16290522367d452af0fd088d68c9dec18eaa7c0b94e279  guard-merge.sh
         "hooks": [
           {
             "type": "command",
-            "command": "r=\$PWD; while [ -n \\"\$r\\" ] && [ ! -d \\"\$r/.specnaut/hooks\\" ]; do r=\${r%/*}; done; [ \\"\$( (sha256sum 2>/dev/null || shasum -a 256) < \\"\$r/.specnaut/hooks/SHA256SUMS\\" 2>/dev/null | cut -c1-64)\\" = \\"8fe9afa74bea1d4acbb41d4ec5af1875b4b68a6c1afc6dec16aba147c530c97f\\" ] && (cd \\"\$r/.specnaut/hooks\\" && (sha256sum -c --status SHA256SUMS 2>/dev/null || shasum -a 256 -c --status SHA256SUMS)) && exec bash \\"\$r/.specnaut/hooks/approve-on-prompt.sh\\" codex; echo \\"specnaut: .specnaut/hooks changed since it was trusted — run specnaut upgrade, then /hooks\\" >&2; exit 0",
+            "command": "r=\$PWD; while [ -n \\"\$r\\" ] && [ ! -d \\"\$r/.specnaut/hooks\\" ]; do r=\${r%/*}; done; [ \\"\$( (sha256sum 2>/dev/null || shasum -a 256) < \\"\$r/.specnaut/hooks/SHA256SUMS\\" 2>/dev/null | cut -c1-64)\\" = \\"dccae95046ba568fe5d3a338128d69b99d9aa7d0d41c114e431c5bb922fc4471\\" ] && (cd \\"\$r/.specnaut/hooks\\" && (sha256sum -c --status SHA256SUMS 2>/dev/null || shasum -a 256 -c --status SHA256SUMS)) && exec bash \\"\$r/.specnaut/hooks/approve-on-prompt.sh\\" codex; echo \\"specnaut: .specnaut/hooks changed since it was trusted — run specnaut upgrade, then /hooks\\" >&2; exit 0",
             "timeout": 10
           }
         ]
@@ -31812,7 +31448,7 @@ e2f7d4779e26518bea16290522367d452af0fd088d68c9dec18eaa7c0b94e279  guard-merge.sh
         "hooks": [
           {
             "type": "command",
-            "command": "r=\$PWD; while [ -n \\"\$r\\" ] && [ ! -d \\"\$r/.specnaut/hooks\\" ]; do r=\${r%/*}; done; [ \\"\$( (sha256sum 2>/dev/null || shasum -a 256) < \\"\$r/.specnaut/hooks/SHA256SUMS\\" 2>/dev/null | cut -c1-64)\\" = \\"8fe9afa74bea1d4acbb41d4ec5af1875b4b68a6c1afc6dec16aba147c530c97f\\" ] && (cd \\"\$r/.specnaut/hooks\\" && (sha256sum -c --status SHA256SUMS 2>/dev/null || shasum -a 256 -c --status SHA256SUMS)) && exec bash \\"\$r/.specnaut/hooks/approve-on-prompt.sh\\" codex; echo \\"specnaut: .specnaut/hooks changed since it was trusted — run specnaut upgrade, then /hooks\\" >&2; exit 0",
+            "command": "r=\$PWD; while [ -n \\"\$r\\" ] && [ ! -d \\"\$r/.specnaut/hooks\\" ]; do r=\${r%/*}; done; [ \\"\$( (sha256sum 2>/dev/null || shasum -a 256) < \\"\$r/.specnaut/hooks/SHA256SUMS\\" 2>/dev/null | cut -c1-64)\\" = \\"dccae95046ba568fe5d3a338128d69b99d9aa7d0d41c114e431c5bb922fc4471\\" ] && (cd \\"\$r/.specnaut/hooks\\" && (sha256sum -c --status SHA256SUMS 2>/dev/null || shasum -a 256 -c --status SHA256SUMS)) && exec bash \\"\$r/.specnaut/hooks/approve-on-prompt.sh\\" codex; echo \\"specnaut: .specnaut/hooks changed since it was trusted — run specnaut upgrade, then /hooks\\" >&2; exit 0",
             "timeout": 10
           }
         ]
@@ -31823,7 +31459,7 @@ e2f7d4779e26518bea16290522367d452af0fd088d68c9dec18eaa7c0b94e279  guard-merge.sh
         "hooks": [
           {
             "type": "command",
-            "command": "r=\$PWD; while [ -n \\"\$r\\" ] && [ ! -d \\"\$r/.specnaut/hooks\\" ]; do r=\${r%/*}; done; [ \\"\$( (sha256sum 2>/dev/null || shasum -a 256) < \\"\$r/.specnaut/hooks/SHA256SUMS\\" 2>/dev/null | cut -c1-64)\\" = \\"8fe9afa74bea1d4acbb41d4ec5af1875b4b68a6c1afc6dec16aba147c530c97f\\" ] && (cd \\"\$r/.specnaut/hooks\\" && (sha256sum -c --status SHA256SUMS 2>/dev/null || shasum -a 256 -c --status SHA256SUMS)) && exec bash \\"\$r/.specnaut/hooks/log-subagent.sh\\" start; echo \\"specnaut: .specnaut/hooks changed since it was trusted — run specnaut upgrade, then /hooks\\" >&2; exit 0",
+            "command": "r=\$PWD; while [ -n \\"\$r\\" ] && [ ! -d \\"\$r/.specnaut/hooks\\" ]; do r=\${r%/*}; done; [ \\"\$( (sha256sum 2>/dev/null || shasum -a 256) < \\"\$r/.specnaut/hooks/SHA256SUMS\\" 2>/dev/null | cut -c1-64)\\" = \\"dccae95046ba568fe5d3a338128d69b99d9aa7d0d41c114e431c5bb922fc4471\\" ] && (cd \\"\$r/.specnaut/hooks\\" && (sha256sum -c --status SHA256SUMS 2>/dev/null || shasum -a 256 -c --status SHA256SUMS)) && exec bash \\"\$r/.specnaut/hooks/log-subagent.sh\\" start; echo \\"specnaut: .specnaut/hooks changed since it was trusted — run specnaut upgrade, then /hooks\\" >&2; exit 0",
             "timeout": 10
           }
         ]
@@ -31834,7 +31470,7 @@ e2f7d4779e26518bea16290522367d452af0fd088d68c9dec18eaa7c0b94e279  guard-merge.sh
         "hooks": [
           {
             "type": "command",
-            "command": "r=\$PWD; while [ -n \\"\$r\\" ] && [ ! -d \\"\$r/.specnaut/hooks\\" ]; do r=\${r%/*}; done; [ \\"\$( (sha256sum 2>/dev/null || shasum -a 256) < \\"\$r/.specnaut/hooks/SHA256SUMS\\" 2>/dev/null | cut -c1-64)\\" = \\"8fe9afa74bea1d4acbb41d4ec5af1875b4b68a6c1afc6dec16aba147c530c97f\\" ] && (cd \\"\$r/.specnaut/hooks\\" && (sha256sum -c --status SHA256SUMS 2>/dev/null || shasum -a 256 -c --status SHA256SUMS)) && exec bash \\"\$r/.specnaut/hooks/log-subagent.sh\\" stop; echo \\"specnaut: .specnaut/hooks changed since it was trusted — run specnaut upgrade, then /hooks\\" >&2; exit 0",
+            "command": "r=\$PWD; while [ -n \\"\$r\\" ] && [ ! -d \\"\$r/.specnaut/hooks\\" ]; do r=\${r%/*}; done; [ \\"\$( (sha256sum 2>/dev/null || shasum -a 256) < \\"\$r/.specnaut/hooks/SHA256SUMS\\" 2>/dev/null | cut -c1-64)\\" = \\"dccae95046ba568fe5d3a338128d69b99d9aa7d0d41c114e431c5bb922fc4471\\" ] && (cd \\"\$r/.specnaut/hooks\\" && (sha256sum -c --status SHA256SUMS 2>/dev/null || shasum -a 256 -c --status SHA256SUMS)) && exec bash \\"\$r/.specnaut/hooks/log-subagent.sh\\" stop; echo \\"specnaut: .specnaut/hooks changed since it was trusted — run specnaut upgrade, then /hooks\\" >&2; exit 0",
             "timeout": 10
           }
         ]
@@ -31877,12 +31513,12 @@ clarifications needed) STOP #2 (pre-merge validation)
 
 ## Skills available
 
-- \`/specnaut plan\` — the feature's one planning document, then the architecture + security audits, then the stop
-- \`/specnaut tasks\` — break the approved plan into tasks
-- \`/specnaut implement\` — run the developer → review-coordinator → qa-tester pipeline
-- \`/specnaut review\` — architecture + quality gates
-- \`/specnaut merge\` — merge the feature branch to main
-- \`/specnaut-board\` — manage the project board (via the PO agent)
+- \`/task plan\` — the feature's one planning document, then the architecture + security audits, then the stop
+- \`/task tasks\` — break the approved plan into tasks
+- \`/task implement\` — run the developer → review-coordinator → qa-tester pipeline
+- \`/task review\` — architecture + quality gates
+- \`/task merge\` — merge the feature branch to main
+- \`/specnaut-task\` — the backlog, the pipeline above, and audits (\`audit --security|--archi|…\`)
 
 ## Agent roles (invocable manually as skills)
 
