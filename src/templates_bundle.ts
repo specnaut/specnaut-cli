@@ -22,6 +22,8 @@ when_to_use: |
 
 # Specnaut router
 
+Read \`docs/constitution.md\` before anything else: it is this project's binding rules, and no agent edits it unasked.
+
 **Response style** — brevity, visual order, questions as selections, badge colours — follows the \`response-style-contract\` skill; read it, never restate it here.
 
 \`\$ARGUMENTS\` carries the user's input. The first token is the verb; everything after it is the
@@ -102,7 +104,10 @@ unknown; their rows are here so a reader looking for them finds the new address.
     category: "phase",
     name: "task",
     suffix: "plan.md",
-    content: `## User Input
+    content:
+      `Read \`docs/constitution.md\` before anything else: it is this project's binding rules, and no agent edits it unasked.
+
+## User Input
 
 \`\`\`text
 \$ARGUMENTS
@@ -194,7 +199,7 @@ features can be planned concurrently — one \`plan\` per task, each pushed inde
 
 ### 3. Read the ground truth before writing a line
 
-- \`docs/constitution.md\` — binding, and it outranks this file.
+- \`docs/constitution.md\`, already read — binding, and it outranks this file.
 - The linked backlog item's body, when there is one.
 - **The code the feature touches.** Most design questions are already decided there; re-deciding
   one produces a second spelling.
@@ -443,6 +448,8 @@ between technical fixes.
     name: "task",
     suffix: "tasks.md",
     content: `
+Read \`docs/constitution.md\` before anything else: it is this project's binding rules, and no agent edits it unasked.
+
 ## User Input
 
 \`\`\`text
@@ -680,6 +687,8 @@ Pause only when the run was started with \`--manual\`.
     name: "task",
     suffix: "implement.md",
     content: `
+Read \`docs/constitution.md\` before anything else: it is this project's binding rules, and no agent edits it unasked.
+
 ## User Input
 
 \`\`\`text
@@ -1582,6 +1591,8 @@ parse.
     name: "task",
     suffix: "review.md",
     content: `
+Read \`docs/constitution.md\` before anything else: it is this project's binding rules, and no agent edits it unasked.
+
 ## User Input
 
 \`\`\`text
@@ -1778,6 +1789,8 @@ report to the user.
     name: "task",
     suffix: "merge.md",
     content: `
+Read \`docs/constitution.md\` before anything else: it is this project's binding rules, and no agent edits it unasked.
+
 ## User Input
 
 \`\`\`text
@@ -2031,6 +2044,8 @@ rejected. That is precisely what \`--pr\` is for; it is not a reason for this ph
     name: "task",
     suffix: "constitution.md",
     content: `
+Read \`docs/constitution.md\` before anything else: it is this project's binding rules, and no agent edits it unasked.
+
 ## User Input
 
 \`\`\`text
@@ -2108,6 +2123,8 @@ constitution first, then the configs. A plain "yes", "ok" or "go" approves nothi
      is read by every planning and review step, and the size limits hold it to its own
      \`constitution\` unit.
    - No HTML comments, no change log, no report inside the file: git history is the record.
+   - No import: a line holding \`@\` followed by a path is refused, whoever asks. Claude Code loads
+     the file into every session and would follow the import, unguarded, into every one.
 4. **Bump \`Version:\`** (the footer line) for a constitution change, by semantic versioning:
    - MAJOR: a principle removed, or redefined so that existing code may now violate it.
    - MINOR: a principle added, or materially expanded.
@@ -2315,6 +2332,8 @@ Shows what Specnaut installed in this project. Read-only and one-shot.
     name: "task",
     suffix: "audit.md",
     content: `# /task audit
+
+Read \`docs/constitution.md\` before anything else: it is this project's binding rules, and no agent edits it unasked.
 
 ## User Input
 
@@ -2860,6 +2879,8 @@ agent.
     suffix: "groom.md",
     content: `# groom — board and delivery hygiene
 
+Read \`docs/constitution.md\` before anything else: it is this project's binding rules, and no agent edits it unasked.
+
 Keeps the backlog and delivery pipeline flowing without human intervention.
 Reachable as **\`/task groom\`** — the only door.
 
@@ -3275,6 +3296,8 @@ when_to_use: |
 ---
 
 # Ship skill
+
+Read \`docs/constitution.md\` before anything else: it is this project's binding rules, and no agent edits it unasked.
 
 **Response style** — brevity, visual order, questions as selections, badge colours — follows the \`response-style-contract\` skill; read it, never restate it here.
 
@@ -4633,6 +4656,7 @@ echo "  or pipe to a custom publisher"
 name: workflow-contract
 description: Defines the machine-readable WORKFLOW STATUS block every workflow-shaped agent emits once at end of turn. Preloaded, not user-invocable.
 user-invocable: false
+constitution-exempt: an output-format contract preloaded by agents that already read the constitution first
 ---
 
 # workflow-contract
@@ -4681,6 +4705,7 @@ HANDOFF_TARGET: developer | review-coordinator | qa-tester | product-owner | wor
 name: backlog-reference-contract
 description: Defines how a backlog item is named when shown to the user — number, title, and a backend-resolved link. Preloaded, not user-invocable.
 user-invocable: false
+constitution-exempt: an output-format contract preloaded by entry points that already read the constitution first
 ---
 
 # backlog-reference-contract
@@ -4785,6 +4810,7 @@ more useful than none.
 name: mobile-first-contract
 description: Defines what mobile-first obliges for any UI — web or native — as the assumed default, with a project-level opt-out. Preloaded, not user-invocable.
 user-invocable: false
+constitution-exempt: a UI-default contract, preloaded by entry points that read the project's binding rules first
 ---
 
 # mobile-first-contract
@@ -4887,6 +4913,7 @@ and a project's own stack is recorded in its own documents.
 name: response-style-contract
 description: Defines how the assistant answers — brevity, visual order, how a question is put, and what a badge colour means. In force on every turn. Preloaded, not user-invocable.
 user-invocable: false
+constitution-exempt: an answer-format contract preloaded by entry points that already read the constitution first
 ---
 
 # response-style-contract
@@ -5021,6 +5048,7 @@ Specnaut's, and \`upgrade\` is the only thing that restores it from the bundle.
 name: handoff-protocol
 description: Defines the machine-readable HANDOFF block emitted right after WORKFLOW STATUS whenever an agent hands work to another actor. Preloaded, not user-invocable.
 user-invocable: false
+constitution-exempt: an output-format contract preloaded by agents that already read the constitution first
 ---
 
 # handoff-protocol
@@ -5067,6 +5095,7 @@ OPEN_RISKS: <comma list | none>
 name: review-findings-contract
 description: Defines the machine-readable REVIEW SUMMARY block every expert/reviewer emits once after its prose, with severity counts and a verdict. Preloaded, not user-invocable.
 user-invocable: false
+constitution-exempt: an output-format contract preloaded by reviewers that already read the constitution first
 ---
 
 # review-findings-contract
@@ -5155,6 +5184,7 @@ amount of contract text will make it answer the second.
 name: alert-triage-contract
 description: Defines the security-expert's alert-triage mode — the per-alert workflow, the constrained Bash allowlist, the resolution values each GitHub endpoint accepts, and the VERDICT line. Preloaded, not user-invocable.
 user-invocable: false
+constitution-exempt: a triage procedure preloaded by security-expert, which already reads the constitution first
 ---
 
 # alert-triage-contract
@@ -5257,6 +5287,7 @@ End with a \`VERDICT\` line: \`clean\` (all alerts dismissed or ticketed),
 name: backlog-frontmatter
 description: The canonical task-file frontmatter schema for the local Markdown backlog backend — every field, its allowed values, and which are mandatory. Preloaded, not user-invocable.
 user-invocable: false
+constitution-exempt: a backlog schema preloaded by product-owner, which already reads the constitution first
 ---
 
 # backlog-frontmatter
@@ -5299,6 +5330,7 @@ lowercase \`status\`: read them, never write them.
 name: specnaut-facts
 description: The vendored offline snapshot of what Specnaut is, its commands, harnesses and backlog backends — what specnaut-guide answers from when the live docs cannot be fetched. Preloaded, not user-invocable.
 user-invocable: false
+constitution-exempt: reference facts about Specnaut preloaded by specnaut-guide, which already reads the constitution first
 ---
 
 # specnaut-facts
@@ -5363,6 +5395,7 @@ Agnostic of language / LLM / harness / backlog backend. Single binary via \`deno
 name: qa-report-contract
 description: Defines the machine-readable QA SUMMARY block the qa-tester emits once after its prose, with test counts and a verdict. Preloaded, not user-invocable.
 user-invocable: false
+constitution-exempt: an output-format contract preloaded by qa-tester, which already reads the constitution first
 ---
 
 # qa-report-contract
@@ -5416,6 +5449,8 @@ maxTurns: 30
 color: cyan
 ---
 
+Read \`docs/constitution.md\` before anything else: it is this project's binding rules, and no agent edits it unasked.
+
 You are the **Product Owner** for this project — the single source of truth
 for business context and backlog management.
 
@@ -5423,7 +5458,7 @@ for business context and backlog management.
 
 Run these in order, every time before answering:
 
-1. Locate yourself (\`git branch --show-current\` + \`git log --oneline -5\`) and read \`AGENTS.md\` + \`docs/constitution.md\` for context.
+1. Locate yourself (\`git branch --show-current\` + \`git log --oneline -5\`) and read \`AGENTS.md\` for context.
 2. Read \`product-owner/memory/MEMORY.md\` beside this file if it exists (not
    every harness ships one) — your memory home. **Never** write to an
    \`agent-memory/\` folder.
@@ -5689,6 +5724,8 @@ disable-model-invocation: true
 color: blue
 ---
 
+Read \`docs/constitution.md\` before anything else: it is this project's binding rules, and no agent edits it unasked.
+
 You are a **senior developer** on this project. Your sole mission is to
 implement assigned tasks cleanly, correctly, and in line with the project's
 architecture.
@@ -5696,8 +5733,8 @@ architecture.
 ## First action in every session
 
 1. Read \`AGENTS.md\` at the project root to learn the tech stack and rules.
-2. Read \`docs/constitution.md\` for the principles every change is held to,
-   and the \`Check:\` line under each — the test your change must pass.
+2. Under each principle of \`docs/constitution.md\`, note its \`Check:\` line —
+   the test your change must pass.
 3. Read the current feature's \`plan.md\` and \`tasks.md\` if a Specnaut feature
    directory is in context. Those are the only two artefacts a feature has.
    (A directory scaffolded before 2.0.0 may also carry \`spec.md\` and friends;
@@ -5841,6 +5878,8 @@ skills: workflow-contract, handoff-protocol, review-findings-contract
 maxTurns: 30
 color: purple
 ---
+
+Read \`docs/constitution.md\` before anything else: it is this project's binding rules, and no agent edits it unasked.
 
 You are the **review coordinator**. Your only job is to run structural review
 in parallel and aggregate results.
@@ -6010,12 +6049,14 @@ maxTurns: 20
 color: yellow
 ---
 
+Read \`docs/constitution.md\` before anything else: it is this project's binding rules, and no agent edits it unasked.
+
 You are a **senior code reviewer**. Review ONLY the files provided. Do not
 explore the rest of the codebase unless strictly necessary for context.
 
 ## Always-check rules
 
-1. **Constitution compliance**: read \`docs/constitution.md\` first.
+1. **Constitution compliance**: hold the change to \`docs/constitution.md\`.
    Any violation is at least HIGH severity.
 2. **Silent error handling**: any \`catch\` block that swallows the error (empty
    body, comment-only, or discards the error object) is CRITICAL.
@@ -6093,6 +6134,8 @@ skills: review-findings-contract, workflow-contract, alert-triage-contract
 maxTurns: 20
 color: red
 ---
+
+Read \`docs/constitution.md\` before anything else: it is this project's binding rules, and no agent edits it unasked.
 
 You are the **security expert**. You judge who can reach what, and what
 they get when they do.
@@ -6297,6 +6340,8 @@ maxTurns: 40
 color: yellow
 ---
 
+Read \`docs/constitution.md\` before anything else: it is this project's binding rules, and no agent edits it unasked.
+
 You are a **test reviewer**. Review ONLY the test files in the diff, cross-
 referenced against the implementation files they cover.
 
@@ -6399,6 +6444,8 @@ disable-model-invocation: true
 color: green
 ---
 
+Read \`docs/constitution.md\` before anything else: it is this project's binding rules, and no agent edits it unasked.
+
 You are the **QA tester** for this project.
 
 ## Mission
@@ -6447,6 +6494,8 @@ skills: workflow-contract, handoff-protocol, backlog-reference-contract
 maxTurns: 60
 color: purple
 ---
+
+Read \`docs/constitution.md\` before anything else: it is this project's binding rules, and no agent edits it unasked.
 
 You are the **workflow manager** for this project.
 
@@ -6523,13 +6572,15 @@ disable-model-invocation: true
 color: orange
 ---
 
+Read \`docs/constitution.md\` before anything else: it is this project's binding rules, and no agent edits it unasked.
+
 You are the **DevOps / SRE** for this project. Your remit is everything
 between "the code compiles" and "the user sees a green dashboard at 3 a.m."
 
 ## First action in every session
 
 1. Read \`AGENTS.md\` at the project root for tech stack and constraints.
-2. Read \`docs/constitution.md\` for non-negotiable invariants
+2. Note the non-negotiable invariants in \`docs/constitution.md\`
    (often where SLOs, error budgets, and security posture live).
 3. Identify which cloud(s) the project targets (GCP, Azure, AWS, multi-cloud)
    and which IaC tool is canonical (Terraform, Pulumi, OpenTofu, CDK).
@@ -6646,6 +6697,8 @@ disable-model-invocation: false
 color: pink
 skills: specnaut-facts
 ---
+
+Read \`docs/constitution.md\` before anything else: it is this project's binding rules, and no agent edits it unasked.
 
 You are the **Specnaut expert**. Your job is to explain how Specnaut
 works, point users at the right command or skill, and surface release
@@ -6867,6 +6920,8 @@ maxTurns: 30
 disable-model-invocation: true
 color: pink
 ---
+
+Read \`docs/constitution.md\` before anything else: it is this project's binding rules, and no agent edits it unasked.
 
 You are a **UI/UX designer**. You own a single source of truth — the
 project's \`DESIGN.md\` — that every other agent (developer, code-reviewer,
@@ -7125,6 +7180,8 @@ color: yellow
 disable-model-invocation: true
 ---
 
+Read \`docs/constitution.md\` before anything else: it is this project's binding rules, and no agent edits it unasked.
+
 You are the **performance expert**. You judge what a system will cost to
 run — the work it repeats, the work it blocks on, and the work it does not
 need to do at all. You operate in one of two modes depending on the dispatch
@@ -7138,7 +7195,7 @@ the runtime, the data volume and the access pattern, none of which a general
 reference can carry without being wrong somewhere. What you have instead is the
 project itself.
 
-1. **Read \`docs/constitution.md\` if it exists.** A project that has
+1. **Weigh \`docs/constitution.md\`, if it exists.** A project that has
    declared a performance budget, a latency target, or an explicit trade-off has
    already answered questions you would otherwise guess at — and a finding that
    contradicts a recorded decision is a question, not a defect.
@@ -7340,6 +7397,8 @@ maxTurns: 20
 color: cyan
 disable-model-invocation: true
 ---
+
+Read \`docs/constitution.md\` before anything else: it is this project's binding rules, and no agent edits it unasked.
 
 You are the **accessibility expert**, judging against WCAG 2.1 AA. You
 judge whether the interface can actually be operated — by keyboard, by a
@@ -7569,6 +7628,8 @@ maxTurns: 20
 color: blue
 disable-model-invocation: true
 ---
+
+Read \`docs/constitution.md\` before anything else: it is this project's binding rules, and no agent edits it unasked.
 
 You are the **architect**. You judge the *shape* of a system — its
 boundaries, its coupling, its cohesion, and where each decision lives.
@@ -7815,6 +7876,8 @@ maxTurns: 20
 color: magenta
 disable-model-invocation: true
 ---
+
+Read \`docs/constitution.md\` before anything else: it is this project's binding rules, and no agent edits it unasked.
 
 You are the **dependency expert**. You judge what a project has taken on
 by depending on someone else's code — what it pins, what it cannot upgrade,
@@ -8489,6 +8552,8 @@ when_to_use: |
 ---
 
 # Task router
+
+Read \`docs/constitution.md\` before anything else: it is this project's binding rules, and no agent edits it unasked.
 
 **Response style** — brevity, visual order, questions as selections, badge colours — follows the \`response-style-contract\` skill; read it, never restate it here.
 
@@ -13449,6 +13514,7 @@ echo "INFRA_COUNT: \${INFRA_COUNT}"
 name: status-audit
 description: Read-only health audit of a multi-agent session from the status ledger. Use when the user says "status audit", "audit the session", "how are the agents doing", "what's blocked", "session health", or when supervising long headless work with /loop. Reads .specnaut/logs/agents.jsonl, derives each agent's current state from its latest entry, and reports seven health views. Writes nothing.
 argument-hint: "[latest|<agent>|<session>]"
+constitution-exempt: reads the session's agent ledger only; it starts no work and writes nothing
 ---
 
 # Status Audit — read-only session health report
@@ -28009,21 +28075,8 @@ if (\$Json) {
     suffix: "AGENTS.md",
     content: `# AGENTS.md — Project Context
 
-> Read this first. It is the source of truth for the project's architecture,
-> rules, and conventions. Agents, reviewers, and developers all consult this
-> file before touching code.
-
-## Tech stack
-
-_(Describe your stack here — languages, frameworks, databases, deployment targets.)_
-
-## Architecture rules
-
-_(List your non-negotiable rules — layering, DI, error handling, security.)_
-
-## Conventions
-
-_(Naming, testing, commits, branches.)_
+> Read this first. It holds the project's working context — its stack, its conventions, and how
+> the agents here work. The rules every change is held to are in \`docs/constitution.md\`.
 
 <!-- --- Specnaut: constitution --- -->
 
@@ -28031,12 +28084,29 @@ _(Naming, testing, commits, branches.)_
 
 *Owned by Specnaut — this section is not a placeholder to fill in. Edit the rest freely.*
 
-**\`docs/constitution.md\` holds the principles every plan, change and review is checked
-against.** Read it before you design or change code. It is the team's document: no agent edits
-it on its own initiative. When a request conflicts with it, stop and ask which one gives way —
-never work around it, and never amend it to fit.
+Read \`docs/constitution.md\` before anything else: it is this project's binding rules, and no agent edits it unasked.
+
+@docs/constitution.md
+
+It holds the principles every plan, change and review is checked against, and it is the team's
+document. When a request conflicts with it, stop and ask which one gives way — never work around
+it, and never amend it to fit. Claude Code loads it into every session, so it imports no other
+file, and a change to it is reviewed like code.
 
 <!-- --- End Specnaut: constitution --- -->
+
+## Tech stack
+
+_(Describe your stack here — languages, frameworks, databases, deployment targets.)_
+
+## Architecture rules
+
+_(These live in \`docs/constitution.md\`, so there is one place to write a rule. Add here only how
+this codebase applies them — where each layer sits, which module owns what.)_
+
+## Conventions
+
+_(Naming, testing, commits, branches.)_
 
 <!-- --- Specnaut: chain-stops --- -->
 
@@ -28307,7 +28377,8 @@ scaffolded for a harness without such features gets none here.
     content: `# Constitution
 
 The principles this project's code is held to. Every plan and every review checks a change
-against them. Amend it deliberately, as a team, and say why in the commit.
+against them. Amend it deliberately, as a team, and say why in the commit. It is loaded into every
+agent session, so it imports no other file, and a change to it is reviewed like code.
 
 ## Domain isolation
 
