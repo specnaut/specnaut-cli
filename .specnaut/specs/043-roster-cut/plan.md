@@ -237,3 +237,10 @@ parsed fields + BLOCKERS; one branch, five ordered commits — (1) fan-out into 
 removed, test-reviewer merged; (2) the three undispatched agents and three contracts removed,
 security `Bash` dropped; (3) `/design`; (4) upgrade test and notice; (5) slim the nine agents +
 README, byte report.
+
+## Measured at the end (2026-10-30)
+
+`deno task test` 2,628 passed, 0 failed; fmt, lint, `gen-hooks --check`, `go test ./...`, smoke
+`features` / `task` / `hooks` / `backlog-github`, `audit.sh` (0 gaps) and the size ratchet green.
+**SC-002:** the 9 agents + README + the two remaining contracts are **69,009 B**, against **146,818
+B** for 15 agents + README + 5 contracts at 1501ccdd — **−77,809 B (−53 %)**.
