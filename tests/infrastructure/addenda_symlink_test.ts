@@ -31,6 +31,8 @@ async function withLinkedAddenda(fn: (dir: string) => Promise<void>): Promise<vo
     await Deno.symlink(join(outside, "x.md"), join(task, "escapes.md"));
     await Deno.symlink("../../../shared/absent.md", join(task, "dangles.md"));
     await Deno.symlink("../../../shared", join(task, "folder"));
+    // Through a regular file: lstat throws NotADirectory, which must not abort the walk.
+    await Deno.symlink("../../../shared/review.md/x", join(task, "through-file.md"));
     await fn(dir);
   } finally {
     await Deno.remove(dir, { recursive: true });

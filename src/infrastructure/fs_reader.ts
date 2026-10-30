@@ -137,7 +137,10 @@ async function landsOnFileInside(root: string, abs: string): Promise<boolean> {
   try {
     target = await resolveTarget(abs);
   } catch (err) {
-    if (err instanceof Deno.errors.FilesystemLoop || err instanceof UnwalkableLinkError) {
+    if (
+      err instanceof Deno.errors.FilesystemLoop || err instanceof UnwalkableLinkError ||
+      err instanceof Deno.errors.NotADirectory // a link through a regular file
+    ) {
       return false;
     }
     throw err;
