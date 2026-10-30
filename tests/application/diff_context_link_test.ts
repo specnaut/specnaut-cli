@@ -1,9 +1,12 @@
 import { assertEquals } from "@std/assert";
+import { join } from "@std/path";
 import { DiffProjectUseCase } from "../../src/application/diff_project.ts";
-import type { Harness, LockStore } from "../../src/application/ports.ts";
+import type { FsReader, Harness, LockStore } from "../../src/application/ports.ts";
 import type { InstalledLock } from "../../src/domain/installed_lock.ts";
 import { linkIdentity } from "../../src/domain/context_link.ts";
 import { sha256Hex } from "../../src/domain/sha256.ts";
+import { DenoFsReader } from "../../src/infrastructure/fs_reader.ts";
+import { CAN_LINK, makeLink } from "../helpers/link_text.ts";
 import { fakeReader } from "./upgrade_fakes.ts";
 
 /**
@@ -26,6 +29,10 @@ async function diff(
   links: Record<string, { target: string; resolved: string | null }>,
   onlyCustomised = false,
 ) {
+  return await diffWith(fakeReader(files, links), "/p", onlyCustomised);
+}
+
+async function diffWith(reader: FsReader, projectDir: string, onlyCustomised = false) {
   const lock: InstalledLock = {
     version: 2,
     harness: "claude",
@@ -45,11 +52,11 @@ async function diff(
     lockPath: (d) => `${d}/.specnaut/installed.lock`,
   };
   return await new DiffProjectUseCase({
-    reader: fakeReader(files, links),
+    reader,
     lockStore,
     core: [],
     findHarness: () => harness,
-  }).execute({ projectDir: "/p", onlyCustomised, path: null });
+  }).execute({ projectDir, onlyCustomised, path: null });
 }
 
 const AGENTS = { "AGENTS.md": "# AGENTS\nlots of rules\n" };
@@ -74,4 +81,35 @@ Deno.test("diff: a customized file differs from the link Specnaut would write, a
     diskContent: "# mine\n",
     bundledContent: "symlink → ../AGENTS.md\n",
   }]);
+});
+
+/**
+ * The same judgement through the real reader, on a real disk: `fakeReader`
+ * models `readEntry`, and a model can agree with the use case while the
+ * adapter reads the link through.
+ */
+async function onDisk(plant: (dir: string) => Promise<void>, onlyCustomised = false) {
+  const dir = await Deno.makeTempDir();
+  try {
+    await Deno.writeTextFile(join(dir, "AGENTS.md"), AGENTS["AGENTS.md"]);
+    await Deno.mkdir(join(dir, ".claude"));
+    await plant(dir);
+    return (await diffWith(new DenoFsReader(), dir, onlyCustomised)).results;
+  } finally {
+    await Deno.remove(dir, { recursive: true });
+  }
+}
+
+Deno.test("diff on disk: our real link matches, never read through to AGENTS.md", {
+  ignore: !CAN_LINK,
+}, async () => {
+  const results = await onDisk((dir) => makeLink("../AGENTS.md", join(dir, DEST)));
+  assertEquals(results, [{ kind: "matches", dest: DEST }]);
+});
+
+Deno.test("diff on disk: our fallback file matches, a customized one differs", async () => {
+  const fallback = await onDisk((dir) => Deno.writeTextFile(join(dir, DEST), "@../AGENTS.md\n"));
+  assertEquals(fallback, [{ kind: "matches", dest: DEST }]);
+  const mine = await onDisk((dir) => Deno.writeTextFile(join(dir, DEST), "# mine\n"), true);
+  assertEquals(mine.map((r) => r.kind), ["differs"]);
 });
