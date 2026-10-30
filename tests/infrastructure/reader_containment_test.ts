@@ -2,26 +2,7 @@ import { assert, assertEquals, assertRejects } from "@std/assert";
 import { join, SEPARATOR } from "@std/path";
 import { DenoFsReader } from "../../src/infrastructure/fs_reader.ts";
 import { parseLock } from "../../src/domain/installed_lock.ts";
-
-/**
- * Registers a test that needs `Deno.symlink`.
- *
- * Windows refuses symlink creation without Developer Mode or elevation, so
- * every fixture in this file fails there for a reason that has nothing to do
- * with the code under test. Registered as IGNORED rather than short-circuited
- * inside the body: a test that returns early reports as PASSED, and a green
- * that never ran is the exact failure this whole feature is about.
- *
- * The consequence is stated rather than hidden: **containment is not covered on
- * Windows.** The code is platform-neutral by construction — `relative()` and
- * `@std/path` throughout, never a hardcoded separator — but that is an argument,
- * not a measurement. `write_bundle_symlink_test.ts` has skipped Windows the same
- * way since before this change.
- */
-const WINDOWS = Deno.build.os === "windows";
-function symlinkTest(name: string, fn: () => Promise<void>): void {
-  Deno.test({ name, ignore: WINDOWS, fn });
-}
+import { symlinkTest } from "../helpers/link_text.ts";
 
 async function box(): Promise<{ root: string; proj: string; outside: string }> {
   const root = await Deno.makeTempDir({ prefix: "read-" });

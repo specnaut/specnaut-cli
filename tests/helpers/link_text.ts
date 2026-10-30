@@ -52,6 +52,51 @@ export function makeLink(
  */
 export const CAN_LINK: boolean = await probeLink();
 
+/**
+ * Registers a test whose fixture links and whose subject is containment —
+ * where a link leads, judged against the kernel. IGNORED on Windows, never
+ * short-circuited inside the body: a test that returns early reports as
+ * PASSED, and a green that never ran is the failure containment exists to
+ * remove.
+ *
+ * Windows, not `!CAN_LINK`: these tests have never run there. The
+ * windows-latest runner can link, but it is recorded resolving `..` in a link
+ * lexically (`write_bundle_link_test.ts`) where they pin the POSIX walk, so
+ * moving them is a measurement still to make. **Containment is not covered on
+ * Windows**; that is stated rather than hidden. A test that pins only what
+ * Windows shares with POSIX registers `ignore: !CAN_LINK` instead.
+ */
+export function symlinkTest(name: string, fn: () => Promise<void>): void {
+  Deno.test({ name, ignore: WINDOWS, fn });
+}
+
+/** Every permission Deno has: granted all at once, it stops checking paths (see below). */
+const EVERY_PERMISSION = ["read", "write", "net", "env", "run", "ffi", "sys", "import"] as const;
+
+/**
+ * Refuses to load under every permission at once (`deno test -A`), so a link
+ * test cannot pass there in silence (cli#690).
+ *
+ * With every permission granted, Deno hands a path to the kernel as written;
+ * with any one withheld, it normalises `..` lexically first. Measured with Deno
+ * 2.9.8 on macOS, `proj/s` linked outside the project: reading
+ * `proj/s/../real.md` returns the file inside under the task's flags and the
+ * one outside under `-A`. The binary withholds `sys` and `import`, so only the
+ * scoped run is the binary's behaviour, and a link test green under `-A` has
+ * proved something about a program nobody ships.
+ */
+function refuseEveryPermission(): void {
+  const granted = (name: (typeof EVERY_PERMISSION)[number]) =>
+    Deno.permissions.querySync({ name }).state === "granted";
+  if (!EVERY_PERMISSION.every(granted)) return;
+  throw new Error(
+    "link tests refuse to run with every permission granted (-A): Deno then stops " +
+      "normalising paths, so they would not test what the binary does. Run them with " +
+      "`deno task test`, or `deno test --allow-read --allow-write --allow-run --allow-env <file>`.",
+  );
+}
+refuseEveryPermission();
+
 async function probeLink(): Promise<boolean> {
   const dir = await Deno.makeTempDir({ prefix: "specnaut-link-probe-" });
   try {

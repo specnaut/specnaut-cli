@@ -2,16 +2,7 @@ import { assertEquals } from "@std/assert";
 import { exists } from "@std/fs";
 import { join } from "@std/path";
 import { migrateLegacyConfigDir } from "../../src/infrastructure/fs_legacy_migrator.ts";
-
-/** Needs `Deno.symlink`, which Windows refuses without Developer Mode or
- * elevation. Registered as IGNORED rather than short-circuited inside the body:
- * a test that returns early reports as PASSED, and a green that never ran is
- * the failure this feature exists to remove. Containment is not covered on
- * Windows, and that is stated rather than implied. */
-const WINDOWS = Deno.build.os === "windows";
-function symlinkTest(name: string, fn: () => Promise<void>): void {
-  Deno.test({ name, ignore: WINDOWS, fn });
-}
+import { symlinkTest } from "../helpers/link_text.ts";
 
 async function withTempDir(fn: (dir: string) => Promise<void>): Promise<void> {
   const dir = await Deno.makeTempDir({ prefix: "specnaut-migrate-" });
