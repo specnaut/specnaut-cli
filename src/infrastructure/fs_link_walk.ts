@@ -27,6 +27,13 @@ const LINK_SEPARATORS = Deno.build.os === "windows" ? /[\\/]/ : /\//;
  * `.specnaut-new/`, and the merge wrote outside the project. The answer to
  * "where does this land" depends on directories that do not exist yet, so
  * there is no answer to give.
+ *
+ * **Unverified on Windows** (cli#690): the `\` in `LINK_SEPARATORS` and this
+ * link-first reading of `..` have not been probed against a Windows host. The
+ * suites that pin this walk are ignored there (`symlinkTest`), and the one
+ * Windows observation on record (`write_bundle_link_test.ts`, a dangling
+ * ancestor) shows `..` in a link resolved lexically, before the link is
+ * followed. Where the two readings differ, this walk answers for POSIX.
  */
 export async function walkLinkText(dir: string, text: string): Promise<string> {
   const segments = text.split(LINK_SEPARATORS).filter((s) => s !== "" && s !== ".");
