@@ -22152,6 +22152,41 @@ json_escape() {
 check_file() { [[ -f "\$1" ]] && echo "  ✓ \$2" || echo "  ✗ \$2"; }
 check_dir() { [[ -d "\$1" && -n \$(ls -A "\$1" 2>/dev/null) ]] && echo "  ✓ \$2" || echo "  ✗ \$2"; }
 
+# Template resolution lives beside this file; sourced here so every caller of
+# \`common.sh\` keeps \`resolve_template\` and \`resolve_template_content\`.
+# shellcheck source=SCRIPTDIR/template-resolution.sh
+source "\$(CDPATH="" cd -- "\$(dirname -- "\${BASH_SOURCE[0]}")" && pwd)/template-resolution.sh"
+`,
+    executable: true,
+    backend: null,
+    skipIfExists: false,
+  },
+  {
+    category: "spec-root",
+    name: "specify",
+    suffix: "scripts/bash/template-resolution.sh",
+    content: `#!/usr/bin/env bash
+# Template resolution for the spec scripts — the override → preset → extension →
+# core stack and the presets' composition strategies. Sourced by \`common.sh\`.
+
+# The enabled preset ids of a \`.registry\`, lowest priority number first (the
+# highest precedence). Exits non-zero on a registry python3 cannot parse, so a
+# caller falls back to the directory scan. Both resolvers read this one order.
+_preset_ids_by_priority() {
+    SPECNAUT_REGISTRY="\$1" python3 -c "
+import json, sys, os
+try:
+    with open(os.environ['SPECNAUT_REGISTRY']) as f:
+        data = json.load(f)
+    presets = data.get('presets', {})
+    for pid, meta in sorted(presets.items(), key=lambda x: x[1].get('priority', 10) if isinstance(x[1], dict) else 10):
+        if isinstance(meta, dict) and meta.get('enabled', True) is not False:
+            print(pid)
+except Exception:
+    sys.exit(1)
+" 2>/dev/null
+}
+
 # Resolve a template name to a file path using the priority stack:
 #   1. .specnaut/templates/overrides/
 #   2. .specnaut/presets/<preset-id>/templates/ (sorted by priority from .registry)
@@ -22166,45 +22201,24 @@ resolve_template() {
     local override="\$base/overrides/\${template_name}.md"
     [ -f "\$override" ] && echo "\$override" && return 0
 
-    # Priority 2: Installed presets (sorted by priority from .registry)
+    # Priority 2: Installed presets — in registry order when python3 reads
+    # \`.registry\`; otherwise (no registry, no python3, a parse error) in
+    # alphabetical directory order. The read sits in the condition so set -e
+    # does not abort the function on a registry python3 cannot parse.
     local presets_dir="\$repo_root/.specnaut/presets"
     if [ -d "\$presets_dir" ]; then
         local registry_file="\$presets_dir/.registry"
-        if [ -f "\$registry_file" ] && command -v python3 >/dev/null 2>&1; then
-            # Read preset IDs sorted by priority (lower number = higher precedence).
-            # The python3 call is wrapped in an if-condition so that set -e does not
-            # abort the function when python3 exits non-zero (e.g. invalid JSON).
-            local sorted_presets=""
-            if sorted_presets=\$(SPECNAUT_REGISTRY="\$registry_file" python3 -c "
-import json, sys, os
-try:
-    with open(os.environ['SPECNAUT_REGISTRY']) as f:
-        data = json.load(f)
-    presets = data.get('presets', {})
-    for pid, meta in sorted(presets.items(), key=lambda x: x[1].get('priority', 10) if isinstance(x[1], dict) else 10):
-        if isinstance(meta, dict) and meta.get('enabled', True) is not False:
-            print(pid)
-except Exception:
-    sys.exit(1)
-" 2>/dev/null); then
-                if [ -n "\$sorted_presets" ]; then
-                    # python3 succeeded and returned preset IDs — search in priority order
-                    while IFS= read -r preset_id; do
-                        local candidate="\$presets_dir/\$preset_id/templates/\${template_name}.md"
-                        [ -f "\$candidate" ] && echo "\$candidate" && return 0
-                    done <<< "\$sorted_presets"
-                fi
-                # python3 succeeded but registry has no presets — nothing to search
-            else
-                # python3 failed (missing, or registry parse error) — fall back to unordered directory scan
-                for preset in "\$presets_dir"/*/; do
-                    [ -d "\$preset" ] || continue
-                    local candidate="\$preset/templates/\${template_name}.md"
+        local sorted_presets=""
+        if [ -f "\$registry_file" ] && command -v python3 >/dev/null 2>&1 &&
+            sorted_presets=\$(_preset_ids_by_priority "\$registry_file"); then
+            # An empty registry has no presets to search.
+            if [ -n "\$sorted_presets" ]; then
+                while IFS= read -r preset_id; do
+                    local candidate="\$presets_dir/\$preset_id/templates/\${template_name}.md"
                     [ -f "\$candidate" ] && echo "\$candidate" && return 0
-                done
+                done <<< "\$sorted_presets"
             fi
         else
-            # Fallback: alphabetical directory order (no python3 available)
             for preset in "\$presets_dir"/*/; do
                 [ -d "\$preset" ] || continue
                 local candidate="\$preset/templates/\${template_name}.md"
@@ -22263,18 +22277,7 @@ resolve_template_content() {
         local registry_file="\$presets_dir/.registry"
         local sorted_presets=""
         if [ -f "\$registry_file" ] && command -v python3 >/dev/null 2>&1; then
-            if sorted_presets=\$(SPECNAUT_REGISTRY="\$registry_file" python3 -c "
-import json, sys, os
-try:
-    with open(os.environ['SPECNAUT_REGISTRY']) as f:
-        data = json.load(f)
-    presets = data.get('presets', {})
-    for pid, meta in sorted(presets.items(), key=lambda x: x[1].get('priority', 10) if isinstance(x[1], dict) else 10):
-        if isinstance(meta, dict) and meta.get('enabled', True) is not False:
-            print(pid)
-except Exception:
-    sys.exit(1)
-" 2>/dev/null); then
+            if sorted_presets=\$(_preset_ids_by_priority "\$registry_file"); then
                 if [ -n "\$sorted_presets" ]; then
                     local yaml_warned=false
                     while IFS= read -r preset_id; do
@@ -22322,7 +22325,7 @@ except Exception:
                         if [ -n "\$manifest_file" ]; then
                             # Reject absolute paths and parent traversal
                             case "\$manifest_file" in
-                                /*|*../*|../*) manifest_file="" ;;
+                                /*|*../*) manifest_file="" ;;
                             esac
                         fi
                         if [ -n "\$manifest_file" ]; then
@@ -22458,7 +22461,7 @@ except Exception:
 }
 
 `,
-    executable: true,
+    executable: false,
     backend: null,
     skipIfExists: false,
   },
