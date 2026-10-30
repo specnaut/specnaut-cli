@@ -3,7 +3,12 @@ import type { Bundle } from "../domain/template.ts";
 import type { InstalledLock } from "../domain/installed_lock.ts";
 import type { UpgradePlan } from "../domain/upgrade_plan.ts";
 import { sha256Hex } from "../domain/sha256.ts";
-import { classifyLinkDisk, linkIdentity, linkTargetPath } from "../domain/context_link.ts";
+import {
+  classifyLinkDisk,
+  linkIdentity,
+  type LinkState,
+  linkTargetPath,
+} from "../domain/context_link.ts";
 import type { PlannableLinkState } from "../domain/link_plan.ts";
 
 /** What `upgrade` learned about the context-link destinations of a bundle. */
@@ -43,26 +48,38 @@ export async function surveyContextLinks(
     // A declaration wins over everything (spec 011): the plan preserves it
     // before it ever asks what is on disk.
     if (file.symlinkTo === undefined || isDeclaredPreserved(dest)) continue;
-    const targetPath = linkTargetPath(dest, file.symlinkTo);
-    const disk = await reader.readEntry(projectDir, dest);
-    const diskSha = disk === null ? undefined : await sha256Hex(
-      disk.kind === "file" ? disk.content : linkIdentity(disk.target),
-    );
-    const state = classifyLinkDisk(dest, { symlinkTo: file.symlinkTo, content: file.content }, {
-      disk,
-      diskSha,
-      lockSha: lock.entries.get(dest)?.sha256,
-      targetEntry: await reader.readEntry(projectDir, targetPath),
-    });
+    const link = { symlinkTo: file.symlinkTo, content: file.content };
+    const { state, diskSha } = await surveyOne(reader, projectDir, dest, link, lock);
     if (state === "inverted") {
-      refused.push({ dest, message: invertedMessage(dest, targetPath) });
+      refused.push({ dest, message: invertedMessage(dest, linkTargetPath(dest, link.symlinkTo)) });
       continue;
     }
-    if (state === "materialised") notes.push(materialisedNote(dest, file.symlinkTo));
+    if (state === "materialised") notes.push(materialisedNote(dest, link.symlinkTo));
     states.set(dest, state);
     if (diskSha !== undefined) diskShas.set(dest, diskSha);
   }
   return { states, diskShas, refused, notes };
+}
+
+/** One destination's disk state, and the sha the plan's presence checks compare. */
+async function surveyOne(
+  reader: FsReader,
+  projectDir: string,
+  dest: string,
+  link: { readonly symlinkTo: string; readonly content: string },
+  lock: InstalledLock,
+): Promise<{ state: LinkState; diskSha?: string }> {
+  const disk = await reader.readEntry(projectDir, dest);
+  const diskSha = disk === null ? undefined : await sha256Hex(
+    disk.kind === "file" ? disk.content : linkIdentity(disk.target),
+  );
+  const state = classifyLinkDisk(dest, link, {
+    disk,
+    diskSha,
+    lockSha: lock.entries.get(dest)?.sha256,
+    targetEntry: await reader.readEntry(projectDir, linkTargetPath(dest, link.symlinkTo)),
+  });
+  return { state, diskSha };
 }
 
 const invertedMessage = (dest: string, target: string) =>
