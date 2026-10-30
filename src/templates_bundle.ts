@@ -1772,6 +1772,7 @@ PO.
 .specnaut/scripts/backlog/view.sh <number>            # one item + body
 .specnaut/scripts/backlog/add.sh "<title>" [body]     # create new item, auto-numbered
 .specnaut/scripts/backlog/move.sh <number> <Status>   # Backlog|Ready|In progress|In review|Done
+.specnaut/scripts/backlog/move.sh <number> Done --not-planned   # close as not planned
 .specnaut/scripts/backlog/clarify-comment.sh <num> "<question>"
 \`\`\`
 
@@ -1779,8 +1780,9 @@ PO.
 
 - \`add.sh\` picks the next free number (\`001\`, \`002\`, …).
 - Status lives in each item's frontmatter, mirrored in the index.
-- **Closing** an item = move to \`Done\`. The file stays on disk as the
-  audit trail; nothing is deleted.
+- **Closing** an item = move to \`Done\`; \`--not-planned\` adds
+  \`resolution: not-planned\`, shown in the index. The file stays on disk as
+  the audit trail; nothing is deleted.
 - Bodies follow \`## Why\` / \`## Acceptance criteria\` / \`## Out of scope\`.
 - Titles are short imperatives ("Add docx skill", not "I want to add a docx skill").
 <!-- END: backend=local -->
@@ -4096,6 +4098,7 @@ a passage inside a role description.
 number: NNN            # zero-padded 3 digits, globally unique within this project
 title: string
 status: Backlog | Ready | In progress | In review | Done
+resolution: not-planned  # only on a Done item closed as not planned; absent = completed
 size: XS | S | M | L | XL       # empty at creation; set when groomed
 priority: P0 | P1 | P2 | P3     # empty at creation; set when groomed
 parent: "#NNN"         # only on a sub-task: the local number of its parent epic
@@ -4103,7 +4106,8 @@ created: YYYY-MM-DDTHH:MM:SSZ   # UTC, written by add.sh
 ---
 \`\`\`
 
-This is what \`scripts/local/add.sh\` writes and \`scripts/local/move.sh\` accepts. \`size\` and
+This is what \`scripts/local/add.sh\` writes and \`scripts/local/move.sh\` accepts;
+\`move.sh <num> Done --not-planned\` writes \`resolution\`, and any other move drops it. \`size\` and
 \`priority\` start empty: an item is not groomed until both hold exactly one value.
 
 \`parent: "#NNN"\` is the local-Markdown sub-task convention (grep-friendly); absent means a
@@ -4344,7 +4348,7 @@ child is closed. Create a child with \`add.sh --parent <num>\` (GitHub native \`
 
 - **Sub-task**: close directly.
 - **Epic / parent**: \`cascade-check.sh <num>\` first (exit 11 = blocked, 0 = safe). Cancel: close parent + children as \`not_planned\`.
-- **GitHub / GitLab two-step**: \`gh issue close <num> --reason {completed|not_planned}\` FIRST, then \`move.sh <num> Done\` — a Done card over an open issue is what \`sweep-closed.sh\` reports as REOPENED (\`phases/merge-close.md\`). Local: flip \`status: done\` in frontmatter.
+- **GitHub / GitLab two-step**: \`gh issue close <num> --reason {completed|not_planned}\` FIRST, then \`move.sh <num> Done\` — a Done card over an open issue is what \`sweep-closed.sh\` reports as REOPENED (\`phases/merge-close.md\`). Local: \`move.sh <num> Done\`, never a hand edit.
 - **Board hygiene sweep**: \`move.sh <num> Done\` for CLOSED issues stuck \`In progress\`/\`In review\`; reopen mislabelled \`Done\`.
 
 ### Epic detection heuristic
@@ -4379,6 +4383,11 @@ The \`/task\` skill's \`backlog.md\` routes them to you; what each owes:
   "child of #042" phrasing sets the parent link on creation.
 - **\`edit <id>\`** / **\`estimate <id>\`** — keep the local index in sync; an estimate larger than one
   task runs the epic detection heuristic.
+- **\`close <id> [--not-planned]\`** — completed by default, not planned with the flag; an epic
+  passes the closing rules above first. GitHub: \`gh issue close --reason completed|not_planned\`,
+  then \`move.sh <id> Done\`. GitLab has no close reason: with the flag, a \`glab issue note\` saying
+  "Closed as not planned" first. Local: \`move.sh <id> Done [--not-planned]\`. Cloud: \`move.sh <id>
+  Done\`; it has no not-planned state, so say so rather than drop the flag silently.
 - **\`status\`** — counts, total points, velocity, open epics with ≥ 1 open child.
 - **\`<id>\`** — the item; on an epic, with every sub-task's status, size and owner.
 - **\`groom\`** — per the \`/task\` skill's \`groom.md\`. **It ends with a promotion**: a groomed item
@@ -6148,16 +6157,21 @@ fi
     content: `#!/usr/bin/env bash
 # Move a backlog item to a new status. Updates the file's frontmatter and
 # regenerates the column-organised index.
-# Usage: move.sh <number> <Status>
+# Usage: move.sh <number> <Status> [--not-planned]
+#
+# \`/task close <id> --not-planned\` is \`move.sh <id> Done --not-planned\`: the
+# item is Done with \`resolution: not-planned\` beside its status. Every other
+# move drops that line, so a reopened or re-closed item never keeps it.
 set -euo pipefail
 
-if [ "\$#" -lt 2 ]; then
-  echo 'usage: move.sh <number> <Status>' >&2
+if [ "\$#" -lt 2 ] || [ "\$#" -gt 3 ]; then
+  echo 'usage: move.sh <number> <Status> [--not-planned]' >&2
   echo '  Status one of: Backlog, Ready, "In progress", "In review", Done' >&2
   exit 2
 fi
 NUM=\$(printf "%03d" "\$1" 2>/dev/null || echo "\$1")
 STATUS="\$2"
+RESOLUTION=""
 
 case "\$STATUS" in
   Backlog|Ready|"In progress"|"In review"|Done) ;;
@@ -6166,6 +6180,13 @@ case "\$STATUS" in
     exit 2
     ;;
 esac
+if [ "\$#" -eq 3 ]; then
+  if [ "\$3" != "--not-planned" ] || [ "\$STATUS" != Done ]; then
+    echo "unexpected '\$3' — the only flag is --not-planned, and only with Done" >&2
+    exit 2
+  fi
+  RESOLUTION=not-planned
+fi
 
 ROOT="\$(cd "\$(dirname "\$0")/../../.." && pwd)"
 BACKLOG_DIR="\$ROOT/.specnaut/backlog"
@@ -6179,19 +6200,27 @@ if [ "\${#matches[@]}" -eq 0 ]; then
 fi
 FILE="\${matches[0]}"
 
-# Update frontmatter status (between the first two \`---\` lines)
-awk -v new="\$STATUS" '
+# Update frontmatter status (between the first two \`---\` lines). Under
+# \`set -e\` an \`awk … && mv\` that fails exits nothing: the old form left the
+# temp file and printed ✓ over an item it never moved.
+if ! awk -v new="\$STATUS" -v res="\$RESOLUTION" '
   BEGIN {n=0}
   /^---\$/ {n++; print; next}
-  n==1 && /^status:/ {print "status: " new; updated=1; next}
+  n==1 && /^resolution:/ {next}
+  n==1 && /^status:/ {print "status: " new; if (res != "") print "resolution: " res; updated=1; next}
   {print}
   END {if (!updated) exit 3}
-' "\$FILE" > "\$FILE.tmp" && mv "\$FILE.tmp" "\$FILE"
+' "\$FILE" > "\$FILE.tmp"; then
+  rm -f "\$FILE.tmp"
+  echo "#\$NUM has no status: line in its frontmatter — nothing moved" >&2
+  exit 1
+fi
+mv "\$FILE.tmp" "\$FILE"
 
 # Regenerate the column-organised index from the file tree.
 bash "\$RENDER" "\$ROOT"
 
-echo "✓ #\$NUM → \$STATUS"
+echo "✓ #\$NUM → \$STATUS\${RESOLUTION:+ (\$RESOLUTION)}"
 
 # Post-move hook: promote the parent Epic if this was a sub-task
 # leaving Backlog. Best-effort — never blocks on failure. See
@@ -6277,10 +6306,12 @@ for f in \$(printf "%s\\n" "\$BACKLOG_DIR"/*.md | sort); do
   status=\$(awk '/^---\$/{n++; next} n==1 && /^status:/ {sub(/^status:[[:space:]]*/, ""); print; exit}' "\$f")
   size=\$(awk '/^---\$/{n++; next} n==1 && /^size:/ {sub(/^size:[[:space:]]*/, ""); print; exit}' "\$f")
   priority=\$(awk '/^---\$/{n++; next} n==1 && /^priority:/ {sub(/^priority:[[:space:]]*/, ""); print; exit}' "\$f")
+  resolution=\$(awk '/^---\$/{n++; next} n==1 && /^resolution:/ {sub(/^resolution:[[:space:]]*/, ""); print; exit}' "\$f")
 
   badge=""
   [ -n "\$size" ] && badge="\$badge \\\`size:\$size\\\`"
   [ -n "\$priority" ] && badge="\$badge \\\`priority:\$priority\\\`"
+  [ -n "\$resolution" ] && badge="\$badge \\\`\$resolution\\\`"
   line="- [#\$num](backlog/\$base)\$badge — \$title"
 
   case "\$status" in
