@@ -116,3 +116,28 @@ Deno.test("the product-owner carries the close contract, per backend", async () 
   }
   assertStringIncludes(verb, "--reason completed|not_planned");
 });
+
+Deno.test("move.sh reads a padded number as decimal: 012 moves #012, never #010", async () => {
+  const dir = await project();
+  try {
+    // printf %03d read `012` as octal 10, so a padded id closed the wrong item.
+    const other = ".specnaut/backlog/010-another-item.md";
+    await Deno.writeTextFile(
+      join(dir, other),
+      "---\nnumber: 010\ntitle: Another\nstatus: Ready\n---\n",
+    );
+    await Deno.writeTextFile(
+      join(dir, ".specnaut/backlog/012-twelfth.md"),
+      "---\nnumber: 012\ntitle: Twelfth\nstatus: Ready\n---\n",
+    );
+    const r = await move(dir, "012", "Done");
+    assertEquals(r.code, 0, r.stderr);
+    assertStringIncludes(
+      await Deno.readTextFile(join(dir, ".specnaut/backlog/012-twelfth.md")),
+      "status: Done",
+    );
+    assertStringIncludes(await Deno.readTextFile(join(dir, other)), "status: Ready");
+  } finally {
+    await Deno.remove(dir, { recursive: true });
+  }
+});

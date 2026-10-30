@@ -13,7 +13,8 @@ if [ "$#" -lt 2 ] || [ "$#" -gt 3 ]; then
   echo '  Status one of: Backlog, Ready, "In progress", "In review", Done' >&2
   exit 2
 fi
-NUM=$(printf "%03d" "$1" 2>/dev/null || echo "$1")
+# Decimal, never octal: printf reads `012` as 10, which would move #010.
+case $1 in '' | *[!0-9]*) NUM=$1 ;; *) NUM=$(printf "%03d" "$((10#$1))") ;; esac
 STATUS="$2"
 RESOLUTION=""
 
