@@ -1,5 +1,6 @@
 import { assert, assertEquals, assertStringIncludes } from "@std/assert";
 import { filterInitBundle } from "../../src/application/init_bundle_filter.ts";
+import { ReadFault } from "../../src/application/read_fault.ts";
 import type { FsReader } from "../../src/application/ports.ts";
 import type { Bundle } from "../../src/domain/template.ts";
 import { fakeReader, fakeWriter } from "./upgrade_fakes.ts";
@@ -61,7 +62,8 @@ const failing = (err: Error, rel?: string, files: Record<string, string> = {}): 
     listFiles: base.listFiles,
   };
 };
-const denied = () => new Deno.errors.PermissionDenied("Permission denied (os error 13)");
+/** What the real reader throws for a file it may not read (cli#704). */
+const denied = () => new ReadFault("Permission denied (os error 13)");
 
 Deno.test("no reader, or nothing on disk yet, refuses nothing", async () => {
   // The reader says "nothing there" for a target directory not created yet.

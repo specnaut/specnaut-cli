@@ -217,6 +217,29 @@ for (const ai of ["claude", "codex"]) {
     });
   });
 
+  Deno.test({
+    name: `${ai}: a docs/ link out of the project is refused as such, never "cannot be read"`,
+    ignore: Deno.build.os === "windows",
+    fn: async () => {
+      await withProject(ai, async (dir) => {
+        const outside = await Deno.makeTempDir({ prefix: "specnaut-outside-" });
+        try {
+          await plantLegacy(dir, OURS);
+          await Deno.remove(at(dir, "docs"), { recursive: true });
+          await Deno.symlink(outside, at(dir, "docs"));
+          const r = await upgrade(dir, "--force");
+          const said = r.stdout + r.stderr;
+          assertStringIncludes(said, "refusing to touch a path that leaves the project");
+          assert(!said.includes("cannot be read"), said);
+          assertEquals(await Deno.readTextFile(at(dir, LEGACY_CONSTITUTION_PATH)), OURS);
+          assertEquals([...Deno.readDirSync(outside)], []);
+        } finally {
+          await Deno.remove(outside, { recursive: true });
+        }
+      });
+    },
+  });
+
   for (const [cmd, out] of [["upgrade", "stdout"], ["init", "stderr"]] as const) {
     Deno.test({
       name: `${ai}: ${cmd} refuses an unreadable old file — no abort, no default beside it`,

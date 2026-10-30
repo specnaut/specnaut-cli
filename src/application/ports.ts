@@ -125,7 +125,7 @@ export interface LockStore {
   lockPath(projectDir: string): string;
 }
 
-/** `null`: nothing there, even under no project dir yet. A throw is never absence. */
+/** `null`: nothing there, even under no project dir yet. A throw is never absence (`ReadFault`). */
 export interface FsReader {
   readText(projectDir: string, rel: string): Promise<string | null>;
   /**

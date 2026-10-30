@@ -1,6 +1,8 @@
-import { assertEquals, assertRejects } from "@std/assert";
+import { assert, assertEquals, assertInstanceOf, assertRejects } from "@std/assert";
 import { join } from "@std/path";
 import { DenoFsReader } from "../../src/infrastructure/fs_reader.ts";
+import { ReadFault } from "../../src/application/read_fault.ts";
+import { ContainmentRefusal } from "../../src/infrastructure/fs_refusals.ts";
 import { WINDOWS } from "../helpers/link_text.ts";
 
 /** `readEntry` reports what is at a path itself — a link as a link (cli#680). */
@@ -52,6 +54,25 @@ Deno.test("readEntry: a link out of the project is reported, never refused or re
       const entry = await new DenoFsReader().readEntry(dir, ".claude/CLAUDE.md");
       assertEquals(entry?.kind, "symlink");
       assertEquals(entry?.kind === "symlink" && entry.resolved?.startsWith(".."), true);
+    } finally {
+      await Deno.remove(outside, { recursive: true });
+    }
+  });
+});
+
+Deno.test("an ancestor link out of the project is a containment refusal, never a ReadFault", {
+  ignore: WINDOWS,
+}, async () => {
+  await withProject(async (dir) => {
+    const outside = await Deno.makeTempDir();
+    try {
+      await Deno.writeTextFile(join(outside, "constitution.md"), "# Ours\n");
+      await Deno.symlink(outside, join(dir, "docs"));
+      const err = await assertRejects(
+        () => new DenoFsReader().readEntry(dir, "docs/constitution.md"),
+        ContainmentRefusal,
+      );
+      assert(!(err instanceof ReadFault), "a refusal relabelled as a read fault");
     } finally {
       await Deno.remove(outside, { recursive: true });
     }
@@ -121,7 +142,9 @@ Deno.test({
       const r = new DenoFsReader();
       const readable = await Deno.readFile(join(dir, "AGENTS.md")).then(() => true, () => false);
       if (readable) return; // root reads through any mode: nothing to observe.
-      await assertRejects(() => r.readEntry(dir, "AGENTS.md"), Deno.errors.PermissionDenied);
+      // A `ReadFault` (cli#704): the one throw a caller may call "cannot be read".
+      const fault = await assertRejects(() => r.readEntry(dir, "AGENTS.md"), ReadFault);
+      assertInstanceOf(fault.cause, Deno.errors.PermissionDenied);
       await assertRejects(() => r.readText(dir, "AGENTS.md"), Deno.errors.PermissionDenied);
     } finally {
       await Deno.chmod(join(dir, "AGENTS.md"), 0o644);

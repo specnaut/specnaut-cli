@@ -1,6 +1,7 @@
 import { assert, assertEquals, assertStrictEquals, assertStringIncludes } from "@std/assert";
 import type { FsReader } from "../../src/application/ports.ts";
 import { gatherPlanInputs } from "../../src/application/upgrade_plan_inputs.ts";
+import { ReadFault } from "../../src/application/read_fault.ts";
 import { sha256Hex } from "../../src/domain/sha256.ts";
 import { wrapInBlock } from "../../src/domain/merge_block.ts";
 import type { Bundle } from "../../src/domain/template.ts";
@@ -110,7 +111,7 @@ Deno.test("the legacy constitution leaves the bundle and the lock in every mode 
 });
 
 Deno.test("an unreadable constitution, at either address, is refused — never an abort", async () => {
-  const denied = () => Promise.reject(new Deno.errors.PermissionDenied("Permission denied"));
+  const denied = () => Promise.reject(new ReadFault("Permission denied"));
   for (const unreadable of [LEGACY_CONSTITUTION_PATH, CONSTITUTION_PATH]) {
     const base = fakeReader({ [LEGACY_CONSTITUTION_PATH]: "ours", "a.md": "alpha" });
     const reader: FsReader = {

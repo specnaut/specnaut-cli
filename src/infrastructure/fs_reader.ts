@@ -2,6 +2,7 @@ import { join, relative, SEPARATOR } from "@std/path";
 import type { FsReader } from "../application/ports.ts";
 import { assertSafeDestination, isInside } from "../domain/template.ts";
 import type { DiskEntry } from "../domain/context_link.ts";
+import { ReadFault } from "../application/read_fault.ts";
 import { UnwalkableLinkError } from "./fs_link_walk.ts";
 import {
   assertInsideProject,
@@ -56,34 +57,52 @@ export class DenoFsReader implements FsReader {
     assertSafeDestination(rel);
     const root = await existingRoot(projectDir);
     const abs = join(projectDir, rel);
-    if (root === null || !await guarded(assertRemovableInProject(root, abs))) return null;
-    let info: Deno.FileInfo;
     try {
-      info = await Deno.lstat(abs);
+      if (root === null || !await guarded(assertRemovableInProject(root, abs))) return null;
+      return await entryOf(root, abs);
     } catch (err) {
-      if (err instanceof Deno.errors.NotFound) return null;
-      throw err;
+      throw asReadFault(err);
     }
-    if (!info.isSymlink) return fileEntry(await Deno.readFile(abs));
-    const target = await Deno.readLink(abs);
-    let resolved: string | null;
-    try {
-      resolved = relative(root, await resolveTarget(abs)).split(SEPARATOR).join("/");
-    } catch (err) {
-      // A cycle, or a link through a directory that does not exist, cannot be
-      // followed; say so with `null` rather than guess.
-      if (!(err instanceof Deno.errors.FilesystemLoop || err instanceof UnwalkableLinkError)) {
-        throw err;
-      }
-      resolved = null;
-    }
-    return { kind: "symlink", target, resolved };
   }
 
   /** See `listProjectFiles`, the one walker of a project folder. */
   listFiles(projectDir: string, rel: string): Promise<string[]> {
     return listProjectFiles(projectDir, rel);
   }
+}
+
+/**
+ * The filesystem's own error — a permission, an I/O fault — as the `ReadFault`
+ * the port promises (cli#704); a containment refusal, or anything else, as is.
+ */
+function asReadFault(err: unknown): unknown {
+  const os = Object.values(Deno.errors).some((c) => err instanceof c);
+  return os ? new ReadFault((err as Error).message, { cause: err }) : err;
+}
+
+/** `readEntry` past its containment check: what `lstat` sees at `abs`. */
+async function entryOf(root: string, abs: string): Promise<DiskEntry | null> {
+  let info: Deno.FileInfo;
+  try {
+    info = await Deno.lstat(abs);
+  } catch (err) {
+    if (err instanceof Deno.errors.NotFound) return null;
+    throw err;
+  }
+  if (!info.isSymlink) return fileEntry(await Deno.readFile(abs));
+  const target = await Deno.readLink(abs);
+  let resolved: string | null;
+  try {
+    resolved = relative(root, await resolveTarget(abs)).split(SEPARATOR).join("/");
+  } catch (err) {
+    // A cycle, or a link through a directory that does not exist, cannot be
+    // followed; say so with `null` rather than guess.
+    if (!(err instanceof Deno.errors.FilesystemLoop || err instanceof UnwalkableLinkError)) {
+      throw err;
+    }
+    resolved = null;
+  }
+  return { kind: "symlink", target, resolved };
 }
 
 /**

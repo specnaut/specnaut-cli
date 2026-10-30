@@ -7,6 +7,7 @@ import {
 } from "../domain/constitution_move.ts";
 import type { DiskEntry } from "../domain/context_link.ts";
 import { deleteExact, exactMoveRefusal, moveExact } from "./upgrade_exact_move.ts";
+import { ReadFault } from "./read_fault.ts";
 
 /** What the move needs: the two existing ports, no new one. */
 export type ConstitutionMoveContext = {
@@ -41,7 +42,7 @@ const WHY = "the constitution is the project's own document now";
  * (A-H2). A caller adds no condition of its own — not even "does the old
  * file exist": nothing there, or no project directory yet, is verdict `none`.
  * An address that cannot be read is a refusal, never an abort and never
- * absence (cli#684 review). Runs before the caller reads
+ * absence (cli#684 review); one that leaves the project aborts (cli#704). Runs before the caller reads
  * disk state for its plan, so the defaults are judged against the moved file
  * (FR-007). Under `dryRun` it judges and writes nothing; its note says
  * "would move".
@@ -101,9 +102,12 @@ async function dedupe(ctx: ConstitutionMoveContext, notes: string[]): Promise<vo
 
 /**
  * What is at `rel`, told apart from what cannot be said: the reader returns
- * `null` for absence (no file, or no project directory yet), so a throw is a
- * file that is there and cannot be read — judged absent, the default would be
- * written beside it.
+ * `null` for absence (no file, or no project directory yet), and a `ReadFault`
+ * for a file that is there and cannot be read — judged absent, the default
+ * would be written beside it. Only that throw is caught (cli#704): a
+ * containment refusal propagates in its own words, as it does for every other
+ * read `upgrade` makes, because "make it readable" is wrong advice for a link
+ * that leaves the project.
  */
 async function entryAt(
   ctx: ConstitutionMoveContext,
@@ -112,6 +116,7 @@ async function entryAt(
   try {
     return await ctx.reader.readEntry(ctx.projectDir, rel);
   } catch (err) {
-    return { kind: "unreadable", reason: err instanceof Error ? err.message : String(err) };
+    if (!(err instanceof ReadFault)) throw err;
+    return { kind: "unreadable", reason: err.message };
   }
 }
