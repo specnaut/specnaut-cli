@@ -2,13 +2,8 @@ import type { BackupReport, FsReader, FsWriter } from "./ports.ts";
 import type { Bundle } from "../domain/template.ts";
 import type { InstalledLock } from "../domain/installed_lock.ts";
 import type { UpgradePlan } from "../domain/upgrade_plan.ts";
-import { sha256Hex } from "../domain/sha256.ts";
-import {
-  classifyLinkDisk,
-  linkIdentity,
-  type LinkState,
-  linkTargetPath,
-} from "../domain/context_link.ts";
+import { classifyLinkDisk, type LinkState, linkTargetPath } from "../domain/context_link.ts";
+import { gatherLinkEvidence } from "./link_evidence.ts";
 import type { PlannableLinkState } from "../domain/link_plan.ts";
 
 /** What `upgrade` learned about the context-link destinations of a bundle. */
@@ -27,11 +22,10 @@ export type ContextLinkSurvey = {
 };
 
 /**
- * Classify every context-link destination in `bundle` (cli#680, cli#681).
- *
- * Read with `readEntry`, never `readText`: through the link `readText` reads
- * `AGENTS.md`, and through a foreign link pointing out of the project it
- * throws — which would abort the very upgrade that replaces the link.
+ * Classify every context-link destination in `bundle` (cli#680, cli#681), on
+ * the evidence `diff` reads too (`gatherLinkEvidence`). Never through the
+ * link: a foreign one pointing out of the project would throw, and abort the
+ * very upgrade that replaces it.
  */
 export async function surveyContextLinks(
   reader: FsReader,
@@ -69,17 +63,9 @@ async function surveyOne(
   link: { readonly symlinkTo: string; readonly content: string },
   lock: InstalledLock,
 ): Promise<{ state: LinkState; diskSha?: string }> {
-  const disk = await reader.readEntry(projectDir, dest);
-  const diskSha = disk === null ? undefined : await sha256Hex(
-    disk.kind === "file" ? disk.content : linkIdentity(disk.target),
-  );
-  const state = classifyLinkDisk(dest, link, {
-    disk,
-    diskSha,
-    lockSha: lock.entries.get(dest)?.sha256,
-    targetEntry: await reader.readEntry(projectDir, linkTargetPath(dest, link.symlinkTo)),
-  });
-  return { state, diskSha };
+  const lockSha = lock.entries.get(dest)?.sha256;
+  const ev = await gatherLinkEvidence(reader, projectDir, dest, link.symlinkTo, lockSha);
+  return { state: classifyLinkDisk(dest, link, ev), diskSha: ev.diskSha };
 }
 
 const invertedMessage = (dest: string, target: string) =>

@@ -1,7 +1,11 @@
 import type { FsReader, Harness, LockStore } from "./ports.ts";
 import type { CoreBundle } from "../domain/core_bundle.ts";
+import type { Bundle } from "../domain/template.ts";
+import type { InstalledLock, LockEntry } from "../domain/installed_lock.ts";
 import { sha256Hex } from "../domain/sha256.ts";
-import { classifyLinkDisk, linkOwnership, linkTargetPath } from "../domain/context_link.ts";
+import { classifyLinkDisk, linkOwnership } from "../domain/context_link.ts";
+import { gatherLinkEvidence } from "./link_evidence.ts";
+import { bundleOptionsOf } from "./upgrade_lock.ts";
 
 /**
  * Per-file outcome of comparing a managed file's on-disk content against the
@@ -86,9 +90,7 @@ export class DiffProjectUseCase {
   constructor(private readonly deps: DiffProjectDeps) {}
 
   async execute(input: DiffProjectInput): Promise<DiffProjectResult> {
-    const { reader, lockStore, core, findHarness } = this.deps;
-
-    const lock = await lockStore.read(input.projectDir);
+    const lock = await this.deps.lockStore.read(input.projectDir);
     // No lock ⇒ nothing is tracked, so there is nothing to compare. Surface an
     // empty result with an empty version rather than throwing — `diff` is a
     // read-only audit, not a precondition-gated mutation.
@@ -102,75 +104,24 @@ export class DiffProjectUseCase {
     // makes a typo indistinguishable from a clean file.
     const wanted = input.path;
     if (wanted !== null && !lock.entries.has(wanted)) {
-      return {
-        results: [],
-        fromVersion: lock.templatesVersion,
-        pathProblem: "not-managed",
-      };
+      return { results: [], fromVersion: lock.templatesVersion, pathProblem: "not-managed" };
     }
-
-    const harness = findHarness(lock.harness);
-    if (!harness) {
-      throw new Error(`unknown harness in lock: ${lock.harness}`);
-    }
-
-    const bundle = harness.mapBundle(core, {
-      backlogBackend: lock.backlogBackend,
-      versionScheme: lock.versionScheme,
-      specBackend: lock.specBackend,
-      specAutogen: lock.specAutogen,
-    });
-
+    const bundle = this.bundleFor(lock);
     const results: DivergenceResult[] = [];
     let scopedAbsent = false;
     for (const [dest, entry] of lock.entries) {
       if (wanted !== null && dest !== wanted) continue;
-
-      const symlinkTo = bundle[dest]?.symlinkTo;
-      if (symlinkTo !== undefined) {
-        const link = await linkDivergence(reader, input.projectDir, dest, {
-          symlinkTo,
-          content: bundle[dest].content,
-        }, entry.sha256);
-        if (link === null) {
-          if (wanted !== null) scopedAbsent = true;
-          continue;
-        }
-        if (input.onlyCustomised && !link.customised) continue;
-        results.push(link.result);
-        continue;
-      }
-
-      const diskContent = await reader.readText(input.projectDir, dest);
+      const verdict = await this.divergence(input.projectDir, bundle, dest, entry);
       // A lock entry whose file is gone from disk is outside this view's remit
       // (the divergence is between disk and bundle); skip it rather than invent
       // a result. When it is the ONE path that was asked about, silence would
       // be read as "clean", so record it and let the caller say so.
-      if (diskContent === null) {
+      if (verdict === null) {
         if (wanted !== null) scopedAbsent = true;
         continue;
       }
-
-      const diskSha = await sha256Hex(diskContent);
-      const isCustomised = diskSha !== entry.sha256;
-      if (input.onlyCustomised && !isCustomised) continue;
-
-      const bundled = bundle[dest];
-      if (bundled === undefined) {
-        // Tracked on disk but dropped from the new bundle (FR-009).
-        results.push({ kind: "missing", dest });
-        continue;
-      }
-      if (bundled.content === diskContent) {
-        results.push({ kind: "matches", dest });
-      } else {
-        results.push({
-          kind: "differs",
-          dest,
-          diskContent,
-          bundledContent: bundled.content,
-        });
-      }
+      if (input.onlyCustomised && !verdict.customised) continue;
+      results.push(verdict.result);
     }
 
     return {
@@ -179,7 +130,49 @@ export class DiffProjectUseCase {
       pathProblem: scopedAbsent ? "absent-on-disk" : null,
     };
   }
+
+  /**
+   * The bundle mapped exactly the way `upgrade` maps it, so the comparison is
+   * against the same bytes a refresh would write.
+   */
+  private bundleFor(lock: InstalledLock): Bundle {
+    const harness = this.deps.findHarness(lock.harness);
+    if (!harness) {
+      throw new Error(`unknown harness in lock: ${lock.harness}`);
+    }
+    return harness.mapBundle(this.deps.core, bundleOptionsOf(lock));
+  }
+
+  /** One lock-tracked dest's divergence, or `null` when nothing is on disk there. */
+  private async divergence(
+    projectDir: string,
+    bundle: Bundle,
+    dest: string,
+    entry: LockEntry,
+  ): Promise<Verdict | null> {
+    const bundled = bundle[dest];
+    if (bundled?.symlinkTo !== undefined) {
+      const link = { symlinkTo: bundled.symlinkTo, content: bundled.content };
+      return await linkDivergence(this.deps.reader, projectDir, dest, link, entry.sha256);
+    }
+    const diskContent = await this.deps.reader.readText(projectDir, dest);
+    if (diskContent === null) return null;
+    const customised = await sha256Hex(diskContent) !== entry.sha256;
+    // Tracked on disk but dropped from the new bundle (FR-009).
+    if (bundled === undefined) return { result: { kind: "missing", dest }, customised };
+    if (bundled.content === diskContent) return { result: { kind: "matches", dest }, customised };
+    const result: DivergenceResult = {
+      kind: "differs",
+      dest,
+      diskContent,
+      bundledContent: bundled.content,
+    };
+    return { result, customised };
+  }
 }
+
+/** A dest's divergence, and whether the maintainer customised it (`onlyCustomised`). */
+type Verdict = { result: DivergenceResult; customised: boolean };
 
 /**
  * A context-link destination's divergence (cli#680), judged by what is there
@@ -194,16 +187,11 @@ async function linkDivergence(
   dest: string,
   file: { readonly symlinkTo: string; readonly content: string },
   lockSha: string,
-): Promise<{ result: DivergenceResult; customised: boolean } | null> {
-  const disk = await reader.readEntry(projectDir, dest);
+): Promise<Verdict | null> {
+  const ev = await gatherLinkEvidence(reader, projectDir, dest, file.symlinkTo, lockSha);
+  const disk = ev.disk;
   if (disk === null) return null;
-  const state = classifyLinkDisk(dest, file, {
-    disk,
-    diskSha: disk.kind === "file" ? await sha256Hex(disk.content) : undefined,
-    lockSha,
-    targetEntry: await reader.readEntry(projectDir, linkTargetPath(dest, file.symlinkTo)),
-  });
-  const owner = linkOwnership(state);
+  const owner = linkOwnership(classifyLinkDisk(dest, file, ev));
   const customised = owner === "theirs";
   if (owner === "ours") return { result: { kind: "matches", dest }, customised };
   const diskContent = disk.kind === "file" ? disk.content : `symlink → ${disk.target}\n`;
