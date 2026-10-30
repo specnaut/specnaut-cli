@@ -236,3 +236,33 @@ Deno.test("the merge and release commands each harness prints mint an approval (
     }
   }
 });
+
+Deno.test("a /task or /ship the lock does not list as Specnaut's mints nothing (cli#702)", async () => {
+  // `/task` is a common name: a project with its own skill of that name, run
+  // under bypass or auto permissions, must not have its `/task merge` land code.
+  // A sandbox per harness: each harness's session keys its own stamp.
+  for (const harness of HARNESSES) {
+    const sb = await sandbox();
+    try {
+      const repo = await makeRepo(sb, { skills: [] });
+      for (
+        const prompt of ["/task merge", "/task merge --no-close", "/ship release", "/ship tag v2"]
+      ) {
+        const r = await approve(sb, harness, repo, prompt);
+        assertEquals(r.code, 0, r.stderr);
+        assertEquals(
+          await stamps(sb),
+          [],
+          `${harness}: ${prompt} minted for a skill not Specnaut's`,
+        );
+      }
+      // What only Specnaut spells, and the plain words, still mint.
+      for (const prompt of ["merge", "/specnaut-task merge", "release it"]) {
+        await approve(sb, harness, repo, prompt);
+        assertEquals((await stamps(sb)).length, 1, `${harness}: ${prompt} must still mint`);
+      }
+    } finally {
+      await sb.cleanup();
+    }
+  }
+});

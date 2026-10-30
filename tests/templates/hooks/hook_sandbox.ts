@@ -107,6 +107,11 @@ export interface RepoOptions {
   head?: string;
   /** What origin/HEAD points at; `null` leaves the base unknown. */
   base?: string | null;
+  /**
+   * The skills `.specnaut/installed.lock` lists as Specnaut's — what tells a
+   * `/task merge` aimed at Specnaut from one aimed at a project's own `/task`.
+   */
+  skills?: ReadonlyArray<string>;
 }
 
 let repoCount = 0;
@@ -117,7 +122,7 @@ let repoCount = 0;
  * exactly as in a scaffolded project. origin/HEAD is set by ref, so no remote has to exist.
  */
 export async function makeRepo(sb: Sandbox, opts: RepoOptions = {}): Promise<string> {
-  const { mode = "manual", head = "feat", base = "main" } = opts;
+  const { mode = "manual", head = "feat", base = "main", skills = ["task", "ship"] } = opts;
   const repo = join(sb.dir, `repo-${++repoCount}`);
   await Deno.mkdir(join(repo, ".specnaut", "scripts", "bash"), { recursive: true });
   await git(sb, repo, "init", "-q", "-b", "main");
@@ -127,6 +132,12 @@ export async function makeRepo(sb: Sandbox, opts: RepoOptions = {}): Promise<str
   if (mode !== null) {
     await Deno.writeTextFile(join(repo, ".specnaut", "workflow.yml"), `merge: ${mode}\n`);
   }
+  await Deno.writeTextFile(
+    join(repo, ".specnaut", "installed.lock"),
+    `version: 2\nharness: claude\nentries:\n${
+      skills.map((s) => `  .claude/skills/${s}/SKILL.md:\n    sha256: ${"0".repeat(64)}\n`).join("")
+    }`,
+  );
   await Deno.writeTextFile(join(repo, "README.md"), "# my-app\n");
   await git(sb, repo, "add", "-A");
   await git(sb, repo, "commit", "-q", "-m", "init");
