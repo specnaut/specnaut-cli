@@ -103,7 +103,10 @@ export function claimsExemption(content: string): boolean {
  * one after the other, a `<!--` written as code opened a comment that
  * swallowed the imports after it (cli#706).
  */
-const HIDDEN = /<!--[\s\S]*?-->|^(```|~~~)[^\n]*\n[\s\S]*?^\1[^\n]*$|`(?:[^`\n]|\n(?!\s*\n))*`/gm;
+// A code span opens on a run of N backticks and closes on a run of exactly N
+// (CommonMark), never across a blank line: `` a ` b `` is one span.
+const HIDDEN =
+  /<!--[\s\S]*?-->|^(```|~~~)[^\n]*\n[\s\S]*?^\1[^\n]*$|(`+)(?:(?!\2)(?!\n\s*\n)[\s\S])*?(?<!`)\2(?!`)/gm;
 
 /**
  * The `@` import tokens Claude Code would follow in `text`, by its own rule:

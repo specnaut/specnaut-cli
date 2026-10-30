@@ -33,6 +33,12 @@ Deno.test("importTokens: code spans, fenced blocks and HTML comments hide a toke
   assertEquals(importTokens("<!-- @a.md\n@b.md -->"), []);
 });
 
+Deno.test("importTokens: a double-backtick span holding a backtick hides nothing after it", () => {
+  // CommonMark: `` opens a span only `` closes, so @x.md here is plain text Claude Code follows.
+  assertEquals(importTokens("``a ` b`` then @x.md and `y`"), ["@x.md"]);
+  assertEquals(importTokens("``a ` @hidden.md``"), []);
+});
+
 Deno.test("importTokens: a code span never crosses a blank line", () => {
   assertEquals(importTokens("an open `tick\n\n@a.md and a close `"), ["@a.md"]);
 });

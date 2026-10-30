@@ -133,9 +133,14 @@ Deno.test("every router opens with the reference, or says on the file why it doe
 });
 
 Deno.test("no agent and no task-routing router may opt out", () => {
+  const taskRouters = routers().filter((e) =>
+    (ADDENDUM_SKILLS as ReadonlyArray<string>).includes(e.name)
+  );
+  // A renamed router would leave the ban checking agents alone, and a quoted key free (cli#706).
+  assertEquals(taskRouters.length, ADDENDUM_SKILLS.length, "a task-routing router is missing");
   const banned = [
     ...agents(),
-    ...routers().filter((e) => (ADDENDUM_SKILLS as ReadonlyArray<string>).includes(e.name)),
+    ...taskRouters,
   ].filter((e) => claimsExemption(e.content)).map((e) => `${e.category}:${e.name}`);
   assertEquals(banned, [], "entry points that may not be exempt");
 });
