@@ -1,5 +1,5 @@
 import { assert, assertEquals, assertStringIncludes } from "@std/assert";
-import { ago, line, project, view } from "./status_audit_fixture.ts";
+import { ago, line, project, SCRIPT, view } from "./status_audit_fixture.ts";
 
 /**
  * The status-audit output sanitiser (cli#679, plan § 11 security MEDIUM).
@@ -110,4 +110,53 @@ Deno.test("a forged handoff target never produces a missing-handoff row", async 
   } finally {
     await p.cleanup();
   }
+});
+
+/**
+ * cli#713 — `clean` itself, on the code points no field can carry today (each
+ * is checked against an ASCII-only pattern first), so the filter is ready the
+ * day a free-text field is printed: the invisible marks a model reads and a
+ * human does not — LRM/RLM, ALM, the zero-width characters, U+FEFF and the
+ * tag block. The definition is cut from the script itself and run by jq: the
+ * filter under test is the one that ships, not a copy of it.
+ */
+Deno.test("clean strips the invisible and directional marks a model reads but a human does not", async () => {
+  const text = await Deno.readTextFile(SCRIPT);
+  const def = text.match(/^def clean:[\s\S]*?implode;$/m)?.[0];
+  assert(def, "status-audit.sh defines no `clean` filter");
+  const hidden = [
+    0x200e,
+    0x200f,
+    0x061c, // LRM, RLM, ALM
+    0x200b,
+    0x200c,
+    0x200d,
+    0x2060,
+    0x2061,
+    0x2062,
+    0x2063,
+    0x2064, // zero width
+    0xfeff, // BOM / zero-width no-break space
+    0xe0000,
+    0xe0001,
+    0xe0041,
+    0xe007f, // the tag block, both ends
+  ];
+  const input = hidden.map((cp, i) => String.fromCodePoint(cp) + "abcdefghijklmnopq"[i]).join("") +
+    "é→";
+  // On stdin, not argv: a Windows argv may not carry a code point past U+FFFF intact.
+  const child = new Deno.Command("jq", {
+    args: ["-rR", `${def} . | clean`],
+    stdin: "piped",
+    stdout: "piped",
+    stderr: "piped",
+  }).spawn();
+  const w = child.stdin.getWriter();
+  await w.write(new TextEncoder().encode(input));
+  await w.close();
+  const out = await child.output();
+  const d = new TextDecoder();
+  assertEquals(out.code, 0, d.decode(out.stderr));
+  // A native Windows jq.exe ends its line in CRLF.
+  assertEquals(d.decode(out.stdout).replace(/\r\n$/, "\n"), "abcdefghijklmnopé→\n");
 });
