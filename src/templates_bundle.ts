@@ -5487,7 +5487,7 @@ is bounded instead by the phases that dispatch it — every review diff and ever
 ## How the two axes reach other harnesses
 
 \`model:\` names a family, never a version — **Specnaut names no model version anywhere**. The
-families correspond across harnesses:
+families correspond across harnesses, Fable → Astra included:
 
 | Claude Code | Codex |
 | ----------- | ----- |
@@ -5501,7 +5501,7 @@ session's model, with a comment naming the family (\`src/domain/codex_models.ts\
 
 | Specnaut | Codex |
 | -------- | ----- |
-| \`model: opus\` / \`sonnet\` / \`haiku\` | \`# Model family: Sol\` / \`Terra\` / \`Luna\` (comment) |
+| \`model: fable\` / \`opus\` / \`sonnet\` / \`haiku\` | \`# Model family: Astra\` / \`Sol\` / \`Terra\` / \`Luna\` (comment) |
 | \`effort: low\` / \`medium\` / \`high\` / \`xhigh\` | \`model_reasoning_effort\`, verbatim |
 
 \`ultra\` and \`max\` are never emitted; an unrecognised value omits the key rather than guessing.
@@ -26498,8 +26498,8 @@ and you say so. No file means no addendum — say nothing about it.
 
 **Dispatch a Specnaut agent by its name, never by describing the task.** On Claude Code that is
 \`Task(subagent_type: "<name>")\`; on Codex, \`spawn_agent(agent_type="<name>")\`. A child started
-from a description selects no role: it runs without that agent's instructions and, on Codex, on
-the primary session's model.
+from a description selects no role: it runs without that agent's instructions and, on Codex,
+without its reasoning budget.
 
 Each step of the chain that delegates names its agent:
 
