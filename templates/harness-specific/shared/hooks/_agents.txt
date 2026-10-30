@@ -9,4 +9,3 @@ performance-expert
 product-owner
 security-expert
 specnaut-guide
-ui-ux-designer
