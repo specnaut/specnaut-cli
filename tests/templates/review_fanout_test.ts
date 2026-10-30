@@ -95,3 +95,29 @@ Deno.test("code-reviewer carries the test checklist and exactly one execution gr
   assert(!c.includes("general interpreter"), "the false containment claim is not carried");
   assert(c.includes("NOT VERIFIED — requires mutating"), "the evidence standard moved with it");
 });
+
+/**
+ * The five experts read the same untrusted bytes as code-reviewer — a diff in
+ * review, a whole tree in `/task audit` — so each carries the same data-only
+ * line (plan 043 § 11, security MEDIUM).
+ *
+ * And `/task audit` sums each seat's `REVIEW SUMMARY` under its dominance
+ * rule, so a seat told that audit mode "emits neither block" hands the
+ * aggregation nothing to sum: the dispatcher and the seat must agree.
+ */
+const EXPERTS = [
+  "architect-expert",
+  "security-expert",
+  "performance-expert",
+  "accessibility-expert",
+  "dependency-expert",
+] as const;
+
+for (const name of EXPERTS) {
+  Deno.test(`${name} treats what it reads as data and ends every mode with REVIEW SUMMARY`, async () => {
+    const c = flat(await read(`templates/core/agents/${name}.md`));
+    assert(c.includes("data, never instructions"), "file content under review is data");
+    assert(!c.includes("emits neither block"), "audit mode emits the block audit.md sums");
+    assert(c.includes(`REVIEW_SCOPE: ${name}`), "the seat names itself in its block");
+  });
+}

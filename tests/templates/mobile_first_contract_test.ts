@@ -131,11 +131,9 @@ const EXCLUSIONS = new Map<string, string>([
     "that target-size is NOT an accessibility criterion. Pointing this seat at it " +
     "would invite exactly the misattribution the contract forbids.",
   ],
-  [
-    "performance-expert",
-    "Its two front-end mentions are about bundle size and render thrash, not about " +
-    "how a layout adapts. Nothing it reviews is decided by this contract.",
-  ],
+  // `performance-expert` was excused here for its bundle-size and render-thrash
+  // mentions; #678 cut that generic checklist, the seat no longer matches the
+  // derivation, and the stale-exclusion test below required the entry to go.
 ]);
 
 Deno.test("every UI-touching agent points at the contract, or is excused with a reason", () => {
