@@ -58,7 +58,7 @@ is bounded instead by the phases that dispatch it — every review diff and ever
 ## How the two axes reach other harnesses
 
 `model:` names a family, never a version — **Specnaut names no model version anywhere**. The
-families correspond across harnesses:
+families correspond across harnesses, Fable → Astra included:
 
 | Claude Code | Codex |
 | ----------- | ----- |
@@ -72,7 +72,7 @@ session's model, with a comment naming the family (`src/domain/codex_models.ts`)
 
 | Specnaut | Codex |
 | -------- | ----- |
-| `model: opus` / `sonnet` / `haiku` | `# Model family: Sol` / `Terra` / `Luna` (comment) |
+| `model: fable` / `opus` / `sonnet` / `haiku` | `# Model family: Astra` / `Sol` / `Terra` / `Luna` (comment) |
 | `effort: low` / `medium` / `high` / `xhigh` | `model_reasoning_effort`, verbatim |
 
 `ultra` and `max` are never emitted; an unrecognised value omits the key rather than guessing.
