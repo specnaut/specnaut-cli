@@ -112,11 +112,12 @@ Deno.test("the worked example in epic-commits.md parses as the doc says", async 
   // The format is written for agents in one file and parsed in another; this keeps them one
   // format. The whole example is committed as written — subject AND trailer — so a trailer the
   // doc spells differently from what the parser reads fails here, not on an epic (cli#711).
-  const doc = await Deno.readTextFile(
+  // A Windows checkout (core.autocrlf) reads the doc with CRLF line ends.
+  const doc = (await Deno.readTextFile(
     fromFileUrl(
       new URL("../../templates/core/skills/task/phases/epic-commits.md", import.meta.url),
     ),
-  );
+  )).replaceAll("\r\n", "\n");
   const block = doc.match(/A worked example[^\n]*\n\n```text\n([\s\S]*?)\n```/)?.[1];
   assert(block, "the worked example is gone from epic-commits.md");
   const [subject, ...rest] = block.split("\n");
