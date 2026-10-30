@@ -652,9 +652,9 @@ quote it and stop.
 | :--- | :--- | :--- |
 | 0 | folded | merge |
 | 2 | usage, or \`--verify\` given a sha that is not the \`PRE\` the stopped fold printed | re-run \`--verify\` with that \`PRE\` sha — never \`HEAD\`, never another |
-| 3 | the base is unknown, or \`epic-status.sh\` could not read the branch | stop and say so |
-| 13 | the rebase stopped on a conflict — or, on \`--verify\`, is still in progress | resolve it, \`git rebase --continue\` (check it exits 0), then \`fold-fixups.sh --verify <PRE sha>\` — the checks run against the tree recorded before the fold |
-| 10 | the tree moved | stop: a fold that changes the tree is a rewrite |
+| 3 | the base is unknown, \`epic-status.sh\` could not read the branch, or the rebase failed without stopping (nothing folded, nothing recorded) | stop and say so |
+| 13 | the rebase stopped on a conflict — or, on \`--verify\`, is still in progress — or, on a plain run, a stopped fold awaits \`--verify <pre>\` (it names the sha) | resolve it, \`git rebase --continue\` (check it exits 0), then \`fold-fixups.sh --verify <PRE sha>\` — the checks run against the tree recorded before the fold. Never a plain re-run: only a passing \`--verify\` spends the record |
+| 10 | the tree moved | stop: a fold that changes the tree is a rewrite. The record stays, so a plain run is refused (13) — the fold is not retried over a moved tree |
 | 11 | the worktree is not clean | untracked output belongs in the child's commit or \`.gitignore\`; a modified file means something still holds the tree — stop it first |
 | 12 | not one commit per child | a surviving \`fixup!\` lost its target or was written by hand; attribute it by sha |
 | 14 | not an epic branch | this file does not apply |
@@ -688,7 +688,8 @@ confirmed closed.
 1. **What shipped.** Standalone: \`linked_issue\` from \`.specnaut/feature.json\` (absent → skip this
    file; a tree from before the field existed). Epic: the children are the \`CHILD\` lines, and the
    epic the \`EPIC\` line, that \`epic-status.sh\` printed at \`phases/merge.md\` step 1, before the landing
-   — never re-run it now: its range is empty after the landing. A child whose commit is not on the
+   — or at its re-run after a clean rebase (step 4, exit 5), whose lines replace the first. Never
+   re-run it now: its range is empty after the landing. A child whose commit is not on the
    branch did not ship, and is not closed.
 2. **Close each one — github and gitlab.** **Do not ask.** The push was the authorisation. For the
    epic itself, and for a standalone item, run \`bash .specnaut/scripts/backlog/cascade-check.sh <n>\`
@@ -725,9 +726,12 @@ confirmed closed.
      kept. Report them by name and never delete them: they are someone's only copy.
    - **7** — the push was rejected; the removal commit is on the local base, and \`feature.json\` with
      it — so never re-run the script (it would skip, 22). \`git pull --rebase --no-autostash origin
-     <base>\`, then \`git push origin <base>\`; a conflict: \`git rebase --abort\`, report it unpushed.
+     <base>\`, then \`git push --no-follow-tags origin refs/heads/<base>:refs/heads/<base>\`; a
+     conflict: \`git rebase --abort\`, report it unpushed.
    - **23** — something else was staged while it ran: the removal is undone, nothing committed.
      Report the path it names; that staged work is someone else's — leave it staged.
+   - **25** — the removal commit failed (a hook, signing): the removal is undone, nothing committed.
+     Quote the failure it names and report it; never bypass the hook.
    - **2 · 3** — usage, or the base branch is unknown: report it; nothing changed.
 
 ## The report names every item, one line each
@@ -787,10 +791,11 @@ commit holds only that child's work — two children in one commit break the mat
 
 There is no state file: resume reconstructs from git. \`bash .specnaut/scripts/bash/epic-status.sh\`
 reads the branch's commits — one \`CHILD T<NN> #<child> <sha>\` line per child done, one-to-one by
-ordinal — and **resume at the first child with no commit** (none yet reads as not an epic branch:
-start at the first child). Do not use issue state as a progress signal — child issues stay open for
-the whole loop. Any other exit stops the loop: say which — its exits are mapped once, in
-\`phases/merge.md\` step 1.
+ordinal — and **resume at the first child with no commit**. This is the loop-context resume: a
+branch with no child commit yet reads **14** (not an epic branch), or **16** when it is empty and an
+earlier branch of the same epic already landed — either way, start at the first open child. Do not
+use issue state as a progress signal — child issues stay open for the whole loop. Any other exit
+stops the loop: say which — the rest are mapped once, in \`phases/merge.md\` step 1.
 `,
     executable: false,
     backend: null,
@@ -1209,9 +1214,10 @@ that runs only on \`pull_request\`. **Do not infer \`--pr\` from a remote, a for
    - **Exit 14 — standalone**: load \`phases/merge-squash.md\` — **Squash by scope**.
    - **Exit 12** — the history does not read back to the board: fix it on the branch. **3** — the
      base is unknown: stop and say so. **15** — the history could not be read: stop and say so.
+     **2** — usage: fix the call.
    - **Exit 16** — the range is empty but \`.specnaut/feature.json\` links an epic whose commits have
      landed (a re-run after the base moved): **stop** and say so — never squash, never close from
-     here; the \`CHILD\` lines cannot be read back.
+     here; the \`CHILD\` lines cannot be read back. A range holding any commit never reads 16.
    - **Exit 0 — an epic**: do **not** squash. Run the full gate tier once,
      \`.specnaut/scripts/bash/run-gate.sh full\` (a failure is fixed on the branch as a \`--fixup\` of the
      child at fault, then the tier re-run — never escalated), then load \`phases/epic-fixups.md\` and
@@ -1244,10 +1250,10 @@ that runs only on \`pull_request\`. **Do not infer \`--pr\` from a remote, a for
    | 2 | not on a feature branch | check out the feature branch, land again |
    | 3 | the base is unknown, or origin does not confirm it as its default | stop and say so, quoting its line — never land on a guessed branch |
    | 4 | the tree is dirty | commit, or stop whoever holds it |
-   | 5 | behind \`origin/<base>\` | \`git rebase refs/remotes/origin/<base>\`. Applies cleanly → re-run the gates, land again. A conflict → \`git rebase --abort\`, and the branch goes back to \`review\` — a resolution is a change nobody reviewed |
+   | 5 | behind \`origin/<base>\` | \`git rebase refs/remotes/origin/<base>\`. Applies cleanly → re-run the gates — on the epic path, re-run \`epic-status.sh\` too and replace the kept \`CHILD\`/\`EPIC\` lines, whose shas the rebase changed — and land again. A conflict → \`git rebase --abort\`, and the branch goes back to \`review\` — a resolution is a change nobody reviewed |
    | 6 | the local base holds commits origin lacks (printed: \`origin/<base>..<base>\`) | **stop on that fact**, quoting the range: they are someone's work. Nothing was rebased or pushed, and the phase does not rebase |
    | 7 | the push was rejected | quote the remote's message — never \`--force\`. A rule refused it (protected base, hook): stop and say so. Origin moved: \`git checkout <branch>\`, \`git branch -f <base> refs/remotes/origin/<base>\` (the local base holds only this branch's fast-forward), land again — exit 5 follows and its row applies. The close does not run until a landing pushes |
-   | 9 | \`HEAD\` is not the base | say so; the person who asked must be back where they work |
+   | 9 | \`HEAD\` is not the base | the landing stands — it was pushed. Say so, \`git checkout <base>\`, then step 5 runs: the person who asked must be back where they work |
    | 10 | nothing to land | the branch has no commit origin lacks: say so — nothing merged, nothing to close |
    | 11 | landed and pushed; the branch would not delete with \`-d\` | the landing stands: step 5 runs. Report the branch that stayed |
    | 12 | an unexpected git failure before the push | quote it and stop: nothing was pushed |
@@ -23361,10 +23367,12 @@ exit 3
 #   14 not an epic branch (no \`Epic:\` trailer at all), and .specnaut/feature.json
 #      does not name an epic either
 #   15 the history could not be read (a \`git log\` failed) — nothing concluded
-#   16 no \`Epic:\` trailer on <base>..HEAD, but .specnaut/feature.json's
-#      \`linked_issue\` is an epic: its own \`Epic: #<n>\` trailers are already in
-#      HEAD's history. The range has landed (a re-run after the base moved),
-#      so the CHILD/EPIC lines cannot be read back from it — stop, never squash
+#   16 <base>..HEAD is empty, and .specnaut/feature.json's \`linked_issue\` is
+#      an epic whose own \`Epic: #<n>\` trailers are already in HEAD's history.
+#      The range has landed (a re-run after the base moved), so the CHILD/EPIC
+#      lines cannot be read back from it — stop, never squash. A range that
+#      holds any commit is read as it stands: the second branch of an epic
+#      delivered across several is not a re-run
 #
 # Usage: epic-status.sh
 set -euo pipefail
@@ -23435,12 +23443,13 @@ if [ -z "\$epic" ] && [ "\$children" -eq 0 ]; then
   # and nothing else writes it. The file has no epic field, by design (D16).
   fj="\$here/../../feature.json"
   issue=""
-  [ -f "\$fj" ] && issue=\$(sed -n 's/.*"linked_issue"[[:space:]]*:[[:space:]]*\\([1-9][0-9]*\\).*/\\1/p' "\$fj" | sed -n 1p)
+  # Only an empty range can be a landed one: a commit on it is this branch's own.
+  [ -f "\$fj" ] && [ -z "\$log" ] && issue=\$(sed -n 's/.*"linked_issue"[[:space:]]*:[[:space:]]*\\([1-9][0-9]*\\).*/\\1/p' "\$fj" | sed -n 1p)
   if [ -n "\$issue" ]; then
     # Anchored per line by git itself: #50 never matches a trailer of #501.
     hit=\$(git --no-pager log -1 --format=%H -E --grep="^Epic: #\$issue\\\$" HEAD) || unread HEAD
     if [ -n "\$hit" ]; then
-      echo "epic-status: no 'Epic:' trailer on \$range, but .specnaut/feature.json links epic #\$issue, whose commits HEAD already holds — the range has landed; the CHILD lines cannot be read back. Stop" >&2
+      echo "epic-status: \$range is empty, but .specnaut/feature.json links epic #\$issue, whose commits HEAD already holds — the range has landed; the CHILD lines cannot be read back. Stop" >&2
       exit 16
     fi
   fi
@@ -23477,20 +23486,24 @@ exit 0
 # conflict (exit 13), resolve it, \`git rebase --continue\`, then run
 # \`fold-fixups.sh --verify <that sha>\`: the checks compare against the tree
 # recorded before the fold, never against a tree the conflict already moved.
-# --verify is bound to that sha: exit 13 records it in the git dir
-# (\`specnaut-fold-pre\`), --verify refuses any other sha — HEAD included — and
-# a pass spends the record. The base is \`refs/heads/<base>\` (else origin's),
-# so a tag named like it cannot shadow it.
+# --verify is bound to that sha: a rebase that really stopped records it in
+# the git dir (\`specnaut-fold-pre\`), --verify refuses any other sha — HEAD
+# included — and only a passing --verify spends the record. While the record
+# exists, or a rebase is in progress, a plain run refuses (13): it would take
+# the moved tree as its own PRE and approve it. The binding guards against
+# mistakes, not an adversary with write access to .git. The base is
+# \`refs/heads/<base>\` (else origin's), so a tag named like it cannot shadow it.
 #
 # Exit — the full table; phases/epic-fixups.md maps each one:
 #   0  folded
 #   2  usage, or --verify with a sha that is not the PRE a stopped fold printed
-#   3  base unknown, or epic-status.sh could not read the branch (any of its
-#      exits but 0, 12 and 14)
+#   3  base unknown, epic-status.sh could not read the branch (any of its
+#      exits but 0, 12 and 14), or the rebase failed without stopping
 #   10 the tree moved
 #   11 the worktree is not clean
 #   12 not one commit per child (epic-status.sh's own, passed through)
-#   13 the rebase stopped on a conflict — or, on --verify, is still in progress
+#   13 the rebase stopped on a conflict — or, on --verify, is still in progress;
+#      or, without --verify, a stopped fold awaits --verify <pre>
 #   14 not an epic branch (epic-status.sh's own, passed through)
 #
 # Usage: fold-fixups.sh [--verify <pre-sha>]
@@ -23510,9 +23523,22 @@ range_base="refs/heads/\$base"
 git --no-pager rev-parse --verify --quiet "\$range_base" >/dev/null || range_base="refs/remotes/origin/\$base"
 # The PRE a conflicted fold printed, kept for the --verify that resumes it.
 record=\$(git rev-parse --git-path specnaut-fold-pre) || exit 3
+rebasing() { [ -d "\$(git rev-parse --git-path rebase-merge)" ] || [ -d "\$(git rev-parse --git-path rebase-apply)" ]; }
 
-if [ -n "\$pre" ]; then
-  if [ -d "\$(git rev-parse --git-path rebase-merge)" ] || [ -d "\$(git rev-parse --git-path rebase-apply)" ]; then
+# An aborted fold leaves its record behind with HEAD back on the PRE: nothing
+# moved, so the record guards nothing and is dropped rather than blocking forever.
+if [ -f "\$record" ] && ! rebasing && [ "\$(git rev-parse HEAD)" = "\$(cat "\$record")" ]; then rm -f "\$record"; fi
+if [ -z "\$pre" ]; then
+  if [ -f "\$record" ]; then
+    echo "fold-fixups: a stopped fold awaits --verify \$(cat "\$record") — resolve it, 'git rebase --continue', then run that" >&2
+    exit 13
+  fi
+  if rebasing; then
+    echo "fold-fixups: a rebase is in progress — finish or abort it first" >&2
+    exit 13
+  fi
+else
+  if rebasing; then
     echo "fold-fixups: the rebase is still in progress — resolve it and 'git rebase --continue' first" >&2
     exit 13
   fi
@@ -23537,11 +23563,16 @@ fi
 
 if [ -z "\$pre" ]; then
   pre=\$(git rev-parse HEAD)
-  rm -f "\$record"
   printf 'PRE %s\\n' "\$pre"
   # -i: before git 2.44, --autosquash does nothing without it. The editor
   # accepts the todo list as autosquash wrote it; git's stderr is the report.
   if ! GIT_SEQUENCE_EDITOR=true git rebase -i --quiet --autosquash --keep-base "\$range_base" >/dev/null; then
+    # Recorded only when the rebase really stopped: a failure that left no
+    # rebase behind has moved nothing, and nothing awaits a --verify.
+    if ! rebasing; then
+      echo "fold-fixups: the rebase failed without stopping — nothing was folded" >&2
+      exit 3
+    fi
     printf '%s\\n' "\$pre" >"\$record"
     echo "fold-fixups: the rebase stopped on a conflict — resolve it, 'git rebase --continue', then: fold-fixups.sh --verify \$pre" >&2
     exit 13
@@ -23739,6 +23770,9 @@ fi
 #      rest left staged, nothing committed)
 #   24 the tracked files are removed and pushed, but files git does not
 #      track remain under the directory, listed and kept
+#   25 a git step between the removal and its commit failed — the commit
+#      itself, refused by a hook or a signing key: the removal undone
+#      (\`git restore\` of this script's two paths), nothing committed
 #
 # Usage: remove-spec.sh <landed-branch>   (the feature branch just landed)
 set -euo pipefail
@@ -23756,7 +23790,7 @@ root=\$(git rev-parse --show-toplevel)
 cd "\$root"
 [ "\$(git symbolic-ref --quiet --short HEAD || true)" = "\$base" ] || skip "HEAD is not \$base"
 [ -f .specnaut/feature.json ] || skip "no .specnaut/feature.json"
-dir=\$(sed -n 's/.*"feature_directory"[[:space:]]*:[[:space:]]*"\\([^"]*\\)".*/\\1/p' .specnaut/feature.json | head -1)
+dir=\$(sed -n 's/.*"feature_directory"[[:space:]]*:[[:space:]]*"\\([^"]*\\)".*/\\1/p' .specnaut/feature.json | sed -n 1p)
 [ -n "\$dir" ] || skip "feature.json names no feature_directory"
 dir=\${dir%/}
 case \$dir in
@@ -23773,12 +23807,22 @@ name=\${dir#.specnaut/specs/}
 [ "\$(cd -P "\$dir" && pwd)" = "\$(pwd -P)/.specnaut/specs/\$name" ] || skip "'\$dir' resolves outside .specnaut/specs/ — a link on its path"
 [ -n "\$(git log --all --oneline -1 -- "\$dir")" ] || skip "'\$dir' is in no commit — deleting it would destroy the only copy"
 
-id=\$(sed -n 's/.*"linked_issue"[[:space:]]*:[[:space:]]*\\([0-9][0-9]*\\).*/\\1/p' .specnaut/feature.json | head -1)
+id=\$(sed -n 's/.*"linked_issue"[[:space:]]*:[[:space:]]*\\([0-9][0-9]*\\).*/\\1/p' .specnaut/feature.json | sed -n 1p)
 # The commit takes the whole index, so it must hold the removal alone: work
 # someone else staged is theirs, never swept into this commit or unstaged.
 git diff --cached --quiet || skip "the index already holds staged changes — commit or unstage them first"
 git diff --quiet -- "\$dir" .specnaut/feature.json || skip "'\$dir' or feature.json has uncommitted changes"
 git ls-files --error-unmatch -- .specnaut/feature.json >/dev/null 2>&1 || skip "feature.json is not tracked"
+# From the removal to its commit, a failure undoes this script's own two paths
+# and exits by the table — never with git's code, the deletion left staged.
+undo() {
+  local rc=\$? cmd=\$BASH_COMMAND undone="the removal is undone"
+  git restore --staged --worktree --source=HEAD -- "\$dir" .specnaut/feature.json ||
+    undone="the removal could not be undone — run: git restore --staged --worktree --source=HEAD -- \$dir .specnaut/feature.json"
+  echo "remove-spec: '\$cmd' failed (exit \$rc) — \$undone, nothing committed" >&2
+  exit 25
+}
+trap undo ERR
 git rm -r --quiet -- "\$dir" .specnaut/feature.json
 # -z: a name git would quote (core.quotePath) is still compared as written.
 while IFS= read -r -d '' status && IFS= read -r -d '' path; do
@@ -23792,6 +23836,7 @@ while IFS= read -r -d '' status && IFS= read -r -d '' path; do
   esac
 done < <(git diff --cached --no-renames --name-status -z)
 git commit --quiet -m "chore(\${id:-spec}): remove the spec directory for the shipped feature"
+trap - ERR
 # No --exclude-standard: an ignored file is in no commit either. -z, then %q,
 # so a name with a space or a newline still reads as one path.
 left=\$(git ls-files -o -z -- "\$dir" | while IFS= read -r -d '' p; do printf '  %q\\n' "\$p"; done)
