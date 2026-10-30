@@ -1708,22 +1708,14 @@ returned nothing is shown as \`errored\` / \`empty\` — **never silently droppe
 ### Verdict: HEALTHY | NEEDS WORK | DEBT ACCRUING
 \`\`\`
 
-Then the aggregated block:
+Then the aggregated block: the \`REVIEW SUMMARY\` of the \`review-findings-contract\` skill, every one
+of its fields inside the block. \`REVIEW_SCOPE\` is \`audit <SCOPE_LABEL> (seats: <list>)\`;
+\`SEATS_EXPECTED\` counts the seats deployed, \`SEATS_REPORTED\` those that returned a block (a clean
+one only with \`EVIDENCE\`), and \`EVIDENCE\` is the union of the seats'.
 
-\`\`\`text
-REVIEW SUMMARY
-REVIEW_SCOPE: audit <SCOPE_LABEL> (seats: <list>)
-REVIEW_VERDICT: pass | fail | needs_followup
-CRITICAL_COUNT: <sum>
-HIGH_COUNT: <sum>
-MEDIUM_COUNT: <sum>
-LOW_COUNT: <sum>
-TOP_ISSUES: <one sentence | none>
-RECOMMENDATION: <one sentence>
-\`\`\`
-
-**Dominance rule:** \`REVIEW_VERDICT\` is \`fail\` if **any** seat reported \`fail\`; else
-\`needs_followup\` if any seat reported \`needs_followup\`; else \`pass\`. The counts are per-seat sums.
+**Dominance rule:** \`REVIEW_VERDICT\` is \`fail\` if **any** seat reported \`fail\` or
+\`SEATS_REPORTED < SEATS_EXPECTED\`; else \`needs_followup\` if any seat reported \`needs_followup\`; else
+\`pass\`. The counts are per-seat sums.
 
 You may persist a multi-seat report at \`docs/specnaut/audits/YYYY-MM-DD-audit.md\` — the only write
 this verb ever makes; the audited code is never touched.
