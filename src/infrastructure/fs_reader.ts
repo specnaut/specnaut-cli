@@ -1,6 +1,6 @@
 import { join, relative, SEPARATOR } from "@std/path";
 import type { FsReader } from "../application/ports.ts";
-import { assertSafeDestination } from "../domain/template.ts";
+import { assertSafeDestination, isInside } from "../domain/template.ts";
 import type { DiskEntry } from "../domain/context_link.ts";
 import { UnwalkableLinkError } from "./fs_link_walk.ts";
 import {
@@ -80,32 +80,74 @@ export class DenoFsReader implements FsReader {
     return { kind: "symlink", target, resolved };
   }
 
-  /**
-   * The regular files under the folder `rel`. The folder is judged as a read
-   * is (its ancestors resolved, inside the project); below it nothing is
-   * resolved at all, because a link is skipped rather than followed — so no
-   * listed path can lead anywhere the folder itself does not.
-   */
-  async listFiles(projectDir: string, rel: string): Promise<string[]> {
-    assertSafeDestination(rel);
-    const root = await existingRoot(projectDir);
-    const abs = join(projectDir, rel);
-    if (root === null || !await guarded(assertInsideProject(root, abs))) return [];
-    try {
-      if (!(await Deno.lstat(abs)).isDirectory) return [];
-    } catch (err) {
-      if (err instanceof Deno.errors.NotFound) return [];
-      throw err;
-    }
-    const found: string[] = [];
-    const walk = async (dir: string, prefix: string): Promise<void> => {
-      for await (const e of Deno.readDir(dir)) {
-        if (e.isFile) found.push(`${prefix}/${e.name}`);
-        else if (e.isDirectory) await walk(join(dir, e.name), `${prefix}/${e.name}`);
+  /** See `listProjectFiles`, the one walker of a project folder. */
+  listFiles(projectDir: string, rel: string): Promise<string[]> {
+    return listProjectFiles(projectDir, rel);
+  }
+}
+
+/**
+ * The files under the folder `rel`, sorted, as project-relative `/` paths — the
+ * one walker of a project folder: `listFiles` is this, and so is the doctor's
+ * addenda check, so the notice that reads an addendum and the check that warns
+ * about it cannot disagree about which files exist (cli#712; they did, about
+ * links).
+ *
+ * The folder is judged as a read is: every link on the way to it resolved, and
+ * inside the project. Below it a link counts as a file only when it lands on a
+ * regular file inside the project, which `readText` then reads under the same
+ * check. A link that leaves the project, dangles or loops is not listed, so
+ * nothing listed can lead outside. A linked folder is never descended into, so
+ * a link back up the tree cannot walk forever; the cost, and the one blind spot
+ * left, is a file reached only through a linked folder, which is not listed.
+ */
+export async function listProjectFiles(projectDir: string, rel: string): Promise<string[]> {
+  assertSafeDestination(rel);
+  const root = await existingRoot(projectDir);
+  const abs = join(projectDir, rel);
+  if (root === null || !await guarded(assertInsideProject(root, abs))) return [];
+  try {
+    if (!(await Deno.stat(abs)).isDirectory) return [];
+  } catch (err) {
+    if (err instanceof Deno.errors.NotFound) return [];
+    throw err;
+  }
+  const found: string[] = [];
+  const walk = async (dir: string, prefix: string): Promise<void> => {
+    for await (const e of Deno.readDir(dir)) {
+      const path = join(dir, e.name);
+      if (e.isDirectory) await walk(path, `${prefix}/${e.name}`);
+      else if (e.isFile || (e.isSymlink && await landsOnFileInside(root, path))) {
+        found.push(`${prefix}/${e.name}`);
       }
-    };
-    await walk(abs, rel);
-    return found.sort();
+    }
+  };
+  await walk(abs, rel);
+  return found.sort();
+}
+
+/**
+ * Whether the link at `abs` lands on a regular file inside `root`. A link that
+ * cannot be followed — a cycle, or one through a folder that does not exist —
+ * lands nowhere: for a listing that means "not a file", not a refusal, so the
+ * user's broken link does not abort a walk that reads nothing through it.
+ */
+async function landsOnFileInside(root: string, abs: string): Promise<boolean> {
+  let target: string;
+  try {
+    target = await resolveTarget(abs);
+  } catch (err) {
+    if (err instanceof Deno.errors.FilesystemLoop || err instanceof UnwalkableLinkError) {
+      return false;
+    }
+    throw err;
+  }
+  if (!isInside(root, target)) return false;
+  try {
+    return (await Deno.stat(target)).isFile;
+  } catch (err) {
+    if (err instanceof Deno.errors.NotFound) return false;
+    throw err;
   }
 }
 

@@ -9,6 +9,7 @@ import {
 import type { CheckOutcome } from "../domain/check_result.ts";
 import { type InstalledLock, parseLock } from "../domain/installed_lock.ts";
 import { sha256Hex } from "../domain/sha256.ts";
+import { listProjectFiles } from "./fs_reader.ts";
 import { predatesPhaseMove, staleRouterAdvice } from "../domain/skill_doc_renames.ts";
 
 /**
@@ -20,21 +21,6 @@ import { predatesPhaseMove, staleRouterAdvice } from "../domain/skill_doc_rename
  *
  * Out of `fs_project_inspector.ts`, which had passed its size ceiling.
  */
-
-/**
- * Every non-directory entry under `root`, as `/`-separated paths relative to
- * it. Symlinks count as files: a router reads through them. Which of these
- * matter is the domain's call (`auditAddendum`), not the walker's.
- */
-async function listFilesUnder(root: string, prefix = ""): Promise<string[]> {
-  const files: string[] = [];
-  for await (const entry of Deno.readDir(join(root, prefix))) {
-    const rel = prefix === "" ? entry.name : `${prefix}/${entry.name}`;
-    if (entry.isDirectory) files.push(...await listFilesUnder(root, rel));
-    else files.push(rel);
-  }
-  return files;
-}
 
 /** Why the router never reads this file, and where the text should live. */
 function describeAddendumFinding(f: AddendumFinding): string {
@@ -62,6 +48,12 @@ function describeAddendumFinding(f: AddendumFinding): string {
   }
 }
 
+const notADirectory: CheckOutcome = {
+  name: `${ADDENDA_ROOT}/`,
+  status: "warn",
+  message: `not a directory — addenda are ${ADDENDA_ROOT}/<skill>/<phase>.md`,
+};
+
 /**
  * Lists every file under `.specnaut/addenda/` that no router will ever read
  * (#622) — a mistyped phase, a phase renamed by an upgrade, a contract doc, a
@@ -72,23 +64,20 @@ function describeAddendumFinding(f: AddendumFinding): string {
  * project that never wrote one should not be told how many it has.
  */
 export async function checkAddenda(projectDir: string): Promise<CheckOutcome[]> {
-  const root = join(projectDir, ADDENDA_ROOT);
-  let files: string[];
   try {
-    files = await listFilesUnder(root);
+    if ((await Deno.stat(join(projectDir, ADDENDA_ROOT))).isDirectory === false) {
+      return [notADirectory];
+    }
   } catch (err) {
     if (err instanceof Deno.errors.NotFound) return [];
-    if (err instanceof Deno.errors.NotADirectory) {
-      return [{
-        name: `${ADDENDA_ROOT}/`,
-        status: "warn",
-        message: `not a directory — addenda are ${ADDENDA_ROOT}/<skill>/<phase>.md`,
-      }];
-    }
+    if (err instanceof Deno.errors.NotADirectory) return [notADirectory];
     throw err;
   }
+  // The reader's walker, not one of this module's own: the upgrade notice reads
+  // addenda through it, and two walkers disagreed about links (cli#712).
+  const files = (await listProjectFiles(projectDir, ADDENDA_ROOT))
+    .map((p) => p.slice(ADDENDA_ROOT.length + 1));
   return files
-    .sort()
     .map(auditAddendum)
     .filter((f): f is AddendumFinding => f !== null)
     .map((f) => ({
