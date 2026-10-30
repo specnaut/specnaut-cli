@@ -24,10 +24,13 @@ that runs only on `pull_request`. **Do not infer `--pr` from a remote, a forge o
 
 ## Steps
 
-1. **Shape the history.** Ask the branch, not the board: `git log <base>..HEAD --format=%B | grep
-   -m1 '^Epic: #'`.
-   - **No match — standalone**: load `phases/merge-squash.md` — **Squash by scope**.
-   - **A match — an epic**: do **not** squash. Run the full gate tier once,
+1. **Shape the history.** Ask the branch, not the board — `bash .specnaut/scripts/bash/epic-status.sh`
+   reads its `Epic: #` trailers, and only before the landing: after it, the range is empty. Keep its
+   last `CHILD` and `EPIC` lines (after any fold) for the close.
+   - **Exit 14 — standalone**: load `phases/merge-squash.md` — **Squash by scope**.
+   - **Exit 12** — the history does not read back to the board: fix it on the branch. **3** — the
+     base is unknown: stop and say so.
+   - **Exit 0 — an epic**: do **not** squash. Run the full gate tier once,
      `.specnaut/scripts/bash/run-gate.sh full` (a failure is fixed on the branch as a `--fixup` of the
      child at fault, then the tier re-run — never escalated), then load `phases/epic-fixups.md` and
      fold. Do not merge past a failed fold.

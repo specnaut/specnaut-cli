@@ -119,7 +119,7 @@ _cmd_shell_c() {
       -*c*) sawc=1 ;;
       -* | +*) ;;
       *)
-        if [ "$sawc" = 0 ]; then v[j]=${x##*/} k=$j; return 0; fi
+        if [ "$sawc" = 0 ]; then k=$j; _cmd_base; return 0; fi
         if [ "$1" = 0 ]; then cmd_parse "$x" 1; else CMD_OPAQUE=1; fi
         k=$m
         return 0 ;;
@@ -145,6 +145,15 @@ _cmd_find() {
   if [ -n "$run" ]; then _cmd_emit "$run" "$1"; fi
 }
 
+# _cmd_base — v[k] reduced to its basename. When an expansion encloses that
+# basename (`${X:-a/land-feature.sh}`), a `$` is kept in front of it: what the
+# word names is still the shell's to decide (_listed.sh). `${HOME}/x.sh` is x.sh.
+_cmd_base() {
+  local b=${v[k]##*/}
+  case $b in *'}'*) case ${v[k]} in *"\${"*) b=\$$b ;; esac ;; esac
+  v[k]=$b
+}
+
 # _cmd_emit <raw segment> <depth> — strip redirections, prefixes and wrappers; record the command.
 _cmd_emit() {
   local -a v
@@ -153,14 +162,14 @@ _cmd_emit() {
   _cmd_skip_prefixes
   if [ -n "${CMD_ON_SEG:-}" ]; then "$CMD_ON_SEG" "$1"; fi
   [ "$k" -lt "$m" ] || return 0
-  v[k]=${v[k]##*/}
+  _cmd_base
   case ${v[k]} in
     cd | pushd | popd) CMD_MOVED=1 ;;
     eval) CMD_OPAQUE=1 ;;
     export | declare | typeset | local | readonly) for x in "${v[@]:k}"; do _cmd_env "$x"; done ;;
     sh | bash | zsh | dash | ksh) _cmd_shell_c "$2"; [ "$k" -lt "$m" ] || return 0 ;;
     -c | --command) _cmd_shell_c "$2" 1; [ "$k" -lt "$m" ] || return 0 ;;
-    source | .) k=$((k + 1)); [ "$k" -lt "$m" ] || return 0; v[k]=${v[k]##*/} ;;
+    source | .) k=$((k + 1)); [ "$k" -lt "$m" ] || return 0; _cmd_base ;;
     find) _cmd_find "$2" ;;
   esac
   IFS=$CMD_SEP

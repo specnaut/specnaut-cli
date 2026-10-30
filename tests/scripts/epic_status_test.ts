@@ -84,6 +84,21 @@ Deno.test("an unfolded fixup is listed, and a branch with no Epic trailer is exi
   }
 });
 
+Deno.test("after the base is fast-forwarded, the range is empty and it reads as no epic (14)", async () => {
+  // Why merge.md reads the epic before land-feature.sh: read after, no child is ever closed.
+  const sb = await epicBranch([["feat(T01): a (#51)", "a"]]);
+  try {
+    assertEquals((await sb.script("epic-status.sh")).code, 0);
+    await git(sb.work, "switch", "--quiet", "main");
+    await git(sb.work, "merge", "--quiet", "--ff-only", "epic");
+    const r = await sb.script("epic-status.sh");
+    assertEquals(r.code, 14, "after the landing");
+    assertEquals(r.stdout, "");
+  } finally {
+    await sb.cleanup();
+  }
+});
+
 Deno.test("it takes no argument: the base has one home", async () => {
   const sb = await sandbox();
   try {

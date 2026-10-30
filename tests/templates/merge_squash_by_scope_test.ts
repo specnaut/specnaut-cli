@@ -133,3 +133,26 @@ Deno.test("merge keeps the backlog close step intact", () => {
   assertStringIncludes(content, "bash .specnaut/scripts/backlog/close-shipped.sh");
   assertStringIncludes(content, "**only exit 0 authorises the close**");
 });
+
+// #677 — epic-status.sh reads <base>..HEAD. After land-feature.sh fast-forwards
+// the base that range is empty (exit 14: "not an epic"), so the children to
+// close are read before the landing and kept, never re-read after it.
+Deno.test("the epic is read in a step before the landing, and the close never re-reads it", () => {
+  const { content } = mergePhase();
+  const stepOf = (needle: string) => {
+    const at = content.indexOf(needle);
+    assert(at >= 0, `merge.md no longer calls ${needle}`);
+    const steps = [...content.slice(0, at).matchAll(/^(\d+)\. \*\*/gm)];
+    return Number(steps.at(-1)?.[1]);
+  };
+  const read = stepOf("bash .specnaut/scripts/bash/epic-status.sh");
+  const land = stepOf("bash .specnaut/scripts/bash/land-feature.sh");
+  // Step 1: the step merge-close.md cites as where the CHILD and EPIC lines come from.
+  assert(read === 1 && read < land, `epic-status.sh at step ${read}, land-feature.sh at ${land}`);
+  const close = closeDoc().content;
+  assert(
+    !close.includes("bash .specnaut/scripts/bash/epic-status.sh"),
+    "merge-close.md re-runs it",
+  );
+  assertStringIncludes(close, "printed at `phases/merge.md` step 1, before the landing");
+});

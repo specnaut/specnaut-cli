@@ -50,6 +50,9 @@ const CASES: ReadonlyArray<[command: string, denied: boolean]> = [
   ['"$S" v1.2.3', true],
   ["./release-*.sh v1.2.3", true],
   ["ls *.sh", false],
+  ['git commit -m "$(cat a) and $(cat b)"', false],
+  ['echo "built $(git rev-parse --short HEAD) at $(date)"', false],
+  ['"$(echo tag.sh)" --bump minor', true],
   // the publishing commands themselves (§ 11 F4)
   ["gh release create v1.2.3 --notes x", true],
   ["gh release edit v1.2.3 --draft=false", true],

@@ -14,9 +14,10 @@ confirmed closed.
 ## The procedure
 
 1. **What shipped.** Standalone: `linked_issue` from `.specnaut/feature.json` (absent → skip this
-   file; a tree from before the field existed). Epic: the children are the `CHILD` lines of
-   `bash .specnaut/scripts/bash/epic-status.sh`, and the epic its `EPIC` line — a child whose
-   commit is not on the branch did not ship, and is not closed.
+   file; a tree from before the field existed). Epic: the children are the `CHILD` lines, and the
+   epic the `EPIC` line, that `epic-status.sh` printed at `phases/merge.md` step 1, before the landing
+   — never re-run it now: its range is empty after the landing. A child whose commit is not on the
+   branch did not ship, and is not closed.
 2. **Close each one — github and gitlab.** **Do not ask.** The push was the authorisation. For the
    epic itself, and for a standalone item, run `bash .specnaut/scripts/backlog/cascade-check.sh <n>`
    first: **only exit 0 authorises the close**. 11 — a child is still open: name it and stop. 3 —

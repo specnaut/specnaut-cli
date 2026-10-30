@@ -17,8 +17,10 @@
 # it. Scripts, interpreters and shell functions are not seen: the stated limit.
 #
 # After cmd_parse: CMD_SEGS holds one entry per simple command, its words
-# joined by CMD_SEP, the first word reduced to its basename. A substitution
-# leaves a `$` in the word it stood in, so a command word that is one still
+# joined by CMD_SEP, the first word reduced to its basename. A substitution is
+# a command of its own, and it does not end the one around it: that command
+# goes on, with a `$` in the word the substitution stood in — so `git -C
+# "$(…)" merge` still reads as a merge, and a command word that is one still
 # reads as a word the shell rewrites (_listed.sh). CMD_MOVED=1 when
 # the line may act on another repository: cd/pushd, env -C, a GIT_DIR/
 # GIT_WORK_TREE/GIT_CONFIG* assignment (and, through _git.sh's cmd_git,
@@ -32,6 +34,21 @@ CMD_OPAQUE=0
 
 _cmd_word() { if [ "$have" = 1 ] || [ -n "$word" ]; then seg+="$word$CMD_SEP"; fi; word=""; have=0; }
 _cmd_end() { _cmd_word; if [ -n "$seg" ]; then _cmd_emit "$seg" "$depth"; fi; seg=""; }
+
+# A `$(` or backtick opens: the command around it is set aside (sw/ss, sp deep)
+# with a `$` standing in for the substitution, and the substitution is read as
+# a line of its own. _cmd_pop, at its close, ends that line and resumes the
+# command set aside — the word the `$` is in included.
+_cmd_push() { sw[sp]=$word'$' ss[sp]=$seg sp=$((sp + 1)) word="" have=0 seg=""; }
+_cmd_pop() { _cmd_end; if [ "$sp" -gt 0 ]; then sp=$((sp - 1)) have=1; word=${sw[sp]} seg=${ss[sp]}; fi; }
+
+# `)` closes the innermost frame: a substitution (d: inside "…", s: bare), a
+# zsh glob group inside a word (g: kept in the word), or a subshell/arithmetic.
+_cmd_close() {
+  local f=${stack:0:1}
+  stack=${stack:1}
+  case $f in g) word+=$c ;; d) _cmd_pop; q='"' ;; s) _cmd_pop ;; *) _cmd_end ;; esac
+}
 
 # Skips the bodies of the heredocs opened on the line just ended. A body that
 # runs to the end of the input never closed: as likely a misread as a typo,
@@ -86,7 +103,8 @@ _cmd_lt() {
 
 # cmd_parse <command line> [depth]
 cmd_parse() {
-  local s=$1 depth=${2:-0} n=${#1} i=0 c nx q="" word="" have=0 seg="" stack="" bt="" heredocs="" d
+  local s=$1 depth=${2:-0} n=${#1} i=0 c nx q="" word="" have=0 seg="" stack="" bt="" heredocs="" d sp=0
+  local -a sw ss
   local IFS=$CMD_SEP
   while [ "$i" -lt "$n" ]; do
     c=${s:i:1} nx=${s:i+1:1}
@@ -97,8 +115,8 @@ cmd_parse() {
       case $c in
         '\') case $nx in '"' | '\' | '$' | '`') word+=$nx i=$((i + 1)) ;; $'\n') i=$((i + 1)) ;; *) word+=$c ;; esac ;;
         '"') q="" ;;
-        '$') if [ "$nx" = "(" ]; then word+=$c have=1; _cmd_end; stack="d$stack" q="" i=$((i + 1)); _cmd_arith; else word+=$c; fi ;;
-        '`') word+='$' have=1; _cmd_end; bt=d q="" ;;
+        '$') if [ "$nx" = "(" ]; then _cmd_push; stack="d$stack" q="" i=$((i + 1)); _cmd_arith; else word+=$c; fi ;;
+        '`') _cmd_push; bt=d q="" ;;
         *) word+=$c ;;
       esac
     else
@@ -109,10 +127,10 @@ cmd_parse() {
         $'\n') _cmd_end; if [ -n "$heredocs" ]; then _cmd_heredocs; fi ;;
         ';' | '|') _cmd_end ;;
         '&') case $word in *'>' | *'<') word+=$c ;; *) if [ "$nx" = ">" ]; then word+=$c; else _cmd_end; fi ;; esac ;;
-        '$') if [ "$nx" = "(" ]; then word+=$c have=1; _cmd_end; stack="u$stack" i=$((i + 1)); _cmd_arith; else word+=$c; fi ;;
-        '(') _cmd_end; stack="u$stack"; _cmd_arith ;;
-        ')') _cmd_end; if [ "${stack:0:1}" = d ]; then q='"'; fi; stack=${stack:1} ;;
-        '`') if [ -z "$bt" ]; then word+='$' have=1; fi; _cmd_end; if [ -z "$bt" ]; then bt=u; elif [ "$bt" = d ]; then q='"' bt=""; else bt=""; fi ;;
+        '$') if [ "$nx" = "(" ]; then _cmd_push; stack="s$stack" i=$((i + 1)); _cmd_arith; else word+=$c; fi ;;
+        '(') if [ -n "$word" ] && [ "$nx" != ")" ]; then word+=$c stack="g$stack"; else _cmd_end; stack="u$stack"; _cmd_arith; fi ;;
+        ')') _cmd_close ;;
+        '`') if [ -z "$bt" ]; then _cmd_push; bt=u; else _cmd_pop; if [ "$bt" = d ]; then q='"'; fi; bt=""; fi ;;
         '#') if [ -z "$word" ] && [ "$have" = 0 ]; then d=${s:i}; d=${d%%$'\n'*}; i=$((i + ${#d})); else word+=$c; fi ;;
         '<') _cmd_lt ;;
         *) word+=$c ;;
@@ -135,9 +153,9 @@ cmd_pos() {
   POS=()
   for w in "${W[@]}"; do
     if [ "$skip" = 1 ]; then skip=0; continue; fi
-    case "${W[0]}:$w" in
-      gh:-R | gh:--repo | glab:-R | glab:--repo) skip=1 ;;
-      *:-*) ;;
+    case $w in
+      -R | --repo) case ${W[0]} in gh | glab) skip=1 ;; esac ;;
+      -*) ;; # an option — and only the word itself says so: `${X:-y}` is none
       *) POS+=("$w") ;;
     esac
   done

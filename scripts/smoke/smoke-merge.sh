@@ -69,7 +69,16 @@ check "cascade-check still gates the parent close (#560 AC2)" \
    grep -qF "only exit 0 authorises the close" .claude/skills/task/phases/merge-close.md'
 check "children are enumerated from the branch, not from memory (#560)" \
   'grep -qF "did not ship" .claude/skills/task/phases/merge-close.md &&
-   grep -qF "bash .specnaut/scripts/bash/epic-status.sh" .claude/skills/task/phases/merge-close.md'
+   grep -qF "bash .specnaut/scripts/bash/epic-status.sh" .claude/skills/task/phases/merge.md &&
+   grep -qF "printed at \`phases/merge.md\` step 1, before the landing" .claude/skills/task/phases/merge-close.md'
+# #677 — epic-status.sh reads <base>..HEAD, empty once land-feature.sh has
+# fast-forwarded the base: read after the landing, no child would ever close.
+check "the epic is read before the landing, and the close never re-reads it (#677)" \
+  'P=.claude/skills/task/phases;
+   r=$(grep -nF "bash .specnaut/scripts/bash/epic-status.sh" "$P/merge.md" | head -1 | cut -d: -f1);
+   l=$(grep -nF "bash .specnaut/scripts/bash/land-feature.sh" "$P/merge.md" | head -1 | cut -d: -f1);
+   [ -n "$r" ] && [ -n "$l" ] && [ "$r" -lt "$l" ] &&
+   ! grep -qF "bash .specnaut/scripts/bash/epic-status.sh" "$P/merge-close.md"'
 check "the report names every item, not a count (#560 AC5)" \
   'flat="$(tr "\n" " " < .claude/skills/task/phases/merge-close.md)";
    grep -qF "Not a count: one line per issue closed" <<<"$flat" &&
@@ -198,8 +207,9 @@ check "a phase that cites another phase's step names the step that does it (spec
 # #557 — merge.md routes by history rule, and the epic path does not squash.
 # Each of these is a sentence a later edit would plausibly "simplify" away.
 check "merge.md asks the BRANCH which rule applies, not the board (#557)" \
-  'grep -qF "Epic: #" .claude/skills/task/phases/merge.md &&
-   grep -qF "log <base>..HEAD" .claude/skills/task/phases/merge.md'
+  'grep -qF "Ask the branch, not the board" .claude/skills/task/phases/merge.md &&
+   grep -qF "Epic: #" .claude/skills/task/phases/merge.md &&
+   grep -qF "range=\"\$base..HEAD\"" .specnaut/scripts/bash/epic-status.sh'
 check "merge.md says an epic branch is NOT squashed (#557)" \
   'grep -qF "an epic**: do **not** squash" .claude/skills/task/phases/merge.md'
 # Spec 042 cut the sentence from merge.md; the rule is the loop's, and lives

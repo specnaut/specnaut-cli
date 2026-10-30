@@ -13,7 +13,8 @@
 #                        shell would expand ($VAR, `…`, quotes, ?, [, {),
 #                        --all, --mirror, --delete and unknown options are
 #                        all gated
-#   gh pr merge, glab mr merge, a git shell alias, a line it cannot read
+#   gh pr merge, glab mr merge, a git shell alias, a git subcommand the shell
+#                        rewrites (`git $(…)`, `git "$X"`), a line it cannot read
 #   every command in merge-commands.txt — the scripts that land on the base
 #                        themselves (land-feature.sh, remove-spec.sh), matched
 #                        by basename however they are reached (_listed.sh)
@@ -55,6 +56,7 @@ for seg in ${CMD_SEGS[@]+"${CMD_SEGS[@]}"}; do
         push) pushes+=("$(IFS=$CMD_SEP; echo "${GIT_ARGS[*]:-}")") ;;
         checkout | switch) switched=1 ;;
         '!') reasons+=("a git alias that runs a shell command") ;;
+        *) if _listed_expands "$GIT_SUB"; then reasons+=("a git subcommand the shell rewrites"); fi ;;
       esac
       continue ;;
   esac
