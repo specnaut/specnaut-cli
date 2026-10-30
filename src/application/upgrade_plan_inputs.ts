@@ -60,27 +60,68 @@ export async function gatherPlanInputs(
   lock: InstalledLock,
   isDeclaredPreserved: (dest: string) => boolean,
 ): Promise<PlanInputs> {
-  const { reader } = io;
-  const bundle: Bundle = { ...planned };
-  const before = await constitutionStep(io, projectDir, planned, lock);
-  const refusals: string[] = [...before.notes];
-  const refusedDests = new Set<string>(before.exclude);
-  for (const dest of before.exclude) delete bundle[dest];
-  const refuse = (dest: string, message: string) => {
-    refusals.push(message);
-    delete bundle[dest];
-    refusedDests.add(dest);
-  };
-  for (const [dest, file] of Object.entries(bundle)) {
+  const held = await constitutionStep(io, projectDir, planned, lock);
+  const refused = await refuseUnsafe(
+    io.reader,
+    projectDir,
+    planned,
+    lock,
+    held,
+    isDeclaredPreserved,
+  );
+  const { bundle, links, refusedDests } = refused;
+  const diskShas = await readDiskShas(io.reader, projectDir, bundle, lock, links, refusedDests);
+  return { bundle, refusals: refused.refusals, links, diskShas, lockForPlan: refused.lockForPlan };
+}
+
+/** The one refusal step's outputs, produced together so no caller patches them apart. */
+type Refused = {
+  readonly bundle: Bundle;
+  readonly lockForPlan: InstalledLock;
+  readonly refusedDests: ReadonlySet<string>;
+  readonly refusals: string[];
+  readonly links: ContextLinkSurvey;
+};
+
+/**
+ * Every refusal source, folded in order: the dests the constitution move holds
+ * back, the merges whose host file cannot take the block (`mergeRefusal`), then
+ * the context links whose target links back to them (`surveyContextLinks`).
+ * Links are surveyed over the bundle the merges left, as they always were.
+ */
+async function refuseUnsafe(
+  reader: FsReader,
+  projectDir: string,
+  planned: Bundle,
+  lock: InstalledLock,
+  held: { readonly notes: ReadonlyArray<string>; readonly exclude: ReadonlyArray<string> },
+  isDeclaredPreserved: (dest: string) => boolean,
+): Promise<Refused> {
+  const refusals: string[] = [...held.notes];
+  const refusedDests = new Set<string>(held.exclude);
+  const remaining = (): Bundle =>
+    Object.fromEntries(Object.entries(planned).filter(([dest]) => !refusedDests.has(dest)));
+  for (const [dest, file] of Object.entries(remaining())) {
     if (file.mergeRefuseIf === undefined) continue;
     const refusal = mergeRefusal(await reader.readText(projectDir, dest), file);
-    if (refusal !== null) refuse(dest, refusal);
+    if (refusal === null) continue;
+    refusals.push(refusal);
+    refusedDests.add(dest);
   }
   // Context links are classified by what `lstat` sees (cli#680).
-  const links = await surveyContextLinks(reader, projectDir, bundle, lock, isDeclaredPreserved);
-  for (const { dest, message } of links.refused) refuse(dest, message);
-  const diskShas = await readDiskShas(reader, projectDir, bundle, lock, links, refusedDests);
-  return { bundle, refusals, links, diskShas, lockForPlan: withoutRefused(lock, refusedDests) };
+  const links = await surveyContextLinks(
+    reader,
+    projectDir,
+    remaining(),
+    lock,
+    isDeclaredPreserved,
+  );
+  for (const { dest, message } of links.refused) {
+    refusals.push(message);
+    refusedDests.add(dest);
+  }
+  const lockForPlan = withoutRefused(lock, refusedDests);
+  return { bundle: remaining(), lockForPlan, refusedDests, refusals, links };
 }
 
 /**

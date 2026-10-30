@@ -114,9 +114,9 @@ function staleSince(
 }
 
 export function computeUpgradePlan(
-  diskShas: Map<string, string>,
+  diskShas: ReadonlyMap<string, string>,
   lock: InstalledLock,
-  newShas: Map<string, string>,
+  newShas: ReadonlyMap<string, string>,
   pluginInstalledOrOpts: boolean | UpgradePlanOptions = false,
   isPluginCovered: (dest: string) => boolean = () => false,
 ): UpgradePlan {

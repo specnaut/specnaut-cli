@@ -3,6 +3,7 @@ import type { InstalledLock, LockEntry } from "../domain/installed_lock.ts";
 import type { BundleOptions } from "./bundle_options.ts";
 import type { UpgradePlan } from "../domain/upgrade_plan.ts";
 import { keptOrphanEntries } from "../domain/orphan_scope.ts";
+import { isAgenticPath } from "../domain/parent_managed.ts";
 import { sha256Hex } from "../domain/sha256.ts";
 
 /**
@@ -22,7 +23,7 @@ import { sha256Hex } from "../domain/sha256.ts";
  */
 export function deriveUnchangedEntries(
   previous: ReadonlyMap<string, LockEntry>,
-  newShas: Map<string, string>,
+  newShas: ReadonlyMap<string, string>,
   bundle: Bundle,
   templatesVersion: string,
   now: string,
@@ -46,6 +47,42 @@ export function deriveUnchangedEntries(
     });
   }
   return out;
+}
+
+/**
+ * Whether a lock whose every dest is `unchanged` still needs rewriting, given
+ * the entry set `deriveUnchangedEntries` built for it.
+ *
+ * `lock` is the lock the plan ran against — renames and refusals re-key its
+ * entries only, so its header is the one read from disk. Stale on any axis:
+ *
+ * - **an entry** — a sha or a `templatesVersion` behind the derived one, a dest
+ *   added, or an orphan row dropped (#572). Keying on the sha alone let an
+ *   entry keep a lagging version while the header advanced, so `staleSince`
+ *   fired on a file that was never behind, and `--reset-baseline` — bounded by
+ *   that predicate — swept a genuine user edit into an overwrite.
+ * - **the header version** — the ordinary post-release state: files current,
+ *   version string behind.
+ * - **the parent-managed decision** — a handler-derived override never reaches
+ *   disk otherwise, until an unrelated file change forces a rewrite (FR-007).
+ * - **an agentic row in a parent-managed lock** — a lock written before the
+ *   flip keeps describing files this workspace does not own (#476).
+ */
+export function isLockStale(
+  lock: InstalledLock,
+  derived: ReadonlyMap<string, LockEntry>,
+  wanted: { readonly templatesVersion: string; readonly parentManaged: boolean },
+): boolean {
+  const staleEntries = [...derived].some(([dest, e]) => {
+    const prev = lock.entries.get(dest);
+    return prev === undefined || prev.sha256 !== e.sha256 ||
+      prev.templatesVersion !== e.templatesVersion;
+  }) || [...lock.entries.keys()].some((dest) => !derived.has(dest));
+  const staleVersion = lock.templatesVersion !== wanted.templatesVersion;
+  const staleDecision = wanted.parentManaged !== (lock.parentManaged ?? false);
+  const staleAgentic = wanted.parentManaged &&
+    [...lock.entries.keys()].some((dest) => isAgenticPath(dest));
+  return staleEntries || staleVersion || staleDecision || staleAgentic;
 }
 
 /** What the rebuild of an applied upgrade's lock entries reads. */

@@ -40,11 +40,19 @@ export type RenameContext = {
   readonly dryRun: boolean;
   readonly isDeclaredPreserved?: (dest: string) => boolean;
   /**
-   * Where every move, skip and refusal is said. The upgrade passes its
-   * `refusals`, which every result carries — the dry run's included, so a
-   * preview names the moves it would make.
+   * Where every move, skip and refusal is said while the carry runs. Owned by
+   * `carryRenames`, which returns it; the upgrade folds it into the `refusals`
+   * every result carries — the dry run's included, so a preview names the
+   * moves it would make.
    */
   readonly notes: string[];
+};
+
+/** What the carry produced: the lock and disk state re-keyed, and what was said. */
+export type CarriedRenames = {
+  readonly lock: InstalledLock;
+  readonly diskShas: Map<string, string>;
+  readonly notes: ReadonlyArray<string>;
 };
 
 /** One rename this project is actually mid-way through, its bytes already read. */
@@ -69,40 +77,42 @@ type ApplicableRename = {
  * spent on the first (plan 037 § 10).
  */
 export async function carryRenames(
-  ctx: RenameContext,
+  io: Omit<RenameContext, "notes">,
   bundle: Bundle,
   lock: InstalledLock,
-  diskShas: Map<string, string>,
-): Promise<InstalledLock> {
+  diskShas: ReadonlyMap<string, string>,
+): Promise<CarriedRenames> {
+  const ctx: RenameContext = { ...io, notes: [] };
   const carried = await carryRenamedDocs(ctx, bundle, lock, diskShas);
   await carryAddenda(ctx);
-  noteStaleRouter(ctx, lock, diskShas);
-  return carried;
+  noteStaleRouter(ctx, lock, carried.diskShas);
+  return { ...carried, notes: ctx.notes };
 }
 
 /**
- * Returns the lock with every applicable rename's entry moved to its new
- * address, and moves the matching `diskShas` entry in place. On a real run the
- * bytes move first and only a move that landed re-keys the maps — a refused
- * write leaves the old entry where its bytes still are. `--dry-run` moves only
- * the maps, which is enough to report the move faithfully.
+ * The lock and the disk shas with every applicable rename's entry moved to its
+ * new address — copies, the caller's are untouched. On a real run the bytes
+ * move first and only a move that landed re-keys the maps — a refused write
+ * leaves the old entry where its bytes still are. `--dry-run` moves only the
+ * maps, which is enough to report the move faithfully.
  */
 async function carryRenamedDocs(
   ctx: RenameContext,
   bundle: Bundle,
   lock: InstalledLock,
-  diskShas: Map<string, string>,
-): Promise<InstalledLock> {
+  diskShas: ReadonlyMap<string, string>,
+): Promise<{ lock: InstalledLock; diskShas: Map<string, string> }> {
   const applicable = await applicableRenames(ctx, bundle, lock, diskShas);
   const landed = ctx.dryRun ? applicable : await moveRenamedBytes(ctx, applicable);
-  if (landed.length === 0) return lock;
+  const shas = new Map(diskShas);
+  if (landed.length === 0) return { lock, diskShas: shas };
 
   const entries = new Map(lock.entries);
   for (const { oldDest, newDest, reason, customised } of landed) {
     entries.set(newDest, entries.get(oldDest)!);
     entries.delete(oldDest);
-    diskShas.set(newDest, diskShas.get(oldDest)!);
-    diskShas.delete(oldDest);
+    shas.set(newDest, shas.get(oldDest)!);
+    shas.delete(oldDest);
     // Only a customisation is worth a line: a vanilla move is just the update
     // the summary already lists at the new address.
     if (customised) {
@@ -111,7 +121,7 @@ async function carryRenamedDocs(
       );
     }
   }
-  return { ...lock, entries };
+  return { lock: { ...lock, entries }, diskShas: shas };
 }
 
 /**
@@ -139,7 +149,7 @@ async function applicableRenames(
   ctx: RenameContext,
   bundle: Bundle,
   lock: InstalledLock,
-  diskShas: Map<string, string>,
+  diskShas: ReadonlyMap<string, string>,
 ): Promise<ApplicableRename[]> {
   const destFor = destResolver(ctx.harness, ctx.bundleOpts);
   const applicable: ApplicableRename[] = [];

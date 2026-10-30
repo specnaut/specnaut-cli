@@ -1,42 +1,23 @@
-import type {
-  ContextLinkWrite,
-  FsReader,
-  FsWriter,
-  Harness,
-  LockStore,
-  PluginDetector,
-  StagingStore,
-} from "./ports.ts";
+import type { FsReader, Harness, LockStore, PluginDetector, StagingStore } from "./ports.ts";
+import type { FsWriter } from "./ports.ts";
 import { type Bundle, lockShaInput } from "../domain/template.ts";
 import { sha256Hex } from "../domain/sha256.ts";
 import type { CoreBundle } from "../domain/core_bundle.ts";
-import {
-  computeUpgradePlan,
-  type UpgradeAction,
-  type UpgradePlan,
-} from "../domain/upgrade_plan.ts";
-import { isPluginCoveredPath, pluginRelativePath } from "../domain/plugin_coverage.ts";
-import { isAgenticPath, pruneAgenticEntries } from "../domain/parent_managed.ts";
-import {
-  bundleOptionsOf,
-  deriveUnchangedEntries,
-  lockWith,
-  rebuildEntries,
-} from "./upgrade_lock.ts";
-import {
-  applyManagedSections,
-  type ManagedSectionOutcome,
-  surveyManagedSections,
-} from "./upgrade_managed_sections.ts";
-import { planStaging, pruneStaging } from "./upgrade_staging.ts";
-import { removeOrphans } from "./upgrade_orphan_removal.ts";
+import type { InstalledLock } from "../domain/installed_lock.ts";
+import { computeUpgradePlan, type UpgradePlan } from "../domain/upgrade_plan.ts";
+import { isPluginCoveredPath, PLUGIN_NAME, pluginRelativePath } from "../domain/plugin_coverage.ts";
+import { isAgenticPath } from "../domain/parent_managed.ts";
+import { bundleOptionsOf } from "./upgrade_lock.ts";
+import { type ManagedSectionOutcome, surveyManagedSections } from "./upgrade_managed_sections.ts";
 import { carryRenames } from "./upgrade_renames.ts";
-import { applyContextLinks } from "./upgrade_context_links.ts";
 import { gatherPlanInputs } from "./upgrade_plan_inputs.ts";
-import { reMergeJsonFiles, splitJsonMerged } from "./upgrade_json_merges.ts";
+import { splitJsonMerged } from "./upgrade_json_merges.ts";
+import type { ContextLinkSurvey } from "./upgrade_context_links.ts";
+import { finishUpToDate } from "./upgrade_up_to_date.ts";
+import { applyUpgrade } from "./upgrade_apply.ts";
+import type { UpgradeIo, UpgradeProjectResult, UpgradeRun } from "./upgrade_run.ts";
 
-/** The plugin name used for both the install probe and the cache directory. */
-export const PLUGIN_NAME = "specnaut-plugin";
+export type { ManagedSectionOutcome, UpgradeProjectResult };
 
 export type UpgradeProjectInput = {
   projectDir: string;
@@ -72,61 +53,6 @@ export type UpgradeProjectInput = {
   isDeclaredPreserved?: (dest: string) => boolean;
 };
 
-export type { ManagedSectionOutcome };
-
-/**
- * Merges this run declined because the host file could not safely take the
- * block — e.g. a `.codex/config.toml` already declaring `[agents]` (cli#599).
- * Carried on every result rather than logged, because a refusal the user never
- * sees is the same as the silent skip it replaced — and on the up-to-date one
- * too, which is the likely path: a project whose only outstanding difference is
- * the refused file lands there. Anything else every path must say joins them:
- * staging cleanup, orphan prunes, and what `carryRenames` moved or would not —
- * the one list a dry run also prints.
- */
-type WithRefusals = { refusals: ReadonlyArray<string> };
-
-/** What the JSON re-merge did (`upgrade_json_merges.ts`) on a run that writes. */
-type WithMerges = {
-  /** What the merges changed that the person should hear about (#642). */
-  notes: ReadonlyArray<string>;
-  /** JSON-merged dests this run changed. */
-  mergedChanged: ReadonlyArray<string>;
-};
-
-export type UpgradeProjectResult =
-  | WithRefusals & WithMerges & { status: "up-to-date"; currentVersion: string }
-  | WithRefusals & {
-    status: "planned";
-    plan: UpgradePlan;
-    fromVersion: string;
-    toVersion: string;
-    managedSections: ReadonlyArray<ManagedSectionOutcome>;
-  }
-  | WithRefusals & WithMerges & {
-    status: "applied";
-    plan: UpgradePlan;
-    fromVersion: string;
-    toVersion: string;
-    backups: ReadonlyArray<string>;
-    /** Backups that moved a SYMLINK rather than content (cli#574). */
-    linksMoved: ReadonlyArray<string>;
-    managedSections: ReadonlyArray<ManagedSectionOutcome>;
-    /**
-     * Dests whose content this run actually wrote from the bundle.
-     *
-     * The plan is a forecast, and the report used to render it as the outcome
-     * (#519). Under `--force` that is not merely imprecise: every overwritten
-     * file was still listed under "customized locally (not touched)", and the
-     * files that *did* receive their delayed update were the ones the run
-     * warned had missed it. A forecast and a result are different objects, so
-     * the result now carries its own.
-     */
-    written: ReadonlyArray<string>;
-    /** The context links this run wrote, and in which form (cli#680). */
-    contextLinks: ReadonlyArray<ContextLinkWrite>;
-  };
-
 export type UpgradeProjectDeps = {
   reader: FsReader;
   writer: FsWriter;
@@ -155,341 +81,178 @@ export type UpgradeProjectDeps = {
 export class UpgradeProjectUseCase {
   constructor(private readonly deps: UpgradeProjectDeps) {}
 
+  /**
+   * One upgrade, as named steps: read the lock, scope the bundle, gather what
+   * the plan reads (every refusal on the way), carry renames, plan, then
+   * finish — up to date, dry run, or apply. Each step returns what the next
+   * one reads; none writes into another's state.
+   */
   async execute(input: UpgradeProjectInput): Promise<UpgradeProjectResult> {
-    const { reader, writer, lockStore, core, templatesVersion, findHarness } = this.deps;
+    const { reader, writer, core, templatesVersion } = this.deps;
+    const { lock, harness } = await this.readLock(input.projectDir);
+    const parentManaged = input.parentManagedOverride ?? lock.parentManaged ?? false;
+    const mapped = harness.mapBundle(core, bundleOptionsOf(lock));
+    // JSON-merged files are user-owned and live outside the lock-tracked plan.
+    const { jsonMerged, planned } = splitJsonMerged(ownedBundle(mapped, parentManaged));
+    const isDeclaredPreserved = input.isDeclaredPreserved ?? (() => false);
+    const io = { reader, writer, dryRun: input.dryRun };
+    const inputs = await gatherPlanInputs(io, input.projectDir, planned, lock, isDeclaredPreserved);
+    // Renamed docs, then the addenda of moved phases; what it did or refused is said.
+    const carried = await carryRenames(
+      { ...input, reader, writer, harness, bundleOpts: bundleOptionsOf(lock) },
+      inputs.bundle,
+      inputs.lockForPlan,
+      inputs.diskShas,
+    );
+    const step = { ...inputs, ...carried, harness, input, isDeclaredPreserved };
+    const { plan, newShas } = await this.plan(step);
+    const run: UpgradeRun = {
+      ...input,
+      resetBaseline: input.resetBaseline ?? false,
+      isDeclaredPreserved,
+      lock,
+      parentManaged,
+      harness,
+      templatesVersion,
+      now: (this.deps.now ?? (() => new Date()))().toISOString(),
+      jsonMerged,
+      bundle: inputs.bundle,
+      effectiveLock: carried.lock,
+      newShas,
+      plan,
+      refusals: [...inputs.refusals, ...carried.notes],
+      links: inputs.links,
+    };
+    return await this.finish(run);
+  }
 
-    const lock = await lockStore.read(input.projectDir);
+  /** The lock, and the harness it names; an upgrade has nothing to plan against without both. */
+  private async readLock(projectDir: string): Promise<{ lock: InstalledLock; harness: Harness }> {
+    const lock = await this.deps.lockStore.read(projectDir);
     if (lock === null) {
       throw new Error(
         "no .specnaut/installed.lock found. Run `specnaut init --here --force` to enable upgrades.",
       );
     }
-    const harness = findHarness(lock.harness);
+    const harness = this.deps.findHarness(lock.harness);
     if (!harness) {
       throw new Error(`unknown harness in lock: ${lock.harness}`);
     }
-    const mappedBundle = harness.mapBundle(core, bundleOptionsOf(lock));
+    return { lock, harness };
+  }
 
-    // Parent-managed targets inherit agentic files from the providing
-    // workspace. Drop agentic dests from the full bundle *before* the plan is
-    // computed so suppressed paths are never planned, written, or "restored"
-    // (FR-007). The decision comes from the handler's re-derivation override
-    // (legacy lock) or the cached `lock.parentManaged`.
-    const parentManaged = input.parentManagedOverride ?? lock.parentManaged ?? false;
-    const fullBundle: Bundle = parentManaged
-      ? Object.fromEntries(
-        Object.entries(mappedBundle).filter(([dest]) => !isAgenticPath(dest)),
-      )
-      : mappedBundle;
-
-    // JSON-merged files are user-owned and live outside the lock-tracked plan.
-    const { jsonMerged, planned } = splitJsonMerged(fullBundle);
-    const isDeclaredPreserved = input.isDeclaredPreserved ?? (() => false);
-    // Refusals out of the bundle and the lock, then the disk state the plan reads.
-    const { bundle, refusals, links, diskShas, lockForPlan } = await gatherPlanInputs(
-      { reader, writer, dryRun: input.dryRun },
-      input.projectDir,
-      planned,
-      lock,
-      isDeclaredPreserved,
-    );
-
-    // Renamed docs, then the addenda of moved phases; what it did or refused is said.
-    const effectiveLock = await carryRenames(
-      { ...input, reader, writer, harness, bundleOpts: bundleOptionsOf(lock), notes: refusals },
-      bundle,
-      lockForPlan,
-      diskShas,
-    );
-
+  /**
+   * The plan, and the bundle shas it compared. The plugin is asked what it
+   * serves here rather than inside `computeUpgradePlan`, because the plan is a
+   * pure synchronous function and that question is a filesystem probe.
+   */
+  private async plan(step: PlanStep): Promise<{ plan: UpgradePlan; newShas: Map<string, string> }> {
+    const { bundle, input } = step;
     const newShas = new Map<string, string>();
     for (const [dest, file] of Object.entries(bundle)) {
       newShas.set(dest, await sha256Hex(lockShaInput(file)));
     }
+    const plugin = await this.pluginServes(step.lock.harness, newShas.keys());
+    const plan = computeUpgradePlan(step.diskShas, step.lock, newShas, {
+      pluginInstalled: plugin.installed,
+      isPluginCovered: (dest) => plugin.served.has(dest),
+      isSkipIfExists: (dest) => bundle[dest]?.skipIfExists === true,
+      resetBaseline: input.resetBaseline ?? false,
+      isDeclaredPreserved: step.isDeclaredPreserved,
+      managedRoots: step.harness.managedRoots,
+      managedFiles: step.harness.managedFiles,
+      linkStates: step.links.states,
+    });
+    return { plan, newShas };
+  }
 
+  /**
+   * Whether the plugin is installed, and which covered dests the INSTALLED
+   * plugin actually serves — not the compile-time coverage list on its own
+   * (cli#606).
+   *
+   * `PLUGIN_COVERED_PATHS_CLAUDE` describes what the plugin is expected to
+   * ship. A user on an older plugin release has covered paths their build has
+   * never heard of — and migrating one deletes the project's only copy while
+   * nothing takes over serving it. The list says "the plugin owns this path";
+   * only the tree can say "this install has it". The probe runs only when the
+   * plugin is installed: on every other run the answer cannot change the
+   * outcome, so it is not worth a single stat.
+   */
+  private async pluginServes(
+    harnessKey: InstalledLock["harness"],
+    dests: Iterable<string>,
+  ): Promise<{ installed: boolean; served: Set<string> }> {
     const detector = this.deps.pluginDetector;
-    const pluginInstalled = detector !== undefined &&
-      await detector.isPluginInstalled(PLUGIN_NAME);
-
-    // Ask the INSTALLED plugin what it actually serves, rather than trusting
-    // the compile-time coverage list on its own (cli#606).
-    //
-    // `PLUGIN_COVERED_PATHS_CLAUDE` describes what the plugin is expected to
-    // ship. A user on an older plugin release has covered paths their build has
-    // never heard of — and migrating one deletes the project's only copy while
-    // nothing takes over serving it. The list says "the plugin owns this
-    // path"; only the tree can say "this install has it".
-    //
-    // Resolved here, not inside `computeUpgradePlan`, because the plan is a
-    // pure synchronous function and this question is a filesystem probe. The
-    // probe runs only when the plugin is installed: on every other run the
-    // answer cannot change the outcome, so it is not worth a single stat.
-    const servedByPlugin = new Set<string>();
-    if (pluginInstalled && detector !== undefined) {
-      for (const dest of newShas.keys()) {
-        if (!isPluginCoveredPath(lock.harness, dest)) continue;
-        const rel = pluginRelativePath(dest);
-        if (rel === null) continue;
-        if (await detector.pluginHasPath(PLUGIN_NAME, rel)) servedByPlugin.add(dest);
-      }
+    const served = new Set<string>();
+    if (detector === undefined || !await detector.isPluginInstalled(PLUGIN_NAME)) {
+      return { installed: false, served };
     }
+    for (const dest of dests) {
+      if (!isPluginCoveredPath(harnessKey, dest)) continue;
+      const rel = pluginRelativePath(dest);
+      if (rel === null) continue;
+      if (await detector.pluginHasPath(PLUGIN_NAME, rel)) served.add(dest);
+    }
+    return { installed: true, served };
+  }
 
-    const plan = computeUpgradePlan(
-      diskShas,
-      effectiveLock,
-      newShas,
-      {
-        pluginInstalled,
-        isPluginCovered: (dest) => servedByPlugin.has(dest),
-        isSkipIfExists: (dest) => bundle[dest]?.skipIfExists === true,
-        resetBaseline: input.resetBaseline ?? false,
-        isDeclaredPreserved,
-        managedRoots: harness.managedRoots,
-        managedFiles: harness.managedFiles,
-        linkStates: links.states,
-      },
+  /**
+   * The three ways a planned run ends. Managed sections — Specnaut's blocks
+   * inside files the user owns (#466) — live outside the plan on purpose:
+   * `AGENTS.md` is `skipIfExists`, so an upgrade never writes it, which is
+   * right for the file and wrong for the one section that has to reach a
+   * project that upgrades rather than inits. So they count as work here.
+   *
+   * `--dry-run` returns BEFORE anything is written. It used to fall through
+   * the staging block on the argument that an agent could then preview the
+   * reconciliation plan — but a preview that leaves several dozen files on
+   * disk is not a preview, and it primed `specnaut reconcile` with upstream
+   * content for an upgrade that was never applied. The plan already names
+   * every customized dest, which is what a preview owes the caller.
+   */
+  private async finish(run: UpgradeRun): Promise<UpgradeProjectResult> {
+    const io: UpgradeIo = this.deps;
+    const sections = await surveyManagedSections(
+      io.reader,
+      run.bundle,
+      run.projectDir,
+      run.isDeclaredPreserved,
     );
-
-    // A declared-preserve (spec 011 / issue #367) is immune to `--force`: the
-    // maintainer overrides it only via `--reset-preserved` (which flips the
-    // predicate off, so the file never reaches here as reason:"declared").
-    // Only a `customized` preserve is overwritten by `--force`.
-    const isForceWritablePreserve = (a: UpgradeAction): boolean =>
-      a.kind === "preserve" && a.reason === "customized" && input.force;
-
-    // Sections Specnaut owns inside files the user owns (#466). These live
-    // outside the plan on purpose: `AGENTS.md` is `skipIfExists`, so an upgrade
-    // never writes it — which is correct for the file and wrong for the one
-    // section that has to reach a project that upgrades rather than inits.
-    // Merged in under their own fence, they never overwrite or reorder a line
-    // the user wrote.
-    const plannedSections = await surveyManagedSections(
-      reader,
-      bundle,
-      input.projectDir,
-      isDeclaredPreserved,
-    );
-
-    if (plannedSections.length === 0 && plan.every((a) => a.kind === "unchanged")) {
-      // No file work to do. But a legacy lock (or any lock whose recorded
-      // `parent_managed` differs from the decision we just computed) still
-      // needs the corrected field persisted — otherwise a handler-derived
-      // override never reaches disk until an unrelated file change triggers
-      // a rewrite (009-parent-managed-init / FR-007). This is a metadata-only
-      // write: no file operations, just the lock. The common case (lock
-      // already carries the right value) keeps the no-op fast path.
-      const lockParentManaged = lock.parentManaged ?? false;
-      // Rewrite when the decision changed OR when a parent-managed lock still
-      // records agentic rows. The second case is the one that bites: a lock
-      // written before the flip keeps describing files this workspace does not
-      // own, and without it the resurrection only moves from "planned adds" to
-      // phantom rows nobody looks at until they mislead someone (#476).
-      // #572, third case, and the one that hides best. When EVERY dest is
-      // `unchanged` the run returns here, before the lock rebuild below ever
-      // sees them — so a project whose whole tree already matches the bundle
-      // but whose lock is behind gets "up-to-date" and no repair at all. Both
-      // other cases at least reached the rebuild. This one never did, which is
-      // why it survived a fix aimed at the rebuild.
-      //
-      // A stale entry here is not ambiguous: `unchanged` means the file equals
-      // the bundle, so the bundle's sha is what the entry should have said all
-      // along.
-      // Every dest here is `unchanged`, so the entry set is fully derivable:
-      // sha and version come from the bundle, `installedAt` is kept when known.
-      // Built from `newShas`, NOT from `effectiveLock.entries`, so an orphan row the
-      // bundle no longer contains is dropped — the prune the rebuild loop gets
-      // for free by iterating the same map, which this branch used to skip
-      // because it copied the lock verbatim.
-      const upToDateEntries = deriveUnchangedEntries(
-        effectiveLock.entries,
-        newShas,
-        bundle,
-        templatesVersion,
-        (this.deps.now ?? (() => new Date()))().toISOString(),
-      );
-      // Stale on EITHER axis. Keying only on the sha let an entry keep a
-      // lagging `templatesVersion` while the header advanced, which makes
-      // `staleSince` fire on a file that was never behind — and
-      // `--reset-baseline` is bounded by exactly that predicate, so a genuine
-      // user edit gets swept into an overwrite by a report that was wrong.
-      const staleEntries = [...upToDateEntries].some(([dest, e]) => {
-        const prev = effectiveLock.entries.get(dest);
-        return prev === undefined || prev.sha256 !== e.sha256 ||
-          prev.templatesVersion !== e.templatesVersion;
-      }) || [...effectiveLock.entries.keys()].some((d) => !upToDateEntries.has(d));
-      const staleVersion = lock.templatesVersion !== templatesVersion;
-      const staleAgentic = parentManaged &&
-        [...effectiveLock.entries.keys()].some((dest) => isAgenticPath(dest));
-      if (
-        parentManaged !== lockParentManaged || staleAgentic ||
-        staleEntries || staleVersion
-      ) {
-        const correctedLock = lockWith(
-          lock,
-          templatesVersion,
-          parentManaged ? pruneAgenticEntries(upToDateEntries) : upToDateEntries,
-          parentManaged,
-        );
-        // NOT on a dry run. `input.dryRun` is first consulted below, AFTER
-        // this early return, so this write happened on a preview — and the new
-        // `staleVersion` clause fires on the ordinary post-release state (files
-        // current, version string behind), which means a preview would have
-        // mutated the trust artefact on a perfectly normal tree. A preview that
-        // writes is not a preview.
-        if (!input.dryRun) {
-          await lockStore.write(input.projectDir, correctedLock);
-        }
-      }
-      // Every dest equals the bundle here, so no staged copy has anything left
-      // to reconcile — and a project already on the current release reaches
-      // its next upgrade through this branch, not the applied one (#613).
-      const merges = input.dryRun
-        ? { notes: [], changed: [] }
-        : await reMergeJsonFiles(writer, jsonMerged, input.projectDir);
-      if (!input.dryRun) {
-        await pruneStaging(this.deps.stagingStore, input.projectDir, new Set(), refusals);
-      }
-      // The version reported is the one now recorded, not the one that was.
-      return {
-        status: "up-to-date",
-        currentVersion: templatesVersion,
-        refusals,
-        notes: merges.notes,
-        mergedChanged: merges.changed,
-      };
+    if (sections.length === 0 && run.plan.every((a) => a.kind === "unchanged")) {
+      return await finishUpToDate(io, run);
     }
-
-    // `--dry-run` returns here, BEFORE anything is written. It used to fall
-    // through the staging block below on the argument that an agent could then
-    // preview the reconciliation plan — but a preview that leaves several dozen
-    // files on disk is not a preview, and the run ended by printing "no files
-    // written". Worse, it primed `specnaut reconcile` with upstream content for
-    // an upgrade that was never applied. The plan itself already names every
-    // customized dest, which is what a preview owes the caller.
-    if (input.dryRun) {
-      return {
-        status: "planned",
-        refusals,
-        plan,
-        fromVersion: lock.templatesVersion,
-        toVersion: templatesVersion,
-        managedSections: plannedSections,
-      };
-    }
-
-    // Stage upstream content for preserved (customized) files so that
-    // `specnaut reconcile` can act on them later.
-    const staging = planStaging(plan, bundle, effectiveLock.entries, isForceWritablePreserve);
-    if (Object.keys(staging.writes).length > 0) {
-      await writer.writeBundle(staging.writes, input.projectDir, {
-        overwrite: true,
-        backupExisting: false,
-      });
-    }
-
-    const toWrite: Bundle = {};
-    for (const action of plan) {
-      if (
-        action.kind === "auto-update" ||
-        action.kind === "add-new" ||
-        isForceWritablePreserve(action)
-      ) {
-        const file = bundle[action.dest];
-        if (file) toWrite[action.dest] = file;
-      }
-    }
-
-    // `--reset-baseline` overwrites from the bundle exactly like `--force` does,
-    // so it owes the same `.specnaut.bak` (#519). It never wrote one: the flag
-    // re-baselines before the plan is computed, so every file it touches arrives
-    // here as `auto-update` rather than a forced `preserve`, and the backup was
-    // keyed on `force` alone. The hint that advertises the flag promises "keeps
-    // a .specnaut.bak of each" — it produced none, which made the safer-looking
-    // option the destructive one.
-    const backupReport = await writer.writeBundle(toWrite, input.projectDir, {
-      overwrite: true,
-      backupExisting: input.force || (input.resetBaseline ?? false),
-    });
-    const relinked = await applyContextLinks(writer, plan, bundle, input.projectDir);
-    const relinkReport = relinked.report;
-    const allWritten: Bundle = { ...toWrite, ...relinked.written };
-
-    const merges = await reMergeJsonFiles(writer, jsonMerged, input.projectDir);
-
-    // What this run staged is the whole of what is pending. Everything else in
-    // the staging tree predates it — see `pruneStaging` (#477, #613).
-    await pruneStaging(this.deps.stagingStore, input.projectDir, staging.staged, refusals);
-
-    // Applied *after* the plan's writes: an `auto-update` may just have
-    // rewritten the whole file from the bundle, in which case the section is
-    // already there and the merge is a no-op. Re-reading is what keeps the
-    // reported outcome honest instead of echoing back what we predicted.
-    const appliedSections = await applyManagedSections(
-      { reader, writer },
-      bundle,
-      input.projectDir,
-      isDeclaredPreserved,
-    );
-
-    const removal = await removeOrphans(
-      writer,
-      plan,
-      input.projectDir,
-      input.force,
-      harness,
-      refusals,
-    );
-    let extraBackups = removal.backups;
-
-    // Plugin migrations: vanilla file on disk + plugin installed →
-    // backup + delete; plugin serves the file going forward. Always
-    // back up (the on-disk copy is exactly what the plugin will serve,
-    // but the user may want to recover it later if they uninstall the
-    // plugin).
-    const pluginMigrations = plan
-      .filter((a): a is Extract<typeof a, { kind: "migrate-to-plugin" }> =>
-        a.kind === "migrate-to-plugin"
-      )
-      .map((a) => a.dest);
-    if (pluginMigrations.length > 0) {
-      const r = await writer.deletePaths(pluginMigrations, input.projectDir, {
-        backupExisting: true,
-      });
-      extraBackups = [...extraBackups, ...r.backups];
-    }
-
-    const updatedEntries = await rebuildEntries({
-      plan,
-      lock: effectiveLock,
-      newShas,
-      bundle,
-      written: allWritten,
-      templatesVersion,
-      now: (this.deps.now ?? (() => new Date()))().toISOString(),
-      force: input.force,
-    });
-    // Persists the (possibly re-derived) parent-managed decision, so future
-    // upgrades read it directly without re-walking the filesystem.
-    const newLock = lockWith(lock, templatesVersion, updatedEntries, parentManaged);
-    await lockStore.write(input.projectDir, newLock);
-
+    if (!run.dryRun) return await applyUpgrade(io, run);
     return {
-      status: "applied",
-      refusals,
-      plan: removal.plan,
-      fromVersion: lock.templatesVersion,
-      toVersion: templatesVersion,
-      backups: [...backupReport.backups, ...relinkReport.backups, ...extraBackups]
-        .filter((b) => b.wasSymlink !== true)
-        .map((b) => b.dest),
-      linksMoved: [...backupReport.backups, ...relinkReport.backups, ...extraBackups]
-        .filter((b) => b.wasSymlink === true)
-        .map((b) => b.dest),
-      contextLinks: [...(backupReport.links ?? []), ...(relinkReport.links ?? [])],
-      managedSections: appliedSections,
-      written: Object.keys(allWritten).sort(),
-      notes: [...links.notes, ...merges.notes],
-      mergedChanged: merges.changed,
+      status: "planned",
+      refusals: run.refusals,
+      plan: run.plan,
+      fromVersion: run.lock.templatesVersion,
+      toVersion: run.templatesVersion,
+      managedSections: sections,
     };
   }
+}
+
+/** What `plan` reads: the gathered inputs with the renames carried. */
+type PlanStep = {
+  readonly bundle: Bundle;
+  readonly diskShas: ReadonlyMap<string, string>;
+  /** The lock the plan runs against — refusals dropped, renames carried. */
+  readonly lock: InstalledLock;
+  readonly links: ContextLinkSurvey;
+  readonly harness: Harness;
+  readonly input: UpgradeProjectInput;
+  readonly isDeclaredPreserved: (dest: string) => boolean;
+};
+
+/**
+ * The bundle this workspace owns. A parent-managed target inherits its agentic
+ * files from the providing workspace, so those dests leave the bundle *before*
+ * the plan is computed: a suppressed path is never planned, written, or
+ * "restored" (FR-007).
+ */
+function ownedBundle(mapped: Bundle, parentManaged: boolean): Bundle {
+  if (!parentManaged) return mapped;
+  return Object.fromEntries(Object.entries(mapped).filter(([dest]) => !isAgenticPath(dest)));
 }

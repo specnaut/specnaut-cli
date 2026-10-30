@@ -11,9 +11,7 @@ import {
   parseLock,
   RemovedHarnessError,
 } from "../domain/installed_lock.ts";
-import { PLUGIN_COVERED_PATHS_CLAUDE } from "../domain/plugin_coverage.ts";
-
-const PLUGIN_NAME = "specnaut-plugin";
+import { PLUGIN_COVERED_PATHS_CLAUDE, PLUGIN_NAME } from "../domain/plugin_coverage.ts";
 
 async function exists(path: string): Promise<boolean> {
   try {

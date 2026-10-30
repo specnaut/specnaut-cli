@@ -29,10 +29,9 @@ for (const linked of [".specnaut/upgrade-staging", ".specnaut"]) {
         await Deno.mkdir(join(dir, ".specnaut"));
         await makeLink("../src", join(dir, ".specnaut/upgrade-staging"), "dir");
       }
-      const refusals: string[] = [];
-      await pruneStaging(new FsStagingStore(), dir, new Set(), refusals).catch((err) =>
-        refusals.push(String(err))
-      );
+      const refusals = await pruneStaging(new FsStagingStore(), dir, new Set()).catch((err) => [
+        String(err),
+      ]);
       assertEquals(await Deno.readTextFile(join(dir, "src/a.ts")), "export {};\n");
       if (linked === ".specnaut") {
         assert(await Deno.stat(join(dir, "elsewhere/upgrade-staging/b.md")), "b.md was deleted");

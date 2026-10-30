@@ -76,7 +76,7 @@ export function planStaging(
  *
  * Best-effort: this is housekeeping, and it runs before the managed sections
  * and the lock write. A delete that throws (a Windows file lock, a permission
- * bit) is reported through `refusals` and the upgrade finishes; letting it
+ * bit) is returned as a refusal line and the upgrade finishes; letting it
  * propagate would leave the project half-upgraded over a copy nobody needs.
  * A containment refusal is reported in its own words (`leftAlone`).
  */
@@ -84,8 +84,8 @@ export async function pruneStaging(
   stagingStore: StagingStore,
   projectDir: string,
   keep: ReadonlySet<string>,
-  refusals: string[],
-): Promise<void> {
+): Promise<string[]> {
+  const refusals: string[] = [];
   for (const rel of await stagingStore.list(projectDir)) {
     if (keep.has(rel)) continue;
     try {
@@ -104,6 +104,7 @@ export async function pruneStaging(
     const path = ".specnaut/upgrade-staging/";
     refusals.push(refusalLine(path, err, `could not remove the empty ${path}`));
   }
+  return refusals;
 }
 
 const why = (err: unknown) => err instanceof Error ? err.message : String(err);

@@ -11,6 +11,11 @@ import { deletesOrphan, orphanScope, relabelRefused } from "../domain/orphan_sco
  * can lead anywhere else in the project. Returns the plan with each orphan
  * the writer refused re-labelled `orphan-refused`, so the summary reports
  * what happened rather than what was planned; its entry leaves the lock.
+ *
+ * `refusals` carries what the writer could not finish. Today that is
+ * `fs_prune.ts:pruneEmptyParents` failing to remove a folder the deletes
+ * emptied: a failed operation, so it is said on the refusal channel the
+ * staging cleanup's own failures use, not as a note.
  */
 export async function removeOrphans(
   writer: FsWriter,
@@ -18,13 +23,13 @@ export async function removeOrphans(
   projectDir: string,
   force: boolean,
   scope: { managedRoots?: ReadonlyArray<string>; managedFiles?: ReadonlyArray<string> },
-  notes: string[],
-): Promise<{ backups: BackupReport["backups"]; plan: UpgradePlan }> {
+): Promise<{ backups: BackupReport["backups"]; plan: UpgradePlan; refusals: string[] }> {
   const removes = plan.filter((a) => deletesOrphan(a, force));
   const within = (rel: string) =>
     orphanScope(rel, scope.managedRoots, scope.managedFiles) === "in-scope";
   let backups: BackupReport["backups"] = [];
   const refused = new Set<string>();
+  const refusals: string[] = [];
   for (const backupExisting of [false, true]) {
     const paths = removes.flatMap((a) =>
       a.kind === "remove" && a.wasCustomized === backupExisting ? [a.dest] : []
@@ -33,7 +38,7 @@ export async function removeOrphans(
     const r = await writer.deletePaths(paths, projectDir, { backupExisting, within });
     backups = [...backups, ...r.backups];
     for (const dest of r.refused ?? []) refused.add(dest);
-    notes.push(...(r.notes ?? []));
+    refusals.push(...(r.notes ?? []));
   }
-  return { backups, plan: relabelRefused(plan, refused) };
+  return { backups, plan: relabelRefused(plan, refused), refusals };
 }

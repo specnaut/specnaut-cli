@@ -1,6 +1,12 @@
 import type { KnownHarness } from "./installed_lock.ts";
 
 /**
+ * The plugin's name, for both the install probe and the cache directory. One
+ * spelling: `upgrade` and `check --project` must ask about the same plugin.
+ */
+export const PLUGIN_NAME = "specnaut-plugin";
+
+/**
  * Pure predicate: does the `specnaut-plugin` plugin own a copy of the
  * file at `dest` (relative to the project root)?
  *

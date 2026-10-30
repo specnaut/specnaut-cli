@@ -22,8 +22,7 @@ Deno.test("a containment refusal while pruning gets its own message", async () =
     rel === "a.md"
       ? Promise.reject(new PathRefusal("refusing to touch a path that leaves the project"))
       : Promise.reject(new Error("EBUSY: resource busy"));
-  const refusals: string[] = [];
-  await pruneStaging(store, "/p", new Set(), refusals);
+  const refusals = await pruneStaging(store, "/p", new Set());
   assertEquals(refusals.length, 2);
   assertStringIncludes(refusals[0], ".specnaut/upgrade-staging/a.md");
   assertStringIncludes(refusals[0], "refusing to touch a path that leaves the project");
@@ -35,8 +34,7 @@ Deno.test("a containment refusal while pruning gets its own message", async () =
 Deno.test("a staging directory that is refused gets the containment message too", async () => {
   const store = fakeStagingStore();
   store.cleanupIfEmpty = () => Promise.reject(new PathRefusal("refusing to touch a path"));
-  const refusals: string[] = [];
-  await pruneStaging(store, "/p", new Set(), refusals);
+  const refusals = await pruneStaging(store, "/p", new Set());
   assertEquals(refusals.length, 1);
   assertStringIncludes(refusals[0], ".specnaut/upgrade-staging/");
   assertRefusalWording(refusals[0]);
@@ -53,8 +51,7 @@ Deno.test({
       await Deno.writeTextFile(outside, "not the project's\n");
       await Deno.mkdir(join(project, ".specnaut/upgrade-staging"), { recursive: true });
       await Deno.symlink(outside, join(project, ".specnaut/upgrade-staging/x.md"));
-      const refusals: string[] = [];
-      await pruneStaging(new FsStagingStore(), project, new Set(), refusals);
+      const refusals = await pruneStaging(new FsStagingStore(), project, new Set());
       assertEquals(await Deno.readTextFile(outside), "not the project's\n");
       assert((await Deno.lstat(join(project, ".specnaut/upgrade-staging/x.md"))).isSymlink);
       assertEquals(refusals.length, 1, refusals.join("\n"));
