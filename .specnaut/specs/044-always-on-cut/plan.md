@@ -195,3 +195,15 @@ decided in spec 036 (status-audit Codex-capable; security-guidance files removed
 integrations reference moves to `/specnaut doc`; four commits — (1) AGENTS.md + integrations doc;
 (2) backlog/groom/ship trims; (3) alias-example + security files + upgrade test; (4) status-audit
 script, byte report.
+
+## Measured at the end (2026-10-30)
+
+`deno task test` 2,680 passed, 0 failed; fmt, lint, `gen-hooks --check`, `go test ./...`, smoke
+`features` / `tag-release` / `backlog-local` / `backlog-github` / `task` / `all-harnesses`,
+`audit.sh` (0 gaps) and the size ratchet green.
+
+**SC-002 — always-on**, the rendered root `AGENTS.md`: Claude Code **11,612 → 8,203 B (−29 %)**,
+Codex **9,499 → 8,162 B (−14 %)**. The optional-integrations reference (3,609 B) is on demand.
+**Skills:** `backlog.md` + `groom.md` + `/ship` 49,451 → 38,134 B; `status-audit` 5,123 → 2,049 B
+(its views are computed by `.specnaut/scripts/status/status-audit.sh`); `alias-example` and the two
+Claude security-guidance files are gone.
