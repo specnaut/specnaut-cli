@@ -7,7 +7,7 @@ import { sha256Hex } from "../../src/domain/sha256.ts";
 import { CODEX_CONFIG_BLOCK_LABEL } from "../../src/domain/codex_config.ts";
 import { canonicalBlockBody } from "../../src/domain/merge_block.ts";
 import { CodexHarness } from "../../src/infrastructure/harness/codex_harness.ts";
-import { DenoFsWriter } from "../../src/infrastructure/deno_fs_writer.ts";
+import { DenoFsWriter, type Linker } from "../../src/infrastructure/deno_fs_writer.ts";
 import { DenoFsReader } from "../../src/infrastructure/fs_reader.ts";
 import { FsLockStore } from "../../src/infrastructure/fs_lock_store.ts";
 import { FsStagingStore } from "../../src/infrastructure/fs_staging_store.ts";
@@ -33,9 +33,11 @@ const OLD_GOAL = "# Project goal prompt\n";
 /** The block as it was before `enabled = true`. */
 const OLD_BLOCK = '[agents]\ndefault_subagent_model = "x"\nmax_concurrent_threads_per_session = 4';
 
-async function oldCodexProject(dir: string, goal: string) {
-  await new InitProjectUseCase({
-    writer: new DenoFsWriter(),
+const refusing: Linker = () => Promise.reject(new Deno.errors.PermissionDenied("no privilege"));
+
+async function initCodex(dir: string, linker?: Linker) {
+  return await new InitProjectUseCase({
+    writer: new DenoFsWriter(linker),
     git: noGit,
     lockStore: new FsLockStore(),
     harness,
@@ -45,6 +47,10 @@ async function oldCodexProject(dir: string, goal: string) {
     core: CORE_BUNDLE,
     ensureDir: (p) => Deno.mkdir(p, { recursive: true }),
   }).execute({ targetDir: dir, initGit: false, force: false, dryRun: false });
+}
+
+async function oldCodexProject(dir: string, goal: string) {
+  await initCodex(dir);
   await Deno.remove(join(dir, ".codex/AGENTS.md"));
   await Deno.writeTextFile(join(dir, ".codex/AGENTS.md"), OLD_AGENTS);
   await Deno.writeTextFile(join(dir, ".codex/goal.md"), goal);
@@ -63,10 +69,10 @@ async function oldCodexProject(dir: string, goal: string) {
   await store.write(dir, { ...lock, templatesVersion: "0.0.1", entries });
 }
 
-const upgrade = (dir: string) =>
+const upgrade = (dir: string, linker?: Linker) =>
   new UpgradeProjectUseCase({
     reader: new DenoFsReader(),
-    writer: new DenoFsWriter(),
+    writer: new DenoFsWriter(linker),
     lockStore: new FsLockStore(),
     stagingStore: new FsStagingStore(),
     core: CORE_BUNDLE,
@@ -113,5 +119,43 @@ Deno.test("a customized goal.md is kept and reported, not deleted", async () => 
       r.plan.some((a) => a.kind === "remove" && a.dest === ".codex/goal.md" && a.wasCustomized),
       "the kept file must be named in the report",
     );
+  });
+});
+
+/**
+ * cli#681 pins both forms of `.codex/AGENTS.md`. Where links are refused, the
+ * fallback is Codex's own sentence — not Claude's `@` import, which Codex
+ * would not follow — and it is ours, so the next run on that system rests.
+ */
+const FALLBACK = harness.mapBundle(CORE_BUNDLE, {
+  backlogBackend: "local",
+  versionScheme: "semver",
+  specBackend: "local",
+})[".codex/AGENTS.md"].content;
+
+Deno.test("where links are refused, .codex/AGENTS.md is the fallback, and the next run rests", async () => {
+  assert(FALLBACK.includes("../AGENTS.md") && !FALLBACK.startsWith("@"), FALLBACK);
+  await withProject(async (dir) => {
+    const init = await initCodex(dir, refusing);
+    assert(init.status === "initialized");
+    assertEquals(init.contextLinks.map((l) => [l.dest, l.form]), [[
+      ".codex/AGENTS.md",
+      "fallback",
+    ]]);
+    assertEquals((await Deno.lstat(join(dir, ".codex/AGENTS.md"))).isSymlink, false);
+    assertEquals(await Deno.readTextFile(join(dir, ".codex/AGENTS.md")), FALLBACK);
+    assertEquals((await upgrade(dir, refusing)).status, "up-to-date");
+  });
+});
+
+Deno.test("an old .codex/AGENTS.md upgraded where links are refused becomes the fallback", async () => {
+  await withProject(async (dir) => {
+    await oldCodexProject(dir, OLD_GOAL);
+    const r = await upgrade(dir, refusing);
+    assert(r.status === "applied", r.status);
+    assertEquals(r.contextLinks.map((l) => [l.dest, l.form]), [[".codex/AGENTS.md", "fallback"]]);
+    assertEquals(await Deno.readTextFile(join(dir, ".codex/AGENTS.md")), FALLBACK);
+    assertEquals(r.backups, [], "the old generated pointer was not the user's");
+    assertEquals((await upgrade(dir, refusing)).status, "up-to-date");
   });
 });

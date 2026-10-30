@@ -10,6 +10,7 @@ import { DenoFsWriter, type Linker } from "../../src/infrastructure/deno_fs_writ
 import { DenoFsReader } from "../../src/infrastructure/fs_reader.ts";
 import { FsLockStore } from "../../src/infrastructure/fs_lock_store.ts";
 import { FsStagingStore } from "../../src/infrastructure/fs_staging_store.ts";
+import { resolveUpgradePreserves } from "../../src/cli/handlers/upgrade_preserve.ts";
 import { CAN_LINK, makeLink, readLinkText } from "../helpers/link_text.ts";
 
 /**
@@ -46,10 +47,23 @@ async function initProject(dir: string, linker?: Linker) {
   }).execute({ targetDir: dir, initGit: false, force: false, dryRun: false });
 }
 
+/**
+ * Run upgrade. `preserved` is written to a real `.specnaut/preserve.yml` and
+ * read back through `resolveUpgradePreserves`, the handler's own resolution,
+ * so a declaration is judged against the real Claude bundle — not handed to
+ * the use case as a predicate nothing in production builds.
+ */
 async function upgrade(
   dir: string,
-  opts: { linker?: Linker; force?: boolean; declared?: string[] } = {},
+  opts: { linker?: Linker; force?: boolean; preserved?: string[] } = {},
 ) {
+  let isDeclaredPreserved = (_: string) => false;
+  if (opts.preserved !== undefined) {
+    const yml = `preserved:\n${opts.preserved.map((p) => `  - ${p}\n`).join("")}`;
+    await Deno.writeTextFile(join(dir, ".specnaut/preserve.yml"), yml);
+    const lock = await new FsLockStore().read(dir);
+    ({ isDeclaredPreserved } = await resolveUpgradePreserves(dir, lock, false, false));
+  }
   return await new UpgradeProjectUseCase({
     reader: new DenoFsReader(),
     writer: new DenoFsWriter(opts.linker),
@@ -62,7 +76,7 @@ async function upgrade(
     projectDir: dir,
     dryRun: false,
     force: opts.force ?? false,
-    isDeclaredPreserved: (d) => (opts.declared ?? []).includes(d),
+    isDeclaredPreserved,
   });
 }
 
@@ -138,7 +152,7 @@ Deno.test("a preserve.yml declaration keeps a customized context file as it is",
   await withProject(async (dir) => {
     await initProject(dir);
     await plantFile(dir, "# my own rules\n", "# Claude Reference\n");
-    const r = await upgrade(dir, { declared: [DEST] });
+    const r = await upgrade(dir, { preserved: [DEST] });
     assert(r.status === "applied", r.status);
     assert(r.plan.some((a) => a.kind === "preserve" && a.dest === DEST && a.reason === "declared"));
     assertEquals(r.backups, []);
@@ -155,7 +169,7 @@ Deno.test("a declaration wins over an inverted consolidation too: preserved, not
     await Deno.writeTextFile(join(dir, DEST), "# everything we wrote\n");
     await Deno.remove(join(dir, "AGENTS.md"));
     await makeLink(".claude/CLAUDE.md", join(dir, "AGENTS.md"));
-    const r = await upgrade(dir, { declared: [DEST] });
+    const r = await upgrade(dir, { preserved: [DEST] });
     assertEquals(r.refusals, []);
     assert(r.status === "applied", r.status);
     assert(r.plan.some((a) => a.kind === "preserve" && a.dest === DEST && a.reason === "declared"));
@@ -175,6 +189,24 @@ Deno.test("a link checked out as text (core.symlinks=false) is relinked and said
       r.notes.some((n) => n.includes("core.symlinks=false") && n.includes(DEST)),
       r.notes.join("\n"),
     );
+  });
+});
+
+Deno.test("core.symlinks=false where links are refused: the fallback, said, then a no-op", async () => {
+  await withProject(async (dir) => {
+    await initProject(dir);
+    await plantFile(dir, "../AGENTS.md", "something else");
+    const r = await upgrade(dir, { linker: refusing });
+    assert(r.status === "applied", r.status);
+    assertEquals(r.backups, []);
+    assertEquals(r.contextLinks.map((l) => l.form), ["fallback"]);
+    assertEquals(await Deno.readTextFile(join(dir, DEST)), "@../AGENTS.md\n");
+    assert(r.notes.some((n) => n.includes("core.symlinks=false")), r.notes.join("\n"));
+    // The fallback is ours: the next run on the same system neither retries the
+    // link nor rewrites the file, nor says the note again.
+    const again = await upgrade(dir, { linker: refusing });
+    assertEquals(again.status, "up-to-date");
+    assertEquals(await Deno.readTextFile(join(dir, DEST)), "@../AGENTS.md\n");
   });
 });
 
