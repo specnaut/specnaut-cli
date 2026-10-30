@@ -202,9 +202,9 @@ accepted; the amendments below **supersede** §§ 3, 5 and 9 where they differ.
 - **MEDIUM — the test-runner grant.** The seven moved patterns (`npx jest*`, `npm test*`,
   `deno test *`, `go test *`…) run arbitrary code and fetch packages, and test-reviewer.md's "cannot
   reach a general interpreter" is false. Decision — **reuse, not a new wrapper**: code-reviewer gets
-  only `Bash(.specnaut/scripts/bash/run-gate.sh fast)`, which runs the fast tier the project
-  declared in its committed `gates.yml` (cli#555); no runner patterns move. The false sentence is
-  not carried. The checklist reads tests and runs that one command.
+  only `Bash(.specnaut/scripts/bash/run-gate.sh fast)`, which runs the fast tier declared on the
+  branch under review — the working tree's `gates.yml` (cli#555); no runner patterns move. The false
+  sentence is not carried. The checklist reads tests and runs that one command.
 - **MEDIUM — untrusted diff content reaches the pushing session.** In `review-seats.md`: briefs
   carry paths, base/head SHAs and script exit codes — never diff hunks or commit message bodies;
   only the **last** REVIEW SUMMARY block of each seat's output counts; EVIDENCE is checked against

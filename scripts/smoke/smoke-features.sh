@@ -638,7 +638,7 @@ check "and a missing seat fails by arithmetic, not by interpretation" \
 check "which seats are required is defined, not left to judgement" \
   'grep -q "Required seats, so the word is not left" .claude/skills/task/phases/review-seats.md'
 check "a skipped seat is distinguished from a missing one" \
-  'grep -q "skipped seat is not a missing one" .claude/skills/task/phases/review-seats.md'
+  'grep -q "skipped seat is not a missing one" .claude/skills/task/phases/review.md'
 # A SWEEP, not a case. The contract gained two fields and six of the eight
 # seats kept describing the old block — an honest review would then have
 # counted six seats as not-reporting. Third instance in two days of an
@@ -661,7 +661,7 @@ check "no automatic re-dispatch: zero findings stays a legitimate result" \
 check "the review phase stops the run when a seat did not report" \
   'grep -qF "SEATS_REPORTED <" .claude/skills/task/phases/review.md'
 check "and re-dispatching narrower is allowed, repeating the brief is not" \
-  'grep -qF "Repeating the same brief is not" .claude/skills/task/phases/review.md'
+  'grep -qF "repeating the same brief is not a remedy" .claude/skills/task/phases/review-seats.md && grep -qF "§ Your own checking, and re-dispatch" .claude/skills/task/phases/review.md'
 # #678 — the coordinator's fan-out moved into the review phase itself.
 check "the review fans its seats out by name under the concurrency cap" \
   'grep -qF "in flight, and never more than the harness" .claude/skills/task/phases/review.md && grep -qF "collect-audit-scope.sh --range" .claude/skills/task/phases/review.md'

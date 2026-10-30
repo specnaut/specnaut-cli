@@ -20,7 +20,7 @@ import { skillDocName } from "../../../src/domain/core_bundle.ts";
 // cli#685 re-captured all four for the constitution reference each now opens
 // with, and plan's step-3 wording — nothing else moved. Spec 041 rewrote plan and
 // implement (the brief by default; tasks folded in) and retired tasks' golden with its phase.
-// cli#678 re-captured review's: the seats fan out from the main session (Phase 0/1).
+// cli#678 re-captured review's: seats fan out from the main session; Phase 4 wraps the roll-up.
 
 function abs(rel: string): string {
   return fromFileUrl(new URL(`../../${rel}`, import.meta.url));

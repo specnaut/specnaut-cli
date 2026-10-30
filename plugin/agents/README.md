@@ -51,8 +51,9 @@ Tally: 7 `high` · 2 `xhigh` = 9 agents. `low` and `medium` remain valid for a p
 **`high` is the floor** because an under-provisioned lens fails quietly: a well-formatted report
 with fewer findings is indistinguishable from clean code. **`xhigh` marks an unrecoverable miss, not
 hard work**: `developer`'s shallow pass meets tests, review and a human; nothing checks
-`security-expert` or `architect-expert`, whose misses ship or become load-bearing. Both are
-`disable-model-invocation: true`, which bounds what the tier costs.
+`security-expert` or `architect-expert`, whose misses ship or become load-bearing. `architect-expert`
+is `disable-model-invocation: true`, which bounds what its tier costs; `security-expert` is not, and
+is bounded instead by the phases that dispatch it — every review diff and every plan.
 
 ## How the two axes reach other harnesses
 

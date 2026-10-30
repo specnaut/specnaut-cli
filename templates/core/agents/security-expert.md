@@ -70,12 +70,15 @@ compensating control lowers it. Rank by what the attacker actually achieves.
 kind only. Never the value, not truncated, not partially masked. Recommend rotation at the issuer,
 not just deletion.
 
-## Mode 1 — Code review
+## Review and audit — code
 
 Dispatched by `/task review` on every diff, and by `/task audit` on a scope. Review ONLY the files
 the brief names.
 
 ## Mode 3 — Plan expertise (before any code exists)
+
+Numbered as in `architect-expert` and `performance-expert`: the plan audit is Mode 3, which is
+how `phases/plan.md` addresses it.
 
 Spawned by `phases/plan.md` at step 6 of `/task plan`, on every plan — brief or full — against
 `plan.md`, in the same message as the architect — **not** against code, because none has been

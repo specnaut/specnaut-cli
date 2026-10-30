@@ -46,7 +46,9 @@ Review the test files in the diff against the implementation they cover.
 ### The one command you may run
 
 `.specnaut/scripts/bash/run-gate.sh fast`, spelled exactly so (your grant matches that string) —
-the fast tier the project declared in its committed `.specnaut/gates.yml`, nothing else. It settles
+the fast tier declared on the branch under review, nothing else. Do not run it when
+`git diff --name-only <base>..HEAD` includes `.specnaut/gates.yml` or anything under
+`.specnaut/scripts/`: the diff would choose what you execute — say so in the report instead. It settles
 the largest class of rule-11 defect from evidence: a test that does not run at all (an always-true
 ignore, a file the runner's glob misses, a count that did not move when a file was added). A run
 saying the tier is not declared ran nothing and is no evidence. You have no write tool, by decision:

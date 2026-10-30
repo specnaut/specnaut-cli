@@ -153,6 +153,7 @@ for (const h of ["claude", "codex"] as const) {
     try {
       const kept = LAYOUT[h].customised;
       await Deno.writeTextFile(join(dir, kept), bodyOf(kept) + "- my own note\n");
+      await Deno.writeTextFile(join(dir, LAYOUT[h].own), "# mine\nHand tests to test-reviewer.\n");
 
       // The plant took: the retired names are there for upgrade to remove.
       assertEquals(namesAny(await Deno.readTextFile(join(dir, AGENTS_TXT))), [...AGENTS]);
@@ -168,8 +169,15 @@ for (const h of ["claude", "codex"] as const) {
       assert(await exists(join(dir, kept)), "a customised copy is the user's: kept");
       assertStringIncludes(up.out, `⚠ ${kept}`);
       assertStringIncludes(up.out, "1 orphan-preserved");
-      // Specnaut's own files name retired agents; only the user's are read.
-      assert(!up.out.includes(NOTICE), `the notice fired on Specnaut's files:\n${up.out}`);
+      // Specnaut's own files name retired agents; only the user's are read. The
+      // one user file planted is named, so the count is not satisfied by a
+      // notice pass that never ran.
+      assertStringIncludes(up.out, `${LAYOUT[h].own} ${NOTICE} — test-reviewer → code-reviewer`);
+      assertEquals(
+        up.out.split(NOTICE).length - 1,
+        1,
+        `the notice read Specnaut's files:\n${up.out}`,
+      );
 
       assertEquals(namesAny(await Deno.readTextFile(join(dir, AGENTS_TXT))), []);
       const section = dispatchSection(await Deno.readTextFile(join(dir, "AGENTS.md")));
@@ -218,6 +226,33 @@ for (const h of ["claude", "codex"] as const) {
       // Read-only: the user's files are untouched.
       assertStringIncludes(await Deno.readTextFile(join(dir, addendum)), "review-coordinator");
       assert(await exists(join(dir, LAYOUT[h].own)), "the user's own agent was removed");
+    } finally {
+      await cleanup(dir, home);
+    }
+  });
+
+  Deno.test(`[${h}] a user's own file at a retired name, not in the lock, survives upgrade`, async () => {
+    // Nothing deletes by these names: a project that wrote its own agent called
+    // `devops-sre` owns it, and the lock — which never recorded it — is the
+    // only thing upgrade prunes by.
+    const dir = await Deno.makeTempDir({ prefix: `specnaut-own-${h}-` });
+    const home = await Deno.makeTempDir({ prefix: "specnaut-home-" });
+    try {
+      const init = await runSpecnaut(
+        ["init", "--here", "--no-git", "--ai", h, "--backlog", "local"],
+        dir,
+        home,
+      );
+      assertEquals(init.code, 0, init.out);
+      const own = LAYOUT[h].agent("devops-sre");
+      const body = "# my own deploy agent\nRuns the deploy runbook.\n";
+      await Deno.writeTextFile(join(dir, own), body);
+      const lock = await Deno.readTextFile(join(dir, ".specnaut/installed.lock"));
+      assert(!lock.includes(own), `the fixture put ${own} in the lock`);
+
+      const up = await runSpecnaut(["upgrade"], dir, home);
+      assertEquals(up.code, 0, up.out);
+      assertEquals(await Deno.readTextFile(join(dir, own)), body, `${own} was not left as written`);
     } finally {
       await cleanup(dir, home);
     }

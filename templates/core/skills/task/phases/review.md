@@ -60,8 +60,9 @@ CATEGORY SIGNALS. The script decides; this table only names what each signal sel
 | `performance-expert`   | the plan's § Audit findings records a `performance-expert` audit          |
 
 The performance seat is the one the script does not select: whether the change has a hot path is
-decided once, at plan time (`phases/plan.md`), and read here. A gated seat whose signal is `0` is
-`SKIPPED`.
+decided once, at plan time (`phases/plan.md`), and read here. A gated seat is required **only when
+its signal fires**; when it does not, it is `SKIPPED` — not dispatched, not counted in
+`SEATS_EXPECTED`. A skipped seat is not a missing one.
 
 ### Dispatch
 
@@ -76,7 +77,7 @@ A seat has a turn limit, and a brief that makes it discover the diff spends that
 the first finding. So the brief carries the file list, the base and head SHAs and the Phase 0
 output, and the seat starts reading. For `code-reviewer`, it also carries `TEST_COUNT`. A diff of
 more than ~40 files is split: the seat is dispatched as several instances, each with its own slice
-of the files, and every instance counts in `SEATS_EXPECTED`.
+of the files, and the seat counts once per instance in `SEATS_EXPECTED`.
 
 Each seat returns findings at severity CRITICAL / HIGH / MEDIUM / LOW with file:line references
 and a suggested fix, then one `REVIEW SUMMARY` block. Aggregate them per `phases/review-seats.md`.
@@ -187,26 +188,22 @@ did not report and stop. Findings-based routing cannot catch this — a seat
 that never ran produces no findings to route and no cell to fill, so without
 this check a lost seat reads as a quiet pass all the way to merge.
 
-A seat can be short here for two reasons now: it returned no block, or it
+A seat can be short here for two reasons: it returned no block, or it
 returned a **clean** one naming no evidence from the diff, which
 `phases/review-seats.md` counts as zero. This check needs no change to catch the second —
 that is the point of the state being a number rather than a prose note.
 
-Resuming the missing seat, then re-dispatching it with a **narrower** brief
-(`phases/review-seats.md`), is the normal remedy and does not need permission.
-Repeating the same brief is not.
+The remedy is `phases/review-seats.md` § Your own checking, and re-dispatch.
 
 ## Phase 4 — Final report
 
-Emit a single report in this exact structure:
+The human-facing wrapper around the report `phases/review-seats.md` § The report defines — its
+`PER-SEAT ROLL-UP` with the findings, verbatim, and its aggregated `REVIEW SUMMARY` block, last:
 
 ```
 📋 Review Summary — <feature name>
 
-Structural (one line per seat, from the per-seat roll-up)
-  code-reviewer       : PASS | FAIL (N CRITICAL, M HIGH, …)
-  security-expert     : …
-  <signal-gated seat> : … (or SKIPPED)
+<the PER-SEAT ROLL-UP and its CRITICAL / HIGH findings, per phases/review-seats.md>
 
 Quality gates
   format              : PASS | FAIL | SKIPPED
@@ -221,6 +218,8 @@ Remaining findings (MEDIUM/LOW, non-blocking)
   - …
 
 Overall: PASS | FAIL
+
+<the aggregated REVIEW SUMMARY block, per phases/review-seats.md>
 ```
 
 If Overall = PASS, surface the verdict summary defined in

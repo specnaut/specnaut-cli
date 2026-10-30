@@ -1,4 +1,5 @@
 import type { FsReader } from "./ports.ts";
+import { ADDENDA_ROOT } from "../domain/addendum_audit.ts";
 
 /**
  * Where the phase docs used to look for extension hooks (`hooks.before_plan`
@@ -52,7 +53,7 @@ async function userDispatchFiles(
       )
     ),
   );
-  return [...await reader.listFiles(projectDir, ".specnaut/addenda"), ...agents.flat()];
+  return [...await reader.listFiles(projectDir, ADDENDA_ROOT), ...agents.flat()];
 }
 
 /**
