@@ -98,6 +98,10 @@ const CASES: ReadonlyArray<[command: string, denied: boolean]> = [
   ["git -c alias.p=push p origin v1.0.0", true],
   ["git pt", true],
   ["git st", false],
+  // git 2.54's `[alias "<name>"] command = …`, which `config --get alias.<name>` misses
+  ["git pt2", true],
+  ["git bt", true], // in both syntaxes: git runs the one defined last
+  ["git st2", false],
   // tag pushes
   ["git push --tags", true],
   ["git push origin feat --follow-tags", true],
@@ -120,6 +124,10 @@ Deno.test("guard-release on Codex: every listed command and every tag push", asy
     await git(sb, repo, "tag", "v1.0.0");
     await git(sb, repo, "config", "alias.pt", "!git push --tags");
     await git(sb, repo, "config", "alias.st", "status --short");
+    await git(sb, repo, "config", "alias.pt2.command", "push --tags");
+    await git(sb, repo, "config", "alias.st2.command", "status");
+    await git(sb, repo, "config", "alias.bt", "status");
+    await git(sb, repo, "config", "alias.bt.command", "push --tags");
     const runs = await pool(CASES, ([command]) => bash(sb, repo, command));
     // An allow is silent: an error inside the matcher once printed "refusing"
     // and exited 0 — a crash read as "not listed".
@@ -131,6 +139,19 @@ Deno.test("guard-release on Codex: every listed command and every tag push", asy
       ]
     );
     assertEquals(wrong, [], wrong.join("\n"));
+  } finally {
+    await sb.cleanup();
+  }
+});
+
+Deno.test("guard-release: a git config it cannot read is no proof that there is no alias", async () => {
+  const sb = await sandbox();
+  try {
+    const repo = await makeRepo(sb, { mode: "auto", head: "feat" });
+    // An include git fails to parse: `config --get` exits 128, not 1 (cli#711).
+    await git(sb, repo, "config", "include.path", "broken.cfg");
+    await Deno.writeTextFile(join(repo, ".git", "broken.cfg"), "[alias\n");
+    assertEquals(denied(await bash(sb, repo, "git worktree list")), true);
   } finally {
     await sb.cleanup();
   }

@@ -26,8 +26,20 @@ import { gitBash, pathWithCrlfJq } from "./hook_path.ts";
 
 const WINDOWS = Deno.build.os === "windows";
 
+/**
+ * What only a rule's own deny prints, for each hook denied below. A crash
+ * exits 2 too — the ERR trap, a payload of another shape, a list missing — so
+ * an exit code alone would read every crash as a deny, and a row would pass
+ * on a guard that never reached its rule (cli#711).
+ */
+const REFUSALS: readonly RegExp[] = [
+  /^specnaut guard-release: .+ publishes a release, .+ To let it through, reply /,
+  /^specnaut protect-generated: denied: .+ is \.specnaut\/installed\.lock\. /,
+  /^specnaut guard-dispatch-model: '[^']+' is a Specnaut agent: /,
+];
+
 function verdict(r: Run): string {
-  if (r.code === 2) return "deny";
+  if (r.code === 2 && REFUSALS.some((re) => re.test(r.stderr))) return "deny";
   if (r.code === 0 && r.stdout === "") return "allow";
   if (r.code === 0 && JSON.parse(r.stdout).hookSpecificOutput?.permissionDecision === "ask") {
     return "ask";

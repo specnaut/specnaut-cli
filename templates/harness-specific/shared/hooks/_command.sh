@@ -163,7 +163,47 @@ _cmd_test_char() {
   return 1
 }
 
-# cmd_parse <command line> [depth]
+# _cmd_dquote — c, inside "…", is a backslash, the closing quote, a `$` or a
+# backtick (cmd_parse adds every other character to the word itself).
+_cmd_dquote() {
+  case $c in
+    '\') case $nx in '"' | '\' | '$' | '`') word+=$nx i=$((i + 1)) ;; $'\n') i=$((i + 1)) ;; *) word+=$c ;; esac ;;
+    '"') q="" ;;
+    '$') if [ "$nx" = "(" ]; then _cmd_push; stack="d$stack" q="" i=$((i + 1)); _cmd_arith; else word+=$c; fi ;;
+    '`') _cmd_push; bt=d q="" ;;
+    *) word+=$c ;;
+  esac
+}
+
+# _cmd_plain — c, unquoted, is not a plain word character: an operator, a
+# quote, a blank, an expansion, a comment — or, inside `[[ … ]]`, part of a
+# word (_cmd_test_char).
+_cmd_plain() {
+  if [ -n "$bk" ] && _cmd_test_char; then return 0; fi
+  case $c in
+    '\') if [ "$nx" != $'\n' ]; then word+=$nx have=1; fi; i=$((i + 1)) ;;
+    "'" | '"') q=$c have=1 ;;
+    ' ' | $'\t') _cmd_word ;;
+    $'\n') _cmd_end; if [ -n "$heredocs" ]; then _cmd_heredocs; fi ;;
+    ';' | '|') _cmd_end ;;
+    '&') case $word in *'>' | *'<') word+=$c ;; *) if [ "$nx" = ">" ]; then word+=$c; else _cmd_end; fi ;; esac ;;
+    '$') if [ "$nx" = "(" ]; then _cmd_push; stack="s$stack" i=$((i + 1)); _cmd_arith; else word+=$c; fi ;;
+    '(') case $word in
+        *'<' | *'>' | '=') _cmd_push; stack="s$stack" ;; # <(…) >(…) =(…): a command runs inside
+        *) if [ -n "$word" ] && [ "$nx" != ")" ] && ! _cmd_keyword; then word+=$c stack="g$stack"; else _cmd_end; stack="u$stack"; _cmd_arith; fi ;;
+      esac ;;
+    ')') _cmd_close ;;
+    '`') if [ -z "$bt" ]; then _cmd_push; bt=u; else _cmd_pop; if [ "$bt" = d ]; then q='"'; fi; bt=""; fi ;;
+    '#') if [ -z "$word" ] && [ "$have" = 0 ]; then d=${s:i}; d=${d%%$'\n'*}; i=$((i + ${#d})); else word+=$c; fi ;;
+    '<') _cmd_lt ;;
+    *) word+=$c ;;
+  esac
+}
+
+# cmd_parse <command line> [depth] — one character at a time. The characters
+# that mean nothing but themselves are added to the word here, without a
+# function call: they are most of any line, and a call costs more than the
+# character (a 5 KB line is parsed in well under a second on bash 3.2).
 cmd_parse() {
   local s=$1 depth=${2:-0} n=${#1} i=0 c nx q="" word="" have=0 seg="" stack="" bt="" heredocs="" d sp=0 bk=""
   local -a sw ss
@@ -173,34 +213,10 @@ cmd_parse() {
     i=$((i + 1))
     if [ "$q" = "'" ]; then
       if [ "$c" = "'" ]; then q=""; else word+=$c; fi
-    elif [ "$q" = '"' ]; then
-      case $c in
-        '\') case $nx in '"' | '\' | '$' | '`') word+=$nx i=$((i + 1)) ;; $'\n') i=$((i + 1)) ;; *) word+=$c ;; esac ;;
-        '"') q="" ;;
-        '$') if [ "$nx" = "(" ]; then _cmd_push; stack="d$stack" q="" i=$((i + 1)); _cmd_arith; else word+=$c; fi ;;
-        '`') _cmd_push; bt=d q="" ;;
-        *) word+=$c ;;
-      esac
-    elif _cmd_test_char; then :
+    elif [ -n "$q" ]; then
+      case $c in '\' | '"' | '$' | '`') _cmd_dquote ;; *) word+=$c ;; esac
     else
-      case $c in
-        '\') if [ "$nx" != $'\n' ]; then word+=$nx have=1; fi; i=$((i + 1)) ;;
-        "'" | '"') q=$c have=1 ;;
-        ' ' | $'\t') _cmd_word ;;
-        $'\n') _cmd_end; if [ -n "$heredocs" ]; then _cmd_heredocs; fi ;;
-        ';' | '|') _cmd_end ;;
-        '&') case $word in *'>' | *'<') word+=$c ;; *) if [ "$nx" = ">" ]; then word+=$c; else _cmd_end; fi ;; esac ;;
-        '$') if [ "$nx" = "(" ]; then _cmd_push; stack="s$stack" i=$((i + 1)); _cmd_arith; else word+=$c; fi ;;
-        '(') case $word in
-            *'<' | *'>' | '=') _cmd_push; stack="s$stack" ;; # <(…) >(…) =(…): a command runs inside
-            *) if [ -n "$word" ] && [ "$nx" != ")" ] && ! _cmd_keyword; then word+=$c stack="g$stack"; else _cmd_end; stack="u$stack"; _cmd_arith; fi ;;
-          esac ;;
-        ')') _cmd_close ;;
-        '`') if [ -z "$bt" ]; then _cmd_push; bt=u; else _cmd_pop; if [ "$bt" = d ]; then q='"'; fi; bt=""; fi ;;
-        '#') if [ -z "$word" ] && [ "$have" = 0 ]; then d=${s:i}; d=${d%%$'\n'*}; i=$((i + ${#d})); else word+=$c; fi ;;
-        '<') _cmd_lt ;;
-        *) word+=$c ;;
-      esac
+      case $c in [[:alnum:]_./=:,+-]) word+=$c ;; *) _cmd_plain ;; esac
     fi
   done
   _cmd_end

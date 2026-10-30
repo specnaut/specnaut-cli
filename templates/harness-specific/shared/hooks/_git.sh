@@ -51,13 +51,16 @@ _git_alias() {
     case $GIT_SUB in
       merge | pull | push | checkout | switch | status | log | diff | show | add | commit | fetch | branch | tag | rebase | reset | config | rev-parse | stash) return 0 ;;
     esac
-    [[ $GIT_SUB =~ ^[A-Za-z0-9][A-Za-z0-9._-]*$ ]] || return 0
-    if val=$(guard_git -C "$GUARD_CWD" config --get "alias.$GIT_SUB" 2>/dev/null); then :; else
-      rc=$?
-      if [ "$rc" = 1 ]; then return 0; fi # not an alias: a builtin or an unknown command
-      GIT_SUB="!"
-      return 0
-    fi
+    # `[alias "<name>"]` takes any name; one outside these characters is not
+    # looked up, it is gated.
+    if ! [[ $GIT_SUB =~ ^[A-Za-z0-9][A-Za-z0-9._-]*$ ]]; then GIT_SUB="!"; return 0; fi
+    rc=0
+    _git_alias_get "$GIT_SUB" || rc=$?
+    case $rc in
+      0) ;;
+      1) return 0 ;; # in neither syntax: a builtin or an unknown command
+      *) GIT_SUB="!"; return 0 ;;
+    esac
     case $val in '!'* | -*) GIT_SUB="!"; return 0 ;; esac
     IFS=$' \t\n' read -r -a a <<<"$val"
     [ ${#a[@]} -gt 0 ] || return 0
@@ -66,4 +69,22 @@ _git_alias() {
     if [ "$level" = 5 ]; then GIT_SUB="!"; fi
   done
   return 0
+}
+
+# _git_alias_get <name> — val: what the alias expands to, in either syntax
+# git reads: `[alias] <name> = …` and `[alias "<name>"] command = …` (git
+# 2.54). Returns 1 when it is in neither, 2 when git could not answer (an
+# unreadable include) or it is in both: git runs the one defined last, and
+# `config --get` cannot say which that is — `[alias] pz = status` before
+# `[alias "pz"] command = push` runs the push.
+_git_alias_get() {
+  local plain old=0 sub=0
+  plain=$(guard_git -C "$GUARD_CWD" config --get "alias.$1" 2>/dev/null) || old=$?
+  val=$(guard_git -C "$GUARD_CWD" config --get "alias.$1.command" 2>/dev/null) || sub=$?
+  case $old:$sub in
+    1:1) return 1 ;;
+    0:1) val=$plain ;;
+    1:0) ;;
+    *) return 2 ;;
+  esac
 }
