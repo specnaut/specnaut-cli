@@ -65,6 +65,9 @@ Deno.test("upgrade refreshes only the managed block in a hand-edited config", as
     );
     const mine =
       `# my own header\napproval_policy = "on-request"\n\n${scaffolded}\n# my own footer\n`;
+    // A replace that matched nothing would leave no stale line to remove, and
+    // the "did not survive" assertion below would pass on a fresh block.
+    assertStringIncludes(mine, 'default_subagent_model = "gpt-5.6-terra"', "fixture is not stale");
     await Deno.writeTextFile(join(dir, CONFIG), mine);
 
     const up = await runSpecnaut(["upgrade", "--force"], dir);
@@ -138,6 +141,8 @@ Deno.test("upgrade rewrites an agent TOML an earlier release pinned to a model v
       /^description = .*$/m,
       (line) => `${line}\nmodel = "gpt-5.6-sol"`,
     );
+    // Same reason: the upgrade must be shown removing a pin that was there.
+    assert(/^model = "gpt-5\.6-sol"$/m.test(old), "fixture is not stale: no pinned model");
     await Deno.writeTextFile(join(dir, rel), old);
     const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(old));
     const sha = [...new Uint8Array(digest)].map((b) => b.toString(16).padStart(2, "0")).join("");
