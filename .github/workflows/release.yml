@@ -12,9 +12,8 @@ on:
 jobs:
   # Hybrid security gate (#188's sibling): checks GitHub-side alert state
   # before we let the release build proceed. Critical alerts block the
-  # release; high/medium surface as a workflow summary the local /release
-  # session reads during postflight (step 10 of the release skill) and triages
-  # in the Security tab. Low alerts are logged silently.
+  # release; high/medium surface as a workflow summary, triaged in the
+  # Security tab. Low alerts are logged silently.
   #
   # The release tag is already pushed at this point; failing here is the
   # safest possible failure mode — no GitHub Release object is created,

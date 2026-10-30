@@ -15,8 +15,7 @@ NAME="${1:?usage: smoke-features.sh <name>}"
 . "$(dirname "$0")/_common.sh"
 DIR="$(scenario_dir "$NAME")"
 
-# Trap-based cleanup: wipe the scenario directory on every exit path
-# (success OR failure) so the sandbox/ tree never accumulates orphans.
+# Wipe the scenario directory on every exit path, success or failure.
 trap 'bash "$SMOKE_DIR/clean.sh" "$NAME" >/dev/null 2>&1 || true' EXIT
 
 bash "$SMOKE_DIR/bootstrap-vite.sh" "$NAME" >/dev/null
