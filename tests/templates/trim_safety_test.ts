@@ -1,5 +1,6 @@
 import { assert } from "@std/assert";
 import { CORE_BUNDLE } from "../../src/templates_bundle.ts";
+import { CONTRACT_DOCS, ROUTABLE_PHASES } from "../../src/domain/addendum_audit.ts";
 
 /**
  * The sentences a trim may not remove.
@@ -133,10 +134,27 @@ for (const { label, body, sentences } of MUST_SURVIVE) {
   });
 }
 
-Deno.test("implement.md runs no command read from a contributor-writable file (spec 041)", () => {
-  const content = entry("phase", "task", "implement.md");
-  for (const shape of ["EXECUTE_COMMAND", "extensions.yml"]) {
-    assert(!content.includes(shape), `implement.md still carries ${shape}`);
+/**
+ * Spec 041 removed the extension hooks: a phase read a command out of
+ * `.specnaut/extensions.yml` — a file any contributor can edit — and ran it.
+ * The guard watched `implement.md` alone, so the same shape returning in any
+ * other phase passed (cli#709). It now reads everything `/task` ships: the
+ * router, every phase and contract doc, and the backlog docs it routes to.
+ */
+Deno.test("no /task doc runs a command read from a contributor-writable file (spec 041)", () => {
+  const docs = CORE_BUNDLE.filter((e) => e.name === "task");
+  const phases = docs.filter((e) => e.category === "phase").map((e) => e.suffix);
+  // Non-vacuity: every routable phase and contract doc of /task was scanned.
+  const expected = [...ROUTABLE_PHASES.task, ...CONTRACT_DOCS.map((c) => c.doc)]
+    .filter((doc) => doc !== "groom").map((doc) => `${doc}.md`);
+  for (const doc of expected) assert(phases.includes(doc), `phases/${doc} was not scanned`);
+  for (const doc of docs) {
+    for (const shape of ["EXECUTE_COMMAND", "extensions.yml"]) {
+      assert(
+        !doc.content.includes(shape),
+        `${doc.category}/task/${doc.suffix ?? "-"} carries ${shape}`,
+      );
+    }
   }
 });
 
