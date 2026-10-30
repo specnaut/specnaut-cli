@@ -302,7 +302,7 @@ reflected with no code change). `reconcile.sh` is the **poll/reconcile** feed:
 it asks `/activity` for every stage transition newer than a stored per-project
 cursor (`.specnaut/.cloud-cursor-<KEY>`), prints one line per transition, and
 advances the cursor — the product-owner consumes those lines and runs the
-matching stage hook (see `product-owner.md` → "Cloud stage reconcile").
+matching stage hook (see "Stage reconcile (poll model)" below).
 
 ### Prerequisites
 

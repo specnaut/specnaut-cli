@@ -20,7 +20,7 @@ type Effort = (typeof VALID_EFFORTS)[number];
 
 /**
  * Authoritative agent → effort assignment, mirroring the tier table in
- * `templates/core/agents/README.md`. 8 high · 2 xhigh = 10.
+ * `templates/core/agents/README.md`. 7 high · 2 xhigh = 9.
  */
 const EFFORT_MAP: Record<string, Effort> = {
   "accessibility-expert": "high",
@@ -92,7 +92,7 @@ Deno.test("the effort rubric covers exactly the bundled agent fleet", () => {
 
 /**
  * Authoritative agent → `model:` assignment, mirroring the model table in
- * `templates/core/agents/README.md`: 9 opus · 1 haiku = 10.
+ * `templates/core/agents/README.md`: 8 opus · 1 haiku = 9.
  *
  * The rule is "who checks the output?". A seat goes to `haiku` only when the
  * person who asked reads its whole output and nothing downstream treats it as

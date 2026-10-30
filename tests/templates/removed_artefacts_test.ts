@@ -45,7 +45,6 @@ const ALLOWED = new Map<string, string>([
   // contract doc since spec 041. The exemption travels with it unchanged.
   ["task|orphan-specs.md", "detects pre-2.0.0 spec dirs, which genuinely have one"],
   ["developer|", "tolerates a pre-2.0.0 dir without ever requiring it"],
-  ["product-owner|", "a spec the user attaches; never generated, never required"],
   ["specify|scripts/audit/collect-audit-scope.sh", "the audit phase's own design records"],
 ]);
 

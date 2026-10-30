@@ -1,14 +1,8 @@
-# Bundled agents — naming and effort
+# Bundled agents — naming, model and effort
 
-Two conventions govern this directory: what an agent is **called**, and how
-much reasoning budget it is **given**. Both are assigned by role class, so
-that adding an agent is a lookup rather than a judgement call.
+Each is assigned by role class, so adding an agent is a lookup rather than a judgement call.
 
 ## Naming — the suffix carries meaning
-
-An agent's suffix is not decoration. It tells you how the agent is reached
-and what it is allowed to do, and the fleet is meant to stay legible when
-someone reads a dispatch line without opening the agent file.
 
 | Suffix | Meaning | Agents |
 | ------ | ------- | ------ |
@@ -16,47 +10,23 @@ someone reads a dispatch line without opening the agent file.
 | `<domain>-reviewer` | A review lens with **no** audit axis — it only ever sees a diff | `code-reviewer` |
 | role noun | Does the work rather than judging it | `developer`, `product-owner` |
 
-Two rules follow, and they are the whole point of writing this down:
+- **`-expert` ⇔ an audit axis exists.** The five `-expert` agents are exactly the five axis flags of
+  `/task audit` (`--security`, `--perf`, `--a11y`, `--archi`, `--deps`). Give `code-reviewer` an
+  audit axis and **rename it to `-expert` in the same change**.
+- **Agents spell the domain out; flags may abbreviate.** A flag is typed by a human, where short
+  wins; an agent name is matched by a model against a request, where `accessibility` is a far
+  stronger signal than `a11y`.
 
-- **`-expert` ⇔ an audit axis exists.** The five `-expert` agents correspond
-  exactly to the five axis flags of `/task audit` (`--security`, `--perf`,
-  `--a11y`, `--archi`, `--deps`). If you give `code-reviewer` an audit
-  axis, **rename it to `-expert` in the same change** — otherwise the suffix stops predicting anything and the next
-  person picks one at random.
-- **Agents spell the domain out; flags may abbreviate.** The agent is
-  `accessibility-expert` while its flag is `--a11y`, and that asymmetry
-  is deliberate: a flag is *typed by a human* at a prompt, where short
-  wins, whereas an agent name is *matched semantically by a model* against a
-  request, where `a11y` is a far weaker signal than `accessibility`. Optimise
-  each for its own reader.
+`specnaut-guide` is the one exception: named after the tool, it answers questions about Specnaut and
+is **not** an `-expert` — there is no audit axis for Specnaut itself.
 
-`specnaut-guide` is the deliberate exception to the table — the only agent
-named after the tool itself. It answers questions about Specnaut rather than
-reviewing your code, so it carries neither a lens suffix nor a role noun. It
-is **not** an `-expert`: giving it that suffix would imply an audit axis for
-Specnaut itself, which does not and should not exist.
+## Model — who checks the output?
 
-## Model and effort — two budgets
-
-Every bundled agent declares `model:` and `effort:` in its frontmatter.
-`model` picks the capability tier; `effort` is a reasoning-budget hint the
-harness reads on dispatch: a higher tier thinks harder and costs more.
-
-### Model — who checks the output?
-
-**Opus is the default, and fourteen of the fifteen seats keep it.** A fleet
-that mixes tiers mostly produces a fleet where the cheap agents are the ones
-that miss things — the failure is silent, arrives as a clean report, and costs
-more to discover later than the tokens it saved.
-
-`haiku` is right for a seat when **the person who asked reads its whole output
-and is the check on it, and no downstream gate treats that output as
-complete.** It is wrong for any seat whose "nothing found" is trusted as
-"nothing there", and for any seat whose work is only sampled afterwards.
-
-The rule is about **whether a miss is visible**, not about how capable the
-model is. A stronger `haiku` makes a miss rarer, not easier to see, so a new
-release never widens the list on its own — re-run the test on the seat.
+**Opus is the default; eight of the nine seats keep it.** `haiku` is right only when **the person
+who asked reads the whole output and is the check on it, and no downstream gate treats that output
+as complete** — never for a seat whose "nothing found" is trusted as "nothing there". The test is
+whether a miss is visible, not how capable the model is, so a stronger `haiku` never widens the
+list on its own.
 
 | Model | Agents | Why |
 | ----- | ------ | --- |
@@ -65,72 +35,29 @@ release never widens the list on its own — re-run the test on the seat.
 | `opus` | `product-owner` | Grooming is judgement; its mechanical board moves share the seat. |
 | `opus` | `developer` | The builder — review samples its work, it does not re-derive it. |
 
-The same test applies per dispatch: a skill may pass `model: "haiku"` for a
-mechanical subtask the caller will check, never for a review lens.
+The same test applies per dispatch: a skill may pass `model: "haiku"` for a mechanical subtask the
+caller will check, never for a review lens.
 
-### Effort — the reasoning budget
+## Effort — the reasoning budget
 
 | Tier | Role class | Agents |
 | ---- | ---------- | ------ |
 | `high` | Everything else — agentic work, review lenses, the backlog owner, the explainer | `developer`, `accessibility-expert`, `dependency-expert`, `performance-expert`, `code-reviewer`, `product-owner`, `specnaut-guide` |
 | `xhigh` | The two lenses whose misses are unrecoverable | `architect-expert`, `security-expert` |
 
-Tally: 7 `high` · 2 `xhigh` = 9 agents. `low` and `medium` remain valid
-values for a project's own agents; **no bundled agent uses them.**
+Tally: 7 `high` · 2 `xhigh` = 9 agents. `low` and `medium` remain valid for a project's own agents;
+**no bundled agent uses them.** Effort is independent of the model tier.
 
-Effort is independent of the model tier: a `haiku` seat takes the same
-`effort:` scale, and `specnaut-guide` keeps `high` — its upgrade walk is a
-multi-step procedure, and the tier change already pays for the saving.
+**`high` is the floor** because an under-provisioned lens fails quietly: a well-formatted report
+with fewer findings is indistinguishable from clean code. **`xhigh` marks an unrecoverable miss, not
+hard work**: `developer`'s shallow pass meets tests, review and a human; nothing checks
+`security-expert` or `architect-expert`, whose misses ship or become load-bearing. Both are
+`disable-model-invocation: true`, which bounds what the tier costs.
 
-### Why `high` is the floor
+## How the two axes reach other harnesses
 
-The earlier rubric put review lenses at `medium` and orchestrators at `low`,
-reasoning that a dispatcher does not think and a read-only pass needs less
-depth than writing code. Both halves turned out to be wrong in the same way.
-
-- **A review lens under-provisioned fails quietly.** It returns a
-  well-formatted report with fewer findings, which is indistinguishable from
-  clean code. There is no error, no retry, and nothing downstream notices —
-  the saving is visible and the cost is not.
-- **An orchestrator does reason.** Whatever sequences a delivery judges
-  when a phase is actually done. It is not a switch statement.
-
-The compound-cost worry behind the old `low` tier is real — an orchestrator
-pays its own budget plus every child's — but it is an argument for fanning
-out fewer lenses, not for the one agent choosing them thinking less.
-
-### Why only `architect-expert` and `security-expert` go further
-
-The tier is not a ranking of importance, and it is not "who does the hardest
-work" — by that measure `developer` would top the list. It asks one question:
-**when this agent thinks too little, what catches it?**
-
-For `developer`, something does. A shallow
-coding pass meets a test suite, a review gate, and a human reading the diff.
-The work is verified downstream by construction, so extra budget buys a better
-first draft of something that was going to be checked anyway.
-
-Nothing checks the checker. When `security-expert` thinks too little it
-returns a clean report, and a clean report is indistinguishable from clean
-code — the miss ships, and it is discovered by whoever finds the
-vulnerability first. When `architect-expert` misses a layering violation, the
-violation is load-bearing by the time anyone notices. These two also need to
-hold a whole-system model in mind rather than pattern-match a diff, which is
-what the extra budget actually buys.
-
-So `xhigh` marks *unrecoverable misses*, not *hard work*. Both seats are
-`disable-model-invocation: true` and fire only from a review or audit phase,
-which also bounds what the tier costs.
-
-### How the two axes reach other harnesses
-
-`model:` and `effort:` are Claude's vocabulary, but `model:` names a family
-(`opus`, `sonnet`, `haiku`), never a version: it always resolves to the
-current model of that family. **Specnaut names no model version anywhere**,
-because a versioned id is obsolete within weeks of being written.
-
-The families correspond across harnesses — the only model names Specnaut
-writes:
+`model:` names a family, never a version — **Specnaut names no model version anywhere**. The
+families correspond across harnesses:
 
 | Claude Code | Codex |
 | ----------- | ----- |
@@ -139,41 +66,22 @@ writes:
 | Opus | Sol |
 | Fable | Astra |
 
-Codex accepts only versioned ids, so an agent file Specnaut writes for Codex
-carries no `model` key and runs on the session's model; a comment names the family it
-was written for. The budget crosses verbatim (`src/domain/codex_models.ts`):
+Codex accepts only versioned ids, so a Codex agent file carries no `model` key and runs on the
+session's model, with a comment naming the family (`src/domain/codex_models.ts`):
 
 | Specnaut | Codex |
 | -------- | ----- |
 | `model: opus` / `sonnet` / `haiku` | `# Model family: Sol` / `Terra` / `Luna` (comment) |
 | `effort: low` / `medium` / `high` / `xhigh` | `model_reasoning_effort`, verbatim |
 
-Specnaut's effort vocabulary is a strict subset of Codex's
-(`ultra`, `max`, `xhigh`, `high`, `medium`, `low`), so that half is identity.
-`ultra` and `max` are never emitted — a subagent is already the unit `ultra`
-fans out over. An unrecognised value omits the key rather than guessing.
+`ultra` and `max` are never emitted; an unrecognised value omits the key rather than guessing.
+**Antigravity** maps both capable tiers to `pro` and `haiku` to `flash`, and drops `effort:`
+(`src/domain/antigravity_models.ts`). **OpenCode** omits both axes — its `model` is a
+provider/model pair, the user's choice. **Cursor and Copilot** have no subagents: agents reach them
+as skills and instruction files, and neither axis applies.
 
-On **Antigravity** the vocabulary is `inherit | flash | pro`, so the two
-capable tiers collapse onto `pro` and `haiku` maps to `flash`
-(`src/domain/antigravity_models.ts`). Antigravity has no reasoning-effort
-knob, so `effort:` is dropped there rather than approximated.
+## Adding an agent
 
-On **OpenCode** both axes are deliberately omitted. Its `model` field takes a
-`provider/model-id` pair, and OpenCode is provider-agnostic — emitting
-`anthropic/…` would pin every agent to one vendor's account, which is the
-user's choice and not Specnaut's. Reasoning options pass straight through to
-the provider there, so a value valid for one errors on another. Omitting both
-means each agent runs on whatever the user configured: the correct answer,
-not a missing feature.
-
-**Cursor and Copilot have no subagent concept at all.** Agents reach them
-as skills and instruction files respectively — the
-content survives, the dispatch boundary does not. Neither axis applies.
-
-### Adding an agent
-
-Pick the suffix from the naming table, then the tier from the effort table.
-Default to `high`. Reach for `xhigh` only when the agent's output is the last
-line of defence — when nothing downstream would catch it thinking too little.
-Doing hard work is not the test; being unchecked is. Then pick the model
-with the question above — who checks the output? — and default to `opus`.
+Pick the suffix from the naming table, the model by who checks the output (default `opus`), and the
+effort tier (default `high`; `xhigh` only when nothing downstream would catch the agent thinking too
+little).
