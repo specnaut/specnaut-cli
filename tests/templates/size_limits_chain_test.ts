@@ -35,7 +35,11 @@ Deno.test("implement: extraction comes first, the rule that left the tasks phase
   const limits = await read("templates/core/specnaut/memory/size-limits.md");
   const at = limits.indexOf("**implement** —");
   assert(at >= 0, "size-limits.md has no implement rule");
-  const rule = limits.slice(at, limits.indexOf("**review** —", at)).replace(/\s+/g, " ");
+  // The end marker is asserted too (cli#709): missing, indexOf is -1 and the slice silently
+  // drops the last character instead of ending at the next rule.
+  const end = limits.indexOf("**review** —", at);
+  assert(end > at, "size-limits.md has no review rule after implement — the slice has no end");
+  const rule = limits.slice(at, end).replace(/\s+/g, " ");
   assert(rule.includes("extraction task"), "the extraction comes first");
   assert(rule.includes("comes only after that file's extraction"), "an addition waits for it");
 });

@@ -303,9 +303,40 @@ Deno.test("no successor is itself retired — a user is sent straight to a live 
   // chain. Read the second column generically, so the next retirement cannot recreate one.
   const retired = new Set(retiredAddresses().map((r) => r.address));
   const successors = retiredSection().split("\n")
-    .map((line) => line.match(/^\| `[^`]+`[^|]*\| `([^`]+)`/)?.[1])
-    .filter((s): s is string => s !== undefined);
+    .filter((line) => line.startsWith("| `"))
+    .flatMap((line) => successorAddresses(line.split("|")[2] ?? ""));
   assert(successors.length >= 10, `read only ${successors.length} successors from the table`);
   const chained = successors.filter((s) => retired.has(s));
   assertEquals(chained, [], "a retired address points at another retired address");
+});
+
+/**
+ * Every address a successor cell names, as skill + verb (cli#709). A cell can
+ * name several (`/task` (`list`, `next`, …)) and carry arguments
+ * (`/task audit --security`, `/task plan <feature>`); reading only the first
+ * token, exactly, let a retired verb hide behind either. A bare verb token
+ * belongs to the last skill named before it; an argument is dropped.
+ */
+function successorAddresses(cell: string): string[] {
+  const out: string[] = [];
+  let skill: string | null = null;
+  for (const [, token] of cell.matchAll(/`([^`]+)`/g)) {
+    const [head, next] = token.trim().split(/\s+/);
+    const isVerb = (w: string | undefined) => w !== undefined && /^[a-z][a-z-]*$/.test(w);
+    if (head.startsWith("/")) {
+      skill = head;
+      out.push(isVerb(next) ? `${head} ${next}` : head);
+    } else if (skill !== null && isVerb(head)) out.push(`${skill} ${head}`);
+  }
+  return out;
+}
+
+Deno.test("a successor cell yields every address it names, as skill + verb", () => {
+  assertEquals(successorAddresses(" `/task plan <feature>`, step 1 "), ["/task plan"]);
+  assertEquals(successorAddresses(" `/task audit --security` "), ["/task audit"]);
+  assertEquals(successorAddresses(" `/task` (`list`, `--deps`, `next`) "), [
+    "/task",
+    "/task list",
+    "/task next",
+  ]);
 });
