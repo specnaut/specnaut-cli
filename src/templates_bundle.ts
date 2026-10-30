@@ -24359,24 +24359,35 @@ default_branch_base() {
 }
 
 # --- walk the changed files ---------------------------------------------------
+# \`:0:\` is the index entry; a bare \`:\` would read a name like \`1:x\` as stage 1.
 if [ -n "\$SINCE" ]; then
   base="\$SINCE" head_prefix="HEAD:" diff_args=("\$SINCE" HEAD) scope="changed since \$SINCE"
 elif git rev-parse --verify -q HEAD >/dev/null; then
   base="\$(default_branch_base || git rev-parse HEAD)"
-  head_prefix=":" diff_args=(--cached "\$base") scope="staged"
+  head_prefix=":0:" diff_args=(--cached "\$base") scope="staged"
 else
-  base="" head_prefix=":" diff_args=(--cached) scope="staged"
+  base="" head_prefix=":0:" diff_args=(--cached) scope="staged"
 fi
+
+# The change list, NUL-delimited: \`<status>\\0<path>\\0\`, or
+# \`<status>\\0<old>\\0<new>\\0\` for a rename or copy. Without \`-z\` git C-quotes a
+# name holding a non-ASCII byte, \`"\`, \`\\\`, a tab or a newline, and the quoted
+# string names no blob — the file measured \`0 → 0\` and passed at any size
+# (cli#705). Every path below is the byte-exact name git stores.
+changes() {
+  git diff -z "\${diff_args[@]}" --name-status -M --diff-filter=ACMR
+}
 
 checked=0
 constitution_over=0
 violations=()
 notes=()
-while IFS=\$'\\t' read -r status first second; do
+while IFS= read -r -d '' status; do
   [ -n "\$status" ] || continue
+  IFS= read -r -d '' old || break
   case "\$status" in
-    R* | C*) old="\$first" path="\$second" ;;
-    *) old="\$first" path="\$first" ;;
+    R* | C*) IFS= read -r -d '' path || break ;;
+    *) path="\$old" ;;
   esac
   if [ "\$path" = "\$CONSTITUTION" ]; then
     t="\$c_target" c="\$c_ceiling" label=" (unit constitution, source: \$c_source)"
@@ -24384,7 +24395,8 @@ while IFS=\$'\\t' read -r status first second; do
     is_exempt "\$path" && continue
     t="\$target" c="\$ceiling" label=""
   fi
-  numstat="\$(git diff "\${diff_args[@]}" --numstat -- "\$path" | head -n 1)"
+  # A literal pathspec: as a glob, \`*.ts\` also matches whichever file sorts first.
+  numstat="\$(git --literal-pathspecs diff "\${diff_args[@]}" --numstat -- "\$path" | head -n 1)"
   case "\$numstat" in -\$'\\t'-*) continue ;; esac
 
   if [ -n "\$base" ]; then before="\$(count_at "\$base:\$old")"; else before=0; fi
@@ -24411,7 +24423,7 @@ while IFS=\$'\\t' read -r status first second; do
     violations+=("\$line — \$verdict")
     [ "\$path" = "\$CONSTITUTION" ] && constitution_over=1
   fi
-done < <(git diff "\${diff_args[@]}" --name-status -M --diff-filter=ACMR)
+done < <(changes)
 
 for n in \${notes[@]+"\${notes[@]}"}; do echo "  note: \$n"; done
 
