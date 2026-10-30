@@ -29,13 +29,56 @@
 # reads as a word the shell rewrites (_listed.sh). CMD_MOVED=1 when
 # the line may act on another repository: cd/pushd, env -C, a GIT_DIR/
 # GIT_WORK_TREE/GIT_CONFIG* assignment (and, through _git.sh's cmd_git,
-# git -C/--git-dir/--work-tree and -c alias.*).
+# git -C/--git-dir/--work-tree and -c alias.*). CMD_SCRUB=1 when it sets or
+# clears what the landing scripts' hold reads (_cmd_env).
 CMD_SEP=$'\x1f'
 # shellcheck source=_simple.sh
 . "${BASH_SOURCE[0]%/*}/_simple.sh" || guard_fail "_simple.sh is missing beside _command.sh"
 CMD_SEGS=()
 CMD_MOVED=0
 CMD_OPAQUE=0
+CMD_SCRUB=0
+
+# _cmd_env <VAR=val | VAR+=val | VAR> — what an assignment, an export or an
+# unset does to what runs: moving the repository sets CMD_MOVED; naming a
+# script a shell reads at start (BASH_ENV, ENV) runs it; and setting or
+# clearing what the landing scripts' hold reads — the session id each harness
+# exports, the state dir its stamp is under — would send merge-hold.sh to
+# another stamp, or to none (spec 048 § 8 F2): CMD_SCRUB, which guard-merge
+# gates. Not CMD_OPAQUE: the line reads fine, and only the landing hold cares
+# — the hooks read their approvals in their own environment. HOME is too common.
+_cmd_env() {
+  local n=${1%%=*}
+  case ${n%+} in
+    GIT_DIR | GIT_WORK_TREE | GIT_COMMON_DIR | GIT_INDEX_FILE | GIT_CONFIG*) CMD_MOVED=1 ;;
+    BASH_ENV | ENV) _cmd_script "${1#*=}" ;;
+    CLAUDE_CODE_SESSION_ID | CODEX_SESSION_ID | XDG_STATE_HOME) CMD_SCRUB=1 ;;
+  esac
+}
+
+# _cmd_env_opts <index of env> — env's options, up to k (_simple.sh's
+# _cmd_wrapper has read them): emptying the environment (-i, a lone `-`,
+# --ignore-environment) clears the hold's session id too: CMD_SCRUB;
+# each -u/--unset NAME goes through _cmd_env. Only 0 and v take no value, so
+# a cluster is read up to its first other letter: `-vi` empties, `-uXi`
+# unsets `Xi`.
+_cmd_env_opts() {
+  local j x
+  for ((j = $1 + 1; j < k && j < m; j++)); do
+    x=${v[j]}
+    case $x in
+      - | --ignore-environment) CMD_SCRUB=1 ;;
+      --unset=*) _cmd_env "${x#*=}" ;;
+      --unset) j=$((j + 1)); _cmd_env "${v[j]:-}" ;;
+      --*) ;;
+      -*)
+        if [[ $x =~ ^-[0v]*i ]]; then CMD_SCRUB=1
+        elif [[ $x =~ ^-[0v]*u(.*)$ ]]; then
+          if [ -n "${BASH_REMATCH[1]}" ]; then _cmd_env "${BASH_REMATCH[1]}"; else j=$((j + 1)); _cmd_env "${v[j]:-}"; fi
+        fi ;;
+    esac
+  done
+}
 
 # _cmd_cmdpos — the word being read stands where a command word does:
 # unquoted, with nothing before it in the segment but the reserved words that

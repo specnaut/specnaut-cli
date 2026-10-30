@@ -195,6 +195,21 @@ for s in land-feature fold-fixups epic-status remove-spec; do
 done
 check "close-shipped.sh scaffolded + executable (spec 042)" \
   '[ -x .specnaut/scripts/backlog/close-shipped.sh ]'
+# Spec 048 — the landing scripts hold `merge: manual` themselves: merge-hold.sh
+# asks the hooks' reader, merge-approved.sh, for this session's `merge` stamp.
+# Run on a copy of the scaffold set to manual, its stamps kept in the tree.
+HOLD="$DIR/hold-probe"
+mkdir -p "$HOLD" && cp -R .specnaut "$HOLD/" && echo "merge: manual" >"$HOLD/.specnaut/workflow.yml"
+hold() { (cd "$HOLD" && XDG_STATE_HOME="$HOLD/state" CLAUDE_CODE_SESSION_ID=s1 bash .specnaut/scripts/bash/merge-hold.sh); }
+check "merge-hold.sh scaffolded + executable; outside a hooked session it lets the landing run (spec 048)" \
+  '[ -x .specnaut/scripts/bash/merge-hold.sh ] && [ -x .specnaut/hooks/merge-approved.sh ] &&
+   [ "$(env -u CLAUDE_CODE_SESSION_ID -u CODEX_SESSION_ID bash "$HOLD/.specnaut/scripts/bash/merge-hold.sh")" = "merge-hold: run" ]'
+check "under manual, a session the user did not approve is held: exit 13, and the line names merge (spec 048)" \
+  'err=$(hold 2>&1 >/dev/null); [ $? = 13 ] && grep -qF "reply \`merge\`" <<<"$err"'
+check "the user's merge, stamped by approve-on-prompt.sh, releases it (spec 048)" \
+  'jq -cn --arg cwd "$HOLD" "{session_id: \"s1\", cwd: \$cwd, permission_mode: \"default\", hook_event_name: \"UserPromptSubmit\", prompt: \"merge\"}" |
+     (cd "$HOLD" && XDG_STATE_HOME="$HOLD/state" bash .specnaut/hooks/approve-on-prompt.sh claude) &&
+   [ "$(hold 2>/dev/null)" = "merge-hold: run" ]'
 check "merge.md lands through land-feature.sh, not inline git (spec 042)" \
   'grep -qF "bash .specnaut/scripts/bash/land-feature.sh" .claude/skills/task/phases/merge.md &&
    ! grep -qE "git merge --ff-only|git branch -d" .claude/skills/task/phases/merge.md'

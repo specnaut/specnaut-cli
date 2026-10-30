@@ -18,9 +18,11 @@
 #                    That reply covers the merge, the push and the close.
 #                    Choose this when a human must read every change before
 #                    it lands. A hook enforces it: every merge into, or push
-#                    of, the base branch is held — Claude Code shows its
-#                    permission prompt, Codex refuses — until your own prompt
-#                    in that turn says `merge` or `/task merge`.
+#                    of, the base branch is refused until your own prompt in
+#                    that turn says `merge` or `/task merge` — after which
+#                    Claude Code still shows its permission prompt once. The
+#                    landing scripts hold themselves the same way, however
+#                    they are run.
 #
 # A single run can make the chain stricter: `/task … --manual-merge`, or
 # "stop before merging" in the request, means manual for that run. It cannot

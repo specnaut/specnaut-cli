@@ -19,14 +19,21 @@
 #                        themselves (land-feature.sh, remove-spec.sh), matched
 #                        by basename however they are reached, and gh pr
 #                        merge, glab mr merge (_listed.sh)
-# An unknown base gates every form. A gated command goes through
-# approval_gate: Claude's own prompt where it can ask, else this turn's
-# `merge` approval (FR-017).
+#   a line that sets or clears what the landing hold below reads — the
+#                        session id, XDG_STATE_HOME, env -i (CMD_SCRUB)
+# An unknown base gates every form. Every gated reason goes through one arm,
+# approval_require (spec 048 § 8): denied unless this turn's prompt approved
+# `merge`, in Claude's ask modes too — a click on a permission prompt is not
+# the user's word — and, with that approval, Claude's own prompt once where it
+# can ask (FR-017). One arm, so a denied model has no laxer spelling to try.
 #
-# The limit: it reads the command line, not what a program does. A listed
-# script copied or renamed, a task-runner alias for it, or an interpreter
-# that runs it gets past — the same limit a hand-written script that runs
-# `git push` already has.
+# The limit: it reads the command line, not what a program does — what it
+# reads is what cmd_git and _command.sh read, and what they cannot read with
+# certainty is gated (CMD_OPAQUE). Past the parser, land-feature.sh and
+# remove-spec.sh hold themselves: they run merge-hold.sh, which under manual
+# exits 13 without the same approval (read by merge-approved.sh), whatever
+# the spelling that reached them. A hand-written script that lands by itself,
+# or a merge through `gh api`, gets past both.
 #
 # Usage: guard-merge.sh <claude|codex>   (payload on stdin)
 case ${BASH_SOURCE[0]} in */*) HOOK_DIR=${BASH_SOURCE[0]%/*} ;; *) HOOK_DIR=. ;; esac
@@ -63,6 +70,7 @@ for seg in ${CMD_SEGS[@]+"${CMD_SEGS[@]}"}; do
   if [ -n "$HIT" ]; then reasons+=("$HIT"); fi
 done
 if [ "$CMD_OPAQUE" = 1 ]; then reasons+=("a command it cannot read (eval, sh -c in sh -c, a shell fed on stdin, a quote or heredoc left open)"); fi
+if [ "$CMD_SCRUB" = 1 ]; then reasons+=("a command that sets or clears what the landing scripts' hold reads (CLAUDE_CODE_SESSION_ID, CODEX_SESSION_ID, XDG_STATE_HOME, env -i)"); fi
 if [ "$merges" = 0 ] && [ ${#pushes[@]} = 0 ] && [ ${#reasons[@]} = 0 ]; then guard_allow; fi
 
 guard_root
@@ -128,6 +136,6 @@ for p in ${pushes[@]+"${pushes[@]}"}; do
 done
 [ ${#reasons[@]} -gt 0 ] || guard_allow
 
-approval_gate merge \
+approval_require merge \
   "merge: manual — $(IFS=';'; echo "${reasons[*]}") would land on the base branch (${base:-unknown}) without the user" \
-  "\`merge\` (or \`/task merge\`)"
+  "To let it through, reply \`merge\` (or \`/task merge\`) — a plain \"yes\" does not approve it."

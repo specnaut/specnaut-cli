@@ -1,25 +1,22 @@
-import { assertEquals, assertStringIncludes } from "@std/assert";
-import { join } from "@std/path";
+import { assertEquals } from "@std/assert";
 import {
-  approve,
   git,
   HARNESSES,
   makeRepo,
-  payload,
   pool,
   type RepoOptions,
-  runHook,
   type Sandbox,
   sandbox,
-  stampDir,
 } from "./hook_sandbox.ts";
-import { bash, GATED, type Verdict, verdict } from "./guard_merge_fixture.ts";
+import { bash, GATED, verdict } from "./guard_merge_fixture.ts";
 
 /**
  * US1 / FR-001, FR-016, FR-017, D3 — under `merge: manual`, nothing lands on
  * the base branch without the user. One case per landing form, each run on
- * Claude (default mode → native "ask") and on Codex (deny unless this turn's
- * prompt approved it). SC-002: a stamp from a previous turn does not count.
+ * Claude and on Codex: denied unless this turn's prompt approved it (spec 048
+ * § 8 — Claude's own ask comes only after that). SC-002: a stamp from a
+ * previous turn does not count — how a gated landing resolves is
+ * guard_merge_approval_test.ts.
  */
 
 /** [repo shape, command, gated?] — repo shapes are built once per test. */
@@ -171,131 +168,6 @@ Deno.test("guard-merge: every landing form, on Claude and on Codex", async () =>
       ];
     });
     assertEquals(wrong, [], wrong.join("\n"));
-  } finally {
-    await sb.cleanup();
-  }
-});
-
-Deno.test("guard-merge: the refusal names the base and the word to type", async () => {
-  const sb = await sandbox();
-  try {
-    const repo = await makeRepo(sb, { head: "feat" });
-    const r = await bash(sb, "codex", repo, "git push origin main");
-    assertEquals(r.code, 2);
-    assertStringIncludes(r.stderr, "main");
-    assertStringIncludes(r.stderr, "`merge`");
-    const ask = await bash(sb, "claude", repo, "git push origin main");
-    assertStringIncludes(
-      JSON.parse(ask.stdout).hookSpecificOutput.permissionDecisionReason,
-      "merge: manual",
-    );
-  } finally {
-    await sb.cleanup();
-  }
-});
-
-Deno.test("guard-merge: Claude asks only in default, acceptEdits and plan (FR-017)", async () => {
-  const sb = await sandbox();
-  try {
-    const repo = await makeRepo(sb, { head: "feat" });
-    const cases: Array<[string, Verdict]> = [
-      ["default", "ask"],
-      ["acceptEdits", "ask"],
-      ["plan", "ask"],
-      ["bypassPermissions", "deny"],
-      ["auto", "deny"],
-      ["dontAsk", "deny"],
-      ["", "deny"],
-    ];
-    for (const [mode, want] of cases) {
-      const r = await bash(sb, "claude", repo, "git push origin main", { permission_mode: mode });
-      assertEquals(verdict(r), want, `permission_mode ${JSON.stringify(mode)}: ${r.stderr}`);
-    }
-    // In a mode that cannot ask, the user's own word this turn lets it through.
-    await approve(sb, "claude", repo, "merge");
-    const r = await bash(sb, "claude", repo, "git push origin main", {
-      permission_mode: "bypassPermissions",
-    });
-    assertEquals(verdict(r), "allow", r.stderr);
-  } finally {
-    await sb.cleanup();
-  }
-});
-
-async function writeStamp(sb: Sandbox, repo: string, session: string, stamp: unknown) {
-  const dir = await stampDir(sb, repo);
-  await Deno.mkdir(dir, { recursive: true });
-  await Deno.writeTextFile(join(dir, session), JSON.stringify(stamp));
-}
-
-Deno.test("guard-merge on Codex: only this turn's merge approval lets a landing through (SC-002)", async () => {
-  const sb = await sandbox();
-  try {
-    const repo = await makeRepo(sb, { head: "feat" });
-    const p = await payload("codex", "pre_tool_use_bash");
-    const session = p.session_id as string;
-    const turn = p.turn_id as string;
-    const push = (extra: Record<string, unknown> = {}) =>
-      bash(sb, "codex", repo, "git push origin main", extra);
-
-    await approve(sb, "codex", repo, "merge");
-    assertEquals(verdict(await push()), "allow", "approved this turn");
-    // Covers every gated command of its kind in that turn (merge.md merges, then pushes).
-    assertEquals(
-      verdict(await bash(sb, "codex", repo, "git checkout main && git merge --ff-only feat")),
-      "allow",
-    );
-
-    assertEquals(
-      verdict(await push({ turn_id: "019a2b3c-ffff-7000-8000-000000000001" })),
-      "deny",
-      "a stamp from a previous turn",
-    );
-
-    await approve(sb, "codex", repo, "release it");
-    assertEquals(verdict(await push()), "deny", "a stamp of the wrong kind");
-
-    // Control: a well-formed forgery where the guard looks is read, so each one
-    // below fails on its content, never on its location.
-    await writeStamp(sb, repo, session, { session_id: session, turn_id: turn, kind: "merge" });
-    assertEquals(verdict(await push()), "allow", "a stamp writeStamp put where the guard reads");
-    await writeStamp(sb, repo, session, { session_id: session, turn_id: "", kind: "merge" });
-    assertEquals(verdict(await push({ turn_id: "" })), "deny", "empty turn ids on both sides");
-
-    await writeStamp(sb, repo, session, { session_id: "", turn_id: turn, kind: "merge" });
-    assertEquals(verdict(await push()), "deny", "an empty session id in the stamp");
-
-    await writeStamp(sb, repo, session, "not an object");
-    assertEquals(verdict(await push()), "deny", "an unreadable stamp");
-
-    await approve(sb, "codex", repo, "merge");
-    await runHook(
-      sb,
-      "approve-on-prompt.sh",
-      "codex",
-      await payload("codex", "stop", { cwd: repo }),
-    );
-    assertEquals(verdict(await push()), "deny", "Stop ended the turn");
-  } finally {
-    await sb.cleanup();
-  }
-});
-
-Deno.test("guard-merge on Claude bypass: empty ids on both sides never match", async () => {
-  const sb = await sandbox();
-  try {
-    const repo = await makeRepo(sb, { head: "feat" });
-    const session = (await payload("claude", "pre_tool_use_bash")).session_id as string;
-    await writeStamp(sb, repo, session, { session_id: "", turn_id: "", kind: "merge" });
-    const r = await bash(sb, "claude", repo, "git push origin main", {
-      permission_mode: "bypassPermissions",
-    });
-    assertEquals(verdict(r), "deny");
-    const noSession = await bash(sb, "claude", repo, "git push origin main", {
-      permission_mode: "bypassPermissions",
-      session_id: "",
-    });
-    assertEquals(verdict(noSession), "deny");
   } finally {
     await sb.cleanup();
   }

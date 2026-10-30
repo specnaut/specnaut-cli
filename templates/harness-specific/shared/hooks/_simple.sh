@@ -23,15 +23,6 @@
 _CMD_RE_REDIR='^[0-9]*(>>|>&|<&|<>|>[|]|<<<|>|<)(.*)$'
 _CMD_RE_AMP='^&>>?(.*)$'
 
-# _cmd_env <VAR=val> — an assignment that moves the repository, or names a
-# script a shell reads at start (BASH_ENV, ENV): that script runs.
-_cmd_env() {
-  case ${1%%=*} in
-    GIT_DIR | GIT_WORK_TREE | GIT_COMMON_DIR | GIT_INDEX_FILE | GIT_CONFIG*) CMD_MOVED=1 ;;
-    BASH_ENV | ENV) _cmd_script "${1#*=}" ;;
-  esac
-}
-
 # _cmd_opaque — a form this parser cannot read with certainty: the guard gates
 # the line (plan § 4, unknown means opaque). k=m: nothing of it is recorded.
 _cmd_opaque() { CMD_OPAQUE=1 k=$m; }
@@ -56,14 +47,15 @@ _cmd_strip_redirs() {
   m=${#v[@]}
 }
 
-# _cmd_skip_prefixes — k: past VAR=val assignments, reserved words, the
+# _cmd_skip_prefixes — k: past VAR=val (and VAR+=val) assignments, read by
+# _cmd_env (_command.sh), reserved words, the
 # prefix words that run what follows (coproc, nocorrect, repeat N, function
 # NAME), and the wrappers that run their argument (env, sudo, nice, exec, …).
 _cmd_skip_prefixes() {
   local x
   while [ "$k" -lt "$m" ]; do
     x=${v[k]}
-    if [[ $x =~ ^[A-Za-z_][A-Za-z0-9_]*= ]]; then _cmd_env "$x"; k=$((k + 1)); continue; fi
+    if [[ $x =~ ^[A-Za-z_][A-Za-z0-9_]*[+]?= ]]; then _cmd_env "$x"; k=$((k + 1)); continue; fi
     case $x in
       '{' | '}' | '!' | if | then | else | elif | do | while | until | noglob | nocorrect) k=$((k + 1)) ;;
       coproc) k=$((k + 1)); if [ "${v[k + 1]:-}" = '{' ]; then k=$((k + 1)); fi ;; # coproc NAME { …; }
@@ -119,7 +111,7 @@ _cmd_wrapper() {
     time) _cmd_getopt plavq of "--portability --verbose --append --quiet" "--output --format" ;;
     nice) _cmd_getopt 0123456789 n "" --adjustment ;;
     env) # -S/--split-string is a command line of its own: unknown, so opaque
-      _cmd_getopt i0v uCPLU "--ignore-environment --null --debug -" "--unset --chdir"
+      _cmd_getopt i0v uCPLU "--ignore-environment --null --debug -" "--unset --chdir"; _cmd_env_opts "$k0"
       while [ "$k" -lt "$m" ] && [[ ${v[k]} == *=* ]]; do _cmd_env "${v[k]}"; k=$((k + 1)); done ;;
     sudo | doas)
       _cmd_getopt ABbEHKknPSVvsil ugpCDhrtUTR \
@@ -286,7 +278,7 @@ _cmd_emit() {
     eval) CMD_OPAQUE=1 ;;
     trap) _cmd_trap ;;
     mapfile | readarray) for ((j = k + 1; j < m; j++)); do case ${v[j]} in -*C*) CMD_OPAQUE=1 ;; esac; done ;; # -C: a callback
-    export | declare | typeset | local | readonly) for x in "${v[@]:k}"; do _cmd_env "$x"; done ;;
+    export | declare | typeset | local | readonly | unset) for x in "${v[@]:k}"; do _cmd_env "$x"; done ;;
     sh | bash | zsh | dash | ksh) _cmd_shell_c "$2"; [ "$k" -lt "$m" ] || return 0 ;;
     -c | --command) _cmd_shell_c "$2" 1; [ "$k" -lt "$m" ] || return 0 ;;
     # no operand left: it was a stripped `<(…)` (or a here-string) — the shell's own input

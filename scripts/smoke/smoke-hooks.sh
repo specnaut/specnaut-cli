@@ -39,7 +39,7 @@ check "cockpit mod enabled" \
 for hook in .specnaut/hooks/protect-generated.sh .specnaut/hooks/log-subagent.sh \
   .specnaut/hooks/guard-merge.sh .specnaut/hooks/guard-release.sh \
   .specnaut/hooks/guard-dispatch-model.sh .specnaut/hooks/approve-on-prompt.sh \
-  .specnaut/hooks/protect-constitution.sh; do
+  .specnaut/hooks/protect-constitution.sh .specnaut/hooks/merge-approved.sh; do
   check "$hook executable" "[ -x $hook ]"
 done
 for support in .specnaut/hooks/_guard.sh .specnaut/hooks/_approval.sh \

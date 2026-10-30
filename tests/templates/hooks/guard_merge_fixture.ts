@@ -8,7 +8,7 @@ import { type Harness, payload, type Run, runHook, type Sandbox } from "./hook_s
 export type Verdict = "allow" | "ask" | "deny";
 
 /**
- * What only guard-merge's deny path prints: approval_gate's refusal, naming
+ * What only guard-merge's deny path prints: approval_require's refusal, naming
  * the base and the word to type. Every crash exits 2 too — the ERR trap, a bad
  * payload, a missing list — so an exit code alone would read a crash as a
  * deny, and a test of a deny would pass on a guard that never reached its rule
@@ -43,5 +43,10 @@ export async function bash(
   return runHook(sb, "guard-merge.sh", harness, p);
 }
 
-/** What a gated command yields when nothing approved it. */
-export const GATED: Record<Harness, Verdict> = { claude: "ask", codex: "deny" };
+/**
+ * What a gated command yields when nothing approved it: denied on both
+ * harnesses, Claude's ask modes included — one arm, approval_require, for
+ * every landing (spec 048 § 8), so a click on a permission prompt never lands
+ * what the user's own prompt did not approve.
+ */
+export const GATED: Record<Harness, Verdict> = { claude: "deny", codex: "deny" };

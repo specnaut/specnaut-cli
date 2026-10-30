@@ -118,7 +118,7 @@ const ALLOWED_FORMS: readonly string[] = [
   "nice ls",
   "nice -n 5 ls",
   "env FOO=1 ls",
-  "env -i -u HOME ls",
+  "env -u HOME ls", // with -i it empties what the landing hold reads: guard_merge_hold_env_test.ts
   "/usr/bin/env ls",
   "/usr/bin/time -p ls",
   "sudo -u root ls",

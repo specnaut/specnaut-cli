@@ -33,6 +33,7 @@ const WINDOWS = Deno.build.os === "windows";
  * on a guard that never reached its rule (cli#711).
  */
 const REFUSALS: readonly RegExp[] = [
+  /^specnaut guard-merge: merge: manual — .+ would land on the base branch .+ To let it through, reply /,
   /^specnaut guard-release: .+ publishes a release, .+ To let it through, reply /,
   /^specnaut protect-generated: denied: .+ is \.specnaut\/installed\.lock\. /,
   /^specnaut guard-dispatch-model: '[^']+' is a Specnaut agent: /,
@@ -59,7 +60,7 @@ const CASES: readonly Case[] = [
     "claude",
     "pre_tool_use_bash",
     bashCmd("git push origin main\ngit status"),
-    "ask",
+    "deny", // spec 048 § 8: no approval is a deny on Claude too
   ],
   [
     "guard-release.sh",
@@ -82,7 +83,7 @@ const CASES: readonly Case[] = [
     "claude",
     "pre_tool_use_bash",
     bashCmd("echo \r# ; git push origin main"),
-    "ask",
+    "deny",
   ],
   [
     "protect-generated.sh",

@@ -4,9 +4,12 @@
 # FR-004). It used to warn and exit 0; the edit went through.
 #
 #   denied  .specnaut/installed.lock — `specnaut upgrade` owns it
-#   gated   the gate's own switches: what the landing guard reads or runs, and
-#           what registers it — .specnaut/workflow.yml, .specnaut/hooks/**,
-#           .specnaut/scripts/bash/{merge-mode,base-branch}.sh,
+#   gated   the gate's own switches: what the landing guard reads or runs,
+#           the landing scripts and the hold they run (spec 048 § 8: an edit
+#           could drop it), and what registers the guards —
+#           .specnaut/workflow.yml, .specnaut/hooks/** (merge-approved.sh,
+#           the hold's reader, included), .specnaut/scripts/bash/{merge-mode,
+#           base-branch,merge-hold,land-feature,remove-spec}.sh,
 #           .codex/hooks.json, .claude/settings.json and
 #           .claude/settings.local.json (its `disableAllHooks` switches every
 #           guard off). Gated like a merge: Claude's prompt where it can ask,
@@ -33,8 +36,8 @@ denied="" gated=()
 for p in "${EDIT_PATHS[@]}"; do
   t=$(paths_norm "$p")
   if paths_names "$t" .specnaut/installed.lock; then denied=$p; break; fi
-  for g in .specnaut/workflow.yml .specnaut/scripts/bash/merge-mode.sh .specnaut/scripts/bash/base-branch.sh \
-    .codex/hooks.json .claude/settings.json .claude/settings.local.json; do
+  for g in .specnaut/workflow.yml .codex/hooks.json .claude/settings.json .claude/settings.local.json \
+    .specnaut/scripts/bash/{merge-mode,base-branch,merge-hold,land-feature,remove-spec}.sh; do
     if paths_names "$t" "$g"; then gated+=("$g"); fi
   done
   if paths_names "$t" .specnaut/hooks under; then gated+=(".specnaut/hooks/"); fi

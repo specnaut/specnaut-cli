@@ -50,8 +50,10 @@ Deno.test("protect-generated: every spelling of the lock, and the gate's switche
     const noLock = await makeRepo(sb, { mode: "auto" });
 
     // [label, cwd, Claude file_path, Codex patch body, want]
+    type Row = [string, string, string, string, Want];
     const L = ".specnaut/installed.lock";
-    const cases: ReadonlyArray<[string, string, string, string, Want]> = [
+    const SB = ".specnaut/scripts/bash";
+    const cases: ReadonlyArray<Row> = [
       ["the lock", repo, `${repo}/${L}`, `*** Update File: ${L}\n@@\n-a\n+b\n`, "deny"],
       [
         "// inside",
@@ -134,19 +136,17 @@ Deno.test("protect-generated: every spelling of the lock, and the gate's switche
         `*** Add File: .claude/settings.local.json\n`,
         "gated",
       ],
+      // What the landing guard runs, and the landing scripts with the hold they
+      // run (spec 048 § 8): an edit could drop it.
+      ...["merge-mode", "base-branch", "merge-hold", "land-feature", "remove-spec"].map((n) =>
+        [n, repo, `${repo}/${SB}/${n}.sh`, `*** Update File: ${SB}/${n}.sh\n`, "gated"] as Row
+      ),
       [
-        "merge-mode.sh",
+        "a sibling script",
         repo,
-        `${repo}/.specnaut/scripts/bash/merge-mode.sh`,
-        `*** Update File: .specnaut/scripts/bash/merge-mode.sh\n`,
-        "gated",
-      ],
-      [
-        "base-branch.sh",
-        repo,
-        `${repo}/.specnaut/scripts/bash/base-branch.sh`,
-        `*** Update File: .specnaut/scripts/bash/base-branch.sh\n`,
-        "gated",
+        `${repo}/${SB}/epic-status.sh`,
+        `*** Update File: ${SB}/epic-status.sh\n`,
+        "allow",
       ],
       ["an ordinary file", repo, `${repo}/src/app.ts`, `*** Update File: src/app.ts\n`, "allow"],
       [
