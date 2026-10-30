@@ -188,23 +188,20 @@ RE_REFSPEC='^\+?[A-Za-z0-9._/@-]*(:[A-Za-z0-9._/@-]+)?$'
 
 # push_allowed <args…> — every refspec explicit, none landing on the base.
 push_allowed() {
-  local a dst skip=0 tags=0
-  local -a pos=()
-  for a in "$@"; do
-    if [ "$skip" = 1 ]; then skip=0; continue; fi
+  local a dst tags=0
+  git_push_pos "$@"
+  for a in ${GIT_PUSH_OPTS[@]+"${GIT_PUSH_OPTS[@]}"}; do
     case $a in
       --all | --mirror | --delete | -d | --prune | --branches) return 1 ;;
-      -o | --push-option | --repo | --receive-pack | --exec) skip=1 ;;
       --tags) tags=1 ;;
       --push-option=* | --repo=* | --receive-pack=* | --exec=* | --force-with-lease* | --force-if-includes | --recurse-submodules=* | --signed* | --no-signed) ;;
       --set-upstream | --force | --dry-run | --verbose | --quiet | --follow-tags | --no-follow-tags | --no-verify | --verify | --atomic | --no-atomic | --porcelain | --progress | --no-progress | --thin | --no-thin | --ipv4 | --ipv6) ;;
       -[ufnvq46]*) [[ $a =~ ^-[ufnvq46]+$ ]] || return 1 ;;
       -*) return 1 ;;
-      *) pos+=("$a") ;;
     esac
   done
-  if [ ${#pos[@]} -le 1 ]; then [ "$tags" = 1 ] && return 0; return 1; fi
-  for a in "${pos[@]:1}"; do
+  if [ ${#GIT_PUSH_POS[@]} -le 1 ]; then [ "$tags" = 1 ] && return 0; return 1; fi
+  for a in "${GIT_PUSH_POS[@]:1}"; do
     [[ $a =~ $RE_REFSPEC ]] || return 1
     a=${a#+}
     case $a in *:*) dst=${a#*:}; [ -n "${a%%:*}" ] || return 1 ;; *) dst=$a ;; esac

@@ -83,25 +83,33 @@ paths_names() {
   suf[n]=""
   for ((k = n - 1; k >= 0; k--)); do suf[k]="${pc[k]}${suf[k + 1]:+/${suf[k + 1]}}"; done
   shopt -s nocasematch
-  while [ "$r" = 1 ]; do
-    if [ -e "$anc" ]; then
-      local pk=$GUARD_ROOT
-      for ((k = 0; k <= n; k++)); do
-        [ -e "$pk" ] || break
-        if [ "$anc" -ef "$pk" ]; then
-          if [[ $rest == "${suf[k]}" ]]; then r=0; break; fi
-          if [ "${3:-}" = under ] && { [ -z "${suf[k]}" ] || [[ $rest == "${suf[k]}"/* ]]; }; then r=0; break; fi
-        fi
-        if [ "$k" -lt "$n" ]; then pk="$pk/${pc[k]}"; fi
-      done
-    fi
-    if [ "$r" = 0 ] || [ "$anc" = / ]; then break; fi
+  while :; do
+    if [ -e "$anc" ] && _paths_names_at "$anc" "$rest" "${3:-}"; then r=0; break; fi
+    [ "$anc" != / ] || break
     rest="${anc##*/}${rest:+/$rest}"
     anc=${anc%/*}
     anc=${anc:-/}
   done
   shopt -u nocasematch
   return "$r"
+}
+
+# _paths_names_at <existing ancestor> <rest of the target> <under|""> — one
+# step of paths_names' walk: the ancestor is the same file (`-ef`) as an
+# existing prefix of the protected path, and the rest of the target is the
+# rest of that path (with `under`: it, or beneath it), compared under the
+# caller's nocasematch. Reads paths_names' pc, suf and n.
+_paths_names_at() {
+  local pk=$GUARD_ROOT k
+  for ((k = 0; k <= n; k++)); do
+    [ -e "$pk" ] || return 1
+    if [ "$1" -ef "$pk" ]; then
+      if [[ $2 == "${suf[k]}" ]]; then return 0; fi
+      if [ "$3" = under ] && { [ -z "${suf[k]}" ] || [[ $2 == "${suf[k]}"/* ]]; }; then return 0; fi
+    fi
+    if [ "$k" -lt "$n" ]; then pk="$pk/${pc[k]}"; fi
+  done
+  return 1
 }
 
 # paths_imatch <text> <ere> — <text> matches, ASCII case ignored. Sets

@@ -15,7 +15,8 @@ import {
 import { pruneEmptyParents } from "./fs_prune.ts";
 import { mergeIntoFile } from "../domain/merge_block.ts";
 import { mergeClaudeSettings, pluginDeclarationNotes } from "../domain/claude_settings_merge.ts";
-import { type JsonMergeResult, mergeCodexHooks } from "../domain/hook_settings_merge.ts";
+import { mergeCodexHooks } from "../domain/hook_settings_merge.ts";
+import type { JsonMergeResult } from "../domain/json_merge.ts";
 import type { BackupReport, ContextLinkWrite, FsWriter } from "../application/ports.ts";
 import { backupForDelete, fileExists, isSymlink, readIfExists } from "./fs_backup.ts";
 import { denoSymlink, type Linker, writeContextLink } from "./fs_link_writer.ts";

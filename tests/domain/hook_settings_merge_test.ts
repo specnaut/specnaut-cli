@@ -1,9 +1,6 @@
 import { assertEquals, assertThrows } from "@std/assert";
-import {
-  isSpecnautHook,
-  JsonMergeParseError,
-  mergeCodexHooks,
-} from "../../src/domain/hook_settings_merge.ts";
+import { mergeCodexHooks, specnautHookFile } from "../../src/domain/hook_settings_merge.ts";
+import { JsonMergeParseError } from "../../src/domain/json_merge.ts";
 import { codexHookCommand } from "../../src/domain/hook_command.ts";
 import { mergeClaudeSettings } from "../../src/domain/claude_settings_merge.ts";
 
@@ -43,22 +40,22 @@ const BUNDLED = settings({
   SessionStart: [{ hooks: [hook(".claude/hooks/check-backlog-prereqs.sh")] }],
 });
 
-Deno.test("isSpecnautHook: each exact shape Specnaut registers, or a retired one, is Specnaut's", () => {
+Deno.test("specnautHookFile: each exact shape Specnaut registers, or a retired one, names its script", () => {
   for (
-    const command of [
-      claude("guard-merge", "claude"),
-      claude("protect-generated"),
-      codex("guard-release", "ab"),
-      codex("log-subagent", "0", "start", 0),
-      codex("my_new-guard", "f", ""),
-      ".claude/hooks/protect-generated.sh",
-      ".claude/hooks/log-subagent.sh start",
-      ".claude/hooks/log-subagent.sh stop",
+    const [command, script] of [
+      [claude("guard-merge", "claude"), "guard-merge"],
+      [claude("protect-generated"), "protect-generated"],
+      [codex("guard-release", "ab"), "guard-release"],
+      [codex("log-subagent", "0", "start", 0), "log-subagent"],
+      [codex("my_new-guard", "f", ""), "my_new-guard"],
+      [".claude/hooks/protect-generated.sh", "protect-generated"],
+      [".claude/hooks/log-subagent.sh start", "log-subagent"],
+      [".claude/hooks/log-subagent.sh stop", "log-subagent"],
     ]
-  ) assertEquals(isSpecnautHook(command), true, command);
+  ) assertEquals(specnautHookFile(command), script, command);
 });
 
-Deno.test("isSpecnautHook: a command that only mentions a Specnaut script is the user's", () => {
+Deno.test("specnautHookFile: a command that only mentions a Specnaut script is the user's", () => {
   for (
     const command of [
       `mycheck.sh && ${claude("guard-merge", "claude")}`,
@@ -76,10 +73,10 @@ Deno.test("isSpecnautHook: a command that only mentions a Specnaut script is the
       "./wrap.sh .claude/hooks/log-subagent.sh start",
       ".claude/hooks/log-subagent.sh begin",
     ]
-  ) assertEquals(isSpecnautHook(command), false, command);
+  ) assertEquals(specnautHookFile(command), null, command);
 });
 
-Deno.test("isSpecnautHook: the user's own scripts, and Specnaut scripts that did not move, are not", () => {
+Deno.test("specnautHookFile: the user's own scripts, and Specnaut scripts that did not move, are not", () => {
   for (
     const command of [
       ".claude/hooks/check-backlog-prereqs.sh",
@@ -90,10 +87,10 @@ Deno.test("isSpecnautHook: the user's own scripts, and Specnaut scripts that did
       "echo .specnaut/hooks/",
       claude("guard-merge").replace("bash ", "zsh "),
     ]
-  ) assertEquals(isSpecnautHook(command), false, command);
+  ) assertEquals(specnautHookFile(command), null, command);
 });
 
-Deno.test("isSpecnautHook: every Specnaut command the bundled Claude settings.json registers is recognised", async () => {
+Deno.test("specnautHookFile: every Specnaut command the bundled Claude settings.json registers is recognised", async () => {
   const bundled = JSON.parse(
     await Deno.readTextFile(
       new URL("../../templates/harness-specific/claude/settings.json", import.meta.url),
@@ -103,7 +100,9 @@ Deno.test("isSpecnautHook: every Specnaut command the bundled Claude settings.js
     .flatMap((groups) => groups.flatMap((g) => g.hooks.map((h) => h.command)))
     .filter((c) => c.includes(".specnaut/hooks/"));
   assertEquals(ours.length > 0, true, "the bundle registers .specnaut/hooks scripts");
-  for (const command of ours) assertEquals(isSpecnautHook(command), true, command);
+  for (const command of ours) {
+    assertEquals(specnautHookFile(command), /hooks\/([\w-]+)\.sh/.exec(command)?.[1], command);
+  }
 });
 
 Deno.test("hook splice: a user wrapper that mentions a Specnaut script is kept verbatim", () => {
@@ -249,6 +248,24 @@ Deno.test("codex-hooks: splices hooks into the user's file and carries none of t
   ]);
   assertEquals(commands(content, "Stop"), [CODEX_STOP]);
   assertEquals(mergeCodexHooks(content, CODEX_BUNDLED, CODEX_DEST).changed, false);
+});
+
+/**
+ * The command 7.3 registered, its root walk keyed on `-d` (cli#700 changed it
+ * to `-e || -L`), verbatim from that release's `.codex/hooks.json`. Not
+ * recognised, it would be the user's: kept beside the new one, its pinned hash
+ * stale, it would refuse every Bash call after the upgrade.
+ */
+const CODEX_7_3 =
+  `r=$PWD; while [ -n "$r" ] && [ ! -d "$r/.specnaut/hooks" ]; do r=\${r%/*}; done; [ "$( (sha256sum 2>/dev/null || shasum -a 256) < "$r/.specnaut/hooks/SHA256SUMS" 2>/dev/null | cut -c1-64)" = "5f1a2aabce6f1fab434be1e3233815e5065e45b0363395ad6371fea0b3adad18" ] && (cd "$r/.specnaut/hooks" && (sha256sum -c --status SHA256SUMS 2>/dev/null || shasum -a 256 -c --status SHA256SUMS)) && exec bash "$r/.specnaut/hooks/guard-merge.sh" codex; echo "specnaut: .specnaut/hooks changed since it was trusted — run specnaut upgrade, then /hooks" >&2; exit 2`;
+
+Deno.test("codex-hooks: the command 7.3 registered is Specnaut's, and the upgrade replaces it", () => {
+  assertEquals(specnautHookFile(CODEX_7_3), "guard-merge");
+  const user = JSON.stringify({
+    hooks: { PreToolUse: [{ matcher: "Bash", hooks: [hook(CODEX_7_3)] }] },
+  });
+  const { content } = mergeCodexHooks(user, CODEX_BUNDLED, CODEX_DEST);
+  assertEquals(commands(content, "PreToolUse"), [CODEX_NEW]);
 });
 
 Deno.test("codex-hooks: malformed user JSON names the file", () => {

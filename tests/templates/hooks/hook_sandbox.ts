@@ -159,15 +159,18 @@ export async function payload(
   return { ...base, ...overrides };
 }
 
-/** Pipe `input` (an object is JSON-encoded) into `<hook> <harness>`. */
+/**
+ * Pipe `input` (an object is JSON-encoded) into `<hook> <harness>` — the
+ * template's own copy, or the one in `opts.hooksDir` (a test's altered copy).
+ */
 export function runHook(
   sb: Sandbox,
   hook: string,
   harness: Harness,
   input: Record<string, unknown> | string,
-  opts: { cwd?: string; env?: Record<string, string> } = {},
+  opts: { cwd?: string; env?: Record<string, string>; hooksDir?: string } = {},
 ): Promise<Run> {
-  return exec("bash", [bashPath(join(HOOKS_DIR, hook)), harness], {
+  return exec("bash", [bashPath(join(opts.hooksDir ?? HOOKS_DIR, hook)), harness], {
     cwd: opts.cwd ?? sb.dir,
     env: { ...sb.env, ...opts.env },
     stdin: typeof input === "string" ? input : JSON.stringify(input),

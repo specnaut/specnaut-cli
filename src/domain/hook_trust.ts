@@ -12,7 +12,8 @@
  * Pure — no IO, no Deno globals.
  */
 
-import { type HookMap, parseUserJson, specnautHookFile } from "./hook_settings_merge.ts";
+import { type HookMap, specnautHookFile } from "./hook_settings_merge.ts";
+import { parseUserJson } from "./json_merge.ts";
 
 /** What a harness that hashes its hook registrations declares. */
 export type HookTrust = {

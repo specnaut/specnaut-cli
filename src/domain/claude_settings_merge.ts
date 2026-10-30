@@ -31,13 +31,8 @@
  * Pure — no IO, no Deno globals.
  */
 
-import {
-  type HookMap,
-  type JsonMergeResult,
-  jsonMergeResult,
-  parseUserJson,
-  spliceHooks,
-} from "./hook_settings_merge.ts";
+import { type HookMap, spliceHooks } from "./hook_settings_merge.ts";
+import { type JsonMergeResult, jsonMergeResult, parseUserJson } from "./json_merge.ts";
 
 type SettingsShape = {
   hooks?: HookMap;

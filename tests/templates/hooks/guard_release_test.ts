@@ -35,10 +35,12 @@ async function bash(
 }
 
 /**
- * Denied, and by the release rule: approval_gate's refusal. A crash exits 2
- * too, so the exit code alone would read every crash as a deny (cli#711).
+ * Denied, and by the release rule: approval_gate's refusal, naming the words
+ * that approve it. A crash exits 2 too, so the exit code alone would read
+ * every crash as a deny (cli#711).
  */
-const DENY = /^specnaut guard-release: .+ publishes a release, .+ To let it through, reply /;
+const DENY =
+  /^specnaut guard-release: .+ publishes a release, .+ To let it through, reply `release it` /;
 const denied = (r: Run) => r.code === 2 && DENY.test(r.stderr);
 
 const CASES: ReadonlyArray<[command: string, denied: boolean]> = [
@@ -154,6 +156,52 @@ Deno.test("guard-release: a git config it cannot read is no proof that there is 
   } finally {
     await sb.cleanup();
   }
+});
+
+/** Whether a mode-000 file still reads — as root, or on Windows: nothing to observe there. */
+async function modeIsIgnored(): Promise<boolean> {
+  if (Deno.build.os === "windows") return true;
+  const probe = await Deno.makeTempFile({ prefix: "specnaut-mode-" });
+  try {
+    await Deno.chmod(probe, 0o000);
+    return await Deno.readFile(probe).then(() => true, () => false);
+  } finally {
+    await Deno.remove(probe);
+  }
+}
+
+/**
+ * `listed` is called bare, never in a condition or `$(…)`: there a read that
+ * fails is muted, and an unreadable list would read as "not listed" — an
+ * allow. Bare, the ERR trap refuses.
+ */
+Deno.test({
+  name: "guard-release: an unreadable release-commands.txt refuses, never reads as not listed",
+  ignore: await modeIsIgnored(),
+  fn: async () => {
+    const sb = await sandbox();
+    try {
+      const repo = await makeRepo(sb, { mode: "auto", head: "feat" });
+      const hooksDir = join(sb.dir, "hooks");
+      await Deno.mkdir(hooksDir);
+      for await (const e of Deno.readDir(HOOKS_DIR)) {
+        if (e.isFile) await Deno.copyFile(join(HOOKS_DIR, e.name), join(hooksDir, e.name));
+      }
+      const p = await payload("codex", "pre_tool_use_bash", {
+        cwd: repo,
+        tool_input: { command: "gh release view v1" },
+      });
+      const readable = await runHook(sb, "guard-release.sh", "codex", p, { hooksDir });
+      assertEquals([readable.code, readable.stderr], [0, ""], "the copy allows what is not listed");
+      await Deno.chmod(join(hooksDir, "release-commands.txt"), 0o000);
+      const r = await runHook(sb, "guard-release.sh", "codex", p, { hooksDir });
+      assertEquals(r.code, 2, r.stderr);
+      assertStringIncludes(r.stderr, "specnaut guard-release: unexpected error");
+      assertStringIncludes(r.stderr, "refusing");
+    } finally {
+      await sb.cleanup();
+    }
+  },
 });
 
 Deno.test("guard-release: push.followTags makes every push a tag push", async () => {

@@ -1,5 +1,5 @@
 # shellcheck shell=bash disable=SC2034
-# (SC2034: CMD_MOVED belongs to _command.sh and is read by the guard.)
+# (SC2034: CMD_MOVED belongs to _command.sh; it and GIT_PUSH_* are read by the guard.)
 # Sourced after _command.sh by the guards that read git commands (guard-merge,
 # guard-release). Reads one `git` segment the way git itself would: past its
 # global options, and through its aliases — so `git -C x -c k=v pm` is seen as
@@ -87,4 +87,23 @@ _git_alias_get() {
     1:0) ;;
     *) return 2 ;;
   esac
+}
+
+# git_push_pos <push args…> — a push's words as git reads them: GIT_PUSH_POS,
+# the words that are not options (the remote, then the refspecs), and
+# GIT_PUSH_OPTS, the options. The one home of which push options take the
+# next word as their value, for both guards that read a push (guard-merge,
+# guard-release): such an option and its value are consumed here, judged by
+# neither, so the two cannot come to disagree on which word is a refspec.
+git_push_pos() {
+  local a skip=0
+  GIT_PUSH_POS=() GIT_PUSH_OPTS=()
+  for a in "$@"; do
+    if [ "$skip" = 1 ]; then skip=0; continue; fi
+    case $a in
+      -o | --push-option | --repo | --receive-pack | --exec) skip=1 ;;
+      -*) GIT_PUSH_OPTS+=("$a") ;;
+      *) GIT_PUSH_POS+=("$a") ;;
+    esac
+  done
 }

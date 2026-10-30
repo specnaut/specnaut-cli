@@ -24,6 +24,13 @@ export type CodexHookCall = {
 };
 
 const SHA = `(sha256sum 2>/dev/null || shasum -a 256)`;
+/** The root walk's test: climb while nothing is at `.specnaut/hooks`. */
+const WALK = `[ ! -e "$r/.specnaut/hooks" ] && [ ! -L "$r/.specnaut/hooks" ]`;
+/**
+ * The walk up to 7.3, `-d`. Still recognised, so the merge replaces a 7.3
+ * registration: left as the user's, its stale hash would refuse every call.
+ */
+const WALK_7_3 = `[ ! -d "$r/.specnaut/hooks" ]`;
 const CHECK =
   `(sha256sum -c --status SHA256SUMS 2>/dev/null || shasum -a 256 -c --status SHA256SUMS)`;
 
@@ -33,15 +40,18 @@ const CHECK =
  * the hash of `SHA256SUMS` and checks the folder against it before running
  * anything: a changed script changes the definition, and Codex asks again.
  *
- * The root is the nearest folder above the session cwd holding a
- * `.specnaut/hooks/` directory — not the git toplevel, which for a project
- * nested in another repository without its own `.git` is the outer one. The
- * walk keys on the directory, not on `SHA256SUMS`: an inner project that lost
- * its sums must refuse, never fall through to an outer project's hooks.
+ * The root is the nearest folder above the session cwd where
+ * `.specnaut/hooks` exists — not the git toplevel, which for a project nested
+ * in another repository without its own `.git` is the outer one. The walk keys
+ * on that path, not on `SHA256SUMS`: an inner project that lost its sums must
+ * refuse, never fall through to an outer project's hooks. And on the path
+ * existing as anything (`-e`, or `-L` for a link to nowhere), not on it being
+ * a directory: a file or a dangling link there is that project's hooks gone
+ * wrong, and it refuses too (cli#700).
  */
-function codexShape(hash: string, script: string, args: string, exit: string): string {
+function codexShape(hash: string, script: string, args: string, exit: string, walk = WALK): string {
   return [
-    `r=$PWD; while [ -n "$r" ] && [ ! -d "$r/.specnaut/hooks" ]; do r=\${r%/*}; done`,
+    `r=$PWD; while [ -n "$r" ] && ${walk}; do r=\${r%/*}; done`,
     `[ "$( ${SHA} < "$r/.specnaut/hooks/SHA256SUMS" 2>/dev/null | cut -c1-64)" = "${hash}" ]` +
     ` && (cd "$r/.specnaut/hooks" && ${CHECK})` +
     ` && exec bash "$r/.specnaut/hooks/${script}"${args}`,
@@ -60,9 +70,9 @@ const SCRIPT_NAME = "([A-Za-z0-9_-]+)\\.sh";
 const escapeRegExp = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
 /** `codexShape` with each variable part punched out: any hash, any script, any args, exit 0|2. */
-function codexPattern(): RegExp {
+function codexPattern(walk: string): RegExp {
   const hole = { hash: "\u0000H", script: "\u0000S", args: "\u0000A", exit: "\u0000E" };
-  const source = escapeRegExp(codexShape(hole.hash, hole.script, hole.args, hole.exit))
+  const source = escapeRegExp(codexShape(hole.hash, hole.script, hole.args, hole.exit, walk))
     .replace(hole.hash, "[0-9a-f]{64}")
     .replace(hole.script, SCRIPT_NAME)
     .replace(hole.args, "(?: [a-z]+)?")
@@ -73,13 +83,14 @@ function codexPattern(): RegExp {
 /**
  * Every shape a Specnaut hook command has, each capturing the script's basename:
  * the Claude registration (`templates/harness-specific/claude/settings.json`),
- * the Codex one (`codexHookCommand`), and the two scripts 7.1 registered under
+ * the Codex one (`codexHookCommand`) and its 7.3 walk, and the two scripts 7.1 registered under
  * `.claude/hooks/` before they moved — named, not globbed, because that folder
  * also holds the user's own scripts and `check-backlog-prereqs.sh`, which did
  * not move.
  */
 export const SPECNAUT_HOOK_SHAPES: readonly RegExp[] = [
   new RegExp(`^bash "\\$CLAUDE_PROJECT_DIR/\\.specnaut/hooks/${SCRIPT_NAME}"(?: [a-z]+)?$`),
-  codexPattern(),
+  codexPattern(WALK),
+  codexPattern(WALK_7_3),
   /^\.claude\/hooks\/(protect-generated|log-subagent)\.sh(?: (?:start|stop))?$/,
 ];

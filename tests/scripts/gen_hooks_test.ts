@@ -26,7 +26,11 @@ Deno.test("gen-hooks: a generated file not yet written reads as absent; any othe
     assertEquals(await readIfPresent(join(dir, "absent.json")), null);
     // A directory where the file should be is not "absent": swallowing it would
     // have the generator try to write over it, or --check call it merely stale.
-    await assertRejects(() => readIfPresent(dir));
+    // The OS's own error, rethrown: Windows refuses to open a directory as a file.
+    const isDir = Deno.build.os === "windows"
+      ? Deno.errors.PermissionDenied
+      : Deno.errors.IsADirectory;
+    await assertRejects(() => readIfPresent(dir), isDir);
   } finally {
     await Deno.remove(dir, { recursive: true });
   }
@@ -111,6 +115,49 @@ Deno.test("gen-hooks: a project without SHA256SUMS refuses rather than run an ou
     await Deno.remove(outer, { recursive: true });
   }
 });
+
+/**
+ * cli#700 — the walk stops at the first `.specnaut/hooks` that exists as
+ * anything: a file, or a link to nowhere. Keyed on `-d`, it climbed past
+ * both, to an outer project, and ran that project's scripts here.
+ */
+for (
+  const [what, plant] of [
+    ["a file", (at: string) => Deno.writeTextFile(at, "not a folder\n")],
+    ["a dangling link", (at: string) => Deno.symlink(at + "-gone", at)],
+  ] as const
+) {
+  Deno.test({
+    name: `gen-hooks: ${what} at an inner project's .specnaut/hooks refuses, never climbs`,
+    // Making a link needs a privilege Windows runners may not grant.
+    ignore: what === "a dangling link" && Deno.build.os === "windows",
+    fn: async () => {
+      const outer = await Deno.makeTempDir({ prefix: "gen-hooks-stop-" });
+      try {
+        const outerHooks = join(outer, ".specnaut", "hooks");
+        const inner = join(outer, "packages", "inner");
+        await Deno.mkdir(outerHooks, { recursive: true });
+        await Deno.mkdir(join(inner, ".specnaut"), { recursive: true });
+        await plant(join(inner, ".specnaut", "hooks"));
+        await Deno.writeTextFile(join(outerHooks, "probe.sh"), "echo RAN-OUTER >&2; exit 0\n");
+        const sums = await sumsOf(outerHooks, ["probe.sh"]);
+        await Deno.writeTextFile(join(outerHooks, "SHA256SUMS"), sums);
+        const guard = codexCommand(
+          { script: "probe.sh", args: "codex", onChanged: 2 },
+          await hex(new TextEncoder().encode(sums)),
+        );
+        const own = await run(guard, outer);
+        assertEquals([own.code, own.stderr.trim()], [0, "RAN-OUTER"], "the outer runs its own");
+        const nested = await run(guard, inner);
+        assertEquals(nested.code, 2);
+        assertEquals(nested.stderr.includes("run specnaut upgrade"), true, nested.stderr);
+        assertEquals(nested.stderr.includes("RAN-"), false, `ran a script: ${nested.stderr}`);
+      } finally {
+        await Deno.remove(outer, { recursive: true });
+      }
+    },
+  });
+}
 
 async function hex(bytes: BufferSource): Promise<string> {
   return Array.from(new Uint8Array(await crypto.subtle.digest("SHA-256", bytes)))

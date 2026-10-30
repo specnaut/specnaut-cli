@@ -17,6 +17,7 @@
  */
 
 import { SPECNAUT_HOOK_SHAPES } from "./hook_command.ts";
+import { type JsonMergeResult, jsonMergeResult, parseUserJson } from "./json_merge.ts";
 
 type Hook = {
   type?: string;
@@ -37,24 +38,6 @@ type MatcherGroup = {
 /** `hooks` as both harnesses spell it: event → matcher groups. */
 export type HookMap = Record<string, MatcherGroup[]>;
 
-/** What every `mergeJson` flavor returns: the file to write, and whether it differs from disk. */
-export type JsonMergeResult = { readonly content: string; readonly changed: boolean };
-
-/**
- * Error thrown when the on-disk file of a JSON merge is not valid JSON.
- * Surfaces a clear actionable hint at the CLI level rather than a raw
- * `SyntaxError` from `JSON.parse`.
- */
-export class JsonMergeParseError extends Error {
-  constructor(public readonly destPath: string, override readonly cause: Error) {
-    super(
-      `${destPath} is not valid JSON: ${cause.message}\n` +
-        `Fix the file (or back it up and re-run with --force) before re-running specnaut.`,
-    );
-    this.name = "JsonMergeParseError";
-  }
-}
-
 /** The Specnaut hook script `command` runs, by basename, or `null` when it runs none. */
 export function specnautHookFile(command: string | undefined): string | null {
   if (command === undefined) return null;
@@ -63,31 +46,6 @@ export function specnautHookFile(command: string | undefined): string | null {
     if (m !== null) return m[1];
   }
   return null;
-}
-
-/** Whether a hook entry's command is Specnaut's to rewrite — see the module doc. */
-export function isSpecnautHook(command: string | undefined): boolean {
-  return specnautHookFile(command) !== null;
-}
-
-/**
- * Parse the user's side of a merge. `null` means greenfield (absent or blank
- * file), where the bundled content is written verbatim.
- */
-// deno-lint-ignore no-explicit-any
-export function parseUserJson(existing: string | null, destPath: string): any | null {
-  if (existing === null || existing.trim().length === 0) return null;
-  try {
-    return JSON.parse(existing);
-  } catch (err) {
-    throw new JsonMergeParseError(destPath, err instanceof Error ? err : new Error(String(err)));
-  }
-}
-
-/** Serialise a merge (2-space indent, trailing newline) and compare it with what is on disk. */
-export function jsonMergeResult(value: unknown, existing: string | null): JsonMergeResult {
-  const content = `${JSON.stringify(value, null, 2)}\n`;
-  return { content, changed: content !== existing };
 }
 
 /**

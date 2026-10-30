@@ -83,22 +83,16 @@ async function agentNames(): Promise<string[]> {
   return [...names].sort();
 }
 
-/** Every generated file, path → content. */
-export async function generate(): Promise<Map<string, string>> {
-  const out = new Map<string, string>();
-  const agents = [
-    "# The Specnaut agents: one name per line, generated from the Specnaut",
-    "# manifest when the binary is built. guard-dispatch-model.sh reads it.",
-    ...(await agentNames()),
-    "",
-  ].join("\n");
-  out.set(join(HOOKS, "_agents.txt"), agents);
-
+/**
+ * SHA256SUMS: every file of the hooks folder but itself, hashed. `_agents.txt`
+ * is hashed as generated, not as it may sit on disk — the sums must match the
+ * folder the same run writes.
+ */
+async function sha256Sums(agents: string): Promise<string> {
   const files: string[] = [];
   for await (const e of Deno.readDir(HOOKS)) {
     if (e.isFile && e.name !== "SHA256SUMS") files.push(e.name);
   }
-  // _agents.txt is hashed as generated, not as it may sit on disk.
   const lines: string[] = [];
   for (const name of files.sort()) {
     const bytes = name === "_agents.txt"
@@ -106,10 +100,11 @@ export async function generate(): Promise<Map<string, string>> {
       : await Deno.readFile(join(HOOKS, name));
     lines.push(`${await sha256(bytes)}  ${name}`);
   }
-  const sums = lines.join("\n") + "\n";
-  out.set(join(HOOKS, "SHA256SUMS"), sums);
+  return lines.join("\n") + "\n";
+}
 
-  const sumsHash = await sha256(new TextEncoder().encode(sums));
+/** The Codex hooks.json: CODEX_REGISTRATIONS grouped by event and matcher, each pinning `sumsHash`. */
+function codexHooksJson(sumsHash: string): string {
   const hooks: Record<string, { matcher?: string; hooks: unknown[] }[]> = {};
   for (const r of CODEX_REGISTRATIONS) {
     const groups = hooks[r.event] ??= [];
@@ -121,8 +116,24 @@ export async function generate(): Promise<Map<string, string>> {
     }
     group.hooks.push({ type: "command", command: codexHookCommand(r, sumsHash), timeout: 10 });
   }
-  out.set(CODEX_HOOKS_JSON, JSON.stringify({ hooks }, null, 2) + "\n");
-  return out;
+  return JSON.stringify({ hooks }, null, 2) + "\n";
+}
+
+/** Every generated file, path → content. */
+export async function generate(): Promise<Map<string, string>> {
+  const agents = [
+    "# The Specnaut agents: one name per line, generated from the Specnaut",
+    "# manifest when the binary is built. guard-dispatch-model.sh reads it.",
+    ...(await agentNames()),
+    "",
+  ].join("\n");
+  const sums = await sha256Sums(agents);
+  const sumsHash = await sha256(new TextEncoder().encode(sums));
+  return new Map([
+    [join(HOOKS, "_agents.txt"), agents],
+    [join(HOOKS, "SHA256SUMS"), sums],
+    [CODEX_HOOKS_JSON, codexHooksJson(sumsHash)],
+  ]);
 }
 
 /**

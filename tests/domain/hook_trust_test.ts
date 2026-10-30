@@ -5,7 +5,7 @@ import {
   hookTrustDue,
   registeredHooks,
 } from "../../src/domain/hook_trust.ts";
-import { JsonMergeParseError } from "../../src/domain/hook_settings_merge.ts";
+import { JsonMergeParseError } from "../../src/domain/json_merge.ts";
 import { codexHookCommand } from "../../src/domain/hook_command.ts";
 
 /**

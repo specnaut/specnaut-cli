@@ -46,20 +46,14 @@ is_tag() {
 
 # tag_push <push args…> — the push publishes a tag.
 tag_push() {
-  local a skip=0 follow
-  local -a pos=()
+  local a follow
   follow=$(guard_git -C "$GUARD_CWD" config --type=bool --get push.followTags 2>/dev/null) || follow=false
   [ "$follow" != true ] || return 0
-  for a in "$@"; do
-    if [ "$skip" = 1 ]; then skip=0; continue; fi
-    case $a in
-      --tags | --follow-tags | --mirror) return 0 ;;
-      -o | --push-option | --repo | --receive-pack | --exec) skip=1 ;;
-      -*) ;;
-      *) pos+=("$a") ;;
-    esac
+  git_push_pos "$@"
+  for a in ${GIT_PUSH_OPTS[@]+"${GIT_PUSH_OPTS[@]}"}; do
+    case $a in --tags | --follow-tags | --mirror) return 0 ;; esac
   done
-  for a in ${pos[@]+"${pos[@]:1}"}; do
+  for a in ${GIT_PUSH_POS[@]+"${GIT_PUSH_POS[@]:1}"}; do
     [ "$a" != tag ] || return 0
     a=${a#+}
     if is_tag "${a%%:*}" || { [[ $a == *:* ]] && is_tag "${a#*:}"; }; then return 0; fi

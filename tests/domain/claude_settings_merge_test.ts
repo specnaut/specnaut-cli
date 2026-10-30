@@ -1,6 +1,6 @@
 import { assertEquals, assertThrows } from "@std/assert";
 import { mergeClaudeSettings } from "../../src/domain/claude_settings_merge.ts";
-import { JsonMergeParseError } from "../../src/domain/hook_settings_merge.ts";
+import { JsonMergeParseError } from "../../src/domain/json_merge.ts";
 
 const BUNDLED = JSON.stringify(
   {
