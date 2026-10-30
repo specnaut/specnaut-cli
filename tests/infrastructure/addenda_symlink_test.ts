@@ -33,6 +33,8 @@ async function withLinkedAddenda(fn: (dir: string) => Promise<void>): Promise<vo
     await Deno.symlink("../../../shared", join(task, "folder"));
     // Through a regular file: lstat throws NotADirectory, which must not abort the walk.
     await Deno.symlink("../../../shared/review.md/x", join(task, "through-file.md"));
+    await Deno.symlink("loops.md", join(task, "loops.md")); // FilesystemLoop
+    await Deno.symlink("../../../nope/x.md", join(task, "missing-dir.md")); // UnwalkableLinkError
     await fn(dir);
   } finally {
     await Deno.remove(dir, { recursive: true });
@@ -77,5 +79,19 @@ Deno.test("an addenda folder linked out of the project is one doctor row, not a 
   } finally {
     await Deno.remove(dir, { recursive: true });
     await Deno.remove(outside, { recursive: true });
+  }
+});
+
+Deno.test("an addenda folder linked into a loop is one doctor row, not a crashed report", {
+  ignore: WINDOWS,
+}, async () => {
+  const dir = await Deno.makeTempDir({ prefix: "specnaut-addenda-loop-" });
+  try {
+    await Deno.mkdir(join(dir, ".specnaut"), { recursive: true });
+    await Deno.symlink("addenda", join(dir, ADDENDA_ROOT));
+    const rows = await checkAddenda(dir);
+    assertEquals(rows.map((r) => [r.name, r.status]), [[`${ADDENDA_ROOT}/`, "warn"]]);
+  } finally {
+    await Deno.remove(dir, { recursive: true });
   }
 });

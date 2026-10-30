@@ -72,6 +72,9 @@ export async function checkAddenda(projectDir: string): Promise<CheckOutcome[]> 
   } catch (err) {
     if (err instanceof Deno.errors.NotFound) return [];
     if (err instanceof Deno.errors.NotADirectory) return [notADirectory];
+    if (err instanceof Deno.errors.FilesystemLoop) {
+      return [{ name: `${ADDENDA_ROOT}/`, status: "warn", message: "its symlinks form a cycle" }];
+    }
     throw err;
   }
   // The reader's walker, not one of this module's own: the upgrade notice reads
