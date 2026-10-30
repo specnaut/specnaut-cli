@@ -157,7 +157,7 @@ rm -f templates/core/agents/probe-unreadable-564.md
 # applies to this source too — and this is the only thing that says so.
 printf -- '---\nname: untracked-accented\n---\n' > "templates/core/agents/untracked-café-564.md"
 set +e
-u564_accent_out="$(_iso_audit)"; u564_accent_rc=$?
+u564_accent_out="$(_iso_audit)"
 set -e
 rm -f "templates/core/agents/untracked-café-564.md"
 
@@ -184,7 +184,6 @@ u564_global_hidden="$(GIT_CONFIG_GLOBAL="$SANDBOX/probe-gitconfig-564" \
 set +e
 u564_excl_out="$(GIT_CONFIG_GLOBAL="$SANDBOX/probe-gitconfig-564" \
   bash "$SMOKE_DIR/audit.sh" --src-root "$SANDBOX" --smoke-dir "$SYNTH_SMOKE" --since vTEST-BASELINE 2>&1)"
-u564_excl_rc=$?
 set -e
 rm -f templates/core/agents/probe-excl-564.md "$SANDBOX/probe-excludes-564" "$SANDBOX/probe-gitconfig-564"
 
