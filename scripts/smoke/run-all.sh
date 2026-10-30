@@ -189,6 +189,14 @@ for script in $to_run; do
   smoke_require_name "$scenario"
   echo
   echo "▶ $script"
+  # Parsed first: on bash 3.2 a syntax error halfway down a script runs its
+  # EXIT trap, and the trap's `|| true` becomes the exit status — the script
+  # stopped at that line, every later check unrun, and this loop read 0.
+  if ! bash -n "$SMOKE_DIR/$script"; then
+    fail "$script" "does not parse"
+    failed="$failed $script"
+    continue
+  fi
   if bash "$SMOKE_DIR/$script" "$scenario"; then
     pass "$script"
   else
