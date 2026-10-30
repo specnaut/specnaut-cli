@@ -23270,25 +23270,35 @@ exit 0
 #              lives under <dir> does, so a cloned repository's scripts are
 #              never executed by the hook that names it. A <dir> that cannot
 #              be entered is manual.
+#   --base <name>
+#              with --strict, also read <name>'s copies (local and origin),
+#              as the base's are read; repeatable. The landing hook passes
+#              the bases the user's prompts pinned (cli#718): a model that
+#              repoints origin/HEAD at a branch of its own has moved what
+#              base-branch.sh prints, not these. One with no ref is skipped
+#              (a base since renamed); one that is not a plain branch name
+#              is manual.
 #
 # Every git call disables core.fsmonitor — the one read-path setting that
 # runs a program — since <dir>'s .git/config is not this project's to trust.
 #
-# Usage: merge-mode.sh [--strict] [--project <dir>]
+# Usage: merge-mode.sh [--strict] [--project <dir>] [--base <name>]…
 set -euo pipefail
 export GIT_OPTIONAL_LOCKS=0
-usage() { echo "usage: merge-mode.sh [--strict] [--project <dir>]" >&2; exit 2; }
+usage() { echo "usage: merge-mode.sh [--strict] [--project <dir>] [--base <name>]..." >&2; exit 2; }
 g() { git --no-pager -c core.fsmonitor=false "\$@"; }
 
-strict=0 project=""
+strict=0 project="" pinned=()
 while [ "\$#" -gt 0 ]; do
   case \$1 in
     --strict) strict=1 ;;
     --project) { [ "\$#" -ge 2 ] && [ -n "\$2" ]; } || usage; project=\$2; shift ;;
+    --base) { [ "\$#" -ge 2 ] && [ -n "\$2" ]; } || usage; pinned+=("\$2"); shift ;;
     *) usage ;;
   esac
   shift
 done
+[ \${#pinned[@]} = 0 ] || [ "\$strict" = 1 ] || usage # --base is read under --strict only
 
 here=\$(cd "\$(dirname "\${BASH_SOURCE[0]}")" && pwd -P)
 # The project this script is installed in, not the git toplevel: a project
@@ -23373,6 +23383,17 @@ if [ "\$found" = 0 ]; then
   echo manual
   exit 0
 fi
+for b in \${pinned[@]+"\${pinned[@]}"}; do
+  if ! [[ \$b =~ ^[A-Za-z0-9][A-Za-z0-9._/-]*\$ ]] || [[ \$b == *..* ]]; then
+    echo "merge-mode: manual (a pinned base '\$b' is not a plain branch name)" >&2
+    echo manual
+    exit 0
+  fi
+  for ref in "refs/heads/\$b" "refs/remotes/origin/\$b"; do
+    g -C "\$root" show-ref --verify --quiet "\$ref" || continue
+    if c=\$(blob "\$ref"); then verdict "\$ref" <<<"\$c"; fi
+  done
+done
 
 echo "merge-mode: auto (every copy of \$rel agrees, or none sets merge:)" >&2
 echo auto
@@ -28374,11 +28395,20 @@ paths_pattern() {
     },
     ".specnaut/hooks/_baseline.sh": {
       content: `# shellcheck shell=bash
-# Sourced by approve-on-prompt.sh after _approval.sh and _paths.sh. The
+# Sourced by approve-on-prompt.sh after _approval.sh and _paths.sh, and by
+# guard-merge.sh after _approval.sh for what the prompt found of the landing
+# hold (cli#718) — it calls none of the file functions. The
 # writer-agnostic backstop behind protect-constitution.sh (spec 038 § 11 S1):
 # the PreToolUse guard reads commands, and no reading of a command sees every
 # writer — an interpreter, a script, a formatter, \`git checkout\`. So the user's
 # prompt fingerprints the four project-owned files, and Stop compares.
+#
+# It does the same for the merge mode (cli#718): merge-mode.sh --strict reads
+# copies of workflow.yml from refs a model can move (\`git update-ref\`), so the
+# mode the prompt found is kept beside the sums. guard-merge holds a turn
+# that began on manual for the whole turn, and Stop asks about a turn that
+# ended on auto when it began on manual, unless the turn approved \`merge\` or
+# \`gate-config\`.
 #
 # A file that changed during the turn with no approval of its kind blocks the
 # stop with a question for the user, and the version from the start of the
@@ -28416,6 +28446,7 @@ baseline_snapshot() {
     if [ -f "\$f" ]; then cp "\$f" "\$1/\$i"; fi
   done
   printf '%s' "\$sums" >"\$1/sums"
+  baseline_mode >"\$1/mode"
 }
 
 # baseline_check <dir> <approved kinds, space-separated> <stop_hook_active> —
@@ -28426,6 +28457,13 @@ baseline_check() {
   local i sum f kept keepdir ts seen=0
   local -a changed=()
   [ -f "\$1/sums" ] || return 0 # no prompt fingerprinted this session yet
+  if [ "\$(cat "\$1/mode" 2>/dev/null)" = manual ] && sum=\$(baseline_mode) && [ "\$sum" != manual ]; then
+    seen=1
+    case " \$2 " in
+      *" merge "* | *" gate-config "*) ;;
+      *) changed+=("the merge mode (manual when the turn began, \$sum now: a copy of .specnaut/workflow.yml, or a ref it is read from, was rewritten)") ;;
+    esac
+  fi
   _baseline_lists
   while read -r i sum; do
     f="\$GUARD_ROOT/\${BL_FILES[i]}"
@@ -28455,6 +28493,60 @@ baseline_check() {
     return 0
   fi
   jq -cn --arg r "\$r" '{decision: "block", reason: \$r}'
+}
+
+# The base branch as the user's prompts found it (cli#718). base-branch.sh
+# reads origin/HEAD, which one \`git remote set-head\` repoints: the landing
+# guard would then judge a push to the real base as a push elsewhere, and
+# read merge-mode from a copy the model wrote. So each prompt keeps the name
+# it resolves, per project, and guard-merge holds every kept name beside the
+# base as it resolves now. A kept name is never dropped: a pin only tightens.
+#   bases/<sha256(GUARD_ROOT)>/pinned   one name per line
+
+# baseline_mode — the merge mode as the landing guard reads it for this
+# project: merge-mode.sh --strict, every pinned base read too. Manual when it
+# cannot be read.
+baseline_mode() {
+  local n m
+  local -a a=()
+  baseline_bases
+  for n in \${PINNED_BASES[@]+"\${PINNED_BASES[@]}"}; do a+=(--base "\$n"); done
+  m=\$(cd "\$GUARD_ROOT" && bash .specnaut/scripts/bash/merge-mode.sh --strict \${a[@]+"\${a[@]}"} 2>/dev/null) || m=manual
+  [ "\$m" = auto ] || m=manual
+  printf '%s\\n' "\$m"
+}
+
+# baseline_pin_base — keep the base as it resolves now, unless it is kept
+# already. An unknown base is kept as \`?\`: until a prompt finds a name, the
+# guard treats the base as unknown whatever base-branch.sh prints later, so a
+# base the model creates mid-turn holds nothing.
+baseline_pin_base() {
+  local f b n
+  if ! b=\$(cd "\$GUARD_ROOT" && bash .specnaut/scripts/bash/base-branch.sh 2>/dev/null); then b='?'; fi
+  baseline_bases
+  if [ "\$b" = '?' ] && [ "\$PINNED_UNKNOWN" = 1 ]; then return 0; fi
+  for n in \${PINNED_BASES[@]+"\${PINNED_BASES[@]}"}; do
+    if guard_ieq "\$n" "\$b"; then return 0; fi
+  done
+  f=\$(approval_state bases pinned) # per project: \`pinned\` stands where a session id would
+  mkdir -p "\${f%/*}"
+  chmod 700 "\${f%/*}"
+  printf '%s\\n' "\$b" >>"\$f"
+}
+
+# baseline_bases — PINNED_BASES: this project's kept names that are plain
+# branch names, by base-branch.sh's own test; PINNED_UNKNOWN=1 when a prompt
+# found no base. Any other line is skipped.
+baseline_bases() {
+  local f n
+  PINNED_BASES=() PINNED_UNKNOWN=0
+  f=\$(approval_state bases pinned)
+  [ -f "\$f" ] || return 0
+  while IFS= read -r n || [ -n "\$n" ]; do
+    n=\${n%\$'\\r'}
+    if [ "\$n" = '?' ]; then PINNED_UNKNOWN=1
+    elif [[ \$n =~ ^[A-Za-z0-9][A-Za-z0-9._/-]*\$ ]] && [[ \$n != *..* ]]; then PINNED_BASES+=("\$n"); fi
+  done <"\$f"
 }
 `,
       executable: false,
@@ -28486,7 +28578,9 @@ baseline_check() {
 #
 # Each user prompt also fingerprints the project-owned files, and Stop
 # compares them (_baseline.sh): a change no approval covered blocks the stop
-# with a question.
+# with a question. It also keeps the base branch as it resolves and the merge
+# mode as the guard reads it (cli#718), so neither repointing origin/HEAD nor
+# rewriting a ref can loosen the landing hold after the prompt.
 #
 # Not a guard: every failure exits 0 with the reason on stderr. Exit 2 here
 # would block the user's prompt, or keep a Claude turn from stopping; failing
@@ -28554,13 +28648,14 @@ case \$P_EVENT in
     # What this turn approved is read before the stamp goes; the stamp goes
     # before anything that could fail and leave it outliving the turn.
     kinds=""
-    for k in constitution gate-config; do if approved "\$k"; then kinds+=" \$k"; fi; done
+    for k in constitution gate-config merge; do if approved "\$k"; then kinds+=" \$k"; fi; done
     rm -f "\$stamp"
     baseline_check "\$baseline" "\$kinds" "\${GF[1]}"
     exit 0 ;;
   UserPromptSubmit) rm -f "\$stamp" ;;
   *) rm -f "\$stamp"; guard_fail "unexpected event '\$P_EVENT' — expected UserPromptSubmit or Stop" ;;
 esac
+baseline_pin_base || : # before the snapshot, whose merge mode reads every pin; never in the way of the mint
 baseline_snapshot "\$baseline"
 
 kind=\$(approval_kind_of "\${GF[0]}")
@@ -28610,7 +28705,13 @@ mv -f "\$tmp" "\$stamp"
 # project AND for each folder a cd on the line names, and the line is inert
 # only if every one reads \`auto\`. A target's mode is read by this project's
 # own reader (\`merge-mode.sh --project\`), never by a script under the target.
-# The base is always the session's. An unknown base gates every form. Every gated reason goes through one arm,
+# The base is always the session's: the name base-branch.sh prints now AND
+# every name the user's prompts found it to be (_baseline.sh, cli#718) — a
+# repointed origin/HEAD adds a base, never removes one. Each is also read by
+# merge-mode (\`--base\`). And a turn whose prompt found the session's project
+# on manual stays manual (_baseline.sh): the copies merge-mode reads sit on
+# refs the model can move. An unknown base gates every form.
+# Every gated reason goes through one arm,
 # approval_require (spec 048 § 8): denied unless this turn's prompt approved
 # \`merge\`, in Claude's ask modes too — a click on a permission prompt is not
 # the user's word — and, with that approval, Claude's own prompt once where it
@@ -28634,6 +28735,8 @@ case \${BASH_SOURCE[0]} in */*) HOOK_DIR=\${BASH_SOURCE[0]%/*} ;; *) HOOK_DIR=. 
 . "\$HOOK_DIR/_git.sh" # and _listed.sh
 # shellcheck source=_approval.sh
 . "\$HOOK_DIR/_approval.sh"
+# shellcheck source=_baseline.sh
+. "\$HOOK_DIR/_baseline.sh"
 guard_init guard-merge "\${1:-}" argv:.tool_input.command
 [ "\$P_TOOL" = Bash ] || guard_fail "expected a Bash tool call, got '\$P_TOOL'"
 [ -n "\${GF[0]}" ] || guard_fail "a Bash call without tool_input.command"
@@ -28709,26 +28812,47 @@ cd_project() {
 # Every candidate read by the session's own reader; one not on auto, or one
 # with no project to read (\`?\`, no repository, no Specnaut), holds the line.
 guard_root
+baseline_bases
+began=""
+if approval_session_ok "\$P_SESSION"; then
+  began=\$(cat "\$(approval_state baselines "\$P_SESSION")/mode" 2>/dev/null) || began=""
+fi
 mode=auto
 for d in "\$GUARD_ROOT" \${CD_DIRS[@]+"\${CD_DIRS[@]}"}; do
   a=()
   if [ "\$d" = '?' ] || { [ "\$d" != "\$GUARD_ROOT" ] && ! cd_project "\$d"; }; then mode=manual; break; fi
-  if [ "\$d" != "\$GUARD_ROOT" ]; then a=(--project "\$CD_PROJ"); fi
+  if [ "\$d" = "\$GUARD_ROOT" ] && [ "\$began" = manual ]; then mode=manual; break; fi
+  if [ "\$d" != "\$GUARD_ROOT" ]; then a=(--project "\$CD_PROJ")
+  else for b in \${PINNED_BASES[@]+"\${PINNED_BASES[@]}"}; do a+=(--base "\$b"); done; fi
   mode=\$(cd "\$GUARD_ROOT" && bash .specnaut/scripts/bash/merge-mode.sh --strict \${a[@]+"\${a[@]}"} 2>/dev/null) || mode=manual
   [ "\$mode" = auto ] || break
 done
 [ "\$mode" != auto ] || guard_allow
 
 if ! base=\$(cd "\$GUARD_ROOT" && bash .specnaut/scripts/bash/base-branch.sh 2>/dev/null); then base=""; fi
+# A prompt found no base, and none since found one: still unknown (cli#718).
+if [ "\$PINNED_UNKNOWN" = 1 ] && [ \${#PINNED_BASES[@]} = 0 ]; then base=""; fi
 if ! head=\$(guard_git -C "\$GUARD_CWD" symbolic-ref --quiet --short HEAD 2>/dev/null); then head=""; fi
 
-# lands_on_base <ref> — the ref, as a push destination, names the base branch.
+# is_base <branch> — the branch is the base now, or one a prompt pinned;
+# PINNED_HIT: a pinned name that matched when the base now does not.
+PINNED_HIT=""
+is_base() {
+  local b
+  if [ -n "\$base" ] && guard_ieq "\$1" "\$base"; then return 0; fi
+  for b in \${PINNED_BASES[@]+"\${PINNED_BASES[@]}"}; do
+    if guard_ieq "\$1" "\$b"; then PINNED_HIT=\$b; return 0; fi
+  done
+  return 1
+}
+
+# lands_on_base <ref> — the ref, as a push destination, names a base branch.
 lands_on_base() {
   local r=\$1
   case \$r in HEAD | @) r=\$head ;; esac
   r=\${r#refs/heads/}
   r=\${r#heads/}
-  [ -z "\$r" ] || guard_ieq "\$r" "\$base"
+  [ -z "\$r" ] || is_base "\$r"
 }
 
 # A refspec as written: [+]src[:dst], ref-name characters only. Anything else
@@ -28765,7 +28889,7 @@ push_allowed() {
 
 if [ "\$merges" = 1 ]; then
   if [ -z "\$base" ]; then reasons+=("git merge/pull with the base branch unknown")
-  elif [ "\$CMD_MOVED" = 1 ] || [ "\$switched" = 1 ] || [ -z "\$head" ] || guard_ieq "\$head" "\$base"; then
+  elif [ "\$CMD_MOVED" = 1 ] || [ "\$switched" = 1 ] || [ -z "\$head" ] || is_base "\$head"; then
     reasons+=("git merge/pull onto \$base")
   fi
 fi
@@ -28778,8 +28902,10 @@ for p in \${pushes[@]+"\${pushes[@]}"}; do
 done
 [ \${#reasons[@]} -gt 0 ] || guard_allow
 
+pin=""
+if [ -n "\$PINNED_HIT" ]; then pin=", or on \$PINNED_HIT, which an earlier prompt found to be the base (kept in \$(approval_state bases pinned))"; fi
 approval_require merge \\
-  "merge: manual — held: \$(IFS=';'; echo "\${reasons[*]}"). Landing on the base branch (\${base:-unknown}) needs the user's own \\\`merge\\\`" \\
+  "merge: manual — held: \$(IFS=';'; echo "\${reasons[*]}"). Landing on the base branch (\${base:-unknown}\$pin) needs the user's own \\\`merge\\\`" \\
   "To let it through, reply \\\`merge\\\` (or \\\`/task merge\\\`) — a plain \\"yes\\" does not approve it."
 `,
       executable: true,
@@ -29507,16 +29633,16 @@ specnaut-guide
       content: `e51a8a1291eb7e2e5a5a21122b971ee78c5392d4dbbabd28798f8f89df9ca08a  .gitattributes
 7a9b8bd4ecba4a1f8bfdece11124399c2e5811d17c42f07cdd60a3c7fe3346ea  _agents.txt
 e15179056fefd0d399c54a8755738046e3cba52d317faf684bd238d3ce2cbb72  _approval.sh
-2d66462ae07aa044176ec7837ab845b25ddaae58ccdc8835d261839299a13639  _baseline.sh
+c48a2d7797fa8f418da355fac867d86ac4de7b9f98e8408600bf5ec524b57e99  _baseline.sh
 ef80f32b8786606687a47a28b447272a8d44a86678bc389324d1d80105bcd696  _command.sh
 a1ce84dc85cfd2fd05306591da86f9a42729e1abff8e4ed8389275bd27f739e6  _git.sh
 40643b49524d4c5b46e21d56c4e264e041a8ffe3792ceff65088130a2f02d0d1  _guard.sh
 f9603a60a031f0921fb71f4cc9f7e958b26cd776763637147f4ca410eb8afb54  _listed.sh
 f5552945f77fb0d24f56bbf2e97fb64d284d9c716abf211ebcbe081cacdf8bdf  _paths.sh
 5bd55bf667fef0ccd63b240de888dbc06fbcdedebc8eb92c944e07866e59d753  _simple.sh
-54bad1d8e27d5dce7e9dfbe8aa808b41385181ce513e078ac5195a736dd7d303  approve-on-prompt.sh
+84ea3ec50be236f52d5c1e5022b9064091b2bdf558c308e677967982c3638e91  approve-on-prompt.sh
 28d13e1fbd696f79036cc1f94c3fd6aa68f4f862f0dd5f6d32191ad05392534f  guard-dispatch-model.sh
-155401c5140b3b96828638e0c9966df88f3345da8488ed8715f01fccfad868e0  guard-merge.sh
+781ba34ca8ff3d3a2f451494352e9416c9339b0b06d0c26c408d466f520568f0  guard-merge.sh
 a3eb7a8dfcb3bbc387008931993a59a4006e9fe6f8042f137752f4ee41ee24ce  guard-release.sh
 3364feb0f3a7892224b67e4f857bb6c085456da98c892d7199c4bbd10f122f8b  log-subagent.sh
 79e66c4451546f416b4e57d942f9ec8e9f078e00f24c0b5a634c1c24dc08bfca  merge-approved.sh
@@ -30889,11 +31015,20 @@ paths_pattern() {
     },
     ".specnaut/hooks/_baseline.sh": {
       content: `# shellcheck shell=bash
-# Sourced by approve-on-prompt.sh after _approval.sh and _paths.sh. The
+# Sourced by approve-on-prompt.sh after _approval.sh and _paths.sh, and by
+# guard-merge.sh after _approval.sh for what the prompt found of the landing
+# hold (cli#718) — it calls none of the file functions. The
 # writer-agnostic backstop behind protect-constitution.sh (spec 038 § 11 S1):
 # the PreToolUse guard reads commands, and no reading of a command sees every
 # writer — an interpreter, a script, a formatter, \`git checkout\`. So the user's
 # prompt fingerprints the four project-owned files, and Stop compares.
+#
+# It does the same for the merge mode (cli#718): merge-mode.sh --strict reads
+# copies of workflow.yml from refs a model can move (\`git update-ref\`), so the
+# mode the prompt found is kept beside the sums. guard-merge holds a turn
+# that began on manual for the whole turn, and Stop asks about a turn that
+# ended on auto when it began on manual, unless the turn approved \`merge\` or
+# \`gate-config\`.
 #
 # A file that changed during the turn with no approval of its kind blocks the
 # stop with a question for the user, and the version from the start of the
@@ -30931,6 +31066,7 @@ baseline_snapshot() {
     if [ -f "\$f" ]; then cp "\$f" "\$1/\$i"; fi
   done
   printf '%s' "\$sums" >"\$1/sums"
+  baseline_mode >"\$1/mode"
 }
 
 # baseline_check <dir> <approved kinds, space-separated> <stop_hook_active> —
@@ -30941,6 +31077,13 @@ baseline_check() {
   local i sum f kept keepdir ts seen=0
   local -a changed=()
   [ -f "\$1/sums" ] || return 0 # no prompt fingerprinted this session yet
+  if [ "\$(cat "\$1/mode" 2>/dev/null)" = manual ] && sum=\$(baseline_mode) && [ "\$sum" != manual ]; then
+    seen=1
+    case " \$2 " in
+      *" merge "* | *" gate-config "*) ;;
+      *) changed+=("the merge mode (manual when the turn began, \$sum now: a copy of .specnaut/workflow.yml, or a ref it is read from, was rewritten)") ;;
+    esac
+  fi
   _baseline_lists
   while read -r i sum; do
     f="\$GUARD_ROOT/\${BL_FILES[i]}"
@@ -30970,6 +31113,60 @@ baseline_check() {
     return 0
   fi
   jq -cn --arg r "\$r" '{decision: "block", reason: \$r}'
+}
+
+# The base branch as the user's prompts found it (cli#718). base-branch.sh
+# reads origin/HEAD, which one \`git remote set-head\` repoints: the landing
+# guard would then judge a push to the real base as a push elsewhere, and
+# read merge-mode from a copy the model wrote. So each prompt keeps the name
+# it resolves, per project, and guard-merge holds every kept name beside the
+# base as it resolves now. A kept name is never dropped: a pin only tightens.
+#   bases/<sha256(GUARD_ROOT)>/pinned   one name per line
+
+# baseline_mode — the merge mode as the landing guard reads it for this
+# project: merge-mode.sh --strict, every pinned base read too. Manual when it
+# cannot be read.
+baseline_mode() {
+  local n m
+  local -a a=()
+  baseline_bases
+  for n in \${PINNED_BASES[@]+"\${PINNED_BASES[@]}"}; do a+=(--base "\$n"); done
+  m=\$(cd "\$GUARD_ROOT" && bash .specnaut/scripts/bash/merge-mode.sh --strict \${a[@]+"\${a[@]}"} 2>/dev/null) || m=manual
+  [ "\$m" = auto ] || m=manual
+  printf '%s\\n' "\$m"
+}
+
+# baseline_pin_base — keep the base as it resolves now, unless it is kept
+# already. An unknown base is kept as \`?\`: until a prompt finds a name, the
+# guard treats the base as unknown whatever base-branch.sh prints later, so a
+# base the model creates mid-turn holds nothing.
+baseline_pin_base() {
+  local f b n
+  if ! b=\$(cd "\$GUARD_ROOT" && bash .specnaut/scripts/bash/base-branch.sh 2>/dev/null); then b='?'; fi
+  baseline_bases
+  if [ "\$b" = '?' ] && [ "\$PINNED_UNKNOWN" = 1 ]; then return 0; fi
+  for n in \${PINNED_BASES[@]+"\${PINNED_BASES[@]}"}; do
+    if guard_ieq "\$n" "\$b"; then return 0; fi
+  done
+  f=\$(approval_state bases pinned) # per project: \`pinned\` stands where a session id would
+  mkdir -p "\${f%/*}"
+  chmod 700 "\${f%/*}"
+  printf '%s\\n' "\$b" >>"\$f"
+}
+
+# baseline_bases — PINNED_BASES: this project's kept names that are plain
+# branch names, by base-branch.sh's own test; PINNED_UNKNOWN=1 when a prompt
+# found no base. Any other line is skipped.
+baseline_bases() {
+  local f n
+  PINNED_BASES=() PINNED_UNKNOWN=0
+  f=\$(approval_state bases pinned)
+  [ -f "\$f" ] || return 0
+  while IFS= read -r n || [ -n "\$n" ]; do
+    n=\${n%\$'\\r'}
+    if [ "\$n" = '?' ]; then PINNED_UNKNOWN=1
+    elif [[ \$n =~ ^[A-Za-z0-9][A-Za-z0-9._/-]*\$ ]] && [[ \$n != *..* ]]; then PINNED_BASES+=("\$n"); fi
+  done <"\$f"
 }
 `,
       executable: false,
@@ -31001,7 +31198,9 @@ baseline_check() {
 #
 # Each user prompt also fingerprints the project-owned files, and Stop
 # compares them (_baseline.sh): a change no approval covered blocks the stop
-# with a question.
+# with a question. It also keeps the base branch as it resolves and the merge
+# mode as the guard reads it (cli#718), so neither repointing origin/HEAD nor
+# rewriting a ref can loosen the landing hold after the prompt.
 #
 # Not a guard: every failure exits 0 with the reason on stderr. Exit 2 here
 # would block the user's prompt, or keep a Claude turn from stopping; failing
@@ -31069,13 +31268,14 @@ case \$P_EVENT in
     # What this turn approved is read before the stamp goes; the stamp goes
     # before anything that could fail and leave it outliving the turn.
     kinds=""
-    for k in constitution gate-config; do if approved "\$k"; then kinds+=" \$k"; fi; done
+    for k in constitution gate-config merge; do if approved "\$k"; then kinds+=" \$k"; fi; done
     rm -f "\$stamp"
     baseline_check "\$baseline" "\$kinds" "\${GF[1]}"
     exit 0 ;;
   UserPromptSubmit) rm -f "\$stamp" ;;
   *) rm -f "\$stamp"; guard_fail "unexpected event '\$P_EVENT' — expected UserPromptSubmit or Stop" ;;
 esac
+baseline_pin_base || : # before the snapshot, whose merge mode reads every pin; never in the way of the mint
 baseline_snapshot "\$baseline"
 
 kind=\$(approval_kind_of "\${GF[0]}")
@@ -31125,7 +31325,13 @@ mv -f "\$tmp" "\$stamp"
 # project AND for each folder a cd on the line names, and the line is inert
 # only if every one reads \`auto\`. A target's mode is read by this project's
 # own reader (\`merge-mode.sh --project\`), never by a script under the target.
-# The base is always the session's. An unknown base gates every form. Every gated reason goes through one arm,
+# The base is always the session's: the name base-branch.sh prints now AND
+# every name the user's prompts found it to be (_baseline.sh, cli#718) — a
+# repointed origin/HEAD adds a base, never removes one. Each is also read by
+# merge-mode (\`--base\`). And a turn whose prompt found the session's project
+# on manual stays manual (_baseline.sh): the copies merge-mode reads sit on
+# refs the model can move. An unknown base gates every form.
+# Every gated reason goes through one arm,
 # approval_require (spec 048 § 8): denied unless this turn's prompt approved
 # \`merge\`, in Claude's ask modes too — a click on a permission prompt is not
 # the user's word — and, with that approval, Claude's own prompt once where it
@@ -31149,6 +31355,8 @@ case \${BASH_SOURCE[0]} in */*) HOOK_DIR=\${BASH_SOURCE[0]%/*} ;; *) HOOK_DIR=. 
 . "\$HOOK_DIR/_git.sh" # and _listed.sh
 # shellcheck source=_approval.sh
 . "\$HOOK_DIR/_approval.sh"
+# shellcheck source=_baseline.sh
+. "\$HOOK_DIR/_baseline.sh"
 guard_init guard-merge "\${1:-}" argv:.tool_input.command
 [ "\$P_TOOL" = Bash ] || guard_fail "expected a Bash tool call, got '\$P_TOOL'"
 [ -n "\${GF[0]}" ] || guard_fail "a Bash call without tool_input.command"
@@ -31224,26 +31432,47 @@ cd_project() {
 # Every candidate read by the session's own reader; one not on auto, or one
 # with no project to read (\`?\`, no repository, no Specnaut), holds the line.
 guard_root
+baseline_bases
+began=""
+if approval_session_ok "\$P_SESSION"; then
+  began=\$(cat "\$(approval_state baselines "\$P_SESSION")/mode" 2>/dev/null) || began=""
+fi
 mode=auto
 for d in "\$GUARD_ROOT" \${CD_DIRS[@]+"\${CD_DIRS[@]}"}; do
   a=()
   if [ "\$d" = '?' ] || { [ "\$d" != "\$GUARD_ROOT" ] && ! cd_project "\$d"; }; then mode=manual; break; fi
-  if [ "\$d" != "\$GUARD_ROOT" ]; then a=(--project "\$CD_PROJ"); fi
+  if [ "\$d" = "\$GUARD_ROOT" ] && [ "\$began" = manual ]; then mode=manual; break; fi
+  if [ "\$d" != "\$GUARD_ROOT" ]; then a=(--project "\$CD_PROJ")
+  else for b in \${PINNED_BASES[@]+"\${PINNED_BASES[@]}"}; do a+=(--base "\$b"); done; fi
   mode=\$(cd "\$GUARD_ROOT" && bash .specnaut/scripts/bash/merge-mode.sh --strict \${a[@]+"\${a[@]}"} 2>/dev/null) || mode=manual
   [ "\$mode" = auto ] || break
 done
 [ "\$mode" != auto ] || guard_allow
 
 if ! base=\$(cd "\$GUARD_ROOT" && bash .specnaut/scripts/bash/base-branch.sh 2>/dev/null); then base=""; fi
+# A prompt found no base, and none since found one: still unknown (cli#718).
+if [ "\$PINNED_UNKNOWN" = 1 ] && [ \${#PINNED_BASES[@]} = 0 ]; then base=""; fi
 if ! head=\$(guard_git -C "\$GUARD_CWD" symbolic-ref --quiet --short HEAD 2>/dev/null); then head=""; fi
 
-# lands_on_base <ref> — the ref, as a push destination, names the base branch.
+# is_base <branch> — the branch is the base now, or one a prompt pinned;
+# PINNED_HIT: a pinned name that matched when the base now does not.
+PINNED_HIT=""
+is_base() {
+  local b
+  if [ -n "\$base" ] && guard_ieq "\$1" "\$base"; then return 0; fi
+  for b in \${PINNED_BASES[@]+"\${PINNED_BASES[@]}"}; do
+    if guard_ieq "\$1" "\$b"; then PINNED_HIT=\$b; return 0; fi
+  done
+  return 1
+}
+
+# lands_on_base <ref> — the ref, as a push destination, names a base branch.
 lands_on_base() {
   local r=\$1
   case \$r in HEAD | @) r=\$head ;; esac
   r=\${r#refs/heads/}
   r=\${r#heads/}
-  [ -z "\$r" ] || guard_ieq "\$r" "\$base"
+  [ -z "\$r" ] || is_base "\$r"
 }
 
 # A refspec as written: [+]src[:dst], ref-name characters only. Anything else
@@ -31280,7 +31509,7 @@ push_allowed() {
 
 if [ "\$merges" = 1 ]; then
   if [ -z "\$base" ]; then reasons+=("git merge/pull with the base branch unknown")
-  elif [ "\$CMD_MOVED" = 1 ] || [ "\$switched" = 1 ] || [ -z "\$head" ] || guard_ieq "\$head" "\$base"; then
+  elif [ "\$CMD_MOVED" = 1 ] || [ "\$switched" = 1 ] || [ -z "\$head" ] || is_base "\$head"; then
     reasons+=("git merge/pull onto \$base")
   fi
 fi
@@ -31293,8 +31522,10 @@ for p in \${pushes[@]+"\${pushes[@]}"}; do
 done
 [ \${#reasons[@]} -gt 0 ] || guard_allow
 
+pin=""
+if [ -n "\$PINNED_HIT" ]; then pin=", or on \$PINNED_HIT, which an earlier prompt found to be the base (kept in \$(approval_state bases pinned))"; fi
 approval_require merge \\
-  "merge: manual — held: \$(IFS=';'; echo "\${reasons[*]}"). Landing on the base branch (\${base:-unknown}) needs the user's own \\\`merge\\\`" \\
+  "merge: manual — held: \$(IFS=';'; echo "\${reasons[*]}"). Landing on the base branch (\${base:-unknown}\$pin) needs the user's own \\\`merge\\\`" \\
   "To let it through, reply \\\`merge\\\` (or \\\`/task merge\\\`) — a plain \\"yes\\" does not approve it."
 `,
       executable: true,
@@ -32022,16 +32253,16 @@ specnaut-guide
       content: `e51a8a1291eb7e2e5a5a21122b971ee78c5392d4dbbabd28798f8f89df9ca08a  .gitattributes
 7a9b8bd4ecba4a1f8bfdece11124399c2e5811d17c42f07cdd60a3c7fe3346ea  _agents.txt
 e15179056fefd0d399c54a8755738046e3cba52d317faf684bd238d3ce2cbb72  _approval.sh
-2d66462ae07aa044176ec7837ab845b25ddaae58ccdc8835d261839299a13639  _baseline.sh
+c48a2d7797fa8f418da355fac867d86ac4de7b9f98e8408600bf5ec524b57e99  _baseline.sh
 ef80f32b8786606687a47a28b447272a8d44a86678bc389324d1d80105bcd696  _command.sh
 a1ce84dc85cfd2fd05306591da86f9a42729e1abff8e4ed8389275bd27f739e6  _git.sh
 40643b49524d4c5b46e21d56c4e264e041a8ffe3792ceff65088130a2f02d0d1  _guard.sh
 f9603a60a031f0921fb71f4cc9f7e958b26cd776763637147f4ca410eb8afb54  _listed.sh
 f5552945f77fb0d24f56bbf2e97fb64d284d9c716abf211ebcbe081cacdf8bdf  _paths.sh
 5bd55bf667fef0ccd63b240de888dbc06fbcdedebc8eb92c944e07866e59d753  _simple.sh
-54bad1d8e27d5dce7e9dfbe8aa808b41385181ce513e078ac5195a736dd7d303  approve-on-prompt.sh
+84ea3ec50be236f52d5c1e5022b9064091b2bdf558c308e677967982c3638e91  approve-on-prompt.sh
 28d13e1fbd696f79036cc1f94c3fd6aa68f4f862f0dd5f6d32191ad05392534f  guard-dispatch-model.sh
-155401c5140b3b96828638e0c9966df88f3345da8488ed8715f01fccfad868e0  guard-merge.sh
+781ba34ca8ff3d3a2f451494352e9416c9339b0b06d0c26c408d466f520568f0  guard-merge.sh
 a3eb7a8dfcb3bbc387008931993a59a4006e9fe6f8042f137752f4ee41ee24ce  guard-release.sh
 3364feb0f3a7892224b67e4f857bb6c085456da98c892d7199c4bbd10f122f8b  log-subagent.sh
 79e66c4451546f416b4e57d942f9ec8e9f078e00f24c0b5a634c1c24dc08bfca  merge-approved.sh
@@ -32059,17 +32290,17 @@ c59dea265fb0e13092cb4ef650a436b29e34be4f18397aeaebc5408811ed3c7c  release-comman
         "hooks": [
           {
             "type": "command",
-            "command": "r=\$PWD; while [ -n \\"\$r\\" ] && [ ! -d \\"\$r/.specnaut/hooks\\" ]; do r=\${r%/*}; done; [ \\"\$( (sha256sum 2>/dev/null || shasum -a 256) < \\"\$r/.specnaut/hooks/SHA256SUMS\\" 2>/dev/null | cut -c1-64)\\" = \\"5f1a2aabce6f1fab434be1e3233815e5065e45b0363395ad6371fea0b3adad18\\" ] && (cd \\"\$r/.specnaut/hooks\\" && (sha256sum -c --status SHA256SUMS 2>/dev/null || shasum -a 256 -c --status SHA256SUMS)) && exec bash \\"\$r/.specnaut/hooks/guard-merge.sh\\" codex; echo \\"specnaut: .specnaut/hooks changed since it was trusted — run specnaut upgrade, then /hooks\\" >&2; exit 2",
+            "command": "r=\$PWD; while [ -n \\"\$r\\" ] && [ ! -d \\"\$r/.specnaut/hooks\\" ]; do r=\${r%/*}; done; [ \\"\$( (sha256sum 2>/dev/null || shasum -a 256) < \\"\$r/.specnaut/hooks/SHA256SUMS\\" 2>/dev/null | cut -c1-64)\\" = \\"a68b19aea300248a01938f069c29aa2d023cbf873c53d3b79dff0a8229747d8a\\" ] && (cd \\"\$r/.specnaut/hooks\\" && (sha256sum -c --status SHA256SUMS 2>/dev/null || shasum -a 256 -c --status SHA256SUMS)) && exec bash \\"\$r/.specnaut/hooks/guard-merge.sh\\" codex; echo \\"specnaut: .specnaut/hooks changed since it was trusted — run specnaut upgrade, then /hooks\\" >&2; exit 2",
             "timeout": 10
           },
           {
             "type": "command",
-            "command": "r=\$PWD; while [ -n \\"\$r\\" ] && [ ! -d \\"\$r/.specnaut/hooks\\" ]; do r=\${r%/*}; done; [ \\"\$( (sha256sum 2>/dev/null || shasum -a 256) < \\"\$r/.specnaut/hooks/SHA256SUMS\\" 2>/dev/null | cut -c1-64)\\" = \\"5f1a2aabce6f1fab434be1e3233815e5065e45b0363395ad6371fea0b3adad18\\" ] && (cd \\"\$r/.specnaut/hooks\\" && (sha256sum -c --status SHA256SUMS 2>/dev/null || shasum -a 256 -c --status SHA256SUMS)) && exec bash \\"\$r/.specnaut/hooks/guard-release.sh\\" codex; echo \\"specnaut: .specnaut/hooks changed since it was trusted — run specnaut upgrade, then /hooks\\" >&2; exit 2",
+            "command": "r=\$PWD; while [ -n \\"\$r\\" ] && [ ! -d \\"\$r/.specnaut/hooks\\" ]; do r=\${r%/*}; done; [ \\"\$( (sha256sum 2>/dev/null || shasum -a 256) < \\"\$r/.specnaut/hooks/SHA256SUMS\\" 2>/dev/null | cut -c1-64)\\" = \\"a68b19aea300248a01938f069c29aa2d023cbf873c53d3b79dff0a8229747d8a\\" ] && (cd \\"\$r/.specnaut/hooks\\" && (sha256sum -c --status SHA256SUMS 2>/dev/null || shasum -a 256 -c --status SHA256SUMS)) && exec bash \\"\$r/.specnaut/hooks/guard-release.sh\\" codex; echo \\"specnaut: .specnaut/hooks changed since it was trusted — run specnaut upgrade, then /hooks\\" >&2; exit 2",
             "timeout": 10
           },
           {
             "type": "command",
-            "command": "r=\$PWD; while [ -n \\"\$r\\" ] && [ ! -d \\"\$r/.specnaut/hooks\\" ]; do r=\${r%/*}; done; [ \\"\$( (sha256sum 2>/dev/null || shasum -a 256) < \\"\$r/.specnaut/hooks/SHA256SUMS\\" 2>/dev/null | cut -c1-64)\\" = \\"5f1a2aabce6f1fab434be1e3233815e5065e45b0363395ad6371fea0b3adad18\\" ] && (cd \\"\$r/.specnaut/hooks\\" && (sha256sum -c --status SHA256SUMS 2>/dev/null || shasum -a 256 -c --status SHA256SUMS)) && exec bash \\"\$r/.specnaut/hooks/protect-constitution.sh\\" codex; echo \\"specnaut: .specnaut/hooks changed since it was trusted — run specnaut upgrade, then /hooks\\" >&2; exit 2",
+            "command": "r=\$PWD; while [ -n \\"\$r\\" ] && [ ! -d \\"\$r/.specnaut/hooks\\" ]; do r=\${r%/*}; done; [ \\"\$( (sha256sum 2>/dev/null || shasum -a 256) < \\"\$r/.specnaut/hooks/SHA256SUMS\\" 2>/dev/null | cut -c1-64)\\" = \\"a68b19aea300248a01938f069c29aa2d023cbf873c53d3b79dff0a8229747d8a\\" ] && (cd \\"\$r/.specnaut/hooks\\" && (sha256sum -c --status SHA256SUMS 2>/dev/null || shasum -a 256 -c --status SHA256SUMS)) && exec bash \\"\$r/.specnaut/hooks/protect-constitution.sh\\" codex; echo \\"specnaut: .specnaut/hooks changed since it was trusted — run specnaut upgrade, then /hooks\\" >&2; exit 2",
             "timeout": 10
           }
         ]
@@ -32079,12 +32310,12 @@ c59dea265fb0e13092cb4ef650a436b29e34be4f18397aeaebc5408811ed3c7c  release-comman
         "hooks": [
           {
             "type": "command",
-            "command": "r=\$PWD; while [ -n \\"\$r\\" ] && [ ! -d \\"\$r/.specnaut/hooks\\" ]; do r=\${r%/*}; done; [ \\"\$( (sha256sum 2>/dev/null || shasum -a 256) < \\"\$r/.specnaut/hooks/SHA256SUMS\\" 2>/dev/null | cut -c1-64)\\" = \\"5f1a2aabce6f1fab434be1e3233815e5065e45b0363395ad6371fea0b3adad18\\" ] && (cd \\"\$r/.specnaut/hooks\\" && (sha256sum -c --status SHA256SUMS 2>/dev/null || shasum -a 256 -c --status SHA256SUMS)) && exec bash \\"\$r/.specnaut/hooks/protect-generated.sh\\" codex; echo \\"specnaut: .specnaut/hooks changed since it was trusted — run specnaut upgrade, then /hooks\\" >&2; exit 2",
+            "command": "r=\$PWD; while [ -n \\"\$r\\" ] && [ ! -d \\"\$r/.specnaut/hooks\\" ]; do r=\${r%/*}; done; [ \\"\$( (sha256sum 2>/dev/null || shasum -a 256) < \\"\$r/.specnaut/hooks/SHA256SUMS\\" 2>/dev/null | cut -c1-64)\\" = \\"a68b19aea300248a01938f069c29aa2d023cbf873c53d3b79dff0a8229747d8a\\" ] && (cd \\"\$r/.specnaut/hooks\\" && (sha256sum -c --status SHA256SUMS 2>/dev/null || shasum -a 256 -c --status SHA256SUMS)) && exec bash \\"\$r/.specnaut/hooks/protect-generated.sh\\" codex; echo \\"specnaut: .specnaut/hooks changed since it was trusted — run specnaut upgrade, then /hooks\\" >&2; exit 2",
             "timeout": 10
           },
           {
             "type": "command",
-            "command": "r=\$PWD; while [ -n \\"\$r\\" ] && [ ! -d \\"\$r/.specnaut/hooks\\" ]; do r=\${r%/*}; done; [ \\"\$( (sha256sum 2>/dev/null || shasum -a 256) < \\"\$r/.specnaut/hooks/SHA256SUMS\\" 2>/dev/null | cut -c1-64)\\" = \\"5f1a2aabce6f1fab434be1e3233815e5065e45b0363395ad6371fea0b3adad18\\" ] && (cd \\"\$r/.specnaut/hooks\\" && (sha256sum -c --status SHA256SUMS 2>/dev/null || shasum -a 256 -c --status SHA256SUMS)) && exec bash \\"\$r/.specnaut/hooks/protect-constitution.sh\\" codex; echo \\"specnaut: .specnaut/hooks changed since it was trusted — run specnaut upgrade, then /hooks\\" >&2; exit 2",
+            "command": "r=\$PWD; while [ -n \\"\$r\\" ] && [ ! -d \\"\$r/.specnaut/hooks\\" ]; do r=\${r%/*}; done; [ \\"\$( (sha256sum 2>/dev/null || shasum -a 256) < \\"\$r/.specnaut/hooks/SHA256SUMS\\" 2>/dev/null | cut -c1-64)\\" = \\"a68b19aea300248a01938f069c29aa2d023cbf873c53d3b79dff0a8229747d8a\\" ] && (cd \\"\$r/.specnaut/hooks\\" && (sha256sum -c --status SHA256SUMS 2>/dev/null || shasum -a 256 -c --status SHA256SUMS)) && exec bash \\"\$r/.specnaut/hooks/protect-constitution.sh\\" codex; echo \\"specnaut: .specnaut/hooks changed since it was trusted — run specnaut upgrade, then /hooks\\" >&2; exit 2",
             "timeout": 10
           }
         ]
@@ -32094,7 +32325,7 @@ c59dea265fb0e13092cb4ef650a436b29e34be4f18397aeaebc5408811ed3c7c  release-comman
         "hooks": [
           {
             "type": "command",
-            "command": "r=\$PWD; while [ -n \\"\$r\\" ] && [ ! -d \\"\$r/.specnaut/hooks\\" ]; do r=\${r%/*}; done; [ \\"\$( (sha256sum 2>/dev/null || shasum -a 256) < \\"\$r/.specnaut/hooks/SHA256SUMS\\" 2>/dev/null | cut -c1-64)\\" = \\"5f1a2aabce6f1fab434be1e3233815e5065e45b0363395ad6371fea0b3adad18\\" ] && (cd \\"\$r/.specnaut/hooks\\" && (sha256sum -c --status SHA256SUMS 2>/dev/null || shasum -a 256 -c --status SHA256SUMS)) && exec bash \\"\$r/.specnaut/hooks/guard-dispatch-model.sh\\" codex; echo \\"specnaut: .specnaut/hooks changed since it was trusted — run specnaut upgrade, then /hooks\\" >&2; exit 2",
+            "command": "r=\$PWD; while [ -n \\"\$r\\" ] && [ ! -d \\"\$r/.specnaut/hooks\\" ]; do r=\${r%/*}; done; [ \\"\$( (sha256sum 2>/dev/null || shasum -a 256) < \\"\$r/.specnaut/hooks/SHA256SUMS\\" 2>/dev/null | cut -c1-64)\\" = \\"a68b19aea300248a01938f069c29aa2d023cbf873c53d3b79dff0a8229747d8a\\" ] && (cd \\"\$r/.specnaut/hooks\\" && (sha256sum -c --status SHA256SUMS 2>/dev/null || shasum -a 256 -c --status SHA256SUMS)) && exec bash \\"\$r/.specnaut/hooks/guard-dispatch-model.sh\\" codex; echo \\"specnaut: .specnaut/hooks changed since it was trusted — run specnaut upgrade, then /hooks\\" >&2; exit 2",
             "timeout": 10
           }
         ]
@@ -32105,7 +32336,7 @@ c59dea265fb0e13092cb4ef650a436b29e34be4f18397aeaebc5408811ed3c7c  release-comman
         "hooks": [
           {
             "type": "command",
-            "command": "r=\$PWD; while [ -n \\"\$r\\" ] && [ ! -d \\"\$r/.specnaut/hooks\\" ]; do r=\${r%/*}; done; [ \\"\$( (sha256sum 2>/dev/null || shasum -a 256) < \\"\$r/.specnaut/hooks/SHA256SUMS\\" 2>/dev/null | cut -c1-64)\\" = \\"5f1a2aabce6f1fab434be1e3233815e5065e45b0363395ad6371fea0b3adad18\\" ] && (cd \\"\$r/.specnaut/hooks\\" && (sha256sum -c --status SHA256SUMS 2>/dev/null || shasum -a 256 -c --status SHA256SUMS)) && exec bash \\"\$r/.specnaut/hooks/approve-on-prompt.sh\\" codex; echo \\"specnaut: .specnaut/hooks changed since it was trusted — run specnaut upgrade, then /hooks\\" >&2; exit 0",
+            "command": "r=\$PWD; while [ -n \\"\$r\\" ] && [ ! -d \\"\$r/.specnaut/hooks\\" ]; do r=\${r%/*}; done; [ \\"\$( (sha256sum 2>/dev/null || shasum -a 256) < \\"\$r/.specnaut/hooks/SHA256SUMS\\" 2>/dev/null | cut -c1-64)\\" = \\"a68b19aea300248a01938f069c29aa2d023cbf873c53d3b79dff0a8229747d8a\\" ] && (cd \\"\$r/.specnaut/hooks\\" && (sha256sum -c --status SHA256SUMS 2>/dev/null || shasum -a 256 -c --status SHA256SUMS)) && exec bash \\"\$r/.specnaut/hooks/approve-on-prompt.sh\\" codex; echo \\"specnaut: .specnaut/hooks changed since it was trusted — run specnaut upgrade, then /hooks\\" >&2; exit 0",
             "timeout": 10
           }
         ]
@@ -32116,7 +32347,7 @@ c59dea265fb0e13092cb4ef650a436b29e34be4f18397aeaebc5408811ed3c7c  release-comman
         "hooks": [
           {
             "type": "command",
-            "command": "r=\$PWD; while [ -n \\"\$r\\" ] && [ ! -d \\"\$r/.specnaut/hooks\\" ]; do r=\${r%/*}; done; [ \\"\$( (sha256sum 2>/dev/null || shasum -a 256) < \\"\$r/.specnaut/hooks/SHA256SUMS\\" 2>/dev/null | cut -c1-64)\\" = \\"5f1a2aabce6f1fab434be1e3233815e5065e45b0363395ad6371fea0b3adad18\\" ] && (cd \\"\$r/.specnaut/hooks\\" && (sha256sum -c --status SHA256SUMS 2>/dev/null || shasum -a 256 -c --status SHA256SUMS)) && exec bash \\"\$r/.specnaut/hooks/approve-on-prompt.sh\\" codex; echo \\"specnaut: .specnaut/hooks changed since it was trusted — run specnaut upgrade, then /hooks\\" >&2; exit 0",
+            "command": "r=\$PWD; while [ -n \\"\$r\\" ] && [ ! -d \\"\$r/.specnaut/hooks\\" ]; do r=\${r%/*}; done; [ \\"\$( (sha256sum 2>/dev/null || shasum -a 256) < \\"\$r/.specnaut/hooks/SHA256SUMS\\" 2>/dev/null | cut -c1-64)\\" = \\"a68b19aea300248a01938f069c29aa2d023cbf873c53d3b79dff0a8229747d8a\\" ] && (cd \\"\$r/.specnaut/hooks\\" && (sha256sum -c --status SHA256SUMS 2>/dev/null || shasum -a 256 -c --status SHA256SUMS)) && exec bash \\"\$r/.specnaut/hooks/approve-on-prompt.sh\\" codex; echo \\"specnaut: .specnaut/hooks changed since it was trusted — run specnaut upgrade, then /hooks\\" >&2; exit 0",
             "timeout": 10
           }
         ]
@@ -32127,7 +32358,7 @@ c59dea265fb0e13092cb4ef650a436b29e34be4f18397aeaebc5408811ed3c7c  release-comman
         "hooks": [
           {
             "type": "command",
-            "command": "r=\$PWD; while [ -n \\"\$r\\" ] && [ ! -d \\"\$r/.specnaut/hooks\\" ]; do r=\${r%/*}; done; [ \\"\$( (sha256sum 2>/dev/null || shasum -a 256) < \\"\$r/.specnaut/hooks/SHA256SUMS\\" 2>/dev/null | cut -c1-64)\\" = \\"5f1a2aabce6f1fab434be1e3233815e5065e45b0363395ad6371fea0b3adad18\\" ] && (cd \\"\$r/.specnaut/hooks\\" && (sha256sum -c --status SHA256SUMS 2>/dev/null || shasum -a 256 -c --status SHA256SUMS)) && exec bash \\"\$r/.specnaut/hooks/log-subagent.sh\\" start; echo \\"specnaut: .specnaut/hooks changed since it was trusted — run specnaut upgrade, then /hooks\\" >&2; exit 0",
+            "command": "r=\$PWD; while [ -n \\"\$r\\" ] && [ ! -d \\"\$r/.specnaut/hooks\\" ]; do r=\${r%/*}; done; [ \\"\$( (sha256sum 2>/dev/null || shasum -a 256) < \\"\$r/.specnaut/hooks/SHA256SUMS\\" 2>/dev/null | cut -c1-64)\\" = \\"a68b19aea300248a01938f069c29aa2d023cbf873c53d3b79dff0a8229747d8a\\" ] && (cd \\"\$r/.specnaut/hooks\\" && (sha256sum -c --status SHA256SUMS 2>/dev/null || shasum -a 256 -c --status SHA256SUMS)) && exec bash \\"\$r/.specnaut/hooks/log-subagent.sh\\" start; echo \\"specnaut: .specnaut/hooks changed since it was trusted — run specnaut upgrade, then /hooks\\" >&2; exit 0",
             "timeout": 10
           }
         ]
@@ -32138,7 +32369,7 @@ c59dea265fb0e13092cb4ef650a436b29e34be4f18397aeaebc5408811ed3c7c  release-comman
         "hooks": [
           {
             "type": "command",
-            "command": "r=\$PWD; while [ -n \\"\$r\\" ] && [ ! -d \\"\$r/.specnaut/hooks\\" ]; do r=\${r%/*}; done; [ \\"\$( (sha256sum 2>/dev/null || shasum -a 256) < \\"\$r/.specnaut/hooks/SHA256SUMS\\" 2>/dev/null | cut -c1-64)\\" = \\"5f1a2aabce6f1fab434be1e3233815e5065e45b0363395ad6371fea0b3adad18\\" ] && (cd \\"\$r/.specnaut/hooks\\" && (sha256sum -c --status SHA256SUMS 2>/dev/null || shasum -a 256 -c --status SHA256SUMS)) && exec bash \\"\$r/.specnaut/hooks/log-subagent.sh\\" stop; echo \\"specnaut: .specnaut/hooks changed since it was trusted — run specnaut upgrade, then /hooks\\" >&2; exit 0",
+            "command": "r=\$PWD; while [ -n \\"\$r\\" ] && [ ! -d \\"\$r/.specnaut/hooks\\" ]; do r=\${r%/*}; done; [ \\"\$( (sha256sum 2>/dev/null || shasum -a 256) < \\"\$r/.specnaut/hooks/SHA256SUMS\\" 2>/dev/null | cut -c1-64)\\" = \\"a68b19aea300248a01938f069c29aa2d023cbf873c53d3b79dff0a8229747d8a\\" ] && (cd \\"\$r/.specnaut/hooks\\" && (sha256sum -c --status SHA256SUMS 2>/dev/null || shasum -a 256 -c --status SHA256SUMS)) && exec bash \\"\$r/.specnaut/hooks/log-subagent.sh\\" stop; echo \\"specnaut: .specnaut/hooks changed since it was trusted — run specnaut upgrade, then /hooks\\" >&2; exit 0",
             "timeout": 10
           }
         ]

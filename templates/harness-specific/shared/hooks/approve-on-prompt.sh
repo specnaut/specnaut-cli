@@ -24,7 +24,9 @@
 #
 # Each user prompt also fingerprints the project-owned files, and Stop
 # compares them (_baseline.sh): a change no approval covered blocks the stop
-# with a question.
+# with a question. It also keeps the base branch as it resolves and the merge
+# mode as the guard reads it (cli#718), so neither repointing origin/HEAD nor
+# rewriting a ref can loosen the landing hold after the prompt.
 #
 # Not a guard: every failure exits 0 with the reason on stderr. Exit 2 here
 # would block the user's prompt, or keep a Claude turn from stopping; failing
@@ -92,13 +94,14 @@ case $P_EVENT in
     # What this turn approved is read before the stamp goes; the stamp goes
     # before anything that could fail and leave it outliving the turn.
     kinds=""
-    for k in constitution gate-config; do if approved "$k"; then kinds+=" $k"; fi; done
+    for k in constitution gate-config merge; do if approved "$k"; then kinds+=" $k"; fi; done
     rm -f "$stamp"
     baseline_check "$baseline" "$kinds" "${GF[1]}"
     exit 0 ;;
   UserPromptSubmit) rm -f "$stamp" ;;
   *) rm -f "$stamp"; guard_fail "unexpected event '$P_EVENT' — expected UserPromptSubmit or Stop" ;;
 esac
+baseline_pin_base || : # before the snapshot, whose merge mode reads every pin; never in the way of the mint
 baseline_snapshot "$baseline"
 
 kind=$(approval_kind_of "${GF[0]}")

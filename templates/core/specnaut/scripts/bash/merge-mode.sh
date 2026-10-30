@@ -30,25 +30,35 @@
 #              lives under <dir> does, so a cloned repository's scripts are
 #              never executed by the hook that names it. A <dir> that cannot
 #              be entered is manual.
+#   --base <name>
+#              with --strict, also read <name>'s copies (local and origin),
+#              as the base's are read; repeatable. The landing hook passes
+#              the bases the user's prompts pinned (cli#718): a model that
+#              repoints origin/HEAD at a branch of its own has moved what
+#              base-branch.sh prints, not these. One with no ref is skipped
+#              (a base since renamed); one that is not a plain branch name
+#              is manual.
 #
 # Every git call disables core.fsmonitor — the one read-path setting that
 # runs a program — since <dir>'s .git/config is not this project's to trust.
 #
-# Usage: merge-mode.sh [--strict] [--project <dir>]
+# Usage: merge-mode.sh [--strict] [--project <dir>] [--base <name>]…
 set -euo pipefail
 export GIT_OPTIONAL_LOCKS=0
-usage() { echo "usage: merge-mode.sh [--strict] [--project <dir>]" >&2; exit 2; }
+usage() { echo "usage: merge-mode.sh [--strict] [--project <dir>] [--base <name>]..." >&2; exit 2; }
 g() { git --no-pager -c core.fsmonitor=false "$@"; }
 
-strict=0 project=""
+strict=0 project="" pinned=()
 while [ "$#" -gt 0 ]; do
   case $1 in
     --strict) strict=1 ;;
     --project) { [ "$#" -ge 2 ] && [ -n "$2" ]; } || usage; project=$2; shift ;;
+    --base) { [ "$#" -ge 2 ] && [ -n "$2" ]; } || usage; pinned+=("$2"); shift ;;
     *) usage ;;
   esac
   shift
 done
+[ ${#pinned[@]} = 0 ] || [ "$strict" = 1 ] || usage # --base is read under --strict only
 
 here=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)
 # The project this script is installed in, not the git toplevel: a project
@@ -133,6 +143,17 @@ if [ "$found" = 0 ]; then
   echo manual
   exit 0
 fi
+for b in ${pinned[@]+"${pinned[@]}"}; do
+  if ! [[ $b =~ ^[A-Za-z0-9][A-Za-z0-9._/-]*$ ]] || [[ $b == *..* ]]; then
+    echo "merge-mode: manual (a pinned base '$b' is not a plain branch name)" >&2
+    echo manual
+    exit 0
+  fi
+  for ref in "refs/heads/$b" "refs/remotes/origin/$b"; do
+    g -C "$root" show-ref --verify --quiet "$ref" || continue
+    if c=$(blob "$ref"); then verdict "$ref" <<<"$c"; fi
+  done
+done
 
 echo "merge-mode: auto (every copy of $rel agrees, or none sets merge:)" >&2
 echo auto

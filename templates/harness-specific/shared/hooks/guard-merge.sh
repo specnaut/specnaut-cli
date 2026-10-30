@@ -25,7 +25,13 @@
 # project AND for each folder a cd on the line names, and the line is inert
 # only if every one reads `auto`. A target's mode is read by this project's
 # own reader (`merge-mode.sh --project`), never by a script under the target.
-# The base is always the session's. An unknown base gates every form. Every gated reason goes through one arm,
+# The base is always the session's: the name base-branch.sh prints now AND
+# every name the user's prompts found it to be (_baseline.sh, cli#718) — a
+# repointed origin/HEAD adds a base, never removes one. Each is also read by
+# merge-mode (`--base`). And a turn whose prompt found the session's project
+# on manual stays manual (_baseline.sh): the copies merge-mode reads sit on
+# refs the model can move. An unknown base gates every form.
+# Every gated reason goes through one arm,
 # approval_require (spec 048 § 8): denied unless this turn's prompt approved
 # `merge`, in Claude's ask modes too — a click on a permission prompt is not
 # the user's word — and, with that approval, Claude's own prompt once where it
@@ -49,6 +55,8 @@ case ${BASH_SOURCE[0]} in */*) HOOK_DIR=${BASH_SOURCE[0]%/*} ;; *) HOOK_DIR=. ;;
 . "$HOOK_DIR/_git.sh" # and _listed.sh
 # shellcheck source=_approval.sh
 . "$HOOK_DIR/_approval.sh"
+# shellcheck source=_baseline.sh
+. "$HOOK_DIR/_baseline.sh"
 guard_init guard-merge "${1:-}" argv:.tool_input.command
 [ "$P_TOOL" = Bash ] || guard_fail "expected a Bash tool call, got '$P_TOOL'"
 [ -n "${GF[0]}" ] || guard_fail "a Bash call without tool_input.command"
@@ -124,26 +132,47 @@ cd_project() {
 # Every candidate read by the session's own reader; one not on auto, or one
 # with no project to read (`?`, no repository, no Specnaut), holds the line.
 guard_root
+baseline_bases
+began=""
+if approval_session_ok "$P_SESSION"; then
+  began=$(cat "$(approval_state baselines "$P_SESSION")/mode" 2>/dev/null) || began=""
+fi
 mode=auto
 for d in "$GUARD_ROOT" ${CD_DIRS[@]+"${CD_DIRS[@]}"}; do
   a=()
   if [ "$d" = '?' ] || { [ "$d" != "$GUARD_ROOT" ] && ! cd_project "$d"; }; then mode=manual; break; fi
-  if [ "$d" != "$GUARD_ROOT" ]; then a=(--project "$CD_PROJ"); fi
+  if [ "$d" = "$GUARD_ROOT" ] && [ "$began" = manual ]; then mode=manual; break; fi
+  if [ "$d" != "$GUARD_ROOT" ]; then a=(--project "$CD_PROJ")
+  else for b in ${PINNED_BASES[@]+"${PINNED_BASES[@]}"}; do a+=(--base "$b"); done; fi
   mode=$(cd "$GUARD_ROOT" && bash .specnaut/scripts/bash/merge-mode.sh --strict ${a[@]+"${a[@]}"} 2>/dev/null) || mode=manual
   [ "$mode" = auto ] || break
 done
 [ "$mode" != auto ] || guard_allow
 
 if ! base=$(cd "$GUARD_ROOT" && bash .specnaut/scripts/bash/base-branch.sh 2>/dev/null); then base=""; fi
+# A prompt found no base, and none since found one: still unknown (cli#718).
+if [ "$PINNED_UNKNOWN" = 1 ] && [ ${#PINNED_BASES[@]} = 0 ]; then base=""; fi
 if ! head=$(guard_git -C "$GUARD_CWD" symbolic-ref --quiet --short HEAD 2>/dev/null); then head=""; fi
 
-# lands_on_base <ref> — the ref, as a push destination, names the base branch.
+# is_base <branch> — the branch is the base now, or one a prompt pinned;
+# PINNED_HIT: a pinned name that matched when the base now does not.
+PINNED_HIT=""
+is_base() {
+  local b
+  if [ -n "$base" ] && guard_ieq "$1" "$base"; then return 0; fi
+  for b in ${PINNED_BASES[@]+"${PINNED_BASES[@]}"}; do
+    if guard_ieq "$1" "$b"; then PINNED_HIT=$b; return 0; fi
+  done
+  return 1
+}
+
+# lands_on_base <ref> — the ref, as a push destination, names a base branch.
 lands_on_base() {
   local r=$1
   case $r in HEAD | @) r=$head ;; esac
   r=${r#refs/heads/}
   r=${r#heads/}
-  [ -z "$r" ] || guard_ieq "$r" "$base"
+  [ -z "$r" ] || is_base "$r"
 }
 
 # A refspec as written: [+]src[:dst], ref-name characters only. Anything else
@@ -180,7 +209,7 @@ push_allowed() {
 
 if [ "$merges" = 1 ]; then
   if [ -z "$base" ]; then reasons+=("git merge/pull with the base branch unknown")
-  elif [ "$CMD_MOVED" = 1 ] || [ "$switched" = 1 ] || [ -z "$head" ] || guard_ieq "$head" "$base"; then
+  elif [ "$CMD_MOVED" = 1 ] || [ "$switched" = 1 ] || [ -z "$head" ] || is_base "$head"; then
     reasons+=("git merge/pull onto $base")
   fi
 fi
@@ -193,6 +222,8 @@ for p in ${pushes[@]+"${pushes[@]}"}; do
 done
 [ ${#reasons[@]} -gt 0 ] || guard_allow
 
+pin=""
+if [ -n "$PINNED_HIT" ]; then pin=", or on $PINNED_HIT, which an earlier prompt found to be the base (kept in $(approval_state bases pinned))"; fi
 approval_require merge \
-  "merge: manual — held: $(IFS=';'; echo "${reasons[*]}"). Landing on the base branch (${base:-unknown}) needs the user's own \`merge\`" \
+  "merge: manual — held: $(IFS=';'; echo "${reasons[*]}"). Landing on the base branch (${base:-unknown}$pin) needs the user's own \`merge\`" \
   "To let it through, reply \`merge\` (or \`/task merge\`) — a plain \"yes\" does not approve it."

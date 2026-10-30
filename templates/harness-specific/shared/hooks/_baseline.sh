@@ -1,9 +1,18 @@
 # shellcheck shell=bash
-# Sourced by approve-on-prompt.sh after _approval.sh and _paths.sh. The
+# Sourced by approve-on-prompt.sh after _approval.sh and _paths.sh, and by
+# guard-merge.sh after _approval.sh for what the prompt found of the landing
+# hold (cli#718) — it calls none of the file functions. The
 # writer-agnostic backstop behind protect-constitution.sh (spec 038 § 11 S1):
 # the PreToolUse guard reads commands, and no reading of a command sees every
 # writer — an interpreter, a script, a formatter, `git checkout`. So the user's
 # prompt fingerprints the four project-owned files, and Stop compares.
+#
+# It does the same for the merge mode (cli#718): merge-mode.sh --strict reads
+# copies of workflow.yml from refs a model can move (`git update-ref`), so the
+# mode the prompt found is kept beside the sums. guard-merge holds a turn
+# that began on manual for the whole turn, and Stop asks about a turn that
+# ended on auto when it began on manual, unless the turn approved `merge` or
+# `gate-config`.
 #
 # A file that changed during the turn with no approval of its kind blocks the
 # stop with a question for the user, and the version from the start of the
@@ -41,6 +50,7 @@ baseline_snapshot() {
     if [ -f "$f" ]; then cp "$f" "$1/$i"; fi
   done
   printf '%s' "$sums" >"$1/sums"
+  baseline_mode >"$1/mode"
 }
 
 # baseline_check <dir> <approved kinds, space-separated> <stop_hook_active> —
@@ -51,6 +61,13 @@ baseline_check() {
   local i sum f kept keepdir ts seen=0
   local -a changed=()
   [ -f "$1/sums" ] || return 0 # no prompt fingerprinted this session yet
+  if [ "$(cat "$1/mode" 2>/dev/null)" = manual ] && sum=$(baseline_mode) && [ "$sum" != manual ]; then
+    seen=1
+    case " $2 " in
+      *" merge "* | *" gate-config "*) ;;
+      *) changed+=("the merge mode (manual when the turn began, $sum now: a copy of .specnaut/workflow.yml, or a ref it is read from, was rewritten)") ;;
+    esac
+  fi
   _baseline_lists
   while read -r i sum; do
     f="$GUARD_ROOT/${BL_FILES[i]}"
@@ -80,4 +97,58 @@ baseline_check() {
     return 0
   fi
   jq -cn --arg r "$r" '{decision: "block", reason: $r}'
+}
+
+# The base branch as the user's prompts found it (cli#718). base-branch.sh
+# reads origin/HEAD, which one `git remote set-head` repoints: the landing
+# guard would then judge a push to the real base as a push elsewhere, and
+# read merge-mode from a copy the model wrote. So each prompt keeps the name
+# it resolves, per project, and guard-merge holds every kept name beside the
+# base as it resolves now. A kept name is never dropped: a pin only tightens.
+#   bases/<sha256(GUARD_ROOT)>/pinned   one name per line
+
+# baseline_mode — the merge mode as the landing guard reads it for this
+# project: merge-mode.sh --strict, every pinned base read too. Manual when it
+# cannot be read.
+baseline_mode() {
+  local n m
+  local -a a=()
+  baseline_bases
+  for n in ${PINNED_BASES[@]+"${PINNED_BASES[@]}"}; do a+=(--base "$n"); done
+  m=$(cd "$GUARD_ROOT" && bash .specnaut/scripts/bash/merge-mode.sh --strict ${a[@]+"${a[@]}"} 2>/dev/null) || m=manual
+  [ "$m" = auto ] || m=manual
+  printf '%s\n' "$m"
+}
+
+# baseline_pin_base — keep the base as it resolves now, unless it is kept
+# already. An unknown base is kept as `?`: until a prompt finds a name, the
+# guard treats the base as unknown whatever base-branch.sh prints later, so a
+# base the model creates mid-turn holds nothing.
+baseline_pin_base() {
+  local f b n
+  if ! b=$(cd "$GUARD_ROOT" && bash .specnaut/scripts/bash/base-branch.sh 2>/dev/null); then b='?'; fi
+  baseline_bases
+  if [ "$b" = '?' ] && [ "$PINNED_UNKNOWN" = 1 ]; then return 0; fi
+  for n in ${PINNED_BASES[@]+"${PINNED_BASES[@]}"}; do
+    if guard_ieq "$n" "$b"; then return 0; fi
+  done
+  f=$(approval_state bases pinned) # per project: `pinned` stands where a session id would
+  mkdir -p "${f%/*}"
+  chmod 700 "${f%/*}"
+  printf '%s\n' "$b" >>"$f"
+}
+
+# baseline_bases — PINNED_BASES: this project's kept names that are plain
+# branch names, by base-branch.sh's own test; PINNED_UNKNOWN=1 when a prompt
+# found no base. Any other line is skipped.
+baseline_bases() {
+  local f n
+  PINNED_BASES=() PINNED_UNKNOWN=0
+  f=$(approval_state bases pinned)
+  [ -f "$f" ] || return 0
+  while IFS= read -r n || [ -n "$n" ]; do
+    n=${n%$'\r'}
+    if [ "$n" = '?' ]; then PINNED_UNKNOWN=1
+    elif [[ $n =~ ^[A-Za-z0-9][A-Za-z0-9._/-]*$ ]] && [[ $n != *..* ]]; then PINNED_BASES+=("$n"); fi
+  done <"$f"
 }
