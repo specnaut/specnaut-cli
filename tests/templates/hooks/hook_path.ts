@@ -32,6 +32,7 @@ const TOOLS = [
   "shasum",
   "sha256sum",
   "env",
+  "find",
   "perl",
 ];
 

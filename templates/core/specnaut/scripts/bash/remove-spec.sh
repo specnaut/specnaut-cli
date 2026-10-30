@@ -15,13 +15,16 @@
 # a commit, and a push with an explicit refspec and never its tags. Files
 # under it that git does not track (ignored ones included) are in no commit:
 # they are listed, quoted, and kept — never deleted. Under `merge: manual`
-# the landing hook holds this script (merge-commands.txt).
+# it holds itself first, exit 13, unless merge-hold.sh prints
+# `merge-hold: run` (spec 048) — whatever command line reached it.
 #
 # Exit — the full table; phases/merge-close.md maps each one:
 #   0  removed and pushed: nothing is left under the directory
 #   2  usage
 #   3  the base branch is unknown
 #   7  the push was rejected (the commit stays on the local base)
+#   13 held by `merge: manual`: nothing changed; the line it printed names
+#      what releases it
 #   22 skipped — the condition that failed is printed, and nothing changed
 #   23 something else was staged after the check (the removal undone, the
 #      rest left staged, nothing committed)
@@ -41,6 +44,9 @@ if [ $# -ne 1 ] || [[ ! $1 =~ ^[A-Za-z0-9][A-Za-z0-9._-]*$ ]]; then
   echo "usage: remove-spec.sh <landed-branch>" >&2
   exit 2
 fi
+# Exit 0 is not enough: only the helper's own line lets the removal run.
+if [ ! -f "$here/merge-hold.sh" ]; then echo "remove-spec: held — merge-hold.sh is missing beside it: run \`specnaut upgrade\`" >&2; exit 13; fi
+[ "$(bash "$here/merge-hold.sh")" = "merge-hold: run" ] || exit 13
 landed=$1
 base=$(bash "$here/base-branch.sh") || exit 3
 root=$(git rev-parse --show-toplevel)

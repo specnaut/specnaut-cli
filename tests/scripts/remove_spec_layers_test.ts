@@ -89,7 +89,7 @@ Deno.test("merge-close.md maps every exit remove-spec.sh's header lists, and res
   const read = (p: string) => Deno.readTextFile(new URL(`../../${p}`, import.meta.url));
   const header = await read("templates/core/specnaut/scripts/bash/remove-spec.sh");
   const codes = [...header.matchAll(/^#\s{3}(\d+)\s/gm)].map((m) => m[1]);
-  assertEquals(codes.sort(), ["0", "2", "22", "23", "24", "25", "3", "7"]);
+  assertEquals(codes.sort(), ["0", "13", "2", "22", "23", "24", "25", "3", "7"]);
   const doc = await read("templates/core/skills/task/phases/merge-close.md");
   const step = doc.slice(doc.indexOf("remove-spec.sh <branch>"), doc.indexOf("## The report"));
   // A bullet's bold lead names the exits it maps: `- **24** —`, `- **2 · 3** —`.

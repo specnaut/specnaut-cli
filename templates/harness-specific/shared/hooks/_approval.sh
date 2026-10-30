@@ -9,6 +9,10 @@
 # while hooks, spawned unsandboxed, can write it (§ 11 F3, Measured). It holds
 # {session_id, turn_id, kind}. Claude's prompts carry no turn_id: its stamp is
 # scoped to the session and deleted by the Stop hook at the end of the turn.
+# The project is keyed by GUARD_ROOT (guard_root), hashed — never the caller's
+# cwd or the git toplevel — so every reader of one project finds one stamp.
+# Two readers: approved, for a hook's payload, and approved_session, for
+# merge-approved.sh, which the landing scripts run outside any payload.
 
 # approval_session_ok <id> — a session id is a path component; only plain tokens.
 approval_session_ok() { [[ $1 =~ ^[A-Za-z0-9_-]+$ ]]; }
@@ -37,24 +41,50 @@ approval_state() {
 # approval_path <session_id> — where this project's stamp for that session lives.
 approval_path() { approval_state approvals "$1"; }
 
+# _approval_read <stamp> <kind> — the stamp file exists, reads, and is
+# P_SESSION's approval of <kind>; APPROVAL_TURN: the turn_id it carries. The
+# one parse both readers share, so they cannot come to disagree on a stamp.
+_approval_read() {
+  local out
+  local -a f
+  [ -f "$1" ] || return 1
+  out=$(guard_jq -j '[.session_id, .kind, .turn_id] | map(if type == "string" then gsub("\u001e"; " ") else "" end)
+    | join("\u001e") + "\u001e."' "$1" 2>/dev/null) || return 1
+  IFS=$'\x1e' read -r -a f <<<"$out"
+  guard_eq "${f[0]}" "$P_SESSION" || return 1
+  guard_eq "${f[1]}" "$2" || return 1
+  APPROVAL_TURN=${f[2]}
+}
+
 # approved <kind> — the user's own prompt in THIS turn approved <kind>: the
 # stamp exists, and its session and kind match; its turn_id must match too
 # whenever the payload carries one, which on Codex it always must. Every
 # compare is non-empty: an absent id never matches an absent id.
 approved() {
-  local stamp out
-  local -a f
+  local stamp
   approval_session_ok "$P_SESSION" || return 1
   if [ "$GUARD_HARNESS" = codex ] && [ -z "$P_TURN" ]; then return 1; fi
   stamp=$(approval_path "$P_SESSION")
-  [ -f "$stamp" ] || return 1
-  out=$(guard_jq -j '[.session_id, .kind, .turn_id] | map(if type == "string" then gsub("\u001e"; " ") else "" end)
-    | join("\u001e") + "\u001e."' "$stamp" 2>/dev/null) || return 1
-  IFS=$'\x1e' read -r -a f <<<"$out"
-  guard_eq "${f[0]}" "$P_SESSION" || return 1
-  guard_eq "${f[1]}" "$1" || return 1
-  if [ -n "$P_TURN" ]; then guard_eq "${f[2]}" "$P_TURN" || return 1; fi
+  _approval_read "$stamp" "$1" || return 1
+  if [ -n "$P_TURN" ]; then guard_eq "$APPROVAL_TURN" "$P_TURN" || return 1; fi
   return 0
+}
+
+# approved_session <kind> — P_SESSION's stamp approves <kind>, with no turn
+# check: its one caller, merge-approved.sh, runs inside a landing script,
+# where neither harness exports a turn id (spec 048 § 8). Never a flag on
+# approved(): a hook that could skip the turn check would be one argument
+# away from doing so. The Stop hook's delete is the turn boundary; the age
+# bound caps the window on Codex, whose Stop may never come — the stamp's
+# mtime is the hook's write, since Codex's sandbox refuses the model's touch.
+APPROVAL_MAX_AGE_MIN=60
+approved_session() {
+  local stamp fresh
+  approval_session_ok "$P_SESSION" || return 1
+  stamp=$(approval_path "$P_SESSION")
+  _approval_read "$stamp" "$1" || return 1
+  fresh=$(find "$stamp" -mmin "-$APPROVAL_MAX_AGE_MIN" 2>/dev/null) || return 1
+  [ "$fresh" = "$stamp" ]
 }
 
 # _approval_ask <reason> — Claude's native permission prompt (exit 0 + "ask").

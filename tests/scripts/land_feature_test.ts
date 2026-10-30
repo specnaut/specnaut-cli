@@ -272,3 +272,14 @@ Deno.test("the exit-7 recovery merge.md maps lands the branch after origin moved
     await sb.cleanup();
   }
 });
+
+Deno.test("merge.md maps every exit land-feature.sh's header lists", async () => {
+  // One exit-table home per script: the header. One doc maps it (cli#711).
+  const read = (p: string) => Deno.readTextFile(new URL(`../../${p}`, import.meta.url));
+  const header = await read("templates/core/specnaut/scripts/bash/land-feature.sh");
+  const codes = [...header.matchAll(/^#\s{3}(\d+)\s/gm)].map((m) => m[1]).sort();
+  assert(codes.includes("13"), "the header lists the hold");
+  const doc = await read("templates/core/skills/task/phases/merge.md");
+  const rows = [...doc.matchAll(/^\s*\| (\d+) \|/gm)].map((m) => m[1]).sort();
+  assertEquals(rows, codes, "merge.md maps a different set of exits");
+});

@@ -60,6 +60,9 @@ confirmed closed.
      Report the path it names; that staged work is someone else's — leave it staged.
    - **25** — the removal commit failed (a hook, signing): the removal is undone, nothing committed.
      Quote the failure it names and report it; never bypass the hook.
+   - **13** — held by `merge: manual`: nothing changed. Quote its line; it names the remedy. The
+     landing and the close stand — only the removal is held. On the next `merge`, run this step 4
+     alone; never land again.
    - **2 · 3** — usage, or the base branch is unknown: report it; nothing changed.
 
 ## The report names every item, one line each

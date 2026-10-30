@@ -56,9 +56,9 @@ that runs only on `pull_request`. **Do not infer `--pr` from a remote, a forge o
    branch with `-d`, and verifies `HEAD` is the base; it prints `LANDED <base> <first>..<last> <n>
    commit(s)`. **It pushes without asking, in either merge mode**: reaching
    this step is the instruction — `phases/auto-chain.md` reads the mode, this phase does not.
-   **Under `merge: manual` the landing hook holds it** until the user's own prompt this turn says
-   `merge` or `/task merge`; a refusal is not an obstacle to route around — quote it, name the word,
-   stop on the branch.
+   **Under `merge: manual` it is held** — by the landing hook, and by the script itself (exit 13),
+   whatever the command line — until the user's own prompt this turn says `merge` or `/task merge`;
+   a refusal is not an obstacle to route around — quote it, name the word, stop on the branch.
 4. **Read its exit** — this table maps every exit `land-feature.sh`'s header lists; an exit it does
    not list is a finding: quote it and stop on the branch.
 
@@ -75,6 +75,7 @@ that runs only on `pull_request`. **Do not infer `--pr` from a remote, a forge o
    | 10 | nothing to land | the branch has no commit origin lacks: say so — nothing merged, nothing to close |
    | 11 | landed and pushed; the branch would not delete with `-d` | the landing stands: step 5 runs. Report the branch that stayed |
    | 12 | an unexpected git failure before the push | quote it and stop: nothing was pushed |
+   | 13 | held by `merge: manual`: nothing ran | quote its line; it names the remedy — reply `merge`, trust the hooks, install `jq`, or run `specnaut upgrade`. Stop on the branch; never route around it |
 
 5. **Close what shipped, and reconcile** — only after a push, and not under `--no-close`: load
    `phases/merge-close.md`.

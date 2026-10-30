@@ -16,6 +16,8 @@ export const SCRIPTS = [
   "epic-status.sh",
   "fold-fixups.sh",
   "land-feature.sh",
+  "merge-hold.sh",
+  "merge-mode.sh",
   "remove-spec.sh",
 ];
 
@@ -50,11 +52,14 @@ function home(): string {
  * The environment a child starts from: the parent's, minus every `GIT_*`
  * variable (a `GIT_DIR`, a `GIT_CONFIG_COUNT` pair, a hook's `GIT_INDEX_FILE`),
  * with an isolated HOME, no global or system config, and the C locale — so an
- * assertion on git's own wording holds in any language (cli#711).
+ * assertion on git's own wording holds in any language (cli#711). Minus, too,
+ * what a harness exports to its shell (spec 048): this suite runs inside one,
+ * and its session id would let the landing hold decide a case no test set.
  */
+const HARNESS_ENV = /^(GIT_|CLAUDE_CODE_SESSION_ID$|CODEX_SESSION_ID$|CLAUDECODE$|CODEX_SANDBOX)/i;
 function hermetic(): Record<string, string> {
   const base = Object.fromEntries(
-    Object.entries(Deno.env.toObject()).filter(([k]) => !/^GIT_/i.test(k)),
+    Object.entries(Deno.env.toObject()).filter(([k]) => !HARNESS_ENV.test(k)),
   );
   const h = home();
   return {

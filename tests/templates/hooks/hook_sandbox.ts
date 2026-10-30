@@ -112,16 +112,16 @@ export interface RepoOptions {
 let repoCount = 0;
 
 /**
- * A git repo with `.specnaut/scripts/bash/{merge-mode,base-branch}.sh` copied
- * from the templates — the guards call them, exactly as in a scaffolded
- * project. origin/HEAD is set by ref, so no remote has to exist.
+ * A git repo with `.specnaut/scripts/bash/{merge-mode,base-branch,merge-hold}.sh`
+ * copied from the templates — the guards and the landing hold call them,
+ * exactly as in a scaffolded project. origin/HEAD is set by ref, so no remote has to exist.
  */
 export async function makeRepo(sb: Sandbox, opts: RepoOptions = {}): Promise<string> {
   const { mode = "manual", head = "feat", base = "main" } = opts;
   const repo = join(sb.dir, `repo-${++repoCount}`);
   await Deno.mkdir(join(repo, ".specnaut", "scripts", "bash"), { recursive: true });
   await git(sb, repo, "init", "-q", "-b", "main");
-  for (const s of ["merge-mode.sh", "base-branch.sh"]) {
+  for (const s of ["merge-mode.sh", "base-branch.sh", "merge-hold.sh"]) {
     await Deno.copyFile(join(BASH_SCRIPTS_DIR, s), join(repo, ".specnaut", "scripts", "bash", s));
   }
   if (mode !== null) {

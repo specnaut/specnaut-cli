@@ -2,11 +2,13 @@
 # The merge mode of this project — its one reader (spec 036, plan § 5, FR-002).
 #
 # Prints exactly `auto` or `manual` on stdout; a one-line note on stderr says
-# why. Two callers, neither of which parses the file itself:
+# why. Three callers, none of which parses the file itself:
 #   - the Specnaut chain (phases/auto-chain.md), which applies a per-run
 #     instruction first and asks this script only when there is none;
 #   - the landing hook (.specnaut/hooks/guard-merge.sh), which calls
-#     `--strict` and enforces the file alone (D3).
+#     `--strict` and enforces the file alone (D3);
+#   - the landing hold (merge-hold.sh, beside this script), which calls
+#     `--strict` inside land-feature.sh and remove-spec.sh (spec 048).
 #
 #   (default)  the first top-level `merge:` line of the working tree's
 #              .specnaut/workflow.yml. No file or no key → auto. An

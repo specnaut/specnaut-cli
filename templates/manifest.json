@@ -1776,6 +1776,13 @@
     {
       "category": "spec-root",
       "name": "specify",
+      "suffix": "scripts/bash/merge-hold.sh",
+      "source": "core/specnaut/scripts/bash/merge-hold.sh",
+      "executable": true
+    },
+    {
+      "category": "spec-root",
+      "name": "specify",
       "suffix": "scripts/bash/remove-spec.sh",
       "source": "core/specnaut/scripts/bash/remove-spec.sh",
       "executable": true
@@ -1966,6 +1973,12 @@
     },
     {
       "harness": "claude",
+      "destination": ".specnaut/hooks/merge-approved.sh",
+      "source": "harness-specific/shared/hooks/merge-approved.sh",
+      "executable": true
+    },
+    {
+      "harness": "claude",
       "destination": ".specnaut/hooks/guard-release.sh",
       "source": "harness-specific/shared/hooks/guard-release.sh",
       "executable": true
@@ -2075,6 +2088,12 @@
       "harness": "codex",
       "destination": ".specnaut/hooks/guard-merge.sh",
       "source": "harness-specific/shared/hooks/guard-merge.sh",
+      "executable": true
+    },
+    {
+      "harness": "codex",
+      "destination": ".specnaut/hooks/merge-approved.sh",
+      "source": "harness-specific/shared/hooks/merge-approved.sh",
       "executable": true
     },
     {

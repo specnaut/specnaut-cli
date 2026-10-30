@@ -10,8 +10,10 @@
 # with an explicit refspec and never its tags; the merged branch is deleted
 # with `-d`; HEAD is verified to be the base. The base is base-branch.sh's —
 # local-only, so origin is asked here, on the path that already talks to it
-# — never an argument. Under `merge: manual` the landing hook holds this
-# script like a `git push` (merge-commands.txt): it does not read the mode.
+# — never an argument. Under `merge: manual` it holds itself first, exit 13,
+# unless merge-hold.sh prints `merge-hold: run` (spec 048): the landing hook
+# reads command lines, and a copy or an alias of this script is not one it
+# can read. The mode is that helper's to read, never this script's.
 #
 # Prints `LANDED <base> <first>..<last> <n> commit(s)` once the push landed.
 #
@@ -31,6 +33,8 @@
 #   10 nothing to land: the branch has no commit origin/<base> lacks
 #   11 landed and pushed, but the branch would not delete with -d (it stays)
 #   12 an unexpected git failure before the push, named on stderr
+#   13 held by `merge: manual`: nothing was run; the line it printed names
+#      what releases it
 # (8 is retired: a branch that will not delete after the push is 11, never
 # read as a failed landing.)
 #
@@ -39,9 +43,13 @@ set -euo pipefail
 export GIT_OPTIONAL_LOCKS=0
 here=$(CDPATH="" cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 # `set -e` alone would exit with git's own code, which no table lists.
-trap 'rc=$?; echo "land-feature: unexpected failure (exit $rc) of: $BASH_COMMAND — nothing was pushed" >&2; exit 12' ERR
+unexpected() { echo "land-feature: unexpected failure (exit $1) of: $2 — nothing was pushed" >&2; exit 12; }
+trap 'unexpected $? "$BASH_COMMAND"' ERR
 
 if [ $# -ne 0 ]; then echo "usage: land-feature.sh" >&2; exit 2; fi
+# Exit 0 is not enough: only the helper's own line lets the landing run.
+if [ ! -f "$here/merge-hold.sh" ]; then echo "land-feature: held — merge-hold.sh is missing beside it: run \`specnaut upgrade\`" >&2; exit 13; fi
+[ "$(bash "$here/merge-hold.sh")" = "merge-hold: run" ] || exit 13
 base=$(bash "$here/base-branch.sh") || exit 3
 branch=$(git symbolic-ref --quiet --short HEAD) || {
   echo "land-feature: HEAD is detached — check out the feature branch" >&2
