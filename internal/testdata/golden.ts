@@ -11,6 +11,9 @@
 import { parseArgs } from "../../src/cli/parser.ts";
 import { parseLock, RemovedHarnessError } from "../../src/domain/installed_lock.ts";
 import { assertSafeDestination } from "../../src/domain/template.ts";
+import { retiredConfigNotices } from "../../src/application/upgrade_retired_notices.ts";
+import type { FsReader } from "../../src/application/ports.ts";
+import { AGENT_FOLDERS } from "../../src/domain/agent_folders.ts";
 
 const argv: string[][] = [
   [],
@@ -248,6 +251,58 @@ function lockOf(yaml: string): unknown {
   }
 }
 
+/**
+ * Upgrade's notices for retired config (cli#712): project files in, lines out.
+ * The reader is in memory, as the notices see the FsReader port; how the
+ * filesystem is walked is the reader's business, not the notices'.
+ */
+const notices: Record<string, { files: Record<string, string>; tracked?: string[] }> = {
+  "empty": { files: {} },
+  "extensions-only": { files: { ".specnaut/extensions.yml": "hooks: {}\n" } },
+  "addendum": { files: { ".specnaut/addenda/task/review.md": "Dispatch `review-coordinator`.\n" } },
+  "every-folder": {
+    files: {
+      ".claude/agents/a.md": "Ask qa-tester, then test-reviewer, then qa-tester.\n",
+      ".codex/agents/b.toml": 'instructions = "hand off to ui-ux-designer"\n',
+      ".opencode/agents/c.md": "workflow-manager\n",
+      ".agents/agents/d.md": "(devops-sre)\n",
+    },
+  },
+  "not-the-users": {
+    files: {
+      ".claude/agents/review-coordinator.md": "review-coordinator\n",
+      ".claude/agents/qa-tester/memory/MEMORY.md": "qa-tester\n",
+      ".claude/agents/notes.txt": "qa-tester\n",
+      ".codex/agents/x.md": "qa-tester\n",
+      ".claude/skills/mine/SKILL.md": "qa-tester\n",
+    },
+    tracked: [".claude/agents/review-coordinator.md"],
+  },
+  "whole-words": {
+    files: {
+      ".claude/agents/a.md": "my-qa-tester-notes devops-sre2 old-test-reviewer test-reviewer_x\n",
+      ".claude/agents/b.md": "éqa-tester\n",
+      ".claude/agents/c.md": "qa-tester.\n",
+    },
+  },
+  "both": {
+    files: {
+      ".specnaut/extensions.yml": "x\n",
+      ".specnaut/addenda/ship/tag.md": "devops-sre and review-coordinator\n",
+    },
+  },
+};
+
+function memoryReader(files: Record<string, string>): FsReader {
+  return {
+    readText: (_d, rel) => Promise.resolve(files[rel] ?? null),
+    readEntry: (_d, rel) =>
+      Promise.resolve(rel in files ? { kind: "file" as const, content: files[rel] } : null),
+    listFiles: (_d, rel) =>
+      Promise.resolve(Object.keys(files).filter((p) => p.startsWith(`${rel}/`)).sort()),
+  };
+}
+
 const here = new URL(".", import.meta.url);
 
 /** One compact JSON value per line. */
@@ -270,3 +325,13 @@ await writeLines(
   "../lockfile/testdata/lock_golden.jsonl",
   Object.entries(locks).map(([name, yaml]) => ({ name, yaml, result: lockOf(yaml) })),
 );
+await writeLines(
+  "../upgrade/testdata/agent_folders_golden.jsonl",
+  Object.values(AGENT_FOLDERS).filter((f) => f !== null),
+);
+const noticeCases = [];
+for (const [name, c] of Object.entries(notices)) {
+  const lines = await retiredConfigNotices(memoryReader(c.files), "/p", new Set(c.tracked ?? []));
+  noticeCases.push({ name, files: c.files, tracked: c.tracked ?? [], lines });
+}
+await writeLines("../upgrade/testdata/notices_golden.jsonl", noticeCases);

@@ -1,0 +1,4 @@
+{"dir":".claude/agents","ext":".md","prefix":""}
+{"dir":".codex/agents","ext":".toml","prefix":""}
+{"dir":".opencode/agents","ext":".md","prefix":"specnaut-"}
+{"dir":".agents/agents","ext":".md","prefix":"specnaut-"}
