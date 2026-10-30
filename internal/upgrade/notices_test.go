@@ -60,7 +60,7 @@ func TestRetiredConfigNoticesMatchesTypeScript(t *testing.T) {
 }
 
 func TestAgentFoldersMatchTypeScript(t *testing.T) {
-	want := golden.Load[AgentFolder](t, "testdata/agent_folders_golden.jsonl", 2)
+	want := golden.Load[AgentFolder](t, "testdata/agent_folders_golden.jsonl", 4)
 	if !slices.Equal(AgentFolders, want) {
 		t.Errorf("AgentFolders = %v; AGENT_FOLDERS = %v", AgentFolders, want)
 	}

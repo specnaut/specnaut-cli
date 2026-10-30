@@ -123,10 +123,10 @@ jobs:
         # an answer TypeScript no longer gives.
         run: |
           deno run --allow-read --allow-write internal/testdata/golden.ts
-          if [ -n "$(git status --porcelain -- internal/cli/testdata internal/lockfile/testdata)" ]; then
+          if [ -n "$(git status --porcelain -- internal/cli/testdata internal/lockfile/testdata internal/upgrade/testdata)" ]; then
             echo "::error::the Go goldens are stale; run internal/testdata/golden.ts and commit them"
-            git status --short -- internal/cli/testdata internal/lockfile/testdata
-            git diff --stat -- internal/cli/testdata internal/lockfile/testdata
+            git status --short -- internal/cli/testdata internal/lockfile/testdata internal/upgrade/testdata
+            git diff --stat -- internal/cli/testdata internal/lockfile/testdata internal/upgrade/testdata
             exit 1
           fi
       - name: Build the linux-x64 TypeScript binary under test
