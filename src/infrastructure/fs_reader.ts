@@ -95,11 +95,8 @@ async function entryOf(root: string, abs: string): Promise<DiskEntry | null> {
   try {
     resolved = relative(root, await resolveTarget(abs)).split(SEPARATOR).join("/");
   } catch (err) {
-    // A cycle, or a link through a directory that does not exist, cannot be
-    // followed; say so with `null` rather than guess.
-    if (!(err instanceof Deno.errors.FilesystemLoop || err instanceof UnwalkableLinkError)) {
-      throw err;
-    }
+    // A link that cannot be followed says so with `null` rather than guess.
+    if (!unfollowable(err)) throw err;
     resolved = null;
   }
   return { kind: "symlink", target, resolved };
@@ -151,17 +148,21 @@ export async function listProjectFiles(projectDir: string, rel: string): Promise
  * lands nowhere: for a listing that means "not a file", not a refusal, so the
  * user's broken link does not abort a walk that reads nothing through it.
  */
+/**
+ * A link that cannot be followed: a cycle, one through a folder that does not
+ * exist, or one through a regular file. The one home of that set (cli#704).
+ */
+function unfollowable(err: unknown): boolean {
+  return err instanceof Deno.errors.FilesystemLoop || err instanceof UnwalkableLinkError ||
+    err instanceof Deno.errors.NotADirectory;
+}
+
 async function landsOnFileInside(root: string, abs: string): Promise<boolean> {
   let target: string;
   try {
     target = await resolveTarget(abs);
   } catch (err) {
-    if (
-      err instanceof Deno.errors.FilesystemLoop || err instanceof UnwalkableLinkError ||
-      err instanceof Deno.errors.NotADirectory // a link through a regular file
-    ) {
-      return false;
-    }
+    if (unfollowable(err)) return false;
     throw err;
   }
   if (!isInside(root, target)) return false;

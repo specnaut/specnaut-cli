@@ -111,6 +111,26 @@ Deno.test("readEntry: a link through a missing directory is reported with no lan
   });
 });
 
+Deno.test(
+  "readEntry: a link through a regular file is reported with no landing, never a ReadFault",
+  {
+    ignore: WINDOWS,
+  },
+  async () => {
+    // A ReadFault here would tell the user to fix permissions on a file that is fine (cli#704).
+    await withProject(async (dir) => {
+      await Deno.writeTextFile(join(dir, "README.md"), "x\n");
+      await Deno.mkdir(join(dir, "docs"));
+      await Deno.symlink("../README.md/x", join(dir, "docs/constitution.md"));
+      assertEquals(await new DenoFsReader().readEntry(dir, "docs/constitution.md"), {
+        kind: "symlink",
+        target: "../README.md/x",
+        resolved: null,
+      });
+    });
+  },
+);
+
 Deno.test("a dangling ancestor reads as absent, never as a refusal (cli#686)", {
   ignore: WINDOWS,
 }, async () => {
