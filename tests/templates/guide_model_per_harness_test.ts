@@ -37,7 +37,7 @@ function guideModelLines(key: string): string[] {
 }
 
 for (const [key, expected] of Object.entries(EXPECTED)) {
-  Deno.test(`${key}: specnaut-guide scaffolds on the haiku tier's model`, () => {
+  Deno.test(`${key}: specnaut-guide scaffolds in the haiku tier's own vocabulary`, () => {
     assertEquals(guideModelLines(key), expected);
   });
 }

@@ -15,14 +15,18 @@ import { CORE_BUNDLE } from "../../../src/templates_bundle.ts";
  * no error, no warning, and nothing in the emitted TOML to hint at it.
  */
 
-function codexAgents(): Map<string, Record<string, unknown>> {
-  const mapped = new CodexHarness().mapBundle(CORE_BUNDLE, {
+/** What the Codex adapter emits for the bundled fleet, with default options. */
+function mapBundle() {
+  return new CodexHarness().mapBundle(CORE_BUNDLE, {
     backlogBackend: "local",
     versionScheme: "semver",
     specBackend: "local",
   });
+}
+
+function codexAgents(): Map<string, Record<string, unknown>> {
   const out = new Map<string, Record<string, unknown>>();
-  for (const [path, file] of Object.entries(mapped)) {
+  for (const [path, file] of Object.entries(mapBundle())) {
     const m = path.match(/^\.codex\/agents\/(.+)\.toml$/);
     if (m) out.set(m[1], parseToml(file.content) as Record<string, unknown>);
   }
@@ -68,13 +72,8 @@ Deno.test("the xhigh seats keep xhigh on Codex", () => {
 });
 
 Deno.test("every emitted Codex agent names its model family, never a version", () => {
-  const mapped = new CodexHarness().mapBundle(CORE_BUNDLE, {
-    backlogBackend: "local",
-    versionScheme: "semver",
-    specBackend: "local",
-  });
   const families = new Set(["Luna", "Terra", "Sol", "Astra"]);
-  const wrong = Object.entries(mapped)
+  const wrong = Object.entries(mapBundle())
     .filter(([path]) => /^\.codex\/agents\/.+\.toml$/.test(path))
     .filter(([, f]) => !families.has(f.content.match(/^# Model family: (\w+)/)?.[1] ?? ""))
     .map(([path]) => path);
