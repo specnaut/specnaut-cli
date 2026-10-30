@@ -17,7 +17,7 @@ import {
   importTokens,
   secondInstruction,
 } from "./constitution_reference.ts";
-import { docOf } from "./verb_table.ts";
+import { docOf, router, verbTable } from "./verb_table.ts";
 
 /**
  * Every task entry point reads the constitution first (spec 039, specnaut-cli#685).
@@ -101,7 +101,12 @@ Deno.test("no agent and no task-routing router may opt out", () => {
 
 Deno.test("the document behind every /task routable verb opens with the reference", () => {
   const verbs = ROUTABLE_PHASES.task;
-  assert(verbs.length > 0, "read no routable /task verbs");
+  // The floor is the router's own verb table (cli#709): every verb it routes to a `phases/` doc
+  // is checked here, so a verb added there and missed in the declared set fails, not passes.
+  const phaseVerbs = verbTable(router("task")).filter((r) => r.doc.startsWith("phases/"));
+  assert(phaseVerbs.length > 0, "parsed no `phases/` row from the /task verb table");
+  const unchecked = phaseVerbs.map((r) => r.verb).filter((v) => !verbs.includes(v));
+  assertEquals(unchecked, [], "/task verbs the router routes to a phase but this test skips");
   const wrong = verbs.filter((v) => firstStep(taskDoc(v).content) !== CONSTITUTION_REFERENCE);
   assertEquals(wrong, [], "/task verbs whose document does not open with the reference");
 });

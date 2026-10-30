@@ -77,3 +77,24 @@ Deno.test("every allowance still excuses a bundled file", () => {
   const dead = [...ALLOWED.keys()].filter((k) => !keys.has(k) || !named.has(k));
   assertEquals(dead, [], "these allowances excuse no bundled file that names a removed artefact");
 });
+
+/**
+ * The fix the header describes, locked (cli#709): `developer.md` finds the
+ * domain model wherever the plan states it, and models what is missing from
+ * the code that exists — it never again blocks on a document the plan does
+ * not produce.
+ */
+Deno.test("developer.md finds the domain model in the plan and never blocks on its absence", () => {
+  const dev = CORE_BUNDLE.find((e) => e.category === "agent" && e.name === "developer");
+  if (!dev) throw new Error("missing agent developer");
+  const text = dev.content.replace(/\s+/g, " ");
+  for (
+    const sentence of [
+      "**The domain model** is wherever the plan states it",
+      "say so in `Decisions` and model them from the code that exists.",
+    ]
+  ) {
+    assertEquals(text.includes(sentence), true, `developer.md lost: ${sentence}`);
+  }
+  assertEquals(text.includes("domain-brief"), false, "developer.md blocks on a domain brief again");
+});

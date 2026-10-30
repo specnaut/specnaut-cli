@@ -1,4 +1,4 @@
-import { assert, assertEquals } from "@std/assert";
+import { assertEquals } from "@std/assert";
 import { dirname, fromFileUrl, join, relative, SEPARATOR } from "@std/path";
 import { findHarness } from "../../src/cli/harnesses.ts";
 import { destResolver } from "../../src/application/upgrade_renames.ts";
@@ -105,7 +105,12 @@ export async function projectOn71(
     entries.set(oldDest, { ...tracked, sha256: await sha256(vanilla) });
     moves.push({ row, oldDest, newDest });
   }
-  assert(moves.length >= 14, `only ${moves.length} moves resolved — the fixture is not a 7.1 tree`);
+  // The floor is the rename table (cli#709): every phase row resolves, whatever the backend.
+  const unresolved = SKILL_DOC_RENAMES.filter((r) =>
+    r.to.owner === "task" && r.kind !== "backlog-doc"
+  )
+    .filter((r) => !moves.some((m) => m.row === r)).map((r) => r.to.doc);
+  assertEquals(unresolved, [], "phase moves the fixture did not resolve — it is not a 7.1 tree");
 
   if (opts.customiseRouter) {
     const router = dest(routerEndpointEntry("specnaut"));
