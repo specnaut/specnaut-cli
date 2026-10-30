@@ -732,6 +732,9 @@ confirmed closed.
      Report the path it names; that staged work is someone else's — leave it staged.
    - **25** — the removal commit failed (a hook, signing): the removal is undone, nothing committed.
      Quote the failure it names and report it; never bypass the hook.
+   - **13** — held by \`merge: manual\`: nothing changed. Quote its line; it names the remedy. The
+     landing and the close stand — only the removal is held. On the next \`merge\`, run this step 4
+     alone; never land again.
    - **2 · 3** — usage, or the base branch is unknown: report it; nothing changed.
 
 ## The report names every item, one line each
@@ -1238,9 +1241,9 @@ that runs only on \`pull_request\`. **Do not infer \`--pr\` from a remote, a for
    branch with \`-d\`, and verifies \`HEAD\` is the base; it prints \`LANDED <base> <first>..<last> <n>
    commit(s)\`. **It pushes without asking, in either merge mode**: reaching
    this step is the instruction — \`phases/auto-chain.md\` reads the mode, this phase does not.
-   **Under \`merge: manual\` the landing hook holds it** until the user's own prompt this turn says
-   \`merge\` or \`/task merge\`; a refusal is not an obstacle to route around — quote it, name the word,
-   stop on the branch.
+   **Under \`merge: manual\` it is held** — by the landing hook, and by the script itself (exit 13),
+   whatever the command line — until the user's own prompt this turn says \`merge\` or \`/task merge\`;
+   a refusal is not an obstacle to route around — quote it, name the word, stop on the branch.
 4. **Read its exit** — this table maps every exit \`land-feature.sh\`'s header lists; an exit it does
    not list is a finding: quote it and stop on the branch.
 
@@ -1257,6 +1260,7 @@ that runs only on \`pull_request\`. **Do not infer \`--pr\` from a remote, a for
    | 10 | nothing to land | the branch has no commit origin lacks: say so — nothing merged, nothing to close |
    | 11 | landed and pushed; the branch would not delete with \`-d\` | the landing stands: step 5 runs. Report the branch that stayed |
    | 12 | an unexpected git failure before the push | quote it and stop: nothing was pushed |
+   | 13 | held by \`merge: manual\`: nothing ran | quote its line; it names the remedy — reply \`merge\`, trust the hooks, install \`jq\`, or run \`specnaut upgrade\`. Stop on the branch; never route around it |
 
 5. **Close what shipped, and reconcile** — only after a push, and not under \`--no-close\`: load
    \`phases/merge-close.md\`.
@@ -23182,11 +23186,13 @@ exit 0
 # The merge mode of this project — its one reader (spec 036, plan § 5, FR-002).
 #
 # Prints exactly \`auto\` or \`manual\` on stdout; a one-line note on stderr says
-# why. Two callers, neither of which parses the file itself:
+# why. Three callers, none of which parses the file itself:
 #   - the Specnaut chain (phases/auto-chain.md), which applies a per-run
 #     instruction first and asks this script only when there is none;
 #   - the landing hook (.specnaut/hooks/guard-merge.sh), which calls
-#     \`--strict\` and enforces the file alone (D3).
+#     \`--strict\` and enforces the file alone (D3);
+#   - the landing hold (merge-hold.sh, beside this script), which calls
+#     \`--strict\` inside land-feature.sh and remove-spec.sh (spec 048).
 #
 #   (default)  the first top-level \`merge:\` line of the working tree's
 #              .specnaut/workflow.yml. No file or no key → auto. An
@@ -23630,8 +23636,10 @@ echo "fold-fixups: folded — tree unchanged, worktree clean, one commit per chi
 # with an explicit refspec and never its tags; the merged branch is deleted
 # with \`-d\`; HEAD is verified to be the base. The base is base-branch.sh's —
 # local-only, so origin is asked here, on the path that already talks to it
-# — never an argument. Under \`merge: manual\` the landing hook holds this
-# script like a \`git push\` (merge-commands.txt): it does not read the mode.
+# — never an argument. Under \`merge: manual\` it holds itself first, exit 13,
+# unless merge-hold.sh prints \`merge-hold: run\` (spec 048): the landing hook
+# reads command lines, and a copy or an alias of this script is not one it
+# can read. The mode is that helper's to read, never this script's.
 #
 # Prints \`LANDED <base> <first>..<last> <n> commit(s)\` once the push landed.
 #
@@ -23651,6 +23659,8 @@ echo "fold-fixups: folded — tree unchanged, worktree clean, one commit per chi
 #   10 nothing to land: the branch has no commit origin/<base> lacks
 #   11 landed and pushed, but the branch would not delete with -d (it stays)
 #   12 an unexpected git failure before the push, named on stderr
+#   13 held by \`merge: manual\`: nothing was run; the line it printed names
+#      what releases it
 # (8 is retired: a branch that will not delete after the push is 11, never
 # read as a failed landing.)
 #
@@ -23659,9 +23669,13 @@ set -euo pipefail
 export GIT_OPTIONAL_LOCKS=0
 here=\$(CDPATH="" cd "\$(dirname "\${BASH_SOURCE[0]}")" && pwd)
 # \`set -e\` alone would exit with git's own code, which no table lists.
-trap 'rc=\$?; echo "land-feature: unexpected failure (exit \$rc) of: \$BASH_COMMAND — nothing was pushed" >&2; exit 12' ERR
+unexpected() { echo "land-feature: unexpected failure (exit \$1) of: \$2 — nothing was pushed" >&2; exit 12; }
+trap 'unexpected \$? "\$BASH_COMMAND"' ERR
 
 if [ \$# -ne 0 ]; then echo "usage: land-feature.sh" >&2; exit 2; fi
+# Exit 0 is not enough: only the helper's own line lets the landing run.
+if [ ! -f "\$here/merge-hold.sh" ]; then echo "land-feature: held — merge-hold.sh is missing beside it: run \\\`specnaut upgrade\\\`" >&2; exit 13; fi
+[ "\$(bash "\$here/merge-hold.sh")" = "merge-hold: run" ] || exit 13
 base=\$(bash "\$here/base-branch.sh") || exit 3
 branch=\$(git symbolic-ref --quiet --short HEAD) || {
   echo "land-feature: HEAD is detached — check out the feature branch" >&2
@@ -23740,6 +23754,72 @@ fi
   {
     category: "spec-root",
     name: "specify",
+    suffix: "scripts/bash/merge-hold.sh",
+    content: `#!/usr/bin/env bash
+# Whether a landing script may run now — the hold \`merge: manual\` puts on
+# land-feature.sh and remove-spec.sh themselves (spec 048), so every spelling
+# that reaches the unedited scripts is held, not only the ones the landing
+# hook's parser reads.
+#
+# Positive allow only: the last stdout line is exactly \`merge-hold: run\` on
+# every row that lets the caller run, and nothing else ever prints it. A
+# caller runs on that line alone, never on the exit code — a \`set -u\` abort
+# under an EXIT trap exits 0 on bash 3.2:
+#   [ "\$(bash "\$here/merge-hold.sh")" = "merge-hold: run" ] || exit 13
+#
+# Rows, in order:
+#   no CLAUDE_CODE_SESSION_ID and no CODEX_SESSION_ID   run (a person in a
+#       terminal, an unhooked harness; a note on stderr when CLAUDECODE or
+#       CODEX_SANDBOX* says a harness is there anyway)
+#   no .specnaut/hooks/guard-merge.sh                    run (nothing could
+#       ever write the approval)
+#   guard-merge.sh, but no .specnaut/hooks/merge-approved.sh   held
+#   merge-mode.sh --strict prints auto                   run (a failure is manual)
+#   otherwise                                            what merge-approved.sh
+#       says: run on this session's \`merge\` stamp, else held
+# Held: exit 13, one stderr line naming what releases it.
+#
+# The key is the session id, never CLAUDECODE: IDE terminals set that too.
+#
+# Usage: merge-hold.sh
+set -euo pipefail
+export GIT_OPTIONAL_LOCKS=0
+
+here=\$(CDPATH="" cd "\$(dirname "\${BASH_SOURCE[0]}")" && pwd -P)
+# The project this script is installed in, as merge-mode.sh finds it.
+case \$here in
+  */.specnaut/scripts/bash) root=\${here%/.specnaut/scripts/bash} ;;
+  *) if ! root=\$(git --no-pager rev-parse --show-toplevel 2>/dev/null); then root=\$PWD; fi ;;
+esac
+hooks=\$root/.specnaut/hooks
+
+run() { echo "merge-hold: run"; exit 0; }
+
+if [ -z "\${CLAUDE_CODE_SESSION_ID:-}" ] && [ -z "\${CODEX_SESSION_ID:-}" ]; then
+  if [ -n "\${CLAUDECODE:-}" ] || [ -n "\$(compgen -v CODEX_SANDBOX || true)" ]; then
+    echo "merge-hold: no session id in the environment — not held" >&2
+  fi
+  run
+fi
+[ -f "\$hooks/guard-merge.sh" ] || run
+if [ ! -f "\$hooks/merge-approved.sh" ]; then
+  echo "merge-hold: held — .specnaut/hooks/merge-approved.sh is missing, so no approval can be read: run \\\`specnaut upgrade\\\`" >&2
+  exit 13
+fi
+cd "\$root"
+mode=\$(bash "\$here/merge-mode.sh" --strict 2>/dev/null) || mode=manual
+[ "\$mode" != auto ] || run
+# The reader prints the one line that says what releases the hold.
+if bash "\$hooks/merge-approved.sh" >&2; then run; fi
+exit 13
+`,
+    executable: true,
+    backend: null,
+    skipIfExists: false,
+  },
+  {
+    category: "spec-root",
+    name: "specify",
     suffix: "scripts/bash/remove-spec.sh",
     content: `#!/usr/bin/env bash
 # Removes a shipped feature's spec directory, in its own commit, pushed
@@ -23758,13 +23838,16 @@ fi
 # a commit, and a push with an explicit refspec and never its tags. Files
 # under it that git does not track (ignored ones included) are in no commit:
 # they are listed, quoted, and kept — never deleted. Under \`merge: manual\`
-# the landing hook holds this script (merge-commands.txt).
+# it holds itself first, exit 13, unless merge-hold.sh prints
+# \`merge-hold: run\` (spec 048) — whatever command line reached it.
 #
 # Exit — the full table; phases/merge-close.md maps each one:
 #   0  removed and pushed: nothing is left under the directory
 #   2  usage
 #   3  the base branch is unknown
 #   7  the push was rejected (the commit stays on the local base)
+#   13 held by \`merge: manual\`: nothing changed; the line it printed names
+#      what releases it
 #   22 skipped — the condition that failed is printed, and nothing changed
 #   23 something else was staged after the check (the removal undone, the
 #      rest left staged, nothing committed)
@@ -23784,6 +23867,9 @@ if [ \$# -ne 1 ] || [[ ! \$1 =~ ^[A-Za-z0-9][A-Za-z0-9._-]*\$ ]]; then
   echo "usage: remove-spec.sh <landed-branch>" >&2
   exit 2
 fi
+# Exit 0 is not enough: only the helper's own line lets the removal run.
+if [ ! -f "\$here/merge-hold.sh" ]; then echo "remove-spec: held — merge-hold.sh is missing beside it: run \\\`specnaut upgrade\\\`" >&2; exit 13; fi
+[ "\$(bash "\$here/merge-hold.sh")" = "merge-hold: run" ] || exit 13
 landed=\$1
 base=\$(bash "\$here/base-branch.sh") || exit 3
 root=\$(git rev-parse --show-toplevel)
@@ -27061,6 +27147,10 @@ guard_git() { git --no-pager -c core.fsmonitor=false "\$@"; }
 # while hooks, spawned unsandboxed, can write it (§ 11 F3, Measured). It holds
 # {session_id, turn_id, kind}. Claude's prompts carry no turn_id: its stamp is
 # scoped to the session and deleted by the Stop hook at the end of the turn.
+# The project is keyed by GUARD_ROOT (guard_root), hashed — never the caller's
+# cwd or the git toplevel — so every reader of one project finds one stamp.
+# Two readers: approved, for a hook's payload, and approved_session, for
+# merge-approved.sh, which the landing scripts run outside any payload.
 
 # approval_session_ok <id> — a session id is a path component; only plain tokens.
 approval_session_ok() { [[ \$1 =~ ^[A-Za-z0-9_-]+\$ ]]; }
@@ -27089,24 +27179,50 @@ approval_state() {
 # approval_path <session_id> — where this project's stamp for that session lives.
 approval_path() { approval_state approvals "\$1"; }
 
+# _approval_read <stamp> <kind> — the stamp file exists, reads, and is
+# P_SESSION's approval of <kind>; APPROVAL_TURN: the turn_id it carries. The
+# one parse both readers share, so they cannot come to disagree on a stamp.
+_approval_read() {
+  local out
+  local -a f
+  [ -f "\$1" ] || return 1
+  out=\$(guard_jq -j '[.session_id, .kind, .turn_id] | map(if type == "string" then gsub("\\u001e"; " ") else "" end)
+    | join("\\u001e") + "\\u001e."' "\$1" 2>/dev/null) || return 1
+  IFS=\$'\\x1e' read -r -a f <<<"\$out"
+  guard_eq "\${f[0]}" "\$P_SESSION" || return 1
+  guard_eq "\${f[1]}" "\$2" || return 1
+  APPROVAL_TURN=\${f[2]}
+}
+
 # approved <kind> — the user's own prompt in THIS turn approved <kind>: the
 # stamp exists, and its session and kind match; its turn_id must match too
 # whenever the payload carries one, which on Codex it always must. Every
 # compare is non-empty: an absent id never matches an absent id.
 approved() {
-  local stamp out
-  local -a f
+  local stamp
   approval_session_ok "\$P_SESSION" || return 1
   if [ "\$GUARD_HARNESS" = codex ] && [ -z "\$P_TURN" ]; then return 1; fi
   stamp=\$(approval_path "\$P_SESSION")
-  [ -f "\$stamp" ] || return 1
-  out=\$(guard_jq -j '[.session_id, .kind, .turn_id] | map(if type == "string" then gsub("\\u001e"; " ") else "" end)
-    | join("\\u001e") + "\\u001e."' "\$stamp" 2>/dev/null) || return 1
-  IFS=\$'\\x1e' read -r -a f <<<"\$out"
-  guard_eq "\${f[0]}" "\$P_SESSION" || return 1
-  guard_eq "\${f[1]}" "\$1" || return 1
-  if [ -n "\$P_TURN" ]; then guard_eq "\${f[2]}" "\$P_TURN" || return 1; fi
+  _approval_read "\$stamp" "\$1" || return 1
+  if [ -n "\$P_TURN" ]; then guard_eq "\$APPROVAL_TURN" "\$P_TURN" || return 1; fi
   return 0
+}
+
+# approved_session <kind> — P_SESSION's stamp approves <kind>, with no turn
+# check: its one caller, merge-approved.sh, runs inside a landing script,
+# where neither harness exports a turn id (spec 048 § 8). Never a flag on
+# approved(): a hook that could skip the turn check would be one argument
+# away from doing so. The Stop hook's delete is the turn boundary; the age
+# bound caps the window on Codex, whose Stop may never come — the stamp's
+# mtime is the hook's write, since Codex's sandbox refuses the model's touch.
+APPROVAL_MAX_AGE_MIN=60
+approved_session() {
+  local stamp fresh
+  approval_session_ok "\$P_SESSION" || return 1
+  stamp=\$(approval_path "\$P_SESSION")
+  _approval_read "\$stamp" "\$1" || return 1
+  fresh=\$(find "\$stamp" -mmin "-\$APPROVAL_MAX_AGE_MIN" 2>/dev/null) || return 1
+  [ "\$fresh" = "\$stamp" ]
 }
 
 # _approval_ask <reason> — Claude's native permission prompt (exit 0 + "ask").
@@ -28386,6 +28502,53 @@ approval_gate merge \\
 `,
       executable: true,
     },
+    ".specnaut/hooks/merge-approved.sh": {
+      content: `#!/usr/bin/env bash
+# Not a hook: no harness registers it (spec 048 § 8). The reader of the
+# \`merge\` approval for the landing scripts — \`.specnaut/scripts/bash/
+# merge-hold.sh\` runs it under \`merge: manual\`. It lives here, beside the
+# hooks, so the stamp's location, its parse and the project root each keep
+# one owner (_guard.sh, _approval.sh), and so it sits under SHA256SUMS: on
+# Codex a script the model could edit would let it choose where this reads.
+#
+# Reads no stdin. The session is the id the harness exports to its Bash
+# children — CLAUDE_CODE_SESSION_ID, else CODEX_SESSION_ID: Claude's wins when
+# both are set. The root is the folder above this file's \`.specnaut/hooks/\`
+# (guard_root), never the caller's cwd.
+#
+# Exit 0 only when that session's stamp approves \`merge\` and is under an hour
+# old (approved_session). Every other path — no jq, a malformed id, no stamp,
+# a crash — exits 2 with one line on stderr naming what releases it.
+#
+# Usage: merge-approved.sh
+case \${BASH_SOURCE[0]} in */*) HOOK_DIR=\${BASH_SOURCE[0]%/*} ;; *) HOOK_DIR=. ;; esac
+# shellcheck source=_guard.sh
+. "\$HOOK_DIR/_guard.sh" || { echo "specnaut: \$HOOK_DIR/_guard.sh is missing — refusing" >&2; exit 2; }
+# shellcheck source=_approval.sh
+. "\$HOOK_DIR/_approval.sh"
+GUARD_NAME=merge-approved
+
+command -v jq >/dev/null 2>&1 \\
+  || guard_fail "held — jq is not on PATH, so the approval cannot be read: install jq, then run it again"
+if [ -n "\${CLAUDE_CODE_SESSION_ID:-}" ]; then
+  GUARD_HARNESS=claude P_SESSION=\$CLAUDE_CODE_SESSION_ID
+else
+  GUARD_HARNESS=codex P_SESSION=\${CODEX_SESSION_ID:-}
+fi
+# shellcheck disable=SC2034 # read by guard_root outside an installed .specnaut/hooks/
+GUARD_CWD=\$PWD
+approval_session_ok "\$P_SESSION" \\
+  || guard_fail "held — the session id in the environment is not a plain token, so no approval can be its own"
+
+if approved_session merge; then guard_allow; fi
+hint=""
+if [ "\$GUARD_HARNESS" = codex ]; then
+  hint=" If you typed merge, the prompt hook did not run — trust the hooks with /hooks."
+fi
+guard_fail "held — merge: manual, and the user's own prompt this turn did not approve the landing: reply \\\`merge\\\` (or \\\`/task merge\\\`); a plain \\"yes\\" does not release it.\$hint"
+`,
+      executable: true,
+    },
     ".specnaut/hooks/guard-release.sh": {
       content: `#!/usr/bin/env bash
 # PreToolUse(Bash), Codex only — publishing a release needs the user (spec
@@ -29054,7 +29217,7 @@ specnaut-guide
     ".specnaut/hooks/SHA256SUMS": {
       content: `e51a8a1291eb7e2e5a5a21122b971ee78c5392d4dbbabd28798f8f89df9ca08a  .gitattributes
 7a9b8bd4ecba4a1f8bfdece11124399c2e5811d17c42f07cdd60a3c7fe3346ea  _agents.txt
-eff27f37501f08c5a39cfcc2c6c7a8382e0d0467dc4a63cf3d29bb84d5ea26d6  _approval.sh
+1ad00a95ca1f01c22ed687724f898ae5097ede407ea3b8fa7294f987bed2b7cb  _approval.sh
 43d7f7db80493808631ae998e4a172bbf9ed494ce0fcbf23b0e083bbc9fed58a  _baseline.sh
 851af0ab2ef8625bd96ef8b0f591d0baffd0d6419a1c7faba7804efc54af70a1  _command.sh
 a1ce84dc85cfd2fd05306591da86f9a42729e1abff8e4ed8389275bd27f739e6  _git.sh
@@ -29067,6 +29230,7 @@ f5552945f77fb0d24f56bbf2e97fb64d284d9c716abf211ebcbe081cacdf8bdf  _paths.sh
 8681e451ab68b6d0332e1b4c0c2f344efa1c92b2d543872f10724ad39ec32e41  guard-merge.sh
 a3eb7a8dfcb3bbc387008931993a59a4006e9fe6f8042f137752f4ee41ee24ce  guard-release.sh
 3364feb0f3a7892224b67e4f857bb6c085456da98c892d7199c4bbd10f122f8b  log-subagent.sh
+79e66c4451546f416b4e57d942f9ec8e9f078e00f24c0b5a634c1c24dc08bfca  merge-approved.sh
 e4948628523983b30e3841f3f5f9393c391bcbb64caa9f192a081ea3ff356017  merge-commands.txt
 0d231c09ef29b1e46b774d283fad725382f33d6f3098545dc8a504bf89c40a80  protect-constitution.sh
 79f8bc840e2e691c2011c0350bd5140bad8caa4448d65ed209e79da582a075a3  protect-generated.sh
@@ -29324,6 +29488,10 @@ guard_git() { git --no-pager -c core.fsmonitor=false "\$@"; }
 # while hooks, spawned unsandboxed, can write it (§ 11 F3, Measured). It holds
 # {session_id, turn_id, kind}. Claude's prompts carry no turn_id: its stamp is
 # scoped to the session and deleted by the Stop hook at the end of the turn.
+# The project is keyed by GUARD_ROOT (guard_root), hashed — never the caller's
+# cwd or the git toplevel — so every reader of one project finds one stamp.
+# Two readers: approved, for a hook's payload, and approved_session, for
+# merge-approved.sh, which the landing scripts run outside any payload.
 
 # approval_session_ok <id> — a session id is a path component; only plain tokens.
 approval_session_ok() { [[ \$1 =~ ^[A-Za-z0-9_-]+\$ ]]; }
@@ -29352,24 +29520,50 @@ approval_state() {
 # approval_path <session_id> — where this project's stamp for that session lives.
 approval_path() { approval_state approvals "\$1"; }
 
+# _approval_read <stamp> <kind> — the stamp file exists, reads, and is
+# P_SESSION's approval of <kind>; APPROVAL_TURN: the turn_id it carries. The
+# one parse both readers share, so they cannot come to disagree on a stamp.
+_approval_read() {
+  local out
+  local -a f
+  [ -f "\$1" ] || return 1
+  out=\$(guard_jq -j '[.session_id, .kind, .turn_id] | map(if type == "string" then gsub("\\u001e"; " ") else "" end)
+    | join("\\u001e") + "\\u001e."' "\$1" 2>/dev/null) || return 1
+  IFS=\$'\\x1e' read -r -a f <<<"\$out"
+  guard_eq "\${f[0]}" "\$P_SESSION" || return 1
+  guard_eq "\${f[1]}" "\$2" || return 1
+  APPROVAL_TURN=\${f[2]}
+}
+
 # approved <kind> — the user's own prompt in THIS turn approved <kind>: the
 # stamp exists, and its session and kind match; its turn_id must match too
 # whenever the payload carries one, which on Codex it always must. Every
 # compare is non-empty: an absent id never matches an absent id.
 approved() {
-  local stamp out
-  local -a f
+  local stamp
   approval_session_ok "\$P_SESSION" || return 1
   if [ "\$GUARD_HARNESS" = codex ] && [ -z "\$P_TURN" ]; then return 1; fi
   stamp=\$(approval_path "\$P_SESSION")
-  [ -f "\$stamp" ] || return 1
-  out=\$(guard_jq -j '[.session_id, .kind, .turn_id] | map(if type == "string" then gsub("\\u001e"; " ") else "" end)
-    | join("\\u001e") + "\\u001e."' "\$stamp" 2>/dev/null) || return 1
-  IFS=\$'\\x1e' read -r -a f <<<"\$out"
-  guard_eq "\${f[0]}" "\$P_SESSION" || return 1
-  guard_eq "\${f[1]}" "\$1" || return 1
-  if [ -n "\$P_TURN" ]; then guard_eq "\${f[2]}" "\$P_TURN" || return 1; fi
+  _approval_read "\$stamp" "\$1" || return 1
+  if [ -n "\$P_TURN" ]; then guard_eq "\$APPROVAL_TURN" "\$P_TURN" || return 1; fi
   return 0
+}
+
+# approved_session <kind> — P_SESSION's stamp approves <kind>, with no turn
+# check: its one caller, merge-approved.sh, runs inside a landing script,
+# where neither harness exports a turn id (spec 048 § 8). Never a flag on
+# approved(): a hook that could skip the turn check would be one argument
+# away from doing so. The Stop hook's delete is the turn boundary; the age
+# bound caps the window on Codex, whose Stop may never come — the stamp's
+# mtime is the hook's write, since Codex's sandbox refuses the model's touch.
+APPROVAL_MAX_AGE_MIN=60
+approved_session() {
+  local stamp fresh
+  approval_session_ok "\$P_SESSION" || return 1
+  stamp=\$(approval_path "\$P_SESSION")
+  _approval_read "\$stamp" "\$1" || return 1
+  fresh=\$(find "\$stamp" -mmin "-\$APPROVAL_MAX_AGE_MIN" 2>/dev/null) || return 1
+  [ "\$fresh" = "\$stamp" ]
 }
 
 # _approval_ask <reason> — Claude's native permission prompt (exit 0 + "ask").
@@ -30649,6 +30843,53 @@ approval_gate merge \\
 `,
       executable: true,
     },
+    ".specnaut/hooks/merge-approved.sh": {
+      content: `#!/usr/bin/env bash
+# Not a hook: no harness registers it (spec 048 § 8). The reader of the
+# \`merge\` approval for the landing scripts — \`.specnaut/scripts/bash/
+# merge-hold.sh\` runs it under \`merge: manual\`. It lives here, beside the
+# hooks, so the stamp's location, its parse and the project root each keep
+# one owner (_guard.sh, _approval.sh), and so it sits under SHA256SUMS: on
+# Codex a script the model could edit would let it choose where this reads.
+#
+# Reads no stdin. The session is the id the harness exports to its Bash
+# children — CLAUDE_CODE_SESSION_ID, else CODEX_SESSION_ID: Claude's wins when
+# both are set. The root is the folder above this file's \`.specnaut/hooks/\`
+# (guard_root), never the caller's cwd.
+#
+# Exit 0 only when that session's stamp approves \`merge\` and is under an hour
+# old (approved_session). Every other path — no jq, a malformed id, no stamp,
+# a crash — exits 2 with one line on stderr naming what releases it.
+#
+# Usage: merge-approved.sh
+case \${BASH_SOURCE[0]} in */*) HOOK_DIR=\${BASH_SOURCE[0]%/*} ;; *) HOOK_DIR=. ;; esac
+# shellcheck source=_guard.sh
+. "\$HOOK_DIR/_guard.sh" || { echo "specnaut: \$HOOK_DIR/_guard.sh is missing — refusing" >&2; exit 2; }
+# shellcheck source=_approval.sh
+. "\$HOOK_DIR/_approval.sh"
+GUARD_NAME=merge-approved
+
+command -v jq >/dev/null 2>&1 \\
+  || guard_fail "held — jq is not on PATH, so the approval cannot be read: install jq, then run it again"
+if [ -n "\${CLAUDE_CODE_SESSION_ID:-}" ]; then
+  GUARD_HARNESS=claude P_SESSION=\$CLAUDE_CODE_SESSION_ID
+else
+  GUARD_HARNESS=codex P_SESSION=\${CODEX_SESSION_ID:-}
+fi
+# shellcheck disable=SC2034 # read by guard_root outside an installed .specnaut/hooks/
+GUARD_CWD=\$PWD
+approval_session_ok "\$P_SESSION" \\
+  || guard_fail "held — the session id in the environment is not a plain token, so no approval can be its own"
+
+if approved_session merge; then guard_allow; fi
+hint=""
+if [ "\$GUARD_HARNESS" = codex ]; then
+  hint=" If you typed merge, the prompt hook did not run — trust the hooks with /hooks."
+fi
+guard_fail "held — merge: manual, and the user's own prompt this turn did not approve the landing: reply \\\`merge\\\` (or \\\`/task merge\\\`); a plain \\"yes\\" does not release it.\$hint"
+`,
+      executable: true,
+    },
     ".specnaut/hooks/guard-release.sh": {
       content: `#!/usr/bin/env bash
 # PreToolUse(Bash), Codex only — publishing a release needs the user (spec
@@ -31317,7 +31558,7 @@ specnaut-guide
     ".specnaut/hooks/SHA256SUMS": {
       content: `e51a8a1291eb7e2e5a5a21122b971ee78c5392d4dbbabd28798f8f89df9ca08a  .gitattributes
 7a9b8bd4ecba4a1f8bfdece11124399c2e5811d17c42f07cdd60a3c7fe3346ea  _agents.txt
-eff27f37501f08c5a39cfcc2c6c7a8382e0d0467dc4a63cf3d29bb84d5ea26d6  _approval.sh
+1ad00a95ca1f01c22ed687724f898ae5097ede407ea3b8fa7294f987bed2b7cb  _approval.sh
 43d7f7db80493808631ae998e4a172bbf9ed494ce0fcbf23b0e083bbc9fed58a  _baseline.sh
 851af0ab2ef8625bd96ef8b0f591d0baffd0d6419a1c7faba7804efc54af70a1  _command.sh
 a1ce84dc85cfd2fd05306591da86f9a42729e1abff8e4ed8389275bd27f739e6  _git.sh
@@ -31330,6 +31571,7 @@ f5552945f77fb0d24f56bbf2e97fb64d284d9c716abf211ebcbe081cacdf8bdf  _paths.sh
 8681e451ab68b6d0332e1b4c0c2f344efa1c92b2d543872f10724ad39ec32e41  guard-merge.sh
 a3eb7a8dfcb3bbc387008931993a59a4006e9fe6f8042f137752f4ee41ee24ce  guard-release.sh
 3364feb0f3a7892224b67e4f857bb6c085456da98c892d7199c4bbd10f122f8b  log-subagent.sh
+79e66c4451546f416b4e57d942f9ec8e9f078e00f24c0b5a634c1c24dc08bfca  merge-approved.sh
 e4948628523983b30e3841f3f5f9393c391bcbb64caa9f192a081ea3ff356017  merge-commands.txt
 0d231c09ef29b1e46b774d283fad725382f33d6f3098545dc8a504bf89c40a80  protect-constitution.sh
 79f8bc840e2e691c2011c0350bd5140bad8caa4448d65ed209e79da582a075a3  protect-generated.sh
@@ -31354,17 +31596,17 @@ c59dea265fb0e13092cb4ef650a436b29e34be4f18397aeaebc5408811ed3c7c  release-comman
         "hooks": [
           {
             "type": "command",
-            "command": "r=\$PWD; while [ -n \\"\$r\\" ] && [ ! -d \\"\$r/.specnaut/hooks\\" ]; do r=\${r%/*}; done; [ \\"\$( (sha256sum 2>/dev/null || shasum -a 256) < \\"\$r/.specnaut/hooks/SHA256SUMS\\" 2>/dev/null | cut -c1-64)\\" = \\"ba99caf63817dfc15e68c09ef39268460dda602b8329435be717e8ec1e64ce6d\\" ] && (cd \\"\$r/.specnaut/hooks\\" && (sha256sum -c --status SHA256SUMS 2>/dev/null || shasum -a 256 -c --status SHA256SUMS)) && exec bash \\"\$r/.specnaut/hooks/guard-merge.sh\\" codex; echo \\"specnaut: .specnaut/hooks changed since it was trusted — run specnaut upgrade, then /hooks\\" >&2; exit 2",
+            "command": "r=\$PWD; while [ -n \\"\$r\\" ] && [ ! -d \\"\$r/.specnaut/hooks\\" ]; do r=\${r%/*}; done; [ \\"\$( (sha256sum 2>/dev/null || shasum -a 256) < \\"\$r/.specnaut/hooks/SHA256SUMS\\" 2>/dev/null | cut -c1-64)\\" = \\"bde9ec6dfd275c0b5ac6ef6e2588e2f8cb9c309fb9d8fad545445be50bd7bcd9\\" ] && (cd \\"\$r/.specnaut/hooks\\" && (sha256sum -c --status SHA256SUMS 2>/dev/null || shasum -a 256 -c --status SHA256SUMS)) && exec bash \\"\$r/.specnaut/hooks/guard-merge.sh\\" codex; echo \\"specnaut: .specnaut/hooks changed since it was trusted — run specnaut upgrade, then /hooks\\" >&2; exit 2",
             "timeout": 10
           },
           {
             "type": "command",
-            "command": "r=\$PWD; while [ -n \\"\$r\\" ] && [ ! -d \\"\$r/.specnaut/hooks\\" ]; do r=\${r%/*}; done; [ \\"\$( (sha256sum 2>/dev/null || shasum -a 256) < \\"\$r/.specnaut/hooks/SHA256SUMS\\" 2>/dev/null | cut -c1-64)\\" = \\"ba99caf63817dfc15e68c09ef39268460dda602b8329435be717e8ec1e64ce6d\\" ] && (cd \\"\$r/.specnaut/hooks\\" && (sha256sum -c --status SHA256SUMS 2>/dev/null || shasum -a 256 -c --status SHA256SUMS)) && exec bash \\"\$r/.specnaut/hooks/guard-release.sh\\" codex; echo \\"specnaut: .specnaut/hooks changed since it was trusted — run specnaut upgrade, then /hooks\\" >&2; exit 2",
+            "command": "r=\$PWD; while [ -n \\"\$r\\" ] && [ ! -d \\"\$r/.specnaut/hooks\\" ]; do r=\${r%/*}; done; [ \\"\$( (sha256sum 2>/dev/null || shasum -a 256) < \\"\$r/.specnaut/hooks/SHA256SUMS\\" 2>/dev/null | cut -c1-64)\\" = \\"bde9ec6dfd275c0b5ac6ef6e2588e2f8cb9c309fb9d8fad545445be50bd7bcd9\\" ] && (cd \\"\$r/.specnaut/hooks\\" && (sha256sum -c --status SHA256SUMS 2>/dev/null || shasum -a 256 -c --status SHA256SUMS)) && exec bash \\"\$r/.specnaut/hooks/guard-release.sh\\" codex; echo \\"specnaut: .specnaut/hooks changed since it was trusted — run specnaut upgrade, then /hooks\\" >&2; exit 2",
             "timeout": 10
           },
           {
             "type": "command",
-            "command": "r=\$PWD; while [ -n \\"\$r\\" ] && [ ! -d \\"\$r/.specnaut/hooks\\" ]; do r=\${r%/*}; done; [ \\"\$( (sha256sum 2>/dev/null || shasum -a 256) < \\"\$r/.specnaut/hooks/SHA256SUMS\\" 2>/dev/null | cut -c1-64)\\" = \\"ba99caf63817dfc15e68c09ef39268460dda602b8329435be717e8ec1e64ce6d\\" ] && (cd \\"\$r/.specnaut/hooks\\" && (sha256sum -c --status SHA256SUMS 2>/dev/null || shasum -a 256 -c --status SHA256SUMS)) && exec bash \\"\$r/.specnaut/hooks/protect-constitution.sh\\" codex; echo \\"specnaut: .specnaut/hooks changed since it was trusted — run specnaut upgrade, then /hooks\\" >&2; exit 2",
+            "command": "r=\$PWD; while [ -n \\"\$r\\" ] && [ ! -d \\"\$r/.specnaut/hooks\\" ]; do r=\${r%/*}; done; [ \\"\$( (sha256sum 2>/dev/null || shasum -a 256) < \\"\$r/.specnaut/hooks/SHA256SUMS\\" 2>/dev/null | cut -c1-64)\\" = \\"bde9ec6dfd275c0b5ac6ef6e2588e2f8cb9c309fb9d8fad545445be50bd7bcd9\\" ] && (cd \\"\$r/.specnaut/hooks\\" && (sha256sum -c --status SHA256SUMS 2>/dev/null || shasum -a 256 -c --status SHA256SUMS)) && exec bash \\"\$r/.specnaut/hooks/protect-constitution.sh\\" codex; echo \\"specnaut: .specnaut/hooks changed since it was trusted — run specnaut upgrade, then /hooks\\" >&2; exit 2",
             "timeout": 10
           }
         ]
@@ -31374,12 +31616,12 @@ c59dea265fb0e13092cb4ef650a436b29e34be4f18397aeaebc5408811ed3c7c  release-comman
         "hooks": [
           {
             "type": "command",
-            "command": "r=\$PWD; while [ -n \\"\$r\\" ] && [ ! -d \\"\$r/.specnaut/hooks\\" ]; do r=\${r%/*}; done; [ \\"\$( (sha256sum 2>/dev/null || shasum -a 256) < \\"\$r/.specnaut/hooks/SHA256SUMS\\" 2>/dev/null | cut -c1-64)\\" = \\"ba99caf63817dfc15e68c09ef39268460dda602b8329435be717e8ec1e64ce6d\\" ] && (cd \\"\$r/.specnaut/hooks\\" && (sha256sum -c --status SHA256SUMS 2>/dev/null || shasum -a 256 -c --status SHA256SUMS)) && exec bash \\"\$r/.specnaut/hooks/protect-generated.sh\\" codex; echo \\"specnaut: .specnaut/hooks changed since it was trusted — run specnaut upgrade, then /hooks\\" >&2; exit 2",
+            "command": "r=\$PWD; while [ -n \\"\$r\\" ] && [ ! -d \\"\$r/.specnaut/hooks\\" ]; do r=\${r%/*}; done; [ \\"\$( (sha256sum 2>/dev/null || shasum -a 256) < \\"\$r/.specnaut/hooks/SHA256SUMS\\" 2>/dev/null | cut -c1-64)\\" = \\"bde9ec6dfd275c0b5ac6ef6e2588e2f8cb9c309fb9d8fad545445be50bd7bcd9\\" ] && (cd \\"\$r/.specnaut/hooks\\" && (sha256sum -c --status SHA256SUMS 2>/dev/null || shasum -a 256 -c --status SHA256SUMS)) && exec bash \\"\$r/.specnaut/hooks/protect-generated.sh\\" codex; echo \\"specnaut: .specnaut/hooks changed since it was trusted — run specnaut upgrade, then /hooks\\" >&2; exit 2",
             "timeout": 10
           },
           {
             "type": "command",
-            "command": "r=\$PWD; while [ -n \\"\$r\\" ] && [ ! -d \\"\$r/.specnaut/hooks\\" ]; do r=\${r%/*}; done; [ \\"\$( (sha256sum 2>/dev/null || shasum -a 256) < \\"\$r/.specnaut/hooks/SHA256SUMS\\" 2>/dev/null | cut -c1-64)\\" = \\"ba99caf63817dfc15e68c09ef39268460dda602b8329435be717e8ec1e64ce6d\\" ] && (cd \\"\$r/.specnaut/hooks\\" && (sha256sum -c --status SHA256SUMS 2>/dev/null || shasum -a 256 -c --status SHA256SUMS)) && exec bash \\"\$r/.specnaut/hooks/protect-constitution.sh\\" codex; echo \\"specnaut: .specnaut/hooks changed since it was trusted — run specnaut upgrade, then /hooks\\" >&2; exit 2",
+            "command": "r=\$PWD; while [ -n \\"\$r\\" ] && [ ! -d \\"\$r/.specnaut/hooks\\" ]; do r=\${r%/*}; done; [ \\"\$( (sha256sum 2>/dev/null || shasum -a 256) < \\"\$r/.specnaut/hooks/SHA256SUMS\\" 2>/dev/null | cut -c1-64)\\" = \\"bde9ec6dfd275c0b5ac6ef6e2588e2f8cb9c309fb9d8fad545445be50bd7bcd9\\" ] && (cd \\"\$r/.specnaut/hooks\\" && (sha256sum -c --status SHA256SUMS 2>/dev/null || shasum -a 256 -c --status SHA256SUMS)) && exec bash \\"\$r/.specnaut/hooks/protect-constitution.sh\\" codex; echo \\"specnaut: .specnaut/hooks changed since it was trusted — run specnaut upgrade, then /hooks\\" >&2; exit 2",
             "timeout": 10
           }
         ]
@@ -31389,7 +31631,7 @@ c59dea265fb0e13092cb4ef650a436b29e34be4f18397aeaebc5408811ed3c7c  release-comman
         "hooks": [
           {
             "type": "command",
-            "command": "r=\$PWD; while [ -n \\"\$r\\" ] && [ ! -d \\"\$r/.specnaut/hooks\\" ]; do r=\${r%/*}; done; [ \\"\$( (sha256sum 2>/dev/null || shasum -a 256) < \\"\$r/.specnaut/hooks/SHA256SUMS\\" 2>/dev/null | cut -c1-64)\\" = \\"ba99caf63817dfc15e68c09ef39268460dda602b8329435be717e8ec1e64ce6d\\" ] && (cd \\"\$r/.specnaut/hooks\\" && (sha256sum -c --status SHA256SUMS 2>/dev/null || shasum -a 256 -c --status SHA256SUMS)) && exec bash \\"\$r/.specnaut/hooks/guard-dispatch-model.sh\\" codex; echo \\"specnaut: .specnaut/hooks changed since it was trusted — run specnaut upgrade, then /hooks\\" >&2; exit 2",
+            "command": "r=\$PWD; while [ -n \\"\$r\\" ] && [ ! -d \\"\$r/.specnaut/hooks\\" ]; do r=\${r%/*}; done; [ \\"\$( (sha256sum 2>/dev/null || shasum -a 256) < \\"\$r/.specnaut/hooks/SHA256SUMS\\" 2>/dev/null | cut -c1-64)\\" = \\"bde9ec6dfd275c0b5ac6ef6e2588e2f8cb9c309fb9d8fad545445be50bd7bcd9\\" ] && (cd \\"\$r/.specnaut/hooks\\" && (sha256sum -c --status SHA256SUMS 2>/dev/null || shasum -a 256 -c --status SHA256SUMS)) && exec bash \\"\$r/.specnaut/hooks/guard-dispatch-model.sh\\" codex; echo \\"specnaut: .specnaut/hooks changed since it was trusted — run specnaut upgrade, then /hooks\\" >&2; exit 2",
             "timeout": 10
           }
         ]
@@ -31400,7 +31642,7 @@ c59dea265fb0e13092cb4ef650a436b29e34be4f18397aeaebc5408811ed3c7c  release-comman
         "hooks": [
           {
             "type": "command",
-            "command": "r=\$PWD; while [ -n \\"\$r\\" ] && [ ! -d \\"\$r/.specnaut/hooks\\" ]; do r=\${r%/*}; done; [ \\"\$( (sha256sum 2>/dev/null || shasum -a 256) < \\"\$r/.specnaut/hooks/SHA256SUMS\\" 2>/dev/null | cut -c1-64)\\" = \\"ba99caf63817dfc15e68c09ef39268460dda602b8329435be717e8ec1e64ce6d\\" ] && (cd \\"\$r/.specnaut/hooks\\" && (sha256sum -c --status SHA256SUMS 2>/dev/null || shasum -a 256 -c --status SHA256SUMS)) && exec bash \\"\$r/.specnaut/hooks/approve-on-prompt.sh\\" codex; echo \\"specnaut: .specnaut/hooks changed since it was trusted — run specnaut upgrade, then /hooks\\" >&2; exit 0",
+            "command": "r=\$PWD; while [ -n \\"\$r\\" ] && [ ! -d \\"\$r/.specnaut/hooks\\" ]; do r=\${r%/*}; done; [ \\"\$( (sha256sum 2>/dev/null || shasum -a 256) < \\"\$r/.specnaut/hooks/SHA256SUMS\\" 2>/dev/null | cut -c1-64)\\" = \\"bde9ec6dfd275c0b5ac6ef6e2588e2f8cb9c309fb9d8fad545445be50bd7bcd9\\" ] && (cd \\"\$r/.specnaut/hooks\\" && (sha256sum -c --status SHA256SUMS 2>/dev/null || shasum -a 256 -c --status SHA256SUMS)) && exec bash \\"\$r/.specnaut/hooks/approve-on-prompt.sh\\" codex; echo \\"specnaut: .specnaut/hooks changed since it was trusted — run specnaut upgrade, then /hooks\\" >&2; exit 0",
             "timeout": 10
           }
         ]
@@ -31411,7 +31653,7 @@ c59dea265fb0e13092cb4ef650a436b29e34be4f18397aeaebc5408811ed3c7c  release-comman
         "hooks": [
           {
             "type": "command",
-            "command": "r=\$PWD; while [ -n \\"\$r\\" ] && [ ! -d \\"\$r/.specnaut/hooks\\" ]; do r=\${r%/*}; done; [ \\"\$( (sha256sum 2>/dev/null || shasum -a 256) < \\"\$r/.specnaut/hooks/SHA256SUMS\\" 2>/dev/null | cut -c1-64)\\" = \\"ba99caf63817dfc15e68c09ef39268460dda602b8329435be717e8ec1e64ce6d\\" ] && (cd \\"\$r/.specnaut/hooks\\" && (sha256sum -c --status SHA256SUMS 2>/dev/null || shasum -a 256 -c --status SHA256SUMS)) && exec bash \\"\$r/.specnaut/hooks/approve-on-prompt.sh\\" codex; echo \\"specnaut: .specnaut/hooks changed since it was trusted — run specnaut upgrade, then /hooks\\" >&2; exit 0",
+            "command": "r=\$PWD; while [ -n \\"\$r\\" ] && [ ! -d \\"\$r/.specnaut/hooks\\" ]; do r=\${r%/*}; done; [ \\"\$( (sha256sum 2>/dev/null || shasum -a 256) < \\"\$r/.specnaut/hooks/SHA256SUMS\\" 2>/dev/null | cut -c1-64)\\" = \\"bde9ec6dfd275c0b5ac6ef6e2588e2f8cb9c309fb9d8fad545445be50bd7bcd9\\" ] && (cd \\"\$r/.specnaut/hooks\\" && (sha256sum -c --status SHA256SUMS 2>/dev/null || shasum -a 256 -c --status SHA256SUMS)) && exec bash \\"\$r/.specnaut/hooks/approve-on-prompt.sh\\" codex; echo \\"specnaut: .specnaut/hooks changed since it was trusted — run specnaut upgrade, then /hooks\\" >&2; exit 0",
             "timeout": 10
           }
         ]
@@ -31422,7 +31664,7 @@ c59dea265fb0e13092cb4ef650a436b29e34be4f18397aeaebc5408811ed3c7c  release-comman
         "hooks": [
           {
             "type": "command",
-            "command": "r=\$PWD; while [ -n \\"\$r\\" ] && [ ! -d \\"\$r/.specnaut/hooks\\" ]; do r=\${r%/*}; done; [ \\"\$( (sha256sum 2>/dev/null || shasum -a 256) < \\"\$r/.specnaut/hooks/SHA256SUMS\\" 2>/dev/null | cut -c1-64)\\" = \\"ba99caf63817dfc15e68c09ef39268460dda602b8329435be717e8ec1e64ce6d\\" ] && (cd \\"\$r/.specnaut/hooks\\" && (sha256sum -c --status SHA256SUMS 2>/dev/null || shasum -a 256 -c --status SHA256SUMS)) && exec bash \\"\$r/.specnaut/hooks/log-subagent.sh\\" start; echo \\"specnaut: .specnaut/hooks changed since it was trusted — run specnaut upgrade, then /hooks\\" >&2; exit 0",
+            "command": "r=\$PWD; while [ -n \\"\$r\\" ] && [ ! -d \\"\$r/.specnaut/hooks\\" ]; do r=\${r%/*}; done; [ \\"\$( (sha256sum 2>/dev/null || shasum -a 256) < \\"\$r/.specnaut/hooks/SHA256SUMS\\" 2>/dev/null | cut -c1-64)\\" = \\"bde9ec6dfd275c0b5ac6ef6e2588e2f8cb9c309fb9d8fad545445be50bd7bcd9\\" ] && (cd \\"\$r/.specnaut/hooks\\" && (sha256sum -c --status SHA256SUMS 2>/dev/null || shasum -a 256 -c --status SHA256SUMS)) && exec bash \\"\$r/.specnaut/hooks/log-subagent.sh\\" start; echo \\"specnaut: .specnaut/hooks changed since it was trusted — run specnaut upgrade, then /hooks\\" >&2; exit 0",
             "timeout": 10
           }
         ]
@@ -31433,7 +31675,7 @@ c59dea265fb0e13092cb4ef650a436b29e34be4f18397aeaebc5408811ed3c7c  release-comman
         "hooks": [
           {
             "type": "command",
-            "command": "r=\$PWD; while [ -n \\"\$r\\" ] && [ ! -d \\"\$r/.specnaut/hooks\\" ]; do r=\${r%/*}; done; [ \\"\$( (sha256sum 2>/dev/null || shasum -a 256) < \\"\$r/.specnaut/hooks/SHA256SUMS\\" 2>/dev/null | cut -c1-64)\\" = \\"ba99caf63817dfc15e68c09ef39268460dda602b8329435be717e8ec1e64ce6d\\" ] && (cd \\"\$r/.specnaut/hooks\\" && (sha256sum -c --status SHA256SUMS 2>/dev/null || shasum -a 256 -c --status SHA256SUMS)) && exec bash \\"\$r/.specnaut/hooks/log-subagent.sh\\" stop; echo \\"specnaut: .specnaut/hooks changed since it was trusted — run specnaut upgrade, then /hooks\\" >&2; exit 0",
+            "command": "r=\$PWD; while [ -n \\"\$r\\" ] && [ ! -d \\"\$r/.specnaut/hooks\\" ]; do r=\${r%/*}; done; [ \\"\$( (sha256sum 2>/dev/null || shasum -a 256) < \\"\$r/.specnaut/hooks/SHA256SUMS\\" 2>/dev/null | cut -c1-64)\\" = \\"bde9ec6dfd275c0b5ac6ef6e2588e2f8cb9c309fb9d8fad545445be50bd7bcd9\\" ] && (cd \\"\$r/.specnaut/hooks\\" && (sha256sum -c --status SHA256SUMS 2>/dev/null || shasum -a 256 -c --status SHA256SUMS)) && exec bash \\"\$r/.specnaut/hooks/log-subagent.sh\\" stop; echo \\"specnaut: .specnaut/hooks changed since it was trusted — run specnaut upgrade, then /hooks\\" >&2; exit 0",
             "timeout": 10
           }
         ]
