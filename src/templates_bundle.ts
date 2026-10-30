@@ -3813,35 +3813,28 @@ constitution-exempt: an output-format contract preloaded by agents that already 
 # workflow-contract
 
 This skill defines the **WORKFLOW STATUS** block. Agents that preload it
-(\`developer\`, \`workflow-manager\`, \`qa-tester\`, and all
-five experts + \`code-reviewer\` via this contract) emit exactly one such block at
-the **end of their turn, after the prose**. The block is additive — it never replaces the prose narrative; it
-appends a normalized, fenced, machine-readable summary that downstream tooling
-(audit synthesis, the status ledger, \`/status-audit\`) can parse without
-re-reading the prose.
+(\`developer\`, the five experts and \`code-reviewer\`) emit exactly one such block
+at the **end of their turn, after the prose**. It is additive: the prose carries
+the narrative, the block carries the fields something parses — the subagent log
+hook reads \`STATE\`, \`DONE_CRITERIA_MET\` and \`HANDOFF_TARGET\` into
+\`.specnaut/logs/agents.jsonl\`, and whoever resumes a blocked turn reads
+\`BLOCKERS\`.
 
 ## Format
 
 \`\`\`text
 WORKFLOW STATUS
-STATE: in_progress | blocked | awaiting_review | awaiting_qa | awaiting_user | done | failed
+STATE: in_progress | blocked | awaiting_review | awaiting_user | done | failed
 DONE_CRITERIA_MET: yes | no
-SUMMARY: <one sentence — outcome, not effort>
-ARTIFACTS: <comma list | none>
-FILES_CHANGED: <comma list | none>
-VALIDATION: <comma list of "command (result)" | none>
 BLOCKERS: <one sentence | none>
-NEXT_ACTION: <one sentence>
-HANDOFF_TARGET: developer | qa-tester | product-owner | workflow-manager | user | none
+HANDOFF_TARGET: developer | product-owner | user | none
 \`\`\`
 
 ## Rules
 
 - Exactly one block per turn; never replaces prose (additive).
 - \`STATE: done\` only when assigned exit criteria are met; otherwise use \`awaiting_review\` /
-  \`awaiting_qa\` / \`blocked\`. Never \`done\` with \`DONE_CRITERIA_MET: no\`.
-- \`FILES_CHANGED: none\` for read-only agents (experts/reviewers).
-- \`VALIDATION\` is explicit, e.g. \`<the command you ran> (pass)\`.
+  \`blocked\`. Never \`done\` with \`DONE_CRITERIA_MET: no\`.
 - \`HANDOFF_TARGET: none\` when work terminates here.
 `,
     executable: false,
@@ -4193,53 +4186,6 @@ Specnaut's, and \`upgrade\` is the only thing that restores it from the bundle.
   },
   {
     category: "skill",
-    name: "handoff-protocol",
-    suffix: null,
-    content: `---
-name: handoff-protocol
-description: Defines the machine-readable HANDOFF block emitted right after WORKFLOW STATUS whenever an agent hands work to another actor. Preloaded, not user-invocable.
-user-invocable: false
-constitution-exempt: an output-format contract preloaded by agents that already read the constitution first
----
-
-# handoff-protocol
-
-This skill defines the **HANDOFF** block. Agents that preload it (\`developer\`,
-\`workflow-manager\`) emit it **immediately after the
-WORKFLOW STATUS block, and only when** that block's \`HANDOFF_TARGET\` is not
-\`none\`. It gives the next actor a precise, executable instruction plus the
-concrete payload they need, so the handoff requires no re-derivation of intent.
-The block is additive — it appends to the prose, never replaces it.
-
-Agents that hand off but do NOT preload this contract (e.g. \`qa-tester\`, which
-routes bugs to the developer) signal the target through the WORKFLOW STATUS
-\`HANDOFF_TARGET\` field rather than emitting a full HANDOFF block — they carry
-\`workflow-contract\` but not \`handoff-protocol\` by design.
-
-## Format
-
-\`\`\`text
-HANDOFF
-TARGET: developer | qa-tester | product-owner | workflow-manager | user
-REASON: <one sentence>
-REQUESTED_ACTION: <one imperative sentence — executable without reinterpretation>
-PAYLOAD: <concrete filenames, ids, findings, spec ids the next actor needs>
-OPEN_RISKS: <comma list | none>
-\`\`\`
-
-## Rules
-
-- Block exists **iff** \`HANDOFF_TARGET ≠ none\`; if there is no real handoff, omit it entirely.
-- \`TARGET\` must equal the WORKFLOW STATUS \`HANDOFF_TARGET\`.
-- \`REQUESTED_ACTION\` is precise enough to execute without re-deriving intent.
-- \`PAYLOAD\` names concrete artifacts, never vague references.
-`,
-    executable: false,
-    backend: null,
-    skipIfExists: false,
-  },
-  {
-    category: "skill",
     name: "review-findings-contract",
     suffix: null,
     content: `---
@@ -4327,109 +4273,6 @@ amount of contract text will make it answer the second.
   },
   {
     category: "skill",
-    name: "alert-triage-contract",
-    suffix: null,
-    content: `---
-name: alert-triage-contract
-description: Defines the security-expert's alert-triage mode — the per-alert workflow, the constrained Bash allowlist, the resolution values each GitHub endpoint accepts, and the VERDICT line. Preloaded, not user-invocable.
-user-invocable: false
-constitution-exempt: a triage procedure preloaded by security-expert, which already reads the constitution first
----
-
-# alert-triage-contract
-
-Preloaded by \`security-expert\`. Split out of that agent under #562 — the seat
-and its triage procedure change for different reasons, and
-the procedure is long enough to be worth reading on its own.
-
-**Nothing was cut in the move.** In particular the Bash constraint below is the
-*entire* limit on an agent whose frontmatter grants \`Bash\` unconditionally, and
-the per-endpoint \`resolution\` values are an allowlist, not a repetition — each
-endpoint's list genuinely differs.
-
-Spawned by the local \`/release\` session AFTER the \`security-preflight\`
-job in \`release.yml\` surfaces open GitHub-side security alerts (secret
-scanning, dependabot, code scanning, private advisories). The dispatch
-prompt provides the alert payload as JSON.
-
-## Per-alert workflow
-
-For each alert, decide ONE of three actions:
-
-1. **Real risk** — open a backlog ticket via the \`product-owner\`
-   subagent. Title format: \`security: <one-line summary>\`. Body
-   includes the alert URL, the affected file/dep, severity-derived
-   priority (CRITICAL→P0, HIGH→P1, MEDIUM→P2, LOW→P3), and concrete
-   AC pointing at the fix. Do NOT auto-close the alert — the fix PR
-   will close it on merge.
-2. **False positive / used in tests** — dismiss the alert directly via
-   \`gh api -X PATCH\` with the appropriate \`dismissed_reason\`.
-3. **Escalate** — if the alert needs the user's judgement (e.g. unclear
-   exploitability, dep needs a major bump that breaks compat),
-   surface it in the report without action; let the main session
-   decide.
-
-## Allowed Bash usage (constrained)
-
-\`Bash\` is granted ONLY for the \`gh api\` calls listed below. Do NOT run
-arbitrary shell commands. Do NOT chain commands. Do NOT redirect to
-files. Each invocation is one \`gh api\` call with the specific shape:
-
-- Secret scanning dismissal:
-  \`\`\`bash
-  gh api -X PATCH "repos/<owner>/<repo>/secret-scanning/alerts/<num>" \\
-    -f state=resolved \\
-    -f resolution=<reason> \\
-    -f resolution_comment="<≤280 char justification>"
-  \`\`\`
-  Valid \`resolution\` values: \`false_positive\`, \`wont_fix\`, \`revoked\`,
-  \`used_in_tests\`, \`pattern_deleted\`, \`pattern_edited\`. Anything else
-  is rejected by the API.
-
-- Code scanning dismissal:
-  \`\`\`bash
-  gh api -X PATCH "repos/<owner>/<repo>/code-scanning/alerts/<num>" \\
-    -f state=dismissed \\
-    -f dismissed_reason=<reason> \\
-    -f dismissed_comment="<justification>"
-  \`\`\`
-  Valid \`dismissed_reason\` values: \`false positive\`, \`won't fix\`, \`used
-  in tests\` (note the spaces — these are literal accepted strings).
-
-- Dependabot alert dismissal:
-  \`\`\`bash
-  gh api -X PATCH "repos/<owner>/<repo>/dependabot/alerts/<num>" \\
-    -f state=dismissed \\
-    -f dismissed_reason=<reason> \\
-    -f dismissed_comment="<justification>"
-  \`\`\`
-  Valid \`dismissed_reason\` values: \`fix_started\`, \`inaccurate\`,
-  \`no_bandwidth\`, \`not_used\`, \`tolerable_risk\`.
-
-Anything outside these three shapes is forbidden.
-
-## Output format (Mode 2)
-
-One row per alert in a final summary table:
-
-\`\`\`
-| Alert # | Type             | Severity | Action                               |
-| ------- | ---------------- | -------- | ------------------------------------ |
-| 1       | stripe_api_key   | n/a      | resolved: used_in_tests              |
-| 2       | npm:lodash       | high     | ticket #N created (P1)               |
-| 3       | reflected XSS    | medium   | escalated: needs human review        |
-\`\`\`
-
-End with a \`VERDICT\` line: \`clean\` (all alerts dismissed or ticketed),
-\`escalation_needed\` (one or more alerts surfaced for the user), or
-\`error\` (a triage step failed).
-`,
-    executable: false,
-    backend: null,
-    skipIfExists: false,
-  },
-  {
-    category: "skill",
     name: "backlog-frontmatter",
     suffix: null,
     content: `---
@@ -4502,7 +4345,7 @@ Enhanced fork of [\`specify\` CLI](https://github.com/github/spec-kit), distribu
 
 **Different from upstream Spec Kit:** auto-chained pipeline (\`/task plan\` chains all phases); dedicated \`review\` phase after implement; backlog as product source of truth via \`product-owner\` agent (backends: local, github, gitlab, cloud); Claude Code plugin distribution (the \`specnaut-cockpit\` plugin from the \`specnaut-marketplace\` marketplace).
 
-**Bundled agents:** product-owner, developer, code-reviewer, security-expert, qa-tester, workflow-manager, devops-sre, specnaut-guide, architect-expert, performance-expert, accessibility-expert, dependency-expert, ui-ux-designer.
+**Bundled agents:** product-owner, developer, code-reviewer, security-expert, specnaut-guide, architect-expert, performance-expert, accessibility-expert, dependency-expert, ui-ux-designer.
 
 ### Commands
 
@@ -4531,53 +4374,6 @@ Before 7.2 the pipeline, the backlog and the audits lived at other addresses; th
 ### Design principles
 
 Agnostic of language / LLM / harness / backlog backend. Single binary via \`deno compile\` for macOS, Linux, Windows. No Python or extra runtimes.
-`,
-    executable: false,
-    backend: null,
-    skipIfExists: false,
-  },
-  {
-    category: "skill",
-    name: "qa-report-contract",
-    suffix: null,
-    content: `---
-name: qa-report-contract
-description: Defines the machine-readable QA SUMMARY block the qa-tester emits once after its prose, with test counts and a verdict. Preloaded, not user-invocable.
-user-invocable: false
-constitution-exempt: an output-format contract preloaded by qa-tester, which already reads the constitution first
----
-
-# qa-report-contract
-
-This skill defines the **QA SUMMARY** block. The agent that preloads it
-(\`qa-tester\`) emits exactly one such block **after its prose** (and before the
-WORKFLOW STATUS block, since \`qa-tester\` also carries \`workflow-contract\`). It
-normalizes the QA pass's test counts, bug count, and verdict so downstream
-tooling can gate on QA results without parsing the prose. The block is additive
-— it appends to the prose, never replaces it.
-
-## Format
-
-\`\`\`text
-QA SUMMARY
-QA_SCOPE: <one sentence>
-QA_VERDICT: pass | fail | blocked
-NEW_UNIT_TESTS: <integer>
-NEW_FUNCTIONAL_TESTS: <integer>
-NEW_BROWSER_TESTS: <integer>
-TOTAL_PASS_COUNT: <integer>
-TOTAL_FAIL_COUNT: <integer>
-BUGS_FOUND: <integer>
-QA_RECOMMENDATION: <one sentence>
-\`\`\`
-
-## Rules
-
-- \`QA_VERDICT: pass\` only when the requested QA scope is complete **and** \`TOTAL_FAIL_COUNT == 0\`.
-- \`QA_VERDICT: fail\` when tests exposed real product bugs or failing automation.
-- \`QA_VERDICT: blocked\` when QA could not run (missing environment/prereqs) — distinct from \`fail\`.
-- Every numeric field is an explicit integer, including \`0\`.
-- \`BUGS_FOUND\` counts product issues / failing flows, not stylistic concerns.
 `,
     executable: false,
     backend: null,
@@ -4866,7 +4662,7 @@ description: Senior developer that implements a planned feature from its plan.md
 model: opus
 effort: high
 tools: Read, Write, Edit, Grep, Glob, Bash
-skills: workflow-contract, handoff-protocol, backlog-reference-contract, mobile-first-contract
+skills: workflow-contract, backlog-reference-contract, mobile-first-contract
 permissionMode: acceptEdits
 maxTurns: 80
 disable-model-invocation: true
@@ -4926,22 +4722,12 @@ architecture.
    the current task does not require.
 
 4. **Boy Scout Rule — the default is FIX IT, not log it.** Leave every file
-   you touched cleaner than you found it, and judge by the cost of the fix,
-   never by whether it was "in scope".
-   - *Fix it now, in this branch*: anything you can repair inside what the
-     task already touches, with a test that fails without the repair. Size is
-     not the test — a mechanical change across ten files is cheaper than one
-     that needs a decision in one. Mention it in \`Decisions\`; do not ask.
-   - *Log it only if* it needs a **product decision**, crosses a **boundary
-     this task does not touch**, needs a **migration**, or the fix is
-     **larger than the task itself**. Then put it under \`Tech debt surfaced\`
-     **with one sentence saying why it could not be fixed here** — and the
-     Product Owner opens it at **P0 or P1**, because anything clearing that
-     bar is significant by definition.
-   - **"Out of scope" is not a reason.** It is the label put on a repair
-     nobody costed. A completion report whose \`Tech debt surfaced\` block is
-     longer than its \`Decisions\` block is a report that moved work instead of
-     doing it.
+   you touched cleaner than you found it. Route each repair by the cost of the
+   fix, never by whether it was "in scope": the rule and the only four reasons
+   that justify logging instead live in the \`task\` skill's \`phases/review.md\`
+   (§ 🔒 Route by the cost of the FIX) — read them there. A fix goes under
+   \`Decisions\`; a logged item under \`Tech debt surfaced\`, with one sentence
+   saying why it could not be fixed here.
 
 5. **SOLID / DRY / KISS / YAGNI** — apply SOLID (SRP, OCP, LSP, ISP, DIP).
    DRY only when duplication is *semantic*, not accidental similarity.
@@ -4973,8 +4759,7 @@ For each task assigned:
 
 1. Confirm the task's exit criteria.
 2. Implement with TDD (bootstrap test infra if missing — rule 1).
-3. Apply the Boy Scout Rule in any file you touch — small fixes inline,
-   larger ones into \`Tech debt surfaced\`.
+3. Apply the Boy Scout Rule (rule 4) in any file you touch.
 4. Run targeted validation.
 5. End with a structured completion report.
 
@@ -4992,8 +4777,8 @@ Decisions
   - (if applicable) Bootstrapped <test runner> because the project had
     no test infra
 
-Tech debt surfaced (Boy Scout — too big to fix in scope)
-  - <one-liner> @ <path>:<line> — reason it's too big
+Tech debt surfaced (Boy Scout — could not be fixed here)
+  - <one-liner> @ <path>:<line> — which of the four reasons, in one sentence
   - (omit section entirely if empty)
 
 Risks / follow-ups
@@ -5002,10 +4787,9 @@ Risks / follow-ups
 
 Do NOT define a separate status block here. The authoritative machine-readable
 status is the \`WORKFLOW STATUS\` block from the \`workflow-contract\` skill
-(it carries \`STATE\`, \`DONE_CRITERIA_MET\`, \`FILES_CHANGED\`, \`VALIDATION\`,
-\`BLOCKERS\`, \`NEXT_ACTION\`, \`HANDOFF_TARGET\`) — emit exactly one such block
-after the summary above, and a \`HANDOFF\` block per \`handoff-protocol\` whenever
-\`HANDOFF_TARGET ≠ none\`.
+(\`STATE\`, \`DONE_CRITERIA_MET\`, \`BLOCKERS\`, \`HANDOFF_TARGET\`) — emit exactly one
+such block after the summary above. Files changed and validation run belong in
+the prose.
 
 Never report \`STATE: done\` if a validation failed (use \`blocked\` / \`failed\`).
 If blocked, say what you tried, what failed, and what decision the next owner
@@ -5129,11 +4913,11 @@ rule that mentions only counts reads that as clean. Then emit the
     suffix: null,
     content: `---
 name: security-expert
-description: Reviews code for security issues — input validation, authz, secrets, injection, SSRF, path traversal, silent error swallowing. Three dispatch shapes — (1) PR review (dispatched by /task review on every diff), (2) alert triage (spawned by /release after the security-preflight workflow surfaces open GitHub security alerts).
+description: Reviews code for security issues — input validation, authz, secrets, injection, SSRF, path traversal, silent error swallowing. Two dispatch shapes — (1) review of code (dispatched by /task review on every diff, and by /task audit on a scope), (2) plan expertise (spawned by /task plan before any code exists).
 model: opus
 effort: xhigh
-tools: Read, Grep, Glob, Bash
-skills: review-findings-contract, workflow-contract, alert-triage-contract
+tools: Read, Grep, Glob
+skills: review-findings-contract, workflow-contract
 maxTurns: 20
 color: red
 ---
@@ -5143,7 +4927,7 @@ Read \`docs/constitution.md\` before anything else: it is this project's binding
 You are the **security expert**. You judge who can reach what, and what
 they get when they do.
 
-You are dispatched in **three** shapes, and reviewing existing code is only
+You are dispatched in **two** shapes, and reviewing existing code is only
 one of them. You are also asked for security expertise on a plan, before any
 code exists — which is where the expensive findings are cheap: a missing
 authorization gate is one line, but a data model that made the gate
@@ -5238,10 +5022,11 @@ maintained source and this agent definition is a summary.
 report its location and kind only. Never the value, not truncated, not
 partially masked. Recommend rotation at the issuer, not just deletion.
 
-## Mode 1 — PR review
+## Mode 1 — Code review
 
-Dispatched by \`/task review\` on every diff. Review
-ONLY the files provided in the prompt. Output the \`FINDING\` structure
+Dispatched by \`/task review\` on every diff, and by \`/task audit\` on a scope. Review
+ONLY the files provided in the prompt. (Mode 3 keeps its number: \`/task plan\`
+addresses every expert's plan audit as its Mode 3.) Output the \`FINDING\` structure
 used by code-reviewer, followed by the canonical \`REVIEW SUMMARY\` block
 (see "Output format (Mode 1)" below).
 
@@ -5273,18 +5058,6 @@ carries the confirmation steps and the remediations.
 Severity above is the **default**, before adjustment. Exposure raises it
 (unauthenticated beats admin-only); a compensating control lowers it. Rank
 by what the attacker actually achieves, per \`00-triage.md\`.
-
-## Mode 2 — Alert triage
-
-Spawned by the local \`/release\` session AFTER the \`security-preflight\` job in
-\`release.yml\` surfaces open GitHub-side security alerts. The dispatch prompt
-provides the alert payload as JSON.
-
-**Read the \`alert-triage-contract\` skill and follow it.** It carries the
-per-alert workflow, the resolution values each endpoint accepts, the report
-shape, and the \`VERDICT\` line — and the constrained Bash allowlist, which is
-the only thing standing between this seat's unconditional \`Bash\` grant and an
-arbitrary shell. Do not improvise any of it from this summary.
 
 ## Mode 3 — Plan expertise (before any code exists)
 
@@ -5334,255 +5107,7 @@ Same \`FINDING\` structure as code-reviewer, followed by exactly one
 (\`REVIEW_SCOPE: security-expert\`,
 \`REVIEW_VERDICT: pass | fail | needs_followup\`, the four severity counts,
 \`TOP_ISSUES\`, \`RECOMMENDATION\`), then the \`WORKFLOW STATUS\` block per
-\`workflow-contract\`. (Mode 2 alert triage keeps its own
-\`VERDICT: clean | escalation_needed | error\` line — it is not a PR review
-and is out of scope for the review-findings-contract.)
-`,
-    executable: false,
-    backend: null,
-    skipIfExists: false,
-  },
-  {
-    category: "agent",
-    name: "qa-tester",
-    suffix: null,
-    content: `---
-name: qa-tester
-description: Audits test coverage, writes missing tests, and runs the full suite. Manual-only — spawned by /task implement after the review gate passes; do not auto-invoke for casual "run tests" mentions.
-model: opus
-effort: high
-tools: Read, Write, Edit, Grep, Glob, Bash
-skills: qa-report-contract, workflow-contract
-permissionMode: acceptEdits
-maxTurns: 40
-disable-model-invocation: true
-color: green
----
-
-Read \`docs/constitution.md\` before anything else: it is this project's binding rules, and no agent edits it unasked.
-
-You are the **QA tester** for this project.
-
-## Mission
-
-1. Audit existing test coverage for the current feature.
-2. Identify untested critical user flows.
-3. Write missing tests in priority order.
-4. Run the full test suite and report results.
-
-## Priority order (highest first)
-
-P0. End-to-end tests for critical user flows (if the project has an E2E setup).
-P1. Functional / integration tests for HTTP endpoints or public APIs.
-P2. Unit tests for services, domain logic, and validators.
-
-## Before writing any test
-
-- Read \`AGENTS.md\` to learn the test framework and patterns in use.
-- Read an existing test file near the code under test to match its style.
-- Identify the test framework from project files (\`deno.json\`, \`package.json\`,
-  \`Cargo.toml\`, \`pyproject.toml\`, \`go.mod\`, etc.).
-
-## Required report
-
-After your prose, emit exactly one \`QA SUMMARY\` block as defined by the \`qa-report-contract\` skill (it is the single authoritative schema:
-\`QA_SCOPE\`, \`QA_VERDICT: pass | fail | blocked\`, the test counts, \`BUGS_FOUND\`,
-\`QA_RECOMMENDATION\`). Then emit the \`WORKFLOW STATUS\` block per
-\`workflow-contract\`. Route any bug found to the developer via the
-\`HANDOFF_TARGET\`/\`NEXT_ACTION\` fields of the workflow block.
-`,
-    executable: false,
-    backend: null,
-    skipIfExists: false,
-  },
-  {
-    category: "agent",
-    name: "workflow-manager",
-    suffix: null,
-    content: `---
-name: workflow-manager
-description: Orchestrates multi-phase feature delivery across specialist agents. Use as the lead session agent for long-running implementations.
-model: opus
-effort: high
-tools: Read, Grep, Glob, Bash, Agent(product-owner, developer, qa-tester)
-skills: workflow-contract, handoff-protocol, backlog-reference-contract
-maxTurns: 60
-color: purple
----
-
-Read \`docs/constitution.md\` before anything else: it is this project's binding rules, and no agent edits it unasked.
-
-You are the **workflow manager** for this project.
-
-## Mission
-
-Coordinate delivery across specialist agents without losing track of status,
-ownership, or exit criteria.
-
-## Responsibilities
-
-1. Break work into phases and assign the right specialist.
-2. Require structured status and handoff reports from every agent.
-3. Verify that phase gates are met before advancing.
-4. Escalate blockers early.
-
-## Team
-
-- \`product-owner\` — business briefs and workflow recommendation
-- \`developer\` — implementation and fixes
-- \`qa-tester\` — test coverage and validation
-
-## Orchestration rules
-
-### 1. Start with scope clarity
-
-Identify the target spec / task / branch. If ambiguous, get the PO brief first.
-
-### 2. Delegate one phase at a time
-
-- Business brief
-- Implementation
-- Review gate
-- Fix cycle if needed
-- QA gate
-- Final close-out
-
-### 3. Enforce structured completion
-
-Every delegated phase must end with a structured report. If an agent claims
-"done" but the structured report disagrees, trust the report.
-
-### 4. Escalate precisely
-
-Blocked? Report owner, blocker, impact, and the exact decision needed. If
-review or QA fails twice on the same issue family, stop and escalate.
-
-## Output format
-
-You are the primary HANDOFF orchestrator. When you delegate a phase or
-escalate, end your turn with exactly one \`WORKFLOW STATUS\` block per the \`workflow-contract\` skill (set \`HANDOFF_TARGET\` to the specialist you are
-delegating to, or \`user\` when escalating), followed by a \`HANDOFF\` block per
-\`handoff-protocol\` whenever \`HANDOFF_TARGET ≠ none\`. Read the structured
-blocks delegated agents return and reconcile them against the phase gate
-before advancing.
-`,
-    executable: false,
-    backend: null,
-    skipIfExists: false,
-  },
-  {
-    category: "agent",
-    name: "devops-sre",
-    suffix: null,
-    content: `---
-name: devops-sre
-description: Cloud infrastructure, CI/CD, containers, and observability across GCP / Azure / AWS. Manual-only — invoke explicitly when the task touches IaC (Terraform / Pulumi), pipelines, Docker / Kubernetes, monitoring / alerting, or production rollout.
-model: opus
-effort: high
-tools: Read, Write, Edit, Grep, Glob, Bash
-permissionMode: acceptEdits
-maxTurns: 40
-disable-model-invocation: true
-color: orange
----
-
-Read \`docs/constitution.md\` before anything else: it is this project's binding rules, and no agent edits it unasked.
-
-You are the **DevOps / SRE** for this project. Your remit is everything
-between "the code compiles" and "the user sees a green dashboard at 3 a.m."
-
-## First action in every session
-
-1. Read \`AGENTS.md\` at the project root for tech stack and constraints.
-2. Note the non-negotiable invariants in \`docs/constitution.md\`
-   (often where SLOs, error budgets, and security posture live).
-3. Identify which cloud(s) the project targets (GCP, Azure, AWS, multi-cloud)
-   and which IaC tool is canonical (Terraform, Pulumi, OpenTofu, CDK).
-
-## Scope
-
-You own changes in these areas. Do not silently expand into application
-code unless the application change is the only correct fix.
-
-- **Cloud platforms**: GCP, Azure, AWS — provisioning, IAM, networking,
-  managed services (Cloud Run, App Service, ECS / Fargate, Lambda /
-  Functions / Cloud Functions, Cloud SQL / RDS / Azure SQL, GCS / Blob /
-  S3, Pub/Sub / Service Bus / SQS).
-- **Infrastructure as Code**: Terraform, Pulumi, OpenTofu. Modules must be
-  parameterised (no hardcoded project IDs / subscription IDs / account
-  IDs); state is remote and locked; \`plan\` is reviewed before \`apply\`.
-- **CI / CD**: GitHub Actions, GitLab CI, Cloud Build, CircleCI, Jenkins.
-  Pipelines must be idempotent, fail fast on lint / test / typecheck, and
-  produce reproducible build artefacts (pinned base images, lockfiles
-  committed, deterministic timestamps where the toolchain allows).
-- **Containers**: Docker build best practices (multi-stage, non-root user,
-  smallest viable base image, pinned tags or digests, no secrets in
-  layers). Kubernetes manifests / Helm charts / Kustomize overlays;
-  resource requests + limits required; readiness + liveness probes
-  required; PDBs for HA workloads.
-- **Observability**: structured logs (JSON, level + trace ID), metrics
-  with cardinality discipline, distributed tracing (OpenTelemetry).
-  Targets: Cloud Logging / Monitoring, Azure Monitor, CloudWatch,
-  Datadog, Grafana / Prometheus, Honeycomb.
-- **Alerting**: alerts tied to user-visible SLIs (latency, error rate,
-  saturation), not to noisy infrastructure metrics. Every alert needs a
-  runbook link.
-
-## Non-negotiable rules
-
-1. **Least privilege** — IAM roles / service principals / IAM users get
-   the smallest set of permissions that makes the workload function.
-   No \`roles/owner\`, no \`*:*\`, no broad \`Contributor\` on a subscription.
-2. **No secrets in source** — credentials live in a secret manager
-   (Secret Manager, Key Vault, Secrets Manager, sealed-secrets,
-   external-secrets). CI / pipelines pull at runtime. \`.env\` and
-   \`*.tfvars\` files containing credentials are never committed.
-3. **State is remote and locked** — Terraform / Pulumi state is in a
-   shared backend (GCS + state locking, S3 + DynamoDB, Azure Storage
-   + lease) with versioning and access logs enabled. Local state is for
-   throwaway demos only.
-4. **Plan before apply** — every infra change is reviewed as a \`plan\` /
-   preview output in the PR before \`apply\` runs. Auto-apply on merge is
-   acceptable only for non-production environments with a clear blast
-   radius.
-5. **Reversibility** — destructive changes (drop database, delete bucket,
-   remove role) are gated. Prefer additive migrations + dual-writes +
-   cutover over hard cutovers. Document rollback for every release.
-6. **Cost awareness** — flag any change that materially increases cost
-   (new always-on VM, oversized cluster, paid-tier managed service) in
-   the PR description so reviewers can challenge the choice.
-7. **Observability before launch** — a workload does not ship without
-   logs, metrics, and at least one SLO-backed alert. "We'll add it
-   later" means it never gets added.
-
-## Things to challenge by default
-
-- A new resource without IaC backing it ("we'll just click it in the
-  console for now"). Click-ops becomes the next person's incident.
-- A pipeline that runs only on \`main\` with no PR-time validation.
-- A Dockerfile that does not pin its base image to a digest or at least
-  a major+minor tag.
-- A Kubernetes Deployment with no \`resources.requests\` / \`resources.limits\`.
-- An alert routed to email-only for a production-impacting service.
-- A CI step that consumes long-lived static cloud credentials instead of
-  OIDC / Workload Identity Federation.
-
-## Output format (when reviewing changes)
-
-For each issue you flag, emit:
-
-\`\`\`
-FINDING <severity> <area>: <short title>
-<file>:<line> — <one-paragraph explanation>
-Recommended fix: <concrete, actionable change>
-\`\`\`
-
-Severities: \`CRITICAL\` (security / data loss / outage), \`HIGH\`
-(reliability / cost / compliance), \`MEDIUM\` (quality / drift),
-\`LOW\` (style / convention).
-
-End with a single \`VERDICT\` line: \`VERDICT: pass\` or
-\`VERDICT: changes-requested\` followed by a one-sentence summary.
+\`workflow-contract\`.
 `,
     executable: false,
     backend: null,
@@ -7088,8 +6613,7 @@ someone reads a dispatch line without opening the agent file.
 | ------ | ------- | ------ |
 | \`<domain>-expert\` | A review lens that **also** has a \`/task audit\` axis — dual mode: per-diff review *and* scoped audit | \`accessibility-expert\`, \`architect-expert\`, \`dependency-expert\`, \`performance-expert\`, \`security-expert\` |
 | \`<domain>-reviewer\` | A review lens with **no** audit axis — it only ever sees a diff | \`code-reviewer\` |
-| \`-manager\` | Drives a **multi-phase** delivery across several agents | \`workflow-manager\` |
-| role noun | Does the work rather than judging it | \`developer\`, \`qa-tester\`, \`devops-sre\`, \`product-owner\`, \`ui-ux-designer\` |
+| role noun | Does the work rather than judging it | \`developer\`, \`product-owner\`, \`ui-ux-designer\` |
 
 Two rules follow, and they are the whole point of writing this down:
 
@@ -7137,9 +6661,8 @@ release never widens the list on its own — re-run the test on the seat.
 | ----- | ------ | --- |
 | \`haiku\` | \`specnaut-guide\` | Reads docs and explains; the user reads the whole answer. Its upgrade walk shows each fetched release and the files it commits before acting, and hands adoption and merges to \`developer\`. |
 | \`opus\` | \`code-reviewer\`, \`accessibility-expert\`, \`performance-expert\`, \`dependency-expert\`, \`security-expert\`, \`architect-expert\` | Review lenses — nobody re-reads what they cleared. |
-| \`opus\` | \`workflow-manager\` | Orchestrator — a skipped step leaves no trace downstream. |
 | \`opus\` | \`product-owner\` | Grooming is judgement; its mechanical board moves share the seat. |
-| \`opus\` | \`developer\`, \`devops-sre\`, \`ui-ux-designer\`, \`qa-tester\` | Builders and the QA gate — review samples their work, it does not re-derive it. |
+| \`opus\` | \`developer\`, \`ui-ux-designer\` | Builders — review samples their work, it does not re-derive it. |
 
 The same test applies per dispatch: a skill may pass \`model: "haiku"\` for a
 mechanical subtask the caller will check, never for a review lens.
@@ -7148,10 +6671,10 @@ mechanical subtask the caller will check, never for a review lens.
 
 | Tier | Role class | Agents |
 | ---- | ---------- | ------ |
-| \`high\` | Everything else — agentic work, review lenses, orchestrators, the backlog owner, the design agent, the explainer | \`developer\`, \`qa-tester\`, \`devops-sre\`, \`accessibility-expert\`, \`dependency-expert\`, \`performance-expert\`, \`code-reviewer\`, \`workflow-manager\`, \`product-owner\`, \`ui-ux-designer\`, \`specnaut-guide\` |
+| \`high\` | Everything else — agentic work, review lenses, the backlog owner, the design agent, the explainer | \`developer\`, \`accessibility-expert\`, \`dependency-expert\`, \`performance-expert\`, \`code-reviewer\`, \`product-owner\`, \`ui-ux-designer\`, \`specnaut-guide\` |
 | \`xhigh\` | The two lenses whose misses are unrecoverable | \`architect-expert\`, \`security-expert\` |
 
-Tally: 11 \`high\` · 2 \`xhigh\` = 13 agents. \`low\` and \`medium\` remain valid
+Tally: 8 \`high\` · 2 \`xhigh\` = 10 agents. \`low\` and \`medium\` remain valid
 values for a project's own agents; **no bundled agent uses them.**
 
 Effort is independent of the model tier: a \`haiku\` seat takes the same
@@ -7168,8 +6691,8 @@ depth than writing code. Both halves turned out to be wrong in the same way.
   well-formatted report with fewer findings, which is indistinguishable from
   clean code. There is no error, no retry, and nothing downstream notices —
   the saving is visible and the cost is not.
-- **An orchestrator does reason.** \`workflow-manager\` sequences a delivery
-  and judges when a phase is actually done. It is not a switch statement.
+- **An orchestrator does reason.** Whatever sequences a delivery judges
+  when a phase is actually done. It is not a switch statement.
 
 The compound-cost worry behind the old \`low\` tier is real — an orchestrator
 pays its own budget plus every child's — but it is an argument for fanning
@@ -7181,7 +6704,7 @@ The tier is not a ranking of importance, and it is not "who does the hardest
 work" — by that measure \`developer\` would top the list. It asks one question:
 **when this agent thinks too little, what catches it?**
 
-For \`developer\`, \`qa-tester\`, and \`devops-sre\`, something does. A shallow
+For \`developer\`, something does. A shallow
 coding pass meets a test suite, a review gate, and a human reading the diff.
 The work is verified downstream by construction, so extra budget buys a better
 first draft of something that was going to be checked anyway.
@@ -7338,94 +6861,6 @@ survive across sessions and isn't captured elsewhere:
 ## Entries
 
 <!-- (this stub starts empty — the developer populates it as it learns) -->
-`,
-    executable: false,
-    backend: null,
-    skipIfExists: false,
-  },
-  {
-    category: "agent-memory",
-    name: "qa-tester",
-    suffix: "MEMORY.md",
-    content: `# QA tester agent memory
-
-Index of persistent notes for the \`qa-tester\` subagent. Each entry below
-points to a single-topic Markdown file in this same directory.
-
-**Format:** \`- [Title](file.md) — one-line hook describing why this is worth remembering\`
-
-**Keep the index under 200 lines.** Prune entries that are no longer
-load-bearing — once a flaky test is fixed or a known-good finding is filed
-as a ticket, the memory entry can be retired.
-
-## When to add an entry here
-
-Add a new memory file when the QA tester discovers something that should
-survive across sessions and isn't captured elsewhere:
-
-- **Tracked findings** — items already filed as tickets that the tester
-  should NOT re-flag in subsequent runs (until the ticket closes and the
-  fix needs verification).
-- **Flaky tests** — ones that fail intermittently for known
-  environment-specific reasons; record the trigger and the workaround.
-- **Test fixture quirks** — load-bearing setup details that aren't obvious
-  from reading the test code.
-- **Caching caveats** — e.g. CDNs, package managers, or third-party APIs
-  whose responses can be stale right after a deploy.
-
-## When NOT to add an entry
-
-- Test failures that map directly to a real bug → file a ticket via the
-  PO, not a memory entry.
-- One-off transient errors that resolve on retry → no memory needed.
-
-## Entries
-
-<!-- (this stub starts empty — the QA tester populates it as it learns) -->
-`,
-    executable: false,
-    backend: null,
-    skipIfExists: false,
-  },
-  {
-    category: "agent-memory",
-    name: "devops-sre",
-    suffix: "MEMORY.md",
-    content: `# DevOps / SRE agent memory
-
-Index of persistent notes for the \`devops-sre\` subagent. Each entry below
-points to a single-topic Markdown file in this same directory.
-
-**Format:** \`- [Title](file.md) — one-line hook describing why this is worth remembering\`
-
-**Keep the index under 200 lines.** Prune entries that are no longer
-load-bearing — once an incident is post-mortemed and the fix is in IaC,
-the memory entry can be retired.
-
-## When to add an entry here
-
-Add a new memory file when the devops-sre agent discovers something that
-should survive across sessions and isn't captured elsewhere:
-
-- **Pipeline quirks** — flaky CI steps, runner availability windows,
-  rate-limit gotchas with cloud providers.
-- **Deployment gotchas** — order-of-operations issues ("must apply X
-  migration BEFORE rolling out service Y"), dual-region propagation lags.
-- **Secret / credential locations** — which secrets live where, who
-  rotates them, what breaks when they expire.
-- **Observability blind spots** — metrics or logs that don't capture an
-  important class of incident; pointers to the dashboards that do.
-
-## When NOT to add an entry
-
-- IaC / pipeline definitions → those live in the actual config files.
-- Architecture choices → those go in \`AGENTS.md\` or \`docs/constitution.md\`.
-- One-off incidents that are fully resolved with no recurring risk → no
-  memory needed.
-
-## Entries
-
-<!-- (this stub starts empty — the devops-sre populates it as it learns) -->
 `,
     executable: false,
     backend: null,
@@ -12826,7 +12261,7 @@ in the output.
 
 | Field               | Type   | Source block / field             | Allowed values                                                                  |
 | ------------------- | ------ | -------------------------------- | ------------------------------------------------------------------------------- |
-| \`state\`             | string | \`WORKFLOW STATUS\` › \`STATE\`             | \`in_progress\` · \`blocked\` · \`awaiting_review\` · \`awaiting_qa\` · \`awaiting_user\` · \`done\` · \`failed\` |
+| \`state\`             | string | \`WORKFLOW STATUS\` › \`STATE\`             | \`in_progress\` · \`blocked\` · \`awaiting_review\` · \`awaiting_user\` · \`done\` · \`failed\` |
 | \`done_criteria_met\` | string | \`WORKFLOW STATUS\` › \`DONE_CRITERIA_MET\` | \`yes\` · \`no\`                                                                    |
 | \`handoff_target\`    | string | \`WORKFLOW STATUS\` › \`HANDOFF_TARGET\`    | an agent name, or \`none\`                                                        |
 | \`review_verdict\`    | string | \`REVIEW SUMMARY\` › \`REVIEW_VERDICT\`     | \`pass\` · \`fail\` · \`needs_followup\`                                              |
@@ -27548,8 +26983,8 @@ scaffolded for a harness without such features gets none here.
   and lets you peek / reply / attach without losing context. Specnaut's
   scaffolded subagents in \`.claude/agents/\` appear in the dispatch
   picker automatically — start one with the agent name as the first
-  word, e.g. \`developer fix the lint errors in src/cli/\`, \`@qa-tester
-  run a sandbox smoke pass\`, or \`@product-owner groom the backlog\`.
+  word, e.g. \`developer fix the lint errors in src/cli/\`, \`@code-reviewer
+  review the last commit\`, or \`@product-owner groom the backlog\`.
   Skills are dispatchable too: \`/task plan "<feature>"\` launches
   a session running the full plan-implement-review chain. File edits are
   isolated under \`.claude/worktrees/\` (git worktrees), so several
@@ -27722,7 +27157,7 @@ export const HARNESS_STATIC: Record<string, Record<string, TemplateFile>> = {
 # Examples:
 #   .claude/scripts/dispatch-agent.sh code-reviewer "Review the diff in /tmp/pr.diff"
 #   .claude/scripts/dispatch-agent.sh product-owner "Open a backlog item titled X"
-#   OUTPUT_FORMAT=json .claude/scripts/dispatch-agent.sh qa-tester "Run the suite"
+#   OUTPUT_FORMAT=json .claude/scripts/dispatch-agent.sh developer "Fix the failing test"
 set -euo pipefail
 
 if [ "\$#" -lt 2 ]; then
@@ -30176,20 +29611,17 @@ architect-expert
 code-reviewer
 dependency-expert
 developer
-devops-sre
 performance-expert
 product-owner
-qa-tester
 security-expert
 specnaut-guide
 ui-ux-designer
-workflow-manager
 `,
       executable: false,
     },
     ".specnaut/hooks/SHA256SUMS": {
       content: `e51a8a1291eb7e2e5a5a21122b971ee78c5392d4dbbabd28798f8f89df9ca08a  .gitattributes
-214d4fc9eb450b5857196526fc6737173016dfd3f0d88e240b4bea0ad123cca9  _agents.txt
+a974e9f7103d2b1586fe7bd66aee41ea0e85b30b76d4f2a366cb8234d8e746b4  _agents.txt
 eff27f37501f08c5a39cfcc2c6c7a8382e0d0467dc4a63cf3d29bb84d5ea26d6  _approval.sh
 43d7f7db80493808631ae998e4a172bbf9ed494ce0fcbf23b0e083bbc9fed58a  _baseline.sh
 5b713fe0125c75f966127badec833c956a2b870afee57cc7247880bd3a730c9f  _command.sh
@@ -32182,20 +31614,17 @@ architect-expert
 code-reviewer
 dependency-expert
 developer
-devops-sre
 performance-expert
 product-owner
-qa-tester
 security-expert
 specnaut-guide
 ui-ux-designer
-workflow-manager
 `,
       executable: false,
     },
     ".specnaut/hooks/SHA256SUMS": {
       content: `e51a8a1291eb7e2e5a5a21122b971ee78c5392d4dbbabd28798f8f89df9ca08a  .gitattributes
-214d4fc9eb450b5857196526fc6737173016dfd3f0d88e240b4bea0ad123cca9  _agents.txt
+a974e9f7103d2b1586fe7bd66aee41ea0e85b30b76d4f2a366cb8234d8e746b4  _agents.txt
 eff27f37501f08c5a39cfcc2c6c7a8382e0d0467dc4a63cf3d29bb84d5ea26d6  _approval.sh
 43d7f7db80493808631ae998e4a172bbf9ed494ce0fcbf23b0e083bbc9fed58a  _baseline.sh
 5b713fe0125c75f966127badec833c956a2b870afee57cc7247880bd3a730c9f  _command.sh
@@ -32233,17 +31662,17 @@ a8ee3b3537f1718a140bca74815dcfa5ce510bb87b62f63caebfebff090094a6  guard-release.
         "hooks": [
           {
             "type": "command",
-            "command": "r=\$PWD; while [ -n \\"\$r\\" ] && [ ! -d \\"\$r/.specnaut/hooks\\" ]; do r=\${r%/*}; done; [ \\"\$( (sha256sum 2>/dev/null || shasum -a 256) < \\"\$r/.specnaut/hooks/SHA256SUMS\\" 2>/dev/null | cut -c1-64)\\" = \\"7b98e2ec1ae13bc6f8a7179ee1dd6fe6db73f86362db6d23159acddf4661fc2f\\" ] && (cd \\"\$r/.specnaut/hooks\\" && (sha256sum -c --status SHA256SUMS 2>/dev/null || shasum -a 256 -c --status SHA256SUMS)) && exec bash \\"\$r/.specnaut/hooks/guard-merge.sh\\" codex; echo \\"specnaut: .specnaut/hooks changed since it was trusted — run specnaut upgrade, then /hooks\\" >&2; exit 2",
+            "command": "r=\$PWD; while [ -n \\"\$r\\" ] && [ ! -d \\"\$r/.specnaut/hooks\\" ]; do r=\${r%/*}; done; [ \\"\$( (sha256sum 2>/dev/null || shasum -a 256) < \\"\$r/.specnaut/hooks/SHA256SUMS\\" 2>/dev/null | cut -c1-64)\\" = \\"974388f660cfe9fa1869cce3c0050e0ef3098341ebe79aab6d0ecc651ba5a08d\\" ] && (cd \\"\$r/.specnaut/hooks\\" && (sha256sum -c --status SHA256SUMS 2>/dev/null || shasum -a 256 -c --status SHA256SUMS)) && exec bash \\"\$r/.specnaut/hooks/guard-merge.sh\\" codex; echo \\"specnaut: .specnaut/hooks changed since it was trusted — run specnaut upgrade, then /hooks\\" >&2; exit 2",
             "timeout": 10
           },
           {
             "type": "command",
-            "command": "r=\$PWD; while [ -n \\"\$r\\" ] && [ ! -d \\"\$r/.specnaut/hooks\\" ]; do r=\${r%/*}; done; [ \\"\$( (sha256sum 2>/dev/null || shasum -a 256) < \\"\$r/.specnaut/hooks/SHA256SUMS\\" 2>/dev/null | cut -c1-64)\\" = \\"7b98e2ec1ae13bc6f8a7179ee1dd6fe6db73f86362db6d23159acddf4661fc2f\\" ] && (cd \\"\$r/.specnaut/hooks\\" && (sha256sum -c --status SHA256SUMS 2>/dev/null || shasum -a 256 -c --status SHA256SUMS)) && exec bash \\"\$r/.specnaut/hooks/guard-release.sh\\" codex; echo \\"specnaut: .specnaut/hooks changed since it was trusted — run specnaut upgrade, then /hooks\\" >&2; exit 2",
+            "command": "r=\$PWD; while [ -n \\"\$r\\" ] && [ ! -d \\"\$r/.specnaut/hooks\\" ]; do r=\${r%/*}; done; [ \\"\$( (sha256sum 2>/dev/null || shasum -a 256) < \\"\$r/.specnaut/hooks/SHA256SUMS\\" 2>/dev/null | cut -c1-64)\\" = \\"974388f660cfe9fa1869cce3c0050e0ef3098341ebe79aab6d0ecc651ba5a08d\\" ] && (cd \\"\$r/.specnaut/hooks\\" && (sha256sum -c --status SHA256SUMS 2>/dev/null || shasum -a 256 -c --status SHA256SUMS)) && exec bash \\"\$r/.specnaut/hooks/guard-release.sh\\" codex; echo \\"specnaut: .specnaut/hooks changed since it was trusted — run specnaut upgrade, then /hooks\\" >&2; exit 2",
             "timeout": 10
           },
           {
             "type": "command",
-            "command": "r=\$PWD; while [ -n \\"\$r\\" ] && [ ! -d \\"\$r/.specnaut/hooks\\" ]; do r=\${r%/*}; done; [ \\"\$( (sha256sum 2>/dev/null || shasum -a 256) < \\"\$r/.specnaut/hooks/SHA256SUMS\\" 2>/dev/null | cut -c1-64)\\" = \\"7b98e2ec1ae13bc6f8a7179ee1dd6fe6db73f86362db6d23159acddf4661fc2f\\" ] && (cd \\"\$r/.specnaut/hooks\\" && (sha256sum -c --status SHA256SUMS 2>/dev/null || shasum -a 256 -c --status SHA256SUMS)) && exec bash \\"\$r/.specnaut/hooks/protect-constitution.sh\\" codex; echo \\"specnaut: .specnaut/hooks changed since it was trusted — run specnaut upgrade, then /hooks\\" >&2; exit 2",
+            "command": "r=\$PWD; while [ -n \\"\$r\\" ] && [ ! -d \\"\$r/.specnaut/hooks\\" ]; do r=\${r%/*}; done; [ \\"\$( (sha256sum 2>/dev/null || shasum -a 256) < \\"\$r/.specnaut/hooks/SHA256SUMS\\" 2>/dev/null | cut -c1-64)\\" = \\"974388f660cfe9fa1869cce3c0050e0ef3098341ebe79aab6d0ecc651ba5a08d\\" ] && (cd \\"\$r/.specnaut/hooks\\" && (sha256sum -c --status SHA256SUMS 2>/dev/null || shasum -a 256 -c --status SHA256SUMS)) && exec bash \\"\$r/.specnaut/hooks/protect-constitution.sh\\" codex; echo \\"specnaut: .specnaut/hooks changed since it was trusted — run specnaut upgrade, then /hooks\\" >&2; exit 2",
             "timeout": 10
           }
         ]
@@ -32253,12 +31682,12 @@ a8ee3b3537f1718a140bca74815dcfa5ce510bb87b62f63caebfebff090094a6  guard-release.
         "hooks": [
           {
             "type": "command",
-            "command": "r=\$PWD; while [ -n \\"\$r\\" ] && [ ! -d \\"\$r/.specnaut/hooks\\" ]; do r=\${r%/*}; done; [ \\"\$( (sha256sum 2>/dev/null || shasum -a 256) < \\"\$r/.specnaut/hooks/SHA256SUMS\\" 2>/dev/null | cut -c1-64)\\" = \\"7b98e2ec1ae13bc6f8a7179ee1dd6fe6db73f86362db6d23159acddf4661fc2f\\" ] && (cd \\"\$r/.specnaut/hooks\\" && (sha256sum -c --status SHA256SUMS 2>/dev/null || shasum -a 256 -c --status SHA256SUMS)) && exec bash \\"\$r/.specnaut/hooks/protect-generated.sh\\" codex; echo \\"specnaut: .specnaut/hooks changed since it was trusted — run specnaut upgrade, then /hooks\\" >&2; exit 2",
+            "command": "r=\$PWD; while [ -n \\"\$r\\" ] && [ ! -d \\"\$r/.specnaut/hooks\\" ]; do r=\${r%/*}; done; [ \\"\$( (sha256sum 2>/dev/null || shasum -a 256) < \\"\$r/.specnaut/hooks/SHA256SUMS\\" 2>/dev/null | cut -c1-64)\\" = \\"974388f660cfe9fa1869cce3c0050e0ef3098341ebe79aab6d0ecc651ba5a08d\\" ] && (cd \\"\$r/.specnaut/hooks\\" && (sha256sum -c --status SHA256SUMS 2>/dev/null || shasum -a 256 -c --status SHA256SUMS)) && exec bash \\"\$r/.specnaut/hooks/protect-generated.sh\\" codex; echo \\"specnaut: .specnaut/hooks changed since it was trusted — run specnaut upgrade, then /hooks\\" >&2; exit 2",
             "timeout": 10
           },
           {
             "type": "command",
-            "command": "r=\$PWD; while [ -n \\"\$r\\" ] && [ ! -d \\"\$r/.specnaut/hooks\\" ]; do r=\${r%/*}; done; [ \\"\$( (sha256sum 2>/dev/null || shasum -a 256) < \\"\$r/.specnaut/hooks/SHA256SUMS\\" 2>/dev/null | cut -c1-64)\\" = \\"7b98e2ec1ae13bc6f8a7179ee1dd6fe6db73f86362db6d23159acddf4661fc2f\\" ] && (cd \\"\$r/.specnaut/hooks\\" && (sha256sum -c --status SHA256SUMS 2>/dev/null || shasum -a 256 -c --status SHA256SUMS)) && exec bash \\"\$r/.specnaut/hooks/protect-constitution.sh\\" codex; echo \\"specnaut: .specnaut/hooks changed since it was trusted — run specnaut upgrade, then /hooks\\" >&2; exit 2",
+            "command": "r=\$PWD; while [ -n \\"\$r\\" ] && [ ! -d \\"\$r/.specnaut/hooks\\" ]; do r=\${r%/*}; done; [ \\"\$( (sha256sum 2>/dev/null || shasum -a 256) < \\"\$r/.specnaut/hooks/SHA256SUMS\\" 2>/dev/null | cut -c1-64)\\" = \\"974388f660cfe9fa1869cce3c0050e0ef3098341ebe79aab6d0ecc651ba5a08d\\" ] && (cd \\"\$r/.specnaut/hooks\\" && (sha256sum -c --status SHA256SUMS 2>/dev/null || shasum -a 256 -c --status SHA256SUMS)) && exec bash \\"\$r/.specnaut/hooks/protect-constitution.sh\\" codex; echo \\"specnaut: .specnaut/hooks changed since it was trusted — run specnaut upgrade, then /hooks\\" >&2; exit 2",
             "timeout": 10
           }
         ]
@@ -32268,7 +31697,7 @@ a8ee3b3537f1718a140bca74815dcfa5ce510bb87b62f63caebfebff090094a6  guard-release.
         "hooks": [
           {
             "type": "command",
-            "command": "r=\$PWD; while [ -n \\"\$r\\" ] && [ ! -d \\"\$r/.specnaut/hooks\\" ]; do r=\${r%/*}; done; [ \\"\$( (sha256sum 2>/dev/null || shasum -a 256) < \\"\$r/.specnaut/hooks/SHA256SUMS\\" 2>/dev/null | cut -c1-64)\\" = \\"7b98e2ec1ae13bc6f8a7179ee1dd6fe6db73f86362db6d23159acddf4661fc2f\\" ] && (cd \\"\$r/.specnaut/hooks\\" && (sha256sum -c --status SHA256SUMS 2>/dev/null || shasum -a 256 -c --status SHA256SUMS)) && exec bash \\"\$r/.specnaut/hooks/guard-dispatch-model.sh\\" codex; echo \\"specnaut: .specnaut/hooks changed since it was trusted — run specnaut upgrade, then /hooks\\" >&2; exit 2",
+            "command": "r=\$PWD; while [ -n \\"\$r\\" ] && [ ! -d \\"\$r/.specnaut/hooks\\" ]; do r=\${r%/*}; done; [ \\"\$( (sha256sum 2>/dev/null || shasum -a 256) < \\"\$r/.specnaut/hooks/SHA256SUMS\\" 2>/dev/null | cut -c1-64)\\" = \\"974388f660cfe9fa1869cce3c0050e0ef3098341ebe79aab6d0ecc651ba5a08d\\" ] && (cd \\"\$r/.specnaut/hooks\\" && (sha256sum -c --status SHA256SUMS 2>/dev/null || shasum -a 256 -c --status SHA256SUMS)) && exec bash \\"\$r/.specnaut/hooks/guard-dispatch-model.sh\\" codex; echo \\"specnaut: .specnaut/hooks changed since it was trusted — run specnaut upgrade, then /hooks\\" >&2; exit 2",
             "timeout": 10
           }
         ]
@@ -32279,7 +31708,7 @@ a8ee3b3537f1718a140bca74815dcfa5ce510bb87b62f63caebfebff090094a6  guard-release.
         "hooks": [
           {
             "type": "command",
-            "command": "r=\$PWD; while [ -n \\"\$r\\" ] && [ ! -d \\"\$r/.specnaut/hooks\\" ]; do r=\${r%/*}; done; [ \\"\$( (sha256sum 2>/dev/null || shasum -a 256) < \\"\$r/.specnaut/hooks/SHA256SUMS\\" 2>/dev/null | cut -c1-64)\\" = \\"7b98e2ec1ae13bc6f8a7179ee1dd6fe6db73f86362db6d23159acddf4661fc2f\\" ] && (cd \\"\$r/.specnaut/hooks\\" && (sha256sum -c --status SHA256SUMS 2>/dev/null || shasum -a 256 -c --status SHA256SUMS)) && exec bash \\"\$r/.specnaut/hooks/approve-on-prompt.sh\\" codex; echo \\"specnaut: .specnaut/hooks changed since it was trusted — run specnaut upgrade, then /hooks\\" >&2; exit 0",
+            "command": "r=\$PWD; while [ -n \\"\$r\\" ] && [ ! -d \\"\$r/.specnaut/hooks\\" ]; do r=\${r%/*}; done; [ \\"\$( (sha256sum 2>/dev/null || shasum -a 256) < \\"\$r/.specnaut/hooks/SHA256SUMS\\" 2>/dev/null | cut -c1-64)\\" = \\"974388f660cfe9fa1869cce3c0050e0ef3098341ebe79aab6d0ecc651ba5a08d\\" ] && (cd \\"\$r/.specnaut/hooks\\" && (sha256sum -c --status SHA256SUMS 2>/dev/null || shasum -a 256 -c --status SHA256SUMS)) && exec bash \\"\$r/.specnaut/hooks/approve-on-prompt.sh\\" codex; echo \\"specnaut: .specnaut/hooks changed since it was trusted — run specnaut upgrade, then /hooks\\" >&2; exit 0",
             "timeout": 10
           }
         ]
@@ -32290,7 +31719,7 @@ a8ee3b3537f1718a140bca74815dcfa5ce510bb87b62f63caebfebff090094a6  guard-release.
         "hooks": [
           {
             "type": "command",
-            "command": "r=\$PWD; while [ -n \\"\$r\\" ] && [ ! -d \\"\$r/.specnaut/hooks\\" ]; do r=\${r%/*}; done; [ \\"\$( (sha256sum 2>/dev/null || shasum -a 256) < \\"\$r/.specnaut/hooks/SHA256SUMS\\" 2>/dev/null | cut -c1-64)\\" = \\"7b98e2ec1ae13bc6f8a7179ee1dd6fe6db73f86362db6d23159acddf4661fc2f\\" ] && (cd \\"\$r/.specnaut/hooks\\" && (sha256sum -c --status SHA256SUMS 2>/dev/null || shasum -a 256 -c --status SHA256SUMS)) && exec bash \\"\$r/.specnaut/hooks/approve-on-prompt.sh\\" codex; echo \\"specnaut: .specnaut/hooks changed since it was trusted — run specnaut upgrade, then /hooks\\" >&2; exit 0",
+            "command": "r=\$PWD; while [ -n \\"\$r\\" ] && [ ! -d \\"\$r/.specnaut/hooks\\" ]; do r=\${r%/*}; done; [ \\"\$( (sha256sum 2>/dev/null || shasum -a 256) < \\"\$r/.specnaut/hooks/SHA256SUMS\\" 2>/dev/null | cut -c1-64)\\" = \\"974388f660cfe9fa1869cce3c0050e0ef3098341ebe79aab6d0ecc651ba5a08d\\" ] && (cd \\"\$r/.specnaut/hooks\\" && (sha256sum -c --status SHA256SUMS 2>/dev/null || shasum -a 256 -c --status SHA256SUMS)) && exec bash \\"\$r/.specnaut/hooks/approve-on-prompt.sh\\" codex; echo \\"specnaut: .specnaut/hooks changed since it was trusted — run specnaut upgrade, then /hooks\\" >&2; exit 0",
             "timeout": 10
           }
         ]
@@ -32301,7 +31730,7 @@ a8ee3b3537f1718a140bca74815dcfa5ce510bb87b62f63caebfebff090094a6  guard-release.
         "hooks": [
           {
             "type": "command",
-            "command": "r=\$PWD; while [ -n \\"\$r\\" ] && [ ! -d \\"\$r/.specnaut/hooks\\" ]; do r=\${r%/*}; done; [ \\"\$( (sha256sum 2>/dev/null || shasum -a 256) < \\"\$r/.specnaut/hooks/SHA256SUMS\\" 2>/dev/null | cut -c1-64)\\" = \\"7b98e2ec1ae13bc6f8a7179ee1dd6fe6db73f86362db6d23159acddf4661fc2f\\" ] && (cd \\"\$r/.specnaut/hooks\\" && (sha256sum -c --status SHA256SUMS 2>/dev/null || shasum -a 256 -c --status SHA256SUMS)) && exec bash \\"\$r/.specnaut/hooks/log-subagent.sh\\" start; echo \\"specnaut: .specnaut/hooks changed since it was trusted — run specnaut upgrade, then /hooks\\" >&2; exit 0",
+            "command": "r=\$PWD; while [ -n \\"\$r\\" ] && [ ! -d \\"\$r/.specnaut/hooks\\" ]; do r=\${r%/*}; done; [ \\"\$( (sha256sum 2>/dev/null || shasum -a 256) < \\"\$r/.specnaut/hooks/SHA256SUMS\\" 2>/dev/null | cut -c1-64)\\" = \\"974388f660cfe9fa1869cce3c0050e0ef3098341ebe79aab6d0ecc651ba5a08d\\" ] && (cd \\"\$r/.specnaut/hooks\\" && (sha256sum -c --status SHA256SUMS 2>/dev/null || shasum -a 256 -c --status SHA256SUMS)) && exec bash \\"\$r/.specnaut/hooks/log-subagent.sh\\" start; echo \\"specnaut: .specnaut/hooks changed since it was trusted — run specnaut upgrade, then /hooks\\" >&2; exit 0",
             "timeout": 10
           }
         ]
@@ -32312,7 +31741,7 @@ a8ee3b3537f1718a140bca74815dcfa5ce510bb87b62f63caebfebff090094a6  guard-release.
         "hooks": [
           {
             "type": "command",
-            "command": "r=\$PWD; while [ -n \\"\$r\\" ] && [ ! -d \\"\$r/.specnaut/hooks\\" ]; do r=\${r%/*}; done; [ \\"\$( (sha256sum 2>/dev/null || shasum -a 256) < \\"\$r/.specnaut/hooks/SHA256SUMS\\" 2>/dev/null | cut -c1-64)\\" = \\"7b98e2ec1ae13bc6f8a7179ee1dd6fe6db73f86362db6d23159acddf4661fc2f\\" ] && (cd \\"\$r/.specnaut/hooks\\" && (sha256sum -c --status SHA256SUMS 2>/dev/null || shasum -a 256 -c --status SHA256SUMS)) && exec bash \\"\$r/.specnaut/hooks/log-subagent.sh\\" stop; echo \\"specnaut: .specnaut/hooks changed since it was trusted — run specnaut upgrade, then /hooks\\" >&2; exit 0",
+            "command": "r=\$PWD; while [ -n \\"\$r\\" ] && [ ! -d \\"\$r/.specnaut/hooks\\" ]; do r=\${r%/*}; done; [ \\"\$( (sha256sum 2>/dev/null || shasum -a 256) < \\"\$r/.specnaut/hooks/SHA256SUMS\\" 2>/dev/null | cut -c1-64)\\" = \\"974388f660cfe9fa1869cce3c0050e0ef3098341ebe79aab6d0ecc651ba5a08d\\" ] && (cd \\"\$r/.specnaut/hooks\\" && (sha256sum -c --status SHA256SUMS 2>/dev/null || shasum -a 256 -c --status SHA256SUMS)) && exec bash \\"\$r/.specnaut/hooks/log-subagent.sh\\" stop; echo \\"specnaut: .specnaut/hooks changed since it was trusted — run specnaut upgrade, then /hooks\\" >&2; exit 0",
             "timeout": 10
           }
         ]
@@ -32356,7 +31785,7 @@ merge: manual)
 ## Skills available
 
 - \`/task plan\` — the feature's brief (or \`--full\` plan), then the architecture + security audits, then the stop
-- \`/task implement\` — run the developer → review → qa-tester pipeline
+- \`/task implement\` — the developer builds the plan, then the review runs
 - \`/task review\` — architecture + quality gates
 - \`/task merge\` — merge the feature branch to main
 - \`/specnaut-task\` — the backlog, the pipeline above, and audits (\`audit --security|--archi|…\`)
@@ -32367,9 +31796,6 @@ merge: manual)
 - \`/specnaut-agent-developer\` — implementation work
 - \`/specnaut-agent-code-reviewer\` — code quality and test review
 - \`/specnaut-agent-security-expert\` — security review
-- \`/specnaut-agent-qa-tester\` — QA + test writing
-- \`/specnaut-agent-workflow-manager\` — long-running orchestration
-- \`/specnaut-agent-devops-sre\` — cloud infrastructure, CI/CD, observability
 
 **Backlog references** follow the \`backlog-reference-contract\` skill — read it; never restate it here.
 

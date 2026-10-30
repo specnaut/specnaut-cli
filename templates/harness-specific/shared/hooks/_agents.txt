@@ -5,11 +5,8 @@ architect-expert
 code-reviewer
 dependency-expert
 developer
-devops-sre
 performance-expert
 product-owner
-qa-tester
 security-expert
 specnaut-guide
 ui-ux-designer
-workflow-manager

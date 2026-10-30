@@ -6,17 +6,17 @@
         "hooks": [
           {
             "type": "command",
-            "command": "r=$PWD; while [ -n \"$r\" ] && [ ! -d \"$r/.specnaut/hooks\" ]; do r=${r%/*}; done; [ \"$( (sha256sum 2>/dev/null || shasum -a 256) < \"$r/.specnaut/hooks/SHA256SUMS\" 2>/dev/null | cut -c1-64)\" = \"7b98e2ec1ae13bc6f8a7179ee1dd6fe6db73f86362db6d23159acddf4661fc2f\" ] && (cd \"$r/.specnaut/hooks\" && (sha256sum -c --status SHA256SUMS 2>/dev/null || shasum -a 256 -c --status SHA256SUMS)) && exec bash \"$r/.specnaut/hooks/guard-merge.sh\" codex; echo \"specnaut: .specnaut/hooks changed since it was trusted — run specnaut upgrade, then /hooks\" >&2; exit 2",
+            "command": "r=$PWD; while [ -n \"$r\" ] && [ ! -d \"$r/.specnaut/hooks\" ]; do r=${r%/*}; done; [ \"$( (sha256sum 2>/dev/null || shasum -a 256) < \"$r/.specnaut/hooks/SHA256SUMS\" 2>/dev/null | cut -c1-64)\" = \"974388f660cfe9fa1869cce3c0050e0ef3098341ebe79aab6d0ecc651ba5a08d\" ] && (cd \"$r/.specnaut/hooks\" && (sha256sum -c --status SHA256SUMS 2>/dev/null || shasum -a 256 -c --status SHA256SUMS)) && exec bash \"$r/.specnaut/hooks/guard-merge.sh\" codex; echo \"specnaut: .specnaut/hooks changed since it was trusted — run specnaut upgrade, then /hooks\" >&2; exit 2",
             "timeout": 10
           },
           {
             "type": "command",
-            "command": "r=$PWD; while [ -n \"$r\" ] && [ ! -d \"$r/.specnaut/hooks\" ]; do r=${r%/*}; done; [ \"$( (sha256sum 2>/dev/null || shasum -a 256) < \"$r/.specnaut/hooks/SHA256SUMS\" 2>/dev/null | cut -c1-64)\" = \"7b98e2ec1ae13bc6f8a7179ee1dd6fe6db73f86362db6d23159acddf4661fc2f\" ] && (cd \"$r/.specnaut/hooks\" && (sha256sum -c --status SHA256SUMS 2>/dev/null || shasum -a 256 -c --status SHA256SUMS)) && exec bash \"$r/.specnaut/hooks/guard-release.sh\" codex; echo \"specnaut: .specnaut/hooks changed since it was trusted — run specnaut upgrade, then /hooks\" >&2; exit 2",
+            "command": "r=$PWD; while [ -n \"$r\" ] && [ ! -d \"$r/.specnaut/hooks\" ]; do r=${r%/*}; done; [ \"$( (sha256sum 2>/dev/null || shasum -a 256) < \"$r/.specnaut/hooks/SHA256SUMS\" 2>/dev/null | cut -c1-64)\" = \"974388f660cfe9fa1869cce3c0050e0ef3098341ebe79aab6d0ecc651ba5a08d\" ] && (cd \"$r/.specnaut/hooks\" && (sha256sum -c --status SHA256SUMS 2>/dev/null || shasum -a 256 -c --status SHA256SUMS)) && exec bash \"$r/.specnaut/hooks/guard-release.sh\" codex; echo \"specnaut: .specnaut/hooks changed since it was trusted — run specnaut upgrade, then /hooks\" >&2; exit 2",
             "timeout": 10
           },
           {
             "type": "command",
-            "command": "r=$PWD; while [ -n \"$r\" ] && [ ! -d \"$r/.specnaut/hooks\" ]; do r=${r%/*}; done; [ \"$( (sha256sum 2>/dev/null || shasum -a 256) < \"$r/.specnaut/hooks/SHA256SUMS\" 2>/dev/null | cut -c1-64)\" = \"7b98e2ec1ae13bc6f8a7179ee1dd6fe6db73f86362db6d23159acddf4661fc2f\" ] && (cd \"$r/.specnaut/hooks\" && (sha256sum -c --status SHA256SUMS 2>/dev/null || shasum -a 256 -c --status SHA256SUMS)) && exec bash \"$r/.specnaut/hooks/protect-constitution.sh\" codex; echo \"specnaut: .specnaut/hooks changed since it was trusted — run specnaut upgrade, then /hooks\" >&2; exit 2",
+            "command": "r=$PWD; while [ -n \"$r\" ] && [ ! -d \"$r/.specnaut/hooks\" ]; do r=${r%/*}; done; [ \"$( (sha256sum 2>/dev/null || shasum -a 256) < \"$r/.specnaut/hooks/SHA256SUMS\" 2>/dev/null | cut -c1-64)\" = \"974388f660cfe9fa1869cce3c0050e0ef3098341ebe79aab6d0ecc651ba5a08d\" ] && (cd \"$r/.specnaut/hooks\" && (sha256sum -c --status SHA256SUMS 2>/dev/null || shasum -a 256 -c --status SHA256SUMS)) && exec bash \"$r/.specnaut/hooks/protect-constitution.sh\" codex; echo \"specnaut: .specnaut/hooks changed since it was trusted — run specnaut upgrade, then /hooks\" >&2; exit 2",
             "timeout": 10
           }
         ]
@@ -26,12 +26,12 @@
         "hooks": [
           {
             "type": "command",
-            "command": "r=$PWD; while [ -n \"$r\" ] && [ ! -d \"$r/.specnaut/hooks\" ]; do r=${r%/*}; done; [ \"$( (sha256sum 2>/dev/null || shasum -a 256) < \"$r/.specnaut/hooks/SHA256SUMS\" 2>/dev/null | cut -c1-64)\" = \"7b98e2ec1ae13bc6f8a7179ee1dd6fe6db73f86362db6d23159acddf4661fc2f\" ] && (cd \"$r/.specnaut/hooks\" && (sha256sum -c --status SHA256SUMS 2>/dev/null || shasum -a 256 -c --status SHA256SUMS)) && exec bash \"$r/.specnaut/hooks/protect-generated.sh\" codex; echo \"specnaut: .specnaut/hooks changed since it was trusted — run specnaut upgrade, then /hooks\" >&2; exit 2",
+            "command": "r=$PWD; while [ -n \"$r\" ] && [ ! -d \"$r/.specnaut/hooks\" ]; do r=${r%/*}; done; [ \"$( (sha256sum 2>/dev/null || shasum -a 256) < \"$r/.specnaut/hooks/SHA256SUMS\" 2>/dev/null | cut -c1-64)\" = \"974388f660cfe9fa1869cce3c0050e0ef3098341ebe79aab6d0ecc651ba5a08d\" ] && (cd \"$r/.specnaut/hooks\" && (sha256sum -c --status SHA256SUMS 2>/dev/null || shasum -a 256 -c --status SHA256SUMS)) && exec bash \"$r/.specnaut/hooks/protect-generated.sh\" codex; echo \"specnaut: .specnaut/hooks changed since it was trusted — run specnaut upgrade, then /hooks\" >&2; exit 2",
             "timeout": 10
           },
           {
             "type": "command",
-            "command": "r=$PWD; while [ -n \"$r\" ] && [ ! -d \"$r/.specnaut/hooks\" ]; do r=${r%/*}; done; [ \"$( (sha256sum 2>/dev/null || shasum -a 256) < \"$r/.specnaut/hooks/SHA256SUMS\" 2>/dev/null | cut -c1-64)\" = \"7b98e2ec1ae13bc6f8a7179ee1dd6fe6db73f86362db6d23159acddf4661fc2f\" ] && (cd \"$r/.specnaut/hooks\" && (sha256sum -c --status SHA256SUMS 2>/dev/null || shasum -a 256 -c --status SHA256SUMS)) && exec bash \"$r/.specnaut/hooks/protect-constitution.sh\" codex; echo \"specnaut: .specnaut/hooks changed since it was trusted — run specnaut upgrade, then /hooks\" >&2; exit 2",
+            "command": "r=$PWD; while [ -n \"$r\" ] && [ ! -d \"$r/.specnaut/hooks\" ]; do r=${r%/*}; done; [ \"$( (sha256sum 2>/dev/null || shasum -a 256) < \"$r/.specnaut/hooks/SHA256SUMS\" 2>/dev/null | cut -c1-64)\" = \"974388f660cfe9fa1869cce3c0050e0ef3098341ebe79aab6d0ecc651ba5a08d\" ] && (cd \"$r/.specnaut/hooks\" && (sha256sum -c --status SHA256SUMS 2>/dev/null || shasum -a 256 -c --status SHA256SUMS)) && exec bash \"$r/.specnaut/hooks/protect-constitution.sh\" codex; echo \"specnaut: .specnaut/hooks changed since it was trusted — run specnaut upgrade, then /hooks\" >&2; exit 2",
             "timeout": 10
           }
         ]
@@ -41,7 +41,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "r=$PWD; while [ -n \"$r\" ] && [ ! -d \"$r/.specnaut/hooks\" ]; do r=${r%/*}; done; [ \"$( (sha256sum 2>/dev/null || shasum -a 256) < \"$r/.specnaut/hooks/SHA256SUMS\" 2>/dev/null | cut -c1-64)\" = \"7b98e2ec1ae13bc6f8a7179ee1dd6fe6db73f86362db6d23159acddf4661fc2f\" ] && (cd \"$r/.specnaut/hooks\" && (sha256sum -c --status SHA256SUMS 2>/dev/null || shasum -a 256 -c --status SHA256SUMS)) && exec bash \"$r/.specnaut/hooks/guard-dispatch-model.sh\" codex; echo \"specnaut: .specnaut/hooks changed since it was trusted — run specnaut upgrade, then /hooks\" >&2; exit 2",
+            "command": "r=$PWD; while [ -n \"$r\" ] && [ ! -d \"$r/.specnaut/hooks\" ]; do r=${r%/*}; done; [ \"$( (sha256sum 2>/dev/null || shasum -a 256) < \"$r/.specnaut/hooks/SHA256SUMS\" 2>/dev/null | cut -c1-64)\" = \"974388f660cfe9fa1869cce3c0050e0ef3098341ebe79aab6d0ecc651ba5a08d\" ] && (cd \"$r/.specnaut/hooks\" && (sha256sum -c --status SHA256SUMS 2>/dev/null || shasum -a 256 -c --status SHA256SUMS)) && exec bash \"$r/.specnaut/hooks/guard-dispatch-model.sh\" codex; echo \"specnaut: .specnaut/hooks changed since it was trusted — run specnaut upgrade, then /hooks\" >&2; exit 2",
             "timeout": 10
           }
         ]
@@ -52,7 +52,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "r=$PWD; while [ -n \"$r\" ] && [ ! -d \"$r/.specnaut/hooks\" ]; do r=${r%/*}; done; [ \"$( (sha256sum 2>/dev/null || shasum -a 256) < \"$r/.specnaut/hooks/SHA256SUMS\" 2>/dev/null | cut -c1-64)\" = \"7b98e2ec1ae13bc6f8a7179ee1dd6fe6db73f86362db6d23159acddf4661fc2f\" ] && (cd \"$r/.specnaut/hooks\" && (sha256sum -c --status SHA256SUMS 2>/dev/null || shasum -a 256 -c --status SHA256SUMS)) && exec bash \"$r/.specnaut/hooks/approve-on-prompt.sh\" codex; echo \"specnaut: .specnaut/hooks changed since it was trusted — run specnaut upgrade, then /hooks\" >&2; exit 0",
+            "command": "r=$PWD; while [ -n \"$r\" ] && [ ! -d \"$r/.specnaut/hooks\" ]; do r=${r%/*}; done; [ \"$( (sha256sum 2>/dev/null || shasum -a 256) < \"$r/.specnaut/hooks/SHA256SUMS\" 2>/dev/null | cut -c1-64)\" = \"974388f660cfe9fa1869cce3c0050e0ef3098341ebe79aab6d0ecc651ba5a08d\" ] && (cd \"$r/.specnaut/hooks\" && (sha256sum -c --status SHA256SUMS 2>/dev/null || shasum -a 256 -c --status SHA256SUMS)) && exec bash \"$r/.specnaut/hooks/approve-on-prompt.sh\" codex; echo \"specnaut: .specnaut/hooks changed since it was trusted — run specnaut upgrade, then /hooks\" >&2; exit 0",
             "timeout": 10
           }
         ]
@@ -63,7 +63,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "r=$PWD; while [ -n \"$r\" ] && [ ! -d \"$r/.specnaut/hooks\" ]; do r=${r%/*}; done; [ \"$( (sha256sum 2>/dev/null || shasum -a 256) < \"$r/.specnaut/hooks/SHA256SUMS\" 2>/dev/null | cut -c1-64)\" = \"7b98e2ec1ae13bc6f8a7179ee1dd6fe6db73f86362db6d23159acddf4661fc2f\" ] && (cd \"$r/.specnaut/hooks\" && (sha256sum -c --status SHA256SUMS 2>/dev/null || shasum -a 256 -c --status SHA256SUMS)) && exec bash \"$r/.specnaut/hooks/approve-on-prompt.sh\" codex; echo \"specnaut: .specnaut/hooks changed since it was trusted — run specnaut upgrade, then /hooks\" >&2; exit 0",
+            "command": "r=$PWD; while [ -n \"$r\" ] && [ ! -d \"$r/.specnaut/hooks\" ]; do r=${r%/*}; done; [ \"$( (sha256sum 2>/dev/null || shasum -a 256) < \"$r/.specnaut/hooks/SHA256SUMS\" 2>/dev/null | cut -c1-64)\" = \"974388f660cfe9fa1869cce3c0050e0ef3098341ebe79aab6d0ecc651ba5a08d\" ] && (cd \"$r/.specnaut/hooks\" && (sha256sum -c --status SHA256SUMS 2>/dev/null || shasum -a 256 -c --status SHA256SUMS)) && exec bash \"$r/.specnaut/hooks/approve-on-prompt.sh\" codex; echo \"specnaut: .specnaut/hooks changed since it was trusted — run specnaut upgrade, then /hooks\" >&2; exit 0",
             "timeout": 10
           }
         ]
@@ -74,7 +74,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "r=$PWD; while [ -n \"$r\" ] && [ ! -d \"$r/.specnaut/hooks\" ]; do r=${r%/*}; done; [ \"$( (sha256sum 2>/dev/null || shasum -a 256) < \"$r/.specnaut/hooks/SHA256SUMS\" 2>/dev/null | cut -c1-64)\" = \"7b98e2ec1ae13bc6f8a7179ee1dd6fe6db73f86362db6d23159acddf4661fc2f\" ] && (cd \"$r/.specnaut/hooks\" && (sha256sum -c --status SHA256SUMS 2>/dev/null || shasum -a 256 -c --status SHA256SUMS)) && exec bash \"$r/.specnaut/hooks/log-subagent.sh\" start; echo \"specnaut: .specnaut/hooks changed since it was trusted — run specnaut upgrade, then /hooks\" >&2; exit 0",
+            "command": "r=$PWD; while [ -n \"$r\" ] && [ ! -d \"$r/.specnaut/hooks\" ]; do r=${r%/*}; done; [ \"$( (sha256sum 2>/dev/null || shasum -a 256) < \"$r/.specnaut/hooks/SHA256SUMS\" 2>/dev/null | cut -c1-64)\" = \"974388f660cfe9fa1869cce3c0050e0ef3098341ebe79aab6d0ecc651ba5a08d\" ] && (cd \"$r/.specnaut/hooks\" && (sha256sum -c --status SHA256SUMS 2>/dev/null || shasum -a 256 -c --status SHA256SUMS)) && exec bash \"$r/.specnaut/hooks/log-subagent.sh\" start; echo \"specnaut: .specnaut/hooks changed since it was trusted — run specnaut upgrade, then /hooks\" >&2; exit 0",
             "timeout": 10
           }
         ]
@@ -85,7 +85,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "r=$PWD; while [ -n \"$r\" ] && [ ! -d \"$r/.specnaut/hooks\" ]; do r=${r%/*}; done; [ \"$( (sha256sum 2>/dev/null || shasum -a 256) < \"$r/.specnaut/hooks/SHA256SUMS\" 2>/dev/null | cut -c1-64)\" = \"7b98e2ec1ae13bc6f8a7179ee1dd6fe6db73f86362db6d23159acddf4661fc2f\" ] && (cd \"$r/.specnaut/hooks\" && (sha256sum -c --status SHA256SUMS 2>/dev/null || shasum -a 256 -c --status SHA256SUMS)) && exec bash \"$r/.specnaut/hooks/log-subagent.sh\" stop; echo \"specnaut: .specnaut/hooks changed since it was trusted — run specnaut upgrade, then /hooks\" >&2; exit 0",
+            "command": "r=$PWD; while [ -n \"$r\" ] && [ ! -d \"$r/.specnaut/hooks\" ]; do r=${r%/*}; done; [ \"$( (sha256sum 2>/dev/null || shasum -a 256) < \"$r/.specnaut/hooks/SHA256SUMS\" 2>/dev/null | cut -c1-64)\" = \"974388f660cfe9fa1869cce3c0050e0ef3098341ebe79aab6d0ecc651ba5a08d\" ] && (cd \"$r/.specnaut/hooks\" && (sha256sum -c --status SHA256SUMS 2>/dev/null || shasum -a 256 -c --status SHA256SUMS)) && exec bash \"$r/.specnaut/hooks/log-subagent.sh\" stop; echo \"specnaut: .specnaut/hooks changed since it was trusted — run specnaut upgrade, then /hooks\" >&2; exit 0",
             "timeout": 10
           }
         ]
