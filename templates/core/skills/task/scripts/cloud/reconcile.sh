@@ -45,18 +45,18 @@ CURSOR=""
 while :; do
   URL="$API_BASE/activity?projectKey=$PROJECT_KEY&limit=$LIMIT"
   if [ -n "$CURSOR" ]; then
-    URL="$URL&cursor=$(printf '%s' "$CURSOR" | jq -sRr @uri)"
+    URL="$URL&cursor=$(printf '%s' "$CURSOR" | jq_lf -sRr @uri)"
   fi
 
   RESP=$(curl -fsS "$URL" "${AUTH[@]}")
-  if ! echo "$RESP" | jq -e '.ok' >/dev/null 2>&1; then
+  if ! echo "$RESP" | jq_lf -e '.ok' >/dev/null 2>&1; then
     echo "✗ reconcile failed: $RESP" >&2
     exit 1
   fi
 
   # In seek-end mode we only advance the cursor, never emit transitions.
   if [ "$SEEK_END" != "1" ]; then
-    echo "$RESP" | jq -r '
+    echo "$RESP" | jq_lf -r '
       .events[]
       | if .kind == "created"
         then "CREATED \(.number) -> \(.toStage // "—")"
@@ -65,8 +65,8 @@ while :; do
     '
   fi
 
-  CURSOR=$(echo "$RESP" | jq -r '.cursor // empty')
+  CURSOR=$(echo "$RESP" | jq_lf -r '.cursor // empty')
   [ -n "$CURSOR" ] && printf '%s' "$CURSOR" > "$STATE"
 
-  [ "$(echo "$RESP" | jq -r '.hasMore')" = "true" ] || break
+  [ "$(echo "$RESP" | jq_lf -r '.hasMore')" = "true" ] || break
 done

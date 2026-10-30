@@ -43,7 +43,7 @@ fi
 JSON=$(gh issue list --repo "$REPO" --state "$STATE" --limit 200 \
   --json number,title,projectItems)
 
-echo "$JSON" | jq -r --arg filter "$FILTER" '
+echo "$JSON" | jq_lf -r --arg filter "$FILTER" '
   .[]
   | . as $issue
   | (.projectItems[0].status.name // "—") as $status

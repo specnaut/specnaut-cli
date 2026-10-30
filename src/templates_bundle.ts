@@ -5826,6 +5826,25 @@ To run a single verb only: \`/task plan --manual "Add OAuth2 login"\`.
 # Sourced by the other local-backend scripts.
 set -euo pipefail
 
+# jq_lf <jq args…> — jq, for every call in this script family (cli#701). A
+# native Windows jq.exe writes stdout in text mode, every \\n as \\r\\n, so a
+# value read with \`\$(jq -r …)\` kept a \\r: a path that opens nothing, an id the
+# tracker does not know, a count \`[ -gt ]\` refuses. The \\r\\n is undone only
+# when the jq on PATH was measured writing it, once, as this file is sourced —
+# exact, never "drop every \\r": a \\r a value carries itself survives. jq's
+# exit status and its trailing newline are kept. Every copy of this helper is
+# the same text (tests/scripts/jq_crlf_test.ts).
+JQ_CRLF=0
+case \$(jq -n 1 2>/dev/null; printf .) in *\$'\\r\\n.') JQ_CRLF=1 ;; esac
+jq_lf() {
+  local _o _rc=0
+  _o=\$(_r=0; jq "\$@" || _r=\$?; printf .; exit "\$_r") || _rc=\$?
+  _o=\${_o%.}
+  if [ "\$JQ_CRLF" = 1 ]; then _o=\${_o//\$'\\r\\n'/\$'\\n'}; fi
+  printf '%s' "\$_o"
+  return "\$_rc"
+}
+
 ROOT="\$(cd "\$(dirname "\$0")/../../.." && pwd)"
 BACKLOG_DIR="\$ROOT/.specnaut/backlog"
 INDEX="\$ROOT/.specnaut/backlog.md"
@@ -5969,7 +5988,7 @@ record() {
     return 1
   fi
   # shellcheck disable=SC2016  # jq program.
-  jq -n -c --arg item "\$num" --rawfile text "\$file" '
+  jq_lf -n -c --arg item "\$num" --rawfile text "\$file" '
     (\$text | gsub("\\r"; "") | split("\\n")) as \$l
     | if \$l[0] != "---" then error("no frontmatter") else . end
     | ([range(1; \$l | length) | select(\$l[.] == "---")] | first
@@ -6895,6 +6914,25 @@ exit 0
 # Sourced by the other github-backend scripts.
 set -euo pipefail
 
+# jq_lf <jq args…> — jq, for every call in this script family (cli#701). A
+# native Windows jq.exe writes stdout in text mode, every \\n as \\r\\n, so a
+# value read with \`\$(jq -r …)\` kept a \\r: a path that opens nothing, an id the
+# tracker does not know, a count \`[ -gt ]\` refuses. The \\r\\n is undone only
+# when the jq on PATH was measured writing it, once, as this file is sourced —
+# exact, never "drop every \\r": a \\r a value carries itself survives. jq's
+# exit status and its trailing newline are kept. Every copy of this helper is
+# the same text (tests/scripts/jq_crlf_test.ts).
+JQ_CRLF=0
+case \$(jq -n 1 2>/dev/null; printf .) in *\$'\\r\\n.') JQ_CRLF=1 ;; esac
+jq_lf() {
+  local _o _rc=0
+  _o=\$(_r=0; jq "\$@" || _r=\$?; printf .; exit "\$_r") || _rc=\$?
+  _o=\${_o%.}
+  if [ "\$JQ_CRLF" = 1 ]; then _o=\${_o//\$'\\r\\n'/\$'\\n'}; fi
+  printf '%s' "\$_o"
+  return "\$_rc"
+}
+
 ROOT="\$(cd "\$(dirname "\$0")/../../.." && pwd)"
 CONFIG="\$ROOT/.specnaut/backlog-config.yml"
 
@@ -7067,7 +7105,7 @@ project_item_id() {
         }
       }
     }' -f owner="\$REPO_OWNER" -f name="\$REPO_NAME" -F num="\$num" 2>/dev/null |
-    jq -r --arg p "\$PROJECT_NODE_ID" \\
+    jq_lf -r --arg p "\$PROJECT_NODE_ID" \\
       '.data.repository.issue.projectItems.nodes[]? | select(.project.id==\$p) | .id' 2>/dev/null |
     head -1 || true
 }
@@ -7125,7 +7163,7 @@ fi
 JSON=\$(gh issue list --repo "\$REPO" --state "\$STATE" --limit 200 \\
   --json number,title,projectItems)
 
-echo "\$JSON" | jq -r --arg filter "\$FILTER" '
+echo "\$JSON" | jq_lf -r --arg filter "\$FILTER" '
   .[]
   | . as \$issue
   | (.projectItems[0].status.name // "—") as \$status
@@ -7250,7 +7288,7 @@ record() {
   raw=\$(gh api graphql -f query="\$QUERY" -f owner="\$REPO_OWNER" -f name="\$REPO_NAME" -F num="\$1") ||
     return 1
   # shellcheck disable=SC2016  # jq program.
-  printf '%s' "\$raw" | jq -c -e --arg item "\$1" --argjson project "\$PROJECT_NUMBER" --arg owner "\$REPO_OWNER" '
+  printf '%s' "\$raw" | jq_lf -c -e --arg item "\$1" --argjson project "\$PROJECT_NUMBER" --arg owner "\$REPO_OWNER" '
     .data.repository.issue // error("no such issue")
     | ([.projectItems.nodes[]?
         | select(.project.number == \$project
@@ -7506,10 +7544,10 @@ NUM="\$1"
 STATUS="\$2"
 
 # Resolve project + status field IDs lazily (cached client-side per call).
-PROJECT_NODE_ID=\$(gh project view "\$PROJECT_NUMBER" --owner "\$REPO_OWNER" --format json | jq -r '.id')
+PROJECT_NODE_ID=\$(gh project view "\$PROJECT_NUMBER" --owner "\$REPO_OWNER" --format json | jq_lf -r '.id')
 STATUS_FIELD_JSON=\$(gh project field-list "\$PROJECT_NUMBER" --owner "\$REPO_OWNER" --format json)
-STATUS_FIELD_ID=\$(echo "\$STATUS_FIELD_JSON" | jq -r '.fields[] | select(.name=="Status") | .id')
-OPTION_ID=\$(echo "\$STATUS_FIELD_JSON" | jq -r --arg s "\$STATUS" '.fields[] | select(.name=="Status") | .options[] | select(.name==\$s) | .id')
+STATUS_FIELD_ID=\$(echo "\$STATUS_FIELD_JSON" | jq_lf -r '.fields[] | select(.name=="Status") | .id')
+OPTION_ID=\$(echo "\$STATUS_FIELD_JSON" | jq_lf -r --arg s "\$STATUS" '.fields[] | select(.name=="Status") | .options[] | select(.name==\$s) | .id')
 
 if [ -z "\$OPTION_ID" ] || [ "\$OPTION_ID" = "null" ]; then
   echo "unknown status '\$STATUS' in Project #\$PROJECT_NUMBER" >&2
@@ -7683,7 +7721,7 @@ read_truncated() {
 
 # <json array> <cap> <what>
 check_not_capped() {
-  [ "\$(echo "\$1" | jq 'length')" -lt "\$2" ] ||
+  [ "\$(echo "\$1" | jq_lf 'length')" -lt "\$2" ] ||
     read_truncated "the \$3 filled the \$2 cap and may be cut short"
 }
 
@@ -7701,8 +7739,8 @@ while [ "\$pass" -le "\$PASSES" ]; do
     echo "  The call succeeded, so this is the board answering, not a failed read." >&2
     exit 1
   fi
-  read_count="\$(echo "\$ITEMS" | jq '.items | length')"
-  total_count="\$(echo "\$ITEMS" | jq '.totalCount // empty')"
+  read_count="\$(echo "\$ITEMS" | jq_lf '.items | length')"
+  total_count="\$(echo "\$ITEMS" | jq_lf '.totalCount // empty')"
   [ -n "\$total_count" ] ||
     read_truncated "Project #\$PROJECT_NUMBER returned no totalCount, so this run cannot tell whether it read every item"
   [ "\$read_count" -ge "\$total_count" ] ||
@@ -7710,13 +7748,13 @@ while [ "\$pass" -le "\$PASSES" ]; do
 
   # \`.content.repository\` — NOT \`.repository\`. Filtering on the latter silently
   # yields an empty set, which reads as "the board is clean" when it is not.
-  SCOPED="\$(echo "\$ITEMS" | jq -c --arg repo "\$REPO" '
+  SCOPED="\$(echo "\$ITEMS" | jq_lf -c --arg repo "\$REPO" '
     [ .items[]
       | select(.content.type == "Issue")
       | select((.content.repository // "") | endswith(\$repo))
       | { number: .content.number, status: (.status // "(unset)") } ]')"
 
-  SCANNED="\$(echo "\$SCOPED" | jq 'length')"
+  SCANNED="\$(echo "\$SCOPED" | jq_lf 'length')"
 
   # Issue state is not exposed by \`item-list\`, so read it per repo in one call.
   # The \`date\` fallback keeps its own \`2>/dev/null\`: BSD and GNU date disagree
@@ -7736,15 +7774,15 @@ while [ "\$pass" -le "\$PASSES" ]; do
   [ "\$rc" -eq 0 ] || read_failed "open issues in \$REPO"
   check_not_capped "\$OPEN" "\$READ_LIMIT" "open issue list for \$REPO"
 
-  D="\$(jq -n -c --argjson items "\$SCOPED" --argjson closed "\$CLOSED" '
+  D="\$(jq_lf -n -c --argjson items "\$SCOPED" --argjson closed "\$CLOSED" '
     [ \$items[] | select(.status != "Done") | select(.number as \$n | \$closed | index(\$n)) ]')"
-  R="\$(jq -n -c --argjson items "\$SCOPED" --argjson open "\$OPEN" '
+  R="\$(jq_lf -n -c --argjson items "\$SCOPED" --argjson open "\$OPEN" '
     [ \$items[] | select(.status == "Done") | select(.number as \$n | \$open | index(\$n)) ]')"
 
   # Union across passes, keyed on number: a later pass can only ever add.
-  ALL_DRIFTED="\$(jq -n -c --argjson a "\$ALL_DRIFTED" --argjson b "\$D" \\
+  ALL_DRIFTED="\$(jq_lf -n -c --argjson a "\$ALL_DRIFTED" --argjson b "\$D" \\
     '(\$a + \$b) | group_by(.number) | map(.[0])')"
-  ALL_REOPENED="\$(jq -n -c --argjson a "\$ALL_REOPENED" --argjson b "\$R" \\
+  ALL_REOPENED="\$(jq_lf -n -c --argjson a "\$ALL_REOPENED" --argjson b "\$R" \\
     '(\$a + \$b) | group_by(.number) | map(.[0])')"
 
   pass=\$((pass + 1))
@@ -7753,10 +7791,10 @@ done
 DRIFTED="\$ALL_DRIFTED"
 REOPENED="\$ALL_REOPENED"
 
-echo "\$DRIFTED" | jq -r '.[] | "DRIFTED  \\(.number) \\(.status)"'
-echo "\$REOPENED" | jq -r '.[] | "REOPENED \\(.number)"'
+echo "\$DRIFTED" | jq_lf -r '.[] | "DRIFTED  \\(.number) \\(.status)"'
+echo "\$REOPENED" | jq_lf -r '.[] | "REOPENED \\(.number)"'
 
-echo "scanned \$SCANNED, drifted \$(echo "\$DRIFTED" | jq 'length'), reopened \$(echo "\$REOPENED" | jq 'length')"
+echo "scanned \$SCANNED, drifted \$(echo "\$DRIFTED" | jq_lf 'length'), reopened \$(echo "\$REOPENED" | jq_lf 'length')"
 
 # A board with items is the precondition for this script meaning anything. Zero
 # is not "nothing drifted" — it is "the query found no items", which happens
@@ -7807,10 +7845,10 @@ fi
 STATUS="\$1"
 shift
 
-PROJECT_NODE_ID=\$(gh project view "\$PROJECT_NUMBER" --owner "\$REPO_OWNER" --format json | jq -r '.id')
+PROJECT_NODE_ID=\$(gh project view "\$PROJECT_NUMBER" --owner "\$REPO_OWNER" --format json | jq_lf -r '.id')
 STATUS_FIELD_JSON=\$(gh project field-list "\$PROJECT_NUMBER" --owner "\$REPO_OWNER" --format json)
-STATUS_FIELD_ID=\$(echo "\$STATUS_FIELD_JSON" | jq -r '.fields[] | select(.name=="Status") | .id')
-OPTION_ID=\$(echo "\$STATUS_FIELD_JSON" | jq -r --arg s "\$STATUS" '.fields[] | select(.name=="Status") | .options[] | select(.name==\$s) | .id')
+STATUS_FIELD_ID=\$(echo "\$STATUS_FIELD_JSON" | jq_lf -r '.fields[] | select(.name=="Status") | .id')
+OPTION_ID=\$(echo "\$STATUS_FIELD_JSON" | jq_lf -r --arg s "\$STATUS" '.fields[] | select(.name=="Status") | .options[] | select(.name==\$s) | .id')
 if [ -z "\$OPTION_ID" ] || [ "\$OPTION_ID" = "null" ]; then
   echo "unknown status '\$STATUS' in Project #\$PROJECT_NUMBER" >&2
   exit 1
@@ -7826,14 +7864,14 @@ done
 Q="\$Q } }"
 
 RESOLVED="\$(gh api graphql -f query="\$Q" -f owner="\$REPO_OWNER" -f name="\$REPO_NAME" \\
-  | jq -c --arg p "\$PROJECT_NODE_ID" '
+  | jq_lf -c --arg p "\$PROJECT_NODE_ID" '
       [ .data.repository | to_entries[] | select(.value != null)
         | { number: .value.number,
             id: ([.value.projectItems.nodes[] | select(.project.id == \$p) | .id] | first) } ]')"
 
-MISSING="\$(echo "\$RESOLVED" | jq -r '.[] | select(.id == null) | .number')"
-TARGETS="\$(echo "\$RESOLVED" | jq -c '[ .[] | select(.id != null) ]')"
-COUNT="\$(echo "\$TARGETS" | jq 'length')"
+MISSING="\$(echo "\$RESOLVED" | jq_lf -r '.[] | select(.id == null) | .number')"
+TARGETS="\$(echo "\$RESOLVED" | jq_lf -c '[ .[] | select(.id != null) ]')"
+COUNT="\$(echo "\$TARGETS" | jq_lf 'length')"
 
 for n in \$MISSING; do
   echo "⚠ #\$n is not on Project #\$PROJECT_NUMBER — skipped" >&2
@@ -7847,7 +7885,7 @@ fi
 # --- one mutation: every field write in a single aliased request ------------
 M='mutation {'
 i=0
-for id in \$(echo "\$TARGETS" | jq -r '.[].id'); do
+for id in \$(echo "\$TARGETS" | jq_lf -r '.[].id'); do
   M="\$M m\$i: updateProjectV2ItemFieldValue(input: {projectId: \\"\$PROJECT_NODE_ID\\", itemId: \\"\$id\\", fieldId: \\"\$STATUS_FIELD_ID\\", value: {singleSelectOptionId: \\"\$OPTION_ID\\"}}) { projectV2Item { id } }"
   i=\$((i + 1))
 done
@@ -7855,7 +7893,7 @@ M="\$M }"
 
 gh api graphql -f query="\$M" >/dev/null
 
-echo "\$TARGETS" | jq -r --arg s "\$STATUS" '.[] | "✓ #\\(.number) → \\(\$s)"'
+echo "\$TARGETS" | jq_lf -r --arg s "\$STATUS" '.[] | "✓ #\\(.number) → \\(\$s)"'
 echo "moved \$COUNT of \$# in 2 requests"
 `,
     executable: true,
@@ -7910,9 +7948,9 @@ config_value() {
 board_options() {
   local json
   json="\$(gh project field-list "\$PROJECT_NUMBER" --owner "\$REPO_OWNER" --format json 2>/dev/null)" || return 1
-  # \`tr -d '\\r'\`: jq on Windows ends lines with CRLF, and a column read as
-  # "Ready\\r" matches no name the user or the config gives.
-  printf '%s' "\$json" | jq -er '[.fields[] | select(.name=="Status")][0].options // empty | .[].name' 2>/dev/null | tr -d '\\r'
+  # Through \`jq_lf\`: a column read as "Ready\\r" matches no name the user or the
+  # config gives.
+  printf '%s' "\$json" | jq_lf -er '[.fields[] | select(.name=="Status")][0].options // empty | .[].name' 2>/dev/null
 }
 
 # The board's own spelling of <name>, matched case-insensitively; empty if absent.
@@ -8045,7 +8083,7 @@ FIELDS_JSON=\$(gh project field-list "\$PROJECT_NUMBER" --owner "\$REPO_OWNER" -
 # invisible — \`echo\`'s status is the line's — and the detector exits 0 having
 # emitted an empty id as if it were an answer. As an assignment, \`set -e\` sees
 # the failure and the caller learns that discovery failed.
-PROJECT_NODE_ID=\$(gh project view "\$PROJECT_NUMBER" --owner "\$REPO_OWNER" --format json | jq -r '.id')
+PROJECT_NODE_ID=\$(gh project view "\$PROJECT_NUMBER" --owner "\$REPO_OWNER" --format json | jq_lf -r '.id')
 
 # Which of the project's fields are organization issue fields, fetched at most
 # once per run (cli#619).
@@ -8091,7 +8129,7 @@ load_field_links() {
         }
       }
     }' -f project="\$PROJECT_NODE_ID" 2>/dev/null) || FIELD_LINKS_JSON=""
-  if ! printf '%s' "\$FIELD_LINKS_JSON" | jq -e '.data.node.fields.nodes' >/dev/null 2>&1; then
+  if ! printf '%s' "\$FIELD_LINKS_JSON" | jq_lf -e '.data.node.fields.nodes' >/dev/null 2>&1; then
     echo "⚠ could not read which of Project #\$PROJECT_NUMBER's fields are organization issue fields — they will read as the project's own" >&2
     FIELD_LINKS_JSON='{}'
   fi
@@ -8108,21 +8146,21 @@ load_field_links() {
 resolve_form() {
   local link
   load_field_links
-  link=\$(printf '%s' "\$FIELD_LINKS_JSON" | jq -c --arg id "\$1" '
+  link=\$(printf '%s' "\$FIELD_LINKS_JSON" | jq_lf -c --arg id "\$1" '
     [ .data.node.fields.nodes[]? | select(.id == \$id) ][0] // {}
   ')
   FORM=local ORG_FIELD_ID="" ORG_OPTIONS='[]'
-  if [ "\$(jq -r '.isIssueField == true' <<<"\$link")" = true ] || [[ "\$1" == IFD_* ]]; then
+  if [ "\$(jq_lf -r '.isIssueField == true' <<<"\$link")" = true ] || [[ "\$1" == IFD_* ]]; then
     FORM=projected
-    ORG_FIELD_ID=\$(jq -r '.issueField.id // ""' <<<"\$link")
-    ORG_OPTIONS=\$(jq -c '.issueField.options // []' <<<"\$link")
+    ORG_FIELD_ID=\$(jq_lf -r '.issueField.id // ""' <<<"\$link")
+    ORG_OPTIONS=\$(jq_lf -c '.issueField.options // []' <<<"\$link")
   fi
 }
 
 emit() {
   local field="\$1" prefix="\$2"
   local field_block
-  field_block=\$(echo "\$FIELDS_JSON" | jq -r --arg n "\$field" '
+  field_block=\$(echo "\$FIELDS_JSON" | jq_lf -r --arg n "\$field" '
     .fields[]
     | select(.type == "ProjectV2SingleSelectField")
     | select((.name | ascii_downcase) == (\$n | ascii_downcase))
@@ -8146,8 +8184,8 @@ emit() {
   # forms take different mutations, and a writer that re-derived the answer
   # would be a second place for the rule to live.
   local opts form=local org_field_id="" field_id
-  field_id=\$(echo "\$field_block" | jq -r '.id')
-  opts=\$(echo "\$field_block" | jq -c '(.options // [])')
+  field_id=\$(echo "\$field_block" | jq_lf -r '.id')
+  opts=\$(echo "\$field_block" | jq_lf -c '(.options // [])')
   if [ "\$opts" = "[]" ]; then
     resolve_form "\$field_id"
     form=\$FORM org_field_id=\$ORG_FIELD_ID
@@ -8160,14 +8198,14 @@ emit() {
   # Option names are not identifiers: "In progress" would emit
   # \`STATUS_OPT_IN PROGRESS=…\`, which breaks the caller's \`eval\`. Fold every
   # non-alphanumeric character to \`_\` so the name is always assignable.
-  echo "\$opts" | jq -r --arg p "\$prefix" '
+  echo "\$opts" | jq_lf -r --arg p "\$prefix" '
     .[]
     | "\\(\$p)_OPT_\\(.name | ascii_upcase | gsub("[^A-Z0-9]"; "_"))=\\(.id)"
   '
-  echo "\$opts" | jq -r --arg p "\$prefix" '
+  echo "\$opts" | jq_lf -r --arg p "\$prefix" '
     "\\(\$p)_OPT_NAMES=\\"\\([.[].name] | join(", "))\\""
   '
-  echo "\$opts" | jq -r --arg p "\$prefix" '
+  echo "\$opts" | jq_lf -r --arg p "\$prefix" '
     "\\(\$p)_FIRST_OPT_ID=\\(.[0].id // "")"
   '
 }
@@ -8192,7 +8230,7 @@ emit Size SIZE
 emit_date() {
   local field="\$1" prefix="\$2"
   local field_id
-  field_id=\$(echo "\$FIELDS_JSON" | jq -r --arg n "\$field" '
+  field_id=\$(echo "\$FIELDS_JSON" | jq_lf -r --arg n "\$field" '
     [ .fields[]
       | select(.type == "ProjectV2Field")
       | select((.name | ascii_downcase) == (\$n | ascii_downcase)) ][0].id // ""
@@ -8218,7 +8256,7 @@ emit_date "Target date" TARGETDATE
 emit_simple() {
   local field="\$1" prefix="\$2"
   local field_id
-  field_id=\$(echo "\$FIELDS_JSON" | jq -r --arg n "\$field" '
+  field_id=\$(echo "\$FIELDS_JSON" | jq_lf -r --arg n "\$field" '
     .fields[]
     | select(.type == "ProjectV2Field")
     | select((.name | ascii_downcase) == (\$n | ascii_downcase))
@@ -8884,7 +8922,7 @@ if [ "\$api_rc" -ne 0 ] || [ -z "\$PAYLOAD" ]; then
   exit 3
 fi
 
-PARENT_URL=\$(printf '%s' "\$PAYLOAD" | jq -r '.parent_issue_url // empty')
+PARENT_URL=\$(printf '%s' "\$PAYLOAD" | jq_lf -r '.parent_issue_url // empty')
 if [ -z "\$PARENT_URL" ]; then
   exit 10
 fi
@@ -9083,12 +9121,12 @@ case "\$NEW_STATUS" in
       # per page) and can't safely answer "are they all Done?" without a
       # second round-trip. Refuse to promote rather than risk a wrong
       # auto-Done.
-      TOTAL=\$(echo "\$CHILDREN_STATUSES" | jq '.total // 0' 2>/dev/null || echo 0)
+      TOTAL=\$(echo "\$CHILDREN_STATUSES" | jq_lf '.total // 0' 2>/dev/null || echo 0)
       if [ "\$TOTAL" -gt 0 ] && [ "\$TOTAL" -le 100 ]; then
         # The statuses array contains one entry per direct sub-issue that
         # has a Status set on this project. If every entry is "Done", we
         # promote.
-        NON_DONE=\$(echo "\$CHILDREN_STATUSES" | jq '[.statuses[] | select(. != "Done")] | length' 2>/dev/null || echo 1)
+        NON_DONE=\$(echo "\$CHILDREN_STATUSES" | jq_lf '[.statuses[] | select(. != "Done")] | length' 2>/dev/null || echo 1)
         if [ "\$NON_DONE" = "0" ]; then
           all_done=true
         fi
@@ -9119,7 +9157,7 @@ case "\$NEW_STATUS" in
     # the card is merely lagging a fact already established.
     PARENT_ISSUE_STATE=""
     if [ -n "\$CHILDREN_STATUSES" ]; then
-      PARENT_ISSUE_STATE=\$(echo "\$CHILDREN_STATUSES" | jq -r '.state // empty' 2>/dev/null || echo "")
+      PARENT_ISSUE_STATE=\$(echo "\$CHILDREN_STATUSES" | jq_lf -r '.state // empty' 2>/dev/null || echo "")
     fi
     if [ "\$PARENT_ISSUE_STATE" = "CLOSED" ]; then
       _target="Done"
@@ -9201,6 +9239,25 @@ exit 0
 # Helper: read host + project_id from .specnaut/backlog-config.yml.
 # Sourced by the other gitlab-backend scripts.
 set -euo pipefail
+
+# jq_lf <jq args…> — jq, for every call in this script family (cli#701). A
+# native Windows jq.exe writes stdout in text mode, every \\n as \\r\\n, so a
+# value read with \`\$(jq -r …)\` kept a \\r: a path that opens nothing, an id the
+# tracker does not know, a count \`[ -gt ]\` refuses. The \\r\\n is undone only
+# when the jq on PATH was measured writing it, once, as this file is sourced —
+# exact, never "drop every \\r": a \\r a value carries itself survives. jq's
+# exit status and its trailing newline are kept. Every copy of this helper is
+# the same text (tests/scripts/jq_crlf_test.ts).
+JQ_CRLF=0
+case \$(jq -n 1 2>/dev/null; printf .) in *\$'\\r\\n.') JQ_CRLF=1 ;; esac
+jq_lf() {
+  local _o _rc=0
+  _o=\$(_r=0; jq "\$@" || _r=\$?; printf .; exit "\$_r") || _rc=\$?
+  _o=\${_o%.}
+  if [ "\$JQ_CRLF" = 1 ]; then _o=\${_o//\$'\\r\\n'/\$'\\n'}; fi
+  printf '%s' "\$_o"
+  return "\$_rc"
+}
 
 ROOT="\$(cd "\$(dirname "\$0")/../../.." && pwd)"
 CONFIG="\$ROOT/.specnaut/backlog-config.yml"
@@ -9298,10 +9355,10 @@ glab_issues_all() {
   while :; do
     got="\$(glab issue list --repo "\$PROJECT_ID" "\$@" --per-page "\$GLAB_PAGE_SIZE" \\
       --page "\$page" --output json 2>"\${GLAB_ERR:-/dev/null}")" || return 1
-    n="\$(jq 'length' <<<"\$got" 2>/dev/null)" || return 1
+    n="\$(jq_lf 'length' <<<"\$got" 2>/dev/null)" || return 1
     [ -n "\$n" ] || return 1
-    GLAB_ISSUES="\$(jq -c -n --argjson a "\$GLAB_ISSUES" --argjson b "\$got" '\$a + \$b')" || return 1
-    [ "\$(jq '[.[].iid] | unique | length' <<<"\$GLAB_ISSUES")" -eq "\$(jq 'length' <<<"\$GLAB_ISSUES")" ] ||
+    GLAB_ISSUES="\$(jq_lf -c -n --argjson a "\$GLAB_ISSUES" --argjson b "\$got" '\$a + \$b')" || return 1
+    [ "\$(jq_lf '[.[].iid] | unique | length' <<<"\$GLAB_ISSUES")" -eq "\$(jq_lf 'length' <<<"\$GLAB_ISSUES")" ] ||
       return 2
     [ "\$n" -ge "\$GLAB_PAGE_SIZE" ] || return 0
     page=\$((page + 1))
@@ -9330,7 +9387,7 @@ FILTER="\${1:-}"
 JSON=\$(glab issue list --repo "\$PROJECT_ID" --output json --per-page 100 \\
   --state opened 2>/dev/null || echo "[]")
 
-echo "\$JSON" | jq -r --arg filter "\$FILTER" '
+echo "\$JSON" | jq_lf -r --arg filter "\$FILTER" '
   .[]
   | . as \$issue
   | (
@@ -9418,7 +9475,7 @@ done
 # The API path segment: a \`group/project\` path must be URL-encoded; a numeric
 # id passes through unchanged. \`-j\`, never \`-r\`: no newline is written, so a
 # native Windows jq.exe has none to turn into CRLF — \`acme%2Fwidget\\r\` is no project.
-PROJECT_PATH=\$(jq -jn --arg p "\$PROJECT_ID" '\$p | @uri')
+PROJECT_PATH=\$(jq_lf -jn --arg p "\$PROJECT_ID" '\$p | @uri')
 
 # One issue → one record on stdout. Fails (non-zero) when it cannot be read.
 record() {
@@ -9428,7 +9485,7 @@ record() {
     return 1
   # On stdin, not as \`--argjson\`: a hundred notes can outgrow the argument limit.
   # shellcheck disable=SC2016  # jq program.
-  printf '%s\\n%s\\n' "\$issue" "\$notes" | jq -n -c -e --arg item "\$1" '
+  printf '%s\\n%s\\n' "\$issue" "\$notes" | jq_lf -n -c -e --arg item "\$1" '
     input as \$issue | input as \$notes
     | def scoped(\$scope):
       [\$issue.labels[]? | select(ascii_downcase | startswith(\$scope))
@@ -9574,7 +9631,7 @@ esac
 
 # Find the existing Status:: label and remove it; add the new one.
 EXISTING=\$(glab issue view "\$NUM" --repo "\$PROJECT_ID" --output json 2>/dev/null \\
-  | jq -r '.labels[]? | select(startswith("Status::"))' | head -1 || true)
+  | jq_lf -r '.labels[]? | select(startswith("Status::"))' | head -1 || true)
 
 if [ -n "\$EXISTING" ]; then
   glab issue update "\$NUM" --repo "\$PROJECT_ID" \\
@@ -9705,19 +9762,19 @@ CLOSED="\$GLAB_ISSUES"
 read_all "open issues in \$PROJECT_ID"
 OPEN="\$GLAB_ISSUES"
 
-SCANNED="\$(jq -n --argjson c "\$CLOSED" --argjson o "\$OPEN" '(\$c | length) + (\$o | length)')"
+SCANNED="\$(jq_lf -n --argjson c "\$CLOSED" --argjson o "\$OPEN" '(\$c | length) + (\$o | length)')"
 
 status_of='([.labels[]? | select(startswith("Status::"))][0] // "(unset)") | sub("^Status::"; "")'
 
-DRIFTED="\$(jq -c -r --arg since "\$SINCE" "
+DRIFTED="\$(jq_lf -c -r --arg since "\$SINCE" "
   [ .[] | select((.closed_at // \\"\\") >= \\\$since)
         | { number: .iid, status: (\$status_of) }
         | select(.status != \\"Done\\") ]" <<<"\$CLOSED")"
-REOPENED="\$(jq -c -r "[ .[] | { number: .iid, status: (\$status_of) } | select(.status == \\"Done\\") ]" <<<"\$OPEN")"
+REOPENED="\$(jq_lf -c -r "[ .[] | { number: .iid, status: (\$status_of) } | select(.status == \\"Done\\") ]" <<<"\$OPEN")"
 
-echo "\$DRIFTED" | jq -r '.[] | "DRIFTED  \\(.number) \\(.status)"'
-echo "\$REOPENED" | jq -r '.[] | "REOPENED \\(.number)"'
-echo "scanned \$SCANNED, drifted \$(echo "\$DRIFTED" | jq 'length'), reopened \$(echo "\$REOPENED" | jq 'length')"
+echo "\$DRIFTED" | jq_lf -r '.[] | "DRIFTED  \\(.number) \\(.status)"'
+echo "\$REOPENED" | jq_lf -r '.[] | "REOPENED \\(.number)"'
+echo "scanned \$SCANNED, drifted \$(echo "\$DRIFTED" | jq_lf 'length'), reopened \$(echo "\$REOPENED" | jq_lf 'length')"
 
 if [ "\$SCANNED" -eq 0 ]; then
   echo "error: scanned 0 issues on \$PROJECT_ID — the query matched nothing, which is not the same as a clean board" >&2
@@ -9867,7 +9924,7 @@ if [ "\$rc" -ne 0 ] || [ -z "\$PARENT_JSON" ]; then
   echo "  This is not a verdict: the gate could not see the parent." >&2
   exit 3
 fi
-PARENT_STATE=\$(printf '%s' "\$PARENT_JSON" | jq -r '.state // empty' 2>/dev/null || true)
+PARENT_STATE=\$(printf '%s' "\$PARENT_JSON" | jq_lf -r '.state // empty' 2>/dev/null || true)
 if [ -z "\$PARENT_STATE" ]; then
   echo "✗ the state of #\$NUM was not readable JSON — refusing to answer" >&2
   exit 3
@@ -9900,13 +9957,13 @@ if [ "\$rc" -ne 0 ] || [ -z "\$CHILDREN" ]; then
   exit 3
 fi
 
-TOTAL=\$(printf '%s' "\$CHILDREN" | jq 'length' 2>/dev/null || echo "")
+TOTAL=\$(printf '%s' "\$CHILDREN" | jq_lf 'length' 2>/dev/null || echo "")
 if [ -z "\$TOTAL" ]; then
   echo "✗ the child listing for #\$NUM was not readable JSON — refusing to answer" >&2
   exit 3
 fi
 OPEN_LIST=\$(printf '%s' "\$CHILDREN" \\
-  | jq -r '.[] | select(.state == "opened") | "  - #\\(.iid) — \\(.title)"')
+  | jq_lf -r '.[] | select(.state == "opened") | "  - #\\(.iid) — \\(.title)"')
 OPEN=\$(printf '%s' "\$OPEN_LIST" | grep -c . || true)
 
 if [ "\$OPEN" -gt 0 ]; then
@@ -10105,7 +10162,7 @@ if [ "\$api_rc" -ne 0 ] || [ -z "\$PAYLOAD" ]; then
 fi
 
 PARENT_NUM=\$(printf '%s' "\$PAYLOAD" \\
-  | jq -r '[.labels[]? | select(startswith("parent::#"))] | first // empty' \\
+  | jq_lf -r '[.labels[]? | select(startswith("parent::#"))] | first // empty' \\
   | sed 's/^parent::#//')
 
 if [ -z "\$PARENT_NUM" ]; then
@@ -10139,6 +10196,25 @@ exit 0
 # (or ~/.specnaut/credentials.json). Run \`specnaut cloud login\` once to
 # authenticate. For CI / headless, set SPECNAUT_CLOUD_TOKEN instead.
 set -euo pipefail
+
+# jq_lf <jq args…> — jq, for every call in this script family (cli#701). A
+# native Windows jq.exe writes stdout in text mode, every \\n as \\r\\n, so a
+# value read with \`\$(jq -r …)\` kept a \\r: a path that opens nothing, an id the
+# tracker does not know, a count \`[ -gt ]\` refuses. The \\r\\n is undone only
+# when the jq on PATH was measured writing it, once, as this file is sourced —
+# exact, never "drop every \\r": a \\r a value carries itself survives. jq's
+# exit status and its trailing newline are kept. Every copy of this helper is
+# the same text (tests/scripts/jq_crlf_test.ts).
+JQ_CRLF=0
+case \$(jq -n 1 2>/dev/null; printf .) in *\$'\\r\\n.') JQ_CRLF=1 ;; esac
+jq_lf() {
+  local _o _rc=0
+  _o=\$(_r=0; jq "\$@" || _r=\$?; printf .; exit "\$_r") || _rc=\$?
+  _o=\${_o%.}
+  if [ "\$JQ_CRLF" = 1 ]; then _o=\${_o//\$'\\r\\n'/\$'\\n'}; fi
+  printf '%s' "\$_o"
+  return "\$_rc"
+}
 
 ROOT="\$(cd "\$(dirname "\$0")/../../.." && pwd)"
 CONFIG="\$ROOT/.specnaut/backlog-config.yml"
@@ -10217,7 +10293,7 @@ AUTH=(-H "Authorization: Bearer \$API_TOKEN")
 COLS=\$(curl -fsS "\$API_BASE/columns?projectKey=\$PROJECT_KEY" "\${AUTH[@]}")
 TASKS=\$(curl -fsS "\$API_BASE/tasks?projectKey=\$PROJECT_KEY" "\${AUTH[@]}")
 
-echo "\$TASKS" | jq -r --argjson cols "\$COLS" --arg filter "\$FILTER" '
+echo "\$TASKS" | jq_lf -r --argjson cols "\$COLS" --arg filter "\$FILTER" '
   (\$cols.columns | map({ (.id): .name }) | add) as \$names
   | .tasks
   | sort_by(.number)[]
@@ -10252,7 +10328,7 @@ AUTH=(-H "Authorization: Bearer \$API_TOKEN")
 COLS=\$(curl -fsS "\$API_BASE/columns?projectKey=\$PROJECT_KEY" "\${AUTH[@]}")
 RESP=\$(curl -fsS "\$API_BASE/tasks?projectKey=\$PROJECT_KEY&number=\$NUM" "\${AUTH[@]}")
 
-echo "\$RESP" | jq -r --argjson cols "\$COLS" '
+echo "\$RESP" | jq_lf -r --argjson cols "\$COLS" '
   (\$cols.columns | map({ (.id): .name }) | add) as \$names
   | .task
   | "#\\(.number)  \\(.title)",
@@ -10327,7 +10403,7 @@ record() {
   local resp
   resp=\$(curl -fsS "\$API_BASE/tasks?projectKey=\$PROJECT_KEY&number=\$1" "\${AUTH[@]}") || return 1
   # shellcheck disable=SC2016  # jq program.
-  printf '%s\\n%s\\n' "\$COLS" "\$resp" | jq -n -c -e --arg item "\$1" '
+  printf '%s\\n%s\\n' "\$COLS" "\$resp" | jq_lf -n -c -e --arg item "\$1" '
     input as \$cols | input as \$resp
     | ([\$cols.columns[]? | { (.id): .name }] | add // {}) as \$names
     | (\$resp.task // error("no such task")) as \$t
@@ -10411,7 +10487,7 @@ BODY="\${2:-}"
 # shellcheck source=./_config.sh
 . "\$(dirname "\$0")/_config.sh"
 
-PAYLOAD=\$(jq -n --arg k "\$PROJECT_KEY" --arg t "\$TITLE" --arg b "\$BODY" --arg p "\$PARENT" \\
+PAYLOAD=\$(jq_lf -n --arg k "\$PROJECT_KEY" --arg t "\$TITLE" --arg b "\$BODY" --arg p "\$PARENT" \\
   '{ projectKey: \$k, title: \$t }
    + (if \$b == "" then {} else { body: \$b } end)
    + (if \$p == "" then {} else { parentNumber: (\$p | tonumber) } end)')
@@ -10421,7 +10497,7 @@ RESP=\$(curl -fsS -X POST "\$API_BASE/tasks" \\
   -H "Content-Type: application/json" \\
   -d "\$PAYLOAD")
 
-KEY=\$(echo "\$RESP" | jq -r '.task.key // empty')
+KEY=\$(echo "\$RESP" | jq_lf -r '.task.key // empty')
 if [ -n "\$KEY" ]; then
   echo "✓ created: \$KEY"
 else
@@ -10455,7 +10531,7 @@ fi
 NUM="\$1"
 STATUS="\$2"
 
-PAYLOAD=\$(jq -n --arg k "\$PROJECT_KEY" --argjson n "\$NUM" --arg s "\$STATUS" \\
+PAYLOAD=\$(jq_lf -n --arg k "\$PROJECT_KEY" --argjson n "\$NUM" --arg s "\$STATUS" \\
   '{ projectKey: \$k, number: \$n, status: \$s }')
 
 RESP=\$(curl -fsS -X PATCH "\$API_BASE/tasks" \\
@@ -10463,7 +10539,7 @@ RESP=\$(curl -fsS -X PATCH "\$API_BASE/tasks" \\
   -H "Content-Type: application/json" \\
   -d "\$PAYLOAD")
 
-if echo "\$RESP" | jq -e '.ok' >/dev/null 2>&1; then
+if echo "\$RESP" | jq_lf -e '.ok' >/dev/null 2>&1; then
   echo "✓ #\$NUM → \$STATUS"
 else
   echo "✗ move failed: \$RESP" >&2
@@ -10522,10 +10598,10 @@ if [ "\$rc" -ne 0 ] || [ -z "\$COLS" ]; then
   exit 3
 fi
 
-TERMINAL_ID=\$(printf '%s' "\$COLS" | jq -r '.columns | sort_by(.order) | last | .id // empty')
-TERMINAL_NAME=\$(printf '%s' "\$COLS" | jq -r '.columns | sort_by(.order) | last | .name // empty')
-TERMINAL_ORDER=\$(printf '%s' "\$COLS" | jq -r '.columns | sort_by(.order) | last | .order')
-COLUMN_COUNT=\$(printf '%s' "\$COLS" | jq -r '.columns | length')
+TERMINAL_ID=\$(printf '%s' "\$COLS" | jq_lf -r '.columns | sort_by(.order) | last | .id // empty')
+TERMINAL_NAME=\$(printf '%s' "\$COLS" | jq_lf -r '.columns | sort_by(.order) | last | .name // empty')
+TERMINAL_ORDER=\$(printf '%s' "\$COLS" | jq_lf -r '.columns | sort_by(.order) | last | .order')
+COLUMN_COUNT=\$(printf '%s' "\$COLS" | jq_lf -r '.columns | length')
 if [ -z "\$TERMINAL_ID" ]; then
   echo "✗ the board reports no columns — nothing to gate against" >&2
   exit 3
@@ -10539,7 +10615,7 @@ if [ "\$rc" -ne 0 ] || [ -z "\$PARENT" ]; then
   exit 3
 fi
 
-PARENT_COL=\$(printf '%s' "\$PARENT" | jq -r '.task.columnId // empty')
+PARENT_COL=\$(printf '%s' "\$PARENT" | jq_lf -r '.task.columnId // empty')
 if [ "\$PARENT_COL" = "\$TERMINAL_ID" ]; then
   echo "ℹ #\$NUM is already in \\"\$TERMINAL_NAME\\" — nothing to gate"
   exit 12
@@ -10554,14 +10630,14 @@ if [ "\$rc" -ne 0 ] || [ -z "\$KIDS" ]; then
   exit 3
 fi
 
-OPEN_LIST=\$(printf '%s' "\$KIDS" | jq -r --arg term "\$TERMINAL_ID" --argjson cols "\$COLS" '
+OPEN_LIST=\$(printf '%s' "\$KIDS" | jq_lf -r --arg term "\$TERMINAL_ID" --argjson cols "\$COLS" '
   (\$cols.columns | map({ (.id): .name }) | add) as \$names
   | .tasks // []
   | map(select(.columnId != \$term))
   | .[] | "  - #\\(.number) — \\(.title) [in \\"\\(\$names[.columnId] // "—")\\"]"
 ')
 OPEN=\$(printf '%s' "\$OPEN_LIST" | grep -c '^  - ' || true)
-TOTAL=\$(printf '%s' "\$KIDS" | jq -r '(.tasks // []) | length')
+TOTAL=\$(printf '%s' "\$KIDS" | jq_lf -r '(.tasks // []) | length')
 
 if [ "\$OPEN" -gt 0 ]; then
   echo "✗ #\$NUM has \$OPEN open child task(s) of \$TOTAL — close them first"
@@ -10741,7 +10817,7 @@ if [ "\$rc" -ne 0 ] || [ -z "\$RESP" ]; then
   exit 3
 fi
 
-PARENT=\$(printf '%s' "\$RESP" | jq -r '.task.parentNumber // empty')
+PARENT=\$(printf '%s' "\$RESP" | jq_lf -r '.task.parentNumber // empty')
 [ -n "\$PARENT" ] || exit 10
 
 case "\$PARENT" in
@@ -10777,7 +10853,7 @@ fi
 NUM="\$1"
 QUESTION="\$2"
 
-PAYLOAD=\$(jq -n --arg k "\$PROJECT_KEY" --argjson n "\$NUM" --arg b "\$QUESTION" \\
+PAYLOAD=\$(jq_lf -n --arg k "\$PROJECT_KEY" --argjson n "\$NUM" --arg b "\$QUESTION" \\
   '{ projectKey: \$k, number: \$n, body: \$b }')
 
 RESP=\$(curl -fsS -X POST "\$API_BASE/comments" \\
@@ -10785,7 +10861,7 @@ RESP=\$(curl -fsS -X POST "\$API_BASE/comments" \\
   -H "Content-Type: application/json" \\
   -d "\$PAYLOAD")
 
-if echo "\$RESP" | jq -e '.ok' >/dev/null 2>&1; then
+if echo "\$RESP" | jq_lf -e '.ok' >/dev/null 2>&1; then
   echo "✓ commented on #\$NUM"
 else
   echo "✗ comment failed: \$RESP" >&2
@@ -10814,7 +10890,7 @@ set -euo pipefail
 AUTH=(-H "Authorization: Bearer \$API_TOKEN")
 RESP=\$(curl -fsS "\$API_BASE/columns?projectKey=\$PROJECT_KEY" "\${AUTH[@]}")
 
-echo "\$RESP" | jq -r '.columns | sort_by(.order)[] | "  \\(.order)\\t\\(.name)"'
+echo "\$RESP" | jq_lf -r '.columns | sort_by(.order)[] | "  \\(.order)\\t\\(.name)"'
 `,
     executable: true,
     backend: "cloud",
@@ -10871,18 +10947,18 @@ CURSOR=""
 while :; do
   URL="\$API_BASE/activity?projectKey=\$PROJECT_KEY&limit=\$LIMIT"
   if [ -n "\$CURSOR" ]; then
-    URL="\$URL&cursor=\$(printf '%s' "\$CURSOR" | jq -sRr @uri)"
+    URL="\$URL&cursor=\$(printf '%s' "\$CURSOR" | jq_lf -sRr @uri)"
   fi
 
   RESP=\$(curl -fsS "\$URL" "\${AUTH[@]}")
-  if ! echo "\$RESP" | jq -e '.ok' >/dev/null 2>&1; then
+  if ! echo "\$RESP" | jq_lf -e '.ok' >/dev/null 2>&1; then
     echo "✗ reconcile failed: \$RESP" >&2
     exit 1
   fi
 
   # In seek-end mode we only advance the cursor, never emit transitions.
   if [ "\$SEEK_END" != "1" ]; then
-    echo "\$RESP" | jq -r '
+    echo "\$RESP" | jq_lf -r '
       .events[]
       | if .kind == "created"
         then "CREATED \\(.number) -> \\(.toStage // "—")"
@@ -10891,10 +10967,10 @@ while :; do
     '
   fi
 
-  CURSOR=\$(echo "\$RESP" | jq -r '.cursor // empty')
+  CURSOR=\$(echo "\$RESP" | jq_lf -r '.cursor // empty')
   [ -n "\$CURSOR" ] && printf '%s' "\$CURSOR" > "\$STATE"
 
-  [ "\$(echo "\$RESP" | jq -r '.hasMore')" = "true" ] || break
+  [ "\$(echo "\$RESP" | jq_lf -r '.hasMore')" = "true" ] || break
 done
 `,
     executable: true,
@@ -21701,7 +21777,7 @@ if \$PATHS_ONLY; then
     if \$JSON_MODE; then
         # Minimal JSON paths payload (no validation performed)
         if has_jq; then
-            jq -cn \\
+            jq_lf -cn \\
                 --arg repo_root "\$REPO_ROOT" \\
                 --arg branch "\$CURRENT_BRANCH" \\
                 --arg feature_dir "\$FEATURE_DIR" \\
@@ -21756,9 +21832,9 @@ if \$JSON_MODE; then
         if [[ \${#docs[@]} -eq 0 ]]; then
             json_docs="[]"
         else
-            json_docs=\$(printf '%s\\n' "\${docs[@]}" | jq -R . | jq -s .)
+            json_docs=\$(printf '%s\\n' "\${docs[@]}" | jq_lf -R . | jq_lf -s .)
         fi
-        jq -cn \\
+        jq_lf -cn \\
             --arg feature_dir "\$FEATURE_DIR" \\
             --argjson docs "\$json_docs" \\
             '{FEATURE_DIR:\$feature_dir,AVAILABLE_DOCS:\$docs}'
@@ -21781,6 +21857,22 @@ else
 fi
 `,
     executable: true,
+    backend: null,
+    skipIfExists: false,
+  },
+  {
+    category: "spec-root",
+    name: "specify",
+    suffix: ".gitattributes",
+    content: `# Specnaut's tree is checked out with LF line ends on every platform. A CRLF
+# checkout (core.autocrlf on Windows) breaks every bash script here under Git
+# Bash, and makes every file Specnaut manages differ from the hash
+# .specnaut/installed.lock holds, so \`specnaut upgrade\` would read them all as
+# customised. Text is normalised, not frozen: a file an editor saved with CRLF
+# is committed with LF. \`hooks/\` carries its own, stricter \`* -text\`.
+* text=auto eol=lf
+`,
+    executable: false,
     backend: null,
     skipIfExists: false,
   },
@@ -22050,7 +22142,7 @@ get_feature_paths() {
         feature_dir_source="feature.json"
         local _fd
         if command -v jq >/dev/null 2>&1; then
-            _fd=\$(jq -r '.feature_directory // empty' "\$repo_root/.specnaut/feature.json" 2>/dev/null)
+            _fd=\$(jq_lf -r '.feature_directory // empty' "\$repo_root/.specnaut/feature.json" 2>/dev/null)
         elif command -v python3 >/dev/null 2>&1; then
             # Fallback: use Python to parse JSON so pretty-printed/multi-line files work
             _fd=\$(python3 -c "import json,sys; d=json.load(open(sys.argv[1])); print(d.get('feature_directory',''))" "\$repo_root/.specnaut/feature.json" 2>/dev/null)
@@ -22119,6 +22211,25 @@ get_feature_paths() {
 # Check if jq is available for safe JSON construction
 has_jq() {
     command -v jq >/dev/null 2>&1
+}
+
+# jq_lf <jq args…> — jq, for every call in this script family (cli#701). A
+# native Windows jq.exe writes stdout in text mode, every \\n as \\r\\n, so a
+# value read with \`\$(jq -r …)\` kept a \\r: a path that opens nothing, an id the
+# tracker does not know, a count \`[ -gt ]\` refuses. The \\r\\n is undone only
+# when the jq on PATH was measured writing it, once, as this file is sourced —
+# exact, never "drop every \\r": a \\r a value carries itself survives. jq's
+# exit status and its trailing newline are kept. Every copy of this helper is
+# the same text (tests/scripts/jq_crlf_test.ts).
+JQ_CRLF=0
+case \$(jq -n 1 2>/dev/null; printf .) in *\$'\\r\\n.') JQ_CRLF=1 ;; esac
+jq_lf() {
+    local _o _rc=0
+    _o=\$(_r=0; jq "\$@" || _r=\$?; printf .; exit "\$_r") || _rc=\$?
+    _o=\${_o%.}
+    if [ "\$JQ_CRLF" = 1 ]; then _o=\${_o//\$'\\r\\n'/\$'\\n'}; fi
+    printf '%s' "\$_o"
+    return "\$_rc"
 }
 
 # Escape a string for safe embedding in a JSON value (fallback when jq is unavailable).
@@ -22703,7 +22814,7 @@ if [ -n "\$EPIC_ISSUE" ] && [ "\$HAS_GIT" = true ]; then
     for _b in \$(git for-each-ref --format='%(refname:short)' refs/heads 2>/dev/null); do
         _fj=\$(git show "\$_b:.specnaut/feature.json" 2>/dev/null || true)
         [ -n "\$_fj" ] || continue
-        _li=\$(printf '%s' "\$_fj" | jq -r '.linked_issue // empty' 2>/dev/null || true)
+        _li=\$(printf '%s' "\$_fj" | jq_lf -r '.linked_issue // empty' 2>/dev/null || true)
         if [ "\$_li" = "\$EPIC_ISSUE" ]; then
             EPIC_BRANCH="\$_b"
             break
@@ -22896,14 +23007,14 @@ fi
 if \$JSON_MODE; then
     if command -v jq >/dev/null 2>&1; then
         if [ "\$DRY_RUN" = true ]; then
-            jq -cn \\
+            jq_lf -cn \\
                 --arg branch_name "\$BRANCH_NAME" \\
                 --arg spec_file "\$SPEC_FILE" \\
                 --arg feature_num "\$FEATURE_NUM" \\
                 --argjson linked_issue "\$LINKED_ISSUE_JSON" \\
                 '{BRANCH_NAME:\$branch_name,SPEC_FILE:\$spec_file,FEATURE_NUM:\$feature_num,LINKED_ISSUE:\$linked_issue,DRY_RUN:true}'
         else
-            jq -cn \\
+            jq_lf -cn \\
                 --arg branch_name "\$BRANCH_NAME" \\
                 --arg spec_file "\$SPEC_FILE" \\
                 --arg feature_num "\$FEATURE_NUM" \\
@@ -24657,6 +24768,10 @@ exit 0
 #           never answers "complete" for an item it did not see.
 set -euo pipefail
 
+# \`jq_lf\`, the family's CR-safe jq: "#3: … L, M\\r" is no line the caller wrote.
+# shellcheck source=SCRIPTDIR/common.sh
+source "\$(CDPATH="" cd -- "\$(dirname -- "\${BASH_SOURCE[0]}")" && pwd)/common.sh"
+
 READY="Ready"
 while [ "\$#" -gt 0 ]; do
   case "\$1" in
@@ -24735,13 +24850,10 @@ def outcome(\$ready):
 | "#\\(.item): missing \\(\$missing | join("; "))"
 '
 
-if ! out="\$(jq -n -r --arg ready "\$READY" "\$PROGRAM")"; then
+if ! out="\$(jq_lf -n -r --arg ready "\$READY" "\$PROGRAM")"; then
   echo "groom-rules.sh: could not read the records — nothing verified" >&2
   exit 2
 fi
-# A native Windows jq.exe ends every line in CRLF: "#3: … L, M\\r" is no line
-# the caller wrote. The verdict is this script's own text, so every \\r goes.
-out=\${out//\$'\\r'/}
 
 [ -n "\$out" ] || exit 0
 printf '%s\\n' "\$out"
@@ -24825,7 +24937,7 @@ fi
 # Output results
 if \$JSON_MODE; then
     if has_jq; then
-        jq -cn \\
+        jq_lf -cn \\
             --arg feature_spec "\$FEATURE_SPEC" \\
             --arg impl_plan "\$IMPL_PLAN" \\
             --arg specs_dir "\$FEATURE_DIR" \\

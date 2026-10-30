@@ -109,19 +109,19 @@ CLOSED="$GLAB_ISSUES"
 read_all "open issues in $PROJECT_ID"
 OPEN="$GLAB_ISSUES"
 
-SCANNED="$(jq -n --argjson c "$CLOSED" --argjson o "$OPEN" '($c | length) + ($o | length)')"
+SCANNED="$(jq_lf -n --argjson c "$CLOSED" --argjson o "$OPEN" '($c | length) + ($o | length)')"
 
 status_of='([.labels[]? | select(startswith("Status::"))][0] // "(unset)") | sub("^Status::"; "")'
 
-DRIFTED="$(jq -c -r --arg since "$SINCE" "
+DRIFTED="$(jq_lf -c -r --arg since "$SINCE" "
   [ .[] | select((.closed_at // \"\") >= \$since)
         | { number: .iid, status: ($status_of) }
         | select(.status != \"Done\") ]" <<<"$CLOSED")"
-REOPENED="$(jq -c -r "[ .[] | { number: .iid, status: ($status_of) } | select(.status == \"Done\") ]" <<<"$OPEN")"
+REOPENED="$(jq_lf -c -r "[ .[] | { number: .iid, status: ($status_of) } | select(.status == \"Done\") ]" <<<"$OPEN")"
 
-echo "$DRIFTED" | jq -r '.[] | "DRIFTED  \(.number) \(.status)"'
-echo "$REOPENED" | jq -r '.[] | "REOPENED \(.number)"'
-echo "scanned $SCANNED, drifted $(echo "$DRIFTED" | jq 'length'), reopened $(echo "$REOPENED" | jq 'length')"
+echo "$DRIFTED" | jq_lf -r '.[] | "DRIFTED  \(.number) \(.status)"'
+echo "$REOPENED" | jq_lf -r '.[] | "REOPENED \(.number)"'
+echo "scanned $SCANNED, drifted $(echo "$DRIFTED" | jq_lf 'length'), reopened $(echo "$REOPENED" | jq_lf 'length')"
 
 if [ "$SCANNED" -eq 0 ]; then
   echo "error: scanned 0 issues on $PROJECT_ID — the query matched nothing, which is not the same as a clean board" >&2

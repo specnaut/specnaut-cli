@@ -1,0 +1,7 @@
+# Specnaut's tree is checked out with LF line ends on every platform. A CRLF
+# checkout (core.autocrlf on Windows) breaks every bash script here under Git
+# Bash, and makes every file Specnaut manages differ from the hash
+# .specnaut/installed.lock holds, so `specnaut upgrade` would read them all as
+# customised. Text is normalised, not frozen: a file an editor saved with CRLF
+# is committed with LF. `hooks/` carries its own, stricter `* -text`.
+* text=auto eol=lf

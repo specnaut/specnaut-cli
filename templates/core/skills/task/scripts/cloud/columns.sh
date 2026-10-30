@@ -12,4 +12,4 @@ set -euo pipefail
 AUTH=(-H "Authorization: Bearer $API_TOKEN")
 RESP=$(curl -fsS "$API_BASE/columns?projectKey=$PROJECT_KEY" "${AUTH[@]}")
 
-echo "$RESP" | jq -r '.columns | sort_by(.order)[] | "  \(.order)\t\(.name)"'
+echo "$RESP" | jq_lf -r '.columns | sort_by(.order)[] | "  \(.order)\t\(.name)"'

@@ -129,7 +129,7 @@ read_truncated() {
 
 # <json array> <cap> <what>
 check_not_capped() {
-  [ "$(echo "$1" | jq 'length')" -lt "$2" ] ||
+  [ "$(echo "$1" | jq_lf 'length')" -lt "$2" ] ||
     read_truncated "the $3 filled the $2 cap and may be cut short"
 }
 
@@ -147,8 +147,8 @@ while [ "$pass" -le "$PASSES" ]; do
     echo "  The call succeeded, so this is the board answering, not a failed read." >&2
     exit 1
   fi
-  read_count="$(echo "$ITEMS" | jq '.items | length')"
-  total_count="$(echo "$ITEMS" | jq '.totalCount // empty')"
+  read_count="$(echo "$ITEMS" | jq_lf '.items | length')"
+  total_count="$(echo "$ITEMS" | jq_lf '.totalCount // empty')"
   [ -n "$total_count" ] ||
     read_truncated "Project #$PROJECT_NUMBER returned no totalCount, so this run cannot tell whether it read every item"
   [ "$read_count" -ge "$total_count" ] ||
@@ -156,13 +156,13 @@ while [ "$pass" -le "$PASSES" ]; do
 
   # `.content.repository` — NOT `.repository`. Filtering on the latter silently
   # yields an empty set, which reads as "the board is clean" when it is not.
-  SCOPED="$(echo "$ITEMS" | jq -c --arg repo "$REPO" '
+  SCOPED="$(echo "$ITEMS" | jq_lf -c --arg repo "$REPO" '
     [ .items[]
       | select(.content.type == "Issue")
       | select((.content.repository // "") | endswith($repo))
       | { number: .content.number, status: (.status // "(unset)") } ]')"
 
-  SCANNED="$(echo "$SCOPED" | jq 'length')"
+  SCANNED="$(echo "$SCOPED" | jq_lf 'length')"
 
   # Issue state is not exposed by `item-list`, so read it per repo in one call.
   # The `date` fallback keeps its own `2>/dev/null`: BSD and GNU date disagree
@@ -182,15 +182,15 @@ while [ "$pass" -le "$PASSES" ]; do
   [ "$rc" -eq 0 ] || read_failed "open issues in $REPO"
   check_not_capped "$OPEN" "$READ_LIMIT" "open issue list for $REPO"
 
-  D="$(jq -n -c --argjson items "$SCOPED" --argjson closed "$CLOSED" '
+  D="$(jq_lf -n -c --argjson items "$SCOPED" --argjson closed "$CLOSED" '
     [ $items[] | select(.status != "Done") | select(.number as $n | $closed | index($n)) ]')"
-  R="$(jq -n -c --argjson items "$SCOPED" --argjson open "$OPEN" '
+  R="$(jq_lf -n -c --argjson items "$SCOPED" --argjson open "$OPEN" '
     [ $items[] | select(.status == "Done") | select(.number as $n | $open | index($n)) ]')"
 
   # Union across passes, keyed on number: a later pass can only ever add.
-  ALL_DRIFTED="$(jq -n -c --argjson a "$ALL_DRIFTED" --argjson b "$D" \
+  ALL_DRIFTED="$(jq_lf -n -c --argjson a "$ALL_DRIFTED" --argjson b "$D" \
     '($a + $b) | group_by(.number) | map(.[0])')"
-  ALL_REOPENED="$(jq -n -c --argjson a "$ALL_REOPENED" --argjson b "$R" \
+  ALL_REOPENED="$(jq_lf -n -c --argjson a "$ALL_REOPENED" --argjson b "$R" \
     '($a + $b) | group_by(.number) | map(.[0])')"
 
   pass=$((pass + 1))
@@ -199,10 +199,10 @@ done
 DRIFTED="$ALL_DRIFTED"
 REOPENED="$ALL_REOPENED"
 
-echo "$DRIFTED" | jq -r '.[] | "DRIFTED  \(.number) \(.status)"'
-echo "$REOPENED" | jq -r '.[] | "REOPENED \(.number)"'
+echo "$DRIFTED" | jq_lf -r '.[] | "DRIFTED  \(.number) \(.status)"'
+echo "$REOPENED" | jq_lf -r '.[] | "REOPENED \(.number)"'
 
-echo "scanned $SCANNED, drifted $(echo "$DRIFTED" | jq 'length'), reopened $(echo "$REOPENED" | jq 'length')"
+echo "scanned $SCANNED, drifted $(echo "$DRIFTED" | jq_lf 'length'), reopened $(echo "$REOPENED" | jq_lf 'length')"
 
 # A board with items is the precondition for this script meaning anything. Zero
 # is not "nothing drifted" — it is "the query found no items", which happens

@@ -232,7 +232,7 @@ if [ -n "$EPIC_ISSUE" ] && [ "$HAS_GIT" = true ]; then
     for _b in $(git for-each-ref --format='%(refname:short)' refs/heads 2>/dev/null); do
         _fj=$(git show "$_b:.specnaut/feature.json" 2>/dev/null || true)
         [ -n "$_fj" ] || continue
-        _li=$(printf '%s' "$_fj" | jq -r '.linked_issue // empty' 2>/dev/null || true)
+        _li=$(printf '%s' "$_fj" | jq_lf -r '.linked_issue // empty' 2>/dev/null || true)
         if [ "$_li" = "$EPIC_ISSUE" ]; then
             EPIC_BRANCH="$_b"
             break
@@ -425,14 +425,14 @@ fi
 if $JSON_MODE; then
     if command -v jq >/dev/null 2>&1; then
         if [ "$DRY_RUN" = true ]; then
-            jq -cn \
+            jq_lf -cn \
                 --arg branch_name "$BRANCH_NAME" \
                 --arg spec_file "$SPEC_FILE" \
                 --arg feature_num "$FEATURE_NUM" \
                 --argjson linked_issue "$LINKED_ISSUE_JSON" \
                 '{BRANCH_NAME:$branch_name,SPEC_FILE:$spec_file,FEATURE_NUM:$feature_num,LINKED_ISSUE:$linked_issue,DRY_RUN:true}'
         else
-            jq -cn \
+            jq_lf -cn \
                 --arg branch_name "$BRANCH_NAME" \
                 --arg spec_file "$SPEC_FILE" \
                 --arg feature_num "$FEATURE_NUM" \

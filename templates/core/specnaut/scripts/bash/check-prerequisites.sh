@@ -86,7 +86,7 @@ if $PATHS_ONLY; then
     if $JSON_MODE; then
         # Minimal JSON paths payload (no validation performed)
         if has_jq; then
-            jq -cn \
+            jq_lf -cn \
                 --arg repo_root "$REPO_ROOT" \
                 --arg branch "$CURRENT_BRANCH" \
                 --arg feature_dir "$FEATURE_DIR" \
@@ -141,9 +141,9 @@ if $JSON_MODE; then
         if [[ ${#docs[@]} -eq 0 ]]; then
             json_docs="[]"
         else
-            json_docs=$(printf '%s\n' "${docs[@]}" | jq -R . | jq -s .)
+            json_docs=$(printf '%s\n' "${docs[@]}" | jq_lf -R . | jq_lf -s .)
         fi
-        jq -cn \
+        jq_lf -cn \
             --arg feature_dir "$FEATURE_DIR" \
             --argjson docs "$json_docs" \
             '{FEATURE_DIR:$feature_dir,AVAILABLE_DOCS:$docs}'

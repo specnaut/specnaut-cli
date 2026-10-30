@@ -41,7 +41,7 @@ if [ "$rc" -ne 0 ] || [ -z "$RESP" ]; then
   exit 3
 fi
 
-PARENT=$(printf '%s' "$RESP" | jq -r '.task.parentNumber // empty')
+PARENT=$(printf '%s' "$RESP" | jq_lf -r '.task.parentNumber // empty')
 [ -n "$PARENT" ] || exit 10
 
 case "$PARENT" in

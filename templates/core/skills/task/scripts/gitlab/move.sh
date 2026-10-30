@@ -26,7 +26,7 @@ esac
 
 # Find the existing Status:: label and remove it; add the new one.
 EXISTING=$(glab issue view "$NUM" --repo "$PROJECT_ID" --output json 2>/dev/null \
-  | jq -r '.labels[]? | select(startswith("Status::"))' | head -1 || true)
+  | jq_lf -r '.labels[]? | select(startswith("Status::"))' | head -1 || true)
 
 if [ -n "$EXISTING" ]; then
   glab issue update "$NUM" --repo "$PROJECT_ID" \

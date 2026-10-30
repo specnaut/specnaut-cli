@@ -55,7 +55,7 @@ record() {
   local resp
   resp=$(curl -fsS "$API_BASE/tasks?projectKey=$PROJECT_KEY&number=$1" "${AUTH[@]}") || return 1
   # shellcheck disable=SC2016  # jq program.
-  printf '%s\n%s\n' "$COLS" "$resp" | jq -n -c -e --arg item "$1" '
+  printf '%s\n%s\n' "$COLS" "$resp" | jq_lf -n -c -e --arg item "$1" '
     input as $cols | input as $resp
     | ([$cols.columns[]? | { (.id): .name }] | add // {}) as $names
     | ($resp.task // error("no such task")) as $t

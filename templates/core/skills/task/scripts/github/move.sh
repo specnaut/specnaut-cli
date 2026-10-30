@@ -33,10 +33,10 @@ NUM="$1"
 STATUS="$2"
 
 # Resolve project + status field IDs lazily (cached client-side per call).
-PROJECT_NODE_ID=$(gh project view "$PROJECT_NUMBER" --owner "$REPO_OWNER" --format json | jq -r '.id')
+PROJECT_NODE_ID=$(gh project view "$PROJECT_NUMBER" --owner "$REPO_OWNER" --format json | jq_lf -r '.id')
 STATUS_FIELD_JSON=$(gh project field-list "$PROJECT_NUMBER" --owner "$REPO_OWNER" --format json)
-STATUS_FIELD_ID=$(echo "$STATUS_FIELD_JSON" | jq -r '.fields[] | select(.name=="Status") | .id')
-OPTION_ID=$(echo "$STATUS_FIELD_JSON" | jq -r --arg s "$STATUS" '.fields[] | select(.name=="Status") | .options[] | select(.name==$s) | .id')
+STATUS_FIELD_ID=$(echo "$STATUS_FIELD_JSON" | jq_lf -r '.fields[] | select(.name=="Status") | .id')
+OPTION_ID=$(echo "$STATUS_FIELD_JSON" | jq_lf -r --arg s "$STATUS" '.fields[] | select(.name=="Status") | .options[] | select(.name==$s) | .id')
 
 if [ -z "$OPTION_ID" ] || [ "$OPTION_ID" = "null" ]; then
   echo "unknown status '$STATUS' in Project #$PROJECT_NUMBER" >&2

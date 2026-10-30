@@ -1,4 +1,4 @@
-import { DELIMITER, fromFileUrl, join } from "@std/path";
+import { DELIMITER, dirname, fromFileUrl, join } from "@std/path";
 
 /**
  * Shared harness for the groom-completeness tests (US4 / FR-005).
@@ -69,7 +69,11 @@ export async function project(backend: string, files: string[], config?: string)
   for (const f of ["_config.sh", "groom-verify.sh", ...files]) {
     await Deno.copyFile(join(BOARD_SCRIPTS, backend, f), join(scripts, f));
   }
-  await Deno.copyFile(RULES, join(bash, "groom-rules.sh"));
+  // groom-rules.sh sources common.sh (its CR-safe jq), which sources the
+  // template resolver: the three are installed side by side.
+  for (const f of ["groom-rules.sh", "common.sh", "template-resolution.sh"]) {
+    await Deno.copyFile(join(dirname(RULES), f), join(bash, f));
+  }
   if (config) await Deno.writeTextFile(join(dir, ".specnaut/backlog-config.yml"), config);
   return {
     dir,

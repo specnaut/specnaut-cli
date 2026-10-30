@@ -44,7 +44,7 @@ done
 # The API path segment: a `group/project` path must be URL-encoded; a numeric
 # id passes through unchanged. `-j`, never `-r`: no newline is written, so a
 # native Windows jq.exe has none to turn into CRLF — `acme%2Fwidget\r` is no project.
-PROJECT_PATH=$(jq -jn --arg p "$PROJECT_ID" '$p | @uri')
+PROJECT_PATH=$(jq_lf -jn --arg p "$PROJECT_ID" '$p | @uri')
 
 # One issue → one record on stdout. Fails (non-zero) when it cannot be read.
 record() {
@@ -54,7 +54,7 @@ record() {
     return 1
   # On stdin, not as `--argjson`: a hundred notes can outgrow the argument limit.
   # shellcheck disable=SC2016  # jq program.
-  printf '%s\n%s\n' "$issue" "$notes" | jq -n -c -e --arg item "$1" '
+  printf '%s\n%s\n' "$issue" "$notes" | jq_lf -n -c -e --arg item "$1" '
     input as $issue | input as $notes
     | def scoped($scope):
       [$issue.labels[]? | select(ascii_downcase | startswith($scope))

@@ -36,7 +36,7 @@ FIELDS_JSON=$(gh project field-list "$PROJECT_NUMBER" --owner "$REPO_OWNER" --fo
 # invisible — `echo`'s status is the line's — and the detector exits 0 having
 # emitted an empty id as if it were an answer. As an assignment, `set -e` sees
 # the failure and the caller learns that discovery failed.
-PROJECT_NODE_ID=$(gh project view "$PROJECT_NUMBER" --owner "$REPO_OWNER" --format json | jq -r '.id')
+PROJECT_NODE_ID=$(gh project view "$PROJECT_NUMBER" --owner "$REPO_OWNER" --format json | jq_lf -r '.id')
 
 # Which of the project's fields are organization issue fields, fetched at most
 # once per run (cli#619).
@@ -82,7 +82,7 @@ load_field_links() {
         }
       }
     }' -f project="$PROJECT_NODE_ID" 2>/dev/null) || FIELD_LINKS_JSON=""
-  if ! printf '%s' "$FIELD_LINKS_JSON" | jq -e '.data.node.fields.nodes' >/dev/null 2>&1; then
+  if ! printf '%s' "$FIELD_LINKS_JSON" | jq_lf -e '.data.node.fields.nodes' >/dev/null 2>&1; then
     echo "⚠ could not read which of Project #$PROJECT_NUMBER's fields are organization issue fields — they will read as the project's own" >&2
     FIELD_LINKS_JSON='{}'
   fi
@@ -99,21 +99,21 @@ load_field_links() {
 resolve_form() {
   local link
   load_field_links
-  link=$(printf '%s' "$FIELD_LINKS_JSON" | jq -c --arg id "$1" '
+  link=$(printf '%s' "$FIELD_LINKS_JSON" | jq_lf -c --arg id "$1" '
     [ .data.node.fields.nodes[]? | select(.id == $id) ][0] // {}
   ')
   FORM=local ORG_FIELD_ID="" ORG_OPTIONS='[]'
-  if [ "$(jq -r '.isIssueField == true' <<<"$link")" = true ] || [[ "$1" == IFD_* ]]; then
+  if [ "$(jq_lf -r '.isIssueField == true' <<<"$link")" = true ] || [[ "$1" == IFD_* ]]; then
     FORM=projected
-    ORG_FIELD_ID=$(jq -r '.issueField.id // ""' <<<"$link")
-    ORG_OPTIONS=$(jq -c '.issueField.options // []' <<<"$link")
+    ORG_FIELD_ID=$(jq_lf -r '.issueField.id // ""' <<<"$link")
+    ORG_OPTIONS=$(jq_lf -c '.issueField.options // []' <<<"$link")
   fi
 }
 
 emit() {
   local field="$1" prefix="$2"
   local field_block
-  field_block=$(echo "$FIELDS_JSON" | jq -r --arg n "$field" '
+  field_block=$(echo "$FIELDS_JSON" | jq_lf -r --arg n "$field" '
     .fields[]
     | select(.type == "ProjectV2SingleSelectField")
     | select((.name | ascii_downcase) == ($n | ascii_downcase))
@@ -137,8 +137,8 @@ emit() {
   # forms take different mutations, and a writer that re-derived the answer
   # would be a second place for the rule to live.
   local opts form=local org_field_id="" field_id
-  field_id=$(echo "$field_block" | jq -r '.id')
-  opts=$(echo "$field_block" | jq -c '(.options // [])')
+  field_id=$(echo "$field_block" | jq_lf -r '.id')
+  opts=$(echo "$field_block" | jq_lf -c '(.options // [])')
   if [ "$opts" = "[]" ]; then
     resolve_form "$field_id"
     form=$FORM org_field_id=$ORG_FIELD_ID
@@ -151,14 +151,14 @@ emit() {
   # Option names are not identifiers: "In progress" would emit
   # `STATUS_OPT_IN PROGRESS=…`, which breaks the caller's `eval`. Fold every
   # non-alphanumeric character to `_` so the name is always assignable.
-  echo "$opts" | jq -r --arg p "$prefix" '
+  echo "$opts" | jq_lf -r --arg p "$prefix" '
     .[]
     | "\($p)_OPT_\(.name | ascii_upcase | gsub("[^A-Z0-9]"; "_"))=\(.id)"
   '
-  echo "$opts" | jq -r --arg p "$prefix" '
+  echo "$opts" | jq_lf -r --arg p "$prefix" '
     "\($p)_OPT_NAMES=\"\([.[].name] | join(", "))\""
   '
-  echo "$opts" | jq -r --arg p "$prefix" '
+  echo "$opts" | jq_lf -r --arg p "$prefix" '
     "\($p)_FIRST_OPT_ID=\(.[0].id // "")"
   '
 }
@@ -183,7 +183,7 @@ emit Size SIZE
 emit_date() {
   local field="$1" prefix="$2"
   local field_id
-  field_id=$(echo "$FIELDS_JSON" | jq -r --arg n "$field" '
+  field_id=$(echo "$FIELDS_JSON" | jq_lf -r --arg n "$field" '
     [ .fields[]
       | select(.type == "ProjectV2Field")
       | select((.name | ascii_downcase) == ($n | ascii_downcase)) ][0].id // ""
@@ -209,7 +209,7 @@ emit_date "Target date" TARGETDATE
 emit_simple() {
   local field="$1" prefix="$2"
   local field_id
-  field_id=$(echo "$FIELDS_JSON" | jq -r --arg n "$field" '
+  field_id=$(echo "$FIELDS_JSON" | jq_lf -r --arg n "$field" '
     .fields[]
     | select(.type == "ProjectV2Field")
     | select((.name | ascii_downcase) == ($n | ascii_downcase))

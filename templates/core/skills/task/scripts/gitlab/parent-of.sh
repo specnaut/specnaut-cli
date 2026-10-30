@@ -42,7 +42,7 @@ if [ "$api_rc" -ne 0 ] || [ -z "$PAYLOAD" ]; then
 fi
 
 PARENT_NUM=$(printf '%s' "$PAYLOAD" \
-  | jq -r '[.labels[]? | select(startswith("parent::#"))] | first // empty' \
+  | jq_lf -r '[.labels[]? | select(startswith("parent::#"))] | first // empty' \
   | sed 's/^parent::#//')
 
 if [ -z "$PARENT_NUM" ]; then

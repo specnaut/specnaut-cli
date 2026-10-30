@@ -55,7 +55,7 @@ if [ "$rc" -ne 0 ] || [ -z "$PARENT_JSON" ]; then
   echo "  This is not a verdict: the gate could not see the parent." >&2
   exit 3
 fi
-PARENT_STATE=$(printf '%s' "$PARENT_JSON" | jq -r '.state // empty' 2>/dev/null || true)
+PARENT_STATE=$(printf '%s' "$PARENT_JSON" | jq_lf -r '.state // empty' 2>/dev/null || true)
 if [ -z "$PARENT_STATE" ]; then
   echo "✗ the state of #$NUM was not readable JSON — refusing to answer" >&2
   exit 3
@@ -88,13 +88,13 @@ if [ "$rc" -ne 0 ] || [ -z "$CHILDREN" ]; then
   exit 3
 fi
 
-TOTAL=$(printf '%s' "$CHILDREN" | jq 'length' 2>/dev/null || echo "")
+TOTAL=$(printf '%s' "$CHILDREN" | jq_lf 'length' 2>/dev/null || echo "")
 if [ -z "$TOTAL" ]; then
   echo "✗ the child listing for #$NUM was not readable JSON — refusing to answer" >&2
   exit 3
 fi
 OPEN_LIST=$(printf '%s' "$CHILDREN" \
-  | jq -r '.[] | select(.state == "opened") | "  - #\(.iid) — \(.title)"')
+  | jq_lf -r '.[] | select(.state == "opened") | "  - #\(.iid) — \(.title)"')
 OPEN=$(printf '%s' "$OPEN_LIST" | grep -c . || true)
 
 if [ "$OPEN" -gt 0 ]; then

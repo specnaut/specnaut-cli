@@ -260,7 +260,7 @@ get_feature_paths() {
         feature_dir_source="feature.json"
         local _fd
         if command -v jq >/dev/null 2>&1; then
-            _fd=$(jq -r '.feature_directory // empty' "$repo_root/.specnaut/feature.json" 2>/dev/null)
+            _fd=$(jq_lf -r '.feature_directory // empty' "$repo_root/.specnaut/feature.json" 2>/dev/null)
         elif command -v python3 >/dev/null 2>&1; then
             # Fallback: use Python to parse JSON so pretty-printed/multi-line files work
             _fd=$(python3 -c "import json,sys; d=json.load(open(sys.argv[1])); print(d.get('feature_directory',''))" "$repo_root/.specnaut/feature.json" 2>/dev/null)
@@ -329,6 +329,25 @@ get_feature_paths() {
 # Check if jq is available for safe JSON construction
 has_jq() {
     command -v jq >/dev/null 2>&1
+}
+
+# jq_lf <jq args…> — jq, for every call in this script family (cli#701). A
+# native Windows jq.exe writes stdout in text mode, every \n as \r\n, so a
+# value read with `$(jq -r …)` kept a \r: a path that opens nothing, an id the
+# tracker does not know, a count `[ -gt ]` refuses. The \r\n is undone only
+# when the jq on PATH was measured writing it, once, as this file is sourced —
+# exact, never "drop every \r": a \r a value carries itself survives. jq's
+# exit status and its trailing newline are kept. Every copy of this helper is
+# the same text (tests/scripts/jq_crlf_test.ts).
+JQ_CRLF=0
+case $(jq -n 1 2>/dev/null; printf .) in *$'\r\n.') JQ_CRLF=1 ;; esac
+jq_lf() {
+    local _o _rc=0
+    _o=$(_r=0; jq "$@" || _r=$?; printf .; exit "$_r") || _rc=$?
+    _o=${_o%.}
+    if [ "$JQ_CRLF" = 1 ]; then _o=${_o//$'\r\n'/$'\n'}; fi
+    printf '%s' "$_o"
+    return "$_rc"
 }
 
 # Escape a string for safe embedding in a JSON value (fallback when jq is unavailable).

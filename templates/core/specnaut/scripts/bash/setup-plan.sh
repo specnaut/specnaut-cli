@@ -68,7 +68,7 @@ fi
 # Output results
 if $JSON_MODE; then
     if has_jq; then
-        jq -cn \
+        jq_lf -cn \
             --arg feature_spec "$FEATURE_SPEC" \
             --arg impl_plan "$IMPL_PLAN" \
             --arg specs_dir "$FEATURE_DIR" \

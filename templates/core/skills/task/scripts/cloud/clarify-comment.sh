@@ -13,7 +13,7 @@ fi
 NUM="$1"
 QUESTION="$2"
 
-PAYLOAD=$(jq -n --arg k "$PROJECT_KEY" --argjson n "$NUM" --arg b "$QUESTION" \
+PAYLOAD=$(jq_lf -n --arg k "$PROJECT_KEY" --argjson n "$NUM" --arg b "$QUESTION" \
   '{ projectKey: $k, number: $n, body: $b }')
 
 RESP=$(curl -fsS -X POST "$API_BASE/comments" \
@@ -21,7 +21,7 @@ RESP=$(curl -fsS -X POST "$API_BASE/comments" \
   -H "Content-Type: application/json" \
   -d "$PAYLOAD")
 
-if echo "$RESP" | jq -e '.ok' >/dev/null 2>&1; then
+if echo "$RESP" | jq_lf -e '.ok' >/dev/null 2>&1; then
   echo "✓ commented on #$NUM"
 else
   echo "✗ comment failed: $RESP" >&2

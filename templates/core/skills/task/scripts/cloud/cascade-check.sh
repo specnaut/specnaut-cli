@@ -42,10 +42,10 @@ if [ "$rc" -ne 0 ] || [ -z "$COLS" ]; then
   exit 3
 fi
 
-TERMINAL_ID=$(printf '%s' "$COLS" | jq -r '.columns | sort_by(.order) | last | .id // empty')
-TERMINAL_NAME=$(printf '%s' "$COLS" | jq -r '.columns | sort_by(.order) | last | .name // empty')
-TERMINAL_ORDER=$(printf '%s' "$COLS" | jq -r '.columns | sort_by(.order) | last | .order')
-COLUMN_COUNT=$(printf '%s' "$COLS" | jq -r '.columns | length')
+TERMINAL_ID=$(printf '%s' "$COLS" | jq_lf -r '.columns | sort_by(.order) | last | .id // empty')
+TERMINAL_NAME=$(printf '%s' "$COLS" | jq_lf -r '.columns | sort_by(.order) | last | .name // empty')
+TERMINAL_ORDER=$(printf '%s' "$COLS" | jq_lf -r '.columns | sort_by(.order) | last | .order')
+COLUMN_COUNT=$(printf '%s' "$COLS" | jq_lf -r '.columns | length')
 if [ -z "$TERMINAL_ID" ]; then
   echo "✗ the board reports no columns — nothing to gate against" >&2
   exit 3
@@ -59,7 +59,7 @@ if [ "$rc" -ne 0 ] || [ -z "$PARENT" ]; then
   exit 3
 fi
 
-PARENT_COL=$(printf '%s' "$PARENT" | jq -r '.task.columnId // empty')
+PARENT_COL=$(printf '%s' "$PARENT" | jq_lf -r '.task.columnId // empty')
 if [ "$PARENT_COL" = "$TERMINAL_ID" ]; then
   echo "ℹ #$NUM is already in \"$TERMINAL_NAME\" — nothing to gate"
   exit 12
@@ -74,14 +74,14 @@ if [ "$rc" -ne 0 ] || [ -z "$KIDS" ]; then
   exit 3
 fi
 
-OPEN_LIST=$(printf '%s' "$KIDS" | jq -r --arg term "$TERMINAL_ID" --argjson cols "$COLS" '
+OPEN_LIST=$(printf '%s' "$KIDS" | jq_lf -r --arg term "$TERMINAL_ID" --argjson cols "$COLS" '
   ($cols.columns | map({ (.id): .name }) | add) as $names
   | .tasks // []
   | map(select(.columnId != $term))
   | .[] | "  - #\(.number) — \(.title) [in \"\($names[.columnId] // "—")\"]"
 ')
 OPEN=$(printf '%s' "$OPEN_LIST" | grep -c '^  - ' || true)
-TOTAL=$(printf '%s' "$KIDS" | jq -r '(.tasks // []) | length')
+TOTAL=$(printf '%s' "$KIDS" | jq_lf -r '(.tasks // []) | length')
 
 if [ "$OPEN" -gt 0 ]; then
   echo "✗ #$NUM has $OPEN open child task(s) of $TOTAL — close them first"

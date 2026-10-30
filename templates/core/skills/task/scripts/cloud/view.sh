@@ -16,7 +16,7 @@ AUTH=(-H "Authorization: Bearer $API_TOKEN")
 COLS=$(curl -fsS "$API_BASE/columns?projectKey=$PROJECT_KEY" "${AUTH[@]}")
 RESP=$(curl -fsS "$API_BASE/tasks?projectKey=$PROJECT_KEY&number=$NUM" "${AUTH[@]}")
 
-echo "$RESP" | jq -r --argjson cols "$COLS" '
+echo "$RESP" | jq_lf -r --argjson cols "$COLS" '
   ($cols.columns | map({ (.id): .name }) | add) as $names
   | .task
   | "#\(.number)  \(.title)",

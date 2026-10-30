@@ -83,7 +83,7 @@ record() {
   raw=$(gh api graphql -f query="$QUERY" -f owner="$REPO_OWNER" -f name="$REPO_NAME" -F num="$1") ||
     return 1
   # shellcheck disable=SC2016  # jq program.
-  printf '%s' "$raw" | jq -c -e --arg item "$1" --argjson project "$PROJECT_NUMBER" --arg owner "$REPO_OWNER" '
+  printf '%s' "$raw" | jq_lf -c -e --arg item "$1" --argjson project "$PROJECT_NUMBER" --arg owner "$REPO_OWNER" '
     .data.repository.issue // error("no such issue")
     | ([.projectItems.nodes[]?
         | select(.project.number == $project

@@ -52,7 +52,7 @@ record() {
     return 1
   fi
   # shellcheck disable=SC2016  # jq program.
-  jq -n -c --arg item "$num" --rawfile text "$file" '
+  jq_lf -n -c --arg item "$num" --rawfile text "$file" '
     ($text | gsub("\r"; "") | split("\n")) as $l
     | if $l[0] != "---" then error("no frontmatter") else . end
     | ([range(1; $l | length) | select($l[.] == "---")] | first

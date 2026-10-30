@@ -3,6 +3,25 @@
 # Sourced by the other gitlab-backend scripts.
 set -euo pipefail
 
+# jq_lf <jq args…> — jq, for every call in this script family (cli#701). A
+# native Windows jq.exe writes stdout in text mode, every \n as \r\n, so a
+# value read with `$(jq -r …)` kept a \r: a path that opens nothing, an id the
+# tracker does not know, a count `[ -gt ]` refuses. The \r\n is undone only
+# when the jq on PATH was measured writing it, once, as this file is sourced —
+# exact, never "drop every \r": a \r a value carries itself survives. jq's
+# exit status and its trailing newline are kept. Every copy of this helper is
+# the same text (tests/scripts/jq_crlf_test.ts).
+JQ_CRLF=0
+case $(jq -n 1 2>/dev/null; printf .) in *$'\r\n.') JQ_CRLF=1 ;; esac
+jq_lf() {
+  local _o _rc=0
+  _o=$(_r=0; jq "$@" || _r=$?; printf .; exit "$_r") || _rc=$?
+  _o=${_o%.}
+  if [ "$JQ_CRLF" = 1 ]; then _o=${_o//$'\r\n'/$'\n'}; fi
+  printf '%s' "$_o"
+  return "$_rc"
+}
+
 ROOT="$(cd "$(dirname "$0")/../../.." && pwd)"
 CONFIG="$ROOT/.specnaut/backlog-config.yml"
 
@@ -99,10 +118,10 @@ glab_issues_all() {
   while :; do
     got="$(glab issue list --repo "$PROJECT_ID" "$@" --per-page "$GLAB_PAGE_SIZE" \
       --page "$page" --output json 2>"${GLAB_ERR:-/dev/null}")" || return 1
-    n="$(jq 'length' <<<"$got" 2>/dev/null)" || return 1
+    n="$(jq_lf 'length' <<<"$got" 2>/dev/null)" || return 1
     [ -n "$n" ] || return 1
-    GLAB_ISSUES="$(jq -c -n --argjson a "$GLAB_ISSUES" --argjson b "$got" '$a + $b')" || return 1
-    [ "$(jq '[.[].iid] | unique | length' <<<"$GLAB_ISSUES")" -eq "$(jq 'length' <<<"$GLAB_ISSUES")" ] ||
+    GLAB_ISSUES="$(jq_lf -c -n --argjson a "$GLAB_ISSUES" --argjson b "$got" '$a + $b')" || return 1
+    [ "$(jq_lf '[.[].iid] | unique | length' <<<"$GLAB_ISSUES")" -eq "$(jq_lf 'length' <<<"$GLAB_ISSUES")" ] ||
       return 2
     [ "$n" -ge "$GLAB_PAGE_SIZE" ] || return 0
     page=$((page + 1))

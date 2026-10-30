@@ -16,7 +16,7 @@ fi
 NUM="$1"
 STATUS="$2"
 
-PAYLOAD=$(jq -n --arg k "$PROJECT_KEY" --argjson n "$NUM" --arg s "$STATUS" \
+PAYLOAD=$(jq_lf -n --arg k "$PROJECT_KEY" --argjson n "$NUM" --arg s "$STATUS" \
   '{ projectKey: $k, number: $n, status: $s }')
 
 RESP=$(curl -fsS -X PATCH "$API_BASE/tasks" \
@@ -24,7 +24,7 @@ RESP=$(curl -fsS -X PATCH "$API_BASE/tasks" \
   -H "Content-Type: application/json" \
   -d "$PAYLOAD")
 
-if echo "$RESP" | jq -e '.ok' >/dev/null 2>&1; then
+if echo "$RESP" | jq_lf -e '.ok' >/dev/null 2>&1; then
   echo "✓ #$NUM → $STATUS"
 else
   echo "✗ move failed: $RESP" >&2

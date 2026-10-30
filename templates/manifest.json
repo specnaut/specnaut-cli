@@ -1720,6 +1720,12 @@
     {
       "category": "spec-root",
       "name": "specify",
+      "suffix": ".gitattributes",
+      "source": "core/specnaut/.gitattributes"
+    },
+    {
+      "category": "spec-root",
+      "name": "specify",
       "suffix": "scripts/bash/common.sh",
       "source": "core/specnaut/scripts/bash/common.sh",
       "executable": true

@@ -172,12 +172,12 @@ case "$NEW_STATUS" in
       # per page) and can't safely answer "are they all Done?" without a
       # second round-trip. Refuse to promote rather than risk a wrong
       # auto-Done.
-      TOTAL=$(echo "$CHILDREN_STATUSES" | jq '.total // 0' 2>/dev/null || echo 0)
+      TOTAL=$(echo "$CHILDREN_STATUSES" | jq_lf '.total // 0' 2>/dev/null || echo 0)
       if [ "$TOTAL" -gt 0 ] && [ "$TOTAL" -le 100 ]; then
         # The statuses array contains one entry per direct sub-issue that
         # has a Status set on this project. If every entry is "Done", we
         # promote.
-        NON_DONE=$(echo "$CHILDREN_STATUSES" | jq '[.statuses[] | select(. != "Done")] | length' 2>/dev/null || echo 1)
+        NON_DONE=$(echo "$CHILDREN_STATUSES" | jq_lf '[.statuses[] | select(. != "Done")] | length' 2>/dev/null || echo 1)
         if [ "$NON_DONE" = "0" ]; then
           all_done=true
         fi
@@ -208,7 +208,7 @@ case "$NEW_STATUS" in
     # the card is merely lagging a fact already established.
     PARENT_ISSUE_STATE=""
     if [ -n "$CHILDREN_STATUSES" ]; then
-      PARENT_ISSUE_STATE=$(echo "$CHILDREN_STATUSES" | jq -r '.state // empty' 2>/dev/null || echo "")
+      PARENT_ISSUE_STATE=$(echo "$CHILDREN_STATUSES" | jq_lf -r '.state // empty' 2>/dev/null || echo "")
     fi
     if [ "$PARENT_ISSUE_STATE" = "CLOSED" ]; then
       _target="Done"

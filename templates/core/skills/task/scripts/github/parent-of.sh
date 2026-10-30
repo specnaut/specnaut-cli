@@ -50,7 +50,7 @@ if [ "$api_rc" -ne 0 ] || [ -z "$PAYLOAD" ]; then
   exit 3
 fi
 
-PARENT_URL=$(printf '%s' "$PAYLOAD" | jq -r '.parent_issue_url // empty')
+PARENT_URL=$(printf '%s' "$PAYLOAD" | jq_lf -r '.parent_issue_url // empty')
 if [ -z "$PARENT_URL" ]; then
   exit 10
 fi

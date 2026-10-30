@@ -45,6 +45,10 @@
 #           never answers "complete" for an item it did not see.
 set -euo pipefail
 
+# `jq_lf`, the family's CR-safe jq: "#3: … L, M\r" is no line the caller wrote.
+# shellcheck source=SCRIPTDIR/common.sh
+source "$(CDPATH="" cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)/common.sh"
+
 READY="Ready"
 while [ "$#" -gt 0 ]; do
   case "$1" in
@@ -123,13 +127,10 @@ def outcome($ready):
 | "#\(.item): missing \($missing | join("; "))"
 '
 
-if ! out="$(jq -n -r --arg ready "$READY" "$PROGRAM")"; then
+if ! out="$(jq_lf -n -r --arg ready "$READY" "$PROGRAM")"; then
   echo "groom-rules.sh: could not read the records — nothing verified" >&2
   exit 2
 fi
-# A native Windows jq.exe ends every line in CRLF: "#3: … L, M\r" is no line
-# the caller wrote. The verdict is this script's own text, so every \r goes.
-out=${out//$'\r'/}
 
 [ -n "$out" ] || exit 0
 printf '%s\n' "$out"
