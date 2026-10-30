@@ -2,9 +2,14 @@ import { assert, assertEquals } from "@std/assert";
 import { CORE_BUNDLE } from "../../src/templates_bundle.ts";
 import { HARNESSES } from "../../src/cli/harnesses.ts";
 import { CONSTITUTION_PATH } from "../../src/domain/constitution_paths.ts";
-import type { CoreEntry } from "../../src/domain/core_bundle.ts";
 import { extractBlock } from "../../src/domain/merge_block.ts";
 import { managedSectionLabels } from "../../src/domain/template.ts";
+import {
+  agentsMd,
+  CONSTITUTION_REFERENCE,
+  constitutionTemplate as bootstrap,
+} from "./constitution_reference.ts";
+import { routers } from "./verb_table.ts";
 
 /**
  * One constitution source (spec 038, FR-001–FR-004).
@@ -22,14 +27,6 @@ const OPTS = {
   specBackend: "local",
   specAutogen: false,
 } as const;
-
-function bootstrap(): CoreEntry {
-  const hits = CORE_BUNDLE.filter((e) =>
-    e.category === "project-root" && e.suffix === CONSTITUTION_PATH
-  );
-  assertEquals(hits.length, 1, "exactly one bootstrap entry");
-  return hits[0];
-}
 
 /** Every bundled dest of every harness, with its content. */
 function allDests(): Array<{ harness: string; dest: string; content: string }> {
@@ -80,10 +77,8 @@ Deno.test("each Check: line lives in the bootstrap only", () => {
 Deno.test("the bootstrap names no Specnaut skill, agent or command, and carries no marker (FR-002)", () => {
   const text = bootstrap().content;
   const names = new Set(
-    CORE_BUNDLE.filter((e) =>
-      e.category === "skill" || e.category === "agent" ||
-      e.category === "phase"
-    ).map((e) => e.name),
+    [...routers(), ...CORE_BUNDLE.filter((e) => e.category === "agent" || e.category === "phase")]
+      .map((e) => e.name),
   );
   const problems: string[] = [];
   for (const name of names) {
@@ -128,11 +123,10 @@ Deno.test("every harness writes the bootstrap verbatim at docs/constitution.md, 
 });
 
 Deno.test("AGENTS.md points at the constitution in its own managed section (FR-005)", () => {
-  const agents = CORE_BUNDLE.find((e) => e.category === "project-root" && e.suffix === "AGENTS.md");
-  assert(agents !== undefined);
+  const agents = agentsMd();
   assert(managedSectionLabels(agents.managedSection).includes("constitution"));
   const body = (extractBlock(agents.content, "constitution", "html") ?? "").replace(/\s+/g, " ");
-  assert(body.includes(`\`${CONSTITUTION_PATH}\``), "points at the file");
-  assert(body.includes("no agent edits it unasked"), "never self-amended");
+  // The imported sentence, not a re-typed part of it: the two cannot drift (cli#706).
+  assert(body.includes(CONSTITUTION_REFERENCE), "points at the file, never self-amended");
   assert(body.includes("stop and ask"), "a conflict is a stop with a question");
 });

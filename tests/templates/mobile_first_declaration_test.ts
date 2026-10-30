@@ -1,6 +1,6 @@
 import { assert } from "@std/assert";
-import { CORE_BUNDLE } from "../../src/templates_bundle.ts";
-import { bodyOf } from "./constitution_reference.ts";
+import { agentsMd, EXEMPT_KEY } from "./constitution_reference.ts";
+import { routers } from "./verb_table.ts";
 
 /**
  * The mobile-first contract's opt-out (#576 FR-005, spec 038 FR-009): where a
@@ -13,7 +13,7 @@ import { bodyOf } from "./constitution_reference.ts";
 const flat = (s: string) => s.replace(/\s+/g, " ");
 
 function contractEntry() {
-  const e = CORE_BUNDLE.find((x) => x.category === "skill" && x.name === "mobile-first-contract");
+  const e = routers().find((x) => x.name === "mobile-first-contract");
   assert(e, "mobile-first-contract is not in CORE_BUNDLE");
   return e;
 }
@@ -45,16 +45,16 @@ Deno.test("the contract states the literal declaration form AND the fail-safe", 
 });
 
 Deno.test("no constitution section is where the exception or the values live", () => {
-  const agents = CORE_BUNDLE.find((e) => e.category === "project-root" && e.suffix === "AGENTS.md");
-  assert(agents, "the root AGENTS.md is not in CORE_BUNDLE");
   const uiDefaults =
     /<!-- --- Specnaut: ui-defaults --- -->([\s\S]*?)<!-- --- End Specnaut: ui-defaults/
-      .exec(agents.content)?.[1];
+      .exec(agentsMd().content)?.[1];
   assert(uiDefaults, "the ui-defaults section is missing");
   assert(uiDefaults.includes("`.specnaut/ui.yml`"), "the section names where the exception lives");
-  // The contract's prose, not its frontmatter: `constitution-exempt` is the key
-  // that says why it does not open with the reference (spec 039), not a pointer.
-  for (const text of [bodyOf(contractEntry().content), uiDefaults]) {
+  // The whole contract minus its exemption line: that key says why it does not
+  // open with the reference (spec 039), not where a value lives. A `description:`
+  // that names the constitution is still caught (cli#706).
+  const contract = contractEntry().content.replace(new RegExp(`^${EXEMPT_KEY}:.*\n`, "m"), "");
+  for (const text of [contract, uiDefaults]) {
     assert(!/constitution/i.test(text), "names the constitution");
     assert(!flat(text).includes("Target surface"), "names the old heading");
     assert(!flat(text).includes("Front-end patterns"), "names a constitution section");
