@@ -37,11 +37,36 @@ function tableNames(): string[] {
     .flatMap((l) => [...(l.split("|")[2] ?? "").matchAll(/`([a-z][a-z0-9-]*)`/g)].map((m) => m[1]));
 }
 
-/** "Dispatch the `x`", "spawn `x`", "Dispatch the **`x`**" across every shipped text. */
-const DELEGATION = /\b(?:[Dd]ispatch|[Ss]pawn)(?:es|ed)?\s+(?:the\s+)?\*{0,2}`([a-z][a-z0-9-]*)`/g;
+/** "Dispatch the `x`", "spawn `x`", "invoke the **`x`**" — a delegation, by any of the three verbs. */
+const DELEGATION =
+  /\b(?:[Dd]ispatch(?:es|ed|ing)?|[Ss]pawn(?:s|ed|ing)?|[Ii]nvok(?:e|es|ed|ing))\s+(?:the\s+)?\*{0,2}`([a-z][a-z0-9-]*)`/g;
+
+/**
+ * A phase is invoked by the same words as an agent — "invoke `review`" — and
+ * is no agent: the names of the phase documents a bundle ships are excluded.
+ */
+const PHASES = new Set(
+  Object.keys(bundle).flatMap((dest) => dest.match(/\/phases\/([a-z0-9-]+)\.md$/)?.slice(1) ?? []),
+);
+
+/** The agents `text` delegates to by name. */
+function delegatedNames(text: string): string[] {
+  return [...text.matchAll(DELEGATION)].map((m) => m[1]).filter((name) => !PHASES.has(name));
+}
 
 Deno.test("Codex scaffolds the agents it is told to delegate to", () => {
   assert(tomlNames.size > 0, "no .codex/agents/*.toml emitted — the oracle reads nothing");
+});
+
+Deno.test("the extractor reads every delegating verb, and no phase as an agent", () => {
+  assert(PHASES.has("review") && PHASES.has("merge"), [...PHASES].join(", "));
+  assertEquals(
+    delegatedNames(
+      "Dispatch the `security-expert`. Spawn `code-reviewer`. Invoke the **`product-owner`**; " +
+        "it invokes `architect-expert`. Then invoke `review`.",
+    ),
+    ["security-expert", "code-reviewer", "product-owner", "architect-expert"],
+  );
 });
 
 Deno.test("the dispatch table names an agent for every delegating step, each one scaffolded", () => {
@@ -68,9 +93,9 @@ Deno.test("every agent a shipped skill or agent delegates to by name is scaffold
   let found = 0;
   for (const [dest, file] of Object.entries(bundle)) {
     if (!/\.(md|toml)$/.test(dest)) continue;
-    for (const m of file.content.matchAll(DELEGATION)) {
+    for (const name of delegatedNames(file.content)) {
       found++;
-      if (!tomlNames.has(m[1])) unknown.push(`${dest}: \`${m[1]}\``);
+      if (!tomlNames.has(name)) unknown.push(`${dest}: \`${name}\``);
     }
   }
   assert(found >= 5, `only ${found} delegations found — the extractor is not reading`);
