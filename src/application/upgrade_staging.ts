@@ -92,13 +92,7 @@ export async function pruneStaging(
       await stagingStore.delete(projectDir, rel);
     } catch (err) {
       const path = `.specnaut/upgrade-staging/${rel}`;
-      refusals.push(
-        err instanceof PathRefusal
-          ? leftAlone(path, err)
-          : `could not clear the stale staged copy ${path} (${
-            why(err)
-          }) — it is safe to delete by hand`,
-      );
+      refusals.push(refusalLine(path, err, `could not clear the stale staged copy ${path}`));
     }
   }
   try {
@@ -107,16 +101,18 @@ export async function pruneStaging(
     // An empty directory left behind is harmless and the next run retries —
     // but it is said, not swallowed: a catch that reports nothing would hide
     // the next failure here that is not harmless.
-    refusals.push(
-      err instanceof PathRefusal
-        ? leftAlone(".specnaut/upgrade-staging/", err)
-        : `could not remove the empty .specnaut/upgrade-staging/ (${why(err)}) — ` +
-          `it is safe to delete by hand`,
-    );
+    const path = ".specnaut/upgrade-staging/";
+    refusals.push(refusalLine(path, err, `could not remove the empty ${path}`));
   }
 }
 
 const why = (err: unknown) => err instanceof Error ? err.message : String(err);
+
+/** A refused path names the link (`leftAlone`); any other failure is safe to clear by hand. */
+const refusalLine = (path: string, err: unknown, failed: string) =>
+  err instanceof PathRefusal
+    ? leftAlone(path, err)
+    : `${failed} (${why(err)}) — it is safe to delete by hand`;
 
 /**
  * A staged path the adapter refused (cli#687) is not a stale copy: it is a link,
