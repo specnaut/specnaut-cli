@@ -1,6 +1,7 @@
 import { assertEquals, assertStringIncludes } from "@std/assert";
 import { join } from "@std/path";
-import { git, makeRepo, runScript, sandbox } from "./hooks/hook_sandbox.ts";
+import { exists } from "@std/fs/exists";
+import { bashPath, git, makeRepo, runScript, sandbox } from "./hooks/hook_sandbox.ts";
 
 /**
  * `merge-mode.sh` is the single home of the project's merge mode (plan § 5,
@@ -154,6 +155,43 @@ Deno.test("merge-mode --strict: a base it cannot read is manual — the guard fa
     r = await runScript(sb, "merge-mode.sh", unknown, "--strict");
     assertEquals([r.code, r.stdout.trim()], [0, "manual"], r.stderr);
     assertStringIncludes(r.stderr, "no copy of the base 'nowhere'");
+  } finally {
+    await sb.cleanup();
+  }
+});
+
+Deno.test("merge-mode --project <dir>: this copy reads another project's file, running none of its scripts", async () => {
+  // The landing hook reads a cd target's mode with the session's own reader
+  // (cli#710): a target's scripts are code the hook must never run.
+  const sb = await sandbox();
+  try {
+    const reader = await makeRepo(sb, { mode: "auto", head: "feat" });
+    const other = await makeRepo(sb, { mode: "manual", head: "feat" });
+    const marker = join(sb.dir, "ran");
+    for (const s of ["merge-mode.sh", "base-branch.sh"]) {
+      await Deno.writeTextFile(
+        join(other, ".specnaut", "scripts", "bash", s),
+        `#!/usr/bin/env bash\necho ${s} >> '${bashPath(marker)}'\necho auto\n`,
+      );
+    }
+    const script = join(reader, ".specnaut", "scripts", "bash", "merge-mode.sh");
+    const run = (...a: string[]) => runScript(sb, script, reader, ...a);
+
+    // Default and --strict alone: unchanged, the reader's own project.
+    assertEquals((await run()).stdout.trim(), "auto");
+    assertEquals((await run("--strict")).stdout.trim(), "auto");
+    // --project, in either order: the other project's working tree, HEAD and base.
+    assertEquals((await run("--strict", "--project", bashPath(other))).stdout.trim(), "manual");
+    assertEquals((await run("--project", bashPath(other), "--strict")).stdout.trim(), "manual");
+    assertEquals((await run("--project", bashPath(other))).stdout.trim(), "manual");
+    // The other project's base holds as in its own reading: a worktree rewrite does not.
+    await Deno.writeTextFile(join(other, ".specnaut", "workflow.yml"), "merge: auto\n");
+    assertEquals((await run("--strict", "--project", bashPath(other))).stdout.trim(), "manual");
+    assertEquals(await exists(marker), false, "a script of the other project ran");
+    // A folder that cannot be read is manual; a missing value is a usage error.
+    const missing = await run("--strict", "--project", bashPath(join(sb.dir, "nowhere")));
+    assertEquals([missing.code, missing.stdout.trim()], [0, "manual"], missing.stderr);
+    assertEquals((await run("--project")).code, 2);
   } finally {
     await sb.cleanup();
   }

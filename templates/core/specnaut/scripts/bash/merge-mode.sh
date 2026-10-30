@@ -6,7 +6,8 @@
 #   - the Specnaut chain (phases/auto-chain.md), which applies a per-run
 #     instruction first and asks this script only when there is none;
 #   - the landing hook (.specnaut/hooks/guard-merge.sh), which calls
-#     `--strict` and enforces the file alone (D3);
+#     `--strict` and enforces the file alone (D3) — and `--strict --project
+#     <dir>` for each folder a `cd` on the line names (cli#710);
 #   - the landing hold (merge-hold.sh, beside this script), which calls
 #     `--strict` inside land-feature.sh and remove-spec.sh (spec 048).
 #
@@ -22,25 +23,48 @@
 #              (§ 11 F2). Comment lines are never settings. A base it
 #              cannot read — base-branch.sh exit 3, or no ref of that name
 #              locally or on origin — is manual: the guard fails closed.
+#   --project <dir>
+#              read <dir>'s .specnaut/workflow.yml (and, with --strict, its
+#              HEAD and base copies) instead of this script's own project.
+#              Only this script and its own base-branch.sh run: nothing that
+#              lives under <dir> does, so a cloned repository's scripts are
+#              never executed by the hook that names it. A <dir> that cannot
+#              be entered is manual.
 #
-# Usage: merge-mode.sh [--strict]
+# Every git call disables core.fsmonitor — the one read-path setting that
+# runs a program — since <dir>'s .git/config is not this project's to trust.
+#
+# Usage: merge-mode.sh [--strict] [--project <dir>]
 set -euo pipefail
 export GIT_OPTIONAL_LOCKS=0
+usage() { echo "usage: merge-mode.sh [--strict] [--project <dir>]" >&2; exit 2; }
+g() { git --no-pager -c core.fsmonitor=false "$@"; }
 
-strict=0
-case "${1:-}" in
-  "") ;;
-  --strict) strict=1 ;;
-  *) echo "usage: merge-mode.sh [--strict]" >&2; exit 2 ;;
-esac
+strict=0 project=""
+while [ "$#" -gt 0 ]; do
+  case $1 in
+    --strict) strict=1 ;;
+    --project) { [ "$#" -ge 2 ] && [ -n "$2" ]; } || usage; project=$2; shift ;;
+    *) usage ;;
+  esac
+  shift
+done
 
 here=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)
 # The project this script is installed in, not the git toplevel: a project
 # without its own .git inside another repository reads its own workflow.yml.
-case $here in
-  */.specnaut/scripts/bash) root=${here%/.specnaut/scripts/bash} ;;
-  *) if ! root=$(git --no-pager rev-parse --show-toplevel 2>/dev/null); then root=$PWD; fi ;;
-esac
+if [ -n "$project" ]; then
+  if ! root=$(cd -- "$project" 2>/dev/null && pwd -P); then
+    echo "merge-mode: manual (cannot enter $project)" >&2
+    echo manual
+    exit 0
+  fi
+else
+  case $here in
+    */.specnaut/scripts/bash) root=${here%/.specnaut/scripts/bash} ;;
+    *) if ! root=$(g rev-parse --show-toplevel 2>/dev/null); then root=$PWD; fi ;;
+  esac
+fi
 rel=.specnaut/workflow.yml
 
 if [ "$strict" = 0 ]; then
@@ -85,9 +109,9 @@ verdict() { # <label> — reads the copy on stdin
 [ -f "$root/$rel" ] && verdict "the working tree" < "$root/$rel"
 
 # `<rev>:./<path>` is relative to -C, so a project below the toplevel reads its own copy.
-blob() { git --no-pager -C "$root" cat-file -e "$1:./$rel" 2>/dev/null && git --no-pager -C "$root" cat-file blob "$1:./$rel"; }
+blob() { g -C "$root" cat-file -e "$1:./$rel" 2>/dev/null && g -C "$root" cat-file blob "$1:./$rel"; }
 
-if git --no-pager -C "$root" rev-parse --verify --quiet HEAD >/dev/null; then
+if g -C "$root" rev-parse --verify --quiet HEAD >/dev/null; then
   if b=$(blob HEAD); then verdict HEAD <<<"$b"; fi
 fi
 
@@ -100,7 +124,7 @@ if ! base=$(cd "$root" && bash "$here/base-branch.sh" 2>/dev/null); then
 fi
 found=0
 for ref in "refs/heads/$base" "refs/remotes/origin/$base"; do
-  git --no-pager -C "$root" show-ref --verify --quiet "$ref" || continue
+  g -C "$root" show-ref --verify --quiet "$ref" || continue
   found=1
   if b=$(blob "$ref"); then verdict "$ref" <<<"$b"; fi
 done

@@ -24,10 +24,10 @@ emit() {
   exit 3
 }
 
-if ref=$(git --no-pager symbolic-ref --quiet --short refs/remotes/origin/HEAD 2>/dev/null); then
+if ref=$(git --no-pager -c core.fsmonitor=false symbolic-ref --quiet --short refs/remotes/origin/HEAD 2>/dev/null); then
   emit "${ref#origin/}"
 fi
-if name=$(git --no-pager config --get init.defaultBranch 2>/dev/null) && [ -n "$name" ]; then
+if name=$(git --no-pager -c core.fsmonitor=false config --get init.defaultBranch 2>/dev/null) && [ -n "$name" ]; then
   emit "$name"
 fi
 echo "base-branch: unknown — no origin/HEAD and no init.defaultBranch. Pass the base explicitly, or run: git remote set-head origin --auto" >&2
