@@ -27014,6 +27014,11 @@ prompts cost more tokens and drift out of relevance.
           },
           {
             "type": "command",
+            "command": "bash \\"\$CLAUDE_PROJECT_DIR/.specnaut/hooks/guard-release.sh\\" claude",
+            "timeout": 5
+          },
+          {
+            "type": "command",
             "command": "bash \\"\$CLAUDE_PROJECT_DIR/.specnaut/hooks/protect-constitution.sh\\" claude",
             "timeout": 5
           }
@@ -28968,23 +28973,26 @@ guard_fail "held — merge: manual, and the user's own prompt this turn did not 
     },
     ".specnaut/hooks/guard-release.sh": {
       content: `#!/usr/bin/env bash
-# PreToolUse(Bash), Codex only — publishing a release needs the user (spec
-# 036, US5, FR-006). The one home of "is this Codex release command approved"
-# (plan § 5). Claude holds the same list with permissions.ask, so there this
-# hook exits 0 before reading anything.
+# PreToolUse(Bash) — publishing a release needs the user (spec 036, US5,
+# FR-006). The one home of "does this command publish a release" (plan § 5).
 #
-# Refused unless the user's own prompt this turn approved a release (\`release
-# it\`, \`/ship release\`): every command in release-commands.txt, and any push
-# of a tag ref — --tags, --follow-tags, --mirror, push.followTags=true, a
-# refs/tags/ ref, \`tag <name>\`, or a name that is a tag, or not a branch and
-# either version-shaped or created as a tag on the same line (tag.sh and
-# \`git tag\` run before the push does, so the tag does not exist yet when this
-# hook reads the command). And a git subcommand it cannot read (_git.sh: a
-# shell alias, \`git \$(…)\`), or a line too nested to read (eval, sh -c in
-# sh -c, a shell fed on stdin, a line that never closes): fail closed.
+# Gated: every command in release-commands.txt, and any push of a tag ref —
+# --tags, --follow-tags, --mirror, push.followTags=true, a refs/tags/ ref,
+# \`tag <name>\`, or a name that is a tag, or not a branch and either
+# version-shaped or created as a tag on the same line (tag.sh and \`git tag\`
+# run before the push does, so the tag does not exist yet when this hook reads
+# the command). And a git subcommand it cannot read (_git.sh: a shell alias,
+# \`git \$(…)\`), or a line too nested to read (eval, sh -c in sh -c, a shell fed
+# on stdin, a line that never closes): fail closed.
+#
+# Resolved through approval_gate: Claude's own prompt where it can ask, and
+# everywhere else — Codex, Claude's bypass and auto modes — only the user's
+# own \`release it\` (or \`/ship release\`) this turn. Claude also keeps the list
+# as permissions.ask rules, but those match a command only by the words it
+# starts with: \`gh -R o/r release create\`, or the same inside \`bash -lc "…"\`,
+# matched none (cli#699). This hook reads the line as _command.sh splits it.
 #
 # Usage: guard-release.sh <claude|codex>   (payload on stdin)
-[ "\${1:-}" != claude ] || exit 0
 case \${BASH_SOURCE[0]} in */*) HOOK_DIR=\${BASH_SOURCE[0]%/*} ;; *) HOOK_DIR=. ;; esac
 # shellcheck source=_guard.sh
 . "\$HOOK_DIR/_guard.sh" || { echo "specnaut: \$HOOK_DIR/_guard.sh is missing — refusing" >&2; exit 2; }
@@ -29059,7 +29067,7 @@ done
 [ \${#hits[@]} -gt 0 ] || guard_allow
 
 approval_gate release \\
-  "\$(IFS=';'; echo "\${hits[*]}") publishes a release, and Codex needs the user's go-ahead in this turn" \\
+  "\$(IFS=';'; echo "\${hits[*]}") publishes a release, and that needs the user's go-ahead in this turn" \\
   "\\\`release it\\\` (or \\\`/ship release\\\`)"
 `,
       executable: true,
@@ -29581,9 +29589,10 @@ exit 0
     },
     ".specnaut/hooks/release-commands.txt": {
       content: `# The release commands that need the user's go-ahead — the one list (spec 036,
-# plan § 5, FR-006). guard-release.sh refuses each on Codex unless the user's
-# own prompt this turn approved a release; Claude Code's permissions.ask rules
-# are held to this list by Specnaut's own tests.
+# plan § 5, FR-006). guard-release.sh gates each on both harnesses: Claude's
+# own prompt where it can ask, else refused unless the user's own prompt this
+# turn approved a release. Claude Code's permissions.ask rules are held to this
+# list by Specnaut's own tests.
 #
 # One command per line: the words it starts with. A first word ending in \`.sh\`
 # is a script, matched by its basename however it is reached (a path, or as
@@ -29652,13 +29661,13 @@ f5552945f77fb0d24f56bbf2e97fb64d284d9c716abf211ebcbe081cacdf8bdf  _paths.sh
 84ea3ec50be236f52d5c1e5022b9064091b2bdf558c308e677967982c3638e91  approve-on-prompt.sh
 28d13e1fbd696f79036cc1f94c3fd6aa68f4f862f0dd5f6d32191ad05392534f  guard-dispatch-model.sh
 a1df2dde47ce2b69d3daf1cc1567a3a4427c447fe6b3c969421dfb74535a9710  guard-merge.sh
-a3eb7a8dfcb3bbc387008931993a59a4006e9fe6f8042f137752f4ee41ee24ce  guard-release.sh
+833961ee8c4b0f33d3758e80c1dea85f7b610f75587d4f96ce89d549384f42bd  guard-release.sh
 3364feb0f3a7892224b67e4f857bb6c085456da98c892d7199c4bbd10f122f8b  log-subagent.sh
 79e66c4451546f416b4e57d942f9ec8e9f078e00f24c0b5a634c1c24dc08bfca  merge-approved.sh
 17fe85c8fb8804103a3d341d304d6d82ad472869dd2827c92ed1dcc2e56b6272  merge-commands.txt
 0d231c09ef29b1e46b774d283fad725382f33d6f3098545dc8a504bf89c40a80  protect-constitution.sh
 446426ad8d9958865dd36b0fb032090d3676c6b2533a513192b27c1b5171470c  protect-generated.sh
-c59dea265fb0e13092cb4ef650a436b29e34be4f18397aeaebc5408811ed3c7c  release-commands.txt
+982f9b8fd55376471246dbb03972b4ebc323d92e172328a15da706c32e3ae496  release-commands.txt
 `,
       executable: false,
     },
@@ -31594,23 +31603,26 @@ guard_fail "held — merge: manual, and the user's own prompt this turn did not 
     },
     ".specnaut/hooks/guard-release.sh": {
       content: `#!/usr/bin/env bash
-# PreToolUse(Bash), Codex only — publishing a release needs the user (spec
-# 036, US5, FR-006). The one home of "is this Codex release command approved"
-# (plan § 5). Claude holds the same list with permissions.ask, so there this
-# hook exits 0 before reading anything.
+# PreToolUse(Bash) — publishing a release needs the user (spec 036, US5,
+# FR-006). The one home of "does this command publish a release" (plan § 5).
 #
-# Refused unless the user's own prompt this turn approved a release (\`release
-# it\`, \`/ship release\`): every command in release-commands.txt, and any push
-# of a tag ref — --tags, --follow-tags, --mirror, push.followTags=true, a
-# refs/tags/ ref, \`tag <name>\`, or a name that is a tag, or not a branch and
-# either version-shaped or created as a tag on the same line (tag.sh and
-# \`git tag\` run before the push does, so the tag does not exist yet when this
-# hook reads the command). And a git subcommand it cannot read (_git.sh: a
-# shell alias, \`git \$(…)\`), or a line too nested to read (eval, sh -c in
-# sh -c, a shell fed on stdin, a line that never closes): fail closed.
+# Gated: every command in release-commands.txt, and any push of a tag ref —
+# --tags, --follow-tags, --mirror, push.followTags=true, a refs/tags/ ref,
+# \`tag <name>\`, or a name that is a tag, or not a branch and either
+# version-shaped or created as a tag on the same line (tag.sh and \`git tag\`
+# run before the push does, so the tag does not exist yet when this hook reads
+# the command). And a git subcommand it cannot read (_git.sh: a shell alias,
+# \`git \$(…)\`), or a line too nested to read (eval, sh -c in sh -c, a shell fed
+# on stdin, a line that never closes): fail closed.
+#
+# Resolved through approval_gate: Claude's own prompt where it can ask, and
+# everywhere else — Codex, Claude's bypass and auto modes — only the user's
+# own \`release it\` (or \`/ship release\`) this turn. Claude also keeps the list
+# as permissions.ask rules, but those match a command only by the words it
+# starts with: \`gh -R o/r release create\`, or the same inside \`bash -lc "…"\`,
+# matched none (cli#699). This hook reads the line as _command.sh splits it.
 #
 # Usage: guard-release.sh <claude|codex>   (payload on stdin)
-[ "\${1:-}" != claude ] || exit 0
 case \${BASH_SOURCE[0]} in */*) HOOK_DIR=\${BASH_SOURCE[0]%/*} ;; *) HOOK_DIR=. ;; esac
 # shellcheck source=_guard.sh
 . "\$HOOK_DIR/_guard.sh" || { echo "specnaut: \$HOOK_DIR/_guard.sh is missing — refusing" >&2; exit 2; }
@@ -31685,7 +31697,7 @@ done
 [ \${#hits[@]} -gt 0 ] || guard_allow
 
 approval_gate release \\
-  "\$(IFS=';'; echo "\${hits[*]}") publishes a release, and Codex needs the user's go-ahead in this turn" \\
+  "\$(IFS=';'; echo "\${hits[*]}") publishes a release, and that needs the user's go-ahead in this turn" \\
   "\\\`release it\\\` (or \\\`/ship release\\\`)"
 `,
       executable: true,
@@ -32207,9 +32219,10 @@ exit 0
     },
     ".specnaut/hooks/release-commands.txt": {
       content: `# The release commands that need the user's go-ahead — the one list (spec 036,
-# plan § 5, FR-006). guard-release.sh refuses each on Codex unless the user's
-# own prompt this turn approved a release; Claude Code's permissions.ask rules
-# are held to this list by Specnaut's own tests.
+# plan § 5, FR-006). guard-release.sh gates each on both harnesses: Claude's
+# own prompt where it can ask, else refused unless the user's own prompt this
+# turn approved a release. Claude Code's permissions.ask rules are held to this
+# list by Specnaut's own tests.
 #
 # One command per line: the words it starts with. A first word ending in \`.sh\`
 # is a script, matched by its basename however it is reached (a path, or as
@@ -32278,13 +32291,13 @@ f5552945f77fb0d24f56bbf2e97fb64d284d9c716abf211ebcbe081cacdf8bdf  _paths.sh
 84ea3ec50be236f52d5c1e5022b9064091b2bdf558c308e677967982c3638e91  approve-on-prompt.sh
 28d13e1fbd696f79036cc1f94c3fd6aa68f4f862f0dd5f6d32191ad05392534f  guard-dispatch-model.sh
 a1df2dde47ce2b69d3daf1cc1567a3a4427c447fe6b3c969421dfb74535a9710  guard-merge.sh
-a3eb7a8dfcb3bbc387008931993a59a4006e9fe6f8042f137752f4ee41ee24ce  guard-release.sh
+833961ee8c4b0f33d3758e80c1dea85f7b610f75587d4f96ce89d549384f42bd  guard-release.sh
 3364feb0f3a7892224b67e4f857bb6c085456da98c892d7199c4bbd10f122f8b  log-subagent.sh
 79e66c4451546f416b4e57d942f9ec8e9f078e00f24c0b5a634c1c24dc08bfca  merge-approved.sh
 17fe85c8fb8804103a3d341d304d6d82ad472869dd2827c92ed1dcc2e56b6272  merge-commands.txt
 0d231c09ef29b1e46b774d283fad725382f33d6f3098545dc8a504bf89c40a80  protect-constitution.sh
 446426ad8d9958865dd36b0fb032090d3676c6b2533a513192b27c1b5171470c  protect-generated.sh
-c59dea265fb0e13092cb4ef650a436b29e34be4f18397aeaebc5408811ed3c7c  release-commands.txt
+982f9b8fd55376471246dbb03972b4ebc323d92e172328a15da706c32e3ae496  release-commands.txt
 `,
       executable: false,
     },
@@ -32305,17 +32318,17 @@ c59dea265fb0e13092cb4ef650a436b29e34be4f18397aeaebc5408811ed3c7c  release-comman
         "hooks": [
           {
             "type": "command",
-            "command": "r=\$PWD; while [ -n \\"\$r\\" ] && [ ! -d \\"\$r/.specnaut/hooks\\" ]; do r=\${r%/*}; done; [ \\"\$( (sha256sum 2>/dev/null || shasum -a 256) < \\"\$r/.specnaut/hooks/SHA256SUMS\\" 2>/dev/null | cut -c1-64)\\" = \\"42fad4aa8a2f318af3732b6488d2c4e1c36958bb5e65e52cd58b56a4f25ffdac\\" ] && (cd \\"\$r/.specnaut/hooks\\" && (sha256sum -c --status SHA256SUMS 2>/dev/null || shasum -a 256 -c --status SHA256SUMS)) && exec bash \\"\$r/.specnaut/hooks/guard-merge.sh\\" codex; echo \\"specnaut: .specnaut/hooks changed since it was trusted — run specnaut upgrade, then /hooks\\" >&2; exit 2",
+            "command": "r=\$PWD; while [ -n \\"\$r\\" ] && [ ! -d \\"\$r/.specnaut/hooks\\" ]; do r=\${r%/*}; done; [ \\"\$( (sha256sum 2>/dev/null || shasum -a 256) < \\"\$r/.specnaut/hooks/SHA256SUMS\\" 2>/dev/null | cut -c1-64)\\" = \\"90b342fac2e4e7ca77180aaf0d7ff0b62fd44cfa1177f13be051d1988fef4ae0\\" ] && (cd \\"\$r/.specnaut/hooks\\" && (sha256sum -c --status SHA256SUMS 2>/dev/null || shasum -a 256 -c --status SHA256SUMS)) && exec bash \\"\$r/.specnaut/hooks/guard-merge.sh\\" codex; echo \\"specnaut: .specnaut/hooks changed since it was trusted — run specnaut upgrade, then /hooks\\" >&2; exit 2",
             "timeout": 10
           },
           {
             "type": "command",
-            "command": "r=\$PWD; while [ -n \\"\$r\\" ] && [ ! -d \\"\$r/.specnaut/hooks\\" ]; do r=\${r%/*}; done; [ \\"\$( (sha256sum 2>/dev/null || shasum -a 256) < \\"\$r/.specnaut/hooks/SHA256SUMS\\" 2>/dev/null | cut -c1-64)\\" = \\"42fad4aa8a2f318af3732b6488d2c4e1c36958bb5e65e52cd58b56a4f25ffdac\\" ] && (cd \\"\$r/.specnaut/hooks\\" && (sha256sum -c --status SHA256SUMS 2>/dev/null || shasum -a 256 -c --status SHA256SUMS)) && exec bash \\"\$r/.specnaut/hooks/guard-release.sh\\" codex; echo \\"specnaut: .specnaut/hooks changed since it was trusted — run specnaut upgrade, then /hooks\\" >&2; exit 2",
+            "command": "r=\$PWD; while [ -n \\"\$r\\" ] && [ ! -d \\"\$r/.specnaut/hooks\\" ]; do r=\${r%/*}; done; [ \\"\$( (sha256sum 2>/dev/null || shasum -a 256) < \\"\$r/.specnaut/hooks/SHA256SUMS\\" 2>/dev/null | cut -c1-64)\\" = \\"90b342fac2e4e7ca77180aaf0d7ff0b62fd44cfa1177f13be051d1988fef4ae0\\" ] && (cd \\"\$r/.specnaut/hooks\\" && (sha256sum -c --status SHA256SUMS 2>/dev/null || shasum -a 256 -c --status SHA256SUMS)) && exec bash \\"\$r/.specnaut/hooks/guard-release.sh\\" codex; echo \\"specnaut: .specnaut/hooks changed since it was trusted — run specnaut upgrade, then /hooks\\" >&2; exit 2",
             "timeout": 10
           },
           {
             "type": "command",
-            "command": "r=\$PWD; while [ -n \\"\$r\\" ] && [ ! -d \\"\$r/.specnaut/hooks\\" ]; do r=\${r%/*}; done; [ \\"\$( (sha256sum 2>/dev/null || shasum -a 256) < \\"\$r/.specnaut/hooks/SHA256SUMS\\" 2>/dev/null | cut -c1-64)\\" = \\"42fad4aa8a2f318af3732b6488d2c4e1c36958bb5e65e52cd58b56a4f25ffdac\\" ] && (cd \\"\$r/.specnaut/hooks\\" && (sha256sum -c --status SHA256SUMS 2>/dev/null || shasum -a 256 -c --status SHA256SUMS)) && exec bash \\"\$r/.specnaut/hooks/protect-constitution.sh\\" codex; echo \\"specnaut: .specnaut/hooks changed since it was trusted — run specnaut upgrade, then /hooks\\" >&2; exit 2",
+            "command": "r=\$PWD; while [ -n \\"\$r\\" ] && [ ! -d \\"\$r/.specnaut/hooks\\" ]; do r=\${r%/*}; done; [ \\"\$( (sha256sum 2>/dev/null || shasum -a 256) < \\"\$r/.specnaut/hooks/SHA256SUMS\\" 2>/dev/null | cut -c1-64)\\" = \\"90b342fac2e4e7ca77180aaf0d7ff0b62fd44cfa1177f13be051d1988fef4ae0\\" ] && (cd \\"\$r/.specnaut/hooks\\" && (sha256sum -c --status SHA256SUMS 2>/dev/null || shasum -a 256 -c --status SHA256SUMS)) && exec bash \\"\$r/.specnaut/hooks/protect-constitution.sh\\" codex; echo \\"specnaut: .specnaut/hooks changed since it was trusted — run specnaut upgrade, then /hooks\\" >&2; exit 2",
             "timeout": 10
           }
         ]
@@ -32325,12 +32338,12 @@ c59dea265fb0e13092cb4ef650a436b29e34be4f18397aeaebc5408811ed3c7c  release-comman
         "hooks": [
           {
             "type": "command",
-            "command": "r=\$PWD; while [ -n \\"\$r\\" ] && [ ! -d \\"\$r/.specnaut/hooks\\" ]; do r=\${r%/*}; done; [ \\"\$( (sha256sum 2>/dev/null || shasum -a 256) < \\"\$r/.specnaut/hooks/SHA256SUMS\\" 2>/dev/null | cut -c1-64)\\" = \\"42fad4aa8a2f318af3732b6488d2c4e1c36958bb5e65e52cd58b56a4f25ffdac\\" ] && (cd \\"\$r/.specnaut/hooks\\" && (sha256sum -c --status SHA256SUMS 2>/dev/null || shasum -a 256 -c --status SHA256SUMS)) && exec bash \\"\$r/.specnaut/hooks/protect-generated.sh\\" codex; echo \\"specnaut: .specnaut/hooks changed since it was trusted — run specnaut upgrade, then /hooks\\" >&2; exit 2",
+            "command": "r=\$PWD; while [ -n \\"\$r\\" ] && [ ! -d \\"\$r/.specnaut/hooks\\" ]; do r=\${r%/*}; done; [ \\"\$( (sha256sum 2>/dev/null || shasum -a 256) < \\"\$r/.specnaut/hooks/SHA256SUMS\\" 2>/dev/null | cut -c1-64)\\" = \\"90b342fac2e4e7ca77180aaf0d7ff0b62fd44cfa1177f13be051d1988fef4ae0\\" ] && (cd \\"\$r/.specnaut/hooks\\" && (sha256sum -c --status SHA256SUMS 2>/dev/null || shasum -a 256 -c --status SHA256SUMS)) && exec bash \\"\$r/.specnaut/hooks/protect-generated.sh\\" codex; echo \\"specnaut: .specnaut/hooks changed since it was trusted — run specnaut upgrade, then /hooks\\" >&2; exit 2",
             "timeout": 10
           },
           {
             "type": "command",
-            "command": "r=\$PWD; while [ -n \\"\$r\\" ] && [ ! -d \\"\$r/.specnaut/hooks\\" ]; do r=\${r%/*}; done; [ \\"\$( (sha256sum 2>/dev/null || shasum -a 256) < \\"\$r/.specnaut/hooks/SHA256SUMS\\" 2>/dev/null | cut -c1-64)\\" = \\"42fad4aa8a2f318af3732b6488d2c4e1c36958bb5e65e52cd58b56a4f25ffdac\\" ] && (cd \\"\$r/.specnaut/hooks\\" && (sha256sum -c --status SHA256SUMS 2>/dev/null || shasum -a 256 -c --status SHA256SUMS)) && exec bash \\"\$r/.specnaut/hooks/protect-constitution.sh\\" codex; echo \\"specnaut: .specnaut/hooks changed since it was trusted — run specnaut upgrade, then /hooks\\" >&2; exit 2",
+            "command": "r=\$PWD; while [ -n \\"\$r\\" ] && [ ! -d \\"\$r/.specnaut/hooks\\" ]; do r=\${r%/*}; done; [ \\"\$( (sha256sum 2>/dev/null || shasum -a 256) < \\"\$r/.specnaut/hooks/SHA256SUMS\\" 2>/dev/null | cut -c1-64)\\" = \\"90b342fac2e4e7ca77180aaf0d7ff0b62fd44cfa1177f13be051d1988fef4ae0\\" ] && (cd \\"\$r/.specnaut/hooks\\" && (sha256sum -c --status SHA256SUMS 2>/dev/null || shasum -a 256 -c --status SHA256SUMS)) && exec bash \\"\$r/.specnaut/hooks/protect-constitution.sh\\" codex; echo \\"specnaut: .specnaut/hooks changed since it was trusted — run specnaut upgrade, then /hooks\\" >&2; exit 2",
             "timeout": 10
           }
         ]
@@ -32340,7 +32353,7 @@ c59dea265fb0e13092cb4ef650a436b29e34be4f18397aeaebc5408811ed3c7c  release-comman
         "hooks": [
           {
             "type": "command",
-            "command": "r=\$PWD; while [ -n \\"\$r\\" ] && [ ! -d \\"\$r/.specnaut/hooks\\" ]; do r=\${r%/*}; done; [ \\"\$( (sha256sum 2>/dev/null || shasum -a 256) < \\"\$r/.specnaut/hooks/SHA256SUMS\\" 2>/dev/null | cut -c1-64)\\" = \\"42fad4aa8a2f318af3732b6488d2c4e1c36958bb5e65e52cd58b56a4f25ffdac\\" ] && (cd \\"\$r/.specnaut/hooks\\" && (sha256sum -c --status SHA256SUMS 2>/dev/null || shasum -a 256 -c --status SHA256SUMS)) && exec bash \\"\$r/.specnaut/hooks/guard-dispatch-model.sh\\" codex; echo \\"specnaut: .specnaut/hooks changed since it was trusted — run specnaut upgrade, then /hooks\\" >&2; exit 2",
+            "command": "r=\$PWD; while [ -n \\"\$r\\" ] && [ ! -d \\"\$r/.specnaut/hooks\\" ]; do r=\${r%/*}; done; [ \\"\$( (sha256sum 2>/dev/null || shasum -a 256) < \\"\$r/.specnaut/hooks/SHA256SUMS\\" 2>/dev/null | cut -c1-64)\\" = \\"90b342fac2e4e7ca77180aaf0d7ff0b62fd44cfa1177f13be051d1988fef4ae0\\" ] && (cd \\"\$r/.specnaut/hooks\\" && (sha256sum -c --status SHA256SUMS 2>/dev/null || shasum -a 256 -c --status SHA256SUMS)) && exec bash \\"\$r/.specnaut/hooks/guard-dispatch-model.sh\\" codex; echo \\"specnaut: .specnaut/hooks changed since it was trusted — run specnaut upgrade, then /hooks\\" >&2; exit 2",
             "timeout": 10
           }
         ]
@@ -32351,7 +32364,7 @@ c59dea265fb0e13092cb4ef650a436b29e34be4f18397aeaebc5408811ed3c7c  release-comman
         "hooks": [
           {
             "type": "command",
-            "command": "r=\$PWD; while [ -n \\"\$r\\" ] && [ ! -d \\"\$r/.specnaut/hooks\\" ]; do r=\${r%/*}; done; [ \\"\$( (sha256sum 2>/dev/null || shasum -a 256) < \\"\$r/.specnaut/hooks/SHA256SUMS\\" 2>/dev/null | cut -c1-64)\\" = \\"42fad4aa8a2f318af3732b6488d2c4e1c36958bb5e65e52cd58b56a4f25ffdac\\" ] && (cd \\"\$r/.specnaut/hooks\\" && (sha256sum -c --status SHA256SUMS 2>/dev/null || shasum -a 256 -c --status SHA256SUMS)) && exec bash \\"\$r/.specnaut/hooks/approve-on-prompt.sh\\" codex; echo \\"specnaut: .specnaut/hooks changed since it was trusted — run specnaut upgrade, then /hooks\\" >&2; exit 0",
+            "command": "r=\$PWD; while [ -n \\"\$r\\" ] && [ ! -d \\"\$r/.specnaut/hooks\\" ]; do r=\${r%/*}; done; [ \\"\$( (sha256sum 2>/dev/null || shasum -a 256) < \\"\$r/.specnaut/hooks/SHA256SUMS\\" 2>/dev/null | cut -c1-64)\\" = \\"90b342fac2e4e7ca77180aaf0d7ff0b62fd44cfa1177f13be051d1988fef4ae0\\" ] && (cd \\"\$r/.specnaut/hooks\\" && (sha256sum -c --status SHA256SUMS 2>/dev/null || shasum -a 256 -c --status SHA256SUMS)) && exec bash \\"\$r/.specnaut/hooks/approve-on-prompt.sh\\" codex; echo \\"specnaut: .specnaut/hooks changed since it was trusted — run specnaut upgrade, then /hooks\\" >&2; exit 0",
             "timeout": 10
           }
         ]
@@ -32362,7 +32375,7 @@ c59dea265fb0e13092cb4ef650a436b29e34be4f18397aeaebc5408811ed3c7c  release-comman
         "hooks": [
           {
             "type": "command",
-            "command": "r=\$PWD; while [ -n \\"\$r\\" ] && [ ! -d \\"\$r/.specnaut/hooks\\" ]; do r=\${r%/*}; done; [ \\"\$( (sha256sum 2>/dev/null || shasum -a 256) < \\"\$r/.specnaut/hooks/SHA256SUMS\\" 2>/dev/null | cut -c1-64)\\" = \\"42fad4aa8a2f318af3732b6488d2c4e1c36958bb5e65e52cd58b56a4f25ffdac\\" ] && (cd \\"\$r/.specnaut/hooks\\" && (sha256sum -c --status SHA256SUMS 2>/dev/null || shasum -a 256 -c --status SHA256SUMS)) && exec bash \\"\$r/.specnaut/hooks/approve-on-prompt.sh\\" codex; echo \\"specnaut: .specnaut/hooks changed since it was trusted — run specnaut upgrade, then /hooks\\" >&2; exit 0",
+            "command": "r=\$PWD; while [ -n \\"\$r\\" ] && [ ! -d \\"\$r/.specnaut/hooks\\" ]; do r=\${r%/*}; done; [ \\"\$( (sha256sum 2>/dev/null || shasum -a 256) < \\"\$r/.specnaut/hooks/SHA256SUMS\\" 2>/dev/null | cut -c1-64)\\" = \\"90b342fac2e4e7ca77180aaf0d7ff0b62fd44cfa1177f13be051d1988fef4ae0\\" ] && (cd \\"\$r/.specnaut/hooks\\" && (sha256sum -c --status SHA256SUMS 2>/dev/null || shasum -a 256 -c --status SHA256SUMS)) && exec bash \\"\$r/.specnaut/hooks/approve-on-prompt.sh\\" codex; echo \\"specnaut: .specnaut/hooks changed since it was trusted — run specnaut upgrade, then /hooks\\" >&2; exit 0",
             "timeout": 10
           }
         ]
@@ -32373,7 +32386,7 @@ c59dea265fb0e13092cb4ef650a436b29e34be4f18397aeaebc5408811ed3c7c  release-comman
         "hooks": [
           {
             "type": "command",
-            "command": "r=\$PWD; while [ -n \\"\$r\\" ] && [ ! -d \\"\$r/.specnaut/hooks\\" ]; do r=\${r%/*}; done; [ \\"\$( (sha256sum 2>/dev/null || shasum -a 256) < \\"\$r/.specnaut/hooks/SHA256SUMS\\" 2>/dev/null | cut -c1-64)\\" = \\"42fad4aa8a2f318af3732b6488d2c4e1c36958bb5e65e52cd58b56a4f25ffdac\\" ] && (cd \\"\$r/.specnaut/hooks\\" && (sha256sum -c --status SHA256SUMS 2>/dev/null || shasum -a 256 -c --status SHA256SUMS)) && exec bash \\"\$r/.specnaut/hooks/log-subagent.sh\\" start; echo \\"specnaut: .specnaut/hooks changed since it was trusted — run specnaut upgrade, then /hooks\\" >&2; exit 0",
+            "command": "r=\$PWD; while [ -n \\"\$r\\" ] && [ ! -d \\"\$r/.specnaut/hooks\\" ]; do r=\${r%/*}; done; [ \\"\$( (sha256sum 2>/dev/null || shasum -a 256) < \\"\$r/.specnaut/hooks/SHA256SUMS\\" 2>/dev/null | cut -c1-64)\\" = \\"90b342fac2e4e7ca77180aaf0d7ff0b62fd44cfa1177f13be051d1988fef4ae0\\" ] && (cd \\"\$r/.specnaut/hooks\\" && (sha256sum -c --status SHA256SUMS 2>/dev/null || shasum -a 256 -c --status SHA256SUMS)) && exec bash \\"\$r/.specnaut/hooks/log-subagent.sh\\" start; echo \\"specnaut: .specnaut/hooks changed since it was trusted — run specnaut upgrade, then /hooks\\" >&2; exit 0",
             "timeout": 10
           }
         ]
@@ -32384,7 +32397,7 @@ c59dea265fb0e13092cb4ef650a436b29e34be4f18397aeaebc5408811ed3c7c  release-comman
         "hooks": [
           {
             "type": "command",
-            "command": "r=\$PWD; while [ -n \\"\$r\\" ] && [ ! -d \\"\$r/.specnaut/hooks\\" ]; do r=\${r%/*}; done; [ \\"\$( (sha256sum 2>/dev/null || shasum -a 256) < \\"\$r/.specnaut/hooks/SHA256SUMS\\" 2>/dev/null | cut -c1-64)\\" = \\"42fad4aa8a2f318af3732b6488d2c4e1c36958bb5e65e52cd58b56a4f25ffdac\\" ] && (cd \\"\$r/.specnaut/hooks\\" && (sha256sum -c --status SHA256SUMS 2>/dev/null || shasum -a 256 -c --status SHA256SUMS)) && exec bash \\"\$r/.specnaut/hooks/log-subagent.sh\\" stop; echo \\"specnaut: .specnaut/hooks changed since it was trusted — run specnaut upgrade, then /hooks\\" >&2; exit 0",
+            "command": "r=\$PWD; while [ -n \\"\$r\\" ] && [ ! -d \\"\$r/.specnaut/hooks\\" ]; do r=\${r%/*}; done; [ \\"\$( (sha256sum 2>/dev/null || shasum -a 256) < \\"\$r/.specnaut/hooks/SHA256SUMS\\" 2>/dev/null | cut -c1-64)\\" = \\"90b342fac2e4e7ca77180aaf0d7ff0b62fd44cfa1177f13be051d1988fef4ae0\\" ] && (cd \\"\$r/.specnaut/hooks\\" && (sha256sum -c --status SHA256SUMS 2>/dev/null || shasum -a 256 -c --status SHA256SUMS)) && exec bash \\"\$r/.specnaut/hooks/log-subagent.sh\\" stop; echo \\"specnaut: .specnaut/hooks changed since it was trusted — run specnaut upgrade, then /hooks\\" >&2; exit 0",
             "timeout": 10
           }
         ]

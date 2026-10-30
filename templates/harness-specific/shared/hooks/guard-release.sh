@@ -1,21 +1,24 @@
 #!/usr/bin/env bash
-# PreToolUse(Bash), Codex only — publishing a release needs the user (spec
-# 036, US5, FR-006). The one home of "is this Codex release command approved"
-# (plan § 5). Claude holds the same list with permissions.ask, so there this
-# hook exits 0 before reading anything.
+# PreToolUse(Bash) — publishing a release needs the user (spec 036, US5,
+# FR-006). The one home of "does this command publish a release" (plan § 5).
 #
-# Refused unless the user's own prompt this turn approved a release (`release
-# it`, `/ship release`): every command in release-commands.txt, and any push
-# of a tag ref — --tags, --follow-tags, --mirror, push.followTags=true, a
-# refs/tags/ ref, `tag <name>`, or a name that is a tag, or not a branch and
-# either version-shaped or created as a tag on the same line (tag.sh and
-# `git tag` run before the push does, so the tag does not exist yet when this
-# hook reads the command). And a git subcommand it cannot read (_git.sh: a
-# shell alias, `git $(…)`), or a line too nested to read (eval, sh -c in
-# sh -c, a shell fed on stdin, a line that never closes): fail closed.
+# Gated: every command in release-commands.txt, and any push of a tag ref —
+# --tags, --follow-tags, --mirror, push.followTags=true, a refs/tags/ ref,
+# `tag <name>`, or a name that is a tag, or not a branch and either
+# version-shaped or created as a tag on the same line (tag.sh and `git tag`
+# run before the push does, so the tag does not exist yet when this hook reads
+# the command). And a git subcommand it cannot read (_git.sh: a shell alias,
+# `git $(…)`), or a line too nested to read (eval, sh -c in sh -c, a shell fed
+# on stdin, a line that never closes): fail closed.
+#
+# Resolved through approval_gate: Claude's own prompt where it can ask, and
+# everywhere else — Codex, Claude's bypass and auto modes — only the user's
+# own `release it` (or `/ship release`) this turn. Claude also keeps the list
+# as permissions.ask rules, but those match a command only by the words it
+# starts with: `gh -R o/r release create`, or the same inside `bash -lc "…"`,
+# matched none (cli#699). This hook reads the line as _command.sh splits it.
 #
 # Usage: guard-release.sh <claude|codex>   (payload on stdin)
-[ "${1:-}" != claude ] || exit 0
 case ${BASH_SOURCE[0]} in */*) HOOK_DIR=${BASH_SOURCE[0]%/*} ;; *) HOOK_DIR=. ;; esac
 # shellcheck source=_guard.sh
 . "$HOOK_DIR/_guard.sh" || { echo "specnaut: $HOOK_DIR/_guard.sh is missing — refusing" >&2; exit 2; }
@@ -90,5 +93,5 @@ done
 [ ${#hits[@]} -gt 0 ] || guard_allow
 
 approval_gate release \
-  "$(IFS=';'; echo "${hits[*]}") publishes a release, and Codex needs the user's go-ahead in this turn" \
+  "$(IFS=';'; echo "${hits[*]}") publishes a release, and that needs the user's go-ahead in this turn" \
   "\`release it\` (or \`/ship release\`)"

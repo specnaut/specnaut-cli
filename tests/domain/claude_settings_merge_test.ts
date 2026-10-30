@@ -224,3 +224,26 @@ Deno.test("mergeClaudeSettings: ask rules are not duplicated on re-merge (#610)"
   assertEquals(twice, once);
   assertEquals(JSON.parse(twice).permissions.ask, PUBLISH_ASK);
 });
+
+// cli#699: a 7.3 settings.json registers guard-merge for Bash but not
+// guard-release; the upgrade adds it to that group once, beside the user's own.
+Deno.test("mergeClaudeSettings: an upgrade registers guard-release once, in the Bash group (#699)", () => {
+  const RELEASE = 'bash "$CLAUDE_PROJECT_DIR/.specnaut/hooks/guard-release.sh" claude';
+  const shipped = JSON.parse(SHIPPED);
+  const bashOf = (
+    s: { hooks: { PreToolUse: { matcher?: string; hooks: { command: string }[] }[] } },
+  ) =>
+    s.hooks.PreToolUse.filter((g) => g.matcher === "Bash").flatMap((g) =>
+      g.hooks.map((h) => h.command)
+    );
+  for (const g of shipped.hooks.PreToolUse) {
+    g.hooks = g.hooks.filter((h: { command: string }) => h.command !== RELEASE);
+  }
+  shipped.hooks.PreToolUse.find((g: { matcher?: string }) => g.matcher === "Bash").hooks
+    .push({ type: "command", command: "./my-check.sh" });
+  const once = mergeClaudeSettings(JSON.stringify(shipped), SHIPPED, DEST).content;
+  const merged = JSON.parse(once);
+  assertEquals(bashOf(merged).filter((c: string) => c === RELEASE).length, 1);
+  assertEquals(bashOf(merged).includes("./my-check.sh"), true, "the user's hook is theirs");
+  assertEquals(mergeClaudeSettings(once, SHIPPED, DEST).changed, false, "a re-merge is a no-op");
+});

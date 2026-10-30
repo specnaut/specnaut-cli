@@ -46,6 +46,11 @@
           },
           {
             "type": "command",
+            "command": "bash \"$CLAUDE_PROJECT_DIR/.specnaut/hooks/guard-release.sh\" claude",
+            "timeout": 5
+          },
+          {
+            "type": "command",
             "command": "bash \"$CLAUDE_PROJECT_DIR/.specnaut/hooks/protect-constitution.sh\" claude",
             "timeout": 5
           }

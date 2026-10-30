@@ -25,6 +25,7 @@ import { pathWithoutJq } from "./hook_path.ts";
 const GUARDS: ReadonlyArray<[hook: string, harness: Harness, fixture: string]> = [
   ["guard-merge.sh", "claude", "pre_tool_use_bash"],
   ["guard-merge.sh", "codex", "pre_tool_use_bash"],
+  ["guard-release.sh", "claude", "pre_tool_use_bash"],
   ["guard-release.sh", "codex", "pre_tool_use_bash"],
   ["guard-dispatch-model.sh", "claude", "pre_tool_use_agent"],
   ["guard-dispatch-model.sh", "codex", "pre_tool_use_spawn_agent"],

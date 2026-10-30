@@ -1,7 +1,8 @@
 # The release commands that need the user's go-ahead — the one list (spec 036,
-# plan § 5, FR-006). guard-release.sh refuses each on Codex unless the user's
-# own prompt this turn approved a release; Claude Code's permissions.ask rules
-# are held to this list by Specnaut's own tests.
+# plan § 5, FR-006). guard-release.sh gates each on both harnesses: Claude's
+# own prompt where it can ask, else refused unless the user's own prompt this
+# turn approved a release. Claude Code's permissions.ask rules are held to this
+# list by Specnaut's own tests.
 #
 # One command per line: the words it starts with. A first word ending in `.sh`
 # is a script, matched by its basename however it is reached (a path, or as

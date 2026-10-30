@@ -12,13 +12,12 @@ import {
   type Sandbox,
   sandbox,
 } from "./hook_sandbox.ts";
-import { pathWithoutJq } from "./hook_path.ts";
 
 /**
  * US5 / FR-006 — on Codex, every command in release-commands.txt, and any
  * push of a tag ref, is refused unless the user's own prompt this turn
- * approved a release. `--no-push` exempts only its own command segment. On
- * Claude the guard is inert: `permissions.ask` holds the same list.
+ * approved a release. `--no-push` exempts only its own command segment. The
+ * Claude arm is guard_release_claude_test.ts (cli#699).
  */
 
 async function bash(
@@ -193,25 +192,6 @@ Deno.test("guard-release: only this turn's release approval lets it through", as
 
     await approve(sb, "codex", repo, "merge");
     assertEquals(denied(await publish()), true, "a merge approval is not a release approval");
-  } finally {
-    await sb.cleanup();
-  }
-});
-
-Deno.test("guard-release is inert on Claude, even without jq: permissions.ask holds the list there", async () => {
-  const sb = await sandbox();
-  try {
-    const repo = await makeRepo(sb, { mode: "auto" });
-    const p = await payload("claude", "pre_tool_use_bash", {
-      cwd: repo,
-      tool_input: { command: "gh release create v1" },
-    });
-    assertEquals((await runHook(sb, "guard-release.sh", "claude", p)).code, 0);
-    const noJq = await pathWithoutJq(sb);
-    assertEquals(
-      (await runHook(sb, "guard-release.sh", "claude", p, { env: { PATH: noJq } })).code,
-      0,
-    );
   } finally {
     await sb.cleanup();
   }
