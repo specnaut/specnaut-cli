@@ -523,7 +523,7 @@ check "auto-chain.md infers re-entry from artefacts, with no flag (#455)" \
 check "review.md owns STOP #2 (no /specnaut-auto handoff)" \
   '! grep -q "hand back to \`/specnaut-auto\`" .claude/skills/task/phases/review.md'
 check "review.md surfaces the verdict summary from phases/auto-chain.md and follows the merge mode" \
-  'grep -q "verdict summary defined in" .claude/skills/task/phases/review.md && grep -q "merge mode" .claude/skills/task/phases/review.md'
+  'grep -q "surface the verdict summary and follow \`phases/auto-chain.md\`" .claude/skills/task/phases/review.md && ! grep -q "invoke it on \"yes\"" .claude/skills/task/phases/review.md'
 
 echo
 echo "═══ specnaut-guide review-upgrade protocol ═══"
