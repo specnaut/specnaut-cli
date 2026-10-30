@@ -128,7 +128,10 @@ cmd_parse() {
         ';' | '|') _cmd_end ;;
         '&') case $word in *'>' | *'<') word+=$c ;; *) if [ "$nx" = ">" ]; then word+=$c; else _cmd_end; fi ;; esac ;;
         '$') if [ "$nx" = "(" ]; then _cmd_push; stack="s$stack" i=$((i + 1)); _cmd_arith; else word+=$c; fi ;;
-        '(') if [ -n "$word" ] && [ "$nx" != ")" ]; then word+=$c stack="g$stack"; else _cmd_end; stack="u$stack"; _cmd_arith; fi ;;
+        '(') case $word in
+            *'<' | *'>' | '=') _cmd_push; stack="s$stack" ;; # <(…) >(…) =(…): a command runs inside
+            *) if [ -n "$word" ] && [ "$nx" != ")" ]; then word+=$c stack="g$stack"; else _cmd_end; stack="u$stack"; _cmd_arith; fi ;;
+          esac ;;
         ')') _cmd_close ;;
         '`') if [ -z "$bt" ]; then _cmd_push; bt=u; else _cmd_pop; if [ "$bt" = d ]; then q='"'; fi; bt=""; fi ;;
         '#') if [ -z "$word" ] && [ "$have" = 0 ]; then d=${s:i}; d=${d%%$'\n'*}; i=$((i + ${#d})); else word+=$c; fi ;;

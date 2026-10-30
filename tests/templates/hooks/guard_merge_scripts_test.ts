@@ -58,6 +58,11 @@ const SPELLED: ReadonlyArray<[command: string, gated: boolean]> = [
   ['git commit -m "$(cat a) and $(cat b)"', false],
   ['echo "built $(git rev-parse --short HEAD) at $(date)"', false],
   ["echo `date` and `whoami`", false],
+  // a process substitution runs a command too
+  ["cat <(git push origin main)", true],
+  ["tee >(git push origin main)", true],
+  ["cat <(bash .specnaut/scripts/bash/land-feature.sh 007-x)", true],
+  ["diff <(sort a) <(sort b)", false],
   ["f() { echo hi; }; f", false],
   ["ls *.sh", false],
   ["grep -l push .specnaut/scripts/bash/*.sh", false],
