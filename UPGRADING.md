@@ -36,6 +36,28 @@ keeps one you edited, with a warning.
 The hooks changed, so Codex runs none of them until you trust them again: open Codex in the project,
 run `/hooks`, and trust Specnaut's hooks. `upgrade` prints this note and the list of hooks.
 
+### Fewer agents; review runs from your session
+
+The agent roster goes from fifteen to nine. `review-coordinator`, `test-reviewer`,
+`workflow-manager`, `qa-tester` and `devops-sre` are gone, and `ui-ux-designer` becomes the
+`/design` skill. Review now dispatches its seats from your main session, at most four at a time.
+`upgrade` names the successor of every retired agent a file of yours still mentions, and removes
+nothing you wrote.
+
+### `merge: manual` holds harder
+
+Under `merge: manual`, a landing on the base branch now waits for the word `merge` in your own
+prompt that turn: a click on a permission prompt no longer releases it, and neither does an edit to
+`workflow.yml` or to the landing scripts. `land-feature.sh` and `remove-spec.sh` also hold
+themselves (exit 13, naming what releases them), so a renamed copy or another spelling is held too.
+After a `cd`, the hold reads the target project's mode as well as yours, and keeps the stricter one.
+
+### Plans are briefs, and `tasks` is part of `implement`
+
+`plan` writes a short brief by default, and `implement` derives the breakdown itself: there is no
+separate `tasks` step to run. An addendum you wrote for `tasks` is carried to `implement` by
+`upgrade`.
+
 ## 7.1.x → 7.2.0
 
 Run `specnaut upgrade`. On Codex, you then trust the hooks once. On Claude Code you have nothing to
