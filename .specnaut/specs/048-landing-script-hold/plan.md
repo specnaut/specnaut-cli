@@ -93,3 +93,107 @@ T1 helper + its tests → T2 the two call sites, exit 13, phase docs, copy-spell
 
 None for the user: `manual` already means "held until the user says merge"; this enforces it in one
 more place.
+
+## 8. Audit findings — binding, they supersede §§ 1–6 where they differ
+
+Architecture (fail: 2 HIGH · 5 MEDIUM · 3 LOW) and security (needs follow-up: 2 MEDIUM · 3 LOW).
+Every finding below is accepted unless it says rejected.
+
+**The reader lives in the hooks.** The stamp reader is a new executable,
+`.specnaut/hooks/merge-approved.sh`. It is never registered as a hook, but it is listed in
+SHA256SUMS and run through codegen. It sources `_guard.sh`/`_approval.sh`, so `guard_root`, the
+stamp path, the JSON read and `approval_session_ok` each have one owner. The core helper
+`merge-hold.sh` calls it.
+
+This replaces the duplicated path and its parity test (architecture HIGH 2 and MEDIUM 1). The root
+is the hook's own `pwd -P` derivation, never the caller's `$here` or the git toplevel. The security
+audit's conditions:
+
+- **(a)** A separate no-turn function in `_approval.sh` (`approved_session <kind>`), never a flag on
+  `approved()`. A test proves that guard-merge on Codex with no `turn_id` still denies.
+- **(b)** The core caller requires a positive token (below).
+- **(c)** Reader missing while `guard-merge.sh` is present → held, never "no hooks".
+- **(d)** The reader is in SHA256SUMS, not in `hooks.json`.
+
+**Positive allow only** (security F1). `merge-hold.sh` prints exactly `merge-hold: run` as its last
+line on every allow row. Both call sites require exit 0 **and** that line:
+
+```
+[ "$(bash "$here/merge-hold.sh")" = "merge-hold: run" ] || exit 13
+```
+
+The helper uses no `local x=$(…)`. A test runs a mutated helper (`set -u` abort under an EXIT trap,
+which bash 3.2 exits 0) and gets 13.
+
+**Exit 13 names its remedy** (architecture MEDIUM, security F5). It prints one stderr line saying
+what releases it:
+
+- reply `merge`;
+- on Codex: "if you typed merge, the prompt hook did not run — trust the hooks with `/hooks`";
+- install `jq`;
+- run `specnaut upgrade` (helper or reader missing).
+
+The `merge.md` / `merge-close.md` rows say "quote its line; it names the remedy". Under `auto`, a
+missing helper is still 13 with the upgrade line.
+
+**Resume after a held spec removal** (architecture MEDIUM). `merge-close.md` step 4 held by 13 means
+the landing and the close stand and only the removal is held. On the next `merge`, run step 4 only,
+never the landing.
+
+**One arm for every landing** (architecture MEDIUM, security F4). `guard-merge.sh`'s single
+`approval_gate` call becomes `approval_require` for every reason: listed scripts, `gh pr merge` /
+`glab mr merge`, and raw git landing on the base. A denied model has no less-strict spelling to fall
+back to, and it matches AGENTS.md ("a 'yes'… does not release it"). A test covers the mixed command
+`bash land-feature.sh && git push origin main` → denied, not asked, in Claude default mode.
+
+**The id can be scrubbed** (security F2).
+
+- (a) § 3 "Buys" now reads "every run of the unedited scripts **from a process that still carries
+  the session id**". Scrubbed environments go under "Does not buy": `env -i`, sudo `env_reset`,
+  tmux/screen send-keys, launchd/cron/at, a harness version that stops exporting it.
+- (b) The parser gates any command that unsets or assigns `CLAUDE_CODE_SESSION_ID`,
+  `CODEX_SESSION_ID` or `XDG_STATE_HOME`, or that uses `env -i`. `unset` joins export/declare in
+  `_cmd_env`. `HOME` is left out because it is too common.
+- (c) When the helper allows with no id while `CLAUDECODE` or `CODEX_SANDBOX*` is set, it prints
+  `merge-hold: no session id in the environment — not held` on stderr.
+- (d) _Rejected:_ walking up the process ancestry. It is platform-specific (MSYS cannot see native
+  processes), and (b)+(c) already make the accidental case visible.
+- (e) The live probe: on Claude Code, `CLAUDE_CODE_SESSION_ID` was read in a hooked session and
+  equals that session's id (2026-10-30). On Codex the claim rests on source (`exec_env.rs`
+  `inject_session_env`) and has not been run. A mismatch is fail-closed (held), recorded as a known
+  risk.
+
+**Bounded stamp age** (security F3). The helper holds when the stamp's mtime is older than 60
+minutes (hook-written; the Codex sandbox refuses the model's touch). This bounds the turn widening
+on Codex, where the script has no turn id. A test covers it.
+
+**The hold's files are gated for edits** (architecture HIGH 1). `protect-generated.sh` adds
+`.specnaut/scripts/bash/{merge-hold,land-feature,remove-spec}.sh`, with `protect_generated_test.ts`
+rows. The reader is already covered by `.specnaut/hooks/**`.
+
+**Tests added** (architecture MEDIUM):
+
+- Positive call-site landings: manual with a `merge` stamp, and auto with an id set.
+- Every script test clears both id variables unless it sets them.
+- Mint a stamp → Stop → 13.
+- Both ids set: Claude's wins, tested.
+- The same session under another root → 13.
+- `merge-mode.sh` failing → held.
+- Helper missing → 13 with the upgrade line.
+- `hook_sandbox.ts` copies `merge-hold.sh`.
+
+**LOW findings:**
+
+- The mirror is `plugin/skills/task/phases/{merge,merge-close}.md`, not a `plugin/` script.
+- The manifest entry follows `land-feature.sh`'s shape.
+- `smoke-merge.sh` checks for `merge-hold.sh`.
+- Headers updated: `merge-mode.sh` ("three callers"), `_approval.sh` (it hashes `GUARD_ROOT`).
+- § 3 names the consequences: Codex users re-trust the hooks after the upgrade, and an install with
+  a customised `land-feature.sh` gets no hold.
+
+**Order:**
+
+- T1: `approved_session` + the reader + `merge-hold.sh` + their tests.
+- T2: the call sites, exit 13, the phase docs and mirrors, the copy-spelling and positive tests.
+- T3: `guard-merge.sh` `approval_require` + the parser's id/XDG gate + `protect-generated.sh`,
+  codegen, smoke.
