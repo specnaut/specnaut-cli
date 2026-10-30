@@ -32,43 +32,52 @@ export type AddendaMoveContext = {
  *   and deletes the bytes, so a lossy decode would lose them for good;
  * - **a write or delete fails** — that one move is reported, the rest proceed.
  *
- * `--dry-run` judges every move and writes nothing.
+ * `--dry-run` judges every move and writes nothing — so it cannot read a
+ * destination an earlier move would have filled. Several moves end at one
+ * address (`task/implement` takes the `implement` move and both `tasks` folds),
+ * so the run keeps the addresses already taken (`claimed`) and refuses a later
+ * move into one exactly as the real run's disk would (cli#709).
  */
 export async function carryAddenda(ctx: AddendaMoveContext): Promise<void> {
+  const claimed = new Set<string>();
   for (const move of addendumRenames()) {
     const from = addendumPath(move.from);
     const to = addendumPath(move.to);
     try {
-      await carryOne(ctx, from, to, move.reason);
+      if (await carryOne(ctx, from, to, move.reason, claimed.has(to))) claimed.add(to);
     } catch (err) {
       ctx.notes.push(`addendum ${from} is not moved to ${to}: ${why(err)}`);
     }
   }
 }
 
+/** One move; `true` when `to` now holds (or, dry, would hold) the addendum. */
 async function carryOne(
   ctx: AddendaMoveContext,
   from: string,
   to: string,
   reason: string,
-): Promise<void> {
-  const verdict = judgeExactMove(
+  taken: boolean,
+): Promise<boolean> {
+  const judged = judgeExactMove(
     await ctx.reader.readEntry(ctx.projectDir, from),
     await ctx.reader.readEntry(ctx.projectDir, to),
   );
+  // The source is still judged first: a link or lossy file is named as such.
+  const verdict = judged.kind === "ok" && taken ? { kind: "target-occupied" as const } : judged;
   const what = `addendum ${from}`;
   if (verdict.kind !== "ok") {
     const refusal = exactMoveRefusal(verdict, what, to);
     if (refusal !== null) ctx.notes.push(refusal);
-    return;
+    return false;
   }
   if (ctx.dryRun) {
     ctx.notes.push(`${what} would move to ${to} (${reason})`);
-    return;
+    return true;
   }
-  if (await moveExact(ctx, what, from, to, verdict.content) === "moved") {
-    ctx.notes.push(`${what} moved to ${to} (${reason})`);
-  }
+  const outcome = await moveExact(ctx, what, from, to, verdict.content);
+  if (outcome === "moved") ctx.notes.push(`${what} moved to ${to} (${reason})`);
+  return outcome !== "failed";
 }
 
 const why = (err: unknown) => err instanceof Error ? err.message : String(err);
