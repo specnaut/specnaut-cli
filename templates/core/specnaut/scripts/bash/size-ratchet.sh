@@ -8,7 +8,7 @@
 # `.specnaut/size-limits.yml` through `_config.sh` beside it. A unit the file
 # does not set — every unit, with no file — takes the defaults of
 # `.specnaut/memory/size-limits.md`. That file states the rules; this script is
-# their deterministic half, and the one measurer the review coordinator calls.
+# their deterministic half, and the one measurer the review phase calls.
 #
 # "Before" is the size at the BASE OF THE CHANGE, not at the previous commit:
 #

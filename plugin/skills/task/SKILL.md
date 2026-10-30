@@ -62,6 +62,7 @@ These are **contract docs, not verbs** — naming one prints the verb table and 
 | `phases/auto-chain.md` | this router, when it chains |
 | `phases/remote-gates.md` | `auto-chain`, in remote mode |
 | `phases/orphan-specs.md` | `groom`, when specs are kept locally |
+| `phases/review-seats.md` | `review`, before its first seat brief |
 
 Unknown verb → look it up first in the `specnaut` skill's **Retired addresses** table: a verb
 retired from this router, or one from before it existed, is answered with where it went. Any other

@@ -143,7 +143,7 @@ branch's merge base. The developer puts that line in its completion report's
 did not shrink, is a blocker: fix it — extract — before handing off to review,
 never after.
 
-**review** — the review coordinator runs
+**review** — the review phase (Phase 0) runs
 `bash .specnaut/scripts/bash/size-ratchet.sh --since <merge base> --report`, which
 measures every changed file at the base and at head (a renamed file against its
 old path), and briefs each seat with that output and the limits. It runs for

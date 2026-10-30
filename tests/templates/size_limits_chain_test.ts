@@ -52,9 +52,9 @@ Deno.test("implement: the phase applies the gate, and the gate carries the table
   assert(limits.includes("is a blocker"), "growth blocks the hand-off");
 });
 
-Deno.test("review: the coordinator measures base and head and briefs every seat with the table", async () => {
-  const c = await read("templates/core/agents/review-coordinator.md");
-  assert(c.includes("0. **Measure sizes.**"), "measurement step");
+Deno.test("review: the phase measures base and head and briefs every seat with the table", async () => {
+  const c = await read("templates/core/skills/task/phases/review.md");
+  assert(c.includes("## Phase 0 — Measure"), "measurement step");
   assert(
     c.includes("size-ratchet.sh --since") && c.includes("--report"),
     "one measurer, base to head",
@@ -75,12 +75,12 @@ Deno.test("review: the coordinator measures base and head and briefs every seat 
 Deno.test("the ratchet is invoked through bash, and a run that did not happen is never a pass", async () => {
   // A lost executable bit (an archive, a Windows checkout) turns `./script` into exit 126,
   // which no caller would read as "clean" unless the docs say what it means.
-  const c = await read("templates/core/agents/review-coordinator.md");
+  const c = await read("templates/core/skills/task/phases/review.md");
   const g = await read("templates/core/skills/task/phases/quality-gates.md");
   for (const doc of [c, g]) {
     assert(doc.includes("bash .specnaut/scripts/bash/size-ratchet.sh --since"));
   }
-  assert(c.includes('never brief "no size data" as clean'), "coordinator");
+  assert(c.includes('never brief "no size data" as clean'), "review phase");
   assert(g.includes("never a pass"), "quality gates");
 });
 

@@ -1,6 +1,6 @@
 ---
 name: architect-expert
-description: Reviews code for architectural drift — hex-layer violations, circular deps, god files, bounded-context leaks, ports/adapters discipline, implicit globals, deep nesting, test-isolation bleed. Two dispatch shapes — (1) PR review (spawned by the review-coordinator during /task review), (2) scoped audit (spawned by /task audit, over the scope it resolved).
+description: Reviews code for architectural drift — hex-layer violations, circular deps, god files, bounded-context leaks, ports/adapters discipline, implicit globals, deep nesting, test-isolation bleed. Two dispatch shapes — (1) PR review (dispatched by name for a diff review), (2) scoped audit (spawned by /task audit, over the scope it resolved).
 model: opus
 effort: xhigh
 tools: Read, Grep, Glob, Bash
@@ -60,7 +60,7 @@ and this definition is a summary.
 
 ## Mode 1 — PR review
 
-Spawned by the `review-coordinator` during `/task review`. Review ONLY
+Dispatched by name for a diff review. Review ONLY
 the files provided in the prompt. Output the `FINDING` structure used by
 code-reviewer, followed by the canonical `REVIEW SUMMARY` block (see "Output
 format (Mode 1 — PR review)" below).

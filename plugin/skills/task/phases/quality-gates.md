@@ -128,7 +128,7 @@ tier, never a pass. Without `--since` it checks the
 staged changes against the branch's merge base, which is the form a pre-commit
 runner calls: an extraction commit followed by an addition passes, as long as
 the file ends no larger than where the branch began. Every review runs it too,
-through the review coordinator, so a standalone item is held as well. Specnaut installs
+through the review phase's Phase 0, so a standalone item is held as well. Specnaut installs
 no git hook: wiring it into one is the project's choice.
 
 ## The import boundary — with every tier
@@ -160,7 +160,7 @@ checked nothing.
   says so instead of passing it.
 
 Any other exit (126, 127) means the check did not run: a failure of the tier,
-never a pass. Every review runs it too, through the review coordinator.
+never a pass. Every review runs it too, in its Phase 0.
 
 ## A standalone item
 

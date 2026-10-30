@@ -9,30 +9,70 @@ $ARGUMENTS
 
 ## Outline
 
-1. Identify files modified in the current feature branch:
-   `git diff --name-only $(git merge-base HEAD main)`
-2. Delegate structural review to parallel sub-agents via the `review-coordinator`.
+1. Fix the range: `base=$(git merge-base HEAD main)`; the files under review are
+   `git diff --name-only $base..HEAD`.
+2. Measure (Phase 0), then fan the review seats out from this session (Phase 1) and aggregate
+   their reports per `phases/review-seats.md`.
 3. Detect the project's toolchain and run its quality gates.
 4. If CRITICAL or HIGH findings exist, route fixes to the implementer and re-run. A HIGH size
    finding (`.specnaut/memory/size-limits.md`) is routed the same way — no special case, and
    its severity is fixed there, not re-judged.
 5. Produce a final pass/fail report.
 
+## Phase 0 — Measure
+
+You measure; the seats read. Run `bash .specnaut/scripts/bash/size-ratchet.sh --since "$base"
+--report`: every changed file's line count at the base and at head, renames measured against
+their old path. Put its output in every seat's brief, with the path
+`.specnaut/memory/size-limits.md` (and `.specnaut/size-limits.yml` when the project has one).
+Severity for size comes from that file's table, nowhere else; exit 2 (unreadable table) is a HIGH
+finding, and any exit but 0, 1 or 2 means nothing was measured — say so in every brief;
+never brief "no size data" as clean.
+
+Then run `bash .specnaut/scripts/bash/boundary-check.sh` when it is present, and put its output in
+every brief too: exit 1 (a forbidden import in the domain) and exit 2 (the check could not run)
+are HIGH findings; exit 4 is briefed as *skipped: <reason>*, never as clean
+(`phases/quality-gates.md`).
+
 ## Phase 1 — Structural review
 
-Spawn the `review-coordinator` agent with the list of changed files. It in turn
-spawns:
+Read `phases/review-seats.md` before the first brief: what a brief may carry, and how the reports
+become one verdict, live there.
 
-- `code-reviewer` (always) — architecture, DRY, YAGNI, readability, alignment
-  with `docs/constitution.md`.
-- `security-expert` (always) — input validation, auth/authz, secret handling,
-  SQL/command injection, path traversal, silent catches that swallow errors.
-- `test-reviewer` (if test files are in the diff) — adequacy of coverage, test
-  quality, mocking boundaries.
+### Seat selection
 
-Each sub-agent returns findings at severity CRITICAL / HIGH / MEDIUM / LOW with
-file:line references and a suggested fix. The coordinator aggregates them into
-a single report.
+Run `bash .specnaut/scripts/audit/collect-audit-scope.sh --range "$base..HEAD"` and read its
+CATEGORY SIGNALS. The script decides; this table only names what each signal selects.
+
+| Seat                   | Runs when                                                                 |
+| :--------------------- | :------------------------------------------------------------------------ |
+| `code-reviewer`        | always — and runs its test checklist when `TEST_COUNT > 0`                |
+| `security-expert`      | always                                                                    |
+| `accessibility-expert` | `FRONTEND_COUNT > 0`                                                      |
+| `dependency-expert`    | `DEP_COUNT > 0`                                                           |
+| `performance-expert`   | the plan's § Audit findings records a `performance-expert` audit          |
+
+The performance seat is the one the script does not select: whether the change has a hot path is
+decided once, at plan time (`phases/plan.md`), and read here. A gated seat whose signal is `0` is
+`SKIPPED`.
+
+### Dispatch
+
+Dispatch every selected seat by its name — `Task(subagent_type: "<seat>")` on Claude Code,
+`spawn_agent(agent_type="<seat>")` on Codex — in one message, with no model or effort override:
+the agent's own definition sets both. Run at most 4 in flight, and never more than the harness's
+configured limit; start the next seat as one returns.
+
+### The turn budget
+
+A seat has a turn limit, and a brief that makes it discover the diff spends that budget before
+the first finding. So the brief carries the file list, the base and head SHAs and the Phase 0
+output, and the seat starts reading. For `code-reviewer`, it also carries `TEST_COUNT`. A diff of
+more than ~40 files is split: the seat is dispatched as several instances, each with its own slice
+of the files, and every instance counts in `SEATS_EXPECTED`.
+
+Each seat returns findings at severity CRITICAL / HIGH / MEDIUM / LOW with file:line references
+and a suggested fix, then one `REVIEW SUMMARY` block. Aggregate them per `phases/review-seats.md`.
 
 ## Phase 2 — Quality gates (auto-detected)
 
@@ -141,12 +181,13 @@ that never ran produces no findings to route and no cell to fill, so without
 this check a lost seat reads as a quiet pass all the way to merge.
 
 A seat can be short here for two reasons now: it returned no block, or it
-returned a **clean** one naming no evidence from the diff, which the
-coordinator counts as zero. This check needs no change to catch the second —
+returned a **clean** one naming no evidence from the diff, which
+`phases/review-seats.md` counts as zero. This check needs no change to catch the second —
 that is the point of the state being a number rather than a prose note.
 
-Re-dispatching the missing seat with a **narrower** brief is the normal remedy
-and does not need permission. Repeating the same brief is not.
+Resuming the missing seat, then re-dispatching it with a **narrower** brief
+(`phases/review-seats.md`), is the normal remedy and does not need permission.
+Repeating the same brief is not.
 
 ## Phase 4 — Final report
 
@@ -155,10 +196,10 @@ Emit a single report in this exact structure:
 ```
 📋 Review Summary — <feature name>
 
-Structural
+Structural (one line per seat, from the per-seat roll-up)
   code-reviewer       : PASS | FAIL (N CRITICAL, M HIGH, …)
-  security-expert    : …
-  test-reviewer       : … (or SKIPPED)
+  security-expert     : …
+  <signal-gated seat> : … (or SKIPPED)
 
 Quality gates
   format              : PASS | FAIL | SKIPPED

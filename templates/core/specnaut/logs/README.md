@@ -62,7 +62,7 @@ Base line (no contract block parsed, or a `start` event):
 Enriched `stop` line (contract block parsed from the output):
 
 ```json
-{"ts":"2026-06-13T11:42:00Z","event":"stop","session":"sess-123","agent":"security-expert","agent_id":"abf05f10d169e18fa","effort":"high","state":"awaiting_review","done_criteria_met":"yes","handoff_target":"review-coordinator","review_verdict":"fail"}
+{"ts":"2026-06-13T11:42:00Z","event":"stop","session":"sess-123","agent":"security-expert","agent_id":"abf05f10d169e18fa","effort":"high","state":"awaiting_review","done_criteria_met":"yes","handoff_target":"developer","review_verdict":"fail"}
 ```
 
 ## Invariants

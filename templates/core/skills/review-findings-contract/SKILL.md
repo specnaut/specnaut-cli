@@ -9,13 +9,12 @@ constitution-exempt: an output-format contract preloaded by reviewers that alrea
 
 This skill defines the **REVIEW SUMMARY** block. Agents that preload it
 (`architect-expert`, `performance-expert`, `security-expert`,
-`accessibility-expert`, `dependency-expert`, `code-reviewer`, `test-reviewer`, and the
-`review-coordinator`) emit exactly one such block **after their prose** (and
-before the WORKFLOW STATUS block when the agent also carries `workflow-contract`).
-It normalizes the review's severity counts and verdict so a coordinator can
-synthesize multiple seats' findings without re-reading each prose report. The
-`review-coordinator` emits the same block with the **aggregated** counts summed
-across every seat. The block is additive — it appends to the prose, never
+`accessibility-expert`, `dependency-expert`, `code-reviewer`) emit exactly one
+such block **after their prose** (and before the WORKFLOW STATUS block when the
+agent also carries `workflow-contract`). It normalizes the review's severity
+counts and verdict so `/task review` can synthesize multiple seats' findings
+without re-reading each prose report; it emits the same block with the
+**aggregated** counts summed across every seat (`phases/review-seats.md`). The block is additive — it appends to the prose, never
 replaces it.
 
 ## Format
@@ -50,7 +49,7 @@ RECOMMENDATION: <one sentence — what the next actor should do>
 - **Every field in the format appears inside the block.** Mentioning a field in
   prose beside the block has not emitted it — the block is the whole
   machine-readable surface, and a parenthetical after it is invisible to
-  whatever parses the run. Observed: a coordinator aggregating correctly, with
+  whatever parses the run. Observed: an aggregated review counting correctly, with
   `SEATS_EXPECTED` / `SEATS_REPORTED` / `EVIDENCE` in a sentence underneath.
 - Verdict and counts must never contradict.
 
@@ -58,22 +57,21 @@ RECOMMENDATION: <one sentence — what the next actor should do>
 
 `SEATS_REPORTED` is a seat's own account of itself. Nothing in the arithmetic
 above stops a seat from emitting `1`/`1` with all-zero counts and an empty
-report; it aggregates as a clean pass and the coordinator, counting blocks,
-cannot tell it from a real one.
+report; it aggregates as a clean pass and the review, counting blocks, cannot
+tell it from a real one.
 
 - `EVIDENCE` names what the seat inspected. On a **clean** report — every
   severity count `0` — it MUST name at least one path from the diff under
   review. A clean verdict is a claim about specific files, so it names them.
 - A clean report whose `EVIDENCE` is **absent, empty, or `NONE`** is `NOT RUN`.
-  The coordinator counts that seat as `0` towards `SEATS_REPORTED` whatever the
-  seat wrote, and the verdict comes out `fail` from the same arithmetic as a
-  missing block. This is the one field a seat's own count does not override.
+  How the review counts that seat is `phases/review-seats.md`'s rule, stated
+  there once. This is the one field a seat's own count does not override.
 - A report **with findings** needs no `EVIDENCE` beyond the findings, which
   already name their locations. Emit the field anyway; it costs one line.
 
 **The limit this leaves, stated so the next reader inherits it rather than
 rediscovering it.** `EVIDENCE` is still written by the seat. What changes is
-that the coordinator now holds a claim it can check — the paths either are in
+that the review now holds a claim it can check — the paths either are in
 the diff or they are not — instead of a number nobody can check. A seat that
 copies real paths out of the diff and reviews none of them still passes. This
 mechanism answers *did it look at all*, never *did it look well*, and no

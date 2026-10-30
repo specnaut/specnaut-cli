@@ -1,6 +1,6 @@
 ---
 name: dependency-expert
-description: Reviews dependency manifests for hygiene — outdated pins, unbounded ranges, unused declared deps, license violations, advisory-shape signals, peer-dep conflicts, typosquatting heuristics. Multi-manifest aware (npm / pyproject / Cargo / composer / Gemfile / go.mod / deno.json). Two dispatch shapes — (1) PR review (spawned by the review-coordinator during /task review), (2) scoped audit (spawned by /task audit, over the scope it resolved).
+description: Reviews dependency manifests for hygiene — outdated pins, unbounded ranges, unused declared deps, license violations, advisory-shape signals, peer-dep conflicts, typosquatting heuristics. Multi-manifest aware (npm / pyproject / Cargo / composer / Gemfile / go.mod / deno.json). Two dispatch shapes — (1) PR review (dispatched by /task review when its signal selects it), (2) scoped audit (spawned by /task audit, over the scope it resolved).
 model: opus
 effort: high
 tools: Read, Grep, Glob, Bash
@@ -56,7 +56,7 @@ If the domain file contradicts this definition, **the domain file wins.**
 
 ## Mode 1 — PR review
 
-Spawned by the `review-coordinator` during `/task review`. Review ONLY
+Dispatched by `/task review` when its signal selects it (`phases/review.md`). Review ONLY
 the files provided in the prompt (typically dependency manifests +
 lockfiles touched by the diff). Output the `FINDING` structure used by
 code-reviewer, followed by the canonical `REVIEW SUMMARY` block (see "Output

@@ -8,8 +8,8 @@ constitution-exempt: an output-format contract preloaded by agents that already 
 # workflow-contract
 
 This skill defines the **WORKFLOW STATUS** block. Agents that preload it
-(`developer`, `review-coordinator`, `workflow-manager`, `qa-tester`, and all
-five experts + both reviewers via this contract) emit exactly one such block at
+(`developer`, `workflow-manager`, `qa-tester`, and all
+five experts + `code-reviewer` via this contract) emit exactly one such block at
 the **end of their turn, after the prose**. The block is additive — it never replaces the prose narrative; it
 appends a normalized, fenced, machine-readable summary that downstream tooling
 (audit synthesis, the status ledger, `/status-audit`) can parse without
@@ -27,7 +27,7 @@ FILES_CHANGED: <comma list | none>
 VALIDATION: <comma list of "command (result)" | none>
 BLOCKERS: <one sentence | none>
 NEXT_ACTION: <one sentence>
-HANDOFF_TARGET: developer | review-coordinator | qa-tester | product-owner | workflow-manager | user | none
+HANDOFF_TARGET: developer | qa-tester | product-owner | workflow-manager | user | none
 ```
 
 ## Rules

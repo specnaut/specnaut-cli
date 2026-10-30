@@ -13,8 +13,7 @@ someone reads a dispatch line without opening the agent file.
 | Suffix | Meaning | Agents |
 | ------ | ------- | ------ |
 | `<domain>-expert` | A review lens that **also** has a `/task audit` axis — dual mode: per-diff review *and* scoped audit | `accessibility-expert`, `architect-expert`, `dependency-expert`, `performance-expert`, `security-expert` |
-| `<domain>-reviewer` | A review lens with **no** audit axis — it only ever sees a diff | `code-reviewer`, `test-reviewer` |
-| `-coordinator` | Fans out the lenses of a **single** phase and aggregates what returns | `review-coordinator` |
+| `<domain>-reviewer` | A review lens with **no** audit axis — it only ever sees a diff | `code-reviewer` |
 | `-manager` | Drives a **multi-phase** delivery across several agents | `workflow-manager` |
 | role noun | Does the work rather than judging it | `developer`, `qa-tester`, `devops-sre`, `product-owner`, `ui-ux-designer` |
 
@@ -22,9 +21,8 @@ Two rules follow, and they are the whole point of writing this down:
 
 - **`-expert` ⇔ an audit axis exists.** The five `-expert` agents correspond
   exactly to the five axis flags of `/task audit` (`--security`, `--perf`,
-  `--a11y`, `--archi`, `--deps`). If you give `code-reviewer` or
-  `test-reviewer` an audit axis, **rename it to `-expert` in the same
-  change** — otherwise the suffix stops predicting anything and the next
+  `--a11y`, `--archi`, `--deps`). If you give `code-reviewer` an audit
+  axis, **rename it to `-expert` in the same change** — otherwise the suffix stops predicting anything and the next
   person picks one at random.
 - **Agents spell the domain out; flags may abbreviate.** The agent is
   `accessibility-expert` while its flag is `--a11y`, and that asymmetry
@@ -64,8 +62,8 @@ release never widens the list on its own — re-run the test on the seat.
 | Model | Agents | Why |
 | ----- | ------ | --- |
 | `haiku` | `specnaut-guide` | Reads docs and explains; the user reads the whole answer. Its upgrade walk shows each fetched release and the files it commits before acting, and hands adoption and merges to `developer`. |
-| `opus` | `code-reviewer`, `test-reviewer`, `accessibility-expert`, `performance-expert`, `dependency-expert`, `security-expert`, `architect-expert` | Review lenses — nobody re-reads what they cleared. |
-| `opus` | `review-coordinator`, `workflow-manager` | Orchestrators — a dropped finding or a skipped step leaves no trace downstream. |
+| `opus` | `code-reviewer`, `accessibility-expert`, `performance-expert`, `dependency-expert`, `security-expert`, `architect-expert` | Review lenses — nobody re-reads what they cleared. |
+| `opus` | `workflow-manager` | Orchestrator — a skipped step leaves no trace downstream. |
 | `opus` | `product-owner` | Grooming is judgement; its mechanical board moves share the seat. |
 | `opus` | `developer`, `devops-sre`, `ui-ux-designer`, `qa-tester` | Builders and the QA gate — review samples their work, it does not re-derive it. |
 
@@ -76,10 +74,10 @@ mechanical subtask the caller will check, never for a review lens.
 
 | Tier | Role class | Agents |
 | ---- | ---------- | ------ |
-| `high` | Everything else — agentic work, review lenses, orchestrators, the backlog owner, the design agent, the explainer | `developer`, `qa-tester`, `devops-sre`, `accessibility-expert`, `dependency-expert`, `performance-expert`, `code-reviewer`, `test-reviewer`, `review-coordinator`, `workflow-manager`, `product-owner`, `ui-ux-designer`, `specnaut-guide` |
+| `high` | Everything else — agentic work, review lenses, orchestrators, the backlog owner, the design agent, the explainer | `developer`, `qa-tester`, `devops-sre`, `accessibility-expert`, `dependency-expert`, `performance-expert`, `code-reviewer`, `workflow-manager`, `product-owner`, `ui-ux-designer`, `specnaut-guide` |
 | `xhigh` | The two lenses whose misses are unrecoverable | `architect-expert`, `security-expert` |
 
-Tally: 13 `high` · 2 `xhigh` = 15 agents. `low` and `medium` remain valid
+Tally: 11 `high` · 2 `xhigh` = 13 agents. `low` and `medium` remain valid
 values for a project's own agents; **no bundled agent uses them.**
 
 Effort is independent of the model tier: a `haiku` seat takes the same
@@ -96,12 +94,10 @@ depth than writing code. Both halves turned out to be wrong in the same way.
   well-formatted report with fewer findings, which is indistinguishable from
   clean code. There is no error, no retry, and nothing downstream notices —
   the saving is visible and the cost is not.
-- **An orchestrator does reason.** `review-coordinator` decides *which*
-  lenses to fire against a given diff and reconciles findings that several
-  of them report differently; `workflow-manager` sequences a delivery and
-  judges when a phase is actually done. Neither is a switch statement.
+- **An orchestrator does reason.** `workflow-manager` sequences a delivery
+  and judges when a phase is actually done. It is not a switch statement.
 
-The compound-cost worry behind the old `low` tier is real — a coordinator
+The compound-cost worry behind the old `low` tier is real — an orchestrator
 pays its own budget plus every child's — but it is an argument for fanning
 out fewer lenses, not for the one agent choosing them thinking less.
 

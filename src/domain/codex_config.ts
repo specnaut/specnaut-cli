@@ -46,8 +46,12 @@ const DEFAULT_CHILD_EFFORT = "medium";
  * Codex picks its own default when the key is unset, so this is Specnaut
  * choosing a conservative number the user can raise, not a value rescuing a
  * broken one.
+ *
+ * Exported because `/task review` caps its own seat fan-out at the same
+ * number (`phases/review.md`, pinned by `review_fanout_test.ts`): one ceiling,
+ * whichever harness runs the review.
  */
-const DEFAULT_MAX_CONCURRENT = 4;
+export const DEFAULT_MAX_CONCURRENT = 4;
 
 /**
  * Every key the block writes, in the order it writes them — the one list the

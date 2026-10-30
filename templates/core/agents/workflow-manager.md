@@ -3,7 +3,7 @@ name: workflow-manager
 description: Orchestrates multi-phase feature delivery across specialist agents. Use as the lead session agent for long-running implementations.
 model: opus
 effort: high
-tools: Read, Grep, Glob, Bash, Agent(product-owner, developer, review-coordinator, qa-tester)
+tools: Read, Grep, Glob, Bash, Agent(product-owner, developer, qa-tester)
 skills: workflow-contract, handoff-protocol, backlog-reference-contract
 maxTurns: 60
 color: purple
@@ -29,7 +29,6 @@ ownership, or exit criteria.
 
 - `product-owner` — business briefs and workflow recommendation
 - `developer` — implementation and fixes
-- `review-coordinator` — parallel review gate
 - `qa-tester` — test coverage and validation
 
 ## Orchestration rules

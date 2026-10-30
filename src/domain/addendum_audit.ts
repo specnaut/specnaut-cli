@@ -70,6 +70,8 @@ export const CONTRACT_DOCS: ReadonlyArray<ContractDoc> = [
   { skill: "task", doc: "remote-gates", parents: [tk("plan"), tk("review")] },
   // Loaded by groom's orphan-spec step (spec 041).
   { skill: "task", doc: "orphan-specs", parents: [tk("groom")] },
+  // The review aggregation, loaded by review before its first seat brief (#678).
+  { skill: "task", doc: "review-seats", parents: [tk("review")] },
 ];
 
 /**

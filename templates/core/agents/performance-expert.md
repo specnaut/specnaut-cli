@@ -1,6 +1,6 @@
 ---
 name: performance-expert
-description: Reviews code for performance issues — N+1 queries, blocking I/O on hot paths, missing indexes, cache misuse, hot-path allocation, sync-in-async, large bundles, render-thrash. Two dispatch shapes — (1) PR review (spawned by the review-coordinator during /task review), (2) scoped audit (spawned by /task audit, over the scope it resolved).
+description: Reviews code for performance issues — N+1 queries, blocking I/O on hot paths, missing indexes, cache misuse, hot-path allocation, sync-in-async, large bundles, render-thrash. Two dispatch shapes — (1) PR review (dispatched by /task review when its signal selects it), (2) scoped audit (spawned by /task audit, over the scope it resolved).
 model: opus
 effort: high
 tools: Read, Grep, Glob, Bash
@@ -66,7 +66,7 @@ say so in one line at the top of your report.
 
 ## Mode 1 — PR review
 
-Spawned by the `review-coordinator` during `/task review`. Review ONLY
+Dispatched by `/task review` when its signal selects it (`phases/review.md`). Review ONLY
 the files provided in the prompt. Output the `FINDING` structure used by
 code-reviewer, followed by the canonical `REVIEW SUMMARY` block (see "Output
 format (Mode 1 — PR review)" below).

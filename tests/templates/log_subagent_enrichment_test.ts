@@ -97,7 +97,7 @@ Deno.test("REAL SubagentStop payload (agent_type + last_assistant_message + UPPE
     "WORKFLOW STATUS",
     "STATE: awaiting_review",
     "DONE_CRITERIA_MET: yes",
-    "HANDOFF_TARGET: review-coordinator",
+    "HANDOFF_TARGET: developer",
   ].join("\n");
   const payload = JSON.stringify({
     session_id: "sess-123",
@@ -125,7 +125,7 @@ Deno.test("REAL SubagentStop payload (agent_type + last_assistant_message + UPPE
   // Contract fields parsed from `last_assistant_message`, UPPERCASE names.
   assertEquals(line.state, "awaiting_review");
   assertEquals(line.done_criteria_met, "yes");
-  assertEquals(line.handoff_target, "review-coordinator");
+  assertEquals(line.handoff_target, "developer");
   assertEquals(line.review_verdict, "fail");
   // QA SUMMARY absent → key omitted, not empty.
   assert(
@@ -222,11 +222,11 @@ Deno.test("dual block REVIEW_VERDICT:fail + QA_VERDICT:pass → each verdict bou
     "WORKFLOW STATUS",
     "STATE: awaiting_review",
     "DONE_CRITERIA_MET: no",
-    "HANDOFF_TARGET: review-coordinator",
+    "HANDOFF_TARGET: developer",
   ].join("\n");
   const payload = JSON.stringify({
     session_id: "sess-dual",
-    agent_type: "review-coordinator",
+    agent_type: "code-reviewer",
     last_assistant_message: lastAssistantMessage,
   });
 

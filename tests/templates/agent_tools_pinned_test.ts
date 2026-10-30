@@ -2,11 +2,12 @@
 //
 // Nothing asserted these before. That means nothing pinned the present values,
 // and nothing would notice a future drift of them — including the silent LOSS
-// of a grant. `test-reviewer` carries `Bash(deno test *)` so that a rule about
-// whether an assertion bites can be settled by running something; if that
-// suffix were dropped in a later edit, the seat would go back to reporting
-// behavioural claims from reading and the only symptom would be reviews that
-// look exactly as confident as before.
+// of a grant. `code-reviewer` carries `Bash(.specnaut/scripts/bash/run-gate.sh fast)`
+// so that a rule about whether an assertion bites can be settled by running the
+// project's own declared fast gate (#678 — reused, not a list of test runners);
+// if that grant were dropped in a later edit, the seat would go back to
+// reporting behavioural claims from reading and the only symptom would be
+// reviews that look exactly as confident as before.
 //
 // A tools line is also the seat's authority boundary. Widening one is a real
 // decision — this test makes it a visible one, by refusing to pass until the
@@ -25,28 +26,17 @@ const AGENTS = fromFileUrl(new URL("../../templates/core/agents/", import.meta.u
 const PINNED = new Map<string, string>([
   ["accessibility-expert", "Read, Grep, Glob, Bash"],
   ["architect-expert", "Read, Grep, Glob, Bash"],
-  ["code-reviewer", "Read, Grep, Glob"],
+  ["code-reviewer", "Read, Grep, Glob, Bash(.specnaut/scripts/bash/run-gate.sh fast)"],
   ["dependency-expert", "Read, Grep, Glob, Bash"],
   ["developer", "Read, Write, Edit, Grep, Glob, Bash"],
   ["devops-sre", "Read, Write, Edit, Grep, Glob, Bash"],
   ["performance-expert", "Read, Grep, Glob, Bash"],
   ["product-owner", "Read, Write, Edit, Grep, Glob, Bash"],
   ["qa-tester", "Read, Write, Edit, Grep, Glob, Bash"],
-  [
-    "review-coordinator",
-    "Read, Grep, Glob, Bash, Agent(code-reviewer, security-expert, test-reviewer)",
-  ],
   ["security-expert", "Read, Grep, Glob, Bash"],
   ["specnaut-guide", "Read, WebFetch, Grep, Glob, Bash, Agent(developer)"],
-  [
-    "test-reviewer",
-    "Read, Grep, Glob, Bash(deno test *), Bash(npm test*), Bash(npx vitest*), Bash(npx jest*), Bash(pytest*), Bash(go test *), Bash(cargo test*)",
-  ],
   ["ui-ux-designer", "Read, Edit, Write, Glob, Grep"],
-  [
-    "workflow-manager",
-    "Read, Grep, Glob, Bash, Agent(product-owner, developer, review-coordinator, qa-tester)",
-  ],
+  ["workflow-manager", "Read, Grep, Glob, Bash, Agent(product-owner, developer, qa-tester)"],
 ]);
 
 /** `README.md` documents the directory; it is not a seat. */

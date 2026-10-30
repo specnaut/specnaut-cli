@@ -8,7 +8,7 @@ constitution-exempt: an output-format contract preloaded by agents that already 
 # handoff-protocol
 
 This skill defines the **HANDOFF** block. Agents that preload it (`developer`,
-`review-coordinator`, `workflow-manager`) emit it **immediately after the
+`workflow-manager`) emit it **immediately after the
 WORKFLOW STATUS block, and only when** that block's `HANDOFF_TARGET` is not
 `none`. It gives the next actor a precise, executable instruction plus the
 concrete payload they need, so the handoff requires no re-derivation of intent.
@@ -23,7 +23,7 @@ routes bugs to the developer) signal the target through the WORKFLOW STATUS
 
 ```text
 HANDOFF
-TARGET: developer | review-coordinator | qa-tester | product-owner | workflow-manager | user
+TARGET: developer | qa-tester | product-owner | workflow-manager | user
 REASON: <one sentence>
 REQUESTED_ACTION: <one imperative sentence — executable without reinterpretation>
 PAYLOAD: <concrete filenames, ids, findings, spec ids the next actor needs>

@@ -332,8 +332,7 @@ echo "═══ bundled agents — basename presence (audit gate) ═══"
 # agent. The for-loops above iterate on bare agent names (no .md) which the
 # audit's basename-matcher cannot see.
 for agent_md in code-reviewer.md developer.md devops-sre.md qa-tester.md \
-                review-coordinator.md security-expert.md test-reviewer.md \
-                workflow-manager.md; do
+                security-expert.md workflow-manager.md; do
   check "agent $agent_md scaffolded" \
     "[ -f .claude/agents/$agent_md ]"
 done
@@ -625,7 +624,7 @@ check "the seat caps Step 0 so the budget reaches the files" \
 # instead of naming the one that happened to have it.
 check "a clean verdict has a shape of its own, on every seat" \
   'for a in accessibility-expert architect-expert code-reviewer dependency-expert \
-            performance-expert security-expert test-reviewer review-coordinator; do
+            performance-expert security-expert; do
      grep -qF "EVIDENCE" ".claude/agents/$a.md" || exit 1
    done'
 check "the contract, not an agent, defines what a clean verdict names" \
@@ -641,32 +640,39 @@ check "the contract can express that nobody looked" \
 check "and a missing seat fails by arithmetic, not by interpretation" \
   'grep -qF "SEATS_REPORTED < SEATS_EXPECTED" .claude/skills/review-findings-contract/SKILL.md'
 check "which seats are required is defined, not left to judgement" \
-  'grep -q "Required seats, so the word is not left" .claude/agents/review-coordinator.md'
+  'grep -q "Required seats, so the word is not left" .claude/skills/task/phases/review-seats.md'
 check "a skipped seat is distinguished from a missing one" \
-  'grep -q "skipped seat is not a missing one" .claude/agents/review-coordinator.md'
+  'grep -q "skipped seat is not a missing one" .claude/skills/task/phases/review-seats.md'
 # A SWEEP, not a case. The contract gained two fields and six of the eight
 # seats kept describing the old block — an honest review would then have
 # counted six seats as not-reporting. Third instance in two days of an
 # enumeration stopping one short, so this counts every seat rather than
 # naming the ones that were wrong at the time.
 check "every review seat names the seat-count fields, not just the ones fixed" \
-  'n=0; for a in .claude/agents/*expert.md .claude/agents/code-reviewer.md .claude/agents/test-reviewer.md .claude/agents/review-coordinator.md; do grep -q "REVIEW_VERDICT" "$a" || continue; grep -q "SEATS_EXPECTED" "$a" || n=$((n+1)); done; [ "$n" -eq 0 ]'
+  'n=0; for a in .claude/agents/*expert.md .claude/agents/code-reviewer.md; do grep -q "REVIEW_VERDICT" "$a" || continue; grep -q "SEATS_EXPECTED" "$a" || n=$((n+1)); done; [ "$n" -eq 0 ]'
 check "a stale seat block does not fail an honest gate" \
-  'grep -q "counts as .*one" .claude/agents/review-coordinator.md'
-check "the coordinator's own restatement carries the third trigger too" \
-  'grep -qF "SEATS_REPORTED < SEATS_EXPECTED" .claude/agents/review-coordinator.md'
-check "the coordinator may not present its own checking as a seat report" \
-  'grep -qF "Coordinator verification is not a seat report" .claude/agents/review-coordinator.md'
+  'grep -q "counts as .*one" .claude/skills/task/phases/review-seats.md'
+check "the aggregation's own restatement carries the third trigger too" \
+  'grep -qF "SEATS_REPORTED < SEATS_EXPECTED" .claude/skills/task/phases/review-seats.md'
+check "the review may not present its own checking as a seat report" \
+  'grep -qF "Your own verification is not a seat report" .claude/skills/task/phases/review-seats.md'
 # AC4 — the option deliberately NOT taken. Without an assertion, deleting the
 # refusal is invisible and an automatic retry creeps back in.
 check "no automatic re-dispatch: zero findings stays a legitimate result" \
-  'grep -q "zero findings can be a" .claude/agents/review-coordinator.md'
-# The consumer of the gate. Without this the coordinator can say fail and the
+  'grep -q "zero findings can be a" .claude/skills/task/phases/review-seats.md'
+# The consumer of the gate. Without this the aggregation can say fail and the
 # chain still reaches the merge prompt.
 check "the review phase stops the run when a seat did not report" \
   'grep -qF "SEATS_REPORTED <" .claude/skills/task/phases/review.md'
 check "and re-dispatching narrower is allowed, repeating the brief is not" \
   'grep -qF "Repeating the same brief is not" .claude/skills/task/phases/review.md'
+# #678 — the coordinator's fan-out moved into the review phase itself.
+check "the review fans its seats out by name under the concurrency cap" \
+  'grep -qF "in flight, and never more than the harness" .claude/skills/task/phases/review.md && grep -qF "collect-audit-scope.sh --range" .claude/skills/task/phases/review.md'
+check "a seat brief carries data, never the diff's own text" \
+  'grep -qF "never diff hunks or commit message bodies" .claude/skills/task/phases/review-seats.md'
+check "and only a seat's last REVIEW SUMMARY block counts" \
+  'grep -qF "Only the last \`REVIEW SUMMARY\` block" .claude/skills/task/phases/review-seats.md'
 
 echo "═══ #547  the thirteen skills nothing asserted on ═══"
 # These shipped covered by an audit that could not fail: every skill's file

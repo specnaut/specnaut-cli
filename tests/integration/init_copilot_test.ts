@@ -94,7 +94,9 @@ Deno.test("specnaut init --ai copilot scaffolds a Copilot layout", async () => {
     // seven skills and the five audit phases. 53 since cli#683: `board`,
     // `code-audit` and the five `*-audit` skills became one `task` skill, which
     // gained `backlog` and `audit` documents; `specnaut` gained `doc` and `list`.
-    assertEquals(instructionsCount, 53);
+    // 52 since cli#678: review-coordinator and test-reviewer retired, the
+    // `task` skill gained the review-seats document.
+    assertEquals(instructionsCount, 52);
 
     // Shared (cross-harness)
     assertEquals(await exists(join(root, "docs/constitution.md")), true);

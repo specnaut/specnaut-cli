@@ -5,9 +5,10 @@ import { CORE_BUNDLE } from "../../src/templates_bundle.ts";
  * monorepo#28 — a review seat's own `SEATS_REPORTED` count is taken on trust.
  *
  * `review-findings-contract` now requires `EVIDENCE` on a clean report, and the
- * coordinator counts a clean seat that names none as `NOT RUN`. That check only
- * works if EVERY seat knows to emit the field: a coordinator enforcing it
- * against seats that never learned about it fails every honest review.
+ * review aggregation (`phases/review-seats.md`) counts a clean seat that names
+ * none as `NOT RUN`. That check only works if EVERY seat knows to emit the
+ * field: an aggregation enforcing it against seats that never learned about it
+ * fails every honest review.
  *
  * monorepo#23 shipped exactly that mistake — two contract fields added and
  * ported to two of eight seats. It was caught by writing a SWEEP over every
@@ -40,9 +41,11 @@ const SEATS = CORE_BUNDLE
 Deno.test("the seat sweep found seats at all", () => {
   // Without this the whole file is vacuous: a frontmatter rename would empty
   // SEATS and every assertion below would pass by iterating nothing.
+  // Six since #678 (five experts + code-reviewer): a population count, not a
+  // weaker guard.
   assert(
-    SEATS.length >= 8,
-    `expected at least 8 agents preloading review-findings-contract, found ${SEATS.length}: ` +
+    SEATS.length >= 6,
+    `expected at least 6 agents preloading review-findings-contract, found ${SEATS.length}: ` +
       SEATS.map((e) => e.name).join(", "),
   );
 });
@@ -52,7 +55,7 @@ for (const seat of SEATS) {
     assert(
       seat.content.includes("EVIDENCE"),
       `${seat.name} preloads review-findings-contract but never names EVIDENCE. ` +
-        `The coordinator counts a clean report with no evidence as NOT RUN, so a ` +
+        `The review counts a clean report with no evidence as NOT RUN, so a ` +
         `seat that does not know about the field fails every honest review it runs.`,
     );
   });
@@ -74,4 +77,17 @@ Deno.test("the contract states the limit the evidence check leaves behind", () =
     contract.content.includes("did it look at all"),
     "the contract must state what the check does NOT answer",
   );
+});
+
+Deno.test("the aggregation checks a clean seat's EVIDENCE against the diff and counts it NOT RUN", () => {
+  // The rule's home since #678. Without it every seat above emits EVIDENCE and
+  // nothing reads it.
+  const doc = CORE_BUNDLE.find(
+    (e) => e.category === "phase" && e.name === "task" && e.suffix === "review-seats.md",
+  );
+  assert(doc, "phases/review-seats.md missing from CORE_BUNDLE");
+  const flat = doc.content.replace(/\s+/g, " ");
+  assert(flat.includes("git diff --name-only <base>..HEAD"), "checked against the diff");
+  assert(flat.includes("NOT RUN: clean verdict, no evidence"), "named NOT RUN in TOP_ISSUES");
+  assert(flat.includes("Count it as **zero** towards `SEATS_REPORTED`"), "counted as zero");
 });

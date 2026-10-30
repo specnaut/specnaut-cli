@@ -1,6 +1,6 @@
 ---
 name: security-expert
-description: Reviews code for security issues — input validation, authz, secrets, injection, SSRF, path traversal, silent error swallowing. Three dispatch shapes — (1) PR review (spawned by the review-coordinator during /task review), (2) alert triage (spawned by /release after the security-preflight workflow surfaces open GitHub security alerts).
+description: Reviews code for security issues — input validation, authz, secrets, injection, SSRF, path traversal, silent error swallowing. Three dispatch shapes — (1) PR review (dispatched by /task review on every diff), (2) alert triage (spawned by /release after the security-preflight workflow surfaces open GitHub security alerts).
 model: opus
 effort: xhigh
 tools: Read, Grep, Glob, Bash
@@ -85,7 +85,7 @@ prose note beside an all-zero block reads as clean to whatever sums it:
 
 - **Found nothing after looking.** `SEATS_EXPECTED: 1`, `SEATS_REPORTED: 1`,
   zero counts, and `EVIDENCE:` naming the paths you inspected. The evidence is
-  **not optional here**: the coordinator checks it against the diff and counts a
+  **not optional here**: the review phase checks it against the diff and counts a
   clean verdict with none as `NOT RUN`, whatever the `1` beside it says.
 - **Could not look.** The same block with `SEATS_REPORTED: 0`,
   `REVIEW_VERDICT: fail`, and `TOP_ISSUES:` opening `NOT RUN: <reason>`. The
@@ -111,7 +111,7 @@ partially masked. Recommend rotation at the issuer, not just deletion.
 
 ## Mode 1 — PR review
 
-Spawned by the `review-coordinator` during `/task review`. Review
+Dispatched by `/task review` on every diff. Review
 ONLY the files provided in the prompt. Output the `FINDING` structure
 used by code-reviewer, followed by the canonical `REVIEW SUMMARY` block
 (see "Output format (Mode 1)" below).

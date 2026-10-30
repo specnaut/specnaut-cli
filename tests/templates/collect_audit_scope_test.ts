@@ -169,6 +169,27 @@ Deno.test("collect-audit-scope counts test files via TEST_COUNT", async () => {
   }
 });
 
+/**
+ * `TEST_COUNT` decides whether `code-reviewer` runs its test checklist during
+ * `/task review`, so a project whose tests sit in a top-level `test/` (not
+ * `tests/`, not `*_test.*`) must still count — otherwise its test changes are
+ * reviewed by no checklist at all.
+ */
+Deno.test("collect-audit-scope counts a top-level test/ directory via TEST_COUNT", async () => {
+  const dir = await fixtureRepo();
+  try {
+    await Deno.mkdir(`${dir}/test`, { recursive: true });
+    await Deno.writeTextFile(`${dir}/test/button.ts`, "export const t = 1;\n");
+    await git(["add", "."], dir);
+    await git(["commit", "-m", "test: top-level test dir"], dir);
+    const r = await scope(dir, ["--range", "HEAD~1..HEAD"]);
+    assertEquals(r.code, 0, r.stderr);
+    assertEquals(count(r.stdout, "TEST_COUNT"), 1);
+  } finally {
+    await Deno.remove(dir, { recursive: true });
+  }
+});
+
 Deno.test("collect-audit-scope exits non-zero with a clear error outside a git repo", async () => {
   const dir = await Deno.makeTempDir({ prefix: "code-audit-nogit-" });
   try {

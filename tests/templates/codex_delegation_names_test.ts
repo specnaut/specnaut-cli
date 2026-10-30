@@ -51,9 +51,10 @@ Deno.test("the dispatch table names an agent for every delegating step, each one
     const required of [
       "architect-expert",
       "security-expert",
-      "review-coordinator",
       "code-reviewer",
-      "test-reviewer",
+      "accessibility-expert",
+      "dependency-expert",
+      "performance-expert",
       "product-owner",
     ]
   ) {

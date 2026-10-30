@@ -57,6 +57,12 @@
     {
       "category": "phase",
       "name": "task",
+      "suffix": "review-seats.md",
+      "source": "core/skills/task/phases/review-seats.md"
+    },
+    {
+      "category": "phase",
+      "name": "task",
       "suffix": "merge.md",
       "source": "core/skills/task/phases/merge.md"
     },
@@ -252,11 +258,6 @@
     },
     {
       "category": "agent",
-      "name": "review-coordinator",
-      "source": "core/agents/review-coordinator.md"
-    },
-    {
-      "category": "agent",
       "name": "code-reviewer",
       "source": "core/agents/code-reviewer.md"
     },
@@ -264,11 +265,6 @@
       "category": "agent",
       "name": "security-expert",
       "source": "core/agents/security-expert.md"
-    },
-    {
-      "category": "agent",
-      "name": "test-reviewer",
-      "source": "core/agents/test-reviewer.md"
     },
     {
       "category": "agent",

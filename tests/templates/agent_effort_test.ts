@@ -20,16 +20,14 @@ type Effort = (typeof VALID_EFFORTS)[number];
 
 /**
  * Authoritative agent → effort assignment, mirroring the tier table in
- * `templates/core/agents/README.md`. 13 high · 2 xhigh = 15.
+ * `templates/core/agents/README.md`. 11 high · 2 xhigh = 13.
  */
 const EFFORT_MAP: Record<string, Effort> = {
-  "review-coordinator": "high",
   "workflow-manager": "high",
   "accessibility-expert": "high",
   "dependency-expert": "high",
   "performance-expert": "high",
   "code-reviewer": "high",
-  "test-reviewer": "high",
   "specnaut-guide": "high",
   "product-owner": "high",
   "ui-ux-designer": "high",
@@ -98,7 +96,7 @@ Deno.test("the effort rubric covers exactly the bundled agent fleet", () => {
 
 /**
  * Authoritative agent → `model:` assignment, mirroring the model table in
- * `templates/core/agents/README.md`: 14 opus · 1 haiku = 15.
+ * `templates/core/agents/README.md`: 12 opus · 1 haiku = 13.
  *
  * The rule is "who checks the output?". A seat goes to `haiku` only when the
  * person who asked reads its whole output and nothing downstream treats it as
@@ -107,13 +105,11 @@ Deno.test("the effort rubric covers exactly the bundled agent fleet", () => {
  * a change has to edit, in the open.
  */
 const MODEL_MAP: Record<string, "opus" | "haiku"> = {
-  "review-coordinator": "opus",
   "workflow-manager": "opus",
   "accessibility-expert": "opus",
   "dependency-expert": "opus",
   "performance-expert": "opus",
   "code-reviewer": "opus",
-  "test-reviewer": "opus",
   "specnaut-guide": "haiku",
   "product-owner": "opus",
   "ui-ux-designer": "opus",
@@ -152,24 +148,23 @@ Deno.test("the model rubric covers exactly the bundled agent fleet", () => {
  *
  * The tiers, so a new seat can be placed rather than guessed:
  *   20 — a read-only review lens: read the diff, report, stop.
- *   30 — writes, or coordinates a fixed set of lenses.
- *   40 — drives an external surface (a sandbox, a pipeline) with retries.
+ *   30 — writes.
+ *   40 — drives an external surface (a sandbox, a pipeline) with retries, or
+ *        a lens that also runs a gate (`code-reviewer`'s test checklist, #678).
  *   60 — walks an interactive protocol that dispatches sub-agents.
  *   80 — implements, which is the only seat that edits until tests pass.
  */
 const MAX_TURNS_MAP: Record<string, number> = {
   "accessibility-expert": 20,
   "architect-expert": 20,
-  "code-reviewer": 20,
+  "code-reviewer": 40,
   "dependency-expert": 20,
   "performance-expert": 20,
   "security-expert": 20,
   "product-owner": 30,
-  "review-coordinator": 30,
   "ui-ux-designer": 30,
   "devops-sre": 40,
   "qa-tester": 40,
-  "test-reviewer": 40,
   "specnaut-guide": 60,
   "workflow-manager": 60,
   "developer": 80,

@@ -15,7 +15,7 @@ FILES:
 TOTAL_FILES: <integer>
 CATEGORY SIGNALS
 FRONTEND_COUNT: <integer>   # GATING — > 0 deploys the accessibility seat
-TEST_COUNT: <integer>       # INFORMATIONAL — context only, no seat consumes it
+TEST_COUNT: <integer>       # GATING (a checklist) — > 0 runs code-reviewer's test checklist
 DEP_COUNT: <integer>        # GATING — > 0 deploys the dependency seat
 INFRA_COUNT: <integer>      # INFORMATIONAL — context only, no seat consumes it
 ```
@@ -28,10 +28,12 @@ whether a seat reads them:
 - **Gating signals** select an auditor seat:
   - `FRONTEND_COUNT > 0` → deploy the **accessibility** seat (`a11y-auditor`).
   - `DEP_COUNT > 0` → deploy the **dependency** seat (`dependency-auditor`).
+  - `TEST_COUNT > 0` → during `/task review`, `code-reviewer` runs its **test checklist**. It gates
+    a checklist inside a seat that always runs, not a seat of its own. Test files are matched by
+    `*_test.*`, `*.test.*`, `*.spec.*`, `tests/`, `test/` (top level or nested) and `__tests__`.
 - **Informational signals** describe the scope but gate nothing:
-  - `TEST_COUNT` and `INFRA_COUNT` are context only — there is no test/coverage or infra auditor
-    seat, by design. They are not orphaned bugs; they round out the scope picture for the maintainer
-    reading the block.
+  - `INFRA_COUNT` is context only — there is no infra auditor seat, by design. It is not an orphaned
+    bug; it rounds out the scope picture for the maintainer reading the block.
 
 ## Rules
 

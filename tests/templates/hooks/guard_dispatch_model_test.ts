@@ -88,7 +88,7 @@ const CASES: readonly Case[] = [
     model: "gpt-5.4-mini",
   }, 2],
   ["Specnaut agent + reasoning_effort", "codex", "spawn_agent", {
-    agent_type: "test-reviewer",
+    agent_type: "code-reviewer",
     reasoning_effort: "low",
   }, 2],
   ["Specnaut agent + model object", "codex", "spawn_agent", {

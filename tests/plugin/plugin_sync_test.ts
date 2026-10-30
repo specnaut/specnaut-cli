@@ -35,6 +35,7 @@ const SYNC_PAIRS: ReadonlyArray<{ plugin: string; source: string }> = [
     "plan",
     "implement",
     "review",
+    "review-seats",
     "merge",
     "audit",
     "constitution",
@@ -100,23 +101,22 @@ const SYNC_PAIRS: ReadonlyArray<{ plugin: string; source: string }> = [
     plugin: "plugin/skills/status-audit/SKILL.md",
     source: "templates/core/skills/status-audit/SKILL.md",
   },
-  // Dual-copy agents: 15 sub-agent definitions, each landing as
+  // Dual-copy agents: 13 sub-agent definitions, each landing as
   // `plugin/agents/<name>.md`. Claude Code resolves agents by file
   // basename in plugin scope; no namespacing needed for invocation
   // (agents are not user-invokable like slash commands).
   // Counts: 10 original + ui-ux-designer (#198, sync-test drift fix in
   // #321) + performance-expert (#304) + accessibility-expert (#305) +
-  // architect-expert (#321) + dependency-expert (#322) = 15.
+  // architect-expert (#321) + dependency-expert (#322) = 15, less
+  // review-coordinator and test-reviewer (#678) = 13.
   ...[
     "code-reviewer",
     "developer",
     "devops-sre",
     "product-owner",
     "qa-tester",
-    "review-coordinator",
     "security-expert",
     "specnaut-guide",
-    "test-reviewer",
     "workflow-manager",
     "ui-ux-designer",
     "performance-expert",

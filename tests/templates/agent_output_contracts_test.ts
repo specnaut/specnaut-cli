@@ -39,8 +39,6 @@ const AGENT_WIRING: Record<string, readonly string[]> = {
   // #576: this seat reviews whatever the developer wrote, UI included, so it
   // is where a fixed-width layout is caught after the fact.
   "code-reviewer": ["review-findings-contract", "workflow-contract", "mobile-first-contract"],
-  "test-reviewer": ["review-findings-contract", "workflow-contract"],
-  "review-coordinator": ["workflow-contract", "handoff-protocol", "review-findings-contract"],
   "developer": [
     "workflow-contract",
     "handoff-protocol",

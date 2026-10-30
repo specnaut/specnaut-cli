@@ -143,7 +143,7 @@ classify_files() {
       '*.tsx' '*.jsx' '*.vue' '*.svelte' '*.css' '*.scss' '*inertia*' '*frontend*' '*components*' &&
       FRONTEND_COUNT=$((FRONTEND_COUNT + 1))
     matches_any "$f" \
-      '*_test.*' '*.test.*' '*.spec.*' 'tests/*' '*/tests/*' '*/test/*' '*__tests__*' &&
+      '*_test.*' '*.test.*' '*.spec.*' 'tests/*' '*/tests/*' 'test/*' '*/test/*' '*__tests__*' &&
       TEST_COUNT=$((TEST_COUNT + 1))
     matches_any "$f" \
       'package.json' '*/package.json' 'deno.json' '*/deno.json' 'deno.jsonc' '*.lock' \
@@ -221,8 +221,10 @@ fi
 # CATEGORY SIGNALS — heuristic path/extension globs (research.md Decision 1).
 # Signal intent (contract: contracts/scope-signals.md): FRONTEND_COUNT and
 # DEP_COUNT are GATING (they decide whether the accessibility and dependency
-# seats run); TEST_COUNT and INFRA_COUNT are INFORMATIONAL only (no seat
-# consumes them) — all four are always emitted per the #379 contract.
+# seats run); TEST_COUNT is GATING for a checklist, not a seat — above zero,
+# `/task review` has `code-reviewer` run its test checklist; INFRA_COUNT is
+# INFORMATIONAL only (no seat consumes it) — all four are always emitted per
+# the #379 contract.
 classify_files "$FILES"
 
 # Emit the fixed block.
