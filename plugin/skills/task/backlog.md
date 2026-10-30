@@ -42,6 +42,7 @@ PO.
 .specnaut/scripts/backlog/view.sh <number>            # one item + body
 .specnaut/scripts/backlog/add.sh "<title>" [body]     # create new item, auto-numbered
 .specnaut/scripts/backlog/move.sh <number> <Status>   # Backlog|Ready|In progress|In review|Done
+.specnaut/scripts/backlog/move.sh <number> Done --not-planned   # close as not planned
 .specnaut/scripts/backlog/clarify-comment.sh <num> "<question>"
 ```
 
@@ -49,8 +50,9 @@ PO.
 
 - `add.sh` picks the next free number (`001`, `002`, …).
 - Status lives in each item's frontmatter, mirrored in the index.
-- **Closing** an item = move to `Done`. The file stays on disk as the
-  audit trail; nothing is deleted.
+- **Closing** an item = move to `Done`; `--not-planned` adds
+  `resolution: not-planned`, shown in the index. The file stays on disk as
+  the audit trail; nothing is deleted.
 - Bodies follow `## Why` / `## Acceptance criteria` / `## Out of scope`.
 - Titles are short imperatives ("Add docx skill", not "I want to add a docx skill").
 <!-- END: backend=local -->

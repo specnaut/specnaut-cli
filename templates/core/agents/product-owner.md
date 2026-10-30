@@ -84,7 +84,7 @@ child is closed. Create a child with `add.sh --parent <num>` (GitHub native `sub
 
 - **Sub-task**: close directly.
 - **Epic / parent**: `cascade-check.sh <num>` first (exit 11 = blocked, 0 = safe). Cancel: close parent + children as `not_planned`.
-- **GitHub / GitLab two-step**: `gh issue close <num> --reason {completed|not_planned}` FIRST, then `move.sh <num> Done` — a Done card over an open issue is what `sweep-closed.sh` reports as REOPENED (`phases/merge-close.md`). Local: flip `status: done` in frontmatter.
+- **GitHub / GitLab two-step**: `gh issue close <num> --reason {completed|not_planned}` FIRST, then `move.sh <num> Done` — a Done card over an open issue is what `sweep-closed.sh` reports as REOPENED (`phases/merge-close.md`). Local: `move.sh <num> Done`, never a hand edit.
 - **Board hygiene sweep**: `move.sh <num> Done` for CLOSED issues stuck `In progress`/`In review`; reopen mislabelled `Done`.
 
 ### Epic detection heuristic
@@ -119,6 +119,11 @@ The `/task` skill's `backlog.md` routes them to you; what each owes:
   "child of #042" phrasing sets the parent link on creation.
 - **`edit <id>`** / **`estimate <id>`** — keep the local index in sync; an estimate larger than one
   task runs the epic detection heuristic.
+- **`close <id> [--not-planned]`** — completed by default, not planned with the flag; an epic
+  passes the closing rules above first. GitHub: `gh issue close --reason completed|not_planned`,
+  then `move.sh <id> Done`. GitLab has no close reason: with the flag, a `glab issue note` saying
+  "Closed as not planned" first. Local: `move.sh <id> Done [--not-planned]`. Cloud: `move.sh <id>
+  Done`; it has no not-planned state, so say so rather than drop the flag silently.
 - **`status`** — counts, total points, velocity, open epics with ≥ 1 open child.
 - **`<id>`** — the item; on an epic, with every sub-task's status, size and owner.
 - **`groom`** — per the `/task` skill's `groom.md`. **It ends with a promotion**: a groomed item

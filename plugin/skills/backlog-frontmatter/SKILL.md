@@ -19,6 +19,7 @@ a passage inside a role description.
 number: NNN            # zero-padded 3 digits, globally unique within this project
 title: string
 status: Backlog | Ready | In progress | In review | Done
+resolution: not-planned  # only on a Done item closed as not planned; absent = completed
 size: XS | S | M | L | XL       # empty at creation; set when groomed
 priority: P0 | P1 | P2 | P3     # empty at creation; set when groomed
 parent: "#NNN"         # only on a sub-task: the local number of its parent epic
@@ -26,7 +27,8 @@ created: YYYY-MM-DDTHH:MM:SSZ   # UTC, written by add.sh
 ---
 ```
 
-This is what `scripts/local/add.sh` writes and `scripts/local/move.sh` accepts. `size` and
+This is what `scripts/local/add.sh` writes and `scripts/local/move.sh` accepts;
+`move.sh <num> Done --not-planned` writes `resolution`, and any other move drops it. `size` and
 `priority` start empty: an item is not groomed until both hold exactly one value.
 
 `parent: "#NNN"` is the local-Markdown sub-task convention (grep-friendly); absent means a

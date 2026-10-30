@@ -25,10 +25,12 @@ for f in $(printf "%s\n" "$BACKLOG_DIR"/*.md | sort); do
   status=$(awk '/^---$/{n++; next} n==1 && /^status:/ {sub(/^status:[[:space:]]*/, ""); print; exit}' "$f")
   size=$(awk '/^---$/{n++; next} n==1 && /^size:/ {sub(/^size:[[:space:]]*/, ""); print; exit}' "$f")
   priority=$(awk '/^---$/{n++; next} n==1 && /^priority:/ {sub(/^priority:[[:space:]]*/, ""); print; exit}' "$f")
+  resolution=$(awk '/^---$/{n++; next} n==1 && /^resolution:/ {sub(/^resolution:[[:space:]]*/, ""); print; exit}' "$f")
 
   badge=""
   [ -n "$size" ] && badge="$badge \`size:$size\`"
   [ -n "$priority" ] && badge="$badge \`priority:$priority\`"
+  [ -n "$resolution" ] && badge="$badge \`$resolution\`"
   line="- [#$num](backlog/$base)$badge — $title"
 
   case "$status" in
