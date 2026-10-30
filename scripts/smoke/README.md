@@ -23,7 +23,9 @@ fixture; `--real` for a genuine pinned `create-vite` scaffold), `bootstrap-empty
 **The suite** — enumerated by `SUITE_FILES` in `_common.sh`, which `audit.sh` checks against the
 scripts actually on disk. A script that exists but is not listed is a finding, not an omission.
 
-**`audit.sh`** — the coverage gate. **`smoke-audit.sh`** — its meta-test.
+**`audit.sh`** — the coverage gate, with what it reads in `_audit_collect.sh` and its scans of the
+smoke scripts in `_audit_smoke_scans.sh`. **`smoke-audit.sh`** — its meta-test, with the #564 probes
+and the verdicts in `_audit_meta_*.sh`.
 
 ## `_common.sh` owns five decisions
 
