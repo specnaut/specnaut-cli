@@ -22571,145 +22571,12 @@ if [ -z "\$FEATURE_DESCRIPTION" ]; then
     exit 1
 fi
 
-# Function to get highest number from specs directory
-get_highest_from_specs() {
-    local specs_dir="\$1"
-    local highest=0
-    
-    if [ -d "\$specs_dir" ]; then
-        for dir in "\$specs_dir"/*; do
-            [ -d "\$dir" ] || continue
-            dirname=\$(basename "\$dir")
-            # Match sequential prefixes (>=3 digits), but skip timestamp dirs.
-            if echo "\$dirname" | grep -Eq '^[0-9]{3,}-' && ! echo "\$dirname" | grep -Eq '^[0-9]{8}-[0-9]{6}-'; then
-                number=\$(echo "\$dirname" | grep -Eo '^[0-9]+')
-                number=\$((10#\$number))
-                if [ "\$number" -gt "\$highest" ]; then
-                    highest=\$number
-                fi
-            fi
-        done
-    fi
-    
-    echo "\$highest"
-}
-
-# Function to get highest number from git branches
-get_highest_from_branches() {
-    git branch -a 2>/dev/null | sed 's/^[* ]*//; s|^remotes/[^/]*/||' | _extract_highest_number
-}
-
-# Extract the highest sequential feature number from a list of ref names (one per line).
-# Shared by get_highest_from_branches, get_highest_from_remote_refs and
-# get_highest_from_history.
-_extract_highest_number() {
-    local highest=0
-    while IFS= read -r name; do
-        [ -z "\$name" ] && continue
-        if echo "\$name" | grep -Eq '^[0-9]{3,}-' && ! echo "\$name" | grep -Eq '^[0-9]{8}-[0-9]{6}-'; then
-            number=\$(echo "\$name" | grep -Eo '^[0-9]+' || echo "0")
-            number=\$((10#\$number))
-            if [ "\$number" -gt "\$highest" ]; then
-                highest=\$number
-            fi
-        fi
-    done
-    echo "\$highest"
-}
-
-# Function to get highest number from remote branches without fetching (side-effect-free)
-get_highest_from_remote_refs() {
-    local highest=0
-
-    for remote in \$(git remote 2>/dev/null); do
-        local remote_highest
-        remote_highest=\$(GIT_TERMINAL_PROMPT=0 git ls-remote --heads "\$remote" 2>/dev/null | sed 's|.*refs/heads/||' | _extract_highest_number)
-        if [ "\$remote_highest" -gt "\$highest" ]; then
-            highest=\$remote_highest
-        fi
-    done
-
-    echo "\$highest"
-}
-
-# Highest feature number any spec directory has EVER carried, per git history.
-#
-# The merge-close phase removes a shipped feature's spec directory and the
-# post-merge cleanup deletes its branch, so neither the tree nor the refs still
-# hold that number — only the commit that added the directory does. Without
-# this, the next feature is handed the shipped number again and every citation
-# of it ("plan 041 FR-004") becomes ambiguous.
-#
-# History rather than a stored counter: it needs no extra committed file (which
-# two parallel feature branches would both bump, and conflict on), and a fresh
-# clone carries it. --all includes remote-tracking refs, so a clone that has
-# only \`main\` checked out still sees \`origin/main\`.
-#
-# Cost is one path-limited walk: git prunes each commit's diff to the specs
-# subtree, and uses changed-path Bloom filters when a commit-graph has them.
-#   --diff-filter=A  only the commit that introduced a file names it; the rest
-#                    of a plan's edits add nothing to read.
-#   --no-renames     plans start from one template, so dropping one and adding
-#                    another in a single commit is a "rename" to the default
-#                    diff — and the new directory never shows up as an addition.
-#   core.quotePath   a non-ASCII name would otherwise be quoted and not match.
-get_highest_from_history() {
-    git -c core.quotePath=false log --all --no-renames --diff-filter=A \\
-        --name-only --format= -- .specnaut/specs 2>/dev/null \\
-        | sed -n 's|^\\.specnaut/specs/\\([^/]*\\)/.*|\\1|p' \\
-        | sort -u \\
-        | _extract_highest_number
-}
-
-# Function to check existing branches (local and remote) and return next available number.
-# When skip_fetch is true, queries remotes via ls-remote (read-only) instead of fetching.
-check_existing_branches() {
-    local specs_dir="\$1"
-    local skip_fetch="\${2:-false}"
-
-    if [ "\$skip_fetch" = true ]; then
-        # Side-effect-free: query remotes via ls-remote
-        local highest_remote=\$(get_highest_from_remote_refs)
-        local highest_branch=\$(get_highest_from_branches)
-        if [ "\$highest_remote" -gt "\$highest_branch" ]; then
-            highest_branch=\$highest_remote
-        fi
-    else
-        # Fetch all remotes to get latest branch info (suppress errors if no remotes)
-        git fetch --all --prune >/dev/null 2>&1 || true
-        local highest_branch=\$(get_highest_from_branches)
-    fi
-
-    # Get highest number from ALL specs (not just matching short name)
-    local highest_spec=\$(get_highest_from_specs "\$specs_dir")
-
-    # ...and from every spec directory history has seen, including shipped
-    # ones whose directory and branch are both gone. Read after the fetch
-    # above, so freshly fetched remote history counts too.
-    local highest_history=\$(get_highest_from_history)
-
-    # Take the maximum of all three
-    local max_num=\$highest_branch
-    if [ "\$highest_spec" -gt "\$max_num" ]; then
-        max_num=\$highest_spec
-    fi
-    if [ "\$highest_history" -gt "\$max_num" ]; then
-        max_num=\$highest_history
-    fi
-
-    # Return next number
-    echo \$((max_num + 1))
-}
-
-# Function to clean and format a branch name
-clean_branch_name() {
-    local name="\$1"
-    echo "\$name" | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9]/-/g' | sed 's/-\\+/-/g' | sed 's/^-//' | sed 's/-\$//'
-}
-
 # Resolve repository root using common.sh functions which prioritize .specify over git
 SCRIPT_DIR="\$(CDPATH="" cd "\$(dirname "\${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=SCRIPTDIR/common.sh
 source "\$SCRIPT_DIR/common.sh"
+# shellcheck source=SCRIPTDIR/branch-naming.sh
+source "\$SCRIPT_DIR/branch-naming.sh"
 
 REPO_ROOT=\$(get_repo_root)
 
@@ -22726,54 +22593,6 @@ SPECS_DIR="\$REPO_ROOT/.specnaut/specs"
 if [ "\$DRY_RUN" != true ]; then
     mkdir -p "\$SPECS_DIR"
 fi
-
-# Function to generate branch name with stop word filtering and length filtering
-generate_branch_name() {
-    local description="\$1"
-    
-    # Common stop words to filter out
-    local stop_words="^(i|a|an|the|to|for|of|in|on|at|by|with|from|is|are|was|were|be|been|being|have|has|had|do|does|did|will|would|should|could|can|may|might|must|shall|this|that|these|those|my|your|our|their|want|need|add|get|set)\$"
-    
-    # Convert to lowercase and split into words
-    local clean_name=\$(echo "\$description" | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9]/ /g')
-    
-    # Filter words: remove stop words and words shorter than 3 chars (unless they're uppercase acronyms in original)
-    local meaningful_words=()
-    for word in \$clean_name; do
-        # Skip empty words
-        [ -z "\$word" ] && continue
-        
-        # Keep words that are NOT stop words AND (length >= 3 OR are potential acronyms)
-        if ! echo "\$word" | grep -qiE "\$stop_words"; then
-            if [ \${#word} -ge 3 ]; then
-                meaningful_words+=("\$word")
-            elif echo "\$description" | grep -q "\\b\${word^^}\\b"; then
-                # Keep short words if they appear as uppercase in original (likely acronyms)
-                meaningful_words+=("\$word")
-            fi
-        fi
-    done
-    
-    # If we have meaningful words, use first 3-4 of them
-    if [ \${#meaningful_words[@]} -gt 0 ]; then
-        local max_words=3
-        if [ \${#meaningful_words[@]} -eq 4 ]; then max_words=4; fi
-        
-        local result=""
-        local count=0
-        for word in "\${meaningful_words[@]}"; do
-            if [ \$count -ge \$max_words ]; then break; fi
-            if [ -n "\$result" ]; then result="\$result-"; fi
-            result="\$result\$word"
-            count=\$((count + 1))
-        done
-        echo "\$result"
-    else
-        # Fallback to original logic if no meaningful words found
-        local cleaned=\$(clean_branch_name "\$description")
-        echo "\$cleaned" | tr '-' '\\n' | grep -v '^\$' | head -3 | tr '\\n' '-' | sed 's/-\$//'
-    fi
-}
 
 # Generate branch name
 if [ -n "\$SHORT_NAME" ]; then
@@ -22929,7 +22748,7 @@ if [ \${#BRANCH_NAME} -gt \$MAX_BRANCH_LENGTH ]; then
     # Truncate suffix at word boundary if possible
     TRUNCATED_SUFFIX=\$(echo "\$BRANCH_SUFFIX" | cut -c1-\$MAX_SUFFIX_LENGTH)
     # Remove trailing hyphen if truncation created one
-    TRUNCATED_SUFFIX=\$(echo "\$TRUNCATED_SUFFIX" | sed 's/-\$//')
+    TRUNCATED_SUFFIX="\${TRUNCATED_SUFFIX%-}"
     
     ORIGINAL_BRANCH_NAME="\$BRANCH_NAME"
     BRANCH_NAME="\${FEATURE_NUM}-\${TRUNCATED_SUFFIX}"
@@ -23092,6 +22911,217 @@ else
 fi
 `,
     executable: true,
+    backend: null,
+    skipIfExists: false,
+  },
+  {
+    category: "spec-root",
+    name: "specify",
+    suffix: "scripts/bash/branch-naming.sh",
+    content: `# shellcheck shell=bash
+#
+# Sourced by create-new-feature.sh, beside it: how a feature branch is named —
+# the next free number and the slug after it. Its PowerShell twin is
+# branch-naming.ps1, and the two are held to the same scenarios by
+# tests/scripts/create_new_feature_number_reuse_test.ts.
+#
+# Kept out of create-new-feature.sh so the script reads as the run it performs
+# (parse, name, detect the epic, create, move the card, report), and so a
+# change to numbering is made in one short file and its twin, not in the middle
+# of a long one. Defines functions only: sourcing it runs nothing.
+
+# Function to get highest number from specs directory
+get_highest_from_specs() {
+    local specs_dir="\$1"
+    local highest=0
+    
+    if [ -d "\$specs_dir" ]; then
+        for dir in "\$specs_dir"/*; do
+            [ -d "\$dir" ] || continue
+            dirname=\$(basename "\$dir")
+            # Match sequential prefixes (>=3 digits), but skip timestamp dirs.
+            if echo "\$dirname" | grep -Eq '^[0-9]{3,}-' && ! echo "\$dirname" | grep -Eq '^[0-9]{8}-[0-9]{6}-'; then
+                number=\$(echo "\$dirname" | grep -Eo '^[0-9]+')
+                number=\$((10#\$number))
+                if [ "\$number" -gt "\$highest" ]; then
+                    highest=\$number
+                fi
+            fi
+        done
+    fi
+    
+    echo "\$highest"
+}
+
+# Function to get highest number from git branches
+get_highest_from_branches() {
+    git branch -a 2>/dev/null | sed 's/^[* ]*//; s|^remotes/[^/]*/||' | _extract_highest_number
+}
+
+# Extract the highest sequential feature number from a list of ref names (one per line).
+# Shared by get_highest_from_branches, get_highest_from_remote_refs and
+# get_highest_from_history.
+_extract_highest_number() {
+    local highest=0
+    while IFS= read -r name; do
+        [ -z "\$name" ] && continue
+        if echo "\$name" | grep -Eq '^[0-9]{3,}-' && ! echo "\$name" | grep -Eq '^[0-9]{8}-[0-9]{6}-'; then
+            number=\$(echo "\$name" | grep -Eo '^[0-9]+' || echo "0")
+            number=\$((10#\$number))
+            if [ "\$number" -gt "\$highest" ]; then
+                highest=\$number
+            fi
+        fi
+    done
+    echo "\$highest"
+}
+
+# Function to get highest number from remote branches without fetching (side-effect-free)
+get_highest_from_remote_refs() {
+    local highest=0
+
+    for remote in \$(git remote 2>/dev/null); do
+        local remote_highest
+        remote_highest=\$(GIT_TERMINAL_PROMPT=0 git ls-remote --heads "\$remote" 2>/dev/null | sed 's|.*refs/heads/||' | _extract_highest_number)
+        if [ "\$remote_highest" -gt "\$highest" ]; then
+            highest=\$remote_highest
+        fi
+    done
+
+    echo "\$highest"
+}
+
+# Highest feature number any spec directory has EVER carried, per git history.
+#
+# The merge-close phase removes a shipped feature's spec directory and the
+# post-merge cleanup deletes its branch, so neither the tree nor the refs still
+# hold that number — only the commit that added the directory does. Without
+# this, the next feature is handed the shipped number again and every citation
+# of it ("plan 041 FR-004") becomes ambiguous.
+#
+# History rather than a stored counter: it needs no extra committed file (which
+# two parallel feature branches would both bump, and conflict on), and a fresh
+# clone carries it. --all includes remote-tracking refs, so a clone that has
+# only \`main\` checked out still sees \`origin/main\`.
+#
+# Cost is one path-limited walk: git prunes each commit's diff to the specs
+# subtree, and uses changed-path Bloom filters when a commit-graph has them.
+#   --diff-filter=A  only the commit that introduced a file names it; the rest
+#                    of a plan's edits add nothing to read.
+#   --no-renames     plans start from one template, so dropping one and adding
+#                    another in a single commit is a "rename" to the default
+#                    diff — and the new directory never shows up as an addition.
+#   core.quotePath   a non-ASCII name would otherwise be quoted and not match.
+get_highest_from_history() {
+    git -c core.quotePath=false log --all --no-renames --diff-filter=A \\
+        --name-only --format= -- .specnaut/specs 2>/dev/null \\
+        | sed -n 's|^\\.specnaut/specs/\\([^/]*\\)/.*|\\1|p' \\
+        | sort -u \\
+        | _extract_highest_number
+}
+
+# Function to check existing branches (local and remote) and return next available number.
+# When skip_fetch is true, queries remotes via ls-remote (read-only) instead of fetching.
+check_existing_branches() {
+    local specs_dir="\$1"
+    local skip_fetch="\${2:-false}"
+
+    if [ "\$skip_fetch" = true ]; then
+        # Side-effect-free: query remotes via ls-remote
+        local highest_remote
+        highest_remote=\$(get_highest_from_remote_refs)
+        local highest_branch
+        highest_branch=\$(get_highest_from_branches)
+        if [ "\$highest_remote" -gt "\$highest_branch" ]; then
+            highest_branch=\$highest_remote
+        fi
+    else
+        # Fetch all remotes to get latest branch info (suppress errors if no remotes)
+        git fetch --all --prune >/dev/null 2>&1 || true
+        local highest_branch
+        highest_branch=\$(get_highest_from_branches)
+    fi
+
+    # Get highest number from ALL specs (not just matching short name)
+    local highest_spec
+    highest_spec=\$(get_highest_from_specs "\$specs_dir")
+
+    # ...and from every spec directory history has seen, including shipped
+    # ones whose directory and branch are both gone. Read after the fetch
+    # above, so freshly fetched remote history counts too.
+    local highest_history
+    highest_history=\$(get_highest_from_history)
+
+    # Take the maximum of all three
+    local max_num=\$highest_branch
+    if [ "\$highest_spec" -gt "\$max_num" ]; then
+        max_num=\$highest_spec
+    fi
+    if [ "\$highest_history" -gt "\$max_num" ]; then
+        max_num=\$highest_history
+    fi
+
+    # Return next number
+    echo \$((max_num + 1))
+}
+
+# Function to clean and format a branch name
+clean_branch_name() {
+    local name="\$1"
+    echo "\$name" | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9]/-/g' | sed 's/-\\+/-/g' | sed 's/^-//' | sed 's/-\$//'
+}
+
+# Function to generate branch name with stop word filtering and length filtering
+generate_branch_name() {
+    local description="\$1"
+    
+    # Common stop words to filter out
+    local stop_words="^(i|a|an|the|to|for|of|in|on|at|by|with|from|is|are|was|were|be|been|being|have|has|had|do|does|did|will|would|should|could|can|may|might|must|shall|this|that|these|those|my|your|our|their|want|need|add|get|set)\$"
+    
+    # Convert to lowercase and split into words
+    local clean_name
+    clean_name=\$(echo "\$description" | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9]/ /g')
+    
+    # Filter words: remove stop words and words shorter than 3 chars (unless they're uppercase acronyms in original)
+    local meaningful_words=()
+    for word in \$clean_name; do
+        # Skip empty words
+        [ -z "\$word" ] && continue
+        
+        # Keep words that are NOT stop words AND (length >= 3 OR are potential acronyms)
+        if ! echo "\$word" | grep -qiE "\$stop_words"; then
+            if [ \${#word} -ge 3 ]; then
+                meaningful_words+=("\$word")
+            elif echo "\$description" | grep -q "\\b\${word^^}\\b"; then
+                # Keep short words if they appear as uppercase in original (likely acronyms)
+                meaningful_words+=("\$word")
+            fi
+        fi
+    done
+    
+    # If we have meaningful words, use first 3-4 of them
+    if [ \${#meaningful_words[@]} -gt 0 ]; then
+        local max_words=3
+        if [ \${#meaningful_words[@]} -eq 4 ]; then max_words=4; fi
+        
+        local result=""
+        local count=0
+        for word in "\${meaningful_words[@]}"; do
+            if [ \$count -ge \$max_words ]; then break; fi
+            if [ -n "\$result" ]; then result="\$result-"; fi
+            result="\$result\$word"
+            count=\$((count + 1))
+        done
+        echo "\$result"
+    else
+        # Fallback to original logic if no meaningful words found
+        local cleaned
+        cleaned=\$(clean_branch_name "\$description")
+        echo "\$cleaned" | tr '-' '\\n' | grep -v '^\$' | head -3 | tr '\\n' '-' | sed 's/-\$//'
+    fi
+}
+`,
+    executable: false,
     backend: null,
     skipIfExists: false,
   },
@@ -25203,6 +25233,28 @@ function Test-DirHasFiles {
     }
 }
 
+# Template resolution (Resolve-Template, Resolve-TemplateContent) lives beside
+# this file; every caller of common.ps1 keeps getting it from here.
+. "\$PSScriptRoot/template-resolution.ps1"
+`,
+    executable: false,
+    backend: null,
+    skipIfExists: false,
+  },
+  {
+    category: "spec-root",
+    name: "specify",
+    suffix: "scripts/powershell/template-resolution.ps1",
+    content: `#!/usr/bin/env pwsh
+# Dot-sourced by common.ps1, beside it: turning a template name into a file
+# path (Resolve-Template) or into composed content (Resolve-TemplateContent),
+# through the override / preset / extension / core priority stack. Every
+# script that dot-sources common.ps1 gets these with it, as before.
+#
+# Kept out of common.ps1 so the repository and feature-path helpers there are
+# not buried under the template stack, the one part of the file that carries
+# its own Python helper. Defines functions only: dot-sourcing it runs nothing.
+
 # Find a usable Python 3 executable (python3, python, or py -3).
 # Returns the command/arguments as an array, or \$null if none found.
 function Get-Python3Command {
@@ -25488,7 +25540,8 @@ except Exception:
     }
 
     return \$content
-}`,
+}
+`,
     executable: false,
     backend: null,
     skipIfExists: false,
@@ -25560,155 +25613,10 @@ if ([string]::IsNullOrWhiteSpace(\$featureDesc)) {
     exit 1
 }
 
-function Get-HighestNumberFromSpecs {
-    param([string]\$SpecsDir)
-
-    [long]\$highest = 0
-    if (Test-Path \$SpecsDir) {
-        Get-ChildItem -Path \$SpecsDir -Directory | ForEach-Object {
-            # Match sequential prefixes (>=3 digits), but skip timestamp dirs.
-            if (\$_.Name -match '^(\\d{3,})-' -and \$_.Name -notmatch '^\\d{8}-\\d{6}-') {
-                [long]\$num = 0
-                if ([long]::TryParse(\$matches[1], [ref]\$num) -and \$num -gt \$highest) {
-                    \$highest = \$num
-                }
-            }
-        }
-    }
-    return \$highest
-}
-
-# Extract the highest sequential feature number from a list of branch/ref names.
-# Shared by Get-HighestNumberFromBranches, Get-HighestNumberFromRemoteRefs and
-# Get-HighestNumberFromHistory.
-function Get-HighestNumberFromNames {
-    param([string[]]\$Names)
-
-    [long]\$highest = 0
-    foreach (\$name in \$Names) {
-        if (\$name -match '^(\\d{3,})-' -and \$name -notmatch '^\\d{8}-\\d{6}-') {
-            [long]\$num = 0
-            if ([long]::TryParse(\$matches[1], [ref]\$num) -and \$num -gt \$highest) {
-                \$highest = \$num
-            }
-        }
-    }
-    return \$highest
-}
-
-function Get-HighestNumberFromBranches {
-    param()
-
-    try {
-        \$branches = git branch -a 2>\$null
-        if (\$LASTEXITCODE -eq 0 -and \$branches) {
-            \$cleanNames = \$branches | ForEach-Object {
-                \$_.Trim() -replace '^\\*?\\s+', '' -replace '^remotes/[^/]+/', ''
-            }
-            return Get-HighestNumberFromNames -Names \$cleanNames
-        }
-    } catch {
-        [Console]::Error.WriteLine("# warning: could not list git branches for numbering: \$_")
-    }
-    return 0
-}
-
-function Get-HighestNumberFromRemoteRefs {
-    [long]\$highest = 0
-    try {
-        \$remotes = git remote 2>\$null
-        if (\$remotes) {
-            foreach (\$remote in \$remotes) {
-                \$env:GIT_TERMINAL_PROMPT = '0'
-                \$refs = git ls-remote --heads \$remote 2>\$null
-                \$env:GIT_TERMINAL_PROMPT = \$null
-                if (\$LASTEXITCODE -eq 0 -and \$refs) {
-                    \$refNames = \$refs | ForEach-Object {
-                        if (\$_ -match 'refs/heads/(.+)\$') { \$matches[1] }
-                    } | Where-Object { \$_ }
-                    \$remoteHighest = Get-HighestNumberFromNames -Names \$refNames
-                    if (\$remoteHighest -gt \$highest) { \$highest = \$remoteHighest }
-                }
-            }
-        }
-    } catch {
-        [Console]::Error.WriteLine("# warning: could not query remote refs for numbering: \$_")
-    }
-    return \$highest
-}
-
-# Highest feature number any spec directory has EVER carried, per git history.
-# PowerShell twin of get_highest_from_history in the bash script, which carries
-# the full account of why history and not a stored counter, and of each flag.
-#
-# In short: merge-close removes a shipped feature's spec directory and the
-# branch is deleted after the merge, so only the commit that ADDED the
-# directory still holds its number. --no-renames keeps a template-identical
-# plan that replaced another one in a single commit from reading as a rename,
-# which --diff-filter=A would then drop.
-function Get-HighestNumberFromHistory {
-    try {
-        \$paths = git -c core.quotePath=false log --all --no-renames --diff-filter=A \`
-            --name-only --format= -- .specnaut/specs 2>\$null
-        if (\$paths) {
-            \$dirNames = \$paths | ForEach-Object {
-                if (\$_ -match '^\\.specnaut/specs/([^/]+)/') { \$matches[1] }
-            } | Where-Object { \$_ } | Sort-Object -Unique
-            return Get-HighestNumberFromNames -Names \$dirNames
-        }
-    } catch {
-        [Console]::Error.WriteLine("# warning: could not read spec history for numbering: \$_")
-    }
-    return 0
-}
-
-# Return next available branch number. When SkipFetch is true, queries remotes
-# via ls-remote (read-only) instead of fetching.
-function Get-NextBranchNumber {
-    param(
-        [string]\$SpecsDir,
-        [switch]\$SkipFetch
-    )
-
-    if (\$SkipFetch) {
-        # Side-effect-free: query remotes via ls-remote
-        \$highestBranch = Get-HighestNumberFromBranches
-        \$highestRemote = Get-HighestNumberFromRemoteRefs
-        \$highestBranch = [Math]::Max(\$highestBranch, \$highestRemote)
-    } else {
-        # Fetch all remotes to get latest branch info (suppress errors if no remotes)
-        try {
-            git fetch --all --prune 2>\$null | Out-Null
-        } catch {
-            # Numbering still works from local refs and history; say so rather
-            # than letting a stale remote view pass unannounced.
-            [Console]::Error.WriteLine("# warning: git fetch failed; numbering from local refs only: \$_")
-        }
-        \$highestBranch = Get-HighestNumberFromBranches
-    }
-
-    # Get highest number from ALL specs (not just matching short name)
-    \$highestSpec = Get-HighestNumberFromSpecs -SpecsDir \$SpecsDir
-
-    # ...and from every spec directory history has seen, including shipped
-    # ones whose directory and branch are both gone. Read after the fetch
-    # above, so freshly fetched remote history counts too.
-    \$highestHistory = Get-HighestNumberFromHistory
-
-    # Take the maximum of all three
-    \$maxNum = [Math]::Max([Math]::Max(\$highestBranch, \$highestSpec), \$highestHistory)
-
-    # Return next number
-    return \$maxNum + 1
-}
-
-function ConvertTo-CleanBranchName {
-    param([string]\$Name)
-
-    return \$Name.ToLower() -replace '[^a-z0-9]', '-' -replace '-{2,}', '-' -replace '^-', '' -replace '-\$', ''
-}
-# Load common functions (includes Get-RepoRoot, Test-HasGit, Resolve-Template)
+# Load common functions (Get-RepoRoot, Test-HasGit, Resolve-Template) and the
+# branch naming beside them (Get-NextBranchNumber, Get-BranchName)
 . "\$PSScriptRoot/common.ps1"
+. "\$PSScriptRoot/branch-naming.ps1"
 
 # Use common.ps1 functions which prioritize .specify over git
 \$repoRoot = Get-RepoRoot
@@ -25721,51 +25629,6 @@ Set-Location \$repoRoot
 \$specsDir = Join-Path \$repoRoot '.specnaut' 'specs'
 if (-not \$DryRun) {
     New-Item -ItemType Directory -Path \$specsDir -Force | Out-Null
-}
-
-# Function to generate branch name with stop word filtering and length filtering
-function Get-BranchName {
-    param([string]\$Description)
-
-    # Common stop words to filter out
-    \$stopWords = @(
-        'i', 'a', 'an', 'the', 'to', 'for', 'of', 'in', 'on', 'at', 'by', 'with', 'from',
-        'is', 'are', 'was', 'were', 'be', 'been', 'being', 'have', 'has', 'had',
-        'do', 'does', 'did', 'will', 'would', 'should', 'could', 'can', 'may', 'might', 'must', 'shall',
-        'this', 'that', 'these', 'those', 'my', 'your', 'our', 'their',
-        'want', 'need', 'add', 'get', 'set'
-    )
-
-    # Convert to lowercase and extract words (alphanumeric only)
-    \$cleanName = \$Description.ToLower() -replace '[^a-z0-9\\s]', ' '
-    \$words = \$cleanName -split '\\s+' | Where-Object { \$_ }
-
-    # Filter words: remove stop words and words shorter than 3 chars (unless they're uppercase acronyms in original)
-    \$meaningfulWords = @()
-    foreach (\$word in \$words) {
-        # Skip stop words
-        if (\$stopWords -contains \$word) { continue }
-
-        # Keep words that are length >= 3 OR appear as uppercase in original (likely acronyms)
-        if (\$word.Length -ge 3) {
-            \$meaningfulWords += \$word
-        } elseif (\$Description -match "\\b\$(\$word.ToUpper())\\b") {
-            # Keep short words if they appear as uppercase in original (likely acronyms)
-            \$meaningfulWords += \$word
-        }
-    }
-
-    # If we have meaningful words, use first 3-4 of them
-    if (\$meaningfulWords.Count -gt 0) {
-        \$maxWords = if (\$meaningfulWords.Count -eq 4) { 4 } else { 3 }
-        \$result = (\$meaningfulWords | Select-Object -First \$maxWords) -join '-'
-        return \$result
-    } else {
-        # Fallback to original logic if no meaningful words found
-        \$result = ConvertTo-CleanBranchName -Name \$Description
-        \$fallbackWords = (\$result -split '-') | Where-Object { \$_ } | Select-Object -First 3
-        return [string]::Join('-', \$fallbackWords)
-    }
 }
 
 # Generate branch name
@@ -26056,6 +25919,218 @@ if (\$Json) {
     Write-Output "HAS_GIT: \$hasGit"
     if (-not \$DryRun) {
         Write-Output "SPECIFY_FEATURE environment variable set to: \$branchName"
+    }
+}
+`,
+    executable: false,
+    backend: null,
+    skipIfExists: false,
+  },
+  {
+    category: "spec-root",
+    name: "specify",
+    suffix: "scripts/powershell/branch-naming.ps1",
+    content: `#!/usr/bin/env pwsh
+# Dot-sourced by create-new-feature.ps1, beside it: how a feature branch is
+# named — the next free number and the slug after it. Its bash twin is
+# branch-naming.sh, and the two are held to the same scenarios by
+# tests/scripts/create_new_feature_number_reuse_test.ts.
+#
+# Kept out of create-new-feature.ps1 so the script reads as the run it performs
+# (parse, name, detect the epic, create, move the card, report), and so a
+# change to numbering is made in one short file and its twin, not in the middle
+# of a long one. Defines functions only: dot-sourcing it runs nothing.
+
+function Get-HighestNumberFromSpecs {
+    param([string]\$SpecsDir)
+
+    [long]\$highest = 0
+    if (Test-Path \$SpecsDir) {
+        Get-ChildItem -Path \$SpecsDir -Directory | ForEach-Object {
+            # Match sequential prefixes (>=3 digits), but skip timestamp dirs.
+            if (\$_.Name -match '^(\\d{3,})-' -and \$_.Name -notmatch '^\\d{8}-\\d{6}-') {
+                [long]\$num = 0
+                if ([long]::TryParse(\$matches[1], [ref]\$num) -and \$num -gt \$highest) {
+                    \$highest = \$num
+                }
+            }
+        }
+    }
+    return \$highest
+}
+
+# Extract the highest sequential feature number from a list of branch/ref names.
+# Shared by Get-HighestNumberFromBranches, Get-HighestNumberFromRemoteRefs and
+# Get-HighestNumberFromHistory.
+function Get-HighestNumberFromNames {
+    param([string[]]\$Names)
+
+    [long]\$highest = 0
+    foreach (\$name in \$Names) {
+        if (\$name -match '^(\\d{3,})-' -and \$name -notmatch '^\\d{8}-\\d{6}-') {
+            [long]\$num = 0
+            if ([long]::TryParse(\$matches[1], [ref]\$num) -and \$num -gt \$highest) {
+                \$highest = \$num
+            }
+        }
+    }
+    return \$highest
+}
+
+function Get-HighestNumberFromBranches {
+    param()
+
+    try {
+        \$branches = git branch -a 2>\$null
+        if (\$LASTEXITCODE -eq 0 -and \$branches) {
+            \$cleanNames = \$branches | ForEach-Object {
+                \$_.Trim() -replace '^\\*?\\s+', '' -replace '^remotes/[^/]+/', ''
+            }
+            return Get-HighestNumberFromNames -Names \$cleanNames
+        }
+    } catch {
+        [Console]::Error.WriteLine("# warning: could not list git branches for numbering: \$_")
+    }
+    return 0
+}
+
+function Get-HighestNumberFromRemoteRefs {
+    [long]\$highest = 0
+    try {
+        \$remotes = git remote 2>\$null
+        if (\$remotes) {
+            foreach (\$remote in \$remotes) {
+                \$env:GIT_TERMINAL_PROMPT = '0'
+                \$refs = git ls-remote --heads \$remote 2>\$null
+                \$env:GIT_TERMINAL_PROMPT = \$null
+                if (\$LASTEXITCODE -eq 0 -and \$refs) {
+                    \$refNames = \$refs | ForEach-Object {
+                        if (\$_ -match 'refs/heads/(.+)\$') { \$matches[1] }
+                    } | Where-Object { \$_ }
+                    \$remoteHighest = Get-HighestNumberFromNames -Names \$refNames
+                    if (\$remoteHighest -gt \$highest) { \$highest = \$remoteHighest }
+                }
+            }
+        }
+    } catch {
+        [Console]::Error.WriteLine("# warning: could not query remote refs for numbering: \$_")
+    }
+    return \$highest
+}
+
+# Highest feature number any spec directory has EVER carried, per git history.
+# PowerShell twin of get_highest_from_history in the bash script, which carries
+# the full account of why history and not a stored counter, and of each flag.
+#
+# In short: merge-close removes a shipped feature's spec directory and the
+# branch is deleted after the merge, so only the commit that ADDED the
+# directory still holds its number. --no-renames keeps a template-identical
+# plan that replaced another one in a single commit from reading as a rename,
+# which --diff-filter=A would then drop.
+function Get-HighestNumberFromHistory {
+    try {
+        \$paths = git -c core.quotePath=false log --all --no-renames --diff-filter=A \`
+            --name-only --format= -- .specnaut/specs 2>\$null
+        if (\$paths) {
+            \$dirNames = \$paths | ForEach-Object {
+                if (\$_ -match '^\\.specnaut/specs/([^/]+)/') { \$matches[1] }
+            } | Where-Object { \$_ } | Sort-Object -Unique
+            return Get-HighestNumberFromNames -Names \$dirNames
+        }
+    } catch {
+        [Console]::Error.WriteLine("# warning: could not read spec history for numbering: \$_")
+    }
+    return 0
+}
+
+# Return next available branch number. When SkipFetch is true, queries remotes
+# via ls-remote (read-only) instead of fetching.
+function Get-NextBranchNumber {
+    param(
+        [string]\$SpecsDir,
+        [switch]\$SkipFetch
+    )
+
+    if (\$SkipFetch) {
+        # Side-effect-free: query remotes via ls-remote
+        \$highestBranch = Get-HighestNumberFromBranches
+        \$highestRemote = Get-HighestNumberFromRemoteRefs
+        \$highestBranch = [Math]::Max(\$highestBranch, \$highestRemote)
+    } else {
+        # Fetch all remotes to get latest branch info (suppress errors if no remotes)
+        try {
+            git fetch --all --prune 2>\$null | Out-Null
+        } catch {
+            # Numbering still works from local refs and history; say so rather
+            # than letting a stale remote view pass unannounced.
+            [Console]::Error.WriteLine("# warning: git fetch failed; numbering from local refs only: \$_")
+        }
+        \$highestBranch = Get-HighestNumberFromBranches
+    }
+
+    # Get highest number from ALL specs (not just matching short name)
+    \$highestSpec = Get-HighestNumberFromSpecs -SpecsDir \$SpecsDir
+
+    # ...and from every spec directory history has seen, including shipped
+    # ones whose directory and branch are both gone. Read after the fetch
+    # above, so freshly fetched remote history counts too.
+    \$highestHistory = Get-HighestNumberFromHistory
+
+    # Take the maximum of all three
+    \$maxNum = [Math]::Max([Math]::Max(\$highestBranch, \$highestSpec), \$highestHistory)
+
+    # Return next number
+    return \$maxNum + 1
+}
+
+function ConvertTo-CleanBranchName {
+    param([string]\$Name)
+
+    return \$Name.ToLower() -replace '[^a-z0-9]', '-' -replace '-{2,}', '-' -replace '^-', '' -replace '-\$', ''
+}
+
+# Function to generate branch name with stop word filtering and length filtering
+function Get-BranchName {
+    param([string]\$Description)
+
+    # Common stop words to filter out
+    \$stopWords = @(
+        'i', 'a', 'an', 'the', 'to', 'for', 'of', 'in', 'on', 'at', 'by', 'with', 'from',
+        'is', 'are', 'was', 'were', 'be', 'been', 'being', 'have', 'has', 'had',
+        'do', 'does', 'did', 'will', 'would', 'should', 'could', 'can', 'may', 'might', 'must', 'shall',
+        'this', 'that', 'these', 'those', 'my', 'your', 'our', 'their',
+        'want', 'need', 'add', 'get', 'set'
+    )
+
+    # Convert to lowercase and extract words (alphanumeric only)
+    \$cleanName = \$Description.ToLower() -replace '[^a-z0-9\\s]', ' '
+    \$words = \$cleanName -split '\\s+' | Where-Object { \$_ }
+
+    # Filter words: remove stop words and words shorter than 3 chars (unless they're uppercase acronyms in original)
+    \$meaningfulWords = @()
+    foreach (\$word in \$words) {
+        # Skip stop words
+        if (\$stopWords -contains \$word) { continue }
+
+        # Keep words that are length >= 3 OR appear as uppercase in original (likely acronyms)
+        if (\$word.Length -ge 3) {
+            \$meaningfulWords += \$word
+        } elseif (\$Description -match "\\b\$(\$word.ToUpper())\\b") {
+            # Keep short words if they appear as uppercase in original (likely acronyms)
+            \$meaningfulWords += \$word
+        }
+    }
+
+    # If we have meaningful words, use first 3-4 of them
+    if (\$meaningfulWords.Count -gt 0) {
+        \$maxWords = if (\$meaningfulWords.Count -eq 4) { 4 } else { 3 }
+        \$result = (\$meaningfulWords | Select-Object -First \$maxWords) -join '-'
+        return \$result
+    } else {
+        # Fallback to original logic if no meaningful words found
+        \$result = ConvertTo-CleanBranchName -Name \$Description
+        \$fallbackWords = (\$result -split '-') | Where-Object { \$_ } | Select-Object -First 3
+        return [string]::Join('-', \$fallbackWords)
     }
 }
 `,
