@@ -1,23 +1,36 @@
 import { assert, assertEquals } from "@std/assert";
 import { parse as parseToml } from "@std/toml";
-import { CORE_BUNDLE } from "../../src/templates_bundle.ts";
+import { CORE_BUNDLE, HARNESS_STATIC } from "../../src/templates_bundle.ts";
 import { HARNESSES } from "../../src/cli/harnesses.ts";
 import { CONSTITUTION_PATH } from "../../src/domain/constitution_paths.ts";
 import { ADDENDUM_SKILLS, ROUTABLE_PHASES } from "../../src/domain/addendum_audit.ts";
+import { AGENT_FOLDERS, agentFile } from "../../src/domain/agent_folders.ts";
+import { linkTargetPath } from "../../src/domain/context_link.ts";
 import type { CoreEntry } from "../../src/domain/core_bundle.ts";
+import type { KnownHarness } from "../../src/domain/installed_lock.ts";
 import { extractBlock } from "../../src/domain/merge_block.ts";
 import {
+  skillDocDestination,
+  skillFolderName,
+  skillNameFor,
+} from "../../src/infrastructure/harness/skill_folder.ts";
+import { SKILL_SURFACE } from "../../src/infrastructure/harness/skill_layout.ts";
+import { alwaysOnDestinations } from "./always_on.ts";
+import {
+  agentsMd,
   bodyOf,
   claimsExemption,
   CONSTITUTION_IMPORT,
   CONSTITUTION_REFERENCE,
+  constitutionTemplate,
   exemptionReason,
   firstInstruction,
   firstStep,
   importTokens,
+  LEADING_LINES,
   secondInstruction,
 } from "./constitution_reference.ts";
-import { docOf, router, verbTable } from "./verb_table.ts";
+import { docOf, router, routers, verbTable } from "./verb_table.ts";
 
 /**
  * Every task entry point reads the constitution first (spec 039, specnaut-cli#685).
@@ -41,8 +54,6 @@ const OPTS = {
 /** The two harnesses whose emitted files are held to position, not just presence. */
 const FRONTIER = ["claude", "codex"];
 
-const routers = () =>
-  CORE_BUNDLE.filter((e) => e.category === "skill" || e.category === "backlog-skill");
 const agents = () => CORE_BUNDLE.filter((e) => e.category === "agent");
 
 /** The bundle entry behind a `/task` routable verb, through the router's own table. */
@@ -56,18 +67,48 @@ function taskDoc(verb: string): CoreEntry {
   return hit;
 }
 
-function agentsMd(): string {
-  const root = CORE_BUNDLE.find((e) => e.category === "project-root" && e.suffix === "AGENTS.md");
-  assert(root, "no project-root AGENTS.md entry");
-  return root!.content;
+/** Every entry point held to the reference, with the lines that precede it (plan 039 § 6). */
+function entryPoints(): Array<{ entry: CoreEntry; skip: number }> {
+  return [
+    ...agents().map((entry) => ({ entry, skip: LEADING_LINES.agent })),
+    // Exemptions are read from the SOURCE: Codex rebuilds frontmatter and drops the key.
+    ...routers().filter((e) => exemptionReason(e.content) === null)
+      .map((entry) => ({ entry, skip: LEADING_LINES.router })),
+    ...ROUTABLE_PHASES.task.map((v) => ({ entry: taskDoc(v), skip: LEADING_LINES.verbDoc })),
+  ];
 }
 
-function constitutionTemplate(): string {
-  const e = CORE_BUNDLE.find((x) =>
-    x.category === "project-root" && x.suffix === CONSTITUTION_PATH
-  );
-  assert(e, "no bundled constitution template");
-  return e!.content;
+/**
+ * Where `harness` writes `e`, composed from the homes the adapters read
+ * (`AGENT_FOLDERS`, `SKILL_SURFACE`). An exact key, never a pattern: a renamed
+ * emit path is then a missing file, not a check that matched nothing (cli#706).
+ * A harness with no agent folder receives each agent as a skill.
+ */
+function emittedAt(harness: KnownHarness, e: CoreEntry): string {
+  const layout = SKILL_SURFACE[harness].layout;
+  if (e.category === "phase" || e.category === "backlog-doc") return skillDocDestination(e, layout);
+  const folder = e.category === "agent" ? AGENT_FOLDERS[harness] : null;
+  if (folder) return agentFile(folder, e.name);
+  const name = e.category === "agent" ? skillFolderName(e) : skillNameFor(e.name, layout);
+  return layout.kind === "flat"
+    ? `${layout.dir}/${name}${layout.ext}`
+    : `${layout.root}/${name}/SKILL.md`;
+}
+
+/** The instructions an emitted file carries: a Codex agent's TOML field, else the body. */
+const emittedBody = (dest: string, content: string) =>
+  dest.endsWith(".toml")
+    ? String((parseToml(content) as Record<string, unknown>).developer_instructions ?? "")
+    : bodyOf(content);
+
+/** Each entry point as `harness` emits it, or a problem naming the missing destination. */
+function emitted(harness: (typeof HARNESSES)[number]) {
+  const bundle = harness.mapBundle(CORE_BUNDLE, OPTS);
+  return entryPoints().map(({ entry, skip }) => {
+    const dest = emittedAt(harness.key as KnownHarness, entry);
+    const file = bundle[dest];
+    return { dest, skip, body: file ? emittedBody(dest, file.content) : null };
+  });
 }
 
 Deno.test("every router opens with the reference, or says on the file why it does not", () => {
@@ -83,7 +124,7 @@ Deno.test("every router opens with the reference, or says on the file why it doe
       wrong.push(`${e.name}: constitution-exempt with no reason`);
       continue;
     }
-    if (firstStep(e.content) !== CONSTITUTION_REFERENCE) wrong.push(e.name);
+    if (firstStep(e.content, LEADING_LINES.router) !== CONSTITUTION_REFERENCE) wrong.push(e.name);
   }
   assertEquals(wrong, [], "routers whose first instruction is not the reference");
   assert(routers().length > exempt.length, "every router is exempt — the guard checks nothing");
@@ -107,68 +148,61 @@ Deno.test("the document behind every /task routable verb opens with the referenc
   assert(phaseVerbs.length > 0, "parsed no `phases/` row from the /task verb table");
   const unchecked = phaseVerbs.map((r) => r.verb).filter((v) => !verbs.includes(v));
   assertEquals(unchecked, [], "/task verbs the router routes to a phase but this test skips");
-  const wrong = verbs.filter((v) => firstStep(taskDoc(v).content) !== CONSTITUTION_REFERENCE);
+  const wrong = verbs.filter((v) =>
+    firstStep(taskDoc(v).content, LEADING_LINES.verbDoc) !== CONSTITUTION_REFERENCE
+  );
   assertEquals(wrong, [], "/task verbs whose document does not open with the reference");
 });
 
 Deno.test("every agent's body opens with the reference", () => {
   assert(agents().length > 0, "no agents in the bundle");
   const wrong = agents()
-    .filter((e) => firstInstruction(bodyOf(e.content)) !== CONSTITUTION_REFERENCE)
+    .filter((e) => firstStep(e.content, LEADING_LINES.agent) !== CONSTITUTION_REFERENCE)
     .map((e) => e.name);
   assertEquals(wrong, [], "agents whose first instruction is not the reference");
 });
 
-Deno.test("Claude and Codex emit every agent with the reference first", () => {
+Deno.test("Claude and Codex emit every agent, router and /task verb document reference-first", () => {
   const wrong: string[] = [];
   for (const key of FRONTIER) {
     const harness = HARNESSES.find((h) => h.key === key);
     assert(harness, `no ${key} harness`);
-    const bundle = harness!.mapBundle(CORE_BUNDLE, OPTS);
-    for (const a of agents()) {
-      const dest = key === "codex" ? `.codex/agents/${a.name}.toml` : `.claude/agents/${a.name}.md`;
-      const file = bundle[dest];
-      if (!file) {
-        wrong.push(`${key}: ${dest} not emitted`);
-        continue;
+    for (const { dest, skip, body } of emitted(harness)) {
+      if (body === null) wrong.push(`${key}: ${dest} not emitted`);
+      else if (firstInstruction(body, skip) !== CONSTITUTION_REFERENCE) {
+        wrong.push(`${key}: ${dest}`);
       }
-      const body = key === "codex"
-        ? String((parseToml(file.content) as Record<string, unknown>).developer_instructions ?? "")
-        : bodyOf(file.content);
-      if (firstInstruction(body) !== CONSTITUTION_REFERENCE) wrong.push(`${key}: ${dest}`);
     }
   }
-  assertEquals(wrong, [], "emitted agents that do not open with the reference");
+  assertEquals(wrong, [], "emitted entry points that do not open with the reference");
 });
 
-Deno.test("every other harness still carries the reference in each emitted agent", () => {
+Deno.test("every other harness still carries the reference in each emitted entry point", () => {
   // Frontier harnesses decide the shape; the others follow (2026-10-28). Their
-  // adapters may rebuild a file around the body, so presence is what is held.
+  // adapters may rebuild a file around the body, so presence is what is held —
+  // at the exact destination, so a path that moved fails instead of matching nothing.
   const missing: string[] = [];
-  for (const harness of HARNESSES.filter((h) => !FRONTIER.includes(h.key))) {
-    const bundle = harness.mapBundle(CORE_BUNDLE, OPTS);
-    for (const a of agents()) {
-      const hits = Object.entries(bundle).filter(([dest]) =>
-        new RegExp(`(^|[/-])${a.name}(\\.|/SKILL\\.md$)`).test(dest) && !dest.includes("/memory/")
-      );
-      if (hits.length === 0) continue;
-      if (!hits.some(([, f]) => f.content.includes(CONSTITUTION_REFERENCE))) {
-        missing.push(`${harness.key}:${a.name}`);
-      }
+  const others = HARNESSES.filter((h) => !FRONTIER.includes(h.key));
+  assert(others.length > 0, "no non-frontier harness to check");
+  for (const harness of others) {
+    for (const { dest, body } of emitted(harness)) {
+      if (body === null) missing.push(`${harness.key}: ${dest} not emitted`);
+      else if (!body.includes(CONSTITUTION_REFERENCE)) missing.push(`${harness.key}: ${dest}`);
     }
   }
-  assertEquals(missing, [], "emitted agents with no reference at all");
+  assertEquals(missing, [], "emitted entry points with no reference at all");
 });
 
 Deno.test("the AGENTS.md constitution fence opens with the reference, then the import", () => {
-  const fence = extractBlock(agentsMd(), "constitution", "html");
+  const fence = extractBlock(agentsMd().content, "constitution", "html");
   assert(fence, "no constitution fence in AGENTS.md");
-  assertEquals(firstInstruction(fence!, 2), CONSTITUTION_REFERENCE, "fence: first instruction");
-  assertEquals(secondInstruction(fence!, 2), CONSTITUTION_IMPORT, "fence: the import line");
+  const skip = LEADING_LINES.fence;
+  assertEquals(firstInstruction(fence!, skip), CONSTITUTION_REFERENCE, "fence: first instruction");
+  assertEquals(secondInstruction(fence!, skip), CONSTITUTION_IMPORT, "fence: the import line");
 });
 
 Deno.test("the scaffolded AGENTS.md leads with the constitution, not with itself", () => {
-  const text = agentsMd();
+  const text = agentsMd().content;
   const fenceAt = text.indexOf("<!-- --- Specnaut: constitution --- -->");
   const firstH2 = text.search(/^## /m);
   assert(fenceAt >= 0 && fenceAt < firstH2, "the constitution fence is not the first section");
@@ -183,12 +217,42 @@ Deno.test("the only import Claude Code would follow is the constitution's own", 
   // Claude Code follows every `@path` in a loaded file, nested five deep, with
   // no prompt for an in-repo target (plan 039 § 11). The always-on file and the
   // file it imports carry exactly one, and the constitution imports nothing.
-  assertEquals(importTokens(agentsMd()), [CONSTITUTION_IMPORT], "AGENTS.md import tokens");
+  assertEquals(importTokens(agentsMd().content), [CONSTITUTION_IMPORT], "AGENTS.md import tokens");
   assertEquals(
-    importTokens(constitutionTemplate()),
+    importTokens(constitutionTemplate().content),
     [],
     "the constitution template imports nothing",
   );
+});
+
+Deno.test("no always-on file of any harness imports anything but the constitution", async () => {
+  // Every `alwaysOn` entry, not two named files: a harness that loads a file in
+  // every session follows its imports too. A context link loads the file it
+  // points at; its fallback, written where links are refused, imports exactly that.
+  const alwaysOn = await alwaysOnDestinations();
+  assert(alwaysOn.size > 0, "no alwaysOn entries at all — the scan would check nothing");
+  const stray: string[] = [];
+  const scan = (at: string, text: string, allowed: string) =>
+    importTokens(text).filter((t) => t !== allowed).forEach((t) => stray.push(`${at}: ${t}`));
+  for (const [key, dests] of alwaysOn) {
+    const bundle = HARNESSES.find((h) => h.key === key)?.mapBundle(CORE_BUNDLE, OPTS) ?? {};
+    for (const dest of dests) {
+      const file = HARNESS_STATIC[key]?.[dest];
+      if (!file) {
+        stray.push(`${key}:${dest} not in HARNESS_STATIC`);
+        continue;
+      }
+      if (file.symlinkTo === undefined) {
+        scan(`${key}:${dest}`, file.content, CONSTITUTION_IMPORT);
+        continue;
+      }
+      scan(`${key}:${dest} (fallback)`, file.content, `@${file.symlinkTo}`);
+      const target = linkTargetPath(dest, file.symlinkTo);
+      if (!bundle[target]) stray.push(`${key}:${dest} links to ${target}, which is not emitted`);
+      else scan(`${key}:${target}`, bundle[target].content, CONSTITUTION_IMPORT);
+    }
+  }
+  assertEquals(stray, [], "always-on files importing something else");
 });
 
 Deno.test("the constitution path is relative and stays inside the project", () => {

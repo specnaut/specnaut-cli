@@ -1,17 +1,21 @@
+import type { CoreEntry } from "../../src/domain/core_bundle.ts";
 import { CORE_BUNDLE } from "../../src/templates_bundle.ts";
 
 /**
  * A router's verb table, parsed — the one home of "which document a routable
  * verb reads" (plan 039 § 5). `/task` routes `groom` to `groom.md`, outside
  * `phases/`, so the document is read from the table rather than assumed.
- * Shared by `routable_phases_test.ts` and `constitution_first_test.ts`.
+ * Shared by `routable_phases_test.ts` and `constitution_first_test.ts`; the
+ * router filter by every test that looks a skill up in the bundle.
  */
+
+/** Every bundled router: each `SKILL.md`, of category `skill` or `backlog-skill`. */
+export const routers = (): CoreEntry[] =>
+  CORE_BUNDLE.filter((e) => e.category === "skill" || e.category === "backlog-skill");
 
 /** The bundled router of `skill`. */
 export function router(skill: string): string {
-  const e = CORE_BUNDLE.find((x) =>
-    (x.category === "skill" || x.category === "backlog-skill") && x.name === skill
-  );
+  const e = routers().find((x) => x.name === skill);
   if (!e) throw new Error(`no bundled router for ${skill}`);
   return e.content;
 }

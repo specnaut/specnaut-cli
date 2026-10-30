@@ -1,9 +1,9 @@
 import { assert, assertEquals } from "@std/assert";
-import { fromFileUrl } from "@std/path";
 import { CORE_BUNDLE, HARNESS_STATIC } from "../../src/templates_bundle.ts";
 import { HARNESSES } from "../../src/cli/harnesses.ts";
 import { extractBlock } from "../../src/domain/merge_block.ts";
 import { linkTargetPath } from "../../src/domain/context_link.ts";
+import { alwaysOnDestinations } from "./always_on.ts";
 
 /**
  * REACH, not shape (#576, FR-015).
@@ -40,22 +40,6 @@ const OPTS = {
   specBackend: "local",
   specAutogen: false,
 } as const;
-
-/** The always-on destinations, from `alwaysOn` in the manifest — not a hand list. */
-async function alwaysOnDestinations(): Promise<Map<string, string[]>> {
-  const raw = await Deno.readTextFile(
-    fromFileUrl(new URL("../../templates/manifest.json", import.meta.url)),
-  );
-  const m = JSON.parse(raw) as {
-    harness_static: Array<{ harness: string; destination: string; alwaysOn?: boolean }>;
-  };
-  const out = new Map<string, string[]>();
-  for (const e of m.harness_static) {
-    if (!e.alwaysOn) continue;
-    out.set(e.harness, [...(out.get(e.harness) ?? []), e.destination]);
-  }
-  return out;
-}
 
 Deno.test("the contract is actually DELIVERED by every harness, not merely referenced", () => {
   // A pointer to a file the project never received is worse than no pointer:
