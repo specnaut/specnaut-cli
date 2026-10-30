@@ -67,6 +67,10 @@ export class UnwalkableLinkError extends Error {
  * is safe because `assertSafeDestination` has already excluded `..` and
  * absolute segments upstream: an unresolved tail cannot re-enter the project
  * from outside it, nor leave it from inside.
+ *
+ * A dangling link on the way up is not absent: it throws `UnwalkableLinkError`
+ * (fail closed, cli#686), because what lies under it depends on a target that
+ * may be created later.
  */
 export async function resolveDeepestExisting(p: string): Promise<string> {
   const missing: string[] = [];
@@ -80,6 +84,11 @@ export async function resolveDeepestExisting(p: string): Promise<string> {
     }
     // NotFound for a dangling link too — not absent: what lies under it depends
     // on a target that may be created later (cli#686). Fail closed.
+    //
+    // The rethrow below has no test, on purpose: only a race reaches it — the
+    // entry vanishing or changing between `realPath` and `lstat` — since every
+    // other error on this path has already left through `realPath`. Rethrowing
+    // is the fail-closed answer, and a faked race would only test the fake.
     const seen = await Deno.lstat(cur).then(() => true, (e) => {
       if (e instanceof Deno.errors.NotFound) return false;
       throw e;
@@ -170,9 +179,9 @@ export async function resolveTarget(abs: string): Promise<string> {
     cur = await followLink(cur);
   }
   // A cycle never reaches a non-symlink, so the cap is what ends it.
-  // `FilesystemLoop` on purpose: `assertInsideProject` already turns that into
-  // a refusal that names the path, and a cycle and a 41-deep chain are the same
-  // unusable path from a caller's side.
+  // `FilesystemLoop` on purpose: it is what the kernel raises for the same
+  // layout, containment's `locate` tags both `loop`, and a cycle and a 41-deep
+  // chain are the same unusable path from a caller's side.
   throw new Deno.errors.FilesystemLoop(
     `more than ${MAX_SYMLINK_HOPS} symlink hops from ${abs}`,
   );

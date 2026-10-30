@@ -1,15 +1,14 @@
 import { join, relative, SEPARATOR } from "@std/path";
 import type { FsReader } from "../application/ports.ts";
-import { assertSafeDestination, isInside } from "../domain/template.ts";
+import { assertSafeDestination } from "../domain/template.ts";
 import type { DiskEntry } from "../domain/context_link.ts";
 import { ReadFault } from "../application/read_fault.ts";
-import { UnwalkableLinkError } from "./fs_link_walk.ts";
 import {
-  assertInsideProject,
-  assertRemovableInProject,
+  admit,
+  admitRemoval,
+  type Containment,
+  locate,
   resolveProjectRoot,
-  resolveTarget,
-  UnwalkableRefusal,
 } from "./fs_containment.ts";
 
 /** `\` separates path segments in a link's text here (see `DiskEntry`). */
@@ -38,7 +37,7 @@ export class DenoFsReader implements FsReader {
     assertSafeDestination(rel);
     const abs = join(projectDir, rel);
     const root = await existingRoot(projectDir);
-    if (root === null || !await guarded(assertInsideProject(root, abs))) return null;
+    if (root === null || !readable(root, abs, await locate(root, abs, "target"))) return null;
     try {
       return await Deno.readTextFile(abs);
     } catch (err) {
@@ -61,7 +60,8 @@ export class DenoFsReader implements FsReader {
     const root = await existingRoot(projectDir);
     const abs = join(projectDir, rel);
     try {
-      if (root === null || !await guarded(assertRemovableInProject(root, abs))) return null;
+      if (root === null) return null;
+      if (!readable(root, abs, await locate(root, abs, "entry"), admitRemoval)) return null;
       return await entryOf(root, abs);
     } catch (err) {
       throw asReadFault(err);
@@ -94,14 +94,11 @@ async function entryOf(root: string, abs: string): Promise<DiskEntry | null> {
   }
   if (!info.isSymlink) return fileEntry(await Deno.readFile(abs));
   const target = await Deno.readLink(abs);
-  let resolved: string | null;
-  try {
-    resolved = relative(root, await resolveTarget(abs)).split(SEPARATOR).join("/");
-  } catch (err) {
-    // A link that cannot be followed says so with `null` rather than guess.
-    if (!unfollowable(err)) throw err;
-    resolved = null;
-  }
+  // A link that cannot be followed says so with `null` rather than guess.
+  const verdict = await followed(root, abs);
+  const resolved = verdict === null || !("resolved" in verdict)
+    ? null
+    : relative(root, verdict.resolved).split(SEPARATOR).join("/");
   return { kind: "symlink", target, resolved, ...(WINDOWS ? { windows: true as const } : {}) };
 }
 
@@ -124,7 +121,7 @@ export async function listProjectFiles(projectDir: string, rel: string): Promise
   assertSafeDestination(rel);
   const root = await existingRoot(projectDir);
   const abs = join(projectDir, rel);
-  if (root === null || !await guarded(assertInsideProject(root, abs))) return [];
+  if (root === null || !readable(root, abs, await locate(root, abs, "target"))) return [];
   try {
     if (!(await Deno.stat(abs)).isDirectory) return [];
   } catch (err) {
@@ -146,31 +143,31 @@ export async function listProjectFiles(projectDir: string, rel: string): Promise
 }
 
 /**
- * Whether the link at `abs` lands on a regular file inside `root`. A link that
- * cannot be followed — a cycle, or one through a folder that does not exist —
- * lands nowhere: for a listing that means "not a file", not a refusal, so the
- * user's broken link does not abort a walk that reads nothing through it.
+ * Where following the link at `abs` lands, as containment tags it — or `null`
+ * for a link through a regular file, the filesystem's own `NotADirectory`,
+ * which is no containment verdict. A link that cannot be followed is that
+ * `null`, an `unwalkable` or a `loop`: the one home of that set (cli#704).
  */
-/**
- * A link that cannot be followed: a cycle, one through a folder that does not
- * exist, or one through a regular file. The one home of that set (cli#704).
- */
-function unfollowable(err: unknown): boolean {
-  return err instanceof Deno.errors.FilesystemLoop || err instanceof UnwalkableLinkError ||
-    err instanceof Deno.errors.NotADirectory;
-}
-
-async function landsOnFileInside(root: string, abs: string): Promise<boolean> {
-  let target: string;
+async function followed(root: string, abs: string): Promise<Containment | null> {
   try {
-    target = await resolveTarget(abs);
+    return await locate(root, abs, "target");
   } catch (err) {
-    if (unfollowable(err)) return false;
+    if (err instanceof Deno.errors.NotADirectory) return null;
     throw err;
   }
-  if (!isInside(root, target)) return false;
+}
+
+/**
+ * Whether the link at `abs` lands on a regular file inside `root`. A link that
+ * cannot be followed lands nowhere (`followed`): for a listing that means
+ * "not a file", not a refusal, so the user's broken link does not abort a walk
+ * that reads nothing through it.
+ */
+async function landsOnFileInside(root: string, abs: string): Promise<boolean> {
+  const verdict = await followed(root, abs);
+  if (verdict?.kind !== "inside") return false;
   try {
-    return (await Deno.stat(target)).isFile;
+    return (await Deno.stat(verdict.resolved)).isFile;
   } catch (err) {
     if (err instanceof Deno.errors.NotFound) return false;
     throw err;
@@ -210,17 +207,19 @@ async function existingRoot(projectDir: string): Promise<string | null> {
 }
 
 /**
- * Runs a containment check for a READ. A link through a directory that does not
- * exist has nothing to read, so a reader reports it as absent (`false`) where a
- * writer refuses (cli#686) — `diff` must not abort over the user's dangling
- * link. Every other refusal still throws.
+ * A READ's answer to a containment verdict. A link through a directory that
+ * does not exist has nothing to read, so a reader reports it as absent
+ * (`false`) where a writer refuses (cli#686) — `diff` must not abort over the
+ * user's dangling link. Every other verdict but `inside` is refused by `admit`
+ * (or `admitRemoval`, for the entry itself), exactly as a writer refuses it.
  */
-async function guarded(check: Promise<void>): Promise<boolean> {
-  try {
-    await check;
-    return true;
-  } catch (err) {
-    if (err instanceof UnwalkableRefusal) return false;
-    throw err;
-  }
+function readable(
+  root: string,
+  abs: string,
+  verdict: Containment,
+  refuse: (root: string, abs: string, verdict: Containment) => void = admit,
+): boolean {
+  if (verdict.kind === "unwalkable") return false;
+  refuse(root, abs, verdict);
+  return true;
 }
