@@ -4,11 +4,13 @@
 // and both streams.
 
 import { fromFileUrl, join } from "@std/path";
+import { bashPath } from "../templates/hooks/hook_sandbox.ts";
 import { CONSTITUTION_PATH, SIZE_LIMITS_CONFIG_PATH } from "../../src/domain/constitution_paths.ts";
 
-export const SCRIPT = fromFileUrl(
+/** Forward slashes on Windows (`bashPath`), as every other bash-driven script test passes it. */
+export const SCRIPT = bashPath(fromFileUrl(
   new URL("../../templates/core/specnaut/scripts/bash/size-ratchet.sh", import.meta.url),
-);
+));
 
 export type Result = { code: number; stdout: string; stderr: string };
 
@@ -76,11 +78,10 @@ export const BASH = "bash";
 export const ratchet = (dir: string) => run(BASH, [SCRIPT], dir);
 export const CLEAN = "staged file(s) within the file limits";
 /**
- * Why the ratchet and boundary-check tests are ignored on Windows: they hand a
- * native `C:\` script path and temp cwd to whichever `bash` PATH resolves
- * first, and on a Windows runner that is not known to be Git Bash (System32's
- * WSL launcher can precede it, and cannot open a `C:\` path). A red there
- * would measure the runner, not the script — so it is reported as ignored,
- * never as a pass.
+ * Only the cases that plant a symlink skip Windows: `Deno.symlink` there needs
+ * a privilege (or Developer Mode) the runner is not known to grant, so a red
+ * would measure the runner, not the script. Every other case runs, through the
+ * `bash` the hook and git-sandbox tests already run on the Windows runner, with
+ * the script path from `bashPath` (cli#704).
  */
-export const isWindows = Deno.build.os === "windows";
+export const symlinkUnsure = Deno.build.os === "windows";

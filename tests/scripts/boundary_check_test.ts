@@ -7,18 +7,18 @@
 // requires its reason: exit 4 is a fact distinct from a pass, and a test that
 // accepted any exit-0 output would let the two blur.
 //
-// Every case is ignored on Windows, for the reason stated on `isWindows` in
-// `size_ratchet_fixture.ts`: the `bash` these tests reach there is not known
-// to be Git Bash, so a red would measure the runner, not the script.
+// On Windows only the cases that plant a symlink are ignored, for the reason
+// stated on `symlinkUnsure` in `size_ratchet_fixture.ts`.
 
 import { assert, assertEquals, assertStringIncludes } from "@std/assert";
 import { dirname, fromFileUrl, join } from "@std/path";
 import { BOUNDARIES_CONFIG_PATH } from "../../src/domain/constitution_paths.ts";
-import { isWindows, run } from "./size_ratchet_fixture.ts";
+import { run, symlinkUnsure } from "./size_ratchet_fixture.ts";
+import { bashPath } from "../templates/hooks/hook_sandbox.ts";
 
-const SCRIPT = fromFileUrl(
+const SCRIPT = bashPath(fromFileUrl(
   new URL("../../templates/core/specnaut/scripts/bash/boundary-check.sh", import.meta.url),
-);
+));
 const check = (dir: string) => run("bash", [SCRIPT], dir);
 const CLEAN = "clean of";
 
@@ -51,9 +51,7 @@ const DOMAIN = ["src/domain"];
 const FORBID = ['^import .* from "web-framework"'];
 const VIOLATION = 'export const a = 1;\nimport x from "web-framework";\n';
 
-Deno.test("a domain free of the forbidden imports passes, and says what it checked", {
-  ignore: isWindows,
-}, async () => {
+Deno.test("a domain free of the forbidden imports passes, and says what it checked", async () => {
   const dir = await repo(
     { "src/domain/order.ts": "export const total = 1;\n", "src/web/app.ts": VIOLATION },
     config(DOMAIN, FORBID),
@@ -63,7 +61,7 @@ Deno.test("a domain free of the forbidden imports passes, and says what it check
   assertStringIncludes(r.stdout, `boundary-check: 1 file(s) under domain: ${CLEAN} 1 pattern(s)`);
 });
 
-Deno.test("a forbidden import fails, as file:line: pattern", { ignore: isWindows }, async () => {
+Deno.test("a forbidden import fails, as file:line: pattern", async () => {
   const dir = await repo({ "src/domain/order.ts": VIOLATION }, config(DOMAIN, FORBID));
   const r = await check(dir);
   assertEquals(r.code, 1, r.stdout + r.stderr);
@@ -71,9 +69,7 @@ Deno.test("a forbidden import fails, as file:line: pattern", { ignore: isWindows
   assert(!r.stdout.includes(CLEAN));
 });
 
-Deno.test("each reason to skip exits 4 with the reason, never 0", {
-  ignore: isWindows,
-}, async () => {
+Deno.test("each reason to skip exits 4 with the reason, never 0", async () => {
   const cases: Array<[string, string | undefined, string]> = [
     ["no config", undefined, `no ${BOUNDARIES_CONFIG_PATH}`],
     ["no patterns", config(DOMAIN, []), "no forbid: patterns"],
@@ -95,7 +91,7 @@ Deno.test("each reason to skip exits 4 with the reason, never 0", {
 });
 
 Deno.test("an unreadable config, a link at its path, or a bad pattern exits 2", {
-  ignore: isWindows,
+  ignore: symlinkUnsure,
 }, async () => {
   const files = { "src/domain/order.ts": VIOLATION };
   const tab = await repo(files, "domain:\n\t- src/domain\nforbid:\n  - x\n");
@@ -116,18 +112,14 @@ Deno.test("an unreadable config, a link at its path, or a bad pattern exits 2", 
   assertStringIncludes(b.stderr, "line 4: forbid: '(unbalanced' is not an extended regular");
 });
 
-Deno.test("a non-ASCII file name is read and reported verbatim", {
-  ignore: isWindows,
-}, async () => {
+Deno.test("a non-ASCII file name is read and reported verbatim", async () => {
   const dir = await repo({ "src/domain/café.ts": VIOLATION }, config(DOMAIN, FORBID));
   const r = await check(dir);
   assertEquals(r.code, 1, r.stdout + r.stderr);
   assertStringIncludes(r.stderr, "src/domain/café.ts:2:");
 });
 
-Deno.test("a pattern starting with - is a pattern, not an option", {
-  ignore: isWindows,
-}, async () => {
+Deno.test("a pattern starting with - is a pattern, not an option", async () => {
   const dir = await repo(
     { "src/domain/order.ts": "a\nrun --unsafe here\n" },
     config(DOMAIN, ["--unsafe"]),
@@ -138,7 +130,7 @@ Deno.test("a pattern starting with - is a pattern, not an option", {
 });
 
 Deno.test("a symlink, committed or in the work tree, is never followed out of the repo", {
-  ignore: isWindows,
+  ignore: symlinkUnsure,
 }, async () => {
   const outside = await Deno.makeTempDir({ prefix: "boundary-outside-" });
   const target = join(outside, "secret.ts");
@@ -158,9 +150,7 @@ Deno.test("a symlink, committed or in the work tree, is never followed out of th
   assertStringIncludes(r.stdout, `1 file(s) under domain: ${CLEAN}`);
 });
 
-Deno.test("only regular files are read: a submodule under the domain is not", {
-  ignore: isWindows,
-}, async () => {
+Deno.test("only regular files are read: a submodule under the domain is not", async () => {
   const dir = await repo(
     { "src/domain/order.ts": "export const total = 1;\n" },
     config(DOMAIN, FORBID),
@@ -178,16 +168,14 @@ Deno.test("only regular files are read: a submodule under the domain is not", {
   assertStringIncludes(r.stdout, `1 file(s) under domain: ${CLEAN}`);
 });
 
-Deno.test("a domain path outside the repo exits 2, never a skip", {
-  ignore: isWindows,
-}, async () => {
+Deno.test("a domain path outside the repo exits 2, never a skip", async () => {
   const dir = await repo({ "src/domain/order.ts": VIOLATION }, config(["../elsewhere"], FORBID));
   const r = await check(dir);
   assertEquals(r.code, 2, r.stdout + r.stderr);
   assertStringIncludes(r.stderr, "domain: '../elsewhere' cannot be listed");
 });
 
-Deno.test("an exempt glob keeps a file out of the check", { ignore: isWindows }, async () => {
+Deno.test("an exempt glob keeps a file out of the check", async () => {
   const dir = await repo(
     { "src/domain/order.ts": "export const total = 1;\n", "src/domain/schema.gen.ts": VIOLATION },
     config(DOMAIN, FORBID, ["*.gen.ts"]),
@@ -197,7 +185,7 @@ Deno.test("an exempt glob keeps a file out of the check", { ignore: isWindows },
   assertStringIncludes(r.stdout, `1 file(s) under domain: ${CLEAN}`);
 });
 
-Deno.test("a file grep cannot read exits 2, never a pass", { ignore: isWindows }, async () => {
+Deno.test("a file grep cannot read exits 2, never a pass", async () => {
   const dir = await repo(
     { "src/domain/order.ts": "export const total = 1;\n" },
     config(DOMAIN, FORBID),

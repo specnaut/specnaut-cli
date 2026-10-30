@@ -14,7 +14,6 @@ import {
   CLEAN,
   EXEMPT,
   FILE,
-  isWindows,
   lines,
   ratchet,
   repo,
@@ -35,9 +34,7 @@ async function restage(dir: string, content: string): Promise<void> {
 
 Deno.test(
   "a staged constitution past 100 lines is refused, with the unit, source and what to move",
-  {
-    ignore: isWindows,
-  },
+  {},
   async () => {
     const dir = await repo(10, undefined, constitution(90));
     await restage(dir, constitution(101));
@@ -51,9 +48,7 @@ Deno.test(
   },
 );
 
-Deno.test("an over-target constitution that grows is refused; one that shrinks passes", {
-  ignore: isWindows,
-}, async () => {
+Deno.test("an over-target constitution that grows is refused; one that shrinks passes", async () => {
   const grows = await repo(10, undefined, constitution(70));
   await restage(grows, constitution(80));
   const g = await ratchet(grows);
@@ -69,9 +64,7 @@ Deno.test("an over-target constitution that grows is refused; one that shrinks p
   assertStringIncludes(s.stdout, `1 ${CLEAN}`);
 });
 
-Deno.test("the config's constitution unit overrides the default", {
-  ignore: isWindows,
-}, async () => {
+Deno.test("the config's constitution unit overrides the default", async () => {
   const config = FILE(300, 500, UNIT("constitution", 50, 80));
   const dir = await repo(10, config, constitution(40));
   await restage(dir, constitution(90));
@@ -90,9 +83,7 @@ Deno.test("the config's constitution unit overrides the default", {
   assertStringIncludes(f.stdout, `1 ${CLEAN}`);
 });
 
-Deno.test("lock-listed or matched by an exempt glob, the constitution is still measured", {
-  ignore: isWindows,
-}, async () => {
+Deno.test("lock-listed or matched by an exempt glob, the constitution is still measured", async () => {
   const config = FILE(300, 500, EXEMPT("docs/**", ".specnaut/**"));
   const dir = await repo(10, config, constitution(100));
   await Deno.writeTextFile(
@@ -114,9 +105,7 @@ Deno.test("lock-listed or matched by an exempt glob, the constitution is still m
   assertStringIncludes(other.stdout, `0 ${CLEAN}`);
 });
 
-Deno.test("a size-limits table left in the constitution is not read — the config is", {
-  ignore: isWindows,
-}, async () => {
+Deno.test("a size-limits table left in the constitution is not read — the config is", async () => {
   const table = "# C\n\n## Size" + " limits\n\n| Unit | Target | Ceiling |\n" +
     "| :--- | ---: | ---: |\n| constitution | none | none |\n";
   const dir = await repo(10, undefined, table + lines(80));
@@ -126,9 +115,7 @@ Deno.test("a size-limits table left in the constitution is not read — the conf
   assertStringIncludes(r.stderr, "(target 60, ceiling 100) (unit constitution, source: default)");
 });
 
-Deno.test("a malformed constitution unit stops it with exit 2, never a pass", {
-  ignore: isWindows,
-}, async () => {
+Deno.test("a malformed constitution unit stops it with exit 2, never a pass", async () => {
   for (
     const unit of [
       UNIT("constitution", "3OO", 500),

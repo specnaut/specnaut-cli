@@ -16,17 +16,15 @@ import {
   CLEAN,
   EXEMPT,
   FILE,
-  isWindows,
   ratchet,
   repo,
   run,
   SCRIPT,
   stage,
+  symlinkUnsure,
 } from "./size_ratchet_fixture.ts";
 
-Deno.test("an over-target file that grows is refused, with before → after and the limits", {
-  ignore: isWindows,
-}, async () => {
+Deno.test("an over-target file that grows is refused, with before → after and the limits", async () => {
   const dir = await repo(380, FILE(300, 400));
   await stage(dir, "big.ts", 390);
   const r = await ratchet(dir);
@@ -38,9 +36,7 @@ Deno.test("an over-target file that grows is refused, with before → after and 
   assertStringIncludes(r.stderr, "source: config");
 });
 
-Deno.test("an over-target file that shrinks passes, and the check says it ran", {
-  ignore: isWindows,
-}, async () => {
+Deno.test("an over-target file that shrinks passes, and the check says it ran", async () => {
   const dir = await repo(380, FILE(300, 400));
   await stage(dir, "big.ts", 350);
   const r = await ratchet(dir);
@@ -48,7 +44,7 @@ Deno.test("an over-target file that shrinks passes, and the check says it ran", 
   assertStringIncludes(r.stdout, `1 ${CLEAN} (target 300, ceiling 400, source: config)`);
 });
 
-Deno.test("over the ceiling fails unless it shrinks", { ignore: isWindows }, async () => {
+Deno.test("over the ceiling fails unless it shrinks", async () => {
   const grows = await repo(380, FILE(300, 400));
   await stage(grows, "big.ts", 401);
   const g = await ratchet(grows);
@@ -63,9 +59,7 @@ Deno.test("over the ceiling fails unless it shrinks", { ignore: isWindows }, asy
   assertStringIncludes(s.stdout, `1 ${CLEAN}`);
 });
 
-Deno.test("a new file crossing the target is a note, not a violation; past the ceiling it is", {
-  ignore: isWindows,
-}, async () => {
+Deno.test("a new file crossing the target is a note, not a violation; past the ceiling it is", async () => {
   const dir = await repo(10, FILE(300, 400));
   await stage(dir, "fresh.ts", 320);
   const r = await ratchet(dir);
@@ -80,9 +74,7 @@ Deno.test("a new file crossing the target is a note, not a violation; past the c
   assertStringIncludes(c.stderr, "fresh.ts: 0 → 420");
 });
 
-Deno.test("extract, then add: measured from the branch base, the second commit passes", {
-  ignore: isWindows,
-}, async () => {
+Deno.test("extract, then add: measured from the branch base, the second commit passes", async () => {
   const dir = await repo(380, FILE(300, 400));
   await run("git", ["branch", "-M", "main"], dir);
   await run("git", ["switch", "-q", "-c", "feature"], dir);
@@ -103,9 +95,7 @@ Deno.test("extract, then add: measured from the branch base, the second commit p
   );
 });
 
-Deno.test("Specnaut's own files are exempt: .specnaut/** and every installed.lock entry", {
-  ignore: isWindows,
-}, async () => {
+Deno.test("Specnaut's own files are exempt: .specnaut/** and every installed.lock entry", async () => {
   const dir = await repo(10, FILE(300, 400));
   await Deno.mkdir(join(dir, ".claude/skills/x"), { recursive: true });
   await Deno.writeTextFile(
@@ -122,7 +112,7 @@ Deno.test("Specnaut's own files are exempt: .specnaut/** and every installed.loc
   assertStringIncludes(r.stdout, `0 ${CLEAN}`);
 });
 
-Deno.test("--report prints every checked file, before → after", { ignore: isWindows }, async () => {
+Deno.test("--report prints every checked file, before → after", async () => {
   const dir = await repo(100, FILE(300, 400));
   await stage(dir, "big.ts", 120);
   const r = await run(BASH, [SCRIPT, "--report"], dir);
@@ -132,7 +122,6 @@ Deno.test("--report prints every checked file, before → after", { ignore: isWi
 
 Deno.test(
   "no config, or no file unit: the defaults apply and say so",
-  { ignore: isWindows },
   async () => {
     const none = await repo(310);
     await stage(none, "big.ts", 320);
@@ -149,7 +138,7 @@ Deno.test(
   },
 );
 
-Deno.test("none switches a rule off", { ignore: isWindows }, async () => {
+Deno.test("none switches a rule off", async () => {
   const dir = await repo(380, FILE("none", 400));
   await stage(dir, "big.ts", 399);
   const r = await ratchet(dir);
@@ -159,7 +148,6 @@ Deno.test("none switches a rule off", { ignore: isWindows }, async () => {
 
 Deno.test(
   "an exempt glob is skipped, at the root and below it",
-  { ignore: isWindows },
   async () => {
     const dir = await repo(
       10,
@@ -176,7 +164,6 @@ Deno.test(
 
 Deno.test(
   "a config it cannot read stops it with exit 2, never a pass — and runs nothing in it",
-  { ignore: isWindows },
   async () => {
     for (
       const config of [
@@ -201,7 +188,7 @@ Deno.test(
 );
 
 Deno.test("a link at the config path is unreadable, never the defaults", {
-  ignore: isWindows,
+  ignore: symlinkUnsure,
 }, async () => {
   const dir = await repo(10);
   await Deno.writeTextFile(join(dir, "elsewhere.yml"), FILE("none", "none"));
@@ -212,21 +199,19 @@ Deno.test("a link at the config path is unreadable, never the defaults", {
   assertStringIncludes(r.stderr, "is a link");
 });
 
-Deno.test("a missing _config.sh beside the script is exit 3, never a pass", {
-  ignore: isWindows,
-}, async () => {
+Deno.test("a missing _config.sh beside the script is exit 3, never a pass", async () => {
   const dir = await repo(10);
   const lone = join(await Deno.makeTempDir(), "size-ratchet.sh");
   await Deno.copyFile(SCRIPT, lone);
   assertEquals((await run(BASH, [lone], dir)).code, 3);
 });
 
-Deno.test("outside a git work tree it exits 3", { ignore: isWindows }, async () => {
+Deno.test("outside a git work tree it exits 3", async () => {
   const dir = await Deno.makeTempDir();
   assertEquals((await ratchet(dir)).code, 3);
 });
 
-Deno.test("--since holds committed changes from a ref to HEAD", { ignore: isWindows }, async () => {
+Deno.test("--since holds committed changes from a ref to HEAD", async () => {
   const dir = await repo(380, FILE(300, 400));
   const base = (await run("git", ["rev-parse", "HEAD"], dir)).stdout.trim();
   await stage(dir, "big.ts", 395);
