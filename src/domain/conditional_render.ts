@@ -146,8 +146,12 @@ export function renderHarness(source: string, harnessKey: string): string {
  *
  * Throws on unmatched markers (BEGIN without END, END without BEGIN) and on
  * nested markers.
+ *
+ * Module-private on purpose (cli#687): `key` goes into a RegExp unescaped
+ * (`markerPatterns`), which is safe only because every caller is a family
+ * above passing a literal name. Export it and that guarantee goes with it.
  */
-export function renderMarked(
+function renderMarked(
   source: string,
   key: string,
   active: string,
