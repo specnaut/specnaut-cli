@@ -3,11 +3,9 @@
 # Sourced by _command.sh. What ONE simple command runs, once cmd_parse has cut
 # it out of the line: redirections dropped, VAR=val prefixes and wrappers
 # (env, command, sudo, nice, time, timeout, xargs, flock, …) skipped, the
-# command word reduced to its basename, `source <script>` and `. <script>`
-# read as the script, each `find -exec … ;` read as a command of its own, and
-# `sh|bash|zsh -c '…'` read one level deep — the string is parsed again as a
-# command line; a second level, or a shell fed on stdin, or `eval`, sets
-# CMD_OPAQUE instead of being guessed at.
+# command word reduced to its basename, `source <script>` read as the script,
+# each `find -exec … ;` as a command of its own, and `sh|bash|zsh -c '…'` one
+# level deep — the string is parsed again as a command line.
 #
 # Unknown means opaque (cli#711, plan § 4): a wrapper is known by its
 # basename, with the options it takes and which of them take a value; any
@@ -115,7 +113,8 @@ _cmd_wrapper() {
   local k0=$k j
   case ${v[k]##*/} in
     exec) _cmd_getopt cl a - ;;
-    command) _cmd_getopt pvV "" ;;
+    # -v/-V name the command and run nothing (cli#711): nothing is recorded
+    command) _cmd_getopt pvV ""; for ((j = k0 + 1; j < k; j++)); do case ${v[j]} in -*[vV]*) k=$m ;; esac; done ;;
     builtin | nohup) _cmd_getopt "" "" ;;
     time) _cmd_getopt plavq of "--portability --verbose --append --quiet" "--output --format" ;;
     nice) _cmd_getopt 0123456789 n "" --adjustment ;;
@@ -142,6 +141,7 @@ _cmd_wrapper() {
 # flock's lock file, `-c '…'` is left for _cmd_emit, which reads the string
 # as a shell's.
 _cmd_runner() {
+  local k0=$k
   case ${v[k]##*/} in
     timeout | gtimeout) _cmd_getopt v sk "--preserve-status --foreground --verbose" "--signal --kill-after"; k=$((k + 1)) ;;
     caffeinate) _cmd_getopt dimsu tw ;;
@@ -154,10 +154,28 @@ _cmd_runner() {
     taskset) _cmd_getopt acp "" "--all-tasks --cpu-list --pid"; k=$((k + 1)) ;;
     xargs)
       _cmd_getopt 0prtxoile adEIJLnPRSs "--null --interactive --no-run-if-empty --verbose --exit --open-tty --show-limits --replace --eof --max-lines" \
-        "--arg-file --delimiter --max-args --max-procs --max-chars --process-slot-var" ;;
+        "--arg-file --delimiter --max-args --max-procs --max-chars --process-slot-var"
+      _cmd_xargs "$k0" ;;
     flock) _cmd_getopt sexnouF wE "--shared --exclusive --nonblock --no-fork --close --unlock --verbose" "--timeout --conflict-exit-code"; k=$((k + 1)) ;;
     *) return 1 ;;
   esac
+}
+
+# _cmd_xargs <index of xargs> — k: the command xargs runs, whose words stdin
+# fills in: each word holding the -I/-J replace string (-i, --replace: `{}`)
+# has it as `$`, and a `$` word ends it — `echo merge | xargs git` is a git
+# subcommand the shell fills in (_listed.sh), not `git` (cli#711).
+_cmd_xargs() {
+  local j r=""
+  for ((j = $1 + 1; j < k; j++)); do
+    case ${v[j]} in
+      --replace) r='{}' ;; --replace=*) r=${v[j]#*=} ;; --*) ;;
+      -*[IJ]) j=$((j + 1)) r=${v[j]:-} ;; -*[IJ]*) r=${v[j]#*[IJ]} ;; -*i*) r='{}' ;;
+    esac
+  done
+  [ "$k" -lt "$m" ] || return 0 # no command: xargs runs echo
+  if [ -n "$r" ]; then for ((j = k; j < m; j++)); do v[j]=${v[j]//"$r"/\$}; done; fi
+  v+=('$') m=$((m + 1))
 }
 
 # _cmd_shell_c <depth> [1] — v[k] is a shell (1: or flock's `-c`, already
@@ -226,15 +244,18 @@ _cmd_base() { _cmd_name "${v[k]}"; v[k]=$CMD_NAME; }
 _cmd_script() { if [ -n "$1" ]; then _cmd_name "$1"; CMD_SEGS+=("$CMD_NAME"); fi; }
 
 # _cmd_evals — opaque when a word holds code the shell runs later, where this
-# parser never reads it: `$(…)` or a backtick after a `[` (an array subscript
-# — let, printf -v, read, test -v and (( )) evaluate it), and a zsh `${(…)`
-# whose flags hold `e` (the value is expanded again). A quoted word keeps that
-# text as it is; unquoted, cmd_parse already read the substitution.
+# parser never reads it: a zsh `${(…)` whose flags hold `e` (the value is
+# expanded again), and, for a builtin that evaluates the array subscript of a
+# name it is given (let, printf -v, read, declare, test -v, …), `$(…)` or a
+# backtick after a `[`. A quoted word keeps that text as it is; unquoted,
+# cmd_parse already read the substitution. Given to any other command, it is
+# data: `git commit -m '[x] $(y)'` runs nothing (cli#711).
 # shellcheck disable=SC2016 # the `$(` and `${(` are matched as text, on purpose
 _cmd_evals() {
-  local x f o='${('
+  local x f o='${(' sub=0
+  case ${v[k]:-} in let | printf | read | test | '[' | '[[' | declare | typeset | local | export | readonly | unset | getopts | wait | mapfile | readarray | print | vared) sub=1 ;; esac
   for x in ${v[@]+"${v[@]}"}; do
-    case $x in *'['*'$('* | *'['*'`'*) CMD_OPAQUE=1; return 0 ;; esac
+    if [ "$sub" = 1 ]; then case $x in *'['*'$('* | *'['*'`'*) CMD_OPAQUE=1; return 0 ;; esac; fi
     while [[ $x == *"$o"* ]]; do
       x=${x#*"$o"} f=${x%%')'*}
       case $f in *e*) CMD_OPAQUE=1; return 0 ;; esac
@@ -255,8 +276,8 @@ _cmd_emit() {
   local -a v
   local x j k=0 m=0 IFS=$' \t\n'
   _cmd_strip_redirs "$1"
-  _cmd_evals
   _cmd_skip_prefixes
+  _cmd_evals
   if [ -n "${CMD_ON_SEG:-}" ]; then "$CMD_ON_SEG" "$1"; fi
   [ "$k" -lt "$m" ] || return 0
   _cmd_base

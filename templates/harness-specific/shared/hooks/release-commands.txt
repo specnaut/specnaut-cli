@@ -13,6 +13,7 @@ tag.sh except --no-push
 release-github.sh
 release-gitlab.sh
 gh release create
+gh release new
 gh release edit
 gh release upload
 glab release create

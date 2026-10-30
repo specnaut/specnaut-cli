@@ -10,7 +10,8 @@
 # refs/tags/ ref, `tag <name>`, or a name that is a tag, or not a branch and
 # either version-shaped or created as a tag on the same line (tag.sh and
 # `git tag` run before the push does, so the tag does not exist yet when this
-# hook reads the command). And a line too nested to read (eval, sh -c in
+# hook reads the command). And a git subcommand it cannot read (_git.sh: a
+# shell alias, `git $(…)`), or a line too nested to read (eval, sh -c in
 # sh -c, a shell fed on stdin, a line that never closes): fail closed.
 #
 # Usage: guard-release.sh <claude|codex>   (payload on stdin)
@@ -21,11 +22,9 @@ case ${BASH_SOURCE[0]} in */*) HOOK_DIR=${BASH_SOURCE[0]%/*} ;; *) HOOK_DIR=. ;;
 # shellcheck source=_command.sh
 . "$HOOK_DIR/_command.sh"
 # shellcheck source=_git.sh
-. "$HOOK_DIR/_git.sh"
+. "$HOOK_DIR/_git.sh" # and _listed.sh
 # shellcheck source=_approval.sh
 . "$HOOK_DIR/_approval.sh"
-# shellcheck source=_listed.sh
-. "$HOOK_DIR/_listed.sh"
 guard_init guard-release "${1:-}" argv:.tool_input.command
 [ "$P_TOOL" = Bash ] || guard_fail "expected a Bash tool call, got '$P_TOOL'"
 [ -n "${GF[0]}" ] || guard_fail "a Bash call without tool_input.command"
@@ -74,6 +73,7 @@ for seg in ${CMD_SEGS[@]+"${CMD_SEGS[@]}"}; do
     case $GIT_SUB in
       tag) tags_made=1 ;;
       push) pushes+=("$(IFS=$CMD_SEP; echo "${GIT_ARGS[*]:-}")") ;;
+      '!') hits+=("$GIT_WHY") ;;
     esac
     continue
   fi

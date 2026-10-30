@@ -10,7 +10,8 @@
       "Bash(*release/release-gitlab.sh*)",
       "Bash(gh release edit *)",
       "Bash(gh release upload *)",
-      "Bash(glab release create *)"
+      "Bash(glab release create *)",
+      "Bash(gh release new *)"
     ]
   },
   "hooks": {

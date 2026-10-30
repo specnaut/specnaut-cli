@@ -4,14 +4,20 @@
 # guard-release). Reads one `git` segment the way git itself would: past its
 # global options, and through its aliases — so `git -C x -c k=v pm` is seen as
 # the command it runs, not as an unknown subcommand.
+# shellcheck source=_listed.sh
+. "${BASH_SOURCE[0]%/*}/_listed.sh" || guard_fail "_listed.sh is missing beside _git.sh"
 
 # cmd_git <git words…> — skip git's global options and expand git aliases
 # (up to 5 levels), so `git -C x -c k=v pm` is read as the command it runs.
-# Sets GIT_SUB and GIT_ARGS; GIT_SUB is "!" for a shell alias or an alias we
-# cannot follow. git ignores an alias that shadows a builtin, so do we.
+# Sets GIT_SUB and GIT_ARGS. GIT_SUB is "!" for a subcommand this cannot
+# read — the one home of that rule, for every guard (cli#711) — and GIT_WHY
+# says which: a word the shell or the command fills in (`git $(…)`, `git
+# "$X"`, xargs' stdin, find's `{}`: _listed_expands), a shell alias, an alias
+# set on the command line, or one it cannot follow. git ignores an alias that
+# shadows a builtin, so do we.
 cmd_git() {
   shift
-  GIT_SUB="" GIT_ARGS=()
+  GIT_SUB="" GIT_ARGS=() GIT_WHY=""
   local inline_alias=0
   while [ $# -gt 0 ]; do
     case $1 in
@@ -27,10 +33,18 @@ cmd_git() {
   GIT_SUB=$1
   shift
   GIT_ARGS=("$@")
+  if _listed_expands "$GIT_SUB"; then GIT_SUB="!" GIT_WHY="a git subcommand the shell or the command fills in"; return 0; fi
   # An alias set on the command line (`git -c alias.p=push p`) is not in any
   # config file, so `git config --get` cannot follow it, and how it fails
   # differs by platform: what the command runs is unknowable, so it is gated.
-  if [ "$inline_alias" = 1 ]; then GIT_SUB="!"; return 0; fi
+  if [ "$inline_alias" = 1 ]; then GIT_SUB="!" GIT_WHY="a git alias set on the command line"; return 0; fi
+  _git_alias
+}
+
+# _git_alias — GIT_SUB and GIT_ARGS through the aliases git would expand, from
+# the config of the repository the command runs in.
+_git_alias() {
+  GIT_WHY="a git alias that runs a shell command, or one it cannot follow"
   local level val rc
   local -a a
   for level in 1 2 3 4 5; do

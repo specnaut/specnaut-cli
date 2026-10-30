@@ -13,11 +13,12 @@
 #                        shell would expand ($VAR, `…`, quotes, ?, [, {),
 #                        --all, --mirror, --delete and unknown options are
 #                        all gated
-#   gh pr merge, glab mr merge, a git shell alias, a git subcommand the shell
-#                        rewrites (`git $(…)`, `git "$X"`), a line it cannot read
+#   a git subcommand it cannot read (_git.sh: a shell alias, `git $(…)`,
+#                        `git "$X"`), a line it cannot read
 #   every command in merge-commands.txt — the scripts that land on the base
 #                        themselves (land-feature.sh, remove-spec.sh), matched
-#                        by basename however they are reached (_listed.sh)
+#                        by basename however they are reached, and gh pr
+#                        merge, glab mr merge (_listed.sh)
 # An unknown base gates every form. A gated command goes through
 # approval_gate: Claude's own prompt where it can ask, else this turn's
 # `merge` approval (FR-017).
@@ -34,11 +35,9 @@ case ${BASH_SOURCE[0]} in */*) HOOK_DIR=${BASH_SOURCE[0]%/*} ;; *) HOOK_DIR=. ;;
 # shellcheck source=_command.sh
 . "$HOOK_DIR/_command.sh"
 # shellcheck source=_git.sh
-. "$HOOK_DIR/_git.sh"
+. "$HOOK_DIR/_git.sh" # and _listed.sh
 # shellcheck source=_approval.sh
 . "$HOOK_DIR/_approval.sh"
-# shellcheck source=_listed.sh
-. "$HOOK_DIR/_listed.sh"
 guard_init guard-merge "${1:-}" argv:.tool_input.command
 [ "$P_TOOL" = Bash ] || guard_fail "expected a Bash tool call, got '$P_TOOL'"
 [ -n "${GF[0]}" ] || guard_fail "a Bash call without tool_input.command"
@@ -55,13 +54,11 @@ for seg in ${CMD_SEGS[@]+"${CMD_SEGS[@]}"}; do
         merge | pull) merges=1 ;;
         push) pushes+=("$(IFS=$CMD_SEP; echo "${GIT_ARGS[*]:-}")") ;;
         checkout | switch) switched=1 ;;
-        '!') reasons+=("a git alias that runs a shell command") ;;
-        *) if _listed_expands "$GIT_SUB"; then reasons+=("a git subcommand the shell rewrites"); fi ;;
+        '!') reasons+=("$GIT_WHY") ;;
       esac
       continue ;;
   esac
   cmd_pos
-  case "${POS[*]:-}" in "gh pr merge"* | "glab mr merge"*) reasons+=("${POS[0]} ${POS[1]} merge") ;; esac
   listed "$HOOK_DIR/merge-commands.txt"
   if [ -n "$HIT" ]; then reasons+=("$HIT"); fi
 done

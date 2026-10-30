@@ -7,6 +7,7 @@ import {
   makeRepo,
   payload,
   pool,
+  type Run,
   runHook,
   type Sandbox,
   sandbox,
@@ -33,6 +34,13 @@ async function bash(
   });
   return runHook(sb, "guard-release.sh", "codex", p);
 }
+
+/**
+ * Denied, and by the release rule: approval_gate's refusal. A crash exits 2
+ * too, so the exit code alone would read every crash as a deny (cli#711).
+ */
+const DENY = /^specnaut guard-release: .+ publishes a release, .+ To let it through, reply /;
+const denied = (r: Run) => r.code === 2 && DENY.test(r.stderr);
 
 const CASES: ReadonlyArray<[command: string, denied: boolean]> = [
   // the release scripts, however they are reached
@@ -74,6 +82,22 @@ const CASES: ReadonlyArray<[command: string, denied: boolean]> = [
   ["gh release list", false],
   ["gh run list", false],
   ["echo gh release create v1", false],
+  // a word the shell or the command fills in, at a listed position (cli#711)
+  ["gh $(echo release) create v1", true],
+  ['gh release "$S" v1', true],
+  ['gh "$X" create v1', true],
+  ["echo release create v1 | xargs gh", true],
+  ["find release -maxdepth 0 -exec gh {} create v1 \\;", true],
+  ["gh release new v1", true],
+  ["gh $W v1", true], // W="release create": an unquoted word may be several
+  ['gh release view "$T"', false],
+  ["echo v1 | xargs gh release view", false],
+  // a git subcommand it cannot read: rewritten by the shell, or an alias it cannot follow
+  ["git $(echo push) origin v1.0.0", true],
+  ['git "$P" origin v1.0.0', true],
+  ["git -c alias.p=push p origin v1.0.0", true],
+  ["git pt", true],
+  ["git st", false],
   // tag pushes
   ["git push --tags", true],
   ["git push origin feat --follow-tags", true],
@@ -94,12 +118,16 @@ Deno.test("guard-release on Codex: every listed command and every tag push", asy
   try {
     const repo = await makeRepo(sb, { mode: "auto", head: "feat" });
     await git(sb, repo, "tag", "v1.0.0");
+    await git(sb, repo, "config", "alias.pt", "!git push --tags");
+    await git(sb, repo, "config", "alias.st", "status --short");
     const runs = await pool(CASES, ([command]) => bash(sb, repo, command));
     // An allow is silent: an error inside the matcher once printed "refusing"
     // and exited 0 — a crash read as "not listed".
-    const wrong = CASES.flatMap(([command, denied], i) =>
-      runs[i].code === (denied ? 2 : 0) && (denied || runs[i].stderr === "") ? [] : [
-        `${JSON.stringify(command)}: want ${denied ? 2 : 0}, got ${runs[i].code} ${runs[i].stderr}`,
+    const wrong = CASES.flatMap(([command, deny], i) =>
+      (deny ? denied(runs[i]) : runs[i].code === 0 && runs[i].stderr === "") ? [] : [
+        `${JSON.stringify(command)}: want ${deny ? "deny" : 0}, got ${runs[i].code} ${
+          runs[i].stderr
+        }`,
       ]
     );
     assertEquals(wrong, [], wrong.join("\n"));
@@ -113,7 +141,7 @@ Deno.test("guard-release: push.followTags makes every push a tag push", async ()
   try {
     const repo = await makeRepo(sb, { mode: "auto", head: "feat" });
     await git(sb, repo, "config", "push.followTags", "true");
-    assertEquals((await bash(sb, repo, "git push origin feat")).code, 2);
+    assertEquals(denied(await bash(sb, repo, "git push origin feat")), true);
   } finally {
     await sb.cleanup();
   }
@@ -125,9 +153,9 @@ Deno.test("guard-release: only this turn's release approval lets it through", as
     const repo = await makeRepo(sb, { mode: "auto", head: "feat" });
     const publish = (extra: Record<string, unknown> = {}) =>
       bash(sb, repo, "gh release create v1.2.3", extra);
-    const denied = await publish();
-    assertEquals(denied.code, 2);
-    assertStringIncludes(denied.stderr, "`release it`");
+    const refused = await publish();
+    assert(denied(refused), refused.stderr);
+    assertStringIncludes(refused.stderr, "`release it`");
 
     await approve(sb, "codex", repo, "release it");
     assertEquals((await publish()).code, 0);
@@ -137,13 +165,13 @@ Deno.test("guard-release: only this turn's release approval lets it through", as
       "the approval covers the turn",
     );
     assertEquals(
-      (await publish({ turn_id: "019a2b3c-ffff-7000-8000-000000000002" })).code,
-      2,
+      denied(await publish({ turn_id: "019a2b3c-ffff-7000-8000-000000000002" })),
+      true,
       "a previous turn",
     );
 
     await approve(sb, "codex", repo, "merge");
-    assertEquals((await publish()).code, 2, "a merge approval is not a release approval");
+    assertEquals(denied(await publish()), true, "a merge approval is not a release approval");
   } finally {
     await sb.cleanup();
   }

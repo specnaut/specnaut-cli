@@ -10,11 +10,15 @@
 # has already reduced the command word to its basename, so it matches however
 # the script is reached (a path, `bash x`, `source x`, `timeout 60 x`, …).
 # The script word is matched ignoring ASCII case (a case-folding filesystem,
-# APFS or NTFS, runs `Land-Feature.sh`), and a command word the shell rewrites
-# after this hook has read it — a `$VAR`, a substitution, a glob, a brace, a
-# zsh glob group (`land-(feature).sh`) — or that holds a byte outside printable
-# ASCII matches every script line: what it names is unknown here, so it is
-# gated (fail closed). An argument is never judged so: `ls *.sh` runs `ls`.
+# APFS or NTFS, runs `Land-Feature.sh`). A word filled in after this hook has
+# read it — by the shell (a `$VAR`, a substitution, a glob, a brace, a zsh
+# glob group: `land-(feature).sh`), by the command (xargs' stdin, its -I
+# placeholder, find's `{}`, which _simple.sh leaves as `$` or `{}`) — or that
+# holds a byte outside printable ASCII matches the line's word at its
+# position and every word after it — unquoted, or as stdin, it may be several
+# words: what it names is unknown here, so it is gated (fail closed). `gh
+# $(echo release) create` and `… | xargs gh` are `gh release create`
+# (cli#711). Only at a position a line has a word for: `ls *.sh` runs `ls`.
 # `<words> except <flag>`: that flag anywhere in the segment exempts it.
 # `#` comments and blank or whitespace-only lines are skipped; a `\r` (a CRLF
 # checkout) is read past.
@@ -51,9 +55,10 @@ listed() {
     [ -n "${e[0]:-}" ] || continue
     ok=1
     for ((i = 0; i < ${#e[@]}; i++)); do
-      if [ "${e[i]}" = "${POS[i]:-}" ]; then continue; fi
-      if [ "$i" = 0 ] && [[ ${e[0]} == *.sh ]] &&
-        { guard_ieq "${e[0]}" "${POS[0]:-}" || _listed_expands "${POS[0]:-}"; }; then continue; fi
+      w=${POS[i]:-}
+      if _listed_expands "$w"; then break; fi
+      if [ "${e[i]}" = "$w" ]; then continue; fi
+      if [ "$i" = 0 ] && [[ ${e[0]} == *.sh ]] && guard_ieq "${e[0]}" "$w"; then continue; fi
       ok=0
       break
     done

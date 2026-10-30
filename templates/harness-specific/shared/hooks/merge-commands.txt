@@ -7,8 +7,9 @@
 # the argument of sh/bash/source, or behind timeout, env, xargs, …); how a line
 # matches lives in _listed.sh. A copy of the script under another name, a
 # task-runner alias or an interpreter that runs it is not seen — the limit a
-# hand-written script that runs `git push` already has. `git merge`, `git
-# push`, `gh pr merge` and `glab mr merge` are rules, not words, and live in
-# guard-merge.sh.
+# hand-written script that runs `git push` already has. `git merge` and `git
+# push` are rules, not words, and live in guard-merge.sh.
 land-feature.sh
 remove-spec.sh
+gh pr merge
+glab mr merge

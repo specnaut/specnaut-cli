@@ -7,9 +7,19 @@ import { type Harness, payload, type Run, runHook, type Sandbox } from "./hook_s
 
 export type Verdict = "allow" | "ask" | "deny";
 
+/**
+ * What only guard-merge's deny path prints: approval_gate's refusal, naming
+ * the base and the word to type. Every crash exits 2 too — the ERR trap, a bad
+ * payload, a missing list — so an exit code alone would read a crash as a
+ * deny, and a test of a deny would pass on a guard that never reached its rule
+ * (cli#711).
+ */
+const DENY =
+  /^specnaut guard-merge: merge: manual — .+ would land on the base branch .+ To let it through, reply /;
+
 /** The guard's answer, as each harness sees it — or what went wrong. */
 export function verdict(r: Run): Verdict | string {
-  if (r.code === 2) return "deny";
+  if (r.code === 2 && DENY.test(r.stderr)) return "deny";
   if (r.code === 0 && r.stdout === "") return "allow";
   if (r.code === 0 && JSON.parse(r.stdout).hookSpecificOutput?.permissionDecision === "ask") {
     return "ask";

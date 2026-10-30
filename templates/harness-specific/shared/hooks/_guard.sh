@@ -31,7 +31,19 @@ export GIT_OPTIONAL_LOCKS=0 GIT_PAGER=cat PAGER=cat
 GUARD_NAME=hook GUARD_FAIL_CODE=2 GUARD_ROOT="" GUARD_JQ_CRLF=0 GUARD_ALLOWED=0
 
 guard_fail() { printf 'specnaut %s: %s\n' "$GUARD_NAME" "$1" >&2; exit "$GUARD_FAIL_CODE"; }
-trap 'guard_fail "unexpected error at line $LINENO — refusing rather than allowing"' ERR
+
+# _guard_err <status> <line> — the ERR trap. set -E carries it into every
+# `$(…)` and subshell; there it only leaves, with the failing command's own
+# status, for the caller to judge: `$(git config --get alias.x)` exiting 1
+# means "no such alias". A caller that does not handle it fails in this
+# shell, where the trap refuses. Refusing inside the substitution turned every
+# such 1 into the fail code — cmd_git read each git subcommand outside its
+# list as an alias it cannot follow — and printed a crash above a deny (cli#711).
+_guard_err() {
+  if [ "${BASH_SUBSHELL:-0}" -gt 0 ]; then exit "$1"; fi
+  guard_fail "unexpected error at line $2 — refusing rather than allowing"
+}
+trap '_guard_err $? $LINENO' ERR
 
 # guard_allow — the ONLY way a guard lets a call through.
 guard_allow() { GUARD_ALLOWED=1; exit 0; }

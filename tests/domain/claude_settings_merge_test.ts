@@ -182,8 +182,9 @@ const SHIPPED = Deno.readTextFileSync(
   new URL("../../templates/harness-specific/claude/settings.json", import.meta.url),
 );
 // The script rules exist because `/ship` never types `gh release create` or
-// `git push` itself: the scripts do (#682). The last three complete
-// release-commands.txt, the Codex guard's list (spec 036, F4).
+// `git push` itself: the scripts do (#682). The last four complete
+// release-commands.txt, the Codex guard's list (spec 036, F4); `gh release
+// new` is `gh release create` under its alias (cli#711).
 const PUBLISH_ASK = [
   "Bash(gh release create *)",
   "Bash(gh release edit *--draft*)",
@@ -194,6 +195,7 @@ const PUBLISH_ASK = [
   "Bash(gh release edit *)",
   "Bash(gh release upload *)",
   "Bash(glab release create *)",
+  "Bash(gh release new *)",
 ];
 
 Deno.test("claude settings: the shipped file asks before every publish-capable command (#610)", () => {
