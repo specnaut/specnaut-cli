@@ -36,7 +36,7 @@ async function runSpecnaut(args: string[], cwd: string, home: string) {
 }
 
 async function withProject(
-  harness: "claude" | "codex",
+  harness: "claude",
   body: (dir: string, home: string) => Promise<void>,
 ) {
   const dir = await Deno.makeTempDir({ prefix: `specnaut-security-${harness}-` });
@@ -60,16 +60,16 @@ const bodyOf = (rel: string) => `# ${rel}\nas an older Specnaut release wrote it
 const plantRetired = (dir: string) =>
   plant(dir, RETIRED.map((rel) => [rel, bodyOf(rel), bodyOf(rel)]));
 
-for (const h of ["claude", "codex"] as const) {
-  Deno.test(`[${h}] a fresh init writes neither security-guidance file`, async () => {
-    await withProject(h, async (dir) => {
-      for (const rel of RETIRED) {
-        assertEquals(await exists(join(dir, rel)), false, `fresh init wrote retired ${rel}`);
-        assert(!(await lockText(dir)).includes(`  ${rel}:`), `the lock records retired ${rel}`);
-      }
-    });
+// Claude only: Codex never received these files, so a Codex case could not
+// fail whatever regressed (cli#713).
+Deno.test("[claude] a fresh init writes neither security-guidance file", async () => {
+  await withProject("claude", async (dir) => {
+    for (const rel of RETIRED) {
+      assertEquals(await exists(join(dir, rel)), false, `fresh init wrote retired ${rel}`);
+      assert(!(await lockText(dir)).includes(`  ${rel}:`), `the lock records retired ${rel}`);
+    }
   });
-}
+});
 
 Deno.test("[claude] upgrade prunes both vanilla files and leaves the rest of .claude/ alone", async () => {
   await withProject("claude", async (dir, home) => {
