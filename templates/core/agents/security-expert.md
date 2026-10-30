@@ -88,7 +88,7 @@ the plan says bounds it, and whether that boundary can hold. **Name what becomes
 later** — a missing gate is one line today, a data model that makes the gate impossible is a
 migration, a backfill and every caller — and say which of your findings is which.
 
-Answer these four, in order, then any the dispatch adds:
+Answer these six, in order, then any the dispatch adds:
 
 1. **Which new surface accepts input, and where does it stop?** Every route, job, webhook, upload,
    argument or file content the plan adds, and the validator that bounds it. A boundary with no
@@ -100,6 +100,12 @@ Answer these four, in order, then any the dispatch adds:
    access check, a field that should never leave the server.
 4. **What does this let an authenticated stranger do to somebody else's account?** In writing.
    "Nothing" is acceptable only when it names what was checked.
+5. **Which text becomes an instruction an agent will follow?** Every prompt, skill, agent file,
+   hook, tool grant or permission allowlist the plan adds or widens, and who can write to it. Text a
+   contributor can edit that an agent then obeys or runs is the finding.
+6. **What does it write into a project that consumes it?** Every file created, overwritten or
+   deleted outside this repository, and what bounds it. A path that can leave the project, a write
+   through a link, or a delete that loses the user's bytes is the finding.
 
 When the plan is a brief and the change adds or widens a trust boundary (the list in `plan.md` step
 4b), say **"crosses the threshold: <which>"** — that makes the full plan due.

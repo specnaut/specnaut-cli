@@ -22,13 +22,14 @@ Deno.test("technical forks are decided by the expert seats, never asked (#630)",
   // A performance seat joins when the plan has a hot path.
   assertStringIncludes(plan, "`performance-expert` too when the change has a hot path");
   assertStringIncludes(plan, "**A technical fork is never a question**");
-  assertStringIncludes(plan, "**Nothing open → no stop**");
   assertStringIncludes(plan, "a new external service, vendor or cost");
   // The intent the seats decide against.
   assertStringIncludes(plan, "clean, SOLID, secure by default");
 
   const chain = flat(phase("auto-chain").content);
   assertStringIncludes(chain, "**only if something only the user can answer is open**");
+  // The no-stop rule's home is the chain, not the plan (cli#709).
+  assertStringIncludes(chain, "Nothing open → a report, then `implement`");
 
   const review = phase("review").content;
   assertStringIncludes(review, "Choosing *between* technical fixes is never the user's call");
@@ -47,10 +48,11 @@ Deno.test("the plan-time audits run on every plan, and each seat states its own 
   const seat = (name: string) => {
     const e = CORE_BUNDLE.find((x) => x.category === "agent" && x.name === name);
     if (!e) throw new Error(`missing agent ${name}`);
-    const text = flat(e.content);
-    const at = text.indexOf("## Mode 3");
+    const at = e.content.indexOf("## Mode 3");
     assert(at >= 0, `${name} has no Mode 3`);
-    return text.slice(at);
+    // Bounded at the next H2 (cli#709): a question that drifted into a later mode is not Mode 3's.
+    const next = e.content.indexOf("\n## ", at);
+    return flat(e.content.slice(at, next < 0 ? undefined : next));
   };
   const questions: Record<string, string[]> = {
     "architect-expert": [
@@ -65,6 +67,8 @@ Deno.test("the plan-time audits run on every plan, and each seat states its own 
       "Who is allowed, and where is that decided?",
       "What identifiers and what bytes become reachable?",
       "What does this let an authenticated stranger do to somebody else's account?",
+      "Which text becomes an instruction an agent will follow?",
+      "What does it write into a project that consumes it?",
     ],
     "performance-expert": [
       "What grows with the data?",
