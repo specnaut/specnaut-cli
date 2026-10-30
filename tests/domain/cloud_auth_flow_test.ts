@@ -1,10 +1,7 @@
 import { assertEquals } from "@std/assert";
 import { freshAccessToken, login } from "../../src/domain/cloud/auth_flow.ts";
 import type { CloudClient, RefreshResult, TokenPoll } from "../../src/domain/cloud/cloud_client.ts";
-import type {
-  CloudCredentials,
-  CredentialStore,
-} from "../../src/infrastructure/credential_store.ts";
+import type { CloudCredentials, CredentialStore } from "../../src/domain/cloud/credentials.ts";
 
 const API = "https://dep.convex.site";
 

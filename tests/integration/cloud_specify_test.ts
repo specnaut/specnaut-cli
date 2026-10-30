@@ -1,7 +1,7 @@
 import { assertEquals } from "@std/assert";
 import { makeSpecSession } from "../../src/domain/cloud/spec_session.ts";
 import type { FetchFn } from "../../src/domain/cloud/cloud_client.ts";
-import type { CredentialStore } from "../../src/infrastructure/credential_store.ts";
+import type { CredentialStore } from "../../src/domain/cloud/credentials.ts";
 import type { SpecStep } from "../../src/domain/spec/spec_step.ts";
 
 // Spec 020 / SC-003 / FR-011 — cloud-mode `specify` authoring. Driving

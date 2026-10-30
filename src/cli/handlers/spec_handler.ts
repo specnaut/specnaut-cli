@@ -3,7 +3,7 @@
 // downstream agents read plain files; `push` upserts local cache content back to
 // the cloud. Both are cloud-backend-only: under the `local` backend they exit
 // with a clear message (there is no remote spec to sync). Mirrors gate_handler.ts
-// — deps built from readCloudConfig + defaultCredentialStore(), exit codes 0/1/5.
+// — deps built from FsBacklogConfigStore + defaultCredentialStore(), exit codes 0/1/5.
 //
 //   pull  exit 0 (materialised / no-spec) · 1 (usage / local backend) · 5 (cloud/auth)
 //   push  exit 0 (upserted) · 1 (usage / local backend / nothing to push) · 5 (cloud/auth)
@@ -13,8 +13,8 @@
 // string or Cloud-internal identifier.
 
 import { dim, green, red, yellow } from "@std/fmt/colors";
-import { readCloudConfig } from "../../domain/cloud/cloud_config.ts";
 import { defaultCredentialStore } from "../../infrastructure/credential_store.ts";
+import { FsBacklogConfigStore } from "../../infrastructure/fs_backlog_config_store.ts";
 import { makeSpecSession, type SpecSession } from "../../domain/cloud/spec_session.ts";
 import { SpecApiError } from "../../domain/cloud/spec_client.ts";
 import { CloudSpecStore } from "../../infrastructure/spec/cloud_spec_store.ts";
@@ -54,13 +54,14 @@ function defaultDeps(intent: SpecIntent): SpecDeps {
       return lock?.specBackend ?? "local";
     },
     buildSession: async () => {
-      const config = await readCloudConfig(projectDir);
+      const config = await new FsBacklogConfigStore().readCloudConfig(projectDir);
       if (!config) return null;
       const apiUrl = intent.apiUrl ?? config.apiUrl;
       if (!apiUrl) return null;
       return makeSpecSession({
         config: { ...config, apiUrl },
         store: defaultCredentialStore(),
+        env: (k) => Deno.env.get(k),
       });
     },
     cache: new SpecCacheWriter(),

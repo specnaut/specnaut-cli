@@ -1,8 +1,6 @@
 import { assertEquals } from "@std/assert";
-import {
-  type CloudCredentials,
-  FileCredentialStore,
-} from "../../src/infrastructure/credential_store.ts";
+import type { CloudCredentials } from "../../src/domain/cloud/credentials.ts";
+import { FileCredentialStore } from "../../src/infrastructure/credential_store.ts";
 
 async function withTempFile(fn: (path: string) => Promise<void>) {
   const dir = await Deno.makeTempDir({ prefix: "specnaut-cred-" });

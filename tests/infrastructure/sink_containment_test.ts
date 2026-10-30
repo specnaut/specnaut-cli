@@ -5,6 +5,7 @@ import { FsPreserveStore } from "../../src/infrastructure/fs_preserve_store.ts";
 import { FsUpgradeMarkerStore } from "../../src/infrastructure/fs_upgrade_marker_store.ts";
 import { FsStagingStore } from "../../src/infrastructure/fs_staging_store.ts";
 import { SpecCacheWriter } from "../../src/infrastructure/spec/spec_cache_writer.ts";
+import { FsBacklogConfigStore } from "../../src/infrastructure/fs_backlog_config_store.ts";
 import type { InstalledLock } from "../../src/domain/installed_lock.ts";
 import { symlinkTest } from "../helpers/link_text.ts";
 
@@ -145,6 +146,18 @@ symlinkTest(
   },
 );
 
+symlinkTest("FsBacklogConfigStore.writeCloudConfig refuses a redirected .specnaut", async () => {
+  const { root, proj, outside } = await redirected();
+  try {
+    await assertRejects(() =>
+      new FsBacklogConfigStore().writeCloudConfig(proj, "https://api.example.com", "CLOUD")
+    );
+    assertEquals(await nothingLandedIn(outside), 0);
+  } finally {
+    await Deno.remove(root, { recursive: true });
+  }
+});
+
 symlinkTest("the stores still work on an ordinary project", async () => {
   // The positive control for this whole file. Seven refusals above, and a set
   // of stores that refused unconditionally would satisfy every one of them.
@@ -157,10 +170,12 @@ symlinkTest("the stores still work on an ordinary project", async () => {
       to: "2.0.0",
       at: "2026-01-01",
     });
+    await new FsBacklogConfigStore().writeCloudConfig(root, "https://api.example.com", "CLOUD");
     assertEquals(
       await Deno.stat(join(root, ".specnaut/installed.lock")).then(() => true).catch(() => false),
       true,
     );
+    assertEquals((await new FsBacklogConfigStore().readCloudConfig(root))?.projectKey, "CLOUD");
   } finally {
     await Deno.remove(root, { recursive: true });
   }

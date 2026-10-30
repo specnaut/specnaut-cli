@@ -15,8 +15,8 @@
 // string.
 
 import { red, yellow } from "@std/fmt/colors";
-import { readCloudConfig } from "../../domain/cloud/cloud_config.ts";
 import { defaultCredentialStore } from "../../infrastructure/credential_store.ts";
+import { FsBacklogConfigStore } from "../../infrastructure/fs_backlog_config_store.ts";
 import { GateSession, makeGateSession } from "../../domain/cloud/gate_session.ts";
 import type { GateRequest, GateType } from "../../domain/cloud/gate_contract.ts";
 import { GATE_TYPES, isGateType } from "../../domain/cloud/gate_contract.ts";
@@ -45,13 +45,14 @@ function defaultDeps(intent: GateIntent): GateDeps {
     out: (s) => console.log(s),
     err: (s) => console.error(s),
     buildSession: async () => {
-      const config = await readCloudConfig(Deno.cwd());
+      const config = await new FsBacklogConfigStore().readCloudConfig(Deno.cwd());
       if (!config) return null;
       const apiUrl = intent.apiUrl ?? config.apiUrl;
       if (!apiUrl) return null;
       return makeGateSession({
         config: { ...config, apiUrl },
         store: defaultCredentialStore(),
+        env: (k) => Deno.env.get(k),
       });
     },
   };

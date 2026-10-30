@@ -3,7 +3,7 @@ import { runSpec, type SpecDeps } from "../../src/cli/handlers/spec_handler.ts";
 import { makeSpecSession, type SpecSession } from "../../src/domain/cloud/spec_session.ts";
 import { SpecCacheWriter } from "../../src/infrastructure/spec/spec_cache_writer.ts";
 import type { FetchFn } from "../../src/domain/cloud/cloud_client.ts";
-import type { CredentialStore } from "../../src/infrastructure/credential_store.ts";
+import type { CredentialStore } from "../../src/domain/cloud/credentials.ts";
 import type { SpecBackend } from "../../src/domain/installed_lock.ts";
 
 // Spec 020 / US3 + US4 — the full author → pull → edit → push loop through the

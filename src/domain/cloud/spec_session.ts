@@ -12,7 +12,7 @@ import { SpecApiError, SpecClient } from "./spec_client.ts";
 import { CloudClient, type FetchFn } from "./cloud_client.ts";
 import { freshAccessToken } from "./auth_flow.ts";
 import type { CloudConfig } from "./cloud_config.ts";
-import type { CredentialStore } from "../../infrastructure/credential_store.ts";
+import type { CredentialStore } from "./credentials.ts";
 import type { SpecStep } from "../spec/spec_step.ts";
 
 /** A valid bearer token, or null when the user must re-authenticate. */
@@ -104,20 +104,21 @@ export class SpecSession {
  * + credentials. Reuses the same Cloud-link file (`backlog-config.yml`) and
  * credential store the gate/backlog paths use — no new credential type (FR-007).
  * Returns `null` when the project isn't Cloud-linked (no api_url / project_key),
- * which the caller treats as "not a cloud-backed spec project". `fetchFn` / `now`
- * are injectable for tests. Mirrors {@link makeGateSession}.
+ * which the caller treats as "not a cloud-backed spec project". `env` is supplied
+ * by the caller; `fetchFn` / `now` are injectable for tests. Mirrors
+ * {@link makeGateSession}.
  */
 export function makeSpecSession(deps: {
   config: CloudConfig;
   store: CredentialStore;
-  env?: (key: string) => string | undefined;
+  /** The environment lookup, injected: the domain never reads `Deno.env` (cli#695). */
+  env: (key: string) => string | undefined;
   fetchFn?: FetchFn;
   now?: () => number;
 }): SpecSession | null {
-  const { config, store } = deps;
+  const { config, store, env } = deps;
   if (!config.apiUrl || !config.projectKey) return null;
 
-  const env = deps.env ?? ((k) => Deno.env.get(k));
   const now = deps.now ?? (() => Date.now());
   const fetchFn = deps.fetchFn ?? fetch;
 

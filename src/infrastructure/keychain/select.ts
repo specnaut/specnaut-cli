@@ -6,7 +6,8 @@
 // not be served from a different store. The platform backend factory is
 // injectable so the selection logic is unit-tested without any FFI.
 
-import { type CredentialStore, FileCredentialStore } from "../credential_store.ts";
+import type { CredentialStore } from "../../domain/cloud/credentials.ts";
+import { FileCredentialStore } from "../credential_store.ts";
 import { type KeychainBackend, KeychainCredentialStore } from "./keychain_backend.ts";
 import { openMacosBackend } from "./macos.ts";
 import { openLinuxBackend } from "./linux.ts";

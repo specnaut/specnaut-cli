@@ -1,6 +1,8 @@
-// Read/write the project's `.specnaut/backlog-config.yml` for the Cloud backend
-// (#353). Holds only non-secret coordinates — backend, api_url, project_key.
-// Credentials live in the credential store, never here.
+// The project's `.specnaut/backlog-config.yml` for the Cloud backend (#353):
+// its shape, its rendering and its parsing. Holds only non-secret coordinates —
+// backend, api_url, project_key. Credentials live in the credential store, never
+// here. Reading and writing the file is `infrastructure/fs_backlog_config_store.ts`
+// (cli#695): the domain does no I/O.
 
 import { parse as parseYaml } from "@std/yaml";
 import type { RemoteConfig } from "./remote_mode.ts";
@@ -42,29 +44,29 @@ export function renderCloudConfig(apiUrl = "", projectKey = ""): string {
   ].join("\n");
 }
 
-/** Read the Cloud config from a project dir, or null if absent/unreadable. */
-export async function readCloudConfig(projectDir: string): Promise<CloudConfig | null> {
-  const path = `${projectDir}/.specnaut/backlog-config.yml`;
-  let text: string;
+/**
+ * The Cloud coordinates in a `backlog-config.yml` body, or `null` when the text
+ * is not a YAML mapping. Pure: reaching the file is the `CloudConfigStore`
+ * port's job (cli#695). A malformed file reads as "not Cloud-linked", which is
+ * what every cloud command already reports for an unlinked project.
+ */
+export function parseCloudConfig(text: string): CloudConfig | null {
+  let parsed: Record<string, unknown> | null;
   try {
-    text = await Deno.readTextFile(path);
-  } catch {
-    return null;
+    parsed = parseYaml(text) as Record<string, unknown> | null;
+  } catch (err) {
+    if (err instanceof SyntaxError) return null;
+    throw err;
   }
-  try {
-    const parsed = parseYaml(text) as Record<string, unknown> | null;
-    if (!parsed || typeof parsed !== "object") return null;
-    const remote = parseRemote(parsed.remote);
-    return {
-      apiUrl: typeof parsed.api_url === "string" ? parsed.api_url : "",
-      projectKey: typeof parsed.project_key === "string" ? parsed.project_key : "",
-      // Only present when the config actually carries a `remote:` block, so a
-      // pre-gates config round-trips to the exact same shape (backward compatible).
-      ...(remote ? { remote } : {}),
-    };
-  } catch {
-    return null;
-  }
+  if (!parsed || typeof parsed !== "object") return null;
+  const remote = parseRemote(parsed.remote);
+  return {
+    apiUrl: typeof parsed.api_url === "string" ? parsed.api_url : "",
+    projectKey: typeof parsed.project_key === "string" ? parsed.project_key : "",
+    // Only present when the config actually carries a `remote:` block, so a
+    // pre-gates config round-trips to the exact same shape (backward compatible).
+    ...(remote ? { remote } : {}),
+  };
 }
 
 /** Project the optional `remote:` YAML block into a RemoteConfig (snake → camel). */
@@ -78,17 +80,4 @@ function parseRemote(raw: unknown): CloudConfig["remote"] {
     awaitTimeoutS: num(o.await_timeout_s),
     pollIntervalS: num(o.poll_interval_s),
   };
-}
-
-/** Write the Cloud config (api_url + project_key) into a project dir. */
-export async function writeCloudConfig(
-  projectDir: string,
-  apiUrl: string,
-  projectKey: string,
-): Promise<void> {
-  await Deno.mkdir(`${projectDir}/.specnaut`, { recursive: true });
-  await Deno.writeTextFile(
-    `${projectDir}/.specnaut/backlog-config.yml`,
-    renderCloudConfig(apiUrl, projectKey),
-  );
 }

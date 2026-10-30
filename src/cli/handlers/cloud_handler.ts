@@ -21,17 +21,12 @@ import {
   type CloudTask,
 } from "../../domain/cloud/cloud_client.ts";
 import { freshAccessToken, login } from "../../domain/cloud/auth_flow.ts";
-import {
-  DEFAULT_CLOUD_API_URL,
-  readCloudConfig,
-  writeCloudConfig,
-} from "../../domain/cloud/cloud_config.ts";
+import { DEFAULT_CLOUD_API_URL } from "../../domain/cloud/cloud_config.ts";
 import { defaultCredentialStore } from "../../infrastructure/credential_store.ts";
+import { FsBacklogConfigStore } from "../../infrastructure/fs_backlog_config_store.ts";
 import { openInBrowser } from "../../infrastructure/browser_opener.ts";
 import { makeStdinSelectIO, selectInteractive, type SelectItem } from "../select.ts";
 import { generateProjectKey } from "../../domain/cloud/project_key.ts";
-import { assertInsideProject, resolveProjectRoot } from "../../infrastructure/fs_containment.ts";
-import { join } from "@std/path";
 
 export type CloudIntent = {
   kind: "cloud";
@@ -73,7 +68,7 @@ async function resolveApiUrl(
     const url = normalizeApiUrl(explicit);
     return url ? { url, source: "flag" } : null;
   }
-  const cfg = await readCloudConfig(Deno.cwd());
+  const cfg = await new FsBacklogConfigStore().readCloudConfig(Deno.cwd());
   if (cfg?.apiUrl) {
     const url = normalizeApiUrl(cfg.apiUrl);
     return url ? { url, source: "config" } : null;
@@ -169,7 +164,7 @@ async function runOrgs(intent: CloudIntent): Promise<number> {
 }
 
 async function runBoard(intent: CloudIntent): Promise<number> {
-  const cfg = await readCloudConfig(Deno.cwd());
+  const cfg = await new FsBacklogConfigStore().readCloudConfig(Deno.cwd());
   const projectKey = cfg?.projectKey;
   if (!projectKey) {
     console.error(red("error: no project linked here."));
@@ -328,18 +323,8 @@ async function runLogin(intent: CloudIntent): Promise<number> {
     return 1;
   }
 
-  // cli#574 — `writeCloudConfig` writes under `.specnaut/` directly, without
-  // going through `DenoFsWriter`. The guard sits HERE rather than inside it
-  // because that function lives in the domain: it already performs IO, which
-  // predates this change, but adding a domain→infrastructure import would turn
-  // a smell into a compile-time dependency edge. The call site is in the CLI
-  // layer, where reaching infrastructure is normal.
-  const cloudDir = Deno.cwd();
-  await assertInsideProject(
-    await resolveProjectRoot(cloudDir),
-    join(cloudDir, ".specnaut", "backlog-config.yml"),
-  );
-  await writeCloudConfig(cloudDir, apiUrl, projectKey);
+  // The store refuses a path resolving outside the project (cli#574).
+  await new FsBacklogConfigStore().writeCloudConfig(Deno.cwd(), apiUrl, projectKey);
   console.log(green(`✓ linked to project ${bold(projectKey)}`));
   console.log(
     dim("  wrote .specnaut/backlog-config.yml — /task now runs against Specnaut Cloud"),

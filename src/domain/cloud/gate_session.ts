@@ -14,7 +14,7 @@ import { type RemoteMode, resolveRemoteMode } from "./remote_mode.ts";
 import { CloudClient, type FetchFn } from "./cloud_client.ts";
 import { freshAccessToken } from "./auth_flow.ts";
 import type { CloudConfig } from "./cloud_config.ts";
-import type { CredentialStore } from "../../infrastructure/credential_store.ts";
+import type { CredentialStore } from "./credentials.ts";
 
 /** Typed result of awaiting / applying / cancelling. */
 export type ResolutionOutcome =
@@ -145,8 +145,9 @@ export class GateSession {
  * One-call factory a skill phase uses to obtain a ready GateSession from the
  * project's Cloud config + credentials (FR-012). It resolves remote mode (config
  * + SPECNAUT_REMOTE), builds the gate client, and wires a token provider that
- * refreshes transparently via the existing device-auth flow. `fetchFn`, `now`,
- * `sleep`, and `env` are injectable so callers/tests can substitute them.
+ * refreshes transparently via the existing device-auth flow. `env` is required —
+ * the caller supplies the environment — and `fetchFn`, `now` and `sleep` are
+ * injectable so callers/tests can substitute them.
  *
  * Returns `null` when the project isn't Cloud-linked (no api_url/project_key) —
  * the caller treats that as "handle locally". The returned session may still be
@@ -156,15 +157,15 @@ export class GateSession {
 export function makeGateSession(deps: {
   config: CloudConfig;
   store: CredentialStore;
-  env?: (key: string) => string | undefined;
+  /** The environment lookup, injected: the domain never reads `Deno.env` (cli#695). */
+  env: (key: string) => string | undefined;
   fetchFn?: FetchFn;
   now?: () => number;
   sleep?: (ms: number) => Promise<void>;
 }): GateSession | null {
-  const { config, store } = deps;
+  const { config, store, env } = deps;
   if (!config.apiUrl || !config.projectKey) return null;
 
-  const env = deps.env ?? ((k) => Deno.env.get(k));
   const now = deps.now ?? (() => Date.now());
   const sleep = deps.sleep ?? ((ms) => new Promise<void>((r) => setTimeout(r, ms)));
   const fetchFn = deps.fetchFn ?? fetch;

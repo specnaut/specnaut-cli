@@ -4,7 +4,8 @@
 // secrets and must never land in a tracked file (the project's
 // `.specnaut/backlog-config.yml` holds only `backend`, `api_url`, `project_key`).
 //
-// Storage: two backends behind one interface.
+// Storage: two backends behind one interface, the domain's `CredentialStore`
+// port (`domain/cloud/credentials.ts`).
 //   - OS-native keychain (macOS Keychain / libsecret / Windows Credential
 //     Manager), reached via Deno FFI — the preferred at-rest store when a
 //     keyring is reachable (#360).
@@ -20,28 +21,8 @@
 // would expose the token to same-user `ps`; only the native in-process API is
 // used.
 
+import type { CloudCredentials, CredentialStore } from "../domain/cloud/credentials.ts";
 import { resolveCredentialStore } from "./keychain/select.ts";
-
-export type CloudCredentials = {
-  /** Bearer access token sent on every `/api/v1` request. Short-lived. */
-  accessToken: string;
-  /** Long-lived credential exchanged at `/api/v1/auth/refresh`. */
-  refreshToken: string;
-  /** Epoch ms when the access token expires. */
-  accessExpiresAt: number;
-};
-
-export interface CredentialStore {
-  /** Which backend secured the credentials — surfaced at login so the at-rest
-   *  posture is never silently weaker than expected (#360). */
-  readonly kind: "keychain" | "file";
-  /** Load the credentials for a deployment, or null if none are stored. */
-  load(apiUrl: string): Promise<CloudCredentials | null>;
-  /** Persist (overwrite) the credentials for a deployment. */
-  save(apiUrl: string, creds: CloudCredentials): Promise<void>;
-  /** Remove the credentials for a deployment (no-op if absent). */
-  delete(apiUrl: string): Promise<void>;
-}
 
 /** Resolve the user's home directory across platforms. */
 function homeDir(): string {

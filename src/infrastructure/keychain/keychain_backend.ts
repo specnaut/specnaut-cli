@@ -9,7 +9,8 @@
 // churn from #353. `CredentialStore` stays async (the file store does real I/O);
 // `KeychainCredentialStore` simply resolves the sync result.
 
-import { type CloudCredentials, type CredentialStore, keyFor } from "../credential_store.ts";
+import type { CloudCredentials, CredentialStore } from "../../domain/cloud/credentials.ts";
+import { keyFor } from "../credential_store.ts";
 
 /** All keychain items are filed under this service name; the account is the
  *  normalised Cloud API URL, so one machine holds tokens for several deployments.

@@ -3,7 +3,7 @@ import { CloudSpecStore } from "../../src/infrastructure/spec/cloud_spec_store.t
 import { LocalSpecStore } from "../../src/infrastructure/spec/local_spec_store.ts";
 import { makeSpecSession } from "../../src/domain/cloud/spec_session.ts";
 import type { FetchFn } from "../../src/domain/cloud/cloud_client.ts";
-import type { CredentialStore } from "../../src/infrastructure/credential_store.ts";
+import type { CredentialStore } from "../../src/domain/cloud/credentials.ts";
 
 // Spec 020 / FR-002 — the SpecStore adapters. CloudSpecStore.pull delegates to a
 // (fake-fetch) session; LocalSpecStore's cloud-only verbs reject with one clear
