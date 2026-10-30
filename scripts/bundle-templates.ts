@@ -8,6 +8,7 @@
 import { relative } from "@std/path";
 import { managedSectionLabels, type MergeJsonFlavor } from "../src/domain/template.ts";
 import { linkTargetPath } from "../src/domain/context_link.ts";
+import { contentField } from "./bundle-content-field.ts";
 
 type CoreManifestEntry = {
   category: string;
@@ -170,24 +171,6 @@ function assertLinkEntries(m: Manifest): void {
   }
 }
 
-function escapeTemplateLiteral(content: string): string {
-  return content.replace(/\\/g, "\\\\").replace(/`/g, "\\`").replace(/\$/g, "\\$");
-}
-
-/**
- * A `content:` field, laid out as `deno fmt` lays it out: when the literal's
- * first line runs past the line width, fmt moves the literal to its own line,
- * so the emitter does the same or `deno task bundle` dirties the tree for
- * `fmt --check` (spec 039: an agent body now opens with one long sentence).
- */
-function contentField(indent: string, content: string): string {
-  const literal = `\`${escapeTemplateLiteral(content)}\``;
-  const inline = `${indent}content: ${literal},\n`;
-  return inline.split("\n")[0].length <= FMT_LINE_WIDTH
-    ? inline
-    : `${indent}content:\n${indent}  ${literal},\n`;
-}
-
 async function buildCoreEntries(m: Manifest): Promise<string[]> {
   const lines: string[] = [];
   for (const entry of m.core) {
@@ -218,7 +201,7 @@ async function buildCoreEntries(m: Manifest): Promise<string[]> {
         `    category: ${JSON.stringify(entry.category)},\n` +
         `    name: ${JSON.stringify(entry.name)},\n` +
         `    suffix: ${suffix},\n` +
-        contentField("    ", content) +
+        contentField("    ", content, FMT_LINE_WIDTH) +
         `    executable: ${entry.executable === true},\n` +
         `    backend: ${backend},\n` +
         `    skipIfExists: ${skipIfExists},\n` +
@@ -266,7 +249,7 @@ async function buildHarnessStatic(m: Manifest): Promise<string> {
         : "";
       return (
         `    ${JSON.stringify(f.destination)}: {\n` +
-        contentField("      ", f.content) +
+        contentField("      ", f.content, FMT_LINE_WIDTH) +
         `      executable: ${f.executable},\n` +
         mergeJsonLine +
         symlinkLine +
