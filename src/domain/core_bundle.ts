@@ -10,6 +10,15 @@ export type CoreCategory =
   | "spec-root"
   | "project-root"
   | "backlog-skill"
+  /**
+   * A document that sits directly beside its owner's SKILL.md. The name is
+   * historical: `specnaut-facts/integrations.md` is a reference doc, not a
+   * backlog doc. It keeps this name on purpose (cli#713). Each of the six
+   * harness adapters switches on the category to place the file, and
+   * `backlog_filter.ts` renders this category through the per-backend
+   * sections, so a more accurate name means editing every adapter for no
+   * change in what gets installed.
+   */
   | "backlog-doc"
   | "backlog-script"
   | "mergeable-project-root";
