@@ -71,6 +71,19 @@ const WRITES: readonly string[] = [
   `dd if=src/a.ts of=rules-link`,
   `cp src/a.ts ${SELF}`,
   `echo > .specnaut/hooks/protect-constitution.sh`,
+  // cli#704: a redirection glued to the word before it is still one, and an
+  // escape in $'…' is a byte the shell computes, never a way to spell the name.
+  `cat src/a.ts>${C}`,
+  `cat src/a.ts>>${C}`,
+  `head -c0 src/a.ts>${C}`,
+  `cat src/a.ts&>${C}`,
+  `grep x src/a.ts>|${C}`,
+  `cat src/a.ts 2>${C}`,
+  `cat src/a.ts"x">${C}`,
+  `cat src/a.ts > $'docs/constitution\\x2emd'`,
+  `cp src/a.ts $'docs/constitution\\x2emd'`,
+  `cp src/a.ts $'docs/\\143onstitution.md'`,
+  `tee $'docs/constitution\\56md' < src/a.ts`,
 ];
 
 /** Reads, and commands that mention the word without naming the file: never gated. */
@@ -110,6 +123,10 @@ const READS: readonly string[] = [
   `cp src/a.ts docs/other.md`,
   `cp src/a.ts docs/constitution.md.bak`,
   `deno fmt src/`,
+  `cat ${C} 2>/dev/null`,
+  `grep -c x ${C}>/dev/null`,
+  `grep $'\\t' ${C}`,
+  `cat ${C} | head -n $((2>1))`,
   // A glob's * stays inside one path component, as the shell's does.
   `deno fmt *.md`,
 ];

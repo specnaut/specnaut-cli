@@ -6,7 +6,8 @@
 # would run, so a rule matches what runs — not text that merely mentions it.
 #
 # A heuristic by design (plan § 6 threat model). It sees: ; && || | & and
-# newlines, ( ) $( ) and backticks (also inside "…"), `if(…)` and the other
+# newlines, ( ) $( ) and backticks (also inside "…"), $'…' (an escape in it read
+# as `$`, the shell's to decide), `if(…)` and the other
 # reserved words before a subshell, `[[ … ]]` (where | ( ) < > & ; are part of
 # a word), quotes and escapes, comments, heredoc bodies (skipped: they are
 # data, once the delimiter is quoted), `<<<` herestrings, `<<` inside
@@ -193,14 +194,42 @@ _cmd_arith() { if [ "${s:i:1}" = "(" ]; then stack="a$stack" i=$((i + 1)); fi; }
 # `<` at i-1: a plain redirection, a herestring (its word is data, dropped
 # with it by _cmd_emit), a shift inside arithmetic, or a heredoc.
 _cmd_lt() {
-  if [ "$nx" != "<" ]; then word+=$c
-  elif [ "${s:i+1:1}" = "<" ]; then word+="<<<" i=$((i + 2))
+  if [ "$nx" != "<" ]; then _cmd_redir; word+=$c
+  elif [ "${s:i+1:1}" = "<" ]; then _cmd_redir; word+="<<<" i=$((i + 2))
   else
     case $stack in
       *a*) word+="<<" i=$((i + 1)) ;;
       *) _cmd_word; i=$((i + 1)); _cmd_heredoc_open ;;
     esac
   fi
+}
+
+# _cmd_redir — an unquoted < or >, or the & of &>, starts a redirection: the
+# word before it ends there, as bash ends it, unless it is the fd the
+# redirection names (`2>`, unquoted digits) or the operator itself (`>>`,
+# `<>`, `>&`). Kept whole, `x>f` hid the redirection from every guard: `cat
+# a>docs/constitution.md` read as a bare cat (cli#704). In arithmetic it compares.
+_cmd_redir() {
+  case $stack in *a*) return 0 ;; esac
+  case $word in *'>' | *'<' | *'&') return 0 ;; esac
+  if [ "$have" = 0 ] && [[ $word =~ ^[0-9]*$ ]]; then return 0; fi
+  _cmd_word
+}
+
+# _cmd_ansi — c is a backslash inside $'…': bash puts the byte the escape
+# names in its place, which this parser does not compute. A `$` stands in for
+# it, as for a substitution — what the word names is the shell's to decide —
+# so `$'docs/constitution\x2emd'` cannot hide the name it spells (cli#704). The
+# whole escape is consumed: `\'` does not close the quote.
+_cmd_ansi() {
+  local e=${s:i:1} max=0 set=""
+  i=$((i + 1))
+  case $e in
+    x) max=2 set=0-9A-Fa-f ;; u) max=4 set=0-9A-Fa-f ;; U) max=8 set=0-9A-Fa-f ;;
+    [0-7]) max=2 set=0-7 ;; c) i=$((i + 1)) ;;
+  esac
+  while [ "$max" -gt 0 ] && [[ ${s:i:1} == [$set] ]]; do i=$((i + 1)) max=$((max - 1)); done
+  word+='$'
 }
 
 # _cmd_test_char — inside `[[ … ]]`, in the frame it was opened in, c is one
@@ -241,8 +270,11 @@ _cmd_plain() {
     ' ' | $'\t') _cmd_word ;;
     $'\n') _cmd_end; if [ -n "$heredocs" ]; then _cmd_heredocs; fi ;;
     ';' | '|') _cmd_end ;;
-    '&') case $word in *'>' | *'<') word+=$c ;; *) if [ "$nx" = ">" ]; then word+=$c; else _cmd_end; fi ;; esac ;;
-    '$') if [ "$nx" = "(" ]; then _cmd_push; stack="s$stack" i=$((i + 1)); _cmd_arith; else word+=$c; fi ;;
+    '&') case $word in *'>' | *'<') word+=$c ;; *) if [ "$nx" = ">" ]; then _cmd_redir; word+=$c; else _cmd_end; fi ;; esac ;;
+    '$')
+      if [ "$nx" = "(" ]; then _cmd_push; stack="s$stack" i=$((i + 1)); _cmd_arith
+      elif [ "$nx" = "'" ]; then q='$' have=1 i=$((i + 1)) # $'…': its escapes are _cmd_ansi's
+      else word+=$c; fi ;;
     '(') case $word in
         *'<' | *'>' | '=') _cmd_push; stack="s$stack" ;; # <(…) >(…) =(…): a command runs inside
         *) if [ -n "$word" ] && [ "$nx" != ")" ] && ! _cmd_keyword; then word+=$c stack="g$stack"; else _cmd_end; stack="u$stack"; _cmd_arith; fi ;;
@@ -251,6 +283,7 @@ _cmd_plain() {
     '`') if [ -z "$bt" ]; then _cmd_push; bt=u; else _cmd_pop; if [ "$bt" = d ]; then q='"'; fi; bt=""; fi ;;
     '#') if [ -z "$word" ] && [ "$have" = 0 ]; then d=${s:i}; d=${d%%$'\n'*}; i=$((i + ${#d})); else word+=$c; fi ;;
     '<') _cmd_lt ;;
+    '>') _cmd_redir; word+=$c ;;
     *) word+=$c ;;
   esac
 }
@@ -268,6 +301,8 @@ cmd_parse() {
     i=$((i + 1))
     if [ "$q" = "'" ]; then
       if [ "$c" = "'" ]; then q=""; else word+=$c; fi
+    elif [ "$q" = '$' ]; then
+      case $c in "'") q="" ;; '\') _cmd_ansi ;; *) word+=$c ;; esac
     elif [ -n "$q" ]; then
       case $c in '\' | '"' | '$' | '`') _cmd_dquote ;; *) word+=$c ;; esac
     else
