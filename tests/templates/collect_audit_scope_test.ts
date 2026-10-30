@@ -1,5 +1,5 @@
 import { assert, assertEquals, assertStringIncludes } from "@std/assert";
-import { fromFileUrl } from "@std/path";
+import { count, fixtureRepo, git, scope } from "./collect_audit_scope_fixture.ts";
 
 /**
  * Hermetic behaviour test for `collect-audit-scope.sh` (the scope resolver the
@@ -12,75 +12,6 @@ import { fromFileUrl } from "@std/path";
  * `scripts/` dir (source); it ships to `.specnaut/scripts/audit/` in a
  * scaffolded project, but the test exercises the source copy directly.
  */
-
-const SCRIPT = fromFileUrl(
-  new URL(
-    "../../templates/core/skills/task/scripts/collect-audit-scope.sh",
-    import.meta.url,
-  ),
-);
-
-/** Runs a command in `cwd`, returning {code, stdout, stderr}. */
-async function run(
-  cmd: string,
-  args: string[],
-  cwd: string,
-  env: Record<string, string> = {},
-): Promise<{ code: number; stdout: string; stderr: string }> {
-  const out = await new Deno.Command(cmd, {
-    args,
-    cwd,
-    stdout: "piped",
-    stderr: "piped",
-    env: { ...env },
-  }).output();
-  return {
-    code: out.code,
-    stdout: new TextDecoder().decode(out.stdout),
-    stderr: new TextDecoder().decode(out.stderr),
-  };
-}
-
-/** git with deterministic identity + no global config bleed-through. */
-async function git(args: string[], cwd: string): Promise<void> {
-  const r = await run("git", args, cwd, {
-    GIT_AUTHOR_NAME: "Test",
-    GIT_AUTHOR_EMAIL: "test@example.com",
-    GIT_COMMITTER_NAME: "Test",
-    GIT_COMMITTER_EMAIL: "test@example.com",
-    HOME: cwd,
-  });
-  if (r.code !== 0) {
-    throw new Error(`git ${args.join(" ")} failed: ${r.stderr}`);
-  }
-}
-
-/** Builds a temp git repo with a frontend file, a backend file, and a deno.json. */
-async function fixtureRepo(): Promise<string> {
-  const dir = await Deno.makeTempDir({ prefix: "code-audit-scope-" });
-  await git(["init", "-b", "main"], dir);
-  await Deno.mkdir(`${dir}/src`, { recursive: true });
-  await Deno.writeTextFile(`${dir}/src/Button.tsx`, "export const Button = () => null;\n");
-  await Deno.writeTextFile(`${dir}/src/service.ts`, "export const svc = () => 1;\n");
-  await Deno.writeTextFile(`${dir}/deno.json`, "{}\n");
-  await git(["add", "."], dir);
-  await git(["commit", "-m", "feat: initial fixtures"], dir);
-  return dir;
-}
-
-async function scope(
-  dir: string,
-  args: string[],
-): Promise<{ code: number; stdout: string; stderr: string }> {
-  return await run("bash", [SCRIPT, ...args], dir, { HOME: dir });
-}
-
-/** Parses an `KEY: value` integer count line from the block. */
-function count(block: string, key: string): number {
-  const m = block.match(new RegExp(`^${key}: (\\d+)$`, "m"));
-  assert(m, `expected a "${key}: <int>" line in:\n${block}`);
-  return Number(m[1]);
-}
 
 Deno.test("collect-audit-scope --last clamps N to available history (last-N label)", async () => {
   const dir = await fixtureRepo();
@@ -150,41 +81,6 @@ Deno.test("collect-audit-scope emits TOTAL_FILES: 0 distinctly on an empty scope
     const r = await scope(dir, ["--path", "nonexistent-subtree"]);
     assertEquals(r.code, 0, r.stderr);
     assertStringIncludes(r.stdout, "TOTAL_FILES: 0");
-  } finally {
-    await Deno.remove(dir, { recursive: true });
-  }
-});
-
-Deno.test("collect-audit-scope counts test files via TEST_COUNT", async () => {
-  const dir = await fixtureRepo();
-  try {
-    await Deno.writeTextFile(`${dir}/src/button_test.ts`, "Deno.test('x', () => {});\n");
-    await git(["add", "."], dir);
-    await git(["commit", "-m", "test: add a test"], dir);
-    const r = await scope(dir, ["--last", "5"]);
-    assertEquals(r.code, 0, r.stderr);
-    assert(count(r.stdout, "TEST_COUNT") >= 1);
-  } finally {
-    await Deno.remove(dir, { recursive: true });
-  }
-});
-
-/**
- * `TEST_COUNT` decides whether `code-reviewer` runs its test checklist during
- * `/task review`, so a project whose tests sit in a top-level `test/` (not
- * `tests/`, not `*_test.*`) must still count — otherwise its test changes are
- * reviewed by no checklist at all.
- */
-Deno.test("collect-audit-scope counts a top-level test/ directory via TEST_COUNT", async () => {
-  const dir = await fixtureRepo();
-  try {
-    await Deno.mkdir(`${dir}/test`, { recursive: true });
-    await Deno.writeTextFile(`${dir}/test/button.ts`, "export const t = 1;\n");
-    await git(["add", "."], dir);
-    await git(["commit", "-m", "test: top-level test dir"], dir);
-    const r = await scope(dir, ["--range", "HEAD~1..HEAD"]);
-    assertEquals(r.code, 0, r.stderr);
-    assertEquals(count(r.stdout, "TEST_COUNT"), 1);
   } finally {
     await Deno.remove(dir, { recursive: true });
   }

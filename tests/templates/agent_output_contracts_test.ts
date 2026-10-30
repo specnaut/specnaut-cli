@@ -29,7 +29,7 @@ const CONTRACT_SKILLS = [
  * a seat no phase calls.
  */
 const RETIRED_SKILLS = ["handoff-protocol", "qa-report-contract", "alert-triage-contract"] as const;
-const RETIRED_AGENTS = ["workflow-manager", "qa-tester", "devops-sre"] as const;
+const RETIRED_AGENTS = ["workflow-manager", "qa-tester", "devops-sre", "ui-ux-designer"] as const;
 
 /** Authoritative wired-agent → contracts mapping (research.md). */
 const AGENT_WIRING: Record<string, readonly string[]> = {
@@ -50,10 +50,6 @@ const AGENT_WIRING: Record<string, readonly string[]> = {
   // Same #562 split; this seat had no `skills:` line before #378 and none of
   // its own content asserted before this ticket.
   "specnaut-guide": ["specnaut-facts"],
-  // #576. Had no `skills:` line before, like product-owner and specnaut-guide
-  // before their own tickets — it owns DESIGN.md, so it decides the tokens the
-  // contract obliges a project to declare.
-  "ui-ux-designer": ["mobile-first-contract"],
 };
 
 function skillEntry(name: string): CoreEntry | undefined {

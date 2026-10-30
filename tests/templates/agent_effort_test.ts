@@ -29,7 +29,6 @@ const EFFORT_MAP: Record<string, Effort> = {
   "code-reviewer": "high",
   "specnaut-guide": "high",
   "product-owner": "high",
-  "ui-ux-designer": "high",
   "architect-expert": "xhigh",
   "security-expert": "xhigh",
   "developer": "high",
@@ -108,7 +107,6 @@ const MODEL_MAP: Record<string, "opus" | "haiku"> = {
   "code-reviewer": "opus",
   "specnaut-guide": "haiku",
   "product-owner": "opus",
-  "ui-ux-designer": "opus",
   "architect-expert": "opus",
   "security-expert": "opus",
   "developer": "opus",
@@ -155,7 +153,6 @@ const MAX_TURNS_MAP: Record<string, number> = {
   "performance-expert": 20,
   "security-expert": 20,
   "product-owner": 30,
-  "ui-ux-designer": 30,
   "specnaut-guide": 60,
   "developer": 80,
 };

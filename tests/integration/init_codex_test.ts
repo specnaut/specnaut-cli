@@ -117,7 +117,9 @@ Deno.test("specnaut init --ai codex scaffolds a Codex layout", async () => {
     // `board`, `code-audit` and the five `*-audit` skills became `specnaut-task`.
     // 11 since #678 retired handoff-protocol, qa-report-contract and
     // alert-triage-contract — blocks nothing parsed, a mode nothing dispatched.
-    assertEquals(agentsSkillsCount, 11);
+    // 12 since #678 turned ui-ux-designer into `specnaut-design`.
+    assertEquals(agentsSkillsCount, 12);
+    assertEquals(await exists(join(root, ".agents/skills/specnaut-design/SKILL.md")), true);
     for (
       const retired of [
         "specnaut-board",
@@ -140,9 +142,9 @@ Deno.test("specnaut init --ai codex scaffolds a Codex layout", async () => {
     // 11 original + performance-expert (#304) + accessibility-expert (#305) +
     // architect-expert (#321) + dependency-expert (#322), less
     // review-coordinator, test-reviewer, workflow-manager, qa-tester and
-    // devops-sre (#678) = 10.
-    assertEquals(codexAgentsCount, 10);
-    for (const retired of ["workflow-manager", "qa-tester", "devops-sre"]) {
+    // devops-sre (#678) = 10, less ui-ux-designer (now the /design skill) = 9.
+    assertEquals(codexAgentsCount, 9);
+    for (const retired of ["workflow-manager", "qa-tester", "devops-sre", "ui-ux-designer"]) {
       assertEquals(await exists(join(root, `.codex/agents/${retired}.toml`)), false);
     }
 

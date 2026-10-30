@@ -11,7 +11,6 @@ Deno.test("isPluginCoveredPath: claude + .claude/agents/<name>.md (non-architect
       "product-owner",
       "security-expert",
       "specnaut-guide",
-      "ui-ux-designer",
       "performance-expert",
       "accessibility-expert",
       "architect-expert",

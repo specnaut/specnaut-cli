@@ -96,8 +96,12 @@ Deno.test("specnaut init --ai copilot scaffolds a Copilot layout", async () => {
     // gained `backlog` and `audit` documents; `specnaut` gained `doc` and `list`.
     // 52 since cli#678: review-coordinator and test-reviewer retired, the
     // `task` skill gained the review-seats document. 46 since cli#678 retired
-    // three undispatched agents and three contracts nothing parsed.
+    // three undispatched agents and three contracts nothing parsed. Still 46
+    // after #678 turned the ui-ux-designer agent into the /design skill.
     assertEquals(instructionsCount, 46);
+    const instr = (n: string) => join(root, `.github/instructions/${n}.instructions.md`);
+    assertEquals(await exists(instr("specnaut-design")), true);
+    assertEquals(await exists(instr("specnaut-agent-ui-ux-designer")), false);
 
     // Shared (cross-harness)
     assertEquals(await exists(join(root, "docs/constitution.md")), true);

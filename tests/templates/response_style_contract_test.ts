@@ -218,6 +218,10 @@ const POINTED_BY_DECISION: ReadonlyMap<string, string> = new Map([
     "the framework router — #575 named it as an anchor while it carried the workflow; since cli#683 its verbs (doc, list, upgrade) still answer a person directly",
   ],
   [
+    "skill/design",
+    "the design-system pass (#678) — its discovery interview asks the user questions, so questions-as-selections is load-bearing",
+  ],
+  [
     "skill/ship",
     "the production verb — it asks a disambiguation question when the repository cannot resolve the intent, so questions-as-selections is load-bearing rather than incidental;",
   ],
@@ -255,10 +259,8 @@ function entryPointSkills(): string[] {
 }
 
 Deno.test("every surface pointing at the contract is required or has a written reason", () => {
-  // Only CORE_BUNDLE is walked here. The always-on harness statics live in
-  // HARNESS_STATIC and are keyed by destination path, so they can never appear
-  // in this set — an earlier revision filtered against them anyway, which was a
-  // clause that could not fire and read as coverage it did not provide.
+  // Only CORE_BUNDLE is walked: HARNESS_STATIC is keyed by destination path and can never appear
+  // here — filtering against it was a clause that could not fire, read as coverage.
   const undeclared = CORE_BUNDLE
     .filter((e) => id(e) !== SOURCE && e.content.includes(CONTRACT))
     .map(id)
@@ -286,10 +288,8 @@ Deno.test("a carve-out cannot outlive its subject", () => {
   const stale = [...WITHHELD_BY_DECISION.keys()].filter((n) => !entryPoints.has(n));
   assertEquals(stale, [], "withheld entries naming something that is no longer an entry point");
 
-  // A register is not a gate. This asked only whether the key still named a
-  // file — so deleting the pointer it records left the whole suite green, twice
-  // over, measured. An entry is a claim that the surface POINTS; assert the
-  // claim, not the filename.
+  // A register is not a gate: asking only whether the key named a file left the suite green, twice,
+  // with the pointer deleted. An entry claims the surface POINTS; assert the claim, not the name.
   const byId = new Map(CORE_BUNDLE.map((e) => [id(e), e]));
   const notPointing = [...POINTED_BY_DECISION.keys()]
     .filter((x) => !byId.get(x)?.content.includes(CONTRACT));

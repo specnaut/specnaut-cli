@@ -344,19 +344,19 @@ check "specnaut-guide grants WebFetch" \
   'grep -q "WebFetch" .claude/agents/specnaut-guide.md'
 check "vendored knowledge snapshot present" \
   'grep -q "## Vendored knowledge snapshot" .claude/agents/specnaut-guide.md'
-
-echo
-echo "═══ #198  ui-ux-designer agent ═══"
-check "ui-ux-designer.md present" \
-  '[ -f .claude/agents/ui-ux-designer.md ]'
-check "ui-ux-designer is manual-dispatch only (disable-model-invocation: true)" \
-  'grep -q "disable-model-invocation: true" .claude/agents/ui-ux-designer.md'
-check "ui-ux-designer declares the three modes" \
-  'grep -q "Discovery interview" .claude/agents/ui-ux-designer.md && grep -q "Edit (DESIGN.md present" .claude/agents/ui-ux-designer.md && grep -q "Audit (explicit" .claude/agents/ui-ux-designer.md'
-check "ui-ux-designer ships the canonical DESIGN.md template" \
-  'grep -q "Canonical DESIGN.md template" .claude/agents/ui-ux-designer.md && grep -q "Brand identity" .claude/agents/ui-ux-designer.md && grep -q "Color palette" .claude/agents/ui-ux-designer.md'
 check "live fetch protocol present" \
   'grep -q "## Live fetch protocol" .claude/agents/specnaut-guide.md'
+
+echo
+echo "═══ #198 → #678  /design skill (was the ui-ux-designer agent) ═══"
+check "the ui-ux-designer agent is retired" \
+  '[ ! -e .claude/agents/ui-ux-designer.md ]'
+check "/design is user-invoked only (disable-model-invocation: true)" \
+  'grep -q "disable-model-invocation: true" .claude/skills/design/SKILL.md'
+check "/design declares the three modes" \
+  'grep -q "## Mode 1 — Discovery" .claude/skills/design/SKILL.md && grep -q "## Mode 2 — Edit" .claude/skills/design/SKILL.md && grep -q "## Mode 3 — Audit" .claude/skills/design/SKILL.md'
+check "/design writes from the shipped DESIGN.md template" \
+  'grep -q ".specnaut/templates/design-template.md" .claude/skills/design/SKILL.md && grep -q "Brand identity" .specnaut/templates/design-template.md && grep -q "Color palette" .specnaut/templates/design-template.md'
 
 echo
 echo "═══ #168  version check protocol (proactive upgrade nudge) ═══"

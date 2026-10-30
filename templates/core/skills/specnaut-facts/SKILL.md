@@ -25,7 +25,7 @@ Enhanced fork of [`specify` CLI](https://github.com/github/spec-kit), distribute
 
 **Different from upstream Spec Kit:** auto-chained pipeline (`/task plan` chains all phases); dedicated `review` phase after implement; backlog as product source of truth via `product-owner` agent (backends: local, github, gitlab, cloud); Claude Code plugin distribution (the `specnaut-cockpit` plugin from the `specnaut-marketplace` marketplace).
 
-**Bundled agents:** product-owner, developer, code-reviewer, security-expert, specnaut-guide, architect-expert, performance-expert, accessibility-expert, dependency-expert, ui-ux-designer.
+**Bundled agents:** product-owner, developer, code-reviewer, security-expert, specnaut-guide, architect-expert, performance-expert, accessibility-expert, dependency-expert.
 
 ### Commands
 
@@ -44,6 +44,7 @@ Enhanced fork of [`specify` CLI](https://github.com/github/spec-kit), distribute
 - `/task` — one unit of work: backlog (`list`, `next`, `add`, `edit`, `close`, `groom`), pipeline (`plan`, `implement`, `review`, `merge`), `audit` (`--security`, `--archi`, `--perf`, `--a11y`, `--deps`; every applicable axis with no flag), `constitution`.
 - `/specnaut` — the framework: `doc`, `list`, `upgrade`.
 - `/ship` — production: `tag`, `release`.
+- `/design` — the project's `DESIGN.md` design system: discovery when absent, edit when present, `audit` for drift. Started by the user only.
 
 Before 7.2 the pipeline, the backlog and the audits lived at other addresses; the `specnaut` skill's **Retired addresses** table maps each to its new one, and `specnaut upgrade` moves them.
 

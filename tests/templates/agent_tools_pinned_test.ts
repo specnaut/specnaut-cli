@@ -35,7 +35,6 @@ const PINNED = new Map<string, string>([
   // mode is gone, and every remaining mode reads.
   ["security-expert", "Read, Grep, Glob"],
   ["specnaut-guide", "Read, WebFetch, Grep, Glob, Bash, Agent(developer)"],
-  ["ui-ux-designer", "Read, Edit, Write, Glob, Grep"],
 ]);
 
 /** `README.md` documents the directory; it is not a seat. */

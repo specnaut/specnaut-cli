@@ -258,11 +258,6 @@
     },
     {
       "category": "agent",
-      "name": "ui-ux-designer",
-      "source": "core/agents/ui-ux-designer.md"
-    },
-    {
-      "category": "agent",
       "name": "performance-expert",
       "source": "core/agents/performance-expert.md"
     },
@@ -745,6 +740,11 @@
       "category": "skill",
       "name": "status-audit",
       "source": "core/skills/status-audit/SKILL.md"
+    },
+    {
+      "category": "skill",
+      "name": "design",
+      "source": "core/skills/design/SKILL.md"
     },
     {
       "category": "spec-root",
@@ -1658,6 +1658,12 @@
       "name": "specify",
       "suffix": "templates/agent-file-template.md",
       "source": "core/specnaut/templates/agent-file-template.md"
+    },
+    {
+      "category": "spec-root",
+      "name": "specify",
+      "suffix": "templates/design-template.md",
+      "source": "core/specnaut/templates/design-template.md"
     },
     {
       "category": "spec-root",

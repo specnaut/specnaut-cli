@@ -1,5 +1,6 @@
 import { assert, assertEquals } from "@std/assert";
 import { CORE_BUNDLE, HARNESS_STATIC } from "../../src/templates_bundle.ts";
+import { FE_VOCAB, flat } from "./mobile_first_vocab.ts";
 
 /**
  * The mobile-first contract (#576) — shape, wiring, and the two things the
@@ -11,16 +12,6 @@ import { CORE_BUNDLE, HARNESS_STATIC } from "../../src/templates_bundle.ts";
  */
 
 const CONTRACT = "mobile-first-contract";
-
-/**
- * Markdown is hard-wrapped, so a prose assertion keyed on a sentence fails on
- * a line break that changed nothing. Collapse whitespace before matching —
- * otherwise the assertion is about the rendering, not the content, and it goes
- * red the next time someone runs a formatter.
- */
-function flat(s: string): string {
-  return s.replace(/\s+/g, " ");
-}
 
 function contractEntry() {
   const e = CORE_BUNDLE.find((x) => x.category === "skill" && x.name === CONTRACT);
@@ -131,21 +122,6 @@ Deno.test("the contract declares no tunable value", () => {
     "a value here is a second decider competing with the project's own DESIGN.md",
   );
 });
-
-/**
- * Front-end vocabulary, used to DERIVE the candidate set rather than to
- * hand-list it. A positive membership list can only be wrong in one direction,
- * and the precedent's list proves it: it still carves out a phase doc deleted
- * two releases ago.
- *
- * `layout` and `component` are NOT in this vocabulary, and their absence is the
- * point. `layout` matched `product-owner` three times — on "Local Markdown
- * layout", "GitHub layout", "Specnaut Cloud layout", every one of them a
- * backlog storage layout. A word that means two things recruits false
- * candidates, and the cure for a false candidate is a tighter word, never an
- * exclusion that records a decision nobody actually took.
- */
-const FE_VOCAB = /front-?end|\bUI\b|\bUX\b|markup|\bCSS\b|viewport|responsive/i;
 
 /** Excluded on purpose, each with the reason. An empty reason is not an exclusion. */
 const EXCLUSIONS = new Map<string, string>([
@@ -304,27 +280,5 @@ Deno.test("the contract limits its own authority", () => {
   assert(
     /confers no authority/i.test(flat(contractEntry().content)),
     "an always-on instruction file must say what it does NOT authorise",
-  );
-});
-
-/** FR-009 — plan.md promises this assertion by name. Round 2: regressing the
- * `40px` literal across all three copies consistently left 1605 tests green,
- * because only the plugin byte-identity guard noticed, and a consistent edit
- * satisfies it. Assert the absence where it matters instead. */
-Deno.test("no interactive primitive decides its own touch size", () => {
-  const designer = CORE_BUNDLE.find((e) => e.category === "agent" && e.name === "ui-ux-designer");
-  assert(designer, "ui-ux-designer is not in CORE_BUNDLE");
-  // Flattened first. A line-based check requires the keyword and the literal to
-  // land on the same line of a hard-wrapped file, so the same defect passes or
-  // fails depending on where the wrap fell.
-  const hits = [
-    ...flat(designer!.content).matchAll(
-      /(?:min[- ]height|min[- ]width|hit area|touch[a-z-]*)[^.]{0,60}?\b\d+\s*(?:px|rem|dp|pt)\b/gi,
-    ),
-  ].map((m) => m[0]);
-  assertEquals(
-    hits,
-    [],
-    "a literal size on a touch affordance is a second decider — the value lives in DESIGN.md tokens",
   );
 });

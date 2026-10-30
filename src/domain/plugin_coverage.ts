@@ -156,7 +156,6 @@ export const PLUGIN_COVERED_PATHS_CLAUDE: ReadonlyArray<string> = [
     "product-owner",
     "security-expert",
     "specnaut-guide",
-    "ui-ux-designer",
     "performance-expert",
     "accessibility-expert",
     "architect-expert",
@@ -209,6 +208,7 @@ export const PLUGIN_COVERED_PATHS_CLAUDE: ReadonlyArray<string> = [
   ...[
     "backlog-frontmatter",
     "backlog-reference-contract",
+    "design",
     "mobile-first-contract",
     "response-style-contract",
     "review-findings-contract",
