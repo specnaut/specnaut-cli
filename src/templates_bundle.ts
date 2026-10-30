@@ -1585,9 +1585,10 @@ Shows what Specnaut installed in this project. Read-only and one-shot.
     category: "phase",
     name: "task",
     suffix: "audit.md",
-    content: `# /task audit
+    content:
+      `Read \`docs/constitution.md\` before anything else: it is this project's binding rules, and no agent edits it unasked.
 
-Read \`docs/constitution.md\` before anything else: it is this project's binding rules, and no agent edits it unasked.
+# /task audit
 
 ## User Input
 
@@ -2018,9 +2019,10 @@ when it could not ask — never treat 3 as "no parent".
     category: "backlog-doc",
     name: "task",
     suffix: "groom.md",
-    content: `# groom — board and delivery hygiene
+    content:
+      `Read \`docs/constitution.md\` before anything else: it is this project's binding rules, and no agent edits it unasked.
 
-Read \`docs/constitution.md\` before anything else: it is this project's binding rules, and no agent edits it unasked.
+# groom — board and delivery hygiene
 
 Reachable as **\`/task groom\`** — the only door — on request ("groom the backlog",
 "run a hygiene pass") or scheduled (\`/loop 1h /task groom\`). **Owned by \`/task\`**
@@ -4443,7 +4445,7 @@ in line with the project's architecture.
 
 ## First action in every session
 
-1. Read \`AGENTS.md\` at the project root for the stack and rules. Under each principle of
+1. Read \`AGENTS.md\` at the project root for the stack and conventions. Under each principle of
    \`docs/constitution.md\`, note its \`Check:\` line — the test your change must pass.
 2. Read the feature's \`plan.md\` when a Specnaut feature directory is in context — the brief or the
    full plan; a \`tasks.md\` or \`spec.md\` left by an older release is read as part of it, never
