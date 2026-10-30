@@ -256,8 +256,9 @@ that changes what the product does, or one in the always-ask class of step 7.
 
 ### 7. The plan stop — ask only what only the user can answer
 
-This is the chain's last chance to ask: under the default \`merge: auto\` nothing after it asks again
-— say so, and ask here what autopilot would otherwise settle alone. Present, in order:
+\`phases/auto-chain.md\` decides whether the chain stops here and whether anything after it asks
+again — tell the user which, and ask here what autopilot would otherwise settle alone. Present, in
+order:
 
 1. the decided design, with what was rejected and why — a report, not a vote;
 2. both audits' findings, separately, and what was done with each;
@@ -267,8 +268,7 @@ This is the chain's last chance to ask: under the default \`merge: auto\` nothin
    invalidates the most others first;
 4. anything you decided yourself, one line each.
 
-Record each answer in \`plan.md\` with its date. **Nothing open → no stop**: report 1, 2 and 4 and go
-on. Never stop to have a recommendation confirmed.
+Record each answer in \`plan.md\` with its date. With nothing open, report 1, 2 and 4 and go on.
 
 ### 8. Commit, then INVOKE \`implement\` — same turn
 
@@ -281,8 +281,9 @@ Commit before handing off: a worktree runs off committed HEAD.
 <!-- END: spec-backend=local -->
 
 Then **invoke \`implement\` yourself, in the same turn as the user's last answer** — your own next
-action, not a command printed for them. This boundary is not a stop; pause only when the run was
-started with \`--manual\`.
+action, not a command printed for them. Whether anything stops here is \`phases/auto-chain.md\`'s to
+say.
+
 References to a backlog item follow the \`backlog-reference-contract\` skill.
 `,
     executable: false,
@@ -321,10 +322,10 @@ Run \`.specnaut/scripts/bash/check-prerequisites.sh --json\` for the feature dir
   every file you will touch, split a file over its target first, in its own commit, and put new
   behaviour in a new module wherever it can.
 - **Done is the brief's checks.** Work until every one of them passes; they are what \`review\` runs.
-- **Keep secrets out of git.** The project's ignore files must exclude \`.env*\`, \`*.tfstate*\`,
-  \`*.tfvars\`, \`kubeconfig*\`, \`*.key\`, \`*.crt\` and \`secrets/\` where the stack produces them, and
-  generated output (\`node_modules/\`, \`dist/\`, \`build/\`, \`target/\`, \`.venv/\`). Append a missing
-  pattern; never rewrite the user's file.
+- **Keep secrets out of git.** The project's ignore files must exclude \`.env*\`, \`*.env\`,
+  \`*.tfstate*\`, \`*.tfvars\`, \`*.secret.yaml\`, \`kubeconfig*\`, \`*.key\`, \`*.crt\` and \`secrets/\` where
+  the stack produces them, and generated output (\`node_modules/\`, \`dist/\`, \`build/\`, \`target/\`,
+  \`.venv/\`). Append a missing pattern; never rewrite the user's file.
 
 ## Building it
 
@@ -353,9 +354,8 @@ An implementation that has not been through review is not finished.
 
 1. **Freeze the tree.** Name the commit and stop every agent still holding the tree before anything
    is gated: reviewers and suites read it live.
-2. **Invoke \`review\` yourself, in the same turn.**
-
-This boundary is not a stop. Pause only when the run was started with \`--manual\`.
+2. **Invoke \`review\` yourself, in the same turn.** Whether anything stops here is
+   \`phases/auto-chain.md\`'s to say.
 `,
     executable: false,
     backend: null,
@@ -440,8 +440,9 @@ one reading.
     suffix: "quality-gates.md",
     content: `# Quality gates — two tiers, declared by the project
 
-Loaded by \`phases/implement.md\` after each child commit on an epic branch, and
-by \`phases/merge.md\` once before the merge to the default branch.
+Loaded by \`phases/implement.md\` after each child commit on an epic branch, by
+\`phases/review.md\` for the unit suite on the frozen tree, and by
+\`phases/merge.md\` once before the merge to the default branch.
 
 Looping over an epic's children is only affordable if the per-child check is
 cheap. Running a project's whole suite once per child would cost more than the
@@ -2804,8 +2805,8 @@ plan → implement → review → merge → push
 
 ## Autopilot is the default. There is ONE stop, and a second only on request.
 
-1. **The end of \`plan\`**, **only if something only the user can answer is open**. Expert seats
-   settle technical forks; nothing open → a report, then \`implement\`.
+1. **The end of \`plan\`**, **only if something only the user can answer is open** — who decides the
+   rest is \`phases/plan.md\` step 6. Nothing open → a report, then \`implement\`.
 2. **The review verdict — only under \`manual\`.** The merge mode is read here and nowhere else,
    the per-run instruction first: \`--manual-merge\`, or "stop before merging" / "do not push", means
    \`manual\`; "merge it" means \`auto\`. Otherwise:
@@ -2900,9 +2901,10 @@ After \`plan\` completes and **before** chaining into \`implement\`, check remot
 - **Exit 0** (remote on) — raise a plan-approval gate and suspend:
   \`specnaut gate raise --type plan_approval --title "Approve the plan for <feature>" --payload '{"summary":"<plan summary>","planRef":"<plan.md path>","context":"<short>"}'\`.
   exit 0 + \`{"approved":true}\` → resume into \`implement\`; exit 0 + \`{"approved":false}\` → halt and
-  report the rejection + any \`note\`; exit 3/4/1 → halt cleanly with the reason; exit 5 → report
-  \`specnaut cloud login\` is needed and fall back to the default below. **Never proceed to \`implement\`
-  without an explicit approval.**
+  report the rejection + any \`note\`; exit 3/4/1 → halt cleanly with the reason; exit 5 → no gate
+  was raised (the Cloud login is missing or lapsed): report \`specnaut cloud login\` is needed and halt
+  before \`implement\` — nothing approved the plan. **Never proceed to \`implement\` without an explicit
+  approval.**
 - **Non-zero** (remote off / not Cloud-linked — the default) — STOP 1 is the local approval and the
   chain continues straight into \`implement\`.
 
@@ -2912,7 +2914,10 @@ After \`review\`, in remote mode, raise a \`merge_approval\` gate instead of a t
 \`specnaut gate raise --type merge_approval --title "Approve merge of <feature>" --payload '{"summary":"<change summary>","prUrl":"<pr/diff ref>","context":"<short>"}'\`.
 exit 0 + \`{"approved":true}\` → invoke \`merge\`; exit 0 + \`{"approved":false}\` → halt on the branch
 and report the rejection + any \`note\`; exit 3/4 (timeout/cancelled) or 1 → halt cleanly with the
-reason; exit 5 → report \`specnaut cloud login\` is needed and fall back to the local prompt in \`phases/auto-chain.md\`.
+reason; exit 5 → no gate was raised (the Cloud login is missing or lapsed), so nothing approved the
+merge: report \`specnaut cloud login\` is needed, then under \`merge: manual\` ask the one question in
+\`phases/auto-chain.md\`; under \`merge: auto\` there is no local prompt: halt on the branch, as on
+exit 3/4 — the merge waits for a login and a re-run, or the user's own \`merge\`.
 **Never merge without an explicit approval.**
 `,
     executable: false,
@@ -4695,7 +4700,7 @@ the plan says bounds it, and whether that boundary can hold. **Name what becomes
 later** — a missing gate is one line today, a data model that makes the gate impossible is a
 migration, a backfill and every caller — and say which of your findings is which.
 
-Answer these four, in order, then any the dispatch adds:
+Answer these six, in order, then any the dispatch adds:
 
 1. **Which new surface accepts input, and where does it stop?** Every route, job, webhook, upload,
    argument or file content the plan adds, and the validator that bounds it. A boundary with no
@@ -4707,6 +4712,12 @@ Answer these four, in order, then any the dispatch adds:
    access check, a field that should never leave the server.
 4. **What does this let an authenticated stranger do to somebody else's account?** In writing.
    "Nothing" is acceptable only when it names what was checked.
+5. **Which text becomes an instruction an agent will follow?** Every prompt, skill, agent file,
+   hook, tool grant or permission allowlist the plan adds or widens, and who can write to it. Text a
+   contributor can edit that an agent then obeys or runs is the finding.
+6. **What does it write into a project that consumes it?** Every file created, overwritten or
+   deleted outside this repository, and what bounds it. A path that can leave the project, a write
+   through a link, or a delete that loses the user's bytes is the finding.
 
 When the plan is a brief and the change adds or widens a trust boundary (the list in \`plan.md\` step
 4b), say **"crosses the threshold: <which>"** — that makes the full plan due.
@@ -5711,7 +5722,7 @@ These are **contract docs, not verbs** — naming one prints the verb table and 
 | :--- | :--- |
 | \`phases/merge-squash.md\` | \`merge\`, at its step 4 |
 | \`phases/epic-commits.md\` | \`implement\`, on an epic |
-| \`phases/quality-gates.md\` | \`implement\` and \`merge\` |
+| \`phases/quality-gates.md\` | \`implement\`, \`review\` and \`merge\` |
 | \`phases/epic-fixups.md\` | \`merge\`, before an epic merge |
 | \`phases/merge-close.md\` | \`merge\`, after any push |
 | \`phases/epic-loop.md\` | \`implement\`, on an epic |
@@ -21618,15 +21629,12 @@ OPTIONS:
   --help, -h          Show this help message
 
 EXAMPLES:
-  # Check task prerequisites (plan.md required)
-  ./check-prerequisites.sh --json
-  
   # Check implementation prerequisites (plan.md required)
   ./check-prerequisites.sh --json
-  
+
   # Get feature paths only (no validation)
   ./check-prerequisites.sh --paths-only
-  
+
 EOF
             exit 0
             ;;
@@ -21694,14 +21702,8 @@ if \$REQUIRE_TASKS; then
     echo "note: --require-tasks is ignored; the plan is the one required document" >&2
 fi
 
-# Build list of available documents
+# Build list of available documents: tasks.md, when asked for and present
 docs=()
-
-# Always check these optional docs
-
-
-
-# Include tasks.md if requested and it exists
 if \$INCLUDE_TASKS && [[ -f "\$TASKS" ]]; then
     docs+=("tasks.md")
 fi
@@ -21732,9 +21734,6 @@ else
     # Text output
     echo "FEATURE_DIR:\$FEATURE_DIR"
     echo "AVAILABLE_DOCS:"
-    
-    # Show status of each potential document
-    
     if \$INCLUDE_TASKS; then
         check_file "\$TASKS" "tasks.md"
     fi
@@ -24772,12 +24771,9 @@ OPTIONS:
   -Help, -h           Show this help message
 
 EXAMPLES:
-  # Check task prerequisites (plan.md required)
-  .\\check-prerequisites.ps1 -Json
-  
   # Check implementation prerequisites (plan.md required)
   .\\check-prerequisites.ps1 -Json
-  
+
   # Get feature paths only (no validation)
   .\\check-prerequisites.ps1 -PathsOnly
 
@@ -24836,16 +24832,10 @@ if (\$RequireTasks) {
     [Console]::Error.WriteLine("note: -RequireTasks is ignored; the plan is the one required document")
 }
 
-# Build list of available documents
+# Build list of available documents: tasks.md, when asked for and present
 \$docs = @()
-
-# Always check these optional docs
-
-
-
-# Include tasks.md if requested and it exists
-if (\$IncludeTasks -and (Test-Path \$paths.TASKS)) { 
-    \$docs += 'tasks.md' 
+if (\$IncludeTasks -and (Test-Path \$paths.TASKS)) {
+    \$docs += 'tasks.md'
 }
 
 # Output results
@@ -24859,9 +24849,6 @@ if (\$Json) {
     # Text output
     Write-Output "FEATURE_DIR:\$(\$paths.FEATURE_DIR)"
     Write-Output "AVAILABLE_DOCS:"
-    
-    # Show status of each potential document
-    
     if (\$IncludeTasks) {
         Test-FileExists -Path \$paths.TASKS -Description 'tasks.md' | Out-Null
     }
