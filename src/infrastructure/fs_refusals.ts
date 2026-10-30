@@ -20,8 +20,11 @@ export function refuseUnusable(root: string, abs: string, err: unknown): never {
   throw err;
 }
 
+/** A path refused because it loops or leaves the project: a reader may report it instead of aborting. */
+export class ContainmentRefusal extends Error {}
+
 export const loopRefusal = (root: string, abs: string) =>
-  new Error(
+  new ContainmentRefusal(
     `refusing to touch a path whose symlinks form a cycle:\n` +
       `  path:    ${abs}\n` +
       `  project: ${root}\n` +
@@ -42,7 +45,7 @@ export const unwalkableRefusal = (root: string, abs: string, missing: string) =>
   );
 
 export const leavesRefusal = (root: string, abs: string, resolved: string) =>
-  new Error(
+  new ContainmentRefusal(
     `refusing to touch a path that leaves the project:\n` +
       `  path:     ${abs}\n` +
       `  resolves: ${resolved}\n` +

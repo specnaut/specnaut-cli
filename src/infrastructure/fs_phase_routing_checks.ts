@@ -10,6 +10,7 @@ import type { CheckOutcome } from "../domain/check_result.ts";
 import { type InstalledLock, parseLock } from "../domain/installed_lock.ts";
 import { sha256Hex } from "../domain/sha256.ts";
 import { listProjectFiles } from "./fs_reader.ts";
+import { ContainmentRefusal, UnwalkableRefusal } from "./fs_refusals.ts";
 import { predatesPhaseMove, staleRouterAdvice } from "../domain/skill_doc_renames.ts";
 
 /**
@@ -75,8 +76,17 @@ export async function checkAddenda(projectDir: string): Promise<CheckOutcome[]> 
   }
   // The reader's walker, not one of this module's own: the upgrade notice reads
   // addenda through it, and two walkers disagreed about links (cli#712).
-  const files = (await listProjectFiles(projectDir, ADDENDA_ROOT))
-    .map((p) => p.slice(ADDENDA_ROOT.length + 1));
+  let listed: string[];
+  try {
+    listed = await listProjectFiles(projectDir, ADDENDA_ROOT);
+  } catch (err) {
+    // A linked addenda folder that loops or leaves the project: one row, not a crashed report.
+    if (err instanceof ContainmentRefusal || err instanceof UnwalkableRefusal) {
+      return [{ name: `${ADDENDA_ROOT}/`, status: "warn", message: err.message.split("\n")[0] }];
+    }
+    throw err;
+  }
+  const files = listed.map((p) => p.slice(ADDENDA_ROOT.length + 1));
   return files
     .map(auditAddendum)
     .filter((f): f is AddendumFinding => f !== null)

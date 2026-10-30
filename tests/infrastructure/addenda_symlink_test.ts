@@ -1,4 +1,4 @@
-import { assertEquals } from "@std/assert";
+import { assertEquals, assertStringIncludes } from "@std/assert";
 import { join } from "@std/path";
 import { ADDENDA_ROOT } from "../../src/domain/addendum_audit.ts";
 import { retiredConfigNotices } from "../../src/application/upgrade_retired_notices.ts";
@@ -61,4 +61,21 @@ Deno.test("an addendum linked inside the project that names a retired agent is n
       "the main session runs phases/review.md",
     ]);
   });
+});
+
+Deno.test("an addenda folder linked out of the project is one doctor row, not a crashed report", {
+  ignore: WINDOWS,
+}, async () => {
+  const dir = await Deno.makeTempDir({ prefix: "specnaut-addenda-out-" });
+  const outside = await Deno.makeTempDir({ prefix: "specnaut-outside-" });
+  try {
+    await Deno.mkdir(join(dir, ".specnaut"), { recursive: true });
+    await Deno.symlink(outside, join(dir, ADDENDA_ROOT));
+    const rows = await checkAddenda(dir);
+    assertEquals(rows.map((r) => [r.name, r.status]), [[`${ADDENDA_ROOT}/`, "warn"]]);
+    assertStringIncludes(rows[0].message, "leaves the project");
+  } finally {
+    await Deno.remove(dir, { recursive: true });
+    await Deno.remove(outside, { recursive: true });
+  }
 });
