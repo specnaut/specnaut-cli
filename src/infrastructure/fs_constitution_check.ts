@@ -24,35 +24,25 @@ export async function checkConstitution(projectDir: string): Promise<CheckOutcom
     text = await Deno.readTextFile(join(projectDir, CONSTITUTION_PATH));
   } catch (err) {
     if (!(err instanceof Deno.errors.NotFound)) throw err;
-    return {
-      name: "constitution",
-      status: "fail",
-      message: `missing ${CONSTITUTION_PATH} — run 'specnaut upgrade'`,
-    };
+    return row("fail", `missing ${CONSTITUTION_PATH} — run 'specnaut upgrade'`);
   }
   if (isEmptyPlaceholderConstitution(text)) {
-    return {
-      name: "constitution",
-      status: "warn",
-      message: `placeholder — edit ${CONSTITUTION_PATH}`,
-    };
+    return row("warn", `placeholder — edit ${CONSTITUTION_PATH}`);
   }
   const config = sizeConfigFromEntry(
     await new DenoFsReader().readEntry(projectDir, SIZE_LIMITS_CONFIG_PATH),
   );
-  if (config.kind === "unreadable") {
-    return {
-      name: "constitution",
-      status: "warn",
-      message: sizeConfigUnreadableNote(config.reason),
-    };
-  }
+  if (config.kind === "unreadable") return row("warn", sizeConfigUnreadableNote(config.reason));
   const over = constitutionOverCeiling(text, config.limits.units.constitution);
-  if (over !== null) {
-    return { name: "constitution", status: "warn", message: constitutionCeilingNote(over) };
-  }
-  return { name: "constitution", status: "pass", message: "populated" };
+  if (over !== null) return row("warn", constitutionCeilingNote(over));
+  return row("pass", "populated");
 }
+
+const row = (status: CheckOutcome["status"], message: string): CheckOutcome => ({
+  name: "constitution",
+  status,
+  message,
+});
 
 /** A file written before the bootstrap shipped principles, or emptied since. */
 function isEmptyPlaceholderConstitution(text: string): boolean {

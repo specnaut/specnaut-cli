@@ -62,34 +62,29 @@ export async function carryLegacySettings(
     const found = s.extract(constitution);
     if (found.kind === "none") continue;
     if (await io.reader.readEntry(io.projectDir, s.to) !== null) continue;
-    if (found.kind === "refuse") {
-      notes.push(
-        `${CONSTITUTION_PATH}: ${s.what} is not carried to ${s.to}: ${found.reason} — ` +
-          `${s.readBy} no longer reads the constitution; write ${s.to} yourself`,
-      );
-      continue;
-    }
-    const from = `from ${s.what} in ${CONSTITUTION_PATH}`;
-    const dropped = found.dropped.length === 0
-      ? ""
-      : ` (not carried: ${
-        found.dropped.join(", ")
-      } — the config sets file, function and constitution)`;
-    if (io.dryRun) {
-      notes.push(`would write ${s.to} ${from}${dropped}`);
-      continue;
-    }
-    notes.push(
-      await write(
-        io,
-        s.to,
-        found.content,
-        `${from}${dropped} — ${s.readBy} reads it ` +
-          `now; that section is no longer read and can be deleted`,
-      ),
-    );
+    notes.push(await carryOne(io, s, found));
   }
   return notes;
+}
+
+/** One setting found in the constitution, for a config that is not there yet: the note. */
+async function carryOne(
+  io: LegacySettingsIo,
+  s: typeof SETTINGS[number],
+  found: Exclude<LegacySetting, { kind: "none" }>,
+): Promise<string> {
+  if (found.kind === "refuse") {
+    return `${CONSTITUTION_PATH}: ${s.what} is not carried to ${s.to}: ${found.reason} — ` +
+      `${s.readBy} no longer reads the constitution; write ${s.to} yourself`;
+  }
+  const from = `from ${s.what} in ${CONSTITUTION_PATH}`;
+  const notCarried = `not carried: ${found.dropped.join(", ")}`;
+  const dropped = found.dropped.length === 0
+    ? ""
+    : ` (${notCarried} — the config sets file, function and constitution)`;
+  if (io.dryRun) return `would write ${s.to} ${from}${dropped}`;
+  const now = `${s.readBy} reads it now; that section is no longer read and can be deleted`;
+  return await write(io, s.to, found.content, `${from}${dropped} — ${now}`);
 }
 
 /** One config, written only if absent; the outcome said either way. */

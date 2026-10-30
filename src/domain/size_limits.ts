@@ -191,39 +191,39 @@ export function readSizeLimits(text: string | null): SizeConfig {
   if (text === null) return { kind: "ok", limits: { units, exempt: [] } };
   const parsed = parseNarrowYaml(text, SIZE_UNITS, ["exempt"]);
   if (typeof parsed === "string") return { kind: "unreadable", reason: parsed };
-  const exempt: string[] = [];
-  const given = new Map<string, Map<string, number | null>>();
+  const given = givenSettings(parsed);
+  if (typeof given === "string") return { kind: "unreadable", reason: given };
   for (const r of parsed) {
-    if (r.kind === "key") given.set(r.key, new Map());
+    if (r.kind !== "key" || r.key === "exempt") continue;
+    const set = given.values.get(r.key)!;
+    const lacks = ["target", "ceiling"].find((child) => !set.has(child));
+    if (lacks !== undefined) {
+      return { kind: "unreadable", reason: `line ${r.line}: '${r.key}' lacks its ${lacks}` };
+    }
+    const [target, ceiling] = [set.get("target")!, set.get("ceiling")!];
+    units[r.key as SizeUnit] = { target, ceiling, source: "config" };
+  }
+  return { kind: "ok", limits: { units, exempt: given.exempt } };
+}
+
+/** Every value checked in file order, the first bad one the reason; and the exempt globs. */
+function givenSettings(parsed: readonly ParsedRecord[]) {
+  const exempt: string[] = [];
+  const values = new Map<string, Map<string, number | null>>();
+  for (const r of parsed) {
+    if (r.kind === "key") values.set(r.key, new Map());
     if (r.kind === "item") exempt.push(r.value);
     if (r.kind !== "child") continue;
     const at = `line ${r.line}: '${r.key}.${r.child}'`;
     if (r.child !== "target" && r.child !== "ceiling") {
-      return { kind: "unreadable", reason: `${at} is not a setting — expected target and ceiling` };
+      return `${at} is not a setting — expected target and ceiling`;
     }
     if (!LIMIT_VALUE.test(r.value)) {
-      return {
-        kind: "unreadable",
-        reason: `${at} is '${r.value}' — expected a whole number of lines or none`,
-      };
+      return `${at} is '${r.value}' — expected a whole number of lines or none`;
     }
-    given.get(r.key)!.set(r.child, toLimit(r.value));
+    values.get(r.key)!.set(r.child, toLimit(r.value));
   }
-  for (const r of parsed) {
-    if (r.kind !== "key" || r.key === "exempt") continue;
-    const set = given.get(r.key)!;
-    for (const child of ["target", "ceiling"]) {
-      if (!set.has(child)) {
-        return { kind: "unreadable", reason: `line ${r.line}: '${r.key}' lacks its ${child}` };
-      }
-    }
-    units[r.key as SizeUnit] = {
-      target: set.get("target")!,
-      ceiling: set.get("ceiling")!,
-      source: "config",
-    };
-  }
-  return { kind: "ok", limits: { units, exempt } };
+  return { values, exempt };
 }
 
 /**

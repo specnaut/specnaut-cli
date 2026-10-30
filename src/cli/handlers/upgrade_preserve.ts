@@ -6,6 +6,7 @@ import { isAgenticPath } from "../../domain/parent_managed.ts";
 import { orphanScope } from "../../domain/orphan_scope.ts";
 import { CORE_BUNDLE } from "../../templates_bundle.ts";
 import type { InstalledLock } from "../../domain/installed_lock.ts";
+import type { Harness } from "../../application/ports.ts";
 import { CONSTITUTION_PATH, LEGACY_CONSTITUTION_PATH } from "../../domain/constitution_paths.ts";
 
 /**
@@ -32,21 +33,7 @@ export async function resolveUpgradePreserves(
 ): Promise<{ known: ReadonlyArray<string>; isDeclaredPreserved: (dest: string) => boolean }> {
   const harness = lock === null ? undefined : findHarness(lock.harness);
   if (lock === null || !harness) return { known: [], isDeclaredPreserved: () => false };
-  const mapped = harness.mapBundle(CORE_BUNDLE, {
-    backlogBackend: lock.backlogBackend,
-    versionScheme: lock.versionScheme,
-    specBackend: lock.specBackend,
-    specAutogen: lock.specAutogen,
-  });
-  // A lock key counts only where upgrade could act on it: outside Specnaut's
-  // folders it is refused whatever it declares (cli#665). The same scope the
-  // orphan path uses, exact-name files included — without them a declared
-  // retired file was warned unmanaged, then deleted.
-  const tracked = [...lock.entries.keys()].filter((d) =>
-    orphanScope(d, harness.managedRoots, harness.managedFiles) === "in-scope"
-  );
-  const managed = [...Object.keys(mapped), ...tracked]
-    .filter((d) => !parentManaged || !isAgenticPath(d));
+  const managed = managedPaths(lock, harness, parentManaged);
   const store = new FsPreserveStore();
   await warnUnusableManifest(store, projectDir);
   const resolved = resolvePreserveDeclarations(await store.read(projectDir), managed);
@@ -65,6 +52,27 @@ export async function resolveUpgradePreserves(
   }
   const declared = new Set(resetPreserved ? [] : known);
   return { known, isDeclaredPreserved: (dest) => declared.has(dest) };
+}
+
+/**
+ * The paths a declaration can take effect on: what the bundle ships for the
+ * lock's harness and backend, and what the lock records within Specnaut's
+ * folders. A lock key counts only where upgrade could act on it: outside those
+ * folders it is refused whatever it declares (cli#665). The same scope the
+ * orphan path uses, exact-name files included — without them a declared
+ * retired file was warned unmanaged, then deleted.
+ */
+function managedPaths(lock: InstalledLock, harness: Harness, parentManaged: boolean): string[] {
+  const mapped = harness.mapBundle(CORE_BUNDLE, {
+    backlogBackend: lock.backlogBackend,
+    versionScheme: lock.versionScheme,
+    specBackend: lock.specBackend,
+    specAutogen: lock.specAutogen,
+  });
+  const tracked = [...lock.entries.keys()].filter((d) =>
+    orphanScope(d, harness.managedRoots, harness.managedFiles) === "in-scope"
+  );
+  return [...Object.keys(mapped), ...tracked].filter((d) => !parentManaged || !isAgenticPath(d));
 }
 
 /**

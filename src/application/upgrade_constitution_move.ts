@@ -42,7 +42,7 @@ const WHY = "the constitution is the project's own document now";
  * (A-H2). A caller adds no condition of its own — not even "does the old
  * file exist": nothing there, or no project directory yet, is verdict `none`.
  * An address that cannot be read is a refusal, never an abort and never
- * absence (cli#684 review); one that leaves the project aborts (cli#704). Runs before the caller reads
+ * absence (cli#684 review); a link out of the project aborts (cli#704). Runs before the caller reads
  * disk state for its plan, so the defaults are judged against the moved file
  * (FR-007). Under `dryRun` it judges and writes nothing; its note says
  * "would move".
@@ -56,22 +56,10 @@ export async function executeConstitutionMove(
   const exclude = [FROM, TO];
   switch (verdict.kind) {
     case "move":
-      if (ctx.dryRun) notes.push(`${FROM} would move to ${TO} (${WHY})`);
-      else if (await moveExact({ ...ctx, notes }, FROM, FROM, TO, verdict.content) === "moved") {
-        notes.push(`${FROM} moved to ${TO} (${WHY})`);
-      }
+      await move(ctx, notes, verdict.content);
       break;
     case "dedupe":
       await dedupe(ctx, notes);
-      break;
-    case "refuse-conflict":
-      notes.push(exactMoveRefusal({ kind: "target-occupied" }, FROM, TO)!);
-      break;
-    case "refuse-link":
-      notes.push(exactMoveRefusal({ kind: "source-link" }, FROM, TO)!);
-      break;
-    case "refuse-lossy":
-      notes.push(exactMoveRefusal({ kind: "source-lossy" }, FROM, TO)!);
       break;
     case "refuse-unreadable":
       notes.push(
@@ -79,8 +67,25 @@ export async function executeConstitutionMove(
           `no default is written at ${TO} — make it readable and run again`,
       );
       break;
+    default:
+      notes.push(exactMoveRefusal({ kind: EXACT_REFUSAL[verdict.kind] }, FROM, TO)!);
   }
   return { verdict, notes, exclude };
+}
+
+/** The refusals worded by the shared exact-move judgement, by the verdict that carries them. */
+const EXACT_REFUSAL = {
+  "refuse-conflict": "target-occupied",
+  "refuse-link": "source-link",
+  "refuse-lossy": "source-lossy",
+} as const;
+
+/** The byte-for-byte move, said once it landed — or, dry, that it would. */
+async function move(ctx: ConstitutionMoveContext, notes: string[], content: string) {
+  if (ctx.dryRun) notes.push(`${FROM} would move to ${TO} (${WHY})`);
+  else if (await moveExact({ ...ctx, notes }, FROM, FROM, TO, content) === "moved") {
+    notes.push(`${FROM} moved to ${TO} (${WHY})`);
+  }
 }
 
 /** The old copy goes; the new one, the same text, is never touched. */

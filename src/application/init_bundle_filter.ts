@@ -62,14 +62,7 @@ export async function filterInitBundle(
       preserved.push(dest);
       continue;
     }
-    // A merge block is non-destructive, but that is not the same as always
-    // safe to add: `.codex/config.toml` already carrying an `[agents]` table
-    // cannot take a second one without ceasing to parse. Refuse, and say
-    // which keys to add by hand — a silent skip would leave the user with the
-    // defect and no idea the fix had been withheld (cli#599).
-    const refusal = reader === undefined || file.mergeRefuseIf === undefined
-      ? null
-      : await hostRefusal(reader, targetDir, dest, file);
+    const refusal = await hostRefusal(reader, targetDir, dest, file);
     if (refusal !== null) {
       refusals.push(refusal);
       continue;
@@ -80,17 +73,24 @@ export async function filterInitBundle(
 }
 
 /**
- * Why the host file at `dest` cannot take its merge block, or `null`. The
- * reader says "nothing there" itself — even for a target directory that does
- * not exist yet — so a throw is a host that is there and cannot be read: it
- * is refused, never merged blind, and never the thing that makes init fail.
+ * Why the host file at `dest` cannot take its merge block, or `null` — also
+ * for a file that is no merge, or no reader. A merge block is non-destructive,
+ * but that is not the same as always safe to add: `.codex/config.toml` already
+ * carrying an `[agents]` table cannot take a second one without ceasing to
+ * parse. Refuse, and say which keys to add by hand — a silent skip would leave
+ * the user with the defect and no idea the fix had been withheld (cli#599).
+ *
+ * The reader says "nothing there" itself — even for a target directory that
+ * does not exist yet — so a throw is a host that is there and cannot be read:
+ * it is refused, never merged blind, and never the thing that makes init fail.
  */
 async function hostRefusal(
-  reader: FsReader,
+  reader: FsReader | undefined,
   targetDir: string,
   dest: string,
   file: Bundle[string],
 ): Promise<string | null> {
+  if (reader === undefined || file.mergeRefuseIf === undefined) return null;
   try {
     return mergeRefusal(await reader.readText(targetDir, dest), file);
   } catch (err) {

@@ -56,48 +56,58 @@ export function extractLegacySizeLimits(constitution: string): LegacySetting {
   if (body === null) return NONE;
   const rows = body.filter((l) => l.startsWith("|"));
   if (rows.length === 0 || !/^unit$/i.test(cells(rows[0])[0] ?? "")) {
-    return { kind: "refuse", reason: "it has no `Unit | Target | Ceiling` table" };
+    return refuse("it has no `Unit | Target | Ceiling` table");
   }
   const units: Partial<Record<SizeUnit, SizeLimit>> = {};
-  const seen = new Set<string>();
+  const seen = new Set<SizeUnit>();
   const dropped: string[] = [];
   for (const row of rows.slice(1)) {
-    const [unit, target, ceiling, ...extra] = cells(row);
-    if (/^[\s:-]*$/.test(unit)) continue; // the separator row
-    if (extra.length > 0 || ceiling === undefined) {
-      return { kind: "refuse", reason: `the row '${row.trim()}' is not unit, target, ceiling` };
-    }
-    const known = SIZE_UNITS.find((u) => u === unit);
-    if (known === undefined) {
-      if (SIZE_UNITS.some((u) => unit.toLowerCase().replace(/s$/, "") === u)) {
-        return {
-          kind: "refuse",
-          reason: `the unit '${unit}' is not spelled as the ratchet reads it`,
-        };
-      }
-      dropped.push(unit);
-      continue;
-    }
-    if (seen.has(known)) return { kind: "refuse", reason: `the unit '${known}' is given twice` };
-    seen.add(known);
-    for (const v of [target, ceiling]) {
-      if (!LIMIT_VALUE.test(v)) {
-        return { kind: "refuse", reason: `'${known}' has the value '${v}', not lines or none` };
-      }
-    }
-    const d = DEFAULT_SIZE_LIMITS[known];
-    const isDefault = `${target} ${ceiling}` === `${d.target} ${d.ceiling}` ||
-      (known === "constitution" && `${target} ${ceiling}` === VANILLA_CONSTITUTION);
-    if (!isDefault) units[known] = { target: limit(target), ceiling: limit(ceiling) };
+    const r = judgeRow(row, seen);
+    if (r.kind === "refuse") return r;
+    if (r.kind === "drop") dropped.push(r.unit);
+    if (r.kind === "unit" && r.limit !== null) units[r.unit] = r.limit;
   }
   const exempt = [...(body.find((l) => /^Exempt:/.test(l)) ?? "").matchAll(/`([^`]*)`/g)]
     .map((m) => m[1]);
   const bad = exempt.find((g) => !isWritableGlob(g));
-  if (bad !== undefined) {
-    return { kind: "refuse", reason: `the exempt glob '${bad}' cannot be written` };
-  }
+  if (bad !== undefined) return refuse(`the exempt glob '${bad}' cannot be written`);
   if (Object.keys(units).length === 0 && exempt.length === 0) return NONE;
   return { kind: "extract", content: sizeLimitsYaml(units, exempt), dropped };
+}
+
+type Refusal = Extract<LegacySetting, { kind: "refuse" }>;
+const refuse = (reason: string): Refusal => ({ kind: "refuse", reason });
+
+/** A table row: the separator, a unit the config skips, or a known unit (`null`: a default). */
+type Row =
+  | { readonly kind: "skip" }
+  | { readonly kind: "drop"; readonly unit: string }
+  | { readonly kind: "unit"; readonly unit: SizeUnit; readonly limit: SizeLimit | null }
+  | Refusal;
+
+/** Judges one row as the old ratchet read it; `seen` is the units already given. */
+function judgeRow(row: string, seen: Set<SizeUnit>): Row {
+  const [unit, target, ceiling, ...extra] = cells(row);
+  if (/^[\s:-]*$/.test(unit)) return { kind: "skip" }; // the separator row
+  if (extra.length > 0 || ceiling === undefined) {
+    return refuse(`the row '${row.trim()}' is not unit, target, ceiling`);
+  }
+  const known = SIZE_UNITS.find((u) => u === unit);
+  if (known === undefined) {
+    return SIZE_UNITS.some((u) => unit.toLowerCase().replace(/s$/, "") === u)
+      ? refuse(`the unit '${unit}' is not spelled as the ratchet reads it`)
+      : { kind: "drop", unit };
+  }
+  if (seen.has(known)) return refuse(`the unit '${known}' is given twice`);
+  seen.add(known);
+  const bad = [target, ceiling].find((v) => !LIMIT_VALUE.test(v));
+  if (bad !== undefined) return refuse(`'${known}' has the value '${bad}', not lines or none`);
+  const d = DEFAULT_SIZE_LIMITS[known];
+  const pair = `${target} ${ceiling}`;
+  const isDefault = pair === `${d.target} ${d.ceiling}` ||
+    (known === "constitution" && pair === VANILLA_CONSTITUTION);
+  const limits = { target: limit(target), ceiling: limit(ceiling) };
+  return { kind: "unit", unit: known, limit: isDefault ? null : limits };
 }
 
 const limit = (v: string) => v === "none" ? null : Number.parseInt(v, 10);

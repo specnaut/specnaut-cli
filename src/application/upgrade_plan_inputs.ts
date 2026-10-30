@@ -62,40 +62,46 @@ export async function gatherPlanInputs(
 ): Promise<PlanInputs> {
   const { reader } = io;
   const bundle: Bundle = { ...planned };
-  const move = await executeConstitutionMove({ ...io, projectDir });
-  const carried = await carryLegacySettings(
-    { ...io, projectDir },
-    await constitutionAfterRun(reader, projectDir, move.verdict),
-  );
-  const notices = await constitutionNotices(
-    reader,
-    projectDir,
-    planned[CONSTITUTION_PATH]?.content,
-    move.verdict,
-  );
-  const retired = await retiredConfigNotices(reader, projectDir, new Set(lock.entries.keys()));
-  const refusals: string[] = [...move.notes, ...carried, ...notices, ...retired];
-  const refusedDests = new Set<string>(move.exclude);
-  for (const dest of move.exclude) delete bundle[dest];
-  for (const [dest, file] of Object.entries(bundle)) {
-    if (file.mergeRefuseIf === undefined) continue;
-    const refusal = mergeRefusal(await reader.readText(projectDir, dest), file);
-    if (refusal === null) continue;
-    refusals.push(refusal);
-    delete bundle[dest];
-    refusedDests.add(dest);
-  }
-
-  // Context links are classified by what `lstat` sees (cli#680).
-  const links = await surveyContextLinks(reader, projectDir, bundle, lock, isDeclaredPreserved);
-  for (const { dest, message } of links.refused) {
+  const before = await constitutionStep(io, projectDir, planned, lock);
+  const refusals: string[] = [...before.notes];
+  const refusedDests = new Set<string>(before.exclude);
+  for (const dest of before.exclude) delete bundle[dest];
+  const refuse = (dest: string, message: string) => {
     refusals.push(message);
     delete bundle[dest];
     refusedDests.add(dest);
+  };
+  for (const [dest, file] of Object.entries(bundle)) {
+    if (file.mergeRefuseIf === undefined) continue;
+    const refusal = mergeRefusal(await reader.readText(projectDir, dest), file);
+    if (refusal !== null) refuse(dest, refusal);
   }
-
+  // Context links are classified by what `lstat` sees (cli#680).
+  const links = await surveyContextLinks(reader, projectDir, bundle, lock, isDeclaredPreserved);
+  for (const { dest, message } of links.refused) refuse(dest, message);
   const diskShas = await readDiskShas(reader, projectDir, bundle, lock, links, refusedDests);
   return { bundle, refusals, links, diskShas, lockForPlan: withoutRefused(lock, refusedDests) };
+}
+
+/**
+ * The constitution's steps, in the order the doc above gives (spec 038): the
+ * move, the settings it carried, the notices that read them, and the retired
+ * configs. Its notes, and the dests the move holds back from plan and lock.
+ */
+async function constitutionStep(
+  io: PlanInputsIo,
+  projectDir: string,
+  planned: Bundle,
+  lock: InstalledLock,
+): Promise<{ notes: string[]; exclude: readonly string[] }> {
+  const { reader } = io;
+  const move = await executeConstitutionMove({ ...io, projectDir });
+  const after = await constitutionAfterRun(reader, projectDir, move.verdict);
+  const carried = await carryLegacySettings({ ...io, projectDir }, after);
+  const shipped = planned[CONSTITUTION_PATH]?.content;
+  const notices = await constitutionNotices(reader, projectDir, shipped, move.verdict);
+  const retired = await retiredConfigNotices(reader, projectDir, new Set(lock.entries.keys()));
+  return { notes: [...move.notes, ...carried, ...notices, ...retired], exclude: move.exclude };
 }
 
 /** The sha of every bundle or lock dest present on disk, never read through a link. */
