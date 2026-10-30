@@ -14,6 +14,7 @@ import { applySpecBackend } from "./spec_backend_filter.ts";
 import { applySpecAutogen } from "./spec_autogen_filter.ts";
 import { addUnique } from "./bundle_writer.ts";
 import { SKILL_SURFACE } from "./skill_layout.ts";
+import { AGENT_FOLDERS, agentFile } from "../../domain/agent_folders.ts";
 
 function toAntigravityAgentMarkdown(entry: CoreEntry): string {
   const split = splitFrontmatter(entry.content);
@@ -42,7 +43,7 @@ function toAntigravityAgentMarkdown(entry: CoreEntry): string {
 function destinationFor(entry: CoreEntry): string {
   switch (entry.category) {
     case "agent":
-      return `.agents/agents/specnaut-${entry.name}.md`;
+      return agentFile(AGENT_FOLDERS.antigravity, entry.name);
     case "skill":
     case "backlog-skill":
       return `.agents/skills/${skillFolderName(entry)}/SKILL.md`;
@@ -71,7 +72,7 @@ function destinationFor(entry: CoreEntry): string {
 export class AntigravityHarness implements Harness {
   readonly key = "antigravity";
   readonly displayName = "Antigravity";
-  readonly managedRoots = [".agents/agents/", ".agents/skills/"] as const;
+  readonly managedRoots = [`${AGENT_FOLDERS.antigravity.dir}/`, ".agents/skills/"] as const;
 
   mapBundle(core: CoreBundle, opts: BundleOptions): Bundle {
     const out: Bundle = {};

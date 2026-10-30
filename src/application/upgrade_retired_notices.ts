@@ -1,5 +1,6 @@
 import type { FsReader } from "./ports.ts";
 import { ADDENDA_ROOT } from "../domain/addendum_audit.ts";
+import { AGENT_FOLDERS, type AgentFolder } from "../domain/agent_folders.ts";
 
 /**
  * Where the phase docs used to look for extension hooks (`hooks.before_plan`
@@ -25,10 +26,9 @@ export const RETIRED_AGENTS: Readonly<Record<string, string>> = {
 };
 
 /** The folder of each harness's agents that a project may add its own to. */
-const AGENT_DIRS: ReadonlyArray<{ dir: string; ext: string }> = [
-  { dir: ".claude/agents", ext: ".md" },
-  { dir: ".codex/agents", ext: ".toml" },
-];
+const AGENT_DIRS: ReadonlyArray<AgentFolder> = Object.values(AGENT_FOLDERS).filter(
+  (f): f is NonNullable<typeof f> => f !== null,
+);
 
 /** A name as a whole word: `qa-tester` in `my-qa-tester-notes` is not a dispatch. */
 const names = (text: string, name: string) =>

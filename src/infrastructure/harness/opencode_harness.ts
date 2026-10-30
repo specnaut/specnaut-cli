@@ -13,6 +13,7 @@ import { applySpecBackend } from "./spec_backend_filter.ts";
 import { applySpecAutogen } from "./spec_autogen_filter.ts";
 import { addUnique } from "./bundle_writer.ts";
 import { SKILL_SURFACE } from "./skill_layout.ts";
+import { AGENT_FOLDERS, agentFile } from "../../domain/agent_folders.ts";
 
 type PermissionValue = "allow" | "ask" | "deny" | { "*": "ask" | "allow" | "deny" };
 type PermissionMap = Record<string, PermissionValue>;
@@ -99,7 +100,7 @@ function toOpenCodeAgentMarkdown(entry: CoreEntry): string {
 function destinationFor(entry: CoreEntry): string {
   switch (entry.category) {
     case "agent":
-      return `.opencode/agents/specnaut-${entry.name}.md`;
+      return agentFile(AGENT_FOLDERS.opencode, entry.name);
     case "skill":
     case "backlog-skill":
       return `.opencode/skills/${skillFolderName(entry)}/SKILL.md`;
@@ -128,7 +129,7 @@ function destinationFor(entry: CoreEntry): string {
 export class OpenCodeHarness implements Harness {
   readonly key = "opencode";
   readonly displayName = "OpenCode";
-  readonly managedRoots = [".opencode/agents/", ".opencode/skills/"] as const;
+  readonly managedRoots = [`${AGENT_FOLDERS.opencode.dir}/`, ".opencode/skills/"] as const;
 
   mapBundle(core: CoreBundle, opts: BundleOptions): Bundle {
     const out: Bundle = {};

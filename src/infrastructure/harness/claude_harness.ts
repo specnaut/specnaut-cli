@@ -12,21 +12,24 @@ import { applySpecAutogen } from "./spec_autogen_filter.ts";
 import { ensureSkillFrontmatter, skillDocDestination } from "./skill_folder.ts";
 import { addUnique } from "./bundle_writer.ts";
 import { SKILL_SURFACE } from "./skill_layout.ts";
+import { AGENT_FOLDERS, agentFile } from "../../domain/agent_folders.ts";
+
+const AGENTS = AGENT_FOLDERS.claude;
 
 function destinationFor(entry: CoreEntry): string {
   switch (entry.category) {
     case "agent":
-      return `.claude/agents/${entry.name}.md`;
+      return agentFile(AGENTS, entry.name);
     case "agent-memory":
       if (!entry.suffix) throw new Error(`agent-memory needs suffix: ${entry.name}`);
-      return `.claude/agents/${entry.name}/memory/${entry.suffix}`;
+      return `${AGENTS.dir}/${entry.name}/memory/${entry.suffix}`;
     case "agent-doc":
       // The agent-fleet README is a Claude-only convention; it sits beside the
-      // agent files at `.claude/agents/README.md`. Other harnesses skip it
-      // (the agents are transformed into harness-specific formats there, so a
-      // README describing the `.claude/agents/` layout has no destination).
+      // agent files. Other harnesses skip it (the agents are transformed into
+      // harness-specific formats there, so a README describing Claude's agent
+      // layout has no destination).
       if (!entry.suffix) throw new Error(`agent-doc needs suffix: ${entry.name}`);
-      return `.claude/agents/${entry.suffix}`;
+      return `${AGENTS.dir}/${entry.suffix}`;
     case "skill":
     case "backlog-skill":
       // Claude doesn't add a `specnaut-` prefix — skill names are emitted
@@ -61,7 +64,7 @@ export class ClaudeHarness implements Harness {
    * register hooks write it, and that root means "every harness writes it".
    */
   readonly managedRoots = [
-    ".claude/agents/",
+    `${AGENTS.dir}/`,
     ".claude/hooks/",
     ".claude/scripts/",
     ".claude/skills/",

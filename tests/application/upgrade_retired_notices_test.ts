@@ -4,6 +4,7 @@ import {
   RETIRED_EXTENSIONS_PATH,
   retiredConfigNotices,
 } from "../../src/application/upgrade_retired_notices.ts";
+import { AGENT_FOLDERS } from "../../src/domain/agent_folders.ts";
 import { fakeReader } from "./upgrade_fakes.ts";
 
 /**
@@ -50,6 +51,17 @@ Deno.test("a project's own agent is named on either harness; each name once, in 
   assertEquals(out[0].split("test-reviewer →").length, 2, "a name is listed once");
   assertStringIncludes(out[1], ".codex/agents/my-designer.toml");
   assertStringIncludes(out[1], "ui-ux-designer → /design");
+});
+
+Deno.test("every harness's agent folder is read, as AGENT_FOLDERS spells it", async () => {
+  // The folders are the adapters' own (cli#712): a project's agent in any of
+  // them still dispatches, whichever harness wrote it.
+  const own = Object.values(AGENT_FOLDERS).flatMap((f) =>
+    f === null ? [] : [`${f.dir}/mine${f.ext}`]
+  );
+  assert(own.length >= 2, "AGENT_FOLDERS declares no folder");
+  const out = await notices(Object.fromEntries(own.map((p) => [p, "Ask test-reviewer.\n"])));
+  assertEquals(out.slice(0, -1).map((l) => l.split(" ")[0]), own);
 });
 
 Deno.test("silent when no file the user owns names a retired agent", async () => {

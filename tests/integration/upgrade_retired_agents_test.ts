@@ -1,6 +1,7 @@
 import { assert, assertEquals, assertStringIncludes } from "@std/assert";
 import { exists } from "@std/fs/exists";
 import { fromFileUrl, join } from "@std/path";
+import { AGENT_FOLDERS, agentFile } from "../../src/domain/agent_folders.ts";
 
 const MAIN = fromFileUrl(new URL("../../src/main.ts", import.meta.url));
 
@@ -12,8 +13,10 @@ const MAIN = fromFileUrl(new URL("../../src/main.ts", import.meta.url));
  * prove that holds for THIS set on both frontier harnesses, and that a project
  * file still dispatching a retired agent is named with its successor.
  *
- * The paths are what an init with the 15-agent bundle wrote, captured before
- * the files left it; nothing outside this test reads them.
+ * The agent folders are `AGENT_FOLDERS`, the ones the adapters write to and
+ * the notice reads (cli#712). The names below are what an init with the
+ * 15-agent bundle wrote, captured before the files left it; nothing outside
+ * this test reads them.
  */
 
 const AGENTS = [
@@ -26,21 +29,23 @@ const AGENTS = [
 ] as const;
 const CONTRACTS = ["handoff-protocol", "qa-report-contract", "alert-triage-contract"] as const;
 
+const CLAUDE = AGENT_FOLDERS.claude;
+const CODEX = AGENT_FOLDERS.codex;
 const LAYOUT = {
   claude: {
-    agent: (n: string) => `.claude/agents/${n}.md`,
-    seeds: ["qa-tester", "devops-sre"].map((n) => `.claude/agents/${n}/memory/MEMORY.md`),
+    agent: (n: string) => agentFile(CLAUDE, n),
+    seeds: ["qa-tester", "devops-sre"].map((n) => `${CLAUDE.dir}/${n}/memory/MEMORY.md`),
     skill: (n: string) => `.claude/skills/${n}/SKILL.md`,
     // The user's edit that upgrade must keep: on Claude, a seed the agent wrote to.
-    customised: ".claude/agents/qa-tester/memory/MEMORY.md",
-    own: ".claude/agents/my-reviewer.md",
+    customised: `${CLAUDE.dir}/qa-tester/memory/MEMORY.md`,
+    own: agentFile(CLAUDE, "my-reviewer"),
   },
   codex: {
-    agent: (n: string) => `.codex/agents/${n}.toml`,
+    agent: (n: string) => agentFile(CODEX, n),
     seeds: [] as string[], // Codex agents never carried a seed.
     skill: (n: string) => `.agents/skills/specnaut-${n}/SKILL.md`,
-    customised: ".codex/agents/qa-tester.toml",
-    own: ".codex/agents/my-reviewer.toml",
+    customised: agentFile(CODEX, "qa-tester"),
+    own: agentFile(CODEX, "my-reviewer"),
   },
 } as const;
 type Harness = keyof typeof LAYOUT;

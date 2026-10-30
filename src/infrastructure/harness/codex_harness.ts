@@ -21,6 +21,9 @@ import { applySpecBackend } from "./spec_backend_filter.ts";
 import { applySpecAutogen } from "./spec_autogen_filter.ts";
 import { addUnique } from "./bundle_writer.ts";
 import { SKILL_SURFACE } from "./skill_layout.ts";
+import { AGENT_FOLDERS, agentFile } from "../../domain/agent_folders.ts";
+
+const AGENTS = AGENT_FOLDERS.codex;
 
 function parseAgentFrontmatter(
   content: string,
@@ -57,7 +60,7 @@ export class CodexHarness implements Harness {
   readonly key = "codex";
   readonly displayName = "Codex CLI";
   /** `.specnaut/hooks/`: see `ClaudeHarness.managedRoots` for why it is not a shared root. */
-  readonly managedRoots = [".codex/agents/", ".agents/skills/", ".specnaut/hooks/"] as const;
+  readonly managedRoots = [`${AGENTS.dir}/`, ".agents/skills/", ".specnaut/hooks/"] as const;
   /**
    * Retired files directly in `.codex/`, which no root may hold: the folder's
    * other files are the user's. `goal.md` was retired by cli#681 — Codex's
@@ -92,7 +95,7 @@ export class CodexHarness implements Harness {
       if (entry.category === "agent-memory" || entry.category === "agent-doc") continue;
       switch (entry.category) {
         case "agent":
-          addUnique(out, `.codex/agents/${entry.name}.toml`, {
+          addUnique(out, agentFile(AGENTS, entry.name), {
             content: toCodexSubagentToml(entry),
             executable: false,
           }, this.key);
