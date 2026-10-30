@@ -40,6 +40,8 @@ check "check-prerequisites.ps1 no longer lists deleted artefacts (#457)" \
   '! grep -qE "research\.md|data-model\.md|quickstart\.md" .specnaut/scripts/powershell/check-prerequisites.ps1'
 check "create-new-feature.ps1 scaffolds from plan-template (#457)" \
   'grep -q "plan-template" .specnaut/scripts/powershell/create-new-feature.ps1'
+check "create-new-feature's extracted helpers are scaffolded and sourced (#703)" \
+  'test -f .specnaut/scripts/bash/branch-naming.sh && grep -q "branch-naming.sh" .specnaut/scripts/bash/create-new-feature.sh && test -f .specnaut/scripts/powershell/branch-naming.ps1 && grep -q "branch-naming.ps1" .specnaut/scripts/powershell/create-new-feature.ps1 && test -f .specnaut/scripts/powershell/template-resolution.ps1 && grep -q "template-resolution.ps1" .specnaut/scripts/powershell/common.ps1'
 
 echo
 echo "═══ #69 + #93  backlog backends + strategy refactor ═══"
