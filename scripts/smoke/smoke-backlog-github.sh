@@ -60,8 +60,11 @@ check "SKILL.md mentions set-field.sh (#161)" \
 # The exit-code contract, keyed on each code's definition rather than on one
 # phrasing of it (#623 reworded "10/11/12 signal label fallback" into a
 # per-code sentence, and a check pinned to the old string went red).
-check "SKILL.md documents set-field exit codes 10-13 and the preflight's 2" \
-  '(for c in 10 11 12 13 2; do grep -q "\`$c\` = " .claude/skills/task/backlog.md || exit 1; done)'
+# cli#679: one prose home — the product-owner's classification contract; backlog.md points there.
+check "the PO contract documents set-field exit codes 10-13 and the preflight's 2" \
+  '(for c in 10 11 12 13 2; do grep -q "\`$c\` = " .claude/agents/product-owner.md || exit 1; done)'
+check "backlog.md points at the PO contract for them" \
+  'grep -q "the product-owner'"'"'s classification contract" .claude/skills/task/backlog.md'
 
 echo
 echo "═══ #654  grooming ends with a promotion ═══"

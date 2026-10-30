@@ -87,14 +87,19 @@ Deno.test("3. Blocked calls out each blocked agent as urgent", async () => {
 });
 
 Deno.test("4. Stale: a non-terminal agent with no entry for 15 minutes or more", async () => {
+  // ±5 min around the threshold, and the printed minutes stripped: the fixture's `ago` and the
+  // script's `now` read the clock at different instants, so an exact count is a race.
   const r = await audit([
-    line({ ts: ago(16), agent: "developer", state: "in_progress" }),
-    line({ ts: ago(14), agent: "product-owner", state: "awaiting_user" }),
+    line({ ts: ago(20), agent: "developer", state: "in_progress" }),
+    line({ ts: ago(10), agent: "product-owner", state: "awaiting_user" }),
     line({ ts: ago(60), agent: "architect-expert", state: "done" }),
     line({ ts: ago(60), agent: "qa-tester", state: "failed" }),
   ]);
   const v = view(r.stdout, 4);
-  assertStringIncludes(v, "  developer · in_progress · no entry for 16 min (last ");
+  assertStringIncludes(
+    v.replace(/ \d+ min/g, " N min"),
+    "  developer · in_progress · no entry for N min (last ",
+  );
   for (const fresh of ["product-owner", "architect-expert", "qa-tester"]) {
     assert(!v.includes(fresh), `${fresh} is not stale:\n${v}`);
   }

@@ -118,11 +118,12 @@ Use the bundled scripts at `.specnaut/scripts/backlog/`:
 
   **That is a sample, taken once** — `groom-report.md` says what it costs and
   requires you to disclose it.
-- `set-field.sh <issue> <Priority|Size> <value>` — writes the field; its exit
-  codes are in the PO's classification contract. `12` / `13` go under
-  "⚠ size / priority missing"; only `10` / `11` fall back to a label.
+- `set-field.sh <issue> <Priority|Size> <value>` — writes the field. Its exit
+  codes, and which of them takes a label, are in the product-owner's
+  classification contract; a value that persists neither way goes under
+  "⚠ size / priority missing".
 
-**Label fallback** (exit `10` / `11` only) — `gh label list`, then
+**Label fallback** (only where that contract says so) — `gh label list`, then
 `gh label create "<name>" --color <hex> --description "<desc>"` if absent,
 then `gh issue edit <num> --add-label …` (`--remove-label` to swap on a
 re-groom). All `--repo <owner>/<repo>`. Suggested colors:

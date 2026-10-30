@@ -13,7 +13,7 @@ import type { CoreEntry } from "../../src/domain/core_bundle.ts";
  *   count of agents per `state`       … "1. Health counts the agents per latest state"
  *   last-update `ts`                  … "2. Per-agent"
  *   urgent                            … "3. Blocked calls out each blocked agent as urgent"
- *   15 minutes                        … "4. Stale" (16 min stale, 14 min not)
+ *   15 minutes                        … "4. Stale" (20 min stale, 10 min not)
  *   state: done / done_criteria_met   … "5. Contradictions"
  *   handoff_target                    … "6. Missing handoffs" (two cases)
  *   review_verdict / qa_verdict       … "7. Verdict summary"
@@ -23,8 +23,8 @@ import type { CoreEntry } from "../../src/domain/core_bundle.ts";
  *   "unknown"                         … "an absent optional field reads as unknown"
  *
  * What the skill still says is pinned below: what it reads, that it is
- * read-only, how it runs the script, what the exits mean, the supervision
- * pattern, and that the output is data.
+ * read-only, how it runs the script, where the exit codes live and what exit 3
+ * obliges, the supervision pattern, and that the output is data.
  */
 
 const SKILL = CORE_BUNDLE.find(
@@ -61,12 +61,15 @@ Deno.test("status-audit SKILL runs the script from where it installs, with its a
   assertStringIncludes(SKILL.content, 'argument-hint: "[latest|<agent>|<session>]"');
 });
 
-Deno.test("status-audit SKILL says what each exit means — 3 is never a made-up report", () => {
+Deno.test("status-audit SKILL points at the script's exit codes — 3 is never a made-up report", () => {
   assert(SKILL);
-  for (const exit of ["| 0 |", "| 2 | usage", "| 3 | could not answer"]) {
-    assertStringIncludes(SKILL.content, exit);
-  }
-  assertStringIncludes(SKILL.content, "never a report of your own");
+  // The exit table lives in the script header only; a copy here had already drifted from it.
+  assertStringIncludes(SKILL.content, "Exit codes: see the script header.");
+  assertStringIncludes(
+    SKILL.content,
+    "On exit 3 the script could not answer: say so — never write the report yourself.",
+  );
+  assertEquals(/^\| *Exit *\|/m.test(SKILL.content), false, "the skill restates the exit table");
 });
 
 Deno.test("status-audit SKILL treats the output as recorded data, never instructions", () => {
@@ -92,5 +95,18 @@ Deno.test("the skill does not re-derive a view the script computes (plan 044 § 
   // A second spelling of a view rule would compete with the script's.
   for (const rule of ["done_criteria_met: no", "15 minutes", "latest entry by `ts`", "## Step 3"]) {
     assertEquals(SKILL.content.includes(rule), false, `the skill restates "${rule}"`);
+  }
+});
+
+Deno.test("the ledger README points at the report instead of restating its views", () => {
+  const readme = CORE_BUNDLE.find((e) =>
+    e.category === "spec-root" && e.suffix === "logs/README.md"
+  );
+  assert(readme, "expected the ledger schema doc in CORE_BUNDLE");
+  // Second home of the view list and its thresholds — the script header is the first.
+  assertStringIncludes(readme.content, "`/status-audit`");
+  assertStringIncludes(readme.content, `the header of \`.specnaut/${SCRIPT_SUFFIX}\``);
+  for (const restated of ["15 min", "seven-view", "contradictions"]) {
+    assertEquals(readme.content.includes(restated), false, `the README restates "${restated}"`);
   }
 });

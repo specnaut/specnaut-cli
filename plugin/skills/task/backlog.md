@@ -83,7 +83,7 @@ refused up front by every writing script.
 .specnaut/scripts/backlog/clarify-comment.sh <num> "<question>"
 .specnaut/scripts/backlog/detect-fields.sh            # native fields → env lines
 .specnaut/scripts/backlog/groom-columns.sh [--set <key> <column|none>]  # columns grooming moves between
-.specnaut/scripts/backlog/set-field.sh <num> <Priority|Size|IssueType> <value>  # exit codes under Conventions
+.specnaut/scripts/backlog/set-field.sh <num> <axis> <value>  # axes + exit codes: the product-owner's classification contract
 .specnaut/scripts/backlog/ensure-labels.sh            # bootstrap the semantic labels (LABELS.md)
 ```
 
@@ -96,9 +96,7 @@ gh issue edit   <num> --repo <repo> --title "…" --body "…"
 
 #### Decision rule for the PO subagent
 
-1. If `mcp__github__*` tools are visible in the session, prefer them.
-2. Otherwise fall back to the shell scripts — so switching paths needs
-   no Specnaut change.
+Prefer `mcp__github__*` tools when visible, else the scripts.
 
 ### Conventions
 
@@ -126,13 +124,8 @@ gh issue edit   <num> --repo <repo> --title "…" --body "…"
   reserved as a strict fallback for projects / orgs without the native
   field or type — or *temporarily* when the platform is rate-limiting and
   a native write cannot land; the native field is always the goal, so
-  reconcile a label fallback back to it once unblocked. Exit codes:
-  `10` = field / type absent (use the label), `11` = value unrecognised
-  (Priority/Size: add the option, re-run; Issue Type: fix the call),
-  `12` = issue not on the project / not in the repo, `13` = discovery
-  failed or the project could not be verified — **not** a fallback
-  signal: retry or report it. `2` = the project demonstrably does not
-  exist: fix `backlog-config.yml`.
+  reconcile a label fallback back to it once unblocked. Which exit
+  code takes the label is in the product-owner's classification contract.
 
 ### Prerequisites
 

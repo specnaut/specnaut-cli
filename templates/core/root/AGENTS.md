@@ -190,6 +190,9 @@ The backlog is managed through the `task` skill — Specnaut Cloud, configured i
 
 *Owned by Specnaut — this section is not a placeholder to fill in. Edit the rest freely.*
 
+Specnaut configures no harness feature beyond what it scaffolds; the ones that pair well with this
+workflow are documented for Claude Code and Codex only — on another harness, see its own docs.
+
 <!-- BEGIN: harness=claude -->
 Claude Code features that pair well with this workflow — `/loop`, `/goal`, `claude agents`, headless
 runs, MCP servers — are in `.claude/skills/specnaut-facts/integrations.md`; read it when asked.

@@ -205,5 +205,5 @@ The script emits the body verbatim. Do NOT:
 - Reword sections / re-categorize commits after the fact. A wrong commit
   message is amended **before** tagging, not hand-edited in the body.
 - Add a raw `git diff` or `git log` dump.
-- Run release publication without showing the user the generated body
-  first when invoked interactively — surface it for review before posting.
+
+**Show the user the generated body and wait before publishing when invoked interactively.**

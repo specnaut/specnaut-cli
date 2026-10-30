@@ -29,29 +29,46 @@ const ROOTS: Record<string, RegExp> = {
 
 /**
  * A reference that is RIGHT on every harness, each with its reason. Keyed on
- * the shipped file's basename stem and the root it names.
+ * the shipped file's basename stem and the root it names. `section` narrows the
+ * allowance to the `## ` heading it is true under; absent ⇒ the whole file.
  */
-const ALLOWED: Record<string, string> = {
+const ALLOWED: Record<string, { reason: string; section?: string }> = {
   // The guard ships to both harnesses from one source and protects each one's
   // hook registration; on the other harness the path simply never exists.
-  "protect-generated.sh .codex/":
-    "names the Codex registration it gates; absent on Claude, never written to",
-  "protect-generated.sh .claude/":
-    "names the Claude registration it gates; absent on Codex, never written to",
+  "protect-generated.sh .codex/": {
+    reason: "names the Codex registration it gates; absent on Claude, never written to",
+  },
+  "protect-generated.sh .claude/": {
+    reason: "names the Claude registration it gates; absent on Codex, never written to",
+  },
   // cli#679: one reference for both design-target harnesses, read on request. Its `.claude/`
-  // paths sit under its `## Claude Code` heading — a fact about that harness, not a pointer.
-  "integrations .claude/": "the Claude Code section of the two-harness integrations reference",
-  "facts-integrations .claude/": "the same reference, under Copilot's flattened instruction name",
+  // paths are facts about Claude Code only while they sit under its heading.
+  "integrations .claude/": {
+    reason: "the Claude Code section of the two-harness integrations reference",
+    section: "Claude Code",
+  },
+  "facts-integrations .claude/": {
+    reason: "the same reference, under Copilot's flattened instruction name",
+    section: "Claude Code",
+  },
 };
 
 /** Entries an allowance actually excused, so a stale one is caught. */
 const used = new Set<string>();
 
-function allowed(file: string, root: string): boolean {
+/** The `## ` heading in force at `offset`, or "" above the first one. */
+function sectionAt(text: string, offset: number): string {
+  const headings = [...text.slice(0, offset).matchAll(/^## (.+)$/gm)];
+  return headings.at(-1)?.[1].trim() ?? "";
+}
+
+function allowed(file: string, root: string, text: string, offset: number): boolean {
   const stem = file.split("/").filter((s) => s !== "SKILL.md").pop()!
     .replace(/\.(instructions\.)?md$/, "").replace(/^specnaut-/, "");
   const key = `${stem} ${root}`;
-  if (!(key in ALLOWED)) return false;
+  const rule = ALLOWED[key];
+  if (rule === undefined) return false;
+  if (rule.section !== undefined && sectionAt(text, offset) !== rule.section) return false;
   used.add(key);
   return true;
 }
@@ -102,7 +119,7 @@ async function foreignRoots(dir: string, own: string): Promise<string[]> {
     for (const [owner, re] of Object.entries(ROOTS)) {
       if (owner === own) continue;
       for (const m of text.matchAll(re)) {
-        if (allowed(relative(dir, e.path).replaceAll("\\", "/"), m[0])) continue;
+        if (allowed(relative(dir, e.path).replaceAll("\\", "/"), m[0], text, m.index)) continue;
         found.push(`${relative(dir, e.path).replaceAll("\\", "/")}: ${m[0]}`);
       }
     }

@@ -60,6 +60,34 @@ function readsAs(_harnessKey: string, bundle: Bundle, dest: string): string | un
 }
 
 /**
+ * cli#679 moved the optional-integrations prose out of the always-on context file into the
+ * `specnaut-facts` reference docs, which ship as a core skill rather than a harness template — so
+ * the manifest scan above stopped seeing the `.claude/` paths it cites. They are scanned here,
+ * on every harness, from the bundle itself.
+ */
+function referenceDocs(bundle: Bundle): string[] {
+  return Object.keys(bundle).filter((dest) => /\/specnaut-facts[-/.]/.test(dest));
+}
+
+/** Every harness-owned root a reference doc may describe, keyed by its owner. */
+const HARNESS_ROOT: Record<string, string> = {
+  ".claude/": "claude",
+  ".codex/": "codex",
+  ".cursor/": "cursor",
+  ".opencode/": "opencode",
+};
+
+/**
+ * A reference doc describes every harness, so a path under another harness's root is a fact
+ * about THAT harness and must resolve in that harness's bundle. Elsewhere it is the scanned
+ * harness's own. (harness_paths_resolve_test keeps such paths inside the owner's section.)
+ */
+function ownerOf(path: string, harnessKey: string): string {
+  const root = Object.keys(HARNESS_ROOT).find((r) => path.startsWith(r));
+  return root === undefined ? harnessKey : HARNESS_ROOT[root];
+}
+
+/**
  * Paths a template may cite that no bundle writes, each with who creates them.
  * `backends` narrows where the citation is legitimate; absent ⇒ every backend.
  * A row here is a statement about the installed project — never a way to
@@ -69,6 +97,15 @@ const CREATED_OUTSIDE_THE_BUNDLE: Record<
   string,
   { reason: string; backends?: readonly BacklogBackend[] }
 > = {
+  ".claude/worktrees/": {
+    reason: "created by Claude Code's agent view for isolated sessions, not by Specnaut",
+  },
+  ".specnaut/upgrade-pending.json": {
+    reason: "written by `specnaut upgrade` on apply, removed once the review walk completes",
+  },
+  ".specnaut/upgrade-staging/": {
+    reason: "written by `specnaut upgrade` on apply, consumed by `specnaut reconcile`",
+  },
   ".specnaut/addenda/": {
     reason:
       "the project's own additions to a phase (cli#611); Specnaut reads them, never writes them",
@@ -141,16 +178,25 @@ Deno.test("every path a harness template cites is shipped by that backend's bund
 
   const dangling: string[] = [];
   let checked = 0;
-  for (const [harnessKey, dests] of templates) {
+  let referenceCitations = 0;
+  for (const { key: harnessKey } of HARNESSES) {
+    const dests = templates.get(harnessKey) ?? [];
     for (const backend of KNOWN_BACKLOG_BACKENDS) {
       const bundle = bundleFor(harnessKey, backend);
-      const destinations = [...Object.keys(bundle), ...writtenBesideTheBundle(backend)];
-      for (const dest of dests) {
+      const writtenBy = (key: string) => [
+        ...Object.keys(key === harnessKey ? bundle : bundleFor(key, backend)),
+        ...writtenBesideTheBundle(backend),
+      ];
+      const references = referenceDocs(bundle);
+      for (const dest of [...dests, ...references]) {
         const content = readsAs(harnessKey, bundle, dest);
         assert(content !== undefined, `${harnessKey}: ${dest} is registered but not written`);
+        const reference = references.includes(dest);
         for (const path of citedPaths(content)) {
           checked++;
-          if (resolves(path, destinations) || excused(path, backend)) continue;
+          if (reference) referenceCitations++;
+          const owner = reference ? ownerOf(path, harnessKey) : harnessKey;
+          if (resolves(path, writtenBy(owner)) || excused(path, backend)) continue;
           dangling.push(`${harnessKey} × ${backend}: ${dest} cites \`${path}\``);
         }
       }
@@ -158,6 +204,7 @@ Deno.test("every path a harness template cites is shipped by that backend's bund
   }
   // Non-vacuity: a regex that stopped matching would report a clean surface.
   assert(checked > 20, `only ${checked} citations scanned — the extractor is not reading`);
+  assert(referenceCitations > 0, "no specnaut-facts citation scanned — the reference docs moved");
   assertEquals(
     dangling,
     [],
@@ -204,10 +251,11 @@ Deno.test("the allow-list has no dead entries", async () => {
   // An excuse for a path no template cites any more is a claim nobody checks.
   const templates = await harnessTemplateDestinations();
   const cited = new Set<string>();
-  for (const [harnessKey, dests] of templates) {
+  for (const { key: harnessKey } of HARNESSES) {
+    const dests = templates.get(harnessKey) ?? [];
     for (const backend of KNOWN_BACKLOG_BACKENDS) {
       const bundle = bundleFor(harnessKey, backend);
-      for (const dest of dests) {
+      for (const dest of [...dests, ...referenceDocs(bundle)]) {
         for (const p of citedPaths(readsAs(harnessKey, bundle, dest) ?? "")) cited.add(p);
       }
     }

@@ -72,13 +72,8 @@ Enriched `stop` line (contract block parsed from the output):
   valid JSON.
 - Optional contract fields are omit-if-absent — never emitted empty.
 - An agent's current state is its latest entry by `ts`.
-- The `/status-audit` skill is read-only and degrades gracefully: an absent
-  ledger reports "no ledger yet", a malformed line is skipped with a note, and
-  an absent optional field reads as "unknown" — never an error.
 
 ## Reading the ledger
 
-Run `/status-audit` for a seven-view session-health report (state counts,
-per-agent latest, blocked, stale ≥ 15 min, `done`-vs-`done_criteria_met`
-contradictions, missing handoffs, and a review/QA verdict summary). For
-continuous supervision of long headless work, use `/loop 5m /status-audit`.
+Run `/status-audit` for the session-health report. Its views, thresholds and
+exit codes are documented once, in the header of `.specnaut/scripts/status/status-audit.sh`.

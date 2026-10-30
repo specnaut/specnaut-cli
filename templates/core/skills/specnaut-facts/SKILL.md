@@ -7,7 +7,7 @@ constitution-exempt: reference facts about Specnaut preloaded by specnaut-guide,
 
 # specnaut-facts
 
-Preloaded by `specnaut-guide`. Split out of that agent under #562. The seat's *protocol* (fetch live, check versions, file bugs) and the
+Preloaded by `specnaut-guide`. Split out of that agent. The seat's *protocol* (fetch live, check versions, file bugs) and the
 *facts* it falls back on change for different reasons, which is the split.
 
 **This is a snapshot and it goes stale.** The live docs win; see the seat's
@@ -46,7 +46,7 @@ Enhanced fork of [`specify` CLI](https://github.com/github/spec-kit), distribute
 - `/ship` — production: `tag`, `release`.
 - `/design` — the project's `DESIGN.md` design system: discovery when absent, edit when present, `audit` for drift. Started by the user only.
 
-Before 7.2 the pipeline, the backlog and the audits lived at other addresses; the `specnaut` skill's **Retired addresses** table maps each to its new one, and `specnaut upgrade` moves them.
+Earlier releases kept the pipeline, the backlog and the audits at other addresses; the `specnaut` skill's **Retired addresses** table maps each to its new one, and `specnaut upgrade` moves them.
 
 ### Backlog conventions (GitHub backend)
 

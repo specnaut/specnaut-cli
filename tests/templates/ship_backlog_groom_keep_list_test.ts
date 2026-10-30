@@ -51,7 +51,8 @@ const KEEP: ReadonlyArray<{ file: string; body: () => string; sentences: readonl
     body: () => read("ship/phases/release.md"),
     sentences: [
       "`ask` beats `allow`, so a broad `gh release *` you add to run `/ship` unattended still stops at the one step you cannot take back.",
-      "Run release publication without showing the user the generated body first when invoked interactively",
+      // A positive instruction on its own line: as the tail of a "Do NOT:" list it read inverted.
+      "**Show the user the generated body and wait before publishing when invoked interactively.**",
       // The deploy recipe: least privilege and per-step secrets.
       "**The rule: production deploys are triggered ONLY by a published release — never by a push to your default branch.**",
       "# Least privilege: the deploy authenticates to your provider via secrets, # not the GITHUB_TOKEN. Grant nothing it doesn't need. permissions: contents: read",

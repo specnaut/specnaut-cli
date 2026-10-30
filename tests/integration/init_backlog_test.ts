@@ -113,11 +113,7 @@ Deno.test("init --backlog github renders the github skill + writes config stub",
     assertEquals(skill.includes("Backend: local Markdown"), false);
     // The PO's decision rule keeps both paths (MCP tools, else the scripts);
     // the unpinned MCP server example went with its tutorial (cli#679).
-    assertStringIncludes(
-      skill,
-      "If `mcp__github__*` tools are visible in the session, prefer them.",
-    );
-    assertStringIncludes(skill, "Otherwise fall back to the shell scripts");
+    assertStringIncludes(skill, "Prefer `mcp__github__*` tools when visible, else the scripts.");
     assertEquals(skill.includes("@modelcontextprotocol/server-github"), false);
 
     // GitHub-flavored scripts present, local ones filtered out

@@ -65,7 +65,7 @@ before your final report.
 
 Persistence per backend:
 
-- **GitHub** — `set-field.sh <issue> <Priority|Size|IssueType|StartDate|TargetDate|Estimate> <value>`; exit `0` OK, `10`/`11` fall back to a label (Priority/Size only; on a date/Estimate axis `10` = field absent → skip, warn nothing), `12` = issue not on project, `13` = discovery failed → never label, report it. Run `detect-fields.sh` once per groom. Never dual-write field + matching label.
+- **GitHub** — `set-field.sh <issue> <Priority|Size|IssueType|StartDate|TargetDate|Estimate> <value>`; exit `0` OK; `10` = field / type absent → use the label (on a date/Estimate axis: skip, warn nothing); `11` = value unrecognised → Priority/Size: add the option and re-run, or use the label; Issue Type: fix the call; `12` = issue not on the project / not in the repo; `13` = discovery failed or the project could not be verified → never label, retry or report it; `2` = config missing or the project demonstrably does not exist → fix `backlog-config.yml`. Run `detect-fields.sh` once per groom. Never dual-write field + matching label.
 - **GitLab** — scoped labels via `glab` (`priority::P1`, `size::M`, `type::feature`). No date or
   Estimate axes.
 - **Local Markdown** — `size:` / `priority:` / `category:` frontmatter (`complexity:` is retired;

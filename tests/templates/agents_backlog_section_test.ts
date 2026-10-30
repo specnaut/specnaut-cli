@@ -126,3 +126,16 @@ Deno.test("the integrations reference lives in specnaut-facts, for both harnesse
   const facts = CORE_BUNDLE.find((e) => e.category === "skill" && e.name === "specnaut-facts");
   assert(facts?.content.includes("`integrations.md`"), "specnaut-facts does not name the file");
 });
+
+Deno.test("the integrations section says something on every harness, not a bare heading", () => {
+  // Only Claude Code and Codex carry a pointer; without a harness-neutral line the
+  // section rendered heading-only on every other harness.
+  const empty: string[] = [];
+  for (const harness of HARNESSES) {
+    const agents = harness.mapBundle(CORE_BUNDLE, optsFor("local"))["AGENTS.md"]!.content;
+    const prose = (extractBlock(agents, "optional-integrations", "html") ?? "").split("\n")
+      .filter((l) => l.trim() !== "" && !l.startsWith("#") && !l.startsWith("*Owned by Specnaut"));
+    if (prose.length === 0) empty.push(harness.key);
+  }
+  assertEquals(empty, []);
+});
