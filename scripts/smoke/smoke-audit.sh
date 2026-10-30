@@ -256,9 +256,9 @@ set -e
 # constant-true across the whole surface and 13 shipped skills were asserted
 # on by nothing. Two are planted, because the naive repair fails on the
 # second: `lonely-skill` is named nowhere, and `mentioned-elsewhere` is named
-# ONLY inside an assertion whose subject is a different file — the shape at
-# smoke-features.sh:591 that both plan-time audits found. A token built from
-# the bare skill name reports the second one covered.
+# ONLY inside an assertion whose subject is a different file — the shape in
+# smoke-contracts.sh's #442 block that both plan-time audits found. A token
+# built from the bare skill name reports the second one covered.
 mkdir -p templates/core/skills/lonely-skill templates/core/skills/mentioned-elsewhere
 printf -- '---\nname: lonely-skill\n---\n' > templates/core/skills/lonely-skill/SKILL.md
 printf -- '---\nname: mentioned-elsewhere\n---\n' > templates/core/skills/mentioned-elsewhere/SKILL.md

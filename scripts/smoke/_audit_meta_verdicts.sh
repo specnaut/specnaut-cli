@@ -186,7 +186,7 @@ if grep -q "skills/mentioned-elsewhere/SKILL.md" <<<"$skills_out"; then
   pass "naming a skill inside another file's assertion is not coverage"
 else
   fail "a cross-reference vouched for a skill" \
-       "the token must not be the bare skill name — smoke-features.sh:591 is this shape"
+       "the token must not be the bare skill name — smoke-contracts.sh's #442 block is this shape"
 fi
 
 # Pinned as a COUNT, the way 3f is. Both greps above match substrings that the

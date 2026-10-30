@@ -16,11 +16,11 @@
 # constant-true for all of them and 13 shipped skills were asserted on by
 # nothing at all. There the token is the runtime path suffix.
 #
-# NOT the bare skill name. `backlog-reference-contract` is named at
-# smoke-features.sh:591 inside an assertion whose subject is BOARD's SKILL.md
-# — delete the skill and that assertion still passes — so the bare name would
-# report covered exactly the file this fix exists for. Both plan-time audits
-# found that independently.
+# NOT the bare skill name. `backlog-reference-contract` is named in
+# smoke-contracts.sh's #442 block, inside an assertion whose subject is the
+# /task SKILL.md — delete the skill and that assertion still passes — so the
+# bare name would report covered exactly the file this fix exists for. Both
+# plan-time audits found that independently.
 #
 # What this measures is a MENTION, not an assertion (024-R4). Verifying that
 # an assertion's subject is the file would mean parsing the smoke, which is
