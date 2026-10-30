@@ -49,11 +49,37 @@ export async function resolveProjectRoot(projectDir: string): Promise<string> {
   if (root === parse(root).root) {
     throw new Error(`refusing to operate with the filesystem root as the project: ${root}`);
   }
-  if (home !== undefined && home !== "" && root === await Deno.realPath(home).catch(() => home)) {
+  if (home !== undefined && home !== "" && root === await realHome(home)) {
     throw new Error(`refusing to operate with the home directory as the project: ${root}`);
   }
   return root;
 }
+
+/**
+ * The home directory resolved, or as written when it names no directory this
+ * process can reach — absent, through a file, a cycle, or behind a folder it
+ * cannot search (a container that leaves `HOME` at another user's directory).
+ * Then no resolved project can be it, and the lexical value is the only
+ * comparison left. Any other error is not guessed past (cli#690): it throws,
+ * and the project is not judged against a home nobody could resolve. Before,
+ * every error fell back, an I/O fault included.
+ */
+async function realHome(home: string): Promise<string> {
+  try {
+    return await Deno.realPath(home);
+  } catch (err) {
+    if (UNREACHABLE.some((c) => err instanceof c)) return home;
+    throw err;
+  }
+}
+
+/** The `realPath` errors that mean "no directory there for this process". */
+const UNREACHABLE = [
+  Deno.errors.NotFound,
+  Deno.errors.NotADirectory,
+  Deno.errors.FilesystemLoop,
+  Deno.errors.PermissionDenied,
+];
 
 /**
  * Containment's one answer about a path (cli#692): where it lands, and whether
