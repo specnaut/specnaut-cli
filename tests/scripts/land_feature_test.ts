@@ -172,6 +172,7 @@ Deno.test("origin's default must be exactly refs/heads/<base>: another branch is
 });
 
 Deno.test("an origin that cannot answer is 3: unreachable, or its ls-remote fails", {
+  // The shim is a bash script named `git` on PATH; Windows resolves `git.exe` first.
   ignore: Deno.build.os === "windows",
 }, async () => {
   const sb = await featureBranch();
@@ -197,6 +198,7 @@ Deno.test("an origin that cannot answer is 3: unreachable, or its ls-remote fail
 });
 
 Deno.test("a branch that will not delete after the push is 11 — landed, not a push failure", {
+  // The shim is a bash script named `git` on PATH; Windows resolves `git.exe` first.
   ignore: Deno.build.os === "windows",
 }, async () => {
   const sb = await featureBranch();
@@ -216,6 +218,7 @@ Deno.test("a branch that will not delete after the push is 11 — landed, not a 
 });
 
 Deno.test("an unexpected git failure is 12, named — never a raw set -e code", {
+  // The shim is a bash script named `git` on PATH; Windows resolves `git.exe` first.
   ignore: Deno.build.os === "windows",
 }, async () => {
   const sb = await featureBranch();

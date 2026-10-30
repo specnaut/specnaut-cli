@@ -27,6 +27,8 @@ Deno.test("a child of run() sees no global git config, no GIT_* variable, and th
     for (const [k, v] of Object.entries(LEAKS)) Deno.env.set(k, v);
     for (const key of ["leak.env", "leak.home"]) {
       const r = await run("git", ["config", "--get", key], home);
+      // 1 is git's "key not set"; any other code is a failure an empty stdout would hide.
+      assertEquals(r.code, 1, `${key}: git config exited ${r.code}: ${r.stderr}`);
       assertEquals(r.stdout.trim(), "", `${key} reached the sandbox`);
     }
     const env = await run("bash", ["-c", 'echo "$LC_ALL|${GIT_CONFIG_COUNT:-}|$HOME"'], home);

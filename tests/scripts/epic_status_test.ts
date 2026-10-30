@@ -149,6 +149,7 @@ Deno.test("a child commit with no Epic trailer is exit 12, named by sha", async 
 });
 
 Deno.test("a git log that fails is exit 15 — never read as 'not an epic' (14)", {
+  // The shim is a bash script named `git` on PATH; Windows resolves `git.exe` first.
   ignore: Deno.build.os === "windows",
 }, async () => {
   const sb = await epicBranch([["feat(T01): a (#51)", "a"]]);
@@ -202,6 +203,31 @@ Deno.test("a tag named like the base does not shadow it: the range is refs/heads
     const r = await sb.script("epic-status.sh");
     assertEquals(r.code, 0, r.stderr);
     assertEquals(r.stdout.trim().split("\n").length, 2, r.stdout);
+  } finally {
+    await sb.cleanup();
+  }
+});
+
+Deno.test("the second branch of a multi-branch epic reads its own range: never 16 once it holds a commit", async () => {
+  // The first branch landed, so HEAD holds `Epic: #50` trailers; only an empty
+  // range is a re-run after landing (cli#711). Anything else is read as it stands.
+  const sb = await epicBranch([["feat(T01): a (#51)", "a"]]);
+  try {
+    await git(sb.work, "switch", "--quiet", "main");
+    await git(sb.work, "merge", "--quiet", "--ff-only", "epic");
+    await git(sb.work, "switch", "--quiet", "-c", "epic-2");
+    await Deno.writeTextFile(
+      `${sb.work}/.specnaut/feature.json`,
+      '{ "feature_directory": ".specnaut/specs/002-y", "linked_issue": 50 }\n',
+    );
+    await sb.commit("notes", "n\n", "docs: the second half");
+    const plain = await sb.script("epic-status.sh");
+    assertEquals(plain.code, 14, plain.stderr);
+    await git(sb.work, "reset", "--quiet", "--hard", "main");
+    const child = await sb.commit("c", "c\n", "feat(T01): c (#53)", "Epic: #50");
+    const r = await sb.script("epic-status.sh");
+    assertEquals(r.code, 0, r.stderr);
+    assertEquals(r.stdout, `CHILD T01 #53 ${child}\nEPIC #50\n`);
   } finally {
     await sb.cleanup();
   }

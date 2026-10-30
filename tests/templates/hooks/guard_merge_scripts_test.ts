@@ -3,6 +3,7 @@ import { copy } from "@std/fs";
 import { join } from "@std/path";
 import {
   bashPath,
+  type Harness,
   HARNESSES,
   HOOKS_DIR,
   makeRepo,
@@ -191,16 +192,14 @@ Deno.test("guard-merge: a blank or whitespace-only line in the list matches noth
   try {
     const hooks = join(sb.dir, "hooks");
     await copy(HOOKS_DIR, hooks);
+    // One real entry among the blanks: the positive control that this list is the one read.
     await Deno.writeTextFile(
       join(hooks, "merge-commands.txt"),
-      "# only blanks\n\n   \n\t\n \t \r\n",
+      "# only blanks\n\n   \n\t\nland-feature.sh\n \t \r\n",
     );
     const repo = await makeRepo(sb, { head: "feat" });
-    for (const h of HARNESSES) {
-      const input = await payload(h, "pre_tool_use_bash", {
-        cwd: repo,
-        tool_input: { command: "ls -la" },
-      });
+    const run = async (h: Harness, command: string) => {
+      const input = await payload(h, "pre_tool_use_bash", { cwd: repo, tool_input: { command } });
       const out = await new Deno.Command("bash", {
         args: [bashPath(join(hooks, "guard-merge.sh")), h],
         cwd: sb.dir,
@@ -215,10 +214,14 @@ Deno.test("guard-merge: a blank or whitespace-only line in the list matches noth
       await w.close();
       const r = await out.output();
       const dec = new TextDecoder();
+      return verdict({ code: r.code, stdout: dec.decode(r.stdout), stderr: dec.decode(r.stderr) });
+    };
+    for (const h of HARNESSES) {
+      assertEquals(await run(h, "ls -la"), "allow", `${h}: a blank line gated ls`);
       assertEquals(
-        verdict({ code: r.code, stdout: dec.decode(r.stdout), stderr: dec.decode(r.stderr) }),
-        "allow",
-        `${h}: a blank line gated ls`,
+        await run(h, "bash .specnaut/scripts/bash/land-feature.sh"),
+        GATED[h],
+        `${h}: the real entry beside the blanks was not gated`,
       );
     }
   } finally {

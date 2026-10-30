@@ -27,6 +27,9 @@
 #      rest left staged, nothing committed)
 #   24 the tracked files are removed and pushed, but files git does not
 #      track remain under the directory, listed and kept
+#   25 a git step between the removal and its commit failed — the commit
+#      itself, refused by a hook or a signing key: the removal undone
+#      (`git restore` of this script's two paths), nothing committed
 #
 # Usage: remove-spec.sh <landed-branch>   (the feature branch just landed)
 set -euo pipefail
@@ -44,7 +47,7 @@ root=$(git rev-parse --show-toplevel)
 cd "$root"
 [ "$(git symbolic-ref --quiet --short HEAD || true)" = "$base" ] || skip "HEAD is not $base"
 [ -f .specnaut/feature.json ] || skip "no .specnaut/feature.json"
-dir=$(sed -n 's/.*"feature_directory"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' .specnaut/feature.json | head -1)
+dir=$(sed -n 's/.*"feature_directory"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' .specnaut/feature.json | sed -n 1p)
 [ -n "$dir" ] || skip "feature.json names no feature_directory"
 dir=${dir%/}
 case $dir in
@@ -61,12 +64,22 @@ name=${dir#.specnaut/specs/}
 [ "$(cd -P "$dir" && pwd)" = "$(pwd -P)/.specnaut/specs/$name" ] || skip "'$dir' resolves outside .specnaut/specs/ — a link on its path"
 [ -n "$(git log --all --oneline -1 -- "$dir")" ] || skip "'$dir' is in no commit — deleting it would destroy the only copy"
 
-id=$(sed -n 's/.*"linked_issue"[[:space:]]*:[[:space:]]*\([0-9][0-9]*\).*/\1/p' .specnaut/feature.json | head -1)
+id=$(sed -n 's/.*"linked_issue"[[:space:]]*:[[:space:]]*\([0-9][0-9]*\).*/\1/p' .specnaut/feature.json | sed -n 1p)
 # The commit takes the whole index, so it must hold the removal alone: work
 # someone else staged is theirs, never swept into this commit or unstaged.
 git diff --cached --quiet || skip "the index already holds staged changes — commit or unstage them first"
 git diff --quiet -- "$dir" .specnaut/feature.json || skip "'$dir' or feature.json has uncommitted changes"
 git ls-files --error-unmatch -- .specnaut/feature.json >/dev/null 2>&1 || skip "feature.json is not tracked"
+# From the removal to its commit, a failure undoes this script's own two paths
+# and exits by the table — never with git's code, the deletion left staged.
+undo() {
+  local rc=$? cmd=$BASH_COMMAND undone="the removal is undone"
+  git restore --staged --worktree --source=HEAD -- "$dir" .specnaut/feature.json ||
+    undone="the removal could not be undone — run: git restore --staged --worktree --source=HEAD -- $dir .specnaut/feature.json"
+  echo "remove-spec: '$cmd' failed (exit $rc) — $undone, nothing committed" >&2
+  exit 25
+}
+trap undo ERR
 git rm -r --quiet -- "$dir" .specnaut/feature.json
 # -z: a name git would quote (core.quotePath) is still compared as written.
 while IFS= read -r -d '' status && IFS= read -r -d '' path; do
@@ -80,6 +93,7 @@ while IFS= read -r -d '' status && IFS= read -r -d '' path; do
   esac
 done < <(git diff --cached --no-renames --name-status -z)
 git commit --quiet -m "chore(${id:-spec}): remove the spec directory for the shipped feature"
+trap - ERR
 # No --exclude-standard: an ignored file is in no commit either. -z, then %q,
 # so a name with a space or a newline still reads as one path.
 left=$(git ls-files -o -z -- "$dir" | while IFS= read -r -d '' p; do printf '  %q\n' "$p"; done)

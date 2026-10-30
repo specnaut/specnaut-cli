@@ -16,7 +16,8 @@ confirmed closed.
 1. **What shipped.** Standalone: `linked_issue` from `.specnaut/feature.json` (absent → skip this
    file; a tree from before the field existed). Epic: the children are the `CHILD` lines, and the
    epic the `EPIC` line, that `epic-status.sh` printed at `phases/merge.md` step 1, before the landing
-   — never re-run it now: its range is empty after the landing. A child whose commit is not on the
+   — or at its re-run after a clean rebase (step 4, exit 5), whose lines replace the first. Never
+   re-run it now: its range is empty after the landing. A child whose commit is not on the
    branch did not ship, and is not closed.
 2. **Close each one — github and gitlab.** **Do not ask.** The push was the authorisation. For the
    epic itself, and for a standalone item, run `bash .specnaut/scripts/backlog/cascade-check.sh <n>`
@@ -53,9 +54,12 @@ confirmed closed.
      kept. Report them by name and never delete them: they are someone's only copy.
    - **7** — the push was rejected; the removal commit is on the local base, and `feature.json` with
      it — so never re-run the script (it would skip, 22). `git pull --rebase --no-autostash origin
-     <base>`, then `git push origin <base>`; a conflict: `git rebase --abort`, report it unpushed.
+     <base>`, then `git push --no-follow-tags origin refs/heads/<base>:refs/heads/<base>`; a
+     conflict: `git rebase --abort`, report it unpushed.
    - **23** — something else was staged while it ran: the removal is undone, nothing committed.
      Report the path it names; that staged work is someone else's — leave it staged.
+   - **25** — the removal commit failed (a hook, signing): the removal is undone, nothing committed.
+     Quote the failure it names and report it; never bypass the hook.
    - **2 · 3** — usage, or the base branch is unknown: report it; nothing changed.
 
 ## The report names every item, one line each

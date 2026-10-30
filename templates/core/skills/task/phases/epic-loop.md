@@ -39,7 +39,8 @@ commit holds only that child's work — two children in one commit break the mat
 
 There is no state file: resume reconstructs from git. `bash .specnaut/scripts/bash/epic-status.sh`
 reads the branch's commits — one `CHILD T<NN> #<child> <sha>` line per child done, one-to-one by
-ordinal — and **resume at the first child with no commit** (none yet reads as not an epic branch:
-start at the first child). Do not use issue state as a progress signal — child issues stay open for
-the whole loop. Any other exit stops the loop: say which — its exits are mapped once, in
-`phases/merge.md` step 1.
+ordinal — and **resume at the first child with no commit**. This is the loop-context resume: a
+branch with no child commit yet reads **14** (not an epic branch), or **16** when it is empty and an
+earlier branch of the same epic already landed — either way, start at the first open child. Do not
+use issue state as a progress signal — child issues stay open for the whole loop. Any other exit
+stops the loop: say which — the rest are mapped once, in `phases/merge.md` step 1.

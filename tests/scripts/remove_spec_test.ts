@@ -195,3 +195,24 @@ Deno.test("a directory in no commit, and a run off the base, are skipped with th
     await off.cleanup();
   }
 });
+
+Deno.test("a commit a hook refuses is 25: the removal is undone, nothing committed, nothing pushed", async () => {
+  // Under set -e alone it died with git's own code and left the deletion staged (cli#711).
+  const sb = await shipped();
+  try {
+    const hook = join(sb.work, ".git/hooks/pre-commit");
+    await Deno.writeTextFile(hook, "#!/bin/sh\necho 'hook says no' >&2\nexit 1\n");
+    // Windows has no mode bits: Git for Windows runs a hook by its `#!` line.
+    if (Deno.build.os !== "windows") await Deno.chmod(hook, 0o755);
+    const before = await state(sb.work);
+    const r = await sb.script("remove-spec.sh", BRANCH);
+    assertEquals(r.code, 25, r.stderr);
+    assertStringIncludes(r.stderr, "hook says no");
+    assertStringIncludes(r.stderr, "the removal is undone, nothing committed");
+    assertEquals(await state(sb.work), before, "the removal was left staged or committed");
+    assertEquals(await files(join(sb.work, `.specnaut/specs/${BRANCH}`)), ["plan.md:# plan\n"]);
+    assertEquals(await git(sb.remote, "rev-parse", "main"), before[0]);
+  } finally {
+    await sb.cleanup();
+  }
+});

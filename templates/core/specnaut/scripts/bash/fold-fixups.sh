@@ -13,20 +13,24 @@
 # conflict (exit 13), resolve it, `git rebase --continue`, then run
 # `fold-fixups.sh --verify <that sha>`: the checks compare against the tree
 # recorded before the fold, never against a tree the conflict already moved.
-# --verify is bound to that sha: exit 13 records it in the git dir
-# (`specnaut-fold-pre`), --verify refuses any other sha — HEAD included — and
-# a pass spends the record. The base is `refs/heads/<base>` (else origin's),
-# so a tag named like it cannot shadow it.
+# --verify is bound to that sha: a rebase that really stopped records it in
+# the git dir (`specnaut-fold-pre`), --verify refuses any other sha — HEAD
+# included — and only a passing --verify spends the record. While the record
+# exists, or a rebase is in progress, a plain run refuses (13): it would take
+# the moved tree as its own PRE and approve it. The binding guards against
+# mistakes, not an adversary with write access to .git. The base is
+# `refs/heads/<base>` (else origin's), so a tag named like it cannot shadow it.
 #
 # Exit — the full table; phases/epic-fixups.md maps each one:
 #   0  folded
 #   2  usage, or --verify with a sha that is not the PRE a stopped fold printed
-#   3  base unknown, or epic-status.sh could not read the branch (any of its
-#      exits but 0, 12 and 14)
+#   3  base unknown, epic-status.sh could not read the branch (any of its
+#      exits but 0, 12 and 14), or the rebase failed without stopping
 #   10 the tree moved
 #   11 the worktree is not clean
 #   12 not one commit per child (epic-status.sh's own, passed through)
-#   13 the rebase stopped on a conflict — or, on --verify, is still in progress
+#   13 the rebase stopped on a conflict — or, on --verify, is still in progress;
+#      or, without --verify, a stopped fold awaits --verify <pre>
 #   14 not an epic branch (epic-status.sh's own, passed through)
 #
 # Usage: fold-fixups.sh [--verify <pre-sha>]
@@ -46,9 +50,22 @@ range_base="refs/heads/$base"
 git --no-pager rev-parse --verify --quiet "$range_base" >/dev/null || range_base="refs/remotes/origin/$base"
 # The PRE a conflicted fold printed, kept for the --verify that resumes it.
 record=$(git rev-parse --git-path specnaut-fold-pre) || exit 3
+rebasing() { [ -d "$(git rev-parse --git-path rebase-merge)" ] || [ -d "$(git rev-parse --git-path rebase-apply)" ]; }
 
-if [ -n "$pre" ]; then
-  if [ -d "$(git rev-parse --git-path rebase-merge)" ] || [ -d "$(git rev-parse --git-path rebase-apply)" ]; then
+# An aborted fold leaves its record behind with HEAD back on the PRE: nothing
+# moved, so the record guards nothing and is dropped rather than blocking forever.
+if [ -f "$record" ] && ! rebasing && [ "$(git rev-parse HEAD)" = "$(cat "$record")" ]; then rm -f "$record"; fi
+if [ -z "$pre" ]; then
+  if [ -f "$record" ]; then
+    echo "fold-fixups: a stopped fold awaits --verify $(cat "$record") — resolve it, 'git rebase --continue', then run that" >&2
+    exit 13
+  fi
+  if rebasing; then
+    echo "fold-fixups: a rebase is in progress — finish or abort it first" >&2
+    exit 13
+  fi
+else
+  if rebasing; then
     echo "fold-fixups: the rebase is still in progress — resolve it and 'git rebase --continue' first" >&2
     exit 13
   fi
@@ -73,11 +90,16 @@ fi
 
 if [ -z "$pre" ]; then
   pre=$(git rev-parse HEAD)
-  rm -f "$record"
   printf 'PRE %s\n' "$pre"
   # -i: before git 2.44, --autosquash does nothing without it. The editor
   # accepts the todo list as autosquash wrote it; git's stderr is the report.
   if ! GIT_SEQUENCE_EDITOR=true git rebase -i --quiet --autosquash --keep-base "$range_base" >/dev/null; then
+    # Recorded only when the rebase really stopped: a failure that left no
+    # rebase behind has moved nothing, and nothing awaits a --verify.
+    if ! rebasing; then
+      echo "fold-fixups: the rebase failed without stopping — nothing was folded" >&2
+      exit 3
+    fi
     printf '%s\n' "$pre" >"$record"
     echo "fold-fixups: the rebase stopped on a conflict — resolve it, 'git rebase --continue', then: fold-fixups.sh --verify $pre" >&2
     exit 13

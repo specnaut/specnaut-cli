@@ -34,9 +34,9 @@ quote it and stop.
 | :--- | :--- | :--- |
 | 0 | folded | merge |
 | 2 | usage, or `--verify` given a sha that is not the `PRE` the stopped fold printed | re-run `--verify` with that `PRE` sha — never `HEAD`, never another |
-| 3 | the base is unknown, or `epic-status.sh` could not read the branch | stop and say so |
-| 13 | the rebase stopped on a conflict — or, on `--verify`, is still in progress | resolve it, `git rebase --continue` (check it exits 0), then `fold-fixups.sh --verify <PRE sha>` — the checks run against the tree recorded before the fold |
-| 10 | the tree moved | stop: a fold that changes the tree is a rewrite |
+| 3 | the base is unknown, `epic-status.sh` could not read the branch, or the rebase failed without stopping (nothing folded, nothing recorded) | stop and say so |
+| 13 | the rebase stopped on a conflict — or, on `--verify`, is still in progress — or, on a plain run, a stopped fold awaits `--verify <pre>` (it names the sha) | resolve it, `git rebase --continue` (check it exits 0), then `fold-fixups.sh --verify <PRE sha>` — the checks run against the tree recorded before the fold. Never a plain re-run: only a passing `--verify` spends the record |
+| 10 | the tree moved | stop: a fold that changes the tree is a rewrite. The record stays, so a plain run is refused (13) — the fold is not retried over a moved tree |
 | 11 | the worktree is not clean | untracked output belongs in the child's commit or `.gitignore`; a modified file means something still holds the tree — stop it first |
 | 12 | not one commit per child | a surviving `fixup!` lost its target or was written by hand; attribute it by sha |
 | 14 | not an epic branch | this file does not apply |

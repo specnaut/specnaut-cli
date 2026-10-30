@@ -23,10 +23,12 @@
 #   14 not an epic branch (no `Epic:` trailer at all), and .specnaut/feature.json
 #      does not name an epic either
 #   15 the history could not be read (a `git log` failed) — nothing concluded
-#   16 no `Epic:` trailer on <base>..HEAD, but .specnaut/feature.json's
-#      `linked_issue` is an epic: its own `Epic: #<n>` trailers are already in
-#      HEAD's history. The range has landed (a re-run after the base moved),
-#      so the CHILD/EPIC lines cannot be read back from it — stop, never squash
+#   16 <base>..HEAD is empty, and .specnaut/feature.json's `linked_issue` is
+#      an epic whose own `Epic: #<n>` trailers are already in HEAD's history.
+#      The range has landed (a re-run after the base moved), so the CHILD/EPIC
+#      lines cannot be read back from it — stop, never squash. A range that
+#      holds any commit is read as it stands: the second branch of an epic
+#      delivered across several is not a re-run
 #
 # Usage: epic-status.sh
 set -euo pipefail
@@ -97,12 +99,13 @@ if [ -z "$epic" ] && [ "$children" -eq 0 ]; then
   # and nothing else writes it. The file has no epic field, by design (D16).
   fj="$here/../../feature.json"
   issue=""
-  [ -f "$fj" ] && issue=$(sed -n 's/.*"linked_issue"[[:space:]]*:[[:space:]]*\([1-9][0-9]*\).*/\1/p' "$fj" | sed -n 1p)
+  # Only an empty range can be a landed one: a commit on it is this branch's own.
+  [ -f "$fj" ] && [ -z "$log" ] && issue=$(sed -n 's/.*"linked_issue"[[:space:]]*:[[:space:]]*\([1-9][0-9]*\).*/\1/p' "$fj" | sed -n 1p)
   if [ -n "$issue" ]; then
     # Anchored per line by git itself: #50 never matches a trailer of #501.
     hit=$(git --no-pager log -1 --format=%H -E --grep="^Epic: #$issue\$" HEAD) || unread HEAD
     if [ -n "$hit" ]; then
-      echo "epic-status: no 'Epic:' trailer on $range, but .specnaut/feature.json links epic #$issue, whose commits HEAD already holds — the range has landed; the CHILD lines cannot be read back. Stop" >&2
+      echo "epic-status: $range is empty, but .specnaut/feature.json links epic #$issue, whose commits HEAD already holds — the range has landed; the CHILD lines cannot be read back. Stop" >&2
       exit 16
     fi
   fi

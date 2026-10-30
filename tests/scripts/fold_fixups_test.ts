@@ -112,10 +112,18 @@ Deno.test("a tree that moved is 10, a dirty worktree 11, a surviving fixup 12", 
     }
     const moved = await sb.script("fold-fixups.sh", "--verify", pre);
     assertEquals(moved.code, 10, moved.stderr);
-    await Deno.writeTextFile(`${sb.work}/stray`, "x\n");
-    assertEquals((await sb.script("fold-fixups.sh")).code, 11);
   } finally {
     await sb.cleanup();
+  }
+  // A worktree that is not clean is refused before anything is rewritten.
+  const dirty = await epicWithFixup();
+  try {
+    await Deno.writeTextFile(`${dirty.work}/stray`, "x\n");
+    const r = await dirty.script("fold-fixups.sh");
+    assertEquals(r.code, 11, r.stderr);
+    assertEquals(r.stdout, "", "a refused run printed a PRE");
+  } finally {
+    await dirty.cleanup();
   }
   const hand = await sandbox();
   try {
@@ -179,6 +187,92 @@ Deno.test("a tag named like the base does not shadow it in the fold", async () =
     assertEquals(r.code, 0, r.stderr);
     assert(!r.stderr.includes("ambiguous"), `the base was read as a bare name: ${r.stderr}`);
     assertEquals(await git(sb.work, "rev-list", "--count", "refs/heads/main..HEAD"), "2");
+  } finally {
+    await sb.cleanup();
+  }
+});
+
+/** An epic whose fixup of T01 touches the line T02 rewrote: it cannot fold without a conflict. */
+async function conflictingFold() {
+  const sb = await sandbox();
+  await git(sb.work, "switch", "--quiet", "-c", "epic");
+  const t01 = await sb.commit("a", "1\n", "feat(T01): a (#51)", "Epic: #50");
+  await sb.commit("a", "2\n", "feat(T02): a again (#52)", "Epic: #50");
+  await Deno.writeTextFile(`${sb.work}/a`, "1 fixed\n");
+  await git(sb.work, "commit", "--quiet", "-am", "x", `--fixup=${t01}`);
+  return sb;
+}
+
+Deno.test("a plain run after a stopped fold is 13 and keeps the record: only --verify <PRE> resumes", async () => {
+  // A plain re-run used to delete the record and take the moved tree as its new PRE (cli#711).
+  const sb = await conflictingFold();
+  try {
+    const r = await sb.script("fold-fixups.sh");
+    assertEquals(r.code, 13, r.stderr);
+    const pre = r.stdout.match(/^PRE ([0-9a-f]{40})$/m)![1];
+    // Mid-rebase, a plain run is refused before it touches anything.
+    const during = await sb.script("fold-fixups.sh");
+    assertEquals(during.code, 13, during.stderr);
+    assertEquals(during.stdout, "", "a refused run printed a PRE");
+    // A resolution that moves the tree, then the rebase finished.
+    for (let i = 0; i < 2 && (await git(sb.work, "status", "--porcelain")) !== ""; i++) {
+      await Deno.writeTextFile(`${sb.work}/a`, "something else\n");
+      await git(sb.work, "add", "a");
+      await run("git", ["-c", "core.editor=true", "rebase", "--continue"], sb.work);
+    }
+    const plain = await sb.script("fold-fixups.sh");
+    assertEquals(plain.code, 13, plain.stdout + plain.stderr);
+    assertStringIncludes(plain.stderr, `a stopped fold awaits --verify ${pre}`);
+    assertEquals(plain.stdout, "", "a refused run printed a PRE");
+    // The record survived the refusal and the failing --verify: the moved tree is still caught.
+    assertEquals((await sb.script("fold-fixups.sh", "--verify", pre)).code, 10);
+    assertEquals((await sb.script("fold-fixups.sh", "--verify", pre)).code, 10);
+    assertEquals((await sb.script("fold-fixups.sh")).code, 13);
+  } finally {
+    await sb.cleanup();
+  }
+});
+
+Deno.test("a rebase that fails without stopping writes no record and is 3", {
+  // The shim is a bash script named `git` on PATH; Windows resolves `git.exe` first.
+  ignore: Deno.build.os === "windows",
+}, async () => {
+  const sb = await epicWithFixup();
+  try {
+    const r = await sb.scriptWithGit(
+      `[ "$1" = rebase ] && exit 1\nexec "$REAL_GIT" "$@"`,
+      "fold-fixups.sh",
+    );
+    assertEquals(r.code, 3, r.stderr);
+    assertEquals(
+      await git(sb.work, "rev-parse", "--git-path", "specnaut-fold-pre").then((p) =>
+        Deno.stat(`${sb.work}/${p}`).then(() => "kept", () => "none")
+      ),
+      "none",
+    );
+    // Nothing awaits a --verify: a plain run folds.
+    assertEquals((await sb.script("fold-fixups.sh")).code, 0);
+  } finally {
+    await sb.cleanup();
+  }
+});
+
+Deno.test("an aborted fold, HEAD back on its PRE, does not block the next fold", async () => {
+  const sb = await sandbox();
+  try {
+    await git(sb.work, "switch", "--quiet", "-c", "epic");
+    const t01 = await sb.commit("a", "1\n", "feat(T01): a (#51)", "Epic: #50");
+    await sb.commit("a", "2\n", "feat(T02): a again (#52)", "Epic: #50");
+    await Deno.writeTextFile(`${sb.work}/a`, "1 fixed\n");
+    await git(sb.work, "commit", "--quiet", "-am", "x", `--fixup=${t01}`);
+    assertEquals((await sb.script("fold-fixups.sh")).code, 13);
+    await git(sb.work, "rebase", "--abort");
+    // Nothing moved, so the record is dropped: the fold runs again and stops on
+    // its own conflict, not on "a stopped fold awaits --verify".
+    const again = await sb.script("fold-fixups.sh");
+    assertEquals(again.code, 13, again.stderr);
+    assert(!again.stderr.includes("awaits --verify"), again.stderr);
+    assertStringIncludes(again.stderr, "fixup! feat(T01): a (#51)");
   } finally {
     await sb.cleanup();
   }
