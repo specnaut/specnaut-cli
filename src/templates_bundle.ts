@@ -425,9 +425,10 @@ epic merge path, not here.
 
 \`bash .specnaut/scripts/bash/epic-status.sh\` is the one reader of this format: it prints a
 \`CHILD T<NN> #<child> <sha>\` line per child, checks the ordinals run 1, 2, 3… and that no child
-has two commits, and exits 12 when the history does not read back to the board. Never parse the
-log a second way. If it exits 12, the branch has been rewritten by something that did not follow
-this file: stop and say so rather than picking one reading.
+has two commits, and fails when the history does not read back to the board. Never parse the log a
+second way; its exits are mapped once, in \`phases/merge.md\` step 1. A history that does not read
+back was rewritten by something that did not follow this file: stop and say so rather than picking
+one reading.
 `,
     executable: false,
     backend: null,
@@ -644,10 +645,15 @@ It prints \`PRE <sha>\`, folds each fixup into the commit it names (\`rebase --a
 --keep-base\`), and runs three checks: the tree is the one recorded before the fold, the worktree is
 clean, and \`epic-status.sh\` reads one commit per child in order with no \`fixup!\` left.
 
+This table maps every exit \`fold-fixups.sh\`'s header lists; an exit it does not list is a finding:
+quote it and stop.
+
 | Exit | Meaning | What you do |
 | :--- | :--- | :--- |
 | 0 | folded | merge |
-| 13 | the rebase stopped on a conflict | resolve it, \`git rebase --continue\`, then \`fold-fixups.sh --verify <PRE sha>\` — the checks run against the tree recorded before the fold |
+| 2 | usage, or \`--verify\` given a sha that is not the \`PRE\` the stopped fold printed | re-run \`--verify\` with that \`PRE\` sha — never \`HEAD\`, never another |
+| 3 | the base is unknown, or \`epic-status.sh\` could not read the branch | stop and say so |
+| 13 | the rebase stopped on a conflict — or, on \`--verify\`, is still in progress | resolve it, \`git rebase --continue\` (check it exits 0), then \`fold-fixups.sh --verify <PRE sha>\` — the checks run against the tree recorded before the fold |
 | 10 | the tree moved | stop: a fold that changes the tree is a rewrite |
 | 11 | the worktree is not clean | untracked output belongs in the child's commit or \`.gitignore\`; a modified file means something still holds the tree — stop it first |
 | 12 | not one commit per child | a surviving \`fixup!\` lost its target or was written by hand; attribute it by sha |
@@ -770,8 +776,10 @@ commit holds only that child's work — two children in one commit break the mat
 
 There is no state file: resume reconstructs from git. \`bash .specnaut/scripts/bash/epic-status.sh\`
 reads the branch's commits — one \`CHILD T<NN> #<child> <sha>\` line per child done, one-to-one by
-ordinal — and **resume at the first child with no commit**. Do not use issue state as a progress signal — child issues stay open for the whole
-loop. If it exits 12 — a commit matches no child, or a child matches two — stop and say so.
+ordinal — and **resume at the first child with no commit** (none yet reads as not an epic branch:
+start at the first child). Do not use issue state as a progress signal — child issues stay open for
+the whole loop. Any other exit stops the loop: say which — its exits are mapped once, in
+\`phases/merge.md\` step 1.
 `,
     executable: false,
     backend: null,
@@ -1185,9 +1193,14 @@ that runs only on \`pull_request\`. **Do not infer \`--pr\` from a remote, a for
 1. **Shape the history.** Ask the branch, not the board — \`bash .specnaut/scripts/bash/epic-status.sh\`
    reads its \`Epic: #\` trailers, and only before the landing: after it, the range is empty. Keep its
    last \`CHILD\` and \`EPIC\` lines (after any fold) for the close.
+   This list maps every exit \`epic-status.sh\`'s header lists; an exit it does not list is a
+   finding: quote it and stop on the branch.
    - **Exit 14 — standalone**: load \`phases/merge-squash.md\` — **Squash by scope**.
    - **Exit 12** — the history does not read back to the board: fix it on the branch. **3** — the
-     base is unknown: stop and say so.
+     base is unknown: stop and say so. **15** — the history could not be read: stop and say so.
+   - **Exit 16** — the range is empty but \`.specnaut/feature.json\` links an epic whose commits have
+     landed (a re-run after the base moved): **stop** and say so — never squash, never close from
+     here; the \`CHILD\` lines cannot be read back.
    - **Exit 0 — an epic**: do **not** squash. Run the full gate tier once,
      \`.specnaut/scripts/bash/run-gate.sh full\` (a failure is fixed on the branch as a \`--fixup\` of the
      child at fault, then the tier re-run — never escalated), then load \`phases/epic-fixups.md\` and
@@ -1203,24 +1216,30 @@ that runs only on \`pull_request\`. **Do not infer \`--pr\` from a remote, a for
    bash .specnaut/scripts/bash/land-feature.sh
    \`\`\`
 
-   It checks the tree is clean and the branch contains \`origin/<base>\`, fast-forwards the base,
-   pushes it, deletes the branch with \`-d\`, and verifies \`HEAD\` is the base; it prints \`LANDED <base>
-   <first>..<last> <n> commit(s)\`. **It pushes without asking, in either merge mode**: reaching
+   It checks the tree is clean, that origin names \`<base>\` as its default, and that the branch
+   contains \`origin/<base>\` and adds to it; it fast-forwards the base, pushes it, deletes the
+   branch with \`-d\`, and verifies \`HEAD\` is the base; it prints \`LANDED <base> <first>..<last> <n>
+   commit(s)\`. **It pushes without asking, in either merge mode**: reaching
    this step is the instruction — \`phases/auto-chain.md\` reads the mode, this phase does not.
    **Under \`merge: manual\` the landing hook holds it** until the user's own prompt this turn says
    \`merge\` or \`/task merge\`; a refusal is not an obstacle to route around — quote it, name the word,
    stop on the branch.
-4. **Read its exit:**
+4. **Read its exit** — this table maps every exit \`land-feature.sh\`'s header lists; an exit it does
+   not list is a finding: quote it and stop on the branch.
 
    | Exit | Meaning | What you do |
    | :--- | :--- | :--- |
    | 0 | landed and pushed | step 5 |
+   | 2 | not on a feature branch | check out the feature branch, land again |
+   | 3 | the base is unknown, or origin does not confirm it as its default | stop and say so, quoting its line — never land on a guessed branch |
    | 4 | the tree is dirty | commit, or stop whoever holds it |
-   | 5 | behind \`origin/<base>\` | rebase, re-run the gates, land again |
-   | 6 | not a fast-forward | stop and ask whether to rebase |
-   | 7 | the push was rejected | quote the remote's message; the merge stays on the local base — never \`--force\`, never an automatic rebase — and the close below does not run. Recovery: \`git fetch\`, reconcile, \`/task merge\` |
-   | 8 | the branch would not delete with \`-d\` | the merge did not land as expected: a finding |
+   | 5 | behind \`origin/<base>\` | \`git rebase refs/remotes/origin/<base>\`. Applies cleanly → re-run the gates, land again. A conflict → \`git rebase --abort\`, and the branch goes back to \`review\` — a resolution is a change nobody reviewed |
+   | 6 | the local base holds commits origin lacks (printed: \`origin/<base>..<base>\`) | **stop on that fact**, quoting the range: they are someone's work. Nothing was rebased or pushed, and the phase does not rebase |
+   | 7 | the push was rejected | quote the remote's message — never \`--force\`. A rule refused it (protected base, hook): stop and say so. Origin moved: \`git checkout <branch>\`, \`git branch -f <base> refs/remotes/origin/<base>\` (the local base holds only this branch's fast-forward), land again — exit 5 follows and its row applies. The close does not run until a landing pushes |
    | 9 | \`HEAD\` is not the base | say so; the person who asked must be back where they work |
+   | 10 | nothing to land | the branch has no commit origin lacks: say so — nothing merged, nothing to close |
+   | 11 | landed and pushed; the branch would not delete with \`-d\` | the landing stands: step 5 runs. Report the branch that stayed |
+   | 12 | an unexpected git failure before the push | quote it and stop: nothing was pushed |
 
 5. **Close what shipped, and reconcile** — only after a push, and not under \`--no-close\`: load
    \`phases/merge-close.md\`.
@@ -22895,7 +22914,9 @@ exit 0
 #              origin) — and within a copy every \`merge:\` line counts,
 #              indented or quoted. A model that rewrites the file in its
 #              worktree, or commits that rewrite, has not changed the base
-#              (§ 11 F2). Comment lines are never settings.
+#              (§ 11 F2). Comment lines are never settings. A base it
+#              cannot read — base-branch.sh exit 3, or no ref of that name
+#              locally or on origin — is manual: the guard fails closed.
 #
 # Usage: merge-mode.sh [--strict]
 set -euo pipefail
@@ -22965,11 +22986,23 @@ if git --no-pager -C "\$root" rev-parse --verify --quiet HEAD >/dev/null; then
   if b=\$(blob HEAD); then verdict HEAD <<<"\$b"; fi
 fi
 
-if base=\$(cd "\$root" && bash "\$here/base-branch.sh" 2>/dev/null); then
-  for ref in "refs/heads/\$base" "refs/remotes/origin/\$base"; do
-    git --no-pager -C "\$root" show-ref --verify --quiet "\$ref" || continue
-    if b=\$(blob "\$ref"); then verdict "\$ref" <<<"\$b"; fi
-  done
+# The base's copy is the one a model cannot rewrite from its worktree, so a
+# base this cannot read is not a copy that agrees: it fails closed (cli#711).
+if ! base=\$(cd "\$root" && bash "\$here/base-branch.sh" 2>/dev/null); then
+  echo "merge-mode: manual (the base branch is unknown — its copy of \$rel cannot be read)" >&2
+  echo manual
+  exit 0
+fi
+found=0
+for ref in "refs/heads/\$base" "refs/remotes/origin/\$base"; do
+  git --no-pager -C "\$root" show-ref --verify --quiet "\$ref" || continue
+  found=1
+  if b=\$(blob "\$ref"); then verdict "\$ref" <<<"\$b"; fi
+done
+if [ "\$found" = 0 ]; then
+  echo "merge-mode: manual (no copy of the base '\$base' — neither refs/heads/\$base nor origin's)" >&2
+  echo manual
+  exit 0
 fi
 
 echo "merge-mode: auto (every copy of \$rel agrees, or none sets merge:)" >&2
@@ -23040,8 +23073,21 @@ exit 3
 # names the same epic. Only digits and hex shas are printed; a problem is
 # named by sha and ordinal on stderr, never by echoing commit text.
 #
-# Exit: 0 consistent · 2 usage · 3 base unknown · 12 inconsistent · 14 not an
-# epic branch (no \`Epic:\` trailer at all).
+# The base is read as \`refs/heads/<base>\` (else \`refs/remotes/origin/<base>\`),
+# so a tag named like it cannot shadow it.
+#
+# Exit — the full table; phases/merge.md maps each one:
+#   0  consistent
+#   2  usage
+#   3  base unknown
+#   12 inconsistent
+#   14 not an epic branch (no \`Epic:\` trailer at all), and .specnaut/feature.json
+#      does not name an epic either
+#   15 the history could not be read (a \`git log\` failed) — nothing concluded
+#   16 no \`Epic:\` trailer on <base>..HEAD, but .specnaut/feature.json's
+#      \`linked_issue\` is an epic: its own \`Epic: #<n>\` trailers are already in
+#      HEAD's history. The range has landed (a re-run after the base moved),
+#      so the CHILD/EPIC lines cannot be read back from it — stop, never squash
 #
 # Usage: epic-status.sh
 set -euo pipefail
@@ -23056,8 +23102,17 @@ if ! git --no-pager rev-parse --verify --quiet "refs/heads/\$base^{commit}" >/de
   echo "epic-status: the base '\$base' does not resolve to a commit" >&2
   exit 3
 fi
-range="\$base..HEAD"
-git --no-pager rev-parse --verify --quiet "refs/heads/\$base" >/dev/null || range="origin/\$base..HEAD"
+# Fully qualified: a tag named like the base would otherwise shadow it.
+range="refs/heads/\$base..HEAD"
+git --no-pager rev-parse --verify --quiet "refs/heads/\$base" >/dev/null || range="refs/remotes/origin/\$base..HEAD"
+
+# unread <what> — a git read failed: 15, never a conclusion drawn from no output.
+unread() {
+  echo "epic-status: could not read \$1 — git log failed; nothing concluded" >&2
+  exit 15
+}
+# Read whole before the loop: a process substitution's exit is never checked.
+log=\$(git --no-pager log --reverse --format='%H%x1f%s' "\$range") || unread "\$range"
 
 problems=() epic="" expected=1 children=0
 seen=" " # " #<child>=<sha> " pairs: bash 3.2 (macOS) has no associative arrays
@@ -23068,7 +23123,8 @@ while IFS=\$'\\x1f' read -r sha subject; do
     continue
   fi
   # The trailer is the one field read from the body: an anchored line of digits.
-  trailer=\$(git --no-pager log -1 --format=%b "\$sha" | sed -n 's/^Epic: #\\([0-9][0-9]*\\)\$/\\1/p' | head -1)
+  body=\$(git --no-pager log -1 --format=%b "\$sha") || unread "\${sha:0:12}"
+  trailer=\$(printf '%s\\n' "\$body" | sed -n 's/^Epic: #\\([0-9][0-9]*\\)\$/\\1/p' | sed -n 1p)
   if [ -z "\$trailer" ]; then
     problems+=("\${sha:0:12} has no 'Epic: #<n>' trailer")
   elif [ -z "\$epic" ]; then
@@ -23094,9 +23150,23 @@ while IFS=\$'\\x1f' read -r sha subject; do
   else
     problems+=("\${sha:0:12}: its subject is not '<type>(T<NN>): <subject> (#<child>)'")
   fi
-done < <(git --no-pager log --reverse --format='%H%x1f%s' "\$range")
+done <<<"\$log"
 
 if [ -z "\$epic" ] && [ "\$children" -eq 0 ]; then
+  # feature.json names an epic when its linked issue is the one HEAD's own
+  # \`Epic: #<n>\` trailers carry: that history is what an epic branch writes,
+  # and nothing else writes it. The file has no epic field, by design (D16).
+  fj="\$here/../../feature.json"
+  issue=""
+  [ -f "\$fj" ] && issue=\$(sed -n 's/.*"linked_issue"[[:space:]]*:[[:space:]]*\\([1-9][0-9]*\\).*/\\1/p' "\$fj" | sed -n 1p)
+  if [ -n "\$issue" ]; then
+    # Anchored per line by git itself: #50 never matches a trailer of #501.
+    hit=\$(git --no-pager log -1 --format=%H -E --grep="^Epic: #\$issue\\\$" HEAD) || unread HEAD
+    if [ -n "\$hit" ]; then
+      echo "epic-status: no 'Epic:' trailer on \$range, but .specnaut/feature.json links epic #\$issue, whose commits HEAD already holds — the range has landed; the CHILD lines cannot be read back. Stop" >&2
+      exit 16
+    fi
+  fi
   echo "epic-status: no 'Epic:' trailer on \$range — not an epic branch" >&2
   exit 14
 fi
@@ -23130,11 +23200,21 @@ exit 0
 # conflict (exit 13), resolve it, \`git rebase --continue\`, then run
 # \`fold-fixups.sh --verify <that sha>\`: the checks compare against the tree
 # recorded before the fold, never against a tree the conflict already moved.
+# --verify is bound to that sha: exit 13 records it in the git dir
+# (\`specnaut-fold-pre\`), --verify refuses any other sha — HEAD included — and
+# a pass spends the record. The base is \`refs/heads/<base>\` (else origin's),
+# so a tag named like it cannot shadow it.
 #
-# Exit: 0 folded · 2 usage · 3 base unknown · 10 the tree moved · 11 the
-# worktree is not clean · 12 not one commit per child · 13 the rebase stopped
-# on a conflict · 14 not an epic branch. 12 and 14 are epic-status.sh's own,
-# passed through; any other epic-status exit is reported as 3.
+# Exit — the full table; phases/epic-fixups.md maps each one:
+#   0  folded
+#   2  usage, or --verify with a sha that is not the PRE a stopped fold printed
+#   3  base unknown, or epic-status.sh could not read the branch (any of its
+#      exits but 0, 12 and 14)
+#   10 the tree moved
+#   11 the worktree is not clean
+#   12 not one commit per child (epic-status.sh's own, passed through)
+#   13 the rebase stopped on a conflict — or, on --verify, is still in progress
+#   14 not an epic branch (epic-status.sh's own, passed through)
 #
 # Usage: fold-fixups.sh [--verify <pre-sha>]
 set -euo pipefail
@@ -23149,8 +23229,28 @@ case \$# in
   *) echo "usage: fold-fixups.sh [--verify <pre-sha>]" >&2; exit 2 ;;
 esac
 base=\$(bash "\$here/base-branch.sh") || exit 3
-range_base=\$base
-git --no-pager rev-parse --verify --quiet "refs/heads/\$base" >/dev/null || range_base="origin/\$base"
+range_base="refs/heads/\$base"
+git --no-pager rev-parse --verify --quiet "\$range_base" >/dev/null || range_base="refs/remotes/origin/\$base"
+# The PRE a conflicted fold printed, kept for the --verify that resumes it.
+record=\$(git rev-parse --git-path specnaut-fold-pre) || exit 3
+
+if [ -n "\$pre" ]; then
+  if [ -d "\$(git rev-parse --git-path rebase-merge)" ] || [ -d "\$(git rev-parse --git-path rebase-apply)" ]; then
+    echo "fold-fixups: the rebase is still in progress — resolve it and 'git rebase --continue' first" >&2
+    exit 13
+  fi
+  if [ ! -f "\$record" ]; then
+    echo "fold-fixups: no stopped fold to verify — --verify takes the PRE an exit-13 fold printed" >&2
+    exit 2
+  fi
+  want=\$(cat "\$record")
+  full=\$(git --no-pager rev-parse --verify --quiet "\$pre^{commit}" || true)
+  if [ -z "\$full" ] || [ "\$full" != "\$want" ]; then
+    echo "fold-fixups: \$pre is not the PRE this fold printed (\$want)" >&2
+    exit 2
+  fi
+  pre=\$full
+fi
 
 if [ -n "\$(git status --porcelain)" ]; then
   git status --short >&2
@@ -23160,10 +23260,12 @@ fi
 
 if [ -z "\$pre" ]; then
   pre=\$(git rev-parse HEAD)
+  rm -f "\$record"
   printf 'PRE %s\\n' "\$pre"
   # -i: before git 2.44, --autosquash does nothing without it. The editor
   # accepts the todo list as autosquash wrote it; git's stderr is the report.
   if ! GIT_SEQUENCE_EDITOR=true git rebase -i --quiet --autosquash --keep-base "\$range_base" >/dev/null; then
+    printf '%s\\n' "\$pre" >"\$record"
     echo "fold-fixups: the rebase stopped on a conflict — resolve it, 'git rebase --continue', then: fold-fixups.sh --verify \$pre" >&2
     exit 13
   fi
@@ -23196,6 +23298,7 @@ if printf '%s\\n' "\$status" | grep -q '^FIXUP '; then
   echo "fold-fixups: a fixup! survived — its target was rewritten, or it was written by hand" >&2
   exit 12
 fi
+rm -f "\$record"
 printf '%s\\n' "\$status"
 echo "fold-fixups: folded — tree unchanged, worktree clean, one commit per child"
 `,
@@ -23213,25 +23316,42 @@ echo "fold-fixups: folded — tree unchanged, worktree clean, one commit per chi
 # fixup fold, has already run: this rewrites no history.
 #
 # In order: HEAD is a branch other than the base, and the tree is clean;
-# \`origin/<base>\` is fetched and the branch contains it; the base is checked
-# out and fast-forwarded to the branch; the base is pushed with an explicit
-# refspec and never its tags; the merged branch is deleted with \`-d\`; HEAD is
-# verified to be the base. The base is base-branch.sh's, never an argument.
-# Under \`merge: manual\` the landing hook holds this script like a \`git push\`
-# (merge-commands.txt) — the script does not read the mode itself.
+# \`origin/<base>\` is fetched, origin confirms <base> is its default branch,
+# and the branch contains it and holds at least one commit origin lacks; the
+# base is checked out and fast-forwarded to the branch; the base is pushed
+# with an explicit refspec and never its tags; the merged branch is deleted
+# with \`-d\`; HEAD is verified to be the base. The base is base-branch.sh's —
+# local-only, so origin is asked here, on the path that already talks to it
+# — never an argument. Under \`merge: manual\` the landing hook holds this
+# script like a \`git push\` (merge-commands.txt): it does not read the mode.
 #
-# Prints \`LANDED <base> <first>..<last> <n> commit(s)\` on success.
+# Prints \`LANDED <base> <first>..<last> <n> commit(s)\` once the push landed.
 #
-# Exit: 0 landed and pushed · 2 usage, or not on a feature branch · 3 base
-# unknown · 4 the tree is dirty · 5 behind origin/<base> (rebase, re-gate,
-# land again) · 6 not a fast-forward · 7 the push was rejected (the merge
-# stays on the local base; nothing is retried, never forced) · 8 the branch
-# would not delete with -d · 9 HEAD is not the base afterwards.
+# Exit — the full table; phases/merge.md maps each one:
+#   0  landed and pushed
+#   2  usage, or not on a feature branch
+#   3  base unknown, or origin does not confirm it: the fetch failed, or
+#      \`ls-remote --symref origin HEAD\` failed or names anything but
+#      exactly refs/heads/<base>
+#   4  the tree is dirty
+#   5  behind origin/<base>
+#   6  the local <base> has commits origin/<base> lacks — printed as
+#      \`origin/<base>..<base>\`; nothing rebased, nothing pushed
+#   7  the push was rejected (the merge stays on the local base; nothing is
+#      retried, never forced)
+#   9  HEAD is not the base afterwards
+#   10 nothing to land: the branch has no commit origin/<base> lacks
+#   11 landed and pushed, but the branch would not delete with -d (it stays)
+#   12 an unexpected git failure before the push, named on stderr
+# (8 is retired: a branch that will not delete after the push is 11, never
+# read as a failed landing.)
 #
 # Usage: land-feature.sh
 set -euo pipefail
 export GIT_OPTIONAL_LOCKS=0
 here=\$(CDPATH="" cd "\$(dirname "\${BASH_SOURCE[0]}")" && pwd)
+# \`set -e\` alone would exit with git's own code, which no table lists.
+trap 'rc=\$?; echo "land-feature: unexpected failure (exit \$rc) of: \$BASH_COMMAND — nothing was pushed" >&2; exit 12' ERR
 
 if [ \$# -ne 0 ]; then echo "usage: land-feature.sh" >&2; exit 2; fi
 base=\$(bash "\$here/base-branch.sh") || exit 3
@@ -23249,36 +23369,61 @@ if [ -n "\$(git status --porcelain)" ]; then
   exit 4
 fi
 
-git fetch --quiet origin "refs/heads/\$base:refs/remotes/origin/\$base"
+if ! GIT_TERMINAL_PROMPT=0 git fetch --quiet origin "refs/heads/\$base:refs/remotes/origin/\$base"; then
+  echo "land-feature: could not fetch \$base from origin — offline, or origin has no \$base" >&2
+  exit 3
+fi
+# An exact match, never a tail one: \`main\` must not pass for \`refs/heads/team/main\`.
+if ! answer=\$(GIT_TERMINAL_PROMPT=0 git ls-remote --symref origin HEAD); then
+  echo "land-feature: origin could not be asked for its default branch (git ls-remote --symref origin HEAD failed)" >&2
+  exit 3
+fi
+default=\$(printf '%s\\n' "\$answer" | awk '\$1 == "ref:" && \$3 == "HEAD" { print \$2; exit }')
+if [ "\$default" != "refs/heads/\$base" ]; then
+  [[ \$default =~ ^refs/heads/[A-Za-z0-9._/-]+\$ ]] || default="<no readable default>"
+  echo "land-feature: origin's default branch is \$default, not refs/heads/\$base — refusing to land. Run: git remote set-head origin --auto" >&2
+  exit 3
+fi
 if ! git merge-base --is-ancestor "refs/remotes/origin/\$base" HEAD; then
   echo "land-feature: \$branch is behind origin/\$base — rebase it, re-run the gates, then land" >&2
   exit 5
 fi
-first=\$(git rev-list --reverse "refs/remotes/origin/\$base..HEAD" | head -1)
-last=\$(git rev-parse HEAD)
 count=\$(git rev-list --count "refs/remotes/origin/\$base..HEAD")
+if [ "\$count" -eq 0 ]; then
+  echo "land-feature: nothing to land — \$branch has no commit origin/\$base lacks" >&2
+  exit 10
+fi
+# sed, not head: head closing the pipe early would fail rev-list under pipefail.
+first=\$(git rev-list --reverse "refs/remotes/origin/\$base..HEAD" | sed -n 1p)
+last=\$(git rev-parse HEAD)
 
 git checkout --quiet "\$base"
 if ! git merge --quiet --ff-only "refs/heads/\$branch"; then
   git checkout --quiet "\$branch"
-  echo "land-feature: \$base cannot fast-forward to \$branch" >&2
+  echo "land-feature: the local \$base has commits origin/\$base lacks (origin/\$base..\$base):" >&2
+  git --no-pager log --format='  %h %s' "refs/remotes/origin/\$base..refs/heads/\$base" >&2
+  echo "land-feature: \$base cannot fast-forward to \$branch. Nothing was rebased or pushed — those commits are someone's work; stop on them" >&2
   exit 6
 fi
 if ! out=\$(git -c push.followTags=false push --quiet --no-follow-tags origin "refs/heads/\$base:refs/heads/\$base" 2>&1); then
   printf '%s\\n' "\$out" >&2
-  echo "land-feature: the push was rejected — the merge stays on the local \$base. git fetch, reconcile, land again; never --force" >&2
+  echo "land-feature: the push was rejected — the merge stays on the local \$base — never --force; phases/merge.md maps the recovery" >&2
   exit 7
 fi
-if ! git branch --quiet -d "\$branch"; then
-  echo "land-feature: \$branch would not delete with -d — the merge did not land as expected" >&2
-  exit 8
-fi
+# The push landed: from here on nothing reads as a failed landing.
+trap - ERR
+deleted=1
+git branch --quiet -d "\$branch" || deleted=0
 now=\$(git symbolic-ref --quiet --short HEAD || true)
 if [ "\$now" != "\$base" ]; then
   echo "land-feature: HEAD is on '\$now', not \$base" >&2
   exit 9
 fi
 printf 'LANDED %s %s..%s %s commit(s)\\n' "\$base" "\${first:0:12}" "\${last:0:12}" "\$count"
+if [ "\$deleted" = 0 ]; then
+  echo "land-feature: landed and pushed, but \$branch would not delete with -d — the landing stands; the branch stays" >&2
+  exit 11
+fi
 `,
     executable: true,
     backend: null,
