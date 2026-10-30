@@ -1,36 +1,9 @@
 import { assert, assertEquals } from "@std/assert";
 import { exists } from "@std/fs/exists";
 import { parse as parseToml } from "@std/toml";
-import { fromFileUrl, join } from "@std/path";
+import { join } from "@std/path";
 import { readLinkText } from "../helpers/link_text.ts";
-
-const MAIN = fromFileUrl(new URL("../../src/main.ts", import.meta.url));
-
-async function runSpecnaut(
-  args: string[],
-  opts: { cwd?: string } = {},
-): Promise<{ code: number; stdout: string; stderr: string }> {
-  const p = new Deno.Command("deno", {
-    args: [
-      "run",
-      "--allow-read",
-      "--allow-write",
-      "--allow-run",
-      "--allow-env",
-      MAIN,
-      ...args,
-    ],
-    cwd: opts.cwd,
-    stdout: "piped",
-    stderr: "piped",
-  });
-  const { code, stdout, stderr } = await p.output();
-  return {
-    code,
-    stdout: new TextDecoder().decode(stdout),
-    stderr: new TextDecoder().decode(stderr),
-  };
-}
+import { runSpecnaut } from "../helpers/run_specnaut.ts";
 
 async function withTempDir(fn: (dir: string) => Promise<void>) {
   const dir = await Deno.makeTempDir({ prefix: "specnaut-init-codex-" });
