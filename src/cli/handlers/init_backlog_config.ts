@@ -6,7 +6,7 @@ import {
   parseKanbanURL,
 } from "../../domain/backlog_strategies/kanban_url_parser.ts";
 import { promptKanbanURL } from "../backlog_picker.ts";
-import { assertInsideProject, resolveProjectRoot } from "../../infrastructure/fs_containment.ts";
+import { FsBacklogConfigStore } from "../../infrastructure/fs_backlog_config_store.ts";
 
 /**
  * What `init` decides and writes about a remote backlog: the Kanban URL it
@@ -28,18 +28,9 @@ export async function writeBacklogConfigStub(
   const stub = strategy.initConfigStub(ctx);
   if (stub === null) return; // local: zero-config, nothing to write
 
-  const path = `${targetDir}/.specnaut/backlog-config.yml`;
-  try {
-    await Deno.stat(path);
-    return; // don't clobber an existing config
-  } catch {
-    // not present → write the stub
-  }
-  // cli#574 — the backlog-config stub is written straight to disk here,
-  // outside the bundle writer, so it needs the guard on its own.
-  await assertInsideProject(await resolveProjectRoot(targetDir), path);
-  await Deno.mkdir(`${targetDir}/.specnaut`, { recursive: true });
-  await Deno.writeTextFile(path, stub);
+  // The store never clobbers an existing config and refuses a path outside the
+  // project (cli#574); the messages are only for a stub it actually wrote.
+  if (!(await new FsBacklogConfigStore().writeStubIfAbsent(targetDir, stub))) return;
   for (const msg of strategy.initConfigMessages(ctx)) {
     console.log(dim(msg));
   }
@@ -55,18 +46,15 @@ export function parseGithubRepoFromRemote(remote: string): string | null {
   // SSH: git@github.com:owner/repo(.git)
   const ssh = remote.match(/^git@github\.com:([^/\s]+)\/([^/\s]+?)(?:\.git)?$/);
   if (ssh) return `${ssh[1]}/${ssh[2]}`;
-  try {
-    const u = new URL(remote);
-    if (u.host !== "github.com") return null;
-    const segs = u.pathname.split("/").filter((s) => s.length > 0);
-    if (segs.length < 2) return null;
-    const owner = segs[0];
-    const repo = segs[1].replace(/\.git$/, "");
-    if (!owner || !repo) return null;
-    return `${owner}/${repo}`;
-  } catch {
-    return null;
-  }
+  if (!URL.canParse(remote)) return null;
+  const u = new URL(remote);
+  if (u.host !== "github.com") return null;
+  const segs = u.pathname.split("/").filter((s) => s.length > 0);
+  if (segs.length < 2) return null;
+  const owner = segs[0];
+  const repo = segs[1].replace(/\.git$/, "");
+  if (!owner || !repo) return null;
+  return `${owner}/${repo}`;
 }
 
 /**

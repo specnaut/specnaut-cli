@@ -158,6 +158,18 @@ symlinkTest("FsBacklogConfigStore.writeCloudConfig refuses a redirected .specnau
   }
 });
 
+symlinkTest("FsBacklogConfigStore.writeStubIfAbsent refuses a redirected .specnaut", async () => {
+  const { root, proj, outside } = await redirected();
+  try {
+    await assertRejects(() =>
+      new FsBacklogConfigStore().writeStubIfAbsent(proj, "backend: github\n")
+    );
+    assertEquals(await nothingLandedIn(outside), 0);
+  } finally {
+    await Deno.remove(root, { recursive: true });
+  }
+});
+
 symlinkTest("the stores still work on an ordinary project", async () => {
   // The positive control for this whole file. Seven refusals above, and a set
   // of stores that refused unconditionally would satisfy every one of them.

@@ -19,3 +19,13 @@ export interface CloudConfigStore {
   /** Overwrites the file; refuses a path that resolves outside the project (cli#574). */
   writeCloudConfig(projectDir: string, apiUrl: string, projectKey: string): Promise<void>;
 }
+
+/** The stub `init` leaves for a remote backlog backend, for the user to finish. */
+export interface BacklogConfigStore {
+  /**
+   * Writes `stub` unless a config already exists, and says whether it wrote.
+   * Only `NotFound` means "absent": any other failure to look throws, rather
+   * than being taken as leave to write. Refuses a path outside the project.
+   */
+  writeStubIfAbsent(projectDir: string, stub: string): Promise<boolean>;
+}
