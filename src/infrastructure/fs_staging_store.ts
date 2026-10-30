@@ -3,12 +3,31 @@ import { walk } from "@std/fs/walk";
 import type { StagingStore } from "../application/ports.ts";
 import { assertSafeDestination, isInside } from "../domain/template.ts";
 import { assertInsideProject, resolveProjectRoot } from "./fs_containment.ts";
+import { linkedStagingRefusal } from "./fs_refusals.ts";
 
 const STAGING_REL = ".specnaut/upgrade-staging";
+
+/**
+ * Refuses when `.specnaut` or `.specnaut/upgrade-staging` is itself a link
+ * (cli#687). Containment is checked against the PROJECT, so a staging root
+ * linked to `../src` passed it and the prune deleted src/ file by file.
+ */
+async function assertStagingNotLinked(projectDir: string): Promise<void> {
+  for (const rel of [".specnaut", STAGING_REL]) {
+    const abs = resolve(projectDir, rel);
+    try {
+      if ((await Deno.lstat(abs)).isSymlink) throw linkedStagingRefusal(projectDir, abs);
+    } catch (err) {
+      if (err instanceof Deno.errors.NotFound) return;
+      throw err;
+    }
+  }
+}
 
 export class FsStagingStore implements StagingStore {
   async list(projectDir: string): Promise<string[]> {
     const stagingDir = resolve(projectDir, STAGING_REL);
+    await assertStagingNotLinked(projectDir);
     try {
       const stat = await Deno.stat(stagingDir);
       if (!stat.isDirectory) return [];
@@ -30,6 +49,7 @@ export class FsStagingStore implements StagingStore {
     // `relPath` as the whole path, discarding the prefix entirely, so the
     // string check is doing real work here and not merely echoing a caller.
     assertSafeDestination(relPath);
+    await assertStagingNotLinked(projectDir);
     const full = resolve(projectDir, STAGING_REL, relPath);
     await assertInsideProject(await resolveProjectRoot(projectDir), full);
     try {
@@ -42,6 +62,7 @@ export class FsStagingStore implements StagingStore {
 
   async delete(projectDir: string, relPath: string): Promise<void> {
     assertSafeDestination(relPath);
+    await assertStagingNotLinked(projectDir);
     const full = resolve(projectDir, STAGING_REL, relPath);
     await assertInsideProject(await resolveProjectRoot(projectDir), full);
     try {
@@ -82,6 +103,7 @@ export class FsStagingStore implements StagingStore {
     // so an empty out-of-project directory made this decide "prune it" on
     // evidence gathered somewhere else entirely.
     await assertInsideProject(await resolveProjectRoot(projectDir), stagingDir);
+    await assertStagingNotLinked(projectDir);
     try {
       const entries = [];
       for await (const _ of Deno.readDir(stagingDir)) entries.push(_);

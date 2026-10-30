@@ -54,3 +54,17 @@ export const leavesRefusal = (root: string, abs: string, resolved: string) =>
       `A symlink in the project points outside it. Specnaut will not write, ` +
       `move, delete or read through it.`,
   );
+
+/**
+ * The staging tree reached through a link (cli#687): everything it lists and
+ * deletes would be the link's target, real project files, removed as "stale
+ * staged copies". Refused, never followed.
+ */
+export const linkedStagingRefusal = (root: string, abs: string) =>
+  new ContainmentRefusal(
+    `refusing to use a staging directory reached through a symlink:\n` +
+      `  path:    ${abs}\n` +
+      `  project: ${root}\n` +
+      `Specnaut stages its own copies there and deletes them; through a link, it would ` +
+      `delete whatever the link points at.`,
+  );
