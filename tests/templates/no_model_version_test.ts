@@ -29,13 +29,21 @@ interface Shape {
 }
 
 const SHAPES: readonly Shape[] = [
-  { name: "OpenAI gpt id", re: /\bgpt-\d/i, probes: ['model = "gpt-5.6-sol"'] },
+  {
+    name: "OpenAI gpt id",
+    re: /(?:\b|chat)gpt[- ]?(?:\d|oss)/i,
+    probes: ['model = "gpt-5.6-sol"', "chatgpt-4o-latest", "gpt-oss-120b", "GPT 5", "GPT5"],
+  },
   {
     name: "Claude family followed by a version",
     re: /\b(?:opus|sonnet|haiku|fable)-\d/i,
     probes: ["claude-sonnet-4-6", "sonnet-4.5"],
   },
-  { name: "Claude id, version before family", re: /\bclaude-\d/i, probes: ["claude-3-5-sonnet"] },
+  {
+    name: "Claude version before family",
+    re: /\bclaude[- ]\d/i,
+    probes: ["claude-3-5-sonnet", "Claude 3.5 Sonnet", "Claude 4"],
+  },
   {
     name: "Claude family and version in prose",
     re: /\b(?:opus|sonnet|haiku|fable) v?\d/i,
@@ -45,11 +53,24 @@ const SHAPES: readonly Shape[] = [
   { name: "Gemini version in prose", re: /\bgemini \d/i, probes: ["Gemini 2.5"] },
   // Case-sensitive on purpose: an o-series id is always lower case.
   { name: "OpenAI o-series id", re: /\bo\d+\b/, probes: ["o3", "o4-mini"] },
-  { name: "codex-mini id", re: /\bcodex-mini\b/i, probes: ["codex-mini-latest"] },
+  {
+    name: "codex model id",
+    re: /\bcodex-(?:mini\b|\d)/i,
+    probes: ["codex-mini-latest", "codex-1"],
+  },
   {
     name: "harness version",
-    re: /\b(?:claude code|codex(?: cli)?) v?\d/i,
-    probes: ["Requires Claude Code v2.1.139+", "Claude Code v2", "codex cli 0.46"],
+    re:
+      /\b(?:claude code|codex(?: cli)?|cursor|copilot(?: cli)?|opencode|antigravity|gemini cli) v?\d/i,
+    probes: [
+      "Requires Claude Code v2.1.139+",
+      "Claude Code v2",
+      "codex cli 0.46",
+      "Cursor 1.7",
+      "Copilot CLI v0.0.339",
+      "OpenCode v0.15",
+      "Gemini CLI 0.1",
+    ],
   },
 ];
 
@@ -103,6 +124,40 @@ Deno.test("each forbidden shape catches its probes, and no other shape does", ()
       const also = SHAPES.filter((s) => s !== shape && s.re.test(probe)).map((s) => s.name);
       assertEquals(also, [], `${probe} is also caught by ${also} — ${shape.name} is not pinned`);
     }
+  }
+});
+
+/**
+ * The ids the guard must stop, kept apart from SHAPES on purpose: deleting a
+ * shape deletes its own probes, but not these, so a lost shape turns red here.
+ */
+const FORBIDDEN = [
+  "gpt-5.6-sol",
+  "chatgpt-4o-latest",
+  "gpt-oss-120b",
+  "GPT 5",
+  "claude-sonnet-4-6",
+  "sonnet-4.5",
+  "claude-3-5-sonnet",
+  "Claude 3.5 Sonnet",
+  "Claude Opus 4.1",
+  "gemini-2.5-pro",
+  "Gemini 2.5",
+  "o3",
+  "o4-mini",
+  "codex-mini-latest",
+  "codex-1",
+  "Claude Code v2",
+  "codex cli 0.46",
+  "Cursor 1.7",
+  "Copilot CLI v0.0.339",
+  "OpenCode v0.15",
+  "Gemini CLI 0.1",
+];
+
+Deno.test("the scan's own matcher flags every forbidden id", () => {
+  for (const id of FORBIDDEN) {
+    assertEquals(hits("probe", `uses ${id} here`).length, 1, `hits() lets ${id} through`);
   }
 });
 
