@@ -66,8 +66,8 @@ read -r -d '' PROGRAM <<'JQ' || true
 def STATES: ["in_progress","blocked","awaiting_review","awaiting_qa","awaiting_user","done","failed"];
 
 # Printable only, and bounded: drop C0 (and DEL), C1, U+2028/U+2029, the
-# bidi overrides and isolates, and every mark a model reads but a terminal
-# does not show (cli#713) — ALM U+061C, U+200B–U+200F (zero-width space,
+# bidi overrides and isolates, and these marks a model reads but a terminal
+# does not show (cli#713): ALM U+061C, U+200B–U+200F (zero-width space,
 # non-joiner and joiner, LRM, RLM), U+2060–U+2064 (word joiner, invisible
 # operators), U+FEFF and the tag block U+E0000–U+E007F; then cap at 64.
 def clean:
