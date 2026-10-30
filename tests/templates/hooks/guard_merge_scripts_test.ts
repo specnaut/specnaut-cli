@@ -37,6 +37,11 @@ const REACHED = [
   "source .specnaut/scripts/bash/S",
   ". .specnaut/scripts/bash/S",
   "git status && S",
+  // a redirection glued to the name, and a $'…' spelling (cli#704: one word on main)
+  "S>out",
+  "bash .specnaut/scripts/bash/S>>log",
+  "S&>out",
+  "bash $'.specnaut/scripts/bash/S'",
   // the remaining reach forms (cli#711): wrappers, frames, lists, prefixes
   "exec S",
   "command S",

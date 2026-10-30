@@ -11,6 +11,7 @@
 import { assert, assertEquals, assertStringIncludes } from "@std/assert";
 import { exists } from "@std/fs/exists";
 import { join } from "@std/path";
+import { bashPath } from "../templates/hooks/hook_sandbox.ts";
 import {
   BASH,
   CLEAN,
@@ -203,7 +204,7 @@ Deno.test("a missing _config.sh beside the script is exit 3, never a pass", asyn
   const dir = await repo(10);
   const lone = join(await Deno.makeTempDir(), "size-ratchet.sh");
   await Deno.copyFile(SCRIPT, lone);
-  assertEquals((await run(BASH, [lone], dir)).code, 3);
+  assertEquals((await run(BASH, [bashPath(lone)], dir)).code, 3);
 });
 
 Deno.test("outside a git work tree it exits 3", async () => {
