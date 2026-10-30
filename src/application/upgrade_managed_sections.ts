@@ -36,17 +36,26 @@ export async function surveyManagedSections(
 ): Promise<ManagedSectionOutcome[]> {
   const out: ManagedSectionOutcome[] = [];
   for (const [dest, label, body] of managedSectionEntries(bundle)) {
-    if (isDeclaredPreserved(dest)) continue;
-    const existing = await reader.readText(projectDir, dest);
-    if (existing === null) continue;
-    const current = extractBlock(existing, label, "html");
-    if (current === body) continue;
-    out.push({ dest, label, kind: current === null ? "added" : "refreshed" });
+    const pending = await pendingSection(
+      reader,
+      projectDir,
+      dest,
+      label,
+      body,
+      isDeclaredPreserved,
+    );
+    if (pending !== null) out.push({ dest, label, kind: pending.kind });
   }
   return out;
 }
 
-/** Merges each managed section in, and reports only what actually changed. */
+/**
+ * Merges each managed section in, and reports only what actually changed.
+ *
+ * Each entry is judged on a fresh read, after the plan's writes and after the
+ * previous label's merge into the same file (#576) — so the report says what
+ * the file now holds, and one label's graft is never written over by the next.
+ */
 export async function applyManagedSections(
   deps: { readonly reader: FsReader; readonly writer: FsWriter },
   bundle: Bundle,
@@ -55,27 +64,53 @@ export async function applyManagedSections(
 ): Promise<ManagedSectionOutcome[]> {
   const out: ManagedSectionOutcome[] = [];
   for (const [dest, label, body] of managedSectionEntries(bundle)) {
-    // A declared preserve wins over everything, `--force` included (spec 011
-    // / #367, FR-009). #466 grafted its section straight off the bundle and
-    // never consulted the predicate, so a file the maintainer had frozen was
-    // written anyway — and the same run printed both "preserved … declared"
-    // and "added the … section" for it. Only `--reset-preserved` lifts this,
-    // and it does so by flipping the predicate in the handler.
-    if (isDeclaredPreserved(dest)) continue;
-    const existing = await deps.reader.readText(projectDir, dest);
-    if (existing === null) continue;
-    const current = extractBlock(existing, label, "html");
-    if (current === body) continue;
-    const merged = mergeIntoFile(existing, body, label, "html");
-    if (merged === existing) continue;
+    const pending = await pendingSection(
+      deps.reader,
+      projectDir,
+      dest,
+      label,
+      body,
+      isDeclaredPreserved,
+    );
+    if (pending === null) continue;
+    const merged = mergeIntoFile(pending.existing, body, label, "html");
+    if (merged === pending.existing) continue;
     await deps.writer.writeBundle(
       { [dest]: { content: merged, executable: false } },
       projectDir,
       { overwrite: true, backupExisting: false },
     );
-    out.push({ dest, label, kind: current === null ? "added" : "refreshed" });
+    out.push({ dest, label, kind: pending.kind });
   }
   return out;
+}
+
+/**
+ * Whether one section still has to reach its file — the one filter survey and
+ * apply share — with the file as read and what the graft would be.
+ *
+ * Not when the file is declared preserved: that wins over everything, `--force`
+ * included (spec 011 / #367, FR-009). #466 grafted its section straight off the
+ * bundle and never consulted the predicate, so a frozen file was written anyway
+ * and the same run printed both "preserved … declared" and "added the …
+ * section"; only `--reset-preserved` lifts it, by flipping the predicate in the
+ * handler. Not when the file is absent — the plan writes it whole — nor when
+ * the block already equals the bundle's.
+ */
+async function pendingSection(
+  reader: FsReader,
+  projectDir: string,
+  dest: string,
+  label: string,
+  body: string,
+  isDeclaredPreserved: (dest: string) => boolean,
+): Promise<{ existing: string; kind: ManagedSectionOutcome["kind"] } | null> {
+  if (isDeclaredPreserved(dest)) return null;
+  const existing = await reader.readText(projectDir, dest);
+  if (existing === null) return null;
+  const current = extractBlock(existing, label, "html");
+  if (current === body) return null;
+  return { existing, kind: current === null ? "added" : "refreshed" };
 }
 
 /**
