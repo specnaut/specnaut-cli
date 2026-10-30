@@ -1,5 +1,5 @@
-import { assertEquals } from "@std/assert";
-import { join, SEPARATOR } from "@std/path";
+import { assert, assertEquals } from "@std/assert";
+import { dirname, join, SEPARATOR } from "@std/path";
 import { resolveTarget } from "../../src/infrastructure/fs_containment.ts";
 import { symlinkTest } from "../helpers/link_text.ts";
 
@@ -48,14 +48,36 @@ const targets = (proj: string, outside: string) => ({
 type Ancestor = "real" | "link-inside" | "link-outside";
 type TargetKey = keyof ReturnType<typeof targets>;
 
-/** Builds one layout: the fixture tree, the `d` ancestor, and a `chain`-link leaf to `key`. */
-async function buildLayout(
-  proj: string,
-  outside: string,
-  ancestor: Ancestor,
-  chain: number,
-  key: TargetKey,
-): Promise<void> {
+/**
+ * Where a chain's intermediate hops live, and the text each link uses to reach
+ * the next one (cli#690). Only the final hop carries the target's text.
+ *
+ *  - `sibling` — beside the leaf, a bare name (`hopN.md`);
+ *  - `dotted` — beside the leaf, through a real folder and back
+ *    (`x/../hopN.md`): a hop whose own text has directory and `..` segments;
+ *  - `other-dir` — in a `hops/` beside the leaf's REAL folder, reached as
+ *    `../hops/hopN.md`: a hop into another directory before the final target,
+ *    through `..` applied where the link really sits — `proj/hops/` unless `d`
+ *    is linked outside, then `outside/hops/`.
+ */
+type HopStyle = "sibling" | "dotted" | "other-dir";
+
+/** Raw separators, never `join`: `join` collapses `x/..`, the very misreading under test. */
+type Hops = { dir: (d: string) => Promise<string>; text: (i: number) => string };
+const HOP: Record<HopStyle, Hops> = {
+  sibling: { dir: (d) => Promise.resolve(d), text: (i) => `hop${i}.md` },
+  dotted: {
+    dir: (d) => Promise.resolve(d),
+    text: (i) => ["x", "..", `hop${i}.md`].join(SEPARATOR),
+  },
+  "other-dir": {
+    dir: async (d) => join(dirname(await Deno.realPath(d)), "hops"),
+    text: (i) => ["..", "hops", `hop${i}.md`].join(SEPARATOR),
+  },
+};
+
+/** The fixture tree every layout shares: real files and folders, inside and out. */
+async function buildFixture(proj: string, outside: string): Promise<void> {
   await Deno.writeTextFile(join(proj, "real.md"), "inside");
   await Deno.mkdir(join(outside, "sub"), { recursive: true });
   await Deno.writeTextFile(join(outside, "real.md"), "outside");
@@ -64,43 +86,66 @@ async function buildLayout(
   await Deno.writeTextFile(join(proj, "realdir", "real.md"), "inside-dir");
   await Deno.mkdir(join(outside, "linked"));
   await Deno.writeTextFile(join(outside, "linked", "real.md"), "outside-dir");
+  // `hops/` on both sides: from a `d` linked outside, `../hops/` lands in `outside/hops/`.
+  await Deno.mkdir(join(proj, "hops"));
+  await Deno.mkdir(join(outside, "hops"));
+}
 
+/** `proj/d`, the leaf's folder, as `ancestor` says, with the links the through-link targets need. */
+async function buildAncestor(proj: string, outside: string, ancestor: Ancestor): Promise<string> {
   const dir = join(proj, "d");
   if (ancestor === "real") await Deno.mkdir(dir);
   else if (ancestor === "link-inside") await Deno.symlink(join(proj, "realdir"), dir);
   else await Deno.symlink(join(outside, "linked"), dir);
-
-  // The links the through-link targets pass through: `s` beside the
-  // leaf and `ps` at the project root, both into the outside tree.
+  // `s` beside the leaf and `ps` at the project root, both into the outside
+  // tree; `x` a real folder for the `dotted` hops to pass through.
   await Deno.symlink(join(outside, "sub"), join(dir, "s"));
   await Deno.symlink(join(outside, "sub"), join(proj, "ps"));
+  await Deno.mkdir(join(dir, "x"));
+  return dir;
+}
 
-  const t = targets(proj, outside)[key];
-  if (chain === 0) {
-    // The leaf is a real file, no link at all — the control case.
-    await Deno.writeTextFile(join(dir, "leaf.md"), "leaf");
-    return;
-  }
-  // A chain of `chain` links ending at `t`.
-  let prev = t;
-  for (let i = chain - 1; i >= 1; i--) {
-    await Deno.symlink(prev, join(dir, `hop${i}.md`));
-    prev = `hop${i}.md`;
+/** Builds one layout: the fixture, the `d` ancestor, and a `chain`-link leaf to `t`. */
+async function buildLayout(
+  proj: string,
+  outside: string,
+  shape: { ancestor: Ancestor; chain: number; style: HopStyle; t: string },
+): Promise<void> {
+  await buildFixture(proj, outside);
+  const dir = await buildAncestor(proj, outside, shape.ancestor);
+  // chain 0: the leaf is a real file, no link at all — the control case.
+  if (shape.chain === 0) return await Deno.writeTextFile(join(dir, "leaf.md"), "leaf");
+  // A chain of `chain` links ending at `t`: hop1 … hop(chain-1), then the leaf.
+  const hops = HOP[shape.style];
+  let prev = shape.t;
+  for (let i = shape.chain - 1; i >= 1; i--) {
+    await Deno.symlink(prev, join(await hops.dir(dir), `hop${i}.md`));
+    prev = hops.text(i);
   }
   await Deno.symlink(prev, join(dir, "leaf.md"));
 }
 
 /** Every combination worth generating, enumerated rather than randomised, so a
- * failure names a layout that can be rebuilt by hand. */
+ * failure names a layout that can be rebuilt by hand. A hop style only varies a
+ * chain that has intermediate hops (2 links or more). */
 function layouts(): Layout[] {
   const out: Layout[] = [];
   for (const ancestor of ["real", "link-inside", "link-outside"] as const) {
     for (const chain of [0, 1, 2, 3]) {
-      for (const key of Object.keys(targets("", "")) as TargetKey[]) {
-        out.push({
-          name: `ancestor=${ancestor} chain=${chain} target=${key}`,
-          build: (proj, outside) => buildLayout(proj, outside, ancestor, chain, key),
-        });
+      const styles: HopStyle[] = chain < 2 ? ["sibling"] : ["sibling", "dotted", "other-dir"];
+      for (const style of styles) {
+        for (const key of Object.keys(targets("", "")) as TargetKey[]) {
+          out.push({
+            name: `ancestor=${ancestor} chain=${chain} hops=${style} target=${key}`,
+            build: (proj, outside) =>
+              buildLayout(proj, outside, {
+                ancestor,
+                chain,
+                style,
+                t: targets(proj, outside)[key],
+              }),
+          });
+        }
       }
     }
   }
@@ -112,24 +157,45 @@ function layouts(): Layout[] {
  *
  * Writes a marker, then asks `realPath` where the file that now exists is. That
  * is the only definition of the invariant the guard protects, and it is not
- * open to interpretation.
+ * open to interpretation. A write the kernel refuses comes back as the error's
+ * name, so the run can say how many layouts never tested anything, and why.
  */
-async function whereAWriteLands(p: string): Promise<string | "unwritable"> {
+async function whereAWriteLands(p: string): Promise<string | { unwritable: string }> {
   try {
     await Deno.writeTextFile(p, "marker");
-  } catch {
-    return "unwritable";
-  }
-  try {
     return await Deno.realPath(p);
-  } catch {
-    return "unwritable";
+  } catch (err) {
+    if (!(err instanceof Error)) throw err;
+    return { unwritable: err.name };
   }
 }
+
+/** What `resolveTarget` says about `p`, or the name of what it threw. */
+async function ours(p: string): Promise<string> {
+  try {
+    return await resolveTarget(p);
+  } catch (err) {
+    if (!(err instanceof Error)) throw err;
+    return `threw ${err.name}`;
+  }
+}
+
+/**
+ * The share of layouts the kernel may refuse to write before the run counts as
+ * having tested too little: a generator change that made most layouts
+ * unwritable — each one skipped, since a refused write cannot be an escape —
+ * fails here instead of passing on the few left.
+ *
+ * Measured at 122 of 288 (42%), all `NotFound`, with Deno 2.9.8 on macOS: under the
+ * task's scoped flags Deno refuses to write through a link to an absent file in
+ * another folder, which `-A` writes through, so those layouts are skipped.
+ */
+const MAX_UNWRITABLE_SHARE = 0.5;
 
 symlinkTest("resolveTarget agrees with the kernel on every generated layout", async () => {
   const all = layouts();
   const disagreements: string[] = [];
+  const unwritable = new Map<string, number>();
 
   for (const layout of all) {
     const root = await Deno.makeTempDir({ prefix: "diff-" });
@@ -140,31 +206,30 @@ symlinkTest("resolveTarget agrees with the kernel on every generated layout", as
     try {
       await layout.build(proj, outside);
       const p = join(proj, "d", "leaf.md");
-
-      let ours: string | "threw";
-      try {
-        ours = await resolveTarget(p);
-      } catch {
-        ours = "threw";
-      }
-
+      const said = await ours(p);
       const truth = await whereAWriteLands(p);
-
       // A path the kernel refuses to write is one our guard may answer either
-      // way — it cannot be an escape. Everything else must match exactly.
-      if (truth === "unwritable") continue;
-      if (ours === "threw" || ours !== truth) {
-        disagreements.push(`${layout.name}\n    ours:  ${ours}\n    truth: ${truth}`);
+      // way — it cannot be an escape. It is counted, never silently skipped.
+      if (typeof truth !== "string") {
+        unwritable.set(truth.unwritable, (unwritable.get(truth.unwritable) ?? 0) + 1);
+      } else if (said !== truth) {
+        disagreements.push(`${layout.name}\n    ours:  ${said}\n    truth: ${truth}`);
       }
     } finally {
       await Deno.remove(root, { recursive: true });
     }
   }
 
+  const skipped = [...unwritable.values()].reduce((a, b) => a + b, 0);
+  const why = [...unwritable].map(([name, n]) => `${name} ${n}`).join(", ");
   assertEquals(
     disagreements,
     [],
     `${disagreements.length} of ${all.length} layouts resolve somewhere other than where a write lands:\n\n` +
       disagreements.join("\n\n"),
+  );
+  assert(
+    skipped <= all.length * MAX_UNWRITABLE_SHARE,
+    `${skipped} of ${all.length} layouts are unwritable (${why}): the generator tests too little`,
   );
 });
