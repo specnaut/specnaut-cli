@@ -1734,6 +1734,12 @@
     {
       "category": "spec-root",
       "name": "specify",
+      "suffix": "scripts/bash/branch-naming.sh",
+      "source": "core/specnaut/scripts/bash/branch-naming.sh"
+    },
+    {
+      "category": "spec-root",
+      "name": "specify",
       "suffix": "scripts/bash/run-gate.sh",
       "source": "core/specnaut/scripts/bash/run-gate.sh",
       "executable": true
@@ -1838,6 +1844,12 @@
       "name": "specify",
       "suffix": "scripts/powershell/create-new-feature.ps1",
       "source": "core/specnaut/scripts/powershell/create-new-feature.ps1"
+    },
+    {
+      "category": "spec-root",
+      "name": "specify",
+      "suffix": "scripts/powershell/branch-naming.ps1",
+      "source": "core/specnaut/scripts/powershell/branch-naming.ps1"
     },
     {
       "category": "spec-root",
