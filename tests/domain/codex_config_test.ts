@@ -9,19 +9,17 @@ import { CodexHarness } from "../../src/infrastructure/harness/codex_harness.ts"
 import { CORE_BUNDLE } from "../../src/templates_bundle.ts";
 
 /**
- * cli#599 — a subagent spawned without a role must not inherit the primary
- * session's model.
+ * The `[agents]` defaults a Codex project gets (cli#599, revised by cli#707).
  *
- * Codex resolves a child's model as: explicit spawn value → `[agents]` default
- * → the parent's value. Specnaut emitted no `[agents]` default anywhere, so for
- * a child dispatched by task description the last link was the only one. That
- * is invisible, and it compounds: raising the primary model raises every such
- * child with it.
+ * Two things are pinned. A subagent spawned without a role gets a `medium`
+ * reasoning default, so untiered work does not run at the session's deepest
+ * budget by accident; and the session's subagents are capped in number. No
+ * model is set anywhere — every child, role or not, runs on the session's
+ * model, because Specnaut names no model version.
  *
  * These assert from the GENERATED artefacts — what `mapBundle` actually emits —
- * rather than from the templates, because the defect was never in the template
- * content. Every bundled role TOML already pinned a model; the gap was that
- * nothing made a role-less dispatch land on one.
+ * rather than from the templates, because what reaches the user is the
+ * adapter's output, not the template it started from.
  */
 
 const OPTS = { backlogBackend: "local", versionScheme: "semver", specBackend: "local" } as const;
@@ -48,6 +46,16 @@ Deno.test("the reasoning default is not the deepest budget", () => {
   // defaulting it to the deepest budget would make silent escalation the design.
   assert(!codexAgentDefaultsBlock().includes('default_subagent_reasoning_effort = "xhigh"'));
   assertStringIncludes(codexAgentDefaultsBlock(), 'default_subagent_reasoning_effort = "medium"');
+});
+
+Deno.test("the comment calls the reasoning effort a default, not a cap", () => {
+  // A role TOML may set a deeper budget, so the value is a floor for role-less
+  // children, never a ceiling. The comment names the value the block writes.
+  const block = codexAgentDefaultsBlock();
+  const effort = block.match(/^default_subagent_reasoning_effort = "(\w+)"$/m)?.[1];
+  assert(effort, "the block writes no reasoning default");
+  assertStringIncludes(block, `sets a ${effort} default`);
+  assert(!/\bcaps\b/.test(block), "the comment calls the reasoning default a cap");
 });
 
 Deno.test("the config is a merge block, never a whole-file write", () => {
@@ -148,8 +156,15 @@ Deno.test("the always-on AGENTS.md names agent_type on the Codex path", () => {
     file.content,
     "agent_type=",
     "AGENTS.md documents dispatch without naming agent_type, so a reader on " +
-      "Codex follows it into the inheritance cli#599 closes",
+      "Codex follows it into the role-less dispatch cli#599 bounds",
   );
+  // Name- and description-dispatch both run on the session's model (cli#707);
+  // what a description-dispatched child loses on Codex is the role's budget.
+  assert(
+    !file.content.includes("primary session's model"),
+    "AGENTS.md still says a description-dispatched child runs on a different model",
+  );
+  assertStringIncludes(file.content, "without its reasoning budget");
 });
 
 Deno.test("the block enables agents explicitly (cli#681), and never writes the legacy alias", () => {

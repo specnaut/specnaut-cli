@@ -140,8 +140,8 @@ and you say so. No file means no addendum — say nothing about it.
 
 **Dispatch a Specnaut agent by its name, never by describing the task.** On Claude Code that is
 `Task(subagent_type: "<name>")`; on Codex, `spawn_agent(agent_type="<name>")`. A child started
-from a description selects no role: it runs without that agent's instructions and, on Codex, on
-the primary session's model.
+from a description selects no role: it runs without that agent's instructions and, on Codex,
+without its reasoning budget.
 
 Each step of the chain that delegates names its agent:
 
