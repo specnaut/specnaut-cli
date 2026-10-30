@@ -705,8 +705,10 @@ confirmed closed.
    \`\`\`
 
    It confirms each issue closed, moves its card to Done, then reconciles the whole board once and
-   prints the sweep's summary line. Exit 20 — an issue was still open, its card left alone; 21 — a
-   move or the reconcile failed. Neither fails the merge, which has happened: report it.
+   prints the sweep's summary line. Its exit table is the header of \`_close_shipped.sh\` beside it;
+   this maps every exit there. **0** — settled. **20** — an issue was not confirmed closed, its card
+   left alone; **21** — a move or the reconcile failed. Neither fails the merge, which has happened:
+   report it. **2** — usage: a bad number was passed; fix the call.
 4. **Remove the spec directory — once, for the whole epic too:**
 
    \`\`\`
@@ -714,10 +716,19 @@ confirmed closed.
    \`\`\`
 
    \`<branch>\` is the feature branch \`land-feature.sh\` just landed — the one you merged, not one read
-   back from \`feature.json\`. It runs only on the base branch, only for a \`feature_directory\` that is
-   directly under \`.specnaut/specs/\`, named like that branch, and in git history, in its own commit,
-   pushed. Exit 22 is a skip, and its reason is printed — report it, never silently.
+   back from \`feature.json\`. What it removes, and when it refuses, is the script's header; this list
+   maps every exit that header lists — an exit it does not list is a failure: report it verbatim.
    Never run it before the close succeeded: nobody authorised a removal then.
+   - **0** — removed and pushed: report its line.
+   - **22** — skipped, nothing changed: its reason is printed — report it, never silently.
+   - **24** — the tracked files are removed and pushed; the files it lists are in no commit and were
+     kept. Report them by name and never delete them: they are someone's only copy.
+   - **7** — the push was rejected; the removal commit is on the local base, and \`feature.json\` with
+     it — so never re-run the script (it would skip, 22). \`git pull --rebase --no-autostash origin
+     <base>\`, then \`git push origin <base>\`; a conflict: \`git rebase --abort\`, report it unpushed.
+   - **23** — something else was staged while it ran: the removal is undone, nothing committed.
+     Report the path it names; that staged work is someone else's — leave it staged.
+   - **2 · 3** — usage, or the base branch is unknown: report it; nothing changed.
 
 ## The report names every item, one line each
 
@@ -6634,29 +6645,103 @@ exit 0
     suffix: "close-shipped.sh",
     content: `#!/usr/bin/env bash
 # After a merge: settle the board for the shipped items (phases/merge-close.md,
-# spec 042) — the local copy. On this backend there is no separate issue to
-# close: \`move.sh <n> Done\` IS the close, in one write, and there is no
-# board to reconcile against. Same exit contract as the forge copies.
-#
-# Exit: 0 every item settled · 2 usage · 21 a move failed.
+# spec 042) — the local half. On this backend there is no separate issue to
+# close: \`move.sh <n> Done\` IS the close, in one write, and there is no board
+# to reconcile against. The loop, the lines and the exit table are the shared
+# body, _close_shipped.sh, beside this file.
 #
 # Usage: close-shipped.sh <issue-number>…
 set -uo pipefail
 here=\$(CDPATH="" cd "\$(dirname "\${BASH_SOURCE[0]}")" && pwd)
 
+confirm_closed() { :; }
+reconcile() { :; }
+
+# shellcheck source=../_close_shipped.sh
+. "\$here/_close_shipped.sh"
+`,
+    executable: true,
+    backend: "local",
+    skipIfExists: false,
+  },
+  {
+    category: "backlog-script",
+    name: "_close_shipped",
+    suffix: "_close_shipped.sh",
+    content: `# shellcheck shell=bash
+# The one body of close-shipped.sh (phases/merge-close.md, spec 042, cli#711).
+# Sourced — never run — by the backend's own close-shipped.sh, which sets
+# \`here\` (its directory: this file and its siblings sit there) and defines:
+#
+#   confirm_closed <n>  0 when the issue is confirmed closed; else prints the
+#                       reason on stdout and fails. Where the move IS the
+#                       close (local, cloud), it always succeeds.
+#   reconcile           the board-wide pass after the moves, through
+#                       sweep_board / reconciled / failed below; 0 when it
+#                       settled, non-zero when it did not. \`:\` where there is
+#                       no board to reconcile against.
+#
+# Per issue, in the order given: confirm it closed — an open issue's card is
+# left alone, because the close comes first and a Done card over an open issue
+# is the drift the sweep exists to report — then move it to Done. Then
+# reconcile once. One line per item on stdout (DONE, OPEN, FAILED, RECONCILED),
+# REOPENED lines and the sweep's own summary line verbatim.
+#
+# Exit — the full table; phases/merge-close.md maps each one:
+#   0  every item settled
+#   2  usage: no argument, or one that is not an issue number
+#   20 an issue was not confirmed closed (its card left alone; the others
+#      still settled) — over 21 when both happened
+#   21 a card move or the reconcile failed — reported; the merge has already
+#      happened
+#
+# Usage: close-shipped.sh <issue-number>…
+
+reconciled() { echo "RECONCILED #\$1"; }
+failed() { echo "FAILED \$*"; }
+
+# sweep_board <sweep-closed.sh argument>… — runs the sweep, prints its
+# REOPENED lines, and sets DRIFTED (numbers only) and SWEEP_SUMMARY (its last
+# line, printed after the moves). A sweep that fails prints its last line and
+# a FAILED line, and fails.
+DRIFTED=""
+SWEEP_SUMMARY=""
+sweep_board() {
+  local sweep
+  if ! sweep=\$(bash "\$here/sweep-closed.sh" "\$@" 2>&1); then
+    printf '%s\\n' "\$sweep" | tail -1
+    failed "reconcile — the sweep did not complete"
+    return 1
+  fi
+  DRIFTED=\$(printf '%s\\n' "\$sweep" | awk '\$1 == "DRIFTED" { print \$2 }' | grep -E '^[0-9]+\$' || true)
+  printf '%s\\n' "\$sweep" | grep '^REOPENED' || true
+  SWEEP_SUMMARY=\$(printf '%s\\n' "\$sweep" | tail -1)
+}
+
 [ \$# -gt 0 ] || { echo "usage: close-shipped.sh <issue-number>…" >&2; exit 2; }
 for n in "\$@"; do
   [[ \$n =~ ^[1-9][0-9]{0,9}\$ ]] || { echo "close-shipped: '\$n' is not an issue number" >&2; exit 2; }
 done
+
 rc=0
 for n in "\$@"; do
+  if ! why=\$(confirm_closed "\$n"); then
+    echo "OPEN #\$n — not confirmed closed (\$why); card left alone"
+    rc=20
+    continue
+  fi
   if bash "\$here/move.sh" "\$n" Done >/dev/null 2>&1; then
     echo "DONE #\$n"
   else
-    echo "FAILED #\$n — it did not move to Done"
-    rc=21
+    failed "#\$n — the card did not move to Done"
+    [ "\$rc" -ne 0 ] || rc=21
   fi
 done
+
+if ! reconcile; then
+  [ "\$rc" -ne 0 ] || rc=21
+fi
+[ -z "\$SWEEP_SUMMARY" ] || printf '%s\\n' "\$SWEEP_SUMMARY"
 exit "\$rc"
 `,
     executable: true,
@@ -8563,23 +8648,97 @@ exit 0
     suffix: "close-shipped.sh",
     content: `#!/usr/bin/env bash
 # After a merge: settle the board for the items the product-owner just closed
-# (phases/merge-close.md, spec 042) — the github copy. One copy per backend, one
-# exit contract; the installer picks this one, so no caller branches on it.
-#
-# Per issue, in the order given: confirm the issue is closed (cascade-check.sh
-# exit 12, and nothing else, means closed) — an open issue's card is left
-# alone, because the close comes first and a Done card over an open issue is
-# the drift the sweep exists to report. Then move it to Done. Then reconcile
-# the whole board once: sweep-closed.sh --passes 2, and one move-batch.sh Done for every DRIFTED.
-# One line per item on stdout, and the sweep's own summary line verbatim.
-#
-# Exit: 0 every item settled · 2 usage · 20 an issue was still open (its card
-# left alone; the others still settled) · 21 a card move or the reconcile
-# failed — reported, the merge has already happened.
+# (phases/merge-close.md, spec 042) — the github half. The loop, the lines and
+# the exit table are the shared body, _close_shipped.sh, beside this file; what
+# is here is how github confirms a close and reconciles the board.
 #
 # Usage: close-shipped.sh <issue-number>…
 set -uo pipefail
 here=\$(CDPATH="" cd "\$(dirname "\${BASH_SOURCE[0]}")" && pwd)
+
+# cascade-check.sh exit 12, and nothing else, means closed. Its stdout (issue
+# titles) is not this script's to print; its stderr — why it could not answer —
+# passes through.
+confirm_closed() {
+  local state=0
+  bash "\$here/cascade-check.sh" "\$1" >/dev/null || state=\$?
+  [ "\$state" -eq 12 ] || { echo "cascade-check exit \$state"; return 1; }
+}
+
+# The whole board once: two sweep passes, then one move-batch.sh Done for every DRIFTED.
+reconcile() {
+  sweep_board --passes 2 || return 1
+  local d
+  [ -n "\$DRIFTED" ] || return 0
+  # shellcheck disable=SC2086 # numbers only, validated by sweep_board
+  if bash "\$here/move-batch.sh" Done \$DRIFTED >/dev/null 2>&1; then
+    for d in \$DRIFTED; do reconciled "\$d"; done
+  else
+    failed "reconcile — move-batch.sh did not move the drifted cards"
+    return 1
+  fi
+}
+
+# shellcheck source=../_close_shipped.sh
+. "\$here/_close_shipped.sh"
+`,
+    executable: true,
+    backend: "github",
+    skipIfExists: false,
+  },
+  {
+    category: "backlog-script",
+    name: "_close_shipped",
+    suffix: "_close_shipped.sh",
+    content: `# shellcheck shell=bash
+# The one body of close-shipped.sh (phases/merge-close.md, spec 042, cli#711).
+# Sourced — never run — by the backend's own close-shipped.sh, which sets
+# \`here\` (its directory: this file and its siblings sit there) and defines:
+#
+#   confirm_closed <n>  0 when the issue is confirmed closed; else prints the
+#                       reason on stdout and fails. Where the move IS the
+#                       close (local, cloud), it always succeeds.
+#   reconcile           the board-wide pass after the moves, through
+#                       sweep_board / reconciled / failed below; 0 when it
+#                       settled, non-zero when it did not. \`:\` where there is
+#                       no board to reconcile against.
+#
+# Per issue, in the order given: confirm it closed — an open issue's card is
+# left alone, because the close comes first and a Done card over an open issue
+# is the drift the sweep exists to report — then move it to Done. Then
+# reconcile once. One line per item on stdout (DONE, OPEN, FAILED, RECONCILED),
+# REOPENED lines and the sweep's own summary line verbatim.
+#
+# Exit — the full table; phases/merge-close.md maps each one:
+#   0  every item settled
+#   2  usage: no argument, or one that is not an issue number
+#   20 an issue was not confirmed closed (its card left alone; the others
+#      still settled) — over 21 when both happened
+#   21 a card move or the reconcile failed — reported; the merge has already
+#      happened
+#
+# Usage: close-shipped.sh <issue-number>…
+
+reconciled() { echo "RECONCILED #\$1"; }
+failed() { echo "FAILED \$*"; }
+
+# sweep_board <sweep-closed.sh argument>… — runs the sweep, prints its
+# REOPENED lines, and sets DRIFTED (numbers only) and SWEEP_SUMMARY (its last
+# line, printed after the moves). A sweep that fails prints its last line and
+# a FAILED line, and fails.
+DRIFTED=""
+SWEEP_SUMMARY=""
+sweep_board() {
+  local sweep
+  if ! sweep=\$(bash "\$here/sweep-closed.sh" "\$@" 2>&1); then
+    printf '%s\\n' "\$sweep" | tail -1
+    failed "reconcile — the sweep did not complete"
+    return 1
+  fi
+  DRIFTED=\$(printf '%s\\n' "\$sweep" | awk '\$1 == "DRIFTED" { print \$2 }' | grep -E '^[0-9]+\$' || true)
+  printf '%s\\n' "\$sweep" | grep '^REOPENED' || true
+  SWEEP_SUMMARY=\$(printf '%s\\n' "\$sweep" | tail -1)
+}
 
 [ \$# -gt 0 ] || { echo "usage: close-shipped.sh <issue-number>…" >&2; exit 2; }
 for n in "\$@"; do
@@ -8588,39 +8747,23 @@ done
 
 rc=0
 for n in "\$@"; do
-  bash "\$here/cascade-check.sh" "\$n" >/dev/null 2>&1
-  state=\$?
-  if [ "\$state" -ne 12 ]; then
-    echo "OPEN #\$n — not confirmed closed (cascade-check exit \$state); card left alone"
+  if ! why=\$(confirm_closed "\$n"); then
+    echo "OPEN #\$n — not confirmed closed (\$why); card left alone"
     rc=20
     continue
   fi
   if bash "\$here/move.sh" "\$n" Done >/dev/null 2>&1; then
     echo "DONE #\$n"
   else
-    echo "FAILED #\$n — the card did not move to Done"
+    failed "#\$n — the card did not move to Done"
     [ "\$rc" -ne 0 ] || rc=21
   fi
 done
 
-if ! sweep=\$(bash "\$here/sweep-closed.sh" --passes 2 2>&1); then
-  printf '%s\\n' "\$sweep" | tail -1
-  echo "FAILED reconcile — the sweep did not complete"
+if ! reconcile; then
   [ "\$rc" -ne 0 ] || rc=21
-  exit "\$rc"
 fi
-drifted=\$(printf '%s\\n' "\$sweep" | awk '\$1 == "DRIFTED" { print \$2 }' | grep -E '^[0-9]+\$' || true)
-printf '%s\\n' "\$sweep" | grep '^REOPENED' || true
-if [ -n "\$drifted" ]; then
-  # shellcheck disable=SC2086 # numbers only, validated above
-  if bash "\$here/move-batch.sh" Done \$drifted >/dev/null 2>&1; then
-    for d in \$drifted; do echo "RECONCILED #\$d"; done
-  else
-    echo "FAILED reconcile — move-batch.sh did not move the drifted cards"
-    [ "\$rc" -ne 0 ] || rc=21
-  fi
-fi
-printf '%s\\n' "\$sweep" | tail -1
+[ -z "\$SWEEP_SUMMARY" ] || printf '%s\\n' "\$SWEEP_SUMMARY"
 exit "\$rc"
 `,
     executable: true,
@@ -9731,25 +9874,100 @@ exit 0
     suffix: "close-shipped.sh",
     content: `#!/usr/bin/env bash
 # After a merge: settle the board for the items the product-owner just closed
-# (phases/merge-close.md, spec 042) — the gitlab copy. One copy per backend, one
-# exit contract; the installer picks this one, so no caller branches on it.
-#
-# Per issue, in the order given: confirm the issue is closed (cascade-check.sh
-# exit 12, and nothing else, means closed) — an open issue's card is left
-# alone, because the close comes first and a Done card over an open issue is
-# the drift the sweep exists to report. Then move it to Done. Then reconcile
-# the whole board once: sweep-closed.sh, one pass (this backend's sweep takes
-# no --passes; the items settled here were confirmed closed above), and one
-# move.sh Done per DRIFTED.
-# One line per item on stdout, and the sweep's own summary line verbatim.
-#
-# Exit: 0 every item settled · 2 usage · 20 an issue was still open (its card
-# left alone; the others still settled) · 21 a card move or the reconcile
-# failed — reported, the merge has already happened.
+# (phases/merge-close.md, spec 042) — the gitlab half. The loop, the lines and
+# the exit table are the shared body, _close_shipped.sh, beside this file; what
+# is here is how gitlab confirms a close and reconciles the board.
 #
 # Usage: close-shipped.sh <issue-number>…
 set -uo pipefail
 here=\$(CDPATH="" cd "\$(dirname "\${BASH_SOURCE[0]}")" && pwd)
+
+# cascade-check.sh exit 12, and nothing else, means closed. Its stdout (issue
+# titles) is not this script's to print; its stderr — why it could not answer —
+# passes through.
+confirm_closed() {
+  local state=0
+  bash "\$here/cascade-check.sh" "\$1" >/dev/null || state=\$?
+  [ "\$state" -eq 12 ] || { echo "cascade-check exit \$state"; return 1; }
+}
+
+# The whole board once: one sweep pass — this backend's sweep takes no
+# --passes, and the items settled here were confirmed closed above — then one
+# move.sh Done per DRIFTED.
+reconcile() {
+  local d ok=0
+  sweep_board || return 1
+  for d in \$DRIFTED; do
+    if bash "\$here/move.sh" "\$d" Done >/dev/null 2>&1; then
+      reconciled "\$d"
+    else
+      failed "#\$d — the drifted card did not move"
+      ok=1
+    fi
+  done
+  return "\$ok"
+}
+
+# shellcheck source=../_close_shipped.sh
+. "\$here/_close_shipped.sh"
+`,
+    executable: true,
+    backend: "gitlab",
+    skipIfExists: false,
+  },
+  {
+    category: "backlog-script",
+    name: "_close_shipped",
+    suffix: "_close_shipped.sh",
+    content: `# shellcheck shell=bash
+# The one body of close-shipped.sh (phases/merge-close.md, spec 042, cli#711).
+# Sourced — never run — by the backend's own close-shipped.sh, which sets
+# \`here\` (its directory: this file and its siblings sit there) and defines:
+#
+#   confirm_closed <n>  0 when the issue is confirmed closed; else prints the
+#                       reason on stdout and fails. Where the move IS the
+#                       close (local, cloud), it always succeeds.
+#   reconcile           the board-wide pass after the moves, through
+#                       sweep_board / reconciled / failed below; 0 when it
+#                       settled, non-zero when it did not. \`:\` where there is
+#                       no board to reconcile against.
+#
+# Per issue, in the order given: confirm it closed — an open issue's card is
+# left alone, because the close comes first and a Done card over an open issue
+# is the drift the sweep exists to report — then move it to Done. Then
+# reconcile once. One line per item on stdout (DONE, OPEN, FAILED, RECONCILED),
+# REOPENED lines and the sweep's own summary line verbatim.
+#
+# Exit — the full table; phases/merge-close.md maps each one:
+#   0  every item settled
+#   2  usage: no argument, or one that is not an issue number
+#   20 an issue was not confirmed closed (its card left alone; the others
+#      still settled) — over 21 when both happened
+#   21 a card move or the reconcile failed — reported; the merge has already
+#      happened
+#
+# Usage: close-shipped.sh <issue-number>…
+
+reconciled() { echo "RECONCILED #\$1"; }
+failed() { echo "FAILED \$*"; }
+
+# sweep_board <sweep-closed.sh argument>… — runs the sweep, prints its
+# REOPENED lines, and sets DRIFTED (numbers only) and SWEEP_SUMMARY (its last
+# line, printed after the moves). A sweep that fails prints its last line and
+# a FAILED line, and fails.
+DRIFTED=""
+SWEEP_SUMMARY=""
+sweep_board() {
+  local sweep
+  if ! sweep=\$(bash "\$here/sweep-closed.sh" "\$@" 2>&1); then
+    printf '%s\\n' "\$sweep" | tail -1
+    failed "reconcile — the sweep did not complete"
+    return 1
+  fi
+  DRIFTED=\$(printf '%s\\n' "\$sweep" | awk '\$1 == "DRIFTED" { print \$2 }' | grep -E '^[0-9]+\$' || true)
+  printf '%s\\n' "\$sweep" | grep '^REOPENED' || true
+  SWEEP_SUMMARY=\$(printf '%s\\n' "\$sweep" | tail -1)
+}
 
 [ \$# -gt 0 ] || { echo "usage: close-shipped.sh <issue-number>…" >&2; exit 2; }
 for n in "\$@"; do
@@ -9758,38 +9976,23 @@ done
 
 rc=0
 for n in "\$@"; do
-  bash "\$here/cascade-check.sh" "\$n" >/dev/null 2>&1
-  state=\$?
-  if [ "\$state" -ne 12 ]; then
-    echo "OPEN #\$n — not confirmed closed (cascade-check exit \$state); card left alone"
+  if ! why=\$(confirm_closed "\$n"); then
+    echo "OPEN #\$n — not confirmed closed (\$why); card left alone"
     rc=20
     continue
   fi
   if bash "\$here/move.sh" "\$n" Done >/dev/null 2>&1; then
     echo "DONE #\$n"
   else
-    echo "FAILED #\$n — the card did not move to Done"
+    failed "#\$n — the card did not move to Done"
     [ "\$rc" -ne 0 ] || rc=21
   fi
 done
 
-if ! sweep=\$(bash "\$here/sweep-closed.sh" 2>&1); then
-  printf '%s\\n' "\$sweep" | tail -1
-  echo "FAILED reconcile — the sweep did not complete"
+if ! reconcile; then
   [ "\$rc" -ne 0 ] || rc=21
-  exit "\$rc"
 fi
-drifted=\$(printf '%s\\n' "\$sweep" | awk '\$1 == "DRIFTED" { print \$2 }' | grep -E '^[0-9]+\$' || true)
-printf '%s\\n' "\$sweep" | grep '^REOPENED' || true
-for d in \$drifted; do
-  if bash "\$here/move.sh" "\$d" Done >/dev/null 2>&1; then
-    echo "RECONCILED #\$d"
-  else
-    echo "FAILED #\$d — the drifted card did not move"
-    [ "\$rc" -ne 0 ] || rc=21
-  fi
-done
-printf '%s\\n' "\$sweep" | tail -1
+[ -z "\$SWEEP_SUMMARY" ] || printf '%s\\n' "\$SWEEP_SUMMARY"
 exit "\$rc"
 `,
     executable: true,
@@ -10330,29 +10533,103 @@ exit 0
     suffix: "close-shipped.sh",
     content: `#!/usr/bin/env bash
 # After a merge: settle the board for the shipped items (phases/merge-close.md,
-# spec 042) — the cloud copy. On this backend there is no separate issue to
-# close: \`move.sh <n> Done\` IS the close, in one write, and there is no
-# board to reconcile against. Same exit contract as the forge copies.
-#
-# Exit: 0 every item settled · 2 usage · 21 a move failed.
+# spec 042) — the cloud half. On this backend there is no separate issue to
+# close: \`move.sh <n> Done\` IS the close, in one write, and there is no board
+# to reconcile against. The loop, the lines and the exit table are the shared
+# body, _close_shipped.sh, beside this file.
 #
 # Usage: close-shipped.sh <issue-number>…
 set -uo pipefail
 here=\$(CDPATH="" cd "\$(dirname "\${BASH_SOURCE[0]}")" && pwd)
 
+confirm_closed() { :; }
+reconcile() { :; }
+
+# shellcheck source=../_close_shipped.sh
+. "\$here/_close_shipped.sh"
+`,
+    executable: true,
+    backend: "cloud",
+    skipIfExists: false,
+  },
+  {
+    category: "backlog-script",
+    name: "_close_shipped",
+    suffix: "_close_shipped.sh",
+    content: `# shellcheck shell=bash
+# The one body of close-shipped.sh (phases/merge-close.md, spec 042, cli#711).
+# Sourced — never run — by the backend's own close-shipped.sh, which sets
+# \`here\` (its directory: this file and its siblings sit there) and defines:
+#
+#   confirm_closed <n>  0 when the issue is confirmed closed; else prints the
+#                       reason on stdout and fails. Where the move IS the
+#                       close (local, cloud), it always succeeds.
+#   reconcile           the board-wide pass after the moves, through
+#                       sweep_board / reconciled / failed below; 0 when it
+#                       settled, non-zero when it did not. \`:\` where there is
+#                       no board to reconcile against.
+#
+# Per issue, in the order given: confirm it closed — an open issue's card is
+# left alone, because the close comes first and a Done card over an open issue
+# is the drift the sweep exists to report — then move it to Done. Then
+# reconcile once. One line per item on stdout (DONE, OPEN, FAILED, RECONCILED),
+# REOPENED lines and the sweep's own summary line verbatim.
+#
+# Exit — the full table; phases/merge-close.md maps each one:
+#   0  every item settled
+#   2  usage: no argument, or one that is not an issue number
+#   20 an issue was not confirmed closed (its card left alone; the others
+#      still settled) — over 21 when both happened
+#   21 a card move or the reconcile failed — reported; the merge has already
+#      happened
+#
+# Usage: close-shipped.sh <issue-number>…
+
+reconciled() { echo "RECONCILED #\$1"; }
+failed() { echo "FAILED \$*"; }
+
+# sweep_board <sweep-closed.sh argument>… — runs the sweep, prints its
+# REOPENED lines, and sets DRIFTED (numbers only) and SWEEP_SUMMARY (its last
+# line, printed after the moves). A sweep that fails prints its last line and
+# a FAILED line, and fails.
+DRIFTED=""
+SWEEP_SUMMARY=""
+sweep_board() {
+  local sweep
+  if ! sweep=\$(bash "\$here/sweep-closed.sh" "\$@" 2>&1); then
+    printf '%s\\n' "\$sweep" | tail -1
+    failed "reconcile — the sweep did not complete"
+    return 1
+  fi
+  DRIFTED=\$(printf '%s\\n' "\$sweep" | awk '\$1 == "DRIFTED" { print \$2 }' | grep -E '^[0-9]+\$' || true)
+  printf '%s\\n' "\$sweep" | grep '^REOPENED' || true
+  SWEEP_SUMMARY=\$(printf '%s\\n' "\$sweep" | tail -1)
+}
+
 [ \$# -gt 0 ] || { echo "usage: close-shipped.sh <issue-number>…" >&2; exit 2; }
 for n in "\$@"; do
   [[ \$n =~ ^[1-9][0-9]{0,9}\$ ]] || { echo "close-shipped: '\$n' is not an issue number" >&2; exit 2; }
 done
+
 rc=0
 for n in "\$@"; do
+  if ! why=\$(confirm_closed "\$n"); then
+    echo "OPEN #\$n — not confirmed closed (\$why); card left alone"
+    rc=20
+    continue
+  fi
   if bash "\$here/move.sh" "\$n" Done >/dev/null 2>&1; then
     echo "DONE #\$n"
   else
-    echo "FAILED #\$n — it did not move to Done"
-    rc=21
+    failed "#\$n — the card did not move to Done"
+    [ "\$rc" -ne 0 ] || rc=21
   fi
 done
+
+if ! reconcile; then
+  [ "\$rc" -ne 0 ] || rc=21
+fi
+[ -z "\$SWEEP_SUMMARY" ] || printf '%s\\n' "\$SWEEP_SUMMARY"
 exit "\$rc"
 `,
     executable: true,
@@ -23442,17 +23719,26 @@ fi
 # \`.specnaut/feature.json\` names a \`feature_directory\`; it exists; it is in
 # git history (so the removal is lossless — \`git log --all -- <dir>\` brings
 # it back); and it is the landed feature's directory: relative, no \`..\`, not
-# a link, resolving directly under \`.specnaut/specs/\`, its basename the
-# branch that landed (a stale feature.json names another). Nothing else may
-# be staged, nor edited under it. Then \`git rm -r\` of it and of
-# feature.json, a check that every staged path is one of those deletions,
-# a commit, and a push with an explicit refspec and never its tags. Under
-# \`merge: manual\` the landing hook holds this script (merge-commands.txt).
+# a link, resolving — every link on the path followed, \`.specnaut/specs\`
+# itself included — directly under this repository's \`.specnaut/specs/\`, its
+# basename the branch that landed (a stale feature.json names another).
+# Nothing else may be staged, nor edited under it. Then \`git rm -r\` of it and
+# of feature.json, a check that every staged path is one of those deletions,
+# a commit, and a push with an explicit refspec and never its tags. Files
+# under it that git does not track (ignored ones included) are in no commit:
+# they are listed, quoted, and kept — never deleted. Under \`merge: manual\`
+# the landing hook holds this script (merge-commands.txt).
 #
-# Exit: 0 removed and pushed · 2 usage · 3 base unknown · 22 skipped — the
-# condition that failed is printed, and nothing changed · 23 something else
-# was staged after the check (the removal undone, the rest left staged,
-# nothing committed) · 7 the push was rejected (the commit stays local).
+# Exit — the full table; phases/merge-close.md maps each one:
+#   0  removed and pushed: nothing is left under the directory
+#   2  usage
+#   3  the base branch is unknown
+#   7  the push was rejected (the commit stays on the local base)
+#   22 skipped — the condition that failed is printed, and nothing changed
+#   23 something else was staged after the check (the removal undone, the
+#      rest left staged, nothing committed)
+#   24 the tracked files are removed and pushed, but files git does not
+#      track remain under the directory, listed and kept
 #
 # Usage: remove-spec.sh <landed-branch>   (the feature branch just landed)
 set -euo pipefail
@@ -23482,7 +23768,9 @@ name=\${dir#.specnaut/specs/}
 [ "\$name" = "\$landed" ] || skip "'\$dir' is not the spec of \$landed, the branch that landed — feature.json is stale"
 [ ! -L "\$dir" ] || skip "'\$dir' is a link"
 [ -d "\$dir" ] || skip "'\$dir' does not exist"
-[ "\$(cd -P "\$dir" && pwd)" = "\$(cd -P .specnaut/specs && pwd)/\$name" ] || skip "'\$dir' resolves outside .specnaut/specs/"
+# Compared with the physical root, not with \`cd -P .specnaut/specs\`: a linked
+# \`.specnaut/specs\` resolves both sides to the same place elsewhere.
+[ "\$(cd -P "\$dir" && pwd)" = "\$(pwd -P)/.specnaut/specs/\$name" ] || skip "'\$dir' resolves outside .specnaut/specs/ — a link on its path"
 [ -n "\$(git log --all --oneline -1 -- "\$dir")" ] || skip "'\$dir' is in no commit — deleting it would destroy the only copy"
 
 id=\$(sed -n 's/.*"linked_issue"[[:space:]]*:[[:space:]]*\\([0-9][0-9]*\\).*/\\1/p' .specnaut/feature.json | head -1)
@@ -23504,10 +23792,19 @@ while IFS= read -r -d '' status && IFS= read -r -d '' path; do
   esac
 done < <(git diff --cached --no-renames --name-status -z)
 git commit --quiet -m "chore(\${id:-spec}): remove the spec directory for the shipped feature"
+# No --exclude-standard: an ignored file is in no commit either. -z, then %q,
+# so a name with a space or a newline still reads as one path.
+left=\$(git ls-files -o -z -- "\$dir" | while IFS= read -r -d '' p; do printf '  %q\\n' "\$p"; done)
 if ! out=\$(git -c push.followTags=false push --quiet --no-follow-tags origin "refs/heads/\$base:refs/heads/\$base" 2>&1); then
   printf '%s\\n' "\$out" >&2
   echo "remove-spec: the push was rejected — the commit stays on the local \$base" >&2
+  [ -z "\$left" ] || printf 'remove-spec: kept on disk, in no commit:\\n%s\\n' "\$left" >&2
   exit 7
+fi
+if [ -n "\$left" ]; then
+  echo "remove-spec: \$dir is out of git and pushed, but these files are in no commit and were kept on disk:" >&2
+  printf '%s\\n' "\$left" >&2
+  exit 24
 fi
 echo "remove-spec: removed \$dir — restore with: git log --all -- \$dir"
 `,
@@ -27161,7 +27458,8 @@ _cmd_emit() {
 # every script line: what it names is unknown here, so it is gated (fail
 # closed). An argument is never judged so: \`ls *.sh\` runs \`ls\`.
 # \`<words> except <flag>\`: that flag anywhere in the segment exempts it.
-# \`#\` comments and blank lines are skipped; a \`\\r\` (a CRLF checkout) is read past.
+# \`#\` comments and blank or whitespace-only lines are skipped; a \`\\r\` (a CRLF
+# checkout) is read past.
 
 # _listed_expands <word> — the shell rewrites it before it runs: a \`\$\`, a
 # substitution (_command.sh leaves a \`\$\` where one stood), \`*\`, \`?\`, a \`(\`
@@ -27184,6 +27482,9 @@ listed() {
     entry=\${line%% except *} except=""
     if [ "\$entry" != "\$line" ]; then except=\${line#* except }; fi
     read -r -a e <<<"\$entry"
+    # Blank or whitespace-only: no words to compare, so it would match every
+    # command. It matches nothing (cli#711).
+    [ -n "\${e[0]:-}" ] || continue
     ok=1
     for ((i = 0; i < \${#e[@]}; i++)); do
       if [ "\${e[i]}" = "\${POS[i]:-}" ]; then continue; fi
@@ -28455,7 +28756,7 @@ eff27f37501f08c5a39cfcc2c6c7a8382e0d0467dc4a63cf3d29bb84d5ea26d6  _approval.sh
 5b713fe0125c75f966127badec833c956a2b870afee57cc7247880bd3a730c9f  _command.sh
 fa8afb422b9af3b7f80580666d66e9332ed35cc3c24c7182300b3224f2a96548  _git.sh
 2829e6a5db6984fee451e242ba16beca68808a7647316cff24930aa8ec53c73a  _guard.sh
-e4a5ae19d443d2baed5fa070cfc0699a0505bd8f715df81f48d6ac1509d1d731  _listed.sh
+3dcdb0c218e595fccb18be8505c8ec38d4337942ab6993012bdb13c17a8a854e  _listed.sh
 f5552945f77fb0d24f56bbf2e97fb64d284d9c716abf211ebcbe081cacdf8bdf  _paths.sh
 d9ee2e6d0431952fd5b1d38468e57a21e7708e8466ca824480c7295be1447ecc  _simple.sh
 298471e25d869161087ddd4f4c0a488ca8ec5508ad01c4589e440af9274d0820  approve-on-prompt.sh
@@ -29163,7 +29464,8 @@ _cmd_emit() {
 # every script line: what it names is unknown here, so it is gated (fail
 # closed). An argument is never judged so: \`ls *.sh\` runs \`ls\`.
 # \`<words> except <flag>\`: that flag anywhere in the segment exempts it.
-# \`#\` comments and blank lines are skipped; a \`\\r\` (a CRLF checkout) is read past.
+# \`#\` comments and blank or whitespace-only lines are skipped; a \`\\r\` (a CRLF
+# checkout) is read past.
 
 # _listed_expands <word> — the shell rewrites it before it runs: a \`\$\`, a
 # substitution (_command.sh leaves a \`\$\` where one stood), \`*\`, \`?\`, a \`(\`
@@ -29186,6 +29488,9 @@ listed() {
     entry=\${line%% except *} except=""
     if [ "\$entry" != "\$line" ]; then except=\${line#* except }; fi
     read -r -a e <<<"\$entry"
+    # Blank or whitespace-only: no words to compare, so it would match every
+    # command. It matches nothing (cli#711).
+    [ -n "\${e[0]:-}" ] || continue
     ok=1
     for ((i = 0; i < \${#e[@]}; i++)); do
       if [ "\${e[i]}" = "\${POS[i]:-}" ]; then continue; fi
@@ -30457,7 +30762,7 @@ eff27f37501f08c5a39cfcc2c6c7a8382e0d0467dc4a63cf3d29bb84d5ea26d6  _approval.sh
 5b713fe0125c75f966127badec833c956a2b870afee57cc7247880bd3a730c9f  _command.sh
 fa8afb422b9af3b7f80580666d66e9332ed35cc3c24c7182300b3224f2a96548  _git.sh
 2829e6a5db6984fee451e242ba16beca68808a7647316cff24930aa8ec53c73a  _guard.sh
-e4a5ae19d443d2baed5fa070cfc0699a0505bd8f715df81f48d6ac1509d1d731  _listed.sh
+3dcdb0c218e595fccb18be8505c8ec38d4337942ab6993012bdb13c17a8a854e  _listed.sh
 f5552945f77fb0d24f56bbf2e97fb64d284d9c716abf211ebcbe081cacdf8bdf  _paths.sh
 d9ee2e6d0431952fd5b1d38468e57a21e7708e8466ca824480c7295be1447ecc  _simple.sh
 298471e25d869161087ddd4f4c0a488ca8ec5508ad01c4589e440af9274d0820  approve-on-prompt.sh
@@ -30489,17 +30794,17 @@ a8ee3b3537f1718a140bca74815dcfa5ce510bb87b62f63caebfebff090094a6  guard-release.
         "hooks": [
           {
             "type": "command",
-            "command": "r=\$PWD; while [ -n \\"\$r\\" ] && [ ! -d \\"\$r/.specnaut/hooks\\" ]; do r=\${r%/*}; done; [ \\"\$( (sha256sum 2>/dev/null || shasum -a 256) < \\"\$r/.specnaut/hooks/SHA256SUMS\\" 2>/dev/null | cut -c1-64)\\" = \\"f207df39e65080d2692c8d24e3184587b6800325f9b57d7b8c752964dcadb38c\\" ] && (cd \\"\$r/.specnaut/hooks\\" && (sha256sum -c --status SHA256SUMS 2>/dev/null || shasum -a 256 -c --status SHA256SUMS)) && exec bash \\"\$r/.specnaut/hooks/guard-merge.sh\\" codex; echo \\"specnaut: .specnaut/hooks changed since it was trusted — run specnaut upgrade, then /hooks\\" >&2; exit 2",
+            "command": "r=\$PWD; while [ -n \\"\$r\\" ] && [ ! -d \\"\$r/.specnaut/hooks\\" ]; do r=\${r%/*}; done; [ \\"\$( (sha256sum 2>/dev/null || shasum -a 256) < \\"\$r/.specnaut/hooks/SHA256SUMS\\" 2>/dev/null | cut -c1-64)\\" = \\"8849a157a42a5c8b766d5221bada6852a60f3699ba874cadb576719faf50853c\\" ] && (cd \\"\$r/.specnaut/hooks\\" && (sha256sum -c --status SHA256SUMS 2>/dev/null || shasum -a 256 -c --status SHA256SUMS)) && exec bash \\"\$r/.specnaut/hooks/guard-merge.sh\\" codex; echo \\"specnaut: .specnaut/hooks changed since it was trusted — run specnaut upgrade, then /hooks\\" >&2; exit 2",
             "timeout": 10
           },
           {
             "type": "command",
-            "command": "r=\$PWD; while [ -n \\"\$r\\" ] && [ ! -d \\"\$r/.specnaut/hooks\\" ]; do r=\${r%/*}; done; [ \\"\$( (sha256sum 2>/dev/null || shasum -a 256) < \\"\$r/.specnaut/hooks/SHA256SUMS\\" 2>/dev/null | cut -c1-64)\\" = \\"f207df39e65080d2692c8d24e3184587b6800325f9b57d7b8c752964dcadb38c\\" ] && (cd \\"\$r/.specnaut/hooks\\" && (sha256sum -c --status SHA256SUMS 2>/dev/null || shasum -a 256 -c --status SHA256SUMS)) && exec bash \\"\$r/.specnaut/hooks/guard-release.sh\\" codex; echo \\"specnaut: .specnaut/hooks changed since it was trusted — run specnaut upgrade, then /hooks\\" >&2; exit 2",
+            "command": "r=\$PWD; while [ -n \\"\$r\\" ] && [ ! -d \\"\$r/.specnaut/hooks\\" ]; do r=\${r%/*}; done; [ \\"\$( (sha256sum 2>/dev/null || shasum -a 256) < \\"\$r/.specnaut/hooks/SHA256SUMS\\" 2>/dev/null | cut -c1-64)\\" = \\"8849a157a42a5c8b766d5221bada6852a60f3699ba874cadb576719faf50853c\\" ] && (cd \\"\$r/.specnaut/hooks\\" && (sha256sum -c --status SHA256SUMS 2>/dev/null || shasum -a 256 -c --status SHA256SUMS)) && exec bash \\"\$r/.specnaut/hooks/guard-release.sh\\" codex; echo \\"specnaut: .specnaut/hooks changed since it was trusted — run specnaut upgrade, then /hooks\\" >&2; exit 2",
             "timeout": 10
           },
           {
             "type": "command",
-            "command": "r=\$PWD; while [ -n \\"\$r\\" ] && [ ! -d \\"\$r/.specnaut/hooks\\" ]; do r=\${r%/*}; done; [ \\"\$( (sha256sum 2>/dev/null || shasum -a 256) < \\"\$r/.specnaut/hooks/SHA256SUMS\\" 2>/dev/null | cut -c1-64)\\" = \\"f207df39e65080d2692c8d24e3184587b6800325f9b57d7b8c752964dcadb38c\\" ] && (cd \\"\$r/.specnaut/hooks\\" && (sha256sum -c --status SHA256SUMS 2>/dev/null || shasum -a 256 -c --status SHA256SUMS)) && exec bash \\"\$r/.specnaut/hooks/protect-constitution.sh\\" codex; echo \\"specnaut: .specnaut/hooks changed since it was trusted — run specnaut upgrade, then /hooks\\" >&2; exit 2",
+            "command": "r=\$PWD; while [ -n \\"\$r\\" ] && [ ! -d \\"\$r/.specnaut/hooks\\" ]; do r=\${r%/*}; done; [ \\"\$( (sha256sum 2>/dev/null || shasum -a 256) < \\"\$r/.specnaut/hooks/SHA256SUMS\\" 2>/dev/null | cut -c1-64)\\" = \\"8849a157a42a5c8b766d5221bada6852a60f3699ba874cadb576719faf50853c\\" ] && (cd \\"\$r/.specnaut/hooks\\" && (sha256sum -c --status SHA256SUMS 2>/dev/null || shasum -a 256 -c --status SHA256SUMS)) && exec bash \\"\$r/.specnaut/hooks/protect-constitution.sh\\" codex; echo \\"specnaut: .specnaut/hooks changed since it was trusted — run specnaut upgrade, then /hooks\\" >&2; exit 2",
             "timeout": 10
           }
         ]
@@ -30509,12 +30814,12 @@ a8ee3b3537f1718a140bca74815dcfa5ce510bb87b62f63caebfebff090094a6  guard-release.
         "hooks": [
           {
             "type": "command",
-            "command": "r=\$PWD; while [ -n \\"\$r\\" ] && [ ! -d \\"\$r/.specnaut/hooks\\" ]; do r=\${r%/*}; done; [ \\"\$( (sha256sum 2>/dev/null || shasum -a 256) < \\"\$r/.specnaut/hooks/SHA256SUMS\\" 2>/dev/null | cut -c1-64)\\" = \\"f207df39e65080d2692c8d24e3184587b6800325f9b57d7b8c752964dcadb38c\\" ] && (cd \\"\$r/.specnaut/hooks\\" && (sha256sum -c --status SHA256SUMS 2>/dev/null || shasum -a 256 -c --status SHA256SUMS)) && exec bash \\"\$r/.specnaut/hooks/protect-generated.sh\\" codex; echo \\"specnaut: .specnaut/hooks changed since it was trusted — run specnaut upgrade, then /hooks\\" >&2; exit 2",
+            "command": "r=\$PWD; while [ -n \\"\$r\\" ] && [ ! -d \\"\$r/.specnaut/hooks\\" ]; do r=\${r%/*}; done; [ \\"\$( (sha256sum 2>/dev/null || shasum -a 256) < \\"\$r/.specnaut/hooks/SHA256SUMS\\" 2>/dev/null | cut -c1-64)\\" = \\"8849a157a42a5c8b766d5221bada6852a60f3699ba874cadb576719faf50853c\\" ] && (cd \\"\$r/.specnaut/hooks\\" && (sha256sum -c --status SHA256SUMS 2>/dev/null || shasum -a 256 -c --status SHA256SUMS)) && exec bash \\"\$r/.specnaut/hooks/protect-generated.sh\\" codex; echo \\"specnaut: .specnaut/hooks changed since it was trusted — run specnaut upgrade, then /hooks\\" >&2; exit 2",
             "timeout": 10
           },
           {
             "type": "command",
-            "command": "r=\$PWD; while [ -n \\"\$r\\" ] && [ ! -d \\"\$r/.specnaut/hooks\\" ]; do r=\${r%/*}; done; [ \\"\$( (sha256sum 2>/dev/null || shasum -a 256) < \\"\$r/.specnaut/hooks/SHA256SUMS\\" 2>/dev/null | cut -c1-64)\\" = \\"f207df39e65080d2692c8d24e3184587b6800325f9b57d7b8c752964dcadb38c\\" ] && (cd \\"\$r/.specnaut/hooks\\" && (sha256sum -c --status SHA256SUMS 2>/dev/null || shasum -a 256 -c --status SHA256SUMS)) && exec bash \\"\$r/.specnaut/hooks/protect-constitution.sh\\" codex; echo \\"specnaut: .specnaut/hooks changed since it was trusted — run specnaut upgrade, then /hooks\\" >&2; exit 2",
+            "command": "r=\$PWD; while [ -n \\"\$r\\" ] && [ ! -d \\"\$r/.specnaut/hooks\\" ]; do r=\${r%/*}; done; [ \\"\$( (sha256sum 2>/dev/null || shasum -a 256) < \\"\$r/.specnaut/hooks/SHA256SUMS\\" 2>/dev/null | cut -c1-64)\\" = \\"8849a157a42a5c8b766d5221bada6852a60f3699ba874cadb576719faf50853c\\" ] && (cd \\"\$r/.specnaut/hooks\\" && (sha256sum -c --status SHA256SUMS 2>/dev/null || shasum -a 256 -c --status SHA256SUMS)) && exec bash \\"\$r/.specnaut/hooks/protect-constitution.sh\\" codex; echo \\"specnaut: .specnaut/hooks changed since it was trusted — run specnaut upgrade, then /hooks\\" >&2; exit 2",
             "timeout": 10
           }
         ]
@@ -30524,7 +30829,7 @@ a8ee3b3537f1718a140bca74815dcfa5ce510bb87b62f63caebfebff090094a6  guard-release.
         "hooks": [
           {
             "type": "command",
-            "command": "r=\$PWD; while [ -n \\"\$r\\" ] && [ ! -d \\"\$r/.specnaut/hooks\\" ]; do r=\${r%/*}; done; [ \\"\$( (sha256sum 2>/dev/null || shasum -a 256) < \\"\$r/.specnaut/hooks/SHA256SUMS\\" 2>/dev/null | cut -c1-64)\\" = \\"f207df39e65080d2692c8d24e3184587b6800325f9b57d7b8c752964dcadb38c\\" ] && (cd \\"\$r/.specnaut/hooks\\" && (sha256sum -c --status SHA256SUMS 2>/dev/null || shasum -a 256 -c --status SHA256SUMS)) && exec bash \\"\$r/.specnaut/hooks/guard-dispatch-model.sh\\" codex; echo \\"specnaut: .specnaut/hooks changed since it was trusted — run specnaut upgrade, then /hooks\\" >&2; exit 2",
+            "command": "r=\$PWD; while [ -n \\"\$r\\" ] && [ ! -d \\"\$r/.specnaut/hooks\\" ]; do r=\${r%/*}; done; [ \\"\$( (sha256sum 2>/dev/null || shasum -a 256) < \\"\$r/.specnaut/hooks/SHA256SUMS\\" 2>/dev/null | cut -c1-64)\\" = \\"8849a157a42a5c8b766d5221bada6852a60f3699ba874cadb576719faf50853c\\" ] && (cd \\"\$r/.specnaut/hooks\\" && (sha256sum -c --status SHA256SUMS 2>/dev/null || shasum -a 256 -c --status SHA256SUMS)) && exec bash \\"\$r/.specnaut/hooks/guard-dispatch-model.sh\\" codex; echo \\"specnaut: .specnaut/hooks changed since it was trusted — run specnaut upgrade, then /hooks\\" >&2; exit 2",
             "timeout": 10
           }
         ]
@@ -30535,7 +30840,7 @@ a8ee3b3537f1718a140bca74815dcfa5ce510bb87b62f63caebfebff090094a6  guard-release.
         "hooks": [
           {
             "type": "command",
-            "command": "r=\$PWD; while [ -n \\"\$r\\" ] && [ ! -d \\"\$r/.specnaut/hooks\\" ]; do r=\${r%/*}; done; [ \\"\$( (sha256sum 2>/dev/null || shasum -a 256) < \\"\$r/.specnaut/hooks/SHA256SUMS\\" 2>/dev/null | cut -c1-64)\\" = \\"f207df39e65080d2692c8d24e3184587b6800325f9b57d7b8c752964dcadb38c\\" ] && (cd \\"\$r/.specnaut/hooks\\" && (sha256sum -c --status SHA256SUMS 2>/dev/null || shasum -a 256 -c --status SHA256SUMS)) && exec bash \\"\$r/.specnaut/hooks/approve-on-prompt.sh\\" codex; echo \\"specnaut: .specnaut/hooks changed since it was trusted — run specnaut upgrade, then /hooks\\" >&2; exit 0",
+            "command": "r=\$PWD; while [ -n \\"\$r\\" ] && [ ! -d \\"\$r/.specnaut/hooks\\" ]; do r=\${r%/*}; done; [ \\"\$( (sha256sum 2>/dev/null || shasum -a 256) < \\"\$r/.specnaut/hooks/SHA256SUMS\\" 2>/dev/null | cut -c1-64)\\" = \\"8849a157a42a5c8b766d5221bada6852a60f3699ba874cadb576719faf50853c\\" ] && (cd \\"\$r/.specnaut/hooks\\" && (sha256sum -c --status SHA256SUMS 2>/dev/null || shasum -a 256 -c --status SHA256SUMS)) && exec bash \\"\$r/.specnaut/hooks/approve-on-prompt.sh\\" codex; echo \\"specnaut: .specnaut/hooks changed since it was trusted — run specnaut upgrade, then /hooks\\" >&2; exit 0",
             "timeout": 10
           }
         ]
@@ -30546,7 +30851,7 @@ a8ee3b3537f1718a140bca74815dcfa5ce510bb87b62f63caebfebff090094a6  guard-release.
         "hooks": [
           {
             "type": "command",
-            "command": "r=\$PWD; while [ -n \\"\$r\\" ] && [ ! -d \\"\$r/.specnaut/hooks\\" ]; do r=\${r%/*}; done; [ \\"\$( (sha256sum 2>/dev/null || shasum -a 256) < \\"\$r/.specnaut/hooks/SHA256SUMS\\" 2>/dev/null | cut -c1-64)\\" = \\"f207df39e65080d2692c8d24e3184587b6800325f9b57d7b8c752964dcadb38c\\" ] && (cd \\"\$r/.specnaut/hooks\\" && (sha256sum -c --status SHA256SUMS 2>/dev/null || shasum -a 256 -c --status SHA256SUMS)) && exec bash \\"\$r/.specnaut/hooks/approve-on-prompt.sh\\" codex; echo \\"specnaut: .specnaut/hooks changed since it was trusted — run specnaut upgrade, then /hooks\\" >&2; exit 0",
+            "command": "r=\$PWD; while [ -n \\"\$r\\" ] && [ ! -d \\"\$r/.specnaut/hooks\\" ]; do r=\${r%/*}; done; [ \\"\$( (sha256sum 2>/dev/null || shasum -a 256) < \\"\$r/.specnaut/hooks/SHA256SUMS\\" 2>/dev/null | cut -c1-64)\\" = \\"8849a157a42a5c8b766d5221bada6852a60f3699ba874cadb576719faf50853c\\" ] && (cd \\"\$r/.specnaut/hooks\\" && (sha256sum -c --status SHA256SUMS 2>/dev/null || shasum -a 256 -c --status SHA256SUMS)) && exec bash \\"\$r/.specnaut/hooks/approve-on-prompt.sh\\" codex; echo \\"specnaut: .specnaut/hooks changed since it was trusted — run specnaut upgrade, then /hooks\\" >&2; exit 0",
             "timeout": 10
           }
         ]
@@ -30557,7 +30862,7 @@ a8ee3b3537f1718a140bca74815dcfa5ce510bb87b62f63caebfebff090094a6  guard-release.
         "hooks": [
           {
             "type": "command",
-            "command": "r=\$PWD; while [ -n \\"\$r\\" ] && [ ! -d \\"\$r/.specnaut/hooks\\" ]; do r=\${r%/*}; done; [ \\"\$( (sha256sum 2>/dev/null || shasum -a 256) < \\"\$r/.specnaut/hooks/SHA256SUMS\\" 2>/dev/null | cut -c1-64)\\" = \\"f207df39e65080d2692c8d24e3184587b6800325f9b57d7b8c752964dcadb38c\\" ] && (cd \\"\$r/.specnaut/hooks\\" && (sha256sum -c --status SHA256SUMS 2>/dev/null || shasum -a 256 -c --status SHA256SUMS)) && exec bash \\"\$r/.specnaut/hooks/log-subagent.sh\\" start; echo \\"specnaut: .specnaut/hooks changed since it was trusted — run specnaut upgrade, then /hooks\\" >&2; exit 0",
+            "command": "r=\$PWD; while [ -n \\"\$r\\" ] && [ ! -d \\"\$r/.specnaut/hooks\\" ]; do r=\${r%/*}; done; [ \\"\$( (sha256sum 2>/dev/null || shasum -a 256) < \\"\$r/.specnaut/hooks/SHA256SUMS\\" 2>/dev/null | cut -c1-64)\\" = \\"8849a157a42a5c8b766d5221bada6852a60f3699ba874cadb576719faf50853c\\" ] && (cd \\"\$r/.specnaut/hooks\\" && (sha256sum -c --status SHA256SUMS 2>/dev/null || shasum -a 256 -c --status SHA256SUMS)) && exec bash \\"\$r/.specnaut/hooks/log-subagent.sh\\" start; echo \\"specnaut: .specnaut/hooks changed since it was trusted — run specnaut upgrade, then /hooks\\" >&2; exit 0",
             "timeout": 10
           }
         ]
@@ -30568,7 +30873,7 @@ a8ee3b3537f1718a140bca74815dcfa5ce510bb87b62f63caebfebff090094a6  guard-release.
         "hooks": [
           {
             "type": "command",
-            "command": "r=\$PWD; while [ -n \\"\$r\\" ] && [ ! -d \\"\$r/.specnaut/hooks\\" ]; do r=\${r%/*}; done; [ \\"\$( (sha256sum 2>/dev/null || shasum -a 256) < \\"\$r/.specnaut/hooks/SHA256SUMS\\" 2>/dev/null | cut -c1-64)\\" = \\"f207df39e65080d2692c8d24e3184587b6800325f9b57d7b8c752964dcadb38c\\" ] && (cd \\"\$r/.specnaut/hooks\\" && (sha256sum -c --status SHA256SUMS 2>/dev/null || shasum -a 256 -c --status SHA256SUMS)) && exec bash \\"\$r/.specnaut/hooks/log-subagent.sh\\" stop; echo \\"specnaut: .specnaut/hooks changed since it was trusted — run specnaut upgrade, then /hooks\\" >&2; exit 0",
+            "command": "r=\$PWD; while [ -n \\"\$r\\" ] && [ ! -d \\"\$r/.specnaut/hooks\\" ]; do r=\${r%/*}; done; [ \\"\$( (sha256sum 2>/dev/null || shasum -a 256) < \\"\$r/.specnaut/hooks/SHA256SUMS\\" 2>/dev/null | cut -c1-64)\\" = \\"8849a157a42a5c8b766d5221bada6852a60f3699ba874cadb576719faf50853c\\" ] && (cd \\"\$r/.specnaut/hooks\\" && (sha256sum -c --status SHA256SUMS 2>/dev/null || shasum -a 256 -c --status SHA256SUMS)) && exec bash \\"\$r/.specnaut/hooks/log-subagent.sh\\" stop; echo \\"specnaut: .specnaut/hooks changed since it was trusted — run specnaut upgrade, then /hooks\\" >&2; exit 0",
             "timeout": 10
           }
         ]
