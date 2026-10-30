@@ -144,23 +144,31 @@ export function auditAddendum(relPath: string): AddendumFinding | null {
   const isMarkdown = file.endsWith(".md");
   const stem = isMarkdown ? file.slice(0, -".md".length) : file.replace(/\.[^.]*$/, "");
   const skillDir = segments.length >= 2 ? segments[0] : null;
-  const finding = (problem: AddendumProblem, suggestion: PhaseAddress | null) => ({
-    path: relPath,
-    problem,
-    suggestion,
-  });
+  const judged = segments.length === 2 && isAddendumSkill(skillDir) && isMarkdown
+    ? judgeWellPlaced(skillDir, stem)
+    : judgeMisplaced(segments.length, skillDir, stem);
+  return judged === null ? null : { path: relPath, ...judged };
+}
 
-  if (segments.length === 2 && isAddendumSkill(skillDir) && isMarkdown) {
-    if (ROUTABLE_PHASES[skillDir].includes(stem)) return null;
-    const rename = renameOf(skillDir, stem);
-    // A contract doc that moved is still a contract doc: pointing at its new
-    // address would send the user from one unread path to another.
-    const contract = contractDocAt(rename?.to ?? { skill: skillDir, phase: stem });
-    if (contract) return finding({ kind: "contract-doc", parents: contract.parents }, null);
-    if (rename) return finding({ kind: "renamed", reason: rename.reason }, rename.to);
-    return finding({ kind: "unknown-phase", skill: skillDir }, suggestFor(skillDir, stem));
+/** A finding before it is pinned to its path. */
+type Judged = Omit<AddendumFinding, "path">;
+
+/** `<skill>/<stem>.md` under a skill that reads addenda: unread only when `stem` is not routable. */
+function judgeWellPlaced(skill: AddendumSkill, stem: string): Judged | null {
+  if (ROUTABLE_PHASES[skill].includes(stem)) return null;
+  const rename = renameOf(skill, stem);
+  // A contract doc that moved is still a contract doc: pointing at its new
+  // address would send the user from one unread path to another.
+  const contract = contractDocAt(rename?.to ?? { skill, phase: stem });
+  if (contract) {
+    return { problem: { kind: "contract-doc", parents: contract.parents }, suggestion: null };
   }
+  if (rename) return { problem: { kind: "renamed", reason: rename.reason }, suggestion: rename.to };
+  return { problem: { kind: "unknown-phase", skill }, suggestion: suggestFor(skill, stem) };
+}
 
+/** Anything not shaped `<skill>/<phase>.md`: always a finding, said in the order a reader fixes it. */
+function judgeMisplaced(depth: number, skillDir: string | null, stem: string): Judged {
   const moved = renameOf(skillDir, stem)?.to;
   // A moved doc that is not itself routable (`groom-report`, loaded by groom)
   // is pointed at the nearest phase of its new skill, never at another unread path.
@@ -169,11 +177,11 @@ export function auditAddendum(relPath: string): AddendumFinding | null {
       ? moved
       : suggestFor(moved.skill, moved.phase))
     : suggestFor(skillDir, stem);
-  if (segments.length !== 2) return finding({ kind: "wrong-depth" }, suggestion);
+  if (depth !== 2) return { problem: { kind: "wrong-depth" }, suggestion };
   if (!isAddendumSkill(skillDir)) {
-    return finding({ kind: "unknown-skill", skill: skillDir ?? "" }, suggestion);
+    return { problem: { kind: "unknown-skill", skill: skillDir ?? "" }, suggestion };
   }
-  return finding({ kind: "not-markdown" }, suggestion);
+  return { problem: { kind: "not-markdown" }, suggestion };
 }
 
 function contractDocAt(address: PhaseAddress): ContractDoc | undefined {
