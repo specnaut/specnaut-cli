@@ -55,9 +55,7 @@ Deno.test("init --backlog local renders the local backlog skill", async () => {
     assertEquals(skill.includes("BEGIN: backend="), false);
     assertEquals(skill.includes("END: backend="), false);
 
-    // The Markdown index belongs here and nowhere else: it indexes
-    // `.specnaut/backlog/NNN-slug.md`, which only the local backend creates.
-    // It used to ship to every backend (#525).
+    // The Markdown index indexes `.specnaut/backlog/`, local only (#525).
     assertEquals(await exists(join(parent, "demo/.specnaut/backlog.md")), true);
 
     // Local backend scripts present
@@ -113,10 +111,8 @@ Deno.test("init --backlog github renders the github skill + writes config stub",
     );
     assertStringIncludes(skill, "Backend: GitHub Issues + Project");
     assertEquals(skill.includes("Backend: local Markdown"), false);
-    // The github skill keeps both paths as the PO's decision rule: GitHub MCP
-    // tools when the session has them, the shell scripts otherwise. The MCP
-    // set-up tutorial went in cli#679, and with it the server example — an
-    // unpinned `npx -y` package is not something a scaffold should recommend.
+    // The PO's decision rule keeps both paths (MCP tools, else the scripts);
+    // the unpinned MCP server example went with its tutorial (cli#679).
     assertStringIncludes(
       skill,
       "If `mcp__github__*` tools are visible in the session, prefer them.",
@@ -200,10 +196,8 @@ Deno.test("init --backlog cloud renders the cloud skill + writes config stub (no
     );
     assertStringIncludes(lock, "backlog_backend: cloud");
 
-    // #407: with the cloud backend, the login CTA must appear exactly once —
-    // the cloud strategy already prints `specnaut cloud login`, so the Cloud
-    // funnel footer drops its duplicate "Start free: specnaut cloud login"
-    // line and just links the site instead.
+    // #407: the cloud strategy already prints `specnaut cloud login`, so the
+    // funnel footer drops its duplicate and just links the site.
     assertEquals(r.stdout.includes("Start free:"), false);
     assertStringIncludes(r.stdout, "Learn more:");
     assertEquals(r.stdout.split("specnaut cloud login").length - 1, 1);
