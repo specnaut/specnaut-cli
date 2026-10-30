@@ -144,6 +144,15 @@ export type LinkEvidence = {
 const trimEnd = (s: string) => s.replace(/(\r?\n)+$/, "");
 
 /**
+ * Whether a file's text is the one-line fallback Specnaut writes where a link
+ * cannot be made, as written. The one rule the classifier and the writer share:
+ * the writer moves aside only what is not ours (cli#687).
+ */
+export function isOurFallbackText(text: string, fallback: string): boolean {
+  return trimEnd(text) === trimEnd(fallback);
+}
+
+/**
  * Classify what is at a context-link destination. The order is the rule:
  * an inverted consolidation wins over everything, because every other answer
  * leads to a write at `dest` — and there, `dest` is the user's only copy.
@@ -161,8 +170,8 @@ export function classifyLinkDisk(
       ? "ours-link"
       : "foreign-link";
   }
+  if (isOurFallbackText(disk.content, link.content)) return "ours-fallback";
   const text = trimEnd(disk.content);
-  if (text === trimEnd(link.content)) return "ours-fallback";
   // Git stores a link's text with `/` on every system, Windows included, so a
   // link checked out as a file holds exactly `symlinkTo` when it is ours.
   if (text === link.symlinkTo) return "materialised";

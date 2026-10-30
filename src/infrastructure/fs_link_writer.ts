@@ -1,6 +1,6 @@
 import type { BackupReport, ContextLinkWrite } from "../application/ports.ts";
 import type { TemplateFile } from "../domain/template.ts";
-import { isOurLinkText } from "../domain/context_link.ts";
+import { isOurFallbackText, isOurLinkText } from "../domain/context_link.ts";
 import { backupForDelete, fileExists, isSymlink } from "./fs_backup.ts";
 
 /**
@@ -41,9 +41,11 @@ const NOT_A_LINK_REFUSAL = [
 /**
  * Put a context link at `abs`. Our own link already there is left alone —
  * even under `backupExisting`, or every forced run would back up its own
- * link. Anything else there is moved aside (`backupExisting`) or removed:
- * the caller decided it may go. Then the link, or the fallback file when
- * the system refuses links.
+ * link. Our own fallback file is removed without a backup for the same reason
+ * (cli#687): where links are refused it is rewritten on every forced run.
+ * Anything else there is moved aside (`backupExisting`) or removed: the caller
+ * decided it may go. Then the link, or the fallback file when the system
+ * refuses links.
  */
 export async function writeContextLink(
   linker: Linker,
@@ -59,8 +61,9 @@ export async function writeContextLink(
   }
   let backup: BackupReport["backups"][number] | undefined;
   if (await fileExists(abs)) {
-    if (backupExisting) backup = await backupForDelete(abs, dest);
-    else await Deno.remove(abs);
+    if (backupExisting && !(await holdsOurFallback(abs, file.content))) {
+      backup = await backupForDelete(abs, dest);
+    } else await Deno.remove(abs);
   }
   try {
     await linker(target, abs);
@@ -71,4 +74,10 @@ export async function writeContextLink(
     await Deno.writeTextFile(abs, file.content);
     return { backup, link: { dest, target, form: "fallback", reason } };
   }
+}
+
+/** Whether `abs` is a regular file holding our fallback — never read through a link. */
+async function holdsOurFallback(abs: string, fallback: string): Promise<boolean> {
+  if (!(await Deno.lstat(abs)).isFile) return false;
+  return isOurFallbackText(await Deno.readTextFile(abs), fallback);
 }
