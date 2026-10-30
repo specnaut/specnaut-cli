@@ -160,6 +160,8 @@ Deno.test("guard-merge: a listed script is gated under manual however it is reac
   try {
     const manual = await makeRepo(sb, { head: "feat" });
     const auto = await makeRepo(sb, { head: "feat", mode: "auto" });
+    // `cd sub`: a folder of the repo, so the repo's mode decides (a missing one is manual — cli#710)
+    for (const repo of [manual, auto]) await Deno.mkdir(`${repo}/sub`);
     const commands = SCRIPTS.flatMap((s) => REACHED.map((form) => form.replaceAll("S", s)));
     const cases = HARNESSES.flatMap((h) =>
       commands.flatMap((c) => [[h, manual, c, true], [h, auto, c, false]] as const)
