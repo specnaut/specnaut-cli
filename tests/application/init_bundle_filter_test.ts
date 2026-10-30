@@ -58,6 +58,7 @@ const failing = (err: Error, rel?: string, files: Record<string, string> = {}): 
   return {
     readText: (d, r) => fail(r) ? Promise.reject(err) : base.readText(d, r),
     readEntry: (d, r) => fail(r) ? Promise.reject(err) : base.readEntry(d, r),
+    listFiles: base.listFiles,
   };
 };
 const denied = () => new Deno.errors.PermissionDenied("Permission denied (os error 13)");

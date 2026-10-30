@@ -132,6 +132,8 @@ export function fakeReader(
       const content = files[rel];
       return Promise.resolve(content === undefined ? null : { kind: "file", content });
     },
+    listFiles: (_d, rel) =>
+      Promise.resolve(Object.keys(files).filter((p) => p.startsWith(`${rel}/`)).sort()),
   };
 }
 

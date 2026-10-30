@@ -116,6 +116,7 @@ Deno.test("an unreadable constitution, at either address, is refused — never a
     const reader: FsReader = {
       readText: (d, r) => r === unreadable ? denied() : base.readText(d, r),
       readEntry: (d, r) => r === unreadable ? denied() : base.readEntry(d, r),
+      listFiles: base.listFiles,
     };
     const writer = fakeWriter();
     const inputs = await gatherPlanInputs(

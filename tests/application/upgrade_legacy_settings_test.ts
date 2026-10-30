@@ -111,6 +111,7 @@ Deno.test("a link planted after the check is not written through, even inside th
       reader: {
         readText: (d: string, rel: string) => real.readText(d, rel),
         readEntry: () => Promise.resolve(null),
+        listFiles: (d: string, rel: string) => real.listFiles(d, rel),
       },
     };
     const notes = await carryLegacySettings(blind, OLD.replace(/## Size[\s\S]*?(?=## Front)/, ""));

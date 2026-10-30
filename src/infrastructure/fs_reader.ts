@@ -79,6 +79,34 @@ export class DenoFsReader implements FsReader {
     }
     return { kind: "symlink", target, resolved };
   }
+
+  /**
+   * The regular files under the folder `rel`. The folder is judged as a read
+   * is (its ancestors resolved, inside the project); below it nothing is
+   * resolved at all, because a link is skipped rather than followed — so no
+   * listed path can lead anywhere the folder itself does not.
+   */
+  async listFiles(projectDir: string, rel: string): Promise<string[]> {
+    assertSafeDestination(rel);
+    const root = await existingRoot(projectDir);
+    const abs = join(projectDir, rel);
+    if (root === null || !await guarded(assertInsideProject(root, abs))) return [];
+    try {
+      if (!(await Deno.lstat(abs)).isDirectory) return [];
+    } catch (err) {
+      if (err instanceof Deno.errors.NotFound) return [];
+      throw err;
+    }
+    const found: string[] = [];
+    const walk = async (dir: string, prefix: string): Promise<void> => {
+      for await (const e of Deno.readDir(dir)) {
+        if (e.isFile) found.push(`${prefix}/${e.name}`);
+        else if (e.isDirectory) await walk(join(dir, e.name), `${prefix}/${e.name}`);
+      }
+    };
+    await walk(abs, rel);
+    return found.sort();
+  }
 }
 
 /**

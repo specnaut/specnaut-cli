@@ -133,6 +133,8 @@ export interface FsReader {
    * link, never read through (cli#680). `null` when nothing is there.
    */
   readEntry(projectDir: string, rel: string): Promise<DiskEntry | null>;
+  /** The regular files under the folder `rel`, any depth, sorted; a link is never followed. */
+  listFiles(projectDir: string, rel: string): Promise<string[]>;
 }
 
 /**

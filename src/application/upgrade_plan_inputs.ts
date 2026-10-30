@@ -73,7 +73,7 @@ export async function gatherPlanInputs(
     planned[CONSTITUTION_PATH]?.content,
     move.verdict,
   );
-  const retired = await retiredConfigNotices(reader, projectDir);
+  const retired = await retiredConfigNotices(reader, projectDir, new Set(lock.entries.keys()));
   const refusals: string[] = [...move.notes, ...carried, ...notices, ...retired];
   const refusedDests = new Set<string>(move.exclude);
   for (const dest of move.exclude) delete bundle[dest];
