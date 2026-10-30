@@ -1,5 +1,6 @@
 import { assert, assertEquals } from "@std/assert";
 import { fromFileUrl, join } from "@std/path";
+import { parseLock } from "../../src/domain/installed_lock.ts";
 
 const MAIN = fromFileUrl(new URL("../../src/main.ts", import.meta.url));
 
@@ -130,6 +131,13 @@ Deno.test({
         { cwd: proj },
       );
       assertEquals(init.code, 0, init.stderr);
+      // The lock is what makes `diff` read under `.claude/`: without an entry
+      // there, this test passes without ever reaching the reader path.
+      const lock = parseLock(await Deno.readTextFile(join(proj, ".specnaut/installed.lock")));
+      assert(
+        [...lock.entries.keys()].some((k) => k.startsWith(".claude/")),
+        "the lock tracks nothing under .claude/",
+      );
       await Deno.remove(join(proj, ".claude"), { recursive: true });
       await Deno.symlink("nope", join(proj, ".claude"));
 

@@ -1,12 +1,14 @@
 import {
   assert,
   assertEquals,
+  assertInstanceOf,
   assertMatch,
   assertRejects,
   assertStringIncludes,
 } from "@std/assert";
 import { join } from "@std/path";
 import { DenoFsWriter, type Linker } from "../../src/infrastructure/deno_fs_writer.ts";
+import { ContainmentRefusal, UnwalkableRefusal } from "../../src/infrastructure/fs_refusals.ts";
 import type { Bundle } from "../../src/domain/template.ts";
 import { CAN_LINK, makeLink, readLinkText, WINDOWS } from "../helpers/link_text.ts";
 
@@ -213,9 +215,18 @@ Deno.test({
           ),
         Error,
       );
-      // POSIX walks `.codex/../..` and finds `.codex` missing; Windows resolves `..`
-      // lexically first and lands outside the project. Either way the guard refuses it.
-      assertMatch(err.message, /does not exist|leaves the project/);
+      // POSIX finds `.claude` dangling (its `.codex` is missing); Windows resolves `..`
+      // lexically first and lands outside the project. Either way the guard refuses it,
+      // naming what it refused — not `mkdir` failing with the same words.
+      if (WINDOWS) {
+        assert(err instanceof ContainmentRefusal || err instanceof UnwalkableRefusal, `${err}`);
+        assertMatch(err.message, /does not exist|leaves the project/);
+      } else {
+        assertInstanceOf(err, UnwalkableRefusal);
+        // The dangling ancestor itself, seen by `lstat` on the walk up.
+        assertStringIncludes(err.message, `missing: ${join(dir, ".claude")}\n`);
+      }
+      assertEquals(await present(join(dir, ".claude/x.md")), false, ".claude/x.md was written");
       // Refused as a bundle: the file judged after the refused one is not written either.
       assertEquals(await present(join(dir, ".codex")), false, ".codex/x.md was written anyway");
     }),

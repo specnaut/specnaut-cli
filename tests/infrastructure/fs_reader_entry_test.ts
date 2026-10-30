@@ -2,7 +2,12 @@ import { assert, assertEquals, assertInstanceOf, assertRejects } from "@std/asse
 import { join } from "@std/path";
 import { DenoFsReader } from "../../src/infrastructure/fs_reader.ts";
 import { ReadFault } from "../../src/application/read_fault.ts";
-import { ContainmentRefusal } from "../../src/infrastructure/fs_refusals.ts";
+import { ContainmentRefusal, UnwalkableRefusal } from "../../src/infrastructure/fs_refusals.ts";
+import {
+  assertInsideProject,
+  assertRemovableInProject,
+  resolveProjectRoot,
+} from "../../src/infrastructure/fs_containment.ts";
 import type { DiskEntry } from "../../src/domain/context_link.ts";
 import { CAN_LINK, makeLink, slashForm, WINDOWS } from "../helpers/link_text.ts";
 
@@ -144,6 +149,12 @@ Deno.test("a dangling ancestor reads as absent, never as a refusal (cli#686)", {
 }, async () => {
   await withProject(async (dir) => {
     await makeLink("nope", join(dir, ".claude"), "dir");
+    // The very checks each read runs DO refuse this path: the `null`s below
+    // are the reader reporting a refusal as absent, not a check that let it by.
+    const root = await resolveProjectRoot(dir);
+    const abs = join(dir, ".claude/CLAUDE.md");
+    await assertRejects(() => assertRemovableInProject(root, abs), UnwalkableRefusal);
+    await assertRejects(() => assertInsideProject(root, abs), UnwalkableRefusal);
     const reader = new DenoFsReader();
     assertEquals(await reader.readEntry(dir, ".claude/CLAUDE.md"), null);
     assertEquals(await reader.readText(dir, ".claude/CLAUDE.md"), null);
