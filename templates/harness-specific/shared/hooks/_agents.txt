@@ -9,9 +9,7 @@ devops-sre
 performance-expert
 product-owner
 qa-tester
-review-coordinator
 security-expert
 specnaut-guide
-test-reviewer
 ui-ux-designer
 workflow-manager
