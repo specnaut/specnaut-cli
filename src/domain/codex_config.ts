@@ -53,6 +53,16 @@ const DEFAULT_CHILD_EFFORT = "medium";
  * choosing a conservative number the user can raise, not a value rescuing a
  * broken one.
  *
+ * Why 4 (cli#681 asked for the value's reason to be written down): it is the
+ * widest fan-out Specnaut's own chain makes in the common case, in one wave.
+ * The plan's audits are at most three seats (architecture, security,
+ * performance); a review runs its two always-on seats (`code-reviewer`,
+ * `security-expert`) plus up to two gated ones. Only a review where every
+ * gated seat fires, or a large diff split into several instances, asks for
+ * more — and then the review queues: it starts the next seat as one returns.
+ * A higher cap would buy nothing in the common case and would let an
+ * orchestration Specnaut did not write spend more of the account in parallel.
+ *
  * Exported because `/task review` caps its own seat fan-out at the same
  * number (`phases/review.md`, pinned by `review_fanout_test.ts`): one ceiling,
  * whichever harness runs the review.
