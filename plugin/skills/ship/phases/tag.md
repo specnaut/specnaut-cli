@@ -10,17 +10,13 @@ Common natural-language requests:
 
 - `/ship tag` — tag HEAD with the next version
 - `/ship tag <sha>` — tag a specific commit
-- `/ship tag --bump minor` — SemVer projects only: bump
-  minor instead of patch (also `--bump major` / `--bump patch`)
+- `/ship tag --bump minor` — SemVer only (also `major` / `patch`)
 - `/ship tag --no-push` — skip pushing to `origin`
 
 ## What this command does
 
-Creates an annotated git tag using the **versioning scheme baked into
-this project at `specnaut init`** (one of SemVer `v1.2.3` or date-based
-`vYY.M.Da`).
-
-The bundled script does all the work:
+Creates an annotated tag in the scheme baked in at `specnaut init` (SemVer
+`v1.2.3` or date-based `vYY.M.Da`). The bundled script does all the work:
 
 ```bash
 bash .specnaut/scripts/release/tag.sh "$@"
@@ -44,26 +40,13 @@ What the script does:
 
 ## What this command does NOT do
 
-- It does **not** create a GitHub / GitLab release — pushing a tag
-  alone does not publish a release. Run `/ship release`
-  after this to publish the categorized release notes.
-- It does **not** deploy anything. A tag push never ships to
-  production — in the recommended model, deploys are triggered by a
-  *published release*, not by tags or branch pushes. See
-  `/ship release` → "From release to production (CD)".
-- It does **not** edit version fields in `package.json` / `Cargo.toml`
-  / `pyproject.toml` / etc. The git tag **is** the version — single
-  source of truth.
-- It does **not** run tests, lint, or any quality gate. Run those
-  yourself before tagging if your project needs them — the contract
-  there is project-specific and lives outside Specnaut's tag/release
-  flow.
+- It does **not** publish a release — that is `/ship release`.
+- Nor deploy, edit version fields, or run quality gates — see `SKILL.md`,
+  "What this skill does not do".
 
 ## After running
 
-If the script exits non-zero, read the stderr message — it says
-exactly what failed (validation regex, missing remote, exhausted
-letter suffix, missing tag).
+On a non-zero exit, read stderr — it names what failed.
 
 On success, suggest `/ship release` as the natural next
 step. Do NOT run it automatically — releasing is an explicit,

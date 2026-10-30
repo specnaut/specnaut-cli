@@ -17,18 +17,8 @@ Read `docs/constitution.md` before anything else: it is this project's binding r
 
 **Response style** — brevity, visual order, questions as selections, badge colours — follows the `response-style-contract` skill; read it, never restate it here.
 
-Specnaut gives a project three skills, and they divide by what they own:
-
-| Skill | Owns |
-| :--- | :--- |
-| `/task` | one unit of work — from backlog item to merged branch, audits included |
-| `/specnaut` | the framework itself — its documentation, what is installed, upgrading it |
-| **`/ship`** | **production — getting a built thing out the door** |
-
-Shipping is not part of delivering a unit of work. It has a different cadence,
-a different risk profile — irreversible, outward-facing, it triggers live
-pipelines — and a different audience. That is why it is its own skill rather
-than a verb of the router that writes plans.
+**`/ship`** owns production — getting a built thing out the door. One unit of
+work is `/task`; the framework itself is `/specnaut`.
 
 ## The three paths
 
@@ -54,9 +44,8 @@ Then determine, without asking:
 - **Is the tree dirty?** If so, say what is uncommitted and stop. Do not
   stash, do not commit on the user's behalf, and do not tag a tree that does
   not match what will be built.
-- **Does an unreleased tag exist?** A tag with no corresponding release is the
-  strongest signal for path C, and it is the case a user most often means when
-  they say "release" with no argument.
+- **Does an unreleased tag exist?** A tag with no release is the strongest
+  signal for path C.
 
 ## Step 2 — resolve the intent
 
@@ -73,7 +62,6 @@ Resolve from the argument when it is unambiguous. Ask only when it is not.
 
 **`/ship` with no argument, and an unreleased tag exists** → path C is the
 answer; state that you are publishing the release for that tag and proceed.
-Naming what you resolved is not the same as asking.
 
 **`/ship` with no argument and nothing to disambiguate it** → ask once, as a
 selection, per the response-style contract:
@@ -100,15 +88,14 @@ adds to the phase at the step it names and never replaces or skips a bundled ste
 contradicts one, the bundled step stands and you say so. No file means no addendum — say nothing
 about it.
 
-The scripts live at `.specnaut/scripts/release/` — a project-relative path that
-does not change with the harness. The versioning scheme (SemVer or date-based)
-is baked in at `specnaut init`; the scripts read it, you do not choose it.
+The scripts live at `.specnaut/scripts/release/` under every harness. The
+versioning scheme (SemVer or date-based) is baked in at `specnaut init`; the
+scripts read it, you do not choose it.
 
 ## Step 4 — confirm before the irreversible act
 
-**A tag push and a release publish are irreversible and outward-facing.**
-Pushing a tag can trigger a live pipeline; publishing a release can trigger a
-deploy. Before either:
+**A tag push and a release publish are irreversible and outward-facing.** Before
+either:
 
 1. Show the computed tag, the target remote, and the commit subject.
 2. Ask once, as a concrete proposal — **"I'm about to push `<tag>` to
@@ -119,12 +106,9 @@ deploy. Before either:
 
 ## What this skill does not do
 
-- **It does not deploy.** In the recommended model a deploy is triggered by a
-  *published release*, not by a tag push and not by a branch push. See
-  `phases/release.md` → "From release to production".
-- **It does not edit version fields** in `package.json`, `Cargo.toml`,
-  `pyproject.toml` or any manifest. The git tag **is** the version.
-- **It does not run tests or quality gates.** Run them before shipping; that
-  contract is project-specific and lives outside this skill.
-- **It does not merge anything.** Landing a feature branch is
-  `/task merge`.
+- **It does not deploy.** A deploy is triggered by a *published release*, never
+  by a tag or branch push — `phases/release.md` → "From release to production".
+- **It does not edit version fields** in any manifest. The git tag **is** the
+  version.
+- **It does not run tests or quality gates.** Run them before shipping.
+- **It does not merge anything.** Landing a feature branch is `/task merge`.

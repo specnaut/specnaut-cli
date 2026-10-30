@@ -113,11 +113,16 @@ Deno.test("init --backlog github renders the github skill + writes config stub",
     );
     assertStringIncludes(skill, "Backend: GitHub Issues + Project");
     assertEquals(skill.includes("Backend: local Markdown"), false);
-    // The github skill now documents both MCP and shell paths
-    assertStringIncludes(skill, "GitHub MCP — preferred when available");
-    assertStringIncludes(skill, "mcp__github__issue_write");
-    assertStringIncludes(skill, "Shell scripts — always available");
-    assertStringIncludes(skill, "@modelcontextprotocol/server-github");
+    // The github skill keeps both paths as the PO's decision rule: GitHub MCP
+    // tools when the session has them, the shell scripts otherwise. The MCP
+    // set-up tutorial went in cli#679, and with it the server example — an
+    // unpinned `npx -y` package is not something a scaffold should recommend.
+    assertStringIncludes(
+      skill,
+      "If `mcp__github__*` tools are visible in the session, prefer them.",
+    );
+    assertStringIncludes(skill, "Otherwise fall back to the shell scripts");
+    assertEquals(skill.includes("@modelcontextprotocol/server-github"), false);
 
     // GitHub-flavored scripts present, local ones filtered out
     assertEquals(

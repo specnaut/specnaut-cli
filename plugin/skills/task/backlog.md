@@ -30,15 +30,12 @@ PO.
 <!-- BEGIN: backend=local -->
 ## Backend: local Markdown files
 
-This project's backlog lives entirely on disk under `.specnaut/`. No remote
-service required.
-
 | Path | Purpose |
 |---|---|
 | `.specnaut/backlog.md` | Top-level index — one line per item with status |
 | `.specnaut/backlog/<NNN>-<slug>.md` | One file per item (frontmatter + body) |
 
-### Scripts (preferred path)
+### Scripts
 
 ```bash
 .specnaut/scripts/backlog/list.sh [Status]            # all items, optional Status filter
@@ -50,10 +47,8 @@ service required.
 
 ### Conventions
 
-- Items are numbered sequentially (`001`, `002`, …) — the `add.sh` script
-  picks the next free number.
-- Status is tracked in each item's YAML frontmatter and mirrored in the
-  index for fast listing.
+- `add.sh` picks the next free number (`001`, `002`, …).
+- Status lives in each item's frontmatter, mirrored in the index.
 - **Closing** an item = move to `Done`. The file stays on disk as the
   audit trail; nothing is deleted.
 - Bodies follow `## Why` / `## Acceptance criteria` / `## Out of scope`.
@@ -63,10 +58,7 @@ service required.
 <!-- BEGIN: backend=github -->
 ## Backend: GitHub Issues + Project
 
-This project's backlog lives on a GitHub Project linked to issues in the
-configured repo. Configuration is read from `.specnaut/backlog-config.yml`
-at runtime — fill in `repo` and `project_number` before running any
-mutation.
+Fill in `repo` and `project_number` in `.specnaut/backlog-config.yml` before any mutation.
 
 ### Configuration file
 
@@ -81,50 +73,7 @@ Both are placeholders; resolve the number with
 `list.sh` / `view.sh` — they address the board through `repo:` alone — and
 refused up front by every writing script.
 
-### Two paths to GitHub: MCP (preferred) and shell (always available)
-
-Two ways to talk to GitHub from this project. Pick whichever fits your
-setup; the skill works either way.
-
-#### A. GitHub MCP — preferred when available
-
-If the **GitHub MCP server is wired up in Claude Code**, the PO
-subagent should call its tools directly: `mcp__github__issue_write`,
-`mcp__github__issue_read`, `mcp__github__add_issue_comment`,
-`mcp__github__list_issues`, `mcp__github__search_issues`, etc. They
-return structured data, no shell parsing needed.
-
-Two ways to enable the GitHub MCP:
-
-1. **Claude Code cloud connector (recommended)** — open a Claude Code
-   session in this project, run `/mcp`, choose **GitHub**, and complete
-   the OAuth flow. No file lives in this repo for that — it's stored
-   in your Claude Code account.
-
-2. **Self-hosted MCP** — add the official server to the project's
-   `.mcp.json` (creates the file if absent). Specnaut does NOT scaffold
-   this for you because it requires Node + a GitHub token; do it
-   manually:
-
-   ```json
-   {
-     "mcpServers": {
-       "github": {
-         "command": "npx",
-         "args": ["-y", "@modelcontextprotocol/server-github"],
-         "env": { "GITHUB_PERSONAL_ACCESS_TOKEN": "${GITHUB_TOKEN}" }
-       }
-     }
-   }
-   ```
-
-   Then restart your Claude Code session.
-
-#### B. Shell scripts — always available
-
-The `gh` CLI scripts under `.specnaut/scripts/backlog/` are scaffolded
-unconditionally and work without MCP. They wrap `gh issue` / `gh
-project` calls and read configuration from `backlog-config.yml`.
+### Scripts
 
 ```bash
 .specnaut/scripts/backlog/list.sh [Status]            # all items, optional Status filter
@@ -146,8 +95,6 @@ gh issue edit   <num> --repo <repo> --title "…" --body "…"
 ```
 
 #### Decision rule for the PO subagent
-
-When dispatched, the PO checks tool availability at runtime:
 
 1. If `mcp__github__*` tools are visible in the session, prefer them.
 2. Otherwise fall back to the shell scripts — so switching paths needs
@@ -189,25 +136,16 @@ When dispatched, the PO checks tool availability at runtime:
 
 ### Prerequisites
 
-For the **shell path**: the `gh` CLI must be authenticated with the
-`project` scope. If `gh project` returns 404, run
+`gh` authenticated with the `project` scope; on a 404 from `gh project`, run
 `gh auth refresh -s project`.
-
-For the **MCP path**: see "Two paths to GitHub" above.
 <!-- END: backend=github -->
 
 <!-- BEGIN: backend=gitlab -->
 ## Backend: GitLab Issues + scoped Status labels
 
-This project's backlog lives on GitLab Issues, with workflow state
-tracked via scoped labels (`Status::Backlog`, `Status::Ready`,
-`Status::"In progress"`, `Status::"In review"`, `Status::Done`).
-GitLab doesn't have a Project Status field equivalent to GitHub's
-Projects V2 — scoped labels are the canonical way to model kanban-
-style state on GitLab.
-
-Configuration is read from `.specnaut/backlog-config.yml` at runtime —
-fill in `host` and `project_id` before running any mutation.
+Workflow state is a scoped label (`Status::Backlog`, `Status::Ready`,
+`Status::"In progress"`, `Status::"In review"`, `Status::Done`). Fill in `host` and
+`project_id` in `.specnaut/backlog-config.yml` before any mutation.
 
 ### Configuration file
 
@@ -217,7 +155,7 @@ host: gitlab.com         # or your self-hosted instance
 project_id: ""           # numeric id (e.g. "12345") or path "group/project"
 ```
 
-### Scripts (preferred path)
+### Scripts
 
 ```bash
 .specnaut/scripts/backlog/list.sh [Status]            # all issues, optional Status:: filter
@@ -238,33 +176,20 @@ glab issue update  <num> --repo <project_id> --title "…" --description "…"
 
 - **Titles** — short imperative phrases. Lowercase OK; no leading emoji.
 - **Bodies** — `## Why` / `## Acceptance criteria` / `## Out of scope`.
-- **Status** — set by adding/swapping a `Status::*` scoped label.
-  Scoped labels are mutually exclusive on the same scope, so swapping
-  is atomic.
+- **Status** — swap the `Status::*` scoped label (one per scope, so atomic).
 - **Closing** — close the issue (don't just move to Done). The repo's
   issue history is the audit trail.
 - **Drafts** are not used. Every task is a real issue.
 
 ### Prerequisites
 
-The `glab` CLI must be installed and authenticated.
-
-- Install: https://gitlab.com/gitlab-org/cli
-- Authenticate: `glab auth login` (use the same host as in
-  `backlog-config.yml`)
-
-The first time the PO runs against this project, it will create the 5
-`Status::*` scoped labels if they don't exist (`Backlog`, `Ready`,
-`In progress`, `In review`, `Done`).
+`glab` installed and authenticated: `glab auth login` on the host in
+`backlog-config.yml`. On its first run the PO creates the five `Status::*` labels
+if they are missing.
 <!-- END: backend=gitlab -->
 
 <!-- BEGIN: backend=cloud -->
 ## Backend: Specnaut Cloud
-
-This project's backlog lives on **Specnaut Cloud** — a hosted, real-time Kanban
-board reached over a small HTTP API. No `gh`/`glab` CLI and no GitHub/GitLab
-rate limits. Configuration is read from `.specnaut/backlog-config.yml` at
-runtime.
 
 ### Configuration file
 
@@ -275,11 +200,9 @@ api_url: https://api.specnaut.com               # optional — defaults to Specn
 project_key: CLOUD                              # the project's short key
 ```
 
-**No token is stored here.** Credentials are obtained by `specnaut cloud login`
-(an interactive browser device-authorization flow) and kept in the OS keychain
-(or a `0600` file under `~/.specnaut`). They refresh transparently. For CI /
-headless runs, set `SPECNAUT_CLOUD_TOKEN` to a Cloud API token instead of
-logging in.
+**No token is stored here.** `specnaut cloud login` keeps credentials in the OS
+keychain (or a `0600` file under `~/.specnaut`); for CI / headless runs, set
+`SPECNAUT_CLOUD_TOKEN` instead.
 
 ### Scripts
 
@@ -293,33 +216,19 @@ logging in.
 .specnaut/scripts/backlog/reconcile.sh [--reset|--seek-end] [--limit N]  # drain stage transitions
 ```
 
-The scripts get a fresh access token from `specnaut cloud token` (which refreshes
-it transparently) and authenticate with `Authorization: Bearer <token>`, talking
-to `<api_url>/api/v1/` (`/tasks`, `/columns`, `/activity`). `move.sh` passes a
-**status name** (the column name); the API resolves it to the column
-server-side. `columns.sh` reads the board's real columns (renames/reorders are
-reflected with no code change). `reconcile.sh` is the **poll/reconcile** feed:
-it asks `/activity` for every stage transition newer than a stored per-project
-cursor (`.specnaut/.cloud-cursor-<KEY>`), prints one line per transition, and
-advances the cursor — the product-owner consumes those lines and runs the
-matching stage hook (see "Stage reconcile (poll model)" below).
+`move.sh` takes the column **name**. `reconcile.sh` prints each stage transition
+since the per-project cursor (`.specnaut/.cloud-cursor-<KEY>`) and advances it.
 
 ### Prerequisites
 
-- `curl` and `jq` on PATH, and the `specnaut` CLI on PATH (the scripts call
-  `specnaut cloud token`).
-- Authenticated once via `specnaut cloud login` (or `SPECNAUT_CLOUD_TOKEN` set
-  for headless / CI).
+`curl`, `jq` and the `specnaut` CLI on PATH; `specnaut cloud login` once (or
+`SPECNAUT_CLOUD_TOKEN`).
 
 ### Stage reconcile (poll model)
 
-The product-owner reacts to board moves by **polling**, not a webhook — the CLI
-has no daemon. Run `reconcile.sh` by hand or on a recurring cadence (Claude
-Code: `/loop`); it drains stage transitions since the cursor and prints one
-line each (`CREATED <n> -> <stage>` / `MOVED <n> <from> -> <to>`). For each
-line the PO resolves the destination against `columns.sh` (canonical names,
-case-insensitive) and runs the mapped hook — parity with a GitHub Projects
-board, just poll-triggered:
+Run `reconcile.sh` by hand or on a cadence (no daemon, no webhook). For each line
+(`CREATED <n> -> <stage>` / `MOVED <n> <from> -> <to>`) the PO resolves the
+destination against `columns.sh` (case-insensitive) and runs the mapped hook:
 
 | Destination stage | Hook |
 |---|---|
@@ -338,15 +247,12 @@ an existing board to "from now".
 
 ### Not yet on the Cloud backend
 
-- Epics / sub-tasks and label management are not exposed over the API yet —
-  use the board UI for those for now.
+- Epics / sub-tasks and label management: use the board UI.
 <!-- END: backend=cloud -->
 
 ## Epics & sub-tasks
 
-Big work that needs decomposition lives as a parent **epic** with one or
-more **sub-tasks**. The link mechanism differs per backend, but the PO
-contract is the same: parents cannot close while any child is open.
+A parent **epic** cannot close while any **sub-task** is open.
 
 | Backend | Parent → child link | Discoverability |
 |---|---|---|
@@ -354,30 +260,18 @@ contract is the same: parents cannot close while any child is open.
 | github | Native sub-issues API (`gh api -X POST .../issues/<parent>/sub_issues`) | Project V2 boards render the children automatically under the parent's `Sub-issues progress` field |
 | gitlab | Scoped label `parent::#NNN` on the child (Free-tier compatible; native Epics are Premium-only) | `glab issue list --label "parent::#042" --opened` lists every child of #042 |
 
-**Creating a child:** `add.sh --parent <num>` does the right thing on
-every backend — writes the link, attaches to the project/board, and
-fails fast if the named parent doesn't exist (exit 3).
+**Creating a child:** `add.sh --parent <num>` on every backend — writes the link,
+attaches to the board, exits 3 if the parent does not exist.
 
-**Closing a parent:** `cascade-check.sh <num>` (github + gitlab) is the
-close gate — exits 11 with the open children listed when close is
-unsafe, exits 0 when all children are closed. The PO must run it before
-`gh issue close` / `glab issue close`. The local backend uses an
-inline grep equivalent.
+**Closing a parent:** `cascade-check.sh <num>` (github + gitlab) is the close
+gate — exits 11 listing the open children, 0 when all are closed. The PO must run
+it before `gh issue close` / `glab issue close`; the local backend greps instead.
 
-**Finding a child's parent:** `parent-of.sh <num>` (github + gitlab) is
-`cascade-check.sh` read from the other end — given a child it prints its
-parent's number and exits 0, exits **10** when the item has no parent, and
-exits 3 when it could not ask. Those last two are separate codes on purpose:
-"this is a standalone item" and "the lookup failed" would otherwise be
-indistinguishable, and a caller branches the same way on each. Branch creation
-uses it to put a whole epic on one branch.
+**Finding a child's parent:** `parent-of.sh <num>` (github + gitlab) prints the
+parent's number and exits 0, exits **10** when the item has no parent, and exits 3
+when it could not ask — never treat 3 as "no parent".
 
-**Auto-detection:** the bundled `product-owner` agent proactively
-detects epic-worthy requests (>5 AC bullets, scope crosses ≥2
-subsystems, trigger phrases like "break down" / "phased" / "as an
-epic") and either auto-decomposes or proposes a concrete sub-task list
-— see the "Epic detection heuristic" section of the `product-owner`
-agent.
+**Auto-detection:** the `product-owner` agent's "Epic detection heuristic".
 
 ## When NOT to use these verbs
 

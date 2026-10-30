@@ -10,19 +10,14 @@ Common natural-language requests:
 
 - `/ship release` — generate notes for the latest tag
 - `/ship release v1.2.3` — generate notes for a specific tag
-- `/ship release --baseline v1.2.0` — override the baseline
-  (use when the previous tag was never released and you want to skip
-  past it; default baseline is the previous tag chronologically)
+- `/ship release --baseline v1.2.0` — override the baseline (default: the
+  previous tag)
 
 ## What this command does
 
-Generates **categorized release notes** for the given tag (default:
-latest) covering every commit between a baseline tag and the target
-tag.
-
-The bundled script is stack-agnostic — it just emits the
-release-body Markdown to stdout, with one section per non-empty
-Conventional-Commits bucket. Run it like this:
+Writes **categorized release notes** for the tag (default: latest) to stdout —
+every commit since the baseline, one section per non-empty Conventional-Commits
+bucket:
 
 ```bash
 bash .specnaut/scripts/release/release.sh "$@"
@@ -45,13 +40,9 @@ Each commit appears as `- <short-sha> <subject>` under its bucket.
 
 ## After the script runs
 
-The script writes the release body to **stdout**. What you do with it
-depends on how this project publishes releases.
-
 ### GitHub remote — prefer the bundled wrapper
 
-If the project ships releases on GitHub, the bundled
-`release-github.sh` wrapper is the one-command path:
+One command:
 
 ```bash
 bash .specnaut/scripts/release/release-github.sh           # latest tag
@@ -64,13 +55,10 @@ bash .specnaut/scripts/release/release-github.sh \
 What the wrapper does on top of `release.sh`:
 
 1. Verifies `gh` CLI is installed + authenticated.
-2. **Computes the baseline = previous DEPLOYED tag** (the most recent
-   tag with a published GitHub Release attached — drafts do not
-   count — NOT the previous tag by date). Tags pushed without a release are "subsumed" —
-   their commits land in this release and the subsumed tag names
-   are listed inline.
-3. Pushes the tag to `origin` if not already there (the GitHub
-   Releases API needs the tag on the remote).
+2. **Computes the baseline = previous DEPLOYED tag** (the latest tag with a
+   published Release — drafts do not count — NOT the previous tag by date).
+   Unreleased tags in between are "subsumed" and listed inline.
+3. Pushes the tag to `origin` if not already there.
 4. Generates the body via `release.sh` with the computed baseline.
 5. Calls `gh release create <tag> --notes-file -` to publish.
 6. Reports the state GitHub holds, not the flag passed: a draft prints
@@ -89,8 +77,7 @@ run `/ship` unattended still stops at the one step you cannot take back.
 
 ### GitLab remote — prefer the bundled wrapper
 
-If the project ships releases on GitLab, the bundled `release-gitlab.sh`
-wrapper mirrors the GitHub one:
+Mirrors the GitHub one:
 
 ```bash
 bash .specnaut/scripts/release/release-gitlab.sh           # latest tag
@@ -106,9 +93,8 @@ auto-push, idempotency. Requires `glab` CLI installed + authenticated
 
 ### Local-only — use the `release-local.sh` wrapper
 
-If the project has no remote (or you just want a Markdown artifact to
-paste into any release UI), the bundled `release-local.sh` wrapper
-writes the categorized body to a file in the current directory:
+No remote: writes the body to a file (default `RELEASE_NOTES_<tag>.md`). No API
+calls, no auth, no tag push.
 
 ```bash
 bash .specnaut/scripts/release/release-local.sh             # latest tag → RELEASE_NOTES_<tag>.md
@@ -116,15 +102,9 @@ bash .specnaut/scripts/release/release-local.sh v1.2.3      # specific tag
 bash .specnaut/scripts/release/release-local.sh --out NOTES.md v1.2.3
 ```
 
-No remote API calls, no auth, no tag pushing. The output file is the
-release-body Markdown — paste it into any release UI, attach it to a
-deploy email, or pipe it to a custom publisher. Default output path:
-`RELEASE_NOTES_<tag>.md`.
-
 ### Custom CI / other remote
 
-Capture `release.sh` output and feed it into whatever your pipeline
-expects:
+Capture `release.sh` output:
 
 ```bash
 BODY=$(bash .specnaut/scripts/release/release.sh v1.2.3)
@@ -133,23 +113,16 @@ BODY=$(bash .specnaut/scripts/release/release.sh v1.2.3)
 
 ## From release to production — the deploy model (CD)
 
-Publishing a release and *deploying* are two separate steps. Specnaut owns
-the first (tag → notes → publish); this section is the opinionated model
-for wiring the second, so that publishing a release **is** what ships
-production.
+Specnaut publishes; this is the model for wiring the deploy, so that publishing
+a release **is** what ships production.
 
 **The rule: production deploys are triggered ONLY by a published release —
 never by a push to your default branch.** A push to `main` should at most
-run a CI gate (lint / test / build); it must not deploy. A deploy ships the
-exact commits bundled between two versions, with the release notes above as
-the audit trail. This keeps "what's in production" equal to "the latest
-published release", always — no surprise deploy from a stray merge.
+run a CI gate (lint / test / build); it must not deploy.
 
 ### Reference workflow (GitHub Actions)
 
-Stack-agnostic skeleton — fill the `TODO`s with your own install / build /
-deploy commands (any target: a PaaS, a container registry, an SSH rsync, a
-serverless CLI). The **shape** is the opinionated part, not the tooling:
+Fill the `TODO`s with your own commands; the **shape** is the opinionated part:
 
 ```yaml
 # .github/workflows/deploy-prod.yml
@@ -196,8 +169,7 @@ jobs:
 
 ### Companion CI gate (separate file)
 
-Keep the lint/build/test gate in its own workflow on `push` /
-`pull_request`. It runs on every change but **never deploys**:
+On `push` / `pull_request`; it **never deploys**:
 
 ```yaml
 # .github/workflows/ci.yml
@@ -217,21 +189,8 @@ jobs:
       - run: <install> && <lint> && <build>   # TODO your gate commands
 ```
 
-### Why this shape
-
-- **Release-only trigger** — "what's deployed" is exactly "the latest
-  published release". No deploy fires from a branch push.
-- **Least-privilege `permissions: contents: read`** — a compromised step
-  can't rewrite the repo.
-- **`concurrency` (no cancel-in-progress)** — back-to-back releases deploy
-  in order; an in-flight deploy is never cut off half-applied.
-- **Per-step secrets** — credentials never enter steps that don't need them.
-- **Build/output gate** — catch a dev/staging endpoint before it ships.
-- **`if: github.repository == …`** — a fork can't run your production deploy.
-
-**Break-glass** (re-deploy without cutting a new tag): re-run the last
-release's deploy run from the Actions UI — it redeploys the same ref. There
-is deliberately no manual `workflow_dispatch` in the model above, so prod is
+**Break-glass** (re-deploy without a new tag): re-run the last release's deploy
+run from the Actions UI. There is deliberately no `workflow_dispatch`, so prod is
 only ever reached through a release.
 
 > GitLab CI mirrors this: a `release` rule (`if: $CI_COMMIT_TAG` gated to a
@@ -243,22 +202,8 @@ only ever reached through a release.
 
 The script emits the body verbatim. Do NOT:
 
-- Reword sections / re-categorize commits after the fact. If a commit
-  message is wrong (e.g. `feat:` for what's really a `fix:`), the
-  correct move is to amend the commit message **before** tagging,
-  not to hand-edit the release body.
-- Add a raw `git diff` or `git log` dump. The whole point of this
-  command is that the body is human-readable on its own.
+- Reword sections / re-categorize commits after the fact. A wrong commit
+  message is amended **before** tagging, not hand-edited in the body.
+- Add a raw `git diff` or `git log` dump.
 - Run release publication without showing the user the generated body
-  first when invoked interactively. The body is the production
-  artifact — surface it for review before posting.
-
-## Workflow
-
-```
-/ship tag             → annotated tag created + pushed
-/ship release         → categorized release notes (stdout)
-↳ pipe to gh/glab release create  → release published
-   └─ (optional CD) a `release: published` job deploys production —
-      see "From release to production" above
-```
+  first when invoked interactively — surface it for review before posting.

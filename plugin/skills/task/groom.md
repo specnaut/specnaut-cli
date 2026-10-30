@@ -2,21 +2,14 @@
 
 Read `docs/constitution.md` before anything else: it is this project's binding rules, and no agent edits it unasked.
 
-Keeps the backlog and delivery pipeline flowing without human intervention.
-Reachable as **`/task groom`** — the only door.
-
-**Owned by `/task`** — see "Which skill owns what" in `SKILL.md`. Orphan
-**spec** detection is not owned here; step 4 says where it lives and runs it.
-
-Auto-invocable: the router advertises "groom the backlog" and "run a hygiene
-pass", and this file honours them. Also invoked explicitly, or scheduled with
-`/loop 1h /task groom`.
+Reachable as **`/task groom`** — the only door — on request ("groom the backlog",
+"run a hygiene pass") or scheduled (`/loop 1h /task groom`). **Owned by `/task`**
+— see "Which skill owns what" in `SKILL.md`. Orphan **spec** detection is not
+owned here; step 4 says where it lives and runs it.
 
 ## What this pass does
 
-A grooming pass runs four independent checks. Each is delegated to the
-right subagent so this skill stays small and the heavy lifting is owned
-by the agent that has the right tools and prompt for the job.
+A grooming pass runs four independent checks.
 
 ### 1. Backlog grooming
 
@@ -44,10 +37,7 @@ The PO will:
   the marker `🤖 specnaut-groom` at the start of any comment).
 - **Process tickets one at a time, end-to-end** — body → size → priority
   → promote/comment, fully complete on ticket N before moving to N+1.
-  Do NOT batch-clarify-then-batch-label across all tickets; the
-  per-ticket loop must close labelling before the PO can consider a
-  ticket "done for this run". Batched labelling-as-an-afterthought is
-  the failure mode this contract exists to prevent.
+  Do NOT batch-clarify-then-batch-label across all tickets.
 - For each remaining item, the loop is a strict 4-step sequence. **What a
   processed ticket must carry is decided by
   `.specnaut/scripts/bash/groom-rules.sh`** — its header is the rule, and
@@ -55,13 +45,10 @@ The PO will:
   The steps below are how the PO satisfies it:
 
   1. **Rewrite the body when it's poorly worded.** If the description is
-     missing, incomplete, or unclear, the PO MUST rewrite it in the
-     standard `## Why` / `## Acceptance criteria` / `## Out of scope` /
-     `## Notes` shape, using correct business and technical vocabulary
-     so the result is readable by a developer or a future PO who has no
-     prior context.
-  2. **Assign a size value.** Apply exactly one of `XS`, `S`, `M`, `L`, `XL`.
-     T-shirt scale rationale:
+     missing, incomplete, or unclear, the PO MUST rewrite it as
+     `## Why` / `## Acceptance criteria` / `## Out of scope` / `## Notes`,
+     readable by someone with no prior context.
+  2. **Assign a size value.** Apply exactly one of `XS`, `S`, `M`, `L`, `XL`:
      - `XS` — < 1 hour, trivial doc / config tweak
      - `S` — 1–4 hours, single-file or single-test change
      - `M` — half-day to a day, one subsystem touched, tests included
@@ -73,9 +60,8 @@ The PO will:
      - `P2` — important but deferrable; standard work
      - `P3` — nice-to-have / long horizon; pick up when slack appears
   3a. **Set Roadmap dates — soft, and only if the board has the fields.**
-     GitHub backend only. Date / Estimate are *optional* Project V2 fields the
-     user adds themselves; a board carrying only `Status` / `Priority` / `Size`
-     is ordinary, not misconfigured. **Gate first** on the once-per-run
+     GitHub backend only; Date / Estimate are *optional* fields, and a board
+     without them is not misconfigured. **Gate first** on the once-per-run
      `detect-fields.sh`, which emits `TARGETDATE_FIELD_ID=` /
      `STARTDATE_FIELD_ID=` / `ESTIMATE_FIELD_ID=` **empty** when the field is
      absent:
@@ -103,30 +89,20 @@ The PO will:
        autonomously.
 
   **Mandatory sizing + priority contract.** Steps 2 and 3 are NOT
-  optional and NOT discretionary, whatever the outcome chosen at step 4
-  — what counts as persisted is `groom-rules.sh`'s to say, not this
-  list's. If persistence fails for an external reason (the user lacks
-  scope, the API rate-limited, etc.), the PO MUST capture the failure
-  reason and surface it under "⚠ size / priority missing" in the final
-  report — silent skip is a contract violation.
+  optional, whatever the outcome at step 4 — what counts as persisted is
+  `groom-rules.sh`'s to say. If persistence fails for an external reason
+  (missing scope, rate limit), the PO MUST surface the reason under
+  "⚠ size / priority missing" in the final report — never a silent skip.
 
 The PO must respect the standard backlog skill — do not bypass its
 scripts.
 
 #### How size and priority are persisted (field-first, label fallback)
 
-Size and priority are conceptually two single-select dimensions. They
-can live on a ticket in two surfaces:
-
-1. **Native Project V2 single-select fields** named `Priority` and
-   `Size`. Every Specnaut project ships with these as the canonical
-   surface — they group on the project board, query cleanly via
-   GraphQL, and don't pollute the label namespace.
-2. **GitHub / GitLab labels** (`priority:P0..P3`, `size:XS..XL`). Used
-   as a fallback when the project does not have native fields, or when
-   the value has no matching native option (only known case today:
-   `priority:P3` on a 3-level field). Also used by the local Markdown
-   backend, which has no native fields at all.
+1. **Native Project V2 single-select fields** `Priority` and `Size` — the
+   canonical surface.
+2. **GitHub / GitLab labels** (`priority:P0..P3`, `size:XS..XL`) — only when
+   the project has no native field, or the value has no matching option.
 
 **Field wins.** If a native field exists for the dimension, write to
 the field. Do NOT also apply the label — double-writing creates drift.
@@ -135,12 +111,10 @@ the field. Do NOT also apply the label — double-writing creates drift.
 
 Use the bundled scripts at `.specnaut/scripts/backlog/`:
 
-- `detect-fields.sh` — emits eval-friendly env lines listing the
-  `Priority` / `Size` field IDs and option IDs (case-insensitive name
-  match), plus `STARTDATE_FIELD_ID` / `TARGETDATE_FIELD_ID` /
-  `ESTIMATE_FIELD_ID` — **empty when the board carries no such field**,
-  which is the gate step 3a reads. Run **once per groom run**, not per
-  ticket.
+- `detect-fields.sh` — env lines with the `Priority` / `Size` field and option
+  IDs, plus `STARTDATE_FIELD_ID` / `TARGETDATE_FIELD_ID` / `ESTIMATE_FIELD_ID`
+  — **empty when the board carries no such field** (step 3a's gate). Run
+  **once per groom run**, not per ticket.
 
   **That is a sample, taken once** — `groom-report.md` says what it costs and
   requires you to disclose it.
@@ -176,41 +150,30 @@ output verbatim, summary line included. The script's header documents what each
 line means; do not restate it, or the two definitions will drift.
 
 **Read-only — report, never move.** Correcting drift belongs to
-`/task merge`, which already owns board mutations; a detector that also
-mutates cannot be run freely on a schedule.
+`/task merge`, which owns board mutations.
 
 ### 3. Stale PR surface
 
-**Only when the project actually opens pull requests** — `/task merge` opens
-none unless `--pr` is passed, so otherwise say the step does not apply rather
-than reporting an empty section forever.
-
-Where it applies: list open PRs waiting on review or CI for more than 48 hours,
-so the user can decide whether to ping, close, or merge. Read-only; do not
-mutate PRs.
+**Only when the project actually opens pull requests** (`/task merge` opens none
+without `--pr`); otherwise say the step does not apply. List open PRs waiting on
+review or CI for more than 48 hours. Read-only; do not mutate PRs.
 
 ### 4. Orphan specs — the pipeline inspected at rest
 
 **Only when the project keeps its specs locally**, i.e. `.specnaut/specs/`
 exists. Skip the step and say so otherwise; do not report an empty section.
 
-**Read `phases/orphan-specs.md` and follow it.**
-An instruction to load that file and execute it, not a pointer for the reader.
-The walk stays there — naming it here twice makes one copy the half that rots.
-Ownership says where the logic lives, not who may call it; saying only the
-first is what left this check unreachable from anything scheduled.
-
-The path is relative to the **task** skill, beside `phases/plan.md`; under
-a harness that flattens phases into siblings, whatever it named that document.
+**Read `phases/orphan-specs.md` and follow it.** Load and execute it; the walk
+lives there, never copied here. The path is relative to the **task** skill,
+beside `phases/plan.md`; under a harness that flattens phases into siblings,
+whatever it named that document.
 
 Read-only, like the two checks above: never delete or modify a spec file.
-
 
 **`<backlog-reference>`** below means a reference built per the
 `backlog-reference-contract` skill: the number **and** the title, wrapped in a
 backend-resolved link — never a bare `#<num>`. Read that contract for the format
 and the degradation ladder; do not restate it here.
-
 
 ## Before the report — prove the groom
 
@@ -242,8 +205,7 @@ reads as missing, never as present — report such a line as what it is.
 
 End with a single summary block — read `groom-report.md` and follow it. The
 per-ticket lines and the size/priority-missing escalation block are **mandatory
-contract output, not optional**: they are how the user verifies the sizing and
-priority contract was honoured.
+contract output, not optional**.
 
 ## When NOT to use this skill
 
