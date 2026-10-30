@@ -27265,7 +27265,8 @@ approval_require() {
 # would run, so a rule matches what runs — not text that merely mentions it.
 #
 # A heuristic by design (plan § 6 threat model). It sees: ; && || | & and
-# newlines, ( ) \$( ) and backticks (also inside "…"), \`if(…)\` and the other
+# newlines, ( ) \$( ) and backticks (also inside "…"), \$'…' (an escape in it read
+# as \`\$\`, the shell's to decide), \`if(…)\` and the other
 # reserved words before a subshell, \`[[ … ]]\` (where | ( ) < > & ; are part of
 # a word), quotes and escapes, comments, heredoc bodies (skipped: they are
 # data, once the delimiter is quoted), \`<<<\` herestrings, \`<<\` inside
@@ -27452,14 +27453,42 @@ _cmd_arith() { if [ "\${s:i:1}" = "(" ]; then stack="a\$stack" i=\$((i + 1)); fi
 # \`<\` at i-1: a plain redirection, a herestring (its word is data, dropped
 # with it by _cmd_emit), a shift inside arithmetic, or a heredoc.
 _cmd_lt() {
-  if [ "\$nx" != "<" ]; then word+=\$c
-  elif [ "\${s:i+1:1}" = "<" ]; then word+="<<<" i=\$((i + 2))
+  if [ "\$nx" != "<" ]; then _cmd_redir; word+=\$c
+  elif [ "\${s:i+1:1}" = "<" ]; then _cmd_redir; word+="<<<" i=\$((i + 2))
   else
     case \$stack in
       *a*) word+="<<" i=\$((i + 1)) ;;
       *) _cmd_word; i=\$((i + 1)); _cmd_heredoc_open ;;
     esac
   fi
+}
+
+# _cmd_redir — an unquoted < or >, or the & of &>, starts a redirection: the
+# word before it ends there, as bash ends it, unless it is the fd the
+# redirection names (\`2>\`, unquoted digits) or the operator itself (\`>>\`,
+# \`<>\`, \`>&\`). Kept whole, \`x>f\` hid the redirection from every guard: \`cat
+# a>docs/constitution.md\` read as a bare cat (cli#704). In arithmetic it compares.
+_cmd_redir() {
+  case \$stack in *a*) return 0 ;; esac
+  case \$word in *'>' | *'<' | *'&') return 0 ;; esac
+  if [ "\$have" = 0 ] && [[ \$word =~ ^[0-9]*\$ ]]; then return 0; fi
+  _cmd_word
+}
+
+# _cmd_ansi — c is a backslash inside \$'…': bash puts the byte the escape
+# names in its place, which this parser does not compute. A \`\$\` stands in for
+# it, as for a substitution — what the word names is the shell's to decide —
+# so \`\$'docs/constitution\\x2emd'\` cannot hide the name it spells (cli#704). The
+# whole escape is consumed: \`\\'\` does not close the quote.
+_cmd_ansi() {
+  local e=\${s:i:1} max=0 set=""
+  i=\$((i + 1))
+  case \$e in
+    x) max=2 set=0-9A-Fa-f ;; u) max=4 set=0-9A-Fa-f ;; U) max=8 set=0-9A-Fa-f ;;
+    [0-7]) max=2 set=0-7 ;; c) i=\$((i + 1)) ;;
+  esac
+  while [ "\$max" -gt 0 ] && [[ \${s:i:1} == [\$set] ]]; do i=\$((i + 1)) max=\$((max - 1)); done
+  word+='\$'
 }
 
 # _cmd_test_char — inside \`[[ … ]]\`, in the frame it was opened in, c is one
@@ -27500,8 +27529,11 @@ _cmd_plain() {
     ' ' | \$'\\t') _cmd_word ;;
     \$'\\n') _cmd_end; if [ -n "\$heredocs" ]; then _cmd_heredocs; fi ;;
     ';' | '|') _cmd_end ;;
-    '&') case \$word in *'>' | *'<') word+=\$c ;; *) if [ "\$nx" = ">" ]; then word+=\$c; else _cmd_end; fi ;; esac ;;
-    '\$') if [ "\$nx" = "(" ]; then _cmd_push; stack="s\$stack" i=\$((i + 1)); _cmd_arith; else word+=\$c; fi ;;
+    '&') case \$word in *'>' | *'<') word+=\$c ;; *) if [ "\$nx" = ">" ]; then _cmd_redir; word+=\$c; else _cmd_end; fi ;; esac ;;
+    '\$')
+      if [ "\$nx" = "(" ]; then _cmd_push; stack="s\$stack" i=\$((i + 1)); _cmd_arith
+      elif [ "\$nx" = "'" ]; then q='\$' have=1 i=\$((i + 1)) # \$'…': its escapes are _cmd_ansi's
+      else word+=\$c; fi ;;
     '(') case \$word in
         *'<' | *'>' | '=') _cmd_push; stack="s\$stack" ;; # <(…) >(…) =(…): a command runs inside
         *) if [ -n "\$word" ] && [ "\$nx" != ")" ] && ! _cmd_keyword; then word+=\$c stack="g\$stack"; else _cmd_end; stack="u\$stack"; _cmd_arith; fi ;;
@@ -27510,6 +27542,7 @@ _cmd_plain() {
     '\`') if [ -z "\$bt" ]; then _cmd_push; bt=u; else _cmd_pop; if [ "\$bt" = d ]; then q='"'; fi; bt=""; fi ;;
     '#') if [ -z "\$word" ] && [ "\$have" = 0 ]; then d=\${s:i}; d=\${d%%\$'\\n'*}; i=\$((i + \${#d})); else word+=\$c; fi ;;
     '<') _cmd_lt ;;
+    '>') _cmd_redir; word+=\$c ;;
     *) word+=\$c ;;
   esac
 }
@@ -27527,6 +27560,8 @@ cmd_parse() {
     i=\$((i + 1))
     if [ "\$q" = "'" ]; then
       if [ "\$c" = "'" ]; then q=""; else word+=\$c; fi
+    elif [ "\$q" = '\$' ]; then
+      case \$c in "'") q="" ;; '\\') _cmd_ansi ;; *) word+=\$c ;; esac
     elif [ -n "\$q" ]; then
       case \$c in '\\' | '"' | '\$' | '\`') _cmd_dquote ;; *) word+=\$c ;; esac
     else
@@ -29274,7 +29309,7 @@ specnaut-guide
 7a9b8bd4ecba4a1f8bfdece11124399c2e5811d17c42f07cdd60a3c7fe3346ea  _agents.txt
 e15179056fefd0d399c54a8755738046e3cba52d317faf684bd238d3ce2cbb72  _approval.sh
 2d66462ae07aa044176ec7837ab845b25ddaae58ccdc8835d261839299a13639  _baseline.sh
-f705ec3284a505e1a5bf47028f6631ed981a73733af36e166c9f16ab465cbc73  _command.sh
+ef80f32b8786606687a47a28b447272a8d44a86678bc389324d1d80105bcd696  _command.sh
 a1ce84dc85cfd2fd05306591da86f9a42729e1abff8e4ed8389275bd27f739e6  _git.sh
 40643b49524d4c5b46e21d56c4e264e041a8ffe3792ceff65088130a2f02d0d1  _guard.sh
 f9603a60a031f0921fb71f4cc9f7e958b26cd776763637147f4ca410eb8afb54  _listed.sh
@@ -29668,7 +29703,8 @@ approval_require() {
 # would run, so a rule matches what runs — not text that merely mentions it.
 #
 # A heuristic by design (plan § 6 threat model). It sees: ; && || | & and
-# newlines, ( ) \$( ) and backticks (also inside "…"), \`if(…)\` and the other
+# newlines, ( ) \$( ) and backticks (also inside "…"), \$'…' (an escape in it read
+# as \`\$\`, the shell's to decide), \`if(…)\` and the other
 # reserved words before a subshell, \`[[ … ]]\` (where | ( ) < > & ; are part of
 # a word), quotes and escapes, comments, heredoc bodies (skipped: they are
 # data, once the delimiter is quoted), \`<<<\` herestrings, \`<<\` inside
@@ -29855,14 +29891,42 @@ _cmd_arith() { if [ "\${s:i:1}" = "(" ]; then stack="a\$stack" i=\$((i + 1)); fi
 # \`<\` at i-1: a plain redirection, a herestring (its word is data, dropped
 # with it by _cmd_emit), a shift inside arithmetic, or a heredoc.
 _cmd_lt() {
-  if [ "\$nx" != "<" ]; then word+=\$c
-  elif [ "\${s:i+1:1}" = "<" ]; then word+="<<<" i=\$((i + 2))
+  if [ "\$nx" != "<" ]; then _cmd_redir; word+=\$c
+  elif [ "\${s:i+1:1}" = "<" ]; then _cmd_redir; word+="<<<" i=\$((i + 2))
   else
     case \$stack in
       *a*) word+="<<" i=\$((i + 1)) ;;
       *) _cmd_word; i=\$((i + 1)); _cmd_heredoc_open ;;
     esac
   fi
+}
+
+# _cmd_redir — an unquoted < or >, or the & of &>, starts a redirection: the
+# word before it ends there, as bash ends it, unless it is the fd the
+# redirection names (\`2>\`, unquoted digits) or the operator itself (\`>>\`,
+# \`<>\`, \`>&\`). Kept whole, \`x>f\` hid the redirection from every guard: \`cat
+# a>docs/constitution.md\` read as a bare cat (cli#704). In arithmetic it compares.
+_cmd_redir() {
+  case \$stack in *a*) return 0 ;; esac
+  case \$word in *'>' | *'<' | *'&') return 0 ;; esac
+  if [ "\$have" = 0 ] && [[ \$word =~ ^[0-9]*\$ ]]; then return 0; fi
+  _cmd_word
+}
+
+# _cmd_ansi — c is a backslash inside \$'…': bash puts the byte the escape
+# names in its place, which this parser does not compute. A \`\$\` stands in for
+# it, as for a substitution — what the word names is the shell's to decide —
+# so \`\$'docs/constitution\\x2emd'\` cannot hide the name it spells (cli#704). The
+# whole escape is consumed: \`\\'\` does not close the quote.
+_cmd_ansi() {
+  local e=\${s:i:1} max=0 set=""
+  i=\$((i + 1))
+  case \$e in
+    x) max=2 set=0-9A-Fa-f ;; u) max=4 set=0-9A-Fa-f ;; U) max=8 set=0-9A-Fa-f ;;
+    [0-7]) max=2 set=0-7 ;; c) i=\$((i + 1)) ;;
+  esac
+  while [ "\$max" -gt 0 ] && [[ \${s:i:1} == [\$set] ]]; do i=\$((i + 1)) max=\$((max - 1)); done
+  word+='\$'
 }
 
 # _cmd_test_char — inside \`[[ … ]]\`, in the frame it was opened in, c is one
@@ -29903,8 +29967,11 @@ _cmd_plain() {
     ' ' | \$'\\t') _cmd_word ;;
     \$'\\n') _cmd_end; if [ -n "\$heredocs" ]; then _cmd_heredocs; fi ;;
     ';' | '|') _cmd_end ;;
-    '&') case \$word in *'>' | *'<') word+=\$c ;; *) if [ "\$nx" = ">" ]; then word+=\$c; else _cmd_end; fi ;; esac ;;
-    '\$') if [ "\$nx" = "(" ]; then _cmd_push; stack="s\$stack" i=\$((i + 1)); _cmd_arith; else word+=\$c; fi ;;
+    '&') case \$word in *'>' | *'<') word+=\$c ;; *) if [ "\$nx" = ">" ]; then _cmd_redir; word+=\$c; else _cmd_end; fi ;; esac ;;
+    '\$')
+      if [ "\$nx" = "(" ]; then _cmd_push; stack="s\$stack" i=\$((i + 1)); _cmd_arith
+      elif [ "\$nx" = "'" ]; then q='\$' have=1 i=\$((i + 1)) # \$'…': its escapes are _cmd_ansi's
+      else word+=\$c; fi ;;
     '(') case \$word in
         *'<' | *'>' | '=') _cmd_push; stack="s\$stack" ;; # <(…) >(…) =(…): a command runs inside
         *) if [ -n "\$word" ] && [ "\$nx" != ")" ] && ! _cmd_keyword; then word+=\$c stack="g\$stack"; else _cmd_end; stack="u\$stack"; _cmd_arith; fi ;;
@@ -29913,6 +29980,7 @@ _cmd_plain() {
     '\`') if [ -z "\$bt" ]; then _cmd_push; bt=u; else _cmd_pop; if [ "\$bt" = d ]; then q='"'; fi; bt=""; fi ;;
     '#') if [ -z "\$word" ] && [ "\$have" = 0 ]; then d=\${s:i}; d=\${d%%\$'\\n'*}; i=\$((i + \${#d})); else word+=\$c; fi ;;
     '<') _cmd_lt ;;
+    '>') _cmd_redir; word+=\$c ;;
     *) word+=\$c ;;
   esac
 }
@@ -29930,6 +29998,8 @@ cmd_parse() {
     i=\$((i + 1))
     if [ "\$q" = "'" ]; then
       if [ "\$c" = "'" ]; then q=""; else word+=\$c; fi
+    elif [ "\$q" = '\$' ]; then
+      case \$c in "'") q="" ;; '\\') _cmd_ansi ;; *) word+=\$c ;; esac
     elif [ -n "\$q" ]; then
       case \$c in '\\' | '"' | '\$' | '\`') _cmd_dquote ;; *) word+=\$c ;; esac
     else
@@ -31677,7 +31747,7 @@ specnaut-guide
 7a9b8bd4ecba4a1f8bfdece11124399c2e5811d17c42f07cdd60a3c7fe3346ea  _agents.txt
 e15179056fefd0d399c54a8755738046e3cba52d317faf684bd238d3ce2cbb72  _approval.sh
 2d66462ae07aa044176ec7837ab845b25ddaae58ccdc8835d261839299a13639  _baseline.sh
-f705ec3284a505e1a5bf47028f6631ed981a73733af36e166c9f16ab465cbc73  _command.sh
+ef80f32b8786606687a47a28b447272a8d44a86678bc389324d1d80105bcd696  _command.sh
 a1ce84dc85cfd2fd05306591da86f9a42729e1abff8e4ed8389275bd27f739e6  _git.sh
 40643b49524d4c5b46e21d56c4e264e041a8ffe3792ceff65088130a2f02d0d1  _guard.sh
 f9603a60a031f0921fb71f4cc9f7e958b26cd776763637147f4ca410eb8afb54  _listed.sh
@@ -31713,17 +31783,17 @@ c59dea265fb0e13092cb4ef650a436b29e34be4f18397aeaebc5408811ed3c7c  release-comman
         "hooks": [
           {
             "type": "command",
-            "command": "r=\$PWD; while [ -n \\"\$r\\" ] && [ ! -d \\"\$r/.specnaut/hooks\\" ]; do r=\${r%/*}; done; [ \\"\$( (sha256sum 2>/dev/null || shasum -a 256) < \\"\$r/.specnaut/hooks/SHA256SUMS\\" 2>/dev/null | cut -c1-64)\\" = \\"b769ec1237bc14096d8ab02232cf8e5bab3b3710d534ca52a209e8fbd43306d7\\" ] && (cd \\"\$r/.specnaut/hooks\\" && (sha256sum -c --status SHA256SUMS 2>/dev/null || shasum -a 256 -c --status SHA256SUMS)) && exec bash \\"\$r/.specnaut/hooks/guard-merge.sh\\" codex; echo \\"specnaut: .specnaut/hooks changed since it was trusted — run specnaut upgrade, then /hooks\\" >&2; exit 2",
+            "command": "r=\$PWD; while [ -n \\"\$r\\" ] && [ ! -d \\"\$r/.specnaut/hooks\\" ]; do r=\${r%/*}; done; [ \\"\$( (sha256sum 2>/dev/null || shasum -a 256) < \\"\$r/.specnaut/hooks/SHA256SUMS\\" 2>/dev/null | cut -c1-64)\\" = \\"9163dacc7e62e37268b214baf3b98e6e6a5e6a97cb2d9bbec6e1c3097f5a19b3\\" ] && (cd \\"\$r/.specnaut/hooks\\" && (sha256sum -c --status SHA256SUMS 2>/dev/null || shasum -a 256 -c --status SHA256SUMS)) && exec bash \\"\$r/.specnaut/hooks/guard-merge.sh\\" codex; echo \\"specnaut: .specnaut/hooks changed since it was trusted — run specnaut upgrade, then /hooks\\" >&2; exit 2",
             "timeout": 10
           },
           {
             "type": "command",
-            "command": "r=\$PWD; while [ -n \\"\$r\\" ] && [ ! -d \\"\$r/.specnaut/hooks\\" ]; do r=\${r%/*}; done; [ \\"\$( (sha256sum 2>/dev/null || shasum -a 256) < \\"\$r/.specnaut/hooks/SHA256SUMS\\" 2>/dev/null | cut -c1-64)\\" = \\"b769ec1237bc14096d8ab02232cf8e5bab3b3710d534ca52a209e8fbd43306d7\\" ] && (cd \\"\$r/.specnaut/hooks\\" && (sha256sum -c --status SHA256SUMS 2>/dev/null || shasum -a 256 -c --status SHA256SUMS)) && exec bash \\"\$r/.specnaut/hooks/guard-release.sh\\" codex; echo \\"specnaut: .specnaut/hooks changed since it was trusted — run specnaut upgrade, then /hooks\\" >&2; exit 2",
+            "command": "r=\$PWD; while [ -n \\"\$r\\" ] && [ ! -d \\"\$r/.specnaut/hooks\\" ]; do r=\${r%/*}; done; [ \\"\$( (sha256sum 2>/dev/null || shasum -a 256) < \\"\$r/.specnaut/hooks/SHA256SUMS\\" 2>/dev/null | cut -c1-64)\\" = \\"9163dacc7e62e37268b214baf3b98e6e6a5e6a97cb2d9bbec6e1c3097f5a19b3\\" ] && (cd \\"\$r/.specnaut/hooks\\" && (sha256sum -c --status SHA256SUMS 2>/dev/null || shasum -a 256 -c --status SHA256SUMS)) && exec bash \\"\$r/.specnaut/hooks/guard-release.sh\\" codex; echo \\"specnaut: .specnaut/hooks changed since it was trusted — run specnaut upgrade, then /hooks\\" >&2; exit 2",
             "timeout": 10
           },
           {
             "type": "command",
-            "command": "r=\$PWD; while [ -n \\"\$r\\" ] && [ ! -d \\"\$r/.specnaut/hooks\\" ]; do r=\${r%/*}; done; [ \\"\$( (sha256sum 2>/dev/null || shasum -a 256) < \\"\$r/.specnaut/hooks/SHA256SUMS\\" 2>/dev/null | cut -c1-64)\\" = \\"b769ec1237bc14096d8ab02232cf8e5bab3b3710d534ca52a209e8fbd43306d7\\" ] && (cd \\"\$r/.specnaut/hooks\\" && (sha256sum -c --status SHA256SUMS 2>/dev/null || shasum -a 256 -c --status SHA256SUMS)) && exec bash \\"\$r/.specnaut/hooks/protect-constitution.sh\\" codex; echo \\"specnaut: .specnaut/hooks changed since it was trusted — run specnaut upgrade, then /hooks\\" >&2; exit 2",
+            "command": "r=\$PWD; while [ -n \\"\$r\\" ] && [ ! -d \\"\$r/.specnaut/hooks\\" ]; do r=\${r%/*}; done; [ \\"\$( (sha256sum 2>/dev/null || shasum -a 256) < \\"\$r/.specnaut/hooks/SHA256SUMS\\" 2>/dev/null | cut -c1-64)\\" = \\"9163dacc7e62e37268b214baf3b98e6e6a5e6a97cb2d9bbec6e1c3097f5a19b3\\" ] && (cd \\"\$r/.specnaut/hooks\\" && (sha256sum -c --status SHA256SUMS 2>/dev/null || shasum -a 256 -c --status SHA256SUMS)) && exec bash \\"\$r/.specnaut/hooks/protect-constitution.sh\\" codex; echo \\"specnaut: .specnaut/hooks changed since it was trusted — run specnaut upgrade, then /hooks\\" >&2; exit 2",
             "timeout": 10
           }
         ]
@@ -31733,12 +31803,12 @@ c59dea265fb0e13092cb4ef650a436b29e34be4f18397aeaebc5408811ed3c7c  release-comman
         "hooks": [
           {
             "type": "command",
-            "command": "r=\$PWD; while [ -n \\"\$r\\" ] && [ ! -d \\"\$r/.specnaut/hooks\\" ]; do r=\${r%/*}; done; [ \\"\$( (sha256sum 2>/dev/null || shasum -a 256) < \\"\$r/.specnaut/hooks/SHA256SUMS\\" 2>/dev/null | cut -c1-64)\\" = \\"b769ec1237bc14096d8ab02232cf8e5bab3b3710d534ca52a209e8fbd43306d7\\" ] && (cd \\"\$r/.specnaut/hooks\\" && (sha256sum -c --status SHA256SUMS 2>/dev/null || shasum -a 256 -c --status SHA256SUMS)) && exec bash \\"\$r/.specnaut/hooks/protect-generated.sh\\" codex; echo \\"specnaut: .specnaut/hooks changed since it was trusted — run specnaut upgrade, then /hooks\\" >&2; exit 2",
+            "command": "r=\$PWD; while [ -n \\"\$r\\" ] && [ ! -d \\"\$r/.specnaut/hooks\\" ]; do r=\${r%/*}; done; [ \\"\$( (sha256sum 2>/dev/null || shasum -a 256) < \\"\$r/.specnaut/hooks/SHA256SUMS\\" 2>/dev/null | cut -c1-64)\\" = \\"9163dacc7e62e37268b214baf3b98e6e6a5e6a97cb2d9bbec6e1c3097f5a19b3\\" ] && (cd \\"\$r/.specnaut/hooks\\" && (sha256sum -c --status SHA256SUMS 2>/dev/null || shasum -a 256 -c --status SHA256SUMS)) && exec bash \\"\$r/.specnaut/hooks/protect-generated.sh\\" codex; echo \\"specnaut: .specnaut/hooks changed since it was trusted — run specnaut upgrade, then /hooks\\" >&2; exit 2",
             "timeout": 10
           },
           {
             "type": "command",
-            "command": "r=\$PWD; while [ -n \\"\$r\\" ] && [ ! -d \\"\$r/.specnaut/hooks\\" ]; do r=\${r%/*}; done; [ \\"\$( (sha256sum 2>/dev/null || shasum -a 256) < \\"\$r/.specnaut/hooks/SHA256SUMS\\" 2>/dev/null | cut -c1-64)\\" = \\"b769ec1237bc14096d8ab02232cf8e5bab3b3710d534ca52a209e8fbd43306d7\\" ] && (cd \\"\$r/.specnaut/hooks\\" && (sha256sum -c --status SHA256SUMS 2>/dev/null || shasum -a 256 -c --status SHA256SUMS)) && exec bash \\"\$r/.specnaut/hooks/protect-constitution.sh\\" codex; echo \\"specnaut: .specnaut/hooks changed since it was trusted — run specnaut upgrade, then /hooks\\" >&2; exit 2",
+            "command": "r=\$PWD; while [ -n \\"\$r\\" ] && [ ! -d \\"\$r/.specnaut/hooks\\" ]; do r=\${r%/*}; done; [ \\"\$( (sha256sum 2>/dev/null || shasum -a 256) < \\"\$r/.specnaut/hooks/SHA256SUMS\\" 2>/dev/null | cut -c1-64)\\" = \\"9163dacc7e62e37268b214baf3b98e6e6a5e6a97cb2d9bbec6e1c3097f5a19b3\\" ] && (cd \\"\$r/.specnaut/hooks\\" && (sha256sum -c --status SHA256SUMS 2>/dev/null || shasum -a 256 -c --status SHA256SUMS)) && exec bash \\"\$r/.specnaut/hooks/protect-constitution.sh\\" codex; echo \\"specnaut: .specnaut/hooks changed since it was trusted — run specnaut upgrade, then /hooks\\" >&2; exit 2",
             "timeout": 10
           }
         ]
@@ -31748,7 +31818,7 @@ c59dea265fb0e13092cb4ef650a436b29e34be4f18397aeaebc5408811ed3c7c  release-comman
         "hooks": [
           {
             "type": "command",
-            "command": "r=\$PWD; while [ -n \\"\$r\\" ] && [ ! -d \\"\$r/.specnaut/hooks\\" ]; do r=\${r%/*}; done; [ \\"\$( (sha256sum 2>/dev/null || shasum -a 256) < \\"\$r/.specnaut/hooks/SHA256SUMS\\" 2>/dev/null | cut -c1-64)\\" = \\"b769ec1237bc14096d8ab02232cf8e5bab3b3710d534ca52a209e8fbd43306d7\\" ] && (cd \\"\$r/.specnaut/hooks\\" && (sha256sum -c --status SHA256SUMS 2>/dev/null || shasum -a 256 -c --status SHA256SUMS)) && exec bash \\"\$r/.specnaut/hooks/guard-dispatch-model.sh\\" codex; echo \\"specnaut: .specnaut/hooks changed since it was trusted — run specnaut upgrade, then /hooks\\" >&2; exit 2",
+            "command": "r=\$PWD; while [ -n \\"\$r\\" ] && [ ! -d \\"\$r/.specnaut/hooks\\" ]; do r=\${r%/*}; done; [ \\"\$( (sha256sum 2>/dev/null || shasum -a 256) < \\"\$r/.specnaut/hooks/SHA256SUMS\\" 2>/dev/null | cut -c1-64)\\" = \\"9163dacc7e62e37268b214baf3b98e6e6a5e6a97cb2d9bbec6e1c3097f5a19b3\\" ] && (cd \\"\$r/.specnaut/hooks\\" && (sha256sum -c --status SHA256SUMS 2>/dev/null || shasum -a 256 -c --status SHA256SUMS)) && exec bash \\"\$r/.specnaut/hooks/guard-dispatch-model.sh\\" codex; echo \\"specnaut: .specnaut/hooks changed since it was trusted — run specnaut upgrade, then /hooks\\" >&2; exit 2",
             "timeout": 10
           }
         ]
@@ -31759,7 +31829,7 @@ c59dea265fb0e13092cb4ef650a436b29e34be4f18397aeaebc5408811ed3c7c  release-comman
         "hooks": [
           {
             "type": "command",
-            "command": "r=\$PWD; while [ -n \\"\$r\\" ] && [ ! -d \\"\$r/.specnaut/hooks\\" ]; do r=\${r%/*}; done; [ \\"\$( (sha256sum 2>/dev/null || shasum -a 256) < \\"\$r/.specnaut/hooks/SHA256SUMS\\" 2>/dev/null | cut -c1-64)\\" = \\"b769ec1237bc14096d8ab02232cf8e5bab3b3710d534ca52a209e8fbd43306d7\\" ] && (cd \\"\$r/.specnaut/hooks\\" && (sha256sum -c --status SHA256SUMS 2>/dev/null || shasum -a 256 -c --status SHA256SUMS)) && exec bash \\"\$r/.specnaut/hooks/approve-on-prompt.sh\\" codex; echo \\"specnaut: .specnaut/hooks changed since it was trusted — run specnaut upgrade, then /hooks\\" >&2; exit 0",
+            "command": "r=\$PWD; while [ -n \\"\$r\\" ] && [ ! -d \\"\$r/.specnaut/hooks\\" ]; do r=\${r%/*}; done; [ \\"\$( (sha256sum 2>/dev/null || shasum -a 256) < \\"\$r/.specnaut/hooks/SHA256SUMS\\" 2>/dev/null | cut -c1-64)\\" = \\"9163dacc7e62e37268b214baf3b98e6e6a5e6a97cb2d9bbec6e1c3097f5a19b3\\" ] && (cd \\"\$r/.specnaut/hooks\\" && (sha256sum -c --status SHA256SUMS 2>/dev/null || shasum -a 256 -c --status SHA256SUMS)) && exec bash \\"\$r/.specnaut/hooks/approve-on-prompt.sh\\" codex; echo \\"specnaut: .specnaut/hooks changed since it was trusted — run specnaut upgrade, then /hooks\\" >&2; exit 0",
             "timeout": 10
           }
         ]
@@ -31770,7 +31840,7 @@ c59dea265fb0e13092cb4ef650a436b29e34be4f18397aeaebc5408811ed3c7c  release-comman
         "hooks": [
           {
             "type": "command",
-            "command": "r=\$PWD; while [ -n \\"\$r\\" ] && [ ! -d \\"\$r/.specnaut/hooks\\" ]; do r=\${r%/*}; done; [ \\"\$( (sha256sum 2>/dev/null || shasum -a 256) < \\"\$r/.specnaut/hooks/SHA256SUMS\\" 2>/dev/null | cut -c1-64)\\" = \\"b769ec1237bc14096d8ab02232cf8e5bab3b3710d534ca52a209e8fbd43306d7\\" ] && (cd \\"\$r/.specnaut/hooks\\" && (sha256sum -c --status SHA256SUMS 2>/dev/null || shasum -a 256 -c --status SHA256SUMS)) && exec bash \\"\$r/.specnaut/hooks/approve-on-prompt.sh\\" codex; echo \\"specnaut: .specnaut/hooks changed since it was trusted — run specnaut upgrade, then /hooks\\" >&2; exit 0",
+            "command": "r=\$PWD; while [ -n \\"\$r\\" ] && [ ! -d \\"\$r/.specnaut/hooks\\" ]; do r=\${r%/*}; done; [ \\"\$( (sha256sum 2>/dev/null || shasum -a 256) < \\"\$r/.specnaut/hooks/SHA256SUMS\\" 2>/dev/null | cut -c1-64)\\" = \\"9163dacc7e62e37268b214baf3b98e6e6a5e6a97cb2d9bbec6e1c3097f5a19b3\\" ] && (cd \\"\$r/.specnaut/hooks\\" && (sha256sum -c --status SHA256SUMS 2>/dev/null || shasum -a 256 -c --status SHA256SUMS)) && exec bash \\"\$r/.specnaut/hooks/approve-on-prompt.sh\\" codex; echo \\"specnaut: .specnaut/hooks changed since it was trusted — run specnaut upgrade, then /hooks\\" >&2; exit 0",
             "timeout": 10
           }
         ]
@@ -31781,7 +31851,7 @@ c59dea265fb0e13092cb4ef650a436b29e34be4f18397aeaebc5408811ed3c7c  release-comman
         "hooks": [
           {
             "type": "command",
-            "command": "r=\$PWD; while [ -n \\"\$r\\" ] && [ ! -d \\"\$r/.specnaut/hooks\\" ]; do r=\${r%/*}; done; [ \\"\$( (sha256sum 2>/dev/null || shasum -a 256) < \\"\$r/.specnaut/hooks/SHA256SUMS\\" 2>/dev/null | cut -c1-64)\\" = \\"b769ec1237bc14096d8ab02232cf8e5bab3b3710d534ca52a209e8fbd43306d7\\" ] && (cd \\"\$r/.specnaut/hooks\\" && (sha256sum -c --status SHA256SUMS 2>/dev/null || shasum -a 256 -c --status SHA256SUMS)) && exec bash \\"\$r/.specnaut/hooks/log-subagent.sh\\" start; echo \\"specnaut: .specnaut/hooks changed since it was trusted — run specnaut upgrade, then /hooks\\" >&2; exit 0",
+            "command": "r=\$PWD; while [ -n \\"\$r\\" ] && [ ! -d \\"\$r/.specnaut/hooks\\" ]; do r=\${r%/*}; done; [ \\"\$( (sha256sum 2>/dev/null || shasum -a 256) < \\"\$r/.specnaut/hooks/SHA256SUMS\\" 2>/dev/null | cut -c1-64)\\" = \\"9163dacc7e62e37268b214baf3b98e6e6a5e6a97cb2d9bbec6e1c3097f5a19b3\\" ] && (cd \\"\$r/.specnaut/hooks\\" && (sha256sum -c --status SHA256SUMS 2>/dev/null || shasum -a 256 -c --status SHA256SUMS)) && exec bash \\"\$r/.specnaut/hooks/log-subagent.sh\\" start; echo \\"specnaut: .specnaut/hooks changed since it was trusted — run specnaut upgrade, then /hooks\\" >&2; exit 0",
             "timeout": 10
           }
         ]
@@ -31792,7 +31862,7 @@ c59dea265fb0e13092cb4ef650a436b29e34be4f18397aeaebc5408811ed3c7c  release-comman
         "hooks": [
           {
             "type": "command",
-            "command": "r=\$PWD; while [ -n \\"\$r\\" ] && [ ! -d \\"\$r/.specnaut/hooks\\" ]; do r=\${r%/*}; done; [ \\"\$( (sha256sum 2>/dev/null || shasum -a 256) < \\"\$r/.specnaut/hooks/SHA256SUMS\\" 2>/dev/null | cut -c1-64)\\" = \\"b769ec1237bc14096d8ab02232cf8e5bab3b3710d534ca52a209e8fbd43306d7\\" ] && (cd \\"\$r/.specnaut/hooks\\" && (sha256sum -c --status SHA256SUMS 2>/dev/null || shasum -a 256 -c --status SHA256SUMS)) && exec bash \\"\$r/.specnaut/hooks/log-subagent.sh\\" stop; echo \\"specnaut: .specnaut/hooks changed since it was trusted — run specnaut upgrade, then /hooks\\" >&2; exit 0",
+            "command": "r=\$PWD; while [ -n \\"\$r\\" ] && [ ! -d \\"\$r/.specnaut/hooks\\" ]; do r=\${r%/*}; done; [ \\"\$( (sha256sum 2>/dev/null || shasum -a 256) < \\"\$r/.specnaut/hooks/SHA256SUMS\\" 2>/dev/null | cut -c1-64)\\" = \\"9163dacc7e62e37268b214baf3b98e6e6a5e6a97cb2d9bbec6e1c3097f5a19b3\\" ] && (cd \\"\$r/.specnaut/hooks\\" && (sha256sum -c --status SHA256SUMS 2>/dev/null || shasum -a 256 -c --status SHA256SUMS)) && exec bash \\"\$r/.specnaut/hooks/log-subagent.sh\\" stop; echo \\"specnaut: .specnaut/hooks changed since it was trusted — run specnaut upgrade, then /hooks\\" >&2; exit 0",
             "timeout": 10
           }
         ]
