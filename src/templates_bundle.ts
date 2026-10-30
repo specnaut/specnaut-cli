@@ -4347,8 +4347,8 @@ child is closed. Create a child with \`add.sh --parent <num>\` (GitHub native \`
 ### Closing rules (all three backends)
 
 - **Sub-task**: close directly.
-- **Epic / parent**: \`cascade-check.sh <num>\` first (exit 11 = blocked, 0 = safe). Cancel: close parent + children as \`not_planned\`.
-- **GitHub / GitLab two-step**: \`gh issue close <num> --reason {completed|not_planned}\` FIRST, then \`move.sh <num> Done\` — a Done card over an open issue is what \`sweep-closed.sh\` reports as REOPENED (\`phases/merge-close.md\`). Local: \`move.sh <num> Done\`, never a hand edit.
+- **Epic / parent**: \`cascade-check.sh <num>\` first (exit 11 = blocked, 0 = safe). Cancel: close parent + children not planned, each by the \`close\` verb below.
+- **Close first, then move**: how each backend closes — completed or not planned — is the \`close\` verb below, its one home. The issue closes BEFORE \`move.sh <num> Done\`: a Done card over an open issue is what \`sweep-closed.sh\` reports as REOPENED (\`phases/merge-close.md\`). Never a hand edit.
 - **Board hygiene sweep**: \`move.sh <num> Done\` for CLOSED issues stuck \`In progress\`/\`In review\`; reopen mislabelled \`Done\`.
 
 ### Epic detection heuristic
@@ -4404,7 +4404,7 @@ The \`/task\` skill's \`backlog.md\` routes them to you; what each owes:
 - **Batch platform mutations; native fields over labels** — the fewest requests (one multi-alias
   \`gh api graphql\` / REST batch), never call-by-call; never a \`priority:*\`/\`size:*\` label beside
   the native field.
-- Never delete task files — change status to \`done\` or \`deferred\`.
+- Never delete task files — close them, with \`--not-planned\` when they will not be done.
 - Don't recommend blocked tasks; never close a parent while children remain open.
 - Persisted artefacts in English; chat replies in the user's language.
 
@@ -6169,7 +6169,8 @@ if [ "\$#" -lt 2 ] || [ "\$#" -gt 3 ]; then
   echo '  Status one of: Backlog, Ready, "In progress", "In review", Done' >&2
   exit 2
 fi
-NUM=\$(printf "%03d" "\$1" 2>/dev/null || echo "\$1")
+# Decimal, never octal: printf reads \`012\` as 10, which would move #010.
+case \$1 in '' | *[!0-9]*) NUM=\$1 ;; *) NUM=\$(printf "%03d" "\$((10#\$1))") ;; esac
 STATUS="\$2"
 RESOLUTION=""
 
