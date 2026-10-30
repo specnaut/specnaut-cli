@@ -43,10 +43,6 @@ const MUST_SURVIVE: ReadonlyArray<
     label: "security-expert.md",
     body: () => entry("agent", "security-expert", null),
     sentences: [
-      // The seat must still SAY its Bash grant is constrained, even though the
-      // allowlist itself now lives in the preloaded skill (#562). A pointer
-      // that stops pointing is how a relocation becomes a deletion.
-      "the constrained Bash allowlist, which is the only thing standing between this seat's unconditional `Bash` grant and an arbitrary shell",
       // The operative half of the secrets rule. The pre-existing assertion
       // covers only the heading clause "never emit a secret value" — these two
       // clauses are what make it actionable.
@@ -90,21 +86,6 @@ const MUST_SURVIVE: ReadonlyArray<
       // per-language rows into the universal set deletes exactly these.
       "*.tfstate",
       "kubeconfig",
-    ],
-  },
-  {
-    label: "alert-triage-contract (split out of security-expert under #562)",
-    body: () => entry("skill", "alert-triage-contract", null),
-    sentences: [
-      // The ENTIRE limit on an agent whose frontmatter grants Bash
-      // unconditionally. Three near-identical `gh api` snippets make the block
-      // read as self-duplication; it is the opposite. It moved file under
-      // #562 — so this assertion moved with it, rather than being deleted for
-      // failing where the text no longer is.
-      "`Bash` is granted ONLY for the `gh api` calls listed below. Do NOT run arbitrary shell commands. Do NOT chain commands. Do NOT redirect to",
-      // Removing this lets the seat close real security alerts with nothing
-      // behind them.
-      "Do NOT auto-close the alert",
     ],
   },
   {
@@ -159,10 +140,37 @@ Deno.test("implement.md runs no command read from a contributor-writable file (s
   }
 });
 
+/**
+ * #678 retired the alert-triage mode, and with it the `gh api` allowlist that
+ * was the ENTIRE limit on security-expert's unconditional `Bash` grant. The two
+ * had to leave together: an allowlist removed while the grant stays is an
+ * arbitrary shell on the seat that reads every diff. The sentences that pinned
+ * the allowlist (and "Do NOT auto-close the alert") moved here as this
+ * absence assertion rather than being deleted for failing where the text no
+ * longer is.
+ */
+Deno.test("security-expert lost its Bash grant with the allowlist that bounded it (#678)", () => {
+  const triage = CORE_BUNDLE.find((e) =>
+    e.category === "skill" && e.name === "alert-triage-contract"
+  );
+  assert(triage === undefined, "alert-triage-contract is back — and with it, a reason for Bash");
+  const raw = CORE_BUNDLE.find((e) => e.category === "agent" && e.name === "security-expert");
+  assert(raw, "no bundle entry: agent/security-expert");
+  const tools = /^tools:\s*(.+)$/m.exec(raw.content)?.[1] ?? "";
+  assert(tools.length > 0, "security-expert has no tools: line — this assertion read nothing");
+  assert(!/\bBash\b/.test(tools), `security-expert grants Bash with no allowlist: ${tools}`);
+  const body = flat(raw.content);
+  for (const gone of ["Alert triage", "alert-triage-contract", "gh api"]) {
+    assert(!body.includes(gone), `security-expert still carries ${JSON.stringify(gone)}`);
+  }
+});
+
 Deno.test("the trim-safety list is not vacuously empty", () => {
   // A list that quietly emptied would make every test above pass. This is the
   // same failure the size guard had: an assertion that cannot fail.
   const total = MUST_SURVIVE.reduce((n, f) => n + f.sentences.length, 0);
-  assert(MUST_SURVIVE.length >= 8, `only ${MUST_SURVIVE.length} files covered`);
+  // 7, not 8: #678 retired alert-triage-contract, whose sentences became the
+  // absence assertion above — a population count, not a weaker guard.
+  assert(MUST_SURVIVE.length >= 7, `only ${MUST_SURVIVE.length} files covered`);
   assert(total >= 15, `only ${total} sentences guarded`);
 });

@@ -25,7 +25,7 @@ Enhanced fork of [`specify` CLI](https://github.com/github/spec-kit), distribute
 
 **Different from upstream Spec Kit:** auto-chained pipeline (`/task plan` chains all phases); dedicated `review` phase after implement; backlog as product source of truth via `product-owner` agent (backends: local, github, gitlab, cloud); Claude Code plugin distribution (the `specnaut-cockpit` plugin from the `specnaut-marketplace` marketplace).
 
-**Bundled agents:** product-owner, developer, code-reviewer, security-expert, qa-tester, workflow-manager, devops-sre, specnaut-guide, architect-expert, performance-expert, accessibility-expert, dependency-expert, ui-ux-designer.
+**Bundled agents:** product-owner, developer, code-reviewer, security-expert, specnaut-guide, architect-expert, performance-expert, accessibility-expert, dependency-expert, ui-ux-designer.
 
 ### Commands
 

@@ -25,7 +25,7 @@
 # Examples:
 #   .claude/scripts/dispatch-agent.sh code-reviewer "Review the diff in /tmp/pr.diff"
 #   .claude/scripts/dispatch-agent.sh product-owner "Open a backlog item titled X"
-#   OUTPUT_FORMAT=json .claude/scripts/dispatch-agent.sh qa-tester "Run the suite"
+#   OUTPUT_FORMAT=json .claude/scripts/dispatch-agent.sh developer "Fix the failing test"
 set -euo pipefail
 
 if [ "$#" -lt 2 ]; then

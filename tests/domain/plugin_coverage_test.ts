@@ -8,12 +8,9 @@ Deno.test("isPluginCoveredPath: claude + .claude/agents/<name>.md (non-architect
     const name of [
       "code-reviewer",
       "developer",
-      "devops-sre",
       "product-owner",
-      "qa-tester",
       "security-expert",
       "specnaut-guide",
-      "workflow-manager",
       "ui-ux-designer",
       "performance-expert",
       "accessibility-expert",
@@ -211,6 +208,15 @@ Deno.test("isPluginCoveredPath: the task skill's SCRIPTS are never covered", () 
       false,
       `${dest} resolves paths relative to itself and must stay binary-owned`,
     );
+  }
+});
+
+Deno.test("isPluginCoveredPath: the contract skills #678 retired are no longer covered", () => {
+  // Same reasoning as cli#683's below: the plugin stopped shipping them, so a
+  // covered path would be a phantom `check --project` reports missing forever.
+  for (const name of ["handoff-protocol", "qa-report-contract", "alert-triage-contract"]) {
+    const dest = `.claude/skills/${name}/SKILL.md`;
+    assertEquals(isPluginCoveredPath("claude", dest), false, `${dest} is no longer shipped`);
   }
 });
 

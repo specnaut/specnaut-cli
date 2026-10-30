@@ -153,12 +153,9 @@ export const PLUGIN_COVERED_PATHS_CLAUDE: ReadonlyArray<string> = [
   ...[
     "code-reviewer",
     "developer",
-    "devops-sre",
     "product-owner",
-    "qa-tester",
     "security-expert",
     "specnaut-guide",
-    "workflow-manager",
     "ui-ux-designer",
     "performance-expert",
     "accessibility-expert",
@@ -210,12 +207,9 @@ export const PLUGIN_COVERED_PATHS_CLAUDE: ReadonlyArray<string> = [
   // `specnaut` was the only skill, and each of these joined the plugin without
   // anyone revisiting it (specnaut-cli#605).
   ...[
-    "alert-triage-contract",
     "backlog-frontmatter",
     "backlog-reference-contract",
-    "handoff-protocol",
     "mobile-first-contract",
-    "qa-report-contract",
     "response-style-contract",
     "review-findings-contract",
     "specnaut-facts",

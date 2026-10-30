@@ -14,8 +14,7 @@ someone reads a dispatch line without opening the agent file.
 | ------ | ------- | ------ |
 | `<domain>-expert` | A review lens that **also** has a `/task audit` axis — dual mode: per-diff review *and* scoped audit | `accessibility-expert`, `architect-expert`, `dependency-expert`, `performance-expert`, `security-expert` |
 | `<domain>-reviewer` | A review lens with **no** audit axis — it only ever sees a diff | `code-reviewer` |
-| `-manager` | Drives a **multi-phase** delivery across several agents | `workflow-manager` |
-| role noun | Does the work rather than judging it | `developer`, `qa-tester`, `devops-sre`, `product-owner`, `ui-ux-designer` |
+| role noun | Does the work rather than judging it | `developer`, `product-owner`, `ui-ux-designer` |
 
 Two rules follow, and they are the whole point of writing this down:
 
@@ -63,9 +62,8 @@ release never widens the list on its own — re-run the test on the seat.
 | ----- | ------ | --- |
 | `haiku` | `specnaut-guide` | Reads docs and explains; the user reads the whole answer. Its upgrade walk shows each fetched release and the files it commits before acting, and hands adoption and merges to `developer`. |
 | `opus` | `code-reviewer`, `accessibility-expert`, `performance-expert`, `dependency-expert`, `security-expert`, `architect-expert` | Review lenses — nobody re-reads what they cleared. |
-| `opus` | `workflow-manager` | Orchestrator — a skipped step leaves no trace downstream. |
 | `opus` | `product-owner` | Grooming is judgement; its mechanical board moves share the seat. |
-| `opus` | `developer`, `devops-sre`, `ui-ux-designer`, `qa-tester` | Builders and the QA gate — review samples their work, it does not re-derive it. |
+| `opus` | `developer`, `ui-ux-designer` | Builders — review samples their work, it does not re-derive it. |
 
 The same test applies per dispatch: a skill may pass `model: "haiku"` for a
 mechanical subtask the caller will check, never for a review lens.
@@ -74,10 +72,10 @@ mechanical subtask the caller will check, never for a review lens.
 
 | Tier | Role class | Agents |
 | ---- | ---------- | ------ |
-| `high` | Everything else — agentic work, review lenses, orchestrators, the backlog owner, the design agent, the explainer | `developer`, `qa-tester`, `devops-sre`, `accessibility-expert`, `dependency-expert`, `performance-expert`, `code-reviewer`, `workflow-manager`, `product-owner`, `ui-ux-designer`, `specnaut-guide` |
+| `high` | Everything else — agentic work, review lenses, the backlog owner, the design agent, the explainer | `developer`, `accessibility-expert`, `dependency-expert`, `performance-expert`, `code-reviewer`, `product-owner`, `ui-ux-designer`, `specnaut-guide` |
 | `xhigh` | The two lenses whose misses are unrecoverable | `architect-expert`, `security-expert` |
 
-Tally: 11 `high` · 2 `xhigh` = 13 agents. `low` and `medium` remain valid
+Tally: 8 `high` · 2 `xhigh` = 10 agents. `low` and `medium` remain valid
 values for a project's own agents; **no bundled agent uses them.**
 
 Effort is independent of the model tier: a `haiku` seat takes the same
@@ -94,8 +92,8 @@ depth than writing code. Both halves turned out to be wrong in the same way.
   well-formatted report with fewer findings, which is indistinguishable from
   clean code. There is no error, no retry, and nothing downstream notices —
   the saving is visible and the cost is not.
-- **An orchestrator does reason.** `workflow-manager` sequences a delivery
-  and judges when a phase is actually done. It is not a switch statement.
+- **An orchestrator does reason.** Whatever sequences a delivery judges
+  when a phase is actually done. It is not a switch statement.
 
 The compound-cost worry behind the old `low` tier is real — an orchestrator
 pays its own budget plus every child's — but it is an argument for fanning
@@ -107,7 +105,7 @@ The tier is not a ranking of importance, and it is not "who does the hardest
 work" — by that measure `developer` would top the list. It asks one question:
 **when this agent thinks too little, what catches it?**
 
-For `developer`, `qa-tester`, and `devops-sre`, something does. A shallow
+For `developer`, something does. A shallow
 coding pass meets a test suite, a review gate, and a human reading the diff.
 The work is verified downstream by construction, so extra budget buys a better
 first draft of something that was going to be checked anyway.

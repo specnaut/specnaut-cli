@@ -28,7 +28,7 @@ const LOAD_BEARING = [
 ];
 
 /** Agents that emit backlog references and pick the contract up via `skills:`. */
-const CHANNEL_A = ["product-owner", "developer", "workflow-manager"] as const;
+const CHANNEL_A = ["product-owner", "developer"] as const;
 
 /** Bundled surfaces with no frontmatter preloading — they carry a pointer. */
 const CHANNEL_B_CORE: ReadonlyArray<{ category: string; name: string; doc?: string }> = [

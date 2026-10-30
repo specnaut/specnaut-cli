@@ -63,18 +63,16 @@ const SYNC_PAIRS: ReadonlyArray<{ plugin: string; source: string }> = [
     plugin: `plugin/skills/ship/phases/${name}.md`,
     source: `templates/core/skills/ship/phases/${name}.md`,
   })),
-  // Four machine-readable output-contract skills (#378). `user-invocable:
+  // Machine-readable output-contract skills (#378). `user-invocable:
   // false` — never user-invoked; preloaded into agent context via the
-  // `skills:` frontmatter to normalize the WORKFLOW STATUS / HANDOFF /
-  // REVIEW SUMMARY / QA SUMMARY blocks agents emit after their prose.
+  // `skills:` frontmatter to normalize the WORKFLOW STATUS / REVIEW SUMMARY
+  // blocks agents emit after their prose (#678 retired HANDOFF and QA SUMMARY,
+  // which nothing parsed).
   ...[
     "workflow-contract",
-    "handoff-protocol",
     "review-findings-contract",
-    "qa-report-contract",
-    // #562: three sections split out of seats that had no duplication left to
+    // #562: sections split out of seats that had no duplication left to
     // reclaim. Same mechanism, same `user-invocable: false`.
-    "alert-triage-contract",
     "backlog-frontmatter",
     "specnaut-facts",
     // Also found by the completeness sweep, and also already identical. #547
@@ -101,23 +99,21 @@ const SYNC_PAIRS: ReadonlyArray<{ plugin: string; source: string }> = [
     plugin: "plugin/skills/status-audit/SKILL.md",
     source: "templates/core/skills/status-audit/SKILL.md",
   },
-  // Dual-copy agents: 13 sub-agent definitions, each landing as
+  // Dual-copy agents: 10 sub-agent definitions, each landing as
   // `plugin/agents/<name>.md`. Claude Code resolves agents by file
   // basename in plugin scope; no namespacing needed for invocation
   // (agents are not user-invokable like slash commands).
   // Counts: 10 original + ui-ux-designer (#198, sync-test drift fix in
   // #321) + performance-expert (#304) + accessibility-expert (#305) +
   // architect-expert (#321) + dependency-expert (#322) = 15, less
-  // review-coordinator and test-reviewer (#678) = 13.
+  // review-coordinator, test-reviewer, workflow-manager, qa-tester and
+  // devops-sre (#678) = 10.
   ...[
     "code-reviewer",
     "developer",
-    "devops-sre",
     "product-owner",
-    "qa-tester",
     "security-expert",
     "specnaut-guide",
-    "workflow-manager",
     "ui-ux-designer",
     "performance-expert",
     "accessibility-expert",

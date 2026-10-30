@@ -115,8 +115,19 @@ Deno.test("specnaut init --ai codex scaffolds a Codex layout", async () => {
     // 27 since spec 033 (/ship is a top-level skill folder; its documents live
     // inside it). 20 since spec 034 retired seven skills. 14 since cli#683:
     // `board`, `code-audit` and the five `*-audit` skills became `specnaut-task`.
-    assertEquals(agentsSkillsCount, 14);
-    for (const retired of ["specnaut-board", "specnaut-code-audit", "specnaut-sec-audit"]) {
+    // 11 since #678 retired handoff-protocol, qa-report-contract and
+    // alert-triage-contract — blocks nothing parsed, a mode nothing dispatched.
+    assertEquals(agentsSkillsCount, 11);
+    for (
+      const retired of [
+        "specnaut-board",
+        "specnaut-code-audit",
+        "specnaut-sec-audit",
+        "specnaut-handoff-protocol",
+        "specnaut-qa-report-contract",
+        "specnaut-alert-triage-contract",
+      ]
+    ) {
       assertEquals(
         await exists(join(root, ".agents/skills", retired)),
         false,
@@ -128,8 +139,12 @@ Deno.test("specnaut init --ai codex scaffolds a Codex layout", async () => {
     )).length;
     // 11 original + performance-expert (#304) + accessibility-expert (#305) +
     // architect-expert (#321) + dependency-expert (#322), less
-    // review-coordinator and test-reviewer (#678) = 13.
-    assertEquals(codexAgentsCount, 13);
+    // review-coordinator, test-reviewer, workflow-manager, qa-tester and
+    // devops-sre (#678) = 10.
+    assertEquals(codexAgentsCount, 10);
+    for (const retired of ["workflow-manager", "qa-tester", "devops-sre"]) {
+      assertEquals(await exists(join(root, `.codex/agents/${retired}.toml`)), false);
+    }
 
     // Shared (cross-harness)
     assertEquals(await exists(join(root, "docs/constitution.md")), true);

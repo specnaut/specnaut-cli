@@ -190,14 +190,14 @@ Deno.test("lowercase contract field names are still captured (case-insensitive m
   ].join("\n");
   const payload = JSON.stringify({
     session_id: "sess-lower",
-    agent_type: "qa-tester",
+    agent_type: "developer",
     last_assistant_message: lastAssistantMessage,
   });
 
   const { code, line } = await runHook("stop", payload);
   assertEquals(code, 0);
   assert(line);
-  assertEquals(line.agent, "qa-tester");
+  assertEquals(line.agent, "developer");
   assertEquals(line.state, "done");
   assertEquals(line.done_criteria_met, "yes");
   assertEquals(line.handoff_target, "none");
@@ -284,9 +284,9 @@ Deno.test("contract block under the legacy `.result` key is still parsed (output
     "REVIEW_VERDICT: needs_followup",
     "",
     "WORKFLOW STATUS",
-    "STATE: awaiting_qa",
+    "STATE: awaiting_review",
     "DONE_CRITERIA_MET: yes",
-    "HANDOFF_TARGET: qa-tester",
+    "HANDOFF_TARGET: developer",
   ].join("\n");
   const payload = JSON.stringify({
     session_id: "sess-result",
@@ -299,8 +299,8 @@ Deno.test("contract block under the legacy `.result` key is still parsed (output
   assert(line);
   assertEquals(line.agent, "architect-expert");
   assertEquals(line.review_verdict, "needs_followup");
-  assertEquals(line.state, "awaiting_qa");
-  assertEquals(line.handoff_target, "qa-tester");
+  assertEquals(line.state, "awaiting_review");
+  assertEquals(line.handoff_target, "developer");
 });
 
 Deno.test("JSON injection via session_id is neutralised → valid JSON, no injected key", async () => {

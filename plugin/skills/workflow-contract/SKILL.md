@@ -8,33 +8,26 @@ constitution-exempt: an output-format contract preloaded by agents that already 
 # workflow-contract
 
 This skill defines the **WORKFLOW STATUS** block. Agents that preload it
-(`developer`, `workflow-manager`, `qa-tester`, and all
-five experts + `code-reviewer` via this contract) emit exactly one such block at
-the **end of their turn, after the prose**. The block is additive — it never replaces the prose narrative; it
-appends a normalized, fenced, machine-readable summary that downstream tooling
-(audit synthesis, the status ledger, `/status-audit`) can parse without
-re-reading the prose.
+(`developer`, the five experts and `code-reviewer`) emit exactly one such block
+at the **end of their turn, after the prose**. It is additive: the prose carries
+the narrative, the block carries the fields something parses — the subagent log
+hook reads `STATE`, `DONE_CRITERIA_MET` and `HANDOFF_TARGET` into
+`.specnaut/logs/agents.jsonl`, and whoever resumes a blocked turn reads
+`BLOCKERS`.
 
 ## Format
 
 ```text
 WORKFLOW STATUS
-STATE: in_progress | blocked | awaiting_review | awaiting_qa | awaiting_user | done | failed
+STATE: in_progress | blocked | awaiting_review | awaiting_user | done | failed
 DONE_CRITERIA_MET: yes | no
-SUMMARY: <one sentence — outcome, not effort>
-ARTIFACTS: <comma list | none>
-FILES_CHANGED: <comma list | none>
-VALIDATION: <comma list of "command (result)" | none>
 BLOCKERS: <one sentence | none>
-NEXT_ACTION: <one sentence>
-HANDOFF_TARGET: developer | qa-tester | product-owner | workflow-manager | user | none
+HANDOFF_TARGET: developer | product-owner | user | none
 ```
 
 ## Rules
 
 - Exactly one block per turn; never replaces prose (additive).
 - `STATE: done` only when assigned exit criteria are met; otherwise use `awaiting_review` /
-  `awaiting_qa` / `blocked`. Never `done` with `DONE_CRITERIA_MET: no`.
-- `FILES_CHANGED: none` for read-only agents (experts/reviewers).
-- `VALIDATION` is explicit, e.g. `<the command you ran> (pass)`.
+  `blocked`. Never `done` with `DONE_CRITERIA_MET: no`.
 - `HANDOFF_TARGET: none` when work terminates here.

@@ -29,14 +29,13 @@ const PINNED = new Map<string, string>([
   ["code-reviewer", "Read, Grep, Glob, Bash(.specnaut/scripts/bash/run-gate.sh fast)"],
   ["dependency-expert", "Read, Grep, Glob, Bash"],
   ["developer", "Read, Write, Edit, Grep, Glob, Bash"],
-  ["devops-sre", "Read, Write, Edit, Grep, Glob, Bash"],
   ["performance-expert", "Read, Grep, Glob, Bash"],
   ["product-owner", "Read, Write, Edit, Grep, Glob, Bash"],
-  ["qa-tester", "Read, Write, Edit, Grep, Glob, Bash"],
-  ["security-expert", "Read, Grep, Glob, Bash"],
+  // #678: its Bash existed for the alert-triage mode's `gh api` calls; that
+  // mode is gone, and every remaining mode reads.
+  ["security-expert", "Read, Grep, Glob"],
   ["specnaut-guide", "Read, WebFetch, Grep, Glob, Bash, Agent(developer)"],
   ["ui-ux-designer", "Read, Edit, Write, Glob, Grep"],
-  ["workflow-manager", "Read, Grep, Glob, Bash, Agent(product-owner, developer, qa-tester)"],
 ]);
 
 /** `README.md` documents the directory; it is not a seat. */

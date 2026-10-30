@@ -21,7 +21,7 @@ merge: manual)
 ## Skills available
 
 - `/task plan` — the feature's brief (or `--full` plan), then the architecture + security audits, then the stop
-- `/task implement` — run the developer → review → qa-tester pipeline
+- `/task implement` — the developer builds the plan, then the review runs
 - `/task review` — architecture + quality gates
 - `/task merge` — merge the feature branch to main
 - `/specnaut-task` — the backlog, the pipeline above, and audits (`audit --security|--archi|…`)
@@ -32,9 +32,6 @@ merge: manual)
 - `/specnaut-agent-developer` — implementation work
 - `/specnaut-agent-code-reviewer` — code quality and test review
 - `/specnaut-agent-security-expert` — security review
-- `/specnaut-agent-qa-tester` — QA + test writing
-- `/specnaut-agent-workflow-manager` — long-running orchestration
-- `/specnaut-agent-devops-sre` — cloud infrastructure, CI/CD, observability
 
 **Backlog references** follow the `backlog-reference-contract` skill — read it; never restate it here.
 

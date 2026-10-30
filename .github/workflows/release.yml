@@ -13,8 +13,8 @@ jobs:
   # Hybrid security gate (#188's sibling): checks GitHub-side alert state
   # before we let the release build proceed. Critical alerts block the
   # release; high/medium surface as a workflow summary the local /release
-  # session reads during postflight (step 10 of the release skill), then dispatches the
-  # security-expert agent for triage. Low alerts are logged silently.
+  # session reads during postflight (step 10 of the release skill) and triages
+  # in the Security tab. Low alerts are logged silently.
   #
   # The release tag is already pushed at this point; failing here is the
   # safest possible failure mode — no GitHub Release object is created,
@@ -186,7 +186,7 @@ jobs:
           fi
 
           if [ "$dep_high" -gt 0 ] || [ "$code_high" -gt 0 ]; then
-            echo "::warning::High-severity findings open: $dep_high dependabot + $code_high code-scanning. The release proceeds; dispatch the security-expert agent locally to triage."
+            echo "::warning::High-severity findings open: $dep_high dependabot + $code_high code-scanning. The release proceeds; triage them in the Security tab."
           fi
 
   # The tag is what publishes, and nothing here used to ask whether the commit

@@ -34,14 +34,12 @@ const SCHEMA_MARKERS: Record<string, string[]> = {
   ],
   "workflow-contract": [
     "WORKFLOW STATUS",
-    "STATE: in_progress | blocked | awaiting_review | awaiting_qa | awaiting_user | done | failed",
+    "STATE: in_progress | blocked | awaiting_review | awaiting_user | done | failed",
+    "DONE_CRITERIA_MET: yes | no",
+    "BLOCKERS: <one sentence | none>",
+    "HANDOFF_TARGET: developer | product-owner | user | none",
     "Never `done` with `DONE_CRITERIA_MET: no`.",
     "`HANDOFF_TARGET: none` when work terminates here.",
-  ],
-  "handoff-protocol": [
-    "HANDOFF",
-    "Block exists **iff** `HANDOFF_TARGET ≠ none`",
-    "`TARGET` must equal the WORKFLOW STATUS `HANDOFF_TARGET`.",
   ],
   "review-findings-contract": [
     "REVIEW SUMMARY",
@@ -54,13 +52,28 @@ const SCHEMA_MARKERS: Record<string, string[]> = {
     "EVIDENCE",
     "A clean report whose `EVIDENCE` is **absent, empty, or `NONE`** is `NOT RUN`.",
   ],
-  "qa-report-contract": [
-    "QA SUMMARY",
-    "QA_VERDICT: pass | fail | blocked",
-    "`QA_VERDICT: pass` only when the requested QA scope is complete **and** `TOTAL_FAIL_COUNT == 0`.",
-    "`QA_VERDICT: blocked` when QA could not run (missing environment/prereqs) — distinct from `fail`.",
-  ],
 };
+
+/**
+ * #678: the WORKFLOW STATUS fields nothing parsed. The log hook reads `STATE`,
+ * `DONE_CRITERIA_MET` and `HANDOFF_TARGET`; the developer reads `BLOCKERS`. A
+ * field returning here is one more line every seat writes and no tool reads.
+ */
+const WORKFLOW_DROPPED_FIELDS = [
+  "SUMMARY:",
+  "ARTIFACTS:",
+  "FILES_CHANGED:",
+  "VALIDATION:",
+  "NEXT_ACTION:",
+  "awaiting_qa",
+] as const;
+
+Deno.test("workflow-contract carries only the fields something parses", () => {
+  const body = skillContent("workflow-contract");
+  for (const field of WORKFLOW_DROPPED_FIELDS) {
+    assert(!body.includes(field), `workflow-contract still carries ${field} (dropped under #678)`);
+  }
+});
 
 for (const [name, markers] of Object.entries(SCHEMA_MARKERS)) {
   Deno.test(`contract "${name}" body carries its block header + rule lines`, () => {

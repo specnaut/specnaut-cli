@@ -39,7 +39,9 @@ async function frontmatters(): Promise<{ path: string; body: string }[]> {
 
 Deno.test("every shipped frontmatter parses as strict YAML", async () => {
   const all = await frontmatters();
-  assert(all.length > 50, `expected the whole shipped surface, found ${all.length} frontmatters`);
+  // A vacuity floor, not a pin: 43 since #678 retired six agents and three
+  // contracts (each shipped twice, in templates/ and plugin/).
+  assert(all.length > 40, `expected the whole shipped surface, found ${all.length} frontmatters`);
   const failing = all.flatMap(({ path, body }) => {
     try {
       parseYaml(body);

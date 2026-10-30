@@ -45,7 +45,7 @@ in the output.
 
 | Field               | Type   | Source block / field             | Allowed values                                                                  |
 | ------------------- | ------ | -------------------------------- | ------------------------------------------------------------------------------- |
-| `state`             | string | `WORKFLOW STATUS` › `STATE`             | `in_progress` · `blocked` · `awaiting_review` · `awaiting_qa` · `awaiting_user` · `done` · `failed` |
+| `state`             | string | `WORKFLOW STATUS` › `STATE`             | `in_progress` · `blocked` · `awaiting_review` · `awaiting_user` · `done` · `failed` |
 | `done_criteria_met` | string | `WORKFLOW STATUS` › `DONE_CRITERIA_MET` | `yes` · `no`                                                                    |
 | `handoff_target`    | string | `WORKFLOW STATUS` › `HANDOFF_TARGET`    | an agent name, or `none`                                                        |
 | `review_verdict`    | string | `REVIEW SUMMARY` › `REVIEW_VERDICT`     | `pass` · `fail` · `needs_followup`                                              |

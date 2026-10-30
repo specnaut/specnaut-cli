@@ -218,18 +218,8 @@
     },
     {
       "category": "skill",
-      "name": "handoff-protocol",
-      "source": "core/skills/handoff-protocol/SKILL.md"
-    },
-    {
-      "category": "skill",
       "name": "review-findings-contract",
       "source": "core/skills/review-findings-contract/SKILL.md"
-    },
-    {
-      "category": "skill",
-      "name": "alert-triage-contract",
-      "source": "core/skills/alert-triage-contract/SKILL.md"
     },
     {
       "category": "skill",
@@ -240,11 +230,6 @@
       "category": "skill",
       "name": "specnaut-facts",
       "source": "core/skills/specnaut-facts/SKILL.md"
-    },
-    {
-      "category": "skill",
-      "name": "qa-report-contract",
-      "source": "core/skills/qa-report-contract/SKILL.md"
     },
     {
       "category": "agent",
@@ -265,21 +250,6 @@
       "category": "agent",
       "name": "security-expert",
       "source": "core/agents/security-expert.md"
-    },
-    {
-      "category": "agent",
-      "name": "qa-tester",
-      "source": "core/agents/qa-tester.md"
-    },
-    {
-      "category": "agent",
-      "name": "workflow-manager",
-      "source": "core/agents/workflow-manager.md"
-    },
-    {
-      "category": "agent",
-      "name": "devops-sre",
-      "source": "core/agents/devops-sre.md"
     },
     {
       "category": "agent",
@@ -328,18 +298,6 @@
       "name": "developer",
       "suffix": "MEMORY.md",
       "source": "core/agents/developer/memory/MEMORY.md"
-    },
-    {
-      "category": "agent-memory",
-      "name": "qa-tester",
-      "suffix": "MEMORY.md",
-      "source": "core/agents/qa-tester/memory/MEMORY.md"
-    },
-    {
-      "category": "agent-memory",
-      "name": "devops-sre",
-      "suffix": "MEMORY.md",
-      "source": "core/agents/devops-sre/memory/MEMORY.md"
     },
     {
       "category": "agent-memory",

@@ -308,9 +308,9 @@ check "groom ships beside the /task router, not as a phase" \
 
 echo
 echo "═══ #77  manual-only flags ═══"
-for agent in developer devops-sre qa-tester; do
-  check "$agent has disable-model-invocation: true" \
-    "grep -q 'disable-model-invocation: true' .claude/agents/$agent.md"
+check "developer has disable-model-invocation: true" "grep -q 'disable-model-invocation: true' .claude/agents/developer.md"
+for agent in devops-sre qa-tester workflow-manager; do # #678: never dispatched
+  check "retired agent $agent is not scaffolded" "[ ! -e .claude/agents/$agent.md ] && [ ! -e .claude/agents/$agent ]"
 done
 
 echo
@@ -321,9 +321,8 @@ check "depth-aware splitter included" \
 
 echo
 echo "═══ #80  agent memory/ stubs ═══"
-for agent in product-owner developer qa-tester devops-sre security-expert; do
-  check "$agent/memory/MEMORY.md present" \
-    "[ -f .claude/agents/$agent/memory/MEMORY.md ]"
+for agent in product-owner developer security-expert; do
+  check "$agent/memory/MEMORY.md present" "[ -f .claude/agents/$agent/memory/MEMORY.md ]"
 done
 
 echo
@@ -331,10 +330,8 @@ echo "═══ bundled agents — basename presence (audit gate) ═══"
 # Explicit `<name>.md` literals so audit.sh's grep -qF finds each bundled
 # agent. The for-loops above iterate on bare agent names (no .md) which the
 # audit's basename-matcher cannot see.
-for agent_md in code-reviewer.md developer.md devops-sre.md qa-tester.md \
-                security-expert.md workflow-manager.md; do
-  check "agent $agent_md scaffolded" \
-    "[ -f .claude/agents/$agent_md ]"
+for agent_md in code-reviewer.md developer.md security-expert.md; do
+  check "agent $agent_md scaffolded" "[ -f .claude/agents/$agent_md ]"
 done
 
 echo
@@ -684,17 +681,18 @@ echo "═══ #547  the thirteen skills nothing asserted on ═══"
 # --- the five output contracts define a named machine-readable block -----
 check "workflow-contract .claude/skills/workflow-contract/SKILL.md is not user-invocable" \
   'grep -q "user-invocable: false" .claude/skills/workflow-contract/SKILL.md'
-check "workflow-contract defines the WORKFLOW STATUS block and its DONE_CRITERIA_MET key" \
-  'grep -q "WORKFLOW STATUS" .claude/skills/workflow-contract/SKILL.md && grep -q "DONE_CRITERIA_MET:" .claude/skills/workflow-contract/SKILL.md'
-# #562 — three sections split out of seats that had no duplication left to
-# reclaim. Each must ship, be preloaded rather than user-invoked, and still
-# carry the sentence it was split out to protect.
-check "alert-triage-contract ships and is preloaded, not user-invocable" \
-  'grep -q "user-invocable: false" .claude/skills/alert-triage-contract/SKILL.md'
-check "alert-triage-contract keeps the constrained Bash allowlist intact" \
-  'tr "\n" " " < .claude/skills/alert-triage-contract/SKILL.md | grep -qF "granted ONLY for the \`gh api\` calls listed below"'
-check "security-expert preloads alert-triage-contract" \
-  'grep -q "^skills:.*alert-triage-contract" .claude/agents/security-expert.md'
+# #678: WORKFLOW STATUS keeps only what the log hook and the developer parse.
+check "workflow-contract defines WORKFLOW STATUS with only its parsed keys" \
+  'f=.claude/skills/workflow-contract/SKILL.md; grep -q "WORKFLOW STATUS" $f && grep -q "^DONE_CRITERIA_MET:" $f && grep -q "^STATE:" $f && grep -q "^HANDOFF_TARGET:" $f && grep -q "^BLOCKERS:" $f && ! grep -qE "^(SUMMARY|ARTIFACTS|FILES_CHANGED|VALIDATION|NEXT_ACTION):" $f'
+# #678: blocks nothing parsed, and a triage mode nothing dispatched. Its gh-api
+# allowlist was the only limit on security-expert's Bash, so the grant left too.
+for retired in alert-triage-contract qa-report-contract handoff-protocol; do
+  check "retired contract $retired is neither scaffolded nor preloaded" \
+    "[ ! -e .claude/skills/$retired ] && ! grep -q '^skills:.*$retired' .claude/agents/*.md"
+done
+check "security-expert grants no Bash once its allowlist is gone" \
+  'grep -q "^tools: " .claude/agents/security-expert.md && ! grep -q "^tools:.*Bash" .claude/agents/security-expert.md'
+# #562 — sections split out of seats; each ships preloaded, not user-invoked.
 check "backlog-frontmatter ships and is preloaded, not user-invocable" \
   'grep -q "user-invocable: false" .claude/skills/backlog-frontmatter/SKILL.md'
 check "product-owner preloads backlog-frontmatter" \
@@ -708,10 +706,6 @@ check "review-findings-contract .claude/skills/review-findings-contract/SKILL.md
   'grep -q "user-invocable: false" .claude/skills/review-findings-contract/SKILL.md'
 check "review-findings-contract requires a verdict and a CRITICAL count" \
   'grep -q "REVIEW_VERDICT:" .claude/skills/review-findings-contract/SKILL.md && grep -q "CRITICAL_COUNT:" .claude/skills/review-findings-contract/SKILL.md'
-check "qa-report-contract .claude/skills/qa-report-contract/SKILL.md requires a verdict and a bug count" \
-  'grep -q "QA_VERDICT:" .claude/skills/qa-report-contract/SKILL.md && grep -q "BUGS_FOUND:" .claude/skills/qa-report-contract/SKILL.md'
-check "handoff-protocol .claude/skills/handoff-protocol/SKILL.md carries a payload and its open risks" \
-  'grep -q "PAYLOAD:" .claude/skills/handoff-protocol/SKILL.md && grep -q "OPEN_RISKS:" .claude/skills/handoff-protocol/SKILL.md'
 # "number, title" matched only the frontmatter description, so the entire
 # Format and Rules body was deletable with this green. Anchored on the
 # canonical rendering instead.

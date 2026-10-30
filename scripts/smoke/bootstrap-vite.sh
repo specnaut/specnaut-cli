@@ -22,7 +22,7 @@
 #      can be slow, and an upstream template change reds a correct pull
 #      request for a reason unrelated to Specnaut. (Observed: `create-vite`
 #      has since added oxlint to the scaffold.)
-#   2. Outside CI this same script is what the `qa-tester` agent runs on a
+#   2. Outside CI this same script is what a local session runs on a
 #      maintainer's workstation — whose working tree also contains the
 #      private half of this project. A compromised `create-vite` release
 #      reaches it. That is a constitution § I exposure path which no review

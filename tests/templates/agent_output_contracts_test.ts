@@ -15,38 +15,35 @@ import type { CoreEntry } from "../../src/domain/core_bundle.ts";
 /** The contract skills, by bundled `name`. Identity = name (data-model.md). */
 const CONTRACT_SKILLS = [
   "workflow-contract",
-  "handoff-protocol",
   "review-findings-contract",
-  "qa-report-contract",
   "backlog-reference-contract",
-  // #562: three sections split out of seats that had no duplication left to
+  // #562: sections split out of seats that had no duplication left to
   // reclaim. Same shape, same `user-invocable: false`.
-  "alert-triage-contract",
   "backlog-frontmatter",
   "specnaut-facts",
 ] as const;
+
+/**
+ * #678: contracts nothing parsed, and agents nothing dispatched. Each must stay
+ * out of the bundle — a returning file would ship a block no consumer reads, or
+ * a seat no phase calls.
+ */
+const RETIRED_SKILLS = ["handoff-protocol", "qa-report-contract", "alert-triage-contract"] as const;
+const RETIRED_AGENTS = ["workflow-manager", "qa-tester", "devops-sre"] as const;
 
 /** Authoritative wired-agent → contracts mapping (research.md). */
 const AGENT_WIRING: Record<string, readonly string[]> = {
   "architect-expert": ["review-findings-contract", "workflow-contract"],
   "performance-expert": ["review-findings-contract", "workflow-contract"],
-  // #562 split this seat's alert-triage mode — including its Bash allowlist —
-  // into a preloaded skill, when the emitted workflow had 49 characters left
-  // and no duplication to reclaim.
-  "security-expert": ["review-findings-contract", "workflow-contract", "alert-triage-contract"],
+  // #678 removed the alert-triage mode (no phase dispatched it) with its
+  // contract and the `Bash` grant it alone justified.
+  "security-expert": ["review-findings-contract", "workflow-contract"],
   "accessibility-expert": ["review-findings-contract", "workflow-contract"],
   "dependency-expert": ["review-findings-contract", "workflow-contract"],
   // #576: this seat reviews whatever the developer wrote, UI included, so it
   // is where a fixed-width layout is caught after the fact.
   "code-reviewer": ["review-findings-contract", "workflow-contract", "mobile-first-contract"],
-  "developer": [
-    "workflow-contract",
-    "handoff-protocol",
-    "backlog-reference-contract",
-    "mobile-first-contract",
-  ],
-  "workflow-manager": ["workflow-contract", "handoff-protocol", "backlog-reference-contract"],
-  "qa-tester": ["qa-report-contract", "workflow-contract"],
+  "developer": ["workflow-contract", "backlog-reference-contract", "mobile-first-contract"],
   // The single biggest emitter of backlog references — and, until now, the
   // only wired agent with no `skills:` line at all.
   "product-owner": ["backlog-reference-contract", "backlog-frontmatter"],
@@ -107,6 +104,18 @@ for (const name of CONTRACT_SKILLS) {
     const fm = frontmatter(skillEntry(name)!.content);
     assert(new RegExp(`^name:\\s*${name}\\s*$`, "m").test(fm), "name mismatch");
     assert(/^description:\s+\S/m.test(fm), "expected a one-line description");
+  });
+}
+
+// (a') The retired contracts and agents are gone from the bundle.
+for (const name of RETIRED_SKILLS) {
+  Deno.test(`retired contract skill "${name}" is not bundled`, () => {
+    assertEquals(skillEntry(name), undefined, `"${name}" was retired under #678`);
+  });
+}
+for (const name of RETIRED_AGENTS) {
+  Deno.test(`retired agent "${name}" is not bundled`, () => {
+    assertEquals(agentEntry(name), undefined, `"${name}" was retired under #678`);
   });
 }
 

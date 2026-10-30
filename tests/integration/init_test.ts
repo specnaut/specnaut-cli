@@ -71,7 +71,11 @@ Deno.test("specnaut init <name> writes a complete tree", async () => {
     assertEquals(await exists(join(root, ".claude/commands/backlog.md")), false);
     assertEquals(await exists(join(root, ".claude/commands/specnaut.md")), false);
     assertEquals(await exists(join(root, ".claude/agents/product-owner.md")), true);
-    assertEquals(await exists(join(root, ".claude/agents/devops-sre.md")), true);
+    // #678: devops-sre, qa-tester and workflow-manager were never dispatched.
+    for (const retired of ["devops-sre", "qa-tester", "workflow-manager"]) {
+      assertEquals(await exists(join(root, `.claude/agents/${retired}.md`)), false);
+      assertEquals(await exists(join(root, `.claude/agents/${retired}`)), false);
+    }
     // #409: the deprecated specnaut-auto alias no longer scaffolds.
     assertEquals(await exists(join(root, ".claude/skills/specnaut-auto/SKILL.md")), false);
 
@@ -79,24 +83,25 @@ Deno.test("specnaut init <name> writes a complete tree", async () => {
     // register `/task` and `/specnaut` from their own frontmatter. The
     // directory itself is not created, which is what a count would miss.
     assertEquals(await exists(join(root, ".claude/commands")), false);
-    // 13 agent .md files (11 original + performance-expert #304 +
+    // 10 agent .md files (11 original + performance-expert #304 +
     // accessibility-expert #305 + architect-expert #321 + dependency-expert
-    // #322, less review-coordinator and test-reviewer #678) + 5 memory subfolders (product-owner, developer, qa-tester,
-    // devops-sre, security-expert; specnaut-guide, ui-ux-designer,
+    // #322, less review-coordinator, test-reviewer, workflow-manager,
+    // qa-tester and devops-sre #678) + 3 memory subfolders (product-owner,
+    // developer, security-expert; specnaut-guide, ui-ux-designer,
     // performance-expert, accessibility-expert, architect-expert, and
     // dependency-expert are stateless and ship without a memory stub)
     const agentDirEntries = await Array.fromAsync(
       Deno.readDir(join(root, ".claude/agents")),
     );
-    // 13 agent definitions; the agent-fleet README (#382) is a sibling
+    // 10 agent definitions; the agent-fleet README (#382) is a sibling
     // doc, not an agent, so it's excluded from this count and asserted
     // separately below.
     const agentMdCount = agentDirEntries.filter(
       (e) => e.isFile && e.name.endsWith(".md") && e.name !== "README.md",
     ).length;
-    assertEquals(agentMdCount, 13);
+    assertEquals(agentMdCount, 10);
     const memoryDirCount = agentDirEntries.filter((e) => e.isDirectory).length;
-    assertEquals(memoryDirCount, 5);
+    assertEquals(memoryDirCount, 3);
     // The effort-rubric README ships beside the agents (#382).
     assertEquals(
       await exists(join(root, ".claude/agents/README.md")),

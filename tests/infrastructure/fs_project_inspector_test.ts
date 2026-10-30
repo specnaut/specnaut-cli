@@ -821,8 +821,8 @@ Deno.test("inspect: plugin gap check warns ONLY for the agents the user actually
       await Deno.mkdir(join(dir, ".claude/agents"), { recursive: true });
       // Scaffold every covered agent EXCEPT product-owner (simulating
       // that one alone got deleted post-migration). The set tracks
-      // PLUGIN_COVERED_PATHS_CLAUDE — 15 agents plus the agents README,
-      // minus product-owner = 15 files.
+      // PLUGIN_COVERED_PATHS_CLAUDE — 10 agents plus the agents README,
+      // minus product-owner = 10 files.
       //
       // `README.md` joined the covered list under specnaut-cli#605. It was
       // always matched by `isPluginCoveredPath`'s agent regex, so `upgrade`
@@ -834,11 +834,8 @@ Deno.test("inspect: plugin gap check warns ONLY for the agents the user actually
         const name of [
           "code-reviewer",
           "developer",
-          "devops-sre",
-          "qa-tester",
           "security-expert",
           "specnaut-guide",
-          "workflow-manager",
           "ui-ux-designer",
           "performance-expert",
           "accessibility-expert",

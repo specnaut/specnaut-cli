@@ -231,8 +231,8 @@ scaffolded for a harness without such features gets none here.
   and lets you peek / reply / attach without losing context. Specnaut's
   scaffolded subagents in `.claude/agents/` appear in the dispatch
   picker automatically — start one with the agent name as the first
-  word, e.g. `developer fix the lint errors in src/cli/`, `@qa-tester
-  run a sandbox smoke pass`, or `@product-owner groom the backlog`.
+  word, e.g. `developer fix the lint errors in src/cli/`, `@code-reviewer
+  review the last commit`, or `@product-owner groom the backlog`.
   Skills are dispatchable too: `/task plan "<feature>"` launches
   a session running the full plan-implement-review chain. File edits are
   isolated under `.claude/worktrees/` (git worktrees), so several

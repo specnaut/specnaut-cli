@@ -40,9 +40,7 @@ core/skills/task/scripts/collect-audit-scope.sh  same rule: a scope collector th
 # no template can reconstruct what was learned. A mirrored seed would be
 # byte-identical on day one and wrong every day after.
 core/agents/developer/memory/MEMORY.md  agent memory seed — written by its agent after install, never a plugin asset
-core/agents/devops-sre/memory/MEMORY.md  same
 core/agents/product-owner/memory/MEMORY.md  same
-core/agents/qa-tester/memory/MEMORY.md  same
 core/agents/security-expert/memory/MEMORY.md  same
 
 # --- The release scripts: same ROOT-resolution rule as the board backends ---
