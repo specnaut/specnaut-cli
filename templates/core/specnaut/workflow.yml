@@ -22,7 +22,10 @@
 #                    that turn says `merge` or `/task merge` — after which
 #                    Claude Code still shows its permission prompt once. The
 #                    landing scripts hold themselves the same way, however
-#                    they are run.
+#                    they are run. It guards against the agent landing by
+#                    mistake, not against an agent set on getting round it:
+#                    one with a shell can rewrite the files the hook reads.
+#                    For that, protect the base branch on the forge.
 #
 # A single run can make the chain stricter: `/task … --manual-merge`, or
 # "stop before merging" in the request, means manual for that run. It cannot

@@ -12,7 +12,8 @@ doesn't:
   security and performance choices are settled by the expert agents and reported; then it
   implements, reviews, merges into your base branch, pushes and closes the backlog item without
   asking again. Set `merge: manual` in `.specnaut/workflow.yml` (or pass `--manual-merge` for one
-  run) to be asked once, at the review verdict
+  run) to be asked once, at the review verdict. A hook enforces it against an agent landing by
+  mistake; to stop one set on getting round it, protect the base branch on your forge
 - **Structured `review` phase** — architecture checks + quality gates (format/lint/typecheck/tests)
   with an `implement → review → fix → re-review` loop
 - **Product backlog** — Markdown index + one file per task with structured frontmatter, a Product

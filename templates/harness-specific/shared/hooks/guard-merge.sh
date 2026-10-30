@@ -45,6 +45,12 @@
 # the spelling that reached them. A hand-written script that lands by itself,
 # or a merge through `gh api`, gets past both.
 #
+# What it is for: an agent that lands by mistake, or by a spelling it did not
+# think of as landing. Not an agent set on getting round it — one with a
+# shell can rewrite what the hold reads (the reader scripts, the state store
+# under XDG_STATE_HOME, refs). That is the forge's job: branch protection.
+# Bypasses that need a deliberate rewrite are out of scope (cli#720, cli#721).
+#
 # Usage: guard-merge.sh <claude|codex>   (payload on stdin)
 case ${BASH_SOURCE[0]} in */*) HOOK_DIR=${BASH_SOURCE[0]%/*} ;; *) HOOK_DIR=. ;; esac
 # shellcheck source=_guard.sh
