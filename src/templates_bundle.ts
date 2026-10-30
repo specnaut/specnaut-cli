@@ -1727,15 +1727,12 @@ PO.
 <!-- BEGIN: backend=local -->
 ## Backend: local Markdown files
 
-This project's backlog lives entirely on disk under \`.specnaut/\`. No remote
-service required.
-
 | Path | Purpose |
 |---|---|
 | \`.specnaut/backlog.md\` | Top-level index — one line per item with status |
 | \`.specnaut/backlog/<NNN>-<slug>.md\` | One file per item (frontmatter + body) |
 
-### Scripts (preferred path)
+### Scripts
 
 \`\`\`bash
 .specnaut/scripts/backlog/list.sh [Status]            # all items, optional Status filter
@@ -1747,10 +1744,8 @@ service required.
 
 ### Conventions
 
-- Items are numbered sequentially (\`001\`, \`002\`, …) — the \`add.sh\` script
-  picks the next free number.
-- Status is tracked in each item's YAML frontmatter and mirrored in the
-  index for fast listing.
+- \`add.sh\` picks the next free number (\`001\`, \`002\`, …).
+- Status lives in each item's frontmatter, mirrored in the index.
 - **Closing** an item = move to \`Done\`. The file stays on disk as the
   audit trail; nothing is deleted.
 - Bodies follow \`## Why\` / \`## Acceptance criteria\` / \`## Out of scope\`.
@@ -1760,10 +1755,7 @@ service required.
 <!-- BEGIN: backend=github -->
 ## Backend: GitHub Issues + Project
 
-This project's backlog lives on a GitHub Project linked to issues in the
-configured repo. Configuration is read from \`.specnaut/backlog-config.yml\`
-at runtime — fill in \`repo\` and \`project_number\` before running any
-mutation.
+Fill in \`repo\` and \`project_number\` in \`.specnaut/backlog-config.yml\` before any mutation.
 
 ### Configuration file
 
@@ -1778,50 +1770,7 @@ Both are placeholders; resolve the number with
 \`list.sh\` / \`view.sh\` — they address the board through \`repo:\` alone — and
 refused up front by every writing script.
 
-### Two paths to GitHub: MCP (preferred) and shell (always available)
-
-Two ways to talk to GitHub from this project. Pick whichever fits your
-setup; the skill works either way.
-
-#### A. GitHub MCP — preferred when available
-
-If the **GitHub MCP server is wired up in Claude Code**, the PO
-subagent should call its tools directly: \`mcp__github__issue_write\`,
-\`mcp__github__issue_read\`, \`mcp__github__add_issue_comment\`,
-\`mcp__github__list_issues\`, \`mcp__github__search_issues\`, etc. They
-return structured data, no shell parsing needed.
-
-Two ways to enable the GitHub MCP:
-
-1. **Claude Code cloud connector (recommended)** — open a Claude Code
-   session in this project, run \`/mcp\`, choose **GitHub**, and complete
-   the OAuth flow. No file lives in this repo for that — it's stored
-   in your Claude Code account.
-
-2. **Self-hosted MCP** — add the official server to the project's
-   \`.mcp.json\` (creates the file if absent). Specnaut does NOT scaffold
-   this for you because it requires Node + a GitHub token; do it
-   manually:
-
-   \`\`\`json
-   {
-     "mcpServers": {
-       "github": {
-         "command": "npx",
-         "args": ["-y", "@modelcontextprotocol/server-github"],
-         "env": { "GITHUB_PERSONAL_ACCESS_TOKEN": "\${GITHUB_TOKEN}" }
-       }
-     }
-   }
-   \`\`\`
-
-   Then restart your Claude Code session.
-
-#### B. Shell scripts — always available
-
-The \`gh\` CLI scripts under \`.specnaut/scripts/backlog/\` are scaffolded
-unconditionally and work without MCP. They wrap \`gh issue\` / \`gh
-project\` calls and read configuration from \`backlog-config.yml\`.
+### Scripts
 
 \`\`\`bash
 .specnaut/scripts/backlog/list.sh [Status]            # all items, optional Status filter
@@ -1843,8 +1792,6 @@ gh issue edit   <num> --repo <repo> --title "…" --body "…"
 \`\`\`
 
 #### Decision rule for the PO subagent
-
-When dispatched, the PO checks tool availability at runtime:
 
 1. If \`mcp__github__*\` tools are visible in the session, prefer them.
 2. Otherwise fall back to the shell scripts — so switching paths needs
@@ -1886,25 +1833,16 @@ When dispatched, the PO checks tool availability at runtime:
 
 ### Prerequisites
 
-For the **shell path**: the \`gh\` CLI must be authenticated with the
-\`project\` scope. If \`gh project\` returns 404, run
+\`gh\` authenticated with the \`project\` scope; on a 404 from \`gh project\`, run
 \`gh auth refresh -s project\`.
-
-For the **MCP path**: see "Two paths to GitHub" above.
 <!-- END: backend=github -->
 
 <!-- BEGIN: backend=gitlab -->
 ## Backend: GitLab Issues + scoped Status labels
 
-This project's backlog lives on GitLab Issues, with workflow state
-tracked via scoped labels (\`Status::Backlog\`, \`Status::Ready\`,
-\`Status::"In progress"\`, \`Status::"In review"\`, \`Status::Done\`).
-GitLab doesn't have a Project Status field equivalent to GitHub's
-Projects V2 — scoped labels are the canonical way to model kanban-
-style state on GitLab.
-
-Configuration is read from \`.specnaut/backlog-config.yml\` at runtime —
-fill in \`host\` and \`project_id\` before running any mutation.
+Workflow state is a scoped label (\`Status::Backlog\`, \`Status::Ready\`,
+\`Status::"In progress"\`, \`Status::"In review"\`, \`Status::Done\`). Fill in \`host\` and
+\`project_id\` in \`.specnaut/backlog-config.yml\` before any mutation.
 
 ### Configuration file
 
@@ -1914,7 +1852,7 @@ host: gitlab.com         # or your self-hosted instance
 project_id: ""           # numeric id (e.g. "12345") or path "group/project"
 \`\`\`
 
-### Scripts (preferred path)
+### Scripts
 
 \`\`\`bash
 .specnaut/scripts/backlog/list.sh [Status]            # all issues, optional Status:: filter
@@ -1935,33 +1873,20 @@ glab issue update  <num> --repo <project_id> --title "…" --description "…"
 
 - **Titles** — short imperative phrases. Lowercase OK; no leading emoji.
 - **Bodies** — \`## Why\` / \`## Acceptance criteria\` / \`## Out of scope\`.
-- **Status** — set by adding/swapping a \`Status::*\` scoped label.
-  Scoped labels are mutually exclusive on the same scope, so swapping
-  is atomic.
+- **Status** — swap the \`Status::*\` scoped label (one per scope, so atomic).
 - **Closing** — close the issue (don't just move to Done). The repo's
   issue history is the audit trail.
 - **Drafts** are not used. Every task is a real issue.
 
 ### Prerequisites
 
-The \`glab\` CLI must be installed and authenticated.
-
-- Install: https://gitlab.com/gitlab-org/cli
-- Authenticate: \`glab auth login\` (use the same host as in
-  \`backlog-config.yml\`)
-
-The first time the PO runs against this project, it will create the 5
-\`Status::*\` scoped labels if they don't exist (\`Backlog\`, \`Ready\`,
-\`In progress\`, \`In review\`, \`Done\`).
+\`glab\` installed and authenticated: \`glab auth login\` on the host in
+\`backlog-config.yml\`. On its first run the PO creates the five \`Status::*\` labels
+if they are missing.
 <!-- END: backend=gitlab -->
 
 <!-- BEGIN: backend=cloud -->
 ## Backend: Specnaut Cloud
-
-This project's backlog lives on **Specnaut Cloud** — a hosted, real-time Kanban
-board reached over a small HTTP API. No \`gh\`/\`glab\` CLI and no GitHub/GitLab
-rate limits. Configuration is read from \`.specnaut/backlog-config.yml\` at
-runtime.
 
 ### Configuration file
 
@@ -1972,11 +1897,9 @@ api_url: https://api.specnaut.com               # optional — defaults to Specn
 project_key: CLOUD                              # the project's short key
 \`\`\`
 
-**No token is stored here.** Credentials are obtained by \`specnaut cloud login\`
-(an interactive browser device-authorization flow) and kept in the OS keychain
-(or a \`0600\` file under \`~/.specnaut\`). They refresh transparently. For CI /
-headless runs, set \`SPECNAUT_CLOUD_TOKEN\` to a Cloud API token instead of
-logging in.
+**No token is stored here.** \`specnaut cloud login\` keeps credentials in the OS
+keychain (or a \`0600\` file under \`~/.specnaut\`); for CI / headless runs, set
+\`SPECNAUT_CLOUD_TOKEN\` instead.
 
 ### Scripts
 
@@ -1990,33 +1913,19 @@ logging in.
 .specnaut/scripts/backlog/reconcile.sh [--reset|--seek-end] [--limit N]  # drain stage transitions
 \`\`\`
 
-The scripts get a fresh access token from \`specnaut cloud token\` (which refreshes
-it transparently) and authenticate with \`Authorization: Bearer <token>\`, talking
-to \`<api_url>/api/v1/\` (\`/tasks\`, \`/columns\`, \`/activity\`). \`move.sh\` passes a
-**status name** (the column name); the API resolves it to the column
-server-side. \`columns.sh\` reads the board's real columns (renames/reorders are
-reflected with no code change). \`reconcile.sh\` is the **poll/reconcile** feed:
-it asks \`/activity\` for every stage transition newer than a stored per-project
-cursor (\`.specnaut/.cloud-cursor-<KEY>\`), prints one line per transition, and
-advances the cursor — the product-owner consumes those lines and runs the
-matching stage hook (see "Stage reconcile (poll model)" below).
+\`move.sh\` takes the column **name**. \`reconcile.sh\` prints each stage transition
+since the per-project cursor (\`.specnaut/.cloud-cursor-<KEY>\`) and advances it.
 
 ### Prerequisites
 
-- \`curl\` and \`jq\` on PATH, and the \`specnaut\` CLI on PATH (the scripts call
-  \`specnaut cloud token\`).
-- Authenticated once via \`specnaut cloud login\` (or \`SPECNAUT_CLOUD_TOKEN\` set
-  for headless / CI).
+\`curl\`, \`jq\` and the \`specnaut\` CLI on PATH; \`specnaut cloud login\` once (or
+\`SPECNAUT_CLOUD_TOKEN\`).
 
 ### Stage reconcile (poll model)
 
-The product-owner reacts to board moves by **polling**, not a webhook — the CLI
-has no daemon. Run \`reconcile.sh\` by hand or on a recurring cadence (Claude
-Code: \`/loop\`); it drains stage transitions since the cursor and prints one
-line each (\`CREATED <n> -> <stage>\` / \`MOVED <n> <from> -> <to>\`). For each
-line the PO resolves the destination against \`columns.sh\` (canonical names,
-case-insensitive) and runs the mapped hook — parity with a GitHub Projects
-board, just poll-triggered:
+Run \`reconcile.sh\` by hand or on a cadence (no daemon, no webhook). For each line
+(\`CREATED <n> -> <stage>\` / \`MOVED <n> <from> -> <to>\`) the PO resolves the
+destination against \`columns.sh\` (case-insensitive) and runs the mapped hook:
 
 | Destination stage | Hook |
 |---|---|
@@ -2035,15 +1944,12 @@ an existing board to "from now".
 
 ### Not yet on the Cloud backend
 
-- Epics / sub-tasks and label management are not exposed over the API yet —
-  use the board UI for those for now.
+- Epics / sub-tasks and label management: use the board UI.
 <!-- END: backend=cloud -->
 
 ## Epics & sub-tasks
 
-Big work that needs decomposition lives as a parent **epic** with one or
-more **sub-tasks**. The link mechanism differs per backend, but the PO
-contract is the same: parents cannot close while any child is open.
+A parent **epic** cannot close while any **sub-task** is open.
 
 | Backend | Parent → child link | Discoverability |
 |---|---|---|
@@ -2051,30 +1957,18 @@ contract is the same: parents cannot close while any child is open.
 | github | Native sub-issues API (\`gh api -X POST .../issues/<parent>/sub_issues\`) | Project V2 boards render the children automatically under the parent's \`Sub-issues progress\` field |
 | gitlab | Scoped label \`parent::#NNN\` on the child (Free-tier compatible; native Epics are Premium-only) | \`glab issue list --label "parent::#042" --opened\` lists every child of #042 |
 
-**Creating a child:** \`add.sh --parent <num>\` does the right thing on
-every backend — writes the link, attaches to the project/board, and
-fails fast if the named parent doesn't exist (exit 3).
+**Creating a child:** \`add.sh --parent <num>\` on every backend — writes the link,
+attaches to the board, exits 3 if the parent does not exist.
 
-**Closing a parent:** \`cascade-check.sh <num>\` (github + gitlab) is the
-close gate — exits 11 with the open children listed when close is
-unsafe, exits 0 when all children are closed. The PO must run it before
-\`gh issue close\` / \`glab issue close\`. The local backend uses an
-inline grep equivalent.
+**Closing a parent:** \`cascade-check.sh <num>\` (github + gitlab) is the close
+gate — exits 11 listing the open children, 0 when all are closed. The PO must run
+it before \`gh issue close\` / \`glab issue close\`; the local backend greps instead.
 
-**Finding a child's parent:** \`parent-of.sh <num>\` (github + gitlab) is
-\`cascade-check.sh\` read from the other end — given a child it prints its
-parent's number and exits 0, exits **10** when the item has no parent, and
-exits 3 when it could not ask. Those last two are separate codes on purpose:
-"this is a standalone item" and "the lookup failed" would otherwise be
-indistinguishable, and a caller branches the same way on each. Branch creation
-uses it to put a whole epic on one branch.
+**Finding a child's parent:** \`parent-of.sh <num>\` (github + gitlab) prints the
+parent's number and exits 0, exits **10** when the item has no parent, and exits 3
+when it could not ask — never treat 3 as "no parent".
 
-**Auto-detection:** the bundled \`product-owner\` agent proactively
-detects epic-worthy requests (>5 AC bullets, scope crosses ≥2
-subsystems, trigger phrases like "break down" / "phased" / "as an
-epic") and either auto-decomposes or proposes a concrete sub-task list
-— see the "Epic detection heuristic" section of the \`product-owner\`
-agent.
+**Auto-detection:** the \`product-owner\` agent's "Epic detection heuristic".
 
 ## When NOT to use these verbs
 
@@ -2095,21 +1989,14 @@ agent.
 
 Read \`docs/constitution.md\` before anything else: it is this project's binding rules, and no agent edits it unasked.
 
-Keeps the backlog and delivery pipeline flowing without human intervention.
-Reachable as **\`/task groom\`** — the only door.
-
-**Owned by \`/task\`** — see "Which skill owns what" in \`SKILL.md\`. Orphan
-**spec** detection is not owned here; step 4 says where it lives and runs it.
-
-Auto-invocable: the router advertises "groom the backlog" and "run a hygiene
-pass", and this file honours them. Also invoked explicitly, or scheduled with
-\`/loop 1h /task groom\`.
+Reachable as **\`/task groom\`** — the only door — on request ("groom the backlog",
+"run a hygiene pass") or scheduled (\`/loop 1h /task groom\`). **Owned by \`/task\`**
+— see "Which skill owns what" in \`SKILL.md\`. Orphan **spec** detection is not
+owned here; step 4 says where it lives and runs it.
 
 ## What this pass does
 
-A grooming pass runs four independent checks. Each is delegated to the
-right subagent so this skill stays small and the heavy lifting is owned
-by the agent that has the right tools and prompt for the job.
+A grooming pass runs four independent checks.
 
 ### 1. Backlog grooming
 
@@ -2137,10 +2024,7 @@ The PO will:
   the marker \`🤖 specnaut-groom\` at the start of any comment).
 - **Process tickets one at a time, end-to-end** — body → size → priority
   → promote/comment, fully complete on ticket N before moving to N+1.
-  Do NOT batch-clarify-then-batch-label across all tickets; the
-  per-ticket loop must close labelling before the PO can consider a
-  ticket "done for this run". Batched labelling-as-an-afterthought is
-  the failure mode this contract exists to prevent.
+  Do NOT batch-clarify-then-batch-label across all tickets.
 - For each remaining item, the loop is a strict 4-step sequence. **What a
   processed ticket must carry is decided by
   \`.specnaut/scripts/bash/groom-rules.sh\`** — its header is the rule, and
@@ -2148,13 +2032,10 @@ The PO will:
   The steps below are how the PO satisfies it:
 
   1. **Rewrite the body when it's poorly worded.** If the description is
-     missing, incomplete, or unclear, the PO MUST rewrite it in the
-     standard \`## Why\` / \`## Acceptance criteria\` / \`## Out of scope\` /
-     \`## Notes\` shape, using correct business and technical vocabulary
-     so the result is readable by a developer or a future PO who has no
-     prior context.
-  2. **Assign a size value.** Apply exactly one of \`XS\`, \`S\`, \`M\`, \`L\`, \`XL\`.
-     T-shirt scale rationale:
+     missing, incomplete, or unclear, the PO MUST rewrite it as
+     \`## Why\` / \`## Acceptance criteria\` / \`## Out of scope\` / \`## Notes\`,
+     readable by someone with no prior context.
+  2. **Assign a size value.** Apply exactly one of \`XS\`, \`S\`, \`M\`, \`L\`, \`XL\`:
      - \`XS\` — < 1 hour, trivial doc / config tweak
      - \`S\` — 1–4 hours, single-file or single-test change
      - \`M\` — half-day to a day, one subsystem touched, tests included
@@ -2166,9 +2047,8 @@ The PO will:
      - \`P2\` — important but deferrable; standard work
      - \`P3\` — nice-to-have / long horizon; pick up when slack appears
   3a. **Set Roadmap dates — soft, and only if the board has the fields.**
-     GitHub backend only. Date / Estimate are *optional* Project V2 fields the
-     user adds themselves; a board carrying only \`Status\` / \`Priority\` / \`Size\`
-     is ordinary, not misconfigured. **Gate first** on the once-per-run
+     GitHub backend only; Date / Estimate are *optional* fields, and a board
+     without them is not misconfigured. **Gate first** on the once-per-run
      \`detect-fields.sh\`, which emits \`TARGETDATE_FIELD_ID=\` /
      \`STARTDATE_FIELD_ID=\` / \`ESTIMATE_FIELD_ID=\` **empty** when the field is
      absent:
@@ -2196,30 +2076,20 @@ The PO will:
        autonomously.
 
   **Mandatory sizing + priority contract.** Steps 2 and 3 are NOT
-  optional and NOT discretionary, whatever the outcome chosen at step 4
-  — what counts as persisted is \`groom-rules.sh\`'s to say, not this
-  list's. If persistence fails for an external reason (the user lacks
-  scope, the API rate-limited, etc.), the PO MUST capture the failure
-  reason and surface it under "⚠ size / priority missing" in the final
-  report — silent skip is a contract violation.
+  optional, whatever the outcome at step 4 — what counts as persisted is
+  \`groom-rules.sh\`'s to say. If persistence fails for an external reason
+  (missing scope, rate limit), the PO MUST surface the reason under
+  "⚠ size / priority missing" in the final report — never a silent skip.
 
 The PO must respect the standard backlog skill — do not bypass its
 scripts.
 
 #### How size and priority are persisted (field-first, label fallback)
 
-Size and priority are conceptually two single-select dimensions. They
-can live on a ticket in two surfaces:
-
-1. **Native Project V2 single-select fields** named \`Priority\` and
-   \`Size\`. Every Specnaut project ships with these as the canonical
-   surface — they group on the project board, query cleanly via
-   GraphQL, and don't pollute the label namespace.
-2. **GitHub / GitLab labels** (\`priority:P0..P3\`, \`size:XS..XL\`). Used
-   as a fallback when the project does not have native fields, or when
-   the value has no matching native option (only known case today:
-   \`priority:P3\` on a 3-level field). Also used by the local Markdown
-   backend, which has no native fields at all.
+1. **Native Project V2 single-select fields** \`Priority\` and \`Size\` — the
+   canonical surface.
+2. **GitHub / GitLab labels** (\`priority:P0..P3\`, \`size:XS..XL\`) — only when
+   the project has no native field, or the value has no matching option.
 
 **Field wins.** If a native field exists for the dimension, write to
 the field. Do NOT also apply the label — double-writing creates drift.
@@ -2228,12 +2098,10 @@ the field. Do NOT also apply the label — double-writing creates drift.
 
 Use the bundled scripts at \`.specnaut/scripts/backlog/\`:
 
-- \`detect-fields.sh\` — emits eval-friendly env lines listing the
-  \`Priority\` / \`Size\` field IDs and option IDs (case-insensitive name
-  match), plus \`STARTDATE_FIELD_ID\` / \`TARGETDATE_FIELD_ID\` /
-  \`ESTIMATE_FIELD_ID\` — **empty when the board carries no such field**,
-  which is the gate step 3a reads. Run **once per groom run**, not per
-  ticket.
+- \`detect-fields.sh\` — env lines with the \`Priority\` / \`Size\` field and option
+  IDs, plus \`STARTDATE_FIELD_ID\` / \`TARGETDATE_FIELD_ID\` / \`ESTIMATE_FIELD_ID\`
+  — **empty when the board carries no such field** (step 3a's gate). Run
+  **once per groom run**, not per ticket.
 
   **That is a sample, taken once** — \`groom-report.md\` says what it costs and
   requires you to disclose it.
@@ -2269,41 +2137,30 @@ output verbatim, summary line included. The script's header documents what each
 line means; do not restate it, or the two definitions will drift.
 
 **Read-only — report, never move.** Correcting drift belongs to
-\`/task merge\`, which already owns board mutations; a detector that also
-mutates cannot be run freely on a schedule.
+\`/task merge\`, which owns board mutations.
 
 ### 3. Stale PR surface
 
-**Only when the project actually opens pull requests** — \`/task merge\` opens
-none unless \`--pr\` is passed, so otherwise say the step does not apply rather
-than reporting an empty section forever.
-
-Where it applies: list open PRs waiting on review or CI for more than 48 hours,
-so the user can decide whether to ping, close, or merge. Read-only; do not
-mutate PRs.
+**Only when the project actually opens pull requests** (\`/task merge\` opens none
+without \`--pr\`); otherwise say the step does not apply. List open PRs waiting on
+review or CI for more than 48 hours. Read-only; do not mutate PRs.
 
 ### 4. Orphan specs — the pipeline inspected at rest
 
 **Only when the project keeps its specs locally**, i.e. \`.specnaut/specs/\`
 exists. Skip the step and say so otherwise; do not report an empty section.
 
-**Read \`phases/orphan-specs.md\` and follow it.**
-An instruction to load that file and execute it, not a pointer for the reader.
-The walk stays there — naming it here twice makes one copy the half that rots.
-Ownership says where the logic lives, not who may call it; saying only the
-first is what left this check unreachable from anything scheduled.
-
-The path is relative to the **task** skill, beside \`phases/plan.md\`; under
-a harness that flattens phases into siblings, whatever it named that document.
+**Read \`phases/orphan-specs.md\` and follow it.** Load and execute it; the walk
+lives there, never copied here. The path is relative to the **task** skill,
+beside \`phases/plan.md\`; under a harness that flattens phases into siblings,
+whatever it named that document.
 
 Read-only, like the two checks above: never delete or modify a spec file.
-
 
 **\`<backlog-reference>\`** below means a reference built per the
 \`backlog-reference-contract\` skill: the number **and** the title, wrapped in a
 backend-resolved link — never a bare \`#<num>\`. Read that contract for the format
 and the degradation ladder; do not restate it here.
-
 
 ## Before the report — prove the groom
 
@@ -2335,8 +2192,7 @@ reads as missing, never as present — report such a line as what it is.
 
 End with a single summary block — read \`groom-report.md\` and follow it. The
 per-ticket lines and the size/priority-missing escalation block are **mandatory
-contract output, not optional**: they are how the user verifies the sizing and
-priority contract was honoured.
+contract output, not optional**.
 
 ## When NOT to use this skill
 
@@ -2515,18 +2371,8 @@ Read \`docs/constitution.md\` before anything else: it is this project's binding
 
 **Response style** — brevity, visual order, questions as selections, badge colours — follows the \`response-style-contract\` skill; read it, never restate it here.
 
-Specnaut gives a project three skills, and they divide by what they own:
-
-| Skill | Owns |
-| :--- | :--- |
-| \`/task\` | one unit of work — from backlog item to merged branch, audits included |
-| \`/specnaut\` | the framework itself — its documentation, what is installed, upgrading it |
-| **\`/ship\`** | **production — getting a built thing out the door** |
-
-Shipping is not part of delivering a unit of work. It has a different cadence,
-a different risk profile — irreversible, outward-facing, it triggers live
-pipelines — and a different audience. That is why it is its own skill rather
-than a verb of the router that writes plans.
+**\`/ship\`** owns production — getting a built thing out the door. One unit of
+work is \`/task\`; the framework itself is \`/specnaut\`.
 
 ## The three paths
 
@@ -2552,9 +2398,8 @@ Then determine, without asking:
 - **Is the tree dirty?** If so, say what is uncommitted and stop. Do not
   stash, do not commit on the user's behalf, and do not tag a tree that does
   not match what will be built.
-- **Does an unreleased tag exist?** A tag with no corresponding release is the
-  strongest signal for path C, and it is the case a user most often means when
-  they say "release" with no argument.
+- **Does an unreleased tag exist?** A tag with no release is the strongest
+  signal for path C.
 
 ## Step 2 — resolve the intent
 
@@ -2571,7 +2416,6 @@ Resolve from the argument when it is unambiguous. Ask only when it is not.
 
 **\`/ship\` with no argument, and an unreleased tag exists** → path C is the
 answer; state that you are publishing the release for that tag and proceed.
-Naming what you resolved is not the same as asking.
 
 **\`/ship\` with no argument and nothing to disambiguate it** → ask once, as a
 selection, per the response-style contract:
@@ -2598,15 +2442,14 @@ adds to the phase at the step it names and never replaces or skips a bundled ste
 contradicts one, the bundled step stands and you say so. No file means no addendum — say nothing
 about it.
 
-The scripts live at \`.specnaut/scripts/release/\` — a project-relative path that
-does not change with the harness. The versioning scheme (SemVer or date-based)
-is baked in at \`specnaut init\`; the scripts read it, you do not choose it.
+The scripts live at \`.specnaut/scripts/release/\` under every harness. The
+versioning scheme (SemVer or date-based) is baked in at \`specnaut init\`; the
+scripts read it, you do not choose it.
 
 ## Step 4 — confirm before the irreversible act
 
-**A tag push and a release publish are irreversible and outward-facing.**
-Pushing a tag can trigger a live pipeline; publishing a release can trigger a
-deploy. Before either:
+**A tag push and a release publish are irreversible and outward-facing.** Before
+either:
 
 1. Show the computed tag, the target remote, and the commit subject.
 2. Ask once, as a concrete proposal — **"I'm about to push \`<tag>\` to
@@ -2617,15 +2460,12 @@ deploy. Before either:
 
 ## What this skill does not do
 
-- **It does not deploy.** In the recommended model a deploy is triggered by a
-  *published release*, not by a tag push and not by a branch push. See
-  \`phases/release.md\` → "From release to production".
-- **It does not edit version fields** in \`package.json\`, \`Cargo.toml\`,
-  \`pyproject.toml\` or any manifest. The git tag **is** the version.
-- **It does not run tests or quality gates.** Run them before shipping; that
-  contract is project-specific and lives outside this skill.
-- **It does not merge anything.** Landing a feature branch is
-  \`/task merge\`.
+- **It does not deploy.** A deploy is triggered by a *published release*, never
+  by a tag or branch push — \`phases/release.md\` → "From release to production".
+- **It does not edit version fields** in any manifest. The git tag **is** the
+  version.
+- **It does not run tests or quality gates.** Run them before shipping.
+- **It does not merge anything.** Landing a feature branch is \`/task merge\`.
 `,
     executable: false,
     backend: null,
@@ -2647,17 +2487,13 @@ Common natural-language requests:
 
 - \`/ship tag\` — tag HEAD with the next version
 - \`/ship tag <sha>\` — tag a specific commit
-- \`/ship tag --bump minor\` — SemVer projects only: bump
-  minor instead of patch (also \`--bump major\` / \`--bump patch\`)
+- \`/ship tag --bump minor\` — SemVer only (also \`major\` / \`patch\`)
 - \`/ship tag --no-push\` — skip pushing to \`origin\`
 
 ## What this command does
 
-Creates an annotated git tag using the **versioning scheme baked into
-this project at \`specnaut init\`** (one of SemVer \`v1.2.3\` or date-based
-\`vYY.M.Da\`).
-
-The bundled script does all the work:
+Creates an annotated tag in the scheme baked in at \`specnaut init\` (SemVer
+\`v1.2.3\` or date-based \`vYY.M.Da\`). The bundled script does all the work:
 
 \`\`\`bash
 bash .specnaut/scripts/release/tag.sh "\$@"
@@ -2681,26 +2517,13 @@ What the script does:
 
 ## What this command does NOT do
 
-- It does **not** create a GitHub / GitLab release — pushing a tag
-  alone does not publish a release. Run \`/ship release\`
-  after this to publish the categorized release notes.
-- It does **not** deploy anything. A tag push never ships to
-  production — in the recommended model, deploys are triggered by a
-  *published release*, not by tags or branch pushes. See
-  \`/ship release\` → "From release to production (CD)".
-- It does **not** edit version fields in \`package.json\` / \`Cargo.toml\`
-  / \`pyproject.toml\` / etc. The git tag **is** the version — single
-  source of truth.
-- It does **not** run tests, lint, or any quality gate. Run those
-  yourself before tagging if your project needs them — the contract
-  there is project-specific and lives outside Specnaut's tag/release
-  flow.
+- It does **not** publish a release — that is \`/ship release\`.
+- Nor deploy, edit version fields, or run quality gates — see \`SKILL.md\`,
+  "What this skill does not do".
 
 ## After running
 
-If the script exits non-zero, read the stderr message — it says
-exactly what failed (validation regex, missing remote, exhausted
-letter suffix, missing tag).
+On a non-zero exit, read stderr — it names what failed.
 
 On success, suggest \`/ship release\` as the natural next
 step. Do NOT run it automatically — releasing is an explicit,
@@ -2726,19 +2549,14 @@ Common natural-language requests:
 
 - \`/ship release\` — generate notes for the latest tag
 - \`/ship release v1.2.3\` — generate notes for a specific tag
-- \`/ship release --baseline v1.2.0\` — override the baseline
-  (use when the previous tag was never released and you want to skip
-  past it; default baseline is the previous tag chronologically)
+- \`/ship release --baseline v1.2.0\` — override the baseline (default: the
+  previous tag)
 
 ## What this command does
 
-Generates **categorized release notes** for the given tag (default:
-latest) covering every commit between a baseline tag and the target
-tag.
-
-The bundled script is stack-agnostic — it just emits the
-release-body Markdown to stdout, with one section per non-empty
-Conventional-Commits bucket. Run it like this:
+Writes **categorized release notes** for the tag (default: latest) to stdout —
+every commit since the baseline, one section per non-empty Conventional-Commits
+bucket:
 
 \`\`\`bash
 bash .specnaut/scripts/release/release.sh "\$@"
@@ -2761,13 +2579,9 @@ Each commit appears as \`- <short-sha> <subject>\` under its bucket.
 
 ## After the script runs
 
-The script writes the release body to **stdout**. What you do with it
-depends on how this project publishes releases.
-
 ### GitHub remote — prefer the bundled wrapper
 
-If the project ships releases on GitHub, the bundled
-\`release-github.sh\` wrapper is the one-command path:
+One command:
 
 \`\`\`bash
 bash .specnaut/scripts/release/release-github.sh           # latest tag
@@ -2780,13 +2594,10 @@ bash .specnaut/scripts/release/release-github.sh \\
 What the wrapper does on top of \`release.sh\`:
 
 1. Verifies \`gh\` CLI is installed + authenticated.
-2. **Computes the baseline = previous DEPLOYED tag** (the most recent
-   tag with a published GitHub Release attached — drafts do not
-   count — NOT the previous tag by date). Tags pushed without a release are "subsumed" —
-   their commits land in this release and the subsumed tag names
-   are listed inline.
-3. Pushes the tag to \`origin\` if not already there (the GitHub
-   Releases API needs the tag on the remote).
+2. **Computes the baseline = previous DEPLOYED tag** (the latest tag with a
+   published Release — drafts do not count — NOT the previous tag by date).
+   Unreleased tags in between are "subsumed" and listed inline.
+3. Pushes the tag to \`origin\` if not already there.
 4. Generates the body via \`release.sh\` with the computed baseline.
 5. Calls \`gh release create <tag> --notes-file -\` to publish.
 6. Reports the state GitHub holds, not the flag passed: a draft prints
@@ -2805,8 +2616,7 @@ run \`/ship\` unattended still stops at the one step you cannot take back.
 
 ### GitLab remote — prefer the bundled wrapper
 
-If the project ships releases on GitLab, the bundled \`release-gitlab.sh\`
-wrapper mirrors the GitHub one:
+Mirrors the GitHub one:
 
 \`\`\`bash
 bash .specnaut/scripts/release/release-gitlab.sh           # latest tag
@@ -2822,9 +2632,8 @@ auto-push, idempotency. Requires \`glab\` CLI installed + authenticated
 
 ### Local-only — use the \`release-local.sh\` wrapper
 
-If the project has no remote (or you just want a Markdown artifact to
-paste into any release UI), the bundled \`release-local.sh\` wrapper
-writes the categorized body to a file in the current directory:
+No remote: writes the body to a file (default \`RELEASE_NOTES_<tag>.md\`). No API
+calls, no auth, no tag push.
 
 \`\`\`bash
 bash .specnaut/scripts/release/release-local.sh             # latest tag → RELEASE_NOTES_<tag>.md
@@ -2832,15 +2641,9 @@ bash .specnaut/scripts/release/release-local.sh v1.2.3      # specific tag
 bash .specnaut/scripts/release/release-local.sh --out NOTES.md v1.2.3
 \`\`\`
 
-No remote API calls, no auth, no tag pushing. The output file is the
-release-body Markdown — paste it into any release UI, attach it to a
-deploy email, or pipe it to a custom publisher. Default output path:
-\`RELEASE_NOTES_<tag>.md\`.
-
 ### Custom CI / other remote
 
-Capture \`release.sh\` output and feed it into whatever your pipeline
-expects:
+Capture \`release.sh\` output:
 
 \`\`\`bash
 BODY=\$(bash .specnaut/scripts/release/release.sh v1.2.3)
@@ -2849,23 +2652,16 @@ BODY=\$(bash .specnaut/scripts/release/release.sh v1.2.3)
 
 ## From release to production — the deploy model (CD)
 
-Publishing a release and *deploying* are two separate steps. Specnaut owns
-the first (tag → notes → publish); this section is the opinionated model
-for wiring the second, so that publishing a release **is** what ships
-production.
+Specnaut publishes; this is the model for wiring the deploy, so that publishing
+a release **is** what ships production.
 
 **The rule: production deploys are triggered ONLY by a published release —
 never by a push to your default branch.** A push to \`main\` should at most
-run a CI gate (lint / test / build); it must not deploy. A deploy ships the
-exact commits bundled between two versions, with the release notes above as
-the audit trail. This keeps "what's in production" equal to "the latest
-published release", always — no surprise deploy from a stray merge.
+run a CI gate (lint / test / build); it must not deploy.
 
 ### Reference workflow (GitHub Actions)
 
-Stack-agnostic skeleton — fill the \`TODO\`s with your own install / build /
-deploy commands (any target: a PaaS, a container registry, an SSH rsync, a
-serverless CLI). The **shape** is the opinionated part, not the tooling:
+Fill the \`TODO\`s with your own commands; the **shape** is the opinionated part:
 
 \`\`\`yaml
 # .github/workflows/deploy-prod.yml
@@ -2912,8 +2708,7 @@ jobs:
 
 ### Companion CI gate (separate file)
 
-Keep the lint/build/test gate in its own workflow on \`push\` /
-\`pull_request\`. It runs on every change but **never deploys**:
+On \`push\` / \`pull_request\`; it **never deploys**:
 
 \`\`\`yaml
 # .github/workflows/ci.yml
@@ -2933,21 +2728,8 @@ jobs:
       - run: <install> && <lint> && <build>   # TODO your gate commands
 \`\`\`
 
-### Why this shape
-
-- **Release-only trigger** — "what's deployed" is exactly "the latest
-  published release". No deploy fires from a branch push.
-- **Least-privilege \`permissions: contents: read\`** — a compromised step
-  can't rewrite the repo.
-- **\`concurrency\` (no cancel-in-progress)** — back-to-back releases deploy
-  in order; an in-flight deploy is never cut off half-applied.
-- **Per-step secrets** — credentials never enter steps that don't need them.
-- **Build/output gate** — catch a dev/staging endpoint before it ships.
-- **\`if: github.repository == …\`** — a fork can't run your production deploy.
-
-**Break-glass** (re-deploy without cutting a new tag): re-run the last
-release's deploy run from the Actions UI — it redeploys the same ref. There
-is deliberately no manual \`workflow_dispatch\` in the model above, so prod is
+**Break-glass** (re-deploy without a new tag): re-run the last release's deploy
+run from the Actions UI. There is deliberately no \`workflow_dispatch\`, so prod is
 only ever reached through a release.
 
 > GitLab CI mirrors this: a \`release\` rule (\`if: \$CI_COMMIT_TAG\` gated to a
@@ -2959,25 +2741,11 @@ only ever reached through a release.
 
 The script emits the body verbatim. Do NOT:
 
-- Reword sections / re-categorize commits after the fact. If a commit
-  message is wrong (e.g. \`feat:\` for what's really a \`fix:\`), the
-  correct move is to amend the commit message **before** tagging,
-  not to hand-edit the release body.
-- Add a raw \`git diff\` or \`git log\` dump. The whole point of this
-  command is that the body is human-readable on its own.
+- Reword sections / re-categorize commits after the fact. A wrong commit
+  message is amended **before** tagging, not hand-edited in the body.
+- Add a raw \`git diff\` or \`git log\` dump.
 - Run release publication without showing the user the generated body
-  first when invoked interactively. The body is the production
-  artifact — surface it for review before posting.
-
-## Workflow
-
-\`\`\`
-/ship tag             → annotated tag created + pushed
-/ship release         → categorized release notes (stdout)
-↳ pipe to gh/glab release create  → release published
-   └─ (optional CD) a \`release: published\` job deploys production —
-      see "From release to production" above
-\`\`\`
+  first when invoked interactively — surface it for review before posting.
 `,
     executable: false,
     backend: null,
