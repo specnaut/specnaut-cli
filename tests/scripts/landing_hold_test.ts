@@ -47,10 +47,16 @@ const inSession = (sb: Sandbox, script: string, ...args: string[]) =>
 
 /** Pipes a Claude payload into an installed hook, from the clone. */
 async function hook(sb: Sandbox, name: string, fixture: string, extra: Record<string, unknown>) {
-  const p = JSON.stringify(await payload("claude", fixture, { cwd: sb.work, ...extra }));
+  // Through a file on stdin, never argv: Windows' process layer rewrites the
+  // quotes of a JSON argument, and the hook then reads it as "not JSON".
+  const file = join(sb.root, `${name}.payload.json`);
+  await Deno.writeTextFile(
+    file,
+    JSON.stringify(await payload("claude", fixture, { cwd: sb.work, ...extra })),
+  );
   return run(
     "bash",
-    ["-c", 'printf %s "$1" | bash "$2" claude', "_", p, `.specnaut/hooks/${name}`],
+    ["-c", 'bash "$2" claude < "$1"', "_", bashPath(file), `.specnaut/hooks/${name}`],
     sb.work,
     session(sb),
   );
