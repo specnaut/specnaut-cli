@@ -85,8 +85,8 @@ Deno.test("specnaut init --ai copilot scaffolds a Copilot layout", async () => {
 
     // One flat instruction file per bundled skill, phase document and agent.
     // The audit scope script ships under .specnaut/scripts/audit/, and
-    // status-audit's schema doc to .specnaut/logs/README.md — neither is
-    // flattened here.
+    // status-audit's schema doc to .specnaut/logs/README.md and its reporter
+    // to .specnaut/scripts/status/ — none is flattened here.
     const instructionsCount = (await Array.fromAsync(
       Deno.readDir(join(root, ".github/instructions")),
     )).length;

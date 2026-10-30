@@ -88,7 +88,7 @@ warned until `--force`; the trimmed managed sections replace the old ones.
 | :-------------------------------------- | :----------------------------------------------------------- | :----------------------------------------------------------------- |
 | The chain's stops and rules (always-on) | `templates/core/root/AGENTS.md` § chain                      | `phases/auto-chain.md` restating the two stops (it points instead) |
 | Optional integrations reference         | `templates/core/skills/specnaut/phases/integrations.md`      | any copy left in AGENTS.md beyond one pointer line                 |
-| Seven status views computation          | `templates/core/skills/status-audit/scripts/status-audit.jq` | the skill re-deriving them in prose                                |
+| Seven status views computation          | `templates/core/skills/status-audit/scripts/status-audit.sh` | the skill re-deriving them in prose                                |
 | Backlog verbs, their scripts and order  | `templates/core/skills/task/backlog.md` command table        | product-owner restating the table                                  |
 | Retired files leave projects            | `src/domain/orphan_scope.ts` (lock-driven)                   | any delete-by-name                                                 |
 

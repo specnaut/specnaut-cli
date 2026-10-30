@@ -26,6 +26,7 @@
 # The plugin ships no shell script today.
 core/skills/task/scripts/  46 backend scripts; see the ROOT-resolution reason above — mirrored, they would resolve a config path that cannot exist
 core/skills/task/scripts/collect-audit-scope.sh  same rule: a scope collector that resolves paths from its installed location, not from the plugin
+core/skills/status-audit/scripts/  the status-audit reporter (cli#679); the skill runs it from the installed .specnaut/scripts/status/, the path init writes on every harness
 
 # --- Agent memory seeds: written BY the agent, never carried ---------------
 # `init` seeds an empty memory file so the agent has somewhere to write. The

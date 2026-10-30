@@ -776,6 +776,11 @@ check "init scaffolds no addenda tree — the seam is opt-in by file" \
 # --- the two that share nothing with each other --------------------------
 check "status-audit .claude/skills/status-audit/SKILL.md reads the agent ledger" \
   'grep -q ".specnaut/logs/agents.jsonl" .claude/skills/status-audit/SKILL.md'
+# cli#679: the views are computed by status-audit.sh, installed executable where the skill runs it.
+check "status-audit.sh installs executable, the skill runs it, and it answers with no ledger" \
+  '[ -x .specnaut/scripts/status/status-audit.sh ] &&
+   grep -qF "bash .specnaut/scripts/status/status-audit.sh" .claude/skills/status-audit/SKILL.md &&
+   bash .specnaut/scripts/status/status-audit.sh | grep -qF "no ledger yet"'
 # alias-example was never bundled, and cli#679 removed its source too: it
 # documented an `alias_of` field nothing reads. The repo-side lock is
 # manifest_registration_test; this checks a project never receives it.

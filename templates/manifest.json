@@ -748,6 +748,13 @@
       "source": "core/skills/status-audit/SKILL.md"
     },
     {
+      "category": "spec-root",
+      "name": "status-audit",
+      "suffix": "scripts/status/status-audit.sh",
+      "source": "core/skills/status-audit/scripts/status-audit.sh",
+      "executable": true
+    },
+    {
       "category": "skill",
       "name": "design",
       "source": "core/skills/design/SKILL.md"

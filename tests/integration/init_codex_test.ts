@@ -113,7 +113,8 @@ Deno.test("specnaut init --ai codex scaffolds a Codex layout", async () => {
     // Phase documents land under specnaut-task/phases/, not as top-level skills.
     // The audit scope script ships under
     // .specnaut/scripts/audit/, not as a skill folder; status-audit's
-    // schema doc ships to .specnaut/logs/README.md, also not a skill folder.
+    // schema doc ships to .specnaut/logs/README.md and its reporter to
+    // .specnaut/scripts/status/ (cli#679), neither a skill folder.
     const agentsSkillsCount = (await Array.fromAsync(
       Deno.readDir(join(root, ".agents/skills")),
     )).length;
@@ -152,6 +153,11 @@ Deno.test("specnaut init --ai codex scaffolds a Codex layout", async () => {
     for (const retired of ["workflow-manager", "qa-tester", "devops-sre", "ui-ux-designer"]) {
       assertEquals(await exists(join(root, `.codex/agents/${retired}.toml`)), false);
     }
+    // cli#679: the status-audit reporter lands where the Codex skill runs it.
+    const statusAudit = ".specnaut/scripts/status/status-audit.sh";
+    assertEquals(await exists(join(root, statusAudit)), true);
+    const statusSkill = join(root, ".agents/skills/specnaut-status-audit/SKILL.md");
+    assertEquals((await Deno.readTextFile(statusSkill)).includes(`bash ${statusAudit}`), true);
 
     // Shared (cross-harness)
     assertEquals(await exists(join(root, "docs/constitution.md")), true);

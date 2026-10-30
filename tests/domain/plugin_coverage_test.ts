@@ -199,6 +199,7 @@ Deno.test("isPluginCoveredPath: the task skill's SCRIPTS are never covered", () 
       ".specnaut/scripts/backlog/add.sh",
       ".specnaut/scripts/backlog/detect-fields.sh",
       ".specnaut/scripts/audit/collect-audit-scope.sh",
+      ".specnaut/scripts/status/status-audit.sh",
       ".claude/skills/task/scripts/add.sh",
     ]
   ) {

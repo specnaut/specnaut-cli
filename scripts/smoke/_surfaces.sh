@@ -38,6 +38,7 @@ SURFACES=(
   # Named, not `task/scripts/*`: that glob would claim the four backend
   # directories above if it were ever moved ahead of them.
   'templates/core/skills/task/scripts/collect-audit-scope.sh|smoke-task.sh|skill-script'
+  'templates/core/skills/status-audit/scripts/*|smoke-features.sh|skill-script'
   # #562 split two contracts out of the board skill (now `/task`, spec 037).
   # The map used to name `groom.md` alone, so a sibling doc added beside it was
   # UNMAPPED — nothing asserted about it and nothing said so. A glob covers the

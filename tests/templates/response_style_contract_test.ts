@@ -241,7 +241,7 @@ const WITHHELD_BY_DECISION: ReadonlyMap<string, string> = new Map([
   // `/task audit`, which reaches the contract through the `/task` router.
   [
     "status-audit",
-    "read-only reporter over a log file; reached by the always-on leg like any other turn",
+    "runs a read-only reporter script over a log file; reached by the always-on leg like any other turn",
   ],
 ]);
 
