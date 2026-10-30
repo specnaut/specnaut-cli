@@ -7,7 +7,7 @@ import { git, makeRepo, runScript, sandbox } from "./hooks/hook_sandbox.ts";
  * FR-002) and `base-branch.sh` of its base branch. The chain calls the
  * default reading; the landing hook calls `--strict`, which must not be
  * talked out of `manual` by a model rewriting its own working tree (§ 11 F2).
- * The default reading's file shapes live in chain_stops_test.ts, beside the
+ * The default reading's file shapes live in merge_mode_docs_test.ts, beside the
  * phase that calls it.
  */
 
