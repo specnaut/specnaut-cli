@@ -26753,7 +26753,8 @@ prompts cost more tokens and drift out of relevance.
       "Bash(*release/release-gitlab.sh*)",
       "Bash(gh release edit *)",
       "Bash(gh release upload *)",
-      "Bash(glab release create *)"
+      "Bash(glab release create *)",
+      "Bash(gh release new *)"
     ]
   },
   "hooks": {
@@ -26912,7 +26913,19 @@ export GIT_OPTIONAL_LOCKS=0 GIT_PAGER=cat PAGER=cat
 GUARD_NAME=hook GUARD_FAIL_CODE=2 GUARD_ROOT="" GUARD_JQ_CRLF=0 GUARD_ALLOWED=0
 
 guard_fail() { printf 'specnaut %s: %s\\n' "\$GUARD_NAME" "\$1" >&2; exit "\$GUARD_FAIL_CODE"; }
-trap 'guard_fail "unexpected error at line \$LINENO — refusing rather than allowing"' ERR
+
+# _guard_err <status> <line> — the ERR trap. set -E carries it into every
+# \`\$(…)\` and subshell; there it only leaves, with the failing command's own
+# status, for the caller to judge: \`\$(git config --get alias.x)\` exiting 1
+# means "no such alias". A caller that does not handle it fails in this
+# shell, where the trap refuses. Refusing inside the substitution turned every
+# such 1 into the fail code — cmd_git read each git subcommand outside its
+# list as an alias it cannot follow — and printed a crash above a deny (cli#711).
+_guard_err() {
+  if [ "\${BASH_SUBSHELL:-0}" -gt 0 ]; then exit "\$1"; fi
+  guard_fail "unexpected error at line \$2 — refusing rather than allowing"
+}
+trap '_guard_err \$? \$LINENO' ERR
 
 # guard_allow — the ONLY way a guard lets a call through.
 guard_allow() { GUARD_ALLOWED=1; exit 0; }
@@ -27143,15 +27156,20 @@ approval_require() {
 # would run, so a rule matches what runs — not text that merely mentions it.
 #
 # A heuristic by design (plan § 6 threat model). It sees: ; && || | & and
-# newlines, ( ) \$( ) and backticks (also inside "…"), quotes and escapes,
-# comments, heredoc bodies (skipped: they are data), \`<<<\` herestrings, \`<<\`
-# inside \`\$((…))\`/\`((…))\` (a shift, not a heredoc), redirections, VAR=val
-# prefixes, the env/command/sudo/nice/timeout/xargs/… wrappers, \`source x\`,
-# the command of \`find -exec\`, and ONE level of \`sh|bash|zsh -c '…'\`. A
-# deeper \`-c\`, or \`eval\`, sets CMD_OPAQUE — and so does a line that never
-# closes: a quote, \`(\`, \`\$(\` or backtick left open, a heredoc whose body never
-# ends. Fail closed: a guard gates what it cannot read rather than guessing at
-# it. Scripts, interpreters and shell functions are not seen: the stated limit.
+# newlines, ( ) \$( ) and backticks (also inside "…"), \`if(…)\` and the other
+# reserved words before a subshell, \`[[ … ]]\` (where | ( ) < > & ; are part of
+# a word), quotes and escapes, comments, heredoc bodies (skipped: they are
+# data, once the delimiter is quoted), \`<<<\` herestrings, \`<<\` inside
+# \`\$((…))\`/\`((…))\` (a shift, not a heredoc), redirections, VAR=val prefixes,
+# the env/command/sudo/nice/timeout/xargs/… wrappers, \`source x\`, the command
+# of \`find -exec\`, and ONE level of \`sh|bash|zsh -c '…'\`. A deeper \`-c\`, or
+# \`eval\`, sets CMD_OPAQUE — and so does what it cannot read with certainty
+# (cli#711): a \`case\` inside a substitution, an unquoted heredoc body holding
+# \`\$(\` or a backtick, a zsh glob qualifier that runs code, and a line that
+# never closes: a quote, \`(\`, \`\$(\`, backtick or \`[[\` left open, a heredoc whose
+# body never ends. Fail closed: a guard gates what it cannot read rather than
+# guessing at it. Scripts, interpreters and shell functions are not seen: the
+# stated limit.
 #
 # After cmd_parse: CMD_SEGS holds one entry per simple command, its words
 # joined by CMD_SEP, the first word reduced to its basename. A substitution is
@@ -27169,7 +27187,33 @@ CMD_SEGS=()
 CMD_MOVED=0
 CMD_OPAQUE=0
 
-_cmd_word() { if [ "\$have" = 1 ] || [ -n "\$word" ]; then seg+="\$word\$CMD_SEP"; fi; word=""; have=0; }
+# _cmd_cmdpos — the word being read stands where a command word does:
+# unquoted, with nothing before it in the segment but the reserved words that
+# lead a command. Only there do \`case\`, \`[[\` and \`if(\` mean what bash reads.
+_cmd_cmdpos() {
+  local x
+  [ "\$have" = 0 ] || return 1
+  for x in \$seg; do case \$x in if | then | else | elif | do | while | until | '!' | '{' | time) ;; *) return 1 ;; esac; done
+}
+
+# _cmd_word — the word read so far joins the segment. As a command word,
+# \`[[\` opens its own mode (bk: the frame it was opened in) and \`]]\` closes it;
+# \`case\` inside a substitution is opaque: an arm's bare \`)\` would close the
+# substitution, and the arm's commands would read as words of the command
+# around it — \`echo \$(case x in *) git push;; esac)\` ran a push (cli#711).
+_cmd_word() {
+  case \$word in
+    '[[') if _cmd_cmdpos; then if [ -n "\$bk" ]; then CMD_OPAQUE=1; fi; bk="+\$stack\$bt"; fi ;;
+    ']]') if [ "\$have" = 0 ] && [ "\$bk" = "+\$stack\$bt" ]; then bk=""; fi ;;
+    case) if _cmd_cmdpos; then case \$stack in *[sd]*) CMD_OPAQUE=1 ;; esac; fi ;;
+  esac
+  if [ "\$have" = 1 ] || [ -n "\$word" ]; then seg+="\$word\$CMD_SEP"; fi
+  word="" have=0
+}
+
+# _cmd_keyword — the word read so far is a reserved word in command position,
+# so a \`(\` right after it opens a subshell: \`if(…)\`, \`then(…)\`, \`while(…)\`.
+_cmd_keyword() { case \$word in if | then | else | elif | do | while | until) _cmd_cmdpos ;; *) return 1 ;; esac; }
 _cmd_end() { _cmd_word; if [ -n "\$seg" ]; then _cmd_emit "\$seg" "\$depth"; fi; seg=""; }
 
 # A \`\$(\` or backtick opens: the command around it is set aside (sw/ss, sp deep)
@@ -27184,22 +27228,37 @@ _cmd_pop() { _cmd_end; if [ "\$sp" -gt 0 ]; then sp=\$((sp - 1)) have=1; word=\$
 _cmd_close() {
   local f=\${stack:0:1}
   stack=\${stack:1}
-  case \$f in g) word+=\$c ;; d) _cmd_pop; q='"' ;; s) _cmd_pop ;; *) _cmd_end ;; esac
+  case \$f in g) _cmd_qual; word+=\$c ;; d) _cmd_pop; q='"' ;; s) _cmd_pop ;; *) _cmd_end ;; esac
+}
+
+# _cmd_qual — the \`)\` at i-1 closes a zsh glob group. At the end of its word,
+# or opened by \`#q\`, the group is a list of glob qualifiers, and an \`e…\` or
+# \`+cmd\` among them runs code for each file the glob matches: \`ls
+# *(e:'git push':)\`. Opaque. Quoted text opens no group, so a commit message
+# never trips this.
+_cmd_qual() {
+  local g=\${word##*[(]}
+  case \$g in '#q'*) ;; *) case \${s:i:1} in '' | [[:space:]] | ';' | '&' | '|' | ')' | '<' | '>') ;; *) return 0 ;; esac ;; esac
+  case \$g in *e* | *+*) CMD_OPAQUE=1 ;; esac
 }
 
 # Skips the bodies of the heredocs opened on the line just ended. A body that
 # runs to the end of the input never closed: as likely a misread as a typo,
-# and what follows a phantom heredoc is hidden — so the line is opaque.
+# and what follows a phantom heredoc is hidden — so the line is opaque. So is
+# a body whose delimiter was not quoted, if it holds \`\$(\` or a backtick: bash
+# expands that body, and runs its substitutions (cli#711).
+# shellcheck disable=SC2016 # the \`\$(\` is matched as text, on purpose
 _cmd_heredocs() {
-  local d strip line closed
+  local d strip quoted line closed
   for d in \$heredocs; do
-    strip=\${d:0:1} d=\${d:1} closed=0
+    strip=\${d:0:1} quoted=\${d:1:1} d=\${d:2} closed=0
     while [ "\$i" -lt "\$n" ]; do
       line=\${s:i}
       line=\${line%%\$'\\n'*}
       i=\$((i + \${#line} + 1))
       if [ "\$strip" = 1 ]; then line=\${line#"\${line%%[!\$'\\t']*}"}; fi
       if [ "\$line" = "\$d" ]; then closed=1; break; fi
+      if [ "\$quoted" = 0 ]; then case \$line in *'\$('* | *'\`'*) CMD_OPAQUE=1 ;; esac; fi
     done
     if [ "\$closed" = 0 ]; then CMD_OPAQUE=1; fi
   done
@@ -27207,17 +27266,18 @@ _cmd_heredocs() {
 }
 
 # Reads the delimiter of the \`<<\` / \`<<-\` heredoc whose operator ends at i and
-# queues it for _cmd_heredocs. Quotes and escapes in it are dropped, as bash does.
+# queues it for _cmd_heredocs. Quotes and escapes in it are dropped, as bash
+# does, and recorded: any of them makes the body literal.
 _cmd_heredoc_open() {
-  local strip=0 d="" ch
+  local strip=0 quoted=0 d="" ch
   if [ "\${s:i:1}" = "-" ]; then strip=1 i=\$((i + 1)); fi
   while [ "\${s:i:1}" = " " ]; do i=\$((i + 1)); done
   while [ "\$i" -lt "\$n" ]; do
     ch=\${s:i:1}
-    case \$ch in [[:space:]] | ';' | '&' | '|' | '<' | '>' | '(' | ')') break ;; "'" | '"' | '\\') ;; *) d+=\$ch ;; esac
+    case \$ch in [[:space:]] | ';' | '&' | '|' | '<' | '>' | '(' | ')') break ;; "'" | '"' | '\\') quoted=1 ;; *) d+=\$ch ;; esac
     i=\$((i + 1))
   done
-  heredocs+="\$strip\$d\$CMD_SEP"
+  heredocs+="\$strip\$quoted\$d\$CMD_SEP"
 }
 
 # A \`(\` just opened a frame: if another follows (\`\$((\`, \`((\`), this is
@@ -27238,9 +27298,24 @@ _cmd_lt() {
   fi
 }
 
+# _cmd_test_char — inside \`[[ … ]]\`, in the frame it was opened in, c is one
+# of | ( ) < > & ; : part of a word (\`[[ \$x =~ ^(a|b)\$ ]]\`), not an operator —
+# returns 0, c kept. Only a word that is exactly \`]]\` ends the mode, before an
+# operator too (\`]];\`). A newline first: opaque.
+_cmd_test_char() {
+  [ -n "\$bk" ] && [ "\$bk" = "+\$stack\$bt" ] || return 1
+  case \$c in
+    '|' | '(' | ')' | '<' | '>' | '&' | ';')
+      if [ "\$word" != ']]' ] || [ "\$have" = 1 ]; then word+=\$c; return 0; fi
+      bk="" ;;
+    \$'\\n') CMD_OPAQUE=1 ;;
+  esac
+  return 1
+}
+
 # cmd_parse <command line> [depth]
 cmd_parse() {
-  local s=\$1 depth=\${2:-0} n=\${#1} i=0 c nx q="" word="" have=0 seg="" stack="" bt="" heredocs="" d sp=0
+  local s=\$1 depth=\${2:-0} n=\${#1} i=0 c nx q="" word="" have=0 seg="" stack="" bt="" heredocs="" d sp=0 bk=""
   local -a sw ss
   local IFS=\$CMD_SEP
   while [ "\$i" -lt "\$n" ]; do
@@ -27256,6 +27331,7 @@ cmd_parse() {
         '\`') _cmd_push; bt=d q="" ;;
         *) word+=\$c ;;
       esac
+    elif _cmd_test_char; then :
     else
       case \$c in
         '\\') if [ "\$nx" != \$'\\n' ]; then word+=\$nx have=1; fi; i=\$((i + 1)) ;;
@@ -27267,7 +27343,7 @@ cmd_parse() {
         '\$') if [ "\$nx" = "(" ]; then _cmd_push; stack="s\$stack" i=\$((i + 1)); _cmd_arith; else word+=\$c; fi ;;
         '(') case \$word in
             *'<' | *'>' | '=') _cmd_push; stack="s\$stack" ;; # <(…) >(…) =(…): a command runs inside
-            *) if [ -n "\$word" ] && [ "\$nx" != ")" ]; then word+=\$c stack="g\$stack"; else _cmd_end; stack="u\$stack"; _cmd_arith; fi ;;
+            *) if [ -n "\$word" ] && [ "\$nx" != ")" ] && ! _cmd_keyword; then word+=\$c stack="g\$stack"; else _cmd_end; stack="u\$stack"; _cmd_arith; fi ;;
           esac ;;
         ')') _cmd_close ;;
         '\`') if [ -z "\$bt" ]; then _cmd_push; bt=u; else _cmd_pop; if [ "\$bt" = d ]; then q='"'; fi; bt=""; fi ;;
@@ -27278,7 +27354,7 @@ cmd_parse() {
     fi
   done
   _cmd_end
-  if [ -n "\$q\$stack\$bt\$heredocs" ]; then CMD_OPAQUE=1; fi
+  if [ -n "\$q\$stack\$bt\$heredocs\$bk" ]; then CMD_OPAQUE=1; fi
 }
 
 # cmd_words <segment> — split a CMD_SEGS entry into the array W.
@@ -27309,11 +27385,9 @@ cmd_pos() {
 # Sourced by _command.sh. What ONE simple command runs, once cmd_parse has cut
 # it out of the line: redirections dropped, VAR=val prefixes and wrappers
 # (env, command, sudo, nice, time, timeout, xargs, flock, …) skipped, the
-# command word reduced to its basename, \`source <script>\` and \`. <script>\`
-# read as the script, each \`find -exec … ;\` read as a command of its own, and
-# \`sh|bash|zsh -c '…'\` read one level deep — the string is parsed again as a
-# command line; a second level, or a shell fed on stdin, or \`eval\`, sets
-# CMD_OPAQUE instead of being guessed at.
+# command word reduced to its basename, \`source <script>\` read as the script,
+# each \`find -exec … ;\` as a command of its own, and \`sh|bash|zsh -c '…'\` one
+# level deep — the string is parsed again as a command line.
 #
 # Unknown means opaque (cli#711, plan § 4): a wrapper is known by its
 # basename, with the options it takes and which of them take a value; any
@@ -27421,7 +27495,8 @@ _cmd_wrapper() {
   local k0=\$k j
   case \${v[k]##*/} in
     exec) _cmd_getopt cl a - ;;
-    command) _cmd_getopt pvV "" ;;
+    # -v/-V name the command and run nothing (cli#711): nothing is recorded
+    command) _cmd_getopt pvV ""; for ((j = k0 + 1; j < k; j++)); do case \${v[j]} in -*[vV]*) k=\$m ;; esac; done ;;
     builtin | nohup) _cmd_getopt "" "" ;;
     time) _cmd_getopt plavq of "--portability --verbose --append --quiet" "--output --format" ;;
     nice) _cmd_getopt 0123456789 n "" --adjustment ;;
@@ -27448,6 +27523,7 @@ _cmd_wrapper() {
 # flock's lock file, \`-c '…'\` is left for _cmd_emit, which reads the string
 # as a shell's.
 _cmd_runner() {
+  local k0=\$k
   case \${v[k]##*/} in
     timeout | gtimeout) _cmd_getopt v sk "--preserve-status --foreground --verbose" "--signal --kill-after"; k=\$((k + 1)) ;;
     caffeinate) _cmd_getopt dimsu tw ;;
@@ -27460,10 +27536,28 @@ _cmd_runner() {
     taskset) _cmd_getopt acp "" "--all-tasks --cpu-list --pid"; k=\$((k + 1)) ;;
     xargs)
       _cmd_getopt 0prtxoile adEIJLnPRSs "--null --interactive --no-run-if-empty --verbose --exit --open-tty --show-limits --replace --eof --max-lines" \\
-        "--arg-file --delimiter --max-args --max-procs --max-chars --process-slot-var" ;;
+        "--arg-file --delimiter --max-args --max-procs --max-chars --process-slot-var"
+      _cmd_xargs "\$k0" ;;
     flock) _cmd_getopt sexnouF wE "--shared --exclusive --nonblock --no-fork --close --unlock --verbose" "--timeout --conflict-exit-code"; k=\$((k + 1)) ;;
     *) return 1 ;;
   esac
+}
+
+# _cmd_xargs <index of xargs> — k: the command xargs runs, whose words stdin
+# fills in: each word holding the -I/-J replace string (-i, --replace: \`{}\`)
+# has it as \`\$\`, and a \`\$\` word ends it — \`echo merge | xargs git\` is a git
+# subcommand the shell fills in (_listed.sh), not \`git\` (cli#711).
+_cmd_xargs() {
+  local j r=""
+  for ((j = \$1 + 1; j < k; j++)); do
+    case \${v[j]} in
+      --replace) r='{}' ;; --replace=*) r=\${v[j]#*=} ;; --*) ;;
+      -*[IJ]) j=\$((j + 1)) r=\${v[j]:-} ;; -*[IJ]*) r=\${v[j]#*[IJ]} ;; -*i*) r='{}' ;;
+    esac
+  done
+  [ "\$k" -lt "\$m" ] || return 0 # no command: xargs runs echo
+  if [ -n "\$r" ]; then for ((j = k; j < m; j++)); do v[j]=\${v[j]//"\$r"/\\\$}; done; fi
+  v+=('\$') m=\$((m + 1))
 }
 
 # _cmd_shell_c <depth> [1] — v[k] is a shell (1: or flock's \`-c\`, already
@@ -27532,15 +27626,18 @@ _cmd_base() { _cmd_name "\${v[k]}"; v[k]=\$CMD_NAME; }
 _cmd_script() { if [ -n "\$1" ]; then _cmd_name "\$1"; CMD_SEGS+=("\$CMD_NAME"); fi; }
 
 # _cmd_evals — opaque when a word holds code the shell runs later, where this
-# parser never reads it: \`\$(…)\` or a backtick after a \`[\` (an array subscript
-# — let, printf -v, read, test -v and (( )) evaluate it), and a zsh \`\${(…)\`
-# whose flags hold \`e\` (the value is expanded again). A quoted word keeps that
-# text as it is; unquoted, cmd_parse already read the substitution.
+# parser never reads it: a zsh \`\${(…)\` whose flags hold \`e\` (the value is
+# expanded again), and, for a builtin that evaluates the array subscript of a
+# name it is given (let, printf -v, read, declare, test -v, …), \`\$(…)\` or a
+# backtick after a \`[\`. A quoted word keeps that text as it is; unquoted,
+# cmd_parse already read the substitution. Given to any other command, it is
+# data: \`git commit -m '[x] \$(y)'\` runs nothing (cli#711).
 # shellcheck disable=SC2016 # the \`\$(\` and \`\${(\` are matched as text, on purpose
 _cmd_evals() {
-  local x f o='\${('
+  local x f o='\${(' sub=0
+  case \${v[k]:-} in let | printf | read | test | '[' | '[[' | declare | typeset | local | export | readonly | unset | getopts | wait | mapfile | readarray | print | vared) sub=1 ;; esac
   for x in \${v[@]+"\${v[@]}"}; do
-    case \$x in *'['*'\$('* | *'['*'\`'*) CMD_OPAQUE=1; return 0 ;; esac
+    if [ "\$sub" = 1 ]; then case \$x in *'['*'\$('* | *'['*'\`'*) CMD_OPAQUE=1; return 0 ;; esac; fi
     while [[ \$x == *"\$o"* ]]; do
       x=\${x#*"\$o"} f=\${x%%')'*}
       case \$f in *e*) CMD_OPAQUE=1; return 0 ;; esac
@@ -27561,8 +27658,8 @@ _cmd_emit() {
   local -a v
   local x j k=0 m=0 IFS=\$' \\t\\n'
   _cmd_strip_redirs "\$1"
-  _cmd_evals
   _cmd_skip_prefixes
+  _cmd_evals
   if [ -n "\${CMD_ON_SEG:-}" ]; then "\$CMD_ON_SEG" "\$1"; fi
   [ "\$k" -lt "\$m" ] || return 0
   _cmd_base
@@ -27597,11 +27694,15 @@ _cmd_emit() {
 # has already reduced the command word to its basename, so it matches however
 # the script is reached (a path, \`bash x\`, \`source x\`, \`timeout 60 x\`, …).
 # The script word is matched ignoring ASCII case (a case-folding filesystem,
-# APFS or NTFS, runs \`Land-Feature.sh\`), and a command word the shell rewrites
-# after this hook has read it — a \`\$VAR\`, a substitution, a glob, a brace, a
-# zsh glob group (\`land-(feature).sh\`) — or that holds a byte outside printable
-# ASCII matches every script line: what it names is unknown here, so it is
-# gated (fail closed). An argument is never judged so: \`ls *.sh\` runs \`ls\`.
+# APFS or NTFS, runs \`Land-Feature.sh\`). A word filled in after this hook has
+# read it — by the shell (a \`\$VAR\`, a substitution, a glob, a brace, a zsh
+# glob group: \`land-(feature).sh\`), by the command (xargs' stdin, its -I
+# placeholder, find's \`{}\`, which _simple.sh leaves as \`\$\` or \`{}\`) — or that
+# holds a byte outside printable ASCII matches the line's word at its
+# position and every word after it — unquoted, or as stdin, it may be several
+# words: what it names is unknown here, so it is gated (fail closed). \`gh
+# \$(echo release) create\` and \`… | xargs gh\` are \`gh release create\`
+# (cli#711). Only at a position a line has a word for: \`ls *.sh\` runs \`ls\`.
 # \`<words> except <flag>\`: that flag anywhere in the segment exempts it.
 # \`#\` comments and blank or whitespace-only lines are skipped; a \`\\r\` (a CRLF
 # checkout) is read past.
@@ -27638,9 +27739,10 @@ listed() {
     [ -n "\${e[0]:-}" ] || continue
     ok=1
     for ((i = 0; i < \${#e[@]}; i++)); do
-      if [ "\${e[i]}" = "\${POS[i]:-}" ]; then continue; fi
-      if [ "\$i" = 0 ] && [[ \${e[0]} == *.sh ]] &&
-        { guard_ieq "\${e[0]}" "\${POS[0]:-}" || _listed_expands "\${POS[0]:-}"; }; then continue; fi
+      w=\${POS[i]:-}
+      if _listed_expands "\$w"; then break; fi
+      if [ "\${e[i]}" = "\$w" ]; then continue; fi
+      if [ "\$i" = 0 ] && [[ \${e[0]} == *.sh ]] && guard_ieq "\${e[0]}" "\$w"; then continue; fi
       ok=0
       break
     done
@@ -27662,14 +27764,20 @@ listed() {
 # guard-release). Reads one \`git\` segment the way git itself would: past its
 # global options, and through its aliases — so \`git -C x -c k=v pm\` is seen as
 # the command it runs, not as an unknown subcommand.
+# shellcheck source=_listed.sh
+. "\${BASH_SOURCE[0]%/*}/_listed.sh" || guard_fail "_listed.sh is missing beside _git.sh"
 
 # cmd_git <git words…> — skip git's global options and expand git aliases
 # (up to 5 levels), so \`git -C x -c k=v pm\` is read as the command it runs.
-# Sets GIT_SUB and GIT_ARGS; GIT_SUB is "!" for a shell alias or an alias we
-# cannot follow. git ignores an alias that shadows a builtin, so do we.
+# Sets GIT_SUB and GIT_ARGS. GIT_SUB is "!" for a subcommand this cannot
+# read — the one home of that rule, for every guard (cli#711) — and GIT_WHY
+# says which: a word the shell or the command fills in (\`git \$(…)\`, \`git
+# "\$X"\`, xargs' stdin, find's \`{}\`: _listed_expands), a shell alias, an alias
+# set on the command line, or one it cannot follow. git ignores an alias that
+# shadows a builtin, so do we.
 cmd_git() {
   shift
-  GIT_SUB="" GIT_ARGS=()
+  GIT_SUB="" GIT_ARGS=() GIT_WHY=""
   local inline_alias=0
   while [ \$# -gt 0 ]; do
     case \$1 in
@@ -27685,10 +27793,18 @@ cmd_git() {
   GIT_SUB=\$1
   shift
   GIT_ARGS=("\$@")
+  if _listed_expands "\$GIT_SUB"; then GIT_SUB="!" GIT_WHY="a git subcommand the shell or the command fills in"; return 0; fi
   # An alias set on the command line (\`git -c alias.p=push p\`) is not in any
   # config file, so \`git config --get\` cannot follow it, and how it fails
   # differs by platform: what the command runs is unknowable, so it is gated.
-  if [ "\$inline_alias" = 1 ]; then GIT_SUB="!"; return 0; fi
+  if [ "\$inline_alias" = 1 ]; then GIT_SUB="!" GIT_WHY="a git alias set on the command line"; return 0; fi
+  _git_alias
+}
+
+# _git_alias — GIT_SUB and GIT_ARGS through the aliases git would expand, from
+# the config of the repository the command runs in.
+_git_alias() {
+  GIT_WHY="a git alias that runs a shell command, or one it cannot follow"
   local level val rc
   local -a a
   for level in 1 2 3 4 5; do
@@ -28112,11 +28228,12 @@ mv -f "\$tmp" "\$stamp"
 #                        shell would expand (\$VAR, \`…\`, quotes, ?, [, {),
 #                        --all, --mirror, --delete and unknown options are
 #                        all gated
-#   gh pr merge, glab mr merge, a git shell alias, a git subcommand the shell
-#                        rewrites (\`git \$(…)\`, \`git "\$X"\`), a line it cannot read
+#   a git subcommand it cannot read (_git.sh: a shell alias, \`git \$(…)\`,
+#                        \`git "\$X"\`), a line it cannot read
 #   every command in merge-commands.txt — the scripts that land on the base
 #                        themselves (land-feature.sh, remove-spec.sh), matched
-#                        by basename however they are reached (_listed.sh)
+#                        by basename however they are reached, and gh pr
+#                        merge, glab mr merge (_listed.sh)
 # An unknown base gates every form. A gated command goes through
 # approval_gate: Claude's own prompt where it can ask, else this turn's
 # \`merge\` approval (FR-017).
@@ -28133,11 +28250,9 @@ case \${BASH_SOURCE[0]} in */*) HOOK_DIR=\${BASH_SOURCE[0]%/*} ;; *) HOOK_DIR=. 
 # shellcheck source=_command.sh
 . "\$HOOK_DIR/_command.sh"
 # shellcheck source=_git.sh
-. "\$HOOK_DIR/_git.sh"
+. "\$HOOK_DIR/_git.sh" # and _listed.sh
 # shellcheck source=_approval.sh
 . "\$HOOK_DIR/_approval.sh"
-# shellcheck source=_listed.sh
-. "\$HOOK_DIR/_listed.sh"
 guard_init guard-merge "\${1:-}" argv:.tool_input.command
 [ "\$P_TOOL" = Bash ] || guard_fail "expected a Bash tool call, got '\$P_TOOL'"
 [ -n "\${GF[0]}" ] || guard_fail "a Bash call without tool_input.command"
@@ -28154,13 +28269,11 @@ for seg in \${CMD_SEGS[@]+"\${CMD_SEGS[@]}"}; do
         merge | pull) merges=1 ;;
         push) pushes+=("\$(IFS=\$CMD_SEP; echo "\${GIT_ARGS[*]:-}")") ;;
         checkout | switch) switched=1 ;;
-        '!') reasons+=("a git alias that runs a shell command") ;;
-        *) if _listed_expands "\$GIT_SUB"; then reasons+=("a git subcommand the shell rewrites"); fi ;;
+        '!') reasons+=("\$GIT_WHY") ;;
       esac
       continue ;;
   esac
   cmd_pos
-  case "\${POS[*]:-}" in "gh pr merge"* | "glab mr merge"*) reasons+=("\${POS[0]} \${POS[1]} merge") ;; esac
   listed "\$HOOK_DIR/merge-commands.txt"
   if [ -n "\$HIT" ]; then reasons+=("\$HIT"); fi
 done
@@ -28249,7 +28362,8 @@ approval_gate merge \\
 # refs/tags/ ref, \`tag <name>\`, or a name that is a tag, or not a branch and
 # either version-shaped or created as a tag on the same line (tag.sh and
 # \`git tag\` run before the push does, so the tag does not exist yet when this
-# hook reads the command). And a line too nested to read (eval, sh -c in
+# hook reads the command). And a git subcommand it cannot read (_git.sh: a
+# shell alias, \`git \$(…)\`), or a line too nested to read (eval, sh -c in
 # sh -c, a shell fed on stdin, a line that never closes): fail closed.
 #
 # Usage: guard-release.sh <claude|codex>   (payload on stdin)
@@ -28260,11 +28374,9 @@ case \${BASH_SOURCE[0]} in */*) HOOK_DIR=\${BASH_SOURCE[0]%/*} ;; *) HOOK_DIR=. 
 # shellcheck source=_command.sh
 . "\$HOOK_DIR/_command.sh"
 # shellcheck source=_git.sh
-. "\$HOOK_DIR/_git.sh"
+. "\$HOOK_DIR/_git.sh" # and _listed.sh
 # shellcheck source=_approval.sh
 . "\$HOOK_DIR/_approval.sh"
-# shellcheck source=_listed.sh
-. "\$HOOK_DIR/_listed.sh"
 guard_init guard-release "\${1:-}" argv:.tool_input.command
 [ "\$P_TOOL" = Bash ] || guard_fail "expected a Bash tool call, got '\$P_TOOL'"
 [ -n "\${GF[0]}" ] || guard_fail "a Bash call without tool_input.command"
@@ -28313,6 +28425,7 @@ for seg in \${CMD_SEGS[@]+"\${CMD_SEGS[@]}"}; do
     case \$GIT_SUB in
       tag) tags_made=1 ;;
       push) pushes+=("\$(IFS=\$CMD_SEP; echo "\${GIT_ARGS[*]:-}")") ;;
+      '!') hits+=("\$GIT_WHY") ;;
     esac
     continue
   fi
@@ -28859,6 +28972,7 @@ tag.sh except --no-push
 release-github.sh
 release-gitlab.sh
 gh release create
+gh release new
 gh release edit
 gh release upload
 glab release create
@@ -28876,11 +28990,12 @@ gh run rerun
 # the argument of sh/bash/source, or behind timeout, env, xargs, …); how a line
 # matches lives in _listed.sh. A copy of the script under another name, a
 # task-runner alias or an interpreter that runs it is not seen — the limit a
-# hand-written script that runs \`git push\` already has. \`git merge\`, \`git
-# push\`, \`gh pr merge\` and \`glab mr merge\` are rules, not words, and live in
-# guard-merge.sh.
+# hand-written script that runs \`git push\` already has. \`git merge\` and \`git
+# push\` are rules, not words, and live in guard-merge.sh.
 land-feature.sh
 remove-spec.sh
+gh pr merge
+glab mr merge
 `,
       executable: false,
     },
@@ -28904,21 +29019,21 @@ specnaut-guide
 7a9b8bd4ecba4a1f8bfdece11124399c2e5811d17c42f07cdd60a3c7fe3346ea  _agents.txt
 eff27f37501f08c5a39cfcc2c6c7a8382e0d0467dc4a63cf3d29bb84d5ea26d6  _approval.sh
 43d7f7db80493808631ae998e4a172bbf9ed494ce0fcbf23b0e083bbc9fed58a  _baseline.sh
-5b713fe0125c75f966127badec833c956a2b870afee57cc7247880bd3a730c9f  _command.sh
-fa8afb422b9af3b7f80580666d66e9332ed35cc3c24c7182300b3224f2a96548  _git.sh
-2829e6a5db6984fee451e242ba16beca68808a7647316cff24930aa8ec53c73a  _guard.sh
-691fa498fabf4491bad2e50f5addeaa87f04d56326fcdcca439e819c3c3129fc  _listed.sh
+939cae4451dc614eb2d2b91857c558f3c4d5e539845c1b966896fcfa40bf18c6  _command.sh
+31508226f758cec8920bb12f339a78d2a579988780ff40cb4b7c00f38b01f5ee  _git.sh
+40643b49524d4c5b46e21d56c4e264e041a8ffe3792ceff65088130a2f02d0d1  _guard.sh
+f9603a60a031f0921fb71f4cc9f7e958b26cd776763637147f4ca410eb8afb54  _listed.sh
 f5552945f77fb0d24f56bbf2e97fb64d284d9c716abf211ebcbe081cacdf8bdf  _paths.sh
-598f6460c778ca945ff4a096dc6f9cabfc94d59c477e0c597cbc69dc9d9a9630  _simple.sh
+2fc37f1cb1d60e1fd22d7e1f8522525be0e85dc849b079663230c62d808167c2  _simple.sh
 298471e25d869161087ddd4f4c0a488ca8ec5508ad01c4589e440af9274d0820  approve-on-prompt.sh
 28d13e1fbd696f79036cc1f94c3fd6aa68f4f862f0dd5f6d32191ad05392534f  guard-dispatch-model.sh
-3956974992bb18f01b6f12dff18bec45a7b57efb515999cf1e82670509549d1e  guard-merge.sh
-a8ee3b3537f1718a140bca74815dcfa5ce510bb87b62f63caebfebff090094a6  guard-release.sh
+8681e451ab68b6d0332e1b4c0c2f344efa1c92b2d543872f10724ad39ec32e41  guard-merge.sh
+a3eb7a8dfcb3bbc387008931993a59a4006e9fe6f8042f137752f4ee41ee24ce  guard-release.sh
 3364feb0f3a7892224b67e4f857bb6c085456da98c892d7199c4bbd10f122f8b  log-subagent.sh
-75ea767aff8b89199c59ad060a230bf5f0caaf050fe2bdc1dd43146d31d637fc  merge-commands.txt
+e4948628523983b30e3841f3f5f9393c391bcbb64caa9f192a081ea3ff356017  merge-commands.txt
 0d231c09ef29b1e46b774d283fad725382f33d6f3098545dc8a504bf89c40a80  protect-constitution.sh
 79f8bc840e2e691c2011c0350bd5140bad8caa4448d65ed209e79da582a075a3  protect-generated.sh
-4e0f336ed4eafecca2904fba2aab427d3e8528889aa68e9e347c4ac03dc53853  release-commands.txt
+c59dea265fb0e13092cb4ef650a436b29e34be4f18397aeaebc5408811ed3c7c  release-commands.txt
 `,
       executable: false,
     },
@@ -29024,7 +29139,19 @@ export GIT_OPTIONAL_LOCKS=0 GIT_PAGER=cat PAGER=cat
 GUARD_NAME=hook GUARD_FAIL_CODE=2 GUARD_ROOT="" GUARD_JQ_CRLF=0 GUARD_ALLOWED=0
 
 guard_fail() { printf 'specnaut %s: %s\\n' "\$GUARD_NAME" "\$1" >&2; exit "\$GUARD_FAIL_CODE"; }
-trap 'guard_fail "unexpected error at line \$LINENO — refusing rather than allowing"' ERR
+
+# _guard_err <status> <line> — the ERR trap. set -E carries it into every
+# \`\$(…)\` and subshell; there it only leaves, with the failing command's own
+# status, for the caller to judge: \`\$(git config --get alias.x)\` exiting 1
+# means "no such alias". A caller that does not handle it fails in this
+# shell, where the trap refuses. Refusing inside the substitution turned every
+# such 1 into the fail code — cmd_git read each git subcommand outside its
+# list as an alias it cannot follow — and printed a crash above a deny (cli#711).
+_guard_err() {
+  if [ "\${BASH_SUBSHELL:-0}" -gt 0 ]; then exit "\$1"; fi
+  guard_fail "unexpected error at line \$2 — refusing rather than allowing"
+}
+trap '_guard_err \$? \$LINENO' ERR
 
 # guard_allow — the ONLY way a guard lets a call through.
 guard_allow() { GUARD_ALLOWED=1; exit 0; }
@@ -29255,15 +29382,20 @@ approval_require() {
 # would run, so a rule matches what runs — not text that merely mentions it.
 #
 # A heuristic by design (plan § 6 threat model). It sees: ; && || | & and
-# newlines, ( ) \$( ) and backticks (also inside "…"), quotes and escapes,
-# comments, heredoc bodies (skipped: they are data), \`<<<\` herestrings, \`<<\`
-# inside \`\$((…))\`/\`((…))\` (a shift, not a heredoc), redirections, VAR=val
-# prefixes, the env/command/sudo/nice/timeout/xargs/… wrappers, \`source x\`,
-# the command of \`find -exec\`, and ONE level of \`sh|bash|zsh -c '…'\`. A
-# deeper \`-c\`, or \`eval\`, sets CMD_OPAQUE — and so does a line that never
-# closes: a quote, \`(\`, \`\$(\` or backtick left open, a heredoc whose body never
-# ends. Fail closed: a guard gates what it cannot read rather than guessing at
-# it. Scripts, interpreters and shell functions are not seen: the stated limit.
+# newlines, ( ) \$( ) and backticks (also inside "…"), \`if(…)\` and the other
+# reserved words before a subshell, \`[[ … ]]\` (where | ( ) < > & ; are part of
+# a word), quotes and escapes, comments, heredoc bodies (skipped: they are
+# data, once the delimiter is quoted), \`<<<\` herestrings, \`<<\` inside
+# \`\$((…))\`/\`((…))\` (a shift, not a heredoc), redirections, VAR=val prefixes,
+# the env/command/sudo/nice/timeout/xargs/… wrappers, \`source x\`, the command
+# of \`find -exec\`, and ONE level of \`sh|bash|zsh -c '…'\`. A deeper \`-c\`, or
+# \`eval\`, sets CMD_OPAQUE — and so does what it cannot read with certainty
+# (cli#711): a \`case\` inside a substitution, an unquoted heredoc body holding
+# \`\$(\` or a backtick, a zsh glob qualifier that runs code, and a line that
+# never closes: a quote, \`(\`, \`\$(\`, backtick or \`[[\` left open, a heredoc whose
+# body never ends. Fail closed: a guard gates what it cannot read rather than
+# guessing at it. Scripts, interpreters and shell functions are not seen: the
+# stated limit.
 #
 # After cmd_parse: CMD_SEGS holds one entry per simple command, its words
 # joined by CMD_SEP, the first word reduced to its basename. A substitution is
@@ -29281,7 +29413,33 @@ CMD_SEGS=()
 CMD_MOVED=0
 CMD_OPAQUE=0
 
-_cmd_word() { if [ "\$have" = 1 ] || [ -n "\$word" ]; then seg+="\$word\$CMD_SEP"; fi; word=""; have=0; }
+# _cmd_cmdpos — the word being read stands where a command word does:
+# unquoted, with nothing before it in the segment but the reserved words that
+# lead a command. Only there do \`case\`, \`[[\` and \`if(\` mean what bash reads.
+_cmd_cmdpos() {
+  local x
+  [ "\$have" = 0 ] || return 1
+  for x in \$seg; do case \$x in if | then | else | elif | do | while | until | '!' | '{' | time) ;; *) return 1 ;; esac; done
+}
+
+# _cmd_word — the word read so far joins the segment. As a command word,
+# \`[[\` opens its own mode (bk: the frame it was opened in) and \`]]\` closes it;
+# \`case\` inside a substitution is opaque: an arm's bare \`)\` would close the
+# substitution, and the arm's commands would read as words of the command
+# around it — \`echo \$(case x in *) git push;; esac)\` ran a push (cli#711).
+_cmd_word() {
+  case \$word in
+    '[[') if _cmd_cmdpos; then if [ -n "\$bk" ]; then CMD_OPAQUE=1; fi; bk="+\$stack\$bt"; fi ;;
+    ']]') if [ "\$have" = 0 ] && [ "\$bk" = "+\$stack\$bt" ]; then bk=""; fi ;;
+    case) if _cmd_cmdpos; then case \$stack in *[sd]*) CMD_OPAQUE=1 ;; esac; fi ;;
+  esac
+  if [ "\$have" = 1 ] || [ -n "\$word" ]; then seg+="\$word\$CMD_SEP"; fi
+  word="" have=0
+}
+
+# _cmd_keyword — the word read so far is a reserved word in command position,
+# so a \`(\` right after it opens a subshell: \`if(…)\`, \`then(…)\`, \`while(…)\`.
+_cmd_keyword() { case \$word in if | then | else | elif | do | while | until) _cmd_cmdpos ;; *) return 1 ;; esac; }
 _cmd_end() { _cmd_word; if [ -n "\$seg" ]; then _cmd_emit "\$seg" "\$depth"; fi; seg=""; }
 
 # A \`\$(\` or backtick opens: the command around it is set aside (sw/ss, sp deep)
@@ -29296,22 +29454,37 @@ _cmd_pop() { _cmd_end; if [ "\$sp" -gt 0 ]; then sp=\$((sp - 1)) have=1; word=\$
 _cmd_close() {
   local f=\${stack:0:1}
   stack=\${stack:1}
-  case \$f in g) word+=\$c ;; d) _cmd_pop; q='"' ;; s) _cmd_pop ;; *) _cmd_end ;; esac
+  case \$f in g) _cmd_qual; word+=\$c ;; d) _cmd_pop; q='"' ;; s) _cmd_pop ;; *) _cmd_end ;; esac
+}
+
+# _cmd_qual — the \`)\` at i-1 closes a zsh glob group. At the end of its word,
+# or opened by \`#q\`, the group is a list of glob qualifiers, and an \`e…\` or
+# \`+cmd\` among them runs code for each file the glob matches: \`ls
+# *(e:'git push':)\`. Opaque. Quoted text opens no group, so a commit message
+# never trips this.
+_cmd_qual() {
+  local g=\${word##*[(]}
+  case \$g in '#q'*) ;; *) case \${s:i:1} in '' | [[:space:]] | ';' | '&' | '|' | ')' | '<' | '>') ;; *) return 0 ;; esac ;; esac
+  case \$g in *e* | *+*) CMD_OPAQUE=1 ;; esac
 }
 
 # Skips the bodies of the heredocs opened on the line just ended. A body that
 # runs to the end of the input never closed: as likely a misread as a typo,
-# and what follows a phantom heredoc is hidden — so the line is opaque.
+# and what follows a phantom heredoc is hidden — so the line is opaque. So is
+# a body whose delimiter was not quoted, if it holds \`\$(\` or a backtick: bash
+# expands that body, and runs its substitutions (cli#711).
+# shellcheck disable=SC2016 # the \`\$(\` is matched as text, on purpose
 _cmd_heredocs() {
-  local d strip line closed
+  local d strip quoted line closed
   for d in \$heredocs; do
-    strip=\${d:0:1} d=\${d:1} closed=0
+    strip=\${d:0:1} quoted=\${d:1:1} d=\${d:2} closed=0
     while [ "\$i" -lt "\$n" ]; do
       line=\${s:i}
       line=\${line%%\$'\\n'*}
       i=\$((i + \${#line} + 1))
       if [ "\$strip" = 1 ]; then line=\${line#"\${line%%[!\$'\\t']*}"}; fi
       if [ "\$line" = "\$d" ]; then closed=1; break; fi
+      if [ "\$quoted" = 0 ]; then case \$line in *'\$('* | *'\`'*) CMD_OPAQUE=1 ;; esac; fi
     done
     if [ "\$closed" = 0 ]; then CMD_OPAQUE=1; fi
   done
@@ -29319,17 +29492,18 @@ _cmd_heredocs() {
 }
 
 # Reads the delimiter of the \`<<\` / \`<<-\` heredoc whose operator ends at i and
-# queues it for _cmd_heredocs. Quotes and escapes in it are dropped, as bash does.
+# queues it for _cmd_heredocs. Quotes and escapes in it are dropped, as bash
+# does, and recorded: any of them makes the body literal.
 _cmd_heredoc_open() {
-  local strip=0 d="" ch
+  local strip=0 quoted=0 d="" ch
   if [ "\${s:i:1}" = "-" ]; then strip=1 i=\$((i + 1)); fi
   while [ "\${s:i:1}" = " " ]; do i=\$((i + 1)); done
   while [ "\$i" -lt "\$n" ]; do
     ch=\${s:i:1}
-    case \$ch in [[:space:]] | ';' | '&' | '|' | '<' | '>' | '(' | ')') break ;; "'" | '"' | '\\') ;; *) d+=\$ch ;; esac
+    case \$ch in [[:space:]] | ';' | '&' | '|' | '<' | '>' | '(' | ')') break ;; "'" | '"' | '\\') quoted=1 ;; *) d+=\$ch ;; esac
     i=\$((i + 1))
   done
-  heredocs+="\$strip\$d\$CMD_SEP"
+  heredocs+="\$strip\$quoted\$d\$CMD_SEP"
 }
 
 # A \`(\` just opened a frame: if another follows (\`\$((\`, \`((\`), this is
@@ -29350,9 +29524,24 @@ _cmd_lt() {
   fi
 }
 
+# _cmd_test_char — inside \`[[ … ]]\`, in the frame it was opened in, c is one
+# of | ( ) < > & ; : part of a word (\`[[ \$x =~ ^(a|b)\$ ]]\`), not an operator —
+# returns 0, c kept. Only a word that is exactly \`]]\` ends the mode, before an
+# operator too (\`]];\`). A newline first: opaque.
+_cmd_test_char() {
+  [ -n "\$bk" ] && [ "\$bk" = "+\$stack\$bt" ] || return 1
+  case \$c in
+    '|' | '(' | ')' | '<' | '>' | '&' | ';')
+      if [ "\$word" != ']]' ] || [ "\$have" = 1 ]; then word+=\$c; return 0; fi
+      bk="" ;;
+    \$'\\n') CMD_OPAQUE=1 ;;
+  esac
+  return 1
+}
+
 # cmd_parse <command line> [depth]
 cmd_parse() {
-  local s=\$1 depth=\${2:-0} n=\${#1} i=0 c nx q="" word="" have=0 seg="" stack="" bt="" heredocs="" d sp=0
+  local s=\$1 depth=\${2:-0} n=\${#1} i=0 c nx q="" word="" have=0 seg="" stack="" bt="" heredocs="" d sp=0 bk=""
   local -a sw ss
   local IFS=\$CMD_SEP
   while [ "\$i" -lt "\$n" ]; do
@@ -29368,6 +29557,7 @@ cmd_parse() {
         '\`') _cmd_push; bt=d q="" ;;
         *) word+=\$c ;;
       esac
+    elif _cmd_test_char; then :
     else
       case \$c in
         '\\') if [ "\$nx" != \$'\\n' ]; then word+=\$nx have=1; fi; i=\$((i + 1)) ;;
@@ -29379,7 +29569,7 @@ cmd_parse() {
         '\$') if [ "\$nx" = "(" ]; then _cmd_push; stack="s\$stack" i=\$((i + 1)); _cmd_arith; else word+=\$c; fi ;;
         '(') case \$word in
             *'<' | *'>' | '=') _cmd_push; stack="s\$stack" ;; # <(…) >(…) =(…): a command runs inside
-            *) if [ -n "\$word" ] && [ "\$nx" != ")" ]; then word+=\$c stack="g\$stack"; else _cmd_end; stack="u\$stack"; _cmd_arith; fi ;;
+            *) if [ -n "\$word" ] && [ "\$nx" != ")" ] && ! _cmd_keyword; then word+=\$c stack="g\$stack"; else _cmd_end; stack="u\$stack"; _cmd_arith; fi ;;
           esac ;;
         ')') _cmd_close ;;
         '\`') if [ -z "\$bt" ]; then _cmd_push; bt=u; else _cmd_pop; if [ "\$bt" = d ]; then q='"'; fi; bt=""; fi ;;
@@ -29390,7 +29580,7 @@ cmd_parse() {
     fi
   done
   _cmd_end
-  if [ -n "\$q\$stack\$bt\$heredocs" ]; then CMD_OPAQUE=1; fi
+  if [ -n "\$q\$stack\$bt\$heredocs\$bk" ]; then CMD_OPAQUE=1; fi
 }
 
 # cmd_words <segment> — split a CMD_SEGS entry into the array W.
@@ -29421,11 +29611,9 @@ cmd_pos() {
 # Sourced by _command.sh. What ONE simple command runs, once cmd_parse has cut
 # it out of the line: redirections dropped, VAR=val prefixes and wrappers
 # (env, command, sudo, nice, time, timeout, xargs, flock, …) skipped, the
-# command word reduced to its basename, \`source <script>\` and \`. <script>\`
-# read as the script, each \`find -exec … ;\` read as a command of its own, and
-# \`sh|bash|zsh -c '…'\` read one level deep — the string is parsed again as a
-# command line; a second level, or a shell fed on stdin, or \`eval\`, sets
-# CMD_OPAQUE instead of being guessed at.
+# command word reduced to its basename, \`source <script>\` read as the script,
+# each \`find -exec … ;\` as a command of its own, and \`sh|bash|zsh -c '…'\` one
+# level deep — the string is parsed again as a command line.
 #
 # Unknown means opaque (cli#711, plan § 4): a wrapper is known by its
 # basename, with the options it takes and which of them take a value; any
@@ -29533,7 +29721,8 @@ _cmd_wrapper() {
   local k0=\$k j
   case \${v[k]##*/} in
     exec) _cmd_getopt cl a - ;;
-    command) _cmd_getopt pvV "" ;;
+    # -v/-V name the command and run nothing (cli#711): nothing is recorded
+    command) _cmd_getopt pvV ""; for ((j = k0 + 1; j < k; j++)); do case \${v[j]} in -*[vV]*) k=\$m ;; esac; done ;;
     builtin | nohup) _cmd_getopt "" "" ;;
     time) _cmd_getopt plavq of "--portability --verbose --append --quiet" "--output --format" ;;
     nice) _cmd_getopt 0123456789 n "" --adjustment ;;
@@ -29560,6 +29749,7 @@ _cmd_wrapper() {
 # flock's lock file, \`-c '…'\` is left for _cmd_emit, which reads the string
 # as a shell's.
 _cmd_runner() {
+  local k0=\$k
   case \${v[k]##*/} in
     timeout | gtimeout) _cmd_getopt v sk "--preserve-status --foreground --verbose" "--signal --kill-after"; k=\$((k + 1)) ;;
     caffeinate) _cmd_getopt dimsu tw ;;
@@ -29572,10 +29762,28 @@ _cmd_runner() {
     taskset) _cmd_getopt acp "" "--all-tasks --cpu-list --pid"; k=\$((k + 1)) ;;
     xargs)
       _cmd_getopt 0prtxoile adEIJLnPRSs "--null --interactive --no-run-if-empty --verbose --exit --open-tty --show-limits --replace --eof --max-lines" \\
-        "--arg-file --delimiter --max-args --max-procs --max-chars --process-slot-var" ;;
+        "--arg-file --delimiter --max-args --max-procs --max-chars --process-slot-var"
+      _cmd_xargs "\$k0" ;;
     flock) _cmd_getopt sexnouF wE "--shared --exclusive --nonblock --no-fork --close --unlock --verbose" "--timeout --conflict-exit-code"; k=\$((k + 1)) ;;
     *) return 1 ;;
   esac
+}
+
+# _cmd_xargs <index of xargs> — k: the command xargs runs, whose words stdin
+# fills in: each word holding the -I/-J replace string (-i, --replace: \`{}\`)
+# has it as \`\$\`, and a \`\$\` word ends it — \`echo merge | xargs git\` is a git
+# subcommand the shell fills in (_listed.sh), not \`git\` (cli#711).
+_cmd_xargs() {
+  local j r=""
+  for ((j = \$1 + 1; j < k; j++)); do
+    case \${v[j]} in
+      --replace) r='{}' ;; --replace=*) r=\${v[j]#*=} ;; --*) ;;
+      -*[IJ]) j=\$((j + 1)) r=\${v[j]:-} ;; -*[IJ]*) r=\${v[j]#*[IJ]} ;; -*i*) r='{}' ;;
+    esac
+  done
+  [ "\$k" -lt "\$m" ] || return 0 # no command: xargs runs echo
+  if [ -n "\$r" ]; then for ((j = k; j < m; j++)); do v[j]=\${v[j]//"\$r"/\\\$}; done; fi
+  v+=('\$') m=\$((m + 1))
 }
 
 # _cmd_shell_c <depth> [1] — v[k] is a shell (1: or flock's \`-c\`, already
@@ -29644,15 +29852,18 @@ _cmd_base() { _cmd_name "\${v[k]}"; v[k]=\$CMD_NAME; }
 _cmd_script() { if [ -n "\$1" ]; then _cmd_name "\$1"; CMD_SEGS+=("\$CMD_NAME"); fi; }
 
 # _cmd_evals — opaque when a word holds code the shell runs later, where this
-# parser never reads it: \`\$(…)\` or a backtick after a \`[\` (an array subscript
-# — let, printf -v, read, test -v and (( )) evaluate it), and a zsh \`\${(…)\`
-# whose flags hold \`e\` (the value is expanded again). A quoted word keeps that
-# text as it is; unquoted, cmd_parse already read the substitution.
+# parser never reads it: a zsh \`\${(…)\` whose flags hold \`e\` (the value is
+# expanded again), and, for a builtin that evaluates the array subscript of a
+# name it is given (let, printf -v, read, declare, test -v, …), \`\$(…)\` or a
+# backtick after a \`[\`. A quoted word keeps that text as it is; unquoted,
+# cmd_parse already read the substitution. Given to any other command, it is
+# data: \`git commit -m '[x] \$(y)'\` runs nothing (cli#711).
 # shellcheck disable=SC2016 # the \`\$(\` and \`\${(\` are matched as text, on purpose
 _cmd_evals() {
-  local x f o='\${('
+  local x f o='\${(' sub=0
+  case \${v[k]:-} in let | printf | read | test | '[' | '[[' | declare | typeset | local | export | readonly | unset | getopts | wait | mapfile | readarray | print | vared) sub=1 ;; esac
   for x in \${v[@]+"\${v[@]}"}; do
-    case \$x in *'['*'\$('* | *'['*'\`'*) CMD_OPAQUE=1; return 0 ;; esac
+    if [ "\$sub" = 1 ]; then case \$x in *'['*'\$('* | *'['*'\`'*) CMD_OPAQUE=1; return 0 ;; esac; fi
     while [[ \$x == *"\$o"* ]]; do
       x=\${x#*"\$o"} f=\${x%%')'*}
       case \$f in *e*) CMD_OPAQUE=1; return 0 ;; esac
@@ -29673,8 +29884,8 @@ _cmd_emit() {
   local -a v
   local x j k=0 m=0 IFS=\$' \\t\\n'
   _cmd_strip_redirs "\$1"
-  _cmd_evals
   _cmd_skip_prefixes
+  _cmd_evals
   if [ -n "\${CMD_ON_SEG:-}" ]; then "\$CMD_ON_SEG" "\$1"; fi
   [ "\$k" -lt "\$m" ] || return 0
   _cmd_base
@@ -29709,11 +29920,15 @@ _cmd_emit() {
 # has already reduced the command word to its basename, so it matches however
 # the script is reached (a path, \`bash x\`, \`source x\`, \`timeout 60 x\`, …).
 # The script word is matched ignoring ASCII case (a case-folding filesystem,
-# APFS or NTFS, runs \`Land-Feature.sh\`), and a command word the shell rewrites
-# after this hook has read it — a \`\$VAR\`, a substitution, a glob, a brace, a
-# zsh glob group (\`land-(feature).sh\`) — or that holds a byte outside printable
-# ASCII matches every script line: what it names is unknown here, so it is
-# gated (fail closed). An argument is never judged so: \`ls *.sh\` runs \`ls\`.
+# APFS or NTFS, runs \`Land-Feature.sh\`). A word filled in after this hook has
+# read it — by the shell (a \`\$VAR\`, a substitution, a glob, a brace, a zsh
+# glob group: \`land-(feature).sh\`), by the command (xargs' stdin, its -I
+# placeholder, find's \`{}\`, which _simple.sh leaves as \`\$\` or \`{}\`) — or that
+# holds a byte outside printable ASCII matches the line's word at its
+# position and every word after it — unquoted, or as stdin, it may be several
+# words: what it names is unknown here, so it is gated (fail closed). \`gh
+# \$(echo release) create\` and \`… | xargs gh\` are \`gh release create\`
+# (cli#711). Only at a position a line has a word for: \`ls *.sh\` runs \`ls\`.
 # \`<words> except <flag>\`: that flag anywhere in the segment exempts it.
 # \`#\` comments and blank or whitespace-only lines are skipped; a \`\\r\` (a CRLF
 # checkout) is read past.
@@ -29750,9 +29965,10 @@ listed() {
     [ -n "\${e[0]:-}" ] || continue
     ok=1
     for ((i = 0; i < \${#e[@]}; i++)); do
-      if [ "\${e[i]}" = "\${POS[i]:-}" ]; then continue; fi
-      if [ "\$i" = 0 ] && [[ \${e[0]} == *.sh ]] &&
-        { guard_ieq "\${e[0]}" "\${POS[0]:-}" || _listed_expands "\${POS[0]:-}"; }; then continue; fi
+      w=\${POS[i]:-}
+      if _listed_expands "\$w"; then break; fi
+      if [ "\${e[i]}" = "\$w" ]; then continue; fi
+      if [ "\$i" = 0 ] && [[ \${e[0]} == *.sh ]] && guard_ieq "\${e[0]}" "\$w"; then continue; fi
       ok=0
       break
     done
@@ -29774,14 +29990,20 @@ listed() {
 # guard-release). Reads one \`git\` segment the way git itself would: past its
 # global options, and through its aliases — so \`git -C x -c k=v pm\` is seen as
 # the command it runs, not as an unknown subcommand.
+# shellcheck source=_listed.sh
+. "\${BASH_SOURCE[0]%/*}/_listed.sh" || guard_fail "_listed.sh is missing beside _git.sh"
 
 # cmd_git <git words…> — skip git's global options and expand git aliases
 # (up to 5 levels), so \`git -C x -c k=v pm\` is read as the command it runs.
-# Sets GIT_SUB and GIT_ARGS; GIT_SUB is "!" for a shell alias or an alias we
-# cannot follow. git ignores an alias that shadows a builtin, so do we.
+# Sets GIT_SUB and GIT_ARGS. GIT_SUB is "!" for a subcommand this cannot
+# read — the one home of that rule, for every guard (cli#711) — and GIT_WHY
+# says which: a word the shell or the command fills in (\`git \$(…)\`, \`git
+# "\$X"\`, xargs' stdin, find's \`{}\`: _listed_expands), a shell alias, an alias
+# set on the command line, or one it cannot follow. git ignores an alias that
+# shadows a builtin, so do we.
 cmd_git() {
   shift
-  GIT_SUB="" GIT_ARGS=()
+  GIT_SUB="" GIT_ARGS=() GIT_WHY=""
   local inline_alias=0
   while [ \$# -gt 0 ]; do
     case \$1 in
@@ -29797,10 +30019,18 @@ cmd_git() {
   GIT_SUB=\$1
   shift
   GIT_ARGS=("\$@")
+  if _listed_expands "\$GIT_SUB"; then GIT_SUB="!" GIT_WHY="a git subcommand the shell or the command fills in"; return 0; fi
   # An alias set on the command line (\`git -c alias.p=push p\`) is not in any
   # config file, so \`git config --get\` cannot follow it, and how it fails
   # differs by platform: what the command runs is unknowable, so it is gated.
-  if [ "\$inline_alias" = 1 ]; then GIT_SUB="!"; return 0; fi
+  if [ "\$inline_alias" = 1 ]; then GIT_SUB="!" GIT_WHY="a git alias set on the command line"; return 0; fi
+  _git_alias
+}
+
+# _git_alias — GIT_SUB and GIT_ARGS through the aliases git would expand, from
+# the config of the repository the command runs in.
+_git_alias() {
+  GIT_WHY="a git alias that runs a shell command, or one it cannot follow"
   local level val rc
   local -a a
   for level in 1 2 3 4 5; do
@@ -30224,11 +30454,12 @@ mv -f "\$tmp" "\$stamp"
 #                        shell would expand (\$VAR, \`…\`, quotes, ?, [, {),
 #                        --all, --mirror, --delete and unknown options are
 #                        all gated
-#   gh pr merge, glab mr merge, a git shell alias, a git subcommand the shell
-#                        rewrites (\`git \$(…)\`, \`git "\$X"\`), a line it cannot read
+#   a git subcommand it cannot read (_git.sh: a shell alias, \`git \$(…)\`,
+#                        \`git "\$X"\`), a line it cannot read
 #   every command in merge-commands.txt — the scripts that land on the base
 #                        themselves (land-feature.sh, remove-spec.sh), matched
-#                        by basename however they are reached (_listed.sh)
+#                        by basename however they are reached, and gh pr
+#                        merge, glab mr merge (_listed.sh)
 # An unknown base gates every form. A gated command goes through
 # approval_gate: Claude's own prompt where it can ask, else this turn's
 # \`merge\` approval (FR-017).
@@ -30245,11 +30476,9 @@ case \${BASH_SOURCE[0]} in */*) HOOK_DIR=\${BASH_SOURCE[0]%/*} ;; *) HOOK_DIR=. 
 # shellcheck source=_command.sh
 . "\$HOOK_DIR/_command.sh"
 # shellcheck source=_git.sh
-. "\$HOOK_DIR/_git.sh"
+. "\$HOOK_DIR/_git.sh" # and _listed.sh
 # shellcheck source=_approval.sh
 . "\$HOOK_DIR/_approval.sh"
-# shellcheck source=_listed.sh
-. "\$HOOK_DIR/_listed.sh"
 guard_init guard-merge "\${1:-}" argv:.tool_input.command
 [ "\$P_TOOL" = Bash ] || guard_fail "expected a Bash tool call, got '\$P_TOOL'"
 [ -n "\${GF[0]}" ] || guard_fail "a Bash call without tool_input.command"
@@ -30266,13 +30495,11 @@ for seg in \${CMD_SEGS[@]+"\${CMD_SEGS[@]}"}; do
         merge | pull) merges=1 ;;
         push) pushes+=("\$(IFS=\$CMD_SEP; echo "\${GIT_ARGS[*]:-}")") ;;
         checkout | switch) switched=1 ;;
-        '!') reasons+=("a git alias that runs a shell command") ;;
-        *) if _listed_expands "\$GIT_SUB"; then reasons+=("a git subcommand the shell rewrites"); fi ;;
+        '!') reasons+=("\$GIT_WHY") ;;
       esac
       continue ;;
   esac
   cmd_pos
-  case "\${POS[*]:-}" in "gh pr merge"* | "glab mr merge"*) reasons+=("\${POS[0]} \${POS[1]} merge") ;; esac
   listed "\$HOOK_DIR/merge-commands.txt"
   if [ -n "\$HIT" ]; then reasons+=("\$HIT"); fi
 done
@@ -30361,7 +30588,8 @@ approval_gate merge \\
 # refs/tags/ ref, \`tag <name>\`, or a name that is a tag, or not a branch and
 # either version-shaped or created as a tag on the same line (tag.sh and
 # \`git tag\` run before the push does, so the tag does not exist yet when this
-# hook reads the command). And a line too nested to read (eval, sh -c in
+# hook reads the command). And a git subcommand it cannot read (_git.sh: a
+# shell alias, \`git \$(…)\`), or a line too nested to read (eval, sh -c in
 # sh -c, a shell fed on stdin, a line that never closes): fail closed.
 #
 # Usage: guard-release.sh <claude|codex>   (payload on stdin)
@@ -30372,11 +30600,9 @@ case \${BASH_SOURCE[0]} in */*) HOOK_DIR=\${BASH_SOURCE[0]%/*} ;; *) HOOK_DIR=. 
 # shellcheck source=_command.sh
 . "\$HOOK_DIR/_command.sh"
 # shellcheck source=_git.sh
-. "\$HOOK_DIR/_git.sh"
+. "\$HOOK_DIR/_git.sh" # and _listed.sh
 # shellcheck source=_approval.sh
 . "\$HOOK_DIR/_approval.sh"
-# shellcheck source=_listed.sh
-. "\$HOOK_DIR/_listed.sh"
 guard_init guard-release "\${1:-}" argv:.tool_input.command
 [ "\$P_TOOL" = Bash ] || guard_fail "expected a Bash tool call, got '\$P_TOOL'"
 [ -n "\${GF[0]}" ] || guard_fail "a Bash call without tool_input.command"
@@ -30425,6 +30651,7 @@ for seg in \${CMD_SEGS[@]+"\${CMD_SEGS[@]}"}; do
     case \$GIT_SUB in
       tag) tags_made=1 ;;
       push) pushes+=("\$(IFS=\$CMD_SEP; echo "\${GIT_ARGS[*]:-}")") ;;
+      '!') hits+=("\$GIT_WHY") ;;
     esac
     continue
   fi
@@ -30971,6 +31198,7 @@ tag.sh except --no-push
 release-github.sh
 release-gitlab.sh
 gh release create
+gh release new
 gh release edit
 gh release upload
 glab release create
@@ -30988,11 +31216,12 @@ gh run rerun
 # the argument of sh/bash/source, or behind timeout, env, xargs, …); how a line
 # matches lives in _listed.sh. A copy of the script under another name, a
 # task-runner alias or an interpreter that runs it is not seen — the limit a
-# hand-written script that runs \`git push\` already has. \`git merge\`, \`git
-# push\`, \`gh pr merge\` and \`glab mr merge\` are rules, not words, and live in
-# guard-merge.sh.
+# hand-written script that runs \`git push\` already has. \`git merge\` and \`git
+# push\` are rules, not words, and live in guard-merge.sh.
 land-feature.sh
 remove-spec.sh
+gh pr merge
+glab mr merge
 `,
       executable: false,
     },
@@ -31016,21 +31245,21 @@ specnaut-guide
 7a9b8bd4ecba4a1f8bfdece11124399c2e5811d17c42f07cdd60a3c7fe3346ea  _agents.txt
 eff27f37501f08c5a39cfcc2c6c7a8382e0d0467dc4a63cf3d29bb84d5ea26d6  _approval.sh
 43d7f7db80493808631ae998e4a172bbf9ed494ce0fcbf23b0e083bbc9fed58a  _baseline.sh
-5b713fe0125c75f966127badec833c956a2b870afee57cc7247880bd3a730c9f  _command.sh
-fa8afb422b9af3b7f80580666d66e9332ed35cc3c24c7182300b3224f2a96548  _git.sh
-2829e6a5db6984fee451e242ba16beca68808a7647316cff24930aa8ec53c73a  _guard.sh
-691fa498fabf4491bad2e50f5addeaa87f04d56326fcdcca439e819c3c3129fc  _listed.sh
+939cae4451dc614eb2d2b91857c558f3c4d5e539845c1b966896fcfa40bf18c6  _command.sh
+31508226f758cec8920bb12f339a78d2a579988780ff40cb4b7c00f38b01f5ee  _git.sh
+40643b49524d4c5b46e21d56c4e264e041a8ffe3792ceff65088130a2f02d0d1  _guard.sh
+f9603a60a031f0921fb71f4cc9f7e958b26cd776763637147f4ca410eb8afb54  _listed.sh
 f5552945f77fb0d24f56bbf2e97fb64d284d9c716abf211ebcbe081cacdf8bdf  _paths.sh
-598f6460c778ca945ff4a096dc6f9cabfc94d59c477e0c597cbc69dc9d9a9630  _simple.sh
+2fc37f1cb1d60e1fd22d7e1f8522525be0e85dc849b079663230c62d808167c2  _simple.sh
 298471e25d869161087ddd4f4c0a488ca8ec5508ad01c4589e440af9274d0820  approve-on-prompt.sh
 28d13e1fbd696f79036cc1f94c3fd6aa68f4f862f0dd5f6d32191ad05392534f  guard-dispatch-model.sh
-3956974992bb18f01b6f12dff18bec45a7b57efb515999cf1e82670509549d1e  guard-merge.sh
-a8ee3b3537f1718a140bca74815dcfa5ce510bb87b62f63caebfebff090094a6  guard-release.sh
+8681e451ab68b6d0332e1b4c0c2f344efa1c92b2d543872f10724ad39ec32e41  guard-merge.sh
+a3eb7a8dfcb3bbc387008931993a59a4006e9fe6f8042f137752f4ee41ee24ce  guard-release.sh
 3364feb0f3a7892224b67e4f857bb6c085456da98c892d7199c4bbd10f122f8b  log-subagent.sh
-75ea767aff8b89199c59ad060a230bf5f0caaf050fe2bdc1dd43146d31d637fc  merge-commands.txt
+e4948628523983b30e3841f3f5f9393c391bcbb64caa9f192a081ea3ff356017  merge-commands.txt
 0d231c09ef29b1e46b774d283fad725382f33d6f3098545dc8a504bf89c40a80  protect-constitution.sh
 79f8bc840e2e691c2011c0350bd5140bad8caa4448d65ed209e79da582a075a3  protect-generated.sh
-4e0f336ed4eafecca2904fba2aab427d3e8528889aa68e9e347c4ac03dc53853  release-commands.txt
+c59dea265fb0e13092cb4ef650a436b29e34be4f18397aeaebc5408811ed3c7c  release-commands.txt
 `,
       executable: false,
     },
@@ -31051,17 +31280,17 @@ a8ee3b3537f1718a140bca74815dcfa5ce510bb87b62f63caebfebff090094a6  guard-release.
         "hooks": [
           {
             "type": "command",
-            "command": "r=\$PWD; while [ -n \\"\$r\\" ] && [ ! -d \\"\$r/.specnaut/hooks\\" ]; do r=\${r%/*}; done; [ \\"\$( (sha256sum 2>/dev/null || shasum -a 256) < \\"\$r/.specnaut/hooks/SHA256SUMS\\" 2>/dev/null | cut -c1-64)\\" = \\"b8b1787542ac9d2abcac1b9b2520f759bc80d12d6b041da5ac521e0e64c71330\\" ] && (cd \\"\$r/.specnaut/hooks\\" && (sha256sum -c --status SHA256SUMS 2>/dev/null || shasum -a 256 -c --status SHA256SUMS)) && exec bash \\"\$r/.specnaut/hooks/guard-merge.sh\\" codex; echo \\"specnaut: .specnaut/hooks changed since it was trusted — run specnaut upgrade, then /hooks\\" >&2; exit 2",
+            "command": "r=\$PWD; while [ -n \\"\$r\\" ] && [ ! -d \\"\$r/.specnaut/hooks\\" ]; do r=\${r%/*}; done; [ \\"\$( (sha256sum 2>/dev/null || shasum -a 256) < \\"\$r/.specnaut/hooks/SHA256SUMS\\" 2>/dev/null | cut -c1-64)\\" = \\"f54e40d88f63dfc20bf108d23e6b006b31c5617714e2d56e496c7c91f778280d\\" ] && (cd \\"\$r/.specnaut/hooks\\" && (sha256sum -c --status SHA256SUMS 2>/dev/null || shasum -a 256 -c --status SHA256SUMS)) && exec bash \\"\$r/.specnaut/hooks/guard-merge.sh\\" codex; echo \\"specnaut: .specnaut/hooks changed since it was trusted — run specnaut upgrade, then /hooks\\" >&2; exit 2",
             "timeout": 10
           },
           {
             "type": "command",
-            "command": "r=\$PWD; while [ -n \\"\$r\\" ] && [ ! -d \\"\$r/.specnaut/hooks\\" ]; do r=\${r%/*}; done; [ \\"\$( (sha256sum 2>/dev/null || shasum -a 256) < \\"\$r/.specnaut/hooks/SHA256SUMS\\" 2>/dev/null | cut -c1-64)\\" = \\"b8b1787542ac9d2abcac1b9b2520f759bc80d12d6b041da5ac521e0e64c71330\\" ] && (cd \\"\$r/.specnaut/hooks\\" && (sha256sum -c --status SHA256SUMS 2>/dev/null || shasum -a 256 -c --status SHA256SUMS)) && exec bash \\"\$r/.specnaut/hooks/guard-release.sh\\" codex; echo \\"specnaut: .specnaut/hooks changed since it was trusted — run specnaut upgrade, then /hooks\\" >&2; exit 2",
+            "command": "r=\$PWD; while [ -n \\"\$r\\" ] && [ ! -d \\"\$r/.specnaut/hooks\\" ]; do r=\${r%/*}; done; [ \\"\$( (sha256sum 2>/dev/null || shasum -a 256) < \\"\$r/.specnaut/hooks/SHA256SUMS\\" 2>/dev/null | cut -c1-64)\\" = \\"f54e40d88f63dfc20bf108d23e6b006b31c5617714e2d56e496c7c91f778280d\\" ] && (cd \\"\$r/.specnaut/hooks\\" && (sha256sum -c --status SHA256SUMS 2>/dev/null || shasum -a 256 -c --status SHA256SUMS)) && exec bash \\"\$r/.specnaut/hooks/guard-release.sh\\" codex; echo \\"specnaut: .specnaut/hooks changed since it was trusted — run specnaut upgrade, then /hooks\\" >&2; exit 2",
             "timeout": 10
           },
           {
             "type": "command",
-            "command": "r=\$PWD; while [ -n \\"\$r\\" ] && [ ! -d \\"\$r/.specnaut/hooks\\" ]; do r=\${r%/*}; done; [ \\"\$( (sha256sum 2>/dev/null || shasum -a 256) < \\"\$r/.specnaut/hooks/SHA256SUMS\\" 2>/dev/null | cut -c1-64)\\" = \\"b8b1787542ac9d2abcac1b9b2520f759bc80d12d6b041da5ac521e0e64c71330\\" ] && (cd \\"\$r/.specnaut/hooks\\" && (sha256sum -c --status SHA256SUMS 2>/dev/null || shasum -a 256 -c --status SHA256SUMS)) && exec bash \\"\$r/.specnaut/hooks/protect-constitution.sh\\" codex; echo \\"specnaut: .specnaut/hooks changed since it was trusted — run specnaut upgrade, then /hooks\\" >&2; exit 2",
+            "command": "r=\$PWD; while [ -n \\"\$r\\" ] && [ ! -d \\"\$r/.specnaut/hooks\\" ]; do r=\${r%/*}; done; [ \\"\$( (sha256sum 2>/dev/null || shasum -a 256) < \\"\$r/.specnaut/hooks/SHA256SUMS\\" 2>/dev/null | cut -c1-64)\\" = \\"f54e40d88f63dfc20bf108d23e6b006b31c5617714e2d56e496c7c91f778280d\\" ] && (cd \\"\$r/.specnaut/hooks\\" && (sha256sum -c --status SHA256SUMS 2>/dev/null || shasum -a 256 -c --status SHA256SUMS)) && exec bash \\"\$r/.specnaut/hooks/protect-constitution.sh\\" codex; echo \\"specnaut: .specnaut/hooks changed since it was trusted — run specnaut upgrade, then /hooks\\" >&2; exit 2",
             "timeout": 10
           }
         ]
@@ -31071,12 +31300,12 @@ a8ee3b3537f1718a140bca74815dcfa5ce510bb87b62f63caebfebff090094a6  guard-release.
         "hooks": [
           {
             "type": "command",
-            "command": "r=\$PWD; while [ -n \\"\$r\\" ] && [ ! -d \\"\$r/.specnaut/hooks\\" ]; do r=\${r%/*}; done; [ \\"\$( (sha256sum 2>/dev/null || shasum -a 256) < \\"\$r/.specnaut/hooks/SHA256SUMS\\" 2>/dev/null | cut -c1-64)\\" = \\"b8b1787542ac9d2abcac1b9b2520f759bc80d12d6b041da5ac521e0e64c71330\\" ] && (cd \\"\$r/.specnaut/hooks\\" && (sha256sum -c --status SHA256SUMS 2>/dev/null || shasum -a 256 -c --status SHA256SUMS)) && exec bash \\"\$r/.specnaut/hooks/protect-generated.sh\\" codex; echo \\"specnaut: .specnaut/hooks changed since it was trusted — run specnaut upgrade, then /hooks\\" >&2; exit 2",
+            "command": "r=\$PWD; while [ -n \\"\$r\\" ] && [ ! -d \\"\$r/.specnaut/hooks\\" ]; do r=\${r%/*}; done; [ \\"\$( (sha256sum 2>/dev/null || shasum -a 256) < \\"\$r/.specnaut/hooks/SHA256SUMS\\" 2>/dev/null | cut -c1-64)\\" = \\"f54e40d88f63dfc20bf108d23e6b006b31c5617714e2d56e496c7c91f778280d\\" ] && (cd \\"\$r/.specnaut/hooks\\" && (sha256sum -c --status SHA256SUMS 2>/dev/null || shasum -a 256 -c --status SHA256SUMS)) && exec bash \\"\$r/.specnaut/hooks/protect-generated.sh\\" codex; echo \\"specnaut: .specnaut/hooks changed since it was trusted — run specnaut upgrade, then /hooks\\" >&2; exit 2",
             "timeout": 10
           },
           {
             "type": "command",
-            "command": "r=\$PWD; while [ -n \\"\$r\\" ] && [ ! -d \\"\$r/.specnaut/hooks\\" ]; do r=\${r%/*}; done; [ \\"\$( (sha256sum 2>/dev/null || shasum -a 256) < \\"\$r/.specnaut/hooks/SHA256SUMS\\" 2>/dev/null | cut -c1-64)\\" = \\"b8b1787542ac9d2abcac1b9b2520f759bc80d12d6b041da5ac521e0e64c71330\\" ] && (cd \\"\$r/.specnaut/hooks\\" && (sha256sum -c --status SHA256SUMS 2>/dev/null || shasum -a 256 -c --status SHA256SUMS)) && exec bash \\"\$r/.specnaut/hooks/protect-constitution.sh\\" codex; echo \\"specnaut: .specnaut/hooks changed since it was trusted — run specnaut upgrade, then /hooks\\" >&2; exit 2",
+            "command": "r=\$PWD; while [ -n \\"\$r\\" ] && [ ! -d \\"\$r/.specnaut/hooks\\" ]; do r=\${r%/*}; done; [ \\"\$( (sha256sum 2>/dev/null || shasum -a 256) < \\"\$r/.specnaut/hooks/SHA256SUMS\\" 2>/dev/null | cut -c1-64)\\" = \\"f54e40d88f63dfc20bf108d23e6b006b31c5617714e2d56e496c7c91f778280d\\" ] && (cd \\"\$r/.specnaut/hooks\\" && (sha256sum -c --status SHA256SUMS 2>/dev/null || shasum -a 256 -c --status SHA256SUMS)) && exec bash \\"\$r/.specnaut/hooks/protect-constitution.sh\\" codex; echo \\"specnaut: .specnaut/hooks changed since it was trusted — run specnaut upgrade, then /hooks\\" >&2; exit 2",
             "timeout": 10
           }
         ]
@@ -31086,7 +31315,7 @@ a8ee3b3537f1718a140bca74815dcfa5ce510bb87b62f63caebfebff090094a6  guard-release.
         "hooks": [
           {
             "type": "command",
-            "command": "r=\$PWD; while [ -n \\"\$r\\" ] && [ ! -d \\"\$r/.specnaut/hooks\\" ]; do r=\${r%/*}; done; [ \\"\$( (sha256sum 2>/dev/null || shasum -a 256) < \\"\$r/.specnaut/hooks/SHA256SUMS\\" 2>/dev/null | cut -c1-64)\\" = \\"b8b1787542ac9d2abcac1b9b2520f759bc80d12d6b041da5ac521e0e64c71330\\" ] && (cd \\"\$r/.specnaut/hooks\\" && (sha256sum -c --status SHA256SUMS 2>/dev/null || shasum -a 256 -c --status SHA256SUMS)) && exec bash \\"\$r/.specnaut/hooks/guard-dispatch-model.sh\\" codex; echo \\"specnaut: .specnaut/hooks changed since it was trusted — run specnaut upgrade, then /hooks\\" >&2; exit 2",
+            "command": "r=\$PWD; while [ -n \\"\$r\\" ] && [ ! -d \\"\$r/.specnaut/hooks\\" ]; do r=\${r%/*}; done; [ \\"\$( (sha256sum 2>/dev/null || shasum -a 256) < \\"\$r/.specnaut/hooks/SHA256SUMS\\" 2>/dev/null | cut -c1-64)\\" = \\"f54e40d88f63dfc20bf108d23e6b006b31c5617714e2d56e496c7c91f778280d\\" ] && (cd \\"\$r/.specnaut/hooks\\" && (sha256sum -c --status SHA256SUMS 2>/dev/null || shasum -a 256 -c --status SHA256SUMS)) && exec bash \\"\$r/.specnaut/hooks/guard-dispatch-model.sh\\" codex; echo \\"specnaut: .specnaut/hooks changed since it was trusted — run specnaut upgrade, then /hooks\\" >&2; exit 2",
             "timeout": 10
           }
         ]
@@ -31097,7 +31326,7 @@ a8ee3b3537f1718a140bca74815dcfa5ce510bb87b62f63caebfebff090094a6  guard-release.
         "hooks": [
           {
             "type": "command",
-            "command": "r=\$PWD; while [ -n \\"\$r\\" ] && [ ! -d \\"\$r/.specnaut/hooks\\" ]; do r=\${r%/*}; done; [ \\"\$( (sha256sum 2>/dev/null || shasum -a 256) < \\"\$r/.specnaut/hooks/SHA256SUMS\\" 2>/dev/null | cut -c1-64)\\" = \\"b8b1787542ac9d2abcac1b9b2520f759bc80d12d6b041da5ac521e0e64c71330\\" ] && (cd \\"\$r/.specnaut/hooks\\" && (sha256sum -c --status SHA256SUMS 2>/dev/null || shasum -a 256 -c --status SHA256SUMS)) && exec bash \\"\$r/.specnaut/hooks/approve-on-prompt.sh\\" codex; echo \\"specnaut: .specnaut/hooks changed since it was trusted — run specnaut upgrade, then /hooks\\" >&2; exit 0",
+            "command": "r=\$PWD; while [ -n \\"\$r\\" ] && [ ! -d \\"\$r/.specnaut/hooks\\" ]; do r=\${r%/*}; done; [ \\"\$( (sha256sum 2>/dev/null || shasum -a 256) < \\"\$r/.specnaut/hooks/SHA256SUMS\\" 2>/dev/null | cut -c1-64)\\" = \\"f54e40d88f63dfc20bf108d23e6b006b31c5617714e2d56e496c7c91f778280d\\" ] && (cd \\"\$r/.specnaut/hooks\\" && (sha256sum -c --status SHA256SUMS 2>/dev/null || shasum -a 256 -c --status SHA256SUMS)) && exec bash \\"\$r/.specnaut/hooks/approve-on-prompt.sh\\" codex; echo \\"specnaut: .specnaut/hooks changed since it was trusted — run specnaut upgrade, then /hooks\\" >&2; exit 0",
             "timeout": 10
           }
         ]
@@ -31108,7 +31337,7 @@ a8ee3b3537f1718a140bca74815dcfa5ce510bb87b62f63caebfebff090094a6  guard-release.
         "hooks": [
           {
             "type": "command",
-            "command": "r=\$PWD; while [ -n \\"\$r\\" ] && [ ! -d \\"\$r/.specnaut/hooks\\" ]; do r=\${r%/*}; done; [ \\"\$( (sha256sum 2>/dev/null || shasum -a 256) < \\"\$r/.specnaut/hooks/SHA256SUMS\\" 2>/dev/null | cut -c1-64)\\" = \\"b8b1787542ac9d2abcac1b9b2520f759bc80d12d6b041da5ac521e0e64c71330\\" ] && (cd \\"\$r/.specnaut/hooks\\" && (sha256sum -c --status SHA256SUMS 2>/dev/null || shasum -a 256 -c --status SHA256SUMS)) && exec bash \\"\$r/.specnaut/hooks/approve-on-prompt.sh\\" codex; echo \\"specnaut: .specnaut/hooks changed since it was trusted — run specnaut upgrade, then /hooks\\" >&2; exit 0",
+            "command": "r=\$PWD; while [ -n \\"\$r\\" ] && [ ! -d \\"\$r/.specnaut/hooks\\" ]; do r=\${r%/*}; done; [ \\"\$( (sha256sum 2>/dev/null || shasum -a 256) < \\"\$r/.specnaut/hooks/SHA256SUMS\\" 2>/dev/null | cut -c1-64)\\" = \\"f54e40d88f63dfc20bf108d23e6b006b31c5617714e2d56e496c7c91f778280d\\" ] && (cd \\"\$r/.specnaut/hooks\\" && (sha256sum -c --status SHA256SUMS 2>/dev/null || shasum -a 256 -c --status SHA256SUMS)) && exec bash \\"\$r/.specnaut/hooks/approve-on-prompt.sh\\" codex; echo \\"specnaut: .specnaut/hooks changed since it was trusted — run specnaut upgrade, then /hooks\\" >&2; exit 0",
             "timeout": 10
           }
         ]
@@ -31119,7 +31348,7 @@ a8ee3b3537f1718a140bca74815dcfa5ce510bb87b62f63caebfebff090094a6  guard-release.
         "hooks": [
           {
             "type": "command",
-            "command": "r=\$PWD; while [ -n \\"\$r\\" ] && [ ! -d \\"\$r/.specnaut/hooks\\" ]; do r=\${r%/*}; done; [ \\"\$( (sha256sum 2>/dev/null || shasum -a 256) < \\"\$r/.specnaut/hooks/SHA256SUMS\\" 2>/dev/null | cut -c1-64)\\" = \\"b8b1787542ac9d2abcac1b9b2520f759bc80d12d6b041da5ac521e0e64c71330\\" ] && (cd \\"\$r/.specnaut/hooks\\" && (sha256sum -c --status SHA256SUMS 2>/dev/null || shasum -a 256 -c --status SHA256SUMS)) && exec bash \\"\$r/.specnaut/hooks/log-subagent.sh\\" start; echo \\"specnaut: .specnaut/hooks changed since it was trusted — run specnaut upgrade, then /hooks\\" >&2; exit 0",
+            "command": "r=\$PWD; while [ -n \\"\$r\\" ] && [ ! -d \\"\$r/.specnaut/hooks\\" ]; do r=\${r%/*}; done; [ \\"\$( (sha256sum 2>/dev/null || shasum -a 256) < \\"\$r/.specnaut/hooks/SHA256SUMS\\" 2>/dev/null | cut -c1-64)\\" = \\"f54e40d88f63dfc20bf108d23e6b006b31c5617714e2d56e496c7c91f778280d\\" ] && (cd \\"\$r/.specnaut/hooks\\" && (sha256sum -c --status SHA256SUMS 2>/dev/null || shasum -a 256 -c --status SHA256SUMS)) && exec bash \\"\$r/.specnaut/hooks/log-subagent.sh\\" start; echo \\"specnaut: .specnaut/hooks changed since it was trusted — run specnaut upgrade, then /hooks\\" >&2; exit 0",
             "timeout": 10
           }
         ]
@@ -31130,7 +31359,7 @@ a8ee3b3537f1718a140bca74815dcfa5ce510bb87b62f63caebfebff090094a6  guard-release.
         "hooks": [
           {
             "type": "command",
-            "command": "r=\$PWD; while [ -n \\"\$r\\" ] && [ ! -d \\"\$r/.specnaut/hooks\\" ]; do r=\${r%/*}; done; [ \\"\$( (sha256sum 2>/dev/null || shasum -a 256) < \\"\$r/.specnaut/hooks/SHA256SUMS\\" 2>/dev/null | cut -c1-64)\\" = \\"b8b1787542ac9d2abcac1b9b2520f759bc80d12d6b041da5ac521e0e64c71330\\" ] && (cd \\"\$r/.specnaut/hooks\\" && (sha256sum -c --status SHA256SUMS 2>/dev/null || shasum -a 256 -c --status SHA256SUMS)) && exec bash \\"\$r/.specnaut/hooks/log-subagent.sh\\" stop; echo \\"specnaut: .specnaut/hooks changed since it was trusted — run specnaut upgrade, then /hooks\\" >&2; exit 0",
+            "command": "r=\$PWD; while [ -n \\"\$r\\" ] && [ ! -d \\"\$r/.specnaut/hooks\\" ]; do r=\${r%/*}; done; [ \\"\$( (sha256sum 2>/dev/null || shasum -a 256) < \\"\$r/.specnaut/hooks/SHA256SUMS\\" 2>/dev/null | cut -c1-64)\\" = \\"f54e40d88f63dfc20bf108d23e6b006b31c5617714e2d56e496c7c91f778280d\\" ] && (cd \\"\$r/.specnaut/hooks\\" && (sha256sum -c --status SHA256SUMS 2>/dev/null || shasum -a 256 -c --status SHA256SUMS)) && exec bash \\"\$r/.specnaut/hooks/log-subagent.sh\\" stop; echo \\"specnaut: .specnaut/hooks changed since it was trusted — run specnaut upgrade, then /hooks\\" >&2; exit 0",
             "timeout": 10
           }
         ]
