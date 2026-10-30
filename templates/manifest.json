@@ -1842,6 +1842,12 @@
     {
       "category": "spec-root",
       "name": "specify",
+      "suffix": "scripts/powershell/template-resolution.ps1",
+      "source": "core/specnaut/scripts/powershell/template-resolution.ps1"
+    },
+    {
+      "category": "spec-root",
+      "name": "specify",
       "suffix": "scripts/powershell/create-new-feature.ps1",
       "source": "core/specnaut/scripts/powershell/create-new-feature.ps1"
     },
