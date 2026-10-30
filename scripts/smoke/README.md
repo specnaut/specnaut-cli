@@ -42,7 +42,8 @@ difference.
 ### What "the working tree" means — three sources, one pathspec
 
 The collected set is the de-duplicated union of three git queries, all scoped by the same
-`SURFACE_PATHSPEC` and all sharing the same `GIT_SRC` invocation prefix:
+`SURFACE_PATHSPEC` and all sharing the same `GIT_SRC` invocation prefix. All three live in
+`_audit_collect.sh`, which `audit.sh` sources:
 
 1. **tracked, changed since the baseline** — `git diff --diff-filter=AMR "$SINCE..HEAD"`.
 2. **staged but not committed** — `git diff --diff-filter=AMR --cached HEAD`.
@@ -62,8 +63,8 @@ path a committed one is.
 `--exclude-standard` is what makes an ignored file invisible, and it reads three sources: the tree's
 `.gitignore` files, `$GIT_DIR/info/exclude`, and the user's machine-global excludes file. The third
 is pinned out with `-c core.excludesFile=/dev/null`, so the verdict is a property of the tree rather
-than of the laptop. This is `scripts/smoke/audit.sh`'s decision; **this document is derived from
-it**, and where the two disagree the script wins.
+than of the laptop. This is the decision of `scripts/smoke/audit.sh` (in `_audit_collect.sh`);
+**this document is derived from it**, and where the two disagree the script wins.
 
 | Finding                           | What it means                                                                                                                                                                                                                                  |
 | :-------------------------------- | :--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
