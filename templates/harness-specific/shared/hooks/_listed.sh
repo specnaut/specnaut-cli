@@ -9,12 +9,12 @@
 # `gh release create`. A first word ending in `.sh` is a script: _command.sh
 # has already reduced the command word to its basename, so it matches however
 # the script is reached (a path, `bash x`, `source x`, `timeout 60 x`, …).
-# The script word is matched ignoring case (a case-folding filesystem, APFS or
-# NTFS, runs `Land-Feature.sh`), and a command word the shell rewrites after
-# this hook has read it — a `$VAR`, a substitution, a glob, a brace, a zsh
-# glob group (`land-(feature).sh`) — matches
-# every script line: what it names is unknown here, so it is gated (fail
-# closed). An argument is never judged so: `ls *.sh` runs `ls`.
+# The script word is matched ignoring ASCII case (a case-folding filesystem,
+# APFS or NTFS, runs `Land-Feature.sh`), and a command word the shell rewrites
+# after this hook has read it — a `$VAR`, a substitution, a glob, a brace, a
+# zsh glob group (`land-(feature).sh`) — or that holds a byte outside printable
+# ASCII matches every script line: what it names is unknown here, so it is
+# gated (fail closed). An argument is never judged so: `ls *.sh` runs `ls`.
 # `<words> except <flag>`: that flag anywhere in the segment exempts it.
 # `#` comments and blank or whitespace-only lines are skipped; a `\r` (a CRLF
 # checkout) is read past.
@@ -22,8 +22,14 @@
 # _listed_expands <word> — the shell rewrites it before it runs: a `$`, a
 # substitution (_command.sh leaves a `$` where one stood), `*`, `?`, a `(`
 # (zsh globs `a(b).sh`), or a bracket or brace pair. A lone `[` or `{` is
-# literal — `[` is test(1).
-_listed_expands() { case $1 in *'$'* | *'`'* | *'*'* | *'?'* | *'('* | *'['*']'* | *'{'*'}'*) return 0 ;; esac; return 1; }
+# literal — `[` is test(1). Or it holds a byte that is not printable ASCII
+# (LC_ALL=C, set by _guard.sh): APFS folds `land-feature.ſh` (U+017F) to the
+# script, and no fold this hook could do would match every filesystem's — so
+# it does not fold, it gates (cli#711).
+_listed_expands() {
+  case $1 in *'$'* | *'`'* | *'*'* | *'?'* | *'('* | *'['*']'* | *'{'*'}'* | *[![:print:]]*) return 0 ;; esac
+  return 1
+}
 
 # listed <list file> — HIT: the entry of the list the segment (W, and POS:
 # its words without options) runs, else "". Always returns 0 and is called
