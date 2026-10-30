@@ -21,9 +21,11 @@
 #                        merge, glab mr merge (_listed.sh)
 #   a line that sets or clears what the landing hold below reads — the
 #                        session id, XDG_STATE_HOME, env -i (CMD_SCRUB)
-# The mode and the base are the project's the gated commands run in (cli#710):
-# after a `cd`, its literal target's — see cd_step below. An unknown base
-# gates every form. Every gated reason goes through one arm,
+# A `cd` can only tighten this (cli#710): the mode is read for the session's
+# project AND for each folder a cd on the line names, and the line is inert
+# only if every one reads `auto`. A target's mode is read by this project's
+# own reader (`merge-mode.sh --project`), never by a script under the target.
+# The base is always the session's. An unknown base gates every form. Every gated reason goes through one arm,
 # approval_require (spec 048 § 8): denied unless this turn's prompt approved
 # `merge`, in Claude's ask modes too — a click on a permission prompt is not
 # the user's word — and, with that approval, Claude's own prompt once where it
@@ -51,48 +53,31 @@ guard_init guard-merge "${1:-}" argv:.tool_input.command
 [ "$P_TOOL" = Bash ] || guard_fail "expected a Bash tool call, got '$P_TOOL'"
 [ -n "${GF[0]}" ] || guard_fail "a Bash call without tool_input.command"
 
-# Where the gated commands run (cli#710). A `cd` moves what lands only if it
-# runs in this shell, unconditionally, before anything else on the line: the
-# leading run of `cd`/`pushd`/`popd`, each bare (VAR= prefixes only — `env cd`
-# runs no builtin), outside any subshell, substitution or `-c` string, joined
-# by `&&`, `;` or a newline. Counted per raw segment (CMD_ON_SEG, cmd_parse's
-# locals by dynamic scope: c/nx the character that ended it, sp the open
-# substitutions, stack the open frames); a cd not counted — after `false &&`,
-# in `( )` or `$( )`, piped, in a function body — leaves the line judged by
-# every state. A `-c` string or a `find -exec` is read after the command
-# holding it, which already ended the run.
-CD_LEAD=1 CD_TRUSTED=0 CD_SEEN=0 CD_DIR="" CD_STATES=()
-# shellcheck disable=SC2154,SC2329 # cmd_parse's locals; called through CMD_ON_SEG
-_cd_seg() {
-  local j
-  case ${v[k]:-} in cd | pushd | popd) ;; *) CD_LEAD=0; return 0 ;; esac
-  for ((j = 0; j < k; j++)); do [[ ${v[j]} =~ ^[A-Za-z_][A-Za-z0-9_]*= ]] || CD_LEAD=0; done
-  case $c:$nx in '|':* | ')':* | '(':*) CD_LEAD=0 ;; '&':'&') ;; '&':*) CD_LEAD=0 ;; esac
-  if [ "$CD_LEAD" = 1 ] && [ "$sp" = 0 ] && [ -z "$stack" ]; then CD_TRUSTED=$((CD_TRUSTED + 1)); else CD_LEAD=0; fi
-}
-CMD_ON_SEG=_cd_seg
 cmd_parse "${GF[0]}"
 
-# cd_step <cd|pushd|popd> <args…> — CD_DIR: the directory after it, as this
-# shell resolves it, or `?` when that is not certain: a non-literal word ($X,
-# a substitution, ~, a glob), `-`, no operand or two, an option other than
-# -L/-P, popd, a pushd option, a relative name CDPATH may redirect, a
-# directory that does not exist. After `?`, only an absolute target is named.
+# The folders a cd on the line names (cli#710), wherever the cd sits — in a
+# subshell, a substitution, a `-c` string, behind a wrapper: each is judged
+# beside the session's project, never instead of it, so no reading of where
+# a cd takes effect can loosen the hold. `?` for one this cannot name.
+CD_DIR="" CD_DIRS=()
+
+# cd_step <cd|pushd|popd> <args…> — CD_DIR: the folder after it, carried as
+# the shell carries it: logical, as cd is by default, physical after -P. `?`
+# when that is not certain: a non-literal word ($X, a substitution, ~, a glob),
+# `-`, no operand or two, an option other than -L/-P, popd, a pushd option, a
+# relative name CDPATH may redirect, a folder that does not exist. A step
+# from `?` needs no case: the `?` already holds the line.
 cd_step() {
-  local a t="" n=0 from=${CD_DIR:-$GUARD_CWD}
-  CD_SEEN=$((CD_SEEN + 1)) CD_DIR='?'
+  local a t="" n=0 p="" from=${CD_DIR:-$GUARD_CWD}
+  CD_DIR='?'
   for a in "${@:2}"; do
-    case $1:$a in popd:*) n=9 ;; *:--) ;; cd:-L | cd:-P) ;; *:-* | *:+*) n=9 ;; *) t=$a n=$((n + 1)) ;; esac
+    case $1:$a in popd:*) n=9 ;; *:--) ;; cd:-L) p="" ;; cd:-P) p=-P ;; *:-* | *:+*) n=9 ;; *) t=$a n=$((n + 1)) ;; esac
   done
   if [ "$n" = 1 ] && [[ $t =~ ^[A-Za-z0-9._/@+,-]+$ ]]; then
-    case $t in
-      /*) from=/ ;;
-      . | .. | ./* | ../*) [ "$from" != '?' ] || t="" ;;
-      *) if [ "$from" = '?' ] || [ -n "${CDPATH:-}" ] || [[ ${GF[0]} == *CDPATH* ]]; then t=""; fi ;;
-    esac
-    if [ -n "$t" ] && a=$(cd -- "$from" 2>/dev/null && CDPATH='' cd -- "$t" 2>/dev/null && pwd -P); then CD_DIR=$a; fi
+    case $t in /* | . | .. | ./* | ../*) ;; *) if [ -n "${CDPATH:-}" ] || [[ ${GF[0]} == *CDPATH* ]]; then t=""; fi ;; esac
+    if [ -n "$t" ] && a=$(cd -- "$from" 2>/dev/null && CDPATH='' cd ${p:+"$p"} -- "$t" 2>/dev/null && pwd); then CD_DIR=$a; fi
   fi
-  CD_STATES+=("$CD_DIR")
+  CD_DIRS+=("$CD_DIR")
 }
 
 reasons=() pushes=() merges=0 switched=0
@@ -119,12 +104,14 @@ if [ "$CMD_OPAQUE" = 1 ]; then reasons+=("a command it cannot read (eval, sh -c 
 if [ "$CMD_SCRUB" = 1 ]; then reasons+=("a command that sets or clears what the landing scripts' hold reads (CLAUDE_CODE_SESSION_ID, CODEX_SESSION_ID, XDG_STATE_HOME, env -i)"); fi
 if [ "$merges" = 0 ] && [ ${#pushes[@]} = 0 ] && [ ${#reasons[@]} = 0 ]; then guard_allow; fi
 
-# cd_project <dir> — CD_PROJ: the Specnaut project <dir> is in — the nearest
-# folder holding .specnaut/scripts/bash/merge-mode.sh, up to its git toplevel
-# (a project without a .git of its own reads its own mode, as guard_root does).
-# Fails outside a git repository, or in one that is no Specnaut project.
+# cd_project <dir> — CD_PROJ: the Specnaut project <dir> is in, physically —
+# the nearest folder holding .specnaut/scripts/bash/merge-mode.sh (looked at,
+# never run), up to its git toplevel: a project without a .git of its own is
+# its own, as guard_root has it. Fails outside a git repository, or in one
+# that is no Specnaut project.
 cd_project() {
-  local d=$1 top
+  local d top
+  d=$(cd -- "$1" 2>/dev/null && pwd -P) || return 1
   top=$(guard_git -C "$d" rev-parse --show-toplevel 2>/dev/null) || return 1
   guard_path top "$top"
   while [ ! -f "$d/.specnaut/scripts/bash/merge-mode.sh" ]; do
@@ -134,24 +121,20 @@ cd_project() {
   CD_PROJ=$d
 }
 
-# The projects that may be landed on: the session's, with no cd on the line;
-# the last cd's, when every cd is in the leading run; else the session's and
-# every state the line's cds pass through. Any of them not on auto holds the
-# line, and its base is the one the reasons name. Unnamed (`?`): manual.
+# Every candidate read by the session's own reader; one not on auto, or one
+# with no project to read (`?`, no repository, no Specnaut), holds the line.
 guard_root
-cands=("$GUARD_ROOT") mode=auto proj=""
-if [ "$CD_SEEN" -gt 0 ]; then
-  if [ "$CD_SEEN" = "$CD_TRUSTED" ]; then cands=("$CD_DIR"); else cands+=("${CD_STATES[@]}"); fi
-fi
-for d in "${cands[@]}"; do
-  if [ "$d" = "$GUARD_ROOT" ]; then CD_PROJ=$d
-  elif [ "$d" = '?' ] || ! cd_project "$d"; then mode=manual proj=""; break; fi
-  mode=$(cd "$CD_PROJ" && bash .specnaut/scripts/bash/merge-mode.sh --strict 2>/dev/null) || mode=manual
-  if [ "$mode" != auto ]; then proj=$CD_PROJ; break; fi
+mode=auto
+for d in "$GUARD_ROOT" ${CD_DIRS[@]+"${CD_DIRS[@]}"}; do
+  a=()
+  if [ "$d" = '?' ] || { [ "$d" != "$GUARD_ROOT" ] && ! cd_project "$d"; }; then mode=manual; break; fi
+  if [ "$d" != "$GUARD_ROOT" ]; then a=(--project "$CD_PROJ"); fi
+  mode=$(cd "$GUARD_ROOT" && bash .specnaut/scripts/bash/merge-mode.sh --strict ${a[@]+"${a[@]}"} 2>/dev/null) || mode=manual
+  [ "$mode" = auto ] || break
 done
 [ "$mode" != auto ] || guard_allow
 
-if [ -z "$proj" ] || ! base=$(cd "$proj" && bash .specnaut/scripts/bash/base-branch.sh 2>/dev/null); then base=""; fi
+if ! base=$(cd "$GUARD_ROOT" && bash .specnaut/scripts/bash/base-branch.sh 2>/dev/null); then base=""; fi
 if ! head=$(guard_git -C "$GUARD_CWD" symbolic-ref --quiet --short HEAD 2>/dev/null); then head=""; fi
 
 # lands_on_base <ref> — the ref, as a push destination, names the base branch.
