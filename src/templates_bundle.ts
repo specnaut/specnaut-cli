@@ -11210,8 +11210,9 @@ It fixes nothing: unblocking, re-dispatching or correcting a false completion is
 #   - event / state / done_criteria_met / verdicts are checked against their
 #     enums, agent / session / handoff_target against \`^[A-Za-z0-9:_.-]{1,64}\$\`,
 #     ts against ISO-8601; anything else prints as \`invalid\` and is counted;
-#   - every printed value is stripped of C0/C1 controls, U+2028/U+2029 and the
-#     bidi overrides U+202A–U+202E / U+2066–U+2069, and capped at 64 characters.
+#   - every printed value is stripped of C0/C1 controls, U+2028/U+2029, the
+#     bidi overrides U+202A–U+202E / U+2066–U+2069 and the invisible marks
+#     (LRM/RLM, ALM, zero-width, U+FEFF, tags), and capped at 64 characters.
 #
 # Exit codes:
 #   0  the report — or "no ledger yet", which is not an error
@@ -11257,13 +11258,18 @@ fi
 read -r -d '' PROGRAM <<'JQ' || true
 def STATES: ["in_progress","blocked","awaiting_review","awaiting_qa","awaiting_user","done","failed"];
 
-# Printable only, and bounded: drop C0 (and DEL), C1, U+2028/U+2029 and the
-# bidi overrides, then cap at 64 code points.
+# Printable only, and bounded: drop C0 (and DEL), C1, U+2028/U+2029, the
+# bidi overrides and isolates, and every mark a model reads but a terminal
+# does not show (cli#713) — ALM U+061C, U+200B–U+200F (zero-width space,
+# non-joiner and joiner, LRM, RLM), U+2060–U+2064 (word joiner, invisible
+# operators), U+FEFF and the tag block U+E0000–U+E007F; then cap at 64.
 def clean:
   tostring | explode
   | map(select((. >= 32 and . < 127)
-      or (. > 159 and . != 8232 and . != 8233
-          and (. < 8234 or . > 8238) and (. < 8294 or . > 8297))))
+      or (. > 159 and . != 1564 and (. < 8203 or . > 8207)
+          and . != 8232 and . != 8233 and (. < 8234 or . > 8238)
+          and (. < 8288 or . > 8292) and (. < 8294 or . > 8297)
+          and . != 65279 and (. < 917504 or . > 917631))))
   | .[:64] | implode;
 
 def enumv(\$allowed):
