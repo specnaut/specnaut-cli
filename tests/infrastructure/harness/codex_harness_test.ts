@@ -131,6 +131,7 @@ Deno.test("CodexHarness names the family, pins no model, and maps the effort", (
     agent("no-model", null, "high"),
     agent("inherit", "inherit", "inherit"),
     agent("weird", "gpt-9-ultra", "cosmic"),
+    agent("cased", "Opus", "high"),
   ];
   const mapped = new CodexHarness().mapBundle(core, {
     backlogBackend: "local",
@@ -153,6 +154,8 @@ Deno.test("CodexHarness names the family, pins no model, and maps the effort", (
   assertEquals(family("mid"), "Terra");
   assertEquals(family("light"), "Luna");
   assertEquals(family("top"), "Astra");
+  // The tier is normalised once: the family and the comment read the same value.
+  assert(file("cased").startsWith("# Model family: Sol (opus on Claude Code)\n"), file("cased"));
   // Absent / inherit / unrecognised: no family named, no guess.
   assertEquals(family("no-model"), null);
   assertEquals(family("inherit"), null);

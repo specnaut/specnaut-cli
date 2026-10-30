@@ -43,7 +43,8 @@ function toCodexSubagentToml(entry: CoreEntry): string {
   // family is a comment, so the agent runs on the session's model and the
   // user still sees which family it was written for.
   const { description, model, effort, body } = parseAgentFrontmatter(entry.content);
-  const family = codexFamilyOf(model);
+  const tier = model?.trim().toLowerCase() ?? null;
+  const family = codexFamilyOf(tier);
   const reasoning = effortToCodexReasoning(effort);
   const toml = stringifyToml({
     name: entry.name,
@@ -51,9 +52,7 @@ function toCodexSubagentToml(entry: CoreEntry): string {
     ...(reasoning ? { model_reasoning_effort: reasoning } : {}),
     developer_instructions: body,
   });
-  return family === null
-    ? toml
-    : `# Model family: ${family} (${model!.trim().toLowerCase()} on Claude Code)\n${toml}`;
+  return family === null ? toml : `# Model family: ${family} (${tier} on Claude Code)\n${toml}`;
 }
 
 export class CodexHarness implements Harness {
