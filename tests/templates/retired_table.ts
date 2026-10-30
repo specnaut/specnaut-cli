@@ -67,3 +67,58 @@ export function retiredAddresses(section: string = retiredSection()): RetiredAdd
   }
   return out;
 }
+
+/**
+ * Every address a successor cell names, as skill + verb (cli#709). A cell can
+ * name several (`/task` (`list`, `next`, …)) and carry arguments
+ * (`/task audit --security`, `/task plan <feature>`); reading only the first
+ * token, exactly, let a retired verb hide behind either. A bare verb token
+ * belongs to the last skill named before it; an argument is dropped.
+ */
+export function successorAddresses(cell: string): string[] {
+  const out: string[] = [];
+  let skill: string | null = null;
+  for (const [, token] of cell.matchAll(/`([^`]+)`/g)) {
+    const [head, next] = token.trim().split(/\s+/);
+    const isVerb = (w: string | undefined) => w !== undefined && /^[a-z][a-z-]*$/.test(w);
+    if (head.startsWith("/")) {
+      skill = head;
+      out.push(isVerb(next) ? `${head} ${next}` : head);
+    } else if (skill !== null && isVerb(head)) out.push(`${skill} ${head}`);
+  }
+  return out;
+}
+
+const esc = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+/**
+ * Every spelling a harness gives the address. A whole retired skill `S` is
+ * `/S` (Claude), `$S` (Codex), `specnaut-S` (namespaced: Codex, Cursor,
+ * OpenCode, Copilot) and `specnaut-plugin:S` (the plugin). A retired verb `V`
+ * of `/specnaut` is `/specnaut V`, `$specnaut V`, `/specnaut-V` on a flat
+ * layout, and `specnaut-plugin:specnaut V`.
+ *
+ * The lookbehind keeps a path out (`skills/board/`, `.specnaut/addenda/board/`):
+ * an address is a command a person types, not a directory name.
+ */
+export function patternFor(a: RetiredAddress): RegExp {
+  const before = "(?<![A-Za-z0-9_./:-])";
+  const plugin = "[/$]?specnaut-plugin:";
+  if (a.verb === null) {
+    const s = esc(a.skill);
+    const after = "(?![A-Za-z0-9_-])";
+    return new RegExp(
+      `${before}(?:[/$]|${plugin}|[/$]?specnaut-)${s}${after}`,
+      "g",
+    );
+  }
+  const s = esc(a.skill);
+  const v = esc(a.verb);
+  // `-` may follow: `/specnaut audit-security` is a spelling of the retired
+  // `/specnaut audit` ("any axis or spelling"), not a different address.
+  const after = "(?![A-Za-z0-9_])";
+  return new RegExp(
+    `${before}(?:[/$]|${plugin})${s}[ -]${v}${after}|${before}[/$]${s}-${v}${after}`,
+    "g",
+  );
+}

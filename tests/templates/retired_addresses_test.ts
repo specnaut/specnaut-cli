@@ -2,7 +2,12 @@ import { assert, assertEquals } from "@std/assert";
 import { walk } from "@std/fs";
 import { fromFileUrl, relative } from "@std/path";
 import { CORE_BUNDLE, HARNESS_STATIC } from "../../src/templates_bundle.ts";
-import { type RetiredAddress, retiredAddresses, retiredSection } from "./retired_table.ts";
+import {
+  patternFor,
+  retiredAddresses,
+  retiredSection,
+  successorAddresses,
+} from "./retired_table.ts";
 
 /**
  * FR-006 (cli#683) — no shipped file names a retired address outside the one
@@ -76,40 +81,6 @@ function codeLinesOnly(text: string): string {
 }
 
 // ─── The matcher ────────────────────────────────────────────────────────────
-
-const esc = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-
-/**
- * Every spelling a harness gives the address. A whole retired skill `S` is
- * `/S` (Claude), `$S` (Codex), `specnaut-S` (namespaced: Codex, Cursor,
- * OpenCode, Copilot) and `specnaut-plugin:S` (the plugin). A retired verb `V`
- * of `/specnaut` is `/specnaut V`, `$specnaut V`, `/specnaut-V` on a flat
- * layout, and `specnaut-plugin:specnaut V`.
- *
- * The lookbehind keeps a path out (`skills/board/`, `.specnaut/addenda/board/`):
- * an address is a command a person types, not a directory name.
- */
-function patternFor(a: RetiredAddress): RegExp {
-  const before = "(?<![A-Za-z0-9_./:-])";
-  const plugin = "[/$]?specnaut-plugin:";
-  if (a.verb === null) {
-    const s = esc(a.skill);
-    const after = "(?![A-Za-z0-9_-])";
-    return new RegExp(
-      `${before}(?:[/$]|${plugin}|[/$]?specnaut-)${s}${after}`,
-      "g",
-    );
-  }
-  const s = esc(a.skill);
-  const v = esc(a.verb);
-  // `-` may follow: `/specnaut audit-security` is a spelling of the retired
-  // `/specnaut audit` ("any axis or spelling"), not a different address.
-  const after = "(?![A-Za-z0-9_])";
-  return new RegExp(
-    `${before}(?:[/$]|${plugin})${s}[ -]${v}${after}|${before}[/$]${s}-${v}${after}`,
-    "g",
-  );
-}
 
 const ADDRESSES = retiredAddresses();
 const PATTERNS = ADDRESSES.map((a) => ({ address: a.address, re: patternFor(a) }));
@@ -308,35 +279,4 @@ Deno.test("no successor is itself retired — a user is sent straight to a live 
   assert(successors.length >= 10, `read only ${successors.length} successors from the table`);
   const chained = successors.filter((s) => retired.has(s));
   assertEquals(chained, [], "a retired address points at another retired address");
-});
-
-/**
- * Every address a successor cell names, as skill + verb (cli#709). A cell can
- * name several (`/task` (`list`, `next`, …)) and carry arguments
- * (`/task audit --security`, `/task plan <feature>`); reading only the first
- * token, exactly, let a retired verb hide behind either. A bare verb token
- * belongs to the last skill named before it; an argument is dropped.
- */
-function successorAddresses(cell: string): string[] {
-  const out: string[] = [];
-  let skill: string | null = null;
-  for (const [, token] of cell.matchAll(/`([^`]+)`/g)) {
-    const [head, next] = token.trim().split(/\s+/);
-    const isVerb = (w: string | undefined) => w !== undefined && /^[a-z][a-z-]*$/.test(w);
-    if (head.startsWith("/")) {
-      skill = head;
-      out.push(isVerb(next) ? `${head} ${next}` : head);
-    } else if (skill !== null && isVerb(head)) out.push(`${skill} ${head}`);
-  }
-  return out;
-}
-
-Deno.test("a successor cell yields every address it names, as skill + verb", () => {
-  assertEquals(successorAddresses(" `/task plan <feature>`, step 1 "), ["/task plan"]);
-  assertEquals(successorAddresses(" `/task audit --security` "), ["/task audit"]);
-  assertEquals(successorAddresses(" `/task` (`list`, `--deps`, `next`) "), [
-    "/task",
-    "/task list",
-    "/task next",
-  ]);
 });
