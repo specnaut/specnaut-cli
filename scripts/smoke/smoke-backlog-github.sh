@@ -352,9 +352,8 @@ check "move-batch does not fire the parent-epic propagation hook" \
   '! grep -q "propagate-parent-status" .specnaut/scripts/backlog/move-batch.sh'
 
 echo "═══ spec 042  close-shipped.sh settles the board after the close ═══"
-check "close-shipped.sh moves a card only once its issue is closed (exit 12; Done over an open issue is REOPENED drift), then reconciles once (spec 042)" \
-  'F=.specnaut/scripts/backlog/close-shipped.sh; [ -x "$F" ] && grep -qF -- "-ne 12" "$F" &&
-   c=$(grep -nF "/cascade-check.sh" "$F" | head -1 | cut -d: -f1) && m=$(grep -nF "/move.sh" "$F" | head -1 | cut -d: -f1) &&
-   [ -n "$c" ] && [ -n "$m" ] && [ "$c" -lt "$m" ] && grep -qF "sweep-closed.sh\" --passes 2" "$F"'
+check "close-shipped.sh moves a card only once its issue is closed (an open one is 20, its card left alone), then sweeps --passes 2 once and batch-moves the drifted (spec 042)" \
+  '[ -x .specnaut/scripts/backlog/close-shipped.sh ] && probe_close_shipped 6 "$(printf "DRIFTED 7\nswept: 3 scanned")" 5 6 &&
+   close_shipped_was 20 "$(printf "cascade-check 5\nmove 5 Done\ncascade-check 6\nsweep-closed --passes 2\nmove-batch Done 7")" "DONE #5" "OPEN #6" "RECONCILED #7" "swept: 3 scanned"'
 
 finish "BACKLOG-GITHUB"

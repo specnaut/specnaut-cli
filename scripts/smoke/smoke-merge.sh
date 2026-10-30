@@ -209,7 +209,7 @@ check "a phase that cites another phase's step names the step that does it (spec
 check "merge.md asks the BRANCH which rule applies, not the board (#557)" \
   'grep -qF "Ask the branch, not the board" .claude/skills/task/phases/merge.md &&
    grep -qF "Epic: #" .claude/skills/task/phases/merge.md &&
-   grep -qF "range=\"\$base..HEAD\"" .specnaut/scripts/bash/epic-status.sh'
+   grep -qF "range=\"refs/heads/\$base..HEAD\"" .specnaut/scripts/bash/epic-status.sh'
 check "merge.md says an epic branch is NOT squashed (#557)" \
   'grep -qF "an epic**: do **not** squash" .claude/skills/task/phases/merge.md'
 # Spec 042 cut the sentence from merge.md; the rule is the loop's, and lives

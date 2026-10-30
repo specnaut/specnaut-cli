@@ -305,6 +305,6 @@ done
   || fail "render-index grouping does not match the items' status fields" "$grouping_why"
 
 check "close-shipped.sh is the close: it moves each item to Done and asks no forge (spec 042)" \
-  'F=.specnaut/scripts/backlog/close-shipped.sh; [ -x "$F" ] && grep -qF "move.sh\" \"\$n\" Done" "$F" && ! grep -qF "/cascade-check.sh" "$F"'
+  '[ -x .specnaut/scripts/backlog/close-shipped.sh ] && probe_close_shipped "" "" 5 6 && close_shipped_was 0 "$(printf "move 5 Done\nmove 6 Done")" "DONE #5" "DONE #6"'
 
 finish "BACKLOG-LOCAL"

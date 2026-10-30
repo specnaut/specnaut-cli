@@ -109,16 +109,11 @@ check "close-shipped.sh present + executable (spec 042)" \
   '[ -x .specnaut/scripts/backlog/close-shipped.sh ]'
 # The card moves only once cascade-check.sh proves the issue closed (exit 12):
 # a Done card over an open issue is exactly what sweep-closed.sh flags REOPENED.
-check "close-shipped.sh confirms the close before it moves the card (spec 042)" \
-  'F=.specnaut/scripts/backlog/close-shipped.sh;
-   c=$(grep -nF "/cascade-check.sh" "$F" | head -1 | cut -d: -f1);
-   m=$(grep -nF "/move.sh" "$F" | head -1 | cut -d: -f1);
-   [ -n "$c" ] && [ -n "$m" ] && [ "$c" -lt "$m" ] && grep -qF -- "-ne 12" "$F"'
 # This backend's sweep takes --since only (it exits 2 on anything else), so the
 # reconcile passes it nothing: a --passes here made every gitlab close exit 21.
-check "close-shipped.sh reconciles the board once, with no flag the gitlab sweep rejects (spec 042)" \
-  'F=.specnaut/scripts/backlog/close-shipped.sh;
-   grep -qF "/sweep-closed.sh\" 2>&1)" "$F" && ! grep -qF "sweep-closed.sh\" --" "$F" &&
+check "close-shipped.sh confirms each close before it moves the card, leaves an open one alone (20), then reconciles once with no flag the gitlab sweep rejects (spec 042)" \
+  'probe_close_shipped 6 "$(printf "DRIFTED 7\nswept: 3 scanned")" 5 6 &&
+   close_shipped_was 20 "$(printf "cascade-check 5\nmove 5 Done\ncascade-check 6\nsweep-closed\nmove 7 Done")" "DONE #5" "OPEN #6" "RECONCILED #7" "swept: 3 scanned" &&
    ! grep -qF -- "--passes" .specnaut/scripts/backlog/sweep-closed.sh'
 
 finish "BACKLOG-GITLAB"
