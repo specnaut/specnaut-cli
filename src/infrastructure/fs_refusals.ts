@@ -1,3 +1,4 @@
+import { PathRefusal } from "../domain/path_refusal.ts";
 import { UnwalkableLinkError } from "./fs_link_walk.ts";
 
 /**
@@ -21,7 +22,7 @@ export function refuseUnusable(root: string, abs: string, err: unknown): never {
 }
 
 /** A path refused because it loops or leaves the project: a reader may report it instead of aborting. */
-export class ContainmentRefusal extends Error {}
+export class ContainmentRefusal extends PathRefusal {}
 
 export const loopRefusal = (root: string, abs: string) =>
   new ContainmentRefusal(
@@ -32,7 +33,7 @@ export const loopRefusal = (root: string, abs: string) =>
   );
 
 /** The refusal for a link through a missing directory: a reader reports it as absent. */
-export class UnwalkableRefusal extends Error {}
+export class UnwalkableRefusal extends PathRefusal {}
 
 export const unwalkableRefusal = (root: string, abs: string, missing: string) =>
   new UnwalkableRefusal(

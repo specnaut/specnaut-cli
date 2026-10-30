@@ -2,6 +2,7 @@ import type { StagingStore } from "./ports.ts";
 import type { Bundle } from "../domain/template.ts";
 import type { LockEntry } from "../domain/installed_lock.ts";
 import type { UpgradeAction, UpgradePlan } from "../domain/upgrade_plan.ts";
+import { PathRefusal } from "../domain/path_refusal.ts";
 
 /**
  * `.specnaut/upgrade-staging/` as `upgrade` fills and empties it: the upstream
@@ -77,6 +78,7 @@ export function planStaging(
  * and the lock write. A delete that throws (a Windows file lock, a permission
  * bit) is reported through `refusals` and the upgrade finishes; letting it
  * propagate would leave the project half-upgraded over a copy nobody needs.
+ * A containment refusal is reported in its own words (`leftAlone`).
  */
 export async function pruneStaging(
   stagingStore: StagingStore,
@@ -89,9 +91,13 @@ export async function pruneStaging(
     try {
       await stagingStore.delete(projectDir, rel);
     } catch (err) {
+      const path = `.specnaut/upgrade-staging/${rel}`;
       refusals.push(
-        `could not clear the stale staged copy .specnaut/upgrade-staging/${rel} (${why(err)}) — ` +
-          `it is safe to delete by hand`,
+        err instanceof PathRefusal
+          ? leftAlone(path, err)
+          : `could not clear the stale staged copy ${path} (${
+            why(err)
+          }) — it is safe to delete by hand`,
       );
     }
   }
@@ -102,10 +108,23 @@ export async function pruneStaging(
     // but it is said, not swallowed: a catch that reports nothing would hide
     // the next failure here that is not harmless.
     refusals.push(
-      `could not remove the empty .specnaut/upgrade-staging/ (${why(err)}) — ` +
-        `it is safe to delete by hand`,
+      err instanceof PathRefusal
+        ? leftAlone(".specnaut/upgrade-staging/", err)
+        : `could not remove the empty .specnaut/upgrade-staging/ (${why(err)}) — ` +
+          `it is safe to delete by hand`,
     );
   }
 }
 
 const why = (err: unknown) => err instanceof Error ? err.message : String(err);
+
+/**
+ * A staged path the adapter refused (cli#687) is not a stale copy: it is a link,
+ * or sits behind one, leading out of the project or round a cycle. "Safe to
+ * delete by hand" would invite deleting what it points at — a file Specnaut
+ * never wrote — so the advice names the link.
+ */
+const leftAlone = (path: string, err: PathRefusal) =>
+  `left ${path} in place — ${err.message}\n` +
+  `It is not a plain staged copy: check where that link points, then remove the link ` +
+  `itself, never what it points at.`;
