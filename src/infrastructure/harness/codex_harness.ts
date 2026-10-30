@@ -14,7 +14,7 @@ import {
 } from "../../domain/codex_config.ts";
 import { ensureSkillFrontmatter, skillDocDestination, skillFolderName } from "./skill_folder.ts";
 import { frontmatterField, splitFrontmatter } from "./frontmatter.ts";
-import { codexFamilyOf, effortToCodexReasoning } from "../../domain/codex_models.ts";
+import { claudeTier, codexFamilyOf, effortToCodexReasoning } from "../../domain/codex_models.ts";
 import { applyBackend, applyHarness, backlogScriptDestination } from "./backlog_filter.ts";
 import { applyScheme, phaseScriptDestination } from "./scheme_filter.ts";
 import { applySpecBackend } from "./spec_backend_filter.ts";
@@ -43,7 +43,7 @@ function toCodexSubagentToml(entry: CoreEntry): string {
   // family is a comment, so the agent runs on the session's model and the
   // user still sees which family it was written for.
   const { description, model, effort, body } = parseAgentFrontmatter(entry.content);
-  const tier = model?.trim().toLowerCase() ?? null;
+  const tier = claudeTier(model);
   const family = codexFamilyOf(tier);
   const reasoning = effortToCodexReasoning(effort);
   const toml = stringifyToml({

@@ -35,7 +35,12 @@ const CLAUDE_TO_CODEX_FAMILY: Readonly<Record<string, string>> = {
  * for an absent, `inherit` or unknown value. Names a family, never an id.
  */
 export function codexFamilyOf(claudeFamily: string | null): string | null {
-  return CLAUDE_TO_CODEX_FAMILY[claudeFamily?.trim().toLowerCase() ?? ""] ?? null;
+  return CLAUDE_TO_CODEX_FAMILY[claudeTier(claudeFamily) ?? ""] ?? null;
+}
+
+/** An agent's `model:` value as a tier: trimmed and lower-cased — the one spelling of that rule. */
+export function claudeTier(model: string | null | undefined): string | null {
+  return model?.trim().toLowerCase() ?? null;
 }
 
 /**
