@@ -6026,20 +6026,25 @@ exit "\$rc"
 # the parent file under a \`## Sub-tasks\` section).
 #
 # Usage:
-#   add.sh "<title>" [body] [labels-csv] [--parent <num>]
+#   add.sh "<title>" [body] [--parent <num>]
+#
+# No labels argument: the task file has no labels field, so a third positional
+# is refused rather than dropped — the other backends take one, and a caller
+# that passed it must not believe it was recorded (cli#697).
 set -euo pipefail
 
+USAGE='usage: add.sh "<title>" [body] [--parent <num>]'
 PARENT=""
 ARGS=()
 while [ \$# -gt 0 ]; do
   case "\$1" in
     -h|--help)
-      echo 'usage: add.sh "<title>" [body] [labels] [--parent <num>]'
+      echo "\$USAGE"
       exit 0
       ;;
     --parent)
       if [ \$# -lt 2 ]; then
-        echo 'usage: add.sh "<title>" [body] [labels] [--parent <num>]' >&2
+        echo "\$USAGE" >&2
         exit 2
       fi
       PARENT="\$2"
@@ -6047,7 +6052,7 @@ while [ \$# -gt 0 ]; do
       ;;
     --*)
       echo "add.sh: unknown flag '\$1'" >&2
-      echo 'usage: add.sh "<title>" [body] [labels] [--parent <num>]' >&2
+      echo "\$USAGE" >&2
       exit 2
       ;;
     *)
@@ -6058,7 +6063,12 @@ while [ \$# -gt 0 ]; do
 done
 
 if [ "\${#ARGS[@]}" -lt 1 ]; then
-  echo 'usage: add.sh "<title>" [body] [labels] [--parent <num>]' >&2
+  echo "\$USAGE" >&2
+  exit 2
+fi
+if [ "\${#ARGS[@]}" -gt 2 ]; then
+  echo "add.sh: the local backlog has no labels field; '\${ARGS[2]}' would not be recorded" >&2
+  echo "\$USAGE" >&2
   exit 2
 fi
 TITLE="\${ARGS[0]}"
