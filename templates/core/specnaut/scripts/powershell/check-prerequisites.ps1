@@ -40,12 +40,9 @@ OPTIONS:
   -Help, -h           Show this help message
 
 EXAMPLES:
-  # Check task prerequisites (plan.md required)
-  .\check-prerequisites.ps1 -Json
-  
   # Check implementation prerequisites (plan.md required)
   .\check-prerequisites.ps1 -Json
-  
+
   # Get feature paths only (no validation)
   .\check-prerequisites.ps1 -PathsOnly
 
@@ -104,16 +101,10 @@ if ($RequireTasks) {
     [Console]::Error.WriteLine("note: -RequireTasks is ignored; the plan is the one required document")
 }
 
-# Build list of available documents
+# Build list of available documents: tasks.md, when asked for and present
 $docs = @()
-
-# Always check these optional docs
-
-
-
-# Include tasks.md if requested and it exists
-if ($IncludeTasks -and (Test-Path $paths.TASKS)) { 
-    $docs += 'tasks.md' 
+if ($IncludeTasks -and (Test-Path $paths.TASKS)) {
+    $docs += 'tasks.md'
 }
 
 # Output results
@@ -127,9 +118,6 @@ if ($Json) {
     # Text output
     Write-Output "FEATURE_DIR:$($paths.FEATURE_DIR)"
     Write-Output "AVAILABLE_DOCS:"
-    
-    # Show status of each potential document
-    
     if ($IncludeTasks) {
         Test-FileExists -Path $paths.TASKS -Description 'tasks.md' | Out-Null
     }

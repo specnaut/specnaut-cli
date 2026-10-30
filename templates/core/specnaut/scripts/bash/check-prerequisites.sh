@@ -55,15 +55,12 @@ OPTIONS:
   --help, -h          Show this help message
 
 EXAMPLES:
-  # Check task prerequisites (plan.md required)
-  ./check-prerequisites.sh --json
-  
   # Check implementation prerequisites (plan.md required)
   ./check-prerequisites.sh --json
-  
+
   # Get feature paths only (no validation)
   ./check-prerequisites.sh --paths-only
-  
+
 EOF
             exit 0
             ;;
@@ -131,14 +128,8 @@ if $REQUIRE_TASKS; then
     echo "note: --require-tasks is ignored; the plan is the one required document" >&2
 fi
 
-# Build list of available documents
+# Build list of available documents: tasks.md, when asked for and present
 docs=()
-
-# Always check these optional docs
-
-
-
-# Include tasks.md if requested and it exists
 if $INCLUDE_TASKS && [[ -f "$TASKS" ]]; then
     docs+=("tasks.md")
 fi
@@ -169,9 +160,6 @@ else
     # Text output
     echo "FEATURE_DIR:$FEATURE_DIR"
     echo "AVAILABLE_DOCS:"
-    
-    # Show status of each potential document
-    
     if $INCLUDE_TASKS; then
         check_file "$TASKS" "tasks.md"
     fi
