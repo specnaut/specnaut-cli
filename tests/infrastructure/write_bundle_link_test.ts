@@ -1,4 +1,10 @@
-import { assert, assertEquals, assertRejects, assertStringIncludes } from "@std/assert";
+import {
+  assert,
+  assertEquals,
+  assertMatch,
+  assertRejects,
+  assertStringIncludes,
+} from "@std/assert";
 import { join } from "@std/path";
 import { DenoFsWriter, type Linker } from "../../src/infrastructure/deno_fs_writer.ts";
 import type { Bundle } from "../../src/domain/template.ts";
@@ -207,7 +213,9 @@ Deno.test({
           ),
         Error,
       );
-      assertStringIncludes(err.message, "does not exist");
+      // POSIX walks `.codex/../..` and finds `.codex` missing; Windows resolves `..`
+      // lexically first and lands outside the project. Either way the guard refuses it.
+      assertMatch(err.message, /does not exist|leaves the project/);
       // Refused as a bundle: the file judged after the refused one is not written either.
       assertEquals(await present(join(dir, ".codex")), false, ".codex/x.md was written anyway");
     }),
