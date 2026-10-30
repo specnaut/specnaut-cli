@@ -21,17 +21,33 @@ const link = (target: string, resolved: string | null = "AGENTS.md"): DiskEntry 
   target,
   resolved,
 });
+/** A link as the reader reports it on Windows, where `\` separates segments. */
+const winLink = (target: string): DiskEntry => ({
+  kind: "symlink",
+  target,
+  resolved: "AGENTS.md",
+  windows: true,
+});
 
 Deno.test("classifyLinkDisk: nothing on disk is absent", () => {
   assertEquals(classify({}), "absent");
 });
 
-Deno.test("classifyLinkDisk: our link is recognised by where it points, in either separator", () => {
+Deno.test("classifyLinkDisk: our link is recognised by its exact text", () => {
   assertEquals(classify({ disk: link("../AGENTS.md") }), "ours-link");
-  // Windows writes the target with `\`; a link made there is still ours.
-  assertEquals(classify({ disk: link("..\\AGENTS.md") }), "ours-link");
-  // Spelled differently, landing on the same file.
-  assertEquals(classify({ disk: link("./../AGENTS.md") }), "ours-link");
+  // Windows writes the target with `\`; a link read there is still ours.
+  assertEquals(classify({ disk: winLink("..\\AGENTS.md") }), "ours-link");
+  assertEquals(classify({ disk: winLink("../AGENTS.md") }), "ours-link");
+});
+
+Deno.test("classifyLinkDisk: any other text is foreign, even one that normalises to ours", () => {
+  // Elsewhere `\` is a literal character: `..\AGENTS.md` names a file of that name.
+  assertEquals(classify({ disk: link("..\\AGENTS.md") }), "foreign-link");
+  // On POSIX `a\b` is ONE segment, so this climbs out of the project; a
+  // lexical normalisation that read `\` as a separator classed it as ours.
+  assertEquals(classify({ disk: link("a\\b/../../../AGENTS.md", null) }), "foreign-link");
+  assertEquals(classify({ disk: winLink("a\\b/../../../AGENTS.md") }), "foreign-link");
+  assertEquals(classify({ disk: link("./../AGENTS.md") }), "foreign-link");
 });
 
 Deno.test("classifyLinkDisk: a link elsewhere is foreign", () => {
@@ -47,6 +63,9 @@ Deno.test("classifyLinkDisk: the fallback file is ours, trailing newlines tolera
 Deno.test("classifyLinkDisk: a link checked out as text (core.symlinks=false) is materialised", () => {
   assertEquals(classify({ disk: file("../AGENTS.md") }), "materialised");
   assertEquals(classify({ disk: file("../AGENTS.md\n") }), "materialised");
+  // Git stores a link's text with `/` on every system, so the checked-out text
+  // is exactly ours or it is not ours.
+  assertEquals(classify({ disk: file("..\\AGENTS.md") }), "customized");
 });
 
 Deno.test("classifyLinkDisk: a file the lock vouches for is generated, any other is customized", () => {
@@ -73,7 +92,7 @@ Deno.test("classifyLinkDisk: AGENTS.md linking back to the destination wins over
 
 Deno.test("linkTargetPath resolves from the destination's own directory", () => {
   assertEquals(linkTargetPath(".claude/CLAUDE.md", "../AGENTS.md"), "AGENTS.md");
-  assertEquals(linkTargetPath(".codex/AGENTS.md", "..\\AGENTS.md"), "AGENTS.md");
+  assertEquals(linkTargetPath(".codex/AGENTS.md", "../AGENTS.md"), "AGENTS.md");
 });
 
 Deno.test("the lock hashes a context link's identity, never its fallback text", () => {

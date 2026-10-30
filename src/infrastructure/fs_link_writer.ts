@@ -1,6 +1,6 @@
 import type { BackupReport, ContextLinkWrite } from "../application/ports.ts";
 import type { TemplateFile } from "../domain/template.ts";
-import { linkTargetPath } from "../domain/context_link.ts";
+import { isOurLinkText } from "../domain/context_link.ts";
 import { backupForDelete, fileExists, isSymlink } from "./fs_backup.ts";
 
 /**
@@ -55,7 +55,7 @@ export async function writeContextLink(
 ): Promise<{ backup?: BackupReport["backups"][number]; link?: ContextLinkWrite }> {
   if (await isSymlink(abs)) {
     const current = await Deno.readLink(abs);
-    if (linkTargetPath(dest, current) === linkTargetPath(dest, target)) return {};
+    if (isOurLinkText(current, target, Deno.build.os === "windows")) return {};
   }
   let backup: BackupReport["backups"][number] | undefined;
   if (await fileExists(abs)) {

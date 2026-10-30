@@ -25,6 +25,12 @@ export type DiskEntry =
      * followed (a cycle).
      */
     readonly resolved: string | null;
+    /**
+     * Set when the link was read on Windows, where `\` separates path segments
+     * and is what Windows itself writes into a link. Elsewhere a `\` is a
+     * literal character in a file name.
+     */
+    readonly windows?: true;
   }
   | {
     readonly kind: "file";
@@ -101,12 +107,27 @@ export function linkIdentity(target: string): string {
 }
 
 /**
- * The project-relative path a link at `dest` with text `target` points at.
- * Lexical, `/` separators, Windows `\` accepted: `../AGENTS.md` from
- * `.claude/CLAUDE.md` is `AGENTS.md`.
+ * The project-relative path the bundle's own link text, `target`, points at
+ * from `dest`: `../AGENTS.md` from `.claude/CLAUDE.md` is `AGENTS.md`. Lexical,
+ * `/` separators — for text Specnaut wrote, never for text read off disk, which
+ * `isOurLinkText` judges as text.
  */
 export function linkTargetPath(dest: string, target: string): string {
-  return normalize(join(dirname(dest), target.replaceAll("\\", "/")));
+  return normalize(join(dirname(dest), target));
+}
+
+/**
+ * Whether a link's text, read off disk, is the one Specnaut writes: exactly
+ * `symlinkTo`, or on Windows its `\` spelling, which Windows itself writes.
+ *
+ * Compared as text, never as a normalised path (cli#687). Normalising read
+ * `\` as a separator everywhere, so on POSIX `a\b/../../../AGENTS.md` — where
+ * `a\b` is one segment and the link climbs out of the project — was classed as
+ * ours and left in place. Any other spelling, even one landing on `AGENTS.md`,
+ * is not ours: being ours is what lets a link be kept without a backup.
+ */
+export function isOurLinkText(text: string, symlinkTo: string, windows: boolean): boolean {
+  return text === symlinkTo || (windows && text === symlinkTo.replaceAll("/", "\\"));
 }
 
 /** What the classifier is told about one destination. */
@@ -136,13 +157,15 @@ export function classifyLinkDisk(
   const disk = ev.disk;
   if (disk === null) return "absent";
   if (disk.kind === "symlink") {
-    return linkTargetPath(dest, disk.target) === linkTargetPath(dest, link.symlinkTo)
+    return isOurLinkText(disk.target, link.symlinkTo, disk.windows === true)
       ? "ours-link"
       : "foreign-link";
   }
   const text = trimEnd(disk.content);
   if (text === trimEnd(link.content)) return "ours-fallback";
-  if (text.replaceAll("\\", "/") === link.symlinkTo) return "materialised";
+  // Git stores a link's text with `/` on every system, Windows included, so a
+  // link checked out as a file holds exactly `symlinkTo` when it is ours.
+  if (text === link.symlinkTo) return "materialised";
   if (ev.diskSha !== undefined && ev.diskSha === ev.lockSha) return "generated";
   return "customized";
 }

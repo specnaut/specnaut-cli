@@ -12,6 +12,9 @@ import {
   UnwalkableRefusal,
 } from "./fs_containment.ts";
 
+/** `\` separates path segments in a link's text here (see `DiskEntry`). */
+const WINDOWS = Deno.build.os === "windows";
+
 export class DenoFsReader implements FsReader {
   /**
    * Reads a project-relative file, or `null` when it is not there.
@@ -99,7 +102,7 @@ async function entryOf(root: string, abs: string): Promise<DiskEntry | null> {
     if (!unfollowable(err)) throw err;
     resolved = null;
   }
-  return { kind: "symlink", target, resolved };
+  return { kind: "symlink", target, resolved, ...(WINDOWS ? { windows: true as const } : {}) };
 }
 
 /**
