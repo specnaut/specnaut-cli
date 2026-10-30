@@ -105,12 +105,11 @@ get_highest_from_history() {
 check_existing_branches() {
     local specs_dir="$1"
     local skip_fetch="${2:-false}"
+    local highest_remote highest_branch highest_spec highest_history
 
     if [ "$skip_fetch" = true ]; then
         # Side-effect-free: query remotes via ls-remote
-        local highest_remote
         highest_remote=$(get_highest_from_remote_refs)
-        local highest_branch
         highest_branch=$(get_highest_from_branches)
         if [ "$highest_remote" -gt "$highest_branch" ]; then
             highest_branch=$highest_remote
@@ -118,18 +117,15 @@ check_existing_branches() {
     else
         # Fetch all remotes to get latest branch info (suppress errors if no remotes)
         git fetch --all --prune >/dev/null 2>&1 || true
-        local highest_branch
         highest_branch=$(get_highest_from_branches)
     fi
 
     # Get highest number from ALL specs (not just matching short name)
-    local highest_spec
     highest_spec=$(get_highest_from_specs "$specs_dir")
 
     # ...and from every spec directory history has seen, including shipped
     # ones whose directory and branch are both gone. Read after the fetch
     # above, so freshly fetched remote history counts too.
-    local highest_history
     highest_history=$(get_highest_from_history)
 
     # Take the maximum of all three
@@ -141,8 +137,7 @@ check_existing_branches() {
         max_num=$highest_history
     fi
 
-    # Return next number
-    echo $((max_num + 1))
+    echo $((max_num + 1)) # the next free number
 }
 
 # Function to clean and format a branch name
@@ -154,12 +149,11 @@ clean_branch_name() {
 # Function to generate branch name with stop word filtering and length filtering
 generate_branch_name() {
     local description="$1"
-    
+    local clean_name cleaned
     # Common stop words to filter out
     local stop_words="^(i|a|an|the|to|for|of|in|on|at|by|with|from|is|are|was|were|be|been|being|have|has|had|do|does|did|will|would|should|could|can|may|might|must|shall|this|that|these|those|my|your|our|their|want|need|add|get|set)$"
     
     # Convert to lowercase and split into words
-    local clean_name
     clean_name=$(echo "$description" | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9]/ /g')
     
     # Filter words: remove stop words and words shorter than 3 chars (unless they're uppercase acronyms in original)
@@ -195,7 +189,6 @@ generate_branch_name() {
         echo "$result"
     else
         # Fallback to original logic if no meaningful words found
-        local cleaned
         cleaned=$(clean_branch_name "$description")
         echo "$cleaned" | tr '-' '\n' | grep -v '^$' | head -3 | tr '\n' '-' | sed 's/-$//'
     fi
