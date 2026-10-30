@@ -32,8 +32,8 @@ Deno.test("an old address that resolves elsewhere is copied, never deleted where
   assertEquals(outcome, "copied");
   assertEquals(writer.deleted, []);
   assertEquals(notes, [
-    `${FROM} was copied to ${TO} but not deleted: it resolves to another path — ` +
-    `delete the old copy yourself once you have checked it`,
+    `${FROM} copied to ${TO}, old copy left at ${FROM}, delete it by hand — ` +
+    `it resolves to another path, so check it first`,
   ]);
 });
 
@@ -48,13 +48,16 @@ Deno.test("a write that fails moves nothing and deletes nothing, and says so", a
 });
 
 Deno.test("a delete that fails after the write is a copy, not a failed move", async () => {
+  // cli#702: the addenda mover named this "not moved" — the copy had landed.
   const writer = fakeWriter();
   writer.deletePaths = () => Promise.reject(new Error("busy"));
   const notes: string[] = [];
-  const outcome = await moveExact({ writer, projectDir: "/p", notes }, FROM, FROM, TO, "x");
+  const outcome = await moveExact({ writer, projectDir: "/p", notes }, "addendum x", FROM, TO, "x");
   assertEquals(outcome, "copied");
   assertEquals(writer.written.get(TO), "x");
-  assertEquals(notes, [`${FROM} was copied to ${TO} but not deleted: busy`]);
+  assertEquals(notes, [
+    `addendum x copied to ${TO}, old copy left at ${FROM}, delete it by hand — busy`,
+  ]);
 });
 
 Deno.test("each refusal reads the same from every mover", () => {

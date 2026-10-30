@@ -71,12 +71,12 @@ export async function moveExact(
   }
   const deleted = await deleteExact(io, from);
   if (deleted.kind === "deleted") return "moved";
-  io.notes.push(
-    deleted.kind === "elsewhere"
-      ? `${what} was copied to ${to} but not deleted: it resolves to another path — ` +
-        `delete the old copy yourself once you have checked it`
-      : `${what} was copied to ${to} but not deleted: ${deleted.reason}`,
-  );
+  // Said as what happened, never as "not moved": the bytes ARE at `to`, so a
+  // reader told otherwise would copy them again (cli#702).
+  const cause = deleted.kind === "elsewhere"
+    ? "it resolves to another path, so check it first"
+    : deleted.reason;
+  io.notes.push(`${what} copied to ${to}, old copy left at ${from}, delete it by hand — ${cause}`);
   return "copied";
 }
 
