@@ -27,3 +27,6 @@ templates/core/skills/task/scripts/cloud/move.sh  cloud backlog backend has no s
 templates/core/skills/task/scripts/cloud/reconcile.sh  cloud backlog backend has no smoke of its own yet; tracked as a follow-up
 templates/core/skills/task/scripts/cloud/view.sh  cloud backlog backend has no smoke of its own yet; tracked as a follow-up
 templates/core/root/README.md	maintainer note, not shipped — absent from templates/manifest.json, so no consumer receives it and no smoke can assert on it
+templates/core/specnaut/scripts/bash/branch-naming.sh  #703 extraction: sourced by create-new-feature.sh, which smoke-features.sh runs in a scaffolded project; a by-name assertion waits on the parallel #703 split of smoke-features.sh
+templates/core/specnaut/scripts/powershell/branch-naming.ps1  #703 extraction: dot-sourced by create-new-feature.ps1, which smoke-features.sh runs in a scaffolded project; a by-name assertion waits on the parallel #703 split of smoke-features.sh
+templates/core/specnaut/scripts/powershell/template-resolution.ps1  #703 extraction: dot-sourced by common.ps1, so every PowerShell script smoke-features.sh runs loads it; a by-name assertion waits on the parallel #703 split of smoke-features.sh
