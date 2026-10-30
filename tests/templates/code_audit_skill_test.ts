@@ -100,3 +100,17 @@ Deno.test("audit.md is read-only and stops on an empty scope", () => {
   assertStringIncludes(body, "`TOTAL_FILES: 0`, dispatch nothing");
   assertStringIncludes(body, "Nothing to audit in this scope.");
 });
+
+Deno.test("audit.md takes the REVIEW SUMMARY from review-findings-contract, never restates it", () => {
+  // cli#702: the restated block had drifted — it lacked SEATS_EXPECTED,
+  // SEATS_REPORTED and EVIDENCE, so an audit with a silent seat read as clean.
+  const body = auditDoc().content;
+  assertStringIncludes(body, "`review-findings-contract`");
+  assert(
+    !/^REVIEW SUMMARY\s*$/m.test(body),
+    "audit.md restates the REVIEW SUMMARY block — point at the contract instead",
+  );
+  for (const field of ["SEATS_EXPECTED", "SEATS_REPORTED", "EVIDENCE"]) {
+    assertStringIncludes(body, `\`${field}\``, `audit.md does not say how it fills ${field}`);
+  }
+});
