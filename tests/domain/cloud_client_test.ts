@@ -1,7 +1,7 @@
 import { assertEquals, assertRejects } from "@std/assert";
 import { CloudApiError, CloudClient } from "../../src/domain/cloud/cloud_client.ts";
 
-const API = "https://dep.convex.site";
+const API = "https://api.example.com";
 
 type Call = { url: string; method: string; body: unknown; auth: string | null };
 

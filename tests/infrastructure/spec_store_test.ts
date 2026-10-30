@@ -9,7 +9,7 @@ import type { CredentialStore } from "../../src/domain/cloud/credentials.ts";
 // (fake-fetch) session; LocalSpecStore's cloud-only verbs reject with one clear
 // message so a misdirected call never silently succeeds.
 
-const API = "https://dep.convex.site";
+const API = "https://api.example.com";
 
 const stubStore: CredentialStore = {
   kind: "file",

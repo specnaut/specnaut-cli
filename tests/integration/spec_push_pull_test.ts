@@ -12,7 +12,7 @@ import type { SpecBackend } from "../../src/domain/installed_lock.ts";
 // through unchanged (upsert-only). Also covers the local-backend gate + the
 // offline cache-reuse fallback (FR-008).
 
-const API = "https://dep.convex.site";
+const API = "https://api.example.com";
 
 const stubStore: CredentialStore = {
   kind: "file",

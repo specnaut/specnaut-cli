@@ -24,7 +24,7 @@ async function runSpecnaut(
 
 Deno.test("`cloud token` echoes SPECNAUT_CLOUD_TOKEN (headless escape hatch)", async () => {
   const r = await runSpecnaut(
-    ["cloud", "token", "--api-url", "https://dep.convex.site"],
+    ["cloud", "token", "--api-url", "https://api.example.com"],
     { SPECNAUT_CLOUD_TOKEN: "sfc_headless_xyz", PATH: Deno.env.get("PATH") ?? "" },
   );
   assertEquals(r.code, 0, r.stderr);
@@ -36,7 +36,7 @@ Deno.test("`cloud token` with no env + no stored creds → exit 1 with guidance"
   const home = await Deno.makeTempDir({ prefix: "specnaut-nohome-" });
   try {
     const r = await runSpecnaut(
-      ["cloud", "token", "--api-url", "https://dep.convex.site"],
+      ["cloud", "token", "--api-url", "https://api.example.com"],
       { HOME: home, PATH: Deno.env.get("PATH") ?? "" },
     );
     assertEquals(r.code, 1);

@@ -6,7 +6,7 @@ import type { FetchFn } from "../../src/domain/cloud/cloud_client.ts";
 // fake fetch, status-only errors, and the § I boundary check that no backend
 // `error` string / `_id` ever surfaces in a CLI-owned message or the parsed spec.
 
-const API = "https://dep.convex.site";
+const API = "https://api.example.com";
 
 function specJson(over: Record<string, unknown> = {}): Record<string, unknown> {
   return {

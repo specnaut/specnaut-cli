@@ -5,7 +5,7 @@ import { GateSession } from "../../src/domain/cloud/gate_session.ts";
 import type { RemoteMode } from "../../src/domain/cloud/remote_mode.ts";
 import type { FetchFn } from "../../src/domain/cloud/cloud_client.ts";
 
-const API = "https://dep.convex.site";
+const API = "https://api.example.com";
 const REMOTE_ON: RemoteMode = { enabled: true, awaitTimeoutMs: 60_000, pollIntervalMs: 5_000 };
 
 function gate(over: Record<string, unknown> = {}): Record<string, unknown> {

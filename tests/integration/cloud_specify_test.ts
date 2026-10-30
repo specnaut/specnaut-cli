@@ -11,7 +11,7 @@ import type { SpecStep } from "../../src/domain/spec/spec_step.ts";
 // session has no filesystem/git dependency — those side effects live only on the
 // local path).
 
-const API = "https://dep.convex.site";
+const API = "https://api.example.com";
 
 type Route = { method: string; match: (u: string) => boolean; status: number; body: unknown };
 

@@ -20,7 +20,7 @@ Deno.test("gate raise captures type/title/payload/task/api-url", () => {
     "--task",
     "42",
     "--api-url",
-    "https://dep.convex.site",
+    "https://api.example.com",
   ]);
   assertEquals(i.kind, "gate");
   if (i.kind === "gate") {
@@ -29,7 +29,7 @@ Deno.test("gate raise captures type/title/payload/task/api-url", () => {
     assertEquals(i.title, "Which auth?");
     assertEquals(i.payload, '{"question":"q","options":[{"id":"A","label":"x"}]}');
     assertEquals(i.task, 42);
-    assertEquals(i.apiUrl, "https://dep.convex.site");
+    assertEquals(i.apiUrl, "https://api.example.com");
   }
 });
 

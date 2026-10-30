@@ -3,7 +3,7 @@ import { freshAccessToken, login } from "../../src/domain/cloud/auth_flow.ts";
 import type { CloudClient, RefreshResult, TokenPoll } from "../../src/domain/cloud/cloud_client.ts";
 import type { CloudCredentials, CredentialStore } from "../../src/domain/cloud/credentials.ts";
 
-const API = "https://dep.convex.site";
+const API = "https://api.example.com";
 
 class MemStore implements CredentialStore {
   readonly kind = "file" as const;

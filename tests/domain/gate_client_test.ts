@@ -2,7 +2,7 @@ import { assertEquals, assertRejects } from "@std/assert";
 import { GateApiError, GateClient, reasonForStatus } from "../../src/domain/cloud/gate_client.ts";
 import type { FetchFn } from "../../src/domain/cloud/cloud_client.ts";
 
-const API = "https://dep.convex.site";
+const API = "https://api.example.com";
 
 function gateJson(over: Record<string, unknown> = {}): Record<string, unknown> {
   return {

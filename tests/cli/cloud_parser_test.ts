@@ -10,18 +10,18 @@ Deno.test("parseArgs: cloud login", () => {
 });
 
 Deno.test("parseArgs: cloud login --api-url", () => {
-  assertEquals(parseArgs(["cloud", "login", "--api-url", "https://x.convex.site"]), {
+  assertEquals(parseArgs(["cloud", "login", "--api-url", "https://x.example.com"]), {
     kind: "cloud",
     sub: "login",
-    apiUrl: "https://x.convex.site",
+    apiUrl: "https://x.example.com",
   });
 });
 
 Deno.test("parseArgs: cloud token (script-facing)", () => {
-  assertEquals(parseArgs(["cloud", "token", "--api-url", "https://x.convex.site"]), {
+  assertEquals(parseArgs(["cloud", "token", "--api-url", "https://x.example.com"]), {
     kind: "cloud",
     sub: "token",
-    apiUrl: "https://x.convex.site",
+    apiUrl: "https://x.example.com",
   });
 });
 
@@ -42,10 +42,10 @@ Deno.test("parseArgs: cloud orgs", () => {
 });
 
 Deno.test("parseArgs: cloud board --api-url", () => {
-  assertEquals(parseArgs(["cloud", "board", "--api-url", "https://x.convex.site"]), {
+  assertEquals(parseArgs(["cloud", "board", "--api-url", "https://x.example.com"]), {
     kind: "cloud",
     sub: "board",
-    apiUrl: "https://x.convex.site",
+    apiUrl: "https://x.example.com",
   });
 });
 
@@ -58,10 +58,10 @@ Deno.test("parseArgs: top-level `login` is an alias for `cloud login`", () => {
 });
 
 Deno.test("parseArgs: top-level `login --api-url`", () => {
-  assertEquals(parseArgs(["login", "--api-url", "https://x.convex.site"]), {
+  assertEquals(parseArgs(["login", "--api-url", "https://x.example.com"]), {
     kind: "cloud",
     sub: "login",
-    apiUrl: "https://x.convex.site",
+    apiUrl: "https://x.example.com",
   });
 });
 

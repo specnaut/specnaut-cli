@@ -4,7 +4,7 @@ import { GateSession, type TokenProvider } from "../../src/domain/cloud/gate_ses
 import type { RemoteMode } from "../../src/domain/cloud/remote_mode.ts";
 import type { FetchFn } from "../../src/domain/cloud/cloud_client.ts";
 
-const API = "https://dep.convex.site";
+const API = "https://api.example.com";
 
 const REMOTE: RemoteMode = { enabled: true, awaitTimeoutMs: 60_000, pollIntervalMs: 5_000 };
 

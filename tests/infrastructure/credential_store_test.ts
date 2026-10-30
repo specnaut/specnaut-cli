@@ -33,11 +33,11 @@ Deno.test("FileCredentialStore: reads legacy ~/.specflow when ~/.specnaut is abs
     await Deno.mkdir(`${home}/.specflow`, { recursive: true });
     await Deno.writeTextFile(
       `${home}/.specflow/credentials.json`,
-      JSON.stringify({ "https://dep.convex.site": creds() }),
+      JSON.stringify({ "https://api.example.com": creds() }),
     );
 
     const store = new FileCredentialStore(); // default home path + legacy fallback
-    const loaded = await store.load("https://dep.convex.site");
+    const loaded = await store.load("https://api.example.com");
     assertEquals(loaded?.accessToken, "sfc_access");
   } finally {
     if (prevHome === undefined) Deno.env.delete("HOME");
@@ -51,7 +51,7 @@ Deno.test("FileCredentialStore: reads legacy ~/.specflow when ~/.specnaut is abs
 Deno.test("FileCredentialStore: save → load round-trips", async () => {
   await withTempFile(async (path) => {
     const store = new FileCredentialStore(path);
-    const url = "https://dep.convex.site";
+    const url = "https://api.example.com";
     assertEquals(await store.load(url), null);
     await store.save(url, creds());
     assertEquals(await store.load(url), creds());
@@ -61,22 +61,22 @@ Deno.test("FileCredentialStore: save → load round-trips", async () => {
 Deno.test("FileCredentialStore: keys by deployment, trailing slash normalized", async () => {
   await withTempFile(async (path) => {
     const store = new FileCredentialStore(path);
-    await store.save("https://a.convex.site/", creds({ accessToken: "A" }));
-    await store.save("https://b.convex.site", creds({ accessToken: "B" }));
+    await store.save("https://a.example.com/", creds({ accessToken: "A" }));
+    await store.save("https://b.example.com", creds({ accessToken: "B" }));
     // trailing slash on save + bare on load resolve to the same key
-    assertEquals((await store.load("https://a.convex.site"))?.accessToken, "A");
-    assertEquals((await store.load("https://b.convex.site/"))?.accessToken, "B");
+    assertEquals((await store.load("https://a.example.com"))?.accessToken, "A");
+    assertEquals((await store.load("https://b.example.com/"))?.accessToken, "B");
   });
 });
 
 Deno.test("FileCredentialStore: delete removes only the target deployment", async () => {
   await withTempFile(async (path) => {
     const store = new FileCredentialStore(path);
-    await store.save("https://a.convex.site", creds({ accessToken: "A" }));
-    await store.save("https://b.convex.site", creds({ accessToken: "B" }));
-    await store.delete("https://a.convex.site");
-    assertEquals(await store.load("https://a.convex.site"), null);
-    assertEquals((await store.load("https://b.convex.site"))?.accessToken, "B");
+    await store.save("https://a.example.com", creds({ accessToken: "A" }));
+    await store.save("https://b.example.com", creds({ accessToken: "B" }));
+    await store.delete("https://a.example.com");
+    assertEquals(await store.load("https://a.example.com"), null);
+    assertEquals((await store.load("https://b.example.com"))?.accessToken, "B");
   });
 });
 
@@ -84,7 +84,7 @@ Deno.test("FileCredentialStore: file is created with 0600 perms", async () => {
   if (Deno.build.os === "windows") return; // POSIX perms only
   await withTempFile(async (path) => {
     const store = new FileCredentialStore(path);
-    await store.save("https://a.convex.site", creds());
+    await store.save("https://a.example.com", creds());
     const mode = (await Deno.stat(path)).mode ?? 0;
     assertEquals(mode & 0o777, 0o600);
   });
@@ -94,9 +94,9 @@ Deno.test("FileCredentialStore: corrupt file is treated as empty (auth never wed
   await withTempFile(async (path) => {
     await Deno.writeTextFile(path, "}{ not json");
     const store = new FileCredentialStore(path);
-    assertEquals(await store.load("https://a.convex.site"), null);
+    assertEquals(await store.load("https://a.example.com"), null);
     // and a subsequent save still works (overwrites the garbage)
-    await store.save("https://a.convex.site", creds());
-    assertEquals((await store.load("https://a.convex.site"))?.accessToken, "sfc_access");
+    await store.save("https://a.example.com", creds());
+    assertEquals((await store.load("https://a.example.com"))?.accessToken, "sfc_access");
   });
 });
