@@ -3,6 +3,7 @@ import { join } from "@std/path";
 import { DenoFsReader } from "../../src/infrastructure/fs_reader.ts";
 import { ReadFault } from "../../src/application/read_fault.ts";
 import { ContainmentRefusal } from "../../src/infrastructure/fs_refusals.ts";
+import type { DiskEntry } from "../../src/domain/context_link.ts";
 import { CAN_LINK, makeLink, slashForm, WINDOWS } from "../helpers/link_text.ts";
 
 /** `readEntry` reports what is at a path itself — a link as a link (cli#680). */
@@ -25,6 +26,16 @@ async function entryOf(dir: string, rel: string) {
   return entry?.kind === "symlink" ? { ...entry, target: slashForm(entry.target) } : entry;
 }
 
+/**
+ * The entry `readEntry` reports for a link. On Windows it carries
+ * `windows: true`, because there `\` separates the segments of a link's text
+ * and the domain must read `..\AGENTS.md` as ours (`DiskEntry`). Expected on
+ * Windows only, so the POSIX legs still prove the flag is absent there.
+ */
+function linkEntry(target: string, resolved: string | null): DiskEntry {
+  return { kind: "symlink", target, resolved, ...(WINDOWS ? { windows: true as const } : {}) };
+}
+
 Deno.test("readEntry: absent is null, a file is its content", async () => {
   await withProject(async (dir) => {
     const r = new DenoFsReader();
@@ -41,11 +52,7 @@ Deno.test("readEntry: a link is reported with its text and landing, not read thr
     await Deno.writeTextFile(join(dir, "AGENTS.md"), "# A\n");
     await Deno.mkdir(join(dir, ".claude"));
     await makeLink("../AGENTS.md", join(dir, ".claude/CLAUDE.md"));
-    assertEquals(await entryOf(dir, ".claude/CLAUDE.md"), {
-      kind: "symlink",
-      target: "../AGENTS.md",
-      resolved: "AGENTS.md",
-    });
+    assertEquals(await entryOf(dir, ".claude/CLAUDE.md"), linkEntry("../AGENTS.md", "AGENTS.md"));
   });
 });
 
@@ -95,11 +102,7 @@ Deno.test(
     await withProject(async (dir) => {
       await makeLink("b.md", join(dir, "a.md"));
       await makeLink("a.md", join(dir, "b.md"));
-      assertEquals(await entryOf(dir, "a.md"), {
-        kind: "symlink",
-        target: "b.md",
-        resolved: null,
-      });
+      assertEquals(await entryOf(dir, "a.md"), linkEntry("b.md", null));
     });
   },
 );
@@ -112,11 +115,7 @@ Deno.test("readEntry: a link through a missing directory is reported with no lan
   await withProject(async (dir) => {
     await Deno.mkdir(join(dir, ".claude"));
     await makeLink("nope/AGENTS.md", join(dir, ".claude/CLAUDE.md"));
-    assertEquals(await entryOf(dir, ".claude/CLAUDE.md"), {
-      kind: "symlink",
-      target: "nope/AGENTS.md",
-      resolved: null,
-    });
+    assertEquals(await entryOf(dir, ".claude/CLAUDE.md"), linkEntry("nope/AGENTS.md", null));
   });
 });
 
