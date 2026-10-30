@@ -12,8 +12,8 @@
 #
 # Kept under ${XDG_STATE_HOME:-$HOME/.local/state}/specnaut/, beside the
 # stamps and outside the workspace for the same reason (spec 036 § 11 F3):
-#   baselines/<sha256(toplevel)>/<session_id>/  sums, and a copy of each file
-#   kept/<sha256(toplevel)>/                    the copies a blocked stop kept
+#   baselines/<sha256(GUARD_ROOT)>/<session_id>/ sums, and a copy of each file
+#   kept/<sha256(GUARD_ROOT)>/                   the copies a blocked stop kept
 
 # _baseline_lists — the files, and the approval kind each one needs.
 _baseline_lists() {

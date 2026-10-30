@@ -29,8 +29,8 @@
 # reads as a word the shell rewrites (_listed.sh). CMD_MOVED=1 when
 # the line may act on another repository: cd/pushd, env -C, a GIT_DIR/
 # GIT_WORK_TREE/GIT_CONFIG* assignment (and, through _git.sh's cmd_git,
-# git -C/--git-dir/--work-tree and -c alias.*). CMD_SCRUB=1 when it sets or
-# clears what the landing scripts' hold reads (_cmd_env).
+# git -C/--git-dir/--work-tree and -c alias.*). CMD_SCRUB=1 when it may set or
+# clear what the landing scripts' hold reads (_cmd_env, _cmd_scrub).
 CMD_SEP=$'\x1f'
 # shellcheck source=_simple.sh
 . "${BASH_SOURCE[0]%/*}/_simple.sh" || guard_fail "_simple.sh is missing beside _command.sh"
@@ -54,6 +54,18 @@ _cmd_env() {
     BASH_ENV | ENV) _cmd_script "${1#*=}" ;;
     CLAUDE_CODE_SESSION_ID | CODEX_SESSION_ID | XDG_STATE_HOME) CMD_SCRUB=1 ;;
   esac
+}
+
+# _cmd_scrub <segment> — CMD_SCRUB on a word holding one of _cmd_env's names
+# whole (no [A-Za-z0-9_] beside it), a read too: `read`, `for`, `printf -v`,
+# `declare -n`, `${X:=…}` write one with no assignment word. And on `exec` with
+# a cluster holding c before any `a` (its value): `env -i` by another name.
+_cmd_scrub() {
+  local x e=0 IFS=$CMD_SEP re='(^|[^A-Za-z0-9_])(CLAUDE_CODE_SESSION_ID|CODEX_SESSION_ID|XDG_STATE_HOME)([^A-Za-z0-9_]|$)'
+  if [[ $1 =~ $re ]]; then CMD_SCRUB=1; fi
+  for x in $1; do
+    case $e:$x in *:exec | *:*/exec | 2:*) e=1 ;; 1:-[!-]*) case ${x%%a*} in *c*) CMD_SCRUB=1 ;; esac; case $x in *a) e=2 ;; esac ;; *) e=0 ;; esac
+  done
 }
 
 # _cmd_env_opts <index of env> — env's options, up to k (_simple.sh's
@@ -107,7 +119,7 @@ _cmd_word() {
 # _cmd_keyword — the word read so far is a reserved word in command position,
 # so a `(` right after it opens a subshell: `if(…)`, `then(…)`, `while(…)`.
 _cmd_keyword() { case $word in if | then | else | elif | do | while | until) _cmd_cmdpos ;; *) return 1 ;; esac; }
-_cmd_end() { _cmd_word; if [ -n "$seg" ]; then _cmd_emit "$seg" "$depth"; fi; seg=""; }
+_cmd_end() { _cmd_word; if [ -n "$seg" ]; then _cmd_scrub "$seg"; _cmd_emit "$seg" "$depth"; fi; seg=""; }
 
 # A `$(` or backtick opens: the command around it is set aside (sw/ss, sp deep)
 # with a `$` standing in for the substitution, and the substitution is read as

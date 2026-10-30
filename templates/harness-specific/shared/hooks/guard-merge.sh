@@ -137,5 +137,5 @@ done
 [ ${#reasons[@]} -gt 0 ] || guard_allow
 
 approval_require merge \
-  "merge: manual — $(IFS=';'; echo "${reasons[*]}") would land on the base branch (${base:-unknown}) without the user" \
+  "merge: manual — held: $(IFS=';'; echo "${reasons[*]}"). Landing on the base branch (${base:-unknown}) needs the user's own \`merge\`" \
   "To let it through, reply \`merge\` (or \`/task merge\`) — a plain \"yes\" does not approve it."

@@ -33,7 +33,7 @@ const WINDOWS = Deno.build.os === "windows";
  * on a guard that never reached its rule (cli#711).
  */
 const REFUSALS: readonly RegExp[] = [
-  /^specnaut guard-merge: merge: manual — .+ would land on the base branch .+ To let it through, reply /,
+  /^specnaut guard-merge: merge: manual — held: .+\. Landing on the base branch \(.+\) needs the user's own `merge`\. To let it through, reply /,
   /^specnaut guard-release: .+ publishes a release, .+ To let it through, reply /,
   /^specnaut protect-generated: denied: .+ is \.specnaut\/installed\.lock\. /,
   /^specnaut guard-dispatch-model: '[^']+' is a Specnaut agent: /,

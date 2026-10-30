@@ -6,9 +6,12 @@ import { bash, GATED, verdict } from "./guard_merge_fixture.ts";
  * Spec 048 § 8 F2(b) — the landing scripts' hold finds the user's approval
  * through the session id the harness exports (CLAUDE_CODE_SESSION_ID,
  * CODEX_SESSION_ID) and the state dir (XDG_STATE_HOME). A line that sets or
- * clears any of them, or empties the environment (`env -i`), would send
- * merge-hold.sh to another stamp, or to none — so the parser marks it opaque,
- * and guard-merge gates it under manual. HOME is left out: too common.
+ * clears any of them, or empties the environment (`env -i`, `exec -c`), would
+ * send merge-hold.sh to another stamp, or to none — so the parser sets
+ * CMD_SCRUB, and guard-merge gates it under manual. The names are swept as
+ * whole words, not matched as assignments: `read`, `for`, `printf -v`,
+ * `declare -n` and `${X:=…}` all write one without an assignment word, so a
+ * line that merely reads one is gated too. HOME is left out: too common.
  */
 
 const LAND = "bash .specnaut/scripts/bash/land-feature.sh";
@@ -43,13 +46,26 @@ const GATED_FORMS: readonly string[] = [
   "env -i -u HOME ls",
   "bash -c 'unset CLAUDE_CODE_SESSION_ID; ls'",
   "echo $(env -i ls)",
+  "exec -c make land",
+  "exec -lc make land",
+  "exec -a x -c make land",
+  // Writes without an assignment word: only the whole-word sweep sees them.
+  "read -r CLAUDE_CODE_SESSION_ID </dev/null; make land",
+  'for CLAUDE_CODE_SESSION_ID in ""; do make land; done',
+  'printf -v CLAUDE_CODE_SESSION_ID "%s" ""; make land',
+  "declare -n r=CLAUDE_CODE_SESSION_ID; r=; make land",
+  ": ${XDG_STATE_HOME:=/tmp/forged}; make land",
+  // A read is a whole word too, and `${X:=…}` above is why it cannot pass.
+  "echo $CLAUDE_CODE_SESSION_ID $CODEX_SESSION_ID",
+  'printf "%s\\n" "$XDG_STATE_HOME"',
+  "printenv CLAUDE_CODE_SESSION_ID",
   // An assignment prefix with `+=` is one too: bash runs `FOO+=1 git push`
   // as a push. It used to be read as a command named `FOO+=1`.
   "FOO+=1 git push origin main",
   "GIT_DIR+=/x git push origin feat",
 ];
 
-/** Allowed in both modes: the same commands on another variable, or reading these. */
+/** Allowed in both modes: the same commands on another variable, or a name that only contains one. */
 const ALLOWED_FORMS: readonly string[] = [
   "unset FOO",
   "unset -v FOO BAR",
@@ -65,9 +81,12 @@ const ALLOWED_FORMS: readonly string[] = [
   "FOO+=1 ls",
   "export FOO=1",
   "declare -x BAR",
-  "echo $CLAUDE_CODE_SESSION_ID $CODEX_SESSION_ID",
-  'printf "%s\\n" "$XDG_STATE_HOME"',
-  "printenv CLAUDE_CODE_SESSION_ID",
+  "echo $XDG_STATE_HOME_X",
+  "ls MY_XDG_STATE_HOME",
+  "exec ls",
+  "exec -l ls",
+  "exec -a c ls", // `c` is -a's value, not the flag
+  "exec -ac ls", // likewise: a valued letter takes the rest of its cluster
 ];
 
 Deno.test("guard-merge: a line that changes what the landing hold reads is gated under manual", async () => {

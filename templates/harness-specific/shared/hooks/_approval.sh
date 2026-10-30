@@ -4,13 +4,13 @@
 # gated arm resolves through (FR-017).
 #
 # The stamp sits OUTSIDE the workspace, under
-#   ${XDG_STATE_HOME:-$HOME/.local/state}/specnaut/approvals/<sha256(toplevel)>/<session_id>
+#   ${XDG_STATE_HOME:-$HOME/.local/state}/specnaut/approvals/<sha256(GUARD_ROOT)>/<session_id>
 # because Codex's workspace-write sandbox refuses the model's writes there
 # while hooks, spawned unsandboxed, can write it (§ 11 F3, Measured). It holds
 # {session_id, turn_id, kind}. Claude's prompts carry no turn_id: its stamp is
 # scoped to the session and deleted by the Stop hook at the end of the turn.
-# The project is keyed by GUARD_ROOT (guard_root), hashed — never the caller's
-# cwd or the git toplevel — so every reader of one project finds one stamp.
+# The project is keyed by GUARD_ROOT (guard_root), hashed — the installed
+# root, never the caller's cwd — so every reader of one project finds one stamp.
 # Two readers: approved, for a hook's payload, and approved_session, for
 # merge-approved.sh, which the landing scripts run outside any payload.
 

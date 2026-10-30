@@ -15,7 +15,7 @@ export type Verdict = "allow" | "ask" | "deny";
  * (cli#711).
  */
 const DENY =
-  /^specnaut guard-merge: merge: manual — .+ would land on the base branch .+ To let it through, reply /;
+  /^specnaut guard-merge: merge: manual — held: .+\. Landing on the base branch \(.+\) needs the user's own `merge`\. To let it through, reply /;
 
 /** The guard's answer, as each harness sees it — or what went wrong. */
 export function verdict(r: Run): Verdict | string {
