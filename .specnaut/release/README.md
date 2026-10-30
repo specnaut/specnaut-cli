@@ -1,10 +1,16 @@
 # `.specnaut/release/` — Release contract
 
-Two scripts compose the Specnaut CLI release pipeline alongside the bundled tag + notes scripts. The
-design spec (2026-05-26, "release flow") lives in the maintainer workspace.
+These scripts compose the Specnaut CLI release pipeline alongside the bundled tag + notes scripts.
+The design spec (2026-05-26, "release flow") lives in the maintainer workspace.
 
 - `preflight.sh` — runs before any release mutation: branch, cleanliness, the `ci` AND `smoke`
   workflows green on HEAD, smoke audit, bundle, test. Exits non-zero on any gate failure.
+- `pretag.sh <tag> [binary]` — runs after the version bump, `deno task bundle` and the tests, before
+  the tag: compiles the host target with `scripts/build.ts` (or takes `[binary]`) and runs
+  `smoke-upgrade.sh <tag>` on it with an absolute path. It cannot be part of `preflight.sh`, because
+  the smoke asserts the lock ends at `<tag>`'s templates version, which only exists once bumped.
+  Exit 1 blocks the tag. Exit 3 (no release before `<tag>`) and exit 4 (the previous project could
+  not be prepared) are named skips that print the re-run command — never a pass.
 - `postflight.sh <tag>` — runs after the tag has been pushed: watches `release.yml`, verifies the
   GitHub Release has its assets, verifies the Homebrew tap formula bumped, refreshes the local
   binary, verifies the artefacts against the attestation, then runs the published binary end to end
@@ -13,10 +19,12 @@ design spec (2026-05-26, "release flow") lives in the maintainer workspace.
   installed binary in a throwaway directory. With `smoke-upgrade.sh`, the only checks that execute
   what users download.
 - `smoke-upgrade.sh <tag> [binary]` — installs the previous published stable release with
-  `install.sh`, scaffolds with it, and upgrades that project twice with the installed binary: a
-  declared file the bundle does not ship stays on disk, in the lock and reported, and a lock entry
-  outside Specnaut's folders leaves its file untouched. Exit 1 is a broken release; exit 3 (no
-  release before `<tag>`) and exit 4 (the previous project could not be prepared) are skips.
+  `install.sh`, scaffolds with it, and upgrades that project twice with `[binary]`: a declared file
+  the bundle does not ship stays on disk, in the lock and reported, a lock entry outside Specnaut's
+  folders leaves its file untouched, and after each run `.claude/CLAUDE.md` is a symlink whose text
+  is exactly `../AGENTS.md`. Run by `pretag.sh` on a local build and by `postflight.sh` on the
+  published binary. Exit 1 is a broken release; exit 3 (no release before `<tag>`) and exit 4 (the
+  previous project could not be prepared) are skips.
 
 These files are convention-pathed (the release skill expects them here). To adjust a check, edit the
 relevant script — never inline new checks into the skill, or you defeat the whole point of the

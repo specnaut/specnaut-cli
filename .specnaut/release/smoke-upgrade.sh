@@ -1,23 +1,29 @@
 #!/usr/bin/env bash
-# Upgrade a project made by the PREVIOUS release with the PUBLISHED binary, twice.
+# Upgrade a project made by the PREVIOUS release with the binary of <tag>, twice.
 #
 # Usage: smoke-upgrade.sh <tag> [binary]     (binary defaults to `specnaut`)
 #
-# `smoke-published.sh` runs a fresh `init`; nothing after publish ran `upgrade`,
+# Two callers: `pretag.sh` with a locally compiled binary, after the bump and
+# before the tag (cli#696), and `postflight.sh` with the published one.
+#
+# `smoke-published.sh` runs a fresh `init`; nothing else ran `upgrade` on a binary,
 # so a release whose fixes live there was verified only by hand (cli#670). This
 # installs the previous release with `install.sh` (SHA-256 verified), scaffolds
-# with it, plants what upgrade must not lose, and asks three things:
+# with it, plants what upgrade must not lose, and asks four things:
 #
 #   1. each `specnaut upgrade` exits 0, and the lock ends at THIS release;
 #   2. a declared file the bundle does not ship is still on disk and in the lock
 #      after the second run, and the second run still reports it (cli#668);
-#   3. a lock entry outside Specnaut's folders leaves its file untouched (cli#665).
+#   3. a lock entry outside Specnaut's folders leaves its file untouched (cli#665);
+#   4. after each run `.claude/CLAUDE.md` is a symlink whose text is exactly `../AGENTS.md` —
+#      the relink upgrade applies (`upgrade_context_links.ts`); a regular file
+#      or a link with other text is a regression this smoke used not to see.
 #
 # The previous release is the highest PUBLISHED stable release below <tag>, read
 # from the Releases API, never hard-coded and never from local tags: a tag with
 # no release cannot be installed, and a shallow clone lacks tags.
 #
-# Exit 0 = all held. Exit 1 = the published `upgrade` failed a check; the reason
+# Exit 0 = all held. Exit 1 = the `upgrade` of <tag> failed a check; the reason
 # is printed. Exit 2 = usage. Exit 3 = skipped: no release before <tag>.
 # Exit 4 = the previous release's project could not be prepared (the API, the
 # install, its `init`, its lock format) — nothing was learned about <tag>, so a
@@ -81,6 +87,8 @@ git init -q || unprepared "could not create a throwaway git repository"
 sha() { if command -v shasum >/dev/null 2>&1; then shasum -a 256 "$1"; else sha256sum "$1"; fi | cut -d' ' -f1; }
 KEPT=.claude/skills/retired-smoke/SKILL.md
 FOREIGN=src/app.ts
+LINK=.claude/CLAUDE.md
+LINK_TO=../AGENTS.md
 mkdir -p "$(dirname "$KEPT")" src
 printf 'retired by upstream, kept by declaration\n' > "$KEPT"
 printf 'export const app = 1;\n' > "$FOREIGN"
@@ -89,6 +97,13 @@ for f in "$KEPT" "$FOREIGN"; do
     "$f" "$(sha "$f")" "${prev#v}" >> .specnaut/installed.lock
 done
 printf 'preserved:\n  - %s\n' "$KEPT" > .specnaut/preserve.yml
+# The previous release may scaffold the link already, so an upgrade that
+# merely leaves it alone would pass check 4 without ever relinking. Plant it as
+# a clone with `core.symlinks=false` checks it out — a file holding the link's
+# text, which upgrade relinks without a backup — so the first run must make it.
+mkdir -p "$(dirname "$LINK")"
+rm -f "$LINK"
+printf '%s\n' "$LINK_TO" > "$LINK"
 foreign_sha="$(sha "$FOREIGN")"
 
 for run in first second; do
@@ -100,9 +115,15 @@ for run in first second; do
     upfail "the $run upgrade did not report that upstream no longer ships $KEPT"
   [ -f "$FOREIGN" ] && [ "$(sha "$FOREIGN")" = "$foreign_sha" ] ||
     upfail "the $run upgrade changed $FOREIGN, which is outside Specnaut's folders"
+  if [ ! -L "$LINK" ]; then
+    [ -e "$LINK" ] || upfail "the $run upgrade left no $LINK, expected a link to $LINK_TO"
+    upfail "the $run upgrade left $LINK a regular file, not a link to $LINK_TO"
+  fi
+  link_text="$(readlink "$LINK")"
+  [ "$link_text" = "$LINK_TO" ] || upfail "the $run upgrade linked $LINK to '$link_text', expected $LINK_TO"
 done
 
 got="$(sed -n 's/^templates_version:[[:space:]]*//p' .specnaut/installed.lock | head -1)"
 [ "$got" = "$want" ] || fail "after upgrading the lock records templates $got, expected $want"
 
-echo "✓ published binary upgrades a $prev project twice: declared orphan kept and reported, $FOREIGN untouched (templates $want)"
+echo "✓ the binary upgrades a $prev project twice: declared orphan kept and reported, $FOREIGN untouched, $LINK linked to $LINK_TO (templates $want)"
