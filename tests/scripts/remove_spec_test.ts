@@ -1,31 +1,9 @@
 import { assertEquals, assertNotEquals, assertStringIncludes } from "@std/assert";
 import { join } from "@std/path";
-import { git, sandbox } from "./git_sandbox.ts";
+import { git } from "./git_sandbox.ts";
+import { BRANCH, files, shipped, state } from "./remove_spec_fixture.ts";
 
 /** spec 042 — remove-spec.sh removes one shipped feature directory, and nothing else. */
-
-const BRANCH = "007-feature";
-
-async function shipped(featureDir = `.specnaut/specs/${BRANCH}`) {
-  const sb = await sandbox();
-  await sb.commit(`.specnaut/specs/${BRANCH}/plan.md`, "# plan\n", "plan(7): x");
-  await sb.commit("src/app.ts", "export {};\n", "feat(7): x");
-  await sb.commit(
-    ".specnaut/feature.json",
-    JSON.stringify({ feature_directory: featureDir, linked_issue: 7 }) + "\n",
-    "chore: feature pointer",
-  );
-  await git(sb.work, "push", "--quiet", "origin", "main");
-  return sb;
-}
-
-/** HEAD, the index and the worktree, so "nothing changed" is one comparison. */
-async function state(work: string) {
-  return [
-    await git(work, "rev-parse", "HEAD"),
-    await git(work, "status", "--porcelain"),
-  ];
-}
 
 Deno.test("it removes the directory and feature.json in one commit carrying the item id, pushed", async () => {
   const sb = await shipped();
@@ -88,9 +66,18 @@ Deno.test("a feature_directory that is not one feature directory is refused, and
     const sb = await shipped(dir);
     try {
       const before = await state(sb.work);
+      const tree = await files(join(sb.work, ".specnaut/specs"));
+      const src = await files(join(sb.work, "src"));
       const r = await sb.script("remove-spec.sh", BRANCH);
       assertEquals(r.code, 22, `${dir}: ${r.stderr}`);
       assertEquals(await state(sb.work), before, `${dir}: something changed`);
+      // The refusal is the point: the spec tree, and what a traversal aims at, are still there.
+      assertEquals(
+        await files(join(sb.work, ".specnaut/specs")),
+        tree,
+        `${dir}: the spec tree moved`,
+      );
+      assertEquals(await files(join(sb.work, "src")), src, `${dir}: src moved`);
     } finally {
       await sb.cleanup();
     }
@@ -186,17 +173,7 @@ Deno.test("a rejected push is 7, says so, and the removal commit stays local", a
   }
 });
 
-Deno.test("a link, a directory in no commit, and a run off the base are skipped with the reason", async () => {
-  // A directory link needs a privilege the Windows runner does not grant; the check is the same.
-  if (Deno.build.os !== "windows") {
-    const link = await shipped(".specnaut/specs/008-link");
-    try {
-      await Deno.symlink("../../src", join(link.work, ".specnaut/specs/008-link"), { type: "dir" });
-      assertStringIncludes((await link.script("remove-spec.sh", "008-link")).stderr, "is a link");
-    } finally {
-      await link.cleanup();
-    }
-  }
+Deno.test("a directory in no commit, and a run off the base, are skipped with the reason", async () => {
   const fresh = await shipped(".specnaut/specs/009-fresh");
   try {
     await Deno.mkdir(join(fresh.work, ".specnaut/specs/009-fresh"), { recursive: true });
@@ -204,6 +181,7 @@ Deno.test("a link, a directory in no commit, and a run off the base are skipped 
     const r = await fresh.script("remove-spec.sh", "009-fresh");
     assertEquals(r.code, 22);
     assertStringIncludes(r.stderr, "the only copy");
+    assertEquals(await files(join(fresh.work, ".specnaut/specs/009-fresh")), ["plan.md:x\n"]);
   } finally {
     await fresh.cleanup();
   }

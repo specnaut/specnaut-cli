@@ -401,6 +401,14 @@
     },
     {
       "category": "backlog-script",
+      "name": "_close_shipped",
+      "suffix": "_close_shipped.sh",
+      "source": "core/skills/task/scripts/_close_shipped.sh",
+      "executable": true,
+      "backend": "local"
+    },
+    {
+      "category": "backlog-script",
       "name": "propagate-parent-status",
       "suffix": "parent-of.sh",
       "source": "core/skills/task/scripts/local/parent-of.sh",
@@ -529,6 +537,14 @@
     },
     {
       "category": "backlog-script",
+      "name": "_close_shipped",
+      "suffix": "_close_shipped.sh",
+      "source": "core/skills/task/scripts/_close_shipped.sh",
+      "executable": true,
+      "backend": "github"
+    },
+    {
+      "category": "backlog-script",
       "name": "cascade-check",
       "suffix": "parent-of.sh",
       "source": "core/skills/task/scripts/github/parent-of.sh",
@@ -633,6 +649,14 @@
     },
     {
       "category": "backlog-script",
+      "name": "_close_shipped",
+      "suffix": "_close_shipped.sh",
+      "source": "core/skills/task/scripts/_close_shipped.sh",
+      "executable": true,
+      "backend": "gitlab"
+    },
+    {
+      "category": "backlog-script",
       "name": "cascade-check",
       "suffix": "parent-of.sh",
       "source": "core/skills/task/scripts/gitlab/parent-of.sh",
@@ -700,6 +724,14 @@
       "name": "close-shipped",
       "suffix": "close-shipped.sh",
       "source": "core/skills/task/scripts/cloud/close-shipped.sh",
+      "executable": true,
+      "backend": "cloud"
+    },
+    {
+      "category": "backlog-script",
+      "name": "_close_shipped",
+      "suffix": "_close_shipped.sh",
+      "source": "core/skills/task/scripts/_close_shipped.sh",
       "executable": true,
       "backend": "cloud"
     },

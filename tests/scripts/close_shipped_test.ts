@@ -1,4 +1,4 @@
-import { assertEquals, assertStringIncludes } from "@std/assert";
+import { assert, assertEquals, assertStringIncludes } from "@std/assert";
 import { DELIMITER, fromFileUrl, join } from "@std/path";
 import { run } from "./git_sandbox.ts";
 
@@ -31,6 +31,8 @@ async function backlog(backend: string, { closed = {}, drifted = [], fail = [] }
     join(SCRIPTS, backend, "close-shipped.sh"),
     join(scripts, "close-shipped.sh"),
   );
+  // The shared body every backend's copy sources, installed beside it (cli#711).
+  await Deno.copyFile(join(SCRIPTS, "_close_shipped.sh"), join(scripts, "_close_shipped.sh"));
   const failing = fail.map((f) => `"${f}"*) exit 1 ;;`).join(" ");
   // Each stub logs its call (to calls.log, in the scripts' directory) and fails on demand.
   const stub = (name: string, body: string) =>
@@ -70,6 +72,7 @@ case "$*" in *--closed*) echo '[${
     );
   }
   return {
+    scripts,
     // By bare name from its own directory: the sibling lookup must not depend on the path's form.
     run: (...args: string[]) =>
       run("bash", ["close-shipped.sh", ...args], scripts, {
@@ -171,6 +174,49 @@ Deno.test("every copy takes issue numbers only", async () => {
         assertEquals((await b.run(...bad)).code, 2, `${backend} ${bad.join(" ")}`);
       }
       assertEquals(await b.calls(), [], `${backend}: a refused call still ran a backlog script`);
+    } finally {
+      await b.cleanup();
+    }
+  }
+});
+
+Deno.test("one body, installed once per backend: the manifest lists _close_shipped.sh for all four", async () => {
+  // A backend-less entry would ship a backlog script to every backend (backend_gating_test).
+  const manifest = JSON.parse(
+    await Deno.readTextFile(new URL("../../templates/manifest.json", import.meta.url)),
+  );
+  const entries = manifest.core
+    .filter((e: { source?: string }) => e?.source === "core/skills/task/scripts/_close_shipped.sh");
+  assertEquals(
+    entries.map((e: { name: string; suffix: string; backend: string }) =>
+      `${e.backend} ${e.name} ${e.suffix}`
+    ).sort(),
+    [
+      "cloud _close_shipped _close_shipped.sh",
+      "github _close_shipped _close_shipped.sh",
+      "gitlab _close_shipped _close_shipped.sh",
+      "local _close_shipped _close_shipped.sh",
+    ],
+  );
+});
+
+Deno.test("cascade-check's stderr reaches the reader; its stdout, the issue titles, does not", async () => {
+  for (const backend of ["github", "gitlab"]) {
+    const b = await backlog(backend);
+    try {
+      await Deno.writeTextFile(
+        join(b.scripts, "cascade-check.sh"),
+        "echo 'TITLE of the issue'\necho 'cascade-check: the forge refused the token' >&2\nexit 3\n",
+      );
+      const r = await b.run("7");
+      assertEquals(r.code, 20, `${backend}: ${r.stdout}${r.stderr}`);
+      assertStringIncludes(r.stderr, "the forge refused the token", backend);
+      assertStringIncludes(
+        r.stdout,
+        "OPEN #7 — not confirmed closed (cascade-check exit 3)",
+        backend,
+      );
+      assert(!(r.stdout + r.stderr).includes("TITLE"), `${backend}: the titles leaked`);
     } finally {
       await b.cleanup();
     }

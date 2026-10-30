@@ -33,8 +33,10 @@ confirmed closed.
    ```
 
    It confirms each issue closed, moves its card to Done, then reconciles the whole board once and
-   prints the sweep's summary line. Exit 20 — an issue was still open, its card left alone; 21 — a
-   move or the reconcile failed. Neither fails the merge, which has happened: report it.
+   prints the sweep's summary line. Its exit table is the header of `_close_shipped.sh` beside it;
+   this maps every exit there. **0** — settled. **20** — an issue was not confirmed closed, its card
+   left alone; **21** — a move or the reconcile failed. Neither fails the merge, which has happened:
+   report it. **2** — usage: a bad number was passed; fix the call.
 4. **Remove the spec directory — once, for the whole epic too:**
 
    ```
@@ -42,10 +44,19 @@ confirmed closed.
    ```
 
    `<branch>` is the feature branch `land-feature.sh` just landed — the one you merged, not one read
-   back from `feature.json`. It runs only on the base branch, only for a `feature_directory` that is
-   directly under `.specnaut/specs/`, named like that branch, and in git history, in its own commit,
-   pushed. Exit 22 is a skip, and its reason is printed — report it, never silently.
+   back from `feature.json`. What it removes, and when it refuses, is the script's header; this list
+   maps every exit that header lists — an exit it does not list is a failure: report it verbatim.
    Never run it before the close succeeded: nobody authorised a removal then.
+   - **0** — removed and pushed: report its line.
+   - **22** — skipped, nothing changed: its reason is printed — report it, never silently.
+   - **24** — the tracked files are removed and pushed; the files it lists are in no commit and were
+     kept. Report them by name and never delete them: they are someone's only copy.
+   - **7** — the push was rejected; the removal commit is on the local base, and `feature.json` with
+     it — so never re-run the script (it would skip, 22). `git pull --rebase --no-autostash origin
+     <base>`, then `git push origin <base>`; a conflict: `git rebase --abort`, report it unpushed.
+   - **23** — something else was staged while it ran: the removal is undone, nothing committed.
+     Report the path it names; that staged work is someone else's — leave it staged.
+   - **2 · 3** — usage, or the base branch is unknown: report it; nothing changed.
 
 ## The report names every item, one line each
 

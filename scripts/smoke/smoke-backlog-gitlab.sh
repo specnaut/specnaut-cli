@@ -105,8 +105,8 @@ check "gitlab sweep treats scanned 0 as a failure, not a quiet run" \
 
 
 echo "═══ spec 042  close-shipped.sh settles the board after the close ═══"
-check "close-shipped.sh present + executable (spec 042)" \
-  '[ -x .specnaut/scripts/backlog/close-shipped.sh ]'
+check "close-shipped.sh present + executable, its shared body _close_shipped.sh beside it (spec 042, cli#711)" \
+  '[ -x .specnaut/scripts/backlog/close-shipped.sh ] && [ -f .specnaut/scripts/backlog/_close_shipped.sh ]'
 # The card moves only once cascade-check.sh proves the issue closed (exit 12):
 # a Done card over an open issue is exactly what sweep-closed.sh flags REOPENED.
 # This backend's sweep takes --since only (it exits 2 on anything else), so the
