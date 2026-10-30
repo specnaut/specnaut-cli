@@ -215,8 +215,6 @@ Overall: PASS | FAIL
 <the aggregated REVIEW SUMMARY block, per phases/review-seats.md>
 ```
 
-If Overall = PASS, surface the verdict summary defined in
-`phases/auto-chain.md`, then follow the project's merge mode from that file:
-under `auto` (the default) invoke `/task merge` in the same turn; under
-`manual` ask for merge confirmation and invoke it on "yes". If FAIL, stop and
-report to the user.
+If Overall = PASS, surface the verdict summary and follow `phases/auto-chain.md`
+from there — it alone says whether `merge` follows in the same turn or is asked
+for. If FAIL, stop and report to the user.

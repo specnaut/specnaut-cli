@@ -11,10 +11,9 @@ import { phase } from "./task_docs.ts";
 
 Deno.test("review, merge and merge-close follow the merge mode instead of always asking", () => {
   const review = phase("review").content;
-  assertStringIncludes(
-    review,
-    "under `auto` (the default) invoke `/task merge` in the same turn",
-  );
+  // The verdict defers to auto-chain.md, the mode's one home, and restates none of it.
+  assertStringIncludes(review, "follow `phases/auto-chain.md`\nfrom there");
+  assert(!review.includes('invoke it on "yes"'), "review.md restates the merge mode");
   const merge = phase("merge").content;
   // The base branch has one home (spec 036); merge.md asks it and never assumes main.
   assertStringIncludes(merge, "bash .specnaut/scripts/bash/base-branch.sh");

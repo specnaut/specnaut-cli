@@ -165,6 +165,7 @@ never a pass. Every review runs it too, in its Phase 0.
 
 ## A standalone item
 
-None of this applies. A standalone task has one commit and one merge; there is
-no per-child tier to run, and a project that has declared gates may still run
-them by hand. The tiers are an epic mechanism.
+Only the per-child `fast` loop is an epic mechanism. A standalone task has one
+commit and one merge, so there is no per-child tier to run; the work-done row —
+the unit suite, the size ratchet and the boundary check — still runs on it,
+through `phases/review.md`.
