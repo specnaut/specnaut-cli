@@ -1,7 +1,8 @@
 # Quality gates — two tiers, declared by the project
 
-Loaded by `phases/implement.md` after each child commit on an epic branch, and
-by `phases/merge.md` once before the merge to the default branch.
+Loaded by `phases/implement.md` after each child commit on an epic branch, by
+`phases/review.md` for the unit suite on the frozen tree, and by
+`phases/merge.md` once before the merge to the default branch.
 
 Looping over an epic's children is only affordable if the per-child check is
 cheap. Running a project's whole suite once per child would cost more than the

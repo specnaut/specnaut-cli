@@ -61,7 +61,8 @@ const tk = (phase: string): PhaseAddress => ({ skill: "task", phase });
 export const CONTRACT_DOCS: ReadonlyArray<ContractDoc> = [
   { skill: "task", doc: "merge-squash", parents: [tk("merge")] },
   { skill: "task", doc: "epic-commits", parents: [tk("implement")] },
-  { skill: "task", doc: "quality-gates", parents: [tk("implement"), tk("merge")] },
+  // `review` runs its middle row — the unit suite, once, on the frozen tree.
+  { skill: "task", doc: "quality-gates", parents: [tk("implement"), tk("review"), tk("merge")] },
   { skill: "task", doc: "epic-fixups", parents: [tk("merge")] },
   { skill: "task", doc: "merge-close", parents: [tk("merge")] },
   { skill: "task", doc: "epic-loop", parents: [tk("implement")] },
@@ -79,10 +80,12 @@ export const CONTRACT_DOCS: ReadonlyArray<ContractDoc> = [
  * (spec 041). Unlike a `SKILL_DOC_RENAMES` row, nothing moves but the
  * ADDENDUM's address: the retired doc's bytes are not the successor's, so they
  * are pruned as an orphan rather than carried. Each row is resolved to its end
- * — never a step through another retired address.
+ * — never a step through another retired address. `from` is a
+ * {@link PhaseAddress}: a fold out of a skill that reads no addendum has no
+ * addendum to carry, so it cannot be written down at all.
  */
 export interface PhaseFold {
-  readonly from: { readonly skill: string; readonly phase: string };
+  readonly from: PhaseAddress;
   readonly into: PhaseAddress;
   readonly reason: string;
 }
@@ -198,11 +201,6 @@ export interface AddendumRename {
  * nobody having asked. The {@link PHASE_FOLDS} follow, with their own reason.
  */
 export function addendumRenames(): ReadonlyArray<AddendumRename> {
-  const folds = PHASE_FOLDS.flatMap((f) =>
-    isAddendumSkill(f.from.skill)
-      ? [{ from: { skill: f.from.skill, phase: f.from.phase }, to: f.into, reason: f.reason }]
-      : []
-  );
   return [
     ...SKILL_DOC_RENAMES.flatMap((r) => {
       const { from, to } = r;
@@ -213,7 +211,7 @@ export function addendumRenames(): ReadonlyArray<AddendumRename> {
         reason: r.reason,
       }];
     }),
-    ...folds,
+    ...PHASE_FOLDS.map((f) => ({ from: f.from, to: f.into, reason: f.reason })),
   ];
 }
 

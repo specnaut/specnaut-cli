@@ -96,7 +96,7 @@ Deno.test("a contract doc is listed and points at the phase(s) that load it", ()
   });
   assertEquals(auditAddendum("task/quality-gates.md")?.problem, {
     kind: "contract-doc",
-    parents: [task("implement"), task("merge")],
+    parents: [task("implement"), task("review"), task("merge")],
   });
 });
 
