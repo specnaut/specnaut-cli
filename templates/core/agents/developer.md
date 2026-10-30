@@ -18,7 +18,7 @@ in line with the project's architecture.
 
 ## First action in every session
 
-1. Read `AGENTS.md` at the project root for the stack and rules. Under each principle of
+1. Read `AGENTS.md` at the project root for the stack and conventions. Under each principle of
    `docs/constitution.md`, note its `Check:` line — the test your change must pass.
 2. Read the feature's `plan.md` when a Specnaut feature directory is in context — the brief or the
    full plan; a `tasks.md` or `spec.md` left by an older release is read as part of it, never

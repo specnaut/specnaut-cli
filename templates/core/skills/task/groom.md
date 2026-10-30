@@ -1,6 +1,6 @@
-# groom — board and delivery hygiene
-
 Read `docs/constitution.md` before anything else: it is this project's binding rules, and no agent edits it unasked.
+
+# groom — board and delivery hygiene
 
 Reachable as **`/task groom`** — the only door — on request ("groom the backlog",
 "run a hygiene pass") or scheduled (`/loop 1h /task groom`). **Owned by `/task`**
