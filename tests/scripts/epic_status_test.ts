@@ -109,23 +109,28 @@ Deno.test("it takes no argument: the base has one home", async () => {
 });
 
 Deno.test("the worked example in epic-commits.md parses as the doc says", async () => {
-  // The format is written for agents in one file and parsed in another; this keeps them one format.
+  // The format is written for agents in one file and parsed in another; this keeps them one
+  // format. The whole example is committed as written — subject AND trailer — so a trailer the
+  // doc spells differently from what the parser reads fails here, not on an epic (cli#711).
   const doc = await Deno.readTextFile(
     fromFileUrl(
       new URL("../../templates/core/skills/task/phases/epic-commits.md", import.meta.url),
     ),
   );
-  const subject = doc.match(/^feat\(T03\): .+ \(#547\)$/m)?.[0];
-  assert(subject, "the worked example is gone from epic-commits.md");
-  const sb = await epicBranch([["feat(T01): a (#545)", "a"], ["feat(T02): b (#546)", "b"], [
-    subject,
-    "c",
-  ]], "540");
+  const block = doc.match(/A worked example[^\n]*\n\n```text\n([\s\S]*?)\n```/)?.[1];
+  assert(block, "the worked example is gone from epic-commits.md");
+  const [subject, ...rest] = block.split("\n");
+  assert(/^feat\(T03\): .+ \(#547\)$/.test(subject), `not the T03 example: ${subject}`);
+  const trailer = rest.filter((l) => l.trim()).at(-1) ?? "";
+  const epic = trailer.match(/#(\d+)$/)?.[1];
+  assert(epic, `the example ends on no trailer naming the epic: ${trailer}`);
+  const sb = await epicBranch([["feat(T01): a (#545)", "a"], ["feat(T02): b (#546)", "b"]], epic);
   try {
+    await sb.commit("c", "c\n", block);
     const r = await sb.script("epic-status.sh");
     assertEquals(r.code, 0, r.stderr);
     assertStringIncludes(r.stdout, "CHILD T03 #547 ");
-    assertStringIncludes(r.stdout, "EPIC #540");
+    assertStringIncludes(r.stdout, `EPIC #${epic}`);
   } finally {
     await sb.cleanup();
   }

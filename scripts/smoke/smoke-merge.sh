@@ -20,6 +20,15 @@ bash "$SMOKE_DIR/bootstrap-vite.sh" "$NAME" >/dev/null
 
 cd "$DIR"
 
+# --- The merge scripts, run (cli#711) ------------------------------------
+# A script that exists is asserted by running it, never by how its source is
+# spelled: a refactor that keeps the behaviour keeps the check green, and one
+# that breaks it fails here even when the text survived. Each scenario is a
+# subshell on a scratch clone of a bare origin, holding this scaffold's
+# scripts, with no global or system git config.
+SCAFFOLD=$PWD
+. "$SMOKE_DIR/_merge_fixtures.sh"
+
 echo "═══ merge phase — close, remove, fold, land ═══"
 # #560 — an epic merge closes N children AND the epic, and moves N+1 cards.
 # The order is derived, not chosen: sweep-closed.sh reports a Done card whose
@@ -60,10 +69,8 @@ check "the EPIC path closes before it moves, in that order (#588 AC4)" \
    grep -qF "Children first, the epic last." .claude/skills/task/phases/merge-close.md'
 # --backlog local installs the local copy, where the move IS the close. A forge
 # copy here (it calls cascade-check.sh) is the installer picking the wrong one.
-check "the installed close-shipped.sh is the local copy: the move is the close (spec 042)" \
-  'grep -qF "the local copy" .specnaut/scripts/backlog/close-shipped.sh &&
-   grep -qF "bash \"\$here/move.sh\" \"\$n\" Done" .specnaut/scripts/backlog/close-shipped.sh &&
-   ! grep -qF "cascade-check.sh" .specnaut/scripts/backlog/close-shipped.sh'
+check "the installed close-shipped.sh is the local copy: the move is the close, no forge asked (spec 042)" \
+  'probe_close_shipped "" "" 5 6 && close_shipped_was 0 "$(printf "move 5 Done\nmove 6 Done")" "DONE #5" "DONE #6"'
 check "cascade-check still gates the parent close (#560 AC2)" \
   'grep -qF "cascade-check.sh <n>" .claude/skills/task/phases/merge-close.md &&
    grep -qF "only exit 0 authorises the close" .claude/skills/task/phases/merge-close.md'
@@ -94,12 +101,14 @@ check "nothing closes when the merge did not push (#560 AC6)" \
 check "the standalone path removes the spec directory (#587 AC1)" \
   'grep -qF "Remove the spec directory" .claude/skills/task/phases/merge-close.md &&
    grep -qF "bash .specnaut/scripts/bash/remove-spec.sh" .claude/skills/task/phases/merge-close.md &&
-   grep -qF "\"feature_directory\"" .specnaut/scripts/bash/remove-spec.sh'
+   (m_shipped && bash .specnaut/scripts/bash/remove-spec.sh 007-x >/dev/null 2>&1 &&
+    [ ! -e .specnaut/specs/007-x ] && [ ! -e .specnaut/feature.json ])'
 # The load-bearing one. Without the history check the step deletes the only
 # copy of a plan that never got its plan-time commit.
 check "the removal refuses a directory git has never seen (#587 AC2)" \
-  'grep -qF "git log --all --oneline -1 -- \"\$dir\"" .specnaut/scripts/bash/remove-spec.sh &&
-   grep -qF "would destroy the only copy" .specnaut/scripts/bash/remove-spec.sh'
+  '(m_shipped .specnaut/specs/009-new && mkdir -p .specnaut/specs/009-new && echo mine >.specnaut/specs/009-new/plan.md &&
+    out=$(bash .specnaut/scripts/bash/remove-spec.sh 009-new 2>&1); rc=$?;
+    [ "$rc" = 22 ] && grep -qF "the only copy" <<<"$out" && [ "$(cat .specnaut/specs/009-new/plan.md)" = mine ])'
 # The push is the one authorisation: the close rides it, and the removal rides
 # the close — never one without the other.
 check "one authorisation covers the close AND the removal, with no second prompt (#587 AC3)" \
@@ -108,23 +117,27 @@ check "one authorisation covers the close AND the removal, with no second prompt
    grep -qF "Never run it before the close succeeded" <<<"$flat" &&
    grep -qF "authorised a removal then" <<<"$flat"'
 check "the removal is its own commit, not folded into the merge (#587 AC4)" \
-  'grep -qF "remove the spec directory for the shipped feature" .specnaut/scripts/bash/remove-spec.sh'
+  '(m_shipped && head=$(git rev-parse HEAD) && bash .specnaut/scripts/bash/remove-spec.sh 007-x >/dev/null 2>&1 &&
+    [ "$(git rev-parse HEAD~1)" = "$head" ] && [ "$(git rev-parse HEAD)" = "$(git rev-parse origin/main)" ] &&
+    [ "$(git log -1 --format=%s)" = "chore(7): remove the spec directory for the shipped feature" ])'
 # An epic is one tree: a per-child removal hits one directory N times. The
 # script takes exactly one argument, the landed branch, never a child id.
 check "an epic removes one directory once, never per child (#587 AC5)" \
   'grep -qF "once, for the whole epic too" .claude/skills/task/phases/merge-close.md &&
-   grep -qF "usage: remove-spec.sh <landed-branch>\"" .specnaut/scripts/bash/remove-spec.sh &&
-   grep -qF "[ \$# -ne 1 ]" .specnaut/scripts/bash/remove-spec.sh'
+   (m_shipped && bash .specnaut/scripts/bash/remove-spec.sh 007-x 008-y >/dev/null 2>&1; [ $? = 2 ] &&
+    [ -f .specnaut/specs/007-x/plan.md ])'
 # feature.json NAMES the removed directory, and common.sh never checks that
 # the name still resolves: get_feature_paths returns the deleted path with
 # exit 0 and no warning, its branch-contradiction guard skipped off a feature
 # branch. Measured, not reasoned. The removal must take it along.
 check "the removal takes feature.json with it, not just the directory (#587)" \
-  'grep -qF "git rm -r --quiet -- \"\$dir\" .specnaut/feature.json" \
-     .specnaut/scripts/bash/remove-spec.sh'
+  '(m_shipped && bash .specnaut/scripts/bash/remove-spec.sh 007-x >/dev/null 2>&1 &&
+    git show --name-status --format= HEAD | grep -qx "D	.specnaut/feature.json")'
 check "a skip is reported, never silent (#587 AC6)" \
   'grep -qF "report it, never silently" .claude/skills/task/phases/merge-close.md &&
-   grep -qF "remove-spec: skipped — " .specnaut/scripts/bash/remove-spec.sh'
+   (m_shipped && git switch -q -c elsewhere &&
+    out=$(bash .specnaut/scripts/bash/remove-spec.sh 007-x 2>&1); [ $? = 22 ] &&
+    grep -qF "remove-spec: skipped — HEAD is not main" <<<"$out")'
 # orphan-specs.md walks the same directories and must NOT delete. Its read-only
 # line survives verbatim; what it gained is why it does not contradict the
 # phase that does delete — without that, the next reader reads one of the two
@@ -149,9 +162,10 @@ check "a fixup is written against its own child, not matched afterwards (#559)" 
   'grep -qF "git commit --fixup=" .claude/skills/task/phases/epic-fixups.md'
 # Spec 042 moved the fold's checks into fold-fixups.sh. The tree is compared
 # with the one recorded BEFORE the fold (PRE), never with the result itself.
-check "the fold verifies the tree did not move (#559 AC5)" \
-  'grep -qF "the tree moved during the fold" .specnaut/scripts/bash/fold-fixups.sh &&
-   grep -qF "\$pre^{tree}" .specnaut/scripts/bash/fold-fixups.sh'
+check "the fold folds the fixup into its own child and keeps the tree (#559 AC5)" \
+  '(m_epic && tree=$(git rev-parse "HEAD^{tree}") && bash .specnaut/scripts/bash/fold-fixups.sh >/dev/null 2>&1 &&
+    [ "$(git rev-parse "HEAD^{tree}")" = "$tree" ] && [ "$(git show HEAD~1:a)" = fixed ] &&
+    [ "$(git log --format=%s refs/heads/main..HEAD | grep -c "fixup!")" = 0 ])'
 # Prose wraps. A phrase that reads as one sentence is several lines in the
 # file, and a line-based grep misses it — three assertions today have failed
 # for exactly that, on this ticket and on #557 and #561 before it. Newlines
@@ -163,16 +177,15 @@ check "the fold verifies the tree did not move (#559 AC5)" \
 check "and it says so for THIS procedure, not by inheritance (#559 AC7)" \
   'grep -qF "runs three checks" <<<"$(tr "\n" " " < .claude/skills/task/phases/epic-fixups.md)" &&
    ! grep -qF "merge-squash" .claude/skills/task/phases/epic-fixups.md'
-check "the fold verifies the worktree is empty afterwards (#559 AC6)" \
-  'grep -qF "the worktree is not clean after the fold" .specnaut/scripts/bash/fold-fixups.sh'
+check "the fold refuses a dirty worktree (#559 AC6)" \
+  '(m_epic && echo stray >stray.txt && bash .specnaut/scripts/bash/fold-fixups.sh >/dev/null 2>&1; [ $? = 11 ])'
 check "a surviving fixup! is a finding, not something to fold by eye (#559)" \
-  'grep -qF "a fixup! survived" .specnaut/scripts/bash/fold-fixups.sh &&
+  '(m_epic && m_commit c "fixup! no such child" && bash .specnaut/scripts/bash/fold-fixups.sh >/dev/null 2>&1; [ $? = 12 ]) &&
    grep -qF "attribute it by sha" .claude/skills/task/phases/epic-fixups.md'
-# The fold no longer diffs — it compares tree ids — so the hazard is held
-# absent: a `diff` reintroduced here brings it back.
-check "the fold does not read diff exit 2 as \"they differ\" (#559)" \
-  '! grep -qw "diff" .specnaut/scripts/bash/fold-fixups.sh &&
-   grep -qF "HEAD^{tree}" .specnaut/scripts/bash/fold-fixups.sh'
+# The fold compares tree ids, so a `diff` exit 2 cannot pass for "they differ":
+# --verify against the PRE a stopped fold recorded is the path that reads them.
+check "the fold verifies by tree id, and --verify takes only the PRE it recorded (#559)" \
+  '(m_epic && bash .specnaut/scripts/bash/fold-fixups.sh --verify "$(git rev-parse HEAD)" >/dev/null 2>&1; [ $? = 2 ])'
 
 # Spec 042 — the merge mechanics live in five scripts. Each doc calls its
 # script; the absence halves keep a second, inline spelling of it out.
@@ -209,7 +222,10 @@ check "a phase that cites another phase's step names the step that does it (spec
 check "merge.md asks the BRANCH which rule applies, not the board (#557)" \
   'grep -qF "Ask the branch, not the board" .claude/skills/task/phases/merge.md &&
    grep -qF "Epic: #" .claude/skills/task/phases/merge.md &&
-   grep -qF "range=\"refs/heads/\$base..HEAD\"" .specnaut/scripts/bash/epic-status.sh'
+   (m_repo && git tag main HEAD && git switch -q -c epic && m_commit a "feat(T01): a (#51)" "Epic: #50" &&
+    m_commit b "feat(T02): b (#52)" "Epic: #50" && git switch -q main && m_commit l "chore: base moves" && git tag -f main HEAD~1 >/dev/null &&
+    git switch -q epic && out=$(bash .specnaut/scripts/bash/epic-status.sh 2>/dev/null) &&
+    [ "$(cut -d" " -f1-3 <<<"$out" | tr "\n" ,)" = "CHILD T01 #51,CHILD T02 #52,EPIC #50," ])'
 check "merge.md says an epic branch is NOT squashed (#557)" \
   'grep -qF "an epic**: do **not** squash" .claude/skills/task/phases/merge.md'
 # Spec 042 cut the sentence from merge.md; the rule is the loop's, and lives

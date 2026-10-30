@@ -1,4 +1,5 @@
-import { assert, assertStringIncludes } from "@std/assert";
+import { assert, assertEquals, assertStringIncludes } from "@std/assert";
+import { git, sandbox } from "../scripts/git_sandbox.ts";
 import { CORE_BUNDLE } from "../../src/templates_bundle.ts";
 import type { CoreEntry } from "../../src/domain/core_bundle.ts";
 import { skillDocName } from "../../src/domain/core_bundle.ts";
@@ -100,15 +101,27 @@ Deno.test("merge documents the protected-branch limit and refuses the forge squa
 
 Deno.test("a merge ends on the base branch, verified rather than assumed", async () => {
   // Spec 042 moved the mechanics into land-feature.sh; the rule moved with them.
-  const script = await Deno.readTextFile(
-    new URL("../../templates/core/specnaut/scripts/bash/land-feature.sh", import.meta.url),
-  );
-  assertStringIncludes(script, "git branch --quiet -d");
-  // -D would paper over a merge that did not actually land.
-  // Commands only: the refusal message itself says "never --force".
-  const commands = script.split("\n").filter((l) => !/^\s*(#|echo )/.test(l)).join("\n");
-  assert(!/branch[^\n]* -D\b|--force\b|push[^\n]* -f\b/.test(commands), "land-feature.sh forces");
-  assertStringIncludes(script, 'if [ "$now" != "$base" ]');
+  // Asserted by running it (cli#711): the landing leaves the person on the base,
+  // the branch gone, and origin at the same commit — never by how it is spelled.
+  // Force-pushing and force-deleting are held absent by land_feature_test's exit
+  // 7 (a rejected push stays rejected) and exit 11 (a branch that will not delete).
+  const sb = await sandbox();
+  try {
+    await git(sb.work, "switch", "--quiet", "-c", "feature");
+    await sb.commit("f", "x\n", "feat(7): a feature");
+    const r = await sb.script("land-feature.sh");
+    assertEquals(r.code, 0, r.stderr);
+    assertEquals(await git(sb.work, "symbolic-ref", "--short", "HEAD"), "main");
+    assertEquals(await git(sb.work, "branch", "--list", "feature"), "", "the branch survived");
+    assertEquals(
+      await git(sb.work, "rev-parse", "HEAD"),
+      await git(sb.remote, "rev-parse", "main"),
+      "origin is not where the landing says",
+    );
+  } finally {
+    await sb.cleanup();
+  }
+  // The phase's half is prose with no script behind it: what the agent is told.
   const { content } = mergePhase();
   assertStringIncludes(content, "bash .specnaut/scripts/bash/land-feature.sh");
   assertStringIncludes(content, "the person who asked must be back where they work");
@@ -140,16 +153,24 @@ Deno.test("merge keeps the backlog close step intact", () => {
 // close are read before the landing and kept, never re-read after it.
 Deno.test("the epic is read in a step before the landing, and the close never re-reads it", () => {
   const { content } = mergePhase();
-  const stepOf = (needle: string) => {
-    const at = content.indexOf(needle);
-    assert(at >= 0, `merge.md no longer calls ${needle}`);
-    const steps = [...content.slice(0, at).matchAll(/^(\d+)\. \*\*/gm)];
-    return Number(steps.at(-1)?.[1]);
+  // Every occurrence, not the first: a second epic-status.sh call after the
+  // landing would read the empty range, and a first-match check passes it (cli#711).
+  const stepsOf = (needle: string) => {
+    const steps: number[] = [];
+    for (let at = content.indexOf(needle); at >= 0; at = content.indexOf(needle, at + 1)) {
+      const heads = [...content.slice(0, at).matchAll(/^(\d+)\. \*\*/gm)];
+      steps.push(Number(heads.at(-1)?.[1]));
+    }
+    assert(steps.length > 0, `merge.md no longer calls ${needle}`);
+    return steps;
   };
-  const read = stepOf("bash .specnaut/scripts/bash/epic-status.sh");
-  const land = stepOf("bash .specnaut/scripts/bash/land-feature.sh");
+  const read = stepsOf("bash .specnaut/scripts/bash/epic-status.sh");
+  const land = stepsOf("bash .specnaut/scripts/bash/land-feature.sh");
   // Step 1: the step merge-close.md cites as where the CHILD and EPIC lines come from.
-  assert(read === 1 && read < land, `epic-status.sh at step ${read}, land-feature.sh at ${land}`);
+  assert(
+    read.every((s) => s === 1) && Math.max(...read) < Math.min(...land),
+    `epic-status.sh at steps ${read}, land-feature.sh at ${land}`,
+  );
   const close = closeDoc().content;
   assert(
     !close.includes("bash .specnaut/scripts/bash/epic-status.sh"),

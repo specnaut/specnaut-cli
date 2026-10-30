@@ -1,5 +1,15 @@
 import { assertEquals } from "@std/assert";
-import { HARNESSES, makeRepo, pool, sandbox } from "./hook_sandbox.ts";
+import { copy } from "@std/fs";
+import { join } from "@std/path";
+import {
+  bashPath,
+  HARNESSES,
+  HOOKS_DIR,
+  makeRepo,
+  payload,
+  pool,
+  sandbox,
+} from "./hook_sandbox.ts";
 import { bash, GATED, verdict } from "./guard_merge_fixture.ts";
 
 /**
@@ -70,6 +80,14 @@ const SPELLED: ReadonlyArray<[command: string, gated: boolean]> = [
   ["echo $HOME ${PWD} $(date)", false],
   ['"$HOME/bin/tool" --help', false],
   ["[ -f land-feature.sh ] && [[ -n $x ]]", false],
+  // a listed name merely mentioned — an argument, a string, a comment — runs nothing (cli#711)
+  ["echo land-feature.sh", false],
+  ["git log --grep remove-spec.sh", false],
+  ['echo "next: bash .specnaut/scripts/bash/land-feature.sh"', false],
+  ["printf '%s\\n' 'remove-spec.sh 007-x'", false],
+  ['git commit -m "chore: run land-feature.sh"', false],
+  ["git status # bash .specnaut/scripts/bash/land-feature.sh", false],
+  ["git status #remove-spec.sh 007-x", false],
 ];
 
 /** [command, gated under manual?] — a wrapper reads like the command it runs. */
@@ -161,6 +179,48 @@ Deno.test("guard-merge: a listed script spelled in another case, a glob or a var
         : [`${h} [${mode}] ${JSON.stringify(command)}: want ${want}, got ${v}`];
     });
     assertEquals(wrong, [], wrong.join("\n"));
+  } finally {
+    await sb.cleanup();
+  }
+});
+
+Deno.test("guard-merge: a blank or whitespace-only line in the list matches nothing", async () => {
+  // Read as an entry, a whitespace-only line has no words to compare — so it
+  // matched every command, and `ls` was held under manual (cli#711). `git` takes its own path.
+  const sb = await sandbox();
+  try {
+    const hooks = join(sb.dir, "hooks");
+    await copy(HOOKS_DIR, hooks);
+    await Deno.writeTextFile(
+      join(hooks, "merge-commands.txt"),
+      "# only blanks\n\n   \n\t\n \t \r\n",
+    );
+    const repo = await makeRepo(sb, { head: "feat" });
+    for (const h of HARNESSES) {
+      const input = await payload(h, "pre_tool_use_bash", {
+        cwd: repo,
+        tool_input: { command: "ls -la" },
+      });
+      const out = await new Deno.Command("bash", {
+        args: [bashPath(join(hooks, "guard-merge.sh")), h],
+        cwd: sb.dir,
+        env: sb.env,
+        clearEnv: true,
+        stdin: "piped",
+        stdout: "piped",
+        stderr: "piped",
+      }).spawn();
+      const w = out.stdin.getWriter();
+      await w.write(new TextEncoder().encode(JSON.stringify(input)));
+      await w.close();
+      const r = await out.output();
+      const dec = new TextDecoder();
+      assertEquals(
+        verdict({ code: r.code, stdout: dec.decode(r.stdout), stderr: dec.decode(r.stderr) }),
+        "allow",
+        `${h}: a blank line gated ls`,
+      );
+    }
   } finally {
     await sb.cleanup();
   }

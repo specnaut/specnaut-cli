@@ -25,6 +25,50 @@ export interface Run {
   stderr: string;
 }
 
+/**
+ * One HOME for every child of this process, empty and outside any repository:
+ * the developer's `~/.gitconfig` (an alias, `init.defaultBranch`, a signing
+ * key, `url.*.insteadOf`) must not decide what a merge script does here.
+ */
+let isolatedHome: string | undefined;
+function home(): string {
+  if (!isolatedHome) {
+    const dir = Deno.makeTempDirSync({ prefix: "specnaut-merge-home-" });
+    isolatedHome = dir;
+    globalThis.addEventListener("unload", () => {
+      try {
+        Deno.removeSync(dir, { recursive: true });
+      } catch (e) {
+        console.warn(`git_sandbox: could not remove ${dir}: ${e}`);
+      }
+    });
+  }
+  return isolatedHome;
+}
+
+/**
+ * The environment a child starts from: the parent's, minus every `GIT_*`
+ * variable (a `GIT_DIR`, a `GIT_CONFIG_COUNT` pair, a hook's `GIT_INDEX_FILE`),
+ * with an isolated HOME, no global or system config, and the C locale — so an
+ * assertion on git's own wording holds in any language (cli#711).
+ */
+function hermetic(): Record<string, string> {
+  const base = Object.fromEntries(
+    Object.entries(Deno.env.toObject()).filter(([k]) => !/^GIT_/i.test(k)),
+  );
+  const h = home();
+  return {
+    ...base,
+    HOME: h,
+    USERPROFILE: h,
+    XDG_CONFIG_HOME: join(h, ".config"),
+    GIT_CONFIG_GLOBAL: join(h, ".gitconfig"),
+    GIT_CONFIG_NOSYSTEM: "1",
+    LC_ALL: "C",
+    LANG: "C",
+  };
+}
+
 export async function run(
   cmd: string,
   args: string[],
@@ -34,7 +78,9 @@ export async function run(
   const out = await new Deno.Command(cmd, {
     args,
     cwd,
+    clearEnv: true,
     env: {
+      ...hermetic(),
       GIT_AUTHOR_NAME: "t",
       GIT_AUTHOR_EMAIL: "t@example.test",
       GIT_COMMITTER_NAME: "t",

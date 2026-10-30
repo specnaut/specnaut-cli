@@ -16,7 +16,8 @@
 # every script line: what it names is unknown here, so it is gated (fail
 # closed). An argument is never judged so: `ls *.sh` runs `ls`.
 # `<words> except <flag>`: that flag anywhere in the segment exempts it.
-# `#` comments and blank lines are skipped; a `\r` (a CRLF checkout) is read past.
+# `#` comments and blank or whitespace-only lines are skipped; a `\r` (a CRLF
+# checkout) is read past.
 
 # _listed_expands <word> — the shell rewrites it before it runs: a `$`, a
 # substitution (_command.sh leaves a `$` where one stood), `*`, `?`, a `(`
@@ -39,6 +40,9 @@ listed() {
     entry=${line%% except *} except=""
     if [ "$entry" != "$line" ]; then except=${line#* except }; fi
     read -r -a e <<<"$entry"
+    # Blank or whitespace-only: no words to compare, so it would match every
+    # command. It matches nothing (cli#711).
+    [ -n "${e[0]:-}" ] || continue
     ok=1
     for ((i = 0; i < ${#e[@]}; i++)); do
       if [ "${e[i]}" = "${POS[i]:-}" ]; then continue; fi
