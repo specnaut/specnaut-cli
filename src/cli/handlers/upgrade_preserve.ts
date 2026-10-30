@@ -39,9 +39,11 @@ export async function resolveUpgradePreserves(
     specAutogen: lock.specAutogen,
   });
   // A lock key counts only where upgrade could act on it: outside Specnaut's
-  // folders it is refused whatever it declares (cli#665).
+  // folders it is refused whatever it declares (cli#665). The same scope the
+  // orphan path uses, exact-name files included — without them a declared
+  // retired file was warned unmanaged, then deleted.
   const tracked = [...lock.entries.keys()].filter((d) =>
-    orphanScope(d, harness.managedRoots) === "in-scope"
+    orphanScope(d, harness.managedRoots, harness.managedFiles) === "in-scope"
   );
   const managed = [...Object.keys(mapped), ...tracked]
     .filter((d) => !parentManaged || !isAgenticPath(d));

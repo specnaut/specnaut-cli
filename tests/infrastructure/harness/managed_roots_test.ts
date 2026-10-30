@@ -74,11 +74,26 @@ for (const harness of HARNESSES) {
         if (folder === "") continue;
         const beside = `${folder}/zz-project-file`;
         assertEquals(
-          orphanScope(beside, harness.managedRoots),
+          orphanScope(beside, harness.managedRoots, harness.managedFiles),
           "outside-managed-roots",
           `${beside} is in scope — ${root} or a sibling claims ${folder}/`,
         );
       }
+    }
+  });
+
+  Deno.test(`${harness.key}: every managedFiles entry names one file, never a folder`, () => {
+    // `managedFiles` is how a retired file directly in a harness folder leaves
+    // (cli#681, cli#679). A trailing slash or a bare folder would turn the exact
+    // match into a claim on everything the project keeps there.
+    for (const file of harness.managedFiles ?? []) {
+      assert(!file.endsWith("/") && file.split("/").length === 2, `${file} is not one file`);
+      assertEquals(orphanScope(file, harness.managedRoots, harness.managedFiles), "in-scope");
+      assertEquals(
+        orphanScope(`${file}.local`, harness.managedRoots, harness.managedFiles),
+        "outside-managed-roots",
+        `${file} matched as a prefix`,
+      );
     }
   });
 

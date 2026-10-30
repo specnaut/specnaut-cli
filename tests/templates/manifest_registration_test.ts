@@ -36,11 +36,6 @@ const NOT_SHIPPED: ReadonlyArray<{ path: string; why: string }> = [
     why: "git artifact keeping the directory tracked; not content",
   },
   {
-    path: "core/skills/alias-example/SKILL.md",
-    why: "documentation of the alias_of/overlays convention, for humans reading " +
-      "this repo. Its own description says Specnaut never installs it.",
-  },
-  {
     path: "core/root/README.md",
     why: "maintainer note warning that the .gitignore beside it is BOTH shipped " +
       "product content and a live per-directory ignore rule over a surface " +
@@ -114,4 +109,12 @@ Deno.test("the not-shipped allowlist does not contradict the manifest", async ()
         `drop the NOT_SHIPPED entry`,
     );
   }
+});
+
+Deno.test("alias-example is gone from the repo, not merely unshipped (cli#679)", async () => {
+  // It documented `alias_of` / `overlays`, which nothing reads — not Specnaut,
+  // not a harness. No manifest ever installed it, so no lock can carry it and
+  // upgrade has nothing to retire: its absence here is the whole lock.
+  const stale = (await authoredFiles()).filter((f) => f.includes("alias-example"));
+  assertEquals(stale, [], "alias-example was retired by cli#679");
 });

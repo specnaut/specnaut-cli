@@ -69,9 +69,6 @@ const CREATED_OUTSIDE_THE_BUNDLE: Record<
   string,
   { reason: string; backends?: readonly BacklogBackend[] }
 > = {
-  ".claude/claude-security-guidance.local.md": {
-    reason: "the user's optional override; Specnaut documents it and never writes it",
-  },
   ".specnaut/addenda/": {
     reason:
       "the project's own additions to a phase (cli#611); Specnaut reads them, never writes them",

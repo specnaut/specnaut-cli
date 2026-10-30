@@ -581,20 +581,17 @@ check "and the rule itself exists where it is supposed to live" \
   'grep -q "Never a number alone" .claude/skills/backlog-reference-contract/SKILL.md'
 
 echo
-echo "═══ #551  the harness-specific tree the scan never looked at ═══"
-# Three of the twelve files under templates/harness-specific/ had no assertion
-# at all — they were invisible because the diff pathspec never collected that
-# tree, so nothing ever reported them missing.
-check "the security-guidance context file scaffolds" \
-  '[ -f .claude/claude-security-guidance.md ]'
-check "and states that it sharpens the checklist rather than replacing it" \
-  'grep -q "it cannot switch parts of it" .claude/claude-security-guidance.md'
-check "the per-edit pattern file scaffolds" \
-  '[ -f .claude/security-patterns.yaml ]'
-check "and promises deterministic matching, with no model call" \
-  'grep -q "no model call" .claude/security-patterns.yaml'
-check "and fires each rule once per file per session, not on every edit" \
-  'grep -q "once per" .claude/security-patterns.yaml'
+echo "═══ #551 / cli#679  the harness-specific tree the scan never looked at ═══"
+# #551 gave the security-guidance plugin files their first assertions; cli#679
+# retired both (Specnaut's hooks and settings read neither). Absence is checked
+# by scaffolding, with the folder's presence checked first so the negatives
+# cannot pass against a tree that was never written.
+check "the .claude/ folder scaffolds, so the absence checks below mean something" \
+  '[ -f .claude/settings.json ]'
+check "the retired security-guidance context file no longer scaffolds (cli#679)" \
+  '[ ! -e .claude/claude-security-guidance.md ]'
+check "the retired per-edit pattern file no longer scaffolds (cli#679)" \
+  '[ ! -e .claude/security-patterns.yaml ]'
 
 echo
 echo "═══ #612 / cli#680  the context file is AGENTS.md, and points only at what was scaffolded ═══"
@@ -779,13 +776,10 @@ check "init scaffolds no addenda tree — the seam is opt-in by file" \
 # --- the two that share nothing with each other --------------------------
 check "status-audit .claude/skills/status-audit/SKILL.md reads the agent ledger" \
   'grep -q ".specnaut/logs/agents.jsonl" .claude/skills/status-audit/SKILL.md'
-# alias-example is deliberately NOT bundled — verified by scaffolding: 21
-# skills land and it is not among them, and the bundle contains its name zero
-# times while every shipped skill appears at least once. It is a source-only
-# reference showing the alias_of + overlays frontmatter convention, meant to
-# be copied. A runtime assertion about it could only ever be false, so its
-# coverage is carried by a reasoned allowlist entry instead (022-R13).
-check "alias-example .claude/skills/alias-example/SKILL.md is source-only and does NOT scaffold" \
-  '[ ! -e .claude/skills/alias-example ]'
+# alias-example was never bundled, and cli#679 removed its source too: it
+# documented an `alias_of` field nothing reads. The repo-side lock is
+# manifest_registration_test; this checks a project never receives it.
+check "alias-example does not scaffold (retired from the repo, cli#679)" \
+  '[ -d .claude/skills/task ] && [ ! -e .claude/skills/alias-example ]'
 
 finish "FEATURES"

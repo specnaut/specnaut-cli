@@ -14,7 +14,6 @@ import (
 var notShipped = []string{
 	".gitkeep",
 	"core/root/README.md",
-	"core/skills/alias-example/SKILL.md",
 	"manifest.json",
 }
 

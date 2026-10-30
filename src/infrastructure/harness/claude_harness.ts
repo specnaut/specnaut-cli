@@ -67,6 +67,19 @@ export class ClaudeHarness implements Harness {
     ".claude/skills/",
     ".specnaut/hooks/",
   ] as const;
+  /**
+   * Retired files directly in `.claude/`, which no root may hold: that folder
+   * also carries the project's `settings.json`, `settings.local.json` and
+   * `CLAUDE.md`, so a `.claude/` root would put them under lock-driven deletion.
+   * The two security-guidance plugin files were retired by cli#679 — Specnaut's
+   * hooks and settings read neither. They stay listed, by exact name, so a lock
+   * an older release wrote can still retire them, until no supported upgrade
+   * path has them.
+   */
+  readonly managedFiles = [
+    ".claude/claude-security-guidance.md",
+    ".claude/security-patterns.yaml",
+  ] as const;
 
   mapBundle(core: CoreBundle, opts: BundleOptions): Bundle {
     const out: Bundle = {};

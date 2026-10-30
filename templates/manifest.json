@@ -1869,16 +1869,6 @@
     },
     {
       "harness": "claude",
-      "destination": ".claude/claude-security-guidance.md",
-      "source": "harness-specific/claude/claude-security-guidance.md"
-    },
-    {
-      "harness": "claude",
-      "destination": ".claude/security-patterns.yaml",
-      "source": "harness-specific/claude/security-patterns.yaml"
-    },
-    {
-      "harness": "claude",
       "destination": ".claude/settings.json",
       "source": "harness-specific/claude/settings.json",
       "mergeJson": "claude-settings"

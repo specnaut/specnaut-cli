@@ -137,27 +137,6 @@ after the reset. Projects scaffolded for Claude Code offer to install it; to ins
 
 Details, settings and privacy: [`mods/specnaut-cockpit/README.md`](mods/specnaut-cockpit/README.md).
 
-## Project-specific skill overlays
-
-Need to override an upstream Specnaut skill in one project — e.g. a monorepo `/ship tag` that has to
-`cd` into an inner repo first? SKILL.md frontmatter accepts two optional fields:
-
-```yaml
----
-name: ship-tag
-alias_of: ship.tag
-overlays:
-  - when: before
-    path: ./scripts/cd-inner-repo.sh
----
-```
-
-The alias and overlay fields are declared in a skill's own frontmatter, where anyone reading it sees
-them. The Specnaut binary scaffolds and ships the convention; the harness (Claude Code, Cursor, …)
-honours it at dispatch time. See [the docs](https://specnaut.com/llms.txt) for the full contract and
-[`templates/core/skills/alias-example/SKILL.md`](templates/core/skills/alias-example/SKILL.md) for a
-copy-pasteable starting point.
-
 ## Upgrading an existing project
 
 When you update the `specnaut` binary (via `specnaut self-update` or Homebrew), the bundled

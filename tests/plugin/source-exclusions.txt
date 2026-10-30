@@ -27,12 +27,6 @@
 core/skills/task/scripts/  46 backend scripts; see the ROOT-resolution reason above — mirrored, they would resolve a config path that cannot exist
 core/skills/task/scripts/collect-audit-scope.sh  same rule: a scope collector that resolves paths from its installed location, not from the plugin
 
-# --- Not installed by init, so not the plugin's to carry -------------------
-# `alias-example` needs no row: the manifest never installs it, so it is
-# outside this population by construction rather than by exception. Its own
-# frontmatter says so — "Specnaut itself never installs this file". Recorded
-# here only so the next reader does not go looking for its entry.
-
 # --- Agent memory seeds: written BY the agent, never carried ---------------
 # `init` seeds an empty memory file so the agent has somewhere to write. The
 # plugin carrying one would ship a memory that belongs to no project — and the

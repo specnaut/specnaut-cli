@@ -2,6 +2,7 @@ import { assert, assertEquals } from "@std/assert";
 import { ClaudeHarness } from "../../../src/infrastructure/harness/claude_harness.ts";
 import { CORE_BUNDLE, HARNESS_STATIC } from "../../../src/templates_bundle.ts";
 import { renderBackend } from "../../../src/domain/conditional_render.ts";
+import { orphanScope } from "../../../src/domain/orphan_scope.ts";
 
 Deno.test("ClaudeHarness.key and displayName", () => {
   const h = new ClaudeHarness();
@@ -77,4 +78,25 @@ Deno.test("ClaudeHarness includes HARNESS_STATIC claude files (.claude/CLAUDE.md
   const staticClaude = HARNESS_STATIC.claude[".claude/CLAUDE.md"];
   // Rendered for the active backend (#612), otherwise the static source verbatim.
   assertEquals(claudeMd?.content, renderBackend(staticClaude?.content ?? "", "local"));
+});
+
+Deno.test("ClaudeHarness retires the security-guidance files by exact name only (cli#679)", () => {
+  const h = new ClaudeHarness();
+  const mapped = h.mapBundle(CORE_BUNDLE, {
+    backlogBackend: "local",
+    versionScheme: "semver",
+    specBackend: "local",
+  });
+  const scope = (dest: string) => orphanScope(dest, h.managedRoots, h.managedFiles);
+  for (const retired of [".claude/claude-security-guidance.md", ".claude/security-patterns.yaml"]) {
+    assert(
+      !(retired in mapped),
+      `${retired} is retired: Specnaut's hooks and settings read neither`,
+    );
+    assertEquals(scope(retired), "in-scope", `an older lock could not retire ${retired}`);
+  }
+  // Their neighbours are the project's: a `.claude/` root would reach them.
+  for (const own of [".claude/settings.json", ".claude/settings.local.json", ".claude/CLAUDE.md"]) {
+    assertEquals(scope(own), "outside-managed-roots", `${own} came under lock-driven deletion`);
+  }
 });

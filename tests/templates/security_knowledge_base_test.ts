@@ -199,53 +199,22 @@ Deno.test("the security seat's audit dispatch names the knowledge base", () => {
   assertStringIncludes(seat, "finding format defined in `00-triage.md`");
 });
 
-Deno.test("Claude gets the security-guidance plugin extension points", () => {
+Deno.test("no harness ships the security-guidance plugin files (cli#679)", () => {
   // `.claude/claude-security-guidance.md` and `.claude/security-patterns.yaml`
-  // are the documented extension points of the official security-guidance
-  // plugin. They are Claude-only: no other harness defines an equivalent slot.
-  const claude = HARNESS_STATIC["claude"] ?? {};
-  assert(
-    ".claude/claude-security-guidance.md" in claude,
-    "Claude must scaffold the plugin's Markdown guidance file",
-  );
-  assert(
-    ".claude/security-patterns.yaml" in claude,
-    "Claude must scaffold the plugin's per-edit pattern file",
-  );
-
+  // were extension points of the official security-guidance plugin. Specnaut's
+  // hooks and settings read neither, so cli#679 retired them; the knowledge base
+  // is reached through the audit seat pinned above. Upgrade retires older copies
+  // through the orphan path (`upgrade_retired_security_files_test.ts`).
   for (const [key, files] of Object.entries(HARNESS_STATIC)) {
-    if (key === "claude") continue;
     for (const dest of Object.keys(files)) {
       assert(
         !dest.includes("security-guidance") && !dest.includes("security-patterns"),
-        `${key} must not receive Claude's security plugin files (${dest})`,
+        `${key} still receives a retired security plugin file (${dest})`,
       );
     }
   }
-});
-
-Deno.test("guidance file stays under the plugin's 8KB context cap", () => {
-  const guidance = HARNESS_STATIC["claude"]?.[".claude/claude-security-guidance.md"];
-  assert(guidance, "guidance file missing from the Claude static bundle");
-  const bytes = new TextEncoder().encode(guidance.content).length;
   assert(
-    bytes < 8 * 1024,
-    `guidance file is ${bytes} bytes; the plugin caps combined guidance at 8KB ` +
-      `across user, project, and local scopes, so the scaffolded file must leave ` +
-      `room for the user's own rules`,
+    !CORE_BUNDLE.some((e) => e.content.includes("claude-security-guidance")),
+    "a bundled template still points at the retired guidance file",
   );
-});
-
-Deno.test("guidance file routes to the knowledge base rather than duplicating it", () => {
-  const guidance = HARNESS_STATIC["claude"]?.[".claude/claude-security-guidance.md"];
-  assert(guidance);
-  assertStringIncludes(guidance.content, ".specnaut/memory/security/");
-  for (const name of DOMAIN_FILES) {
-    if (name === "00-triage.md") continue;
-    assertStringIncludes(
-      guidance.content,
-      name,
-      `guidance routing table must mention ${name}`,
-    );
-  }
 });

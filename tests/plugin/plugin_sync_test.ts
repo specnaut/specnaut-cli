@@ -358,8 +358,8 @@ Deno.test(
 // rather than its claims.
 //
 // The population is DERIVED from `templates/manifest.json` — what `init`
-// actually installs — not from a list beside this test. That is what makes
-// `alias-example` fall out on its own: the manifest never installs it, so it is
+// actually installs — not from a list beside this test. A file authored under
+// `templates/` that the manifest never installs falls out on its own: it is
 // outside the population by construction rather than by an exception someone
 // remembered to write.
 
