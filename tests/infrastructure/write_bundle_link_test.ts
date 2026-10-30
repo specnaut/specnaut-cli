@@ -1,8 +1,8 @@
 import { assert, assertEquals, assertRejects, assertStringIncludes } from "@std/assert";
-import { join, SEPARATOR } from "@std/path";
+import { join } from "@std/path";
 import { DenoFsWriter, type Linker } from "../../src/infrastructure/deno_fs_writer.ts";
 import type { Bundle } from "../../src/domain/template.ts";
-import { readLinkText, WINDOWS } from "../helpers/link_text.ts";
+import { CAN_LINK, makeLink, readLinkText, WINDOWS } from "../helpers/link_text.ts";
 
 /**
  * The writer's context-link branch (cli#680, cli#681): a destination carrying
@@ -15,6 +15,8 @@ const LINKED: Bundle = {
   [DEST]: { content: "@../AGENTS.md\n", executable: false, symlinkTo: "../AGENTS.md" },
 };
 const refusing = (err: Error): Linker => () => Promise.reject(err);
+/** Whether anything — a file, a folder, a link, dangling or not — is at `path`. */
+const present = (path: string) => Deno.lstat(path).then(() => true, () => false);
 
 async function withProject(fn: (dir: string) => Promise<void>): Promise<void> {
   const dir = await Deno.makeTempDir();
@@ -35,6 +37,18 @@ Deno.test("a context link is written as a relative symlink that resolves to AGEN
     assertEquals(await Deno.readTextFile(abs), "# AGENTS\n");
     assertEquals(report.links, [{ dest: DEST, target: "../AGENTS.md", form: "symlink" }]);
   });
+});
+
+Deno.test({
+  name: "on Windows the link's text is `..\\AGENTS.md`, the form Windows itself writes",
+  ignore: !WINDOWS || !CAN_LINK,
+  fn: () =>
+    withProject(async (dir) => {
+      await new DenoFsWriter().writeBundle(LINKED, dir, { overwrite: true });
+      // `Deno.readLink` itself: `readLinkText` turns `\` into `/` on Windows,
+      // so nothing asserted through it can see which form was written.
+      assertEquals(await Deno.readLink(join(dir, DEST)), "..\\AGENTS.md");
+    }),
 });
 
 Deno.test("where links are refused, the fallback is written and the reason reported", async () => {
@@ -63,11 +77,11 @@ Deno.test("a refusal that is not about links propagates instead of falling back"
 });
 
 Deno.test("our own link is left alone even under backupExisting — no backup, no report", {
-  ignore: WINDOWS,
+  ignore: !CAN_LINK,
 }, async () => {
   await withProject(async (dir) => {
     await Deno.mkdir(join(dir, ".claude"));
-    await Deno.symlink("../AGENTS.md", join(dir, DEST));
+    await makeLink("../AGENTS.md", join(dir, DEST));
     const report = await new DenoFsWriter().writeBundle(LINKED, dir, {
       overwrite: true,
       backupExisting: true,
@@ -80,12 +94,12 @@ Deno.test("our own link is left alone even under backupExisting — no backup, n
 
 Deno.test(
   "a foreign link is moved aside as a link, and ours takes its place",
-  { ignore: WINDOWS },
+  { ignore: !CAN_LINK },
   async () => {
     await withProject(async (dir) => {
       await Deno.mkdir(join(dir, ".claude"));
       await Deno.writeTextFile(join(dir, "OTHER.md"), "other\n");
-      await Deno.symlink("../OTHER.md", join(dir, DEST));
+      await makeLink("../OTHER.md", join(dir, DEST));
       const report = await new DenoFsWriter().writeBundle(LINKED, dir, {
         overwrite: true,
         backupExisting: true,
@@ -102,7 +116,7 @@ Deno.test(
 );
 
 Deno.test("a foreign link pointing OUT of the project is replaced, not refused", {
-  ignore: WINDOWS,
+  ignore: !CAN_LINK,
 }, async () => {
   // Replacing a link touches the link, not its target. Judged by its target,
   // the whole bundle aborted on a link the run was about to remove.
@@ -111,7 +125,7 @@ Deno.test("a foreign link pointing OUT of the project is replaced, not refused",
     try {
       await Deno.writeTextFile(join(outside, "theirs.md"), "theirs\n");
       await Deno.mkdir(join(dir, ".claude"));
-      await Deno.symlink(join(outside, "theirs.md"), join(dir, DEST));
+      await makeLink(join(outside, "theirs.md"), join(dir, DEST));
       await new DenoFsWriter().writeBundle(LINKED, dir, { overwrite: true, backupExisting: true });
       assertEquals(await readLinkText(join(dir, DEST)), "../AGENTS.md");
       assertEquals(await Deno.readTextFile(join(outside, "theirs.md")), "theirs\n");
@@ -141,12 +155,14 @@ Deno.test("a link whose text would leave the project is refused before anything 
       Error,
     );
     assertStringIncludes(err.message, "leaves the project");
+    assertEquals(await present(join(dir, DEST)), false, "the link was written anyway");
+    assertEquals(await present(join(dir, ".claude")), false, "its folder was made anyway");
   });
 });
 
 Deno.test({
   name: "a link text with `..` after a link is walked as the kernel walks it (cli#686)",
-  ignore: WINDOWS,
+  ignore: !CAN_LINK,
   fn: () =>
     withProject(async (dir) => {
       // `s -> <outside>/deep`: lexically `../s/../evil` from `.claude/` is
@@ -154,7 +170,7 @@ Deno.test({
       const outside = await Deno.makeTempDir();
       try {
         await Deno.mkdir(join(outside, "deep"));
-        await Deno.symlink(join(outside, "deep"), join(dir, "s"));
+        await makeLink(join(outside, "deep"), join(dir, "s"), "dir");
         const escaping: Bundle = {
           [DEST]: { content: "x\n", executable: false, symlinkTo: "../s/../evil" },
         };
@@ -163,7 +179,7 @@ Deno.test({
           Error,
         );
         assertStringIncludes(err.message, "leaves the project");
-        assertEquals(await Deno.lstat(join(dir, DEST)).then(() => true, () => false), false);
+        assertEquals(await present(join(dir, DEST)), false, "the link was written anyway");
       } finally {
         await Deno.remove(outside, { recursive: true });
       }
@@ -172,13 +188,13 @@ Deno.test({
 
 Deno.test({
   name: "a dangling link as an ancestor is refused by the guard, not by mkdir (cli#686)",
-  ignore: WINDOWS,
+  ignore: !CAN_LINK,
   fn: () =>
     withProject(async (dir) => {
       // `.claude -> .codex/../..` is dangling until `.codex/` exists. `.claude/x.md`
       // comes first, so it is judged while the link still dangles: containment
       // must not rest on `mkdir` happening to fail on it.
-      await Deno.symlink([".codex", "..", ".."].join(SEPARATOR), join(dir, ".claude"));
+      await makeLink(".codex/../..", join(dir, ".claude"), "dir");
       const err = await assertRejects(
         () =>
           new DenoFsWriter().writeBundle(
@@ -192,5 +208,7 @@ Deno.test({
         Error,
       );
       assertStringIncludes(err.message, "does not exist");
+      // Refused as a bundle: the file judged after the refused one is not written either.
+      assertEquals(await present(join(dir, ".codex")), false, ".codex/x.md was written anyway");
     }),
 });

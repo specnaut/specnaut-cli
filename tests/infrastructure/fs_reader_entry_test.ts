@@ -3,7 +3,7 @@ import { join } from "@std/path";
 import { DenoFsReader } from "../../src/infrastructure/fs_reader.ts";
 import { ReadFault } from "../../src/application/read_fault.ts";
 import { ContainmentRefusal } from "../../src/infrastructure/fs_refusals.ts";
-import { WINDOWS } from "../helpers/link_text.ts";
+import { CAN_LINK, makeLink, slashForm, WINDOWS } from "../helpers/link_text.ts";
 
 /** `readEntry` reports what is at a path itself — a link as a link (cli#680). */
 
@@ -16,6 +16,15 @@ async function withProject(fn: (dir: string) => Promise<void>): Promise<void> {
   }
 }
 
+/**
+ * `readEntry` with a link's text in `/` form: the Windows leg makes its links
+ * in `\` form, as the writer does, and the text is not what these tests pin.
+ */
+async function entryOf(dir: string, rel: string) {
+  const entry = await new DenoFsReader().readEntry(dir, rel);
+  return entry?.kind === "symlink" ? { ...entry, target: slashForm(entry.target) } : entry;
+}
+
 Deno.test("readEntry: absent is null, a file is its content", async () => {
   await withProject(async (dir) => {
     const r = new DenoFsReader();
@@ -26,13 +35,13 @@ Deno.test("readEntry: absent is null, a file is its content", async () => {
 });
 
 Deno.test("readEntry: a link is reported with its text and landing, not read through", {
-  ignore: WINDOWS,
+  ignore: !CAN_LINK,
 }, async () => {
   await withProject(async (dir) => {
     await Deno.writeTextFile(join(dir, "AGENTS.md"), "# A\n");
     await Deno.mkdir(join(dir, ".claude"));
-    await Deno.symlink("../AGENTS.md", join(dir, ".claude/CLAUDE.md"));
-    assertEquals(await new DenoFsReader().readEntry(dir, ".claude/CLAUDE.md"), {
+    await makeLink("../AGENTS.md", join(dir, ".claude/CLAUDE.md"));
+    assertEquals(await entryOf(dir, ".claude/CLAUDE.md"), {
       kind: "symlink",
       target: "../AGENTS.md",
       resolved: "AGENTS.md",
@@ -41,7 +50,7 @@ Deno.test("readEntry: a link is reported with its text and landing, not read thr
 });
 
 Deno.test("readEntry: a link out of the project is reported, never refused or read", {
-  ignore: WINDOWS,
+  ignore: !CAN_LINK,
 }, async () => {
   // `readText` refuses this path; `upgrade` still has to know what is there to
   // decide to replace it.
@@ -50,7 +59,7 @@ Deno.test("readEntry: a link out of the project is reported, never refused or re
     try {
       await Deno.writeTextFile(join(outside, "secret.md"), "secret\n");
       await Deno.mkdir(join(dir, ".claude"));
-      await Deno.symlink(join(outside, "secret.md"), join(dir, ".claude/CLAUDE.md"));
+      await makeLink(join(outside, "secret.md"), join(dir, ".claude/CLAUDE.md"));
       const entry = await new DenoFsReader().readEntry(dir, ".claude/CLAUDE.md");
       assertEquals(entry?.kind, "symlink");
       assertEquals(entry?.kind === "symlink" && entry.resolved?.startsWith(".."), true);
@@ -81,12 +90,12 @@ Deno.test("an ancestor link out of the project is a containment refusal, never a
 
 Deno.test(
   "readEntry: a link cycle resolves to null instead of throwing",
-  { ignore: WINDOWS },
+  { ignore: !CAN_LINK },
   async () => {
     await withProject(async (dir) => {
-      await Deno.symlink("b.md", join(dir, "a.md"));
-      await Deno.symlink("a.md", join(dir, "b.md"));
-      assertEquals(await new DenoFsReader().readEntry(dir, "a.md"), {
+      await makeLink("b.md", join(dir, "a.md"));
+      await makeLink("a.md", join(dir, "b.md"));
+      assertEquals(await entryOf(dir, "a.md"), {
         kind: "symlink",
         target: "b.md",
         resolved: null,
@@ -96,14 +105,14 @@ Deno.test(
 );
 
 Deno.test("readEntry: a link through a missing directory is reported with no landing (cli#686)", {
-  ignore: WINDOWS,
+  ignore: !CAN_LINK,
 }, async () => {
   // The walk refuses to guess where `nope/AGENTS.md` lands; `readEntry` must
   // still report the link, not abort `upgrade` or `diff` over it.
   await withProject(async (dir) => {
     await Deno.mkdir(join(dir, ".claude"));
-    await Deno.symlink("nope/AGENTS.md", join(dir, ".claude/CLAUDE.md"));
-    assertEquals(await new DenoFsReader().readEntry(dir, ".claude/CLAUDE.md"), {
+    await makeLink("nope/AGENTS.md", join(dir, ".claude/CLAUDE.md"));
+    assertEquals(await entryOf(dir, ".claude/CLAUDE.md"), {
       kind: "symlink",
       target: "nope/AGENTS.md",
       resolved: null,
@@ -132,10 +141,10 @@ Deno.test(
 );
 
 Deno.test("a dangling ancestor reads as absent, never as a refusal (cli#686)", {
-  ignore: WINDOWS,
+  ignore: !CAN_LINK,
 }, async () => {
   await withProject(async (dir) => {
-    await Deno.symlink("nope", join(dir, ".claude"));
+    await makeLink("nope", join(dir, ".claude"), "dir");
     const reader = new DenoFsReader();
     assertEquals(await reader.readEntry(dir, ".claude/CLAUDE.md"), null);
     assertEquals(await reader.readText(dir, ".claude/CLAUDE.md"), null);
@@ -153,7 +162,7 @@ Deno.test("a project directory that does not exist yet holds nothing: null, not 
 
 Deno.test({
   name: "a file that is there and cannot be read throws, never reads as absent",
-  ignore: WINDOWS,
+  ignore: WINDOWS, // POSIX modes: Windows has no 0o000 to read through.
 }, async () => {
   await withProject(async (dir) => {
     await Deno.writeTextFile(join(dir, "AGENTS.md"), "# A\n");

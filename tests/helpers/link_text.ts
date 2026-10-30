@@ -1,3 +1,5 @@
+import { join } from "@std/path";
+
 /**
  * A link's text as `Deno.readLink` returns it, in `/` form on Windows only.
  *
@@ -11,13 +13,56 @@
  * so the comparison stays exact there.
  */
 export async function readLinkText(path: string): Promise<string> {
-  const text = await Deno.readLink(path);
-  return Deno.build.os === "windows" ? text.replaceAll("\\", "/") : text;
+  return slashForm(await Deno.readLink(path));
+}
+
+/** `text` with Windows' `\` read as `/`; verbatim everywhere else. See `readLinkText`. */
+export function slashForm(text: string): string {
+  return WINDOWS ? text.replaceAll("\\", "/") : text;
 }
 
 /**
- * `Deno.symlink` needs Developer Mode or elevation on Windows. A test whose
- * SETUP makes a link registers as IGNORED there — never short-circuited into a
- * pass — the convention `write_bundle_symlink_test.ts` set on main.
+ * The test runs on Windows. Kept for what is Windows-specific beyond links —
+ * POSIX modes, the `\` link text — never as a stand-in for "cannot link".
  */
 export const WINDOWS = Deno.build.os === "windows";
+
+/**
+ * Make a link in a test's SETUP the way the writer makes one on this system:
+ * `\` text and an explicit `type` on Windows, where links are typed and Deno
+ * cannot infer the type of a target that is missing or relative to another
+ * directory than the cwd. Verbatim elsewhere.
+ */
+export function makeLink(
+  target: string,
+  path: string,
+  type: "file" | "dir" = "file",
+): Promise<void> {
+  return Deno.symlink(WINDOWS ? target.replaceAll("/", "\\") : target, path, { type });
+}
+
+/**
+ * Whether this run can make a link at all — decided by making one, at module
+ * load, so a test whose setup links registers `ignore: !CAN_LINK`: IGNORED
+ * where links are refused, never short-circuited into a pass. The windows-latest
+ * runner can link; a Windows box without Developer Mode or elevation cannot.
+ *
+ * Off Windows a refusal is not a property of the system but a broken
+ * environment, so it throws instead of quietly ignoring every link test.
+ */
+export const CAN_LINK: boolean = await probeLink();
+
+async function probeLink(): Promise<boolean> {
+  const dir = await Deno.makeTempDir({ prefix: "specnaut-link-probe-" });
+  try {
+    await Deno.writeTextFile(join(dir, "target.md"), "");
+    await makeLink("target.md", join(dir, "link.md"));
+    return true;
+  } catch (err) {
+    if (!WINDOWS) throw err;
+    console.warn(`link tests ignored — this system refuses links: ${err}`);
+    return false;
+  } finally {
+    await Deno.remove(dir, { recursive: true });
+  }
+}

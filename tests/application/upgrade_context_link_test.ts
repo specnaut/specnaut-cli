@@ -10,7 +10,7 @@ import { DenoFsWriter, type Linker } from "../../src/infrastructure/deno_fs_writ
 import { DenoFsReader } from "../../src/infrastructure/fs_reader.ts";
 import { FsLockStore } from "../../src/infrastructure/fs_lock_store.ts";
 import { FsStagingStore } from "../../src/infrastructure/fs_staging_store.ts";
-import { readLinkText, WINDOWS } from "../helpers/link_text.ts";
+import { CAN_LINK, makeLink, readLinkText } from "../helpers/link_text.ts";
 
 /**
  * A context link through the real init and upgrade use cases, on a real
@@ -147,14 +147,14 @@ Deno.test("a preserve.yml declaration keeps a customized context file as it is",
 });
 
 Deno.test("a declaration wins over an inverted consolidation too: preserved, not refused", {
-  ignore: WINDOWS,
+  ignore: !CAN_LINK,
 }, async () => {
   await withProject(async (dir) => {
     await initProject(dir);
     await Deno.remove(join(dir, DEST));
     await Deno.writeTextFile(join(dir, DEST), "# everything we wrote\n");
     await Deno.remove(join(dir, "AGENTS.md"));
-    await Deno.symlink(".claude/CLAUDE.md", join(dir, "AGENTS.md"));
+    await makeLink(".claude/CLAUDE.md", join(dir, "AGENTS.md"));
     const r = await upgrade(dir, { declared: [DEST] });
     assertEquals(r.refusals, []);
     assert(r.status === "applied", r.status);
@@ -179,14 +179,14 @@ Deno.test("a link checked out as text (core.symlinks=false) is relinked and said
 });
 
 Deno.test("AGENTS.md linking back to the context file is refused, never relinked", {
-  ignore: WINDOWS,
+  ignore: !CAN_LINK,
 }, async () => {
   await withProject(async (dir) => {
     await initProject(dir);
     await Deno.remove(join(dir, DEST));
     await Deno.writeTextFile(join(dir, DEST), "# everything we wrote\n");
     await Deno.remove(join(dir, "AGENTS.md"));
-    await Deno.symlink(".claude/CLAUDE.md", join(dir, "AGENTS.md"));
+    await makeLink(".claude/CLAUDE.md", join(dir, "AGENTS.md"));
     const r = await upgrade(dir);
     assert(
       r.refusals.some((m) => m.includes("AGENTS.md links to .claude/CLAUDE.md")),
@@ -199,7 +199,7 @@ Deno.test("AGENTS.md linking back to the context file is refused, never relinked
 });
 
 Deno.test("a foreign link pointing out of the project is replaced, its target untouched", {
-  ignore: WINDOWS,
+  ignore: !CAN_LINK,
 }, async () => {
   await withProject(async (dir) => {
     const outside = await Deno.makeTempDir();
@@ -207,7 +207,7 @@ Deno.test("a foreign link pointing out of the project is replaced, its target un
       await initProject(dir);
       await Deno.writeTextFile(join(outside, "theirs.md"), "theirs\n");
       await Deno.remove(join(dir, DEST));
-      await Deno.symlink(join(outside, "theirs.md"), join(dir, DEST));
+      await makeLink(join(outside, "theirs.md"), join(dir, DEST));
       const r = await upgrade(dir);
       assert(r.status === "applied");
       assert(r.plan.some((a) => a.kind === "replace-with-link" && a.previous === "foreign-link"));
