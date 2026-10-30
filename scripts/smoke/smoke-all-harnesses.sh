@@ -124,14 +124,20 @@ check_helper() {
 
 # cli#680: the harness context file is a relative symlink to the root
 # AGENTS.md, the one always-on file — asserted by _common.sh's one spelling.
+# The directory is assigned on its own line, as in check_helper: inside an
+# argument's substitution a rejected scenario name is lost, and the check then
+# fails on a path that names the wrong cause.
 check_link() {
-  check_context_link "$1 context link: $2 → $3" "$(scenario_dir "$NAME-$1")/$2" "$3"
+  local dir
+  dir="$(scenario_dir "$NAME-$1")"
+  check_context_link "$1 context link: $2 → $3" "$dir/$2" "$3"
 }
 
 check_link   claude ".claude/CLAUDE.md" "../AGENTS.md"
 check_helper claude ".claude/loop.md"   "^# Project loop prompt"
 check_link   codex  ".codex/AGENTS.md"  "../AGENTS.md"
-if [ -e "$(scenario_dir "$NAME-codex")/.codex/goal.md" ]; then
+codex_dir="$(scenario_dir "$NAME-codex")"
+if [ -e "$codex_dir/.codex/goal.md" ]; then
   fail "codex helper" ".codex/goal.md is retired (cli#681) but was written"
 else
   pass "codex helper: .codex/goal.md not written"
