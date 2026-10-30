@@ -89,6 +89,10 @@ Deno.test("remote-gates.md raises both approvals and never proceeds without one"
   assertStringIncludes(content, "--type merge_approval");
   assertStringIncludes(content, "Never proceed to `implement` without an explicit approval.");
   assertStringIncludes(content, "Never merge without an explicit approval.");
+  // cli#709: exit 5 raised no gate. Under `merge: auto` there is no local prompt to fall back
+  // to, so falling through to auto-chain would land with nothing approved.
+  assert(!content.includes("fall back to the local prompt"), "exit 5 still falls back to a prompt");
+  assertStringIncludes(content, "under `merge: auto` there is no local prompt: halt on the branch");
 });
 
 Deno.test("every chaining phase ends by invoking the next one itself", () => {
@@ -102,10 +106,26 @@ Deno.test("every chaining phase ends by invoking the next one itself", () => {
       `${name}.md must end by invoking ${next} itself`,
     );
     assertStringIncludes(content, "same turn", `${name}.md must say "same turn"`);
-    assert(
-      content.includes("is not a stop"),
-      `${name}.md must state that its closing boundary is not a stop`,
-    );
+    // Whether the boundary stops is auto-chain.md's to say (cli#709): the phase points there.
+    assertStringIncludes(content, "`phases/auto-chain.md`", `${name}.md must point at the stops`);
+  }
+});
+
+/**
+ * Spec 041's guardrail, enforced (cli#709): each chain rule has one home and
+ * every other doc points at it. "Who decides" lives in plan.md step 6; the
+ * chain's stops live in auto-chain.md. A restatement is a second decider that
+ * drifts from the first — these are the sentences that had been copied.
+ */
+Deno.test("the stop rules and who decides each have one home (spec 041)", () => {
+  const chain = flat(phase("auto-chain").content);
+  assert(!chain.includes("settle technical forks"), "auto-chain.md restates who decides");
+  assertStringIncludes(chain, "`phases/plan.md` step 6");
+  for (const name of ["plan", "implement"]) {
+    const content = flat(phase(name).content).toLowerCase();
+    for (const restated of ["pause only when the run was started with", "nothing after it asks"]) {
+      assert(!content.includes(restated), `${name}.md restates the stop rule: "${restated}"`);
+    }
   }
 });
 
@@ -117,9 +137,10 @@ Deno.test("review.md does not re-ask between fix cycles and reports harm, not la
   assertStringIncludes(content, "does not terminate");
 });
 
-Deno.test("the plan stop announces that nothing after it asks again", () => {
+Deno.test("the plan stop asks what autopilot would otherwise settle alone", () => {
   const content = flat(phase("plan").content);
-  assertStringIncludes(content, "the chain's last chance to ask");
+  // Whether anything after it asks again is auto-chain.md's; the stop says which (cli#709).
+  assertStringIncludes(content, "`phases/auto-chain.md` decides whether the chain stops here");
   assertStringIncludes(content, "ask here what autopilot would otherwise settle alone");
   // D10: what autopilot would decide alone is named, and discovery needs an acceptance check.
   assertStringIncludes(content, "always: the base branch, anything irreversible or");

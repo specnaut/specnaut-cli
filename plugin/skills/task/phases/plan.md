@@ -148,8 +148,9 @@ that changes what the product does, or one in the always-ask class of step 7.
 
 ### 7. The plan stop — ask only what only the user can answer
 
-This is the chain's last chance to ask: under the default `merge: auto` nothing after it asks again
-— say so, and ask here what autopilot would otherwise settle alone. Present, in order:
+`phases/auto-chain.md` decides whether the chain stops here and whether anything after it asks
+again — tell the user which, and ask here what autopilot would otherwise settle alone. Present, in
+order:
 
 1. the decided design, with what was rejected and why — a report, not a vote;
 2. both audits' findings, separately, and what was done with each;
@@ -159,8 +160,7 @@ This is the chain's last chance to ask: under the default `merge: auto` nothing 
    invalidates the most others first;
 4. anything you decided yourself, one line each.
 
-Record each answer in `plan.md` with its date. **Nothing open → no stop**: report 1, 2 and 4 and go
-on. Never stop to have a recommendation confirmed.
+Record each answer in `plan.md` with its date. With nothing open, report 1, 2 and 4 and go on.
 
 ### 8. Commit, then INVOKE `implement` — same turn
 
@@ -173,6 +173,7 @@ Commit before handing off: a worktree runs off committed HEAD.
 <!-- END: spec-backend=local -->
 
 Then **invoke `implement` yourself, in the same turn as the user's last answer** — your own next
-action, not a command printed for them. This boundary is not a stop; pause only when the run was
-started with `--manual`.
+action, not a command printed for them. Whether anything stops here is `phases/auto-chain.md`'s to
+say.
+
 References to a backlog item follow the `backlog-reference-contract` skill.

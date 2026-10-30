@@ -13,8 +13,8 @@ plan → implement → review → merge → push
 
 ## Autopilot is the default. There is ONE stop, and a second only on request.
 
-1. **The end of `plan`**, **only if something only the user can answer is open**. Expert seats
-   settle technical forks; nothing open → a report, then `implement`.
+1. **The end of `plan`**, **only if something only the user can answer is open** — who decides the
+   rest is `phases/plan.md` step 6. Nothing open → a report, then `implement`.
 2. **The review verdict — only under `manual`.** The merge mode is read here and nowhere else,
    the per-run instruction first: `--manual-merge`, or "stop before merging" / "do not push", means
    `manual`; "merge it" means `auto`. Otherwise:

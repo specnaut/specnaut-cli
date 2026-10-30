@@ -21,6 +21,8 @@ import { skillDocName } from "../../../src/domain/core_bundle.ts";
 // with, and plan's step-3 wording — nothing else moved. Spec 041 rewrote plan and
 // implement (the brief by default; tasks folded in) and retired tasks' golden with its phase.
 // cli#678 re-captured review's: seats fan out from the main session; Phase 4 wraps the roll-up.
+// cli#709 re-captured plan's and implement's: their stop restatements became pointers to
+// auto-chain.md, and implement's secrets list gained `*.env` and `*.secret.yaml`.
 
 function abs(rel: string): string {
   return fromFileUrl(new URL(`../../${rel}`, import.meta.url));

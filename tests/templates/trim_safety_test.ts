@@ -84,9 +84,14 @@ const MUST_SURVIVE: ReadonlyArray<
       // Integrity control against a TOCTOU between "reviewed" and "what ships".
       "Freeze the tree.",
       // Secret-exclusion patterns for CONSUMER repositories. Collapsing the
-      // per-language rows into the universal set deletes exactly these.
+      // per-language rows into the universal set deletes exactly these. The
+      // list stays though spec 041's brief said drop the catalogue: the
+      // security seat wanted it, and cli#709 settled it — with `*.env` and
+      // `*.secret.yaml`, which the first cut did not name.
       "*.tfstate",
       "kubeconfig",
+      "`*.env`",
+      "`*.secret.yaml`",
     ],
   },
   {

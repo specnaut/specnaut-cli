@@ -25,10 +25,10 @@ Run `.specnaut/scripts/bash/check-prerequisites.sh --json` for the feature direc
   every file you will touch, split a file over its target first, in its own commit, and put new
   behaviour in a new module wherever it can.
 - **Done is the brief's checks.** Work until every one of them passes; they are what `review` runs.
-- **Keep secrets out of git.** The project's ignore files must exclude `.env*`, `*.tfstate*`,
-  `*.tfvars`, `kubeconfig*`, `*.key`, `*.crt` and `secrets/` where the stack produces them, and
-  generated output (`node_modules/`, `dist/`, `build/`, `target/`, `.venv/`). Append a missing
-  pattern; never rewrite the user's file.
+- **Keep secrets out of git.** The project's ignore files must exclude `.env*`, `*.env`,
+  `*.tfstate*`, `*.tfvars`, `*.secret.yaml`, `kubeconfig*`, `*.key`, `*.crt` and `secrets/` where
+  the stack produces them, and generated output (`node_modules/`, `dist/`, `build/`, `target/`,
+  `.venv/`). Append a missing pattern; never rewrite the user's file.
 
 ## Building it
 
@@ -57,6 +57,5 @@ An implementation that has not been through review is not finished.
 
 1. **Freeze the tree.** Name the commit and stop every agent still holding the tree before anything
    is gated: reviewers and suites read it live.
-2. **Invoke `review` yourself, in the same turn.**
-
-This boundary is not a stop. Pause only when the run was started with `--manual`.
+2. **Invoke `review` yourself, in the same turn.** Whether anything stops here is
+   `phases/auto-chain.md`'s to say.
