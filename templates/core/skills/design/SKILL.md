@@ -3,6 +3,7 @@ name: design
 description: Owns the project's `DESIGN.md` design system — drafts it from a short interview when it is absent, edits it on request when present, audits the UI source for drift against it when asked. Stack-agnostic — a Markdown spec the developer translates into code. Started by the user only.
 argument-hint: "[audit | <the change to make>]"
 disable-model-invocation: true
+disallowed-tools: Bash, PowerShell, Monitor, Agent
 ---
 
 # Design skill

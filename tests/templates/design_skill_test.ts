@@ -29,6 +29,22 @@ Deno.test("/design is user-invoked only", () => {
   assertStringIncludes(fm, "disable-model-invocation: true");
 });
 
+/**
+ * The agent `/design` replaced had no shell (Read, Edit, Write, Glob, Grep), and
+ * the skill's own text says "no command, no agent dispatch". Claude Code's
+ * `disallowed-tools` removes tools from the pool while a skill is active
+ * (https://code.claude.com/docs/en/skills, frontmatter reference); `Monitor`
+ * runs commands too. `context: fork` would not do: a forked skill cannot hold
+ * the Discovery interview. The removal lasts the invoking turn only, so the
+ * prose still carries the rule after the user's first reply.
+ */
+Deno.test("/design runs with no shell and no agent dispatch on Claude Code", () => {
+  const fm = /^---\n([\s\S]*?)\n---/.exec(skill())?.[1] ?? "";
+  const line = /^disallowed-tools:\s*(.+)$/m.exec(fm)?.[1] ?? "";
+  const removed = line.split(/[\s,]+/).filter(Boolean).sort();
+  assertEquals(removed, ["Agent", "Bash", "Monitor", "PowerShell"]);
+});
+
 Deno.test("/design carries the three modes", () => {
   for (const mode of ["Discovery", "Edit", "Audit"]) {
     assert(new RegExp(`^## Mode \\d — ${mode}`, "m").test(skill()), `no ${mode} mode`);
