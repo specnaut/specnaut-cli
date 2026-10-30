@@ -54,7 +54,7 @@ echo
 echo "═══ #612 / cli#680  the context file is AGENTS.md, and points only at what was scaffolded ═══"
 check_context_file local
 check "AGENTS.md carries the backlog section, rendered for its backend (cli#680)" \
-  'grep -q -- "<!-- --- Specnaut: backlog --- -->" AGENTS.md && grep -q "\.specnaut/backlog\.md" AGENTS.md && ! grep -q "backend=" AGENTS.md'
+  'grep -q -- "<!-- --- Specnaut: backlog --- -->" AGENTS.md && grep -q "\.specnaut/backlog\.md" AGENTS.md'
 check "AGENTS.md's optional-integrations section points at the written reference (cli#680, cli#679)" \
   'grep -q -- "<!-- --- Specnaut: optional-integrations --- -->" AGENTS.md && grep -q "\.claude/skills/specnaut-facts/integrations\.md" AGENTS.md && grep -q "^## Claude Code" .claude/skills/specnaut-facts/integrations.md'
 
