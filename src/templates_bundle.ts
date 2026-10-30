@@ -4558,13 +4558,15 @@ Review the test files in the diff against the implementation they cover.
 
 ### The one command you may run
 
-\`.specnaut/scripts/bash/run-gate.sh fast\`, spelled exactly so (your grant matches that string) —
-the fast tier declared on the branch under review, nothing else. Do not run it when
+\`.specnaut/scripts/bash/run-gate.sh fast\`, spelled exactly so — the fast tier declared on the
+branch under review, nothing else. Your grant names that one command, but this rule is the fence,
+not the grant: as a permission rule, a \`Bash(...)\` with no \`*\` matches that exact command only, yet
+an agent's \`tools:\` line is a list of tools, so the shell may reach you whole. Do not run it when
 \`git diff --name-only <base>..HEAD\` includes \`.specnaut/gates.yml\` or anything under
 \`.specnaut/scripts/\`: the diff would choose what you execute — say so in the report instead. It settles
 the largest class of rule-11 defect from evidence: a test that does not run at all (an always-true
 ignore, a file the runner's glob misses, a count that did not move when a file was added). A run
-saying the tier is not declared ran nothing and is no evidence. You have no write tool, by decision:
+saying the tier is not declared ran nothing and is no evidence. You have no write tool and write nothing through the shell, by decision:
 a seat that can edit what it reviews can corrupt it silently, so mutate-run-restore is not yours.
 
 A rule-11 finding carries one of exactly two evidence forms, never a third and never the word
@@ -11334,6 +11336,7 @@ name: design
 description: Owns the project's \`DESIGN.md\` design system — drafts it from a short interview when it is absent, edits it on request when present, audits the UI source for drift against it when asked. Stack-agnostic — a Markdown spec the developer translates into code. Started by the user only.
 argument-hint: "[audit | <the change to make>]"
 disable-model-invocation: true
+disallowed-tools: Bash, PowerShell, Monitor, Agent
 ---
 
 # Design skill
