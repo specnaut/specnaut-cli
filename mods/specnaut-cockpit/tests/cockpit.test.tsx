@@ -77,6 +77,25 @@ test(
   },
 );
 
+test(
+  "the plugin-scoped and pre-7.2 routers are held too, and another plugin's task is not",
+  async ($, on) => {
+    world(on);
+    const ran: string[] = [];
+    on("tool.call", { tool: "Skill" }, (_$, e) => {
+      ran.push(e.skill);
+      return { result: { success: true, commandName: e.skill } };
+    });
+    await $.session.measure(measure(93));
+    for (const skill of ["specnaut-plugin:task", "specnaut", "specnaut-plugin:specnaut"]) {
+      const out = await $.tool.call({ tool: "Skill", skill, args: "merge" });
+      expect(out.text ?? out.deny ?? "").toMatch(/quota hold before `merge`/);
+    }
+    await $.tool.call({ tool: "Skill", skill: "someone-else:task", args: "merge" });
+    expect(ran).toEqual(["someone-else:task"]);
+  },
+);
+
 test("below the threshold the chain goes through, and the band shows its phase", async ($, on) => {
   world(on);
   let ran = false;
