@@ -112,7 +112,8 @@ Deno.test("a merge ends on the base branch, verified rather than assumed", async
   const { content } = mergePhase();
   assertStringIncludes(content, "bash .specnaut/scripts/bash/land-feature.sh");
   assertStringIncludes(content, "the person who asked must be back where they work");
-  assertStringIncludes(content, "the merge did not land as expected: a finding");
+  // A branch that will not delete after the push is 11: landed, never a failed landing (cli#711).
+  assertStringIncludes(content, "the landing stands: step 5 runs");
 });
 
 function closeDoc(): CoreEntry {

@@ -17,7 +17,9 @@
 #              origin) — and within a copy every `merge:` line counts,
 #              indented or quoted. A model that rewrites the file in its
 #              worktree, or commits that rewrite, has not changed the base
-#              (§ 11 F2). Comment lines are never settings.
+#              (§ 11 F2). Comment lines are never settings. A base it
+#              cannot read — base-branch.sh exit 3, or no ref of that name
+#              locally or on origin — is manual: the guard fails closed.
 #
 # Usage: merge-mode.sh [--strict]
 set -euo pipefail
@@ -87,11 +89,23 @@ if git --no-pager -C "$root" rev-parse --verify --quiet HEAD >/dev/null; then
   if b=$(blob HEAD); then verdict HEAD <<<"$b"; fi
 fi
 
-if base=$(cd "$root" && bash "$here/base-branch.sh" 2>/dev/null); then
-  for ref in "refs/heads/$base" "refs/remotes/origin/$base"; do
-    git --no-pager -C "$root" show-ref --verify --quiet "$ref" || continue
-    if b=$(blob "$ref"); then verdict "$ref" <<<"$b"; fi
-  done
+# The base's copy is the one a model cannot rewrite from its worktree, so a
+# base this cannot read is not a copy that agrees: it fails closed (cli#711).
+if ! base=$(cd "$root" && bash "$here/base-branch.sh" 2>/dev/null); then
+  echo "merge-mode: manual (the base branch is unknown — its copy of $rel cannot be read)" >&2
+  echo manual
+  exit 0
+fi
+found=0
+for ref in "refs/heads/$base" "refs/remotes/origin/$base"; do
+  git --no-pager -C "$root" show-ref --verify --quiet "$ref" || continue
+  found=1
+  if b=$(blob "$ref"); then verdict "$ref" <<<"$b"; fi
+done
+if [ "$found" = 0 ]; then
+  echo "merge-mode: manual (no copy of the base '$base' — neither refs/heads/$base nor origin's)" >&2
+  echo manual
+  exit 0
 fi
 
 echo "merge-mode: auto (every copy of $rel agrees, or none sets merge:)" >&2

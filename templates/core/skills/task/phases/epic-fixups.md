@@ -27,10 +27,15 @@ It prints `PRE <sha>`, folds each fixup into the commit it names (`rebase --auto
 --keep-base`), and runs three checks: the tree is the one recorded before the fold, the worktree is
 clean, and `epic-status.sh` reads one commit per child in order with no `fixup!` left.
 
+This table maps every exit `fold-fixups.sh`'s header lists; an exit it does not list is a finding:
+quote it and stop.
+
 | Exit | Meaning | What you do |
 | :--- | :--- | :--- |
 | 0 | folded | merge |
-| 13 | the rebase stopped on a conflict | resolve it, `git rebase --continue`, then `fold-fixups.sh --verify <PRE sha>` — the checks run against the tree recorded before the fold |
+| 2 | usage, or `--verify` given a sha that is not the `PRE` the stopped fold printed | re-run `--verify` with that `PRE` sha — never `HEAD`, never another |
+| 3 | the base is unknown, or `epic-status.sh` could not read the branch | stop and say so |
+| 13 | the rebase stopped on a conflict — or, on `--verify`, is still in progress | resolve it, `git rebase --continue` (check it exits 0), then `fold-fixups.sh --verify <PRE sha>` — the checks run against the tree recorded before the fold |
 | 10 | the tree moved | stop: a fold that changes the tree is a rewrite |
 | 11 | the worktree is not clean | untracked output belongs in the child's commit or `.gitignore`; a modified file means something still holds the tree — stop it first |
 | 12 | not one commit per child | a surviving `fixup!` lost its target or was written by hand; attribute it by sha |

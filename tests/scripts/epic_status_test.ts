@@ -130,3 +130,74 @@ Deno.test("the worked example in epic-commits.md parses as the doc says", async 
     await sb.cleanup();
   }
 });
+
+Deno.test("a child commit with no Epic trailer is exit 12, named by sha", async () => {
+  const sb = await epicBranch([["feat(T01): a (#51)", "a"]]);
+  try {
+    const bare = await sb.commit("b", "b\n", "feat(T02): b (#52)");
+    const r = await sb.script("epic-status.sh");
+    assertEquals(r.code, 12, r.stderr);
+    assertStringIncludes(r.stderr, `${bare.slice(0, 12)} has no 'Epic: #<n>' trailer`);
+  } finally {
+    await sb.cleanup();
+  }
+});
+
+Deno.test("a git log that fails is exit 15 — never read as 'not an epic' (14)", {
+  ignore: Deno.build.os === "windows",
+}, async () => {
+  const sb = await epicBranch([["feat(T01): a (#51)", "a"]]);
+  try {
+    for (const flag of ["--reverse", "-1"]) {
+      const r = await sb.scriptWithGit(
+        `[ "$1" = --no-pager ] && [ "$2" = log ] && [[ " $* " == *" ${flag} "* ]] && exit 128\nexec "$REAL_GIT" "$@"`,
+        "epic-status.sh",
+      );
+      assertEquals(r.code, 15, `${flag}: ${r.stderr}`);
+      assertStringIncludes(r.stderr, "could not read");
+    }
+  } finally {
+    await sb.cleanup();
+  }
+});
+
+Deno.test("an empty range while feature.json names an epic is 16: stop, never squash", async () => {
+  // A re-run after a rejected push or a --pr merge: the base has moved, the
+  // range is empty, and 14 would send the epic down the standalone path.
+  const sb = await epicBranch([["feat(T01): a (#51)", "a"]]);
+  try {
+    await git(sb.work, "switch", "--quiet", "main");
+    await git(sb.work, "merge", "--quiet", "--ff-only", "epic");
+    await git(sb.work, "switch", "--quiet", "epic");
+    const fj = `${sb.work}/.specnaut/feature.json`;
+    await Deno.writeTextFile(
+      fj,
+      '{ "feature_directory": ".specnaut/specs/001-x", "linked_issue": 50 }\n',
+    );
+    const r = await sb.script("epic-status.sh");
+    assertEquals(r.code, 16, r.stderr);
+    assertStringIncludes(r.stderr, "#50");
+    assertEquals(r.stdout, "");
+    // A standalone item's number is in no Epic trailer: still 14.
+    await Deno.writeTextFile(
+      fj,
+      '{ "feature_directory": ".specnaut/specs/001-x", "linked_issue": 77 }\n',
+    );
+    assertEquals((await sb.script("epic-status.sh")).code, 14);
+  } finally {
+    await sb.cleanup();
+  }
+});
+
+Deno.test("a tag named like the base does not shadow it: the range is refs/heads/<base>", async () => {
+  const sb = await epicBranch([["feat(T01): a (#51)", "a"]]);
+  try {
+    // A tag `main` on the root commit: `main..HEAD` would read the install commit too.
+    await git(sb.work, "tag", "main", "main~1");
+    const r = await sb.script("epic-status.sh");
+    assertEquals(r.code, 0, r.stderr);
+    assertEquals(r.stdout.trim().split("\n").length, 2, r.stdout);
+  } finally {
+    await sb.cleanup();
+  }
+});

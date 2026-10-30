@@ -12,8 +12,21 @@
 # names the same epic. Only digits and hex shas are printed; a problem is
 # named by sha and ordinal on stderr, never by echoing commit text.
 #
-# Exit: 0 consistent · 2 usage · 3 base unknown · 12 inconsistent · 14 not an
-# epic branch (no `Epic:` trailer at all).
+# The base is read as `refs/heads/<base>` (else `refs/remotes/origin/<base>`),
+# so a tag named like it cannot shadow it.
+#
+# Exit — the full table; phases/merge.md maps each one:
+#   0  consistent
+#   2  usage
+#   3  base unknown
+#   12 inconsistent
+#   14 not an epic branch (no `Epic:` trailer at all), and .specnaut/feature.json
+#      does not name an epic either
+#   15 the history could not be read (a `git log` failed) — nothing concluded
+#   16 no `Epic:` trailer on <base>..HEAD, but .specnaut/feature.json's
+#      `linked_issue` is an epic: its own `Epic: #<n>` trailers are already in
+#      HEAD's history. The range has landed (a re-run after the base moved),
+#      so the CHILD/EPIC lines cannot be read back from it — stop, never squash
 #
 # Usage: epic-status.sh
 set -euo pipefail
@@ -28,8 +41,17 @@ if ! git --no-pager rev-parse --verify --quiet "refs/heads/$base^{commit}" >/dev
   echo "epic-status: the base '$base' does not resolve to a commit" >&2
   exit 3
 fi
-range="$base..HEAD"
-git --no-pager rev-parse --verify --quiet "refs/heads/$base" >/dev/null || range="origin/$base..HEAD"
+# Fully qualified: a tag named like the base would otherwise shadow it.
+range="refs/heads/$base..HEAD"
+git --no-pager rev-parse --verify --quiet "refs/heads/$base" >/dev/null || range="refs/remotes/origin/$base..HEAD"
+
+# unread <what> — a git read failed: 15, never a conclusion drawn from no output.
+unread() {
+  echo "epic-status: could not read $1 — git log failed; nothing concluded" >&2
+  exit 15
+}
+# Read whole before the loop: a process substitution's exit is never checked.
+log=$(git --no-pager log --reverse --format='%H%x1f%s' "$range") || unread "$range"
 
 problems=() epic="" expected=1 children=0
 seen=" " # " #<child>=<sha> " pairs: bash 3.2 (macOS) has no associative arrays
@@ -40,7 +62,8 @@ while IFS=$'\x1f' read -r sha subject; do
     continue
   fi
   # The trailer is the one field read from the body: an anchored line of digits.
-  trailer=$(git --no-pager log -1 --format=%b "$sha" | sed -n 's/^Epic: #\([0-9][0-9]*\)$/\1/p' | head -1)
+  body=$(git --no-pager log -1 --format=%b "$sha") || unread "${sha:0:12}"
+  trailer=$(printf '%s\n' "$body" | sed -n 's/^Epic: #\([0-9][0-9]*\)$/\1/p' | sed -n 1p)
   if [ -z "$trailer" ]; then
     problems+=("${sha:0:12} has no 'Epic: #<n>' trailer")
   elif [ -z "$epic" ]; then
@@ -66,9 +89,23 @@ while IFS=$'\x1f' read -r sha subject; do
   else
     problems+=("${sha:0:12}: its subject is not '<type>(T<NN>): <subject> (#<child>)'")
   fi
-done < <(git --no-pager log --reverse --format='%H%x1f%s' "$range")
+done <<<"$log"
 
 if [ -z "$epic" ] && [ "$children" -eq 0 ]; then
+  # feature.json names an epic when its linked issue is the one HEAD's own
+  # `Epic: #<n>` trailers carry: that history is what an epic branch writes,
+  # and nothing else writes it. The file has no epic field, by design (D16).
+  fj="$here/../../feature.json"
+  issue=""
+  [ -f "$fj" ] && issue=$(sed -n 's/.*"linked_issue"[[:space:]]*:[[:space:]]*\([1-9][0-9]*\).*/\1/p' "$fj" | sed -n 1p)
+  if [ -n "$issue" ]; then
+    # Anchored per line by git itself: #50 never matches a trailer of #501.
+    hit=$(git --no-pager log -1 --format=%H -E --grep="^Epic: #$issue\$" HEAD) || unread HEAD
+    if [ -n "$hit" ]; then
+      echo "epic-status: no 'Epic:' trailer on $range, but .specnaut/feature.json links epic #$issue, whose commits HEAD already holds — the range has landed; the CHILD lines cannot be read back. Stop" >&2
+      exit 16
+    fi
+  fi
   echo "epic-status: no 'Epic:' trailer on $range — not an epic branch" >&2
   exit 14
 fi

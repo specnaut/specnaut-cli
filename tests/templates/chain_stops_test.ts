@@ -155,9 +155,10 @@ Deno.test("review, merge and merge-close follow the merge mode instead of always
   // D6: merge never asks about the push (run by land-feature.sh); D4: it does not read the mode.
   assertStringIncludes(merge, "pushes without asking, in either merge mode");
   assert(!merge.includes("workflow.yml"), "merge.md must not read the merge mode (one reader)");
-  // D7: a rejected push is never forced or rebased, and nothing closes.
-  assertStringIncludes(merge, "never `--force`, never an automatic rebase");
-  assertStringIncludes(merge, "the close below does not run");
+  // D7: a rejected push is never forced, and nothing closes until a landing pushes. Its
+  // recovery is exercised in tests/scripts/land_feature_test.ts (cli#711).
+  assertStringIncludes(merge, "quote the remote's message — never `--force`");
+  assertStringIncludes(merge, "The close does not run until a landing pushes");
   // The multi-branch case lost its "no" answer; --no-close replaces it.
   assertStringIncludes(merge, "`--no-close`");
   const close = phase("merge-close").content;

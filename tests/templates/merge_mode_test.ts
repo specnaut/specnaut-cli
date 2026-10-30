@@ -135,3 +135,26 @@ Deno.test("base-branch: a name git would read as an option, or one with '..', is
     await sb.cleanup();
   }
 });
+
+Deno.test("merge-mode --strict: a base it cannot read is manual — the guard fails closed", async () => {
+  // Every copy the worktree holds can be rewritten by the model it guards;
+  // the base's is the one it cannot. Unknown, or naming no ref, it is not
+  // there to agree — so the reading that does not push wins (cli#711).
+  const sb = await sandbox();
+  try {
+    const unknown = await makeRepo(sb, { mode: "auto", base: null, head: "feat" });
+    let r = await runScript(sb, "merge-mode.sh", unknown, "--strict");
+    assertEquals([r.code, r.stdout.trim()], [0, "manual"], r.stderr);
+    assertStringIncludes(r.stderr, "base branch is unknown");
+    // The default reading is the chain's, not the guard's: it never reads the base.
+    r = await runScript(sb, "merge-mode.sh", unknown);
+    assertEquals(r.stdout.trim(), "auto");
+
+    await git(sb, unknown, "config", "init.defaultBranch", "nowhere");
+    r = await runScript(sb, "merge-mode.sh", unknown, "--strict");
+    assertEquals([r.code, r.stdout.trim()], [0, "manual"], r.stderr);
+    assertStringIncludes(r.stderr, "no copy of the base 'nowhere'");
+  } finally {
+    await sb.cleanup();
+  }
+});

@@ -27,9 +27,14 @@ that runs only on `pull_request`. **Do not infer `--pr` from a remote, a forge o
 1. **Shape the history.** Ask the branch, not the board — `bash .specnaut/scripts/bash/epic-status.sh`
    reads its `Epic: #` trailers, and only before the landing: after it, the range is empty. Keep its
    last `CHILD` and `EPIC` lines (after any fold) for the close.
+   This list maps every exit `epic-status.sh`'s header lists; an exit it does not list is a
+   finding: quote it and stop on the branch.
    - **Exit 14 — standalone**: load `phases/merge-squash.md` — **Squash by scope**.
    - **Exit 12** — the history does not read back to the board: fix it on the branch. **3** — the
-     base is unknown: stop and say so.
+     base is unknown: stop and say so. **15** — the history could not be read: stop and say so.
+   - **Exit 16** — the range is empty but `.specnaut/feature.json` links an epic whose commits have
+     landed (a re-run after the base moved): **stop** and say so — never squash, never close from
+     here; the `CHILD` lines cannot be read back.
    - **Exit 0 — an epic**: do **not** squash. Run the full gate tier once,
      `.specnaut/scripts/bash/run-gate.sh full` (a failure is fixed on the branch as a `--fixup` of the
      child at fault, then the tier re-run — never escalated), then load `phases/epic-fixups.md` and
@@ -45,24 +50,30 @@ that runs only on `pull_request`. **Do not infer `--pr` from a remote, a forge o
    bash .specnaut/scripts/bash/land-feature.sh
    ```
 
-   It checks the tree is clean and the branch contains `origin/<base>`, fast-forwards the base,
-   pushes it, deletes the branch with `-d`, and verifies `HEAD` is the base; it prints `LANDED <base>
-   <first>..<last> <n> commit(s)`. **It pushes without asking, in either merge mode**: reaching
+   It checks the tree is clean, that origin names `<base>` as its default, and that the branch
+   contains `origin/<base>` and adds to it; it fast-forwards the base, pushes it, deletes the
+   branch with `-d`, and verifies `HEAD` is the base; it prints `LANDED <base> <first>..<last> <n>
+   commit(s)`. **It pushes without asking, in either merge mode**: reaching
    this step is the instruction — `phases/auto-chain.md` reads the mode, this phase does not.
    **Under `merge: manual` the landing hook holds it** until the user's own prompt this turn says
    `merge` or `/task merge`; a refusal is not an obstacle to route around — quote it, name the word,
    stop on the branch.
-4. **Read its exit:**
+4. **Read its exit** — this table maps every exit `land-feature.sh`'s header lists; an exit it does
+   not list is a finding: quote it and stop on the branch.
 
    | Exit | Meaning | What you do |
    | :--- | :--- | :--- |
    | 0 | landed and pushed | step 5 |
+   | 2 | not on a feature branch | check out the feature branch, land again |
+   | 3 | the base is unknown, or origin does not confirm it as its default | stop and say so, quoting its line — never land on a guessed branch |
    | 4 | the tree is dirty | commit, or stop whoever holds it |
-   | 5 | behind `origin/<base>` | rebase, re-run the gates, land again |
-   | 6 | not a fast-forward | stop and ask whether to rebase |
-   | 7 | the push was rejected | quote the remote's message; the merge stays on the local base — never `--force`, never an automatic rebase — and the close below does not run. Recovery: `git fetch`, reconcile, `/task merge` |
-   | 8 | the branch would not delete with `-d` | the merge did not land as expected: a finding |
+   | 5 | behind `origin/<base>` | `git rebase refs/remotes/origin/<base>`. Applies cleanly → re-run the gates, land again. A conflict → `git rebase --abort`, and the branch goes back to `review` — a resolution is a change nobody reviewed |
+   | 6 | the local base holds commits origin lacks (printed: `origin/<base>..<base>`) | **stop on that fact**, quoting the range: they are someone's work. Nothing was rebased or pushed, and the phase does not rebase |
+   | 7 | the push was rejected | quote the remote's message — never `--force`. A rule refused it (protected base, hook): stop and say so. Origin moved: `git checkout <branch>`, `git branch -f <base> refs/remotes/origin/<base>` (the local base holds only this branch's fast-forward), land again — exit 5 follows and its row applies. The close does not run until a landing pushes |
    | 9 | `HEAD` is not the base | say so; the person who asked must be back where they work |
+   | 10 | nothing to land | the branch has no commit origin lacks: say so — nothing merged, nothing to close |
+   | 11 | landed and pushed; the branch would not delete with `-d` | the landing stands: step 5 runs. Report the branch that stayed |
+   | 12 | an unexpected git failure before the push | quote it and stop: nothing was pushed |
 
 5. **Close what shipped, and reconcile** — only after a push, and not under `--no-close`: load
    `phases/merge-close.md`.

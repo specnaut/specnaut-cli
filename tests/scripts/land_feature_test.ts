@@ -118,3 +118,154 @@ Deno.test("every merge script finds base-branch.sh when run by bare name from it
     await sb.cleanup();
   }
 });
+
+Deno.test("a local base ahead of origin is 6: the range is printed, nothing is rebased or pushed", async () => {
+  // By the fast-forward the branch already contains origin/<base>, so exit 6
+  // can only mean the local base holds commits origin lacks — a fact to stop on.
+  const sb = await sandbox();
+  try {
+    const local = await sb.commit("l", "l\n", "chore: local only");
+    await git(sb.work, "switch", "--quiet", "-c", "feature", "origin/main");
+    const head = await sb.commit("f", "x\n", "feat(7): a feature");
+    const before = await git(sb.remote, "rev-parse", "main");
+    const r = await sb.script("land-feature.sh");
+    assertEquals(r.code, 6, r.stderr);
+    assertStringIncludes(r.stderr, "origin/main..main");
+    assertStringIncludes(r.stderr, local.slice(0, 7));
+    assertStringIncludes(r.stderr, "chore: local only");
+    assertEquals(await git(sb.work, "symbolic-ref", "--short", "HEAD"), "feature");
+    assertEquals(await git(sb.work, "rev-parse", "HEAD"), head, "the branch was rewritten");
+    assertEquals(await git(sb.work, "rev-parse", "main"), local);
+    assertEquals(await git(sb.remote, "rev-parse", "main"), before);
+  } finally {
+    await sb.cleanup();
+  }
+});
+
+Deno.test("a branch with nothing origin lacks is 10, never a LANDED of 0 commits", async () => {
+  const sb = await sandbox();
+  try {
+    await git(sb.work, "switch", "--quiet", "-c", "feature");
+    const r = await sb.script("land-feature.sh");
+    assertEquals(r.code, 10, r.stderr);
+    assertEquals(r.stdout, "");
+    assertStringIncludes(r.stderr, "nothing to land");
+    assertEquals(await git(sb.work, "symbolic-ref", "--short", "HEAD"), "feature");
+  } finally {
+    await sb.cleanup();
+  }
+});
+
+Deno.test("origin's default must be exactly refs/heads/<base>: another branch is 3", async () => {
+  // `team/main` ends in `main`: a tail match would have passed it.
+  const sb = await featureBranch();
+  try {
+    await git(sb.work, "push", "--quiet", "origin", "main:refs/heads/team/main");
+    await git(sb.remote, "symbolic-ref", "HEAD", "refs/heads/team/main");
+    const r = await sb.script("land-feature.sh");
+    assertEquals(r.code, 3, r.stderr);
+    assertStringIncludes(r.stderr, "refs/heads/team/main");
+    assertEquals(await git(sb.work, "symbolic-ref", "--short", "HEAD"), "feature");
+  } finally {
+    await sb.cleanup();
+  }
+});
+
+Deno.test("an origin that cannot answer is 3: unreachable, or its ls-remote fails", {
+  ignore: Deno.build.os === "windows",
+}, async () => {
+  const sb = await featureBranch();
+  try {
+    const failing = await sb.scriptWithGit(
+      `[ "$1" = ls-remote ] && exit 128\nexec "$REAL_GIT" "$@"`,
+      "land-feature.sh",
+    );
+    assertEquals(failing.code, 3, failing.stderr);
+    assertStringIncludes(failing.stderr, "ls-remote");
+    const silent = await sb.scriptWithGit(
+      `[ "$1" = ls-remote ] && exit 0\nexec "$REAL_GIT" "$@"`,
+      "land-feature.sh",
+    );
+    assertEquals(silent.code, 3, "an answer naming no default is not a match");
+    await git(sb.work, "remote", "set-url", "origin", join(sb.root, "gone.git"));
+    const gone = await sb.script("land-feature.sh");
+    assertEquals(gone.code, 3, gone.stderr);
+    assertEquals(await git(sb.work, "symbolic-ref", "--short", "HEAD"), "feature");
+  } finally {
+    await sb.cleanup();
+  }
+});
+
+Deno.test("a branch that will not delete after the push is 11 — landed, not a push failure", {
+  ignore: Deno.build.os === "windows",
+}, async () => {
+  const sb = await featureBranch();
+  try {
+    const head = await git(sb.work, "rev-parse", "HEAD");
+    const r = await sb.scriptWithGit(
+      `[ "$1" = branch ] && [ "$3" = -d ] && exit 1\nexec "$REAL_GIT" "$@"`,
+      "land-feature.sh",
+    );
+    assertEquals(r.code, 11, r.stderr);
+    assert(/^LANDED main [0-9a-f]{12}\.\.[0-9a-f]{12} 1 commit\(s\)$/m.test(r.stdout), r.stdout);
+    assertEquals(await git(sb.remote, "rev-parse", "main"), head);
+    assertStringIncludes(r.stderr, "landed and pushed");
+  } finally {
+    await sb.cleanup();
+  }
+});
+
+Deno.test("an unexpected git failure is 12, named — never a raw set -e code", {
+  ignore: Deno.build.os === "windows",
+}, async () => {
+  const sb = await featureBranch();
+  try {
+    const r = await sb.scriptWithGit(
+      `[ "$1" = rev-parse ] && [ "$2" = HEAD ] && exit 128\nexec "$REAL_GIT" "$@"`,
+      "land-feature.sh",
+    );
+    assertEquals(r.code, 12, r.stderr);
+    assertStringIncludes(r.stderr, "rev-parse HEAD");
+    assertStringIncludes(r.stderr, "nothing was pushed");
+  } finally {
+    await sb.cleanup();
+  }
+});
+
+Deno.test("the exit-7 recovery merge.md maps lands the branch after origin moved", async () => {
+  // Exit 7 leaves the fast-forward on the local base: without resetting it,
+  // the rebase that exit 5 asks for ends at exit 6, and the landing loops.
+  const sb = await featureBranch();
+  try {
+    await sb.refusePushes();
+    assertEquals((await sb.script("land-feature.sh")).code, 7);
+    await Deno.writeTextFile(join(sb.root, "allow"), "");
+    const other = join(sb.root, "other");
+    await git(sb.root, "clone", "--quiet", sb.remote, other);
+    await Deno.writeTextFile(join(other, "o"), "o\n");
+    await git(other, "add", "o");
+    await git(
+      other,
+      "-c",
+      "user.name=o",
+      "-c",
+      "user.email=o@example.test",
+      "commit",
+      "-qm",
+      "theirs",
+    );
+    await git(other, "push", "--quiet", "origin", "main");
+    // The recovery, as merge.md writes it.
+    await git(sb.work, "checkout", "--quiet", "feature");
+    await git(sb.work, "branch", "-f", "main", "refs/remotes/origin/main");
+    assertEquals((await sb.script("land-feature.sh")).code, 5);
+    await git(sb.work, "rebase", "--quiet", "refs/remotes/origin/main");
+    const r = await sb.script("land-feature.sh");
+    assertEquals(r.code, 0, r.stderr);
+    const log = await git(sb.remote, "log", "--format=%s", "main");
+    assertStringIncludes(log, "feat(7)");
+    assertStringIncludes(log, "theirs");
+  } finally {
+    await sb.cleanup();
+  }
+});
