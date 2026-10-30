@@ -38,6 +38,10 @@ const ALLOWED: Record<string, string> = {
     "names the Codex registration it gates; absent on Claude, never written to",
   "protect-generated.sh .claude/":
     "names the Claude registration it gates; absent on Codex, never written to",
+  // cli#679: one reference for both design-target harnesses, read on request. Its `.claude/`
+  // paths sit under its `## Claude Code` heading — a fact about that harness, not a pointer.
+  "integrations .claude/": "the Claude Code section of the two-harness integrations reference",
+  "facts-integrations .claude/": "the same reference, under Copilot's flattened instruction name",
 };
 
 /** Entries an allowance actually excused, so a stale one is caught. */

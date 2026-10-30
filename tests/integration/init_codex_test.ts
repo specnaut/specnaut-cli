@@ -88,8 +88,13 @@ Deno.test("specnaut init --ai codex scaffolds a Codex layout", async () => {
     assertEquals(await readLinkText(join(root, ".codex/AGENTS.md")), "../AGENTS.md");
     assertEquals(await exists(join(root, ".codex/goal.md")), false);
     const agentsMd = await Deno.readTextFile(join(root, "AGENTS.md"));
-    assertEquals(agentsMd.includes("**Codex only:**"), true);
-    assertEquals(agentsMd.includes("`/goal <objective>`"), true);
+    // cli#679: one pointer line; the reference sits beside the specnaut-facts skill.
+    assertEquals(agentsMd.includes("`.agents/skills/specnaut-facts/integrations.md`"), true);
+    const integrations = await Deno.readTextFile(
+      join(root, ".agents/skills/specnaut-facts/integrations.md"),
+    );
+    assertEquals(integrations.includes("## Codex"), true);
+    assertEquals(integrations.includes("`/goal <objective>`"), true);
     assertEquals(agentsMd.includes(".claude/"), false);
 
     // Top-level skill folders post-consolidation: specnaut router +

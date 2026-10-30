@@ -561,8 +561,7 @@ check "auto-chain.md states autopilot is the default (#458)" \
   'grep -q "Autopilot is the default" .claude/skills/task/phases/auto-chain.md'
 check "auto-chain.md refuses the stalling excuses (#458)" \
   'grep -q "real code gets written" .claude/skills/task/phases/auto-chain.md'
-check "scaffolded AGENTS.md carries the stop rule (#458)" \
-  'grep -q "runs on autopilot after the plan" AGENTS.md'
+check "scaffolded AGENTS.md carries the stop rule, and not the excuse table (#458, cli#679)" 'grep -q "runs on autopilot after the plan" AGENTS.md && ! grep -q "| The excuse |" AGENTS.md'
 check "the chain-stops section is fenced so upgrade can deliver it (#466)" \
   'grep -q -- "<!-- --- Specnaut: chain-stops --- -->" AGENTS.md && grep -q -- "<!-- --- End Specnaut: chain-stops --- -->" AGENTS.md'
 
@@ -602,8 +601,8 @@ echo "═══ #612 / cli#680  the context file is AGENTS.md, and points only a
 check_context_file local
 check "AGENTS.md carries the backlog section, rendered for its backend (cli#680)" \
   'grep -q -- "<!-- --- Specnaut: backlog --- -->" AGENTS.md && grep -q "\.specnaut/backlog\.md" AGENTS.md && ! grep -q "backend=" AGENTS.md'
-check "AGENTS.md carries the optional-integrations section (cli#680)" \
-  'grep -q -- "<!-- --- Specnaut: optional-integrations --- -->" AGENTS.md'
+check "AGENTS.md's optional-integrations section points at the written reference (cli#680, cli#679)" \
+  'grep -q -- "<!-- --- Specnaut: optional-integrations --- -->" AGENTS.md && grep -q "\.claude/skills/specnaut-facts/integrations\.md" AGENTS.md && grep -q "^## Claude Code" .claude/skills/specnaut-facts/integrations.md'
 
 echo
 echo "═══ #23  a silent review seat fails the gate ═══"

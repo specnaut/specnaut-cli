@@ -52,6 +52,13 @@ Before 7.2 the pipeline, the backlog and the audits lived at other addresses; th
 
 `Priority` (P0–P3) and `Size` (XS–XL) via Project V2 native fields (`set-field.sh`); fall back to `priority:*`/`size:*` labels when the native field is absent. Two-step close: `gh issue close --reason completed` first, then `move.sh <num> Done` — moving first makes a sweep report the open card in Done as drift. `/task groom` catches items closed via paths that bypassed the move step.
 
+### Optional integrations
+
+Harness features Specnaut does not configure but that pair well with it — Claude Code's `/loop`,
+`/goal`, `claude agents`, headless runs, deep links, MCP; Codex's `/goal` and CLI reference — are in
+`integrations.md`, the document installed beside this skill's own file. The always-on `AGENTS.md`
+points there in one line.
+
 ### Design principles
 
 Agnostic of language / LLM / harness / backlog backend. Single binary via `deno compile` for macOS, Linux, Windows. No Python or extra runtimes.

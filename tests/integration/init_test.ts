@@ -363,39 +363,32 @@ Deno.test("specnaut init --here moves an existing legacy constitution.md, unlock
     assertEquals(await exists(join(target, LEGACY_CONSTITUTION_PATH)), false);
   });
 });
-// what Claude Code loads, the root AGENTS.md as rendered for Claude.
-Deno.test("scaffolded .claude/CLAUDE.md documents /goal", async () => {
+// `.claude/CLAUDE.md` is a link to the root AGENTS.md (cli#680), so what it says is what Claude Code
+// loads. Since cli#679 it carries one pointer line; the reference sits beside specnaut-facts.
+Deno.test("scaffolded .claude/CLAUDE.md points at the integrations reference, which is written", async () => {
   await withTempDir(async (dir) => {
     const { code, stderr } = await runSpecnaut(
       ["init", "demo", "--no-git", "--ai", "claude", "--backlog", "local"],
       { cwd: dir },
     );
     assertEquals(code, 0, `init failed: ${stderr}`);
-    const claudeMd = await Deno.readTextFile(
-      join(dir, "demo/.claude/CLAUDE.md"),
-    );
+    const claudeMd = await Deno.readTextFile(join(dir, "demo/.claude/CLAUDE.md"));
+    const INTEGRATIONS = ".claude/skills/specnaut-facts/integrations.md";
     assertStringIncludes(claudeMd, "## Optional integrations");
-    assertStringIncludes(claudeMd, "Goal-directed sessions");
-    assertStringIncludes(claudeMd, "/goal");
-    assertStringIncludes(claudeMd, "code.claude.com/docs/en/goal");
-    assertStringIncludes(claudeMd, ".claude/loop.md");
-  });
-});
-
-Deno.test("scaffolded .claude/CLAUDE.md documents `claude agents`", async () => {
-  await withTempDir(async (dir) => {
-    const { code, stderr } = await runSpecnaut(
-      ["init", "demo", "--no-git", "--ai", "claude", "--backlog", "local"],
-      { cwd: dir },
-    );
-    assertEquals(code, 0, `init failed: ${stderr}`);
-    const claudeMd = await Deno.readTextFile(
-      join(dir, "demo/.claude/CLAUDE.md"),
-    );
-    assertStringIncludes(claudeMd, "Multi-session dispatch");
-    assertStringIncludes(claudeMd, "claude agents");
-    assertStringIncludes(claudeMd, "code.claude.com/docs/en/agent-view");
-    assertStringIncludes(claudeMd, ".claude/worktrees/");
+    assertStringIncludes(claudeMd, `\`${INTEGRATIONS}\``);
+    // Named in the pointer, so a session knows to open the reference for them.
+    for (const name of ["`/goal`", "`claude agents`"]) assertStringIncludes(claudeMd, name);
+    const doc = await Deno.readTextFile(join(dir, "demo", INTEGRATIONS));
+    for (
+      const text of [
+        "Goal-directed sessions",
+        "code.claude.com/docs/en/goal",
+        ".claude/loop.md",
+        "Multi-session dispatch",
+        "code.claude.com/docs/en/agent-view",
+        ".claude/worktrees/",
+      ]
+    ) assertStringIncludes(doc, text);
   });
 });
 

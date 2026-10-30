@@ -216,4 +216,6 @@ export const PLUGIN_COVERED_PATHS_CLAUDE: ReadonlyArray<string> = [
     "status-audit",
     "workflow-contract",
   ].map((name) => `.claude/skills/${name}/SKILL.md`),
+  // The on-demand integrations reference `AGENTS.md` points at (cli#679).
+  ".claude/skills/specnaut-facts/integrations.md",
 ];

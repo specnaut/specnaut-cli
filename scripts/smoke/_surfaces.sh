@@ -44,6 +44,8 @@ SURFACES=(
   # next one too. smoke-features.sh is listed for backlog.md, the backend
   # sections it asserts on.
   'templates/core/skills/task/*.md|smoke-backlog-github.sh smoke-features.sh|backlog-skill-doc'
+  # cli#679: the integrations reference the always-on AGENTS.md points at.
+  'templates/core/skills/specnaut-facts/integrations.md|smoke-features.sh|skill-reference-doc'
   'templates/core/specnaut/templates/*|smoke-features.sh|scaffold-template'
   'templates/core/specnaut/backlog.md|smoke-backlog-local.sh|specnaut-root-doc'
   'templates/core/specnaut/logs/README.md|smoke-features.sh|specnaut-root-doc'

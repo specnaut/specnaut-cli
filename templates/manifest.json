@@ -232,6 +232,12 @@
       "source": "core/skills/specnaut-facts/SKILL.md"
     },
     {
+      "category": "backlog-doc",
+      "name": "specnaut-facts",
+      "suffix": "integrations.md",
+      "source": "core/skills/specnaut-facts/integrations.md"
+    },
+    {
       "category": "agent",
       "name": "product-owner",
       "source": "core/agents/product-owner.md"

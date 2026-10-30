@@ -69,9 +69,6 @@ const CREATED_OUTSIDE_THE_BUNDLE: Record<
   string,
   { reason: string; backends?: readonly BacklogBackend[] }
 > = {
-  ".claude/worktrees/": {
-    reason: "created by Claude Code's agent view for isolated sessions, not by Specnaut",
-  },
   ".claude/claude-security-guidance.local.md": {
     reason: "the user's optional override; Specnaut documents it and never writes it",
   },

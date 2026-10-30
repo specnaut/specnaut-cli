@@ -43,9 +43,8 @@ function rootAgents(): CoreEntry {
   return e;
 }
 
-// The five sentences that have actually been used to stall the chain. Each must
-// be refused in writing, in BOTH carriers — quoting the excuse is what lets a
-// model recognise its own reasoning instead of rationalising past a generality.
+// The five sentences that have actually been used to stall the chain, each refused in writing —
+// quoting one lets a model recognise its own reasoning. One home since cli#679: auto-chain.md.
 const EXCUSES: ReadonlyArray<[label: string, fragment: string]> = [
   ["task count", "lot of tasks"],
   ["MVP fork", "MVP"],
@@ -75,10 +74,11 @@ Deno.test("the scaffolded AGENTS.md carries the stop rule — it is the always-l
   assertStringIncludes(content, "without a second confirmation");
 });
 
-Deno.test("AGENTS.md refuses every excuse that has been used to stall the chain", () => {
+Deno.test("the excuse catalogue has one home, and it is not the always-on file (cli#679)", () => {
   const { content } = rootAgents();
+  assert(!content.includes("| The excuse |"), "AGENTS.md restates the excuse table");
   for (const [label, fragment] of EXCUSES) {
-    assertStringIncludes(content, fragment, `AGENTS.md must refuse the "${label}" excuse`);
+    assert(!content.includes(fragment), `AGENTS.md restates the "${label}" excuse`);
   }
 });
 

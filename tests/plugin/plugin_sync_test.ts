@@ -87,17 +87,16 @@ const SYNC_PAIRS: ReadonlyArray<{ plugin: string; source: string }> = [
     // rather than on a topic — so it is reached by the always-on leg and the
     // AGENTS.md fence, never by a per-seat `skills:` enumeration.
     "response-style-contract",
+    // #381: the read-only session-health report over the status ledger.
+    "status-audit",
   ].map((name) => ({
     plugin: `plugin/skills/${name}/SKILL.md`,
     source: `templates/core/skills/${name}/SKILL.md`,
   })),
-  // status-audit (#381). Markdown-only read-only skill — reads the
-  // `.specnaut/logs/agents.jsonl` status ledger and reports seven session-health
-  // views; pairs with `/loop 5m /status-audit` for headless supervision. Mirrors
-  // through the same byte-identical channel as the other markdown-only skills.
+  // specnaut-facts' on-demand integrations reference, which AGENTS.md points at (cli#679).
   {
-    plugin: "plugin/skills/status-audit/SKILL.md",
-    source: "templates/core/skills/status-audit/SKILL.md",
+    plugin: "plugin/skills/specnaut-facts/integrations.md",
+    source: "templates/core/skills/specnaut-facts/integrations.md",
   },
   // /design (#678) — the former ui-ux-designer agent, a user-invoked skill.
   { plugin: "plugin/skills/design/SKILL.md", source: "templates/core/skills/design/SKILL.md" },

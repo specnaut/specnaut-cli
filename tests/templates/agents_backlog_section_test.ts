@@ -59,25 +59,70 @@ Deno.test("the backlog reference pointer is said once, inside the fence", () => 
   assertEquals(root.content.split("backlog-reference-contract").length - 1, 1);
 });
 
-Deno.test("each harness-only integration list reaches its harness, and only it", () => {
-  // The root AGENTS.md ships to every harness: a list about one harness's own
-  // folders would send the others to paths they never received (#656). Each
-  // list still says which harness it is for, where it lands.
-  const LABEL: Record<string, string> = {
-    claude: "**Claude Code only:**",
-    codex: "**Codex only:**",
-  };
+/**
+ * cli#679 moved the integrations tour out of the always-on file: its managed
+ * section is one pointer line per design-target harness, and the reference
+ * lives in `specnaut-facts/integrations.md`. The label stays, so an upgrade
+ * refreshes the old body away instead of leaving ~75 lines behind.
+ */
+const POINTER: Record<string, string> = {
+  claude: "`.claude/skills/specnaut-facts/integrations.md`",
+  codex: "`.agents/skills/specnaut-facts/integrations.md`",
+};
+
+Deno.test("each harness's integrations pointer reaches its harness, and only it", () => {
+  // The root AGENTS.md ships to every harness: a pointer into one harness's own
+  // folders would send the others to paths they never received (#656).
   const wrong: string[] = [];
   for (const harness of HARNESSES) {
-    const agents = harness.mapBundle(CORE_BUNDLE, optsFor("local"))["AGENTS.md"]!.content;
+    const bundle = harness.mapBundle(CORE_BUNDLE, optsFor("local"));
+    const agents = bundle["AGENTS.md"]!.content;
     const body = extractBlock(agents, "optional-integrations", "html") ?? "";
-    for (const [owner, label] of Object.entries(LABEL)) {
-      if (body.includes(label) !== (owner === harness.key)) {
-        wrong.push(`${harness.key}: ${label} ${owner === harness.key ? "missing" : "leaked"}`);
+    for (const [owner, pointer] of Object.entries(POINTER)) {
+      if (body.includes(pointer) !== (owner === harness.key)) {
+        wrong.push(`${harness.key}: ${pointer} ${owner === harness.key ? "missing" : "leaked"}`);
       }
     }
+    const own = POINTER[harness.key];
+    if (own !== undefined && bundle[own.replaceAll("`", "")] === undefined) {
+      wrong.push(`${harness.key}: ${own} is cited but not written`);
+    }
+    if (body.split("\n").filter((l) => l.includes("integrations.md")).length > 1) {
+      wrong.push(`${harness.key}: more than one pointer line`);
+    }
     if (agents.includes("harness=")) wrong.push(`${harness.key}: markers left in AGENTS.md`);
-    if (body.includes("/docs/fr/")) wrong.push(`${harness.key}: a localised docs URL survived`);
   }
   assertEquals(wrong, []);
+});
+
+Deno.test("the integrations reference lives in specnaut-facts, for both harnesses", () => {
+  const doc = CORE_BUNDLE.find((e) => e.name === "specnaut-facts" && e.suffix === "integrations.md")
+    ?.content;
+  assert(doc, "no specnaut-facts/integrations.md in the bundle");
+  for (
+    const text of [
+      "## Claude Code",
+      "## Codex",
+      "`/loop 1h`",
+      "`.claude/loop.md`",
+      "https://code.claude.com/docs/en/goal",
+      "Multi-session dispatch (`claude agents`)",
+      "https://code.claude.com/docs/en/agent-view",
+      "`.claude/worktrees/`",
+      "`.claude/scripts/dispatch-agent.sh",
+      "`/goal <objective>`",
+      "https://learn.chatgpt.com/use-cases/follow-goals",
+    ]
+  ) assert(doc!.includes(text), `integrations.md lost ${text}`);
+  // No filter runs on a skill document, so no marker may reach it; no harness
+  // version (constitution § VIII); and no example naming Specnaut's own board
+  // or toolchain (cli#687).
+  assert(!doc!.includes("harness="), "harness markers in integrations.md");
+  assert(!/v[0-9]+\.[0-9]+/.test(doc!), "a version pin in integrations.md");
+  for (const leak of ["Specnaut Project", "deno task"]) {
+    assert(!doc!.includes(leak), `integrations.md names ${leak}`);
+  }
+  assert(!doc!.includes("/docs/fr/"), "a localised docs URL survived");
+  const facts = CORE_BUNDLE.find((e) => e.category === "skill" && e.name === "specnaut-facts");
+  assert(facts?.content.includes("`integrations.md`"), "specnaut-facts does not name the file");
 });

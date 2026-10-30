@@ -146,6 +146,39 @@ Deno.test("upgrade restores a gutted section without disturbing the user's edits
   });
 });
 
+/**
+ * cli#679 trimmed two sections in place (the excuse table; the ~75-line integrations tour). Both
+ * labels were kept, so this refresh — not a new deletion path — removes the old bodies on upgrade.
+ */
+Deno.test("upgrade refreshes the trimmed sections away from the old bodies (cli#679)", async () => {
+  await withTempDir(async (dir) => {
+    assertEquals((await runSpecnaut(INIT, dir)).code, 0);
+    const agents = join(dir, "AGENTS.md");
+    // The project as the previous bundle left it: each section carried its old body.
+    const swap = (text: string, label: string, body: string) => {
+      const [start, end] = [
+        `<!-- --- Specnaut: ${label} --- -->`,
+        `<!-- --- End Specnaut: ${label} --- -->`,
+      ];
+      return text.slice(0, text.indexOf(start)) + `${start}\n\n${body}\n${end}` +
+        text.slice(text.indexOf(end) + end.length);
+    };
+    let stale = await Deno.readTextFile(agents);
+    stale = swap(stale, "chain-stops", `${HEADING}\n\n| The excuse | Why it is not a reason |\n`);
+    stale = swap(stale, "optional-integrations", "**Claude Code only:**\n\n- `/loop 1h` …\n");
+    await Deno.writeTextFile(agents, stale);
+
+    const up = await runSpecnaut(["upgrade"], dir);
+    assertEquals(up.code, 0, `upgrade failed: ${up.stderr}`);
+    const after = await Deno.readTextFile(agents);
+    assert(!after.includes("| The excuse |"), "the excuse table survived the upgrade");
+    assert(!after.includes("**Claude Code only:**"), "the integrations tour survived the upgrade");
+    assertStringIncludes(after, "`.claude/skills/specnaut-facts/integrations.md`");
+    assertStringIncludes(after, "Only a CRITICAL or HIGH finding buys another fix cycle");
+    assertEquals(occurrences(after, "<!-- --- Specnaut: optional-integrations --- -->"), 1);
+  });
+});
+
 Deno.test("a dry-run reports the section without writing it", async () => {
   await withTempDir(async (dir) => {
     const own = "# AGENTS.md\n\nOurs.\n";
