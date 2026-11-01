@@ -16,7 +16,10 @@
 
 import { red, yellow } from "@std/fmt/colors";
 import { defaultCredentialStore } from "../../infrastructure/credential_store.ts";
-import { FsBacklogConfigStore } from "../../infrastructure/fs_backlog_config_store.ts";
+import {
+  CloudConfigUnreadable,
+  FsBacklogConfigStore,
+} from "../../infrastructure/fs_backlog_config_store.ts";
 import { GateSession, makeGateSession } from "../../domain/cloud/gate_session.ts";
 import type { GateRequest, GateType } from "../../domain/cloud/gate_contract.ts";
 import { GATE_TYPES, isGateType } from "../../domain/cloud/gate_contract.ts";
@@ -62,6 +65,16 @@ export async function runGate(
   intent: GateIntent,
   deps: GateDeps = defaultDeps(intent),
 ): Promise<number> {
+  try {
+    return await runGateUnguarded(intent, deps);
+  } catch (e) {
+    if (!(e instanceof CloudConfigUnreadable)) throw e;
+    deps.err(red(`error: ${e.message}`));
+    return 1;
+  }
+}
+
+async function runGateUnguarded(intent: GateIntent, deps: GateDeps): Promise<number> {
   switch (intent.sub) {
     case "status":
       return await runStatus(deps);

@@ -14,7 +14,10 @@
 
 import { dim, green, red, yellow } from "@std/fmt/colors";
 import { defaultCredentialStore } from "../../infrastructure/credential_store.ts";
-import { FsBacklogConfigStore } from "../../infrastructure/fs_backlog_config_store.ts";
+import {
+  CloudConfigUnreadable,
+  FsBacklogConfigStore,
+} from "../../infrastructure/fs_backlog_config_store.ts";
 import { makeSpecSession, type SpecSession } from "../../domain/cloud/spec_session.ts";
 import { SpecApiError } from "../../domain/cloud/spec_client.ts";
 import { CloudSpecStore } from "../../infrastructure/spec/cloud_spec_store.ts";
@@ -72,6 +75,16 @@ export async function runSpec(
   intent: SpecIntent,
   deps: SpecDeps = defaultDeps(intent),
 ): Promise<number> {
+  try {
+    return await runSpecUnguarded(intent, deps);
+  } catch (e) {
+    if (!(e instanceof CloudConfigUnreadable)) throw e;
+    deps.err(red(`error: ${e.message}`));
+    return 1;
+  }
+}
+
+async function runSpecUnguarded(intent: SpecIntent, deps: SpecDeps): Promise<number> {
   if (intent.task === null) {
     deps.err(red(`error: \`specnaut spec ${intent.sub}\` requires a task number.`));
     return 1;

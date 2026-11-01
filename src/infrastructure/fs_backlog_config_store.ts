@@ -5,6 +5,14 @@ import type { CloudConfig } from "../domain/cloud/cloud_config.ts";
 import type { BacklogConfigStore, CloudConfigStore } from "../application/backlog_config_ports.ts";
 
 /**
+ * A `backlog-config.yml` that exists but cannot be read. Distinct from absent:
+ * the cloud commands report it and exit 1 instead of "not Cloud-linked".
+ */
+export class CloudConfigUnreadable extends Error {
+  override name = "CloudConfigUnreadable";
+}
+
+/**
  * Reads and writes the project's `.specnaut/backlog-config.yml`. Mirrors
  * `FsLockStore`: the store owns the path, the containment guard in front of
  * every write, and the rule that only `NotFound` means "absent".
@@ -20,7 +28,9 @@ export class FsBacklogConfigStore implements BacklogConfigStore, CloudConfigStor
       text = await Deno.readTextFile(this.configPath(projectDir));
     } catch (err) {
       if (err instanceof Deno.errors.NotFound) return null;
-      throw err;
+      throw new CloudConfigUnreadable(
+        `cannot read .specnaut/backlog-config.yml: ${err instanceof Error ? err.message : err}`,
+      );
     }
     return parseCloudConfig(text);
   }
