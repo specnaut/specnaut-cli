@@ -45,6 +45,7 @@ export const SHARED_ROOTS: ReadonlyArray<string> = [
  * missing here; a retired one stays until no supported upgrade path has it.
  */
 export const SPECNAUT_FILES: ReadonlyArray<string> = [
+  ".specnaut/.gitattributes",
   ".specnaut/LABELS.md",
   ".specnaut/backlog.md",
   ".specnaut/gates.yml",

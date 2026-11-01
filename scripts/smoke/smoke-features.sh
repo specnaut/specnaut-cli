@@ -32,6 +32,10 @@ check "common.sh resolves FEATURE_SPEC to plan.md (#457)" \
   'grep -q "plan.md" .specnaut/scripts/bash/common.sh'
 check "common.sh no longer exports the deleted artefact paths (#457)" \
   '! grep -qE "RESEARCH=|DATA_MODEL=|QUICKSTART=|CONTRACTS_DIR=" .specnaut/scripts/bash/common.sh'
+check "common.sh sources template-resolution.sh, scaffolded beside it (#701)" \
+  '[ -f .specnaut/scripts/bash/template-resolution.sh ] && grep -q "template-resolution.sh" .specnaut/scripts/bash/common.sh'
+check ".specnaut/.gitattributes keeps Specnaut's tree LF on every platform (#701)" \
+  'grep -qx "\* text=auto eol=lf" .specnaut/.gitattributes'
 check "check-prerequisites.sh no longer lists deleted artefacts (#457)" \
   '! grep -qE "research\.md|data-model\.md|quickstart\.md" .specnaut/scripts/bash/check-prerequisites.sh'
 check "common.ps1 resolves FEATURE_SPEC to plan.md (#457)" \

@@ -57,6 +57,8 @@ SURFACES=(
   # `templates/core/specnaut/*.yml`. There are two today, and a glob
   # here would claim the next one silently — which is the opposite of what
   # the unmapped class is for.
+  # cli#701: keeps the scaffolded tree LF under core.autocrlf.
+  'templates/core/specnaut/.gitattributes|smoke-features.sh|specnaut-config'
   'templates/core/specnaut/gates.yml|smoke-features.sh smoke-merge.sh|specnaut-config'
   'templates/core/specnaut/workflow.yml|smoke-features.sh smoke-merge.sh|specnaut-config'
   # Harness-specific artefacts. The pathspec ignored this whole tree until
