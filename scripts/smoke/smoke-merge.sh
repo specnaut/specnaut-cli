@@ -12,7 +12,9 @@ NAME="${1:?usage: smoke-merge.sh <name>}"
 . "$(dirname "$0")/_common.sh"
 DIR="$(scenario_dir "$NAME")"
 
-trap 'bash "$SMOKE_DIR/clean.sh" "$NAME" >/dev/null 2>&1 || true' EXIT
+# One trap for both: a second `trap … EXIT` would replace this one. M_TMP is
+# _merge_fixtures.sh's, set once it is sourced below.
+trap 'rm -rf "${M_TMP:-}"; bash "$SMOKE_DIR/clean.sh" "$NAME" >/dev/null 2>&1 || true' EXIT
 
 bash "$SMOKE_DIR/bootstrap-vite.sh" "$NAME" >/dev/null
 (cd "$DIR" && deno run --allow-all "$CLI/src/main.ts" \
@@ -42,8 +44,10 @@ check "companion doc merge-close.md scaffolded (#560)" \
 # Instruction only: which doc the agent loads after a push — no script reads it.
 check "merge.md routes to it after a push (#560)" \
   'grep -qF "phases/merge-close.md" .claude/skills/task/phases/merge.md'
-check "close-shipped.sh moves each number it is given once, in the order given (#560 AC1)" \
-  'probe_close_shipped "" "" 51 52 50 && close_shipped_was 0 "$(printf "move 51 Done\nmove 52 Done\nmove 50 Done")"'
+# The report is built from close-shipped.sh's lines: one per item, and no count.
+check "close-shipped.sh moves each number once, in the order given, and reports one line per item (#560 AC1, AC5)" \
+  'probe_close_shipped "" "" 51 52 50 && close_shipped_was 0 "$(printf "move 51 Done\nmove 52 Done\nmove 50 Done")" &&
+   [ "$CS_OUT" = "$(printf "DONE #51\nDONE #52\nDONE #50")" ]'
 # Instruction only: the order the agent runs `gh issue close` and close-shipped.sh
 # in, on both paths. `!e`/`!c`/`!m` keep the FIRST of each; a missing marker
 # fails, so a renamed command must re-state its order (#588).
@@ -79,9 +83,6 @@ check "the epic is read before the landing, and the close never re-reads it (#67
    l=$(grep -nF "bash .specnaut/scripts/bash/land-feature.sh" "$P/merge.md" | head -1 | cut -d: -f1);
    [ -n "$r" ] && [ -n "$l" ] && [ "$r" -lt "$l" ] &&
    ! grep -qF "bash .specnaut/scripts/bash/epic-status.sh" "$P/merge-close.md"'
-# The report is built from close-shipped.sh's lines: one per item, and no count.
-check "the report names every item, not a count: one line per item, nothing else (#560 AC5)" \
-  'probe_close_shipped "" "" 51 52 50 && [ "$CS_OUT" = "$(printf "DONE #51\nDONE #52\nDONE #50")" ]'
 # Instruction only: merge-close.md is loaded only after a push — no script routes it.
 check "nothing closes when the merge did not push (#560 AC6)" \
   'grep -qF "only when the push" .claude/skills/task/phases/merge-close.md'

@@ -1,6 +1,6 @@
 import { assert, assertEquals, assertStringIncludes } from "@std/assert";
 import { join } from "@std/path";
-import { git, run, sandbox } from "./git_sandbox.ts";
+import { git, REFUSALS_ON_BASE, run, sandbox } from "./git_sandbox.ts";
 
 /** spec 042 — land-feature.sh is the one home of the mechanical merge. */
 
@@ -103,16 +103,10 @@ Deno.test("every merge script finds base-branch.sh when run by bare name from it
   const sb = await sandbox();
   try {
     const dir = join(sb.work, ".specnaut/scripts/bash");
-    // On main, with no feature: each stops at its own refusal, past the base lookup.
-    const want: Record<string, [number, ...string[]]> = {
-      "epic-status.sh": [14],
-      "fold-fixups.sh": [14],
-      "land-feature.sh": [2],
-      "remove-spec.sh": [22, "007-x"],
-    };
-    for (const [name, [code, ...args]] of Object.entries(want)) {
+    for (const [name, { args, code, line }] of Object.entries(REFUSALS_ON_BASE)) {
       const r = await run("bash", [name, ...args], dir);
       assertEquals(r.code, code, `${name}: ${r.stderr}`);
+      assertStringIncludes(r.stderr, line, name);
     }
   } finally {
     await sb.cleanup();

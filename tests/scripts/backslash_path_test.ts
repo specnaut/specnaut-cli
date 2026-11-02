@@ -1,6 +1,6 @@
-import { assert, assertEquals, assertMatch } from "@std/assert";
+import { assert, assertEquals, assertMatch, assertRejects } from "@std/assert";
 import { join } from "@std/path";
-import { git, run, sandbox } from "./git_sandbox.ts";
+import { git, REFUSALS_ON_BASE, run, sandbox } from "./git_sandbox.ts";
 import * as hooks from "../templates/hooks/hook_sandbox.ts";
 
 /**
@@ -41,19 +41,13 @@ Deno.test({
   fn: async () => {
     const sb = await sandbox();
     try {
-      // On main, with no feature: each stops at its own refusal, past the
-      // sibling lookup. A sibling unfound is 3 (base-branch.sh) or 13 (merge-hold.sh).
-      const want: Record<string, [number, ...string[]]> = {
-        "epic-status.sh": [14],
-        "fold-fixups.sh": [14],
-        "land-feature.sh": [2],
-        "remove-spec.sh": [22, "007-x"],
-      };
       const wrong: string[] = [];
-      for (const [name, [code, ...args]] of Object.entries(want)) {
+      for (const [name, { args, code, line }] of Object.entries(REFUSALS_ON_BASE)) {
         for (const [form, path] of Object.entries(forms(sb.work, name))) {
           const r = await run("bash", [path, ...args], sb.work);
-          if (r.code !== code) wrong.push(`${form} ${name}: ${r.code}, not ${code}: ${r.stderr}`);
+          if (r.code !== code || !r.stderr.includes(line)) {
+            wrong.push(`${form} ${name}: ${r.code}, not ${code} with "${line}": ${r.stderr}`);
+          }
         }
       }
       assertEquals(wrong, []);
@@ -114,4 +108,36 @@ Deno.test({
       await sb.cleanup();
     }
   },
+});
+
+Deno.test("runHook refuses an opts.path that names another hook, or comes with opts.hooksDir", async () => {
+  // Any OS: the guard is never reached, so a `\` here is only text (cli#728).
+  const sb = await hooks.sandbox();
+  try {
+    const call = async (path: string, extra: Record<string, string> = {}) =>
+      await hooks.runHook(
+        sb,
+        "guard-merge.sh",
+        "claude",
+        "{}",
+        { path, ...extra } as { path: string },
+      );
+    await assertRejects(
+      () => call("C:\\p/.specnaut/hooks/guard-release.sh"),
+      Error,
+      "does not name",
+    );
+    await assertRejects(
+      () => call("C:\\p/.specnaut/hooks/xguard-merge.sh"),
+      Error,
+      "does not name",
+    );
+    await assertRejects(
+      () => call("C:\\p/.specnaut/hooks/guard-merge.sh", { hooksDir: "/elsewhere" }),
+      Error,
+      "replaces opts.hooksDir",
+    );
+  } finally {
+    await sb.cleanup();
+  }
 });

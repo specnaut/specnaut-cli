@@ -78,31 +78,11 @@ Deno.test("generated output the squash left untracked refuses the landing: exit 
   }
 });
 
-Deno.test("a merge ends on the base branch, verified rather than assumed", async () => {
-  // Spec 042 moved the mechanics into land-feature.sh; the rule moved with them.
-  // Asserted by running it (cli#711): the landing leaves the person on the base,
-  // the branch gone, and origin at the same commit — never by how it is spelled.
-  // Force-pushing and force-deleting are held absent by land_feature_test's exit
-  // 7 (a rejected push stays rejected) and exit 11 (a branch that will not
-  // delete). Its exit-table test holds that each exit has a row in merge.md, not
-  // what the row says: that is instruction, in INSTRUCTION below.
-  const sb = await sandbox();
-  try {
-    await git(sb.work, "switch", "--quiet", "-c", "feature");
-    await sb.commit("f", "x\n", "feat(7): a feature");
-    const r = await sb.script("land-feature.sh");
-    assertEquals(r.code, 0, r.stderr);
-    assertEquals(await git(sb.work, "symbolic-ref", "--short", "HEAD"), "main");
-    assertEquals(await git(sb.work, "branch", "--list", "feature"), "", "the branch survived");
-    assertEquals(
-      await git(sb.work, "rev-parse", "HEAD"),
-      await git(sb.remote, "rev-parse", "main"),
-      "origin is not where the landing says",
-    );
-  } finally {
-    await sb.cleanup();
-  }
-});
+// A merge ends on the base branch, the branch gone and origin level: that is
+// land_feature_test's first test, run (cli#711). Its refusals hold force-pushing
+// and force-deleting absent: exit 7 (a rejected push stays rejected) and 11 (a
+// branch that will not delete). Its exit-table test holds that each exit has a
+// row in merge.md, not what the row says: that is instruction, below.
 
 /**
  * [doc, anchor, why no run can observe it]. Not here, because a run proves

@@ -163,15 +163,24 @@ export async function payload(
  * Pipe `input` (an object is JSON-encoded) into `<hook> <harness>` — the
  * template's own copy, or the one in `opts.hooksDir` (a test's altered copy).
  * `opts.path` is handed to bash exactly as given, never through `bashPath`:
- * the one way a test reaches a guard by a path holding a `\` (cli#716).
+ * the one way a test reaches a guard by a path holding a `\` (cli#716). It
+ * replaces `hooksDir`, so the two never come together, and it must name `hook`.
  */
 export function runHook(
   sb: Sandbox,
   hook: string,
   harness: Harness,
   input: Record<string, unknown> | string,
-  opts: { cwd?: string; env?: Record<string, string>; hooksDir?: string; path?: string } = {},
+  opts:
+    & { cwd?: string; env?: Record<string, string> }
+    & ({ hooksDir?: string; path?: never } | { path: string; hooksDir?: never }) = {},
 ): Promise<Run> {
+  if (opts.path !== undefined) {
+    // The type already forbids both; a cast must not get them past it either.
+    if (opts.hooksDir !== undefined) throw new Error("runHook: opts.path replaces opts.hooksDir");
+    const named = opts.path.endsWith(hook) && /[\\/]/.test(opts.path.at(-hook.length - 1) ?? "");
+    if (!named) throw new Error(`runHook: opts.path ${opts.path} does not name ${hook}`);
+  }
   const path = opts.path ?? bashPath(join(opts.hooksDir ?? HOOKS_DIR, hook));
   return exec("bash", [path, harness], {
     cwd: opts.cwd ?? sb.dir,

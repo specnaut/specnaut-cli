@@ -22,6 +22,26 @@ export const SCRIPTS = [
   "wip-audit.sh",
 ];
 
+/**
+ * Each merge script run on main with no feature stops at a refusal of its own,
+ * past the sibling lookup (a sibling unfound is 3, base-branch.sh, or 13,
+ * merge-hold.sh): its arguments, its exit, and the stderr line of that refusal
+ * (fold-fixups.sh passes epic-status.sh's through). Exit 2 is bash's own too,
+ * so the line is what tells the refusal apart (cli#728).
+ */
+export const REFUSALS_ON_BASE: Readonly<
+  Record<string, { args: string[]; code: number; line: string }>
+> = {
+  "epic-status.sh": { args: [], code: 14, line: "not an epic branch" },
+  "fold-fixups.sh": { args: [], code: 14, line: "not an epic branch" },
+  "land-feature.sh": { args: [], code: 2, line: "land-feature: already on main" },
+  "remove-spec.sh": {
+    args: ["007-x"],
+    code: 22,
+    line: "remove-spec: skipped — no .specnaut/feature.json",
+  },
+};
+
 export interface Run {
   code: number;
   stdout: string;
