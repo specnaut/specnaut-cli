@@ -104,7 +104,11 @@ printf '<%s>' "$one" "$many" "$count" "$kept" "$rc"
 }
 
 // A \r the value carries itself survives, \r\n included; jq's exit status is jq's.
-const VALUES = "<ACME-7><a\nb><3><keep\r\nit\r><1>";
+// Except at the very end on Windows: Git Bash's own `$(…)` drops a trailing
+// \r with the \n, whatever jq_lf printed — the shell's, not the helper's.
+const VALUES = Deno.build.os === "windows"
+  ? "<ACME-7><a\nb><3><keep\r\nit><1>"
+  : "<ACME-7><a\nb><3><keep\r\nit\r><1>";
 
 for (const family of ["spec", ...BACKENDS]) {
   Deno.test(`jq_lf (${family}): values read under a CRLF jq carry no \\r`, async () => {
@@ -228,7 +232,8 @@ Deno.test("every jq call in both families goes through jq_lf", async () => {
 Deno.test("every copy of jq_lf is the same text", async () => {
   const copies = [join(SPEC, "common.sh"), ...BACKENDS.map((b) => join(BOARD, b, "_config.sh"))];
   const bodies = await Promise.all(copies.map(async (f) => {
-    const text = await Deno.readTextFile(f);
+    // A Windows checkout may carry CRLF (core.autocrlf); compare the text, not its line ends.
+    const text = (await Deno.readTextFile(f)).replaceAll("\r\n", "\n");
     const start = text.indexOf("# jq_lf <jq args…>");
     const end = text.indexOf("\n}\n", start);
     assert(start >= 0 && end > start, `no jq_lf in ${f}`);

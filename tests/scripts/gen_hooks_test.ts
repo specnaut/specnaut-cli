@@ -26,11 +26,15 @@ Deno.test("gen-hooks: a generated file not yet written reads as absent; any othe
     assertEquals(await readIfPresent(join(dir, "absent.json")), null);
     // A directory where the file should be is not "absent": swallowing it would
     // have the generator try to write over it, or --check call it merely stale.
-    // The OS's own error, rethrown: Windows refuses to open a directory as a file.
-    const isDir = Deno.build.os === "windows"
-      ? Deno.errors.PermissionDenied
-      : Deno.errors.IsADirectory;
-    await assertRejects(() => readIfPresent(dir), isDir);
+    // The OS's own error, rethrown. POSIX names it IsADirectory; Windows' class
+    // for it varies (a generic Error on the CI runner), so there it is held to
+    // "rethrown, and not NotFound".
+    if (Deno.build.os === "windows") {
+      const e = await assertRejects(() => readIfPresent(dir));
+      assertEquals(e instanceof Deno.errors.NotFound, false, String(e));
+    } else {
+      await assertRejects(() => readIfPresent(dir), Deno.errors.IsADirectory);
+    }
   } finally {
     await Deno.remove(dir, { recursive: true });
   }
