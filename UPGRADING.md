@@ -1,5 +1,10 @@
 # Upgrading Specnaut
 
+## 7.3.1 → 7.4.0
+
+Run `specnaut upgrade`. Codex projects gain `.specnaut/codex/session-lifecycle.md` and a pointer to
+it in `AGENTS.md`. The hooks did not change, so there is nothing to trust again with `/hooks`.
+
 ## 7.3.0 → 7.3.1
 
 Run `specnaut upgrade`. On Codex, then trust the hooks again with `/hooks`: their folder changed, so

@@ -1,14 +1,14 @@
-**The landing hold stays where you left it.** Under `merge: manual`, the base branch and the merge
-mode are pinned at each prompt, so neither can be switched mid-turn to let a landing through. On
-Claude, a release now asks first, including behind `gh -R` or `sh -c`.
+**On Codex, a run now closes what it spawned.** A subagent started with `spawn_agent` used to
+outlive its work and hold its worktree, so the host refused to archive it and every delegating run
+left children behind. Codex projects now receive `.specnaut/codex/session-lifecycle.md`: each
+spawned child is recorded, a finished one is closed with `close_agent`, and every run that spawned
+children ends with a sweep that reports what stayed open.
 
-**Scripts behave the same on Windows.** Every value a script reads through `jq` drops a stray
-carriage return, and a new `.specnaut/.gitattributes` checks the `.specnaut/` tree out with LF line
-ends on every platform, so a CRLF checkout no longer breaks its scripts or makes `upgrade` read
-every file as customised.
+**Worktrees are archived only when nothing can be lost.** The sweep archives a worktree through the
+host, never with `git worktree remove`, and only when its commits are on a freshly fetched base
+branch or kept under a local, never-pushed `specnaut-kept/` branch, its status is clean, and its
+ignored files were copied out to `~/.specnaut-kept/`. A refusal is reported, never forced. The merge
+phase runs this sweep on every exit, including `--pr`.
 
-**Clearer failures.** An unreadable `.specnaut/backlog-config.yml` stops `gate` and `spec` with the
-reason instead of a crash, and the local `add.sh` refuses labels it cannot record.
-
-On Codex, trust the hooks again with `/hooks` after upgrading: until you do, none of Specnaut's
-hooks run. See [UPGRADING.md](https://github.com/specnaut/specnaut-cli/blob/main/UPGRADING.md).
+`specnaut upgrade` adds the file and the `AGENTS.md` pointer on its own; other harnesses are
+unchanged.
