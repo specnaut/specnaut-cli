@@ -58,8 +58,17 @@ function toCodexSubagentToml(entry: CoreEntry): string {
 export class CodexHarness implements Harness {
   readonly key = "codex";
   readonly displayName = "Codex CLI";
-  /** `.specnaut/hooks/`: see `ClaudeHarness.managedRoots` for why it is not a shared root. */
-  readonly managedRoots = [`${AGENTS.dir}/`, ".agents/skills/", ".specnaut/hooks/"] as const;
+  /**
+   * `.specnaut/hooks/`: see `ClaudeHarness.managedRoots` for why it is not a shared root.
+   * `.specnaut/codex/` holds the session lifecycle only Codex receives (cli#723); a shared
+   * root would let every other harness's upgrade retire it.
+   */
+  readonly managedRoots = [
+    `${AGENTS.dir}/`,
+    ".agents/skills/",
+    ".specnaut/hooks/",
+    ".specnaut/codex/",
+  ] as const;
   /**
    * Retired files directly in `.codex/`, which no root may hold: the folder's
    * other files are the user's. `goal.md` was retired by cli#681 — Codex's

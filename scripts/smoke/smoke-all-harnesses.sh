@@ -150,6 +150,9 @@ fi
 check_helper codex  "AGENTS.md"  "agent_type="
 # cli#681: agents explicitly enabled beside the cap, in Specnaut's block.
 check_helper codex  ".codex/config.toml"  "^enabled = true"
+# cli#723: the session lifecycle ships to Codex alone, and its AGENTS.md points at it.
+check_helper codex  ".specnaut/codex/session-lifecycle.md"  "^# Codex: close what a run spawned"
+check_helper codex  "AGENTS.md"  "specnaut/codex/session-lifecycle.md"
 
 # The harness count stays COUNTED, not spelled: the literal once said 8
 # while the array held 7. finish() owns the banner shape (R4); the number

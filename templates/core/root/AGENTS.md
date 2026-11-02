@@ -142,6 +142,12 @@ and you say so. No file means no addendum — say nothing about it.
 `Task(subagent_type: "<name>")`; on Codex, `spawn_agent(agent_type="<name>")`. A child started
 from a description selects no role: it runs without that agent's instructions and, on Codex,
 without its reasoning budget.
+<!-- BEGIN: harness=codex -->
+
+A Codex child outlives its work and holds its worktree. This harness's delegated-session
+lifecycle is `.specnaut/codex/session-lifecycle.md` — read it before the first `spawn_agent` of a
+run.
+<!-- END: harness=codex -->
 
 Each step of the chain that delegates names its agent:
 

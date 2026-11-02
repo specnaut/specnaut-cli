@@ -42,8 +42,8 @@ that runs only on `pull_request`. **Do not infer `--pr` from a remote, a forge o
      fold. Do not merge past a failed fold.
 2. **`--pr` only** — push the branch, open the pull request against the base, name any issue its
    body references that `gh pr view <n> --json closingIssuesReferences` omits, report the PR URL,
-   and **stop**: nothing has merged, so the backlog item does not move. Re-run `/task merge` after
-   the PR lands, or let the forge's close keyword handle it. Never use the forge's "Squash and
+   run step 6, and **stop**: nothing has merged, so the backlog item does not move. Re-run
+   `/task merge` after the PR lands, or let the forge's close keyword handle it. Never use the forge's "Squash and
    merge": it collapses the scopes the squash produced.
 3. **Land it:**
 
@@ -79,6 +79,10 @@ that runs only on `pull_request`. **Do not infer `--pr` from a remote, a forge o
 
 5. **Close what shipped, and reconcile** — only after a push, and not under `--no-close`: load
    `phases/merge-close.md`.
+6. **Close what this run spawned** — on every exit from this phase, a stop in step 1, 2 or 4
+   included, whatever step 5 did: if `AGENTS.md` names a delegated-session lifecycle for your
+   harness, run its session sweep now, telling it whether the branch landed (step 4 exit 0, 9 or 11
+   — only that decides it). Quote its lines verbatim.
 
 ## 🔒 Merge is not a filing desk
 
@@ -93,6 +97,7 @@ name.
 
 Files and commits merged (from `LANDED`), whether the push ran or the remote's message, the branch
 `HEAD` is on, and — when the close ran — each item closed, each card moved and why any was not,
-the sweep's summary line verbatim, and the spec removal or its reason. Every backlog item is named
+`close-shipped.sh`'s summary line verbatim, and the spec removal or its reason — then step 6's lines, when it
+ran. Every backlog item is named
 per the `backlog-reference-contract` skill. On `--pr` the report is shorter and says plainly: the
 branch pushed, the PR URL, and **nothing has merged and the backlog item has not moved**.

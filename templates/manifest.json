@@ -2194,6 +2194,11 @@
       "fallback": "This project's instructions are in ../AGENTS.md, which Codex reads itself."
     },
     {
+      "harness": "codex",
+      "destination": ".specnaut/codex/session-lifecycle.md",
+      "source": "harness-specific/codex/session-lifecycle.md"
+    },
+    {
       "harness": "cursor",
       "destination": ".cursor/rules/specify-rules.mdc",
       "source": "harness-specific/cursor/specify-rules.mdc",
