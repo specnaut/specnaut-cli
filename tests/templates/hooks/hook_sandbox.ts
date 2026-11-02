@@ -162,15 +162,18 @@ export async function payload(
 /**
  * Pipe `input` (an object is JSON-encoded) into `<hook> <harness>` — the
  * template's own copy, or the one in `opts.hooksDir` (a test's altered copy).
+ * `opts.path` is handed to bash exactly as given, never through `bashPath`:
+ * the one way a test reaches a guard by a path holding a `\` (cli#716).
  */
 export function runHook(
   sb: Sandbox,
   hook: string,
   harness: Harness,
   input: Record<string, unknown> | string,
-  opts: { cwd?: string; env?: Record<string, string>; hooksDir?: string } = {},
+  opts: { cwd?: string; env?: Record<string, string>; hooksDir?: string; path?: string } = {},
 ): Promise<Run> {
-  return exec("bash", [bashPath(join(opts.hooksDir ?? HOOKS_DIR, hook)), harness], {
+  const path = opts.path ?? bashPath(join(opts.hooksDir ?? HOOKS_DIR, hook));
+  return exec("bash", [path, harness], {
     cwd: opts.cwd ?? sb.dir,
     env: { ...sb.env, ...opts.env },
     stdin: typeof input === "string" ? input : JSON.stringify(input),
