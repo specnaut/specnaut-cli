@@ -16,6 +16,8 @@ Run `.specnaut/scripts/bash/check-prerequisites.sh --json` for the feature direc
 - **Extract before you grow** — apply `.specnaut/memory/size-limits.md` § **implement**: re-measure
   every file you will touch, split a file over its target first, in its own commit, and put new
   behaviour in a new module wherever it can.
+- **Start from what the branch already holds.** Read `<base>..HEAD` against the brief before the
+  first change: a re-entered branch may be half built, or done. Build only what is missing.
 - **Done is the brief's checks.** Work until every one of them passes; they are what `review` runs.
 - **Keep secrets out of git.** The project's ignore files must exclude `.env*`, `*.env`,
   `*.tfstate*`, `*.tfvars`, `*.secret.yaml`, `kubeconfig*`, `*.key`, `*.crt` and `secrets/` where

@@ -38,7 +38,7 @@ commit holds only that child's work — two children in one commit break the mat
 ## Resuming, without a state file
 
 This is the child rule. Re-entering a stopped chain as a whole is `/task resume <id>`
-(`resume.md`, beside the router), which hands an epic branch to `implement`, and so to this loop.
+(`resume.md`, beside the router).
 
 There is no state file: resume reconstructs from git. `bash .specnaut/scripts/bash/epic-status.sh`
 reads the branch's commits — one `CHILD T<NN> #<child> <sha>` line per child done, one-to-one by
