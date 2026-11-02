@@ -224,20 +224,10 @@ if [ -n "$LINKED_ISSUE" ]; then
 fi
 
 # When this invocation belongs to an epic, reuse the epic's existing branch
-# rather than minting a second one. The link is `.specnaut/feature.json`,
-# which lives at a fixed path and is committed on the branch — so this reads
-# git, parses no branch name (D2) and introduces no state file (D16).
+# rather than minting a second one; epic-branch.sh is the lookup's one home.
 if [ -n "$EPIC_ISSUE" ] && [ "$HAS_GIT" = true ]; then
     _cur=$(git rev-parse --abbrev-ref HEAD 2>/dev/null || echo "")
-    for _b in $(git for-each-ref --format='%(refname:short)' refs/heads 2>/dev/null); do
-        _fj=$(git show "$_b:.specnaut/feature.json" 2>/dev/null || true)
-        [ -n "$_fj" ] || continue
-        _li=$(printf '%s' "$_fj" | jq_lf -r '.linked_issue // empty' 2>/dev/null || true)
-        if [ "$_li" = "$EPIC_ISSUE" ]; then
-            EPIC_BRANCH="$_b"
-            break
-        fi
-    done
+    EPIC_BRANCH=$(bash "$SCRIPT_DIR/epic-branch.sh" "$EPIC_ISSUE")
     if [ -n "$EPIC_BRANCH" ]; then
         if [ "$EPIC_BRANCH" = "$_cur" ]; then
             echo "# already on the epic's branch '$EPIC_BRANCH' — reusing it, no branch created" >&2
@@ -318,7 +308,16 @@ FEATURE_DIR="$SPECS_DIR/$BRANCH_NAME"
 SPEC_FILE="$FEATURE_DIR/plan.md"
 
 if [ "$DRY_RUN" != true ]; then
-    if [ "$HAS_GIT" = true ]; then
+    if [ "$HAS_GIT" = true ] && [ -n "$EPIC_BRANCH" ]; then
+        # The epic's branch exists: switch to it, or stay on it. Reuse is the
+        # point of the lookup, so it needs no --allow-existing-branch.
+        if [ "$_cur" != "$EPIC_BRANCH" ] &&
+            ! switch_branch_error=$(git checkout -q "$EPIC_BRANCH" 2>&1); then
+            >&2 echo "Error: Failed to switch to the epic's branch '$EPIC_BRANCH'. Please resolve any local changes or conflicts and try again."
+            [ -n "$switch_branch_error" ] && >&2 printf '%s\n' "$switch_branch_error"
+            exit 1
+        fi
+    elif [ "$HAS_GIT" = true ]; then
         branch_create_error=""
         if ! branch_create_error=$(git checkout -q -b "$BRANCH_NAME" 2>&1); then
             current_branch="$(git rev-parse --abbrev-ref HEAD 2>/dev/null || true)"

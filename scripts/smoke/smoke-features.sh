@@ -160,9 +160,15 @@ check "the cannot-enumerate branch is gone, not unreachable (#563 AC4)" \
    ! grep -qF "ships no sub-issue enumerator" .specnaut/scripts/powershell/create-new-feature.ps1'
 check "a missing install is reported separately (#553 AC12)" \
   'grep -qF "epic detection did NOT run" .specnaut/scripts/bash/create-new-feature.sh'
+# The lookup lives in epic-branch.sh (cli#731), which both twins call.
 check "the epic branch is found via feature.json, not by parsing a name (#553 AC6/D2)" \
-  'grep -qF "feature.json" .specnaut/scripts/bash/create-new-feature.sh &&
-   ! grep -qE "epic[-_]|EPIC_PREFIX" .specnaut/scripts/bash/create-new-feature.sh'
+  'grep -qF "feature.json" .specnaut/scripts/bash/epic-branch.sh &&
+   ! grep -qE "EPIC_PREFIX|refname.*epic" .specnaut/scripts/bash/epic-branch.sh &&
+   grep -qF "epic-branch.sh" .specnaut/scripts/bash/create-new-feature.sh &&
+   grep -qF "epic-branch.sh" .specnaut/scripts/powershell/create-new-feature.ps1'
+check "the epic branch lookup skips the base and its merged branches (cli#731)" \
+  'grep -qF "merge-base --is-ancestor" .specnaut/scripts/bash/epic-branch.sh &&
+   [ -x .specnaut/scripts/bash/epic-branch.sh ]'
 check "the EPIC card moves, never the child's (#553 AC9/AC10)" \
   'grep -qF "was NOT moved" .specnaut/scripts/bash/create-new-feature.sh'
 check "no new flag was introduced (#553 AC7/D1)" \

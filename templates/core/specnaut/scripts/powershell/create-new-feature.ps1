@@ -192,24 +192,14 @@ if ($Issue -gt 0) {
     }
 }
 
-# Reuse the epic's existing branch rather than minting a second one. The link
-# is .specnaut/feature.json, at a fixed path and committed on the branch - so
-# this reads git, parses no branch name and introduces no state file.
+# Reuse the epic's existing branch; epic-branch.sh is the lookup's one home.
 if ($epicIssue -and $hasGit) {
     $current = (& git rev-parse --abbrev-ref HEAD 2>$null)
-    foreach ($b in (& git for-each-ref --format='%(refname:short)' refs/heads 2>$null)) {
-        $fj = & git show "${b}:.specnaut/feature.json" 2>$null
-        if (-not $fj) { continue }
-        try {
-            $li = ($fj | ConvertFrom-Json).linked_issue
-        } catch {
-            [Console]::Error.WriteLine("# warning: branch '$b' has an unreadable .specnaut/feature.json - skipped for epic lookup: $_")
-            continue
-        }
-        if ("$li" -eq $epicIssue) { $epicBranch = $b; break }
-    }
+    $epicBranch = "$(& bash (Join-Path $PSScriptRoot '..' 'bash' 'epic-branch.sh') $epicIssue)".Trim()
+    # Read as "no branch yet", a failed lookup would mint the epic a second branch.
+    if ($LASTEXITCODE -ne 0) { Write-Error "Error: the epic branch lookup failed (exit $LASTEXITCODE)"; exit 1 }
     if ($epicBranch) {
-        if ($epicBranch -eq $current) {
+        if ($epicBranch -ceq $current) {
             [Console]::Error.WriteLine("# already on the epic's branch '$epicBranch' - reusing it, no branch created")
         } else {
             [Console]::Error.WriteLine("# epic #$epicIssue already has branch '$epicBranch' - reusing it, no branch created")
@@ -227,7 +217,17 @@ $featureDir = Join-Path $specsDir $branchName
 $specFile = Join-Path $featureDir 'plan.md'
 
 if (-not $DryRun) {
-    if ($hasGit) {
+    if ($hasGit -and $epicBranch) {
+        # The epic's branch exists: switch to it, or stay on it. Reuse is the
+        # point of the lookup, so it needs no -AllowExistingBranch.
+        if ($current -cne $epicBranch) {
+            $switchBranchError = git checkout -q $epicBranch 2>&1 | Out-String
+            if ($LASTEXITCODE -ne 0) {
+                Write-Error "Error: Failed to switch to the epic's branch '$epicBranch'. Resolve any local changes or conflicts and try again.`n$($switchBranchError.Trim())"
+                exit 1
+            }
+        }
+    } elseif ($hasGit) {
         $branchCreated = $false
         $branchCreateError = ''
         try {

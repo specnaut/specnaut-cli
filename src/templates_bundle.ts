@@ -23080,20 +23080,10 @@ if [ -n "\$LINKED_ISSUE" ]; then
 fi
 
 # When this invocation belongs to an epic, reuse the epic's existing branch
-# rather than minting a second one. The link is \`.specnaut/feature.json\`,
-# which lives at a fixed path and is committed on the branch — so this reads
-# git, parses no branch name (D2) and introduces no state file (D16).
+# rather than minting a second one; epic-branch.sh is the lookup's one home.
 if [ -n "\$EPIC_ISSUE" ] && [ "\$HAS_GIT" = true ]; then
     _cur=\$(git rev-parse --abbrev-ref HEAD 2>/dev/null || echo "")
-    for _b in \$(git for-each-ref --format='%(refname:short)' refs/heads 2>/dev/null); do
-        _fj=\$(git show "\$_b:.specnaut/feature.json" 2>/dev/null || true)
-        [ -n "\$_fj" ] || continue
-        _li=\$(printf '%s' "\$_fj" | jq_lf -r '.linked_issue // empty' 2>/dev/null || true)
-        if [ "\$_li" = "\$EPIC_ISSUE" ]; then
-            EPIC_BRANCH="\$_b"
-            break
-        fi
-    done
+    EPIC_BRANCH=\$(bash "\$SCRIPT_DIR/epic-branch.sh" "\$EPIC_ISSUE")
     if [ -n "\$EPIC_BRANCH" ]; then
         if [ "\$EPIC_BRANCH" = "\$_cur" ]; then
             echo "# already on the epic's branch '\$EPIC_BRANCH' — reusing it, no branch created" >&2
@@ -23174,7 +23164,16 @@ FEATURE_DIR="\$SPECS_DIR/\$BRANCH_NAME"
 SPEC_FILE="\$FEATURE_DIR/plan.md"
 
 if [ "\$DRY_RUN" != true ]; then
-    if [ "\$HAS_GIT" = true ]; then
+    if [ "\$HAS_GIT" = true ] && [ -n "\$EPIC_BRANCH" ]; then
+        # The epic's branch exists: switch to it, or stay on it. Reuse is the
+        # point of the lookup, so it needs no --allow-existing-branch.
+        if [ "\$_cur" != "\$EPIC_BRANCH" ] &&
+            ! switch_branch_error=\$(git checkout -q "\$EPIC_BRANCH" 2>&1); then
+            >&2 echo "Error: Failed to switch to the epic's branch '\$EPIC_BRANCH'. Please resolve any local changes or conflicts and try again."
+            [ -n "\$switch_branch_error" ] && >&2 printf '%s\\n' "\$switch_branch_error"
+            exit 1
+        fi
+    elif [ "\$HAS_GIT" = true ]; then
         branch_create_error=""
         if ! branch_create_error=\$(git checkout -q -b "\$BRANCH_NAME" 2>&1); then
             current_branch="\$(git rev-parse --abbrev-ref HEAD 2>/dev/null || true)"
@@ -23838,6 +23837,60 @@ if name=\$(git --no-pager -c core.fsmonitor=false config --get init.defaultBranc
 fi
 echo "base-branch: unknown — no origin/HEAD and no init.defaultBranch. Pass the base explicitly, or run: git remote set-head origin --auto" >&2
 exit 3
+`,
+    executable: true,
+    backend: null,
+    skipIfExists: false,
+  },
+  {
+    category: "spec-root",
+    name: "specify",
+    suffix: "scripts/bash/epic-branch.sh",
+    content: `#!/usr/bin/env bash
+# The epic's live branch (cli#731) — the one home of the lookup both
+# create-new-feature twins run for an epic and its children.
+#
+# Prints the first local branch whose committed \`.specnaut/feature.json\`
+# links <epic>, or nothing when none does; always exit 0. The link lives at a
+# fixed path and is committed on the branch, so this reads git, parses no
+# branch name and introduces no state file.
+#
+# The base, and every branch already merged into it, is never the epic's
+# branch: a landing can leave the epic's feature.json on the base, and
+# checking the base out as the epic's branch blocks every later slice. The
+# base is base-branch.sh's; when it is unknown the exclusion cannot run, and
+# stderr says so.
+#
+# Usage: epic-branch.sh <epic>
+set -uo pipefail
+export GIT_OPTIONAL_LOCKS=0
+
+SCRIPT_DIR="\$(CDPATH="" cd "\$(dirname "\${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=SCRIPTDIR/common.sh
+source "\$SCRIPT_DIR/common.sh"
+
+epic="\${1:?usage: epic-branch.sh <epic>}"
+
+if ! base=\$(bash "\$SCRIPT_DIR/base-branch.sh" 2>/dev/null); then
+    base=""
+    echo "# the base branch is unknown — the epic branch lookup cannot skip it or the branches merged into it" >&2
+fi
+
+for b in \$(git for-each-ref --format='%(refname:short)' refs/heads 2>/dev/null); do
+    # A name git would read as an option never reaches it.
+    [[ \$b =~ ^[A-Za-z0-9][A-Za-z0-9._/-]*\$ ]] || continue
+    # An ancestor of the base, the base itself included, is merged.
+    if [ -n "\$base" ] && git merge-base --is-ancestor "refs/heads/\$b" "refs/heads/\$base" 2>/dev/null; then
+        continue
+    fi
+    fj=\$(git show "refs/heads/\$b:.specnaut/feature.json" 2>/dev/null) || continue
+    li=\$(printf '%s' "\$fj" | jq_lf -r '.linked_issue // empty' 2>/dev/null) || continue
+    if [ "\$li" = "\$epic" ]; then
+        printf '%s\\n' "\$b"
+        exit 0
+    fi
+done
+exit 0
 `,
     executable: true,
     backend: null,
@@ -26363,24 +26416,14 @@ if (\$Issue -gt 0) {
     }
 }
 
-# Reuse the epic's existing branch rather than minting a second one. The link
-# is .specnaut/feature.json, at a fixed path and committed on the branch - so
-# this reads git, parses no branch name and introduces no state file.
+# Reuse the epic's existing branch; epic-branch.sh is the lookup's one home.
 if (\$epicIssue -and \$hasGit) {
     \$current = (& git rev-parse --abbrev-ref HEAD 2>\$null)
-    foreach (\$b in (& git for-each-ref --format='%(refname:short)' refs/heads 2>\$null)) {
-        \$fj = & git show "\${b}:.specnaut/feature.json" 2>\$null
-        if (-not \$fj) { continue }
-        try {
-            \$li = (\$fj | ConvertFrom-Json).linked_issue
-        } catch {
-            [Console]::Error.WriteLine("# warning: branch '\$b' has an unreadable .specnaut/feature.json - skipped for epic lookup: \$_")
-            continue
-        }
-        if ("\$li" -eq \$epicIssue) { \$epicBranch = \$b; break }
-    }
+    \$epicBranch = "\$(& bash (Join-Path \$PSScriptRoot '..' 'bash' 'epic-branch.sh') \$epicIssue)".Trim()
+    # Read as "no branch yet", a failed lookup would mint the epic a second branch.
+    if (\$LASTEXITCODE -ne 0) { Write-Error "Error: the epic branch lookup failed (exit \$LASTEXITCODE)"; exit 1 }
     if (\$epicBranch) {
-        if (\$epicBranch -eq \$current) {
+        if (\$epicBranch -ceq \$current) {
             [Console]::Error.WriteLine("# already on the epic's branch '\$epicBranch' - reusing it, no branch created")
         } else {
             [Console]::Error.WriteLine("# epic #\$epicIssue already has branch '\$epicBranch' - reusing it, no branch created")
@@ -26398,7 +26441,17 @@ if (\$epicBranch) { \$branchName = \$epicBranch }
 \$specFile = Join-Path \$featureDir 'plan.md'
 
 if (-not \$DryRun) {
-    if (\$hasGit) {
+    if (\$hasGit -and \$epicBranch) {
+        # The epic's branch exists: switch to it, or stay on it. Reuse is the
+        # point of the lookup, so it needs no -AllowExistingBranch.
+        if (\$current -cne \$epicBranch) {
+            \$switchBranchError = git checkout -q \$epicBranch 2>&1 | Out-String
+            if (\$LASTEXITCODE -ne 0) {
+                Write-Error "Error: Failed to switch to the epic's branch '\$epicBranch'. Resolve any local changes or conflicts and try again.\`n\$(\$switchBranchError.Trim())"
+                exit 1
+            }
+        }
+    } elseif (\$hasGit) {
         \$branchCreated = \$false
         \$branchCreateError = ''
         try {

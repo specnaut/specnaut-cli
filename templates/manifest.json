@@ -1779,6 +1779,13 @@
     {
       "category": "spec-root",
       "name": "specify",
+      "suffix": "scripts/bash/epic-branch.sh",
+      "source": "core/specnaut/scripts/bash/epic-branch.sh",
+      "executable": true
+    },
+    {
+      "category": "spec-root",
+      "name": "specify",
       "suffix": "scripts/bash/epic-status.sh",
       "source": "core/specnaut/scripts/bash/epic-status.sh",
       "executable": true
