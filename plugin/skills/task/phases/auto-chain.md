@@ -1,7 +1,7 @@
 # Auto-chain control
 
 What the `/task` router follows after a chainable verb (`plan`, `implement`, `review`) completes —
-unless `--manual` was passed, or what is on disk shows a single step is being re-run.
+unless `--manual` was passed, or the re-entry table below runs the verb alone.
 
 ```
 plan → implement → review → merge → push
@@ -72,13 +72,20 @@ review was not empty is a loop that does not terminate.
 
 ## Re-entry, without a flag
 
-A verb invoked directly chains when what follows it is missing, and runs one-shot when it exists:
+A verb invoked directly chains, or runs alone, by this table and nothing else:
 
 | Invoked | Chains when |
 |---|---|
-| `plan` | nothing is committed on the feature branch past `plan.md` |
+| `plan <id>` | the item is open and `wip-audit.sh` classed it `IDLE`, `LANDED` or, on the local backend, `ACTIVE` (`phases/plan.md`, "Re-entry"): an open item whose work landed has more to do. Closed or a non-zero exit runs alone; `UNPUSHED` lists `origin/<base>..<base>` and stops |
+| `plan` with no id | always: a new feature |
 | `implement` | the branch is not merged into the base branch |
 | `review` | always one-shot |
+
+Before a `plan` or `implement` row chains, HEAD's branch passes checks 2 to 6 of `resume.md` § 3,
+checked when the verb completes (for `plan`, after its commit): a fresh plan branches from HEAD and
+inherits whatever it carries. A failure ends the run there and names the check and the first failing
+sha. Inside a running chain the next
+verb is invoked without this table.
 
 ## Failure
 

@@ -67,7 +67,8 @@ Deno.test("ACTIVE on one clean local branch of your own: every gate check passes
     assertEquals(token, "ACTIVE");
     assertEquals(await headsAt(sb, sha), ["refs/heads/feat-202"]);
     assertEquals(await config(sb, "branch.feat-202.remote"), "");
-    assertEquals(await authors(sb, "feat-202"), [await config(sb, "user.email")]);
+    const me = (await git(sb.work, "var", "GIT_COMMITTER_IDENT")).replace(/^.*<([^>]*)>.*$/, "$1");
+    assertEquals(await authors(sb, "feat-202"), [me]);
     assertEquals(await git(sb.work, "status", "--porcelain"), "");
   } finally {
     await sb.cleanup();

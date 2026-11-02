@@ -24,6 +24,8 @@ import { skillDocName } from "../../../src/domain/core_bundle.ts";
 // cli#709 re-captured plan's and implement's: their stop restatements became pointers to
 // auto-chain.md, and implement's secrets list gained `*.env` and `*.secret.yaml`.
 // cli#727 re-captured implement's: it starts from what the branch already holds.
+// cli#729 re-captured plan's (its Re-entry paragraph, step 2's non-zero exit) and implement's
+// (a commit subject is a claim).
 
 function abs(rel: string): string {
   return fromFileUrl(new URL(`../../${rel}`, import.meta.url));

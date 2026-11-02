@@ -113,8 +113,8 @@ After the verb completes successfully:
 - The verb is not chainable → stop. Chainable verbs: `plan`, `implement`, `review`.
 - Otherwise → read `phases/auto-chain.md` and follow it.
 
-**Re-entry needs no flag.** A verb whose downstream artefacts already exist runs one-shot; one whose
-downstream artefacts are absent chains. `phases/auto-chain.md` holds the detection table.
+**Re-entry needs no flag.** Whether a verb invoked directly chains is decided by the re-entry table
+in `phases/auto-chain.md`, from git and the item's state.
 
 ## Overview
 

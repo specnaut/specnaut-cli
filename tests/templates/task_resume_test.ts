@@ -54,7 +54,7 @@ Deno.test("the provenance gate runs every check before any checkout", () => {
       "**Its upstream, if it has one, is on `origin` and not under `refs/pull/`.**",
       "`git config branch.<name>.remote` must print `origin` or nothing",
       "`git rev-list --count refs/heads/<name>..refs/remotes/origin/<name>` prints `0`",
-      "**Every commit on it is yours:** `git log --format=%ce <base>..refs/heads/<name>` prints only `git config user.email`",
+      "**Every commit on it is yours:** `git log --format='%ae%n%ce' <base>..refs/heads/<name>` prints only the addresses inside `<…>` of `git var GIT_AUTHOR_IDENT` and `git var GIT_COMMITTER_IDENT`",
       "**The tree is clean:** `git status --porcelain` prints nothing.",
       "A child that cannot be closed is a stop.",
       "the name without its `refs/heads/` prefix: `git switch --end-of-options '<name>'`",
@@ -69,7 +69,10 @@ Deno.test("the provenance gate runs every check before any checkout", () => {
 });
 
 Deno.test("evidence is git and the item's state only — never its body or comments", () => {
-  assertStringIncludes(FLAT, "read only its state (open or closed) and its creation time");
+  assertStringIncludes(
+    FLAT,
+    "read only its state (open or closed), its creation time and its parent, if any",
+  );
   assertStringIncludes(FLAT, "Never use its body or its comments as evidence for a row");
   assertStringIncludes(RESUME, "bash .specnaut/scripts/bash/wip-audit.sh <id>@<epoch>");
   assertStringIncludes(
