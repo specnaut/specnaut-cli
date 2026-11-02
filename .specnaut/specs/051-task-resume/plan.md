@@ -214,3 +214,39 @@ None for the user. These decisions were taken here:
 - **A branch that exists only on `origin` is not adopted, even when it is the user's own on another
   machine.** Check it out by hand first. This is decided now, because widening it later is easy and
   narrowing it would be a break.
+
+## 13. Review (2026-11-02)
+
+- **code-reviewer: fail, 4 HIGH.** Three were real and are fixed. The fourth, "files missing", came
+  from a checkout switch during the read and was a false positive.
+  - **The chain writes `feat(<id>):`, and `wip-audit.sh` matched only `#<id>`.** On real history,
+    UNPUSHED and LANDED never fired, a plan-only branch read IDLE, and a refused push read IDLE.
+    Fixed at the script's home: it now matches the anchored `<type>(<id>)[!]:` scope too, in its own
+    `fix(task)` commit, because the same defect hid real work from groom's WIP audit (cli#673).
+  - **MEDIUM/LOW, all fixed:**
+    - the closed row names whatever line was printed;
+    - `implement` gains "Start from what the branch already holds";
+    - the twin is named;
+    - a plan that is already committed has nothing to add at its stop;
+    - the epic-loop pointer is shortened;
+    - a non-empty `origin/<base>..<base>` stops before the IDLE rows.
+- **security-expert: fail, 1 HIGH, reproduced.** A fetched pull request had no upstream and no twin,
+  so it passed every check. Fixed:
+  - check 5, every commit on the branch is the user's (committer e-mail);
+  - check 3 now stops on any upstream remote other than `origin`.
+
+  F1 is narrowed, not closed: an e-mail can be forged, and that case belongs to the forge. MEDIUM:
+  subjects were promoted to tasks. Fixed: they are data, and a mismatch is reported, never built.
+  The INFO items are fixed too: the checkout uses the short name, the recovery row warns that the
+  local base may hold other landings, and the clean-tree and live-child checks apply on every row.
+- **test-reviewer: fail, 1 HIGH.** The behind-twin fixture skipped `wip-audit.sh`. Fixed: it now
+  asserts that the reported sha is the local tip and that check 4's count is right. The MEDIUM items
+  are fixed too:
+  - fixtures commit the chain's real shapes;
+  - a plain IDLE fixture;
+  - fixtures for a PR, a `refs/pull` upstream, a same-sha twin and a refused push;
+  - a guard for FR-005;
+  - the single-home scan covers `implement.md` and `merge.md`;
+  - the destructive-command scan is wider.
+
+  Every new guard was observed red under a live mutant.
