@@ -36,6 +36,9 @@ coverage_token() {
       _rest="${1#templates/harness-specific/}"
       case "$_rest" in
         claude/*)  echo ".claude/${_rest#claude/}" ;;
+        # The session lifecycle lives in Specnaut's own tree, not in .codex/
+        # (cli#723), so the mechanical token below would name a path never written.
+        codex/session-lifecycle.md) echo ".specnaut/codex/session-lifecycle.md" ;;
         codex/*)   echo ".codex/${_rest#codex/}" ;;
         # cursor nests its rules a level deeper than the source tree does,
         # so a mechanical `.cursor/<rest>` token names a path that is never
