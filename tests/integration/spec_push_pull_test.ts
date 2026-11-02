@@ -1,5 +1,5 @@
 import { assertEquals } from "@std/assert";
-import { runSpec, type SpecDeps } from "../../src/cli/handlers/spec_handler.ts";
+import { PULL_STALE_CACHE, runSpec, type SpecDeps } from "../../src/cli/handlers/spec_handler.ts";
 import { makeSpecSession, type SpecSession } from "../../src/domain/cloud/spec_session.ts";
 import { SpecCacheWriter } from "../../src/infrastructure/spec/spec_cache_writer.ts";
 import type { FetchFn } from "../../src/domain/cloud/cloud_client.ts";
@@ -141,13 +141,25 @@ Deno.test("spec pull falls back to an existing cache when Cloud is unreachable (
     // Seed a prior cache, then simulate a network failure on the fresh pull.
     await cache.write(dir, 154, [{ key: "specify", name: "Specify", order: 1, body: "cached" }]);
     const session = sessionWith((() => Promise.reject(new TypeError("offline"))) as FetchFn);
-    const { deps: d, err } = deps({
+    const { deps: d, err, out } = deps({
       projectDir: dir,
       cache,
       buildSession: () => Promise.resolve(session),
     });
-    assertEquals(await runSpec({ kind: "spec", sub: "pull", task: 154, apiUrl: null }, d), 0);
+    // Its own exit, not a fresh pull's 0: a push from this cache would
+    // overwrite every tab on Cloud with what may be stale (cli#732).
+    assertEquals(
+      await runSpec({ kind: "spec", sub: "pull", task: 154, apiUrl: null }, d),
+      PULL_STALE_CACHE,
+    );
+    assertEquals(PULL_STALE_CACHE, 6);
     assertEquals(err.join("\n").includes("reusing the existing cache"), true);
+    // The cache is left as it was, and the run says what it kept.
+    assertEquals(
+      await Deno.readTextFile(`${dir}/.specnaut/specs/.cache/154/1-specify.md`),
+      "cached",
+    );
+    assertEquals(out.join("\n").includes("1 cached step(s)"), true);
   });
 });
 

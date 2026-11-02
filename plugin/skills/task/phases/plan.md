@@ -31,14 +31,17 @@ whether the chain goes on; where its row stops (`UNPUSHED`), stop here, before s
 - `LANDED`, the item open: its next slice. Step 2 runs as for any new feature.
 <!-- END: spec-backend=local -->
 <!-- BEGIN: spec-backend=cloud -->
-An epic is one plan: for a child, `<task>` below is its parent epic. Run `specnaut spec pull <task>`
-first. A plan exists when it materialises `.specnaut/specs/.cache/<task>/1-plan.md`; `no spec for
-task`, or no such file, means none does. Anything else — a non-zero exit, or "reusing the existing
-cache" — stops here, since an amendment pushed over a stale cache overwrites every tab.
+An epic is one plan: for a child, `<task>` below is its parent epic, and the epic's classification
+decides. Read the epic's creation time from its own `view.sh` and run `wip-audit.sh <task>@<epoch>`;
+its `UNPUSHED` is a stop as above. So an `IDLE` child of an `ACTIVE` epic continues on the epic's
+branch. Run `specnaut spec pull <task>` first. A plan exists when it materialises
+`.specnaut/specs/.cache/<task>/1-plan.md`; `no spec for task`, or no such file, means none does.
+Any non-zero exit stops here — exit 6 too, Cloud unreachable and an older cache reused — since an
+amendment pushed over a stale cache overwrites every tab.
 
-- `IDLE` with no plan, or `LANDED` with the item open: a new plan, or the next slice. Step 2 runs.
+- `IDLE` with no plan, or `LANDED` with `<task>` open: a new plan, or the next slice. Step 2 runs.
 - `IDLE` with a plan: one that stopped on a question. It is an adopted plan; skip step 2.
-- `ACTIVE`: adopt the item's branch as `resume.md` § 1 item 4 and § 3 do; a failed check stops and
+- `ACTIVE`: adopt `<task>`'s branch as `resume.md` § 1 item 4 and § 3 do; a failed check stops and
   names it. It is an adopted plan; skip step 2. A plan changed since it was approved, by
   `implement`'s `plan_blob` rule, is an open question at step 7.
 
@@ -211,8 +214,8 @@ Commit before handing off: a worktree runs off committed HEAD.
 a pull replaces the cache. It runs once, before the run ends or hands off: here, or at step 7 when
 the plan stops on a question there. A non-zero push is a stop, before anything is invoked.
 
-When Re-entry adopted the item's branch, record the plan now approved — pushed here, or changed
-and approved at step 7 — as the cloud returns it: `specnaut spec pull <task>` again; when
+When Re-entry adopted a branch, record the plan now approved — pushed here, or changed
+and approved at step 7 — as the cloud returns it: `specnaut spec pull <task>` again, a non-zero exit a stop; when
 `git hash-object .specnaut/specs/.cache/<task>/1-plan.md` is not `feature.json`'s `plan_blob`, set
 it, and with nothing else staged (`git diff --cached --quiet`), `git add .specnaut/feature.json &&
 git commit -m "plan(<task>): the approved plan"`.

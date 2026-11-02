@@ -278,3 +278,30 @@ Deno.test("cloud next slice: the link commit is empty on the landed base's featu
     await sb.cleanup();
   }
 });
+
+// cli#732 — an epic is one plan and one branch: for a child, the cloud
+// Re-entry reads the epic's classification, so an IDLE child of an ACTIVE epic
+// adopts the epic's branch and implement continues there, never a stop.
+Deno.test("cloud, a new child of an active epic: the child reads IDLE, the epic ACTIVE at its branch's tip, the one ref there", async () => {
+  const sb = await sandbox();
+  try {
+    await linkedCloud(sb, "070-epic", 70);
+    await sb.commit("src/e.ts", "e\n", "feat(71): the first child");
+    const epicTip = await tip(sb);
+    await git(sb.work, "switch", "--quiet", "main");
+    assertEquals(
+      (await audit(sb, 72)).tok,
+      "IDLE",
+      "the child's own classification would make a branch",
+    );
+    const e = await audit(sb, 70);
+    assertEquals([e.tok, e.sha], ["ACTIVE", epicTip], "the epic's names its branch");
+    // Re-entry adopts it; implement's ACTIVE rule then holds at HEAD's tip.
+    assertEquals(await pointing(sb, e.sha), ["refs/heads/070-epic"], "§ 3 check 1: one ref");
+    await git(sb.work, "switch", "--quiet", "070-epic");
+    assertEquals(await tip(sb), (await audit(sb, 70)).sha);
+    assertEquals(await linked(sb, "HEAD"), 70, "check 8: it links the epic");
+  } finally {
+    await sb.cleanup();
+  }
+});

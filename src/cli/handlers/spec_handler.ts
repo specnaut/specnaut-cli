@@ -3,9 +3,10 @@
 // downstream agents read plain files; `push` upserts local cache content back to
 // the cloud. Both are cloud-backend-only: under the `local` backend they exit
 // with a clear message (there is no remote spec to sync). Mirrors gate_handler.ts
-// — deps built from FsBacklogConfigStore + defaultCredentialStore(), exit codes 0/1/5.
+// — deps built from FsBacklogConfigStore + defaultCredentialStore(); exit codes below.
 //
 //   pull  exit 0 (materialised / no-spec) · 1 (usage / local backend) · 5 (cloud/auth)
+//         · 6 (Cloud unreachable; the existing cache was left as it was — it may be stale)
 //   push  exit 0 (upserted) · 1 (usage / local backend / nothing to push) · 5 (cloud/auth)
 //
 // Constitution § I: stdout/stderr carry only CLI-owned messages + public
@@ -26,6 +27,14 @@ import type { SpecCacheStore } from "../../application/ports.ts";
 import { FsLockStore } from "../../infrastructure/fs_lock_store.ts";
 import type { SpecBackend } from "../../domain/installed_lock.ts";
 import type { SpecStep } from "../../domain/spec/spec_step.ts";
+
+/**
+ * `spec pull`'s exit when Cloud could not be reached and an existing cache was
+ * reused. Distinct from a fresh pull's 0: a push from a stale cache overwrites
+ * every tab on Cloud, so a caller must be able to tell the two apart without
+ * reading the warning text.
+ */
+export const PULL_STALE_CACHE = 6;
 
 export type SpecIntent = {
   kind: "spec";
@@ -132,7 +141,7 @@ async function runPull(task: number, deps: SpecDeps): Promise<number> {
         ),
       );
       deps.out(dim(`↳ ${cached.length} cached step(s) under .specnaut/specs/.cache/${task}/`));
-      return 0;
+      return PULL_STALE_CACHE;
     }
     deps.err(actionable(e, `pull spec for task ${task}`));
     return 5;

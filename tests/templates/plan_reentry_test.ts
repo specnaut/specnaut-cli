@@ -135,10 +135,13 @@ Deno.test("every harness and option set ships the same plan row, gate and Re-ent
 
 /** spec 056 (cli#730) — a cloud re-entry continues on the item's branch: only the cloud render says how. */
 const CLOUD_PLAN = [
-  "for a child, `<task>` below is its parent epic",
-  'a non-zero exit, or "reusing the existing cache" — stops here',
+  "for a child, `<task>` below is its parent epic, and the epic's classification decides. Read the epic's creation time from its own `view.sh` and run `wip-audit.sh <task>@<epoch>`",
+  // cli#732: an IDLE child of an ACTIVE epic continues on the epic's branch, never a stop at implement.
+  "So an `IDLE` child of an `ACTIVE` epic continues on the epic's branch.",
+  // cli#732: the stale-cache fallback is read by its exit code, never by its warning text.
+  "Any non-zero exit stops here — exit 6 too, Cloud unreachable and an older cache reused",
   "`IDLE` with a plan: one that stopped on a question. It is an adopted plan; skip step 2.",
-  "`ACTIVE`: adopt the item's branch as `resume.md` § 1 item 4 and § 3 do; a failed check stops and names it. It is an adopted plan; skip step 2.",
+  "`ACTIVE`: adopt `<task>`'s branch as `resume.md` § 1 item 4 and § 3 do; a failed check stops and names it. It is an adopted plan; skip step 2.",
   "A plan changed since it was approved, by `implement`'s `plan_blob` rule, is an open question at step 7.",
   "It runs once, before the run ends or hands off: here, or at step 7 when the plan stops on a question there.",
   "A non-zero push is a stop, before anything is invoked.",
@@ -146,13 +149,13 @@ const CLOUD_PLAN = [
   "A plan exists when it materialises `.specnaut/specs/.cache/<task>/1-plan.md`",
   "do **NOT** write `.specnaut/feature.json`",
   "`specnaut spec push <task>` sends the plan with its audits and answers",
-  "`IDLE` with no plan, or `LANDED` with the item open: a new plan, or the next slice. Step 2 runs.",
+  "`IDLE` with no plan, or `LANDED` with `<task>` open: a new plan, or the next slice. Step 2 runs.",
   "`no spec for task`, or no such file, means none does",
   "The task is the item's id: `plan <id>`, or `--issue <N>`. With no item, the product-owner creates one first",
   "Stopping here on a question: push first, as step 8's cloud block says.",
   // Step 8's record of the approved plan: without it, a re-approved plan stops at implement forever.
-  "When Re-entry adopted the item's branch, record the plan now approved",
-  "`specnaut spec pull <task>` again; when `git hash-object .specnaut/specs/.cache/<task>/1-plan.md` is not `feature.json`'s `plan_blob`, set it",
+  "When Re-entry adopted a branch, record the plan now approved",
+  "`specnaut spec pull <task>` again, a non-zero exit a stop; when `git hash-object .specnaut/specs/.cache/<task>/1-plan.md` is not `feature.json`'s `plan_blob`, set it",
   'git commit -m "plan(<task>): the approved plan"',
 ];
 /** Text the cloud render must not carry: the removed base-dirtying step, the false auto-create, the local branch. */
@@ -161,6 +164,8 @@ const NOT_IN_CLOUD_PLAN = [
   "auto-creates",
   "create-new-feature.sh --json --short-name",
   "git add .specnaut/specs/<feature-dir>/ .specnaut/feature.json",
+  // cli#732: the stale-cache fallback is keyed on exit 6, not on the warning's words.
+  "reusing the existing cache",
 ];
 const CLOUD_IMPLEMENT = [
   "`bash .specnaut/scripts/bash/wip-audit.sh <task>@<epoch>`; a non-zero exit stops",
@@ -232,4 +237,25 @@ Deno.test("spec-autogen's cloud plan ends with its push and invokes nothing afte
     flat(read("skills/task/spec-autogen.md")),
     "The flow ends with its push, at the plan stop or step 8, and invokes nothing after it.",
   );
+});
+
+Deno.test("cloud review stops on spec pull's stale-cache exit, as plan and implement do (cli#732)", () => {
+  let n = 0;
+  for (const h of HARNESSES) {
+    for (const opts of everyBundleOption().filter((o) => o.specBackend === "cloud")) {
+      n++;
+      const files = Object.values(h.mapBundle(CORE_BUNDLE, opts));
+      const review = files.find((f) =>
+        (f.content ?? "").includes("**Materialise the spec (cloud backend):**")
+      );
+      const tag = `${h.key}/${JSON.stringify(opts)}`;
+      assert(review, `${tag}: no cloud review document`);
+      assertStringIncludes(
+        flat(review.content!),
+        "A non-zero exit stops with its message — exit 6 too, Cloud unreachable and an older cache reused",
+        tag,
+      );
+    }
+  }
+  assert(n > 0, "no cloud option set was rendered");
 });

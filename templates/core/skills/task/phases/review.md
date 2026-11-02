@@ -12,8 +12,8 @@ $ARGUMENTS
 <!-- BEGIN: spec-backend=cloud -->
 **Materialise the spec (cloud backend):** run `specnaut spec pull <task>` ONCE now. It
 writes the spec's tabs to the gitignored `.specnaut/specs/.cache/<task>/`; read the spec
-from there as files. If the pull fails (offline/auth), stop with its message — do not
-proceed against an empty spec.
+from there as files. A non-zero exit stops with its message — exit 6 too, Cloud unreachable
+and an older cache reused: do not review against an empty or stale spec.
 
 <!-- END: spec-backend=cloud -->
 1. Fix the range: `base=$(git merge-base HEAD main)`; the files under review are
