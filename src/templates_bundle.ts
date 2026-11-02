@@ -23087,7 +23087,8 @@ fi
 # rather than minting a second one; epic-branch.sh is the lookup's one home.
 if [ -n "\$EPIC_ISSUE" ] && [ "\$HAS_GIT" = true ]; then
     _cur=\$(git rev-parse --abbrev-ref HEAD 2>/dev/null || echo "")
-    EPIC_BRANCH=\$(bash "\$SCRIPT_DIR/epic-branch.sh" "\$EPIC_ISSUE")
+    # Several branches claiming the epic is a stop, never a pick (epic-branch.sh).
+    EPIC_BRANCH=\$(bash "\$SCRIPT_DIR/epic-branch.sh" "\$EPIC_ISSUE") || exit 1
     if [ -n "\$EPIC_BRANCH" ]; then
         if [ "\$EPIC_BRANCH" = "\$_cur" ]; then
             echo "# already on the epic's branch '\$EPIC_BRANCH' — reusing it, no branch created" >&2
@@ -23105,8 +23106,13 @@ if [ "\$USE_TIMESTAMP" = true ] && [ -n "\$BRANCH_NUMBER" ]; then
     BRANCH_NUMBER=""
 fi
 
-# Determine branch prefix
-if [ "\$USE_TIMESTAMP" = true ]; then
+# Determine branch prefix. An epic's second, third and ninth child all land
+# on the branch the epic already has: no number is computed for it, and no
+# remote is scanned for one.
+if [ -n "\$EPIC_BRANCH" ]; then
+    FEATURE_NUM=""
+    BRANCH_NAME="\$EPIC_BRANCH"
+elif [ "\$USE_TIMESTAMP" = true ]; then
     FEATURE_NUM=\$(date +%Y%m%d-%H%M%S)
     BRANCH_NAME="\${FEATURE_NUM}-\${BRANCH_SUFFIX}"
 else
@@ -23156,13 +23162,6 @@ if [ \${#BRANCH_NAME} -gt \$MAX_BRANCH_LENGTH ]; then
     >&2 echo "[specify] Truncated to: \$BRANCH_NAME (\${#BRANCH_NAME} bytes)"
 fi
 
-# An epic's second, third and ninth child all land on the branch the epic
-# already has. Overriding here, after the name was computed, keeps the
-# standalone path byte-for-byte unchanged: nothing above this line knows an
-# epic exists.
-if [ -n "\$EPIC_BRANCH" ]; then
-    BRANCH_NAME="\$EPIC_BRANCH"
-fi
 
 FEATURE_DIR="\$SPECS_DIR/\$BRANCH_NAME"
 SPEC_FILE="\$FEATURE_DIR/plan.md"
@@ -23308,7 +23307,7 @@ if \$JSON_MODE; then
 else
     echo "BRANCH_NAME: \$BRANCH_NAME"
     echo "SPEC_FILE: \$SPEC_FILE"
-    echo "FEATURE_NUM: \$FEATURE_NUM"
+    [ -z "\$FEATURE_NUM" ] || echo "FEATURE_NUM: \$FEATURE_NUM"
     if [ -n "\$LINKED_ISSUE" ]; then
         echo "LINKED_ISSUE: \$LINKED_ISSUE"
     fi
@@ -23854,16 +23853,22 @@ exit 3
 # The epic's live branch (cli#731) — the one home of the lookup both
 # create-new-feature twins run for an epic and its children.
 #
-# Prints the first local branch whose committed \`.specnaut/feature.json\`
-# links <epic>, or nothing when none does; always exit 0. The link lives at a
-# fixed path and is committed on the branch, so this reads git, parses no
-# branch name and introduces no state file.
+# Prints the local branch whose committed \`.specnaut/feature.json\` links
+# <epic>, or nothing when none does. The link lives at a fixed path and is
+# committed on the branch, so this reads git, parses no branch name and
+# introduces no state file.
 #
 # The base, and every branch already merged into it, is never the epic's
 # branch: a landing can leave the epic's feature.json on the base, and
-# checking the base out as the epic's branch blocks every later slice. The
-# base is base-branch.sh's; when it is unknown the exclusion cannot run, and
-# stderr says so.
+# checking the base out as the epic's branch blocks every later slice. A
+# branch at the base's tip inherits the base's link without making it its
+# own, so it is a candidate only when it is HEAD — the fresh epic branch the
+# user is on; any other branch cut there may be another item's. The base is
+# base-branch.sh's, read locally, else as origin/<base>; when it is unknown
+# the exclusion cannot run, and stderr says so.
+#
+# Exit: 0 found or none · 1 usage · 4 several branches link the epic (listed
+# on stderr; picking one would be a guess).
 #
 # Usage: epic-branch.sh <epic>
 set -uo pipefail
@@ -23875,25 +23880,44 @@ source "\$SCRIPT_DIR/common.sh"
 
 epic="\${1:?usage: epic-branch.sh <epic>}"
 
-if ! base=\$(bash "\$SCRIPT_DIR/base-branch.sh" 2>/dev/null); then
-    base=""
+base_ref=""
+if base=\$(bash "\$SCRIPT_DIR/base-branch.sh" 2>/dev/null); then
+    for r in "refs/heads/\$base" "refs/remotes/origin/\$base"; do
+        if git rev-parse --verify --quiet "\$r^{commit}" >/dev/null; then base_ref=\$r; break; fi
+    done
+fi
+if [ -z "\$base_ref" ]; then
     echo "# the base branch is unknown — the epic branch lookup cannot skip it or the branches merged into it" >&2
+else
+    base_tip=\$(git rev-parse "\$base_ref")
+    head=\$(git symbolic-ref --quiet --short HEAD 2>/dev/null || true)
 fi
 
+found=()
 for b in \$(git for-each-ref --format='%(refname:short)' refs/heads 2>/dev/null); do
     # A name git would read as an option never reaches it.
     [[ \$b =~ ^[A-Za-z0-9][A-Za-z0-9._/-]*\$ ]] || continue
-    # An ancestor of the base, the base itself included, is merged.
-    if [ -n "\$base" ] && git merge-base --is-ancestor "refs/heads/\$b" "refs/heads/\$base" 2>/dev/null; then
-        continue
+    if [ -n "\$base_ref" ]; then
+        [ "refs/heads/\$b" = "\$base_ref" ] && continue
+        # Merged: an ancestor of the base — at its tip, unless it is HEAD.
+        if git merge-base --is-ancestor "refs/heads/\$b" "\$base_ref" 2>/dev/null &&
+            { [ "\$(git rev-parse "refs/heads/\$b")" != "\$base_tip" ] || [ "\$b" != "\$head" ]; }; then
+            continue
+        fi
     fi
     fj=\$(git show "refs/heads/\$b:.specnaut/feature.json" 2>/dev/null) || continue
-    li=\$(printf '%s' "\$fj" | jq_lf -r '.linked_issue // empty' 2>/dev/null) || continue
-    if [ "\$li" = "\$epic" ]; then
-        printf '%s\\n' "\$b"
-        exit 0
+    if ! li=\$(printf '%s' "\$fj" | jq_lf -r '.linked_issue // empty' 2>/dev/null); then
+        echo "# warning: branch '\$b' has an unreadable .specnaut/feature.json - skipped for epic lookup" >&2
+        continue
     fi
+    [ "\$li" = "\$epic" ] && found+=("\$b")
 done
+
+if [ "\${#found[@]}" -gt 1 ]; then
+    echo "# several branches link epic #\$epic — not picking one: \${found[*]}" >&2
+    exit 4
+fi
+[ "\${#found[@]}" -eq 0 ] || printf '%s\\n' "\${found[0]}"
 exit 0
 `,
     executable: true,
@@ -26316,60 +26340,6 @@ if (\$ShortName) {
     \$branchSuffix = Get-BranchName -Description \$featureDesc
 }
 
-# Warn if -Number and -Timestamp are both specified
-if (\$Timestamp -and \$Number -ne 0) {
-    Write-Warning "[specify] Warning: -Number is ignored when -Timestamp is used"
-    \$Number = 0
-}
-
-# Determine branch prefix
-if (\$Timestamp) {
-    \$featureNum = Get-Date -Format 'yyyyMMdd-HHmmss'
-    \$branchName = "\$featureNum-\$branchSuffix"
-} else {
-    # Determine branch number
-    if (\$Number -eq 0) {
-        if (\$DryRun -and \$hasGit) {
-            # Dry-run: query remotes via ls-remote (side-effect-free, no fetch)
-            \$Number = Get-NextBranchNumber -SpecsDir \$specsDir -SkipFetch
-        } elseif (\$DryRun) {
-            # Dry-run without git: local spec dirs only
-            \$Number = (Get-HighestNumberFromSpecs -SpecsDir \$specsDir) + 1
-        } elseif (\$hasGit) {
-            # Check existing branches on remotes
-            \$Number = Get-NextBranchNumber -SpecsDir \$specsDir
-        } else {
-            # Fall back to local directory check
-            \$Number = (Get-HighestNumberFromSpecs -SpecsDir \$specsDir) + 1
-        }
-    }
-
-    \$featureNum = ('{0:000}' -f \$Number)
-    \$branchName = "\$featureNum-\$branchSuffix"
-}
-
-# GitHub enforces a 244-byte limit on branch names
-# Validate and truncate if necessary
-\$maxBranchLength = 244
-if (\$branchName.Length -gt \$maxBranchLength) {
-    # Calculate how much we need to trim from suffix
-    # Account for prefix length: timestamp (15) + hyphen (1) = 16, or sequential (3) + hyphen (1) = 4
-    \$prefixLength = \$featureNum.Length + 1
-    \$maxSuffixLength = \$maxBranchLength - \$prefixLength
-
-    # Truncate suffix
-    \$truncatedSuffix = \$branchSuffix.Substring(0, [Math]::Min(\$branchSuffix.Length, \$maxSuffixLength))
-    # Remove trailing hyphen if truncation created one
-    \$truncatedSuffix = \$truncatedSuffix -replace '-\$', ''
-
-    \$originalBranchName = \$branchName
-    \$branchName = "\$featureNum-\$truncatedSuffix"
-
-    Write-Warning "[specify] Branch name exceeded GitHub's 244-byte limit"
-    Write-Warning "[specify] Original: \$originalBranchName (\$(\$originalBranchName.Length) bytes)"
-    Write-Warning "[specify] Truncated to: \$branchName (\$(\$branchName.Length) bytes)"
-}
-
 # --- Epic detection: one branch per epic, never one per child -------------
 # PowerShell twin of the bash block. Same contract, same messages, same
 # never-fails-the-run rule. See the bash script for why detection is
@@ -26437,9 +26407,63 @@ if (\$epicIssue -and \$hasGit) {
     }
 }
 
-# Overriding here, after the name was computed, keeps the standalone path
-# byte-for-byte unchanged: nothing above this line knows an epic exists.
-if (\$epicBranch) { \$branchName = \$epicBranch }
+# Warn if -Number and -Timestamp are both specified
+if (\$Timestamp -and \$Number -ne 0) {
+    Write-Warning "[specify] Warning: -Number is ignored when -Timestamp is used"
+    \$Number = 0
+}
+
+# Determine branch prefix. An epic's later children land on the branch the
+# epic already has: no number is computed for it, and no remote is scanned.
+if (\$epicBranch) {
+    \$featureNum = ''
+    \$branchName = \$epicBranch
+} elseif (\$Timestamp) {
+    \$featureNum = Get-Date -Format 'yyyyMMdd-HHmmss'
+    \$branchName = "\$featureNum-\$branchSuffix"
+} else {
+    # Determine branch number
+    if (\$Number -eq 0) {
+        if (\$DryRun -and \$hasGit) {
+            # Dry-run: query remotes via ls-remote (side-effect-free, no fetch)
+            \$Number = Get-NextBranchNumber -SpecsDir \$specsDir -SkipFetch
+        } elseif (\$DryRun) {
+            # Dry-run without git: local spec dirs only
+            \$Number = (Get-HighestNumberFromSpecs -SpecsDir \$specsDir) + 1
+        } elseif (\$hasGit) {
+            # Check existing branches on remotes
+            \$Number = Get-NextBranchNumber -SpecsDir \$specsDir
+        } else {
+            # Fall back to local directory check
+            \$Number = (Get-HighestNumberFromSpecs -SpecsDir \$specsDir) + 1
+        }
+    }
+
+    \$featureNum = ('{0:000}' -f \$Number)
+    \$branchName = "\$featureNum-\$branchSuffix"
+}
+
+# GitHub enforces a 244-byte limit on branch names
+# Validate and truncate if necessary
+\$maxBranchLength = 244
+if (\$branchName.Length -gt \$maxBranchLength) {
+    # Calculate how much we need to trim from suffix
+    # Account for prefix length: timestamp (15) + hyphen (1) = 16, or sequential (3) + hyphen (1) = 4
+    \$prefixLength = \$featureNum.Length + 1
+    \$maxSuffixLength = \$maxBranchLength - \$prefixLength
+
+    # Truncate suffix
+    \$truncatedSuffix = \$branchSuffix.Substring(0, [Math]::Min(\$branchSuffix.Length, \$maxSuffixLength))
+    # Remove trailing hyphen if truncation created one
+    \$truncatedSuffix = \$truncatedSuffix -replace '-\$', ''
+
+    \$originalBranchName = \$branchName
+    \$branchName = "\$featureNum-\$truncatedSuffix"
+
+    Write-Warning "[specify] Branch name exceeded GitHub's 244-byte limit"
+    Write-Warning "[specify] Original: \$originalBranchName (\$(\$originalBranchName.Length) bytes)"
+    Write-Warning "[specify] Truncated to: \$branchName (\$(\$branchName.Length) bytes)"
+}
 
 \$featureDir = Join-Path \$specsDir \$branchName
 \$specFile = Join-Path \$featureDir 'plan.md'
@@ -26588,7 +26612,7 @@ if (\$Json) {
 } else {
     Write-Output "BRANCH_NAME: \$branchName"
     Write-Output "SPEC_FILE: \$specFile"
-    Write-Output "FEATURE_NUM: \$featureNum"
+    if (\$featureNum) { Write-Output "FEATURE_NUM: \$featureNum" }
     if (\$Issue -gt 0) {
         Write-Output "LINKED_ISSUE: \$Issue"
     }

@@ -227,7 +227,8 @@ fi
 # rather than minting a second one; epic-branch.sh is the lookup's one home.
 if [ -n "$EPIC_ISSUE" ] && [ "$HAS_GIT" = true ]; then
     _cur=$(git rev-parse --abbrev-ref HEAD 2>/dev/null || echo "")
-    EPIC_BRANCH=$(bash "$SCRIPT_DIR/epic-branch.sh" "$EPIC_ISSUE")
+    # Several branches claiming the epic is a stop, never a pick (epic-branch.sh).
+    EPIC_BRANCH=$(bash "$SCRIPT_DIR/epic-branch.sh" "$EPIC_ISSUE") || exit 1
     if [ -n "$EPIC_BRANCH" ]; then
         if [ "$EPIC_BRANCH" = "$_cur" ]; then
             echo "# already on the epic's branch '$EPIC_BRANCH' — reusing it, no branch created" >&2
@@ -245,8 +246,13 @@ if [ "$USE_TIMESTAMP" = true ] && [ -n "$BRANCH_NUMBER" ]; then
     BRANCH_NUMBER=""
 fi
 
-# Determine branch prefix
-if [ "$USE_TIMESTAMP" = true ]; then
+# Determine branch prefix. An epic's second, third and ninth child all land
+# on the branch the epic already has: no number is computed for it, and no
+# remote is scanned for one.
+if [ -n "$EPIC_BRANCH" ]; then
+    FEATURE_NUM=""
+    BRANCH_NAME="$EPIC_BRANCH"
+elif [ "$USE_TIMESTAMP" = true ]; then
     FEATURE_NUM=$(date +%Y%m%d-%H%M%S)
     BRANCH_NAME="${FEATURE_NUM}-${BRANCH_SUFFIX}"
 else
@@ -296,13 +302,6 @@ if [ ${#BRANCH_NAME} -gt $MAX_BRANCH_LENGTH ]; then
     >&2 echo "[specify] Truncated to: $BRANCH_NAME (${#BRANCH_NAME} bytes)"
 fi
 
-# An epic's second, third and ninth child all land on the branch the epic
-# already has. Overriding here, after the name was computed, keeps the
-# standalone path byte-for-byte unchanged: nothing above this line knows an
-# epic exists.
-if [ -n "$EPIC_BRANCH" ]; then
-    BRANCH_NAME="$EPIC_BRANCH"
-fi
 
 FEATURE_DIR="$SPECS_DIR/$BRANCH_NAME"
 SPEC_FILE="$FEATURE_DIR/plan.md"
@@ -448,7 +447,7 @@ if $JSON_MODE; then
 else
     echo "BRANCH_NAME: $BRANCH_NAME"
     echo "SPEC_FILE: $SPEC_FILE"
-    echo "FEATURE_NUM: $FEATURE_NUM"
+    [ -z "$FEATURE_NUM" ] || echo "FEATURE_NUM: $FEATURE_NUM"
     if [ -n "$LINKED_ISSUE" ]; then
         echo "LINKED_ISSUE: $LINKED_ISSUE"
     fi

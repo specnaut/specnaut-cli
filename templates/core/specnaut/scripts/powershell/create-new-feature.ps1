@@ -88,60 +88,6 @@ if ($ShortName) {
     $branchSuffix = Get-BranchName -Description $featureDesc
 }
 
-# Warn if -Number and -Timestamp are both specified
-if ($Timestamp -and $Number -ne 0) {
-    Write-Warning "[specify] Warning: -Number is ignored when -Timestamp is used"
-    $Number = 0
-}
-
-# Determine branch prefix
-if ($Timestamp) {
-    $featureNum = Get-Date -Format 'yyyyMMdd-HHmmss'
-    $branchName = "$featureNum-$branchSuffix"
-} else {
-    # Determine branch number
-    if ($Number -eq 0) {
-        if ($DryRun -and $hasGit) {
-            # Dry-run: query remotes via ls-remote (side-effect-free, no fetch)
-            $Number = Get-NextBranchNumber -SpecsDir $specsDir -SkipFetch
-        } elseif ($DryRun) {
-            # Dry-run without git: local spec dirs only
-            $Number = (Get-HighestNumberFromSpecs -SpecsDir $specsDir) + 1
-        } elseif ($hasGit) {
-            # Check existing branches on remotes
-            $Number = Get-NextBranchNumber -SpecsDir $specsDir
-        } else {
-            # Fall back to local directory check
-            $Number = (Get-HighestNumberFromSpecs -SpecsDir $specsDir) + 1
-        }
-    }
-
-    $featureNum = ('{0:000}' -f $Number)
-    $branchName = "$featureNum-$branchSuffix"
-}
-
-# GitHub enforces a 244-byte limit on branch names
-# Validate and truncate if necessary
-$maxBranchLength = 244
-if ($branchName.Length -gt $maxBranchLength) {
-    # Calculate how much we need to trim from suffix
-    # Account for prefix length: timestamp (15) + hyphen (1) = 16, or sequential (3) + hyphen (1) = 4
-    $prefixLength = $featureNum.Length + 1
-    $maxSuffixLength = $maxBranchLength - $prefixLength
-
-    # Truncate suffix
-    $truncatedSuffix = $branchSuffix.Substring(0, [Math]::Min($branchSuffix.Length, $maxSuffixLength))
-    # Remove trailing hyphen if truncation created one
-    $truncatedSuffix = $truncatedSuffix -replace '-$', ''
-
-    $originalBranchName = $branchName
-    $branchName = "$featureNum-$truncatedSuffix"
-
-    Write-Warning "[specify] Branch name exceeded GitHub's 244-byte limit"
-    Write-Warning "[specify] Original: $originalBranchName ($($originalBranchName.Length) bytes)"
-    Write-Warning "[specify] Truncated to: $branchName ($($branchName.Length) bytes)"
-}
-
 # --- Epic detection: one branch per epic, never one per child -------------
 # PowerShell twin of the bash block. Same contract, same messages, same
 # never-fails-the-run rule. See the bash script for why detection is
@@ -209,9 +155,63 @@ if ($epicIssue -and $hasGit) {
     }
 }
 
-# Overriding here, after the name was computed, keeps the standalone path
-# byte-for-byte unchanged: nothing above this line knows an epic exists.
-if ($epicBranch) { $branchName = $epicBranch }
+# Warn if -Number and -Timestamp are both specified
+if ($Timestamp -and $Number -ne 0) {
+    Write-Warning "[specify] Warning: -Number is ignored when -Timestamp is used"
+    $Number = 0
+}
+
+# Determine branch prefix. An epic's later children land on the branch the
+# epic already has: no number is computed for it, and no remote is scanned.
+if ($epicBranch) {
+    $featureNum = ''
+    $branchName = $epicBranch
+} elseif ($Timestamp) {
+    $featureNum = Get-Date -Format 'yyyyMMdd-HHmmss'
+    $branchName = "$featureNum-$branchSuffix"
+} else {
+    # Determine branch number
+    if ($Number -eq 0) {
+        if ($DryRun -and $hasGit) {
+            # Dry-run: query remotes via ls-remote (side-effect-free, no fetch)
+            $Number = Get-NextBranchNumber -SpecsDir $specsDir -SkipFetch
+        } elseif ($DryRun) {
+            # Dry-run without git: local spec dirs only
+            $Number = (Get-HighestNumberFromSpecs -SpecsDir $specsDir) + 1
+        } elseif ($hasGit) {
+            # Check existing branches on remotes
+            $Number = Get-NextBranchNumber -SpecsDir $specsDir
+        } else {
+            # Fall back to local directory check
+            $Number = (Get-HighestNumberFromSpecs -SpecsDir $specsDir) + 1
+        }
+    }
+
+    $featureNum = ('{0:000}' -f $Number)
+    $branchName = "$featureNum-$branchSuffix"
+}
+
+# GitHub enforces a 244-byte limit on branch names
+# Validate and truncate if necessary
+$maxBranchLength = 244
+if ($branchName.Length -gt $maxBranchLength) {
+    # Calculate how much we need to trim from suffix
+    # Account for prefix length: timestamp (15) + hyphen (1) = 16, or sequential (3) + hyphen (1) = 4
+    $prefixLength = $featureNum.Length + 1
+    $maxSuffixLength = $maxBranchLength - $prefixLength
+
+    # Truncate suffix
+    $truncatedSuffix = $branchSuffix.Substring(0, [Math]::Min($branchSuffix.Length, $maxSuffixLength))
+    # Remove trailing hyphen if truncation created one
+    $truncatedSuffix = $truncatedSuffix -replace '-$', ''
+
+    $originalBranchName = $branchName
+    $branchName = "$featureNum-$truncatedSuffix"
+
+    Write-Warning "[specify] Branch name exceeded GitHub's 244-byte limit"
+    Write-Warning "[specify] Original: $originalBranchName ($($originalBranchName.Length) bytes)"
+    Write-Warning "[specify] Truncated to: $branchName ($($branchName.Length) bytes)"
+}
 
 $featureDir = Join-Path $specsDir $branchName
 $specFile = Join-Path $featureDir 'plan.md'
@@ -360,7 +360,7 @@ if ($Json) {
 } else {
     Write-Output "BRANCH_NAME: $branchName"
     Write-Output "SPEC_FILE: $specFile"
-    Write-Output "FEATURE_NUM: $featureNum"
+    if ($featureNum) { Write-Output "FEATURE_NUM: $featureNum" }
     if ($Issue -gt 0) {
         Write-Output "LINKED_ISSUE: $Issue"
     }
