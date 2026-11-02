@@ -23,13 +23,14 @@ Deno.test("the re-entry table keys plan on the item, and nothing else decides it
   const plan = reentry.split("\n").find((l) => l.startsWith("| `plan <id>`"))!;
   for (
     const s of [
-      "the item is open and `wip-audit.sh` classed it `IDLE`, `LANDED` or, on the local backend, `ACTIVE`",
+      "the item is open and `wip-audit.sh` classed it `IDLE`, `ACTIVE` or `LANDED`",
       "an open item whose work landed has more to do",
       "Closed or a non-zero exit runs alone",
       "`UNPUSHED` lists `origin/<base>..<base>` and stops",
     ]
   ) assertStringIncludes(plan, s);
   assert(!CHAIN.includes("past `plan.md`"), "the artefact-presence rule is back");
+  assert(!plan.includes("backend"), "the plan row is keyed on a backend again (cli#730)");
   const line = (verb: string) => reentry.split("\n").find((l) => l.startsWith(`| \`${verb}\` |`));
   assertEquals(
     line("implement"),
@@ -96,6 +97,7 @@ Deno.test("plugin copies are byte-identical", () => {
       "skills/task/phases/plan.md",
       "skills/task/phases/implement.md",
       "skills/task/resume.md",
+      "skills/task/spec-autogen.md",
     ]
   ) {
     assertEquals(
@@ -129,4 +131,105 @@ Deno.test("every harness and option set ships the same plan row, gate and Re-ent
       for (const sentence of para) assertStringIncludes(flat(doc.content!), sentence, tag);
     }
   }
+});
+
+/** spec 056 (cli#730) — a cloud re-entry continues on the item's branch: only the cloud render says how. */
+const CLOUD_PLAN = [
+  "for a child, `<task>` below is its parent epic",
+  'a non-zero exit, or "reusing the existing cache" — stops here',
+  "`IDLE` with a plan: one that stopped on a question. It is an adopted plan; skip step 2.",
+  "`ACTIVE`: adopt the item's branch as `resume.md` § 1 item 4 and § 3 do; a failed check stops and names it. It is an adopted plan; skip step 2.",
+  "A plan changed since it was approved, by `implement`'s `plan_blob` rule, is an open question at step 7.",
+  "It runs once, before the run ends or hands off: here, or at step 7 when the plan stops on a question there.",
+  "A non-zero push is a stop, before anything is invoked.",
+  "On an adopted plan, step 8 pushes only when something changed.",
+  "A plan exists when it materialises `.specnaut/specs/.cache/<task>/1-plan.md`",
+  "do **NOT** write `.specnaut/feature.json`",
+  "`specnaut spec push <task>` sends the plan with its audits and answers",
+  "`IDLE` with no plan, or `LANDED` with the item open: a new plan, or the next slice. Step 2 runs.",
+  "`no spec for task`, or no such file, means none does",
+  "The task is the item's id: `plan <id>`, or `--issue <N>`. With no item, the product-owner creates one first",
+  "Stopping here on a question: push first, as step 8's cloud block says.",
+  // Step 8's record of the approved plan: without it, a re-approved plan stops at implement forever.
+  "When Re-entry adopted the item's branch, record the plan now approved",
+  "`specnaut spec pull <task>` again; when `git hash-object .specnaut/specs/.cache/<task>/1-plan.md` is not `feature.json`'s `plan_blob`, set it",
+  'git commit -m "plan(<task>): the approved plan"',
+];
+/** Text the cloud render must not carry: the removed base-dirtying step, the false auto-create, the local branch. */
+const NOT_IN_CLOUD_PLAN = [
+  "Persist `{",
+  "auto-creates",
+  "create-new-feature.sh --json --short-name",
+  "git add .specnaut/specs/<feature-dir>/ .specnaut/feature.json",
+];
+const CLOUD_IMPLEMENT = [
+  "`bash .specnaut/scripts/bash/wip-audit.sh <task>@<epoch>`; a non-zero exit stops",
+  "`ACTIVE <task> <sha>`, HEAD's tip is `<sha>`, and HEAD's branch passes `resume.md` § 3: continue on it",
+  "A re-entry creates no second branch.",
+  "the plan changed since it was approved: stop and say so — `/task plan <task>` re-approves it",
+  "when `wip-audit.sh` (below) prints `ACTIVE` for it at HEAD's tip — a link HEAD's own commits set, never one inherited from the base; otherwise stop and ask for it",
+  "the whole-number `linked_issue` of HEAD's committed",
+  "For an epic's child it is the epic, and `<epoch>` is `<task>`'s creation time.",
+  "anything but a materialised `1-plan.md` stops",
+  "anything already staged (`git diff --cached --quiet` fails) is a stop",
+  "`ACTIVE` anywhere else: stop and name the sha, never a branch name",
+  "`UNPUSHED`: stop; that push is `merge`'s recovery.",
+  "HEAD is the base, or its branch passes `resume.md` § 3 check 5; otherwise stop and name HEAD's sha",
+  "--branch-only --issue <task>",
+  '"plan_blob": "<git hash-object of the pulled 1-plan.md>"',
+  'git commit --allow-empty -m "plan(<task>): link the branch to its task"',
+];
+
+Deno.test("the cloud render carries the cloud re-entry and implement rules, and none of the local ones; the local render none of the cloud's", () => {
+  let cloud = 0;
+  for (const h of HARNESSES) {
+    for (const opts of everyBundleOption()) {
+      const files = Object.values(h.mapBundle(CORE_BUNDLE, opts));
+      const tag = `${h.key}/${JSON.stringify(opts)}`;
+      const plan = files.find((f) => (f.content ?? "").includes("**Re-entry.**"));
+      const impl = files.find((f) => (f.content ?? "").includes("**Done is the brief's checks.**"));
+      assert(plan && impl, `${tag}: no plan or implement document`);
+      const isCloud = opts.specBackend === "cloud";
+      if (isCloud) cloud++;
+      for (const [doc, want] of [[plan, CLOUD_PLAN], [impl, CLOUD_IMPLEMENT]] as const) {
+        for (const s of want) {
+          assertEquals(flat(doc.content!).includes(s), isCloud, `${tag}: ${s}`);
+        }
+      }
+      for (const s of NOT_IN_CLOUD_PLAN) {
+        if (isCloud) assert(!flat(plan.content!).includes(s), `${tag}: cloud carries ${s}`);
+      }
+    }
+  }
+  assert(cloud > 0, "no cloud option set was rendered");
+});
+
+Deno.test("cloud plan pushes once, at step 8, after the audits and answers it carries", () => {
+  let n = 0;
+  for (const h of HARNESSES) {
+    for (const opts of everyBundleOption().filter((o) => o.specBackend === "cloud")) {
+      n++;
+      const files = Object.values(h.mapBundle(CORE_BUNDLE, opts));
+      const plan = flat(files.find((f) => (f.content ?? "").includes("**Re-entry.**"))!.content!);
+      const tag = `${h.key}/${JSON.stringify(opts)}`;
+      // Every spelling of the command, less the one sentence that only names it.
+      const named = "`specnaut spec push` needs a task number";
+      const pushes = [...plan.replace(named, "_".repeat(named.length)).matchAll(/spec push/g)].map((
+        m,
+      ) => m.index!);
+      assertStringIncludes(plan, named, tag);
+      assertEquals(pushes.length, 1, `${tag}: one push`);
+      const step7 = plan.search(/#+ 7\. /), step8 = plan.search(/#+ 8\. /);
+      assert(step7 > 0 && step8 > step7, `${tag}: steps 7 and 8`);
+      assert(pushes[0] > step8, `${tag}: the push comes before the plan is done`);
+    }
+  }
+  assert(n > 0, "no cloud option set was rendered");
+});
+
+Deno.test("spec-autogen's cloud plan ends with its push and invokes nothing after it", () => {
+  assertStringIncludes(
+    flat(read("skills/task/spec-autogen.md")),
+    "The flow ends with its push, at the plan stop or step 8, and invokes nothing after it.",
+  );
 });

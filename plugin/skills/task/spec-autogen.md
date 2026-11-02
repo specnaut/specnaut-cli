@@ -7,7 +7,7 @@ false the skill does not point here and task creation is unchanged.
 Immediately **after** creating a task, ALSO generate its spec: run the cloud `plan` flow for
 the new task (branch-free — no git branch, no local `.specnaut/specs/` files), so the spec is
 already written when the task is later picked for implementation. No waiting, no blocking
-pre-step.
+pre-step. The flow ends with its push, at the plan stop or step 8, and invokes nothing after it.
 
 - Trigger it once per newly created task, right after the create succeeds — for a single
   `add.sh` or for every task in a batch.

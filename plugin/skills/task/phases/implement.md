@@ -9,11 +9,29 @@ $ARGUMENTS
 ## Before the first line
 
 <!-- BEGIN: spec-backend=cloud -->
-**Cloud spec setup** — the spec lives on SpecNaut Cloud and `/task plan` created no branch. First,
-run `specnaut spec pull <task>` once: it writes the spec to the gitignored
-`.specnaut/specs/.cache/<task>/`, and you read it from there. If the pull fails, stop with its
-message. Then create the branch:
-`.specnaut/scripts/bash/create-new-feature.sh --branch-only "<feature description>"`.
+**Cloud spec setup** — the spec lives on SpecNaut Cloud and `/task plan` created no branch.
+`<task>` is the item `plan` handed on, else the whole-number `linked_issue` of HEAD's committed
+`.specnaut/feature.json` when `wip-audit.sh` (below) prints `ACTIVE` for it at HEAD's tip — a link
+HEAD's own commits set, never one inherited from the base; otherwise stop and ask for it. For an
+epic's child it is the epic, and `<epoch>` is `<task>`'s creation time. First, run
+`specnaut spec pull <task>` once: it writes the spec to the gitignored `.specnaut/specs/.cache/<task>/`,
+and you read it from there. Read its outcome as `phases/plan.md`'s Re-entry does: anything but a
+materialised `1-plan.md` stops. Then the branch, from
+`bash .specnaut/scripts/bash/wip-audit.sh <task>@<epoch>`; a non-zero exit stops:
+
+- `ACTIVE <task> <sha>`, HEAD's tip is `<sha>`, and HEAD's branch passes `resume.md` § 3: continue
+  on it. A re-entry creates no second branch. When `git hash-object` of the pulled `1-plan.md` is
+  not its committed `feature.json` `plan_blob`, the plan changed since it was approved: stop and say
+  so — `/task plan <task>` re-approves it.
+- `ACTIVE` anywhere else: stop and name the sha, never a branch name — `/task resume <task>`
+  adopts it. `UNPUSHED`: stop; that push is `merge`'s recovery.
+- `IDLE` or `LANDED`: HEAD is the base, or its branch passes `resume.md` § 3 check 5; otherwise stop
+  and name HEAD's sha. Then `.specnaut/scripts/bash/create-new-feature.sh --branch-only --issue
+  <task> "<feature description>"`, write `{ "linked_issue": <task>, "plan_blob": "<git hash-object
+  of the pulled 1-plan.md>" }` to `.specnaut/feature.json` and commit it alone — anything already
+  staged (`git diff --cached --quiet` fails) is a stop:
+  `git add .specnaut/feature.json && git commit --allow-empty -m "plan(<task>): link the branch to
+  its task"`. `wip-audit.sh` and `resume.md` § 3 check 8 read the branch by it.
 
 <!-- END: spec-backend=cloud -->
 Run `.specnaut/scripts/bash/check-prerequisites.sh --json` for the feature directory, and read its

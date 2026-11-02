@@ -76,7 +76,7 @@ A verb invoked directly chains, or runs alone, by this table and nothing else:
 
 | Invoked | Chains when |
 |---|---|
-| `plan <id>` | the item is open and `wip-audit.sh` classed it `IDLE`, `LANDED` or, on the local backend, `ACTIVE` (`phases/plan.md`, "Re-entry"): an open item whose work landed has more to do. Closed or a non-zero exit runs alone; `UNPUSHED` lists `origin/<base>..<base>` and stops |
+| `plan <id>` | the item is open and `wip-audit.sh` classed it `IDLE`, `ACTIVE` or `LANDED` (`phases/plan.md`, "Re-entry"): an open item whose work landed has more to do. Closed or a non-zero exit runs alone; `UNPUSHED` lists `origin/<base>..<base>` and stops |
 | `plan` with no id | always: a new feature |
 | `implement` | the branch is not merged into the base branch |
 | `review` | always one-shot |

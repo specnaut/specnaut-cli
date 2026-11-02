@@ -348,8 +348,15 @@ check "create-new-feature.ps1 says so when no bash is available to run the helpe
   'grep -q "bash-only and no bash was found" .specnaut/scripts/powershell/create-new-feature.ps1'
 check "create-new-feature.sh exposes --issue flag" \
   'grep -q -- "--issue" .specnaut/scripts/bash/create-new-feature.sh'
-check "plan.md persists linked_issue into feature.json" \
-  'grep -q "linked_issue" .claude/skills/task/phases/plan.md'
+# The phase that cuts the branch persists the link: plan on the local spec
+# backend, implement on the cloud one (cli#730), whichever this init picked.
+if grep -q '^spec_backend: cloud' .specnaut/installed.lock; then
+  check "implement.md persists linked_issue into feature.json (cloud spec backend)" \
+    'grep -q "\"linked_issue\": <task>" .claude/skills/task/phases/implement.md'
+else
+  check "plan.md persists linked_issue into feature.json (local spec backend)" \
+    'grep -q "\"linked_issue\": <N or null>" .claude/skills/task/phases/plan.md'
+fi
 # Both re-anchored by #560: the close block moved to the merge-close
 # companion, so this is where feature.json is read and the PO is dispatched.
 # merge.md keeps a routing assertion instead — a companion nobody loads is a

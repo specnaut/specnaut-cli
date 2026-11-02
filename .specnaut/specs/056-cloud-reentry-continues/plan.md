@@ -215,3 +215,45 @@ both the script and its PowerShell twin, and the script's own epic reuse already
 
 None. The issue's criteria fix the behaviour, and every fork above is technical, settled by the
 seats.
+
+## 11. Review (frozen tree 4eac708f) and its fix cycle
+
+- **code-reviewer: needs_followup, 0 HIGH · 3 MEDIUM · 4 LOW.** All of these were fixed in the
+  branch:
+  - `implement` now reads the pull outcome by `plan.md`'s Re-entry rule;
+  - the continue rule cites `resume.md` § 3 instead of restating check 1;
+  - step 7 points to step 8's push;
+  - step 8's blob commit runs only after an adopted branch and with nothing else staged;
+  - the duplicate "only when changed" is dropped;
+  - `<epoch>` is `<task>`'s creation time;
+  - a test was renamed.
+- **security-expert: needs_followup, 0 HIGH · 1 MEDIUM · 1 LOW.** Both fixed in the branch:
+  - **MEDIUM: the fallback task trusted an inherited link.** HEAD's link now counts only when
+    `wip-audit.sh` prints `ACTIVE` for it at HEAD's tip.
+  - **LOW: only check 8 applied.** The continue rule requires all of § 3. IDLE/LANDED cuts from the
+    base, or from a branch that passes check 5.
+  - The INFO "a non-zero `wip-audit.sh` exit has no rule" is fixed too: it stops.
+  - INFO recorded, not acted on:
+    - the seconds-long race on the approval record;
+    - adopted plans with no blob (trusted cloud writers);
+    - quoting of `<feature description>`, which predates this change.
+- **test-reviewer: fail, 1 HIGH · 3 MEDIUM · 4 LOW.** All of these were fixed:
+  - **HIGH:** step 8's record of the approved blob had no assertion. It is now asserted and
+    red-probed.
+  - **MEDIUM:** the `UNPUSHED`, whole-number and epic guards were unasserted, as were the
+    IDLE-no-plan bullet and the task sentence; negative assertions were missing for the removed
+    "Persist" step, "auto-creates" and the local branch commands; the push count matched one
+    spelling only (it now matches every `spec push`).
+  - **LOW:** the cloud-filter count guard, a second branch at the same tip, and the test name.
+
+**Mutants run, all red (20):**
+
+- **Plan audit pass 1 (6):** `--allow-empty` dropped; a push in step 2; the ACTIVE adoption dropped;
+  check 8 dropped; the local-only row restored; `wip-audit.sh`'s fork-point diff removed.
+- **Pass 2 (6):** the blob stop; the base exclusion; the staged stop; the push at the step-7 stop;
+  the failed-push stop; spec-autogen's ending.
+- **Review cycle (8):** step 8's blob record; the "Persist" step restored; a push spelled
+  `spec push <N>` in step 2; the step-7 pointer; the `UNPUSHED` stop; the whole-number guard; the
+  check-5 clause; the ACTIVE-keyed fallback.
+- **Follow-ups filed:** [cli#731](https://github.com/specnaut/specnaut-cli/issues/731) and
+  [cli#732](https://github.com/specnaut/specnaut-cli/issues/732).
