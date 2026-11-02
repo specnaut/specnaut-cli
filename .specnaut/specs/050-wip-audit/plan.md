@@ -154,7 +154,8 @@ Edge cases:
 
 - § I (halves): CLI only, with no private name.
 - § XI (consumers): the issue's anecdote is described, never attributed.
-- Size: `wip-audit.sh` must stay under 120 lines.
+- Size: `wip-audit.sh` must stay under 160 lines (amended at review: telling a failed git read apart
+  from an empty one took 30 lines; the default target is 300).
 
 | File                                                                                                                                                             | Lines now | Change                                                                                |
 | :--------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------: | :------------------------------------------------------------------------------------ |
@@ -257,3 +258,36 @@ and is settled by the seats. These decisions were taken here:
 - **The `Blocked` column move is dropped,** because no backend has one. A blocked item gets one
   comment.
 - **This workspace's root `.claude/` copies are root-authored** and out of scope.
+
+## 13. Review (2026-11-02)
+
+- **code-reviewer: fail, 1 HIGH.** A failed `feature.json` read could print `IDLE` and lazy-fetch.
+  Fixed: `ls-tree` before `show`, every failure goes to `unread`, and `GIT_NO_LAZY_FETCH=1`.
+- **The MEDIUM and LOW findings were fixed in the branch:**
+  - an inherited `feature.json` gave a false `ACTIVE`; only a branch's own change counts now;
+  - a branch merged locally is now `UNPUSHED`;
+  - the `cascade-check` exits are all mapped;
+  - the ready column is `$READY`;
+  - wip-audit exits not in the table are now handled;
+  - the report gained tokens;
+  - `--pr` is now the first row of merge step 5, which validates `linked_issue`;
+  - every git read takes `--`;
+  - the guards were widened.
+- **security-expert: needs_followup, no HIGH.** A stranger's "blocked" comment, and a forged idle
+  marker, could steer a card. Fixed: a block counts only from a team member, and groom's own
+  comments never count as evidence. The idle warning counts only when posted by groom's own account.
+  Groom posts fixed sentences only, once per move.
+- **test-reviewer: needs_followup, no HIGH.** Fixed:
+  - exit 3 is tested through each git read separately;
+  - the shas are asserted exactly;
+  - an `origin`-only branch is covered;
+  - boundary characters and lengths are covered;
+  - precedence and order are tested;
+  - the bundle-level guard covers every harness × option set;
+  - FR-008 and FR-009 are asserted;
+  - the allowlist cells are pinned.
+
+  Every new assertion was observed red under a live mutant.
+- **Not fixed: `create-new-feature.sh` reads `linked_issue` with a parser of its own**
+  (code-reviewer LOW). It is outside this branch's surface and is noted here. Its contract stays "a
+  bare number".
