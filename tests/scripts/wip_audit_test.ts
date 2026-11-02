@@ -349,6 +349,34 @@ Deno.test("a git read that fails is exit 3 with nothing classified, never IDLE",
   }
 });
 
+Deno.test("the chain's own scope form names the item: feat(N):, plan(N):, fix(N)!:", async () => {
+  const sb = await sandbox();
+  try {
+    await sb.commit("a", "a\n", "feat(301): landed the chain's way");
+    await sb.commit("b", "b\n", "fix(302)!: a breaking fix");
+    await sb.commit("c", "c\n", "feat(3030): not 303", "feat(303): only in the body");
+    await sb.commit("d", "d\n", "chore(x304): not an id");
+    await sb.commit("e", "e\n", "feat(305) no colon");
+    await sb.commit("g", "g\n", "chore: see feat(307): mid-subject");
+    await git(sb.work, "push", "--quiet", "origin", "main");
+    await git(sb.work, "switch", "--quiet", "-c", "feat-306");
+    await sb.commit("f", "f\n", "plan(306): the plan, committed after its stop");
+    await git(sb.work, "switch", "--quiet", "main");
+    const r = await sb.script("wip-audit.sh", "301", "302", "303", "304", "305", "306", "307");
+    assertEquals(shape(r.stdout).slice(0, 7), [
+      "LANDED 301 <sha>",
+      "LANDED 302 <sha>",
+      "IDLE 303",
+      "IDLE 304",
+      "IDLE 305",
+      "ACTIVE 306 <sha>",
+      "IDLE 307",
+    ]);
+  } finally {
+    await sb.cleanup();
+  }
+});
+
 // The script is installed beside the merge scripts, so a project's sandbox finds it there.
 Deno.test("the sandbox installs it where base-branch.sh resolves", async () => {
   const sb = await sandbox();

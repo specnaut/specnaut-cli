@@ -21,8 +21,10 @@
 #   DEFERRED <n>        beyond --limit, not checked
 #   audited <A>, active <C>, unpushed <U>, landed <L>, idle <I>, deferred <D>
 #
-# "Names #<n>" is the subject only, as a whole reference: not after a letter,
-# digit, `_`, `/`, `.` or `-` (owner/repo#12, x#12), not before a digit (#120).
+# "Names #<n>" is the subject only, in either of two shapes: the scope the
+# chain itself writes (`feat(12): …`, `plan(12): …`, merge-squash.md), or a
+# whole `#12` reference — not after a letter, digit, `_`, `/`, `.` or `-`
+# (owner/repo#12, x#12), not before a digit (#120).
 # `<n>@<epoch>` — the item's creation time — ignores commits older than it: a
 # number reused by imported history, or a PR number, names something else.
 # The feature.json link carries no date and is never filtered.
@@ -119,7 +121,7 @@ done <<<"$refs"
 # subject names #<n> and whose time is not older than <epoch>.
 first_naming() {
   local n=$1 since=$2 sha ct subject
-  local re="(^|[^[:alnum:]_/.-])#${n}([^0-9]|$)"
+  local re="(^|[^[:alnum:]_/.-])#${n}([^0-9]|$)" scope="^[a-z]+\\(${n}\\)!?: "
   while IFS=$'\x1f' read -r sha ct subject; do
     [ -n "$sha" ] || continue
     if [ "$ct" = LINK ]; then
@@ -127,7 +129,7 @@ first_naming() {
       continue
     fi
     [ "$ct" -ge "$since" ] || continue
-    [[ $subject =~ $re ]] && { printf '%s' "$sha"; return 0; }
+    if [[ $subject =~ $re ]] || [[ $subject =~ $scope ]]; then printf '%s' "$sha"; return 0; fi
   done <<<"$3"
   return 1
 }
