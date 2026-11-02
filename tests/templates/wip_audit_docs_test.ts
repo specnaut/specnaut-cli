@@ -12,7 +12,8 @@ import { everyBundleOption } from "../../src/application/bundle_options.ts";
  */
 
 const T = fromFileUrl(new URL("../../templates/core/", import.meta.url));
-const read = (p: string) => Deno.readTextFileSync(join(T, p));
+// A Windows checkout carries CRLF; every assertion here is about the text, not its line ends.
+const read = (p: string) => Deno.readTextFileSync(join(T, p)).replace(/\r\n/g, "\n");
 const GROOM = read("skills/task/groom.md");
 const MERGE = read("skills/task/phases/merge.md");
 const PO = read("agents/product-owner.md");
@@ -120,7 +121,11 @@ Deno.test("every edited file's plugin copy is byte-identical", () => {
       "agents/product-owner.md",
     ]
   ) {
-    assertEquals(Deno.readTextFileSync(join(P, f)), read(f), `plugin/${f} drifted`);
+    assertEquals(
+      Deno.readTextFileSync(join(P, f)).replace(/\r\n/g, "\n"),
+      read(f),
+      `plugin/${f} drifted`,
+    );
   }
 });
 

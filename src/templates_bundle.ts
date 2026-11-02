@@ -23822,6 +23822,9 @@ exit 0
 # Usage: wip-audit.sh [--limit <N>] <num>[@<epoch>]…   (--limit default 20)
 set -euo pipefail
 export GIT_OPTIONAL_LOCKS=0 GIT_NO_LAZY_FETCH=1
+# Git Bash on Windows rewrites an argument shaped like a path list, which
+# \`<ref>:<path>\` is; git must receive it as written.
+export MSYS_NO_PATHCONV=1 MSYS2_ARG_CONV_EXCL="*"
 here=\$(CDPATH="" cd "\$(dirname "\${BASH_SOURCE[0]}")" && pwd)
 
 usage() { echo "usage: wip-audit.sh [--limit <N>] <num>[@<epoch>]…" >&2; exit 2; }
