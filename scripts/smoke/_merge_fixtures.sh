@@ -1,10 +1,12 @@
 # shellcheck shell=bash
 # Sourced by smoke-merge.sh: scratch-repo fixtures for the merge checks, which
 # run the installed scripts instead of grepping their text. Reads $SCAFFOLD.
-# Every scratch repo lives under M_TMP, made once here; smoke-merge.sh's EXIT
-# trap removes it (cli#728). m_repo runs in subshells, so a per-call dir could
-# never be handed back to the parent to clean.
-M_TMP=$(mktemp -d "${TMPDIR:-/tmp}/smoke-merge.XXXXXX")
+# Every scratch repo lives under M_TMP, made once here: the scenario tree
+# "$NAME-repos", which smoke-merge.sh's EXIT trap hands to clean.sh (cli#728).
+# m_repo runs in subshells, so a per-call dir could never be handed back to
+# the parent to clean, and a raw `rm -rf` is what smoke-toolbox's sweep refuses.
+M_TMP="$(scenario_dir "$NAME-repos")"
+mkdir -p "$M_TMP"
 # m_repo — cd into a fresh clone whose origin's HEAD is main, scripts committed.
 m_repo() {
   export GIT_CONFIG_NOSYSTEM=1 GIT_CONFIG_GLOBAL=/dev/null LC_ALL=C \

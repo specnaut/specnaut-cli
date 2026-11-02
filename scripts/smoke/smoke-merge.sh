@@ -12,9 +12,10 @@ NAME="${1:?usage: smoke-merge.sh <name>}"
 . "$(dirname "$0")/_common.sh"
 DIR="$(scenario_dir "$NAME")"
 
-# One trap for both: a second `trap … EXIT` would replace this one. M_TMP is
-# _merge_fixtures.sh's, set once it is sourced below.
-trap 'rm -rf "${M_TMP:-}"; bash "$SMOKE_DIR/clean.sh" "$NAME" >/dev/null 2>&1 || true' EXIT
+# One trap for both trees: a second `trap … EXIT` would replace this one.
+# "$NAME-repos" is _merge_fixtures.sh's scratch-repo tree, made once it is
+# sourced below.
+trap 'bash "$SMOKE_DIR/clean.sh" "$NAME-repos" >/dev/null 2>&1; bash "$SMOKE_DIR/clean.sh" "$NAME" >/dev/null 2>&1 || true' EXIT
 
 bash "$SMOKE_DIR/bootstrap-vite.sh" "$NAME" >/dev/null
 (cd "$DIR" && deno run --allow-all "$CLI/src/main.ts" \
