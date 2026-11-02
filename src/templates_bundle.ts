@@ -140,14 +140,15 @@ whether the chain goes on; where its row stops (\`UNPUSHED\`), stop here, before
 <!-- END: spec-backend=local -->
 <!-- BEGIN: spec-backend=cloud -->
 An epic is one plan: for a child, \`<task>\` below is its parent epic, and the epic's classification
-decides. Read the epic's creation time from its own \`view.sh\` and run \`wip-audit.sh <task>@<epoch>\`;
+decides — the item's own open state governs, as \`phases/auto-chain.md\` says. Read the epic's creation time from its own \`view.sh\` and run \`wip-audit.sh <task>@<epoch>\`;
 its \`UNPUSHED\` is a stop as above. So an \`IDLE\` child of an \`ACTIVE\` epic continues on the epic's
 branch. Run \`specnaut spec pull <task>\` first. A plan exists when it materialises
 \`.specnaut/specs/.cache/<task>/1-plan.md\`; \`no spec for task\`, or no such file, means none does.
 Any non-zero exit stops here — exit 6 too, Cloud unreachable and an older cache reused — since an
 amendment pushed over a stale cache overwrites every tab.
 
-- \`IDLE\` with no plan, or \`LANDED\` with \`<task>\` open: a new plan, or the next slice. Step 2 runs.
+- \`IDLE\` with no plan, or \`LANDED\` with the item open: a new plan, or the next slice. Step 2 runs.
+- \`LANDED\` with the item closed: a plan that runs alone (\`phases/auto-chain.md\`). Step 2 runs.
 - \`IDLE\` with a plan: one that stopped on a question. It is an adopted plan; skip step 2.
 - \`ACTIVE\`: adopt \`<task>\`'s branch as \`resume.md\` § 1 item 4 and § 3 do; a failed check stops and
   names it. It is an adopted plan; skip step 2. A plan changed since it was approved, by
@@ -3128,7 +3129,7 @@ A verb invoked directly chains, or runs alone, by this table and nothing else:
 
 | Invoked | Chains when |
 |---|---|
-| \`plan <id>\` | the item is open and \`wip-audit.sh\` classed it \`IDLE\`, \`ACTIVE\` or \`LANDED\` (\`phases/plan.md\`, "Re-entry"): an open item whose work landed has more to do. Closed or a non-zero exit runs alone; \`UNPUSHED\` lists \`origin/<base>..<base>\` and stops |
+| \`plan <id>\` | the item is open and \`wip-audit.sh\` classed it \`IDLE\`, \`ACTIVE\` or \`LANDED\` (\`phases/plan.md\`, "Re-entry", which says whose class an epic's child takes — its own open state governs either way): an open item whose work landed has more to do. Closed or a non-zero exit runs alone; \`UNPUSHED\` lists \`origin/<base>..<base>\` and stops |
 | \`plan\` with no id | always: a new feature |
 | \`implement\` | the branch is not merged into the base branch |
 | \`review\` | always one-shot |

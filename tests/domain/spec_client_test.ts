@@ -49,6 +49,8 @@ function scripted(
 
 Deno.test("reasonForStatus maps statuses; everything else is transient", () => {
   assertEquals(reasonForStatus(401), "unauthorized");
+  // cli#733: authenticated and refused — not retryable, so never "transient".
+  assertEquals(reasonForStatus(403), "forbidden");
   assertEquals(reasonForStatus(404), "not_found");
   assertEquals(reasonForStatus(409), "conflict");
   assertEquals(reasonForStatus(422), "invalid");

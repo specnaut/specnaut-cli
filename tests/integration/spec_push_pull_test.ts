@@ -1,6 +1,8 @@
 import { assertEquals } from "@std/assert";
 import { PULL_STALE_CACHE, runSpec, type SpecDeps } from "../../src/cli/handlers/spec_handler.ts";
-import { makeSpecSession, type SpecSession } from "../../src/domain/cloud/spec_session.ts";
+import { makeSpecSession, SpecSession } from "../../src/domain/cloud/spec_session.ts";
+import type { SpecClient } from "../../src/domain/cloud/spec_client.ts";
+import type { CloudClient } from "../../src/domain/cloud/cloud_client.ts";
 import { SpecCacheWriter } from "../../src/infrastructure/spec/spec_cache_writer.ts";
 import type { FetchFn } from "../../src/domain/cloud/cloud_client.ts";
 import type { CredentialStore } from "../../src/domain/cloud/credentials.ts";
@@ -172,5 +174,73 @@ Deno.test("spec pull with a broken connection and NO cache exits 5 with an actio
     });
     assertEquals(await runSpec({ kind: "spec", sub: "pull", task: 154, apiUrl: null }, d), 5);
     assertEquals(err.join("\n").includes("retry"), true);
+  });
+});
+
+// cli#733 — the fallback is for an unreachable Cloud only. An answer Cloud gave
+// is not "unreachable": with a cache present it still exits 5, the cache untouched.
+for (const status of [401, 403, 409, 422]) {
+  Deno.test(`spec pull answered ${status} with a cache present exits 5, never the stale-cache 6`, async () => {
+    await withTmp(async (dir) => {
+      const cache = new SpecCacheWriter();
+      await cache.write(dir, 154, [{ key: "specify", name: "Specify", order: 1, body: "cached" }]);
+      const session = sessionWith(
+        (() => Promise.resolve(new Response("{}", { status }))) as FetchFn,
+      );
+      const { deps: d, err } = deps({
+        projectDir: dir,
+        cache,
+        buildSession: () => Promise.resolve(session),
+      });
+      assertEquals(await runSpec({ kind: "spec", sub: "pull", task: 154, apiUrl: null }, d), 5);
+      assertEquals(err.join("\n").includes("reusing the existing cache"), false);
+      if (status === 403) assertEquals(err.join("\n").includes("not allowed to pull spec"), true);
+      assertEquals(
+        await Deno.readTextFile(`${dir}/.specnaut/specs/.cache/154/1-specify.md`),
+        "cached",
+      );
+    });
+  });
+}
+
+Deno.test("spec pull answered 503 with a cache present is unreachable: the stale-cache 6", async () => {
+  await withTmp(async (dir) => {
+    const cache = new SpecCacheWriter();
+    await cache.write(dir, 154, [{ key: "specify", name: "Specify", order: 1, body: "cached" }]);
+    const session = sessionWith(
+      (() => Promise.resolve(new Response("{}", { status: 503 }))) as FetchFn,
+    );
+    const { deps: d } = deps({
+      projectDir: dir,
+      cache,
+      buildSession: () => Promise.resolve(session),
+    });
+    assertEquals(
+      await runSpec({ kind: "spec", sub: "pull", task: 154, apiUrl: null }, d),
+      PULL_STALE_CACHE,
+    );
+  });
+});
+
+Deno.test("spec pull whose token refresh cannot reach Cloud is unreachable too: the stale-cache 6", async () => {
+  await withTmp(async (dir) => {
+    const cache = new SpecCacheWriter();
+    await cache.write(dir, 154, [{ key: "specify", name: "Specify", order: 1, body: "cached" }]);
+    // The refresh fails before any spec request: only the token provider runs.
+    const session = new SpecSession({
+      projectKey: "CLOUD",
+      client: {} as SpecClient,
+      cloudClient: {} as CloudClient,
+      token: () => Promise.reject(new TypeError("offline")),
+    });
+    const { deps: d } = deps({
+      projectDir: dir,
+      cache,
+      buildSession: () => Promise.resolve(session),
+    });
+    assertEquals(
+      await runSpec({ kind: "spec", sub: "pull", task: 154, apiUrl: null }, d),
+      PULL_STALE_CACHE,
+    );
   });
 });

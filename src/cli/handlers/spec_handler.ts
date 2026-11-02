@@ -128,23 +128,7 @@ async function runPull(task: number, deps: SpecDeps): Promise<number> {
   try {
     steps = await new CloudSpecStore(session).pull(task);
   } catch (e) {
-    // Offline / auth failure (FR-008): fall back to an existing cache if present,
-    // otherwise a non-zero exit with an actionable message — never a partial or
-    // silently-empty spec.
-    const cached = await deps.cache.read(deps.projectDir, task);
-    if (cached && cached.length > 0) {
-      deps.err(
-        yellow(
-          `warning: could not reach Cloud (${
-            reasonOf(e)
-          }); reusing the existing cache for task ${task}.`,
-        ),
-      );
-      deps.out(dim(`↳ ${cached.length} cached step(s) under .specnaut/specs/.cache/${task}/`));
-      return PULL_STALE_CACHE;
-    }
-    deps.err(actionable(e, `pull spec for task ${task}`));
-    return 5;
+    return await pullFailed(e, task, deps);
   }
 
   if (steps === null || steps.length === 0) {
@@ -156,6 +140,30 @@ async function runPull(task: number, deps: SpecDeps): Promise<number> {
   deps.out(green(`✓ materialised ${written.length} step(s) for task ${task}:`));
   for (const p of written) deps.out(dim(`  ↳ ${p}`));
   return 0;
+}
+
+/**
+ * A failed pull. Cloud unreachable (FR-008) — a transient reason, nothing else —
+ * falls back to an existing cache: exit 6. An answer Cloud gave (401, 403, 409,
+ * 422…) is never "unreachable", so it exits 5 with an actionable message, as does
+ * a pull with no cache — never a partial or silently-empty spec.
+ */
+async function pullFailed(e: unknown, task: number, deps: SpecDeps): Promise<number> {
+  const transient = e instanceof SpecApiError && e.reason === "transient";
+  const cached = transient ? await deps.cache.read(deps.projectDir, task) : null;
+  if (!cached || cached.length === 0) {
+    deps.err(actionable(e, `pull spec for task ${task}`));
+    return 5;
+  }
+  deps.err(
+    yellow(
+      `warning: could not reach Cloud (${
+        reasonOf(e)
+      }); reusing the existing cache for task ${task}.`,
+    ),
+  );
+  deps.out(dim(`↳ ${cached.length} cached step(s) under .specnaut/specs/.cache/${task}/`));
+  return PULL_STALE_CACHE;
 }
 
 async function runPush(task: number, deps: SpecDeps): Promise<number> {
@@ -194,6 +202,9 @@ function reasonOf(e: unknown): string {
 /** An actionable, § I-safe error message for a cloud failure. */
 function actionable(e: unknown, what: string): string {
   const reason = reasonOf(e);
+  if (reason === "forbidden") {
+    return red(`error: not allowed to ${what} — check this project's Cloud access and retry.`);
+  }
   if (reason === "unauthorized") {
     return red(`error: not authenticated to ${what} — run \`specnaut cloud login\` and retry.`);
   }

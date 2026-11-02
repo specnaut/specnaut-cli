@@ -42,9 +42,18 @@ export class SpecSession {
     return this.deps.projectKey;
   }
 
-  /** Obtain a bearer token or fail with a typed unauthorized error (→ re-login). */
+  /**
+   * Obtain a bearer token or fail with a typed unauthorized error (→ re-login).
+   * A refresh that cannot reach Cloud is transient, like any other network failure.
+   */
   private async requireToken(): Promise<string> {
-    const tok = await this.deps.token();
+    let tok: string | null;
+    try {
+      tok = await this.deps.token();
+    } catch (e) {
+      if (e instanceof TypeError) throw new SpecApiError(0, "transient");
+      throw e;
+    }
     if (!tok) throw new SpecApiError(401, "unauthorized");
     return tok;
   }

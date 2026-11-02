@@ -14,6 +14,7 @@ import type { SpecStep } from "../spec/spec_step.ts";
 /** Typed error reasons the caller branches on. Derived from HTTP status only. */
 export type SpecErrorReason =
   | "unauthorized" // 401
+  | "forbidden" // 403 — authenticated, not allowed: retrying changes nothing
   | "not_found" // 404
   | "conflict" // 409
   | "invalid" // 422 — bad payload
@@ -30,6 +31,7 @@ export class SpecApiError extends Error {
 /** Map an HTTP status to a typed reason. 5xx and 0 (network) → transient. */
 export function reasonForStatus(status: number): SpecErrorReason {
   if (status === 401) return "unauthorized";
+  if (status === 403) return "forbidden";
   if (status === 404) return "not_found";
   if (status === 409) return "conflict";
   if (status === 422) return "invalid";
