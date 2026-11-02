@@ -23,8 +23,10 @@ recovers it, but only for a user who knows to type it.
   lacks; `review` and `merge` follow.
 - **P1, built but not landed.** Same, with the plan's checks already met: the chain still continues.
   `implement` builds nothing and chains to `review`, then `merge`.
-- **P1, landed.** The item's work has landed (or the item is closed): `/task plan <id>` runs
-  one-shot and chains nothing.
+- **P1, the issue's reproducer.** An earlier slice of the item landed, the item is still open, and
+  new approved work was added: `wip-audit.sh` reads `LANDED`, and `/task plan <id>` plans the next
+  slice on a new branch and chains.
+- **P1, closed.** The item is closed: `/task plan <id>` runs one-shot and chains nothing.
 - **P2, a branch that is not the user's.** The item's branch exists only on `origin`, is a fetched
   pull request, is behind its `origin` twin, or the tree is dirty: `plan` stops and names the check
   that failed, as `/task resume` does. It never plans on top of someone else's work.
@@ -45,8 +47,9 @@ recovers it, but only for a user who knows to type it.
   being the item's creation time from the backend's `view.sh`, plus the item's open/closed state. No
   id → no classification: a new plan, as today.
 - **FR-002** `phases/auto-chain.md`'s `plan` row is keyed on that classification, and nothing else:
-  `IDLE` or `ACTIVE` chains; `LANDED`, closed, `UNPUSHED` or a non-zero exit runs one-shot (for
-  `UNPUSHED`, report the range and stop). It replaces "nothing is committed past `plan.md`".
+  `IDLE`, `ACTIVE` or `LANDED` chains while the item is open (a landed slice of an open item is the
+  issue's reproducer: more approved work remains); closed or a non-zero exit runs one-shot;
+  `UNPUSHED` reports the range and stops. It replaces "nothing is committed past `plan.md`".
 - **FR-003** Before step 2, on the local backend:
   - `IDLE` and the working tree's `.specnaut/feature.json` links the item → re-enter that plan in
     place, as `resume.md` § 2's linked-plan row does (its uncommitted-paths exception included);
@@ -88,7 +91,8 @@ recovers it, but only for a user who knows to type it.
 - **SC-001** On an item with approved, unbuilt work on its own branch, a direct `/task plan <id>`
   reaches `implement` in the same turn with no question asked, on that branch, with one feature
   directory.
-- **SC-002** On a landed or closed item, a direct `/task plan <id>` chains nothing.
+- **SC-002** On a closed item, a direct `/task plan <id>` chains nothing; on an open item whose
+  earlier slice landed, it chains.
 - **SC-003** Claude Code and Codex installs, local and cloud backends, ship the same rule.
 
 ## 5. 🔒 The decision table
@@ -196,6 +200,35 @@ Architecture, second pass: **fail**, 3 HIGH, 2 LOW, all taken.
 - LOW — check 5 against an unset `user.email` → compare to `git var GIT_COMMITTER_IDENT`; FR-005b
   applies to direct invocations only.
 - LOW — `wip-audit.sh` exit 3 → named in § 9.
+
+Review, test seat: **fail**, 1 HIGH — no fixture for the issue's reproducer, and that reproducer (an
+earlier slice landed, the item still open) reads `LANDED`, which the row ran one-shot → FR-002:
+`LANDED` chains while the item is open; fixtures for the reproducer and for built-but-unmerged work.
+
+Review, code seat: **fail**, 2 HIGH, 4 MEDIUM, 3 LOW.
+
+- HIGH — the gate's clean-tree check ran after a step 8 that staged only the spec directory, so
+  `feature.json` stayed dirty and every local plan would run alone → step 8 stages
+  `.specnaut/feature.json` too.
+- HIGH — the cloud `ACTIVE` exception lived in `plan.md`, outside the row that decides → moved into
+  the `plan <id>` row ("on the local backend, `ACTIVE`").
+- MEDIUM — `UNPUSHED` fell through to step 2 → the Re-entry paragraph stops there, before step 2.
+- MEDIUM — the linked-plan row spelled the adopted-plan rule a second time → it points at
+  `plan.md`'s Re-entry, which says the plan is entered at step 7 unless this turn amends it.
+- MEDIUM — check 8's parent epic was not gathered evidence → § 1 item 2 reads the parent.
+- MEDIUM — `resume.md` § 4 keeps its rule: it is what resume reports in its brief, where
+  `implement.md`'s is how completion is judged; both cite each other. Declined.
+- LOW — the intro and the gate's timing → reworded. LOW — the local bullets ship to cloud → wrapped
+  in a `spec-backend=local` block. LOW — renumbering check 8 to 6 → declined: it would renumber
+  every reference to checks 6 and 7 for no change in meaning.
+
+Review, security seat: nothing at CRITICAL/HIGH; 1 MEDIUM, 1 LOW, both taken.
+
+- MEDIUM — a rebased or cherry-picked foreign commit keeps its author but gets the user as
+  committer, passing a `%ce`-only check 5 → check 5 reads `%ae` and `%ce` against both `git var`
+  identities; a rebase fixture proves it.
+- LOW — the gate skipped check 2, which vets the branch name before any command uses it → checks 2
+  to 6.
 
 ## 12. Open questions
 
