@@ -1,15 +1,16 @@
 import { assert, assertEquals } from "@std/assert";
 import { CORE_BUNDLE } from "../../src/templates_bundle.ts";
 import { HARNESSES } from "../../src/cli/harnesses.ts";
-import { KNOWN_BACKLOG_BACKENDS } from "../../src/domain/installed_lock.ts";
 import type { BacklogBackend } from "../../src/domain/installed_lock.ts";
+import { everyBundleOption } from "../../src/application/bundle_options.ts";
 import type { Bundle } from "../../src/domain/template.ts";
 
 /**
  * cli#723 — a Codex child outlives its work and holds its worktree. What a run
  * may close or archive has one home, `.specnaut/codex/session-lifecycle.md`,
  * which only Codex receives. These read what each harness's project RECEIVES,
- * for every harness and backend, never the template source alone.
+ * for every harness and every install option set (cli#724), never the
+ * template source alone.
  */
 
 const DOC = ".specnaut/codex/session-lifecycle.md";
@@ -25,12 +26,13 @@ function bundleFor(harnessKey: string, backend: BacklogBackend): Bundle {
   });
 }
 
-function everyBundle(): Array<{ harness: string; backend: BacklogBackend; bundle: Bundle }> {
-  return HARNESSES.flatMap(({ key }) =>
-    KNOWN_BACKLOG_BACKENDS.map((backend) => ({
-      harness: key,
-      backend,
-      bundle: bundleFor(key, backend),
+/** Every harness × every install option set — not the backlog backend alone (cli#724). */
+function everyBundle(): Array<{ harness: string; backend: string; bundle: Bundle }> {
+  return HARNESSES.flatMap((h) =>
+    everyBundleOption().map((opts) => ({
+      harness: h.key,
+      backend: JSON.stringify(opts),
+      bundle: h.mapBundle(CORE_BUNDLE, opts),
     }))
   );
 }
@@ -44,10 +46,10 @@ function codexDoc(): string {
 /** Terms only the lifecycle may use: each is one of its rules. */
 const LIFECYCLE_TERMS = ["close_agent", "session-lifecycle", "specnaut-kept/"];
 
-Deno.test("cli#723: only Codex receives the session lifecycle, on every backend", () => {
+Deno.test("cli#723: only Codex receives the session lifecycle, under every option set", () => {
   const got = everyBundle().filter((b) => b.bundle[DOC] !== undefined)
     .map((b) => `${b.harness}×${b.backend}`);
-  const want = KNOWN_BACKLOG_BACKENDS.map((b) => `codex×${b}`);
+  const want = everyBundleOption().map((o) => `codex×${JSON.stringify(o)}`);
   assertEquals(got.sort(), want.sort());
 });
 
