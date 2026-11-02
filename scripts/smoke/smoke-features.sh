@@ -241,6 +241,9 @@ echo "═══ #75  loop.md + groom phase ═══"
 check ".claude/loop.md scaffolded" '[ -f .claude/loop.md ]'
 check "groom ships beside the /task router, not as a phase" \
   '[ -f .claude/skills/task/groom.md ] && [ ! -e .claude/skills/task/phases/groom.md ]'
+check "/task resume ships beside the router, which routes it (cli#727)" \
+  '[ -f .claude/skills/task/resume.md ] &&
+   grep -qF "| \`resume <id>\` _(or \`continue <id>\`)_ | \`resume.md\` |" .claude/skills/task/SKILL.md'
 check "groom's WIP audit ships its script and calls it (cli#673)" \
   '[ -x .specnaut/scripts/bash/wip-audit.sh ] &&
    grep -qF "bash .specnaut/scripts/bash/wip-audit.sh" .claude/skills/task/groom.md'

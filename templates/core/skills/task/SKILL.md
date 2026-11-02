@@ -1,12 +1,13 @@
 ---
 name: task
 description: Carry one unit of work from the backlog to a merged branch — list, add, edit, close and groom items, then plan, implement, review and merge them, and audit the code. `/task <verb> [args]`; `/task` alone prints the overview.
-argument-hint: "<list|next|add|edit|close|groom|plan|implement|review|merge|audit|constitution> [args]"
+argument-hint: "<list|next|add|edit|close|groom|resume|plan|implement|review|merge|audit|constitution> [args]"
 when_to_use: |
   Trigger phrases that should route here:
   - backlog: "add to backlog", "what's next?", "move task X", "close task X", "groom the backlog"
   - plan: "plan a feature", "spec out a feature", "I have a rough idea", "clarify requirements"
   - implement / review / merge: "implement the feature", "review the implementation", "merge the branch"
+  - resume: "resume task X", "continue where we stopped", "pick up the interrupted chain"
   - audit: "audit the codebase", "security audit", "check for vulnerabilities", "audit the architecture"
   - constitution: "update the constitution", "edit project rules"
 ---
@@ -42,6 +43,7 @@ Read `docs/constitution.md` before anything else: it is this project's binding r
 | `brief <id>` | `backlog.md` | Product-owner business brief |
 | `<id>` | `backlog.md` | Show that item |
 | `groom` | `groom.md` | Full grooming pass |
+| `resume <id>` _(or `continue <id>`)_ | `resume.md` | Rebuild where a stopped chain stood, from git, and re-enter it |
 | `plan [<id>] [--full] [brief]` | `phases/plan.md` | The feature's brief — or the full plan — its architecture and security audit, then the stop. |
 | `implement` | `phases/implement.md` | Build it, ordering the work itself. Ends by invoking `review`. |
 | `review` | `phases/review.md` | The quality battery on a frozen tree. Its verdict is the merge request. |

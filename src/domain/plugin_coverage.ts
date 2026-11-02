@@ -187,6 +187,7 @@ export const PLUGIN_COVERED_PATHS_CLAUDE: ReadonlyArray<string> = [
   ".claude/skills/task/backlog.md",
   ".claude/skills/task/groom.md",
   ".claude/skills/task/groom-report.md",
+  ".claude/skills/task/resume.md",
   ".claude/skills/task/spec-autogen.md",
   ...[
     "plan",

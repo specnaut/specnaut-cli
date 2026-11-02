@@ -15,7 +15,7 @@ backend is fixed at init time and recorded in `.specnaut/installed.lock`; run
 | `estimate <id>` | Estimate complexity |
 | `status` | Dashboard summary |
 | `brief <id>` | Product-owner business brief |
-| `<number>` | Show that item |
+| `<number>` | Show that item; when it is in progress, point to `/task resume <number>` |
 
 Every write — `add`, `edit`, `close`, `estimate` — is dispatched to the `product-owner` agent. After
 one, commit the backlog changes — `chore(backlog): add task NNN — <short title>`, or

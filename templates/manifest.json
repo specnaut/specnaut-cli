@@ -123,6 +123,12 @@
     {
       "category": "backlog-doc",
       "name": "task",
+      "suffix": "resume.md",
+      "source": "core/skills/task/resume.md"
+    },
+    {
+      "category": "backlog-doc",
+      "name": "task",
       "suffix": "spec-autogen.md",
       "source": "core/skills/task/spec-autogen.md"
     },

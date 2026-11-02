@@ -146,6 +146,7 @@ const SYNC_PAIRS: ReadonlyArray<{ plugin: string; source: string }> = [
     "backlog.md",
     "groom.md",
     "groom-report.md",
+    "resume.md",
     "spec-autogen.md",
   ].map((name) => ({
     plugin: `plugin/skills/task/${name}`,
