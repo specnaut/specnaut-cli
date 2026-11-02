@@ -1,5 +1,11 @@
 # Upgrading Specnaut
 
+## 7.3.0 → 7.3.1
+
+Run `specnaut upgrade`. On Codex, then trust the hooks again with `/hooks`: their folder changed, so
+Codex runs none of them (the merge hold, the release guard, the constitution protection) until you
+do. Nothing else needs a hand.
+
 ## 7.2.x → 7.3.0
 
 Run `specnaut upgrade`. On Codex, you then trust the hooks again. If upgrade refuses to move your
