@@ -33,7 +33,7 @@ Read `docs/constitution.md` before anything else: it is this project's binding r
 | Verb | Reference | One-liner |
 | :--- | :--- | :--- |
 | `list` _(or empty)_ | `backlog.md` | Backlog overview |
-| `next` | `backlog.md` | Recommend the top 3 items, with workflow advice |
+| `next` | `backlog.md` | Count work in progress, then recommend the top 3 items, with workflow advice |
 | `add <title>` | `backlog.md` | Create an item |
 | `edit <id>` | `backlog.md` | Change an item's title, body, status or fields |
 | `close <id> [--not-planned]` | `backlog.md` | Close an item — completed, or not planned |

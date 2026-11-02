@@ -42,7 +42,7 @@ that runs only on `pull_request`. **Do not infer `--pr` from a remote, a forge o
      fold. Do not merge past a failed fold.
 2. **`--pr` only** — push the branch, open the pull request against the base, name any issue its
    body references that `gh pr view <n> --json closingIssuesReferences` omits, report the PR URL,
-   run step 6, and **stop**: nothing has merged, so the backlog item does not move. Re-run
+   run step 5 and step 6, and **stop**: nothing has merged, so the item stays open. Re-run
    `/task merge` after the PR lands, or let the forge's close keyword handle it. Never use the forge's "Squash and
    merge": it collapses the scopes the squash produced.
 3. **Land it:**
@@ -70,15 +70,22 @@ that runs only on `pull_request`. **Do not infer `--pr` from a remote, a forge o
    | 4 | the tree is dirty | commit, or stop whoever holds it |
    | 5 | behind `origin/<base>` | `git rebase refs/remotes/origin/<base>`. Applies cleanly → re-run the gates — on the epic path, re-run `epic-status.sh` too and replace the kept `CHILD`/`EPIC` lines, whose shas the rebase changed — and land again. A conflict → `git rebase --abort`, and the branch goes back to `review` — a resolution is a change nobody reviewed |
    | 6 | the local base holds commits origin lacks (printed: `origin/<base>..<base>`) | **stop on that fact**, quoting the range: they are someone's work. Nothing was rebased or pushed, and the phase does not rebase |
-   | 7 | the push was rejected | quote the remote's message — never `--force`. A rule refused it (protected base, hook): stop and say so. Origin moved: `git checkout <branch>`, `git branch -f <base> refs/remotes/origin/<base>` (the local base holds only this branch's fast-forward), land again — exit 5 follows and its row applies. The close does not run until a landing pushes |
+   | 7 | the push was rejected | quote the remote's message — never `--force`. A rule refused it (protected base, hook): run step 5, then stop and say so. Origin moved: `git checkout <branch>`, `git branch -f <base> refs/remotes/origin/<base>` (the local base holds only this branch's fast-forward), land again — exit 5 follows and its row applies. The close does not run until a landing pushes |
    | 9 | `HEAD` is not the base | the landing stands — it was pushed. Say so, `git checkout <base>`, then step 5 runs: the person who asked must be back where they work |
    | 10 | nothing to land | the branch has no commit origin lacks: say so — nothing merged, nothing to close |
    | 11 | landed and pushed; the branch would not delete with `-d` | the landing stands: step 5 runs. Report the branch that stayed |
    | 12 | an unexpected git failure before the push | quote it and stop: nothing was pushed |
    | 13 | held by `merge: manual`: nothing ran | quote its line; it names the remedy — reply `merge`, trust the hooks, install `jq`, or run `specnaut upgrade`. Stop on the branch; never route around it |
 
-5. **Close what shipped, and reconcile** — only after a push, and not under `--no-close`: load
-   `phases/merge-close.md`.
+5. **Settle the card** — the one place this phase decides where the linked item's card goes. The
+   item is `.specnaut/feature.json`'s `linked_issue`, a positive whole number; none, or anything
+   else, means nothing to settle. The first row that matches decides:
+
+   | How the phase ends | The card |
+   | :--- | :--- |
+   | `--pr`, whatever `--no-close` says, or not pushed (step 4 exit 7, refused by a rule) | `bash .specnaut/scripts/backlog/move.sh "<linked_issue>" "<review column>"`, the backend's own name for it from its `move.sh` usage. A failed move is reported; it never fails the merge |
+   | pushed under `--no-close` | leave it in `In progress`: the delivery continues on another branch |
+   | pushed, not under `--no-close` | load `phases/merge-close.md`: it closes what shipped and reconciles |
 6. **Close what this run spawned** — on every exit from this phase, a stop in step 1, 2 or 4
    included, whatever step 5 did: if `AGENTS.md` names a delegated-session lifecycle for your
    harness, run its session sweep now, telling it whether the branch landed (step 4 exit 0, 9 or 11
@@ -100,4 +107,4 @@ Files and commits merged (from `LANDED`), whether the push ran or the remote's m
 `close-shipped.sh`'s summary line verbatim, and the spec removal or its reason — then step 6's lines, when it
 ran. Every backlog item is named
 per the `backlog-reference-contract` skill. On `--pr` the report is shorter and says plainly: the
-branch pushed, the PR URL, and **nothing has merged and the backlog item has not moved**.
+branch pushed, the PR URL, step 5's move, and **nothing has merged and the item is still open**.

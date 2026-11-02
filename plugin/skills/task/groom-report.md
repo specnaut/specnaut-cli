@@ -95,6 +95,14 @@ Per-ticket:
    detect-fields.sh is empty — the board has no such field, so nothing is
    missing — and when the fields exist but no dates are missing)
 
+WIP:        <wip-audit.sh's summary line, verbatim — or "not classified: <its stderr>">
+  ↳ <backlog-reference> → moved to <review|ready> | commented (idle|blocked)
+       | left (active|epic|blocked|idle, ready column|PROMOTE=no|epic gate failed)
+       | move failed: <move.sh's error, verbatim>
+       <the line it acted on, e.g. LANDED 12 <sha>>
+  ↳ ...
+  (every audited item gets a line; DEFERRED items are counted, not listed)
+
 Stale PRs:  <S> open PRs idle > 48h
 Orphan specs: <O> spec directories missing the next artefact
 

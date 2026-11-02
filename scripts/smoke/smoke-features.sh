@@ -241,6 +241,9 @@ echo "═══ #75  loop.md + groom phase ═══"
 check ".claude/loop.md scaffolded" '[ -f .claude/loop.md ]'
 check "groom ships beside the /task router, not as a phase" \
   '[ -f .claude/skills/task/groom.md ] && [ ! -e .claude/skills/task/phases/groom.md ]'
+check "groom's WIP audit ships its script and calls it (cli#673)" \
+  '[ -x .specnaut/scripts/bash/wip-audit.sh ] &&
+   grep -qF "bash .specnaut/scripts/bash/wip-audit.sh" .claude/skills/task/groom.md'
 
 echo
 echo "═══ #78 + #92  dispatch-agent.sh + depth-aware splitter ═══"

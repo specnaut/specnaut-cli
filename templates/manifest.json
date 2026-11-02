@@ -1780,6 +1780,13 @@
     {
       "category": "spec-root",
       "name": "specify",
+      "suffix": "scripts/bash/wip-audit.sh",
+      "source": "core/specnaut/scripts/bash/wip-audit.sh",
+      "executable": true
+    },
+    {
+      "category": "spec-root",
+      "name": "specify",
       "suffix": "scripts/bash/fold-fixups.sh",
       "source": "core/specnaut/scripts/bash/fold-fixups.sh",
       "executable": true

@@ -230,7 +230,7 @@ check "a phase that cites another phase's step names the step that does it (spec
    oref=$(grep -oE "merge-close\.md\` step [0-9]+" "$P/orphan-specs.md" | grep -oE "[0-9]+$" || true);
    mref=$(grep -oE "merge\.md\` at its step [0-9]+" "$P/merge-close.md" | grep -oE "[0-9]+$" || true);
    { [ -z "$oref" ] || grep -qE "^$oref\. \*\*Remove the spec directory" "$P/merge-close.md"; } &&
-   { [ -z "$mref" ] || grep -qE "^$mref\. \*\*Close what shipped" "$P/merge.md"; }'
+   { [ -z "$mref" ] || grep -qE "^$mref\. \*\*Settle the card" "$P/merge.md"; }'
 
 # #557 — merge.md routes by history rule, and the epic path does not squash.
 # Each of these is a sentence a later edit would plausibly "simplify" away.

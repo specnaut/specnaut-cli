@@ -98,13 +98,16 @@ Deno.test("cli#723: in Codex's project, the lifecycle's terms live only in its o
 Deno.test("cli#723: merge sweeps after step 5 whatever it did, and on --pr, in neutral words", () => {
   for (const { harness, bundle } of everyBundle()) {
     // Destinations differ per harness; the merge phase is the file with its step 5.
-    const merge = Object.values(bundle).find((f) => f.content?.includes("5. **Close what shipped"))
+    const merge = Object.values(bundle).find((f) => f.content?.includes("5. **Settle the card**"))
       ?.content;
     assert(merge !== undefined, `${harness}: no merge.md`);
     const step6 = merge.indexOf("6. **Close what this run spawned**");
-    assert(step6 > merge.indexOf("5. **Close what shipped"), `${harness}: no step 6 after step 5`);
+    assert(step6 > merge.indexOf("5. **Settle the card**"), `${harness}: no step 6 after step 5`);
     assert(merge.includes("whatever step 5 did"), `${harness}: step 6 depends on step 5`);
-    assert(merge.includes("run step 6, and **stop**"), `${harness}: --pr stops before step 6`);
+    assert(
+      merge.includes("run step 5 and step 6, and **stop**"),
+      `${harness}: --pr stops before step 6`,
+    );
     assert(merge.includes("on every exit from this phase"), `${harness}: a stop skips step 6`);
     assert(merge.includes("(step 4 exit 0, 9 or 11"), `${harness}: "landed" is not pinned`);
     assert(merge.includes("Quote its lines verbatim"), `${harness}: step 6 lines not quoted`);

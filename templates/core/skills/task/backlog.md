@@ -8,7 +8,7 @@ backend is fixed at init time and recorded in `.specnaut/installed.lock`; run
 | Input | Action |
 | --- | --- |
 | _(empty)_ or `list` | Backlog overview |
-| `next` | Recommend the top 3 items, with workflow advice |
+| `next` | Count work in progress, then recommend the top 3 items, with workflow advice |
 | `add <title>` | Create an item |
 | `edit <id>` | Update an existing item — title, body, status, fields |
 | `close <id> [--not-planned]` | Close the item: completed by default, not planned with the flag. Reopening undoes it; nothing is deleted. |
@@ -230,7 +230,7 @@ destination against `columns.sh` (case-insensitive) and runs the mapped hook:
 | **Backlog / Ready** (incl. `CREATED`) | **Classify** — ensure priority/size/type per the mandatory classification contract; skip if already set. |
 | **In Review** | *(opt-in, off by default)* post a review-readiness checklist comment. |
 | **Done** | *(opt-in, off by default)* post a closing-summary comment; run the board-hygiene check. |
-| **In Progress** / any unmapped column | **No-op** — never invent behaviour for an unmapped stage. |
+| **In Progress** / any unmapped column | **No-op** — never invent behaviour for an unmapped stage. A card that stays in In Progress is audited by `/task groom` ("WIP audit — Ready and In progress"), not by this hook. |
 
 Rules: **idempotent** (delivery is at-least-once — read `view.sh` before
 writing, never double-post or re-classify); **comments are opt-in** (if the

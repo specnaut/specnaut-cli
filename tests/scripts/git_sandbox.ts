@@ -19,6 +19,7 @@ export const SCRIPTS = [
   "merge-hold.sh",
   "merge-mode.sh",
   "remove-spec.sh",
+  "wip-audit.sh",
 ];
 
 export interface Run {

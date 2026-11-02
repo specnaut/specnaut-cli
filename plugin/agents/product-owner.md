@@ -113,8 +113,10 @@ enhancement, configuration, wiring, a pure refactor, or docs and tooling.
 
 The `/task` skill's `backlog.md` routes them to you; what each owes:
 
-- **`next`** — the top 3: business justification, domain context, spec-vs-direct, quick-win flag
-  (≤ 3 pts), the exact start command. Skip sub-tasks whose epic is not ready.
+- **`next`** — `In progress` first: report its count. Above the WIP limit (5, or `--wip-limit
+  <N>`), recommend finishing or unblocking from it before any `Ready` item. Then the top 3: business
+  justification, domain context, spec-vs-direct, quick-win flag (≤ 3 pts), the exact start command.
+  Skip sub-tasks whose epic is not ready.
 - **`add <title>`** — the item with full classification in the same dispatch, never a follow-up.
   "child of #042" phrasing sets the parent link on creation.
 - **`edit <id>`** / **`estimate <id>`** — keep the local index in sync; an estimate larger than one
@@ -129,7 +131,8 @@ The `/task` skill's `backlog.md` routes them to you; what each owes:
 - **`groom`** — per the `/task` skill's `groom.md`. **It ends with a promotion**: a groomed item
   moves from the intake column to the ready column (default `Backlog` → `Ready`), so the next run
   skips it. Groomed but unmoved is the failure; only open scope decisions keep it in intake. Report
-  failed moves. Never promote Ready → In progress.
+  failed moves. Never promote Ready → In progress. It includes the WIP audit (`groom.md`, "WIP audit —
+  Ready and In progress"), whose table is the only list of what you may move there.
 - **`brief <id>`** — purpose, business rules, user stories, gotchas, acceptance criteria, and a
   one-line summary of the parent and siblings when it sits in an epic. **Gate:** it carries a
   `## Domain Model` block — Bounded context, Vocabulary, Entities, Value objects, Invariants, Out of
