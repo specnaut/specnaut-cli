@@ -1,5 +1,30 @@
 # Upgrading Specnaut
 
+## 7.4.0 → 8.0.0
+
+Run `specnaut upgrade`. Two Cloud inputs that used to work are now refused; if neither applies to
+you, nothing else needs a hand.
+
+### A headless token needs its deployment named
+
+`SPECNAUT_CLOUD_TOKEN` now goes only to Specnaut Cloud itself or to the deployment named by
+`SPECNAUT_CLOUD_API_URL`. If your CI or VM uses another deployment, set both variables. When the
+token is refused, Specnaut warns on stderr and uses your own login for that deployment, if you have
+one; otherwise the command fails as not authenticated.
+
+### `api_url` must be the final address
+
+No Cloud request follows a redirect any more. If your `api_url` or `--api-url` redirects, replace it
+with the address it lands on. An `api_url` that is not a plain http(s) URL is reported as such, with
+exit 1, instead of "not Cloud-linked".
+
+### Also different
+
+- The Cloud backlog scripts no longer read `~/.curlrc`: a `proxy` or `cacert` set there stops
+  applying to them. The environment's proxy variables still do.
+- Run `specnaut upgrade` in every project on the Cloud backend: the fixes in those scripts reach a
+  project only through it.
+
 ## 7.3.1 → 7.4.0
 
 Run `specnaut upgrade`. Codex projects gain `.specnaut/codex/session-lifecycle.md` and a pointer to
