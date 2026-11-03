@@ -21,7 +21,9 @@
 #
 # Usage: epic-branch.sh <epic>
 set -uo pipefail
-export GIT_OPTIONAL_LOCKS=0
+# Git Bash rewrites a `<ref>:<path>` argument as a Windows path list before git
+# sees it, so `git show` read nothing and every branch looked unlinked.
+export GIT_OPTIONAL_LOCKS=0 MSYS_NO_PATHCONV=1 MSYS2_ARG_CONV_EXCL="*"
 
 SCRIPT_DIR="$(CDPATH="" cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=SCRIPTDIR/common.sh
