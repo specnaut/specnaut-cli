@@ -32,7 +32,7 @@ Deno.test("epic-branch.sh: several branches linking the epic exit 4, listed", as
     assertEquals(code, 4, out);
     assertStringIncludes(
       out,
-      `several branches link epic #${EPIC} — not picking one: 005-epic 006-epic-again`,
+      `several branches link epic #${EPIC} - not picking one: 005-epic 006-epic-again`,
     );
   });
 });
@@ -43,7 +43,7 @@ Deno.test("epic-branch.sh: a branch dropped by the name filter is said, not skip
   }, async (r) => {
     const { code, out } = await lookup(r);
     assertEquals(code, 0, out);
-    assertStringIncludes(out, "branch '-evil' has a name git could read as an option — skipped");
+    assertStringIncludes(out, "branch '-evil' has a name git could read as an option - skipped");
   });
 });
 
@@ -70,6 +70,12 @@ Deno.test({
   },
 });
 
+/** The fixture's premise: the local base really is behind origin's. */
+async function assertStaleMain(r: Repo) {
+  const behind = await r.git("rev-list", "--count", "main..origin/main");
+  assert(Number(behind) > 0, "local main is not behind origin/main");
+}
+
 for (const runner of RUNNERS) {
   Deno.test(`epic branch scan [${runner.name}]: a branch landed on origin but not on a stale local base is still skipped`, async () => {
     await withRepo(async (r) => {
@@ -82,6 +88,7 @@ for (const runner of RUNNERS) {
       // Landed from elsewhere: origin/main has it, the local main does not.
       await r.git("push", "-q", "origin", "004-old-epic:main");
       await r.git("fetch", "-q", "origin");
+      await assertStaleMain(r);
     }, async (r) => {
       const { code, out } = await r.run(runner);
       assertEquals(code, 0, out);
@@ -103,6 +110,7 @@ for (const runner of RUNNERS) {
       await r.git("fetch", "-q", "origin");
       await r.git("branch", "-q", "-D", "landed");
       await r.git("checkout", "-q", "-b", "005-epic", "origin/main");
+      await assertStaleMain(r);
     }, async (r) => {
       const { code, out } = await r.run(runner);
       assertEquals(code, 0, out);
@@ -127,22 +135,25 @@ for (const runner of RUNNERS) {
     });
   });
 
-  Deno.test({
-    name:
-      `epic branch scan [${runner.name}]: an epic branch over 244 bytes is refused, never truncated into a dash name`,
-    // 250-byte ref files exceed MAX_PATH on a Windows runner.
-    ignore: Deno.build.os === "windows",
-    fn: async () => {
-      const long = `005-${"a".repeat(246)}`;
-      await withRepo(async (r) => {
-        await branchWith(r, long, LINK);
-      }, async (r) => {
-        const { code, out } = await r.run(runner);
-        assertEquals(code, 1, out);
-        assertStringIncludes(out, "over GitHub's 244-byte limit");
-        assertEquals(await r.head(), "main");
-        assertEquals(await r.git("for-each-ref", "--format=%(refname:short)", "refs/heads/-*"), "");
-      });
-    },
+  Deno.test(`epic branch scan [${runner.name}]: an epic branch over 244 bytes is refused, never truncated into a dash name`, async () => {
+    const long = `005-${"a".repeat(246)}`;
+    await withRepo(async (r) => {
+      await branchWith(r, "short", LINK);
+      // Packed, so it needs no ref file: a 250-byte one exceeds MAX_PATH on Windows.
+      const sha = await r.git("rev-parse", "short");
+      await r.git("branch", "-q", "-D", "short");
+      await Deno.writeTextFile(join(r.dir, ".git", "packed-refs"), `${sha} refs/heads/${long}\n`);
+      await r.git("config", "core.longpaths", "true");
+      assertEquals(
+        await r.git("for-each-ref", "--format=%(refname:short)", "refs/heads/005-*"),
+        long,
+      );
+    }, async (r) => {
+      const { code, out } = await r.run(runner);
+      assertEquals(code, 1, out);
+      assertStringIncludes(out, "over GitHub's 244-byte limit");
+      assertEquals(await r.head(), "main");
+      assertEquals(await r.git("for-each-ref", "--format=%(refname:short)", "refs/heads/-*"), "");
+    });
   });
 }

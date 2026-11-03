@@ -222,3 +222,13 @@ Deno.test("a network failure surfaces as a transient GateApiError (status 0)", a
   assertEquals(err.reason, "transient");
   assertEquals(err.status, 0);
 });
+
+Deno.test("a connection dropped mid-body is transient, like a failed fetch", async () => {
+  const dropped = new ReadableStream({ start: (c) => c.error(new TypeError("connection reset")) });
+  const fetchFn = (() => Promise.resolve(new Response(dropped, { status: 200 }))) as FetchFn;
+  const e = await assertRejects(
+    () => new GateClient(API, fetchFn).get("t", "CLOUD", "g"),
+    GateApiError,
+  );
+  assertEquals([e.status, e.reason], [0, "transient"]);
+});

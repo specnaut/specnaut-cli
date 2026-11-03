@@ -31,8 +31,8 @@ whether the chain goes on; where its row stops (`UNPUSHED`), stop here, before s
 - `LANDED`, the item open: its next slice. Step 2 runs as for any new feature.
 <!-- END: spec-backend=local -->
 <!-- BEGIN: spec-backend=cloud -->
-An epic is one plan: for a child, `<task>` below is its parent epic. The epic's class picks the
-branch; whether the chain runs at all is still the child's own open state (`phases/auto-chain.md`).
+An epic is one plan: for a child, `<task>` below is its parent epic, and the epic's class picks the
+branch. Only one thing is the child's own: open chains, closed runs alone (`phases/auto-chain.md`).
 Read the epic's creation time from its own `view.sh` and run `wip-audit.sh <task>@<epoch>`; its
 `UNPUSHED` is a stop as above. So an `IDLE` child of an `ACTIVE` epic continues on the epic's
 branch. Run `specnaut spec pull <task>` first. A plan exists when it materialises

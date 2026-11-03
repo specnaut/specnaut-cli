@@ -200,3 +200,52 @@ Deno.test("refresh: a 5xx or an unreachable Cloud throws an unavailable CloudApi
   const bug = (() => Promise.reject(new RangeError("bug"))) as typeof fetch;
   await assertRejects(() => new CloudClient(API, bug).refresh("RT"), RangeError);
 });
+
+// cli#735 — an approving answer must carry a real pair, and cannot grant a token forever.
+Deno.test('pollToken: approved without a real token pair is invalid, never the string "undefined"', async () => {
+  for (
+    const json of [{ status: "approved" }, {
+      status: "approved",
+      access_token: "",
+      refresh_token: "r",
+    }]
+  ) {
+    assertEquals(await new CloudClient(API, fakeFetch(200, json).fn).pollToken("d"), {
+      status: "invalid",
+    });
+  }
+});
+
+Deno.test("refresh and pollToken cap expires_in", async () => {
+  const pair = { access_token: "a", refresh_token: "r", expires_in: 1e15 };
+  const ok = await new CloudClient(API, fakeFetch(200, { status: "ok", ...pair }).fn).refresh("RT");
+  assertEquals(ok.status === "ok" && ok.expiresInS, 31_536_000);
+  const approved = await new CloudClient(API, fakeFetch(200, { status: "approved", ...pair }).fn)
+    .pollToken("d");
+  assertEquals(approved.status === "approved" && approved.expiresInS, 31_536_000);
+});
+
+Deno.test("the auth POSTs refuse a redirect: it would re-send the refresh token elsewhere", async () => {
+  const seen: (string | undefined)[] = [];
+  const fn = ((_: string, init?: RequestInit) => {
+    seen.push(init?.redirect);
+    return Promise.resolve(new Response(JSON.stringify({ status: "invalid" }), { status: 200 }));
+  }) as typeof fetch;
+  const client = new CloudClient(API, fn);
+  await client.refresh("RT");
+  await client.pollToken("d");
+  assertEquals(seen, ["error", "error"]);
+});
+
+Deno.test("pollToken: a status that is not a string approves nothing, however it stringifies", async () => {
+  const body = { status: ["approved"], access_token: "a", refresh_token: "r" };
+  assertEquals(await new CloudClient(API, fakeFetch(200, body).fn).pollToken("d"), {
+    status: "invalid",
+  });
+});
+
+Deno.test("a connection dropped mid-body rejects: an outage is not an empty listing", async () => {
+  const dropped = new ReadableStream({ start: (c) => c.error(new TypeError("connection reset")) });
+  const fn = (() => Promise.resolve(new Response(dropped, { status: 200 }))) as typeof fetch;
+  await assertRejects(() => new CloudClient(API, fn).listProjects("t"), TypeError);
+});

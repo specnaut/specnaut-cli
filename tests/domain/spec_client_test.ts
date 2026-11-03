@@ -70,7 +70,7 @@ Deno.test("a success body that is not JSON is an unexpected answer, not silently
   assertEquals([e.status, e.reason], [200, "unexpected"]);
 });
 
-Deno.test("a success body that is JSON but no object is an unexpected answer", async () => {
+Deno.test("a success body that is JSON but no object, an array `[]` included, is an unexpected answer", async () => {
   for (const body of ["42", '"x"', "null", "[]"]) {
     const fetchFn = (() => Promise.resolve(new Response(body, { status: 200 }))) as FetchFn;
     const e = await assertRejects(
@@ -79,6 +79,16 @@ Deno.test("a success body that is JSON but no object is an unexpected answer", a
     );
     assertEquals([e.status, e.reason], [200, "unexpected"], body);
   }
+});
+
+Deno.test("a connection dropped mid-body is transient, not a raw TypeError", async () => {
+  const dropped = new ReadableStream({ start: (c) => c.error(new TypeError("connection reset")) });
+  const fetchFn = (() => Promise.resolve(new Response(dropped, { status: 200 }))) as FetchFn;
+  const e = await assertRejects(
+    () => new SpecClient(API, fetchFn).get("t", "CLOUD", 1),
+    SpecApiError,
+  );
+  assertEquals([e.status, e.reason], [0, "transient"]);
 });
 
 Deno.test("an empty success body is still a success (putSteps needs none)", async () => {

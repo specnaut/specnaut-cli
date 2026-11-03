@@ -23,14 +23,17 @@ const PROBE = [
 ].join("\n");
 
 /** Source the installed `_config.sh` in a project holding `config`; `specnaut` is stubbed. */
-async function source(config: string): Promise<{ code: number; out: string; calls: string }> {
+async function source(
+  config: string,
+  probe = PROBE,
+): Promise<{ code: number; out: string; calls: string }> {
   const dir = await Deno.makeTempDir({ prefix: "cloud-config-sh-" });
   try {
     const scripts = join(dir, ".specnaut", "scripts", "backlog");
     await Deno.mkdir(scripts, { recursive: true });
     await Deno.writeTextFile(join(dir, ".specnaut", "backlog-config.yml"), config);
     await Deno.copyFile(CONFIG_SH, join(scripts, "_config.sh"));
-    await Deno.writeTextFile(join(scripts, "probe.sh"), PROBE);
+    await Deno.writeTextFile(join(scripts, "probe.sh"), probe);
     const { code, stdout, stderr } = await new Deno.Command("bash", {
       args: [".specnaut/scripts/backlog/probe.sh"],
       cwd: dir,
@@ -113,4 +116,11 @@ Deno.test("cloud _config.sh and normalizeApiUrl agree on what a plain API base i
     const r = await source(`backend: cloud\napi_url: "${url}"\nproject_key: CLOUD\n`);
     assertEquals(r.code === 0, normalizeApiUrl(url) !== null, `${url}\n${r.out}`);
   }
+});
+
+Deno.test("cloud _config.sh adds nothing to the reason `cloud token` gave for failing", async () => {
+  const failing = PROBE.replace("echo tok;", 'echo "the CLI says why" >&2; return 1;');
+  const r = await source(renderCloudConfig("https://api.specnaut.com", "CLOUD"), failing);
+  assertEquals(r.code, 2, r.out);
+  assertEquals(r.out.trim(), "the CLI says why");
 });

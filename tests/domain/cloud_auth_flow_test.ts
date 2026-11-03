@@ -1,5 +1,5 @@
 import { assertEquals, assertRejects } from "@std/assert";
-import { accessToken, freshAccessToken, login } from "../../src/domain/cloud/auth_flow.ts";
+import { accessToken, login } from "../../src/domain/cloud/auth_flow.ts";
 import {
   CloudApiError,
   CloudClient,
@@ -122,7 +122,7 @@ Deno.test("login: never approved before deadline → timeout", async () => {
   assertEquals(result, { ok: false, reason: "timeout" });
 });
 
-Deno.test("freshAccessToken: returns cached token when not near expiry", async () => {
+Deno.test("accessToken: returns cached token when not near expiry", async () => {
   const store = new MemStore();
   const clock = fakeClock(0);
   await store.save(API, {
@@ -131,7 +131,7 @@ Deno.test("freshAccessToken: returns cached token when not near expiry", async (
     accessExpiresAt: 10 * 60_000, // 10 min out
   });
   let refreshed = false;
-  const token = await freshAccessToken({
+  const token = await accessToken({
     apiUrl: API,
     client: fakeClient({
       refresh: () => {
@@ -146,7 +146,7 @@ Deno.test("freshAccessToken: returns cached token when not near expiry", async (
   assertEquals(refreshed, false);
 });
 
-Deno.test("freshAccessToken: refreshes transparently when near expiry", async () => {
+Deno.test("accessToken: refreshes transparently when near expiry", async () => {
   const store = new MemStore();
   const clock = fakeClock(0);
   await store.save(API, {
@@ -154,7 +154,7 @@ Deno.test("freshAccessToken: refreshes transparently when near expiry", async ()
     refreshToken: "RT_OLD",
     accessExpiresAt: 1_000, // ~now → within skew
   });
-  const token = await freshAccessToken({
+  const token = await accessToken({
     apiUrl: API,
     client: fakeClient({
       refresh: (rt: string) => {
@@ -176,7 +176,7 @@ Deno.test("freshAccessToken: refreshes transparently when near expiry", async ()
   assertEquals(stored.refreshToken, "RT_NEW");
 });
 
-Deno.test("freshAccessToken: dead refresh token → null and creds cleared", async () => {
+Deno.test("accessToken: dead refresh token → null and creds cleared", async () => {
   const store = new MemStore();
   const clock = fakeClock(0);
   await store.save(API, {
@@ -184,7 +184,7 @@ Deno.test("freshAccessToken: dead refresh token → null and creds cleared", asy
     refreshToken: "RT_DEAD",
     accessExpiresAt: 0,
   });
-  const token = await freshAccessToken({
+  const token = await accessToken({
     apiUrl: API,
     client: fakeClient({
       refresh: () => Promise.resolve({ status: "invalid" }),
@@ -196,9 +196,9 @@ Deno.test("freshAccessToken: dead refresh token → null and creds cleared", asy
   assertEquals(store.m.has(API), false);
 });
 
-Deno.test("freshAccessToken: no stored creds → null", async () => {
+Deno.test("accessToken: no stored creds → null", async () => {
   const store = new MemStore();
-  const token = await freshAccessToken({
+  const token = await accessToken({
     apiUrl: API,
     client: fakeClient({}),
     store,
@@ -207,24 +207,8 @@ Deno.test("freshAccessToken: no stored creds → null", async () => {
   assertEquals(token, null);
 });
 
-// cli#734 — a refresh Cloud could not serve keeps the credentials for the next attempt.
-Deno.test("accessToken: an unavailable refresh throws and keeps the creds; freshAccessToken reads it as null", async () => {
-  const store = new MemStore();
-  const creds = { accessToken: "OLD", refreshToken: "RT", accessExpiresAt: 0 };
-  await store.save(API, creds);
-  const deps = {
-    apiUrl: API,
-    client: fakeClient({ refresh: () => Promise.reject(new CloudApiError(503, "down")) }),
-    store,
-    now: () => 0,
-  };
-  await assertRejects(() => accessToken(deps), CloudApiError);
-  assertEquals(await freshAccessToken(deps), null);
-  assertEquals(store.m.get(API), creds);
-});
-
 // cli#734 — through the real CloudClient: only Cloud's literal verdict on the
-// refresh token drops the credentials; any other answer keeps them.
+// refresh token drops the credentials; any other answer throws and keeps them.
 for (
   const [status, body, dropped] of [
     [401, { status: "invalid" }, true],
@@ -233,23 +217,20 @@ for (
     [401, { status: ["invalid"] }, false],
     [200, { status: "ok" }, false],
     [429, {}, false],
+    [503, {}, false],
     [200, "<html>captive portal</html>", false],
     [200, "null", false],
     [200, "[]", false],
   ] as const
 ) {
-  Deno.test(`freshAccessToken: a refresh answered ${status} ${JSON.stringify(body)} ${dropped ? "drops" : "keeps"} the creds`, async () => {
+  Deno.test(`accessToken: a refresh answered ${status} ${JSON.stringify(body)} ${dropped ? "drops" : "keeps"} the creds`, async () => {
     const store = new MemStore();
     await store.save(API, { accessToken: "OLD", refreshToken: "RT", accessExpiresAt: 0 });
     const text = typeof body === "string" ? body : JSON.stringify(body);
     const fetchFn = (() => Promise.resolve(new Response(text, { status }))) as typeof fetch;
-    const token = await freshAccessToken({
-      apiUrl: API,
-      client: new CloudClient(API, fetchFn),
-      store,
-      now: () => 0,
-    });
-    assertEquals(token, null);
+    const deps = { apiUrl: API, client: new CloudClient(API, fetchFn), store, now: () => 0 };
+    if (dropped) assertEquals(await accessToken(deps), null);
+    else await assertRejects(() => accessToken(deps), CloudApiError);
     assertEquals(store.m.has(API), !dropped);
   });
 }

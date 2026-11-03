@@ -139,8 +139,8 @@ whether the chain goes on; where its row stops (\`UNPUSHED\`), stop here, before
 - \`LANDED\`, the item open: its next slice. Step 2 runs as for any new feature.
 <!-- END: spec-backend=local -->
 <!-- BEGIN: spec-backend=cloud -->
-An epic is one plan: for a child, \`<task>\` below is its parent epic. The epic's class picks the
-branch; whether the chain runs at all is still the child's own open state (\`phases/auto-chain.md\`).
+An epic is one plan: for a child, \`<task>\` below is its parent epic, and the epic's class picks the
+branch. Only one thing is the child's own: open chains, closed runs alone (\`phases/auto-chain.md\`).
 Read the epic's creation time from its own \`view.sh\` and run \`wip-audit.sh <task>@<epoch>\`; its
 \`UNPUSHED\` is a stop as above. So an \`IDLE\` child of an \`ACTIVE\` epic continues on the epic's
 branch. Run \`specnaut spec pull <task>\` first. A plan exists when it materialises
@@ -10543,9 +10543,8 @@ fi
 
 # Resolve a fresh access token (refreshes transparently; honors
 # SPECNAUT_CLOUD_TOKEN for headless / CI).
+# A failure has said why on stderr: logged out, Cloud unavailable, or a refused token.
 if ! API_TOKEN=\$(specnaut cloud token --api-url "\$API_URL"); then
-  echo "error: not authenticated with Specnaut Cloud." >&2
-  echo "Run \\\`specnaut cloud login\\\` (or set SPECNAUT_CLOUD_TOKEN)." >&2
   exit 2
 fi
 
@@ -23886,6 +23885,9 @@ exit 3
 # working tree's feature.json links the epic: any other branch cut there, or
 # HEAD planning another item, may be another item's.
 #
+# What it prints is ASCII: a Windows console may not be UTF-8, and the PowerShell
+# twin relays it.
+#
 # Exit: 0 found or none · 1 usage, or jq missing (no feature.json could be
 # read, and "none" would mint the epic a second branch) · 4 several branches
 # link the epic (listed on stderr; picking one would be a guess).
@@ -23902,7 +23904,7 @@ source "\$SCRIPT_DIR/common.sh"
 
 epic="\${1:?usage: epic-branch.sh <epic>}"
 command -v jq >/dev/null 2>&1 || {
-    echo "# the epic branch lookup needs jq, which is not installed — it stops rather than create the epic a second branch" >&2
+    echo "# the epic branch lookup needs jq, which is not installed - it stops rather than create the epic a second branch" >&2
     exit 1
 }
 
@@ -23916,7 +23918,7 @@ if base=\$(bash "\$SCRIPT_DIR/base-branch.sh" 2>/dev/null); then
     done
 fi
 [ "\${#bases[@]}" -gt 0 ] ||
-    echo "# the base branch is unknown — the epic branch lookup cannot skip it or the branches merged into it" >&2
+    echo "# the base branch is unknown - the epic branch lookup cannot skip it or the branches merged into it" >&2
 head=\$(git symbolic-ref --quiet --short HEAD 2>/dev/null || true)
 top=\$(git rev-parse --show-toplevel 2>/dev/null || true)
 
@@ -23924,7 +23926,7 @@ found=()
 for b in \$(git for-each-ref --format='%(refname:short)' refs/heads 2>/dev/null); do
     # A name git would read as an option never reaches it.
     if ! [[ \$b =~ ^[A-Za-z0-9][A-Za-z0-9._/-]*\$ ]]; then
-        echo "# warning: branch '\$b' has a name git could read as an option — skipped for epic lookup" >&2
+        echo "# warning: branch '\$b' has a name git could read as an option - skipped for epic lookup" >&2
         continue
     fi
     [ "\${#bases[@]}" -gt 0 ] && [ "\$b" = "\$base" ] && continue
@@ -23943,14 +23945,14 @@ for b in \$(git for-each-ref --format='%(refname:short)' refs/heads 2>/dev/null)
         fj=\$(git show "refs/heads/\$b:.specnaut/feature.json" 2>/dev/null) || continue
     fi
     if ! li=\$(linked "\$fj"); then
-        echo "# warning: branch '\$b' has an unreadable .specnaut/feature.json — skipped for epic lookup" >&2
+        echo "# warning: branch '\$b' has an unreadable .specnaut/feature.json - skipped for epic lookup" >&2
         continue
     fi
     [ "\$li" = "\$epic" ] && found+=("\$b")
 done
 
 if [ "\${#found[@]}" -gt 1 ]; then
-    echo "# several branches link epic #\$epic — not picking one: \${found[*]}" >&2
+    echo "# several branches link epic #\$epic - not picking one: \${found[*]}" >&2
     exit 4
 fi
 [ "\${#found[@]}" -eq 0 ] || printf '%s\\n' "\${found[0]}"

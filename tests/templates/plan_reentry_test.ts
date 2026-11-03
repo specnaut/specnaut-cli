@@ -136,8 +136,8 @@ Deno.test("every harness and option set ships the same plan row, gate and Re-ent
 
 /** spec 056 (cli#730) — a cloud re-entry continues on the item's branch: only the cloud render says how. */
 const CLOUD_PLAN = [
-  // cli#734: one rule per question — the epic's class picks the branch, the child's state the run.
-  "for a child, `<task>` below is its parent epic. The epic's class picks the branch; whether the chain runs at all is still the child's own open state (`phases/auto-chain.md`).",
+  // cli#735: one rule per question — the epic's class picks the branch, the child's state the run.
+  "for a child, `<task>` below is its parent epic, and the epic's class picks the branch. Only one thing is the child's own: open chains, closed runs alone (`phases/auto-chain.md`).",
   "Read the epic's creation time from its own `view.sh` and run `wip-audit.sh <task>@<epoch>`",
   // cli#732: an IDLE child of an ACTIVE epic continues on the epic's branch, never a stop at implement.
   "So an `IDLE` child of an `ACTIVE` epic continues on the epic's branch.",
@@ -155,7 +155,7 @@ const CLOUD_PLAN = [
   "`IDLE` with no plan, or `LANDED` with the item open: a new plan, or the next slice. Step 2 runs.",
   // cli#733: one rule for a child — the epic's class, the item's own open state — in plan and auto-chain.
   "`LANDED` with the item closed: a plan that runs alone (`phases/auto-chain.md`). Step 2 runs.",
-  "whether the chain runs at all is still the child's own open state (`phases/auto-chain.md`).",
+  "Only one thing is the child's own: open chains, closed runs alone (`phases/auto-chain.md`).",
   "`no spec for task`, or no such file, means none does",
   "The task is the item's id: `plan <id>`, or `--issue <N>`. With no item, the product-owner creates one first",
   "Stopping here on a question: push first, as step 8's cloud block says.",

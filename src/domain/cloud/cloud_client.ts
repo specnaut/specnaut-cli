@@ -2,6 +2,8 @@
 // documented, versioned `/api/v1` wire format — the sole OSS↔Cloud coupling.
 // `fetch` is injectable for tests.
 
+import { isUnavailableStatus, readJson } from "./cloud_wire.ts";
+
 export type DeviceStart = {
   deviceCode: string;
   userCode: string;
@@ -48,11 +50,19 @@ export type CloudTask = {
 
 export type FetchFn = typeof fetch;
 
+/** A year: far beyond any real access token, and far from an overflowing expiry. */
+const MAX_TOKEN_TTL_S = 31_536_000;
+
 export class CloudApiError extends Error {
   constructor(public readonly status: number, message: string) {
     super(message);
     this.name = "CloudApiError";
   }
+}
+
+/** An error saying Cloud is unavailable, as opposed to an answer it gave. */
+export function isUnavailable(e: unknown): boolean {
+  return e instanceof CloudApiError && isUnavailableStatus(e.status);
 }
 
 export class CloudClient {
@@ -75,6 +85,8 @@ export class CloudClient {
       method: "POST",
       headers,
       body: JSON.stringify(body ?? {}),
+      // A redirect would re-send a body that may hold a refresh token to another host.
+      redirect: "error",
     });
     return { status: res.status, json: await readJson(res) };
   }
@@ -122,15 +134,9 @@ export class CloudClient {
 
   async pollToken(deviceCode: string): Promise<TokenPoll> {
     const { json } = await this.postJson("/auth/token", { device_code: deviceCode });
-    const s = String(json.status ?? "invalid");
-    if (s === "approved") {
-      return {
-        status: "approved",
-        accessToken: String(json.access_token),
-        refreshToken: String(json.refresh_token),
-        expiresInS: Number(json.expires_in ?? 0),
-      };
-    }
+    const s = typeof json.status === "string" ? json.status : "invalid";
+    const pair = tokenPair(json);
+    if (s === "approved") return pair ? { status: "approved", ...pair } : { status: "invalid" };
     if (s === "pending" || s === "slow_down" || s === "denied" || s === "expired") {
       return { status: s };
     }
@@ -146,19 +152,12 @@ export class CloudClient {
         if (e instanceof TypeError) return { status: 0, json: {} as Record<string, unknown> };
         throw e;
       });
-    if (status === 0 || status >= 500) {
+    if (isUnavailableStatus(status)) {
       throw new CloudApiError(status, "token refresh: Cloud unavailable");
     }
     const verdict = typeof json.status === "string" ? json.status : "";
-    const { access_token: at, refresh_token: rt } = json;
-    if (verdict === "ok" && typeof at === "string" && at && typeof rt === "string" && rt) {
-      return {
-        status: "ok",
-        accessToken: at,
-        refreshToken: rt,
-        expiresInS: Number(json.expires_in ?? 0),
-      };
-    }
+    const pair = tokenPair(json);
+    if (verdict === "ok" && pair) return { status: "ok", ...pair };
     if (verdict === "expired" || verdict === "invalid") return { status: verdict };
     throw new CloudApiError(status, "token refresh: no verdict on the token");
   }
@@ -262,12 +261,17 @@ export class CloudClient {
   }
 }
 
-/** The body as an object; anything else (no JSON, `null`, an array, a primitive) reads as `{}`. */
-async function readJson(res: Response): Promise<Record<string, unknown>> {
-  const json: unknown = await res.json().catch(() => null);
-  return json !== null && typeof json === "object" && !Array.isArray(json)
-    ? json as Record<string, unknown>
-    : {};
+/** A token pair from an approving answer, or null when it does not carry a real one. */
+function tokenPair(json: Record<string, unknown>) {
+  const { access_token: accessToken, refresh_token: refreshToken } = json;
+  if (typeof accessToken !== "string" || !accessToken) return null;
+  if (typeof refreshToken !== "string" || !refreshToken) return null;
+  // Clamped like startDevice's timing: a server cannot grant a token "forever".
+  return {
+    accessToken,
+    refreshToken,
+    expiresInS: clamp(Number(json.expires_in ?? 0), 0, MAX_TOKEN_TTL_S),
+  };
 }
 
 function strField(json: Record<string, unknown>, key: string): string | null {

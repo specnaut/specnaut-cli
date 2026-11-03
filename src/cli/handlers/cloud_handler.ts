@@ -20,7 +20,8 @@ import {
   type CloudProject,
   type CloudTask,
 } from "../../domain/cloud/cloud_client.ts";
-import { freshAccessToken, login } from "../../domain/cloud/auth_flow.ts";
+import { login } from "../../domain/cloud/auth_flow.ts";
+import { requireCloudToken } from "./cloud_token.ts";
 import {
   DEFAULT_CLOUD_API_URL,
   headlessRefusal,
@@ -121,12 +122,8 @@ async function authedSession(
   const apiUrl = resolved.url;
   const client = new CloudClient(apiUrl);
   const store = defaultCredentialStore();
-  const token = await freshAccessToken({ apiUrl, client, store, now: () => Date.now() });
-  if (!token) {
-    console.error(red("error: not authenticated with Specnaut Cloud."));
-    console.error(dim("  run `specnaut login` (or set SPECNAUT_CLOUD_TOKEN)."));
-    return 1;
-  }
+  const token = await requireCloudToken(apiUrl, client, store);
+  if (!token) return 1;
   return { client, token };
 }
 
@@ -297,11 +294,8 @@ async function runLogin(intent: CloudIntent): Promise<number> {
   );
 
   // Bind the project: list, then select or create.
-  const token = await freshAccessToken({ apiUrl, client, store, now: () => Date.now() });
-  if (!token) {
-    console.error(red("error: lost the session right after login — please retry."));
-    return 1;
-  }
+  const token = await requireCloudToken(apiUrl, client, store);
+  if (!token) return 1;
 
   let projectKey: string | null = null;
   try {
@@ -425,12 +419,8 @@ async function runToken(intent: CloudIntent): Promise<number> {
 
   const client = new CloudClient(apiUrl);
   const store = defaultCredentialStore();
-  const token = await freshAccessToken({ apiUrl, client, store, now: () => Date.now() });
-  if (!token) {
-    console.error(red("error: not authenticated with Specnaut Cloud."));
-    console.error(dim("  run `specnaut cloud login` (or set SPECNAUT_CLOUD_TOKEN)."));
-    return 1;
-  }
+  const token = await requireCloudToken(apiUrl, client, store);
+  if (!token) return 1;
   console.log(token);
   return 0;
 }

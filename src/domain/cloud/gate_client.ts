@@ -10,6 +10,7 @@
 // public status code is, so no Cloud-internal message can leak.
 
 import type { FetchFn } from "./cloud_client.ts";
+import { readJson } from "./cloud_wire.ts";
 import { type Gate, type GateRequest, parseGate } from "./gate_contract.ts";
 
 /** Typed error reasons the caller branches on. Derived from HTTP status only. */
@@ -54,18 +55,17 @@ export class GateClient {
   ): Promise<{ status: number; json: Record<string, unknown> }> {
     const headers: Record<string, string> = { Authorization: `Bearer ${token}` };
     if (body !== undefined) headers["Content-Type"] = "application/json";
-    let res: Response;
     try {
-      res = await this.fetchFn(`${this.base}${path}`, {
+      const res = await this.fetchFn(`${this.base}${path}`, {
         method,
         headers,
         body: body !== undefined ? JSON.stringify(body) : undefined,
       });
+      return { status: res.status, json: await readJson(res) };
     } catch {
-      // Network failure — surface as transient (status 0) so an await loop retries.
+      // Network failure, mid-body too — surface as transient (status 0) so an await loop retries.
       throw new GateApiError(0, "transient");
     }
-    return { status: res.status, json: await readJson(res) };
   }
 
   /** POST /api/v1/gates — open a gate. 201 ⇒ the new `open` gate. */
@@ -149,12 +149,4 @@ export class GateClient {
     if (!gate) throw new GateApiError(status, "transient");
     return gate;
   }
-}
-
-/** The body as an object; anything else (no JSON, `null`, an array, a primitive) reads as `{}`. */
-async function readJson(res: Response): Promise<Record<string, unknown>> {
-  const json: unknown = await res.json().catch(() => null);
-  return json !== null && typeof json === "object" && !Array.isArray(json)
-    ? json as Record<string, unknown>
-    : {};
 }

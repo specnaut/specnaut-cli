@@ -11,8 +11,8 @@
 import { type Gate, type GateRequest, validatePayload } from "./gate_contract.ts";
 import { GateApiError, GateClient, type GateErrorReason } from "./gate_client.ts";
 import { type RemoteMode, resolveRemoteMode } from "./remote_mode.ts";
-import { CloudClient, type FetchFn } from "./cloud_client.ts";
-import { freshAccessToken, sessionToken } from "./auth_flow.ts";
+import { CloudApiError, CloudClient, type FetchFn } from "./cloud_client.ts";
+import { accessToken, sessionToken } from "./auth_flow.ts";
 import { type CloudConfig, normalizeApiUrl } from "./cloud_config.ts";
 import type { CredentialStore } from "./credentials.ts";
 
@@ -41,6 +41,9 @@ export type GateSessionDeps = {
 const BACKOFF_STEP_MS = 5_000;
 const BACKOFF_CAP_MS = 60_000;
 
+/** Why a session has no token to send. */
+type NoToken = Extract<ResolutionOutcome, { kind: "error" }>;
+
 export class GateSession {
   constructor(private readonly deps: GateSessionDeps) {}
 
@@ -57,15 +60,16 @@ export class GateSession {
    * returns `{ error: "no_remote" }` (the caller checks `remote.enabled` first).
    */
   async raiseAndAwait(req: GateRequest): Promise<ResolutionOutcome> {
-    const { projectKey, client, remote, token, now, sleep } = this.deps;
+    const { projectKey, client, remote, now, sleep } = this.deps;
 
     if (!remote.enabled) return { kind: "error", reason: "no_remote" };
 
     const check = validatePayload(req.type, req.payload);
     if (!check.ok) return { kind: "error", reason: "invalid" };
 
-    let tok = await token();
-    if (!tok) return { kind: "error", reason: "no_remote" }; // no creds ⇒ prerequisites unmet
+    const first = await this.bearer("no_remote"); // no creds ⇒ prerequisites unmet
+    if (typeof first !== "string") return first;
+    let tok = first;
 
     let gate: Gate;
     try {
@@ -79,27 +83,17 @@ export class GateSession {
     while (now() < deadline) {
       await sleep(remote.pollIntervalMs + backoffMs);
       // Refresh the token each poll cycle so a long await survives expiry (SC-007).
-      const fresh = await token();
-      if (fresh) tok = fresh;
-      else if (!tok) return { kind: "error", reason: "unauthorized" };
+      const fresh = await this.bearer("unauthorized");
+      if (typeof fresh === "string") tok = fresh;
+      const stale = typeof fresh !== "string" && fresh.reason === "transient";
 
-      let probed: Gate | null;
-      try {
-        probed = await client.get(tok, projectKey, gate.id);
-        backoffMs = 0; // success — reset backoff
-      } catch (e) {
-        const reason = reasonOf(e);
-        if (reason === "transient") {
-          backoffMs = Math.min(backoffMs + BACKOFF_STEP_MS, BACKOFF_CAP_MS);
-          continue; // tolerate flaps; keep awaiting until the overall deadline
-        }
-        if (reason === "unauthorized") {
-          // One transparent retry already happened via token(); a hard 401 means
-          // the credential is unrecoverable.
-          return { kind: "error", reason: "unauthorized" };
-        }
-        return errorOutcome(e);
+      const probed = await this.probe(tok, gate.id, stale);
+      if (probed === "retry") {
+        backoffMs = Math.min(backoffMs + BACKOFF_STEP_MS, BACKOFF_CAP_MS);
+        continue; // tolerate flaps; keep awaiting until the overall deadline
       }
+      if (probed && "kind" in probed) return probed;
+      backoffMs = 0; // success — reset backoff
 
       if (!probed) continue; // not visible yet
       if (probed.state === "answered" || probed.state === "applied") {
@@ -112,13 +106,42 @@ export class GateSession {
   }
 
   /**
+   * One poll: the gate (null if not visible yet), "retry" for a flap the await tolerates, or
+   * the error ending it. A hard 401 means the credential is unrecoverable, unless the last
+   * refresh got no verdict (`stale`): then it only says the token in hand expired.
+   */
+  private async probe(
+    tok: string,
+    id: string,
+    stale: boolean,
+  ): Promise<Gate | null | "retry" | ResolutionOutcome> {
+    try {
+      return await this.deps.client.get(tok, this.deps.projectKey, id);
+    } catch (e) {
+      const reason = reasonOf(e);
+      if (reason === "transient" || (reason === "unauthorized" && stale)) return "retry";
+      return reason === "unauthorized" ? { kind: "error", reason } : errorOutcome(e);
+    }
+  }
+
+  /** The token, or why there is none: `missing` when logged out, transient when Cloud gave no verdict. */
+  private async bearer(missing: "no_remote" | "unauthorized"): Promise<string | NoToken> {
+    try {
+      return (await this.deps.token()) ?? { kind: "error", reason: missing };
+    } catch (e) {
+      if (e instanceof CloudApiError) return { kind: "error", reason: "transient" };
+      throw e;
+    }
+  }
+
+  /**
    * Acknowledge consumption of an answered gate (answered → applied). Idempotent —
    * re-applying an already-applied gate is a success no-op (FR-004 / SC-002).
    */
   async apply(gate: Gate): Promise<ResolutionOutcome> {
-    const { projectKey, client, token } = this.deps;
-    const tok = await token();
-    if (!tok) return { kind: "error", reason: "unauthorized" };
+    const { projectKey, client } = this.deps;
+    const tok = await this.bearer("unauthorized");
+    if (typeof tok !== "string") return tok;
     try {
       const applied = await client.apply(tok, projectKey, gate.id);
       return { kind: "applied", gate: applied };
@@ -129,9 +152,9 @@ export class GateSession {
 
   /** Withdraw an open gate the agent no longer needs (open → cancelled). */
   async cancel(id: string): Promise<ResolutionOutcome> {
-    const { projectKey: _projectKey, client, token } = this.deps;
-    const tok = await token();
-    if (!tok) return { kind: "error", reason: "unauthorized" };
+    const { client } = this.deps;
+    const tok = await this.bearer("unauthorized");
+    if (typeof tok !== "string") return tok;
     try {
       const cancelled = await client.cancel(tok, id);
       return { kind: "cancelled", gate: cancelled };
@@ -183,7 +206,7 @@ export function makeGateSession(deps: {
   const gateClient = new GateClient(apiUrl, fetchFn);
 
   // SPECNAUT_CLOUD_TOKEN, for a deployment it may go to only; else the stored login.
-  const stored = () => freshAccessToken({ apiUrl, client: cloudClient, store, now });
+  const stored = () => accessToken({ apiUrl, client: cloudClient, store, now });
   const token: TokenProvider = sessionToken(apiUrl, env, stored, deps.warn);
 
   return new GateSession({

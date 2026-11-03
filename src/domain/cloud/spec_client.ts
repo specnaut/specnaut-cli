@@ -8,6 +8,7 @@
 // public status code is, so no Cloud-internal message can leak.
 
 import type { FetchFn } from "./cloud_client.ts";
+import { isUnavailableStatus, jsonObject } from "./cloud_wire.ts";
 import { parseSpec, type SpecWire } from "./spec_contract.ts";
 import type { SpecStep } from "../spec/spec_step.ts";
 
@@ -40,7 +41,7 @@ export function reasonForStatus(status: number): SpecErrorReason {
   if (status === 404) return "not_found";
   if (status === 409) return "conflict";
   if (status === 422) return "invalid";
-  return status === 0 || status >= 500 ? "transient" : "unexpected";
+  return isUnavailableStatus(status) ? "transient" : "unexpected";
 }
 
 export class SpecClient {
@@ -71,7 +72,7 @@ export class SpecClient {
       // Network failure — surface as transient (status 0) so callers can retry.
       throw new SpecApiError(0, "transient");
     }
-    return { status: res.status, json: await readJson(res) };
+    return { status: res.status, json: await readSuccessBody(res) };
   }
 
   /**
@@ -132,12 +133,18 @@ export class SpecClient {
  * A success body, parsed. An error body is never read (§ I: only its status is
  * used); a non-empty success body that is not a JSON object is an unexpected answer.
  */
-async function readJson(res: Response): Promise<Record<string, unknown>> {
+async function readSuccessBody(res: Response): Promise<Record<string, unknown>> {
   if (!res.ok) {
     await res.body?.cancel();
     return {};
   }
-  const text = await res.text();
+  let text: string;
+  try {
+    text = await res.text();
+  } catch {
+    // The connection dropped mid-body: Cloud unreachable, like a failed fetch.
+    throw new SpecApiError(0, "transient");
+  }
   if (text.trim() === "") return {};
   let json: unknown;
   try {
@@ -145,8 +152,7 @@ async function readJson(res: Response): Promise<Record<string, unknown>> {
   } catch {
     throw new SpecApiError(res.status, "unexpected");
   }
-  if (json === null || typeof json !== "object" || Array.isArray(json)) {
-    throw new SpecApiError(res.status, "unexpected");
-  }
-  return json as Record<string, unknown>;
+  const object = jsonObject(json);
+  if (!object) throw new SpecApiError(res.status, "unexpected");
+  return object;
 }

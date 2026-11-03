@@ -73,9 +73,8 @@ fi
 
 # Resolve a fresh access token (refreshes transparently; honors
 # SPECNAUT_CLOUD_TOKEN for headless / CI).
+# A failure has said why on stderr: logged out, Cloud unavailable, or a refused token.
 if ! API_TOKEN=$(specnaut cloud token --api-url "$API_URL"); then
-  echo "error: not authenticated with Specnaut Cloud." >&2
-  echo "Run \`specnaut cloud login\` (or set SPECNAUT_CLOUD_TOKEN)." >&2
   exit 2
 fi
 
