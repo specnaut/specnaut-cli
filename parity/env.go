@@ -54,7 +54,8 @@ var Canary = sync.OnceValue(func() string {
 //   - Cloud: $CLOUD_URL is the Cloud stub, owned here; scenarios pass it as
 //     --api-url. A scenario that forgets reaches the default host, which the
 //     proxy denies — it fails toward safety.
-//   - Credentials: SPECNAUT_CLOUD_TOKEN is the canary. No session bus and a
+//   - Credentials: SPECNAUT_CLOUD_TOKEN is the canary, and
+//     SPECNAUT_CLOUD_API_URL names the stub as the deployment it may go to. No session bus and a
 //     runtime dir that does not exist keep libsecret from finding a keyring,
 //     so on Linux the CLI falls back to the file store under $WORK/home.
 //   - git: no system or global config but one under $WORK, no prompts, and
@@ -101,6 +102,8 @@ func scenarioVars(work, home, stubDir string, set *stubs.Set) []string {
 func serviceVars(set *stubs.Set) []string {
 	return []string{
 		"SPECNAUT_CLOUD_TOKEN=" + Canary(),
+		// The environment names the one deployment the canary may go to.
+		"SPECNAUT_CLOUD_API_URL=" + set.URL(stubs.Cloud),
 		"CLOUD_URL=" + set.URL(stubs.Cloud),
 		stubs.GhURLVar + "=" + set.URL(stubs.GH),
 		stubs.GlabURLVar + "=" + set.URL(stubs.Glab),
