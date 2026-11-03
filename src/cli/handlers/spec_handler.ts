@@ -20,6 +20,7 @@ import {
   FsBacklogConfigStore,
 } from "../../infrastructure/fs_backlog_config_store.ts";
 import { InvalidApiUrl } from "../../domain/cloud/cloud_config.ts";
+import { REDIRECT_REFUSED } from "../../domain/cloud/cloud_wire.ts";
 import { makeSpecSession, type SpecSession } from "../../domain/cloud/spec_session.ts";
 import { SpecApiError } from "../../domain/cloud/spec_client.ts";
 import { CloudSpecStore } from "../../infrastructure/spec/cloud_spec_store.ts";
@@ -210,10 +211,6 @@ function actionable(e: unknown, what: string): string {
   if (reason === "unauthorized") {
     return red(`error: not authenticated to ${what} — run \`specnaut cloud login\` and retry.`);
   }
-  if (reason === "redirected") {
-    return red(
-      `error: could not ${what} — Specnaut Cloud redirected the request, and the CLI follows no redirect: check api_url.`,
-    );
-  }
+  if (reason === "redirected") return red(`error: could not ${what}: ${REDIRECT_REFUSED}.`);
   return red(`error: could not ${what} (${reason}) — check your connection and retry.`);
 }

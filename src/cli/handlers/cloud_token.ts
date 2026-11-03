@@ -10,13 +10,12 @@ import {
   isRedirected,
   isUnavailable,
 } from "../../domain/cloud/cloud_client.ts";
+import { REDIRECT_REFUSED } from "../../domain/cloud/cloud_wire.ts";
 import type { CredentialStore } from "../../domain/cloud/credentials.ts";
 
 /** What went wrong with a Cloud request, in the CLI's own words (§ I). */
 export function cloudFailure(e: CloudApiError): string {
-  if (isRedirected(e)) {
-    return "Specnaut Cloud redirected the request, and the CLI follows no redirect: check the API URL";
-  }
+  if (isRedirected(e)) return REDIRECT_REFUSED;
   return `Specnaut Cloud ${
     isUnavailable(e) ? "cannot be reached" : "answered unexpectedly"
   }; retry`;

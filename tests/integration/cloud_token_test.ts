@@ -1,5 +1,6 @@
 import { assertEquals, assertStringIncludes } from "@std/assert";
 import { fromFileUrl, join } from "@std/path";
+import { DENO_DIR } from "./spawn_env.ts";
 import { FileCredentialStore } from "../../src/infrastructure/credential_store.ts";
 
 const MAIN = fromFileUrl(new URL("../../src/main.ts", import.meta.url));
@@ -7,11 +8,14 @@ const MAIN = fromFileUrl(new URL("../../src/main.ts", import.meta.url));
 async function runSpecnaut(
   args: string[],
   env: Record<string, string>,
+  cwd?: string,
 ): Promise<{ code: number; stdout: string; stderr: string }> {
   const p = new Deno.Command("deno", {
     args: ["run", "--allow-read", "--allow-write", "--allow-run", "--allow-env", MAIN, ...args],
-    env,
+    cwd,
+    env: { DENO_DIR, ...env },
     clearEnv: true,
+    stdin: "null",
     stdout: "piped",
     stderr: "piped",
   });
@@ -75,15 +79,20 @@ Deno.test("`cloud token` refuses the headless token for a deployment the environ
 });
 
 // cli#736 — one refusal policy: warn, then the user's own login for that deployment.
+// HOME alone places the store on every OS, Windows included, because the store reads
+// HOME first. The cross-smoke (windows-latest) job runs this test.
 Deno.test("`cloud token` refused the headless token: it warns, then uses the login stored for that URL", async () => {
   const home = await Deno.makeTempDir({ prefix: "specnaut-home-" });
   const url = "https://cloud.example.test";
   try {
+    // Backslashes on Windows, as the store must accept: its own default path uses "/".
     await new FileCredentialStore(join(home, ".specnaut", "credentials.json")).save(url, {
       accessToken: "stored-login",
       refreshToken: "r",
       accessExpiresAt: 8.64e15,
     });
+    const stored = await Array.fromAsync(Deno.readDir(join(home, ".specnaut")));
+    assertEquals(stored.map((e) => e.name), ["credentials.json"]);
     const r = await runSpecnaut(
       ["cloud", "token", "--api-url", url],
       { HOME: home, SPECNAUT_CLOUD_TOKEN: "sfc_headless_xyz", PATH: Deno.env.get("PATH") ?? "" },
@@ -112,4 +121,38 @@ Deno.test("`cloud token` with no env + no stored creds → exit 1 with guidance"
   } finally {
     await Deno.remove(home, { recursive: true });
   }
+});
+
+// cli#737 — only some commands read the variable, and each says the truth about it.
+Deno.test("`cloud orgs` and `cloud board` logged out: log in, and the variable would not help", async () => {
+  const home = await Deno.makeTempDir({ prefix: "specnaut-nohome-" });
+  try {
+    await Deno.mkdir(join(home, ".specnaut"));
+    await Deno.writeTextFile(
+      join(home, ".specnaut", "backlog-config.yml"),
+      "backend: cloud\nproject_key: K\n",
+    );
+    for (const sub of ["orgs", "board"]) {
+      // The token would be accepted here: only a command that ignores it says log in.
+      const url = "https://api.example.com";
+      const env = {
+        HOME: home,
+        SPECNAUT_CLOUD_TOKEN: "x",
+        SPECNAUT_CLOUD_API_URL: url,
+        PATH: Deno.env.get("PATH") ?? "",
+      };
+      const r = await runSpecnaut(["cloud", sub, "--api-url", url], env, home);
+      assertEquals(r.code, 1, r.stderr);
+      assertStringIncludes(r.stderr, "cloud login");
+      assertStringIncludes(r.stderr, "does not read SPECNAUT_CLOUD_TOKEN");
+    }
+  } finally {
+    await Deno.remove(home, { recursive: true });
+  }
+});
+
+Deno.test("`cloud login` with no terminal says which commands the variable serves", async () => {
+  const r = await runSpecnaut(["cloud", "login"], { PATH: Deno.env.get("PATH") ?? "" });
+  assertEquals(r.code, 2, r.stderr);
+  assertStringIncludes(r.stderr, "`cloud orgs` and `cloud board` need this login");
 });

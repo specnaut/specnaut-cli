@@ -1,5 +1,5 @@
 import { assertEquals } from "@std/assert";
-import { buildProjectChoices } from "../../src/cli/handlers/cloud_handler.ts";
+import { buildProjectChoices } from "../../src/cli/handlers/cloud_project_binding.ts";
 import type { CloudProject } from "../../src/domain/cloud/cloud_client.ts";
 
 const P = (key: string, name: string, role = ""): CloudProject => ({ key, name, role });

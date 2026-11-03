@@ -245,3 +245,37 @@ Deno.test("refresh over a dropped body: no verdict, so nothing condemns the toke
   const e = await assertRejects(() => new CloudClient(API, fn).refresh("RT"), CloudApiError);
   assertEquals([e.status, isUnavailable(e)], [0, true]);
 });
+
+Deno.test("no control character from a server survives a client method", async () => {
+  const dirty = "a\x1b]0;x\x07b\x9bc";
+  const clean = "a]0;xbc";
+  const task = { number: 1, title: dirty, columnId: "c", priority: dirty, size: dirty };
+  const body = {
+    device_code: "d",
+    user_code: dirty,
+    verification_uri: dirty,
+    projects: [{ key: dirty, name: dirty, role: dirty }],
+    orgs: [{ slug: dirty, name: dirty, role: dirty }],
+    columns: [{ id: "c", name: dirty, order: 1 }],
+    tasks: [task],
+    task,
+    project: { key: dirty, name: dirty },
+  };
+  const c = new CloudClient(API, fakeFetch(200, body).fn);
+  const start = await c.startDevice();
+  assertEquals([start.userCode, start.verificationUri, start.verificationUriComplete], [
+    clean,
+    clean,
+    clean,
+  ]);
+  assertEquals(await c.listProjects("t"), [{ key: clean, name: clean, role: clean }]);
+  assertEquals((await c.listOrgs("t"))[0].name, clean);
+  assertEquals((await c.listColumns("t", "K"))[0].name, clean);
+  const expected = { number: 1, title: clean, columnId: "c", priority: clean, size: clean };
+  assertEquals(await c.listTasks("t", "K"), [expected]);
+  assertEquals(await c.createTask("t", "K", "n"), expected);
+  assertEquals((await c.createProject("t", "K", "n")).name, clean);
+  const refused = new CloudClient(API, fakeFetch(400, { error: dirty }).fn);
+  const e = await assertRejects(() => refused.listOrgs("t"), CloudApiError);
+  assertEquals(e.message, clean);
+});

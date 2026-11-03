@@ -10,7 +10,7 @@
 // public status code is, so no Cloud-internal message can leak.
 
 import type { FetchFn } from "./cloud_client.ts";
-import { cloudFetch, isRedirectStatus, readJson } from "./cloud_wire.ts";
+import { cloudFetch, isRedirectStatus, isUnavailableStatus, readJson } from "./cloud_wire.ts";
 import { type Gate, type GateRequest, parseGate } from "./gate_contract.ts";
 
 /** Typed error reasons the caller branches on. Derived from HTTP status only. */
@@ -20,7 +20,8 @@ export type GateErrorReason =
   | "conflict" // 409 — illegal transition
   | "invalid" // 422 — bad type/payload/answer
   | "redirected" // 3xx — no client follows one: an await does not retry it
-  | "transient"; // network / 5xx — retryable inside an await loop
+  | "unexpected" // any other answer, or a body that is not the wire format
+  | "transient"; // network / 5xx — Cloud unavailable
 
 export class GateApiError extends Error {
   constructor(public readonly status: number, public readonly reason: GateErrorReason) {
@@ -30,14 +31,14 @@ export class GateApiError extends Error {
   }
 }
 
-/** Map an HTTP status to a typed reason. 5xx and 0 (network) → transient. */
+/** Map an HTTP status to a typed reason. Only 5xx and 0 (network) are transient: an answer Cloud gave is not "unreachable". */
 export function reasonForStatus(status: number): GateErrorReason {
   if (status === 401) return "unauthorized";
   if (status === 404) return "not_found";
   if (status === 409) return "conflict";
   if (status === 422) return "invalid";
   if (isRedirectStatus(status)) return "redirected";
-  return "transient"; // 5xx, 0, and anything else the loop may retry
+  return isUnavailableStatus(status) ? "transient" : "unexpected";
 }
 
 export class GateClient {
@@ -81,7 +82,7 @@ export class GateClient {
     });
     if (status !== 201 && status !== 200) throw new GateApiError(status, reasonForStatus(status));
     const gate = parseGate(json.gate);
-    if (!gate) throw new GateApiError(status, "transient");
+    if (!gate) throw new GateApiError(status, "unexpected");
     return gate;
   }
 
@@ -126,7 +127,7 @@ export class GateClient {
     if (status === 200) {
       const gate = parseGate(json.gate);
       if (gate) return gate;
-      throw new GateApiError(status, "transient");
+      throw new GateApiError(status, "unexpected");
     }
     if (status === 409) {
       // The contract declares apply idempotent — confirm "already applied" by
@@ -148,7 +149,7 @@ export class GateClient {
     );
     if (status !== 200) throw new GateApiError(status, reasonForStatus(status));
     const gate = parseGate(json.gate);
-    if (!gate) throw new GateApiError(status, "transient");
+    if (!gate) throw new GateApiError(status, "unexpected");
     return gate;
   }
 }

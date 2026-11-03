@@ -40,6 +40,14 @@ Deno.test("an explicit remote: block parses into the config (#357)", () => {
   });
 });
 
+Deno.test("an api_url that is not a string is a bad one, not an absent one", () => {
+  assertEquals(parseCloudConfig("api_url: 1234\nproject_key: K\n")?.apiUrl, "1234");
+  assertEquals(parseCloudConfig("api_url: []\nproject_key: K\n")?.apiUrl, "[]");
+  assertEquals(parseCloudConfig("api_url: {a: 1}\nproject_key: K\n")?.apiUrl, '{"a":1}');
+  assertEquals(parseCloudConfig("project_key: K\n")?.apiUrl, "");
+  assertEquals(parseCloudConfig("api_url: null\nproject_key: K\n")?.apiUrl, "");
+});
+
 Deno.test("malformed YAML or a non-mapping reads as not Cloud-linked", () => {
   assertEquals(parseCloudConfig("api_url: [unclosed"), null);
   assertEquals(parseCloudConfig("just a scalar"), null);

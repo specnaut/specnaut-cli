@@ -73,7 +73,7 @@ fi
 
 # Resolve a fresh access token (refreshes transparently; honors
 # SPECNAUT_CLOUD_TOKEN for headless / CI).
-# A failure has said why on stderr: logged out, Cloud unavailable, or a refused token.
+# A failure has said why on stderr: logged out, Cloud unavailable, or a redirect.
 unset API_TOKEN
 if ! API_TOKEN=$(specnaut cloud token --api-url "$API_URL"); then
   exit 2
@@ -101,7 +101,7 @@ cloud_curl() {
   [ "$_rc" -eq 0 ] || return "$_rc"
   case ${_out##*$'\n'} in
     3*)
-      echo "error: Specnaut Cloud redirected the request, and the CLI follows no redirect: check api_url." >&2
+      echo "error: Specnaut Cloud redirected the request, and the CLI follows no redirect: check the API URL." >&2
       return 22
       ;;
   esac

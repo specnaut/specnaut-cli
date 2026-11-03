@@ -160,6 +160,11 @@ Deno.test("gate raise: remote disabled / no creds → exit 5", async () => {
     pollIntervalMs: 1,
   });
   assertEquals(await runGate(raiseIntent(), cap.deps(session)), 5);
+  assertEquals(
+    cap.err.join("\n").includes("remote mode requires a Cloud login"),
+    true,
+    cap.err.join(),
+  );
 });
 
 Deno.test("gate raise: not Cloud-linked (no session) → exit 5", async () => {
@@ -222,4 +227,50 @@ Deno.test("gate: a refused api_url is the handler's own message and exit 1", asy
   });
   assertEquals(code, 1);
   assertEquals(c.err.join("\n").includes("invalid Specnaut Cloud API URL"), true, c.err.join());
+});
+
+Deno.test("gate cancel: each reason has its own sentence", async () => {
+  const sentences: [number, string][] = [
+    [503, "Specnaut Cloud cannot be reached right now; retry."],
+    [400, "Specnaut Cloud answered unexpectedly; retry."],
+    [401, "not authenticated with Specnaut Cloud; run `specnaut cloud login`."],
+    [404, "Specnaut Cloud does not know this gate."],
+    [409, "the gate is no longer in a state that allows this."],
+    [422, "Specnaut Cloud refused the request as invalid."],
+    [
+      307,
+      "Specnaut Cloud redirected the request, and the CLI follows no redirect: check the API URL.",
+    ],
+  ];
+  for (const [status, sentence] of sentences) {
+    const fetchFn = (() => Promise.resolve(new Response("{}", { status }))) as FetchFn;
+    const c = capture();
+    const intent = raiseIntent({ sub: "cancel", id: "g" });
+    assertEquals(await runGate(intent, c.deps(sessionWith(fetchFn))), 1);
+    assertEquals(
+      c.err.join("\n").includes(`could not cancel gate: ${sentence}`),
+      true,
+      c.err.join(),
+    );
+  }
+});
+
+Deno.test("gate raise: each reason has its sentence; invalid names the flags only raise has", async () => {
+  const sentences: [number, string][] = [
+    [503, "Specnaut Cloud cannot be reached right now; retry."],
+    [400, "Specnaut Cloud answered unexpectedly; retry."],
+    [401, "not authenticated with Specnaut Cloud; run `specnaut cloud login`."],
+    [422, "the gate is invalid; check --type and --payload."],
+    [
+      307,
+      "Specnaut Cloud redirected the request, and the CLI follows no redirect: check the API URL.",
+    ],
+  ];
+  for (const [status, sentence] of sentences) {
+    const fetchFn = (() => Promise.resolve(new Response("{}", { status }))) as FetchFn;
+    const c = capture();
+    assertEquals(await runGate(raiseIntent(), c.deps(sessionWith(fetchFn))), 1);
+    const err = c.err.join("\n");
+    assertEquals(err.includes(`gate could not be resolved: ${sentence}`), true, err);
+  }
 });

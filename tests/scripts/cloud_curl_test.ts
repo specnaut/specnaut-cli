@@ -1,5 +1,6 @@
 import { assertEquals, assertStringIncludes } from "@std/assert";
 import { fromFileUrl, join } from "@std/path";
+import { withServer } from "./cloud_stub.ts";
 
 // The Cloud backlog scripts make every request through `cloud_curl`. Real scripts, a
 // real curl and a real HTTP server: a shim on PATH records what curl was handed,
@@ -11,7 +12,6 @@ const CLOUD = fromFileUrl(
 const RULES = fromFileUrl(
   new URL("../../templates/core/specnaut/scripts/bash/groom-rules.sh", import.meta.url),
 );
-const SERVER = fromFileUrl(new URL("./cloud_stub_server.ts", import.meta.url));
 const TOKEN = "tok-Secret.123";
 
 const SCRIPTS: [string, string[]][] = [
@@ -26,34 +26,6 @@ const SCRIPTS: [string, string[]][] = [
   ["reconcile.sh", []],
   ["view.sh", ["1"]],
 ];
-
-type Request = { path: string; authorization: string | null; extra: string | null };
-
-/** The stub server, for the length of `fn`. */
-async function withServer(fn: (port: string, requests: () => Promise<Request[]>) => Promise<void>) {
-  const dir = await Deno.makeTempDir({ prefix: "cloud-stub-" });
-  const child = new Deno.Command("deno", {
-    args: ["run", "--no-config", "--allow-net=127.0.0.1", `--allow-write=${dir}`, SERVER, dir],
-    stdout: "null",
-    stderr: "null",
-  }).spawn();
-  try {
-    let port = "";
-    for (let i = 0; i < 300 && !port; i++) {
-      port = await Deno.readTextFile(join(dir, "port")).catch(() => "");
-      if (!port) await new Promise((r) => setTimeout(r, 100));
-    }
-    assertEquals(port !== "", true, "the stub server did not start");
-    await fn(port, async () => {
-      const log = await Deno.readTextFile(join(dir, "requests.log")).catch(() => "");
-      return log.split("\n").filter(Boolean).map((l) => JSON.parse(l));
-    });
-  } finally {
-    child.kill();
-    await child.status;
-    await Deno.remove(dir, { recursive: true });
-  }
-}
 
 /** Run one script in a fresh project. */
 async function run(

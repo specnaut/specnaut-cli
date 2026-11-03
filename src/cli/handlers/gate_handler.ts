@@ -22,6 +22,7 @@ import {
   FsBacklogConfigStore,
 } from "../../infrastructure/fs_backlog_config_store.ts";
 import { InvalidApiUrl } from "../../domain/cloud/cloud_config.ts";
+import { REDIRECT_REFUSED } from "../../domain/cloud/cloud_wire.ts";
 import type { GateErrorReason } from "../../domain/cloud/gate_client.ts";
 import {
   GateSession,
@@ -56,9 +57,9 @@ const FAILURE: Record<GateErrorReason | "no_remote", string> = {
   unauthorized: "not authenticated with Specnaut Cloud; run `specnaut cloud login`.",
   not_found: "Specnaut Cloud does not know this gate.",
   conflict: "the gate is no longer in a state that allows this.",
-  invalid: "Specnaut Cloud refused the gate as invalid; check --type and --payload.",
-  redirected:
-    "Specnaut Cloud redirected the request, and the CLI follows no redirect: check api_url.",
+  invalid: "Specnaut Cloud refused the request as invalid.",
+  unexpected: "Specnaut Cloud answered unexpectedly; retry.",
+  redirected: `${REDIRECT_REFUSED}.`,
   no_remote: "remote mode requires a Cloud login (`specnaut cloud login`).",
 };
 
@@ -184,7 +185,16 @@ async function reportRaise(
         deps.err(red(`error: ${FAILURE.no_remote}`));
         return 5;
       }
-      deps.err(red(`error: gate could not be resolved: ${FAILURE[outcome.reason]}`));
+      // Raising is the one command with those flags, and the check is partly local.
+      deps.err(
+        red(
+          `error: gate could not be resolved: ${
+            outcome.reason === "invalid"
+              ? "the gate is invalid; check --type and --payload."
+              : FAILURE[outcome.reason]
+          }`,
+        ),
+      );
       return 1;
     default:
       return 1;

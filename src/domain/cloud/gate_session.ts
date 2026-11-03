@@ -11,7 +11,13 @@
 import { type Gate, type GateRequest, validatePayload } from "./gate_contract.ts";
 import { GateApiError, GateClient, type GateErrorReason } from "./gate_client.ts";
 import { type RemoteMode, resolveRemoteMode } from "./remote_mode.ts";
-import { CloudApiError, CloudClient, type FetchFn, isRedirected } from "./cloud_client.ts";
+import {
+  CloudApiError,
+  CloudClient,
+  type FetchFn,
+  isRedirected,
+  isUnavailable,
+} from "./cloud_client.ts";
 import { accessToken, sessionToken } from "./auth_flow.ts";
 import { type CloudConfig, linkedApiUrl } from "./cloud_config.ts";
 import type { CredentialStore } from "./credentials.ts";
@@ -86,7 +92,7 @@ export class GateSession {
       const fresh = await this.bearer("unauthorized");
       if (typeof fresh === "string") tok = fresh;
       else if (fresh.reason === "redirected") return fresh; // retrying changes nothing
-      const stale = typeof fresh !== "string" && fresh.reason === "transient";
+      const stale = typeof fresh !== "string" && fresh.reason !== "unauthorized";
 
       const probed = await this.probe(tok, gate.id, stale);
       if (probed === "retry") {
@@ -120,7 +126,8 @@ export class GateSession {
       return await this.deps.client.get(tok, this.deps.projectKey, id);
     } catch (e) {
       const reason = reasonOf(e);
-      if (reason === "transient" || (reason === "unauthorized" && stale)) return "retry";
+      const flap = reason === "transient" || reason === "unexpected";
+      if (flap || (reason === "unauthorized" && stale)) return "retry";
       return reason === "unauthorized" ? { kind: "error", reason } : errorOutcome(e);
     }
   }
@@ -131,7 +138,8 @@ export class GateSession {
       return (await this.deps.token()) ?? { kind: "error", reason: missing };
     } catch (e) {
       if (!(e instanceof CloudApiError)) throw e;
-      return { kind: "error", reason: isRedirected(e) ? "redirected" : "transient" };
+      if (isRedirected(e)) return { kind: "error", reason: "redirected" };
+      return { kind: "error", reason: isUnavailable(e) ? "transient" : "unexpected" };
     }
   }
 

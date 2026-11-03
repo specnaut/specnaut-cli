@@ -196,3 +196,56 @@ Deno.test("a logged-out cancel is unauthorized, and asks Cloud nothing", async (
   assertEquals(out, { kind: "error", reason: "unauthorized" });
   assertEquals(be.tokensSeen, []);
 });
+
+// cli#737 — an answer that is not a verdict is not an outage, and an await still survives it.
+Deno.test("a refresh answered with no verdict is unexpected, not unreachable", async () => {
+  const noVerdict: TokenProvider = () => Promise.reject(new CloudApiError(200, "no verdict"));
+  const out = await session(new Backend(), noVerdict).raiseAndAwait(REQUEST);
+  assertEquals(out, { kind: "error", reason: "unexpected" });
+});
+
+Deno.test("a poll answered oddly is tolerated like a flap: the answer still arrives", async () => {
+  const be = new Backend();
+  be.state = "answered";
+  be.answer = {};
+  const orig = be.fetch;
+  let polls = 0;
+  be.fetch =
+    ((input: string | URL | Request, init?: RequestInit) =>
+      (init?.method ?? "GET").toUpperCase() === "GET" && ++polls === 1
+        ? Promise.resolve(new Response("{}", { status: 429 }))
+        : orig(input, init)) as FetchFn;
+  const out = await session(be, () => Promise.resolve("tok")).raiseAndAwait(REQUEST);
+  assertEquals(out.kind, "answered");
+  assertEquals(polls, 2);
+});
+
+Deno.test("a 401 after a refresh with no verdict only says the token in hand expired", async () => {
+  const be = new Backend();
+  const orig = be.fetch;
+  be.fetch =
+    ((input: string | URL | Request, init?: RequestInit) =>
+      (init?.method ?? "GET").toUpperCase() === "GET"
+        ? Promise.resolve(new Response("{}", { status: 401 }))
+        : orig(input, init)) as FetchFn;
+  let calls = 0;
+  const flaky: TokenProvider = () =>
+    ++calls === 1 ? Promise.resolve("tok") : Promise.reject(new CloudApiError(200, "no verdict"));
+  assertEquals(await session(be, flaky).raiseAndAwait(REQUEST), { kind: "unresolved" });
+});
+
+Deno.test("an answer that is a verdict ends an await at once", async () => {
+  const reasons: [number, string][] = [[404, "not_found"], [409, "conflict"], [422, "invalid"]];
+  for (const [status, reason] of reasons) {
+    const be = new Backend();
+    const orig = be.fetch;
+    be.fetch = ((input: string | URL | Request, init?: RequestInit) => {
+      if ((init?.method ?? "GET").toUpperCase() !== "GET") return orig(input, init);
+      be.getCalls++;
+      return Promise.resolve(new Response("{}", { status }));
+    }) as FetchFn;
+    const out = await session(be, () => Promise.resolve("tok")).raiseAndAwait(REQUEST);
+    assertEquals(out, { kind: "error", reason } as never);
+    assertEquals(be.getCalls, 1);
+  }
+});

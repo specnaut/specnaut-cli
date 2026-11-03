@@ -91,16 +91,16 @@ Deno.test("cloud _config.sh refuses an api_url two URL parsers could read as dif
   }
 });
 
-// One grammar in two languages: a string they judge differently is a hole, whichever is laxer.
 Deno.test("a legitimate URL with a port passes both guards, unchanged", async () => {
   const url = "https://cloud.example.test:8443/base";
   assertEquals(normalizeApiUrl(url), url);
   const r = await source(`backend: cloud\napi_url: "${url}"\nproject_key: CLOUD\n`);
   assertEquals(r.code, 0, r.out);
-  assertStringIncludes(r.out, `API_URL=${url}`);
-  assertStringIncludes(r.calls, `cloud token --api-url ${url}`);
+  assertEquals(r.out, `API_URL=${url}\n`);
+  assertEquals(r.calls, `cloud token --api-url ${url}\n`);
 });
 
+// One grammar in two languages: a string they judge differently is a hole, whichever is laxer.
 Deno.test("cloud _config.sh and normalizeApiUrl agree on what a plain API base is", async () => {
   for (
     const url of [

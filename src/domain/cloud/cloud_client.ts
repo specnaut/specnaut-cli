@@ -2,7 +2,16 @@
 // documented, versioned `/api/v1` wire format — the sole OSS↔Cloud coupling.
 // `fetch` is injectable for tests.
 
-import { cloudFetch, isRedirectStatus, isUnavailableStatus, readJson } from "./cloud_wire.ts";
+import {
+  clamp,
+  cleanText,
+  cloudFetch,
+  isRedirectStatus,
+  isUnavailableStatus,
+  readJson,
+  REDIRECT_REFUSED,
+  strField,
+} from "./cloud_wire.ts";
 
 export type DeviceStart = {
   deviceCode: string;
@@ -88,7 +97,7 @@ export class CloudClient {
       const res = await cloudFetch(this.fetchFn, `${this.base}${path}`, init);
       if (isRedirectStatus(res.status)) {
         await res.body?.cancel();
-        throw new CloudApiError(res.status, "Specnaut Cloud redirected the request");
+        throw new CloudApiError(res.status, REDIRECT_REFUSED);
       }
       return { status: res.status, json: await readJson(res) };
     } catch (e) {
@@ -134,9 +143,9 @@ export class CloudClient {
     }
     return {
       deviceCode: String(json.device_code),
-      userCode: String(json.user_code),
-      verificationUri: String(json.verification_uri),
-      verificationUriComplete: String(
+      userCode: cleanText(json.user_code),
+      verificationUri: cleanText(json.verification_uri),
+      verificationUriComplete: cleanText(
         json.verification_uri_complete ?? json.verification_uri,
       ),
       // Clamp server-controlled timing so a malicious/misconfigured server can't
@@ -178,7 +187,7 @@ export class CloudClient {
     const raw = Array.isArray(json.projects) ? json.projects : [];
     return raw.map((p) => {
       const o = p as Record<string, unknown>;
-      return { key: String(o.key), name: String(o.name), role: String(o.role ?? "") };
+      return { key: cleanText(o.key), name: cleanText(o.name), role: cleanText(o.role) };
     });
   }
 
@@ -225,8 +234,8 @@ export class CloudClient {
         number: Number(o.number ?? 0),
         title: cleanText(o.title),
         columnId: String(o.columnId ?? ""),
-        priority: typeof o.priority === "string" ? o.priority : null,
-        size: typeof o.size === "string" ? o.size : null,
+        priority: strField(o, "priority"),
+        size: strField(o, "size"),
       };
     });
   }
@@ -241,7 +250,7 @@ export class CloudClient {
       throw new CloudApiError(status, strField(json, "error") ?? "create project failed");
     }
     const p = (json.project ?? {}) as Record<string, unknown>;
-    return { key: String(p.key ?? key), name: String(p.name ?? name), role: "owner" };
+    return { key: cleanText(p.key ?? key), name: cleanText(p.name ?? name), role: "owner" };
   }
 
   /**
@@ -266,8 +275,8 @@ export class CloudClient {
       number: Number(t.number ?? 0),
       title: cleanText(t.title ?? title),
       columnId: String(t.columnId ?? ""),
-      priority: typeof t.priority === "string" ? t.priority : null,
-      size: typeof t.size === "string" ? t.size : null,
+      priority: strField(t, "priority"),
+      size: strField(t, "size"),
     };
   }
 }
@@ -283,24 +292,4 @@ function tokenPair(json: Record<string, unknown>) {
     refreshToken,
     expiresInS: clamp(Number(json.expires_in ?? 0), 0, MAX_TOKEN_TTL_S),
   };
-}
-
-function strField(json: Record<string, unknown>, key: string): string | null {
-  const v = json[key];
-  return typeof v === "string" ? v : null;
-}
-
-/** Coerce a server value to a string with control / non-printable characters
- *  stripped, so hostile or misconfigured API output can't inject terminal
- *  escape sequences (ANSI / OSC) when the CLI prints org names, board column
- *  names, or task titles (#398 hardening). */
-function cleanText(v: unknown): string {
-  // deno-lint-ignore no-control-regex
-  return String(v ?? "").replace(/[\x00-\x1f\x7f]/g, "");
-}
-
-/** Clamp a (possibly NaN) number into [lo, hi], falling back to lo. */
-function clamp(n: number, lo: number, hi: number): number {
-  if (!Number.isFinite(n)) return lo;
-  return Math.max(lo, Math.min(hi, n));
 }

@@ -46,7 +46,8 @@ function scripted(
   return { fetchFn, calls };
 }
 
-Deno.test("reasonForStatus maps statuses; everything else is transient", () => {
+Deno.test("reasonForStatus maps statuses; only 5xx and no connection are transient", () => {
+  for (const s of [400, 403, 429]) assertEquals(reasonForStatus(s), "unexpected", String(s));
   assertEquals(reasonForStatus(401), "unauthorized");
   assertEquals(reasonForStatus(404), "not_found");
   assertEquals(reasonForStatus(409), "conflict");
@@ -231,4 +232,18 @@ Deno.test("a connection dropped mid-body is transient, like a failed fetch", asy
     GateApiError,
   );
   assertEquals([e.status, e.reason], [0, "transient"]);
+});
+
+Deno.test("a 2xx that is not the wire format is unexpected, not an outage", async () => {
+  const malformed = (() => Promise.resolve(new Response("{}", { status: 200 }))) as FetchFn;
+  const c = new GateClient(API, malformed);
+  const calls = [
+    () => c.open("t", { projectKey: "K", type: "clarification", title: "t", payload: {} }),
+    () => c.apply("t", "K", "g"),
+    () => c.cancel("t", "g"),
+  ];
+  for (const call of calls) {
+    const e = await assertRejects(call as () => Promise<unknown>, GateApiError);
+    assertEquals(e.reason, "unexpected");
+  }
 });

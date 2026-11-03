@@ -1,4 +1,5 @@
 import { assertEquals, assertRejects } from "@std/assert";
+import { fromFileUrl, join } from "@std/path";
 import {
   CloudApiError,
   CloudClient,
@@ -34,20 +35,45 @@ const REQUEST = {
   payload: { question: "q" },
 } as const;
 
+/** The calls, once they are shown to cover every method the client has: a new one fails here. */
+function covering(
+  client: { prototype: object },
+  internal: string[],
+  calls: Record<string, () => Promise<unknown>>,
+): (() => Promise<unknown>)[] {
+  const methods = Object.getOwnPropertyNames(client.prototype)
+    .filter((m) => m !== "constructor" && !internal.includes(m));
+  assertEquals(Object.keys(calls).sort(), methods.sort());
+  return Object.values(calls);
+}
+
+Deno.test("no client reaches fetch except through cloudFetch", async () => {
+  const dir = fromFileUrl(new URL("../../src/domain/cloud", import.meta.url));
+  const clients: string[] = [];
+  for await (const f of Deno.readDir(dir)) {
+    const text = await Deno.readTextFile(join(dir, f.name));
+    clients.push(...[...text.matchAll(/export class (\w+Client)\b/g)].map((m) => m[1]));
+    if (f.name === "cloud_wire.ts") continue;
+    assertEquals(/\b(fetch|fetchFn)\(/.test(text), false, f.name);
+  }
+  // A client this file does not exercise fails here, until it does.
+  assertEquals(clients.sort(), ["CloudClient", "GateClient", "SpecClient"]);
+});
+
 Deno.test("every CloudClient request refuses a redirect, as a redirect and not as an outage", async () => {
   const { fn, modes } = redirecting();
   const c = new CloudClient(API, fn);
-  const calls: (() => Promise<unknown>)[] = [
-    () => c.startDevice(),
-    () => c.pollToken("d"),
-    () => c.refresh("r"),
-    () => c.listProjects("t"),
-    () => c.listOrgs("t"),
-    () => c.listColumns("t", "K"),
-    () => c.listTasks("t", "K"),
-    () => c.createProject("t", "K", "n"),
-    () => c.createTask("t", "K", "n"),
-  ];
+  const calls = covering(CloudClient, ["send", "postJson", "getJson"], {
+    startDevice: () => c.startDevice(),
+    pollToken: () => c.pollToken("d"),
+    refresh: () => c.refresh("r"),
+    listProjects: () => c.listProjects("t"),
+    listOrgs: () => c.listOrgs("t"),
+    listColumns: () => c.listColumns("t", "K"),
+    listTasks: () => c.listTasks("t", "K"),
+    createProject: () => c.createProject("t", "K", "n"),
+    createTask: () => c.createTask("t", "K", "n"),
+  });
   for (const call of calls) {
     const e = await assertRejects(call, CloudApiError);
     assertEquals([isRedirected(e), isUnavailable(e), e.status], [true, false, 307]);
@@ -58,11 +84,11 @@ Deno.test("every CloudClient request refuses a redirect, as a redirect and not a
 Deno.test("every SpecClient request refuses a redirect, and reads it as redirected", async () => {
   const { fn, modes } = redirecting();
   const c = new SpecClient(API, fn);
-  const calls = [
-    () => c.get("t", "K", 1),
-    () => c.ensure("t", "K", 1),
-    () => c.putSteps("t", "K", 1, []),
-  ];
+  const calls = covering(SpecClient, ["send"], {
+    get: () => c.get("t", "K", 1),
+    ensure: () => c.ensure("t", "K", 1),
+    putSteps: () => c.putSteps("t", "K", 1, []),
+  });
   for (const call of calls) {
     const e = await assertRejects(call as () => Promise<unknown>, SpecApiError);
     assertEquals(e.reason, "redirected");
@@ -73,12 +99,12 @@ Deno.test("every SpecClient request refuses a redirect, and reads it as redirect
 Deno.test("every GateClient request refuses a redirect, and reads it as redirected", async () => {
   const { fn, modes } = redirecting();
   const c = new GateClient(API, fn);
-  const calls = [
-    () => c.open("t", REQUEST),
-    () => c.get("t", "K", "g"),
-    () => c.apply("t", "K", "g"),
-    () => c.cancel("t", "g"),
-  ];
+  const calls = covering(GateClient, ["send"], {
+    open: () => c.open("t", REQUEST),
+    get: () => c.get("t", "K", "g"),
+    apply: () => c.apply("t", "K", "g"),
+    cancel: () => c.cancel("t", "g"),
+  });
   for (const call of calls) {
     const e = await assertRejects(call as () => Promise<unknown>, GateApiError);
     assertEquals(e.reason, "redirected");

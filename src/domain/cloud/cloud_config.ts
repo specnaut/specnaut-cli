@@ -94,12 +94,18 @@ export function parseCloudConfig(text: string): CloudConfig | null {
   if (!parsed || typeof parsed !== "object") return null;
   const remote = parseRemote(parsed.remote);
   return {
-    apiUrl: typeof parsed.api_url === "string" ? parsed.api_url : "",
+    apiUrl: apiUrlValue(parsed.api_url),
     projectKey: typeof parsed.project_key === "string" ? parsed.project_key : "",
     // Only present when the config actually carries a `remote:` block, so a
     // pre-gates config round-trips to the exact same shape (backward compatible).
     ...(remote ? { remote } : {}),
   };
+}
+
+/** A value of any other type is a bad api_url, which is not the same as none. */
+function apiUrlValue(raw: unknown): string {
+  if (raw === undefined || raw === null) return "";
+  return typeof raw === "string" ? raw : JSON.stringify(raw);
 }
 
 /** Project the optional `remote:` YAML block into a RemoteConfig (snake → camel). */

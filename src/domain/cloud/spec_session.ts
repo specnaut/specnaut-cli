@@ -9,7 +9,13 @@
 // keyed off HTTP status — never a Cloud-internal identifier or backend string.
 
 import { SpecApiError, SpecClient } from "./spec_client.ts";
-import { CloudClient, type FetchFn, isRedirected, isUnavailable } from "./cloud_client.ts";
+import {
+  CloudApiError,
+  CloudClient,
+  type FetchFn,
+  isRedirected,
+  isUnavailable,
+} from "./cloud_client.ts";
 import { accessToken, sessionToken } from "./auth_flow.ts";
 import { type CloudConfig, linkedApiUrl } from "./cloud_config.ts";
 import type { CredentialStore } from "./credentials.ts";
@@ -54,6 +60,7 @@ export class SpecSession {
     } catch (e) {
       if (isUnavailable(e)) throw new SpecApiError(0, "transient");
       if (isRedirected(e)) throw new SpecApiError(e.status, "redirected");
+      if (e instanceof CloudApiError) throw new SpecApiError(e.status, "unexpected");
       throw e;
     }
     if (!tok) throw new SpecApiError(401, "unauthorized");

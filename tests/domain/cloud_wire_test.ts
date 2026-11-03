@@ -1,10 +1,13 @@
 import { assertEquals, assertRejects } from "@std/assert";
 import {
+  clamp,
+  cleanText,
   cloudFetch,
   isRedirectStatus,
   isUnavailableStatus,
   jsonObject,
   readJson,
+  strField,
 } from "../../src/domain/cloud/cloud_wire.ts";
 
 Deno.test("isUnavailableStatus: no connection and 5xx only", () => {
@@ -44,4 +47,16 @@ Deno.test("cloudFetch: no caller can ask to follow a redirect", async () => {
   }) as typeof fetch;
   await cloudFetch(fn, "https://x.test", { method: "PUT", redirect: "follow" });
   assertEquals(seen, [{ method: "PUT", redirect: "manual" }]);
+});
+
+Deno.test("cleanText and strField: no control character reaches a terminal, C1 included", () => {
+  assertEquals(cleanText("a\x1b[31m\x07b\x9b1mc\x7f"), "a[31mb1mc");
+  assertEquals(cleanText(undefined), "");
+  assertEquals(cleanText("caf\u00e9 \u00a0 ~"), "caf\u00e9 \u00a0 ~");
+  assertEquals(strField({ error: "x\x1by" }, "error"), "xy");
+  assertEquals(strField({ error: 1 }, "error"), null);
+});
+
+Deno.test("clamp: into the range, NaN to the floor", () => {
+  assertEquals([clamp(1, 5, 9), clamp(7, 5, 9), clamp(99, 5, 9), clamp(NaN, 5, 9)], [5, 7, 9, 5]);
 });

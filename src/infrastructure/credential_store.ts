@@ -55,7 +55,7 @@ export class FileCredentialStore implements CredentialStore {
   }
 
   private get dir(): string {
-    return this.path.slice(0, this.path.lastIndexOf("/"));
+    return this.path.slice(0, Math.max(this.path.lastIndexOf("/"), this.path.lastIndexOf("\\")));
   }
 
   private async readAll(): Promise<Record<string, CloudCredentials>> {

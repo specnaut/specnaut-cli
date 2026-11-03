@@ -16,7 +16,7 @@ const DEVICE = {
 const json = (status: number, body: unknown) =>
   Promise.resolve(new Response(JSON.stringify(body), { status }));
 
-async function run(fetchFn: FetchFn) {
+function recordingStore() {
   const saved: unknown[] = [];
   const store: CredentialStore = {
     kind: "file",
@@ -27,11 +27,16 @@ async function run(fetchFn: FetchFn) {
     },
     delete: () => Promise.resolve(),
   };
+  return { store, saved };
+}
+
+async function run(fetchFn: FetchFn) {
+  const { store, saved } = recordingStore();
   const original = console.error;
   const lines: string[] = [];
   console.error = (...a: unknown[]) => void lines.push(a.join(" "));
+  let t = 0;
   try {
-    let t = 0;
     const ok = await deviceLogin({
       apiUrl: API,
       client: new CloudClient(API, fetchFn),
@@ -39,10 +44,7 @@ async function run(fetchFn: FetchFn) {
       io: { log: () => {} },
       openUrl: () => Promise.resolve(),
       now: () => t,
-      sleep: (ms) => {
-        t += ms;
-        return Promise.resolve();
-      },
+      sleep: (ms) => Promise.resolve(void (t += ms)),
     });
     return { ok, err: lines.join("\n"), saved };
   } finally {
@@ -82,9 +84,17 @@ Deno.test("deviceLogin: Cloud failing to start is a message without Cloud's own 
 });
 
 Deno.test("deviceLogin: a refusal keeps its reason, an approval stores the login and prints nothing", async () => {
-  const denied = await run(polling(() => json(200, { status: "denied" })));
-  assertEquals(denied.ok, false);
-  assertStringIncludes(denied.err, "authorization was denied");
+  const endings: [string, string][] = [
+    ["denied", "authorization was denied."],
+    ["expired", "the code expired before approval."],
+    ["invalid", "the authorization request was invalid."],
+    ["pending", "timed out waiting for approval."],
+  ];
+  for (const [status, words] of endings) {
+    const r = await run(polling(() => json(200, { status })));
+    assertEquals(r.ok, false, status);
+    assertStringIncludes(r.err, `error: ${words}`);
+  }
   const approved = await run(
     polling(() =>
       json(200, { status: "approved", access_token: "a", refresh_token: "r", expires_in: 60 })

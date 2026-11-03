@@ -81,3 +81,16 @@ for (const [when, expiry] of [["request", 8.64e15], ["refresh", 0]] as const) {
     assertEquals(/connection|retry|unknown/.test(text), false, text);
   });
 }
+
+Deno.test("spec pull: a refresh with no verdict is unexpected, and the login is kept", async () => {
+  const proxy = (() => Promise.resolve(new Response("<html>", { status: 200 }))) as FetchFn;
+  const s = makeSpecSession({
+    config: { apiUrl: "https://cloud.example.test", projectKey: "CLOUD" },
+    store: login(0),
+    fetchFn: proxy,
+    env: () => undefined,
+  });
+  const { all, err } = deps({ buildSession: () => Promise.resolve(s), cache: cacheOf([STEP]) });
+  assertEquals(await runSpec({ kind: "spec", sub: "pull", task: 7, apiUrl: null }, all), 5);
+  assertStringIncludes(err.join("\n"), "(unexpected)");
+});

@@ -1,41 +1,41 @@
 import { assertEquals, assertStringIncludes } from "@std/assert";
 import { fromFileUrl, join } from "@std/path";
+import { DENO_DIR } from "./spawn_env.ts";
 import { FsLockStore } from "../../src/infrastructure/fs_lock_store.ts";
+import { SpecCacheWriter } from "../../src/infrastructure/spec/spec_cache_writer.ts";
 
 // cli#736 — a project whose api_url is set and refused is not "not Cloud-linked".
 // Through the real binary: the handlers' own session wiring is what is under test.
 
 const MAIN = fromFileUrl(new URL("../../src/main.ts", import.meta.url));
 
-/** The cache this run uses. With a cleared environment, a child may look elsewhere and re-download. */
-const { denoDir } = JSON.parse(
-  new TextDecoder().decode(
-    (await new Deno.Command("deno", { args: ["info", "--json"], stdout: "piped", stderr: "null" })
-      .output()).stdout,
-  ),
-);
+/** A project linked to `apiUrl`, on the Cloud spec backend, with a spec to push. */
+async function linkedProject(dir: string, apiUrl: string) {
+  await Deno.mkdir(join(dir, ".specnaut"));
+  await Deno.writeTextFile(
+    join(dir, ".specnaut", "backlog-config.yml"),
+    `backend: cloud\napi_url: ${JSON.stringify(apiUrl)}\nproject_key: CLOUD\n`,
+  );
+  await new FsLockStore().write(dir, {
+    version: 2,
+    harness: "claude",
+    backlogBackend: "cloud",
+    versionScheme: "semver",
+    specBackend: "cloud",
+    templatesVersion: "0.0.0",
+    entries: new Map(),
+  });
+  await new SpecCacheWriter().write(dir, 1, [{ key: "plan", name: "Plan", order: 1, body: "x" }]);
+}
 
 async function inProject(apiUrl: string, args: string[]) {
   const dir = await Deno.makeTempDir({ prefix: "specnaut-bad-url-" });
   try {
-    await Deno.mkdir(join(dir, ".specnaut"));
-    await Deno.writeTextFile(
-      join(dir, ".specnaut", "backlog-config.yml"),
-      `backend: cloud\napi_url: ${JSON.stringify(apiUrl)}\nproject_key: CLOUD\n`,
-    );
-    await new FsLockStore().write(dir, {
-      version: 2,
-      harness: "claude",
-      backlogBackend: "cloud",
-      versionScheme: "semver",
-      specBackend: "cloud",
-      templatesVersion: "0.0.0",
-      entries: new Map(),
-    });
+    await linkedProject(dir, apiUrl);
     const { code, stderr } = await new Deno.Command("deno", {
       args: ["run", "--allow-read", "--allow-write", "--allow-run", "--allow-env", MAIN, ...args],
       cwd: dir,
-      env: { HOME: dir, DENO_DIR: denoDir, PATH: Deno.env.get("PATH") ?? "" },
+      env: { HOME: dir, DENO_DIR, PATH: Deno.env.get("PATH") ?? "" },
       clearEnv: true,
       stdout: "piped",
       stderr: "piped",
@@ -50,7 +50,9 @@ for (
   const args of [
     ["gate", "status"],
     ["gate", "cancel", "g"],
+    ["gate", "raise", "--type", "decision", "--title", "t"],
     ["spec", "pull", "1"],
+    ["spec", "push", "1"],
   ]
 ) {
   Deno.test(`\`${args.join(" ")}\`: a refused api_url is reported as such`, async () => {
