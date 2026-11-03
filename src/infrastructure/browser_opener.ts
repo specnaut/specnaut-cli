@@ -3,30 +3,36 @@
 
 export type BrowserOpener = (url: string) => Promise<void>;
 
-/** Platform launcher: `open` (macOS), `start` (Windows), `xdg-open` (Linux). */
-export const openInBrowser: BrowserOpener = async (url: string) => {
-  // Only open well-formed http(s) URLs. The verification URL comes from the
-  // (semi-trusted) Cloud server response; refusing other schemes / malformed
-  // values blocks argument-injection into the platform launcher (esp. Windows
-  // `cmd /c start`) and file:// / custom-scheme abuse.
+/** An http(s) URL in plain characters: all a verification page needs. */
+const PLAIN_URL = /^https?:\/\/[A-Za-z0-9._~:\[\]\/?#=&%+,-]+$/;
+
+/**
+ * What opens `url` on `os`, or null for anything but a plain http(s) URL: the
+ * verification URL comes from the (semi-trusted) Cloud server, and file:// or a
+ * custom scheme is not ours to open. A URL that does not open is still printed for
+ * the user to copy. Only the normalized form is handed on. On Windows it goes to
+ * the URL handler directly.
+ */
+export function browserCommand(os: string, url: string): [string, string[]] | null {
+  let href: string;
   try {
-    const u = new URL(url);
-    if (u.protocol !== "http:" && u.protocol !== "https:") return;
+    href = new URL(url).href;
   } catch {
-    return;
+    return null;
   }
-  const os = Deno.build.os;
-  const [cmd, args] = os === "darwin"
-    ? ["open", [url]]
-    : os === "windows"
-    ? ["cmd", ["/c", "start", "", url]]
-    : ["xdg-open", [url]];
+  if (!PLAIN_URL.test(href)) return null;
+  if (os === "darwin") return ["open", [href]];
+  if (os === "windows") return ["rundll32", ["url.dll,FileProtocolHandler", href]];
+  return ["xdg-open", [href]];
+}
+
+/** Platform launcher: `open` (macOS), the URL handler (Windows), `xdg-open` (Linux). */
+export const openInBrowser: BrowserOpener = async (url: string) => {
+  const launcher = browserCommand(Deno.build.os, url);
+  if (!launcher) return;
+  const [cmd, args] = launcher;
   try {
-    await new Deno.Command(cmd as string, {
-      args: args as string[],
-      stdout: "null",
-      stderr: "null",
-    }).output();
+    await new Deno.Command(cmd, { args, stdout: "null", stderr: "null" }).output();
   } catch {
     // Headless / no launcher — the caller already prints the URL to copy.
   }
