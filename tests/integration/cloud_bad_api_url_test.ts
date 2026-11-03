@@ -7,6 +7,14 @@ import { FsLockStore } from "../../src/infrastructure/fs_lock_store.ts";
 
 const MAIN = fromFileUrl(new URL("../../src/main.ts", import.meta.url));
 
+/** The cache this run uses. With a cleared environment, a child may look elsewhere and re-download. */
+const { denoDir } = JSON.parse(
+  new TextDecoder().decode(
+    (await new Deno.Command("deno", { args: ["info", "--json"], stdout: "piped", stderr: "null" })
+      .output()).stdout,
+  ),
+);
+
 async function inProject(apiUrl: string, args: string[]) {
   const dir = await Deno.makeTempDir({ prefix: "specnaut-bad-url-" });
   try {
@@ -27,7 +35,7 @@ async function inProject(apiUrl: string, args: string[]) {
     const { code, stderr } = await new Deno.Command("deno", {
       args: ["run", "--allow-read", "--allow-write", "--allow-run", "--allow-env", MAIN, ...args],
       cwd: dir,
-      env: { HOME: dir, USERPROFILE: dir, PATH: Deno.env.get("PATH") ?? "" },
+      env: { HOME: dir, DENO_DIR: denoDir, PATH: Deno.env.get("PATH") ?? "" },
       clearEnv: true,
       stdout: "piped",
       stderr: "piped",
