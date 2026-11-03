@@ -8,7 +8,7 @@
 // public status code is, so no Cloud-internal message can leak.
 
 import type { FetchFn } from "./cloud_client.ts";
-import { isUnavailableStatus, jsonObject } from "./cloud_wire.ts";
+import { cloudFetch, isRedirectStatus, isUnavailableStatus, jsonObject } from "./cloud_wire.ts";
 import { parseSpec, type SpecWire } from "./spec_contract.ts";
 import type { SpecStep } from "../spec/spec_step.ts";
 
@@ -19,6 +19,7 @@ export type SpecErrorReason =
   | "not_found" // 404
   | "conflict" // 409
   | "invalid" // 422 — bad payload
+  | "redirected" // 3xx — no client follows one: retrying changes nothing
   | "unexpected" // any other answer, or a body that is not the wire format
   | "transient"; // network / 5xx — Cloud unreachable, retryable
 
@@ -41,6 +42,7 @@ export function reasonForStatus(status: number): SpecErrorReason {
   if (status === 404) return "not_found";
   if (status === 409) return "conflict";
   if (status === 422) return "invalid";
+  if (isRedirectStatus(status)) return "redirected";
   return isUnavailableStatus(status) ? "transient" : "unexpected";
 }
 
@@ -63,7 +65,7 @@ export class SpecClient {
     if (body !== undefined) headers["Content-Type"] = "application/json";
     let res: Response;
     try {
-      res = await this.fetchFn(`${this.base}${path}`, {
+      res = await cloudFetch(this.fetchFn, `${this.base}${path}`, {
         method,
         headers,
         body: body !== undefined ? JSON.stringify(body) : undefined,

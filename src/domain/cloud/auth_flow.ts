@@ -3,7 +3,7 @@
 // injected so this is unit-testable without network / browser / keychain.
 
 import type { CloudClient } from "./cloud_client.ts";
-import { headlessRefusal, headlessToken } from "./cloud_config.ts";
+import { headlessRefusal, headlessToken } from "./headless_token.ts";
 import type { CloudCredentials, CredentialStore } from "./credentials.ts";
 
 export type AuthIo = {

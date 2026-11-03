@@ -65,6 +65,8 @@ Read these rather than any list in prose — prose lists here have drifted befor
 - Run tests with the task's permissions: `deno task test`, or for one file
   `deno test --allow-read --allow-write --allow-run --allow-env <file>`. `deno test -A` hides the
   permission errors the task hits.
+- A line a shell script prints is ASCII when it is written or changed: a legacy Windows code page
+  mangles anything else. Existing lines convert when they are next touched, never in a sweep.
 - A new assertion is shown red by mutating the code it guards before it is trusted.
 - The pre-commit hook (`hooks/pre-commit`, installed by `deno task setup`) runs `deno fmt --check`,
   `deno lint`, `deno task bundle` and `deno check src/main.ts`. It must be green before every

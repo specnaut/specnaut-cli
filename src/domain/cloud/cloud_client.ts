@@ -2,7 +2,7 @@
 // documented, versioned `/api/v1` wire format — the sole OSS↔Cloud coupling.
 // `fetch` is injectable for tests.
 
-import { isUnavailableStatus, readJson } from "./cloud_wire.ts";
+import { cloudFetch, isRedirectStatus, isUnavailableStatus, readJson } from "./cloud_wire.ts";
 
 export type DeviceStart = {
   deviceCode: string;
@@ -65,6 +65,11 @@ export function isUnavailable(e: unknown): boolean {
   return e instanceof CloudApiError && isUnavailableStatus(e.status);
 }
 
+/** A redirect Cloud answered with: no client follows one (cloud_wire.ts). */
+export function isRedirected(e: unknown): e is CloudApiError {
+  return e instanceof CloudApiError && isRedirectStatus(e.status);
+}
+
 export class CloudClient {
   private readonly base: string;
   private readonly fetchFn: FetchFn;
@@ -74,21 +79,32 @@ export class CloudClient {
     this.fetchFn = fetchFn;
   }
 
-  private async postJson(
+  /** One request: a network failure, mid-body too, or a redirect is a CloudApiError. */
+  private async send(
+    path: string,
+    init: RequestInit,
+  ): Promise<{ status: number; json: Record<string, unknown> }> {
+    try {
+      const res = await cloudFetch(this.fetchFn, `${this.base}${path}`, init);
+      if (isRedirectStatus(res.status)) {
+        await res.body?.cancel();
+        throw new CloudApiError(res.status, "Specnaut Cloud redirected the request");
+      }
+      return { status: res.status, json: await readJson(res) };
+    } catch (e) {
+      if (e instanceof TypeError) throw new CloudApiError(0, "Specnaut Cloud cannot be reached");
+      throw e;
+    }
+  }
+
+  private postJson(
     path: string,
     body: unknown,
     accessToken?: string,
   ): Promise<{ status: number; json: Record<string, unknown> }> {
     const headers: Record<string, string> = { "Content-Type": "application/json" };
     if (accessToken) headers.Authorization = `Bearer ${accessToken}`;
-    const res = await this.fetchFn(`${this.base}${path}`, {
-      method: "POST",
-      headers,
-      body: JSON.stringify(body ?? {}),
-      // A redirect would re-send a body that may hold a refresh token to another host.
-      redirect: "error",
-    });
-    return { status: res.status, json: await readJson(res) };
+    return this.send(path, { method: "POST", headers, body: JSON.stringify(body ?? {}) });
   }
 
   /** Authenticated GET → parsed body, throwing CloudApiError on non-200. The
@@ -99,12 +115,11 @@ export class CloudClient {
     accessToken: string,
     failMsg: string,
   ): Promise<Record<string, unknown>> {
-    const res = await this.fetchFn(`${this.base}${path}`, {
+    const { status, json } = await this.send(path, {
       headers: { Authorization: `Bearer ${accessToken}` },
     });
-    const json = await readJson(res);
-    if (res.status !== 200) {
-      throw new CloudApiError(res.status, strField(json, "error") ?? failMsg);
+    if (status !== 200) {
+      throw new CloudApiError(status, strField(json, "error") ?? failMsg);
     }
     return json;
   }
@@ -143,15 +158,11 @@ export class CloudClient {
     return { status: "invalid" };
   }
 
-  /** Rotate the pair. Only a literal `expired` / `invalid` condemns the token. Cloud unreachable
-   *  (fetch rejects), failing (5xx), or any other answer (a 429, a proxy's page) throws: no
+  /** Rotate the pair. Only a literal `expired` / `invalid` condemns the token. Cloud unreachable,
+   *  failing (5xx), redirecting, or any other answer (a 429, a proxy's page) throws: no
    *  verdict, so the token survives for the next attempt. */
   async refresh(refreshToken: string): Promise<RefreshResult> {
-    const { status, json } = await this.postJson("/auth/refresh", { refresh_token: refreshToken })
-      .catch((e) => {
-        if (e instanceof TypeError) return { status: 0, json: {} as Record<string, unknown> };
-        throw e;
-      });
+    const { status, json } = await this.postJson("/auth/refresh", { refresh_token: refreshToken });
     if (isUnavailableStatus(status)) {
       throw new CloudApiError(status, "token refresh: Cloud unavailable");
     }

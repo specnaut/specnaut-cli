@@ -10,7 +10,7 @@
 // public status code is, so no Cloud-internal message can leak.
 
 import type { FetchFn } from "./cloud_client.ts";
-import { readJson } from "./cloud_wire.ts";
+import { cloudFetch, isRedirectStatus, readJson } from "./cloud_wire.ts";
 import { type Gate, type GateRequest, parseGate } from "./gate_contract.ts";
 
 /** Typed error reasons the caller branches on. Derived from HTTP status only. */
@@ -19,6 +19,7 @@ export type GateErrorReason =
   | "not_found" // 404
   | "conflict" // 409 — illegal transition
   | "invalid" // 422 — bad type/payload/answer
+  | "redirected" // 3xx — no client follows one: an await does not retry it
   | "transient"; // network / 5xx — retryable inside an await loop
 
 export class GateApiError extends Error {
@@ -35,6 +36,7 @@ export function reasonForStatus(status: number): GateErrorReason {
   if (status === 404) return "not_found";
   if (status === 409) return "conflict";
   if (status === 422) return "invalid";
+  if (isRedirectStatus(status)) return "redirected";
   return "transient"; // 5xx, 0, and anything else the loop may retry
 }
 
@@ -56,7 +58,7 @@ export class GateClient {
     const headers: Record<string, string> = { Authorization: `Bearer ${token}` };
     if (body !== undefined) headers["Content-Type"] = "application/json";
     try {
-      const res = await this.fetchFn(`${this.base}${path}`, {
+      const res = await cloudFetch(this.fetchFn, `${this.base}${path}`, {
         method,
         headers,
         body: body !== undefined ? JSON.stringify(body) : undefined,

@@ -11,9 +11,9 @@
 import { type Gate, type GateRequest, validatePayload } from "./gate_contract.ts";
 import { GateApiError, GateClient, type GateErrorReason } from "./gate_client.ts";
 import { type RemoteMode, resolveRemoteMode } from "./remote_mode.ts";
-import { CloudApiError, CloudClient, type FetchFn } from "./cloud_client.ts";
+import { CloudApiError, CloudClient, type FetchFn, isRedirected } from "./cloud_client.ts";
 import { accessToken, sessionToken } from "./auth_flow.ts";
-import { type CloudConfig, normalizeApiUrl } from "./cloud_config.ts";
+import { type CloudConfig, linkedApiUrl } from "./cloud_config.ts";
 import type { CredentialStore } from "./credentials.ts";
 
 /** Typed result of awaiting / applying / cancelling. */
@@ -85,6 +85,7 @@ export class GateSession {
       // Refresh the token each poll cycle so a long await survives expiry (SC-007).
       const fresh = await this.bearer("unauthorized");
       if (typeof fresh === "string") tok = fresh;
+      else if (fresh.reason === "redirected") return fresh; // retrying changes nothing
       const stale = typeof fresh !== "string" && fresh.reason === "transient";
 
       const probed = await this.probe(tok, gate.id, stale);
@@ -124,13 +125,13 @@ export class GateSession {
     }
   }
 
-  /** The token, or why there is none: `missing` when logged out, transient when Cloud gave no verdict. */
+  /** The token, or why there is none: `missing` when logged out, else what kept Cloud from giving a verdict. */
   private async bearer(missing: "no_remote" | "unauthorized"): Promise<string | NoToken> {
     try {
       return (await this.deps.token()) ?? { kind: "error", reason: missing };
     } catch (e) {
-      if (e instanceof CloudApiError) return { kind: "error", reason: "transient" };
-      throw e;
+      if (!(e instanceof CloudApiError)) throw e;
+      return { kind: "error", reason: isRedirected(e) ? "redirected" : "transient" };
     }
   }
 
@@ -173,7 +174,8 @@ export class GateSession {
  * injectable so callers/tests can substitute them.
  *
  * Returns `null` when the project isn't Cloud-linked (no api_url/project_key) —
- * the caller treats that as "handle locally". The returned session may still be
+ * the caller treats that as "handle locally"; an api_url that is set and not plain
+ * throws InvalidApiUrl. The returned session may still be
  * remote-disabled (`session.remote.enabled === false`); callers check that to
  * decide remote vs local before raising a gate.
  */
@@ -189,7 +191,7 @@ export function makeGateSession(deps: {
   sleep?: (ms: number) => Promise<void>;
 }): GateSession | null {
   const { config, store, env } = deps;
-  const apiUrl = normalizeApiUrl(config.apiUrl);
+  const apiUrl = linkedApiUrl(config.apiUrl);
   if (!apiUrl || !config.projectKey) return null;
 
   const now = deps.now ?? (() => Date.now());

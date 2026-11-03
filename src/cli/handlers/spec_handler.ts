@@ -5,9 +5,9 @@
 // with a clear message (there is no remote spec to sync). Mirrors gate_handler.ts
 // — deps built from FsBacklogConfigStore + defaultCredentialStore(); exit codes below.
 //
-//   pull  exit 0 (materialised / no-spec) · 1 (usage / local backend) · 5 (cloud/auth)
+//   pull  exit 0 (materialised / no-spec) · 1 (usage / local backend / bad api_url) · 5 (cloud/auth)
 //         · 6 (Cloud unreachable; the existing cache was left as it was — it may be stale)
-//   push  exit 0 (upserted) · 1 (usage / local backend / nothing to push) · 5 (cloud/auth)
+//   push  exit 0 (upserted) · 1 (usage / local backend / bad api_url / nothing to push) · 5 (cloud/auth)
 //
 // Constitution § I: stdout/stderr carry only CLI-owned messages + public
 // task/step data; a cloud failure is a status-derived reason, never a backend
@@ -19,6 +19,7 @@ import {
   CloudConfigUnreadable,
   FsBacklogConfigStore,
 } from "../../infrastructure/fs_backlog_config_store.ts";
+import { InvalidApiUrl } from "../../domain/cloud/cloud_config.ts";
 import { makeSpecSession, type SpecSession } from "../../domain/cloud/spec_session.ts";
 import { SpecApiError } from "../../domain/cloud/spec_client.ts";
 import { CloudSpecStore } from "../../infrastructure/spec/cloud_spec_store.ts";
@@ -88,7 +89,7 @@ export async function runSpec(
   try {
     return await runSpecUnguarded(intent, deps);
   } catch (e) {
-    if (!(e instanceof CloudConfigUnreadable)) throw e;
+    if (!(e instanceof CloudConfigUnreadable || e instanceof InvalidApiUrl)) throw e;
     deps.err(red(`error: ${e.message}`));
     return 1;
   }
@@ -208,6 +209,11 @@ function actionable(e: unknown, what: string): string {
   }
   if (reason === "unauthorized") {
     return red(`error: not authenticated to ${what} — run \`specnaut cloud login\` and retry.`);
+  }
+  if (reason === "redirected") {
+    return red(
+      `error: could not ${what} — Specnaut Cloud redirected the request, and the CLI follows no redirect: check api_url.`,
+    );
   }
   return red(`error: could not ${what} (${reason}) — check your connection and retry.`);
 }

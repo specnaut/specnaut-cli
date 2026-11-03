@@ -143,6 +143,7 @@ for (const runner of RUNNERS) {
       const sha = await r.git("rev-parse", "short");
       await r.git("branch", "-q", "-D", "short");
       await Deno.writeTextFile(join(r.dir, ".git", "packed-refs"), `${sha} refs/heads/${long}\n`);
+      // Without it, Git for Windows fails on a ref name past MAX_PATH, even a packed one.
       await r.git("config", "core.longpaths", "true");
       assertEquals(
         await r.git("for-each-ref", "--format=%(refname:short)", "refs/heads/005-*"),

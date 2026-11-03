@@ -4,7 +4,8 @@
 // plan/merge approval in #359) shell out to it instead of re-implementing HTTP.
 //
 //   status   exit 0 + {"enabled":true,...} when remote mode is on for the project;
-//            exit 2 when off, exit 5 when the project isn't Cloud-linked.
+//            exit 2 when off, exit 5 when the project isn't Cloud-linked, exit 1 when
+//            its api_url is unreadable or not a plain http(s) URL.
 //   raise    open → await → apply a gate; prints the answer JSON on stdout and
 //            exits 0 (answered) / 3 (unresolved) / 4 (cancelled) / 5 (no_remote)
 //            / 1 (other). Distinct codes let the phase branch deterministically.
@@ -20,7 +21,13 @@ import {
   CloudConfigUnreadable,
   FsBacklogConfigStore,
 } from "../../infrastructure/fs_backlog_config_store.ts";
-import { GateSession, makeGateSession } from "../../domain/cloud/gate_session.ts";
+import { InvalidApiUrl } from "../../domain/cloud/cloud_config.ts";
+import type { GateErrorReason } from "../../domain/cloud/gate_client.ts";
+import {
+  GateSession,
+  makeGateSession,
+  type ResolutionOutcome,
+} from "../../domain/cloud/gate_session.ts";
 import type { GateRequest, GateType } from "../../domain/cloud/gate_contract.ts";
 import { GATE_TYPES, isGateType } from "../../domain/cloud/gate_contract.ts";
 
@@ -41,6 +48,18 @@ export type GateDeps = {
   err: (s: string) => void;
   /** Build a session for the project, or null when not Cloud-linked. */
   buildSession: () => Promise<GateSession | null>;
+};
+
+/** Why a gate request failed, in a sentence (the reason itself is an internal branch key). */
+const FAILURE: Record<GateErrorReason | "no_remote", string> = {
+  transient: "Specnaut Cloud cannot be reached right now; retry.",
+  unauthorized: "not authenticated with Specnaut Cloud; run `specnaut cloud login`.",
+  not_found: "Specnaut Cloud does not know this gate.",
+  conflict: "the gate is no longer in a state that allows this.",
+  invalid: "Specnaut Cloud refused the gate as invalid; check --type and --payload.",
+  redirected:
+    "Specnaut Cloud redirected the request, and the CLI follows no redirect: check api_url.",
+  no_remote: "remote mode requires a Cloud login (`specnaut cloud login`).",
 };
 
 function defaultDeps(intent: GateIntent): GateDeps {
@@ -69,7 +88,7 @@ export async function runGate(
   try {
     return await runGateUnguarded(intent, deps);
   } catch (e) {
-    if (!(e instanceof CloudConfigUnreadable)) throw e;
+    if (!(e instanceof CloudConfigUnreadable || e instanceof InvalidApiUrl)) throw e;
     deps.err(red(`error: ${e.message}`));
     return 1;
   }
@@ -134,7 +153,15 @@ async function runRaise(intent: GateIntent, deps: GateDeps): Promise<number> {
     ...(intent.task !== null ? { taskNumber: intent.task } : {}),
   };
 
-  const outcome = await session.raiseAndAwait(req);
+  return await reportRaise(await session.raiseAndAwait(req), session, deps);
+}
+
+/** Print a raise's outcome; the exit code tells the phase which it was. */
+async function reportRaise(
+  outcome: ResolutionOutcome,
+  session: GateSession,
+  deps: GateDeps,
+): Promise<number> {
   switch (outcome.kind) {
     case "answered": {
       // Acknowledge consumption (idempotent). The answer is what the phase needs,
@@ -154,10 +181,10 @@ async function runRaise(intent: GateIntent, deps: GateDeps): Promise<number> {
       return 4;
     case "error":
       if (outcome.reason === "no_remote") {
-        deps.err(red("error: remote mode requires a Cloud login (`specnaut cloud login`)."));
+        deps.err(red(`error: ${FAILURE.no_remote}`));
         return 5;
       }
-      deps.err(red(`error: gate could not be resolved (${outcome.reason}).`));
+      deps.err(red(`error: gate could not be resolved: ${FAILURE[outcome.reason]}`));
       return 1;
     default:
       return 1;
@@ -179,10 +206,7 @@ async function runCancel(intent: GateIntent, deps: GateDeps): Promise<number> {
     deps.out(JSON.stringify({ state: "cancelled" }));
     return 0;
   }
-  deps.err(
-    red(
-      `error: could not cancel gate (${outcome.kind === "error" ? outcome.reason : outcome.kind}).`,
-    ),
-  );
+  const why = outcome.kind === "error" ? FAILURE[outcome.reason] : `it is ${outcome.kind}.`;
+  deps.err(red(`error: could not cancel gate: ${why}`));
   return 1;
 }

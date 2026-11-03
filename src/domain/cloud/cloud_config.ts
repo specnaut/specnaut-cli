@@ -38,36 +38,20 @@ export function normalizeApiUrl(raw: string): string | null {
   return host && URL.canParse(trimmed) && new URL(trimmed).hostname === host ? trimmed : null;
 }
 
-/** A headless token handed over for a deployment, or the origin it was refused for. */
-export type HeadlessToken = { token: string } | { refused: string } | null;
-
-/**
- * The headless token (`SPECNAUT_CLOUD_TOKEN`, legacy `SPECFLOW_CLOUD_TOKEN`) for
- * `apiUrl`, or `null` when the environment sets none. Unlike a stored credential
- * it is bound to no deployment, so it goes only to the canonical endpoint or to
- * the origin the environment itself names in `SPECNAUT_CLOUD_API_URL`: never to
- * one a repository picked, through `api_url` or a command line it runs.
- */
-export function headlessToken(
-  apiUrl: string,
-  env: (key: string) => string | undefined,
-): HeadlessToken {
-  const token = (env("SPECNAUT_CLOUD_TOKEN") ?? env("SPECFLOW_CLOUD_TOKEN"))?.trim();
-  if (!token) return null;
-  const origin = originOf(apiUrl);
-  const allowed = [DEFAULT_CLOUD_API_URL, env("SPECNAUT_CLOUD_API_URL") ?? ""].map(originOf);
-  return origin && allowed.includes(origin) ? { token } : { refused: origin ?? apiUrl };
+/** An `api_url` is set, and is not a plain http(s) base: not the same as no link at all. */
+export class InvalidApiUrl extends Error {
+  constructor() {
+    super("invalid Specnaut Cloud API URL — check --api-url / api_url.");
+    this.name = "InvalidApiUrl";
+  }
 }
 
-/** Why a headless token was not sent, for the caller to print. */
-export function headlessRefusal(origin: string): string {
-  return `SPECNAUT_CLOUD_TOKEN is not sent to ${origin}: a headless token goes only to ` +
-    `${DEFAULT_CLOUD_API_URL}, or to the origin SPECNAUT_CLOUD_API_URL names.`;
-}
-
-function originOf(url: string): string | null {
-  const u = normalizeApiUrl(url);
-  return u ? new URL(u).origin : null;
+/** The project's API base: null when none is set, InvalidApiUrl when it is not a plain one. */
+export function linkedApiUrl(raw: string): string | null {
+  if (!raw.trim()) return null;
+  const url = normalizeApiUrl(raw);
+  if (!url) throw new InvalidApiUrl();
+  return url;
 }
 
 /** Render the Cloud `backlog-config.yml` body (no secret). */

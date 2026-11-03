@@ -20,14 +20,11 @@ import {
   type CloudProject,
   type CloudTask,
 } from "../../domain/cloud/cloud_client.ts";
-import { login } from "../../domain/cloud/auth_flow.ts";
+import { deviceLogin } from "./cloud_login.ts";
 import { requireCloudToken } from "./cloud_token.ts";
-import {
-  DEFAULT_CLOUD_API_URL,
-  headlessRefusal,
-  headlessToken,
-  normalizeApiUrl,
-} from "../../domain/cloud/cloud_config.ts";
+import { DEFAULT_CLOUD_API_URL, normalizeApiUrl } from "../../domain/cloud/cloud_config.ts";
+import { headlessRefusal, headlessToken } from "../../domain/cloud/headless_token.ts";
+import type { CredentialStore } from "../../domain/cloud/credentials.ts";
 import { defaultCredentialStore } from "../../infrastructure/credential_store.ts";
 import { FsBacklogConfigStore } from "../../infrastructure/fs_backlog_config_store.ts";
 import { openInBrowser } from "../../infrastructure/browser_opener.ts";
@@ -212,9 +209,7 @@ function renderBoard(
 
 async function runLogin(intent: CloudIntent): Promise<number> {
   if (!Deno.stdin.isTerminal()) {
-    console.error(
-      red("error: `specnaut cloud login` needs an interactive terminal."),
-    );
+    console.error(red("error: `specnaut cloud login` needs an interactive terminal."));
     console.error(
       dim("  For CI / headless use, set SPECNAUT_CLOUD_TOKEN to a Cloud API token instead."),
     );
@@ -238,33 +233,9 @@ async function runLogin(intent: CloudIntent): Promise<number> {
   const client = new CloudClient(apiUrl);
   const store = defaultCredentialStore();
 
-  // First-ever auth against a URL a project config chose is the phishing window
-  // — require an explicit confirmation there (and only there). An --api-url
-  // flag, a typed URL, or re-login to a known deployment proceed unprompted.
-  //
-  // Only a `config` source can EVER require the gate, so read credentials only
-  // then. For the default endpoint / an explicit flag the answer is always "no
-  // confirm" — reading here would just pop a keychain prompt (and, mid-rebrand,
-  // a legacy-item migration read) to compute a value we'd discard. Login writes
-  // fresh credentials regardless, so it never needs the existing ones.
-  const existing = resolved.source === "config" ? await store.load(apiUrl) : null;
-  if (loginNeedsTrustConfirm(resolved.source, existing !== null)) {
-    console.log(
-      yellow(
-        "  ⚠ this URL comes from the project config, not from you, and you have",
-      ),
-    );
-    console.log(yellow("    never logged in here before."));
-    const answer = (prompt("  Authenticate against this server? [y/N]") ?? "")
-      .trim()
-      .toLowerCase();
-    if (answer !== "y" && answer !== "yes") {
-      console.error(red("aborted — login cancelled."));
-      return 1;
-    }
-  }
+  if (!await trustedTarget(resolved, store)) return 1;
 
-  const result = await login({
+  const loggedIn = await deviceLogin({
     apiUrl,
     client,
     store,
@@ -273,17 +244,7 @@ async function runLogin(intent: CloudIntent): Promise<number> {
     now: () => Date.now(),
     sleep,
   });
-
-  if (!result.ok) {
-    const reason = {
-      denied: "authorization was denied.",
-      expired: "the code expired before approval.",
-      timeout: "timed out waiting for approval.",
-      invalid: "the authorization request was invalid.",
-    }[result.reason];
-    console.error(red(`error: ${reason} Run \`specnaut cloud login\` to try again.`));
-    return 1;
-  }
+  if (!loggedIn) return 1;
   console.log(green("✓ authenticated with Specnaut Cloud"));
   console.log(
     dim(
@@ -293,7 +254,37 @@ async function runLogin(intent: CloudIntent): Promise<number> {
     ),
   );
 
-  // Bind the project: list, then select or create.
+  return await bindProject(apiUrl, client, store);
+}
+
+/**
+ * First-ever auth against a URL a project config chose is the phishing window —
+ * require an explicit confirmation there (and only there). An --api-url flag, a
+ * typed URL, or re-login to a known deployment proceed unprompted.
+ *
+ * Only a `config` source can EVER require the gate, so read credentials only
+ * then. For the default endpoint / an explicit flag the answer is always "no
+ * confirm" — reading here would just pop a keychain prompt (and, mid-rebrand,
+ * a legacy-item migration read) to compute a value we'd discard. Login writes
+ * fresh credentials regardless, so it never needs the existing ones.
+ */
+async function trustedTarget(resolved: ResolvedApiUrl, store: CredentialStore): Promise<boolean> {
+  const existing = resolved.source === "config" ? await store.load(resolved.url) : null;
+  if (!loginNeedsTrustConfirm(resolved.source, existing !== null)) return true;
+  console.log(yellow("  ⚠ this URL comes from the project config, not from you, and you have"));
+  console.log(yellow("    never logged in here before."));
+  const answer = (prompt("  Authenticate against this server? [y/N]") ?? "").trim().toLowerCase();
+  if (answer === "y" || answer === "yes") return true;
+  console.error(red("aborted — login cancelled."));
+  return false;
+}
+
+/** Bind the project: list, then select or create. */
+async function bindProject(
+  apiUrl: string,
+  client: CloudClient,
+  store: CredentialStore,
+): Promise<number> {
   const token = await requireCloudToken(apiUrl, client, store);
   if (!token) return 1;
 
@@ -411,15 +402,22 @@ async function runToken(intent: CloudIntent): Promise<number> {
   const apiUrl = resolved.url;
   // Headless / CI: the environment's token wins, for a deployment it may go to only.
   const headless = headlessToken(apiUrl, (k) => Deno.env.get(k));
-  if (headless) {
-    if ("token" in headless) console.log(headless.token);
-    else console.error(red(`error: ${headlessRefusal(headless.refused)}`));
-    return "token" in headless ? 0 : 1;
+  if (headless && "token" in headless) {
+    console.log(headless.token);
+    return 0;
   }
+  // Refused: the policy every session follows (headless_token.ts), so a script and
+  // the session beside it never disagree about the same project.
+  if (headless) console.error(yellow(`warning: ${headlessRefusal(headless.refused)}`));
 
   const client = new CloudClient(apiUrl);
   const store = defaultCredentialStore();
-  const token = await requireCloudToken(apiUrl, client, store);
+  const token = await requireCloudToken(
+    apiUrl,
+    client,
+    store,
+    headless ? undefined : "run `specnaut cloud login` (or set SPECNAUT_CLOUD_TOKEN).",
+  );
   if (!token) return 1;
   console.log(token);
   return 0;

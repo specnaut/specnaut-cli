@@ -9,9 +9,9 @@
 // keyed off HTTP status — never a Cloud-internal identifier or backend string.
 
 import { SpecApiError, SpecClient } from "./spec_client.ts";
-import { CloudClient, type FetchFn, isUnavailable } from "./cloud_client.ts";
+import { CloudClient, type FetchFn, isRedirected, isUnavailable } from "./cloud_client.ts";
 import { accessToken, sessionToken } from "./auth_flow.ts";
-import { type CloudConfig, normalizeApiUrl } from "./cloud_config.ts";
+import { type CloudConfig, linkedApiUrl } from "./cloud_config.ts";
 import type { CredentialStore } from "./credentials.ts";
 import type { SpecStep } from "../spec/spec_step.ts";
 
@@ -44,7 +44,8 @@ export class SpecSession {
 
   /**
    * Obtain a bearer token or fail with a typed unauthorized error (→ re-login).
-   * A refresh that cannot reach Cloud is transient, like any other network failure.
+   * A refresh that cannot reach Cloud is transient, like any other network failure; one
+   * that meets a redirect is that, not an outage.
    */
   private async requireToken(): Promise<string> {
     let tok: string | null;
@@ -52,6 +53,7 @@ export class SpecSession {
       tok = await this.deps.token();
     } catch (e) {
       if (isUnavailable(e)) throw new SpecApiError(0, "transient");
+      if (isRedirected(e)) throw new SpecApiError(e.status, "redirected");
       throw e;
     }
     if (!tok) throw new SpecApiError(401, "unauthorized");
@@ -113,7 +115,8 @@ export class SpecSession {
  * + credentials. Reuses the same Cloud-link file (`backlog-config.yml`) and
  * credential store the gate/backlog paths use — no new credential type (FR-007).
  * Returns `null` when the project isn't Cloud-linked (no api_url / project_key),
- * which the caller treats as "not a cloud-backed spec project". `env` is supplied
+ * which the caller treats as "not a cloud-backed spec project"; an api_url that is
+ * set and not plain throws InvalidApiUrl. `env` is supplied
  * by the caller; `fetchFn` / `now` are injectable for tests. Mirrors
  * {@link makeGateSession}.
  */
@@ -128,7 +131,7 @@ export function makeSpecSession(deps: {
   now?: () => number;
 }): SpecSession | null {
   const { config, store, env } = deps;
-  const apiUrl = normalizeApiUrl(config.apiUrl);
+  const apiUrl = linkedApiUrl(config.apiUrl);
   if (!apiUrl || !config.projectKey) return null;
 
   const now = deps.now ?? (() => Date.now());

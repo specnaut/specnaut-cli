@@ -1,5 +1,5 @@
 import { assertEquals, assertRejects } from "@std/assert";
-import { CloudApiError, CloudClient } from "../../src/domain/cloud/cloud_client.ts";
+import { CloudApiError, CloudClient, isUnavailable } from "../../src/domain/cloud/cloud_client.ts";
 
 const API = "https://api.example.com";
 
@@ -225,18 +225,6 @@ Deno.test("refresh and pollToken cap expires_in", async () => {
   assertEquals(approved.status === "approved" && approved.expiresInS, 31_536_000);
 });
 
-Deno.test("the auth POSTs refuse a redirect: it would re-send the refresh token elsewhere", async () => {
-  const seen: (string | undefined)[] = [];
-  const fn = ((_: string, init?: RequestInit) => {
-    seen.push(init?.redirect);
-    return Promise.resolve(new Response(JSON.stringify({ status: "invalid" }), { status: 200 }));
-  }) as typeof fetch;
-  const client = new CloudClient(API, fn);
-  await client.refresh("RT");
-  await client.pollToken("d");
-  assertEquals(seen, ["error", "error"]);
-});
-
 Deno.test("pollToken: a status that is not a string approves nothing, however it stringifies", async () => {
   const body = { status: ["approved"], access_token: "a", refresh_token: "r" };
   assertEquals(await new CloudClient(API, fakeFetch(200, body).fn).pollToken("d"), {
@@ -247,5 +235,13 @@ Deno.test("pollToken: a status that is not a string approves nothing, however it
 Deno.test("a connection dropped mid-body rejects: an outage is not an empty listing", async () => {
   const dropped = new ReadableStream({ start: (c) => c.error(new TypeError("connection reset")) });
   const fn = (() => Promise.resolve(new Response(dropped, { status: 200 }))) as typeof fetch;
-  await assertRejects(() => new CloudClient(API, fn).listProjects("t"), TypeError);
+  const e = await assertRejects(() => new CloudClient(API, fn).listProjects("t"), CloudApiError);
+  assertEquals([e.status, isUnavailable(e)], [0, true]);
+});
+
+Deno.test("refresh over a dropped body: no verdict, so nothing condemns the token", async () => {
+  const dropped = new ReadableStream({ start: (c) => c.error(new TypeError("connection reset")) });
+  const fn = (() => Promise.resolve(new Response(dropped, { status: 200 }))) as typeof fetch;
+  const e = await assertRejects(() => new CloudClient(API, fn).refresh("RT"), CloudApiError);
+  assertEquals([e.status, isUnavailable(e)], [0, true]);
 });

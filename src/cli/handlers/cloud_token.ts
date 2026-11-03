@@ -4,24 +4,43 @@
 
 import { dim, red } from "@std/fmt/colors";
 import { accessToken } from "../../domain/cloud/auth_flow.ts";
-import { CloudApiError, type CloudClient, isUnavailable } from "../../domain/cloud/cloud_client.ts";
+import {
+  CloudApiError,
+  type CloudClient,
+  isRedirected,
+  isUnavailable,
+} from "../../domain/cloud/cloud_client.ts";
 import type { CredentialStore } from "../../domain/cloud/credentials.ts";
 
-/** A token for `apiUrl`, or null once the reason has been printed. Never prints the token. */
+/** What went wrong with a Cloud request, in the CLI's own words (§ I). */
+export function cloudFailure(e: CloudApiError): string {
+  if (isRedirected(e)) {
+    return "Specnaut Cloud redirected the request, and the CLI follows no redirect: check the API URL";
+  }
+  return `Specnaut Cloud ${
+    isUnavailable(e) ? "cannot be reached" : "answered unexpectedly"
+  }; retry`;
+}
+
+/**
+ * A token for `apiUrl`, or null once the reason has been printed. Never prints the
+ * token. `loginHint` is what a logged-out user is told to do: only `cloud token`
+ * reads SPECNAUT_CLOUD_TOKEN, so only it may offer that.
+ */
 export async function requireCloudToken(
   apiUrl: string,
   client: CloudClient,
   store: CredentialStore,
+  loginHint = "run `specnaut cloud login`.",
 ): Promise<string | null> {
   try {
     const token = await accessToken({ apiUrl, client, store, now: () => Date.now() });
     if (token) return token;
     console.error(red("error: not authenticated with Specnaut Cloud."));
-    console.error(dim("  run `specnaut cloud login` (or set SPECNAUT_CLOUD_TOKEN)."));
+    console.error(dim(`  ${loginHint}`));
   } catch (e) {
     if (!(e instanceof CloudApiError)) throw e;
-    const why = isUnavailable(e) ? "cannot be reached" : "answered unexpectedly";
-    console.error(red(`error: Specnaut Cloud ${why} — your login is kept; retry.`));
+    console.error(red(`error: ${cloudFailure(e)}. Your login is kept.`));
   }
   return null;
 }

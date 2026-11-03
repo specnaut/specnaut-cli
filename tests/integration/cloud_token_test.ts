@@ -1,5 +1,6 @@
 import { assertEquals, assertStringIncludes } from "@std/assert";
-import { fromFileUrl } from "@std/path";
+import { fromFileUrl, join } from "@std/path";
+import { FileCredentialStore } from "../../src/infrastructure/credential_store.ts";
 
 const MAIN = fromFileUrl(new URL("../../src/main.ts", import.meta.url));
 
@@ -48,20 +49,51 @@ Deno.test("`cloud token` hands the headless token over for the canonical endpoin
 });
 
 Deno.test("`cloud token` refuses the headless token for a deployment the environment did not name", async () => {
-  for (
-    const url of [
-      "https://api.example.com",
-      "http://api.specnaut.com",
-      "https://api.specnaut.com.evil.test",
-    ]
-  ) {
+  const home = await Deno.makeTempDir({ prefix: "specnaut-nohome-" });
+  try {
+    for (
+      const url of [
+        "https://api.example.com",
+        "http://api.specnaut.com",
+        "https://api.specnaut.com.evil.test",
+      ]
+    ) {
+      const r = await runSpecnaut(
+        ["cloud", "token", "--api-url", url],
+        { HOME: home, SPECNAUT_CLOUD_TOKEN: "sfc_headless_xyz", PATH: Deno.env.get("PATH") ?? "" },
+      );
+      assertEquals(r.code, 1, url);
+      assertEquals(r.stdout.includes("sfc_headless_xyz"), false, url);
+      assertStringIncludes(r.stderr, "is not sent to", url);
+      assertStringIncludes(r.stderr, "not authenticated", url);
+      // The env's token was just refused: setting it is not the way out.
+      assertEquals(r.stderr.includes("(or set SPECNAUT_CLOUD_TOKEN)"), false, r.stderr);
+    }
+  } finally {
+    await Deno.remove(home, { recursive: true });
+  }
+});
+
+// cli#736 — one refusal policy: warn, then the user's own login for that deployment.
+Deno.test("`cloud token` refused the headless token: it warns, then uses the login stored for that URL", async () => {
+  const home = await Deno.makeTempDir({ prefix: "specnaut-home-" });
+  const url = "https://cloud.example.test";
+  try {
+    await new FileCredentialStore(join(home, ".specnaut", "credentials.json")).save(url, {
+      accessToken: "stored-login",
+      refreshToken: "r",
+      accessExpiresAt: 8.64e15,
+    });
     const r = await runSpecnaut(
       ["cloud", "token", "--api-url", url],
-      { SPECNAUT_CLOUD_TOKEN: "sfc_headless_xyz", PATH: Deno.env.get("PATH") ?? "" },
+      { HOME: home, SPECNAUT_CLOUD_TOKEN: "sfc_headless_xyz", PATH: Deno.env.get("PATH") ?? "" },
     );
-    assertEquals(r.code, 1, url);
-    assertEquals(r.stdout.includes("sfc_headless_xyz"), false, url);
-    assertStringIncludes(r.stderr, "is not sent to", url);
+    assertEquals(r.code, 0, r.stderr);
+    assertEquals(r.stdout.trim(), "stored-login");
+    assertStringIncludes(r.stderr, "is not sent to");
+    assertEquals(r.stderr.includes("sfc_headless_xyz"), false, r.stderr);
+  } finally {
+    await Deno.remove(home, { recursive: true });
   }
 });
 
@@ -75,6 +107,8 @@ Deno.test("`cloud token` with no env + no stored creds → exit 1 with guidance"
     );
     assertEquals(r.code, 1);
     assertStringIncludes(r.stderr, "cloud login");
+    // The one command that reads the variable may offer it.
+    assertStringIncludes(r.stderr, "SPECNAUT_CLOUD_TOKEN");
   } finally {
     await Deno.remove(home, { recursive: true });
   }

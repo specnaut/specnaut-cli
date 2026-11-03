@@ -18,14 +18,17 @@ function storeWith(login: boolean): CredentialStore {
 }
 
 async function errorsOf(fetchFn: typeof fetch, store: CredentialStore) {
-  const original = console.error;
+  const { error, log } = console;
   const lines: string[] = [];
+  const out: string[] = [];
   console.error = (...a: unknown[]) => void lines.push(a.join(" "));
+  console.log = (...a: unknown[]) => void out.push(a.join(" "));
   try {
     const token = await requireCloudToken(API, new CloudClient(API, fetchFn), store);
-    return { token, err: lines.join("\n") };
+    return { token, err: lines.join("\n"), out: out.join("\n") };
   } finally {
-    console.error = original;
+    console.error = error;
+    console.log = log;
   }
 }
 
@@ -59,6 +62,17 @@ Deno.test("requireCloudToken: with no login, it says to log in", async () => {
   assertEquals(token, null);
   assertStringIncludes(err, "not authenticated");
   assertStringIncludes(err, "specnaut cloud login");
+  // orgs, board and login never read SPECNAUT_CLOUD_TOKEN: setting it would not help them.
+  assertEquals(err.includes("SPECNAUT_CLOUD_TOKEN"), false, err);
+});
+
+Deno.test("requireCloudToken: a redirect is not an outage: nothing says to retry", async () => {
+  const moved = (() => Promise.resolve(new Response("{}", { status: 307 }))) as typeof fetch;
+  const { token, err } = await errorsOf(moved, storeWith(true));
+  assertEquals(token, null);
+  assertStringIncludes(err, "redirected the request");
+  assertEquals(/cannot be reached|retry/.test(err), false, err);
+  assertEquals(err.includes("not authenticated"), false, err);
 });
 
 Deno.test("requireCloudToken: a valid login returns its token and prints nothing", async () => {
@@ -66,7 +80,7 @@ Deno.test("requireCloudToken: a valid login returns its token and prints nothing
     ...storeWith(true),
     load: () => Promise.resolve({ accessToken: "A", refreshToken: "R", accessExpiresAt: 8.64e15 }),
   };
-  assertEquals(await errorsOf(unused, store), { token: "A", err: "" });
+  assertEquals(await errorsOf(unused, store), { token: "A", err: "", out: "" });
 });
 
 Deno.test("requireCloudToken: an error that is not Cloud's is not dressed up as an outage", async () => {

@@ -1,5 +1,10 @@
-import { assertEquals } from "@std/assert";
-import { headlessToken, normalizeApiUrl } from "../../src/domain/cloud/cloud_config.ts";
+import { assertEquals, assertThrows } from "@std/assert";
+import {
+  InvalidApiUrl,
+  linkedApiUrl,
+  normalizeApiUrl,
+} from "../../src/domain/cloud/cloud_config.ts";
+import { headlessToken } from "../../src/domain/cloud/headless_token.ts";
 import { makeSpecSession } from "../../src/domain/cloud/spec_session.ts";
 import { makeGateSession } from "../../src/domain/cloud/gate_session.ts";
 import type { FetchFn } from "../../src/domain/cloud/cloud_client.ts";
@@ -148,10 +153,25 @@ Deno.test("a gate session for a repository-chosen api_url never sends the headle
   assertEquals(warned.length, 1);
 });
 
-Deno.test("a session for a non-http(s) api_url is not built at all", () => {
+Deno.test("a session for a refused api_url is not built, and says why; none set is not linked", () => {
   const config = { apiUrl: "file:///tmp/x", projectKey: "CLOUD" };
-  assertEquals(makeSpecSession({ config, store: stubStore, env: env() }), null);
-  assertEquals(makeGateSession({ config, store: stubStore, env: env() }), null);
+  assertThrows(() => makeSpecSession({ config, store: stubStore, env: env() }), InvalidApiUrl);
+  assertThrows(() => makeGateSession({ config, store: stubStore, env: env() }), InvalidApiUrl);
+  const unset = { apiUrl: " ", projectKey: "CLOUD" };
+  assertEquals(makeSpecSession({ config: unset, store: stubStore, env: env() }), null);
+  assertEquals(makeGateSession({ config: unset, store: stubStore, env: env() }), null);
+});
+
+Deno.test("linkedApiUrl: unset, plain, or refused", () => {
+  assertEquals(linkedApiUrl(""), null);
+  assertEquals(linkedApiUrl("https://cloud.example.test:8443/"), "https://cloud.example.test:8443");
+  assertThrows(() => linkedApiUrl("https://user:pw@cloud.example.test"), InvalidApiUrl);
+});
+
+Deno.test("headlessToken: a port is part of the origin the environment names", () => {
+  const named = env({ SPECNAUT_CLOUD_API_URL: "https://cloud.example.test:8443/" });
+  assertEquals(headlessToken("https://cloud.example.test:8443/base", named), { token: TOKEN });
+  assertEquals("refused" in (headlessToken("https://cloud.example.test:9443", named) ?? {}), true);
 });
 
 Deno.test("a gate session for the deployment the environment names sends the headless token", async () => {

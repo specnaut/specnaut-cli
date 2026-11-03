@@ -1,5 +1,6 @@
 import { assertEquals } from "@std/assert";
 import { type GateDeps, type GateIntent, runGate } from "../../src/cli/handlers/gate_handler.ts";
+import { InvalidApiUrl } from "../../src/domain/cloud/cloud_config.ts";
 import { GateClient } from "../../src/domain/cloud/gate_client.ts";
 import { GateSession } from "../../src/domain/cloud/gate_session.ts";
 import type { RemoteMode } from "../../src/domain/cloud/remote_mode.ts";
@@ -192,4 +193,33 @@ Deno.test("gate status: remote on → exit 0 + JSON; off → exit 2", async () =
     pollIntervalMs: 1,
   });
   assertEquals(await runGate({ ...raiseIntent(), sub: "status" }, off.deps(offSession)), 2);
+});
+
+// cli#736 — a failure reads as a sentence, never as an internal reason key.
+Deno.test("gate raise and cancel: a failure is a sentence, not a raw reason", async () => {
+  const down = (() => Promise.resolve(new Response("{}", { status: 503 }))) as FetchFn;
+  const moved = (() => Promise.resolve(new Response("{}", { status: 307 }))) as FetchFn;
+  const cases: [FetchFn, string][] = [
+    [down, "cannot be reached"],
+    [moved, "redirected the request"],
+  ];
+  for (const [fetchFn, words] of cases) {
+    for (const intent of [raiseIntent(), raiseIntent({ sub: "cancel", id: "g" })]) {
+      const c = capture();
+      assertEquals(await runGate(intent, c.deps(sessionWith(fetchFn))), 1);
+      const err = c.err.join("\n");
+      assertEquals(err.includes(words), true, err);
+      assertEquals(/\((transient|redirected)\)/.test(err), false, err);
+    }
+  }
+});
+
+Deno.test("gate: a refused api_url is the handler's own message and exit 1", async () => {
+  const c = capture();
+  const code = await runGate(raiseIntent(), {
+    ...c.deps(null),
+    buildSession: () => Promise.reject(new InvalidApiUrl()),
+  });
+  assertEquals(code, 1);
+  assertEquals(c.err.join("\n").includes("invalid Specnaut Cloud API URL"), true, c.err.join());
 });

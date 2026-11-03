@@ -86,8 +86,12 @@ export function fakeClock() {
   };
 }
 
-export function session(backend: Backend, token: TokenProvider, remote = REMOTE): GateSession {
-  const { now, sleep } = fakeClock();
+export function session(
+  backend: Backend,
+  token: TokenProvider,
+  remote = REMOTE,
+  { now, sleep } = fakeClock(),
+): GateSession {
   // Late-bind through `backend.fetch` so a test may reassign it after construction.
   const lateFetch =
     ((i: string | URL | Request, init?: RequestInit) => backend.fetch(i, init)) as FetchFn;
