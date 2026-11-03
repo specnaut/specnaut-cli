@@ -1,14 +1,15 @@
-**On Codex, a run now closes what it spawned.** A subagent started with `spawn_agent` used to
-outlive its work and hold its worktree, so the host refused to archive it and every delegating run
-left children behind. Codex projects now receive `.specnaut/codex/session-lifecycle.md`: each
-spawned child is recorded, a finished one is closed with `close_agent`, and every run that spawned
-children ends with a sweep that reports what stayed open.
+**Upgrade now if you use Specnaut Cloud from Windows or from CI.** This release closes security gaps
+in the Cloud client. On Windows, `specnaut cloud login` could run a command carried in the URL
+returned by a Cloud server you had accepted. A `SPECNAUT_CLOUD_TOKEN` could be sent to a deployment
+a repository chose through its `api_url`. The Cloud backlog scripts put the bearer token on `curl`'s
+command line, read as success an answer that was only a redirect, and printed control characters
+from task text. All of these are fixed; update the binary, then run `specnaut upgrade` in each
+project on the Cloud backend, since the scripts reach a project only through it.
 
-**Worktrees are archived only when nothing can be lost.** The sweep archives a worktree through the
-host, never with `git worktree remove`, and only when its commits are on a freshly fetched base
-branch or kept under a local, never-pushed `specnaut-kept/` branch, its status is clean, and its
-ignored files were copied out to `~/.specnaut-kept/`. A refusal is reported, never forced. The merge
-phase runs this sweep on every exit, including `--pr`.
+**Why this is a major: two inputs are now refused.** A headless token goes only to Specnaut Cloud or
+to the deployment named by `SPECNAUT_CLOUD_API_URL`, so CI on another deployment sets both
+variables. No Cloud request follows a redirect, so an `api_url` that redirects must be replaced by
+the address it lands on. `UPGRADING.md` has the details.
 
-`specnaut upgrade` adds the file and the `AGENTS.md` pointer on its own; other harnesses are
-unchanged.
+**`/task resume` rebuilds where a chain stopped from git, then re-enters it.** Grooming and next
+also audit Ready and In progress from git evidence.
