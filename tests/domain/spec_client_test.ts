@@ -47,7 +47,7 @@ function scripted(
   return { fetchFn, calls };
 }
 
-Deno.test("reasonForStatus maps statuses; everything else is transient", () => {
+Deno.test("reasonForStatus maps statuses; only a network failure or a 5xx is transient", () => {
   assertEquals(reasonForStatus(401), "unauthorized");
   // cli#733: authenticated and refused — not retryable, so never "transient".
   assertEquals(reasonForStatus(403), "forbidden");
@@ -55,7 +55,35 @@ Deno.test("reasonForStatus maps statuses; everything else is transient", () => {
   assertEquals(reasonForStatus(409), "conflict");
   assertEquals(reasonForStatus(422), "invalid");
   assertEquals(reasonForStatus(500), "transient");
+  assertEquals(reasonForStatus(503), "transient");
   assertEquals(reasonForStatus(0), "transient");
+  // cli#734: an answer the CLI does not branch on is not "Cloud unreachable".
+  for (const s of [400, 405, 418, 429]) assertEquals(reasonForStatus(s), "unexpected", `${s}`);
+});
+
+Deno.test("a success body that is not JSON is an unexpected answer, not silently empty", async () => {
+  const fetchFn = (() => Promise.resolve(new Response("<html>oops", { status: 200 }))) as FetchFn;
+  const e = await assertRejects(
+    () => new SpecClient(API, fetchFn).get("t", "CLOUD", 1),
+    SpecApiError,
+  );
+  assertEquals([e.status, e.reason], [200, "unexpected"]);
+});
+
+Deno.test("a success body that is JSON but no object is an unexpected answer", async () => {
+  for (const body of ["42", '"x"', "null", "[]"]) {
+    const fetchFn = (() => Promise.resolve(new Response(body, { status: 200 }))) as FetchFn;
+    const e = await assertRejects(
+      () => new SpecClient(API, fetchFn).get("t", "CLOUD", 1),
+      SpecApiError,
+    );
+    assertEquals([e.status, e.reason], [200, "unexpected"], body);
+  }
+});
+
+Deno.test("an empty success body is still a success (putSteps needs none)", async () => {
+  const fetchFn = (() => Promise.resolve(new Response(null, { status: 200 }))) as FetchFn;
+  await new SpecClient(API, fetchFn).putSteps("t", "CLOUD", 1, []);
 });
 
 Deno.test("ensure() posts projectKey/taskNumber and returns the parsed spec", async () => {

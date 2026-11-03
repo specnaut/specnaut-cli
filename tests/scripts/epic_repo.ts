@@ -26,11 +26,19 @@ async function hasPwsh(): Promise<boolean> {
 }
 export const PWSH_AVAILABLE = await hasPwsh();
 
-export type Runner = { name: string; argv: string[]; dryRun: string };
+/** A twin to run; `env` is laid over the isolated environment, `text` drops its JSON flag. */
+export type Runner = {
+  name: string;
+  argv: string[];
+  dryRun: string;
+  json: string;
+  env?: Record<string, string>;
+};
 export const RUNNERS: Runner[] = [{
   name: "bash",
   argv: ["bash", join(CORE, "bash", "create-new-feature.sh"), "--json", "--issue", `${CHILD}`],
   dryRun: "--dry-run",
+  json: "--json",
 }];
 if (PWSH_AVAILABLE) {
   RUNNERS.push({
@@ -45,6 +53,7 @@ if (PWSH_AVAILABLE) {
       `${CHILD}`,
     ],
     dryRun: "-DryRun",
+    json: "-Json",
   });
 }
 
@@ -57,12 +66,19 @@ export function pwshRunsOnCi(file: string) {
   });
 }
 
+/** The same twin, printing text rather than JSON. */
+export const text = (r: Runner): Runner => ({ ...r, argv: r.argv.filter((a) => a !== r.json) });
+
 export type Repo = {
   dir: string;
   git: (...args: string[]) => Promise<string>;
   run: (runner: Runner, ...extra: string[]) => Promise<{ code: number; out: string }>;
+  /** Any command in the repo, isolated like the twins; `env` laid over it. */
+  exec: (argv: string[], env?: Record<string, string>) => Promise<{ code: number; out: string }>;
   head: () => Promise<string>;
 };
+
+export const EPIC_BRANCH_SH = join(CORE, "bash", "epic-branch.sh");
 
 /**
  * Children see no global or system git config and inherit no `GIT_*` variable
@@ -115,22 +131,23 @@ export async function withRepo(setup: (r: Repo) => Promise<void>, fn: (r: Repo) 
   try {
     const git = makeGit(dir);
     await seedRepo(dir, git);
+    const exec: Repo["exec"] = async ([cmd, ...args], env = {}) => {
+      const { code, stdout, stderr } = await new Deno.Command(cmd, {
+        args,
+        cwd: dir,
+        env: { ...ISOLATED, ...env },
+        clearEnv: true,
+        stdout: "piped",
+        stderr: "piped",
+      }).output();
+      const dec = new TextDecoder();
+      return { code, out: dec.decode(stdout) + dec.decode(stderr) };
+    };
     const repo: Repo = {
       dir,
       git,
-      run: async (runner, ...extra) => {
-        const [cmd, ...args] = runner.argv;
-        const { code, stdout, stderr } = await new Deno.Command(cmd, {
-          args: [...args, ...extra, "a child slice"],
-          cwd: dir,
-          env: ISOLATED,
-          clearEnv: true,
-          stdout: "piped",
-          stderr: "piped",
-        }).output();
-        const dec = new TextDecoder();
-        return { code, out: dec.decode(stdout) + dec.decode(stderr) };
-      },
+      run: (runner, ...extra) => exec([...runner.argv, ...extra, "a child slice"], runner.env),
+      exec,
       head: () => git("rev-parse", "--abbrev-ref", "HEAD"),
     };
     await setup(repo);

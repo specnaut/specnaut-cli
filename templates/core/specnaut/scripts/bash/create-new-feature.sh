@@ -227,8 +227,11 @@ fi
 # rather than minting a second one; epic-branch.sh is the lookup's one home.
 if [ -n "$EPIC_ISSUE" ] && [ "$HAS_GIT" = true ]; then
     _cur=$(git rev-parse --abbrev-ref HEAD 2>/dev/null || echo "")
-    # Several branches claiming the epic is a stop, never a pick (epic-branch.sh).
-    EPIC_BRANCH=$(bash "$SCRIPT_DIR/epic-branch.sh" "$EPIC_ISSUE") || exit 1
+    # Read as "no branch yet", a failed lookup would mint the epic a second branch.
+    EPIC_BRANCH=$(bash "$SCRIPT_DIR/epic-branch.sh" "$EPIC_ISSUE") || {
+        >&2 echo "Error: the epic branch lookup failed (exit $?)"
+        exit 1
+    }
     if [ -n "$EPIC_BRANCH" ]; then
         if [ "$EPIC_BRANCH" = "$_cur" ]; then
             echo "# already on the epic's branch '$EPIC_BRANCH' — reusing it, no branch created" >&2
@@ -280,23 +283,20 @@ else
     BRANCH_NAME="${FEATURE_NUM}-${BRANCH_SUFFIX}"
 fi
 
-# GitHub enforces a 244-byte limit on branch names
-# Validate and truncate if necessary
+# GitHub enforces a 244-byte limit on branch names. An epic's branch exists
+# already: a truncated name would be another branch, so it is refused instead.
 MAX_BRANCH_LENGTH=244
-if [ ${#BRANCH_NAME} -gt $MAX_BRANCH_LENGTH ]; then
-    # Calculate how much we need to trim from suffix
-    # Account for prefix length: timestamp (15) + hyphen (1) = 16, or sequential (3) + hyphen (1) = 4
-    PREFIX_LENGTH=$(( ${#FEATURE_NUM} + 1 ))
-    MAX_SUFFIX_LENGTH=$((MAX_BRANCH_LENGTH - PREFIX_LENGTH))
-    
-    # Truncate suffix at word boundary if possible
+if [ -n "$EPIC_BRANCH" ] && [ ${#EPIC_BRANCH} -gt $MAX_BRANCH_LENGTH ]; then
+    >&2 echo "Error: the epic's branch '$EPIC_BRANCH' is over GitHub's $MAX_BRANCH_LENGTH-byte limit; rename it and try again."
+    exit 1
+elif [ ${#BRANCH_NAME} -gt $MAX_BRANCH_LENGTH ]; then
+    # Trim the suffix to what the prefix (timestamp 15, or sequential 3, plus a hyphen) leaves,
+    # dropping a trailing hyphen the cut created.
+    MAX_SUFFIX_LENGTH=$((MAX_BRANCH_LENGTH - ${#FEATURE_NUM} - 1))
     TRUNCATED_SUFFIX=$(echo "$BRANCH_SUFFIX" | cut -c1-$MAX_SUFFIX_LENGTH)
-    # Remove trailing hyphen if truncation created one
     TRUNCATED_SUFFIX="${TRUNCATED_SUFFIX%-}"
-    
     ORIGINAL_BRANCH_NAME="$BRANCH_NAME"
     BRANCH_NAME="${FEATURE_NUM}-${TRUNCATED_SUFFIX}"
-    
     >&2 echo "[specify] Warning: Branch name exceeded GitHub's 244-byte limit"
     >&2 echo "[specify] Original: $ORIGINAL_BRANCH_NAME (${#ORIGINAL_BRANCH_NAME} bytes)"
     >&2 echo "[specify] Truncated to: $BRANCH_NAME (${#BRANCH_NAME} bytes)"

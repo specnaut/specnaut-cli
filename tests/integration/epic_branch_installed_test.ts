@@ -82,35 +82,47 @@ async function installedWithEpicBranch(parent: string): Promise<string> {
   return project;
 }
 
-Deno.test("installed create-new-feature --issue <child> finds the epic's branch through the installed helper", async () => {
-  const parent = await Deno.makeTempDir({ prefix: "specnaut-epic-installed-" });
-  try {
-    const project = await installedWithEpicBranch(parent);
-    const runs: [string, string[]][] = [[
-      "bash",
-      [".specnaut/scripts/bash/create-new-feature.sh", "--json", "--issue", "42", "a child"],
-    ]];
-    if (PWSH_AVAILABLE) {
-      runs.push(["pwsh", [
-        "-NoProfile",
-        "-File",
-        ".specnaut/scripts/powershell/create-new-feature.ps1",
-        "-Json",
-        "-Issue",
-        "42",
-        "a child",
-      ]]);
-    } else if (Deno.env.get("CI") === "true") {
-      throw new Error("pwsh is absent on CI — the PowerShell arm did not run");
-    }
-    for (const [cmd, args] of runs) {
-      const r = await exec(cmd, args, project);
-      assertEquals(r.code, 0, `${cmd}: ${r.out}`);
-      assertStringIncludes(r.out, `epic #${EPIC} already has branch '005-epic'`, cmd);
-      assertEquals(await git(project, "rev-parse", "--abbrev-ref", "HEAD"), "005-epic", cmd);
-      await git(project, "checkout", "-q", "main");
-    }
-  } finally {
-    await Deno.remove(parent, { recursive: true });
-  }
+const ARMS: [string, string[], boolean][] = [
+  [
+    "bash",
+    [".specnaut/scripts/bash/create-new-feature.sh", "--json", "--issue", "42", "a child"],
+    false,
+  ],
+  ["pwsh", [
+    "-NoProfile",
+    "-File",
+    ".specnaut/scripts/powershell/create-new-feature.ps1",
+    "-Json",
+    "-Issue",
+    "42",
+    "a child",
+  ], !PWSH_AVAILABLE],
+];
+
+// One test per arm (cli#734): a bash failure no longer hides the pwsh result.
+for (const [cmd, args, ignore] of ARMS) {
+  Deno.test({
+    name:
+      `installed create-new-feature [${cmd}] --issue <child> finds the epic's branch through the installed helper`,
+    ignore,
+    fn: async () => {
+      const parent = await Deno.makeTempDir({ prefix: "specnaut-epic-installed-" });
+      try {
+        const project = await installedWithEpicBranch(parent);
+        const r = await exec(cmd, args, project);
+        assertEquals(r.code, 0, `${cmd}: ${r.out}`);
+        assertStringIncludes(r.out, `epic #${EPIC} already has branch '005-epic'`, cmd);
+        assertEquals(await git(project, "rev-parse", "--abbrev-ref", "HEAD"), "005-epic", cmd);
+      } finally {
+        await Deno.remove(parent, { recursive: true });
+      }
+    },
+  });
+}
+
+Deno.test({
+  name: "installed create-new-feature: the PowerShell arm actually runs on CI",
+  ignore: Deno.env.get("CI") !== "true",
+  fn: () =>
+    assertEquals(PWSH_AVAILABLE, true, "pwsh is absent on CI — the PowerShell arm did not run"),
 });

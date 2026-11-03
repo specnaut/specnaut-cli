@@ -18,7 +18,8 @@ export type SpecErrorReason =
   | "not_found" // 404
   | "conflict" // 409
   | "invalid" // 422 — bad payload
-  | "transient"; // network / 5xx — retryable
+  | "unexpected" // any other answer, or a body that is not the wire format
+  | "transient"; // network / 5xx — Cloud unreachable, retryable
 
 export class SpecApiError extends Error {
   constructor(public readonly status: number, public readonly reason: SpecErrorReason) {
@@ -28,14 +29,18 @@ export class SpecApiError extends Error {
   }
 }
 
-/** Map an HTTP status to a typed reason. 5xx and 0 (network) → transient. */
+/**
+ * Map an HTTP status to a typed reason. Only 0 (network) and 5xx are transient:
+ * an answer Cloud gave (400, 429…) is not "unreachable", so it never takes the
+ * stale-cache fallback.
+ */
 export function reasonForStatus(status: number): SpecErrorReason {
   if (status === 401) return "unauthorized";
   if (status === 403) return "forbidden";
   if (status === 404) return "not_found";
   if (status === 409) return "conflict";
   if (status === 422) return "invalid";
-  return "transient"; // 5xx, 0, and anything else
+  return status === 0 || status >= 500 ? "transient" : "unexpected";
 }
 
 export class SpecClient {
@@ -86,7 +91,7 @@ export class SpecClient {
     });
     if (status !== 201 && status !== 200) throw new SpecApiError(status, reasonForStatus(status));
     const spec = parseSpec(json.spec);
-    if (!spec) throw new SpecApiError(status, "transient");
+    if (!spec) throw new SpecApiError(status, "unexpected");
     return spec;
   }
 
@@ -123,10 +128,25 @@ export class SpecClient {
   }
 }
 
+/**
+ * A success body, parsed. An error body is never read (§ I: only its status is
+ * used); a non-empty success body that is not a JSON object is an unexpected answer.
+ */
 async function readJson(res: Response): Promise<Record<string, unknown>> {
-  try {
-    return (await res.json()) as Record<string, unknown>;
-  } catch {
+  if (!res.ok) {
+    await res.body?.cancel();
     return {};
   }
+  const text = await res.text();
+  if (text.trim() === "") return {};
+  let json: unknown;
+  try {
+    json = JSON.parse(text);
+  } catch {
+    throw new SpecApiError(res.status, "unexpected");
+  }
+  if (json === null || typeof json !== "object" || Array.isArray(json)) {
+    throw new SpecApiError(res.status, "unexpected");
+  }
+  return json as Record<string, unknown>;
 }

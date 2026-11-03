@@ -191,23 +191,19 @@ if ($epicBranch) {
     $branchName = "$featureNum-$branchSuffix"
 }
 
-# GitHub enforces a 244-byte limit on branch names
-# Validate and truncate if necessary
+# GitHub enforces a 244-byte limit on branch names. An epic's branch exists
+# already: a truncated name would be another branch, so it is refused instead.
 $maxBranchLength = 244
-if ($branchName.Length -gt $maxBranchLength) {
-    # Calculate how much we need to trim from suffix
-    # Account for prefix length: timestamp (15) + hyphen (1) = 16, or sequential (3) + hyphen (1) = 4
-    $prefixLength = $featureNum.Length + 1
-    $maxSuffixLength = $maxBranchLength - $prefixLength
-
-    # Truncate suffix
-    $truncatedSuffix = $branchSuffix.Substring(0, [Math]::Min($branchSuffix.Length, $maxSuffixLength))
-    # Remove trailing hyphen if truncation created one
-    $truncatedSuffix = $truncatedSuffix -replace '-$', ''
-
+if ($epicBranch -and $epicBranch.Length -gt $maxBranchLength) {
+    Write-Error "Error: the epic's branch '$epicBranch' is over GitHub's $maxBranchLength-byte limit; rename it and try again."
+    exit 1
+} elseif ($branchName.Length -gt $maxBranchLength) {
+    # Trim the suffix to what the prefix (timestamp 15, or sequential 3, plus a hyphen) leaves,
+    # dropping a trailing hyphen the cut created.
+    $maxSuffixLength = $maxBranchLength - $featureNum.Length - 1
+    $truncatedSuffix = $branchSuffix.Substring(0, [Math]::Min($branchSuffix.Length, $maxSuffixLength)) -replace '-$', ''
     $originalBranchName = $branchName
     $branchName = "$featureNum-$truncatedSuffix"
-
     Write-Warning "[specify] Branch name exceeded GitHub's 244-byte limit"
     Write-Warning "[specify] Original: $originalBranchName ($($originalBranchName.Length) bytes)"
     Write-Warning "[specify] Truncated to: $branchName ($($branchName.Length) bytes)"

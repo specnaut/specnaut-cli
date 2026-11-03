@@ -1,5 +1,6 @@
 import { assert, assertEquals, assertStringIncludes } from "@std/assert";
-import { EPIC, link, pwshRunsOnCi, RUNNERS, withRepo } from "./epic_repo.ts";
+import { join } from "@std/path";
+import { EPIC, link, pwshRunsOnCi, type Repo, RUNNERS, text, withRepo } from "./epic_repo.ts";
 
 /**
  * `create-new-feature.sh --issue <child>` scans every local branch for a
@@ -85,6 +86,44 @@ for (const runner of RUNNERS) {
       const { code, out } = await r.run(runner);
       assertEquals(code, 0, out);
       assertStringIncludes(out, "the base branch is unknown");
+    });
+  });
+}
+
+/** `005-epic` links the epic and the base has moved on; an origin is there to fetch from. */
+async function epicBranchWithOrigin(r: Repo) {
+  const origin = join(r.dir, ".git", "test-origin");
+  await r.git("init", "-q", "--bare", origin);
+  await r.git("remote", "add", "origin", origin);
+  await r.git("checkout", "-q", "-b", "005-epic");
+  await link(r, EPIC);
+  await r.git("checkout", "-q", "main");
+  await r.git("push", "-q", "origin", "main");
+}
+
+// cli#734 — what reuse does not do, on both twins.
+for (const runner of RUNNERS) {
+  Deno.test(`epic branch scan [${runner.name}]: reusing the epic's branch prints no FEATURE_NUM line as text`, async () => {
+    await withRepo(epicBranchWithOrigin, async (r) => {
+      const { code, out } = await r.run(text(runner));
+      assertEquals(code, 0, out);
+      assertStringIncludes(out, "BRANCH_NAME: 005-epic");
+      assert(!out.includes("FEATURE_NUM"), out);
+    });
+  });
+
+  Deno.test(`epic branch scan [${runner.name}]: reusing the epic's branch runs no git fetch`, async () => {
+    await withRepo(epicBranchWithOrigin, async (r) => {
+      const trace = join(r.dir, ".git", "trace.log");
+      const { code, out } = await r.run({ ...runner, env: { GIT_TRACE: trace } });
+      assertEquals(code, 0, out);
+      assertEquals(await r.head(), "005-epic");
+      const ran = await Deno.readTextFile(trace);
+      assertStringIncludes(ran, "rev-parse", "the trace saw the run");
+      assert(
+        !/git fetch\b/.test(ran),
+        ran.split("\n").filter((l) => l.includes("fetch")).join("\n"),
+      );
     });
   });
 }

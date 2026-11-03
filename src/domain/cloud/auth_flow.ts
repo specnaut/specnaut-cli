@@ -2,7 +2,7 @@
 // and hand out a fresh access token (refreshing transparently). All IO is
 // injected so this is unit-testable without network / browser / keychain.
 
-import type { CloudClient } from "./cloud_client.ts";
+import { CloudApiError, type CloudClient } from "./cloud_client.ts";
 import type { CloudCredentials, CredentialStore } from "./credentials.ts";
 
 export type AuthIo = {
@@ -82,12 +82,33 @@ export type TokenDeps = {
   now: () => number;
 };
 
+/** Cloud could not be reached, or failed itself (status 0 or 5xx): retrying may help. */
+export function isUnavailable(e: unknown): boolean {
+  return e instanceof CloudApiError && (e.status === 0 || e.status >= 500);
+}
+
+/**
+ * `accessToken`, with a refresh that got no verdict — Cloud unavailable, or an
+ * answer that is none — read as "no token" (the caller prompts re-login). The
+ * stored credentials survive it either way.
+ */
+export async function freshAccessToken(deps: TokenDeps): Promise<string | null> {
+  try {
+    return await accessToken(deps);
+  } catch (e) {
+    if (e instanceof CloudApiError) return null;
+    throw e;
+  }
+}
+
 /**
  * Return a valid access token for the deployment, refreshing transparently when
  * the stored one is near/at expiry. Returns null when there are no credentials
- * or the refresh credential is dead (caller should prompt re-login).
+ * or the refresh credential is dead (caller should prompt re-login). A refresh
+ * with no verdict throws its CloudApiError (`isUnavailable` when Cloud could not
+ * serve it) and keeps the credentials for the next attempt.
  */
-export async function freshAccessToken(deps: TokenDeps): Promise<string | null> {
+export async function accessToken(deps: TokenDeps): Promise<string | null> {
   const { client, store, now, apiUrl } = deps;
   const creds = await store.load(apiUrl);
   if (!creds) return null;

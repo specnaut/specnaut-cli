@@ -184,3 +184,19 @@ Deno.test("listTasks parses tasks and tolerates missing priority/size (#398)", a
     { number: 13, title: "No meta", columnId: "c2", priority: null, size: null },
   ]);
 });
+
+// cli#734 — a refresh that cannot reach Cloud, or meets a failing one, is no
+// verdict on the token: it throws, where "invalid" would have the creds dropped.
+Deno.test("refresh: a 5xx or an unreachable Cloud throws an unavailable CloudApiError", async () => {
+  const e503 = await assertRejects(
+    () => new CloudClient(API, fakeFetch(503, {}).fn).refresh("RT"),
+    CloudApiError,
+  );
+  assertEquals(e503.status, 503);
+  const offline = (() => Promise.reject(new TypeError("offline"))) as typeof fetch;
+  const e0 = await assertRejects(() => new CloudClient(API, offline).refresh("RT"), CloudApiError);
+  assertEquals(e0.status, 0);
+  // Only fetch's network failure is mapped: any other error is not Cloud's.
+  const bug = (() => Promise.reject(new RangeError("bug"))) as typeof fetch;
+  await assertRejects(() => new CloudClient(API, bug).refresh("RT"), RangeError);
+});

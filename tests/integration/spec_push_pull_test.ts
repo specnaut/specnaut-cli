@@ -179,7 +179,8 @@ Deno.test("spec pull with a broken connection and NO cache exits 5 with an actio
 
 // cli#733 — the fallback is for an unreachable Cloud only. An answer Cloud gave
 // is not "unreachable": with a cache present it still exits 5, the cache untouched.
-for (const status of [401, 403, 409, 422]) {
+// cli#734: an unlisted 4xx (400, 429) is an answer too, never "transient".
+for (const status of [400, 401, 403, 409, 422, 429]) {
   Deno.test(`spec pull answered ${status} with a cache present exits 5, never the stale-cache 6`, async () => {
     await withTmp(async (dir) => {
       const cache = new SpecCacheWriter();
@@ -222,25 +223,65 @@ Deno.test("spec pull answered 503 with a cache present is unreachable: the stale
   });
 });
 
-Deno.test("spec pull whose token refresh cannot reach Cloud is unreachable too: the stale-cache 6", async () => {
+// cli#734 — through the real refresh path: an expired token whose refresh cannot
+// reach Cloud, or meets a failing one, is unreachable — exit 6 — and the stored
+// credentials survive it for the next attempt.
+for (
+  const [why, refresh] of [
+    ["cannot reach Cloud", () => Promise.reject(new TypeError("offline"))],
+    ["meets a 503", () => Promise.resolve(new Response("{}", { status: 503 }))],
+  ] as const
+) {
+  Deno.test(`spec pull whose token refresh ${why} exits 6 and keeps the credentials`, async () => {
+    await withTmp(async (dir) => {
+      const cache = new SpecCacheWriter();
+      await cache.write(dir, 154, [{ key: "specify", name: "Specify", order: 1, body: "cached" }]);
+      let deleted = false;
+      const store: CredentialStore = {
+        ...stubStore,
+        load: () => Promise.resolve({ accessToken: "A", refreshToken: "R", accessExpiresAt: 0 }),
+        delete: () => Promise.resolve(void (deleted = true)),
+      };
+      const fetchFn = ((url: string) =>
+        url.endsWith("/auth/refresh") ? refresh() : Promise.reject(new Error(url))) as FetchFn;
+      const session = makeSpecSession({
+        config: { apiUrl: API, projectKey: "CLOUD" },
+        store,
+        fetchFn,
+        env: () =>
+          undefined,
+      })!;
+      const { deps: d } = deps({
+        projectDir: dir,
+        cache,
+        buildSession: () => Promise.resolve(session),
+      });
+      assertEquals(
+        await runSpec({ kind: "spec", sub: "pull", task: 154, apiUrl: null }, d),
+        PULL_STALE_CACHE,
+      );
+      assertEquals(deleted, false, "a transient refresh failure must not drop the credentials");
+    });
+  });
+}
+
+Deno.test("spec pull whose token provider throws a TypeError is no network failure: exit 5", async () => {
   await withTmp(async (dir) => {
     const cache = new SpecCacheWriter();
     await cache.write(dir, 154, [{ key: "specify", name: "Specify", order: 1, body: "cached" }]);
-    // The refresh fails before any spec request: only the token provider runs.
+    // A bug in the provider, not Cloud unreachable: it must not take the stale cache.
     const session = new SpecSession({
       projectKey: "CLOUD",
       client: {} as SpecClient,
       cloudClient: {} as CloudClient,
-      token: () => Promise.reject(new TypeError("offline")),
+      token: () => Promise.reject(new TypeError("undefined is not a function")),
     });
-    const { deps: d } = deps({
+    const { deps: d, err } = deps({
       projectDir: dir,
       cache,
       buildSession: () => Promise.resolve(session),
     });
-    assertEquals(
-      await runSpec({ kind: "spec", sub: "pull", task: 154, apiUrl: null }, d),
-      PULL_STALE_CACHE,
-    );
+    assertEquals(await runSpec({ kind: "spec", sub: "pull", task: 154, apiUrl: null }, d), 5);
+    assertEquals(err.join("\n").includes("reusing the existing cache"), false);
   });
 });

@@ -137,19 +137,30 @@ export class CloudClient {
     return { status: "invalid" };
   }
 
+  /** Rotate the pair. Only a literal `expired` / `invalid` condemns the token. Cloud unreachable
+   *  (fetch rejects), failing (5xx), or any other answer (a 429, a proxy's page) throws: no
+   *  verdict, so the token survives for the next attempt. */
   async refresh(refreshToken: string): Promise<RefreshResult> {
-    const { json } = await this.postJson("/auth/refresh", {
-      refresh_token: refreshToken,
-    });
-    if (String(json.status) === "ok") {
+    const { status, json } = await this.postJson("/auth/refresh", { refresh_token: refreshToken })
+      .catch((e) => {
+        if (e instanceof TypeError) return { status: 0, json: {} as Record<string, unknown> };
+        throw e;
+      });
+    if (status === 0 || status >= 500) {
+      throw new CloudApiError(status, "token refresh: Cloud unavailable");
+    }
+    const verdict = typeof json.status === "string" ? json.status : "";
+    const { access_token: at, refresh_token: rt } = json;
+    if (verdict === "ok" && typeof at === "string" && at && typeof rt === "string" && rt) {
       return {
         status: "ok",
-        accessToken: String(json.access_token),
-        refreshToken: String(json.refresh_token),
+        accessToken: at,
+        refreshToken: rt,
         expiresInS: Number(json.expires_in ?? 0),
       };
     }
-    return { status: String(json.status) === "expired" ? "expired" : "invalid" };
+    if (verdict === "expired" || verdict === "invalid") return { status: verdict };
+    throw new CloudApiError(status, "token refresh: no verdict on the token");
   }
 
   async listProjects(accessToken: string): Promise<CloudProject[]> {
@@ -251,12 +262,12 @@ export class CloudClient {
   }
 }
 
+/** The body as an object; anything else (no JSON, `null`, an array, a primitive) reads as `{}`. */
 async function readJson(res: Response): Promise<Record<string, unknown>> {
-  try {
-    return (await res.json()) as Record<string, unknown>;
-  } catch {
-    return {};
-  }
+  const json: unknown = await res.json().catch(() => null);
+  return json !== null && typeof json === "object" && !Array.isArray(json)
+    ? json as Record<string, unknown>
+    : {};
 }
 
 function strField(json: Record<string, unknown>, key: string): string | null {

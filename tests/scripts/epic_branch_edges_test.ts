@@ -40,6 +40,8 @@ for (const runner of RUNNERS) {
       assertEquals(code, 1, out);
       assertStringIncludes(out, `several branches link epic #${EPIC}`);
       assertStringIncludes(out, "005-epic 006-epic-again");
+      // cli#734: each twin says the lookup failed, in its own words.
+      assertStringIncludes(out, "the epic branch lookup failed (exit 4)");
       assertEquals(await r.head(), "main", "no branch was picked, none created");
     });
   });
@@ -101,7 +103,8 @@ for (const runner of RUNNERS) {
 
   Deno.test(`epic branch scan [${runner.name}]: with the base only on origin, a branch merged into it is still skipped`, async () => {
     await withRepo(async (r) => {
-      const origin = await Deno.makeTempDir({ prefix: "epic-scan-origin-" });
+      // Inside .git: removed with the repo, and invisible to its work tree.
+      const origin = join(r.dir, ".git", "test-origin");
       await r.git("init", "-q", "--bare", origin);
       await r.git("remote", "add", "origin", origin);
       await r.git("branch", "elsewhere");

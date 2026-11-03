@@ -151,10 +151,10 @@ export class GateClient {
   }
 }
 
+/** The body as an object; anything else (no JSON, `null`, an array, a primitive) reads as `{}`. */
 async function readJson(res: Response): Promise<Record<string, unknown>> {
-  try {
-    return (await res.json()) as Record<string, unknown>;
-  } catch {
-    return {};
-  }
+  const json: unknown = await res.json().catch(() => null);
+  return json !== null && typeof json === "object" && !Array.isArray(json)
+    ? json as Record<string, unknown>
+    : {};
 }

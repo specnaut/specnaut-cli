@@ -10,7 +10,7 @@
 
 import { SpecApiError, SpecClient } from "./spec_client.ts";
 import { CloudClient, type FetchFn } from "./cloud_client.ts";
-import { freshAccessToken } from "./auth_flow.ts";
+import { accessToken, isUnavailable } from "./auth_flow.ts";
 import type { CloudConfig } from "./cloud_config.ts";
 import type { CredentialStore } from "./credentials.ts";
 import type { SpecStep } from "../spec/spec_step.ts";
@@ -51,7 +51,7 @@ export class SpecSession {
     try {
       tok = await this.deps.token();
     } catch (e) {
-      if (e instanceof TypeError) throw new SpecApiError(0, "transient");
+      if (isUnavailable(e)) throw new SpecApiError(0, "transient");
       throw e;
     }
     if (!tok) throw new SpecApiError(401, "unauthorized");
@@ -140,7 +140,7 @@ export function makeSpecSession(deps: {
   const headlessToken = env("SPECNAUT_CLOUD_TOKEN") ?? env("SPECFLOW_CLOUD_TOKEN");
   const token: TokenProvider = headlessToken && headlessToken.trim() !== ""
     ? () => Promise.resolve(headlessToken)
-    : () => freshAccessToken({ apiUrl: config.apiUrl, client: cloudClient, store, now });
+    : () => accessToken({ apiUrl: config.apiUrl, client: cloudClient, store, now });
 
   return new SpecSession({
     projectKey: config.projectKey,
