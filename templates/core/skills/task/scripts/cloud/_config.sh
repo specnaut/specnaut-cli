@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Helper: read api_url + project_key from .specnaut/backlog-config.yml and get a
 # fresh access token from `specnaut cloud token`. Sourced by the other
-# cloud-backend scripts. Exports API_BASE (…/api/v1) + API_TOKEN.
+# cloud-backend scripts. Exports API_BASE (…/api/v1); `cloud_curl` sends a request.
 #
 # Credentials are NOT stored in backlog-config.yml — they live in the OS keychain
 # (or ~/.specnaut/credentials.json). Run `specnaut cloud login` once to
@@ -74,13 +74,39 @@ fi
 # Resolve a fresh access token (refreshes transparently; honors
 # SPECNAUT_CLOUD_TOKEN for headless / CI).
 # A failure has said why on stderr: logged out, Cloud unavailable, or a refused token.
+unset API_TOKEN
 if ! API_TOKEN=$(specnaut cloud token --api-url "$API_URL"); then
   exit 2
 fi
 
+case "$API_TOKEN" in
+  *[[:cntrl:]]*)
+    echo "error: \`specnaut cloud token\` returned an unusable token." >&2
+    exit 2
+    ;;
+esac
+
 API_BASE="${API_URL%/}/api/v1"
 
-export API_URL API_TOKEN PROJECT_KEY API_BASE
+export API_URL PROJECT_KEY API_BASE
+
+# cloud_curl <curl args…> — the one way this script family reaches Cloud, so every
+# request is made alike: curl reads no config file (`-q`), the Authorization
+# header arrives on stdin, and a 3xx is a failure (exit 22, as for any HTTP error,
+# which `-f` does not make of a 3xx). No Cloud request follows a redirect.
+cloud_curl() {
+  local _out _rc=0
+  _out=$(printf 'Authorization: Bearer %s\n' "$API_TOKEN" |
+    curl -q -H @- -fsS -w '\n%{http_code}' "$@") || _rc=$?
+  [ "$_rc" -eq 0 ] || return "$_rc"
+  case ${_out##*$'\n'} in
+    3*)
+      echo "error: Specnaut Cloud redirected the request, and the CLI follows no redirect: check api_url." >&2
+      return 22
+      ;;
+  esac
+  printf '%s' "${_out%$'\n'*}"
+}
 
 # Cloud has no browser URL yet: the config carries an API base, and the task
 # payloads expose no web address. Per `backlog-reference-contract` this is the

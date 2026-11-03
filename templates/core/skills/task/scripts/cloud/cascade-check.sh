@@ -33,10 +33,8 @@ case "$NUM" in
   '' | *[!0-9]*) echo "not a task number: '$NUM'" >&2; exit 2 ;;
 esac
 
-AUTH=(-H "Authorization: Bearer $API_TOKEN")
-
 rc=0
-COLS=$(curl -fsS "$API_BASE/columns?projectKey=$PROJECT_KEY" "${AUTH[@]}") || rc=$?
+COLS=$(cloud_curl "$API_BASE/columns?projectKey=$PROJECT_KEY") || rc=$?
 if [ "$rc" -ne 0 ] || [ -z "$COLS" ]; then
   echo "✗ could not read the board's columns" >&2
   exit 3
@@ -53,7 +51,7 @@ fi
 echo "  terminal column: \"$TERMINAL_NAME\" (order $TERMINAL_ORDER of $COLUMN_COUNT)"
 
 rc=0
-PARENT=$(curl -fsS "$API_BASE/tasks?projectKey=$PROJECT_KEY&number=$NUM" "${AUTH[@]}") || rc=$?
+PARENT=$(cloud_curl "$API_BASE/tasks?projectKey=$PROJECT_KEY&number=$NUM") || rc=$?
 if [ "$rc" -ne 0 ] || [ -z "$PARENT" ]; then
   echo "✗ task #$NUM not found on the board (or the lookup failed)" >&2
   exit 3
@@ -68,8 +66,13 @@ fi
 # One request for every child. The contract enumerates by parent number, so
 # this never costs one call per child.
 rc=0
-KIDS=$(curl -fsS "$API_BASE/tasks?projectKey=$PROJECT_KEY&parentNumber=$NUM" "${AUTH[@]}") || rc=$?
+KIDS=$(cloud_curl "$API_BASE/tasks?projectKey=$PROJECT_KEY&parentNumber=$NUM") || rc=$?
 if [ "$rc" -ne 0 ] || [ -z "$KIDS" ]; then
+  echo "✗ could not enumerate the children of #$NUM" >&2
+  exit 3
+fi
+
+if ! printf '%s' "$KIDS" | jq_lf -e '.tasks | type == "array"' >/dev/null 2>&1; then
   echo "✗ could not enumerate the children of #$NUM" >&2
   exit 3
 fi

@@ -9,10 +9,8 @@ set -euo pipefail
 . "$(dirname "$0")/_config.sh"
 
 FILTER="${1:-}"
-AUTH=(-H "Authorization: Bearer $API_TOKEN")
-
-COLS=$(curl -fsS "$API_BASE/columns?projectKey=$PROJECT_KEY" "${AUTH[@]}")
-TASKS=$(curl -fsS "$API_BASE/tasks?projectKey=$PROJECT_KEY" "${AUTH[@]}")
+COLS=$(cloud_curl "$API_BASE/columns?projectKey=$PROJECT_KEY")
+TASKS=$(cloud_curl "$API_BASE/tasks?projectKey=$PROJECT_KEY")
 
 echo "$TASKS" | jq_lf -r --argjson cols "$COLS" --arg filter "$FILTER" '
   ($cols.columns | map({ (.id): .name }) | add) as $names

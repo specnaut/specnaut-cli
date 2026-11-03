@@ -16,8 +16,7 @@ QUESTION="$2"
 PAYLOAD=$(jq_lf -n --arg k "$PROJECT_KEY" --argjson n "$NUM" --arg b "$QUESTION" \
   '{ projectKey: $k, number: $n, body: $b }')
 
-RESP=$(curl -fsS -X POST "$API_BASE/comments" \
-  -H "Authorization: Bearer $API_TOKEN" \
+RESP=$(cloud_curl -X POST "$API_BASE/comments" \
   -H "Content-Type: application/json" \
   -d "$PAYLOAD")
 

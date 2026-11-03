@@ -11,10 +11,8 @@ if [ "$#" -lt 1 ]; then
   exit 2
 fi
 NUM="$1"
-AUTH=(-H "Authorization: Bearer $API_TOKEN")
-
-COLS=$(curl -fsS "$API_BASE/columns?projectKey=$PROJECT_KEY" "${AUTH[@]}")
-RESP=$(curl -fsS "$API_BASE/tasks?projectKey=$PROJECT_KEY&number=$NUM" "${AUTH[@]}")
+COLS=$(cloud_curl "$API_BASE/columns?projectKey=$PROJECT_KEY")
+RESP=$(cloud_curl "$API_BASE/tasks?projectKey=$PROJECT_KEY&number=$NUM")
 
 echo "$RESP" | jq_lf -r --argjson cols "$COLS" '
   ($cols.columns | map({ (.id): .name }) | add) as $names

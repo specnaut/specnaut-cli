@@ -28,15 +28,18 @@ case "$NUM" in
   '' | *[!0-9]*) echo "not a task number: '$NUM'" >&2; exit 2 ;;
 esac
 
-AUTH=(-H "Authorization: Bearer $API_TOKEN")
-
 # Branch on curl's EXIT STATUS, not on empty output: an error body is still
 # output, and treating it as "no parent" is the one confusion this script
 # exists to prevent. `|| rc=$?` because under `set -e` a failing command
 # substitution in an assignment aborts before the next line runs.
 rc=0
-RESP=$(curl -fsS "$API_BASE/tasks?projectKey=$PROJECT_KEY&number=$NUM" "${AUTH[@]}") || rc=$?
+RESP=$(cloud_curl "$API_BASE/tasks?projectKey=$PROJECT_KEY&number=$NUM") || rc=$?
 if [ "$rc" -ne 0 ] || [ -z "$RESP" ]; then
+  echo "✗ task #$NUM not found on the board (or the lookup failed)" >&2
+  exit 3
+fi
+
+if ! printf '%s' "$RESP" | jq_lf -e '.task | type == "object"' >/dev/null 2>&1; then
   echo "✗ task #$NUM not found on the board (or the lookup failed)" >&2
   exit 3
 fi

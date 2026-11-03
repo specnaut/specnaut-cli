@@ -165,7 +165,7 @@ Deno.test("init --backlog cloud renders the cloud skill + writes config stub (no
     const addScript = await Deno.readTextFile(
       join(parent, "demo/.specnaut/scripts/backlog/add.sh"),
     );
-    assertStringIncludes(addScript, "Authorization: Bearer");
+    assertStringIncludes(addScript, "cloud_curl");
     assertStringIncludes(addScript, "$API_BASE/tasks");
     assertEquals(addScript.includes("gh issue create"), false);
     // The /api/v1 base lives in _config.sh, which now sources a fresh token

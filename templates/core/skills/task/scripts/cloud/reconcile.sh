@@ -35,8 +35,6 @@ while [ "$#" -gt 0 ]; do
 done
 
 STATE="$ROOT/.specnaut/.cloud-cursor-$PROJECT_KEY"
-AUTH=(-H "Authorization: Bearer $API_TOKEN")
-
 [ "$RESET" = "1" ] && rm -f "$STATE"
 
 CURSOR=""
@@ -48,7 +46,7 @@ while :; do
     URL="$URL&cursor=$(printf '%s' "$CURSOR" | jq_lf -sRr @uri)"
   fi
 
-  RESP=$(curl -fsS "$URL" "${AUTH[@]}")
+  RESP=$(cloud_curl "$URL")
   if ! echo "$RESP" | jq_lf -e '.ok' >/dev/null 2>&1; then
     echo "✗ reconcile failed: $RESP" >&2
     exit 1

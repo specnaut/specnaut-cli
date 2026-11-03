@@ -10471,7 +10471,7 @@ exit 0
     content: `#!/usr/bin/env bash
 # Helper: read api_url + project_key from .specnaut/backlog-config.yml and get a
 # fresh access token from \`specnaut cloud token\`. Sourced by the other
-# cloud-backend scripts. Exports API_BASE (…/api/v1) + API_TOKEN.
+# cloud-backend scripts. Exports API_BASE (…/api/v1); \`cloud_curl\` sends a request.
 #
 # Credentials are NOT stored in backlog-config.yml — they live in the OS keychain
 # (or ~/.specnaut/credentials.json). Run \`specnaut cloud login\` once to
@@ -10544,13 +10544,39 @@ fi
 # Resolve a fresh access token (refreshes transparently; honors
 # SPECNAUT_CLOUD_TOKEN for headless / CI).
 # A failure has said why on stderr: logged out, Cloud unavailable, or a refused token.
+unset API_TOKEN
 if ! API_TOKEN=\$(specnaut cloud token --api-url "\$API_URL"); then
   exit 2
 fi
 
+case "\$API_TOKEN" in
+  *[[:cntrl:]]*)
+    echo "error: \\\`specnaut cloud token\\\` returned an unusable token." >&2
+    exit 2
+    ;;
+esac
+
 API_BASE="\${API_URL%/}/api/v1"
 
-export API_URL API_TOKEN PROJECT_KEY API_BASE
+export API_URL PROJECT_KEY API_BASE
+
+# cloud_curl <curl args…> — the one way this script family reaches Cloud, so every
+# request is made alike: curl reads no config file (\`-q\`), the Authorization
+# header arrives on stdin, and a 3xx is a failure (exit 22, as for any HTTP error,
+# which \`-f\` does not make of a 3xx). No Cloud request follows a redirect.
+cloud_curl() {
+  local _out _rc=0
+  _out=\$(printf 'Authorization: Bearer %s\\n' "\$API_TOKEN" |
+    curl -q -H @- -fsS -w '\\n%{http_code}' "\$@") || _rc=\$?
+  [ "\$_rc" -eq 0 ] || return "\$_rc"
+  case \${_out##*\$'\\n'} in
+    3*)
+      echo "error: Specnaut Cloud redirected the request, and the CLI follows no redirect: check api_url." >&2
+      return 22
+      ;;
+  esac
+  printf '%s' "\${_out%\$'\\n'*}"
+}
 
 # Cloud has no browser URL yet: the config carries an API base, and the task
 # payloads expose no web address. Per \`backlog-reference-contract\` this is the
@@ -10583,10 +10609,8 @@ set -euo pipefail
 . "\$(dirname "\$0")/_config.sh"
 
 FILTER="\${1:-}"
-AUTH=(-H "Authorization: Bearer \$API_TOKEN")
-
-COLS=\$(curl -fsS "\$API_BASE/columns?projectKey=\$PROJECT_KEY" "\${AUTH[@]}")
-TASKS=\$(curl -fsS "\$API_BASE/tasks?projectKey=\$PROJECT_KEY" "\${AUTH[@]}")
+COLS=\$(cloud_curl "\$API_BASE/columns?projectKey=\$PROJECT_KEY")
+TASKS=\$(cloud_curl "\$API_BASE/tasks?projectKey=\$PROJECT_KEY")
 
 echo "\$TASKS" | jq_lf -r --argjson cols "\$COLS" --arg filter "\$FILTER" '
   (\$cols.columns | map({ (.id): .name }) | add) as \$names
@@ -10618,10 +10642,8 @@ if [ "\$#" -lt 1 ]; then
   exit 2
 fi
 NUM="\$1"
-AUTH=(-H "Authorization: Bearer \$API_TOKEN")
-
-COLS=\$(curl -fsS "\$API_BASE/columns?projectKey=\$PROJECT_KEY" "\${AUTH[@]}")
-RESP=\$(curl -fsS "\$API_BASE/tasks?projectKey=\$PROJECT_KEY&number=\$NUM" "\${AUTH[@]}")
+COLS=\$(cloud_curl "\$API_BASE/columns?projectKey=\$PROJECT_KEY")
+RESP=\$(cloud_curl "\$API_BASE/tasks?projectKey=\$PROJECT_KEY&number=\$NUM")
 
 echo "\$RESP" | jq_lf -r --argjson cols "\$COLS" '
   (\$cols.columns | map({ (.id): .name }) | add) as \$names
@@ -10686,9 +10708,7 @@ done
 # shellcheck source=./_config.sh
 . "\$(dirname "\$0")/_config.sh"
 RULES="\$(dirname "\$0")/../bash/groom-rules.sh"
-AUTH=(-H "Authorization: Bearer \$API_TOKEN")
-
-if ! COLS=\$(curl -fsS "\$API_BASE/columns?projectKey=\$PROJECT_KEY" "\${AUTH[@]}"); then
+if ! COLS=\$(cloud_curl "\$API_BASE/columns?projectKey=\$PROJECT_KEY"); then
   echo "groom-verify.sh: could not read the board's columns — nothing verified" >&2
   exit 2
 fi
@@ -10696,7 +10716,7 @@ fi
 # One task → one record on stdout. Fails (non-zero) when it cannot be read.
 record() {
   local resp
-  resp=\$(curl -fsS "\$API_BASE/tasks?projectKey=\$PROJECT_KEY&number=\$1" "\${AUTH[@]}") || return 1
+  resp=\$(cloud_curl "\$API_BASE/tasks?projectKey=\$PROJECT_KEY&number=\$1") || return 1
   # shellcheck disable=SC2016  # jq program.
   printf '%s\\n%s\\n' "\$COLS" "\$resp" | jq_lf -n -c -e --arg item "\$1" '
     input as \$cols | input as \$resp
@@ -10787,8 +10807,7 @@ PAYLOAD=\$(jq_lf -n --arg k "\$PROJECT_KEY" --arg t "\$TITLE" --arg b "\$BODY" -
    + (if \$b == "" then {} else { body: \$b } end)
    + (if \$p == "" then {} else { parentNumber: (\$p | tonumber) } end)')
 
-RESP=\$(curl -fsS -X POST "\$API_BASE/tasks" \\
-  -H "Authorization: Bearer \$API_TOKEN" \\
+RESP=\$(cloud_curl -X POST "\$API_BASE/tasks" \\
   -H "Content-Type: application/json" \\
   -d "\$PAYLOAD")
 
@@ -10829,8 +10848,7 @@ STATUS="\$2"
 PAYLOAD=\$(jq_lf -n --arg k "\$PROJECT_KEY" --argjson n "\$NUM" --arg s "\$STATUS" \\
   '{ projectKey: \$k, number: \$n, status: \$s }')
 
-RESP=\$(curl -fsS -X PATCH "\$API_BASE/tasks" \\
-  -H "Authorization: Bearer \$API_TOKEN" \\
+RESP=\$(cloud_curl -X PATCH "\$API_BASE/tasks" \\
   -H "Content-Type: application/json" \\
   -d "\$PAYLOAD")
 
@@ -10884,10 +10902,8 @@ case "\$NUM" in
   '' | *[!0-9]*) echo "not a task number: '\$NUM'" >&2; exit 2 ;;
 esac
 
-AUTH=(-H "Authorization: Bearer \$API_TOKEN")
-
 rc=0
-COLS=\$(curl -fsS "\$API_BASE/columns?projectKey=\$PROJECT_KEY" "\${AUTH[@]}") || rc=\$?
+COLS=\$(cloud_curl "\$API_BASE/columns?projectKey=\$PROJECT_KEY") || rc=\$?
 if [ "\$rc" -ne 0 ] || [ -z "\$COLS" ]; then
   echo "✗ could not read the board's columns" >&2
   exit 3
@@ -10904,7 +10920,7 @@ fi
 echo "  terminal column: \\"\$TERMINAL_NAME\\" (order \$TERMINAL_ORDER of \$COLUMN_COUNT)"
 
 rc=0
-PARENT=\$(curl -fsS "\$API_BASE/tasks?projectKey=\$PROJECT_KEY&number=\$NUM" "\${AUTH[@]}") || rc=\$?
+PARENT=\$(cloud_curl "\$API_BASE/tasks?projectKey=\$PROJECT_KEY&number=\$NUM") || rc=\$?
 if [ "\$rc" -ne 0 ] || [ -z "\$PARENT" ]; then
   echo "✗ task #\$NUM not found on the board (or the lookup failed)" >&2
   exit 3
@@ -10919,8 +10935,13 @@ fi
 # One request for every child. The contract enumerates by parent number, so
 # this never costs one call per child.
 rc=0
-KIDS=\$(curl -fsS "\$API_BASE/tasks?projectKey=\$PROJECT_KEY&parentNumber=\$NUM" "\${AUTH[@]}") || rc=\$?
+KIDS=\$(cloud_curl "\$API_BASE/tasks?projectKey=\$PROJECT_KEY&parentNumber=\$NUM") || rc=\$?
 if [ "\$rc" -ne 0 ] || [ -z "\$KIDS" ]; then
+  echo "✗ could not enumerate the children of #\$NUM" >&2
+  exit 3
+fi
+
+if ! printf '%s' "\$KIDS" | jq_lf -e '.tasks | type == "array"' >/dev/null 2>&1; then
   echo "✗ could not enumerate the children of #\$NUM" >&2
   exit 3
 fi
@@ -11099,15 +11120,18 @@ case "\$NUM" in
   '' | *[!0-9]*) echo "not a task number: '\$NUM'" >&2; exit 2 ;;
 esac
 
-AUTH=(-H "Authorization: Bearer \$API_TOKEN")
-
 # Branch on curl's EXIT STATUS, not on empty output: an error body is still
 # output, and treating it as "no parent" is the one confusion this script
 # exists to prevent. \`|| rc=\$?\` because under \`set -e\` a failing command
 # substitution in an assignment aborts before the next line runs.
 rc=0
-RESP=\$(curl -fsS "\$API_BASE/tasks?projectKey=\$PROJECT_KEY&number=\$NUM" "\${AUTH[@]}") || rc=\$?
+RESP=\$(cloud_curl "\$API_BASE/tasks?projectKey=\$PROJECT_KEY&number=\$NUM") || rc=\$?
 if [ "\$rc" -ne 0 ] || [ -z "\$RESP" ]; then
+  echo "✗ task #\$NUM not found on the board (or the lookup failed)" >&2
+  exit 3
+fi
+
+if ! printf '%s' "\$RESP" | jq_lf -e '.task | type == "object"' >/dev/null 2>&1; then
   echo "✗ task #\$NUM not found on the board (or the lookup failed)" >&2
   exit 3
 fi
@@ -11151,8 +11175,7 @@ QUESTION="\$2"
 PAYLOAD=\$(jq_lf -n --arg k "\$PROJECT_KEY" --argjson n "\$NUM" --arg b "\$QUESTION" \\
   '{ projectKey: \$k, number: \$n, body: \$b }')
 
-RESP=\$(curl -fsS -X POST "\$API_BASE/comments" \\
-  -H "Authorization: Bearer \$API_TOKEN" \\
+RESP=\$(cloud_curl -X POST "\$API_BASE/comments" \\
   -H "Content-Type: application/json" \\
   -d "\$PAYLOAD")
 
@@ -11182,8 +11205,7 @@ set -euo pipefail
 # shellcheck source=./_config.sh
 . "\$(dirname "\$0")/_config.sh"
 
-AUTH=(-H "Authorization: Bearer \$API_TOKEN")
-RESP=\$(curl -fsS "\$API_BASE/columns?projectKey=\$PROJECT_KEY" "\${AUTH[@]}")
+RESP=\$(cloud_curl "\$API_BASE/columns?projectKey=\$PROJECT_KEY")
 
 echo "\$RESP" | jq_lf -r '.columns | sort_by(.order)[] | "  \\(.order)\\t\\(.name)"'
 `,
@@ -11232,8 +11254,6 @@ while [ "\$#" -gt 0 ]; do
 done
 
 STATE="\$ROOT/.specnaut/.cloud-cursor-\$PROJECT_KEY"
-AUTH=(-H "Authorization: Bearer \$API_TOKEN")
-
 [ "\$RESET" = "1" ] && rm -f "\$STATE"
 
 CURSOR=""
@@ -11245,7 +11265,7 @@ while :; do
     URL="\$URL&cursor=\$(printf '%s' "\$CURSOR" | jq_lf -sRr @uri)"
   fi
 
-  RESP=\$(curl -fsS "\$URL" "\${AUTH[@]}")
+  RESP=\$(cloud_curl "\$URL")
   if ! echo "\$RESP" | jq_lf -e '.ok' >/dev/null 2>&1; then
     echo "✗ reconcile failed: \$RESP" >&2
     exit 1

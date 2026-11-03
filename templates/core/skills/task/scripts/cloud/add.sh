@@ -53,8 +53,7 @@ PAYLOAD=$(jq_lf -n --arg k "$PROJECT_KEY" --arg t "$TITLE" --arg b "$BODY" --arg
    + (if $b == "" then {} else { body: $b } end)
    + (if $p == "" then {} else { parentNumber: ($p | tonumber) } end)')
 
-RESP=$(curl -fsS -X POST "$API_BASE/tasks" \
-  -H "Authorization: Bearer $API_TOKEN" \
+RESP=$(cloud_curl -X POST "$API_BASE/tasks" \
   -H "Content-Type: application/json" \
   -d "$PAYLOAD")
 

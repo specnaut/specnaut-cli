@@ -43,9 +43,7 @@ done
 # shellcheck source=./_config.sh
 . "$(dirname "$0")/_config.sh"
 RULES="$(dirname "$0")/../bash/groom-rules.sh"
-AUTH=(-H "Authorization: Bearer $API_TOKEN")
-
-if ! COLS=$(curl -fsS "$API_BASE/columns?projectKey=$PROJECT_KEY" "${AUTH[@]}"); then
+if ! COLS=$(cloud_curl "$API_BASE/columns?projectKey=$PROJECT_KEY"); then
   echo "groom-verify.sh: could not read the board's columns — nothing verified" >&2
   exit 2
 fi
@@ -53,7 +51,7 @@ fi
 # One task → one record on stdout. Fails (non-zero) when it cannot be read.
 record() {
   local resp
-  resp=$(curl -fsS "$API_BASE/tasks?projectKey=$PROJECT_KEY&number=$1" "${AUTH[@]}") || return 1
+  resp=$(cloud_curl "$API_BASE/tasks?projectKey=$PROJECT_KEY&number=$1") || return 1
   # shellcheck disable=SC2016  # jq program.
   printf '%s\n%s\n' "$COLS" "$resp" | jq_lf -n -c -e --arg item "$1" '
     input as $cols | input as $resp

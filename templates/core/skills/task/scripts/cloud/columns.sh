@@ -9,7 +9,6 @@ set -euo pipefail
 # shellcheck source=./_config.sh
 . "$(dirname "$0")/_config.sh"
 
-AUTH=(-H "Authorization: Bearer $API_TOKEN")
-RESP=$(curl -fsS "$API_BASE/columns?projectKey=$PROJECT_KEY" "${AUTH[@]}")
+RESP=$(cloud_curl "$API_BASE/columns?projectKey=$PROJECT_KEY")
 
 echo "$RESP" | jq_lf -r '.columns | sort_by(.order)[] | "  \(.order)\t\(.name)"'

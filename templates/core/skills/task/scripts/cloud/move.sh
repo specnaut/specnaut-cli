@@ -19,8 +19,7 @@ STATUS="$2"
 PAYLOAD=$(jq_lf -n --arg k "$PROJECT_KEY" --argjson n "$NUM" --arg s "$STATUS" \
   '{ projectKey: $k, number: $n, status: $s }')
 
-RESP=$(curl -fsS -X PATCH "$API_BASE/tasks" \
-  -H "Authorization: Bearer $API_TOKEN" \
+RESP=$(cloud_curl -X PATCH "$API_BASE/tasks" \
   -H "Content-Type: application/json" \
   -d "$PAYLOAD")
 
