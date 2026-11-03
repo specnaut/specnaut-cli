@@ -17,7 +17,7 @@ import { bold, dim, green, red, yellow } from "@std/fmt/colors";
 import { CloudClient, type CloudColumn, type CloudTask } from "../../domain/cloud/cloud_client.ts";
 import { bindProject } from "./cloud_project_binding.ts";
 import { deviceLogin } from "./cloud_login.ts";
-import { requireCloudToken } from "./cloud_token.ts";
+import { printToken, requireCloudToken } from "./cloud_token.ts";
 import { DEFAULT_CLOUD_API_URL, normalizeApiUrl } from "../../domain/cloud/cloud_config.ts";
 import { headlessRefusal, headlessToken } from "../../domain/cloud/headless_token.ts";
 import type { CredentialStore } from "../../domain/cloud/credentials.ts";
@@ -293,10 +293,7 @@ async function runToken(intent: CloudIntent): Promise<number> {
   const apiUrl = resolved.url;
   // Headless / CI: the environment's token wins, for a deployment it may go to only.
   const headless = headlessToken(apiUrl, (k) => Deno.env.get(k));
-  if (headless && "token" in headless) {
-    console.log(headless.token);
-    return 0;
-  }
+  if (headless && "token" in headless) return printToken(headless.token);
   // Refused: the policy every session follows (headless_token.ts), so a script and
   // the session beside it never disagree about the same project.
   if (headless) console.error(yellow(`warning: ${headlessRefusal(headless.refused)}`));
@@ -309,9 +306,7 @@ async function runToken(intent: CloudIntent): Promise<number> {
     store,
     headless ? undefined : "run `specnaut cloud login` (or set SPECNAUT_CLOUD_TOKEN).",
   );
-  if (!token) return 1;
-  console.log(token);
-  return 0;
+  return token ? printToken(token) : 1;
 }
 
 async function runLogout(intent: CloudIntent): Promise<number> {

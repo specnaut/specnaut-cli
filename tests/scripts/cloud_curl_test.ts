@@ -1,5 +1,6 @@
 import { assertEquals, assertStringIncludes } from "@std/assert";
 import { fromFileUrl, join } from "@std/path";
+import { REDIRECT_REFUSED } from "../../src/domain/cloud/cloud_wire.ts";
 import { withServer } from "./cloud_stub.ts";
 
 // The Cloud backlog scripts make every request through `cloud_curl`. Real scripts, a
@@ -9,9 +10,7 @@ import { withServer } from "./cloud_stub.ts";
 const CLOUD = fromFileUrl(
   new URL("../../templates/core/skills/task/scripts/cloud", import.meta.url),
 );
-const RULES = fromFileUrl(
-  new URL("../../templates/core/specnaut/scripts/bash/groom-rules.sh", import.meta.url),
-);
+const BASH = fromFileUrl(new URL("../../templates/core/specnaut/scripts/bash", import.meta.url));
 const TOKEN = "tok-Secret.123";
 
 const SCRIPTS: [string, string[]][] = [
@@ -43,7 +42,11 @@ async function run(
     for await (const f of Deno.readDir(CLOUD)) {
       await Deno.copyFile(join(CLOUD, f.name), join(scripts, f.name));
     }
-    await Deno.copyFile(RULES, join(dir, ".specnaut", "scripts", "bash", "groom-rules.sh"));
+    for await (const f of Deno.readDir(BASH)) {
+      if (f.isFile) {
+        await Deno.copyFile(join(BASH, f.name), join(dir, ".specnaut", "scripts", "bash", f.name));
+      }
+    }
     await Deno.writeTextFile(
       join(dir, ".specnaut", "backlog-config.yml"),
       `backend: cloud\napi_url: "${apiUrl}"\nproject_key: K\n`,
@@ -100,7 +103,7 @@ Deno.test("cloud scripts: a redirect is a failure, is said, and is not followed"
     for (const [script, args] of SCRIPTS) {
       const { code, out } = await run(script, args, `http://127.0.0.1:${port}/moved`);
       assertEquals(code !== 0, true, `${script} succeeded\n${out}`);
-      assertStringIncludes(out, "redirected the request", script);
+      assertStringIncludes(out, `error: ${REDIRECT_REFUSED}.`, script);
       assertEquals(out.includes("✓"), false, `${script}\n${out}`);
     }
     assertEquals((await requests()).filter((r) => r.path.startsWith("/elsewhere")), []);
@@ -206,5 +209,73 @@ Deno.test("cloud scripts: curl's environment does not gain the token, even under
       env: { API_TOKEN: "inherited" },
     });
     assertEquals(curlLog.includes(" env:\n"), true, curlLog);
+  });
+});
+
+// deno-lint-ignore no-control-regex
+const NOT_PLAIN = /[\x00-\x08\x0b-\x1f\x7f-\x9f]/;
+
+Deno.test("cloud scripts: strings come back normalized", async () => {
+  await withServer(async (port) => {
+    const url = `http://127.0.0.1:${port}/dirty`;
+    const seen: [string, string[], string][] = [
+      ["add.sh", ["t"], "created: K-1]0;x\n"],
+      ["cascade-check.sh", ["1"], "child next]0;x"],
+      ["columns.sh", [], "1\tTodo]0;x\n"],
+      ["list.sh", [], "child next]0;x"],
+      ["parent-of.sh", ["1"], "cannot read: 2]0;x"],
+      ["reconcile.sh", [], "CREATED 1 -> Todo next]0;x\n"],
+      ["view.sh", ["1"], "first\nsecond\tthird]0;x"],
+    ];
+    for (const [script, args, expected] of seen) {
+      const { out } = await run(script, args, url);
+      assertStringIncludes(out, expected, script);
+      assertEquals(out.match(NOT_PLAIN), null, `${script}\n${JSON.stringify(out)}`);
+    }
+    const groom = await run("groom-verify.sh", ["1"], url);
+    assertStringIncludes(groom.out, "#1", groom.out);
+    assertEquals(groom.out.match(NOT_PLAIN), null, JSON.stringify(groom.out));
+  });
+});
+
+Deno.test("cloud scripts: a refusal is reported with its text normalized, keys included", async () => {
+  await withServer(async (port) => {
+    const refusals: [string, string[], string][] = [
+      ["add.sh", ["t"], "create failed: "],
+      ["clarify-comment.sh", ["1", "q"], "comment failed: "],
+      ["move.sh", ["1", "Done"], "move failed: "],
+      ["reconcile.sh", [], "reconcile failed: "],
+    ];
+    for (const [script, args, words] of refusals) {
+      const { code, out } = await run(script, args, `http://127.0.0.1:${port}/refused`);
+      assertEquals(code, 1, `${script}\n${out}`);
+      assertStringIncludes(out, words, script);
+      assertStringIncludes(out, "no]0;x", script);
+      assertStringIncludes(out, "key]0;x", script);
+      assertEquals(out.match(NOT_PLAIN), null, `${script}\n${JSON.stringify(out)}`);
+    }
+  });
+});
+
+Deno.test("cloud scripts: an answer that is no JSON is a failure", async () => {
+  await withServer(async (port) => {
+    for (const [script, args] of SCRIPTS) {
+      const { code, out } = await run(script, args, `http://127.0.0.1:${port}/garbage`);
+      assertEquals(code !== 0, true, `${script}\n${out}`);
+      assertStringIncludes(out, "something other than JSON", script);
+      assertEquals(out.includes("<html>"), false, `${script}\n${out}`);
+    }
+  });
+});
+
+Deno.test("cloud_curl: an empty success stays empty, and is not called bad JSON", async () => {
+  await withServer(async (port) => {
+    const { code, out } = await run(
+      "cascade-check.sh",
+      ["1"],
+      `http://127.0.0.1:${port}/status/204`,
+    );
+    assertEquals(code, 3, out);
+    assertEquals(out.includes("something other than JSON"), false, out);
   });
 });

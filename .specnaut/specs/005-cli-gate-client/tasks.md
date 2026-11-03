@@ -71,10 +71,10 @@ Depends on B + `auth_flow.freshAccessToken`. Injects `now()`, `sleep()`, token p
 ## Phase E — Validation & review
 
 - [x] **T016** `deno task check && deno lint && deno fmt --check && deno task test` — all green.
-- [x] **T017** Boundary review (§ I): grep the new files + tests for any Convex/internal identifier,
-      table, function, or backend error string; confirm only `docs/api/gates.md` wire fields cross.
-      Update `docs/api/gates.md`'s consumer note / `README` if a client-usage pointer is warranted;
-      mark #357 row done in the epic tracker if present.
+- [x] **T017** Boundary review (§ I): grep the new files + tests for any internal identifier, table,
+      function, or backend error string; confirm only `docs/api/gates.md` wire fields cross. Update
+      `docs/api/gates.md`'s consumer note / `README` if a client-usage pointer is warranted; mark
+      #357 row done in the epic tracker if present.
 
 ## Dependencies
 

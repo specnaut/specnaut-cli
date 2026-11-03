@@ -68,6 +68,20 @@ export function cleanText(v: unknown): string {
   return String(v ?? "").replace(/[\x00-\x1f\x7f-\x9f]/g, "");
 }
 
+/** JSON with DEL and C1 escaped too, which `JSON.stringify` leaves as they are. */
+export function terminalJson(value: unknown): string {
+  return JSON.stringify(value).replace(
+    /[\x7f-\x9f]/g,
+    (c) => `\\u${c.charCodeAt(0).toString(16).padStart(4, "0")}`,
+  );
+}
+
+/** Whether a value holds a control character. */
+export function hasControl(value: string): boolean {
+  // deno-lint-ignore no-control-regex
+  return /[\x00-\x1f\x7f-\x9f]/.test(value);
+}
+
 /** Clamp a (possibly NaN) number into [lo, hi], falling back to lo. */
 export function clamp(n: number, lo: number, hi: number): number {
   if (!Number.isFinite(n)) return lo;

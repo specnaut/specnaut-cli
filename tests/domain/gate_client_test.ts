@@ -47,7 +47,8 @@ function scripted(
 }
 
 Deno.test("reasonForStatus maps statuses; only 5xx and no connection are transient", () => {
-  for (const s of [400, 403, 429]) assertEquals(reasonForStatus(s), "unexpected", String(s));
+  assertEquals(reasonForStatus(403), "forbidden");
+  for (const s of [400, 429]) assertEquals(reasonForStatus(s), "unexpected", String(s));
   assertEquals(reasonForStatus(401), "unauthorized");
   assertEquals(reasonForStatus(404), "not_found");
   assertEquals(reasonForStatus(409), "conflict");

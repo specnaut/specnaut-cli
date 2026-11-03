@@ -234,3 +234,43 @@ for (
     assertEquals(store.m.has(API), !dropped);
   });
 }
+
+/** A login that goes as far as opening a page: what it opened, and what it printed. */
+async function pageOf(complete: string) {
+  const client = new CloudClient(API, (() => Promise.reject(new Error("unused"))) as typeof fetch);
+  client.startDevice = () =>
+    Promise.resolve({ ...DEVICE_START, verificationUriComplete: complete });
+  client.pollToken = () => Promise.resolve({ status: "denied" });
+  const logs: string[] = [];
+  let opened = "";
+  const store = {
+    kind: "file" as const,
+    load: () => Promise.resolve(null),
+    save: () => Promise.resolve(),
+    delete: () => Promise.resolve(),
+  };
+  const openUrl = (u: string) => Promise.resolve(void (opened = u));
+  const io = { log: (m: string) => void logs.push(m) };
+  const sleep = () => Promise.resolve();
+  await login({ apiUrl: API, client, store, io, openUrl, now: () => 0, sleep });
+  return { opened, printed: logs.join("\n") };
+}
+
+Deno.test("login opens the verification page it prints", async () => {
+  const prefilled = `${API}/cli?code=ABCD-1234`;
+  const same = await pageOf(prefilled);
+  assertEquals(same.opened, prefilled);
+  assertEquals(same.printed.includes(`visit:  ${prefilled}`), true, same.printed);
+  const host = new URL(API);
+  const others = [
+    "https://other.example.test/cli",
+    `${host.protocol === "https:" ? "http:" : "https:"}//${host.host}/cli`,
+    `${host.protocol}//${host.hostname}:8443/cli`,
+    "not a url",
+  ];
+  for (const other of others) {
+    const { opened, printed } = await pageOf(other);
+    assertEquals(opened, DEVICE_START.verificationUri, other);
+    assertEquals(printed.includes(`visit:  ${opened}`), true, printed);
+  }
+});

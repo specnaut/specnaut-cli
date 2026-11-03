@@ -124,10 +124,8 @@ Deno.test("gate raise: § I — no Cloud-internal identifier in stdout", async (
     raiseIntent({ type: "clarification", payload: '{"question":"q"}' }),
     cap.deps(session),
   );
-  const stdout = cap.out.join("\n");
-  for (const forbidden of ["_id", "convex", "ctx", "gateKey", "createdByUserId", "tasks"]) {
-    assertEquals(stdout.includes(forbidden), false, `stdout leaked '${forbidden}'`);
-  }
+  // Exactly the public answer: whatever else the backend holds cannot reach stdout.
+  assertEquals(cap.out, ['{"text":"use device flow"}']);
 });
 
 Deno.test("gate raise: unresolved (timeout) → exit 3", async () => {
@@ -234,6 +232,7 @@ Deno.test("gate cancel: each reason has its own sentence", async () => {
     [503, "Specnaut Cloud cannot be reached right now; retry."],
     [400, "Specnaut Cloud answered unexpectedly; retry."],
     [401, "not authenticated with Specnaut Cloud; run `specnaut cloud login`."],
+    [403, "Specnaut Cloud refuses this account here; check its access to the project."],
     [404, "Specnaut Cloud does not know this gate."],
     [409, "the gate is no longer in a state that allows this."],
     [422, "Specnaut Cloud refused the request as invalid."],
@@ -260,6 +259,7 @@ Deno.test("gate raise: each reason has its sentence; invalid names the flags onl
     [503, "Specnaut Cloud cannot be reached right now; retry."],
     [400, "Specnaut Cloud answered unexpectedly; retry."],
     [401, "not authenticated with Specnaut Cloud; run `specnaut cloud login`."],
+    [403, "Specnaut Cloud refuses this account here; check its access to the project."],
     [422, "the gate is invalid; check --type and --payload."],
     [
       307,
@@ -273,4 +273,15 @@ Deno.test("gate raise: each reason has its sentence; invalid names the flags onl
     const err = c.err.join("\n");
     assertEquals(err.includes(`gate could not be resolved: ${sentence}`), true, err);
   }
+});
+
+Deno.test("gate raise: stdout is the answer as escaped JSON", async () => {
+  const cap = capture();
+  const answer = { text: "a\x7f\x9bb" };
+  const session = sessionWith(resolvingFetch(answer));
+  await runGate(
+    raiseIntent({ type: "clarification", payload: '{"question":"q"}' }),
+    cap.deps(session),
+  );
+  assertEquals(cap.out, ['{"text":"a\\u007f\\u009bb"}']);
 });

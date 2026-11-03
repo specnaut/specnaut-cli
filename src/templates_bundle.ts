@@ -10563,7 +10563,20 @@ export API_URL PROJECT_KEY API_BASE
 # cloud_curl <curl args…> — the one way this script family reaches Cloud, so every
 # request is made alike: curl reads no config file (\`-q\`), the Authorization
 # header arrives on stdin, and a 3xx is a failure (exit 22, as for any HTTP error,
-# which \`-f\` does not make of a 3xx). No Cloud request follows a redirect.
+# which \`-f\` does not make of a 3xx). No Cloud request follows a redirect. What comes
+# back is normalized JSON (\`CLOUD_JSON\`): one line per string, except a \`body\`.
+CLOUD_JSON='
+  def text: gsub("[\\\\x{09}\\\\x{0a}]"; " ") | gsub("[\\\\x{00}-\\\\x{1f}\\\\x{7f}-\\\\x{9f}]"; "");
+  def body: gsub("[\\\\x{00}-\\\\x{08}\\\\x{0b}-\\\\x{1f}\\\\x{7f}-\\\\x{9f}]"; "");
+  def clean:
+    if type == "object" then
+      with_entries(.key as \$k
+        | .value |= (if \$k == "body" and type == "string" then body else clean end)
+        | .key |= text)
+    elif type == "array" then map(clean)
+    elif type == "string" then text
+    else . end;
+  clean'
 cloud_curl() {
   local _out _rc=0
   _out=\$(printf 'Authorization: Bearer %s\\n' "\$API_TOKEN" |
@@ -10575,7 +10588,12 @@ cloud_curl() {
       return 22
       ;;
   esac
-  printf '%s' "\${_out%\$'\\n'*}"
+  _out=\${_out%\$'\\n'*}
+  [ -n "\$_out" ] || return 0
+  if ! printf '%s' "\$_out" | jq_lf "\$CLOUD_JSON" 2>/dev/null; then
+    echo "error: Specnaut Cloud answered with something other than JSON." >&2
+    return 22
+  fi
 }
 
 # Cloud has no browser URL yet: the config carries an API base, and the task

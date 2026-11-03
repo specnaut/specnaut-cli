@@ -32,7 +32,7 @@ contract.
 
 Symmetric scripts live at the same path in `specnaut/specnaut-cloud`. Both repos implement the same
 contract; their preflight/postflight bodies differ because their deploy targets differ (binaries +
-Homebrew vs. Convex + Cloudflare).
+Homebrew vs. a hosted service).
 
 ---
 

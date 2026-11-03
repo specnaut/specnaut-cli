@@ -156,3 +156,31 @@ Deno.test("`cloud login` with no terminal says which commands the variable serve
   assertEquals(r.code, 2, r.stderr);
   assertStringIncludes(r.stderr, "`cloud orgs` and `cloud board` need this login");
 });
+
+Deno.test("`cloud token` prints only a well-formed token, from the environment too", async () => {
+  const r = await runSpecnaut(["cloud", "token", "--api-url", "https://api.specnaut.com"], {
+    SPECNAUT_CLOUD_TOKEN: "a\x1bb",
+    PATH: Deno.env.get("PATH") ?? "",
+  });
+  assertEquals([r.code, r.stdout], [1, ""], r.stderr);
+});
+
+Deno.test("`cloud token` prints only a well-formed stored token", async () => {
+  const home = await Deno.makeTempDir({ prefix: "specnaut-home-" });
+  const url = "https://cloud.example.test";
+  try {
+    await new FileCredentialStore(join(home, ".specnaut", "credentials.json")).save(url, {
+      accessToken: "a\x1bb",
+      refreshToken: "r",
+      accessExpiresAt: 8.64e15,
+    });
+    const r = await runSpecnaut(["cloud", "token", "--api-url", url], {
+      HOME: home,
+      PATH: Deno.env.get("PATH") ?? "",
+    });
+    assertEquals([r.code, r.stdout], [1, ""], r.stderr);
+    assertStringIncludes(r.stderr, "not usable");
+  } finally {
+    await Deno.remove(home, { recursive: true });
+  }
+});

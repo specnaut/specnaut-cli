@@ -22,7 +22,7 @@ import {
   FsBacklogConfigStore,
 } from "../../infrastructure/fs_backlog_config_store.ts";
 import { InvalidApiUrl } from "../../domain/cloud/cloud_config.ts";
-import { REDIRECT_REFUSED } from "../../domain/cloud/cloud_wire.ts";
+import { REDIRECT_REFUSED, terminalJson } from "../../domain/cloud/cloud_wire.ts";
 import type { GateErrorReason } from "../../domain/cloud/gate_client.ts";
 import {
   GateSession,
@@ -57,6 +57,7 @@ const FAILURE: Record<GateErrorReason | "no_remote", string> = {
   unauthorized: "not authenticated with Specnaut Cloud; run `specnaut cloud login`.",
   not_found: "Specnaut Cloud does not know this gate.",
   conflict: "the gate is no longer in a state that allows this.",
+  forbidden: "Specnaut Cloud refuses this account here; check its access to the project.",
   invalid: "Specnaut Cloud refused the request as invalid.",
   unexpected: "Specnaut Cloud answered unexpectedly; retry.",
   redirected: `${REDIRECT_REFUSED}.`,
@@ -171,7 +172,7 @@ async function reportRaise(
       if (applied.kind === "error") {
         deps.err(yellow("warning: answer received but apply (ack) did not complete; continuing."));
       }
-      deps.out(JSON.stringify(outcome.answer));
+      deps.out(terminalJson(outcome.answer));
       return 0;
     }
     case "unresolved":

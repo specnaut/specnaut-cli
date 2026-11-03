@@ -240,19 +240,19 @@ No new entities. Vocabulary the code must use consistently:
 
 ## 7. Constitution check
 
-| Principle                                    | Verdict           | Note                                                                                                                                                              |
-| :------------------------------------------- | :---------------- | :---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| I — OSS/proprietary boundary                 | pass              | Swept: `specnaut-cloud\|convex\|pulumi\|api\.specnaut` across all 16 scripts returns zero. But see Complexity tracking — S1 opens a § I _path_, not a § I _leak_. |
-| II — HTTP contract is the only bridge        | pass              | Not touched.                                                                                                                                                      |
-| III — the monorepo holds no product code     | improves          | Moves 16 fixtures out of the workspace root into the half that owns them.                                                                                         |
-| IV — cross-cutting change discipline         | pass, and binding | Two repos. Submodule pushed **first**, pointer second. See A13 for where the closing keyword goes.                                                                |
-| V — local merge by default                   | pass              | `scripts/land.sh cli 022-smoke-suite-ci`, then the root. No PR.                                                                                                   |
-| VI — centralised backlog routing             | pass              | #544 closes through the landing; `land.sh` reconciles the board.                                                                                                  |
-| VII — submodule autonomy                     | improves          | The CLI gains a guard it can run standalone. The skill stays centralised.                                                                                         |
-| VIII — no pinned versions in long-lived docs | pass, with care   | The rewritten `SKILL.md` must not restate a harness count or a script count.                                                                                      |
-| IX — dogfooding                              | pass              | This is the dogfooding loop being repaired.                                                                                                                       |
-| X — epic status mirrors children             | n/a               | #544 has no children.                                                                                                                                             |
-| XI — consumer agnosticism                    | pass              | No consuming project is named anywhere in the moving files.                                                                                                       |
+| Principle                                    | Verdict           | Note                                                                                                                                       |
+| :------------------------------------------- | :---------------- | :----------------------------------------------------------------------------------------------------------------------------------------- |
+| I — OSS/proprietary boundary                 | pass              | Swept: the private half's names across all 16 scripts returns zero. But see Complexity tracking — S1 opens a § I _path_, not a § I _leak_. |
+| II — HTTP contract is the only bridge        | pass              | Not touched.                                                                                                                               |
+| III — the monorepo holds no product code     | improves          | Moves 16 fixtures out of the workspace root into the half that owns them.                                                                  |
+| IV — cross-cutting change discipline         | pass, and binding | Two repos. Submodule pushed **first**, pointer second. See A13 for where the closing keyword goes.                                         |
+| V — local merge by default                   | pass              | `scripts/land.sh cli 022-smoke-suite-ci`, then the root. No PR.                                                                            |
+| VI — centralised backlog routing             | pass              | #544 closes through the landing; `land.sh` reconciles the board.                                                                           |
+| VII — submodule autonomy                     | improves          | The CLI gains a guard it can run standalone. The skill stays centralised.                                                                  |
+| VIII — no pinned versions in long-lived docs | pass, with care   | The rewritten `SKILL.md` must not restate a harness count or a script count.                                                               |
+| IX — dogfooding                              | pass              | This is the dogfooding loop being repaired.                                                                                                |
+| X — epic status mirrors children             | n/a               | #544 has no children.                                                                                                                      |
+| XI — consumer agnosticism                    | pass              | No consuming project is named anywhere in the moving files.                                                                                |
 
 ### Complexity tracking
 

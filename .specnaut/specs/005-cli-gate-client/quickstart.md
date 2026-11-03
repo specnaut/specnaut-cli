@@ -43,8 +43,7 @@ Cases the unit suite covers (maps to SC-001…SC-007):
 - token refresh mid-await: stub returns 401 once, refresh path issues a new token, await continues.
 - remote-mode off → no fetch calls happen; on-but-no-creds →
   `{ kind: "error", reason: "no_remote" }`.
-- § I: assert no request body / stored value contains a Convex/internal identifier; only wire
-  fields.
+- § I: assert no request body / stored value contains an internal identifier; only wire fields.
 
 ```bash
 deno task test            # full suite incl. gate_client / gate_session / remote_mode

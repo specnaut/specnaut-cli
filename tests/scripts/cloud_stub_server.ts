@@ -1,7 +1,9 @@
-// A stand-in for the Cloud API, run as its own process by cloud_curl_test.ts (the
+// A stand-in for the Cloud API, run as its own process through cloud_stub.ts, by cloud_curl_test.ts and cloud_real_fetch_test.ts (the
 // test suite itself holds no network permission). `/ok/…` answers; `/moved/…` sends a
 // 307 to `/elsewhere/…`; `/status/<n>/…` answers n; `/partial/…` answers a body that
-// is not the contract for a task or its children. Every request is one JSON line in
+// is not the contract for a task or its children; `/dirty/…` and `/refused/…` answer
+// strings that need normalizing, the second with `ok: false`; `/garbage/…` answers no
+// JSON. Every request is one JSON line in
 // `<dir>/requests.log`.
 
 const dir = Deno.args[0];
@@ -14,6 +16,24 @@ const ANSWER = {
   hasMore: false,
   cursor: "",
 };
+
+const CONTROL = "\x00\x07\x08\x0b\x1b]0;x\r\x1f\x7f\u0080\u009b\u009f";
+const DIRTY = {
+  ok: true,
+  columns: ANSWER.columns.map((c) => ({ ...c, name: `${c.name}${CONTROL}` })),
+  task: {
+    ...ANSWER.task,
+    key: `K-1${CONTROL}`,
+    title: `t\nnext${CONTROL}`,
+    body: `first\nsecond\tthird${CONTROL}`,
+    parentNumber: `2${CONTROL}`,
+  },
+  tasks: [{ number: 2, title: `child\nnext${CONTROL}`, columnId: "c1" }],
+  events: [{ kind: "created", number: 1, toStage: `Todo\nnext${CONTROL}` }],
+  hasMore: false,
+  cursor: "",
+};
+const REFUSED = { ok: false, error: `no${CONTROL}`, [`key${CONTROL}`]: 1 };
 
 const server = Deno.serve({
   hostname: "127.0.0.1",
@@ -37,6 +57,11 @@ const server = Deno.serve({
   if (url.pathname.startsWith("/partial/") && url.pathname.endsWith("/tasks")) {
     return Response.json({ ok: false });
   }
+  if (url.pathname.startsWith("/garbage/")) {
+    return new Response("<html>\x1b[31m", { status: 200 });
+  }
+  if (url.pathname.startsWith("/dirty/")) return Response.json(DIRTY);
+  if (url.pathname.startsWith("/refused/")) return Response.json(REFUSED);
   return Response.json(ANSWER);
 });
 

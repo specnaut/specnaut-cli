@@ -235,7 +235,12 @@ Deno.test("a 401 after a refresh with no verdict only says the token in hand exp
 });
 
 Deno.test("an answer that is a verdict ends an await at once", async () => {
-  const reasons: [number, string][] = [[404, "not_found"], [409, "conflict"], [422, "invalid"]];
+  const reasons: [number, string][] = [
+    [403, "forbidden"],
+    [404, "not_found"],
+    [409, "conflict"],
+    [422, "invalid"],
+  ];
   for (const [status, reason] of reasons) {
     const be = new Backend();
     const orig = be.fetch;
@@ -248,4 +253,25 @@ Deno.test("an answer that is a verdict ends an await at once", async () => {
     assertEquals(out, { kind: "error", reason } as never);
     assertEquals(be.getCalls, 1);
   }
+});
+
+Deno.test("makeGateSession: a 429 on the refresh, through the real wiring, is unexpected and keeps the login", async () => {
+  const urls: string[] = [];
+  const fetchFn = ((url: string) => {
+    urls.push(new URL(url).pathname);
+    return Promise.resolve(new Response("{}", { status: 429 }));
+  }) as FetchFn;
+  const s = makeGateSession({
+    config: { apiUrl: "https://cloud.example.com", projectKey: "CLOUD", remote: { enabled: true } },
+    store: {
+      kind: "file",
+      load: () => Promise.resolve({ accessToken: "A", refreshToken: "R", accessExpiresAt: 0 }),
+      save: () => Promise.resolve(),
+      delete: () => Promise.reject(new Error("the login must be kept")),
+    },
+    fetchFn,
+    env: () => undefined,
+  })!;
+  assertEquals(await s.raiseAndAwait(REQUEST), { kind: "error", reason: "unexpected" });
+  assertEquals(urls, ["/api/v1/auth/refresh"]);
 });

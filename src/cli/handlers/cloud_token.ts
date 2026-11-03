@@ -10,7 +10,7 @@ import {
   isRedirected,
   isUnavailable,
 } from "../../domain/cloud/cloud_client.ts";
-import { REDIRECT_REFUSED } from "../../domain/cloud/cloud_wire.ts";
+import { hasControl, REDIRECT_REFUSED } from "../../domain/cloud/cloud_wire.ts";
 import type { CredentialStore } from "../../domain/cloud/credentials.ts";
 
 /** What went wrong with a Cloud request, in the CLI's own words (§ I). */
@@ -19,6 +19,16 @@ export function cloudFailure(e: CloudApiError): string {
   return `Specnaut Cloud ${
     isUnavailable(e) ? "cannot be reached" : "answered unexpectedly"
   }; retry`;
+}
+
+/** Print a token for a script to read, once it is well formed. The exit code. */
+export function printToken(token: string): number {
+  if (hasControl(token)) {
+    console.error(red("error: the token is not usable; run `specnaut cloud login`."));
+    return 1;
+  }
+  console.log(token);
+  return 0;
 }
 
 /**

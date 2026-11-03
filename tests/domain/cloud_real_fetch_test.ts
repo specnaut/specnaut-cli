@@ -1,6 +1,8 @@
 import { assertEquals } from "@std/assert";
 import { fromFileUrl } from "@std/path";
 import { withServer } from "../scripts/cloud_stub.ts";
+// Only for the type check: the probe is spawned, so `deno test` would not reach it otherwise.
+import type * as _Probe from "./cloud_real_fetch_probe.ts";
 
 // The stubs elsewhere answer 307 whatever the redirect mode. This one is the real
 // `fetch` against a real server: it reports the 3xx itself and goes nowhere.

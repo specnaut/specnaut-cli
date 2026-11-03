@@ -16,6 +16,7 @@ import { type Gate, type GateRequest, parseGate } from "./gate_contract.ts";
 /** Typed error reasons the caller branches on. Derived from HTTP status only. */
 export type GateErrorReason =
   | "unauthorized" // 401
+  | "forbidden" // 403 — authenticated, not allowed: retrying changes nothing
   | "not_found" // 404
   | "conflict" // 409 — illegal transition
   | "invalid" // 422 — bad type/payload/answer
@@ -34,6 +35,7 @@ export class GateApiError extends Error {
 /** Map an HTTP status to a typed reason. Only 5xx and 0 (network) are transient: an answer Cloud gave is not "unreachable". */
 export function reasonForStatus(status: number): GateErrorReason {
   if (status === 401) return "unauthorized";
+  if (status === 403) return "forbidden";
   if (status === 404) return "not_found";
   if (status === 409) return "conflict";
   if (status === 422) return "invalid";

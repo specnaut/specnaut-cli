@@ -2,7 +2,7 @@
 // and hand out a fresh access token (refreshing transparently). All IO is
 // injected so this is unit-testable without network / browser / keychain.
 
-import type { CloudClient } from "./cloud_client.ts";
+import type { CloudClient, DeviceStart } from "./cloud_client.ts";
 import { headlessRefusal, headlessToken } from "./headless_token.ts";
 import type { CloudCredentials, CredentialStore } from "./credentials.ts";
 
@@ -28,6 +28,28 @@ export type LoginResult =
 // never races the boundary.
 const REFRESH_SKEW_MS = 60_000;
 
+/** The verification page: the prefilled one on the plain one's origin. */
+function verificationPage(start: DeviceStart): string {
+  try {
+    const same = new URL(start.verificationUriComplete).origin ===
+      new URL(start.verificationUri).origin;
+    return same ? start.verificationUriComplete : start.verificationUri;
+  } catch {
+    return start.verificationUri;
+  }
+}
+
+/** Tell the user where to go and with which code: the page to open. */
+function announce(start: DeviceStart, io: AuthIo): string {
+  const page = verificationPage(start);
+  io.log("");
+  io.log(`  To connect, visit:  ${page}`);
+  io.log(`  and enter the code: ${start.userCode}`);
+  io.log("");
+  io.log("  Opening your browser…");
+  return page;
+}
+
 /**
  * Run the full device-authorization login: start a request, show the user the
  * code + URL (and open the browser), poll until they approve, then persist the
@@ -37,12 +59,7 @@ export async function login(deps: LoginDeps): Promise<LoginResult> {
   const { client, store, io, openUrl, now, sleep, apiUrl } = deps;
 
   const start = await client.startDevice();
-  io.log("");
-  io.log(`  To connect, visit:  ${start.verificationUri}`);
-  io.log(`  and enter the code: ${start.userCode}`);
-  io.log("");
-  io.log("  Opening your browser…");
-  await openUrl(start.verificationUriComplete);
+  await openUrl(announce(start, io));
 
   const deadline = now() + start.expiresInS * 1000;
   let intervalMs = Math.max(1, start.intervalS) * 1000;

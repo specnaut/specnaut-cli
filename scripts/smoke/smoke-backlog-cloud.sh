@@ -66,12 +66,12 @@ check "and the script SAYS which column it used (#563)" \
 check "both branch on curl exit status, not on empty output (#563)" \
   'grep -qF "rc=0" .specnaut/scripts/backlog/parent-of.sh &&
    grep -qF "rc=0" .specnaut/scripts/backlog/cascade-check.sh'
-# Constitution § I. The only bridge is the versioned public HTTP contract;
-# an internal identifier of the hosted half must never appear here.
-check "no internal identifier of the hosted board appears (#563 AC6)" \
-  '! grep -qE "parentId|convex|_creationTime" .specnaut/scripts/backlog/parent-of.sh &&
-   ! grep -qE "parentId|convex|_creationTime" .specnaut/scripts/backlog/cascade-check.sh &&
-   ! grep -qE "parentId|convex|_creationTime" .specnaut/scripts/backlog/add.sh'
+# Constitution § I. The only bridge is the versioned public HTTP contract:
+# a parent travels by its public number, in the field the contract names.
+check "a parent goes by its public number (#563 AC6)" \
+  'grep -qF ".task.parentNumber" .specnaut/scripts/backlog/parent-of.sh &&
+   grep -qF "parentNumber=" .specnaut/scripts/backlog/cascade-check.sh &&
+   grep -qF "parentNumber:" .specnaut/scripts/backlog/add.sh'
 
 
 echo "═══ spec 042  close-shipped.sh — the move is the close ═══"
