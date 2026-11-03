@@ -163,6 +163,8 @@ Deno.test("`cloud token` prints only a well-formed token, from the environment t
     PATH: Deno.env.get("PATH") ?? "",
   });
   assertEquals([r.code, r.stdout], [1, ""], r.stderr);
+  assertStringIncludes(r.stderr, "fix SPECNAUT_CLOUD_TOKEN");
+  assertEquals(r.stderr.includes("cloud login"), false, r.stderr);
 });
 
 Deno.test("`cloud token` prints only a well-formed stored token", async () => {
@@ -179,7 +181,7 @@ Deno.test("`cloud token` prints only a well-formed stored token", async () => {
       PATH: Deno.env.get("PATH") ?? "",
     });
     assertEquals([r.code, r.stdout], [1, ""], r.stderr);
-    assertStringIncludes(r.stderr, "not usable");
+    assertStringIncludes(r.stderr, "not usable; run `specnaut cloud login`");
   } finally {
     await Deno.remove(home, { recursive: true });
   }

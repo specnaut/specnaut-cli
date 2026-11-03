@@ -8438,6 +8438,30 @@ resolve_form() {
   fi
 }
 
+# A KEY=value line, the value quoted for \`eval\`. Plain ids print as they are.
+kv() {
+  if [ -n "\$2" ]; then printf '%s=%q\\n' "\$1" "\$2"; else printf '%s=\\n' "\$1"; fi
+}
+
+# The per-option lines of field <prefix>, from its options as JSON.
+emit_options() {
+  # Option names are not identifiers: "In progress" would emit
+  # \`STATUS_OPT_IN PROGRESS=…\`, which breaks the caller's \`eval\`. Fold every
+  # non-alphanumeric character to \`_\` so the name is always assignable.
+  echo "\$2" | jq_lf -r --arg p "\$1" '
+    def q: if test("^[A-Za-z0-9_-]+\$") then . else @sh end;
+    .[]
+    | "\\(\$p)_OPT_\\(.name | ascii_upcase | gsub("[^A-Z0-9]"; "_"))=\\(.id // "" | q)"
+  '
+  echo "\$2" | jq_lf -r --arg p "\$1" '
+    "\\(\$p)_OPT_NAMES=\\([.[].name] | join(", ") | @sh)"
+  '
+  echo "\$2" | jq_lf -r --arg p "\$1" '
+    def q: if test("^[A-Za-z0-9_-]+\$") then . else @sh end;
+    "\\(\$p)_FIRST_OPT_ID=\\(.[0].id // "" | q)"
+  '
+}
+
 emit() {
   local field="\$1" prefix="\$2"
   local field_block
@@ -8473,22 +8497,10 @@ emit() {
     [ "\$form" = local ] || opts=\$ORG_OPTIONS
   fi
 
-  echo "\${prefix}_FIELD_ID=\$field_id"
-  echo "\${prefix}_FIELD_FORM=\$form"
-  echo "\${prefix}_ORG_FIELD_ID=\$org_field_id"
-  # Option names are not identifiers: "In progress" would emit
-  # \`STATUS_OPT_IN PROGRESS=…\`, which breaks the caller's \`eval\`. Fold every
-  # non-alphanumeric character to \`_\` so the name is always assignable.
-  echo "\$opts" | jq_lf -r --arg p "\$prefix" '
-    .[]
-    | "\\(\$p)_OPT_\\(.name | ascii_upcase | gsub("[^A-Z0-9]"; "_"))=\\(.id)"
-  '
-  echo "\$opts" | jq_lf -r --arg p "\$prefix" '
-    "\\(\$p)_OPT_NAMES=\\"\\([.[].name] | join(", "))\\""
-  '
-  echo "\$opts" | jq_lf -r --arg p "\$prefix" '
-    "\\(\$p)_FIRST_OPT_ID=\\(.[0].id // "")"
-  '
+  kv "\${prefix}_FIELD_ID" "\$field_id"
+  kv "\${prefix}_FIELD_FORM" "\$form"
+  kv "\${prefix}_ORG_FIELD_ID" "\$org_field_id"
+  emit_options "\$prefix" "\$opts"
 }
 
 emit Status STATUS
@@ -8523,9 +8535,9 @@ emit_date() {
     return
   fi
   resolve_form "\$field_id"
-  echo "\${prefix}_FIELD_ID=\$field_id"
-  echo "\${prefix}_FIELD_FORM=\$FORM"
-  echo "\${prefix}_ORG_FIELD_ID=\$ORG_FIELD_ID"
+  kv "\${prefix}_FIELD_ID" "\$field_id"
+  kv "\${prefix}_FIELD_FORM" "\$FORM"
+  kv "\${prefix}_ORG_FIELD_ID" "\$ORG_FIELD_ID"
 }
 
 emit_date "Start date"  STARTDATE
@@ -8547,13 +8559,13 @@ emit_simple() {
     echo "\${prefix}_FIELD_ID="
     return
   fi
-  echo "\${prefix}_FIELD_ID=\$field_id"
+  kv "\${prefix}_FIELD_ID" "\$field_id"
 }
 
 emit_simple "Estimate"    ESTIMATE
 
 # Project node ID — handy for callers that also want to write field values.
-echo "PROJECT_NODE_ID=\$PROJECT_NODE_ID"
+kv PROJECT_NODE_ID "\$PROJECT_NODE_ID"
 `,
     executable: true,
     backend: "github",
@@ -10566,8 +10578,10 @@ export API_URL PROJECT_KEY API_BASE
 # which \`-f\` does not make of a 3xx). No Cloud request follows a redirect. What comes
 # back is normalized JSON (\`CLOUD_JSON\`): one line per string, except a \`body\`.
 CLOUD_JSON='
-  def text: gsub("[\\\\x{09}\\\\x{0a}]"; " ") | gsub("[\\\\x{00}-\\\\x{1f}\\\\x{7f}-\\\\x{9f}]"; "");
-  def body: gsub("[\\\\x{00}-\\\\x{08}\\\\x{0b}-\\\\x{1f}\\\\x{7f}-\\\\x{9f}]"; "");
+  def printable: . >= 32 and (. < 127 or . > 159)
+    and (. < 8206 or . > 8207) and (. < 8232 or . > 8238) and (. < 8294 or . > 8297);
+  def text: explode | map(if . == 9 or . == 10 or . == 8232 or . == 8233 then 32 else . end | select(printable)) | implode;
+  def body: explode | map(if . == 8232 or . == 8233 then 10 else . end | select(printable or . == 9 or . == 10)) | implode;
   def clean:
     if type == "object" then
       with_entries(.key as \$k
@@ -10591,6 +10605,10 @@ cloud_curl() {
   _out=\${_out%\$'\\n'*}
   [ -n "\$_out" ] || return 0
   if ! printf '%s' "\$_out" | jq_lf "\$CLOUD_JSON" 2>/dev/null; then
+    if ! jq_lf -n "\\"\\" | \$CLOUD_JSON" >/dev/null 2>&1; then
+      echo "error: the Cloud scripts cannot run on this version of jq; install 1.6 or later." >&2
+      return 22
+    fi
     echo "error: Specnaut Cloud answered with something other than JSON." >&2
     return 22
   fi
@@ -11291,11 +11309,14 @@ while :; do
 
   # In seek-end mode we only advance the cursor, never emit transitions.
   if [ "\$SEEK_END" != "1" ]; then
+    # One \`->\` per row: the separator between its two stages.
     echo "\$RESP" | jq_lf -r '
+      def stage: (. // "—") | tostring | split("->") | join("→");
       .events[]
+      | (.number | if type == "number" then . else "?" end) as \$n
       | if .kind == "created"
-        then "CREATED \\(.number) -> \\(.toStage // "—")"
-        else "MOVED \\(.number) \\(.fromStage // "—") -> \\(.toStage // "—")"
+        then "CREATED \\(\$n) -> \\(.toStage | stage)"
+        else "MOVED \\(\$n) \\(.fromStage | stage) -> \\(.toStage | stage)"
         end
     '
   fi

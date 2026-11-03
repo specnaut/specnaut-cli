@@ -54,11 +54,14 @@ while :; do
 
   # In seek-end mode we only advance the cursor, never emit transitions.
   if [ "$SEEK_END" != "1" ]; then
+    # One `->` per row: the separator between its two stages.
     echo "$RESP" | jq_lf -r '
+      def stage: (. // "—") | tostring | split("->") | join("→");
       .events[]
+      | (.number | if type == "number" then . else "?" end) as $n
       | if .kind == "created"
-        then "CREATED \(.number) -> \(.toStage // "—")"
-        else "MOVED \(.number) \(.fromStage // "—") -> \(.toStage // "—")"
+        then "CREATED \($n) -> \(.toStage | stage)"
+        else "MOVED \($n) \(.fromStage | stage) -> \(.toStage | stage)"
         end
     '
   fi

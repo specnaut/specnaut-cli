@@ -261,6 +261,7 @@ Deno.test("login opens the verification page it prints", async () => {
   const same = await pageOf(prefilled);
   assertEquals(same.opened, prefilled);
   assertEquals(same.printed.includes(`visit:  ${prefilled}`), true, same.printed);
+  assertEquals(same.printed.includes("and check the code"), true, same.printed);
   const host = new URL(API);
   const others = [
     "https://other.example.test/cli",
@@ -272,5 +273,6 @@ Deno.test("login opens the verification page it prints", async () => {
     const { opened, printed } = await pageOf(other);
     assertEquals(opened, DEVICE_START.verificationUri, other);
     assertEquals(printed.includes(`visit:  ${opened}`), true, printed);
+    assertEquals(printed.includes("and enter the code"), true, printed);
   }
 });

@@ -22,6 +22,8 @@ function gate(over: Record<string, unknown> = {}): Record<string, unknown> {
     resolvedBy: null,
     createdAt: "2026-06-04T10:00:00Z",
     resolvedAt: null,
+    // Something only the backend holds: stdout is the answer, and never this.
+    internalRef: "ref_backend_only",
     ...over,
   };
 }

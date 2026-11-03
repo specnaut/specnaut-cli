@@ -26,7 +26,7 @@ Deno.test("a projected field's options are resolved from the organization", asyn
     // The options come across in the SAME shape as a project-local field, so
     // callers need no new vocabulary — that was the point of AC 2.
     assertStringIncludes(r.stdout, "PRIORITY_OPT_URGENT=IFSSO_urgent");
-    assertStringIncludes(r.stdout, 'PRIORITY_OPT_NAMES="Urgent, High"');
+    assertStringIncludes(r.stdout, "PRIORITY_OPT_NAMES='Urgent, High'");
     assertStringIncludes(r.stdout, "PRIORITY_FIRST_OPT_ID=IFSSO_urgent");
   } finally {
     await Deno.remove(tmp, { recursive: true });
@@ -61,7 +61,7 @@ Deno.test("a projected field whose organization field is unreadable degrades, it
     assertEquals(r.code, 0, `the detector aborted: ${r.stderr}`);
     assertStringIncludes(r.stdout, "PRIORITY_FIELD_FORM=projected");
     assertStringIncludes(r.stdout, "PRIORITY_ORG_FIELD_ID=\n");
-    assertStringIncludes(r.stdout, 'PRIORITY_OPT_NAMES=""');
+    assertStringIncludes(r.stdout, "PRIORITY_OPT_NAMES=''");
     // Size is emitted AFTER Priority: holding it proves the run continued.
     assertStringIncludes(r.stdout, "SIZE_FIELD_ID=F_size");
   } finally {
@@ -167,7 +167,7 @@ Deno.test("a project-owned single-select with no options is not taken for the or
     const detect = await run(tmp, "detect-fields.sh");
     assertEquals(detect.code, 0, detect.stderr);
     assertStringIncludes(detect.stdout, "PRIORITY_FIELD_FORM=local");
-    assertStringIncludes(detect.stdout, 'PRIORITY_OPT_NAMES=""');
+    assertStringIncludes(detect.stdout, "PRIORITY_OPT_NAMES=''");
 
     const r = await run(tmp, "set-field.sh", ["42", "Priority", "Urgent"]);
     assertEquals(r.code, 11, `expected the label-fallback exit, got ${r.code}: ${r.stderr}`);

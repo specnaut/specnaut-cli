@@ -96,8 +96,10 @@ export API_URL PROJECT_KEY API_BASE
 # which `-f` does not make of a 3xx). No Cloud request follows a redirect. What comes
 # back is normalized JSON (`CLOUD_JSON`): one line per string, except a `body`.
 CLOUD_JSON='
-  def text: gsub("[\\x{09}\\x{0a}]"; " ") | gsub("[\\x{00}-\\x{1f}\\x{7f}-\\x{9f}]"; "");
-  def body: gsub("[\\x{00}-\\x{08}\\x{0b}-\\x{1f}\\x{7f}-\\x{9f}]"; "");
+  def printable: . >= 32 and (. < 127 or . > 159)
+    and (. < 8206 or . > 8207) and (. < 8232 or . > 8238) and (. < 8294 or . > 8297);
+  def text: explode | map(if . == 9 or . == 10 or . == 8232 or . == 8233 then 32 else . end | select(printable)) | implode;
+  def body: explode | map(if . == 8232 or . == 8233 then 10 else . end | select(printable or . == 9 or . == 10)) | implode;
   def clean:
     if type == "object" then
       with_entries(.key as $k
@@ -121,6 +123,10 @@ cloud_curl() {
   _out=${_out%$'\n'*}
   [ -n "$_out" ] || return 0
   if ! printf '%s' "$_out" | jq_lf "$CLOUD_JSON" 2>/dev/null; then
+    if ! jq_lf -n "\"\" | $CLOUD_JSON" >/dev/null 2>&1; then
+      echo "error: the Cloud scripts cannot run on this version of jq; install 1.6 or later." >&2
+      return 22
+    fi
     echo "error: Specnaut Cloud answered with something other than JSON." >&2
     return 22
   fi

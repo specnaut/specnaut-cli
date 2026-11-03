@@ -110,6 +110,30 @@ resolve_form() {
   fi
 }
 
+# A KEY=value line, the value quoted for `eval`. Plain ids print as they are.
+kv() {
+  if [ -n "$2" ]; then printf '%s=%q\n' "$1" "$2"; else printf '%s=\n' "$1"; fi
+}
+
+# The per-option lines of field <prefix>, from its options as JSON.
+emit_options() {
+  # Option names are not identifiers: "In progress" would emit
+  # `STATUS_OPT_IN PROGRESS=…`, which breaks the caller's `eval`. Fold every
+  # non-alphanumeric character to `_` so the name is always assignable.
+  echo "$2" | jq_lf -r --arg p "$1" '
+    def q: if test("^[A-Za-z0-9_-]+$") then . else @sh end;
+    .[]
+    | "\($p)_OPT_\(.name | ascii_upcase | gsub("[^A-Z0-9]"; "_"))=\(.id // "" | q)"
+  '
+  echo "$2" | jq_lf -r --arg p "$1" '
+    "\($p)_OPT_NAMES=\([.[].name] | join(", ") | @sh)"
+  '
+  echo "$2" | jq_lf -r --arg p "$1" '
+    def q: if test("^[A-Za-z0-9_-]+$") then . else @sh end;
+    "\($p)_FIRST_OPT_ID=\(.[0].id // "" | q)"
+  '
+}
+
 emit() {
   local field="$1" prefix="$2"
   local field_block
@@ -145,22 +169,10 @@ emit() {
     [ "$form" = local ] || opts=$ORG_OPTIONS
   fi
 
-  echo "${prefix}_FIELD_ID=$field_id"
-  echo "${prefix}_FIELD_FORM=$form"
-  echo "${prefix}_ORG_FIELD_ID=$org_field_id"
-  # Option names are not identifiers: "In progress" would emit
-  # `STATUS_OPT_IN PROGRESS=…`, which breaks the caller's `eval`. Fold every
-  # non-alphanumeric character to `_` so the name is always assignable.
-  echo "$opts" | jq_lf -r --arg p "$prefix" '
-    .[]
-    | "\($p)_OPT_\(.name | ascii_upcase | gsub("[^A-Z0-9]"; "_"))=\(.id)"
-  '
-  echo "$opts" | jq_lf -r --arg p "$prefix" '
-    "\($p)_OPT_NAMES=\"\([.[].name] | join(", "))\""
-  '
-  echo "$opts" | jq_lf -r --arg p "$prefix" '
-    "\($p)_FIRST_OPT_ID=\(.[0].id // "")"
-  '
+  kv "${prefix}_FIELD_ID" "$field_id"
+  kv "${prefix}_FIELD_FORM" "$form"
+  kv "${prefix}_ORG_FIELD_ID" "$org_field_id"
+  emit_options "$prefix" "$opts"
 }
 
 emit Status STATUS
@@ -195,9 +207,9 @@ emit_date() {
     return
   fi
   resolve_form "$field_id"
-  echo "${prefix}_FIELD_ID=$field_id"
-  echo "${prefix}_FIELD_FORM=$FORM"
-  echo "${prefix}_ORG_FIELD_ID=$ORG_FIELD_ID"
+  kv "${prefix}_FIELD_ID" "$field_id"
+  kv "${prefix}_FIELD_FORM" "$FORM"
+  kv "${prefix}_ORG_FIELD_ID" "$ORG_FIELD_ID"
 }
 
 emit_date "Start date"  STARTDATE
@@ -219,10 +231,10 @@ emit_simple() {
     echo "${prefix}_FIELD_ID="
     return
   fi
-  echo "${prefix}_FIELD_ID=$field_id"
+  kv "${prefix}_FIELD_ID" "$field_id"
 }
 
 emit_simple "Estimate"    ESTIMATE
 
 # Project node ID — handy for callers that also want to write field values.
-echo "PROJECT_NODE_ID=$PROJECT_NODE_ID"
+kv PROJECT_NODE_ID "$PROJECT_NODE_ID"

@@ -293,19 +293,17 @@ async function runToken(intent: CloudIntent): Promise<number> {
   const apiUrl = resolved.url;
   // Headless / CI: the environment's token wins, for a deployment it may go to only.
   const headless = headlessToken(apiUrl, (k) => Deno.env.get(k));
-  if (headless && "token" in headless) return printToken(headless.token);
+  if (headless && "token" in headless) {
+    return printToken(headless.token, "fix SPECNAUT_CLOUD_TOKEN");
+  }
   // Refused: the policy every session follows (headless_token.ts), so a script and
   // the session beside it never disagree about the same project.
   if (headless) console.error(yellow(`warning: ${headlessRefusal(headless.refused)}`));
 
   const client = new CloudClient(apiUrl);
   const store = defaultCredentialStore();
-  const token = await requireCloudToken(
-    apiUrl,
-    client,
-    store,
-    headless ? undefined : "run `specnaut cloud login` (or set SPECNAUT_CLOUD_TOKEN).",
-  );
+  const hint = headless ? undefined : "run `specnaut cloud login` (or set SPECNAUT_CLOUD_TOKEN).";
+  const token = await requireCloudToken(apiUrl, client, store, hint);
   return token ? printToken(token) : 1;
 }
 

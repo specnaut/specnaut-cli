@@ -17,7 +17,8 @@ const ANSWER = {
   cursor: "",
 };
 
-const CONTROL = "\x00\x07\x08\x0b\x1b]0;x\r\x1f\x7f\u0080\u009b\u009f";
+const CONTROL =
+  "\x00\x07\x08\x0b\x1b]0;x\r\x1f\x7f\u0080\u009b\u009f\u200e\u200f\u202e\u2066\u2069";
 const DIRTY = {
   ok: true,
   columns: ANSWER.columns.map((c) => ({ ...c, name: `${c.name}${CONTROL}` })),
@@ -25,11 +26,18 @@ const DIRTY = {
     ...ANSWER.task,
     key: `K-1${CONTROL}`,
     title: `t\nnext${CONTROL}`,
-    body: `first\nsecond\tthird${CONTROL}`,
+    body: `first\nsecond\tthird\u2028fourth${CONTROL}`,
     parentNumber: `2${CONTROL}`,
   },
-  tasks: [{ number: 2, title: `child\nnext${CONTROL}`, columnId: "c1" }],
-  events: [{ kind: "created", number: 1, toStage: `Todo\nnext${CONTROL}` }],
+  tasks: [{
+    number: 2,
+    title: `child\nnext\u2028café 日本 👩‍💻${CONTROL}`,
+    columnId: "c1",
+  }],
+  events: [
+    { kind: "created", number: 1, toStage: `Todo\nnext${CONTROL}` },
+    { kind: "moved", number: "7 x", fromStage: "old -> extra", toStage: "new -> more" },
+  ],
   hasMore: false,
   cursor: "",
 };

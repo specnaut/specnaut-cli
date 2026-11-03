@@ -44,7 +44,9 @@ function announce(start: DeviceStart, io: AuthIo): string {
   const page = verificationPage(start);
   io.log("");
   io.log(`  To connect, visit:  ${page}`);
-  io.log(`  and enter the code: ${start.userCode}`);
+  // The prefilled page already holds the code: there it is only to be compared.
+  const verb = page === start.verificationUri ? "enter" : "check";
+  io.log(`  and ${verb} the code: ${start.userCode}`);
   io.log("");
   io.log("  Opening your browser…");
   return page;

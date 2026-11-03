@@ -1,5 +1,10 @@
 # Upgrading Specnaut
 
+## 8.0.0 → 8.0.1
+
+Run `specnaut upgrade` in every project: the backlog scripts reach a project only through it.
+Nothing else needs a hand.
+
 ## 7.4.0 → 8.0.0
 
 Run `specnaut upgrade`. Two Cloud inputs that used to work are now refused; if neither applies to

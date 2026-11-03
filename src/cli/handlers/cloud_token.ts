@@ -22,9 +22,9 @@ export function cloudFailure(e: CloudApiError): string {
 }
 
 /** Print a token for a script to read, once it is well formed. The exit code. */
-export function printToken(token: string): number {
+export function printToken(token: string, fix = "run `specnaut cloud login`"): number {
   if (hasControl(token)) {
-    console.error(red("error: the token is not usable; run `specnaut cloud login`."));
+    console.error(red(`error: the token is not usable; ${fix}.`));
     return 1;
   }
   console.log(token);

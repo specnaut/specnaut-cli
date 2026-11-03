@@ -26,42 +26,60 @@ const SCRIPTS: [string, string[]][] = [
   ["view.sh", ["1"]],
 ];
 
+type RunOptions = {
+  token?: string;
+  curlrc?: string;
+  env?: Record<string, string>;
+  jqRefusesFilter?: boolean;
+};
+
+/** A project holding the scripts, a config, and stand-ins for curl and specnaut. */
+async function layOut(dir: string, apiUrl: string, opts: RunOptions) {
+  const scripts = join(dir, ".specnaut", "scripts", "backlog");
+  await Deno.mkdir(scripts, { recursive: true });
+  await Deno.mkdir(join(dir, ".specnaut", "scripts", "bash"));
+  await Deno.mkdir(join(dir, ".bin"));
+  for await (const f of Deno.readDir(CLOUD)) {
+    await Deno.copyFile(join(CLOUD, f.name), join(scripts, f.name));
+  }
+  for await (const f of Deno.readDir(BASH)) {
+    if (f.isFile) {
+      await Deno.copyFile(join(BASH, f.name), join(dir, ".specnaut", "scripts", "bash", f.name));
+    }
+  }
+  await Deno.writeTextFile(
+    join(dir, ".specnaut", "backlog-config.yml"),
+    `backend: cloud\napi_url: "${apiUrl}"\nproject_key: K\n`,
+  );
+  await Deno.writeTextFile(join(dir, ".curlrc"), opts.curlrc ?? "");
+  await Deno.writeTextFile(
+    join(dir, ".bin", "curl"),
+    '#!/usr/bin/env bash\nprintf "ARGS %s\\n" "$* env:${API_TOKEN:-}" >> curl.log\nexec "$REAL_CURL" "$@"\n',
+  );
+  if (opts.jqRefusesFilter) {
+    await Deno.writeTextFile(
+      join(dir, ".bin", "jq"),
+      '#!/usr/bin/env bash\ncase "$*" in *"def printable"*) exit 3 ;; esac\nexec "$REAL_JQ" "$@"\n',
+    );
+  }
+  await Deno.writeTextFile(join(dir, ".token"), `${opts.token ?? TOKEN}\n`);
+  await Deno.writeTextFile(join(dir, ".bin", "specnaut"), "#!/usr/bin/env bash\ncat .token\n");
+}
+
 /** Run one script in a fresh project. */
 async function run(
   script: string,
   args: string[],
   apiUrl: string,
-  opts: { token?: string; curlrc?: string; env?: Record<string, string> } = {},
+  opts: RunOptions = {},
 ): Promise<{ code: number; out: string; curlLog: string }> {
   const dir = await Deno.makeTempDir({ prefix: "cloud-curl-" });
   try {
-    const scripts = join(dir, ".specnaut", "scripts", "backlog");
-    await Deno.mkdir(scripts, { recursive: true });
-    await Deno.mkdir(join(dir, ".specnaut", "scripts", "bash"));
-    await Deno.mkdir(join(dir, ".bin"));
-    for await (const f of Deno.readDir(CLOUD)) {
-      await Deno.copyFile(join(CLOUD, f.name), join(scripts, f.name));
-    }
-    for await (const f of Deno.readDir(BASH)) {
-      if (f.isFile) {
-        await Deno.copyFile(join(BASH, f.name), join(dir, ".specnaut", "scripts", "bash", f.name));
-      }
-    }
-    await Deno.writeTextFile(
-      join(dir, ".specnaut", "backlog-config.yml"),
-      `backend: cloud\napi_url: "${apiUrl}"\nproject_key: K\n`,
-    );
-    await Deno.writeTextFile(join(dir, ".curlrc"), opts.curlrc ?? "");
-    await Deno.writeTextFile(
-      join(dir, ".bin", "curl"),
-      '#!/usr/bin/env bash\nprintf "ARGS %s\\n" "$* env:${API_TOKEN:-}" >> curl.log\nexec "$REAL_CURL" "$@"\n',
-    );
-    await Deno.writeTextFile(join(dir, ".token"), `${opts.token ?? TOKEN}\n`);
-    await Deno.writeTextFile(join(dir, ".bin", "specnaut"), "#!/usr/bin/env bash\ncat .token\n");
+    await layOut(dir, apiUrl, opts);
     const { code, stdout, stderr } = await new Deno.Command("bash", {
       args: [
         "-c",
-        'export REAL_CURL=$(command -v curl) HOME="$PWD" PATH="$PWD/.bin:$PATH"; ' +
+        'export REAL_CURL=$(command -v curl) REAL_JQ=$(command -v jq) HOME="$PWD" PATH="$PWD/.bin:$PATH"; ' +
         'chmod +x .bin/*; s=$1; shift; exec bash ".specnaut/scripts/backlog/$s" "$@"',
         "driver",
         script,
@@ -213,19 +231,20 @@ Deno.test("cloud scripts: curl's environment does not gain the token, even under
 });
 
 // deno-lint-ignore no-control-regex
-const NOT_PLAIN = /[\x00-\x08\x0b-\x1f\x7f-\x9f]/;
+const NOT_PLAIN = /[\x00-\x08\x0b-\x1f\x7f-\x9f\u200e\u200f\u2028-\u202e\u2066-\u2069]/;
 
 Deno.test("cloud scripts: strings come back normalized", async () => {
   await withServer(async (port) => {
     const url = `http://127.0.0.1:${port}/dirty`;
     const seen: [string, string[], string][] = [
       ["add.sh", ["t"], "created: K-1]0;x\n"],
-      ["cascade-check.sh", ["1"], "child next]0;x"],
+      ["cascade-check.sh", ["1"], "child next café 日本 👩‍💻]0;x"],
       ["columns.sh", [], "1\tTodo]0;x\n"],
-      ["list.sh", [], "child next]0;x"],
+      ["list.sh", [], "child next café 日本 👩‍💻]0;x"],
       ["parent-of.sh", ["1"], "cannot read: 2]0;x"],
       ["reconcile.sh", [], "CREATED 1 -> Todo next]0;x\n"],
-      ["view.sh", ["1"], "first\nsecond\tthird]0;x"],
+      ["reconcile.sh", [], "MOVED ? old → extra -> new → more\n"],
+      ["view.sh", ["1"], "first\nsecond\tthird\nfourth]0;x"],
     ];
     for (const [script, args, expected] of seen) {
       const { out } = await run(script, args, url);
@@ -277,5 +296,24 @@ Deno.test("cloud_curl: an empty success stays empty, and is not called bad JSON"
     );
     assertEquals(code, 3, out);
     assertEquals(out.includes("something other than JSON"), false, out);
+  });
+});
+
+Deno.test("CLOUD_JSON uses no regex", async () => {
+  const config = await Deno.readTextFile(join(CLOUD, "_config.sh"));
+  const start = config.indexOf("CLOUD_JSON='");
+  assertEquals(start > 0, true, "the filter moved");
+  const filter = config.slice(start, config.indexOf("cloud_curl() {"));
+  assertEquals(/gsub|\btest\(|\bsub\(/.test(filter), false, filter);
+});
+
+Deno.test("cloud_curl: a jq that cannot run the filter is reported as that", async () => {
+  await withServer(async (port) => {
+    const { code, out } = await run("columns.sh", [], `http://127.0.0.1:${port}/ok`, {
+      jqRefusesFilter: true,
+    });
+    assertEquals(code !== 0, true, out);
+    assertStringIncludes(out, "cannot run on this version of jq");
+    assertEquals(out.includes("other than JSON"), false, out);
   });
 });
