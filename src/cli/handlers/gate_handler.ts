@@ -56,6 +56,7 @@ function defaultDeps(intent: GateIntent): GateDeps {
         config: { ...config, apiUrl },
         store: defaultCredentialStore(),
         env: (k) => Deno.env.get(k),
+        warn: (msg) => console.error(yellow(`warning: ${msg}`)),
       });
     },
   };

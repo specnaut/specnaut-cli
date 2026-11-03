@@ -12,8 +12,8 @@ import { type Gate, type GateRequest, validatePayload } from "./gate_contract.ts
 import { GateApiError, GateClient, type GateErrorReason } from "./gate_client.ts";
 import { type RemoteMode, resolveRemoteMode } from "./remote_mode.ts";
 import { CloudClient, type FetchFn } from "./cloud_client.ts";
-import { freshAccessToken } from "./auth_flow.ts";
-import type { CloudConfig } from "./cloud_config.ts";
+import { freshAccessToken, sessionToken } from "./auth_flow.ts";
+import { type CloudConfig, normalizeApiUrl } from "./cloud_config.ts";
 import type { CredentialStore } from "./credentials.ts";
 
 /** Typed result of awaiting / applying / cancelling. */
@@ -159,12 +159,15 @@ export function makeGateSession(deps: {
   store: CredentialStore;
   /** The environment lookup, injected: the domain never reads `Deno.env` (cli#695). */
   env: (key: string) => string | undefined;
+  /** Told why a headless token was withheld; the domain prints nothing itself. */
+  warn?: (msg: string) => void;
   fetchFn?: FetchFn;
   now?: () => number;
   sleep?: (ms: number) => Promise<void>;
 }): GateSession | null {
   const { config, store, env } = deps;
-  if (!config.apiUrl || !config.projectKey) return null;
+  const apiUrl = normalizeApiUrl(config.apiUrl);
+  if (!apiUrl || !config.projectKey) return null;
 
   const now = deps.now ?? (() => Date.now());
   const sleep = deps.sleep ?? ((ms) => new Promise<void>((r) => setTimeout(r, ms)));
@@ -176,16 +179,12 @@ export function makeGateSession(deps: {
     config.remote,
     env("SPECNAUT_REMOTE") ?? env("SPECFLOW_REMOTE"),
   );
-  const cloudClient = new CloudClient(config.apiUrl, fetchFn);
-  const gateClient = new GateClient(config.apiUrl, fetchFn);
+  const cloudClient = new CloudClient(apiUrl, fetchFn);
+  const gateClient = new GateClient(apiUrl, fetchFn);
 
-  // Headless escape hatch: an explicit SPECNAUT_CLOUD_TOKEN short-circuits the
-  // stored-credential refresh path, mirroring `specnaut cloud token`. The legacy
-  // SPECFLOW_CLOUD_TOKEN name is still honored as a fallback.
-  const headlessToken = env("SPECNAUT_CLOUD_TOKEN") ?? env("SPECFLOW_CLOUD_TOKEN");
-  const token: TokenProvider = headlessToken && headlessToken.trim() !== ""
-    ? () => Promise.resolve(headlessToken)
-    : () => freshAccessToken({ apiUrl: config.apiUrl, client: cloudClient, store, now });
+  // SPECNAUT_CLOUD_TOKEN, for a deployment it may go to only; else the stored login.
+  const stored = () => freshAccessToken({ apiUrl, client: cloudClient, store, now });
+  const token: TokenProvider = sessionToken(apiUrl, env, stored, deps.warn);
 
   return new GateSession({
     projectKey: config.projectKey,

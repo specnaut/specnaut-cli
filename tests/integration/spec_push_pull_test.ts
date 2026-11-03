@@ -28,7 +28,8 @@ function sessionWith(fetchFn: FetchFn): SpecSession {
     config: { apiUrl: API, projectKey: "CLOUD" },
     store: stubStore,
     fetchFn,
-    env: (k) => (k === "SPECNAUT_CLOUD_TOKEN" ? "headless-token" : undefined),
+    // The test deployment is named by the environment, so the headless token may go there.
+    env: (k) => ({ SPECNAUT_CLOUD_TOKEN: "headless-token", SPECNAUT_CLOUD_API_URL: API })[k],
   })!;
 }
 

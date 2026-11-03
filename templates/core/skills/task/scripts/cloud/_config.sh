@@ -35,12 +35,17 @@ if [ ! -f "$CONFIG" ]; then
   exit 2
 fi
 
-# Extract YAML scalars. Strip surrounding quotes.
+# Extract a YAML scalar: a quoted value up to its closing quote, or a bare one
+# up to an inline `# comment` — the shape renderCloudConfig writes. A CRLF
+# checkout's \r is dropped first.
 extract() {
   awk -v key="$1" '
     $0 ~ "^"key":" {
+      sub(/\r$/, "")
       sub("^"key":[[:space:]]*", "")
-      gsub(/^["'"'"']|["'"'"']$/, "")
+      if ($0 ~ /^"/) { sub(/^"/, ""); sub(/".*$/, "") }
+      else if ($0 ~ /^'"'"'/) { sub(/^'"'"'/, ""); sub(/'"'"'.*$/, "") }
+      else { sub(/[[:space:]]+#.*$/, ""); sub(/[[:space:]]+$/, "") }
       print
       exit
     }
@@ -53,6 +58,16 @@ PROJECT_KEY=$(extract project_key)
 if [ -z "$API_URL" ] || [ -z "$PROJECT_KEY" ]; then
   echo "error: backlog-config.yml is missing api_url or project_key." >&2
   echo "Run \`specnaut cloud login\` to authenticate and link a project." >&2
+  exit 2
+fi
+
+# curl is handed this string, and is not the parser `specnaut cloud token` judged
+# it with: only a plain http(s) base passes, the grammar normalizeApiUrl holds
+# (tests/scripts/cloud_config_sh_test.ts keeps the two equal). LC_ALL=C keeps the
+# classes ASCII whatever the locale.
+if ! printf '%s\n' "$API_URL" |
+  LC_ALL=C grep -Eq '^https?://[A-Za-z0-9-]+(\.[A-Za-z0-9-]+)*(:[0-9]+)?(/[A-Za-z0-9._~/-]*)?$'; then
+  echo "error: backlog-config.yml api_url is not a plain http(s) URL." >&2
   exit 2
 fi
 

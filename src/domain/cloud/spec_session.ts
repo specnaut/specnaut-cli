@@ -10,8 +10,8 @@
 
 import { SpecApiError, SpecClient } from "./spec_client.ts";
 import { CloudClient, type FetchFn } from "./cloud_client.ts";
-import { accessToken, isUnavailable } from "./auth_flow.ts";
-import type { CloudConfig } from "./cloud_config.ts";
+import { accessToken, isUnavailable, sessionToken } from "./auth_flow.ts";
+import { type CloudConfig, normalizeApiUrl } from "./cloud_config.ts";
 import type { CredentialStore } from "./credentials.ts";
 import type { SpecStep } from "../spec/spec_step.ts";
 
@@ -122,25 +122,24 @@ export function makeSpecSession(deps: {
   store: CredentialStore;
   /** The environment lookup, injected: the domain never reads `Deno.env` (cli#695). */
   env: (key: string) => string | undefined;
+  /** Told why a headless token was withheld; the domain prints nothing itself. */
+  warn?: (msg: string) => void;
   fetchFn?: FetchFn;
   now?: () => number;
 }): SpecSession | null {
   const { config, store, env } = deps;
-  if (!config.apiUrl || !config.projectKey) return null;
+  const apiUrl = normalizeApiUrl(config.apiUrl);
+  if (!apiUrl || !config.projectKey) return null;
 
   const now = deps.now ?? (() => Date.now());
   const fetchFn = deps.fetchFn ?? fetch;
 
-  const cloudClient = new CloudClient(config.apiUrl, fetchFn);
-  const specClient = new SpecClient(config.apiUrl, fetchFn);
+  const cloudClient = new CloudClient(apiUrl, fetchFn);
+  const specClient = new SpecClient(apiUrl, fetchFn);
 
-  // Headless escape hatch: an explicit SPECNAUT_CLOUD_TOKEN short-circuits the
-  // stored-credential refresh path (mirroring gate_session). The legacy
-  // SPECFLOW_CLOUD_TOKEN name is still honored as a fallback.
-  const headlessToken = env("SPECNAUT_CLOUD_TOKEN") ?? env("SPECFLOW_CLOUD_TOKEN");
-  const token: TokenProvider = headlessToken && headlessToken.trim() !== ""
-    ? () => Promise.resolve(headlessToken)
-    : () => accessToken({ apiUrl: config.apiUrl, client: cloudClient, store, now });
+  // SPECNAUT_CLOUD_TOKEN, for a deployment it may go to only; else the stored login.
+  const stored = () => accessToken({ apiUrl, client: cloudClient, store, now });
+  const token: TokenProvider = sessionToken(apiUrl, env, stored, deps.warn);
 
   return new SpecSession({
     projectKey: config.projectKey,

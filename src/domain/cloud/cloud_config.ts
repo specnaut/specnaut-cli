@@ -21,6 +21,55 @@ export type CloudConfig = {
   remote?: RemoteConfig;
 };
 
+/**
+ * A plain http(s) API base: dot-separated ASCII host labels, an optional port and
+ * path. An allow-list, because the shell scripts hand this string to curl, which is
+ * not the parser `URL` is: anything else may read as two different hosts. The same
+ * grammar guards `scripts/cloud/_config.sh` (tests/scripts/cloud_config_sh_test.ts).
+ */
+const PLAIN_API_URL =
+  /^https?:\/\/([A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)*)(?::[0-9]+)?(?:\/[A-Za-z0-9._~\/-]*)?$/;
+
+/** A plain API base, trailing slashes dropped, or null. */
+export function normalizeApiUrl(raw: string): string | null {
+  const trimmed = raw.trim().replace(/\/+$/, "");
+  const host = PLAIN_API_URL.exec(trimmed)?.[1]?.toLowerCase();
+  // A host `URL` rewrites (`127.0x.0.1`) is not the one curl reads.
+  return host && URL.canParse(trimmed) && new URL(trimmed).hostname === host ? trimmed : null;
+}
+
+/** A headless token handed over for a deployment, or the origin it was refused for. */
+export type HeadlessToken = { token: string } | { refused: string } | null;
+
+/**
+ * The headless token (`SPECNAUT_CLOUD_TOKEN`, legacy `SPECFLOW_CLOUD_TOKEN`) for
+ * `apiUrl`, or `null` when the environment sets none. Unlike a stored credential
+ * it is bound to no deployment, so it goes only to the canonical endpoint or to
+ * the origin the environment itself names in `SPECNAUT_CLOUD_API_URL`: never to
+ * one a repository picked, through `api_url` or a command line it runs.
+ */
+export function headlessToken(
+  apiUrl: string,
+  env: (key: string) => string | undefined,
+): HeadlessToken {
+  const token = (env("SPECNAUT_CLOUD_TOKEN") ?? env("SPECFLOW_CLOUD_TOKEN"))?.trim();
+  if (!token) return null;
+  const origin = originOf(apiUrl);
+  const allowed = [DEFAULT_CLOUD_API_URL, env("SPECNAUT_CLOUD_API_URL") ?? ""].map(originOf);
+  return origin && allowed.includes(origin) ? { token } : { refused: origin ?? apiUrl };
+}
+
+/** Why a headless token was not sent, for the caller to print. */
+export function headlessRefusal(origin: string): string {
+  return `SPECNAUT_CLOUD_TOKEN is not sent to ${origin}: a headless token goes only to ` +
+    `${DEFAULT_CLOUD_API_URL}, or to the origin SPECNAUT_CLOUD_API_URL names.`;
+}
+
+function originOf(url: string): string | null {
+  const u = normalizeApiUrl(url);
+  return u ? new URL(u).origin : null;
+}
+
 /** Render the Cloud `backlog-config.yml` body (no secret). */
 export function renderCloudConfig(apiUrl = "", projectKey = ""): string {
   return [

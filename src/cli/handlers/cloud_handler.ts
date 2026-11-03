@@ -21,7 +21,12 @@ import {
   type CloudTask,
 } from "../../domain/cloud/cloud_client.ts";
 import { freshAccessToken, login } from "../../domain/cloud/auth_flow.ts";
-import { DEFAULT_CLOUD_API_URL } from "../../domain/cloud/cloud_config.ts";
+import {
+  DEFAULT_CLOUD_API_URL,
+  headlessRefusal,
+  headlessToken,
+  normalizeApiUrl,
+} from "../../domain/cloud/cloud_config.ts";
 import { defaultCredentialStore } from "../../infrastructure/credential_store.ts";
 import { FsBacklogConfigStore } from "../../infrastructure/fs_backlog_config_store.ts";
 import { openInBrowser } from "../../infrastructure/browser_opener.ts";
@@ -35,19 +40,6 @@ export type CloudIntent = {
 };
 
 const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
-
-/** Accept only well-formed http(s) URLs — guards against file:// / SSRF-y
- *  schemes reaching fetch / the refresh endpoint where the token is sent. */
-function normalizeApiUrl(raw: string): string | null {
-  const trimmed = raw.trim().replace(/\/+$/, "");
-  try {
-    const u = new URL(trimmed);
-    if (u.protocol !== "http:" && u.protocol !== "https:") return null;
-    return trimmed;
-  } catch {
-    return null;
-  }
-}
 
 /** Where a resolved deployment URL came from — drives the login trust
  *  disclosure (#400). `flag` is an explicit user act; `default` is the
@@ -417,20 +409,19 @@ async function createProjectFromName(
 }
 
 async function runToken(intent: CloudIntent): Promise<number> {
-  // Headless / CI escape hatch: an explicit token wins, no store needed.
-  // Honor the new SPECNAUT_CLOUD_TOKEN, falling back to the legacy name.
-  const envToken = Deno.env.get("SPECNAUT_CLOUD_TOKEN") ?? Deno.env.get("SPECFLOW_CLOUD_TOKEN");
-  if (envToken && envToken.trim()) {
-    console.log(envToken.trim());
-    return 0;
-  }
-
   const resolved = await resolveApiUrl(intent.apiUrl);
   if (!resolved) {
     console.error(red("error: invalid Specnaut Cloud API URL — check --api-url / api_url."));
     return 1;
   }
   const apiUrl = resolved.url;
+  // Headless / CI: the environment's token wins, for a deployment it may go to only.
+  const headless = headlessToken(apiUrl, (k) => Deno.env.get(k));
+  if (headless) {
+    if ("token" in headless) console.log(headless.token);
+    else console.error(red(`error: ${headlessRefusal(headless.refused)}`));
+    return "token" in headless ? 0 : 1;
+  }
 
   const client = new CloudClient(apiUrl);
   const store = defaultCredentialStore();

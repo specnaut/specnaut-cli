@@ -3,6 +3,7 @@
 // injected so this is unit-testable without network / browser / keychain.
 
 import { CloudApiError, type CloudClient } from "./cloud_client.ts";
+import { headlessRefusal, headlessToken } from "./cloud_config.ts";
 import type { CloudCredentials, CredentialStore } from "./credentials.ts";
 
 export type AuthIo = {
@@ -129,4 +130,20 @@ export async function accessToken(deps: TokenDeps): Promise<string | null> {
     accessExpiresAt: now() + r.expiresInS * 1000,
   });
   return r.accessToken;
+}
+
+/**
+ * A session's token provider: the environment's headless token where it may
+ * go (`headlessToken`), else `stored`. A refusal is told to `warn` and falls
+ * back to the user's own login for that deployment, keyed by its URL.
+ */
+export function sessionToken(
+  apiUrl: string,
+  env: (key: string) => string | undefined,
+  stored: () => Promise<string | null>,
+  warn?: (msg: string) => void,
+): () => Promise<string | null> {
+  const headless = headlessToken(apiUrl, env);
+  if (headless && "refused" in headless) warn?.(headlessRefusal(headless.refused));
+  return headless && "token" in headless ? () => Promise.resolve(headless.token) : stored;
 }

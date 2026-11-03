@@ -197,7 +197,9 @@ project_key: CLOUD                              # the project's short key
 
 **No token is stored here.** `specnaut cloud login` keeps credentials in the OS
 keychain (or a `0600` file under `~/.specnaut`); for CI / headless runs, set
-`SPECNAUT_CLOUD_TOKEN` instead.
+`SPECNAUT_CLOUD_TOKEN` instead. That token goes only to Specnaut Cloud itself, or to
+the deployment the environment names in `SPECNAUT_CLOUD_API_URL`: never to an
+`api_url` the repository alone sets.
 
 ### Scripts
 
