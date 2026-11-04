@@ -2,7 +2,7 @@
 import type { CoreBundle } from "./domain/core_bundle.ts";
 import type { TemplateFile } from "./domain/template.ts";
 
-export const TEMPLATES_VERSION = "8.0.0";
+export const TEMPLATES_VERSION = "8.0.1";
 
 export const CORE_BUNDLE: CoreBundle = [
   {
@@ -27851,7 +27851,7 @@ prompts cost more tokens and drift out of relevance.
       "source": {
         "source": "github",
         "repo": "specnaut/specnaut-cli",
-        "ref": "v8.0.0",
+        "ref": "v8.0.1",
         "path": "packaging/marketplace/.claude-plugin/marketplace.json"
       }
     }
