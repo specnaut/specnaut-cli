@@ -12,7 +12,7 @@
 # mode the prompt found is kept beside the sums. guard-merge holds a turn
 # that began on manual for the whole turn, and Stop asks about a turn that
 # ended on auto when it began on manual, unless the turn approved `merge` or
-# `gate-config`.
+# `gate-config` or `guards`.
 #
 # A file that changed during the turn with no approval of its kind blocks the
 # stop with a question for the user, and the version from the start of the
@@ -64,7 +64,7 @@ baseline_check() {
   if [ "$(cat "$1/mode" 2>/dev/null)" = manual ] && sum=$(baseline_mode) && [ "$sum" != manual ]; then
     seen=1
     case " $2 " in
-      *" merge "* | *" gate-config "*) ;;
+      *" merge "* | *" gate-config "* | *" guards "*) ;;
       *) changed+=("the merge mode (manual when the turn began, $sum now: a copy of .specnaut/workflow.yml, or a ref it is read from, was rewritten)") ;;
     esac
   fi

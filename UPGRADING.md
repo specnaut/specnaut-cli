@@ -1,5 +1,16 @@
 # Upgrading Specnaut
 
+## 8.0.1 → 9.0.0
+
+Run `specnaut upgrade`. One word that used to work is now refused: `merge` no longer releases an
+edit to `.claude/settings*.json`, `.specnaut/hooks/`, `.specnaut/workflow.yml` or the landing
+scripts. Reply `approve the guard change` for those. On Codex, trust the hooks again with `/hooks`,
+because they changed.
+
+The guards also fire less: an unreadable line, or a command word that is only a variable, is held
+only when the line names git or a listed command, and `ls`, `echo` and similar reads no longer count
+as writes.
+
 ## 8.0.0 → 8.0.1
 
 Run `specnaut upgrade` in every project: the backlog scripts reach a project only through it.
@@ -319,56 +330,9 @@ not match Claude Code's format. The catalog is fixed, and the right commands are
 /plugin install specnaut-plugin@specnaut-marketplace
 ```
 
-## 4.6.x → 5.0.0
-
-**Breaking: `/specnaut` merges and pushes without asking.** A project that relied on the "Ready to
-merge?" stop gets the old behaviour back only by adding `merge: manual` to `.specnaut/workflow.yml`
-— see below. Nothing else needs a hand edit.
-
-### Technical decisions are no longer put to you
-
-At the end of `plan`, architecture, design patterns, layering, security hardening and performance
-trade-offs are now settled by the expert agents — `architect-expert`, `security-expert`, and
-`performance-expert` when the plan has a hot path — against Specnaut's intent: long-lived software,
-clean, SOLID, secure by default. The plan stop reports what they decided and why; it asks only what
-only you can answer — business rules, scope, and anything irreversible, destructive, breaking a
-public surface, or bringing in a new external service, vendor or cost. When none of that is open,
-there is no stop at all: the plan is reported and the chain goes on. Fix loops in `implement` and
-`review` no longer ask you to choose between technical fixes either.
-
-Nothing to do on upgrade: the `chain-stops` block of your `AGENTS.md` is refreshed in place.
-
-### The chain now merges and pushes on its own
-
-`/specnaut` runs on **autopilot** by default. It still stops at the end of `plan` — the
-architecture, both audits' findings and the open questions are put to you there, before any code
-exists — but after your answers it no longer stops at the review verdict. It implements, reviews,
-fixes every CRITICAL or HIGH finding, merges into the base branch, **pushes**, and closes the
-backlog item without asking "Ready to merge?" or "Push to origin?".
-
-`specnaut upgrade` adds `.specnaut/workflow.yml` with the default spelled out, and refreshes the
-`chain-stops` block of your `AGENTS.md` to match. Nothing else is required.
-
-**If a human must read every change before it lands**, restore the merge stop in one line:
-
-```yaml
-# .specnaut/workflow.yml
-merge: manual
-```
-
-The chain then stops at the review verdict and asks "Ready to merge?" once; a yes covers the merge,
-the push and the close. A value the file cannot be read as — a typo — counts as `manual`, so a
-broken setting never pushes. For a single run, `--manual-merge` or "stop before merging" in your
-request does the same, and `/specnaut merge --pr` still delivers through a pull request.
-
-Two things no longer ask in either mode: the push after a merge, and closing the linked item. A
-rejected push is reported and never forced; the item then stays open. A feature delivered across
-several branches passes `--no-close` to `/specnaut merge` on every branch but the last — that used
-to be a "no" at the close question. Remote mode (`specnaut gate`) still raises its merge-approval
-gate.
-
 ## Older releases
 
+- [4.6.x → 5.0.0](docs/upgrading/4.6-to-5.0.md)
 - [4.0.x → 4.1.0 and 4.4.x → 4.5.0](docs/upgrading/4.0-to-4.5.md)
 - [2.1.x → 3.0.0 and 3.2.x → 4.0.0](docs/upgrading/2.x-to-4.0.md)
 - [1.x → 2.0.0 and 2.0.x → 2.1.0](docs/upgrading/1.x-to-2.1.md)

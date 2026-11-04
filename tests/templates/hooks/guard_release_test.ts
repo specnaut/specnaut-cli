@@ -56,7 +56,7 @@ const CASES: ReadonlyArray<[command: string, denied: boolean]> = [
   ['"" ; gh release list', false],
   // spelled in another case, or as a word the shell rewrites (_listed.sh)
   ["Release-GitHub.sh v1.2.3", true],
-  ['"$S" v1.2.3', true],
+  ['"$S" v1.2.3', false], // the line never mentions a listed command
   ["./release-*.sh v1.2.3", true],
   ["ls *.sh", false],
   ['git commit -m "$(cat a) and $(cat b)"', false],

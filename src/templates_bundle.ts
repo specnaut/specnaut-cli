@@ -28064,6 +28064,9 @@ guard_git() { git --no-pager -c core.fsmonitor=false "\$@"; }
 # Two readers: approved, for a hook's payload, and approved_session, for
 # merge-approved.sh, which the landing scripts run outside any payload.
 
+# What the user types for the \`guards\` kind: a landing word must not rewrite the guards.
+APPROVAL_GUARDS_HOW='To let it through, reply \`approve the guard change\` — a plain "yes" does not approve it.'
+
 # approval_session_ok <id> — a session id is a path component; only plain tokens.
 approval_session_ok() { [[ \$1 =~ ^[A-Za-z0-9_-]+\$ ]]; }
 
@@ -28193,9 +28196,8 @@ approval_require() {
 # the env/command/sudo/nice/timeout/xargs/… wrappers, \`source x\`, the command
 # of \`find -exec\`, and ONE level of \`sh|bash|zsh -c '…'\`. A deeper \`-c\`, or
 # \`eval\`, sets CMD_OPAQUE — and so does what it cannot read with certainty
-# (cli#711): a \`case\` inside a substitution, an unquoted heredoc body holding
-# \`\$(\` or a backtick, a zsh glob qualifier that runs code, and a line that
-# never closes: a quote, \`(\`, \`\$(\`, backtick or \`[[\` left open, a heredoc whose
+# (cli#711): a \`case\` inside a substitution, a zsh glob qualifier that runs
+# code, and a line that never closes: a quote, \`(\`, \`\$(\`, backtick or \`[[\` left open, a heredoc whose
 # body never ends. Fail closed: a guard gates what it cannot read rather than
 # guessing at it. Scripts, interpreters and shell functions are not seen: the
 # stated limit.
@@ -28326,25 +28328,25 @@ _cmd_qual() {
   case \$g in *e* | *+*) CMD_OPAQUE=1 ;; esac
 }
 
-# Skips the bodies of the heredocs opened on the line just ended. A body that
-# runs to the end of the input never closed: as likely a misread as a typo,
-# and what follows a phantom heredoc is hidden — so the line is opaque. So is
-# a body whose delimiter was not quoted, if it holds \`\$(\` or a backtick: bash
-# expands that body, and runs its substitutions (cli#711).
+# Skips the bodies of the heredocs opened on the line just ended. A body running
+# to the end of the input never closed, and what follows it is hidden: opaque.
+# Bash expands a body whose delimiter was not quoted and runs its substitutions
+# (cli#711): it is parsed in cmd_parse's body mode, its prose an argument of \`:\`.
 # shellcheck disable=SC2016 # the \`\$(\` is matched as text, on purpose
 _cmd_heredocs() {
-  local d strip quoted line closed
+  local d strip quoted line closed body
   for d in \$heredocs; do
-    strip=\${d:0:1} quoted=\${d:1:1} d=\${d:2} closed=0
+    strip=\${d:0:1} quoted=\${d:1:1} d=\${d:2} closed=0 body=""
     while [ "\$i" -lt "\$n" ]; do
       line=\${s:i}
       line=\${line%%\$'\\n'*}
       i=\$((i + \${#line} + 1))
       if [ "\$strip" = 1 ]; then line=\${line#"\${line%%[!\$'\\t']*}"}; fi
       if [ "\$line" = "\$d" ]; then closed=1; break; fi
-      if [ "\$quoted" = 0 ]; then case \$line in *'\$('* | *'\`'*) CMD_OPAQUE=1 ;; esac; fi
+      if [ "\$quoted" = 0 ]; then body+=\$line\$'\\n'; fi
     done
     if [ "\$closed" = 0 ]; then CMD_OPAQUE=1; fi
+    case \$body in *'\$('* | *'\`'*) cmd_parse "\$body" "\$depth" 1 ;; esac
   done
   heredocs=""
 }
@@ -28425,12 +28427,12 @@ _cmd_test_char() {
   return 1
 }
 
-# _cmd_dquote — c, inside "…", is a backslash, the closing quote, a \`\$\` or a
-# backtick (cmd_parse adds every other character to the word itself).
+# _cmd_dquote — c, inside "…", is a backslash, the closing quote (in a heredoc
+# body's own text, a plain character), a \`\$\` or a backtick.
 _cmd_dquote() {
   case \$c in
     '\\') case \$nx in '"' | '\\' | '\$' | '\`') word+=\$nx i=\$((i + 1)) ;; \$'\\n') i=\$((i + 1)) ;; *) word+=\$c ;; esac ;;
-    '"') q="" ;;
+    '"') if [ -n "\$hd" ] && [ "\$sp" = 0 ]; then word+=\$c; else q=""; fi ;;
     '\$') if [ "\$nx" = "(" ]; then _cmd_push; stack="d\$stack" q="" i=\$((i + 1)); _cmd_arith; else word+=\$c; fi ;;
     '\`') _cmd_push; bt=d q="" ;;
     *) word+=\$c ;;
@@ -28466,12 +28468,12 @@ _cmd_plain() {
   esac
 }
 
-# cmd_parse <command line> [depth] — one character at a time. The characters
-# that mean nothing but themselves are added to the word here, without a
-# function call: they are most of any line, and a call costs more than the
-# character (a 5 KB line is parsed in well under a second on bash 3.2).
+# cmd_parse <command line> [depth] [1: a heredoc body, read as if inside "…"] —
+# one character at a time; those that mean nothing but themselves join the word
+# here: a call costs more than the character (5 KB: under a second on bash 3.2).
 cmd_parse() {
-  local s=\$1 depth=\${2:-0} n=\${#1} i=0 c nx q="" word="" have=0 seg="" stack="" bt="" heredocs="" d sp=0 bk=""
+  local s=\$1 depth=\${2:-0} hd=\${3:-} n=\${#1} i=0 c nx q="" word="" have=0 seg="" stack="" bt="" heredocs="" d sp=0 bk=""
+  if [ -n "\$hd" ]; then q='"' seg=":\$CMD_SEP"; fi
   local -a sw ss
   local IFS=\$CMD_SEP
   while [ "\$i" -lt "\$n" ]; do
@@ -28488,6 +28490,7 @@ cmd_parse() {
     fi
   done
   _cmd_end
+  if [ -n "\$hd" ] && [ "\$sp" = 0 ]; then q=""; fi
   if [ -n "\$q\$stack\$bt\$heredocs\$bk" ]; then CMD_OPAQUE=1; fi
 }
 
@@ -28829,6 +28832,9 @@ _cmd_emit() {
 # words: what it names is unknown here, so it is gated (fail closed). \`gh
 # \$(echo release) create\` and \`… | xargs gh\` are \`gh release create\`
 # (cli#711). Only at a position a line has a word for: \`ls *.sh\` runs \`ls\`.
+# A command word that is only named variables is the one exception: it may be
+# anything, so most lines holding one run nothing listed. It matches when the
+# line mentions the entry or git, or loops over a glob or \`read\` (_listed_may_run).
 # \`<words> except <flag>\`: that flag anywhere in the segment exempts it.
 # \`#\` comments and blank or whitespace-only lines are skipped; a \`\\r\` (a CRLF
 # checkout) is read past.
@@ -28842,6 +28848,52 @@ _cmd_emit() {
 # it does not fold, it gates (cli#711).
 _listed_expands() {
   case \$1 in *'\$'* | *'\`'* | *'*'* | *'?'* | *'('* | *'['*']'* | *'{'*'}'* | *[![:print:]]*) return 0 ;; esac
+  return 1
+}
+
+# _listed_names <word> — the line mentions <word> as a whole token, a script by
+# its stem, case ignored: \`git\` is not in \`.git\` or \`github\`, but is in \`git-push\`.
+_listed_names() {
+  local w=\${1%.sh} re rc=1
+  re="(^|[^[:alnum:]_.-])\${w//./\\\\.}([^[:alnum:]_]|\\\$)"
+  shopt -s nocasematch
+  if [[ \${GF[0]} =~ \$re ]]; then rc=0; fi
+  shopt -u nocasematch
+  return "\$rc"
+}
+
+# _listed_may_run <word> <the entry's first word> — the expanding command word
+# may run that entry. Anything but named variables may; those, only as above.
+_listed_may_run() {
+  local nl=\$'\\n' w=\$1
+  case \$w in '\$\${'*) w=\${w#?} ;; esac # _cmd_name's mark on a word ending in \`}\`
+  [[ \$w =~ ^([A-Za-z0-9_.-]|\\\$[A-Za-z_][A-Za-z0-9_]*|\\\$\\{[A-Za-z_][A-Za-z0-9_]*\\})+\$ ]] || return 0
+  [[ \${GF[0]} =~ (^|[^[:alnum:]_])for[[:space:]]+[[:alnum:]_]+[[:space:]]+in[[:space:]][^\\;\$nl]*[][*?\\\$\\\`] ]] && return 0
+  [[ \${GF[0]} =~ (^|[^[:alnum:]_])read[[:space:]] ]] && return 0
+  _listed_names git || _listed_names "\$2"
+}
+
+# listed_opaque <list file> — LISTED_OPAQUE: the reason, when the line cannot be
+# read and mentions git or an entry of the list. An unreadable line that names neither
+# is no landing or release by mistake. Called bare, as listed is.
+listed_opaque() {
+  local line why='a command it cannot read (eval, sh -c in sh -c, a shell fed on stdin, a quote or heredoc left open), and it names git or a listed command'
+  LISTED_OPAQUE=""
+  [ "\$CMD_OPAQUE" = 1 ] || return 0
+  [ -f "\$1" ] || guard_fail "\${1##*/} is missing beside this hook — refusing"
+  if _listed_names git; then LISTED_OPAQUE=\$why; return 0; fi
+  while IFS= read -r line || [ -n "\$line" ]; do
+    line=\${line%\$'\\r'}
+    case \$line in '' | '#'*) continue ;; esac
+    line=\${line%%[[:space:]]*}
+    if [ -n "\$line" ] && _listed_names "\$line"; then LISTED_OPAQUE=\$why; return 0; fi
+  done <"\$1"
+}
+
+# _listed_exempt <flag> — that flag is a word of the segment.
+_listed_exempt() {
+  local w
+  for w in "\${W[@]}"; do if [ "\$w" = "\$1" ]; then return 0; fi; done
   return 1
 }
 
@@ -28866,16 +28918,14 @@ listed() {
     ok=1
     for ((i = 0; i < \${#e[@]}; i++)); do
       w=\${POS[i]:-}
-      if _listed_expands "\$w"; then break; fi
+      if _listed_expands "\$w"; then if [ "\$i" = 0 ] && ! _listed_may_run "\$w" "\${e[0]}"; then ok=0; fi; break; fi
       if [ "\${e[i]}" = "\$w" ]; then continue; fi
       if [ "\$i" = 0 ] && [[ \${e[0]} == *.sh ]] && guard_ieq "\${e[0]}" "\$w"; then continue; fi
       ok=0
       break
     done
     [ "\$ok" = 1 ] || continue
-    if [ -n "\$except" ]; then
-      for w in "\${W[@]}"; do if [ "\$w" = "\$except" ]; then continue 2; fi; done
-    fi
+    if [ -n "\$except" ] && _listed_exempt "\$except"; then continue; fi
     HIT=\$entry
     return 0
   done <"\$1"
@@ -29211,7 +29261,7 @@ paths_pattern() {
 # mode the prompt found is kept beside the sums. guard-merge holds a turn
 # that began on manual for the whole turn, and Stop asks about a turn that
 # ended on auto when it began on manual, unless the turn approved \`merge\` or
-# \`gate-config\`.
+# \`gate-config\` or \`guards\`.
 #
 # A file that changed during the turn with no approval of its kind blocks the
 # stop with a question for the user, and the version from the start of the
@@ -29263,7 +29313,7 @@ baseline_check() {
   if [ "\$(cat "\$1/mode" 2>/dev/null)" = manual ] && sum=\$(baseline_mode) && [ "\$sum" != manual ]; then
     seen=1
     case " \$2 " in
-      *" merge "* | *" gate-config "*) ;;
+      *" merge "* | *" gate-config "* | *" guards "*) ;;
       *) changed+=("the merge mode (manual when the turn began, \$sum now: a copy of .specnaut/workflow.yml, or a ref it is read from, was rewritten)") ;;
     esac
   fi
@@ -29368,6 +29418,7 @@ baseline_bases() {
 #   release  /ship release|tag…  /specnaut-ship release|tag…  \$specnaut-ship release|tag…  release it  tag it
 #   constitution  approve the constitution amendment   (spec 038 S2: the phrase
 #   gate-config   approve the gate config change        the constitution verb prints)
+#   guards        approve the guard change              (the guards' own switches)
 # Claude spells the skills /task, /ship; Codex /specnaut-task or \$specnaut-task
 # (harness_commands.ts). A test holds these spellings to harnessCommands.
 # Never a bare yes/ok/go: a reply to some other question must not land code.
@@ -29400,7 +29451,7 @@ case \${BASH_SOURCE[0]} in */*) HOOK_DIR=\${BASH_SOURCE[0]%/*} ;; *) HOOK_DIR=. 
 GUARD_FAIL_CODE=0
 guard_init approve-on-prompt "\${1:-}" .prompt any:.stop_hook_active
 
-# approval_kind_of <prompt> — prints merge, release, constitution, gate-config, or nothing;
+# approval_kind_of <prompt> — prints merge, release, constitution, gate-config, guards, or nothing;
 # a kind spelled through a bare skill name carries it, as merge:task or release:ship.
 approval_kind_of() {
   local p
@@ -29425,6 +29476,7 @@ approval_kind_of() {
       echo release ;;
     "approve the constitution amendment") echo constitution ;;
     "approve the gate config change") echo gate-config ;;
+    "approve the guard change") echo guards ;;
   esac
 }
 
@@ -29451,7 +29503,7 @@ case \$P_EVENT in
     # What this turn approved is read before the stamp goes; the stamp goes
     # before anything that could fail and leave it outliving the turn.
     kinds=""
-    for k in constitution gate-config merge; do if approved "\$k"; then kinds+=" \$k"; fi; done
+    for k in constitution gate-config guards merge; do if approved "\$k"; then kinds+=" \$k"; fi; done
     rm -f "\$stamp"
     baseline_check "\$baseline" "\$kinds" "\${GF[1]}"
     exit 0 ;;
@@ -29497,7 +29549,8 @@ mv -f "\$tmp" "\$stamp"
 #                        --all, --mirror, --delete and unknown options are
 #                        all gated
 #   a git subcommand it cannot read (_git.sh: a shell alias, \`git \$(…)\`,
-#                        \`git "\$X"\`), a line it cannot read
+#                        \`git "\$X"\`), a line it cannot read that names git
+#                        or a listed command (_listed.sh)
 #   every command in merge-commands.txt — the scripts that land on the base
 #                        themselves (land-feature.sh, remove-spec.sh), matched
 #                        by basename however they are reached, and gh pr
@@ -29597,7 +29650,8 @@ for seg in \${CMD_SEGS[@]+"\${CMD_SEGS[@]}"}; do
   listed "\$HOOK_DIR/merge-commands.txt"
   if [ -n "\$HIT" ]; then reasons+=("\$HIT"); fi
 done
-if [ "\$CMD_OPAQUE" = 1 ]; then reasons+=("a command it cannot read (eval, sh -c in sh -c, a shell fed on stdin, a quote or heredoc left open)"); fi
+listed_opaque "\$HOOK_DIR/merge-commands.txt"
+if [ -n "\$LISTED_OPAQUE" ]; then reasons+=("\$LISTED_OPAQUE"); fi
 if [ "\$CMD_SCRUB" = 1 ]; then reasons+=("a command that sets or clears what the landing scripts' hold reads (CLAUDE_CODE_SESSION_ID, CODEX_SESSION_ID, XDG_STATE_HOME, env -i)"); fi
 if [ "\$merges" = 0 ] && [ \${#pushes[@]} = 0 ] && [ \${#reasons[@]} = 0 ]; then guard_allow; fi
 
@@ -29775,7 +29829,7 @@ guard_fail "held — merge: manual, and the user's own prompt this turn did not 
 # run before the push does, so the tag does not exist yet when this hook reads
 # the command). And a git subcommand it cannot read (_git.sh: a shell alias,
 # \`git \$(…)\`), or a line too nested to read (eval, sh -c in sh -c, a shell fed
-# on stdin, a line that never closes): fail closed.
+# on stdin, a line that never closes) that names git or a listed command.
 #
 # Resolved through approval_gate: Claude's own prompt where it can ask, and
 # everywhere else — Codex, Claude's bypass and auto modes — only the user's
@@ -29845,7 +29899,8 @@ for seg in \${CMD_SEGS[@]+"\${CMD_SEGS[@]}"}; do
   listed "\$HOOK_DIR/release-commands.txt"
   if [ -n "\$HIT" ]; then hits+=("\$HIT"); fi
 done
-if [ "\$CMD_OPAQUE" = 1 ]; then hits+=("a command it cannot read (eval, sh -c in sh -c, a shell fed on stdin, a quote or heredoc left open)"); fi
+listed_opaque "\$HOOK_DIR/release-commands.txt"
+if [ -n "\$LISTED_OPAQUE" ]; then hits+=("\$LISTED_OPAQUE"); fi
 for p in \${pushes[@]+"\${pushes[@]}"}; do
   cmd_words "\$p"
   if tag_push \${W[@]+"\${W[@]}"}; then hits+=("a push of a tag"); fi
@@ -29920,11 +29975,12 @@ guard_fail "'\$agent' is a Specnaut agent: it runs on the model its definition d
 #           base-branch,merge-hold,land-feature,remove-spec}.sh,
 #           .codex/hooks.json, .claude/settings.json and
 #           .claude/settings.local.json (its \`disableAllHooks\` switches every
-#           guard off). Held like a landing, through guard-merge's one arm,
-#           approval_require: denied unless this turn's prompt said \`merge\`,
-#           in Claude's ask modes too — a click on an edit prompt is not the
+#           guard off). Through approval_require, under its own kind: denied
+#           unless this turn's prompt said \`approve the guard change\`, in
+#           Claude's ask modes too — a click on an edit prompt is not the
 #           user's typed word — and, with it, Claude's prompt once where it
-#           can ask.
+#           can ask. \`merge\` does not release these: the word that lands a
+#           branch must not also rewrite what holds it.
 #
 # Decided by identity, never by text (§ 11 F5) — see _paths.sh, which reads
 # the paths an edit names and resolves them; a patch from which no path can be
@@ -29958,9 +30014,9 @@ if [ -n "\$denied" ]; then
   guard_fail "denied: \$denied is .specnaut/installed.lock. .specnaut/installed.lock is generated by \\\`specnaut init\\\` / \\\`specnaut upgrade\\\`. Manual edits will be overwritten by the next upgrade. If you need to change the recorded harness or backend, re-run \\\`specnaut upgrade\\\` instead."
 fi
 [ \${#gated[@]} -gt 0 ] || guard_allow
-approval_require merge \\
+approval_require guards \\
   "editing \${gated[*]} changes how Specnaut gates landings on the base branch, so it needs the user" \\
-  "To let it through, reply \\\`merge\\\` (or \\\`/task merge\\\`) — a plain \\"yes\\" does not approve it."
+  "\$APPROVAL_GUARDS_HOW"
 `,
       executable: true,
     },
@@ -29973,18 +30029,20 @@ approval_require merge \\
 #
 #   docs/constitution.md                       constitution
 #   .specnaut/{size-limits,boundaries,ui}.yml  gate-config
-#   .specnaut/hooks/**                         constitution — this guard and
-#                                              what it sources; protect-generated
-#                                              gates the same folder under merge
+#   .specnaut/hooks/**                         guards — this guard and what it
+#                                              sources; protect-generated gates the
+#                                              same folder under the same kind
 #
 # A write needs THIS turn's approval of its kind (approval_require): no stamp
 # denies on every harness and in every mode.
 #
 # The Bash arm (S1) reads each simple command _command.sh cuts out of the line.
 # One goes through untouched only when it is a bare read: the command word
-# exactly \`cat head tail grep wc diff\`, or \`git diff|log|show|blame|status|add\`
-# with no option before the subcommand (so no -c) and none of --output*,
-# --ext-diff, --textconv, add -e/-p/-i; no \`/\` in it, no VAR= prefix, and
+# exactly \`cat head tail grep wc diff ls echo printf stat :\`, a \`for\` header
+# none of whose words holds a glob or expansion, or \`git
+# diff|log|show|blame|status|add|grep|ls-files|rev-parse\` with no option before
+# the subcommand (so no -c) and none of --output*, --ext-diff, --textconv,
+# -O/--open-files-in-pager, add -e/-p/-i; no \`/\` in it, no VAR= prefix, and
 # nothing on the line that redefines a command (a function, an alias, hash,
 # source, a PATH/GIT_* assignment). Any other
 # command is judged by the words it carries: a word names a guarded file by
@@ -30016,7 +30074,7 @@ PC_HOOKS=.specnaut/hooks
 PC_PATHS=("\$PATHS_CONSTITUTION" "\${PATHS_GATE_CONFIGS[@]}" "\$PC_HOOKS")
 PC_KINDS=(constitution)
 for _ in "\${PATHS_GATE_CONFIGS[@]}"; do PC_KINDS+=(gate-config); done
-PC_KINDS+=(constitution)
+PC_KINDS+=(guards)
 PC_LAST=\$((\${#PC_PATHS[@]} - 1))
 PC_SELF=(protect-constitution.sh _paths.sh _guard.sh _approval.sh _command.sh _simple.sh
   _baseline.sh approve-on-prompt.sh)
@@ -30124,13 +30182,16 @@ _pc_read_only() {
     case \${W[j]} in '{' | '}' | '!' | if | then | else | elif | do | while | until) ;; *) return 1 ;; esac
   done
   case \${W[K]:-} in
-    cat | head | tail | grep | wc | diff) return 0 ;;
+    cat | head | tail | grep | wc | diff | ls | echo | printf | stat | :) return 0 ;;
+    for)
+      for w in "\${W[@]:K+1}"; do case \$w in *'*'* | *'?'* | *'['* | *'\$'* | *'{'*) return 1 ;; esac; done
+      return 0 ;;
     git) sub=\${W[K + 1]:-} ;;
     *) return 1 ;;
   esac
-  case \$sub in diff | log | show | blame | status | add) ;; *) return 1 ;; esac
+  case \$sub in diff | log | show | blame | status | add | grep | ls-files | rev-parse) ;; *) return 1 ;; esac
   for w in "\${W[@]:K+2}"; do
-    case \$w in --output* | --ext-diff | --textconv) return 1 ;; esac
+    case \$w in --output* | --ext-diff | --textconv | --open-files-in-pager* | -O*) return 1 ;; esac
     if [ "\$sub" = add ]; then
       case \$w in --edit | --patch | --interactive) return 1 ;; --*) ;; -*[epi]*) return 1 ;; esac
     fi
@@ -30207,16 +30268,18 @@ fi
 
 [ -n "\$PC_NEED" ] || guard_allow
 what=\$(IFS=';'; echo "\${PC_WHAT[*]}")
+PC_READS="a bare cat, head, tail, grep, wc, diff, ls, echo, printf, stat, or git diff/log/show/blame/status/add/grep/ls-files/rev-parse"
 read -r kind other <<<"\$PC_NEED"
 if [ -n "\$other" ]; then
   guard_fail "this call changes \$what — files of two approval kinds. One approval covers one kind: make the changes one at a time"
 fi
 case \$kind in
-  constitution) reason="this call would change \$what: the team's constitution, or the hooks that guard it. An agent never amends it on its own initiative" ;;
+  constitution) reason="this call would change \$what: the team's constitution. An agent never amends it on its own initiative" ;;
+  guards) approval_require guards "this call would change \$what: the hooks that guard the project. An agent never changes them on its own initiative" "\$APPROVAL_GUARDS_HOW Reading is allowed: \$PC_READS." ;;
   *) reason="this call would change \$what: a gate config, which loosens or tightens the project's own gates. An agent never changes it on its own initiative" ;;
 esac
 approval_require "\$kind" "\$reason" \\
-  "Only the user approves it: draft the change with the task skill's \\\`constitution\\\` verb, which prints the phrase the user types as their whole message — a plain \\"yes\\" does not approve it. Reading is allowed with a bare cat, head, tail, grep, wc, diff, or git diff/log/show/blame/status/add."
+  "Only the user approves it: draft the change with the task skill's \\\`constitution\\\` verb, which prints the phrase the user types as their whole message — a plain \\"yes\\" does not approve it. Reading is allowed: \$PC_READS."
 `,
       executable: true,
     },
@@ -30436,23 +30499,23 @@ specnaut-guide
     ".specnaut/hooks/SHA256SUMS": {
       content: `e51a8a1291eb7e2e5a5a21122b971ee78c5392d4dbbabd28798f8f89df9ca08a  .gitattributes
 7a9b8bd4ecba4a1f8bfdece11124399c2e5811d17c42f07cdd60a3c7fe3346ea  _agents.txt
-e15179056fefd0d399c54a8755738046e3cba52d317faf684bd238d3ce2cbb72  _approval.sh
-c48a2d7797fa8f418da355fac867d86ac4de7b9f98e8408600bf5ec524b57e99  _baseline.sh
-ef80f32b8786606687a47a28b447272a8d44a86678bc389324d1d80105bcd696  _command.sh
+4da1c0869333a9a40761756b3f87ae8a57f6bb015e8b89cda059962c9b6b9aa2  _approval.sh
+c0c1633b277253defe2066511785f9d9827d4577e60e3b8060e9ab20e4014b3a  _baseline.sh
+9fcdf99cb2f9df6cc3c8f9f2f23f61430efbbb2f1c4c1156c47c4bfa963c2920  _command.sh
 60b9b8446946044c888ca8a3ee0937e69dc8f555d988ab2d919bed281a288897  _git.sh
 40643b49524d4c5b46e21d56c4e264e041a8ffe3792ceff65088130a2f02d0d1  _guard.sh
-f9603a60a031f0921fb71f4cc9f7e958b26cd776763637147f4ca410eb8afb54  _listed.sh
+87e9f4cac88e071054b773b6421f1e241f3113e62df2958ce4bcc96c959de88e  _listed.sh
 0d152301178789e9680792cfbe1f5e99cf9503427403ae41c456cf3181ac63cc  _paths.sh
 5bd55bf667fef0ccd63b240de888dbc06fbcdedebc8eb92c944e07866e59d753  _simple.sh
-84ea3ec50be236f52d5c1e5022b9064091b2bdf558c308e677967982c3638e91  approve-on-prompt.sh
+aa049cd4eaed0b5bd6b447380ff985d6e8415670225dcd9114461a8a7fedeca4  approve-on-prompt.sh
 28d13e1fbd696f79036cc1f94c3fd6aa68f4f862f0dd5f6d32191ad05392534f  guard-dispatch-model.sh
-cbee21355813aa693fd4cbfbe7fef321125959882f762ddf4bfde0b74fcb972d  guard-merge.sh
-ffe7285c87a890d6c4caf0b338dbe34cf9794afac646334241801913cb939a86  guard-release.sh
+3d3a2d0b6182bb49ee73c23c8b7d57013aea02ee65e9c8f5d8329b17e237d370  guard-merge.sh
+c1a4ebed6d6a8ad987d2b615ef80ce0608d4387b40121aebbf8549d107ee6430  guard-release.sh
 3364feb0f3a7892224b67e4f857bb6c085456da98c892d7199c4bbd10f122f8b  log-subagent.sh
 79e66c4451546f416b4e57d942f9ec8e9f078e00f24c0b5a634c1c24dc08bfca  merge-approved.sh
 17fe85c8fb8804103a3d341d304d6d82ad472869dd2827c92ed1dcc2e56b6272  merge-commands.txt
-0d231c09ef29b1e46b774d283fad725382f33d6f3098545dc8a504bf89c40a80  protect-constitution.sh
-446426ad8d9958865dd36b0fb032090d3676c6b2533a513192b27c1b5171470c  protect-generated.sh
+e3844fe56536ca7acf8898c7aff581c377c249c4eba7c9c46431870ce88a81be  protect-constitution.sh
+74319b447f1c30851ddd8d680380028482b839c19425cdf36a34e68eb31afe03  protect-generated.sh
 982f9b8fd55376471246dbb03972b4ebc323d92e172328a15da706c32e3ae496  release-commands.txt
 `,
       executable: false,
@@ -30712,6 +30775,9 @@ guard_git() { git --no-pager -c core.fsmonitor=false "\$@"; }
 # Two readers: approved, for a hook's payload, and approved_session, for
 # merge-approved.sh, which the landing scripts run outside any payload.
 
+# What the user types for the \`guards\` kind: a landing word must not rewrite the guards.
+APPROVAL_GUARDS_HOW='To let it through, reply \`approve the guard change\` — a plain "yes" does not approve it.'
+
 # approval_session_ok <id> — a session id is a path component; only plain tokens.
 approval_session_ok() { [[ \$1 =~ ^[A-Za-z0-9_-]+\$ ]]; }
 
@@ -30841,9 +30907,8 @@ approval_require() {
 # the env/command/sudo/nice/timeout/xargs/… wrappers, \`source x\`, the command
 # of \`find -exec\`, and ONE level of \`sh|bash|zsh -c '…'\`. A deeper \`-c\`, or
 # \`eval\`, sets CMD_OPAQUE — and so does what it cannot read with certainty
-# (cli#711): a \`case\` inside a substitution, an unquoted heredoc body holding
-# \`\$(\` or a backtick, a zsh glob qualifier that runs code, and a line that
-# never closes: a quote, \`(\`, \`\$(\`, backtick or \`[[\` left open, a heredoc whose
+# (cli#711): a \`case\` inside a substitution, a zsh glob qualifier that runs
+# code, and a line that never closes: a quote, \`(\`, \`\$(\`, backtick or \`[[\` left open, a heredoc whose
 # body never ends. Fail closed: a guard gates what it cannot read rather than
 # guessing at it. Scripts, interpreters and shell functions are not seen: the
 # stated limit.
@@ -30974,25 +31039,25 @@ _cmd_qual() {
   case \$g in *e* | *+*) CMD_OPAQUE=1 ;; esac
 }
 
-# Skips the bodies of the heredocs opened on the line just ended. A body that
-# runs to the end of the input never closed: as likely a misread as a typo,
-# and what follows a phantom heredoc is hidden — so the line is opaque. So is
-# a body whose delimiter was not quoted, if it holds \`\$(\` or a backtick: bash
-# expands that body, and runs its substitutions (cli#711).
+# Skips the bodies of the heredocs opened on the line just ended. A body running
+# to the end of the input never closed, and what follows it is hidden: opaque.
+# Bash expands a body whose delimiter was not quoted and runs its substitutions
+# (cli#711): it is parsed in cmd_parse's body mode, its prose an argument of \`:\`.
 # shellcheck disable=SC2016 # the \`\$(\` is matched as text, on purpose
 _cmd_heredocs() {
-  local d strip quoted line closed
+  local d strip quoted line closed body
   for d in \$heredocs; do
-    strip=\${d:0:1} quoted=\${d:1:1} d=\${d:2} closed=0
+    strip=\${d:0:1} quoted=\${d:1:1} d=\${d:2} closed=0 body=""
     while [ "\$i" -lt "\$n" ]; do
       line=\${s:i}
       line=\${line%%\$'\\n'*}
       i=\$((i + \${#line} + 1))
       if [ "\$strip" = 1 ]; then line=\${line#"\${line%%[!\$'\\t']*}"}; fi
       if [ "\$line" = "\$d" ]; then closed=1; break; fi
-      if [ "\$quoted" = 0 ]; then case \$line in *'\$('* | *'\`'*) CMD_OPAQUE=1 ;; esac; fi
+      if [ "\$quoted" = 0 ]; then body+=\$line\$'\\n'; fi
     done
     if [ "\$closed" = 0 ]; then CMD_OPAQUE=1; fi
+    case \$body in *'\$('* | *'\`'*) cmd_parse "\$body" "\$depth" 1 ;; esac
   done
   heredocs=""
 }
@@ -31073,12 +31138,12 @@ _cmd_test_char() {
   return 1
 }
 
-# _cmd_dquote — c, inside "…", is a backslash, the closing quote, a \`\$\` or a
-# backtick (cmd_parse adds every other character to the word itself).
+# _cmd_dquote — c, inside "…", is a backslash, the closing quote (in a heredoc
+# body's own text, a plain character), a \`\$\` or a backtick.
 _cmd_dquote() {
   case \$c in
     '\\') case \$nx in '"' | '\\' | '\$' | '\`') word+=\$nx i=\$((i + 1)) ;; \$'\\n') i=\$((i + 1)) ;; *) word+=\$c ;; esac ;;
-    '"') q="" ;;
+    '"') if [ -n "\$hd" ] && [ "\$sp" = 0 ]; then word+=\$c; else q=""; fi ;;
     '\$') if [ "\$nx" = "(" ]; then _cmd_push; stack="d\$stack" q="" i=\$((i + 1)); _cmd_arith; else word+=\$c; fi ;;
     '\`') _cmd_push; bt=d q="" ;;
     *) word+=\$c ;;
@@ -31114,12 +31179,12 @@ _cmd_plain() {
   esac
 }
 
-# cmd_parse <command line> [depth] — one character at a time. The characters
-# that mean nothing but themselves are added to the word here, without a
-# function call: they are most of any line, and a call costs more than the
-# character (a 5 KB line is parsed in well under a second on bash 3.2).
+# cmd_parse <command line> [depth] [1: a heredoc body, read as if inside "…"] —
+# one character at a time; those that mean nothing but themselves join the word
+# here: a call costs more than the character (5 KB: under a second on bash 3.2).
 cmd_parse() {
-  local s=\$1 depth=\${2:-0} n=\${#1} i=0 c nx q="" word="" have=0 seg="" stack="" bt="" heredocs="" d sp=0 bk=""
+  local s=\$1 depth=\${2:-0} hd=\${3:-} n=\${#1} i=0 c nx q="" word="" have=0 seg="" stack="" bt="" heredocs="" d sp=0 bk=""
+  if [ -n "\$hd" ]; then q='"' seg=":\$CMD_SEP"; fi
   local -a sw ss
   local IFS=\$CMD_SEP
   while [ "\$i" -lt "\$n" ]; do
@@ -31136,6 +31201,7 @@ cmd_parse() {
     fi
   done
   _cmd_end
+  if [ -n "\$hd" ] && [ "\$sp" = 0 ]; then q=""; fi
   if [ -n "\$q\$stack\$bt\$heredocs\$bk" ]; then CMD_OPAQUE=1; fi
 }
 
@@ -31477,6 +31543,9 @@ _cmd_emit() {
 # words: what it names is unknown here, so it is gated (fail closed). \`gh
 # \$(echo release) create\` and \`… | xargs gh\` are \`gh release create\`
 # (cli#711). Only at a position a line has a word for: \`ls *.sh\` runs \`ls\`.
+# A command word that is only named variables is the one exception: it may be
+# anything, so most lines holding one run nothing listed. It matches when the
+# line mentions the entry or git, or loops over a glob or \`read\` (_listed_may_run).
 # \`<words> except <flag>\`: that flag anywhere in the segment exempts it.
 # \`#\` comments and blank or whitespace-only lines are skipped; a \`\\r\` (a CRLF
 # checkout) is read past.
@@ -31490,6 +31559,52 @@ _cmd_emit() {
 # it does not fold, it gates (cli#711).
 _listed_expands() {
   case \$1 in *'\$'* | *'\`'* | *'*'* | *'?'* | *'('* | *'['*']'* | *'{'*'}'* | *[![:print:]]*) return 0 ;; esac
+  return 1
+}
+
+# _listed_names <word> — the line mentions <word> as a whole token, a script by
+# its stem, case ignored: \`git\` is not in \`.git\` or \`github\`, but is in \`git-push\`.
+_listed_names() {
+  local w=\${1%.sh} re rc=1
+  re="(^|[^[:alnum:]_.-])\${w//./\\\\.}([^[:alnum:]_]|\\\$)"
+  shopt -s nocasematch
+  if [[ \${GF[0]} =~ \$re ]]; then rc=0; fi
+  shopt -u nocasematch
+  return "\$rc"
+}
+
+# _listed_may_run <word> <the entry's first word> — the expanding command word
+# may run that entry. Anything but named variables may; those, only as above.
+_listed_may_run() {
+  local nl=\$'\\n' w=\$1
+  case \$w in '\$\${'*) w=\${w#?} ;; esac # _cmd_name's mark on a word ending in \`}\`
+  [[ \$w =~ ^([A-Za-z0-9_.-]|\\\$[A-Za-z_][A-Za-z0-9_]*|\\\$\\{[A-Za-z_][A-Za-z0-9_]*\\})+\$ ]] || return 0
+  [[ \${GF[0]} =~ (^|[^[:alnum:]_])for[[:space:]]+[[:alnum:]_]+[[:space:]]+in[[:space:]][^\\;\$nl]*[][*?\\\$\\\`] ]] && return 0
+  [[ \${GF[0]} =~ (^|[^[:alnum:]_])read[[:space:]] ]] && return 0
+  _listed_names git || _listed_names "\$2"
+}
+
+# listed_opaque <list file> — LISTED_OPAQUE: the reason, when the line cannot be
+# read and mentions git or an entry of the list. An unreadable line that names neither
+# is no landing or release by mistake. Called bare, as listed is.
+listed_opaque() {
+  local line why='a command it cannot read (eval, sh -c in sh -c, a shell fed on stdin, a quote or heredoc left open), and it names git or a listed command'
+  LISTED_OPAQUE=""
+  [ "\$CMD_OPAQUE" = 1 ] || return 0
+  [ -f "\$1" ] || guard_fail "\${1##*/} is missing beside this hook — refusing"
+  if _listed_names git; then LISTED_OPAQUE=\$why; return 0; fi
+  while IFS= read -r line || [ -n "\$line" ]; do
+    line=\${line%\$'\\r'}
+    case \$line in '' | '#'*) continue ;; esac
+    line=\${line%%[[:space:]]*}
+    if [ -n "\$line" ] && _listed_names "\$line"; then LISTED_OPAQUE=\$why; return 0; fi
+  done <"\$1"
+}
+
+# _listed_exempt <flag> — that flag is a word of the segment.
+_listed_exempt() {
+  local w
+  for w in "\${W[@]}"; do if [ "\$w" = "\$1" ]; then return 0; fi; done
   return 1
 }
 
@@ -31514,16 +31629,14 @@ listed() {
     ok=1
     for ((i = 0; i < \${#e[@]}; i++)); do
       w=\${POS[i]:-}
-      if _listed_expands "\$w"; then break; fi
+      if _listed_expands "\$w"; then if [ "\$i" = 0 ] && ! _listed_may_run "\$w" "\${e[0]}"; then ok=0; fi; break; fi
       if [ "\${e[i]}" = "\$w" ]; then continue; fi
       if [ "\$i" = 0 ] && [[ \${e[0]} == *.sh ]] && guard_ieq "\${e[0]}" "\$w"; then continue; fi
       ok=0
       break
     done
     [ "\$ok" = 1 ] || continue
-    if [ -n "\$except" ]; then
-      for w in "\${W[@]}"; do if [ "\$w" = "\$except" ]; then continue 2; fi; done
-    fi
+    if [ -n "\$except" ] && _listed_exempt "\$except"; then continue; fi
     HIT=\$entry
     return 0
   done <"\$1"
@@ -31859,7 +31972,7 @@ paths_pattern() {
 # mode the prompt found is kept beside the sums. guard-merge holds a turn
 # that began on manual for the whole turn, and Stop asks about a turn that
 # ended on auto when it began on manual, unless the turn approved \`merge\` or
-# \`gate-config\`.
+# \`gate-config\` or \`guards\`.
 #
 # A file that changed during the turn with no approval of its kind blocks the
 # stop with a question for the user, and the version from the start of the
@@ -31911,7 +32024,7 @@ baseline_check() {
   if [ "\$(cat "\$1/mode" 2>/dev/null)" = manual ] && sum=\$(baseline_mode) && [ "\$sum" != manual ]; then
     seen=1
     case " \$2 " in
-      *" merge "* | *" gate-config "*) ;;
+      *" merge "* | *" gate-config "* | *" guards "*) ;;
       *) changed+=("the merge mode (manual when the turn began, \$sum now: a copy of .specnaut/workflow.yml, or a ref it is read from, was rewritten)") ;;
     esac
   fi
@@ -32016,6 +32129,7 @@ baseline_bases() {
 #   release  /ship release|tag…  /specnaut-ship release|tag…  \$specnaut-ship release|tag…  release it  tag it
 #   constitution  approve the constitution amendment   (spec 038 S2: the phrase
 #   gate-config   approve the gate config change        the constitution verb prints)
+#   guards        approve the guard change              (the guards' own switches)
 # Claude spells the skills /task, /ship; Codex /specnaut-task or \$specnaut-task
 # (harness_commands.ts). A test holds these spellings to harnessCommands.
 # Never a bare yes/ok/go: a reply to some other question must not land code.
@@ -32048,7 +32162,7 @@ case \${BASH_SOURCE[0]} in */*) HOOK_DIR=\${BASH_SOURCE[0]%/*} ;; *) HOOK_DIR=. 
 GUARD_FAIL_CODE=0
 guard_init approve-on-prompt "\${1:-}" .prompt any:.stop_hook_active
 
-# approval_kind_of <prompt> — prints merge, release, constitution, gate-config, or nothing;
+# approval_kind_of <prompt> — prints merge, release, constitution, gate-config, guards, or nothing;
 # a kind spelled through a bare skill name carries it, as merge:task or release:ship.
 approval_kind_of() {
   local p
@@ -32073,6 +32187,7 @@ approval_kind_of() {
       echo release ;;
     "approve the constitution amendment") echo constitution ;;
     "approve the gate config change") echo gate-config ;;
+    "approve the guard change") echo guards ;;
   esac
 }
 
@@ -32099,7 +32214,7 @@ case \$P_EVENT in
     # What this turn approved is read before the stamp goes; the stamp goes
     # before anything that could fail and leave it outliving the turn.
     kinds=""
-    for k in constitution gate-config merge; do if approved "\$k"; then kinds+=" \$k"; fi; done
+    for k in constitution gate-config guards merge; do if approved "\$k"; then kinds+=" \$k"; fi; done
     rm -f "\$stamp"
     baseline_check "\$baseline" "\$kinds" "\${GF[1]}"
     exit 0 ;;
@@ -32145,7 +32260,8 @@ mv -f "\$tmp" "\$stamp"
 #                        --all, --mirror, --delete and unknown options are
 #                        all gated
 #   a git subcommand it cannot read (_git.sh: a shell alias, \`git \$(…)\`,
-#                        \`git "\$X"\`), a line it cannot read
+#                        \`git "\$X"\`), a line it cannot read that names git
+#                        or a listed command (_listed.sh)
 #   every command in merge-commands.txt — the scripts that land on the base
 #                        themselves (land-feature.sh, remove-spec.sh), matched
 #                        by basename however they are reached, and gh pr
@@ -32245,7 +32361,8 @@ for seg in \${CMD_SEGS[@]+"\${CMD_SEGS[@]}"}; do
   listed "\$HOOK_DIR/merge-commands.txt"
   if [ -n "\$HIT" ]; then reasons+=("\$HIT"); fi
 done
-if [ "\$CMD_OPAQUE" = 1 ]; then reasons+=("a command it cannot read (eval, sh -c in sh -c, a shell fed on stdin, a quote or heredoc left open)"); fi
+listed_opaque "\$HOOK_DIR/merge-commands.txt"
+if [ -n "\$LISTED_OPAQUE" ]; then reasons+=("\$LISTED_OPAQUE"); fi
 if [ "\$CMD_SCRUB" = 1 ]; then reasons+=("a command that sets or clears what the landing scripts' hold reads (CLAUDE_CODE_SESSION_ID, CODEX_SESSION_ID, XDG_STATE_HOME, env -i)"); fi
 if [ "\$merges" = 0 ] && [ \${#pushes[@]} = 0 ] && [ \${#reasons[@]} = 0 ]; then guard_allow; fi
 
@@ -32423,7 +32540,7 @@ guard_fail "held — merge: manual, and the user's own prompt this turn did not 
 # run before the push does, so the tag does not exist yet when this hook reads
 # the command). And a git subcommand it cannot read (_git.sh: a shell alias,
 # \`git \$(…)\`), or a line too nested to read (eval, sh -c in sh -c, a shell fed
-# on stdin, a line that never closes): fail closed.
+# on stdin, a line that never closes) that names git or a listed command.
 #
 # Resolved through approval_gate: Claude's own prompt where it can ask, and
 # everywhere else — Codex, Claude's bypass and auto modes — only the user's
@@ -32493,7 +32610,8 @@ for seg in \${CMD_SEGS[@]+"\${CMD_SEGS[@]}"}; do
   listed "\$HOOK_DIR/release-commands.txt"
   if [ -n "\$HIT" ]; then hits+=("\$HIT"); fi
 done
-if [ "\$CMD_OPAQUE" = 1 ]; then hits+=("a command it cannot read (eval, sh -c in sh -c, a shell fed on stdin, a quote or heredoc left open)"); fi
+listed_opaque "\$HOOK_DIR/release-commands.txt"
+if [ -n "\$LISTED_OPAQUE" ]; then hits+=("\$LISTED_OPAQUE"); fi
 for p in \${pushes[@]+"\${pushes[@]}"}; do
   cmd_words "\$p"
   if tag_push \${W[@]+"\${W[@]}"}; then hits+=("a push of a tag"); fi
@@ -32568,11 +32686,12 @@ guard_fail "'\$agent' is a Specnaut agent: it runs on the model its definition d
 #           base-branch,merge-hold,land-feature,remove-spec}.sh,
 #           .codex/hooks.json, .claude/settings.json and
 #           .claude/settings.local.json (its \`disableAllHooks\` switches every
-#           guard off). Held like a landing, through guard-merge's one arm,
-#           approval_require: denied unless this turn's prompt said \`merge\`,
-#           in Claude's ask modes too — a click on an edit prompt is not the
+#           guard off). Through approval_require, under its own kind: denied
+#           unless this turn's prompt said \`approve the guard change\`, in
+#           Claude's ask modes too — a click on an edit prompt is not the
 #           user's typed word — and, with it, Claude's prompt once where it
-#           can ask.
+#           can ask. \`merge\` does not release these: the word that lands a
+#           branch must not also rewrite what holds it.
 #
 # Decided by identity, never by text (§ 11 F5) — see _paths.sh, which reads
 # the paths an edit names and resolves them; a patch from which no path can be
@@ -32606,9 +32725,9 @@ if [ -n "\$denied" ]; then
   guard_fail "denied: \$denied is .specnaut/installed.lock. .specnaut/installed.lock is generated by \\\`specnaut init\\\` / \\\`specnaut upgrade\\\`. Manual edits will be overwritten by the next upgrade. If you need to change the recorded harness or backend, re-run \\\`specnaut upgrade\\\` instead."
 fi
 [ \${#gated[@]} -gt 0 ] || guard_allow
-approval_require merge \\
+approval_require guards \\
   "editing \${gated[*]} changes how Specnaut gates landings on the base branch, so it needs the user" \\
-  "To let it through, reply \\\`merge\\\` (or \\\`/task merge\\\`) — a plain \\"yes\\" does not approve it."
+  "\$APPROVAL_GUARDS_HOW"
 `,
       executable: true,
     },
@@ -32621,18 +32740,20 @@ approval_require merge \\
 #
 #   docs/constitution.md                       constitution
 #   .specnaut/{size-limits,boundaries,ui}.yml  gate-config
-#   .specnaut/hooks/**                         constitution — this guard and
-#                                              what it sources; protect-generated
-#                                              gates the same folder under merge
+#   .specnaut/hooks/**                         guards — this guard and what it
+#                                              sources; protect-generated gates the
+#                                              same folder under the same kind
 #
 # A write needs THIS turn's approval of its kind (approval_require): no stamp
 # denies on every harness and in every mode.
 #
 # The Bash arm (S1) reads each simple command _command.sh cuts out of the line.
 # One goes through untouched only when it is a bare read: the command word
-# exactly \`cat head tail grep wc diff\`, or \`git diff|log|show|blame|status|add\`
-# with no option before the subcommand (so no -c) and none of --output*,
-# --ext-diff, --textconv, add -e/-p/-i; no \`/\` in it, no VAR= prefix, and
+# exactly \`cat head tail grep wc diff ls echo printf stat :\`, a \`for\` header
+# none of whose words holds a glob or expansion, or \`git
+# diff|log|show|blame|status|add|grep|ls-files|rev-parse\` with no option before
+# the subcommand (so no -c) and none of --output*, --ext-diff, --textconv,
+# -O/--open-files-in-pager, add -e/-p/-i; no \`/\` in it, no VAR= prefix, and
 # nothing on the line that redefines a command (a function, an alias, hash,
 # source, a PATH/GIT_* assignment). Any other
 # command is judged by the words it carries: a word names a guarded file by
@@ -32664,7 +32785,7 @@ PC_HOOKS=.specnaut/hooks
 PC_PATHS=("\$PATHS_CONSTITUTION" "\${PATHS_GATE_CONFIGS[@]}" "\$PC_HOOKS")
 PC_KINDS=(constitution)
 for _ in "\${PATHS_GATE_CONFIGS[@]}"; do PC_KINDS+=(gate-config); done
-PC_KINDS+=(constitution)
+PC_KINDS+=(guards)
 PC_LAST=\$((\${#PC_PATHS[@]} - 1))
 PC_SELF=(protect-constitution.sh _paths.sh _guard.sh _approval.sh _command.sh _simple.sh
   _baseline.sh approve-on-prompt.sh)
@@ -32772,13 +32893,16 @@ _pc_read_only() {
     case \${W[j]} in '{' | '}' | '!' | if | then | else | elif | do | while | until) ;; *) return 1 ;; esac
   done
   case \${W[K]:-} in
-    cat | head | tail | grep | wc | diff) return 0 ;;
+    cat | head | tail | grep | wc | diff | ls | echo | printf | stat | :) return 0 ;;
+    for)
+      for w in "\${W[@]:K+1}"; do case \$w in *'*'* | *'?'* | *'['* | *'\$'* | *'{'*) return 1 ;; esac; done
+      return 0 ;;
     git) sub=\${W[K + 1]:-} ;;
     *) return 1 ;;
   esac
-  case \$sub in diff | log | show | blame | status | add) ;; *) return 1 ;; esac
+  case \$sub in diff | log | show | blame | status | add | grep | ls-files | rev-parse) ;; *) return 1 ;; esac
   for w in "\${W[@]:K+2}"; do
-    case \$w in --output* | --ext-diff | --textconv) return 1 ;; esac
+    case \$w in --output* | --ext-diff | --textconv | --open-files-in-pager* | -O*) return 1 ;; esac
     if [ "\$sub" = add ]; then
       case \$w in --edit | --patch | --interactive) return 1 ;; --*) ;; -*[epi]*) return 1 ;; esac
     fi
@@ -32855,16 +32979,18 @@ fi
 
 [ -n "\$PC_NEED" ] || guard_allow
 what=\$(IFS=';'; echo "\${PC_WHAT[*]}")
+PC_READS="a bare cat, head, tail, grep, wc, diff, ls, echo, printf, stat, or git diff/log/show/blame/status/add/grep/ls-files/rev-parse"
 read -r kind other <<<"\$PC_NEED"
 if [ -n "\$other" ]; then
   guard_fail "this call changes \$what — files of two approval kinds. One approval covers one kind: make the changes one at a time"
 fi
 case \$kind in
-  constitution) reason="this call would change \$what: the team's constitution, or the hooks that guard it. An agent never amends it on its own initiative" ;;
+  constitution) reason="this call would change \$what: the team's constitution. An agent never amends it on its own initiative" ;;
+  guards) approval_require guards "this call would change \$what: the hooks that guard the project. An agent never changes them on its own initiative" "\$APPROVAL_GUARDS_HOW Reading is allowed: \$PC_READS." ;;
   *) reason="this call would change \$what: a gate config, which loosens or tightens the project's own gates. An agent never changes it on its own initiative" ;;
 esac
 approval_require "\$kind" "\$reason" \\
-  "Only the user approves it: draft the change with the task skill's \\\`constitution\\\` verb, which prints the phrase the user types as their whole message — a plain \\"yes\\" does not approve it. Reading is allowed with a bare cat, head, tail, grep, wc, diff, or git diff/log/show/blame/status/add."
+  "Only the user approves it: draft the change with the task skill's \\\`constitution\\\` verb, which prints the phrase the user types as their whole message — a plain \\"yes\\" does not approve it. Reading is allowed: \$PC_READS."
 `,
       executable: true,
     },
@@ -33084,23 +33210,23 @@ specnaut-guide
     ".specnaut/hooks/SHA256SUMS": {
       content: `e51a8a1291eb7e2e5a5a21122b971ee78c5392d4dbbabd28798f8f89df9ca08a  .gitattributes
 7a9b8bd4ecba4a1f8bfdece11124399c2e5811d17c42f07cdd60a3c7fe3346ea  _agents.txt
-e15179056fefd0d399c54a8755738046e3cba52d317faf684bd238d3ce2cbb72  _approval.sh
-c48a2d7797fa8f418da355fac867d86ac4de7b9f98e8408600bf5ec524b57e99  _baseline.sh
-ef80f32b8786606687a47a28b447272a8d44a86678bc389324d1d80105bcd696  _command.sh
+4da1c0869333a9a40761756b3f87ae8a57f6bb015e8b89cda059962c9b6b9aa2  _approval.sh
+c0c1633b277253defe2066511785f9d9827d4577e60e3b8060e9ab20e4014b3a  _baseline.sh
+9fcdf99cb2f9df6cc3c8f9f2f23f61430efbbb2f1c4c1156c47c4bfa963c2920  _command.sh
 60b9b8446946044c888ca8a3ee0937e69dc8f555d988ab2d919bed281a288897  _git.sh
 40643b49524d4c5b46e21d56c4e264e041a8ffe3792ceff65088130a2f02d0d1  _guard.sh
-f9603a60a031f0921fb71f4cc9f7e958b26cd776763637147f4ca410eb8afb54  _listed.sh
+87e9f4cac88e071054b773b6421f1e241f3113e62df2958ce4bcc96c959de88e  _listed.sh
 0d152301178789e9680792cfbe1f5e99cf9503427403ae41c456cf3181ac63cc  _paths.sh
 5bd55bf667fef0ccd63b240de888dbc06fbcdedebc8eb92c944e07866e59d753  _simple.sh
-84ea3ec50be236f52d5c1e5022b9064091b2bdf558c308e677967982c3638e91  approve-on-prompt.sh
+aa049cd4eaed0b5bd6b447380ff985d6e8415670225dcd9114461a8a7fedeca4  approve-on-prompt.sh
 28d13e1fbd696f79036cc1f94c3fd6aa68f4f862f0dd5f6d32191ad05392534f  guard-dispatch-model.sh
-cbee21355813aa693fd4cbfbe7fef321125959882f762ddf4bfde0b74fcb972d  guard-merge.sh
-ffe7285c87a890d6c4caf0b338dbe34cf9794afac646334241801913cb939a86  guard-release.sh
+3d3a2d0b6182bb49ee73c23c8b7d57013aea02ee65e9c8f5d8329b17e237d370  guard-merge.sh
+c1a4ebed6d6a8ad987d2b615ef80ce0608d4387b40121aebbf8549d107ee6430  guard-release.sh
 3364feb0f3a7892224b67e4f857bb6c085456da98c892d7199c4bbd10f122f8b  log-subagent.sh
 79e66c4451546f416b4e57d942f9ec8e9f078e00f24c0b5a634c1c24dc08bfca  merge-approved.sh
 17fe85c8fb8804103a3d341d304d6d82ad472869dd2827c92ed1dcc2e56b6272  merge-commands.txt
-0d231c09ef29b1e46b774d283fad725382f33d6f3098545dc8a504bf89c40a80  protect-constitution.sh
-446426ad8d9958865dd36b0fb032090d3676c6b2533a513192b27c1b5171470c  protect-generated.sh
+e3844fe56536ca7acf8898c7aff581c377c249c4eba7c9c46431870ce88a81be  protect-constitution.sh
+74319b447f1c30851ddd8d680380028482b839c19425cdf36a34e68eb31afe03  protect-generated.sh
 982f9b8fd55376471246dbb03972b4ebc323d92e172328a15da706c32e3ae496  release-commands.txt
 `,
       executable: false,
@@ -33122,17 +33248,17 @@ ffe7285c87a890d6c4caf0b338dbe34cf9794afac646334241801913cb939a86  guard-release.
         "hooks": [
           {
             "type": "command",
-            "command": "r=\$PWD; while [ -n \\"\$r\\" ] && [ ! -e \\"\$r/.specnaut/hooks\\" ] && [ ! -L \\"\$r/.specnaut/hooks\\" ]; do r=\${r%/*}; done; [ \\"\$( (sha256sum 2>/dev/null || shasum -a 256) < \\"\$r/.specnaut/hooks/SHA256SUMS\\" 2>/dev/null | cut -c1-64)\\" = \\"937ab021774e68c625c96f19058af710bac038263fe3755cc2eaceffef8e358a\\" ] && (cd \\"\$r/.specnaut/hooks\\" && (sha256sum -c --status SHA256SUMS 2>/dev/null || shasum -a 256 -c --status SHA256SUMS)) && exec bash \\"\$r/.specnaut/hooks/guard-merge.sh\\" codex; echo \\"specnaut: .specnaut/hooks changed since it was trusted — run specnaut upgrade, then /hooks\\" >&2; exit 2",
+            "command": "r=\$PWD; while [ -n \\"\$r\\" ] && [ ! -e \\"\$r/.specnaut/hooks\\" ] && [ ! -L \\"\$r/.specnaut/hooks\\" ]; do r=\${r%/*}; done; [ \\"\$( (sha256sum 2>/dev/null || shasum -a 256) < \\"\$r/.specnaut/hooks/SHA256SUMS\\" 2>/dev/null | cut -c1-64)\\" = \\"8f6d040a88e03bd535ee918514316de6789f57a54a380f1961ee27d67938e55e\\" ] && (cd \\"\$r/.specnaut/hooks\\" && (sha256sum -c --status SHA256SUMS 2>/dev/null || shasum -a 256 -c --status SHA256SUMS)) && exec bash \\"\$r/.specnaut/hooks/guard-merge.sh\\" codex; echo \\"specnaut: .specnaut/hooks changed since it was trusted — run specnaut upgrade, then /hooks\\" >&2; exit 2",
             "timeout": 10
           },
           {
             "type": "command",
-            "command": "r=\$PWD; while [ -n \\"\$r\\" ] && [ ! -e \\"\$r/.specnaut/hooks\\" ] && [ ! -L \\"\$r/.specnaut/hooks\\" ]; do r=\${r%/*}; done; [ \\"\$( (sha256sum 2>/dev/null || shasum -a 256) < \\"\$r/.specnaut/hooks/SHA256SUMS\\" 2>/dev/null | cut -c1-64)\\" = \\"937ab021774e68c625c96f19058af710bac038263fe3755cc2eaceffef8e358a\\" ] && (cd \\"\$r/.specnaut/hooks\\" && (sha256sum -c --status SHA256SUMS 2>/dev/null || shasum -a 256 -c --status SHA256SUMS)) && exec bash \\"\$r/.specnaut/hooks/guard-release.sh\\" codex; echo \\"specnaut: .specnaut/hooks changed since it was trusted — run specnaut upgrade, then /hooks\\" >&2; exit 2",
+            "command": "r=\$PWD; while [ -n \\"\$r\\" ] && [ ! -e \\"\$r/.specnaut/hooks\\" ] && [ ! -L \\"\$r/.specnaut/hooks\\" ]; do r=\${r%/*}; done; [ \\"\$( (sha256sum 2>/dev/null || shasum -a 256) < \\"\$r/.specnaut/hooks/SHA256SUMS\\" 2>/dev/null | cut -c1-64)\\" = \\"8f6d040a88e03bd535ee918514316de6789f57a54a380f1961ee27d67938e55e\\" ] && (cd \\"\$r/.specnaut/hooks\\" && (sha256sum -c --status SHA256SUMS 2>/dev/null || shasum -a 256 -c --status SHA256SUMS)) && exec bash \\"\$r/.specnaut/hooks/guard-release.sh\\" codex; echo \\"specnaut: .specnaut/hooks changed since it was trusted — run specnaut upgrade, then /hooks\\" >&2; exit 2",
             "timeout": 10
           },
           {
             "type": "command",
-            "command": "r=\$PWD; while [ -n \\"\$r\\" ] && [ ! -e \\"\$r/.specnaut/hooks\\" ] && [ ! -L \\"\$r/.specnaut/hooks\\" ]; do r=\${r%/*}; done; [ \\"\$( (sha256sum 2>/dev/null || shasum -a 256) < \\"\$r/.specnaut/hooks/SHA256SUMS\\" 2>/dev/null | cut -c1-64)\\" = \\"937ab021774e68c625c96f19058af710bac038263fe3755cc2eaceffef8e358a\\" ] && (cd \\"\$r/.specnaut/hooks\\" && (sha256sum -c --status SHA256SUMS 2>/dev/null || shasum -a 256 -c --status SHA256SUMS)) && exec bash \\"\$r/.specnaut/hooks/protect-constitution.sh\\" codex; echo \\"specnaut: .specnaut/hooks changed since it was trusted — run specnaut upgrade, then /hooks\\" >&2; exit 2",
+            "command": "r=\$PWD; while [ -n \\"\$r\\" ] && [ ! -e \\"\$r/.specnaut/hooks\\" ] && [ ! -L \\"\$r/.specnaut/hooks\\" ]; do r=\${r%/*}; done; [ \\"\$( (sha256sum 2>/dev/null || shasum -a 256) < \\"\$r/.specnaut/hooks/SHA256SUMS\\" 2>/dev/null | cut -c1-64)\\" = \\"8f6d040a88e03bd535ee918514316de6789f57a54a380f1961ee27d67938e55e\\" ] && (cd \\"\$r/.specnaut/hooks\\" && (sha256sum -c --status SHA256SUMS 2>/dev/null || shasum -a 256 -c --status SHA256SUMS)) && exec bash \\"\$r/.specnaut/hooks/protect-constitution.sh\\" codex; echo \\"specnaut: .specnaut/hooks changed since it was trusted — run specnaut upgrade, then /hooks\\" >&2; exit 2",
             "timeout": 10
           }
         ]
@@ -33142,12 +33268,12 @@ ffe7285c87a890d6c4caf0b338dbe34cf9794afac646334241801913cb939a86  guard-release.
         "hooks": [
           {
             "type": "command",
-            "command": "r=\$PWD; while [ -n \\"\$r\\" ] && [ ! -e \\"\$r/.specnaut/hooks\\" ] && [ ! -L \\"\$r/.specnaut/hooks\\" ]; do r=\${r%/*}; done; [ \\"\$( (sha256sum 2>/dev/null || shasum -a 256) < \\"\$r/.specnaut/hooks/SHA256SUMS\\" 2>/dev/null | cut -c1-64)\\" = \\"937ab021774e68c625c96f19058af710bac038263fe3755cc2eaceffef8e358a\\" ] && (cd \\"\$r/.specnaut/hooks\\" && (sha256sum -c --status SHA256SUMS 2>/dev/null || shasum -a 256 -c --status SHA256SUMS)) && exec bash \\"\$r/.specnaut/hooks/protect-generated.sh\\" codex; echo \\"specnaut: .specnaut/hooks changed since it was trusted — run specnaut upgrade, then /hooks\\" >&2; exit 2",
+            "command": "r=\$PWD; while [ -n \\"\$r\\" ] && [ ! -e \\"\$r/.specnaut/hooks\\" ] && [ ! -L \\"\$r/.specnaut/hooks\\" ]; do r=\${r%/*}; done; [ \\"\$( (sha256sum 2>/dev/null || shasum -a 256) < \\"\$r/.specnaut/hooks/SHA256SUMS\\" 2>/dev/null | cut -c1-64)\\" = \\"8f6d040a88e03bd535ee918514316de6789f57a54a380f1961ee27d67938e55e\\" ] && (cd \\"\$r/.specnaut/hooks\\" && (sha256sum -c --status SHA256SUMS 2>/dev/null || shasum -a 256 -c --status SHA256SUMS)) && exec bash \\"\$r/.specnaut/hooks/protect-generated.sh\\" codex; echo \\"specnaut: .specnaut/hooks changed since it was trusted — run specnaut upgrade, then /hooks\\" >&2; exit 2",
             "timeout": 10
           },
           {
             "type": "command",
-            "command": "r=\$PWD; while [ -n \\"\$r\\" ] && [ ! -e \\"\$r/.specnaut/hooks\\" ] && [ ! -L \\"\$r/.specnaut/hooks\\" ]; do r=\${r%/*}; done; [ \\"\$( (sha256sum 2>/dev/null || shasum -a 256) < \\"\$r/.specnaut/hooks/SHA256SUMS\\" 2>/dev/null | cut -c1-64)\\" = \\"937ab021774e68c625c96f19058af710bac038263fe3755cc2eaceffef8e358a\\" ] && (cd \\"\$r/.specnaut/hooks\\" && (sha256sum -c --status SHA256SUMS 2>/dev/null || shasum -a 256 -c --status SHA256SUMS)) && exec bash \\"\$r/.specnaut/hooks/protect-constitution.sh\\" codex; echo \\"specnaut: .specnaut/hooks changed since it was trusted — run specnaut upgrade, then /hooks\\" >&2; exit 2",
+            "command": "r=\$PWD; while [ -n \\"\$r\\" ] && [ ! -e \\"\$r/.specnaut/hooks\\" ] && [ ! -L \\"\$r/.specnaut/hooks\\" ]; do r=\${r%/*}; done; [ \\"\$( (sha256sum 2>/dev/null || shasum -a 256) < \\"\$r/.specnaut/hooks/SHA256SUMS\\" 2>/dev/null | cut -c1-64)\\" = \\"8f6d040a88e03bd535ee918514316de6789f57a54a380f1961ee27d67938e55e\\" ] && (cd \\"\$r/.specnaut/hooks\\" && (sha256sum -c --status SHA256SUMS 2>/dev/null || shasum -a 256 -c --status SHA256SUMS)) && exec bash \\"\$r/.specnaut/hooks/protect-constitution.sh\\" codex; echo \\"specnaut: .specnaut/hooks changed since it was trusted — run specnaut upgrade, then /hooks\\" >&2; exit 2",
             "timeout": 10
           }
         ]
@@ -33157,7 +33283,7 @@ ffe7285c87a890d6c4caf0b338dbe34cf9794afac646334241801913cb939a86  guard-release.
         "hooks": [
           {
             "type": "command",
-            "command": "r=\$PWD; while [ -n \\"\$r\\" ] && [ ! -e \\"\$r/.specnaut/hooks\\" ] && [ ! -L \\"\$r/.specnaut/hooks\\" ]; do r=\${r%/*}; done; [ \\"\$( (sha256sum 2>/dev/null || shasum -a 256) < \\"\$r/.specnaut/hooks/SHA256SUMS\\" 2>/dev/null | cut -c1-64)\\" = \\"937ab021774e68c625c96f19058af710bac038263fe3755cc2eaceffef8e358a\\" ] && (cd \\"\$r/.specnaut/hooks\\" && (sha256sum -c --status SHA256SUMS 2>/dev/null || shasum -a 256 -c --status SHA256SUMS)) && exec bash \\"\$r/.specnaut/hooks/guard-dispatch-model.sh\\" codex; echo \\"specnaut: .specnaut/hooks changed since it was trusted — run specnaut upgrade, then /hooks\\" >&2; exit 2",
+            "command": "r=\$PWD; while [ -n \\"\$r\\" ] && [ ! -e \\"\$r/.specnaut/hooks\\" ] && [ ! -L \\"\$r/.specnaut/hooks\\" ]; do r=\${r%/*}; done; [ \\"\$( (sha256sum 2>/dev/null || shasum -a 256) < \\"\$r/.specnaut/hooks/SHA256SUMS\\" 2>/dev/null | cut -c1-64)\\" = \\"8f6d040a88e03bd535ee918514316de6789f57a54a380f1961ee27d67938e55e\\" ] && (cd \\"\$r/.specnaut/hooks\\" && (sha256sum -c --status SHA256SUMS 2>/dev/null || shasum -a 256 -c --status SHA256SUMS)) && exec bash \\"\$r/.specnaut/hooks/guard-dispatch-model.sh\\" codex; echo \\"specnaut: .specnaut/hooks changed since it was trusted — run specnaut upgrade, then /hooks\\" >&2; exit 2",
             "timeout": 10
           }
         ]
@@ -33168,7 +33294,7 @@ ffe7285c87a890d6c4caf0b338dbe34cf9794afac646334241801913cb939a86  guard-release.
         "hooks": [
           {
             "type": "command",
-            "command": "r=\$PWD; while [ -n \\"\$r\\" ] && [ ! -e \\"\$r/.specnaut/hooks\\" ] && [ ! -L \\"\$r/.specnaut/hooks\\" ]; do r=\${r%/*}; done; [ \\"\$( (sha256sum 2>/dev/null || shasum -a 256) < \\"\$r/.specnaut/hooks/SHA256SUMS\\" 2>/dev/null | cut -c1-64)\\" = \\"937ab021774e68c625c96f19058af710bac038263fe3755cc2eaceffef8e358a\\" ] && (cd \\"\$r/.specnaut/hooks\\" && (sha256sum -c --status SHA256SUMS 2>/dev/null || shasum -a 256 -c --status SHA256SUMS)) && exec bash \\"\$r/.specnaut/hooks/approve-on-prompt.sh\\" codex; echo \\"specnaut: .specnaut/hooks changed since it was trusted — run specnaut upgrade, then /hooks\\" >&2; exit 0",
+            "command": "r=\$PWD; while [ -n \\"\$r\\" ] && [ ! -e \\"\$r/.specnaut/hooks\\" ] && [ ! -L \\"\$r/.specnaut/hooks\\" ]; do r=\${r%/*}; done; [ \\"\$( (sha256sum 2>/dev/null || shasum -a 256) < \\"\$r/.specnaut/hooks/SHA256SUMS\\" 2>/dev/null | cut -c1-64)\\" = \\"8f6d040a88e03bd535ee918514316de6789f57a54a380f1961ee27d67938e55e\\" ] && (cd \\"\$r/.specnaut/hooks\\" && (sha256sum -c --status SHA256SUMS 2>/dev/null || shasum -a 256 -c --status SHA256SUMS)) && exec bash \\"\$r/.specnaut/hooks/approve-on-prompt.sh\\" codex; echo \\"specnaut: .specnaut/hooks changed since it was trusted — run specnaut upgrade, then /hooks\\" >&2; exit 0",
             "timeout": 10
           }
         ]
@@ -33179,7 +33305,7 @@ ffe7285c87a890d6c4caf0b338dbe34cf9794afac646334241801913cb939a86  guard-release.
         "hooks": [
           {
             "type": "command",
-            "command": "r=\$PWD; while [ -n \\"\$r\\" ] && [ ! -e \\"\$r/.specnaut/hooks\\" ] && [ ! -L \\"\$r/.specnaut/hooks\\" ]; do r=\${r%/*}; done; [ \\"\$( (sha256sum 2>/dev/null || shasum -a 256) < \\"\$r/.specnaut/hooks/SHA256SUMS\\" 2>/dev/null | cut -c1-64)\\" = \\"937ab021774e68c625c96f19058af710bac038263fe3755cc2eaceffef8e358a\\" ] && (cd \\"\$r/.specnaut/hooks\\" && (sha256sum -c --status SHA256SUMS 2>/dev/null || shasum -a 256 -c --status SHA256SUMS)) && exec bash \\"\$r/.specnaut/hooks/approve-on-prompt.sh\\" codex; echo \\"specnaut: .specnaut/hooks changed since it was trusted — run specnaut upgrade, then /hooks\\" >&2; exit 0",
+            "command": "r=\$PWD; while [ -n \\"\$r\\" ] && [ ! -e \\"\$r/.specnaut/hooks\\" ] && [ ! -L \\"\$r/.specnaut/hooks\\" ]; do r=\${r%/*}; done; [ \\"\$( (sha256sum 2>/dev/null || shasum -a 256) < \\"\$r/.specnaut/hooks/SHA256SUMS\\" 2>/dev/null | cut -c1-64)\\" = \\"8f6d040a88e03bd535ee918514316de6789f57a54a380f1961ee27d67938e55e\\" ] && (cd \\"\$r/.specnaut/hooks\\" && (sha256sum -c --status SHA256SUMS 2>/dev/null || shasum -a 256 -c --status SHA256SUMS)) && exec bash \\"\$r/.specnaut/hooks/approve-on-prompt.sh\\" codex; echo \\"specnaut: .specnaut/hooks changed since it was trusted — run specnaut upgrade, then /hooks\\" >&2; exit 0",
             "timeout": 10
           }
         ]
@@ -33190,7 +33316,7 @@ ffe7285c87a890d6c4caf0b338dbe34cf9794afac646334241801913cb939a86  guard-release.
         "hooks": [
           {
             "type": "command",
-            "command": "r=\$PWD; while [ -n \\"\$r\\" ] && [ ! -e \\"\$r/.specnaut/hooks\\" ] && [ ! -L \\"\$r/.specnaut/hooks\\" ]; do r=\${r%/*}; done; [ \\"\$( (sha256sum 2>/dev/null || shasum -a 256) < \\"\$r/.specnaut/hooks/SHA256SUMS\\" 2>/dev/null | cut -c1-64)\\" = \\"937ab021774e68c625c96f19058af710bac038263fe3755cc2eaceffef8e358a\\" ] && (cd \\"\$r/.specnaut/hooks\\" && (sha256sum -c --status SHA256SUMS 2>/dev/null || shasum -a 256 -c --status SHA256SUMS)) && exec bash \\"\$r/.specnaut/hooks/log-subagent.sh\\" start; echo \\"specnaut: .specnaut/hooks changed since it was trusted — run specnaut upgrade, then /hooks\\" >&2; exit 0",
+            "command": "r=\$PWD; while [ -n \\"\$r\\" ] && [ ! -e \\"\$r/.specnaut/hooks\\" ] && [ ! -L \\"\$r/.specnaut/hooks\\" ]; do r=\${r%/*}; done; [ \\"\$( (sha256sum 2>/dev/null || shasum -a 256) < \\"\$r/.specnaut/hooks/SHA256SUMS\\" 2>/dev/null | cut -c1-64)\\" = \\"8f6d040a88e03bd535ee918514316de6789f57a54a380f1961ee27d67938e55e\\" ] && (cd \\"\$r/.specnaut/hooks\\" && (sha256sum -c --status SHA256SUMS 2>/dev/null || shasum -a 256 -c --status SHA256SUMS)) && exec bash \\"\$r/.specnaut/hooks/log-subagent.sh\\" start; echo \\"specnaut: .specnaut/hooks changed since it was trusted — run specnaut upgrade, then /hooks\\" >&2; exit 0",
             "timeout": 10
           }
         ]
@@ -33201,7 +33327,7 @@ ffe7285c87a890d6c4caf0b338dbe34cf9794afac646334241801913cb939a86  guard-release.
         "hooks": [
           {
             "type": "command",
-            "command": "r=\$PWD; while [ -n \\"\$r\\" ] && [ ! -e \\"\$r/.specnaut/hooks\\" ] && [ ! -L \\"\$r/.specnaut/hooks\\" ]; do r=\${r%/*}; done; [ \\"\$( (sha256sum 2>/dev/null || shasum -a 256) < \\"\$r/.specnaut/hooks/SHA256SUMS\\" 2>/dev/null | cut -c1-64)\\" = \\"937ab021774e68c625c96f19058af710bac038263fe3755cc2eaceffef8e358a\\" ] && (cd \\"\$r/.specnaut/hooks\\" && (sha256sum -c --status SHA256SUMS 2>/dev/null || shasum -a 256 -c --status SHA256SUMS)) && exec bash \\"\$r/.specnaut/hooks/log-subagent.sh\\" stop; echo \\"specnaut: .specnaut/hooks changed since it was trusted — run specnaut upgrade, then /hooks\\" >&2; exit 0",
+            "command": "r=\$PWD; while [ -n \\"\$r\\" ] && [ ! -e \\"\$r/.specnaut/hooks\\" ] && [ ! -L \\"\$r/.specnaut/hooks\\" ]; do r=\${r%/*}; done; [ \\"\$( (sha256sum 2>/dev/null || shasum -a 256) < \\"\$r/.specnaut/hooks/SHA256SUMS\\" 2>/dev/null | cut -c1-64)\\" = \\"8f6d040a88e03bd535ee918514316de6789f57a54a380f1961ee27d67938e55e\\" ] && (cd \\"\$r/.specnaut/hooks\\" && (sha256sum -c --status SHA256SUMS 2>/dev/null || shasum -a 256 -c --status SHA256SUMS)) && exec bash \\"\$r/.specnaut/hooks/log-subagent.sh\\" stop; echo \\"specnaut: .specnaut/hooks changed since it was trusted — run specnaut upgrade, then /hooks\\" >&2; exit 0",
             "timeout": 10
           }
         ]

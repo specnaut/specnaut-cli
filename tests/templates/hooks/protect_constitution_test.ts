@@ -54,26 +54,28 @@ function write(shape: Shape, repo: string, file: string, session: string, mode =
 
 const harnessOf = (s: Shape): Harness => s.startsWith("claude") ? "claude" : "codex";
 
+const PHRASE: Record<string, string> = {
+  constitution: "approve the constitution amendment",
+  "gate-config": "approve the gate config change",
+  guards: "approve the guard change",
+  merge: "merge",
+};
+
 Deno.test("protect-constitution: 4 input shapes × the stamp of each kind", async () => {
   const sb = await sandbox();
   try {
     const repo = await project(sb);
-    const stamps = ["none", "constitution", "gate-config", "merge"] as const;
-    const phrase: Record<string, string> = {
-      constitution: "approve the constitution amendment",
-      "gate-config": "approve the gate config change",
-      merge: "merge",
-    };
+    const stamps = ["none", "constitution", "gate-config", "guards", "merge"] as const;
     for (const h of HARNESSES) {
       for (const s of stamps) {
-        if (s !== "none") await approve(sb, h, repo, phrase[s], { session_id: `s-${s}` });
+        if (s !== "none") await approve(sb, h, repo, PHRASE[s], { session_id: `s-${s}` });
       }
     }
     // [file, the kind it needs | null]
     const targets: ReadonlyArray<[string, string | null]> = [
       [C, "constitution"],
       [UI, "gate-config"],
-      [SELF, "constitution"],
+      [SELF, "guards"],
       ["src/b.ts", null],
     ];
     const cases = SHAPES.flatMap((shape) =>

@@ -11,6 +11,7 @@
 #   release  /ship release|tag…  /specnaut-ship release|tag…  $specnaut-ship release|tag…  release it  tag it
 #   constitution  approve the constitution amendment   (spec 038 S2: the phrase
 #   gate-config   approve the gate config change        the constitution verb prints)
+#   guards        approve the guard change              (the guards' own switches)
 # Claude spells the skills /task, /ship; Codex /specnaut-task or $specnaut-task
 # (harness_commands.ts). A test holds these spellings to harnessCommands.
 # Never a bare yes/ok/go: a reply to some other question must not land code.
@@ -43,7 +44,7 @@ case ${BASH_SOURCE[0]} in */*) HOOK_DIR=${BASH_SOURCE[0]%/*} ;; *) HOOK_DIR=. ;;
 GUARD_FAIL_CODE=0
 guard_init approve-on-prompt "${1:-}" .prompt any:.stop_hook_active
 
-# approval_kind_of <prompt> — prints merge, release, constitution, gate-config, or nothing;
+# approval_kind_of <prompt> — prints merge, release, constitution, gate-config, guards, or nothing;
 # a kind spelled through a bare skill name carries it, as merge:task or release:ship.
 approval_kind_of() {
   local p
@@ -68,6 +69,7 @@ approval_kind_of() {
       echo release ;;
     "approve the constitution amendment") echo constitution ;;
     "approve the gate config change") echo gate-config ;;
+    "approve the guard change") echo guards ;;
   esac
 }
 
@@ -94,7 +96,7 @@ case $P_EVENT in
     # What this turn approved is read before the stamp goes; the stamp goes
     # before anything that could fail and leave it outliving the turn.
     kinds=""
-    for k in constitution gate-config merge; do if approved "$k"; then kinds+=" $k"; fi; done
+    for k in constitution gate-config guards merge; do if approved "$k"; then kinds+=" $k"; fi; done
     rm -f "$stamp"
     baseline_check "$baseline" "$kinds" "${GF[1]}"
     exit 0 ;;

@@ -15,9 +15,8 @@
 # the env/command/sudo/nice/timeout/xargs/… wrappers, `source x`, the command
 # of `find -exec`, and ONE level of `sh|bash|zsh -c '…'`. A deeper `-c`, or
 # `eval`, sets CMD_OPAQUE — and so does what it cannot read with certainty
-# (cli#711): a `case` inside a substitution, an unquoted heredoc body holding
-# `$(` or a backtick, a zsh glob qualifier that runs code, and a line that
-# never closes: a quote, `(`, `$(`, backtick or `[[` left open, a heredoc whose
+# (cli#711): a `case` inside a substitution, a zsh glob qualifier that runs
+# code, and a line that never closes: a quote, `(`, `$(`, backtick or `[[` left open, a heredoc whose
 # body never ends. Fail closed: a guard gates what it cannot read rather than
 # guessing at it. Scripts, interpreters and shell functions are not seen: the
 # stated limit.
@@ -148,25 +147,25 @@ _cmd_qual() {
   case $g in *e* | *+*) CMD_OPAQUE=1 ;; esac
 }
 
-# Skips the bodies of the heredocs opened on the line just ended. A body that
-# runs to the end of the input never closed: as likely a misread as a typo,
-# and what follows a phantom heredoc is hidden — so the line is opaque. So is
-# a body whose delimiter was not quoted, if it holds `$(` or a backtick: bash
-# expands that body, and runs its substitutions (cli#711).
+# Skips the bodies of the heredocs opened on the line just ended. A body running
+# to the end of the input never closed, and what follows it is hidden: opaque.
+# Bash expands a body whose delimiter was not quoted and runs its substitutions
+# (cli#711): it is parsed in cmd_parse's body mode, its prose an argument of `:`.
 # shellcheck disable=SC2016 # the `$(` is matched as text, on purpose
 _cmd_heredocs() {
-  local d strip quoted line closed
+  local d strip quoted line closed body
   for d in $heredocs; do
-    strip=${d:0:1} quoted=${d:1:1} d=${d:2} closed=0
+    strip=${d:0:1} quoted=${d:1:1} d=${d:2} closed=0 body=""
     while [ "$i" -lt "$n" ]; do
       line=${s:i}
       line=${line%%$'\n'*}
       i=$((i + ${#line} + 1))
       if [ "$strip" = 1 ]; then line=${line#"${line%%[!$'\t']*}"}; fi
       if [ "$line" = "$d" ]; then closed=1; break; fi
-      if [ "$quoted" = 0 ]; then case $line in *'$('* | *'`'*) CMD_OPAQUE=1 ;; esac; fi
+      if [ "$quoted" = 0 ]; then body+=$line$'\n'; fi
     done
     if [ "$closed" = 0 ]; then CMD_OPAQUE=1; fi
+    case $body in *'$('* | *'`'*) cmd_parse "$body" "$depth" 1 ;; esac
   done
   heredocs=""
 }
@@ -247,12 +246,12 @@ _cmd_test_char() {
   return 1
 }
 
-# _cmd_dquote — c, inside "…", is a backslash, the closing quote, a `$` or a
-# backtick (cmd_parse adds every other character to the word itself).
+# _cmd_dquote — c, inside "…", is a backslash, the closing quote (in a heredoc
+# body's own text, a plain character), a `$` or a backtick.
 _cmd_dquote() {
   case $c in
     '\') case $nx in '"' | '\' | '$' | '`') word+=$nx i=$((i + 1)) ;; $'\n') i=$((i + 1)) ;; *) word+=$c ;; esac ;;
-    '"') q="" ;;
+    '"') if [ -n "$hd" ] && [ "$sp" = 0 ]; then word+=$c; else q=""; fi ;;
     '$') if [ "$nx" = "(" ]; then _cmd_push; stack="d$stack" q="" i=$((i + 1)); _cmd_arith; else word+=$c; fi ;;
     '`') _cmd_push; bt=d q="" ;;
     *) word+=$c ;;
@@ -288,12 +287,12 @@ _cmd_plain() {
   esac
 }
 
-# cmd_parse <command line> [depth] — one character at a time. The characters
-# that mean nothing but themselves are added to the word here, without a
-# function call: they are most of any line, and a call costs more than the
-# character (a 5 KB line is parsed in well under a second on bash 3.2).
+# cmd_parse <command line> [depth] [1: a heredoc body, read as if inside "…"] —
+# one character at a time; those that mean nothing but themselves join the word
+# here: a call costs more than the character (5 KB: under a second on bash 3.2).
 cmd_parse() {
-  local s=$1 depth=${2:-0} n=${#1} i=0 c nx q="" word="" have=0 seg="" stack="" bt="" heredocs="" d sp=0 bk=""
+  local s=$1 depth=${2:-0} hd=${3:-} n=${#1} i=0 c nx q="" word="" have=0 seg="" stack="" bt="" heredocs="" d sp=0 bk=""
+  if [ -n "$hd" ]; then q='"' seg=":$CMD_SEP"; fi
   local -a sw ss
   local IFS=$CMD_SEP
   while [ "$i" -lt "$n" ]; do
@@ -310,6 +309,7 @@ cmd_parse() {
     fi
   done
   _cmd_end
+  if [ -n "$hd" ] && [ "$sp" = 0 ]; then q=""; fi
   if [ -n "$q$stack$bt$heredocs$bk" ]; then CMD_OPAQUE=1; fi
 }
 

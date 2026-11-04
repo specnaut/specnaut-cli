@@ -14,6 +14,9 @@
 # Two readers: approved, for a hook's payload, and approved_session, for
 # merge-approved.sh, which the landing scripts run outside any payload.
 
+# What the user types for the `guards` kind: a landing word must not rewrite the guards.
+APPROVAL_GUARDS_HOW='To let it through, reply `approve the guard change` — a plain "yes" does not approve it.'
+
 # approval_session_ok <id> — a session id is a path component; only plain tokens.
 approval_session_ok() { [[ $1 =~ ^[A-Za-z0-9_-]+$ ]]; }
 

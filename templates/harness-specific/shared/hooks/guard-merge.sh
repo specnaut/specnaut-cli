@@ -14,7 +14,8 @@
 #                        --all, --mirror, --delete and unknown options are
 #                        all gated
 #   a git subcommand it cannot read (_git.sh: a shell alias, `git $(…)`,
-#                        `git "$X"`), a line it cannot read
+#                        `git "$X"`), a line it cannot read that names git
+#                        or a listed command (_listed.sh)
 #   every command in merge-commands.txt — the scripts that land on the base
 #                        themselves (land-feature.sh, remove-spec.sh), matched
 #                        by basename however they are reached, and gh pr
@@ -114,7 +115,8 @@ for seg in ${CMD_SEGS[@]+"${CMD_SEGS[@]}"}; do
   listed "$HOOK_DIR/merge-commands.txt"
   if [ -n "$HIT" ]; then reasons+=("$HIT"); fi
 done
-if [ "$CMD_OPAQUE" = 1 ]; then reasons+=("a command it cannot read (eval, sh -c in sh -c, a shell fed on stdin, a quote or heredoc left open)"); fi
+listed_opaque "$HOOK_DIR/merge-commands.txt"
+if [ -n "$LISTED_OPAQUE" ]; then reasons+=("$LISTED_OPAQUE"); fi
 if [ "$CMD_SCRUB" = 1 ]; then reasons+=("a command that sets or clears what the landing scripts' hold reads (CLAUDE_CODE_SESSION_ID, CODEX_SESSION_ID, XDG_STATE_HOME, env -i)"); fi
 if [ "$merges" = 0 ] && [ ${#pushes[@]} = 0 ] && [ ${#reasons[@]} = 0 ]; then guard_allow; fi
 

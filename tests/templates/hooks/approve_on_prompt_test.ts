@@ -80,19 +80,22 @@ const NOTHING = [
   "",
 ];
 
+const CASES: Array<[string, string | null]> = [
+  ...MERGE.map((p): [string, string] => [p, "merge"]),
+  ...RELEASE.map((p): [string, string] => [p, "release"]),
+  ...CONSTITUTION.map((p): [string, string] => [p, "constitution"]),
+  ...GATE_CONFIG.map((p): [string, string] => [p, "gate-config"]),
+  ["approve the guard change", "guards"],
+  ["Approve the guard change.", "guards"],
+  ...NOTHING.map((p): [string, null] => [p, null]),
+];
+
 Deno.test("approve-on-prompt mints the right kind for each anchored phrase, on both harnesses", async () => {
   const sb = await sandbox();
   try {
     const repo = await makeRepo(sb);
     for (const harness of HARNESSES) {
-      const cases: Array<[string, string | null]> = [
-        ...MERGE.map((p): [string, string] => [p, "merge"]),
-        ...RELEASE.map((p): [string, string] => [p, "release"]),
-        ...CONSTITUTION.map((p): [string, string] => [p, "constitution"]),
-        ...GATE_CONFIG.map((p): [string, string] => [p, "gate-config"]),
-        ...NOTHING.map((p): [string, null] => [p, null]),
-      ];
-      for (const [prompt, kind] of cases) {
+      for (const [prompt, kind] of CASES) {
         const r = await approve(sb, harness, repo, prompt);
         assertEquals(r.code, 0, `${harness} ${JSON.stringify(prompt)}: ${r.stderr}`);
         assertEquals(

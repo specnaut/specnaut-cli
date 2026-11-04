@@ -86,9 +86,10 @@ const SPELLED: ReadonlyArray<[command: string, gated: boolean]> = [
   ["bash .specnaut/scripts/bash/land-feature.s?", true],
   ["./land-feature.[s]h", true],
   ["{land-feature,x}.sh", true],
-  ["$S", true],
-  ['"$S" 007-x', true],
-  ["${S}", true],
+  // a variable the line never mentions the script in: most run nothing listed
+  ["$S", false],
+  ['"$S" 007-x', false],
+  ["${S}", false],
   ["S=.specnaut/scripts/bash/land-feature.sh; bash $S", true],
   ["`echo land-feature.sh`", true],
   ["$(echo .specnaut/scripts/bash/land-feature.sh)", true],

@@ -121,7 +121,7 @@ const FORMS: ReadonlyArray<[shape: string, command: string, gated: boolean]> = [
   ["onFeat", "echo 'unterminated\ngit push origin main", true],
   ["onFeat", "echo $(git status", true],
   ["onFeat", "echo `git status", true],
-  ["onFeat", "cat <<EOF", true],
+  ["onFeat", "cat <<EOF", false], // never closes, but names nothing gated
   ["onFeat", "cat <<EOF\ngit push origin main", true],
   // unknown base: every landing form is gated
   ["noBase", "git push origin feat", true],

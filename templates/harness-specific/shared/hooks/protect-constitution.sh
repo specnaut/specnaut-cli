@@ -6,18 +6,20 @@
 #
 #   docs/constitution.md                       constitution
 #   .specnaut/{size-limits,boundaries,ui}.yml  gate-config
-#   .specnaut/hooks/**                         constitution — this guard and
-#                                              what it sources; protect-generated
-#                                              gates the same folder under merge
+#   .specnaut/hooks/**                         guards — this guard and what it
+#                                              sources; protect-generated gates the
+#                                              same folder under the same kind
 #
 # A write needs THIS turn's approval of its kind (approval_require): no stamp
 # denies on every harness and in every mode.
 #
 # The Bash arm (S1) reads each simple command _command.sh cuts out of the line.
 # One goes through untouched only when it is a bare read: the command word
-# exactly `cat head tail grep wc diff`, or `git diff|log|show|blame|status|add`
-# with no option before the subcommand (so no -c) and none of --output*,
-# --ext-diff, --textconv, add -e/-p/-i; no `/` in it, no VAR= prefix, and
+# exactly `cat head tail grep wc diff ls echo printf stat :`, a `for` header
+# none of whose words holds a glob or expansion, or `git
+# diff|log|show|blame|status|add|grep|ls-files|rev-parse` with no option before
+# the subcommand (so no -c) and none of --output*, --ext-diff, --textconv,
+# -O/--open-files-in-pager, add -e/-p/-i; no `/` in it, no VAR= prefix, and
 # nothing on the line that redefines a command (a function, an alias, hash,
 # source, a PATH/GIT_* assignment). Any other
 # command is judged by the words it carries: a word names a guarded file by
@@ -49,7 +51,7 @@ PC_HOOKS=.specnaut/hooks
 PC_PATHS=("$PATHS_CONSTITUTION" "${PATHS_GATE_CONFIGS[@]}" "$PC_HOOKS")
 PC_KINDS=(constitution)
 for _ in "${PATHS_GATE_CONFIGS[@]}"; do PC_KINDS+=(gate-config); done
-PC_KINDS+=(constitution)
+PC_KINDS+=(guards)
 PC_LAST=$((${#PC_PATHS[@]} - 1))
 PC_SELF=(protect-constitution.sh _paths.sh _guard.sh _approval.sh _command.sh _simple.sh
   _baseline.sh approve-on-prompt.sh)
@@ -157,13 +159,16 @@ _pc_read_only() {
     case ${W[j]} in '{' | '}' | '!' | if | then | else | elif | do | while | until) ;; *) return 1 ;; esac
   done
   case ${W[K]:-} in
-    cat | head | tail | grep | wc | diff) return 0 ;;
+    cat | head | tail | grep | wc | diff | ls | echo | printf | stat | :) return 0 ;;
+    for)
+      for w in "${W[@]:K+1}"; do case $w in *'*'* | *'?'* | *'['* | *'$'* | *'{'*) return 1 ;; esac; done
+      return 0 ;;
     git) sub=${W[K + 1]:-} ;;
     *) return 1 ;;
   esac
-  case $sub in diff | log | show | blame | status | add) ;; *) return 1 ;; esac
+  case $sub in diff | log | show | blame | status | add | grep | ls-files | rev-parse) ;; *) return 1 ;; esac
   for w in "${W[@]:K+2}"; do
-    case $w in --output* | --ext-diff | --textconv) return 1 ;; esac
+    case $w in --output* | --ext-diff | --textconv | --open-files-in-pager* | -O*) return 1 ;; esac
     if [ "$sub" = add ]; then
       case $w in --edit | --patch | --interactive) return 1 ;; --*) ;; -*[epi]*) return 1 ;; esac
     fi
@@ -240,13 +245,15 @@ fi
 
 [ -n "$PC_NEED" ] || guard_allow
 what=$(IFS=';'; echo "${PC_WHAT[*]}")
+PC_READS="a bare cat, head, tail, grep, wc, diff, ls, echo, printf, stat, or git diff/log/show/blame/status/add/grep/ls-files/rev-parse"
 read -r kind other <<<"$PC_NEED"
 if [ -n "$other" ]; then
   guard_fail "this call changes $what — files of two approval kinds. One approval covers one kind: make the changes one at a time"
 fi
 case $kind in
-  constitution) reason="this call would change $what: the team's constitution, or the hooks that guard it. An agent never amends it on its own initiative" ;;
+  constitution) reason="this call would change $what: the team's constitution. An agent never amends it on its own initiative" ;;
+  guards) approval_require guards "this call would change $what: the hooks that guard the project. An agent never changes them on its own initiative" "$APPROVAL_GUARDS_HOW Reading is allowed: $PC_READS." ;;
   *) reason="this call would change $what: a gate config, which loosens or tightens the project's own gates. An agent never changes it on its own initiative" ;;
 esac
 approval_require "$kind" "$reason" \
-  "Only the user approves it: draft the change with the task skill's \`constitution\` verb, which prints the phrase the user types as their whole message — a plain \"yes\" does not approve it. Reading is allowed with a bare cat, head, tail, grep, wc, diff, or git diff/log/show/blame/status/add."
+  "Only the user approves it: draft the change with the task skill's \`constitution\` verb, which prints the phrase the user types as their whole message — a plain \"yes\" does not approve it. Reading is allowed: $PC_READS."

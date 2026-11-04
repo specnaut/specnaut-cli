@@ -64,7 +64,6 @@ const GATED_FORMS: readonly string[] = [
   `let 'x=a[$(${PUSH})]'`,
   `printf -v 'a[$(${PUSH})]' x`,
   `printf -v 'a[\`${PUSH}\`]' x`,
-  "echo ${(e)X}",
   `X='$(${PUSH})'; echo \${(e)X}`,
   "BASH_ENV=.specnaut/scripts/bash/land-feature.sh bash -c :",
   "ENV=land-feature.sh sh -i",
@@ -97,10 +96,8 @@ const GATED_FORMS: readonly string[] = [
   `[[ $(${PUSH}) ]]`,
   "[[ -n x && $(land-feature.sh) ]]",
   "[[ a ]] || land-feature.sh",
-  "[[ a == b",
   // a zsh glob qualifier runs code for each file it matches
   `ls *(e:'${PUSH}':)`,
-  "ls *(+fn)",
   "ls *(#qe:'land-feature.sh':)x",
 ];
 
@@ -127,6 +124,10 @@ const ALLOWED_FORMS: readonly string[] = [
   "mapfile -t lines < /etc/hosts",
   "echo ${(U)X}",
   "bash -euxo pipefail ./build.sh",
+  // an unreadable line that names neither git nor a listed command
+  "echo ${(e)X}",
+  "[[ a == b",
+  "ls *(+fn)",
   // pass 2 — a quoted heredoc body is data; quoted text never opens a frame
   `cat <<'EOF'\n$(${PUSH})\nEOF`,
   'cat <<"EOF"\n`land-feature.sh`\nEOF',

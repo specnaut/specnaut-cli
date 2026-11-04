@@ -8,6 +8,7 @@ import {
   pool,
   type Run,
   runHook,
+  type Sandbox,
   sandbox,
 } from "./hook_sandbox.ts";
 
@@ -47,6 +48,10 @@ function verdict(r: Run): string {
 const GATED: Record<Harness, string> = { claude: "deny", codex: "deny" };
 
 const patch = (body: string) => `*** Begin Patch\n${body}*** End Patch\n`;
+const approveBoth = async (sb: Sandbox, repo: string, prompt: string) => {
+  await approve(sb, "codex", repo, prompt);
+  await approve(sb, "claude", repo, prompt);
+};
 
 Deno.test("protect-generated: every spelling of the lock, and the gate's switches, on both harnesses", async () => {
   const sb = await sandbox();
@@ -209,7 +214,7 @@ Deno.test("protect-generated: every spelling of the lock, and the gate's switche
   }
 });
 
-Deno.test("protect-generated: a gated switch goes through on this turn's merge approval", async () => {
+Deno.test("protect-generated: a gated switch goes through on this turn's guards approval, never on merge", async () => {
   const sb = await sandbox();
   try {
     const repo = await makeRepo(sb, { mode: "manual" });
@@ -243,9 +248,9 @@ Deno.test("protect-generated: a gated switch goes through on this turn's merge a
     };
 
     await judge(["deny", "deny", "deny"]);
-    await approve(sb, "codex", repo, "merge");
-    await approve(sb, "claude", repo, "merge");
-    // With the typed `merge`, Claude's prompt once where it can ask.
+    await approveBoth(sb, repo, "merge"); // what lands a branch does not rewrite what holds it
+    await judge(["deny", "deny", "deny"]);
+    await approveBoth(sb, repo, "approve the guard change"); // Claude still asks once where it can
     await judge(["allow", "allow", "ask"]);
 
     // The lock is never a gate: no approval opens it.

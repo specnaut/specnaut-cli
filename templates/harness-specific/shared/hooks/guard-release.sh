@@ -9,7 +9,7 @@
 # run before the push does, so the tag does not exist yet when this hook reads
 # the command). And a git subcommand it cannot read (_git.sh: a shell alias,
 # `git $(…)`), or a line too nested to read (eval, sh -c in sh -c, a shell fed
-# on stdin, a line that never closes): fail closed.
+# on stdin, a line that never closes) that names git or a listed command.
 #
 # Resolved through approval_gate: Claude's own prompt where it can ask, and
 # everywhere else — Codex, Claude's bypass and auto modes — only the user's
@@ -79,7 +79,8 @@ for seg in ${CMD_SEGS[@]+"${CMD_SEGS[@]}"}; do
   listed "$HOOK_DIR/release-commands.txt"
   if [ -n "$HIT" ]; then hits+=("$HIT"); fi
 done
-if [ "$CMD_OPAQUE" = 1 ]; then hits+=("a command it cannot read (eval, sh -c in sh -c, a shell fed on stdin, a quote or heredoc left open)"); fi
+listed_opaque "$HOOK_DIR/release-commands.txt"
+if [ -n "$LISTED_OPAQUE" ]; then hits+=("$LISTED_OPAQUE"); fi
 for p in ${pushes[@]+"${pushes[@]}"}; do
   cmd_words "$p"
   if tag_push ${W[@]+"${W[@]}"}; then hits+=("a push of a tag"); fi
