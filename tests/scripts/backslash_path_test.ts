@@ -14,7 +14,7 @@ import * as hooks from "../templates/hooks/hook_sandbox.ts";
  *     scripts find their siblings through `dirname`, which Git Bash reads `\`
  *     in, so this form must land.
  *   - harness: the configured hook command, which appends `/…` to the project
- *     dir the harness holds — `C:\…\proj/.specnaut/hooks/guard-merge.sh`. A
+ *     dir the harness holds — `C:\…\proj/.specnaut/hooks/protect-generated.sh`. A
  *     guard finds `_guard.sh` by the last `/` of its own path, and this form
  *     has one. A guard reached by the all-backslash form refuses (it looks
  *     in `.`), and no configured command builds that form.
@@ -78,32 +78,32 @@ Deno.test({
 
 Deno.test({
   name:
-    "on Windows, guard-merge.sh reached as the configured hook command builds it judges the call",
+    "on Windows, protect-generated.sh reached as the configured hook command builds it judges the call",
   ignore: !WINDOWS, // off Windows a `\` is a filename character: these paths name nothing
   fn: async () => {
     const sb = await hooks.sandbox();
     try {
-      const repo = await hooks.makeRepo(sb, { head: "feat", mode: "manual" });
-      // `bash "$CLAUDE_PROJECT_DIR/.specnaut/hooks/guard-merge.sh"`, the project dir a `C:\…`.
-      const path = `${hooks.HOOKS_DIR.replace(/[\\/]+$/, "")}/guard-merge.sh`;
+      const repo = await hooks.makeRepo(sb, { head: "feat", mode: "auto" });
+      // `bash "$CLAUDE_PROJECT_DIR/.specnaut/hooks/protect-generated.sh"`, the project dir a `C:\…`.
+      const path = `${hooks.HOOKS_DIR.replace(/[\\/]+$/, "")}/protect-generated.sh`;
       assert(path.includes("\\"), `no backslash in ${path}`);
-      const judge = async (command: string) =>
+      const judge = async (file: string) =>
         hooks.runHook(
           sb,
-          "guard-merge.sh",
+          "protect-generated.sh",
           "claude",
-          await hooks.payload("claude", "pre_tool_use_bash", {
+          await hooks.payload("claude", "pre_tool_use_edit", {
             cwd: repo,
-            tool_input: { command },
+            tool_input: { file_path: `${repo}/${file}` },
           }),
           { path },
         );
-      const push = await judge("git push origin main");
-      assertEquals(push.code, 2, push.stderr);
+      const lock = await judge(".specnaut/installed.lock");
+      assertEquals(lock.code, 2, lock.stderr);
       // Its rule's own line, not the refusal of a guard that never found _guard.sh.
-      assertMatch(push.stderr, /^specnaut guard-merge: merge: manual — held: /);
-      const status = await judge("git status");
-      assertEquals([status.code, status.stdout], [0, ""], status.stderr);
+      assertMatch(lock.stderr, /^specnaut protect-generated: denied: /);
+      const other = await judge("src/a.ts");
+      assertEquals([other.code, other.stdout], [0, ""], other.stderr);
     } finally {
       await sb.cleanup();
     }
