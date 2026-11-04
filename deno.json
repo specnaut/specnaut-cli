@@ -1,6 +1,6 @@
 {
   "name": "@specnaut/cli",
-  "version": "8.0.1",
+  "version": "9.0.0",
   "tasks": {
     "bundle": "deno run --allow-read --allow-write scripts/gen-hooks.ts && deno run --allow-read --allow-write scripts/bundle-templates.ts",
     "dev": "deno run --allow-read --allow-write --allow-run --allow-env src/main.ts",
