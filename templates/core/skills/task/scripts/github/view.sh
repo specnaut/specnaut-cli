@@ -1,6 +1,12 @@
 #!/usr/bin/env bash
-# Show one GitHub issue + its comments.
+# Show one GitHub issue: its creation time, fields, body and comments.
 # Usage: view.sh <number>
+#
+# The first line, `created:`, comes from GitHub, before any text an issue's
+# author wrote: a `created:` line further down is that text, not the date.
+#
+# `gh issue view --comments` prints the whole issue only on a terminal. Anywhere
+# else it prints the comments alone, so an issue with none prints nothing.
 set -euo pipefail
 
 # shellcheck source=./_config.sh
@@ -11,4 +17,11 @@ if [ "$#" -lt 1 ]; then
   exit 2
 fi
 
-gh issue view "$1" --repo "$REPO" --comments
+gh issue view "$1" --repo "$REPO" --json createdAt --jq '"created:\t" + .createdAt'
+
+if [ -t 1 ]; then
+  gh issue view "$1" --repo "$REPO" --comments
+else
+  gh issue view "$1" --repo "$REPO"
+  gh issue view "$1" --repo "$REPO" --comments
+fi

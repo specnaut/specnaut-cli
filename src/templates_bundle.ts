@@ -1897,7 +1897,7 @@ refused up front by every writing script.
 
 \`\`\`bash
 .specnaut/scripts/backlog/list.sh [Status]            # all items, optional Status filter
-.specnaut/scripts/backlog/view.sh <number>            # one issue + comments
+.specnaut/scripts/backlog/view.sh <number>            # created time, fields, body, comments
 .specnaut/scripts/backlog/add.sh "<title>" [body] [labels-csv]
 .specnaut/scripts/backlog/move.sh <number> <Status>   # sets Project Status field
 .specnaut/scripts/backlog/clarify-comment.sh <num> "<question>"
@@ -7462,8 +7462,14 @@ echo "\$JSON" | jq_lf -r --arg filter "\$FILTER" '
     name: "view",
     suffix: "view.sh",
     content: `#!/usr/bin/env bash
-# Show one GitHub issue + its comments.
+# Show one GitHub issue: its creation time, fields, body and comments.
 # Usage: view.sh <number>
+#
+# The first line, \`created:\`, comes from GitHub, before any text an issue's
+# author wrote: a \`created:\` line further down is that text, not the date.
+#
+# \`gh issue view --comments\` prints the whole issue only on a terminal. Anywhere
+# else it prints the comments alone, so an issue with none prints nothing.
 set -euo pipefail
 
 # shellcheck source=./_config.sh
@@ -7474,7 +7480,14 @@ if [ "\$#" -lt 1 ]; then
   exit 2
 fi
 
-gh issue view "\$1" --repo "\$REPO" --comments
+gh issue view "\$1" --repo "\$REPO" --json createdAt --jq '"created:\\t" + .createdAt'
+
+if [ -t 1 ]; then
+  gh issue view "\$1" --repo "\$REPO" --comments
+else
+  gh issue view "\$1" --repo "\$REPO"
+  gh issue view "\$1" --repo "\$REPO" --comments
+fi
 `,
     executable: true,
     backend: "github",

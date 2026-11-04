@@ -79,7 +79,7 @@ refused up front by every writing script.
 
 ```bash
 .specnaut/scripts/backlog/list.sh [Status]            # all items, optional Status filter
-.specnaut/scripts/backlog/view.sh <number>            # one issue + comments
+.specnaut/scripts/backlog/view.sh <number>            # created time, fields, body, comments
 .specnaut/scripts/backlog/add.sh "<title>" [body] [labels-csv]
 .specnaut/scripts/backlog/move.sh <number> <Status>   # sets Project Status field
 .specnaut/scripts/backlog/clarify-comment.sh <num> "<question>"
