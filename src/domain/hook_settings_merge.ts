@@ -16,7 +16,7 @@
  * Pure — no IO, no Deno globals.
  */
 
-import { SPECNAUT_HOOK_SHAPES } from "./hook_command.ts";
+import { RETIRED_HOOK_SCRIPTS, SPECNAUT_HOOK_SHAPES } from "./hook_command.ts";
 import { type JsonMergeResult, jsonMergeResult, parseUserJson } from "./json_merge.ts";
 
 type Hook = {
@@ -59,6 +59,8 @@ export function specnautHookFile(command: string | undefined): string | null {
  *     registration appears once. A group emptied that way goes with it.
  *   - A bundled entry that runs no `.specnaut/hooks/` script keeps the
  *     original rule: appended unless the same command is already there.
+ *   - An entry for a script Specnaut retired (`RETIRED_HOOK_SCRIPTS`) is removed,
+ *     and a group emptied that way goes with it.
  */
 export function spliceHooks(user: HookMap, bundled: HookMap): HookMap {
   const merged: HookMap = {};
@@ -98,10 +100,13 @@ function place(target: MatcherGroup, hook: Hook, placed: Set<Hook>): void {
   placed.add(hook);
 }
 
-/** Remove every entry for a bundled script other than the one the bundle placed. */
+/** Remove every entry for a bundled script other than the one the bundle placed, and every retired one. */
 function dropSuperseded(merged: HookMap, placed: ReadonlySet<Hook>): HookMap {
   const files = new Set([...placed].map((h) => specnautHookFile(h.command)));
-  const superseded = (h: Hook) => !placed.has(h) && files.has(specnautHookFile(h.command));
+  const superseded = (h: Hook) => {
+    const file = specnautHookFile(h.command);
+    return !placed.has(h) && (files.has(file) || (file !== null && RETIRED_HOOK_SCRIPTS.has(file)));
+  };
   const out: HookMap = {};
   for (const [event, groups] of Object.entries(merged)) {
     const kept = groups.flatMap((g) => {

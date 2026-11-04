@@ -1814,13 +1814,6 @@
     {
       "category": "spec-root",
       "name": "specify",
-      "suffix": "scripts/bash/merge-hold.sh",
-      "source": "core/specnaut/scripts/bash/merge-hold.sh",
-      "executable": true
-    },
-    {
-      "category": "spec-root",
-      "name": "specify",
       "suffix": "scripts/bash/remove-spec.sh",
       "source": "core/specnaut/scripts/bash/remove-spec.sh",
       "executable": true
@@ -1976,62 +1969,8 @@
     },
     {
       "harness": "claude",
-      "destination": ".specnaut/hooks/_approval.sh",
-      "source": "harness-specific/shared/hooks/_approval.sh"
-    },
-    {
-      "harness": "claude",
-      "destination": ".specnaut/hooks/_command.sh",
-      "source": "harness-specific/shared/hooks/_command.sh"
-    },
-    {
-      "harness": "claude",
-      "destination": ".specnaut/hooks/_simple.sh",
-      "source": "harness-specific/shared/hooks/_simple.sh"
-    },
-    {
-      "harness": "claude",
-      "destination": ".specnaut/hooks/_listed.sh",
-      "source": "harness-specific/shared/hooks/_listed.sh"
-    },
-    {
-      "harness": "claude",
-      "destination": ".specnaut/hooks/_git.sh",
-      "source": "harness-specific/shared/hooks/_git.sh"
-    },
-    {
-      "harness": "claude",
       "destination": ".specnaut/hooks/_paths.sh",
       "source": "harness-specific/shared/hooks/_paths.sh"
-    },
-    {
-      "harness": "claude",
-      "destination": ".specnaut/hooks/_baseline.sh",
-      "source": "harness-specific/shared/hooks/_baseline.sh"
-    },
-    {
-      "harness": "claude",
-      "destination": ".specnaut/hooks/approve-on-prompt.sh",
-      "source": "harness-specific/shared/hooks/approve-on-prompt.sh",
-      "executable": true
-    },
-    {
-      "harness": "claude",
-      "destination": ".specnaut/hooks/guard-merge.sh",
-      "source": "harness-specific/shared/hooks/guard-merge.sh",
-      "executable": true
-    },
-    {
-      "harness": "claude",
-      "destination": ".specnaut/hooks/merge-approved.sh",
-      "source": "harness-specific/shared/hooks/merge-approved.sh",
-      "executable": true
-    },
-    {
-      "harness": "claude",
-      "destination": ".specnaut/hooks/guard-release.sh",
-      "source": "harness-specific/shared/hooks/guard-release.sh",
-      "executable": true
     },
     {
       "harness": "claude",
@@ -2047,25 +1986,9 @@
     },
     {
       "harness": "claude",
-      "destination": ".specnaut/hooks/protect-constitution.sh",
-      "source": "harness-specific/shared/hooks/protect-constitution.sh",
-      "executable": true
-    },
-    {
-      "harness": "claude",
       "destination": ".specnaut/hooks/log-subagent.sh",
       "source": "harness-specific/shared/hooks/log-subagent.sh",
       "executable": true
-    },
-    {
-      "harness": "claude",
-      "destination": ".specnaut/hooks/release-commands.txt",
-      "source": "harness-specific/shared/hooks/release-commands.txt"
-    },
-    {
-      "harness": "claude",
-      "destination": ".specnaut/hooks/merge-commands.txt",
-      "source": "harness-specific/shared/hooks/merge-commands.txt"
     },
     {
       "harness": "claude",
@@ -2095,62 +2018,8 @@
     },
     {
       "harness": "codex",
-      "destination": ".specnaut/hooks/_approval.sh",
-      "source": "harness-specific/shared/hooks/_approval.sh"
-    },
-    {
-      "harness": "codex",
-      "destination": ".specnaut/hooks/_command.sh",
-      "source": "harness-specific/shared/hooks/_command.sh"
-    },
-    {
-      "harness": "codex",
-      "destination": ".specnaut/hooks/_simple.sh",
-      "source": "harness-specific/shared/hooks/_simple.sh"
-    },
-    {
-      "harness": "codex",
-      "destination": ".specnaut/hooks/_listed.sh",
-      "source": "harness-specific/shared/hooks/_listed.sh"
-    },
-    {
-      "harness": "codex",
-      "destination": ".specnaut/hooks/_git.sh",
-      "source": "harness-specific/shared/hooks/_git.sh"
-    },
-    {
-      "harness": "codex",
       "destination": ".specnaut/hooks/_paths.sh",
       "source": "harness-specific/shared/hooks/_paths.sh"
-    },
-    {
-      "harness": "codex",
-      "destination": ".specnaut/hooks/_baseline.sh",
-      "source": "harness-specific/shared/hooks/_baseline.sh"
-    },
-    {
-      "harness": "codex",
-      "destination": ".specnaut/hooks/approve-on-prompt.sh",
-      "source": "harness-specific/shared/hooks/approve-on-prompt.sh",
-      "executable": true
-    },
-    {
-      "harness": "codex",
-      "destination": ".specnaut/hooks/guard-merge.sh",
-      "source": "harness-specific/shared/hooks/guard-merge.sh",
-      "executable": true
-    },
-    {
-      "harness": "codex",
-      "destination": ".specnaut/hooks/merge-approved.sh",
-      "source": "harness-specific/shared/hooks/merge-approved.sh",
-      "executable": true
-    },
-    {
-      "harness": "codex",
-      "destination": ".specnaut/hooks/guard-release.sh",
-      "source": "harness-specific/shared/hooks/guard-release.sh",
-      "executable": true
     },
     {
       "harness": "codex",
@@ -2166,25 +2035,9 @@
     },
     {
       "harness": "codex",
-      "destination": ".specnaut/hooks/protect-constitution.sh",
-      "source": "harness-specific/shared/hooks/protect-constitution.sh",
-      "executable": true
-    },
-    {
-      "harness": "codex",
       "destination": ".specnaut/hooks/log-subagent.sh",
       "source": "harness-specific/shared/hooks/log-subagent.sh",
       "executable": true
-    },
-    {
-      "harness": "codex",
-      "destination": ".specnaut/hooks/release-commands.txt",
-      "source": "harness-specific/shared/hooks/release-commands.txt"
-    },
-    {
-      "harness": "codex",
-      "destination": ".specnaut/hooks/merge-commands.txt",
-      "source": "harness-specific/shared/hooks/merge-commands.txt"
     },
     {
       "harness": "codex",

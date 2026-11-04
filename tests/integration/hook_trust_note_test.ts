@@ -13,7 +13,7 @@ const MAIN = fromFileUrl(new URL("../../src/main.ts", import.meta.url));
 
 const NOTE = "Codex runs project hooks only once you trust them: open Codex here and run /hooks";
 const FOREIGN = "./tools/acme-lint.sh --strict";
-const CUSTOMIZED = ".specnaut/hooks/guard-merge.sh";
+const CUSTOMIZED = ".specnaut/hooks/protect-generated.sh";
 
 async function runSpecnaut(args: string[], cwd: string, home: string) {
   const { code, stdout, stderr } = await new Deno.Command("deno", {
@@ -64,9 +64,9 @@ Deno.test("codex init prints the trust note with the hooks it registered", async
     assertStringIncludes(out, NOTE);
     assertStringIncludes(
       out,
-      "Until then the merge, release, generated-file, constitution and model guards",
+      "Until then the generated-file and model guards",
     );
-    assertStringIncludes(out, "Specnaut's hooks: approve-on-prompt.sh, guard-dispatch-model.sh");
+    assertStringIncludes(out, "Specnaut's hooks: guard-dispatch-model.sh, log-subagent.sh");
     assert(!out.includes("not installed by Specnaut"), out);
     return Promise.resolve();
   });
@@ -140,7 +140,7 @@ async function outdateHook(dir: string, rel: string): Promise<void> {
 }
 
 Deno.test("a codex upgrade that rewrites an outdated Specnaut hook tells the user to trust it again", async () => {
-  // Spec 038, FR-016: a release that changes the hooks (the constitution guard)
+  // Spec 038, FR-016: a release that changes the hooks
   // leaves every Codex guard off until re-trusted, and the upgrade must say so.
   await withProject("codex", async (dir, home) => {
     await outdateHook(dir, CUSTOMIZED);

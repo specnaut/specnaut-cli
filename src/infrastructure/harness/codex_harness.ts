@@ -85,8 +85,7 @@ export class CodexHarness implements Harness {
     paths: [".codex/hooks.json", ".specnaut/hooks/"],
     registry: ".codex/hooks.json",
     note: "Codex runs project hooks only once you trust them: open Codex here and run /hooks, " +
-      "then trust Specnaut's hooks. Until then the merge, release, generated-file, constitution " +
-      "and model guards do not run.",
+      "then trust Specnaut's hooks. Until then the generated-file and model guards do not run.",
   };
 
   mapBundle(core: CoreBundle, opts: BundleOptions): Bundle {

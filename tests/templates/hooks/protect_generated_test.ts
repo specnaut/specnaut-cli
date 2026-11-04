@@ -1,35 +1,24 @@
 import { assertEquals } from "@std/assert";
 import { join } from "@std/path";
-import {
-  approve,
-  type Harness,
-  makeRepo,
-  payload,
-  pool,
-  type Run,
-  runHook,
-  type Sandbox,
-  sandbox,
-} from "./hook_sandbox.ts";
+import { makeRepo, payload, pool, type Run, runHook, sandbox } from "./hook_sandbox.ts";
 
 /**
  * US3 / FR-004 — `.specnaut/installed.lock` cannot be hand-edited (exit 2,
- * the existing explanation), and the gate's own switches are held like a
- * landing: denied without this turn's `merge`, in Claude's ask modes too. Paths are decided by identity — resolved against the payload cwd,
+ * the existing explanation), and nothing else is gated.
+ * Paths are decided by identity — resolved against the payload cwd,
  * `-ef` on the target or its deepest existing ancestor — so none of the
  * spellings the security seat reproduced (§ 11 F5) gets through: `//`, `./`,
  * `..`, case on a case-folding filesystem, a symlink, a path relative to a
  * subdirectory, indented and CRLF patch headers, `*** Move to:`.
  */
 
-type Want = "allow" | "deny" | "gated";
+type Want = "allow" | "deny";
 
 /**
  * What only this hook's own rules print. A crash exits 2 too, so an exit code
  * alone would read a guard that never reached its rule as a deny (cli#711).
  */
-const REFUSAL =
-  /^specnaut protect-generated: (denied: .+ is \.specnaut\/installed\.lock\.|editing .+ changes how Specnaut gates landings)/;
+const REFUSAL = /^specnaut protect-generated: denied: .+ is \.specnaut\/installed\.lock\./;
 
 function verdict(r: Run): string {
   if (r.code === 2 && REFUSAL.test(r.stderr)) return "deny";
@@ -40,20 +29,9 @@ function verdict(r: Run): string {
   return `exit ${r.code}: ${r.stdout} ${r.stderr}`;
 }
 
-/**
- * What a gated path yields when nothing approved it: denied on both, in
- * Claude's default mode too — a click on an edit prompt is not the user's
- * typed `merge` (spec 048 § 8, guard-merge's one arm).
- */
-const GATED: Record<Harness, string> = { claude: "deny", codex: "deny" };
-
 const patch = (body: string) => `*** Begin Patch\n${body}*** End Patch\n`;
-const approveBoth = async (sb: Sandbox, repo: string, prompt: string) => {
-  await approve(sb, "codex", repo, prompt);
-  await approve(sb, "claude", repo, prompt);
-};
 
-Deno.test("protect-generated: every spelling of the lock, and the gate's switches, on both harnesses", async () => {
+Deno.test("protect-generated: every spelling of the lock, and nothing else, on both harnesses", async () => {
   const sb = await sandbox();
   try {
     const repo = await makeRepo(sb, { mode: "auto" });
@@ -115,47 +93,46 @@ Deno.test("protect-generated: every spelling of the lock, and the gate's switche
         repo,
         `${repo}/.specnaut/workflow.yml`,
         `*** Update File: .specnaut/workflow.yml\n`,
-        "gated",
+        "allow",
       ],
       [
         "a hook",
         repo,
         `${repo}/.specnaut/hooks/guard-merge.sh`,
         `*** Update File: .specnaut/hooks/guard-merge.sh\n`,
-        "gated",
+        "allow",
       ],
       [
         "a new hook",
         repo,
         `${repo}/.specnaut/hooks/new.sh`,
         `*** Add File: .specnaut/hooks/new.sh\n`,
-        "gated",
+        "allow",
       ],
       [
         "hooks.json",
         repo,
         `${repo}/.codex/hooks.json`,
         `*** Add File: .codex/hooks.json\n`,
-        "gated",
+        "allow",
       ],
       [
         "settings.json",
         repo,
         `${repo}/.claude/settings.json`,
         `*** Add File: .claude/settings.json\n`,
-        "gated",
+        "allow",
       ],
       [
         "settings.local.json",
         repo,
         `${repo}/.claude/settings.local.json`,
         `*** Add File: .claude/settings.local.json\n`,
-        "gated",
+        "allow",
       ],
-      // What the landing guard runs, and the landing scripts with the hold they
-      // run (spec 048 § 8): an edit could drop it.
-      ...["merge-mode", "base-branch", "merge-hold", "land-feature", "remove-spec"].map((n) =>
-        [n, repo, `${repo}/${SB}/${n}.sh`, `*** Update File: ${SB}/${n}.sh\n`, "gated"] as Row
+      // Settings, hooks and landing scripts are ordinary edits now.
+      ...["merge-mode", "base-branch", "land-feature", "remove-spec"].map((n) =>
+        [n, repo, `${repo}/${SB}/${n}.sh`, `*** Update File: ${SB}/${n}.sh\n`, "allow"] as Row
       ),
       [
         "a sibling script",
@@ -202,60 +179,13 @@ Deno.test("protect-generated: every spelling of the lock, and the gate's switche
       ),
       async ([harness, label, want, p]) => {
         const r = await runHook(sb, "protect-generated.sh", harness, await p);
-        const expected = want === "gated" ? GATED[harness] : want;
+        const expected = want;
         const v = verdict(r);
         return v === expected ? "" : `${harness} ${label}: want ${expected}, got ${v} ${r.stderr}`;
       },
     );
     const wrong = runs.filter((x) => x !== "");
     assertEquals(wrong, [], wrong.join("\n"));
-  } finally {
-    await sb.cleanup();
-  }
-});
-
-Deno.test("protect-generated: a gated switch goes through on this turn's guards approval, never on merge", async () => {
-  const sb = await sandbox();
-  try {
-    const repo = await makeRepo(sb, { mode: "manual" });
-    const edit = (h: Harness, file: string, extra: Record<string, unknown> = {}) =>
-      payload(h, h === "codex" ? "pre_tool_use_apply_patch" : "pre_tool_use_edit", {
-        cwd: repo,
-        tool_input: h === "codex"
-          ? { command: patch(`*** Update File: ${file}\n`) }
-          : { file_path: `${repo}/${file}` },
-        ...extra,
-      });
-    const files = [".specnaut/workflow.yml", ".specnaut/scripts/bash/merge-hold.sh"];
-    // Claude's default mode is the one seat that can ask.
-    const seats = ["codex default", "claude bypassPermissions", "claude default"];
-    const judge = async (want: string[]) => {
-      const got: string[] = [], expected: string[] = [];
-      for (const file of files) {
-        for (const [i, seat] of seats.entries()) {
-          const [h, permission_mode] = seat.split(" ") as [Harness, string];
-          const r = await runHook(
-            sb,
-            "protect-generated.sh",
-            h,
-            await edit(h, file, { permission_mode }),
-          );
-          got.push(`${seat} ${file}: ${verdict(r)}`);
-          expected.push(`${seat} ${file}: ${want[i]}`);
-        }
-      }
-      assertEquals(got, expected);
-    };
-
-    await judge(["deny", "deny", "deny"]);
-    await approveBoth(sb, repo, "merge"); // what lands a branch does not rewrite what holds it
-    await judge(["deny", "deny", "deny"]);
-    await approveBoth(sb, repo, "approve the guard change"); // Claude still asks once where it can
-    await judge(["allow", "allow", "ask"]);
-
-    // The lock is never a gate: no approval opens it.
-    const lock = await edit("codex", ".specnaut/installed.lock");
-    assertEquals((await runHook(sb, "protect-generated.sh", "codex", lock)).code, 2);
   } finally {
     await sb.cleanup();
   }

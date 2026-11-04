@@ -24,13 +24,11 @@ plan → implement → review → merge → push
    ```
 
    It prints `auto` or `manual` and says why on stderr. No file or no key is `auto`; an unreadable
-   value is `manual` — say so in one line. **Under `merge: manual` in the file, a hook holds the
-   landing whatever the run said**: every merge into, and push of, the base branch waits until the
-   user's own prompt in that turn says `merge` or `/task merge`.
+   value is `manual` — say so in one line.
 
    - **`auto`** — a verdict with no unresolved CRITICAL or HIGH invokes `merge` in the same turn.
-   - **`manual`** — ask once: "Ready to merge? Reply `merge` to land it, anything else to stay on the
-     branch." A plain "yes" does not release the hook; if that is the answer, ask for the word.
+   - **`manual`** — ask once: "Ready to merge?" A yes lands it, merge and push; anything else stays
+     on the branch.
 
 When the project is in remote mode (`specnaut gate status` exits 0), read `phases/remote-gates.md`:
 it raises the plan and merge approvals as gates, and remote mode keeps its gate under either mode.

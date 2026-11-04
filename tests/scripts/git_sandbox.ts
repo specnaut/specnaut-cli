@@ -16,7 +16,6 @@ export const SCRIPTS = [
   "epic-status.sh",
   "fold-fixups.sh",
   "land-feature.sh",
-  "merge-hold.sh",
   "merge-mode.sh",
   "remove-spec.sh",
   "wip-audit.sh",

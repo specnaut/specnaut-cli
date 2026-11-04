@@ -31,26 +31,10 @@ type Registration = CodexHookCall & { readonly event: string; readonly matcher?:
 
 /** The Codex registrations — the counterpart of templates/harness-specific/claude/settings.json. */
 export const CODEX_REGISTRATIONS: readonly Registration[] = [
-  { event: "PreToolUse", matcher: "Bash", script: "guard-merge.sh", args: "codex", onChanged: 2 },
-  { event: "PreToolUse", matcher: "Bash", script: "guard-release.sh", args: "codex", onChanged: 2 },
   {
     event: "PreToolUse",
     matcher: "Edit|Write",
     script: "protect-generated.sh",
-    args: "codex",
-    onChanged: 2,
-  },
-  {
-    event: "PreToolUse",
-    matcher: "Edit|Write",
-    script: "protect-constitution.sh",
-    args: "codex",
-    onChanged: 2,
-  },
-  {
-    event: "PreToolUse",
-    matcher: "Bash",
-    script: "protect-constitution.sh",
     args: "codex",
     onChanged: 2,
   },
@@ -61,8 +45,6 @@ export const CODEX_REGISTRATIONS: readonly Registration[] = [
     args: "codex",
     onChanged: 2,
   },
-  { event: "UserPromptSubmit", script: "approve-on-prompt.sh", args: "codex", onChanged: 0 },
-  { event: "Stop", script: "approve-on-prompt.sh", args: "codex", onChanged: 0 },
   { event: "SubagentStart", script: "log-subagent.sh", args: "start", onChanged: 0 },
   { event: "SubagentStop", script: "log-subagent.sh", args: "stop", onChanged: 0 },
 ];

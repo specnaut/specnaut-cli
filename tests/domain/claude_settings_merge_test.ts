@@ -198,52 +198,63 @@ const PUBLISH_ASK = [
   "Bash(gh release new *)",
 ];
 
-Deno.test("claude settings: the shipped file asks before every publish-capable command (#610)", () => {
-  const ask: string[] = JSON.parse(SHIPPED).permissions?.ask ?? [];
-  for (const rule of PUBLISH_ASK) {
-    assertEquals(ask.includes(rule), true, `shipped settings.json lacks ask rule ${rule}`);
+Deno.test("claude settings: the shipped file asks for no release and registers no approval hook", () => {
+  const shipped = JSON.parse(SHIPPED);
+  assertEquals(shipped.permissions, undefined);
+  for (
+    const retired of ["guard-merge", "guard-release", "protect-constitution", "approve-on-prompt"]
+  ) {
+    assertEquals(SHIPPED.includes(retired), false, retired);
   }
-  // A prompt, never a prohibition — and never a bare pre-authorisation.
-  const perms = JSON.parse(SHIPPED).permissions ?? {};
-  assertEquals(perms.deny, undefined);
-  assertEquals((perms.allow ?? []).some((r: string) => r.startsWith("Bash(gh release")), false);
 });
 
-Deno.test("mergeClaudeSettings: ask rules reach an existing settings.json beside a broad allow (#610)", () => {
+Deno.test("mergeClaudeSettings: the retired ask rules leave, and the user's stay", () => {
   const existing = JSON.stringify({
-    permissions: { allow: ["Bash(gh release *)"], ask: ["Bash(git push *)"] },
+    permissions: { allow: ["Bash(gh release *)"], ask: ["Bash(git push *)", ...PUBLISH_ASK] },
   });
   const merged = JSON.parse(mergeClaudeSettings(existing, SHIPPED, DEST).content);
   assertEquals(merged.permissions.allow, ["Bash(gh release *)"], "the user's allow is theirs");
-  assertEquals(merged.permissions.ask, ["Bash(git push *)", ...PUBLISH_ASK]);
+  assertEquals(merged.permissions.ask, ["Bash(git push *)"]);
 });
 
-Deno.test("mergeClaudeSettings: ask rules are not duplicated on re-merge (#610)", () => {
-  const once = mergeClaudeSettings(JSON.stringify({ theme: "dark" }), SHIPPED, DEST).content;
-  const twice = mergeClaudeSettings(once, SHIPPED, DEST).content;
-  assertEquals(twice, once);
-  assertEquals(JSON.parse(twice).permissions.ask, PUBLISH_ASK);
-});
-
-// cli#699: a 7.3 settings.json registers guard-merge for Bash but not
-// guard-release; the upgrade adds it to that group once, beside the user's own.
-Deno.test("mergeClaudeSettings: an upgrade registers guard-release once, in the Bash group (#699)", () => {
-  const RELEASE = 'bash "$CLAUDE_PROJECT_DIR/.specnaut/hooks/guard-release.sh" claude';
-  const shipped = JSON.parse(SHIPPED);
-  const bashOf = (
-    s: { hooks: { PreToolUse: { matcher?: string; hooks: { command: string }[] }[] } },
-  ) =>
-    s.hooks.PreToolUse.filter((g) => g.matcher === "Bash").flatMap((g) =>
-      g.hooks.map((h) => h.command)
-    );
-  for (const g of shipped.hooks.PreToolUse) {
-    g.hooks = g.hooks.filter((h: { command: string }) => h.command !== RELEASE);
-  }
-  shipped.hooks.PreToolUse.find((g: { matcher?: string }) => g.matcher === "Bash").hooks
-    .push({ type: "command", command: "./my-check.sh" });
-  const once = mergeClaudeSettings(JSON.stringify(shipped), SHIPPED, DEST).content;
-  const merged = JSON.parse(once);
-  assertEquals(bashOf(merged).filter((c: string) => c === RELEASE).length, 1);
-  assertEquals(bashOf(merged).includes("./my-check.sh"), true, "the user's hook is theirs");
+Deno.test("mergeClaudeSettings: a permissions block holding only retired rules goes with them", () => {
+  const once = mergeClaudeSettings(
+    JSON.stringify({ theme: "dark", permissions: { ask: PUBLISH_ASK } }),
+    SHIPPED,
+    DEST,
+  ).content;
+  assertEquals(JSON.parse(once).permissions, undefined);
   assertEquals(mergeClaudeSettings(once, SHIPPED, DEST).changed, false, "a re-merge is a no-op");
+});
+
+Deno.test("mergeClaudeSettings: the approval hooks leave, the user's hooks stay", () => {
+  const entry = (script: string) => ({
+    type: "command",
+    command: `bash "$CLAUDE_PROJECT_DIR/.specnaut/hooks/${script}.sh" claude`,
+  });
+  const merged = JSON.parse(
+    mergeClaudeSettings(
+      JSON.stringify({
+        hooks: {
+          PreToolUse: [{
+            matcher: "Bash",
+            hooks: [
+              entry("guard-merge"),
+              entry("guard-release"),
+              entry("protect-constitution"),
+              { type: "command", command: "./my-check.sh" },
+            ],
+          }],
+          UserPromptSubmit: [{ hooks: [entry("approve-on-prompt")] }],
+          Stop: [{ hooks: [entry("approve-on-prompt")] }],
+        },
+      }),
+      SHIPPED,
+      DEST,
+    ).content,
+  );
+  const bash = merged.hooks.PreToolUse.find((g: { matcher?: string }) => g.matcher === "Bash");
+  assertEquals(bash.hooks.map((h: { command: string }) => h.command), ["./my-check.sh"]);
+  assertEquals(merged.hooks.UserPromptSubmit, undefined);
+  assertEquals(merged.hooks.Stop, undefined);
 });

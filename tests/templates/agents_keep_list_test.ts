@@ -18,13 +18,6 @@ import { HARNESSES } from "../../src/cli/harnesses.ts";
 
 const KEEP: ReadonlyArray<[rule: string, words: string]> = [
   ["the plan stop's scope", "irreversible, destructive, public-breaking or costly"],
-  [
-    "the merge: manual hook",
-    "under `merge: manual` a hook holds every landing on the base branch until the user's own " +
-    "prompt in that turn says `merge`",
-  ],
-  ["no stale release", 'a "yes", or a "merge it" from an earlier turn, does not release it'],
-  ["the hook is not bypassed", "When the hook refuses, say what to type; never route around it."],
   ["the review loop ends", "Only a CRITICAL or HIGH finding buys another fix cycle"],
 ];
 

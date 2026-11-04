@@ -35,9 +35,6 @@ Deno.test("the scaffolded AGENTS.md carries the stop rule — it is the always-l
   assertStringIncludes(content, "The end of `plan`");
   assertStringIncludes(content, "The review verdict — only under `merge: manual`");
   assertStringIncludes(content, ".specnaut/workflow.yml");
-  // D3 (spec 036): a hook enforces the file; a "yes" or an earlier "merge it" does not release it.
-  assertStringIncludes(content, "The file is enforced, not just read");
-  assertStringIncludes(content, "naming the word to reply");
   // Under the default the merge and the push are not asked for.
   assertStringIncludes(content, "`merge` and the push are automatic");
   // The positive instruction, not just the prohibition.
@@ -64,9 +61,7 @@ Deno.test("auto-chain.md carries the same rule for the phase that is already run
   assertStringIncludes(content, "read here and nowhere else");
   // D5: the per-run override comes first.
   assertStringIncludes(content, "`--manual-merge`");
-  // D3 (spec 036): the per-run override moves the chain, never the hook; STOP 2 names the word.
-  assertStringIncludes(content, "a hook holds the landing whatever the run said");
-  assertStringIncludes(content, "Reply `merge` to land it");
+  assertStringIncludes(content, "Ready to merge?");
   // D2: remote mode keeps its merge gate whatever the mode — and the check stays here (spec 041).
   assertStringIncludes(content, "remote mode keeps its gate under either mode");
   assertStringIncludes(content, "`specnaut gate status` exits 0), read `phases/remote-gates.md`");

@@ -5,7 +5,7 @@
  *
  * Recognition is by whole-command shape, anchored at both ends, never by a
  * mention of a Specnaut script: a user wrapper such as
- * `mycheck.sh && bash "$CLAUDE_PROJECT_DIR/.specnaut/hooks/guard-merge.sh"` is
+ * `mycheck.sh && bash "$CLAUDE_PROJECT_DIR/.specnaut/hooks/log-subagent.sh"` is
  * the user's hook, and the merge replacing it would delete it with no backup.
  *
  * The Codex command is built and matched from ONE template (`codexShape`): the
@@ -65,6 +65,18 @@ export function codexHookCommand(call: CodexHookCall, sumsHash: string): string 
   const args = call.args === "" ? "" : ` ${call.args}`;
   return codexShape(sumsHash, call.script, args, String(call.onChanged));
 }
+
+/**
+ * The scripts Specnaut used to register and no longer ships. An entry running one
+ * is Specnaut's and leaves at the next merge: the script is gone from the folder,
+ * and on Codex a registration left behind refuses every call.
+ */
+export const RETIRED_HOOK_SCRIPTS: ReadonlySet<string> = new Set([
+  "guard-merge",
+  "guard-release",
+  "protect-constitution",
+  "approve-on-prompt",
+]);
 
 const SCRIPT_NAME = "([A-Za-z0-9_-]+)\\.sh";
 const escapeRegExp = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");

@@ -4,7 +4,7 @@
 # Prints the name on stdout: what origin/HEAD points at (the remote's own
 # default), else the configured `init.defaultBranch`. Neither → exit 3,
 # unknown. Callers never substitute `main` for unknown: `/task merge`
-# stops and asks for the base, and the landing hook gates every landing.
+# stops and asks for the base.
 #
 # Every caller hands the name to git as an argument, so a name git would read
 # as an option (`--exec=…` reached `git rebase` and ran a command), or one

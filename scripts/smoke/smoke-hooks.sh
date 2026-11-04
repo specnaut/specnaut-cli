@@ -37,16 +37,11 @@ check "cockpit mod enabled" \
   'jq -e ".enabledPlugins[\"specnaut-cockpit@specnaut-marketplace\"] == true" .claude/settings.json >/dev/null'
 # Spelled out, not looped: audit.sh counts a path as covered only where it is written.
 for hook in .specnaut/hooks/protect-generated.sh .specnaut/hooks/log-subagent.sh \
-  .specnaut/hooks/guard-merge.sh .specnaut/hooks/guard-release.sh \
-  .specnaut/hooks/guard-dispatch-model.sh .specnaut/hooks/approve-on-prompt.sh \
-  .specnaut/hooks/protect-constitution.sh .specnaut/hooks/merge-approved.sh; do
+  .specnaut/hooks/guard-dispatch-model.sh; do
   check "$hook executable" "[ -x $hook ]"
 done
-for support in .specnaut/hooks/_guard.sh .specnaut/hooks/_approval.sh \
-  .specnaut/hooks/_command.sh .specnaut/hooks/_git.sh .specnaut/hooks/_simple.sh \
-  .specnaut/hooks/_listed.sh .specnaut/hooks/_paths.sh .specnaut/hooks/_baseline.sh \
-  .specnaut/hooks/_agents.txt .specnaut/hooks/release-commands.txt \
-  .specnaut/hooks/merge-commands.txt .specnaut/hooks/SHA256SUMS; do
+for support in .specnaut/hooks/_guard.sh .specnaut/hooks/_paths.sh \
+  .specnaut/hooks/_agents.txt .specnaut/hooks/SHA256SUMS; do
   check "$support installed" "[ -f $support ]"
 done
 # cli#679: a CRLF checkout would change every hash SHA256SUMS pins.
@@ -75,21 +70,11 @@ mkdir -p "$CODEX_DIR"
 (cd "$CODEX_DIR" && git init -q && deno run --allow-all "$CLI/src/main.ts" \
   init --here --no-git --ai codex --backlog local >/dev/null 2>&1)
 check ".codex/hooks.json scaffolded" '[ -f codex-probe/.codex/hooks.json ]'
-check "Bash guard registered once on Codex" \
-  'jq -e "[.hooks.PreToolUse[] | select(.matcher == \"Bash\") | .hooks[].command | select(test(\"guard-merge\\\\.sh\"))] | length == 1" codex-probe/.codex/hooks.json'
 check "status ledger registered on Codex SubagentStart (FR-011)" \
   'jq -e "[.hooks.SubagentStart[].hooks[].command | select(test(\"log-subagent\\\\.sh\"))] | length == 1" codex-probe/.codex/hooks.json'
-check "guard-merge.sh executable on Codex" '[ -x codex-probe/.specnaut/hooks/guard-merge.sh ]'
+check "protect-generated.sh executable on Codex" '[ -x codex-probe/.specnaut/hooks/protect-generated.sh ]'
 check "installed hooks match their SHA256SUMS" \
   '(cd codex-probe/.specnaut/hooks && { sha256sum -c --status SHA256SUMS 2>/dev/null || shasum -a 256 -c --status SHA256SUMS; })'
-# The registered command end to end — the SHA256SUMS pin included — on a
-# harmless command: a pin that no longer matches the folder exits 2 here.
-codex_bash=$(jq -r '[.hooks.PreToolUse[] | select(.matcher == "Bash") | .hooks[].command | select(test("guard-merge\\.sh"))][0]' codex-probe/.codex/hooks.json)
-out=$(cd "$CODEX_DIR" && jq -cn --arg cwd "$CODEX_DIR" \
-  '{session_id: "s", turn_id: "t", cwd: $cwd, hook_event_name: "PreToolUse", permission_mode: "default", tool_name: "Bash", tool_input: {command: "git status"}}' \
-  | bash -c "$codex_bash" 2>&1; echo "ec=$?")
-echo "$out" | grep -q "ec=0" && pass "the registered Codex Bash guard allows git status" \
-  || fail "the registered Codex Bash guard did not allow git status" "$out"
 
 echo
 
@@ -265,33 +250,5 @@ echo "$out" | grep -q "ec=0" \
   && pass "check-backlog-prereqs exits 0 with no lock" \
   || fail "check-backlog-prereqs crashed" "$out"
 mv .installed.lock.aside .specnaut/installed.lock
-
-echo
-echo "═══ spec 038  protect-constitution.sh + the Stop backstop (_baseline.sh) ═══"
-# Stamps and baselines kept inside the scenario tree, which the EXIT trap removes.
-export XDG_STATE_HOME="$DIR/state"
-# pc <harness> <tool> <tool_input JSON> — the guard's verdict, its status last.
-pc() {
-  jq -cn --arg cwd "$PWD" --arg t "$2" --argjson i "$3" '{session_id: "s1", turn_id: "t1", cwd: $cwd,
-    permission_mode: "default", hook_event_name: "PreToolUse", tool_name: $t, tool_input: $i}' \
-    | bash .specnaut/hooks/protect-constitution.sh "$1" 2>&1; echo "ec=$?"
-}
-DENY="protect-constitution: this call would change docs/constitution.md"
-out=$(pc claude Edit "$(jq -cn --arg f "$PWD/docs/constitution.md" '{file_path: $f}')")
-echo "$out" | grep -q "ec=2" && echo "$out" | grep -qF "$DENY" && pass "a Claude Edit of docs/constitution.md with no stamp is denied" \
-  || fail "the Claude Edit of the constitution was not denied" "$out"
-out=$(pc codex apply_patch '{"command": "*** Begin Patch\n*** Update File: docs/constitution.md\n*** End Patch\n"}')
-echo "$out" | grep -q "ec=2" && echo "$out" | grep -qF "$DENY" && pass "a Codex apply_patch of docs/constitution.md with no stamp is denied" \
-  || fail "the Codex patch of the constitution was not denied" "$out"
-out=$(pc claude Bash '{"command": "cat docs/constitution.md"}')
-[ "$out" = "ec=0" ] && pass "reading it with a bare cat is allowed" || fail "a read of the constitution was refused" "$out"
-# A writer no command reading sees: the user's prompt fingerprints, Stop compares.
-aop() { jq -cn --arg cwd "$PWD" --arg e "$1" '{session_id: "s1", cwd: $cwd, permission_mode: "default",
-  hook_event_name: $e, prompt: "tidy the readme", stop_hook_active: false}' | bash .specnaut/hooks/approve-on-prompt.sh claude; }
-aop UserPromptSubmit
-echo "- a principle nobody approved" >>docs/constitution.md
-out=$(aop Stop 2>&1)
-jq -e '.decision == "block" and (.reason | startswith("Specnaut: docs/constitution.md (") and contains("changed during this turn"))' <<<"$out" >/dev/null \
-  && pass "Stop blocks after an unapproved change to the constitution" || fail "Stop let an unapproved change through" "$out"
 
 finish "HOOKS"

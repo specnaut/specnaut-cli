@@ -12,25 +12,14 @@ You **MUST** consider the user input before proceeding (if not empty).
 ## Outline
 
 The project's constitution is `docs/constitution.md`. It is the team's document, not Specnaut's:
-Specnaut bootstrapped it once and only reads it since. An amendment is exceptional, happens only
-because the user asked for it, and is written only after the user has seen it and typed the
-confirmation phrase below. A hook enforces that last part: without the phrase, every write to the
-file is refused, whatever tool attempts it, and a change made some other way is caught when the turn
-ends. Never look for another route; ask.
+Specnaut bootstrapped it once and only reads it since. An amendment is exceptional and happens only
+because the user asked for it. An agent never amends it on its own initiative.
 
 The same verb changes the three **gate configs**, which hold the settings the project's gates read:
 `.specnaut/size-limits.yml`, `.specnaut/boundaries.yml` and `.specnaut/ui.yml`. They are not the
-constitution, so they take no version bump, but they are gated the same way under their own phrase.
+constitution, so they take no version bump.
 
-| What changes | The user types, as their whole message | Kind |
-| --- | --- | --- |
-| `docs/constitution.md` | `approve the constitution amendment` | `constitution` |
-| a gate config | `approve the gate config change` | `gate-config` |
-
-One approval covers one kind for one turn. A request that changes both is two rounds: the
-constitution first, then the configs. A plain "yes", "ok" or "go" approves nothing.
-
-### Round 1: draft, then stop
+### Steps
 
 1. **The reason.** If the request does not say why the change is needed, ask, in one question.
    Nothing is drafted without a reason the user gave: it goes into the commit body.
@@ -53,20 +42,8 @@ constitution first, then the configs. A plain "yes", "ok" or "go" approves nothi
 
    Shrinking the file never licenses dropping a principle: a removal still takes the MAJOR bump.
    A gate config change has no version.
-5. **Show** the user the diff, the bump with its one-line rationale, and the commit message you will
-   use. Then print the phrase for that kind, exactly as in the table, and end the turn:
-
-   ```text
-   To apply this, reply with exactly: approve the constitution amendment
-   ```
-
-   Do not write the file in this turn. Any reply other than the phrase is feedback: revise the draft,
-   show it again, print the phrase again.
-
-### Round 2: the user typed the phrase
-
-6. **Write** the drafted change, exactly as shown, to the file it names. Nothing else is touched.
-7. **Commit** it alone. The subject names the change; the body carries the reason, in the user's
+5. **Write** the change to the file it names. Nothing else is touched.
+6. **Commit** it alone. The subject names the change; the body carries the reason, in the user's
    words, and for the constitution the version change:
 
    ```text
@@ -76,7 +53,7 @@ constitution first, then the configs. A plain "yes", "ok" or "go" approves nothi
    Version: 1.2.0 → 1.3.0
    ```
 
-8. **Report** the new version (or the config written) and the commit, in two lines.
+7. **Report** the diff, the new version (or the config written) and the commit.
 
 If a principle now conflicts with the code, or with another principle, report it as a stop with a
 question. Never resolve it by amending the constitution on your own initiative.

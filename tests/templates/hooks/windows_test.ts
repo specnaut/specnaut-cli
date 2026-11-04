@@ -10,7 +10,6 @@ import {
   runHook,
   runScript,
   sandbox,
-  stamps,
 } from "./hook_sandbox.ts";
 import { gitBash, pathWithCrlfJq } from "./hook_path.ts";
 
@@ -56,36 +55,6 @@ const CASES: readonly Case[] = [
   // Each line but the last came back from jq.exe with a \r: `main\r` is no base
   // branch, and `v1.2.3\r` no ref name — both used to read as nothing to gate.
   [
-    "guard-merge.sh",
-    "claude",
-    "pre_tool_use_bash",
-    bashCmd("git push origin main\ngit status"),
-    "deny", // spec 048 § 8: no approval is a deny on Claude too
-  ],
-  [
-    "guard-release.sh",
-    "codex",
-    "pre_tool_use_bash",
-    bashCmd("git push origin v1.2.3\ngit status"),
-    "deny",
-  ],
-  [
-    "guard-merge.sh",
-    "claude",
-    "pre_tool_use_bash",
-    bashCmd("cat <<EOF\nhi\nEOF\ngit status\n"),
-    "allow",
-  ],
-  // A \r the command carries itself is kept: dropped, `\r#` would start a
-  // comment the shell never sees, and hide the push behind it.
-  [
-    "guard-merge.sh",
-    "claude",
-    "pre_tool_use_bash",
-    bashCmd("echo \r# ; git push origin main"),
-    "deny",
-  ],
-  [
     "protect-generated.sh",
     "codex",
     "pre_tool_use_apply_patch",
@@ -119,24 +88,6 @@ Deno.test("a jq that writes CRLF, as its Windows build does, changes no guard's 
       }
     }
     assertEquals(wrong, []);
-
-    // The approval round trip: minted, written and read back through jq.exe.
-    await runHook(
-      sb,
-      "approve-on-prompt.sh",
-      "codex",
-      await payload("codex", "user_prompt_submit", { cwd: repo }),
-      { env: crlf },
-    );
-    assertEquals((await stamps(sb)).length, 1, "a CRLF jq still mints the stamp");
-    const push = await payload("codex", "pre_tool_use_bash", {
-      cwd: repo,
-      tool_input: bashCmd("git push origin main"),
-    });
-    assertEquals(
-      verdict(await runHook(sb, "guard-merge.sh", "codex", push, { env: crlf })),
-      "allow",
-    );
   } finally {
     await sb.cleanup();
   }
@@ -191,13 +142,6 @@ Deno.test("a C:\\ cwd and file path, as a Windows harness sends them, are judged
     assertEquals(verdict(await edit(repo, win(join(repo, "src", "app.ts")))), "allow");
     assertEquals(verdict(await edit(join(repo, "src"), "..\\.specnaut\\installed.lock")), "deny");
     assertEquals(verdict(await edit(join(repo, "src"), "app.ts")), "allow");
-
-    // The approval store honours a Windows XDG_STATE_HOME too.
-    const p = await payload("codex", "user_prompt_submit", { cwd: win(repo) });
-    await runHook(sb, "approve-on-prompt.sh", "codex", p, {
-      env: { ...env, XDG_STATE_HOME: win(sb.state) },
-    });
-    assertEquals((await stamps(sb)).length, 1, "minted under XDG_STATE_HOME");
   } finally {
     await sb.cleanup();
   }

@@ -33,14 +33,6 @@ const ROOTS: Record<string, RegExp> = {
  * allowance to the `## ` heading it is true under; absent ⇒ the whole file.
  */
 const ALLOWED: Record<string, { reason: string; section?: string }> = {
-  // The guard ships to both harnesses from one source and protects each one's
-  // hook registration; on the other harness the path simply never exists.
-  "protect-generated.sh .codex/": {
-    reason: "names the Codex registration it gates; absent on Claude, never written to",
-  },
-  "protect-generated.sh .claude/": {
-    reason: "names the Claude registration it gates; absent on Codex, never written to",
-  },
   // cli#679: one reference for both design-target harnesses, read on request. Its `.claude/`
   // paths are facts about Claude Code only while they sit under its heading.
   "integrations .claude/": {

@@ -172,12 +172,12 @@ Deno.test("specnaut init --ai codex installs the guards and merges them into .co
     assertEquals(code, 0, `init failed: ${stderr}`);
     assertEquals(stdout.includes(".codex/hooks.json"), true, "hooks.json is not reported merged");
 
-    const guard = await Deno.stat(join(root, ".specnaut/hooks/guard-merge.sh"));
+    const guard = await Deno.stat(join(root, ".specnaut/hooks/protect-generated.sh"));
     assertEquals(guard.isFile, true);
     // Windows has no POSIX mode (Deno reports none): nothing to assert there, and
     // nothing lost — every registration runs the guard as `bash <script>`.
     if (Deno.build.os !== "windows") {
-      assertEquals((guard.mode ?? 0) & 0o111, 0o111, "guard-merge.sh is not executable");
+      assertEquals((guard.mode ?? 0) & 0o111, 0o111, "protect-generated.sh is not executable");
     }
 
     const hooks = JSON.parse(await Deno.readTextFile(join(root, ".codex/hooks.json"))).hooks;
@@ -189,7 +189,7 @@ Deno.test("specnaut init --ai codex installs the guards and merges them into .co
     assertEquals(commands.filter((c) => c === own.command).length, 1, "the user's hook was lost");
     const scripts = commands.flatMap((c) => [...c.matchAll(/\.specnaut\/hooks\/([\w-]+\.sh)/g)])
       .map((m) => m[1]);
-    assertEquals(scripts.includes("guard-merge.sh"), true, JSON.stringify(commands));
+    assertEquals(scripts.includes("protect-generated.sh"), true, JSON.stringify(commands));
     for (const script of scripts) {
       assertEquals(await exists(join(root, ".specnaut/hooks", script)), true, `${script} missing`);
     }

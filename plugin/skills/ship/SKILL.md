@@ -92,17 +92,12 @@ The scripts live at `.specnaut/scripts/release/` under every harness. The
 versioning scheme (SemVer or date-based) is baked in at `specnaut init`; the
 scripts read it, you do not choose it.
 
-## Step 4 — confirm before the irreversible act
+## Step 4 — push, and report
 
-**A tag push and a release publish are irreversible and outward-facing.** Before
-either:
+**The order to ship is the approval.** Push the tag or publish the release, then print the tag,
+the target remote, the commit subject and the resulting URL. Nothing here asks again.
 
-1. Show the computed tag, the target remote, and the commit subject.
-2. Ask once, as a concrete proposal — **"I'm about to push `<tag>` to
-   `<remote>` — OK?"** — never as an open question.
-3. On confirmation, proceed and print the resulting URL.
-
-`--no-push` creates the tag locally and skips the push, and needs no prompt.
+`--no-push` creates the tag locally and skips the push.
 
 ## What this skill does not do
 

@@ -1,5 +1,13 @@
 # Upgrading Specnaut
 
+## 9.0.0 → 9.1.0
+
+Run `specnaut upgrade`. The approval hooks are gone: nothing waits on a typed word any more, for a
+merge, a release or an edit of the constitution, the settings or the hooks. `upgrade` removes the
+scripts, their registrations and the release `permissions.ask` rules it added. `merge: manual` still
+asks once before a landing, and a yes is enough. On Codex, trust the hooks again with `/hooks`,
+because they changed.
+
 ## 8.0.1 → 9.0.0
 
 Run `specnaut upgrade`. One word that used to work is now refused: `merge` no longer releases an
@@ -288,50 +296,9 @@ it proposes the table — or add it by hand in the shape that file shows.
 `.specnaut/scripts/bash/size-ratchet.sh` is new and runs nowhere on its own: Specnaut installs no
 git hook. Wire it into your pre-commit runner if you want direct edits held too.
 
-## 5.0.x → 5.1.0
-
-Nothing to edit by hand, but one thing to know: for Claude Code projects, `specnaut upgrade` now
-declares a plugin that runs code once someone installs it. The upgrade prints a line for each key it
-adds.
-
-### Claude Code projects offer the Specnaut Cockpit
-
-`specnaut upgrade` adds two keys to `.claude/settings.json` for projects scaffolded for Claude Code:
-
-- `extraKnownMarketplaces["specnaut-marketplace"]`: Specnaut's catalog, read from the specnaut-cli
-  repository **at the release tag** of the binary that wrote it;
-- `enabledPlugins["specnaut-cockpit@specnaut-marketplace"]`.
-
-When someone trusts the project, Claude Code offers to install the marketplace and the cockpit mod.
-The mod shows usage limits, context and cost above the prompt, and holds the autopilot cleanly
-before it runs out of quota. A mod runs a hooks module inside Claude Code with the user's
-permissions. The cockpit's only process is `git rev-parse`, and the only call it ever refuses is the
-step that would start a phase past the quota threshold. Each later `specnaut upgrade` re-pins the
-marketplace to its own release. See
-[`mods/specnaut-cockpit/README.md`](mods/specnaut-cockpit/README.md).
-
-To decline it for a project, set the plugin to `false`:
-
-```json
-{ "enabledPlugins": { "specnaut-cockpit@specnaut-marketplace": false } }
-```
-
-The merge only adds keys that are absent, so a `false` survives every later `specnaut upgrade`. So
-does a marketplace you pointed somewhere else, and the upgrade says so each time. Deleting the key
-brings it back on the next upgrade, so use `false` rather than deleting it.
-
-### The Claude Code marketplace installs again
-
-`/plugin install` from the marketplace installed an empty plugin, because the published catalog did
-not match Claude Code's format. The catalog is fixed, and the right commands are:
-
-```text
-/plugin marketplace add specnaut/specnaut-marketplace
-/plugin install specnaut-plugin@specnaut-marketplace
-```
-
 ## Older releases
 
+- [5.0.x → 5.1.0](docs/upgrading/5.0-to-5.1.md)
 - [4.6.x → 5.0.0](docs/upgrading/4.6-to-5.0.md)
 - [4.0.x → 4.1.0 and 4.4.x → 4.5.0](docs/upgrading/4.0-to-4.5.md)
 - [2.1.x → 3.0.0 and 3.2.x → 4.0.0](docs/upgrading/2.x-to-4.0.md)

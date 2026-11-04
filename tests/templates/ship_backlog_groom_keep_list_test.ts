@@ -38,10 +38,9 @@ const KEEP: ReadonlyArray<{ file: string; body: () => string; sentences: readonl
     file: "ship/SKILL.md",
     body: () => read("ship/SKILL.md"),
     sentences: [
-      // Step 4 — the one stop before an act that cannot be taken back.
-      "## Step 4 — confirm before the irreversible act",
-      "**A tag push and a release publish are irreversible and outward-facing.**",
-      'Ask once, as a concrete proposal — **"I\'m about to push `<tag>` to `<remote>` — OK?"** — never as an open question.',
+      // Step 4 — the order to ship is the approval.
+      "## Step 4 — push, and report",
+      "**The order to ship is the approval.**",
       // Step 1 — the dirty tree.
       "**Is the tree dirty?** If so, say what is uncommitted and stop. Do not stash, do not commit on the user's behalf, and do not tag a tree that does not match what will be built.",
     ],
