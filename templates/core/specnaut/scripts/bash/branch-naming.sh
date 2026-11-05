@@ -3,7 +3,8 @@
 # Sourced by create-new-feature.sh, beside it: how a feature branch is named —
 # the next free number and the slug after it. Its PowerShell twin is
 # branch-naming.ps1, and the two are held to the same scenarios by
-# tests/scripts/create_new_feature_number_reuse_test.ts.
+# tests/scripts/create_new_feature_number_reuse_test.ts and, for the slug,
+# tests/scripts/branch_slug_twins_test.ts.
 #
 # Kept out of create-new-feature.sh so the script reads as the run it performs
 # (parse, name, detect the epic, create, move the card, report), and so a
@@ -143,10 +144,13 @@ check_existing_branches() {
 # Function to clean and format a branch name
 clean_branch_name() {
     local name="$1"
-    echo "$name" | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9]/-/g' | sed 's/-\+/-/g' | sed 's/^-//' | sed 's/-$//'
+    # `--*`, not `-\+`: BSD sed has no `\+`, and macOS was left with the hyphens.
+    echo "$name" | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9]/-/g' | sed 's/--*/-/g' | sed 's/^-//' | sed 's/-$//'
 }
 
-# Function to generate branch name with stop word filtering and length filtering
+# Function to generate branch name with stop word filtering and length filtering.
+# The acronym check uppercases with `tr`, not `${word^^}`: that is a bad
+# substitution on macOS's bash 3.2.
 generate_branch_name() {
     local description="$1"
     local clean_name cleaned
@@ -166,7 +170,7 @@ generate_branch_name() {
         if ! echo "$word" | grep -qiE "$stop_words"; then
             if [ ${#word} -ge 3 ]; then
                 meaningful_words+=("$word")
-            elif echo "$description" | grep -q "\b${word^^}\b"; then
+            elif echo "$description" | grep -qw -- "$(printf '%s' "$word" | tr '[:lower:]' '[:upper:]')"; then
                 # Keep short words if they appear as uppercase in original (likely acronyms)
                 meaningful_words+=("$word")
             fi

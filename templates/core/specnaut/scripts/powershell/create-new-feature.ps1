@@ -347,7 +347,6 @@ if ($Json) {
         SPEC_FILE = $specFile
         FEATURE_NUM = $featureNum
         LINKED_ISSUE = $linkedIssueValue
-        HAS_GIT = $hasGit
     }
     if ($DryRun) {
         $obj | Add-Member -NotePropertyName 'DRY_RUN' -NotePropertyValue $true
@@ -360,7 +359,6 @@ if ($Json) {
     if ($Issue -gt 0) {
         Write-Output "LINKED_ISSUE: $Issue"
     }
-    Write-Output "HAS_GIT: $hasGit"
     if (-not $DryRun) {
         Write-Output "SPECIFY_FEATURE environment variable set to: $branchName"
     }

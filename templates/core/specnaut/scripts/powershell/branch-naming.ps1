@@ -2,7 +2,8 @@
 # Dot-sourced by create-new-feature.ps1, beside it: how a feature branch is
 # named — the next free number and the slug after it. Its bash twin is
 # branch-naming.sh, and the two are held to the same scenarios by
-# tests/scripts/create_new_feature_number_reuse_test.ts.
+# tests/scripts/create_new_feature_number_reuse_test.ts and, for the slug,
+# tests/scripts/branch_slug_twins_test.ts.
 #
 # Kept out of create-new-feature.ps1 so the script reads as the run it performs
 # (parse, name, detect the epic, create, move the card, report), and so a
@@ -157,7 +158,9 @@ function ConvertTo-CleanBranchName {
     return $Name.ToLower() -replace '[^a-z0-9]', '-' -replace '-{2,}', '-' -replace '^-', '' -replace '-$', ''
 }
 
-# Function to generate branch name with stop word filtering and length filtering
+# Function to generate branch name with stop word filtering and length filtering.
+# The acronym check is `-cmatch`: the word comes from this very text, so `-match`
+# always succeeds.
 function Get-BranchName {
     param([string]$Description)
 
@@ -183,7 +186,7 @@ function Get-BranchName {
         # Keep words that are length >= 3 OR appear as uppercase in original (likely acronyms)
         if ($word.Length -ge 3) {
             $meaningfulWords += $word
-        } elseif ($Description -match "\b$($word.ToUpper())\b") {
+        } elseif ($Description -cmatch "\b$($word.ToUpper())\b") {
             # Keep short words if they appear as uppercase in original (likely acronyms)
             $meaningfulWords += $word
         }
