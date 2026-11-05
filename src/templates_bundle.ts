@@ -27094,6 +27094,43 @@ function Find-SpecifyRoot {
     }
 }
 
+# The one git probe (cli#719): git's stdout, or \$null when it did not answer. A normal "no" is
+# quiet: no .git here, or a failure -NormalIf explains (git exits 0 on it). A .git that git cannot
+# read says so, once per process, because the caller then carries on as if there were no repository.
+# The sentence is fixed text: git's stderr names paths and config, and this reaches an agent. A
+# non-zero exit stays an exit under any caller's preference: the catch is for a git that cannot start.
+function Invoke-GitProbe {
+    param(
+        [Parameter(Mandatory = \$true)][string]\$WorkDir,
+        [Parameter(Mandatory = \$true)][string[]]\$GitArgs,
+        [string[]]\$NormalIf
+    )
+    \$PSNativeCommandUseErrorActionPreference = \$false
+    \$hasMarker = Test-Path -LiteralPath (Join-Path \$WorkDir '.git')
+    \$problem = \$null
+    if (Get-Command git -ErrorAction SilentlyContinue) {
+        try {
+            \$out = & git -C \$WorkDir @GitArgs 2>\$null
+            \$code = \$LASTEXITCODE
+            if (\$code -eq 0) { return \$out }
+            if (\$NormalIf) {
+                \$null = & git -C \$WorkDir @NormalIf 2>\$null
+                if (\$LASTEXITCODE -eq 0) { return \$null }
+            }
+            if (\$hasMarker) { \$problem = "git exited \$code reading this repository" }
+        } catch {
+            \$problem = "git could not be started (\$(\$_.Exception.GetType().Name))"
+        }
+    } elseif (\$hasMarker) {
+        \$problem = '.git is present but git is not on PATH'
+    }
+    if (\$problem -and -not \$script:GitProbeWarned) {
+        \$script:GitProbeWarned = \$true
+        [Console]::Error.WriteLine("WARNING: \$problem; continuing without git")
+    }
+    return \$null
+}
+
 # Get repository root, prioritizing .specify directory over git
 # This prevents using a parent git repo when spec-kit is initialized in a subdirectory
 function Get-RepoRoot {
@@ -27104,14 +27141,8 @@ function Get-RepoRoot {
     }
 
     # Fallback to git if no .specify found
-    try {
-        \$result = git rev-parse --show-toplevel 2>\$null
-        if (\$LASTEXITCODE -eq 0) {
-            return \$result
-        }
-    } catch {
-        # Git command failed
-    }
+    \$result = Invoke-GitProbe -WorkDir '.' -GitArgs @('rev-parse', '--show-toplevel')
+    if (\$null -ne \$result) { return \$result }
 
     # Final fallback to script location for non-git repos
     # Use -LiteralPath to handle paths with wildcard characters
@@ -27127,19 +27158,14 @@ function Get-CurrentBranch {
     # Then check git if available at the spec-kit root (not parent)
     \$repoRoot = Get-RepoRoot
     if (Test-HasGit) {
-        try {
-            \$result = git -C \$repoRoot rev-parse --abbrev-ref HEAD 2>\$null
-            if (\$LASTEXITCODE -eq 0) {
-                return \$result
-            }
-        } catch {
-            # Git command failed
-        }
+        # An unborn HEAD fails this too and is normal: HEAD is still a symbolic ref.
+        \$result = Invoke-GitProbe -WorkDir \$repoRoot -GitArgs @('rev-parse', '--abbrev-ref', 'HEAD') \`
+            -NormalIf @('symbolic-ref', '-q', 'HEAD')
+        if (\$null -ne \$result) { return \$result }
     }
 
     # For non-git repos, try to find the latest feature directory
     \$specsDir = Join-Path \$repoRoot ".specnaut" "specs"
-    
     if (Test-Path \$specsDir) {
         \$latestFeature = ""
         \$highest = 0
@@ -27169,7 +27195,7 @@ function Get-CurrentBranch {
             return \$latestFeature
         }
     }
-    
+
     # Final fallback
     return "main"
 }
@@ -27178,10 +27204,6 @@ function Get-CurrentBranch {
 # Returns true only if git is installed and the repo root is inside a git work tree
 # Handles both regular repos (.git directory) and worktrees/submodules (.git file)
 function Test-HasGit {
-    # First check if git command is available (before calling Get-RepoRoot which may use git)
-    if (-not (Get-Command git -ErrorAction SilentlyContinue)) {
-        return \$false
-    }
     \$repoRoot = Get-RepoRoot
     # Check if .git exists (directory or file for worktrees/submodules)
     # Use -LiteralPath to handle paths with wildcard characters
@@ -27189,12 +27211,7 @@ function Test-HasGit {
         return \$false
     }
     # Verify it's actually a valid git work tree
-    try {
-        \$null = git -C \$repoRoot rev-parse --is-inside-work-tree 2>\$null
-        return (\$LASTEXITCODE -eq 0)
-    } catch {
-        return \$false
-    }
+    return (\$null -ne (Invoke-GitProbe -WorkDir \$repoRoot -GitArgs @('rev-parse', '--is-inside-work-tree')))
 }
 
 # Strip a single optional path segment (e.g. gitflow "feat/004-name" -> "004-name").
@@ -27293,6 +27310,20 @@ function Get-FeatureDirFromBranchPrefixOrExit {
     return \$resolved
 }
 
+# The "feature_directory" of .specnaut/feature.json; \$null when it names none.
+function Get-FeatureJsonDirectory {
+    param([Parameter(Mandatory = \$true)][string]\$RepoRoot)
+    \$featureJson = Join-Path \$RepoRoot '.specnaut/feature.json'
+    if (-not (Test-Path \$featureJson)) { return \$null }
+    \$featureJsonRaw = Get-Content -LiteralPath \$featureJson -Raw
+    try {
+        return (\$featureJsonRaw | ConvertFrom-Json).feature_directory
+    } catch {
+        [Console]::Error.WriteLine("ERROR: Failed to parse .specnaut/feature.json: \$_")
+        exit 1
+    }
+}
+
 function Get-FeaturePathsEnv {
     \$repoRoot = Get-RepoRoot
     \$currentBranch = Get-CurrentBranch
@@ -27302,42 +27333,22 @@ function Get-FeaturePathsEnv {
     #   1. SPECIFY_FEATURE_DIRECTORY env var (explicit override)
     #   2. .specnaut/feature.json "feature_directory" key (persisted by /task plan)
     #   3. Branch-name-based prefix lookup (same as scripts/bash/common.sh)
-    \$featureJson = Join-Path \$repoRoot '.specnaut/feature.json'
-    \$featureDirSource = 'branch'
-    if (\$env:SPECIFY_FEATURE_DIRECTORY) {
-        \$featureDirSource = 'env'
-        \$featureDir = \$env:SPECIFY_FEATURE_DIRECTORY
-        # Normalize relative paths to absolute under repo root
-        if (-not [System.IO.Path]::IsPathRooted(\$featureDir)) {
-            \$featureDir = Join-Path \$repoRoot \$featureDir
-        }
-    } elseif (Test-Path \$featureJson) {
-        \$featureJsonRaw = Get-Content -LiteralPath \$featureJson -Raw
-        try {
-            \$featureConfig = \$featureJsonRaw | ConvertFrom-Json
-        } catch {
-            [Console]::Error.WriteLine("ERROR: Failed to parse .specnaut/feature.json: \$_")
-            exit 1
-        }
-        if (\$featureConfig.feature_directory) {
-            \$featureDirSource = 'feature.json'
-            \$featureDir = \$featureConfig.feature_directory
-            # Normalize relative paths to absolute under repo root
-            if (-not [System.IO.Path]::IsPathRooted(\$featureDir)) {
-                \$featureDir = Join-Path \$repoRoot \$featureDir
-            }
-        } else {
-            \$featureDir = Get-FeatureDirFromBranchPrefixOrExit -RepoRoot \$repoRoot -CurrentBranch \$currentBranch
-        }
-    } else {
+    \$featureDirSource = 'env'
+    \$featureDir = \$env:SPECIFY_FEATURE_DIRECTORY
+    if (-not \$featureDir) {
+        \$featureDirSource = 'feature.json'
+        \$featureDir = Get-FeatureJsonDirectory -RepoRoot \$repoRoot
+    }
+    if (-not \$featureDir) {
+        \$featureDirSource = 'branch'
         \$featureDir = Get-FeatureDirFromBranchPrefixOrExit -RepoRoot \$repoRoot -CurrentBranch \$currentBranch
+    } elseif (-not [System.IO.Path]::IsPathRooted(\$featureDir)) {
+        # Normalize relative paths to absolute under repo root
+        \$featureDir = Join-Path \$repoRoot \$featureDir
     }
 
-    # A resolution that contradicts the branch is an error, not an output.
-    # See the same guard in scripts/bash/common.sh for the reasoning: only the
-    # feature.json rule can disagree with the branch, and every caller used to
-    # receive a CURRENT_BRANCH and a FEATURE_DIR naming different features with
-    # nothing comparing them.
+    # A resolution that contradicts the branch is an error, not an output: only
+    # the feature.json rule can disagree with it (see scripts/bash/common.sh).
     if (\$featureDirSource -eq 'feature.json' -and \$hasGit) {
         \$effBranch = Get-SpecnautEffectiveBranchName \$currentBranch
         if ((Test-FeatureBranchName \$effBranch) -and ((Split-Path -Leaf \$featureDir) -ne \$effBranch)) {
@@ -27373,17 +27384,6 @@ function Test-FileExists {
     }
 }
 
-function Test-DirHasFiles {
-    param([string]\$Path, [string]\$Description)
-    if ((Test-Path -Path \$Path -PathType Container) -and (Get-ChildItem -Path \$Path -ErrorAction SilentlyContinue | Where-Object { -not \$_.PSIsContainer } | Select-Object -First 1)) {
-        Write-Output "  ✓ \$Description"
-        return \$true
-    } else {
-        Write-Output "  ✗ \$Description"
-        return \$false
-    }
-}
-
 # Template resolution (Resolve-Template) lives beside this file; every caller of
 # common.ps1 keeps getting it from here.
 . "\$PSScriptRoot/template-resolution.ps1"
@@ -27404,6 +27404,29 @@ function Test-DirHasFiles {
 # Kept out of common.ps1 so the repository and feature-path helpers there are
 # not buried under the template stack. Defines functions only: dot-sourcing it
 # runs nothing.
+
+# The enabled preset ids of a .registry, lowest priority number first. A file
+# that does not parse yields none, so the caller takes the alphabetical order,
+# and says so once per process: a preset order silently lost is a template
+# silently swapped (cli#719). The sentence is fixed text, because a parser's
+# message quotes the file, and this reaches a terminal and an agent's context.
+function Get-RegistryPresetIds {
+    param([Parameter(Mandatory=\$true)][string]\$RegistryFile)
+    try {
+        \$presets = (Get-Content \$RegistryFile -Raw | ConvertFrom-Json).presets
+        if (-not \$presets) { return @() }
+        return @(\$presets.PSObject.Properties |
+            Where-Object { \$null -eq \$_.Value.enabled -or \$_.Value.enabled -ne \$false } |
+            Sort-Object { if (\$null -ne \$_.Value.priority) { \$_.Value.priority } else { 10 } } |
+            ForEach-Object { \$_.Name })
+    } catch {
+        if (-not \$script:RegistryWarned) {
+            \$script:RegistryWarned = \$true
+            [Console]::Error.WriteLine("WARNING: .specnaut/presets/.registry could not be parsed (\$(\$_.Exception.GetType().Name)); using alphabetical preset order")
+        }
+        return @()
+    }
+}
 
 # Resolve a template name to a file path using the priority stack:
 #   1. .specnaut/templates/overrides/
@@ -27427,21 +27450,7 @@ function Resolve-Template {
     if (Test-Path \$presetsDir) {
         \$registryFile = Join-Path \$presetsDir '.registry'
         \$sortedPresets = @()
-        if (Test-Path \$registryFile) {
-            try {
-                \$registryData = Get-Content \$registryFile -Raw | ConvertFrom-Json
-                \$presets = \$registryData.presets
-                if (\$presets) {
-                    \$sortedPresets = \$presets.PSObject.Properties |
-                        Where-Object { \$null -eq \$_.Value.enabled -or \$_.Value.enabled -ne \$false } |
-                        Sort-Object { if (\$null -ne \$_.Value.priority) { \$_.Value.priority } else { 10 } } |
-                        ForEach-Object { \$_.Name }
-                }
-            } catch {
-                # Fallback: alphabetical directory order
-                \$sortedPresets = @()
-            }
-        }
+        if (Test-Path \$registryFile) { \$sortedPresets = @(Get-RegistryPresetIds -RegistryFile \$registryFile) }
 
         if (\$sortedPresets.Count -gt 0) {
             foreach (\$presetId in \$sortedPresets) {

@@ -7,6 +7,29 @@
 # not buried under the template stack. Defines functions only: dot-sourcing it
 # runs nothing.
 
+# The enabled preset ids of a .registry, lowest priority number first. A file
+# that does not parse yields none, so the caller takes the alphabetical order,
+# and says so once per process: a preset order silently lost is a template
+# silently swapped (cli#719). The sentence is fixed text, because a parser's
+# message quotes the file, and this reaches a terminal and an agent's context.
+function Get-RegistryPresetIds {
+    param([Parameter(Mandatory=$true)][string]$RegistryFile)
+    try {
+        $presets = (Get-Content $RegistryFile -Raw | ConvertFrom-Json).presets
+        if (-not $presets) { return @() }
+        return @($presets.PSObject.Properties |
+            Where-Object { $null -eq $_.Value.enabled -or $_.Value.enabled -ne $false } |
+            Sort-Object { if ($null -ne $_.Value.priority) { $_.Value.priority } else { 10 } } |
+            ForEach-Object { $_.Name })
+    } catch {
+        if (-not $script:RegistryWarned) {
+            $script:RegistryWarned = $true
+            [Console]::Error.WriteLine("WARNING: .specnaut/presets/.registry could not be parsed ($($_.Exception.GetType().Name)); using alphabetical preset order")
+        }
+        return @()
+    }
+}
+
 # Resolve a template name to a file path using the priority stack:
 #   1. .specnaut/templates/overrides/
 #   2. .specnaut/presets/<preset-id>/templates/ (sorted by priority from .registry)
@@ -29,21 +52,7 @@ function Resolve-Template {
     if (Test-Path $presetsDir) {
         $registryFile = Join-Path $presetsDir '.registry'
         $sortedPresets = @()
-        if (Test-Path $registryFile) {
-            try {
-                $registryData = Get-Content $registryFile -Raw | ConvertFrom-Json
-                $presets = $registryData.presets
-                if ($presets) {
-                    $sortedPresets = $presets.PSObject.Properties |
-                        Where-Object { $null -eq $_.Value.enabled -or $_.Value.enabled -ne $false } |
-                        Sort-Object { if ($null -ne $_.Value.priority) { $_.Value.priority } else { 10 } } |
-                        ForEach-Object { $_.Name }
-                }
-            } catch {
-                # Fallback: alphabetical directory order
-                $sortedPresets = @()
-            }
-        }
+        if (Test-Path $registryFile) { $sortedPresets = @(Get-RegistryPresetIds -RegistryFile $registryFile) }
 
         if ($sortedPresets.Count -gt 0) {
             foreach ($presetId in $sortedPresets) {
