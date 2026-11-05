@@ -1,6 +1,7 @@
 import { assertEquals } from "@std/assert";
 import { CORE_BUNDLE, HARNESS_STATIC } from "../../src/templates_bundle.ts";
 import { skillFolderName } from "../../src/infrastructure/harness/skill_folder.ts";
+import { routers } from "./verb_table.ts";
 
 /**
  * A shipped file must not name a slash command the bundle does not emit.
@@ -50,15 +51,12 @@ const ENTRIES: Entry[] = [
  */
 function emittedNames(): Set<string> {
   const out = new Set<string>(["specnaut"]);
-  for (const e of CORE_BUNDLE) {
-    if (e.category === "skill" || e.category === "backlog-skill") {
-      out.add(skillFolderName(e));
-    } else if (e.category === "agent") {
-      out.add(skillFolderName(e));
-      // Claude keeps agents unprefixed in `.claude/agents/`, and the docs
-      // reference them by that bare name.
-      out.add(e.name);
-    }
+  for (const e of routers()) out.add(skillFolderName(e));
+  for (const e of CORE_BUNDLE.filter((x) => x.category === "agent")) {
+    out.add(skillFolderName(e));
+    // Claude keeps agents unprefixed in `.claude/agents/`, and the docs
+    // reference them by that bare name.
+    out.add(e.name);
   }
   return out;
 }

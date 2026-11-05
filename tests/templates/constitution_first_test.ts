@@ -101,8 +101,11 @@ const emittedBody = (dest: string, content: string) =>
     ? String((parseToml(content) as Record<string, unknown>).developer_instructions ?? "")
     : bodyOf(content);
 
+/** What the checks below read of a harness. */
+type Emitter = Pick<(typeof HARNESSES)[number], "key" | "mapBundle">;
+
 /** Each entry point as `harness` emits it, or a problem naming the missing destination. */
-function emitted(harness: (typeof HARNESSES)[number]) {
+function emitted(harness: Emitter) {
   const bundle = harness.mapBundle(CORE_BUNDLE, OPTS);
   return entryPoints().map(({ entry, skip }) => {
     const dest = emittedAt(harness.key as KnownHarness, entry);
@@ -182,20 +185,41 @@ Deno.test("Claude and Codex emit every agent, router and /task verb document ref
   assertEquals(wrong, [], "emitted entry points that do not open with the reference");
 });
 
+/** The entry points `harness` does not emit, or emits with no reference at all. */
+function withoutReference(harness: Emitter): string[] {
+  const missing: string[] = [];
+  for (const { dest, body } of emitted(harness)) {
+    if (body === null) missing.push(`${harness.key}: ${dest} not emitted`);
+    else if (!body.includes(CONSTITUTION_REFERENCE)) missing.push(`${harness.key}: ${dest}`);
+  }
+  return missing;
+}
+
 Deno.test("every other harness still carries the reference in each emitted entry point", () => {
   // Frontier harnesses decide the shape; the others follow (2026-10-28). Their
   // adapters may rebuild a file around the body, so presence is what is held —
   // at the exact destination, so a path that moved fails instead of matching nothing.
-  const missing: string[] = [];
   const others = HARNESSES.filter((h) => !FRONTIER.includes(h.key));
   assert(others.length > 0, "no non-frontier harness to check");
-  for (const harness of others) {
-    for (const { dest, body } of emitted(harness)) {
-      if (body === null) missing.push(`${harness.key}: ${dest} not emitted`);
-      else if (!body.includes(CONSTITUTION_REFERENCE)) missing.push(`${harness.key}: ${dest}`);
-    }
-  }
-  assertEquals(missing, [], "emitted entry points with no reference at all");
+  assertEquals(others.flatMap(withoutReference), [], "emitted entry points with no reference");
+});
+
+Deno.test("a renamed emit path turns that check red, rather than checking nothing (cli#706)", () => {
+  // The stored red-probe: the check once `continue`d when no destination matched.
+  const real = HARNESSES.find((h) => !FRONTIER.includes(h.key));
+  assert(real, "no non-frontier harness to probe");
+  const agent = agents()[0];
+  assert(agent, "no agent to probe");
+  const dest = emittedAt(real.key as KnownHarness, agent);
+  const renamed: Emitter = {
+    key: real.key,
+    mapBundle: (core, opts) => {
+      const { [dest]: moved, ...rest } = real.mapBundle(core, opts);
+      assert(moved, `${dest} is not where ${real.key} emits ${agent.name}`);
+      return { ...rest, [`${dest}.moved`]: moved };
+    },
+  };
+  assertEquals(withoutReference(renamed), [`${real.key}: ${dest} not emitted`]);
 });
 
 Deno.test("the AGENTS.md constitution fence opens with the reference, then the import", () => {

@@ -5,6 +5,7 @@ import { HARNESSES } from "../../src/cli/harnesses.ts";
 import { extractBlock } from "../../src/domain/merge_block.ts";
 import { managedSectionLabels } from "../../src/domain/template.ts";
 import { ADDENDUM_SKILLS, ROUTABLE_PHASES } from "../../src/domain/addendum_audit.ts";
+import { router } from "./verb_table.ts";
 
 /**
  * #611 — a project adds to a bundled phase without preserving or editing it.
@@ -66,12 +67,6 @@ function entry(pred: (e: CoreEntry) => boolean, what: string): CoreEntry {
   if (!e) throw new Error(`missing bundle entry: ${what}`);
   return e;
 }
-
-const router = (name: string) =>
-  entry(
-    (e) => (e.category === "skill" || e.category === "backlog-skill") && e.name === name,
-    `${name} router`,
-  ).content;
 
 /** The body of one `## ` section, heading excluded, up to the next `## `. */
 function section(content: string, heading: string): string {

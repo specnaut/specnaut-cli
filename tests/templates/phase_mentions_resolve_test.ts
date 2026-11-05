@@ -1,6 +1,7 @@
 import { assert } from "@std/assert";
 import { CORE_BUNDLE, HARNESS_STATIC } from "../../src/templates_bundle.ts";
 import { retiredAddresses } from "./retired_table.ts";
+import { router } from "./verb_table.ts";
 
 /**
  * Every `/specnaut <verb>`, `/task <verb>` and `/ship <verb>` a shipped document
@@ -35,14 +36,6 @@ const documents: Array<{ where: string; content: string; isStatic: boolean }> = 
   ),
 ];
 
-function routerOf(name: Router): string {
-  const e = CORE_BUNDLE.find((x) =>
-    (x.category === "skill" || x.category === "backlog-skill") && x.name === name
-  );
-  if (!e) throw new Error(`no bundled router for /${name}`);
-  return e.content;
-}
-
 /** The documents a router owns that actually ship, by their path under its folder. */
 function shippedDocs(name: Router): Set<string> {
   return new Set(
@@ -71,7 +64,7 @@ function routedBy(name: Router): Set<string> {
     );
   }
   const out = new Set<string>();
-  for (const line of routerOf(name).split("\n")) {
+  for (const line of router(name).split("\n")) {
     const m = line.match(/^\| `([a-z][a-z-]*)[^`]*`(?: _[^|]*_)? \| `([a-z0-9/-]+\.md)` \|/);
     if (m && shipped.has(m[2])) out.add(m[1]);
   }

@@ -1,6 +1,7 @@
 import { assert, assertEquals } from "@std/assert";
 import { CORE_BUNDLE } from "../../src/templates_bundle.ts";
 import { FE_VOCAB, flat } from "./mobile_first_vocab.ts";
+import { routers } from "./verb_table.ts";
 
 /**
  * The mobile-first contract reaches skills too, not only agents (#678).
@@ -16,11 +17,7 @@ const CONTRACT = "mobile-first-contract";
 const POINTER = `\`${CONTRACT}\` skill`;
 
 /** Top-level skill documents — what a user or a router loads by name. */
-const skills = () =>
-  CORE_BUNDLE.filter((e) =>
-    (e.category === "skill" || e.category === "backlog-skill") && e.suffix === null &&
-    e.name !== CONTRACT
-  );
+const skills = () => routers().filter((e) => e.name !== CONTRACT);
 
 const candidates = () => skills().filter((e) => FE_VOCAB.test(e.content)).map((e) => e.name);
 

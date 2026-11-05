@@ -6,6 +6,7 @@ import { CORE_BUNDLE } from "../../../src/templates_bundle.ts";
 import { type CoreEntry, skillDocName } from "../../../src/domain/core_bundle.ts";
 import { isSkillDoc } from "../../../src/infrastructure/harness/skill_folder.ts";
 import type { Harness } from "../../../src/application/ports.ts";
+import { routers } from "../../templates/verb_table.ts";
 
 /**
  * `init`'s "Next steps" told every user to type the Claude commands.
@@ -90,8 +91,7 @@ Deno.test("every top-level skill's command locates the folder the harness emits"
   for (const h of HARNESSES) {
     const cmd = harnessCommands(h.key as KnownHarness);
     if (!cmd.invocable) continue;
-    for (const e of CORE_BUNDLE) {
-      if (e.category !== "skill" && e.category !== "backlog-skill") continue;
+    for (const e of routers()) {
       const dest = destOf(h, e);
       if (dest === null) continue;
       const token = cmd.skill(e.name).slice(1);

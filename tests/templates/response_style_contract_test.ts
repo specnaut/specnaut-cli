@@ -1,6 +1,7 @@
 import { assert, assertEquals } from "@std/assert";
 import { CORE_BUNDLE, HARNESS_STATIC } from "../../src/templates_bundle.ts";
 import type { CoreEntry } from "../../src/domain/core_bundle.ts";
+import { routers } from "./verb_table.ts";
 
 /**
  * SHAPE and SINGLE-SOURCING for the response-style contract (#575).
@@ -252,8 +253,7 @@ const WITHHELD_BY_DECISION: ReadonlyMap<string, string> = new Map([
  * not edit, so it cannot go stale in step with the edit.
  */
 function entryPointSkills(): string[] {
-  return CORE_BUNDLE
-    .filter((e) => (e.category === "skill" || e.category === "backlog-skill") && e.suffix === null)
+  return routers()
     .filter((e) => /^argument-hint:/m.test(e.content))
     .map((e) => e.name);
 }
