@@ -60,6 +60,8 @@ const DEFAULT_CHILD_EFFORT = "medium";
  * `security-expert`) plus up to two gated ones. Only a review where every
  * gated seat fires, or a large diff split into several instances, asks for
  * more — and then the review queues: it starts the next seat as one returns.
+ * `/task audit` with no axis flag can ask for five, one per axis, all in one
+ * message: run by hand and rarely, so it is not what the number is sized for.
  * A higher cap would buy nothing in the common case and would let an
  * orchestration Specnaut did not write spend more of the account in parallel.
  *
