@@ -43,7 +43,8 @@ Deno.test("collect-audit-scope never runs the program core.fsmonitor names", asy
   const outside = await Deno.makeTempDir({ prefix: "fsmonitor-marker-" });
   try {
     const { hook, marker } = await plantHook(outside);
-    await git(["config", "core.fsmonitor", hook], dir);
+    // git runs core.fsmonitor through a shell, which reads a Windows path's backslashes as escapes.
+    await git(["config", "core.fsmonitor", hook.replaceAll("\\", "/")], dir);
     await assertHookLive(dir, marker, ["status"]);
     const r = await scope(dir, ["--path", "src"]);
     assertEquals(r.code, 0, r.stderr);

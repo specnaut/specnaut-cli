@@ -31,7 +31,8 @@ Deno.test("the JSON document matches its golden, field for field and in order", 
   assertEquals(r.code, 0, r.stderr);
   const got = JSON.stringify(JSON.parse(r.stdout), null, 2) + "\n";
   if (Deno.env.get("UPDATE_SCAN_GOLDEN") === "1") await Deno.writeTextFile(GOLDEN, got);
-  assertEquals(got, await Deno.readTextFile(GOLDEN));
+  // A Windows checkout may hand the golden back with CRLF line ends; the contract is the content.
+  assertEquals(got, (await Deno.readTextFile(GOLDEN)).replaceAll("\r\n", "\n"));
 });
 
 /**

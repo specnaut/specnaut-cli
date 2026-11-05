@@ -81,7 +81,11 @@ export async function scope(
   dir: string,
   args: string[],
 ): Promise<{ code: number; stdout: string; stderr: string }> {
-  return await run("bash", [SCRIPT, ...args], dir, { HOME: dir });
+  // On Windows the MSYS runtime expands a wildcard in the arguments a native process hands bash
+  // (`*.json` arrives as `deno.json`); `noglob` passes them through as an agent's shell would.
+  const env: Record<string, string> = { HOME: dir };
+  if (Deno.build.os === "windows") env.MSYS = "noglob";
+  return await run("bash", [SCRIPT, ...args], dir, env);
 }
 
 /** Parses an `KEY: value` integer count line from the block. */

@@ -57,8 +57,23 @@ export const lines = (n: number, text = "x") => `${text}\n`.repeat(n);
 
 const made: string[] = [];
 globalThis.addEventListener("unload", () => {
-  for (const dir of made) Deno.removeSync(dir, { recursive: true });
+  for (const dir of made) removeQuietly(dir);
 });
+
+/**
+ * Removing a temp tree is housekeeping, not an assertion: on macOS a recursive remove of a large
+ * tree can report "Directory not empty" while it races itself, and that once failed a green module.
+ * One retry, then the folder is left to the OS.
+ */
+function removeQuietly(dir: string) {
+  for (let attempt = 0; attempt < 2; attempt++) {
+    try {
+      return Deno.removeSync(dir, { recursive: true });
+    } catch (err) {
+      if (err instanceof Deno.errors.NotFound) return;
+    }
+  }
+}
 
 /** A repository holding `files`, all added and committed; removed when the test module ends. */
 export async function repo(files: Record<string, string | Uint8Array>): Promise<string> {
