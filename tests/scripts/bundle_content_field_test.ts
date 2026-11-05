@@ -1,5 +1,9 @@
-import { assertEquals } from "@std/assert";
-import { contentField, escapeTemplateLiteral } from "../../scripts/bundle-content-field.ts";
+import { assertEquals, assertThrows } from "@std/assert";
+import {
+  contentField,
+  escapeTemplateLiteral,
+  fmtLineWidth,
+} from "../../scripts/bundle-content-field.ts";
 
 /**
  * The bundler lays a `content:` field out as `deno fmt` would (spec 039), or
@@ -35,4 +39,15 @@ Deno.test("the width is measured on the escaped literal, not the raw text", () =
 
 Deno.test("escapeTemplateLiteral escapes what a template literal would interpret", () => {
   assertEquals(escapeTemplateLiteral("a\\b `c` ${d}"), "a\\\\b \\`c\\` \\${d}");
+});
+
+Deno.test("fmtLineWidth reads the width, and refuses a config that has no usable one", async () => {
+  assertEquals(fmtLineWidth(`{ "fmt": { "lineWidth": 88 } }`), 88);
+  // The real config answers, or the bundler would refuse it on every run.
+  const real = await Deno.readTextFile(new URL("../../deno.json", import.meta.url));
+  assertEquals(fmtLineWidth(real) > 0, true);
+  const widths = [`"100"`, `0`, `-1`, `88.5`].map((w) => `{ "fmt": { "lineWidth": ${w} } }`);
+  for (const bad of [`{}`, `{ "fmt": {} }`, ...widths]) {
+    assertThrows(() => fmtLineWidth(bad), Error, "fmt.lineWidth", bad);
+  }
 });

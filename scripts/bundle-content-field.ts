@@ -22,3 +22,14 @@ export function contentField(indent: string, content: string, lineWidth: number)
     ? inline
     : `${indent}content:\n${indent}  ${literal},\n`;
 }
+
+/**
+ * `deno fmt`'s line width out of `deno.json`'s text. A missing or unusable value
+ * throws: as `undefined`, every `<=` in `contentField` is false, so each literal
+ * moves to its own line and the bundle dirties the tree with no error (cli#719).
+ */
+export function fmtLineWidth(denoJson: string): number {
+  const width = JSON.parse(denoJson).fmt?.lineWidth;
+  if (Number.isInteger(width) && width > 0) return width;
+  throw new Error(`deno.json: fmt.lineWidth must be a positive whole number, got ${width}`);
+}

@@ -8,7 +8,7 @@
 import { relative } from "@std/path";
 import { managedSectionLabels, type MergeJsonFlavor } from "../src/domain/template.ts";
 import { linkTargetPath } from "../src/domain/context_link.ts";
-import { contentField } from "./bundle-content-field.ts";
+import { contentField, fmtLineWidth } from "./bundle-content-field.ts";
 
 type CoreManifestEntry = {
   category: string;
@@ -55,9 +55,7 @@ const TEMPLATES_DIR = new URL("templates/", ROOT);
 const MANIFEST_PATH = new URL("templates/manifest.json", ROOT);
 const OUTPUT_PATH = new URL("src/templates_bundle.ts", ROOT);
 /** `deno fmt`'s line width, read from its one home so the emitter cannot disagree with it. */
-const FMT_LINE_WIDTH: number = JSON.parse(
-  await Deno.readTextFile(new URL("deno.json", ROOT)),
-).fmt.lineWidth;
+const FMT_LINE_WIDTH = fmtLineWidth(await Deno.readTextFile(new URL("deno.json", ROOT)));
 
 async function readManifest(): Promise<Manifest> {
   return JSON.parse(await Deno.readTextFile(MANIFEST_PATH)) as Manifest;
