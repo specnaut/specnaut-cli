@@ -127,7 +127,8 @@ step 4b, without being asked.
 
 **Re-entry.** \`plan <id>\` classifies the item once, before step 2: its state, creation time and
 parent from the backend's \`view.sh\` (never its body as evidence), then
-\`bash .specnaut/scripts/bash/wip-audit.sh <id>@<epoch>\`. \`phases/auto-chain.md\` decides from that
+\`bash .specnaut/scripts/bash/wip-audit.sh <id>@<epoch>\` (with no creation time to read, its header
+says what to pass). \`phases/auto-chain.md\` decides from that
 whether the chain goes on; where its row stops (\`UNPUSHED\`), stop here, before step 2.
 
 <!-- BEGIN: spec-backend=local -->
@@ -365,7 +366,8 @@ epic's child it is the epic, and \`<epoch>\` is \`<task>\`'s creation time. Firs
 \`specnaut spec pull <task>\` once: it writes the spec to the gitignored \`.specnaut/specs/.cache/<task>/\`,
 and you read it from there. Read its outcome as \`phases/plan.md\`'s Re-entry does: anything but a
 materialised \`1-plan.md\` stops. Then the branch, from
-\`bash .specnaut/scripts/bash/wip-audit.sh <task>@<epoch>\`; a non-zero exit stops:
+\`bash .specnaut/scripts/bash/wip-audit.sh <task>@<epoch>\` (with no creation time to read, its header
+says what to pass); a non-zero exit stops:
 
 - \`ACTIVE <task> <sha>\`, HEAD's tip is \`<sha>\`, and HEAD's branch passes \`resume.md\` § 3: continue
   on it. A re-entry creates no second branch. When \`git hash-object\` of the pulled \`1-plan.md\` is
@@ -1993,7 +1995,7 @@ the deployment the environment names in \`SPECNAUT_CLOUD_API_URL\`: never to an
 
 \`\`\`bash
 .specnaut/scripts/backlog/list.sh [Status]            # all tasks (status = column), optional filter
-.specnaut/scripts/backlog/view.sh <number>            # one task (status, priority, size, body)
+.specnaut/scripts/backlog/view.sh <number>            # one task (created, status, priority, size, body)
 .specnaut/scripts/backlog/add.sh "<title>" [body]     # create a task → returns KEY-N
 .specnaut/scripts/backlog/move.sh <number> <Status>   # Backlog|Ready|"In Progress"|"In Review"|Done
 .specnaut/scripts/backlog/clarify-comment.sh <number> "<question>"
@@ -10642,7 +10644,8 @@ echo "\$TASKS" | jq_lf -r --argjson cols "\$COLS" --arg filter "\$FILTER" '
     name: "view",
     suffix: "view.sh",
     content: `#!/usr/bin/env bash
-# Show one Specnaut Cloud task (status, priority, size, body).
+# Show one Specnaut Cloud task: its creation time on the first line, ahead of any
+# task text, then status, priority, size and body.
 # Usage: view.sh <number>
 set -euo pipefail
 
@@ -10656,6 +10659,18 @@ fi
 NUM="\$1"
 COLS=\$(cloud_curl "\$API_BASE/columns?projectKey=\$PROJECT_KEY")
 RESP=\$(cloud_curl "\$API_BASE/tasks?projectKey=\$PROJECT_KEY&number=\$NUM")
+
+# The one shape on every backend: UTC, seconds, \`Z\`. It comes from the API's answer
+# and is never computed here. Anything else, a missing field included, prints \`—\`:
+# a phase turns this value into a command argument, so only this shape may reach it.
+CREATED=\$(printf '%s' "\$RESP" | jq_lf -r '.task.createdAt | if type == "string" then . else "" end')
+if (LC_ALL=C; [[ \$CREATED =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(\\.[0-9]{1,9})?Z\$ ]]); then
+  CREATED="\${CREATED%Z}"
+  CREATED="\${CREATED%%.*}Z"
+else
+  CREATED="—"
+fi
+printf 'created:\\t%s\\n' "\$CREATED"
 
 echo "\$RESP" | jq_lf -r --argjson cols "\$COLS" '
   (\$cols.columns | map({ (.id): .name }) | add) as \$names
@@ -24036,6 +24051,8 @@ exit 0
 # \`<n>@<epoch>\` — the item's creation time — ignores commits older than it: a
 # number reused by imported history, or a PR number, names something else.
 # The feature.json link carries no date and is never filtered.
+# An item with no creation time to read (\`view.sh\` printed \`—\`) is passed as
+# \`<n>\` alone, and the caller says the date filter was off for it.
 #
 # A read that fails is never taken for one that found nothing: git's own
 # errors are discarded (they can carry ref text) and the script stops.

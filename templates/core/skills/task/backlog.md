@@ -205,7 +205,7 @@ the deployment the environment names in `SPECNAUT_CLOUD_API_URL`: never to an
 
 ```bash
 .specnaut/scripts/backlog/list.sh [Status]            # all tasks (status = column), optional filter
-.specnaut/scripts/backlog/view.sh <number>            # one task (status, priority, size, body)
+.specnaut/scripts/backlog/view.sh <number>            # one task (created, status, priority, size, body)
 .specnaut/scripts/backlog/add.sh "<title>" [body]     # create a task → returns KEY-N
 .specnaut/scripts/backlog/move.sh <number> <Status>   # Backlog|Ready|"In Progress"|"In Review"|Done
 .specnaut/scripts/backlog/clarify-comment.sh <number> "<question>"

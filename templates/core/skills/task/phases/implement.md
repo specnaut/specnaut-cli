@@ -17,7 +17,8 @@ epic's child it is the epic, and `<epoch>` is `<task>`'s creation time. First, r
 `specnaut spec pull <task>` once: it writes the spec to the gitignored `.specnaut/specs/.cache/<task>/`,
 and you read it from there. Read its outcome as `phases/plan.md`'s Re-entry does: anything but a
 materialised `1-plan.md` stops. Then the branch, from
-`bash .specnaut/scripts/bash/wip-audit.sh <task>@<epoch>`; a non-zero exit stops:
+`bash .specnaut/scripts/bash/wip-audit.sh <task>@<epoch>` (with no creation time to read, its header
+says what to pass); a non-zero exit stops:
 
 - `ACTIVE <task> <sha>`, HEAD's tip is `<sha>`, and HEAD's branch passes `resume.md` § 3: continue
   on it. A re-entry creates no second branch. When `git hash-object` of the pulled `1-plan.md` is

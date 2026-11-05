@@ -28,6 +28,8 @@
 # `<n>@<epoch>` — the item's creation time — ignores commits older than it: a
 # number reused by imported history, or a PR number, names something else.
 # The feature.json link carries no date and is never filtered.
+# An item with no creation time to read (`view.sh` printed `—`) is passed as
+# `<n>` alone, and the caller says the date filter was off for it.
 #
 # A read that fails is never taken for one that found nothing: git's own
 # errors are discarded (they can carry ref text) and the script stops.
