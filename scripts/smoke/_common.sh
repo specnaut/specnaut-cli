@@ -171,11 +171,11 @@ check() {
 # cascade-check.sh exits 11 (open) for a listed issue, 12 (closed) otherwise;
 # sweep-closed.sh prints <sweep stdout> and exits 0.
 probe_close_shipped() {
-  local open=$1 sweep=$2 dir s
+  local open=$1 sweep=$2 tmp dir s
   shift 2
-  dir=$(mktemp -d "${TMPDIR:-/tmp}/close-shipped.XXXXXX") || return 1
-  cp -R .specnaut/scripts/backlog "$dir/b" || return 1
-  dir=$dir/b
+  tmp=$(mktemp -d "${TMPDIR:-/tmp}/close-shipped.XXXXXX") || return 1
+  dir=$tmp/b
+  cp -R .specnaut/scripts/backlog "$dir" || { rm -rf -- "$tmp"; return 1; }
   for s in cascade-check move move-batch sweep-closed; do
     printf '#!/usr/bin/env bash\necho "%s${*:+ $*}" >>"%s/calls"\n' "$s" "$dir" >"$dir/$s.sh"
   done
@@ -186,7 +186,7 @@ probe_close_shipped() {
   CS_RC=0
   CS_OUT=$(bash "$dir/close-shipped.sh" "$@" 2>&1) || CS_RC=$?
   CS_CALLS=$(cat "$dir/calls")
-  rm -rf "${dir%/b}"
+  rm -rf -- "$tmp"
 }
 
 # close_shipped_was <exit> "<calls, one per line>" <line prefix>… — the last

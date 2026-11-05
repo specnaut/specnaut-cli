@@ -40,7 +40,7 @@ up=".."
 for script in clean.sh bootstrap-empty.sh bootstrap-vite.sh; do
   for evil in "$up/$up" "$up/$up/$up/$up" "." "$up" ""; do
     if bash "$SMOKE_DIR/$script" "$evil" >/dev/null 2>&1; then
-      fail "$script accepted '$evil'" "it reaches rm -rf with an unvalidated path"
+      fail "$script accepted '$evil'" "it reaches the delete with an unvalidated path"
     else
       pass "$script refuses '${evil:-<empty>}'"
     fi

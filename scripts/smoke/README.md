@@ -25,7 +25,9 @@ scripts actually on disk. A script that exists but is not listed is a finding, n
 
 **`audit.sh`** — the coverage gate, with what it reads in `_audit_collect.sh` and its scans of the
 smoke scripts in `_audit_smoke_scans.sh`. **`smoke-audit.sh`** — its meta-test, with the #564 probes
-and the verdicts in `_audit_meta_*.sh`.
+and the verdicts in `_audit_meta_*.sh`. **`smoke-toolbox.sh`** — the suite's guard on its own
+deleting scripts; its static sweep, which holds every `rm -rf` to a vetted path, is `smoke_rm_sweep`
+in `_rm_sweep.sh`.
 
 ## `_common.sh` owns six decisions
 
