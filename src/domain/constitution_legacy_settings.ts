@@ -6,6 +6,7 @@ import {
   type SizeLimit,
   sizeLimitsYaml,
   type SizeUnit,
+  toLimit,
 } from "./size_limits.ts";
 import { targetSurfaceProblem, uiSettingsYaml } from "./ui_settings.ts";
 
@@ -106,11 +107,9 @@ function judgeRow(row: string, seen: Set<SizeUnit>): Row {
   const pair = `${target} ${ceiling}`;
   const isDefault = pair === `${d.target} ${d.ceiling}` ||
     (known === "constitution" && pair === VANILLA_CONSTITUTION);
-  const limits = { target: limit(target), ceiling: limit(ceiling) };
+  const limits = { target: toLimit(target), ceiling: toLimit(ceiling) };
   return { kind: "unit", unit: known, limit: isDefault ? null : limits };
 }
-
-const limit = (v: string) => v === "none" ? null : Number.parseInt(v, 10);
 
 /**
  * An exact-form target-surface declaration, as `.specnaut/ui.yml`. The form

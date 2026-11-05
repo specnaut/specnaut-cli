@@ -59,7 +59,7 @@ export type SizeConfig =
 export const LIMIT_VALUE = /^(none|[0-9]{1,9})$/;
 
 /** `"300"` → 300, `"none"` → null. Only for a value that matched `LIMIT_VALUE`. */
-const toLimit = (v: string): number | null => v === "none" ? null : Number.parseInt(v, 10);
+export const toLimit = (v: string): number | null => v === "none" ? null : Number.parseInt(v, 10);
 
 /** A value as the config spells it. */
 export const limitText = (n: number | null): string => n === null ? "none" : String(n);
