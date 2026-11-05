@@ -56,6 +56,53 @@ $ONLY
   esac
 done
 
+# --- The one exit path (cli#748) ----------------------------------------
+# One trap, installed before anything it cleans up exists. It takes the exit
+# status first and may raise it, never lower it: a trap that ended on its
+# last command's status turned an abort into a pass on bash 3.2.
+BUNDLE="$CLI/src/templates_bundle.ts"
+BUNDLE_BAK="" # set only once the backup is complete
+MARKS=""      # the verdict-marker directory, once it exists
+# shellcheck disable=SC2329 # invoked by the trap below
+on_exit() {
+  local rc=$?
+  if [ -n "$BUNDLE_BAK" ]; then
+    if cp "$BUNDLE_BAK" "$BUNDLE"; then
+      rm -f "$BUNDLE_BAK"
+    else
+      echo "run-all.sh: could not restore $BUNDLE; the backup is kept at $BUNDLE_BAK" >&2
+      [ "$rc" -ne 0 ] || rc=1
+    fi
+  fi
+  if [ -n "$MARKS" ]; then rm -rf -- "$MARKS"; fi
+  exit "$rc"
+}
+trap on_exit EXIT
+
+# One directory per run, never inherited: each script's marker is a file in
+# it (see _common.sh). Without it no verdict could be read, so it is fatal.
+MARKS="$(mktemp -d "${TMPDIR:-/tmp}/smoke-marks.XXXXXX")" || MARKS=""
+[ -n "$MARKS" ] || die "could not create the verdict-marker directory"
+
+# run_checked <script> [args…] — the one reading of a verdict. A pass is
+# exit 0 AND a marker holding the script's own name, byte for byte: on bash
+# 3.2 an abort under an EXIT trap can exit 0, and only the marker tells.
+run_checked() {
+  local script=$1 marker="$MARKS/$1" rc=0
+  shift
+  rm -f -- "$marker"
+  SMOKE_DONE="$marker" bash "$SMOKE_DIR/$script" "$@" || rc=$?
+  if [ "$rc" -ne 0 ]; then
+    fail "$script" "exit $rc"
+  elif [ -f "$marker" ] && printf '%s' "$script" | cmp -s - "$marker"; then
+    pass "$script"
+  else
+    fail "$script" "aborted before its verdict"
+    return 1
+  fi
+  return "$rc"
+}
+
 # --- FR-001: the suite guards its own boundary --------------------------
 # Every script must resolve its paths inside this repository. This used to be
 # a grep a person ran once, for a defect whose entire history is that it
@@ -157,19 +204,15 @@ if [ "$boundary_hits" -gt 0 ]; then
 fi
 
 # --- Re-bundle, and put it back afterwards ------------------------------
-BUNDLE="$CLI/src/templates_bundle.ts"
 if [ "$DO_BUNDLE" -eq 1 ]; then
-  # This script is `set -uo pipefail` with NO `-e`, so a failed mktemp would
-  # leave BUNDLE_BAK empty, `cp "$BUNDLE" ""` would fail, execution would
-  # continue, and the trap would become `cp '' <bundle>` — failing at exit,
-  # after `finish` has already printed ALL CHECKS PASSED and set the code.
-  # The restore is the one thing here that touches a TRACKED file, so it does
-  # not get to fail quietly.
-  BUNDLE_BAK="$(mktemp)" || BUNDLE_BAK=""
-  [ -n "$BUNDLE_BAK" ] || die "could not create a bundle backup — refusing to regenerate over a tracked file"
-  cp "$BUNDLE" "$BUNDLE_BAK" || die "could not back up $BUNDLE"
-  # shellcheck disable=SC2064
-  trap "cp '$BUNDLE_BAK' '$BUNDLE'; rm -f '$BUNDLE_BAK'" EXIT
+  # This script is `set -uo pipefail` with NO `-e`, so a failed mktemp or cp
+  # would continue silently. The restore is the one thing here that touches a
+  # TRACKED file, so the exit trap restores only a backup known to be whole,
+  # and a failed restore fails the run (on_exit, above).
+  bak="$(mktemp "${TMPDIR:-/tmp}/smoke-bundle.XXXXXX")" || bak=""
+  [ -n "$bak" ] || die "could not create a bundle backup — refusing to regenerate over a tracked file"
+  cp "$BUNDLE" "$bak" || { rm -f "$bak"; die "could not back up $BUNDLE"; }
+  BUNDLE_BAK="$bak"
   echo "▶ deno task bundle (so the suite reads the working tree, not the committed bundle)"
   ( cd "$CLI" && deno task bundle ) >/dev/null || die "deno task bundle failed"
 fi
@@ -197,22 +240,12 @@ for script in $to_run; do
     failed="$failed $script"
     continue
   fi
-  if bash "$SMOKE_DIR/$script" "$scenario"; then
-    pass "$script"
-  else
-    fail "$script" "exit $?"
-    failed="$failed $script"
-  fi
+  run_checked "$script" "$scenario" || failed="$failed $script"
 done
 
 echo
 echo "▶ audit"
-if bash "$SMOKE_DIR/audit.sh"; then
-  pass "audit.sh"
-else
-  fail "audit.sh" "exit $?"
-  failed="$failed audit.sh"
-fi
+run_checked audit.sh || failed="$failed audit.sh"
 
 echo
 [ -n "$failed" ] && echo "red:$failed"

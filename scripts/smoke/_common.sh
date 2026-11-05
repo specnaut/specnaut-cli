@@ -28,10 +28,12 @@
 # point the audit at a synthetic tree without relocating anything.
 SMOKE_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 CLI="$(cd "$SMOKE_DIR/../.." && pwd)"
+# shellcheck disable=SC2034 # read by audit.sh and the helpers it sources
 SRC_ROOT="$CLI"
 SANDBOX_ROOT="$CLI/sandbox"
 # audit.sh may be pointed at a foreign smoke directory (--smoke-dir); it
 # compares against this to know whether SUITE_FILES applies.
+# shellcheck disable=SC2034 # read by audit.sh and _audit_smoke_scans.sh
 DEFAULT_SMOKE_DIR="$SMOKE_DIR"
 
 # --- What counts as code (plan.md §5 023-R1, 023-R2, 023-R3) -------------
@@ -93,6 +95,7 @@ smoke_code_lines() {
 # directory, that declaration kept its documentation and lost its only
 # reader — a second spelling of membership that had stopped meaning
 # anything while still reading like the source of truth.
+# shellcheck disable=SC2034 # read by run-all.sh, audit.sh and smoke-toolbox.sh
 SUITE_FILES="smoke-toolbox.sh
 smoke-features.sh
 smoke-agents.sh
@@ -177,8 +180,10 @@ probe_close_shipped() {
   dir=$tmp/b
   cp -R .specnaut/scripts/backlog "$dir" || { rm -rf -- "$tmp"; return 1; }
   for s in cascade-check move move-batch sweep-closed; do
+    # shellcheck disable=SC2016 # the stub expands $*, not this shell
     printf '#!/usr/bin/env bash\necho "%s${*:+ $*}" >>"%s/calls"\n' "$s" "$dir" >"$dir/$s.sh"
   done
+  # shellcheck disable=SC2016 # the stub expands $1, not this shell
   printf 'case " %s " in *" $1 "*) exit 11 ;; esac\nexit 12\n' "$open" >>"$dir/cascade-check.sh"
   printf '%s\n' "$sweep" >"$dir/sweep.out"
   printf 'cat "%s/sweep.out"\n' "$dir" >>"$dir/sweep-closed.sh"
@@ -237,8 +242,30 @@ check_context_file() {
   check "AGENTS.md carries no unrendered backend markers" '! grep -q "backend=" AGENTS.md'
 }
 
+# --- The verdict marker (cli#748) ----------------------------------------
+# On macOS's bash 3.2, a script under `set -e` that dies on an unset variable
+# while an EXIT trap is set exits with the trap's status: 0 for a cleanup that
+# succeeded. Its exit code cannot tell a verdict from an abort, so run-all.sh
+# hands each script SMOKE_DONE=<file> and passes it only if that file then
+# holds the script's own name. It proves the verdict was reached, not that
+# every check above it ran.
+#
+# Read once and unset, never exported: a child smoke script (smoke-audit.sh
+# runs audit.sh seventeen times) must not write its parent's marker.
+_smoke_done_file="${SMOKE_DONE:-}"
+unset SMOKE_DONE
+
+# smoke_mark_verdict — called by `finish`, and by audit.sh at its clean exit.
+# Writes nothing from a subshell: `( finish X )` is a verdict for the subshell.
+smoke_mark_verdict() {
+  [ "$BASH_SUBSHELL" -eq 0 ] || return 0
+  [ -n "$_smoke_done_file" ] || return 0
+  printf '%s' "${0##*/}" > "$_smoke_done_file"
+}
+
 # finish "<LABEL>" — the single closing banner. Exits 0 clean, 1 with fails.
 finish() {
+  smoke_mark_verdict
   echo
   if [ "$fails" -eq 0 ]; then
     echo "═══ $1: ALL CHECKS PASSED ═══"

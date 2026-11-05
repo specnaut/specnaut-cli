@@ -29,12 +29,15 @@ and the verdicts in `_audit_meta_*.sh`. **`smoke-toolbox.sh`** — the suite's g
 deleting scripts; its static sweep, which holds every `rm -rf` to a vetted path, is `smoke_rm_sweep`
 in `_rm_sweep.sh`.
 
-## `_common.sh` owns six decisions
+## `_common.sh` owns seven decisions
 
 Path resolution, suite membership, the assertion harness, what a valid scenario name is, what counts
-as code in a smoke script, and the scaffold most scripts start from (`smoke_scaffold`). Source it;
-never re-derive any of them locally. It is written for **bash 3.2**, because macOS ships that and
-the interactive scenarios exist for that machine.
+as code in a smoke script, the scaffold most scripts start from (`smoke_scaffold`), and the marker
+that says a script reached its verdict (`smoke_mark_verdict`, called by `finish` and by `audit.sh`
+at its clean exit). `run-all.sh` passes a script only on exit 0 **and** that marker: on bash 3.2 a
+script that dies under an EXIT trap can exit 0 (cli#748). Source it; never re-derive any of them
+locally. It is written for **bash 3.2**, because macOS ships that and the interactive scenarios
+exist for that machine.
 
 ## Audit heuristics
 

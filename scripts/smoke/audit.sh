@@ -450,4 +450,4 @@ if [ "$gaps_count" -gt 0 ] || [ "$stale_count" -gt 0 ] || [ "$stale_allow_count"
   echo "(audit.sh never edits smoke scripts autonomously — that is on you.)"
   exit 1
 fi
-exit 0
+smoke_mark_verdict; exit 0 # the marker: run-all.sh reads it with the exit code (cli#748)
