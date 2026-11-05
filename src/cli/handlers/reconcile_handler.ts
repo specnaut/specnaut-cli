@@ -47,6 +47,7 @@ export async function runReconcile(intent: ReconcileIntent): Promise<number> {
     case "ok": {
       const verb = intent.mode === "accept-upstream" ? "took upstream" : "kept local";
       console.log(green(`✓ reconciled ${intent.path} — ${verb}`));
+      for (const note of result.notes) console.error(yellow(`note: ${note}`));
       return 0;
     }
     case "no-marker":

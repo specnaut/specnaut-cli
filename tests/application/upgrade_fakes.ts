@@ -105,7 +105,7 @@ export function fakeStagingStore(
     delete: (_d, rel) => {
       staged.delete(rel);
       deleted.push(rel);
-      return Promise.resolve();
+      return Promise.resolve([]);
     },
     cleanupIfEmpty: () => Promise.resolve(staged.size === 0),
   };

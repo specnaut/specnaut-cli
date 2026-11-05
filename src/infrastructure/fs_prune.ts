@@ -8,8 +8,8 @@ import { isInside } from "../domain/template.ts";
  * away that is invisible; for a *renamed* skill it is not — the emptied
  * folder keeps the old command's name sitting in the harness's skills
  * directory, so `upgrade` reports "removed" while the old name is still
- * listed. `FsStagingStore.delete` has always pruned its own parents; the
- * real tree did not, and the asymmetry is what let the ghost through.
+ * listed. `FsStagingStore.delete` prunes its own parents through this walk too;
+ * the real tree once did not, and the asymmetry is what let the ghost through.
  *
  * Containment via `isInside`, not a string prefix. The first version tested
  * `current.startsWith(stopAt + "/")`, which hardcodes the POSIX separator: on

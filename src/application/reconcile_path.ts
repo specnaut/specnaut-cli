@@ -1,6 +1,7 @@
 import type { FsReader, FsWriter, LockStore, StagingStore } from "./ports.ts";
 import type { InstalledLock } from "../domain/installed_lock.ts";
 import { computeAcceptCurrent, computeAcceptUpstream } from "../domain/reconcile.ts";
+import { tidyStagingRoot } from "./upgrade_staging.ts";
 
 export type ReconcileMode = "accept-upstream" | "accept-current";
 
@@ -12,7 +13,7 @@ export type ReconcilePathInput = {
 };
 
 export type ReconcilePathResult =
-  | { status: "ok" }
+  | { status: "ok"; notes: readonly string[] }
   | { status: "no-marker" }
   | { status: "no-staging" }
   | { status: "no-lock-entry" }
@@ -40,41 +41,16 @@ export class ReconcilePathUseCase {
     if (ready.status !== "ok") return ready;
     const { lock, stagingContent, onDiskContent } = ready;
 
-    const now = (input.now ?? (() => new Date()))();
+    const compute = input.mode === "accept-upstream" ? computeAcceptUpstream : computeAcceptCurrent;
+    const recomputed = await compute({
+      path: input.path,
+      onDiskContent,
+      stagingContent,
+      templatesVersion: lock.templatesVersion,
+      now: (input.now ?? (() => new Date()))(),
+    });
 
-    const recomputed = input.mode === "accept-upstream"
-      ? await computeAcceptUpstream({
-        path: input.path,
-        onDiskContent,
-        stagingContent,
-        templatesVersion: lock.templatesVersion,
-        now,
-      })
-      : await computeAcceptCurrent({
-        path: input.path,
-        onDiskContent,
-        stagingContent,
-        templatesVersion: lock.templatesVersion,
-        now,
-      });
-
-    // Backup + write to project path (only on accept-upstream).
-    const toWrite: Record<string, { content: string; executable: boolean }> = {};
-    if (recomputed.backupFromContent !== null) {
-      toWrite[`${input.path}.specnaut.bak`] = {
-        content: recomputed.backupFromContent,
-        executable: false,
-      };
-    }
-    if (recomputed.projectWrite !== null) {
-      toWrite[input.path] = { content: recomputed.projectWrite, executable: false };
-    }
-    if (Object.keys(toWrite).length > 0) {
-      await writer.writeBundle(toWrite, input.projectDir, {
-        overwrite: true,
-        backupExisting: false,
-      });
-    }
+    await writeProjectFile(writer, input, recomputed);
 
     // Update lock entry.
     const updatedEntries = new Map(lock.entries);
@@ -82,11 +58,35 @@ export class ReconcilePathUseCase {
     const updatedLock: InstalledLock = { ...lock, entries: updatedEntries };
     await lockStore.write(input.projectDir, updatedLock);
 
-    // Remove the staging entry.
-    await stagingStore.delete(input.projectDir, input.path);
-    await stagingStore.cleanupIfEmpty(input.projectDir);
+    // Remove the staging entry. The project file and the lock are committed by
+    // now, so a folder that cannot be tidied is a note on an `ok`, never a failure.
+    const notes = await stagingStore.delete(input.projectDir, input.path);
+    const tidy = await tidyStagingRoot(stagingStore, input.projectDir);
+    return { status: "ok", notes: tidy === null ? notes : [...notes, tidy] };
+  }
+}
 
-    return { status: "ok" };
+/** The backup and the write to the project path; only accept-upstream has either. */
+async function writeProjectFile(
+  writer: FsWriter,
+  input: ReconcilePathInput,
+  recomputed: Awaited<ReturnType<typeof computeAcceptUpstream>>,
+): Promise<void> {
+  const toWrite: Record<string, { content: string; executable: boolean }> = {};
+  if (recomputed.backupFromContent !== null) {
+    toWrite[`${input.path}.specnaut.bak`] = {
+      content: recomputed.backupFromContent,
+      executable: false,
+    };
+  }
+  if (recomputed.projectWrite !== null) {
+    toWrite[input.path] = { content: recomputed.projectWrite, executable: false };
+  }
+  if (Object.keys(toWrite).length > 0) {
+    await writer.writeBundle(toWrite, input.projectDir, {
+      overwrite: true,
+      backupExisting: false,
+    });
   }
 }
 

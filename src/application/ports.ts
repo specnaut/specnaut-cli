@@ -289,8 +289,11 @@ export interface StagingStore {
   list(projectDir: string): Promise<string[]>;
   /** Read upstream content for a project-relative path. `null` if absent. */
   read(projectDir: string, relPath: string): Promise<string | null>;
-  /** Remove the staging entry for a path. Idempotent. */
-  delete(projectDir: string, relPath: string): Promise<void>;
+  /**
+   * Remove the staging entry for a path. Idempotent. Throws only when the copy is
+   * still there; what could not be tidied after it comes back as notes to report.
+   */
+  delete(projectDir: string, relPath: string): Promise<string[]>;
   /** If the staging dir is empty, remove it. Returns whether it was removed. */
   cleanupIfEmpty(projectDir: string): Promise<boolean>;
 }

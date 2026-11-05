@@ -92,9 +92,9 @@ class StubStagingStore implements StagingStore {
   read(_: string, rel: string): Promise<string | null> {
     return Promise.resolve(this.files[rel] ?? null);
   }
-  delete(_: string, rel: string): Promise<void> {
+  delete(_: string, rel: string): Promise<string[]> {
     delete this.files[rel];
-    return Promise.resolve();
+    return Promise.resolve([]);
   }
   cleanupIfEmpty(): Promise<boolean> {
     return Promise.resolve(Object.keys(this.files).length === 0);

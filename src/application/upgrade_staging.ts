@@ -78,7 +78,9 @@ export function planStaging(
  * and the lock write. A delete that throws (a Windows file lock, a permission
  * bit) is returned as a refusal line and the upgrade finishes; letting it
  * propagate would leave the project half-upgraded over a copy nobody needs.
- * A containment refusal is reported in its own words (`leftAlone`).
+ * A containment refusal is reported in its own words (`leftAlone`), and a folder
+ * the copy left behind in the store's: the copy is gone, so nothing there is to
+ * delete by hand.
  */
 export async function pruneStaging(
   stagingStore: StagingStore,
@@ -89,22 +91,38 @@ export async function pruneStaging(
   for (const rel of await stagingStore.list(projectDir)) {
     if (keep.has(rel)) continue;
     try {
-      await stagingStore.delete(projectDir, rel);
+      refusals.push(...await stagingStore.delete(projectDir, rel));
     } catch (err) {
       const path = `.specnaut/upgrade-staging/${rel}`;
       refusals.push(refusalLine(path, err, `could not clear the stale staged copy ${path}`));
     }
   }
+  const tidy = await tidyStagingRoot(stagingStore, projectDir);
+  return tidy === null ? refusals : [...refusals, tidy];
+}
+
+/**
+ * Removes the staging folder if nothing is left in it, the one tidy `pruneStaging`
+ * and `reconcile` share. Returns the line to report when it could not, else `null`.
+ *
+ * A folder left behind is harmless and the next run retries, but it is said, not
+ * swallowed: a catch that reports nothing would hide the next failure here that is
+ * not harmless. No "safe to delete by hand": the failed read cannot say the folder
+ * is empty, and it may still hold copies waiting to be reconciled.
+ */
+export async function tidyStagingRoot(
+  stagingStore: StagingStore,
+  projectDir: string,
+): Promise<string | null> {
   try {
     await stagingStore.cleanupIfEmpty(projectDir);
+    return null;
   } catch (err) {
-    // An empty directory left behind is harmless and the next run retries —
-    // but it is said, not swallowed: a catch that reports nothing would hide
-    // the next failure here that is not harmless.
     const path = ".specnaut/upgrade-staging/";
-    refusals.push(refusalLine(path, err, `could not remove the empty ${path}`));
+    return err instanceof PathRefusal
+      ? leftAlone(path, err)
+      : `could not tidy ${path} (${why(err)}); the next run retries`;
   }
-  return refusals;
 }
 
 const why = (err: unknown) => err instanceof Error ? err.message : String(err);

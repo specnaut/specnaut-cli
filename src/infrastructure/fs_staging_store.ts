@@ -1,8 +1,9 @@
-import { relative, resolve } from "@std/path";
+import { dirname, relative, resolve } from "@std/path";
 import { walk } from "@std/fs/walk";
 import type { StagingStore } from "../application/ports.ts";
-import { assertSafeDestination, isInside } from "../domain/template.ts";
+import { assertSafeDestination } from "../domain/template.ts";
 import { assertInsideProject, resolveProjectRoot } from "./fs_containment.ts";
+import { pruneEmptyParents } from "./fs_prune.ts";
 import { linkedStagingRefusal } from "./fs_refusals.ts";
 
 const STAGING_REL = ".specnaut/upgrade-staging";
@@ -60,7 +61,7 @@ export class FsStagingStore implements StagingStore {
     }
   }
 
-  async delete(projectDir: string, relPath: string): Promise<void> {
+  async delete(projectDir: string, relPath: string): Promise<string[]> {
     assertSafeDestination(relPath);
     await assertStagingNotLinked(projectDir);
     const full = resolve(projectDir, STAGING_REL, relPath);
@@ -68,27 +69,14 @@ export class FsStagingStore implements StagingStore {
     try {
       await Deno.remove(full);
     } catch (err) {
-      if (err instanceof Deno.errors.NotFound) return;
+      if (err instanceof Deno.errors.NotFound) return [];
       throw err;
     }
-    // Best-effort: clean up now-empty parent dirs up to the staging root.
-    let parent = resolve(full, "..");
-    const stagingDir = resolve(projectDir, STAGING_REL);
-    // `isInside`, not `startsWith` (cli#574). The prefix test is wrong on
-    // Windows for the reason `pruneEmptyParents` records, and wrong on POSIX
-    // too: a sibling directory named `upgrade-staging-old` starts with
-    // `upgrade-staging` while being nowhere inside it.
-    while (parent !== stagingDir && isInside(stagingDir, parent)) {
-      try {
-        const entries = [];
-        for await (const _ of Deno.readDir(parent)) entries.push(_);
-        if (entries.length > 0) break;
-        await Deno.remove(parent);
-      } catch {
-        break;
-      }
-      parent = resolve(parent, "..");
-    }
+    // The copy is gone. A folder left behind is a note, never a throw: a caller
+    // would report that throw as a copy it could not clear (cli#719).
+    const notes: string[] = [];
+    await pruneEmptyParents(dirname(full), resolve(projectDir, STAGING_REL), notes);
+    return notes;
   }
 
   async cleanupIfEmpty(projectDir: string): Promise<boolean> {
