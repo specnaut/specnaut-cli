@@ -83,8 +83,14 @@ async function exec(
     stderr: "piped",
   }).spawn();
   const writer = child.stdin.getWriter();
-  if (opts.stdin !== undefined) await writer.write(new TextEncoder().encode(opts.stdin));
-  await writer.close();
+  try {
+    if (opts.stdin !== undefined) await writer.write(new TextEncoder().encode(opts.stdin));
+    await writer.close();
+  } catch (e) {
+    // A guard that refuses before it reads its payload has closed the pipe: its
+    // exit code is the result. Anything else is a failure.
+    if (!(e instanceof Deno.errors.BrokenPipe)) throw e;
+  }
   const out = await child.output();
   const dec = new TextDecoder();
   return { code: out.code, stdout: dec.decode(out.stdout), stderr: dec.decode(out.stderr) };

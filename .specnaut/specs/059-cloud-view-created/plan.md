@@ -39,8 +39,7 @@ plain line, and the shape check leaves only digits and fixed separators.
 Readers: `plan`, `resume`, `groom`, `implement`. Parsers of the old first line: none found.
 
 Touched, with `wc -l` before the change: `cloud/view.sh` 25, `backlog.md` 278 (and its plugin
-mirror), `phases/plan.md` and `phases/implement.md` (one pointer each, with their mirrors),
-`wip-audit.sh` 155, `tests/scripts/view_sh_test.ts` 94, `tests/scripts/cloud_stub.ts` 44,
+mirror), `wip-audit.sh` 155, `tests/scripts/view_sh_test.ts` 94, `tests/scripts/cloud_stub.ts` 44,
 `tests/scripts/cloud_stub_server.ts` 76, `tests/scripts/cloud_curl_test.ts` 319 (target 300; its
 harness moves to `cloud_stub.ts`, so it shrinks), and the regenerated `src/templates_bundle.ts`.
 

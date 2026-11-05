@@ -19,8 +19,7 @@ step 4b, without being asked.
 
 **Re-entry.** `plan <id>` classifies the item once, before step 2: its state, creation time and
 parent from the backend's `view.sh` (never its body as evidence), then
-`bash .specnaut/scripts/bash/wip-audit.sh <id>@<epoch>` (with no creation time to read, its header
-says what to pass). `phases/auto-chain.md` decides from that
+`bash .specnaut/scripts/bash/wip-audit.sh <id>@<epoch>`. `phases/auto-chain.md` decides from that
 whether the chain goes on; where its row stops (`UNPUSHED`), stop here, before step 2.
 
 <!-- BEGIN: spec-backend=local -->
