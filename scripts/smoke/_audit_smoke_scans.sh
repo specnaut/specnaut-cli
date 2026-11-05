@@ -15,61 +15,30 @@ echo
 # `.claude/...` paths can scaffold from EITHER templates/core/ OR
 # templates/harness-specific/<harness>/ (the harness-specific tree wins on
 # overlap). The resolver checks both.
+#
+# `hits` is captured rather than piped into `grep -q`: this script runs under
+# `set -euo pipefail`, and `grep -q` exits at the first match, SIGPIPE-ing
+# `find`. pipefail then reports 141 for a run that FOUND the file, and the
+# caller reads that as "does not resolve" — a stale-assertion finding
+# manufactured out of a path that resolves. Same hazard as audit.sh's coverage
+# grep; see the commit body for the witness.
 resolves() {
-  local rt="$1"
-  # Captured rather than piped into `grep -q`: this script runs under
-  # `set -euo pipefail`, and `grep -q` exits at the first match, SIGPIPE-ing
-  # `find`. pipefail then reports 141 for a run that FOUND the file, and the
-  # caller reads that as "does not resolve" — a stale-assertion finding
-  # manufactured out of a path that resolves. Same hazard as audit.sh's coverage
-  # grep; see the commit body for the witness.
-  local hits
+  local rt="$1" hits
   # Strip trailing slash — directory references in `[ -d ... ]` checks are
   # not stale signals; they're shape assertions on the runtime tree.
   case "$rt" in */) return 0 ;; esac
   case "$rt" in
-    .claude/agents/*.md)
-      local n="${rt#.claude/agents/}"
-      [ -f "$SRC_ROOT/templates/core/agents/$n" ] && return 0
-      hits="$(find "$SRC_ROOT/templates/harness-specific" -path "*/agents/$n" 2>/dev/null || true)"
-      [ -n "$hits" ]
-      ;;
-    .claude/commands/*.md)
-      local n="${rt#.claude/commands/}"
-      [ -f "$SRC_ROOT/templates/core/commands/$n" ] && return 0
-      hits="$(find "$SRC_ROOT/templates/harness-specific" -path "*/commands/$n" 2>/dev/null || true)"
-      [ -n "$hits" ]
-      ;;
-    .claude/skills/*/SKILL.md)
-      local n="${rt#.claude/skills/}"
-      n="${n%/SKILL.md}"
-      [ -f "$SRC_ROOT/templates/core/skills/$n/SKILL.md" ] && return 0
-      hits="$(find "$SRC_ROOT/templates/harness-specific" -path "*/skills/$n/SKILL.md" 2>/dev/null || true)"
+    .claude/agents/*.md|.claude/commands/*.md|.claude/skills/*/SKILL.md|.claude/hooks/*|.claude/scripts/*|.claude/loop.md)
+      local n="${rt#.claude/}"
+      [ -e "$SRC_ROOT/templates/core/$n" ] && return 0
+      hits="$(find "$SRC_ROOT/templates/harness-specific" -path "*/$n" 2>/dev/null || true)"
       [ -n "$hits" ]
       ;;
     .claude/skills/*/phases/*.md)
       # Owner-generic since spec 033: a phase document belongs to whichever
       # skill owns it, not to `specnaut`. A pattern naming one owner reports
       # every other skill's documents as stale assertions.
-      local rest="${rt#.claude/skills/}"
-      [ -f "$SRC_ROOT/templates/core/skills/$rest" ]
-      ;;
-    .claude/hooks/*)
-      local n="${rt#.claude/hooks/}"
-      [ -e "$SRC_ROOT/templates/core/hooks/$n" ] && return 0
-      hits="$(find "$SRC_ROOT/templates/harness-specific" -path "*/hooks/$n" 2>/dev/null || true)"
-      [ -n "$hits" ]
-      ;;
-    .claude/scripts/*)
-      local n="${rt#.claude/scripts/}"
-      [ -e "$SRC_ROOT/templates/core/scripts/$n" ] && return 0
-      hits="$(find "$SRC_ROOT/templates/harness-specific" -path "*/scripts/$n" 2>/dev/null || true)"
-      [ -n "$hits" ]
-      ;;
-    .claude/loop.md)
-      [ -f "$SRC_ROOT/templates/core/loop.md" ] && return 0
-      hits="$(find "$SRC_ROOT/templates/harness-specific" -name "loop.md" 2>/dev/null || true)"
-      [ -n "$hits" ]
+      [ -f "$SRC_ROOT/templates/core/skills/${rt#.claude/skills/}" ]
       ;;
     .claude/settings.json|.claude/settings.local.json)
       return 0 # merged at init time from per-harness logic; no single source file

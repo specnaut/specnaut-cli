@@ -8,16 +8,7 @@ set -euo pipefail
 
 NAME="${1:?usage: smoke-backlog-local.sh <name>}"
 . "$(dirname "$0")/_common.sh"
-DIR="$(scenario_dir "$NAME")"
-
-# Wipe the scenario directory on every exit path, so sandbox/ never accumulates orphans.
-trap 'bash "$SMOKE_DIR/clean.sh" "$NAME" >/dev/null 2>&1 || true' EXIT
-
-bash "$SMOKE_DIR/bootstrap-vite.sh" "$NAME" >/dev/null
-(cd "$DIR" && deno run --allow-all "$CLI/src/main.ts" \
-  init --here --no-git --ai claude --backlog local >/dev/null 2>&1)
-
-cd "$DIR"
+smoke_scaffold "$NAME"
 
 echo "═══ #563  sub-issue enumeration on the local backend ═══"
 check "parent-of.sh present + executable (#563)" \

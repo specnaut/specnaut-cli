@@ -13,16 +13,7 @@ set -euo pipefail
 
 NAME="${1:?usage: smoke-features.sh <name>}"
 . "$(dirname "$0")/_common.sh"
-DIR="$(scenario_dir "$NAME")"
-
-# Wipe the scenario directory on every exit path, success or failure.
-trap 'bash "$SMOKE_DIR/clean.sh" "$NAME" >/dev/null 2>&1 || true' EXIT
-
-bash "$SMOKE_DIR/bootstrap-vite.sh" "$NAME" >/dev/null
-(cd "$DIR" && deno run --allow-all "$CLI/src/main.ts" \
-  init --here --no-git --ai claude --backlog local >/dev/null 2>&1)
-
-cd "$DIR"
+smoke_scaffold "$NAME"
 
 echo "═══ #67  specs/ → .specnaut/specs/ ═══"
 check "no top-level specs/ directory" '[ ! -d specs ]'

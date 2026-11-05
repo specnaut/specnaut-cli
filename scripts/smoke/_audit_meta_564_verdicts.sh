@@ -1,8 +1,8 @@
 # shellcheck shell=bash
 # Sourced by smoke-audit.sh, after _audit_meta_verdicts.sh: the verdicts on
-# the #564 probes that _audit_meta_564.sh captured.
+# the #564 probes that _audit_meta_564.sh and _audit_meta_564_foreign.sh captured.
 #
-# Every u564_* capture read here is assigned in _audit_meta_564.sh, which
+# Every u564_* capture read here is assigned in one of those two, which
 # ShellCheck cannot see from this file.
 # shellcheck disable=SC2154
 

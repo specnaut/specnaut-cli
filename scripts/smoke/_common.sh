@@ -130,6 +130,21 @@ smoke_require_name() {
 # Absolute path of a scenario tree, name-checked.
 scenario_dir() { smoke_require_name "${1:-}"; echo "$SANDBOX_ROOT/$1"; }
 
+# --- The scaffold most scripts start from (cli#719) ----------------------
+# smoke_scaffold <name> — a fresh Vite project under the scenario tree, wiped on
+# every exit path, success or failure, with a Claude scaffold on the local backend,
+# and the caller standing in it. Sets DIR and the EXIT trap in the CALLER'S shell,
+# so never call it inside $(...): the trap would fire when that subshell ends.
+smoke_scaffold() {
+  DIR="$(scenario_dir "$1")"
+  SCAFFOLD_NAME="$1"
+  trap 'bash "$SMOKE_DIR/clean.sh" "$SCAFFOLD_NAME" >/dev/null 2>&1 || true' EXIT
+  bash "$SMOKE_DIR/bootstrap-vite.sh" "$1" >/dev/null
+  (cd "$DIR" && deno run --allow-all "$CLI/src/main.ts" \
+    init --here --no-git --ai claude --backlog local >/dev/null 2>&1)
+  cd "$DIR" || exit 1
+}
+
 # --- Assertion harness (plan.md §5 R4) ----------------------------------
 # Nine scripts each carried their own pass/fail/counter and printed one of
 # twelve different closing banners. FR-013 requires that a red run NAME the

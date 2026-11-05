@@ -27,11 +27,12 @@ scripts actually on disk. A script that exists but is not listed is a finding, n
 smoke scripts in `_audit_smoke_scans.sh`. **`smoke-audit.sh`** — its meta-test, with the #564 probes
 and the verdicts in `_audit_meta_*.sh`.
 
-## `_common.sh` owns five decisions
+## `_common.sh` owns six decisions
 
-Path resolution, suite membership, the assertion harness, what a valid scenario name is, and what
-counts as code in a smoke script. Source it; never re-derive any of them locally. It is written for
-**bash 3.2**, because macOS ships that and the interactive scenarios exist for that machine.
+Path resolution, suite membership, the assertion harness, what a valid scenario name is, what counts
+as code in a smoke script, and the scaffold most scripts start from (`smoke_scaffold`). Source it;
+never re-derive any of them locally. It is written for **bash 3.2**, because macOS ships that and
+the interactive scenarios exist for that machine.
 
 ## Audit heuristics
 

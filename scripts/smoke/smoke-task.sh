@@ -10,17 +10,7 @@ set -euo pipefail
 
 NAME="${1:?usage: smoke-task.sh <name>}"
 . "$(dirname "$0")/_common.sh"
-DIR="$(scenario_dir "$NAME")"
-
-# Trap-based cleanup: wipe the scenario directory on every exit path
-# (success OR failure) so the sandbox/ tree never accumulates orphans.
-trap 'bash "$SMOKE_DIR/clean.sh" "$NAME" >/dev/null 2>&1 || true' EXIT
-
-bash "$SMOKE_DIR/bootstrap-vite.sh" "$NAME" >/dev/null
-(cd "$DIR" && deno run --allow-all "$CLI/src/main.ts" \
-  init --here --no-git --ai claude --backlog local >/dev/null 2>&1)
-
-cd "$DIR"
+smoke_scaffold "$NAME"
 
 echo "═══ spec 037  the pipeline phases live under /task ═══"
 # Spec 037 moved the pipeline phases under /task; /specnaut keeps only the
