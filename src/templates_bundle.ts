@@ -23807,8 +23807,10 @@ while IFS= read -r cmd; do
   i=\$((i + 1))
   echo "  [\$i/\$count] \$cmd"
   # \`cd\` per command: a command that changes directory must not silently
-  # relocate the next one.
-  ( cd "\$REPO_ROOT" && eval "\$cmd" )
+  # relocate the next one. Stdin from /dev/null: this loop reads its list from
+  # stdin, so a command inheriting it would consume the commands after it, and
+  # the tier would report them as passed without running them.
+  ( cd "\$REPO_ROOT" && eval "\$cmd" ) </dev/null
   rc=\$?
   if [ "\$rc" -ne 0 ]; then
     echo "  ✗ the \$TIER gate failed at command \$i/\$count (exit \$rc): \$cmd" >&2
@@ -27565,27 +27567,38 @@ if (\$commands.Count -eq 0) {
 \$count = \$commands.Count
 Write-Output "running the \$Tier gate — \$count command(s) from \$(Split-Path -Leaf \$gates)"
 
+# One command, with stdin closed. Only a new process can have that: a native
+# command inherits this script's stdin and PowerShell has no redirect for it, so
+# a command reading stdin would take the caller's data or wait on a terminal.
+# ProcessPath is this very host, where a path built from \$PSHOME was fragile. The
+# process is also what makes a directory change or an \`exit\` end with the command.
+#
+# The command string is the project's and is run verbatim, as bash's \`eval\` runs
+# it. A native command sets \$LASTEXITCODE; a failing cmdlet leaves it 0 and sets
+# \$? to false. Both are failures, so both are read, and \$? is read first because
+# the next statement resets it. Invoke-Expression cannot serve here: it succeeds
+# whenever its argument parses, so \$? never sees the cmdlet inside it.
+function Invoke-GateCommand([string]\$Command) {
+    \$script = "\`\$global:LASTEXITCODE = 0\`n\$Command\`n" +
+    '\$gateOk = \$?; if (\$LASTEXITCODE -ne 0) { exit \$LASTEXITCODE }; if (-not \$gateOk) { exit 1 }; exit 0'
+    \$psi = [System.Diagnostics.ProcessStartInfo]::new([Environment]::ProcessPath)
+    foreach (\$a in @('-NoProfile', '-NonInteractive', '-Command', \$script)) {
+        \$psi.ArgumentList.Add(\$a)
+    }
+    \$psi.WorkingDirectory = \$repoRoot
+    \$psi.UseShellExecute = \$false
+    \$psi.RedirectStandardInput = \$true
+    \$process = [System.Diagnostics.Process]::Start(\$psi)
+    \$process.StandardInput.Close()
+    \$process.WaitForExit()
+    return \$process.ExitCode
+}
+
 \$i = 0
 foreach (\$cmd in \$commands) {
     \$i++
     Write-Output "  [\$i/\$count] \$cmd"
-    # Push/pop per command: a command that changes directory must not silently
-    # relocate the next one.
-    Push-Location \$repoRoot
-    try {
-        # Invoke-Expression is the direct analogue of bash's \`eval\`: the
-        # command string is the project's and is run verbatim. Spawning a
-        # child pwsh through a constructed \$PSHOME path was the first draft
-        # and is fragile across platforms for no gain.
-        \$global:LASTEXITCODE = 0
-        Invoke-Expression \$cmd
-        # A native command sets \$LASTEXITCODE; a failing cmdlet leaves it 0
-        # and sets \$? to false. Both are failures, so both are checked —
-        # reading only one is how a gate passes on a command that did not.
-        \$rc = if (\$LASTEXITCODE -ne 0) { \$LASTEXITCODE } elseif (-not \$?) { 1 } else { 0 }
-    } finally {
-        Pop-Location
-    }
+    \$rc = Invoke-GateCommand \$cmd
     if (\$rc -ne 0) {
         Write-Error "  ✗ the \$Tier gate failed at command \$i/\$count (exit \$rc): \$cmd"
         exit 1

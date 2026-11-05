@@ -86,8 +86,10 @@ while IFS= read -r cmd; do
   i=$((i + 1))
   echo "  [$i/$count] $cmd"
   # `cd` per command: a command that changes directory must not silently
-  # relocate the next one.
-  ( cd "$REPO_ROOT" && eval "$cmd" )
+  # relocate the next one. Stdin from /dev/null: this loop reads its list from
+  # stdin, so a command inheriting it would consume the commands after it, and
+  # the tier would report them as passed without running them.
+  ( cd "$REPO_ROOT" && eval "$cmd" ) </dev/null
   rc=$?
   if [ "$rc" -ne 0 ]; then
     echo "  ✗ the $TIER gate failed at command $i/$count (exit $rc): $cmd" >&2
