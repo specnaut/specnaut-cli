@@ -585,7 +585,8 @@ pre-merge step both call it; neither reads \`gates.yml\` itself. A second parser
 is a second definition of what a gate is, and two definitions drift.
 
 - Commands run in order, from the repository root, each in its own subshell —
-  a command that changes directory does not relocate the next one.
+  a command that changes directory does not relocate the next one. Each runs with
+  no stdin: a command that reads it finds it empty.
 - **A non-zero exit from any command fails the tier.**
 - **A tier that is not declared is not a failure.** No \`gates.yml\`, or an empty
   list, and the run reports that the tier is not declared and continues. A
@@ -593,6 +594,103 @@ is a second definition of what a gate is, and two definitions drift.
 - "No gate ran" and "the gate passed" are printed as different sentences,
   because they are different facts and a caller that cannot tell them apart
   will report the wrong one.
+
+## Running only what a change can affect
+
+A repository holding several workspaces may not want a one-line change to validate
+every one of them. It can opt in, and **nothing changes for a project that does
+not**. Specnaut ships no graph and no adapter: only the project knows its own
+graph, and a shipped one would name a tool.
+
+\`\`\`
+.specnaut/scripts/bash/run-gate.sh <fast|full> --base <rev>
+.specnaut/scripts/bash/run-gate.sh <fast|full> --refs-stdin
+\`\`\`
+
+Bare \`run-gate.sh <tier>\` never reads any of this: it stays the manual full
+override. Behind a flag with no \`.specnaut/impact.json\`, here or on a base, the run
+is the bare run, to the byte. \`--refs-stdin\` reads a pre-push hook's lines.
+
+\`.specnaut/impact.json\` is the project's own, and Specnaut ships no copy of it:
+
+\`\`\`json
+{
+  "schema": 1,
+  "adapter": { "command": "<a command>", "files": ["tools/graph-adapter"] },
+  "scoped_tiers": ["fast"],
+  "full_on": ["<a lockfile>", "<a directory>/"],
+  "inert": [".specnaut/specs/", ".specnaut/feature.json"],
+  "checks": [
+    { "gate": "<a command in gates.yml>", "scoped": "<its narrowed form>" },
+    { "gate": "<another>", "scoped": "<its narrowed form>", "owners": ["<an owner id>"] }
+  ]
+}
+\`\`\`
+
+- **\`adapter.command\`** reports the graph. **\`adapter.files\`** names what it is built
+  from; a change to any of them widens the run.
+- **\`scoped_tiers\`**: a tier outside the list runs full.
+- **\`full_on\`**: a changed path here runs full. **\`inert\`**: a changed path here affects
+  nothing, such as what every branch commits. \`full_on\` beats \`inert\`.
+- **\`checks\`** maps a gate command, by its exact string, to the command that narrows
+  it. The scoped command reads the owners from \`SPECNAUT_AFFECTED_OWNERS\`,
+  space-separated; they are never spliced into the string. A check with **\`owners\`** is
+  omitted when none of them is affected, and given only those that are. **A gate
+  command with no check always runs.**
+- A path in \`adapter.files\`, \`full_on\`, \`inert\` and an owner's \`roots\` is a directory prefix ending in \`/\`,
+  or an exact path: relative, with no \`..\`, no \`./\`, no \`//\`, no backslash, no glob and
+  no control character. An owner id matches \`[A-Za-z0-9][A-Za-z0-9._-]{0,63}\`.
+
+**The adapter.** It is the base's copy, run from a temporary worktree of the base, once
+for each base and once for the candidate. It gets no stdin and no \`GIT_*\` variable, runs
+in the shell of the twin that started it, and is told \`SPECNAUT_IMPACT_TREE\` (the
+absolute path of the tree to describe), \`SPECNAUT_IMPACT_COMMIT\`, \`SPECNAUT_IMPACT_OUT\`
+(where to write), \`SPECNAUT_IMPACT_SCHEMA\` and \`SPECNAUT_IMPACT_REPO\` (the candidate
+root, should it need an installed toolchain). It writes:
+
+\`\`\`json
+{ "schema": 1, "commit": "<SPECNAUT_IMPACT_COMMIT>", "complete": true,
+  "owners": [{ "id": "<id>", "roots": ["<path>"], "depends_on": ["<id>"] }] }
+\`\`\`
+
+**What runs.** A changed path under a root in either snapshot affects that owner, and an
+owner whose record differs, or that exists on one side only, is affected. So is every
+owner that depends on an affected one, over the edges of every snapshot.
+
+**Uncertainty widens.** Each of these runs the candidate's whole tier and names itself on
+the \`fallback:\` line: an unowned path, a \`full_on\` match, a gitlink, a symlink or a type
+change; a declaration, an \`adapter.files\` entry, \`gates.yml\` or \`.specnaut/scripts/\` that
+differs from a given base, or from the merge-base with the default branch; any of those
+that is not a tracked regular file; an adapter that fails or answers anything invalid; a
+malformed declaration; a base that does not resolve or was never fetched; \`jq\` absent, older
+than 1.6, or failing where its answer decides the run.
+
+**Exit codes**, the last two only behind a flag:
+
+| Exit | Meaning |
+|------|---------|
+| 0 | The selection passed |
+| 1 | A command failed. It stops there, whatever else is true |
+| 2 | Usage |
+| 3 | **The candidate is refused**: a dirty tree, an untracked file, a tree that moved during the run, or a push of several trees. Nothing presents one tree's pass as another's. A gate that leaves an unignored file is refused too, by design |
+| 4 | **Nothing was checked**: every command was omitted, or the tier was emptied on the branch. A skip is never a pass. With a \`removed:\` line other than \`none\`, stop and name what left the tier: a bare run of an empty tier passes. With \`removed: none\`, the bare run is the check |
+
+**What it prints.** Every run behind a flag prints \`candidate:\`, \`scope:\`, \`fallback:\`,
+\`removed:\`, \`omitted:\`, \`ran:\` and \`evidence:\` lines, in ASCII. \`removed:\` names what is in
+a base's tier and gone from the candidate's, because "full" means the candidate's own list.
+A pass whose \`scope:\` is not \`full\` **is not the full gate**, and its last line names the
+scope. Nor is a pass with a \`removed:\` line other than \`none\`: it names those commands. Evidence
+goes to \`git rev-parse --git-path specnaut/gate-evidence/<tier>-<tree>.json\`.
+It is write-only: nothing reads it to decide anything, and failing to write it changes no
+result.
+
+**Limits to know.** A hung adapter hangs the run, as a gate command does today. Ignored
+files are not part of the candidate. Each run costs a checkout of the base. A wrong adapter
+under-selects, and only the project can know its graph; that \`scoped\` truly narrows its
+gate is the project's claim too, and the evidence records what was trusted. It stops
+mistakes, not a hostile branch, which already controls \`gates.yml\`. Behind a flag the PowerShell
+twin needs pwsh 7.4 or later, and a SIGTERM during its adapter leaves the temporary worktree and
+its registration behind: remove the directory and \`git worktree prune\` clears the entry.
 
 ## \`fast\` — after every child commit
 
@@ -1297,9 +1395,17 @@ that runs only on \`pull_request\`. **Do not infer \`--pr\` from a remote, a for
      landed (a re-run after the base moved): **stop** and say so — never squash, never close from
      here; the \`CHILD\` lines cannot be read back. A range holding any commit never reads 16.
    - **Exit 0 — an epic**: do **not** squash. Run the full gate tier once,
-     \`.specnaut/scripts/bash/run-gate.sh full\` (a failure is fixed on the branch as a \`--fixup\` of the
-     child at fault, then the tier re-run — never escalated), then load \`phases/epic-fixups.md\` and
-     fold. Do not merge past a failed fold.
+     \`.specnaut/scripts/bash/run-gate.sh full --base "\$(git merge-base HEAD <base>)"\` (a failure is
+     fixed on the branch as a \`--fixup\` of the child at fault,
+     then the tier re-run — never escalated), then load \`phases/epic-fixups.md\` and fold. Do not
+     merge past a failed fold. Its other exits: **3**, the candidate is refused: stop and say why,
+     on the branch. **4**, nothing was checked. With a \`removed:\` line other than \`none\`, the branch
+     emptied the tier: stop and say which commands left it, because a bare run of an empty tier
+     passes. With \`removed: none\`, everything was omitted: run it bare,
+     \`.specnaut/scripts/bash/run-gate.sh full\`, and read that result instead. A project that
+     declares \`.specnaut/impact.json\` may run less than the whole tier, so a pass whose \`scope:\`
+     line is not \`full\` is reported as that scope, and a pass with a \`removed:\` line names those
+     commands: neither is ever reported as the full gate.
 2. **\`--pr\` only** — push the branch, open the pull request against the base, name any issue its
    body references that \`gh pr view <n> --json closingIssuesReferences\` omits, report the PR URL,
    run step 5 and step 6, and **stop**: nothing has merged, so the item stays open. Re-run
@@ -4546,6 +4652,10 @@ Enhanced fork of [\`specify\` CLI](https://github.com/github/spec-kit), distribu
 - \`/design\` — the project's \`DESIGN.md\` design system: discovery when absent, edit when present, \`audit\` for drift. Started by the user only.
 
 Earlier releases kept the pipeline, the backlog and the audits at other addresses; the \`specnaut\` skill's **Retired addresses** table maps each to its new one, and \`specnaut upgrade\` moves them.
+
+### Quality gates
+
+\`.specnaut/gates.yml\` declares the \`fast\` and \`full\` tiers, and \`run-gate.sh <tier>\` runs them. A project may opt in to running only what a change can affect: \`.specnaut/impact.json\` and an adapter of its own, used behind \`--base <rev>\` or \`--refs-stdin\`. Specnaut ships no graph and names no build tool; what cannot be shown safe runs the whole tier and names why. Behind those flags exit 3 refuses a candidate and exit 4 means nothing was checked. \`phases/quality-gates.md\` is the contract.
 
 ### Backlog conventions (GitHub backend)
 
@@ -23722,7 +23832,7 @@ generate_branch_name() {
     content: `#!/usr/bin/env bash
 # Run one declared quality-gate tier.
 #
-#   run-gate.sh <fast|full>
+#   run-gate.sh <fast|full> [--base <rev> | --refs-stdin]
 #
 # Reads \`.specnaut/gates.yml\` and runs the commands under \`fast_gate:\` or
 # \`full_gate:\`, in order, from the repository root.
@@ -23739,6 +23849,17 @@ generate_branch_name() {
 #   0   every command succeeded, OR the tier is not declared (see below)
 #   1   a command exited non-zero — the tier failed
 #   2   usage error
+#   3   behind a flag: the candidate is refused, before or after the commands
+#   4   behind a flag: every command was omitted, or the tier was emptied on the
+#       branch. A skip is never a pass
+#
+# Bare, it never reads \`.specnaut/impact.json\` and is the manual full override.
+# Behind a flag it asks gate-impact.sh which commands this candidate needs, runs
+# that selection with its own loop and reports what it ran and what it did not. With
+# no declaration on either side the flag changes nothing, to the byte. Which
+# command runs and why is the resolver's to say; what the outcome exits is this
+# file's. \`--parse-gates <file>\` prints a tier's commands from <file>: it is how the
+# resolver reads a base's list without a second parser.
 #
 # A tier that is not declared is NOT a failure. A project with no gates.yml,
 # or with an empty list, behaves exactly as it did before this file existed.
@@ -23759,16 +23880,11 @@ SPECNAUT_DIR="\$(cd -- "\$SCRIPT_DIR/../.." && pwd)"
 GATES="\$SPECNAUT_DIR/gates.yml"
 REPO_ROOT="\$(cd -- "\$SPECNAUT_DIR/.." && pwd)"
 
-if [ ! -r "\$GATES" ]; then
-  echo "no \$TIER gate declared — \$GATES is absent, so nothing ran"
-  exit 0
-fi
-
 # Read one flat list. The format is narrow on purpose (see gates.yml): a
 # top-level \`<tier>_gate:\` key, then \`  - \` items until the next top-level key.
 # Quotes around an item are optional and are stripped as a matched pair only,
 # so a command containing a quote is not silently mangled.
-COMMANDS="\$(
+parse_tier() {
   awk -v key="\${TIER}_gate:" '
     # A top-level key is a line starting in column 1 with a non-space,
     # non-comment character. Reaching one ends the section we are in.
@@ -23790,8 +23906,177 @@ COMMANDS="\$(
       }
       print line
     }
-  ' < "\$GATES"
-)"
+  ' < "\$1"
+}
+
+FLAG="" BASE_VALUE=""
+flag_usage() { echo "usage: run-gate.sh <fast|full> [--base <rev> | --refs-stdin]" >&2; exit 2; }
+parse_flags() {
+  while [ "\$#" -gt 0 ]; do
+    case "\$1" in
+      --base)
+        if [ -n "\$FLAG" ] || [ "\$#" -lt 2 ]; then flag_usage; fi
+        case "\$2" in -*) flag_usage ;; esac
+        FLAG=--base BASE_VALUE="\$2"
+        shift 2
+        ;;
+      --refs-stdin)
+        [ -z "\$FLAG" ] || flag_usage
+        FLAG=--refs-stdin
+        shift
+        ;;
+      --parse-gates)
+        [ "\$#" -eq 2 ] || flag_usage
+        parse_tier "\$2"
+        exit 0
+        ;;
+      *) flag_usage ;;
+    esac
+  done
+}
+parse_flags "\${@:2}"
+
+# The answer gate-impact.sh wrote, one array per kind of record.
+TREE="" COMMIT="" SCOPE="" SCOPE_OWNERS="" REFUSED="" CAUSE=""
+RUN_OWNERS=() RUN_COMMANDS=() OMITTED=() REMOVED=()
+read_records() {
+  local kind rest
+  while IFS=\$'\\t' read -r kind rest; do
+    case "\$kind" in
+      candidate) TREE="\${rest%%\$'\\t'*}" COMMIT="\${rest#*\$'\\t'}" ;;
+      scope) SCOPE="\${rest%%\$'\\t'*}" SCOPE_OWNERS="\${rest#*\$'\\t'}" ;;
+      refused) REFUSED="\$rest" ;;
+      fallback) CAUSE="\$rest" ;;
+      removed) REMOVED+=("\$rest") ;;
+      omit) OMITTED+=("\${rest#*\$'\\t'} (\${rest%%\$'\\t'*})") ;;
+      run) RUN_OWNERS+=("\${rest%%\$'\\t'*}") RUN_COMMANDS+=("\${rest#*\$'\\t'}") ;;
+    esac
+  done <"\$1"
+}
+
+# Every activated run prints every label, \`none\` where there is nothing to say: a
+# line missing from a report cannot be told from a report that was cut short.
+report_label() {
+  local label="\$1" item
+  shift
+  [ "\$#" -gt 0 ] || { echo "\$label: none"; return 0; }
+  for item in "\$@"; do echo "\$label: \$(gate_ascii "\$item")"; done
+}
+
+print_report_head() {
+  if [ -n "\$TREE" ]; then echo "candidate: tree=\$TREE commit=\$COMMIT"; else echo "candidate: unknown"; fi
+  case "\$SCOPE" in
+    owners) echo "scope: owners \$SCOPE_OWNERS" ;;
+    "") echo "scope: none" ;;
+    *) echo "scope: \$SCOPE" ;;
+  esac
+  if [ -n "\$CAUSE" ]; then echo "fallback: \$CAUSE"; else echo "fallback: none"; fi
+  report_label removed \${REMOVED[@]+"\${REMOVED[@]}"}
+  report_label omitted \${OMITTED[@]+"\${OMITTED[@]}"}
+}
+
+# Exit 3 before anything ran. A refusal still prints the whole report, so a caller
+# reads one shape; there is no result to record, so no evidence is written.
+refuse_candidate() {
+  local label
+  echo "candidate: refused (\$1)"
+  for label in scope fallback removed omitted ran; do echo "\$label: none"; done
+  echo "evidence: unwritten (candidate refused)"
+  echo "the \$TIER gate refused the candidate: \$1" >&2
+  exit 3
+}
+
+# Runs the selection in order and stops at the first failure. Sets FAILED_AT and
+# FAILED_RC. Stdin from /dev/null, and the owners in the one variable named for them,
+# never spliced into a command string; no owners means none is inherited either.
+FAILED_AT=0 FAILED_RC=0
+run_selection() {
+  local i=0 count="\${#RUN_COMMANDS[@]}" cmd owners rc shown
+  [ "\$count" -gt 0 ] || { echo "ran: none"; return 0; }
+  while [ "\$i" -lt "\$count" ]; do
+    cmd="\${RUN_COMMANDS[\$i]}" owners="\${RUN_OWNERS[\$i]}" shown="\$(gate_ascii "\${RUN_COMMANDS[\$i]}")"
+    i=\$((i + 1))
+    echo "  [\$i/\$count] \$shown"
+    (
+      cd "\$REPO_ROOT" || exit 125
+      if [ "\$owners" = "-" ]; then unset SPECNAUT_AFFECTED_OWNERS; else export SPECNAUT_AFFECTED_OWNERS="\$owners"; fi
+      eval "\$cmd"
+    ) </dev/null
+    rc=\$?
+    printf '%s\\t%s\\t%s\\n' "\$rc" "\$owners" "\$cmd" >>"\$WORK/ran"
+    if [ "\$owners" = "-" ]; then echo "ran: \$shown (exit \$rc)"; else echo "ran: \$shown (owners \$owners; exit \$rc)"; fi
+    if [ "\$rc" -ne 0 ]; then
+      FAILED_AT="\$i" FAILED_RC="\$rc"
+      return 0
+    fi
+  done
+}
+
+# FR-013: a failed command stops at 1, whatever else is true. Drift after commands
+# that passed is 3, and drift of any kind invalidates the evidence. Omitted commands
+# with nothing run, or a tier emptied on the branch, is 4: nothing was checked.
+conclude_selected() {
+  local count="\${#RUN_COMMANDS[@]}" result=passed valid=true code=0 drift="" outcome="" where
+  if [ "\$FAILED_AT" -ne 0 ]; then
+    result=failed code=1
+    outcome="the \$TIER gate failed at command \$FAILED_AT/\$count (exit \$FAILED_RC)"
+  elif [ "\$count" -eq 0 ] && [ "\$((\${#OMITTED[@]} + \${#REMOVED[@]}))" -gt 0 ]; then
+    result=skipped code=4
+    outcome="the \$TIER gate ran nothing: every command was omitted or removed, and a skip is not a pass"
+  elif [ "\$count" -eq 0 ]; then
+    result=undeclared
+    outcome="no \$TIER gate declared, so nothing ran"
+  else
+    outcome="the \$TIER gate passed (scope: \$SCOPE) - \$count command(s) ran, \${#OMITTED[@]} omitted"
+    [ "\$SCOPE" != owners ] || outcome="the \$TIER gate passed (scope: owners \$SCOPE_OWNERS) - \$count command(s) ran, \${#OMITTED[@]} omitted"
+  fi
+  if ! drift="\$(gate_candidate_check "\$TREE")"; then
+    valid=false
+    if [ "\$code" -eq 0 ]; then
+      result=invalid code=3
+      outcome="the \$TIER gate refused the candidate after running: \$drift"
+    fi
+  fi
+  where="\$(gate_evidence_write "\$TIER" "\$TREE" "\$WORK/records" "\$WORK/ran" "\$result" "\$valid")"
+  echo "evidence: \$(gate_ascii "\$where")"
+  if [ "\$code" -eq 0 ]; then echo "\$outcome"; else echo "\$outcome" >&2; fi
+  exit "\$code"
+}
+
+# Behind a flag. Returns only when the answer is \`inactive\`, for the bare path to run
+# with nothing printed. An answer with no final \`end\` is no answer: it never reads
+# as a pass, and whether to widen is not this file's to decide.
+run_selected() {
+  local rc=0
+  WORK="\$(mktemp -d)" || { echo "run-gate: no temporary directory" >&2; exit 3; }
+  trap 'rm -rf "\$WORK"' EXIT
+  : >"\$WORK/commands"
+  : >"\$WORK/ran"
+  if [ -r "\$GATES" ]; then parse_tier "\$GATES" >"\$WORK/commands"; fi
+  bash "\$SCRIPT_DIR/gate-impact.sh" "\$TIER" "\$WORK/commands" "\$WORK/records" "\$FLAG" "\$BASE_VALUE" || rc=\$?
+  [ "\$(head -n 1 "\$WORK/records" 2>/dev/null)" != inactive ] || return 0
+  # shellcheck source=SCRIPTDIR/_gate_candidate.sh
+  . "\$SCRIPT_DIR/_gate_candidate.sh" || { echo "run-gate: _gate_candidate.sh is missing" >&2; exit 3; }
+  # shellcheck source=SCRIPTDIR/common.sh
+  . "\$SCRIPT_DIR/common.sh" || { echo "run-gate: common.sh is missing" >&2; exit 3; }
+  # shellcheck source=SCRIPTDIR/_gate_evidence.sh
+  . "\$SCRIPT_DIR/_gate_evidence.sh" || { echo "run-gate: _gate_evidence.sh is missing" >&2; exit 3; }
+  [ "\$(tail -n 1 "\$WORK/records" 2>/dev/null)" = end ] || refuse_candidate "no-selection: gate-impact exit \$rc"
+  read_records "\$WORK/records"
+  [ -z "\$REFUSED" ] || refuse_candidate "\$REFUSED"
+  print_report_head
+  run_selection
+  conclude_selected
+}
+
+if [ -n "\$FLAG" ]; then run_selected; fi
+
+if [ ! -r "\$GATES" ]; then
+  echo "no \$TIER gate declared — \$GATES is absent, so nothing ran"
+  exit 0
+fi
+
+COMMANDS="\$(parse_tier "\$GATES")"
 
 if [ -z "\$COMMANDS" ]; then
   echo "no \$TIER gate declared — \${TIER}_gate in \$(basename "\$GATES") is empty, so nothing ran"
@@ -23822,6 +24107,734 @@ EOF
 
 echo "✓ the \$TIER gate passed — \$count of \$count command(s)"
 exit 0
+`,
+    executable: true,
+    backend: null,
+    skipIfExists: false,
+  },
+  {
+    category: "spec-root",
+    name: "specify",
+    suffix: "scripts/bash/gate-impact.sh",
+    content: `#!/usr/bin/env bash
+# Decide which of a tier's commands this candidate needs. Called by run-gate.sh, and
+# by nothing else:
+#
+#   gate-impact.sh <tier> <commands-file> <records-file> <--base <rev> | --refs-stdin>
+#
+# It takes data and returns data. <commands-file> holds the tier's parsed commands,
+# one per line; <records-file> receives tab-separated records and a final \`end\`:
+#
+#   inactive                 no declaration, here or on a base: run as if bare
+#   refused   <cause>        the candidate cannot be vouched for
+#   candidate <tree> <commit>
+#   base      <commit>       once per base
+#   scope     <full|owners|none> <owners or ->
+#   fallback  <cause>        why the run widened to full
+#   adapter   <command>      the adapter this selection took on trust
+#   removed   <command>      in a base's tier, gone from the candidate's
+#   run       <owners or -> <command>
+#   omit      <reason> <command>
+#   end
+#
+# This file holds every fallback cause and the rule behind them: uncertainty widens.
+# What is not shown safe to narrow runs the full tier and names why. It runs nothing
+# of the tier itself; a missing \`end\` is how run-gate.sh knows there is no answer.
+# The threat model is mistakes: this runs from the candidate's own scripts, so it
+# cannot stop a hostile branch, which already controls gates.yml.
+set -uo pipefail
+
+SCRIPT_DIR="\$(cd -- "\$(dirname -- "\${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="\$(cd -- "\$SCRIPT_DIR/../../.." && pwd)"
+# shellcheck source=SCRIPTDIR/common.sh
+. "\$SCRIPT_DIR/common.sh" || exit 70
+# shellcheck source=SCRIPTDIR/_gate_candidate.sh
+. "\$SCRIPT_DIR/_gate_candidate.sh" || exit 70
+# shellcheck source=SCRIPTDIR/_gate_impact_read.sh
+. "\$SCRIPT_DIR/_gate_impact_read.sh" || exit 70
+# shellcheck source=SCRIPTDIR/_gate_impact_adapter.sh
+. "\$SCRIPT_DIR/_gate_impact_adapter.sh" || exit 70
+# shellcheck source=SCRIPTDIR/_gate_impact_graph.sh
+. "\$SCRIPT_DIR/_gate_impact_graph.sh" || exit 70
+
+for gate_var in \$GATE_LOCAL_ENV; do unset "\$gate_var"; done
+
+TIER="\${1:?}" COMMANDS="\${2:?}" RECORDS="\${3:?}" MODE="\${4:?}" BASE_ARG="\${5:-}"
+: >"\$RECORDS" || exit 70
+
+DECLARATION=.specnaut/impact.json
+CAUSE=""
+BASES=()       # the commits the change set is computed against
+COMPARE=()     # those, and the merge-base with the default branch (FR-006)
+LOCAL_SHAS=()  # what a push offers as the candidate
+CANDIDATE_TREE="" CANDIDATE_COMMIT="" AFFECTED="" SELECT=0
+
+WORK="\$(mktemp -d)" || exit 70
+cleanup() { gate_adapter_cleanup; rm -rf "\$WORK"; }
+trap cleanup EXIT
+trap 'exit 129' HUP; trap 'exit 130' INT; trap 'exit 143' TERM
+
+record() { local IFS=\$'\\t'; printf '%s\\n' "\$*" >>"\$RECORDS"; }
+widen() { [ -n "\$CAUSE" ] || CAUSE="\$(gate_ascii "\$1")"; }
+inactive() { record inactive; record end; exit 0; }
+refuse() {
+  [ -z "\$CANDIDATE_COMMIT" ] || record candidate "\$CANDIDATE_TREE" "\$CANDIDATE_COMMIT"
+  record refused "\$(gate_ascii "\$1")"
+  record end
+  exit 0
+}
+
+add_base() { case " \${BASES[*]-} " in *" \$1 "*) return 0 ;; esac; BASES+=("\$1"); COMPARE+=("\$1"); }
+
+# FR-005: what a push's lines say is the candidate's reader's; what they mean is here.
+read_refs() {
+  local fact value
+  while read -r fact value; do
+    case "\$fact" in
+      local) LOCAL_SHAS+=("\$value") ;;
+      base) add_base "\$value" ;;
+      malformed) widen "refs-malformed: \$value" ;;
+      zero) widen "remote-zero: \$value" ;;
+      unfetched) widen "remote-unfetched: \$value" ;;
+    esac
+  done < <(gate_candidate_read_refs)
+  [ "\${#BASES[@]}" -gt 0 ] || widen "no-base-in-refs"
+}
+
+read_base_flag() {
+  local commit
+  [ -n "\$BASE_ARG" ] || { widen "base-empty"; return 0; }
+  if commit="\$(gate_git rev-parse --verify --quiet --end-of-options "\$BASE_ARG^{commit}" 2>/dev/null)"; then
+    add_base "\$commit"
+  else
+    widen "base-unresolved: \$BASE_ARG"
+  fi
+}
+
+# FR-006: a narrow base must not launder an earlier change, so the protected paths
+# are also compared with where the branch left the default branch.
+read_merge_base() {
+  local name commit
+  name="\$(cd -- "\$REPO_ROOT" && bash "\$SCRIPT_DIR/base-branch.sh" 2>/dev/null)" ||
+    { widen "default-branch-unresolved"; return 0; }
+  if commit="\$(gate_candidate_merge_base "\$name")"; then COMPARE+=("\$commit"); else widen "merge-base-unresolved: \$name"; fi
+}
+
+# Does a commit in reach hold a declaration the work tree does not? One deleted on the
+# branch is a change, not a project that never opted in.
+declaration_on_a_side() {
+  local commit
+  for commit in HEAD \${COMPARE[@]+"\${COMPARE[@]}"}; do
+    gate_git cat-file -e "\$commit:\$DECLARATION" 2>/dev/null && return 0
+  done
+  return 1
+}
+
+# FR-006, for one path: tracked and regular on every side, and the same on every side.
+check_protected() {
+  local path="\$1" mine theirs commit mine_rc theirs_rc
+  mine="\$(gate_graph_protected_entries "\$CANDIDATE_COMMIT" "\$path")"
+  mine_rc=\$?
+  [ "\$mine_rc" -ne 2 ] || { widen "protected-not-regular: \$path"; return 1; }
+  for commit in "\${COMPARE[@]}"; do
+    theirs="\$(gate_graph_protected_entries "\$commit" "\$path")"
+    theirs_rc=\$?
+    [ "\$theirs_rc" -ne 2 ] || { widen "protected-not-regular: \$path"; return 1; }
+    [ "\$mine" = "\$theirs" ] || { widen "protected-changed: \$path"; return 1; }
+  done
+  [ "\$mine_rc" -eq 0 ] || { widen "protected-not-regular: \$path"; return 1; }
+}
+
+load_declaration() {
+  local problem
+  gate_git cat-file blob "\$CANDIDATE_COMMIT:\$DECLARATION" >"\$WORK/impact.json" 2>/dev/null ||
+    { widen "declaration-malformed: unreadable"; return 1; }
+  problem="\$(gate_read_declaration "\$WORK/impact.json" "\$WORK/declared.json")" ||
+    { widen "declaration-malformed: \$problem"; return 1; }
+  ADAPTER_COMMAND="\$(gate_read_adapter_command "\$WORK/declared.json")" || { widen "declaration-unreadable: adapter.command"; return 1; }
+  gate_read_adapter_files "\$WORK/declared.json" >"\$WORK/adapter-files" || { widen "declaration-unreadable: adapter.files"; return 1; }
+  gate_read_checks "\$WORK/declared.json" >"\$WORK/checks" || { widen "declaration-unreadable: checks"; return 1; }
+}
+
+check_every_protected() {
+  local path
+  check_protected .specnaut/gates.yml || return 1
+  check_protected .specnaut/scripts/ || return 1
+  while IFS= read -r path; do
+    check_protected "\$path" || return 1
+  done <"\$WORK/adapter-files"
+}
+
+# One adapter run: its exit and its output are all a cause needs, and each is one.
+snapshot_side() {
+  local side="\$1" worktree="\$2" tree="\$3" commit="\$4" n="\$5" rc problem
+  gate_adapter_run "\$ADAPTER_COMMAND" "\$worktree" "\$tree" "\$commit" "\$WORK/adapter.\$n.out"
+  rc=\$?
+  [ "\$rc" -eq 0 ] || { widen "adapter-failed: \$side exit \$rc"; return 1; }
+  [ -s "\$WORK/adapter.\$n.out" ] || { widen "adapter-no-output: \$side"; return 1; }
+  problem="\$(gate_read_snapshot "\$WORK/adapter.\$n.out" "\$commit" "\$WORK/snapshot.\$n.json")" ||
+    { widen "adapter-\$problem: \$side"; return 1; }
+}
+
+# One snapshot per distinct base, plus the candidate's, described by the first base's
+# adapter. FR-006 has shown every copy of the adapter to be the same bytes.
+take_snapshots() {
+  local i=0 commit first=""
+  mkdir -p "\$WORK/nohooks"
+  for commit in "\${BASES[@]}"; do
+    i=\$((i + 1))
+    gate_adapter_worktree "\$commit" "\$WORK/wt.\$i" "\$WORK/nohooks" ||
+      { widen "worktree-failed: \$commit"; return 1; }
+    [ -n "\$first" ] || first="\$WORK/wt.\$i"
+    snapshot_side base "\$WORK/wt.\$i" "\$WORK/wt.\$i" "\$commit" "\$i" || return 1
+  done
+  snapshot_side candidate "\$first" "\$REPO_ROOT" "\$CANDIDATE_COMMIT" candidate
+}
+
+compute_affected() {
+  local i=0 commit problem answer unknown
+  : >"\$WORK/pairs"
+  for commit in "\${BASES[@]}"; do
+    i=\$((i + 1))
+    problem="\$(gate_graph_changes "\$commit" "\$CANDIDATE_COMMIT" "\$WORK/paths.\$i")" ||
+      { widen "\$problem"; return 1; }
+    gate_graph_pair "\$WORK/paths.\$i" "\$WORK/snapshot.\$i.json" >>"\$WORK/pairs" ||
+      { widen "graph-failed: pair"; return 1; }
+  done
+  unknown="\$(gate_read_unknown_owner "\$WORK/declared.json" "\$WORK"/snapshot.*.json)" ||
+    { widen "graph-failed: owners"; return 1; }
+  [ -z "\$unknown" ] || { widen "declaration-malformed: unknown owner \$unknown"; return 1; }
+  answer="\$(gate_graph_affected "\$WORK/pairs" "\$WORK/snapshot.candidate.json" "\$WORK/declared.json")" ||
+    { widen "graph-failed: closure"; return 1; }
+  case "\$answer" in
+    full\$'\\t'*) widen "\${answer#full\$'\\t'}"; return 1 ;;
+    owners\$'\\t'*) AFFECTED="\${answer#owners\$'\\t'}" ;;
+    *) widen "graph-failed: answer"; return 1 ;;
+  esac
+}
+
+# The chain that can narrow a run: the first stage unable to show narrowing safe
+# widens and ends it, and only reaching the end sets SELECT.
+decide() {
+  local drift
+  [ -z "\$CAUSE" ] || return 0
+  command -v jq >/dev/null 2>&1 || { widen "jq-absent"; return 0; }
+  gate_read_jq_usable "\$COMMANDS" || { widen "jq-unusable"; return 0; }
+  check_protected "\$DECLARATION" || return 0
+  load_declaration || return 0
+  case " \$(gate_read_scoped_tiers "\$WORK/declared.json") " in
+    *" \$TIER "*) ;;
+    *) widen "tier-not-scoped: \$TIER"; return 0 ;;
+  esac
+  check_every_protected || return 0
+  take_snapshots || { drift="\$(gate_candidate_check "\$CANDIDATE_TREE")" || refuse "\$drift"; return 0; }
+  drift="\$(gate_candidate_check "\$CANDIDATE_TREE")" || refuse "\$drift"
+  compute_affected || return 0
+  SELECT=1
+}
+
+# One command's record. A check naming owners gets those it covers that are affected;
+# one naming none covers any. A command with no check always runs, as declared.
+select_one() {
+  local cmd="\$1" gate scoped owners hit o
+  while IFS=\$'\\t' read -r gate scoped owners; do
+    [ "\$gate" = "\$cmd" ] || continue
+    hit=""
+    for o in \$AFFECTED; do
+      case " \$owners " in " - "|*" \$o "*) hit="\$hit \$o" ;; esac
+    done
+    if [ -n "\$hit" ]; then
+      record run "\${hit# }" "\$scoped"
+    elif [ "\$owners" = "-" ]; then
+      record omit "no-affected-owner" "\$cmd"
+    else
+      record omit "owners-not-affected: \$owners" "\$cmd"
+    fi
+    return 0
+  done <"\$WORK/checks"
+  record run - "\$cmd"
+}
+
+# Commands in a base's tier that the candidate's no longer has. "Full" means the
+# candidate's own list, so a branch that drops a command would otherwise pass without
+# it. Read through run-gate's parser: a second one would be a second definition.
+report_removed() {
+  local commit cmd seen=\$'\\n'
+  for commit in \${COMPARE[@]+"\${COMPARE[@]}"}; do
+    gate_git cat-file blob "\$commit:.specnaut/gates.yml" >"\$WORK/gates.base" 2>/dev/null || continue
+    while IFS= read -r cmd; do
+      grep -qxF -- "\$cmd" "\$COMMANDS" && continue
+      case "\$seen" in *\$'\\n'"\$cmd"\$'\\n'*) continue ;; esac
+      seen="\$seen\$cmd"\$'\\n'
+      record removed "\$cmd"
+    done < <(bash "\$SCRIPT_DIR/run-gate.sh" "\$TIER" --parse-gates "\$WORK/gates.base")
+  done
+}
+
+write_selection() {
+  local commit cmd scope
+  record candidate "\$CANDIDATE_TREE" "\$CANDIDATE_COMMIT"
+  for commit in \${BASES[@]+"\${BASES[@]}"}; do record base "\$commit"; done
+  if [ "\$SELECT" -eq 1 ]; then
+    scope=none
+    [ -z "\$AFFECTED" ] || scope=owners
+    record scope "\$scope" "\${AFFECTED:--}"
+    record adapter "\$ADAPTER_COMMAND"
+  else
+    record scope full -
+    record fallback "\$CAUSE"
+  fi
+  report_removed
+  while IFS= read -r cmd; do
+    if [ "\$SELECT" -eq 1 ]; then select_one "\$cmd"; else record run - "\$cmd"; fi
+  done <"\$COMMANDS"
+  record end
+}
+
+main() {
+  local refusal in_repo=0
+  gate_candidate_in_repo && in_repo=1
+  if [ "\$in_repo" -eq 1 ]; then
+    case "\$MODE" in
+      --base) read_base_flag ;;
+      --refs-stdin) read_refs ;;
+    esac
+    read_merge_base
+  fi
+  if [ ! -e "\$REPO_ROOT/\$DECLARATION" ] && [ ! -L "\$REPO_ROOT/\$DECLARATION" ]; then
+    if [ "\$in_repo" -eq 0 ] || ! declaration_on_a_side; then inactive; fi
+  fi
+  [ "\$in_repo" -eq 1 ] || refuse "not-a-repository: a declaration needs a work tree to vouch for"
+  gate_candidate_capture || refuse "no-commit"
+  refusal="\$(gate_candidate_check "\$CANDIDATE_TREE")" || refuse "\$refusal"
+  refusal="\$(gate_candidate_same_tree \${LOCAL_SHAS[@]+"\${LOCAL_SHAS[@]}"})" || refuse "\$refusal"
+  decide
+  write_selection
+}
+
+main
+`,
+    executable: true,
+    backend: null,
+    skipIfExists: false,
+  },
+  {
+    category: "spec-root",
+    name: "specify",
+    suffix: "scripts/bash/_gate_candidate.sh",
+    content: `# shellcheck shell=bash
+# Sourced by run-gate.sh and gate-impact.sh, and the one home of what a candidate
+# is: a tree and the commit that holds it. A pass is a statement about one exact
+# tree, so a tree that is dirty, or that moved during the run, is refused rather
+# than presented as tested.
+#
+# Requires REPO_ROOT. Every git call goes through gate_git: this runs inside hooks,
+# where git has exported GIT_DIR and friends pointing at someone else's view of
+# the repository.
+
+GATE_LOCAL_ENV="\$(git rev-parse --local-env-vars 2>/dev/null)"
+
+# gate_git <git args...> - git on this repository, with the inherited repository
+# variables gone and no filesystem monitor to start.
+gate_git() {
+  (
+    for gate_var in \$GATE_LOCAL_ENV; do unset "\$gate_var"; done
+    git -C "\$REPO_ROOT" -c core.fsmonitor=false "\$@"
+  )
+}
+
+# gate_ascii <text> - the text with anything but printable ASCII replaced, byte by
+# byte. Causes and commands reach a line a legacy console prints, and a path may
+# hold a newline, which would forge a record or a report line.
+gate_ascii() {
+  printf '%s' "\$1" | LC_ALL=C tr -c ' -~' '?'
+}
+
+# gate_candidate_in_repo - true only at a work tree's top level. Inside another
+# repository's tree, every path this mechanism reads would mean something else.
+gate_candidate_in_repo() {
+  local prefix
+  prefix="\$(gate_git rev-parse --is-inside-work-tree --show-prefix 2>/dev/null)" || return 1
+  [ "\$prefix" = "true" ]
+}
+
+# gate_candidate_check <tree> - is the work tree still exactly <tree>? Prints the
+# refusal and returns 1 when it is not. Status is read with the submodule flag
+# the change set uses, so neither can see a change the other cannot.
+gate_candidate_check() {
+  local status head
+  status="\$(gate_git status --porcelain --untracked-files=all --ignore-submodules=none 2>/dev/null)" ||
+    { echo "status-failed"; return 1; }
+  if [ -n "\$status" ]; then
+    echo "dirty-tree: \$(printf '%s\\n' "\$status" | wc -l | tr -d ' ') path(s) differ from the commit"
+    return 1
+  fi
+  head="\$(gate_git rev-parse --verify --quiet 'HEAD^{tree}' 2>/dev/null)" ||
+    { echo "no-commit"; return 1; }
+  if [ "\$head" != "\$1" ]; then
+    echo "tree-moved: HEAD holds \$head"
+    return 1
+  fi
+  return 0
+}
+
+# gate_candidate_merge_base <name> - the merge-base of HEAD and the default branch <name>,
+# from the remote's copy when there is one, as that is where the branch will land.
+gate_candidate_merge_base() {
+  local ref
+  for ref in "refs/remotes/origin/\$1" "refs/heads/\$1"; do
+    gate_git rev-parse --verify --quiet "\$ref" >/dev/null 2>&1 || continue
+    gate_git merge-base HEAD "\$ref" 2>/dev/null
+    return \$?
+  done
+  return 1
+}
+
+# gate_candidate_capture - sets CANDIDATE_TREE and CANDIDATE_COMMIT from HEAD. Called
+# in the caller's own shell, so they stay set; returns 1 when HEAD holds no commit.
+# shellcheck disable=SC2034  # read by the scripts that source this one
+gate_candidate_capture() {
+  CANDIDATE_COMMIT="\$(gate_git rev-parse --verify --quiet 'HEAD^{commit}' 2>/dev/null)" || return 1
+  CANDIDATE_TREE="\$(gate_git rev-parse --verify --quiet 'HEAD^{tree}' 2>/dev/null)" || return 1
+}
+
+# gate_candidate_same_tree <local sha...> - does every pushed sha hold CANDIDATE_TREE? Prints the refusal, naming each tree that is not, and returns 1 otherwise:
+# one pass cannot speak for several trees.
+gate_candidate_same_tree() {
+  local sha tree others=""
+  for sha in "\$@"; do
+    tree="\$(gate_git rev-parse --verify --quiet "\$sha^{tree}" 2>/dev/null)" ||
+      { echo "local-sha-unknown: \$sha"; return 1; }
+    [ "\$tree" = "\$CANDIDATE_TREE" ] || others="\$others \$sha=\$tree"
+  done
+  [ -z "\$others" ] && return 0
+  echo "several-trees: candidate \$CANDIDATE_TREE, pushed\$others"
+  return 1
+}
+
+# gate_candidate_read_refs - reads pre-push lines (\`<local ref> <local sha> <remote
+# ref> <remote sha>\`) from stdin and prints one fact per ref: \`local <sha>\` and then
+# \`base <commit>\`, \`zero <remote ref>\` or \`unfetched <sha>\`; \`malformed <ref>\` for a
+# line that is not that. A deleted ref offers no tree, so it prints nothing.
+gate_candidate_read_refs() {
+  local ref local_sha remote_ref remote_sha commit hex='^[0-9a-f]{40}([0-9a-f]{24})?\$'
+  while IFS=' ' read -r ref local_sha remote_ref remote_sha || [ -n "\$ref" ]; do
+    remote_sha="\${remote_sha%\$'\\r'}"
+    if ! [[ \$local_sha =~ \$hex ]] || ! [[ \$remote_sha =~ \$hex ]]; then
+      echo "malformed \$ref"
+    elif ! [[ \$local_sha =~ ^0+\$ ]]; then
+      echo "local \$local_sha"
+      if [[ \$remote_sha =~ ^0+\$ ]]; then
+        echo "zero \$remote_ref"
+      elif commit="\$(gate_git rev-parse --verify --quiet "\$remote_sha^{commit}" 2>/dev/null)"; then
+        echo "base \$commit"
+      else
+        echo "unfetched \$remote_sha"
+      fi
+    fi
+  done
+}
+`,
+    executable: true,
+    backend: null,
+    skipIfExists: false,
+  },
+  {
+    category: "spec-root",
+    name: "specify",
+    suffix: "scripts/bash/_gate_impact_read.sh",
+    content: `# shellcheck shell=bash
+# shellcheck disable=SC2016  # the \$ in these strings belongs to jq
+# Sourced by gate-impact.sh, and the one reader of \`.specnaut/impact.json\` and of
+# an adapter's output. Each file is validated once and written back out normalized;
+# everything downstream reads the normalized copy, never the original.
+#
+# A function here reports what is wrong and returns 1. Whether that widens the run
+# is gate-impact.sh's call, not this file's. Requires jq_lf.
+#
+# Anchored with \\A and \\z, because \$ also matches before a final newline, and an id
+# or a path ending in one must not pass.
+GATE_READ_DEFS='
+def owner_id: type == "string" and test("\\\\A[A-Za-z0-9][A-Za-z0-9._-]{0,63}\\\\z");
+def clean: type == "string" and length > 0 and (test("[\\\\x00-\\\\x1f\\\\x7f]") | not);
+def path_ok: type == "string" and length > 0
+  and (test("\\\\A/|\\\\\\\\|[*?\\\\[\\\\]{}]|[\\\\x00-\\\\x1f\\\\x7f]|\\\\.\\\\.|//|\\\\./|\\\\A\\\\.\\\\z|/\\\\.\\\\z") | not);
+def paths_ok: type == "array" and all(path_ok);
+def ids_ok: type == "array" and all(owner_id);
+'
+
+# gate_read_declaration <file> <normalized-out> - prints the first problem and
+# returns 1, or writes the normalized declaration.
+gate_read_declaration() {
+  local problem
+  problem="\$(jq_lf -r --slurp "\$GATE_READ_DEFS"'
+    def check_ok: type == "object" and (.gate | clean) and (.scoped | clean)
+      and (.owners == null or ((.owners | ids_ok) and (.owners | length) > 0));
+    if length != 1 then "not-json"
+    elif (.[0] | type) != "object" then "not-an-object"
+    else .[0] |
+      if .schema != 1 then "schema"
+      elif (.adapter | type) != "object" or (.adapter.command | clean | not) then "adapter.command"
+      elif (.adapter.files | paths_ok | not) or (.adapter.files | length) == 0 then "adapter.files"
+      elif (.scoped_tiers | type) != "array"
+        or (.scoped_tiers | all(. == "fast" or . == "full") | not) then "scoped_tiers"
+      elif (.full_on | paths_ok | not) then "full_on"
+      elif (.inert | paths_ok | not) then "inert"
+      elif (.checks | type) != "array" or (.checks | all(check_ok) | not) then "checks"
+      elif ([.checks[].gate] | length) != ([.checks[].gate] | unique | length) then "checks.gate-duplicated"
+      else "" end
+    end' "\$1" 2>/dev/null)" || { echo "not-json"; return 1; }
+  if [ -n "\$problem" ]; then echo "\$problem"; return 1; fi
+  jq_lf --slurp '.[0] | {adapter, scoped_tiers, full_on, inert, checks}' "\$1" >"\$2"
+}
+
+# gate_read_jq_usable - can this jq do what the graph needs? --rawfile came with jq 1.6,
+# and a jq without it would fail at a stage no one would think to look at.
+gate_read_jq_usable() { jq_lf -n --rawfile gate_probe "\$1" 1 >/dev/null 2>&1; }
+
+gate_read_adapter_command() { jq_lf -r '.adapter.command' "\$1"; }
+gate_read_adapter_files() { jq_lf -r '.adapter.files[]' "\$1"; }
+gate_read_scoped_tiers() { jq_lf -r '.scoped_tiers | join(" ")' "\$1"; }
+
+# gate_read_checks <normalized> - one \`gate<TAB>scoped<TAB>owners\` line per check,
+# \`-\` for no owners. Nothing here can hold a tab or a newline: \`clean\` refused it.
+gate_read_checks() {
+  jq_lf -r '.checks[] | [.gate, .scoped, ((.owners // ["-"]) | join(" "))] | join("\\t")' "\$1"
+}
+
+# gate_read_unknown_owner <normalized> <snapshot...> - prints an owner a check names
+# that no snapshot holds. A check that can never match is a declaration out of date
+# with the graph, and would omit its gate on every change.
+gate_read_unknown_owner() {
+  local normalized="\$1"
+  shift
+  jq_lf -r --slurp --slurpfile declared "\$normalized" '
+    (map(.owners | keys) | add // []) as \$known
+    | [\$declared[0].checks[] | (.owners // [])[] | select(. as \$o | \$known | all(. != \$o))]
+    | .[0] // empty
+  ' "\$@"
+}
+
+# gate_read_snapshot <adapter-output> <expected-commit> <normalized-out> - prints the
+# first problem and returns 1, or writes \`{owners: {id: {roots, depends_on}}}\`.
+gate_read_snapshot() {
+  local problem
+  problem="\$(jq_lf -r --slurp --arg commit "\$2" "\$GATE_READ_DEFS"'
+    if length != 1 or (.[0] | type) != "object" then "invalid-json"
+    else .[0] |
+      if .schema != 1 then "schema-mismatch"
+      elif .complete != true then "incomplete"
+      elif .commit != \$commit then "commit-mismatch"
+      elif (.owners | type) != "array"
+        or (.owners | all(type == "object" and (.id | owner_id)) | not)
+        or ([.owners[].id] | length) != ([.owners[].id] | unique | length) then "invalid-owner"
+      elif (.owners | all(.roots | paths_ok) | not) then "invalid-root"
+      elif (.owners | all(.depends_on | ids_ok) | not) then "invalid-owner"
+      elif ([.owners[].id] as \$ids | .owners | all(.depends_on | all(. as \$d | \$ids | any(. == \$d))) | not)
+        then "dangling-depends-on"
+      else "" end
+    end' "\$1" 2>/dev/null)" || { echo "invalid-json"; return 1; }
+  if [ -n "\$problem" ]; then echo "\$problem"; return 1; fi
+  jq_lf --slurp '.[0] | {owners: (.owners | map({key: .id,
+    value: {roots: (.roots | unique), depends_on: (.depends_on | unique)}}) | from_entries)}' "\$1" >"\$3"
+}
+`,
+    executable: true,
+    backend: null,
+    skipIfExists: false,
+  },
+  {
+    category: "spec-root",
+    name: "specify",
+    suffix: "scripts/bash/_gate_impact_adapter.sh",
+    content: `# shellcheck shell=bash
+# Sourced by gate-impact.sh, and the one place an adapter runs and the base worktree
+# is made. The adapter is always the base's copy: a branch must not choose the code
+# that tells this mechanism how little to check. Requires gate_git.
+
+GATE_WORKTREES=()
+
+# gate_adapter_worktree <commit> <path> <empty-hooks-dir> - a detached worktree of
+# <commit> at <path>, outside the repository. The hooks directory is empty so the
+# checkout runs none of the repository's hooks.
+gate_adapter_worktree() {
+  GATE_WORKTREES+=("\$2")
+  gate_git -c "core.hooksPath=\$3" worktree add --quiet --detach "\$2" "\$1" >/dev/null 2>&1
+}
+
+# gate_adapter_cleanup - safe to call on any exit path, and more than once.
+gate_adapter_cleanup() {
+  local path failed=0
+  for path in \${GATE_WORKTREES[@]+"\${GATE_WORKTREES[@]}"}; do
+    gate_git worktree remove --force "\$path" >/dev/null 2>&1 && continue
+    rm -rf "\$path"
+    failed=1
+  done
+  # Only this run's own failure prunes. A bare prune would drop the user's stale entries too.
+  if [ "\$failed" -eq 1 ]; then gate_git worktree prune >/dev/null 2>&1 || true; fi
+  GATE_WORKTREES=()
+}
+
+# gate_adapter_run <command> <worktree> <tree> <commit> <out> - runs the adapter from
+# <worktree> to describe <tree>, returns its exit. No GIT_* variable and no stdin
+# reach it, and its stdout goes to stderr: only the file it writes is its answer.
+gate_adapter_run() {
+  (
+    for gate_var in \$(compgen -e); do
+      case "\$gate_var" in GIT_*) unset "\$gate_var" ;; esac
+    done
+    cd "\$2" || exit 125
+    export SPECNAUT_IMPACT_TREE="\$3" SPECNAUT_IMPACT_COMMIT="\$4" SPECNAUT_IMPACT_OUT="\$5"
+    export SPECNAUT_IMPACT_SCHEMA=1 SPECNAUT_IMPACT_REPO="\$REPO_ROOT"
+    exec bash -c "\$1"
+  ) </dev/null >&2
+}
+`,
+    executable: true,
+    backend: null,
+    skipIfExists: false,
+  },
+  {
+    category: "spec-root",
+    name: "specify",
+    suffix: "scripts/bash/_gate_impact_graph.sh",
+    content: `# shellcheck shell=bash
+# shellcheck disable=SC2016  # the \$ in these strings belongs to jq
+# Sourced by gate-impact.sh: the one home of the change set and of the affected set
+# with its reverse closure. Reports facts; whether one widens the run is
+# gate-impact.sh's call. Requires gate_git and jq_lf.
+
+# gate_graph_changes <base> <commit> <paths-out> - writes the changed paths,
+# NUL-separated. --no-renames makes a rename its delete plus its add, so both of
+# its owners are seen. Prints the first path whose kind no adapter can vouch for,
+# as \`gitlink: <path>\`, \`symlink: <path>\` or \`type-change: <path>\`, and returns 1.
+gate_graph_changes() {
+  local meta path old new status raw="\$3.raw"
+  : >"\$3"
+  gate_git diff-tree -r -z --raw --no-renames --ignore-submodules=none "\$1" "\$2" >"\$raw" 2>/dev/null ||
+    { echo "diff-failed"; return 1; }
+  while IFS= read -r -d '' meta && IFS= read -r -d '' path; do
+    old="\${meta%% *}"; old="\${old#:}"
+    new="\${meta#* }"; new="\${new%% *}"
+    status="\${meta##* }"
+    case "\$status" in T*) echo "type-change: \$path"; return 1 ;; esac
+    case "\$old \$new" in
+      160000\\ *|*\\ 160000) echo "gitlink: \$path"; return 1 ;;
+      120000\\ *|*\\ 120000) echo "symlink: \$path"; return 1 ;;
+    esac
+    printf '%s\\0' "\$path" >>"\$3"
+  done <"\$raw"
+  return 0
+}
+
+# gate_graph_protected_entries <commit> <path> - the path's tracked entries as text,
+# for comparing sides. Returns 1 when it has none, 2 when one is not a regular file.
+# ls-tree finds nothing through a symlink component, so that reads as untracked.
+gate_graph_protected_entries() {
+  local entry found=1
+  while IFS= read -r -d '' entry; do
+    found=0
+    case "\$entry" in 100644\\ *|100755\\ *) ;; *) return 2 ;; esac
+    printf '%s\\n' "\$entry"
+  done < <(gate_git ls-tree -r -z "\$1" -- "\$2" 2>/dev/null)
+  return "\$found"
+}
+
+# gate_graph_pair <paths> <snapshot> >>pairs - one line of the input to
+# gate_graph_affected: a base's snapshot with the paths that differ from it.
+gate_graph_pair() {
+  jq_lf -c -n --rawfile paths "\$1" --slurpfile snapshot "\$2" \\
+    '{snapshot: \$snapshot[0], changes: (\$paths | split("\\u0000") | map(select(length > 0)))}'
+}
+
+# gate_graph_affected <pairs> <candidate-snapshot> <normalized> - prints \`full<TAB>
+# <cause>\` or \`owners<TAB><space-separated ids>\`. Every base is walked against its
+# own snapshot: a path must be owned on its own pair's sides, or an owner that only
+# another base knows would stop it being unowned. Once owned, it affects whoever
+# holds it in any snapshot, and the closure runs over every edge any snapshot holds,
+# because a dependency removed on the branch still explains why the dependent broke.
+gate_graph_affected() {
+  jq_lf -r --slurp --slurpfile cand "\$2" --slurpfile declared "\$3" '
+    def holds(\$p): . as \$r | if endswith("/") then (\$p | startswith(\$r)) else \$p == \$r end;
+    def listed(\$list; \$p): \$list | any(holds(\$p));
+    def owners_of(\$p): .owners | to_entries | map(select(.value.roots | any(holds(\$p))) | .key);
+    def close(\$edges): . as \$s
+      | (\$s + [\$edges[] | select(.[1] as \$d | \$s | any(. == \$d)) | .[0]] | unique) as \$n
+      | if \$n == \$s then \$s else \$n | close(\$edges) end;
+    . as \$pairs | \$cand[0] as \$c | \$declared[0] as \$d
+    | ([\$pairs[] as \$b | \$b.changes[] as \$p
+        | if listed(\$d.full_on; \$p) then "full-on: \\(\$p)"
+          elif listed(\$d.inert; \$p) then empty
+          elif ((\$c | owners_of(\$p)) + (\$b.snapshot | owners_of(\$p))) == [] then "unowned: \\(\$p)"
+          else empty end] | first // "") as \$cause
+    | if \$cause != "" then "full\\t\\(\$cause)" else
+        ([\$c] + [\$pairs[].snapshot]) as \$snaps
+        | ([\$pairs[].changes[] | select(. as \$p | listed(\$d.inert; \$p) | not)
+            | . as \$p | \$snaps[] | owners_of(\$p)[]]) as \$by_path
+        | ([\$pairs[].snapshot as \$b | ((\$b.owners | keys) + (\$c.owners | keys) | unique)[]
+            | select(\$b.owners[.] != \$c.owners[.])]) as \$by_record
+        | ([\$snaps[].owners | to_entries[] | .key as \$o | .value.depends_on[] | [\$o, .]]) as \$edges
+        | "owners\\t" + ((\$by_path + \$by_record | unique | close(\$edges)) | join(" "))
+      end' "\$1"
+}
+`,
+    executable: true,
+    backend: null,
+    skipIfExists: false,
+  },
+  {
+    category: "spec-root",
+    name: "specify",
+    suffix: "scripts/bash/_gate_evidence.sh",
+    content: `# shellcheck shell=bash
+# shellcheck disable=SC2016  # the \$ in these strings belongs to jq
+# Sourced by run-gate.sh, and the one writer of gate evidence: what ran on which tree,
+# what was omitted and why, and what was taken on trust. It is write-only. Nothing
+# reads it to decide anything: a stale file must never be able to skip a check, and
+# a pass is only ever what this run saw. Requires gate_git and jq_lf.
+
+# gate_evidence_write <tier> <tree> <records> <ran> <result> <valid> - writes the file
+# atomically and prints its path, or prints \`unwritten (<cause>)\`. Always returns 0:
+# failing to record a result does not change the result.
+gate_evidence_write() {
+  local path dir tmp
+  command -v jq >/dev/null 2>&1 || { echo "unwritten (jq-absent)"; return 0; }
+  path="\$(gate_git rev-parse --git-path "specnaut/gate-evidence/\$1-\$2.json" 2>/dev/null)" ||
+    { echo "unwritten (no-git-path)"; return 0; }
+  case "\$path" in /*|[A-Za-z]:*) ;; *) path="\$REPO_ROOT/\$path" ;; esac
+  dir="\$(dirname -- "\$path")"
+  mkdir -p -- "\$dir" 2>/dev/null || { echo "unwritten (cannot-create-directory)"; return 0; }
+  tmp="\$(mktemp "\$dir/.evidence.XXXXXX" 2>/dev/null)" || { echo "unwritten (cannot-create-file)"; return 0; }
+  # mv into a directory standing at the path would succeed, and report a file not there.
+  if [ -d "\$path" ] || ! gate_evidence_json "\$1" "\$2" "\$3" "\$4" "\$5" "\$6" >"\$tmp" 2>/dev/null ||
+    ! mv -f -- "\$tmp" "\$path" 2>/dev/null; then
+    rm -f -- "\$tmp"
+    echo "unwritten (cannot-write-file)"
+    return 0
+  fi
+  echo "\$path"
+}
+
+gate_evidence_json() {
+  jq_lf -n --arg tier "\$1" --arg tree "\$2" --rawfile records "\$3" --rawfile ran "\$4" \\
+    --arg result "\$5" --argjson valid "\$6" '
+    def rows(\$text): \$text | split("\\n") | map(select(length > 0) | split("\\t"));
+    def rest: .[2:] | join("\\t");
+    rows(\$records) as \$r
+    | def kind(\$k): \$r | map(select(.[0] == \$k));
+    {schema: 1, tier: \$tier, tree: \$tree, commit: (kind("candidate")[0][2] // null),
+     result: \$result, valid: \$valid,
+     bases: (kind("base") | map(.[1])),
+     scope: (kind("scope")[0][1] // null),
+     owners: ((kind("scope")[0][2] // "-") | if . == "-" then [] else split(" ") end),
+     fallback: (kind("fallback") | map(.[1:] | join("\\t"))),
+     removed: (kind("removed") | map(.[1:] | join("\\t"))),
+     ran: (rows(\$ran) | map({exit: (.[0] | tonumber),
+       owners: (.[1] | if . == "-" then [] else split(" ") end), command: rest})),
+     omitted: (kind("omit") | map({reason: .[1], command: rest})),
+     trusted: {adapter: (kind("adapter")[0][1] // null),
+       scoped: (kind("run") | map(select(.[1] != "-") | rest))}}'
+}
 `,
     executable: true,
     backend: null,
@@ -27491,7 +28504,7 @@ function Get-BranchName {
     content: `#!/usr/bin/env pwsh
 # Run one declared quality-gate tier. PowerShell twin of run-gate.sh.
 #
-#   run-gate.ps1 <fast|full>
+#   run-gate.ps1 <fast|full> [--base <rev> | --refs-stdin]
 #
 # Reads \`.specnaut/gates.yml\` and runs the commands under \`fast_gate:\` or
 # \`full_gate:\`, in order, from the repository root.
@@ -27507,13 +28520,17 @@ function Get-BranchName {
 #   0   every command succeeded, OR the tier is not declared
 #   1   a command exited non-zero — the tier failed
 #   2   usage error
+#   3   behind a flag: the candidate is refused, before or after the commands
+#   4   behind a flag: every command was omitted, or the tier was emptied on the
+#       branch. A skip is never a pass
 #
-# A tier that is not declared is NOT a failure, and the script says so on
-# stdout rather than passing in silence: "no gate ran" and "the gate passed"
-# are different facts, and a caller that cannot tell them apart reports the
-# wrong one.
+# Bare, it never reads \`.specnaut/impact.json\` and is the manual full override.
+# Behind a flag it asks gate-impact.ps1 which commands this candidate needs, runs that
+# selection with its own loop and reports it; run-gate.sh states the contract.
 
-param([Parameter(Position = 0)][string]\$Tier)
+# \$args, not a param block: PowerShell would refuse \`--base\` as a parameter name.
+\$scriptArgs = @(\$args)
+\$Tier = if (\$scriptArgs.Count -gt 0) { [string]\$scriptArgs[0] } else { '' }
 
 if (\$Tier -ne 'fast' -and \$Tier -ne 'full') {
     Write-Error 'usage: run-gate.ps1 <fast|full>'
@@ -27526,38 +28543,224 @@ if (\$Tier -ne 'fast' -and \$Tier -ne 'full') {
 \$gates = Join-Path \$specnautDir 'gates.yml'
 \$repoRoot = (Resolve-Path (Join-Path \$specnautDir '..')).Path
 
+# One flat list. The format is narrow on purpose (see gates.yml): a top-level
+# \`<tier>_gate:\` key, then \`  - \` items until the next top-level key. Quotes
+# around an item are stripped as a matched pair only, so a command containing
+# a quote is not silently mangled.
+function Read-GateTier([string]\$File) {
+    \$key = "\${Tier}_gate:"
+    \$inside = \$false
+    \$found = @()
+    foreach (\$line in [System.IO.File]::ReadAllLines(\$File)) {
+        if (\$line -match '^[^ \\t#]') {
+            \$inside = \$line.StartsWith(\$key, [StringComparison]::Ordinal)
+            continue
+        }
+        if (-not \$inside) { continue }
+        if (\$line -match '^[ \\t]*#') { continue }
+        if (\$line -match '^[ \\t]*\$') { continue }
+        if (\$line -match '^[ \\t]*-[ \\t]*(.*)\$') {
+            \$item = \$Matches[1].TrimEnd()
+            if (\$item.Length -eq 0) { continue }
+            if (\$item.Length -ge 2) {
+                \$first = \$item[0]; \$last = \$item[\$item.Length - 1]
+                if ((\$first -eq '"' -and \$last -eq '"') -or (\$first -eq "'" -and \$last -eq "'")) {
+                    \$item = \$item.Substring(1, \$item.Length - 2)
+                }
+            }
+            \$found += \$item
+        }
+    }
+    return , \$found
+}
+
+function Stop-FlagUsage {
+    [Console]::Error.WriteLine('usage: run-gate.ps1 <fast|full> [--base <rev> | --refs-stdin]')
+    exit 2
+}
+
+\$flag = ''
+\$baseValue = ''
+for (\$n = 1; \$n -lt \$scriptArgs.Count; \$n++) {
+    # Checked first: \`switch\` follows culture rules, and would read a flag with a zero-width character as the flag.
+    if ([string]\$scriptArgs[\$n] -cnotmatch '\\A--[a-z-]+\\z') { Stop-FlagUsage }
+    switch -CaseSensitive ([string]\$scriptArgs[\$n]) {
+        '--base' {
+            if (\$flag.Length -gt 0 -or \$n + 1 -ge \$scriptArgs.Count) { Stop-FlagUsage }
+            \$n++
+            \$baseValue = [string]\$scriptArgs[\$n]
+            if (\$baseValue.StartsWith('-', [StringComparison]::Ordinal)) { Stop-FlagUsage }
+            \$flag = '--base'
+        }
+        '--refs-stdin' {
+            if (\$flag.Length -gt 0) { Stop-FlagUsage }
+            \$flag = '--refs-stdin'
+        }
+        '--parse-gates' {
+            if (\$n + 2 -ne \$scriptArgs.Count) { Stop-FlagUsage }
+            Write-Output (Read-GateTier ([string]\$scriptArgs[\$n + 1]))
+            exit 0
+        }
+        default { Stop-FlagUsage }
+    }
+}
+
+# One command, with stdin closed. Only a new process can have that: a native
+# command inherits this script's stdin and PowerShell has no redirect for it.
+# ProcessPath is this very host, where a path built from \$PSHOME was fragile. The
+# process is also what makes a directory change or an \`exit\` end with the command.
+#
+# The command string is the project's and is run verbatim, as bash's \`eval\` runs
+# it. A native command sets \$LASTEXITCODE; a failing cmdlet leaves it 0 and sets
+# \$? to false. Both are failures, and \$? is read first because the next statement
+# resets it. Invoke-Expression cannot serve: it succeeds whenever its argument parses.
+#
+# <Owners> reaches the one variable named for them, never the command string; \`-\`
+# means no owners and that none is inherited. Not given, the variable is left alone.
+function New-GateCommandStart([string]\$Command, [string]\$Cwd) {
+    \$script = "\`\$global:LASTEXITCODE = 0\`n\$Command\`n" +
+    '\$gateOk = \$?; if (\$LASTEXITCODE -ne 0) { exit \$LASTEXITCODE }; if (-not \$gateOk) { exit 1 }; exit 0'
+    \$psi = [System.Diagnostics.ProcessStartInfo]::new([Environment]::ProcessPath)
+    foreach (\$a in @('-NoProfile', '-NonInteractive', '-Command', \$script)) { \$psi.ArgumentList.Add(\$a) }
+    \$psi.WorkingDirectory = \$Cwd
+    \$psi.UseShellExecute = \$false
+    \$psi.RedirectStandardInput = \$true
+    return \$psi
+}
+
+function Invoke-GateCommand([string]\$Command, [string]\$Owners = '') {
+    \$psi = New-GateCommandStart \$Command \$repoRoot
+    if ([string]::Equals(\$Owners, '-', [StringComparison]::Ordinal)) {
+        [void]\$psi.Environment.Remove('SPECNAUT_AFFECTED_OWNERS')
+    } elseif (\$Owners.Length -gt 0) {
+        \$psi.Environment['SPECNAUT_AFFECTED_OWNERS'] = \$Owners
+    }
+    \$process = [System.Diagnostics.Process]::Start(\$psi)
+    \$process.StandardInput.Close()
+    \$process.WaitForExit()
+    return \$process.ExitCode
+}
+
+# Exit 3 before anything ran. A refusal still prints the whole report, so a caller
+# reads one shape; there is no result to record, so no evidence is written.
+function Stop-Refused([string]\$Text) {
+    Write-Output "candidate: refused (\$Text)"
+    foreach (\$label in @('scope', 'fallback', 'removed', 'omitted', 'ran')) { Write-Output "\${label}: none" }
+    Write-Output 'evidence: unwritten (candidate refused)'
+    [Console]::Error.WriteLine("the \$Tier gate refused the candidate: \$Text")
+    exit 3
+}
+
+# Every activated run prints every label, \`none\` where there is nothing to say: a
+# line missing from a report cannot be told from a report that was cut short.
+function Write-ReportLabel([string]\$Label, \$Items) {
+    if (@(\$Items).Count -eq 0) { Write-Output "\${Label}: none"; return }
+    foreach (\$item in \$Items) { Write-Output "\${Label}: \$(ConvertTo-GateAscii \$item)" }
+}
+
+# Behind a flag. Returns only when the answer is \`inactive\`, for the bare path to run
+# with nothing printed. An answer with no final \`end\` is no answer: it never reads as
+# a pass, and whether to widen is not this file's to decide.
+function Invoke-SelectedResolver {
+    \$work = [System.IO.Directory]::CreateTempSubdirectory('specnaut-gate-run-').FullName
+    \$utf8 = [System.Text.UTF8Encoding]::new(\$false)
+    \$list = if (Test-Path -LiteralPath \$gates -PathType Leaf) { Read-GateTier \$gates } else { @() }
+    \$commandsFile = Join-Path \$work 'commands'
+    \$recordsFile = Join-Path \$work 'records'
+    [System.IO.File]::WriteAllLines(\$commandsFile, [string[]]@(\$list), \$utf8)
+    \$rc = 0
+    try {
+        \$null = & (Join-Path \$scriptDir 'gate-impact.ps1') \$Tier \$commandsFile \$recordsFile \$flag \$baseValue
+        \$rc = \$LASTEXITCODE
+    } catch {
+        [Console]::Error.WriteLine("run-gate: gate-impact stopped: \$_")
+        \$rc = 70
+    }
+    \$lines = if (Test-Path -LiteralPath \$recordsFile) { [string[]]@([System.IO.File]::ReadAllLines(\$recordsFile, \$utf8)) } else { @() }
+    Remove-Item -LiteralPath \$work -Recurse -Force -ErrorAction SilentlyContinue
+    return @{ Lines = \$lines; Code = \$rc }
+}
+
+function Write-ReportHead(\$A) {
+    if (\$A.Tree) { Write-Output "candidate: tree=\$(\$A.Tree) commit=\$(\$A.Commit)" } else { Write-Output 'candidate: unknown' }
+    if (Test-GateSame \$A.Scope 'owners') { Write-Output "scope: owners \$(\$A.Owners)" } elseif (\$A.Scope) { Write-Output "scope: \$(\$A.Scope)" } else { Write-Output 'scope: none' }
+    if (\$A.Cause.Length -gt 0) { Write-Output "fallback: \$(\$A.Cause)" } else { Write-Output 'fallback: none' }
+    Write-ReportLabel 'removed' \$A.Removed
+    Write-ReportLabel 'omitted' \$A.Omitted
+}
+
+# Runs the selection, stopping at the first failure. Its pipeline is the run's report.
+function Invoke-Selection(\$A, \$Outcome) {
+    \$count = \$A.Runs.Count
+    \$i = 0
+    if (\$count -eq 0) { Write-Output 'ran: none' }
+    foreach (\$run in \$A.Runs) {
+        \$i++
+        \$shown = ConvertTo-GateAscii \$run.Command
+        Write-Output "  [\$i/\$count] \$shown"
+        \$rc = Invoke-GateCommand \$run.Command \$run.Owners
+        \$Outcome.Ran.Add("\$rc\`t\$(\$run.Owners)\`t\$(\$run.Command)")
+        if (Test-GateSame \$run.Owners '-') { Write-Output "ran: \$shown (exit \$rc)" } else { Write-Output "ran: \$shown (owners \$(\$run.Owners); exit \$rc)" }
+        if (\$rc -ne 0) { \$Outcome.FailedAt = \$i; \$Outcome.FailedRc = \$rc; return }
+    }
+}
+
+# FR-013: a failed command stops at 1, whatever else is true. Drift after commands that
+# passed is 3, and drift of any kind invalidates the evidence. Omitted commands with
+# nothing run, or a tier emptied on the branch, is 4: nothing was checked.
+function Stop-Concluded(\$A, \$Outcome, \$Records) {
+    \$count = \$A.Runs.Count
+    \$result = 'passed'; \$valid = \$true; \$code = 0
+    if (\$Outcome.FailedAt -ne 0) {
+        \$result = 'failed'; \$code = 1
+        \$line = "the \$Tier gate failed at command \$(\$Outcome.FailedAt)/\$count (exit \$(\$Outcome.FailedRc))"
+    } elseif (\$count -eq 0 -and (\$A.Omitted.Count + \$A.Removed.Count) -gt 0) {
+        \$result = 'skipped'; \$code = 4
+        \$line = "the \$Tier gate ran nothing: every command was omitted or removed, and a skip is not a pass"
+    } elseif (\$count -eq 0) {
+        \$result = 'undeclared'
+        \$line = "no \$Tier gate declared, so nothing ran"
+    } else {
+        \$named = if (\$A.Scope -and (Test-GateSame \$A.Scope 'owners')) { "owners \$(\$A.Owners)" } else { \$A.Scope }
+        \$line = "the \$Tier gate passed (scope: \$named) - \$count command(s) ran, \$(\$A.Omitted.Count) omitted"
+    }
+    \$drift = Get-GateCandidateRefusal \$A.Tree
+    if (\$null -ne \$drift) {
+        \$valid = \$false
+        if (\$code -eq 0) {
+            \$result = 'invalid'; \$code = 3
+            \$line = "the \$Tier gate refused the candidate after running: \$drift"
+        }
+    }
+    \$where = Write-GateEvidence \$Tier \$A.Tree ([string[]]@(\$Records)) ([string[]]@(\$Outcome.Ran)) \$result \$valid
+    Write-Output "evidence: \$(ConvertTo-GateAscii \$where)"
+    if (\$code -eq 0) { Write-Output \$line } else { [Console]::Error.WriteLine(\$line) }
+    exit \$code
+}
+
+if (\$flag.Length -gt 0) {
+    \$answer = Invoke-SelectedResolver
+    if (-not (\$answer.Lines.Count -gt 0 -and [string]::Equals(\$answer.Lines[0], 'inactive', [StringComparison]::Ordinal))) {
+        . (Join-Path \$scriptDir '_gate_candidate.ps1')
+        . (Join-Path \$scriptDir '_gate_evidence.ps1')
+        if (\$answer.Lines.Count -eq 0 -or -not (Test-GateSame \$answer.Lines[-1] 'end')) {
+            Stop-Refused "no-selection: gate-impact exit \$(\$answer.Code)"
+        }
+        \$selection = Read-SelectedRecords \$answer.Lines
+        if (\$selection.Refused.Length -gt 0) { Stop-Refused \$selection.Refused }
+        Write-ReportHead \$selection
+        \$outcome = @{ FailedAt = 0; FailedRc = 0; Ran = [System.Collections.Generic.List[string]]::new() }
+        Invoke-Selection \$selection \$outcome
+        Stop-Concluded \$selection \$outcome \$answer.Lines
+    }
+}
+
 if (-not (Test-Path -LiteralPath \$gates -PathType Leaf)) {
     Write-Output "no \$Tier gate declared — \$gates is absent, so nothing ran"
     exit 0
 }
 
-# One flat list. The format is narrow on purpose (see gates.yml): a top-level
-# \`<tier>_gate:\` key, then \`  - \` items until the next top-level key. Quotes
-# around an item are stripped as a matched pair only, so a command containing
-# a quote is not silently mangled.
-\$key = "\${Tier}_gate:"
-\$inside = \$false
-\$commands = @()
-foreach (\$line in [System.IO.File]::ReadAllLines(\$gates)) {
-    if (\$line -match '^[^ \\t#]') {
-        \$inside = \$line.StartsWith(\$key)
-        continue
-    }
-    if (-not \$inside) { continue }
-    if (\$line -match '^[ \\t]*#') { continue }
-    if (\$line -match '^[ \\t]*\$') { continue }
-    if (\$line -match '^[ \\t]*-[ \\t]*(.*)\$') {
-        \$item = \$Matches[1].TrimEnd()
-        if (\$item -eq '') { continue }
-        if (\$item.Length -ge 2) {
-            \$first = \$item[0]; \$last = \$item[\$item.Length - 1]
-            if ((\$first -eq '"' -and \$last -eq '"') -or (\$first -eq "'" -and \$last -eq "'")) {
-                \$item = \$item.Substring(1, \$item.Length - 2)
-            }
-        }
-        \$commands += \$item
-    }
-}
+\$commands = Read-GateTier \$gates
 
 if (\$commands.Count -eq 0) {
     Write-Output "no \$Tier gate declared — \${Tier}_gate in \$(Split-Path -Leaf \$gates) is empty, so nothing ran"
@@ -27566,33 +28769,6 @@ if (\$commands.Count -eq 0) {
 
 \$count = \$commands.Count
 Write-Output "running the \$Tier gate — \$count command(s) from \$(Split-Path -Leaf \$gates)"
-
-# One command, with stdin closed. Only a new process can have that: a native
-# command inherits this script's stdin and PowerShell has no redirect for it, so
-# a command reading stdin would take the caller's data or wait on a terminal.
-# ProcessPath is this very host, where a path built from \$PSHOME was fragile. The
-# process is also what makes a directory change or an \`exit\` end with the command.
-#
-# The command string is the project's and is run verbatim, as bash's \`eval\` runs
-# it. A native command sets \$LASTEXITCODE; a failing cmdlet leaves it 0 and sets
-# \$? to false. Both are failures, so both are read, and \$? is read first because
-# the next statement resets it. Invoke-Expression cannot serve here: it succeeds
-# whenever its argument parses, so \$? never sees the cmdlet inside it.
-function Invoke-GateCommand([string]\$Command) {
-    \$script = "\`\$global:LASTEXITCODE = 0\`n\$Command\`n" +
-    '\$gateOk = \$?; if (\$LASTEXITCODE -ne 0) { exit \$LASTEXITCODE }; if (-not \$gateOk) { exit 1 }; exit 0'
-    \$psi = [System.Diagnostics.ProcessStartInfo]::new([Environment]::ProcessPath)
-    foreach (\$a in @('-NoProfile', '-NonInteractive', '-Command', \$script)) {
-        \$psi.ArgumentList.Add(\$a)
-    }
-    \$psi.WorkingDirectory = \$repoRoot
-    \$psi.UseShellExecute = \$false
-    \$psi.RedirectStandardInput = \$true
-    \$process = [System.Diagnostics.Process]::Start(\$psi)
-    \$process.StandardInput.Close()
-    \$process.WaitForExit()
-    return \$process.ExitCode
-}
 
 \$i = 0
 foreach (\$cmd in \$commands) {
@@ -27607,6 +28783,903 @@ foreach (\$cmd in \$commands) {
 
 Write-Output "✓ the \$Tier gate passed — \$count of \$count command(s)"
 exit 0
+`,
+    executable: false,
+    backend: null,
+    skipIfExists: false,
+  },
+  {
+    category: "spec-root",
+    name: "specify",
+    suffix: "scripts/powershell/gate-impact.ps1",
+    content: `#!/usr/bin/env pwsh
+# Decide which of a tier's commands this candidate needs. PowerShell twin of
+# gate-impact.sh, whose header states the records this writes. Called by run-gate.ps1,
+# and by nothing else:
+#
+#   gate-impact.ps1 <tier> <commands-file> <records-file> <--base | --refs-stdin> [<rev>]
+#
+# This file holds every fallback cause and the rule behind them: uncertainty widens.
+# What is not shown safe to narrow runs the full tier and names why. It runs nothing of
+# the tier itself; a missing \`end\` is how run-gate.ps1 knows there is no answer. The
+# threat model is mistakes: this runs from the candidate's own scripts, so it cannot
+# stop a hostile branch, which already controls gates.yml.
+
+param([string]\$Tier, [string]\$Commands, [string]\$Records, [string]\$Mode, [string]\$BaseArg)
+\$ErrorActionPreference = 'Stop'
+
+\$scriptDir = Split-Path -Parent \$MyInvocation.MyCommand.Path
+\$repoRoot = (Resolve-Path (Join-Path \$scriptDir '..' '..' '..')).Path
+. (Join-Path \$scriptDir '_gate_candidate.ps1')
+. (Join-Path \$scriptDir '_gate_impact_read.ps1')
+. (Join-Path \$scriptDir '_gate_impact_adapter.ps1')
+. (Join-Path \$scriptDir '_gate_impact_graph.ps1')
+
+\$Declaration = '.specnaut/impact.json'
+\$Cause = ''
+\$Bases = [System.Collections.Generic.List[string]]::new()    # what the change set is computed against
+\$Compare = [System.Collections.Generic.List[string]]::new()  # those, and the merge-base (FR-006)
+\$LocalShas = [System.Collections.Generic.List[string]]::new()
+\$CandidateTree = ''; \$CandidateCommit = ''
+\$Affected = @(); \$Selected = \$false
+\$Declared = \$null
+\$Snapshots = @{}
+\$Utf8 = [System.Text.UTF8Encoding]::new(\$false)
+# Private: mode 0700 on Unix, as bash's mktemp -d makes it. It holds what the adapter wrote.
+\$Work = [System.IO.Directory]::CreateTempSubdirectory('specnaut-gate-').FullName
+[System.IO.File]::WriteAllText(\$Records, '', \$Utf8)
+
+function Write-Record([string[]]\$Fields) { [System.IO.File]::AppendAllText(\$Records, ((\$Fields -join "\`t") + "\`n"), \$Utf8) }
+function Set-Widen([string]\$Text) { if (\$script:Cause.Length -eq 0) { \$script:Cause = ConvertTo-GateAscii \$Text } }
+function Exit-Inactive { Write-Record @('inactive'); Write-Record @('end'); exit 0 }
+function Exit-Refuse([string]\$Text) {
+    if (\$script:CandidateCommit) { Write-Record @('candidate', \$script:CandidateTree, \$script:CandidateCommit) }
+    Write-Record @('refused', (ConvertTo-GateAscii \$Text))
+    Write-Record @('end')
+    exit 0
+}
+function Add-Base([string]\$Commit) { if (-not \$Bases.Contains(\$Commit)) { \$Bases.Add(\$Commit); \$Compare.Add(\$Commit) } }
+
+# FR-005. What a push's lines say comes from the candidate's reader; what each of them
+# means for the run is decided here.
+function Read-Refs {
+    foreach (\$fact in (Read-GateCandidateRefs ([Console]::In.ReadToEnd()))) {
+        \$kind, \$value = \$fact.Split(' ', 2)
+        switch -CaseSensitive (\$kind) {
+            'local' { \$LocalShas.Add(\$value) }
+            'base' { Add-Base \$value }
+            'malformed' { Set-Widen "refs-malformed: \$value" }
+            'zero' { Set-Widen "remote-zero: \$value" }
+            'unfetched' { Set-Widen "remote-unfetched: \$value" }
+        }
+    }
+    if (\$Bases.Count -eq 0) { Set-Widen 'no-base-in-refs' }
+}
+
+function Read-BaseFlag {
+    if (\$BaseArg.Length -eq 0) { Set-Widen 'base-empty'; return }
+    \$commit = Get-GateGitValue @('rev-parse', '--verify', '--quiet', '--end-of-options', "\$BaseArg^{commit}")
+    if (\$null -ne \$commit) { Add-Base \$commit } else { Set-Widen "base-unresolved: \$BaseArg" }
+}
+
+# FR-006: a narrow base must not launder an earlier change, so the protected paths are
+# also compared with where the branch left the default branch.
+function Read-MergeBase {
+    \$r = Invoke-GateProcess ([Environment]::ProcessPath) @('-NoProfile', '-NonInteractive', '-File', (Join-Path \$scriptDir 'base-branch.ps1')) \$repoRoot
+    if (\$r.Code -ne 0) { Set-Widen 'default-branch-unresolved'; return }
+    \$name = \$r.Out.Trim()
+    foreach (\$ref in @("refs/remotes/origin/\$name", "refs/heads/\$name")) {
+        if (\$null -eq (Get-GateGitValue @('rev-parse', '--verify', '--quiet', \$ref))) { continue }
+        \$commit = Get-GateGitValue @('merge-base', 'HEAD', \$ref)
+        if (\$null -eq \$commit) { break }
+        \$Compare.Add(\$commit)
+        return
+    }
+    Set-Widen "merge-base-unresolved: \$name"
+}
+
+# Whether any commit in reach holds a declaration the work tree does not: one deleted on
+# the branch is a change, and must not read as a project that never opted in.
+function Test-DeclarationOnASide {
+    foreach (\$commit in @('HEAD') + @(\$Compare)) {
+        if ((Invoke-GateGit @('cat-file', '-e', "\${commit}:\$Declaration")).Code -eq 0) { return \$true }
+    }
+    return \$false
+}
+
+# FR-006, for one path: tracked and regular on every side, and the same on every side.
+function Test-Protected([string]\$Path) {
+    \$mine = Get-GateProtectedEntries \$CandidateCommit \$Path
+    if (\$mine.Code -eq 2) { Set-Widen "protected-not-regular: \$Path"; return \$false }
+    foreach (\$commit in \$Compare) {
+        \$theirs = Get-GateProtectedEntries \$commit \$Path
+        if (\$theirs.Code -eq 2) { Set-Widen "protected-not-regular: \$Path"; return \$false }
+        if (-not (Test-GateSame \$mine.Text \$theirs.Text)) { Set-Widen "protected-changed: \$Path"; return \$false }
+    }
+    if (\$mine.Code -ne 0) { Set-Widen "protected-not-regular: \$Path"; return \$false }
+    return \$true
+}
+
+function Read-Declaration {
+    \$blob = Invoke-GateGit @('cat-file', 'blob', "\${CandidateCommit}:\$Declaration")
+    if (\$blob.Code -ne 0) { Set-Widen 'declaration-malformed: unreadable'; return \$false }
+    \$file = Join-Path \$Work 'impact.json'
+    [System.IO.File]::WriteAllText(\$file, \$blob.Out, \$Utf8)
+    \$script:Declared = Read-GateDeclaration \$file
+    if (\$Declared.Problem.Length -gt 0) { Set-Widen "declaration-malformed: \$(\$Declared.Problem)"; return \$false }
+    return \$true
+}
+
+function Test-EveryProtected {
+    if (-not (Test-Protected '.specnaut/gates.yml')) { return \$false }
+    if (-not (Test-Protected '.specnaut/scripts/')) { return \$false }
+    foreach (\$path in \$Declared.AdapterFiles) { if (-not (Test-Protected \$path)) { return \$false } }
+    return \$true
+}
+
+# One adapter run: its exit and its output are all a cause needs, and each is one.
+function Read-Side([string]\$Side, [string]\$Worktree, [string]\$Tree, [string]\$Commit, [string]\$Key) {
+    \$out = Join-Path \$Work "adapter.\$Key.out"
+    \$rc = Invoke-GateAdapter \$Declared.AdapterCommand \$Worktree \$Tree \$Commit \$out
+    if (\$rc -ne 0) { Set-Widen "adapter-failed: \$Side exit \$rc"; return \$false }
+    if (-not (Test-Path -LiteralPath \$out) -or (Get-Item -LiteralPath \$out).Length -eq 0) { Set-Widen "adapter-no-output: \$Side"; return \$false }
+    \$snapshot = Read-GateSnapshot \$out \$Commit
+    if (\$snapshot.Problem.Length -gt 0) { Set-Widen "adapter-\$(\$snapshot.Problem): \$Side"; return \$false }
+    \$Snapshots[\$Key] = \$snapshot.Owners
+    return \$true
+}
+
+# One snapshot per distinct base, plus the candidate's, described by the first base's
+# adapter. FR-006 has shown every copy of the adapter to be the same bytes.
+function Read-Snapshots {
+    \$hooks = Join-Path \$Work 'nohooks'
+    [void][System.IO.Directory]::CreateDirectory(\$hooks)
+    \$first = \$null
+    for (\$i = 0; \$i -lt \$Bases.Count; \$i++) {
+        \$worktree = Join-Path \$Work "wt.\$i"
+        if (-not (New-GateWorktree \$Bases[\$i] \$worktree \$hooks)) { Set-Widen "worktree-failed: \$(\$Bases[\$i])"; return \$false }
+        if (\$null -eq \$first) { \$first = \$worktree }
+        if (-not (Read-Side 'base' \$worktree \$worktree \$Bases[\$i] "\$i")) { return \$false }
+    }
+    return (Read-Side 'candidate' \$first \$repoRoot \$CandidateCommit 'candidate')
+}
+
+function Read-Affected {
+    \$pairs = [System.Collections.Generic.List[object]]::new()
+    for (\$i = 0; \$i -lt \$Bases.Count; \$i++) {
+        \$changes = Get-GateChanges \$Bases[\$i] \$CandidateCommit
+        if (\$changes.Problem.Length -gt 0) { Set-Widen \$changes.Problem; return \$false }
+        \$pairs.Add(@{ Snapshot = \$Snapshots["\$i"]; Changes = \$changes.Paths })
+    }
+    \$unknown = Get-GateUnknownOwner \$Declared @(\$Snapshots.Values)
+    if (\$null -ne \$unknown) { Set-Widen "declaration-malformed: unknown owner \$unknown"; return \$false }
+    \$answer = Get-GateAffected \$pairs \$Snapshots['candidate'] \$Declared
+    if (\$answer.Cause.Length -gt 0) { Set-Widen \$answer.Cause; return \$false }
+    \$script:Affected = @(\$answer.Owners)
+    return \$true
+}
+
+# The chain that can narrow a run: the first stage unable to show narrowing safe widens
+# and ends it, and only reaching the end sets Selected.
+function Invoke-Decide {
+    if (\$Cause.Length -gt 0) { return }
+    if (-not (Test-Protected \$Declaration)) { return }
+    if (-not (Read-Declaration)) { return }
+    if (-not \$Declared.ScopedTiers.Contains(\$Tier)) { Set-Widen "tier-not-scoped: \$Tier"; return }
+    if (-not (Test-EveryProtected)) { return }
+    \$ok = Read-Snapshots
+    \$drift = Get-GateCandidateRefusal \$CandidateTree
+    if (\$null -ne \$drift) { Exit-Refuse \$drift }
+    if (-not \$ok) { return }
+    if (-not (Read-Affected)) { return }
+    \$script:Selected = \$true
+}
+
+# One command's record. A check naming owners gets those it covers that are affected; one
+# naming none covers any. A command with no check always runs, as declared.
+function Write-CommandRecord([string]\$Command) {
+    foreach (\$check in \$Declared.Checks) {
+        if (-not (Test-GateSame \$check.Gate \$Command)) { continue }
+        \$hit = @(\$Affected | Where-Object { \$null -eq \$check.Owners -or \$check.Owners.Contains(\$_) })
+        if (\$hit.Count -gt 0) {
+            Write-Record @('run', (\$hit -join ' '), \$check.Scoped)
+        } elseif (\$null -eq \$check.Owners) {
+            Write-Record @('omit', 'no-affected-owner', \$Command)
+        } else {
+            Write-Record @('omit', "owners-not-affected: \$(\$check.Owners -join ' ')", \$Command)
+        }
+        return
+    }
+    Write-Record @('run', '-', \$Command)
+}
+
+# Commands in a base's tier that the candidate's no longer has. "Full" means the candidate's
+# own list, so a branch that drops a command would otherwise pass without it. Read through
+# run-gate's parser: a second one would be a second definition.
+function Write-Removed([string[]]\$Mine) {
+    \$seen = [System.Collections.Generic.HashSet[string]]::new(\$Mine, [StringComparer]::Ordinal)
+    foreach (\$commit in \$Compare) {
+        \$blob = Invoke-GateGit @('cat-file', 'blob', "\${commit}:.specnaut/gates.yml")
+        if (\$blob.Code -ne 0) { continue }
+        \$file = Join-Path \$Work 'gates.base'
+        [System.IO.File]::WriteAllText(\$file, \$blob.Out, \$Utf8)
+        foreach (\$command in @(& (Join-Path \$scriptDir 'run-gate.ps1') \$Tier --parse-gates \$file)) {
+            if (\$seen.Add(\$command)) { Write-Record @('removed', \$command) }
+        }
+    }
+}
+
+function Write-Selection {
+    \$mine = [string[]]@([System.IO.File]::ReadAllLines(\$Commands, \$Utf8))
+    Write-Record @('candidate', \$CandidateTree, \$CandidateCommit)
+    foreach (\$commit in \$Bases) { Write-Record @('base', \$commit) }
+    if (\$Selected) {
+        \$scope = if (\$Affected.Count -gt 0) { 'owners' } else { 'none' }
+        \$names = if (\$Affected.Count -gt 0) { \$Affected -join ' ' } else { '-' }
+        Write-Record @('scope', \$scope, \$names)
+        Write-Record @('adapter', \$Declared.AdapterCommand)
+    } else {
+        Write-Record @('scope', 'full', '-')
+        Write-Record @('fallback', \$Cause)
+    }
+    Write-Removed \$mine
+    foreach (\$command in \$mine) {
+        if (\$Selected) { Write-CommandRecord \$command } else { Write-Record @('run', '-', \$command) }
+    }
+    Write-Record @('end')
+}
+
+function Invoke-Main {
+    \$inRepo = Test-GateCandidateInRepo
+    if (\$inRepo) {
+        if (Test-GateSame \$Mode '--base') { Read-BaseFlag } else { Read-Refs }
+        Read-MergeBase
+    }
+    # Get-Item rather than Test-Path, which reads a dangling symlink as absent.
+    if (\$null -eq (Get-Item -LiteralPath (Join-Path \$repoRoot \$Declaration) -Force -ErrorAction SilentlyContinue)) {
+        if (-not \$inRepo -or -not (Test-DeclarationOnASide)) { Exit-Inactive }
+    }
+    if (-not \$inRepo) { Exit-Refuse 'not-a-repository: a declaration needs a work tree to vouch for' }
+    if (-not (Set-GateCandidate)) { Exit-Refuse 'no-commit' }
+    \$refusal = Get-GateCandidateRefusal \$CandidateTree
+    if (\$null -ne \$refusal) { Exit-Refuse \$refusal }
+    \$refusal = Get-GateTreeRefusal @(\$LocalShas)
+    if (\$null -ne \$refusal) { Exit-Refuse \$refusal }
+    Invoke-Decide
+    Write-Selection
+}
+
+try {
+    Invoke-Main
+} finally {
+    Remove-GateWorktrees
+    if (Test-Path -LiteralPath \$Work) { Remove-Item -LiteralPath \$Work -Recurse -Force -ErrorAction SilentlyContinue }
+}
+exit 0
+`,
+    executable: false,
+    backend: null,
+    skipIfExists: false,
+  },
+  {
+    category: "spec-root",
+    name: "specify",
+    suffix: "scripts/powershell/base-branch.ps1",
+    content: `#!/usr/bin/env pwsh
+# The base branch of this repository. PowerShell twin of base-branch.sh, which states
+# the rule: what origin/HEAD points at, else the configured init.defaultBranch, and
+# neither is exit 3, unknown. A name git would read as an option, or one with \`..\`
+# (a range), is exit 3 too, because every caller hands it to git as an argument.
+
+function Write-BaseBranch([string]\$Name) {
+    if (\$Name -cmatch '\\A[A-Za-z0-9][A-Za-z0-9._/-]*\\z' -and -not \$Name.Contains('..')) {
+        Write-Output \$Name
+        exit 0
+    }
+    [Console]::Error.WriteLine("base-branch: '\$Name' is not a branch name this script hands to git - set origin/HEAD to the real base: git remote set-head origin --auto")
+    exit 3
+}
+
+\$ref = & git --no-pager -c core.fsmonitor=false symbolic-ref --quiet --short refs/remotes/origin/HEAD 2>\$null
+if (\$LASTEXITCODE -eq 0 -and \$ref) {
+    Write-BaseBranch (\$ref -replace '\\Aorigin/', '')
+}
+\$name = & git --no-pager -c core.fsmonitor=false config --get init.defaultBranch 2>\$null
+if (\$LASTEXITCODE -eq 0 -and \$name) {
+    Write-BaseBranch \$name
+}
+[Console]::Error.WriteLine('base-branch: unknown - no origin/HEAD and no init.defaultBranch. Pass the base explicitly, or run: git remote set-head origin --auto')
+exit 3
+`,
+    executable: false,
+    backend: null,
+    skipIfExists: false,
+  },
+  {
+    category: "spec-root",
+    name: "specify",
+    suffix: "scripts/powershell/_gate_candidate.ps1",
+    content: `# Dot-sourced by run-gate.ps1 and gate-impact.ps1. PowerShell twin of
+# _gate_candidate.sh, and the one home of what a candidate is: a tree and the commit
+# that holds it. A pass is a statement about one exact tree, so a tree that is dirty,
+# or that moved during the run, is refused rather than presented as tested.
+#
+# Requires \$repoRoot. Every git call goes through Invoke-GateGit: this runs inside
+# hooks, where git has exported GIT_DIR and friends pointing elsewhere. Output is read
+# whole as UTF-8, because PowerShell's own capture splits lines and drops a \\r a path
+# may hold, and a console code page would mangle anything non-ASCII.
+#
+# Strings are compared with Test-GateSame, never -ceq, -cne or Sort-Object: those follow
+# culture rules, under which a zero-width character compares as nothing at all, and a
+# path differing only by one would read as the same path.
+
+function Test-GateSame([string]\$A, [string]\$B) { return [string]::Equals(\$A, \$B, [StringComparison]::Ordinal) }
+
+# Invoke-GateProcess - a process with stdin closed and the repository variables gone;
+# returns its exit code and its whole stdout. A program that cannot start reads as exit
+# 127, as bash has it, so each caller's own check on the exit reports it.
+function Invoke-GateProcess([string]\$File, [string[]]\$Arguments, [string]\$Cwd) {
+    \$psi = [System.Diagnostics.ProcessStartInfo]::new(\$File)
+    foreach (\$a in \$Arguments) { \$psi.ArgumentList.Add(\$a) }
+    if (\$Cwd) { \$psi.WorkingDirectory = \$Cwd }
+    \$psi.UseShellExecute = \$false
+    \$psi.RedirectStandardInput = \$true
+    \$psi.RedirectStandardOutput = \$true
+    \$psi.RedirectStandardError = \$true
+    \$psi.StandardOutputEncoding = [System.Text.UTF8Encoding]::new(\$false)
+    foreach (\$name in \$script:GateLocalEnv) { [void]\$psi.Environment.Remove(\$name) }
+    try {
+        \$process = [System.Diagnostics.Process]::Start(\$psi)
+    } catch [System.ComponentModel.Win32Exception] {
+        return [pscustomobject]@{ Code = 127; Out = '' }
+    }
+    \$process.StandardInput.Close()
+    \$stderr = \$process.StandardError.ReadToEndAsync()
+    \$stdout = \$process.StandardOutput.ReadToEnd()
+    \$process.WaitForExit()
+    [void]\$stderr.Result
+    return [pscustomobject]@{ Code = \$process.ExitCode; Out = \$stdout }
+}
+
+\$script:GateLocalEnv = @()
+\$gateEnvList = Invoke-GateProcess 'git' @('rev-parse', '--local-env-vars') ''
+# No git at all has no variables to scrub. A git that fails here would leave them in place.
+if (\$gateEnvList.Code -ne 0 -and \$gateEnvList.Code -ne 127) { throw "git rev-parse --local-env-vars exited \$(\$gateEnvList.Code)" }
+\$script:GateLocalEnv = @(\$gateEnvList.Out -split '\\s+' | Where-Object { \$_.Length -gt 0 })
+
+function Invoke-GateGit([string[]]\$GitArgs) {
+    return Invoke-GateProcess 'git' (@('-C', \$repoRoot, '-c', 'core.fsmonitor=false') + \$GitArgs) ''
+}
+
+# Runs git and returns its stdout with the line end gone, or \$null when it failed.
+function Get-GateGitValue([string[]]\$GitArgs) {
+    \$r = Invoke-GateGit \$GitArgs
+    if (\$r.Code -ne 0) { return \$null }
+    return \$r.Out.TrimEnd("\`r", "\`n")
+}
+
+# The text with anything but printable ASCII replaced, byte by byte, as the bash twin
+# does. Causes and commands reach a line a legacy console prints, and a path may hold
+# a newline, which would forge a record or a report line.
+function ConvertTo-GateAscii([string]\$Text) {
+    \$bytes = [System.Text.Encoding]::UTF8.GetBytes(\$Text)
+    \$out = [System.Text.StringBuilder]::new()
+    foreach (\$b in \$bytes) {
+        if (\$b -ge 0x20 -and \$b -le 0x7e) { [void]\$out.Append([char]\$b) } else { [void]\$out.Append('?') }
+    }
+    return \$out.ToString()
+}
+
+# True only at a work tree's top level. Inside another repository's tree, every path
+# this mechanism reads would mean something else.
+function Test-GateCandidateInRepo {
+    \$value = Get-GateGitValue @('rev-parse', '--is-inside-work-tree', '--show-prefix')
+    return (\$null -ne \$value -and (Test-GateSame \$value 'true'))
+}
+
+# Is the work tree still exactly <tree>? Returns the refusal, or \$null when it is.
+# Status is read with the submodule flag the change set uses, so neither can see a
+# change the other cannot.
+function Get-GateCandidateRefusal([string]\$Tree) {
+    \$status = Invoke-GateGit @('status', '--porcelain', '--untracked-files=all', '--ignore-submodules=none')
+    if (\$status.Code -ne 0) { return 'status-failed' }
+    if (\$status.Out.Length -gt 0) {
+        \$count = @(\$status.Out.TrimEnd("\`n") -split "\`n").Count
+        return "dirty-tree: \$count path(s) differ from the commit"
+    }
+    \$head = Get-GateGitValue @('rev-parse', '--verify', '--quiet', 'HEAD^{tree}')
+    if (\$null -eq \$head) { return 'no-commit' }
+    if (-not (Test-GateSame \$head \$Tree)) { return "tree-moved: HEAD holds \$head" }
+    return \$null
+}
+
+# Sets the candidate from HEAD; returns \$false when HEAD holds no commit.
+function Set-GateCandidate {
+    \$script:CandidateCommit = Get-GateGitValue @('rev-parse', '--verify', '--quiet', 'HEAD^{commit}')
+    \$script:CandidateTree = Get-GateGitValue @('rev-parse', '--verify', '--quiet', 'HEAD^{tree}')
+    return (\$null -ne \$script:CandidateCommit -and \$null -ne \$script:CandidateTree)
+}
+
+# Does every pushed sha hold the candidate tree? Returns the refusal, naming each tree
+# that is not, or \$null: one pass cannot speak for several trees.
+function Get-GateTreeRefusal([string[]]\$Shas) {
+    \$others = ''
+    foreach (\$sha in \$Shas) {
+        \$tree = Get-GateGitValue @('rev-parse', '--verify', '--quiet', "\$sha^{tree}")
+        if (\$null -eq \$tree) { return "local-sha-unknown: \$sha" }
+        if (-not (Test-GateSame \$tree \$script:CandidateTree)) { \$others += " \$sha=\$tree" }
+    }
+    if (\$others.Length -eq 0) { return \$null }
+    return "several-trees: candidate \$(\$script:CandidateTree), pushed\$others"
+}
+
+# Reads pre-push lines (\`<local ref> <local sha> <remote ref> <remote sha>\`) and returns
+# one fact per ref: \`local <sha>\` and then \`base <commit>\`, \`zero <remote ref>\` or
+# \`unfetched <sha>\`; \`malformed <ref>\` for a line that is not that. A deleted ref offers
+# no tree, so it returns nothing.
+function Read-GateCandidateRefs([string]\$Text) {
+    \$hex = '\\A[0-9a-f]{40}([0-9a-f]{24})?\\z'
+    \$facts = [System.Collections.Generic.List[string]]::new()
+    \$lines = \$Text -split "\`n"
+    if (\$lines.Count -gt 0 -and \$lines[-1].Length -eq 0) { \$lines = @(\$lines | Select-Object -SkipLast 1) }
+    foreach (\$raw in \$lines) {
+        \$line = \$raw.TrimEnd("\`r")
+        \$fields = \$line.Split(' ', 4)
+        \$ref = \$fields[0]
+        \$localSha = if (\$fields.Count -gt 1) { \$fields[1] } else { '' }
+        \$remoteRef = if (\$fields.Count -gt 2) { \$fields[2] } else { '' }
+        \$remoteSha = if (\$fields.Count -gt 3) { \$fields[3] } else { '' }
+        if (\$localSha -cnotmatch \$hex -or \$remoteSha -cnotmatch \$hex) {
+            \$facts.Add("malformed \$ref")
+        } elseif (\$localSha -cnotmatch '\\A0+\\z') {
+            \$facts.Add("local \$localSha")
+            if (\$remoteSha -cmatch '\\A0+\\z') {
+                \$facts.Add("zero \$remoteRef")
+            } else {
+                \$commit = Get-GateGitValue @('rev-parse', '--verify', '--quiet', "\$remoteSha^{commit}")
+                if (\$null -ne \$commit) { \$facts.Add("base \$commit") } else { \$facts.Add("unfetched \$remoteSha") }
+            }
+        }
+    }
+    return , \$facts
+}
+
+# The answer gate-impact.ps1 wrote, one field per kind of record. Read here, for run-gate.ps1,
+# to keep that file under its size target; what the answer exits is decided there.
+function Read-SelectedRecords(\$Records) {
+    \$answer = @{
+        Tree = ''; Commit = ''; Scope = ''; Owners = ''; Refused = ''; Cause = ''
+        Runs = [System.Collections.ArrayList]::new(); Omitted = [System.Collections.ArrayList]::new(); Removed = [System.Collections.ArrayList]::new()
+    }
+    foreach (\$line in \$Records) {
+        \$kind, \$rest = \$line.Split("\`t", 2)
+        switch -CaseSensitive (\$kind) {
+            'candidate' { \$answer.Tree, \$answer.Commit = \$rest.Split("\`t", 2) }
+            'scope' { \$answer.Scope, \$answer.Owners = \$rest.Split("\`t", 2) }
+            'refused' { \$answer.Refused = \$rest }
+            'fallback' { \$answer.Cause = \$rest }
+            'removed' { [void]\$answer.Removed.Add(\$rest) }
+            'omit' { \$reason, \$text = \$rest.Split("\`t", 2); [void]\$answer.Omitted.Add("\$text (\$reason)") }
+            'run' { \$who, \$text = \$rest.Split("\`t", 2); [void]\$answer.Runs.Add(@{ Owners = \$who; Command = \$text }) }
+        }
+    }
+    return \$answer
+}
+`,
+    executable: false,
+    backend: null,
+    skipIfExists: false,
+  },
+  {
+    category: "spec-root",
+    name: "specify",
+    suffix: "scripts/powershell/_gate_impact_read.ps1",
+    content: `# Dot-sourced by gate-impact.ps1. PowerShell twin of _gate_impact_read.sh, and the one
+# reader of \`.specnaut/impact.json\` and of an adapter's output. System.Text.Json is
+# strict where ConvertFrom-Json is not: it refuses comments and trailing commas, and
+# leaves a string that looks like a date a string, so both twins refuse the same files.
+#
+# A function here reports what is wrong; whether that widens the run is gate-impact's
+# call, not this file's. Every catch below turns a parse failure into that named
+# report, which is how it reaches the run's \`fallback:\` line.
+
+\$script:GateOwnerId = '\\A[A-Za-z0-9][A-Za-z0-9._-]{0,63}\\z'
+\$script:GateBadPath = '\\A/|\\\\|[*?\\[\\]{}]|[\\x00-\\x1f\\x7f]|\\.\\.|//|\\./|\\A\\.\\z|/\\.\\z'
+
+function Get-JsonProperty(\$Element, [string]\$Name) {
+    \$out = [System.Text.Json.JsonElement]::new()
+    if (\$Element.ValueKind -eq 'Object' -and \$Element.TryGetProperty(\$Name, [ref]\$out)) { return \$out }
+    return \$null
+}
+function Test-JsonKind(\$Value, [string]\$Kind) { return (\$null -ne \$Value -and (Test-GateSame "\$(\$Value.ValueKind)" \$Kind)) }
+function Test-OwnerId(\$Value) { return ((Test-JsonKind \$Value 'String') -and \$Value.GetString() -cmatch \$script:GateOwnerId) }
+function Test-Clean(\$Value) {
+    if (-not (Test-JsonKind \$Value 'String')) { return \$false }
+    \$text = \$Value.GetString()
+    return (\$text.Length -gt 0 -and \$text -cnotmatch '[\\x00-\\x1f\\x7f]')
+}
+function Test-PathOk(\$Value) {
+    if (-not (Test-JsonKind \$Value 'String')) { return \$false }
+    \$text = \$Value.GetString()
+    return (\$text.Length -gt 0 -and \$text -cnotmatch \$script:GateBadPath)
+}
+function Test-Every(\$Value, [scriptblock]\$Predicate) {
+    if (-not (Test-JsonKind \$Value 'Array')) { return \$false }
+    foreach (\$item in \$Value.EnumerateArray()) { if (-not (& \$Predicate \$item)) { return \$false } }
+    return \$true
+}
+function Test-PathsOk(\$Value) { return (Test-Every \$Value { param(\$i) Test-PathOk \$i }) }
+function Test-IdsOk(\$Value) { return (Test-Every \$Value { param(\$i) Test-OwnerId \$i }) }
+function Get-JsonStrings(\$Value) {
+    \$out = [System.Collections.Generic.List[string]]::new()
+    if (\$null -ne \$Value) { foreach (\$item in \$Value.EnumerateArray()) { \$out.Add(\$item.GetString()) } }
+    return , \$out
+}
+# A JSON array's strings, each once, in ordinal order. A pipeline would see the list as one
+# object, and Sort-Object would merge strings that differ only by an ignorable character.
+function Get-SortedUnique(\$Value) {
+    \$set = [System.Collections.Generic.HashSet[string]]::new([string[]](Get-JsonStrings \$Value).ToArray(), [StringComparer]::Ordinal)
+    \$sorted = [string[]]::new(\$set.Count)
+    \$set.CopyTo(\$sorted)
+    [Array]::Sort(\$sorted, [StringComparer]::Ordinal)
+    return , \$sorted
+}
+function Test-SchemaOne(\$Value) { return ((Test-JsonKind \$Value 'Number') -and \$Value.GetDouble() -eq 1) }
+function Read-JsonRoot([string]\$File) {
+    return [System.Text.Json.JsonDocument]::Parse([System.IO.File]::ReadAllText(\$File), [System.Text.Json.JsonDocumentOptions]::new()).RootElement
+}
+
+function Test-CheckOk(\$Check) {
+    if (-not (Test-JsonKind \$Check 'Object')) { return \$false }
+    if (-not (Test-Clean (Get-JsonProperty \$Check 'gate'))) { return \$false }
+    if (-not (Test-Clean (Get-JsonProperty \$Check 'scoped'))) { return \$false }
+    \$owners = Get-JsonProperty \$Check 'owners'
+    if (\$null -eq \$owners -or (Test-JsonKind \$owners 'Null')) { return \$true }
+    return ((Test-IdsOk \$owners) -and \$owners.GetArrayLength() -gt 0)
+}
+
+# The first problem with a declaration, or '' when it has none.
+function Get-DeclarationProblem(\$Root) {
+    if (-not (Test-JsonKind \$Root 'Object')) { return 'not-an-object' }
+    if (-not (Test-SchemaOne (Get-JsonProperty \$Root 'schema'))) { return 'schema' }
+    \$adapter = Get-JsonProperty \$Root 'adapter'
+    if (-not (Test-JsonKind \$adapter 'Object') -or -not (Test-Clean (Get-JsonProperty \$adapter 'command'))) { return 'adapter.command' }
+    \$files = Get-JsonProperty \$adapter 'files'
+    if (-not (Test-PathsOk \$files) -or \$files.GetArrayLength() -eq 0) { return 'adapter.files' }
+    \$tiers = Get-JsonProperty \$Root 'scoped_tiers'
+    if (-not (Test-Every \$tiers { param(\$i) (Test-JsonKind \$i 'String') -and ((Test-GateSame \$i.GetString() 'fast') -or (Test-GateSame \$i.GetString() 'full')) })) { return 'scoped_tiers' }
+    if (-not (Test-PathsOk (Get-JsonProperty \$Root 'full_on'))) { return 'full_on' }
+    if (-not (Test-PathsOk (Get-JsonProperty \$Root 'inert'))) { return 'inert' }
+    \$checks = Get-JsonProperty \$Root 'checks'
+    if (-not (Test-Every \$checks { param(\$i) Test-CheckOk \$i })) { return 'checks' }
+    \$gates = [System.Collections.Generic.HashSet[string]]::new([StringComparer]::Ordinal)
+    foreach (\$check in \$checks.EnumerateArray()) {
+        if (-not \$gates.Add((Get-JsonProperty \$check 'gate').GetString())) { return 'checks.gate-duplicated' }
+    }
+    return ''
+}
+
+# Reads and validates a declaration. Returns @{ Problem } or the normalized form.
+function Read-GateDeclaration([string]\$File) {
+    try { \$root = Read-JsonRoot \$File } catch { return @{ Problem = 'not-json' } }
+    \$problem = Get-DeclarationProblem \$root
+    if (\$problem.Length -gt 0) { return @{ Problem = \$problem } }
+    \$adapter = Get-JsonProperty \$root 'adapter'
+    \$checks = [System.Collections.Generic.List[object]]::new()
+    foreach (\$check in (Get-JsonProperty \$root 'checks').EnumerateArray()) {
+        \$owners = Get-JsonProperty \$check 'owners'
+        \$named = \$null -ne \$owners -and (Test-JsonKind \$owners 'Array')
+        \$checks.Add(@{
+                Gate   = (Get-JsonProperty \$check 'gate').GetString()
+                Scoped = (Get-JsonProperty \$check 'scoped').GetString()
+                Owners = if (\$named) { Get-JsonStrings \$owners } else { \$null }
+            })
+    }
+    return @{
+        Problem        = ''
+        AdapterCommand = (Get-JsonProperty \$adapter 'command').GetString()
+        AdapterFiles   = Get-JsonStrings (Get-JsonProperty \$adapter 'files')
+        ScopedTiers    = Get-JsonStrings (Get-JsonProperty \$root 'scoped_tiers')
+        FullOn         = Get-JsonStrings (Get-JsonProperty \$root 'full_on')
+        Inert          = Get-JsonStrings (Get-JsonProperty \$root 'inert')
+        Checks         = \$checks
+    }
+}
+
+# An owner a check names that no snapshot holds, or \$null. A check that can never match
+# is a declaration out of date with the graph, and would omit its gate on every change.
+function Get-GateUnknownOwner(\$Declared, \$Snapshots) {
+    foreach (\$check in \$Declared.Checks) {
+        foreach (\$owner in @(\$check.Owners)) {
+            if (\$null -eq \$owner) { continue }
+            \$known = \$false
+            foreach (\$snapshot in \$Snapshots) { if (\$snapshot.ContainsKey(\$owner)) { \$known = \$true } }
+            if (-not \$known) { return \$owner }
+        }
+    }
+    return \$null
+}
+
+function Get-SnapshotProblem(\$Root, [string]\$Commit) {
+    if (-not (Test-JsonKind \$Root 'Object')) { return 'invalid-json' }
+    if (-not (Test-SchemaOne (Get-JsonProperty \$Root 'schema'))) { return 'schema-mismatch' }
+    if (-not (Test-JsonKind (Get-JsonProperty \$Root 'complete') 'True')) { return 'incomplete' }
+    \$echoed = Get-JsonProperty \$Root 'commit'
+    if (-not (Test-JsonKind \$echoed 'String') -or -not (Test-GateSame \$echoed.GetString() \$Commit)) { return 'commit-mismatch' }
+    \$owners = Get-JsonProperty \$Root 'owners'
+    if (-not (Test-Every \$owners { param(\$i) (Test-JsonKind \$i 'Object') -and (Test-OwnerId (Get-JsonProperty \$i 'id')) })) { return 'invalid-owner' }
+    \$ids = [System.Collections.Generic.HashSet[string]]::new([StringComparer]::Ordinal)
+    foreach (\$owner in \$owners.EnumerateArray()) {
+        if (-not \$ids.Add((Get-JsonProperty \$owner 'id').GetString())) { return 'invalid-owner' }
+    }
+    foreach (\$owner in \$owners.EnumerateArray()) {
+        if (-not (Test-PathsOk (Get-JsonProperty \$owner 'roots'))) { return 'invalid-root' }
+    }
+    foreach (\$owner in \$owners.EnumerateArray()) {
+        if (-not (Test-IdsOk (Get-JsonProperty \$owner 'depends_on'))) { return 'invalid-owner' }
+    }
+    foreach (\$owner in \$owners.EnumerateArray()) {
+        foreach (\$dep in (Get-JsonProperty \$owner 'depends_on').EnumerateArray()) {
+            if (-not \$ids.Contains(\$dep.GetString())) { return 'dangling-depends-on' }
+        }
+    }
+    return ''
+}
+
+# Reads and validates an adapter's output. Returns @{ Problem } or @{ Owners }, a map
+# from id to its sorted roots and dependencies, compared as text by the graph.
+function Read-GateSnapshot([string]\$File, [string]\$Commit) {
+    try { \$root = Read-JsonRoot \$File } catch { return @{ Problem = 'invalid-json' } }
+    \$problem = Get-SnapshotProblem \$root \$Commit
+    if (\$problem.Length -gt 0) { return @{ Problem = \$problem } }
+    \$owners = [System.Collections.Generic.Dictionary[string, object]]::new([StringComparer]::Ordinal)
+    foreach (\$owner in (Get-JsonProperty \$root 'owners').EnumerateArray()) {
+        \$roots = Get-SortedUnique (Get-JsonProperty \$owner 'roots')
+        \$deps = Get-SortedUnique (Get-JsonProperty \$owner 'depends_on')
+        \$owners[(Get-JsonProperty \$owner 'id').GetString()] = @{ Roots = \$roots; DependsOn = \$deps; Record = (\$roots -join "\`0") + "\`u{1}" + (\$deps -join "\`0") }
+    }
+    return @{ Problem = ''; Owners = \$owners }
+}
+`,
+    executable: false,
+    backend: null,
+    skipIfExists: false,
+  },
+  {
+    category: "spec-root",
+    name: "specify",
+    suffix: "scripts/powershell/_gate_impact_adapter.ps1",
+    content: `# Dot-sourced by gate-impact.ps1. PowerShell twin of _gate_impact_adapter.sh, and the
+# one place an adapter runs and the base worktree is made. The adapter is always the
+# base's copy: a branch must not choose the code that tells this mechanism how little
+# to check.
+
+\$script:GateWorktrees = [System.Collections.Generic.List[string]]::new()
+
+# A detached worktree of <commit> at <path>, outside the repository. The hooks directory
+# is empty so the checkout runs none of the repository's hooks. Returns its success.
+function New-GateWorktree([string]\$Commit, [string]\$Path, [string]\$EmptyHooks) {
+    \$script:GateWorktrees.Add(\$Path)
+    \$r = Invoke-GateGit @('-c', "core.hooksPath=\$EmptyHooks", 'worktree', 'add', '--quiet', '--detach', \$Path, \$Commit)
+    return (\$r.Code -eq 0)
+}
+
+# Safe to call on any exit path, and more than once.
+function Remove-GateWorktrees {
+    \$failed = \$false
+    foreach (\$path in \$script:GateWorktrees) {
+        if ((Invoke-GateGit @('worktree', 'remove', '--force', \$path)).Code -eq 0) { continue }
+        # Only this run's own failure prunes. A bare prune would drop the user's stale entries too.
+        if (Test-Path -LiteralPath \$path) { Remove-Item -LiteralPath \$path -Recurse -Force -ErrorAction SilentlyContinue }
+        \$failed = \$true
+    }
+    if (\$failed) { [void](Invoke-GateGit @('worktree', 'prune')) }
+    \$script:GateWorktrees.Clear()
+}
+
+# Runs the adapter from <worktree> to describe <tree>; returns its exit. No GIT_* variable
+# and no stdin reach it, and its stdout goes to stderr: only the file it writes is its
+# answer. It runs in this twin's shell, as a gate command does.
+function Invoke-GateAdapter([string]\$Command, [string]\$Worktree, [string]\$Tree, [string]\$Commit, [string]\$Out) {
+    # New-GateCommandStart is run-gate.ps1's, the one caller of this script family.
+    \$psi = New-GateCommandStart \$Command \$Worktree
+    \$psi.RedirectStandardOutput = \$true
+    foreach (\$name in @(\$psi.Environment.Keys)) { if (\$name.StartsWith('GIT_', [StringComparison]::Ordinal)) { [void]\$psi.Environment.Remove(\$name) } }
+    \$psi.Environment['SPECNAUT_IMPACT_TREE'] = \$Tree
+    \$psi.Environment['SPECNAUT_IMPACT_COMMIT'] = \$Commit
+    \$psi.Environment['SPECNAUT_IMPACT_OUT'] = \$Out
+    \$psi.Environment['SPECNAUT_IMPACT_SCHEMA'] = '1'
+    \$psi.Environment['SPECNAUT_IMPACT_REPO'] = \$repoRoot
+    \$process = [System.Diagnostics.Process]::Start(\$psi)
+    \$process.StandardInput.Close()
+    \$stdout = \$process.StandardOutput.ReadToEnd()
+    \$process.WaitForExit()
+    if (\$stdout) { [Console]::Error.Write(\$stdout) }
+    return \$process.ExitCode
+}
+`,
+    executable: false,
+    backend: null,
+    skipIfExists: false,
+  },
+  {
+    category: "spec-root",
+    name: "specify",
+    suffix: "scripts/powershell/_gate_impact_graph.ps1",
+    content:
+      `# Dot-sourced by gate-impact.ps1. PowerShell twin of _gate_impact_graph.sh: the one home
+# of the change set and of the affected set with its reverse closure. Reports facts;
+# whether one widens the run is gate-impact's call. Comparison is ordinal throughout.
+
+# Returns @{ Paths } or @{ Problem }. --no-renames makes a rename its delete plus its add,
+# so both of its owners are seen. Problem is the first path whose kind no adapter can
+# vouch for: \`type-change: <path>\`, \`gitlink: <path>\` or \`symlink: <path>\`.
+function Get-GateChanges([string]\$Base, [string]\$Commit) {
+    \$r = Invoke-GateGit @('diff-tree', '-r', '-z', '--raw', '--no-renames', '--ignore-submodules=none', \$Base, \$Commit)
+    if (\$r.Code -ne 0) { return @{ Problem = 'diff-failed' } }
+    \$paths = [System.Collections.Generic.List[string]]::new()
+    \$parts = \$r.Out.Split([char]0)
+    for (\$i = 0; \$i + 1 -lt \$parts.Count; \$i += 2) {
+        \$meta = \$parts[\$i].Split(' ')
+        \$path = \$parts[\$i + 1]
+        \$old = \$meta[0].TrimStart(':')
+        \$new = \$meta[1]
+        if (\$meta[4].StartsWith('T', [StringComparison]::Ordinal)) { return @{ Problem = "type-change: \$path" } }
+        if ((Test-GateSame \$old '160000') -or (Test-GateSame \$new '160000')) { return @{ Problem = "gitlink: \$path" } }
+        if ((Test-GateSame \$old '120000') -or (Test-GateSame \$new '120000')) { return @{ Problem = "symlink: \$path" } }
+        \$paths.Add(\$path)
+    }
+    return @{ Paths = \$paths; Problem = '' }
+}
+
+# The path's tracked entries as text, for comparing sides. Code 1 when it has none, 2 when
+# one is not a regular file. ls-tree finds nothing through a symlink component, so that
+# reads as untracked.
+function Get-GateProtectedEntries([string]\$Commit, [string]\$Path) {
+    \$r = Invoke-GateGit @('ls-tree', '-r', '-z', \$Commit, '--', \$Path)
+    \$entries = @(\$r.Out.Split([char]0) | Where-Object { \$_.Length -gt 0 })
+    if (\$entries.Count -eq 0) { return @{ Code = 1; Text = '' } }
+    foreach (\$entry in \$entries) {
+        if (-not (\$entry.StartsWith('100644 ', [StringComparison]::Ordinal) -or \$entry.StartsWith('100755 ', [StringComparison]::Ordinal))) {
+            return @{ Code = 2; Text = '' }
+        }
+    }
+    return @{ Code = 0; Text = (\$entries -join "\`n") }
+}
+
+function Test-GateHolds([string]\$Root, [string]\$Path) {
+    if (\$Root.EndsWith('/', [StringComparison]::Ordinal)) { return \$Path.StartsWith(\$Root, [StringComparison]::Ordinal) }
+    return (Test-GateSame \$Path \$Root)
+}
+function Test-GateListed(\$List, [string]\$Path) {
+    foreach (\$root in \$List) { if (Test-GateHolds \$root \$Path) { return \$true } }
+    return \$false
+}
+function Get-GateOwnersOf(\$Owners, [string]\$Path) {
+    \$out = [System.Collections.Generic.List[string]]::new()
+    foreach (\$id in \$Owners.Keys) {
+        if (Test-GateListed \$Owners[\$id].Roots \$Path) { \$out.Add(\$id) }
+    }
+    return , \$out
+}
+
+# The first path no snapshot on its own pair's sides owns, or a full_on one. A path must
+# be owned on its own pair's sides, or an owner only another base knows would stop it
+# being unowned. Returns the cause, or ''.
+function Get-GatePathCause(\$Pairs, \$Candidate, \$Declared) {
+    foreach (\$pair in \$Pairs) {
+        foreach (\$path in \$pair.Changes) {
+            if (Test-GateListed \$Declared.FullOn \$path) { return "full-on: \$path" }
+            if (Test-GateListed \$Declared.Inert \$path) { continue }
+            \$held = (Get-GateOwnersOf \$Candidate \$path).Count + (Get-GateOwnersOf \$pair.Snapshot \$path).Count
+            if (\$held -eq 0) { return "unowned: \$path" }
+        }
+    }
+    return ''
+}
+
+# Returns @{ Cause } or @{ Owners }, sorted ordinally. Once owned, a path affects whoever
+# holds it in any snapshot, and the closure runs over every edge any snapshot holds,
+# because a dependency removed on the branch still explains why the dependent broke.
+function Get-GateAffected(\$Pairs, \$Candidate, \$Declared) {
+    \$cause = Get-GatePathCause \$Pairs \$Candidate \$Declared
+    if (\$cause.Length -gt 0) { return @{ Cause = \$cause } }
+    \$snapshots = @(\$Candidate) + @(\$Pairs | ForEach-Object { \$_.Snapshot })
+    \$set = [System.Collections.Generic.HashSet[string]]::new([StringComparer]::Ordinal)
+    foreach (\$pair in \$Pairs) {
+        foreach (\$path in \$pair.Changes) {
+            if (Test-GateListed \$Declared.Inert \$path) { continue }
+            foreach (\$snapshot in \$snapshots) {
+                foreach (\$id in (Get-GateOwnersOf \$snapshot \$path)) { [void]\$set.Add(\$id) }
+            }
+        }
+        foreach (\$id in @(\$pair.Snapshot.Keys) + @(\$Candidate.Keys)) {
+            \$onBoth = \$Candidate.ContainsKey(\$id) -and \$pair.Snapshot.ContainsKey(\$id)
+            if (-not \$onBoth -or -not (Test-GateSame \$Candidate[\$id].Record \$pair.Snapshot[\$id].Record)) { [void]\$set.Add(\$id) }
+        }
+    }
+    do {
+        \$before = \$set.Count
+        foreach (\$snapshot in \$snapshots) {
+            foreach (\$id in \$snapshot.Keys) {
+                foreach (\$dep in \$snapshot[\$id].DependsOn) { if (\$set.Contains(\$dep)) { [void]\$set.Add(\$id) } }
+            }
+        }
+    } while (\$set.Count -ne \$before)
+    \$sorted = [string[]]@(\$set)
+    [Array]::Sort(\$sorted, [StringComparer]::Ordinal)
+    return @{ Cause = ''; Owners = \$sorted }
+}
+`,
+    executable: false,
+    backend: null,
+    skipIfExists: false,
+  },
+  {
+    category: "spec-root",
+    name: "specify",
+    suffix: "scripts/powershell/_gate_evidence.ps1",
+    content:
+      `# Dot-sourced by run-gate.ps1. PowerShell twin of _gate_evidence.sh, and the one writer of
+# gate evidence: what ran on which tree, what was omitted and why, and what was taken on
+# trust. It is write-only. Nothing reads it to decide anything: a stale file must never be
+# able to skip a check, and a pass is only ever what this run saw.
+
+function Get-GateEvidenceObject([string]\$Tier, [string]\$Tree, [string[]]\$Records, [string[]]\$Ran, [string]\$Result, [bool]\$Valid) {
+    # Three fields suit \`run\` and \`omit\`. A one-value record is read with rest(): its value may hold a tab.
+    \$rows = @(\$Records | ForEach-Object { , @(\$_.Split("\`t", 3)) })
+    \$rest = { param(\$kind) @(\$Records | ForEach-Object { , @(\$_.Split("\`t", 2)) } | Where-Object { Test-GateSame \$_[0] \$kind } | ForEach-Object { \$_[1] }) }
+    \$of = { param(\$kind) @(\$rows | Where-Object { Test-GateSame \$_[0] \$kind }) }
+    \$candidate = @(& \$of 'candidate')[0]
+    \$scope = @(& \$of 'scope')[0]
+    \$ownersOf = { param(\$text) if (Test-GateSame \$text '-') { , @() } else { , @(\$text.Split(' ')) } }
+    return [ordered]@{
+        schema   = 1
+        tier     = \$Tier
+        tree     = \$Tree
+        commit   = \$candidate[2]
+        result   = \$Result
+        valid    = \$Valid
+        bases    = @(& \$of 'base' | ForEach-Object { \$_[1] })
+        scope    = \$scope[1]
+        owners   = & \$ownersOf \$scope[2]
+        fallback = @(& \$rest 'fallback')
+        removed  = @(& \$rest 'removed')
+        ran      = @(\$Ran | ForEach-Object {
+                \$parts = \$_.Split("\`t", 3)
+                [ordered]@{ exit = [int]\$parts[0]; owners = & \$ownersOf \$parts[1]; command = \$parts[2] }
+            })
+        omitted  = @(& \$of 'omit' | ForEach-Object { [ordered]@{ reason = \$_[1]; command = \$_[2] } })
+        trusted  = [ordered]@{
+            adapter = @(& \$rest 'adapter')[0]
+            scoped  = @(& \$of 'run' | Where-Object { -not (Test-GateSame \$_[1] '-') } | ForEach-Object { \$_[2] })
+        }
+    }
+}
+
+# Writes the file atomically and returns its path, or \`unwritten (<cause>)\`. Failing to
+# record a result does not change the result, so every failure here is that report.
+function Write-GateEvidence([string]\$Tier, [string]\$Tree, [string[]]\$Records, [string[]]\$Ran, [string]\$Result, [bool]\$Valid) {
+    \$path = Get-GateGitValue @('rev-parse', '--git-path', "specnaut/gate-evidence/\$Tier-\$Tree.json")
+    if (\$null -eq \$path) { return 'unwritten (no-git-path)' }
+    if (-not [System.IO.Path]::IsPathRooted(\$path)) { \$path = Join-Path \$repoRoot \$path }
+    \$dir = Split-Path -Parent \$path
+    try {
+        [void][System.IO.Directory]::CreateDirectory(\$dir)
+    } catch {
+        return 'unwritten (cannot-create-directory)'
+    }
+    \$tmp = Join-Path \$dir ".evidence.\$([guid]::NewGuid().ToString('N'))"
+    try {
+        \$json = Get-GateEvidenceObject \$Tier \$Tree \$Records \$Ran \$Result \$Valid | ConvertTo-Json -Depth 6
+        [System.IO.File]::WriteAllText(\$tmp, "\$json\`n", [System.Text.UTF8Encoding]::new(\$false))
+        [System.IO.File]::Move(\$tmp, \$path, \$true)
+    } catch {
+        if (Test-Path -LiteralPath \$tmp) { Remove-Item -LiteralPath \$tmp -Force -ErrorAction SilentlyContinue }
+        return 'unwritten (cannot-write-file)'
+    }
+    return \$path
+}
 `,
     executable: false,
     backend: null,

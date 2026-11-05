@@ -276,11 +276,16 @@ check "an undeclared tier degrades rather than failing: exit 0, and it says noth
 # finishing silently at code 0 with every later check unrun and no closing
 # banner. A fail-open guard, written inside the ticket about guards.
 # grep takes several files, so no loop is needed here at all.
-check "no surface of the gate mechanism names a test tool (#555 AC2)" \
-  '! grep -qiE "jest|vitest|playwright|cypress|pytest|rspec|junit|mocha|karma|nightwatch|testcafe|phpunit|xunit|nunit" \
+# The globs reach every script of the mechanism (#725), so a file added to it is swept
+# without anyone remembering to list it here. Build tools count as much as test tools.
+check "no surface of the gate mechanism names a test or build tool (#555 AC2, #725)" \
+  '[ -f .specnaut/scripts/bash/run-gate.sh ] && [ -f .specnaut/scripts/bash/gate-impact.sh ] &&
+   [ -f .specnaut/scripts/powershell/run-gate.ps1 ] && [ -f .specnaut/scripts/powershell/gate-impact.ps1 ] &&
+   [ -f .claude/skills/task/phases/quality-gates.md ] &&
+   ! grep -qiE "jest|vitest|playwright|cypress|pytest|rspec|junit|mocha|karma|nightwatch|testcafe|phpunit|xunit|nunit|\b(nx|turbo|turborepo|bazel|buck2?|pantsbuild|gradle|maven|lerna|moonrepo|pnpm|yarn|npm|cargo)\b" \
        .specnaut/gates.yml \
-       .specnaut/scripts/bash/run-gate.sh \
-       .specnaut/scripts/powershell/run-gate.ps1 \
+       .specnaut/scripts/bash/*gate* \
+       .specnaut/scripts/powershell/*gate* \
        .claude/skills/task/phases/quality-gates.md'
 
 finish "MERGE"

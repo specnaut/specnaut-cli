@@ -37,9 +37,17 @@ that runs only on `pull_request`. **Do not infer `--pr` from a remote, a forge o
      landed (a re-run after the base moved): **stop** and say so — never squash, never close from
      here; the `CHILD` lines cannot be read back. A range holding any commit never reads 16.
    - **Exit 0 — an epic**: do **not** squash. Run the full gate tier once,
-     `.specnaut/scripts/bash/run-gate.sh full` (a failure is fixed on the branch as a `--fixup` of the
-     child at fault, then the tier re-run — never escalated), then load `phases/epic-fixups.md` and
-     fold. Do not merge past a failed fold.
+     `.specnaut/scripts/bash/run-gate.sh full --base "$(git merge-base HEAD <base>)"` (a failure is
+     fixed on the branch as a `--fixup` of the child at fault,
+     then the tier re-run — never escalated), then load `phases/epic-fixups.md` and fold. Do not
+     merge past a failed fold. Its other exits: **3**, the candidate is refused: stop and say why,
+     on the branch. **4**, nothing was checked. With a `removed:` line other than `none`, the branch
+     emptied the tier: stop and say which commands left it, because a bare run of an empty tier
+     passes. With `removed: none`, everything was omitted: run it bare,
+     `.specnaut/scripts/bash/run-gate.sh full`, and read that result instead. A project that
+     declares `.specnaut/impact.json` may run less than the whole tier, so a pass whose `scope:`
+     line is not `full` is reported as that scope, and a pass with a `removed:` line names those
+     commands: neither is ever reported as the full gate.
 2. **`--pr` only** — push the branch, open the pull request against the base, name any issue its
    body references that `gh pr view <n> --json closingIssuesReferences` omits, report the PR URL,
    run step 5 and step 6, and **stop**: nothing has merged, so the item stays open. Re-run

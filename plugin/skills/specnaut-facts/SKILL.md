@@ -48,6 +48,10 @@ Enhanced fork of [`specify` CLI](https://github.com/github/spec-kit), distribute
 
 Earlier releases kept the pipeline, the backlog and the audits at other addresses; the `specnaut` skill's **Retired addresses** table maps each to its new one, and `specnaut upgrade` moves them.
 
+### Quality gates
+
+`.specnaut/gates.yml` declares the `fast` and `full` tiers, and `run-gate.sh <tier>` runs them. A project may opt in to running only what a change can affect: `.specnaut/impact.json` and an adapter of its own, used behind `--base <rev>` or `--refs-stdin`. Specnaut ships no graph and names no build tool; what cannot be shown safe runs the whole tier and names why. Behind those flags exit 3 refuses a candidate and exit 4 means nothing was checked. `phases/quality-gates.md` is the contract.
+
 ### Backlog conventions (GitHub backend)
 
 `Priority` (P0–P3) and `Size` (XS–XL) via Project V2 native fields (`set-field.sh`); fall back to `priority:*`/`size:*` labels when the native field is absent. Two-step close: `gh issue close --reason completed` first, then `move.sh <num> Done` — moving first makes a sweep report the open card in Done as drift. `/task groom` catches items closed via paths that bypassed the move step.

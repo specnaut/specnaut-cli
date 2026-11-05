@@ -10,7 +10,7 @@ import { assert, assertEquals, assertStringIncludes } from "@std/assert";
 import { join } from "@std/path";
 import { bashPath } from "../templates/hooks/hook_sandbox.ts";
 import { pwshRunsOnCi } from "./epic_repo.ts";
-import { gateProject, lf, runGate, TWINS } from "./run_gate_fixture.ts";
+import { gateProject, gitIn, lf, runGate, TWINS } from "./run_gate_fixture.ts";
 
 pwshRunsOnCi("run-gate");
 
@@ -106,7 +106,7 @@ four
   - git rev-parse --show-prefix
 `;
     const root = await gateProject(gates);
-    await new Deno.Command("git", { args: ["init", "-q"], cwd: root }).output();
+    await gitIn(root, "init", "-q");
     const r = await runGate(twin, root, ["fast"]);
     assertEquals(r.code, 0, r.stderr);
     assert(!lf(r.stdout).includes(".specnaut/\n"), r.stdout);
@@ -166,7 +166,7 @@ if (TWINS.includes("pwsh")) {
     const r = await runGate("pwsh", await gateProject(gates), ["fast"]);
     assertEquals(r.code, 1, r.stdout);
     assertStringIncludes(r.stderr, "the fast gate failed at command 1/2 (exit 1)");
-    assert(!lf(r.stdout).includes("never\n  "), r.stdout);
+    assert(!lf(r.stdout).includes("[2/2]"), r.stdout);
     assert(!lf(r.stdout).includes("passed"), r.stdout);
   });
 

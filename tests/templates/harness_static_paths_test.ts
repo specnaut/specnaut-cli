@@ -106,6 +106,9 @@ const CREATED_OUTSIDE_THE_BUNDLE: Record<
   ".specnaut/upgrade-staging/": {
     reason: "written by `specnaut upgrade` on apply, consumed by `specnaut reconcile`",
   },
+  ".specnaut/impact.json": {
+    reason: "the project's own opt-in, written by the project: Specnaut ships no copy of it",
+  },
   ".specnaut/addenda/": {
     reason:
       "the project's own additions to a phase (cli#611); Specnaut reads them, never writes them",

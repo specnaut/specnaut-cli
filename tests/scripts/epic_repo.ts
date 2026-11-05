@@ -84,7 +84,7 @@ export const EPIC_BRANCH_SH = join(CORE, "bash", "epic-branch.sh");
  * Children see no global or system git config and inherit no `GIT_*` variable
  * (`GIT_DIR`, `GIT_INDEX_FILE`… from a hook): the fixture is all they read.
  */
-const ISOLATED = {
+export const ISOLATED = {
   ...Object.fromEntries(Object.entries(Deno.env.toObject()).filter(([k]) => !/^GIT_/.test(k))),
   GIT_CONFIG_GLOBAL: "/dev/null",
   GIT_CONFIG_SYSTEM: "/dev/null",

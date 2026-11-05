@@ -29,6 +29,8 @@ const TOOLS = [
   "chmod",
   "dirname",
   "head",
+  "tail",
+  "wc",
   "shasum",
   "sha256sum",
   "env",

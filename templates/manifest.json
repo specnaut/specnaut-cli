@@ -1771,6 +1771,48 @@
     {
       "category": "spec-root",
       "name": "specify",
+      "suffix": "scripts/bash/gate-impact.sh",
+      "source": "core/specnaut/scripts/bash/gate-impact.sh",
+      "executable": true
+    },
+    {
+      "category": "spec-root",
+      "name": "specify",
+      "suffix": "scripts/bash/_gate_candidate.sh",
+      "source": "core/specnaut/scripts/bash/_gate_candidate.sh",
+      "executable": true
+    },
+    {
+      "category": "spec-root",
+      "name": "specify",
+      "suffix": "scripts/bash/_gate_impact_read.sh",
+      "source": "core/specnaut/scripts/bash/_gate_impact_read.sh",
+      "executable": true
+    },
+    {
+      "category": "spec-root",
+      "name": "specify",
+      "suffix": "scripts/bash/_gate_impact_adapter.sh",
+      "source": "core/specnaut/scripts/bash/_gate_impact_adapter.sh",
+      "executable": true
+    },
+    {
+      "category": "spec-root",
+      "name": "specify",
+      "suffix": "scripts/bash/_gate_impact_graph.sh",
+      "source": "core/specnaut/scripts/bash/_gate_impact_graph.sh",
+      "executable": true
+    },
+    {
+      "category": "spec-root",
+      "name": "specify",
+      "suffix": "scripts/bash/_gate_evidence.sh",
+      "source": "core/specnaut/scripts/bash/_gate_evidence.sh",
+      "executable": true
+    },
+    {
+      "category": "spec-root",
+      "name": "specify",
       "suffix": "scripts/bash/merge-mode.sh",
       "source": "core/specnaut/scripts/bash/merge-mode.sh",
       "executable": true
@@ -1912,6 +1954,48 @@
       "name": "specify",
       "suffix": "scripts/powershell/run-gate.ps1",
       "source": "core/specnaut/scripts/powershell/run-gate.ps1"
+    },
+    {
+      "category": "spec-root",
+      "name": "specify",
+      "suffix": "scripts/powershell/gate-impact.ps1",
+      "source": "core/specnaut/scripts/powershell/gate-impact.ps1"
+    },
+    {
+      "category": "spec-root",
+      "name": "specify",
+      "suffix": "scripts/powershell/base-branch.ps1",
+      "source": "core/specnaut/scripts/powershell/base-branch.ps1"
+    },
+    {
+      "category": "spec-root",
+      "name": "specify",
+      "suffix": "scripts/powershell/_gate_candidate.ps1",
+      "source": "core/specnaut/scripts/powershell/_gate_candidate.ps1"
+    },
+    {
+      "category": "spec-root",
+      "name": "specify",
+      "suffix": "scripts/powershell/_gate_impact_read.ps1",
+      "source": "core/specnaut/scripts/powershell/_gate_impact_read.ps1"
+    },
+    {
+      "category": "spec-root",
+      "name": "specify",
+      "suffix": "scripts/powershell/_gate_impact_adapter.ps1",
+      "source": "core/specnaut/scripts/powershell/_gate_impact_adapter.ps1"
+    },
+    {
+      "category": "spec-root",
+      "name": "specify",
+      "suffix": "scripts/powershell/_gate_impact_graph.ps1",
+      "source": "core/specnaut/scripts/powershell/_gate_impact_graph.ps1"
+    },
+    {
+      "category": "spec-root",
+      "name": "specify",
+      "suffix": "scripts/powershell/_gate_evidence.ps1",
+      "source": "core/specnaut/scripts/powershell/_gate_evidence.ps1"
     },
     {
       "category": "spec-root",

@@ -115,8 +115,10 @@ protected path, a command that reads stdin, several bases with different edges.
   goes full. A value starting with `-` is a usage error.
 - **FR-015** PowerShell twin with the same flags, grammar, causes and exit codes.
 - **FR-016** `merge.md`'s epic path passes `--base "$(git merge-base HEAD <base>)"` and says what
-  exits 3 and 4 mean there: 3 stops, 4 runs bare, and a scoped pass is never reported as the full
-  gate. `epic-loop.md` and the `code-reviewer` grant stay bare.
+  exits 3 and 4 mean there: 3 stops; 4 with a `removed:` line other than `none` stops and names the
+  commands that left the tier; 4 with `removed: none` runs bare. A scoped pass, or a pass with a
+  `removed:` line, is never reported as the full gate. `epic-loop.md` and the `code-reviewer` grant
+  stay bare.
 
 ## 4. Success criteria
 
@@ -243,7 +245,44 @@ Matching gaps: FR-009, FR-010. Cleared by the seat: eval strings at `gates.yml` 
 evidence, the reviewer grant. Git plumbing claims rest on git's documentation until the tests
 exercise them.
 
-## 12. Open questions
+## 12. Decided while implementing
+
+Nothing below moves a decision out of its home; each fills a gap the table leaves open.
+
+- **`base-branch.ps1` is new.** FR-006 asks the default branch of `base-branch.sh`, which had no
+  twin. A port inside `gate-impact.ps1` would have been a second home for that rule in one language;
+  a twin keeps one home per shell. The resolver starts it with the repository variables gone, as a
+  process, because it reads git from its working directory.
+- **`run-gate --parse-gates <file>` is new, and internal.** FR-012 reads a base's tier "through
+  `run-gate`'s own parser", and the parser's home is `run-gate`, so the resolver calls it. It prints
+  a list and exits; it runs nothing.
+- **The PowerShell twin starts one process per command (FR-000).** Run, not read: the twin cannot
+  lose its list, but its commands inherited the caller's stdin, and PowerShell has no redirect for a
+  native command. Doing it showed two defects in the same lines, fixed in the FR-000 commit: a
+  failing cmdlet passed the tier, and an `exit` in a command ended `run-gate` itself.
+- **The resolver writes more kinds of record than `run` and `omit`** (`candidate`, `base`, `scope`,
+  `fallback`, `adapter`, `removed`, `refused`, `inactive`, `end`), so `run-gate` prints the report
+  and the evidence from one answer. A missing `end` is no answer: exit 3, never a pass, and not a
+  `full` decision in `run-gate`.
+- **Plumbing sits apart from its decision where the size limit asks.** `_gate_candidate` reads the
+  push's lines into facts and `gate-impact` turns each into a cause; `_gate_impact_graph` lists a
+  protected path's entries and `gate-impact` decides what a difference means.
+- **What the plan left unsaid.** A repeated flag, both flags, or a stray argument is a usage error:
+  a mistyped flag must not read as a narrowed run. A push line that is not hex, or a push with no
+  base left in it, widens. An `adapter.files` entry may be a directory: every entry under it must be
+  a regular file. `SPECNAUT_AFFECTED_OWNERS` for a check naming `owners` is their intersection with
+  the affected set. A refusal before anything ran writes no evidence, having no result to record.
+- **`scripts/smoke/_surfaces.sh` is unchanged.** Its `templates/core/specnaut/scripts/*/*` glob
+  already claims every new script; the smoke surface they need is `smoke-gates.sh`.
+
+- **Review round 1 amended FR-016.** It first sent every exit 4 to a bare run. A tier emptied on the
+  branch then passes with exit 0 on nothing, so exit 4 with a `removed:` line now stops.
+- **The PowerShell twin's limits, stated.** A SIGTERM during its adapter leaves the worktree and its
+  registration in place, because .NET skips the `finally`; nothing sweeps them, as a sweep could not
+  tell them from the user's. Its private work directory needs pwsh 7.4. On bash a jq older than 1.6
+  has no `--rawfile`, so it is probed and goes full.
+
+## 13. Open questions
 
 None: the ticket records that no product question blocks it.
 

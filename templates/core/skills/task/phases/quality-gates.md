@@ -70,7 +70,8 @@ pre-merge step both call it; neither reads `gates.yml` itself. A second parser
 is a second definition of what a gate is, and two definitions drift.
 
 - Commands run in order, from the repository root, each in its own subshell —
-  a command that changes directory does not relocate the next one.
+  a command that changes directory does not relocate the next one. Each runs with
+  no stdin: a command that reads it finds it empty.
 - **A non-zero exit from any command fails the tier.**
 - **A tier that is not declared is not a failure.** No `gates.yml`, or an empty
   list, and the run reports that the tier is not declared and continues. A
@@ -78,6 +79,103 @@ is a second definition of what a gate is, and two definitions drift.
 - "No gate ran" and "the gate passed" are printed as different sentences,
   because they are different facts and a caller that cannot tell them apart
   will report the wrong one.
+
+## Running only what a change can affect
+
+A repository holding several workspaces may not want a one-line change to validate
+every one of them. It can opt in, and **nothing changes for a project that does
+not**. Specnaut ships no graph and no adapter: only the project knows its own
+graph, and a shipped one would name a tool.
+
+```
+.specnaut/scripts/bash/run-gate.sh <fast|full> --base <rev>
+.specnaut/scripts/bash/run-gate.sh <fast|full> --refs-stdin
+```
+
+Bare `run-gate.sh <tier>` never reads any of this: it stays the manual full
+override. Behind a flag with no `.specnaut/impact.json`, here or on a base, the run
+is the bare run, to the byte. `--refs-stdin` reads a pre-push hook's lines.
+
+`.specnaut/impact.json` is the project's own, and Specnaut ships no copy of it:
+
+```json
+{
+  "schema": 1,
+  "adapter": { "command": "<a command>", "files": ["tools/graph-adapter"] },
+  "scoped_tiers": ["fast"],
+  "full_on": ["<a lockfile>", "<a directory>/"],
+  "inert": [".specnaut/specs/", ".specnaut/feature.json"],
+  "checks": [
+    { "gate": "<a command in gates.yml>", "scoped": "<its narrowed form>" },
+    { "gate": "<another>", "scoped": "<its narrowed form>", "owners": ["<an owner id>"] }
+  ]
+}
+```
+
+- **`adapter.command`** reports the graph. **`adapter.files`** names what it is built
+  from; a change to any of them widens the run.
+- **`scoped_tiers`**: a tier outside the list runs full.
+- **`full_on`**: a changed path here runs full. **`inert`**: a changed path here affects
+  nothing, such as what every branch commits. `full_on` beats `inert`.
+- **`checks`** maps a gate command, by its exact string, to the command that narrows
+  it. The scoped command reads the owners from `SPECNAUT_AFFECTED_OWNERS`,
+  space-separated; they are never spliced into the string. A check with **`owners`** is
+  omitted when none of them is affected, and given only those that are. **A gate
+  command with no check always runs.**
+- A path in `adapter.files`, `full_on`, `inert` and an owner's `roots` is a directory prefix ending in `/`,
+  or an exact path: relative, with no `..`, no `./`, no `//`, no backslash, no glob and
+  no control character. An owner id matches `[A-Za-z0-9][A-Za-z0-9._-]{0,63}`.
+
+**The adapter.** It is the base's copy, run from a temporary worktree of the base, once
+for each base and once for the candidate. It gets no stdin and no `GIT_*` variable, runs
+in the shell of the twin that started it, and is told `SPECNAUT_IMPACT_TREE` (the
+absolute path of the tree to describe), `SPECNAUT_IMPACT_COMMIT`, `SPECNAUT_IMPACT_OUT`
+(where to write), `SPECNAUT_IMPACT_SCHEMA` and `SPECNAUT_IMPACT_REPO` (the candidate
+root, should it need an installed toolchain). It writes:
+
+```json
+{ "schema": 1, "commit": "<SPECNAUT_IMPACT_COMMIT>", "complete": true,
+  "owners": [{ "id": "<id>", "roots": ["<path>"], "depends_on": ["<id>"] }] }
+```
+
+**What runs.** A changed path under a root in either snapshot affects that owner, and an
+owner whose record differs, or that exists on one side only, is affected. So is every
+owner that depends on an affected one, over the edges of every snapshot.
+
+**Uncertainty widens.** Each of these runs the candidate's whole tier and names itself on
+the `fallback:` line: an unowned path, a `full_on` match, a gitlink, a symlink or a type
+change; a declaration, an `adapter.files` entry, `gates.yml` or `.specnaut/scripts/` that
+differs from a given base, or from the merge-base with the default branch; any of those
+that is not a tracked regular file; an adapter that fails or answers anything invalid; a
+malformed declaration; a base that does not resolve or was never fetched; `jq` absent, older
+than 1.6, or failing where its answer decides the run.
+
+**Exit codes**, the last two only behind a flag:
+
+| Exit | Meaning |
+|------|---------|
+| 0 | The selection passed |
+| 1 | A command failed. It stops there, whatever else is true |
+| 2 | Usage |
+| 3 | **The candidate is refused**: a dirty tree, an untracked file, a tree that moved during the run, or a push of several trees. Nothing presents one tree's pass as another's. A gate that leaves an unignored file is refused too, by design |
+| 4 | **Nothing was checked**: every command was omitted, or the tier was emptied on the branch. A skip is never a pass. With a `removed:` line other than `none`, stop and name what left the tier: a bare run of an empty tier passes. With `removed: none`, the bare run is the check |
+
+**What it prints.** Every run behind a flag prints `candidate:`, `scope:`, `fallback:`,
+`removed:`, `omitted:`, `ran:` and `evidence:` lines, in ASCII. `removed:` names what is in
+a base's tier and gone from the candidate's, because "full" means the candidate's own list.
+A pass whose `scope:` is not `full` **is not the full gate**, and its last line names the
+scope. Nor is a pass with a `removed:` line other than `none`: it names those commands. Evidence
+goes to `git rev-parse --git-path specnaut/gate-evidence/<tier>-<tree>.json`.
+It is write-only: nothing reads it to decide anything, and failing to write it changes no
+result.
+
+**Limits to know.** A hung adapter hangs the run, as a gate command does today. Ignored
+files are not part of the candidate. Each run costs a checkout of the base. A wrong adapter
+under-selects, and only the project can know its graph; that `scoped` truly narrows its
+gate is the project's claim too, and the evidence records what was trusted. It stops
+mistakes, not a hostile branch, which already controls `gates.yml`. Behind a flag the PowerShell
+twin needs pwsh 7.4 or later, and a SIGTERM during its adapter leaves the temporary worktree and
+its registration behind: remove the directory and `git worktree prune` clears the entry.
 
 ## `fast` — after every child commit
 
