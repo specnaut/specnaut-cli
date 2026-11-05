@@ -1,6 +1,8 @@
-import { assert, assertEquals, assertRejects } from "@std/assert";
+import { assert, assertEquals, assertInstanceOf, assertRejects } from "@std/assert";
 import { join, SEPARATOR } from "@std/path";
+import { PathRefusal } from "../../src/application/path_refusal.ts";
 import { DenoFsWriter } from "../../src/infrastructure/deno_fs_writer.ts";
+import { ContainmentRefusal } from "../../src/infrastructure/fs_refusals.ts";
 import { symlinkTest } from "../helpers/link_text.ts";
 
 /**
@@ -208,12 +210,17 @@ symlinkTest("a path that lands on the project directory itself is refused", asyn
     // `up/proj` is the project: `up` points at its parent.
     await Deno.symlink(root, join(proj, "up"));
     for (const dest of [".", "a/..", "up/proj"]) {
-      await assertRejects(
+      const err = await assertRejects(
         () => w.deletePaths([dest], proj, { backupExisting: true }),
         Error,
         undefined,
         dest,
       );
+      // `.` and `a/..` stop earlier, at `assertSafeDestination`.
+      if (dest === "up/proj") {
+        assertInstanceOf(err, PathRefusal);
+        assert(!(err instanceof ContainmentRefusal), "a reader would report this and carry on");
+      }
       assertEquals(await Deno.readTextFile(join(proj, "a.md")), "keep", dest);
       const aside = await Deno.lstat(`${proj}.specnaut.bak`).then(() => true, () => false);
       assertEquals(aside, false, `${dest}: the project was moved aside`);

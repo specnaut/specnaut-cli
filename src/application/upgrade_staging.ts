@@ -2,7 +2,7 @@ import type { StagingStore } from "./ports.ts";
 import type { Bundle } from "../domain/template.ts";
 import type { LockEntry } from "../domain/installed_lock.ts";
 import type { UpgradeAction, UpgradePlan } from "../domain/upgrade_plan.ts";
-import { PathRefusal } from "../domain/path_refusal.ts";
+import { PathRefusal } from "./path_refusal.ts";
 
 /**
  * `.specnaut/upgrade-staging/` as `upgrade` fills and empties it: the upstream

@@ -6,11 +6,11 @@ import {
   addendumPath,
   auditAddendum,
 } from "../domain/addendum_audit.ts";
+import { PathRefusal } from "../application/path_refusal.ts";
 import type { CheckOutcome } from "../domain/check_result.ts";
 import { type InstalledLock, parseLock } from "../domain/installed_lock.ts";
 import { sha256Hex } from "../domain/sha256.ts";
 import { listProjectFiles } from "./fs_reader.ts";
-import { ContainmentRefusal, UnwalkableRefusal } from "./fs_refusals.ts";
 import { predatesPhaseMove, staleRouterAdvice } from "../domain/skill_doc_renames.ts";
 
 /**
@@ -84,7 +84,7 @@ export async function checkAddenda(projectDir: string): Promise<CheckOutcome[]> 
     listed = await listProjectFiles(projectDir, ADDENDA_ROOT);
   } catch (err) {
     // A linked addenda folder that loops or leaves the project: one row, not a crashed report.
-    if (err instanceof ContainmentRefusal || err instanceof UnwalkableRefusal) {
+    if (err instanceof PathRefusal) {
       return [{ name: `${ADDENDA_ROOT}/`, status: "warn", message: err.message.split("\n")[0] }];
     }
     throw err;

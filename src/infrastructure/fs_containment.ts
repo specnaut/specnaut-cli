@@ -6,7 +6,7 @@ import {
   UnwalkableLinkError,
   walkLinkText,
 } from "./fs_link_walk.ts";
-import { refusalFor } from "./fs_refusals.ts";
+import { projectDirectoryRefusal, refusalFor } from "./fs_refusals.ts";
 
 export { resolveTarget } from "./fs_link_walk.ts";
 
@@ -156,9 +156,7 @@ export function admit(
 export function admitRemoval(root: string, abs: string, verdict: Containment): void {
   admit(root, abs, verdict);
   if (relative(root, verdict.resolved) === "") {
-    throw new Error(
-      `refusing to remove the project directory itself:\n  path:    ${abs}\n  project: ${root}`,
-    );
+    throw projectDirectoryRefusal(root, abs);
   }
 }
 

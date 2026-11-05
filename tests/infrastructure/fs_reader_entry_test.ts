@@ -1,7 +1,8 @@
 import { assert, assertEquals, assertInstanceOf, assertRejects } from "@std/assert";
-import { join } from "@std/path";
+import { basename, join } from "@std/path";
 import { DenoFsReader } from "../../src/infrastructure/fs_reader.ts";
 import { ReadFault } from "../../src/application/read_fault.ts";
+import { PathRefusal } from "../../src/application/path_refusal.ts";
 import { ContainmentRefusal, UnwalkableRefusal } from "../../src/infrastructure/fs_refusals.ts";
 import {
   assertInsideProject,
@@ -9,7 +10,7 @@ import {
   resolveProjectRoot,
 } from "../../src/infrastructure/fs_containment.ts";
 import type { DiskEntry } from "../../src/domain/context_link.ts";
-import { CAN_LINK, makeLink, slashForm, WINDOWS } from "../helpers/link_text.ts";
+import { CAN_LINK, makeLink, slashForm, symlinkTest, WINDOWS } from "../helpers/link_text.ts";
 
 /** `readEntry` reports what is at a path itself — a link as a link (cli#680). */
 
@@ -81,24 +82,26 @@ Deno.test("readEntry: a link out of the project is reported, never refused or re
   });
 });
 
-Deno.test("an ancestor link out of the project is a containment refusal, never a ReadFault", {
-  ignore: WINDOWS,
-}, async () => {
-  await withProject(async (dir) => {
-    const outside = await Deno.makeTempDir();
-    try {
-      await Deno.writeTextFile(join(outside, "constitution.md"), "# Ours\n");
-      await Deno.symlink(outside, join(dir, "docs"));
-      const err = await assertRejects(
-        () => new DenoFsReader().readEntry(dir, "docs/constitution.md"),
-        ContainmentRefusal,
-      );
-      assert(!(err instanceof ReadFault), "a refusal relabelled as a read fault");
-    } finally {
-      await Deno.remove(outside, { recursive: true });
-    }
-  });
-});
+// `symlinkTest`: its subject is where a link leads, which is not covered on Windows (see there).
+symlinkTest(
+  "an ancestor link out of the project is a containment refusal, never a ReadFault",
+  async () => {
+    await withProject(async (dir) => {
+      const outside = await Deno.makeTempDir();
+      try {
+        await Deno.writeTextFile(join(outside, "constitution.md"), "# Ours\n");
+        await Deno.symlink(outside, join(dir, "docs"));
+        const err = await assertRejects(
+          () => new DenoFsReader().readEntry(dir, "docs/constitution.md"),
+          ContainmentRefusal,
+        );
+        assert(!(err instanceof ReadFault), "a refusal relabelled as a read fault");
+      } finally {
+        await Deno.remove(outside, { recursive: true });
+      }
+    });
+  },
+);
 
 Deno.test(
   "readEntry: a link cycle resolves to null instead of throwing",
@@ -124,11 +127,9 @@ Deno.test("readEntry: a link through a missing directory is reported with no lan
   });
 });
 
-Deno.test(
+// `symlinkTest`: the POSIX `NotADirectory` it pins has never been measured on Windows (see there).
+symlinkTest(
   "readEntry: a link through a regular file is reported with no landing, never a ReadFault",
-  {
-    ignore: WINDOWS,
-  },
   async () => {
     // A ReadFault here would tell the user to fix permissions on a file that is fine (cli#704).
     await withProject(async (dir) => {
@@ -158,6 +159,19 @@ Deno.test("a dangling ancestor reads as absent, never as a refusal (cli#686)", {
     const reader = new DenoFsReader();
     assertEquals(await reader.readEntry(dir, ".claude/CLAUDE.md"), null);
     assertEquals(await reader.readText(dir, ".claude/CLAUDE.md"), null);
+  });
+});
+
+symlinkTest("a path that lands on the project directory itself is refused, typed", async () => {
+  await withProject(async (dir) => {
+    const real = await Deno.realPath(dir);
+    await Deno.symlink(join(real, ".."), join(real, "up"));
+    const err = await assertRejects(
+      () => new DenoFsReader().readEntry(real, `up/${basename(real)}`),
+      PathRefusal,
+      "refusing to treat the project directory itself as a file in it",
+    );
+    assert(!(err instanceof ContainmentRefusal), "a reader would report this and carry on");
   });
 });
 

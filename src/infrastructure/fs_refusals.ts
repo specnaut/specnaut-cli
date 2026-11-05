@@ -1,4 +1,4 @@
-import { PathRefusal } from "../domain/path_refusal.ts";
+import { PathRefusal } from "../application/path_refusal.ts";
 import type { Containment } from "./fs_containment.ts";
 
 /**
@@ -85,6 +85,20 @@ const leavesRefusal = (root: string, abs: string, resolved: string) =>
       `  project:  ${root}\n` +
       `A symlink in the project points outside it. Specnaut will not write, ` +
       `move, delete or read through it.`,
+  );
+
+/**
+ * A path that lands on the project directory itself (cli#669), which is inside the
+ * project and still never to be removed. `admitRemoval` throws it for a removal, a
+ * rename and `readEntry`, which judges a read as a removal, so the words fit each.
+ * A plain `PathRefusal`: a `ContainmentRefusal` is one a reader may report instead
+ * of aborting, and this one is not. `checkAddenda`'s catch cannot reach it, because
+ * `listProjectFiles` judges with `admit`, not `admitRemoval`.
+ */
+export const projectDirectoryRefusal = (root: string, abs: string) =>
+  new PathRefusal(
+    `refusing to treat the project directory itself as a file in it:\n` +
+      `  path:    ${abs}\n  project: ${root}`,
   );
 
 /**

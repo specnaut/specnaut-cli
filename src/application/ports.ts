@@ -10,6 +10,7 @@ import type { DiskEntry } from "../domain/context_link.ts";
 import type { PreserveConfig, PreserveManifestDiagnosis } from "../domain/preserve_config.ts";
 import type { HookTrust } from "../domain/hook_trust.ts";
 
+/** `PathRefusal`: a path that passes `assertSafeDestination`, then leaves, loops or lands on the project. */
 export interface FsWriter {
   detectConflicts(bundle: Bundle, targetDir: string): Promise<string[]>;
   writeBundle(
@@ -27,12 +28,10 @@ export interface FsWriter {
 export type BackupReport = {
   /**
    * `wasSymlink` marks a backup that moved a LINK rather than file content
-   * (cli#574). `Deno.rename` operates on the link, so the user's actual bytes
-   * are still at the target and restoring this backup restores a pointer.
-   * Reporting it as an ordinary backup told the user their file was saved when
-   * what was saved was an arrow — and the moved link lands under
-   * `*.specnaut.bak`, which the scaffolded `.gitignore` hides, so the project's
-   * deliberate consolidation was dismantled without a trace.
+   * (cli#574). `Deno.rename` operates on the link, so the user's bytes are still
+   * at the target and restoring this backup restores a pointer. Reporting it as
+   * an ordinary backup told the user their file was saved when what was saved was
+   * an arrow, under a `*.specnaut.bak` the scaffolded `.gitignore` hides.
    */
   readonly backups: ReadonlyArray<
     { readonly dest: string; readonly backupPath: string; readonly wasSymlink?: true }
@@ -76,10 +75,9 @@ export interface GitAdapter {
   isInitialized(dir: string): Promise<boolean>;
   init(dir: string): Promise<void>;
   /**
-   * Returns the URL for `git remote get-url <remote>` in `dir`, or `null`
-   * if the directory is not a git repo, the remote does not exist, or git
-   * is not on PATH. Used at init time to derive the GitHub `repo` field
-   * from the user's `origin` remote when they provide a Project URL.
+   * The URL for `git remote get-url <remote>` in `dir`, or `null` if it is not a
+   * git repo, the remote does not exist, or git is not on PATH. `init` derives the
+   * GitHub `repo` field from it when the user provides a Project URL.
    */
   getRemoteUrl(dir: string, remote: string): Promise<string | null>;
 }
@@ -125,7 +123,10 @@ export interface LockStore {
   lockPath(projectDir: string): string;
 }
 
-/** `null`: nothing there, even under no project dir yet. A throw is never absence (`ReadFault`). */
+/**
+ * `null`: nothing there, even under no project dir yet. A throw is never absence: a `PathRefusal`
+ * for where the path leads, else the filesystem's error, wrapped as `ReadFault` by `readEntry` alone.
+ */
 export interface FsReader {
   readText(projectDir: string, rel: string): Promise<string | null>;
   /**
@@ -187,10 +188,6 @@ export interface ParentWorkspaceReader {
 /**
  * Detects whether a Claude Code plugin is installed, and what it serves.
  *
- * The default implementation reads `~/.claude/plugins/installed_plugins.json`
- * and falls back to walking `~/.claude/plugins/cache/<marketplace>/<plugin>/`;
- * test seams can stub both methods.
- *
  * Used by the upgrade use case to drive the binary → plugin migration table:
  * when the plugin is installed AND serves a given path, a vanilla on-disk copy
  * is migrated away; a customized one is preserved with a warning.
@@ -202,11 +199,9 @@ export interface PluginDetector {
    * Does the installed plugin actually carry `pluginRelPath` (plugin-root
    * relative, e.g. `skills/task/SKILL.md`)?
    *
-   * Migration used to be decided by a compile-time list alone, which describes
-   * what the plugin is EXPECTED to ship rather than what the user's installed
-   * version does. A user on an older release would have files deleted that
-   * their plugin has never heard of, leaving no copy anywhere. This is the
-   * question that cannot be answered at compile time (cli#606).
+   * A compile-time list describes what the plugin is EXPECTED to ship, not what
+   * the installed version does: a user on an older release would have files
+   * deleted that their plugin has never heard of, leaving no copy anywhere (cli#606).
    */
   pluginHasPath(name: string, pluginRelPath: string): Promise<boolean>;
 }
@@ -286,7 +281,8 @@ export interface UpgradeMarkerStore {
 /**
  * Filesystem-backed access to `.specnaut/upgrade-staging/`. The staging
  * directory holds upstream versions of files that the upgrade preserved
- * (customized locally). `specnaut reconcile` consumes the directory.
+ * (customized locally). `specnaut reconcile` consumes the directory. A path that
+ * passes `assertSafeDestination` and then leads out, or a linked root, is a `PathRefusal`.
  */
 export interface StagingStore {
   /** Project-relative paths currently in the staging directory. */

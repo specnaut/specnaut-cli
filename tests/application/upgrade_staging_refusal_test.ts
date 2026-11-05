@@ -1,7 +1,7 @@
 import { assert, assertEquals, assertStringIncludes } from "@std/assert";
 import { join } from "@std/path";
 import { pruneStaging } from "../../src/application/upgrade_staging.ts";
-import { PathRefusal } from "../../src/domain/path_refusal.ts";
+import { PathRefusal } from "../../src/application/path_refusal.ts";
 import { FsStagingStore } from "../../src/infrastructure/fs_staging_store.ts";
 import { fakeStagingStore } from "./upgrade_fakes.ts";
 
