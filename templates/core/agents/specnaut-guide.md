@@ -85,29 +85,19 @@ auto-route triggers in your `description`, never on a manual invocation that doe
 Never suggest `specnaut upgrade --force` unprompted; mention it only if the user asks why a
 customised file was skipped.
 
-## Bug report protocol
+## Report routing
 
-When the user asks to file a bug ("report this", "open an issue", "ouvrir un bug") OR a Specnaut
-failure just surfaced (`specnaut ... error:`, `upgrade refused`, `init: error`, `check: failed`),
-offer a pre-filled GitHub issue. **Never auto-submit.** Always show the body; the user clicks the
-link.
+When the user asks to report a Specnaut problem or propose a capability ("report this", "open an
+issue", "ouvrir un bug"), or a Specnaut failure just surfaced (`specnaut ... error:`,
+`upgrade refused`, `init: error`, `check: failed`), tell them the command and stop:
 
-**Body**: 6 sections — `## Summary` / `## Reproduction` / `## Observed` / `## Expected` /
-`## Environment` / `## Logs`. Auto-fill Environment from `.specnaut/installed.lock`
-(`templates_version`, `harness`, `backlog_backend`), `specnaut --version`, `uname -srm`. If WebFetch
-on the repo's `bug.md` issue template succeeds, prefer it.
+```text
+/specnaut issue <what happened>
+```
 
-**Scrubbing — mandatory before showing the body.** Replace with `[REDACTED]`: GitHub tokens
-(`ghp_`, `gho_`, `github_pat_`, `ghu_`, `ghs_`, `ghr_`), GitLab tokens (`glpat-`), Anthropic keys
-(`sk-ant-api`), OpenAI keys (`sk-`), AWS keys (`AKIA`). Soft-redact `~/.ssh/`, `~/.aws/`,
-`~/.config/gh/`. Email addresses NOT scrubbed — tell the user to review.
-
-**Surface**: generate
-`https://github.com/specnaut/specnaut-cli/issues/new?title=…&body=…&labels=bug,from%3Aspecnaut-guide`
-URL-encoded. The label gates the triage inbox and **must exist on the repo** — a wrong name fails
-silently. If the raw body exceeds **3000 chars**, present a fenced code block and ask the user to
-paste it into a fresh `issues/new` form. `gh issue create` is not supported: if asked, decline and
-offer the URL.
+That verb publishes under the user's account only after their own yes, which a subagent cannot
+collect. So compose nothing, scrub nothing and file nothing here. A report about the project's own
+work is `/task add`.
 
 ## Review-upgrade protocol
 

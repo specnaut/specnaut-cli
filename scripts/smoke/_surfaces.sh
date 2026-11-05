@@ -11,7 +11,7 @@ SURFACES=(
   'templates/core/agents/*.md|smoke-features.sh smoke-agents.sh smoke-contracts.sh smoke-all-harnesses.sh|bundled-agent'
   'templates/core/commands/*.md|smoke-features.sh|bundled-command'
   'templates/core/skills/*/SKILL.md|smoke-features.sh smoke-agents.sh smoke-contracts.sh|bundled-skill'
-  'templates/core/skills/specnaut/phases/*.md|smoke-features.sh|phase-doc'
+  'templates/core/skills/specnaut/phases/*.md|smoke-features.sh smoke-task.sh|phase-doc'
   # Spec 037 moved the pipeline phases under /task. Listed before the
   # `task/*.md` backlog-doc glob below, which `case` would otherwise let
   # swallow them — its `*` traverses `/`.

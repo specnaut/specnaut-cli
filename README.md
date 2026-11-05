@@ -22,11 +22,11 @@ doesn't:
 
 Specnaut gives your harness three skills, and they divide by what they own:
 
-| Skill       | Owns                                                                   | Typical invocation                                           |
-| :---------- | :--------------------------------------------------------------------- | :----------------------------------------------------------- |
-| `/task`     | one unit of work — from backlog item to merged branch, audits included | `/task add "…"`, `/task plan <id>`, `/task audit --security` |
-| `/specnaut` | the framework itself — its documentation, what is installed, upgrading | `/specnaut doc`, `/specnaut upgrade`                         |
-| `/ship`     | production — getting a built thing out the door                        | `/ship`, `/ship tag`, `/ship release`                        |
+| Skill       | Owns                                                                                                | Typical invocation                                           |
+| :---------- | :-------------------------------------------------------------------------------------------------- | :----------------------------------------------------------- |
+| `/task`     | one unit of work — from backlog item to merged branch, audits included                              | `/task add "…"`, `/task plan <id>`, `/task audit --security` |
+| `/specnaut` | the framework itself — its documentation, what is installed, upgrading, reporting a problem with it | `/specnaut doc`, `/specnaut upgrade`, `/specnaut issue "…"`  |
+| `/ship`     | production — getting a built thing out the door                                                     | `/ship`, `/ship tag`, `/ship release`                        |
 
 Shipping is deliberately not part of delivering a unit of work. It has a different cadence, a
 different risk profile — irreversible, outward-facing, it triggers live pipelines — and a different

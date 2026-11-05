@@ -99,8 +99,9 @@ Deno.test("specnaut init --ai copilot scaffolds a Copilot layout", async () => {
     // three undispatched agents and three contracts nothing parsed. Still 46
     // after #678 turned the ui-ux-designer agent into the /design skill. 47 since
     // cli#679 moved the integrations reference into `specnaut-facts`. 48 since
-    // cli#727 gave `task` its resume document.
-    assertEquals(instructionsCount, 48);
+    // cli#727 gave `task` its resume document. 49 since cli#726 gave `specnaut`
+    // its issue phase.
+    assertEquals(instructionsCount, 49);
     const instr = (n: string) => join(root, `.github/instructions/${n}.instructions.md`);
     assertEquals(await exists(instr("specnaut-design")), true);
     assertEquals(await exists(instr("specnaut-agent-ui-ux-designer")), false);

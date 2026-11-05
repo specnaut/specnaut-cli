@@ -86,7 +86,10 @@ if (import.meta.main) {
   const [inbox, pool] = await Promise.all([fetchInbox(), fetchPool()]);
 
   if (inbox.length === 0) {
-    console.log("✓ inbox empty (no open issues with label `from:specnaut-guide`)");
+    console.log(
+      "✓ no open issue labelled `from:specnaut-guide`. Labelled reports only: unlabelled " +
+        "ones are in the sweep of untracked issues.",
+    );
     Deno.exit(0);
   }
 

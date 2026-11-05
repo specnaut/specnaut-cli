@@ -12,7 +12,7 @@ user-scope plugin instead. `/task plan "<feature>"` auto-chains the full workflo
 | `.claude-plugin/plugin.json`               | Plugin manifest (`specnaut-plugin`, lockstep with the binary version)                                                                                |
 | `skills/task/SKILL.md`, `skills/task/*.md` | The `/task` router and its backlog docs — one unit of work, from backlog item to merged branch.                                                      |
 | `skills/task/phases/*.md`                  | The documents `/task` loads on demand — `plan`, `tasks`, `implement`, `review`, `merge`, `audit`, `constitution`, plus the contract docs they share. |
-| `skills/specnaut/`, `skills/ship/`         | `/specnaut` (`doc`, `list`, `upgrade`) and `/ship` (`tag`, `release`).                                                                               |
+| `skills/specnaut/`, `skills/ship/`         | `/specnaut` (`doc`, `list`, `upgrade`, `issue`) and `/ship` (`tag`, `release`).                                                                      |
 | `agents/*.md`                              | The sub-agents, available to invoke in plugin scope                                                                                                  |
 
 The full plugin migration shipped in v0.12.x (issue

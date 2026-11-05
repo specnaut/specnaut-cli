@@ -119,7 +119,7 @@ workflow, a chained step — read its addendum if the file exists:
 | :--- | :--- |
 | `plan`, `implement`, `review`, `merge`, `audit`, `constitution`, `groom` | `.specnaut/addenda/task/<name>.md` |
 | `tag`, `release` | `.specnaut/addenda/ship/<name>.md` |
-| `doc`, `list`, `upgrade` | `.specnaut/addenda/specnaut/<name>.md` |
+| `doc`, `list`, `upgrade`, `issue` | `.specnaut/addenda/specnaut/<name>.md` |
 
 So `/task plan` reads `.specnaut/addenda/task/plan.md`, and so does any older router that still runs
 a `plan` phase. It is this project's own addition to that phase. It adds to the phase at the step it

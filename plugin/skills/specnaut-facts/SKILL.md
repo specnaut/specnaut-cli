@@ -7,7 +7,7 @@ constitution-exempt: reference facts about Specnaut preloaded by specnaut-guide,
 
 # specnaut-facts
 
-Preloaded by `specnaut-guide`. Split out of that agent. The seat's *protocol* (fetch live, check versions, file bugs) and the
+Preloaded by `specnaut-guide`. Split out of that agent. The seat's *protocol* (fetch live, check versions, route reports) and the
 *facts* it falls back on change for different reasons, which is the split.
 
 **This is a snapshot and it goes stale.** The live docs win; see the seat's
@@ -42,7 +42,7 @@ Enhanced fork of [`specify` CLI](https://github.com/github/spec-kit), distribute
 ### Skills
 
 - `/task` — one unit of work: backlog (`list`, `next`, `add`, `edit`, `close`, `groom`), pipeline (`plan`, `implement`, `review`, `merge`), `audit` (`--security`, `--archi`, `--perf`, `--a11y`, `--deps`; every applicable axis with no flag), `constitution`.
-- `/specnaut` — the framework: `doc`, `list`, `upgrade`.
+- `/specnaut` — the framework: `doc`, `list`, `upgrade`, `issue` (reports a Specnaut problem or proposal upstream, after the user approves the exact text).
 - `/ship` — production: `tag`, `release`.
 - `/design` — the project's `DESIGN.md` design system: discovery when absent, edit when present, `audit` for drift. Started by the user only.
 

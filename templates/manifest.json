@@ -98,6 +98,12 @@
     },
     {
       "category": "phase",
+      "name": "specnaut",
+      "suffix": "issue.md",
+      "source": "core/skills/specnaut/phases/issue.md"
+    },
+    {
+      "category": "phase",
       "name": "task",
       "suffix": "audit.md",
       "source": "core/skills/task/phases/audit.md"
@@ -1823,6 +1829,25 @@
       "name": "specify",
       "suffix": "scripts/bash/_config.sh",
       "source": "core/specnaut/scripts/bash/_config.sh"
+    },
+    {
+      "category": "spec-root",
+      "name": "specify",
+      "suffix": "scripts/bash/report-upstream.sh",
+      "source": "core/specnaut/scripts/bash/report-upstream.sh",
+      "executable": true
+    },
+    {
+      "category": "spec-root",
+      "name": "specify",
+      "suffix": "scripts/bash/_report_text.sh",
+      "source": "core/specnaut/scripts/bash/_report_text.sh"
+    },
+    {
+      "category": "spec-root",
+      "name": "specify",
+      "suffix": "scripts/bash/_report_store.sh",
+      "source": "core/specnaut/scripts/bash/_report_store.sh"
     },
     {
       "category": "spec-root",

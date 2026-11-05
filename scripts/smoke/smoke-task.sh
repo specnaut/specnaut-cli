@@ -36,6 +36,8 @@ for phase in doc list upgrade; do
   check ".claude/skills/specnaut/phases/$phase.md present" \
     "[ -f .claude/skills/specnaut/phases/$phase.md ]"
 done
+check "phase doc issue.md scaffolded, and routed by the /specnaut router (cli#726)" \
+  '[ -f .claude/skills/specnaut/phases/issue.md ] && grep -qF "phases/issue.md" .claude/skills/specnaut/SKILL.md'
 
 echo
 echo "═══ spec 037  /task audit replaced the audit skills ═══"

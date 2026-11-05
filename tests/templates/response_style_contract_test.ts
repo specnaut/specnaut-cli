@@ -215,7 +215,7 @@ Deno.test("the selection rule is stated once and pointed at everywhere else", ()
 const POINTED_BY_DECISION: ReadonlyMap<string, string> = new Map([
   [
     "skill/specnaut",
-    "the framework router — #575 named it as an anchor while it carried the workflow; since cli#683 its verbs (doc, list, upgrade) still answer a person directly",
+    "the framework router — #575 named it as an anchor while it carried the workflow; since cli#683 its verbs (doc, list, upgrade, issue) still answer a person directly",
   ],
   [
     "skill/design",

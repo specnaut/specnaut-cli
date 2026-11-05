@@ -1,7 +1,8 @@
-// gh-issues list — enumerate inbound issues filed by users via the
-// specnaut-guide bug-report protocol. Filtered by the
-// `from:specnaut-guide` label so it doesn't catch maintainer-filed
-// items.
+// gh-issues list — enumerate the LABELLED reports filed through `/specnaut issue`,
+// by the `from:specnaut-guide` label, so it doesn't catch maintainer-filed items.
+// Labelled reports only: a user without push or triage files with no label, and
+// that report reaches maintainers through the sweep of untracked issues instead.
+// An empty list here is not an empty intake.
 //
 // Usage: deno run --allow-run list.ts
 
@@ -13,8 +14,8 @@ const REPO = "specnaut/specnaut-cli";
 // ends failed that way for months: the prefill named `from:specnaut-expert`,
 // which was never created, while the repo carried `from:specflow-expert` from
 // before the rebrand. Zero issues ever bore either. Rename this constant, the
-// sibling scripts and the guide agent's prefill together, and create the label
-// on the repo in the same change — a rename that stops at the string is the
+// sibling scripts and `report-upstream.sh`'s PROVENANCE together, and create the
+// label on the repo in the same change — a rename that stops at the string is the
 // shape that produced the original silence.
 const LABEL = "from:specnaut-guide";
 
@@ -55,7 +56,10 @@ async function ghList(): Promise<GhIssue[]> {
 if (import.meta.main) {
   const issues = await ghList();
   if (issues.length === 0) {
-    console.log("✓ inbox empty (no open issues with label `from:specnaut-guide`)");
+    console.log(
+      "✓ no open issue labelled `from:specnaut-guide`. Labelled reports only: unlabelled " +
+        "ones are in the sweep of untracked issues.",
+    );
     Deno.exit(0);
   }
 

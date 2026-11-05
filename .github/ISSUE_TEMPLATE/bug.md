@@ -2,7 +2,7 @@
 name: Bug report
 about: Report a Specnaut problem you hit while running the CLI or using the bundled agents.
 title: ""
-labels: "bug,from:specnaut-expert"
+labels: "bug,from:specnaut-guide"
 ---
 
 ## Summary
@@ -48,17 +48,11 @@ OS / arch         : <uname -srm output>
 <!--
 Paste the failing command's stdout / stderr in a fenced code block.
 
-Before submitting, scrub any of:
-  - GitHub tokens (ghp_/gho_/ghu_/ghs_/ghr_/github_pat_…)
-  - GitLab PATs (glpat-…)
-  - Anthropic / OpenAI keys (sk-ant-…, sk-…)
-  - AWS access keys (AKIA…)
-  - Paths inside ~/.ssh/, ~/.aws/, ~/.config/gh/
+Remove secrets and anything that identifies your project before submitting.
+This issue is public, and only maintainers can delete it.
 
-The bundled `specnaut-guide` agent can do this scrubbing for you —
-ask it "report this as a bug" and it will pre-fill an issue with the
-above sections, scrub the listed token shapes, and hand you a link
-to review and submit.
+`/specnaut issue <what happened>` drafts this report in your harness, checks it
+for those, and shows you the exact text before anything is published.
 -->
 
 ```

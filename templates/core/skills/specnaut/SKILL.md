@@ -1,12 +1,13 @@
 ---
 name: specnaut
-description: The Specnaut framework itself — `/specnaut doc` explains how it works, `/specnaut list` shows the skills and agents installed in this project, `/specnaut upgrade` updates the binary and the project's Specnaut files. Work on the project goes through `/task`; production through `/ship`.
-argument-hint: <doc|list|upgrade> [args]
+description: The Specnaut framework itself — `/specnaut doc` explains how it works, `/specnaut list` shows the skills and agents installed in this project, `/specnaut upgrade` updates the binary and the project's Specnaut files, `/specnaut issue` reports a Specnaut problem or proposal to Specnaut's public tracker. Work on the project goes through `/task`; production through `/ship`.
+argument-hint: <doc|list|upgrade|issue> [args]
 when_to_use: |
   Trigger phrases that should route here:
   - doc: "how does specnaut work", "explain specnaut", "what is /task"
   - list: "which skills are installed", "list the specnaut agents"
   - upgrade: "upgrade specnaut", "update the specnaut templates", "get the latest specnaut"
+  - issue: "report a specnaut bug", "file a specnaut issue", "open an issue on specnaut", "propose a specnaut feature"
 ---
 
 # Specnaut router
@@ -25,15 +26,16 @@ verb's argument string. Nothing → render the verb table below and stop.
 | `doc [topic]` | `phases/doc.md` | How Specnaut works, its commands, harnesses and backends. |
 | `list` | `phases/list.md` | The skills and agents installed in this project, from `.specnaut/installed.lock`. |
 | `upgrade` | `phases/upgrade.md` | Update the `specnaut` binary if a newer one is out, run `specnaut upgrade`, verify, commit. |
+| `issue <brief>` | `phases/issue.md` | Report a Specnaut problem or proposal upstream, after the user approves the exact text. A project lists its own words to remove in `.specnaut/addenda/specnaut/issue.md`. |
 
-All three are one-shot; none chains.
+All four are one-shot; none chains.
 
 ## Which skill owns what
 
 | Skill | Owns |
 | :--- | :--- |
 | `/task` | one unit of work — from backlog item to merged branch, audits included |
-| `/specnaut` | the framework itself — its documentation, what is installed, upgrading it |
+| `/specnaut` | the framework itself — its documentation, what is installed, upgrading it, reporting a problem with it |
 | `/ship` | production — getting a built thing out the door |
 
 ## Routing

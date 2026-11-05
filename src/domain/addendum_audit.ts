@@ -32,7 +32,7 @@ export interface PhaseAddress {
  * instead of turning this check stale.
  */
 export const ROUTABLE_PHASES: Readonly<Record<AddendumSkill, ReadonlyArray<string>>> = {
-  specnaut: ["doc", "list", "upgrade"],
+  specnaut: ["doc", "list", "upgrade", "issue"],
   // `groom` is the one backlog verb that reads an addendum: it is a full pass,
   // where the others are single reads or writes (plan 037 § 10).
   task: ["groom", "plan", "implement", "review", "merge", "audit", "constitution"],

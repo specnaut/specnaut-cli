@@ -14,13 +14,13 @@ import { walk } from "@std/fs";
  */
 const SYNC_PAIRS: ReadonlyArray<{ plugin: string; source: string }> = [
   // The /specnaut router (v1.0.0). Since cli#683 it carries only the
-  // framework verbs — `doc`, `list`, `upgrade` — and the one "Retired
+  // framework verbs — `doc`, `list`, `upgrade`, `issue` — and the one "Retired
   // addresses" table; the pipeline moved to /task.
   {
     plugin: "plugin/skills/specnaut/SKILL.md",
     source: "templates/core/skills/specnaut/SKILL.md",
   },
-  ...["doc", "list", "upgrade"].map((name) => ({
+  ...["doc", "list", "upgrade", "issue"].map((name) => ({
     plugin: `plugin/skills/specnaut/phases/${name}.md`,
     source: `templates/core/skills/specnaut/phases/${name}.md`,
   })),

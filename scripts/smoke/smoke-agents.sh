@@ -149,19 +149,24 @@ check "agent reads templates_version from installed.lock" \
   'grep -q "templates_version" .claude/agents/specnaut-guide.md'
 
 echo
-echo "═══ #172 + #174  bug-report protocol + from:specnaut-expert label ═══"
-check "bug-report protocol section present" \
-  'grep -q "## Bug report protocol" .claude/agents/specnaut-guide.md'
-check "issues/new URL pre-fill present" \
-  'grep -q "github.com/specnaut/specnaut-cli/issues/new" .claude/agents/specnaut-guide.md'
-check "URL pre-fill auto-applies the from:specnaut-guide label (#174)" \
-  'grep -q "from%3Aspecnaut-guide" .claude/agents/specnaut-guide.md'
-check "scrubbing patterns documented (ghp_/sk-ant-/AKIA)" \
-  'grep -q "ghp_" .claude/agents/specnaut-guide.md && grep -q "sk-ant-" .claude/agents/specnaut-guide.md && grep -q "AKIA" .claude/agents/specnaut-guide.md'
-check "3000-char URL fallback rule documented" \
-  'grep -q "3000" .claude/agents/specnaut-guide.md'
+echo "═══ cli#726  a report goes through /specnaut issue, with the scan in a script ═══"
+check "specnaut-guide routes a report to /specnaut issue" \
+  'grep -qF "/specnaut issue <what happened>" .claude/agents/specnaut-guide.md'
+check "specnaut-guide composes and files nothing itself" \
+  '! grep -qF "issues/new" .claude/agents/specnaut-guide.md'
+check "report-upstream.sh installs executable, beside its helpers" \
+  '[ -x .specnaut/scripts/bash/report-upstream.sh ] && [ -f .specnaut/scripts/bash/_report_text.sh ] && [ -f .specnaut/scripts/bash/_report_store.sh ]'
+# The token is assembled: this file is public, and it is a token's shape the scan refuses.
+token="ghp_$(printf "a%.0s" 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0)"
+check "the installed script refuses a token before anything is stored or contacted" \
+  'r=$(printf "%s\n\n%s\n" title "$token" | HOME="$PWD" .specnaut/scripts/bash/report-upstream.sh prepare --kind bug) ;
+   [ "$r" = "REFUSED secret" ] && [ -z "$(ls -A .specnaut/reports 2>/dev/null)" ]'
+# A gh that answers nothing stands first on PATH: a smoke contacts no one.
+mkdir -p .smoke-bin && printf '#!/bin/sh\nexit 1\n' >.smoke-bin/gh && chmod +x .smoke-bin/gh
+check "the installed script prepares a clean report, with no identity to post as" \
+  'o=$(printf "A title\n\nA body\n" | HOME="$PWD" PATH="$PWD/.smoke-bin:$PATH" .specnaut/scripts/bash/report-upstream.sh prepare --kind bug) &&
+   grep -qx -- "POSTING_AS -" <<<"$o" && grep -q "^DIGEST [0-9a-f]\{64\}$" <<<"$o"'
 
-echo
 echo "═══ #180  PO doc — epic detection heuristic + cascade-check refs ═══"
 check "PO doc documents the epic detection heuristic" \
   'grep -q "Epic detection heuristic" .claude/agents/product-owner.md'

@@ -77,12 +77,12 @@ Deno.test("every skill document's command locates the file the harness emits", (
       checked++;
     }
   }
-  // Non-vacuity: 5 invocable harnesses × 26 sub-documents (cli#683: `specnaut`
-  // doc/list/upgrade, 15 `task` phases, 2 `ship` phases, 4 `task` backlog
+  // Non-vacuity: 5 invocable harnesses × 27 sub-documents (cli#683: `specnaut`
+  // doc/list/upgrade/issue, 15 `task` phases, 2 `ship` phases, 4 `task` backlog
   // docs; cli#678 added `task`'s review-seats; cli#679 `specnaut-facts`'s
   // integrations; cli#727 `task`'s resume). A derivation that silently returned
   // nothing would otherwise report green having asserted nothing at all.
-  assertEquals(checked, 135, "the sweep did not cover every harness × sub-document");
+  assertEquals(checked, 140, "the sweep did not cover every harness × sub-document");
 });
 
 Deno.test("every top-level skill's command locates the folder the harness emits", () => {

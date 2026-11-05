@@ -174,7 +174,7 @@ export const PLUGIN_COVERED_PATHS_CLAUDE: ReadonlyArray<string> = [
   ".claude/skills/ship/SKILL.md",
   ".claude/skills/ship/phases/tag.md",
   ".claude/skills/ship/phases/release.md",
-  ...["doc", "list", "upgrade"].map((name) => `.claude/skills/specnaut/phases/${name}.md`),
+  ...["doc", "list", "upgrade", "issue"].map((name) => `.claude/skills/specnaut/phases/${name}.md`),
 
   // `task` (cli#683): the backlog verbs, the delivery pipeline and audits. Its
   // `scripts/` subtree is NOT here and must not be: those resolve paths
