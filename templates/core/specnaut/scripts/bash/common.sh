@@ -382,6 +382,6 @@ check_file() { [[ -f "$1" ]] && echo "  ✓ $2" || echo "  ✗ $2"; }
 check_dir() { [[ -d "$1" && -n $(ls -A "$1" 2>/dev/null) ]] && echo "  ✓ $2" || echo "  ✗ $2"; }
 
 # Template resolution lives beside this file; sourced here so every caller of
-# `common.sh` keeps `resolve_template` and `resolve_template_content`.
+# `common.sh` keeps `resolve_template`.
 # shellcheck source=SCRIPTDIR/template-resolution.sh
 source "$(CDPATH="" cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)/template-resolution.sh"

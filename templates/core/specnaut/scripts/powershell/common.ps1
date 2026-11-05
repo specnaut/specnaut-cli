@@ -314,6 +314,6 @@ function Test-DirHasFiles {
     }
 }
 
-# Template resolution (Resolve-Template, Resolve-TemplateContent) lives beside
-# this file; every caller of common.ps1 keeps getting it from here.
+# Template resolution (Resolve-Template) lives beside this file; every caller of
+# common.ps1 keeps getting it from here.
 . "$PSScriptRoot/template-resolution.ps1"

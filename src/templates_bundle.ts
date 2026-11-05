@@ -22843,7 +22843,7 @@ check_file() { [[ -f "\$1" ]] && echo "  ✓ \$2" || echo "  ✗ \$2"; }
 check_dir() { [[ -d "\$1" && -n \$(ls -A "\$1" 2>/dev/null) ]] && echo "  ✓ \$2" || echo "  ✗ \$2"; }
 
 # Template resolution lives beside this file; sourced here so every caller of
-# \`common.sh\` keeps \`resolve_template\` and \`resolve_template_content\`.
+# \`common.sh\` keeps \`resolve_template\`.
 # shellcheck source=SCRIPTDIR/template-resolution.sh
 source "\$(CDPATH="" cd -- "\$(dirname -- "\${BASH_SOURCE[0]}")" && pwd)/template-resolution.sh"
 `,
@@ -22857,11 +22857,11 @@ source "\$(CDPATH="" cd -- "\$(dirname -- "\${BASH_SOURCE[0]}")" && pwd)/templat
     suffix: "scripts/bash/template-resolution.sh",
     content: `#!/usr/bin/env bash
 # Template resolution for the spec scripts — the override → preset → extension →
-# core stack and the presets' composition strategies. Sourced by \`common.sh\`.
+# core stack. Sourced by \`common.sh\`.
 
 # The enabled preset ids of a \`.registry\`, lowest priority number first (the
 # highest precedence). Exits non-zero on a registry python3 cannot parse, so a
-# caller falls back to the directory scan. Both resolvers read this one order.
+# caller falls back to the directory scan.
 _preset_ids_by_priority() {
     SPECNAUT_REGISTRY="\$1" python3 -c "
 import json, sys, os
@@ -22938,218 +22938,6 @@ resolve_template() {
     # Callers running under set -e should use: TEMPLATE=\$(resolve_template ...) || true
     return 1
 }
-
-# Resolve a template name to composed content using composition strategies.
-# Reads strategy metadata from preset manifests and composes content
-# from multiple layers using prepend, append, or wrap strategies.
-#
-# Usage: CONTENT=\$(resolve_template_content "template-name" "\$REPO_ROOT")
-# Returns composed content string on stdout; exit code 1 if not found.
-resolve_template_content() {
-    local template_name="\$1"
-    local repo_root="\$2"
-    local base="\$repo_root/.specnaut/templates"
-
-    # Collect all layers (highest priority first)
-    local -a layer_paths=()
-    local -a layer_strategies=()
-
-    # Priority 1: Project overrides (always "replace")
-    local override="\$base/overrides/\${template_name}.md"
-    if [ -f "\$override" ]; then
-        layer_paths+=("\$override")
-        layer_strategies+=("replace")
-    fi
-
-    # Priority 2: Installed presets (sorted by priority from .registry)
-    local presets_dir="\$repo_root/.specnaut/presets"
-    if [ -d "\$presets_dir" ]; then
-        local registry_file="\$presets_dir/.registry"
-        local sorted_presets=""
-        if [ -f "\$registry_file" ] && command -v python3 >/dev/null 2>&1; then
-            if sorted_presets=\$(_preset_ids_by_priority "\$registry_file"); then
-                if [ -n "\$sorted_presets" ]; then
-                    local yaml_warned=false
-                    while IFS= read -r preset_id; do
-                        # Read strategy and file path from preset manifest
-                        local strategy="replace"
-                        local manifest_file=""
-                        local manifest="\$presets_dir/\$preset_id/preset.yml"
-                        if [ -f "\$manifest" ] && command -v python3 >/dev/null 2>&1; then
-                            # Requires PyYAML; falls back to replace/convention if unavailable
-                            local result
-                            local py_stderr
-                            py_stderr=\$(mktemp)
-                            result=\$(SPECNAUT_MANIFEST="\$manifest" SPECNAUT_TMPL="\$template_name" python3 -c "
-import sys, os
-try:
-    import yaml
-except ImportError:
-    print('yaml_missing', file=sys.stderr)
-    print('replace\\t')
-    sys.exit(0)
-try:
-    with open(os.environ['SPECNAUT_MANIFEST']) as f:
-        data = yaml.safe_load(f)
-    for t in data.get('provides', {}).get('templates', []):
-        if t.get('name') == os.environ['SPECNAUT_TMPL'] and t.get('type', 'template') == 'template':
-            print(t.get('strategy', 'replace') + '\\t' + t.get('file', ''))
-            sys.exit(0)
-    print('replace\\t')
-except Exception:
-    print('replace\\t')
-" 2>"\$py_stderr")
-                            local parse_status=\$?
-                            if [ \$parse_status -eq 0 ] && [ -n "\$result" ]; then
-                                IFS=\$'\\t' read -r strategy manifest_file <<< "\$result"
-                                strategy=\$(printf '%s' "\$strategy" | tr '[:upper:]' '[:lower:]')
-                            fi
-                            if [ "\$yaml_warned" = false ] && grep -q 'yaml_missing' "\$py_stderr" 2>/dev/null; then
-                                echo "Warning: PyYAML not available; composition strategies may be ignored" >&2
-                                yaml_warned=true
-                            fi
-                            rm -f "\$py_stderr"
-                        fi
-                        # Try manifest file path first, then convention path
-                        local candidate=""
-                        if [ -n "\$manifest_file" ]; then
-                            # Reject absolute paths and parent traversal
-                            case "\$manifest_file" in
-                                /*|*../*) manifest_file="" ;;
-                            esac
-                        fi
-                        if [ -n "\$manifest_file" ]; then
-                            local mf="\$presets_dir/\$preset_id/\$manifest_file"
-                            [ -f "\$mf" ] && candidate="\$mf"
-                        fi
-                        if [ -z "\$candidate" ]; then
-                            local cf="\$presets_dir/\$preset_id/templates/\${template_name}.md"
-                            [ -f "\$cf" ] && candidate="\$cf"
-                        fi
-                        if [ -n "\$candidate" ]; then
-                            layer_paths+=("\$candidate")
-                            layer_strategies+=("\$strategy")
-                        fi
-                    done <<< "\$sorted_presets"
-                fi
-            else
-                # python3 failed — fall back to unordered directory scan (replace only)
-                for preset in "\$presets_dir"/*/; do
-                    [ -d "\$preset" ] || continue
-                    local candidate="\$preset/templates/\${template_name}.md"
-                    if [ -f "\$candidate" ]; then
-                        layer_paths+=("\$candidate")
-                        layer_strategies+=("replace")
-                    fi
-                done
-            fi
-        else
-            # No python3 or registry — fall back to unordered directory scan (replace only)
-            for preset in "\$presets_dir"/*/; do
-                [ -d "\$preset" ] || continue
-                local candidate="\$preset/templates/\${template_name}.md"
-                if [ -f "\$candidate" ]; then
-                    layer_paths+=("\$candidate")
-                    layer_strategies+=("replace")
-                fi
-            done
-        fi
-    fi
-
-    # Priority 3: Extension-provided templates (always "replace")
-    local ext_dir="\$repo_root/.specnaut/extensions"
-    if [ -d "\$ext_dir" ]; then
-        for ext in "\$ext_dir"/*/; do
-            [ -d "\$ext" ] || continue
-            case "\$(basename "\$ext")" in .*) continue;; esac
-            local candidate="\$ext/templates/\${template_name}.md"
-            if [ -f "\$candidate" ]; then
-                layer_paths+=("\$candidate")
-                layer_strategies+=("replace")
-            fi
-        done
-    fi
-
-    # Priority 4: Core templates (always "replace")
-    local core="\$base/\${template_name}.md"
-    if [ -f "\$core" ]; then
-        layer_paths+=("\$core")
-        layer_strategies+=("replace")
-    fi
-
-    local count=\${#layer_paths[@]}
-    [ "\$count" -eq 0 ] && return 1
-
-    # Check if any layer uses a non-replace strategy
-    local has_composition=false
-    for s in "\${layer_strategies[@]}"; do
-        [ "\$s" != "replace" ] && has_composition=true && break
-    done
-
-    # If the top (highest-priority) layer is replace, it wins entirely —
-    # lower layers are irrelevant regardless of their strategies.
-    if [ "\${layer_strategies[0]}" = "replace" ]; then
-        cat "\${layer_paths[0]}"
-        return 0
-    fi
-
-    if [ "\$has_composition" = false ]; then
-        cat "\${layer_paths[0]}"
-        return 0
-    fi
-
-    # Find the effective base: scan from highest priority (index 0) downward
-    # to find the nearest replace layer. Only compose layers above that base.
-    local base_idx=-1
-    local i
-    for (( i=0; i<count; i++ )); do
-        if [ "\${layer_strategies[\$i]}" = "replace" ]; then
-            base_idx=\$i
-            break
-        fi
-    done
-
-    if [ \$base_idx -lt 0 ]; then
-        return 1  # no base layer found
-    fi
-
-    # Read the base content; compose layers above the base (higher priority)
-    local content
-    content=\$(cat "\${layer_paths[\$base_idx]}"; printf x)
-    content="\${content%x}"
-
-    for (( i=base_idx-1; i>=0; i-- )); do
-        local path="\${layer_paths[\$i]}"
-        local strat="\${layer_strategies[\$i]}"
-        local layer_content
-        # Preserve trailing newlines
-        layer_content=\$(cat "\$path"; printf x)
-        layer_content="\${layer_content%x}"
-
-        case "\$strat" in
-            replace) content="\$layer_content" ;;
-            prepend) content="\$(printf '%s\\n\\n%s' "\$layer_content" "\$content")" ;;
-            append)  content="\$(printf '%s\\n\\n%s' "\$content" "\$layer_content")" ;;
-            wrap)
-                case "\$layer_content" in
-                    *'{CORE_TEMPLATE}'*) ;;
-                    *) echo "Error: wrap strategy missing {CORE_TEMPLATE} placeholder" >&2; return 1 ;;
-                esac
-                while [[ "\$layer_content" == *'{CORE_TEMPLATE}'* ]]; do
-                    local before="\${layer_content%%\\{CORE_TEMPLATE\\}*}"
-                    local after="\${layer_content#*\\{CORE_TEMPLATE\\}}"
-                    layer_content="\${before}\${content}\${after}"
-                done
-                content="\$layer_content"
-                ;;
-            *) echo "Error: unknown strategy '\$strat'" >&2; return 1 ;;
-        esac
-    done
-
-    printf '%s' "\$content"
-    return 0
-}
-
 `,
     executable: false,
     backend: null,
@@ -27596,8 +27384,8 @@ function Test-DirHasFiles {
     }
 }
 
-# Template resolution (Resolve-Template, Resolve-TemplateContent) lives beside
-# this file; every caller of common.ps1 keeps getting it from here.
+# Template resolution (Resolve-Template) lives beside this file; every caller of
+# common.ps1 keeps getting it from here.
 . "\$PSScriptRoot/template-resolution.ps1"
 `,
     executable: false,
@@ -27610,28 +27398,12 @@ function Test-DirHasFiles {
     suffix: "scripts/powershell/template-resolution.ps1",
     content: `#!/usr/bin/env pwsh
 # Dot-sourced by common.ps1, beside it: turning a template name into a file
-# path (Resolve-Template) or into composed content (Resolve-TemplateContent),
-# through the override / preset / extension / core priority stack. Every
-# script that dot-sources common.ps1 gets these with it, as before.
+# path (Resolve-Template) through the override / preset / extension / core
+# priority stack. Every script that dot-sources common.ps1 gets it with it.
 #
 # Kept out of common.ps1 so the repository and feature-path helpers there are
-# not buried under the template stack, the one part of the file that carries
-# its own Python helper. Defines functions only: dot-sourcing it runs nothing.
-
-# Find a usable Python 3 executable (python3, python, or py -3).
-# Returns the command/arguments as an array, or \$null if none found.
-function Get-Python3Command {
-    if (Get-Command python3 -ErrorAction SilentlyContinue) { return @('python3') }
-    if (Get-Command python -ErrorAction SilentlyContinue) {
-        \$ver = & python --version 2>&1
-        if (\$ver -match 'Python 3') { return @('python') }
-    }
-    if (Get-Command py -ErrorAction SilentlyContinue) {
-        \$ver = & py -3 --version 2>&1
-        if (\$ver -match 'Python 3') { return @('py', '-3') }
-    }
-    return \$null
-}
+# not buried under the template stack. Defines functions only: dot-sourcing it
+# runs nothing.
 
 # Resolve a template name to a file path using the priority stack:
 #   1. .specnaut/templates/overrides/
@@ -27699,210 +27471,6 @@ function Resolve-Template {
     if (Test-Path \$core) { return \$core }
 
     return \$null
-}
-
-# Resolve a template name to composed content using composition strategies.
-# Reads strategy metadata from preset manifests and composes content
-# from multiple layers using prepend, append, or wrap strategies.
-function Resolve-TemplateContent {
-    param(
-        [Parameter(Mandatory=\$true)][string]\$TemplateName,
-        [Parameter(Mandatory=\$true)][string]\$RepoRoot
-    )
-
-    \$base = Join-Path \$RepoRoot '.specnaut/templates'
-
-    # Collect all layers (highest priority first)
-    \$layerPaths = @()
-    \$layerStrategies = @()
-
-    # Priority 1: Project overrides (always "replace")
-    \$override = Join-Path \$base "overrides/\$TemplateName.md"
-    if (Test-Path \$override) {
-        \$layerPaths += \$override
-        \$layerStrategies += 'replace'
-    }
-
-    # Priority 2: Installed presets (sorted by priority from .registry)
-    \$presetsDir = Join-Path \$RepoRoot '.specnaut/presets'
-    if (Test-Path \$presetsDir) {
-        \$registryFile = Join-Path \$presetsDir '.registry'
-        \$sortedPresets = @()
-        if (Test-Path \$registryFile) {
-            try {
-                \$registryData = Get-Content \$registryFile -Raw | ConvertFrom-Json
-                \$presets = \$registryData.presets
-                if (\$presets) {
-                    \$sortedPresets = \$presets.PSObject.Properties |
-                        Where-Object { \$null -eq \$_.Value.enabled -or \$_.Value.enabled -ne \$false } |
-                        Sort-Object { if (\$null -ne \$_.Value.priority) { \$_.Value.priority } else { 10 } } |
-                        ForEach-Object { \$_.Name }
-                }
-            } catch {
-                \$sortedPresets = @()
-            }
-        }
-
-        if (\$sortedPresets.Count -gt 0) {
-            \$pyCmd = Get-Python3Command
-            if (-not \$pyCmd) {
-                # Check if any preset has strategy fields that would be ignored
-                foreach (\$pid in \$sortedPresets) {
-                    \$mf = Join-Path \$presetsDir "\$pid/preset.yml"
-                    if ((Test-Path \$mf) -and (Select-String -Path \$mf -Pattern 'strategy:' -Quiet -ErrorAction SilentlyContinue)) {
-                        Write-Warning "No Python 3 found; preset composition strategies will be ignored"
-                        break
-                    }
-                }
-            }
-            \$yamlWarned = \$false
-            foreach (\$presetId in \$sortedPresets) {
-                # Read strategy and file path from preset manifest
-                \$strategy = 'replace'
-                \$manifestFilePath = ''
-                \$manifest = Join-Path \$presetsDir "\$presetId/preset.yml"
-                if ((Test-Path \$manifest) -and \$pyCmd) {
-                    try {
-                        # Use Python to parse YAML manifest for strategy and file path
-                        \$pyArgs = if (\$pyCmd.Count -gt 1) { \$pyCmd[1..(\$pyCmd.Count-1)] } else { @() }
-                        \$pyStderrFile = [System.IO.Path]::GetTempFileName()
-                        \$stratResult = & \$pyCmd[0] @pyArgs -c @"
-import sys
-try:
-    import yaml
-except ImportError:
-    print('yaml_missing', file=sys.stderr)
-    print('replace\\t')
-    sys.exit(0)
-try:
-    with open(sys.argv[1]) as f:
-        data = yaml.safe_load(f)
-    for t in data.get('provides', {}).get('templates', []):
-        if t.get('name') == sys.argv[2] and t.get('type', 'template') == 'template':
-            print(t.get('strategy', 'replace') + '\\t' + t.get('file', ''))
-            sys.exit(0)
-    print('replace\\t')
-except Exception:
-    print('replace\\t')
-"@ \$manifest \$TemplateName 2>\$pyStderrFile
-                        if (\$stratResult) {
-                            \$parts = \$stratResult.Trim() -split "\`t", 2
-                            \$strategy = \$parts[0].ToLowerInvariant()
-                            if (\$parts.Count -gt 1 -and \$parts[1]) { \$manifestFilePath = \$parts[1] }
-                        }
-                        if (-not \$yamlWarned -and (Test-Path \$pyStderrFile) -and (Get-Content \$pyStderrFile -Raw -ErrorAction SilentlyContinue) -match 'yaml_missing') {
-                            Write-Warning "PyYAML not available; composition strategies may be ignored"
-                            \$yamlWarned = \$true
-                        }
-                        Remove-Item \$pyStderrFile -Force -ErrorAction SilentlyContinue
-                    } catch {
-                        \$strategy = 'replace'
-                        if (\$pyStderrFile) { Remove-Item \$pyStderrFile -Force -ErrorAction SilentlyContinue }
-                    }
-                }
-                # Try manifest file path first, then convention path
-                \$candidate = \$null
-                if (\$manifestFilePath) {
-                    # Reject absolute paths and parent traversal
-                    if ([System.IO.Path]::IsPathRooted(\$manifestFilePath) -or \$manifestFilePath -match '\\.\\.[\\\\/]') {
-                        \$manifestFilePath = ''
-                    }
-                }
-                if (\$manifestFilePath) {
-                    \$mf = Join-Path \$presetsDir "\$presetId/\$manifestFilePath"
-                    if (Test-Path \$mf) { \$candidate = \$mf }
-                }
-                if (-not \$candidate) {
-                    \$cf = Join-Path \$presetsDir "\$presetId/templates/\$TemplateName.md"
-                    if (Test-Path \$cf) { \$candidate = \$cf }
-                }
-                if (\$candidate) {
-                    \$layerPaths += \$candidate
-                    \$layerStrategies += \$strategy
-                }
-            }
-        } else {
-            # Fallback: alphabetical directory order (no registry or parse failure)
-            foreach (\$preset in Get-ChildItem -Path \$presetsDir -Directory -ErrorAction SilentlyContinue | Where-Object { \$_.Name -notlike '.*' }) {
-                \$candidate = Join-Path \$preset.FullName "templates/\$TemplateName.md"
-                if (Test-Path \$candidate) {
-                    \$layerPaths += \$candidate
-                    \$layerStrategies += 'replace'
-                }
-            }
-        }
-    }
-
-    # Priority 3: Extension-provided templates (always "replace")
-    \$extDir = Join-Path \$RepoRoot '.specnaut/extensions'
-    if (Test-Path \$extDir) {
-        foreach (\$ext in Get-ChildItem -Path \$extDir -Directory -ErrorAction SilentlyContinue | Where-Object { \$_.Name -notlike '.*' } | Sort-Object Name) {
-            \$candidate = Join-Path \$ext.FullName "templates/\$TemplateName.md"
-            if (Test-Path \$candidate) {
-                \$layerPaths += \$candidate
-                \$layerStrategies += 'replace'
-            }
-        }
-    }
-
-    # Priority 4: Core templates (always "replace")
-    \$core = Join-Path \$base "\$TemplateName.md"
-    if (Test-Path \$core) {
-        \$layerPaths += \$core
-        \$layerStrategies += 'replace'
-    }
-
-    if (\$layerPaths.Count -eq 0) { return \$null }
-
-    # If the top (highest-priority) layer is replace, it wins entirely —
-    # lower layers are irrelevant regardless of their strategies.
-    if (\$layerStrategies[0] -eq 'replace') {
-        return (Get-Content \$layerPaths[0] -Raw)
-    }
-
-    # Check if any layer uses a non-replace strategy
-    \$hasComposition = \$false
-    foreach (\$s in \$layerStrategies) {
-        if (\$s -ne 'replace') { \$hasComposition = \$true; break }
-    }
-
-    if (-not \$hasComposition) {
-        return (Get-Content \$layerPaths[0] -Raw)
-    }
-
-    # Find the effective base: scan from highest priority (index 0) downward
-    # to find the nearest replace layer. Only compose layers above that base.
-    \$baseIdx = -1
-    for (\$i = 0; \$i -lt \$layerPaths.Count; \$i++) {
-        if (\$layerStrategies[\$i] -eq 'replace') {
-            \$baseIdx = \$i
-            break
-        }
-    }
-    if (\$baseIdx -lt 0) { return \$null }
-
-    \$content = Get-Content \$layerPaths[\$baseIdx] -Raw
-
-    for (\$i = \$baseIdx - 1; \$i -ge 0; \$i--) {
-        \$path = \$layerPaths[\$i]
-        \$strat = \$layerStrategies[\$i]
-        \$layerContent = Get-Content \$path -Raw
-
-        switch (\$strat) {
-            'replace' { \$content = \$layerContent }
-            'prepend' { \$content = "\$layerContent\`n\`n\$content" }
-            'append'  { \$content = "\$content\`n\`n\$layerContent" }
-            'wrap'    {
-                if (-not \$layerContent.Contains('{CORE_TEMPLATE}')) {
-                    throw "Wrap strategy missing {CORE_TEMPLATE} placeholder"
-                }
-                \$content = \$layerContent.Replace('{CORE_TEMPLATE}', \$content)
-            }
-            default { throw "Unknown strategy: \$strat" }
-        }
-    }
-
-    return \$content
 }
 `,
     executable: false,
