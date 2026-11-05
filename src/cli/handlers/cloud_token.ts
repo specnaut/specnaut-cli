@@ -10,7 +10,8 @@ import {
   isRedirected,
   isUnavailable,
 } from "../../domain/cloud/cloud_client.ts";
-import { hasControl, REDIRECT_REFUSED } from "../../domain/cloud/cloud_wire.ts";
+import { REDIRECT_REFUSED } from "../../domain/cloud/cloud_wire.ts";
+import { hasControl } from "../../domain/terminal_text.ts";
 import type { CredentialStore } from "../../domain/cloud/credentials.ts";
 
 /** What went wrong with a Cloud request, in the CLI's own words (§ I). */

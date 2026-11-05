@@ -128,14 +128,14 @@ Deno.test(
     await stage(none, "big.ts", 320);
     const a = await ratchet(none);
     assertEquals(a.code, 1);
-    assertStringIncludes(a.stderr, "(target 300, ceiling 500) — over the target and grew");
+    assertStringIncludes(a.stderr, "(target 200, ceiling 500) — over the target and grew");
     assertStringIncludes(a.stderr, "source: default");
 
     const noRow = await repo(310, "function:\n  target: 30\n  ceiling: 50\n");
     await stage(noRow, "big.ts", 305);
     const b = await ratchet(noRow);
     assertEquals(b.code, 0, b.stdout + b.stderr);
-    assertStringIncludes(b.stdout, `1 ${CLEAN} (target 300, ceiling 500, source: default)`);
+    assertStringIncludes(b.stdout, `1 ${CLEAN} (target 200, ceiling 500, source: default)`);
   },
 );
 

@@ -1,3 +1,4 @@
 file 300 450 config
-function 30 50 default
+function 20 50 default
+class 100 200 default
 constitution 60 100 default

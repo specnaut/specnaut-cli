@@ -1,11 +1,8 @@
 import {
-  DEFAULT_SIZE_LIMITS,
   isWritableGlob,
   LIMIT_VALUE,
-  SIZE_UNITS,
   type SizeLimit,
   sizeLimitsYaml,
-  type SizeUnit,
   toLimit,
 } from "./size_limits.ts";
 import { targetSurfaceProblem, uiSettingsYaml } from "./ui_settings.ts";
@@ -38,6 +35,25 @@ function section(text: string, heading: RegExp): string[] | null {
   return end === -1 ? rest : rest.slice(0, end);
 }
 
+/**
+ * The units the old ratchet read, frozen. A table is read as it was written:
+ * following the live unit list would carry into the config a `class` row the
+ * old ratchet never read.
+ */
+const LEGACY_SIZE_UNITS = ["file", "function", "constitution"] as const;
+type LegacySizeUnit = typeof LEGACY_SIZE_UNITS[number];
+
+/**
+ * The defaults back then, frozen for the same reason: a row equal to one of
+ * them is a project that never chose. Compared with the live defaults it would
+ * read as a choice, and pin that project to the old limit for good.
+ */
+const LEGACY_SIZE_DEFAULTS: Readonly<Record<LegacySizeUnit, string>> = {
+  file: "300 500",
+  function: "30 50",
+  constitution: "60 100",
+};
+
 /** The vanilla constitution row older releases shipped: the 60 / 100 default replaces it. */
 const VANILLA_CONSTITUTION = "300 500";
 
@@ -47,7 +63,7 @@ const cells = (row: string) =>
 /**
  * A non-default size table, as `.specnaut/size-limits.yml`. Rows equal to a
  * default — or the old vanilla `| constitution | 300 | 500 |` — are dropped;
- * a table with nothing else is `none`. Units the config does not take
+ * a table with nothing else is `none`. Units the old ratchet did not read
  * (`class`, `component`) are named in `dropped`. A table the old ratchet
  * stopped on — a loose unit name (`File`, `files`), a value that is not a
  * number or `none`, a unit given twice — is refused.
@@ -59,8 +75,8 @@ export function extractLegacySizeLimits(constitution: string): LegacySetting {
   if (rows.length === 0 || !/^unit$/i.test(cells(rows[0])[0] ?? "")) {
     return refuse("it has no `Unit | Target | Ceiling` table");
   }
-  const units: Partial<Record<SizeUnit, SizeLimit>> = {};
-  const seen = new Set<SizeUnit>();
+  const units: Partial<Record<LegacySizeUnit, SizeLimit>> = {};
+  const seen = new Set<LegacySizeUnit>();
   const dropped: string[] = [];
   for (const row of rows.slice(1)) {
     const r = judgeRow(row, seen);
@@ -83,19 +99,19 @@ const refuse = (reason: string): Refusal => ({ kind: "refuse", reason });
 type Row =
   | { readonly kind: "skip" }
   | { readonly kind: "drop"; readonly unit: string }
-  | { readonly kind: "unit"; readonly unit: SizeUnit; readonly limit: SizeLimit | null }
+  | { readonly kind: "unit"; readonly unit: LegacySizeUnit; readonly limit: SizeLimit | null }
   | Refusal;
 
 /** Judges one row as the old ratchet read it; `seen` is the units already given. */
-function judgeRow(row: string, seen: Set<SizeUnit>): Row {
+function judgeRow(row: string, seen: Set<LegacySizeUnit>): Row {
   const [unit, target, ceiling, ...extra] = cells(row);
   if (/^[\s:-]*$/.test(unit)) return { kind: "skip" }; // the separator row
   if (extra.length > 0 || ceiling === undefined) {
     return refuse(`the row '${row.trim()}' is not unit, target, ceiling`);
   }
-  const known = SIZE_UNITS.find((u) => u === unit);
+  const known = LEGACY_SIZE_UNITS.find((u) => u === unit);
   if (known === undefined) {
-    return SIZE_UNITS.some((u) => unit.toLowerCase().replace(/s$/, "") === u)
+    return LEGACY_SIZE_UNITS.some((u) => unit.toLowerCase().replace(/s$/, "") === u)
       ? refuse(`the unit '${unit}' is not spelled as the ratchet reads it`)
       : { kind: "drop", unit };
   }
@@ -103,9 +119,8 @@ function judgeRow(row: string, seen: Set<SizeUnit>): Row {
   seen.add(known);
   const bad = [target, ceiling].find((v) => !LIMIT_VALUE.test(v));
   if (bad !== undefined) return refuse(`'${known}' has the value '${bad}', not lines or none`);
-  const d = DEFAULT_SIZE_LIMITS[known];
   const pair = `${target} ${ceiling}`;
-  const isDefault = pair === `${d.target} ${d.ceiling}` ||
+  const isDefault = pair === LEGACY_SIZE_DEFAULTS[known] ||
     (known === "constitution" && pair === VANILLA_CONSTITUTION);
   const limits = { target: toLimit(target), ceiling: toLimit(ceiling) };
   return { kind: "unit", unit: known, limit: isDefault ? null : limits };

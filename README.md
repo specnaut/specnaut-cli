@@ -41,8 +41,8 @@ On harnesses that namespace their skills the names carry a prefix (`/specnaut-ta
 
 ## What Specnaut is not
 
-Specnaut does not talk to any LLM. Specnaut does not orchestrate any agent. You need a compatible AI
-harness (same as upstream).
+Specnaut talks to no LLM and orchestrates no agent; `specnaut scan`, its size map, runs offline. You
+need a compatible AI harness (same as upstream).
 
 ## Supported AI harnesses
 

@@ -69,7 +69,8 @@ Deno.test("upgrade carries the old table and declaration into their configs", as
     assertEquals(read.code, 0);
     assertEquals(
       new TextDecoder().decode(read.stdout).replaceAll("\r", ""),
-      "file 280 450 config\nfunction 30 50 default\nconstitution 60 100 default\nexempt *.lock\n",
+      "file 280 450 config\nfunction 20 50 default\nclass 100 200 default\n" +
+        "constitution 60 100 default\nexempt *.lock\n",
     );
 
     // Written once: a second run finds the configs and says nothing of them.

@@ -132,8 +132,8 @@ Deno.test("what the extraction writes, both readers read back as written", {
     { file: { target: 250, ceiling: null }, constitution: { target: 70, ceiling: 110 } },
     ["*.lock", "docs/a b/**", "x # y"],
   );
-  const expected = "file 250 none config\nfunction 30 50 default\nconstitution 70 110 config\n" +
-    "exempt *.lock\nexempt docs/a b/**\nexempt x # y\n";
+  const expected = "file 250 none config\nfunction 20 50 default\nclass 100 200 default\n" +
+    "constitution 70 110 config\nexempt *.lock\nexempt docs/a b/**\nexempt x # y\n";
   assertEquals(tsDump(readSizeLimits(text)), expected);
   const path = join(await Deno.makeTempDir(), "size-limits.yml");
   await Deno.writeTextFile(path, text);

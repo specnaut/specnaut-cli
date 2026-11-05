@@ -11,8 +11,8 @@ Each is assigned by role class, so adding an agent is a lookup rather than a jud
 | role noun | Does the work rather than judging it | `developer`, `product-owner` |
 
 - **`-expert` ⇔ an audit axis exists.** The five `-expert` agents are exactly the five axis flags of
-  `/task audit` (`--security`, `--perf`, `--a11y`, `--archi`, `--deps`). Give `code-reviewer` an
-  audit axis and **rename it to `-expert` in the same change**.
+  `/task audit` (`--security`, `--perf`, `--a11y`, `--archi`, `--deps`); `--scan` runs no agent and
+  is no axis. Give `code-reviewer` an audit axis and **rename it to `-expert` in the same change**.
 - **Agents spell the domain out; flags may abbreviate.** A flag is typed by a human, where short
   wins; an agent name is matched by a model against a request, where `accessibility` is a far
   stronger signal than `a11y`.

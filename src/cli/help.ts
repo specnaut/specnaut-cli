@@ -14,6 +14,9 @@ ${bold("Usage:")}
   specnaut diff [<path>] [--only-customised]
                                       Show how managed files diverge from the bundled originals (read-only).
                                       With <path>, scope to that one managed file.
+  specnaut scan [--path <dir>] [--format text|json|mermaid] [--top <n|all>]
+                                      Map file, function and class sizes against the size limits
+                                      (read-only, offline, no agent): where to look, not a verdict
   specnaut reconcile --status         List files pending post-upgrade reconciliation
   specnaut reconcile <path> --accept-upstream | --accept-current
                                       Resolve a preserved file after upgrade
@@ -75,6 +78,13 @@ ${bold("Flags (for diff):")}
                       error, not a silent fall-back to the whole-project view.
   --only-customised   Restrict the output to files whose on-disk content diverges from the recorded
                       lock baseline — i.e. files you actually customized (skips unchanged managed files).
+
+${bold("Flags (for scan):")}
+  --path <dir>        Scan one subtree, relative to the repository root; matching nothing exits 2
+  --format <name>     text (default) | json | mermaid
+  --top <n|all>       How long each list is (default 20); the totals always count every file.
+                      Exit 0: no file over its ceiling; 1: a file over its ceiling; 3: could not run.
+                      Function and class sizes are estimated and never change the exit code.
 
 ${bold("Docs:")}    ${cyan("https://specnaut.com")}
 ${bold("Cloud:")}   ${cyan("https://specnaut.com")} ${

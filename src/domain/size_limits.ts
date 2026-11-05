@@ -1,12 +1,11 @@
-import { CONSTITUTION_PATH, SIZE_LIMITS_CONFIG_PATH } from "./constitution_paths.ts";
+import { SIZE_LIMITS_CONFIG_PATH } from "./constitution_paths.ts";
 import type { DiskEntry } from "./context_link.ts";
 
 /**
- * Size limits, as the binary judges them (spec 038). The gate itself is
- * `size-ratchet.sh`; this module answers the one size question the CLI asks
- * on its own — is the constitution over its ceiling — and is the TypeScript
- * reader of `.specnaut/size-limits.yml`. The bash reader is `_config.sh`
- * beside the ratchet; both are held to one corpus,
+ * Size limits, as the binary reads them (spec 038). The gate itself is
+ * `size-ratchet.sh`; this module holds what a line count is and is the
+ * TypeScript reader of `.specnaut/size-limits.yml`. The bash reader is
+ * `_config.sh` beside the ratchet; both are held to one corpus,
  * `tests/fixtures/size_limits/`, so they cannot read one file two ways.
  */
 
@@ -16,8 +15,8 @@ export type SizeLimit = {
   readonly ceiling: number | null;
 };
 
-/** The units the config sets. `class`, `component` and the like are the agents' judgement. */
-export const SIZE_UNITS = ["file", "function", "constitution"] as const;
+/** The units the config sets. `component` and the like are the agents' judgement. */
+export const SIZE_UNITS = ["file", "function", "class", "constitution"] as const;
 export type SizeUnit = typeof SIZE_UNITS[number];
 
 /**
@@ -33,8 +32,9 @@ export const DEFAULT_CONSTITUTION_LIMIT: SizeLimit = { target: 60, ceiling: 100 
  * copies to that file's table.
  */
 export const DEFAULT_SIZE_LIMITS: Readonly<Record<SizeUnit, SizeLimit>> = {
-  file: { target: 300, ceiling: 500 },
-  function: { target: 30, ceiling: 50 },
+  file: { target: 200, ceiling: 500 },
+  function: { target: 20, ceiling: 50 },
+  class: { target: 100, ceiling: 200 },
   constitution: DEFAULT_CONSTITUTION_LIMIT,
 };
 
@@ -182,12 +182,7 @@ function listItem(st: ParseState, rest: string, n: number): string | null {
  * whole file parsed, as `config_size_limits` does.
  */
 export function readSizeLimits(text: string | null): SizeConfig {
-  const dflt = (u: SizeUnit): ResolvedLimit => ({ ...DEFAULT_SIZE_LIMITS[u], source: "default" });
-  const units = {
-    file: dflt("file"),
-    function: dflt("function"),
-    constitution: dflt("constitution"),
-  };
+  const units = defaultUnits();
   if (text === null) return { kind: "ok", limits: { units, exempt: [] } };
   const parsed = parseNarrowYaml(text, SIZE_UNITS, ["exempt"]);
   if (typeof parsed === "string") return { kind: "unreadable", reason: parsed };
@@ -205,6 +200,12 @@ export function readSizeLimits(text: string | null): SizeConfig {
   }
   return { kind: "ok", limits: { units, exempt: given.exempt } };
 }
+
+/** Every unit of `SIZE_UNITS` at its default: a unit added there needs no line here. */
+const defaultUnits = (): Record<SizeUnit, ResolvedLimit> =>
+  Object.fromEntries(
+    SIZE_UNITS.map((u) => [u, { ...DEFAULT_SIZE_LIMITS[u], source: "default" }]),
+  ) as Record<SizeUnit, ResolvedLimit>;
 
 /** Every value checked in file order, the first bad one the reason; and the exempt globs. */
 function givenSettings(parsed: readonly ParsedRecord[]) {
@@ -271,30 +272,18 @@ export function sizeLimitsYaml(
 /** Whether `glob` can be written as a quoted entry and read back as itself. */
 export const isWritableGlob = (glob: string): boolean => /^[^"\\\p{Cc}]+$/u.test(glob);
 
-/** How far over its ceiling the constitution is. */
-export type OverCeiling = { readonly lines: number; readonly ceiling: number };
-
-/** Lines as `wc -l` counts them — newlines — so the warning and the ratchet agree. */
-function countLines(text: string): number {
+/** Lines as `wc -l` counts them — newlines — so a warning and the ratchet agree. */
+export function countLines(text: string): number {
   return text.split("\n").length - 1;
 }
 
 /**
- * The constitution's size against its ceiling, or `null` when it is within
- * it (or the ceiling is `none`). The one home of this judgement: `check` and
- * the upgrade notice both ask it, so neither counts lines itself.
+ * `countLines` over raw bytes: a caller sums it across a stream's chunks and
+ * never decodes, so a chunk boundary inside a character, or bytes that are not
+ * UTF-8, cannot change the count. A multi-byte UTF-8 character holds no 0x0A.
  */
-export function constitutionOverCeiling(
-  text: string,
-  limit: SizeLimit = DEFAULT_CONSTITUTION_LIMIT,
-): OverCeiling | null {
-  if (limit.ceiling === null) return null;
-  const lines = countLines(text);
-  return lines > limit.ceiling ? { lines, ceiling: limit.ceiling } : null;
-}
-
-/** What `check` and `upgrade` say about an over-ceiling constitution. */
-export function constitutionCeilingNote(over: OverCeiling): string {
-  return `${CONSTITUTION_PATH} is ${over.lines} lines, over its ceiling of ${over.ceiling} — ` +
-    `shrink it; every session loads it`;
+export function countNewlines(chunk: Uint8Array): number {
+  let newlines = 0;
+  for (let i = 0; i < chunk.length; i++) if (chunk[i] === 0x0a) newlines++;
+  return newlines;
 }

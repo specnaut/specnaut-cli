@@ -91,9 +91,21 @@ async function defaultsTable(): Promise<Map<string, string>> {
 
 Deno.test("the defaults file states the one rule and the default table", async () => {
   const table = await defaultsTable();
-  assertEquals(table.get("file"), "300 500", "file default");
-  assertEquals(table.get("function"), "30 50", "function default");
+  assertEquals(table.get("file"), "200 500", "file default");
+  assertEquals(table.get("function"), "20 50", "function default");
+  assertEquals(table.get("class"), "100 200", "class default");
   assertEquals(table.get("constitution"), "60 100", "constitution default");
+});
+
+Deno.test("the defaults file says who judges what, and the reviewer judges classes too", async () => {
+  const text = (await Deno.readTextFile(`${ROOT}templates/core/specnaut/memory/size-limits.md`))
+    .replace(/\s+/g, " ");
+  assert(text.includes("The ratchet judges `file` and `constitution` only"), "the ratchet's units");
+  assert(text.includes("estimated by `specnaut scan` and judged by agents"), "who judges the rest");
+  assert(!text.includes("never the config's"), "class is the config's now");
+  assert(text.includes("`component` stays the agents' judgement"), "component is not a unit");
+  const reviewer = await Deno.readTextFile(`${ROOT}templates/core/agents/code-reviewer.md`);
+  assert(reviewer.replace(/\s+/g, " ").includes("every file, function and class"), "code-reviewer");
 });
 
 Deno.test("both readers' default constants equal the table, unit for unit", async () => {
@@ -108,7 +120,7 @@ Deno.test("both readers' default constants equal the table, unit for unit", asyn
     args: [
       "-c",
       '. "$1"; printf "%s\\n" "$CONFIG_DEFAULT_FILE" "$CONFIG_DEFAULT_FUNCTION" ' +
-      '"$CONFIG_DEFAULT_CONSTITUTION"',
+      '"$CONFIG_DEFAULT_CLASS" "$CONFIG_DEFAULT_CONSTITUTION"',
       "_",
       configSh,
     ],

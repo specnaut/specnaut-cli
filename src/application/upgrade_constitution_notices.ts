@@ -5,9 +5,8 @@ import { missingPrinciples } from "../domain/constitution_principles.ts";
 import {
   constitutionCeilingNote,
   constitutionOverCeiling,
-  sizeConfigFromEntry,
-  sizeConfigUnreadableNote,
-} from "../domain/size_limits.ts";
+} from "../domain/constitution_ceiling.ts";
+import { sizeConfigFromEntry, sizeConfigUnreadableNote } from "../domain/size_limits.ts";
 
 /**
  * The constitution the project will have once the run is done: the moved

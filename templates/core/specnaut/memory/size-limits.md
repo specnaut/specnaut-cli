@@ -1,5 +1,5 @@
 > **Agents depend on this file.** Every phase and agent that judges the size of
-> a file or a function cites it instead of carrying its own number. Moving or
+> a file, a function or a class cites it instead of carrying its own number. Moving or
 > renaming it breaks those links in silence. Specnaut owns it: `specnaut
 > upgrade` rewrites it, so a project changes its limits in
 > `.specnaut/size-limits.yml`, never here.
@@ -24,8 +24,9 @@ unit, the measured value, and the limit with its source: `config` or
 
 | Unit | Target | Ceiling |
 | :--- | ---: | ---: |
-| file | 300 | 500 |
-| function | 30 | 50 |
+| file | 200 | 500 |
+| function | 20 | 50 |
+| class | 100 | 200 |
 | constitution | 60 | 100 |
 
 `constitution` is `docs/constitution.md` itself. It is loaded into every
@@ -37,11 +38,14 @@ principles only, which is why its limits are the shortest.
 ```yaml
 # .specnaut/size-limits.yml — set only what differs from the defaults
 file:
-  target: 300
+  target: 200
   ceiling: 500
 function:
-  target: 30
+  target: 20
   ceiling: 50
+class:
+  target: 100
+  ceiling: 200
 constitution:
   target: 60
   ceiling: 100
@@ -50,10 +54,12 @@ exempt:
   - "**/generated/**"
 ```
 
-- Each unit — `file`, `function`, `constitution` — sets both `target` and
-  `ceiling`. A value is a whole number of lines, or `none`. `none` as a target
-  turns off rule 2 for that unit; `none` as a ceiling turns off rule 1. Other
-  units (`class`, `component`) are the agents' judgement, never the config's.
+- Each unit — `file`, `function`, `class`, `constitution` — sets both `target`
+  and `ceiling`. A value is a whole number of lines, or `none`. `none` as a
+  target turns off rule 2 for that unit; `none` as a ceiling turns off rule 1.
+  `component` stays the agents' judgement.
+- The ratchet judges `file` and `constitution` only. `function` and `class` are
+  estimated by `specnaut scan` and judged by agents in a review.
 - `exempt:` is optional: globs, one per line and quoted (`*.lock` bare is not
   YAML), matched against the path from the repository root. An exempt file has
   no file limit at all. Lockfiles, generated code and vendored bundles are what
@@ -92,7 +98,13 @@ commit or task: measured that way, rule 3's second step (add, after the
 extraction) would read as growth and be refused.
 
 A file is measured with `wc -l`. A function, class or component is measured by
-the agent reading it, from its first line to its last.
+the agent reading it, from its first line to its last; `specnaut scan` says where
+to look, and its estimate never replaces that reading.
+
+`specnaut scan` measures every tracked file, changed or not, that the ratchet
+does not exempt, in `wc -l` lines. It estimates functions and classes in the
+brace languages (TypeScript, Go, Java, …) and Python: those figures are labelled
+estimated and never change its exit code. A file over its ceiling does (exit 1).
 
 ## Severity, in a review
 
@@ -142,6 +154,9 @@ branch's merge base. The developer puts that line in its completion report's
 `Decisions`. A file over its target that grew, or a file over its ceiling that
 did not shrink, is a blocker: fix it — extract — before handing off to review,
 never after.
+
+**audit** — `/task audit` runs `specnaut scan` before any seat; its phase doc
+says what the map is and which hot spots reach the architecture seat.
 
 **review** — the review phase (Phase 0) runs
 `bash .specnaut/scripts/bash/size-ratchet.sh --since <merge base> --report`, which

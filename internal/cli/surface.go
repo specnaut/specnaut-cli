@@ -21,7 +21,7 @@ var Surface = FlagTable{
 	},
 	Strings: []string{
 		"ai", "backlog", "backlog-url", "backlog-repo", "scheme", "spec-backend",
-		"api-url", "type", "title", "payload", "task",
+		"api-url", "type", "title", "payload", "task", "path", "format", "top",
 	},
 	Aliases: map[string]string{"v": "version", "h": "help"},
 }
@@ -41,6 +41,7 @@ var Commands = map[string]func(Args, []string) Intent{
 	"cloud":       subcommand("cloud", CloudSubs),
 	"gate":        subcommand("gate", GateSubs),
 	"spec":        subcommand("spec", SpecSubs),
+	"scan":        parseScan,
 }
 
 // Subcommand words, as parser.ts accepts them.

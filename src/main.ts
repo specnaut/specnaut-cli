@@ -21,6 +21,7 @@ export async function run(argv: string[]): Promise<number> {
   }
 }
 
+/** A handler module is evaluated only when its command runs: `--version` evaluates none. */
 async function dispatch(argv: string[]): Promise<number> {
   const intent = parseArgs(argv);
   switch (intent.kind) {
@@ -30,45 +31,27 @@ async function dispatch(argv: string[]): Promise<number> {
     case "help":
       console.log(HELP);
       return 0;
-    case "init": {
-      const { runInit } = await import("./cli/handlers/init_handler.ts");
-      return await runInit(intent);
-    }
-    case "self-update": {
-      const { handleSelfUpdate } = await import(
-        "./cli/handlers/self_update_handler.ts"
-      );
-      return await handleSelfUpdate(intent);
-    }
-    case "check": {
-      const { runCheck } = await import("./cli/handlers/check_handler.ts");
-      return await runCheck(intent);
-    }
-    case "upgrade": {
-      const { runUpgrade } = await import("./cli/handlers/upgrade_handler.ts");
-      return await runUpgrade(intent);
-    }
-    case "diff": {
-      const { runDiff } = await import("./cli/handlers/diff_handler.ts");
-      return await runDiff(intent);
-    }
+    case "init":
+      return (await import("./cli/handlers/init_handler.ts")).runInit(intent);
+    case "self-update":
+      return (await import("./cli/handlers/self_update_handler.ts")).handleSelfUpdate(intent);
+    case "check":
+      return (await import("./cli/handlers/check_handler.ts")).runCheck(intent);
+    case "upgrade":
+      return (await import("./cli/handlers/upgrade_handler.ts")).runUpgrade(intent);
+    case "diff":
+      return (await import("./cli/handlers/diff_handler.ts")).runDiff(intent);
+    case "scan":
+      return (await import("./cli/handlers/scan_handler.ts")).runScan(intent);
     case "reconcile-status":
-    case "reconcile-path": {
-      const { runReconcile } = await import("./cli/handlers/reconcile_handler.ts");
-      return await runReconcile(intent);
-    }
-    case "cloud": {
-      const { runCloud } = await import("./cli/handlers/cloud_handler.ts");
-      return await runCloud(intent);
-    }
-    case "gate": {
-      const { runGate } = await import("./cli/handlers/gate_handler.ts");
-      return await runGate(intent);
-    }
-    case "spec": {
-      const { runSpec } = await import("./cli/handlers/spec_handler.ts");
-      return await runSpec(intent);
-    }
+    case "reconcile-path":
+      return (await import("./cli/handlers/reconcile_handler.ts")).runReconcile(intent);
+    case "cloud":
+      return (await import("./cli/handlers/cloud_handler.ts")).runCloud(intent);
+    case "gate":
+      return (await import("./cli/handlers/gate_handler.ts")).runGate(intent);
+    case "spec":
+      return (await import("./cli/handlers/spec_handler.ts")).runSpec(intent);
     case "removed-harness":
       console.error(red(`error: ${removedHarnessInitNotice(intent.harness)}`));
       return 1;

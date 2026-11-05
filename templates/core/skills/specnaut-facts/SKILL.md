@@ -35,13 +35,14 @@ Enhanced fork of [`specify` CLI](https://github.com/github/spec-kit), distribute
 - `specnaut reconcile <path> --accept-upstream` — take the new template version (backs up local, updates lock).
 - `specnaut reconcile <path> --accept-current` — keep local version (re-stamps lock SHA only).
 - `specnaut check [--project]` — verify scaffold integrity.
+- `specnaut scan [--path <dir>] [--format text|json|mermaid] [--top <n|all>]` — map file, function and class sizes against the size limits, read-only, offline, no agent: where to look, never a verdict. Function and class sizes are estimated. Exit 0 no file over its ceiling, 1 one is, 2 usage or a `--path` matching nothing, 3 could not run.
 - `specnaut gate <status|raise|cancel>` — the non-interactive bridge a skill phase uses to raise a remote-control gate (Specnaut Cloud).
 - `specnaut self-update` — replace binary with latest release, verifying SHA256.
 - `specnaut --version` — print binary + bundled templates version.
 
 ### Skills
 
-- `/task` — one unit of work: backlog (`list`, `next`, `add`, `edit`, `close`, `groom`), pipeline (`plan`, `implement`, `review`, `merge`), `audit` (`--security`, `--archi`, `--perf`, `--a11y`, `--deps`; every applicable axis with no flag), `constitution`.
+- `/task` — one unit of work: backlog (`list`, `next`, `add`, `edit`, `close`, `groom`), pipeline (`plan`, `implement`, `review`, `merge`), `audit` (`--security`, `--archi`, `--perf`, `--a11y`, `--deps`; every applicable axis with no flag; opened by the `specnaut scan` map, `--scan` for the map alone), `constitution`.
 - `/specnaut` — the framework: `doc`, `list`, `upgrade`, `issue` (reports a Specnaut problem or proposal upstream, after the user approves the exact text).
 - `/ship` — production: `tag`, `release`.
 - `/design` — the project's `DESIGN.md` design system: discovery when absent, edit when present, `audit` for drift. Started by the user only.

@@ -48,7 +48,7 @@ Read `docs/constitution.md` before anything else: it is this project's binding r
 | `implement` | `phases/implement.md` | Build it, ordering the work itself. Ends by invoking `review`. |
 | `review` | `phases/review.md` | The quality battery on a frozen tree. Its verdict is the merge request. |
 | `merge` | `phases/merge.md` | Pre-merge validation; merge, push, close the item. |
-| `audit [--security\|--archi\|--perf\|--a11y\|--deps]` | `phases/audit.md` | Read-only audit of a scope; every applicable axis with no flag. |
+| `audit [--scan\|--security\|--archi\|--perf\|--a11y\|--deps]` | `phases/audit.md` | Read-only audit of a scope; every applicable axis with no flag; `--scan` the size map alone. |
 | `constitution` | `phases/constitution.md` | Amend the project's constitution, on the user's explicit request only. |
 
 These are **contract docs, not verbs** — naming one prints the verb table and stops:

@@ -173,8 +173,8 @@ check "removed phases do NOT scaffold (#455)" \
   '! ls .claude/skills/specnaut/phases/ .claude/skills/task/phases/ | grep -qE "^(brainstorm|specify|clarify|analyze|checklist|list-skills|lite-heuristic)\.md$"'
 check "tasks.md is folded into implement, not scaffolded (spec 041)" \
   '[ ! -e .claude/skills/task/phases/tasks.md ]'
-check "phase doc audit.md scaffolded, and routed by the /task router (spec 037)" \
-  '[ -f .claude/skills/task/phases/audit.md ] && grep -qF "phases/audit.md" .claude/skills/task/SKILL.md'
+check "phase doc audit.md scaffolded, routed by the /task router with --scan (spec 037, #747)" \
+  '[ -f .claude/skills/task/phases/audit.md ] && grep -qF "phases/audit.md" .claude/skills/task/SKILL.md && grep -qF -- "audit [--scan" .claude/skills/task/SKILL.md'
 check "phase doc doc.md scaffolded, and routed by the /specnaut router (spec 037)" \
   '[ -f .claude/skills/specnaut/phases/doc.md ] && grep -qF "phases/doc.md" .claude/skills/specnaut/SKILL.md'
 check "phase doc list.md scaffolded, and routed by the /specnaut router (spec 037)" \

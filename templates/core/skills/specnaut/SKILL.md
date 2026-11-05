@@ -62,7 +62,7 @@ someone following an instruction written before the move, which is exactly who a
 | `/specnaut review` | `/task review` |
 | `/specnaut merge` | `/task merge` |
 | `/specnaut constitution` | `/task constitution` |
-| `/specnaut audit` (any axis or spelling) | `/task audit` (`--security`, `--archi`, `--perf`, `--a11y`, `--deps`) |
+| `/specnaut audit` (any axis or spelling) | `/task audit` (`--security`, `--archi`, `--perf`, `--a11y`, `--deps`, `--scan`) |
 | `/specnaut tag-version` | `/ship tag` |
 | `/specnaut release-version` | `/ship release` |
 | `/board` | `/task` (`list`, `next`, `add`, `close`, `groom`, …) |

@@ -1,3 +1,4 @@
 file none 600 config
-function 30 50 default
+function 20 50 default
+class 100 200 default
 constitution none none config

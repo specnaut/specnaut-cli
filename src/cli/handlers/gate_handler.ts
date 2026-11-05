@@ -1,7 +1,6 @@
-// `specnaut gate <status|raise|cancel>` (#358) — the non-interactive bridge a
-// skill phase uses to raise a remote-control gate and block for a human's answer.
-// It wraps the agent-side gate session (#357); skill phases (clarify here,
-// plan/merge approval in #359) shell out to it instead of re-implementing HTTP.
+// `specnaut gate <status|raise|cancel>` (#358) — the non-interactive bridge a skill phase uses
+// to raise a remote-control gate and block for a human's answer. It wraps the agent-side gate
+// session (#357); skill phases (clarify here, plan/merge approval in #359) shell out to it.
 //
 //   status   exit 0 + {"enabled":true,...} when remote mode is on for the project;
 //            exit 2 when off, exit 5 when the project isn't Cloud-linked, exit 1 when
@@ -22,7 +21,8 @@ import {
   FsBacklogConfigStore,
 } from "../../infrastructure/fs_backlog_config_store.ts";
 import { InvalidApiUrl } from "../../domain/cloud/cloud_config.ts";
-import { REDIRECT_REFUSED, terminalJson } from "../../domain/cloud/cloud_wire.ts";
+import { REDIRECT_REFUSED } from "../../domain/cloud/cloud_wire.ts";
+import { terminalJson } from "../../domain/terminal_text.ts";
 import type { GateErrorReason } from "../../domain/cloud/gate_client.ts";
 import {
   GateSession,

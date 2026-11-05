@@ -33,3 +33,9 @@ specnaut reconcile --status --accept-upstream
 specnaut reconcile a.md --accept-upstream --accept-current
 specnaut reconcile --accept-upstream
 specnaut reconcile a.md b.md --accept-current
+# scan refusals: every one is parse-time, before the handler runs git.
+specnaut scan extra
+specnaut scan --format bogus
+specnaut scan --top -1
+specnaut scan --path ../x
+specnaut scan --path /etc

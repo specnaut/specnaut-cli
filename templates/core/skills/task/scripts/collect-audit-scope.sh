@@ -18,6 +18,8 @@
 #
 # Contract: .specnaut/specs/013-code-audit/contracts/scope-signals.md
 set -euo pipefail
+# Unvetted repository: no fsmonitor, pager or signature program it names runs; a path is literal.
+git() { command git --no-pager --literal-pathspecs -c core.fsmonitor=false -c log.showSignature=false "$@"; }
 
 PATH_ARG=""
 RANGE_ARG=""
@@ -25,8 +27,7 @@ LAST_N=20
 
 usage() {
   echo "usage: collect-audit-scope.sh [--path <subtree> | --range <a>..<b>] [--last <n>]" >&2
-  # Known limitation: the --range allowlist excludes '{' '}', so stash refs of
-  # the form 'stash@{N}' are not accepted as range endpoints.
+  # Known limitation: the --range allowlist excludes '{' '}', so no stash@{N}.
   echo "note: stash refs (stash@{N}) are not valid --range endpoints" >&2
 }
 
@@ -156,8 +157,7 @@ classify_files() {
   done <<EOF
 $list
 EOF
-  # A trailing non-match leaves $? non-zero; return 0 so `set -e` doesn't abort
-  # (the function's job is to set the four counters, not to report a status).
+  # A trailing non-match leaves $? non-zero; the job is the counters, not a status.
   return 0
 }
 

@@ -46,8 +46,9 @@ than scaffolded — judge from the axes below, downgrade what you cannot cite, a
 at the top of your report. If a leaf contradicts this file, **the leaf wins**: it is the maintained
 source and this definition is a summary.
 
-**Size** is judged against `.specnaut/memory/size-limits.md` only — thresholds from the
-constitution, severity from that file's table, never a number of your own. Name the limit and its
+**Size** is judged against `.specnaut/memory/size-limits.md` only — thresholds from
+`.specnaut/size-limits.yml` or that file's defaults, severity from that file's table, never a number
+of your own. Name the limit and its
 source, and sketch the split.
 
 ## Review — a diff

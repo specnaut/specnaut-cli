@@ -4,9 +4,8 @@ import { CONSTITUTION_PATH, SIZE_LIMITS_CONFIG_PATH } from "../domain/constituti
 import {
   constitutionCeilingNote,
   constitutionOverCeiling,
-  sizeConfigFromEntry,
-  sizeConfigUnreadableNote,
-} from "../domain/size_limits.ts";
+} from "../domain/constitution_ceiling.ts";
+import { sizeConfigFromEntry, sizeConfigUnreadableNote } from "../domain/size_limits.ts";
 import { DenoFsReader } from "./fs_reader.ts";
 
 /**

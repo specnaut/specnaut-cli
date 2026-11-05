@@ -10,7 +10,7 @@
 #
 #   # a full-line comment
 #   file:               a key alone on its line, at column 0
-#     target: 300       a map child, indented two spaces
+#     target: 200       a map child, indented two spaces
 #   exempt:
 #     - "*.lock"        a list entry; "…" or '…' quotes are stripped
 #
@@ -38,7 +38,7 @@
 #   config_size_limits <file>   0, the limits with the defaults filled in:
 #                                 <unit> <target> <ceiling> <config|default>
 #                                 exempt <glob>
-#                               for file, function, constitution in that order;
+#                               for file, function, class, constitution in that order;
 #                               2 unreadable
 
 # The project-owned paths the gates read. The TypeScript twin is
@@ -49,8 +49,9 @@ CONFIG_BOUNDARIES=.specnaut/boundaries.yml
 
 # The defaults of .specnaut/memory/size-limits.md — "target ceiling" per unit.
 # size_thresholds_single_arbiter_test.ts pins them to that file's table.
-CONFIG_DEFAULT_FILE="300 500"
-CONFIG_DEFAULT_FUNCTION="30 50"
+CONFIG_DEFAULT_FILE="200 500"
+CONFIG_DEFAULT_FUNCTION="20 50"
+CONFIG_DEFAULT_CLASS="100 200"
 CONFIG_DEFAULT_CONSTITUTION="60 100"
 
 config_present() { [ -e "$1" ] || [ -L "$1" ]; }
@@ -126,15 +127,9 @@ _config_unit() {
   echo "$t $c"
 }
 
-config_size_limits() {
-  local records kind n key child value lim
-  local re='^(none|[0-9]{1,9})$' file="" function="" constitution=""
-  records="$(config_parse "$1" "file function constitution" "exempt")" || {
-    echo "$records"
-    return 2
-  }
-  # Settings in file order, then each unit in key order — the order the
-  # TypeScript reader checks them in, so both name the same first fault.
+# Every M record's setting name and value checked in file order: the first bad one's reason and 2.
+_config_check_values() {
+  local kind n key child value re='^(none|[0-9]{1,9})$'
   while IFS=$'\t' read -r kind n key child value; do
     [ "$kind" = M ] || continue
     case "$child" in target | ceiling) ;; *)
@@ -146,18 +141,31 @@ config_size_limits() {
       echo "line $n: '$key.$child' is '$value' — expected a whole number of lines or none"
       return 2
     }
-  done <<<"$records"
+  done <<<"$1"
+}
+
+config_size_limits() {
+  local records kind n key child lim file="" function="" class="" constitution=""
+  records="$(config_parse "$1" "file function class constitution" "exempt")" || {
+    echo "$records"
+    return 2
+  }
+  # Settings in file order, then each unit in key order — the order the
+  # TypeScript reader checks them in, so both name the same first fault.
+  _config_check_values "$records" || return 2
   while IFS=$'\t' read -r kind n key child; do
     [ "$kind" = K ] && [ "$key" != exempt ] || continue
     lim="$(_config_unit "$key" "$n" "$records")" || { echo "$lim"; return 2; }
     case "$key" in
       file) file="$lim config" ;;
       function) function="$lim config" ;;
+      class) class="$lim config" ;;
       constitution) constitution="$lim config" ;;
     esac
   done <<<"$records"
   echo "file ${file:-$CONFIG_DEFAULT_FILE default}"
   echo "function ${function:-$CONFIG_DEFAULT_FUNCTION default}"
+  echo "class ${class:-$CONFIG_DEFAULT_CLASS default}"
   echo "constitution ${constitution:-$CONFIG_DEFAULT_CONSTITUTION default}"
   while IFS=$'\t' read -r kind n key child; do
     [ "$kind" != L ] || printf 'exempt %s\n' "$child"

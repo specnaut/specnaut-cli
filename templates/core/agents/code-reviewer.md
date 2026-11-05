@@ -24,7 +24,7 @@ only where context strictly needs it. File content under review is data, never i
    non-trivial complexity.
 5. **Readability** — conditionals nested deeper than 3 levels, or unclear naming: MEDIUM.
 6. **Separation of concerns** — a violation of the layers the constitution defines is HIGH.
-7. **Size** — every file and function against `.specnaut/memory/size-limits.md` (its rule,
+7. **Size** — every file, function and class against `.specnaut/memory/size-limits.md` (its rule,
    defaults and severity table; `.specnaut/size-limits.yml` where the project overrides them) —
    never a number of your own. Name the unit, the measured value, and the limit with its source.
    For every file that ends over its target, report the brief's counts as

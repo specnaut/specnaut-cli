@@ -5,6 +5,9 @@ file:
 function:
   target: 25
   ceiling: 40
+class:
+  target: 90
+  ceiling: 180
 constitution:
   target: 80
   ceiling: 120

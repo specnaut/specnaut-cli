@@ -36,7 +36,7 @@ check "and writes no .specnaut/memory/constitution.md" '[ ! -e .specnaut/memory/
 check "size limits: the bootstrap constitution carries no size table (spec 038)" \
   '! grep -qi "^## Size limits" docs/constitution.md'
 check "size limits: the one rule and the defaults are scaffolded (#645)" \
-  'grep -q "^## Where the numbers come from" .specnaut/memory/size-limits.md && grep -q "^| file | 300 | 500 |" .specnaut/memory/size-limits.md'
+  'grep -q "^## Where the numbers come from" .specnaut/memory/size-limits.md && grep -q "^| file | 200 | 500 |" .specnaut/memory/size-limits.md'
 
 echo
 echo "═══ #651 + spec 038  size-ratchet.sh reads .specnaut/size-limits.yml (_config.sh) ═══"

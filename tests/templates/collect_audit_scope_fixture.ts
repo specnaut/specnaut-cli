@@ -21,33 +21,47 @@ async function run(
   args: string[],
   cwd: string,
   env: Record<string, string> = {},
+  stdin?: string,
 ): Promise<{ code: number; stdout: string; stderr: string }> {
-  const out = await new Deno.Command(cmd, {
+  const child = new Deno.Command(cmd, {
     args,
     cwd,
+    stdin: stdin === undefined ? "null" : "piped",
     stdout: "piped",
     stderr: "piped",
     env: { ...env },
-  }).output();
-  return {
-    code: out.code,
-    stdout: new TextDecoder().decode(out.stdout),
-    stderr: new TextDecoder().decode(out.stderr),
-  };
+  }).spawn();
+  if (stdin !== undefined) await writeStdin(child, stdin);
+  const out = await child.output();
+  const d = new TextDecoder();
+  return { code: out.code, stdout: d.decode(out.stdout), stderr: d.decode(out.stderr) };
 }
 
-/** git with deterministic identity + no global config bleed-through. */
-export async function git(args: string[], cwd: string): Promise<void> {
-  const r = await run("git", args, cwd, {
+async function writeStdin(child: Deno.ChildProcess, text: string): Promise<void> {
+  const writer = child.stdin.getWriter();
+  await writer.write(new TextEncoder().encode(text));
+  await writer.close();
+}
+
+/** git with deterministic identity + no global config bleed-through; never throws. */
+export function gitRun(args: string[], cwd: string, stdin?: string) {
+  const env = {
     GIT_AUTHOR_NAME: "Test",
     GIT_AUTHOR_EMAIL: "test@example.com",
     GIT_COMMITTER_NAME: "Test",
     GIT_COMMITTER_EMAIL: "test@example.com",
     HOME: cwd,
-  });
+  };
+  return run("git", args, cwd, env, stdin);
+}
+
+/** `gitRun`, its stdout, or a throw naming git's error. */
+export async function git(args: string[], cwd: string, stdin?: string): Promise<string> {
+  const r = await gitRun(args, cwd, stdin);
   if (r.code !== 0) {
     throw new Error(`git ${args.join(" ")} failed: ${r.stderr}`);
   }
+  return r.stdout;
 }
 
 /** Builds a temp git repo with a frontend file, a backend file, and a deno.json. */

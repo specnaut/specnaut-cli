@@ -3,13 +3,11 @@ import {
   clamp,
   cleanText,
   cloudFetch,
-  hasControl,
   isRedirectStatus,
   isUnavailableStatus,
   jsonObject,
   readJson,
   strField,
-  terminalJson,
 } from "../../src/domain/cloud/cloud_wire.ts";
 
 Deno.test("isUnavailableStatus: no connection and 5xx only", () => {
@@ -61,17 +59,4 @@ Deno.test("cleanText and strField: no control character reaches a terminal, C1 i
 
 Deno.test("clamp: into the range, NaN to the floor", () => {
   assertEquals([clamp(1, 5, 9), clamp(7, 5, 9), clamp(99, 5, 9), clamp(NaN, 5, 9)], [5, 7, 9, 5]);
-});
-
-Deno.test("terminalJson: the same value when read back", () => {
-  const value = { text: "a\x7f\x9b\x1bb é" };
-  const json = terminalJson(value);
-  // deno-lint-ignore no-control-regex
-  assertEquals(/[\x00-\x1f\x7f-\x9f]/.test(json), false, json);
-  assertEquals(JSON.parse(json), value);
-});
-
-Deno.test("hasControl: a token's own characters pass", () => {
-  assertEquals(hasControl("sfc_abc-1.2~3+4/5=6"), false);
-  for (const v of ["a\x1bb", "a\nb", "a\x7fb", "a\x9bb"]) assertEquals(hasControl(v), true);
 });

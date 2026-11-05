@@ -73,5 +73,8 @@ check "collect-audit-scope.sh installs executable where audit.md runs it" \
   '[ -x .specnaut/scripts/audit/collect-audit-scope.sh ] &&
    grep -qF ".specnaut/scripts/audit/collect-audit-scope.sh" .claude/skills/task/phases/audit.md &&
    [ ! -e .specnaut/scripts/code-audit ]'
+check "audit.md maps the repository with specnaut scan; --scan takes no axis flag (#747)" \
+  'grep -qF "specnaut scan --format json" .claude/skills/task/phases/audit.md &&
+   grep -qF -- "[--scan | [--security]" .claude/skills/task/phases/audit.md'
 
 finish "TASK"

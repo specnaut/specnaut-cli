@@ -24,7 +24,7 @@ merge: manual)
 - `/task implement` — the developer builds the plan, then the review runs
 - `/task review` — architecture + quality gates
 - `/task merge` — merge the feature branch to main
-- `/specnaut-task` — the backlog, the pipeline above, and audits (`audit --security|--archi|…`)
+- `/specnaut-task` — the backlog, the pipeline above, and audits (`audit --security|--archi|…`, `audit --scan` for the size map alone)
 
 ## Agent roles (invocable manually as skills)
 

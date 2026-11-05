@@ -58,6 +58,26 @@ Deno.test("a customised table carries only what differs, and reads back as writt
   }
 });
 
+Deno.test("the migration reads the old ratchet's units, whatever the config takes today", () => {
+  // `Classs` tells the frozen list from the live one in the loose-spelling rule: that rule
+  // strips one `s`, so `class` and `Class` read as `clas` and meet neither list.
+  for (const unit of ["class", "Class", "classes", "Classs", "component"]) {
+    const r = extractLegacySizeLimits(table(`| file | 250 | 400 |\n| ${unit} | 9 | 9 |`));
+    assertEquals(content(r), "file:\n  target: 250\n  ceiling: 400\n", unit);
+    assertEquals(r.kind === "extract" ? r.dropped : [], [unit]);
+  }
+});
+
+Deno.test("the migration reads the old defaults: today's are a customisation back then", () => {
+  // A vanilla row pinned into the config would hold that project to the old limit for good.
+  assertEquals(extractLegacySizeLimits(table("| file | 300 | 500 |")), { kind: "none" });
+  assertEquals(extractLegacySizeLimits(table("| function | 30 | 50 |")), { kind: "none" });
+  assertEquals(
+    content(extractLegacySizeLimits(table("| file | 200 | 500 |\n| function | 20 | 50 |"))),
+    "file:\n  target: 200\n  ceiling: 500\nfunction:\n  target: 20\n  ceiling: 50\n",
+  );
+});
+
 Deno.test("an exempt line alone is a customisation", () => {
   assertEquals(
     content(extractLegacySizeLimits(table(DEFAULT_ROWS, "Exempt: `vendor/**`"))),
