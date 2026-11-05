@@ -1,6 +1,7 @@
 import type { FsReader, FsWriter } from "./ports.ts";
 import type { Bundle } from "../domain/template.ts";
 import { mergeRefusal } from "../domain/merge_block.ts";
+import { PathRefusal } from "./path_refusal.ts";
 import { executeConstitutionMove } from "./upgrade_constitution_move.ts";
 
 /** The ports init's filter reads through; `writer` and `dryRun` serve the constitution move. */
@@ -81,8 +82,12 @@ export async function filterInitBundle(
  * the user with the defect and no idea the fix had been withheld (cli#599).
  *
  * The reader says "nothing there" itself — even for a target directory that
- * does not exist yet — so a throw is a host that is there and cannot be read:
- * it is refused, never merged blind, and never the thing that makes init fail.
+ * does not exist yet — so a throw is a host that is there and cannot be read,
+ * or a path the reader refused: held back either way, never merged blind, and
+ * never the thing that makes init fail. A refusal is worded as one, without
+ * "make it readable": on a link out of the project, an agent could act on that
+ * by copying the target in. `readText` throws the filesystem's error raw, so
+ * "cannot be read" is everything else, not `ReadFault`, which is `readEntry`'s.
  */
 async function hostRefusal(
   reader: FsReader | undefined,
@@ -95,6 +100,9 @@ async function hostRefusal(
     return mergeRefusal(await reader.readText(targetDir, dest), file);
   } catch (err) {
     const why = err instanceof Error ? err.message : String(err);
+    if (err instanceof PathRefusal) {
+      return `${dest} was refused, so its block is not merged: ${why}`;
+    }
     return `${dest} cannot be read (${why}), so its block is not merged — make it readable and run again`;
   }
 }

@@ -1,6 +1,7 @@
 import { basename, dirname, isAbsolute, join, parse, relative, SEPARATOR } from "@std/path";
 import { isInside } from "../domain/template.ts";
 import {
+  DeniedLandingError,
   resolveDeepestExisting,
   resolveTarget,
   UnwalkableLinkError,
@@ -86,7 +87,8 @@ const UNREACHABLE = [
  * that is inside the project.
  *
  *  - `inside` / `leaves` carry where it resolved, so a caller that reports a
- *    link's landing need not resolve it a second time;
+ *    link's landing need not resolve it a second time. `leaves` includes a link
+ *    the process may not follow to its end, once it has left: where it stopped;
  *  - `unwalkable` carries the directory that does not exist (`walkLinkText`);
  *  - `loop` is a cycle, or a chain past the hop cap.
  *
@@ -123,6 +125,9 @@ export async function locate(root: string, abs: string, judged: Judged): Promise
   } catch (err) {
     if (err instanceof UnwalkableLinkError) return { kind: "unwalkable", missing: err.missing };
     if (err instanceof Deno.errors.FilesystemLoop) return { kind: "loop" };
+    if (err instanceof DeniedLandingError && !isInside(root, err.at)) {
+      return { kind: "leaves", resolved: err.at };
+    }
     throw err;
   }
   return isInside(root, resolved) ? { kind: "inside", resolved } : { kind: "leaves", resolved };

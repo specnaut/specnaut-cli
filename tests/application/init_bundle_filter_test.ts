@@ -1,5 +1,6 @@
 import { assert, assertEquals, assertStringIncludes } from "@std/assert";
 import { filterInitBundle } from "../../src/application/init_bundle_filter.ts";
+import { PathRefusal } from "../../src/application/path_refusal.ts";
 import { ReadFault } from "../../src/application/read_fault.ts";
 import type { FsReader } from "../../src/application/ports.ts";
 import type { Bundle } from "../../src/domain/template.ts";
@@ -52,18 +53,21 @@ Deno.test("a host file that can take the block is merged into", async () => {
   assertEquals(r.refusals, []);
 });
 
-/** A reader whose every read of `rel` (or of every path, without one) fails with `err`. */
-const failing = (err: Error, rel?: string, files: Record<string, string> = {}): FsReader => {
-  const base = fakeReader(files);
-  const fail = (r: string) => rel === undefined || r === rel;
+/**
+ * A reader that fails at `rel` as the real one does: a refusal from both reads,
+ * and a filesystem error raw from `readText`, wrapped as a `ReadFault` by
+ * `readEntry` alone (cli#704).
+ */
+const failing = (err: Error, rel: string): FsReader => {
+  const base = fakeReader({});
+  const asEntry = err instanceof PathRefusal ? err : new ReadFault(err.message, { cause: err });
   return {
-    readText: (d, r) => fail(r) ? Promise.reject(err) : base.readText(d, r),
-    readEntry: (d, r) => fail(r) ? Promise.reject(err) : base.readEntry(d, r),
+    readText: (d, r) => r === rel ? Promise.reject(err) : base.readText(d, r),
+    readEntry: (d, r) => r === rel ? Promise.reject(asEntry) : base.readEntry(d, r),
     listFiles: base.listFiles,
   };
 };
-/** What the real reader throws for a file it may not read (cli#704). */
-const denied = () => new ReadFault("Permission denied (os error 13)");
+const denied = () => new Deno.errors.PermissionDenied("Permission denied (os error 13)");
 
 Deno.test("no reader, or nothing on disk yet, refuses nothing", async () => {
   // The reader says "nothing there" for a target directory not created yet.
@@ -131,4 +135,21 @@ Deno.test("a merge host that cannot be read is refused, not merged blind", async
   assertEquals(Object.keys(r.bundleToWrite), ["a.md", "kept.md"]);
   assertEquals(r.refusals.length, 1);
   assertStringIncludes(r.refusals[0], "config.toml cannot be read");
+});
+
+Deno.test("a merge host the reader refused says so, and is not told to be made readable", async () => {
+  const leaves = "refusing to touch a path that leaves the project";
+  const r = await filterInitBundle(
+    io(failing(new PathRefusal(leaves), "config.toml")),
+    "/p",
+    bundle,
+    new Set(),
+  );
+  // Held back like an unreadable host: the refusal changes the words, not the outcome.
+  assertEquals(Object.keys(r.bundleToWrite), ["a.md", "kept.md"]);
+  assertEquals(r.refusals.length, 1);
+  assertStringIncludes(r.refusals[0], "config.toml was refused");
+  assertStringIncludes(r.refusals[0], leaves);
+  assert(!r.refusals[0].includes("cannot be read"), r.refusals[0]);
+  assert(!r.refusals[0].includes("make it readable"), r.refusals[0]);
 });

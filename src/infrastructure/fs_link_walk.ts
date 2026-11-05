@@ -49,6 +49,7 @@ export async function walkLinkText(dir: string, text: string): Promise<string> {
     try {
       cur = await Deno.realPath(next);
     } catch (err) {
+      if (err instanceof Deno.errors.PermissionDenied) throw new DeniedLandingError(next, err);
       if (!(err instanceof Deno.errors.NotFound)) throw err;
       throw new UnwalkableLinkError(next);
     }
@@ -61,6 +62,19 @@ export class UnwalkableLinkError extends Error {
   constructor(readonly missing: string) {
     super(`a symlink's text passes through ${missing}, which does not exist`);
     this.name = "UnwalkableLinkError";
+  }
+}
+
+/**
+ * A followed link led to `at`, and this process may not go further. Still a
+ * `PermissionDenied`, so a caller that reads the permission reads it as before;
+ * `locate` also asks where `at` is, because outside the project this is no
+ * permission to fix but a link that leaves (cli#719).
+ */
+export class DeniedLandingError extends Deno.errors.PermissionDenied {
+  constructor(readonly at: string, cause: unknown) {
+    super(`permission denied following a link, at ${at}`, { cause });
+    this.name = "DeniedLandingError";
   }
 }
 
@@ -157,6 +171,9 @@ export async function resolveTarget(abs: string): Promise<string> {
     try {
       info = await Deno.lstat(cur);
     } catch (err) {
+      if (hops > 0 && err instanceof Deno.errors.PermissionDenied) {
+        throw new DeniedLandingError(cur, err);
+      }
       if (!(err instanceof Deno.errors.NotFound)) throw err;
       info = null;
     }

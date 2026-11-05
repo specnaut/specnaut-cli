@@ -111,11 +111,13 @@ Deno.test("the legacy constitution leaves the bundle and the lock in every mode 
 });
 
 Deno.test("an unreadable constitution, at either address, is refused — never an abort", async () => {
+  // As the real reader fails: raw from `readText`, a `ReadFault` from `readEntry` alone.
+  const raw = () => Promise.reject(new Deno.errors.PermissionDenied("Permission denied"));
   const denied = () => Promise.reject(new ReadFault("Permission denied"));
   for (const unreadable of [LEGACY_CONSTITUTION_PATH, CONSTITUTION_PATH]) {
     const base = fakeReader({ [LEGACY_CONSTITUTION_PATH]: "ours", "a.md": "alpha" });
     const reader: FsReader = {
-      readText: (d, r) => r === unreadable ? denied() : base.readText(d, r),
+      readText: (d, r) => r === unreadable ? raw() : base.readText(d, r),
       readEntry: (d, r) => r === unreadable ? denied() : base.readEntry(d, r),
       listFiles: base.listFiles,
     };
