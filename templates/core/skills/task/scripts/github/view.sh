@@ -16,12 +16,13 @@ if [ "$#" -lt 1 ]; then
   echo "usage: $0 <number>" >&2
   exit 2
 fi
+NUM=$(require_issue_number "$1") || exit 2
 
-gh issue view "$1" --repo "$REPO" --json createdAt --jq '"created:\t" + .createdAt'
+gh issue view "$NUM" --repo "$REPO" --json createdAt --jq '"created:\t" + .createdAt'
 
 if [ -t 1 ]; then
-  gh issue view "$1" --repo "$REPO" --comments
+  gh issue view "$NUM" --repo "$REPO" --comments
 else
-  gh issue view "$1" --repo "$REPO"
-  gh issue view "$1" --repo "$REPO" --comments
+  gh issue view "$NUM" --repo "$REPO"
+  gh issue view "$NUM" --repo "$REPO" --comments
 fi

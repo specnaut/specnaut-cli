@@ -2,13 +2,15 @@
 # Print one backlog item by number.
 set -euo pipefail
 
+# shellcheck source=./_config.sh
+. "$(dirname "$0")/_config.sh"
+
 if [ "$#" -lt 1 ]; then
   echo "usage: $0 <number>" >&2
   exit 2
 fi
-NUM=$(printf "%03d" "$1" 2>/dev/null || echo "$1")
-ROOT="$(cd "$(dirname "$0")/../../.." && pwd)"
-BACKLOG_DIR="$ROOT/.specnaut/backlog"
+NUM=$(require_issue_number "$1") || exit 2
+NUM=$(printf "%03d" "$NUM")
 
 shopt -s nullglob
 matches=("$BACKLOG_DIR/$NUM-"*.md)

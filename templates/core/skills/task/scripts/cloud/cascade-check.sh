@@ -28,10 +28,7 @@ if [ "$#" -lt 1 ]; then
   echo 'usage: cascade-check.sh <task-number>' >&2
   exit 2
 fi
-NUM="$1"
-case "$NUM" in
-  '' | *[!0-9]*) echo "not a task number: '$NUM'" >&2; exit 2 ;;
-esac
+NUM=$(require_issue_number "$1") || exit 2
 
 rc=0
 COLS=$(cloud_curl "$API_BASE/columns?projectKey=$PROJECT_KEY") || rc=$?

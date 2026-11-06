@@ -18,10 +18,7 @@ if [ "$#" -lt 1 ]; then
   echo 'usage: cascade-check.sh <task-number>' >&2
   exit 2
 fi
-NUM="$1"
-case "$NUM" in
-  '' | *[!0-9]*) echo "not a task number: '$NUM'" >&2; exit 2 ;;
-esac
+NUM=$(require_issue_number "$1") || exit 2
 
 # Read one frontmatter scalar from a task file.
 _fm() {

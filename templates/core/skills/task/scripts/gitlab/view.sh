@@ -10,5 +10,6 @@ if [ "$#" -lt 1 ]; then
   echo "usage: $0 <number>" >&2
   exit 2
 fi
+NUM=$(require_issue_number "$1") || exit 2
 
-glab issue view "$1" --repo "$PROJECT_ID" --comments
+glab issue view "$NUM" --repo "$PROJECT_ID" --comments

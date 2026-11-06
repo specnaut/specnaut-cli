@@ -13,8 +13,11 @@ if [ "$#" -lt 2 ] || [ "$#" -gt 3 ]; then
   echo '  Status one of: Backlog, Ready, "In progress", "In review", Done' >&2
   exit 2
 fi
-# Decimal, never octal: printf reads `012` as 10, which would move #010.
-case $1 in '' | *[!0-9]*) NUM=$1 ;; *) NUM=$(printf "%03d" "$((10#$1))") ;; esac
+# shellcheck source=./_config.sh
+. "$(dirname "$0")/_config.sh"
+# Decimal, never octal: require_issue_number drops the padding printf would read as octal.
+NUM=$(require_issue_number "$1") || exit 2
+NUM=$(printf "%03d" "$NUM")
 STATUS="$2"
 RESOLUTION=""
 
@@ -33,8 +36,6 @@ if [ "$#" -eq 3 ]; then
   RESOLUTION=not-planned
 fi
 
-ROOT="$(cd "$(dirname "$0")/../../.." && pwd)"
-BACKLOG_DIR="$ROOT/.specnaut/backlog"
 RENDER="$(dirname "$0")/render-index.sh"
 
 shopt -s nullglob

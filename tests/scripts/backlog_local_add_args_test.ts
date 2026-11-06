@@ -16,7 +16,7 @@ async function sandbox(): Promise<{ root: string; add: string }> {
   const root = await Deno.makeTempDir({ prefix: "backlog-local-add-" });
   const scripts = join(root, ".specnaut", "scripts", "backlog");
   await Deno.mkdir(scripts, { recursive: true });
-  for (const name of ["add.sh", "render-index.sh"]) {
+  for (const name of ["_config.sh", "add.sh", "render-index.sh"]) {
     await Deno.copyFile(
       fromFileUrl(new URL(`${LOCAL}/${name}`, import.meta.url)),
       join(scripts, name),

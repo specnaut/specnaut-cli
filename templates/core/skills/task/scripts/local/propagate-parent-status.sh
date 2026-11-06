@@ -59,9 +59,11 @@ if [ "$NEW_STATUS" = "Backlog" ]; then
 fi
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-# Deployed layout: <root>/.specnaut/scripts/backlog/<this>.sh — up 3.
-ROOT="$(cd "$SCRIPT_DIR/../../.." && pwd)"
-BACKLOG_DIR="$ROOT/.specnaut/backlog"
+# Deployed layout: <root>/.specnaut/scripts/backlog/<this>.sh — ROOT and
+# BACKLOG_DIR from _config.sh, whose `set -e` this always-0 script turns off.
+# shellcheck source=./_config.sh
+. "$SCRIPT_DIR/_config.sh" || exit 0
+set +e
 
 if [ ! -d "$BACKLOG_DIR" ]; then
   echo "::warning::propagate-parent-status: backlog dir not found at $BACKLOG_DIR — skipping" >&2
@@ -69,7 +71,8 @@ if [ ! -d "$BACKLOG_DIR" ]; then
 fi
 
 # Find the child file (NNN-*.md).
-CHILD_PADDED=$(printf '%03d' "$((10#$CHILD))" 2>/dev/null || echo "$CHILD")
+CHILD=$(require_issue_number "$CHILD") || exit 0   # said why on stderr; never blocks the move
+CHILD_PADDED=$(printf '%03d' "$CHILD")
 shopt -s nullglob
 child_matches=("$BACKLOG_DIR/${CHILD_PADDED}-"*.md)
 if [ "${#child_matches[@]}" -eq 0 ]; then

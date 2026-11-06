@@ -30,6 +30,9 @@ if [ "$#" -lt 2 ]; then
 fi
 STATUS="$1"
 shift
+NUMS=()
+for n in "$@"; do n=$(require_issue_number "$n") || exit 2; NUMS+=("$n"); done
+set -- "${NUMS[@]}"
 
 PROJECT_NODE_ID=$(gh project view "$PROJECT_NUMBER" --owner "$REPO_OWNER" --format json | jq_lf -r '.id')
 STATUS_FIELD_JSON=$(gh project field-list "$PROJECT_NUMBER" --owner "$REPO_OWNER" --format json)

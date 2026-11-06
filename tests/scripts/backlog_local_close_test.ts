@@ -18,7 +18,7 @@ async function project(frontmatter = "status: Ready\n"): Promise<string> {
   const scripts = join(dir, ".specnaut/scripts/backlog");
   await Deno.mkdir(scripts, { recursive: true });
   await Deno.mkdir(join(dir, ".specnaut/backlog"), { recursive: true });
-  for (const name of ["move.sh", "render-index.sh"]) {
+  for (const name of ["_config.sh", "move.sh", "render-index.sh"]) {
     await Deno.copyFile(join(LOCAL, name), join(scripts, name));
   }
   await Deno.writeTextFile(

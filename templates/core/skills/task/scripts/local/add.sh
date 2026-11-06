@@ -5,15 +5,18 @@
 # the parent file under a `## Sub-tasks` section).
 #
 # Usage:
-#   add.sh "<title>" [body] [--parent <num>]
+#   add.sh "<title>" [body] [--parent <num>] [--body-file <path>]
+#
+# `--body-file` reads the body from a file, in place of the positional one.
 #
 # No labels argument: the task file has no labels field, so a third positional
 # is refused rather than dropped — the other backends take one, and a caller
 # that passed it must not believe it was recorded (cli#697).
 set -euo pipefail
 
-USAGE='usage: add.sh "<title>" [body] [--parent <num>]'
+USAGE='usage: add.sh "<title>" [body] [--parent <num>] [--body-file <path>]'
 PARENT=""
+BODY_FILE=""
 ARGS=()
 while [ $# -gt 0 ]; do
   case "$1" in
@@ -27,6 +30,11 @@ while [ $# -gt 0 ]; do
         exit 2
       fi
       PARENT="$2"
+      shift 2
+      ;;
+    --body-file)
+      [ $# -ge 2 ] && [ -f "$2" ] || { echo "add.sh: --body-file needs a file" >&2; exit 2; }
+      BODY_FILE="$2"
       shift 2
       ;;
     --*)
@@ -52,10 +60,15 @@ if [ "${#ARGS[@]}" -gt 2 ]; then
 fi
 TITLE="${ARGS[0]}"
 BODY="${ARGS[1]:-}"
+if [ -n "$BODY_FILE" ] && [ -n "$BODY" ]; then
+  echo "add.sh: give a body or --body-file, not both" >&2
+  exit 2
+fi
 
-ROOT="$(cd "$(dirname "$0")/../../.." && pwd)"
-BACKLOG_DIR="$ROOT/.specnaut/backlog"
-INDEX="$ROOT/.specnaut/backlog.md"
+# shellcheck source=./_config.sh
+. "$(dirname "$0")/_config.sh"
+if [ -n "$PARENT" ]; then PARENT=$(require_issue_number "$PARENT") || exit 2; fi
+if [ -n "$BODY_FILE" ]; then BODY=$(cat -- "$BODY_FILE"); fi
 RENDER="$(dirname "$0")/render-index.sh"
 mkdir -p "$BACKLOG_DIR"
 

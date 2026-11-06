@@ -25,14 +25,11 @@ if [ "$#" -lt 1 ]; then
   echo 'usage: cascade-check.sh <issue-number>' >&2
   exit 2
 fi
-NUM="$1"
+NUM=$(require_issue_number "$1") || exit 2
 # A bad ARGUMENT is a usage error, and it used to reach the API as if it were
 # an issue number — where the failed lookup rendered it as exit 3, the code
 # that tells a caller the world was unreadable. Misuse and unreadability are
 # not the same event and must not share a code.
-case "$NUM" in
-  '' | *[!0-9]*) echo "not an issue number: '$NUM'" >&2; exit 2 ;;
-esac
 
 # Existence + state in one glab call, judged by its EXIT CODE. Mirrors the
 # GitHub backend so both variants share the exit-code contract (3 = unreadable,

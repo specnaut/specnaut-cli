@@ -26,10 +26,7 @@ if [ "$#" -lt 1 ]; then
   echo 'usage: parent-of.sh <issue-number>' >&2
   exit 2
 fi
-NUM="$1"
-case "$NUM" in
-  '' | *[!0-9]*) echo "not an issue number: '$NUM'" >&2; exit 2 ;;
-esac
+NUM=$(require_issue_number "$1") || exit 2
 
 # Existence and the parent link in one call.
 #

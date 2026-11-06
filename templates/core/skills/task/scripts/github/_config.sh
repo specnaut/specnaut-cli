@@ -56,32 +56,35 @@ REPO_NAME="${REPO##*/}"
 
 export REPO REPO_OWNER REPO_NAME PROJECT_NUMBER
 
-# Fail here, not four calls deeper.
+# require_issue_number <id> — <id> as a bare decimal issue number on stdout, or
+# a refusal on stderr and status 2. Every script that takes an id runs it first:
+# the id reaches a URL path, a query variable or a file glob, so it is digits
+# and nothing else — never a URL, an `@file` or query text. Zero padding is
+# dropped (`042` is 42, never octal). Every copy is the same text
+# (tests/scripts/backlog_issue_number_test.ts).
+require_issue_number() {
+  local n=${1:-}
+  n=${n#"${n%%[!0]*}"}
+  if [[ $n =~ ^[1-9][0-9]{0,9}$ ]]; then printf '%s\n' "$n"; return 0; fi
+  printf '%s: not an issue number: %q\n' "${0##*/}" "${1:-}" >&2
+  return 2
+}
+
+# Fail here, not four calls deeper. This config carries TWO addressing keys,
+# `repo:` and `project_number:`, and the read paths (`gh issue list` / `view`)
+# use only the first, so a wrong `project_number` leaves every visible command
+# working while every project WRITE is dead — and surfaces four calls inside a
+# mutation. So the number is checked once, when the config is read, and the
+# message says which project numbers DO exist for the owner.
 #
-# This config carries TWO independent addressing keys — `repo:` and
-# `project_number:` — and the read paths use only the first. `list.sh` and
-# `view.sh` go through `gh issue list` / `gh issue view`, which never touch the
-# project, so a wrong `project_number` leaves every visible command working
-# while every project WRITE is dead. Nothing says so until someone moves a
-# card, and by then the failure surfaces as a resolution error four calls
-# inside a mutation — the worst possible place to learn the config is wrong.
-#
-# So the number is checked once, when the config is read, and the message says
-# which project numbers DO exist for the owner.
-#
-# Exit 2 ONLY on proof. A failed `gh project view` is not proof: a rate limit,
-# a network error, a 5xx or a missing scope all fail it too — and a
-# rate-limited view has been seen to print `unknown owner type`, which names
-# nothing. Proof is a listing that SUCCEEDED and does not contain the number.
-# Every other outcome exits 13, "could not verify", with `gh`'s own stderr
-# quoted so the cause is named by the tool that saw it rather than guessed
-# from a list of error texts — a list that misreports every fault it omits,
-# which is how this guard came to call a rate limit a wrong project number.
-# 13 carries the meaning `set-field.sh` already gives it: retry or report,
-# never a fallback signal, never a reason to edit the config.
-#
-# The listing is asked for closed projects and far past `gh`'s default page
-# of 30: a number missing from a partial listing proves nothing either.
+# Exit 2 ONLY on proof: a listing that SUCCEEDED and does not contain the
+# number. A failed `gh project view` is not proof — a rate limit, a network
+# error, a 5xx or a missing scope fail it too, and a rate-limited view has
+# printed `unknown owner type`. Every other outcome exits 13, "could not
+# verify", quoting `gh`'s own stderr rather than guessing from error texts.
+# 13 means what it means in `set-field.sh`: retry or report, never a fallback
+# signal, never a reason to edit the config. The listing asks for closed
+# projects and far past `gh`'s page of 30: a partial listing proves nothing.
 #
 # Skipped when `gh` is absent or unauthenticated: this must not turn a missing
 # tool into a config error, and the callers report those separately.
@@ -94,12 +97,9 @@ require_project() {
     return 0
   fi
 
-  # The listing's exit status is captured APART from its output. An earlier
-  # version piped straight into `grep … || true`, which folded "the listing
-  # failed" and "the listing is empty" into the same empty string — so a
-  # rate-limited listing was reported as a scope problem, and either one as
-  # proof the project does not exist. stderr goes to a file because it has to
-  # be quoted separately from the JSON that is parsed.
+  # The listing's exit status is captured APART from its output: piped into
+  # `grep … || true`, "the listing failed" and "the listing is empty" read the
+  # same. stderr goes to a file: it is quoted apart from the JSON parsed.
   errfile="$(mktemp "${TMPDIR:-/tmp}/gh-project-list.XXXXXX")"
   list_rc=0
   list_out="$(gh project list --owner "$REPO_OWNER" --closed --limit 1000 \

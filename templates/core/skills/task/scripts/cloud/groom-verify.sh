@@ -71,6 +71,7 @@ record() {
 
 RECORDS=""
 for num in "${ITEMS[@]}"; do
+  num=$(require_issue_number "$num") || exit 2
   rec=$(record "$num") || { echo "groom-verify.sh: #$num could not be read from $PROJECT_KEY — nothing verified" >&2; exit 2; }
   RECORDS+="$rec"$'\n'
 done

@@ -6428,6 +6428,20 @@ INDEX="\$ROOT/.specnaut/backlog.md"
 
 export ROOT BACKLOG_DIR INDEX
 
+# require_issue_number <id> — <id> as a bare decimal issue number on stdout, or
+# a refusal on stderr and status 2. Every script that takes an id runs it first:
+# the id reaches a URL path, a query variable or a file glob, so it is digits
+# and nothing else — never a URL, an \`@file\` or query text. Zero padding is
+# dropped (\`042\` is 42, never octal). Every copy is the same text
+# (tests/scripts/backlog_issue_number_test.ts).
+require_issue_number() {
+  local n=\${1:-}
+  n=\${n#"\${n%%[!0]*}"}
+  if [[ \$n =~ ^[1-9][0-9]{0,9}\$ ]]; then printf '%s\\n' "\$n"; return 0; fi
+  printf '%s: not an issue number: %q\\n' "\${0##*/}" "\${1:-}" >&2
+  return 2
+}
+
 # A Markdown backlog has no browser URL, but it does have a file — so emit a
 # repo-relative path that a harness can open. Prints nothing when no task file
 # matches. Never fails: a reference must never block a workflow.
@@ -6487,13 +6501,15 @@ done
 # Print one backlog item by number.
 set -euo pipefail
 
+# shellcheck source=./_config.sh
+. "\$(dirname "\$0")/_config.sh"
+
 if [ "\$#" -lt 1 ]; then
   echo "usage: \$0 <number>" >&2
   exit 2
 fi
-NUM=\$(printf "%03d" "\$1" 2>/dev/null || echo "\$1")
-ROOT="\$(cd "\$(dirname "\$0")/../../.." && pwd)"
-BACKLOG_DIR="\$ROOT/.specnaut/backlog"
+NUM=\$(require_issue_number "\$1") || exit 2
+NUM=\$(printf "%03d" "\$NUM")
 
 shopt -s nullglob
 matches=("\$BACKLOG_DIR/\$NUM-"*.md)
@@ -6548,8 +6564,7 @@ while [ "\$#" -gt 0 ]; do
   case "\$1" in
     --ready) [ -n "\${2:-}" ] || usage; READY="\$2"; shift 2 ;;
     -h | --help) usage ;;
-    '' | *[!0-9]*) echo "groom-verify.sh: not an item number: '\$1'" >&2; usage ;;
-    *) ITEMS+=("\$1"); shift ;;
+    *) n=\$(require_issue_number "\$1") || usage; ITEMS+=("\$n"); shift ;;
   esac
 done
 [ "\${#ITEMS[@]}" -gt 0 ] || usage
@@ -6622,15 +6637,18 @@ exit "\$rc"
 # the parent file under a \`## Sub-tasks\` section).
 #
 # Usage:
-#   add.sh "<title>" [body] [--parent <num>]
+#   add.sh "<title>" [body] [--parent <num>] [--body-file <path>]
+#
+# \`--body-file\` reads the body from a file, in place of the positional one.
 #
 # No labels argument: the task file has no labels field, so a third positional
 # is refused rather than dropped — the other backends take one, and a caller
 # that passed it must not believe it was recorded (cli#697).
 set -euo pipefail
 
-USAGE='usage: add.sh "<title>" [body] [--parent <num>]'
+USAGE='usage: add.sh "<title>" [body] [--parent <num>] [--body-file <path>]'
 PARENT=""
+BODY_FILE=""
 ARGS=()
 while [ \$# -gt 0 ]; do
   case "\$1" in
@@ -6644,6 +6662,11 @@ while [ \$# -gt 0 ]; do
         exit 2
       fi
       PARENT="\$2"
+      shift 2
+      ;;
+    --body-file)
+      [ \$# -ge 2 ] && [ -f "\$2" ] || { echo "add.sh: --body-file needs a file" >&2; exit 2; }
+      BODY_FILE="\$2"
       shift 2
       ;;
     --*)
@@ -6669,10 +6692,15 @@ if [ "\${#ARGS[@]}" -gt 2 ]; then
 fi
 TITLE="\${ARGS[0]}"
 BODY="\${ARGS[1]:-}"
+if [ -n "\$BODY_FILE" ] && [ -n "\$BODY" ]; then
+  echo "add.sh: give a body or --body-file, not both" >&2
+  exit 2
+fi
 
-ROOT="\$(cd "\$(dirname "\$0")/../../.." && pwd)"
-BACKLOG_DIR="\$ROOT/.specnaut/backlog"
-INDEX="\$ROOT/.specnaut/backlog.md"
+# shellcheck source=./_config.sh
+. "\$(dirname "\$0")/_config.sh"
+if [ -n "\$PARENT" ]; then PARENT=\$(require_issue_number "\$PARENT") || exit 2; fi
+if [ -n "\$BODY_FILE" ]; then BODY=\$(cat -- "\$BODY_FILE"); fi
 RENDER="\$(dirname "\$0")/render-index.sh"
 mkdir -p "\$BACKLOG_DIR"
 
@@ -6775,8 +6803,11 @@ if [ "\$#" -lt 2 ] || [ "\$#" -gt 3 ]; then
   echo '  Status one of: Backlog, Ready, "In progress", "In review", Done' >&2
   exit 2
 fi
-# Decimal, never octal: printf reads \`012\` as 10, which would move #010.
-case \$1 in '' | *[!0-9]*) NUM=\$1 ;; *) NUM=\$(printf "%03d" "\$((10#\$1))") ;; esac
+# shellcheck source=./_config.sh
+. "\$(dirname "\$0")/_config.sh"
+# Decimal, never octal: require_issue_number drops the padding printf would read as octal.
+NUM=\$(require_issue_number "\$1") || exit 2
+NUM=\$(printf "%03d" "\$NUM")
 STATUS="\$2"
 RESOLUTION=""
 
@@ -6795,8 +6826,6 @@ if [ "\$#" -eq 3 ]; then
   RESOLUTION=not-planned
 fi
 
-ROOT="\$(cd "\$(dirname "\$0")/../../.." && pwd)"
-BACKLOG_DIR="\$ROOT/.specnaut/backlog"
 RENDER="\$(dirname "\$0")/render-index.sh"
 
 shopt -s nullglob
@@ -6848,17 +6877,26 @@ fi
     content: `#!/usr/bin/env bash
 # Append a clarification block to a backlog item file.
 # Usage: clarify-comment.sh <number> "<question>"
+#        clarify-comment.sh <number> --body-file <path>
+#
+# \`--body-file\` keeps the text off the caller's command line: the file is read
+# here and appended as it is.
 set -euo pipefail
 
+# shellcheck source=./_config.sh
+. "\$(dirname "\$0")/_config.sh"
+
 if [ "\$#" -lt 2 ]; then
-  echo 'usage: clarify-comment.sh <number> "<question>"' >&2
+  echo 'usage: clarify-comment.sh <number> "<question>" | <number> --body-file <path>' >&2
   exit 2
 fi
-NUM=\$(printf "%03d" "\$1" 2>/dev/null || echo "\$1")
+NUM=\$(require_issue_number "\$1") || exit 2
+NUM=\$(printf "%03d" "\$NUM")
 QUESTION="\$2"
-
-ROOT="\$(cd "\$(dirname "\$0")/../../.." && pwd)"
-BACKLOG_DIR="\$ROOT/.specnaut/backlog"
+if [ "\$2" = "--body-file" ]; then
+  [ "\$#" -eq 3 ] && [ -f "\$3" ] || { echo "clarify-comment.sh: --body-file needs a file" >&2; exit 2; }
+  QUESTION=\$(cat -- "\$3")
+fi
 
 shopt -s nullglob
 matches=("\$BACKLOG_DIR/\$NUM-"*.md)
@@ -6869,12 +6907,7 @@ fi
 FILE="\${matches[0]}"
 NOW=\$(date -u +%Y-%m-%dT%H:%M:%SZ)
 
-cat >> "\$FILE" <<EOF
-
-## Clarification (\$NOW)
-
-\$QUESTION
-EOF
+printf '\\n## Clarification (%s)\\n\\n%s\\n' "\$NOW" "\$QUESTION" >> "\$FILE"
 
 echo "✓ added clarification on #\$NUM"
 `,
@@ -7058,9 +7091,11 @@ if [ "\$NEW_STATUS" = "Backlog" ]; then
 fi
 
 SCRIPT_DIR="\$(cd "\$(dirname "\$0")" && pwd)"
-# Deployed layout: <root>/.specnaut/scripts/backlog/<this>.sh — up 3.
-ROOT="\$(cd "\$SCRIPT_DIR/../../.." && pwd)"
-BACKLOG_DIR="\$ROOT/.specnaut/backlog"
+# Deployed layout: <root>/.specnaut/scripts/backlog/<this>.sh — ROOT and
+# BACKLOG_DIR from _config.sh, whose \`set -e\` this always-0 script turns off.
+# shellcheck source=./_config.sh
+. "\$SCRIPT_DIR/_config.sh" || exit 0
+set +e
 
 if [ ! -d "\$BACKLOG_DIR" ]; then
   echo "::warning::propagate-parent-status: backlog dir not found at \$BACKLOG_DIR — skipping" >&2
@@ -7068,7 +7103,8 @@ if [ ! -d "\$BACKLOG_DIR" ]; then
 fi
 
 # Find the child file (NNN-*.md).
-CHILD_PADDED=\$(printf '%03d' "\$((10#\$CHILD))" 2>/dev/null || echo "\$CHILD")
+CHILD=\$(require_issue_number "\$CHILD") || exit 0   # said why on stderr; never blocks the move
+CHILD_PADDED=\$(printf '%03d' "\$CHILD")
 shopt -s nullglob
 child_matches=("\$BACKLOG_DIR/\${CHILD_PADDED}-"*.md)
 if [ "\${#child_matches[@]}" -eq 0 ]; then
@@ -7210,10 +7246,7 @@ if [ "\$#" -lt 1 ]; then
   echo 'usage: cascade-check.sh <task-number>' >&2
   exit 2
 fi
-NUM="\$1"
-case "\$NUM" in
-  '' | *[!0-9]*) echo "not a task number: '\$NUM'" >&2; exit 2 ;;
-esac
+NUM=\$(require_issue_number "\$1") || exit 2
 
 # Read one frontmatter scalar from a task file.
 _fm() {
@@ -7432,10 +7465,7 @@ if [ "\$#" -lt 1 ]; then
   echo 'usage: parent-of.sh <task-number>' >&2
   exit 2
 fi
-NUM="\$1"
-case "\$NUM" in
-  '' | *[!0-9]*) echo "not a task number: '\$NUM'" >&2; exit 2 ;;
-esac
+NUM=\$(require_issue_number "\$1") || exit 2
 
 # \`10#\` forces base 10. Without it \`printf '%03d' 011\` reads the argument
 # as OCTAL and yields 009 — a lookup for a different task, silently. A
@@ -7544,32 +7574,35 @@ REPO_NAME="\${REPO##*/}"
 
 export REPO REPO_OWNER REPO_NAME PROJECT_NUMBER
 
-# Fail here, not four calls deeper.
+# require_issue_number <id> — <id> as a bare decimal issue number on stdout, or
+# a refusal on stderr and status 2. Every script that takes an id runs it first:
+# the id reaches a URL path, a query variable or a file glob, so it is digits
+# and nothing else — never a URL, an \`@file\` or query text. Zero padding is
+# dropped (\`042\` is 42, never octal). Every copy is the same text
+# (tests/scripts/backlog_issue_number_test.ts).
+require_issue_number() {
+  local n=\${1:-}
+  n=\${n#"\${n%%[!0]*}"}
+  if [[ \$n =~ ^[1-9][0-9]{0,9}\$ ]]; then printf '%s\\n' "\$n"; return 0; fi
+  printf '%s: not an issue number: %q\\n' "\${0##*/}" "\${1:-}" >&2
+  return 2
+}
+
+# Fail here, not four calls deeper. This config carries TWO addressing keys,
+# \`repo:\` and \`project_number:\`, and the read paths (\`gh issue list\` / \`view\`)
+# use only the first, so a wrong \`project_number\` leaves every visible command
+# working while every project WRITE is dead — and surfaces four calls inside a
+# mutation. So the number is checked once, when the config is read, and the
+# message says which project numbers DO exist for the owner.
 #
-# This config carries TWO independent addressing keys — \`repo:\` and
-# \`project_number:\` — and the read paths use only the first. \`list.sh\` and
-# \`view.sh\` go through \`gh issue list\` / \`gh issue view\`, which never touch the
-# project, so a wrong \`project_number\` leaves every visible command working
-# while every project WRITE is dead. Nothing says so until someone moves a
-# card, and by then the failure surfaces as a resolution error four calls
-# inside a mutation — the worst possible place to learn the config is wrong.
-#
-# So the number is checked once, when the config is read, and the message says
-# which project numbers DO exist for the owner.
-#
-# Exit 2 ONLY on proof. A failed \`gh project view\` is not proof: a rate limit,
-# a network error, a 5xx or a missing scope all fail it too — and a
-# rate-limited view has been seen to print \`unknown owner type\`, which names
-# nothing. Proof is a listing that SUCCEEDED and does not contain the number.
-# Every other outcome exits 13, "could not verify", with \`gh\`'s own stderr
-# quoted so the cause is named by the tool that saw it rather than guessed
-# from a list of error texts — a list that misreports every fault it omits,
-# which is how this guard came to call a rate limit a wrong project number.
-# 13 carries the meaning \`set-field.sh\` already gives it: retry or report,
-# never a fallback signal, never a reason to edit the config.
-#
-# The listing is asked for closed projects and far past \`gh\`'s default page
-# of 30: a number missing from a partial listing proves nothing either.
+# Exit 2 ONLY on proof: a listing that SUCCEEDED and does not contain the
+# number. A failed \`gh project view\` is not proof — a rate limit, a network
+# error, a 5xx or a missing scope fail it too, and a rate-limited view has
+# printed \`unknown owner type\`. Every other outcome exits 13, "could not
+# verify", quoting \`gh\`'s own stderr rather than guessing from error texts.
+# 13 means what it means in \`set-field.sh\`: retry or report, never a fallback
+# signal, never a reason to edit the config. The listing asks for closed
+# projects and far past \`gh\`'s page of 30: a partial listing proves nothing.
 #
 # Skipped when \`gh\` is absent or unauthenticated: this must not turn a missing
 # tool into a config error, and the callers report those separately.
@@ -7582,12 +7615,9 @@ require_project() {
     return 0
   fi
 
-  # The listing's exit status is captured APART from its output. An earlier
-  # version piped straight into \`grep … || true\`, which folded "the listing
-  # failed" and "the listing is empty" into the same empty string — so a
-  # rate-limited listing was reported as a scope problem, and either one as
-  # proof the project does not exist. stderr goes to a file because it has to
-  # be quoted separately from the JSON that is parsed.
+  # The listing's exit status is captured APART from its output: piped into
+  # \`grep … || true\`, "the listing failed" and "the listing is empty" read the
+  # same. stderr goes to a file: it is quoted apart from the JSON parsed.
   errfile="\$(mktemp "\${TMPDIR:-/tmp}/gh-project-list.XXXXXX")"
   list_rc=0
   list_out="\$(gh project list --owner "\$REPO_OWNER" --closed --limit 1000 \\
@@ -7775,14 +7805,15 @@ if [ "\$#" -lt 1 ]; then
   echo "usage: \$0 <number>" >&2
   exit 2
 fi
+NUM=\$(require_issue_number "\$1") || exit 2
 
-gh issue view "\$1" --repo "\$REPO" --json createdAt --jq '"created:\\t" + .createdAt'
+gh issue view "\$NUM" --repo "\$REPO" --json createdAt --jq '"created:\\t" + .createdAt'
 
 if [ -t 1 ]; then
-  gh issue view "\$1" --repo "\$REPO" --comments
+  gh issue view "\$NUM" --repo "\$REPO" --comments
 else
-  gh issue view "\$1" --repo "\$REPO"
-  gh issue view "\$1" --repo "\$REPO" --comments
+  gh issue view "\$NUM" --repo "\$REPO"
+  gh issue view "\$NUM" --repo "\$REPO" --comments
 fi
 `,
     executable: true,
@@ -7838,8 +7869,7 @@ while [ "\$#" -gt 0 ]; do
   case "\$1" in
     --ready) [ -n "\${2:-}" ] || usage; READY="\$2"; shift 2 ;;
     -h | --help) usage ;;
-    '' | *[!0-9]*) echo "groom-verify.sh: not an issue number: '\$1'" >&2; usage ;;
-    *) ITEMS+=("\$1"); shift ;;
+    *) n=\$(require_issue_number "\$1") || usage; ITEMS+=("\$n"); shift ;;
   esac
 done
 [ "\${#ITEMS[@]}" -gt 0 ] || usage
@@ -7923,7 +7953,10 @@ exit "\$rc"
 # parent via GitHub's native \`/sub_issues\` REST endpoint (beta).
 #
 # Usage:
-#   add.sh "<title>" [body] [labels-csv] [--parent <num>]
+#   add.sh "<title>" [body] [labels-csv] [--parent <num>] [--body-file <path>]
+#
+# \`--body-file\` reads the body from a file, in place of the positional one
+# (pass "" there to give labels), so no quoting stands between the text and gh.
 #
 # Exit codes:
 #   0   issue created — attaching and placing it are best-effort and only warn
@@ -7939,25 +7972,32 @@ set -euo pipefail
 
 # Parse arguments before sourcing _config.sh so \`--help\` and unknown-flag
 # handling work regardless of whether the backlog backend is configured.
+USAGE='usage: add.sh "<title>" [body] [labels-csv] [--parent <num>] [--body-file <path>]'
 PARENT=""
+BODY_FILE=""
 ARGS=()
 while [ \$# -gt 0 ]; do
   case "\$1" in
     -h|--help)
-      echo 'usage: add.sh "<title>" [body] [labels-csv] [--parent <num>]'
+      echo "\$USAGE"
       exit 0
       ;;
     --parent)
       if [ \$# -lt 2 ]; then
-        echo 'usage: add.sh "<title>" [body] [labels-csv] [--parent <num>]' >&2
+        echo "\$USAGE" >&2
         exit 2
       fi
       PARENT="\$2"
       shift 2
       ;;
+    --body-file)
+      [ \$# -ge 2 ] && [ -f "\$2" ] || { echo "add.sh: --body-file needs a file" >&2; exit 2; }
+      BODY_FILE="\$2"
+      shift 2
+      ;;
     --*)
       echo "add.sh: unknown flag '\$1'" >&2
-      echo 'usage: add.sh "<title>" [body] [labels-csv] [--parent <num>]' >&2
+      echo "\$USAGE" >&2
       exit 2
       ;;
     *)
@@ -7968,15 +8008,20 @@ while [ \$# -gt 0 ]; do
 done
 
 if [ "\${#ARGS[@]}" -lt 1 ]; then
-  echo 'usage: add.sh "<title>" [body] [labels-csv] [--parent <num>]' >&2
+  echo "\$USAGE" >&2
   exit 2
 fi
 TITLE="\${ARGS[0]}"
 BODY="\${ARGS[1]:-}"
 LABELS="\${ARGS[2]:-}"
+if [ -n "\$BODY_FILE" ] && [ -n "\$BODY" ]; then
+  echo "add.sh: give a body or --body-file, not both" >&2
+  exit 2
+fi
 
 # shellcheck source=./_config.sh
 . "\$(dirname "\$0")/_config.sh"
+if [ -n "\$PARENT" ]; then PARENT=\$(require_issue_number "\$PARENT") || exit 2; fi
 require_project   # a project that does not resolve fails here, not mid-write
 
 # When --parent is set, fail fast if the parent issue doesn't exist —
@@ -7989,7 +8034,7 @@ if [ -n "\$PARENT" ]; then
 fi
 
 CREATE_ARGS=("--repo" "\$REPO" "--title" "\$TITLE")
-if [ -n "\$BODY" ]; then CREATE_ARGS+=("--body" "\$BODY"); else CREATE_ARGS+=("--body" ""); fi
+if [ -n "\$BODY_FILE" ]; then CREATE_ARGS+=("--body-file" "\$BODY_FILE"); else CREATE_ARGS+=("--body" "\$BODY"); fi
 if [ -n "\$LABELS" ]; then CREATE_ARGS+=("--label" "\$LABELS"); fi
 
 URL=\$(gh issue create "\${CREATE_ARGS[@]}")
@@ -8130,7 +8175,7 @@ if [ "\$#" -lt 2 ]; then
   echo '  Status one of: Backlog, Ready, "In progress", "In review", Done' >&2
   exit 2
 fi
-NUM="\$1"
+NUM=\$(require_issue_number "\$1") || exit 2
 STATUS="\$2"
 
 # Resolve project + status field IDs lazily (cached client-side per call).
@@ -8434,6 +8479,9 @@ if [ "\$#" -lt 2 ]; then
 fi
 STATUS="\$1"
 shift
+NUMS=()
+for n in "\$@"; do n=\$(require_issue_number "\$n") || exit 2; NUMS+=("\$n"); done
+set -- "\${NUMS[@]}"
 
 PROJECT_NODE_ID=\$(gh project view "\$PROJECT_NUMBER" --owner "\$REPO_OWNER" --format json | jq_lf -r '.id')
 STATUS_FIELD_JSON=\$(gh project field-list "\$PROJECT_NUMBER" --owner "\$REPO_OWNER" --format json)
@@ -8615,17 +8663,28 @@ fi
     content: `#!/usr/bin/env bash
 # Post a clarification comment on a GitHub issue.
 # Usage: clarify-comment.sh <number> "<question>"
+#        clarify-comment.sh <number> --body-file <path>
+#
+# \`--body-file\` keeps the text off the command line: a caller writes it to a
+# file and passes the path, so no quoting stands between the text and gh.
 set -euo pipefail
 
 # shellcheck source=./_config.sh
 . "\$(dirname "\$0")/_config.sh"
 
+USAGE='usage: clarify-comment.sh <number> "<question>" | <number> --body-file <path>'
 if [ "\$#" -lt 2 ]; then
-  echo 'usage: clarify-comment.sh <number> "<question>"' >&2
+  echo "\$USAGE" >&2
   exit 2
 fi
+NUM=\$(require_issue_number "\$1") || exit 2
 
-gh issue comment "\$1" --repo "\$REPO" --body "\$2"
+if [ "\$2" = "--body-file" ]; then
+  [ "\$#" -eq 3 ] && [ -f "\$3" ] || { echo "clarify-comment.sh: --body-file needs a file" >&2; exit 2; }
+  gh issue comment "\$NUM" --repo "\$REPO" --body-file "\$3"
+else
+  gh issue comment "\$NUM" --repo "\$REPO" --body "\$2"
+fi
 `,
     executable: true,
     backend: "github",
@@ -8938,7 +8997,7 @@ if [ "\$#" -lt 3 ]; then
   echo 'usage: set-field.sh <issue-number> <Priority|Size|IssueType|StartDate|TargetDate|Estimate> <value>' >&2
   exit 1
 fi
-NUM="\$1"
+NUM=\$(require_issue_number "\$1") || exit 1
 FIELD_NAME="\$2"
 VALUE="\$3"
 
@@ -9250,14 +9309,11 @@ if [ "\$#" -lt 1 ]; then
   echo 'usage: cascade-check.sh <issue-number>' >&2
   exit 2
 fi
-NUM="\$1"
+NUM=\$(require_issue_number "\$1") || exit 2
 # A bad ARGUMENT is a usage error, and it used to reach the API as if it were
 # an issue number — where the failed lookup rendered it as exit 3, the code
 # that tells a caller the world was unreadable. Misuse and unreadability are
 # not the same event and must not share a code.
-case "\$NUM" in
-  '' | *[!0-9]*) echo "not an issue number: '\$NUM'" >&2; exit 2 ;;
-esac
 
 # One API call covers existence + state, and the read is judged by its EXIT
 # CODE. \`gh api\` writes the API's error body to STDOUT on a 404 — a
@@ -9500,10 +9556,7 @@ if [ "\$#" -lt 1 ]; then
   echo 'usage: parent-of.sh <issue-number>' >&2
   exit 2
 fi
-NUM="\$1"
-case "\$NUM" in
-  '' | *[!0-9]*) echo "not an issue number: '\$NUM'" >&2; exit 2 ;;
-esac
+NUM=\$(require_issue_number "\$1") || exit 2
 
 # Existence and the parent link in one call.
 #
@@ -9614,9 +9667,8 @@ SCRIPT_DIR="\$(cd "\$(dirname "\$0")" && pwd)"
 # the primary move already succeeded; we don't want stderr noise on
 # fresh projects that haven't filled in backlog-config.yml yet.
 # shellcheck source=./_config.sh
-if ! . "\$SCRIPT_DIR/_config.sh" 2>/dev/null; then
-  exit 0
-fi
+. "\$SCRIPT_DIR/_config.sh" 2>/dev/null || exit 0
+CHILD=\$(require_issue_number "\$CHILD") || exit 0   # said why on stderr; never blocks the move
 
 # 1. Resolve parent via GraphQL Issue.parent { number }.
 PARENT_NUM=\$(gh api graphql -f query='
@@ -9909,6 +9961,20 @@ fi
 export GITLAB_HOST="\$HOST"
 export PROJECT_ID
 
+# require_issue_number <id> — <id> as a bare decimal issue number on stdout, or
+# a refusal on stderr and status 2. Every script that takes an id runs it first:
+# the id reaches a URL path, a query variable or a file glob, so it is digits
+# and nothing else — never a URL, an \`@file\` or query text. Zero padding is
+# dropped (\`042\` is 42, never octal). Every copy is the same text
+# (tests/scripts/backlog_issue_number_test.ts).
+require_issue_number() {
+  local n=\${1:-}
+  n=\${n#"\${n%%[!0]*}"}
+  if [[ \$n =~ ^[1-9][0-9]{0,9}\$ ]]; then printf '%s\\n' "\$n"; return 0; fi
+  printf '%s: not an issue number: %q\\n' "\${0##*/}" "\${1:-}" >&2
+  return 2
+}
+
 # Browser URL for one item, per \`backlog-reference-contract\`. Prints nothing
 # when it cannot be resolved — callers degrade rather than guessing. Never
 # fails: a reference must never block a workflow.
@@ -10020,8 +10086,9 @@ if [ "\$#" -lt 1 ]; then
   echo "usage: \$0 <number>" >&2
   exit 2
 fi
+NUM=\$(require_issue_number "\$1") || exit 2
 
-glab issue view "\$1" --repo "\$PROJECT_ID" --comments
+glab issue view "\$NUM" --repo "\$PROJECT_ID" --comments
 `,
     executable: true,
     backend: "gitlab",
@@ -10068,8 +10135,7 @@ while [ "\$#" -gt 0 ]; do
   case "\$1" in
     --ready) [ -n "\${2:-}" ] || usage; READY="\$2"; shift 2 ;;
     -h | --help) usage ;;
-    '' | *[!0-9]*) echo "groom-verify.sh: not an issue number: '\$1'" >&2; usage ;;
-    *) ITEMS+=("\$1"); shift ;;
+    *) n=\$(require_issue_number "\$1") || usage; ITEMS+=("\$n"); shift ;;
   esac
 done
 [ "\${#ITEMS[@]}" -gt 0 ] || usage
@@ -10132,30 +10198,40 @@ exit "\$rc"
 # every tier and stays consistent with the existing Status::* pattern.)
 #
 # Usage:
-#   add.sh "<title>" [body] [labels-csv] [--parent <num>]
+#   add.sh "<title>" [body] [labels-csv] [--parent <num>] [--body-file <path>]
+#
+# \`--body-file\` reads the body from a file, in place of the positional one
+# (pass "" there to give labels); it reaches glab as one argument, no shell.
 set -euo pipefail
 
 # Parse arguments before sourcing _config.sh so \`--help\` and unknown-flag
 # handling work regardless of whether the backlog backend is configured.
+USAGE='usage: add.sh "<title>" [body] [labels-csv] [--parent <num>] [--body-file <path>]'
 PARENT=""
+BODY_FILE=""
 ARGS=()
 while [ \$# -gt 0 ]; do
   case "\$1" in
     -h|--help)
-      echo 'usage: add.sh "<title>" [body] [labels-csv] [--parent <num>]'
+      echo "\$USAGE"
       exit 0
       ;;
     --parent)
       if [ \$# -lt 2 ]; then
-        echo 'usage: add.sh "<title>" [body] [labels-csv] [--parent <num>]' >&2
+        echo "\$USAGE" >&2
         exit 2
       fi
       PARENT="\$2"
       shift 2
       ;;
+    --body-file)
+      [ \$# -ge 2 ] && [ -f "\$2" ] || { echo "add.sh: --body-file needs a file" >&2; exit 2; }
+      BODY_FILE="\$2"
+      shift 2
+      ;;
     --*)
       echo "add.sh: unknown flag '\$1'" >&2
-      echo 'usage: add.sh "<title>" [body] [labels-csv] [--parent <num>]' >&2
+      echo "\$USAGE" >&2
       exit 2
       ;;
     *)
@@ -10166,15 +10242,21 @@ while [ \$# -gt 0 ]; do
 done
 
 if [ "\${#ARGS[@]}" -lt 1 ]; then
-  echo 'usage: add.sh "<title>" [body] [labels-csv] [--parent <num>]' >&2
+  echo "\$USAGE" >&2
   exit 2
 fi
 TITLE="\${ARGS[0]}"
 BODY="\${ARGS[1]:-}"
 EXTRA_LABELS="\${ARGS[2]:-}"
+if [ -n "\$BODY_FILE" ] && [ -n "\$BODY" ]; then
+  echo "add.sh: give a body or --body-file, not both" >&2
+  exit 2
+fi
 
 # shellcheck source=./_config.sh
 . "\$(dirname "\$0")/_config.sh"
+if [ -n "\$PARENT" ]; then PARENT=\$(require_issue_number "\$PARENT") || exit 2; fi
+if [ -n "\$BODY_FILE" ]; then BODY=\$(cat -- "\$BODY_FILE"); fi
 
 LABELS="Status::Backlog"
 if [ -n "\$EXTRA_LABELS" ]; then
@@ -10220,7 +10302,7 @@ if [ "\$#" -lt 2 ]; then
   echo '  Status one of: Backlog, Ready, "In progress", "In review", Done' >&2
   exit 2
 fi
-NUM="\$1"
+NUM=\$(require_issue_number "\$1") || exit 2
 STATUS="\$2"
 
 case "\$STATUS" in
@@ -10394,17 +10476,27 @@ fi
     content: `#!/usr/bin/env bash
 # Post a clarification comment on a GitLab issue.
 # Usage: clarify-comment.sh <number> "<question>"
+#        clarify-comment.sh <number> --body-file <path>
+#
+# \`--body-file\` keeps the text off the caller's command line: the file is read
+# here and handed to glab as one argument, with no shell between the two.
 set -euo pipefail
 
 # shellcheck source=./_config.sh
 . "\$(dirname "\$0")/_config.sh"
 
 if [ "\$#" -lt 2 ]; then
-  echo 'usage: clarify-comment.sh <number> "<question>"' >&2
+  echo 'usage: clarify-comment.sh <number> "<question>" | <number> --body-file <path>' >&2
   exit 2
 fi
+NUM=\$(require_issue_number "\$1") || exit 2
+QUESTION="\$2"
+if [ "\$2" = "--body-file" ]; then
+  [ "\$#" -eq 3 ] && [ -f "\$3" ] || { echo "clarify-comment.sh: --body-file needs a file" >&2; exit 2; }
+  QUESTION=\$(cat -- "\$3")
+fi
 
-glab issue note "\$1" --repo "\$PROJECT_ID" --message "\$2"
+glab issue note "\$NUM" --repo "\$PROJECT_ID" --message "\$QUESTION"
 `,
     executable: true,
     backend: "gitlab",
@@ -10496,14 +10588,11 @@ if [ "\$#" -lt 1 ]; then
   echo 'usage: cascade-check.sh <issue-number>' >&2
   exit 2
 fi
-NUM="\$1"
+NUM=\$(require_issue_number "\$1") || exit 2
 # A bad ARGUMENT is a usage error, and it used to reach the API as if it were
 # an issue number — where the failed lookup rendered it as exit 3, the code
 # that tells a caller the world was unreadable. Misuse and unreadability are
 # not the same event and must not share a code.
-case "\$NUM" in
-  '' | *[!0-9]*) echo "not an issue number: '\$NUM'" >&2; exit 2 ;;
-esac
 
 # Existence + state in one glab call, judged by its EXIT CODE. Mirrors the
 # GitHub backend so both variants share the exit-code contract (3 = unreadable,
@@ -10747,10 +10836,7 @@ if [ "\$#" -lt 1 ]; then
   echo 'usage: parent-of.sh <issue-number>' >&2
   exit 2
 fi
-NUM="\$1"
-case "\$NUM" in
-  '' | *[!0-9]*) echo "not an issue number: '\$NUM'" >&2; exit 2 ;;
-esac
+NUM=\$(require_issue_number "\$1") || exit 2
 
 # Branch on glab's EXIT STATUS, not on empty output: a failed lookup that
 # happens to print something would otherwise read as "no parent". Under
@@ -10881,6 +10967,20 @@ API_BASE="\${API_URL%/}/api/v1"
 
 export API_URL PROJECT_KEY API_BASE
 
+# require_issue_number <id> — <id> as a bare decimal issue number on stdout, or
+# a refusal on stderr and status 2. Every script that takes an id runs it first:
+# the id reaches a URL path, a query variable or a file glob, so it is digits
+# and nothing else — never a URL, an \`@file\` or query text. Zero padding is
+# dropped (\`042\` is 42, never octal). Every copy is the same text
+# (tests/scripts/backlog_issue_number_test.ts).
+require_issue_number() {
+  local n=\${1:-}
+  n=\${n#"\${n%%[!0]*}"}
+  if [[ \$n =~ ^[1-9][0-9]{0,9}\$ ]]; then printf '%s\\n' "\$n"; return 0; fi
+  printf '%s: not an issue number: %q\\n' "\${0##*/}" "\${1:-}" >&2
+  return 2
+}
+
 # cloud_curl <curl args…> — the one way this script family reaches Cloud, so every
 # request is made alike: curl reads no config file (\`-q\`), the Authorization
 # header arrives on stdin, and a 3xx is a failure (exit 22, as for any HTTP error,
@@ -10987,7 +11087,7 @@ if [ "\$#" -lt 1 ]; then
   echo "usage: \$0 <number>" >&2
   exit 2
 fi
-NUM="\$1"
+NUM=\$(require_issue_number "\$1") || exit 2
 COLS=\$(cloud_curl "\$API_BASE/columns?projectKey=\$PROJECT_KEY")
 RESP=\$(cloud_curl "\$API_BASE/tasks?projectKey=\$PROJECT_KEY&number=\$NUM")
 
@@ -11094,6 +11194,7 @@ record() {
 
 RECORDS=""
 for num in "\${ITEMS[@]}"; do
+  num=\$(require_issue_number "\$num") || exit 2
   rec=\$(record "\$num") || { echo "groom-verify.sh: #\$num could not be read from \$PROJECT_KEY — nothing verified" >&2; exit 2; }
   RECORDS+="\$rec"\$'\\n'
 done
@@ -11113,33 +11214,37 @@ exit "\$rc"
     content: `#!/usr/bin/env bash
 # Create a task on the Specnaut Cloud board.
 #
-# Usage: add.sh "<title>" [body] [--parent <num>]
+# Usage: add.sh "<title>" [body] [--parent <num>] [--body-file <path>]
+#
+# \`--body-file\` reads the body from a file, in place of the positional one; it
+# travels in the JSON payload, with no shell between the two.
 #
 # \`--parent\` makes the new task a sub-task of an existing one, in the same
 # shape as the local and github versions. It travels as \`parentNumber\` on the
 # versioned public contract — by number, never by an internal identifier.
 set -euo pipefail
 
+USAGE='usage: add.sh "<title>" [body] [--parent <num>] [--body-file <path>]'
 PARENT=""
+BODY_FILE=""
 ARGS=()
 while [ \$# -gt 0 ]; do
   case "\$1" in
     -h | --help)
-      echo 'usage: add.sh "<title>" [body] [--parent <num>]'
+      echo "\$USAGE"
       exit 0
       ;;
     --parent)
       if [ "\$#" -lt 2 ]; then
-        echo 'usage: add.sh "<title>" [body] [--parent <num>]' >&2
+        echo "\$USAGE" >&2
         exit 2
       fi
       PARENT="\$2"
-      case "\$PARENT" in
-        '' | *[!0-9]*)
-          echo "not a task number: '\$PARENT'" >&2
-          exit 2
-          ;;
-      esac
+      shift 2
+      ;;
+    --body-file)
+      [ \$# -ge 2 ] && [ -f "\$2" ] || { echo "add.sh: --body-file needs a file" >&2; exit 2; }
+      BODY_FILE="\$2"
       shift 2
       ;;
     *)
@@ -11151,14 +11256,20 @@ done
 set -- \${ARGS[@]+"\${ARGS[@]}"}
 
 if [ "\$#" -lt 1 ]; then
-  echo 'usage: add.sh "<title>" [body] [--parent <num>]' >&2
+  echo "\$USAGE" >&2
   exit 2
 fi
 TITLE="\$1"
 BODY="\${2:-}"
+if [ -n "\$BODY_FILE" ] && [ -n "\$BODY" ]; then
+  echo "add.sh: give a body or --body-file, not both" >&2
+  exit 2
+fi
 
 # shellcheck source=./_config.sh
 . "\$(dirname "\$0")/_config.sh"
+if [ -n "\$PARENT" ]; then PARENT=\$(require_issue_number "\$PARENT") || exit 2; fi
+if [ -n "\$BODY_FILE" ]; then BODY=\$(cat -- "\$BODY_FILE"); fi
 
 PAYLOAD=\$(jq_lf -n --arg k "\$PROJECT_KEY" --arg t "\$TITLE" --arg b "\$BODY" --arg p "\$PARENT" \\
   '{ projectKey: \$k, title: \$t }
@@ -11200,7 +11311,7 @@ if [ "\$#" -lt 2 ]; then
   echo '  Status one of: Backlog, Ready, "In Progress", "In Review", Done' >&2
   exit 2
 fi
-NUM="\$1"
+NUM=\$(require_issue_number "\$1") || exit 2
 STATUS="\$2"
 
 PAYLOAD=\$(jq_lf -n --arg k "\$PROJECT_KEY" --argjson n "\$NUM" --arg s "\$STATUS" \\
@@ -11255,10 +11366,7 @@ if [ "\$#" -lt 1 ]; then
   echo 'usage: cascade-check.sh <task-number>' >&2
   exit 2
 fi
-NUM="\$1"
-case "\$NUM" in
-  '' | *[!0-9]*) echo "not a task number: '\$NUM'" >&2; exit 2 ;;
-esac
+NUM=\$(require_issue_number "\$1") || exit 2
 
 rc=0
 COLS=\$(cloud_curl "\$API_BASE/columns?projectKey=\$PROJECT_KEY") || rc=\$?
@@ -11473,10 +11581,7 @@ if [ "\$#" -lt 1 ]; then
   echo 'usage: parent-of.sh <task-number>' >&2
   exit 2
 fi
-NUM="\$1"
-case "\$NUM" in
-  '' | *[!0-9]*) echo "not a task number: '\$NUM'" >&2; exit 2 ;;
-esac
+NUM=\$(require_issue_number "\$1") || exit 2
 
 # Branch on curl's EXIT STATUS, not on empty output: an error body is still
 # output, and treating it as "no parent" is the one confusion this script
@@ -11518,17 +11623,25 @@ exit 0
     content: `#!/usr/bin/env bash
 # Post a clarification comment on a task.
 # Usage: clarify-comment.sh <number> "<question>"
+#        clarify-comment.sh <number> --body-file <path>
+#
+# \`--body-file\` keeps the text off the caller's command line: the file is read
+# here and travels in the JSON payload, with no shell between the two.
 set -euo pipefail
 
 # shellcheck source=./_config.sh
 . "\$(dirname "\$0")/_config.sh"
 
 if [ "\$#" -lt 2 ]; then
-  echo 'usage: clarify-comment.sh <number> "<question>"' >&2
+  echo 'usage: clarify-comment.sh <number> "<question>" | <number> --body-file <path>' >&2
   exit 2
 fi
-NUM="\$1"
+NUM=\$(require_issue_number "\$1") || exit 2
 QUESTION="\$2"
+if [ "\$2" = "--body-file" ]; then
+  [ "\$#" -eq 3 ] && [ -f "\$3" ] || { echo "clarify-comment.sh: --body-file needs a file" >&2; exit 2; }
+  QUESTION=\$(cat -- "\$3")
+fi
 
 PAYLOAD=\$(jq_lf -n --arg k "\$PROJECT_KEY" --argjson n "\$NUM" --arg b "\$QUESTION" \\
   '{ projectKey: \$k, number: \$n, body: \$b }')

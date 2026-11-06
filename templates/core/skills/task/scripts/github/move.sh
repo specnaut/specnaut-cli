@@ -29,7 +29,7 @@ if [ "$#" -lt 2 ]; then
   echo '  Status one of: Backlog, Ready, "In progress", "In review", Done' >&2
   exit 2
 fi
-NUM="$1"
+NUM=$(require_issue_number "$1") || exit 2
 STATUS="$2"
 
 # Resolve project + status field IDs lazily (cached client-side per call).

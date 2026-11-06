@@ -90,6 +90,20 @@ API_BASE="${API_URL%/}/api/v1"
 
 export API_URL PROJECT_KEY API_BASE
 
+# require_issue_number <id> — <id> as a bare decimal issue number on stdout, or
+# a refusal on stderr and status 2. Every script that takes an id runs it first:
+# the id reaches a URL path, a query variable or a file glob, so it is digits
+# and nothing else — never a URL, an `@file` or query text. Zero padding is
+# dropped (`042` is 42, never octal). Every copy is the same text
+# (tests/scripts/backlog_issue_number_test.ts).
+require_issue_number() {
+  local n=${1:-}
+  n=${n#"${n%%[!0]*}"}
+  if [[ $n =~ ^[1-9][0-9]{0,9}$ ]]; then printf '%s\n' "$n"; return 0; fi
+  printf '%s: not an issue number: %q\n' "${0##*/}" "${1:-}" >&2
+  return 2
+}
+
 # cloud_curl <curl args…> — the one way this script family reaches Cloud, so every
 # request is made alike: curl reads no config file (`-q`), the Authorization
 # header arrives on stdin, and a 3xx is a failure (exit 22, as for any HTTP error,

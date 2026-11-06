@@ -52,7 +52,7 @@ if [ "$#" -lt 3 ]; then
   echo 'usage: set-field.sh <issue-number> <Priority|Size|IssueType|StartDate|TargetDate|Estimate> <value>' >&2
   exit 1
 fi
-NUM="$1"
+NUM=$(require_issue_number "$1") || exit 1
 FIELD_NAME="$2"
 VALUE="$3"
 

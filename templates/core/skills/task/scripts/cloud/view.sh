@@ -11,7 +11,7 @@ if [ "$#" -lt 1 ]; then
   echo "usage: $0 <number>" >&2
   exit 2
 fi
-NUM="$1"
+NUM=$(require_issue_number "$1") || exit 2
 COLS=$(cloud_curl "$API_BASE/columns?projectKey=$PROJECT_KEY")
 RESP=$(cloud_curl "$API_BASE/tasks?projectKey=$PROJECT_KEY&number=$NUM")
 

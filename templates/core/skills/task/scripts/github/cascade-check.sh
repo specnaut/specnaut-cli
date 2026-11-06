@@ -26,14 +26,11 @@ if [ "$#" -lt 1 ]; then
   echo 'usage: cascade-check.sh <issue-number>' >&2
   exit 2
 fi
-NUM="$1"
+NUM=$(require_issue_number "$1") || exit 2
 # A bad ARGUMENT is a usage error, and it used to reach the API as if it were
 # an issue number — where the failed lookup rendered it as exit 3, the code
 # that tells a caller the world was unreadable. Misuse and unreadability are
 # not the same event and must not share a code.
-case "$NUM" in
-  '' | *[!0-9]*) echo "not an issue number: '$NUM'" >&2; exit 2 ;;
-esac
 
 # One API call covers existence + state, and the read is judged by its EXIT
 # CODE. `gh api` writes the API's error body to STDOUT on a 404 — a

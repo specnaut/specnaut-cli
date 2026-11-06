@@ -358,7 +358,7 @@ Deno.test("cascade-check: every backend rejects a non-number before it reaches i
   for (const b of backends) {
     const src = await Deno.readTextFile(join(SCRIPTS, b, "cascade-check.sh"));
     const code = src.split("\n").filter((l) => !l.trimStart().startsWith("#")).join("\n");
-    if (!/case "\$NUM" in[\s\S]{0,120}\*\[!0-9\]\*\)[\s\S]{0,120}exit 2/.test(code)) {
+    if (!/NUM=\$\(require_issue_number "\$1"\) \|\| exit 2/.test(code)) {
       missing.push(b);
     }
   }

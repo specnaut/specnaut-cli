@@ -63,9 +63,8 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 # the primary move already succeeded; we don't want stderr noise on
 # fresh projects that haven't filled in backlog-config.yml yet.
 # shellcheck source=./_config.sh
-if ! . "$SCRIPT_DIR/_config.sh" 2>/dev/null; then
-  exit 0
-fi
+. "$SCRIPT_DIR/_config.sh" 2>/dev/null || exit 0
+CHILD=$(require_issue_number "$CHILD") || exit 0   # said why on stderr; never blocks the move
 
 # 1. Resolve parent via GraphQL Issue.parent { number }.
 PARENT_NUM=$(gh api graphql -f query='

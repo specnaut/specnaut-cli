@@ -23,10 +23,7 @@ if [ "$#" -lt 1 ]; then
   echo 'usage: parent-of.sh <task-number>' >&2
   exit 2
 fi
-NUM="$1"
-case "$NUM" in
-  '' | *[!0-9]*) echo "not a task number: '$NUM'" >&2; exit 2 ;;
-esac
+NUM=$(require_issue_number "$1") || exit 2
 
 # Branch on curl's EXIT STATUS, not on empty output: an error body is still
 # output, and treating it as "no parent" is the one confusion this script

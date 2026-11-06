@@ -4,7 +4,10 @@
 # parent via GitHub's native `/sub_issues` REST endpoint (beta).
 #
 # Usage:
-#   add.sh "<title>" [body] [labels-csv] [--parent <num>]
+#   add.sh "<title>" [body] [labels-csv] [--parent <num>] [--body-file <path>]
+#
+# `--body-file` reads the body from a file, in place of the positional one
+# (pass "" there to give labels), so no quoting stands between the text and gh.
 #
 # Exit codes:
 #   0   issue created — attaching and placing it are best-effort and only warn
@@ -20,25 +23,32 @@ set -euo pipefail
 
 # Parse arguments before sourcing _config.sh so `--help` and unknown-flag
 # handling work regardless of whether the backlog backend is configured.
+USAGE='usage: add.sh "<title>" [body] [labels-csv] [--parent <num>] [--body-file <path>]'
 PARENT=""
+BODY_FILE=""
 ARGS=()
 while [ $# -gt 0 ]; do
   case "$1" in
     -h|--help)
-      echo 'usage: add.sh "<title>" [body] [labels-csv] [--parent <num>]'
+      echo "$USAGE"
       exit 0
       ;;
     --parent)
       if [ $# -lt 2 ]; then
-        echo 'usage: add.sh "<title>" [body] [labels-csv] [--parent <num>]' >&2
+        echo "$USAGE" >&2
         exit 2
       fi
       PARENT="$2"
       shift 2
       ;;
+    --body-file)
+      [ $# -ge 2 ] && [ -f "$2" ] || { echo "add.sh: --body-file needs a file" >&2; exit 2; }
+      BODY_FILE="$2"
+      shift 2
+      ;;
     --*)
       echo "add.sh: unknown flag '$1'" >&2
-      echo 'usage: add.sh "<title>" [body] [labels-csv] [--parent <num>]' >&2
+      echo "$USAGE" >&2
       exit 2
       ;;
     *)
@@ -49,15 +59,20 @@ while [ $# -gt 0 ]; do
 done
 
 if [ "${#ARGS[@]}" -lt 1 ]; then
-  echo 'usage: add.sh "<title>" [body] [labels-csv] [--parent <num>]' >&2
+  echo "$USAGE" >&2
   exit 2
 fi
 TITLE="${ARGS[0]}"
 BODY="${ARGS[1]:-}"
 LABELS="${ARGS[2]:-}"
+if [ -n "$BODY_FILE" ] && [ -n "$BODY" ]; then
+  echo "add.sh: give a body or --body-file, not both" >&2
+  exit 2
+fi
 
 # shellcheck source=./_config.sh
 . "$(dirname "$0")/_config.sh"
+if [ -n "$PARENT" ]; then PARENT=$(require_issue_number "$PARENT") || exit 2; fi
 require_project   # a project that does not resolve fails here, not mid-write
 
 # When --parent is set, fail fast if the parent issue doesn't exist —
@@ -70,7 +85,7 @@ if [ -n "$PARENT" ]; then
 fi
 
 CREATE_ARGS=("--repo" "$REPO" "--title" "$TITLE")
-if [ -n "$BODY" ]; then CREATE_ARGS+=("--body" "$BODY"); else CREATE_ARGS+=("--body" ""); fi
+if [ -n "$BODY_FILE" ]; then CREATE_ARGS+=("--body-file" "$BODY_FILE"); else CREATE_ARGS+=("--body" "$BODY"); fi
 if [ -n "$LABELS" ]; then CREATE_ARGS+=("--label" "$LABELS"); fi
 
 URL=$(gh issue create "${CREATE_ARGS[@]}")

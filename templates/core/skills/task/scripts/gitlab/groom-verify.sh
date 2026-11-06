@@ -35,8 +35,7 @@ while [ "$#" -gt 0 ]; do
   case "$1" in
     --ready) [ -n "${2:-}" ] || usage; READY="$2"; shift 2 ;;
     -h | --help) usage ;;
-    '' | *[!0-9]*) echo "groom-verify.sh: not an issue number: '$1'" >&2; usage ;;
-    *) ITEMS+=("$1"); shift ;;
+    *) n=$(require_issue_number "$1") || usage; ITEMS+=("$n"); shift ;;
   esac
 done
 [ "${#ITEMS[@]}" -gt 0 ] || usage

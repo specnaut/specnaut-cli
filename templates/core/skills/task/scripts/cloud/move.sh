@@ -13,7 +13,7 @@ if [ "$#" -lt 2 ]; then
   echo '  Status one of: Backlog, Ready, "In Progress", "In Review", Done' >&2
   exit 2
 fi
-NUM="$1"
+NUM=$(require_issue_number "$1") || exit 2
 STATUS="$2"
 
 PAYLOAD=$(jq_lf -n --arg k "$PROJECT_KEY" --argjson n "$NUM" --arg s "$STATUS" \

@@ -24,10 +24,7 @@ if [ "$#" -lt 1 ]; then
   echo 'usage: parent-of.sh <task-number>' >&2
   exit 2
 fi
-NUM="$1"
-case "$NUM" in
-  '' | *[!0-9]*) echo "not a task number: '$NUM'" >&2; exit 2 ;;
-esac
+NUM=$(require_issue_number "$1") || exit 2
 
 # `10#` forces base 10. Without it `printf '%03d' 011` reads the argument
 # as OCTAL and yields 009 — a lookup for a different task, silently. A

@@ -35,6 +35,20 @@ INDEX="$ROOT/.specnaut/backlog.md"
 
 export ROOT BACKLOG_DIR INDEX
 
+# require_issue_number <id> — <id> as a bare decimal issue number on stdout, or
+# a refusal on stderr and status 2. Every script that takes an id runs it first:
+# the id reaches a URL path, a query variable or a file glob, so it is digits
+# and nothing else — never a URL, an `@file` or query text. Zero padding is
+# dropped (`042` is 42, never octal). Every copy is the same text
+# (tests/scripts/backlog_issue_number_test.ts).
+require_issue_number() {
+  local n=${1:-}
+  n=${n#"${n%%[!0]*}"}
+  if [[ $n =~ ^[1-9][0-9]{0,9}$ ]]; then printf '%s\n' "$n"; return 0; fi
+  printf '%s: not an issue number: %q\n' "${0##*/}" "${1:-}" >&2
+  return 2
+}
+
 # A Markdown backlog has no browser URL, but it does have a file — so emit a
 # repo-relative path that a harness can open. Prints nothing when no task file
 # matches. Never fails: a reference must never block a workflow.
