@@ -15,7 +15,7 @@ echo >> "$FAKE_ROOT/calls.log"
 case "$1 $2" in
   "api user") echo '{"id":1}' ;;
   "issue view") echo '{"iid":4,"title":"T","description":"Body","created_at":"2026-02-03T04:05:06Z","labels":[],"state":"opened","author":{"id":2,"username":"someone"}}' ;;
-  "api --paginate") echo '[{"name":"bug"}]' ;;
+  "api --paginate") echo '[{"name":"bug"},{"name":"Status::Done"},{"name":"parent::#9"},{"name":"PRIORITY::P0"}]' ;;
   "issue list") echo '[]' ;;
   api*) echo '[]' ;;
 esac
@@ -88,6 +88,25 @@ Deno.test("gitlab: a link sets the child's parent label", async () => {
       out.calls,
       "glab\tissue\tupdate\t6\t--repo\tacme/my-app\t--label\tparent::#4\n",
     );
+  } finally {
+    await p.cleanup();
+  }
+});
+
+Deno.test("gitlab: a plan names no scoped label the executor sets itself", async () => {
+  const p = await gitlab();
+  try {
+    const cases: ReadonlyArray<[string[], unknown]> = [
+      [["edit", "--id", "4"], { op: "label", target: 4, labels: ["Status::Done"] }],
+      [["edit", "--id", "4"], { op: "label", target: 4, labels: ["PRIORITY::P0"] }],
+      [["add"], { op: "create", title: "New item", labels: ["parent::#9"] }],
+    ];
+    for (const [read, op] of cases) {
+      const out = await readThenApply(p, read, jsonl(op));
+      const seen = `${JSON.stringify(op)}\n${out.stdout}${out.stderr}`;
+      assertEquals([out.code, out.lines], [3, ["REFUSED label 1.labels", "RECEIPT: none"]], seen);
+      assert(!/glab\tissue\t(create|update)/.test(out.calls), out.calls);
+    }
   } finally {
     await p.cleanup();
   }

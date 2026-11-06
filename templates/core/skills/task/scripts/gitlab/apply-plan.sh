@@ -19,10 +19,15 @@ CLOSE_IS_MOVE=0
 # The columns move.sh accepts.
 board_statuses() { printf '%s\n' Backlog Ready "In progress" "In review" Done; }
 
+# The repository's labels, less the scoped ones this executor sets itself:
+# status, parent and classification. A `label` or `create` naming one would
+# move an item to Done or under a parent past the checks `close` and `link`
+# pass, so no plan may name one.
 repo_labels() {
   local enc
   enc=$(jq_lf -rn --arg p "$PROJECT_ID" '$p | @uri')
-  glab api --paginate "projects/$enc/labels?per_page=100" | jq_lf -r '.[]?.name // empty'
+  glab api --paginate "projects/$enc/labels?per_page=100" |
+    jq_lf -r '.[]?.name // empty | strings | select(test("^(status|parent|priority|size|type)::"; "i") | not)'
 }
 
 # add.sh prints `✓ created: <url>`; the number ends the URL.
