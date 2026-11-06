@@ -31251,10 +31251,11 @@ esac
 #
 # Groom's own comment — the marker the product owner also skips an item on —
 # is one whose text starts with \`🤖 specnaut-groom\` AND that the account groom
-# runs as wrote (\`by_viewer: true\`): anyone can type the marker. The one
-# exception is a comment that names no author and no viewer (\`author\` and
-# \`by_viewer\` both null, or a bare string): the local backend's own task-file
-# sections, which only the repository writes. Cloud reads no comments at all.
+# runs as wrote (\`by_viewer: true\`): another author's comment may carry the
+# same text. The one exception is a comment that names no author and no viewer
+# (\`author\` and \`by_viewer\` both null, or a bare string): the local backend's
+# own task-file sections, which only the repository writes. Cloud reads no
+# comments at all.
 # A comment with an author but an unknown viewer does not count — missing is
 # the safe direction.
 #

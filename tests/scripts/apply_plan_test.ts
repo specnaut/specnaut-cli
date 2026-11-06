@@ -105,7 +105,7 @@ Deno.test("apply-plan: a plan any check refuses writes nothing, and names only t
       assert(!GH_WRITES.test(out.calls), `${seen}\nwrote:\n${out.calls}`);
       assert(!out.stdout.includes(TOKEN) && !out.stderr.includes(TOKEN), seen);
     }
-    // A plan that is not JSON Lines, or holds a forged extra line, is refused whole.
+    // A plan that is not JSON Lines, or holds an extra line in another shape, is refused whole.
     const broken = await readThenApply(
       p,
       ["edit", "--id", "7"],

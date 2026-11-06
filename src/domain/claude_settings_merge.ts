@@ -17,10 +17,10 @@
  *     A bundled rule, if one ever returns, joins as a set union. `allow` is
  *     never touched.
  *   - `permissions.deny` gains each bundled rule the user lacks, after the
- *     user's own, which stay in order: the credential reads no seat may make
- *     (the product owner reads issue text anyone can write, and a subagent's
- *     Read reaches outside the project without a prompt). Claude Code applies
- *     a Read rule to Grep and Glob as well.
+ *     user's own, which stay in order: the credential reads no seat needs (the
+ *     product owner receives issue text as data, and a subagent's Read reaches
+ *     outside the project with no approval step). Claude Code applies a Read
+ *     rule to Grep and Glob as well.
  *   - `extraKnownMarketplaces` and `enabledPlugins` gain each bundled key the
  *     user does not have, and keep every key they do — `false` included, which
  *     is how a project declines a plugin Specnaut enables (#642).

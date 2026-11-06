@@ -83,7 +83,7 @@ const FIELDS = {
 };
 
 /** One GraphQL issue record, as item-record.sh reads it. */
-export function ghIssue(title: string, author = "a-stranger", body = "Plain.") {
+export function ghIssue(title: string, author = "another-author", body = "Plain.") {
   return {
     data: {
       repository: {

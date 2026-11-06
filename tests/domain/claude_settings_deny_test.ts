@@ -6,7 +6,7 @@ import { mergeClaudeSettings } from "../../src/domain/claude_settings_merge.ts";
  * The credential read-deny rules Specnaut ships in `.claude/settings.json` join
  * the user's own `permissions.deny` as a set union: theirs stay, in order, and
  * none is ever dropped or rewritten. A seat's Read reaches outside the project
- * without a prompt, so these rules are what keep it off the credential files.
+ * with no approval step, so these rules keep it off credential reads no seat needs.
  */
 
 const OURS = ["Read(~/.config/gh/**)", "Read(**/.env)"];
