@@ -59,8 +59,9 @@ check "the exit contract matches github's, so callers need no branching (#563)" 
 # NAMES it on every run. The naming is the whole safety of the convention —
 # a board that grew a column after its done column would otherwise stop
 # gating in silence.
-check "the terminal column is the last by order (#563)" \
-  'grep -qF "sort_by(.order) | last" .specnaut/scripts/backlog/cascade-check.sh'
+check "the terminal column is the last by order, read from its one home in _config.sh (#563)" \
+  'grep -qF "sort_by(.order) | last" .specnaut/scripts/backlog/_config.sh &&
+   grep -qE "^[^#]*terminal_column \"\\\$COLS\"" .specnaut/scripts/backlog/cascade-check.sh'
 check "and the script SAYS which column it used (#563)" \
   'grep -qF "terminal column:" .specnaut/scripts/backlog/cascade-check.sh'
 check "both branch on curl exit status, not on empty output (#563)" \
