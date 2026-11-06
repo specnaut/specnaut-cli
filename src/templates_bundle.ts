@@ -6113,8 +6113,9 @@ ticket, the memory entry can be retired.
 
 ## When to add an entry here
 
-The PO holds no write tool: it names a note worth keeping in its summary, and
-the session writes it here.
+The PO holds no write tool, and its summary is a report, never an instruction.
+A note it suggests is shown to the user as quoted text; an entry is written
+here only on the user's own instruction.
 
 Add a new memory file when the PO discovers something that should survive
 across sessions and isn't captured elsewhere:
