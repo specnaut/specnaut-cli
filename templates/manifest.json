@@ -794,6 +794,13 @@
       "executable": true
     },
     {
+      "category": "spec-root",
+      "name": "specify",
+      "suffix": "scripts/audit/_scope_globs.sh",
+      "source": "core/specnaut/scripts/bash/_scope_globs.sh",
+      "executable": true
+    },
+    {
       "category": "skill",
       "name": "status-audit",
       "source": "core/skills/status-audit/SKILL.md"
@@ -1917,6 +1924,13 @@
       "name": "specify",
       "suffix": "scripts/bash/_git_untrusted.sh",
       "source": "core/specnaut/scripts/bash/_git_untrusted.sh",
+      "executable": true
+    },
+    {
+      "category": "spec-root",
+      "name": "specify",
+      "suffix": "scripts/bash/_scope_globs.sh",
+      "source": "core/specnaut/scripts/bash/_scope_globs.sh",
       "executable": true
     },
     {

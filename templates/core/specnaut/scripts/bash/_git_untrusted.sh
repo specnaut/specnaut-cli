@@ -1,7 +1,7 @@
 # shellcheck shell=bash
 # _git_untrusted.sh - git with hardened defaults, for reading a repository whose
 # configuration nobody vetted. Sourced, never run: git-read.sh is its command
-# line, and collect-audit-scope.sh sources it beside itself.
+# line and lists its forms; collect-audit-scope.sh sources it beside itself.
 #
 # The one home of how git reads such a repository. Every call drops the GIT_*
 # environment and runs with these defaults, each turning off a program or a
@@ -15,74 +15,78 @@
 #   -c submodule.recurse=false -c diff.submodule=short
 #   --no-textconv --no-ext-diff --no-color on every form that diffs
 #
-# --no-lazy-fetch needs git 2.44. Below it, a repository that names a promisor
-# remote is refused rather than read, since reading a missing object would fetch it.
+# Three defaults come in deliberate pairs, so dropping one leaves the other in
+# force: --no-optional-locks and GIT_OPTIONAL_LOCKS=0; --no-lazy-fetch and
+# GIT_NO_LAZY_FETCH=1; gpg.program and gpg.openpgp.program, two names for the
+# OpenPGP program. --no-lazy-fetch needs git 2.44. Below it, a repository that
+# names a promisor remote is refused rather than read, since reading a missing
+# object would fetch it.
 #
-# The forms take data only - revisions, paths, a fixed-string pattern, a count -
-# never a git option, and each runs one fixed command line. They read objects and
-# the index, never the work tree, so no clean or smudge filter applies either.
-#
-#   gu_names <a> <b>               files that differ between two revisions
-#   gu_patch <a> <b> [<path>...]   the patch between two revisions
-#   gu_log <a>..<b> | <rev> [<n>]  one line per commit: short hash, subject
-#   gu_show <rev> --stat|--no-patch
-#   gu_files [<path>]              tracked files, under <path> when given
-#   gu_grep <pattern> <rev> [<path>...]
-#   gu_base <rev>                  the merge base of HEAD and <rev>
-#
-# A refused argument prints "git-read: refused: <why>" and returns 2.
-# _gu_git runs a fixed argv under the same defaults; it is for this file and for
-# scripts that source it, never for an argv someone else composed.
+# The forms (gu_<form>) take data only - revisions, paths, a fixed-string
+# pattern, a count - never a git option, and each runs one fixed command line.
+# They read objects and the index, never the work tree, so no clean or smudge
+# filter applies either. A refused argument prints "git-read: refused: <why>" and
+# returns 2. _gu_rev, _gu_range, _gu_path and _gu_count are the one home of what
+# an argument may look like. _gu_git runs a fixed argv under the same defaults,
+# for scripts that source this file, never for an argv someone else composed.
 
-# A revision: ref-name characters only, never an option, never a range. `+` is
-# there for a tag carrying SemVer build metadata (v1.0.0+build.7).
+_gu_here=$(CDPATH="" cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
+[ -f "$_gu_here/_scope_globs.sh" ] ||
+  { echo "git-read: $_gu_here/_scope_globs.sh is missing" >&2 && return 70; }
+# shellcheck source=SCRIPTDIR/_scope_globs.sh
+. "$_gu_here/_scope_globs.sh"
+
+# A revision: ref-name characters only, the whole string, never an option or a
+# range. `+` is there for a tag carrying SemVer build metadata (v1.0.0+build.7).
 _gu_rev() {
+  local re='^[A-Za-z0-9._/@^~+-]+$'
   case "$1" in
-    '' | -* | *..*) return 1 ;;
+    -* | *..*) return 1 ;;
   esac
-  printf '%s' "$1" | grep -Eq '^[A-Za-z0-9._/@^~+-]+$'
+  [[ "$1" =~ $re ]]
 }
 
-# A path: relative, inside the tree, forward slashes.
+# A two-dot range of two revisions.
+_gu_range() {
+  case "$1" in
+    *...*) return 1 ;;
+    *..*) _gu_rev "${1%%..*}" && _gu_rev "${1#*..}" ;;
+    *) return 1 ;;
+  esac
+}
+
+# A path: relative, inside the tree, forward slashes, one line.
 _gu_path() {
   case "$1" in
-    '' | /* | [A-Za-z]:* | *\\* | .. | ../* | */../* | */..) return 1 ;;
+    '' | /* | [A-Za-z]:* | *\\* | .. | ../* | */../* | */.. | *$'\n'* | *$'\r'*) return 1 ;;
   esac
-  return 0
 }
 
-_gu_refuse() {
-  echo "git-read: refused: $1" >&2
-  return 2
+# A positive count, the whole string.
+_gu_count() {
+  local re='^[1-9][0-9]*$'
+  [[ "$1" =~ $re ]]
 }
 
+_gu_refuse() { echo "git-read: refused: $1" >&2 && return 2; }
 _gu_need_rev() { _gu_rev "$1" || _gu_refuse "not a revision: $1"; }
 
 _gu_need_paths() {
   local p
   for p in "$@"; do
-    _gu_path "$p" || {
-      _gu_refuse "not a relative path inside the tree: $p"
-      return 2
-    }
+    _gu_path "$p" || { _gu_refuse "not a relative path inside the tree: $p"; return 2; }
   done
 }
 
 # True when this git knows --no-lazy-fetch (2.44 or later). Cached.
 _gu_lazy_flag() {
   if [ -z "${_GU_LAZY:-}" ]; then
-    local v major minor
+    local v re='([0-9]+)\.([0-9]+)'
     v="$(_gu_env_run version 2>/dev/null)" || v=""
-    if [[ "$v" =~ ([0-9]+)\.([0-9]+) ]]; then
-      major="${BASH_REMATCH[1]}"
-      minor="${BASH_REMATCH[2]}"
-      if [ "$major" -gt 2 ] || { [ "$major" -eq 2 ] && [ "$minor" -ge 44 ]; }; then
-        _GU_LAZY=yes
-      else
-        _GU_LAZY=no
-      fi
-    else
-      _GU_LAZY=no
+    _GU_LAZY=no
+    if [[ "$v" =~ $re ]]; then
+      local major="${BASH_REMATCH[1]}" minor="${BASH_REMATCH[2]}"
+      { [ "$major" -gt 2 ] || { [ "$major" -eq 2 ] && [ "$minor" -ge 44 ]; }; } && _GU_LAZY=yes
     fi
   fi
   [ "$_GU_LAZY" = yes ]
@@ -99,10 +103,10 @@ _gu_env_run() (
 )
 
 _gu_git() {
-  local lazy=()
+  local lazy=() promisor='^(extensions\.partialclone|remote\..*\.promisor)$'
   if _gu_lazy_flag; then
     lazy=(--no-lazy-fetch)
-  elif _gu_env_run config --get-regexp '^(extensions\.partialclone|remote\..*\.promisor)$' >/dev/null 2>&1; then
+  elif _gu_env_run config --get-regexp "$promisor" >/dev/null 2>&1; then
     _gu_refuse "a promisor remote is configured and this git predates --no-lazy-fetch (2.44)"
     return 2
   fi
@@ -113,47 +117,44 @@ _gu_git() {
     -c submodule.recurse=false -c diff.submodule=short "$@"
 }
 
+# The flags every form that diffs carries: no textconv, no external diff, no color.
+_GU_PLAIN=(--no-textconv --no-ext-diff --no-color)
+
 gu_names() {
   [ $# -eq 2 ] || { _gu_refuse "names takes <a> <b>"; return 2; }
   _gu_need_rev "$1" && _gu_need_rev "$2" || return 2
-  _gu_git diff --name-only --no-textconv --no-ext-diff --no-color --end-of-options "$1" "$2" --
+  _gu_git diff --name-only "${_GU_PLAIN[@]}" --end-of-options "$1" "$2" --
 }
 
 gu_patch() {
   [ $# -ge 2 ] || { _gu_refuse "patch takes <a> <b> [<path>...]"; return 2; }
   _gu_need_rev "$1" && _gu_need_rev "$2" || return 2
-  local a="$1" b="$2"
-  shift 2
+  local a="$1" b="$2" && shift 2
   _gu_need_paths "$@" || return 2
-  _gu_git diff --no-textconv --no-ext-diff --no-color --end-of-options "$a" "$b" -- "$@"
+  _gu_git diff "${_GU_PLAIN[@]}" --end-of-options "$a" "$b" -- "$@"
 }
 
 gu_log() {
   [ $# -ge 1 ] && [ $# -le 2 ] || { _gu_refuse "log takes <a>..<b> | <rev> [<n>]"; return 2; }
-  local spec="$1"
-  case "$spec" in
-    *...*) _gu_refuse "a three-dot range: $spec"; return 2 ;;
-    *..*) _gu_need_rev "${spec%%..*}" && _gu_need_rev "${spec#*..}" || return 2 ;;
-    *) _gu_need_rev "$spec" || return 2 ;;
+  case "$1" in
+    *..*) _gu_range "$1" || { _gu_refuse "not a two-dot range of revisions: $1"; return 2; } ;;
+    *) _gu_need_rev "$1" || return 2 ;;
   esac
   local max=()
   if [ $# -eq 2 ]; then
-    printf '%s' "$2" | grep -Eq '^[1-9][0-9]*$' || { _gu_refuse "not a count: $2"; return 2; }
+    _gu_count "$2" || { _gu_refuse "not a count: $2"; return 2; }
     max=("--max-count=$2")
   fi
-  _gu_git log ${max[@]+"${max[@]}"} --format='%h %s' --no-notes --no-textconv --no-ext-diff --no-color \
-    --end-of-options "$spec" --
+  _gu_git log ${max[@]+"${max[@]}"} --format='%h %s' --no-notes "${_GU_PLAIN[@]}" \
+    --end-of-options "$1" --
 }
 
 gu_show() {
   [ $# -eq 2 ] || { _gu_refuse "show takes <rev> --stat|--no-patch"; return 2; }
   _gu_need_rev "$1" || return 2
-  case "$2" in
-    --stat | --no-patch) ;;
-    *) _gu_refuse "show takes --stat or --no-patch, not: $2"; return 2 ;;
-  esac
-  _gu_git show "$2" --format=medium --no-notes --no-textconv --no-ext-diff --no-color \
-    --end-of-options "$1" --
+  [ "$2" = --stat ] || [ "$2" = --no-patch ] ||
+    { _gu_refuse "show takes --stat or --no-patch, not: $2"; return 2; }
+  _gu_git show "$2" --format=medium --no-notes "${_GU_PLAIN[@]}" --end-of-options "$1" --
 }
 
 gu_files() {
@@ -166,8 +167,7 @@ gu_grep() {
   [ $# -ge 2 ] || { _gu_refuse "grep takes <pattern> <rev> [<path>...]"; return 2; }
   [ -n "$1" ] || { _gu_refuse "an empty pattern"; return 2; }
   _gu_need_rev "$2" || return 2
-  local pattern="$1" rev="$2"
-  shift 2
+  local pattern="$1" rev="$2" && shift 2
   _gu_need_paths "$@" || return 2
   _gu_git grep -n -I -F --no-textconv --no-color -e "$pattern" --end-of-options "$rev" -- "$@"
 }
@@ -176,4 +176,25 @@ gu_base() {
   [ $# -eq 1 ] || { _gu_refuse "base takes <rev>"; return 2; }
   _gu_need_rev "$1" || return 2
   _gu_git merge-base --end-of-options HEAD "$1"
+}
+
+# The patch of every changed file _scope_globs.sh counts as a manifest, into a
+# file. The selection is made here, so no repository file name reaches a caller.
+gu_manifests() {
+  [ $# -eq 3 ] || { _gu_refuse "manifests takes <a> <b> <file>"; return 2; }
+  _gu_need_rev "$1" && _gu_need_rev "$2" || return 2
+  _gu_path "$3" || { _gu_refuse "not a relative path inside the tree: $3"; return 2; }
+  local names f picked=()
+  names="$(gu_names "$1" "$2")" || return $?
+  while IFS= read -r f; do
+    [ -n "$f" ] && matches_any "$f" "${SCOPE_DEP_GLOBS[@]}" && picked+=("$f")
+  done <<<"$names"
+  mkdir -p "$(dirname "$3")"
+  # None changed: an empty file, since a patch naming no path is the whole diff.
+  if [ ${#picked[@]} -eq 0 ]; then
+    : >"$3"
+  else
+    gu_patch "$1" "$2" "${picked[@]}" >"$3" || return $?
+  fi
+  echo "MANIFESTS: ${#picked[@]}"
 }

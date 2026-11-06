@@ -1,5 +1,6 @@
 import { fromFileUrl } from "@std/path";
 import { git } from "./collect_audit_scope_fixture.ts";
+import { IDENTITY, run } from "./child_fixture.ts";
 
 /**
  * The harness the `git-read.sh` tests share: the script, its library, a runner
@@ -16,44 +17,16 @@ export const LIBRARY = fromFileUrl(
   new URL("../../templates/core/specnaut/scripts/bash/_git_untrusted.sh", import.meta.url),
 );
 
-export type Result = { code: number; stdout: string; stderr: string };
-
-const IDENTITY = {
-  GIT_AUTHOR_NAME: "Test",
-  GIT_AUTHOR_EMAIL: "test@example.com",
-  GIT_COMMITTER_NAME: "Test",
-  GIT_COMMITTER_EMAIL: "test@example.com",
-};
-
-/** Runs `cmd` in `cwd` with `env` on top of the inherited environment. */
-export async function runIn(
-  cmd: string,
-  args: string[],
-  cwd: string,
-  env: Record<string, string> = {},
-): Promise<Result> {
-  const out = await new Deno.Command(cmd, {
-    args,
-    cwd,
-    stdin: "null",
-    stdout: "piped",
-    stderr: "piped",
-    env: { HOME: cwd, ...env },
-  }).output();
-  const d = new TextDecoder();
-  return { code: out.code, stdout: d.decode(out.stdout), stderr: d.decode(out.stderr) };
-}
-
 /** Plain git, as an agent's shell would run it: the positive control. */
 export function plainGit(args: string[], cwd: string, env: Record<string, string> = {}) {
-  return runIn("git", args, cwd, { ...IDENTITY, ...env });
+  return run("git", args, cwd, { ...IDENTITY, ...env });
 }
 
 /** `git-read.sh <args>`; `noglob` keeps a wildcard argument as typed on Windows. */
 export function gitRead(args: string[], cwd: string, env: Record<string, string> = {}) {
   const e: Record<string, string> = { ...env };
   if (Deno.build.os === "windows") e.MSYS = "noglob";
-  return runIn("bash", [SCRIPT, ...args], cwd, e);
+  return run("bash", [SCRIPT, ...args], cwd, e);
 }
 
 /** The library's runner on a fixed argv, as a script that sources it calls it. */
@@ -61,7 +34,7 @@ export function libraryGit(args: string[], cwd: string, env: Record<string, stri
   const e: Record<string, string> = { ...env };
   if (Deno.build.os === "windows") e.MSYS = "noglob";
   const lib = LIBRARY.replaceAll("\\", "/");
-  return runIn("bash", ["-c", '. "$1"; shift; _gu_git "$@"', "_", lib, ...args], cwd, e);
+  return run("bash", ["-c", '. "$1"; shift; _gu_git "$@"', "_", lib, ...args], cwd, e);
 }
 
 /** Forward slashes: git runs these programs through a shell, which reads `\` as an escape. */

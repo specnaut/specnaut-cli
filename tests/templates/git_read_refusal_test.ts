@@ -33,6 +33,11 @@ const REFUSED: [string, string[]][] = [
   ["a drive-letter path", ["files", "C:/Windows"]],
   ["an empty pattern", ["grep", "", "HEAD"]],
   ["too many arguments", ["names", "HEAD~1", "HEAD", "notes.txt"]],
+  ["a revision whose second line is an option", ["names", "HEAD\n--output=x", "HEAD"]],
+  ["a range whose second line is an option", ["log", "HEAD~1..HEAD\n--all"]],
+  ["a count with a second line", ["log", "HEAD", "1\n2"]],
+  ["a path with a second line", ["files", "notes.txt\n.."]],
+  ["a manifests output path outside the tree", ["manifests", "HEAD~1", "HEAD", "/tmp/m.diff"]],
 ];
 
 for (const [why, argv] of REFUSED) {

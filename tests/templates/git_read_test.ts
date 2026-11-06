@@ -145,6 +145,15 @@ Deno.test("git-read reads a path literally, never as a pathspec pattern", () =>
     assertEquals(r.stdout, "", "`*.json` matched deno.json as a glob");
   }));
 
+Deno.test("git-read grep reads the revision it is given, not the work tree", () =>
+  withPlants(async (dir) => {
+    const worktree = await plainGit(["grep", "-F", "-e", "version 1"], dir);
+    assertEquals(worktree.stdout, "", "the text must exist only at the older revision");
+    const r = await gitRead(["grep", "version 1", "HEAD~1"], dir);
+    assertEquals(r.code, 0, r.stderr);
+    assertEquals(r.stdout, "HEAD~1:notes.txt:1:version 1\n");
+  }));
+
 Deno.test("git-read hands a grep pattern to git as a pattern, never as an option", () =>
   withPlants(async (dir, p) => {
     // `-f <file>` would read the patterns from a file outside the tree.

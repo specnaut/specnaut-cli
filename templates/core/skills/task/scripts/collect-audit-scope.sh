@@ -21,7 +21,7 @@ set -euo pipefail
 here=$(CDPATH="" cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 [ -f "$here/_git_untrusted.sh" ] || { echo "error: $here/_git_untrusted.sh is missing" >&2 && exit 70; }
 # shellcheck source=SCRIPTDIR/_git_untrusted.sh
-. "$here/_git_untrusted.sh"
+. "$here/_git_untrusted.sh" || exit 70
 
 PATH_ARG=""
 RANGE_ARG=""
@@ -42,17 +42,12 @@ while [ $# -gt 0 ]; do
         usage
         exit 2
       fi
-      # Reject anything that escapes the repo root before any git call: an
-      # absolute path (leading '/') or any '..' path segment lets the caller
-      # point the scope outside the working tree. Only relative, in-tree
-      # subtrees are valid scope arguments.
-      case "$PATH_ARG" in
-        /* | ../* | */../* | */.. | ..)
-          echo "error: --path must be a relative path inside the repo (got: $PATH_ARG)" >&2
-          usage
-          exit 2
-          ;;
-      esac
+      # Before any git call, and by the library's own rule: relative and in-tree.
+      if ! _gu_path "$PATH_ARG"; then
+        echo "error: --path must be a relative path inside the repo (got: $PATH_ARG)" >&2
+        usage
+        exit 2
+      fi
       shift 2
       ;;
     --range)
@@ -62,15 +57,9 @@ while [ $# -gt 0 ]; do
         usage
         exit 2
       fi
-      # Validate the range shape before handing it to git — a malformed range
-      # must error, not silently fall through to auto-scope. Two endpoints,
-      # each restricted to a git-ref-name allowlist ([A-Za-z0-9._/@^~-]), around
-      # a single two-dot '..'. This rejects three-dot ranges, shell
-      # metacharacters, and whitespace (so a value can never become a shell
-      # injection or a misleading empty scope). The '.' is allowed inside a ref
-      # (tags like v1.0) but the '..' separator must be exactly two dots.
-      if ! printf '%s' "$RANGE_ARG" | grep -Eq '^[A-Za-z0-9._/@^~-]+\.\.[A-Za-z0-9._/@^~-]+$' ||
-        printf '%s' "$RANGE_ARG" | grep -Eq '\.\.\.'; then
+      # A malformed range errors, never falls through to auto-scope: two
+      # revisions around one two-dot '..', by the library's own rule.
+      if ! _gu_range "$RANGE_ARG"; then
         echo "error: --range must match <a>..<b> with ref-name-shaped endpoints (got: $RANGE_ARG)" >&2
         usage
         exit 2
@@ -106,27 +95,28 @@ SCOPE_LABEL=""
 COMMITS=""
 FILES=""
 
+# scope_read <form> <args...> - the form's output. A refusal by the library stops
+# the audit with its message: an argument it refuses is an error, not an empty
+# scope. Any other failure (an unknown revision) reads as empty, as before.
+scope_read() {
+  local out rc=0 err
+  err="$(mktemp)"
+  out="$("$@" 2>"$err")" || rc=$?
+  if [ "$rc" -eq 2 ] && grep -q '^git-read: refused' "$err"; then
+    cat "$err" >&2
+    rm -f "$err"
+    exit 2
+  fi
+  rm -f "$err"
+  printf '%s' "$out"
+}
+
 # Classifies a newline-separated file list into the four CATEGORY SIGNAL
 # counters in a SINGLE pass over the list. Each file is tested against every
 # category's glob set independently (a file can count toward more than one
 # category, e.g. a frontend test file). Sets FRONTEND_COUNT / TEST_COUNT /
-# DEP_COUNT / INFRA_COUNT. The globs are heuristic (research.md Decision 1):
-# good enough to pick which expert seats run. One pass instead of four is a perf
-# optimization only: the counts equal four separate passes.
-#
-# matches_any <file> <glob...> — 0 if the file matches any of the globs.
-matches_any() {
-  local f="$1"
-  shift
-  local pat
-  for pat in "$@"; do
-    # shellcheck disable=SC2254
-    case "$f" in
-      $pat) return 0 ;;
-    esac
-  done
-  return 1
-}
+# DEP_COUNT / INFRA_COUNT. The globs live in _scope_globs.sh, sourced by the
+# library. One pass instead of four is a perf optimization only.
 
 classify_files() {
   local list="$1"
@@ -141,20 +131,10 @@ classify_files() {
     # failed `&&` compound list (a non-match is expected, not an error). This is
     # bash semantics; a future shebang switch to /bin/sh would need an explicit
     # `if matches_any …; then COUNT=…; fi` rewrite to stay safe.
-    matches_any "$f" \
-      '*.tsx' '*.jsx' '*.vue' '*.svelte' '*.css' '*.scss' '*inertia*' '*frontend*' '*components*' &&
-      FRONTEND_COUNT=$((FRONTEND_COUNT + 1))
-    matches_any "$f" \
-      '*_test.*' '*.test.*' '*.spec.*' 'tests/*' '*/tests/*' 'test/*' '*/test/*' '*__tests__*' &&
-      TEST_COUNT=$((TEST_COUNT + 1))
-    matches_any "$f" \
-      'package.json' '*/package.json' 'deno.json' '*/deno.json' 'deno.jsonc' '*.lock' \
-      'Cargo.toml' 'pyproject.toml' 'go.mod' 'composer.json' 'Gemfile' 'requirements.txt' &&
-      DEP_COUNT=$((DEP_COUNT + 1))
-    matches_any "$f" \
-      'Dockerfile' '*/Dockerfile' '*.tf' '*.pulumi.*' 'k8s/*' '*/k8s/*' \
-      '.github/workflows/*' '*.yaml' '*.yml' &&
-      INFRA_COUNT=$((INFRA_COUNT + 1))
+    matches_any "$f" "${SCOPE_FRONTEND_GLOBS[@]}" && FRONTEND_COUNT=$((FRONTEND_COUNT + 1))
+    matches_any "$f" "${SCOPE_TEST_GLOBS[@]}" && TEST_COUNT=$((TEST_COUNT + 1))
+    matches_any "$f" "${SCOPE_DEP_GLOBS[@]}" && DEP_COUNT=$((DEP_COUNT + 1))
+    matches_any "$f" "${SCOPE_INFRA_GLOBS[@]}" && INFRA_COUNT=$((INFRA_COUNT + 1))
   done <<EOF
 $list
 EOF
@@ -166,7 +146,7 @@ if [ -n "$PATH_ARG" ]; then
   SCOPE="path"
   SCOPE_LABEL="$PATH_ARG"
   # Tracked files under the subtree; no commit list for a path scope.
-  FILES="$(gu_files "$PATH_ARG" 2>/dev/null || true)"
+  FILES="$(scope_read gu_files "$PATH_ARG")"
   COMMITS=""
   if [ -z "$FILES" ]; then
     echo "warning: --path '$PATH_ARG' matched no tracked files (empty scope)" >&2
@@ -175,21 +155,21 @@ elif [ -n "$RANGE_ARG" ]; then
   SCOPE="range"
   SCOPE_LABEL="$RANGE_ARG"
   # The library takes the two endpoints apart; each is validated again there.
-  FILES="$(gu_names "${RANGE_ARG%%..*}" "${RANGE_ARG#*..}" 2>/dev/null || true)"
-  COMMITS="$(gu_log "$RANGE_ARG" 2>/dev/null || true)"
+  FILES="$(scope_read gu_names "${RANGE_ARG%%..*}" "${RANGE_ARG#*..}")"
+  COMMITS="$(scope_read gu_log "$RANGE_ARG")"
 elif _gu_git rev-parse --verify --quiet origin/main >/dev/null 2>&1 &&
   local_count="$(_gu_git rev-list --count origin/main..HEAD 2>/dev/null || echo 0)" &&
   [ "$local_count" -gt 0 ]; then
   # Reuse the count captured in the guard rather than running rev-list twice.
   SCOPE="unpushed"
   SCOPE_LABEL="origin/main..HEAD (${local_count} commits)"
-  FILES="$(gu_names origin/main HEAD 2>/dev/null || true)"
-  COMMITS="$(gu_log origin/main..HEAD 2>/dev/null || true)"
+  FILES="$(scope_read gu_names origin/main HEAD)"
+  COMMITS="$(scope_read gu_log origin/main..HEAD)"
 elif TAG="$(_gu_git describe --tags --abbrev=0 2>/dev/null)" && [ -n "$TAG" ]; then
   SCOPE="since-tag"
   SCOPE_LABEL="${TAG}..HEAD"
-  FILES="$(gu_names "$TAG" HEAD 2>/dev/null || true)"
-  COMMITS="$(gu_log "${TAG}..HEAD" 2>/dev/null || true)"
+  FILES="$(scope_read gu_names "$TAG" HEAD)"
+  COMMITS="$(scope_read gu_log "${TAG}..HEAD")"
 else
   SCOPE="last-N"
   # Clamp N to the available history so HEAD~N never points before the root.
@@ -203,11 +183,11 @@ else
     # The window covers all of history; HEAD~N would precede the root, so diff
     # against the empty tree to surface every file the history touched.
     EMPTY_TREE="$(_gu_git hash-object -t tree /dev/null)"
-    FILES="$(gu_names "$EMPTY_TREE" HEAD 2>/dev/null || true)"
+    FILES="$(scope_read gu_names "$EMPTY_TREE" HEAD)"
   else
-    FILES="$(gu_names "HEAD~${N}" HEAD 2>/dev/null || true)"
+    FILES="$(scope_read gu_names "HEAD~${N}" HEAD)"
   fi
-  COMMITS="$(gu_log HEAD "$N" 2>/dev/null || true)"
+  COMMITS="$(scope_read gu_log HEAD "$N")"
 fi
 
 # Normalize: drop blank lines once, then count the surviving lines.

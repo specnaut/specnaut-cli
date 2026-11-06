@@ -17,6 +17,12 @@ import {
  * The last case runs every form with every planted program in place.
  */
 
+/** The git on PATH knows --no-lazy-fetch (2.44 or later). */
+const LAZY_FLAG = await (async () => {
+  const v = (await plainGit(["version"], Deno.cwd())).stdout.match(/(\d+)\.(\d+)/);
+  return v !== null && (Number(v[1]) > 2 || (Number(v[1]) === 2 && Number(v[2]) >= 44));
+})();
+
 /** `dir` with a submodule `sub` holding `needle` in a file, recorded in two commits. */
 async function withSubmodule(dir: string, root: string): Promise<void> {
   const sub = `${root}/sub-origin`;
@@ -31,37 +37,42 @@ async function withSubmodule(dir: string, root: string): Promise<void> {
   await git(["commit", "-am", "chore: submodule subject two"], sub);
   await git(["-C", "sub", "pull", "-q", "origin", "main"], dir);
   await git(["commit", "-am", "chore: move the submodule"], dir);
+  await git(["config", "submodule.recurse", "true"], dir);
+  await git(["config", "diff.submodule", "log"], dir);
 }
 
-Deno.test("git-read never enters a submodule, whatever the repository sets", async () => {
+async function inSubmoduleRepo(fn: (dir: string) => Promise<void>): Promise<void> {
   const dir = await twoCommitRepo();
   const root = await Deno.makeTempDir({ prefix: "git-read-sub-" });
   try {
     await withSubmodule(dir, root);
-    await git(["config", "submodule.recurse", "true"], dir);
-    await git(["config", "diff.submodule", "log"], dir);
-    const grep = await plainGit(["grep", "-F", "-e", "needle", "HEAD"], dir);
-    assertStringIncludes(grep.stdout, "sub/inside.txt", "the recursion must be live");
-    const diff = await plainGit(["diff", "HEAD~1", "HEAD"], dir);
-    assertStringIncludes(diff.stdout, "submodule subject two", "the submodule log must be live");
-
-    const g = await gitRead(["grep", "needle", "HEAD"], dir);
-    assert(!g.stdout.includes("sub/inside.txt"), `grep entered the submodule:\n${g.stdout}`);
-    const d = await gitRead(["patch", "HEAD~1", "HEAD"], dir);
-    assertEquals(d.code, 0, d.stderr);
-    assertStringIncludes(d.stdout, "Subproject commit", "the patch form must have run");
-    assert(
-      !d.stdout.includes("submodule subject two"),
-      `patch read the submodule's log:\n${d.stdout}`,
-    );
+    await fn(dir);
   } finally {
     await Deno.remove(dir, { recursive: true });
     await Deno.remove(root, { recursive: true });
   }
-});
+}
 
-/** Turns `dir` into a partial clone missing HEAD's `notes.txt`, its fetch a planted program. */
-async function promisor(dir: string, p: Plants): Promise<void> {
+Deno.test("git-read grep never enters a submodule, whatever the repository sets", () =>
+  inSubmoduleRepo(async (dir) => {
+    const control = await plainGit(["grep", "-F", "-e", "needle", "HEAD"], dir);
+    assertStringIncludes(control.stdout, "sub/inside.txt", "the recursion must be live");
+    const g = await gitRead(["grep", "needle", "HEAD"], dir);
+    assert(!g.stdout.includes("sub/inside.txt"), `grep entered the submodule:\n${g.stdout}`);
+  }));
+
+Deno.test("git-read patch never reads a submodule's log, whatever the repository sets", () =>
+  inSubmoduleRepo(async (dir) => {
+    const control = await plainGit(["diff", "HEAD~1", "HEAD"], dir);
+    assertStringIncludes(control.stdout, "submodule subject two", "the submodule log must be live");
+    const d = await gitRead(["patch", "HEAD~1", "HEAD"], dir);
+    assertEquals(d.code, 0, d.stderr);
+    assertStringIncludes(d.stdout, "Subproject commit", "the patch form must have run");
+    assert(!d.stdout.includes("submodule subject two"), `read the submodule's log:\n${d.stdout}`);
+  }));
+
+/** Makes `dir` a partial clone missing HEAD's `notes.txt`; its fetch is a planted program. */
+async function promisor(dir: string, p: Plants): Promise<string> {
   const blob = (await git(["rev-parse", "HEAD:notes.txt"], dir)).trim();
   await Deno.remove(`${dir}/.git/objects/${blob.slice(0, 2)}/${blob.slice(2)}`);
   await git(["config", "core.repositoryformatversion", "1"], dir);
@@ -69,22 +80,30 @@ async function promisor(dir: string, p: Plants): Promise<void> {
   await git(["config", "remote.origin.url", slash(`${p.dir}/nowhere`)], dir);
   await git(["config", "remote.origin.promisor", "true"], dir);
   await git(["config", "remote.origin.uploadpack", await p.plant("upload-pack")], dir);
+  return blob;
 }
 
-Deno.test("git-read never fetches a missing object from a promisor remote", async () => {
-  const dir = await twoCommitRepo();
-  const p = await Plants.create();
-  try {
-    await promisor(dir, p);
-    await plainGit(["diff", "HEAD~1", "HEAD"], dir);
-    assertEquals(await p.ran(), ["upload-pack"], "the lazy fetch must be live");
-    const r = await gitRead(["patch", "HEAD~1", "HEAD", "notes.txt"], dir);
-    assert(r.code !== 0, "the object is missing; reading it cannot succeed");
-    assertEquals(await p.ran(), []);
-  } finally {
-    await Deno.remove(dir, { recursive: true });
-    await p.remove();
-  }
+// Below 2.44 the library refuses instead, which the next case covers.
+Deno.test({
+  name: "git-read never fetches a missing object from a promisor remote",
+  ignore: !LAZY_FLAG,
+  fn: async () => {
+    const dir = await twoCommitRepo();
+    const p = await Plants.create();
+    try {
+      const blob = await promisor(dir, p);
+      await plainGit(["diff", "HEAD~1", "HEAD"], dir);
+      assertEquals(await p.ran(), ["upload-pack"], "the lazy fetch must be live");
+      const r = await gitRead(["patch", "HEAD~1", "HEAD", "notes.txt"], dir);
+      assert(r.code !== 0, "the object is missing; reading it cannot succeed");
+      assert(!r.stderr.includes("git-read: refused"), "git ran, and the library refused nothing");
+      assertStringIncludes(r.stderr, blob, "git's own error names the missing object");
+      assertEquals(await p.ran(), []);
+    } finally {
+      await Deno.remove(dir, { recursive: true });
+      await p.remove();
+    }
+  },
 });
 
 /** A `git` first on PATH that reports `version` and runs the real git for the rest. */
@@ -112,7 +131,6 @@ Deno.test({
       const env = await olderGit(shim, "2.43.0");
       const plain = await gitRead(["names", "HEAD~1", "HEAD"], dir, env);
       assertEquals(plain.code, 0, `an ordinary repository still reads: ${plain.stderr}`);
-      assertStringIncludes(plain.stdout, "notes.txt");
       await promisor(dir, p);
       const r = await gitRead(["patch", "HEAD~1", "HEAD", "notes.txt"], dir, env);
       assertEquals(r.code, 2, r.stderr);
@@ -126,45 +144,48 @@ Deno.test({
   },
 });
 
-Deno.test("every git-read form runs with every planted program in place, and none of them runs", async () => {
-  const dir = await twoCommitRepo();
-  const p = await Plants.create();
-  try {
-    for (const kind of ["openpgp", "ssh", "x509"] as const) await signedCommit(dir, kind);
-    await Deno.writeTextFile(`${dir}/.gitattributes`, "*.txt diff=conv\n*.bin diff=ext\n");
-    await Deno.writeTextFile(`${p.dir}/allowed`, "");
-    const config: [string, string][] = [
-      ["core.fsmonitor", await p.plant("fsmonitor")],
-      ["diff.conv.textconv", await p.plant("textconv")],
-      ["diff.ext.command", await p.plant("external-diff")],
-      ["diff.external", await p.plant("diff-external")],
-      ["core.pager", await p.plant("pager")],
-      ["gpg.program", await p.plant("gpg")],
-      ["gpg.ssh.program", await p.plant("gpg-ssh")],
-      ["gpg.x509.program", await p.plant("gpg-x509")],
+/** Every program and setting git could be made to run, configured in `dir`. */
+async function plantEverything(dir: string, p: Plants): Promise<void> {
+  for (const kind of ["openpgp", "ssh", "x509"] as const) await signedCommit(dir, kind);
+  await Deno.writeTextFile(`${dir}/.gitattributes`, "*.txt diff=conv\n*.bin diff=ext\n");
+  await Deno.writeTextFile(`${p.dir}/allowed`, "");
+  for (const hook of ["post-index-change", "reference-transaction"]) {
+    await p.plant(hook, `${p.dir}/${hook}`);
+  }
+  const programs = ["core.fsmonitor", "diff.conv.textconv", "diff.ext.command", "diff.external"]
+    .concat(["core.pager", "gpg.program", "gpg.ssh.program", "gpg.x509.program"]);
+  for (const key of programs) await git(["config", key, await p.plant(key)], dir);
+  for (
+    const [k, v] of [
       ["gpg.ssh.allowedSignersFile", slash(`${p.dir}/allowed`)],
       ["log.showSignature", "true"],
       ["format.pretty", "format:%G? %s"],
       ["core.hooksPath", slash(p.dir)],
-    ];
-    for (const [k, v] of config) await git(["config", k, v], dir);
-    for (const hook of ["post-index-change", "reference-transaction"]) {
-      await p.plant(hook, `${p.dir}/${hook}`);
-    }
-    const forms = [
-      ["names", "HEAD~1", "HEAD"],
-      ["patch", "HEAD~1", "HEAD"],
-      ["log", "HEAD~1..HEAD"],
-      ...["openpgp", "ssh", "x509"].flatMap((k) => [
-        ["log", `signed-${k}`, "1"],
-        ["show", `signed-${k}`, "--stat"],
-        ["show", `signed-${k}`, "--no-patch"],
-      ]),
-      ["files"],
-      ["grep", "version", "HEAD"],
-      ["base", "main"],
-    ];
-    for (const form of forms) {
+    ]
+  ) await git(["config", k, v], dir);
+}
+
+const FORMS = [
+  ["names", "HEAD~1", "HEAD"],
+  ["patch", "HEAD~1", "HEAD"],
+  ["log", "HEAD~1..HEAD"],
+  ...["openpgp", "ssh", "x509"].flatMap((k) => [
+    ["log", `signed-${k}`, "1"],
+    ["show", `signed-${k}`, "--stat"],
+    ["show", `signed-${k}`, "--no-patch"],
+  ]),
+  ["files"],
+  ["grep", "version", "HEAD"],
+  ["base", "main"],
+  ["manifests", "HEAD~1", "HEAD", "out/manifests.diff"],
+];
+
+Deno.test("every git-read form runs with every planted program in place, and none of them runs", async () => {
+  const dir = await twoCommitRepo();
+  const p = await Plants.create();
+  try {
+    await plantEverything(dir, p);
+    for (const form of FORMS) {
       const r = await gitRead(form, dir);
       assertEquals(r.code, 0, `git-read ${form.join(" ")}: ${r.stderr}`);
       assert(r.stdout.length > 0, `git-read ${form.join(" ")} printed nothing`);

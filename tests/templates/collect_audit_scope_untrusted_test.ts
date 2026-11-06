@@ -136,6 +136,22 @@ Deno.test("collect-audit-scope scopes since a tag whose name carries build metad
   }
 });
 
+Deno.test("collect-audit-scope stops on a tag git accepts and the library refuses", async () => {
+  const dir = await fixtureRepo();
+  try {
+    await git(["tag", "v1,2"], dir);
+    await Deno.writeTextFile(`${dir}/src/after.ts`, "export const after = 1;\n");
+    await git(["add", "."], dir);
+    await git(["commit", "-m", "feat: after the tag"], dir);
+    const r = await scope(dir, []);
+    assertEquals(r.code, 2, `a refused tag must stop the audit:\n${r.stdout}`);
+    assertStringIncludes(r.stderr, "git-read: refused: not a revision: v1,2");
+    assertStrictEquals(r.stdout, "", "no scope block, rather than an empty one");
+  } finally {
+    await Deno.remove(dir, { recursive: true });
+  }
+});
+
 async function exists(path: string): Promise<boolean> {
   try {
     await Deno.lstat(path);
