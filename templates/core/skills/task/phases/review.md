@@ -16,8 +16,8 @@ from there as files. A non-zero exit stops with its message — exit 6 too, Clou
 and an older cache reused: do not review against an empty or stale spec.
 
 <!-- END: spec-backend=cloud -->
-1. Fix the range: `base=$(git merge-base HEAD main)`; the files under review are
-   `git diff --name-only $base..HEAD`.
+1. Fix the range: `base=$(bash .specnaut/scripts/bash/git-read.sh base main)`; the files under
+   review are `bash .specnaut/scripts/bash/git-read.sh names "$base" HEAD`.
 2. Measure (Phase 0), then fan the review seats out from this session (Phase 1) and aggregate
    their reports per `phases/review-seats.md`.
 3. Detect the project's toolchain and run its quality gates.

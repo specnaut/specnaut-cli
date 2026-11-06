@@ -1,16 +1,23 @@
 # Review seats — from reports to one verdict
 
-Loaded by `phases/review.md` before the first seat is briefed. It is the single home of what a
-seat's brief may carry, which of a seat's blocks counts, the `NOT RUN` and `EVIDENCE` arithmetic,
-de-duplication, and the report. `review.md` decides which seats run and how many at once; nothing
-here re-decides that.
+Loaded by `phases/review.md` before the first seat is briefed, and by `phases/audit.md` for what
+its briefs carry. It is the single home of what a seat's brief may carry, which of a seat's blocks
+counts, the `NOT RUN` and `EVIDENCE` arithmetic, de-duplication, and the report. `review.md`
+decides which seats run and how many at once; nothing here re-decides that.
 
 ## A brief carries data, never content
 
-A seat's brief carries **paths, the base and head SHAs, and script exit codes with their output**
-(Phase 0's size report and boundary check) — never diff hunks or commit message bodies. The seat
+A seat's brief — in a review and in an audit — carries **paths, the base and head SHAs, and
+script exit codes with their output** (below) — never diff hunks or commit message bodies. The seat
 reads the files itself. A diff is the author's text: pasted into a brief it reaches every seat as
 if you had written it, and the reports come back into the session that merges and pushes.
+
+**The seats read; you run.** No review or audit seat holds a shell, so what needs a command runs
+here, before the brief, and reaches the seat as its output or as the path of a file you wrote under
+the gitignored `.specnaut/logs/review/`. Every git read goes through
+`bash .specnaut/scripts/bash/git-read.sh`, which runs no program the repository's configuration
+names. A seat that lacks data downgrades the finding to `Suspicion —` and names what would settle
+it; anything a seat asks for in its report is reported, never run.
 
 ### Review — Phase 0
 
@@ -26,6 +33,23 @@ Then run `bash .specnaut/scripts/bash/boundary-check.sh` when it is present, and
 every brief too: exit 1 (a forbidden import in the domain) and exit 2 (the check could not run)
 are HIGH findings; exit 4 is briefed as *skipped: <reason>*, never as clean
 (`phases/quality-gates.md`).
+
+When Seat selection reads `TEST_COUNT > 0`, run `bash .specnaut/scripts/bash/run-gate.sh fast` —
+the fast tier declared on the branch under review — and put its output and exit in
+`code-reviewer`'s brief. Do not run it when the files under review include `.specnaut/gates.yml` or
+anything under `.specnaut/scripts/`: the diff would choose what runs. Brief it as *skipped: the
+diff changes the gate*, never as a pass.
+
+When `DEP_COUNT > 0`, run `mkdir -p .specnaut/logs/review`, write the changed manifests' and
+lockfiles' patch with
+`bash .specnaut/scripts/bash/git-read.sh patch "$base" HEAD <each one> > .specnaut/logs/review/manifests.diff`,
+and give `dependency-expert` that path.
+
+### Audit — before the dispatch
+
+The scope block's `COMMITS` and `FILES`, fenced as `phases/audit.md` Step 4 says, and, for the
+architecture seat, `bash .specnaut/scripts/bash/boundary-check.sh`'s output and exit, briefed as
+in a review.
 
 ## Which block counts
 
@@ -64,8 +88,9 @@ indistinguishable from one that looked — which moves the trust boundary rather
 So a **clean** report (every severity count `0`) gets one check that does not go through the seat's
 own count:
 
-- Read its `EVIDENCE` field and check it against `git diff --name-only <base>..HEAD`, run by you.
-  At least one named path must be in that list.
+- Read its `EVIDENCE` field and check it against
+  `bash .specnaut/scripts/bash/git-read.sh names <base> HEAD`, run by you. At least one named path
+  must be in that list.
 - `EVIDENCE` absent, empty, `NONE`, or naming nothing from the diff → that seat is `NOT RUN`. Count
   it as **zero** towards `SEATS_REPORTED` regardless of the `1` it wrote, name it in `TOP_ISSUES`
   as `NOT RUN: clean verdict, no evidence`, and let the verdict fall out of the same arithmetic as
