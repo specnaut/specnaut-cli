@@ -12,14 +12,15 @@
 # the siblings close-shipped.sh calls with stubs that record their argv to
 # `calls`, runs it there, and sets CS_RC, CS_OUT (stdout+stderr), CS_CALLS.
 # cascade-check.sh exits 11 (open) for a listed issue, 12 (closed) otherwise;
-# sweep-closed.sh prints <sweep stdout> and exits 0.
+# sweep-closed.sh prints <sweep stdout> and exits 0. columns.sh answers
+# `Shipped`: the terminal column Cloud's close moves a card into.
 probe_close_shipped() {
   local open=$1 sweep=$2 tmp dir s
   shift 2
   tmp=$(mktemp -d "${TMPDIR:-/tmp}/close-shipped.XXXXXX") || return 1
   dir=$tmp/b
   cp -R .specnaut/scripts/backlog "$dir" || { rm -rf -- "$tmp"; return 1; }
-  for s in cascade-check move move-batch sweep-closed; do
+  for s in cascade-check move move-batch sweep-closed columns; do
     # shellcheck disable=SC2016 # the stub expands $*, not this shell
     printf '#!/usr/bin/env bash\necho "%s${*:+ $*}" >>"%s/calls"\n' "$s" "$dir" >"$dir/$s.sh"
   done
@@ -27,6 +28,7 @@ probe_close_shipped() {
   printf 'case " %s " in *" $1 "*) exit 11 ;; esac\nexit 12\n' "$open" >>"$dir/cascade-check.sh"
   printf '%s\n' "$sweep" >"$dir/sweep.out"
   printf 'cat "%s/sweep.out"\n' "$dir" >>"$dir/sweep-closed.sh"
+  echo 'echo Shipped' >>"$dir/columns.sh"
   : >"$dir/calls"
   CS_RC=0
   CS_OUT=$(bash "$dir/close-shipped.sh" "$@" 2>&1) || CS_RC=$?

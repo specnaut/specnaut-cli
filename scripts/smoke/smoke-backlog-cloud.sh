@@ -77,7 +77,8 @@ check "a parent goes by its public number (#563 AC6)" \
 echo "═══ spec 042  close-shipped.sh — the move is the close ═══"
 check "close-shipped.sh present + executable, its shared body _close_shipped.sh beside it (spec 042, cli#711)" \
   '[ -x .specnaut/scripts/backlog/close-shipped.sh ] && [ -f .specnaut/scripts/backlog/_close_shipped.sh ]'
-check "close-shipped.sh moves each item to Done, in order, and asks no forge (spec 042)" \
-  'probe_close_shipped "" "" 5 6 && close_shipped_was 0 "$(printf "move 5 Done\nmove 6 Done")" "DONE #5" "DONE #6"'
+check "close-shipped.sh moves each item into the board's terminal column, in order, and asks no forge (spec 042)" \
+  'probe_close_shipped "" "" 5 6 &&
+   close_shipped_was 0 "$(printf "columns --terminal\nmove 5 Shipped\nmove 6 Shipped")" "DONE #5" "DONE #6"'
 
 finish "BACKLOG-CLOUD"
