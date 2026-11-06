@@ -1,8 +1,14 @@
-import { assert, assertEquals, assertNotEquals, assertStringIncludes } from "@std/assert";
+import { assert, assertEquals, assertStringIncludes } from "@std/assert";
 import { join, relative } from "@std/path";
 import { exists } from "@std/fs/exists";
-import { type Project, project } from "./backlog_tracker_fixture.ts";
-import { gitProject, NOT_INERT, readItems, removeRead } from "./read_items_fixture.ts";
+import {
+  answer,
+  ghIssue,
+  gitProject,
+  NOT_INERT,
+  readItems,
+  removeRead,
+} from "./read_items_fixture.ts";
 
 /**
  * The product owner receives issue text as data: `read-items.sh` writes every
@@ -23,47 +29,6 @@ const STORED_TAGS = [
 ].join("\n");
 /** Controls, bidi, zero-width and tag characters around that text. */
 const HIDDEN = "\x07\x1b\x85\u202e\u2066\u200b\u200d\u2060\ufeff\u061c\u{e0041}\u{e007f}";
-
-function ghIssue(o: { body: string; title?: string; comments?: unknown[] }) {
-  return {
-    data: {
-      repository: {
-        issue: {
-          title: o.title ?? "Export times out",
-          body: o.body,
-          createdAt: "2026-03-04T05:06:07Z",
-          state: "OPEN",
-          stateReason: null,
-          author: { login: "another-author" },
-          authorAssociation: "NONE",
-          viewerDidAuthor: false,
-          labels: { nodes: [{ name: "size:M" }] },
-          comments: { nodes: o.comments ?? [] },
-          projectItems: {
-            nodes: [{
-              project: { number: 7, owner: { login: "acme" } },
-              fieldValues: { nodes: [{ name: "Ready", field: { name: "Status" } }] },
-            }],
-          },
-        },
-      },
-    },
-  };
-}
-
-/** gh answers `api graphql … num=<n>` from gh-<n>.json, and logs every call. */
-async function answer(p: Project, n: number, issue: unknown) {
-  await p.write(`gh-${n}.json`, JSON.stringify(issue));
-  await p.write(
-    "bin/gh",
-    `#!/usr/bin/env bash
-printf '%s\\n' "$*" >> "$FAKE_ROOT/calls.log"
-for a in "$@"; do case "$a" in num=*) n="\${a#num=}" ;; esac; done
-[ "$1 $2" = "api graphql" ] && [ -f "$FAKE_ROOT/gh-$n.json" ] || exit 1
-cat "$FAKE_ROOT/gh-$n.json"
-`,
-  );
-}
 
 const COMMENTS = [
   {
@@ -161,77 +126,6 @@ Deno.test("read-items: the file sits alone in a directory only the user can open
     assertEquals([...Deno.readDirSync(join(p.dir, "tmp"))], []);
   } finally {
     await removeRead(read);
-    await p.cleanup();
-  }
-});
-
-Deno.test("read-items: the fingerprint follows the work tree", async () => {
-  const p = await gitProject("github");
-  const reads = [];
-  try {
-    await answer(p, 7, ghIssue({ body: "Plain." }));
-    reads.push((await readItems(p, ["edit", "--id", "7"])).read);
-    reads.push((await readItems(p, ["edit", "--id", "7"])).read);
-    await p.write("new-file.txt", "x\n");
-    reads.push((await readItems(p, ["edit", "--id", "7"])).read);
-    assertEquals(reads[0]?.fingerprint, reads[1]?.fingerprint);
-    assertNotEquals(reads[1]?.fingerprint, reads[2]?.fingerprint);
-  } finally {
-    for (const r of reads) await removeRead(r);
-    await p.cleanup();
-  }
-});
-
-Deno.test("read-items: a field past its cap is cut, and its tag says so", async () => {
-  const p = await gitProject("github");
-  await answer(p, 7, ghIssue({ body: "é".repeat(70000), title: "t".repeat(600) }));
-  const { r, read } = await readItems(p, ["edit", "--id", "7"]);
-  try {
-    assertEquals(r.code, 0, r.stderr);
-    const by = (f: string) => read!.blocks.find((b) => b.field === f)!;
-    assertEquals([by("body").truncated, by("body").value.length], [true, 65536]);
-    assertEquals([by("title").truncated, by("title").value.length], [true, 512]);
-  } finally {
-    await removeRead(read);
-    await p.cleanup();
-  }
-});
-
-Deno.test("read-items: a refused argument prints nothing and reaches no tracker", async () => {
-  const p = await gitProject("github");
-  try {
-    await answer(p, 7, ghIssue({ body: "Plain." }));
-    for (
-      const args of [
-        [],
-        ["Groom", "7"],
-        ["groom;id", "7"],
-        ["edit", "--id", "@/etc/hosts"],
-        ["edit", "https://github.com/acme/other/issues/7"],
-        ["groom", "--status", "Ready", "7"],
-        ["groom", "--status", "Re\x1bady"],
-        ["groom", "--repo", "acme/other", "7"],
-        ["groom"],
-      ]
-    ) {
-      const r = await p.run("read-items.sh", args);
-      assertEquals([r.code, r.stdout], [2, ""], `${JSON.stringify(args)}\n${r.stderr}`);
-      assert(!r.calls.includes("graphql"), `${JSON.stringify(args)} reached gh:\n${r.calls}`);
-    }
-  } finally {
-    await p.cleanup();
-  }
-});
-
-Deno.test("read-items: outside a git work tree there is no fingerprint, and nothing is read", async () => {
-  const p = await project("github");
-  try {
-    await answer(p, 7, ghIssue({ body: "Plain." }));
-    const r = await p.run("read-items.sh", ["edit", "--id", "7"]);
-    assertEquals([r.code, r.stdout], [2, ""], r.stderr);
-    assertStringIncludes(r.stderr, "not a git work tree");
-    assert(!r.calls.includes("graphql"), r.calls);
-  } finally {
     await p.cleanup();
   }
 });

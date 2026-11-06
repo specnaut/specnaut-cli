@@ -96,3 +96,45 @@ export async function gitProject(backend: Backend): Promise<Project> {
 export async function removeRead(read: Read | undefined) {
   if (read) await Deno.remove(join(read.path, ".."), { recursive: true });
 }
+
+/** One GraphQL issue record as `gh` answers it: `item-record.sh`'s input. */
+export function ghIssue(o: { body: string; title?: string; comments?: unknown[] }) {
+  return {
+    data: {
+      repository: {
+        issue: {
+          title: o.title ?? "Export times out",
+          body: o.body,
+          createdAt: "2026-03-04T05:06:07Z",
+          state: "OPEN",
+          stateReason: null,
+          author: { login: "another-author" },
+          authorAssociation: "NONE",
+          viewerDidAuthor: false,
+          labels: { nodes: [{ name: "size:M" }] },
+          comments: { nodes: o.comments ?? [] },
+          projectItems: {
+            nodes: [{
+              project: { number: 7, owner: { login: "acme" } },
+              fieldValues: { nodes: [{ name: "Ready", field: { name: "Status" } }] },
+            }],
+          },
+        },
+      },
+    },
+  };
+}
+
+/** gh answers `api graphql … num=<n>` from gh-<n>.json, and logs every call. */
+export async function answer(p: Project, n: number, issue: unknown) {
+  await p.write(`gh-${n}.json`, JSON.stringify(issue));
+  await p.write(
+    "bin/gh",
+    `#!/usr/bin/env bash
+printf '%s\\n' "$*" >> "$FAKE_ROOT/calls.log"
+for a in "$@"; do case "$a" in num=*) n="\${a#num=}" ;; esac; done
+[ "$1 $2" = "api graphql" ] && [ -f "$FAKE_ROOT/gh-$n.json" ] || exit 1
+cat "$FAKE_ROOT/gh-$n.json"
+`,
+  );
+}
