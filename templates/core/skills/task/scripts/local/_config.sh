@@ -64,3 +64,30 @@ item_url() {
   done
   return 0
 }
+
+# item_file <n> — the task file of item <n> on stdout, or nothing and status 1.
+item_file() {
+  local f
+  for f in "$BACKLOG_DIR/$(printf '%03d' "$((10#$1))")"-*.md; do
+    [ -f "$f" ] && { printf '%s\n' "$f"; return 0; }
+  done
+  return 1
+}
+
+# fm_set <file> <key> <value> — one frontmatter scalar set, or added before
+# the closing `---`. The value reaches awk through the environment, never
+# `-v`: `-v` turns a backslash sequence into a newline, and a newline in
+# frontmatter is a second key.
+fm_set() {
+  if FM_KEY="$2" FM_VALUE="$3" awk '
+    BEGIN { k = ENVIRON["FM_KEY"]; v = ENVIRON["FM_VALUE"] }
+    /^---[[:space:]]*$/ { n++; if (n == 2 && !done) { print k ": " v; done = 1 } print; next }
+    n == 1 && index($0, k ":") == 1 { if (!done) print k ": " v; done = 1; next }
+    { print }
+    END { if (n < 2) exit 3 }' "$1" >"$1.tmp"; then
+    mv "$1.tmp" "$1"
+  else
+    rm -f "$1.tmp"
+    return 1
+  fi
+}

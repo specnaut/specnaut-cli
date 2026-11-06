@@ -32,18 +32,38 @@ const COMMON: Case[] = [
   ["groom-verify.sh", (id) => [id], 2],
   ["item-record.sh", (id) => [id], 2],
   ["add.sh", (id) => ["A title", "--parent", id], 2],
+  ["apply-plan.sh", (id) => ["edit", "--id", id, "plan.jsonl", "items.txt"], 2],
+];
+/** The scripts the executor calls, where a backend has them. */
+const WRITERS: Case[] = [
+  ["edit.sh", (id) => [id, "--title", "A title"], 2],
+  ["close.sh", (id) => [id], 2],
+  // Both positions at once: neither number may reach the tracker.
+  ["link.sh", (id) => [id, id], 2],
 ];
 const CASES: Record<Backend, Case[]> = {
   github: [
     ...COMMON,
+    ...WRITERS,
+    ["label.sh", (id) => [id, "bug"], 2],
     ["move-batch.sh", (id) => ["Done", id], 2],
     // set-field.sh keeps its own table: 1 is its usage code.
     ["set-field.sh", (id) => [id, "Priority", "P1"], 1],
     // Propagation never fails the move that triggered it: it refuses and exits 0.
     ["propagate-parent-status.sh", (id) => [id, "Ready"], 0],
   ],
-  gitlab: COMMON,
-  local: [...COMMON, ["propagate-parent-status.sh", (id) => [id, "Ready"], 0]],
+  gitlab: [
+    ...COMMON,
+    ...WRITERS,
+    ["label.sh", (id) => [id, "bug"], 2],
+    ["set-field.sh", (id) => [id, "Priority", "P1"], 1],
+  ],
+  local: [
+    ...COMMON,
+    ...WRITERS,
+    ["set-field.sh", (id) => [id, "Priority", "P1"], 1],
+    ["propagate-parent-status.sh", (id) => [id, "Ready"], 0],
+  ],
   cloud: COMMON,
 };
 

@@ -51,7 +51,8 @@ fi
 
 # Already-done short-circuit, matching github's exit 12: a caller that
 # trusts exit 0 would otherwise close it a second time.
-PARENT_STATUS=$(_fm "$PARENT_FILE" status)
+# move.sh writes `Done`; the check is case-blind, so `done` reads the same.
+PARENT_STATUS=$(_fm "$PARENT_FILE" status | tr '[:upper:]' '[:lower:]')
 if [ "$PARENT_STATUS" = "done" ]; then
   echo "ℹ #$NUM is already done — nothing to gate"
   exit 12
@@ -66,14 +67,17 @@ OPEN_LIST=""
 for f in "$BACKLOG_DIR"/*.md; do
   [ -e "$f" ] || continue
   [ "$f" = "$PARENT_FILE" ] && continue
-  [ "$(_fm "$f" parent)" = "$NUM" ] || continue
+  # add.sh writes `parent: "#001"`: compared as a number, or no child of an
+  # item under 100 was ever found and its close was never gated.
+  p=$(_fm "$f" parent)
+  [[ $p =~ ^[0-9]{1,10}$ ]] && [ "$((10#$p))" = "$NUM" ] || continue
   TOTAL=$((TOTAL + 1))
-  st=$(_fm "$f" status)
+  st=$(_fm "$f" status | tr '[:upper:]' '[:lower:]')
   case "$st" in
     done | deferred) continue ;;
   esac
   OPEN=$((OPEN + 1))
-  OPEN_LIST="$OPEN_LIST  - #$(_fm "$f" id) — $(_fm "$f" title) [${st:-no status}]
+  OPEN_LIST="$OPEN_LIST  - #$(_fm "$f" number) — $(_fm "$f" title) [${st:-no status}]
 "
 done
 

@@ -1,0 +1,150 @@
+import { assert, assertEquals, assertStringIncludes } from "@std/assert";
+import { localItem } from "./backlog_tracker_fixture.ts";
+import { jsonl, readThenApply } from "./apply_plan_fixture.ts";
+import { gitProject } from "./read_items_fixture.ts";
+
+/**
+ * `apply-plan.sh` beside GitHub: the same checks, each backend's own scripts,
+ * an operation the backend cannot do answered UNSUPPORTED before any write,
+ * and — on the local backend — a RECEIPT naming the files to stage.
+ */
+
+Deno.test("local: an add plan writes the task file, and the receipt names what changed", async () => {
+  const p = await gitProject("local");
+  try {
+    const out = await readThenApply(
+      p,
+      ["add"],
+      jsonl(
+        { op: "create", ref: "@a", title: "Local item", body: "Why." },
+        { op: "classify", target: "@a", axis: "Priority", value: "P1" },
+        { op: "move", target: "@a", status: "Ready" },
+      ),
+    );
+    assertEquals(out.code, 0, out.stdout + out.stderr);
+    assertEquals(out.lines, [
+      "APPLIED create 1",
+      "APPLIED classify 1",
+      "APPLIED move 1",
+      "RECEIPT: .specnaut/backlog.md .specnaut/backlog/001-local-item.md",
+    ]);
+    const file = await p.read(".specnaut/backlog/001-local-item.md");
+    assertStringIncludes(file, "\ntitle: Local item\nstatus: Ready\nsize:\npriority: P1\n");
+    const label = await readThenApply(
+      p,
+      ["add"],
+      jsonl({ op: "create", title: "X", labels: ["bug"] }),
+    );
+    assertEquals([label.code, label.lines], [3, ["UNSUPPORTED create", "RECEIPT: none"]]);
+  } finally {
+    await p.cleanup();
+  }
+});
+
+Deno.test("local: a title is one line, so it never adds a frontmatter key", async () => {
+  const p = await gitProject("local");
+  try {
+    const add = await p.run("add.sh", ["Title\nstatus: Done"]);
+    assertEquals(add.code, 2, add.stderr);
+    assertEquals([...Deno.readDirSync(`${p.dir}/.specnaut/backlog`)], []);
+    await p.write(".specnaut/backlog/001-a.md", localItem("001", "A"));
+    const edit = await p.run("edit.sh", ["1", "--title", "Literal \\nstatus: Done"]);
+    assertEquals(edit.code, 0, edit.stderr);
+    const fm = (await p.read(".specnaut/backlog/001-a.md")).split("---")[1];
+    assertEquals(fm.split("\n").filter((l) => l.startsWith("status:")), ["status: Ready"]);
+    assertStringIncludes(fm, "title: Literal \\nstatus: Done\n");
+  } finally {
+    await p.cleanup();
+  }
+});
+
+Deno.test("local: an epic with an open child is not closed; once the child is done, it is", async () => {
+  const p = await gitProject("local");
+  try {
+    // In Backlog, so the child's move to Done does not promote it first.
+    await p.write(
+      ".specnaut/backlog/001-epic.md",
+      localItem("001", "Epic").replace("Ready", "Backlog"),
+    );
+    await p.write(
+      ".specnaut/backlog/002-child.md",
+      localItem("002", "Child").replace("status: Ready", 'status: Backlog\nparent: "#001"'),
+    );
+    const plan = jsonl({ op: "close", target: 1, reason: "completed" });
+    const blocked = await readThenApply(p, ["close", "--id", "1", "2"], plan);
+    assertEquals([blocked.code, blocked.lines], [4, ["FAILED close 1 11", "RECEIPT: none"]]);
+    assertStringIncludes(await p.read(".specnaut/backlog/001-epic.md"), "status: Backlog");
+    assertEquals((await p.run("move.sh", ["2", "Done"])).code, 0);
+    const cleared = await readThenApply(p, ["close", "--id", "1", "2"], plan);
+    assertEquals(cleared.lines[0], "APPLIED close 1", cleared.stdout + cleared.stderr);
+    assertStringIncludes(cleared.lines[1], ".specnaut/backlog/001-epic.md");
+    assertStringIncludes(await p.read(".specnaut/backlog/001-epic.md"), "status: Done");
+  } finally {
+    await p.cleanup();
+  }
+});
+
+const GLAB = `#!/usr/bin/env bash
+printf glab >> "$FAKE_ROOT/calls.log"
+for a in "$@"; do printf '\\t%s' "$a" >> "$FAKE_ROOT/calls.log"; done
+echo >> "$FAKE_ROOT/calls.log"
+case "$1 $2" in
+  "api user") echo '{"id":1}' ;;
+  "issue view") echo '{"iid":4,"title":"T","description":"Body","created_at":"2026-02-03T04:05:06Z","labels":[],"state":"opened","author":{"id":2,"username":"someone"}}' ;;
+  "api --paginate") echo '[{"name":"bug"}]' ;;
+  "issue list") echo '[]' ;;
+  api*) echo '[]' ;;
+esac
+`;
+
+Deno.test("gitlab: a classification is its scoped label; a close reason it cannot record is unsupported", async () => {
+  const p = await gitProject("gitlab");
+  try {
+    await p.write("bin/glab", GLAB);
+    const out = await readThenApply(
+      p,
+      ["edit", "--id", "4"],
+      jsonl(
+        { op: "classify", target: 4, axis: "Priority", value: "P1" },
+        { op: "label", target: 4, labels: ["bug"] },
+      ),
+    );
+    assertEquals(out.lines, ["APPLIED classify 4", "APPLIED label 4", "RECEIPT: none"], out.stderr);
+    assertStringIncludes(
+      out.calls,
+      "glab\tissue\tupdate\t4\t--repo\tacme/my-app\t--label\tpriority::P1\n",
+    );
+    assertStringIncludes(out.calls, "glab\tissue\tupdate\t4\t--repo\tacme/my-app\t--label\tbug\n");
+    const close = await readThenApply(
+      p,
+      ["close", "--id", "4"],
+      jsonl({ op: "close", target: 4, reason: "not_planned" }),
+    );
+    assertEquals([close.code, close.lines], [3, ["UNSUPPORTED close", "RECEIPT: none"]]);
+    assert(!/glab\tissue\t(close|update)/.test(close.calls), close.calls);
+  } finally {
+    await p.cleanup();
+  }
+});
+
+Deno.test("cloud: a create travels in the JSON payload; what the contract lacks is unsupported", async () => {
+  const p = await gitProject("cloud");
+  try {
+    const out = await readThenApply(
+      p,
+      ["tech-debt"],
+      jsonl({ op: "create", title: "A $(touch m) debt", body: "Why." }),
+    );
+    assertEquals(out.lines, ["APPLIED create 5", "RECEIPT: none"], out.stderr);
+    assertStringIncludes(out.calls, '"title": "A $(touch m) debt",   "body": "Why."');
+    const label = await readThenApply(
+      p,
+      ["tech-debt"],
+      jsonl({ op: "create", title: "X", labels: ["bug"] }),
+    );
+    assertEquals([label.code, label.lines[0]], [3, "UNSUPPORTED create"]);
+    assert(!label.calls.includes("POST"), label.calls);
+  } finally {
+    await p.cleanup();
+  }
+});

@@ -67,6 +67,10 @@ fi
 
 # shellcheck source=./_config.sh
 . "$(dirname "$0")/_config.sh"
+# The title is written into YAML frontmatter: one line, or it would be a key.
+# shellcheck source=../_backlog_plan.sh
+. "$(dirname "$0")/_backlog_plan.sh"
+require_title "$TITLE" || exit 2
 if [ -n "$PARENT" ]; then PARENT=$(require_issue_number "$PARENT") || exit 2; fi
 if [ -n "$BODY_FILE" ]; then BODY=$(cat -- "$BODY_FILE"); fi
 RENDER="$(dirname "$0")/render-index.sh"

@@ -13,7 +13,7 @@ export const SCRIPTS = fromFileUrl(
   new URL("../../templates/core/skills/task/scripts/", import.meta.url),
 );
 export const BACKENDS = ["github", "gitlab", "local", "cloud"] as const;
-/** The spec family's shared helpers (`jq_lf`), which a shared backlog script sources. */
+/** The spec family's shared helpers (`jq_lf`, the secret scan), which a shared backlog script sources. */
 const BASH = fromFileUrl(new URL("../../templates/core/specnaut/scripts/bash/", import.meta.url));
 export type Backend = typeof BACKENDS[number];
 
@@ -77,7 +77,7 @@ export async function project(backend: Backend): Promise<Project> {
   await Deno.mkdir(scripts, { recursive: true });
   await Deno.mkdir(join(dir, ".specnaut", "backlog"));
   await Deno.mkdir(join(dir, ".specnaut", "scripts", "bash"));
-  for (const f of ["common.sh", "template-resolution.sh"]) {
+  for (const f of ["common.sh", "template-resolution.sh", "_report_text.sh"]) {
     await Deno.copyFile(join(BASH, f), join(dir, ".specnaut", "scripts", "bash", f));
   }
   await Deno.mkdir(join(dir, "bin"));

@@ -31,19 +31,21 @@
 #     [A-Za-z0-9._-]{1,64} is written author="".
 # How a reader treats the blocks is the agent definition's rule, not this file's.
 #
-# Usage: read-items.sh <verb> [--id <n>] (<n>... | --status <column>)
-#   <verb>      the work the items are read for (`groom`, `edit`, ...): a
-#               lower-case word, recorded in the header
+# Usage: read-items.sh <verb> [--id <n>] [<n>... | --status <column>]
+#   <verb>      the work the items are read for, one `scope_for` lists in
+#               `_backlog_plan.sh` (`groom`, `edit`, ...); recorded in the header
 #   --id <n>    the item the verb acts on; read first, recorded in the header
 #   --status    every item in that column, as `list.sh --numbers` lists them
-# Exit: 0 written · 2 usage, a refused number, an item that cannot be read, no
-# git work tree, no randomness, or a temporary directory inside the repository.
+# A verb that creates items (SCOPE_REFS) may read nothing: `items: none`.
+# Exit: 0 written · 2 usage, a verb scope_for refuses, a refused number, an item
+# that cannot be read, no git work tree, no randomness, or a temporary
+# directory inside the repository.
 # On any failure stdout stays empty and no directory is left behind.
 set -euo pipefail
 
 here=$(dirname "$0")
 usage() {
-  echo "usage: read-items.sh <verb> [--id <n>] (<n>... | --status <column>)" >&2
+  echo "usage: read-items.sh <verb> [--id <n>] [<n>... | --status <column>]" >&2
   exit 2
 }
 die() { echo "read-items.sh: $*" >&2; exit 2; }
@@ -64,26 +66,22 @@ while [ "$#" -gt 0 ]; do
     *) NUMS+=("$1"); shift ;;
   esac
 done
+# jq_lf, the family's CR-safe jq; scope_for, the fingerprint and, through
+# _issue_text.sh, ISSUE_TEXT_JQ: the characters that pass.
+# shellcheck source=../../specnaut/scripts/bash/common.sh
+. "$here/../bash/common.sh"
+# shellcheck source=./_backlog_plan.sh
+. "$here/_backlog_plan.sh"
+scope_for "$VERB" "$ID" || die "no plan can follow a read for: $(printf '%q' "$VERB")${ID:+ --id}"
 if [ "$BY_STATUS" = true ]; then
   [ "${#NUMS[@]}" -eq 0 ] || usage
   (LC_ALL=C; [[ $STATUS =~ ^[^[:cntrl:]]{1,64}$ ]]) || die "not a column name: $(printf '%q' "$STATUS")"
-elif [ "${#NUMS[@]}" -eq 0 ] && [ -z "$ID" ]; then
+elif [ "${#NUMS[@]}" -eq 0 ] && [ -z "$ID" ] && [ "$SCOPE_REFS" != true ]; then
   usage
 fi
 
-# jq_lf, the family's CR-safe jq; ISSUE_TEXT_JQ, the characters that pass.
-# shellcheck source=../../specnaut/scripts/bash/common.sh
-. "$here/../bash/common.sh"
-# shellcheck source=./_issue_text.sh
-. "$here/_issue_text.sh"
-
 ROOT=$(cd "$here/../../.." && pwd)
-porcelain=$(cd "$ROOT" && git status --porcelain 2>/dev/null) ||
-  die "$ROOT is not a git work tree: the fingerprint needs one"
-FINGERPRINT=$(printf '%s' "$porcelain" | (cd "$ROOT" && git hash-object --stdin)) ||
-  die "git could not hash the work tree's status"
-FINGERPRINT=${FINGERPRINT%$'\r'}
-[[ $FINGERPRINT =~ ^[0-9a-f]{40}([0-9a-f]{24})?$ ]] || die "git gave no fingerprint"
+FINGERPRINT=$(backlog_fingerprint "$ROOT") || die "$ROOT is not a git work tree: the fingerprint needs one"
 
 if [ "$BY_STATUS" = true ]; then
   listed=$(bash "$here/list.sh" --numbers "$STATUS") || die "could not list the column"

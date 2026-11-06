@@ -1,0 +1,200 @@
+# shellcheck shell=bash
+# The one home of what a backlog write plan may say: the product owner proposes
+# a plan, a bundled executor (`apply-plan.sh`) checks it here and applies it.
+# Sourced, never run, by apply-plan.sh, read-items.sh and the local add.sh,
+# installed beside it, once the caller has `jq_lf`.
+#
+# A plan is JSON Lines: one object per line, its `op` one of the eight below,
+# with exactly these keys (? = optional) and nothing else:
+#
+#   create    ref?, title, body?, labels?, parent?   a new item
+#   edit      target, title?, append?                at least one of the two
+#   comment   target, body
+#   move      target, status
+#   classify  target, axis, value
+#   label     target, labels
+#   close     target, reason
+#   link      target, parent                         target becomes parent's child
+#
+# The values, checked by PLAN_JQ before anything is written:
+#   target, parent  an issue number (a JSON integer), or a `ref` an earlier
+#                   create in the same plan named (`@` + [a-z][a-z0-9-]{0,15});
+#                   always inside the verb's scope (scope_for). A repository, a
+#                   project, a URL or a path is no value any key takes.
+#   status          one of the board's own columns, never Done: an item reaches
+#                   Done through `close`, behind its cascade check
+#   axis, value     Priority P0-P3 · Size XS, S, M, L, XL · IssueType Task, Bug, Feature
+#   labels          1 to 10 of the repository's existing labels
+#   reason          completed or not_planned
+#   title           one line, 1 to 256 characters, every one `inert` (_issue_text.sh)
+#   body, append    up to 65536 characters (a comment's body: 16384), inert,
+#                   tabs and newlines kept. An edit only appends to a body.
+#   @-mentions      in any text, only of the target item's author, as the items
+#                   file records it; a new item's text mentions nobody
+# Caps: PLAN_MAX_OPS lines, and one comment per target per run. There is no
+# operation for memory, files or raw tracker calls, and no key that is a path:
+# the executor writes every body file itself.
+
+PLAN_MAX_OPS=40
+_PLAN_DIR=$(CDPATH="" cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
+# shellcheck source=./_issue_text.sh
+. "$_PLAN_DIR/_issue_text.sh"
+
+# backlog_fingerprint <root> — the work tree's state at a read, the same text
+# for read-items.sh, which records it, and apply-plan.sh, which checks it:
+# `git hash-object` of `git status --porcelain`. Fails outside a work tree.
+backlog_fingerprint() {
+  local porcelain fp
+  porcelain=$(cd "$1" && git status --porcelain 2>/dev/null) || return 1
+  fp=$(printf '%s' "$porcelain" | (cd "$1" && git hash-object --stdin)) || return 1
+  fp=${fp%$'\r'}
+  [[ $fp =~ ^[0-9a-f]{40}([0-9a-f]{24})?$ ]] || return 1
+  printf '%s\n' "$fp"
+}
+
+# scope_for <verb> [<id>] — what a run of <verb> may write, derived here, never
+# from a plan: SCOPE_OPS, SCOPE_TARGETS (issue numbers) and SCOPE_REFS (may it
+# create and name new items). 2 for a verb not listed, or an id it needs and
+# lacks or must not have. ITEMS_READ (the items file's numbers) is set by
+# apply-plan.sh; read-items.sh calls this to refuse a verb before any read.
+#
+#   add [<parent>]   create; then its own new items and the parent the user named
+#   edit <id>        {id}
+#   estimate <id>    {id}, classification only
+#   close <id>       {id}, and its children among the items read once the
+#                    executor's own cascade-check.sh <id> exits 0
+#   groom            the items read, no create; it closes only an epic whose
+#                    cascade check clears (epic_cleared)
+#   tech-debt        create only
+scope_for() {
+  local verb=${1:-} id=${2:-} n p
+  SCOPE_OPS="" SCOPE_TARGETS="" SCOPE_REFS=false
+  case $verb in
+    add) SCOPE_OPS="create comment move classify label link" SCOPE_REFS=true SCOPE_TARGETS=$id ;;
+    edit) SCOPE_OPS="edit comment move classify label link" SCOPE_TARGETS=$id ;;
+    estimate) SCOPE_OPS="classify label comment" SCOPE_TARGETS=$id ;;
+    close) SCOPE_OPS="close comment label" SCOPE_TARGETS=$id ;;
+    groom) SCOPE_OPS="edit comment move classify label close link" SCOPE_TARGETS=${ITEMS_READ:-} ;;
+    tech-debt) SCOPE_OPS="create" SCOPE_REFS=true ;;
+    *) return 2 ;;
+  esac
+  case $verb in
+    edit | estimate | close) [ -n "$id" ] || return 2 ;;
+    tech-debt) [ -z "$id" ] || return 2 ;;
+  esac
+  if [ "$verb" = close ] && [ -n "${ITEMS_READ:-}" ] &&
+    bash "$_PLAN_DIR/cascade-check.sh" "$id" >/dev/null 2>&1; then
+    for n in $ITEMS_READ; do
+      [ "$n" != "$id" ] || continue
+      p=$(bash "$_PLAN_DIR/parent-of.sh" "$n" 2>/dev/null) || continue
+      [ "${p#"${p%%[!0]*}"}" != "$id" ] || SCOPE_TARGETS="$SCOPE_TARGETS $n"
+    done
+  fi
+  return 0
+}
+
+# epic_cleared <n> — 0 when <n> has children and its cascade check clears it:
+# the only item a groom may close. The check's exit 0 alone also means "no
+# children at all"; only its "safe to close" line says it has some.
+epic_cleared() {
+  local out
+  out=$(bash "$_PLAN_DIR/cascade-check.sh" "$1" 2>/dev/null) || return 1
+  case $out in *"safe to close"*) return 0 ;; *) return 1 ;; esac
+}
+
+# jq definitions the validator and the local add.sh share; appended to ISSUE_TEXT_JQ.
+# shellcheck disable=SC2016  # jq program.
+PLAN_DEFS='
+  def plan_title: type == "string" and length >= 1 and length <= 256
+    and (explode | all(.[]; inert)) and (explode | any(.[]; . != 32));
+  def plan_text($max): type == "string" and length >= 1 and length <= $max
+    and (explode | all(.[]; inert or . == 9 or . == 10));
+'
+
+# The validator, over the plan's raw lines (jq -n -R), given $ops, $targets,
+# $refs, $statuses, $labels, $authors ({n: login}), $cannot ("op" or
+# "op:qualifier") and $max. Out: {refused: [[class, path]], unsupported, ops},
+# each op normalised, its targets strings, its `line` (1-based) added.
+# shellcheck disable=SC2016  # jq program.
+PLAN_JQ='
+  def schema: {
+    create: {ref: "ref?", title: "title", body: "body?", labels: "labels?", parent: "target?"},
+    edit: {target: "target", title: "title?", append: "body?"},
+    comment: {target: "target", body: "comment"},
+    move: {target: "target", status: "status"},
+    classify: {target: "target", axis: "axis", value: "value"},
+    label: {target: "target", labels: "labels"},
+    close: {target: "target", reason: "reason"},
+    link: {target: "target", parent: "target"} };
+  def axes: {Priority: ["P0", "P1", "P2", "P3"], Size: ["XS", "S", "M", "L", "XL"], IssueType: ["Task", "Bug", "Feature"]};
+  def shown: if type == "string" and test("^[a-z_]{1,32}$") then . else "?" end;
+  def number: type == "number" and . == floor and . >= 1 and . <= 9999999999;
+  def refname: type == "string" and test("^@[a-z][a-z0-9-]{0,15}$");
+  def mentions: [match("(?:^|[^A-Za-z0-9_.`/@-])@([A-Za-z0-9][A-Za-z0-9-]*)"; "g") | .captures[0].string];
+  def resolve($v; $st): if ($v | number) then ($v | tostring) as $n
+      | (if any($targets[]; . == $n) then $n else null end)
+    elif $refs and ($v | refname) and any($st.refs[]; . == $v) then $v
+    else null end;
+  def check($k; $kind; $v; $st; $o):
+    if $kind == "target" then (if resolve($v; $st) == null then "scope" else null end)
+    elif $kind == "ref" then (if ($v | refname) and ($st.refs | index([$v]) == null) and $refs then null else "ref" end)
+    elif $kind == "title" then (if $v | plan_title then null else "title" end)
+    elif $kind == "body" then (if $v | plan_text(65536) then null else "text" end)
+    elif $kind == "comment" then (if $v | plan_text(16384) then null else "text" end)
+    elif $kind == "status" then (if ($v | type) == "string" and ($v | ascii_downcase) != "done"
+      and any($statuses[]; . == $v) then null else "status" end)
+    elif $kind == "axis" then (if ($v | type) == "string" and (axes | has($v)) then null else "axis" end)
+    elif $kind == "value" then ((axes[$o.axis | strings] // []) as $vs | if any($vs[]; . == $v) then null else "value" end)
+    elif $kind == "labels" then (if ($v | type) == "array" and ($v | length) >= 1 and ($v | length) <= 10
+      and all($v[]; type == "string" and plan_title and (index(",") == null) and (. as $l | any($labels[]; . == $l)))
+      then null else "label" end)
+    elif $kind == "reason" then (if $v == "completed" or $v == "not_planned" then null else "reason" end)
+    else "schema" end;
+  def cannot($o): ($o.op) as $op
+    | if any($cannot[]; . == $op) then $op
+      elif $op == "close" and any($cannot[]; . == "close:" + $o.reason) then $op
+      elif $op == "classify" and any($cannot[]; . == "classify:" + $o.axis) then $op
+      elif $op == "create" and $o.labels != null and any($cannot[]; . == "create:labels") then $op
+      else null end;
+  [inputs] as $lines
+  | reduce range($lines | length) as $i ({refused: [], unsupported: [], ops: [], refs: [], said: []};
+      ($i + 1 | tostring) as $at
+      | ($lines[$i] | try fromjson catch null) as $o
+      | if ($o | type) != "object" then .refused += [["parse", $at]]
+        elif ($o.op | type) != "string" or (schema | has($o.op) | not) then .refused += [["op", "\($at).op"]]
+        elif ($ops | index([$o.op]) == null) then .refused += [["scope", "\($at).op"]]
+        elif cannot($o) != null then .unsupported += [cannot($o)]
+        else schema[$o.op] as $s | . as $st
+          | ([$o | keys[] | . as $k | select($k != "op" and ($s | has($k) | not)) | ["unknown-key", "\($at).\(shown)"]]
+             + [$s | to_entries[] | .key as $k | select((.value | endswith("?") | not) and ($o | has($k) | not))
+                 | ["missing-key", "\($at).\(.key)"]]
+             + [$s | to_entries[] | .key as $k | select($o | has($k))
+                 | check($k; .value | rtrimstr("?"); $o[$k]; $st; $o) // empty | [., "\($at).\($k)"]]
+             + (if $o.op == "edit" and ($o | has("title") or has("append") | not) then [["missing-key", "\($at).append"]] else [] end)
+             + [("title", "body", "append") as $k | select($o[$k] | type == "string")
+                 | (if $o.op == "create" then [] else [$authors[$o.target | tostring]? // empty] end) as $who
+                 | select([$o[$k] | mentions[] | select(. as $m | $who | index([$m]) == null)] | length > 0)
+                 | ["mention", "\($at).\($k)"]]) as $bad
+          | if ($bad | length) > 0 then .refused += $bad
+            else ($o
+                   | (if has("target") then .target = resolve(.target; $st) else . end)
+                   | (if has("parent") then .parent = resolve(.parent; $st) else . end)
+                   | .line = ($i + 1)) as $n
+              | (if $n.op == "comment" and any(.said[]; . == $n.target)
+                 then .refused += [["cap", "\($at).target"]] else . end)
+              | .said += (if $n.op == "comment" then [$n.target] else [] end)
+              | .refs += (if $n.op == "create" and $n.ref != null then [$n.ref] else [] end)
+              | .ops += [$n]
+            end
+        end)
+  | if ($lines | length) > $max then .refused += [["cap", "plan"]] elif ($lines | length) == 0 then .refused += [["parse", "plan"]] else . end
+  | {refused, unsupported: (.unsupported | unique), ops}
+'
+
+# require_title <title> — the plan's title rule, or a refusal and status 2: the
+# local add.sh writes a title into frontmatter, where a second line is a key.
+require_title() {
+  jq_lf -n -e --arg t "${1-}" "$ISSUE_TEXT_JQ$PLAN_DEFS"' $t | plan_title' >/dev/null 2>&1 && return 0
+  printf '%s: a title is one line of 1 to 256 printable characters\n' "${0##*/}" >&2
+  return 2
+}

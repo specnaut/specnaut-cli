@@ -445,6 +445,62 @@
     },
     {
       "category": "backlog-script",
+      "name": "apply-plan",
+      "suffix": "apply-plan.sh",
+      "source": "core/skills/task/scripts/local/apply-plan.sh",
+      "executable": true,
+      "backend": "local"
+    },
+    {
+      "category": "backlog-script",
+      "name": "edit",
+      "suffix": "edit.sh",
+      "source": "core/skills/task/scripts/local/edit.sh",
+      "executable": true,
+      "backend": "local"
+    },
+    {
+      "category": "backlog-script",
+      "name": "close",
+      "suffix": "close.sh",
+      "source": "core/skills/task/scripts/local/close.sh",
+      "executable": true,
+      "backend": "local"
+    },
+    {
+      "category": "backlog-script",
+      "name": "set-field",
+      "suffix": "set-field.sh",
+      "source": "core/skills/task/scripts/local/set-field.sh",
+      "executable": true,
+      "backend": "local"
+    },
+    {
+      "category": "backlog-script",
+      "name": "link",
+      "suffix": "link.sh",
+      "source": "core/skills/task/scripts/local/link.sh",
+      "executable": true,
+      "backend": "local"
+    },
+    {
+      "category": "backlog-script",
+      "name": "_backlog_plan",
+      "suffix": "_backlog_plan.sh",
+      "source": "core/skills/task/scripts/_backlog_plan.sh",
+      "executable": true,
+      "backend": "local"
+    },
+    {
+      "category": "backlog-script",
+      "name": "_apply_plan",
+      "suffix": "_apply_plan.sh",
+      "source": "core/skills/task/scripts/_apply_plan.sh",
+      "executable": true,
+      "backend": "local"
+    },
+    {
+      "category": "backlog-script",
       "name": "propagate-parent-status",
       "suffix": "parent-of.sh",
       "source": "core/skills/task/scripts/local/parent-of.sh",
@@ -605,6 +661,62 @@
     },
     {
       "category": "backlog-script",
+      "name": "apply-plan",
+      "suffix": "apply-plan.sh",
+      "source": "core/skills/task/scripts/github/apply-plan.sh",
+      "executable": true,
+      "backend": "github"
+    },
+    {
+      "category": "backlog-script",
+      "name": "edit",
+      "suffix": "edit.sh",
+      "source": "core/skills/task/scripts/github/edit.sh",
+      "executable": true,
+      "backend": "github"
+    },
+    {
+      "category": "backlog-script",
+      "name": "close",
+      "suffix": "close.sh",
+      "source": "core/skills/task/scripts/github/close.sh",
+      "executable": true,
+      "backend": "github"
+    },
+    {
+      "category": "backlog-script",
+      "name": "label",
+      "suffix": "label.sh",
+      "source": "core/skills/task/scripts/github/label.sh",
+      "executable": true,
+      "backend": "github"
+    },
+    {
+      "category": "backlog-script",
+      "name": "link",
+      "suffix": "link.sh",
+      "source": "core/skills/task/scripts/github/link.sh",
+      "executable": true,
+      "backend": "github"
+    },
+    {
+      "category": "backlog-script",
+      "name": "_backlog_plan",
+      "suffix": "_backlog_plan.sh",
+      "source": "core/skills/task/scripts/_backlog_plan.sh",
+      "executable": true,
+      "backend": "github"
+    },
+    {
+      "category": "backlog-script",
+      "name": "_apply_plan",
+      "suffix": "_apply_plan.sh",
+      "source": "core/skills/task/scripts/_apply_plan.sh",
+      "executable": true,
+      "backend": "github"
+    },
+    {
+      "category": "backlog-script",
       "name": "cascade-check",
       "suffix": "parent-of.sh",
       "source": "core/skills/task/scripts/github/parent-of.sh",
@@ -741,6 +853,70 @@
     },
     {
       "category": "backlog-script",
+      "name": "apply-plan",
+      "suffix": "apply-plan.sh",
+      "source": "core/skills/task/scripts/gitlab/apply-plan.sh",
+      "executable": true,
+      "backend": "gitlab"
+    },
+    {
+      "category": "backlog-script",
+      "name": "edit",
+      "suffix": "edit.sh",
+      "source": "core/skills/task/scripts/gitlab/edit.sh",
+      "executable": true,
+      "backend": "gitlab"
+    },
+    {
+      "category": "backlog-script",
+      "name": "close",
+      "suffix": "close.sh",
+      "source": "core/skills/task/scripts/gitlab/close.sh",
+      "executable": true,
+      "backend": "gitlab"
+    },
+    {
+      "category": "backlog-script",
+      "name": "label",
+      "suffix": "label.sh",
+      "source": "core/skills/task/scripts/gitlab/label.sh",
+      "executable": true,
+      "backend": "gitlab"
+    },
+    {
+      "category": "backlog-script",
+      "name": "set-field",
+      "suffix": "set-field.sh",
+      "source": "core/skills/task/scripts/gitlab/set-field.sh",
+      "executable": true,
+      "backend": "gitlab"
+    },
+    {
+      "category": "backlog-script",
+      "name": "link",
+      "suffix": "link.sh",
+      "source": "core/skills/task/scripts/gitlab/link.sh",
+      "executable": true,
+      "backend": "gitlab"
+    },
+    {
+      "category": "backlog-script",
+      "name": "_backlog_plan",
+      "suffix": "_backlog_plan.sh",
+      "source": "core/skills/task/scripts/_backlog_plan.sh",
+      "executable": true,
+      "backend": "gitlab"
+    },
+    {
+      "category": "backlog-script",
+      "name": "_apply_plan",
+      "suffix": "_apply_plan.sh",
+      "source": "core/skills/task/scripts/_apply_plan.sh",
+      "executable": true,
+      "backend": "gitlab"
+    },
+    {
+      "category": "backlog-script",
       "name": "cascade-check",
       "suffix": "parent-of.sh",
       "source": "core/skills/task/scripts/gitlab/parent-of.sh",
@@ -840,6 +1016,30 @@
       "name": "_issue_text",
       "suffix": "_issue_text.sh",
       "source": "core/skills/task/scripts/_issue_text.sh",
+      "executable": true,
+      "backend": "cloud"
+    },
+    {
+      "category": "backlog-script",
+      "name": "apply-plan",
+      "suffix": "apply-plan.sh",
+      "source": "core/skills/task/scripts/cloud/apply-plan.sh",
+      "executable": true,
+      "backend": "cloud"
+    },
+    {
+      "category": "backlog-script",
+      "name": "_backlog_plan",
+      "suffix": "_backlog_plan.sh",
+      "source": "core/skills/task/scripts/_backlog_plan.sh",
+      "executable": true,
+      "backend": "cloud"
+    },
+    {
+      "category": "backlog-script",
+      "name": "_apply_plan",
+      "suffix": "_apply_plan.sh",
+      "source": "core/skills/task/scripts/_apply_plan.sh",
       "executable": true,
       "backend": "cloud"
     },

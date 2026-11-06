@@ -6457,6 +6457,33 @@ item_url() {
   done
   return 0
 }
+
+# item_file <n> — the task file of item <n> on stdout, or nothing and status 1.
+item_file() {
+  local f
+  for f in "\$BACKLOG_DIR/\$(printf '%03d' "\$((10#\$1))")"-*.md; do
+    [ -f "\$f" ] && { printf '%s\\n' "\$f"; return 0; }
+  done
+  return 1
+}
+
+# fm_set <file> <key> <value> — one frontmatter scalar set, or added before
+# the closing \`---\`. The value reaches awk through the environment, never
+# \`-v\`: \`-v\` turns a backslash sequence into a newline, and a newline in
+# frontmatter is a second key.
+fm_set() {
+  if FM_KEY="\$2" FM_VALUE="\$3" awk '
+    BEGIN { k = ENVIRON["FM_KEY"]; v = ENVIRON["FM_VALUE"] }
+    /^---[[:space:]]*\$/ { n++; if (n == 2 && !done) { print k ": " v; done = 1 } print; next }
+    n == 1 && index(\$0, k ":") == 1 { if (!done) print k ": " v; done = 1; next }
+    { print }
+    END { if (n < 2) exit 3 }' "\$1" >"\$1.tmp"; then
+    mv "\$1.tmp" "\$1"
+  else
+    rm -f "\$1.tmp"
+    return 1
+  fi
+}
 `,
     executable: true,
     backend: "local",
@@ -6753,6 +6780,10 @@ fi
 
 # shellcheck source=./_config.sh
 . "\$(dirname "\$0")/_config.sh"
+# The title is written into YAML frontmatter: one line, or it would be a key.
+# shellcheck source=../_backlog_plan.sh
+. "\$(dirname "\$0")/_backlog_plan.sh"
+require_title "\$TITLE" || exit 2
 if [ -n "\$PARENT" ]; then PARENT=\$(require_issue_number "\$PARENT") || exit 2; fi
 if [ -n "\$BODY_FILE" ]; then BODY=\$(cat -- "\$BODY_FILE"); fi
 RENDER="\$(dirname "\$0")/render-index.sh"
@@ -7333,7 +7364,8 @@ fi
 
 # Already-done short-circuit, matching github's exit 12: a caller that
 # trusts exit 0 would otherwise close it a second time.
-PARENT_STATUS=\$(_fm "\$PARENT_FILE" status)
+# move.sh writes \`Done\`; the check is case-blind, so \`done\` reads the same.
+PARENT_STATUS=\$(_fm "\$PARENT_FILE" status | tr '[:upper:]' '[:lower:]')
 if [ "\$PARENT_STATUS" = "done" ]; then
   echo "ℹ #\$NUM is already done — nothing to gate"
   exit 12
@@ -7348,14 +7380,17 @@ OPEN_LIST=""
 for f in "\$BACKLOG_DIR"/*.md; do
   [ -e "\$f" ] || continue
   [ "\$f" = "\$PARENT_FILE" ] && continue
-  [ "\$(_fm "\$f" parent)" = "\$NUM" ] || continue
+  # add.sh writes \`parent: "#001"\`: compared as a number, or no child of an
+  # item under 100 was ever found and its close was never gated.
+  p=\$(_fm "\$f" parent)
+  [[ \$p =~ ^[0-9]{1,10}\$ ]] && [ "\$((10#\$p))" = "\$NUM" ] || continue
   TOTAL=\$((TOTAL + 1))
-  st=\$(_fm "\$f" status)
+  st=\$(_fm "\$f" status | tr '[:upper:]' '[:lower:]')
   case "\$st" in
     done | deferred) continue ;;
   esac
   OPEN=\$((OPEN + 1))
-  OPEN_LIST="\$OPEN_LIST  - #\$(_fm "\$f" id) — \$(_fm "\$f" title) [\${st:-no status}]
+  OPEN_LIST="\$OPEN_LIST  - #\$(_fm "\$f" number) — \$(_fm "\$f" title) [\${st:-no status}]
 "
 done
 
@@ -7526,19 +7561,21 @@ exit "\$rc"
 #     [A-Za-z0-9._-]{1,64} is written author="".
 # How a reader treats the blocks is the agent definition's rule, not this file's.
 #
-# Usage: read-items.sh <verb> [--id <n>] (<n>... | --status <column>)
-#   <verb>      the work the items are read for (\`groom\`, \`edit\`, ...): a
-#               lower-case word, recorded in the header
+# Usage: read-items.sh <verb> [--id <n>] [<n>... | --status <column>]
+#   <verb>      the work the items are read for, one \`scope_for\` lists in
+#               \`_backlog_plan.sh\` (\`groom\`, \`edit\`, ...); recorded in the header
 #   --id <n>    the item the verb acts on; read first, recorded in the header
 #   --status    every item in that column, as \`list.sh --numbers\` lists them
-# Exit: 0 written · 2 usage, a refused number, an item that cannot be read, no
-# git work tree, no randomness, or a temporary directory inside the repository.
+# A verb that creates items (SCOPE_REFS) may read nothing: \`items: none\`.
+# Exit: 0 written · 2 usage, a verb scope_for refuses, a refused number, an item
+# that cannot be read, no git work tree, no randomness, or a temporary
+# directory inside the repository.
 # On any failure stdout stays empty and no directory is left behind.
 set -euo pipefail
 
 here=\$(dirname "\$0")
 usage() {
-  echo "usage: read-items.sh <verb> [--id <n>] (<n>... | --status <column>)" >&2
+  echo "usage: read-items.sh <verb> [--id <n>] [<n>... | --status <column>]" >&2
   exit 2
 }
 die() { echo "read-items.sh: \$*" >&2; exit 2; }
@@ -7559,26 +7596,22 @@ while [ "\$#" -gt 0 ]; do
     *) NUMS+=("\$1"); shift ;;
   esac
 done
+# jq_lf, the family's CR-safe jq; scope_for, the fingerprint and, through
+# _issue_text.sh, ISSUE_TEXT_JQ: the characters that pass.
+# shellcheck source=../../specnaut/scripts/bash/common.sh
+. "\$here/../bash/common.sh"
+# shellcheck source=./_backlog_plan.sh
+. "\$here/_backlog_plan.sh"
+scope_for "\$VERB" "\$ID" || die "no plan can follow a read for: \$(printf '%q' "\$VERB")\${ID:+ --id}"
 if [ "\$BY_STATUS" = true ]; then
   [ "\${#NUMS[@]}" -eq 0 ] || usage
   (LC_ALL=C; [[ \$STATUS =~ ^[^[:cntrl:]]{1,64}\$ ]]) || die "not a column name: \$(printf '%q' "\$STATUS")"
-elif [ "\${#NUMS[@]}" -eq 0 ] && [ -z "\$ID" ]; then
+elif [ "\${#NUMS[@]}" -eq 0 ] && [ -z "\$ID" ] && [ "\$SCOPE_REFS" != true ]; then
   usage
 fi
 
-# jq_lf, the family's CR-safe jq; ISSUE_TEXT_JQ, the characters that pass.
-# shellcheck source=../../specnaut/scripts/bash/common.sh
-. "\$here/../bash/common.sh"
-# shellcheck source=./_issue_text.sh
-. "\$here/_issue_text.sh"
-
 ROOT=\$(cd "\$here/../../.." && pwd)
-porcelain=\$(cd "\$ROOT" && git status --porcelain 2>/dev/null) ||
-  die "\$ROOT is not a git work tree: the fingerprint needs one"
-FINGERPRINT=\$(printf '%s' "\$porcelain" | (cd "\$ROOT" && git hash-object --stdin)) ||
-  die "git could not hash the work tree's status"
-FINGERPRINT=\${FINGERPRINT%\$'\\r'}
-[[ \$FINGERPRINT =~ ^[0-9a-f]{40}([0-9a-f]{24})?\$ ]] || die "git gave no fingerprint"
+FINGERPRINT=\$(backlog_fingerprint "\$ROOT") || die "\$ROOT is not a git work tree: the fingerprint needs one"
 
 if [ "\$BY_STATUS" = true ]; then
   listed=\$(bash "\$here/list.sh" --numbers "\$STATUS") || die "could not list the column"
@@ -7730,6 +7763,615 @@ ISSUE_TEXT_JQ='
   def body: explode | map(if . == 8232 or . == 8233 then 10 else . end | select(printable or . == 9 or . == 10)) | implode;
   def inert_body: explode | map(if . == 8232 or . == 8233 then 10 else . end | select(inert or . == 9 or . == 10)) | implode;
 '
+`,
+    executable: true,
+    backend: "local",
+    skipIfExists: false,
+  },
+  {
+    category: "backlog-script",
+    name: "apply-plan",
+    suffix: "apply-plan.sh",
+    content: `#!/usr/bin/env bash
+# Apply the product owner's write plan to the local Markdown backlog — the
+# bundled executor. The checks, the operations, the output lines and the exit
+# table are the shared body, \`_apply_plan.sh\`, beside this file; the plan's
+# vocabulary is \`_backlog_plan.sh\`. This file supplies only what the task files
+# answer differently: no labels, no issue type, and a close that is the move
+# to Done. Its RECEIPT names the files it changed, for the caller to stage.
+#
+# Usage: apply-plan.sh <verb> [--id <n>] <plan-file> <items-file>
+set -euo pipefail
+here=\$(CDPATH="" cd "\$(dirname "\${BASH_SOURCE[0]}")" && pwd)
+# shellcheck source=./_config.sh
+. "\$here/_config.sh"
+
+PLAN_CANNOT='["label", "create:labels", "classify:IssueType"]'
+CLOSE_IS_MOVE=1
+
+# The columns move.sh accepts.
+board_statuses() { printf '%s\\n' Backlog Ready "In progress" "In review" Done; }
+repo_labels() { :; }
+
+# add.sh prints \`✓ created #NNN — <title>\`.
+create_item() {
+  local args=("\$1") out rc=0
+  [ -z "\$4" ] || args+=(--parent "\$4")
+  [ -z "\$2" ] || args+=(--body-file "\$2")
+  out=\$(bash "\$here/add.sh" "\${args[@]}" 2>/dev/null) || rc=\$?
+  printf '%s\\n' "\$out" | sed -n 's/.*created #0*\\([1-9][0-9]*\\) .*/\\1/p' | head -1
+  return "\$rc"
+}
+
+close_item() { bash "\$here/close.sh" "\$1" "\$2"; }
+fallback_label() { :; }
+
+# The index and every task file, as \`cksum\` sees them: what changed is staged.
+receipt_snapshot() {
+  (cd "\$ROOT" && for f in .specnaut/backlog.md .specnaut/backlog/*.md; do
+    [ ! -f "\$f" ] || cksum "\$f"
+  done)
+}
+
+# shellcheck source=../_apply_plan.sh
+. "\$here/_apply_plan.sh"
+`,
+    executable: true,
+    backend: "local",
+    skipIfExists: false,
+  },
+  {
+    category: "backlog-script",
+    name: "edit",
+    suffix: "edit.sh",
+    content: `#!/usr/bin/env bash
+# Edit a backlog item: its frontmatter title, and text appended to its body.
+# A body is never replaced: the new text follows what is there.
+#
+# Usage: edit.sh <number> [--title <title>] [--append-file <path>]
+#
+# A title passes the plan's title rule (_backlog_plan.sh): one line, so it can
+# never add a frontmatter key.
+# Exit: 0 edited · 1 no such item · 2 usage or a refused title
+set -euo pipefail
+
+# shellcheck source=./_config.sh
+. "\$(dirname "\$0")/_config.sh"
+# shellcheck source=../_backlog_plan.sh
+. "\$(dirname "\$0")/_backlog_plan.sh"
+
+USAGE='usage: edit.sh <number> [--title <title>] [--append-file <path>]'
+[ "\$#" -ge 1 ] || { echo "\$USAGE" >&2; exit 2; }
+NUM=\$(require_issue_number "\$1") || exit 2
+shift
+TITLE="" HAS_TITLE=false APPEND=""
+while [ "\$#" -gt 0 ]; do
+  case "\$1" in
+    --title) [ "\$#" -ge 2 ] || { echo "\$USAGE" >&2; exit 2; }; TITLE=\$2 HAS_TITLE=true; shift 2 ;;
+    --append-file) [ "\$#" -ge 2 ] && [ -f "\$2" ] || { echo "edit.sh: --append-file needs a file" >&2; exit 2; }; APPEND=\$2; shift 2 ;;
+    *) echo "\$USAGE" >&2; exit 2 ;;
+  esac
+done
+[ "\$HAS_TITLE" = true ] || [ -n "\$APPEND" ] || { echo "\$USAGE" >&2; exit 2; }
+[ "\$HAS_TITLE" = false ] || require_title "\$TITLE" || exit 2
+
+FILE=\$(item_file "\$NUM") || { echo "no backlog item #\$NUM" >&2; exit 1; }
+[ "\$HAS_TITLE" = false ] || fm_set "\$FILE" title "\$TITLE" || { echo "#\$NUM has no frontmatter" >&2; exit 1; }
+[ -z "\$APPEND" ] || { printf '\\n'; cat -- "\$APPEND"; printf '\\n'; } >>"\$FILE"
+
+bash "\$(dirname "\$0")/render-index.sh" "\$ROOT"
+echo "edited #\$NUM"
+`,
+    executable: true,
+    backend: "local",
+    skipIfExists: false,
+  },
+  {
+    category: "backlog-script",
+    name: "close",
+    suffix: "close.sh",
+    content: `#!/usr/bin/env bash
+# Close a backlog item: on this backend the close IS the move to Done, with
+# \`resolution: not-planned\` beside it for that reason. It checks no gate: the
+# executor runs cascade-check.sh first.
+#
+# Usage: close.sh <number> [completed|not_planned]   (completed by default)
+# Exit: move.sh's — 0 closed · 1 no such item · 2 usage
+set -euo pipefail
+
+# shellcheck source=./_config.sh
+. "\$(dirname "\$0")/_config.sh"
+
+[ "\$#" -ge 1 ] && [ "\$#" -le 2 ] || { echo 'usage: close.sh <number> [completed|not_planned]' >&2; exit 2; }
+NUM=\$(require_issue_number "\$1") || exit 2
+case "\${2:-completed}" in
+  completed) exec bash "\$(dirname "\$0")/move.sh" "\$NUM" Done ;;
+  not_planned) exec bash "\$(dirname "\$0")/move.sh" "\$NUM" Done --not-planned ;;
+  *) echo "close.sh: a reason is completed or not_planned" >&2; exit 2 ;;
+esac
+`,
+    executable: true,
+    backend: "local",
+    skipIfExists: false,
+  },
+  {
+    category: "backlog-script",
+    name: "set-field",
+    suffix: "set-field.sh",
+    content: `#!/usr/bin/env bash
+# Set a classification on a backlog item: its frontmatter \`priority:\` or
+# \`size:\`, the keys add.sh writes and item-record.sh reads. A task file has no
+# issue type, so IssueType answers 10, as GitHub's set-field.sh does for a
+# field the board lacks.
+#
+# Usage: set-field.sh <number> <Priority|Size|IssueType> <value>
+# Exit: 0 set · 10 no such field here · 11 a value outside P0-P3 / XS-XL ·
+#       12 no such item · 1 usage
+set -euo pipefail
+
+# shellcheck source=./_config.sh
+. "\$(dirname "\$0")/_config.sh"
+
+[ "\$#" -eq 3 ] || { echo 'usage: set-field.sh <number> <Priority|Size|IssueType> <value>' >&2; exit 1; }
+NUM=\$(require_issue_number "\$1") || exit 1
+case "\$2:\$3" in
+  Priority:P[0-3]) KEY=priority ;;
+  Size:XS | Size:S | Size:M | Size:L | Size:XL) KEY=size ;;
+  IssueType:*) echo "a task file has no issue type" >&2; exit 10 ;;
+  Priority:* | Size:*) echo "set-field.sh: '\$3' is not a \$2 value" >&2; exit 11 ;;
+  *) echo "set-field.sh: unsupported field '\$2' (Priority|Size)" >&2; exit 1 ;;
+esac
+
+FILE=\$(item_file "\$NUM") || { echo "no backlog item #\$NUM" >&2; exit 12; }
+fm_set "\$FILE" "\$KEY" "\$3" || { echo "#\$NUM has no frontmatter" >&2; exit 12; }
+bash "\$(dirname "\$0")/render-index.sh" "\$ROOT"
+echo "#\$NUM \$2 -> \$3"
+`,
+    executable: true,
+    backend: "local",
+    skipIfExists: false,
+  },
+  {
+    category: "backlog-script",
+    name: "link",
+    suffix: "link.sh",
+    content: `#!/usr/bin/env bash
+# Make an existing backlog item a sub-task of another: the \`parent: "#NNN"\`
+# frontmatter and the \`## Sub-tasks\` line \`add.sh --parent\` writes at creation.
+#
+# Usage: link.sh <child-number> <parent-number>
+# Exit: 0 linked · 1 an item does not exist · 2 usage, or an item linked to itself
+set -euo pipefail
+
+# shellcheck source=./_config.sh
+. "\$(dirname "\$0")/_config.sh"
+
+[ "\$#" -eq 2 ] || { echo 'usage: link.sh <child-number> <parent-number>' >&2; exit 2; }
+CHILD=\$(require_issue_number "\$1") || exit 2
+PARENT=\$(require_issue_number "\$2") || exit 2
+[ "\$CHILD" != "\$PARENT" ] || { echo "link.sh: an item is not its own parent" >&2; exit 2; }
+CHILD_FILE=\$(item_file "\$CHILD") || { echo "no backlog item #\$CHILD" >&2; exit 1; }
+PARENT_FILE=\$(item_file "\$PARENT") || { echo "no backlog item #\$PARENT" >&2; exit 1; }
+PADDED=\$(printf '%03d' "\$PARENT")
+
+fm_set "\$CHILD_FILE" parent "\\"#\$PADDED\\"" || { echo "#\$CHILD has no frontmatter" >&2; exit 1; }
+TITLE=\$(awk 'NR > 1 && /^---[[:space:]]*\$/ { exit } /^title:/ { sub(/^title:[[:space:]]*/, ""); print; exit }' "\$CHILD_FILE")
+grep -q '^## Sub-tasks\$' "\$PARENT_FILE" || printf '\\n## Sub-tasks\\n\\n' >>"\$PARENT_FILE"
+printf -- '- #%03d — %s\\n' "\$CHILD" "\$TITLE" >>"\$PARENT_FILE"
+
+bash "\$(dirname "\$0")/render-index.sh" "\$ROOT"
+echo "linked #\$CHILD under #\$PARENT"
+`,
+    executable: true,
+    backend: "local",
+    skipIfExists: false,
+  },
+  {
+    category: "backlog-script",
+    name: "_backlog_plan",
+    suffix: "_backlog_plan.sh",
+    content: `# shellcheck shell=bash
+# The one home of what a backlog write plan may say: the product owner proposes
+# a plan, a bundled executor (\`apply-plan.sh\`) checks it here and applies it.
+# Sourced, never run, by apply-plan.sh, read-items.sh and the local add.sh,
+# installed beside it, once the caller has \`jq_lf\`.
+#
+# A plan is JSON Lines: one object per line, its \`op\` one of the eight below,
+# with exactly these keys (? = optional) and nothing else:
+#
+#   create    ref?, title, body?, labels?, parent?   a new item
+#   edit      target, title?, append?                at least one of the two
+#   comment   target, body
+#   move      target, status
+#   classify  target, axis, value
+#   label     target, labels
+#   close     target, reason
+#   link      target, parent                         target becomes parent's child
+#
+# The values, checked by PLAN_JQ before anything is written:
+#   target, parent  an issue number (a JSON integer), or a \`ref\` an earlier
+#                   create in the same plan named (\`@\` + [a-z][a-z0-9-]{0,15});
+#                   always inside the verb's scope (scope_for). A repository, a
+#                   project, a URL or a path is no value any key takes.
+#   status          one of the board's own columns, never Done: an item reaches
+#                   Done through \`close\`, behind its cascade check
+#   axis, value     Priority P0-P3 · Size XS, S, M, L, XL · IssueType Task, Bug, Feature
+#   labels          1 to 10 of the repository's existing labels
+#   reason          completed or not_planned
+#   title           one line, 1 to 256 characters, every one \`inert\` (_issue_text.sh)
+#   body, append    up to 65536 characters (a comment's body: 16384), inert,
+#                   tabs and newlines kept. An edit only appends to a body.
+#   @-mentions      in any text, only of the target item's author, as the items
+#                   file records it; a new item's text mentions nobody
+# Caps: PLAN_MAX_OPS lines, and one comment per target per run. There is no
+# operation for memory, files or raw tracker calls, and no key that is a path:
+# the executor writes every body file itself.
+
+PLAN_MAX_OPS=40
+_PLAN_DIR=\$(CDPATH="" cd "\$(dirname "\${BASH_SOURCE[0]}")" && pwd)
+# shellcheck source=./_issue_text.sh
+. "\$_PLAN_DIR/_issue_text.sh"
+
+# backlog_fingerprint <root> — the work tree's state at a read, the same text
+# for read-items.sh, which records it, and apply-plan.sh, which checks it:
+# \`git hash-object\` of \`git status --porcelain\`. Fails outside a work tree.
+backlog_fingerprint() {
+  local porcelain fp
+  porcelain=\$(cd "\$1" && git status --porcelain 2>/dev/null) || return 1
+  fp=\$(printf '%s' "\$porcelain" | (cd "\$1" && git hash-object --stdin)) || return 1
+  fp=\${fp%\$'\\r'}
+  [[ \$fp =~ ^[0-9a-f]{40}([0-9a-f]{24})?\$ ]] || return 1
+  printf '%s\\n' "\$fp"
+}
+
+# scope_for <verb> [<id>] — what a run of <verb> may write, derived here, never
+# from a plan: SCOPE_OPS, SCOPE_TARGETS (issue numbers) and SCOPE_REFS (may it
+# create and name new items). 2 for a verb not listed, or an id it needs and
+# lacks or must not have. ITEMS_READ (the items file's numbers) is set by
+# apply-plan.sh; read-items.sh calls this to refuse a verb before any read.
+#
+#   add [<parent>]   create; then its own new items and the parent the user named
+#   edit <id>        {id}
+#   estimate <id>    {id}, classification only
+#   close <id>       {id}, and its children among the items read once the
+#                    executor's own cascade-check.sh <id> exits 0
+#   groom            the items read, no create; it closes only an epic whose
+#                    cascade check clears (epic_cleared)
+#   tech-debt        create only
+scope_for() {
+  local verb=\${1:-} id=\${2:-} n p
+  SCOPE_OPS="" SCOPE_TARGETS="" SCOPE_REFS=false
+  case \$verb in
+    add) SCOPE_OPS="create comment move classify label link" SCOPE_REFS=true SCOPE_TARGETS=\$id ;;
+    edit) SCOPE_OPS="edit comment move classify label link" SCOPE_TARGETS=\$id ;;
+    estimate) SCOPE_OPS="classify label comment" SCOPE_TARGETS=\$id ;;
+    close) SCOPE_OPS="close comment label" SCOPE_TARGETS=\$id ;;
+    groom) SCOPE_OPS="edit comment move classify label close link" SCOPE_TARGETS=\${ITEMS_READ:-} ;;
+    tech-debt) SCOPE_OPS="create" SCOPE_REFS=true ;;
+    *) return 2 ;;
+  esac
+  case \$verb in
+    edit | estimate | close) [ -n "\$id" ] || return 2 ;;
+    tech-debt) [ -z "\$id" ] || return 2 ;;
+  esac
+  if [ "\$verb" = close ] && [ -n "\${ITEMS_READ:-}" ] &&
+    bash "\$_PLAN_DIR/cascade-check.sh" "\$id" >/dev/null 2>&1; then
+    for n in \$ITEMS_READ; do
+      [ "\$n" != "\$id" ] || continue
+      p=\$(bash "\$_PLAN_DIR/parent-of.sh" "\$n" 2>/dev/null) || continue
+      [ "\${p#"\${p%%[!0]*}"}" != "\$id" ] || SCOPE_TARGETS="\$SCOPE_TARGETS \$n"
+    done
+  fi
+  return 0
+}
+
+# epic_cleared <n> — 0 when <n> has children and its cascade check clears it:
+# the only item a groom may close. The check's exit 0 alone also means "no
+# children at all"; only its "safe to close" line says it has some.
+epic_cleared() {
+  local out
+  out=\$(bash "\$_PLAN_DIR/cascade-check.sh" "\$1" 2>/dev/null) || return 1
+  case \$out in *"safe to close"*) return 0 ;; *) return 1 ;; esac
+}
+
+# jq definitions the validator and the local add.sh share; appended to ISSUE_TEXT_JQ.
+# shellcheck disable=SC2016  # jq program.
+PLAN_DEFS='
+  def plan_title: type == "string" and length >= 1 and length <= 256
+    and (explode | all(.[]; inert)) and (explode | any(.[]; . != 32));
+  def plan_text(\$max): type == "string" and length >= 1 and length <= \$max
+    and (explode | all(.[]; inert or . == 9 or . == 10));
+'
+
+# The validator, over the plan's raw lines (jq -n -R), given \$ops, \$targets,
+# \$refs, \$statuses, \$labels, \$authors ({n: login}), \$cannot ("op" or
+# "op:qualifier") and \$max. Out: {refused: [[class, path]], unsupported, ops},
+# each op normalised, its targets strings, its \`line\` (1-based) added.
+# shellcheck disable=SC2016  # jq program.
+PLAN_JQ='
+  def schema: {
+    create: {ref: "ref?", title: "title", body: "body?", labels: "labels?", parent: "target?"},
+    edit: {target: "target", title: "title?", append: "body?"},
+    comment: {target: "target", body: "comment"},
+    move: {target: "target", status: "status"},
+    classify: {target: "target", axis: "axis", value: "value"},
+    label: {target: "target", labels: "labels"},
+    close: {target: "target", reason: "reason"},
+    link: {target: "target", parent: "target"} };
+  def axes: {Priority: ["P0", "P1", "P2", "P3"], Size: ["XS", "S", "M", "L", "XL"], IssueType: ["Task", "Bug", "Feature"]};
+  def shown: if type == "string" and test("^[a-z_]{1,32}\$") then . else "?" end;
+  def number: type == "number" and . == floor and . >= 1 and . <= 9999999999;
+  def refname: type == "string" and test("^@[a-z][a-z0-9-]{0,15}\$");
+  def mentions: [match("(?:^|[^A-Za-z0-9_.\`/@-])@([A-Za-z0-9][A-Za-z0-9-]*)"; "g") | .captures[0].string];
+  def resolve(\$v; \$st): if (\$v | number) then (\$v | tostring) as \$n
+      | (if any(\$targets[]; . == \$n) then \$n else null end)
+    elif \$refs and (\$v | refname) and any(\$st.refs[]; . == \$v) then \$v
+    else null end;
+  def check(\$k; \$kind; \$v; \$st; \$o):
+    if \$kind == "target" then (if resolve(\$v; \$st) == null then "scope" else null end)
+    elif \$kind == "ref" then (if (\$v | refname) and (\$st.refs | index([\$v]) == null) and \$refs then null else "ref" end)
+    elif \$kind == "title" then (if \$v | plan_title then null else "title" end)
+    elif \$kind == "body" then (if \$v | plan_text(65536) then null else "text" end)
+    elif \$kind == "comment" then (if \$v | plan_text(16384) then null else "text" end)
+    elif \$kind == "status" then (if (\$v | type) == "string" and (\$v | ascii_downcase) != "done"
+      and any(\$statuses[]; . == \$v) then null else "status" end)
+    elif \$kind == "axis" then (if (\$v | type) == "string" and (axes | has(\$v)) then null else "axis" end)
+    elif \$kind == "value" then ((axes[\$o.axis | strings] // []) as \$vs | if any(\$vs[]; . == \$v) then null else "value" end)
+    elif \$kind == "labels" then (if (\$v | type) == "array" and (\$v | length) >= 1 and (\$v | length) <= 10
+      and all(\$v[]; type == "string" and plan_title and (index(",") == null) and (. as \$l | any(\$labels[]; . == \$l)))
+      then null else "label" end)
+    elif \$kind == "reason" then (if \$v == "completed" or \$v == "not_planned" then null else "reason" end)
+    else "schema" end;
+  def cannot(\$o): (\$o.op) as \$op
+    | if any(\$cannot[]; . == \$op) then \$op
+      elif \$op == "close" and any(\$cannot[]; . == "close:" + \$o.reason) then \$op
+      elif \$op == "classify" and any(\$cannot[]; . == "classify:" + \$o.axis) then \$op
+      elif \$op == "create" and \$o.labels != null and any(\$cannot[]; . == "create:labels") then \$op
+      else null end;
+  [inputs] as \$lines
+  | reduce range(\$lines | length) as \$i ({refused: [], unsupported: [], ops: [], refs: [], said: []};
+      (\$i + 1 | tostring) as \$at
+      | (\$lines[\$i] | try fromjson catch null) as \$o
+      | if (\$o | type) != "object" then .refused += [["parse", \$at]]
+        elif (\$o.op | type) != "string" or (schema | has(\$o.op) | not) then .refused += [["op", "\\(\$at).op"]]
+        elif (\$ops | index([\$o.op]) == null) then .refused += [["scope", "\\(\$at).op"]]
+        elif cannot(\$o) != null then .unsupported += [cannot(\$o)]
+        else schema[\$o.op] as \$s | . as \$st
+          | ([\$o | keys[] | . as \$k | select(\$k != "op" and (\$s | has(\$k) | not)) | ["unknown-key", "\\(\$at).\\(shown)"]]
+             + [\$s | to_entries[] | .key as \$k | select((.value | endswith("?") | not) and (\$o | has(\$k) | not))
+                 | ["missing-key", "\\(\$at).\\(.key)"]]
+             + [\$s | to_entries[] | .key as \$k | select(\$o | has(\$k))
+                 | check(\$k; .value | rtrimstr("?"); \$o[\$k]; \$st; \$o) // empty | [., "\\(\$at).\\(\$k)"]]
+             + (if \$o.op == "edit" and (\$o | has("title") or has("append") | not) then [["missing-key", "\\(\$at).append"]] else [] end)
+             + [("title", "body", "append") as \$k | select(\$o[\$k] | type == "string")
+                 | (if \$o.op == "create" then [] else [\$authors[\$o.target | tostring]? // empty] end) as \$who
+                 | select([\$o[\$k] | mentions[] | select(. as \$m | \$who | index([\$m]) == null)] | length > 0)
+                 | ["mention", "\\(\$at).\\(\$k)"]]) as \$bad
+          | if (\$bad | length) > 0 then .refused += \$bad
+            else (\$o
+                   | (if has("target") then .target = resolve(.target; \$st) else . end)
+                   | (if has("parent") then .parent = resolve(.parent; \$st) else . end)
+                   | .line = (\$i + 1)) as \$n
+              | (if \$n.op == "comment" and any(.said[]; . == \$n.target)
+                 then .refused += [["cap", "\\(\$at).target"]] else . end)
+              | .said += (if \$n.op == "comment" then [\$n.target] else [] end)
+              | .refs += (if \$n.op == "create" and \$n.ref != null then [\$n.ref] else [] end)
+              | .ops += [\$n]
+            end
+        end)
+  | if (\$lines | length) > \$max then .refused += [["cap", "plan"]] elif (\$lines | length) == 0 then .refused += [["parse", "plan"]] else . end
+  | {refused, unsupported: (.unsupported | unique), ops}
+'
+
+# require_title <title> — the plan's title rule, or a refusal and status 2: the
+# local add.sh writes a title into frontmatter, where a second line is a key.
+require_title() {
+  jq_lf -n -e --arg t "\${1-}" "\$ISSUE_TEXT_JQ\$PLAN_DEFS"' \$t | plan_title' >/dev/null 2>&1 && return 0
+  printf '%s: a title is one line of 1 to 256 printable characters\\n' "\${0##*/}" >&2
+  return 2
+}
+`,
+    executable: true,
+    backend: "local",
+    skipIfExists: false,
+  },
+  {
+    category: "backlog-script",
+    name: "_apply_plan",
+    suffix: "_apply_plan.sh",
+    content: `# shellcheck shell=bash
+# The one body of apply-plan.sh: the bundled executor that applies the product
+# owner's write plan. Sourced — never run — by the backend's own apply-plan.sh,
+# which sets \`here\` (its directory), sources its \`_config.sh\`, and defines:
+#
+#   PLAN_CANNOT         a JSON array of what the backend cannot do (\`label\`,
+#                       \`close:not_planned\`, \`create:labels\`, ...)
+#   board_statuses      the board's columns, one per line
+#   repo_labels         the repository's labels, one per line
+#   create_item <title> <body-file|""> <labels-csv> <parent|"">
+#                       prints the new item's number; its status is add.sh's
+#   close_item <n> <reason>, CLOSE_IS_MOVE (1: the close moves the card itself)
+#   fallback_label <axis> <value>
+#                       the label a classification falls back to, or nothing
+#   receipt_snapshot    \`cksum\` lines of the repository files a write can change
+#
+# Usage: apply-plan.sh <verb> [--id <n>] <plan-file> <items-file>
+#
+# The plan is checked whole before anything is written (_backlog_plan.sh): its
+# verb, id and fingerprint against the items file's header, every line against
+# the schema and the verb's scope, every text against the secret scan of
+# \`_report_text.sh\`, run over the bytes this script then sends. Any refusal
+# writes nothing. Free text reaches a backend script only as a file this
+# script wrote in its own 0700 directory; every other value as one argument.
+#
+# stdout holds these lines and no others, then RECEIPT:
+#   APPLIED <op> <n>              FAILED <op> <n|@ref> <exit|skipped>
+#   FALLBACK classify <n>         (no such field: the label was set instead)
+#   REFUSED <class> <field-path>  (a path such as 3.body, never the value)
+#   UNSUPPORTED <op>              (this backend cannot do it; nothing written)
+#   RECEIPT: <path>... | none     the repository files changed, to stage
+# Exit: 0 applied · 2 usage · 3 refused, nothing written · 4 an operation failed
+# shellcheck disable=SC2154  # \`here\` is the caller's.
+
+# Every failure below is handled where it happens: \`set -e\` from \`_config.sh\`
+# would end a run between two writes, and kill the scans' own grep calls.
+set +e
+usage() { echo "usage: apply-plan.sh <verb> [--id <n>] <plan-file> <items-file>" >&2; exit 2; }
+VERB=\${1:-}
+[ "\$#" -gt 0 ] && shift
+ID=""
+if [ "\${1:-}" = --id ]; then
+  [ "\$#" -ge 2 ] || usage
+  ID=\$(require_issue_number "\$2") || exit 2
+  shift 2
+fi
+[ "\$#" -eq 2 ] || usage
+PLAN=\$1 ITEMS_FILE=\$2
+[[ \$VERB =~ ^[a-z][a-z-]{0,31}\$ ]] || usage
+
+# A scan that is not there would pass every text: its absence stops the run.
+# shellcheck source=./_backlog_plan.sh
+. "\$here/_backlog_plan.sh" || exit 2
+# shellcheck source=../../specnaut/scripts/bash/_report_text.sh
+. "\$here/../bash/_report_text.sh" || exit 2
+declare -F scan_hard >/dev/null || { echo "apply-plan.sh: the secret scan is missing" >&2; exit 2; }
+
+REFUSED=0
+refused() { printf 'REFUSED %s %s\\n' "\$1" "\$2"; REFUSED=1; }
+stop_if_refused() { [ "\$REFUSED" = 0 ] || { echo "RECEIPT: none"; exit 3; }; }
+
+# The items file's header, up to its first blank line: the facts of the read.
+[ -f "\$PLAN" ] || refused plan-file plan
+[ -f "\$ITEMS_FILE" ] || refused items-file header
+stop_if_refused
+HEADER=\$(sed -n '1,/^\$/p' "\$ITEMS_FILE" | tr -d '\\r')
+hv() { printf '%s\\n' "\$HEADER" | sed -n "s/^\$1: //p" | head -1; }
+[ "\$(hv specnaut-items)" = 1 ] || refused items-file header
+[ "\$(hv verb)" = "\$VERB" ] || refused verb header.verb
+[ "\$(hv id)" = "\${ID:-none}" ] || refused id header.id
+FP=\$(backlog_fingerprint "\$ROOT") || FP=""
+[ -n "\$FP" ] && [ "\$(hv fingerprint)" = "\$FP" ] || refused fingerprint header.fingerprint
+NONCE=\$(hv nonce)
+[[ \$NONCE =~ ^[0-9a-f]{32}\$ ]] || refused items-file header.nonce
+ITEMS_READ=\$(hv items)
+[[ \$ITEMS_READ =~ ^(none|[0-9]+( [0-9]+)*)\$ ]] || refused items-file header.items
+[ "\$ITEMS_READ" != none ] || ITEMS_READ=""
+stop_if_refused
+scope_for "\$VERB" "\$ID" || refused verb verb
+stop_if_refused
+
+# The board's facts, read only when a plan line needs them. A read that fails
+# refuses the plan: an unknown column must not pass for an allowed one.
+SEEN=\$(jq_lf -R -r 'try fromjson catch null | objects | .op? | strings' "\$PLAN" 2>/dev/null | sort -u)
+lines_json() { jq_lf -R -s -c 'split("\\n") | map(sub("\\r\$"; "") | select(length > 0))'; }
+STATUSES='[]' LABELS='[]'
+if printf '%s\\n' "\$SEEN" | grep -qx move; then
+  STATUSES=\$(board_statuses | lines_json) || refused unreadable board.status
+fi
+if printf '%s\\n' "\$SEEN" | grep -Eqx 'label|create'; then
+  LABELS=\$(repo_labels | lines_json) || refused unreadable repo.labels
+fi
+AUTHORS=\$(sed -n "s/^<untrusted-issue-text nonce=\\"\$NONCE\\" item=\\"\\([0-9]*\\)\\" field=\\"title\\" author=\\"\\([A-Za-z0-9._-]*\\)\\".*/\\1 \\2/p" "\$ITEMS_FILE" |
+  jq_lf -R -s -c 'split("\\n") | map(select(test(" .")) | split(" ") | {(.[0]): .[1]}) | add // {}') ||
+  refused items-file authors
+stop_if_refused
+ops_json() { printf '%s' "\$1" | jq_lf -R -s -c 'split(" ") | map(select(length > 0))'; }
+RESULT=\$(jq_lf -n -R -c --argjson ops "\$(ops_json "\$SCOPE_OPS")" --argjson targets "\$(ops_json "\$SCOPE_TARGETS")" \\
+  --argjson refs "\$SCOPE_REFS" --argjson statuses "\$STATUSES" --argjson labels "\$LABELS" \\
+  --argjson authors "\$AUTHORS" --argjson cannot "\$PLAN_CANNOT" --argjson max "\$PLAN_MAX_OPS" \\
+  "\$ISSUE_TEXT_JQ\$PLAN_DEFS\$PLAN_JQ" <"\$PLAN") || { refused parse plan; stop_if_refused; }
+printf '%s' "\$RESULT" | jq_lf -r '.refused[] | "REFUSED \\(.[0]) \\(.[1])"'
+printf '%s' "\$RESULT" | jq_lf -r '.unsupported[] | "UNSUPPORTED \\(.)"'
+[ "\$(printf '%s' "\$RESULT" | jq_lf '(.refused | length) + (.unsupported | length)')" = 0 ] || REFUSED=1
+stop_if_refused
+
+TMP=\${TMPDIR:-/tmp}
+WORK=\$(mktemp -d "\${TMP%/}/specnaut-plan.XXXXXXXX") || { echo "apply-plan.sh: no temporary directory" >&2; exit 2; }
+trap 'rm -rf "\$WORK"' EXIT
+chmod 700 "\$WORK"
+printf '%s' "\$RESULT" | jq_lf -c '.ops[]' >"\$WORK/ops.jsonl"
+
+# Every text, written once to the file it is sent from, scanned from those bytes.
+# shellcheck disable=SC2329  # called by _report_text.sh's scans.
+refuse() { printf '%s' "\$1"; exit 1; }
+while IFS= read -r op <&3; do
+  at=\$(jq_lf -r .line <<<"\$op")
+  for k in title body append; do
+    jq_lf -e --arg k "\$k" 'has(\$k)' <<<"\$op" >/dev/null || continue
+    jq_lf -j --arg k "\$k" '.[\$k]' <<<"\$op" >"\$WORK/\$at.\$k"
+    bytes=\$(read_bytes <"\$WORK/\$at.\$k")
+    class=\$(scan_hard "\${bytes%x}"; exit 0) || refused "\${class:-secret}" "\$at.\$k"
+  done
+  if [ "\$VERB" = groom ] && [ "\$(jq_lf -r .op <<<"\$op")" = close ]; then
+    epic_cleared "\$(jq_lf -r .target <<<"\$op")" || refused scope "\$at.target"
+  fi
+done 3<"\$WORK/ops.jsonl"
+stop_if_refused
+
+shown() { if command -v cygpath >/dev/null 2>&1; then cygpath -m "\$1"; else printf '%s' "\$1"; fi; }
+text() { cat -- "\$WORK/\$at.\$1"; printf x; }
+REFS=" " RC=0
+resolve() { case \$1 in @*) r=\${REFS#* "\$1"=}; [ "\$r" != "\$REFS" ] && printf '%s' "\${r%% *}" ;; *) printf '%s' "\$1" ;; esac; }
+report() { if [ "\$2" = 0 ]; then echo "APPLIED \$1 \$3"; else echo "FAILED \$1 \$3 \$2"; RC=4; fi; }
+BEFORE=\$(receipt_snapshot)
+while IFS= read -r op <&3; do
+  at=\$(jq_lf -r .line <<<"\$op")
+  o=\$(jq_lf -r .op <<<"\$op")
+  t=\$(jq_lf -r '.target // empty' <<<"\$op")
+  n=\$(resolve "\$t")
+  if [ -n "\$t" ] && [ -z "\$n" ]; then echo "FAILED \$o \$t skipped"; RC=4; continue; fi
+  rc=0
+  case \$o in
+    create)
+      title=\$(text title); bf=""; [ ! -f "\$WORK/\$at.body" ] || bf=\$(shown "\$WORK/\$at.body")
+      p=\$(resolve "\$(jq_lf -r '.parent // empty' <<<"\$op")")
+      new=\$(create_item "\${title%x}" "\$bf" "\$(jq_lf -r '(.labels // []) | join(",")' <<<"\$op")" "\$p") || rc=\$?
+      ref=\$(jq_lf -r '.ref // empty' <<<"\$op")
+      if [[ \$new =~ ^[1-9][0-9]*\$ ]]; then [ -z "\$ref" ] || REFS="\$REFS\$ref=\$new "; report create "\$rc" "\$new"
+      else [ "\$rc" != 0 ] || rc=1; echo "FAILED create \${ref:-new} \$rc"; RC=4; fi ;;
+    edit)
+      args=("\$n")
+      if [ -f "\$WORK/\$at.title" ]; then title=\$(text title); args+=(--title "\${title%x}"); fi
+      [ ! -f "\$WORK/\$at.append" ] || args+=(--append-file "\$(shown "\$WORK/\$at.append")")
+      bash "\$here/edit.sh" "\${args[@]}" >/dev/null 2>&1 || rc=\$?
+      report edit "\$rc" "\$n" ;;
+    comment)
+      bash "\$here/clarify-comment.sh" "\$n" --body-file "\$(shown "\$WORK/\$at.body")" >/dev/null 2>&1 || rc=\$?
+      report comment "\$rc" "\$n" ;;
+    move)
+      bash "\$here/move.sh" "\$n" "\$(jq_lf -r .status <<<"\$op")" >/dev/null 2>&1 || rc=\$?
+      report move "\$rc" "\$n" ;;
+    classify)
+      axis=\$(jq_lf -r .axis <<<"\$op") value=\$(jq_lf -r .value <<<"\$op")
+      bash "\$here/set-field.sh" "\$n" "\$axis" "\$value" >/dev/null 2>&1 || rc=\$?
+      lbl=""; [ "\$rc" != 10 ] || lbl=\$(fallback_label "\$axis" "\$value")
+      if [ -n "\$lbl" ] && bash "\$here/label.sh" "\$n" "\$lbl" >/dev/null 2>&1; then echo "FALLBACK classify \$n"
+      else report classify "\$rc" "\$n"; fi ;;
+    label)
+      IFS=, read -r -a labels <<<"\$(jq_lf -r '.labels | join(",")' <<<"\$op")"
+      bash "\$here/label.sh" "\$n" "\${labels[@]}" >/dev/null 2>&1 || rc=\$?
+      report label "\$rc" "\$n" ;;
+    close)
+      bash "\$here/cascade-check.sh" "\$n" >/dev/null 2>&1 || rc=\$?
+      [ "\$rc" != 0 ] || close_item "\$n" "\$(jq_lf -r .reason <<<"\$op")" >/dev/null 2>&1 || rc=\$?
+      report close "\$rc" "\$n"
+      if [ "\$rc" = 0 ] && [ "\$CLOSE_IS_MOVE" != 1 ]; then
+        rc=0; bash "\$here/move.sh" "\$n" Done >/dev/null 2>&1 || rc=\$?
+        report move "\$rc" "\$n"
+      fi ;;
+    link)
+      p=\$(resolve "\$(jq_lf -r .parent <<<"\$op")")
+      if [ -z "\$p" ]; then echo "FAILED link \$n skipped"; RC=4; continue; fi
+      bash "\$here/link.sh" "\$n" "\$p" >/dev/null 2>&1 || rc=\$?
+      report link "\$rc" "\$n" ;;
+    *) echo "FAILED \$o \$n skipped"; RC=4 ;;
+  esac
+done 3<"\$WORK/ops.jsonl"
+
+CHANGED=\$(printf '%s\\n' "\$(receipt_snapshot)" | grep -vxF -f <(printf '%s\\n' "\$BEFORE") | awk 'NF { print \$NF }' | sort -u | tr '\\n' ' ')
+CHANGED=\${CHANGED% }
+echo "RECEIPT: \${CHANGED:-none}"
+exit "\$RC"
 `,
     executable: true,
     backend: "local",
@@ -9914,19 +10556,21 @@ exit "\$rc"
 #     [A-Za-z0-9._-]{1,64} is written author="".
 # How a reader treats the blocks is the agent definition's rule, not this file's.
 #
-# Usage: read-items.sh <verb> [--id <n>] (<n>... | --status <column>)
-#   <verb>      the work the items are read for (\`groom\`, \`edit\`, ...): a
-#               lower-case word, recorded in the header
+# Usage: read-items.sh <verb> [--id <n>] [<n>... | --status <column>]
+#   <verb>      the work the items are read for, one \`scope_for\` lists in
+#               \`_backlog_plan.sh\` (\`groom\`, \`edit\`, ...); recorded in the header
 #   --id <n>    the item the verb acts on; read first, recorded in the header
 #   --status    every item in that column, as \`list.sh --numbers\` lists them
-# Exit: 0 written · 2 usage, a refused number, an item that cannot be read, no
-# git work tree, no randomness, or a temporary directory inside the repository.
+# A verb that creates items (SCOPE_REFS) may read nothing: \`items: none\`.
+# Exit: 0 written · 2 usage, a verb scope_for refuses, a refused number, an item
+# that cannot be read, no git work tree, no randomness, or a temporary
+# directory inside the repository.
 # On any failure stdout stays empty and no directory is left behind.
 set -euo pipefail
 
 here=\$(dirname "\$0")
 usage() {
-  echo "usage: read-items.sh <verb> [--id <n>] (<n>... | --status <column>)" >&2
+  echo "usage: read-items.sh <verb> [--id <n>] [<n>... | --status <column>]" >&2
   exit 2
 }
 die() { echo "read-items.sh: \$*" >&2; exit 2; }
@@ -9947,26 +10591,22 @@ while [ "\$#" -gt 0 ]; do
     *) NUMS+=("\$1"); shift ;;
   esac
 done
+# jq_lf, the family's CR-safe jq; scope_for, the fingerprint and, through
+# _issue_text.sh, ISSUE_TEXT_JQ: the characters that pass.
+# shellcheck source=../../specnaut/scripts/bash/common.sh
+. "\$here/../bash/common.sh"
+# shellcheck source=./_backlog_plan.sh
+. "\$here/_backlog_plan.sh"
+scope_for "\$VERB" "\$ID" || die "no plan can follow a read for: \$(printf '%q' "\$VERB")\${ID:+ --id}"
 if [ "\$BY_STATUS" = true ]; then
   [ "\${#NUMS[@]}" -eq 0 ] || usage
   (LC_ALL=C; [[ \$STATUS =~ ^[^[:cntrl:]]{1,64}\$ ]]) || die "not a column name: \$(printf '%q' "\$STATUS")"
-elif [ "\${#NUMS[@]}" -eq 0 ] && [ -z "\$ID" ]; then
+elif [ "\${#NUMS[@]}" -eq 0 ] && [ -z "\$ID" ] && [ "\$SCOPE_REFS" != true ]; then
   usage
 fi
 
-# jq_lf, the family's CR-safe jq; ISSUE_TEXT_JQ, the characters that pass.
-# shellcheck source=../../specnaut/scripts/bash/common.sh
-. "\$here/../bash/common.sh"
-# shellcheck source=./_issue_text.sh
-. "\$here/_issue_text.sh"
-
 ROOT=\$(cd "\$here/../../.." && pwd)
-porcelain=\$(cd "\$ROOT" && git status --porcelain 2>/dev/null) ||
-  die "\$ROOT is not a git work tree: the fingerprint needs one"
-FINGERPRINT=\$(printf '%s' "\$porcelain" | (cd "\$ROOT" && git hash-object --stdin)) ||
-  die "git could not hash the work tree's status"
-FINGERPRINT=\${FINGERPRINT%\$'\\r'}
-[[ \$FINGERPRINT =~ ^[0-9a-f]{40}([0-9a-f]{24})?\$ ]] || die "git gave no fingerprint"
+FINGERPRINT=\$(backlog_fingerprint "\$ROOT") || die "\$ROOT is not a git work tree: the fingerprint needs one"
 
 if [ "\$BY_STATUS" = true ]; then
   listed=\$(bash "\$here/list.sh" --numbers "\$STATUS") || die "could not list the column"
@@ -10118,6 +10758,618 @@ ISSUE_TEXT_JQ='
   def body: explode | map(if . == 8232 or . == 8233 then 10 else . end | select(printable or . == 9 or . == 10)) | implode;
   def inert_body: explode | map(if . == 8232 or . == 8233 then 10 else . end | select(inert or . == 9 or . == 10)) | implode;
 '
+`,
+    executable: true,
+    backend: "github",
+    skipIfExists: false,
+  },
+  {
+    category: "backlog-script",
+    name: "apply-plan",
+    suffix: "apply-plan.sh",
+    content: `#!/usr/bin/env bash
+# Apply the product owner's write plan to GitHub — the bundled executor. The
+# checks, the operations, the output lines and the exit table are the shared
+# body, \`_apply_plan.sh\`, beside this file; the plan's vocabulary is
+# \`_backlog_plan.sh\`. This file supplies only what GitHub answers differently.
+#
+# Usage: apply-plan.sh <verb> [--id <n>] <plan-file> <items-file>
+set -euo pipefail
+here=\$(CDPATH="" cd "\$(dirname "\${BASH_SOURCE[0]}")" && pwd)
+# shellcheck source=./_config.sh
+. "\$here/_config.sh"
+
+PLAN_CANNOT='[]'
+CLOSE_IS_MOVE=0
+
+# The board's Status options, as move.sh resolves them.
+board_statuses() {
+  gh project field-list "\$PROJECT_NUMBER" --owner "\$REPO_OWNER" --format json |
+    jq_lf -r '.fields[] | select(.name == "Status") | .options[].name'
+}
+
+repo_labels() {
+  gh label list --repo "\$REPO" --limit 1000 --json name --jq '.[].name'
+}
+
+# add.sh prints \`✓ created: <url>\`; the number ends the URL.
+create_item() {
+  local args=("\$1" "" "\$3") out rc=0
+  [ -z "\$4" ] || args+=(--parent "\$4")
+  [ -z "\$2" ] || args+=(--body-file "\$2")
+  out=\$(bash "\$here/add.sh" "\${args[@]}" 2>/dev/null) || rc=\$?
+  printf '%s\\n' "\$out" | sed -n 's|.*created: https://[^ ]*/issues/\\([0-9][0-9]*\\)\$|\\1|p' | head -1
+  return "\$rc"
+}
+
+close_item() { bash "\$here/close.sh" "\$1" "\$2"; }
+
+# set-field.sh's exit 10: no such field or type here, so the label carries it.
+fallback_label() {
+  case \$1 in
+    Priority) echo "priority:\$2" ;;
+    Size) echo "size:\$2" ;;
+    IssueType) printf 'type:%s\\n' "\$2" | tr '[:upper:]' '[:lower:]' ;;
+  esac
+}
+
+# Nothing in the repository changes on this backend.
+receipt_snapshot() { :; }
+
+# shellcheck source=../_apply_plan.sh
+. "\$here/_apply_plan.sh"
+`,
+    executable: true,
+    backend: "github",
+    skipIfExists: false,
+  },
+  {
+    category: "backlog-script",
+    name: "edit",
+    suffix: "edit.sh",
+    content: `#!/usr/bin/env bash
+# Edit a GitHub issue: its title, and text appended to its body. A body is
+# never replaced: what is there stays, and the new text follows a blank line.
+#
+# Usage: edit.sh <number> [--title <title>] [--append-file <path>]
+#
+# The body travels as a file (\`gh issue edit --body-file\`), written in a fresh
+# directory only the user can open; the title as one argument.
+# Exit: 0 edited · 2 usage · 3 the current body could not be read · other gh's
+set -euo pipefail
+
+# shellcheck source=./_config.sh
+. "\$(dirname "\$0")/_config.sh"
+
+USAGE='usage: edit.sh <number> [--title <title>] [--append-file <path>]'
+[ "\$#" -ge 1 ] || { echo "\$USAGE" >&2; exit 2; }
+NUM=\$(require_issue_number "\$1") || exit 2
+shift
+TITLE="" HAS_TITLE=false APPEND=""
+while [ "\$#" -gt 0 ]; do
+  case "\$1" in
+    --title) [ "\$#" -ge 2 ] || { echo "\$USAGE" >&2; exit 2; }; TITLE=\$2 HAS_TITLE=true; shift 2 ;;
+    --append-file) [ "\$#" -ge 2 ] && [ -f "\$2" ] || { echo "edit.sh: --append-file needs a file" >&2; exit 2; }; APPEND=\$2; shift 2 ;;
+    *) echo "\$USAGE" >&2; exit 2 ;;
+  esac
+done
+[ "\$HAS_TITLE" = true ] || [ -n "\$APPEND" ] || { echo "\$USAGE" >&2; exit 2; }
+
+ARGS=(issue edit "\$NUM" --repo "\$REPO")
+[ "\$HAS_TITLE" = false ] || ARGS+=(--title "\$TITLE")
+if [ -n "\$APPEND" ]; then
+  BODY=\$(gh issue view "\$NUM" --repo "\$REPO" --json body --jq '.body') || { echo "edit.sh: could not read #\$NUM's body" >&2; exit 3; }
+  DIR=\$(mktemp -d "\${TMPDIR:-/tmp}/specnaut-edit.XXXXXXXX")
+  trap 'rm -rf "\$DIR"' EXIT
+  chmod 700 "\$DIR"
+  { [ -z "\$BODY" ] || printf '%s\\n\\n' "\$BODY"; cat -- "\$APPEND"; } >"\$DIR/body.md"
+  ARGS+=(--body-file "\$DIR/body.md")
+fi
+gh "\${ARGS[@]}" >/dev/null
+echo "edited #\$NUM"
+`,
+    executable: true,
+    backend: "github",
+    skipIfExists: false,
+  },
+  {
+    category: "backlog-script",
+    name: "close",
+    suffix: "close.sh",
+    content: `#!/usr/bin/env bash
+# Close a GitHub issue with its reason. It checks no gate: the executor runs
+# cascade-check.sh first, and moves the card to Done after.
+#
+# Usage: close.sh <number> [completed|not_planned]   (completed by default)
+# Exit: 0 closed · 2 usage · other gh's
+set -euo pipefail
+
+# shellcheck source=./_config.sh
+. "\$(dirname "\$0")/_config.sh"
+
+[ "\$#" -ge 1 ] && [ "\$#" -le 2 ] || { echo 'usage: close.sh <number> [completed|not_planned]' >&2; exit 2; }
+NUM=\$(require_issue_number "\$1") || exit 2
+case "\${2:-completed}" in
+  completed) REASON=completed ;;
+  not_planned) REASON="not planned" ;;
+  *) echo "close.sh: a reason is completed or not_planned" >&2; exit 2 ;;
+esac
+
+gh issue close "\$NUM" --repo "\$REPO" --reason "\$REASON" >/dev/null
+echo "closed #\$NUM"
+`,
+    executable: true,
+    backend: "github",
+    skipIfExists: false,
+  },
+  {
+    category: "backlog-script",
+    name: "label",
+    suffix: "label.sh",
+    content: `#!/usr/bin/env bash
+# Add labels to a GitHub issue. Labels the repository already has: gh refuses
+# one it does not know, and this script creates none.
+#
+# Usage: label.sh <number> <label>...
+# Exit: 0 labelled · 2 usage · other gh's
+set -euo pipefail
+
+# shellcheck source=./_config.sh
+. "\$(dirname "\$0")/_config.sh"
+
+[ "\$#" -ge 2 ] || { echo 'usage: label.sh <number> <label>...' >&2; exit 2; }
+NUM=\$(require_issue_number "\$1") || exit 2
+shift
+ARGS=(issue edit "\$NUM" --repo "\$REPO")
+for l in "\$@"; do
+  case "\$l" in '' | *,*) echo "label.sh: a label is one name, without a comma" >&2; exit 2 ;; esac
+  ARGS+=(--add-label "\$l")
+done
+
+gh "\${ARGS[@]}" >/dev/null
+echo "labelled #\$NUM"
+`,
+    executable: true,
+    backend: "github",
+    skipIfExists: false,
+  },
+  {
+    category: "backlog-script",
+    name: "link",
+    suffix: "link.sh",
+    content: `#!/usr/bin/env bash
+# Link an existing issue as a sub-issue of another, through GitHub's
+# \`/sub_issues\` endpoint — the link \`add.sh --parent\` makes at creation.
+#
+# Usage: link.sh <child-number> <parent-number>
+# Exit: 0 linked · 2 usage, or an issue linked to itself · 3 the child could not be read · other gh's
+set -euo pipefail
+
+# shellcheck source=./_config.sh
+. "\$(dirname "\$0")/_config.sh"
+
+[ "\$#" -eq 2 ] || { echo 'usage: link.sh <child-number> <parent-number>' >&2; exit 2; }
+CHILD=\$(require_issue_number "\$1") || exit 2
+PARENT=\$(require_issue_number "\$2") || exit 2
+[ "\$CHILD" != "\$PARENT" ] || { echo "link.sh: an issue is not its own parent" >&2; exit 2; }
+
+# sub_issues is keyed by the child's REST id, not its number.
+CHILD_ID=\$(gh api "repos/\$REPO_OWNER/\$REPO_NAME/issues/\$CHILD" --jq '.id') ||
+  { echo "link.sh: could not read #\$CHILD" >&2; exit 3; }
+[[ \$CHILD_ID =~ ^[0-9]+\$ ]] || { echo "link.sh: #\$CHILD has no id" >&2; exit 3; }
+gh api -X POST "repos/\$REPO_OWNER/\$REPO_NAME/issues/\$PARENT/sub_issues" -F sub_issue_id="\$CHILD_ID" >/dev/null
+echo "linked #\$CHILD under #\$PARENT"
+`,
+    executable: true,
+    backend: "github",
+    skipIfExists: false,
+  },
+  {
+    category: "backlog-script",
+    name: "_backlog_plan",
+    suffix: "_backlog_plan.sh",
+    content: `# shellcheck shell=bash
+# The one home of what a backlog write plan may say: the product owner proposes
+# a plan, a bundled executor (\`apply-plan.sh\`) checks it here and applies it.
+# Sourced, never run, by apply-plan.sh, read-items.sh and the local add.sh,
+# installed beside it, once the caller has \`jq_lf\`.
+#
+# A plan is JSON Lines: one object per line, its \`op\` one of the eight below,
+# with exactly these keys (? = optional) and nothing else:
+#
+#   create    ref?, title, body?, labels?, parent?   a new item
+#   edit      target, title?, append?                at least one of the two
+#   comment   target, body
+#   move      target, status
+#   classify  target, axis, value
+#   label     target, labels
+#   close     target, reason
+#   link      target, parent                         target becomes parent's child
+#
+# The values, checked by PLAN_JQ before anything is written:
+#   target, parent  an issue number (a JSON integer), or a \`ref\` an earlier
+#                   create in the same plan named (\`@\` + [a-z][a-z0-9-]{0,15});
+#                   always inside the verb's scope (scope_for). A repository, a
+#                   project, a URL or a path is no value any key takes.
+#   status          one of the board's own columns, never Done: an item reaches
+#                   Done through \`close\`, behind its cascade check
+#   axis, value     Priority P0-P3 · Size XS, S, M, L, XL · IssueType Task, Bug, Feature
+#   labels          1 to 10 of the repository's existing labels
+#   reason          completed or not_planned
+#   title           one line, 1 to 256 characters, every one \`inert\` (_issue_text.sh)
+#   body, append    up to 65536 characters (a comment's body: 16384), inert,
+#                   tabs and newlines kept. An edit only appends to a body.
+#   @-mentions      in any text, only of the target item's author, as the items
+#                   file records it; a new item's text mentions nobody
+# Caps: PLAN_MAX_OPS lines, and one comment per target per run. There is no
+# operation for memory, files or raw tracker calls, and no key that is a path:
+# the executor writes every body file itself.
+
+PLAN_MAX_OPS=40
+_PLAN_DIR=\$(CDPATH="" cd "\$(dirname "\${BASH_SOURCE[0]}")" && pwd)
+# shellcheck source=./_issue_text.sh
+. "\$_PLAN_DIR/_issue_text.sh"
+
+# backlog_fingerprint <root> — the work tree's state at a read, the same text
+# for read-items.sh, which records it, and apply-plan.sh, which checks it:
+# \`git hash-object\` of \`git status --porcelain\`. Fails outside a work tree.
+backlog_fingerprint() {
+  local porcelain fp
+  porcelain=\$(cd "\$1" && git status --porcelain 2>/dev/null) || return 1
+  fp=\$(printf '%s' "\$porcelain" | (cd "\$1" && git hash-object --stdin)) || return 1
+  fp=\${fp%\$'\\r'}
+  [[ \$fp =~ ^[0-9a-f]{40}([0-9a-f]{24})?\$ ]] || return 1
+  printf '%s\\n' "\$fp"
+}
+
+# scope_for <verb> [<id>] — what a run of <verb> may write, derived here, never
+# from a plan: SCOPE_OPS, SCOPE_TARGETS (issue numbers) and SCOPE_REFS (may it
+# create and name new items). 2 for a verb not listed, or an id it needs and
+# lacks or must not have. ITEMS_READ (the items file's numbers) is set by
+# apply-plan.sh; read-items.sh calls this to refuse a verb before any read.
+#
+#   add [<parent>]   create; then its own new items and the parent the user named
+#   edit <id>        {id}
+#   estimate <id>    {id}, classification only
+#   close <id>       {id}, and its children among the items read once the
+#                    executor's own cascade-check.sh <id> exits 0
+#   groom            the items read, no create; it closes only an epic whose
+#                    cascade check clears (epic_cleared)
+#   tech-debt        create only
+scope_for() {
+  local verb=\${1:-} id=\${2:-} n p
+  SCOPE_OPS="" SCOPE_TARGETS="" SCOPE_REFS=false
+  case \$verb in
+    add) SCOPE_OPS="create comment move classify label link" SCOPE_REFS=true SCOPE_TARGETS=\$id ;;
+    edit) SCOPE_OPS="edit comment move classify label link" SCOPE_TARGETS=\$id ;;
+    estimate) SCOPE_OPS="classify label comment" SCOPE_TARGETS=\$id ;;
+    close) SCOPE_OPS="close comment label" SCOPE_TARGETS=\$id ;;
+    groom) SCOPE_OPS="edit comment move classify label close link" SCOPE_TARGETS=\${ITEMS_READ:-} ;;
+    tech-debt) SCOPE_OPS="create" SCOPE_REFS=true ;;
+    *) return 2 ;;
+  esac
+  case \$verb in
+    edit | estimate | close) [ -n "\$id" ] || return 2 ;;
+    tech-debt) [ -z "\$id" ] || return 2 ;;
+  esac
+  if [ "\$verb" = close ] && [ -n "\${ITEMS_READ:-}" ] &&
+    bash "\$_PLAN_DIR/cascade-check.sh" "\$id" >/dev/null 2>&1; then
+    for n in \$ITEMS_READ; do
+      [ "\$n" != "\$id" ] || continue
+      p=\$(bash "\$_PLAN_DIR/parent-of.sh" "\$n" 2>/dev/null) || continue
+      [ "\${p#"\${p%%[!0]*}"}" != "\$id" ] || SCOPE_TARGETS="\$SCOPE_TARGETS \$n"
+    done
+  fi
+  return 0
+}
+
+# epic_cleared <n> — 0 when <n> has children and its cascade check clears it:
+# the only item a groom may close. The check's exit 0 alone also means "no
+# children at all"; only its "safe to close" line says it has some.
+epic_cleared() {
+  local out
+  out=\$(bash "\$_PLAN_DIR/cascade-check.sh" "\$1" 2>/dev/null) || return 1
+  case \$out in *"safe to close"*) return 0 ;; *) return 1 ;; esac
+}
+
+# jq definitions the validator and the local add.sh share; appended to ISSUE_TEXT_JQ.
+# shellcheck disable=SC2016  # jq program.
+PLAN_DEFS='
+  def plan_title: type == "string" and length >= 1 and length <= 256
+    and (explode | all(.[]; inert)) and (explode | any(.[]; . != 32));
+  def plan_text(\$max): type == "string" and length >= 1 and length <= \$max
+    and (explode | all(.[]; inert or . == 9 or . == 10));
+'
+
+# The validator, over the plan's raw lines (jq -n -R), given \$ops, \$targets,
+# \$refs, \$statuses, \$labels, \$authors ({n: login}), \$cannot ("op" or
+# "op:qualifier") and \$max. Out: {refused: [[class, path]], unsupported, ops},
+# each op normalised, its targets strings, its \`line\` (1-based) added.
+# shellcheck disable=SC2016  # jq program.
+PLAN_JQ='
+  def schema: {
+    create: {ref: "ref?", title: "title", body: "body?", labels: "labels?", parent: "target?"},
+    edit: {target: "target", title: "title?", append: "body?"},
+    comment: {target: "target", body: "comment"},
+    move: {target: "target", status: "status"},
+    classify: {target: "target", axis: "axis", value: "value"},
+    label: {target: "target", labels: "labels"},
+    close: {target: "target", reason: "reason"},
+    link: {target: "target", parent: "target"} };
+  def axes: {Priority: ["P0", "P1", "P2", "P3"], Size: ["XS", "S", "M", "L", "XL"], IssueType: ["Task", "Bug", "Feature"]};
+  def shown: if type == "string" and test("^[a-z_]{1,32}\$") then . else "?" end;
+  def number: type == "number" and . == floor and . >= 1 and . <= 9999999999;
+  def refname: type == "string" and test("^@[a-z][a-z0-9-]{0,15}\$");
+  def mentions: [match("(?:^|[^A-Za-z0-9_.\`/@-])@([A-Za-z0-9][A-Za-z0-9-]*)"; "g") | .captures[0].string];
+  def resolve(\$v; \$st): if (\$v | number) then (\$v | tostring) as \$n
+      | (if any(\$targets[]; . == \$n) then \$n else null end)
+    elif \$refs and (\$v | refname) and any(\$st.refs[]; . == \$v) then \$v
+    else null end;
+  def check(\$k; \$kind; \$v; \$st; \$o):
+    if \$kind == "target" then (if resolve(\$v; \$st) == null then "scope" else null end)
+    elif \$kind == "ref" then (if (\$v | refname) and (\$st.refs | index([\$v]) == null) and \$refs then null else "ref" end)
+    elif \$kind == "title" then (if \$v | plan_title then null else "title" end)
+    elif \$kind == "body" then (if \$v | plan_text(65536) then null else "text" end)
+    elif \$kind == "comment" then (if \$v | plan_text(16384) then null else "text" end)
+    elif \$kind == "status" then (if (\$v | type) == "string" and (\$v | ascii_downcase) != "done"
+      and any(\$statuses[]; . == \$v) then null else "status" end)
+    elif \$kind == "axis" then (if (\$v | type) == "string" and (axes | has(\$v)) then null else "axis" end)
+    elif \$kind == "value" then ((axes[\$o.axis | strings] // []) as \$vs | if any(\$vs[]; . == \$v) then null else "value" end)
+    elif \$kind == "labels" then (if (\$v | type) == "array" and (\$v | length) >= 1 and (\$v | length) <= 10
+      and all(\$v[]; type == "string" and plan_title and (index(",") == null) and (. as \$l | any(\$labels[]; . == \$l)))
+      then null else "label" end)
+    elif \$kind == "reason" then (if \$v == "completed" or \$v == "not_planned" then null else "reason" end)
+    else "schema" end;
+  def cannot(\$o): (\$o.op) as \$op
+    | if any(\$cannot[]; . == \$op) then \$op
+      elif \$op == "close" and any(\$cannot[]; . == "close:" + \$o.reason) then \$op
+      elif \$op == "classify" and any(\$cannot[]; . == "classify:" + \$o.axis) then \$op
+      elif \$op == "create" and \$o.labels != null and any(\$cannot[]; . == "create:labels") then \$op
+      else null end;
+  [inputs] as \$lines
+  | reduce range(\$lines | length) as \$i ({refused: [], unsupported: [], ops: [], refs: [], said: []};
+      (\$i + 1 | tostring) as \$at
+      | (\$lines[\$i] | try fromjson catch null) as \$o
+      | if (\$o | type) != "object" then .refused += [["parse", \$at]]
+        elif (\$o.op | type) != "string" or (schema | has(\$o.op) | not) then .refused += [["op", "\\(\$at).op"]]
+        elif (\$ops | index([\$o.op]) == null) then .refused += [["scope", "\\(\$at).op"]]
+        elif cannot(\$o) != null then .unsupported += [cannot(\$o)]
+        else schema[\$o.op] as \$s | . as \$st
+          | ([\$o | keys[] | . as \$k | select(\$k != "op" and (\$s | has(\$k) | not)) | ["unknown-key", "\\(\$at).\\(shown)"]]
+             + [\$s | to_entries[] | .key as \$k | select((.value | endswith("?") | not) and (\$o | has(\$k) | not))
+                 | ["missing-key", "\\(\$at).\\(.key)"]]
+             + [\$s | to_entries[] | .key as \$k | select(\$o | has(\$k))
+                 | check(\$k; .value | rtrimstr("?"); \$o[\$k]; \$st; \$o) // empty | [., "\\(\$at).\\(\$k)"]]
+             + (if \$o.op == "edit" and (\$o | has("title") or has("append") | not) then [["missing-key", "\\(\$at).append"]] else [] end)
+             + [("title", "body", "append") as \$k | select(\$o[\$k] | type == "string")
+                 | (if \$o.op == "create" then [] else [\$authors[\$o.target | tostring]? // empty] end) as \$who
+                 | select([\$o[\$k] | mentions[] | select(. as \$m | \$who | index([\$m]) == null)] | length > 0)
+                 | ["mention", "\\(\$at).\\(\$k)"]]) as \$bad
+          | if (\$bad | length) > 0 then .refused += \$bad
+            else (\$o
+                   | (if has("target") then .target = resolve(.target; \$st) else . end)
+                   | (if has("parent") then .parent = resolve(.parent; \$st) else . end)
+                   | .line = (\$i + 1)) as \$n
+              | (if \$n.op == "comment" and any(.said[]; . == \$n.target)
+                 then .refused += [["cap", "\\(\$at).target"]] else . end)
+              | .said += (if \$n.op == "comment" then [\$n.target] else [] end)
+              | .refs += (if \$n.op == "create" and \$n.ref != null then [\$n.ref] else [] end)
+              | .ops += [\$n]
+            end
+        end)
+  | if (\$lines | length) > \$max then .refused += [["cap", "plan"]] elif (\$lines | length) == 0 then .refused += [["parse", "plan"]] else . end
+  | {refused, unsupported: (.unsupported | unique), ops}
+'
+
+# require_title <title> — the plan's title rule, or a refusal and status 2: the
+# local add.sh writes a title into frontmatter, where a second line is a key.
+require_title() {
+  jq_lf -n -e --arg t "\${1-}" "\$ISSUE_TEXT_JQ\$PLAN_DEFS"' \$t | plan_title' >/dev/null 2>&1 && return 0
+  printf '%s: a title is one line of 1 to 256 printable characters\\n' "\${0##*/}" >&2
+  return 2
+}
+`,
+    executable: true,
+    backend: "github",
+    skipIfExists: false,
+  },
+  {
+    category: "backlog-script",
+    name: "_apply_plan",
+    suffix: "_apply_plan.sh",
+    content: `# shellcheck shell=bash
+# The one body of apply-plan.sh: the bundled executor that applies the product
+# owner's write plan. Sourced — never run — by the backend's own apply-plan.sh,
+# which sets \`here\` (its directory), sources its \`_config.sh\`, and defines:
+#
+#   PLAN_CANNOT         a JSON array of what the backend cannot do (\`label\`,
+#                       \`close:not_planned\`, \`create:labels\`, ...)
+#   board_statuses      the board's columns, one per line
+#   repo_labels         the repository's labels, one per line
+#   create_item <title> <body-file|""> <labels-csv> <parent|"">
+#                       prints the new item's number; its status is add.sh's
+#   close_item <n> <reason>, CLOSE_IS_MOVE (1: the close moves the card itself)
+#   fallback_label <axis> <value>
+#                       the label a classification falls back to, or nothing
+#   receipt_snapshot    \`cksum\` lines of the repository files a write can change
+#
+# Usage: apply-plan.sh <verb> [--id <n>] <plan-file> <items-file>
+#
+# The plan is checked whole before anything is written (_backlog_plan.sh): its
+# verb, id and fingerprint against the items file's header, every line against
+# the schema and the verb's scope, every text against the secret scan of
+# \`_report_text.sh\`, run over the bytes this script then sends. Any refusal
+# writes nothing. Free text reaches a backend script only as a file this
+# script wrote in its own 0700 directory; every other value as one argument.
+#
+# stdout holds these lines and no others, then RECEIPT:
+#   APPLIED <op> <n>              FAILED <op> <n|@ref> <exit|skipped>
+#   FALLBACK classify <n>         (no such field: the label was set instead)
+#   REFUSED <class> <field-path>  (a path such as 3.body, never the value)
+#   UNSUPPORTED <op>              (this backend cannot do it; nothing written)
+#   RECEIPT: <path>... | none     the repository files changed, to stage
+# Exit: 0 applied · 2 usage · 3 refused, nothing written · 4 an operation failed
+# shellcheck disable=SC2154  # \`here\` is the caller's.
+
+# Every failure below is handled where it happens: \`set -e\` from \`_config.sh\`
+# would end a run between two writes, and kill the scans' own grep calls.
+set +e
+usage() { echo "usage: apply-plan.sh <verb> [--id <n>] <plan-file> <items-file>" >&2; exit 2; }
+VERB=\${1:-}
+[ "\$#" -gt 0 ] && shift
+ID=""
+if [ "\${1:-}" = --id ]; then
+  [ "\$#" -ge 2 ] || usage
+  ID=\$(require_issue_number "\$2") || exit 2
+  shift 2
+fi
+[ "\$#" -eq 2 ] || usage
+PLAN=\$1 ITEMS_FILE=\$2
+[[ \$VERB =~ ^[a-z][a-z-]{0,31}\$ ]] || usage
+
+# A scan that is not there would pass every text: its absence stops the run.
+# shellcheck source=./_backlog_plan.sh
+. "\$here/_backlog_plan.sh" || exit 2
+# shellcheck source=../../specnaut/scripts/bash/_report_text.sh
+. "\$here/../bash/_report_text.sh" || exit 2
+declare -F scan_hard >/dev/null || { echo "apply-plan.sh: the secret scan is missing" >&2; exit 2; }
+
+REFUSED=0
+refused() { printf 'REFUSED %s %s\\n' "\$1" "\$2"; REFUSED=1; }
+stop_if_refused() { [ "\$REFUSED" = 0 ] || { echo "RECEIPT: none"; exit 3; }; }
+
+# The items file's header, up to its first blank line: the facts of the read.
+[ -f "\$PLAN" ] || refused plan-file plan
+[ -f "\$ITEMS_FILE" ] || refused items-file header
+stop_if_refused
+HEADER=\$(sed -n '1,/^\$/p' "\$ITEMS_FILE" | tr -d '\\r')
+hv() { printf '%s\\n' "\$HEADER" | sed -n "s/^\$1: //p" | head -1; }
+[ "\$(hv specnaut-items)" = 1 ] || refused items-file header
+[ "\$(hv verb)" = "\$VERB" ] || refused verb header.verb
+[ "\$(hv id)" = "\${ID:-none}" ] || refused id header.id
+FP=\$(backlog_fingerprint "\$ROOT") || FP=""
+[ -n "\$FP" ] && [ "\$(hv fingerprint)" = "\$FP" ] || refused fingerprint header.fingerprint
+NONCE=\$(hv nonce)
+[[ \$NONCE =~ ^[0-9a-f]{32}\$ ]] || refused items-file header.nonce
+ITEMS_READ=\$(hv items)
+[[ \$ITEMS_READ =~ ^(none|[0-9]+( [0-9]+)*)\$ ]] || refused items-file header.items
+[ "\$ITEMS_READ" != none ] || ITEMS_READ=""
+stop_if_refused
+scope_for "\$VERB" "\$ID" || refused verb verb
+stop_if_refused
+
+# The board's facts, read only when a plan line needs them. A read that fails
+# refuses the plan: an unknown column must not pass for an allowed one.
+SEEN=\$(jq_lf -R -r 'try fromjson catch null | objects | .op? | strings' "\$PLAN" 2>/dev/null | sort -u)
+lines_json() { jq_lf -R -s -c 'split("\\n") | map(sub("\\r\$"; "") | select(length > 0))'; }
+STATUSES='[]' LABELS='[]'
+if printf '%s\\n' "\$SEEN" | grep -qx move; then
+  STATUSES=\$(board_statuses | lines_json) || refused unreadable board.status
+fi
+if printf '%s\\n' "\$SEEN" | grep -Eqx 'label|create'; then
+  LABELS=\$(repo_labels | lines_json) || refused unreadable repo.labels
+fi
+AUTHORS=\$(sed -n "s/^<untrusted-issue-text nonce=\\"\$NONCE\\" item=\\"\\([0-9]*\\)\\" field=\\"title\\" author=\\"\\([A-Za-z0-9._-]*\\)\\".*/\\1 \\2/p" "\$ITEMS_FILE" |
+  jq_lf -R -s -c 'split("\\n") | map(select(test(" .")) | split(" ") | {(.[0]): .[1]}) | add // {}') ||
+  refused items-file authors
+stop_if_refused
+ops_json() { printf '%s' "\$1" | jq_lf -R -s -c 'split(" ") | map(select(length > 0))'; }
+RESULT=\$(jq_lf -n -R -c --argjson ops "\$(ops_json "\$SCOPE_OPS")" --argjson targets "\$(ops_json "\$SCOPE_TARGETS")" \\
+  --argjson refs "\$SCOPE_REFS" --argjson statuses "\$STATUSES" --argjson labels "\$LABELS" \\
+  --argjson authors "\$AUTHORS" --argjson cannot "\$PLAN_CANNOT" --argjson max "\$PLAN_MAX_OPS" \\
+  "\$ISSUE_TEXT_JQ\$PLAN_DEFS\$PLAN_JQ" <"\$PLAN") || { refused parse plan; stop_if_refused; }
+printf '%s' "\$RESULT" | jq_lf -r '.refused[] | "REFUSED \\(.[0]) \\(.[1])"'
+printf '%s' "\$RESULT" | jq_lf -r '.unsupported[] | "UNSUPPORTED \\(.)"'
+[ "\$(printf '%s' "\$RESULT" | jq_lf '(.refused | length) + (.unsupported | length)')" = 0 ] || REFUSED=1
+stop_if_refused
+
+TMP=\${TMPDIR:-/tmp}
+WORK=\$(mktemp -d "\${TMP%/}/specnaut-plan.XXXXXXXX") || { echo "apply-plan.sh: no temporary directory" >&2; exit 2; }
+trap 'rm -rf "\$WORK"' EXIT
+chmod 700 "\$WORK"
+printf '%s' "\$RESULT" | jq_lf -c '.ops[]' >"\$WORK/ops.jsonl"
+
+# Every text, written once to the file it is sent from, scanned from those bytes.
+# shellcheck disable=SC2329  # called by _report_text.sh's scans.
+refuse() { printf '%s' "\$1"; exit 1; }
+while IFS= read -r op <&3; do
+  at=\$(jq_lf -r .line <<<"\$op")
+  for k in title body append; do
+    jq_lf -e --arg k "\$k" 'has(\$k)' <<<"\$op" >/dev/null || continue
+    jq_lf -j --arg k "\$k" '.[\$k]' <<<"\$op" >"\$WORK/\$at.\$k"
+    bytes=\$(read_bytes <"\$WORK/\$at.\$k")
+    class=\$(scan_hard "\${bytes%x}"; exit 0) || refused "\${class:-secret}" "\$at.\$k"
+  done
+  if [ "\$VERB" = groom ] && [ "\$(jq_lf -r .op <<<"\$op")" = close ]; then
+    epic_cleared "\$(jq_lf -r .target <<<"\$op")" || refused scope "\$at.target"
+  fi
+done 3<"\$WORK/ops.jsonl"
+stop_if_refused
+
+shown() { if command -v cygpath >/dev/null 2>&1; then cygpath -m "\$1"; else printf '%s' "\$1"; fi; }
+text() { cat -- "\$WORK/\$at.\$1"; printf x; }
+REFS=" " RC=0
+resolve() { case \$1 in @*) r=\${REFS#* "\$1"=}; [ "\$r" != "\$REFS" ] && printf '%s' "\${r%% *}" ;; *) printf '%s' "\$1" ;; esac; }
+report() { if [ "\$2" = 0 ]; then echo "APPLIED \$1 \$3"; else echo "FAILED \$1 \$3 \$2"; RC=4; fi; }
+BEFORE=\$(receipt_snapshot)
+while IFS= read -r op <&3; do
+  at=\$(jq_lf -r .line <<<"\$op")
+  o=\$(jq_lf -r .op <<<"\$op")
+  t=\$(jq_lf -r '.target // empty' <<<"\$op")
+  n=\$(resolve "\$t")
+  if [ -n "\$t" ] && [ -z "\$n" ]; then echo "FAILED \$o \$t skipped"; RC=4; continue; fi
+  rc=0
+  case \$o in
+    create)
+      title=\$(text title); bf=""; [ ! -f "\$WORK/\$at.body" ] || bf=\$(shown "\$WORK/\$at.body")
+      p=\$(resolve "\$(jq_lf -r '.parent // empty' <<<"\$op")")
+      new=\$(create_item "\${title%x}" "\$bf" "\$(jq_lf -r '(.labels // []) | join(",")' <<<"\$op")" "\$p") || rc=\$?
+      ref=\$(jq_lf -r '.ref // empty' <<<"\$op")
+      if [[ \$new =~ ^[1-9][0-9]*\$ ]]; then [ -z "\$ref" ] || REFS="\$REFS\$ref=\$new "; report create "\$rc" "\$new"
+      else [ "\$rc" != 0 ] || rc=1; echo "FAILED create \${ref:-new} \$rc"; RC=4; fi ;;
+    edit)
+      args=("\$n")
+      if [ -f "\$WORK/\$at.title" ]; then title=\$(text title); args+=(--title "\${title%x}"); fi
+      [ ! -f "\$WORK/\$at.append" ] || args+=(--append-file "\$(shown "\$WORK/\$at.append")")
+      bash "\$here/edit.sh" "\${args[@]}" >/dev/null 2>&1 || rc=\$?
+      report edit "\$rc" "\$n" ;;
+    comment)
+      bash "\$here/clarify-comment.sh" "\$n" --body-file "\$(shown "\$WORK/\$at.body")" >/dev/null 2>&1 || rc=\$?
+      report comment "\$rc" "\$n" ;;
+    move)
+      bash "\$here/move.sh" "\$n" "\$(jq_lf -r .status <<<"\$op")" >/dev/null 2>&1 || rc=\$?
+      report move "\$rc" "\$n" ;;
+    classify)
+      axis=\$(jq_lf -r .axis <<<"\$op") value=\$(jq_lf -r .value <<<"\$op")
+      bash "\$here/set-field.sh" "\$n" "\$axis" "\$value" >/dev/null 2>&1 || rc=\$?
+      lbl=""; [ "\$rc" != 10 ] || lbl=\$(fallback_label "\$axis" "\$value")
+      if [ -n "\$lbl" ] && bash "\$here/label.sh" "\$n" "\$lbl" >/dev/null 2>&1; then echo "FALLBACK classify \$n"
+      else report classify "\$rc" "\$n"; fi ;;
+    label)
+      IFS=, read -r -a labels <<<"\$(jq_lf -r '.labels | join(",")' <<<"\$op")"
+      bash "\$here/label.sh" "\$n" "\${labels[@]}" >/dev/null 2>&1 || rc=\$?
+      report label "\$rc" "\$n" ;;
+    close)
+      bash "\$here/cascade-check.sh" "\$n" >/dev/null 2>&1 || rc=\$?
+      [ "\$rc" != 0 ] || close_item "\$n" "\$(jq_lf -r .reason <<<"\$op")" >/dev/null 2>&1 || rc=\$?
+      report close "\$rc" "\$n"
+      if [ "\$rc" = 0 ] && [ "\$CLOSE_IS_MOVE" != 1 ]; then
+        rc=0; bash "\$here/move.sh" "\$n" Done >/dev/null 2>&1 || rc=\$?
+        report move "\$rc" "\$n"
+      fi ;;
+    link)
+      p=\$(resolve "\$(jq_lf -r .parent <<<"\$op")")
+      if [ -z "\$p" ]; then echo "FAILED link \$n skipped"; RC=4; continue; fi
+      bash "\$here/link.sh" "\$n" "\$p" >/dev/null 2>&1 || rc=\$?
+      report link "\$rc" "\$n" ;;
+    *) echo "FAILED \$o \$n skipped"; RC=4 ;;
+  esac
+done 3<"\$WORK/ops.jsonl"
+
+CHANGED=\$(printf '%s\\n' "\$(receipt_snapshot)" | grep -vxF -f <(printf '%s\\n' "\$BEFORE") | awk 'NF { print \$NF }' | sort -u | tr '\\n' ' ')
+CHANGED=\${CHANGED% }
+echo "RECEIPT: \${CHANGED:-none}"
+exit "\$RC"
 `,
     executable: true,
     backend: "github",
@@ -11500,19 +12752,21 @@ exit "\$rc"
 #     [A-Za-z0-9._-]{1,64} is written author="".
 # How a reader treats the blocks is the agent definition's rule, not this file's.
 #
-# Usage: read-items.sh <verb> [--id <n>] (<n>... | --status <column>)
-#   <verb>      the work the items are read for (\`groom\`, \`edit\`, ...): a
-#               lower-case word, recorded in the header
+# Usage: read-items.sh <verb> [--id <n>] [<n>... | --status <column>]
+#   <verb>      the work the items are read for, one \`scope_for\` lists in
+#               \`_backlog_plan.sh\` (\`groom\`, \`edit\`, ...); recorded in the header
 #   --id <n>    the item the verb acts on; read first, recorded in the header
 #   --status    every item in that column, as \`list.sh --numbers\` lists them
-# Exit: 0 written · 2 usage, a refused number, an item that cannot be read, no
-# git work tree, no randomness, or a temporary directory inside the repository.
+# A verb that creates items (SCOPE_REFS) may read nothing: \`items: none\`.
+# Exit: 0 written · 2 usage, a verb scope_for refuses, a refused number, an item
+# that cannot be read, no git work tree, no randomness, or a temporary
+# directory inside the repository.
 # On any failure stdout stays empty and no directory is left behind.
 set -euo pipefail
 
 here=\$(dirname "\$0")
 usage() {
-  echo "usage: read-items.sh <verb> [--id <n>] (<n>... | --status <column>)" >&2
+  echo "usage: read-items.sh <verb> [--id <n>] [<n>... | --status <column>]" >&2
   exit 2
 }
 die() { echo "read-items.sh: \$*" >&2; exit 2; }
@@ -11533,26 +12787,22 @@ while [ "\$#" -gt 0 ]; do
     *) NUMS+=("\$1"); shift ;;
   esac
 done
+# jq_lf, the family's CR-safe jq; scope_for, the fingerprint and, through
+# _issue_text.sh, ISSUE_TEXT_JQ: the characters that pass.
+# shellcheck source=../../specnaut/scripts/bash/common.sh
+. "\$here/../bash/common.sh"
+# shellcheck source=./_backlog_plan.sh
+. "\$here/_backlog_plan.sh"
+scope_for "\$VERB" "\$ID" || die "no plan can follow a read for: \$(printf '%q' "\$VERB")\${ID:+ --id}"
 if [ "\$BY_STATUS" = true ]; then
   [ "\${#NUMS[@]}" -eq 0 ] || usage
   (LC_ALL=C; [[ \$STATUS =~ ^[^[:cntrl:]]{1,64}\$ ]]) || die "not a column name: \$(printf '%q' "\$STATUS")"
-elif [ "\${#NUMS[@]}" -eq 0 ] && [ -z "\$ID" ]; then
+elif [ "\${#NUMS[@]}" -eq 0 ] && [ -z "\$ID" ] && [ "\$SCOPE_REFS" != true ]; then
   usage
 fi
 
-# jq_lf, the family's CR-safe jq; ISSUE_TEXT_JQ, the characters that pass.
-# shellcheck source=../../specnaut/scripts/bash/common.sh
-. "\$here/../bash/common.sh"
-# shellcheck source=./_issue_text.sh
-. "\$here/_issue_text.sh"
-
 ROOT=\$(cd "\$here/../../.." && pwd)
-porcelain=\$(cd "\$ROOT" && git status --porcelain 2>/dev/null) ||
-  die "\$ROOT is not a git work tree: the fingerprint needs one"
-FINGERPRINT=\$(printf '%s' "\$porcelain" | (cd "\$ROOT" && git hash-object --stdin)) ||
-  die "git could not hash the work tree's status"
-FINGERPRINT=\${FINGERPRINT%\$'\\r'}
-[[ \$FINGERPRINT =~ ^[0-9a-f]{40}([0-9a-f]{24})?\$ ]] || die "git gave no fingerprint"
+FINGERPRINT=\$(backlog_fingerprint "\$ROOT") || die "\$ROOT is not a git work tree: the fingerprint needs one"
 
 if [ "\$BY_STATUS" = true ]; then
   listed=\$(bash "\$here/list.sh" --numbers "\$STATUS") || die "could not list the column"
@@ -11704,6 +12954,637 @@ ISSUE_TEXT_JQ='
   def body: explode | map(if . == 8232 or . == 8233 then 10 else . end | select(printable or . == 9 or . == 10)) | implode;
   def inert_body: explode | map(if . == 8232 or . == 8233 then 10 else . end | select(inert or . == 9 or . == 10)) | implode;
 '
+`,
+    executable: true,
+    backend: "gitlab",
+    skipIfExists: false,
+  },
+  {
+    category: "backlog-script",
+    name: "apply-plan",
+    suffix: "apply-plan.sh",
+    content: `#!/usr/bin/env bash
+# Apply the product owner's write plan to GitLab — the bundled executor. The
+# checks, the operations, the output lines and the exit table are the shared
+# body, \`_apply_plan.sh\`, beside this file; the plan's vocabulary is
+# \`_backlog_plan.sh\`. This file supplies only what GitLab answers differently:
+# scoped labels for status and classification, and no reason on a close.
+#
+# Usage: apply-plan.sh <verb> [--id <n>] <plan-file> <items-file>
+set -euo pipefail
+here=\$(CDPATH="" cd "\$(dirname "\${BASH_SOURCE[0]}")" && pwd)
+# shellcheck source=./_config.sh
+. "\$here/_config.sh"
+
+# GitLab records no reason for closing an issue (item-record.sh).
+PLAN_CANNOT='["close:not_planned"]'
+CLOSE_IS_MOVE=0
+
+# The columns move.sh accepts.
+board_statuses() { printf '%s\\n' Backlog Ready "In progress" "In review" Done; }
+
+repo_labels() {
+  local enc
+  enc=\$(jq_lf -rn --arg p "\$PROJECT_ID" '\$p | @uri')
+  glab api --paginate "projects/\$enc/labels?per_page=100" | jq_lf -r '.[]?.name // empty'
+}
+
+# add.sh prints \`✓ created: <url>\`; the number ends the URL.
+create_item() {
+  local args=("\$1" "" "\$3") out rc=0
+  [ -z "\$4" ] || args+=(--parent "\$4")
+  [ -z "\$2" ] || args+=(--body-file "\$2")
+  out=\$(bash "\$here/add.sh" "\${args[@]}" 2>/dev/null) || rc=\$?
+  printf '%s\\n' "\$out" | sed -n 's|.*created: https://[^ ]*/issues/\\([0-9][0-9]*\\)\$|\\1|p' | head -1
+  return "\$rc"
+}
+
+close_item() { bash "\$here/close.sh" "\$1" "\$2"; }
+
+# set-field.sh writes scoped labels itself: it never answers 10.
+fallback_label() { :; }
+receipt_snapshot() { :; }
+
+# shellcheck source=../_apply_plan.sh
+. "\$here/_apply_plan.sh"
+`,
+    executable: true,
+    backend: "gitlab",
+    skipIfExists: false,
+  },
+  {
+    category: "backlog-script",
+    name: "edit",
+    suffix: "edit.sh",
+    content: `#!/usr/bin/env bash
+# Edit a GitLab issue: its title, and text appended to its description. A
+# description is never replaced: what is there stays, and the new text
+# follows a blank line.
+#
+# Usage: edit.sh <number> [--title <title>] [--append-file <path>]
+#
+# Each value reaches glab as one argument, with no shell between the two.
+# Exit: 0 edited · 2 usage · 3 the description could not be read · other glab's
+set -euo pipefail
+
+# shellcheck source=./_config.sh
+. "\$(dirname "\$0")/_config.sh"
+
+USAGE='usage: edit.sh <number> [--title <title>] [--append-file <path>]'
+[ "\$#" -ge 1 ] || { echo "\$USAGE" >&2; exit 2; }
+NUM=\$(require_issue_number "\$1") || exit 2
+shift
+TITLE="" HAS_TITLE=false APPEND=""
+while [ "\$#" -gt 0 ]; do
+  case "\$1" in
+    --title) [ "\$#" -ge 2 ] || { echo "\$USAGE" >&2; exit 2; }; TITLE=\$2 HAS_TITLE=true; shift 2 ;;
+    --append-file) [ "\$#" -ge 2 ] && [ -f "\$2" ] || { echo "edit.sh: --append-file needs a file" >&2; exit 2; }; APPEND=\$2; shift 2 ;;
+    *) echo "\$USAGE" >&2; exit 2 ;;
+  esac
+done
+[ "\$HAS_TITLE" = true ] || [ -n "\$APPEND" ] || { echo "\$USAGE" >&2; exit 2; }
+
+ARGS=(issue update "\$NUM" --repo "\$PROJECT_ID")
+[ "\$HAS_TITLE" = false ] || ARGS+=(--title "\$TITLE")
+if [ -n "\$APPEND" ]; then
+  BODY=\$(glab issue view "\$NUM" --repo "\$PROJECT_ID" --output json | jq_lf -r '.description // ""') ||
+    { echo "edit.sh: could not read #\$NUM's description" >&2; exit 3; }
+  ADDED=\$(cat -- "\$APPEND"; printf x)
+  if [ -n "\$BODY" ]; then BODY="\$BODY"\$'\\n\\n'"\${ADDED%x}"; else BODY=\${ADDED%x}; fi
+  ARGS+=(--description "\$BODY")
+fi
+glab "\${ARGS[@]}" >/dev/null
+echo "edited #\$NUM"
+`,
+    executable: true,
+    backend: "gitlab",
+    skipIfExists: false,
+  },
+  {
+    category: "backlog-script",
+    name: "close",
+    suffix: "close.sh",
+    content: `#!/usr/bin/env bash
+# Close a GitLab issue. GitLab records no reason for a close, so only
+# \`completed\` is accepted: a reason that would not be recorded is refused,
+# never dropped. It checks no gate: the executor runs cascade-check.sh first,
+# and moves the card to Done after.
+#
+# Usage: close.sh <number> [completed]
+# Exit: 0 closed · 2 usage, or a reason GitLab cannot record · other glab's
+set -euo pipefail
+
+# shellcheck source=./_config.sh
+. "\$(dirname "\$0")/_config.sh"
+
+[ "\$#" -ge 1 ] && [ "\$#" -le 2 ] || { echo 'usage: close.sh <number> [completed]' >&2; exit 2; }
+NUM=\$(require_issue_number "\$1") || exit 2
+[ "\${2:-completed}" = completed ] || { echo "close.sh: GitLab records no close reason; only 'completed'" >&2; exit 2; }
+
+glab issue close "\$NUM" --repo "\$PROJECT_ID" >/dev/null
+echo "closed #\$NUM"
+`,
+    executable: true,
+    backend: "gitlab",
+    skipIfExists: false,
+  },
+  {
+    category: "backlog-script",
+    name: "label",
+    suffix: "label.sh",
+    content: `#!/usr/bin/env bash
+# Add labels to a GitLab issue.
+#
+# Usage: label.sh <number> <label>...
+# Exit: 0 labelled · 2 usage · other glab's
+set -euo pipefail
+
+# shellcheck source=./_config.sh
+. "\$(dirname "\$0")/_config.sh"
+
+[ "\$#" -ge 2 ] || { echo 'usage: label.sh <number> <label>...' >&2; exit 2; }
+NUM=\$(require_issue_number "\$1") || exit 2
+shift
+LABELS=""
+for l in "\$@"; do
+  case "\$l" in '' | *,*) echo "label.sh: a label is one name, without a comma" >&2; exit 2 ;; esac
+  LABELS="\${LABELS:+\$LABELS,}\$l"
+done
+
+glab issue update "\$NUM" --repo "\$PROJECT_ID" --label "\$LABELS" >/dev/null
+echo "labelled #\$NUM"
+`,
+    executable: true,
+    backend: "gitlab",
+    skipIfExists: false,
+  },
+  {
+    category: "backlog-script",
+    name: "set-field",
+    suffix: "set-field.sh",
+    content: `#!/usr/bin/env bash
+# Set a classification on a GitLab issue, as the scoped label item-record.sh
+# reads: \`priority::P1\`, \`size::M\`, \`type::feature\`. A scoped label replaces
+# the one of the same scope, so a second value never stands beside the first.
+#
+# Usage: set-field.sh <number> <Priority|Size|IssueType> <value>
+# Exit: 0 set · 11 a value outside P0-P3 / XS-XL / Task, Bug, Feature ·
+#       1 usage, or glab failed
+set -euo pipefail
+
+# shellcheck source=./_config.sh
+. "\$(dirname "\$0")/_config.sh"
+
+[ "\$#" -eq 3 ] || { echo 'usage: set-field.sh <number> <Priority|Size|IssueType> <value>' >&2; exit 1; }
+NUM=\$(require_issue_number "\$1") || exit 1
+case "\$2:\$3" in
+  Priority:P[0-3]) LABEL="priority::\$3" ;;
+  Size:XS | Size:S | Size:M | Size:L | Size:XL) LABEL="size::\$3" ;;
+  IssueType:Task | IssueType:Bug | IssueType:Feature) LABEL="type::\$(printf '%s' "\$3" | tr '[:upper:]' '[:lower:]')" ;;
+  Priority:* | Size:* | IssueType:*) echo "set-field.sh: '\$3' is not a \$2 value" >&2; exit 11 ;;
+  *) echo "set-field.sh: unsupported field '\$2' (Priority|Size|IssueType)" >&2; exit 1 ;;
+esac
+
+glab issue update "\$NUM" --repo "\$PROJECT_ID" --label "\$LABEL" >/dev/null || exit 1
+echo "#\$NUM \$2 -> \$3"
+`,
+    executable: true,
+    backend: "gitlab",
+    skipIfExists: false,
+  },
+  {
+    category: "backlog-script",
+    name: "link",
+    suffix: "link.sh",
+    content: `#!/usr/bin/env bash
+# Make an existing GitLab issue a child of another: the \`parent::#NNN\` scoped
+# label \`add.sh --parent\` sets at creation and cascade-check.sh reads.
+#
+# Usage: link.sh <child-number> <parent-number>
+# Exit: 0 linked · 2 usage, or an issue linked to itself · other glab's
+set -euo pipefail
+
+# shellcheck source=./_config.sh
+. "\$(dirname "\$0")/_config.sh"
+
+[ "\$#" -eq 2 ] || { echo 'usage: link.sh <child-number> <parent-number>' >&2; exit 2; }
+CHILD=\$(require_issue_number "\$1") || exit 2
+PARENT=\$(require_issue_number "\$2") || exit 2
+[ "\$CHILD" != "\$PARENT" ] || { echo "link.sh: an issue is not its own parent" >&2; exit 2; }
+
+glab issue update "\$CHILD" --repo "\$PROJECT_ID" --label "parent::#\$PARENT" >/dev/null
+echo "linked #\$CHILD under #\$PARENT"
+`,
+    executable: true,
+    backend: "gitlab",
+    skipIfExists: false,
+  },
+  {
+    category: "backlog-script",
+    name: "_backlog_plan",
+    suffix: "_backlog_plan.sh",
+    content: `# shellcheck shell=bash
+# The one home of what a backlog write plan may say: the product owner proposes
+# a plan, a bundled executor (\`apply-plan.sh\`) checks it here and applies it.
+# Sourced, never run, by apply-plan.sh, read-items.sh and the local add.sh,
+# installed beside it, once the caller has \`jq_lf\`.
+#
+# A plan is JSON Lines: one object per line, its \`op\` one of the eight below,
+# with exactly these keys (? = optional) and nothing else:
+#
+#   create    ref?, title, body?, labels?, parent?   a new item
+#   edit      target, title?, append?                at least one of the two
+#   comment   target, body
+#   move      target, status
+#   classify  target, axis, value
+#   label     target, labels
+#   close     target, reason
+#   link      target, parent                         target becomes parent's child
+#
+# The values, checked by PLAN_JQ before anything is written:
+#   target, parent  an issue number (a JSON integer), or a \`ref\` an earlier
+#                   create in the same plan named (\`@\` + [a-z][a-z0-9-]{0,15});
+#                   always inside the verb's scope (scope_for). A repository, a
+#                   project, a URL or a path is no value any key takes.
+#   status          one of the board's own columns, never Done: an item reaches
+#                   Done through \`close\`, behind its cascade check
+#   axis, value     Priority P0-P3 · Size XS, S, M, L, XL · IssueType Task, Bug, Feature
+#   labels          1 to 10 of the repository's existing labels
+#   reason          completed or not_planned
+#   title           one line, 1 to 256 characters, every one \`inert\` (_issue_text.sh)
+#   body, append    up to 65536 characters (a comment's body: 16384), inert,
+#                   tabs and newlines kept. An edit only appends to a body.
+#   @-mentions      in any text, only of the target item's author, as the items
+#                   file records it; a new item's text mentions nobody
+# Caps: PLAN_MAX_OPS lines, and one comment per target per run. There is no
+# operation for memory, files or raw tracker calls, and no key that is a path:
+# the executor writes every body file itself.
+
+PLAN_MAX_OPS=40
+_PLAN_DIR=\$(CDPATH="" cd "\$(dirname "\${BASH_SOURCE[0]}")" && pwd)
+# shellcheck source=./_issue_text.sh
+. "\$_PLAN_DIR/_issue_text.sh"
+
+# backlog_fingerprint <root> — the work tree's state at a read, the same text
+# for read-items.sh, which records it, and apply-plan.sh, which checks it:
+# \`git hash-object\` of \`git status --porcelain\`. Fails outside a work tree.
+backlog_fingerprint() {
+  local porcelain fp
+  porcelain=\$(cd "\$1" && git status --porcelain 2>/dev/null) || return 1
+  fp=\$(printf '%s' "\$porcelain" | (cd "\$1" && git hash-object --stdin)) || return 1
+  fp=\${fp%\$'\\r'}
+  [[ \$fp =~ ^[0-9a-f]{40}([0-9a-f]{24})?\$ ]] || return 1
+  printf '%s\\n' "\$fp"
+}
+
+# scope_for <verb> [<id>] — what a run of <verb> may write, derived here, never
+# from a plan: SCOPE_OPS, SCOPE_TARGETS (issue numbers) and SCOPE_REFS (may it
+# create and name new items). 2 for a verb not listed, or an id it needs and
+# lacks or must not have. ITEMS_READ (the items file's numbers) is set by
+# apply-plan.sh; read-items.sh calls this to refuse a verb before any read.
+#
+#   add [<parent>]   create; then its own new items and the parent the user named
+#   edit <id>        {id}
+#   estimate <id>    {id}, classification only
+#   close <id>       {id}, and its children among the items read once the
+#                    executor's own cascade-check.sh <id> exits 0
+#   groom            the items read, no create; it closes only an epic whose
+#                    cascade check clears (epic_cleared)
+#   tech-debt        create only
+scope_for() {
+  local verb=\${1:-} id=\${2:-} n p
+  SCOPE_OPS="" SCOPE_TARGETS="" SCOPE_REFS=false
+  case \$verb in
+    add) SCOPE_OPS="create comment move classify label link" SCOPE_REFS=true SCOPE_TARGETS=\$id ;;
+    edit) SCOPE_OPS="edit comment move classify label link" SCOPE_TARGETS=\$id ;;
+    estimate) SCOPE_OPS="classify label comment" SCOPE_TARGETS=\$id ;;
+    close) SCOPE_OPS="close comment label" SCOPE_TARGETS=\$id ;;
+    groom) SCOPE_OPS="edit comment move classify label close link" SCOPE_TARGETS=\${ITEMS_READ:-} ;;
+    tech-debt) SCOPE_OPS="create" SCOPE_REFS=true ;;
+    *) return 2 ;;
+  esac
+  case \$verb in
+    edit | estimate | close) [ -n "\$id" ] || return 2 ;;
+    tech-debt) [ -z "\$id" ] || return 2 ;;
+  esac
+  if [ "\$verb" = close ] && [ -n "\${ITEMS_READ:-}" ] &&
+    bash "\$_PLAN_DIR/cascade-check.sh" "\$id" >/dev/null 2>&1; then
+    for n in \$ITEMS_READ; do
+      [ "\$n" != "\$id" ] || continue
+      p=\$(bash "\$_PLAN_DIR/parent-of.sh" "\$n" 2>/dev/null) || continue
+      [ "\${p#"\${p%%[!0]*}"}" != "\$id" ] || SCOPE_TARGETS="\$SCOPE_TARGETS \$n"
+    done
+  fi
+  return 0
+}
+
+# epic_cleared <n> — 0 when <n> has children and its cascade check clears it:
+# the only item a groom may close. The check's exit 0 alone also means "no
+# children at all"; only its "safe to close" line says it has some.
+epic_cleared() {
+  local out
+  out=\$(bash "\$_PLAN_DIR/cascade-check.sh" "\$1" 2>/dev/null) || return 1
+  case \$out in *"safe to close"*) return 0 ;; *) return 1 ;; esac
+}
+
+# jq definitions the validator and the local add.sh share; appended to ISSUE_TEXT_JQ.
+# shellcheck disable=SC2016  # jq program.
+PLAN_DEFS='
+  def plan_title: type == "string" and length >= 1 and length <= 256
+    and (explode | all(.[]; inert)) and (explode | any(.[]; . != 32));
+  def plan_text(\$max): type == "string" and length >= 1 and length <= \$max
+    and (explode | all(.[]; inert or . == 9 or . == 10));
+'
+
+# The validator, over the plan's raw lines (jq -n -R), given \$ops, \$targets,
+# \$refs, \$statuses, \$labels, \$authors ({n: login}), \$cannot ("op" or
+# "op:qualifier") and \$max. Out: {refused: [[class, path]], unsupported, ops},
+# each op normalised, its targets strings, its \`line\` (1-based) added.
+# shellcheck disable=SC2016  # jq program.
+PLAN_JQ='
+  def schema: {
+    create: {ref: "ref?", title: "title", body: "body?", labels: "labels?", parent: "target?"},
+    edit: {target: "target", title: "title?", append: "body?"},
+    comment: {target: "target", body: "comment"},
+    move: {target: "target", status: "status"},
+    classify: {target: "target", axis: "axis", value: "value"},
+    label: {target: "target", labels: "labels"},
+    close: {target: "target", reason: "reason"},
+    link: {target: "target", parent: "target"} };
+  def axes: {Priority: ["P0", "P1", "P2", "P3"], Size: ["XS", "S", "M", "L", "XL"], IssueType: ["Task", "Bug", "Feature"]};
+  def shown: if type == "string" and test("^[a-z_]{1,32}\$") then . else "?" end;
+  def number: type == "number" and . == floor and . >= 1 and . <= 9999999999;
+  def refname: type == "string" and test("^@[a-z][a-z0-9-]{0,15}\$");
+  def mentions: [match("(?:^|[^A-Za-z0-9_.\`/@-])@([A-Za-z0-9][A-Za-z0-9-]*)"; "g") | .captures[0].string];
+  def resolve(\$v; \$st): if (\$v | number) then (\$v | tostring) as \$n
+      | (if any(\$targets[]; . == \$n) then \$n else null end)
+    elif \$refs and (\$v | refname) and any(\$st.refs[]; . == \$v) then \$v
+    else null end;
+  def check(\$k; \$kind; \$v; \$st; \$o):
+    if \$kind == "target" then (if resolve(\$v; \$st) == null then "scope" else null end)
+    elif \$kind == "ref" then (if (\$v | refname) and (\$st.refs | index([\$v]) == null) and \$refs then null else "ref" end)
+    elif \$kind == "title" then (if \$v | plan_title then null else "title" end)
+    elif \$kind == "body" then (if \$v | plan_text(65536) then null else "text" end)
+    elif \$kind == "comment" then (if \$v | plan_text(16384) then null else "text" end)
+    elif \$kind == "status" then (if (\$v | type) == "string" and (\$v | ascii_downcase) != "done"
+      and any(\$statuses[]; . == \$v) then null else "status" end)
+    elif \$kind == "axis" then (if (\$v | type) == "string" and (axes | has(\$v)) then null else "axis" end)
+    elif \$kind == "value" then ((axes[\$o.axis | strings] // []) as \$vs | if any(\$vs[]; . == \$v) then null else "value" end)
+    elif \$kind == "labels" then (if (\$v | type) == "array" and (\$v | length) >= 1 and (\$v | length) <= 10
+      and all(\$v[]; type == "string" and plan_title and (index(",") == null) and (. as \$l | any(\$labels[]; . == \$l)))
+      then null else "label" end)
+    elif \$kind == "reason" then (if \$v == "completed" or \$v == "not_planned" then null else "reason" end)
+    else "schema" end;
+  def cannot(\$o): (\$o.op) as \$op
+    | if any(\$cannot[]; . == \$op) then \$op
+      elif \$op == "close" and any(\$cannot[]; . == "close:" + \$o.reason) then \$op
+      elif \$op == "classify" and any(\$cannot[]; . == "classify:" + \$o.axis) then \$op
+      elif \$op == "create" and \$o.labels != null and any(\$cannot[]; . == "create:labels") then \$op
+      else null end;
+  [inputs] as \$lines
+  | reduce range(\$lines | length) as \$i ({refused: [], unsupported: [], ops: [], refs: [], said: []};
+      (\$i + 1 | tostring) as \$at
+      | (\$lines[\$i] | try fromjson catch null) as \$o
+      | if (\$o | type) != "object" then .refused += [["parse", \$at]]
+        elif (\$o.op | type) != "string" or (schema | has(\$o.op) | not) then .refused += [["op", "\\(\$at).op"]]
+        elif (\$ops | index([\$o.op]) == null) then .refused += [["scope", "\\(\$at).op"]]
+        elif cannot(\$o) != null then .unsupported += [cannot(\$o)]
+        else schema[\$o.op] as \$s | . as \$st
+          | ([\$o | keys[] | . as \$k | select(\$k != "op" and (\$s | has(\$k) | not)) | ["unknown-key", "\\(\$at).\\(shown)"]]
+             + [\$s | to_entries[] | .key as \$k | select((.value | endswith("?") | not) and (\$o | has(\$k) | not))
+                 | ["missing-key", "\\(\$at).\\(.key)"]]
+             + [\$s | to_entries[] | .key as \$k | select(\$o | has(\$k))
+                 | check(\$k; .value | rtrimstr("?"); \$o[\$k]; \$st; \$o) // empty | [., "\\(\$at).\\(\$k)"]]
+             + (if \$o.op == "edit" and (\$o | has("title") or has("append") | not) then [["missing-key", "\\(\$at).append"]] else [] end)
+             + [("title", "body", "append") as \$k | select(\$o[\$k] | type == "string")
+                 | (if \$o.op == "create" then [] else [\$authors[\$o.target | tostring]? // empty] end) as \$who
+                 | select([\$o[\$k] | mentions[] | select(. as \$m | \$who | index([\$m]) == null)] | length > 0)
+                 | ["mention", "\\(\$at).\\(\$k)"]]) as \$bad
+          | if (\$bad | length) > 0 then .refused += \$bad
+            else (\$o
+                   | (if has("target") then .target = resolve(.target; \$st) else . end)
+                   | (if has("parent") then .parent = resolve(.parent; \$st) else . end)
+                   | .line = (\$i + 1)) as \$n
+              | (if \$n.op == "comment" and any(.said[]; . == \$n.target)
+                 then .refused += [["cap", "\\(\$at).target"]] else . end)
+              | .said += (if \$n.op == "comment" then [\$n.target] else [] end)
+              | .refs += (if \$n.op == "create" and \$n.ref != null then [\$n.ref] else [] end)
+              | .ops += [\$n]
+            end
+        end)
+  | if (\$lines | length) > \$max then .refused += [["cap", "plan"]] elif (\$lines | length) == 0 then .refused += [["parse", "plan"]] else . end
+  | {refused, unsupported: (.unsupported | unique), ops}
+'
+
+# require_title <title> — the plan's title rule, or a refusal and status 2: the
+# local add.sh writes a title into frontmatter, where a second line is a key.
+require_title() {
+  jq_lf -n -e --arg t "\${1-}" "\$ISSUE_TEXT_JQ\$PLAN_DEFS"' \$t | plan_title' >/dev/null 2>&1 && return 0
+  printf '%s: a title is one line of 1 to 256 printable characters\\n' "\${0##*/}" >&2
+  return 2
+}
+`,
+    executable: true,
+    backend: "gitlab",
+    skipIfExists: false,
+  },
+  {
+    category: "backlog-script",
+    name: "_apply_plan",
+    suffix: "_apply_plan.sh",
+    content: `# shellcheck shell=bash
+# The one body of apply-plan.sh: the bundled executor that applies the product
+# owner's write plan. Sourced — never run — by the backend's own apply-plan.sh,
+# which sets \`here\` (its directory), sources its \`_config.sh\`, and defines:
+#
+#   PLAN_CANNOT         a JSON array of what the backend cannot do (\`label\`,
+#                       \`close:not_planned\`, \`create:labels\`, ...)
+#   board_statuses      the board's columns, one per line
+#   repo_labels         the repository's labels, one per line
+#   create_item <title> <body-file|""> <labels-csv> <parent|"">
+#                       prints the new item's number; its status is add.sh's
+#   close_item <n> <reason>, CLOSE_IS_MOVE (1: the close moves the card itself)
+#   fallback_label <axis> <value>
+#                       the label a classification falls back to, or nothing
+#   receipt_snapshot    \`cksum\` lines of the repository files a write can change
+#
+# Usage: apply-plan.sh <verb> [--id <n>] <plan-file> <items-file>
+#
+# The plan is checked whole before anything is written (_backlog_plan.sh): its
+# verb, id and fingerprint against the items file's header, every line against
+# the schema and the verb's scope, every text against the secret scan of
+# \`_report_text.sh\`, run over the bytes this script then sends. Any refusal
+# writes nothing. Free text reaches a backend script only as a file this
+# script wrote in its own 0700 directory; every other value as one argument.
+#
+# stdout holds these lines and no others, then RECEIPT:
+#   APPLIED <op> <n>              FAILED <op> <n|@ref> <exit|skipped>
+#   FALLBACK classify <n>         (no such field: the label was set instead)
+#   REFUSED <class> <field-path>  (a path such as 3.body, never the value)
+#   UNSUPPORTED <op>              (this backend cannot do it; nothing written)
+#   RECEIPT: <path>... | none     the repository files changed, to stage
+# Exit: 0 applied · 2 usage · 3 refused, nothing written · 4 an operation failed
+# shellcheck disable=SC2154  # \`here\` is the caller's.
+
+# Every failure below is handled where it happens: \`set -e\` from \`_config.sh\`
+# would end a run between two writes, and kill the scans' own grep calls.
+set +e
+usage() { echo "usage: apply-plan.sh <verb> [--id <n>] <plan-file> <items-file>" >&2; exit 2; }
+VERB=\${1:-}
+[ "\$#" -gt 0 ] && shift
+ID=""
+if [ "\${1:-}" = --id ]; then
+  [ "\$#" -ge 2 ] || usage
+  ID=\$(require_issue_number "\$2") || exit 2
+  shift 2
+fi
+[ "\$#" -eq 2 ] || usage
+PLAN=\$1 ITEMS_FILE=\$2
+[[ \$VERB =~ ^[a-z][a-z-]{0,31}\$ ]] || usage
+
+# A scan that is not there would pass every text: its absence stops the run.
+# shellcheck source=./_backlog_plan.sh
+. "\$here/_backlog_plan.sh" || exit 2
+# shellcheck source=../../specnaut/scripts/bash/_report_text.sh
+. "\$here/../bash/_report_text.sh" || exit 2
+declare -F scan_hard >/dev/null || { echo "apply-plan.sh: the secret scan is missing" >&2; exit 2; }
+
+REFUSED=0
+refused() { printf 'REFUSED %s %s\\n' "\$1" "\$2"; REFUSED=1; }
+stop_if_refused() { [ "\$REFUSED" = 0 ] || { echo "RECEIPT: none"; exit 3; }; }
+
+# The items file's header, up to its first blank line: the facts of the read.
+[ -f "\$PLAN" ] || refused plan-file plan
+[ -f "\$ITEMS_FILE" ] || refused items-file header
+stop_if_refused
+HEADER=\$(sed -n '1,/^\$/p' "\$ITEMS_FILE" | tr -d '\\r')
+hv() { printf '%s\\n' "\$HEADER" | sed -n "s/^\$1: //p" | head -1; }
+[ "\$(hv specnaut-items)" = 1 ] || refused items-file header
+[ "\$(hv verb)" = "\$VERB" ] || refused verb header.verb
+[ "\$(hv id)" = "\${ID:-none}" ] || refused id header.id
+FP=\$(backlog_fingerprint "\$ROOT") || FP=""
+[ -n "\$FP" ] && [ "\$(hv fingerprint)" = "\$FP" ] || refused fingerprint header.fingerprint
+NONCE=\$(hv nonce)
+[[ \$NONCE =~ ^[0-9a-f]{32}\$ ]] || refused items-file header.nonce
+ITEMS_READ=\$(hv items)
+[[ \$ITEMS_READ =~ ^(none|[0-9]+( [0-9]+)*)\$ ]] || refused items-file header.items
+[ "\$ITEMS_READ" != none ] || ITEMS_READ=""
+stop_if_refused
+scope_for "\$VERB" "\$ID" || refused verb verb
+stop_if_refused
+
+# The board's facts, read only when a plan line needs them. A read that fails
+# refuses the plan: an unknown column must not pass for an allowed one.
+SEEN=\$(jq_lf -R -r 'try fromjson catch null | objects | .op? | strings' "\$PLAN" 2>/dev/null | sort -u)
+lines_json() { jq_lf -R -s -c 'split("\\n") | map(sub("\\r\$"; "") | select(length > 0))'; }
+STATUSES='[]' LABELS='[]'
+if printf '%s\\n' "\$SEEN" | grep -qx move; then
+  STATUSES=\$(board_statuses | lines_json) || refused unreadable board.status
+fi
+if printf '%s\\n' "\$SEEN" | grep -Eqx 'label|create'; then
+  LABELS=\$(repo_labels | lines_json) || refused unreadable repo.labels
+fi
+AUTHORS=\$(sed -n "s/^<untrusted-issue-text nonce=\\"\$NONCE\\" item=\\"\\([0-9]*\\)\\" field=\\"title\\" author=\\"\\([A-Za-z0-9._-]*\\)\\".*/\\1 \\2/p" "\$ITEMS_FILE" |
+  jq_lf -R -s -c 'split("\\n") | map(select(test(" .")) | split(" ") | {(.[0]): .[1]}) | add // {}') ||
+  refused items-file authors
+stop_if_refused
+ops_json() { printf '%s' "\$1" | jq_lf -R -s -c 'split(" ") | map(select(length > 0))'; }
+RESULT=\$(jq_lf -n -R -c --argjson ops "\$(ops_json "\$SCOPE_OPS")" --argjson targets "\$(ops_json "\$SCOPE_TARGETS")" \\
+  --argjson refs "\$SCOPE_REFS" --argjson statuses "\$STATUSES" --argjson labels "\$LABELS" \\
+  --argjson authors "\$AUTHORS" --argjson cannot "\$PLAN_CANNOT" --argjson max "\$PLAN_MAX_OPS" \\
+  "\$ISSUE_TEXT_JQ\$PLAN_DEFS\$PLAN_JQ" <"\$PLAN") || { refused parse plan; stop_if_refused; }
+printf '%s' "\$RESULT" | jq_lf -r '.refused[] | "REFUSED \\(.[0]) \\(.[1])"'
+printf '%s' "\$RESULT" | jq_lf -r '.unsupported[] | "UNSUPPORTED \\(.)"'
+[ "\$(printf '%s' "\$RESULT" | jq_lf '(.refused | length) + (.unsupported | length)')" = 0 ] || REFUSED=1
+stop_if_refused
+
+TMP=\${TMPDIR:-/tmp}
+WORK=\$(mktemp -d "\${TMP%/}/specnaut-plan.XXXXXXXX") || { echo "apply-plan.sh: no temporary directory" >&2; exit 2; }
+trap 'rm -rf "\$WORK"' EXIT
+chmod 700 "\$WORK"
+printf '%s' "\$RESULT" | jq_lf -c '.ops[]' >"\$WORK/ops.jsonl"
+
+# Every text, written once to the file it is sent from, scanned from those bytes.
+# shellcheck disable=SC2329  # called by _report_text.sh's scans.
+refuse() { printf '%s' "\$1"; exit 1; }
+while IFS= read -r op <&3; do
+  at=\$(jq_lf -r .line <<<"\$op")
+  for k in title body append; do
+    jq_lf -e --arg k "\$k" 'has(\$k)' <<<"\$op" >/dev/null || continue
+    jq_lf -j --arg k "\$k" '.[\$k]' <<<"\$op" >"\$WORK/\$at.\$k"
+    bytes=\$(read_bytes <"\$WORK/\$at.\$k")
+    class=\$(scan_hard "\${bytes%x}"; exit 0) || refused "\${class:-secret}" "\$at.\$k"
+  done
+  if [ "\$VERB" = groom ] && [ "\$(jq_lf -r .op <<<"\$op")" = close ]; then
+    epic_cleared "\$(jq_lf -r .target <<<"\$op")" || refused scope "\$at.target"
+  fi
+done 3<"\$WORK/ops.jsonl"
+stop_if_refused
+
+shown() { if command -v cygpath >/dev/null 2>&1; then cygpath -m "\$1"; else printf '%s' "\$1"; fi; }
+text() { cat -- "\$WORK/\$at.\$1"; printf x; }
+REFS=" " RC=0
+resolve() { case \$1 in @*) r=\${REFS#* "\$1"=}; [ "\$r" != "\$REFS" ] && printf '%s' "\${r%% *}" ;; *) printf '%s' "\$1" ;; esac; }
+report() { if [ "\$2" = 0 ]; then echo "APPLIED \$1 \$3"; else echo "FAILED \$1 \$3 \$2"; RC=4; fi; }
+BEFORE=\$(receipt_snapshot)
+while IFS= read -r op <&3; do
+  at=\$(jq_lf -r .line <<<"\$op")
+  o=\$(jq_lf -r .op <<<"\$op")
+  t=\$(jq_lf -r '.target // empty' <<<"\$op")
+  n=\$(resolve "\$t")
+  if [ -n "\$t" ] && [ -z "\$n" ]; then echo "FAILED \$o \$t skipped"; RC=4; continue; fi
+  rc=0
+  case \$o in
+    create)
+      title=\$(text title); bf=""; [ ! -f "\$WORK/\$at.body" ] || bf=\$(shown "\$WORK/\$at.body")
+      p=\$(resolve "\$(jq_lf -r '.parent // empty' <<<"\$op")")
+      new=\$(create_item "\${title%x}" "\$bf" "\$(jq_lf -r '(.labels // []) | join(",")' <<<"\$op")" "\$p") || rc=\$?
+      ref=\$(jq_lf -r '.ref // empty' <<<"\$op")
+      if [[ \$new =~ ^[1-9][0-9]*\$ ]]; then [ -z "\$ref" ] || REFS="\$REFS\$ref=\$new "; report create "\$rc" "\$new"
+      else [ "\$rc" != 0 ] || rc=1; echo "FAILED create \${ref:-new} \$rc"; RC=4; fi ;;
+    edit)
+      args=("\$n")
+      if [ -f "\$WORK/\$at.title" ]; then title=\$(text title); args+=(--title "\${title%x}"); fi
+      [ ! -f "\$WORK/\$at.append" ] || args+=(--append-file "\$(shown "\$WORK/\$at.append")")
+      bash "\$here/edit.sh" "\${args[@]}" >/dev/null 2>&1 || rc=\$?
+      report edit "\$rc" "\$n" ;;
+    comment)
+      bash "\$here/clarify-comment.sh" "\$n" --body-file "\$(shown "\$WORK/\$at.body")" >/dev/null 2>&1 || rc=\$?
+      report comment "\$rc" "\$n" ;;
+    move)
+      bash "\$here/move.sh" "\$n" "\$(jq_lf -r .status <<<"\$op")" >/dev/null 2>&1 || rc=\$?
+      report move "\$rc" "\$n" ;;
+    classify)
+      axis=\$(jq_lf -r .axis <<<"\$op") value=\$(jq_lf -r .value <<<"\$op")
+      bash "\$here/set-field.sh" "\$n" "\$axis" "\$value" >/dev/null 2>&1 || rc=\$?
+      lbl=""; [ "\$rc" != 10 ] || lbl=\$(fallback_label "\$axis" "\$value")
+      if [ -n "\$lbl" ] && bash "\$here/label.sh" "\$n" "\$lbl" >/dev/null 2>&1; then echo "FALLBACK classify \$n"
+      else report classify "\$rc" "\$n"; fi ;;
+    label)
+      IFS=, read -r -a labels <<<"\$(jq_lf -r '.labels | join(",")' <<<"\$op")"
+      bash "\$here/label.sh" "\$n" "\${labels[@]}" >/dev/null 2>&1 || rc=\$?
+      report label "\$rc" "\$n" ;;
+    close)
+      bash "\$here/cascade-check.sh" "\$n" >/dev/null 2>&1 || rc=\$?
+      [ "\$rc" != 0 ] || close_item "\$n" "\$(jq_lf -r .reason <<<"\$op")" >/dev/null 2>&1 || rc=\$?
+      report close "\$rc" "\$n"
+      if [ "\$rc" = 0 ] && [ "\$CLOSE_IS_MOVE" != 1 ]; then
+        rc=0; bash "\$here/move.sh" "\$n" Done >/dev/null 2>&1 || rc=\$?
+        report move "\$rc" "\$n"
+      fi ;;
+    link)
+      p=\$(resolve "\$(jq_lf -r .parent <<<"\$op")")
+      if [ -z "\$p" ]; then echo "FAILED link \$n skipped"; RC=4; continue; fi
+      bash "\$here/link.sh" "\$n" "\$p" >/dev/null 2>&1 || rc=\$?
+      report link "\$rc" "\$n" ;;
+    *) echo "FAILED \$o \$n skipped"; RC=4 ;;
+  esac
+done 3<"\$WORK/ops.jsonl"
+
+CHANGED=\$(printf '%s\\n' "\$(receipt_snapshot)" | grep -vxF -f <(printf '%s\\n' "\$BEFORE") | awk 'NF { print \$NF }' | sort -u | tr '\\n' ' ')
+CHANGED=\${CHANGED% }
+echo "RECEIPT: \${CHANGED:-none}"
+exit "\$RC"
 `,
     executable: true,
     backend: "gitlab",
@@ -12539,19 +14420,21 @@ exit "\$rc"
 #     [A-Za-z0-9._-]{1,64} is written author="".
 # How a reader treats the blocks is the agent definition's rule, not this file's.
 #
-# Usage: read-items.sh <verb> [--id <n>] (<n>... | --status <column>)
-#   <verb>      the work the items are read for (\`groom\`, \`edit\`, ...): a
-#               lower-case word, recorded in the header
+# Usage: read-items.sh <verb> [--id <n>] [<n>... | --status <column>]
+#   <verb>      the work the items are read for, one \`scope_for\` lists in
+#               \`_backlog_plan.sh\` (\`groom\`, \`edit\`, ...); recorded in the header
 #   --id <n>    the item the verb acts on; read first, recorded in the header
 #   --status    every item in that column, as \`list.sh --numbers\` lists them
-# Exit: 0 written · 2 usage, a refused number, an item that cannot be read, no
-# git work tree, no randomness, or a temporary directory inside the repository.
+# A verb that creates items (SCOPE_REFS) may read nothing: \`items: none\`.
+# Exit: 0 written · 2 usage, a verb scope_for refuses, a refused number, an item
+# that cannot be read, no git work tree, no randomness, or a temporary
+# directory inside the repository.
 # On any failure stdout stays empty and no directory is left behind.
 set -euo pipefail
 
 here=\$(dirname "\$0")
 usage() {
-  echo "usage: read-items.sh <verb> [--id <n>] (<n>... | --status <column>)" >&2
+  echo "usage: read-items.sh <verb> [--id <n>] [<n>... | --status <column>]" >&2
   exit 2
 }
 die() { echo "read-items.sh: \$*" >&2; exit 2; }
@@ -12572,26 +14455,22 @@ while [ "\$#" -gt 0 ]; do
     *) NUMS+=("\$1"); shift ;;
   esac
 done
+# jq_lf, the family's CR-safe jq; scope_for, the fingerprint and, through
+# _issue_text.sh, ISSUE_TEXT_JQ: the characters that pass.
+# shellcheck source=../../specnaut/scripts/bash/common.sh
+. "\$here/../bash/common.sh"
+# shellcheck source=./_backlog_plan.sh
+. "\$here/_backlog_plan.sh"
+scope_for "\$VERB" "\$ID" || die "no plan can follow a read for: \$(printf '%q' "\$VERB")\${ID:+ --id}"
 if [ "\$BY_STATUS" = true ]; then
   [ "\${#NUMS[@]}" -eq 0 ] || usage
   (LC_ALL=C; [[ \$STATUS =~ ^[^[:cntrl:]]{1,64}\$ ]]) || die "not a column name: \$(printf '%q' "\$STATUS")"
-elif [ "\${#NUMS[@]}" -eq 0 ] && [ -z "\$ID" ]; then
+elif [ "\${#NUMS[@]}" -eq 0 ] && [ -z "\$ID" ] && [ "\$SCOPE_REFS" != true ]; then
   usage
 fi
 
-# jq_lf, the family's CR-safe jq; ISSUE_TEXT_JQ, the characters that pass.
-# shellcheck source=../../specnaut/scripts/bash/common.sh
-. "\$here/../bash/common.sh"
-# shellcheck source=./_issue_text.sh
-. "\$here/_issue_text.sh"
-
 ROOT=\$(cd "\$here/../../.." && pwd)
-porcelain=\$(cd "\$ROOT" && git status --porcelain 2>/dev/null) ||
-  die "\$ROOT is not a git work tree: the fingerprint needs one"
-FINGERPRINT=\$(printf '%s' "\$porcelain" | (cd "\$ROOT" && git hash-object --stdin)) ||
-  die "git could not hash the work tree's status"
-FINGERPRINT=\${FINGERPRINT%\$'\\r'}
-[[ \$FINGERPRINT =~ ^[0-9a-f]{40}([0-9a-f]{24})?\$ ]] || die "git gave no fingerprint"
+FINGERPRINT=\$(backlog_fingerprint "\$ROOT") || die "\$ROOT is not a git work tree: the fingerprint needs one"
 
 if [ "\$BY_STATUS" = true ]; then
   listed=\$(bash "\$here/list.sh" --numbers "\$STATUS") || die "could not list the column"
@@ -12743,6 +14622,466 @@ ISSUE_TEXT_JQ='
   def body: explode | map(if . == 8232 or . == 8233 then 10 else . end | select(printable or . == 9 or . == 10)) | implode;
   def inert_body: explode | map(if . == 8232 or . == 8233 then 10 else . end | select(inert or . == 9 or . == 10)) | implode;
 '
+`,
+    executable: true,
+    backend: "cloud",
+    skipIfExists: false,
+  },
+  {
+    category: "backlog-script",
+    name: "apply-plan",
+    suffix: "apply-plan.sh",
+    content: `#!/usr/bin/env bash
+# Apply the product owner's write plan to the Specnaut Cloud board — the
+# bundled executor. The checks, the operations, the output lines and the exit
+# table are the shared body, \`_apply_plan.sh\`, beside this file; the plan's
+# vocabulary is \`_backlog_plan.sh\`.
+#
+# This backend creates (with a parent), comments, moves and closes; the
+# versioned contract this half calls names no edit, label, classification,
+# link or close reason, so a plan holding one is answered UNSUPPORTED and
+# nothing is written. A close is the move to Done, as close-shipped.sh does it.
+#
+# Usage: apply-plan.sh <verb> [--id <n>] <plan-file> <items-file>
+set -euo pipefail
+here=\$(CDPATH="" cd "\$(dirname "\${BASH_SOURCE[0]}")" && pwd)
+# shellcheck source=./_config.sh
+. "\$here/_config.sh"
+
+PLAN_CANNOT='["edit", "label", "classify", "link", "close:not_planned", "create:labels"]'
+CLOSE_IS_MOVE=1
+
+# columns.sh prints \`  <order>\\t<name>\`.
+board_statuses() { bash "\$here/columns.sh" | awk -F '\\t' 'NF > 1 { print \$2 }'; }
+repo_labels() { :; }
+
+# add.sh prints \`✓ created: <key>\`; the key ends with the task's number.
+create_item() {
+  local args=("\$1") out rc=0
+  [ -z "\$4" ] || args+=(--parent "\$4")
+  [ -z "\$2" ] || args+=(--body-file "\$2")
+  out=\$(bash "\$here/add.sh" "\${args[@]}" 2>/dev/null) || rc=\$?
+  printf '%s\\n' "\$out" | sed -n 's/.*created: [A-Za-z0-9]*-\\([1-9][0-9]*\\)\$/\\1/p' | head -1
+  return "\$rc"
+}
+
+close_item() { bash "\$here/move.sh" "\$1" Done; }
+fallback_label() { :; }
+receipt_snapshot() { :; }
+
+# shellcheck source=../_apply_plan.sh
+. "\$here/_apply_plan.sh"
+`,
+    executable: true,
+    backend: "cloud",
+    skipIfExists: false,
+  },
+  {
+    category: "backlog-script",
+    name: "_backlog_plan",
+    suffix: "_backlog_plan.sh",
+    content: `# shellcheck shell=bash
+# The one home of what a backlog write plan may say: the product owner proposes
+# a plan, a bundled executor (\`apply-plan.sh\`) checks it here and applies it.
+# Sourced, never run, by apply-plan.sh, read-items.sh and the local add.sh,
+# installed beside it, once the caller has \`jq_lf\`.
+#
+# A plan is JSON Lines: one object per line, its \`op\` one of the eight below,
+# with exactly these keys (? = optional) and nothing else:
+#
+#   create    ref?, title, body?, labels?, parent?   a new item
+#   edit      target, title?, append?                at least one of the two
+#   comment   target, body
+#   move      target, status
+#   classify  target, axis, value
+#   label     target, labels
+#   close     target, reason
+#   link      target, parent                         target becomes parent's child
+#
+# The values, checked by PLAN_JQ before anything is written:
+#   target, parent  an issue number (a JSON integer), or a \`ref\` an earlier
+#                   create in the same plan named (\`@\` + [a-z][a-z0-9-]{0,15});
+#                   always inside the verb's scope (scope_for). A repository, a
+#                   project, a URL or a path is no value any key takes.
+#   status          one of the board's own columns, never Done: an item reaches
+#                   Done through \`close\`, behind its cascade check
+#   axis, value     Priority P0-P3 · Size XS, S, M, L, XL · IssueType Task, Bug, Feature
+#   labels          1 to 10 of the repository's existing labels
+#   reason          completed or not_planned
+#   title           one line, 1 to 256 characters, every one \`inert\` (_issue_text.sh)
+#   body, append    up to 65536 characters (a comment's body: 16384), inert,
+#                   tabs and newlines kept. An edit only appends to a body.
+#   @-mentions      in any text, only of the target item's author, as the items
+#                   file records it; a new item's text mentions nobody
+# Caps: PLAN_MAX_OPS lines, and one comment per target per run. There is no
+# operation for memory, files or raw tracker calls, and no key that is a path:
+# the executor writes every body file itself.
+
+PLAN_MAX_OPS=40
+_PLAN_DIR=\$(CDPATH="" cd "\$(dirname "\${BASH_SOURCE[0]}")" && pwd)
+# shellcheck source=./_issue_text.sh
+. "\$_PLAN_DIR/_issue_text.sh"
+
+# backlog_fingerprint <root> — the work tree's state at a read, the same text
+# for read-items.sh, which records it, and apply-plan.sh, which checks it:
+# \`git hash-object\` of \`git status --porcelain\`. Fails outside a work tree.
+backlog_fingerprint() {
+  local porcelain fp
+  porcelain=\$(cd "\$1" && git status --porcelain 2>/dev/null) || return 1
+  fp=\$(printf '%s' "\$porcelain" | (cd "\$1" && git hash-object --stdin)) || return 1
+  fp=\${fp%\$'\\r'}
+  [[ \$fp =~ ^[0-9a-f]{40}([0-9a-f]{24})?\$ ]] || return 1
+  printf '%s\\n' "\$fp"
+}
+
+# scope_for <verb> [<id>] — what a run of <verb> may write, derived here, never
+# from a plan: SCOPE_OPS, SCOPE_TARGETS (issue numbers) and SCOPE_REFS (may it
+# create and name new items). 2 for a verb not listed, or an id it needs and
+# lacks or must not have. ITEMS_READ (the items file's numbers) is set by
+# apply-plan.sh; read-items.sh calls this to refuse a verb before any read.
+#
+#   add [<parent>]   create; then its own new items and the parent the user named
+#   edit <id>        {id}
+#   estimate <id>    {id}, classification only
+#   close <id>       {id}, and its children among the items read once the
+#                    executor's own cascade-check.sh <id> exits 0
+#   groom            the items read, no create; it closes only an epic whose
+#                    cascade check clears (epic_cleared)
+#   tech-debt        create only
+scope_for() {
+  local verb=\${1:-} id=\${2:-} n p
+  SCOPE_OPS="" SCOPE_TARGETS="" SCOPE_REFS=false
+  case \$verb in
+    add) SCOPE_OPS="create comment move classify label link" SCOPE_REFS=true SCOPE_TARGETS=\$id ;;
+    edit) SCOPE_OPS="edit comment move classify label link" SCOPE_TARGETS=\$id ;;
+    estimate) SCOPE_OPS="classify label comment" SCOPE_TARGETS=\$id ;;
+    close) SCOPE_OPS="close comment label" SCOPE_TARGETS=\$id ;;
+    groom) SCOPE_OPS="edit comment move classify label close link" SCOPE_TARGETS=\${ITEMS_READ:-} ;;
+    tech-debt) SCOPE_OPS="create" SCOPE_REFS=true ;;
+    *) return 2 ;;
+  esac
+  case \$verb in
+    edit | estimate | close) [ -n "\$id" ] || return 2 ;;
+    tech-debt) [ -z "\$id" ] || return 2 ;;
+  esac
+  if [ "\$verb" = close ] && [ -n "\${ITEMS_READ:-}" ] &&
+    bash "\$_PLAN_DIR/cascade-check.sh" "\$id" >/dev/null 2>&1; then
+    for n in \$ITEMS_READ; do
+      [ "\$n" != "\$id" ] || continue
+      p=\$(bash "\$_PLAN_DIR/parent-of.sh" "\$n" 2>/dev/null) || continue
+      [ "\${p#"\${p%%[!0]*}"}" != "\$id" ] || SCOPE_TARGETS="\$SCOPE_TARGETS \$n"
+    done
+  fi
+  return 0
+}
+
+# epic_cleared <n> — 0 when <n> has children and its cascade check clears it:
+# the only item a groom may close. The check's exit 0 alone also means "no
+# children at all"; only its "safe to close" line says it has some.
+epic_cleared() {
+  local out
+  out=\$(bash "\$_PLAN_DIR/cascade-check.sh" "\$1" 2>/dev/null) || return 1
+  case \$out in *"safe to close"*) return 0 ;; *) return 1 ;; esac
+}
+
+# jq definitions the validator and the local add.sh share; appended to ISSUE_TEXT_JQ.
+# shellcheck disable=SC2016  # jq program.
+PLAN_DEFS='
+  def plan_title: type == "string" and length >= 1 and length <= 256
+    and (explode | all(.[]; inert)) and (explode | any(.[]; . != 32));
+  def plan_text(\$max): type == "string" and length >= 1 and length <= \$max
+    and (explode | all(.[]; inert or . == 9 or . == 10));
+'
+
+# The validator, over the plan's raw lines (jq -n -R), given \$ops, \$targets,
+# \$refs, \$statuses, \$labels, \$authors ({n: login}), \$cannot ("op" or
+# "op:qualifier") and \$max. Out: {refused: [[class, path]], unsupported, ops},
+# each op normalised, its targets strings, its \`line\` (1-based) added.
+# shellcheck disable=SC2016  # jq program.
+PLAN_JQ='
+  def schema: {
+    create: {ref: "ref?", title: "title", body: "body?", labels: "labels?", parent: "target?"},
+    edit: {target: "target", title: "title?", append: "body?"},
+    comment: {target: "target", body: "comment"},
+    move: {target: "target", status: "status"},
+    classify: {target: "target", axis: "axis", value: "value"},
+    label: {target: "target", labels: "labels"},
+    close: {target: "target", reason: "reason"},
+    link: {target: "target", parent: "target"} };
+  def axes: {Priority: ["P0", "P1", "P2", "P3"], Size: ["XS", "S", "M", "L", "XL"], IssueType: ["Task", "Bug", "Feature"]};
+  def shown: if type == "string" and test("^[a-z_]{1,32}\$") then . else "?" end;
+  def number: type == "number" and . == floor and . >= 1 and . <= 9999999999;
+  def refname: type == "string" and test("^@[a-z][a-z0-9-]{0,15}\$");
+  def mentions: [match("(?:^|[^A-Za-z0-9_.\`/@-])@([A-Za-z0-9][A-Za-z0-9-]*)"; "g") | .captures[0].string];
+  def resolve(\$v; \$st): if (\$v | number) then (\$v | tostring) as \$n
+      | (if any(\$targets[]; . == \$n) then \$n else null end)
+    elif \$refs and (\$v | refname) and any(\$st.refs[]; . == \$v) then \$v
+    else null end;
+  def check(\$k; \$kind; \$v; \$st; \$o):
+    if \$kind == "target" then (if resolve(\$v; \$st) == null then "scope" else null end)
+    elif \$kind == "ref" then (if (\$v | refname) and (\$st.refs | index([\$v]) == null) and \$refs then null else "ref" end)
+    elif \$kind == "title" then (if \$v | plan_title then null else "title" end)
+    elif \$kind == "body" then (if \$v | plan_text(65536) then null else "text" end)
+    elif \$kind == "comment" then (if \$v | plan_text(16384) then null else "text" end)
+    elif \$kind == "status" then (if (\$v | type) == "string" and (\$v | ascii_downcase) != "done"
+      and any(\$statuses[]; . == \$v) then null else "status" end)
+    elif \$kind == "axis" then (if (\$v | type) == "string" and (axes | has(\$v)) then null else "axis" end)
+    elif \$kind == "value" then ((axes[\$o.axis | strings] // []) as \$vs | if any(\$vs[]; . == \$v) then null else "value" end)
+    elif \$kind == "labels" then (if (\$v | type) == "array" and (\$v | length) >= 1 and (\$v | length) <= 10
+      and all(\$v[]; type == "string" and plan_title and (index(",") == null) and (. as \$l | any(\$labels[]; . == \$l)))
+      then null else "label" end)
+    elif \$kind == "reason" then (if \$v == "completed" or \$v == "not_planned" then null else "reason" end)
+    else "schema" end;
+  def cannot(\$o): (\$o.op) as \$op
+    | if any(\$cannot[]; . == \$op) then \$op
+      elif \$op == "close" and any(\$cannot[]; . == "close:" + \$o.reason) then \$op
+      elif \$op == "classify" and any(\$cannot[]; . == "classify:" + \$o.axis) then \$op
+      elif \$op == "create" and \$o.labels != null and any(\$cannot[]; . == "create:labels") then \$op
+      else null end;
+  [inputs] as \$lines
+  | reduce range(\$lines | length) as \$i ({refused: [], unsupported: [], ops: [], refs: [], said: []};
+      (\$i + 1 | tostring) as \$at
+      | (\$lines[\$i] | try fromjson catch null) as \$o
+      | if (\$o | type) != "object" then .refused += [["parse", \$at]]
+        elif (\$o.op | type) != "string" or (schema | has(\$o.op) | not) then .refused += [["op", "\\(\$at).op"]]
+        elif (\$ops | index([\$o.op]) == null) then .refused += [["scope", "\\(\$at).op"]]
+        elif cannot(\$o) != null then .unsupported += [cannot(\$o)]
+        else schema[\$o.op] as \$s | . as \$st
+          | ([\$o | keys[] | . as \$k | select(\$k != "op" and (\$s | has(\$k) | not)) | ["unknown-key", "\\(\$at).\\(shown)"]]
+             + [\$s | to_entries[] | .key as \$k | select((.value | endswith("?") | not) and (\$o | has(\$k) | not))
+                 | ["missing-key", "\\(\$at).\\(.key)"]]
+             + [\$s | to_entries[] | .key as \$k | select(\$o | has(\$k))
+                 | check(\$k; .value | rtrimstr("?"); \$o[\$k]; \$st; \$o) // empty | [., "\\(\$at).\\(\$k)"]]
+             + (if \$o.op == "edit" and (\$o | has("title") or has("append") | not) then [["missing-key", "\\(\$at).append"]] else [] end)
+             + [("title", "body", "append") as \$k | select(\$o[\$k] | type == "string")
+                 | (if \$o.op == "create" then [] else [\$authors[\$o.target | tostring]? // empty] end) as \$who
+                 | select([\$o[\$k] | mentions[] | select(. as \$m | \$who | index([\$m]) == null)] | length > 0)
+                 | ["mention", "\\(\$at).\\(\$k)"]]) as \$bad
+          | if (\$bad | length) > 0 then .refused += \$bad
+            else (\$o
+                   | (if has("target") then .target = resolve(.target; \$st) else . end)
+                   | (if has("parent") then .parent = resolve(.parent; \$st) else . end)
+                   | .line = (\$i + 1)) as \$n
+              | (if \$n.op == "comment" and any(.said[]; . == \$n.target)
+                 then .refused += [["cap", "\\(\$at).target"]] else . end)
+              | .said += (if \$n.op == "comment" then [\$n.target] else [] end)
+              | .refs += (if \$n.op == "create" and \$n.ref != null then [\$n.ref] else [] end)
+              | .ops += [\$n]
+            end
+        end)
+  | if (\$lines | length) > \$max then .refused += [["cap", "plan"]] elif (\$lines | length) == 0 then .refused += [["parse", "plan"]] else . end
+  | {refused, unsupported: (.unsupported | unique), ops}
+'
+
+# require_title <title> — the plan's title rule, or a refusal and status 2: the
+# local add.sh writes a title into frontmatter, where a second line is a key.
+require_title() {
+  jq_lf -n -e --arg t "\${1-}" "\$ISSUE_TEXT_JQ\$PLAN_DEFS"' \$t | plan_title' >/dev/null 2>&1 && return 0
+  printf '%s: a title is one line of 1 to 256 printable characters\\n' "\${0##*/}" >&2
+  return 2
+}
+`,
+    executable: true,
+    backend: "cloud",
+    skipIfExists: false,
+  },
+  {
+    category: "backlog-script",
+    name: "_apply_plan",
+    suffix: "_apply_plan.sh",
+    content: `# shellcheck shell=bash
+# The one body of apply-plan.sh: the bundled executor that applies the product
+# owner's write plan. Sourced — never run — by the backend's own apply-plan.sh,
+# which sets \`here\` (its directory), sources its \`_config.sh\`, and defines:
+#
+#   PLAN_CANNOT         a JSON array of what the backend cannot do (\`label\`,
+#                       \`close:not_planned\`, \`create:labels\`, ...)
+#   board_statuses      the board's columns, one per line
+#   repo_labels         the repository's labels, one per line
+#   create_item <title> <body-file|""> <labels-csv> <parent|"">
+#                       prints the new item's number; its status is add.sh's
+#   close_item <n> <reason>, CLOSE_IS_MOVE (1: the close moves the card itself)
+#   fallback_label <axis> <value>
+#                       the label a classification falls back to, or nothing
+#   receipt_snapshot    \`cksum\` lines of the repository files a write can change
+#
+# Usage: apply-plan.sh <verb> [--id <n>] <plan-file> <items-file>
+#
+# The plan is checked whole before anything is written (_backlog_plan.sh): its
+# verb, id and fingerprint against the items file's header, every line against
+# the schema and the verb's scope, every text against the secret scan of
+# \`_report_text.sh\`, run over the bytes this script then sends. Any refusal
+# writes nothing. Free text reaches a backend script only as a file this
+# script wrote in its own 0700 directory; every other value as one argument.
+#
+# stdout holds these lines and no others, then RECEIPT:
+#   APPLIED <op> <n>              FAILED <op> <n|@ref> <exit|skipped>
+#   FALLBACK classify <n>         (no such field: the label was set instead)
+#   REFUSED <class> <field-path>  (a path such as 3.body, never the value)
+#   UNSUPPORTED <op>              (this backend cannot do it; nothing written)
+#   RECEIPT: <path>... | none     the repository files changed, to stage
+# Exit: 0 applied · 2 usage · 3 refused, nothing written · 4 an operation failed
+# shellcheck disable=SC2154  # \`here\` is the caller's.
+
+# Every failure below is handled where it happens: \`set -e\` from \`_config.sh\`
+# would end a run between two writes, and kill the scans' own grep calls.
+set +e
+usage() { echo "usage: apply-plan.sh <verb> [--id <n>] <plan-file> <items-file>" >&2; exit 2; }
+VERB=\${1:-}
+[ "\$#" -gt 0 ] && shift
+ID=""
+if [ "\${1:-}" = --id ]; then
+  [ "\$#" -ge 2 ] || usage
+  ID=\$(require_issue_number "\$2") || exit 2
+  shift 2
+fi
+[ "\$#" -eq 2 ] || usage
+PLAN=\$1 ITEMS_FILE=\$2
+[[ \$VERB =~ ^[a-z][a-z-]{0,31}\$ ]] || usage
+
+# A scan that is not there would pass every text: its absence stops the run.
+# shellcheck source=./_backlog_plan.sh
+. "\$here/_backlog_plan.sh" || exit 2
+# shellcheck source=../../specnaut/scripts/bash/_report_text.sh
+. "\$here/../bash/_report_text.sh" || exit 2
+declare -F scan_hard >/dev/null || { echo "apply-plan.sh: the secret scan is missing" >&2; exit 2; }
+
+REFUSED=0
+refused() { printf 'REFUSED %s %s\\n' "\$1" "\$2"; REFUSED=1; }
+stop_if_refused() { [ "\$REFUSED" = 0 ] || { echo "RECEIPT: none"; exit 3; }; }
+
+# The items file's header, up to its first blank line: the facts of the read.
+[ -f "\$PLAN" ] || refused plan-file plan
+[ -f "\$ITEMS_FILE" ] || refused items-file header
+stop_if_refused
+HEADER=\$(sed -n '1,/^\$/p' "\$ITEMS_FILE" | tr -d '\\r')
+hv() { printf '%s\\n' "\$HEADER" | sed -n "s/^\$1: //p" | head -1; }
+[ "\$(hv specnaut-items)" = 1 ] || refused items-file header
+[ "\$(hv verb)" = "\$VERB" ] || refused verb header.verb
+[ "\$(hv id)" = "\${ID:-none}" ] || refused id header.id
+FP=\$(backlog_fingerprint "\$ROOT") || FP=""
+[ -n "\$FP" ] && [ "\$(hv fingerprint)" = "\$FP" ] || refused fingerprint header.fingerprint
+NONCE=\$(hv nonce)
+[[ \$NONCE =~ ^[0-9a-f]{32}\$ ]] || refused items-file header.nonce
+ITEMS_READ=\$(hv items)
+[[ \$ITEMS_READ =~ ^(none|[0-9]+( [0-9]+)*)\$ ]] || refused items-file header.items
+[ "\$ITEMS_READ" != none ] || ITEMS_READ=""
+stop_if_refused
+scope_for "\$VERB" "\$ID" || refused verb verb
+stop_if_refused
+
+# The board's facts, read only when a plan line needs them. A read that fails
+# refuses the plan: an unknown column must not pass for an allowed one.
+SEEN=\$(jq_lf -R -r 'try fromjson catch null | objects | .op? | strings' "\$PLAN" 2>/dev/null | sort -u)
+lines_json() { jq_lf -R -s -c 'split("\\n") | map(sub("\\r\$"; "") | select(length > 0))'; }
+STATUSES='[]' LABELS='[]'
+if printf '%s\\n' "\$SEEN" | grep -qx move; then
+  STATUSES=\$(board_statuses | lines_json) || refused unreadable board.status
+fi
+if printf '%s\\n' "\$SEEN" | grep -Eqx 'label|create'; then
+  LABELS=\$(repo_labels | lines_json) || refused unreadable repo.labels
+fi
+AUTHORS=\$(sed -n "s/^<untrusted-issue-text nonce=\\"\$NONCE\\" item=\\"\\([0-9]*\\)\\" field=\\"title\\" author=\\"\\([A-Za-z0-9._-]*\\)\\".*/\\1 \\2/p" "\$ITEMS_FILE" |
+  jq_lf -R -s -c 'split("\\n") | map(select(test(" .")) | split(" ") | {(.[0]): .[1]}) | add // {}') ||
+  refused items-file authors
+stop_if_refused
+ops_json() { printf '%s' "\$1" | jq_lf -R -s -c 'split(" ") | map(select(length > 0))'; }
+RESULT=\$(jq_lf -n -R -c --argjson ops "\$(ops_json "\$SCOPE_OPS")" --argjson targets "\$(ops_json "\$SCOPE_TARGETS")" \\
+  --argjson refs "\$SCOPE_REFS" --argjson statuses "\$STATUSES" --argjson labels "\$LABELS" \\
+  --argjson authors "\$AUTHORS" --argjson cannot "\$PLAN_CANNOT" --argjson max "\$PLAN_MAX_OPS" \\
+  "\$ISSUE_TEXT_JQ\$PLAN_DEFS\$PLAN_JQ" <"\$PLAN") || { refused parse plan; stop_if_refused; }
+printf '%s' "\$RESULT" | jq_lf -r '.refused[] | "REFUSED \\(.[0]) \\(.[1])"'
+printf '%s' "\$RESULT" | jq_lf -r '.unsupported[] | "UNSUPPORTED \\(.)"'
+[ "\$(printf '%s' "\$RESULT" | jq_lf '(.refused | length) + (.unsupported | length)')" = 0 ] || REFUSED=1
+stop_if_refused
+
+TMP=\${TMPDIR:-/tmp}
+WORK=\$(mktemp -d "\${TMP%/}/specnaut-plan.XXXXXXXX") || { echo "apply-plan.sh: no temporary directory" >&2; exit 2; }
+trap 'rm -rf "\$WORK"' EXIT
+chmod 700 "\$WORK"
+printf '%s' "\$RESULT" | jq_lf -c '.ops[]' >"\$WORK/ops.jsonl"
+
+# Every text, written once to the file it is sent from, scanned from those bytes.
+# shellcheck disable=SC2329  # called by _report_text.sh's scans.
+refuse() { printf '%s' "\$1"; exit 1; }
+while IFS= read -r op <&3; do
+  at=\$(jq_lf -r .line <<<"\$op")
+  for k in title body append; do
+    jq_lf -e --arg k "\$k" 'has(\$k)' <<<"\$op" >/dev/null || continue
+    jq_lf -j --arg k "\$k" '.[\$k]' <<<"\$op" >"\$WORK/\$at.\$k"
+    bytes=\$(read_bytes <"\$WORK/\$at.\$k")
+    class=\$(scan_hard "\${bytes%x}"; exit 0) || refused "\${class:-secret}" "\$at.\$k"
+  done
+  if [ "\$VERB" = groom ] && [ "\$(jq_lf -r .op <<<"\$op")" = close ]; then
+    epic_cleared "\$(jq_lf -r .target <<<"\$op")" || refused scope "\$at.target"
+  fi
+done 3<"\$WORK/ops.jsonl"
+stop_if_refused
+
+shown() { if command -v cygpath >/dev/null 2>&1; then cygpath -m "\$1"; else printf '%s' "\$1"; fi; }
+text() { cat -- "\$WORK/\$at.\$1"; printf x; }
+REFS=" " RC=0
+resolve() { case \$1 in @*) r=\${REFS#* "\$1"=}; [ "\$r" != "\$REFS" ] && printf '%s' "\${r%% *}" ;; *) printf '%s' "\$1" ;; esac; }
+report() { if [ "\$2" = 0 ]; then echo "APPLIED \$1 \$3"; else echo "FAILED \$1 \$3 \$2"; RC=4; fi; }
+BEFORE=\$(receipt_snapshot)
+while IFS= read -r op <&3; do
+  at=\$(jq_lf -r .line <<<"\$op")
+  o=\$(jq_lf -r .op <<<"\$op")
+  t=\$(jq_lf -r '.target // empty' <<<"\$op")
+  n=\$(resolve "\$t")
+  if [ -n "\$t" ] && [ -z "\$n" ]; then echo "FAILED \$o \$t skipped"; RC=4; continue; fi
+  rc=0
+  case \$o in
+    create)
+      title=\$(text title); bf=""; [ ! -f "\$WORK/\$at.body" ] || bf=\$(shown "\$WORK/\$at.body")
+      p=\$(resolve "\$(jq_lf -r '.parent // empty' <<<"\$op")")
+      new=\$(create_item "\${title%x}" "\$bf" "\$(jq_lf -r '(.labels // []) | join(",")' <<<"\$op")" "\$p") || rc=\$?
+      ref=\$(jq_lf -r '.ref // empty' <<<"\$op")
+      if [[ \$new =~ ^[1-9][0-9]*\$ ]]; then [ -z "\$ref" ] || REFS="\$REFS\$ref=\$new "; report create "\$rc" "\$new"
+      else [ "\$rc" != 0 ] || rc=1; echo "FAILED create \${ref:-new} \$rc"; RC=4; fi ;;
+    edit)
+      args=("\$n")
+      if [ -f "\$WORK/\$at.title" ]; then title=\$(text title); args+=(--title "\${title%x}"); fi
+      [ ! -f "\$WORK/\$at.append" ] || args+=(--append-file "\$(shown "\$WORK/\$at.append")")
+      bash "\$here/edit.sh" "\${args[@]}" >/dev/null 2>&1 || rc=\$?
+      report edit "\$rc" "\$n" ;;
+    comment)
+      bash "\$here/clarify-comment.sh" "\$n" --body-file "\$(shown "\$WORK/\$at.body")" >/dev/null 2>&1 || rc=\$?
+      report comment "\$rc" "\$n" ;;
+    move)
+      bash "\$here/move.sh" "\$n" "\$(jq_lf -r .status <<<"\$op")" >/dev/null 2>&1 || rc=\$?
+      report move "\$rc" "\$n" ;;
+    classify)
+      axis=\$(jq_lf -r .axis <<<"\$op") value=\$(jq_lf -r .value <<<"\$op")
+      bash "\$here/set-field.sh" "\$n" "\$axis" "\$value" >/dev/null 2>&1 || rc=\$?
+      lbl=""; [ "\$rc" != 10 ] || lbl=\$(fallback_label "\$axis" "\$value")
+      if [ -n "\$lbl" ] && bash "\$here/label.sh" "\$n" "\$lbl" >/dev/null 2>&1; then echo "FALLBACK classify \$n"
+      else report classify "\$rc" "\$n"; fi ;;
+    label)
+      IFS=, read -r -a labels <<<"\$(jq_lf -r '.labels | join(",")' <<<"\$op")"
+      bash "\$here/label.sh" "\$n" "\${labels[@]}" >/dev/null 2>&1 || rc=\$?
+      report label "\$rc" "\$n" ;;
+    close)
+      bash "\$here/cascade-check.sh" "\$n" >/dev/null 2>&1 || rc=\$?
+      [ "\$rc" != 0 ] || close_item "\$n" "\$(jq_lf -r .reason <<<"\$op")" >/dev/null 2>&1 || rc=\$?
+      report close "\$rc" "\$n"
+      if [ "\$rc" = 0 ] && [ "\$CLOSE_IS_MOVE" != 1 ]; then
+        rc=0; bash "\$here/move.sh" "\$n" Done >/dev/null 2>&1 || rc=\$?
+        report move "\$rc" "\$n"
+      fi ;;
+    link)
+      p=\$(resolve "\$(jq_lf -r .parent <<<"\$op")")
+      if [ -z "\$p" ]; then echo "FAILED link \$n skipped"; RC=4; continue; fi
+      bash "\$here/link.sh" "\$n" "\$p" >/dev/null 2>&1 || rc=\$?
+      report link "\$rc" "\$n" ;;
+    *) echo "FAILED \$o \$n skipped"; RC=4 ;;
+  esac
+done 3<"\$WORK/ops.jsonl"
+
+CHANGED=\$(printf '%s\\n' "\$(receipt_snapshot)" | grep -vxF -f <(printf '%s\\n' "\$BEFORE") | awk 'NF { print \$NF }' | sort -u | tr '\\n' ' ')
+CHANGED=\${CHANGED% }
+echo "RECEIPT: \${CHANGED:-none}"
+exit "\$RC"
 `,
     executable: true,
     backend: "cloud",

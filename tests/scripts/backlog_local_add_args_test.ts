@@ -22,6 +22,13 @@ async function sandbox(): Promise<{ root: string; add: string }> {
       join(scripts, name),
     );
   }
+  // The shared files every backend installs beside its own: add.sh checks its title there.
+  for (const name of ["_backlog_plan.sh", "_issue_text.sh"]) {
+    await Deno.copyFile(
+      fromFileUrl(new URL(`${LOCAL}/../${name}`, import.meta.url)),
+      join(scripts, name),
+    );
+  }
   return { root, add: bashPath(join(scripts, "add.sh")) };
 }
 

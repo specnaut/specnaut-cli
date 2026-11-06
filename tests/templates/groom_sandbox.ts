@@ -69,8 +69,11 @@ export async function project(backend: string, files: string[], config?: string)
   for (const f of ["_config.sh", "groom-verify.sh", "item-record.sh", ...files]) {
     await Deno.copyFile(join(BOARD_SCRIPTS, backend, f), join(scripts, f));
   }
-  // The shared character rule cloud's `_config.sh` sources, installed beside it.
-  await Deno.copyFile(join(BOARD_SCRIPTS, "_issue_text.sh"), join(scripts, "_issue_text.sh"));
+  // The shared files installed beside every backend: the character rule cloud's
+  // `_config.sh` sources, and the plan rules the local add.sh checks a title by.
+  for (const f of ["_issue_text.sh", "_backlog_plan.sh"]) {
+    await Deno.copyFile(join(BOARD_SCRIPTS, f), join(scripts, f));
+  }
   // groom-rules.sh sources common.sh (its CR-safe jq), which sources the
   // template resolver: the three are installed side by side.
   for (const f of ["groom-rules.sh", "common.sh", "template-resolution.sh"]) {
