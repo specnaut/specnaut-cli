@@ -30,9 +30,9 @@ dependency order:
 **The loop does not return to the user between children** — not for a finding, a failed gate, or
 the next child.
 A child's review never stops the loop: `phases/review.md` runs once per child, and its findings go
-to the lead, who triages, fixes, commits against that child and moves on in the same turn. **The
-last child's review is the one checkpoint** before the merge: `phases/review.md` applies to it
-exactly as written; the earlier children's reviews are reported and carried, not held.
+to the lead, who triages, fixes, commits against that child and moves on in the same turn.
+**The last child's review is the one checkpoint** before the merge: `phases/review.md` applies to
+it exactly as written; the earlier children's reviews are reported and carried, not held.
 
 Re-read the open-children list at each iteration: a child added mid-flight is picked up. A child's
 commit holds only that child's work — two children in one commit break the match resume relies on.

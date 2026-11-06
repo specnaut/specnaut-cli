@@ -25,3 +25,4 @@ src/infrastructure/deno_fs_writer.ts::writeJsonMerge  called only from DenoFsWri
 src/infrastructure/deno_fs_writer.ts::writeEntry  DenoFsWriter.writeBundle's phase 2, called only after phase 1 (assertDestinations) ran assertInsideProject, or the two link asserts, on every destination of the bundle
 src/infrastructure/deno_fs_writer.ts::writeOwnedFile  called only from writeEntry in writeBundle's phase 2, after phase 1 (assertDestinations) ran assertInsideProject on this exact path; its chmod re-asserts it, since a mode change follows a link created since
 src/cli/handlers/init_handler.ts::runInit  its only mutation is the git adapter's ensureDir, which receives the target directory itself rather than a path built under it
+src/cli/handlers/verify_scripts_handler.ts::defaultDeps  its only write is the names list, to a fresh file from Deno.makeTempFile in the OS temp directory; no path is built from a project directory
