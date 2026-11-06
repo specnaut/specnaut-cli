@@ -3,7 +3,7 @@ name: dependency-expert
 description: Reviews dependency manifests for hygiene — outdated pins, unbounded ranges, unused declared deps, license violations, advisory-shape signals, peer-dep conflicts, typosquatting heuristics. Multi-manifest aware (npm / pyproject / Cargo / composer / Gemfile / go.mod / deno.json). Two dispatch shapes — (1) PR review (dispatched by /task review when its signal selects it), (2) scoped audit (spawned by /task audit, over the scope it resolved).
 model: opus
 effort: high
-tools: Read, Grep, Glob, Bash
+tools: Read, Grep, Glob
 skills: review-findings-contract, workflow-contract
 maxTurns: 20
 color: magenta
@@ -51,7 +51,8 @@ the domain file contradicts this definition, **the domain file wins.**
 ## Mode 1 — Review
 
 Dispatched by `/task review` when `phases/review.md` selects this seat. Review ONLY the files the
-brief names — typically the manifests and lockfiles the diff touched.
+brief names — typically the manifests and lockfiles the diff touched. Their state at the base
+comes as the patch file the brief names; with none, a claim about what changed is a suspicion.
 
 ### Always-check rules
 
@@ -71,13 +72,12 @@ Spawned by `/task audit`, over the scope it resolved — the whole project by de
 
 ### Read-only contract (NON-NEGOTIABLE)
 
-No Edit, Write, NotebookEdit or any mutating tool. Bash only for `git ls-files|log|show|grep`,
-`grep`, `rg`, `find`, `wc -l`, `du -sh`, `ls -la`, and offline manifest listings
-(`npm ls --offline`, `pip show`, `cargo metadata --offline`, `composer show --no-update`,
-`bundle list`, `go list -m all`). **Never a live advisory or CVE fetch** — `npm audit`,
-`cargo audit`, `pip-audit`, `osv-scanner`, `snyk` and every sibling: name them as recommended
-follow-up tooling instead. Any other invocation is a contract violation: report it as an error and
-stop.
+No Edit, Write, NotebookEdit or any mutating tool, and no shell: Glob and Grep find files, Read
+reads them. What only a command can tell you reaches you in the brief
+(`phases/review-seats.md` § A brief carries data, never content); what the brief does not hold,
+downgrade to `Suspicion —` and name what would settle it. Versions, licenses and the dependency tree
+come from the manifests and lockfiles you read. **Never a live advisory or CVE lookup**: name an
+advisory scanner for the ecosystem as recommended follow-up tooling instead.
 
 ### Manifest auto-detection
 
@@ -135,8 +135,9 @@ The domain file hands licensing back to you, so this is its negative section.
 2. **Unused declared deps** — a direct dep no `import` / `require` / `use` / `from <pkg>` reaches is
    MEDIUM; skip build-tool deps invoked from scripts or CI (linters, formatters, test runners).
 3. **License violations** — each direct dep's declared license against the effective allowlist.
-4. **Outdated by major** — a pin older than 2 years by git log, or a major behind another of the
-   project's lockfiles, is LOW; you have no registry, so word it as a heuristic.
+4. **Outdated by major** — a pin older than 2 years by the commit list the brief carries, or a
+   major behind another of the project's lockfiles, is LOW; you have no registry, so word it as a
+   heuristic.
 5. **Peer-dep conflicts** — unmet peers in the lockfile, incoherent optional groups: MEDIUM.
 6. **Duplicate deps at different versions** — one lockfile resolving a package twice: LOW.
 

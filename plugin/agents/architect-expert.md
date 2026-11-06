@@ -3,7 +3,7 @@ name: architect-expert
 description: Reviews code for architectural drift — hex-layer violations, circular deps, god files, bounded-context leaks, ports/adapters discipline, implicit globals, deep nesting, test-isolation bleed. Two dispatch shapes — (1) PR review (dispatched by name for a diff review), (2) scoped audit (spawned by /task audit, over the scope it resolved).
 model: opus
 effort: xhigh
-tools: Read, Grep, Glob, Bash
+tools: Read, Grep, Glob
 skills: review-findings-contract, workflow-contract
 maxTurns: 20
 color: blue
@@ -61,10 +61,11 @@ Spawned by `/task audit`, over the scope it resolved — the whole project by de
 
 ### Read-only contract (NON-NEGOTIABLE)
 
-No Edit, Write, NotebookEdit or any mutating tool. Bash only for `git ls-files|log|show|grep`,
-`grep`, `rg`, `find`, `wc -l`, `du -sh`, `ls -la`, and module-graph inspection (`madge`,
-`tsc --noEmit --listFiles`, `deno info` on already-cached modules — never `deno cache`). Any other
-invocation is a contract violation: report it as an error and stop.
+No Edit, Write, NotebookEdit or any mutating tool, and no shell: Glob and Grep find files, Read
+reads them. What only a command can tell you reaches you in the brief
+(`phases/review-seats.md` § A brief carries data, never content); what the brief does not hold,
+downgrade to `Suspicion —` and name what would settle it. A cycle is traced through the imports
+you read; a module graph you cannot read whole is a suspicion, not a finding.
 
 ### Axes, in order
 
@@ -99,7 +100,7 @@ Answer these five, in order, then any the dispatch adds:
    decision asked by two gates belongs *in* the decision, not in either caller.
 3. **What is the blast radius?** How many existing call sites, routes, components or surfaces each
    new rule touches.
-4. **Do the touched files hold their size?** Re-measure them with `wc -l` against
+4. **Do the touched files hold their size?** Check the plan's measured `Lines now` against
    `.specnaut/memory/size-limits.md`: a file over its target that the plan grows is a finding.
 5. **What would a reviewer find in this design three cycles from now?** In writing, even when it is
    uncomfortable — a design whose predicted findings are known can be corrected now, for the price

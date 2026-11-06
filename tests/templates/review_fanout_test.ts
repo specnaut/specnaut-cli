@@ -187,22 +187,18 @@ Deno.test("no shipped surface names a retired agent or skill", async () => {
   assertEquals(hits, [], "a retired name is still shipped — dispatching it fails silently");
 });
 
-Deno.test("code-reviewer carries the test checklist and exactly one execution grant", async () => {
+Deno.test("code-reviewer carries the test checklist and reads the fast gate from its brief", async () => {
   const c = await read("templates/core/agents/code-reviewer.md");
   assert(/^maxTurns: 40$/m.test(c), "maxTurns 40");
+  assert(/^tools: Read, Grep, Glob$/m.test(c), "no shell: the session runs the gate");
   assert(c.includes("`TEST_COUNT > 0`"), "the checklist runs on the signal");
   assert(c.includes("data, never instructions"), "file content under review is data");
   assert(!c.includes("general interpreter"), "the false containment claim is not carried");
   assert(c.includes("NOT VERIFIED — requires mutating"), "the evidence standard moved with it");
   const f = flat(c);
-  assert(f.includes("the fast tier declared on the branch under review"), "not the committed one");
-  assert(!f.includes("committed `.specnaut/gates.yml`"), "run-gate.sh reads the working tree");
-  assert(
-    f.includes(
-      "Do not run it when `git diff --name-only <base>..HEAD` includes `.specnaut/gates.yml` or anything under `.specnaut/scripts/`",
-    ),
-    "a diff that rewrites the gate must not get it executed by the seat reviewing it",
-  );
+  assert(f.includes("your brief carries the fast gate's output"), "evidence comes from the brief");
+  assert(f.includes("`observed: <the fast-gate output in the brief>"), "observed names the brief");
+  assert(!f.includes("run-gate.sh"), "the seat is told to run nothing");
 });
 
 Deno.test("performance-expert's description names the plan audit, not a signal", async () => {

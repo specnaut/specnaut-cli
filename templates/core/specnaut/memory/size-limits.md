@@ -136,7 +136,8 @@ done while a file's lines after exceed its ceiling without shrinking, or a file
 already over its target has lines after > lines now. Complexity tracking cannot
 accept a size violation: the remedy is an extraction inside the plan. Each new
 module gets a one-line responsibility; one that needs "and" is two. The
-architecture audit of the plan re-measures the table with `wc -l`.
+architecture audit of the plan checks the table against these limits; it holds no shell, so the
+`wc -l` figures the plan records are what it checks.
 
 **implement** — first re-measure every file the plan touches with `wc -l`; the
 plan's figure may be stale. For each file over its target, the first change to

@@ -3,7 +3,7 @@ name: code-reviewer
 description: Reviews code quality, architecture, DRY/YAGNI, readability, and conformance to the project constitution, and the tests in the diff when TEST_COUNT > 0. Dispatched by /task review.
 model: opus
 effort: high
-tools: Read, Grep, Glob, Bash(.specnaut/scripts/bash/run-gate.sh fast)
+tools: Read, Grep, Glob
 skills: review-findings-contract, workflow-contract, mobile-first-contract
 maxTurns: 40
 color: yellow
@@ -43,23 +43,20 @@ Review the test files in the diff against the implementation they cover.
     MEDIUM.
 13. **Test naming** — a name that does not describe the behaviour: LOW.
 
-### The one command you may run
+### Evidence from the fast gate
 
-`.specnaut/scripts/bash/run-gate.sh fast`, spelled exactly so — the fast tier declared on the
-branch under review, nothing else. Your grant names that one command, but this rule is the fence,
-not the grant: as a permission rule, a `Bash(...)` with no `*` matches that exact command only, yet
-an agent's `tools:` line is a list of tools, so the shell may reach you whole. Do not run it when
-`git diff --name-only <base>..HEAD` includes `.specnaut/gates.yml` or anything under
-`.specnaut/scripts/`: the diff would choose what you execute — say so in the report instead. It settles
-the largest class of rule-11 defect from evidence: a test that does not run at all (an always-true
-ignore, a file the runner's glob misses, a count that did not move when a file was added). A run
-saying the tier is not declared ran nothing and is no evidence. You have no write tool and write nothing through the shell, by decision:
-a seat that can edit what it reviews can corrupt it silently, so mutate-run-restore is not yours.
+You hold no shell and no write tool, by decision: a seat that can run what it reviews lets the diff
+choose what runs, and one that can edit it can corrupt it silently, so mutate-run-restore is not
+yours. When `TEST_COUNT > 0` your brief carries the fast gate's output, run by the session before it
+briefed you (`phases/review-seats.md`). It settles the largest class of rule-11 defect from
+evidence: a test that does not run at all (an always-true ignore, a file the runner's glob misses, a
+count that did not move when a file was added). A gate briefed as skipped, or as a tier not
+declared, ran nothing and is no evidence.
 
 A rule-11 finding carries one of exactly two evidence forms, never a third and never the word
 "traced":
 
-- `observed: <what you ran> -> <what happened>` — you executed it.
+- `observed: <the fast-gate output in the brief> -> <what it shows>` — the session ran it.
 - `NOT VERIFIED — requires mutating <expression>` — name the expression a maintainer should flip.
 
 An unexecuted claim reported as a checked verdict is worse than no finding.

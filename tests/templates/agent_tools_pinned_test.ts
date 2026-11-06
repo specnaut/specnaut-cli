@@ -1,17 +1,15 @@
 // Every bundled seat's `tools:` line is pinned (#573).
 //
-// Nothing asserted these before. That means nothing pinned the present values,
-// and nothing would notice a future drift of them — including the silent LOSS
-// of a grant. `code-reviewer` carries `Bash(.specnaut/scripts/bash/run-gate.sh fast)`
-// so that a rule about whether an assertion bites can be settled by running the
-// project's own declared fast gate (#678 — reused, not a list of test runners);
-// if that grant were dropped in a later edit, the seat would go back to
-// reporting behavioural claims from reading and the only symptom would be
-// reviews that look exactly as confident as before.
+// A tools line is the seat's authority boundary, and the pin makes widening one
+// a visible decision: this test refuses to pass until the expected value here
+// changes too. It also catches the silent LOSS of a grant, whose only symptom
+// would be a seat that quietly stops being able to do what it claims.
 //
-// A tools line is also the seat's authority boundary. Widening one is a real
-// decision — this test makes it a visible one, by refusing to pass until the
-// expected value here is changed too.
+// Which seats may hold a shell is decided here and nowhere else. A seat that
+// reads what it reviews or audits holds Read, Grep and Glob: what needs a
+// command is run by the session that briefs it (`phases/review-seats.md`). A
+// parenthesised specifier on a tool does not narrow it in a subagent's list —
+// `Bash(<pattern>)` grants the whole shell — so no seat carries one as if it did.
 
 import { assert, assertEquals } from "@std/assert";
 import { fromFileUrl, join } from "@std/path";
@@ -24,17 +22,27 @@ const AGENTS = fromFileUrl(new URL("../../templates/core/agents/", import.meta.u
  * cannot arrive with an unreviewed authority boundary.
  */
 const PINNED = new Map<string, string>([
-  ["accessibility-expert", "Read, Grep, Glob, Bash"],
-  ["architect-expert", "Read, Grep, Glob, Bash"],
-  ["code-reviewer", "Read, Grep, Glob, Bash(.specnaut/scripts/bash/run-gate.sh fast)"],
-  ["dependency-expert", "Read, Grep, Glob, Bash"],
+  ["accessibility-expert", "Read, Grep, Glob"],
+  ["architect-expert", "Read, Grep, Glob"],
+  ["code-reviewer", "Read, Grep, Glob"],
+  ["dependency-expert", "Read, Grep, Glob"],
   ["developer", "Read, Write, Edit, Grep, Glob, Bash"],
-  ["performance-expert", "Read, Grep, Glob, Bash"],
+  ["performance-expert", "Read, Grep, Glob"],
   ["product-owner", "Read, Write, Edit, Grep, Glob, Bash"],
   // #678: its Bash existed for the alert-triage mode's `gh api` calls; that
   // mode is gone, and every remaining mode reads.
   ["security-expert", "Read, Grep, Glob"],
   ["specnaut-guide", "Read, WebFetch, Grep, Glob, Bash, Agent(developer)"],
+]);
+
+/**
+ * Specifiers kept knowing they narrow nothing. `Agent(developer)` records the
+ * one seat the guide's review-upgrade protocol dispatches; the guide holds a
+ * shell by design and is not handed review data, so the pin documents, it does
+ * not fence.
+ */
+const DOCUMENTING_SPECIFIERS = new Map<string, string[]>([
+  ["specnaut-guide", ["Agent(developer)"]],
 ]);
 
 /** `README.md` documents the directory; it is not a seat. */
@@ -57,6 +65,23 @@ function toolsLineOf(md: string): string | null {
     if (m) return m[1];
   }
   return null;
+}
+
+/** The tools a value names, split at depth 0, specifiers kept. */
+function entriesOf(tools: string): string[] {
+  const out: string[] = [];
+  let depth = 0;
+  let current = "";
+  for (const ch of tools) {
+    if (ch === "(") depth++;
+    else if (ch === ")") depth--;
+    if (ch === "," && depth === 0) {
+      out.push(current.trim());
+      current = "";
+    } else current += ch;
+  }
+  out.push(current.trim());
+  return out.filter((e) => e.length > 0);
 }
 
 Deno.test("agent tools: the pinned table covers every seat on disk", async () => {
@@ -95,6 +120,29 @@ for (const [name, expected] of PINNED) {
     );
   });
 }
+
+/** No `tools:` line is not "no tools": the harness then grants every tool it has. */
+Deno.test("agent tools: every seat declares a tools line", async () => {
+  const missing: string[] = [];
+  for (const seat of await seatNames()) {
+    if (toolsLineOf(await Deno.readTextFile(join(AGENTS, `${seat}.md`))) === null) {
+      missing.push(seat);
+    }
+  }
+  assertEquals(missing, [], "a seat with no tools line inherits every tool");
+});
+
+Deno.test("agent tools: no seat carries a specifier as if it narrowed a tool", async () => {
+  const found: string[] = [];
+  for (const seat of await seatNames()) {
+    const tools = toolsLineOf(await Deno.readTextFile(join(AGENTS, `${seat}.md`))) ?? "";
+    const allowed = DOCUMENTING_SPECIFIERS.get(seat) ?? [];
+    for (const entry of entriesOf(tools)) {
+      if (entry.includes("(") && !allowed.includes(entry)) found.push(`${seat}: ${entry}`);
+    }
+  }
+  assertEquals(found, [], "a specifier inside a subagent's tools list grants the whole tool");
+});
 
 /**
  * An `Agent` grant names the seats it may spawn.

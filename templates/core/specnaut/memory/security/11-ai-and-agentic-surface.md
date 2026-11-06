@@ -309,14 +309,17 @@ $ISSUE_BODY
 UNTRUSTED
 ```
 
-**Grant the narrowest tool set, and constrain the shell by command.**
+**Grant the narrowest tool set; constrain the shell in the permission policy, not the tool list.**
 
 ```yaml
-# UNSAFE — a review-only seat with an unconstrained shell
+# UNSAFE — a review-only seat with a shell
 tools: Read, Grep, Bash
 
-# SAFE — the seat's job, and only the commands that job runs
-tools: Read, Grep, Bash(git log *), Bash(git diff *)
+# UNSAFE — reads as narrower, but a pattern in a subagent's tool list grants the whole tool
+tools: Read, Grep, Bash(git log *)
+
+# SAFE — a seat that reads holds no shell; the session that briefs it runs the commands
+tools: Read, Grep, Glob
 ```
 
 **Default-deny the permission policy.**
