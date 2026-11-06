@@ -48,8 +48,25 @@ const permissionOf = (md: string) => {
   const fm = parseYaml(splitFrontmatter(md)!.fmBody) as { permission: Record<string, unknown> };
   return { map: fm.permission, first: /^permission:\n {2}(\S+):/m.exec(md)?.[1] };
 };
-/** A read-only grant on OpenCode: every tool denied, then its read tools allowed back. */
-const READ_ONLY = { "*": "deny", read: "allow", list: "allow", grep: "allow", glob: "allow" };
+/** What a read-only grant on OpenCode denies by name, beside the wildcard, unless it grants it. */
+const NAMED_DENIES = {
+  bash: "deny",
+  edit: "deny",
+  write: "deny",
+  webfetch: "deny",
+  websearch: "deny",
+  task: "deny",
+  skill: "deny",
+};
+/** A read-only grant on OpenCode: every tool denied, by wildcard and by name, then its read tools allowed back. */
+const READ_ONLY = {
+  "*": "deny",
+  ...NAMED_DENIES,
+  read: "allow",
+  list: "allow",
+  grep: "allow",
+  glob: "allow",
+};
 
 Deno.test("OpenCode denies every capability a seat's grant does not hold", () => {
   const out = new OpenCodeHarness().mapBundle(seats, OPTS);
@@ -107,7 +124,13 @@ Deno.test("a read-only grant on OpenCode denies by default, MCP, task and skill 
   ], OPTS);
   const of = (n: string) => permissionOf(bundle[`.opencode/agents/specnaut-${n}.md`].content);
   assertEquals(of("seat"), { map: READ_ONLY, first: '"*"' });
-  assertEquals(of("fetcher").map, { "*": "deny", read: "allow", list: "allow", webfetch: "ask" });
+  assertEquals(of("fetcher").map, {
+    "*": "deny",
+    ...NAMED_DENIES,
+    read: "allow",
+    list: "allow",
+    webfetch: "ask",
+  });
 });
 
 Deno.test("agent maps NotebookEdit to edit", () => {

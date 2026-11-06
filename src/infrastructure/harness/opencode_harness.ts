@@ -45,10 +45,17 @@ const READ_TOOLS: Readonly<Record<string, ReadonlyArray<string>>> = {
 };
 
 /**
+ * The tools a read-only grant also denies by name, beside `"*": deny`, unless
+ * it grants one back: the map then holds however OpenCode reads the wildcard.
+ */
+const READ_ONLY_DENIED = ["bash", "edit", "write", "webfetch", "websearch", "task", "skill"];
+
+/**
  * The permission block for a seat's grant (`src/domain/tool_grant.ts`). A
- * read-only grant denies every tool (`"*"` first: the last matching rule wins)
- * and allows back its own. Any other grant denies by name each capability it
- * does not hold, `read` aside: silence would leave OpenCode's default in force.
+ * read-only grant denies every tool (`"*"` first: the last matching rule wins),
+ * names each tool that runs, writes or spawns as denied too, and allows back its
+ * own. Any other grant denies by name each capability it does not hold, `read`
+ * aside: silence would leave OpenCode's default in force.
  */
 function translateToolsToPermissions(toolsField: string | null): PermissionMap | null {
   const granted = grantedCapabilities(toolsField);
@@ -56,9 +63,9 @@ function translateToolsToPermissions(toolsField: string | null): PermissionMap |
   const map: PermissionMap = {};
   if (isReadOnlyGrant(toolsField)) {
     map["*"] = "deny";
-    for (const tool of toolNames(toolsField ?? "").flatMap((t) => READ_TOOLS[t] ?? [])) {
-      map[tool] = tool.startsWith("web") ? "ask" : "allow";
-    }
+    const own = toolNames(toolsField ?? "").flatMap((t) => READ_TOOLS[t] ?? []);
+    for (const tool of READ_ONLY_DENIED) if (!own.includes(tool)) map[tool] = "deny";
+    for (const tool of own) map[tool] = tool.startsWith("web") ? "ask" : "allow";
     return map;
   }
   for (const capability of CAPABILITIES) {

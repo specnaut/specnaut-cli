@@ -6077,7 +6077,7 @@ the product owner (\`tools: Read, Grep, Glob\`), really has none:
 | Harness | Holds | Why |
 | :--- | :--- | :--- |
 | Claude Code | yes | a tool the line does not name is not there: no \`Bash\`, no shell |
-| OpenCode | yes | a read-only grant is deny-by-default (\`"*": deny\`, then its read tools): MCP tools, \`task\` and \`skill\` included; any other grant denies by name what it lacks |
+| OpenCode | yes (rendered deny-by-default; not live-probed) | a read-only grant renders \`"*": deny\`, then \`bash\`, \`edit\`, \`write\`, the web tools it lacks, \`task\` and \`skill\` denied by name, then its read tools; any other grant denies by name what it lacks |
 | Codex | no | an agent file can switch the shell tool off, as it does for a seat whose tools all run and write nothing, but cannot remove exec, inherited MCP servers or agent spawning: the restriction rests on the seat's instructions |
 | Cursor, Copilot | no | no separate seat: an agent reaches them as a skill or an instruction file, in the session's own tools |
 | Antigravity | unknown | it receives the line as written; what it enforces is its own |

@@ -9,7 +9,8 @@
  * - **OpenCode** gets an explicit `deny` for every capability not granted,
  *   rather than silence, which would leave OpenCode's own default in force. A
  *   read-only grant (`isReadOnlyGrant`) is deny-by-default: `"*": deny`, then
- *   its read tools, so MCP tools, `task`, `skill` and patching are denied too.
+ *   `bash`, `edit`, `write`, the web tools it lacks, `task` and `skill` denied by
+ *   name, then its read tools: MCP tools and patching fall under the wildcard.
  * - **Codex** offers no enforced seat isolation. A seat inherits the parent
  *   session's sandbox, and its agent file can switch the shell tool off but
  *   cannot remove exec, inherited MCP servers or agent spawning. A grant naming
