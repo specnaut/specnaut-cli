@@ -103,18 +103,30 @@ Deno.test("an item with no status line is refused, never reported as moved", asy
   }
 });
 
-Deno.test("the product-owner carries the close contract, per backend", async () => {
-  const po = await Deno.readTextFile(
-    fromFileUrl(new URL("../../templates/core/agents/product-owner.md", import.meta.url)),
-  );
+Deno.test("the product-owner proposes one close; each backend's executor records the reason it can", async () => {
+  const read = (rel: string) =>
+    Deno.readTextFile(fromFileUrl(new URL(`../../templates/core/${rel}`, import.meta.url)));
+  const po = await read("agents/product-owner.md");
   const verb = po.split("\n- **`").find((v) => v.startsWith("close <id> [--not-planned]`**"));
   assert(verb, "product-owner.md serves no `/task close <id> [--not-planned]`");
-  for (
-    const backend of ["GitHub:", "GitLab", "Local: `move.sh <id> Done [--not-planned]`", "Cloud:"]
-  ) {
-    assertStringIncludes(verb, backend);
+  const said = verb.replace(/\s+/g, " ");
+  for (const s of ["one `close` line", "`completed` by default", "`not_planned` with the flag"]) {
+    assertStringIncludes(said, s);
   }
-  assertStringIncludes(verb, "--reason completed|not_planned");
+  assertStringIncludes(said, "answers `UNSUPPORTED close`: say so rather than drop the flag");
+  // The reason a backend can record: GitHub and local keep not_planned; GitLab and Cloud cannot.
+  for (
+    const [backend, records] of [["github", true], ["local", true], ["gitlab", false], [
+      "cloud",
+      false,
+    ]] as const
+  ) {
+    const plan = await read(`skills/task/scripts/${backend}/apply-plan.sh`);
+    assertStringIncludes(plan, "close_item()", backend);
+    const cannot = /^PLAN_CANNOT='([^']*)'/m.exec(plan)?.[1].replace(/\s+/g, " ");
+    assert(cannot !== undefined, `${backend}: no PLAN_CANNOT`);
+    assertEquals(!JSON.parse(cannot).includes("close:not_planned"), records, backend);
+  }
 });
 
 Deno.test("move.sh reads a padded number as decimal: 012 moves #012, never #010", async () => {
