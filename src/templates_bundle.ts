@@ -11657,9 +11657,9 @@ done
 # collect-audit-scope.sh — resolve the scope for \`/task audit\` and emit the
 # CODE-AUDIT SCOPE block + CATEGORY SIGNALS the orchestrator skill parses.
 #
-# Read-only: it never mutates the tree. Pure bash + git, no extra deps, so it
-# runs unmodified in any scaffolded project (the Specnaut binary need not be on
-# PATH at audit time).
+# Read-only: it never mutates the tree. Pure bash + git, so it runs in any
+# scaffolded project. Every git call goes through _git_untrusted.sh, installed
+# beside it: no program the unvetted repository's configuration names may run.
 #
 # Resolution priority (first match wins):
 #   1. --path <subtree>     → files tracked under that subtree (SCOPE: path)
@@ -11672,17 +11672,9 @@ done
 #                             (SCOPE: last-N)
 #
 # Contract: .specnaut/specs/013-code-audit/contracts/scope-signals.md
-#
-# Every git call goes through _git_untrusted.sh, installed beside this script: the
-# repository is unvetted, so no program its configuration names may run. The reads
-# use the library's forms; the fixed probes (rev-parse, rev-list, describe,
-# hash-object) run their fixed argv through its runner, under the same defaults.
 set -euo pipefail
 here=\$(CDPATH="" cd "\$(dirname "\${BASH_SOURCE[0]}")" && pwd)
-[ -f "\$here/_git_untrusted.sh" ] || {
-  echo "error: \$here/_git_untrusted.sh is missing; nothing was read" >&2
-  exit 70
-}
+[ -f "\$here/_git_untrusted.sh" ] || { echo "error: \$here/_git_untrusted.sh is missing" >&2 && exit 70; }
 # shellcheck source=SCRIPTDIR/_git_untrusted.sh
 . "\$here/_git_untrusted.sh"
 
@@ -11774,9 +11766,8 @@ FILES=""
 # category's glob set independently (a file can count toward more than one
 # category, e.g. a frontend test file). Sets FRONTEND_COUNT / TEST_COUNT /
 # DEP_COUNT / INFRA_COUNT. The globs are heuristic (research.md Decision 1):
-# good enough to pick which expert seats run. Walking the list once instead of
-# four times is purely a perf optimization — the per-category counts are
-# identical to testing each category in its own pass.
+# good enough to pick which expert seats run. One pass instead of four is a perf
+# optimization only: the counts equal four separate passes.
 #
 # matches_any <file> <glob...> — 0 if the file matches any of the globs.
 matches_any() {
@@ -15986,10 +15977,7 @@ UNTRUSTED
 **Grant the narrowest tool set; constrain the shell in the permission policy, not the tool list.**
 
 \`\`\`yaml
-# UNSAFE — a review-only seat with a shell
-tools: Read, Grep, Bash
-
-# UNSAFE — reads as narrower, but a pattern in a subagent's tool list grants the whole tool
+# UNSAFE — a review-only seat with a shell: a pattern in a subagent's tool list narrows nothing
 tools: Read, Grep, Bash(git log *)
 
 # SAFE — a seat that reads holds no shell; the session that briefs it runs the commands

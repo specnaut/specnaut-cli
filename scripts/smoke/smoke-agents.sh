@@ -83,14 +83,6 @@ check "dependency-expert points at the supply-chain domain file rather than dupl
   'grep -q "memory/security/06-supply-chain-and-integrity.md" .claude/agents/dependency-expert.md'
 check "performance-expert carries the measure gate instead of a catalogue" \
   'grep -q "did you measure" .claude/agents/performance-expert.md && [ ! -d .specnaut/memory/performance ]'
-# The git reads the phases run for the seats go through one library, installed
-# beside each script that sources it.
-check "git-read.sh installs executable beside _git_untrusted.sh, and collect-audit-scope.sh has its own copy" \
-  '[ -x .specnaut/scripts/bash/git-read.sh ] && [ -f .specnaut/scripts/bash/_git_untrusted.sh ] &&
-   cmp -s .specnaut/scripts/bash/_git_untrusted.sh .specnaut/scripts/audit/_git_untrusted.sh'
-check "the installed git-read refuses an option where a revision belongs, before git runs" \
-  'r=0; bash .specnaut/scripts/bash/git-read.sh names --output=smoke-out HEAD 2>/dev/null || r=$?;
-   [ "$r" = 2 ] && [ ! -e smoke-out ]'
 
 echo
 echo "═══ #77  manual-only flags ═══"

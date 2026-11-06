@@ -312,10 +312,7 @@ UNTRUSTED
 **Grant the narrowest tool set; constrain the shell in the permission policy, not the tool list.**
 
 ```yaml
-# UNSAFE — a review-only seat with a shell
-tools: Read, Grep, Bash
-
-# UNSAFE — reads as narrower, but a pattern in a subagent's tool list grants the whole tool
+# UNSAFE — a review-only seat with a shell: a pattern in a subagent's tool list narrows nothing
 tools: Read, Grep, Bash(git log *)
 
 # SAFE — a seat that reads holds no shell; the session that briefs it runs the commands
