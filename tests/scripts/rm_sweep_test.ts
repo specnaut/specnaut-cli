@@ -122,12 +122,16 @@ for (const [what, body, v] of UNVETTED_VARIABLE) {
   });
 }
 
-Deno.test("the suite's own scripts pass, _common.sh and this sweep's file included", {
+Deno.test("the suite's own scripts pass, the shared helpers and this sweep's file included", {
   ignore,
 }, async () => {
   const r = await sweep(SMOKE);
   assertEquals(r.code, 0, r.out);
   assertStringIncludes(r.out, CLEAN);
-  // _common.sh is read now: its one delete is vetted, by name.
-  assertStringIncludes(r.out, "✓ _common.sh builds $tmp through scenario_dir or mktemp -d\n");
+  // The helpers _common.sh sources are read too: the close-shipped probe's
+  // one delete is vetted, by name.
+  assertStringIncludes(
+    r.out,
+    "✓ _close_shipped_probe.sh builds $tmp through scenario_dir or mktemp -d\n",
+  );
 });
