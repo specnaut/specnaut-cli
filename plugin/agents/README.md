@@ -81,6 +81,15 @@ session's model, with a comment naming the family (`src/domain/codex_models.ts`)
 provider/model pair, the user's choice. **Cursor and Copilot** have no subagents: agents reach them
 as skills and instruction files, and neither axis applies.
 
+## How the tool grant reaches other harnesses
+
+`tools:` is written in Claude Code's vocabulary and read once, by `src/domain/tool_grant.ts`, which
+says what each harness enforces. **OpenCode** denies by name every capability a seat is not
+granted. **Codex** has no per-tool list: a seat with no write, edit or shell runs in its
+`read-only` sandbox, which stops writes and network, not commands. **Antigravity** receives the
+line as written. A pattern in parentheses (`Bash(git log *)`) narrows nothing in a subagent's list,
+so no bundled seat uses one as a fence.
+
 ## Adding an agent
 
 Pick the suffix from the naming table, the model by who checks the output (default `opus`), and the

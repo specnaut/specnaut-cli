@@ -112,12 +112,38 @@ Deno.test("agent de-dups Edit+MultiEdit into single edit permission", () => {
   assertEquals(content.match(/edit: allow/g)?.length, 1);
 });
 
-Deno.test("agent omits Grep/Glob/Task/TodoWrite/NotebookEdit and unknowns", () => {
+Deno.test("agent grants nothing for Grep/Glob/Task/TodoWrite and unknowns, and denies the rest", () => {
   const bundle = harness.mapBundle([
-    agentEntry("dev", "Grep, Glob, Task, TodoWrite, NotebookEdit, Mystery"),
+    agentEntry("dev", "Grep, Glob, Task, TodoWrite, Mystery"),
   ], { backlogBackend: "local", versionScheme: "semver", specBackend: "local" });
   const content = bundle[".opencode/agents/specnaut-dev.md"].content;
-  assertEquals(content.includes("permission:"), false);
+  assertEquals(content.includes("allow"), false);
+  for (const key of ["write", "edit", "bash", "webfetch", "websearch"]) {
+    assertStringIncludes(content, `  ${key}: deny`);
+  }
+  assertEquals(content.includes("read:"), false, "read is never denied");
+});
+
+Deno.test("agent with a read-only grant denies write, edit and the shell by name", () => {
+  const bundle = harness.mapBundle([agentEntry("seat", "Read, Grep, Glob")], {
+    backlogBackend: "local",
+    versionScheme: "semver",
+    specBackend: "local",
+  });
+  const content = bundle[".opencode/agents/specnaut-seat.md"].content;
+  assertStringIncludes(content, "read: allow");
+  for (const key of ["write", "edit", "bash", "webfetch", "websearch"]) {
+    assertStringIncludes(content, `  ${key}: deny`);
+  }
+});
+
+Deno.test("agent maps NotebookEdit to edit", () => {
+  const bundle = harness.mapBundle([agentEntry("nb", "Read, NotebookEdit")], {
+    backlogBackend: "local",
+    versionScheme: "semver",
+    specBackend: "local",
+  });
+  assertStringIncludes(bundle[".opencode/agents/specnaut-nb.md"].content, "edit: allow");
 });
 
 Deno.test("agent strips Bash(git log *) parenthesized variants to Bash", () => {

@@ -22,18 +22,26 @@ import { applySpecAutogen } from "./spec_autogen_filter.ts";
 import { addUnique } from "./bundle_writer.ts";
 import { SKILL_SURFACE } from "./skill_layout.ts";
 import { AGENT_FOLDERS, agentFile } from "../../domain/agent_folders.ts";
+import { isReadOnlyGrant } from "../../domain/tool_grant.ts";
 
 const AGENTS = AGENT_FOLDERS.codex;
 
 function parseAgentFrontmatter(
   content: string,
-): { description: string; model: string | null; effort: string | null; body: string } {
+): {
+  description: string;
+  model: string | null;
+  effort: string | null;
+  tools: string | null;
+  body: string;
+} {
   const split = splitFrontmatter(content);
-  if (!split) return { description: "", model: null, effort: null, body: content };
+  if (!split) return { description: "", model: null, effort: null, tools: null, body: content };
   return {
     description: frontmatterField(split.fmBody, "description") ?? "",
     model: frontmatterField(split.fmBody, "model"),
     effort: frontmatterField(split.fmBody, "effort"),
+    tools: frontmatterField(split.fmBody, "tools"),
     body: split.rest.replace(/^\n+/, ""),
   };
 }
@@ -42,7 +50,7 @@ function toCodexSubagentToml(entry: CoreEntry): string {
   // No `model` key: Specnaut names no model version (codex_models.ts). The
   // family is a comment, so the agent runs on the session's model and the
   // user still sees which family it was written for.
-  const { description, model, effort, body } = parseAgentFrontmatter(entry.content);
+  const { description, model, effort, tools, body } = parseAgentFrontmatter(entry.content);
   const tier = claudeTier(model);
   const family = codexFamilyOf(tier);
   const reasoning = effortToCodexReasoning(effort);
@@ -50,6 +58,9 @@ function toCodexSubagentToml(entry: CoreEntry): string {
     name: entry.name,
     description: description || `Specnaut ${entry.name} agent`,
     ...(reasoning ? { model_reasoning_effort: reasoning } : {}),
+    // Codex has no per-tool list: a grant with no write, edit or shell is its
+    // read-only sandbox (`src/domain/tool_grant.ts` says what that does not stop).
+    ...(isReadOnlyGrant(tools) ? { sandbox_mode: "read-only" } : {}),
     developer_instructions: body,
   });
   return family === null ? toml : `# Model family: ${family} (${tier} on Claude Code)\n${toml}`;

@@ -14,58 +14,35 @@ import { applySpecAutogen } from "./spec_autogen_filter.ts";
 import { addUnique } from "./bundle_writer.ts";
 import { SKILL_SURFACE } from "./skill_layout.ts";
 import { AGENT_FOLDERS, agentFile } from "../../domain/agent_folders.ts";
+import { CAPABILITIES, grantedCapabilities } from "../../domain/tool_grant.ts";
 
 type PermissionValue = "allow" | "ask" | "deny" | { "*": "ask" | "allow" | "deny" };
 type PermissionMap = Record<string, PermissionValue>;
 
-function parseToolsList(tools: string): string[] {
-  // Split on commas at depth 0 (ignoring commas inside parens like "Agent(a, b)").
-  const out: string[] = [];
-  let depth = 0;
-  let current = "";
-  for (const ch of tools) {
-    if (ch === "(") depth++;
-    else if (ch === ")") depth--;
-    if (ch === "," && depth === 0) {
-      if (current.trim()) out.push(current.trim());
-      current = "";
-    } else {
-      current += ch;
-    }
-  }
-  if (current.trim()) out.push(current.trim());
-  // Strip parenthesized suffix: "Bash(git log *)" → "Bash".
-  return out.map((t) => t.replace(/\(.*$/, "").trim()).filter((t) => t.length > 0);
-}
+/** How OpenCode allows each capability a seat is granted. */
+const ALLOWED: Readonly<Record<string, PermissionValue>> = {
+  read: "allow",
+  write: "allow",
+  edit: "allow",
+  bash: { "*": "ask" },
+  webfetch: "ask",
+  websearch: "ask",
+};
 
+/**
+ * The permission block for a seat's grant (`src/domain/tool_grant.ts`). Every
+ * capability it does not grant is denied by name, `read` aside: silence would
+ * leave OpenCode's own default in force, which is not the seat's grant.
+ */
 function translateToolsToPermissions(toolsField: string | null): PermissionMap | null {
-  if (toolsField === null || toolsField.trim().length === 0) return null;
+  const granted = grantedCapabilities(toolsField);
+  if (granted === null) return null;
   const map: PermissionMap = {};
-  for (const tool of parseToolsList(toolsField)) {
-    switch (tool) {
-      case "Read":
-        map.read = "allow";
-        break;
-      case "Write":
-        map.write = "allow";
-        break;
-      case "Edit":
-      case "MultiEdit":
-        map.edit = "allow";
-        break;
-      case "Bash":
-        map.bash = { "*": "ask" };
-        break;
-      case "WebFetch":
-        map.webfetch = "ask";
-        break;
-      case "WebSearch":
-        map.websearch = "ask";
-        break;
-        // Grep, Glob, Task, Agent, TodoWrite, NotebookEdit, unknowns: omit.
-    }
+  for (const capability of CAPABILITIES) {
+    if (granted.has(capability)) map[capability] = ALLOWED[capability];
+    else if (capability !== "read") map[capability] = "deny";
   }
-  return Object.keys(map).length > 0 ? map : null;
+  return map;
 }
 
 function stringifyPermissions(perms: PermissionMap): string {

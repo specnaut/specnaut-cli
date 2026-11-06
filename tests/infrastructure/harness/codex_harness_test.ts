@@ -171,6 +171,34 @@ Deno.test("CodexHarness names the family, pins no model, and maps the effort", (
   assertEquals("model_reasoning_effort" in toml("weird"), false);
 });
 
+Deno.test("CodexHarness runs a grant with no write, edit or shell in the read-only sandbox", () => {
+  const agent = (name: string, tools: string | null): CoreBundle[number] => ({
+    category: "agent",
+    name,
+    suffix: null,
+    content: `---\nname: ${name}\ndescription: ${name} role\n${
+      tools === null ? "" : `tools: ${tools}\n`
+    }---\n\n# Body\n`,
+    executable: false,
+  });
+  const mapped = new CodexHarness().mapBundle([
+    agent("reader", "Read, Grep, Glob"),
+    agent("fetcher", "Read, WebFetch"),
+    agent("shell", "Read, Bash"),
+    agent("patterned", "Read, Bash(echo *)"),
+    agent("writer", "Read, Write"),
+    agent("editor", "Read, Edit"),
+    agent("untooled", null),
+  ], { backlogBackend: "local", versionScheme: "semver", specBackend: "local" });
+  const sandbox = (name: string) =>
+    parseToml(mapped[`.codex/agents/${name}.toml`].content).sandbox_mode;
+  assertEquals(sandbox("reader"), "read-only");
+  assertEquals(sandbox("fetcher"), "read-only");
+  for (const name of ["shell", "patterned", "writer", "editor", "untooled"]) {
+    assertEquals(sandbox(name), undefined, `${name} must keep the session's sandbox`);
+  }
+});
+
 Deno.test("CodexHarness maps spec-root to .specnaut/<suffix> and project-root to <suffix>", () => {
   const h = new CodexHarness();
   const mapped = h.mapBundle(SAMPLE, {
