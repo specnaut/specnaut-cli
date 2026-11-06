@@ -104,7 +104,13 @@ Deno.test("gitlab: scoped labels, notes without system notes, no close reason", 
     await put("gl-1", issue(["Status::Ready", "priority::P1", "size::M", "type::feature"]));
     await put("gl-1-notes", []);
     await put("gl-2", issue(["Status::Backlog", "priority::P2", "size::S"]));
-    await put("gl-2-notes", [{ body: "🤖 specnaut-groom — which tenant?", system: false }]);
+    // By the signed-in user: a note with no author is never groom's own.
+    const me = { id: 1, username: "me" };
+    await put("gl-2-notes", [{
+      body: "🤖 specnaut-groom — which tenant?",
+      system: false,
+      author: me,
+    }]);
     // A system note quoting the marker is GitLab's, not the groom's.
     await put("gl-3", issue(["Status::Backlog", "priority::P2", "size::S"]));
     await put("gl-3-notes", [{ body: "🤖 specnaut-groom added label", system: true }]);

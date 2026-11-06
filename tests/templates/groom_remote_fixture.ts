@@ -23,7 +23,14 @@ export function ghIssue(o: {
           state: o.state ?? "OPEN",
           stateReason: o.stateReason ?? null,
           labels: { nodes: (o.labels ?? []).map((name) => ({ name })) },
-          comments: { nodes: (o.comments ?? []).map((body) => ({ body })) },
+          // Written by the account gh runs as: a comment with no author is never groom's own.
+          comments: {
+            nodes: (o.comments ?? []).map((body) => ({
+              body,
+              author: { login: "me" },
+              viewerDidAuthor: true,
+            })),
+          },
           projectItems: {
             nodes: (o.items ?? []).map((it) => ({
               project: { number: it.number, owner: { login: it.owner ?? "acme" } },
@@ -55,6 +62,7 @@ cat "$FIXTURES/gh-$num.json"
 /** `glab issue view <n>` → $FIXTURES/gl-<n>.json; `glab api …/issues/<n>/notes…` → gl-<n>-notes.json. */
 export const GL_STUB = `
 case "$1 $2" in
+  "api user") echo '{"id":1}'; exit 0 ;;
   "issue view") f="$FIXTURES/gl-$3.json" ;;
   api*) n="\${2#*issues/}"; n="\${n%%/*}"; f="$FIXTURES/gl-$n-notes.json"
         case "$2" in projects/acme%2Fwidget/*) ;; *) echo "glab: unencoded project in $2" >&2; exit 1 ;; esac ;;
