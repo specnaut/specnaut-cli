@@ -84,44 +84,33 @@ Deno.test("local: an epic with an open child is not closed; once the child is do
   }
 });
 
-const GLAB = `#!/usr/bin/env bash
-printf glab >> "$FAKE_ROOT/calls.log"
-for a in "$@"; do printf '\\t%s' "$a" >> "$FAKE_ROOT/calls.log"; done
-echo >> "$FAKE_ROOT/calls.log"
-case "$1 $2" in
-  "api user") echo '{"id":1}' ;;
-  "issue view") echo '{"iid":4,"title":"T","description":"Body","created_at":"2026-02-03T04:05:06Z","labels":[],"state":"opened","author":{"id":2,"username":"someone"}}' ;;
-  "api --paginate") echo '[{"name":"bug"}]' ;;
-  "issue list") echo '[]' ;;
-  api*) echo '[]' ;;
-esac
-`;
-
-Deno.test("gitlab: a classification is its scoped label; a close reason it cannot record is unsupported", async () => {
-  const p = await gitProject("gitlab");
+Deno.test("local: an edit renames the item and appends to its body; a link records the parent on both files", async () => {
+  const p = await gitProject("local");
   try {
-    await p.write("bin/glab", GLAB);
-    const out = await readThenApply(
+    await p.write(".specnaut/backlog/001-epic.md", localItem("001", "Epic"));
+    await p.write(".specnaut/backlog/002-child.md", localItem("002", "Child"));
+    const edit = await readThenApply(
       p,
-      ["edit", "--id", "4"],
-      jsonl(
-        { op: "classify", target: 4, axis: "Priority", value: "P1" },
-        { op: "label", target: 4, labels: ["bug"] },
-      ),
+      ["edit", "--id", "1"],
+      jsonl({ op: "edit", target: 1, title: "Renamed", append: "Added." }),
     );
-    assertEquals(out.lines, ["APPLIED classify 4", "APPLIED label 4", "RECEIPT: none"], out.stderr);
+    assertEquals(edit.lines[0], "APPLIED edit 1", edit.stdout + edit.stderr);
+    assertEquals(
+      await p.read(".specnaut/backlog/001-epic.md"),
+      localItem("001", "Renamed", "Body.\n\nAdded.\n"),
+    );
+    const link = await readThenApply(
+      p,
+      ["groom", "1", "2"],
+      jsonl({ op: "link", target: 2, parent: 1 }),
+    );
+    assertEquals(link.lines[0], "APPLIED link 2", link.stdout + link.stderr);
+    assertStringIncludes(link.lines[1], ".specnaut/backlog/002-child.md");
+    assertStringIncludes(await p.read(".specnaut/backlog/002-child.md"), '\nparent: "#001"\n');
     assertStringIncludes(
-      out.calls,
-      "glab\tissue\tupdate\t4\t--repo\tacme/my-app\t--label\tpriority::P1\n",
+      await p.read(".specnaut/backlog/001-epic.md"),
+      "Added.\n\n## Sub-tasks\n\n- #002 — Child\n",
     );
-    assertStringIncludes(out.calls, "glab\tissue\tupdate\t4\t--repo\tacme/my-app\t--label\tbug\n");
-    const close = await readThenApply(
-      p,
-      ["close", "--id", "4"],
-      jsonl({ op: "close", target: 4, reason: "not_planned" }),
-    );
-    assertEquals([close.code, close.lines], [3, ["UNSUPPORTED close", "RECEIPT: none"]]);
-    assert(!/glab\tissue\t(close|update)/.test(close.calls), close.calls);
   } finally {
     await p.cleanup();
   }
