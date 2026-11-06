@@ -17,7 +17,7 @@
 # --- Which column means "done" -------------------------------------------
 # The hosted board's columns are the project's own: an order and a name, and
 # nothing that declares one terminal. So this takes the LAST column by order
-# and NAMES IT on every run.
+# (`terminal_column`, _config.sh) and NAMES IT on every run.
 #
 # That naming is the whole safety of the convention. A board that grew a
 # column after its done column would otherwise silently stop gating, and an
@@ -43,11 +43,7 @@ if [ "$rc" -ne 0 ] || [ -z "$COLS" ]; then
   exit 3
 fi
 
-TERMINAL_ID=$(printf '%s' "$COLS" | jq_lf -r '.columns | sort_by(.order) | last | .id // empty')
-TERMINAL_NAME=$(printf '%s' "$COLS" | jq_lf -r '.columns | sort_by(.order) | last | .name // empty')
-TERMINAL_ORDER=$(printf '%s' "$COLS" | jq_lf -r '.columns | sort_by(.order) | last | .order')
-COLUMN_COUNT=$(printf '%s' "$COLS" | jq_lf -r '.columns | length')
-if [ -z "$TERMINAL_ID" ]; then
+if ! terminal_column "$COLS"; then
   echo "✗ the board reports no columns — nothing to gate against" >&2
   exit 3
 fi

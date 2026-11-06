@@ -22,8 +22,11 @@
 #                   create in the same plan named (`@` + [a-z][a-z0-9-]{0,15});
 #                   always inside the verb's scope (scope_for). A repository, a
 #                   project, a URL or a path is no value any key takes.
-#   status          one of the board's own columns, never Done: an item reaches
-#                   Done through `close`, behind its cascade check
+#   status          one of the board's own columns, never its terminal one: an
+#                   item reaches it through `close`, behind its cascade check.
+#                   The backend's board_statuses leaves the terminal column out
+#                   (on Cloud, the last by order whatever its name); a column
+#                   named Done is refused here too, on every backend
 #   axis, value     Priority P0-P3 · Size XS, S, M, L, XL · IssueType Task, Bug, Feature
 #                   · StartDate, TargetDate a string YYYY-MM-DD · Estimate a JSON
 #                   number 0 to 9999, at most two decimals. A backend without an

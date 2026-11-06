@@ -8003,8 +8003,11 @@ echo "linked #\$CHILD under #\$PARENT"
 #                   create in the same plan named (\`@\` + [a-z][a-z0-9-]{0,15});
 #                   always inside the verb's scope (scope_for). A repository, a
 #                   project, a URL or a path is no value any key takes.
-#   status          one of the board's own columns, never Done: an item reaches
-#                   Done through \`close\`, behind its cascade check
+#   status          one of the board's own columns, never its terminal one: an
+#                   item reaches it through \`close\`, behind its cascade check.
+#                   The backend's board_statuses leaves the terminal column out
+#                   (on Cloud, the last by order whatever its name); a column
+#                   named Done is refused here too, on every backend
 #   axis, value     Priority P0-P3 · Size XS, S, M, L, XL · IssueType Task, Bug, Feature
 #                   · StartDate, TargetDate a string YYYY-MM-DD · Estimate a JSON
 #                   number 0 to 9999, at most two decimals. A backend without an
@@ -11061,8 +11064,11 @@ echo "linked #\$CHILD under #\$PARENT"
 #                   create in the same plan named (\`@\` + [a-z][a-z0-9-]{0,15});
 #                   always inside the verb's scope (scope_for). A repository, a
 #                   project, a URL or a path is no value any key takes.
-#   status          one of the board's own columns, never Done: an item reaches
-#                   Done through \`close\`, behind its cascade check
+#   status          one of the board's own columns, never its terminal one: an
+#                   item reaches it through \`close\`, behind its cascade check.
+#                   The backend's board_statuses leaves the terminal column out
+#                   (on Cloud, the last by order whatever its name); a column
+#                   named Done is refused here too, on every backend
 #   axis, value     Priority P0-P3 · Size XS, S, M, L, XL · IssueType Task, Bug, Feature
 #                   · StartDate, TargetDate a string YYYY-MM-DD · Estimate a JSON
 #                   number 0 to 9999, at most two decimals. A backend without an
@@ -13337,8 +13343,11 @@ echo "linked #\$CHILD under #\$PARENT"
 #                   create in the same plan named (\`@\` + [a-z][a-z0-9-]{0,15});
 #                   always inside the verb's scope (scope_for). A repository, a
 #                   project, a URL or a path is no value any key takes.
-#   status          one of the board's own columns, never Done: an item reaches
-#                   Done through \`close\`, behind its cascade check
+#   status          one of the board's own columns, never its terminal one: an
+#                   item reaches it through \`close\`, behind its cascade check.
+#                   The backend's board_statuses leaves the terminal column out
+#                   (on Cloud, the last by order whatever its name); a column
+#                   named Done is refused here too, on every backend
 #   axis, value     Priority P0-P3 · Size XS, S, M, L, XL · IssueType Task, Bug, Feature
 #                   · StartDate, TargetDate a string YYYY-MM-DD · Estimate a JSON
 #                   number 0 to 9999, at most two decimals. A backend without an
@@ -13980,6 +13989,31 @@ cloud_curl() {
 item_url() {
   return 0
 }
+
+# terminal_column <columns-json> — the one home of which column means "done"
+# on a hosted board. Its columns are the project's own, an order and a name,
+# and nothing declares one terminal: so it is the LAST column by order,
+# whatever it is called. Sets TERMINAL_ID, TERMINAL_NAME, TERMINAL_ORDER and
+# COLUMN_COUNT from a \`GET /columns\` answer; 1 when the board has none.
+# cascade-check.sh gates against it, apply-plan.sh closes into it and keeps
+# it out of the columns a plan may move a task to.
+terminal_column() {
+  local t
+  # shellcheck disable=SC2016  # jq program.
+  t=\$(printf '%s' "\$1" | jq_lf -r -e '(.columns // []) as \$c | (\$c | sort_by(.order) | last) as \$t
+    | select((\$t.id // "" | tostring) != "" and (\$t.name | type) == "string" and \$t.name != "")
+    | "\\(\$t.id)\\t\\(\$t.order)\\t\\(\$c | length)\\t\\(\$t.name)"' 2>/dev/null) || return 1
+  # shellcheck disable=SC2034  # read by the sourcing script.
+  IFS=\$'\\t' read -r TERMINAL_ID TERMINAL_ORDER COLUMN_COUNT TERMINAL_NAME <<<"\$t"
+}
+
+# open_columns <columns-json> — every column's name but the terminal one, in
+# board order: the statuses a \`move\` may name. 1 when the board has none.
+open_columns() {
+  terminal_column "\$1" || return 1
+  # shellcheck disable=SC2016  # jq program.
+  printf '%s' "\$1" | jq_lf -r --arg t "\$TERMINAL_ID" '.columns | sort_by(.order)[] | select((.id | tostring) != \$t) | .name'
+}
 `,
     executable: true,
     backend: "cloud",
@@ -14348,7 +14382,7 @@ fi
 # --- Which column means "done" -------------------------------------------
 # The hosted board's columns are the project's own: an order and a name, and
 # nothing that declares one terminal. So this takes the LAST column by order
-# and NAMES IT on every run.
+# (\`terminal_column\`, _config.sh) and NAMES IT on every run.
 #
 # That naming is the whole safety of the convention. A board that grew a
 # column after its done column would otherwise silently stop gating, and an
@@ -14374,11 +14408,7 @@ if [ "\$rc" -ne 0 ] || [ -z "\$COLS" ]; then
   exit 3
 fi
 
-TERMINAL_ID=\$(printf '%s' "\$COLS" | jq_lf -r '.columns | sort_by(.order) | last | .id // empty')
-TERMINAL_NAME=\$(printf '%s' "\$COLS" | jq_lf -r '.columns | sort_by(.order) | last | .name // empty')
-TERMINAL_ORDER=\$(printf '%s' "\$COLS" | jq_lf -r '.columns | sort_by(.order) | last | .order')
-COLUMN_COUNT=\$(printf '%s' "\$COLS" | jq_lf -r '.columns | length')
-if [ -z "\$TERMINAL_ID" ]; then
+if ! terminal_column "\$COLS"; then
   echo "✗ the board reports no columns — nothing to gate against" >&2
   exit 3
 fi
@@ -14814,7 +14844,9 @@ ISSUE_TEXT_JQ='
 # This backend creates (with a parent), comments, moves and closes; the
 # versioned contract this half calls names no edit, label, classification,
 # link or close reason, so a plan holding one is answered UNSUPPORTED and
-# nothing is written. A close is the move to Done, as close-shipped.sh does it.
+# nothing is written. A close is the move to the board's terminal column
+# (\`terminal_column\`, _config.sh), whatever it is called, behind the cascade
+# check; a \`move\` may name every other column, never that one.
 #
 # Usage: apply-plan.sh <verb> [--id <n>] <plan-file> <items-file>
 set -euo pipefail
@@ -14825,8 +14857,11 @@ here=\$(CDPATH="" cd "\$(dirname "\${BASH_SOURCE[0]}")" && pwd)
 PLAN_CANNOT='["edit", "label", "classify", "link", "close:not_planned", "create:labels"]'
 CLOSE_IS_MOVE=1
 
-# columns.sh prints \`  <order>\\t<name>\`.
-board_statuses() { bash "\$here/columns.sh" | awk -F '\\t' 'NF > 1 { print \$2 }'; }
+board_columns() { cloud_curl "\$API_BASE/columns?projectKey=\$PROJECT_KEY"; }
+board_statuses() {
+  local cols
+  cols=\$(board_columns) && open_columns "\$cols"
+}
 repo_labels() { :; }
 
 # add.sh prints \`✓ created: <key>\`; the key ends with the task's number.
@@ -14839,7 +14874,11 @@ create_item() {
   return "\$rc"
 }
 
-close_item() { bash "\$here/move.sh" "\$1" Done; }
+close_item() {
+  local cols
+  cols=\$(board_columns) && terminal_column "\$cols" || return 3
+  bash "\$here/move.sh" "\$1" "\$TERMINAL_NAME"
+}
 fallback_label() { :; }
 receipt_snapshot() { :; }
 
@@ -14878,8 +14917,11 @@ receipt_snapshot() { :; }
 #                   create in the same plan named (\`@\` + [a-z][a-z0-9-]{0,15});
 #                   always inside the verb's scope (scope_for). A repository, a
 #                   project, a URL or a path is no value any key takes.
-#   status          one of the board's own columns, never Done: an item reaches
-#                   Done through \`close\`, behind its cascade check
+#   status          one of the board's own columns, never its terminal one: an
+#                   item reaches it through \`close\`, behind its cascade check.
+#                   The backend's board_statuses leaves the terminal column out
+#                   (on Cloud, the last by order whatever its name); a column
+#                   named Done is refused here too, on every backend
 #   axis, value     Priority P0-P3 · Size XS, S, M, L, XL · IssueType Task, Bug, Feature
 #                   · StartDate, TargetDate a string YYYY-MM-DD · Estimate a JSON
 #                   number 0 to 9999, at most two decimals. A backend without an

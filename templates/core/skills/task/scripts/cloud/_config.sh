@@ -156,3 +156,28 @@ cloud_curl() {
 item_url() {
   return 0
 }
+
+# terminal_column <columns-json> — the one home of which column means "done"
+# on a hosted board. Its columns are the project's own, an order and a name,
+# and nothing declares one terminal: so it is the LAST column by order,
+# whatever it is called. Sets TERMINAL_ID, TERMINAL_NAME, TERMINAL_ORDER and
+# COLUMN_COUNT from a `GET /columns` answer; 1 when the board has none.
+# cascade-check.sh gates against it, apply-plan.sh closes into it and keeps
+# it out of the columns a plan may move a task to.
+terminal_column() {
+  local t
+  # shellcheck disable=SC2016  # jq program.
+  t=$(printf '%s' "$1" | jq_lf -r -e '(.columns // []) as $c | ($c | sort_by(.order) | last) as $t
+    | select(($t.id // "" | tostring) != "" and ($t.name | type) == "string" and $t.name != "")
+    | "\($t.id)\t\($t.order)\t\($c | length)\t\($t.name)"' 2>/dev/null) || return 1
+  # shellcheck disable=SC2034  # read by the sourcing script.
+  IFS=$'\t' read -r TERMINAL_ID TERMINAL_ORDER COLUMN_COUNT TERMINAL_NAME <<<"$t"
+}
+
+# open_columns <columns-json> — every column's name but the terminal one, in
+# board order: the statuses a `move` may name. 1 when the board has none.
+open_columns() {
+  terminal_column "$1" || return 1
+  # shellcheck disable=SC2016  # jq program.
+  printf '%s' "$1" | jq_lf -r --arg t "$TERMINAL_ID" '.columns | sort_by(.order)[] | select((.id | tostring) != $t) | .name'
+}
