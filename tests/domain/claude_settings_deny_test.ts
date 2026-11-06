@@ -1,4 +1,5 @@
-import { assertEquals } from "@std/assert";
+import { assert, assertEquals } from "@std/assert";
+import { globToRegExp } from "@std/path";
 import { mergeClaudeSettings } from "../../src/domain/claude_settings_merge.ts";
 
 /**
@@ -32,4 +33,34 @@ Deno.test("deny: the user's ask rules and other permission keys pass through", (
     defaultMode: "plan",
     deny: OURS,
   });
+});
+
+/** The shipped rules cover the credential and secret `.env` files only. */
+const SHIPPED = JSON.parse(
+  Deno.readTextFileSync(
+    new URL("../../templates/harness-specific/claude/settings.json", import.meta.url),
+  ),
+).permissions.deny as string[];
+const readGlobs = SHIPPED.map((r) => r.replace(/^Read\((.*)\)$/, "$1"));
+const denied = (path: string) =>
+  readGlobs.some((g) => globToRegExp(g, { globstar: true, extended: false }).test(path));
+
+Deno.test("deny: the shipped settings deny exactly the credential and secret env reads", () => {
+  assertEquals(SHIPPED, [
+    "Read(~/.config/gh/**)",
+    "Read(~/.specnaut/credentials*)",
+    "Read(**/.env)",
+    "Read(**/.env.local)",
+    "Read(**/.env.*.local)",
+    "Read(**/.env.production)",
+  ]);
+});
+
+Deno.test("deny: a secret env file is denied, a committed template env file stays readable", () => {
+  for (const p of ["app/.env", "app/.env.local", "app/.env.test.local", "app/.env.production"]) {
+    assert(denied(p), `${p} should be denied`);
+  }
+  for (const p of ["app/.env.example", "app/.env.sample", "app/.env.test", "app/.envrc"]) {
+    assert(!denied(p), `${p} should stay readable`);
+  }
 });

@@ -34255,7 +34255,9 @@ prompts cost more tokens and drift out of relevance.
       "Read(~/.config/gh/**)",
       "Read(~/.specnaut/credentials*)",
       "Read(**/.env)",
-      "Read(**/.env.*)"
+      "Read(**/.env.local)",
+      "Read(**/.env.*.local)",
+      "Read(**/.env.production)"
     ]
   },
   "hooks": {
