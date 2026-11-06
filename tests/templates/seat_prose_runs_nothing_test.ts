@@ -23,6 +23,8 @@ const COMMAND_SPAN = new RegExp(
   "g",
 );
 const REPORT_SHAPES = new Set(["`wc -l <before> → <after>`"]);
+/** A script a seat is told to Read, never to run: the product owner's plan vocabulary is its header. */
+const READ_ONLY_FILES = new Set(["`.specnaut/scripts/backlog/_backlog_plan.sh`"]);
 
 async function shellLessSeats(): Promise<Map<string, string>> {
   const out = new Map<string, string>();
@@ -41,7 +43,7 @@ Deno.test("a seat with no shell names no command to run", async () => {
   const hits: string[] = [];
   for (const [seat, md] of seats) {
     for (const m of md.matchAll(COMMAND_SPAN)) {
-      if (!REPORT_SHAPES.has(m[0])) hits.push(`${seat}: ${m[0]}`);
+      if (!REPORT_SHAPES.has(m[0]) && !READ_ONLY_FILES.has(m[0])) hits.push(`${seat}: ${m[0]}`);
     }
   }
   assertEquals(hits, [], "a shell-less seat is told to run a command it cannot run");

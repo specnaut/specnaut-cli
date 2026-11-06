@@ -32,7 +32,7 @@ list on its own.
 | ----- | ------ | --- |
 | `haiku` | `specnaut-guide` | Reads docs and explains; the user reads the whole answer. Its upgrade walk shows each fetched release and the files it commits before acting, and hands adoption and merges to `developer`. |
 | `opus` | `code-reviewer`, `accessibility-expert`, `performance-expert`, `dependency-expert`, `security-expert`, `architect-expert` | Review lenses — nobody re-reads what they cleared. |
-| `opus` | `product-owner` | Grooming is judgement; its mechanical board moves share the seat. |
+| `opus` | `product-owner` | Grooming is judgement. It proposes; the bundled executor applies (`task/backlog.md`, "The session protocol"). |
 | `opus` | `developer` | The builder — review samples its work, it does not re-derive it. |
 
 The same test applies per dispatch: a skill may pass `model: "haiku"` for a mechanical subtask the

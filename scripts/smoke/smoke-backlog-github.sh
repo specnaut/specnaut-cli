@@ -57,10 +57,10 @@ check "SKILL.md mentions detect-fields.sh (#161)" \
   'grep -q "detect-fields.sh" .claude/skills/task/backlog.md'
 check "SKILL.md mentions set-field.sh (#161)" \
   'grep -q "set-field.sh" .claude/skills/task/backlog.md'
-# Exit codes keyed on each code's definition (#623); their one home is the PO contract (cli#679).
-check "the PO contract documents set-field exit codes 10-13 and 2, and backlog.md points there" \
-  '(for c in 10 11 12 13 2; do grep -q "\`$c\` = " .claude/agents/product-owner.md || exit 1; done) &&
-   grep -q "the product-owner'"'"'s classification contract" .claude/skills/task/backlog.md'
+# Exit codes keyed on each code's definition (#623); their one home is the script's header.
+check "set-field.sh's header documents exit codes 10-13 and 2, and backlog.md points there" \
+  '(for c in 10 11 12 13 2; do grep -qE "^#   $c +[a-z]" .specnaut/scripts/backlog/set-field.sh || exit 1; done) &&
+   grep -qF "its header: the axes and exit codes" .claude/skills/task/backlog.md'
 
 echo
 echo "═══ #654  grooming ends with a promotion ═══"

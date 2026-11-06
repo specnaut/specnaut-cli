@@ -66,6 +66,8 @@ backlog_fingerprint() {
 #   groom            the items read, no create; it closes only an epic whose
 #                    cascade check clears (epic_cleared)
 #   tech-debt        create only
+#   next, status     nothing: a read, whose plan is empty
+#   brief <id>       nothing, for {id}
 scope_for() {
   local verb=${1:-} id=${2:-} n p
   SCOPE_OPS="" SCOPE_TARGETS="" SCOPE_REFS=false
@@ -76,11 +78,12 @@ scope_for() {
     close) SCOPE_OPS="close comment label" SCOPE_TARGETS=$id ;;
     groom) SCOPE_OPS="edit comment move classify label close link" SCOPE_TARGETS=${ITEMS_READ:-} ;;
     tech-debt) SCOPE_OPS="create" SCOPE_REFS=true ;;
+    next | status | brief) ;;
     *) return 2 ;;
   esac
   case $verb in
-    edit | estimate | close) [ -n "$id" ] || return 2 ;;
-    tech-debt) [ -z "$id" ] || return 2 ;;
+    edit | estimate | close | brief) [ -n "$id" ] || return 2 ;;
+    tech-debt | next | status) [ -z "$id" ] || return 2 ;;
   esac
   if [ "$verb" = close ] && [ -n "${ITEMS_READ:-}" ] &&
     bash "$_PLAN_DIR/cascade-check.sh" "$id" >/dev/null 2>&1; then

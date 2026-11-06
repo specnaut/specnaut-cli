@@ -29,7 +29,9 @@ const PINNED = new Map<string, string>([
   ["dependency-expert", "Read, Grep, Glob"],
   ["developer", "Read, Write, Edit, Grep, Glob, Bash"],
   ["performance-expert", "Read, Grep, Glob"],
-  ["product-owner", "Read, Write, Edit, Grep, Glob, Bash"],
+  // It reads issue text anyone can write, so it holds no shell and writes
+  // nothing: it proposes a plan, which `apply-plan.sh` checks and applies.
+  ["product-owner", "Read, Grep, Glob"],
   // #678: its Bash existed for the alert-triage mode's `gh api` calls; that
   // mode is gone, and every remaining mode reads.
   ["security-expert", "Read, Grep, Glob"],

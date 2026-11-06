@@ -22,11 +22,18 @@ confirmed closed.
 2. **Close each one — github and gitlab.** **Do not ask.** The push was the authorisation. For the
    epic itself, and for a standalone item, run `bash .specnaut/scripts/backlog/cascade-check.sh <n>`
    first: **only exit 0 authorises the close**. 11 — a child is still open: name it and stop. 3 —
-   the gate could not answer: say so and stop. 12 — already closed: nothing to close. Then dispatch
-   the `product-owner` to post a close comment naming the merged range from `land-feature.sh`'s
-   `LANDED` line and run `gh issue close <n> --reason completed` (gitlab: its equivalent), leaving
-   the card alone. Children first, the epic last. On local and cloud there is no separate issue:
-   skip to step 3, which is the close.
+   the gate could not answer: say so and stop. 12 — already closed: nothing to close. Then close it
+   yourself — no `product-owner` dispatch, this close is mechanical — with a comment filled from
+   `land-feature.sh`'s `LANDED` line and nothing else, leaving the card alone:
+
+   ```bash
+   range=<first>..<last>   # from LANDED; it must match ^[0-9a-f]{7,40}\.\.[0-9a-f]{7,40}$
+   d=$(mktemp -d) && chmod 700 "$d" && printf 'Shipped in %s.\n' "$range" >"$d/close.md"
+   bash .specnaut/scripts/backlog/close.sh <n> completed --body-file "$d/close.md"
+   ```
+
+   Children first, the epic last. On local and cloud there is no separate issue: skip to step 3,
+   which is the close.
 3. **Settle the board:**
 
    ```

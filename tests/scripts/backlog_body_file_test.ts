@@ -92,6 +92,38 @@ Deno.test("local: --body-file text lands in the item file, unexpanded", async ()
   }
 });
 
+/** merge-close.md posts its close comment this way, with no product-owner dispatch. */
+for (
+  const [backend, note, flag] of [["github", "comment", "--body-file"], [
+    "gitlab",
+    "note",
+    "--message",
+  ]] as const
+) {
+  Deno.test(`${backend}: close.sh --body-file comments from the file, then closes`, async () => {
+    const p = await project(backend);
+    try {
+      await p.write("body.md", TEXT);
+      const r = await p.run("close.sh", ["7", "completed", "--body-file", "body.md"]);
+      assertEquals(r.code, 0, r.stderr);
+      const tool = backend === "github" ? "gh" : "glab";
+      const sent = argAfter(r.calls, `${tool}\tissue\t${note}\t7`, flag);
+      assertEquals(sent, backend === "github" ? "body.md" : TEXT);
+      const order = r.calls.split("\n").map((l) => l.split("\t").slice(0, 3).join(" "));
+      assert(
+        order.indexOf(`${tool} issue ${note}`) < order.indexOf(`${tool} issue close`),
+        r.calls,
+      );
+      await noneRan(p.dir);
+      const missing = await p.run("close.sh", ["7", "completed", "--body-file", "missing.md"]);
+      assertEquals(missing.code, 2, missing.stderr);
+      assert(!/issue\tclose/.test(missing.calls), missing.calls);
+    } finally {
+      await p.cleanup();
+    }
+  });
+}
+
 for (const backend of BACKENDS) {
   Deno.test(`${backend}: --body-file without a file, or beside a body, is a usage error`, async () => {
     const p = await project(backend);

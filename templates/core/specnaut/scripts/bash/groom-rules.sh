@@ -15,10 +15,19 @@
 #   3. exactly one priority, one of P0 P1 P2 P3. The same value on two surfaces
 #      (a native field and a label) is one value; two different values are two,
 #      and the item is incomplete until one is removed.
-#   4. an outcome: in the ready column, OR a comment whose text starts with the
-#      marker `🤖 specnaut-groom`, OR closed with the reason `not_planned`.
-#      With `--ready none` (the user chose to groom without promoting) the item
-#      stays where it is by design, and the outcome is not checked.
+#   4. an outcome: in the ready column, OR groom's own comment, OR closed with
+#      the reason `not_planned`. With `--ready none` (the user chose to groom
+#      without promoting) the item stays where it is by design, and the outcome
+#      is not checked.
+#
+# Groom's own comment — the marker the product owner also skips an item on —
+# is one whose text starts with `🤖 specnaut-groom` AND that the account groom
+# runs as wrote (`by_viewer: true`): anyone can type the marker. The one
+# exception is a comment that names no author and no viewer (`author` and
+# `by_viewer` both null, or a bare string): the local backend's own task-file
+# sections, which only the repository writes. Cloud reads no comments at all.
+# A comment with an author but an unknown viewer does not count — missing is
+# the safe direction.
 #
 # Pure: reads stdin, writes stdout, touches nothing else.
 #
@@ -107,7 +116,9 @@ def exactly_one($axis; $values; $allowed):
     elif any($allowed[]; . == $v[0]) | not then "\($axis) (\($v[0]) is not one of \($allowed | join(" ")))"
     else empty end;
 
-def marked: any(.comments // [] | .[] | comment_text; sub("^\\s+"; "") | startswith("🤖 specnaut-groom"));
+def groom_wrote: type == "string" or .by_viewer == true or (.by_viewer == null and .author == null);
+def marked: any(.comments // [] | .[] | select(groom_wrote) | comment_text;
+  sub("^\\s+"; "") | startswith("🤖 specnaut-groom"));
 
 def outcome($ready):
   if $ready == "none" then empty

@@ -116,6 +116,23 @@ Deno.test("read-items: a verb no plan can follow is refused before any read", as
   }
 });
 
+Deno.test("a read verb (next, status, brief) reads its items, and no plan can write after it", async () => {
+  const p = await ghProject(issues);
+  try {
+    for (const read of [["next", "7", "8"], ["status", "7"], ["brief", "--id", "7"]]) {
+      const r = await readThenApply(p, read, comment);
+      assertEquals([r.code, r.lines], [3, ["REFUSED scope 1.op", "RECEIPT: none"]], r.stderr);
+      assert(!GH_WRITES.test(r.calls), r.calls);
+    }
+    for (const args of [["brief"], ["next", "--id", "7"]]) {
+      const r = await p.run("read-items.sh", args);
+      assertEquals([r.code, r.stdout], [2, ""], `${args}\n${r.stderr}`);
+    }
+  } finally {
+    await p.cleanup();
+  }
+});
+
 Deno.test("apply-plan: a missing field falls back to its label; tech-debt only creates", async () => {
   const p = await ghProject(issues, { "patch-fails": "" });
   try {

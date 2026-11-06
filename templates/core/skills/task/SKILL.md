@@ -80,10 +80,11 @@ unknown verb → print the verb table and stop.
 
 ## All backlog writes go through the Product Owner
 
-The main session does **not** run the backlog scripts' writing commands. Every create, edit, move
-and close — including the ones `plan` and `merge` make — is dispatched to the `product-owner`
-agent, the single owner of backlog state. The read-only scripts (`list.sh`, `view.sh`) may be run
-directly.
+The product owner proposes; a bundled executor applies. Every create, edit, move and close —
+including the ones `plan` makes — follows `backlog.md`'s "The session protocol" (`read-items.sh`, the
+dispatch, `apply-plan.sh`), its one home;
+`merge`'s close after a push is the one write it names itself (`phases/merge-close.md`). The
+read-only scripts (`list.sh`, `view.sh`) may be run directly.
 
 <!-- BEGIN: spec-autogen=on -->
 ## Auto-generate a task's spec at creation (cloud, opt-in)

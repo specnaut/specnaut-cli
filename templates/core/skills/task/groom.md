@@ -14,7 +14,10 @@ A grooming pass runs five independent checks.
 ### 1. Backlog grooming
 
 Dispatch the **`product-owner`** subagent to groom the items in the board's
-intake column. **Grooming ends with a promotion** — the rule is in the PO's own
+intake column, through `backlog.md`'s "The session protocol": `read-items.sh
+groom <n>...` with the numbers `list.sh --numbers` prints for the intake, ready
+and in-progress columns (check 2 audits the last two), and `apply-plan.sh groom`
+for its plan. **Grooming ends with a promotion** — the rule is in the PO's own
 `/task groom` contract; name it in the dispatch, do not restate it here.
 
 **Resolve the columns once per run** (GitHub: `groom-columns.sh`). Exit `0`
@@ -32,9 +35,11 @@ assume a run covered them unless the PO reports on them.
 
 The PO will:
 
-- Read each item's body and existing comments.
-- **Skip** items it has already commented on in a previous run (look for
-  the marker `🤖 specnaut-groom` at the start of any comment).
+- Read each item's body and existing comments in the items file.
+- **Skip** items groom already commented on in a previous run: a comment
+  starting with the marker `🤖 specnaut-groom` that counts by
+  `groom-rules.sh`'s rule — its own account's (`by_viewer="true"`), on the
+  backends whose comments name an author.
 - **Process tickets one at a time, end-to-end** — body → size → priority
   → promote/comment, fully complete on ticket N before moving to N+1.
   Do NOT batch-clarify-then-batch-label across all tickets.
@@ -59,22 +64,15 @@ The PO will:
      - `P1` — must-have for the next sprint or release
      - `P2` — important but deferrable; standard work
      - `P3` — nice-to-have / long horizon; pick up when slack appears
-  3a. **Set Roadmap dates — soft, and only if the board has the fields.**
-     GitHub backend only; Date / Estimate are *optional* fields, and a board
-     without them is not misconfigured. **Gate first** on the once-per-run
-     `detect-fields.sh`, which emits `TARGETDATE_FIELD_ID=` /
-     `STARTDATE_FIELD_ID=` / `ESTIMATE_FIELD_ID=` **empty** when the field is
-     absent:
-     - **Both IDs empty → skip this step entirely.** Set nothing, warn nothing,
-       omit the "⚠ Roadmap dates missing" section. Never report a value as
-       unset when it cannot be set at all.
-     - **Field present** — `set-field.sh <num> TargetDate <YYYY-MM-DD>` on
-       Backlog → Ready (best-estimate delivery date), `StartDate` on
-       Ready → In Progress (today), `Estimate <N>` optional. A missing *value*
-       on a field that exists never blocks: it emits a `⚠ no target date set`
-       / `⚠ no start date set` line in the final report and the run moves on.
+  3a. **Roadmap dates — soft, and only if the board has the fields.**
+     GitHub backend only; the session runs `detect-fields.sh` once per run,
+     which emits `TARGETDATE_FIELD_ID=` / `STARTDATE_FIELD_ID=` **empty** when
+     the field is absent, and hands them to the PO in the dispatch.
+     **Both IDs empty → say nothing.** A field present: the plan has no date
+     operation, so the report carries `⚠ no target date set` /
+     `⚠ no start date set` for the item, and the run moves on.
   4. **Decide the outcome:**
-     - **Promote to the ready column** (`move.sh <num> "$READY"`) when the
+     - **Promote to the ready column** (a `move` line to `$READY`) when the
        body is clear, both labels are applied, AND no scope decisions remain.
        A failed move goes in the report with its reason.
      - **Leave a clarification comment** marked with the `🤖 specnaut-groom`
@@ -94,63 +92,35 @@ The PO will:
   (missing scope, rate limit), the PO MUST surface the reason under
   "⚠ size / priority missing" in the final report — never a silent skip.
 
-The PO must respect the standard backlog skill — do not bypass its
-scripts.
+The PO's writes are its plan; only the executor applies them.
 
 #### How size and priority are persisted (field-first, label fallback)
 
-1. **Native Project V2 single-select fields** `Priority` and `Size` — the
-   canonical surface.
-2. **GitHub / GitLab labels** (`priority:P0..P3`, `size:XS..XL`) — only when
-   the project has no native field, or the value has no matching option.
+Each is a `classify` line, which the executor writes through the backend's
+`set-field.sh` — its header holds the axes and the exit codes:
 
-**Field wins.** If a native field exists for the dimension, write to
-the field. Do NOT also apply the label — double-writing creates drift.
+- **GitHub** — the native Project V2 fields `Priority` and `Size`. Where one is
+  absent the executor sets the matching label (`priority:P0..P3`,
+  `size:XS..XL`) and prints `FALLBACK classify <n>` — never both, which is drift.
+  `ensure-labels.sh` bootstraps those labels. The session's once-per-run
+  `detect-fields.sh` **is a sample, taken once** — `groom-report.md` says what
+  it costs and requires you to disclose it.
+- **GitLab** — the scoped labels `priority::P1`, `size::M`.
+- **Local** — the front-matter keys `size:` and `priority:`, which `add.sh`
+  writes empty. Its columns are the same five (`scripts/local/move.sh`).
 
-##### GitHub backend
-
-Use the bundled scripts at `.specnaut/scripts/backlog/`:
-
-- `detect-fields.sh` — env lines with the `Priority` / `Size` field and option
-  IDs, plus `STARTDATE_FIELD_ID` / `TARGETDATE_FIELD_ID` / `ESTIMATE_FIELD_ID`
-  — **empty when the board carries no such field** (step 3a's gate). Run
-  **once per groom run**, not per ticket.
-
-  **That is a sample, taken once** — `groom-report.md` says what it costs and
-  requires you to disclose it.
-- `set-field.sh <issue> <Priority|Size> <value>` — writes the field. Its exit
-  codes, and which of them takes a label, are in the product-owner's
-  classification contract; a value that persists neither way goes under
-  "⚠ size / priority missing".
-
-**Label fallback** (only where that contract says so) — `gh label list`, then
-`gh label create "<name>" --color <hex> --description "<desc>"` if absent,
-then `gh issue edit <num> --add-label …` (`--remove-label` to swap on a
-re-groom). All `--repo <owner>/<repo>`. Suggested colors:
-
-- `size:XS` `#c2e0c6` · `size:S` `#bfdadc` · `size:M` `#bfd4f2` · `size:L` `#d4c5f9` · `size:XL` `#f9d0c4`
-- `priority:P0` `#b60205` · `priority:P1` `#d93f0b` · `priority:P2` `#fbca04` · `priority:P3` `#0e8a16`
-
-##### GitLab backend
-
-No `set-field.sh` helper: scoped labels via `glab`, per the PO's
-classification contract.
-
-##### Local Markdown backend
-
-The local backend has the same five columns (`scripts/local/move.sh`).
-Size and priority are front-matter keys, `size:` and `priority:`, which
-`add.sh` writes empty: set each to exactly one value (`XS`–`XL`,
-`P0`–`P3`) by editing the task file, then move the card to `Ready`.
+A value that persists neither way (`FAILED classify <n>`) goes under
+"⚠ size / priority missing".
 
 ### 2. WIP audit — Ready and In progress
 
 Nothing else re-reads these two columns, so cards pile up there: work that landed but never
 closed, epics with one started child, items waiting on someone, and moves with nothing behind
 them. Every backend with columns runs this check, the local one included. It is part of the
-`product-owner` dispatch in check 1.
+`product-owner` dispatch in check 1: the session runs steps 1 and 2, whose scripts print no item
+text, and hands their lines to the PO in that dispatch; the PO plans step 3.
 
-1. **List both columns** with `list.sh`: the ready column (`$READY`, from check 1; with
+1. **List both columns** with `list.sh --numbers`: the ready column (`$READY`, from check 1; with
    `PROMOTE=no`, the in-progress column only) and the in-progress column. For each item, take its
    creation time (`view.sh`, or the `created:` front-matter key on the local backend), and pass the
    items oldest first:
@@ -192,9 +162,9 @@ count:
   or `COLLABORATOR`; on gitlab, a project member. On local and cloud, every commenter is on the team.
   A `🤖 specnaut-groom` comment is never evidence of a block. This fact can only keep a card where
   it is.
-- **Groom's own idle warning.** It counts only when it was posted by the account groom runs as (on
-  github, `gh api user --jq .login`; on gitlab, `glab api user`) after the card last moved. This
-  fact is what allows the second-run move, so a look-alike from anyone else never does.
+- **Groom's own idle warning.** It counts only when it was posted by the account groom runs as —
+  `by_viewer="true"` on its block in the items file — after the card last moved. This fact is what
+  allows the second-run move, so a look-alike from anyone else never does.
 
 Groom's comments are the fixed sentences in the table, with no copied text, no `@` mention and no
 URL.
@@ -268,8 +238,8 @@ contract output, not optional**.
 
 ## When NOT to use this skill
 
-- For a single-item backlog clarification → invoke the `product-owner`
-  subagent directly with the item number.
+- For a single-item backlog clarification → `/task edit <id>`, which dispatches
+  the `product-owner` through the same session protocol.
 - For PR review on a specific PR → invoke `code-reviewer` /
   `security-expert` directly.
 - For implementing a spec → invoke `/task implement` directly.

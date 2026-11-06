@@ -14,8 +14,13 @@
  *     which entries are Specnaut's.
  *   - `permissions.ask` loses the release rules Specnaut used to add
  *     (`RETIRED_ASK_RULES`) and keeps every other rule of the user's, in order.
- *     A bundled rule, if one ever returns, joins as a set union. `allow` and
- *     `deny` are never touched.
+ *     A bundled rule, if one ever returns, joins as a set union. `allow` is
+ *     never touched.
+ *   - `permissions.deny` gains each bundled rule the user lacks, after the
+ *     user's own, which stay in order: the credential reads no seat may make
+ *     (the product owner reads issue text anyone can write, and a subagent's
+ *     Read reaches outside the project without a prompt). Claude Code applies
+ *     a Read rule to Grep and Glob as well.
  *   - `extraKnownMarketplaces` and `enabledPlugins` gain each bundled key the
  *     user does not have, and keep every key they do — `false` included, which
  *     is how a project declines a plugin Specnaut enables (#642).
@@ -83,9 +88,17 @@ export function mergeClaudeSettings(
   const userPerms = userParsed.permissions;
   const ask = ((userPerms?.ask ?? []) as string[]).filter((r) => !RETIRED_ASK_RULES.has(r));
   for (const rule of bundledAsk) if (!ask.includes(rule)) ask.push(rule);
-  if (userPerms !== undefined || ask.length > 0) {
-    const { ask: _dropped, ...rest } = userPerms ?? {};
-    const permissions = ask.length > 0 ? { ...rest, ask } : rest;
+  const deny = [...((userPerms?.deny ?? []) as string[])];
+  for (const rule of (bundledParsed.permissions?.deny ?? []) as string[]) {
+    if (!deny.includes(rule)) deny.push(rule);
+  }
+  if (userPerms !== undefined || ask.length > 0 || deny.length > 0) {
+    const { ask: _dropped, deny: _denied, ...rest } = userPerms ?? {};
+    const permissions = {
+      ...rest,
+      ...(ask.length > 0 ? { ask } : {}),
+      ...(deny.length > 0 ? { deny } : {}),
+    };
     if (Object.keys(permissions).length > 0) result.permissions = permissions;
     else delete result.permissions;
   }

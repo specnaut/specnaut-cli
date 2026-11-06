@@ -200,7 +200,7 @@ const PUBLISH_ASK = [
 
 Deno.test("claude settings: the shipped file asks for no release and registers no approval hook", () => {
   const shipped = JSON.parse(SHIPPED);
-  assertEquals(shipped.permissions, undefined);
+  assertEquals(Object.keys(shipped.permissions), ["deny"]);
   for (
     const retired of ["guard-merge", "guard-release", "protect-constitution", "approve-on-prompt"]
   ) {
@@ -217,13 +217,13 @@ Deno.test("mergeClaudeSettings: the retired ask rules leave, and the user's stay
   assertEquals(merged.permissions.ask, ["Bash(git push *)"]);
 });
 
-Deno.test("mergeClaudeSettings: a permissions block holding only retired rules goes with them", () => {
+Deno.test("mergeClaudeSettings: retired ask rules leave, and only the shipped deny remains", () => {
   const once = mergeClaudeSettings(
     JSON.stringify({ theme: "dark", permissions: { ask: PUBLISH_ASK } }),
     SHIPPED,
     DEST,
   ).content;
-  assertEquals(JSON.parse(once).permissions, undefined);
+  assertEquals(JSON.parse(once).permissions, { deny: JSON.parse(SHIPPED).permissions.deny });
   assertEquals(mergeClaudeSettings(once, SHIPPED, DEST).changed, false, "a re-merge is a no-op");
 });
 

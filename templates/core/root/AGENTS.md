@@ -153,7 +153,7 @@ Each step of the chain that delegates names its agent:
 | `plan` — the security audit | `security-expert` |
 | `plan` — the performance audit, when the plan has a hot path | `performance-expert` |
 | `review` — the seats, dispatched from the main session | `code-reviewer`, `security-expert`; `accessibility-expert`, `dependency-expert`, `performance-expert` when their signal selects them |
-| every backlog write — create, clarify, move, close | `product-owner` |
+| every backlog write — proposed as a plan, applied per `task/backlog.md`'s session protocol | `product-owner` |
 
 Each name is the `name` of an agent Specnaut scaffolded for your harness.
 

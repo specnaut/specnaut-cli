@@ -111,9 +111,9 @@ Deno.test("init --backlog github renders the github skill + writes config stub",
     );
     assertStringIncludes(skill, "Backend: GitHub Issues + Project");
     assertEquals(skill.includes("Backend: local Markdown"), false);
-    // The PO's decision rule keeps both paths (MCP tools, else the scripts);
-    // the unpinned MCP server example went with its tutorial (cli#679).
-    assertStringIncludes(skill, "Prefer `mcp__github__*` tools when visible, else the scripts.");
+    assertStringIncludes(skill, "## The session protocol"); // no MCP or raw `gh` write path
+    assertEquals(skill.includes("mcp__github__"), false);
+    assertEquals(skill.includes("gh issue close"), false);
     assertEquals(skill.includes("@modelcontextprotocol/server-github"), false);
 
     // GitHub-flavored scripts present, local ones filtered out
@@ -224,7 +224,7 @@ Deno.test("init --backlog gitlab renders the gitlab skill + writes config stub",
     assertStringIncludes(skill, "Backend: GitLab Issues + scoped Status labels");
     assertEquals(skill.includes("Backend: local Markdown"), false);
     assertEquals(skill.includes("Backend: GitHub"), false);
-    assertStringIncludes(skill, "glab issue close");
+    assertEquals(skill.includes("glab issue close"), false); // closes go through the executor
 
     // GitLab-flavored scripts present
     assertEquals(

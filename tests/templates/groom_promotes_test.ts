@@ -35,7 +35,7 @@ Deno.test("groom.md resolves the columns, asks once, and promotes to the resolve
   assertStringIncludes(groom, "groom-columns.sh");
   assertStringIncludes(groom, "ask the user **once**");
   assertStringIncludes(groom, "groom-columns.sh --set ready_column <column|none>");
-  assertStringIncludes(groom, '`move.sh <num> "$READY"`');
+  assertStringIncludes(groom, "a `move` line to `$READY`");
   // The column is the board's, not a hard-coded `Ready`.
   assert(!groom.includes("**Promote to `Ready`**"), "groom.md still hard-codes the ready column");
 });

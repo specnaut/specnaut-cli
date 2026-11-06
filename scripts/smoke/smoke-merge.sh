@@ -49,13 +49,13 @@ check "merge.md routes to it after a push (#560)" \
 check "close-shipped.sh moves each number once, in the order given, and reports one line per item (#560 AC1, AC5)" \
   'probe_close_shipped "" "" 51 52 50 && close_shipped_was 0 "$(printf "move 51 Done\nmove 52 Done\nmove 50 Done")" &&
    [ "$CS_OUT" = "$(printf "DONE #51\nDONE #52\nDONE #50")" ]'
-# Instruction only: the order the agent runs `gh issue close` and close-shipped.sh
-# in, on both paths. `!e`/`!c`/`!m` keep the FIRST of each; a missing marker
+# Instruction only: the order the agent runs close.sh and close-shipped.sh in,
+# on both paths. `!e`/`!c`/`!m` keep the FIRST of each; a missing marker
 # fails, so a renamed command must re-state its order (#588).
 check "the procedure enumerates, closes, then moves — standalone and epic alike (#588 AC4)" \
   'awk "/^## The procedure/{s=1; next} /^## /{s=0}
         s && /Epic: the children are/ && !e {e=NR}
-        s && /gh issue close <n>/ && !c {c=NR}
+        s && /backlog\/close\.sh <n> completed/ && !c {c=NR}
         s && /close-shipped\.sh <n>/ && !m {m=NR}
         END{exit !(e && c && m && e < c && c < m)}" \
      .claude/skills/task/phases/merge-close.md'

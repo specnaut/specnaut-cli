@@ -92,7 +92,7 @@ This project stores specifications on SpecNaut Cloud. Do **NOT** create a git br
 creates the branch and links it.
 
 1. The task is the item's id: `plan <id>`, or `--issue <N>`. With no item, the product-owner
-   creates one first; `specnaut spec push` needs a task number.
+   creates one first, per `backlog.md`'s session protocol (`read-items.sh add`); `specnaut spec push` needs a task number.
 2. Write the planning document to the gitignored cache as the `plan` step:
    `.specnaut/specs/.cache/<task>/1-plan.md`. Step 8 pushes it.
 

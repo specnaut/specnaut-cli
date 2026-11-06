@@ -11,6 +11,9 @@ ticket, the memory entry can be retired.
 
 ## When to add an entry here
 
+The PO holds no write tool: it names a note worth keeping in its summary, and
+the session writes it here.
+
 Add a new memory file when the PO discovers something that should survive
 across sessions and isn't captured elsewhere:
 

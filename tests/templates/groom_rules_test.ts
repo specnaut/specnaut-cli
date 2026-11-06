@@ -173,3 +173,22 @@ Deno.test("a comment may be an object whose body is its text, as item-record.sh 
   r = await rules([{ ...rec(), comments: [{ author: "me" }] }]);
   assertEquals([r.code, r.stdout], [2, ""], "a comment without a body is unreadable");
 });
+
+Deno.test("the marker counts only from groom's own account, or where comments name no author", async () => {
+  const off = rec({ status: "Backlog" });
+  const text = "🤖 specnaut-groom — which tenant?";
+  const counted = async (comment: unknown) => (await rules([{ ...off, comments: [comment] }])).code;
+  // github / gitlab: the account the session runs as.
+  assertEquals(
+    await counted({ body: text, author: "me", association: "OWNER", by_viewer: true }),
+    0,
+  );
+  // Anyone else's look-alike, even a maintainer's, and an author whose viewer is unknown.
+  assertEquals(
+    await counted({ body: text, author: "x", association: "OWNER", by_viewer: false }),
+    1,
+  );
+  assertEquals(await counted({ body: text, author: "x", association: null, by_viewer: null }), 1);
+  // local: a task file's own sections, written by the repository, name nobody.
+  assertEquals(await counted({ body: text, author: null, association: null, by_viewer: null }), 0);
+});

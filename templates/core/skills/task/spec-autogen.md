@@ -9,8 +9,8 @@ the new task (branch-free — no git branch, no local `.specnaut/specs/` files),
 already written when the task is later picked for implementation. No waiting, no blocking
 pre-step. The flow ends with its push, at the plan stop or step 8, and invokes nothing after it.
 
-- Trigger it once per newly created task, right after the create succeeds — for a single
-  `add.sh` or for every task in a batch.
+- Trigger it once per newly created task, right after the create succeeds — one per
+  `APPLIED create <n>` line the executor printed (`backlog.md`, "The session protocol").
 - **Never fatal to task creation** — if spec generation fails (offline, auth, model error),
   report it and continue; the task stays created and the spec-gen is retryable later by
   running the cloud `plan` for that task by hand.

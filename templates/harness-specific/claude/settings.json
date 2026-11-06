@@ -1,5 +1,13 @@
 {
   "$schema": "https://json.schemastore.org/claude-code-settings.json",
+  "permissions": {
+    "deny": [
+      "Read(~/.config/gh/**)",
+      "Read(~/.specnaut/credentials*)",
+      "Read(**/.env)",
+      "Read(**/.env.*)"
+    ]
+  },
   "hooks": {
     "PreToolUse": [
       {
