@@ -12,7 +12,9 @@
 #   author, association, by_viewer
 #                the issue author's login, authorAssociation (OWNER, MEMBER,
 #                NONE, ...) and viewerDidAuthor: whether the account `gh` is
-#                logged in as wrote it. A deleted account's login is null.
+#                logged in as wrote it. A deleted account's login is null,
+#                and its by_viewer false: null for both is the local backend's
+#                own text (groom-rules.sh), never a remote comment's.
 #   sizes        the `Size` single-select of THIS project's item (project number
 #                and owner from backlog-config.yml), plus every `size:<X>` label
 #   priorities   the same, `Priority` field + `priority:<X>` labels. Both
@@ -92,7 +94,8 @@ record() {
       def labelled($prefix):
         [.labels.nodes[]?.name | select(ascii_downcase | startswith($prefix)) | .[($prefix | length):]];
       def who: { author: (.author.login // null), association: (.authorAssociation // null),
-                 by_viewer: (.viewerDidAuthor | if type == "boolean" then . else null end) };
+                 by_viewer: (if .author.login == null then false
+                             else .viewerDidAuthor | if type == "boolean" then . else null end end) };
     { item: $item,
       title: (.title // ""),
       created: (.createdAt // null),

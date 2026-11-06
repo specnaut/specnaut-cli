@@ -12,7 +12,9 @@
 #   author       the author's username
 #   association  CANNOT be read: GitLab has no author association. null.
 #   by_viewer    whether the author is the user `glab` is signed in as; null
-#                when that user could not be read
+#                when that user could not be read, false when the author is
+#                null: null for both is the local backend's own text
+#                (groom-rules.sh), never a remote comment's
 #   sizes        every `size::<X>` scoped label (`size::M`)
 #   priorities   every `priority::<X>` scoped label (`priority::P1`)
 #   status       the `Status::<X>` scoped label `move.sh` sets; "" without one
@@ -65,7 +67,8 @@ record() {
       [$issue.labels[]? | select(ascii_downcase | startswith($scope))
        | .[($scope | length):] | gsub("^\"|\"$"; "")];
       def who: { author: (.author.username // null), association: null,
-                 by_viewer: (if $viewer == "" or (.author.id | type) != "number" then null
+                 by_viewer: (if .author.username == null then false
+                             elif $viewer == "" or (.author.id | type) != "number" then null
                              else (.author.id | tostring) == $viewer end) };
     if ($notes | type) != "array" then error("notes are not a list") else . end
     | { item: $item,
