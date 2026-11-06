@@ -19,10 +19,10 @@ backend is fixed at init time and recorded in `.specnaut/installed.lock`; run
 
 ## The session protocol — every product-owner dispatch
 
-**The product owner proposes; a bundled executor applies.** It holds no shell. Every dispatch of the
-`product-owner` — these verbs, `groom`, `plan`, the tech-debt intake — runs these steps, and this
-section is their one home. The main session runs no writing script itself; the read-only `list.sh`
-and `view.sh` inspect state.
+**The product owner proposes; a bundled executor applies.** It holds no shell where the harness
+enforces its grant (the agents README's table). Every dispatch of the `product-owner` — these verbs,
+`groom`, `plan`, the tech-debt intake — runs these steps, and this section is their one home. The
+main session runs no writing script itself; the read-only `list.sh` and `view.sh` inspect state.
 
 1. **Read.** `bash .specnaut/scripts/backlog/read-items.sh <verb> [--id <n>] [<n>... | --status
    <column>]`. `<verb>` is one `scope_for` lists in `_backlog_scope.sh` (`add`, `edit`, `estimate`,

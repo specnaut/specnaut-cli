@@ -83,13 +83,21 @@ as skills and instruction files, and neither axis applies.
 
 ## How the tool grant reaches other harnesses
 
-`tools:` is written in Claude Code's vocabulary and read once, by `src/domain/tool_grant.ts`, which
-says what each harness enforces. **OpenCode** denies by name every capability a seat is not
-granted. **Codex** offers no enforced seat isolation: an agent file can switch the shell tool off,
-as it does for a seat whose tools all run and write nothing, but cannot remove exec, inherited MCP
-servers or agent spawning, so the seat's restriction there rests on its instructions.
-**Antigravity** receives the line as written. A pattern in parentheses (`Bash(git log *)`) narrows
-nothing in a subagent's list, so no bundled seat uses one as a fence.
+`tools:` is written in Claude Code's vocabulary and read once, by `src/domain/tool_grant.ts`. This
+table is the one home of whether a narrow grant holds — whether a seat granted no shell, such as
+the product owner (`tools: Read, Grep, Glob`), really has none:
+
+| Harness | Holds | Why |
+| :--- | :--- | :--- |
+| Claude Code | yes | a tool the line does not name is not there: no `Bash`, no shell |
+| OpenCode | yes | a read-only grant is deny-by-default (`"*": deny`, then its read tools): MCP tools, `task` and `skill` included; any other grant denies by name what it lacks |
+| Codex | no | an agent file can switch the shell tool off, as it does for a seat whose tools all run and write nothing, but cannot remove exec, inherited MCP servers or agent spawning: the restriction rests on the seat's instructions |
+| Cursor, Copilot | no | no separate seat: an agent reaches them as a skill or an instruction file, in the session's own tools |
+| Antigravity | unknown | it receives the line as written; what it enforces is its own |
+
+A pattern in parentheses (`Bash(git log *)`) narrows nothing in a subagent's list, so no bundled
+seat uses one as a fence. `specnaut upgrade` warns when a project's product-owner file, under any
+harness, still grants `Bash`, `Write` or `Edit`.
 
 ## Adding an agent
 

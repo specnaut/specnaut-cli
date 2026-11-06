@@ -3,6 +3,7 @@ import { pruneAgenticEntries } from "../domain/parent_managed.ts";
 import { deriveUnchangedEntries, isLockStale, lockWith } from "./upgrade_lock.ts";
 import { reMergeJsonFiles } from "./upgrade_json_merges.ts";
 import { pruneStaging } from "./upgrade_staging.ts";
+import { productOwnerGrantNotices } from "./upgrade_seat_grant_notice.ts";
 import type { UpgradeIo, UpgradeRun, UpToDateResult } from "./upgrade_run.ts";
 
 /**
@@ -33,12 +34,13 @@ export async function finishUpToDate(io: UpgradeIo, run: UpgradeRun): Promise<Up
     : await reMergeJsonFiles(io.writer, run.jsonMerged, run.projectDir);
   // Every dest equals the bundle, so no staged copy has anything left to reconcile.
   const pruned = run.dryRun ? [] : await pruneStaging(io.stagingStore, run.projectDir, new Set());
+  const grants = run.dryRun ? [] : await productOwnerGrantNotices(io.reader, run.projectDir);
   // The version reported is the one now recorded, not the one that was.
   return {
     status: "up-to-date",
     currentVersion: run.templatesVersion,
     refusals: [...run.refusals, ...pruned],
-    notes: merges.notes,
+    notes: [...merges.notes, ...grants],
     mergedChanged: merges.changed,
   };
 }

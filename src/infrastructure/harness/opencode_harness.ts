@@ -14,7 +14,13 @@ import { applySpecAutogen } from "./spec_autogen_filter.ts";
 import { addUnique } from "./bundle_writer.ts";
 import { SKILL_SURFACE } from "./skill_layout.ts";
 import { AGENT_FOLDERS, agentFile } from "../../domain/agent_folders.ts";
-import { CAPABILITIES, type Capability, grantedCapabilities } from "../../domain/tool_grant.ts";
+import {
+  CAPABILITIES,
+  type Capability,
+  grantedCapabilities,
+  isReadOnlyGrant,
+  toolNames,
+} from "../../domain/tool_grant.ts";
 
 type PermissionValue = "allow" | "ask" | "deny" | { "*": "ask" | "allow" | "deny" };
 type PermissionMap = Record<string, PermissionValue>;
@@ -29,15 +35,32 @@ const ALLOWED: Readonly<Record<Capability, PermissionValue>> = {
   websearch: "ask",
 };
 
+/** OpenCode's own tools behind each read-only Claude Code tool; `list` reads a directory. */
+const READ_TOOLS: Readonly<Record<string, ReadonlyArray<string>>> = {
+  Read: ["read", "list"],
+  Grep: ["grep"],
+  Glob: ["glob", "list"],
+  WebFetch: ["webfetch"],
+  WebSearch: ["websearch"],
+};
+
 /**
- * The permission block for a seat's grant (`src/domain/tool_grant.ts`). Every
- * capability it does not grant is denied by name, `read` aside: silence would
- * leave OpenCode's own default in force, which is not the seat's grant.
+ * The permission block for a seat's grant (`src/domain/tool_grant.ts`). A
+ * read-only grant denies every tool (`"*"` first: the last matching rule wins)
+ * and allows back its own. Any other grant denies by name each capability it
+ * does not hold, `read` aside: silence would leave OpenCode's default in force.
  */
 function translateToolsToPermissions(toolsField: string | null): PermissionMap | null {
   const granted = grantedCapabilities(toolsField);
   if (granted === null) return null;
   const map: PermissionMap = {};
+  if (isReadOnlyGrant(toolsField)) {
+    map["*"] = "deny";
+    for (const tool of toolNames(toolsField ?? "").flatMap((t) => READ_TOOLS[t] ?? [])) {
+      map[tool] = tool.startsWith("web") ? "ask" : "allow";
+    }
+    return map;
+  }
   for (const capability of CAPABILITIES) {
     if (granted.has(capability)) map[capability] = ALLOWED[capability];
     else if (capability !== "read") map[capability] = "deny";
@@ -49,7 +72,7 @@ function stringifyPermissions(perms: PermissionMap): string {
   const lines: string[] = ["permission:"];
   for (const [key, value] of Object.entries(perms)) {
     if (typeof value === "string") {
-      lines.push(`  ${key}: ${value}`);
+      lines.push(`  ${/^[a-z_]+$/.test(key) ? key : `"${key}"`}: ${value}`);
     } else {
       // bash: { "*": "ask" } → block form
       lines.push(`  ${key}:`);

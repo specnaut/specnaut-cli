@@ -1,5 +1,6 @@
 import { assert, assertEquals, assertStringIncludes } from "@std/assert";
 import { parse as parseToml } from "@std/toml";
+import { parse as parseYaml } from "@std/yaml";
 import { CORE_BUNDLE } from "../../../src/templates_bundle.ts";
 import { CodexHarness } from "../../../src/infrastructure/harness/codex_harness.ts";
 import { OpenCodeHarness } from "../../../src/infrastructure/harness/opencode_harness.ts";
@@ -42,12 +43,24 @@ Deno.test("Codex runs every bundled seat with a read-only grant without the shel
   }
 });
 
+/** The `permission:` map an OpenCode agent file carries, and its first key. */
+const permissionOf = (md: string) => {
+  const fm = parseYaml(splitFrontmatter(md)!.fmBody) as { permission: Record<string, unknown> };
+  return { map: fm.permission, first: /^permission:\n {2}(\S+):/m.exec(md)?.[1] };
+};
+/** A read-only grant on OpenCode: every tool denied, then its read tools allowed back. */
+const READ_ONLY = { "*": "deny", read: "allow", list: "allow", grep: "allow", glob: "allow" };
+
 Deno.test("OpenCode denies every capability a seat's grant does not hold", () => {
   const out = new OpenCodeHarness().mapBundle(seats, OPTS);
   for (const seat of seats) {
     const md = out[`.opencode/agents/specnaut-${seat.name}.md`].content;
     const granted = grantedCapabilities(toolsOf(seat.content));
     assert(granted !== null, `${seat.name} has no tools line`);
+    if (toolsOf(seat.content) === "Read, Grep, Glob") {
+      assertEquals(permissionOf(md), { map: READ_ONLY, first: '"*"' }, seat.name);
+      continue;
+    }
     for (const capability of ["write", "edit", "bash", "webfetch", "websearch"] as const) {
       const denied = new RegExp(`^  ${capability}: deny$`, "m").test(md);
       assertEquals(denied, !granted.has(capability), `${seat.name}: ${capability}`);
@@ -87,13 +100,14 @@ Deno.test("CodexHarness drops the shell only for a grant of tools that run and w
   }
 });
 
-Deno.test("agent with a read-only grant denies write, edit and the shell by name", () => {
-  const bundle = new OpenCodeHarness().mapBundle([agentEntry("seat", "Read, Grep, Glob")], OPTS);
-  const content = bundle[".opencode/agents/specnaut-seat.md"].content;
-  assertStringIncludes(content, "read: allow");
-  for (const key of ["write", "edit", "bash", "webfetch", "websearch"]) {
-    assertStringIncludes(content, `  ${key}: deny`);
-  }
+Deno.test("a read-only grant on OpenCode denies by default, MCP, task and skill included", () => {
+  const bundle = new OpenCodeHarness().mapBundle([
+    agentEntry("seat", "Read, Grep, Glob"),
+    agentEntry("fetcher", "Read, WebFetch"),
+  ], OPTS);
+  const of = (n: string) => permissionOf(bundle[`.opencode/agents/specnaut-${n}.md`].content);
+  assertEquals(of("seat"), { map: READ_ONLY, first: '"*"' });
+  assertEquals(of("fetcher").map, { "*": "deny", read: "allow", list: "allow", webfetch: "ask" });
 });
 
 Deno.test("agent maps NotebookEdit to edit", () => {

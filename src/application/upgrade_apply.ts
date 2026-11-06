@@ -7,6 +7,7 @@ import { planStaging, pruneStaging } from "./upgrade_staging.ts";
 import { removeOrphans } from "./upgrade_orphan_removal.ts";
 import { applyContextLinks } from "./upgrade_context_links.ts";
 import { reMergeJsonFiles } from "./upgrade_json_merges.ts";
+import { productOwnerGrantNotices } from "./upgrade_seat_grant_notice.ts";
 import type { AppliedResult, UpgradeIo, UpgradeRun } from "./upgrade_run.ts";
 
 type Backups = BackupReport["backups"];
@@ -60,7 +61,11 @@ export async function applyUpgrade(io: UpgradeIo, run: UpgradeRun): Promise<Appl
     contextLinks: written.links,
     managedSections: appliedSections,
     written: Object.keys(written.bundle).sort(),
-    notes: [...run.links.notes, ...merges.notes],
+    notes: [
+      ...run.links.notes,
+      ...merges.notes,
+      ...await productOwnerGrantNotices(io.reader, run.projectDir),
+    ],
     mergedChanged: merges.changed,
   };
 }
