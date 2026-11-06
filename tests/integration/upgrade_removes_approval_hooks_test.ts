@@ -31,6 +31,12 @@ const RETIRED = [
   ".specnaut/scripts/bash/merge-hold.sh",
 ];
 const ASK = ["Bash(gh release create *)", "Bash(*release/tag.sh*)", "Bash(gh release new *)"];
+/** The read-deny rules every upgrade merges into Claude's settings, as shipped. */
+const DENY: string[] = JSON.parse(
+  Deno.readTextFileSync(
+    fromFileUrl(new URL("../../templates/harness-specific/claude/settings.json", import.meta.url)),
+  ),
+).permissions.deny;
 
 async function runSpecnaut(args: string[], cwd: string, home: string) {
   const { code, stdout, stderr } = await new Deno.Command("deno", {
@@ -116,7 +122,7 @@ for (const harness of ["claude", "codex"] as const) {
       assertEquals(after.hooks.UserPromptSubmit, undefined);
       assertEquals(after.hooks.Stop, undefined);
       if (harness === "claude") {
-        assertEquals(after.permissions, { allow: ["Read"], ask: ["Bash(mine)"] });
+        assertEquals(after.permissions, { allow: ["Read"], ask: ["Bash(mine)"], deny: DENY });
       }
 
       const again = await runSpecnaut(["upgrade"], dir, home);
