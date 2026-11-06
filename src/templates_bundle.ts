@@ -6092,10 +6092,11 @@ as skills and instruction files, and neither axis applies.
 
 \`tools:\` is written in Claude Code's vocabulary and read once, by \`src/domain/tool_grant.ts\`, which
 says what each harness enforces. **OpenCode** denies by name every capability a seat is not
-granted. **Codex** has no per-tool list: a seat whose tools all run and write nothing runs in
-its \`read-only\` sandbox, which stops writes and network, not commands. **Antigravity** receives the
-line as written. A pattern in parentheses (\`Bash(git log *)\`) narrows nothing in a subagent's list,
-so no bundled seat uses one as a fence.
+granted. **Codex** offers no enforced seat isolation: an agent file can switch the shell tool off,
+as it does for a seat whose tools all run and write nothing, but cannot remove exec, inherited MCP
+servers or agent spawning, so the seat's restriction there rests on its instructions.
+**Antigravity** receives the line as written. A pattern in parentheses (\`Bash(git log *)\`) narrows
+nothing in a subagent's list, so no bundled seat uses one as a fence.
 
 ## Adding an agent
 

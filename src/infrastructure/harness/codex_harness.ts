@@ -25,6 +25,8 @@ import { AGENT_FOLDERS, agentFile } from "../../domain/agent_folders.ts";
 import { isReadOnlyGrant } from "../../domain/tool_grant.ts";
 
 const AGENTS = AGENT_FOLDERS.codex;
+/** Best effort only: Codex enforces no seat isolation (`tool_grant.ts` says what stays). */
+const CODEX_READ_ONLY_FEATURES = { shell_tool: false, request_permissions_tool: false } as const;
 
 function parseAgentFrontmatter(
   content: string,
@@ -58,10 +60,8 @@ function toCodexSubagentToml(entry: CoreEntry): string {
     name: entry.name,
     description: description || `Specnaut ${entry.name} agent`,
     ...(reasoning ? { model_reasoning_effort: reasoning } : {}),
-    // Codex has no per-tool list: a grant naming only tools that run and write
-    // nothing is its read-only sandbox (`src/domain/tool_grant.ts` says what that does not stop).
-    ...(isReadOnlyGrant(tools) ? { sandbox_mode: "read-only" } : {}),
     developer_instructions: body,
+    ...(isReadOnlyGrant(tools) ? { features: CODEX_READ_ONLY_FEATURES } : {}),
   });
   return family === null ? toml : `# Model family: ${family} (${tier} on Claude Code)\n${toml}`;
 }

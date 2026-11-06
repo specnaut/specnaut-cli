@@ -28,12 +28,17 @@ Deno.test("the bundle ships the seats these cases read", () => {
   assert(seats.some((s) => isReadOnlyGrant(toolsOf(s.content))), "no read-only seat to check");
 });
 
-Deno.test("Codex runs every bundled seat with a read-only grant in its read-only sandbox", () => {
+/** What Codex gets for a read-only grant: the shell and the permission request switched off. */
+const NO_SHELL = { shell_tool: false, request_permissions_tool: false };
+
+Deno.test("Codex runs every bundled seat with a read-only grant without the shell tool", () => {
   const out = new CodexHarness().mapBundle(seats, OPTS);
   for (const seat of seats) {
     const toml = parseToml(out[`.codex/agents/${seat.name}.toml`].content);
-    const expected = isReadOnlyGrant(toolsOf(seat.content)) ? "read-only" : undefined;
-    assertEquals(toml.sandbox_mode, expected, seat.name);
+    const expected = isReadOnlyGrant(toolsOf(seat.content)) ? NO_SHELL : undefined;
+    assertEquals(toml.features, expected, seat.name);
+    assertEquals(toml.sandbox_mode, undefined, `${seat.name}: a seat file cannot set it`);
+    assertEquals(typeof toml.developer_instructions, "string", `${seat.name}: top level`);
   }
 });
 
@@ -62,7 +67,7 @@ function agentEntry(name: string, tools: string | null): CoreBundle[number] {
   };
 }
 
-Deno.test("CodexHarness runs only a grant of tools that run and write nothing read-only", () => {
+Deno.test("CodexHarness drops the shell only for a grant of tools that run and write nothing", () => {
   const mapped = new CodexHarness().mapBundle([
     agentEntry("agented", "Read, Agent(developer)"),
     agentEntry("reader", "Read, Grep, Glob"),
@@ -73,12 +78,12 @@ Deno.test("CodexHarness runs only a grant of tools that run and write nothing re
     agentEntry("editor", "Read, Edit"),
     agentEntry("untooled", null),
   ], OPTS);
-  const sandbox = (name: string) =>
-    parseToml(mapped[`.codex/agents/${name}.toml`].content).sandbox_mode;
-  assertEquals(sandbox("reader"), "read-only");
-  assertEquals(sandbox("fetcher"), "read-only");
+  const features = (name: string) =>
+    parseToml(mapped[`.codex/agents/${name}.toml`].content).features;
+  assertEquals(features("reader"), NO_SHELL);
+  assertEquals(features("fetcher"), NO_SHELL);
   for (const name of ["agented", "shell", "patterned", "writer", "editor", "untooled"]) {
-    assertEquals(sandbox(name), undefined, `${name} must keep the session's sandbox`);
+    assertEquals(features(name), undefined, `${name} must keep the session's tools`);
   }
 });
 

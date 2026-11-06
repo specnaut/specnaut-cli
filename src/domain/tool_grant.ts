@@ -8,12 +8,12 @@
  * - **Claude Code** enforces the list itself: a tool not named is not there.
  * - **OpenCode** gets an explicit `deny` for every capability not granted,
  *   rather than silence, which would leave OpenCode's own default in force.
- * - **Codex** has no per-tool list; a grant naming only tools that run and
- *   write nothing runs in its `read-only` sandbox. That sandbox stops writes
- *   and network, not command execution, and a parent session started with full
- *   access may override it. Any other grant gets no `sandbox_mode` and inherits
- *   the parent session's: judging a grant read-only fails closed on the label,
- *   not by imposing the strictest sandbox.
+ * - **Codex** offers no enforced seat isolation. A seat inherits the parent
+ *   session's sandbox, and its agent file can switch the shell tool off but
+ *   cannot remove exec, inherited MCP servers or agent spawning. A grant naming
+ *   only tools that run and write nothing gets `[features]` with `shell_tool`
+ *   and `request_permissions_tool` off, as best effort; the seat's restriction
+ *   there rests on its instructions. Any other grant keeps the session's tools.
  * - **Antigravity** receives the line verbatim; what it enforces is its own.
  * - **Cursor and Copilot** run no separate seat, so no grant applies.
  *
