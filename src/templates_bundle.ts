@@ -12100,8 +12100,8 @@ gu_manifests() {
 # _scope_globs.sh - the one home of which paths count as front-end, test,
 # dependency-manifest and infrastructure files. Sourced by _git_untrusted.sh,
 # so collect-audit-scope.sh's CATEGORY SIGNALS and git-read.sh's \`manifests\`
-# form read the same lists. The globs are heuristic (research.md Decision 1):
-# good enough to pick which expert seats run.
+# form read the same lists. The globs are heuristic: good enough to pick which
+# expert seats run.
 
 SCOPE_FRONTEND_GLOBS=('*.tsx' '*.jsx' '*.vue' '*.svelte' '*.css' '*.scss' '*inertia*' '*frontend*'
   '*components*')
@@ -27253,8 +27253,8 @@ gu_manifests() {
 # _scope_globs.sh - the one home of which paths count as front-end, test,
 # dependency-manifest and infrastructure files. Sourced by _git_untrusted.sh,
 # so collect-audit-scope.sh's CATEGORY SIGNALS and git-read.sh's \`manifests\`
-# form read the same lists. The globs are heuristic (research.md Decision 1):
-# good enough to pick which expert seats run.
+# form read the same lists. The globs are heuristic: good enough to pick which
+# expert seats run.
 
 SCOPE_FRONTEND_GLOBS=('*.tsx' '*.jsx' '*.vue' '*.svelte' '*.css' '*.scss' '*inertia*' '*frontend*'
   '*components*')
