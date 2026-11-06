@@ -17,7 +17,9 @@ plan → implement → review → merge → push
    rest is `phases/plan.md` step 6. Nothing open → a report, then `implement`.
 2. **The review verdict — only under `manual`.** The merge mode is read here and nowhere else,
    the per-run instruction first: `--manual-merge`, or "stop before merging" / "do not push", means
-   `manual`; "merge it" means `auto`. Otherwise:
+   `manual`; "merge it" means `auto`. Then `specnaut verify-scripts`: any outcome but the trusted
+   one (`phases/merge.md` step 0), or a `NAMES_FILE` that lists `.specnaut/workflow.yml`, means
+   `manual` for this run — say which, and do not run the script below. Otherwise:
 
    ```
    bash .specnaut/scripts/bash/merge-mode.sh

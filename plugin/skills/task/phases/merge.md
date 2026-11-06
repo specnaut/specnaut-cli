@@ -13,8 +13,8 @@ $ARGUMENTS
 - `$ARGUMENTS` may carry, in any order: **`--pr`** — deliver through a pull request instead of a
   local merge; **`--no-close`** — merge and push but leave the backlog item open (a feature
   delivered across several branches, on every branch but the last).
-- The base branch is what `bash .specnaut/scripts/bash/base-branch.sh` prints. Exit 3 means it is
-  unknown: stop and say so — never assume `main`.
+- The base branch is the `BASE_BRANCH` that `specnaut verify-scripts` prints at step 0. No such line
+  means it is unknown: stop and say so — never assume `main`.
 
 ## The default is a local merge. `--pr` is the opt-in.
 
@@ -23,6 +23,24 @@ when the project genuinely requires the round-trip — a protected base, a human
 that runs only on `pull_request`. **Do not infer `--pr` from a remote, a forge or an open issue.**
 
 ## Steps
+
+0. **Check the helper scripts — before any script under `.specnaut/scripts/` runs**, and again
+   before step 3 and after every commit this phase makes or rewrites (squash, fold, rebase):
+
+   ```bash
+   specnaut verify-scripts
+   ```
+
+   - **Trusted** — exit 0, a full `BASE` sha, and the last line `VERDICT scripts trusted`: go on.
+   - **Exit 1, every reason `behind base: rebase`** — `git rebase refs/remotes/origin/<BASE_BRANCH>`,
+     re-run the gates, verify again. Not a question: the branch only lags the base.
+   - **Exit 1, any other reason** — this run's merge mode is `manual`, whatever
+     `phases/auto-chain.md` read. Stop on the branch, name each `UNTRUSTED` path and its reason, and
+     ask once: *"This branch changes these helper scripts. Yes lands these scripts and runs them to
+     land."* A yes runs the rest of this phase, `land-feature.sh` and `phases/merge-close.md`
+     included, on that approved verdict; anything else stays on the branch, nothing landed.
+   - **Anything else** — exit 3, no `specnaut` on the PATH, output without the three trusted parts:
+     stop on the branch and say so. Nothing lands.
 
 1. **Shape the history.** Ask the branch, not the board — `bash .specnaut/scripts/bash/epic-status.sh`
    reads its `Epic: #` trailers, and only before the landing: after it, the range is empty. Keep its
@@ -53,7 +71,7 @@ that runs only on `pull_request`. **Do not infer `--pr` from a remote, a forge o
    run step 5 and step 6, and **stop**: nothing has merged, so the item stays open. Re-run
    `/task merge` after the PR lands, or let the forge's close keyword handle it. Never use the forge's "Squash and
    merge": it collapses the scopes the squash produced.
-3. **Land it:**
+3. **Land it** — after step 0 ran again on the history as it now stands:
 
    ```
    bash .specnaut/scripts/bash/land-feature.sh
@@ -63,9 +81,11 @@ that runs only on `pull_request`. **Do not infer `--pr` from a remote, a forge o
    contains `origin/<base>` and adds to it; it fast-forwards the base, pushes it, deletes the
    branch with `-d`, and verifies `HEAD` is the base; it prints `LANDED <base> <first>..<last> <n>
    commit(s)`. **It pushes without asking, in either merge mode**: reaching
-   this step is the instruction — `phases/auto-chain.md` reads the mode, this phase does not.
+   this step is the instruction — `phases/auto-chain.md` reads the mode, and this phase stops only
+   where step 0 says.
 4. **Read its exit** — this table maps every exit `land-feature.sh`'s header lists; an exit it does
-   not list is a finding: quote it and stop on the branch.
+   not list is a finding: quote it and stop on the branch. A row that rebases runs step 0 again
+   before it lands again.
 
    | Exit | Meaning | What you do |
    | :--- | :--- | :--- |

@@ -71,8 +71,8 @@ Deno.test("review-seats.md keeps untrusted diff content out of the merging sessi
     "last block",
   );
   assert(
-    s.includes("bash .specnaut/scripts/bash/git-read.sh names <base> HEAD"),
-    "EVIDENCE checked against the diff",
+    s.includes("check it against the file `NAMES_FILE` names (`review.md` step 1)"),
+    "EVIDENCE checked against the diff the verifier listed",
   );
 });
 
@@ -114,7 +114,8 @@ Deno.test("seat requirement lives in review.md, the missing-seat remedy in revie
   }
   assert(s.includes("re-dispatched with a **narrower** brief second"), "the remedy's home");
   assert(!r.includes("narrower"), "review.md restates the remedy instead of pointing at it");
-  assert(r.includes("`phases/review-seats.md` § Your own checking, and re-dispatch"), "pointer");
+  assert(r.includes("`phases/review-seats.md` § A missing seat stops the run"), "pointer");
+  assert(s.includes("The remedy is § Your own checking, and re-dispatch."), "the stop's remedy");
   assert(!r.includes("two reasons now"), "a sentence dated to the change that wrote it");
 });
 

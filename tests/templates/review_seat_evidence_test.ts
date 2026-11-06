@@ -88,7 +88,7 @@ Deno.test("the aggregation checks a clean seat's EVIDENCE against the diff and c
   assert(doc, "phases/review-seats.md missing from CORE_BUNDLE");
   const flat = doc.content.replace(/\s+/g, " ");
   assert(
-    flat.includes("bash .specnaut/scripts/bash/git-read.sh names <base> HEAD"),
+    flat.includes("check it against the file `NAMES_FILE` names"),
     "checked against the diff",
   );
   assert(flat.includes("NOT RUN: clean verdict, no evidence"), "named NOT RUN in TOP_ISSUES");

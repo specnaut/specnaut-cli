@@ -9,10 +9,26 @@ $ARGUMENTS
 
 ## Outline
 
-1. Fix the range: `base=$(bash .specnaut/scripts/bash/git-read.sh base main)`; the files under
-   review are `bash .specnaut/scripts/bash/git-read.sh names "$base" HEAD`. Then run the scope
-   script once, `bash .specnaut/scripts/audit/collect-audit-scope.sh --range "$base..HEAD"`:
-   Phase 0 and Seat selection both read its CATEGORY SIGNALS.
+1. **Check the helper scripts, then fix the range.** Run this block as written, from the project's
+   root, before any script under `.specnaut/scripts/` runs — again after each fix cycle (Phase 3):
+
+   <!-- review-gate: verify-scripts -->
+   ```bash
+   out=$(specnaut verify-scripts); rc=$?; printf '%s\n' "$out"
+   base=$(printf '%s\n' "$out" | sed -n 's/^BASE \([0-9a-f]\{40,64\}\)$/\1/p')
+   last=$(printf '%s\n' "$out" | tail -n 1)
+   if [ "$rc" -eq 0 ] && [ -n "$base" ] && [ "$last" = "VERDICT scripts trusted" ]; then
+     bash .specnaut/scripts/audit/collect-audit-scope.sh --range "$base..HEAD"
+   else
+     echo "SCRIPTS NOT RUN: verify-scripts exit $rc"
+   fi
+   ```
+
+   The files under review are the lines of the file `NAMES_FILE` names. **No `BASE` line** — exit
+   2 or 3, or no `specnaut` on the PATH — **stops the review**: say the base or the verifier is
+   missing; never fall back to a script of the tree. Any outcome but the trusted one runs no script
+   of the tree in this review: `phases/review-seats.md` § Review — Phase 0 says how each step is
+   briefed. Phase 0 and Seat selection read the CATEGORY SIGNALS the scope script printed.
 2. Measure (Phase 0), then fan the review seats out from this session (Phase 1) and aggregate
    their reports per `phases/review-seats.md`.
 3. Detect the project's toolchain and run its quality gates.
@@ -94,7 +110,8 @@ If none of the markers match, skip Phase 2 and note it in the report.
 For each finding the routing rule below says to fix — which is most of them, not
 only the CRITICAL and HIGH ones — spawn the `developer` agent with the finding
 and the target file:line. After the developer reports the fix, re-run the
-specific check that failed (or the full quality gate if the fix is broad).
+specific check that failed (or the full quality gate if the fix is broad), after re-running the
+step 1 block: a fix may have touched `.specnaut/scripts/`, and the last verdict no longer holds.
 
 Batch the cheap ones into a single dispatch. Ten one-line fixes are one commit
 and one round trip, not ten.
@@ -154,31 +171,11 @@ is always true, and a loop with no exit criterion does not terminate. The exit i
 "nothing left that would hurt a user, a maintainer, or the data", not "nothing
 left at all".
 
-## An epic's children — only the last review is a stop
+## An epic's children, and a missing seat
 
-On an epic branch this phase runs once per child, inside the loop
-(`phases/epic-loop.md`). **A child's review does not stop the run.** Findings
-go to the lead, who triages, fixes, commits against that child and moves on in
-the same turn.
-
-**The last child's review is the stop** — the single user-facing checkpoint
-before the merge. Everything below applies to it exactly as written; the
-earlier children's reviews are reported and carried, not held.
-
-## Phase 3b — A missing seat stops the run
-
-Before the report: if the aggregated block has `SEATS_REPORTED <
-SEATS_EXPECTED`, the run **does not reach the merge prompt**. Say which seat
-did not report and stop. Findings-based routing cannot catch this — a seat
-that never ran produces no findings to route and no cell to fill, so without
-this check a lost seat reads as a quiet pass all the way to merge.
-
-A seat can be short here for two reasons: it returned no block, or it
-returned a **clean** one naming no evidence from the diff, which
-`phases/review-seats.md` counts as zero. This check needs no change to catch the second —
-that is the point of the state being a number rather than a prose note.
-
-The remedy is `phases/review-seats.md` § Your own checking, and re-dispatch.
+On an epic branch only the last child's review is a stop (`phases/epic-loop.md` § A child's
+review). A seat that did not report stops the run before the merge (`phases/review-seats.md`
+§ A missing seat stops the run).
 
 ## Phase 4 — Final report
 

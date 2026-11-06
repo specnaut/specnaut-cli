@@ -28,6 +28,8 @@ import { skillDocName } from "../../../src/domain/core_bundle.ts";
 // (a commit subject is a claim).
 // Review's golden re-captured when its Phase 0 moved into review-seats.md, leaving a pointer.
 // And again when its step 1 began running the scope script that Phase 0 and Seat selection read.
+// And again when step 1 became the verify-scripts gate block, and its epic and missing-seat
+// sections moved to epic-loop.md and review-seats.md behind a pointer.
 
 function abs(rel: string): string {
   return fromFileUrl(new URL(`../../${rel}`, import.meta.url));

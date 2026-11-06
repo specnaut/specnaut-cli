@@ -34,7 +34,7 @@ Deno.test("review's Phase 0 runs the fast gate for code-reviewer, unless the dif
   assert(s.includes("the fast tier declared on the branch under review"), "not the committed one");
   assert(
     s.includes(
-      "Do not run it when the files under review include `.specnaut/gates.yml` or anything under `.specnaut/scripts/`",
+      "Do not run it when the verdict is not trusted, or when `NAMES_FILE` lists `.specnaut/gates.yml` or anything under `.specnaut/scripts/`",
     ),
     "a diff that rewrites the gate must not get it executed for the seat reviewing it",
   );
@@ -54,7 +54,7 @@ Deno.test("review.md runs the scope script before Phase 0 reads its signals", as
   const r = await read(REVIEW);
   const scope = r.indexOf("collect-audit-scope.sh --range");
   assert(scope >= 0 && scope < r.indexOf("## Phase 0"), "the scope script runs in the outline");
-  assert(flat(r).includes("Phase 0 and Seat selection both read its CATEGORY SIGNALS"), "reuse");
+  assert(flat(r).includes("Phase 0 and Seat selection read the CATEGORY SIGNALS"), "reuse");
 });
 
 /** The git reads the phases run for the seats go through the library with hardened defaults. */
@@ -66,6 +66,10 @@ Deno.test("the review and audit phases read git only through git-read.sh", async
       /(`|\$\()git\s+(?:-\S+\s+)*(?:diff|log|show|ls-files|grep|merge-base|rev-parse|rev-list|blame|cat-file)\b[^`)]*/g,
     ) ?? [];
     assertEquals(raw, [], `${doc} runs git directly`);
-    assert(text.includes("bash .specnaut/scripts/bash/git-read.sh"), `${doc} names git-read.sh`);
+    // review.md reads its range from the verifier, which runs before any script of the tree.
+    const reader = doc === REVIEW
+      ? "specnaut verify-scripts"
+      : "bash .specnaut/scripts/bash/git-read.sh";
+    assert(text.includes(reader), `${doc} names ${reader}`);
   }
 });

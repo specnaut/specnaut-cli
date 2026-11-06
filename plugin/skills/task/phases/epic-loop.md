@@ -47,3 +47,13 @@ branch with no child commit yet reads **14** (not an epic branch), or **16** whe
 earlier branch of the same epic already landed — either way, start at the first open child. Do not
 use issue state as a progress signal — child issues stay open for the whole loop. Any other exit
 stops the loop: say which — the rest are mapped once, in `phases/merge.md` step 1.
+
+## A child's review — only the last one is a stop
+
+On an epic branch `phases/review.md` runs once per child, inside this loop. **A child's review does not stop the run.** Findings
+go to the lead, who triages, fixes, commits against that child and moves on in
+the same turn.
+
+**The last child's review is the stop** — the single user-facing checkpoint
+before the merge. Everything below applies to it exactly as written; the
+earlier children's reviews are reported and carried, not held.

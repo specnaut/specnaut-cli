@@ -15,8 +15,8 @@ Deno.test("review, merge and merge-close follow the merge mode instead of always
   assertStringIncludes(review, "follow `phases/auto-chain.md`\nfrom there");
   assert(!review.includes('invoke it on "yes"'), "review.md restates the merge mode");
   const merge = phase("merge").content;
-  // The base branch has one home (spec 036); merge.md asks it and never assumes main.
-  assertStringIncludes(merge, "bash .specnaut/scripts/bash/base-branch.sh");
+  // The base branch comes from the verifier, which runs before any script of the tree; never main.
+  assertStringIncludes(merge, "the `BASE_BRANCH` that `specnaut verify-scripts` prints");
   assertStringIncludes(merge, "never assume `main`");
   // D6: merge never asks about the push (run by land-feature.sh); D4: it does not read the mode.
   assertStringIncludes(merge, "pushes without asking, in either merge mode");
