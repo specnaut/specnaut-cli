@@ -5,7 +5,7 @@ import type { InstalledLock, LockEntry } from "../domain/installed_lock.ts";
 import { sha256Hex } from "../domain/sha256.ts";
 import { classifyLinkDisk, linkOwnership } from "../domain/context_link.ts";
 import { gatherLinkEvidence } from "./link_evidence.ts";
-import { bundleOptionsOf } from "./upgrade_lock.ts";
+import { bundleForLock } from "./lock_bundle.ts";
 
 /**
  * Per-file outcome of comparing a managed file's on-disk content against the
@@ -136,11 +136,9 @@ export class DiffProjectUseCase {
    * against the same bytes a refresh would write.
    */
   private bundleFor(lock: InstalledLock): Bundle {
-    const harness = this.deps.findHarness(lock.harness);
-    if (!harness) {
-      throw new Error(`unknown harness in lock: ${lock.harness}`);
-    }
-    return harness.mapBundle(this.deps.core, bundleOptionsOf(lock));
+    const bundle = bundleForLock(this.deps.core, lock, this.deps.findHarness);
+    if (bundle === null) throw new Error(`unknown harness in lock: ${lock.harness}`);
+    return bundle;
   }
 
   /** One lock-tracked dest's divergence, or `null` when nothing is on disk there. */

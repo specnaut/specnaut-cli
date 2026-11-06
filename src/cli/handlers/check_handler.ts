@@ -6,7 +6,7 @@ import { DenoEnvironmentProbe } from "../../infrastructure/deno_environment_prob
 import { FsProjectInspector } from "../../infrastructure/fs_project_inspector.ts";
 import { FsPluginDetector } from "../../infrastructure/fs_plugin_detector.ts";
 import { phaseRouterDest } from "../../application/upgrade_renames.ts";
-import { bundleOptionsOf } from "../../application/upgrade_lock.ts";
+import { bundleOptionsOf } from "../../application/lock_bundle.ts";
 import { findHarness } from "../harnesses.ts";
 import { TEMPLATES_VERSION } from "../../templates_bundle.ts";
 import { type CheckOutcome, worstStatusOf } from "../../domain/check_result.ts";

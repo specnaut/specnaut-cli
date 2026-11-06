@@ -7,7 +7,7 @@ import type { InstalledLock } from "../domain/installed_lock.ts";
 import { computeUpgradePlan, type UpgradePlan } from "../domain/upgrade_plan.ts";
 import { isPluginCoveredPath, PLUGIN_NAME, pluginRelativePath } from "../domain/plugin_coverage.ts";
 import { isAgenticPath } from "../domain/parent_managed.ts";
-import { bundleOptionsOf } from "./upgrade_lock.ts";
+import { bundleOptionsOf } from "./lock_bundle.ts";
 import { type ManagedSectionOutcome, surveyManagedSections } from "./upgrade_managed_sections.ts";
 import { carryRenames } from "./upgrade_renames.ts";
 import { gatherPlanInputs } from "./upgrade_plan_inputs.ts";

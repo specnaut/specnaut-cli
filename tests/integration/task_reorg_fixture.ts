@@ -2,7 +2,7 @@ import { assertEquals } from "@std/assert";
 import { dirname, fromFileUrl, join, relative, SEPARATOR } from "@std/path";
 import { findHarness } from "../../src/cli/harnesses.ts";
 import { destResolver } from "../../src/application/upgrade_renames.ts";
-import { bundleOptionsOf } from "../../src/application/upgrade_lock.ts";
+import { bundleOptionsOf } from "../../src/application/lock_bundle.ts";
 import { parseLock, serializeLock } from "../../src/domain/installed_lock.ts";
 import type { CoreEntry } from "../../src/domain/core_bundle.ts";
 import {

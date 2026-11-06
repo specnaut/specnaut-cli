@@ -1,6 +1,6 @@
 import { type Bundle, lockShaInput } from "../domain/template.ts";
 import type { InstalledLock, LockEntry } from "../domain/installed_lock.ts";
-import type { BundleOptions } from "./bundle_options.ts";
+import { bundleOptionsOf } from "./lock_bundle.ts";
 import type { UpgradePlan } from "../domain/upgrade_plan.ts";
 import { keptOrphanEntries } from "../domain/orphan_scope.ts";
 import { isAgenticPath } from "../domain/parent_managed.ts";
@@ -211,16 +211,6 @@ async function entryFor(
     templatesVersion: matchesBundle
       ? templatesVersion
       : (existing?.templatesVersion ?? templatesVersion),
-  };
-}
-
-/** The install options a lock records, as the bundle mapper takes them. */
-export function bundleOptionsOf(lock: InstalledLock): BundleOptions {
-  return {
-    backlogBackend: lock.backlogBackend,
-    versionScheme: lock.versionScheme,
-    specBackend: lock.specBackend,
-    specAutogen: lock.specAutogen,
   };
 }
 
