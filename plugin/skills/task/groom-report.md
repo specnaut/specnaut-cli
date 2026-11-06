@@ -76,7 +76,7 @@ Per-ticket:
   ↳ ...
 
 ⚠ promotion failed — groomed but still in <intake>:
-  ↳ <backlog-reference> — <move.sh's error, verbatim>
+  ↳ <backlog-reference> — <the executor's `FAILED move <n> <exit>` line>
   (omit when every promotion landed; never omitted when one did not — a
    groomed item left in intake is exactly what grooming exists to prevent)
 
@@ -98,7 +98,7 @@ Per-ticket:
 WIP:        <wip-audit.sh's summary line, verbatim — or "not classified: <its stderr>">
   ↳ <backlog-reference> → moved to <review|ready> | commented (idle|blocked)
        | left (active|epic|blocked|idle, ready column|PROMOTE=no|epic gate failed)
-       | move failed: <move.sh's error, verbatim>
+       | move failed: <the executor's `FAILED move <n> <exit>` line>
        <the line it acted on, e.g. LANDED 12 <sha>>
   ↳ ...
   (every audited item gets a line; DEFERRED items are counted, not listed)

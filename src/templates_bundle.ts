@@ -2725,7 +2725,7 @@ Per-ticket:
   ↳ ...
 
 ⚠ promotion failed — groomed but still in <intake>:
-  ↳ <backlog-reference> — <move.sh's error, verbatim>
+  ↳ <backlog-reference> — <the executor's \`FAILED move <n> <exit>\` line>
   (omit when every promotion landed; never omitted when one did not — a
    groomed item left in intake is exactly what grooming exists to prevent)
 
@@ -2747,7 +2747,7 @@ Per-ticket:
 WIP:        <wip-audit.sh's summary line, verbatim — or "not classified: <its stderr>">
   ↳ <backlog-reference> → moved to <review|ready> | commented (idle|blocked)
        | left (active|epic|blocked|idle, ready column|PROMOTE=no|epic gate failed)
-       | move failed: <move.sh's error, verbatim>
+       | move failed: <the executor's \`FAILED move <n> <exit>\` line>
        <the line it acted on, e.g. LANDED 12 <sha>>
   ↳ ...
   (every audited item gets a line; DEFERRED items are counted, not listed)
@@ -4751,9 +4751,9 @@ harness's own documentation wins wherever it says something newer.
 - **Multi-session dispatch (\`claude agents\`)** — opens a terminal UI that lists every background
   Claude session, dispatches new ones, and lets you peek / reply / attach without losing context.
   Specnaut's scaffolded subagents in \`.claude/agents/\` appear in the dispatch picker automatically —
-  start one with the agent name as the first word, e.g. \`developer fix the lint errors in src/cli/\`,
-  \`@code-reviewer review the last commit\`, or \`@product-owner groom the backlog\`. Skills are
-  dispatchable too: \`/task plan "<feature>"\` launches a session running the full
+  start one with the agent name as the first word, e.g. \`developer fix the lint errors in src/cli/\`
+  or \`@code-reviewer review the last commit\`. Skills are dispatchable too: \`/task groom\` grooms the
+  backlog, and \`/task plan "<feature>"\` launches a session running the full
   plan-implement-review chain. File edits are isolated under \`.claude/worktrees/\` (git worktrees),
   so several Specnaut agents can work in parallel without stepping on each other. See
   https://code.claude.com/docs/en/agent-view.
@@ -34337,7 +34337,7 @@ export const HARNESS_STATIC: Record<string, Record<string, TemplateFile>> = {
 #
 # Examples:
 #   .claude/scripts/dispatch-agent.sh code-reviewer "Review the diff in /tmp/pr.diff"
-#   .claude/scripts/dispatch-agent.sh product-owner "Open a backlog item titled X"
+#   .claude/scripts/dispatch-agent.sh architect-expert "Assess the module boundaries in src/"
 #   OUTPUT_FORMAT=json .claude/scripts/dispatch-agent.sh developer "Fix the failing test"
 set -euo pipefail
 
@@ -34350,7 +34350,7 @@ with the right tool allowlist, derived from the agent's frontmatter.
 
 Examples:
   dispatch-agent.sh code-reviewer "Review /tmp/pr.diff"
-  dispatch-agent.sh product-owner "Open a backlog item titled Foo"
+  dispatch-agent.sh architect-expert "Assess the module boundaries in src/"
 USAGE
   exit 2
 fi

@@ -21,9 +21,9 @@ harness's own documentation wins wherever it says something newer.
 - **Multi-session dispatch (`claude agents`)** — opens a terminal UI that lists every background
   Claude session, dispatches new ones, and lets you peek / reply / attach without losing context.
   Specnaut's scaffolded subagents in `.claude/agents/` appear in the dispatch picker automatically —
-  start one with the agent name as the first word, e.g. `developer fix the lint errors in src/cli/`,
-  `@code-reviewer review the last commit`, or `@product-owner groom the backlog`. Skills are
-  dispatchable too: `/task plan "<feature>"` launches a session running the full
+  start one with the agent name as the first word, e.g. `developer fix the lint errors in src/cli/`
+  or `@code-reviewer review the last commit`. Skills are dispatchable too: `/task groom` grooms the
+  backlog, and `/task plan "<feature>"` launches a session running the full
   plan-implement-review chain. File edits are isolated under `.claude/worktrees/` (git worktrees),
   so several Specnaut agents can work in parallel without stepping on each other. See
   https://code.claude.com/docs/en/agent-view.

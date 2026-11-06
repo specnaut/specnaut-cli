@@ -24,7 +24,7 @@
 #
 # Examples:
 #   .claude/scripts/dispatch-agent.sh code-reviewer "Review the diff in /tmp/pr.diff"
-#   .claude/scripts/dispatch-agent.sh product-owner "Open a backlog item titled X"
+#   .claude/scripts/dispatch-agent.sh architect-expert "Assess the module boundaries in src/"
 #   OUTPUT_FORMAT=json .claude/scripts/dispatch-agent.sh developer "Fix the failing test"
 set -euo pipefail
 
@@ -37,7 +37,7 @@ with the right tool allowlist, derived from the agent's frontmatter.
 
 Examples:
   dispatch-agent.sh code-reviewer "Review /tmp/pr.diff"
-  dispatch-agent.sh product-owner "Open a backlog item titled Foo"
+  dispatch-agent.sh architect-expert "Assess the module boundaries in src/"
 USAGE
   exit 2
 fi
