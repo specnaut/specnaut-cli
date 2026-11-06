@@ -10,7 +10,9 @@ $ARGUMENTS
 ## Outline
 
 1. Fix the range: `base=$(bash .specnaut/scripts/bash/git-read.sh base main)`; the files under
-   review are `bash .specnaut/scripts/bash/git-read.sh names "$base" HEAD`.
+   review are `bash .specnaut/scripts/bash/git-read.sh names "$base" HEAD`. Then run the scope
+   script once, `bash .specnaut/scripts/audit/collect-audit-scope.sh --range "$base..HEAD"`:
+   Phase 0 and Seat selection both read its CATEGORY SIGNALS.
 2. Measure (Phase 0), then fan the review seats out from this session (Phase 1) and aggregate
    their reports per `phases/review-seats.md`.
 3. Detect the project's toolchain and run its quality gates.
@@ -31,8 +33,8 @@ become one verdict, live there.
 
 ### Seat selection
 
-Run `bash .specnaut/scripts/audit/collect-audit-scope.sh --range "$base..HEAD"` and read its
-CATEGORY SIGNALS. The script decides; this table only names what each signal selects.
+Read the CATEGORY SIGNALS of the scope block step 1 printed. The script decides; this table only
+names what each signal selects.
 
 | Seat                   | Runs when                                                                 |
 | :--------------------- | :------------------------------------------------------------------------ |

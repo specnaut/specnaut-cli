@@ -1002,7 +1002,9 @@ and an older cache reused: do not review against an empty or stale spec.
 
 <!-- END: spec-backend=cloud -->
 1. Fix the range: \`base=\$(bash .specnaut/scripts/bash/git-read.sh base main)\`; the files under
-   review are \`bash .specnaut/scripts/bash/git-read.sh names "\$base" HEAD\`.
+   review are \`bash .specnaut/scripts/bash/git-read.sh names "\$base" HEAD\`. Then run the scope
+   script once, \`bash .specnaut/scripts/audit/collect-audit-scope.sh --range "\$base..HEAD"\`:
+   Phase 0 and Seat selection both read its CATEGORY SIGNALS.
 2. Measure (Phase 0), then fan the review seats out from this session (Phase 1) and aggregate
    their reports per \`phases/review-seats.md\`.
 3. Detect the project's toolchain and run its quality gates.
@@ -1023,8 +1025,8 @@ become one verdict, live there.
 
 ### Seat selection
 
-Run \`bash .specnaut/scripts/audit/collect-audit-scope.sh --range "\$base..HEAD"\` and read its
-CATEGORY SIGNALS. The script decides; this table only names what each signal selects.
+Read the CATEGORY SIGNALS of the scope block step 1 printed. The script decides; this table only
+names what each signal selects.
 
 | Seat                   | Runs when                                                                 |
 | :--------------------- | :------------------------------------------------------------------------ |
@@ -1245,16 +1247,16 @@ every brief too: exit 1 (a forbidden import in the domain) and exit 2 (the check
 are HIGH findings; exit 4 is briefed as *skipped: <reason>*, never as clean
 (\`phases/quality-gates.md\`).
 
-When Seat selection reads \`TEST_COUNT > 0\`, run \`bash .specnaut/scripts/bash/run-gate.sh fast\` —
-the fast tier declared on the branch under review — and put its output and exit in
-\`code-reviewer\`'s brief. Do not run it when the files under review include \`.specnaut/gates.yml\` or
+When the scope block \`review.md\` step 1 printed has \`TEST_COUNT > 0\`, run
+\`bash .specnaut/scripts/bash/run-gate.sh fast\` — the fast tier declared on the branch under
+review — and put its output and exit in \`code-reviewer\`'s brief. Do not run it when the files under review include \`.specnaut/gates.yml\` or
 anything under \`.specnaut/scripts/\`: the diff would choose what runs. Brief it as *skipped: the
 diff changes the gate*, never as a pass.
 
-When \`DEP_COUNT > 0\`, run \`mkdir -p .specnaut/logs/review\`, write the changed manifests' and
-lockfiles' patch with
-\`bash .specnaut/scripts/bash/git-read.sh patch "\$base" HEAD <each one> > .specnaut/logs/review/manifests.diff\`,
-and give \`dependency-expert\` that path.
+When it has \`DEP_COUNT > 0\`, run
+\`bash .specnaut/scripts/bash/git-read.sh manifests "\$base" HEAD .specnaut/logs/review/manifests.diff\`
+and give \`dependency-expert\` that path. The script picks the manifests and lockfiles itself, so
+no file name from the repository enters the command.
 
 ### Audit — before the dispatch
 
