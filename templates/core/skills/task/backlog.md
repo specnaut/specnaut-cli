@@ -25,7 +25,7 @@ section is their one home. The main session runs no writing script itself; the r
 and `view.sh` inspect state.
 
 1. **Read.** `bash .specnaut/scripts/backlog/read-items.sh <verb> [--id <n>] [<n>... | --status
-   <column>]`. `<verb>` is one `scope_for` lists in `_backlog_plan.sh` (`add`, `edit`, `estimate`,
+   <column>]`. `<verb>` is one `scope_for` lists in `_backlog_scope.sh` (`add`, `edit`, `estimate`,
    `close`, `groom`, `tech-debt`, `next`, `status`, `brief`); `--id` is the item it acts on (for
    `add`, the parent the user named); for `close <id>`, pass the children's numbers too. A
    column's numbers are `list.sh --numbers <column>`. Keep only the `ITEMS_FILE:` path, and never

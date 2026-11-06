@@ -33,7 +33,7 @@
 #
 # Usage: read-items.sh <verb> [--id <n>] [<n>... | --status <column>]
 #   <verb>      the work the items are read for, one `scope_for` lists in
-#               `_backlog_plan.sh` (`groom`, `edit`, ...); recorded in the header
+#               `_backlog_scope.sh` (`groom`, `edit`, ...); recorded in the header
 #   --id <n>    the item the verb acts on; read first, recorded in the header
 #   --status    every item in that column, as `list.sh --numbers` lists them
 # A verb that creates items (SCOPE_REFS) may read nothing: `items: none`.
@@ -72,6 +72,8 @@ done
 . "$here/../bash/common.sh"
 # shellcheck source=./_backlog_plan.sh
 . "$here/_backlog_plan.sh"
+# shellcheck source=./_backlog_scope.sh
+. "$here/_backlog_scope.sh"
 scope_for "$VERB" "$ID" || die "no plan can follow a read for: $(printf '%q' "$VERB")${ID:+ --id}"
 if [ "$BY_STATUS" = true ]; then
   [ "${#NUMS[@]}" -eq 0 ] || usage

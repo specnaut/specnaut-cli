@@ -51,6 +51,8 @@ PLAN=$1 ITEMS_FILE=$2
 # A scan that is not there would pass every text: its absence stops the run.
 # shellcheck source=./_backlog_plan.sh
 . "$here/_backlog_plan.sh" || exit 2
+# shellcheck source=./_backlog_scope.sh
+. "$here/_backlog_scope.sh" || exit 2
 # shellcheck source=../../specnaut/scripts/bash/_report_text.sh
 . "$here/../bash/_report_text.sh" || exit 2
 declare -F scan_hard >/dev/null || { echo "apply-plan.sh: the secret scan is missing" >&2; exit 2; }
