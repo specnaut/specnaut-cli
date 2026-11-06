@@ -13,6 +13,7 @@
 
 import { assert, assertEquals } from "@std/assert";
 import { fromFileUrl, join } from "@std/path";
+import { toolEntries } from "../../src/domain/tool_grant.ts";
 
 const AGENTS = fromFileUrl(new URL("../../templates/core/agents/", import.meta.url));
 
@@ -65,23 +66,6 @@ function toolsLineOf(md: string): string | null {
     if (m) return m[1];
   }
   return null;
-}
-
-/** The tools a value names, split at depth 0, specifiers kept. */
-function entriesOf(tools: string): string[] {
-  const out: string[] = [];
-  let depth = 0;
-  let current = "";
-  for (const ch of tools) {
-    if (ch === "(") depth++;
-    else if (ch === ")") depth--;
-    if (ch === "," && depth === 0) {
-      out.push(current.trim());
-      current = "";
-    } else current += ch;
-  }
-  out.push(current.trim());
-  return out.filter((e) => e.length > 0);
 }
 
 Deno.test("agent tools: the pinned table covers every seat on disk", async () => {
@@ -137,7 +121,7 @@ Deno.test("agent tools: no seat carries a specifier as if it narrowed a tool", a
   for (const seat of await seatNames()) {
     const tools = toolsLineOf(await Deno.readTextFile(join(AGENTS, `${seat}.md`))) ?? "";
     const allowed = DOCUMENTING_SPECIFIERS.get(seat) ?? [];
-    for (const entry of entriesOf(tools)) {
+    for (const entry of toolEntries(tools)) {
       if (entry.includes("(") && !allowed.includes(entry)) found.push(`${seat}: ${entry}`);
     }
   }
@@ -163,8 +147,7 @@ Deno.test("agent tools: every Agent grant names its seats", async () => {
     const tools = toolsLineOf(md);
     assert(tools !== null, `${seat} has no tools: line`);
     // `Agent` as a whole entry, rather than `Agent(...)`.
-    const entries = tools!.split(",").map((t) => t.trim());
-    if (entries.includes("Agent")) bare.push(seat);
+    if (toolEntries(tools!).includes("Agent")) bare.push(seat);
   }
   assertEquals(bare, [], "seats granting an unscoped Agent — name the seats they may spawn");
 });

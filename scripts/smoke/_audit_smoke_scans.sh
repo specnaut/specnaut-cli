@@ -8,6 +8,17 @@ echo
 echo "## Stale-assertion scan"
 echo
 
+# manifest_source_exists <suffix> - the manifest installs a file at <suffix> from a
+# source that exists. For a file installed in a folder its source does not mirror,
+# as the git library is beside collect-audit-scope.sh. One awk, no pipe to break.
+manifest_source_exists() {
+  local src
+  src="$(awk -v s="\"suffix\": \"$1\"," 'index($0, s) { getline
+    if (match($0, /"source": "[^"]*"/)) { print substr($0, RSTART + 11, RLENGTH - 12); exit } }' \
+    "$SRC_ROOT/templates/manifest.json")"
+  [ -n "$src" ] && [ -e "$SRC_ROOT/templates/$src" ]
+}
+
 # Map each runtime path to its candidate source paths under templates/.
 # If NO candidate exists, the smoke is asserting against a moved/deleted file.
 # Returns 0 (path resolves) or 1 (stale).
@@ -22,17 +33,6 @@ echo
 # caller reads that as "does not resolve" — a stale-assertion finding
 # manufactured out of a path that resolves. Same hazard as audit.sh's coverage
 # grep; see the commit body for the witness.
-# manifest_source_exists <suffix> - the manifest installs a file at <suffix> from a
-# source that exists. For a file installed in a folder its source does not mirror,
-# as the git library is beside collect-audit-scope.sh. One awk, no pipe to break.
-manifest_source_exists() {
-  local src
-  src="$(awk -v s="\"suffix\": \"$1\"," 'index($0, s) { getline
-    if (match($0, /"source": "[^"]*"/)) { print substr($0, RSTART + 11, RLENGTH - 12); exit } }' \
-    "$SRC_ROOT/templates/manifest.json")"
-  [ -n "$src" ] && [ -e "$SRC_ROOT/templates/$src" ]
-}
-
 resolves() {
   local rt="$1" hits
   # Strip trailing slash — directory references in `[ -d ... ]` checks are

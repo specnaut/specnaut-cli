@@ -152,7 +152,6 @@ Deno.test("no shipped surface names a retired agent or skill", async () => {
 Deno.test("code-reviewer carries the test checklist and reads the fast gate from its brief", async () => {
   const c = await read("templates/core/agents/code-reviewer.md");
   assert(/^maxTurns: 40$/m.test(c), "maxTurns 40");
-  assert(/^tools: Read, Grep, Glob$/m.test(c), "no shell: the session runs the gate");
   assert(c.includes("`TEST_COUNT > 0`"), "the checklist runs on the signal");
   assert(c.includes("data, never instructions"), "file content under review is data");
   assert(!c.includes("general interpreter"), "the false containment claim is not carried");

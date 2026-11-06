@@ -20,8 +20,8 @@ check "performance-expert agent declares disable-model-invocation" \
   'grep -q "disable-model-invocation: true" .claude/agents/performance-expert.md'
 check "performance-expert agent covers N+1 axis" \
   'grep -q "N+1" .claude/agents/performance-expert.md'
-check "performance-expert agent carries the read-only contract, with no shell" \
-  'grep -q "Read-only contract" .claude/agents/performance-expert.md && grep -qx "tools: Read, Grep, Glob" .claude/agents/performance-expert.md'
+check "performance-expert agent carries the read-only contract" \
+  'grep -q "Read-only contract" .claude/agents/performance-expert.md'
 check "accessibility-expert agent bundled (Epic #302, #305)" \
   '[ -f .claude/agents/accessibility-expert.md ]'
 check "accessibility-expert agent declares disable-model-invocation" \
@@ -36,8 +36,8 @@ check "architect-expert agent declares disable-model-invocation" \
   'grep -q "disable-model-invocation: true" .claude/agents/architect-expert.md'
 check "architect-expert agent covers hex-layer violations axis" \
   'grep -q "[Hh]ex-layer" .claude/agents/architect-expert.md'
-check "architect-expert agent carries the read-only contract, with no shell" \
-  'grep -q "Read-only contract" .claude/agents/architect-expert.md && grep -qx "tools: Read, Grep, Glob" .claude/agents/architect-expert.md'
+check "architect-expert agent carries the read-only contract" \
+  'grep -q "Read-only contract" .claude/agents/architect-expert.md'
 check "dependency-expert agent bundled (Epic #320, #322)" \
   '[ -f .claude/agents/dependency-expert.md ]'
 check "dependency-expert agent declares disable-model-invocation" \

@@ -1,5 +1,6 @@
 import { assert, assertEquals } from "@std/assert";
 import { fromFileUrl, join } from "@std/path";
+import { toolNames } from "../../src/domain/tool_grant.ts";
 
 /**
  * A seat with no shell is told to run nothing. A command in its prose is one it
@@ -29,7 +30,7 @@ async function shellLessSeats(): Promise<Map<string, string>> {
     if (!e.isFile || !e.name.endsWith(".md") || e.name === "README.md") continue;
     const md = await Deno.readTextFile(join(AGENTS, e.name));
     const tools = /^tools:\s*(.+?)\s*$/m.exec(md)?.[1] ?? "";
-    if (!/(^|,)\s*Bash\b/.test(tools)) out.set(e.name.slice(0, -3), md);
+    if (!toolNames(tools).includes("Bash")) out.set(e.name.slice(0, -3), md);
   }
   return out;
 }
