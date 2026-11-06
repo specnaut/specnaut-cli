@@ -11,17 +11,14 @@ import {
 } from "./git_read_fixture.ts";
 
 /**
- * The git library keeps a read inside the one repository and the objects it
- * already holds: no submodule is entered, no missing object is fetched, and on a
- * git too old to forbid the fetch, a repository that could trigger one is refused.
- * The last case runs every form with every configured program in place.
+ * A read stays inside the one repository and the objects it holds: no submodule
+ * is entered and no missing object fetched (below git 2.44, such a repository is
+ * refused). The last case runs every form with every configured program in place.
  */
 
 /** The git on PATH knows --no-lazy-fetch (2.44 or later). */
-const LAZY_FLAG = await (async () => {
-  const v = (await plainGit(["version"], Deno.cwd())).stdout.match(/(\d+)\.(\d+)/);
-  return v !== null && (Number(v[1]) > 2 || (Number(v[1]) === 2 && Number(v[2]) >= 44));
-})();
+const VERSION = (await plainGit(["version"], Deno.cwd())).stdout.match(/(\d+)\.(\d+)/);
+const LAZY_FLAG = VERSION !== null && Number(VERSION[1]) * 1000 + Number(VERSION[2]) >= 2044;
 
 /** `dir` with a submodule `sub` holding `needle` in a file, recorded in two commits. */
 async function withSubmodule(dir: string, root: string): Promise<void> {
