@@ -6,15 +6,13 @@
 // is exit 0 and a marker holding the script's own name, written by `finish`
 // (or by audit.sh at its clean exit) through `_common.sh`.
 //
-// The seam: the real `run-all.sh` and `_common.sh`, copied byte for byte into
-// a throwaway `scripts/smoke/`. A fixture takes the name of an existing suite
-// member, so the membership list is not edited. `--no-bundle` keeps the
-// tracked bundle untouched; the one test that bundles runs a `deno` shim in a
-// throwaway tree. The bash under test is /bin/bash on macOS, the one with the
-// defect, and the PATH's bash elsewhere. A `bash` shim for it goes first on
-// PATH, because `run-all.sh` starts each member as `bash <script>`. Every
-// fixture prints its BASH_VERSINFO, so a run that picked up another bash
-// cannot pass for a run on 3.2.
+// The seam: the real `run-all.sh` and every `_*.sh` helper (`_common.sh` and what it sources),
+// copied byte for byte into a throwaway `scripts/smoke/`. A fixture takes the name of an existing
+// suite member, so the membership list is not edited. `--no-bundle` keeps the tracked bundle
+// untouched; the one test that bundles runs a `deno` shim in a throwaway tree. The bash under test
+// is /bin/bash on macOS, the one with the defect, and the PATH's bash elsewhere. A `bash` shim for
+// it goes first on PATH, because `run-all.sh` starts each member as `bash <script>`. Every fixture
+// prints its BASH_VERSINFO, so a run that picked up another bash cannot pass for a run on 3.2.
 //
 // Ignored on Windows: the defect is bash 3.2's, which no Windows runner ships,
 // and the shims rely on a POSIX `#!/bin/sh` script being runnable by name.
@@ -83,8 +81,10 @@ async function withSuite(
   try {
     const smoke = join(root, "scripts", "smoke");
     await Deno.mkdir(join(smoke, "nested"), { recursive: true });
-    for (const f of ["run-all.sh", "_common.sh"]) {
-      await Deno.copyFile(join(SMOKE, f), join(smoke, f));
+    for await (const { name } of Deno.readDir(SMOKE)) {
+      if (/^(run-all|_.*)\.sh$/.test(name)) {
+        await Deno.copyFile(join(SMOKE, name), join(smoke, name));
+      }
     }
     const files = { [MEMBER]: member, "audit.sh": audit, ...extra };
     for (const [path, content] of Object.entries(files)) {
