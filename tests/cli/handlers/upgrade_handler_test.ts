@@ -1,6 +1,6 @@
 import { assert, assertEquals } from "@std/assert";
 import { fromFileUrl, join } from "@std/path";
-import { switchBacklogBackend } from "../../../src/cli/handlers/upgrade_handler.ts";
+import { switchBacklogBackend } from "../../../src/cli/handlers/upgrade_backlog_switch.ts";
 import { parseLock } from "../../../src/domain/installed_lock.ts";
 
 const MAIN = fromFileUrl(new URL("../../../src/main.ts", import.meta.url));
