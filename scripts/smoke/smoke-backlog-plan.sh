@@ -43,13 +43,12 @@ stub() {
 
 # apply "<read-items args>" "<plan lines>" — read-items.sh, then apply-plan.sh
 # with the read's verb and id. Sets OUT (apply's stdout), RC, CALLS (apply's
-# tracker calls) and ITEMS (the items file, removed by the next apply).
+# tracker calls) and ITEMS (the items file, read into $WORK, which the EXIT trap removes).
 ITEMS=""
 apply() {
   local args read id=()
-  [ -z "$ITEMS" ] || rm -rf -- "$(dirname "$ITEMS")"
   read -r -a args <<<"$1"
-  read=$(PATH="$FR/bin:$PATH" FAKE_ROOT="$FR" \
+  read=$(PATH="$FR/bin:$PATH" FAKE_ROOT="$FR" TMPDIR="$WORK" \
     bash .specnaut/scripts/backlog/read-items.sh "${args[@]}" 2>&1) || read=""
   ITEMS=$(printf '%s\n' "$read" | sed -n 's/^ITEMS_FILE: //p')
   [ "${args[1]:-}" != --id ] || id=(--id "${args[2]}")
@@ -91,7 +90,7 @@ check "_backlog_plan.sh: a move to Done is refused, and nothing is written" \
 apply "edit --id 1" '{"op":"comment","target":2,"body":"x"}'
 check "_backlog_scope.sh: a target outside the verb's scope is refused" \
   'said 3 "REFUSED scope 1.target" "RECEIPT: none"'
-read=$(bash .specnaut/scripts/backlog/read-items.sh edit --id 1)
+read=$(TMPDIR="$WORK" bash .specnaut/scripts/backlog/read-items.sh edit --id 1)
 touch moved-since-the-read
 printf '%s\n' '{"op":"comment","target":1,"body":"x"}' >"$FR/plan.jsonl"
 RC=0; OUT=$(bash .specnaut/scripts/backlog/apply-plan.sh edit --id 1 "$FR/plan.jsonl" \
