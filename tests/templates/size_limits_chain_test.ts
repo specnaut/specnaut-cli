@@ -59,11 +59,12 @@ Deno.test("implement: the phase applies the gate, and the gate carries the table
 Deno.test("review: the phase measures base and head and briefs every seat with the table", async () => {
   const c = await read("templates/core/skills/task/phases/review.md");
   assert(c.includes("## Phase 0 — Measure"), "measurement step");
+  const seats = await read("templates/core/skills/task/phases/review-seats.md");
   assert(
-    c.includes("size-ratchet.sh --since") && c.includes("--report"),
+    seats.includes("size-ratchet.sh --since") && seats.includes("--report"),
     "one measurer, base to head",
   );
-  assert(c.includes(LIMITS), "table or defaults in the brief");
+  assert(seats.includes(LIMITS), "table or defaults in the brief");
   const r = await read("templates/core/agents/code-reviewer.md");
   assert(r.includes("`wc -l <before> → <after>`"), "code-reviewer reports the counts");
   const limits = await read("templates/core/specnaut/memory/size-limits.md");
@@ -79,7 +80,8 @@ Deno.test("review: the phase measures base and head and briefs every seat with t
 Deno.test("the ratchet is invoked through bash, and a run that did not happen is never a pass", async () => {
   // A lost executable bit (an archive, a Windows checkout) turns `./script` into exit 126,
   // which no caller would read as "clean" unless the docs say what it means.
-  const c = await read("templates/core/skills/task/phases/review.md");
+  // Review's Phase 0 lives in review-seats.md, beside the brief rules it feeds.
+  const c = await read("templates/core/skills/task/phases/review-seats.md");
   const g = await read("templates/core/skills/task/phases/quality-gates.md");
   for (const doc of [c, g]) {
     assert(doc.includes("bash .specnaut/scripts/bash/size-ratchet.sh --since"));

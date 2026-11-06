@@ -37,14 +37,17 @@ Deno.test("the fan-out cap in review.md is the Codex concurrency default, not a 
 });
 
 Deno.test("review.md measures first, with the exit semantics the coordinator carried", async () => {
+  // Phase 0 lives beside the brief rules it feeds; review.md points at it.
   const r = flat(await read(REVIEW));
-  assert(r.includes("bash .specnaut/scripts/bash/size-ratchet.sh --since"), "one measurer");
+  assert(r.includes("`phases/review-seats.md` § Review — Phase 0"), "review.md points at Phase 0");
+  const s = flat(await read(SEATS));
+  assert(s.includes("bash .specnaut/scripts/bash/size-ratchet.sh --since"), "one measurer");
   assert(
-    r.includes('never brief "no size data" as clean'),
+    s.includes('never brief "no size data" as clean'),
     "a run that did not happen is not clean",
   );
-  assert(r.includes("boundary-check.sh"), "the boundary check is part of Phase 0");
-  assert(r.includes("*skipped: <reason>*, never as clean"), "exit 4 is briefed as skipped");
+  assert(s.includes("boundary-check.sh"), "the boundary check is part of Phase 0");
+  assert(s.includes("*skipped: <reason>*, never as clean"), "exit 4 is briefed as skipped");
 });
 
 Deno.test("review.md selects seats from the scope script's signals, and dispatches them by name", async () => {

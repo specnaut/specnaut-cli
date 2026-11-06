@@ -12,6 +12,21 @@ A seat's brief carries **paths, the base and head SHAs, and script exit codes wi
 reads the files itself. A diff is the author's text: pasted into a brief it reaches every seat as
 if you had written it, and the reports come back into the session that merges and pushes.
 
+### Review — Phase 0
+
+Run `bash .specnaut/scripts/bash/size-ratchet.sh --since "$base"
+--report`: every changed file's line count at the base and at head, renames measured against
+their old path. Put its output in every seat's brief, with the path
+`.specnaut/memory/size-limits.md` (and `.specnaut/size-limits.yml` when the project has one).
+Severity for size comes from that file's table, nowhere else; exit 2 (unreadable table) is a HIGH
+finding, and any exit but 0, 1 or 2 means nothing was measured — say so in every brief;
+never brief "no size data" as clean.
+
+Then run `bash .specnaut/scripts/bash/boundary-check.sh` when it is present, and put its output in
+every brief too: exit 1 (a forbidden import in the domain) and exit 2 (the check could not run)
+are HIGH findings; exit 4 is briefed as *skipped: <reason>*, never as clean
+(`phases/quality-gates.md`).
+
 ## Which block counts
 
 Only the last `REVIEW SUMMARY` block in a seat's output counts, and only when nothing but a

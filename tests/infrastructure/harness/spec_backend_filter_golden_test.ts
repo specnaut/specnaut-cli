@@ -26,6 +26,7 @@ import { skillDocName } from "../../../src/domain/core_bundle.ts";
 // cli#727 re-captured implement's: it starts from what the branch already holds.
 // cli#729 re-captured plan's (its Re-entry paragraph, step 2's non-zero exit) and implement's
 // (a commit subject is a claim).
+// Review's golden re-captured when its Phase 0 moved into review-seats.md, leaving a pointer.
 
 function abs(rel: string): string {
   return fromFileUrl(new URL(`../../${rel}`, import.meta.url));
