@@ -22,6 +22,17 @@ echo
 # caller reads that as "does not resolve" — a stale-assertion finding
 # manufactured out of a path that resolves. Same hazard as audit.sh's coverage
 # grep; see the commit body for the witness.
+# manifest_source_exists <suffix> - the manifest installs a file at <suffix> from a
+# source that exists. For a file installed in a folder its source does not mirror,
+# as the git library is beside collect-audit-scope.sh. One awk, no pipe to break.
+manifest_source_exists() {
+  local src
+  src="$(awk -v s="\"suffix\": \"$1\"," 'index($0, s) { getline
+    if (match($0, /"source": "[^"]*"/)) { print substr($0, RSTART + 11, RLENGTH - 12); exit } }' \
+    "$SRC_ROOT/templates/manifest.json")"
+  [ -n "$src" ] && [ -e "$SRC_ROOT/templates/$src" ]
+}
+
 resolves() {
   local rt="$1" hits
   # Strip trailing slash — directory references in `[ -d ... ]` checks are
@@ -52,7 +63,8 @@ resolves() {
       [ -n "$hits" ]
       ;;
     .specnaut/scripts/audit/*)
-      [ -e "$SRC_ROOT/templates/core/skills/task/scripts/${rt#.specnaut/scripts/audit/}" ]
+      [ -e "$SRC_ROOT/templates/core/skills/task/scripts/${rt#.specnaut/scripts/audit/}" ] ||
+        manifest_source_exists "${rt#.specnaut/}"
       ;;
     .specnaut/scripts/bash/*|.specnaut/scripts/powershell/*)
       local n="${rt#.specnaut/scripts/}"
